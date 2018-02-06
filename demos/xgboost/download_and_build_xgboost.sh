@@ -9,11 +9,14 @@ apt-get update
 apt-get install -y python3-pip python3-setuptools
 pip3 install kubernetes
 
+#install the cmake
+./install_cmake.sh
+
 # Download and build XGBoost
 rm -rf xgboost_src && mkdir xgboost_src
 pushd xgboost_src
 git clone https://github.com/dmlc/xgboost .
-git checkout 6d5b34d82486cd1d0480c548f5d1953834659bd6
+git checkout 9e955fb9b06cac32a06c92c4715f749d9d87e932
 git submodule init
 git submodule update
 git apply ../patch/xgboost-01.diff
