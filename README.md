@@ -6,7 +6,7 @@ Rusgx is a single-address-space library OS for Intel SGX. It is written in Rust 
 
 ### Prerequisite
 
-Rusgx depends on [Rust SGX SDK](https://github.com/baidu/rust-sgx-sdk/). So, make sure Rust SGX SDk can be built properly. We have tested with Rust SGX SDK 1.0, Rust 1.26.0 and Intel SGX SDK 2.1 on Ubuntu 16.04.
+Rusgx depends on [Rust SGX SDK](https://github.com/baidu/rust-sgx-sdk/). So, make sure Rust SGX SDk can be built properly. We have tested with Rust SGX SDK 1.1, Rust nightly-2018-08-25 and Intel SGX SDK 2.2 on Ubuntu 16.04.
 
 ### Compile
 

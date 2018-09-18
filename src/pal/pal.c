@@ -187,6 +187,11 @@ int initialize_enclave(const char* enclave_path)
     return 0;
 }
 
+// Debug
+void ocall_print_string(const char* msg) {
+    printf("%s", msg);
+}
+
 /* Application entry */
 int SGX_CDECL main(int argc, char *argv[])
 {
@@ -197,11 +202,12 @@ int SGX_CDECL main(int argc, char *argv[])
 
     if (argc != 2) {
         printf("ERROR: The expected number of arguments is 1, but given %d\n\n", argc - 1);
-        printf("Usage: pal <path_to_enclave>\n");
+        printf("Usage: pal <path_to_executable>\n");
         return -1;
     }
-    const char* enclave_path = argv[1];
+    const char* executable_path = argv[1];
 
+    const char* enclave_path = "librusgx.signed.so";
     /* Initialize the enclave */
     if(initialize_enclave(enclave_path) < 0){
         printf("Enter a character before exit ...\n");
@@ -209,8 +215,13 @@ int SGX_CDECL main(int argc, char *argv[])
         return -1;
     }
 
-    sgx_ret = libos_boot(global_eid, &exitcode);
+    sgx_ret = libos_boot(global_eid, &exitcode, executable_path);
+    if(sgx_ret != SGX_SUCCESS) {
+        print_error_message(sgx_ret);
+        return -1;
+    }
 
+    sgx_ret = libos_run(global_eid, &exitcode);
     if(sgx_ret != SGX_SUCCESS) {
         print_error_message(sgx_ret);
         return -1;

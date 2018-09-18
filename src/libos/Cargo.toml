@@ -1,14 +1,19 @@
 [package]
 name = "Rusgx"
-version = "1.0.0"
+version = "0.0.1"
 
 [lib]
-name = "rusgx"
+name = "libos"
 crate-type = ["staticlib"]
+
+[dependencies]
+xmas-elf = "0.6"
+lazy_static = { version = "1.1.0", features = ["spin_no_std"] } # Implies nightly
 
 [features]
 default = []
 
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
 sgx_types = { path = "../../deps/rust-sgx-sdk/sgx_types" }
-sgx_tstd = { path = "../../deps/rust-sgx-sdk/sgx_tstd" }
+sgx_tstd = { path = "../../deps/rust-sgx-sdk/sgx_tstd", features = ["backtrace"] }
+sgx_trts = { path = "../../deps/rust-sgx-sdk/sgx_trts" }

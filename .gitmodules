@@ -1,4 +1,7 @@
 [submodule "deps/rust-sgx-sdk"]
 	path = deps/rust-sgx-sdk
 	url = https://github.com/baidu/rust-sgx-sdk
-	branch = rust-stable
+	branch = master
+[submodule "deps/sgx_protect_file"]
+	path = deps/sgx_protect_file
+	url = https://github.com/tatetian/sgx_protect_file

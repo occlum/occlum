@@ -69,11 +69,31 @@ endif
 #
 SGX_CFLAGS_T := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fstack-protector
 SGX_CFLAGS_T += -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/stlport -I$(SGX_SDK)/include/epid
-# Before use this linker flag, the user should define $(Other_Enclave_Libs),
-# which lists all libraries that are to be part of the enclave.
-SGX_LFLAGS_T = $(SGX_COMMON_CFLAGS) -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L$(SGX_LIBRARY_PATH) $(Other_Link_Flags) \
+# Before use this linker flag, the user should define $(_Other_Enclave_Libs),
+# and $(_Other_Link_Flags)
+#
+# Linker arguments:
+# --no-undefined: Report unresolved symbols.
+# --whole-archive <libs> --no-whole-archive: Force including all object files 
+#  in the libraries <libs>. Normally, only required object files are included
+#  by the linker.
+# --start-group <libs> --end-group: Link libraries <libs>, resolve any circular 
+#  dependencies between them.
+# -Bstatic: Do not link against shared libraries.
+# -Bsymbolic: Bind references to global symbols to the definition within this 
+#  shared library.
+# -pie: Create a position independent executable
+# --defsym=<symbol>=<value>: Define a symbol with the specified value
+# --gc-sections: Enable link-time garbage collection, i.e., eliminating unused 
+#  sections. See -ffunction-sections and -fdata-section of GCC.
+#
+# GCC arguments:
+# --nostdlib: Do not use system startup files or libraries when linking. Thus, 
+#  only the libaries that are explictly specified on the command line are 
+#  linked.
+SGX_LFLAGS_T = $(SGX_COMMON_CFLAGS) -nostdlib -L$(SGX_LIBRARY_PATH) $(_Other_Link_Flags) \
 	-Wl,--whole-archive -l$(Trts_Library_Name) -Wl,--no-whole-archive \
-	-Wl,--start-group -lsgx_tstdc -lsgx_tstdcxx -l$(Crypto_Library_Name) $(Other_Enclave_Libs) -Wl,--end-group \
+	-Wl,--start-group -lsgx_tstdc -lsgx_tcxx -l$(Crypto_Library_Name) -l$(Service_Library_Name) $(_Other_Enclave_Libs) -Wl,--end-group \
 	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined \
 	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic  \
 	-Wl,--defsym,__ImageBase=0 \

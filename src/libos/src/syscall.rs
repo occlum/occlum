@@ -1,10 +1,11 @@
 use sgx_types::*;
 
+use std::collections::HashMap;
 // Use the internal syscall wrappers from sgx_tstd
-use std::libc_fs as fs;
-use std::libc_io as io;
+//use std::libc_fs as fs;
+//use std::libc_io as io;
 
-
+/*
 #[no_mangle]
 pub unsafe extern "C" fn sys_open(path: * const c_char, flags: c_int, mode: c_int) -> c_int {
     fs::open64(path, flags, mode)
@@ -19,8 +20,11 @@ pub unsafe extern "C" fn sys_close(fd: c_int) -> c_int {
 pub unsafe extern "C" fn sys_read(fd: c_int, buf: * mut c_void, size: size_t) -> ssize_t {
     io::read(fd, buf, size)
 }
+*/
 
 #[no_mangle]
-pub unsafe extern "C" fn sys_write(fd: c_int, buf: * const c_void, size: size_t) -> ssize_t {
-    io::write(fd, buf, size)
+pub extern fn rusgx_write(fd: c_int, buf: * const c_void, size: size_t) -> ssize_t {
+    println!("Hello World!");
+    size as ssize_t
 }
+

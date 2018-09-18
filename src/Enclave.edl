@@ -5,13 +5,15 @@ enclave {
     from "sgx_tstd.edl" import *;
     from "sgx_net.edl" import *;
     from "sgx_time.edl" import *;
+    from "sgx_tprotected_fs.edl" import *;
 
     trusted {
         /* define ECALLs here. */
-        public int libos_boot(void);
+        public int libos_boot([in, string] const char* executable_path);
+        public int libos_run(void);
     };
 
     untrusted {
-
+        void ocall_print_string([in, string] const char* msg);
     };
 };

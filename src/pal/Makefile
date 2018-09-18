@@ -1,4 +1,4 @@
-include ../../buildenv.mk
+include ../sgxenv.mk
 
 EDL_Gen_Files := Enclave_u.c Enclave_u.h
 
@@ -8,7 +8,7 @@ Bin := pal
 
 C_Flags := $(SGX_CFLAGS_U)
 Link_Flags := $(SGX_LFLAGS_U)
-Link_Flags += -L../../deps/rust-sgx-sdk/sgx_ustdc/ -lsgx_ustdc
+Link_Flags += -L../../deps/rust-sgx-sdk/sgx_ustdc/ -lsgx_ustdc -lsgx_uprotected_fs
 
 
 all: $(Bin)
