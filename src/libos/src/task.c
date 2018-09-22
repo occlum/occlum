@@ -35,10 +35,10 @@ int do_run_task(struct Task* task) {
 
     // From rusgx_exit
     RESET_CURRENT_TASK();
-    return task->exit_code;
+    return 0;
 }
 
-void do_exit_task(int exitcode) {
+void do_exit_task(void) {
     jmp_buf* jb = __get_current_task()->saved_state;
     longjmp(*jb, 1);
 }

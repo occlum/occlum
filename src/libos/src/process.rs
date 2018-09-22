@@ -4,6 +4,7 @@ use std::path::Path;
 use std::sgxfs::SgxFile;
 use std::io;
 use std::io::{Read};
+use std::mem;
 
 use sgx_types::*;
 
@@ -13,20 +14,44 @@ use xmas_elf::symbol_table::Entry;
 
 use {elf_helper, vma, syscall};
 use vma::Vma;
-use std::sync::atomic::AtomicU32;
-use std::sync::SgxMutex;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{SgxMutex, SgxMutexGuard};
 use std::sync::Arc;
 use std::collections::{HashMap, VecDeque};
-
-//static next_pid : AtomicU32 = AtomicU32::new(42);
+use std::thread;
+use std::cell::Cell;
 
 lazy_static! {
-    static ref process_table: SgxMutex<HashMap<u32, Arc<SgxMutex<Process>>>> = {
+    static ref PROCESS_TABLE: SgxMutex<HashMap<u32, ProcessRef>> = {
         SgxMutex::new(HashMap::new())
     };
 }
 
-pub fn spawn_process<P: AsRef<Path>>(elf_path: &P) -> Result<(), &'static str> {
+fn put_into_pid_table(pid: u32, process: ProcessRef) {
+    PROCESS_TABLE.lock().unwrap().insert(pid, process);
+}
+
+fn del_from_pid_table(pid: u32) {
+    PROCESS_TABLE.lock().unwrap().remove(&pid);
+}
+
+fn look_up_pid_table(pid: u32) -> Option<ProcessRef> {
+    PROCESS_TABLE.lock().unwrap().get(&pid).map(|pr| pr.clone())
+}
+
+
+static NEXT_PID : AtomicU32 = AtomicU32::new(1);
+
+fn alloc_pid() -> u32 {
+    NEXT_PID.fetch_add(1, Ordering::SeqCst)
+}
+
+fn free_pid(pid: u32) {
+    // TODO:
+}
+
+
+pub fn do_spawn<P: AsRef<Path>>(new_pid: &mut u32, elf_path: &P) -> Result<(), &'static str> {
     let elf_buf = open_elf(elf_path).unwrap();
     let elf_file = ElfFile::new(&elf_buf).unwrap();
     header::sanity_check(&elf_file).unwrap();
@@ -36,13 +61,12 @@ pub fn spawn_process<P: AsRef<Path>>(elf_path: &P) -> Result<(), &'static str> {
     elf_helper::print_pltrel_section(&elf_file)?;
 */
     let new_process = Process::new(&elf_file)?;
+    *new_pid = new_process.pid;
+    let new_process = Arc::new(SgxMutex::new(new_process));
     //println!("new_process: {:#x?}", &new_process);
-    let new_task = Task::from(&new_process);
 
-    process_table.lock().unwrap()
-        .insert(0, Arc::new(SgxMutex::new(new_process)));
-    new_task_queue.lock().unwrap()
-        .push_back(new_task);
+    enqueue_new_process(new_process.clone());
+    put_into_pid_table(*new_pid, new_process);
 
     let mut ret = 0;
     let ocall_status = unsafe { ocall_run_new_task(&mut ret) };
@@ -53,14 +77,72 @@ pub fn spawn_process<P: AsRef<Path>>(elf_path: &P) -> Result<(), &'static str> {
     Ok(())
 }
 
+thread_local! {
+    static _CURRENT_PROCESS_PTR: Cell<*const SgxMutex<Process>> =
+        Cell::new(0 as *const SgxMutex<Process>);
+}
+
+pub fn set_current(process: &ProcessRef) {
+    let process_ref_clone = process.clone();
+    let process_ptr = Arc::into_raw(process_ref_clone);
+
+    _CURRENT_PROCESS_PTR.with(|cp| {
+        cp.set(process_ptr);
+    });
+}
+
+pub fn get_current() -> &'static SgxMutex<Process> {
+    let mut process_ptr : *const SgxMutex<Process> = 0 as *const SgxMutex<Process>;
+    _CURRENT_PROCESS_PTR.with(|cp| {
+        process_ptr = cp.get();
+    });
+    unsafe {
+        mem::transmute::<*const SgxMutex<Process>, &'static SgxMutex<Process>>(process_ptr)
+    }
+}
+
+pub fn do_getpid() -> u32 {
+    let current_ref = get_current();
+    let current_process = current_ref.lock().unwrap();
+    current_process.pid
+}
+
+pub fn do_exit(exit_code: i32) {
+    {
+        let current_ref = get_current();
+        let mut current_process = current_ref.lock().unwrap();
+        current_process.exit_code = exit_code;
+        current_process.status = Status::ZOMBIE;
+    }
+}
+
+pub fn do_wait4(child_pid: u32, exit_code: &mut i32) -> Result<(), &'static str> {
+    let child_process = look_up_pid_table(child_pid).ok_or("Not found")?;
+    loop {
+        let guard = child_process.lock().unwrap();
+        if guard.status == Status::ZOMBIE {
+            *exit_code = guard.exit_code;
+            break;
+        }
+        drop(guard);
+    }
+    Ok(())
+}
 
 pub fn run_task() -> Result<(), &'static str> {
-    if let Some(new_task) = pop_new_task() {
-        println!("Run task: {:#x?}", &new_task);
-        println!("do_run_task() begin: {}", do_run_task as *const () as usize);
-        unsafe { do_run_task(&new_task as *const Task); }
-        println!("do_run_task() end");
-    }
+    let new_process : ProcessRef = dequeue_new_process().ok_or("No new process to run")?;
+    set_current(&new_process);
+
+    let new_task;
+    {
+        let guard = new_process.lock().unwrap();
+        let process : &Process = &guard;
+        println!("Run process: {:#x?}", process);
+        new_task = &process.task as *const Task
+    };
+
+    unsafe { do_run_task(new_task as *const Task); }
+
     Ok(())
 }
 
@@ -77,12 +159,17 @@ fn open_elf<P: AsRef<Path>>(path: &P) -> io::Result<Vec<u8>> {
 #[derive(Clone, Debug, Default)]
 #[repr(C)]
 pub struct Process {
+    pub task: Task,
+    pub status: Status,
+    pub pid: u32,
+    pub exit_code: i32,
     pub code_vma: Vma,
     pub data_vma: Vma,
     pub stack_vma: Vma,
     pub program_base_addr: usize,
     pub program_entry_addr: usize,
 }
+pub type ProcessRef = Arc<SgxMutex<Process>>;
 
 impl Process {
     pub fn new(elf_file: &ElfFile) -> Result<Process, &'static str> {
@@ -90,6 +177,16 @@ impl Process {
         new_process.create_process_image(elf_file)?;
         new_process.link_syscalls(elf_file)?;
         new_process.mprotect()?;
+
+        new_process.task = Task {
+            user_stack_addr: new_process.stack_vma.mem_end - 16,
+            user_entry_addr: new_process.program_entry_addr,
+            fs_base_addr: 0,
+            .. Default::default()
+        };
+
+        new_process.pid = alloc_pid();
+
         Ok(new_process)
     }
 
@@ -152,12 +249,17 @@ impl Process {
     }
 }
 
+impl Drop for Process {
+    fn drop(&mut self) {
+        del_from_pid_table(self.pid);
+        free_pid(self.pid);
+    }
+}
 
+/// Note: this definition must be in sync with task.h
 #[derive(Clone, Debug, Default)]
 #[repr(C)]
 pub struct Task {
-    pub pid: u32,
-    pub exit_code: u32,
     pub syscall_stack_addr: usize,
     pub user_stack_addr: usize,
     pub user_entry_addr: usize,
@@ -165,31 +267,40 @@ pub struct Task {
     pub saved_state: usize, // struct jmpbuf*
 }
 
-impl<'a> From<&'a Process> for Task {
-    fn from(process: &'a Process) -> Task {
-        Task {
-            pid: 1234,
-            user_stack_addr: process.stack_vma.mem_end - 16,
-            user_entry_addr: process.program_entry_addr,
-            fs_base_addr: 0,
-            .. Default::default()
-        }
-    }
-}
-
 lazy_static! {
-    static ref new_task_queue: Arc<SgxMutex<VecDeque<Task>>> = {
-        Arc::new(SgxMutex::new(VecDeque::new()))
+    static ref new_process_queue: SgxMutex<VecDeque<ProcessRef>> = {
+        SgxMutex::new(VecDeque::new())
     };
 }
 
-fn pop_new_task() -> Option<Task> {
-    new_task_queue.lock().unwrap().pop_front()
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Status {
+    RUNNING,
+    INTERRUPTIBLE,
+    ZOMBIE,
+    STOPPED,
+}
+
+impl Default for Status {
+    fn default() -> Status {
+        Status::RUNNING
+    }
+}
+
+
+fn dequeue_new_process() -> Option<ProcessRef> {
+    new_process_queue.lock().unwrap().pop_front()
+}
+
+fn enqueue_new_process(new_process: ProcessRef) {
+    new_process_queue.lock().unwrap().push_back(new_process)
 }
 
 
 extern {
     fn ocall_run_new_task(ret: *mut i32) -> sgx_status_t;
     fn do_run_task(task: *const Task) -> i32;
+    fn do_exit_task();
     fn rusgx_syscall(num: i32, arg0: u64, arg1: u64, arg2: u64, arg3: u64, arg4: u64) -> i64;
 }

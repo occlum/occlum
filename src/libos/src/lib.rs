@@ -31,9 +31,6 @@ mod elf_helper;
 mod mm;
 mod errno;
 
-use process::spawn_process;
-use process::run_task;
-
 /// Export system calls
 pub use syscall::*;
 
@@ -47,7 +44,8 @@ pub extern "C" fn libos_boot(path_buf: *const i8) -> i32 {
     let _ = backtrace::enable_backtrace("librusgx.signed.so", PrintFormat::Short);
     panic::catch_unwind(||{
         backtrace::__rust_begin_short_backtrace(||{
-            let _ = spawn_process(&path_str);
+            let mut pid = 0;
+            let _ = process::do_spawn(&mut pid, &path_str);
         })
     }).ok();
 
@@ -59,7 +57,7 @@ pub extern "C" fn libos_run() -> i32 {
     let _ = backtrace::enable_backtrace("librusgx.signed.so", PrintFormat::Short);
     panic::catch_unwind(||{
         backtrace::__rust_begin_short_backtrace(||{
-            let _ = run_task();
+            let _ = process::run_task();
         })
     }).ok();
 

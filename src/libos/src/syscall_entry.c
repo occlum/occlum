@@ -9,8 +9,9 @@ long dispatch_syscall(int num, long arg0, long arg1, long arg2, long arg3, long 
 
     switch (num) {
     case SYS_exit: {
-        DECL_SYSCALL_ARG(int, exit_code, arg0);
-        do_exit_task(exit_code);
+        DECL_SYSCALL_ARG(int, status, arg0);
+        rusgx_exit(status);
+        do_exit_task();
         break;
     }
     case SYS_write: {
@@ -34,6 +35,10 @@ long dispatch_syscall(int num, long arg0, long arg1, long arg2, long arg3, long 
         DECL_SYSCALL_ARG(int, options, arg2);
         //DECL_SYSCALL_ARG(struct rusage*, rusage, arg3);
         ret = rusgx_wait4(child_pid, status, options/*, rusage*/);
+        break;
+    }
+    case SYS_getpid: {
+        ret = rusgx_getpid();
         break;
     }
     default:

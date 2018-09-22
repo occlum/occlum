@@ -13,11 +13,11 @@ void _start(void) {
 
     ret = __rusgx_spawn(&pid, "hello_world_raw/bin.encrypted", NULL, NULL);
     if (ret < 0) { __rusgx_exit(0); }
-/*
+
     int status;
     ret = __rusgx_wait4(pid, &status, 0);
     if (ret < 0) { __rusgx_exit(0); }
-*/
+
     print_ok();
 
     __rusgx_exit(0);

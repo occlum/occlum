@@ -21,12 +21,15 @@
  */
 
 #define SYS_write   1
+#define SYS_getpid  39
 #define SYS_exit    60
 #define SYS_wait4   61
 #define SYS_spawn   360
 
 long rusgx_syscall(int num, long arg0, long arg1, long arg2, long arg3, long arg4);
 
+#define RUSGX_SYSCALL0(num) \
+    rusgx_syscall((num), (long)0, (long)0, (long)0, (long)0, (long)0)
 #define RUSGX_SYSCALL1(num, arg0) \
     rusgx_syscall((num), (long)(arg0), (long)0, (long)0, (long)0, (long)0)
 #define RUSGX_SYSCALL2(num, arg0, arg1) \
@@ -40,6 +43,10 @@ long rusgx_syscall(int num, long arg0, long arg1, long arg2, long arg3, long arg
 
 static inline ssize_t __rusgx_write(int fd, const void* buf, unsigned long size) {
     return (ssize_t) RUSGX_SYSCALL3(SYS_write, fd, buf, size);
+}
+
+static inline unsigned int __rusgx_getpid(void) {
+    return (unsigned int) RUSGX_SYSCALL0(SYS_getpid);
 }
 
 static inline void __rusgx_exit(int status) {

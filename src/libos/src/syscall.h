@@ -13,6 +13,8 @@ extern int rusgx_spawn(int* child_pid, const char* path,
                         const char** argv,
                         const char** envp);
 extern int rusgx_wait4(int child_pid, int* status, int options/*, struct rusage* rusage*/);
+extern unsigned int rusgx_getpid(void);
+extern void rusgx_exit(int status);
 
 #ifdef __cplusplus
 }

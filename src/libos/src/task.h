@@ -13,8 +13,6 @@ extern "C" {
 
 // See Struct Task in process.rs
 struct Task {
-    uint32_t            pid;
-    int32_t             exit_code;
     uint64_t            syscall_stack_addr;
     uint64_t            user_stack_addr;
     uint64_t            user_entry_addr;
@@ -26,7 +24,7 @@ void __set_current_task(struct Task* task);
 struct Task* __get_current_task(void);
 
 int do_run_task(struct Task* task);
-void do_exit_task(int exitcode);
+void do_exit_task(void);
 
 #ifdef __cplusplus
 }
@@ -39,7 +37,7 @@ void do_exit_task(int exitcode);
 /* Override the field for stack guard */
 #define TD_TASK_OFFSET              TD_STACKGUARD_OFFSET
 
-#define TASK_SYSCALL_STACK_OFFSET   (8 * 1)
+#define TASK_SYSCALL_STACK_OFFSET   (8 * 0)
 
 #endif /* __ASSEMBLY__ */
 

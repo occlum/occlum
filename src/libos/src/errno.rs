@@ -1,7 +1,7 @@
 use std;
 use std::fmt;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum Errno {
     OK = 0,
     EPERM = 1,
