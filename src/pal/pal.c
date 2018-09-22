@@ -4,12 +4,13 @@
 
 #include <unistd.h>
 #include <pwd.h>
+
 #define MAX_PATH FILENAME_MAX
 
 #include "sgx_urts.h"
 #include "pal.h"
+#include "task.h"
 #include "Enclave_u.h"
-
 
 sgx_enclave_id_t global_eid = 0;
 
@@ -192,11 +193,17 @@ void ocall_print_string(const char* msg) {
     printf("%s", msg);
 }
 
+int ocall_run_new_task(void) {
+    int ret = run_new_task(global_eid);
+    return ret;
+}
+
+
 /* Application entry */
 int SGX_CDECL main(int argc, char *argv[])
 {
     sgx_status_t sgx_ret = SGX_SUCCESS;
-    int exitcode = 0;
+    int status = 0;
     uint32_t sealed_log_size = 1024;
     uint8_t sealed_log[1024] = {0};
 
@@ -215,25 +222,16 @@ int SGX_CDECL main(int argc, char *argv[])
         return -1;
     }
 
-    sgx_ret = libos_boot(global_eid, &exitcode, executable_path);
+    sgx_ret = libos_boot(global_eid, &status, executable_path);
     if(sgx_ret != SGX_SUCCESS) {
         print_error_message(sgx_ret);
         return -1;
     }
 
-    sgx_ret = libos_run(global_eid, &exitcode);
-    if(sgx_ret != SGX_SUCCESS) {
-        print_error_message(sgx_ret);
-        return -1;
-    }
-
-    if(exitcode) {
-        printf("Program exits with error code %d...\n", exitcode);
-        return -1;
-    }
+    status = wait_all_tasks();
 
     /* Destroy the enclave */
     sgx_destroy_enclave(global_eid);
 
-    return 0;
+    return status;
 }

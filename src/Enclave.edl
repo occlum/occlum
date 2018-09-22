@@ -15,5 +15,6 @@ enclave {
 
     untrusted {
         void ocall_print_string([in, string] const char* msg);
+        int ocall_run_new_task(void);
     };
 };

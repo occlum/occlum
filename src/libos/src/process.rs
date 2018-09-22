@@ -36,7 +36,7 @@ pub fn spawn_process<P: AsRef<Path>>(elf_path: &P) -> Result<(), &'static str> {
     elf_helper::print_pltrel_section(&elf_file)?;
 */
     let new_process = Process::new(&elf_file)?;
-    println!("new_process: {:#x?}", &new_process);
+    //println!("new_process: {:#x?}", &new_process);
     let new_task = Task::from(&new_process);
 
     process_table.lock().unwrap()
@@ -44,11 +44,18 @@ pub fn spawn_process<P: AsRef<Path>>(elf_path: &P) -> Result<(), &'static str> {
     new_task_queue.lock().unwrap()
         .push_back(new_task);
 
+    let mut ret = 0;
+    let ocall_status = unsafe { ocall_run_new_task(&mut ret) };
+    if ocall_status != sgx_status_t::SGX_SUCCESS || ret != 0 {
+        return Err("ocall_run_new_task failed");
+    }
+
     Ok(())
 }
 
+
 pub fn run_task() -> Result<(), &'static str> {
-    if let Some(new_task) = new_task_queue.lock().unwrap().pop_front() {
+    if let Some(new_task) = pop_new_task() {
         println!("Run task: {:#x?}", &new_task);
         println!("do_run_task() begin: {}", do_run_task as *const () as usize);
         unsafe { do_run_task(&new_task as *const Task); }
@@ -176,7 +183,13 @@ lazy_static! {
     };
 }
 
+fn pop_new_task() -> Option<Task> {
+    new_task_queue.lock().unwrap().pop_front()
+}
+
+
 extern {
+    fn ocall_run_new_task(ret: *mut i32) -> sgx_status_t;
     fn do_run_task(task: *const Task) -> i32;
     fn rusgx_syscall(num: i32, arg0: u64, arg1: u64, arg2: u64, arg3: u64, arg4: u64) -> i64;
 }

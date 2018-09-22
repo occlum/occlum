@@ -20,17 +20,39 @@
  *  host syscalls provided by the default implementation of this library.
  */
 
-#define SYS_exit    60
 #define SYS_write   1
+#define SYS_exit    60
+#define SYS_wait4   61
+#define SYS_spawn   360
 
 long rusgx_syscall(int num, long arg0, long arg1, long arg2, long arg3, long arg4);
 
+#define RUSGX_SYSCALL1(num, arg0) \
+    rusgx_syscall((num), (long)(arg0), (long)0, (long)0, (long)0, (long)0)
+#define RUSGX_SYSCALL2(num, arg0, arg1) \
+    rusgx_syscall((num), (long)(arg0), (long)(arg1), (long)0, (long)0, (long)0)
+#define RUSGX_SYSCALL3(num, arg0, arg1, arg2) \
+    rusgx_syscall((num), (long)(arg0), (long)(arg1), (long)(arg2), (long)0, (long)0)
+#define RUSGX_SYSCALL4(num, arg0, arg1, arg2, arg3) \
+    rusgx_syscall((num), (long)(arg0), (long)(arg1), (long)(arg2), (long)(arg3), (long)0)
+#define RUSGX_SYSCALL5(num, arg0, arg1, arg2, arg3, arg4) \
+    rusgx_syscall((num), (long)(arg0), (long)(arg1), (long)(arg2), (long)(arg3), (long)(arg4))
+
 static inline ssize_t __rusgx_write(int fd, const void* buf, unsigned long size) {
-    return (ssize_t) rusgx_syscall(SYS_write, (long)fd, (long)buf, (long)size, (long)0, (long)0);
+    return (ssize_t) RUSGX_SYSCALL3(SYS_write, fd, buf, size);
 }
 
 static inline void __rusgx_exit(int status) {
-    rusgx_syscall(SYS_exit, (long)status, (long)0, (long)0, (long)0, (long)0);
+    RUSGX_SYSCALL1(SYS_exit, status);
+}
+
+static inline int __rusgx_spawn(int* child_pid, const char* path,
+                        const char** argv, const char** envp) {
+    return (int) RUSGX_SYSCALL4(SYS_spawn, child_pid, path, argv, envp);
+}
+
+static inline int __rusgx_wait4(int child_pid, int* status, int options/*, struct rusage* rusage*/) {
+    return (int) RUSGX_SYSCALL3(SYS_wait4, child_pid, status, options);
 }
 
 #endif /* __RUSGX_STUB__ */
