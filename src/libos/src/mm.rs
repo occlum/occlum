@@ -27,9 +27,9 @@ impl MemObj {
         unsafe { memset(mem_ptr, 0 as c_int, mem_size as size_t) };
 
         Ok(MemObj {
-            mem_ptr: mem_ptr,
-            mem_size: mem_size,
-            mem_align: mem_align,
+            mem_ptr,
+            mem_size,
+            mem_align,
         })
     }
 

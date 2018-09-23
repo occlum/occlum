@@ -141,7 +141,10 @@ pub fn mprotect_batch(vma_list: &[&Vma])
         let size = (vma.mem_end - vma.mem_begin) as size_t;
         let perms = vma.mem_flags.0 as uint64_t;
         let status = unsafe {
-            trts_mprotect(start, size, perms)
+            //TODO: use proper permissions
+            //TODO: reset the permissions when drop VMA
+            //trts_mprotect(start, size, perms)
+            trts_mprotect(start, size, (PERM_R | PERM_W | PERM_X) as uint64_t)
         };
         if (status != sgx_status_t::SGX_SUCCESS) {
             return Err("trts_mprotect failed");
@@ -151,7 +154,7 @@ pub fn mprotect_batch(vma_list: &[&Vma])
 }
 
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub struct Perms(pub u32);
 
 pub const PERM_R: u32 = 0x1;

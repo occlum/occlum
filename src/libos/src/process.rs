@@ -91,6 +91,17 @@ pub fn set_current(process: &ProcessRef) {
     });
 }
 
+pub fn reset_current() {
+    let mut process_ptr = 0 as *const SgxMutex<Process>;
+    _CURRENT_PROCESS_PTR.with(|cp| {
+        process_ptr = cp.get();
+        cp.set(0 as *const SgxMutex<Process>);
+    });
+
+    // Prevent memory leakage
+    unsafe { drop(Arc::from_raw(process_ptr)); }
+}
+
 pub fn get_current() -> &'static SgxMutex<Process> {
     let mut process_ptr : *const SgxMutex<Process> = 0 as *const SgxMutex<Process>;
     _CURRENT_PROCESS_PTR.with(|cp| {
@@ -124,6 +135,7 @@ pub fn do_wait4(child_pid: u32, exit_code: &mut i32) -> Result<(), &'static str>
             *exit_code = guard.exit_code;
             break;
         }
+        del_from_pid_table(guard.pid);
         drop(guard);
     }
     Ok(())
@@ -133,15 +145,25 @@ pub fn run_task() -> Result<(), &'static str> {
     let new_process : ProcessRef = dequeue_new_process().ok_or("No new process to run")?;
     set_current(&new_process);
 
+    let pid;
     let new_task;
     {
         let guard = new_process.lock().unwrap();
         let process : &Process = &guard;
-        println!("Run process: {:#x?}", process);
+        pid = process.pid;
+        //println!("Run process: {:#x?}", process);
+        println!("Run process (pid = {})", process.pid);
         new_task = &process.task as *const Task
     };
 
     unsafe { do_run_task(new_task as *const Task); }
+
+    // Init process does not have any parent, so it has to release itself
+    if pid == 1 {
+        del_from_pid_table(1);
+    }
+
+    reset_current();
 
     Ok(())
 }
@@ -152,6 +174,7 @@ fn open_elf<P: AsRef<Path>>(path: &P) -> io::Result<Vec<u8>> {
 
     let mut elf_buf = Vec::<u8>::new();
     elf_file.read_to_end(&mut elf_buf);
+    drop(elf_file);
     Ok(elf_buf)
 }
 
@@ -251,7 +274,6 @@ impl Process {
 
 impl Drop for Process {
     fn drop(&mut self) {
-        del_from_pid_table(self.pid);
         free_pid(self.pid);
     }
 }
