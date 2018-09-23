@@ -7,7 +7,7 @@ static void print_ok(void) {
     __rusgx_write(1, success_str_buf, success_str_size);
 }
 
-#define NUM_CHILDREN            100
+#define NUM_CHILDREN            10
 
 void _start(void) {
     for (int ci = 0; ci < NUM_CHILDREN; ci++) {
@@ -16,7 +16,6 @@ void _start(void) {
 
         ret = __rusgx_spawn(&pid, "hello_world_raw/bin.encrypted", NULL, NULL);
         if (ret < 0) { __rusgx_exit(0); }
-        print_ok();
 
         int status;
         ret = __rusgx_wait4(pid, &status, 0);

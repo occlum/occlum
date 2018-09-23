@@ -152,7 +152,7 @@ pub fn run_task() -> Result<(), &'static str> {
         let process : &Process = &guard;
         pid = process.pid;
         //println!("Run process: {:#x?}", process);
-        println!("Run process (pid = {})", process.pid);
+        //println!("Run process (pid = {})", process.pid);
         new_task = &process.task as *const Task
     };
 
@@ -221,7 +221,7 @@ impl Process {
 
         self.code_vma = Vma::from_program_header(&code_ph)?;
         self.data_vma = Vma::from_program_header(&data_ph)?;
-        self.stack_vma = Vma::new(8 * 1024, 4096,
+        self.stack_vma = Vma::new(32 * 1024 * 1024, 4096,
             vma::Perms(vma::PERM_R | vma::PERM_W))?;
 
         self.program_base_addr = self.alloc_mem_for_vmas(elf_file)?;

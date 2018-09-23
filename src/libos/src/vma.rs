@@ -90,8 +90,8 @@ pub fn malloc_batch(vma_list: &mut [&mut Vma], mapped_data: &[u8])
     let mut max_align = VMA_MIN_MEM_ALIGN;
     let mut total_size = 0;
     for vma in vma_list.into_iter() {
-        let mem_begin = round_up(total_size, vma.mem_align);
-        let mem_end = mem_begin + round_up(vma.mem_size, vma.mem_align);
+        let mem_begin = align_up(total_size, vma.mem_align);
+        let mem_end = mem_begin + align_up(vma.mem_size, vma.mem_align);
 
         if vma.file_is_mapped {
             if vma.mem_addr < mem_begin ||
@@ -114,8 +114,8 @@ pub fn malloc_batch(vma_list: &mut [&mut Vma], mapped_data: &[u8])
     let program_base_addr = memobj.get_addr();
     let mut mem_cur = program_base_addr;
     for vma in vma_list.into_iter() {
-        vma.mem_begin = round_up(mem_cur, vma.mem_align);
-        vma.mem_end = vma.mem_begin + round_up(vma.mem_size, vma.mem_align);
+        vma.mem_begin = align_up(mem_cur, vma.mem_align);
+        vma.mem_end = vma.mem_begin + align_up(vma.mem_size, vma.mem_align);
         vma.mem_addr += program_base_addr;
         vma.underlying = memobj.clone();
 
@@ -137,13 +137,19 @@ pub fn mprotect_batch(vma_list: &[&Vma])
     -> Result<(), &'static str>
 {
     for vma in vma_list.into_iter() {
-        let start = vma.mem_begin as size_t;
-        let size = (vma.mem_end - vma.mem_begin) as size_t;
+        // If don't need to change memory permissions
+        if vma.mem_flags == Perms(PERM_R | PERM_W) {
+            continue;
+        }
+
+        let start = align_down(vma.mem_addr, 4096);
+        let size = align_up(vma.mem_size, 4096);
         let perms = vma.mem_flags.0 as uint64_t;
         let status = unsafe {
             //TODO: use proper permissions
             //TODO: reset the permissions when drop VMA
             //trts_mprotect(start, size, perms)
+            //println!("trts_mprotect: start = {}, size = {}", start, size);
             trts_mprotect(start, size, (PERM_R | PERM_W | PERM_X) as uint64_t)
         };
         if (status != sgx_status_t::SGX_SUCCESS) {
@@ -185,8 +191,12 @@ impl<'a> From<&'a program::Flags> for Perms {
     }
 }
 
-fn round_up(addr: usize, align: usize) -> usize {
+fn align_up(addr: usize, align: usize) -> usize {
     (addr + (align - 1)) / align * align
+}
+
+fn align_down(addr: usize, align: usize) -> usize {
+    addr & !(align - 1)
 }
 
 #[link(name = "sgx_trts")]
