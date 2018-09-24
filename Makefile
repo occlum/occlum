@@ -2,10 +2,9 @@
 
 all: build_src build_test
 
-init:
+submodule:
 	git submodule init
 	git submodule update
-	#cd deps/rust-sgx-sdk && git apply ../rust-sgx-sdk.patch
 	cd deps/sgx_protect_file && make
 
 build_src:

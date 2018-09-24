@@ -135,9 +135,12 @@ pub fn do_wait4(child_pid: u32, exit_code: &mut i32) -> Result<(), &'static str>
             *exit_code = guard.exit_code;
             break;
         }
-        del_from_pid_table(guard.pid);
         drop(guard);
     }
+
+    let child_pid = child_process.lock().unwrap().pid;
+    del_from_pid_table(child_pid);
+
     Ok(())
 }
 

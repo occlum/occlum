@@ -2,6 +2,10 @@
 	path = deps/rust-sgx-sdk
 	url = https://github.com/baidu/rust-sgx-sdk
 	branch = master
+[submodule "deps/xmas-elf"]
+	path = deps/xmas-elf
+	url = http://github.com/tatetian/xmas-elf
+	branch = master
 [submodule "deps/sgx_protect_file"]
 	path = deps/sgx_protect_file
 	url = https://github.com/tatetian/sgx_protect_file
