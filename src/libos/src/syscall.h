@@ -8,6 +8,9 @@
 extern "C" {
 #endif
 
+extern int rusgx_open(const char* path, int flags, int mode);
+extern int rusgx_close(int fd);
+extern ssize_t rusgx_read(int fd, void* buf, size_t size);
 extern ssize_t rusgx_write(int fd, const void* buf, size_t size);
 extern int rusgx_spawn(int* child_pid, const char* path,
                         const char** argv,

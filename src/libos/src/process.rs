@@ -1,25 +1,19 @@
-use std;
-use std::vec::Vec;
+use prelude::*;
+use {std, elf_helper, vma, syscall, file, file_table};
+use std::{io, mem};
 use std::path::Path;
-use std::sgxfs::SgxFile;
-use std::io;
 use std::io::{Read};
-use std::mem;
-
-use sgx_types::*;
-
-use xmas_elf::{ElfFile, header, program};
-use xmas_elf::sections;
-use xmas_elf::symbol_table::Entry;
-
-use {elf_helper, vma, syscall};
-use vma::Vma;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{SgxMutex, SgxMutexGuard};
-use std::sync::Arc;
-use std::collections::{HashMap, VecDeque};
+use std::sgxfs::SgxFile;
 use std::thread;
 use std::cell::Cell;
+
+use xmas_elf::{ElfFile, header, program, sections};
+use xmas_elf::symbol_table::Entry;
+
+use vma::Vma;
+use file::{File, StdinFile, StdoutFile/*, StderrFile*/};
+use file_table::{FileTable};
 
 lazy_static! {
     static ref PROCESS_TABLE: SgxMutex<HashMap<u32, ProcessRef>> = {
@@ -51,30 +45,56 @@ fn free_pid(pid: u32) {
 }
 
 
-pub fn do_spawn<P: AsRef<Path>>(new_pid: &mut u32, elf_path: &P) -> Result<(), &'static str> {
-    let elf_buf = open_elf(elf_path).unwrap();
-    let elf_file = ElfFile::new(&elf_buf).unwrap();
-    header::sanity_check(&elf_file).unwrap();
-/*
-    elf_helper::print_program_headers(&elf_file)?;
-    elf_helper::print_sections(&elf_file)?;
-    elf_helper::print_pltrel_section(&elf_file)?;
-*/
-    let new_process = Process::new(&elf_file)?;
-    *new_pid = new_process.pid;
-    let new_process = Arc::new(SgxMutex::new(new_process));
-    //println!("new_process: {:#x?}", &new_process);
+pub fn do_spawn<P: AsRef<Path>>(elf_path: &P) -> Result<u32, Error> {
+    let elf_buf = open_elf(elf_path)
+        .map_err(|e| (e.errno, "Failed to open the ELF file"))?;
 
-    enqueue_new_process(new_process.clone());
-    put_into_pid_table(*new_pid, new_process);
+    let elf_file = {
+        let elf_file = ElfFile::new(&elf_buf)
+            .map_err(|e| (Errno::ENOEXEC, "Failed to parse the ELF file"))?;
+        header::sanity_check(&elf_file)
+            .map_err(|e| (Errno::ENOEXEC, "Failed to parse the ELF file"))?;
 
+    /*
+        elf_helper::print_program_headers(&elf_file)?;
+        elf_helper::print_sections(&elf_file)?;
+        elf_helper::print_pltrel_section(&elf_file)?;
+    */
+        elf_file
+    };
+
+    let new_process = {
+        let mut new_process = Process::new(&elf_file)
+            .map_err(|e| (Errno::EUNDEF, "Failed to create the process"))?;
+
+        {
+            let file_table = &mut new_process.file_table;
+
+            //let stdin = Arc::new(SgxMutex::new(Box::new(StdinFile::new())));
+            let stdin : Arc<Box<File>> = Arc::new(Box::new(StdinFile::new()));
+            let stdout : Arc<Box<File>> = Arc::new(Box::new(StdoutFile::new()));
+            let stderr = stdout.clone();
+            file_table.put(stdin);
+            file_table.put(stdout);
+            file_table.put(stderr);
+        };
+
+        new_process
+    };
+
+    let new_pid = new_process.pid;
+    let new_process_ref = Arc::new(SgxMutex::new(new_process));
+    enqueue_new_process(new_process_ref.clone());
+    put_into_pid_table(new_pid, new_process_ref.clone());
+
+    // FIXME: if ocall_new_task failed, then new_process will not be dropped
     let mut ret = 0;
     let ocall_status = unsafe { ocall_run_new_task(&mut ret) };
     if ocall_status != sgx_status_t::SGX_SUCCESS || ret != 0 {
-        return Err("ocall_run_new_task failed");
+        return Err((Errno::EUNDEF, "Failed to start the process").into());
     }
 
-    Ok(())
+    Ok(new_pid)
 }
 
 thread_local! {
@@ -127,12 +147,14 @@ pub fn do_exit(exit_code: i32) {
     }
 }
 
-pub fn do_wait4(child_pid: u32, exit_code: &mut i32) -> Result<(), &'static str> {
-    let child_process = look_up_pid_table(child_pid).ok_or("Not found")?;
+pub fn do_wait4(child_pid: u32) -> Result<i32, Error> {
+    let child_process = look_up_pid_table(child_pid)
+        .ok_or_else(|| (Errno::ECHILD, "Cannot find child process with the given PID"))?;
+    let mut exit_code = 0;
     loop {
         let guard = child_process.lock().unwrap();
         if guard.status == Status::ZOMBIE {
-            *exit_code = guard.exit_code;
+            exit_code = guard.exit_code;
             break;
         }
         drop(guard);
@@ -141,11 +163,12 @@ pub fn do_wait4(child_pid: u32, exit_code: &mut i32) -> Result<(), &'static str>
     let child_pid = child_process.lock().unwrap().pid;
     del_from_pid_table(child_pid);
 
-    Ok(())
+    Ok(exit_code)
 }
 
-pub fn run_task() -> Result<(), &'static str> {
-    let new_process : ProcessRef = dequeue_new_process().ok_or("No new process to run")?;
+pub fn run_task() -> Result<(), Error> {
+    let new_process : ProcessRef = dequeue_new_process()
+        .ok_or_else(|| (Errno::EAGAIN, "No new processes to run"))?;
     set_current(&new_process);
 
     let pid;
@@ -171,13 +194,14 @@ pub fn run_task() -> Result<(), &'static str> {
     Ok(())
 }
 
-fn open_elf<P: AsRef<Path>>(path: &P) -> io::Result<Vec<u8>> {
+fn open_elf<P: AsRef<Path>>(path: &P) -> Result<Vec<u8>, Error> {
     let key : sgx_key_128bit_t = [0 as uint8_t; 16];
-    let mut elf_file = SgxFile::open_ex(path, &key)?;
+    let mut elf_file = SgxFile::open_ex(path, &key)
+        .map_err(|e| (Errno::ENOENT, "Failed to open the SGX-protected file"))?;
 
     let mut elf_buf = Vec::<u8>::new();
     elf_file.read_to_end(&mut elf_buf);
-    drop(elf_file);
+
     Ok(elf_buf)
 }
 
@@ -194,11 +218,12 @@ pub struct Process {
     pub stack_vma: Vma,
     pub program_base_addr: usize,
     pub program_entry_addr: usize,
+    pub file_table: FileTable,
 }
 pub type ProcessRef = Arc<SgxMutex<Process>>;
 
 impl Process {
-    pub fn new(elf_file: &ElfFile) -> Result<Process, &'static str> {
+    pub fn new(elf_file: &ElfFile) -> Result<Process, Error> {
         let mut new_process : Process = Default::default();
         new_process.create_process_image(elf_file)?;
         new_process.link_syscalls(elf_file)?;
@@ -217,10 +242,12 @@ impl Process {
     }
 
     fn create_process_image(self: &mut Process, elf_file: &ElfFile)
-        -> Result<(), &'static str>
+        -> Result<(), Error>
     {
-        let code_ph = elf_helper::get_code_program_header(elf_file)?;
-        let data_ph = elf_helper::get_data_program_header(elf_file)?;
+        let code_ph = elf_helper::get_code_program_header(elf_file)
+            .map_err(|e| (Errno::ENOEXEC, "Failed to get the program header of code"))?;
+        let data_ph = elf_helper::get_data_program_header(elf_file)
+            .map_err(|e| (Errno::ENOEXEC, "Failed to get the program header of code"))?;
 
         self.code_vma = Vma::from_program_header(&code_ph)?;
         self.data_vma = Vma::from_program_header(&data_ph)?;
@@ -231,14 +258,14 @@ impl Process {
         self.program_entry_addr = self.program_base_addr +
             elf_helper::get_start_address(elf_file)?;
         if !self.code_vma.contains(self.program_entry_addr) {
-            return Err("Entry address is out of the code segment");
+            return Err((Errno::EINVAL, "Entry address is out of the code segment").into());
         }
 
         Ok(())
     }
 
     fn alloc_mem_for_vmas(self: &mut Process, elf_file: &ElfFile)
-        -> Result<usize, &'static str>
+        -> Result<usize, Error>
     {
         let mut vma_list = vec![&mut self.code_vma, &mut self.data_vma, &mut self.stack_vma];
         let base_addr = vma::malloc_batch(&mut vma_list, elf_file.input)?;
@@ -247,7 +274,7 @@ impl Process {
     }
 
     fn link_syscalls(self: &mut Process, elf_file: &ElfFile)
-        -> Result<(), &'static str>
+        -> Result<(), Error>
     {
         let syscall_addr = rusgx_syscall as *const () as usize;
 
@@ -256,7 +283,9 @@ impl Process {
         for rela_entry in rela_entries {
             let dynsym_idx = rela_entry.get_symbol_table_index() as usize;
             let dynsym_entry = &dynsym_entries[dynsym_idx];
-            let dynsym_str = dynsym_entry.get_name(&elf_file)?;
+            let dynsym_str = dynsym_entry.get_name(elf_file)
+                .map_err(|e| Error::new(Errno::ENOEXEC,
+                                        "Failed to get the name of dynamic symbol"))?;
 
             if dynsym_str == "rusgx_syscall" {
                 let rela_addr = self.program_base_addr + rela_entry.get_offset() as usize;
@@ -269,7 +298,7 @@ impl Process {
         Ok(())
     }
 
-    fn mprotect(self: &mut Process) -> Result<(), &'static str> {
+    fn mprotect(self: &mut Process) -> Result<(), Error> {
         let vma_list = vec![&self.code_vma, &self.data_vma, &self.stack_vma];
         vma::mprotect_batch(&vma_list)
     }

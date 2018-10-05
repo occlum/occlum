@@ -24,12 +24,16 @@ use std::panic;
 use sgx_types::*;
 use sgx_trts::libc;
 
-mod vma;
+mod prelude;
+mod elf_helper;
+mod errno;
+mod file;
+mod file_table;
+mod fs;
+mod mm;
 mod process;
 mod syscall;
-mod elf_helper;
-mod mm;
-mod errno;
+mod vma;
 
 /// Export system calls
 pub use syscall::*;
@@ -44,8 +48,7 @@ pub extern "C" fn libos_boot(path_buf: *const i8) -> i32 {
     let _ = backtrace::enable_backtrace("librusgx.signed.so", PrintFormat::Short);
     panic::catch_unwind(||{
         backtrace::__rust_begin_short_backtrace(||{
-            let mut pid = 0;
-            let _ = process::do_spawn(&mut pid, &path_str);
+            process::do_spawn(&path_str);
         })
     }).ok();
 

@@ -1,11 +1,11 @@
 /// Virtuam Memory Area (VMA)
+use prelude::*;
+use {std};
 
 use xmas_elf::program;
 use xmas_elf::program::{ProgramHeader};
-use std;
-use std::sync::Arc;
+
 use mm::MemObj;
-use sgx_types::*;
 
 #[derive(Clone, Debug, Default)]
 #[repr(C)]
@@ -31,11 +31,11 @@ const VMA_MIN_MEM_ALIGN: usize = (4 * 1024);
 
 impl Vma {
     pub fn from_program_header<'a>(ph: &ProgramHeader<'a>)
-        -> Result<Vma, &'static str>
+        -> Result<Vma, Error>
     {
         let ph64 = match ph {
             ProgramHeader::Ph32(ph) => {
-                return Err("Not support 32-bit ELF")
+                return Err((Errno::ENOEXEC, "Not support 32-bit ELF").into())
             }
             ProgramHeader::Ph64(ph64) => {
                 ph64
@@ -43,10 +43,12 @@ impl Vma {
         };
         if ph64.align > 1 && ((ph64.offset % ph64.align) !=
                               (ph64.virtual_addr % ph64.align)) {
-            return Err("Memory address and file offset is not equal, per modulo");
+            return Err((Errno::EINVAL,
+                        "Memory address and file offset is not equal, per modulo").into());
         }
         if ph64.mem_size < ph64.file_size {
-            return Err("Memory size must be greater than file size");
+            return Err((Errno::EINVAL,
+                        "Memory size must be greater than file size").into());
         }
 
         let mut new_vma = Vma::new(ph64.mem_size as usize,
@@ -62,13 +64,15 @@ impl Vma {
     }
 
     pub fn new(mem_size: usize, mem_align: usize, mem_flags: Perms)
-        -> Result<Self, &'static str>
+        -> Result<Self, Error>
     {
         if mem_align == 0 || mem_align % VMA_MIN_MEM_ALIGN != 0 {
-            return Err("Memory alignment is not a multiple of 4KB");
+            return Err((Errno::EINVAL,
+                        "Memory alignment is not a multiple of 4KB").into());
         }
         if mem_size == 0 {
-            return Err("Memory size must be greater than zero");
+            return Err((Errno::EINVAL,
+                        "Memory size must be greater than zero").into());
         }
 
         Ok(Vma {
@@ -85,7 +89,7 @@ impl Vma {
 }
 
 pub fn malloc_batch(vma_list: &mut [&mut Vma], mapped_data: &[u8])
-    -> Result<usize, &'static str>
+    -> Result<usize, Error>
 {
     let mut max_align = VMA_MIN_MEM_ALIGN;
     let mut total_size = 0;
@@ -96,11 +100,13 @@ pub fn malloc_batch(vma_list: &mut [&mut Vma], mapped_data: &[u8])
         if vma.file_is_mapped {
             if vma.mem_addr < mem_begin ||
                 vma.mem_addr + vma.mem_size > mem_end {
-                    return Err("Impossible memory layout for the VMA");
+                    return Err((Errno::EINVAL,
+                                "Impossible memory layout for the VMA").into());
                 }
             if vma.file_offset > mapped_data.len() ||
                 vma.file_offset + vma.file_size > mapped_data.len() {
-                    return Err("Impossible to load data from file");
+                    return Err((Errno::EINVAL,
+                                "Impossible to load data from file").into());
                 }
         }
 
@@ -134,7 +140,7 @@ pub fn malloc_batch(vma_list: &mut [&mut Vma], mapped_data: &[u8])
 }
 
 pub fn mprotect_batch(vma_list: &[&Vma])
-    -> Result<(), &'static str>
+    -> Result<(), Error>
 {
     for vma in vma_list.into_iter() {
         // If don't need to change memory permissions
@@ -153,7 +159,7 @@ pub fn mprotect_batch(vma_list: &[&Vma])
             trts_mprotect(start, size, (PERM_R | PERM_W | PERM_X) as uint64_t)
         };
         if (status != sgx_status_t::SGX_SUCCESS) {
-            return Err("trts_mprotect failed");
+            return Err((Errno::EACCES, "trts_mprotect failed").into());
         }
     }
     Ok(())

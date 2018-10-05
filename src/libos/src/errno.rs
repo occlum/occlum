@@ -1,9 +1,51 @@
-use std;
-use std::fmt;
+use prelude::*;
+use std::{fmt, error, convert,};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum Errno {
-    OK = 0,
+pub struct Error {
+    pub errno: Errno,
+    pub desc: &'static str,
+}
+
+impl Error {
+    pub fn new(errno: Errno, desc: &'static str) -> Error {
+        let ret = Error {
+            errno,
+            desc,
+        };
+        println!("{}", ret);
+        ret
+    }
+}
+
+impl convert::From<(Errno, &'static str)> for Error {
+    fn from(info: (Errno, &'static str)) -> Error {
+        Error::new(
+            info.0,
+            info.1,
+        )
+    }
+}
+
+impl error::Error for Error {
+    fn description(&self) -> &str {
+        self.desc
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        None
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Error: {} ({})", self.desc, self.errno)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Errno {
+    EUNDEF = 0,
     EPERM = 1,
     ENOENT = 2,
     ESRCH = 3,
@@ -44,23 +86,16 @@ enum Errno {
 }
 
 impl Errno {
-    fn as_retval(&self) -> i32 {
-        *self as i32
-    }
-}
-
-impl Default for Errno {
-    fn default() -> Errno {
-        Errno::OK
+    pub fn as_retval(&self) -> i32 {
+        - (*self as i32)
     }
 }
 
 impl fmt::Display for Errno {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} ({})",
-            *self as i32,
+        write!(f, "errno = {}, \"{}\"",
+            *self as u32,
             match *self {
-                Errno::OK => "Ok",
                 Errno::EPERM =>  "Operation not permitted",
                 Errno::ENOENT => "No such file or directory",
                 Errno::ESRCH => "No such process",
@@ -98,7 +133,10 @@ impl fmt::Display for Errno {
                 Errno::EDEADLK => "Resource deadlock would occur",
                 Errno::ENAMETOOLONG => "File name too long",
                 Errno::ENOLCK => "No record locks available",
-                _ => "Unknown",
-            })
+                _ => "Unknown error",
+            },
+        )
     }
 }
+
+

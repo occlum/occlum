@@ -1,8 +1,6 @@
-use sgx_types::{c_void, c_int, size_t};
-use sgx_trts::libc;
+use prelude::*;
+
 use std::mem;
-use std::marker::Send;
-use std::marker::Sync;
 
 #[derive(Clone, Debug)]
 pub struct MemObj {
@@ -13,16 +11,16 @@ pub struct MemObj {
 
 impl MemObj {
     pub fn new(mem_size: usize, mem_align: usize)
-        -> Result<Self, &'static str>
+        -> Result<Self, Error>
     {
         if mem_size == 0 || !is_power_of_two(mem_align) ||
             mem_align % mem::size_of::<*const c_void>() != 0 {
-            return Err("Invalid argument");
+            return Err((Errno::EINVAL, "Invalid argument").into());
         }
 
         let mem_ptr = unsafe { aligned_malloc(mem_size, mem_align) };
         if mem_ptr == (0 as *mut c_void) {
-            return Err("Out of memory");
+            return Err((Errno::ENOMEM, "Out of memory").into());
         };
         unsafe { memset(mem_ptr, 0 as c_int, mem_size as size_t) };
 
@@ -58,7 +56,6 @@ impl Drop for MemObj {
 
 unsafe impl Send for MemObj {}
 unsafe impl Sync for MemObj {}
-
 
 fn is_power_of_two(x: usize) -> bool {
     return (x != 0) && ((x & (x - 1)) == 0);

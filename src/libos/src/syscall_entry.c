@@ -14,11 +14,30 @@ long dispatch_syscall(int num, long arg0, long arg1, long arg2, long arg3, long 
         do_exit_task();
         break;
     }
+    case SYS_open: {
+        DECL_SYSCALL_ARG(const void*, path, arg0);
+        DECL_SYSCALL_ARG(int, flags, arg1);
+        DECL_SYSCALL_ARG(int, mode, arg2);
+        ret = rusgx_open(path, flags, mode);
+        break;
+    }
+    case SYS_close: {
+        DECL_SYSCALL_ARG(int, fd, arg0);
+        ret = rusgx_close(fd);
+        break;
+    }
     case SYS_write: {
         DECL_SYSCALL_ARG(int, fd, arg0);
         DECL_SYSCALL_ARG(const void*, buf, arg1);
         DECL_SYSCALL_ARG(size_t, buf_size, arg2);
         ret = rusgx_write(fd, buf, buf_size);
+        break;
+    }
+    case SYS_read: {
+        DECL_SYSCALL_ARG(int, fd, arg0);
+        DECL_SYSCALL_ARG(void*, buf, arg1);
+        DECL_SYSCALL_ARG(size_t, buf_size, arg2);
+        ret = rusgx_read(fd, buf, buf_size);
         break;
     }
     case SYS_spawn: {
