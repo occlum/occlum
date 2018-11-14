@@ -14,7 +14,7 @@ build_test:
 	@$(MAKE) --no-print-directory -C test
 
 test: build_test
-	@$(MAKE) --no-print-directory -C test test
+	@$(MAKE) --no-print-directory -C test run
 
 clean:
 	@$(MAKE) --no-print-directory -C src clean
