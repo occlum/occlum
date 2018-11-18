@@ -214,7 +214,7 @@ int SGX_CDECL main(int argc, char *argv[])
     }
     const char* executable_path = argv[1];
 
-    const char* enclave_path = "librusgx.signed.so";
+    const char* enclave_path = "libocclum.signed.so";
     /* Initialize the enclave */
     if(initialize_enclave(enclave_path) < 0){
         printf("Enter a character before exit ...\n");

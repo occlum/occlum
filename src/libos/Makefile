@@ -2,8 +2,8 @@ include ../sgxenv.mk
 
 DEBUG=1
 
-LIBOS_ENCLAVE := librusgx.signed.so
-LIBOS_SO := librusgx.so # Link $(LIBOS_A), $(C_OBJS) and all dependencies
+LIBOS_ENCLAVE := libocclum.signed.so
+LIBOS_SO := libocclum.so # Link $(LIBOS_A), $(C_OBJS) and all dependencies
 LIBOS_A := liblibos.a # Built from Rust code
 
 RUST_SRCS := $(wildcard src/*.rs)

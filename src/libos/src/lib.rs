@@ -45,7 +45,7 @@ pub extern "C" fn libos_boot(path_buf: *const i8) -> i32 {
     };
     println!("LibOS boots: {}", path_str);
 
-    let _ = backtrace::enable_backtrace("librusgx.signed.so", PrintFormat::Short);
+    let _ = backtrace::enable_backtrace("libocclum.signed.so", PrintFormat::Short);
     panic::catch_unwind(||{
         backtrace::__rust_begin_short_backtrace(||{
             process::do_spawn(&path_str);
@@ -57,7 +57,7 @@ pub extern "C" fn libos_boot(path_buf: *const i8) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn libos_run() -> i32 {
-    let _ = backtrace::enable_backtrace("librusgx.signed.so", PrintFormat::Short);
+    let _ = backtrace::enable_backtrace("libocclum.signed.so", PrintFormat::Short);
     panic::catch_unwind(||{
         backtrace::__rust_begin_short_backtrace(||{
             let _ = process::run_task();

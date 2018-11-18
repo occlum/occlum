@@ -33,7 +33,7 @@ int do_run_task(struct Task* task) {
         __run_task(task->user_entry_addr, task->user_stack_addr);
     }
 
-    // From rusgx_exit
+    // From occlum_exit
     RESET_CURRENT_TASK();
     return 0;
 }

@@ -31,10 +31,10 @@ run: build $(RUN_TEST_SUITES)
 pal: $(PROJECT_DIR)/src/pal/pal
 	cp $< pal
 
-librusgx.signed.so: $(PROJECT_DIR)/src/libos/librusgx.signed.so
-	cp $< librusgx.signed.so
+libocclum.signed.so: $(PROJECT_DIR)/src/libos/libocclum.signed.so
+	cp $< libocclum.signed.so
 
-$(RUN_TEST_SUITES): run-%: % pal librusgx.signed.so
+$(RUN_TEST_SUITES): run-%: % pal libocclum.signed.so
 	@$(MAKE) -C $< run
 
 #############################################################################
@@ -43,7 +43,7 @@ $(RUN_TEST_SUITES): run-%: % pal librusgx.signed.so
 
 clean: $(CLEAN_TEST_SUITES)
 	@$(MAKE) -C rusgx_stub clean
-	@$(RM) -f pal librusgx.signed.so
+	@$(RM) -f pal libocclum.signed.so
 
 $(CLEAN_TEST_SUITES): clean-%:
 	@$(MAKE) -C $(patsubst clean-%,%,$@) clean

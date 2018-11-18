@@ -46,20 +46,20 @@
 #define O_SYNC          0x00101000U
 
 
-long rusgx_syscall(int num, long arg0, long arg1, long arg2, long arg3, long arg4);
+long __occlum_syscall(int num, long arg0, long arg1, long arg2, long arg3, long arg4);
 
 #define RUSGX_SYSCALL0(num) \
-    rusgx_syscall((num), (long)0, (long)0, (long)0, (long)0, (long)0)
+    __occlum_syscall((num), (long)0, (long)0, (long)0, (long)0, (long)0)
 #define RUSGX_SYSCALL1(num, arg0) \
-    rusgx_syscall((num), (long)(arg0), (long)0, (long)0, (long)0, (long)0)
+    __occlum_syscall((num), (long)(arg0), (long)0, (long)0, (long)0, (long)0)
 #define RUSGX_SYSCALL2(num, arg0, arg1) \
-    rusgx_syscall((num), (long)(arg0), (long)(arg1), (long)0, (long)0, (long)0)
+    __occlum_syscall((num), (long)(arg0), (long)(arg1), (long)0, (long)0, (long)0)
 #define RUSGX_SYSCALL3(num, arg0, arg1, arg2) \
-    rusgx_syscall((num), (long)(arg0), (long)(arg1), (long)(arg2), (long)0, (long)0)
+    __occlum_syscall((num), (long)(arg0), (long)(arg1), (long)(arg2), (long)0, (long)0)
 #define RUSGX_SYSCALL4(num, arg0, arg1, arg2, arg3) \
-    rusgx_syscall((num), (long)(arg0), (long)(arg1), (long)(arg2), (long)(arg3), (long)0)
+    __occlum_syscall((num), (long)(arg0), (long)(arg1), (long)(arg2), (long)(arg3), (long)0)
 #define RUSGX_SYSCALL5(num, arg0, arg1, arg2, arg3, arg4) \
-    rusgx_syscall((num), (long)(arg0), (long)(arg1), (long)(arg2), (long)(arg3), (long)(arg4))
+    __occlum_syscall((num), (long)(arg0), (long)(arg1), (long)(arg2), (long)(arg3), (long)(arg4))
 
 
 static inline ssize_t __rusgx_read(int fd, void* buf, unsigned long size) {

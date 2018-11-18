@@ -1,5 +1,5 @@
-#ifndef __RUSGX_TASK_H__
-#define __RUSGX_TASK_H__
+#ifndef __OCCLUM_TASK_H__
+#define __OCCLUM_TASK_H__
 
 #ifndef __ASSEMBLY__
 
@@ -41,4 +41,4 @@ void do_exit_task(void);
 
 #endif /* __ASSEMBLY__ */
 
-#endif /* __RUSGX_TASK_H__ */
+#endif /* __OCCLUM_TASK_H__ */

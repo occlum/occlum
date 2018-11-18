@@ -1,5 +1,5 @@
-#ifndef __RUSGX_SYSCALL_NR_H__
-#define __RUSGX_SYSCALL_NR_H__
+#ifndef __OCCLUM_SYSCALL_NR_H__
+#define __OCCLUM_SYSCALL_NR_H__
 
 /* Macros are copied from glibc headers for x86-64 */
 
@@ -713,4 +713,4 @@
 
 #define __NR_spawn 360
 
-#endif /* __RUSGX_SYSCALL_NR_H__ */
+#endif /* __OCCLUM_SYSCALL_NR_H__ */

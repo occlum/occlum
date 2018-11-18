@@ -1,5 +1,5 @@
-#ifndef __RUSGX_ERRNO_H_
-#define __RUSGX_ERRNO_H_
+#ifndef __OCCLUM_ERRNO_H_
+#define __OCCLUM_ERRNO_H_
 
 /* Copied from glibc headers for x86-64 */
 
@@ -157,4 +157,4 @@
 
 #endif
 
-#endif /* __RUSGX_ERRNO_H_ */
+#endif /* __OCCLUM_ERRNO_H_ */

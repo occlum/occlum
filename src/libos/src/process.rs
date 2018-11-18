@@ -276,7 +276,7 @@ impl Process {
     fn link_syscalls(self: &mut Process, elf_file: &ElfFile)
         -> Result<(), Error>
     {
-        let syscall_addr = rusgx_syscall as *const () as usize;
+        let syscall_addr = __occlum_syscall as *const () as usize;
 
         let rela_entries = elf_helper::get_pltrel_entries(&elf_file)?;
         let dynsym_entries = elf_helper::get_dynsym_entries(&elf_file)?;
@@ -287,7 +287,7 @@ impl Process {
                 .map_err(|e| Error::new(Errno::ENOEXEC,
                                         "Failed to get the name of dynamic symbol"))?;
 
-            if dynsym_str == "rusgx_syscall" {
+            if dynsym_str == "__occlum_syscall" {
                 let rela_addr = self.program_base_addr + rela_entry.get_offset() as usize;
                 unsafe {
                     std::ptr::write_unaligned(rela_addr as *mut usize, syscall_addr);
@@ -356,5 +356,5 @@ extern {
     fn ocall_run_new_task(ret: *mut i32) -> sgx_status_t;
     fn do_run_task(task: *const Task) -> i32;
     fn do_exit_task();
-    fn rusgx_syscall(num: i32, arg0: u64, arg1: u64, arg2: u64, arg3: u64, arg4: u64) -> i64;
+    fn __occlum_syscall(num: i32, arg0: u64, arg1: u64, arg2: u64, arg3: u64, arg4: u64) -> i64;
 }

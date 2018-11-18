@@ -52,7 +52,7 @@ static void __exit(int status) {
     return;
 }
 
-long rusgx_syscall(int num, long arg0, long arg1, long arg2, long arg3, long arg4) {
+long __occlum_syscall(int num, long arg0, long arg1, long arg2, long arg3, long arg4) {
     long ret = 0;
     switch (num) {
     case SYS_exit:

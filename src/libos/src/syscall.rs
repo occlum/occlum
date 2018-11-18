@@ -11,7 +11,7 @@ use std::ffi::CStr; // a borrowed C string
 
 */
 #[no_mangle]
-pub extern "C" fn rusgx_open(path_buf: * const c_char, flags: c_int, mode: c_int) -> c_int {
+pub extern "C" fn occlum_open(path_buf: * const c_char, flags: c_int, mode: c_int) -> c_int {
     let path = unsafe {
         CStr::from_ptr(path_buf as * const i8).to_string_lossy().into_owned()
     };
@@ -26,7 +26,7 @@ pub extern "C" fn rusgx_open(path_buf: * const c_char, flags: c_int, mode: c_int
 }
 
 #[no_mangle]
-pub extern "C" fn rusgx_close(fd: c_int) -> c_int {
+pub extern "C" fn occlum_close(fd: c_int) -> c_int {
     match fs::do_close(fd as file_table::FileDesc) {
         Ok(()) => {
             0
@@ -38,7 +38,7 @@ pub extern "C" fn rusgx_close(fd: c_int) -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn rusgx_read(fd: c_int, buf: * mut c_void, size: size_t) -> ssize_t {
+pub extern "C" fn occlum_read(fd: c_int, buf: * mut c_void, size: size_t) -> ssize_t {
     let buf = unsafe {
         std::slice::from_raw_parts_mut(buf as *mut u8, size as usize)
     };
@@ -53,11 +53,11 @@ pub extern "C" fn rusgx_read(fd: c_int, buf: * mut c_void, size: size_t) -> ssiz
 }
 
 #[no_mangle]
-pub extern "C" fn rusgx_write(fd: c_int, buf: * const c_void, size: size_t) -> ssize_t {
+pub extern "C" fn occlum_write(fd: c_int, buf: * const c_void, size: size_t) -> ssize_t {
 /*    let str_from_c = unsafe {
         CStr::from_ptr(buf as * const i8).to_string_lossy().into_owned()
     };
-    println!("rusgx_write: {}", str_from_c);
+    println!("occlum_write: {}", str_from_c);
     size as ssize_t
 */
     let buf = unsafe {
@@ -74,19 +74,19 @@ pub extern "C" fn rusgx_write(fd: c_int, buf: * const c_void, size: size_t) -> s
 }
 
 #[no_mangle]
-pub extern "C" fn rusgx_getpid() -> c_uint
+pub extern "C" fn occlum_getpid() -> c_uint
 {
     process::do_getpid()
 }
 
 #[no_mangle]
-pub extern "C" fn rusgx_exit(status: i32)
+pub extern "C" fn occlum_exit(status: i32)
 {
     process::do_exit(status);
 }
 
 #[no_mangle]
-pub extern "C" fn rusgx_spawn(child_pid: *mut c_int, path: *const c_char,
+pub extern "C" fn occlum_spawn(child_pid: *mut c_int, path: *const c_char,
     argv: *const *const c_char, envp: *const *const c_char) -> c_int
 {
     let mut ret = 0;
@@ -105,7 +105,7 @@ pub extern "C" fn rusgx_spawn(child_pid: *mut c_int, path: *const c_char,
 }
 
 #[no_mangle]
-pub extern "C" fn rusgx_wait4(child_pid: c_int, _exit_code: *mut c_int,
+pub extern "C" fn occlum_wait4(child_pid: c_int, _exit_code: *mut c_int,
     options: c_int/*, rusage: *mut Rusage*/) -> c_int
 {
     match process::do_wait4(child_pid as u32) {
