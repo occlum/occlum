@@ -18,6 +18,7 @@ extern int occlum_spawn(int* child_pid, const char* path,
 extern int occlum_wait4(int child_pid, int* status, int options/*, struct rusage* rusage*/);
 extern unsigned int occlum_getpid(void);
 extern void occlum_exit(int status);
+extern int occlum_unknown(int num);
 
 #ifdef __cplusplus
 }

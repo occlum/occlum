@@ -51,7 +51,7 @@ pub fn do_write(fd: FileDesc, buf: &[u8]) -> Result<usize, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_ref = current_process.file_table.get(fd)
-        .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor"))?;
+        .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor [do_write]"))?;
     file_ref.write(buf)
 }
 
@@ -59,7 +59,7 @@ pub fn do_read(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_ref = current_process.file_table.get(fd)
-        .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor"))?;
+        .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor [do_read]"))?;
     file_ref.read(buf)
 }
 
@@ -69,6 +69,6 @@ pub fn do_close(fd: FileDesc) -> Result<(), Error> {
     let file_table = &mut current_process.file_table;
     match file_table.del(fd) {
         Some(_) => Ok(()),
-        None => Err(Error::new(Errno::EBADF, "Invalid file descriptor")),
+        None => Err(Error::new(Errno::EBADF, "Invalid file descriptor [do_close]")),
     }
 }

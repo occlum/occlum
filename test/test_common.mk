@@ -3,6 +3,7 @@ INCLUDE_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 CUR_DIR := $(shell dirname $(realpath $(MAIN_MAKEFILE)))
 PROJECT_DIR := $(realpath $(CUR_DIR)/../../)
 
+CC := /usr/local/occlum/bin/musl-gcc
 C_SRCS := $(wildcard *.c)
 S_FILES := $(C_SRCS:%.c=%.S)
 C_OBJS := $(C_SRCS:%.c=%.o)
@@ -11,14 +12,10 @@ BIN_ENC_NAME := bin.encrypted
 OBJDUMP_FILE := bin.objdump
 READELF_FILE := bin.readelf
 
-C_FLAGS = -Wall -fno-stack-protector -fverbose-asm -fpic \
-		  -I../include -L../rusgx_stub -lrusgx_stub \
-		  -O0 \
-		  $(EXTRA_C_FLAGS)
-LINK_FLAGS = -pie -L../rusgx_stub -lrusgx_stub \
-			$(EXTRA_LINK_FLAGS)
+C_FLAGS = -Wall -fverbose-asm -O0 $(EXTRA_C_FLAGS)
+LINK_FLAGS = $(EXTRA_LINK_FLAGS)
 
-.PHONY: all run run-without-rusgx debug clean
+.PHONY: all run debug clean
 
 #############################################################################
 # Build
@@ -54,9 +51,6 @@ $(S_FILES): %.S: %.c
 
 run: $(BIN_ENC_NAME)
 	cd ../ && RUST_BACKTRACE=1 ./pal $(CUR_DIR)/$(BIN_ENC_NAME)
-
-run-without-rusgx:
-	cd ../ && LD_LIBRARY_PATH=./rusgx_stub/ ./$(BIN_NAME)
 
 #############################################################################
 # Misc

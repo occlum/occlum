@@ -61,7 +61,7 @@ long dispatch_syscall(int num, long arg0, long arg1, long arg2, long arg3, long 
         break;
     }
     default:
-        ret = -1;
+        ret = occlum_unknown(num);
         break;
     }
 

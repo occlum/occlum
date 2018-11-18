@@ -1,7 +1,7 @@
 CUR_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 PROJECT_DIR := $(realpath $(CUR_DIR)/../)
 
-TEST_SUITES := hello_world_raw spawn_and_wait4_raw getpid file_io
+TEST_SUITES := empty
 BUILD_TEST_SUITES := $(TEST_SUITES:%=%)
 RUN_TEST_SUITES := $(TEST_SUITES:%=run-%)
 CLEAN_TEST_SUITES := $(TEST_SUITES:%=clean-%)
@@ -14,10 +14,7 @@ CLEAN_TEST_SUITES := $(TEST_SUITES:%=clean-%)
 
 all: build
 
-build: build_rusgx_stub $(BUILD_TEST_SUITES)
-
-build_rusgx_stub:
-	@$(MAKE) -C rusgx_stub
+build: $(BUILD_TEST_SUITES)
 
 $(BUILD_TEST_SUITES): %:
 	@$(MAKE) -C $@
@@ -42,7 +39,6 @@ $(RUN_TEST_SUITES): run-%: % pal libocclum.signed.so
 #############################################################################
 
 clean: $(CLEAN_TEST_SUITES)
-	@$(MAKE) -C rusgx_stub clean
 	@$(RM) -f pal libocclum.signed.so
 
 $(CLEAN_TEST_SUITES): clean-%:

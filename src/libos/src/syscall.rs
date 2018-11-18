@@ -86,6 +86,12 @@ pub extern "C" fn occlum_exit(status: i32)
 }
 
 #[no_mangle]
+pub extern "C" fn occlum_unknown(num: u32)
+{
+    println!("[WARNING] Unknown syscall (num = {})", num);
+}
+
+#[no_mangle]
 pub extern "C" fn occlum_spawn(child_pid: *mut c_int, path: *const c_char,
     argv: *const *const c_char, envp: *const *const c_char) -> c_int
 {
