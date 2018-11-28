@@ -232,8 +232,10 @@ impl Process {
     {
         let mut new_process : Process = Default::default();
         new_process.create_process_image(elf_file)?;
+        new_process.reloc_symbols(elf_file)?;
         new_process.link_syscalls(elf_file)?;
         new_process.mprotect()?;
+        //println!("Process image: {:#X?}", new_process);
 
         new_process.task = Task {
             user_stack_addr: new_process.init_stack(argv, envp)? as usize,
@@ -298,12 +300,41 @@ impl Process {
         Ok(base_addr)
     }
 
+    fn reloc_symbols(self: &mut Process, elf_file: &ElfFile)
+        -> Result<(), Error>
+    {
+        let rela_entries = elf_helper::get_rela_entries(&elf_file, ".rela.dyn")?;
+        for rela_entry in rela_entries {
+            /*
+            println!("\toffset: {:#X}, symbol index: {}, type: {}, addend: {:#X}",
+                 rela_entry.get_offset(),
+                 rela_entry.get_symbol_table_index(),
+                 rela_entry.get_type(),
+                 rela_entry.get_addend());
+            */
+
+            /* reloc type == R_X86_64_RELATIVE */
+            match rela_entry.get_type() {
+                8 if rela_entry.get_symbol_table_index() == 0 => {
+                    let rela_addr = self.program_base_addr + rela_entry.get_offset() as usize;
+                    let rela_val = self.program_base_addr + rela_entry.get_addend() as usize;
+                    unsafe {
+                        std::ptr::write_unaligned(rela_addr as *mut usize, rela_val);
+                    }
+                }
+                // TODO: need to handle other relocation types
+                _ => {  }
+            }
+        }
+        Ok(())
+    }
+
     fn link_syscalls(self: &mut Process, elf_file: &ElfFile)
         -> Result<(), Error>
     {
         let syscall_addr = __occlum_syscall as *const () as usize;
 
-        let rela_entries = elf_helper::get_pltrel_entries(&elf_file)?;
+        let rela_entries = elf_helper::get_rela_entries(&elf_file, ".rela.plt")?;
         let dynsym_entries = elf_helper::get_dynsym_entries(&elf_file)?;
         for rela_entry in rela_entries {
             let dynsym_idx = rela_entry.get_symbol_table_index() as usize;

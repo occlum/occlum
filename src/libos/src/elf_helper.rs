@@ -34,15 +34,15 @@ pub fn print_sections(elf_file: &ElfFile) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn print_pltrel_section(elf_file: &ElfFile) -> Result<(), Error> {
-    let rela_entries = get_pltrel_entries(elf_file)
+pub fn print_rela_plt_section(elf_file: &ElfFile) -> Result<(), Error> {
+    let rela_entries = get_rela_entries(elf_file, ".rela.plt")
         .map_err(|e| (Errno::ENOEXEC,
                       "Failed to get .pltrel entries"))?;
     let dynsym_entries = get_dynsym_entries(elf_file)
         .map_err(|e| (Errno::ENOEXEC,
                       "Failed to get .dynsym entries"))?;
 
-    println!(".plt.rela section:");
+    println!(".rela.plt section:");
     for entry in rela_entries {
         println!("\toffset: {}, symbol index: {}, type: {}, addend: {}",
                  entry.get_offset(),
@@ -113,10 +113,10 @@ pub fn get_sym_entries<'b, 'a: 'b>(elf_file: &'b ElfFile<'a>)
         }).ok_or_else(|| (Errno::ENOEXEC, "Failed get the symbol entries").into())
 }
 
-pub fn get_pltrel_entries<'b, 'a: 'b>(elf_file: &'b ElfFile<'a>)
+pub fn get_rela_entries<'b, 'a: 'b>(elf_file: &'b ElfFile<'a>, sec_name: &'b str)
     -> Result<&'a [Rela<P64>], Error>
 {
-    elf_file.find_section_by_name(".rela.plt")
+    elf_file.find_section_by_name(sec_name)
         .and_then(|plt_rela_section| {
             plt_rela_section.get_data(&elf_file).ok()
         }).and_then(|rela_table| {
