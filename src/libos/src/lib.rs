@@ -34,6 +34,7 @@ mod mm;
 mod process;
 mod syscall;
 mod vma;
+mod init_stack;
 
 /// Export system calls
 pub use syscall::*;
@@ -48,7 +49,9 @@ pub extern "C" fn libos_boot(path_buf: *const i8) -> i32 {
     let _ = backtrace::enable_backtrace("libocclum.signed.so", PrintFormat::Short);
     panic::catch_unwind(||{
         backtrace::__rust_begin_short_backtrace(||{
-            process::do_spawn(&path_str);
+            let argv = std::vec::Vec::new();
+            let envp = std::vec::Vec::new();
+            process::do_spawn(&path_str, &argv, &envp);
         })
     }).ok();
 

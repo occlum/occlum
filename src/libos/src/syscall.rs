@@ -1,15 +1,36 @@
 use prelude::*;
 use {std, file, file_table, fs, process};
-use std::ffi::CStr; // a borrowed C string
+use std::ffi::{CStr, CString};
 // Use the internal syscall wrappers from sgx_tstd
 //use std::libc_fs as fs;
 //use std::libc_io as io;
 
-// TODO: check all pointer passed from user belongs to user space
+fn check_ptr_from_user<T>(user_ptr: *const T) -> Result<*const T, Error> {
+    Ok(user_ptr)
+}
 
-/*
+fn check_mut_ptr_from_user<T>(user_ptr: *mut T) -> Result<*mut T, Error> {
+    Ok(user_ptr)
+}
 
-*/
+fn clone_string_from_user_safely(user_ptr: *const c_char)
+    -> Result<String, Error>
+{
+    let user_ptr = check_ptr_from_user(user_ptr)?;
+    let string = unsafe {
+        CStr::from_ptr(user_ptr).to_string_lossy().into_owned()
+    };
+    Ok(string)
+}
+
+fn clone_cstrings_from_user_safely(user_ptr: *const *const c_char)
+    -> Result<Vec<CString>, Error>
+{
+    let cstrings = Vec::new();
+    Ok(cstrings)
+}
+
+
 #[no_mangle]
 pub extern "C" fn occlum_open(path_buf: * const c_char, flags: c_int, mode: c_int) -> c_int {
     let path = unsafe {
@@ -91,22 +112,31 @@ pub extern "C" fn occlum_unknown(num: u32)
     println!("[WARNING] Unknown syscall (num = {})", num);
 }
 
+fn do_spawn(child_pid_ptr: *mut c_uint,
+            path: *const c_char,
+            argv: *const *const c_char,
+            envp: *const *const c_char)
+    -> Result<(), Error>
+{
+    let child_pid_ptr = check_mut_ptr_from_user(child_pid_ptr)?;
+    let path = clone_string_from_user_safely(path)?;
+    let argv = clone_cstrings_from_user_safely(argv)?;
+    let envp = clone_cstrings_from_user_safely(envp)?;
+
+    let child_pid = process::do_spawn(&path, &argv, &envp)?;
+
+    unsafe { *child_pid_ptr = child_pid };
+    Ok(())
+}
+
 #[no_mangle]
-pub extern "C" fn occlum_spawn(child_pid: *mut c_int, path: *const c_char,
+pub extern "C" fn occlum_spawn(
+    child_pid: *mut c_uint, path: *const c_char,
     argv: *const *const c_char, envp: *const *const c_char) -> c_int
 {
-    let mut ret = 0;
-    let path_str = unsafe {
-        CStr::from_ptr(path as * const i8).to_string_lossy().into_owned()
-    };
-    match process::do_spawn(&path_str) {
-        Ok(new_pid) => unsafe {
-            *child_pid = new_pid as c_int;
-            0
-        },
-        Err(e) => {
-            e.errno.as_retval()
-        }
+    match do_spawn(child_pid, path, argv, envp) {
+        Ok(()) => 0,
+        Err(e) => { e.errno.as_retval() }
     }
 }
 

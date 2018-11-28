@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sgxfs::SgxFile;
 use std::thread;
 use std::cell::Cell;
+use std::ffi::{CStr, CString};
 
 use xmas_elf::{ElfFile, header, program, sections};
 use xmas_elf::symbol_table::Entry;
@@ -14,6 +15,7 @@ use xmas_elf::symbol_table::Entry;
 use vma::Vma;
 use file::{File, StdinFile, StdoutFile/*, StderrFile*/};
 use file_table::{FileTable};
+use init_stack::{StackBuf, AuxKey, AuxTable, do_init_process_stack};
 
 lazy_static! {
     static ref PROCESS_TABLE: SgxMutex<HashMap<u32, ProcessRef>> = {
@@ -45,8 +47,10 @@ fn free_pid(pid: u32) {
 }
 
 
-pub fn do_spawn<P: AsRef<Path>>(elf_path: &P) -> Result<u32, Error> {
-    let elf_buf = open_elf(elf_path)
+pub fn do_spawn<P: AsRef<Path>>(elf_path: &P, argv: &[CString], envp: &[CString])
+    -> Result<u32, Error>
+{
+    let elf_buf = open_elf(&elf_path)
         .map_err(|e| (e.errno, "Failed to open the ELF file"))?;
 
     let elf_file = {
@@ -64,7 +68,7 @@ pub fn do_spawn<P: AsRef<Path>>(elf_path: &P) -> Result<u32, Error> {
     };
 
     let new_process = {
-        let mut new_process = Process::new(&elf_file)
+        let mut new_process = Process::new(&elf_file, argv, envp)
             .map_err(|e| (Errno::EUNDEF, "Failed to create the process"))?;
 
         {
@@ -206,7 +210,7 @@ fn open_elf<P: AsRef<Path>>(path: &P) -> Result<Vec<u8>, Error> {
 }
 
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 #[repr(C)]
 pub struct Process {
     pub task: Task,
@@ -223,14 +227,16 @@ pub struct Process {
 pub type ProcessRef = Arc<SgxMutex<Process>>;
 
 impl Process {
-    pub fn new(elf_file: &ElfFile) -> Result<Process, Error> {
+    pub fn new(elf_file: &ElfFile, argv: &[CString], envp: &[CString])
+        -> Result<Process, Error>
+    {
         let mut new_process : Process = Default::default();
         new_process.create_process_image(elf_file)?;
         new_process.link_syscalls(elf_file)?;
         new_process.mprotect()?;
 
         new_process.task = Task {
-            user_stack_addr: new_process.stack_vma.mem_end - 16,
+            user_stack_addr: new_process.init_stack(argv, envp)? as usize,
             user_entry_addr: new_process.program_entry_addr,
             fs_base_addr: 0,
             .. Default::default()
@@ -239,6 +245,25 @@ impl Process {
         new_process.pid = alloc_pid();
 
         Ok(new_process)
+    }
+
+    fn init_stack(&mut self, argv: &[CString], envp: &[CString])
+        -> Result<*const u8, Error>
+    {
+        let stack = StackBuf::new(self.stack_vma.mem_end as *const u8,
+            self.stack_vma.mem_begin as *const u8)?;
+
+        let mut auxtbl = AuxTable::new();
+        auxtbl.set_val(AuxKey::AT_PAGESZ, 4096)?;
+        auxtbl.set_val(AuxKey::AT_UID, 0)?;
+        auxtbl.set_val(AuxKey::AT_GID, 0)?;
+        auxtbl.set_val(AuxKey::AT_EUID, 0)?;
+        auxtbl.set_val(AuxKey::AT_EGID, 0)?;
+        auxtbl.set_val(AuxKey::AT_SECURE, 0)?;
+
+        do_init_process_stack(&stack, &argv, &envp, &auxtbl)?;
+
+        Ok(stack.get_pos())
     }
 
     fn create_process_image(self: &mut Process, elf_file: &ElfFile)

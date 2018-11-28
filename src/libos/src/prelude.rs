@@ -7,10 +7,12 @@ pub use sgx_trts::libc;
 pub use std::marker::{Sync, Send};
 pub use std::sync::{Arc, SgxMutex, SgxMutexGuard, SgxRwLock,
     SgxRwLockReadGuard, SgxRwLockWriteGuard};
+pub use std::cell::{Cell};
 pub use std::result::Result;
 pub use std::borrow::BorrowMut;
 pub use std::boxed::Box;
 pub use std::vec::Vec;
+pub use std::string::{String};
 pub use std::collections::{HashMap, VecDeque};
 pub use std::fmt::{Debug, Display};
 
