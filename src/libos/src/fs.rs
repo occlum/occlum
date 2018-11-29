@@ -63,6 +63,22 @@ pub fn do_read(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
     file_ref.read(buf)
 }
 
+pub fn do_writev<'a, 'b>(fd: FileDesc, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    let file_ref = current_process.file_table.get(fd)
+        .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor [do_write]"))?;
+    file_ref.writev(bufs)
+}
+
+pub fn do_readv<'a, 'b>(fd: FileDesc, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    let file_ref = current_process.file_table.get(fd)
+        .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor [do_read]"))?;
+    file_ref.readv(bufs)
+}
+
 pub fn do_close(fd: FileDesc) -> Result<(), Error> {
     let current_ref = process::get_current();
     let mut current_process = current_ref.lock().unwrap();

@@ -40,6 +40,20 @@ long dispatch_syscall(int num, long arg0, long arg1, long arg2, long arg3, long 
         ret = occlum_read(fd, buf, buf_size);
         break;
     }
+    case SYS_writev: {
+        DECL_SYSCALL_ARG(int, fd, arg0);
+        DECL_SYSCALL_ARG(const struct iovec*, iov, arg1);
+        DECL_SYSCALL_ARG(int, count, arg2);
+        ret = occlum_writev(fd, iov, count);
+        break;
+    }
+    case SYS_readv: {
+        DECL_SYSCALL_ARG(int, fd, arg0);
+        DECL_SYSCALL_ARG(struct iovec*, iov, arg1);
+        DECL_SYSCALL_ARG(int, count, arg2);
+        ret = occlum_readv(fd, iov, count);
+        break;
+    }
     case SYS_spawn: {
         DECL_SYSCALL_ARG(int*, child_pid, arg0);
         DECL_SYSCALL_ARG(const char*, path, arg1);

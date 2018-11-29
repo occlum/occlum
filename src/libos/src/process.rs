@@ -77,6 +77,7 @@ pub fn do_spawn<P: AsRef<Path>>(elf_path: &P, argv: &[CString], envp: &[CString]
             //let stdin = Arc::new(SgxMutex::new(Box::new(StdinFile::new())));
             let stdin : Arc<Box<File>> = Arc::new(Box::new(StdinFile::new()));
             let stdout : Arc<Box<File>> = Arc::new(Box::new(StdoutFile::new()));
+            // TODO: implement and use a real stderr
             let stderr = stdout.clone();
             file_table.put(stdin);
             file_table.put(stdout);

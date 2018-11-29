@@ -8,8 +8,9 @@ use std::io::{Read, Write, Seek, SeekFrom};
 pub trait File : Debug + Sync + Send {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error>;
     fn write(&self, buf: &[u8]) -> Result<usize, Error>;
+    fn readv<'a, 'b>(&self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error>;
+    fn writev<'a, 'b>(&self, bufs: &'a [&'b [u8]]) -> Result<usize, Error>;
     //pub seek(&mut self, ) -> Result<usize, Error>;
-
 }
 
 pub type FileRef = Arc<Box<File>>;
@@ -48,6 +49,18 @@ impl File for SgxFile {
         let inner = inner_guard.borrow_mut();
         inner.write(buf)
     }
+
+    fn readv<'a, 'b>(&self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {
+        let mut inner_guard = self.inner.lock().unwrap();
+        let inner = inner_guard.borrow_mut();
+        inner.readv(bufs)
+    }
+
+    fn writev<'a, 'b>(&self, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
+        let mut inner_guard = self.inner.lock().unwrap();
+        let inner = inner_guard.borrow_mut();
+        inner.writev(bufs)
+    }
 }
 
 #[derive(Clone)]
@@ -67,6 +80,7 @@ impl SgxFileInner {
         let file = file_guard.borrow_mut();
 
         let seek_pos = SeekFrom::Start(self.pos as u64);
+        // TODO: recover from error
         file.seek(seek_pos).map_err(
             |e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
 
@@ -94,6 +108,70 @@ impl SgxFileInner {
 
         self.pos += read_len;
         Ok(read_len)
+    }
+
+    pub fn writev<'a, 'b>(&mut self, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
+        let mut file_guard = self.file.lock().unwrap();
+        let file = file_guard.borrow_mut();
+
+        let seek_pos = SeekFrom::Start(self.pos as u64);
+        file.seek(seek_pos).map_err(
+            |e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
+
+        let mut total_bytes = 0;
+        for buf in bufs {
+            match file.write(buf) {
+                Ok(this_bytes) => {
+                    if this_bytes == 0 { break; }
+
+                    total_bytes += this_bytes;
+                    if this_bytes < buf.len() { break; }
+                }
+                Err(e) => {
+                    match total_bytes {
+                        // a complete failure
+                        0 => return Err(Error::new(Errno::EINVAL, "Failed to write")),
+                        // a partially failure
+                        _ => break,
+                    }
+                }
+            }
+        }
+
+        self.pos += total_bytes;
+        Ok(total_bytes)
+    }
+
+    fn readv<'a, 'b>(&mut self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {
+        let mut file_guard = self.file.lock().unwrap();
+        let file = file_guard.borrow_mut();
+
+        let seek_pos = SeekFrom::Start(self.pos as u64);
+        file.seek(seek_pos).map_err(
+            |e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
+
+        let mut total_bytes = 0;
+        for buf in bufs {
+            match file.read(buf) {
+                Ok(this_bytes) => {
+                    if this_bytes == 0 { break; }
+
+                    total_bytes += this_bytes;
+                    if this_bytes < buf.len() { break; }
+                }
+                Err(e) => {
+                    match total_bytes {
+                        // a complete failure
+                        0 => return Err(Error::new(Errno::EINVAL, "Failed to write")),
+                        // a partially failure
+                        _ => break,
+                    }
+                }
+            }
+        }
+
+        self.pos += total_bytes;
+        Ok(total_bytes)
     }
 }
 
@@ -130,6 +208,33 @@ impl File for StdoutFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
         Err(Error::new(Errno::EBADF, "Stdout does not support reading"))
     }
+
+    fn writev<'a, 'b>(&self, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
+        let mut guard = self.inner.lock();
+        let mut total_bytes = 0;
+        for buf in bufs {
+            match guard.write(buf) {
+                Ok(this_len) => {
+                    if this_len == 0 { break; }
+                    total_bytes += this_len;
+                    if this_len < buf.len() { break; }
+                }
+                Err(e) => {
+                    match total_bytes {
+                        // a complete failure
+                        0 => return Err(Error::new(Errno::EINVAL, "Failed to write")),
+                        // a partially failure
+                        _ => break,
+                    }
+                }
+            }
+        }
+        Ok(total_bytes)
+    }
+
+    fn readv<'a, 'b>(&self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {
+        Err(Error::new(Errno::EBADF, "Stdout does not support reading"))
+    }
 }
 
 impl Debug for StdoutFile {
@@ -163,6 +268,33 @@ impl File for StdinFile {
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize, Error> {
+        Err(Error::new(Errno::EBADF, "Stdin does not support reading"))
+    }
+
+    fn readv<'a, 'b>(&self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {
+        let mut guard = self.inner.lock();
+        let mut total_bytes = 0;
+        for buf in bufs {
+            match guard.read(buf) {
+                Ok(this_len) => {
+                    if this_len == 0 { break; }
+                    total_bytes += this_len;
+                    if this_len < buf.len() { break; }
+                }
+                Err(e) => {
+                    match total_bytes {
+                        // a complete failure
+                        0 => return Err(Error::new(Errno::EINVAL, "Failed to write")),
+                        // a partially failure
+                        _ => break,
+                    }
+                }
+            }
+        }
+        Ok(total_bytes)
+    }
+
+    fn writev<'a, 'b>(&self, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
         Err(Error::new(Errno::EBADF, "Stdin does not support reading"))
     }
 }

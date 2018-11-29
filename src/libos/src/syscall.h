@@ -4,6 +4,8 @@
 #include <sys/types.h>
 #include "syscall_nr.h"
 
+struct iovec;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -12,6 +14,8 @@ extern int occlum_open(const char* path, int flags, int mode);
 extern int occlum_close(int fd);
 extern ssize_t occlum_read(int fd, void* buf, size_t size);
 extern ssize_t occlum_write(int fd, const void* buf, size_t size);
+extern ssize_t occlum_readv(int fd, struct iovec* iov, int count);
+extern ssize_t occlum_writev(int fd, const struct iovec* iov, int count);
 extern int occlum_spawn(int* child_pid, const char* path,
                         const char** argv,
                         const char** envp);
