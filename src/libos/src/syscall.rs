@@ -11,7 +11,6 @@ pub struct iovec_t {
     len: size_t,
 }
 
-
 fn check_ptr_from_user<T>(user_ptr: *const T) -> Result<(), Error> {
     Ok(())
 }
@@ -133,6 +132,33 @@ fn do_readv(fd: c_int, iov: *mut iovec_t, count: c_int)
 }
 
 
+pub fn do_lseek(fd: c_int, offset: off_t, whence: c_int) -> Result<off_t, Error>
+{
+
+    let fd = fd as file_table::FileDesc;
+
+    let seek_from = match whence {
+        0 => { // SEEK_SET
+            if offset < 0 {
+                return Err(Error::new(Errno::EINVAL, "Invalid offset"));
+            }
+            SeekFrom::Start(offset as u64)
+        }
+        1 => { // SEEK_CUR
+            SeekFrom::Current(offset)
+        }
+        2 => { // SEEK_END
+            SeekFrom::End(offset)
+        }
+        _ => {
+            return Err(Error::new(Errno::EINVAL, "Invalid whence"));
+        }
+    };
+
+    fs::do_lseek(fd, seek_from)
+}
+
+
 #[no_mangle]
 pub extern "C" fn occlum_open(path_buf: * const c_char, flags: c_int, mode: c_int) -> c_int {
     let path = unsafe {
@@ -208,6 +234,17 @@ pub extern "C" fn occlum_writev(fd: c_int, iov: * const iovec_t, count: c_int) -
     }
 }
 
+#[no_mangle]
+pub extern "C" fn occlum_lseek(fd: c_int, offset: off_t, whence: c_int) -> off_t {
+    match do_lseek(fd, offset, whence) {
+        Ok(ret) => {
+            ret
+        },
+        Err(e) => {
+            -1 as off_t // this special value indicates error
+        }
+    }
+}
 
 #[no_mangle]
 pub extern "C" fn occlum_getpid() -> c_uint

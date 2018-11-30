@@ -54,6 +54,13 @@ long dispatch_syscall(int num, long arg0, long arg1, long arg2, long arg3, long 
         ret = occlum_readv(fd, iov, count);
         break;
     }
+    case SYS_lseek: {
+        DECL_SYSCALL_ARG(int, fd, arg0);
+        DECL_SYSCALL_ARG(off_t, offset, arg1);
+        DECL_SYSCALL_ARG(int, whence, arg2);
+        ret = occlum_lseek(fd, offset, whence);
+        break;
+    }
     case SYS_spawn: {
         DECL_SYSCALL_ARG(int*, child_pid, arg0);
         DECL_SYSCALL_ARG(const char*, path, arg1);

@@ -3,14 +3,13 @@ use {std};
 use std::{fmt};
 
 use std::sgxfs as fs_impl;
-use std::io::{Read, Write, Seek, SeekFrom};
 
 pub trait File : Debug + Sync + Send {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error>;
     fn write(&self, buf: &[u8]) -> Result<usize, Error>;
     fn readv<'a, 'b>(&self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error>;
     fn writev<'a, 'b>(&self, bufs: &'a [&'b [u8]]) -> Result<usize, Error>;
-    //pub seek(&mut self, ) -> Result<usize, Error>;
+    fn seek(&self, pos: SeekFrom) -> Result<off_t, Error>;
 }
 
 pub type FileRef = Arc<Box<File>>;
@@ -23,9 +22,14 @@ pub struct SgxFile {
 
 impl SgxFile {
     pub fn new(file: Arc<SgxMutex<fs_impl::SgxFile>>,
-               is_readable: bool, is_writable: bool, is_append: bool) -> SgxFile
+               is_readable: bool, is_writable: bool, is_append: bool)
+        -> Result<SgxFile, Error>
     {
-        SgxFile {
+        if !is_readable && !is_writable {
+            return Err(Error::new(Errno::EINVAL, "Invalid permissions"));
+        }
+
+        Ok(SgxFile {
             inner: SgxMutex::new(SgxFileInner {
                 pos: 0 as usize,
                 file: file,
@@ -33,7 +37,7 @@ impl SgxFile {
                 is_writable,
                 is_append,
             }),
-        }
+        })
     }
 }
 
@@ -61,6 +65,12 @@ impl File for SgxFile {
         let inner = inner_guard.borrow_mut();
         inner.writev(bufs)
     }
+
+    fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
+        let mut inner_guard = self.inner.lock().unwrap();
+        let inner = inner_guard.borrow_mut();
+        inner.seek(pos)
+    }
 }
 
 #[derive(Clone)]
@@ -76,10 +86,18 @@ struct SgxFileInner {
 
 impl SgxFileInner {
     pub fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
+        if !self.is_writable {
+            return Err(Error::new(Errno::EINVAL, "File not writable"));
+        }
+
         let mut file_guard = self.file.lock().unwrap();
         let file = file_guard.borrow_mut();
 
-        let seek_pos = SeekFrom::Start(self.pos as u64);
+        let seek_pos = if !self.is_append {
+            SeekFrom::Start(self.pos as u64)
+        } else {
+            SeekFrom::End(0)
+        };
         // TODO: recover from error
         file.seek(seek_pos).map_err(
             |e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
@@ -89,11 +107,17 @@ impl SgxFileInner {
                 |e| Error::new(Errno::EINVAL, "Failed to write"))?
         };
 
-        self.pos += write_len;
+        if !self.is_append {
+            self.pos += write_len;
+        }
         Ok(write_len)
     }
 
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        if !self.is_readable {
+            return Err(Error::new(Errno::EINVAL, "File not readable"));
+        }
+
         let mut file_guard = self.file.lock().unwrap();
         let file = file_guard.borrow_mut();
 
@@ -110,11 +134,50 @@ impl SgxFileInner {
         Ok(read_len)
     }
 
-    pub fn writev<'a, 'b>(&mut self, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
+    pub fn seek(&mut self, pos: SeekFrom) -> Result<off_t, Error> {
         let mut file_guard = self.file.lock().unwrap();
         let file = file_guard.borrow_mut();
 
-        let seek_pos = SeekFrom::Start(self.pos as u64);
+        let pos = match pos {
+            SeekFrom::Start(absolute_offset) => {
+                pos
+            }
+            SeekFrom::End(relative_offset) => {
+                pos
+            }
+            SeekFrom::Current(relative_offset) => {
+                if relative_offset >= 0 {
+                    SeekFrom::Start((self.pos + relative_offset as usize) as u64)
+                }
+                else {
+                    let backward_offset = (-relative_offset) as usize;
+                    if self.pos < backward_offset { // underflow
+                        return Err(Error::new(Errno::EINVAL,
+                                              "Invalid seek position"));
+                    }
+                    SeekFrom::Start((self.pos - backward_offset) as u64)
+                }
+            }
+        };
+
+        self.pos = file.seek(pos).map_err(
+            |e| Error::new(Errno::EINVAL, "Failed to seek to a position"))? as usize;
+        Ok(self.pos as off_t)
+    }
+
+    pub fn writev<'a, 'b>(&mut self, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
+        if !self.is_writable {
+            return Err(Error::new(Errno::EINVAL, "File not writable"));
+        }
+
+        let mut file_guard = self.file.lock().unwrap();
+        let file = file_guard.borrow_mut();
+
+        let seek_pos = if !self.is_append {
+            SeekFrom::Start(self.pos as u64)
+        } else {
+            SeekFrom::End(0)
+        };
         file.seek(seek_pos).map_err(
             |e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
 
@@ -143,6 +206,10 @@ impl SgxFileInner {
     }
 
     fn readv<'a, 'b>(&mut self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {
+        if !self.is_readable {
+            return Err(Error::new(Errno::EINVAL, "File not readable"));
+        }
+
         let mut file_guard = self.file.lock().unwrap();
         let file = file_guard.borrow_mut();
 
@@ -233,7 +300,11 @@ impl File for StdoutFile {
     }
 
     fn readv<'a, 'b>(&self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "Stdout does not support reading"))
+        Err(Error::new(Errno::EBADF, "Stdout does not support read"))
+    }
+
+    fn seek(&self, seek_pos: SeekFrom) -> Result<off_t, Error> {
+        Err(Error::new(Errno::ESPIPE, "Stdout does not support seek"))
     }
 }
 
@@ -268,7 +339,11 @@ impl File for StdinFile {
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "Stdin does not support reading"))
+        Err(Error::new(Errno::EBADF, "Stdin does not support write"))
+    }
+
+    fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
+        Err(Error::new(Errno::ESPIPE, "Stdin does not support seek"))
     }
 
     fn readv<'a, 'b>(&self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {

@@ -15,6 +15,9 @@ pub use std::vec::Vec;
 pub use std::string::{String};
 pub use std::collections::{HashMap, VecDeque};
 pub use std::fmt::{Debug, Display};
+pub use std::io::{Read, Write, Seek, SeekFrom};
 
 pub use errno::Error as Error;
 pub use errno::Errno;
+
+pub use fs::off_t;

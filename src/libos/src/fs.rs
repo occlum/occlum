@@ -12,6 +12,13 @@ pub const O_CREAT  : u32 = 0x00000040;
 pub const O_TRUNC  : u32 = 0x00000200;
 pub const O_APPEND : u32 = 0x00000400;
 
+// TODO: use the type defined in Rust libc.
+//
+// However, off_t is defined as i64 in the current Rust SGX SDK, which is
+// wrong (see issue https://github.com/baidu/rust-sgx-sdk/issues/46)
+#[allow(non_camel_case_types)]
+pub type off_t = i64;
+
 pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
     let open_options = {
         let mut open_options = fs_impl::OpenOptions::new();
@@ -29,6 +36,7 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
 
     let mut sgx_file = {
         let key : sgx_key_128bit_t = [0 as uint8_t; 16];
+        // TODO: what if two processes open the same underlying SGX file?
         let sgx_file = open_options.open_ex(path, &key)
             .map_err(|e| (Errno::ENOENT, "Failed to open the SGX-protected file") )?;
         Arc::new(SgxMutex::new(sgx_file))
@@ -38,7 +46,7 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
     let is_writable = (flags & O_WRONLY != 0) || (flags & O_RDWR != 0);
     let is_append = (flags & O_APPEND != 0);
     let file_ref : Arc<Box<File>> = Arc::new(Box::new(
-            SgxFile::new(sgx_file, is_readable, is_writable, is_append)));
+            SgxFile::new(sgx_file, is_readable, is_writable, is_append)?));
 
     let current_ref = process::get_current();
     let mut current_process = current_ref.lock().unwrap();
@@ -77,6 +85,14 @@ pub fn do_readv<'a, 'b>(fd: FileDesc, bufs: &'a mut [&'b mut [u8]]) -> Result<us
     let file_ref = current_process.file_table.get(fd)
         .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor [do_read]"))?;
     file_ref.readv(bufs)
+}
+
+pub fn do_lseek<'a, 'b>(fd: FileDesc, offset: SeekFrom) -> Result<off_t, Error> {
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    let file_ref = current_process.file_table.get(fd)
+        .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor [do_lseek]"))?;
+    file_ref.seek(offset)
 }
 
 pub fn do_close(fd: FileDesc) -> Result<(), Error> {
