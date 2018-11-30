@@ -1,9 +1,10 @@
 #include <unistd.h>
 #include <string.h>
+#include <stdio.h>
 
 static const char* msg = "Hello World\n";
 
 int main(void) {
-    write(1, msg, strlen(msg) + 1);
+    printf("%s", msg);
     return 0;
 }

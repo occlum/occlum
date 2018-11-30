@@ -21,3 +21,9 @@ pub use errno::Error as Error;
 pub use errno::Errno;
 
 pub use fs::off_t;
+
+macro_rules! debug_trace {
+    () => {
+        println!("> Line = {}, File = {}", line!(), file!())
+    };
+}

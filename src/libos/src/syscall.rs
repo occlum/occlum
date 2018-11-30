@@ -92,7 +92,7 @@ fn do_writev(fd: c_int, iov: *const iovec_t, count: c_int)
             let buf = unsafe {
                 std::slice::from_raw_parts(iov.base as * const u8, iov.len)
             };
-            bufs_vec[iov_i] = buf;
+            bufs_vec.push(buf);
         }
         bufs_vec
     };
@@ -122,7 +122,7 @@ fn do_readv(fd: c_int, iov: *mut iovec_t, count: c_int)
             let buf = unsafe {
                 std::slice::from_raw_parts_mut(iov.base as * mut u8, iov.len)
             };
-            bufs_vec[iov_i] = buf;
+            bufs_vec.push(buf);
         }
         bufs_vec
     };

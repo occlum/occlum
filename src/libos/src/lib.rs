@@ -24,6 +24,7 @@ use std::panic;
 use sgx_types::*;
 use sgx_trts::libc;
 
+#[macro_use]
 mod prelude;
 mod elf_helper;
 mod errno;

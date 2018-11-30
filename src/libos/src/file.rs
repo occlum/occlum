@@ -185,8 +185,6 @@ impl SgxFileInner {
         for buf in bufs {
             match file.write(buf) {
                 Ok(this_bytes) => {
-                    if this_bytes == 0 { break; }
-
                     total_bytes += this_bytes;
                     if this_bytes < buf.len() { break; }
                 }
@@ -221,8 +219,6 @@ impl SgxFileInner {
         for buf in bufs {
             match file.read(buf) {
                 Ok(this_bytes) => {
-                    if this_bytes == 0 { break; }
-
                     total_bytes += this_bytes;
                     if this_bytes < buf.len() { break; }
                 }
@@ -282,7 +278,6 @@ impl File for StdoutFile {
         for buf in bufs {
             match guard.write(buf) {
                 Ok(this_len) => {
-                    if this_len == 0 { break; }
                     total_bytes += this_len;
                     if this_len < buf.len() { break; }
                 }
@@ -352,7 +347,6 @@ impl File for StdinFile {
         for buf in bufs {
             match guard.read(buf) {
                 Ok(this_len) => {
-                    if this_len == 0 { break; }
                     total_bytes += this_len;
                     if this_len < buf.len() { break; }
                 }
