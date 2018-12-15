@@ -1,4 +1,5 @@
-use prelude::*;
+use super::*;
+
 use {std, std::mem, std::ptr};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -46,17 +47,19 @@ use std::os::raw::c_char;
  *
  */
 
-pub fn do_init_process_stack<'a, 'b>(stack: &'a StackBuf,
-            argv: &'b [CString], envp: &'b [CString], auxtbl: &'b AuxTable)
-    -> Result<(), Error>
+pub fn do_init(stack_top: usize, init_area_size: usize,
+               argv: &[CString], envp: &[CString], auxtbl: &AuxTable)
+    -> Result<usize, Error>
 {
-    let envp_cloned = clone_cstrings_on_stack(stack, envp)?;
-    let argv_cloned = clone_cstrings_on_stack(stack, argv)?;
-    dump_auxtbl_on_stack(stack, auxtbl)?;
-    dump_cstrptrs_on_stack(stack, &envp_cloned);
-    dump_cstrptrs_on_stack(stack, &argv_cloned);
-    stack.put(argv.len() as u64);
-    Ok(())
+    let stack_buf = unsafe { StackBuf::new(stack_top, init_area_size)? };
+    let envp_cloned = clone_cstrings_on_stack(&stack_buf, envp)?;
+    let argv_cloned = clone_cstrings_on_stack(&stack_buf, argv)?;
+    dump_auxtbl_on_stack(&stack_buf, auxtbl)?;
+    dump_auxtbl_on_stack(&stack_buf, auxtbl)?;
+    dump_cstrptrs_on_stack(&stack_buf, &envp_cloned);
+    dump_cstrptrs_on_stack(&stack_buf, &argv_cloned);
+    stack_buf.put(argv.len() as u64);
+    Ok(stack_buf.get_pos())
 }
 
 /// StackBuf is a buffer that is filled in from high addresses to low
@@ -64,29 +67,19 @@ pub fn do_init_process_stack<'a, 'b>(stack: &'a StackBuf,
 /// [self.bottom, self.top).
 #[derive(Debug)]
 pub struct StackBuf {
-    stack_top: *const u8,
-    stack_bottom: *const u8,
-    stack_pos: Cell<*const u8>,
-}
-
-impl Default for StackBuf {
-    fn default() -> StackBuf {
-        StackBuf {
-            stack_top: 0 as *const u8,
-            stack_bottom: 0 as *const u8,
-            stack_pos: Cell::new(0 as *const u8),
-        }
-    }
+    stack_top: usize,
+    stack_bottom: usize,
+    stack_pos: Cell<usize>,
 }
 
 impl StackBuf {
-    pub fn new(stack_top: *const u8, stack_bottom: *const u8) -> Result<StackBuf, Error>{
-        if stack_top as usize <= stack_bottom as usize{
-            return Err(Error::new(Errno::EINVAL, "Invalid stack range"));
+    pub unsafe fn new(stack_top: usize, stack_size: usize) -> Result<StackBuf, Error>{
+        if stack_top % 16 != 0 || stack_size == 0 || stack_top < stack_size {
+            return errno!(EINVAL, "Invalid stack range");
         };
         Ok(StackBuf {
             stack_top: stack_top,
-            stack_bottom: stack_bottom,
+            stack_bottom: stack_top - stack_size,
             stack_pos: Cell::new(stack_top),
         })
     }
@@ -106,7 +99,11 @@ impl StackBuf {
     {
         let val_size = mem::size_of::<T>();
         let val_align = mem::align_of::<T>();
-        let total_size = val_size * vals.len();
+        let total_size = {
+            let num_vals = vals.len();
+            if num_vals == 0 { return Ok(self.get_pos() as *const T); }
+            val_size * num_vals
+        };
         let base_ptr = self.alloc(total_size, val_align)? as *mut T;
 
         let mut val_ptr = base_ptr;
@@ -123,31 +120,18 @@ impl StackBuf {
         self.put_slice(bytes)
     }
 
-    pub fn get_pos(&self) -> *const u8 {
+    pub fn get_pos(&self) -> usize {
         self.stack_pos.get()
     }
 
-    fn alloc(&self, size: usize, align_power2: usize) -> Result<*mut u8, Error> {
-        if size == 0 || !align_power2.is_power_of_two() {
-            return Err(Error::new(Errno::EINVAL, "Invalid size or align"));
-        }
-
-        let old_pos = {
-            let old_pos = self.stack_pos.get() as usize;
-            let remain_size = old_pos - self.stack_bottom as usize;
-            if size > remain_size {
-                return Err(Error::new(Errno::ENOMEM, "No enough space in buffer"));
-            }
-            old_pos
-        };
-
+    fn alloc(&self, size: usize, align: usize) -> Result<*mut u8, Error> {
         let new_pos = {
-            let mask = (-(align_power2 as isize)) as usize;
-            let new_pos = (old_pos - size) & mask;
-            if new_pos < self.stack_bottom as usize {
+            let old_pos = self.stack_pos.get();
+            let new_pos = align_down(old_pos - size, align);
+            if new_pos < self.stack_bottom {
                 return Err(Error::new(Errno::ENOMEM, "No enough space in buffer"));
             }
-            new_pos as *const u8
+            new_pos
         };
         self.stack_pos.set(new_pos);
 

@@ -7,6 +7,7 @@
 #![cfg_attr(target_env = "sgx", feature(rustc_private))]
 #![feature(allocator_api)]
 #![feature(integer_atomics)]
+#![feature(range_contains)]
 
 extern crate sgx_types;
 #[cfg(not(target_env = "sgx"))]
@@ -26,16 +27,13 @@ use sgx_trts::libc;
 
 #[macro_use]
 mod prelude;
-mod elf_helper;
 mod errno;
 mod file;
 mod file_table;
 mod fs;
-mod mm;
 mod process;
 mod syscall;
-mod vma;
-mod init_stack;
+mod vm;
 
 /// Export system calls
 pub use syscall::*;

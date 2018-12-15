@@ -6,17 +6,17 @@ LIBOS_ENCLAVE := libocclum.signed.so
 LIBOS_SO := libocclum.so # Link $(LIBOS_A), $(C_OBJS) and all dependencies
 LIBOS_A := liblibos.a # Built from Rust code
 
-RUST_SRCS := $(wildcard src/*.rs)
-C_SRCS := $(sort $(filter-out src/Enclave_t.c, $(wildcard src/*.c))) src/Enclave_t.c
+RUST_SRCS := $(wildcard src/*.rs src/*/*.rs src/*/*/*.rs)
+C_SRCS := $(sort $(filter-out src/Enclave_t.c, $(wildcard src/*.c src/*/*.c))) src/Enclave_t.c
 C_OBJS := $(C_SRCS:.c=.o)
-S_SRCS := $(wildcard src/*.S)
+S_SRCS := $(wildcard src/*.S src/*/*.S)
 S_OBJS := $(S_SRCS:.S=.o)
 EDL_C_SRCS := src/Enclave_t.c src/Enclave_t.h
 
 ENCLAVE_CONFIG := Enclave_config.xml
 ENCLAVE_KEY := Enclave_private.pem
 
-C_FLAGS := $(SGX_CFLAGS_T) -fno-stack-protector
+C_FLAGS := $(SGX_CFLAGS_T) -fno-stack-protector -I./include/
 _Other_Link_Flags := -L../../deps/rust-sgx-sdk/compiler-rt/ -L.
 _Other_Enclave_Libs := -lcompiler-rt-patch -llibos -lsgx_tprotected_fs
 LINK_FLAGS := $(SGX_LFLAGS_T)

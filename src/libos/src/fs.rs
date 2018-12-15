@@ -50,7 +50,7 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
 
     let current_ref = process::get_current();
     let mut current_process = current_ref.lock().unwrap();
-    let fd = current_process.file_table.put(file_ref);
+    let fd = current_process.get_files_mut().put(file_ref);
 
     Ok(fd)
 }
@@ -58,7 +58,7 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
 pub fn do_write(fd: FileDesc, buf: &[u8]) -> Result<usize, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.file_table.get(fd)
+    let file_ref = current_process.get_files().get(fd)
         .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor [do_write]"))?;
     file_ref.write(buf)
 }
@@ -66,7 +66,7 @@ pub fn do_write(fd: FileDesc, buf: &[u8]) -> Result<usize, Error> {
 pub fn do_read(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.file_table.get(fd)
+    let file_ref = current_process.get_files().get(fd)
         .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor [do_read]"))?;
     file_ref.read(buf)
 }
@@ -74,7 +74,7 @@ pub fn do_read(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
 pub fn do_writev<'a, 'b>(fd: FileDesc, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.file_table.get(fd)
+    let file_ref = current_process.get_files().get(fd)
         .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor [do_write]"))?;
     file_ref.writev(bufs)
 }
@@ -82,7 +82,7 @@ pub fn do_writev<'a, 'b>(fd: FileDesc, bufs: &'a [&'b [u8]]) -> Result<usize, Er
 pub fn do_readv<'a, 'b>(fd: FileDesc, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.file_table.get(fd)
+    let file_ref = current_process.get_files().get(fd)
         .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor [do_read]"))?;
     file_ref.readv(bufs)
 }
@@ -90,7 +90,7 @@ pub fn do_readv<'a, 'b>(fd: FileDesc, bufs: &'a mut [&'b mut [u8]]) -> Result<us
 pub fn do_lseek<'a, 'b>(fd: FileDesc, offset: SeekFrom) -> Result<off_t, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.file_table.get(fd)
+    let file_ref = current_process.get_files().get(fd)
         .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor [do_lseek]"))?;
     file_ref.seek(offset)
 }
@@ -98,7 +98,7 @@ pub fn do_lseek<'a, 'b>(fd: FileDesc, offset: SeekFrom) -> Result<off_t, Error> 
 pub fn do_close(fd: FileDesc) -> Result<(), Error> {
     let current_ref = process::get_current();
     let mut current_process = current_ref.lock().unwrap();
-    let file_table = &mut current_process.file_table;
+    let file_table = current_process.get_files_mut();
     match file_table.del(fd) {
         Some(_) => Ok(()),
         None => Err(Error::new(Errno::EBADF, "Invalid file descriptor [do_close]")),

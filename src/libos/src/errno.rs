@@ -1,6 +1,8 @@
 use prelude::*;
 use std::{fmt, error, convert,};
 
+// TODO: remove errno.h
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Error {
     pub errno: Errno,
@@ -13,7 +15,6 @@ impl Error {
             errno,
             desc,
         };
-        println!("{}", ret);
         ret
     }
 }

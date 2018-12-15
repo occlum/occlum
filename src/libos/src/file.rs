@@ -1,6 +1,7 @@
 use prelude::*;
 use {std};
 use std::{fmt};
+use std::borrow::BorrowMut;
 
 use std::sgxfs as fs_impl;
 

@@ -1,4 +1,4 @@
-use prelude::*;
+use super::*;
 
 use xmas_elf::{sections, ElfFile, program, P64};
 use xmas_elf::symbol_table::{Entry64, DynEntry64};
