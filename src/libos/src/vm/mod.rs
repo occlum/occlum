@@ -1,5 +1,8 @@
 use prelude::*;
 use std::{fmt};
+use file_table::{FileDesc};
+use fs::{off_t};
+use process::{Process, ProcessRef, get_current};
 
 // TODO: Rename VMSpace to VMUniverse
 
@@ -13,8 +16,43 @@ mod process_vm;
 pub use self::vm_range::{VMRange, VMRangeTrait};
 pub use self::process_vm::{ProcessVM};
 
-pub const PAGE_SIZE : usize = 4096;
+// TODO: separate proc and flags
+// TODO: accept fd and offset
+pub fn do_mmap(addr: usize, size: usize, flags: VMAreaFlags)
+    -> Result<usize, Error>
+{
+    let current_ref = get_current();
+    let mut current_process = current_ref.lock().unwrap();
+    let current_vm = current_process.get_vm_mut();
+    current_vm.mmap(addr, size, flags)
+}
 
+pub fn do_munmap(addr: usize, size: usize) -> Result<(), Error> {
+    let current_ref = get_current();
+    let mut current_process = current_ref.lock().unwrap();
+    let current_vm = current_process.get_vm_mut();
+    current_vm.munmap(addr, size)
+}
+
+// TODO: accept flags
+pub fn do_mremap(old_addr: usize, old_size: usize, options: &VMResizeOptions)
+    -> Result<usize, Error>
+{
+    let current_ref = get_current();
+    let mut current_process = current_ref.lock().unwrap();
+    let current_vm = current_process.get_vm_mut();
+    current_vm.mremap(old_addr, old_size, options)
+}
+
+pub fn do_brk(addr: usize) -> Result<usize, Error> {
+    let current_ref = get_current();
+    let mut current_process = current_ref.lock().unwrap();
+    let current_vm = current_process.get_vm_mut();
+    current_vm.brk(addr)
+}
+
+
+pub const PAGE_SIZE : usize = 4096;
 
 #[derive(Debug)]
 pub struct VMSpace {

@@ -1,6 +1,8 @@
 use prelude::*;
-use {std, file, file_table, fs, process};
+use {std, file, file_table, fs, process, vm};
 use std::ffi::{CStr, CString};
+use fs::{off_t};
+use vm::{VMAreaFlags, VMResizeOptions};
 // Use the internal syscall wrappers from sgx_tstd
 //use std::libc_fs as fs;
 //use std::libc_io as io;
@@ -158,6 +160,80 @@ pub fn do_lseek(fd: c_int, offset: off_t, whence: c_int) -> Result<off_t, Error>
     fs::do_lseek(fd, seek_from)
 }
 
+fn do_mmap(addr: *const c_void, size: size_t, prot: c_int,
+           flags: c_int, fd: c_int, offset: off_t)
+    -> Result<*const c_void, Error>
+{
+    let addr = addr as usize;
+    let size = size as usize;
+    let flags = VMAreaFlags(prot as u32);
+    vm::do_mmap(addr, size, flags).map(|ret_addr| ret_addr as *const c_void)
+}
+
+fn do_munmap(addr: *const c_void, size: size_t) -> Result<(), Error> {
+    let addr = addr as usize;
+    let size = size as usize;
+    vm::do_munmap(addr, size)
+}
+
+fn do_mremap(old_addr: *const c_void, old_size: size_t,
+             new_size: size_t, flags: c_int, new_addr: *const c_void)
+    -> Result<*const c_void, Error>
+{
+    let old_addr = old_addr as usize;
+    let old_size = old_size as usize;
+    let mut options = VMResizeOptions::new(new_size)?;
+    // TODO: handle flags and new_addr
+    vm::do_mremap(old_addr, old_size, &options)
+        .map(|ret_addr| ret_addr as *const c_void)
+}
+
+fn do_brk(new_brk_addr: *const c_void) -> Result<*const c_void, Error> {
+    let new_brk_addr = new_brk_addr as usize;
+    vm::do_brk(new_brk_addr).map(|ret_brk_addr| ret_brk_addr as *const c_void)
+}
+
+
+const MAP_FAILED : *const c_void = ((-1) as i64) as *const c_void;
+
+#[no_mangle]
+pub extern "C" fn occlum_mmap(addr: *const c_void, length: size_t, prot: c_int,
+                              flags: c_int, fd: c_int, offset: off_t)
+    -> *const c_void
+{
+    match do_mmap(addr, length, prot, flags, fd, offset) {
+        Ok(ret_addr) => { ret_addr },
+        Err(e) => { MAP_FAILED }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn occlum_munmap(addr: *const c_void, length: size_t) -> c_int {
+    match do_munmap(addr, length) {
+        Ok(()) => { 0 },
+        Err(e) => { -1 }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn occlum_mremap(old_addr: *const c_void, old_size: size_t,
+                                new_size: size_t, flags: c_int,
+                                new_addr: *const c_void)
+    -> *const c_void
+{
+    match do_mremap(old_addr, old_size, new_size, flags, new_addr) {
+        Ok(ret_addr) => { ret_addr },
+        Err(e) => { MAP_FAILED }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn occlum_brk(addr: *const c_void) ->  *const c_void {
+    match do_brk(addr) {
+        Ok(ret_addr) => { ret_addr },
+        Err(e) => { MAP_FAILED }
+    }
+}
 
 #[no_mangle]
 pub extern "C" fn occlum_open(path_buf: * const c_char, flags: c_int, mode: c_int) -> c_int {

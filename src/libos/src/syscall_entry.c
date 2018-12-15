@@ -4,7 +4,7 @@
 #define DECL_SYSCALL_ARG(_type, _name, _arg)        \
     _type _name = (_type) (_arg)
 
-long dispatch_syscall(int num, long arg0, long arg1, long arg2, long arg3, long arg4) {
+long dispatch_syscall(int num, long arg0, long arg1, long arg2, long arg3, long arg4, long arg5) {
     long ret = 0;
 
     switch (num) {
@@ -81,10 +81,39 @@ long dispatch_syscall(int num, long arg0, long arg1, long arg2, long arg3, long 
         ret = occlum_getpid();
         break;
     }
+    case SYS_mmap: {
+        DECL_SYSCALL_ARG(void*, addr, arg0);
+        DECL_SYSCALL_ARG(size_t, length, arg1);
+        DECL_SYSCALL_ARG(int, prot, arg2);
+        DECL_SYSCALL_ARG(int, flags, arg3);
+        DECL_SYSCALL_ARG(int, fd, arg4);
+        DECL_SYSCALL_ARG(off_t, offset, arg5);
+        ret = (long) occlum_mmap(addr, length, prot, flags, fd, offset);
+        break;
+    }
+    case SYS_munmap: {
+        DECL_SYSCALL_ARG(void*, addr, arg0);
+        DECL_SYSCALL_ARG(size_t, length, arg1);
+        ret = occlum_munmap(addr, length);
+        break;
+    }
+    case SYS_mremap: {
+        DECL_SYSCALL_ARG(void*, old_addr, arg0);
+        DECL_SYSCALL_ARG(size_t, old_size, arg1);
+        DECL_SYSCALL_ARG(size_t, new_size, arg2);
+        DECL_SYSCALL_ARG(int, flags, arg3);
+        DECL_SYSCALL_ARG(void*, new_addr, arg4);
+        ret = (long) occlum_mremap(old_addr, old_size, new_size, flags, new_addr);
+        break;
+    }
+    case SYS_brk: {
+        DECL_SYSCALL_ARG(void*, addr, arg0);
+        ret = (long) occlum_brk(addr);
+        break;
+    }
     default:
         ret = occlum_unknown(num);
         break;
     }
-
     return ret;
 }

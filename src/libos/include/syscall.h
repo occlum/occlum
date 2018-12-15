@@ -17,12 +17,19 @@ extern ssize_t occlum_write(int fd, const void* buf, size_t size);
 extern ssize_t occlum_readv(int fd, struct iovec* iov, int count);
 extern ssize_t occlum_writev(int fd, const struct iovec* iov, int count);
 extern off_t occlum_lseek(int fd, off_t offset, int whence);
+
 extern int occlum_spawn(int* child_pid, const char* path,
                         const char** argv,
                         const char** envp);
 extern int occlum_wait4(int child_pid, int* status, int options/*, struct rusage* rusage*/);
 extern unsigned int occlum_getpid(void);
 extern void occlum_exit(int status);
+
+extern void *occlum_mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
+extern int occlum_munmap(void *addr, size_t length);
+extern void *occlum_mremap(void *old_address, size_t old_size, size_t new_size, int flags, void *new_address);
+extern void* occlum_brk(void* addr);
+
 extern int occlum_unknown(int num);
 
 #ifdef __cplusplus
