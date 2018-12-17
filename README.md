@@ -12,7 +12,11 @@ Compared to existing library OSes for SGX, Occlum has following unprecedented fe
 
 ### Prerequisite
 
-Occlum depends on [Rust SGX SDK](https://github.com/baidu/rust-sgx-sdk/) and [Intel SGX SDK](https://github.com/intel/linux-sgx/). So, make sure Rust SGX SDK and Intel SGX SDK can be built properly on your machine. We have tested with Rust SGX SDK 1.1, Rust nightly-2018-08-25 and Intel SGX SDK 2.2 on Ubuntu 16.04.
+Occlum depends on [Baidu Rust SGX SDK](https://github.com/baidu/rust-sgx-sdk/) and [Intel SGX SDK](https://github.com/intel/linux-sgx/).
+
+Rust SGX SDK is included as a Git submodule of this project, which can be automatically downloaded by using project's Makefile. Currently, we're using version 1.0.4 of Rust SGX SDK, which in turn depends on Rust nightly-2018-10-01. So, make sure you have Rust installed and use this version as the default.
+
+Intel SGX SDK has to be installed separately. We have tested with Intel SGX SDK v2.3.1. Note that it must be modified slightly to work with Rust SGX SDK. The patch can be found [here](https://github.com/baidu/rust-sgx-sdk/blob/af441e3c9143a8c1d04dbbc544142adc8e35f73e/dockerfile/patch).
 
 ### Compile
 

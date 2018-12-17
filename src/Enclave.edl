@@ -3,8 +3,6 @@ enclave {
     from "sgx_backtrace.edl" import *;
     from "sgx_tstdc.edl" import *;
     from "sgx_tstd.edl" import *;
-    from "sgx_net.edl" import *;
-    from "sgx_time.edl" import *;
     from "sgx_tprotected_fs.edl" import *;
 
     trusted {
