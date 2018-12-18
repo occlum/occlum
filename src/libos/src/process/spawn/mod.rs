@@ -1,6 +1,5 @@
 use super::*;
-use file::{File, StdinFile, StdoutFile/*, StderrFile*/};
-use file_table::{FileTable};
+use fs::{File, StdinFile, StdoutFile/*, StderrFile*/, FileTable};
 use std::path::Path;
 use std::ffi::{CStr, CString};
 use std::sgxfs::SgxFile;

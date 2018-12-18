@@ -28,8 +28,6 @@ use sgx_trts::libc;
 #[macro_use]
 mod prelude;
 mod errno;
-mod file;
-mod file_table;
 mod fs;
 mod process;
 mod syscall;

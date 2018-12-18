@@ -1,8 +1,7 @@
 use super::*;
 use super::task::{Task};
 use vm::{ProcessVM, VMRangeTrait};
-use file_table::{FileTable};
-use file::{File, FileRef,};
+use fs::{FileTable, File, FileRef};
 
 #[allow(non_camel_case_types)]
 pub type pid_t = u32;

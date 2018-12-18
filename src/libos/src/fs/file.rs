@@ -1,9 +1,8 @@
-use prelude::*;
+use super::*;
 use {std};
 use std::{fmt};
 use std::borrow::BorrowMut;
 
-use std::sgxfs as fs_impl;
 
 pub trait File : Debug + Sync + Send {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error>;

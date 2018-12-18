@@ -1,7 +1,6 @@
 use prelude::*;
 use std::{fmt};
-use file_table::{FileDesc};
-use fs::{off_t};
+use fs::{off_t, FileDesc};
 use process::{Process, ProcessRef, get_current};
 
 // TODO: Rename VMSpace to VMUniverse

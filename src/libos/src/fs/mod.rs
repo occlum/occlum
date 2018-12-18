@@ -1,9 +1,13 @@
+use super::*;
 use prelude::*;
-use {std, file, file_table, process};
-use file::{File, SgxFile};
-use file_table::{FileDesc};
-
+use {std, process};
 use std::sgxfs as fs_impl;
+
+mod file;
+mod file_table;
+
+pub use self::file::{File, FileRef, SgxFile, StdinFile, StdoutFile};
+pub use self::file_table::{FileDesc, FileTable};
 
 pub const O_RDONLY : u32 = 0x00000000;
 pub const O_WRONLY : u32 = 0x00000001;

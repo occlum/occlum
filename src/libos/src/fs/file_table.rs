@@ -1,6 +1,6 @@
-use prelude::*;
-use {std, file};
-use file::{File, FileRef};
+use super::*;
+use super::file::{File, FileRef};
+use {std};
 
 pub type FileDesc = u32;
 

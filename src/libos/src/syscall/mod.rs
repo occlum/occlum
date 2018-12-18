@@ -1,7 +1,8 @@
+use super::*;
 use prelude::*;
-use {std, file, file_table, fs, process, vm};
+use {std, fs, process, vm};
 use std::ffi::{CStr, CString};
-use fs::{off_t};
+use fs::{off_t, FileDesc};
 use vm::{VMAreaFlags, VMResizeOptions};
 // Use the internal syscall wrappers from sgx_tstd
 //use std::libc_fs as fs;
@@ -50,7 +51,7 @@ fn clone_cstrings_from_user_safely(user_ptr: *const *const c_char)
 fn do_read(fd: c_int, buf: *mut c_void, size: size_t)
     -> Result<size_t, Error>
 {
-    let fd = fd as file_table::FileDesc;
+    let fd = fd as FileDesc;
     let safe_buf = {
         let buf = buf as *mut u8;
         let size = size as usize;
@@ -63,7 +64,7 @@ fn do_read(fd: c_int, buf: *mut c_void, size: size_t)
 fn do_write(fd: c_int, buf: *const c_void, size: size_t)
     -> Result<size_t, Error>
 {
-    let fd = fd as file_table::FileDesc;
+    let fd = fd as FileDesc;
     let safe_buf = {
         let buf = buf as *mut u8;
         let size = size as usize;
@@ -76,7 +77,7 @@ fn do_write(fd: c_int, buf: *const c_void, size: size_t)
 fn do_writev(fd: c_int, iov: *const iovec_t, count: c_int)
     -> Result<size_t, Error>
 {
-    let fd = fd as file_table::FileDesc;
+    let fd = fd as FileDesc;
 
     let count = {
         if count < 0 {
@@ -106,7 +107,7 @@ fn do_writev(fd: c_int, iov: *const iovec_t, count: c_int)
 fn do_readv(fd: c_int, iov: *mut iovec_t, count: c_int)
     -> Result<size_t, Error>
 {
-    let fd = fd as file_table::FileDesc;
+    let fd = fd as FileDesc;
 
     let count = {
         if count < 0 {
@@ -137,7 +138,7 @@ fn do_readv(fd: c_int, iov: *mut iovec_t, count: c_int)
 pub fn do_lseek(fd: c_int, offset: off_t, whence: c_int) -> Result<off_t, Error>
 {
 
-    let fd = fd as file_table::FileDesc;
+    let fd = fd as FileDesc;
 
     let seek_from = match whence {
         0 => { // SEEK_SET
@@ -252,7 +253,7 @@ pub extern "C" fn occlum_open(path_buf: * const c_char, flags: c_int, mode: c_in
 
 #[no_mangle]
 pub extern "C" fn occlum_close(fd: c_int) -> c_int {
-    match fs::do_close(fd as file_table::FileDesc) {
+    match fs::do_close(fd as FileDesc) {
         Ok(()) => {
             0
         },
