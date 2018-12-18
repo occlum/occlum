@@ -1,17 +1,14 @@
 use super::*;
 
-const DATA_SPACE_SIZE : usize = 12 * 1024 * 1024; // 16MB
-
 lazy_static! {
     static ref DATA_SPACE: SgxMutex<VMSpace> = {
-        let size = DATA_SPACE_SIZE;
-        let addr = {
-            let ptr = unsafe { aligned_malloc(size, PAGE_SIZE) };
-            if ptr == (0 as *mut c_void) {
-                panic!("Out of memory");
-            };
-            ptr as usize
+        let (addr, size) = {
+            let mut addr : usize = 0;
+            let mut size : usize = 0;
+            unsafe { vm_get_prealloced_data_space(&mut addr, &mut size) };
+            (addr, size)
         };
+        println!("addr = {:X?}, size = {}", addr, size);
         let vm_space = unsafe {
             match VMSpace::new(addr, size, VMGuardAreaType::None) {
                 Ok(vm_space) => vm_space,
@@ -22,14 +19,8 @@ lazy_static! {
     };
 }
 
-unsafe fn aligned_malloc(mem_size: usize, mem_align: usize) -> *mut c_void {
-    let mut mem_ptr = ::core::ptr::null_mut();
-    let ret = libc::posix_memalign(&mut mem_ptr, mem_align, mem_size);
-    if ret == 0 {
-        mem_ptr
-    } else {
-        0 as *mut c_void
-    }
+extern {
+    pub fn vm_get_prealloced_data_space(addr: &mut usize, size: &mut usize);
 }
 
 #[derive(Debug)]

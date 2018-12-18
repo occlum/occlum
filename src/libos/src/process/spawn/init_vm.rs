@@ -41,9 +41,6 @@ pub fn do_init(elf_file: &ElfFile, elf_buf: &[u8]) -> Result<ProcessVM, Error> {
     reloc_symbols(process_base_addr, elf_file)?;
     link_syscalls(process_base_addr, elf_file)?;
 
-    // Make code executable
-    code_seg.mprotect(PERM_R | PERM_W | PERM_X);
-
     Ok(process_vm)
 }
 

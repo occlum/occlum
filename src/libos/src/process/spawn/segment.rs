@@ -77,10 +77,13 @@ impl Segment {
     }
 
     pub fn mprotect(&mut self, perm: u32) {
+        panic!("Not implemented yet!");
+        /*
         unsafe {
             trts_mprotect(self.start_addr, self.end_addr - self.start_addr,
                           perm as u64);
         }
+        */
     }
 }
 
@@ -98,5 +101,10 @@ pub fn get_data_segment(elf_file: &ElfFile) -> Result<Segment, Error> {
 
 #[link(name = "sgx_trts")]
 extern {
+    // XXX: trts_mprotect is a private SGX function that is not supposed to be
+    // used by external users. At least, this is the case for SGX v2.2. To use
+    // this function, we need to modify Intel SGX SDK slightly. I suppose
+    // this functionality will be exposed to external users as an SGX API in
+    // the future.
     pub fn trts_mprotect(start: size_t, size: size_t, perms: uint64_t) -> sgx_status_t;
 }
