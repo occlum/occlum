@@ -3,7 +3,7 @@ INCLUDE_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 CUR_DIR := $(shell dirname $(realpath $(MAIN_MAKEFILE)))
 PROJECT_DIR := $(realpath $(CUR_DIR)/../../)
 
-CC := /usr/local/occlum/bin/musl-gcc
+CC := /usr/local/occlum/bin/musl-clang
 C_SRCS := $(wildcard *.c)
 S_FILES := $(C_SRCS:%.c=%.S)
 C_OBJS := $(C_SRCS:%.c=%.o)
@@ -12,8 +12,9 @@ BIN_ENC_NAME := bin.encrypted
 OBJDUMP_FILE := bin.objdump
 READELF_FILE := bin.readelf
 
-C_FLAGS = -Wall -fverbose-asm -O0 $(EXTRA_C_FLAGS)
-LINK_FLAGS = $(EXTRA_LINK_FLAGS)
+C_FLAGS = -Wall -O0 $(EXTRA_C_FLAGS)
+C_FLAGS += -Xclang -load -Xclang $(LLVM_PATH)/lib/LLVMBoundchecker.so -mllvm -check-store-only=true
+LINK_FLAGS = $(C_FLAGS) $(EXTRA_LINK_FLAGS)
 
 .PHONY: all run debug clean
 
@@ -39,11 +40,8 @@ $(READELF_FILE): $(BIN_NAME)
 $(BIN_NAME): $(C_OBJS)
 	$(CC) $^ $(LINK_FLAGS) -o $(BIN_NAME)
 
-$(C_OBJS): %.o: %.S
+$(C_OBJS): %.o: %.c
 	$(CC) $(C_FLAGS) -c $< -o $@
-
-$(S_FILES): %.S: %.c
-	$(CC) $(C_FLAGS) -S $< -o $@
 
 #############################################################################
 # Test
