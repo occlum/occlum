@@ -11,21 +11,21 @@ pub fn do_getpid() -> pid_t {
     current_process.get_pid()
 }
 
-pub fn do_exit(exit_code: i32) {
+pub fn do_exit(exit_status: i32) {
     let current_ref = get_current();
     let mut current_process = current_ref.lock().unwrap();
-    current_process.exit(exit_code);
+    current_process.exit(exit_status);
 }
 
 pub fn do_wait4(child_pid: u32) -> Result<i32, Error> {
     let child_process = process_table::get(child_pid)
         .ok_or_else(|| (Errno::ECHILD, "Cannot find child process with the given PID"))?;
 
-    let mut exit_code = 0;
+    let mut exit_status = 0;
     loop {
         let guard = child_process.lock().unwrap();
         if guard.get_status() == Status::ZOMBIE {
-            exit_code = guard.get_exit_code();
+            exit_status = guard.get_exit_status();
             break;
         }
         drop(guard);
@@ -34,7 +34,7 @@ pub fn do_wait4(child_pid: u32) -> Result<i32, Error> {
     let child_pid = child_process.lock().unwrap().get_pid();
     process_table::remove(child_pid);
 
-    Ok(exit_code)
+    Ok(exit_status)
 }
 
 mod task;

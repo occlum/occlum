@@ -370,12 +370,12 @@ pub extern "C" fn occlum_spawn(
 }
 
 #[no_mangle]
-pub extern "C" fn occlum_wait4(child_pid: c_int, _exit_code: *mut c_int,
+pub extern "C" fn occlum_wait4(child_pid: c_int, _exit_status: *mut c_int,
     options: c_int/*, rusage: *mut Rusage*/) -> c_int
 {
     match process::do_wait4(child_pid as u32) {
-        Ok(exit_code) => unsafe {
-            *_exit_code = exit_code;
+        Ok(exit_status) => unsafe {
+            *_exit_status = exit_status;
             0
         }
         Err(e) => {

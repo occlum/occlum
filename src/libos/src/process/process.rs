@@ -12,7 +12,7 @@ pub struct Process {
     status: Status,
     pid: pid_t,
     tgid: pid_t,
-    exit_code: i32,
+    exit_status: i32,
     exec_path: String,
     vm: ProcessVM,
     file_table: FileTable,
@@ -31,7 +31,7 @@ impl Process {
             pid: new_pid,
             tgid: new_pid,
             exec_path: exec_path.to_owned(),
-            exit_code: 0,
+            exit_status: 0,
             vm: vm,
             file_table: file_table,
         }));
@@ -43,15 +43,15 @@ impl Process {
     pub fn get_pid(&self) -> pid_t { self.pid }
     pub fn get_tgid(&self) -> pid_t { self.tgid }
     pub fn get_status(&self) -> Status { self.status }
-    pub fn get_exit_code(&self) -> i32 { self.exit_code }
+    pub fn get_exit_status(&self) -> i32 { self.exit_status }
     pub fn get_exec_path(&self) -> &str { &self.exec_path }
     pub fn get_vm(&self) -> &ProcessVM { &self.vm }
     pub fn get_vm_mut(&mut self) -> &mut ProcessVM { &mut self.vm }
     pub fn get_files(&self) -> &FileTable { &self.file_table }
     pub fn get_files_mut(&mut self) -> &mut FileTable { &mut self.file_table }
 
-    pub fn exit(&mut self, exit_code: i32) {
-        self.exit_code = exit_code;
+    pub fn exit(&mut self, exit_status: i32) {
+        self.exit_status = exit_status;
         self.status = Status::ZOMBIE;
     }
 }

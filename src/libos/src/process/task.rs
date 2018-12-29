@@ -34,7 +34,7 @@ fn dequeue_task() -> Option<ProcessRef> {
 }
 
 
-pub fn run_task() -> Result<(), Error> {
+pub fn run_task() -> Result<i32, Error> {
     let new_process : ProcessRef = dequeue_task()
         .ok_or_else(|| (Errno::EAGAIN, "No new processes to run"))?;
     set_current(&new_process);
@@ -51,13 +51,18 @@ pub fn run_task() -> Result<(), Error> {
         do_run_task(task);
     }
 
+    let exit_status = {
+        let mut process = new_process.lock().unwrap();
+        process.get_exit_status()
+    };
+
     // Init process does not have any parent, so it has to release itself
     if pid == 1 {
         process_table::remove(1);
     }
 
     reset_current();
-    Ok(())
+    Ok(exit_status)
 }
 
 

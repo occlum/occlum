@@ -225,7 +225,7 @@ int SGX_CDECL main(int argc, char *argv[])
     sgx_ret = libos_boot(global_eid, &status, executable_path);
     if(sgx_ret != SGX_SUCCESS) {
         print_error_message(sgx_ret);
-        return -1;
+        return status;
     }
 
     status = wait_all_tasks();

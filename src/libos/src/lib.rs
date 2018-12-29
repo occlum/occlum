@@ -49,10 +49,10 @@ pub extern "C" fn libos_boot(path_buf: *const i8) -> i32 {
         backtrace::__rust_begin_short_backtrace(||{
             match do_boot(&path_str) {
                 Ok(()) => 0,
-                Err(err) => err.errno.as_retval() /* Normal error */,
+                Err(err) => EXIT_STATUS_INTERNAL_ERROR,
             }
         })
-    }).unwrap_or(-1 /* Fatal error */)
+    }).unwrap_or(EXIT_STATUS_INTERNAL_ERROR)
 }
 
 #[no_mangle]
@@ -61,13 +61,16 @@ pub extern "C" fn libos_run() -> i32 {
     panic::catch_unwind(||{
         backtrace::__rust_begin_short_backtrace(||{
             match do_run() {
-                Ok(()) => 0,
-                Err(err) => err.errno.as_retval() /* Normal error */,
+                Ok(exit_status) => exit_status,
+                Err(err) => EXIT_STATUS_INTERNAL_ERROR,
             }
         })
-    }).unwrap_or(-1 /* Fatal error */)
+    }).unwrap_or(EXIT_STATUS_INTERNAL_ERROR)
 }
 
+// Use 127 as a special value to indicate internal error from libos, not from
+// user programs, although it is completely ok for a user program to return 127.
+const EXIT_STATUS_INTERNAL_ERROR : i32 = 127;
 
 // TODO: make sure do_boot can only be called once
 fn do_boot(path_str: &str) -> Result<(), Error> {
@@ -81,7 +84,7 @@ fn do_boot(path_str: &str) -> Result<(), Error> {
 }
 
 // TODO: make sure do_run() cannot be called before do_boot()
-fn do_run() -> Result<(), Error> {
-    process::run_task()?;
-    Ok(())
+fn do_run() -> Result<i32, Error> {
+    let exit_status = process::run_task()?;
+    Ok(exit_status)
 }
