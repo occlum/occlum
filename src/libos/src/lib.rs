@@ -21,7 +21,6 @@ extern crate lazy_static;
 use std::ffi::CStr; // a borrowed C string
 use std::backtrace::{self, PrintFormat};
 use std::panic;
-
 use sgx_types::*;
 use sgx_trts::libc;
 
@@ -32,27 +31,28 @@ mod fs;
 mod process;
 mod syscall;
 mod vm;
+mod util;
+
+use prelude::*;
 
 /// Export system calls
 pub use syscall::*;
 
+// TODO: return meaningful exit code
 #[no_mangle]
 pub extern "C" fn libos_boot(path_buf: *const i8) -> i32 {
     let path_str = unsafe {
         CStr::from_ptr(path_buf).to_string_lossy().into_owned()
     };
-    println!("LibOS boots: {}", path_str);
-
     let _ = backtrace::enable_backtrace("libocclum.signed.so", PrintFormat::Short);
     panic::catch_unwind(||{
         backtrace::__rust_begin_short_backtrace(||{
-            let argv = std::vec::Vec::new();
-            let envp = std::vec::Vec::new();
-            process::do_spawn(&path_str, &argv, &envp);
+            match do_boot(&path_str) {
+                Ok(()) => 0,
+                Err(err) => err.errno.as_retval() /* Normal error */,
+            }
         })
-    }).ok();
-
-    0
+    }).unwrap_or(-1 /* Fatal error */)
 }
 
 #[no_mangle]
@@ -60,10 +60,28 @@ pub extern "C" fn libos_run() -> i32 {
     let _ = backtrace::enable_backtrace("libocclum.signed.so", PrintFormat::Short);
     panic::catch_unwind(||{
         backtrace::__rust_begin_short_backtrace(||{
-            let _ = process::run_task();
+            match do_run() {
+                Ok(()) => 0,
+                Err(err) => err.errno.as_retval() /* Normal error */,
+            }
         })
-    }).ok();
-
-    0
+    }).unwrap_or(-1 /* Fatal error */)
 }
 
+
+// TODO: make sure do_boot can only be called once
+fn do_boot(path_str: &str) -> Result<(), Error> {
+    util::mpx_enable()?;
+
+    let argv = std::vec::Vec::new();
+    let envp = std::vec::Vec::new();
+    process::do_spawn(&path_str, &argv, &envp)?;
+
+    Ok(())
+}
+
+// TODO: make sure do_run() cannot be called before do_boot()
+fn do_run() -> Result<(), Error> {
+    process::run_task()?;
+    Ok(())
+}
