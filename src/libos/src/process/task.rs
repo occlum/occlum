@@ -5,10 +5,11 @@ use std::{mem};
 #[derive(Clone, Debug, Default)]
 #[repr(C)]
 pub struct Task {
-    pub syscall_stack_addr: usize,
+    pub kernel_stack_addr: usize,
+    pub kernel_fsbase_addr: usize,
     pub user_stack_addr: usize,
+    pub user_fsbase_addr: usize,
     pub user_entry_addr: usize,
-    pub fs_base_addr: usize,
     pub saved_state: usize, // struct jmpbuf*
 }
 

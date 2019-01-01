@@ -30,5 +30,14 @@ __set_stack_guard:
     .global __run_task
     .type __run_task, @function
 __run_task:
-    mov %rsi, %rsp
-    jmp *%rdi
+    // Save kernel fsbase
+    rdfsbase %r10
+    movq %r10, TASK_KERNEL_FSBASE_ADDR(%rdi)
+    // Use user fsbase
+    movq TASK_USER_FSBASE_ADDR(%rdi), %r10
+    wrfsbase %r10
+    // Use user stack
+    movq TASK_USER_STACK_ADDR(%rdi), %rsp
+    // Run user code
+    movq TASK_USER_ENTRY_ADDR(%rdi), %r11
+    jmp *%r11

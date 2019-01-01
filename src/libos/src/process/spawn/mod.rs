@@ -85,7 +85,6 @@ fn init_task(user_entry: usize, stack_top: usize,
     Ok(Task {
         user_stack_addr: user_stack,
         user_entry_addr: user_entry,
-        fs_base_addr: 0,
         .. Default::default()
     })
 }

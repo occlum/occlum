@@ -8,7 +8,6 @@ lazy_static! {
             unsafe { vm_get_prealloced_data_space(&mut addr, &mut size) };
             (addr, size)
         };
-        println!("addr = {:X?}, size = {}", addr, size);
         let vm_space = unsafe {
             match VMSpace::new(addr, size, VMGuardAreaType::None) {
                 Ok(vm_space) => vm_space,
