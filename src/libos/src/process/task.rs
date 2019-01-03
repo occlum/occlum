@@ -66,18 +66,26 @@ pub fn run_task() -> Result<i32, Error> {
     Ok(exit_status)
 }
 
-
 thread_local! {
-    static _CURRENT_PROCESS_PTR: Cell<*const SgxMutex<Process>> =
-        Cell::new(0 as *const SgxMutex<Process>);
+    static _CURRENT_PROCESS_PTR: Cell<*const SgxMutex<Process>> = {
+        Cell::new(0 as *const SgxMutex<Process>)
+    };
 }
 
-pub fn get_current() -> &'static SgxMutex<Process> {
-    let mut process_ptr = 0 as *const SgxMutex<Process>;
-    _CURRENT_PROCESS_PTR.with(|cp| {
-        process_ptr = cp.get();
-    });
-    unsafe { mem::transmute(process_ptr) }
+pub fn get_current() -> ProcessRef {
+    let current_ptr = {
+        let mut current_ptr = 0 as *const SgxMutex<Process>;
+        _CURRENT_PROCESS_PTR.with(|cell| {
+            current_ptr = cell.get();
+        });
+        current_ptr
+    };
+
+    let current_ref = unsafe { Arc::from_raw(current_ptr) };
+    let current_ref_clone = current_ref.clone();
+    Arc::into_raw(current_ref);
+
+    current_ref_clone
 }
 
 fn set_current(process: &ProcessRef) {

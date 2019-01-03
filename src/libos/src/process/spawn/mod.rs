@@ -14,7 +14,8 @@ mod init_vm;
 mod elf_helper;
 mod segment;
 
-pub fn do_spawn<P: AsRef<Path>>(elf_path: &P, argv: &[CString], envp: &[CString])
+pub fn do_spawn<P: AsRef<Path>>(elf_path: &P, argv: &[CString], envp: &[CString],
+                                parent_ref: &ProcessRef)
     -> Result<u32, Error>
 {
     let mut elf_buf = {
@@ -58,6 +59,7 @@ pub fn do_spawn<P: AsRef<Path>>(elf_path: &P, argv: &[CString], envp: &[CString]
         let exec_path = elf_path.as_ref().to_str().unwrap();
         Process::new(exec_path, task, vm, files)?
     };
+    parent_adopts_new_child(&parent_ref, &new_process_ref);
     process_table::put(new_pid, new_process_ref.clone());
     task::enqueue_task(new_process_ref);
     Ok(new_pid)
@@ -101,4 +103,12 @@ fn init_stack(stack_top: usize, argv: &[CString], envp: &[CString])
     auxtbl.set_val(AuxKey::AT_SECURE, 0)?;
 
     init_stack::do_init(stack_top, 4096, argv, envp, &auxtbl)
+}
+
+fn parent_adopts_new_child(parent_ref: &ProcessRef, child_ref: &ProcessRef)
+{
+    let mut parent = parent_ref.lock().unwrap();
+    let mut child = child_ref.lock().unwrap();
+    parent.children.push(child_ref.clone());
+    child.parent = Some(parent_ref.clone());
 }

@@ -22,8 +22,9 @@ extern int occlum_spawn(int* child_pid, const char* path,
                         const char** argv,
                         const char** envp);
 extern int occlum_wait4(int child_pid, int* status, int options/*, struct rusage* rusage*/);
-extern unsigned int occlum_getpid(void);
 extern void occlum_exit(int status);
+extern unsigned int occlum_getpid(void);
+extern unsigned int occlum_getppid(void);
 
 extern void *occlum_mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 extern int occlum_munmap(void *addr, size_t length);

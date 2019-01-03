@@ -3,22 +3,23 @@ use super::task::{Task};
 use vm::{ProcessVM, VMRangeTrait};
 use fs::{FileTable, File, FileRef};
 
-#[allow(non_camel_case_types)]
-pub type pid_t = u32;
-
-#[derive(Debug)]
-pub struct Process {
-    task: Task,
-    status: Status,
-    pid: pid_t,
-    tgid: pid_t,
-    exit_status: i32,
-    exec_path: String,
-    vm: ProcessVM,
-    file_table: FileTable,
+lazy_static! {
+    // Dummy object to make all processes having a parent
+    pub static ref IDLE_PROCESS: ProcessRef = {
+        Arc::new(SgxMutex::new(Process {
+            task: Default::default(),
+            status: Default::default(),
+            pid: 0,
+            tgid: 0,
+            exit_status: 0,
+            exec_path: "".to_owned(),
+            parent: None,
+            children: Vec::new(),
+            vm: Default::default(),
+            file_table: Default::default(),
+        }))
+    };
 }
-
-pub type ProcessRef = Arc<SgxMutex<Process>>;
 
 impl Process {
     pub fn new(exec_path: &str, task: Task, vm: ProcessVM, file_table: FileTable)
@@ -32,6 +33,8 @@ impl Process {
             tgid: new_pid,
             exec_path: exec_path.to_owned(),
             exit_status: 0,
+            parent: None,
+            children: Vec::new(),
             vm: vm,
             file_table: file_table,
         }));
@@ -49,11 +52,8 @@ impl Process {
     pub fn get_vm_mut(&mut self) -> &mut ProcessVM { &mut self.vm }
     pub fn get_files(&self) -> &FileTable { &self.file_table }
     pub fn get_files_mut(&mut self) -> &mut FileTable { &mut self.file_table }
-
-    pub fn exit(&mut self, exit_status: i32) {
-        self.exit_status = exit_status;
-        self.status = Status::ZOMBIE;
-    }
+    pub fn get_parent(&self) -> &ProcessRef { self.parent.as_ref().unwrap() }
+    pub fn get_children(&self) -> &[ProcessRef] { &self.children }
 }
 
 impl Drop for Process {

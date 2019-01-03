@@ -27,6 +27,8 @@ pub fn alloc_pid() -> u32 {
 }
 
 pub fn free_pid(pid: u32) {
+    // PID 0 is reserved for idle thread, thus no need to free
+    if pid == 0 { return; }
     // TODO:
 }
 

@@ -1,7 +1,7 @@
 CUR_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 PROJECT_DIR := $(realpath $(CUR_DIR)/../)
 
-TEST_SUITES := empty hello_world malloc
+TEST_SUITES := empty hello_world malloc getpid
 BUILD_TEST_SUITES := $(TEST_SUITES:%=%)
 RUN_TEST_SUITES := $(TEST_SUITES:%=run-%)
 CLEAN_TEST_SUITES := $(TEST_SUITES:%=clean-%)

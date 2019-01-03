@@ -22,7 +22,7 @@ extern {
     pub fn vm_get_prealloced_data_space(addr: &mut usize, size: &mut usize);
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ProcessVM {
     //code_domain: VMDomain,
     data_domain: VMDomain,

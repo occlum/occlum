@@ -383,6 +383,16 @@ impl Drop for VMRange {
 unsafe impl Send for VMRange {}
 unsafe impl Sync for VMRange {}
 
+impl Default for VMRange {
+    fn default() -> VMRange {
+        VMRange {
+            inner: VMRangeInner::new(0, 0, VMGrowthType::Fixed),
+            parent_range: 0 as *const VMRange,
+            sub_ranges: None,
+        }
+    }
+}
+
 
 #[derive(Clone, Copy)]
 pub struct VMRangeInner {

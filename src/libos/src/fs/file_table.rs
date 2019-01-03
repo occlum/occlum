@@ -7,7 +7,7 @@ pub type FileDesc = u32;
 // Invariant 1: fd < max_fd, where fd is any fd in the table
 // Invariant 2: max_fd = table.size()
 // Invariant 3: num_fds <= table.size()
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[repr(C)]
 pub struct FileTable {
     table: Vec<Option<FileRef>>,
@@ -72,10 +72,3 @@ impl FileTable {
         del_file
     }
 }
-
-impl Default for FileTable {
-    fn default() -> FileTable {
-        FileTable::new()
-    }
-}
-

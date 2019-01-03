@@ -59,12 +59,12 @@ pub struct VMSpace {
     guard_type: VMGuardAreaType,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct VMDomain {
     range: VMRange,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct VMArea {
     range: VMRange,
     flags: VMAreaFlags,

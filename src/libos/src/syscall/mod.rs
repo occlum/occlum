@@ -30,7 +30,7 @@ fn check_mut_array_from_user<T>(user_buf: *mut T, count: usize) -> Result<(), Er
     Ok(())
 }
 
-fn clone_string_from_user_safely(user_ptr: *const c_char)
+fn clone_cstring_from_user_safely(user_ptr: *const c_char)
     -> Result<String, Error>
 {
     check_ptr_from_user(user_ptr)?;
@@ -330,6 +330,12 @@ pub extern "C" fn occlum_getpid() -> c_uint
 }
 
 #[no_mangle]
+pub extern "C" fn occlum_getppid() -> c_uint
+{
+    process::do_getppid()
+}
+
+#[no_mangle]
 pub extern "C" fn occlum_exit(status: i32)
 {
     process::do_exit(status);
@@ -348,11 +354,12 @@ fn do_spawn(child_pid_ptr: *mut c_uint,
     -> Result<(), Error>
 {
     check_mut_ptr_from_user(child_pid_ptr)?;
-    let path = clone_string_from_user_safely(path)?;
+    let path = clone_cstring_from_user_safely(path)?;
     let argv = clone_cstrings_from_user_safely(argv)?;
     let envp = clone_cstrings_from_user_safely(envp)?;
+    let parent = process::get_current();
 
-    let child_pid = process::do_spawn(&path, &argv, &envp)?;
+    let child_pid = process::do_spawn(&path, &argv, &envp, &parent)?;
 
     unsafe { *child_pid_ptr = child_pid };
     Ok(())
