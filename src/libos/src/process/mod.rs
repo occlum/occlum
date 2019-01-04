@@ -20,14 +20,14 @@ pub struct Process {
     exit_status: i32,
     exec_path: String,
     parent: Option<ProcessRef>,
-    children: Vec<ProcessRef>,
+    children: Vec<ProcessWeakRef>,
     waiting_children: Option<WaitQueue<ChildProcessFilter, pid_t>>,
     vm: ProcessVM,
     file_table: FileTable,
 }
 
 pub type ProcessRef = Arc<SgxMutex<Process>>;
-
+pub type ProcessWeakRef = std::sync::Weak<SgxMutex<Process>>;
 
 pub fn do_getpid() -> pid_t {
     let current_ref = get_current();
@@ -58,7 +58,7 @@ mod spawn;
 mod wait;
 mod exit;
 
-use prelude::*;
+use super::{*};
 use vm::{ProcessVM, VMRangeTrait};
 use fs::{FileTable, File, FileRef};
 use self::task::{Task};

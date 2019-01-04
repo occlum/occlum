@@ -109,6 +109,6 @@ fn parent_adopts_new_child(parent_ref: &ProcessRef, child_ref: &ProcessRef)
 {
     let mut parent = parent_ref.lock().unwrap();
     let mut child = child_ref.lock().unwrap();
-    parent.children.push(child_ref.clone());
+    parent.children.push(Arc::downgrade(child_ref));
     child.parent = Some(parent_ref.clone());
 }

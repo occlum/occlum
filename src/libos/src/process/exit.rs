@@ -20,7 +20,8 @@ pub fn do_exit(exit_status: i32) {
     current.status = Status::ZOMBIE;
 
     // Update children
-    for child_ref in &current.children {
+    for child_weak in &current.children {
+        let child_ref = child_weak.upgrade().unwrap();
         let mut child = child_ref.lock().unwrap();
         child.parent = Some(IDLE_PROCESS.clone());
     }
@@ -58,12 +59,13 @@ pub fn do_exit(exit_status: i32) {
 pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32)
     -> Result<pid_t, Error>
 {
+    let current_ref = get_current();
     let waiter = {
-        let current_ref = get_current();
         let mut current = current_ref.lock().unwrap();
 
         let mut any_child_to_wait_for = false;
-        for child_ref in current.get_children() {
+        for child_weak in current.get_children() {
+            let child_ref = child_weak.upgrade().unwrap();
             let child = child_ref.lock().unwrap();
 
             let may_wait_for = match child_filter {
@@ -98,23 +100,27 @@ pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32)
     };
 
     let child_pid = Waiter::sleep_until_woken_with_result(waiter);
-    if child_pid == 0 { panic!("THIS SHOULD NEVER HAPPEN!"); }
 
-    {
-        let current_ref = get_current();
-        let mut current = current_ref.lock().unwrap();
-        current.waiting_children = None;
-    }
+    let mut current = current_ref.lock().unwrap();
+    let child_i = {
+        let mut child_i_opt = None;
+        for (child_i, child_weak) in current.children.iter().enumerate() {
+            let child_ref = child_weak.upgrade().unwrap();
+            let child = child_ref.lock().unwrap();
+            if child.get_pid() != child_pid { continue; }
 
-    let child_ref = process_table::get(child_pid).unwrap();
-    let child = {
-        let child = child_ref.lock().unwrap();
-        if child.get_status() != Status::ZOMBIE {
-            panic!("THIS SHOULD NEVER HAPPEN!");
+            if child.get_status() != Status::ZOMBIE {
+                panic!("THIS SHOULD NEVER HAPPEN!");
+            }
+            child_i_opt = Some(child_i);
+            *exit_status = child.get_exit_status();
         }
-        child
+        child_i_opt.unwrap()
     };
-    *exit_status = child.get_exit_status();
+    current.children.swap_remove(child_i);
+    current.waiting_children = None;
+
+    // Release the last reference to the child process
     process_table::remove(child_pid);
 
     Ok(child_pid)

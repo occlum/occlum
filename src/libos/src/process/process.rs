@@ -58,7 +58,7 @@ impl Process {
     pub fn get_files(&self) -> &FileTable { &self.file_table }
     pub fn get_files_mut(&mut self) -> &mut FileTable { &mut self.file_table }
     pub fn get_parent(&self) -> &ProcessRef { self.parent.as_ref().unwrap() }
-    pub fn get_children(&self) -> &[ProcessRef] { &self.children }
+    pub fn get_children(&self) -> &[ProcessWeakRef] { &self.children }
 }
 
 impl Drop for Process {
