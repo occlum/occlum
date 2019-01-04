@@ -40,7 +40,7 @@ impl<D, R> Waiter<D, R>
     pub fn wait_on(&self) -> R {
         if !self.inner.lock().unwrap().has_waken {
             unsafe {
-                sgx_thread_wait_untrusted_event_ocall(self.thread);
+                wait_event(self.thread);
             }
         }
 
@@ -93,10 +93,30 @@ impl<D, R> WaitQueue<D, R>
             waiter_i.unwrap()
         };
         let del_waiter = waiters.swap_remove(del_waiter_i);
-        unsafe {
-            sgx_thread_set_untrusted_event_ocall(del_waiter.thread);
-        }
+        set_event(del_waiter.thread);
         1
+    }
+}
+
+fn wait_event(thread: *const c_void) {
+    let mut ret : c_int = 0;
+    let mut sgx_ret : c_int = 0;
+    unsafe {
+        sgx_ret = sgx_thread_wait_untrusted_event_ocall(&mut ret as *mut c_int, thread);
+    }
+    if ret != 0 || sgx_ret != 0 {
+        panic!("ERROR: OCall failed!");
+    }
+}
+
+fn set_event(thread: *const c_void) {
+    let mut ret : c_int = 0;
+    let mut sgx_ret : c_int = 0;
+    unsafe {
+        sgx_ret = sgx_thread_set_untrusted_event_ocall(&mut ret as *mut c_int, thread);
+    }
+    if ret != 0 || sgx_ret != 0 {
+        panic!("ERROR: OCall failed!");
     }
 }
 
@@ -104,16 +124,16 @@ extern {
     fn sgx_thread_get_self() -> *const c_void;
 
     /* Go outside and wait on my untrusted event */
-    fn sgx_thread_wait_untrusted_event_ocall(self_thread: *const c_void) -> c_int;
+    fn sgx_thread_wait_untrusted_event_ocall(ret: *mut c_int, self_thread: *const c_void) -> c_int;
 
     /* Wake a thread waiting on its untrusted event */
-    fn sgx_thread_set_untrusted_event_ocall(waiter_thread: *const c_void) -> c_int;
+    fn sgx_thread_set_untrusted_event_ocall(ret: *mut c_int, waiter_thread: *const c_void) -> c_int;
 
     /* Wake a thread waiting on its untrusted event, and wait on my untrusted event */
-    fn sgx_thread_setwait_untrusted_events_ocall(
+    fn sgx_thread_setwait_untrusted_events_ocall(ret: *mut c_int,
         waiter_thread: *const c_void, self_thread: *const c_void) -> c_int;
 
     /* Wake multiple threads waiting on their untrusted events */
-    fn sgx_thread_set_multiple_untrusted_events_ocall(
+    fn sgx_thread_set_multiple_untrusted_events_ocall(ret: *mut c_int,
         waiter_threads: *const *const c_void, total: size_t ) -> c_int;
 }

@@ -378,7 +378,9 @@ pub extern "C" fn occlum_spawn(
 }
 
 fn do_wait4(pid: c_int, _exit_status: *mut c_int) -> Result<pid_t, Error> {
-    check_mut_ptr_from_user(_exit_status)?;
+    if _exit_status != 0 as *mut c_int {
+        check_mut_ptr_from_user(_exit_status)?;
+    }
 
     let child_process_filter = match pid {
         pid if pid < -1 => {
@@ -401,7 +403,9 @@ fn do_wait4(pid: c_int, _exit_status: *mut c_int) -> Result<pid_t, Error> {
     let mut exit_status = 0;
     match process::do_wait4(&child_process_filter, &mut exit_status) {
         Ok(pid) => {
-            unsafe { *_exit_status = exit_status; }
+            if _exit_status != 0 as *mut c_int {
+                unsafe { *_exit_status = exit_status; }
+            }
             Ok(pid)
         }
         Err(e) => {
