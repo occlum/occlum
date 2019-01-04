@@ -14,7 +14,7 @@ unsafe impl<D, R> Send for Waiter<D, R> where D: Sized + Copy, R: Sized + Copy {
 struct WaiterInner<D, R>
     where D: Sized + Copy, R: Sized + Copy
 {
-    has_waken: bool,
+    is_woken: bool,
     data: D,
     result: Option<R>,
 }
@@ -26,7 +26,7 @@ impl<D, R> Waiter<D, R>
         Waiter {
             thread: unsafe { sgx_thread_get_self() },
             inner: Arc::new(SgxMutex::new(WaiterInner {
-                has_waken: false,
+                is_woken: false,
                 data: *data,
                 result: None,
             })),
@@ -37,14 +37,14 @@ impl<D, R> Waiter<D, R>
         self.inner.lock().unwrap().data
     }
 
-    pub fn wait_on(&self) -> R {
-        if !self.inner.lock().unwrap().has_waken {
+    pub fn sleep_until_woken_with_result(waiter: Waiter<D, R>) -> R {
+        while !waiter.inner.lock().unwrap().is_woken {
             unsafe {
-                wait_event(self.thread);
+                wait_event(waiter.thread);
             }
         }
 
-        self.inner.lock().unwrap().result.unwrap()
+        waiter.inner.lock().unwrap().result.unwrap()
     }
 }
 
@@ -81,7 +81,7 @@ impl<D, R> WaitQueue<D, R>
             let waiter_i = waiters.iter().position(|waiter| {
                 let mut waiter_inner = waiter.inner.lock().unwrap();
                 if let Some(waiter_result) = cond(&waiter_inner.data) {
-                    waiter_inner.has_waken = true;
+                    waiter_inner.is_woken = true;
                     waiter_inner.result = Some(waiter_result);
                     true
                 }

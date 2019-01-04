@@ -15,7 +15,6 @@ unsafe impl Send for ChildProcessFilter {}
 pub fn do_exit(exit_status: i32) {
     let current_ref = get_current();
     let mut current = current_ref.lock().unwrap();
-
     // Update current
     current.exit_status = exit_status;
     current.status = Status::ZOMBIE;
@@ -98,7 +97,7 @@ pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32)
         waiter
     };
 
-    let child_pid = waiter.wait_on();
+    let child_pid = Waiter::sleep_until_woken_with_result(waiter);
     if child_pid == 0 { panic!("THIS SHOULD NEVER HAPPEN!"); }
 
     {
