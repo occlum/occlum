@@ -10,11 +10,13 @@ lazy_static! {
             task: Default::default(),
             status: Default::default(),
             pid: 0,
+            pgid: 0,
             tgid: 0,
             exit_status: 0,
             exec_path: "".to_owned(),
             parent: None,
             children: Vec::new(),
+            waiting_children: Default::default(),
             vm: Default::default(),
             file_table: Default::default(),
         }))
@@ -30,11 +32,13 @@ impl Process {
             task: task,
             status: Default::default(),
             pid: new_pid,
+            pgid: new_pid,
             tgid: new_pid,
             exec_path: exec_path.to_owned(),
             exit_status: 0,
             parent: None,
             children: Vec::new(),
+            waiting_children: None,
             vm: vm,
             file_table: file_table,
         }));
@@ -44,6 +48,7 @@ impl Process {
     pub fn get_task(&self) -> &Task { &self.task }
     pub fn get_task_mut(&mut self) -> &mut Task { &mut self.task }
     pub fn get_pid(&self) -> pid_t { self.pid }
+    pub fn get_pgid(&self) -> pid_t { self.pgid }
     pub fn get_tgid(&self) -> pid_t { self.tgid }
     pub fn get_status(&self) -> Status { self.status }
     pub fn get_exit_status(&self) -> i32 { self.exit_status }

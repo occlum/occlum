@@ -4,6 +4,7 @@ use {std, fs, process, vm};
 use std::ffi::{CStr, CString};
 use fs::{off_t, FileDesc};
 use vm::{VMAreaFlags, VMResizeOptions};
+use process::{pid_t, ChildProcessFilter};
 // Use the internal syscall wrappers from sgx_tstd
 //use std::libc_fs as fs;
 //use std::libc_io as io;
@@ -376,14 +377,46 @@ pub extern "C" fn occlum_spawn(
     }
 }
 
+fn do_wait4(pid: c_int, _exit_status: *mut c_int) -> Result<pid_t, Error> {
+    check_mut_ptr_from_user(_exit_status)?;
+
+    let child_process_filter = match pid {
+        pid if pid < -1 => {
+            process::ChildProcessFilter::WithPGID((-pid) as pid_t)
+        },
+        -1 => {
+            process::ChildProcessFilter::WithAnyPID
+        },
+        0 => {
+            let gpid = process::do_getgpid();
+            process::ChildProcessFilter::WithPGID(gpid)
+        },
+        pid if pid > 0 => {
+            process::ChildProcessFilter::WithPID(pid as pid_t)
+        },
+        _ => {
+            panic!("THIS SHOULD NEVER HAPPEN!");
+        }
+    };
+    let mut exit_status = 0;
+    match process::do_wait4(&child_process_filter, &mut exit_status) {
+        Ok(pid) => {
+            unsafe { *_exit_status = exit_status; }
+            Ok(pid)
+        }
+        Err(e) => {
+            Err(e)
+        }
+    }
+}
+
 #[no_mangle]
-pub extern "C" fn occlum_wait4(child_pid: c_int, _exit_status: *mut c_int,
+pub extern "C" fn occlum_wait4(child_pid: c_int, exit_status: *mut c_int,
     options: c_int/*, rusage: *mut Rusage*/) -> c_int
 {
-    match process::do_wait4(child_pid as u32) {
-        Ok(exit_status) => unsafe {
-            *_exit_status = exit_status;
-            0
+    match do_wait4(child_pid, exit_status) {
+        Ok(pid) => {
+            pid as c_int
         }
         Err(e) => {
             e.errno.as_retval()
