@@ -55,7 +55,7 @@ pub fn do_spawn<P: AsRef<Path>>(elf_path: &P, argv: &[CString], envp: &[CString]
             let stack_top = vm.get_stack_top();
             init_task(program_entry, stack_top, argv, envp)?
         };
-        let files = init_files()?;
+        let files = init_files(parent_ref)?;
         let exec_path = elf_path.as_ref().to_str().unwrap();
         Process::new(exec_path, task, vm, files)?
     };
@@ -65,9 +65,17 @@ pub fn do_spawn<P: AsRef<Path>>(elf_path: &P, argv: &[CString], envp: &[CString]
     Ok(new_pid)
 }
 
-fn init_files() -> Result<FileTable, Error> {
-    let mut file_table = FileTable::new();
+fn init_files(parent_ref: &ProcessRef) -> Result<FileTable, Error> {
+    // Usually, we just inherit the file table from the parent
+    let parent = parent_ref.lock().unwrap();
+    let should_inherit_file_table = parent.get_pid() > 0;
+    if should_inherit_file_table {
+        return Ok(parent.get_files().clone());
+    }
+    drop(parent);
 
+    // But, for init process, we initialize file table for it
+    let mut file_table = FileTable::new();
     let stdin : Arc<Box<File>> = Arc::new(Box::new(StdinFile::new()));
     let stdout : Arc<Box<File>> = Arc::new(Box::new(StdoutFile::new()));
     // TODO: implement and use a real stderr
@@ -75,7 +83,6 @@ fn init_files() -> Result<FileTable, Error> {
     file_table.put(stdin);
     file_table.put(stdout);
     file_table.put(stderr);
-
     Ok(file_table)
 }
 

@@ -269,7 +269,7 @@ impl File for StdoutFile {
     }
 
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "Stdout does not support reading"))
+        Err(Error::new(Errno::EBADF, "Stdout does not support read"))
     }
 
     fn writev<'a, 'b>(&self, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
@@ -364,7 +364,7 @@ impl File for StdinFile {
     }
 
     fn writev<'a, 'b>(&self, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "Stdin does not support reading"))
+        Err(Error::new(Errno::EBADF, "Stdin does not support write"))
     }
 }
 

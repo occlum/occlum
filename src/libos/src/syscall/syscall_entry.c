@@ -114,6 +114,11 @@ long dispatch_syscall(int num, long arg0, long arg1, long arg2, long arg3, long 
         ret = (long) occlum_brk(addr);
         break;
     }
+    case SYS_pipe: {
+        DECL_SYSCALL_ARG(int*, fds, arg0);
+        ret = (long) occlum_pipe(fds);
+        break;
+    }
     default:
         ret = occlum_unknown(num);
         break;

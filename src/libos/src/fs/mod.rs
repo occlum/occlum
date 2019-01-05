@@ -5,9 +5,11 @@ use std::sgxfs as fs_impl;
 
 mod file;
 mod file_table;
+mod pipe;
 
 pub use self::file::{File, FileRef, SgxFile, StdinFile, StdoutFile};
 pub use self::file_table::{FileDesc, FileTable};
+pub use self::pipe::{Pipe};
 
 pub const O_RDONLY : u32 = 0x00000000;
 pub const O_WRONLY : u32 = 0x00000001;
@@ -18,7 +20,7 @@ pub const O_APPEND : u32 = 0x00000400;
 
 // TODO: use the type defined in Rust libc.
 //
-// However, off_t is defined as i64 in the current Rust SGX SDK, which is
+// However, off_t is defined as u64 in the current Rust SGX SDK, which is
 // wrong (see issue https://github.com/baidu/rust-sgx-sdk/issues/46)
 #[allow(non_camel_case_types)]
 pub type off_t = i64;
@@ -107,4 +109,15 @@ pub fn do_close(fd: FileDesc) -> Result<(), Error> {
         Some(_) => Ok(()),
         None => Err(Error::new(Errno::EBADF, "Invalid file descriptor [do_close]")),
     }
+}
+
+pub fn do_pipe() -> Result<[FileDesc; 2], Error> {
+    let current_ref = process::get_current();
+    let mut current = current_ref.lock().unwrap();
+    let pipe = Pipe::new()?;
+
+    let mut file_table = current.get_files_mut();
+    let reader_fd = file_table.put(Arc::new(Box::new(pipe.reader)));
+    let writer_fd = file_table.put(Arc::new(Box::new(pipe.writer)));
+    Ok([reader_fd, writer_fd])
 }

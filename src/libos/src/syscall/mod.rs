@@ -237,6 +237,28 @@ pub extern "C" fn occlum_brk(addr: *const c_void) ->  *const c_void {
     }
 }
 
+fn do_pipe(fds_u: *mut c_int) -> Result<(), Error> {
+    check_mut_array_from_user(fds_u, 2)?;
+    let fds = fs::do_pipe()?;
+    unsafe {
+        *fds_u.offset(0) = fds[0] as c_int;
+        *fds_u.offset(1) = fds[1] as c_int;
+    }
+    Ok(())
+}
+
+#[no_mangle]
+pub extern "C" fn occlum_pipe(fds: *mut c_int) ->  c_int {
+    match do_pipe(fds) {
+        Ok(()) => {
+            0
+        },
+        Err(e) => {
+            e.errno.as_retval()
+        }
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn occlum_open(path_buf: * const c_char, flags: c_int, mode: c_int) -> c_int {
     let path = unsafe {
