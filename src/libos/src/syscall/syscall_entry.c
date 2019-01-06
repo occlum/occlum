@@ -125,6 +125,24 @@ long dispatch_syscall(int num, long arg0, long arg1, long arg2, long arg3, long 
         ret = (long) occlum_pipe2(fds, flags);
         break;
     }
+    case SYS_dup: {
+        DECL_SYSCALL_ARG(int, old_fd, arg0);
+        ret = (long) occlum_dup(old_fd);
+        break;
+    }
+    case SYS_dup2: {
+        DECL_SYSCALL_ARG(int, old_fd, arg0);
+        DECL_SYSCALL_ARG(int, new_fd, arg1);
+        ret = (long) occlum_dup2(old_fd, new_fd);
+        break;
+    }
+    case SYS_dup3: {
+        DECL_SYSCALL_ARG(int, old_fd, arg0);
+        DECL_SYSCALL_ARG(int, new_fd, arg1);
+        DECL_SYSCALL_ARG(int, flags, arg2);
+        ret = (long) occlum_dup3(old_fd, new_fd, flags);
+        break;
+    }
     default:
         ret = occlum_unknown(num);
         break;

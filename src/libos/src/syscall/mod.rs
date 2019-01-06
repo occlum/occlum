@@ -195,6 +195,43 @@ fn do_brk(new_brk_addr: *const c_void) -> Result<*const c_void, Error> {
     vm::do_brk(new_brk_addr).map(|ret_brk_addr| ret_brk_addr as *const c_void)
 }
 
+fn do_wait4(pid: c_int, _exit_status: *mut c_int) -> Result<pid_t, Error> {
+    if _exit_status != 0 as *mut c_int {
+        check_mut_ptr_from_user(_exit_status)?;
+    }
+
+    let child_process_filter = match pid {
+        pid if pid < -1 => {
+            process::ChildProcessFilter::WithPGID((-pid) as pid_t)
+        },
+        -1 => {
+            process::ChildProcessFilter::WithAnyPID
+        },
+        0 => {
+            let gpid = process::do_getgpid();
+            process::ChildProcessFilter::WithPGID(gpid)
+        },
+        pid if pid > 0 => {
+            process::ChildProcessFilter::WithPID(pid as pid_t)
+        },
+        _ => {
+            panic!("THIS SHOULD NEVER HAPPEN!");
+        }
+    };
+    let mut exit_status = 0;
+    match process::do_wait4(&child_process_filter, &mut exit_status) {
+        Ok(pid) => {
+            if _exit_status != 0 as *mut c_int {
+                unsafe { *_exit_status = exit_status; }
+            }
+            Ok(pid)
+        }
+        Err(e) => {
+            Err(e)
+        }
+    }
+}
+
 fn do_pipe2(fds_u: *mut c_int, flags: c_int) -> Result<(), Error> {
     check_mut_array_from_user(fds_u, 2)?;
     // TODO: how to deal with open flags???
@@ -405,43 +442,6 @@ pub extern "C" fn occlum_spawn(
     }
 }
 
-fn do_wait4(pid: c_int, _exit_status: *mut c_int) -> Result<pid_t, Error> {
-    if _exit_status != 0 as *mut c_int {
-        check_mut_ptr_from_user(_exit_status)?;
-    }
-
-    let child_process_filter = match pid {
-        pid if pid < -1 => {
-            process::ChildProcessFilter::WithPGID((-pid) as pid_t)
-        },
-        -1 => {
-            process::ChildProcessFilter::WithAnyPID
-        },
-        0 => {
-            let gpid = process::do_getgpid();
-            process::ChildProcessFilter::WithPGID(gpid)
-        },
-        pid if pid > 0 => {
-            process::ChildProcessFilter::WithPID(pid as pid_t)
-        },
-        _ => {
-            panic!("THIS SHOULD NEVER HAPPEN!");
-        }
-    };
-    let mut exit_status = 0;
-    match process::do_wait4(&child_process_filter, &mut exit_status) {
-        Ok(pid) => {
-            if _exit_status != 0 as *mut c_int {
-                unsafe { *_exit_status = exit_status; }
-            }
-            Ok(pid)
-        }
-        Err(e) => {
-            Err(e)
-        }
-    }
-}
-
 #[no_mangle]
 pub extern "C" fn occlum_wait4(child_pid: c_int, exit_status: *mut c_int,
     options: c_int/*, rusage: *mut Rusage*/) -> c_int
@@ -449,6 +449,53 @@ pub extern "C" fn occlum_wait4(child_pid: c_int, exit_status: *mut c_int,
     match do_wait4(child_pid, exit_status) {
         Ok(pid) => {
             pid as c_int
+        }
+        Err(e) => {
+            e.errno.as_retval()
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn occlum_dup(old_fd: c_int) -> c_int
+{
+    let old_fd = old_fd as FileDesc;
+    match fs::do_dup(old_fd) {
+        Ok(new_fd) => {
+            new_fd as c_int
+        }
+        Err(e) => {
+            e.errno.as_retval()
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn occlum_dup2(old_fd: c_int, new_fd: c_int)
+    -> c_int
+{
+    let old_fd = old_fd as FileDesc;
+    let new_fd = new_fd as FileDesc;
+    match fs::do_dup2(old_fd, new_fd) {
+        Ok(new_fd) => {
+            new_fd as c_int
+        }
+        Err(e) => {
+            e.errno.as_retval()
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn occlum_dup3(old_fd: c_int, new_fd: c_int, flags: c_int)
+    -> c_int
+{
+    let old_fd = old_fd as FileDesc;
+    let new_fd = new_fd as FileDesc;
+    let flags = flags as u32;
+    match fs::do_dup3(old_fd, new_fd, flags) {
+        Ok(new_fd) => {
+            new_fd as c_int
         }
         Err(e) => {
             e.errno.as_retval()

@@ -44,25 +44,45 @@ impl FileTable {
         min_free_fd as FileDesc
     }
 
-    pub fn get(&self, fd: FileDesc) -> Option<FileRef> {
+    pub fn put_at(&mut self, fd: FileDesc, file: FileRef, close_on_spawn: bool) {
+        let mut table = &mut self.table;
+        let mut table_entry = Some(FileTableEntry::new(file, close_on_spawn));
+        if fd as usize >= table.len() {
+            table.resize(fd as usize + 1, None);
+        }
+        std::mem::swap(&mut table_entry, &mut table[fd as usize]);
+        if table_entry.is_none() {
+            self.num_fds += 1;
+        }
+    }
+
+    pub fn get(&self, fd: FileDesc) -> Result<FileRef, Error> {
         if fd as usize >= self.table.len() {
-            return None;
+            return errno!(EBADF, "Invalid file descriptor");
         }
 
         let table = &self.table;
-        table[fd as usize].as_ref().map(|entry| entry.file.clone())
+        match table[fd as usize].as_ref() {
+            Some(table_entry) => Ok(table_entry.file.clone()),
+            None => errno!(EBADF, "Invalid file descriptor"),
+        }
     }
 
-    pub fn del(&mut self, fd: FileDesc) -> Option<FileRef> {
+    pub fn del(&mut self, fd: FileDesc) -> Result<FileRef, Error> {
         if fd as usize >= self.table.len() {
-            return None;
+            return errno!(EBADF, "Invalid file descriptor");
         }
 
-        let mut del_entry = None;
+        let mut del_table_entry = None;
         let table = &mut self.table;
-        std::mem::swap(&mut del_entry, &mut table[fd as usize]);
-        self.num_fds -= 1;
-        del_entry.map(|entry| entry.file)
+        std::mem::swap(&mut del_table_entry, &mut table[fd as usize]);
+        match del_table_entry {
+            Some(del_table_entry) => {
+                self.num_fds -= 1;
+                Ok(del_table_entry.file)
+            },
+            None => errno!(EBADF, "Invalid file descriptor"),
+        }
     }
 }
 

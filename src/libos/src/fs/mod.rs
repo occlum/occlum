@@ -67,40 +67,35 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
 pub fn do_write(fd: FileDesc, buf: &[u8]) -> Result<usize, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)
-        .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor [do_write]"))?;
+    let file_ref = current_process.get_files().get(fd)?;
     file_ref.write(buf)
 }
 
 pub fn do_read(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)
-        .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor [do_read]"))?;
+    let file_ref = current_process.get_files().get(fd)?;
     file_ref.read(buf)
 }
 
 pub fn do_writev<'a, 'b>(fd: FileDesc, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)
-        .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor [do_write]"))?;
+    let file_ref = current_process.get_files().get(fd)?;
     file_ref.writev(bufs)
 }
 
 pub fn do_readv<'a, 'b>(fd: FileDesc, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)
-        .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor [do_read]"))?;
+    let file_ref = current_process.get_files().get(fd)?;
     file_ref.readv(bufs)
 }
 
 pub fn do_lseek<'a, 'b>(fd: FileDesc, offset: SeekFrom) -> Result<off_t, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)
-        .ok_or_else(|| Error::new(Errno::EBADF, "Invalid file descriptor [do_lseek]"))?;
+    let file_ref = current_process.get_files().get(fd)?;
     file_ref.seek(offset)
 }
 
@@ -108,10 +103,8 @@ pub fn do_close(fd: FileDesc) -> Result<(), Error> {
     let current_ref = process::get_current();
     let mut current_process = current_ref.lock().unwrap();
     let file_table = current_process.get_files_mut();
-    match file_table.del(fd) {
-        Some(_) => Ok(()),
-        None => Err(Error::new(Errno::EBADF, "Invalid file descriptor [do_close]")),
-    }
+    file_table.del(fd)?;
+    Ok(())
 }
 
 pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2], Error> {
@@ -126,4 +119,37 @@ pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2], Error> {
     let writer_fd = file_table.put(Arc::new(Box::new(pipe.writer)),
                                    close_on_spawn);
     Ok([reader_fd, writer_fd])
+}
+
+pub fn do_dup(old_fd: FileDesc) -> Result<FileDesc, Error> {
+    let current_ref = process::get_current();
+    let mut current = current_ref.lock().unwrap();
+    let file_table = current.get_files_mut();
+    let file = file_table.get(old_fd)?;
+    let new_fd = file_table.put(file, false);
+    Ok(new_fd)
+}
+
+pub fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<FileDesc, Error> {
+    let current_ref = process::get_current();
+    let mut current = current_ref.lock().unwrap();
+    let file_table = current.get_files_mut();
+    let file = file_table.get(old_fd)?;
+    if old_fd != new_fd {
+        file_table.put_at(new_fd, file, false);
+    }
+    Ok(new_fd)
+}
+
+pub fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<FileDesc, Error> {
+    let current_ref = process::get_current();
+    let mut current = current_ref.lock().unwrap();
+    let file_table = current.get_files_mut();
+    let file = file_table.get(old_fd)?;
+    if old_fd == new_fd {
+        return errno!(EINVAL, "old_fd must not be equal to new_fd");
+    }
+    let close_on_spawn = flags & O_CLOEXEC != 0;
+    file_table.put_at(new_fd, file, close_on_spawn);
+    Ok(new_fd)
 }
