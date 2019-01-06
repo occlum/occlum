@@ -195,6 +195,17 @@ fn do_brk(new_brk_addr: *const c_void) -> Result<*const c_void, Error> {
     vm::do_brk(new_brk_addr).map(|ret_brk_addr| ret_brk_addr as *const c_void)
 }
 
+fn do_pipe2(fds_u: *mut c_int, flags: c_int) -> Result<(), Error> {
+    check_mut_array_from_user(fds_u, 2)?;
+    // TODO: how to deal with open flags???
+    let fds = fs::do_pipe2(flags as u32)?;
+    unsafe {
+        *fds_u.offset(0) = fds[0] as c_int;
+        *fds_u.offset(1) = fds[1] as c_int;
+    }
+    Ok(())
+}
+
 
 const MAP_FAILED : *const c_void = ((-1) as i64) as *const c_void;
 
@@ -237,19 +248,14 @@ pub extern "C" fn occlum_brk(addr: *const c_void) ->  *const c_void {
     }
 }
 
-fn do_pipe(fds_u: *mut c_int) -> Result<(), Error> {
-    check_mut_array_from_user(fds_u, 2)?;
-    let fds = fs::do_pipe()?;
-    unsafe {
-        *fds_u.offset(0) = fds[0] as c_int;
-        *fds_u.offset(1) = fds[1] as c_int;
-    }
-    Ok(())
+#[no_mangle]
+pub extern "C" fn occlum_pipe(fds: *mut c_int) ->  c_int {
+    occlum_pipe2(fds, 0)
 }
 
 #[no_mangle]
-pub extern "C" fn occlum_pipe(fds: *mut c_int) ->  c_int {
-    match do_pipe(fds) {
+pub extern "C" fn occlum_pipe2(fds: *mut c_int, flags: c_int) ->  c_int {
+    match do_pipe2(fds, flags) {
         Ok(()) => {
             0
         },

@@ -17,6 +17,7 @@ pub const O_RDWR   : u32 = 0x00000002;
 pub const O_CREAT  : u32 = 0x00000040;
 pub const O_TRUNC  : u32 = 0x00000200;
 pub const O_APPEND : u32 = 0x00000400;
+pub const O_CLOEXEC: u32 = 0x00080000;
 
 // TODO: use the type defined in Rust libc.
 //
@@ -54,10 +55,12 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
     let file_ref : Arc<Box<File>> = Arc::new(Box::new(
             SgxFile::new(sgx_file, is_readable, is_writable, is_append)?));
 
-    let current_ref = process::get_current();
-    let mut current_process = current_ref.lock().unwrap();
-    let fd = current_process.get_files_mut().put(file_ref);
-
+    let fd = {
+        let current_ref = process::get_current();
+        let mut current = current_ref.lock().unwrap();
+        let close_on_spawn = flags & O_CLOEXEC != 0;
+        current.get_files_mut().put(file_ref, close_on_spawn)
+    };
     Ok(fd)
 }
 
@@ -111,13 +114,16 @@ pub fn do_close(fd: FileDesc) -> Result<(), Error> {
     }
 }
 
-pub fn do_pipe() -> Result<[FileDesc; 2], Error> {
+pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2], Error> {
     let current_ref = process::get_current();
     let mut current = current_ref.lock().unwrap();
     let pipe = Pipe::new()?;
 
     let mut file_table = current.get_files_mut();
-    let reader_fd = file_table.put(Arc::new(Box::new(pipe.reader)));
-    let writer_fd = file_table.put(Arc::new(Box::new(pipe.writer)));
+    let close_on_spawn = flags & O_CLOEXEC != 0;
+    let reader_fd = file_table.put(Arc::new(Box::new(pipe.reader)),
+                                   close_on_spawn);
+    let writer_fd = file_table.put(Arc::new(Box::new(pipe.writer)),
+                                   close_on_spawn);
     Ok([reader_fd, writer_fd])
 }

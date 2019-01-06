@@ -80,9 +80,9 @@ fn init_files(parent_ref: &ProcessRef) -> Result<FileTable, Error> {
     let stdout : Arc<Box<File>> = Arc::new(Box::new(StdoutFile::new()));
     // TODO: implement and use a real stderr
     let stderr = stdout.clone();
-    file_table.put(stdin);
-    file_table.put(stdout);
-    file_table.put(stderr);
+    file_table.put(stdin, false);
+    file_table.put(stdout, false);
+    file_table.put(stderr, false);
     Ok(file_table)
 }
 

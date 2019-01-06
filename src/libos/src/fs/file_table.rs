@@ -4,71 +4,100 @@ use {std};
 
 pub type FileDesc = u32;
 
-// Invariant 1: fd < max_fd, where fd is any fd in the table
-// Invariant 2: max_fd = table.size()
-// Invariant 3: num_fds <= table.size()
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 #[repr(C)]
 pub struct FileTable {
-    table: Vec<Option<FileRef>>,
-    max_fd: FileDesc,
-    num_fds: u32,
+    table: Vec<Option<FileTableEntry>>,
+    num_fds: usize,
 }
+
+#[derive(Debug, Clone)]
+struct FileTableEntry {
+    file: FileRef,
+    close_on_spawn: bool,
+}
+
 
 impl FileTable {
     pub fn new() -> FileTable {
         FileTable {
-            table: Vec::with_capacity(0),
-            max_fd: 0,
+            table: Vec::with_capacity(4),
             num_fds: 0,
         }
     }
 
-    pub fn put(&mut self, file: FileRef) -> FileDesc {
+    pub fn put(&mut self, file: FileRef, close_on_spawn: bool) -> FileDesc {
         let mut table = &mut self.table;
 
-        let free_fd = if self.num_fds < self.max_fd {
-            table.iter().enumerate()
-                .find(|&(idx, opt)| opt.is_none()).unwrap().0 as FileDesc
+        let min_free_fd = if self.num_fds < table.len() {
+            table.iter().enumerate().find(|&(idx, opt)| opt.is_none())
+                .unwrap().0
         } else {
             table.push(None);
-            self.max_fd += 1;
-            self.num_fds
+            table.len() - 1
         };
 
-        table[free_fd as usize] = Some(file);
+        table[min_free_fd as usize] = Some(FileTableEntry::new(file,
+                                                               close_on_spawn));
         self.num_fds += 1;
 
-        free_fd
+        min_free_fd as FileDesc
     }
 
     pub fn get(&self, fd: FileDesc) -> Option<FileRef> {
-        if fd >= self.max_fd {
+        if fd as usize >= self.table.len() {
             return None;
         }
 
         let table = &self.table;
-        table[fd as usize].as_ref().map(|file_ref| file_ref.clone())
+        table[fd as usize].as_ref().map(|entry| entry.file.clone())
     }
 
     pub fn del(&mut self, fd: FileDesc) -> Option<FileRef> {
-        if fd >= self.max_fd {
+        if fd as usize >= self.table.len() {
             return None;
         }
 
-        let mut del_file = None;
+        let mut del_entry = None;
         let table = &mut self.table;
-        std::mem::swap(&mut del_file, &mut table[fd as usize]);
-        if del_file.is_none() {
-            return None;
-        }
-
+        std::mem::swap(&mut del_entry, &mut table[fd as usize]);
         self.num_fds -= 1;
-        if fd + 1 == self.max_fd {
-            self.max_fd = table.iter().enumerate().rev()
-                .find(|&(idx, opt)| opt.is_some())
-                .map_or(0, |(max_used_fd,opt)| max_used_fd + 1) as FileDesc;
+        del_entry.map(|entry| entry.file)
+    }
+}
+
+impl Clone for FileTable {
+    fn clone(&self) -> FileTable {
+        // Only clone file descriptors that are not close-on-spawn
+        let mut num_cloned_fds = 0;
+        let cloned_table = self.table.iter().map(|entry| {
+            match entry {
+                Some(file_table_entry) => {
+                    match file_table_entry.close_on_spawn {
+                        false => {
+                            num_cloned_fds += 1;
+                            Some(file_table_entry.clone())
+                        }
+                        true => None
+                    }
+                },
+                None => None
+            }
+        }).collect();
+
+        FileTable {
+            table: cloned_table,
+            num_fds: num_cloned_fds,
         }
-        del_file
+    }
+}
+
+
+impl FileTableEntry {
+    fn new(file: FileRef, close_on_spawn: bool) -> FileTableEntry {
+        FileTableEntry {
+            file,
+            close_on_spawn,
+        }
     }
 }
