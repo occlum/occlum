@@ -69,6 +69,7 @@ endif
 #
 SGX_CFLAGS_T := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fstack-protector
 SGX_CFLAGS_T += -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/stlport -I$(SGX_SDK)/include/epid
+
 # Before use this linker flag, the user should define $(_Other_Enclave_Libs),
 # and $(_Other_Link_Flags)
 #

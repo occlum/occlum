@@ -169,7 +169,6 @@ int initialize_enclave(const char* enclave_path)
         if (fp != NULL) fclose(fp);
         return -1;
     }
-    printf("[+] global_eid: %ld\n", global_eid);
 
     /* Step 3: save the launch token if it is updated */
     if (updated == FALSE || fp == NULL) {

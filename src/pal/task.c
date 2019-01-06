@@ -6,8 +6,9 @@
 #include "sgx_urts.h"
 #include "Enclave_u.h"
 
-static int num_tasks = 0;
-static int main_task_status = 0;
+static volatile int num_tasks = 0;
+static volatile int main_task_status = 0;
+static volatile int any_fatal_error = 0;
 
 static int BEGIN_TASK(void) {
     return a_fetch_and_add(&num_tasks, 1) == 0;
@@ -32,6 +33,7 @@ static void* __run_task_thread(void* _data) {
     if(sgx_ret != SGX_SUCCESS) {
         // TODO: deal with ECALL error
         printf("ERROR: ECall libos_run failed\n");
+        any_fatal_error = 1;
     }
 
     if (data->is_main_task) main_task_status = status;
@@ -64,5 +66,5 @@ int wait_all_tasks(void) {
     while ((cur_num_tasks = a_load(&num_tasks)) != 0) {
         futex_wait(&num_tasks, cur_num_tasks);
     }
-    return main_task_status;
+    return any_fatal_error ? -1 : main_task_status;
 }

@@ -6,6 +6,11 @@ BUILD_TEST_SUITES := $(TEST_SUITES:%=%)
 RUN_TEST_SUITES := $(TEST_SUITES:%=run-%)
 CLEAN_TEST_SUITES := $(TEST_SUITES:%=clean-%)
 
+CYAN :=\033[1;36m
+GREEN :=\033[1;32m
+RED :=\033[1;31m
+NO_COLOR :=\033[0m
+
 .PHONY: all build test clean $(BUILD_TEST_SUITES) $(RUN_TEST_SUITES) $(CLEAN_TEST_SUITES)
 
 #############################################################################
@@ -17,7 +22,9 @@ all: build
 build: $(BUILD_TEST_SUITES)
 
 $(BUILD_TEST_SUITES): %:
-	@$(MAKE) -C $@
+	@echo "$(CYAN)BUILD TEST => $@$(NO_COLOR)"
+	@$(MAKE) --no-print-directory -C $@
+	@echo "$(GREEN)DONE$(NO_COLOR)"
 
 #############################################################################
 # Run tests
@@ -26,13 +33,19 @@ $(BUILD_TEST_SUITES): %:
 run: build $(RUN_TEST_SUITES)
 
 pal: $(PROJECT_DIR)/src/pal/pal
-	cp $< pal
+	@cp $< pal
 
 libocclum.signed.so: $(PROJECT_DIR)/src/libos/libocclum.signed.so
-	cp $< libocclum.signed.so
+	@cp $< libocclum.signed.so
 
 $(RUN_TEST_SUITES): run-%: % pal libocclum.signed.so
-	@$(MAKE) -C $< run
+	@echo "$(CYAN)TEST => $<$(NO_COLOR)"
+	@$(MAKE) --no-print-directory -C $< run ; \
+		if [ $$? -eq 0 ] ; then \
+			echo "$(GREEN)PASS$(NO_COLOR)" ; \
+		else \
+			echo "$(RED)FAILED$(NO_COLOR)" ; \
+		fi ;
 
 #############################################################################
 # Misc
@@ -42,4 +55,4 @@ clean: $(CLEAN_TEST_SUITES)
 	@$(RM) -f pal libocclum.signed.so
 
 $(CLEAN_TEST_SUITES): clean-%:
-	@$(MAKE) -C $(patsubst clean-%,%,$@) clean
+	@$(MAKE) --no-print-directory -C $(patsubst clean-%,%,$@) clean

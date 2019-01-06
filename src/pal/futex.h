@@ -3,7 +3,7 @@
 
 #include <sys/time.h>
 
-int futex_wait(int* uaddr, int val);
-int futex_wakeup(int* uaddr);
+int futex_wait(volatile int* uaddr, int val);
+int futex_wakeup(volatile int* uaddr);
 
 #endif /* __ATOMIC_H_ */

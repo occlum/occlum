@@ -18,15 +18,15 @@ static inline long __syscall6(long n, long a1, long a2, long a3, long a4, long a
 #define syscall(num, a1, a2, a3, a4, a5, a6) \
     __syscall6((num), (long)(a1), (long)(a2), (long)(a3), (long)(a4), (long)(a5), (long)(a6))
 
-static inline int futex(void *addr1, int op, int val1, struct timespec *timeout,
+static inline int futex(volatile void *addr1, int op, int val1, struct timespec *timeout,
                 void *addr2, int val3) {
     return (int) syscall(SYS_futex, addr1, op, val1, timeout, addr2, val3);
 }
 
-int futex_wait(int* uaddr, int val) {
+int futex_wait(volatile int* uaddr, int val) {
     return futex(uaddr, FUTEX_WAIT, val, NULL, NULL, 0);
 }
 
-int futex_wakeup(int* uaddr) {
+int futex_wakeup(volatile int* uaddr) {
     return futex(uaddr, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
 }

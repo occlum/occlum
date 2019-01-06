@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-#![crate_name = "libos"]
+#![crate_name = "occlum_rs"]
 #![crate_type = "staticlib"]
 
 #![cfg_attr(not(target_env = "sgx"), no_std)]

@@ -11,6 +11,7 @@ Link_Flags := $(SGX_LFLAGS_U)
 Link_Flags += -L../../deps/rust-sgx-sdk/sgx_ustdc/ -lsgx_ustdc -lsgx_uprotected_fs
 
 
+.PHONY: all
 all: $(Bin)
 
 $(Bin): $(EDL_Gen_Files) $(Objs) sgx_ustdc
@@ -30,8 +31,7 @@ $(Objs): %.o: %.c
 #
 .PHONY: sgx_ustdc
 sgx_ustdc:
-	@$(MAKE) --no-print-directory -C ../../deps/rust-sgx-sdk/sgx_ustdc/ 2> /dev/null
-
+	@$(MAKE) --no-print-directory -C ../../deps/rust-sgx-sdk/sgx_ustdc/ > /dev/null
 
 .PHONY: clean
 clean:
