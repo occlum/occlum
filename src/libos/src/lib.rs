@@ -78,8 +78,9 @@ fn do_boot(path_str: &str) -> Result<(), Error> {
 
     let argv = std::vec::Vec::new();
     let envp = std::vec::Vec::new();
+    let file_actions = Vec::new();
     let parent = &process::IDLE_PROCESS;
-    process::do_spawn(&path_str, &argv, &envp, parent)?;
+    process::do_spawn(&path_str, &argv, &envp, &file_actions, parent)?;
 
     Ok(())
 }

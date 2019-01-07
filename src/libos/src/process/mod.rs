@@ -3,7 +3,7 @@ pub use self::task::{get_current, run_task};
 pub mod table {
     pub use super::process_table::{get};
 }
-pub use self::spawn::{do_spawn};
+pub use self::spawn::{do_spawn, FileAction};
 pub use self::exit::{do_exit, do_wait4, ChildProcessFilter};
 pub use self::wait::{Waiter, WaitQueue};
 

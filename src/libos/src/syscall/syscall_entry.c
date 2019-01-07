@@ -65,7 +65,8 @@ long dispatch_syscall(int num, long arg0, long arg1, long arg2, long arg3, long 
         DECL_SYSCALL_ARG(const char*, path, arg1);
         DECL_SYSCALL_ARG(const char**, argv, arg2);
         DECL_SYSCALL_ARG(const char**, envp, arg3);
-        ret = occlum_spawn(child_pid, path, argv, envp);
+        DECL_SYSCALL_ARG(void*, file_actions, arg4);
+        ret = occlum_spawn(child_pid, path, argv, envp, file_actions);
         break;
     }
     case SYS_wait4: {

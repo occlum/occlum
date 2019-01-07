@@ -26,8 +26,8 @@ extern int occlum_dup2(int old_fd, int new_fd);
 extern int occlum_dup3(int old_fd, int new_fd, int flags);
 
 extern int occlum_spawn(int* child_pid, const char* path,
-                        const char** argv,
-                        const char** envp);
+                        const char** argv, const char** envp,
+                        void* file_actions);
 extern int occlum_wait4(int child_pid, int* status, int options/*, struct rusage* rusage*/);
 extern void occlum_exit(int status);
 extern unsigned int occlum_getpid(void);

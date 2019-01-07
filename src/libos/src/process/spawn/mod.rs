@@ -1,5 +1,5 @@
 use super::*;
-use fs::{File, StdinFile, StdoutFile/*, StderrFile*/, FileTable};
+use fs::{File, FileDesc, StdinFile, StdoutFile/*, StderrFile*/, FileTable};
 use std::path::Path;
 use std::ffi::{CStr, CString};
 use std::sgxfs::SgxFile;
@@ -14,8 +14,16 @@ mod init_vm;
 mod elf_helper;
 mod segment;
 
+#[derive(Debug)]
+pub enum FileAction {
+    // TODO: Add open action
+    // Open(...)
+    Dup2(FileDesc, FileDesc),
+    Close(FileDesc),
+}
+
 pub fn do_spawn<P: AsRef<Path>>(elf_path: &P, argv: &[CString], envp: &[CString],
-                                parent_ref: &ProcessRef)
+                                file_actions: &[FileAction], parent_ref: &ProcessRef)
     -> Result<u32, Error>
 {
     let mut elf_buf = {
@@ -55,7 +63,7 @@ pub fn do_spawn<P: AsRef<Path>>(elf_path: &P, argv: &[CString], envp: &[CString]
             let stack_top = vm.get_stack_top();
             init_task(program_entry, stack_top, argv, envp)?
         };
-        let files = init_files(parent_ref)?;
+        let files = init_files(parent_ref, file_actions)?;
         let exec_path = elf_path.as_ref().to_str().unwrap();
         Process::new(exec_path, task, vm, files)?
     };
@@ -65,12 +73,29 @@ pub fn do_spawn<P: AsRef<Path>>(elf_path: &P, argv: &[CString], envp: &[CString]
     Ok(new_pid)
 }
 
-fn init_files(parent_ref: &ProcessRef) -> Result<FileTable, Error> {
+fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction])
+    -> Result<FileTable, Error>
+{
     // Usually, we just inherit the file table from the parent
     let parent = parent_ref.lock().unwrap();
     let should_inherit_file_table = parent.get_pid() > 0;
     if should_inherit_file_table {
-        return Ok(parent.get_files().clone());
+        let mut cloned_file_table = parent.get_files().clone();
+        // Perform file actions to modify the cloned file table
+        for file_action in file_actions {
+            match file_action {
+                FileAction::Dup2(old_fd, new_fd) => {
+                    let file = cloned_file_table.get(*old_fd)?;
+                    if old_fd != new_fd {
+                        cloned_file_table.put_at(*new_fd, file, false);
+                    }
+                },
+                FileAction::Close(fd) => {
+                    cloned_file_table.del(*fd)?;
+                }
+            }
+        }
+        return Ok(cloned_file_table);
     }
     drop(parent);
 

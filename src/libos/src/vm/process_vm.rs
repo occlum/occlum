@@ -31,6 +31,7 @@ pub struct ProcessVM {
     heap_vma: VMArea,
     stack_vma: VMArea,
     mmap_vmas: Vec<Box<VMArea>>,
+    brk: usize,
 }
 
 impl ProcessVM {
@@ -46,6 +47,8 @@ impl ProcessVM {
         let (code_vma, data_vma, heap_vma, stack_vma) =
             ProcessVM::alloc_vmas(&mut data_domain, code_size, data_size,
                                  heap_size, stack_size)?;
+        // Initial value of the program break
+        let brk = heap_vma.get_start();
         // No mmapped vmas initially
         let mmap_vmas = Vec::new();
 
@@ -56,6 +59,7 @@ impl ProcessVM {
             heap_vma,
             stack_vma,
             mmap_vmas,
+            brk,
         })
     }
 
@@ -128,7 +132,7 @@ impl ProcessVM {
     }
 
     pub fn get_brk(&self) -> usize {
-        self.get_heap_vma().get_end()
+        self.brk
     }
 
     pub fn get_mmap_start(&self) -> usize {
@@ -196,17 +200,17 @@ impl ProcessVM {
         if new_brk == 0 {
             return Ok(self.get_brk());
         }
+        else if new_brk < self.heap_vma.get_start() {
+            return errno!(EINVAL, "New brk address is too low");
+        }
+        else if new_brk <= self.heap_vma.get_end() {
+            self.brk = new_brk;
+            return Ok(new_brk);
+        }
 
         let resize_options = {
             let brk_start = self.get_brk_start();
-
-            let new_heap_size = {
-                if new_brk < brk_start {
-                    return Err(Error::new(Errno::EINVAL, "Invalid brk"));
-                }
-                new_brk - brk_start
-            };
-
+            let new_heap_size = align_up(new_brk, 4096) - brk_start;
             let mut options = VMResizeOptions::new(new_heap_size)?;
             options.addr(VMAddrOption::Fixed(brk_start));
             options
