@@ -52,7 +52,7 @@ impl ProcessVM {
         // No mmapped vmas initially
         let mmap_vmas = Vec::new();
 
-        Ok(ProcessVM {
+        let vm = ProcessVM {
             data_domain,
             code_vma,
             data_vma,
@@ -60,7 +60,8 @@ impl ProcessVM {
             stack_vma,
             mmap_vmas,
             brk,
-        })
+        };
+        Ok(vm)
     }
 
     fn alloc_vmas(data_domain: &mut VMDomain,
