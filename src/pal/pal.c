@@ -4,6 +4,7 @@
 
 #include <unistd.h>
 #include <pwd.h>
+#include <sys/time.h>
 
 #define MAX_PATH FILENAME_MAX
 
@@ -195,6 +196,13 @@ void ocall_print_string(const char* msg) {
 int ocall_run_new_task(void) {
     int ret = run_new_task(global_eid);
     return ret;
+}
+
+void ocall_gettimeofday(long* seconds, long* microseconds) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    *seconds = tv.tv_sec;
+    *microseconds = tv.tv_usec;
 }
 
 

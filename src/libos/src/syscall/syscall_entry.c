@@ -144,6 +144,12 @@ long dispatch_syscall(int num, long arg0, long arg1, long arg2, long arg3, long 
         ret = (long) occlum_dup3(old_fd, new_fd, flags);
         break;
     }
+    case SYS_gettimeofday: {
+        DECL_SYSCALL_ARG(struct timeval*, tv, arg0);
+        //DECL_SYSCALL_ARG(struct timezone*, tz, arg1);
+        ret = (long) occlum_gettimeofday(tv/*, tz*/);
+        break;
+    }
     default:
         ret = occlum_unknown(num);
         break;

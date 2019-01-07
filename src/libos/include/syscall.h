@@ -5,6 +5,7 @@
 #include "syscall_nr.h"
 
 struct iovec;
+struct timeval;
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,6 +38,8 @@ extern void *occlum_mmap(void *addr, size_t length, int prot, int flags, int fd,
 extern int occlum_munmap(void *addr, size_t length);
 extern void *occlum_mremap(void *old_address, size_t old_size, size_t new_size, int flags, void *new_address);
 extern void* occlum_brk(void* addr);
+
+extern int occlum_gettimeofday(struct timeval* tv/*, struct timezone* tz*/);
 
 extern int occlum_unknown(int num);
 

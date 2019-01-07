@@ -14,5 +14,6 @@ enclave {
     untrusted {
         void ocall_print_string([in, string] const char* msg);
         int ocall_run_new_task(void);
+        void ocall_gettimeofday([out] long* seconds, [out] long* microseconds);
     };
 };

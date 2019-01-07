@@ -1,11 +1,12 @@
 use super::*;
 use prelude::*;
-use std::{ptr};
 use {std, fs, process, vm};
+use std::{ptr};
 use std::ffi::{CStr, CString};
 use fs::{off_t, FileDesc};
 use vm::{VMAreaFlags, VMResizeOptions};
 use process::{pid_t, ChildProcessFilter, FileAction};
+use time::{timeval_t};
 // Use the internal syscall wrappers from sgx_tstd
 //use std::libc_fs as fs;
 //use std::libc_io as io;
@@ -49,6 +50,81 @@ fn clone_cstrings_from_user_safely(user_ptr: *const *const c_char)
     Ok(cstrings)
 }
 
+
+/*
+ * This Rust-version of fdop correspond to the C-version one in Occlum.
+ * See <path_to_musl_libc>/src/process/fdop.h.
+ */
+const FDOP_CLOSE : u32 = 1;
+const FDOP_DUP2 : u32 = 2;
+const FDOP_OPEN : u32 = 3;
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct FdOp {
+    // We actually switch the prev and next fields in the libc definition.
+    prev: *const FdOp,
+    next: *const FdOp,
+    cmd: u32,
+    fd: u32,
+    srcfd: u32,
+    oflag: u32,
+    mode: u32,
+    path: *const u8,
+}
+
+fn clone_file_actions_from_user_safely(fdop_ptr: *const FdOp)
+    -> Result<Vec<FileAction>, Error>
+{
+    let mut file_actions = Vec::new();
+
+    let mut fdop_ptr = fdop_ptr;
+    while fdop_ptr != ptr::null() {
+        check_ptr_from_user(fdop_ptr)?;
+        let fdop = unsafe { &*fdop_ptr };
+
+        let file_action = match fdop.cmd {
+            FDOP_CLOSE => {
+                FileAction::Close(fdop.fd)
+            },
+            FDOP_DUP2 => {
+                FileAction::Dup2(fdop.srcfd, fdop.fd)
+            },
+            FDOP_OPEN => {
+                return errno!(EINVAL, "Not implemented");
+            },
+            _ => {
+                return errno!(EINVAL, "Unknown file action command");
+            },
+        };
+        file_actions.push(file_action);
+
+        fdop_ptr = fdop.next;
+    }
+
+    Ok(file_actions)
+}
+
+fn do_spawn(child_pid_ptr: *mut c_uint,
+            path: *const c_char,
+            argv: *const *const c_char,
+            envp: *const *const c_char,
+            fdop_list: *const FdOp,
+            )
+    -> Result<(), Error>
+{
+    check_mut_ptr_from_user(child_pid_ptr)?;
+    let path = clone_cstring_from_user_safely(path)?;
+    let argv = clone_cstrings_from_user_safely(argv)?;
+    let envp = clone_cstrings_from_user_safely(envp)?;
+    let file_actions = clone_file_actions_from_user_safely(fdop_list)?;
+    let parent = process::get_current();
+
+    let child_pid = process::do_spawn(&path, &argv, &envp, &file_actions, &parent)?;
+
+    unsafe { *child_pid_ptr = child_pid };
+    Ok(())
+}
 
 fn do_read(fd: c_int, buf: *mut c_void, size: size_t)
     -> Result<size_t, Error>
@@ -244,6 +320,13 @@ fn do_pipe2(fds_u: *mut c_int, flags: c_int) -> Result<(), Error> {
     Ok(())
 }
 
+fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<(), Error> {
+    check_mut_ptr_from_user(tv_u)?;
+    let tv = time::do_gettimeofday();
+    unsafe { *tv_u = tv; }
+    Ok(())
+}
+
 
 const MAP_FAILED : *const c_void = ((-1) as i64) as *const c_void;
 
@@ -414,82 +497,6 @@ pub extern "C" fn occlum_unknown(num: u32)
     println!("[WARNING] Unknown syscall (num = {})", num);
 }
 
-
-/*
- * This Rust-version of fdop correspond to the C-version one in Occlum.
- * See <path_to_musl_libc>/src/process/fdop.h.
- */
-const FDOP_CLOSE : u32 = 1;
-const FDOP_DUP2 : u32 = 2;
-const FDOP_OPEN : u32 = 3;
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct FdOp {
-    // We actually switch the prev and next fields in the libc definition.
-    prev: *const FdOp,
-    next: *const FdOp,
-    cmd: u32,
-    fd: u32,
-    srcfd: u32,
-    oflag: u32,
-    mode: u32,
-    path: *const u8,
-}
-
-fn clone_file_actions_from_user_safely(fdop_ptr: *const FdOp)
-    -> Result<Vec<FileAction>, Error>
-{
-    let mut file_actions = Vec::new();
-
-    let mut fdop_ptr = fdop_ptr;
-    while fdop_ptr != ptr::null() {
-        check_ptr_from_user(fdop_ptr)?;
-        let fdop = unsafe { &*fdop_ptr };
-
-        let file_action = match fdop.cmd {
-            FDOP_CLOSE => {
-                FileAction::Close(fdop.fd)
-            },
-            FDOP_DUP2 => {
-                FileAction::Dup2(fdop.srcfd, fdop.fd)
-            },
-            FDOP_OPEN => {
-                return errno!(EINVAL, "Not implemented");
-            },
-            _ => {
-                return errno!(EINVAL, "Unknown file action command");
-            },
-        };
-        file_actions.push(file_action);
-
-        fdop_ptr = fdop.next;
-    }
-
-    Ok(file_actions)
-}
-
-fn do_spawn(child_pid_ptr: *mut c_uint,
-            path: *const c_char,
-            argv: *const *const c_char,
-            envp: *const *const c_char,
-            fdop_list: *const FdOp,
-            )
-    -> Result<(), Error>
-{
-    check_mut_ptr_from_user(child_pid_ptr)?;
-    let path = clone_cstring_from_user_safely(path)?;
-    let argv = clone_cstrings_from_user_safely(argv)?;
-    let envp = clone_cstrings_from_user_safely(envp)?;
-    let file_actions = clone_file_actions_from_user_safely(fdop_list)?;
-    let parent = process::get_current();
-
-    let child_pid = process::do_spawn(&path, &argv, &envp, &file_actions, &parent)?;
-
-    unsafe { *child_pid_ptr = child_pid };
-    Ok(())
-}
-
 #[no_mangle]
 pub extern "C" fn occlum_spawn(
     child_pid: *mut c_uint, path: *const c_char,
@@ -556,6 +563,20 @@ pub extern "C" fn occlum_dup3(old_fd: c_int, new_fd: c_int, flags: c_int)
     match fs::do_dup3(old_fd, new_fd, flags) {
         Ok(new_fd) => {
             new_fd as c_int
+        }
+        Err(e) => {
+            e.errno.as_retval()
+        }
+    }
+}
+
+// TODO: handle tz: timezone_t
+#[no_mangle]
+pub extern "C" fn occlum_gettimeofday(tv: *mut timeval_t) -> c_int
+{
+    match do_gettimeofday(tv) {
+        Ok(()) => {
+            0
         }
         Err(e) => {
             e.errno.as_retval()
