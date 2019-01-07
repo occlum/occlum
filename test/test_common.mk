@@ -16,7 +16,7 @@ C_FLAGS = -Wall -O0 $(EXTRA_C_FLAGS)
 C_FLAGS += -Xclang -load -Xclang $(LLVM_PATH)/lib/LLVMBoundchecker.so -mllvm -check-store-only=true
 LINK_FLAGS = $(C_FLAGS) $(EXTRA_LINK_FLAGS)
 
-.PHONY: all run debug clean
+.PHONY: all test debug clean
 
 #############################################################################
 # Build
@@ -44,18 +44,18 @@ $(READELF_FILE): $(BIN_NAME)
 	@echo "READELF => $@"
 
 $(BIN_NAME): $(C_OBJS)
-	@$(CC) $^ $(LINK_FLAGS) -o $(BIN_NAME) 2> /dev/null
+	@$(CC) $^ $(LINK_FLAGS) -o $(BIN_NAME)
 	@echo "LINK => $@"
 
 $(C_OBJS): %.o: %.c
-	@$(CC) $(C_FLAGS) -c $< -o $@ 2> /dev/null
+	@$(CC) $(C_FLAGS) -c $< -o $@
 	@echo "CC <= $@"
 
 #############################################################################
 # Test
 #############################################################################
 
-run: $(BIN_ENC_NAME)
+test: $(BIN_ENC_NAME)
 	@cd ../ && RUST_BACKTRACE=1 ./pal $(CUR_DIR)/$(BIN_ENC_NAME)
 
 #############################################################################

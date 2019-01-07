@@ -4,7 +4,7 @@
 
 static const char* msg = "Hello World\n";
 
-int main(int argc) {
+int main() {
     printf("%s", msg);
     return 0;
 }

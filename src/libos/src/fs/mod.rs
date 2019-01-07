@@ -49,7 +49,7 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
         Arc::new(SgxMutex::new(sgx_file))
     };
 
-    let is_readable = (flags & O_RDONLY != 0) || (flags & O_RDWR != 0);
+    let is_readable = (flags & O_WRONLY) == 0;
     let is_writable = (flags & O_WRONLY != 0) || (flags & O_RDWR != 0);
     let is_append = (flags & O_APPEND != 0);
     let file_ref : Arc<Box<File>> = Arc::new(Box::new(

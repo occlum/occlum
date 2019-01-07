@@ -1,15 +1,15 @@
 CUR_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 PROJECT_DIR := $(realpath $(CUR_DIR)/../)
 
-TEST_SUITES := empty hello_world malloc getpid spawn
+TEST_SUITES := empty hello_world malloc file getpid spawn
 BUILD_TEST_SUITES := $(TEST_SUITES:%=%)
-RUN_TEST_SUITES := $(TEST_SUITES:%=run-%)
+RUN_TEST_SUITES := $(TEST_SUITES:%=test-%)
 CLEAN_TEST_SUITES := $(TEST_SUITES:%=clean-%)
 
-CYAN :=\033[1;36m
-GREEN :=\033[1;32m
-RED :=\033[1;31m
-NO_COLOR :=\033[0m
+CYAN := \033[1;36m
+GREEN := \033[1;32m
+RED := \033[1;31m
+NO_COLOR := \033[0m
 
 .PHONY: all build test clean $(BUILD_TEST_SUITES) $(RUN_TEST_SUITES) $(CLEAN_TEST_SUITES)
 
@@ -30,7 +30,7 @@ $(BUILD_TEST_SUITES): %:
 # Run tests
 #############################################################################
 
-run: build $(RUN_TEST_SUITES)
+test: build $(RUN_TEST_SUITES)
 
 pal: $(PROJECT_DIR)/src/pal/pal
 	@cp $< pal
@@ -38,9 +38,9 @@ pal: $(PROJECT_DIR)/src/pal/pal
 libocclum.signed.so: $(PROJECT_DIR)/src/libos/libocclum.signed.so
 	@cp $< libocclum.signed.so
 
-$(RUN_TEST_SUITES): run-%: % pal libocclum.signed.so
-	@echo "$(CYAN)TEST => $<$(NO_COLOR)"
-	@$(MAKE) --no-print-directory -C $< run ; \
+$(RUN_TEST_SUITES): test-%: % pal libocclum.signed.so
+	@echo "$(CYAN)RUN TEST => $<$(NO_COLOR)"
+	@$(MAKE) --no-print-directory -C $< test ; \
 		if [ $$? -eq 0 ] ; then \
 			echo "$(GREEN)PASS$(NO_COLOR)" ; \
 		else \

@@ -11,7 +11,7 @@ src:
 	@$(MAKE) --no-print-directory -C src
 
 test:
-	@$(MAKE) --no-print-directory -C test run
+	@$(MAKE) --no-print-directory -C test test
 
 clean:
 	@$(MAKE) --no-print-directory -C src clean
