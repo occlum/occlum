@@ -10,30 +10,29 @@ Compared to existing library OSes for SGX, Occlum has following unprecedented fe
 
 ## How to Build?
 
-### Prerequisite
+### Dependencies
 
-Occlum depends on [Baidu Rust SGX SDK](https://github.com/baidu/rust-sgx-sdk/) and [Intel SGX SDK](https://github.com/intel/linux-sgx/).
+Occlum LibOS has several *explicit* and *implicit* dependencies: the former ones must be installed manually, while the latter ones are downloaded and compiled automatically via Makefile.
 
-Rust SGX SDK is included as a Git submodule of this project, which can be automatically downloaded by using project's Makefile. Currently, we're using version 1.0.4 of Rust SGX SDK, which in turn depends on Rust nightly-2018-10-01. So, make sure you have Rust installed and use this version as the default.
+Explicit dependencies are listed below:
 
-Intel SGX SDK has to be installed separately. We have tested with Intel SGX SDK v2.3.1. Note that it must be modified slightly to work with Rust SGX SDK. The patch can be found [here](https://github.com/baidu/rust-sgx-sdk/blob/af441e3c9143a8c1d04dbbc544142adc8e35f73e/dockerfile/patch).
+   1. [Occlum's fork of Intel SGX SDK](https://github.com/occlum/linux-sgx/tree/for_occlum). See [README.md](https://github.com/occlum/linux-sgx/blob/for_occlum/README.md) for how to compile and install.
+   1. [Occlum's fork of LLVM toolchain](https://github.com/occlum/llvm/tree/for_occlum). See [README.occlum.md](https://github.com/occlum/llvm/blob/for_occlum/README.occlum.md) for how to compile and install.
+   1. [Occlum's fork of musl libc](https://github.com/occlum/musl/tree/for_occlum). See [INSTALL](https://github.com/occlum/musl/blob/for_occlum/INSTALL) for how to compile and install.
+   1. [enable_rdfsbase kernel module](https://github.com/occlum/enable_rdfsbase), which enables rdfsbase instruction and its friends. See [README.md](https://github.com/occlum/enable_rdfsbase/blob/master/README.md) for how to compile and install.
+   1. [Rust programming language](https://www.rust-lang.org/). We have tested with Rust nightly-2018-10-01. Other versions of Rust may or may not work.
+
+Implicit dependencies are managed by Git with [.gitmodules](https://github.com/occlum/libos/blob/master/.gitmodules) and compiled with Makefile. The most important implicit dependency is [Rust SGX SDK](https://github.com/baidu/rust-sgx-sdk). After downloading Occlum LibOS project, run the following command to set up the implicit dependecies:
+
+    cd path/to/occlum/libos
+    make submodule
 
 ### Compile
 
-The first time to compile the project, there are some dependencies must be first downloaded. To do this, run the following commands
+Then, compile the project and run tests with the following commands
 
-    cd path/to/occlum-libos
-    make submodule
-
-Then, compile the project with the following commands
-
-    cd src/
+    cd path/to/occlum/libos
     make
-
-### Run tests
-
-Build and run all tests with the following commands
-
     make test
 
 ## How to Use?
