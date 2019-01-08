@@ -1,5 +1,5 @@
 use super::*;
-use util::{new_ring_buf, RingBufReader, RingBufWriter};
+use util::ring_buf::{*};
 
 // TODO: Use Waiter and WaitQueue infrastructure to sleep when blocking
 
@@ -13,13 +13,13 @@ pub struct Pipe {
 
 impl Pipe {
     pub fn new() -> Result<Pipe, Error> {
-        let (reader, writer) = new_ring_buf(PIPE_BUF_SIZE);
+        let mut ring_buf = RingBuf::new(PIPE_BUF_SIZE);
         Ok(Pipe {
             reader: PipeReader {
-                inner: SgxMutex::new(reader),
+                inner: SgxMutex::new(ring_buf.reader),
             },
             writer: PipeWriter {
-                inner: SgxMutex::new(writer),
+                inner: SgxMutex::new(ring_buf.writer),
             }
         })
     }

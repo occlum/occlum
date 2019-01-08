@@ -214,9 +214,9 @@ int SGX_CDECL main(int argc, char *argv[])
     uint32_t sealed_log_size = 1024;
     uint8_t sealed_log[1024] = {0};
 
-    if (argc != 2) {
-        printf("ERROR: The expected number of arguments is 1, but given %d\n\n", argc - 1);
-        printf("Usage: pal <path_to_executable>\n");
+    if (argc < 2) {
+        printf("ERROR: at least one argument must be provided\n\n");
+        printf("Usage: pal <executable> <arg1> <arg2>...\n");
         return -1;
     }
     const char* executable_path = argv[1];
@@ -229,7 +229,7 @@ int SGX_CDECL main(int argc, char *argv[])
         return -1;
     }
 
-    sgx_ret = libos_boot(global_eid, &status, executable_path);
+    sgx_ret = libos_boot(global_eid, &status, executable_path, &argv[2]);
     if(sgx_ret != SGX_SUCCESS) {
         print_error_message(sgx_ret);
         return status;

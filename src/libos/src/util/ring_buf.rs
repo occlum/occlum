@@ -4,11 +4,19 @@ use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use std::cmp::{min, max};
 use std::{ptr};
 
-pub fn with_fixed_capacity(capacity: usize) -> (RingBufReader, RingBufWriter) {
-    let inner = Arc::new(RingBufInner::new(capacity));
-    let reader = RingBufReader { inner: inner.clone() };
-    let writer = RingBufWriter { inner: inner };
-    (reader, writer)
+#[derive(Debug)]
+pub struct RingBuf {
+    pub reader: RingBufReader,
+    pub writer: RingBufWriter,
+}
+
+impl RingBuf {
+    pub fn new(capacity: usize) -> RingBuf {
+        let inner = Arc::new(RingBufInner::new(capacity));
+        let reader = RingBufReader { inner: inner.clone() };
+        let writer = RingBufWriter { inner: inner };
+        RingBuf { reader: reader, writer: writer }
+    }
 }
 
 #[derive(Debug)]

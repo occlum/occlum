@@ -7,7 +7,7 @@ enclave {
 
     trusted {
         /* define ECALLs here. */
-        public int libos_boot([in, string] const char* executable_path);
+        public int libos_boot([in, string] const char* executable_path, [user_check] char** argv);
         public int libos_run(void);
     };
 

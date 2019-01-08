@@ -7,6 +7,7 @@ use fs::{off_t, FileDesc};
 use vm::{VMAreaFlags, VMResizeOptions};
 use process::{pid_t, ChildProcessFilter, FileAction};
 use time::{timeval_t};
+use util::mem_util::from_user::{*};
 // Use the internal syscall wrappers from sgx_tstd
 //use std::libc_fs as fs;
 //use std::libc_io as io;
@@ -15,39 +16,6 @@ use time::{timeval_t};
 pub struct iovec_t {
     base: *const c_void,
     len: size_t,
-}
-
-fn check_ptr_from_user<T>(user_ptr: *const T) -> Result<(), Error> {
-    Ok(())
-}
-
-fn check_mut_ptr_from_user<T>(user_ptr: *mut T) -> Result<(), Error> {
-    Ok(())
-}
-
-fn check_array_from_user<T>(user_buf: *const T, count: usize) -> Result<(), Error> {
-    Ok(())
-}
-
-fn check_mut_array_from_user<T>(user_buf: *mut T, count: usize) -> Result<(), Error> {
-    Ok(())
-}
-
-fn clone_cstring_from_user_safely(user_ptr: *const c_char)
-    -> Result<String, Error>
-{
-    check_ptr_from_user(user_ptr)?;
-    let string = unsafe {
-        CStr::from_ptr(user_ptr).to_string_lossy().into_owned()
-    };
-    Ok(string)
-}
-
-fn clone_cstrings_from_user_safely(user_ptr: *const *const c_char)
-    -> Result<Vec<CString>, Error>
-{
-    let cstrings = Vec::new();
-    Ok(cstrings)
 }
 
 
@@ -73,14 +41,14 @@ pub struct FdOp {
     path: *const u8,
 }
 
-fn clone_file_actions_from_user_safely(fdop_ptr: *const FdOp)
+fn clone_file_actions_safely(fdop_ptr: *const FdOp)
     -> Result<Vec<FileAction>, Error>
 {
     let mut file_actions = Vec::new();
 
     let mut fdop_ptr = fdop_ptr;
     while fdop_ptr != ptr::null() {
-        check_ptr_from_user(fdop_ptr)?;
+        check_ptr(fdop_ptr)?;
         let fdop = unsafe { &*fdop_ptr };
 
         let file_action = match fdop.cmd {
@@ -113,11 +81,11 @@ fn do_spawn(child_pid_ptr: *mut c_uint,
             )
     -> Result<(), Error>
 {
-    check_mut_ptr_from_user(child_pid_ptr)?;
-    let path = clone_cstring_from_user_safely(path)?;
-    let argv = clone_cstrings_from_user_safely(argv)?;
-    let envp = clone_cstrings_from_user_safely(envp)?;
-    let file_actions = clone_file_actions_from_user_safely(fdop_list)?;
+    check_mut_ptr(child_pid_ptr)?;
+    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
+    let argv = clone_cstrings_safely(argv)?;
+    let envp = clone_cstrings_safely(envp)?;
+    let file_actions = clone_file_actions_safely(fdop_list)?;
     let parent = process::get_current();
 
     let child_pid = process::do_spawn(&path, &argv, &envp, &file_actions, &parent)?;
@@ -133,7 +101,7 @@ fn do_read(fd: c_int, buf: *mut c_void, size: size_t)
     let safe_buf = {
         let buf = buf as *mut u8;
         let size = size as usize;
-        check_mut_array_from_user(buf, size)?;
+        check_mut_array(buf, size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, size) }
     };
     fs::do_read(fd, safe_buf)
@@ -146,7 +114,7 @@ fn do_write(fd: c_int, buf: *const c_void, size: size_t)
     let safe_buf = {
         let buf = buf as *mut u8;
         let size = size as usize;
-        check_array_from_user(buf, size)?;
+        check_array(buf, size)?;
         unsafe { std::slice::from_raw_parts(buf, size) }
     };
     fs::do_write(fd, safe_buf)
@@ -164,7 +132,7 @@ fn do_writev(fd: c_int, iov: *const iovec_t, count: c_int)
         count as usize
     };
 
-    check_array_from_user(iov, count);
+    check_array(iov, count);
     let bufs_vec = {
         let mut bufs_vec = Vec::with_capacity(count);
         for iov_i in 0..count {
@@ -194,7 +162,7 @@ fn do_readv(fd: c_int, iov: *mut iovec_t, count: c_int)
         count as usize
     };
 
-    check_array_from_user(iov, count);
+    check_array(iov, count);
     let mut bufs_vec = {
         let mut bufs_vec = Vec::with_capacity(count);
         for iov_i in 0..count {
@@ -274,7 +242,7 @@ fn do_brk(new_brk_addr: *const c_void) -> Result<*const c_void, Error> {
 
 fn do_wait4(pid: c_int, _exit_status: *mut c_int) -> Result<pid_t, Error> {
     if _exit_status != 0 as *mut c_int {
-        check_mut_ptr_from_user(_exit_status)?;
+        check_mut_ptr(_exit_status)?;
     }
 
     let child_process_filter = match pid {
@@ -310,7 +278,7 @@ fn do_wait4(pid: c_int, _exit_status: *mut c_int) -> Result<pid_t, Error> {
 }
 
 fn do_pipe2(fds_u: *mut c_int, flags: c_int) -> Result<(), Error> {
-    check_mut_array_from_user(fds_u, 2)?;
+    check_mut_array(fds_u, 2)?;
     // TODO: how to deal with open flags???
     let fds = fs::do_pipe2(flags as u32)?;
     unsafe {
@@ -321,7 +289,7 @@ fn do_pipe2(fds_u: *mut c_int, flags: c_int) -> Result<(), Error> {
 }
 
 fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<(), Error> {
-    check_mut_ptr_from_user(tv_u)?;
+    check_mut_ptr(tv_u)?;
     let tv = time::do_gettimeofday();
     unsafe { *tv_u = tv; }
     Ok(())
