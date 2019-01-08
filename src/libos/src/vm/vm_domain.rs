@@ -21,6 +21,7 @@ impl VMDomain {
     pub fn resize_area(&mut self, area: &mut VMArea, options: &VMResizeOptions)
         -> Result<(), Error>
     {
+        // TODO: init memory with zeros when expanding!
         self.range.resize_subrange(&mut area.range, options)
     }
 }

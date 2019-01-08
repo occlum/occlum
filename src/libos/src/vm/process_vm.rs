@@ -142,7 +142,7 @@ impl ProcessVM {
         self.get_stack_vma().get_end()
     }
 
-    // TODO: override the mmaping of already mmaped range
+    // TODO: support overriding the mmaping of already mmaped range
     pub fn mmap(&mut self, addr: usize, size: usize, flags: VMAreaFlags)
         -> Result<usize, Error>
     {
@@ -211,6 +211,7 @@ impl ProcessVM {
             return Ok(new_brk);
         }
 
+        // TODO: init the memory with zeros for the expanded area
         let resize_options = {
             let brk_start = self.get_brk_start();
             let new_heap_size = align_up(new_brk, 4096) - brk_start;
