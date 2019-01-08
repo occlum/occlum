@@ -1,7 +1,14 @@
 CUR_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 PROJECT_DIR := $(realpath $(CUR_DIR)/../)
 
+# Whether test performance or not?
+PERF = yes
+
+ifeq ($(PERF),no)
 TEST_SUITES := empty argv hello_world malloc file getpid spawn pipe time
+else
+TEST_SUITES := empty perf_spawn_and_wait4
+endif
 BUILD_TEST_SUITES := $(TEST_SUITES:%=%)
 RUN_TEST_SUITES := $(TEST_SUITES:%=test-%)
 CLEAN_TEST_SUITES := $(TEST_SUITES:%=clean-%)

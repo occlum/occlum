@@ -372,9 +372,11 @@ impl PartialEq for VMRange {
 impl Drop for VMRange {
     fn drop(&mut self) {
         if !self.is_dealloced() {
+            println!("VMRange::drop::panic1");
             panic!("A range must be dealloc'ed before drop");
         }
         if self.has_subranges() {
+            println!("VMRange::drop::panic2");
             panic!("All sub-ranges must be removed explicitly before drop");
         }
     }

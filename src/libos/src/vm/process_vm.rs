@@ -1,5 +1,7 @@
 use super::*;
 
+// TODO: examine the ProcessVM code for memory leakage
+
 lazy_static! {
     static ref DATA_SPACE: SgxMutex<VMSpace> = {
         let (addr, size) = {

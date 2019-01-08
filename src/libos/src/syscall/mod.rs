@@ -462,7 +462,9 @@ pub extern "C" fn occlum_exit(status: i32)
 #[no_mangle]
 pub extern "C" fn occlum_unknown(num: u32)
 {
-    println!("[WARNING] Unknown syscall (num = {})", num);
+    if cfg!(debug_assertions) {
+        //println!("[WARNING] Unknown syscall (num = {})", num);
+    }
 }
 
 #[no_mangle]
