@@ -6,6 +6,11 @@ BUILD_TEST_SUITES := $(TEST_SUITES:%=%)
 RUN_TEST_SUITES := $(TEST_SUITES:%=test-%)
 CLEAN_TEST_SUITES := $(TEST_SUITES:%=clean-%)
 
+# Use echo program instead of built-in echo command in shell. This ensures
+# that echo can recognize escaped sequences (with -e argument) regardless of
+# the specific shell (e.g., bash, zash, etc.)
+ECHO := /bin/echo -e
+# Shell escaped sequences for colorful output
 CYAN := \033[1;36m
 GREEN := \033[1;32m
 RED := \033[1;31m
@@ -22,9 +27,9 @@ all: build
 build: $(BUILD_TEST_SUITES)
 
 $(BUILD_TEST_SUITES): %:
-	@echo "$(CYAN)BUILD TEST => $@$(NO_COLOR)"
+	@$(ECHO) "$(CYAN)BUILD TEST => $@$(NO_COLOR)"
 	@$(MAKE) --no-print-directory -C $@
-	@echo "$(GREEN)DONE$(NO_COLOR)"
+	@$(ECHO) "$(GREEN)DONE$(NO_COLOR)"
 
 #############################################################################
 # Run tests
@@ -39,12 +44,12 @@ libocclum.signed.so: $(PROJECT_DIR)/src/libos/libocclum.signed.so
 	@cp $< libocclum.signed.so
 
 $(RUN_TEST_SUITES): test-%: % pal libocclum.signed.so
-	@echo "$(CYAN)RUN TEST => $<$(NO_COLOR)"
+	@$(ECHO) "$(CYAN)RUN TEST => $<$(NO_COLOR)"
 	@$(MAKE) --no-print-directory -C $< test ; \
 		if [ $$? -eq 0 ] ; then \
-			echo "$(GREEN)PASS$(NO_COLOR)" ; \
+			$(ECHO) "$(GREEN)PASS$(NO_COLOR)" ; \
 		else \
-			echo "$(RED)FAILED$(NO_COLOR)" ; \
+			$(ECHO) "$(RED)FAILED$(NO_COLOR)" ; \
 		fi ;
 
 #############################################################################
