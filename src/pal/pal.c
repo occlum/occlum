@@ -207,7 +207,7 @@ void ocall_gettimeofday(long* seconds, long* microseconds) {
 
 
 /* Application entry */
-int SGX_CDECL main(int argc, char *argv[])
+int SGX_CDECL main(int argc, const char *argv[])
 {
     sgx_status_t sgx_ret = SGX_SUCCESS;
     int status = 0;

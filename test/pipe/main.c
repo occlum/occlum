@@ -6,7 +6,7 @@
 #include <spawn.h>
 #include <string.h>
 
-int main(void) {
+int main(int argc, const char* argv[]) {
     // XXX: this is a hack! remove this in the future
     void* ptr = malloc(64);
     free(ptr);
@@ -24,15 +24,18 @@ int main(void) {
     posix_spawn_file_actions_adddup2(&file_actions, pipe_wr_fd, STDOUT_FILENO);
     posix_spawn_file_actions_addclose(&file_actions, pipe_rd_fd);
 
+    const char* msg = "Echo!\n";
+    const char* child_prog = "hello_world/bin.encrypted";
+    const char* child_argv[3] = { child_prog, msg, NULL };
     int child_pid;
-    if (posix_spawn(&child_pid, "hello_world/bin.encrypted", &file_actions,
-            NULL, NULL, NULL) < 0) {
+    if (posix_spawn(&child_pid, child_prog, &file_actions,
+            NULL, child_argv, NULL) < 0) {
         printf("ERROR: failed to spawn a child process\n");
         return -1;
     }
     close(pipe_wr_fd);
 
-    const char* expected_str = "Hello World\n";
+    const char* expected_str = msg;
     size_t expected_len = strlen(expected_str);
     char actual_str[32] = {0};
     ssize_t actual_len;

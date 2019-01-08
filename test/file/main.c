@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 
-int main() {
+int main(int argc, const char* argv[]) {
     const char* file_name = "tmp.txt";
     int fd, flags, mode, len;
     const char* write_msg = "Hello World\n";

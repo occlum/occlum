@@ -4,7 +4,7 @@
 #define MAX_SIZE    (1*1024*1024)
 #define MIN_SIZE    8
 
-int main(void) {
+int main(int argc, const char* argv[]) {
     printf("Testing malloc and free...\n");
     for (size_t buf_size = MIN_SIZE; buf_size <= MAX_SIZE; buf_size *= 4) {
         printf("buf_size = %lu\n", buf_size);

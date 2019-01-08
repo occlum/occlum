@@ -45,11 +45,20 @@ pub mod from_user {
         -> Result<Vec<CString>, Error>
     {
         let mut cstrings = Vec::new();
+        if user_ptr == ptr::null() { return Ok(cstrings); }
+
         let mut user_ptr = user_ptr;
-        while user_ptr != ptr::null() {
-            let cstr_ptr = unsafe { *user_ptr };
+        loop {
+            check_ptr(user_ptr);
+            let cstr_ptr = {
+                let cstr_ptr = unsafe { *user_ptr };
+                if cstr_ptr == ptr::null() { break; }
+                check_ptr(cstr_ptr);
+                cstr_ptr
+            };
             let cstring = clone_cstring_safely(cstr_ptr)?;
             cstrings.push(cstring);
+
             user_ptr = unsafe { user_ptr.offset(1) };
         }
         Ok(cstrings)

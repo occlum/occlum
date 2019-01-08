@@ -10,7 +10,7 @@ const char* expected_argv[EXPECTED_ARGC] = {
     EXPECTED_ARG3,
 };
 
-int main(int argc, char* argv[]) {
+int main(int argc, const char* argv[]) {
     if (argc != EXPECTED_ARGC) {
         printf("ERROR: expect %d arguments, but %d are given\n", EXPECTED_ARGC, argc);
         return -1;
