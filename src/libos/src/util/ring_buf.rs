@@ -72,7 +72,7 @@ impl RingBufInner {
     }
 
     fn set_tail(&self, new_tail: usize) {
-        self.head.store(new_tail, Ordering::SeqCst)
+        self.tail.store(new_tail, Ordering::SeqCst)
     }
 
     fn is_closed(&self) -> bool {
