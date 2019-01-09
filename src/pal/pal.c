@@ -205,6 +205,10 @@ void ocall_gettimeofday(long* seconds, long* microseconds) {
     *microseconds = tv.tv_usec;
 }
 
+void ocall_sync(void) {
+    sync();
+}
+
 
 /* Application entry */
 int SGX_CDECL main(int argc, const char *argv[])

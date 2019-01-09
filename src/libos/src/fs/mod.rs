@@ -153,3 +153,12 @@ pub fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<FileDes
     file_table.put_at(new_fd, file, close_on_spawn);
     Ok(new_fd)
 }
+
+pub fn do_sync() -> Result<(), Error> {
+    unsafe { ocall_sync(); }
+    Ok(())
+}
+
+extern {
+    fn ocall_sync() -> sgx_status_t;
+}

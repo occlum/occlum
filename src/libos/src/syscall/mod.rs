@@ -540,6 +540,19 @@ pub extern "C" fn occlum_dup3(old_fd: c_int, new_fd: c_int, flags: c_int)
     }
 }
 
+#[no_mangle]
+pub extern "C" fn occlum_sync() -> c_int
+{
+    match fs::do_sync() {
+        Ok(()) => {
+            0 as c_int
+        }
+        Err(e) => {
+            e.errno.as_retval()
+        }
+    }
+}
+
 // TODO: handle tz: timezone_t
 #[no_mangle]
 pub extern "C" fn occlum_gettimeofday(tv: *mut timeval_t) -> c_int

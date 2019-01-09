@@ -85,6 +85,10 @@ long dispatch_syscall(int num, long arg0, long arg1, long arg2, long arg3, long 
         ret = occlum_getppid();
         break;
     }
+    case SYS_sync: {
+        ret = occlum_sync();
+        break;
+    }
     case SYS_mmap: {
         DECL_SYSCALL_ARG(void*, addr, arg0);
         DECL_SYSCALL_ARG(size_t, length, arg1);
