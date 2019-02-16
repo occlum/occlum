@@ -30,6 +30,16 @@
         "code",
         "test"
       ]
+    },
+    {
+      "login": "ysminnpu",
+      "name": "Shoumeng Yan",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/1940384?v=4",
+      "profile": "https://github.com/ysminnpu",
+      "contributions": [
+        "ideas",
+        "business"
+      ]
     }
   ],
   "contributorsPerLine": 7
