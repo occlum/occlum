@@ -40,6 +40,16 @@
         "ideas",
         "business"
       ]
+    },
+    {
+      "login": "wangrunji0408",
+      "name": "Wang Runji",
+      "avatar_url": "https://avatars0.githubusercontent.com/u/15158738?v=4",
+      "profile": "https://wangrunji.com",
+      "contributions": [
+        "code",
+        "test"
+      ]
     }
   ],
   "contributorsPerLine": 7
