@@ -1,4 +1,5 @@
 # Occlum
+[![All Contributors](https://img.shields.io/badge/all_contributors-1-orange.svg?style=flat-square)](#contributors)
 
 Occlum is a *memory-safe*, *multi-process* library OS (LibOS) for [Intel SGX](https://software.intel.com/en-us/sgx). As a LibOS, it enables *unmodified* applications to run on SGX, thus protecting the confidentiality and integrity of user workloads transparently. 
 
@@ -82,6 +83,11 @@ The original source code was released by Intel under a project named SGX Multi-P
 
 ## Contributors
 
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore -->
+| [<img src="https://avatars0.githubusercontent.com/u/568208?v=4" width="100px;" alt="Tate Tian"/><br /><sub><b>Tate Tian</b></sub>](https://github.com/tatetian)<br />[💻](https://github.com/occlum/libos/commits?author=tatetian "Code") [⚠️](https://github.com/occlum/libos/commits?author=tatetian "Tests") [📖](https://github.com/occlum/libos/commits?author=tatetian "Documentation") [🚧](#maintenance-tatetian "Maintenance") |
+| :---: |
+<!-- ALL-CONTRIBUTORS-LIST:END -->
 The original authors of Occlum (or SGXMPLOS) are
   * Hongliang Tian and Shoumeng Yan from Intel; and
   * Youren Shen, Yu Chen, and Kang Chen from Tsinghua University.
