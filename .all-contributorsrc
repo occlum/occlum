@@ -20,6 +20,17 @@
         "doc",
         "maintenance"
       ]
+    },
+    {
+      "login": "Yourens",
+      "name": "Youren Shen",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/5778943?v=4",
+      "profile": "http://yourenis.me",
+      "contributions": [
+        "code",
+        "test",
+        "ideas"
+      ]
     }
   ],
   "contributorsPerLine": 7
