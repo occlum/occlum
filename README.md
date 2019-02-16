@@ -1,12 +1,33 @@
 # Occlum
 
-Occlum is a memory-safe, multi-process library OS for Intel SGX. As a library OS, it enables *unmodified* applications to run on SGX, thus protecting the confidentiality and integrity of user workloads transparently. 
+Occlum is a *memory-safe*, *multi-process* library OS (LibOS) for [Intel SGX](https://software.intel.com/en-us/sgx). As a LibOS, it enables *unmodified* applications to run on SGX, thus protecting the confidentiality and integrity of user workloads transparently. 
 
-Compared to existing library OSes for SGX, Occlum has following unprecedented features:
+Compared to existing LibOSes for SGX, Occlum has following salient features:
 
-  * **Memory safety.** The library OS itself is written in Rust, a memory-safe programming language, thus free from low-level, memory bugs;
-  * **Efficient multitasking.** The library OS has a complete and efficient multi-process support, including fast process creation, low-cost IPC, code sharing (e.g., shared libraries) and data sharing (e.g., encrypted file systems).
-  * **Fault isolation** - The crash of one user process cannot crash the library OS or other user processes, which is good for system stability and data integrity.
+  * **Efficient multitasking.** The LibOS has a complete and efficient multi-process support, including fast process creation, low-cost IPC, code sharing (e.g., shared libraries) and data sharing (e.g., encrypted file systems).
+  * **Fault isolation.** The crash of one user process cannot crash the LibOS or other user processes, which is good for security and robustness.
+  * **Memory safety.** The LibOS itself is written in [Rust](https://www.rust-lang.org/), a memory-safe programming language, thus free from low-level, memory bugs;
+  
+## Why Occlum?
+
+### Efficient Multitasking
+
+The primary motivation of Occlum project is to achieve efficient multitasking on LibOSes for SGX.
+
+Multitasking is an important feature for LibOSes (or any OSes in general), but difficult to implement efficiently on SGX. It is important since virtually any non-trivial application demands more than one process. And its difficulty is evident from the fact that existing LibOSes for SGX either do not support multitasking (e.g., Haven and SCONE) or fail to do so efficiently (e.g., Graphene-SGX is nearly 10,000X slower than Linux on spawning new processes).
+
+To realize efficient multitasking, Occlum adopts a novel *multi-process-per-enclave* approach, which runs all LibOS processes and the LibOS itself inside a single enclave. Running inside a single address space, Occlum’s processes enjoy the benefits of fast startup, low-cost inter-process communication (IPC) and shared system services (e.g., encrypted file systems).
+
+### Fault Isolation
+
+As there are no hardware isolation mechanisms available inside an enclave, Occlum emulates the traditional OS-enforced inter-process isolation and user-kernel isolation with [Software Fault Isolation (SFI)]() technique. Specifically, we design a novel SFI scheme called **Multi-Domain SFI (MDSFI)** that enables Occlum to enforce process sandbox: *any LibOS process cannot compromise or crash other LibOS processes or the LibOS itself*.
+
+### Memory Safety
+
+Occlum also improves the memory safety of LibOS-based, SGX-protected applications. The memory safety of C/C++ programs is still an unresolved problem (e.g., Google [syzkaller project](https://github.com/google/syzkaller) found 600+ memory bugs in Linux kernel). And it is well known that memory-safe bugs are the most common class of security vulnerabilities. Compared to existing LibOSes for SGX, Occlum improves the memory safety of SGX applications in two folds:
+
+   1. User programs are made more resilient to memory safety vulnerabilities. Thanks to MDSFI, Occlum enforces Data Execution Prevention (DEP) to prevent code injection attacks and Control Flow Integrity (CFI) to mitigate Return-Oriented Programming (ROP) attacks. 
+   1. LibOS itself is memory safe. Occlum LibOS is developed in Rust programming language, a memory-safe programming language. This reduces the odds of low-level memory-safety bugs in the LibOS, thus more trustworthy to the application developers.
 
 ## How to Build?
 
@@ -35,21 +56,11 @@ Then, compile the project and run tests with the following commands
     make
     make test
 
-## How to Use?
+## What is the Implementation Status?
 
-To be written...
+The current version is only for technical preview, not ready for production use. Yet, even with this early version, we can achieve a speedup of multitasking-related operations by up to three orders of magnitude, thus demonstrating the effectiveness of our multi-process-per-enclave approach.
 
-## How it Works?
-
-To be written...
-
-### Architecture Overview
-
-To be written...
-
-### Software Isolated Processes (SIPs)
-
-To be written...
+This project is being actively developed. We now focus on implementing more system calls and hopefully enable real-world applications on Occlum soon.
 
 ## Why the Name?
 
@@ -63,3 +74,16 @@ The same thing can be said to Occlum, not for mind, but program:
 
 Of course, Occlum must be run on Intel x86 CPUs with SGX support to do its magic.
 
+## Disclaimer
+
+While Occlum was originally designed by and incubated inside Intel, it is NOT an official Intel product.
+
+The original source code was released by Intel under a project named SGX Multi-Process Library Operating System (SGXMPLOS). As the vendor-neutral, community-driven successor of SGXMPLOS, Occlum project is where all future development happens.
+
+## Contributors
+
+The original authors of Occlum (or SGXMPLOS) are
+  * Hongliang Tian and Shoumeng Yan from Intel; and
+  * Youren Shen, Yu Chen, and Kang Chen from Tsinghua University.
+
+For the names of all contributors, see [this list](CONTRIBUTOR.md).
