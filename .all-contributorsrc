@@ -1,0 +1,26 @@
+{
+  "projectName": "libos",
+  "projectOwner": "occlum",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "files": [
+    "README.md"
+  ],
+  "imageSize": 100,
+  "commit": false,
+  "contributors": [
+    {
+      "login": "tatetian",
+      "name": "Tate Tian",
+      "avatar_url": "https://avatars0.githubusercontent.com/u/568208?v=4",
+      "profile": "https://github.com/tatetian",
+      "contributions": [
+        "code",
+        "test",
+        "doc",
+        "maintenance"
+      ]
+    }
+  ],
+  "contributorsPerLine": 7
+}
