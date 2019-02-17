@@ -79,7 +79,7 @@ Of course, Occlum must be run on Intel x86 CPUs with SGX support to do its magic
 
 While Occlum was originally designed by and incubated inside Intel, it is NOT an official Intel product.
 
-The original source code was released by Intel in a BSD-licensed project named [SGX Multi-Process Library Operating System (SGXMPLOS)](https://github.com/sgxmplos/libos). As the vendor-neutral, community-driven successor of SGXMPLOS, Occlum project is where all future development happens.
+The original source code was released by Intel in a BSD-licensed project named [SGX Multi-Process Library Operating System (SGXMPLOS)](https://github.com/occlum/sgxmplos). As the vendor-neutral, community-driven successor of SGXMPLOS, Occlum project is where all future development happens.
 
 ## Contributors
 
@@ -87,4 +87,6 @@ The creators of Occlum (or SGXMPLOS) project are
   * Hongliang Tian and Shoumeng Yan from Intel; and
   * Youren Shen, Yu Chen, and Kang Chen from Tsinghua University.
 
-For the names of all contributors, see [this list](CONTRIBUTORS.md).
+This project follows the [all-contributors](https://allcontributors.org) specification. Contributions of any kind are welcome! We will publish contributing guidelines and accept pull requests after the project gets more stable.
+
+Thanks go to [all these wonderful contributors for this project](CONTRIBUTORS.md).
