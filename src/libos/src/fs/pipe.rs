@@ -1,9 +1,9 @@
 use super::*;
-use util::ring_buf::{*};
+use util::ring_buf::*;
 
 // TODO: Use Waiter and WaitQueue infrastructure to sleep when blocking
 
-pub const PIPE_BUF_SIZE : usize = 2 * 1024 * 1024;
+pub const PIPE_BUF_SIZE: usize = 2 * 1024 * 1024;
 
 #[derive(Debug)]
 pub struct Pipe {
@@ -20,11 +20,10 @@ impl Pipe {
             },
             writer: PipeWriter {
                 inner: SgxMutex::new(ring_buf.writer),
-            }
+            },
         })
     }
 }
-
 
 #[derive(Debug)]
 pub struct PipeReader {
@@ -44,7 +43,9 @@ impl File for PipeReader {
             match ringbuf.read(buf) {
                 Ok(this_len) => {
                     total_bytes += this_len;
-                    if this_len < buf.len() { break; }
+                    if this_len < buf.len() {
+                        break;
+                    }
                 }
                 Err(e) => {
                     match total_bytes {
@@ -60,11 +61,17 @@ impl File for PipeReader {
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "PipeReader does not support write"))
+        Err(Error::new(
+            Errno::EBADF,
+            "PipeReader does not support write",
+        ))
     }
 
     fn writev<'a, 'b>(&self, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "PipeReader does not support write"))
+        Err(Error::new(
+            Errno::EBADF,
+            "PipeReader does not support write",
+        ))
     }
 
     fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
@@ -74,7 +81,6 @@ impl File for PipeReader {
 
 unsafe impl Send for PipeReader {}
 unsafe impl Sync for PipeReader {}
-
 
 #[derive(Debug)]
 pub struct PipeWriter {
@@ -94,7 +100,9 @@ impl File for PipeWriter {
             match ringbuf.write(buf) {
                 Ok(this_len) => {
                     total_bytes += this_len;
-                    if this_len < buf.len() { break; }
+                    if this_len < buf.len() {
+                        break;
+                    }
                 }
                 Err(e) => {
                     match total_bytes {

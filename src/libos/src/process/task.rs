@@ -1,5 +1,5 @@
 use super::*;
-use std::{mem};
+use std::mem;
 
 /// Note: this definition must be in sync with task.h
 #[derive(Clone, Debug, Default)]
@@ -13,11 +13,9 @@ pub struct Task {
     pub saved_state: usize, // struct jmpbuf*
 }
 
-
 lazy_static! {
-    static ref new_process_queue: SgxMutex<VecDeque<ProcessRef>> = {
-        SgxMutex::new(VecDeque::new())
-    };
+    static ref new_process_queue: SgxMutex<VecDeque<ProcessRef>> =
+        { SgxMutex::new(VecDeque::new()) };
 }
 
 pub fn enqueue_task(new_process: ProcessRef) {
@@ -34,10 +32,9 @@ fn dequeue_task() -> Option<ProcessRef> {
     new_process_queue.lock().unwrap().pop_front()
 }
 
-
 pub fn run_task() -> Result<i32, Error> {
-    let new_process : ProcessRef = dequeue_task()
-        .ok_or_else(|| (Errno::EAGAIN, "No new processes to run"))?;
+    let new_process: ProcessRef =
+        dequeue_task().ok_or_else(|| (Errno::EAGAIN, "No new processes to run"))?;
     set_current(&new_process);
 
     let (pid, task) = {
@@ -105,10 +102,12 @@ fn reset_current() {
     });
 
     // Prevent memory leakage
-    unsafe { drop(Arc::from_raw(process_ptr)); }
+    unsafe {
+        drop(Arc::from_raw(process_ptr));
+    }
 }
 
-extern {
+extern "C" {
     fn ocall_run_new_task(ret: *mut i32) -> sgx_status_t;
     fn do_run_task(task: *mut Task) -> i32;
 }

@@ -1,11 +1,11 @@
 pub use self::process::{Status, IDLE_PROCESS};
 pub use self::task::{get_current, run_task};
 pub mod table {
-    pub use super::process_table::{get};
+    pub use super::process_table::get;
 }
-pub use self::spawn::{do_spawn, FileAction};
 pub use self::exit::{do_exit, do_wait4, ChildProcessFilter};
-pub use self::wait::{Waiter, WaitQueue};
+pub use self::spawn::{do_spawn, FileAction};
+pub use self::wait::{WaitQueue, Waiter};
 
 #[allow(non_camel_case_types)]
 pub type pid_t = u32;
@@ -51,14 +51,14 @@ pub fn do_getppid() -> pid_t {
     parent.get_pid()
 }
 
-mod task;
+mod exit;
 mod process;
 mod process_table;
 mod spawn;
+mod task;
 mod wait;
-mod exit;
 
-use super::{*};
+use self::task::Task;
+use super::*;
+use fs::{File, FileRef, FileTable};
 use vm::{ProcessVM, VMRangeTrait};
-use fs::{FileTable, File, FileRef};
-use self::task::{Task};

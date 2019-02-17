@@ -1,6 +1,6 @@
-use super::*;
 use super::file::{File, FileRef};
-use {std};
+use super::*;
+use std;
 
 pub type FileDesc = u32;
 
@@ -17,7 +17,6 @@ struct FileTableEntry {
     close_on_spawn: bool,
 }
 
-
 impl FileTable {
     pub fn new() -> FileTable {
         FileTable {
@@ -30,15 +29,18 @@ impl FileTable {
         let mut table = &mut self.table;
 
         let min_free_fd = if self.num_fds < table.len() {
-            table.iter().enumerate().find(|&(idx, opt)| opt.is_none())
-                .unwrap().0
+            table
+                .iter()
+                .enumerate()
+                .find(|&(idx, opt)| opt.is_none())
+                .unwrap()
+                .0
         } else {
             table.push(None);
             table.len() - 1
         };
 
-        table[min_free_fd as usize] = Some(FileTableEntry::new(file,
-                                                               close_on_spawn));
+        table[min_free_fd as usize] = Some(FileTableEntry::new(file, close_on_spawn));
         self.num_fds += 1;
 
         min_free_fd as FileDesc
@@ -80,7 +82,7 @@ impl FileTable {
             Some(del_table_entry) => {
                 self.num_fds -= 1;
                 Ok(del_table_entry.file)
-            },
+            }
             None => errno!(EBADF, "Invalid file descriptor"),
         }
     }
@@ -90,20 +92,20 @@ impl Clone for FileTable {
     fn clone(&self) -> FileTable {
         // Only clone file descriptors that are not close-on-spawn
         let mut num_cloned_fds = 0;
-        let cloned_table = self.table.iter().map(|entry| {
-            match entry {
-                Some(file_table_entry) => {
-                    match file_table_entry.close_on_spawn {
-                        false => {
-                            num_cloned_fds += 1;
-                            Some(file_table_entry.clone())
-                        }
-                        true => None
+        let cloned_table = self
+            .table
+            .iter()
+            .map(|entry| match entry {
+                Some(file_table_entry) => match file_table_entry.close_on_spawn {
+                    false => {
+                        num_cloned_fds += 1;
+                        Some(file_table_entry.clone())
                     }
+                    true => None,
                 },
-                None => None
-            }
-        }).collect();
+                None => None,
+            })
+            .collect();
 
         FileTable {
             table: cloned_table,
@@ -111,7 +113,6 @@ impl Clone for FileTable {
         }
     }
 }
-
 
 impl FileTableEntry {
     fn new(file: FileRef, close_on_spawn: bool) -> FileTableEntry {

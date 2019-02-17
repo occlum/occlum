@@ -14,14 +14,13 @@ pub struct timeval_t {
 }
 
 pub fn do_gettimeofday() -> timeval_t {
-    let mut tv : timeval_t = Default::default();
+    let mut tv: timeval_t = Default::default();
     unsafe {
-        ocall_gettimeofday(&mut tv.sec as *mut time_t,
-                           &mut tv.usec as *mut suseconds_t);
+        ocall_gettimeofday(&mut tv.sec as *mut time_t, &mut tv.usec as *mut suseconds_t);
     }
     tv
 }
 
-extern {
+extern "C" {
     fn ocall_gettimeofday(sec: *mut time_t, usec: *mut suseconds_t) -> sgx_status_t;
 }

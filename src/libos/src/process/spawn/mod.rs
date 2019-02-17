@@ -1,17 +1,17 @@
-use super::*;
-use fs::{File, FileDesc, StdinFile, StdoutFile/*, StderrFile*/, FileTable};
-use std::path::Path;
-use std::ffi::{CStr, CString};
-use std::sgxfs::SgxFile;
-use xmas_elf::{ElfFile, header, program, sections};
-use xmas_elf::symbol_table::Entry;
 use self::init_stack::{AuxKey, AuxTable};
-use super::task::{Task};
+use super::task::Task;
+use super::*;
+use fs::{File, FileDesc, FileTable, StdinFile, StdoutFile /*, StderrFile*/};
+use std::ffi::{CStr, CString};
+use std::path::Path;
+use std::sgxfs::SgxFile;
 use vm::{ProcessVM, VMRangeTrait};
+use xmas_elf::symbol_table::Entry;
+use xmas_elf::{header, program, sections, ElfFile};
 
+mod elf_helper;
 mod init_stack;
 mod init_vm;
-mod elf_helper;
 mod segment;
 
 #[derive(Debug)]
@@ -22,12 +22,15 @@ pub enum FileAction {
     Close(FileDesc),
 }
 
-pub fn do_spawn<P: AsRef<Path>>(elf_path: &P, argv: &[CString], envp: &[CString],
-                                file_actions: &[FileAction], parent_ref: &ProcessRef)
-    -> Result<u32, Error>
-{
+pub fn do_spawn<P: AsRef<Path>>(
+    elf_path: &P,
+    argv: &[CString],
+    envp: &[CString],
+    file_actions: &[FileAction],
+    parent_ref: &ProcessRef,
+) -> Result<u32, Error> {
     let mut elf_buf = {
-        let key : sgx_key_128bit_t = [0 as uint8_t; 16];
+        let key: sgx_key_128bit_t = [0 as uint8_t; 16];
         let mut sgx_file = SgxFile::open_ex(elf_path, &key)
             .map_err(|e| (Errno::ENOENT, "Failed to open the SGX-protected file"))?;
 
@@ -37,15 +40,15 @@ pub fn do_spawn<P: AsRef<Path>>(elf_path: &P, argv: &[CString], envp: &[CString]
     };
 
     let elf_file = {
-        let elf_file = ElfFile::new(&elf_buf)
-            .map_err(|e| (Errno::ENOEXEC, "Failed to parse the ELF file"))?;
+        let elf_file =
+            ElfFile::new(&elf_buf).map_err(|e| (Errno::ENOEXEC, "Failed to parse the ELF file"))?;
         header::sanity_check(&elf_file)
             .map_err(|e| (Errno::ENOEXEC, "Failed to parse the ELF file"))?;
-    /*
-        elf_helper::print_program_headers(&elf_file)?;
-        elf_helper::print_sections(&elf_file)?;
-        elf_helper::print_pltrel_section(&elf_file)?;
-    */
+        /*
+            elf_helper::print_program_headers(&elf_file)?;
+            elf_helper::print_sections(&elf_file)?;
+            elf_helper::print_pltrel_section(&elf_file)?;
+        */
         elf_file
     };
 
@@ -53,8 +56,7 @@ pub fn do_spawn<P: AsRef<Path>>(elf_path: &P, argv: &[CString], envp: &[CString]
         let vm = init_vm::do_init(&elf_file, &elf_buf[..])?;
         let task = {
             let program_entry = {
-                let program_entry = vm.get_base_addr() +
-                                    elf_helper::get_start_address(&elf_file)?;
+                let program_entry = vm.get_base_addr() + elf_helper::get_start_address(&elf_file)?;
                 if !vm.get_code_vma().contains_obj(program_entry, 16) {
                     return Err(Error::new(Errno::EINVAL, "Invalid program entry"));
                 }
@@ -73,9 +75,7 @@ pub fn do_spawn<P: AsRef<Path>>(elf_path: &P, argv: &[CString], envp: &[CString]
     Ok(new_pid)
 }
 
-fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction])
-    -> Result<FileTable, Error>
-{
+fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<FileTable, Error> {
     // Usually, we just inherit the file table from the parent
     let parent = parent_ref.lock().unwrap();
     let should_inherit_file_table = parent.get_pid() > 0;
@@ -89,7 +89,7 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction])
                     if old_fd != new_fd {
                         cloned_file_table.put_at(*new_fd, file, false);
                     }
-                },
+                }
                 FileAction::Close(fd) => {
                     cloned_file_table.del(*fd)?;
                 }
@@ -101,8 +101,8 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction])
 
     // But, for init process, we initialize file table for it
     let mut file_table = FileTable::new();
-    let stdin : Arc<Box<File>> = Arc::new(Box::new(StdinFile::new()));
-    let stdout : Arc<Box<File>> = Arc::new(Box::new(StdoutFile::new()));
+    let stdin: Arc<Box<File>> = Arc::new(Box::new(StdinFile::new()));
+    let stdout: Arc<Box<File>> = Arc::new(Box::new(StdoutFile::new()));
     // TODO: implement and use a real stderr
     let stderr = stdout.clone();
     file_table.put(stdin, false);
@@ -111,21 +111,21 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction])
     Ok(file_table)
 }
 
-fn init_task(user_entry: usize, stack_top: usize,
-             argv: &[CString], envp: &[CString])
-    -> Result<Task, Error>
-{
+fn init_task(
+    user_entry: usize,
+    stack_top: usize,
+    argv: &[CString],
+    envp: &[CString],
+) -> Result<Task, Error> {
     let user_stack = init_stack(stack_top, argv, envp)?;
     Ok(Task {
         user_stack_addr: user_stack,
         user_entry_addr: user_entry,
-        .. Default::default()
+        ..Default::default()
     })
 }
 
-fn init_stack(stack_top: usize, argv: &[CString], envp: &[CString])
-    -> Result<usize, Error>
-{
+fn init_stack(stack_top: usize, argv: &[CString], envp: &[CString]) -> Result<usize, Error> {
     let mut auxtbl = AuxTable::new();
     auxtbl.set_val(AuxKey::AT_PAGESZ, 4096)?;
     auxtbl.set_val(AuxKey::AT_UID, 0)?;
@@ -137,8 +137,7 @@ fn init_stack(stack_top: usize, argv: &[CString], envp: &[CString])
     init_stack::do_init(stack_top, 4096, argv, envp, &auxtbl)
 }
 
-fn parent_adopts_new_child(parent_ref: &ProcessRef, child_ref: &ProcessRef)
-{
+fn parent_adopts_new_child(parent_ref: &ProcessRef, child_ref: &ProcessRef) {
     let mut parent = parent_ref.lock().unwrap();
     let mut child = child_ref.lock().unwrap();
     parent.children.push(Arc::downgrade(child_ref));

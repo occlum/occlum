@@ -1,5 +1,5 @@
 use super::*;
-use std::{fmt};
+use std::fmt;
 
 pub trait VMRangeTrait {
     fn get_start(&self) -> usize;
@@ -32,14 +32,13 @@ macro_rules! impl_vmrange_trait_for {
                 self.$field.contains_obj(ptr, size)
             }
         }
-    }
+    };
 }
 
 impl_vmrange_trait_for!(VMRange, inner);
 impl_vmrange_trait_for!(VMSpace, range);
 impl_vmrange_trait_for!(VMDomain, range);
 impl_vmrange_trait_for!(VMArea, range);
-
 
 #[derive(Debug)]
 pub struct VMRange {
@@ -74,7 +73,7 @@ impl VMRange {
         // Find a free space for allocating a VMRange
         let free_space = {
             // Look for the minimal big-enough free space
-            let mut min_big_enough_free_space : Option<FreeSpace> = None;
+            let mut min_big_enough_free_space: Option<FreeSpace> = None;
             let sub_ranges = self.get_subranges();
             for (idx, range_pair) in sub_ranges.windows(2).enumerate() {
                 let pre_range = &range_pair[0];
@@ -85,18 +84,24 @@ impl VMRange {
                     let free_range_end = next_range.get_start();
 
                     let free_range_size = free_range_end - free_range_start;
-                    if free_range_size < size { continue }
+                    if free_range_size < size {
+                        continue;
+                    }
 
                     free_range_start..free_range_end
                 };
 
                 match addr {
                     VMAddrOption::Hint(addr) | VMAddrOption::Fixed(addr) => {
-                        if !free_range.contains(&addr) { continue }
+                        if !free_range.contains(&addr) {
+                            continue;
+                        }
                         free_range.start = addr;
                     }
                     VMAddrOption::Beyond(addr) => {
-                        if free_range.start < addr { continue }
+                        if free_range.start < addr {
+                            continue;
+                        }
                     }
                     _ => {}
                 }
@@ -105,20 +110,18 @@ impl VMRange {
                     index_in_subranges: idx + 1,
                     start: free_range.start,
                     end: free_range.end,
-                    may_neighbor_grow: (pre_range.growth == VMGrowthType::Upward,
-                                        next_range.growth == VMGrowthType::Downward),
+                    may_neighbor_grow: (
+                        pre_range.growth == VMGrowthType::Upward,
+                        next_range.growth == VMGrowthType::Downward,
+                    ),
                 });
 
-                if min_big_enough_free_space == None ||
-                    free_space < min_big_enough_free_space
-                {
+                if min_big_enough_free_space == None || free_space < min_big_enough_free_space {
                     min_big_enough_free_space = free_space;
 
                     match addr {
-                        VMAddrOption::Hint(addr) | VMAddrOption::Fixed(addr) => {
-                            break
-                        }
-                        _ => {},
+                        VMAddrOption::Hint(addr) | VMAddrOption::Fixed(addr) => break,
+                        _ => {}
                     }
                 }
             }
@@ -133,18 +136,14 @@ impl VMRange {
         let (new_subrange_start, new_subrange_end) = match addr {
             VMAddrOption::Any | VMAddrOption::Beyond(_) => {
                 let should_no_gap_to_pre_domain =
-                    free_space.may_neighbor_grow.0 == false &&
-                    growth != VMGrowthType::Downward;
+                    free_space.may_neighbor_grow.0 == false && growth != VMGrowthType::Downward;
                 let should_no_gap_to_next_domain =
-                    free_space.may_neighbor_grow.1 == false &&
-                    growth != VMGrowthType::Upward;
+                    free_space.may_neighbor_grow.1 == false && growth != VMGrowthType::Upward;
                 let domain_start = if should_no_gap_to_pre_domain {
                     free_space.start
-                }
-                else if should_no_gap_to_next_domain {
+                } else if should_no_gap_to_next_domain {
                     free_space.end - size
-                }
-                else {
+                } else {
                     // We want to leave some space at both ends in case
                     // this sub-range or neighbor sub-range needs to grow later.
                     // As a simple heuristic, we put this sub-range near the
@@ -153,18 +152,15 @@ impl VMRange {
                 };
                 (domain_start, domain_start + size)
             }
-            VMAddrOption::Fixed(addr) => {
-                (addr, addr + size)
-            }
+            VMAddrOption::Fixed(addr) => (addr, addr + size),
             VMAddrOption::Hint(addr) => {
                 return errno!(EINVAL, "Not implemented");
             }
         };
 
-        let new_subrange_inner = VMRangeInner::new(new_subrange_start,
-            new_subrange_end, growth);
-        self.get_subranges_mut().insert(free_space.index_in_subranges,
-                                        new_subrange_inner);
+        let new_subrange_inner = VMRangeInner::new(new_subrange_start, new_subrange_end, growth);
+        self.get_subranges_mut()
+            .insert(free_space.index_in_subranges, new_subrange_inner);
         // Although there are two copies of the newly created VMRangeInner obj,
         // we can keep them in sync as all mutation on VMRange object must
         // be carried out through dealloc_subrange() and resize_subrange() that
@@ -189,7 +185,8 @@ impl VMRange {
         self.get_subranges_mut().remove(domain_i);
 
         // When all sub-ranges are removed, remove the sub-range array
-        if self.get_subranges().len() == 2 { // two sentinel sub-ranges excluded
+        if self.get_subranges().len() == 2 {
+            // two sentinel sub-ranges excluded
             self.sub_ranges = None;
         }
 
@@ -197,8 +194,11 @@ impl VMRange {
         subrange.mark_as_dealloced();
     }
 
-    pub fn resize_subrange(&mut self, subrange: &mut VMRange, options: &VMResizeOptions)
-        -> Result<(), Error> {
+    pub fn resize_subrange(
+        &mut self,
+        subrange: &mut VMRange,
+        options: &VMResizeOptions,
+    ) -> Result<(), Error> {
         self.ensure_subrange_is_a_child(subrange);
 
         // Get valid parameters from options
@@ -243,7 +243,10 @@ impl VMRange {
 
     fn position_subrange(&self, subrange: &VMRange) -> usize {
         let sub_ranges = self.get_subranges();
-        sub_ranges.iter().position(|d| d == &subrange.inner).unwrap()
+        sub_ranges
+            .iter()
+            .position(|d| d == &subrange.inner)
+            .unwrap()
     }
 
     fn get_subranges(&self) -> &Vec<VMRangeInner> {
@@ -258,9 +261,7 @@ impl VMRange {
         self.sub_ranges.is_some()
     }
 
-    fn shrink_subrange_to(&mut self, subrange: &mut VMRange, new_size: usize)
-        -> Result<(), Error>
-    {
+    fn shrink_subrange_to(&mut self, subrange: &mut VMRange, new_size: usize) -> Result<(), Error> {
         let subrange_i = self.position_subrange(subrange);
         let subranges = self.get_subranges_mut();
 
@@ -268,13 +269,10 @@ impl VMRange {
             // Can we do shrink?
             let min_new_size = match subrange.sub_ranges.as_mut() {
                 Some(child_subranges) => {
-                    let child_last_subrange = &child_subranges[
-                        child_subranges.len() - 2];
+                    let child_last_subrange = &child_subranges[child_subranges.len() - 2];
                     child_last_subrange.end - subrange.inner.start
                 }
-                None => {
-                    0
-                }
+                None => 0,
             };
             if new_size < min_new_size {
                 return errno!(ENOMEM, "Cannot shrink to new size");
@@ -284,17 +282,15 @@ impl VMRange {
             subrange.inner.end = new_subrange_end;
             // Sync state
             subranges[subrange_i].end = new_subrange_end;
-        }
-        else { // self.growth == VMGrowthType::Downward
+        } else {
+            // self.growth == VMGrowthType::Downward
             // Can we do shrink?
             let min_new_size = match subrange.sub_ranges.as_mut() {
                 Some(child_subranges) => {
                     let child_first_subrange = &child_subranges[1];
                     subrange.inner.end - child_first_subrange.start
                 }
-                None => {
-                    0
-                }
+                None => 0,
             };
             if new_size < min_new_size {
                 return errno!(ENOMEM, "Cannot shrink to new size");
@@ -308,9 +304,7 @@ impl VMRange {
         Ok(())
     }
 
-    fn grow_subrange_to(&mut self, subrange: &mut VMRange, new_size: usize)
-        -> Result<(), Error>
-    {
+    fn grow_subrange_to(&mut self, subrange: &mut VMRange, new_size: usize) -> Result<(), Error> {
         let subrange_i = self.position_subrange(subrange);
         let subranges = self.get_subranges_mut();
 
@@ -328,8 +322,8 @@ impl VMRange {
             subrange.inner.end = subrange_new_end;
             // Sync state
             subranges[subrange_i].end = subrange_new_end;
-        }
-        else { // self.growth == VMGrowthType::Downward
+        } else {
+            // self.growth == VMGrowthType::Downward
             // Can we grow?
             let max_new_size = {
                 let pre_subrange = &subranges[subrange_i - 1];
@@ -395,7 +389,6 @@ impl Default for VMRange {
     }
 }
 
-
 #[derive(Clone, Copy)]
 pub struct VMRangeInner {
     start: usize,
@@ -404,8 +397,7 @@ pub struct VMRangeInner {
 }
 
 impl VMRangeInner {
-    pub fn new(start: usize, end: usize, growth: VMGrowthType) -> VMRangeInner
-    {
+    pub fn new(start: usize, end: usize, growth: VMGrowthType) -> VMRangeInner {
         VMRangeInner {
             start: start,
             end: end,
@@ -440,8 +432,14 @@ impl VMRangeTrait for VMRangeInner {
 
 impl fmt::Debug for VMRangeInner {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "VMRangeInner {{ start: 0x{:X?}, end: 0x{:X?}, size: 0x{:X?}, growth: {:?} }}",
-               self.start, self.end, self.get_size(), self.growth)
+        write!(
+            f,
+            "VMRangeInner {{ start: 0x{:X?}, end: 0x{:X?}, size: 0x{:X?}, growth: {:?} }}",
+            self.start,
+            self.end,
+            self.get_size(),
+            self.growth
+        )
     }
 }
 
@@ -449,14 +447,11 @@ impl PartialOrd for VMRangeInner {
     fn partial_cmp(&self, other: &VMRangeInner) -> Option<Ordering> {
         if self.end <= other.start {
             return Some(Ordering::Less);
-        }
-        else if self.start >= other.end {
+        } else if self.start >= other.end {
             return Some(Ordering::Greater);
-        }
-        else if self.start == other.start && self.end == other.end {
+        } else if self.start == other.start && self.end == other.end {
             return Some(Ordering::Equal);
-        }
-        else {
+        } else {
             return None;
         }
     }
@@ -467,7 +462,6 @@ impl PartialEq for VMRangeInner {
         self.start == other.start && self.end == other.end
     }
 }
-
 
 #[derive(Debug)]
 struct FreeSpace {
@@ -491,8 +485,8 @@ impl FreeSpace {
 
 impl PartialEq for FreeSpace {
     fn eq(&self, other: &FreeSpace) -> bool {
-        self.get_size() == other.get_size() &&
-            self.get_neighbor_pressure() == other.get_neighbor_pressure()
+        self.get_size() == other.get_size()
+            && self.get_neighbor_pressure() == other.get_neighbor_pressure()
     }
 }
 
@@ -502,21 +496,17 @@ impl PartialOrd for FreeSpace {
         let other_size = other.get_size();
         if self_size < other_size {
             Some(Ordering::Less)
-        }
-        else if self_size > other_size {
+        } else if self_size > other_size {
             Some(Ordering::Greater)
-        }
-        else {
+        } else {
             // The less neighbor pressure, the larger the free space
             let self_neighbor_pressure = self.get_neighbor_pressure();
             let other_neighbor_pressure = other.get_neighbor_pressure();
             if self_neighbor_pressure > other_neighbor_pressure {
                 Some(Ordering::Less)
-            }
-            else if self_neighbor_pressure < other_neighbor_pressure {
+            } else if self_neighbor_pressure < other_neighbor_pressure {
                 Some(Ordering::Greater)
-            }
-            else {
+            } else {
                 Some(Ordering::Equal)
             }
         }

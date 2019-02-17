@@ -2,9 +2,8 @@ use super::*;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 lazy_static! {
-    static ref PROCESS_TABLE: SgxMutex<HashMap<pid_t, ProcessRef>> = {
-        SgxMutex::new(HashMap::new())
-    };
+    static ref PROCESS_TABLE: SgxMutex<HashMap<pid_t, ProcessRef>> =
+        { SgxMutex::new(HashMap::new()) };
 }
 
 pub fn put(pid: pid_t, process: ProcessRef) {
@@ -19,8 +18,7 @@ pub fn get(pid: pid_t) -> Option<ProcessRef> {
     PROCESS_TABLE.lock().unwrap().get(&pid).map(|pr| pr.clone())
 }
 
-
-static NEXT_PID : AtomicU32 = AtomicU32::new(1);
+static NEXT_PID: AtomicU32 = AtomicU32::new(1);
 
 pub fn alloc_pid() -> u32 {
     NEXT_PID.fetch_add(1, Ordering::SeqCst)
@@ -28,7 +26,8 @@ pub fn alloc_pid() -> u32 {
 
 pub fn free_pid(pid: u32) {
     // PID 0 is reserved for idle thread, thus no need to free
-    if pid == 0 { return; }
+    if pid == 0 {
+        return;
+    }
     // TODO:
 }
-

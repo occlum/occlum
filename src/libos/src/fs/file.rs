@@ -1,10 +1,9 @@
 use super::*;
-use {std};
-use std::{fmt};
+use std;
 use std::borrow::BorrowMut;
+use std::fmt;
 
-
-pub trait File : Debug + Sync + Send {
+pub trait File: Debug + Sync + Send {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error>;
     fn write(&self, buf: &[u8]) -> Result<usize, Error>;
     fn readv<'a, 'b>(&self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error>;
@@ -21,10 +20,12 @@ pub struct SgxFile {
 }
 
 impl SgxFile {
-    pub fn new(file: Arc<SgxMutex<fs_impl::SgxFile>>,
-               is_readable: bool, is_writable: bool, is_append: bool)
-        -> Result<SgxFile, Error>
-    {
+    pub fn new(
+        file: Arc<SgxMutex<fs_impl::SgxFile>>,
+        is_readable: bool,
+        is_writable: bool,
+        is_append: bool,
+    ) -> Result<SgxFile, Error> {
         if !is_readable && !is_writable {
             return Err(Error::new(Errno::EINVAL, "Invalid permissions"));
         }
@@ -76,7 +77,7 @@ impl File for SgxFile {
 #[derive(Clone)]
 #[repr(C)]
 struct SgxFileInner {
-//    perms: FilePerms,
+    //    perms: FilePerms,
     pos: usize,
     file: Arc<SgxMutex<fs_impl::SgxFile>>,
     is_readable: bool,
@@ -99,12 +100,12 @@ impl SgxFileInner {
             SeekFrom::End(0)
         };
         // TODO: recover from error
-        file.seek(seek_pos).map_err(
-            |e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
+        file.seek(seek_pos)
+            .map_err(|e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
 
         let write_len = {
-            file.write(buf).map_err(
-                |e| Error::new(Errno::EINVAL, "Failed to write"))?
+            file.write(buf)
+                .map_err(|e| Error::new(Errno::EINVAL, "Failed to write"))?
         };
 
         if !self.is_append {
@@ -122,12 +123,12 @@ impl SgxFileInner {
         let file = file_guard.borrow_mut();
 
         let seek_pos = SeekFrom::Start(self.pos as u64);
-        file.seek(seek_pos).map_err(
-            |e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
+        file.seek(seek_pos)
+            .map_err(|e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
 
         let read_len = {
-            file.read(buf).map_err(
-                |e| Error::new(Errno::EINVAL, "Failed to write"))?
+            file.read(buf)
+                .map_err(|e| Error::new(Errno::EINVAL, "Failed to write"))?
         };
 
         self.pos += read_len;
@@ -139,29 +140,26 @@ impl SgxFileInner {
         let file = file_guard.borrow_mut();
 
         let pos = match pos {
-            SeekFrom::Start(absolute_offset) => {
-                pos
-            }
-            SeekFrom::End(relative_offset) => {
-                pos
-            }
+            SeekFrom::Start(absolute_offset) => pos,
+            SeekFrom::End(relative_offset) => pos,
             SeekFrom::Current(relative_offset) => {
                 if relative_offset >= 0 {
                     SeekFrom::Start((self.pos + relative_offset as usize) as u64)
-                }
-                else {
+                } else {
                     let backward_offset = (-relative_offset) as usize;
-                    if self.pos < backward_offset { // underflow
-                        return Err(Error::new(Errno::EINVAL,
-                                              "Invalid seek position"));
+                    if self.pos < backward_offset {
+                        // underflow
+                        return Err(Error::new(Errno::EINVAL, "Invalid seek position"));
                     }
                     SeekFrom::Start((self.pos - backward_offset) as u64)
                 }
             }
         };
 
-        self.pos = file.seek(pos).map_err(
-            |e| Error::new(Errno::EINVAL, "Failed to seek to a position"))? as usize;
+        self.pos = file
+            .seek(pos)
+            .map_err(|e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?
+            as usize;
         Ok(self.pos as off_t)
     }
 
@@ -178,15 +176,17 @@ impl SgxFileInner {
         } else {
             SeekFrom::End(0)
         };
-        file.seek(seek_pos).map_err(
-            |e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
+        file.seek(seek_pos)
+            .map_err(|e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
 
         let mut total_bytes = 0;
         for buf in bufs {
             match file.write(buf) {
                 Ok(this_bytes) => {
                     total_bytes += this_bytes;
-                    if this_bytes < buf.len() { break; }
+                    if this_bytes < buf.len() {
+                        break;
+                    }
                 }
                 Err(e) => {
                     match total_bytes {
@@ -212,15 +212,17 @@ impl SgxFileInner {
         let file = file_guard.borrow_mut();
 
         let seek_pos = SeekFrom::Start(self.pos as u64);
-        file.seek(seek_pos).map_err(
-            |e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
+        file.seek(seek_pos)
+            .map_err(|e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
 
         let mut total_bytes = 0;
         for buf in bufs {
             match file.read(buf) {
                 Ok(this_bytes) => {
                     total_bytes += this_bytes;
-                    if this_bytes < buf.len() { break; }
+                    if this_bytes < buf.len() {
+                        break;
+                    }
                 }
                 Err(e) => {
                     match total_bytes {
@@ -262,8 +264,10 @@ impl StdoutFile {
 impl File for StdoutFile {
     fn write(&self, buf: &[u8]) -> Result<usize, Error> {
         let write_len = {
-            self.inner.lock().write(buf).map_err(|e| (Errno::EINVAL,
-                                           "Failed to write"))?
+            self.inner
+                .lock()
+                .write(buf)
+                .map_err(|e| (Errno::EINVAL, "Failed to write"))?
         };
         Ok(write_len)
     }
@@ -279,7 +283,9 @@ impl File for StdoutFile {
             match guard.write(buf) {
                 Ok(this_len) => {
                     total_bytes += this_len;
-                    if this_len < buf.len() { break; }
+                    if this_len < buf.len() {
+                        break;
+                    }
                 }
                 Err(e) => {
                     match total_bytes {
@@ -327,8 +333,10 @@ impl StdinFile {
 impl File for StdinFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
         let read_len = {
-            self.inner.lock().read(buf).map_err(|e| (Errno::EINVAL,
-                                           "Failed to read"))?
+            self.inner
+                .lock()
+                .read(buf)
+                .map_err(|e| (Errno::EINVAL, "Failed to read"))?
         };
         Ok(read_len)
     }
@@ -348,7 +356,9 @@ impl File for StdinFile {
             match guard.read(buf) {
                 Ok(this_len) => {
                     total_bytes += this_len;
-                    if this_len < buf.len() { break; }
+                    if this_len < buf.len() {
+                        break;
+                    }
                 }
                 Err(e) => {
                     match total_bytes {

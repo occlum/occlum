@@ -1,11 +1,11 @@
+use self::segment::*;
 use super::*;
-use std::{ptr};
-use xmas_elf::{ElfFile, header, program, sections};
-use self::segment::{*};
+use std::ptr;
+use xmas_elf::{header, program, sections, ElfFile};
 
-pub const DEFAULT_STACK_SIZE : usize = 1 * 1024 * 1024;
-pub const DEFAULT_HEAP_SIZE : usize  = 2 * 1024 * 1024;
-pub const DEFAULT_MMAP_SIZE : usize  = 2 * 1024 * 1024;
+pub const DEFAULT_STACK_SIZE: usize = 1 * 1024 * 1024;
+pub const DEFAULT_HEAP_SIZE: usize = 2 * 1024 * 1024;
+pub const DEFAULT_MMAP_SIZE: usize = 2 * 1024 * 1024;
 
 pub fn do_init(elf_file: &ElfFile, elf_buf: &[u8]) -> Result<ProcessVM, Error> {
     let mut code_seg = get_code_segment(elf_file)?;
@@ -21,8 +21,7 @@ pub fn do_init(elf_file: &ElfFile, elf_buf: &[u8]) -> Result<ProcessVM, Error> {
     let stack_size = DEFAULT_STACK_SIZE;
     let heap_size = DEFAULT_HEAP_SIZE;
     let mmap_size = DEFAULT_MMAP_SIZE;
-    let mut process_vm = ProcessVM::new(code_size, data_size, heap_size,
-                                        stack_size, mmap_size)?;
+    let mut process_vm = ProcessVM::new(code_size, data_size, heap_size, stack_size, mmap_size)?;
 
     // Calculate the "real" addresses
     let process_base_addr = process_vm.get_base_addr();
@@ -44,9 +43,7 @@ pub fn do_init(elf_file: &ElfFile, elf_buf: &[u8]) -> Result<ProcessVM, Error> {
     Ok(process_vm)
 }
 
-fn reloc_symbols(process_base_addr: usize, elf_file: &ElfFile)
-    -> Result<(), Error>
-{
+fn reloc_symbols(process_base_addr: usize, elf_file: &ElfFile) -> Result<(), Error> {
     let rela_entries = elf_helper::get_rela_entries(elf_file, ".rela.dyn")?;
     for rela_entry in rela_entries {
         /*
@@ -67,15 +64,13 @@ fn reloc_symbols(process_base_addr: usize, elf_file: &ElfFile)
                 }
             }
             // TODO: need to handle other relocation types
-            _ => {  }
+            _ => {}
         }
     }
     Ok(())
 }
 
-fn link_syscalls(process_base_addr: usize, elf_file: &ElfFile)
-    -> Result<(), Error>
-{
+fn link_syscalls(process_base_addr: usize, elf_file: &ElfFile) -> Result<(), Error> {
     let syscall_addr = __occlum_syscall as *const () as usize;
 
     let rela_entries = elf_helper::get_rela_entries(elf_file, ".rela.plt")?;
@@ -83,9 +78,9 @@ fn link_syscalls(process_base_addr: usize, elf_file: &ElfFile)
     for rela_entry in rela_entries {
         let dynsym_idx = rela_entry.get_symbol_table_index() as usize;
         let dynsym_entry = &dynsym_entries[dynsym_idx];
-        let dynsym_str = dynsym_entry.get_name(elf_file)
-            .map_err(|e| Error::new(Errno::ENOEXEC,
-                                    "Failed to get the name of dynamic symbol"))?;
+        let dynsym_str = dynsym_entry
+            .get_name(elf_file)
+            .map_err(|e| Error::new(Errno::ENOEXEC, "Failed to get the name of dynamic symbol"))?;
 
         if dynsym_str == "__occlum_syscall" {
             let rela_addr = process_base_addr + rela_entry.get_offset() as usize;
@@ -98,6 +93,6 @@ fn link_syscalls(process_base_addr: usize, elf_file: &ElfFile)
     Ok(())
 }
 
-extern {
+extern "C" {
     fn __occlum_syscall(num: i32, arg0: u64, arg1: u64, arg2: u64, arg3: u64, arg4: u64) -> i64;
 }

@@ -1,8 +1,8 @@
 use super::*;
 
-use {std, std::mem, std::ptr};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
+use {std, std::mem, std::ptr};
 
 /*
  * The initial stack of a process looks like below:
@@ -47,10 +47,13 @@ use std::os::raw::c_char;
  *
  */
 
-pub fn do_init(stack_top: usize, init_area_size: usize,
-               argv: &[CString], envp: &[CString], auxtbl: &AuxTable)
-    -> Result<usize, Error>
-{
+pub fn do_init(
+    stack_top: usize,
+    init_area_size: usize,
+    argv: &[CString],
+    envp: &[CString],
+    auxtbl: &AuxTable,
+) -> Result<usize, Error> {
     let stack_buf = unsafe { StackBuf::new(stack_top, init_area_size)? };
     let envp_cloned = clone_cstrings_on_stack(&stack_buf, envp)?;
     let argv_cloned = clone_cstrings_on_stack(&stack_buf, argv)?;
@@ -73,7 +76,7 @@ pub struct StackBuf {
 }
 
 impl StackBuf {
-    pub unsafe fn new(stack_top: usize, stack_size: usize) -> Result<StackBuf, Error>{
+    pub unsafe fn new(stack_top: usize, stack_size: usize) -> Result<StackBuf, Error> {
         if stack_top % 16 != 0 || stack_size == 0 || stack_top < stack_size {
             return errno!(EINVAL, "Invalid stack range");
         };
@@ -85,30 +88,38 @@ impl StackBuf {
     }
 
     pub fn put<T>(&self, val: T) -> Result<*const T, Error>
-        where T : Copy
+    where
+        T: Copy,
     {
         let val_size = mem::size_of::<T>();
         let val_align = mem::align_of::<T>();
         let val_ptr = self.alloc(val_size, val_align)? as *mut T;
-        unsafe { ptr::write(val_ptr, val); }
+        unsafe {
+            ptr::write(val_ptr, val);
+        }
         Ok(val_ptr as *const T)
     }
 
     pub fn put_slice<T>(&self, vals: &[T]) -> Result<*const T, Error>
-        where T: Copy
+    where
+        T: Copy,
     {
         let val_size = mem::size_of::<T>();
         let val_align = mem::align_of::<T>();
         let total_size = {
             let num_vals = vals.len();
-            if num_vals == 0 { return Ok(self.get_pos() as *const T); }
+            if num_vals == 0 {
+                return Ok(self.get_pos() as *const T);
+            }
             val_size * num_vals
         };
         let base_ptr = self.alloc(total_size, val_align)? as *mut T;
 
         let mut val_ptr = base_ptr;
         for v in vals {
-            unsafe { ptr::write(val_ptr, *v); }
+            unsafe {
+                ptr::write(val_ptr, *v);
+            }
             val_ptr = unsafe { val_ptr.offset(1) };
         }
 
@@ -139,26 +150,21 @@ impl StackBuf {
     }
 }
 
-
-fn clone_cstrings_on_stack<'a, 'b>(stack: &'a StackBuf,
-                                   cstrings: &'b [CString])
-    -> Result<Vec<&'a CStr>, Error>
-{
+fn clone_cstrings_on_stack<'a, 'b>(
+    stack: &'a StackBuf,
+    cstrings: &'b [CString],
+) -> Result<Vec<&'a CStr>, Error> {
     let mut cstrs_cloned = Vec::new();
     for cs in cstrings.iter().rev() {
         let cstrp_cloned = stack.put_cstr(cs)?;
-        let cstr_cloned = unsafe {
-            CStr::from_ptr::<'a>(cstrp_cloned as *const c_char)
-        };
+        let cstr_cloned = unsafe { CStr::from_ptr::<'a>(cstrp_cloned as *const c_char) };
         cstrs_cloned.push(cstr_cloned);
     }
     cstrs_cloned.reverse();
     Ok(cstrs_cloned)
 }
 
-fn dump_auxtbl_on_stack<'a, 'b>(stack: &'a StackBuf, auxtbl: &'b AuxTable)
-    -> Result<(), Error>
-{
+fn dump_auxtbl_on_stack<'a, 'b>(stack: &'a StackBuf, auxtbl: &'b AuxTable) -> Result<(), Error> {
     // For every key-value pari, dump the value first, then the key
     stack.put(AuxKey::AT_NULL as u64);
     stack.put(AuxKey::AT_NULL as u64);
@@ -169,9 +175,10 @@ fn dump_auxtbl_on_stack<'a, 'b>(stack: &'a StackBuf, auxtbl: &'b AuxTable)
     Ok(())
 }
 
-fn dump_cstrptrs_on_stack<'a, 'b>(stack: &'a StackBuf, strptrs: &'b [&'a CStr])
-    -> Result<(), Error>
-{
+fn dump_cstrptrs_on_stack<'a, 'b>(
+    stack: &'a StackBuf,
+    strptrs: &'b [&'a CStr],
+) -> Result<(), Error> {
     stack.put(0 as u64); // End with a NULL pointer
     for sp in strptrs.iter().rev() {
         stack.put(sp.as_ptr() as u64);
@@ -179,44 +186,40 @@ fn dump_cstrptrs_on_stack<'a, 'b>(stack: &'a StackBuf, strptrs: &'b [&'a CStr])
     Ok(())
 }
 
-
 /* Symbolic values for the entries in the auxiliary table
-  put on the initial stack */
+put on the initial stack */
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum AuxKey {
-    AT_NULL                 = 0, /* end of vector */
-    AT_IGNORE               = 1, /* entry should be ignored */
-    AT_EXECFD               = 2, /* file descriptor of program */
-    AT_PHDR                 = 3, /* program headers for program */
-    AT_PHENT                = 4, /* size of program header entry */
-    AT_PHNUM                = 5, /* number of program headers */
-    AT_PAGESZ               = 6, /* system page size */
-    AT_BASE                 = 7, /* base address of interpreter */
-    AT_FLAGS                = 8, /* flags */
-    AT_ENTRY                = 9, /* entry point of program */
-    AT_NOTELF               = 10, /* program is not ELF */
-    AT_UID                  = 11, /* real uid */
-    AT_EUID                 = 12, /* effective uid */
-    AT_GID                  = 13, /* real gid */
-    AT_EGID                 = 14, /* effective gid */
-    AT_PLATFORM             = 15, /* string identifying CPU for optimizations */
-    AT_HWCAP                = 16, /* arch dependent hints at CPU capabilities */
-    AT_CLKTCK               = 17, /* frequency at which times() increments */
+    AT_NULL = 0,      /* end of vector */
+    AT_IGNORE = 1,    /* entry should be ignored */
+    AT_EXECFD = 2,    /* file descriptor of program */
+    AT_PHDR = 3,      /* program headers for program */
+    AT_PHENT = 4,     /* size of program header entry */
+    AT_PHNUM = 5,     /* number of program headers */
+    AT_PAGESZ = 6,    /* system page size */
+    AT_BASE = 7,      /* base address of interpreter */
+    AT_FLAGS = 8,     /* flags */
+    AT_ENTRY = 9,     /* entry point of program */
+    AT_NOTELF = 10,   /* program is not ELF */
+    AT_UID = 11,      /* real uid */
+    AT_EUID = 12,     /* effective uid */
+    AT_GID = 13,      /* real gid */
+    AT_EGID = 14,     /* effective gid */
+    AT_PLATFORM = 15, /* string identifying CPU for optimizations */
+    AT_HWCAP = 16,    /* arch dependent hints at CPU capabilities */
+    AT_CLKTCK = 17,   /* frequency at which times() increments */
 
     /* 18...22 not used */
-
-    AT_SECURE               = 23, /* secure mode boolean */
-    AT_BASE_PLATFORM        = 24, /* string identifying real platform, may
-    * differ from AT_PLATFORM. */
-    AT_RANDOM               = 25, /* address of 16 random bytes */
-    AT_HWCAP2               = 26, /* extension of AT_HWCAP */
+    AT_SECURE = 23, /* secure mode boolean */
+    AT_BASE_PLATFORM = 24, /* string identifying real platform, may
+                     * differ from AT_PLATFORM. */
+    AT_RANDOM = 25, /* address of 16 random bytes */
+    AT_HWCAP2 = 26, /* extension of AT_HWCAP */
 
     /* 28...30 not used */
-
-    AT_EXECFN               = 31, /* filename of program */
+    AT_EXECFN = 31, /* filename of program */
 }
-
 
 static AUX_KEYS: &'static [AuxKey] = &[
     AuxKey::AT_NULL,
@@ -252,13 +255,11 @@ impl AuxKey {
         let next_idx = self_idx + 1;
         if next_idx < AUX_KEYS.len() {
             Some(AUX_KEYS[next_idx])
-        }
-        else {
+        } else {
             None
         }
     }
 }
-
 
 #[derive(Clone, Default, Copy, Debug)]
 pub struct AuxTable {
@@ -268,11 +269,11 @@ pub struct AuxTable {
 impl AuxTable {
     pub fn new() -> AuxTable {
         AuxTable {
-            values: [None; AuxKey::MAX]
+            values: [None; AuxKey::MAX],
         }
     }
 
-    pub fn set_val(&mut self, key: AuxKey, val: u64) -> Result<(), Error>{
+    pub fn set_val(&mut self, key: AuxKey, val: u64) -> Result<(), Error> {
         if key == AuxKey::AT_NULL || key == AuxKey::AT_IGNORE {
             return Err(Error::new(Errno::EINVAL, "Illegal key"));
         }
@@ -315,10 +316,12 @@ impl<'a> Iterator for AuxTableIter<'a> {
 
     fn next(&mut self) -> Option<(AuxKey, u64)> {
         loop {
-            if self.key == None { return None; }
+            if self.key == None {
+                return None;
+            }
             let key = self.key.unwrap();
 
-            let item = self.tbl.get_val(key).map(|val| (key, val) );
+            let item = self.tbl.get_val(key).map(|val| (key, val));
             self.key = key.next();
 
             if item != None {

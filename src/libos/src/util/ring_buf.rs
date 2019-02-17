@@ -1,8 +1,8 @@
-use super::{*};
+use super::*;
+use std::cmp::{max, min};
+use std::ptr;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
-use std::cmp::{min, max};
-use std::{ptr};
 
 #[derive(Debug)]
 pub struct RingBuf {
@@ -13,9 +13,14 @@ pub struct RingBuf {
 impl RingBuf {
     pub fn new(capacity: usize) -> RingBuf {
         let inner = Arc::new(RingBufInner::new(capacity));
-        let reader = RingBufReader { inner: inner.clone() };
+        let reader = RingBufReader {
+            inner: inner.clone(),
+        };
         let writer = RingBufWriter { inner: inner };
-        RingBuf { reader: reader, writer: writer }
+        RingBuf {
+            reader: reader,
+            writer: writer,
+        }
     }
 }
 
@@ -33,8 +38,8 @@ pub struct RingBufWriter {
 struct RingBufInner {
     buf: *mut u8,
     capacity: usize,
-    head: AtomicUsize, // write to head
-    tail: AtomicUsize, // read from tail
+    head: AtomicUsize,  // write to head
+    tail: AtomicUsize,  // read from tail
     closed: AtomicBool, // if reader has been dropped
 }
 
@@ -108,7 +113,6 @@ impl Drop for RingBufInner {
     }
 }
 
-
 impl RingBufReader {
     pub fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
         let mut tail = self.inner.get_tail();
@@ -123,7 +127,9 @@ impl RingBufReader {
                 } else {
                     self.inner.capacity - tail
                 };
-                if may_read_nbytes == 0 { break; }
+                if may_read_nbytes == 0 {
+                    break;
+                }
 
                 min(may_read_nbytes, buf_remain)
             };
@@ -150,7 +156,6 @@ impl Drop for RingBufReader {
     }
 }
 
-
 impl RingBufWriter {
     pub fn write(&self, buf: &[u8]) -> Result<usize, Error> {
         if self.inner.is_closed() {
@@ -169,7 +174,9 @@ impl RingBufWriter {
                 } else {
                     tail - head - 1
                 };
-                if may_write_nbytes == 0 { break; }
+                if may_write_nbytes == 0 {
+                    break;
+                }
 
                 min(may_write_nbytes, buf_remain)
             };

@@ -1,5 +1,5 @@
 use prelude::*;
-use std::{fmt, error, convert,};
+use std::{convert, error, fmt};
 
 // TODO: remove errno.h
 
@@ -11,20 +11,14 @@ pub struct Error {
 
 impl Error {
     pub fn new(errno: Errno, desc: &'static str) -> Error {
-        let ret = Error {
-            errno,
-            desc,
-        };
+        let ret = Error { errno, desc };
         ret
     }
 }
 
 impl convert::From<(Errno, &'static str)> for Error {
     fn from(info: (Errno, &'static str)) -> Error {
-        Error::new(
-            info.0,
-            info.1,
-        )
+        Error::new(info.0, info.1)
     }
 }
 
@@ -88,16 +82,18 @@ pub enum Errno {
 
 impl Errno {
     pub fn as_retval(&self) -> i32 {
-        - (*self as i32)
+        -(*self as i32)
     }
 }
 
 impl fmt::Display for Errno {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "errno = {}, \"{}\"",
+        write!(
+            f,
+            "errno = {}, \"{}\"",
             *self as u32,
             match *self {
-                Errno::EPERM =>  "Operation not permitted",
+                Errno::EPERM => "Operation not permitted",
                 Errno::ENOENT => "No such file or directory",
                 Errno::ESRCH => "No such process",
                 Errno::EINTR => "Interrupted system call",
@@ -139,5 +135,3 @@ impl fmt::Display for Errno {
         )
     }
 }
-
-

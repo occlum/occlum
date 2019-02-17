@@ -1,9 +1,9 @@
 use super::*;
 
 pub fn mpx_enable() -> Result<(), Error> {
-    match unsafe { __mpx_enable () } {
-        0 => { Ok(()) }
-        _ => { errno!(EPERM, "MPX cannot be enabled") }
+    match unsafe { __mpx_enable() } {
+        0 => Ok(()),
+        _ => errno!(EPERM, "MPX cannot be enabled"),
     }
 }
 
@@ -47,8 +47,7 @@ pub fn mpx_bndcu(bndreg: MpxReg, addr: usize) {
     }
 }
 
-
-extern {
+extern "C" {
     // See mpx_util.h
     fn __mpx_enable() -> i32;
     fn __mpx_bndmk0(base: usize, size: usize);

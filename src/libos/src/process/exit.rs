@@ -1,4 +1,4 @@
-use super::{*};
+use super::*;
 
 // TODO: make sure Processes are released eventually
 
@@ -10,7 +10,6 @@ pub enum ChildProcessFilter {
 }
 
 unsafe impl Send for ChildProcessFilter {}
-
 
 pub fn do_exit(exit_status: i32) {
     let current_ref = get_current();
@@ -35,30 +34,29 @@ pub fn do_exit(exit_status: i32) {
         lock_two_in_order(&parent_ref, &current_ref)
     };
     // Wake up the parent if it is waiting on this child
-    if parent.waiting_children.is_none() { return; }
+    if parent.waiting_children.is_none() {
+        return;
+    }
     let mut wait_queue = parent.waiting_children.as_mut().unwrap();
     wait_queue.del_and_wake_one_waiter(|waiter_data| -> Option<pid_t> {
         match waiter_data {
-            ChildProcessFilter::WithAnyPID => {
-            },
+            ChildProcessFilter::WithAnyPID => {}
             ChildProcessFilter::WithPID(required_pid) => {
                 if current.get_pid() != *required_pid {
                     return None;
                 }
-            },
+            }
             ChildProcessFilter::WithPGID(required_pgid) => {
                 if current.get_pgid() != *required_pgid {
                     return None;
                 }
-            },
+            }
         }
         Some(current.get_pid())
     });
 }
 
-pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32)
-    -> Result<pid_t, Error>
-{
+pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32) -> Result<pid_t, Error> {
     let current_ref = get_current();
     let waiter = {
         let mut current = current_ref.lock().unwrap();
@@ -69,17 +67,13 @@ pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32)
             let child = child_ref.lock().unwrap();
 
             let may_wait_for = match child_filter {
-                ChildProcessFilter::WithAnyPID => {
-                    true
-                },
-                ChildProcessFilter::WithPID(required_pid) => {
-                    child.get_pid() == *required_pid
-                },
-                ChildProcessFilter::WithPGID(required_pgid) => {
-                    child.get_pgid() == *required_pgid
-                }
+                ChildProcessFilter::WithAnyPID => true,
+                ChildProcessFilter::WithPID(required_pid) => child.get_pid() == *required_pid,
+                ChildProcessFilter::WithPGID(required_pgid) => child.get_pgid() == *required_pgid,
             };
-            if !may_wait_for { continue; }
+            if !may_wait_for {
+                continue;
+            }
 
             // Return immediately as a child that we wait for has alreay exited
             if child.status == Status::ZOMBIE {
@@ -88,7 +82,9 @@ pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32)
 
             any_child_to_wait_for = true;
         }
-        if !any_child_to_wait_for { return errno!(ECHILD, "No such child"); }
+        if !any_child_to_wait_for {
+            return errno!(ECHILD, "No such child");
+        }
 
         let waiter = Waiter::new(child_filter);
         let mut wait_queue = WaitQueue::new();
@@ -107,7 +103,9 @@ pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32)
         for (child_i, child_weak) in current.children.iter().enumerate() {
             let child_ref = child_weak.upgrade().unwrap();
             let child = child_ref.lock().unwrap();
-            if child.get_pid() != child_pid { continue; }
+            if child.get_pid() != child_pid {
+                continue;
+            }
 
             if child.get_status() != Status::ZOMBIE {
                 panic!("THIS SHOULD NEVER HAPPEN!");
@@ -126,9 +124,9 @@ pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32)
     Ok(child_pid)
 }
 
-fn lock_two_in_order<'a>(first_ref: &'a ProcessRef, second_ref: &'a ProcessRef) ->
-    (SgxMutexGuard<'a, Process>, SgxMutexGuard<'a, Process>)
-{
+fn lock_two_in_order<'a>(
+    first_ref: &'a ProcessRef,
+    second_ref: &'a ProcessRef,
+) -> (SgxMutexGuard<'a, Process>, SgxMutexGuard<'a, Process>) {
     (first_ref.lock().unwrap(), second_ref.lock().unwrap())
 }
-

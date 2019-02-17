@@ -1,7 +1,7 @@
+use super::task::Task;
 use super::*;
-use super::task::{Task};
+use fs::{File, FileRef, FileTable};
 use vm::{ProcessVM, VMRangeTrait};
-use fs::{FileTable, File, FileRef};
 
 lazy_static! {
     // Dummy object to make all processes having a parent
@@ -24,9 +24,12 @@ lazy_static! {
 }
 
 impl Process {
-    pub fn new(exec_path: &str, task: Task, vm: ProcessVM, file_table: FileTable)
-        -> Result<(pid_t, ProcessRef), Error>
-    {
+    pub fn new(
+        exec_path: &str,
+        task: Task,
+        vm: ProcessVM,
+        file_table: FileTable,
+    ) -> Result<(pid_t, ProcessRef), Error> {
         let new_pid = process_table::alloc_pid();
         let new_process_ref = Arc::new(SgxMutex::new(Process {
             task: task,
@@ -45,20 +48,48 @@ impl Process {
         Ok((new_pid, new_process_ref))
     }
 
-    pub fn get_task(&self) -> &Task { &self.task }
-    pub fn get_task_mut(&mut self) -> &mut Task { &mut self.task }
-    pub fn get_pid(&self) -> pid_t { self.pid }
-    pub fn get_pgid(&self) -> pid_t { self.pgid }
-    pub fn get_tgid(&self) -> pid_t { self.tgid }
-    pub fn get_status(&self) -> Status { self.status }
-    pub fn get_exit_status(&self) -> i32 { self.exit_status }
-    pub fn get_exec_path(&self) -> &str { &self.exec_path }
-    pub fn get_vm(&self) -> &ProcessVM { &self.vm }
-    pub fn get_vm_mut(&mut self) -> &mut ProcessVM { &mut self.vm }
-    pub fn get_files(&self) -> &FileTable { &self.file_table }
-    pub fn get_files_mut(&mut self) -> &mut FileTable { &mut self.file_table }
-    pub fn get_parent(&self) -> &ProcessRef { self.parent.as_ref().unwrap() }
-    pub fn get_children(&self) -> &[ProcessWeakRef] { &self.children }
+    pub fn get_task(&self) -> &Task {
+        &self.task
+    }
+    pub fn get_task_mut(&mut self) -> &mut Task {
+        &mut self.task
+    }
+    pub fn get_pid(&self) -> pid_t {
+        self.pid
+    }
+    pub fn get_pgid(&self) -> pid_t {
+        self.pgid
+    }
+    pub fn get_tgid(&self) -> pid_t {
+        self.tgid
+    }
+    pub fn get_status(&self) -> Status {
+        self.status
+    }
+    pub fn get_exit_status(&self) -> i32 {
+        self.exit_status
+    }
+    pub fn get_exec_path(&self) -> &str {
+        &self.exec_path
+    }
+    pub fn get_vm(&self) -> &ProcessVM {
+        &self.vm
+    }
+    pub fn get_vm_mut(&mut self) -> &mut ProcessVM {
+        &mut self.vm
+    }
+    pub fn get_files(&self) -> &FileTable {
+        &self.file_table
+    }
+    pub fn get_files_mut(&mut self) -> &mut FileTable {
+        &mut self.file_table
+    }
+    pub fn get_parent(&self) -> &ProcessRef {
+        self.parent.as_ref().unwrap()
+    }
+    pub fn get_children(&self) -> &[ProcessWeakRef] {
+        &self.children
+    }
 }
 
 impl Drop for Process {
@@ -66,7 +97,6 @@ impl Drop for Process {
         process_table::free_pid(self.pid);
     }
 }
-
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Status {

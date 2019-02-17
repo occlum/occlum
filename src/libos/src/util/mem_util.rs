@@ -1,6 +1,6 @@
 use super::*;
 use std::ffi::{CStr, CString};
-use std::{ptr};
+use std::ptr;
 
 /// Memory utilities that deals with primitive types passed from user process
 /// running inside enclave
@@ -28,9 +28,7 @@ pub mod from_user {
     }
 
     /// Clone a C-string from the user process safely
-    pub fn clone_cstring_safely(out_ptr: *const c_char)
-        -> Result<CString, Error>
-    {
+    pub fn clone_cstring_safely(out_ptr: *const c_char) -> Result<CString, Error> {
         check_ptr(out_ptr)?;
         // TODO: using from_ptr directly is not safe
         let cstr = unsafe { CStr::from_ptr(out_ptr) };
@@ -41,18 +39,20 @@ pub mod from_user {
     /// Clone a C-string array (const char*[]) from the user process safely
     ///
     /// This array must be ended with a NULL pointer.
-    pub fn clone_cstrings_safely(user_ptr: *const *const c_char)
-        -> Result<Vec<CString>, Error>
-    {
+    pub fn clone_cstrings_safely(user_ptr: *const *const c_char) -> Result<Vec<CString>, Error> {
         let mut cstrings = Vec::new();
-        if user_ptr == ptr::null() { return Ok(cstrings); }
+        if user_ptr == ptr::null() {
+            return Ok(cstrings);
+        }
 
         let mut user_ptr = user_ptr;
         loop {
             check_ptr(user_ptr);
             let cstr_ptr = {
                 let cstr_ptr = unsafe { *user_ptr };
-                if cstr_ptr == ptr::null() { break; }
+                if cstr_ptr == ptr::null() {
+                    break;
+                }
                 check_ptr(cstr_ptr);
                 cstr_ptr
             };
@@ -80,9 +80,7 @@ pub mod from_untrusted {
     }
 
     /// Clone a C-string from outside the enclave
-    pub fn clone_cstring_safely(out_ptr: *const c_char)
-        -> Result<CString, Error>
-    {
+    pub fn clone_cstring_safely(out_ptr: *const c_char) -> Result<CString, Error> {
         check_ptr(out_ptr)?;
         // TODO: using from_ptr directly is not safe
         let cstr = unsafe { CStr::from_ptr(out_ptr) };
@@ -93,18 +91,20 @@ pub mod from_untrusted {
     /// Clone a C-string array (const char*[]) from outside the enclave
     ///
     /// This array must be ended with a NULL pointer.
-    pub fn clone_cstrings_safely(out_ptr: *const *const c_char)
-        -> Result<Vec<CString>, Error>
-    {
+    pub fn clone_cstrings_safely(out_ptr: *const *const c_char) -> Result<Vec<CString>, Error> {
         let mut cstrings = Vec::new();
-        if out_ptr == ptr::null() { return Ok(cstrings); }
+        if out_ptr == ptr::null() {
+            return Ok(cstrings);
+        }
 
         let mut out_ptr = out_ptr;
         loop {
             check_ptr(out_ptr);
             let cstr_ptr = {
                 let cstr_ptr = unsafe { *out_ptr };
-                if cstr_ptr == ptr::null() { break; }
+                if cstr_ptr == ptr::null() {
+                    break;
+                }
                 check_ptr(cstr_ptr);
                 cstr_ptr
             };
@@ -116,4 +116,3 @@ pub mod from_untrusted {
         Ok(cstrings)
     }
 }
-
