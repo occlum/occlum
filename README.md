@@ -1,11 +1,11 @@
 # Occlum
-[![All Contributors](https://img.shields.io/badge/all_contributors-6-orange.svg?style=flat-square)](#contributors)
+[![All Contributors](https://img.shields.io/badge/all_contributors-6-orange.svg?style=flat-square)](CONTRIBUTORS.md)
 
 Occlum is a *memory-safe*, *multi-process* library OS (LibOS) for [Intel SGX](https://software.intel.com/en-us/sgx). As a LibOS, it enables *unmodified* applications to run on SGX, thus protecting the confidentiality and integrity of user workloads transparently. 
 
 Compared to existing LibOSes for SGX, Occlum has following salient features:
 
-  * **Efficient multitasking.** The LibOS has a complete and efficient multi-process support, including fast process creation, low-cost IPC, code sharing (e.g., shared libraries) and data sharing (e.g., encrypted file systems).
+  * **Efficient multitasking.** The LibOS has a complete and efficient multi-process support, including fast process creation, low-cost IPC, shared OS services (e.g., encrypted file systems).
   * **Fault isolation.** The crash of one user process cannot crash the LibOS or other user processes, which is good for security and robustness.
   * **Memory safety.** The LibOS itself is written in [Rust](https://www.rust-lang.org/), a memory-safe programming language, thus free from low-level, memory bugs;
 
@@ -79,11 +79,9 @@ Of course, Occlum must be run on Intel x86 CPUs with SGX support to do its magic
 
 While Occlum was originally designed by and incubated inside Intel, it is NOT an official Intel product.
 
-The original source code was released by Intel in a BSD-licensed project named [SGX Multi-Process Library Operating System (SGXMPLOS)](https://github.com/occlum/sgxmplos). As the vendor-neutral, community-driven successor of SGXMPLOS, Occlum project is where all future development happens.
-
 ## Contributors
 
-The creators of Occlum (or SGXMPLOS) project are
+The creators of Occlum project are
   * Hongliang Tian and Shoumeng Yan from Intel; and
   * Youren Shen, Yu Chen, and Kang Chen from Tsinghua University.
 

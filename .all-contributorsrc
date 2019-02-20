@@ -60,6 +60,15 @@
         "ideas",
         "content"
       ]
+    },
+    {
+      "login": "chyyuu",
+      "name": "chyyuu",
+      "avatar_url": "https://avatars3.githubusercontent.com/u/2077445?v=4",
+      "profile": "http://soft.cs.tsinghua.edu.cn/~chen",
+      "contributions": [
+        "ideas"
+      ]
     }
   ],
   "contributorsPerLine": 7
