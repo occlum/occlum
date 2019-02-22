@@ -12,8 +12,11 @@ BIN_ENC_NAME := bin.encrypted
 OBJDUMP_FILE := bin.objdump
 READELF_FILE := bin.readelf
 
+CLANG_BIN_PATH := $(shell clang -print-prog-name=clang)
+LLVM_PATH := $(abspath $(dir $(CLANG_BIN_PATH))../)
+
 C_FLAGS = -Wall -O0 $(EXTRA_C_FLAGS)
-C_FLAGS += -Xclang -load -Xclang $(LLVM_PATH)/lib/LLVMBoundchecker.so -mllvm -check-store-only=true
+C_FLAGS += -Xclang -load -Xclang $(LLVM_PATH)/lib/LLVMMDSFIIRInserter.so
 LINK_FLAGS = $(C_FLAGS) $(EXTRA_LINK_FLAGS)
 
 .PHONY: all test debug clean
