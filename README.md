@@ -75,16 +75,16 @@ The same thing can be said to Occlum, not for mind, but program:
 
 Of course, Occlum must be run on Intel x86 CPUs with SGX support to do its magic.
 
-## Disclaimer
-
-While Occlum was originally designed by and incubated inside Intel, it is NOT an official Intel product.
-
 ## Contributors
 
 The creators of Occlum project are
-  * Hongliang Tian and Shoumeng Yan from Intel; and
+  * Hongliang Tian and Shoumeng Yan from Intel Corporation; and
   * Youren Shen, Yu Chen, and Kang Chen from Tsinghua University.
 
 This project follows the [all-contributors](https://allcontributors.org) specification. Contributions of any kind are welcome! We will publish contributing guidelines and accept pull requests after the project gets more stable.
 
 Thanks go to [all these wonderful contributors for this project](CONTRIBUTORS.md).
+
+## Disclaimer
+
+While Occlum was originally designed by and incubated inside Intel, it is NOT an official Intel product.
