@@ -3,6 +3,7 @@ use std::cmp::{max, min};
 use std::ptr;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
+use alloc::alloc::{Layout, alloc, dealloc};
 
 #[derive(Debug)]
 pub struct RingBuf {
@@ -43,15 +44,17 @@ struct RingBufInner {
     closed: AtomicBool, // if reader has been dropped
 }
 
+const RING_BUF_ALIGN : usize = 16;
+
 impl RingBufInner {
     fn new(capacity: usize) -> RingBufInner {
-        let capacity = max(capacity, 16).next_power_of_two();
+        let capacity = max(capacity, RING_BUF_ALIGN).next_power_of_two();
         RingBufInner {
             buf: unsafe {
-                let mut buf_ptr = ptr::null_mut();
-                libc::posix_memalign(&mut buf_ptr, 16, capacity);
+                let buf_layout = Layout::from_size_align_unchecked(capacity, RING_BUF_ALIGN);
+                let buf_ptr = alloc(buf_layout);
                 assert!(buf_ptr != ptr::null_mut());
-                buf_ptr as *mut u8
+                buf_ptr
             },
             capacity: capacity,
             head: AtomicUsize::new(0),
@@ -109,7 +112,10 @@ impl RingBufInner {
 
 impl Drop for RingBufInner {
     fn drop(&mut self) {
-        unsafe { libc::free(self.buf as *mut c_void) }
+        unsafe {
+            let buf_layout = Layout::from_size_align_unchecked(self.capacity, RING_BUF_ALIGN);
+            dealloc(self.buf, buf_layout);
+        }
     }
 }
 

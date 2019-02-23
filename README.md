@@ -38,11 +38,11 @@ Occlum LibOS has several *explicit* and *implicit* dependencies: the former ones
 
 Explicit dependencies are listed below:
 
-   1. [Occlum's fork of Intel SGX SDK](https://github.com/occlum/linux-sgx/tree/for_occlum). See [README.md](https://github.com/occlum/linux-sgx/blob/for_occlum/README.md) for how to compile and install.
+   1. [enable_rdfsbase kernel module](https://github.com/occlum/enable_rdfsbase), which enables rdfsbase instruction and its friends. See [README.md](https://github.com/occlum/enable_rdfsbase/blob/master/README.md) for how to compile and install.
+   1. [Occlum's fork of Intel SGX SDK](https://github.com/occlum/linux-sgx/tree/sgx_2.4_for_occlum). See [README.md](https://github.com/occlum/linux-sgx/blob/sgx_2.4_for_occlum/README.md) for how to compile and install.
    1. [Occlum's fork of LLVM toolchain](https://github.com/occlum/llvm/tree/for_occlum). See [README.occlum.md](https://github.com/occlum/llvm/blob/for_occlum/README.occlum.md) for how to compile and install.
    1. [Occlum's fork of musl libc](https://github.com/occlum/musl/tree/for_occlum). See [INSTALL](https://github.com/occlum/musl/blob/for_occlum/INSTALL) for how to compile and install.
-   1. [enable_rdfsbase kernel module](https://github.com/occlum/enable_rdfsbase), which enables rdfsbase instruction and its friends. See [README.md](https://github.com/occlum/enable_rdfsbase/blob/master/README.md) for how to compile and install.
-   1. [Rust programming language](https://www.rust-lang.org/). We have tested with Rust nightly-2018-10-01. Other versions of Rust may or may not work.
+   1. [Rust programming language](https://www.rust-lang.org/). We have tested with Rust nightly-2019-01-28. Other versions of Rust may or may not work.
 
 Implicit dependencies are managed by Git with [.gitmodules](https://github.com/occlum/libos/blob/master/.gitmodules) and compiled with Makefile. The most important implicit dependency is [Rust SGX SDK](https://github.com/baidu/rust-sgx-sdk). After downloading Occlum LibOS project, run the following command to set up the implicit dependecies:
 
