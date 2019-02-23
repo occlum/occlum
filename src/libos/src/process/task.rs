@@ -14,12 +14,12 @@ pub struct Task {
 }
 
 lazy_static! {
-    static ref new_process_queue: SgxMutex<VecDeque<ProcessRef>> =
+    static ref NEW_PROCESS_QUEUE: SgxMutex<VecDeque<ProcessRef>> =
         { SgxMutex::new(VecDeque::new()) };
 }
 
 pub fn enqueue_task(new_process: ProcessRef) {
-    new_process_queue.lock().unwrap().push_back(new_process);
+    NEW_PROCESS_QUEUE.lock().unwrap().push_back(new_process);
 
     let mut ret = 0;
     let ocall_status = unsafe { ocall_run_new_task(&mut ret) };
@@ -29,7 +29,7 @@ pub fn enqueue_task(new_process: ProcessRef) {
 }
 
 fn dequeue_task() -> Option<ProcessRef> {
-    new_process_queue.lock().unwrap().pop_front()
+    NEW_PROCESS_QUEUE.lock().unwrap().pop_front()
 }
 
 pub fn run_task() -> Result<i32, Error> {

@@ -1,3 +1,8 @@
+MAIN_MAKEFILE := $(firstword $(MAKEFILE_LIST))
+INCLUDE_MAKEFILE := $(lastword $(MAKEFILE_LIST))
+CUR_DIR := $(shell dirname $(realpath $(MAIN_MAKEFILE)))
+PROJECT_DIR := $(realpath $(CUR_DIR)/../../)
+
 SGX_SDK ?= /opt/intel/sgxsdk
 SGX_MODE ?= HW
 SGX_ARCH ?= x64
@@ -31,6 +36,9 @@ ifeq ($(SGX_DEBUG), 1)
 else
 	SGX_COMMON_CFLAGS += -O2
 endif
+
+RUST_SGX_SDK_DIR := $(PROJECT_DIR)/deps/rust-sgx-sdk
+SGX_COMMON_CFLAGS += -I$(RUST_SGX_SDK_DIR)/common/ -I$(RUST_SGX_SDK_DIR)/edl/
 
 ifneq ($(SGX_MODE), HW)
 	Urts_Library_Name := sgx_urts_sim

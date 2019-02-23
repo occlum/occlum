@@ -3,10 +3,12 @@
 #![crate_type = "staticlib"]
 #![cfg_attr(not(target_env = "sgx"), no_std)]
 #![cfg_attr(target_env = "sgx", feature(rustc_private))]
+#![feature(alloc)]
 #![feature(allocator_api)]
-#![feature(integer_atomics)]
 #![feature(range_contains)]
 
+#[macro_use]
+extern crate alloc;
 extern crate sgx_types;
 #[cfg(not(target_env = "sgx"))]
 #[macro_use]

@@ -17,7 +17,7 @@ ENCLAVE_CONFIG := Enclave_config.xml
 ENCLAVE_KEY := Enclave_private.pem
 
 C_FLAGS := $(SGX_CFLAGS_T) -fno-stack-protector -I./include/
-_Other_Link_Flags := -L../../deps/rust-sgx-sdk/compiler-rt/ -L.
+_Other_Link_Flags := -L$(RUST_SGX_SDK_DIR)/compiler-rt/ -L.
 _Other_Enclave_Libs := -lcompiler-rt-patch -locclum_rs -lsgx_tprotected_fs
 LINK_FLAGS := $(SGX_LFLAGS_T)
 
@@ -42,11 +42,11 @@ $(S_OBJS): %.o: %.S
 	@echo "CC <= $@"
 
 $(EDL_C_SRCS): $(SGX_EDGER8R) ../Enclave.edl
-	@cd src/ && $(SGX_EDGER8R) --trusted ../../Enclave.edl --search-path $(SGX_SDK)/include --search-path ../../../deps/rust-sgx-sdk/edl/
+	@cd src/ && $(SGX_EDGER8R) --trusted ../../Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_DIR)/edl/
 	@echo "GEN  <= $(EDL_C_SRCS)"
 
 compiler-rt:
-	@$(MAKE) --no-print-directory -C ../../deps/rust-sgx-sdk/compiler-rt/ > /dev/null
+	@$(MAKE) --no-print-directory -C $(RUST_SGX_SDK_DIR)/compiler-rt/ > /dev/null
 
 ifeq ($(DEBUG), 1)
 $(LIBOS_A): $(RUST_SRCS)
