@@ -1,0 +1,9 @@
+*.o
+*.a
+*.so
+src/pal/pal
+src/libos/target
+src/libos/src/Enclave_t.c
+src/libos/src/Enclave_t.h
+src/pal/Enclave_u.c
+src/pal/Enclave_u.h
