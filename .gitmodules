@@ -4,7 +4,7 @@
 	branch = master
 [submodule "deps/xmas-elf"]
 	path = deps/xmas-elf
-	url = http://github.com/occlum/xmas-elf
+	url = https://github.com/occlum/xmas-elf
 	branch = master
 [submodule "deps/sgx_protect_file"]
 	path = deps/sgx_protect_file
