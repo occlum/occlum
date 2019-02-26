@@ -69,6 +69,16 @@
       "contributions": [
         "ideas"
       ]
+    },
+    {
+      "login": "jiazhang0",
+      "name": "Jia Zhang",
+      "avatar_url": "https://avatars3.githubusercontent.com/u/10241344?v=4",
+      "profile": "https://github.com/jiazhang0",
+      "contributions": [
+        "code",
+        "test"
+      ]
     }
   ],
   "contributorsPerLine": 7
