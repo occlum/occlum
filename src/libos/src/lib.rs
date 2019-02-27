@@ -17,6 +17,8 @@ extern crate sgx_trts;
 extern crate xmas_elf;
 #[macro_use]
 extern crate lazy_static;
+extern crate rcore_fs;
+extern crate rcore_fs_sefs;
 
 use sgx_trts::libc;
 use sgx_types::*;
