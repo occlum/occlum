@@ -6,6 +6,7 @@ use {process, std};
 mod file;
 mod file_table;
 mod pipe;
+mod inode_file;
 
 pub use self::file::{File, FileRef, SgxFile, StdinFile, StdoutFile};
 pub use self::file_table::{FileDesc, FileTable};

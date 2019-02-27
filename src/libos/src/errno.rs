@@ -78,6 +78,8 @@ pub enum Errno {
     EDEADLK = 35,
     ENAMETOOLONG = 36,
     ENOLCK = 37,
+    ENOSYS = 38,
+    ENOTEMPTY = 39,
 }
 
 impl Errno {
@@ -130,6 +132,8 @@ impl fmt::Display for Errno {
                 Errno::EDEADLK => "Resource deadlock would occur",
                 Errno::ENAMETOOLONG => "File name too long",
                 Errno::ENOLCK => "No record locks available",
+                Errno::ENOSYS => "Function not implemented",
+                Errno::ENOTEMPTY => "Directory not empty",
                 _ => "Unknown error",
             },
         )
