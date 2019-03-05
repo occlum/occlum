@@ -11,6 +11,7 @@ mod inode_file;
 pub use self::file::{File, FileRef, SgxFile, StdinFile, StdoutFile};
 pub use self::file_table::{FileDesc, FileTable};
 pub use self::pipe::Pipe;
+pub use self::inode_file::INodeFile;
 
 pub const O_RDONLY: u32 = 0x00000000;
 pub const O_WRONLY: u32 = 0x00000001;
@@ -28,33 +29,33 @@ pub const O_CLOEXEC: u32 = 0x00080000;
 pub type off_t = i64;
 
 pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
-    let open_options = {
-        let mut open_options = fs_impl::OpenOptions::new();
-
-        if ((flags & O_TRUNC) != 0 || (flags & O_CREAT) != 0) {
-            open_options.write(true);
-        } else {
-            open_options.read(true);
-        }
-        open_options.update(true).binary(true);
-
-        open_options
-    };
-
-    let mut sgx_file = {
-        let key: sgx_key_128bit_t = [0 as uint8_t; 16];
-        // TODO: what if two processes open the same underlying SGX file?
-        let sgx_file = open_options
-            .open_ex(path, &key)
-            .map_err(|e| (Errno::ENOENT, "Failed to open the SGX-protected file"))?;
-        Arc::new(SgxMutex::new(sgx_file))
-    };
+//    let open_options = {
+//        let mut open_options = fs_impl::OpenOptions::new();
+//
+//        if ((flags & O_TRUNC) != 0 || (flags & O_CREAT) != 0) {
+//            open_options.write(true);
+//        } else {
+//            open_options.read(true);
+//        }
+//        open_options.update(true).binary(true);
+//
+//        open_options
+//    };
+//
+//    let mut sgx_file = {
+//        let key: sgx_key_128bit_t = [0 as uint8_t; 16];
+//        // TODO: what if two processes open the same underlying SGX file?
+//        let sgx_file = open_options
+//            .open_ex(path, &key)
+//            .map_err(|e| (Errno::ENOENT, "Failed to open the SGX-protected file"))?;
+//        Arc::new(SgxMutex::new(sgx_file))
+//    };
 
     let is_readable = (flags & O_WRONLY) == 0;
     let is_writable = (flags & O_WRONLY != 0) || (flags & O_RDWR != 0);
     let is_append = (flags & O_APPEND != 0);
-    let file_ref: Arc<Box<File>> = Arc::new(Box::new(SgxFile::new(
-        sgx_file,
+    let file_ref: Arc<Box<File>> = Arc::new(Box::new(INodeFile::open(
+        path,
         is_readable,
         is_writable,
         is_append,
