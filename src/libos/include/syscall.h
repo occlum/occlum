@@ -43,6 +43,8 @@ extern void* occlum_brk(void* addr);
 
 extern int occlum_gettimeofday(struct timeval* tv/*, struct timezone* tz*/);
 
+extern int occlum_getcwd(char* buf, size_t size);
+
 extern int occlum_unknown(int num);
 
 #ifdef __cplusplus
