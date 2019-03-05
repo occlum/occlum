@@ -8,7 +8,8 @@ lazy_static! {
     /// The root of file system
     pub static ref ROOT_INODE: Arc<INode> = {
         let device = Box::new(SgxStorage::new("sefs"));
-        let sefs = SEFS::open(device, &SgxTimeProvider).expect("failed to open SEFS");
+        let sefs = SEFS::open(device, &time::OcclumTimeProvider)
+            .expect("failed to open SEFS");
         sefs.root_inode()
     };
 }
