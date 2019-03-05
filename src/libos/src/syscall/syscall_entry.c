@@ -154,6 +154,12 @@ long dispatch_syscall(int num, long arg0, long arg1, long arg2, long arg3, long 
         ret = (long) occlum_gettimeofday(tv/*, tz*/);
         break;
     }
+    case SYS_getcwd: {
+        DECL_SYSCALL_ARG(char*, buf, arg0);
+        DECL_SYSCALL_ARG(size_t, buf_size, arg1);
+        ret = (long) occlum_getcwd(buf, buf_size);
+        break;
+    }
     default:
         ret = occlum_unknown(num);
         break;

@@ -494,3 +494,28 @@ pub extern "C" fn occlum_gettimeofday(tv: *mut timeval_t) -> c_int {
         Err(e) => e.errno.as_retval(),
     }
 }
+
+#[no_mangle]
+pub extern "C" fn occlum_getcwd(buf: *mut c_void, size: size_t) -> c_int {
+
+    fn do_getcwd(buf: *mut u8, size: usize) -> Result<(), Error> {
+        let safe_buf = {
+            check_mut_array(buf, size)?;
+            unsafe { std::slice::from_raw_parts_mut(buf, size) }
+        };
+        let proc_ref = process::get_current();
+        let mut proc = proc_ref.lock().unwrap();
+        let cwd = proc.get_exec_path();
+        if cwd.len() + 1 > safe_buf.len() {
+            return Err(Error::new(ERANGE, "buf is not long enough"));
+        }
+        safe_buf[..cwd.len()].copy_from_slice(cwd.as_bytes());
+        safe_buf[cwd.len()] = 0;
+        Ok(())
+    }
+
+    match do_getcwd(buf as *mut u8, size as usize) {
+        Ok(()) => 0 as c_int,
+        Err(e) => e.errno.as_retval(),
+    }
+}
