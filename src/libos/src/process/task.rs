@@ -70,13 +70,7 @@ thread_local! {
 }
 
 pub fn get_current() -> ProcessRef {
-    let current_ptr = {
-        let mut current_ptr = 0 as *const SgxMutex<Process>;
-        _CURRENT_PROCESS_PTR.with(|cell| {
-            current_ptr = cell.get();
-        });
-        current_ptr
-    };
+    let current_ptr = _CURRENT_PROCESS_PTR.with(|cell| cell.get());
 
     let current_ref = unsafe { Arc::from_raw(current_ptr) };
     let current_ref_clone = current_ref.clone();
@@ -95,10 +89,8 @@ fn set_current(process: &ProcessRef) {
 }
 
 fn reset_current() {
-    let mut process_ptr = 0 as *const SgxMutex<Process>;
-    _CURRENT_PROCESS_PTR.with(|cp| {
-        process_ptr = cp.get();
-        cp.set(0 as *const SgxMutex<Process>);
+    let mut process_ptr = _CURRENT_PROCESS_PTR.with(|cp| {
+        cp.replace(0 as *const SgxMutex<Process>)
     });
 
     // Prevent memory leakage

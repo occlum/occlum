@@ -17,14 +17,20 @@ lazy_static! {
 pub struct INodeFile {
     inode: Arc<INode>,
     offset: SgxMutex<usize>,
-    is_readable: bool,
-    is_writable: bool,
-    is_append: bool,
+    options: OpenOptions,
+}
+
+#[derive(Debug, Clone)]
+pub struct OpenOptions {
+    pub read: bool,
+    pub write: bool,
+    /// Before each write, the file offset is positioned at the end of the file.
+    pub append: bool,
 }
 
 impl File for INodeFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
-        if !self.is_readable {
+        if !self.options.read {
             return Err(Error::new(Errno::EBADF, "File not readable"));
         }
         let mut offset = self.offset.lock().unwrap();
@@ -34,11 +40,11 @@ impl File for INodeFile {
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize, Error> {
-        if !self.is_writable {
+        if !self.options.write {
             return Err(Error::new(Errno::EBADF, "File not writable"));
         }
         let mut offset = self.offset.lock().unwrap();
-        if self.is_append {
+        if self.options.append {
             let info = self.inode.metadata()?;
             *offset = info.size;
         }
@@ -67,13 +73,11 @@ impl File for INodeFile {
 }
 
 impl INodeFile {
-    pub fn open(inode: Arc<INode>, is_readable: bool, is_writable: bool, is_append: bool) -> Result<Self, Error> {
+    pub fn open(inode: Arc<INode>, options: OpenOptions) -> Result<Self, Error> {
         Ok(INodeFile {
             inode,
             offset: SgxMutex::new(0),
-            is_readable,
-            is_writable,
-            is_append,
+            options,
         })
     }
 }
@@ -102,6 +106,7 @@ impl From<FsError> for Error {
 
 impl Debug for INodeFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "INodeFile {{ pos: {}, inode: ??? }}", *self.offset.lock().unwrap())
+        write!(f, "INodeFile {{ inode: ???, pos: {}, options: {:?} }}",
+               *self.offset.lock().unwrap(), self.options)
     }
 }

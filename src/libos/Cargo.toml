@@ -7,6 +7,7 @@ name = "occlum_rs"
 crate-type = ["staticlib"]
 
 [dependencies]
+bitflags = "1.0"
 log = "0.4"
 lazy_static = { version = "1.1.0", features = ["spin_no_std"] } # Implies nightly
 rcore-fs = { path = "../../deps/sefs/rcore-fs" }

@@ -9,6 +9,8 @@
 
 #[macro_use]
 extern crate alloc;
+#[macro_use]
+extern crate bitflags;
 extern crate sgx_types;
 #[cfg(not(target_env = "sgx"))]
 #[macro_use]
