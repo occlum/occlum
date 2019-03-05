@@ -11,6 +11,8 @@ BIN_NAME := bin
 BIN_ENC_NAME := bin.encrypted
 OBJDUMP_FILE := bin.objdump
 READELF_FILE := bin.readelf
+FS_NAME := fs
+SEFS_NAME := sefs
 
 CLANG_BIN_PATH := $(shell clang -print-prog-name=clang)
 LLVM_PATH := $(abspath $(dir $(CLANG_BIN_PATH))../)
@@ -25,7 +27,7 @@ LINK_FLAGS = $(C_FLAGS) $(EXTRA_LINK_FLAGS)
 # Build
 #############################################################################
 
-all: $(BIN_ENC_NAME)
+all: $(BIN_ENC_NAME) $(SEFS_NAME)
 
 $(BIN_ENC_NAME): $(BIN_NAME)
 	@$(RM) -f $(BIN_ENC_NAME)
@@ -35,6 +37,16 @@ $(BIN_ENC_NAME): $(BIN_NAME)
 			-o $(CUR_DIR)/$(BIN_ENC_NAME) \
 			-k 123 > /dev/null
 	@echo "GEN => $@"
+
+$(SEFS_NAME):
+	@mkdir -p $(FS_NAME)
+	@$(RM) -rf $(SEFS_NAME)
+	@cd $(PROJECT_DIR)/deps/sefs/sefs-fuse/bin/ && \
+		./app \
+			$(CUR_DIR)/$(SEFS_NAME) \
+			$(CUR_DIR)/$(FS_NAME) \
+			zip
+	@echo "SEFS => $@"
 
 debug: $(OBJDUMP_FILE) $(READELF_FILE)
 
@@ -59,7 +71,9 @@ $(C_OBJS): %.o: %.c
 #############################################################################
 
 test: $(BIN_ENC_NAME)
-	@cd ../ && RUST_BACKTRACE=1 ./pal $(CUR_DIR)/$(BIN_ENC_NAME) $(BIN_ARGS)
+	# run test on current directory
+	@ln -sf ../pal ../libocclum.signed.so $(CUR_DIR)
+	@cd $(CUR_DIR) && RUST_BACKTRACE=1 ./pal $(BIN_ENC_NAME) $(BIN_ARGS)
 
 #############################################################################
 # Misc
