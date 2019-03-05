@@ -5,6 +5,7 @@ name = "Occlum"
 version = "0.0.1"
 dependencies = [
  "lazy_static 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rcore-fs 0.1.0",
  "rcore-fs-sefs 0.1.0",
  "sgx_trts 1.0.6",
