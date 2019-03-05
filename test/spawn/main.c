@@ -8,7 +8,7 @@ int main(int argc, const char* argv[]) {
     int ret, child_pid, status;
     printf("Run a parent process has pid = %d and ppid = %d\n", getpid(), getppid());
 
-    ret = posix_spawn(&child_pid, "getpid/bin.encrypted", NULL, NULL, NULL, NULL);
+    ret = posix_spawn(&child_pid, "../getpid/bin.encrypted", NULL, NULL, NULL, NULL);
     if (ret < 0) {
         printf("ERROR: failed to spawn a child process\n");
         return -1;
