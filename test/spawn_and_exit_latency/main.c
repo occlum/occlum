@@ -13,7 +13,7 @@ int main(int argc, const char* argv[]) {
     gettimeofday(&tv_start, NULL);
     for (unsigned long i = 0; i < NREPEATS; i++) {
         int child_pid, status;
-        if (posix_spawn(&child_pid, "empty/bin.encrypted", NULL, NULL, NULL, NULL) <0) {
+        if (posix_spawn(&child_pid, "../empty/bin.encrypted", NULL, NULL, NULL, NULL) <0) {
             printf("ERROR: failed to spawn (# of repeats = %lu)\n", i);
             return -1;
         }
