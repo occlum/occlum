@@ -13,14 +13,7 @@ pub use self::file_table::{FileDesc, FileTable};
 pub use self::pipe::Pipe;
 pub use self::inode_file::{INodeFile, ROOT_INODE};
 use rcore_fs::vfs::{FsError, FileType, INode};
-
-pub const O_RDONLY: u32 = 0x00000000;
-pub const O_WRONLY: u32 = 0x00000001;
-pub const O_RDWR: u32 = 0x00000002;
-pub const O_CREAT: u32 = 0x00000040;
-pub const O_TRUNC: u32 = 0x00000200;
-pub const O_APPEND: u32 = 0x00000400;
-pub const O_CLOEXEC: u32 = 0x00080000;
+use self::inode_file::OpenOptions;
 
 // TODO: use the type defined in Rust libc.
 //
@@ -30,22 +23,18 @@ pub const O_CLOEXEC: u32 = 0x00080000;
 pub type off_t = i64;
 
 pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
+    let flags = OpenFlags::from_bits_truncate(flags);
     info!("open: path: {:?}, flags: {:?}, mode: {:#o}", path, flags, mode);
 
-    let is_readable = (flags & O_WRONLY) == 0;
-    let is_writable = (flags & O_WRONLY != 0) || (flags & O_RDWR != 0);
-    let is_append = (flags & O_APPEND != 0);
-    let is_create = (flags & O_CREAT != 0);
-
     let inode =
-        if is_create {
+        if flags.contains(OpenFlags::CREATE) {
             let (dir_path, file_name) = split_path(&path);
             let dir_inode = ROOT_INODE.lookup(dir_path)?;
             match dir_inode.find(file_name) {
                 Ok(file_inode) => {
-//                    if flags.contains(OpenFlags::EXCLUSIVE) {
-//                        return Err(SysError::EEXIST);
-//                    }
+                    if flags.contains(OpenFlags::EXCLUSIVE) {
+                        return Err(Error::new(EEXIST, "file exists"));
+                    }
                     file_inode
                 },
                 Err(FsError::EntryNotFound) => {
@@ -57,17 +46,14 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
             ROOT_INODE.lookup(&path)?
         };
 
-    let file_ref: Arc<Box<File>> = Arc::new(Box::new(INodeFile::open(
-        inode,
-        is_readable,
-        is_writable,
-        is_append,
-    )?));
+    let file_ref: Arc<Box<File>> = Arc::new(Box::new(
+        INodeFile::open(inode, flags.to_options())?
+    ));
 
     let fd = {
         let current_ref = process::get_current();
         let mut current = current_ref.lock().unwrap();
-        let close_on_spawn = flags & O_CLOEXEC != 0;
+        let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
         current.get_files_mut().put(file_ref, close_on_spawn)
     };
     Ok(fd)
@@ -117,12 +103,13 @@ pub fn do_close(fd: FileDesc) -> Result<(), Error> {
 }
 
 pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2], Error> {
+    let flags = OpenFlags::from_bits_truncate(flags);
     let current_ref = process::get_current();
     let mut current = current_ref.lock().unwrap();
     let pipe = Pipe::new()?;
 
     let mut file_table = current.get_files_mut();
-    let close_on_spawn = flags & O_CLOEXEC != 0;
+    let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
     let reader_fd = file_table.put(Arc::new(Box::new(pipe.reader)), close_on_spawn);
     let writer_fd = file_table.put(Arc::new(Box::new(pipe.writer)), close_on_spawn);
     Ok([reader_fd, writer_fd])
@@ -149,6 +136,7 @@ pub fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<FileDesc, Error> {
 }
 
 pub fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<FileDesc, Error> {
+    let flags = OpenFlags::from_bits_truncate(flags);
     let current_ref = process::get_current();
     let mut current = current_ref.lock().unwrap();
     let file_table = current.get_files_mut();
@@ -156,7 +144,7 @@ pub fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<FileDes
     if old_fd == new_fd {
         return errno!(EINVAL, "old_fd must not be equal to new_fd");
     }
-    let close_on_spawn = flags & O_CLOEXEC != 0;
+    let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
     file_table.put_at(new_fd, file, close_on_spawn);
     Ok(new_fd)
 }
@@ -178,4 +166,43 @@ fn split_path(path: &str) -> (&str, &str) {
     let file_name = split.next().unwrap();
     let dir_path = split.next().unwrap_or(".");
     (dir_path, file_name)
+}
+
+bitflags! {
+    struct OpenFlags: u32 {
+        /// read only
+        const RDONLY = 0;
+        /// write only
+        const WRONLY = 1;
+        /// read write
+        const RDWR = 2;
+        /// create file if it does not exist
+        const CREATE = 1 << 6;
+        /// error if CREATE and the file exists
+        const EXCLUSIVE = 1 << 7;
+        /// truncate file upon open
+        const TRUNCATE = 1 << 9;
+        /// append on each write
+        const APPEND = 1 << 10;
+        /// close on exec
+        const CLOEXEC = 1 << 19;
+    }
+}
+
+impl OpenFlags {
+    fn readable(&self) -> bool {
+        let b = self.bits() & 0b11;
+        b == OpenFlags::RDONLY.bits() || b == OpenFlags::RDWR.bits()
+    }
+    fn writable(&self) -> bool {
+        let b = self.bits() & 0b11;
+        b == OpenFlags::WRONLY.bits() || b == OpenFlags::RDWR.bits()
+    }
+    fn to_options(&self) -> OpenOptions {
+        OpenOptions {
+            read: self.readable(),
+            write: self.writable(),
+            append: self.contains(OpenFlags::APPEND),
+        }
+    }
 }
