@@ -67,9 +67,9 @@ impl File for INodeFile {
 }
 
 impl INodeFile {
-    pub fn open(path: &str, is_readable: bool, is_writable: bool, is_append: bool) -> Result<Self, Error> {
+    pub fn open(inode: Arc<INode>, is_readable: bool, is_writable: bool, is_append: bool) -> Result<Self, Error> {
         Ok(INodeFile {
-            inode: ROOT_INODE.lookup(path)?,
+            inode,
             offset: SgxMutex::new(0),
             is_readable,
             is_writable,
