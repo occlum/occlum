@@ -34,7 +34,15 @@ pub extern "C" fn dispatch_syscall(
         SYS_write => do_write(arg0 as FileDesc, arg1 as *const u8, arg2 as usize),
         SYS_readv => do_readv(arg0 as FileDesc, arg1 as *mut iovec_t, arg2 as i32),
         SYS_writev => do_writev(arg0 as FileDesc, arg1 as *mut iovec_t, arg2 as i32),
+        SYS_stat => do_stat(arg0 as *const i8, arg1 as *mut fs::Stat),
+        SYS_fstat => do_fstat(arg0 as FileDesc, arg1 as *mut fs::Stat),
+        SYS_lstat => do_lstat(arg0 as *const i8, arg1 as *mut fs::Stat),
         SYS_lseek => do_lseek(arg0 as FileDesc, arg1 as off_t, arg2 as i32),
+        SYS_fsync => do_fsync(arg0 as FileDesc),
+        SYS_fdatasync => do_fdatasync(arg0 as FileDesc),
+        SYS_truncate => do_truncate(arg0 as *const i8, arg1 as usize),
+        SYS_ftruncate => do_ftruncate(arg0 as FileDesc, arg1 as usize),
+        SYS_getdents64 => do_getdents64(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
         SYS_sync => do_sync(),
         SYS_getcwd => do_getcwd(arg0 as *mut u8, arg1 as usize),
 
@@ -159,8 +167,8 @@ fn do_spawn(
     Ok(0)
 }
 
-fn do_open(path_buf: *const i8, flags: u32, mode: u32) -> Result<isize, Error> {
-    let path = unsafe { CStr::from_ptr(path_buf).to_string_lossy().into_owned() };
+fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize, Error> {
+    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     let fd = fs::do_open(&path, flags, mode)?;
     Ok(fd as isize)
 }
@@ -238,6 +246,32 @@ fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize, Error>
     Ok(len as isize)
 }
 
+fn do_stat(path: *const i8, stat_buf: *mut fs::Stat) -> Result<isize, Error> {
+    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
+    check_mut_ptr(stat_buf)?;
+
+    let stat = fs::do_stat(&path)?;
+    unsafe { stat_buf.write(stat); }
+    Ok(0)
+}
+
+fn do_fstat(fd: FileDesc, stat_buf: *mut fs::Stat) -> Result<isize, Error> {
+    check_mut_ptr(stat_buf)?;
+
+    let stat = fs::do_fstat(fd)?;
+    unsafe { stat_buf.write(stat); }
+    Ok(0)
+}
+
+fn do_lstat(path: *const i8, stat_buf: *mut fs::Stat) -> Result<isize, Error> {
+    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
+    check_mut_ptr(stat_buf)?;
+
+    let stat = fs::do_lstat(&path)?;
+    unsafe { stat_buf.write(stat); }
+    Ok(0)
+}
+
 fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize, Error> {
     let seek_from = match whence {
         0 => {
@@ -262,6 +296,36 @@ fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize, Error> {
 
     let offset = fs::do_lseek(fd, seek_from)?;
     Ok(offset as isize)
+}
+
+fn do_fsync(fd: FileDesc) -> Result<isize, Error> {
+    fs::do_fsync(fd)?;
+    Ok(0)
+}
+
+fn do_fdatasync(fd: FileDesc) -> Result<isize, Error> {
+    fs::do_fdatasync(fd)?;
+    Ok(0)
+}
+
+fn do_truncate(path: *const i8, len: usize) -> Result<isize, Error> {
+    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
+    fs::do_truncate(&path, len)?;
+    Ok(0)
+}
+
+fn do_ftruncate(fd: FileDesc, len: usize) -> Result<isize, Error> {
+    fs::do_ftruncate(fd, len)?;
+    Ok(0)
+}
+
+fn do_getdents64(fd: FileDesc, buf: *mut u8, buf_size: usize) -> Result<isize, Error> {
+    let safe_buf = {
+        check_mut_array(buf, buf_size)?;
+        unsafe { std::slice::from_raw_parts_mut(buf, buf_size) }
+    };
+    let len = fs::do_getdents64(fd, safe_buf)?;
+    Ok(len as isize)
 }
 
 fn do_sync() -> Result<isize, Error> {
