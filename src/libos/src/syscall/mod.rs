@@ -12,6 +12,79 @@ use {fs, process, std, vm};
 //use std::libc_fs as fs;
 //use std::libc_io as io;
 
+use self::consts::*;
+use fs::File;
+
+mod consts;
+
+#[no_mangle]
+pub extern "C" fn dispatch_syscall(
+    num: u32,
+    arg0: isize,
+    arg1: isize,
+    arg2: isize,
+    arg3: isize,
+    arg4: isize,
+    arg5: isize,
+) -> isize {
+    let ret = match num {
+        SYS_open => do_open(arg0 as *const i8, arg1 as u32, arg2 as u32),
+        SYS_close => do_close(arg0 as FileDesc),
+        SYS_read => do_read(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
+        SYS_write => do_write(arg0 as FileDesc, arg1 as *const u8, arg2 as usize),
+        SYS_readv => do_readv(arg0 as FileDesc, arg1 as *mut iovec_t, arg2 as i32),
+        SYS_writev => do_writev(arg0 as FileDesc, arg1 as *mut iovec_t, arg2 as i32),
+        SYS_lseek => do_lseek(arg0 as FileDesc, arg1 as off_t, arg2 as i32),
+        SYS_sync => do_sync(),
+        SYS_getcwd => do_getcwd(arg0 as *mut u8, arg1 as usize),
+
+        SYS_exit => do_exit(arg0 as i32),
+        SYS_spawn => do_spawn(
+            arg0 as *mut u32,
+            arg1 as *mut i8,
+            arg2 as *const *const i8,
+            arg3 as *const *const i8,
+            arg4 as *const FdOp,
+        ),
+        SYS_wait4 => do_wait4(arg0 as i32, arg1 as *mut i32),
+        SYS_getpid => do_getpid(),
+        SYS_getppid => do_getppid(),
+
+        SYS_mmap => do_mmap(
+            arg0 as usize,
+            arg1 as usize,
+            arg2 as i32,
+            arg3 as i32,
+            arg4 as FileDesc,
+            arg5 as off_t,
+        ),
+        SYS_munmap => do_munmap(arg0 as usize, arg1 as usize),
+        SYS_mremap => do_mremap(
+            arg0 as usize,
+            arg1 as usize,
+            arg2 as usize,
+            arg3 as i32,
+            arg4 as usize,
+        ),
+        SYS_brk => do_brk(arg0 as usize),
+
+        SYS_pipe => do_pipe2(arg0 as *mut i32, 0),
+        SYS_pipe2 => do_pipe2(arg0 as *mut i32, arg1 as u32),
+        SYS_dup => do_dup(arg0 as FileDesc),
+        SYS_dup2 => do_dup2(arg0 as FileDesc, arg1 as FileDesc),
+        SYS_dup3 => do_dup3(arg0 as FileDesc, arg1 as FileDesc, arg2 as u32),
+
+        SYS_gettimeofday => do_gettimeofday(arg0 as *mut timeval_t),
+
+        _ => do_unknown(num),
+    };
+
+    match ret {
+        Ok(code) => code as isize,
+        Err(e) => e.errno.as_retval() as isize,
+    }
+}
+
 #[allow(non_camel_case_types)]
 pub struct iovec_t {
     base: *const c_void,
@@ -67,12 +140,12 @@ fn clone_file_actions_safely(fdop_ptr: *const FdOp) -> Result<Vec<FileAction>, E
 }
 
 fn do_spawn(
-    child_pid_ptr: *mut c_uint,
-    path: *const c_char,
-    argv: *const *const c_char,
-    envp: *const *const c_char,
+    child_pid_ptr: *mut u32,
+    path: *const i8,
+    argv: *const *const i8,
+    envp: *const *const i8,
     fdop_list: *const FdOp,
-) -> Result<(), Error> {
+) -> Result<isize, Error> {
     check_mut_ptr(child_pid_ptr)?;
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     let argv = clone_cstrings_safely(argv)?;
@@ -83,34 +156,39 @@ fn do_spawn(
     let child_pid = process::do_spawn(&path, &argv, &envp, &file_actions, &parent)?;
 
     unsafe { *child_pid_ptr = child_pid };
-    Ok(())
+    Ok(0)
 }
 
-fn do_read(fd: c_int, buf: *mut c_void, size: size_t) -> Result<size_t, Error> {
-    let fd = fd as FileDesc;
+fn do_open(path_buf: *const i8, flags: u32, mode: u32) -> Result<isize, Error> {
+    let path = unsafe { CStr::from_ptr(path_buf).to_string_lossy().into_owned() };
+    let fd = fs::do_open(&path, flags, mode)?;
+    Ok(fd as isize)
+}
+
+fn do_close(fd: FileDesc) -> Result<isize, Error> {
+    fs::do_close(fd)?;
+    Ok(0)
+}
+
+fn do_read(fd: FileDesc, buf: *mut u8, size: usize) -> Result<isize, Error> {
     let safe_buf = {
-        let buf = buf as *mut u8;
-        let size = size as usize;
         check_mut_array(buf, size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, size) }
     };
-    fs::do_read(fd, safe_buf)
+    let len = fs::do_read(fd, safe_buf)?;
+    Ok(len as isize)
 }
 
-fn do_write(fd: c_int, buf: *const c_void, size: size_t) -> Result<size_t, Error> {
-    let fd = fd as FileDesc;
+fn do_write(fd: FileDesc, buf: *const u8, size: usize) -> Result<isize, Error> {
     let safe_buf = {
-        let buf = buf as *mut u8;
-        let size = size as usize;
         check_array(buf, size)?;
         unsafe { std::slice::from_raw_parts(buf, size) }
     };
-    fs::do_write(fd, safe_buf)
+    let len = fs::do_write(fd, safe_buf)?;
+    Ok(len as isize)
 }
 
-fn do_writev(fd: c_int, iov: *const iovec_t, count: c_int) -> Result<size_t, Error> {
-    let fd = fd as FileDesc;
-
+fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<isize, Error> {
     let count = {
         if count < 0 {
             return Err(Error::new(Errno::EINVAL, "Invalid count of iovec"));
@@ -131,12 +209,11 @@ fn do_writev(fd: c_int, iov: *const iovec_t, count: c_int) -> Result<size_t, Err
     };
     let bufs = &bufs_vec[..];
 
-    fs::do_writev(fd, bufs)
+    let len = fs::do_writev(fd, bufs)?;
+    Ok(len as isize)
 }
 
-fn do_readv(fd: c_int, iov: *mut iovec_t, count: c_int) -> Result<size_t, Error> {
-    let fd = fd as FileDesc;
-
+fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize, Error> {
     let count = {
         if count < 0 {
             return Err(Error::new(Errno::EINVAL, "Invalid count of iovec"));
@@ -157,12 +234,11 @@ fn do_readv(fd: c_int, iov: *mut iovec_t, count: c_int) -> Result<size_t, Error>
     };
     let bufs = &mut bufs_vec[..];
 
-    fs::do_readv(fd, bufs)
+    let len = fs::do_readv(fd, bufs)?;
+    Ok(len as isize)
 }
 
-pub fn do_lseek(fd: c_int, offset: off_t, whence: c_int) -> Result<off_t, Error> {
-    let fd = fd as FileDesc;
-
+fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize, Error> {
     let seek_from = match whence {
         0 => {
             // SEEK_SET
@@ -184,50 +260,53 @@ pub fn do_lseek(fd: c_int, offset: off_t, whence: c_int) -> Result<off_t, Error>
         }
     };
 
-    fs::do_lseek(fd, seek_from)
+    let offset = fs::do_lseek(fd, seek_from)?;
+    Ok(offset as isize)
+}
+
+fn do_sync() -> Result<isize, Error> {
+    fs::do_sync()?;
+    Ok(0)
 }
 
 fn do_mmap(
-    addr: *const c_void,
-    size: size_t,
-    prot: c_int,
-    flags: c_int,
-    fd: c_int,
+    addr: usize,
+    size: usize,
+    prot: i32,
+    flags: i32,
+    fd: FileDesc,
     offset: off_t,
-) -> Result<*const c_void, Error> {
-    let addr = addr as usize;
-    let size = size as usize;
+) -> Result<isize, Error> {
     let flags = VMAreaFlags(prot as u32);
-    vm::do_mmap(addr, size, flags).map(|ret_addr| ret_addr as *const c_void)
+    let addr = vm::do_mmap(addr, size, flags)?;
+    Ok(addr as isize)
 }
 
-fn do_munmap(addr: *const c_void, size: size_t) -> Result<(), Error> {
-    let addr = addr as usize;
-    let size = size as usize;
-    vm::do_munmap(addr, size)
+fn do_munmap(addr: usize, size: usize) -> Result<isize, Error> {
+    vm::do_munmap(addr, size)?;
+    Ok(0)
 }
 
 fn do_mremap(
-    old_addr: *const c_void,
-    old_size: size_t,
-    new_size: size_t,
-    flags: c_int,
-    new_addr: *const c_void,
-) -> Result<*const c_void, Error> {
-    let old_addr = old_addr as usize;
-    let old_size = old_size as usize;
+    old_addr: usize,
+    old_size: usize,
+    new_size: usize,
+    flags: i32,
+    new_addr: usize,
+) -> Result<isize, Error> {
     let mut options = VMResizeOptions::new(new_size)?;
     // TODO: handle flags and new_addr
-    vm::do_mremap(old_addr, old_size, &options).map(|ret_addr| ret_addr as *const c_void)
+    let ret_addr = vm::do_mremap(old_addr, old_size, &options)?;
+    Ok(ret_addr as isize)
 }
 
-fn do_brk(new_brk_addr: *const c_void) -> Result<*const c_void, Error> {
-    let new_brk_addr = new_brk_addr as usize;
-    vm::do_brk(new_brk_addr).map(|ret_brk_addr| ret_brk_addr as *const c_void)
+fn do_brk(new_brk_addr: usize) -> Result<isize, Error> {
+    let ret_brk_addr = vm::do_brk(new_brk_addr)?;
+    Ok(ret_brk_addr as isize)
 }
 
-fn do_wait4(pid: c_int, _exit_status: *mut c_int) -> Result<pid_t, Error> {
-    if _exit_status != 0 as *mut c_int {
+fn do_wait4(pid: i32, _exit_status: *mut i32) -> Result<isize, Error> {
+    if !_exit_status.is_null() {
         check_mut_ptr(_exit_status)?;
     }
 
@@ -246,18 +325,28 @@ fn do_wait4(pid: c_int, _exit_status: *mut c_int) -> Result<pid_t, Error> {
     let mut exit_status = 0;
     match process::do_wait4(&child_process_filter, &mut exit_status) {
         Ok(pid) => {
-            if _exit_status != 0 as *mut c_int {
+            if !_exit_status.is_null() {
                 unsafe {
                     *_exit_status = exit_status;
                 }
             }
-            Ok(pid)
+            Ok(pid as isize)
         }
         Err(e) => Err(e),
     }
 }
 
-fn do_pipe2(fds_u: *mut c_int, flags: c_int) -> Result<(), Error> {
+fn do_getpid() -> Result<isize, Error> {
+    let pid = process::do_getpid();
+    Ok(pid as isize)
+}
+
+fn do_getppid() -> Result<isize, Error> {
+    let ppid = process::do_getppid();
+    Ok(ppid as isize)
+}
+
+fn do_pipe2(fds_u: *mut i32, flags: u32) -> Result<isize, Error> {
     check_mut_array(fds_u, 2)?;
     // TODO: how to deal with open flags???
     let fds = fs::do_pipe2(flags as u32)?;
@@ -265,257 +354,66 @@ fn do_pipe2(fds_u: *mut c_int, flags: c_int) -> Result<(), Error> {
         *fds_u.offset(0) = fds[0] as c_int;
         *fds_u.offset(1) = fds[1] as c_int;
     }
-    Ok(())
+    Ok(0)
 }
 
-fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<(), Error> {
+fn do_dup(old_fd: FileDesc) -> Result<isize, Error> {
+    let new_fd = fs::do_dup(old_fd)?;
+    Ok(new_fd as isize)
+}
+
+fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<isize, Error> {
+    let new_fd = fs::do_dup2(old_fd, new_fd)?;
+    Ok(new_fd as isize)
+}
+
+fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<isize, Error> {
+    let new_fd = fs::do_dup3(old_fd, new_fd, flags)?;
+    Ok(new_fd as isize)
+}
+
+// TODO: handle tz: timezone_t
+fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<isize, Error> {
     check_mut_ptr(tv_u)?;
     let tv = time::do_gettimeofday();
     unsafe {
         *tv_u = tv;
     }
-    Ok(())
+    Ok(0)
 }
 
+// FIXME: use this
 const MAP_FAILED: *const c_void = ((-1) as i64) as *const c_void;
 
-#[no_mangle]
-pub extern "C" fn occlum_mmap(
-    addr: *const c_void,
-    length: size_t,
-    prot: c_int,
-    flags: c_int,
-    fd: c_int,
-    offset: off_t,
-) -> *const c_void {
-    match do_mmap(addr, length, prot, flags, fd, offset) {
-        Ok(ret_addr) => ret_addr,
-        Err(e) => MAP_FAILED,
+fn do_exit(status: i32) -> ! {
+    extern "C" {
+        fn do_exit_task() -> !;
     }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_munmap(addr: *const c_void, length: size_t) -> c_int {
-    match do_munmap(addr, length) {
-        Ok(()) => 0,
-        Err(e) => -1,
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_mremap(
-    old_addr: *const c_void,
-    old_size: size_t,
-    new_size: size_t,
-    flags: c_int,
-    new_addr: *const c_void,
-) -> *const c_void {
-    match do_mremap(old_addr, old_size, new_size, flags, new_addr) {
-        Ok(ret_addr) => ret_addr,
-        Err(e) => MAP_FAILED,
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_brk(addr: *const c_void) -> *const c_void {
-    match do_brk(addr) {
-        Ok(ret_addr) => ret_addr,
-        Err(e) => MAP_FAILED,
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_pipe(fds: *mut c_int) -> c_int {
-    occlum_pipe2(fds, 0)
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_pipe2(fds: *mut c_int, flags: c_int) -> c_int {
-    match do_pipe2(fds, flags) {
-        Ok(()) => 0,
-        Err(e) => e.errno.as_retval(),
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_open(path_buf: *const c_char, flags: c_int, mode: c_int) -> c_int {
-    let path = unsafe {
-        CStr::from_ptr(path_buf as *const i8)
-            .to_string_lossy()
-            .into_owned()
-    };
-    match fs::do_open(&path, flags as u32, mode as u32) {
-        Ok(fd) => fd as c_int,
-        Err(e) => e.errno.as_retval(),
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_close(fd: c_int) -> c_int {
-    match fs::do_close(fd as FileDesc) {
-        Ok(()) => 0,
-        Err(e) => e.errno.as_retval(),
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_read(fd: c_int, buf: *mut c_void, size: size_t) -> ssize_t {
-    match do_read(fd, buf, size) {
-        Ok(read_len) => read_len as ssize_t,
-        Err(e) => e.errno.as_retval() as ssize_t,
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_write(fd: c_int, buf: *const c_void, size: size_t) -> ssize_t {
-    match do_write(fd, buf, size) {
-        Ok(write_len) => write_len as ssize_t,
-        Err(e) => e.errno.as_retval() as ssize_t,
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_readv(fd: c_int, iov: *mut iovec_t, count: c_int) -> ssize_t {
-    match do_readv(fd, iov, count) {
-        Ok(read_len) => read_len as ssize_t,
-        Err(e) => e.errno.as_retval() as ssize_t,
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_writev(fd: c_int, iov: *const iovec_t, count: c_int) -> ssize_t {
-    match do_writev(fd, iov, count) {
-        Ok(write_len) => write_len as ssize_t,
-        Err(e) => e.errno.as_retval() as ssize_t,
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_lseek(fd: c_int, offset: off_t, whence: c_int) -> off_t {
-    match do_lseek(fd, offset, whence) {
-        Ok(ret) => ret,
-        Err(e) => {
-            -1 as off_t // this special value indicates error
-        }
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_getpid() -> c_uint {
-    process::do_getpid()
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_getppid() -> c_uint {
-    process::do_getppid()
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_exit(status: i32) {
     process::do_exit(status);
+    unsafe {
+        do_exit_task();
+    }
 }
 
-#[no_mangle]
-pub extern "C" fn occlum_unknown(num: u32) {
+fn do_unknown(num: u32) -> Result<isize, Error> {
     if cfg!(debug_assertions) {
         //println!("[WARNING] Unknown syscall (num = {})", num);
     }
+    Err(Error::new(ENOSYS, "Unknown syscall"))
 }
 
-#[no_mangle]
-pub extern "C" fn occlum_spawn(
-    child_pid: *mut c_uint,
-    path: *const c_char,
-    argv: *const *const c_char,
-    envp: *const *const c_char,
-    fdop_list: *const FdOp,
-) -> c_int {
-    match do_spawn(child_pid, path, argv, envp, fdop_list) {
-        Ok(()) => 0,
-        Err(e) => e.errno.as_retval(),
+fn do_getcwd(buf: *mut u8, size: usize) -> Result<isize, Error> {
+    let safe_buf = {
+        check_mut_array(buf, size)?;
+        unsafe { std::slice::from_raw_parts_mut(buf, size) }
+    };
+    let proc_ref = process::get_current();
+    let mut proc = proc_ref.lock().unwrap();
+    let cwd = proc.get_exec_path();
+    if cwd.len() + 1 > safe_buf.len() {
+        return Err(Error::new(ERANGE, "buf is not long enough"));
     }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_wait4(
-    child_pid: c_int,
-    exit_status: *mut c_int,
-    options: c_int, /*, rusage: *mut Rusage*/
-) -> c_int {
-    match do_wait4(child_pid, exit_status) {
-        Ok(pid) => pid as c_int,
-        Err(e) => e.errno.as_retval(),
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_dup(old_fd: c_int) -> c_int {
-    let old_fd = old_fd as FileDesc;
-    match fs::do_dup(old_fd) {
-        Ok(new_fd) => new_fd as c_int,
-        Err(e) => e.errno.as_retval(),
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_dup2(old_fd: c_int, new_fd: c_int) -> c_int {
-    let old_fd = old_fd as FileDesc;
-    let new_fd = new_fd as FileDesc;
-    match fs::do_dup2(old_fd, new_fd) {
-        Ok(new_fd) => new_fd as c_int,
-        Err(e) => e.errno.as_retval(),
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_dup3(old_fd: c_int, new_fd: c_int, flags: c_int) -> c_int {
-    let old_fd = old_fd as FileDesc;
-    let new_fd = new_fd as FileDesc;
-    let flags = flags as u32;
-    match fs::do_dup3(old_fd, new_fd, flags) {
-        Ok(new_fd) => new_fd as c_int,
-        Err(e) => e.errno.as_retval(),
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_sync() -> c_int {
-    match fs::do_sync() {
-        Ok(()) => 0 as c_int,
-        Err(e) => e.errno.as_retval(),
-    }
-}
-
-// TODO: handle tz: timezone_t
-#[no_mangle]
-pub extern "C" fn occlum_gettimeofday(tv: *mut timeval_t) -> c_int {
-    match do_gettimeofday(tv) {
-        Ok(()) => 0,
-        Err(e) => e.errno.as_retval(),
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_getcwd(buf: *mut c_void, size: size_t) -> c_int {
-
-    fn do_getcwd(buf: *mut u8, size: usize) -> Result<(), Error> {
-        let safe_buf = {
-            check_mut_array(buf, size)?;
-            unsafe { std::slice::from_raw_parts_mut(buf, size) }
-        };
-        let proc_ref = process::get_current();
-        let mut proc = proc_ref.lock().unwrap();
-        let cwd = proc.get_exec_path();
-        if cwd.len() + 1 > safe_buf.len() {
-            return Err(Error::new(ERANGE, "buf is not long enough"));
-        }
-        safe_buf[..cwd.len()].copy_from_slice(cwd.as_bytes());
-        safe_buf[cwd.len()] = 0;
-        Ok(())
-    }
-
-    match do_getcwd(buf as *mut u8, size as usize) {
-        Ok(()) => 0 as c_int,
-        Err(e) => e.errno.as_retval(),
-    }
+    safe_buf[..cwd.len()].copy_from_slice(cwd.as_bytes());
+    safe_buf[cwd.len()] = 0;
+    Ok(0)
 }
