@@ -77,6 +77,26 @@ impl File for PipeReader {
     fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
         Err(Error::new(Errno::ESPIPE, "Pipe does not support seek"))
     }
+
+    fn metadata(&self) -> Result<Metadata, Error> {
+        unimplemented!()
+    }
+
+    fn set_len(&self, len: u64) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    fn sync_all(&self) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    fn sync_data(&self) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    fn read_entry(&self) -> Result<String, Error> {
+        unimplemented!()
+    }
 }
 
 unsafe impl Send for PipeReader {}
@@ -127,6 +147,26 @@ impl File for PipeWriter {
 
     fn seek(&self, seek_pos: SeekFrom) -> Result<off_t, Error> {
         Err(Error::new(Errno::ESPIPE, "Pipe does not support seek"))
+    }
+
+    fn metadata(&self) -> Result<Metadata, Error> {
+        unimplemented!()
+    }
+
+    fn set_len(&self, len: u64) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    fn sync_all(&self) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    fn sync_data(&self) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    fn read_entry(&self) -> Result<String, Error> {
+        unimplemented!()
     }
 }
 

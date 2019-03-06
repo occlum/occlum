@@ -12,8 +12,9 @@ pub use self::file::{File, FileRef, SgxFile, StdinFile, StdoutFile};
 pub use self::file_table::{FileDesc, FileTable};
 pub use self::pipe::Pipe;
 pub use self::inode_file::{INodeFile, ROOT_INODE};
-use rcore_fs::vfs::{FsError, FileType, INode};
+use rcore_fs::vfs::{FsError, FileType, INode, Metadata, Timespec};
 use self::inode_file::OpenOptions;
+use process::Process;
 
 // TODO: use the type defined in Rust libc.
 //
@@ -87,11 +88,93 @@ pub fn do_readv<'a, 'b>(fd: FileDesc, bufs: &'a mut [&'b mut [u8]]) -> Result<us
     file_ref.readv(bufs)
 }
 
+pub fn do_stat(path: &str) -> Result<Stat, Error> {
+    warn!("stat is partial implemented as lstat");
+    do_lstat(path)
+}
+
+pub fn do_fstat(fd: u32) -> Result<Stat, Error> {
+    info!("fstat: fd: {}", fd);
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    let file_ref = current_process.get_files().get(fd)?;
+    let stat = Stat::from(file_ref.metadata()?);
+    // TODO: handle symlink
+    Ok(stat)
+}
+
+pub fn do_lstat(path: &str) -> Result<Stat, Error> {
+    info!("lstat: path: {}", path);
+
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    let inode = current_process.lookup_inode(&path)?;
+    let stat = Stat::from(inode.metadata()?);
+    Ok(stat)
+}
+
 pub fn do_lseek<'a, 'b>(fd: FileDesc, offset: SeekFrom) -> Result<off_t, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_ref = current_process.get_files().get(fd)?;
     file_ref.seek(offset)
+}
+
+pub fn do_fsync(fd: FileDesc) -> Result<(), Error> {
+    info!("fsync: fd: {}", fd);
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    let file_ref = current_process.get_files().get(fd)?;
+    file_ref.sync_all()?;
+    Ok(())
+}
+
+pub fn do_fdatasync(fd: FileDesc) -> Result<(), Error> {
+    info!("fdatasync: fd: {}", fd);
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    let file_ref = current_process.get_files().get(fd)?;
+    file_ref.sync_data()?;
+    Ok(())
+}
+
+pub fn do_truncate(path: &str, len: usize) -> Result<(), Error> {
+    info!("truncate: path: {:?}, len: {}", path, len);
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    current_process.lookup_inode(&path)?.resize(len)?;
+    Ok(())
+}
+
+pub fn do_ftruncate(fd: FileDesc, len: usize) -> Result<(), Error> {
+    info!("ftruncate: fd: {}, len: {}", fd, len);
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    let file_ref = current_process.get_files().get(fd)?;
+    file_ref.set_len(len as u64)?;
+    Ok(())
+}
+
+pub fn do_getdents64(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
+    info!("getdents64: fd: {}, buf: {:?}, buf_size: {}", fd, buf.as_ptr(), buf.len());
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    let file_ref = current_process.get_files().get(fd)?;
+    let info = file_ref.metadata()?;
+    if info.type_ != FileType::Dir {
+        return Err(Error::new(ENOTDIR, ""));
+    }
+    let mut writer = unsafe { DirentBufWriter::new(buf) };
+    loop {
+        let name = match file_ref.read_entry() {
+            Err(e) if e.errno == ENOENT => break,
+            r => r,
+        }?;
+        // TODO: get ino from dirent
+        let ok = writer.try_write(0, 0, &name);
+        if !ok { break; }
+    }
+    Ok(writer.written_size)
 }
 
 pub fn do_close(fd: FileDesc) -> Result<(), Error> {
@@ -160,6 +243,14 @@ extern "C" {
     fn ocall_sync() -> sgx_status_t;
 }
 
+impl Process {
+    fn lookup_inode(&self, path: &str) -> Result<Arc<INode>, Error> {
+        let cwd = self.get_exec_path().split_at(1).1; // skip start '/'
+        let inode = ROOT_INODE.lookup(cwd)?.lookup(path)?;
+        Ok(inode)
+    }
+}
+
 /// Split a `path` str to `(base_path, file_name)`
 fn split_path(path: &str) -> (&str, &str) {
     let mut split = path.trim_end_matches('/').rsplitn(2, '/');
@@ -205,4 +296,191 @@ impl OpenFlags {
             append: self.contains(OpenFlags::APPEND),
         }
     }
+}
+
+#[derive(Debug)]
+#[repr(packed)] // Don't use 'C'. Or its size will align up to 8 bytes.
+pub struct LinuxDirent64 {
+    /// Inode number
+    ino: u64,
+    /// Offset to next structure
+    offset: u64,
+    /// Size of this dirent
+    reclen: u16,
+    /// File type
+    type_: u8,
+    /// Filename (null-terminated)
+    name: [u8; 0],
+}
+
+struct DirentBufWriter<'a> {
+    buf: &'a mut [u8],
+    rest_size: usize,
+    written_size: usize,
+}
+
+impl<'a> DirentBufWriter<'a> {
+    unsafe fn new(buf: &'a mut [u8]) -> Self {
+        let rest_size = buf.len();
+        DirentBufWriter {
+            buf,
+            rest_size,
+            written_size: 0,
+        }
+    }
+    fn try_write(&mut self, inode: u64, type_: u8, name: &str) -> bool {
+        let len = ::core::mem::size_of::<LinuxDirent64>() + name.len() + 1;
+        let len = (len + 7) / 8 * 8; // align up
+        if self.rest_size < len {
+            return false;
+        }
+        let dent = LinuxDirent64 {
+            ino: inode,
+            offset: 0,
+            reclen: len as u16,
+            type_,
+            name: [],
+        };
+        unsafe {
+            let ptr = self.buf.as_mut_ptr().add(self.written_size) as *mut LinuxDirent64;
+            ptr.write(dent);
+            let name_ptr = ptr.add(1) as _;
+            write_cstr(name_ptr, name);
+        }
+        self.rest_size -= len;
+        self.written_size += len;
+        true
+    }
+}
+
+#[repr(C)]
+pub struct Stat {
+    /// ID of device containing file
+    dev: u64,
+    /// inode number
+    ino: u64,
+    /// number of hard links
+    nlink: u64,
+
+    /// file type and mode
+    mode: StatMode,
+    /// user ID of owner
+    uid: u32,
+    /// group ID of owner
+    gid: u32,
+    /// padding
+    _pad0: u32,
+    /// device ID (if special file)
+    rdev: u64,
+    /// total size, in bytes
+    size: u64,
+    /// blocksize for filesystem I/O
+    blksize: u64,
+    /// number of 512B blocks allocated
+    blocks: u64,
+
+    /// last access time
+    atime: Timespec,
+    /// last modification time
+    mtime: Timespec,
+    /// last status change time
+    ctime: Timespec,
+}
+
+bitflags! {
+    pub struct StatMode: u32 {
+        const NULL  = 0;
+        /// Type
+        const TYPE_MASK = 0o170000;
+        /// FIFO
+        const FIFO  = 0o010000;
+        /// character device
+        const CHAR  = 0o020000;
+        /// directory
+        const DIR   = 0o040000;
+        /// block device
+        const BLOCK = 0o060000;
+        /// ordinary regular file
+        const FILE  = 0o100000;
+        /// symbolic link
+        const LINK  = 0o120000;
+        /// socket
+        const SOCKET = 0o140000;
+
+        /// Set-user-ID on execution.
+        const SET_UID = 0o4000;
+        /// Set-group-ID on execution.
+        const SET_GID = 0o2000;
+
+        /// Read, write, execute/search by owner.
+        const OWNER_MASK = 0o700;
+        /// Read permission, owner.
+        const OWNER_READ = 0o400;
+        /// Write permission, owner.
+        const OWNER_WRITE = 0o200;
+        /// Execute/search permission, owner.
+        const OWNER_EXEC = 0o100;
+
+        /// Read, write, execute/search by group.
+        const GROUP_MASK = 0o70;
+        /// Read permission, group.
+        const GROUP_READ = 0o40;
+        /// Write permission, group.
+        const GROUP_WRITE = 0o20;
+        /// Execute/search permission, group.
+        const GROUP_EXEC = 0o10;
+
+        /// Read, write, execute/search by others.
+        const OTHER_MASK = 0o7;
+        /// Read permission, others.
+        const OTHER_READ = 0o4;
+        /// Write permission, others.
+        const OTHER_WRITE = 0o2;
+        /// Execute/search permission, others.
+        const OTHER_EXEC = 0o1;
+    }
+}
+
+impl StatMode {
+    fn from_type_mode(type_: FileType, mode: u16) -> Self {
+        let type_ = match type_ {
+            FileType::File => StatMode::FILE,
+            FileType::Dir => StatMode::DIR,
+            FileType::SymLink => StatMode::LINK,
+            FileType::CharDevice => StatMode::CHAR,
+            FileType::BlockDevice => StatMode::BLOCK,
+            FileType::Socket => StatMode::SOCKET,
+            FileType::NamedPipe => StatMode::FIFO,
+            _ => StatMode::NULL,
+        };
+        let mode = StatMode::from_bits_truncate(mode as u32);
+        type_ | mode
+    }
+}
+
+impl From<Metadata> for Stat {
+    fn from(info: Metadata) -> Self {
+        Stat {
+            dev: info.dev as u64,
+            ino: info.inode as u64,
+            mode: StatMode::from_type_mode(info.type_, info.mode as u16),
+            nlink: info.nlinks as u64,
+            uid: info.uid as u32,
+            gid: info.gid as u32,
+            rdev: 0,
+            size: info.size as u64,
+            blksize: info.blk_size as u64,
+            blocks: info.blocks as u64,
+            atime: info.atime,
+            mtime: info.mtime,
+            ctime: info.ctime,
+            _pad0: 0
+        }
+    }
+}
+
+/// Write a Rust string to C string
+pub unsafe fn write_cstr(ptr: *mut u8, s: &str) {
+    ptr.copy_from(s.as_ptr(), s.len());
+    ptr.add(s.len()).write(0);
 }

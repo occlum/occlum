@@ -9,6 +9,11 @@ pub trait File: Debug + Sync + Send {
     fn readv<'a, 'b>(&self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error>;
     fn writev<'a, 'b>(&self, bufs: &'a [&'b [u8]]) -> Result<usize, Error>;
     fn seek(&self, pos: SeekFrom) -> Result<off_t, Error>;
+    fn metadata(&self) -> Result<Metadata, Error>;
+    fn set_len(&self, len: u64) -> Result<(), Error>;
+    fn sync_all(&self) -> Result<(), Error>;
+    fn sync_data(&self) -> Result<(), Error>;
+    fn read_entry(&self) -> Result<String, Error>;
 }
 
 pub type FileRef = Arc<Box<File>>;
@@ -71,6 +76,26 @@ impl File for SgxFile {
         let mut inner_guard = self.inner.lock().unwrap();
         let inner = inner_guard.borrow_mut();
         inner.seek(pos)
+    }
+
+    fn metadata(&self) -> Result<Metadata, Error> {
+        unimplemented!()
+    }
+
+    fn set_len(&self, len: u64) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    fn sync_all(&self) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    fn sync_data(&self) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    fn read_entry(&self) -> Result<String, Error> {
+        unimplemented!()
     }
 }
 
@@ -307,6 +332,26 @@ impl File for StdoutFile {
     fn seek(&self, seek_pos: SeekFrom) -> Result<off_t, Error> {
         Err(Error::new(Errno::ESPIPE, "Stdout does not support seek"))
     }
+
+    fn metadata(&self) -> Result<Metadata, Error> {
+        unimplemented!()
+    }
+
+    fn set_len(&self, len: u64) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    fn sync_all(&self) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    fn sync_data(&self) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    fn read_entry(&self) -> Result<String, Error> {
+        unimplemented!()
+    }
 }
 
 impl Debug for StdoutFile {
@@ -375,6 +420,26 @@ impl File for StdinFile {
 
     fn writev<'a, 'b>(&self, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
         Err(Error::new(Errno::EBADF, "Stdin does not support write"))
+    }
+
+    fn metadata(&self) -> Result<Metadata, Error> {
+        unimplemented!()
+    }
+
+    fn set_len(&self, len: u64) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    fn sync_all(&self) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    fn sync_data(&self) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    fn read_entry(&self) -> Result<String, Error> {
+        unimplemented!()
     }
 }
 

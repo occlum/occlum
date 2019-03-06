@@ -70,6 +70,40 @@ impl File for INodeFile {
         };
         Ok(*offset as i64)
     }
+
+    fn metadata(&self) -> Result<Metadata, Error> {
+        let metadata = self.inode.metadata()?;
+        Ok(metadata)
+    }
+
+    fn set_len(&self, len: u64) -> Result<(), Error> {
+        if !self.options.write {
+            return Err(Error::new(EBADF, "File not writable. Can't set len."));
+        }
+        self.inode.resize(len as usize)?;
+        Ok(())
+    }
+
+    fn sync_all(&self) -> Result<(), Error> {
+        self.inode.sync()?;
+        Ok(())
+    }
+
+    fn sync_data(&self) -> Result<(), Error> {
+        // TODO: add sync_data to VFS
+        self.inode.sync()?;
+        Ok(())
+    }
+
+    fn read_entry(&self) -> Result<String, Error> {
+        if !self.options.read {
+            return Err(Error::new(EBADF, "File not readable. Can't read entry."));
+        }
+        let mut offset = self.offset.lock().unwrap();
+        let name = self.inode.get_entry(*offset)?;
+        *offset += 1;
+        Ok(name)
+    }
 }
 
 impl INodeFile {
