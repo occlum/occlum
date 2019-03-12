@@ -12,10 +12,7 @@ use {fs, process, std, vm};
 //use std::libc_fs as fs;
 //use std::libc_io as io;
 
-use self::consts::*;
 use fs::File;
-
-mod consts;
 
 #[no_mangle]
 pub extern "C" fn dispatch_syscall(
@@ -29,37 +26,37 @@ pub extern "C" fn dispatch_syscall(
 ) -> isize {
     debug!("syscall {}: {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}", num, arg0, arg1, arg2, arg3, arg4, arg5);
     let ret = match num {
-        SYS_open => do_open(arg0 as *const i8, arg1 as u32, arg2 as u32),
-        SYS_close => do_close(arg0 as FileDesc),
-        SYS_read => do_read(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
-        SYS_write => do_write(arg0 as FileDesc, arg1 as *const u8, arg2 as usize),
-        SYS_readv => do_readv(arg0 as FileDesc, arg1 as *mut iovec_t, arg2 as i32),
-        SYS_writev => do_writev(arg0 as FileDesc, arg1 as *mut iovec_t, arg2 as i32),
-        SYS_stat => do_stat(arg0 as *const i8, arg1 as *mut fs::Stat),
-        SYS_fstat => do_fstat(arg0 as FileDesc, arg1 as *mut fs::Stat),
-        SYS_lstat => do_lstat(arg0 as *const i8, arg1 as *mut fs::Stat),
-        SYS_lseek => do_lseek(arg0 as FileDesc, arg1 as off_t, arg2 as i32),
-        SYS_fsync => do_fsync(arg0 as FileDesc),
-        SYS_fdatasync => do_fdatasync(arg0 as FileDesc),
-        SYS_truncate => do_truncate(arg0 as *const i8, arg1 as usize),
-        SYS_ftruncate => do_ftruncate(arg0 as FileDesc, arg1 as usize),
-        SYS_getdents64 => do_getdents64(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
-        SYS_sync => do_sync(),
-        SYS_getcwd => do_getcwd(arg0 as *mut u8, arg1 as usize),
+        002 => do_open(arg0 as *const i8, arg1 as u32, arg2 as u32),
+        003 => do_close(arg0 as FileDesc),
+        000 => do_read(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
+        001 => do_write(arg0 as FileDesc, arg1 as *const u8, arg2 as usize),
+        019 => do_readv(arg0 as FileDesc, arg1 as *mut iovec_t, arg2 as i32),
+        020 => do_writev(arg0 as FileDesc, arg1 as *mut iovec_t, arg2 as i32),
+        004 => do_stat(arg0 as *const i8, arg1 as *mut fs::Stat),
+        005 => do_fstat(arg0 as FileDesc, arg1 as *mut fs::Stat),
+        006 => do_lstat(arg0 as *const i8, arg1 as *mut fs::Stat),
+        008 => do_lseek(arg0 as FileDesc, arg1 as off_t, arg2 as i32),
+        074 => do_fsync(arg0 as FileDesc),
+        075 => do_fdatasync(arg0 as FileDesc),
+        076 => do_truncate(arg0 as *const i8, arg1 as usize),
+        077 => do_ftruncate(arg0 as FileDesc, arg1 as usize),
+        217 => do_getdents64(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
+        162 => do_sync(),
+        079 => do_getcwd(arg0 as *mut u8, arg1 as usize),
 
-        SYS_exit => do_exit(arg0 as i32),
-        SYS_spawn => do_spawn(
+        060 => do_exit(arg0 as i32),
+        360 => do_spawn(
             arg0 as *mut u32,
             arg1 as *mut i8,
             arg2 as *const *const i8,
             arg3 as *const *const i8,
             arg4 as *const FdOp,
         ),
-        SYS_wait4 => do_wait4(arg0 as i32, arg1 as *mut i32),
-        SYS_getpid => do_getpid(),
-        SYS_getppid => do_getppid(),
+        061 => do_wait4(arg0 as i32, arg1 as *mut i32),
+        039 => do_getpid(),
+        110 => do_getppid(),
 
-        SYS_mmap => do_mmap(
+        009 => do_mmap(
             arg0 as usize,
             arg1 as usize,
             arg2 as i32,
@@ -67,23 +64,23 @@ pub extern "C" fn dispatch_syscall(
             arg4 as FileDesc,
             arg5 as off_t,
         ),
-        SYS_munmap => do_munmap(arg0 as usize, arg1 as usize),
-        SYS_mremap => do_mremap(
+        011 => do_munmap(arg0 as usize, arg1 as usize),
+        025 => do_mremap(
             arg0 as usize,
             arg1 as usize,
             arg2 as usize,
             arg3 as i32,
             arg4 as usize,
         ),
-        SYS_brk => do_brk(arg0 as usize),
+        012 => do_brk(arg0 as usize),
 
-        SYS_pipe => do_pipe2(arg0 as *mut i32, 0),
-        SYS_pipe2 => do_pipe2(arg0 as *mut i32, arg1 as u32),
-        SYS_dup => do_dup(arg0 as FileDesc),
-        SYS_dup2 => do_dup2(arg0 as FileDesc, arg1 as FileDesc),
-        SYS_dup3 => do_dup3(arg0 as FileDesc, arg1 as FileDesc, arg2 as u32),
+        022 => do_pipe2(arg0 as *mut i32, 0),
+        293 => do_pipe2(arg0 as *mut i32, arg1 as u32),
+        032 => do_dup(arg0 as FileDesc),
+        033 => do_dup2(arg0 as FileDesc, arg1 as FileDesc),
+        292 => do_dup3(arg0 as FileDesc, arg1 as FileDesc, arg2 as u32),
 
-        SYS_gettimeofday => do_gettimeofday(arg0 as *mut timeval_t),
+        096 => do_gettimeofday(arg0 as *mut timeval_t),
 
         _ => do_unknown(num),
     };
@@ -175,11 +172,13 @@ fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize, Error> {
 }
 
 fn do_close(fd: FileDesc) -> Result<isize, Error> {
+    info!("close: fd: {}", fd);
     fs::do_close(fd)?;
     Ok(0)
 }
 
 fn do_read(fd: FileDesc, buf: *mut u8, size: usize) -> Result<isize, Error> {
+    info!("write: fd: {}, buf: {:?}, size: {}", fd, buf, size);
     let safe_buf = {
         check_mut_array(buf, size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, size) }
@@ -189,6 +188,7 @@ fn do_read(fd: FileDesc, buf: *mut u8, size: usize) -> Result<isize, Error> {
 }
 
 fn do_write(fd: FileDesc, buf: *const u8, size: usize) -> Result<isize, Error> {
+    info!("write: fd: {}, buf: {:?}, size: {}", fd, buf, size);
     let safe_buf = {
         check_array(buf, size)?;
         unsafe { std::slice::from_raw_parts(buf, size) }
@@ -402,6 +402,7 @@ fn do_wait4(pid: i32, _exit_status: *mut i32) -> Result<isize, Error> {
 }
 
 fn do_getpid() -> Result<isize, Error> {
+    info!("getpid");
     let pid = process::do_getpid();
     Ok(pid as isize)
 }
@@ -451,6 +452,7 @@ fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<isize, Error> {
 const MAP_FAILED: *const c_void = ((-1) as i64) as *const c_void;
 
 fn do_exit(status: i32) -> ! {
+    info!("exit: {}", status);
     extern "C" {
         fn do_exit_task() -> !;
     }
@@ -461,9 +463,7 @@ fn do_exit(status: i32) -> ! {
 }
 
 fn do_unknown(num: u32) -> Result<isize, Error> {
-    if cfg!(debug_assertions) {
-        //println!("[WARNING] Unknown syscall (num = {})", num);
-    }
+    warn!("Unknown syscall (num = {})", num);
     Err(Error::new(ENOSYS, "Unknown syscall"))
 }
 
