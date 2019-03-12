@@ -4,7 +4,7 @@
 // Expected arguments are given by Makefile throught macro ARGC, ARG1, ARG2 and
 // ARG3
 const char* expected_argv[EXPECTED_ARGC] = {
-    "bin.encrypted",
+    "argv",
     EXPECTED_ARG1,
     EXPECTED_ARG2,
     EXPECTED_ARG3,

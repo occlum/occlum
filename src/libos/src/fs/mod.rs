@@ -11,7 +11,7 @@ mod inode_file;
 pub use self::file::{File, FileRef, SgxFile, StdinFile, StdoutFile};
 pub use self::file_table::{FileDesc, FileTable};
 pub use self::pipe::Pipe;
-pub use self::inode_file::{INodeFile, ROOT_INODE};
+pub use self::inode_file::{INodeFile, ROOT_INODE, INodeExt};
 use rcore_fs::vfs::{FsError, FileType, INode, Metadata, Timespec};
 use self::inode_file::OpenOptions;
 use process::Process;
@@ -244,7 +244,7 @@ extern "C" {
 }
 
 impl Process {
-    fn lookup_inode(&self, path: &str) -> Result<Arc<INode>, Error> {
+    pub fn lookup_inode(&self, path: &str) -> Result<Arc<INode>, Error> {
         let cwd = self.get_exec_path().split_at(1).1; // skip start '/'
         let inode = ROOT_INODE.lookup(cwd)?.lookup(path)?;
         Ok(inode)

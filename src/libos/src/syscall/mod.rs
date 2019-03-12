@@ -158,6 +158,7 @@ fn do_spawn(
     let envp = clone_cstrings_safely(envp)?;
     let file_actions = clone_file_actions_safely(fdop_list)?;
     let parent = process::get_current();
+    info!("spawn: path: {:?}, argv: {:?}, envp: {:?}, fdop: {:?}", path, argv, envp, file_actions);
 
     let child_pid = process::do_spawn(&path, &argv, &envp, &file_actions, &parent)?;
 

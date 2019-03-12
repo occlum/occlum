@@ -25,18 +25,30 @@ GREEN := \033[1;32m
 RED := \033[1;31m
 NO_COLOR := \033[0m
 
+FS_PATH := fs
+SEFS_PATH := sefs
+
 #############################################################################
 # Build targets
 #############################################################################
 
 all: build
 
-build: $(BUILD_TARGETS)
+build: $(BUILD_TARGETS) sefs
 
 $(BUILD_TARGETS): %:
 	@$(ECHO) "$(CYAN)BUILD TEST => $@$(NO_COLOR)"
 	@$(MAKE) --no-print-directory -C $@
 	@$(ECHO) "$(GREEN)DONE$(NO_COLOR)"
+
+sefs:
+	@$(RM) -rf $(SEFS_PATH)
+	@cd $(PROJECT_DIR)/deps/sefs/sefs-fuse/bin/ && \
+		./app \
+			$(CUR_DIR)/$(SEFS_PATH) \
+			$(CUR_DIR)/$(FS_PATH) \
+			zip
+	@echo "SEFS => $@"
 
 #############################################################################
 # Test targets
@@ -80,6 +92,7 @@ $(BENCH_TARGETS): bench-%: % pal libocclum.signed.so
 
 clean: $(CLEAN_TARGETS)
 	@$(RM) -f pal libocclum.signed.so
+	@$(RM) -rf $(FS_PATH) $(SEFS_PATH)
 
 $(CLEAN_TARGETS): clean-%:
 	@$(MAKE) --no-print-directory -C $(patsubst clean-%,%,$@) clean

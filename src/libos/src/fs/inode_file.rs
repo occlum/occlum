@@ -144,3 +144,17 @@ impl Debug for INodeFile {
                *self.offset.lock().unwrap(), self.options)
     }
 }
+
+pub trait INodeExt {
+    fn read_as_vec(&self) -> Result<Vec<u8>, Error>;
+}
+
+impl INodeExt for INode {
+    fn read_as_vec(&self) -> Result<Vec<u8>, Error> {
+        let size = self.metadata()?.size;
+        let mut buf = Vec::with_capacity(size);
+        unsafe { buf.set_len(size); }
+        self.read_at(0, buf.as_mut_slice())?;
+        Ok(buf)
+    }
+}
