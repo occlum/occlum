@@ -1,7 +1,7 @@
 use self::init_stack::{AuxKey, AuxTable};
 use super::task::Task;
 use super::*;
-use fs::{File, FileDesc, FileTable, StdinFile, StdoutFile /*, StderrFile*/};
+use fs::{File, FileDesc, FileTable, StdinFile, StdoutFile, ROOT_INODE, INodeExt};
 use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::sgxfs::SgxFile;
@@ -30,13 +30,9 @@ pub fn do_spawn<P: AsRef<Path>>(
     parent_ref: &ProcessRef,
 ) -> Result<u32, Error> {
     let mut elf_buf = {
-        let key: sgx_key_128bit_t = [0 as uint8_t; 16];
-        let mut sgx_file = SgxFile::open_ex(elf_path, &key)
-            .map_err(|e| (Errno::ENOENT, "Failed to open the SGX-protected file"))?;
-
-        let mut elf_buf = Vec::<u8>::new();
-        sgx_file.read_to_end(&mut elf_buf);
-        elf_buf
+        let path = elf_path.as_ref().to_str().unwrap();
+        let inode = ROOT_INODE.lookup(path)?;
+        inode.read_as_vec()?
     };
 
     let elf_file = {
