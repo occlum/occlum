@@ -5,6 +5,7 @@ use util::mem_util::from_untrusted::*;
 
 #[no_mangle]
 pub extern "C" fn libos_boot(path_buf: *const c_char, argv: *const *const c_char) -> i32 {
+    util::log::init();
     let (path, args) = match parse_arguments(path_buf, argv) {
         Ok(path_and_args) => path_and_args,
         Err(_) => {
