@@ -27,6 +27,7 @@ pub extern "C" fn dispatch_syscall(
     arg4: isize,
     arg5: isize,
 ) -> isize {
+    debug!("syscall {}: {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}", num, arg0, arg1, arg2, arg3, arg4, arg5);
     let ret = match num {
         SYS_open => do_open(arg0 as *const i8, arg1 as u32, arg2 as u32),
         SYS_close => do_close(arg0 as FileDesc),
