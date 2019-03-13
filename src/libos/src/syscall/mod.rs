@@ -84,6 +84,7 @@ pub extern "C" fn dispatch_syscall(
 
         _ => do_unknown(num),
     };
+    debug!("syscall return: {:?}", ret);
 
     match ret {
         Ok(code) => code as isize,
@@ -475,7 +476,7 @@ fn do_getcwd(buf: *mut u8, size: usize) -> Result<isize, Error> {
     };
     let proc_ref = process::get_current();
     let mut proc = proc_ref.lock().unwrap();
-    let cwd = proc.get_exec_path();
+    let cwd = proc.get_cwd();
     if cwd.len() + 1 > safe_buf.len() {
         return Err(Error::new(ERANGE, "buf is not long enough"));
     }

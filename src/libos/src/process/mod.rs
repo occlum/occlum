@@ -18,7 +18,7 @@ pub struct Process {
     pgid: pid_t,
     tgid: pid_t,
     exit_status: i32,
-    exec_path: String,
+    cwd: String,
     parent: Option<ProcessRef>,
     children: Vec<ProcessWeakRef>,
     waiting_children: Option<WaitQueue<ChildProcessFilter, pid_t>>,

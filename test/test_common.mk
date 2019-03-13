@@ -9,7 +9,7 @@ S_FILES := $(C_SRCS:%.c=%.S)
 C_OBJS := $(C_SRCS:%.c=%.o)
 FS_PATH := ../fs
 BIN_NAME := $(shell basename $(CUR_DIR))
-BIN_FS_PATH := $(BIN_NAME)
+BIN_FS_PATH := /$(BIN_NAME)
 BIN_PATH := $(FS_PATH)/$(BIN_FS_PATH)
 OBJDUMP_FILE := bin.objdump
 READELF_FILE := bin.readelf

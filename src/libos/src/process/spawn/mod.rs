@@ -30,7 +30,7 @@ pub fn do_spawn<P: AsRef<Path>>(
     parent_ref: &ProcessRef,
 ) -> Result<u32, Error> {
     let mut elf_buf = {
-        let path = elf_path.as_ref().to_str().unwrap();
+        let path = elf_path.as_ref().to_str().unwrap().trim_start_matches('/');
         let inode = ROOT_INODE.lookup(path)?;
         inode.read_as_vec()?
     };
@@ -62,8 +62,8 @@ pub fn do_spawn<P: AsRef<Path>>(
             init_task(program_entry, stack_top, argv, envp)?
         };
         let files = init_files(parent_ref, file_actions)?;
-        let exec_path = elf_path.as_ref().to_str().unwrap();
-        Process::new(exec_path, task, vm, files)?
+        let cwd = elf_path.as_ref().parent().unwrap().to_str().unwrap();
+        Process::new(cwd, task, vm, files)?
     };
     parent_adopts_new_child(&parent_ref, &new_process_ref);
     process_table::put(new_pid, new_process_ref.clone());

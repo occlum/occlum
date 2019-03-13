@@ -27,10 +27,13 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
     let flags = OpenFlags::from_bits_truncate(flags);
     info!("open: path: {:?}, flags: {:?}, mode: {:#o}", path, flags, mode);
 
+    let current_ref = process::get_current();
+    let mut proc = current_ref.lock().unwrap();
+
     let inode =
         if flags.contains(OpenFlags::CREATE) {
             let (dir_path, file_name) = split_path(&path);
-            let dir_inode = ROOT_INODE.lookup(dir_path)?;
+            let dir_inode = proc.lookup_inode(dir_path)?;
             match dir_inode.find(file_name) {
                 Ok(file_inode) => {
                     if flags.contains(OpenFlags::EXCLUSIVE) {
@@ -44,7 +47,7 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
                 Err(e) => return Err(Error::from(e)),
             }
         } else {
-            ROOT_INODE.lookup(&path)?
+            proc.lookup_inode(&path)?
         };
 
     let file_ref: Arc<Box<File>> = Arc::new(Box::new(
@@ -52,10 +55,8 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
     ));
 
     let fd = {
-        let current_ref = process::get_current();
-        let mut current = current_ref.lock().unwrap();
         let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
-        current.get_files_mut().put(file_ref, close_on_spawn)
+        proc.get_files_mut().put(file_ref, close_on_spawn)
     };
     Ok(fd)
 }
@@ -245,9 +246,18 @@ extern "C" {
 
 impl Process {
     pub fn lookup_inode(&self, path: &str) -> Result<Arc<INode>, Error> {
-        let cwd = self.get_exec_path().split_at(1).1; // skip start '/'
-        let inode = ROOT_INODE.lookup(cwd)?.lookup(path)?;
-        Ok(inode)
+        debug!("lookup_inode: cwd: {:?}, path: {:?}", self.get_cwd(), path);
+        if path.len() > 0 && path.as_bytes()[0] == b'/' {
+            // absolute path
+            let abs_path = path.trim_start_matches('/');
+            let inode = ROOT_INODE.lookup(abs_path)?;
+            Ok(inode)
+        } else {
+            // relative path
+            let cwd = self.get_cwd().trim_start_matches('/');
+            let inode = ROOT_INODE.lookup(cwd)?.lookup(path)?;
+            Ok(inode)
+        }
     }
 }
 
