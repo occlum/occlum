@@ -4,7 +4,7 @@ PROJECT_DIR := $(realpath $(CUR_DIR)/../)
 # Dependencies: need to be compiled but not to run by any Makefile target
 TEST_DEPS := dev_null
 # Tests: need to be compiled and run by test-% target
-TESTS := empty argv hello_world malloc file getpid spawn pipe time truncate
+TESTS := empty argv hello_world malloc file getpid spawn pipe time truncate readdir
 # Benchmarks: need to be compiled and run by bench-% target
 BENCHES := spawn_and_exit_latency pipe_throughput
 
@@ -13,7 +13,7 @@ BUILD_TARGETS := $(TEST_DEPS) $(TESTS) $(BENCHES)
 TEST_TARGETS := $(TESTS:%=test-%)
 BENCH_TARGETS := $(BENCHES:%=bench-%)
 CLEAN_TARGETS := $(BUILD_TARGETS:%=clean-%)
-.PHONY: all build test clean $(BUILD_TARGETS) $(TEST_TARGETS) $(BENCH_TARGETS) $(CLEAN_TARGETS)
+.PHONY: all build test clean sefs $(BUILD_TARGETS) $(TEST_TARGETS) $(BENCH_TARGETS) $(CLEAN_TARGETS)
 
 # Use echo program instead of built-in echo command in shell. This ensures
 # that echo can recognize escaped sequences (with -e argument) regardless of
