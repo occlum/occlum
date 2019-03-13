@@ -13,7 +13,7 @@ lazy_static! {
             pgid: 0,
             tgid: 0,
             exit_status: 0,
-            exec_path: "".to_owned(),
+            cwd: "/".to_owned(),
             parent: None,
             children: Vec::new(),
             waiting_children: Default::default(),
@@ -25,7 +25,7 @@ lazy_static! {
 
 impl Process {
     pub fn new(
-        exec_path: &str,
+        cwd: &str,
         task: Task,
         vm: ProcessVM,
         file_table: FileTable,
@@ -37,7 +37,7 @@ impl Process {
             pid: new_pid,
             pgid: new_pid,
             tgid: new_pid,
-            exec_path: exec_path.to_owned(),
+            cwd: cwd.to_owned(),
             exit_status: 0,
             parent: None,
             children: Vec::new(),
@@ -69,8 +69,8 @@ impl Process {
     pub fn get_exit_status(&self) -> i32 {
         self.exit_status
     }
-    pub fn get_exec_path(&self) -> &str {
-        &self.exec_path
+    pub fn get_cwd(&self) -> &str {
+        &self.cwd
     }
     pub fn get_vm(&self) -> &ProcessVM {
         &self.vm

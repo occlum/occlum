@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 int main(int argc, const char* argv[]) {
-    DIR* dirp = opendir(".");
+    DIR* dirp = opendir("/");
     if (dirp == NULL) {
         printf("failed to open directory at /\n");
         return -1;
