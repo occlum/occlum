@@ -90,6 +90,15 @@ impl Process {
     pub fn get_children(&self) -> &[ProcessWeakRef] {
         &self.children
     }
+    pub fn change_cwd(&mut self, path: &str) {
+        if path.len() > 0 && path.as_bytes()[0] == b'/' {
+            // absolute
+            self.cwd = path.to_owned();
+        } else {
+            // relative
+            self.cwd += path;
+        }
+    }
 }
 
 impl Drop for Process {
