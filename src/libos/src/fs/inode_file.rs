@@ -53,6 +53,23 @@ impl File for INodeFile {
         Ok(len)
     }
 
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+        if !self.options.read {
+            return Err(Error::new(Errno::EBADF, "File not readable"));
+        }
+        let len = self.inode.read_at(offset, buf)?;
+        Ok(len)
+    }
+
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error> {
+        if !self.options.write {
+            return Err(Error::new(Errno::EBADF, "File not writable"));
+        }
+        let len = self.inode.write_at(offset, buf)?;
+        Ok(len)
+    }
+
+
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
         Err(Error::new(Errno::ENOSYS, "Not implemented"))
     }

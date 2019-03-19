@@ -36,7 +36,22 @@ impl File for PipeReader {
         ringbuf.read(buf)
     }
 
-    fn readv<'a, 'b>(&self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {
+    fn write(&self, buf: &[u8]) -> Result<usize, Error> {
+        Err(Error::new(
+            Errno::EBADF,
+            "PipeReader does not support write",
+        ))
+    }
+
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+        unimplemented!()
+    }
+
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error> {
+        unimplemented!()
+    }
+
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
         let mut ringbuf = self.inner.lock().unwrap();
         let mut total_bytes = 0;
         for buf in bufs {
@@ -60,14 +75,7 @@ impl File for PipeReader {
         Ok(total_bytes)
     }
 
-    fn write(&self, buf: &[u8]) -> Result<usize, Error> {
-        Err(Error::new(
-            Errno::EBADF,
-            "PipeReader does not support write",
-        ))
-    }
-
-    fn writev<'a, 'b>(&self, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
         Err(Error::new(
             Errno::EBADF,
             "PipeReader does not support write",
@@ -108,12 +116,27 @@ pub struct PipeWriter {
 }
 
 impl File for PipeWriter {
+    fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
+        Err(Error::new(Errno::EBADF, "PipeWriter does not support read"))
+    }
+
     fn write(&self, buf: &[u8]) -> Result<usize, Error> {
         let ringbuf = self.inner.lock().unwrap();
         ringbuf.write(buf)
     }
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+        unimplemented!()
+    }
 
-    fn writev<'a, 'b>(&self, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error> {
+        unimplemented!()
+    }
+
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
+        Err(Error::new(Errno::EBADF, "PipeWriter does not support read"))
+    }
+
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
         let ringbuf = self.inner.lock().unwrap();
         let mut total_bytes = 0;
         for buf in bufs {
@@ -135,14 +158,6 @@ impl File for PipeWriter {
             }
         }
         Ok(total_bytes)
-    }
-
-    fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "PipeWriter does not support read"))
-    }
-
-    fn readv<'a, 'b>(&self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "PipeWriter does not support read"))
     }
 
     fn seek(&self, seek_pos: SeekFrom) -> Result<off_t, Error> {
