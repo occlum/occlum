@@ -34,6 +34,8 @@ pub extern "C" fn dispatch_syscall(
         SYS_CLOSE => do_close(arg0 as FileDesc),
         SYS_READ => do_read(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
         SYS_WRITE => do_write(arg0 as FileDesc, arg1 as *const u8, arg2 as usize),
+        SYS_PREAD64 => do_pread(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize, arg3 as usize),
+        SYS_PWRITE64 => do_pwrite(arg0 as FileDesc, arg1 as *const u8, arg2 as usize, arg3 as usize),
         SYS_READV => do_readv(arg0 as FileDesc, arg1 as *mut iovec_t, arg2 as i32),
         SYS_WRITEV => do_writev(arg0 as FileDesc, arg1 as *mut iovec_t, arg2 as i32),
         SYS_STAT => do_stat(arg0 as *const i8, arg1 as *mut fs::Stat),
@@ -247,6 +249,24 @@ fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize, Error>
     let bufs = &mut bufs_vec[..];
 
     let len = fs::do_readv(fd, bufs)?;
+    Ok(len as isize)
+}
+
+fn do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: usize) -> Result<isize, Error> {
+    let safe_buf = {
+        check_mut_array(buf, size)?;
+        unsafe { std::slice::from_raw_parts_mut(buf, size) }
+    };
+    let len = fs::do_pread(fd, safe_buf, offset)?;
+    Ok(len as isize)
+}
+
+fn do_pwrite(fd: FileDesc, buf: *const u8, size: usize, offset: usize) -> Result<isize, Error> {
+    let safe_buf = {
+        check_array(buf, size)?;
+        unsafe { std::slice::from_raw_parts(buf, size) }
+    };
+    let len = fs::do_pwrite(fd, safe_buf, offset)?;
     Ok(len as isize)
 }
 

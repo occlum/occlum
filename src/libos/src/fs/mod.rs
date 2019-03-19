@@ -75,18 +75,32 @@ pub fn do_read(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
     file_ref.read(buf)
 }
 
-pub fn do_writev<'a, 'b>(fd: FileDesc, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
+pub fn do_writev(fd: FileDesc, bufs: &[&[u8]]) -> Result<usize, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_ref = current_process.get_files().get(fd)?;
     file_ref.writev(bufs)
 }
 
-pub fn do_readv<'a, 'b>(fd: FileDesc, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {
+pub fn do_readv(fd: FileDesc, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_ref = current_process.get_files().get(fd)?;
     file_ref.readv(bufs)
+}
+
+pub fn do_pwrite(fd: FileDesc, buf: &[u8], offset: usize) -> Result<usize, Error> {
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    let file_ref = current_process.get_files().get(fd)?;
+    file_ref.write_at(offset, buf)
+}
+
+pub fn do_pread(fd: FileDesc, buf: &mut [u8], offset: usize) -> Result<usize, Error> {
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    let file_ref = current_process.get_files().get(fd)?;
+    file_ref.read_at(offset, buf)
 }
 
 pub fn do_stat(path: &str) -> Result<Stat, Error> {
@@ -114,7 +128,7 @@ pub fn do_lstat(path: &str) -> Result<Stat, Error> {
     Ok(stat)
 }
 
-pub fn do_lseek<'a, 'b>(fd: FileDesc, offset: SeekFrom) -> Result<off_t, Error> {
+pub fn do_lseek(fd: FileDesc, offset: SeekFrom) -> Result<off_t, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_ref = current_process.get_files().get(fd)?;

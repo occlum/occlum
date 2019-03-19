@@ -2,12 +2,15 @@ use super::*;
 use std;
 use std::borrow::BorrowMut;
 use std::fmt;
+use std::io::SeekFrom;
 
 pub trait File: Debug + Sync + Send {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error>;
     fn write(&self, buf: &[u8]) -> Result<usize, Error>;
-    fn readv<'a, 'b>(&self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error>;
-    fn writev<'a, 'b>(&self, bufs: &'a [&'b [u8]]) -> Result<usize, Error>;
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error>;
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error>;
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error>;
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error>;
     fn seek(&self, pos: SeekFrom) -> Result<off_t, Error>;
     fn metadata(&self) -> Result<Metadata, Error>;
     fn set_len(&self, len: u64) -> Result<(), Error>;
@@ -60,13 +63,27 @@ impl File for SgxFile {
         inner.write(buf)
     }
 
-    fn readv<'a, 'b>(&self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+        let mut inner_guard = self.inner.lock().unwrap();
+        let inner = inner_guard.borrow_mut();
+        inner.seek(SeekFrom::Start(offset as u64))?;
+        inner.read(buf)
+    }
+
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error> {
+        let mut inner_guard = self.inner.lock().unwrap();
+        let inner = inner_guard.borrow_mut();
+        inner.seek(SeekFrom::Start(offset as u64))?;
+        inner.write(buf)
+    }
+
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
         let mut inner_guard = self.inner.lock().unwrap();
         let inner = inner_guard.borrow_mut();
         inner.readv(bufs)
     }
 
-    fn writev<'a, 'b>(&self, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
         let mut inner_guard = self.inner.lock().unwrap();
         let inner = inner_guard.borrow_mut();
         inner.writev(bufs)
@@ -287,6 +304,10 @@ impl StdoutFile {
 }
 
 impl File for StdoutFile {
+    fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
+        Err(Error::new(Errno::EBADF, "Stdout does not support read"))
+    }
+
     fn write(&self, buf: &[u8]) -> Result<usize, Error> {
         let write_len = {
             self.inner
@@ -297,11 +318,19 @@ impl File for StdoutFile {
         Ok(write_len)
     }
 
-    fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+        unimplemented!()
+    }
+
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error> {
+        unimplemented!()
+    }
+
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
         Err(Error::new(Errno::EBADF, "Stdout does not support read"))
     }
 
-    fn writev<'a, 'b>(&self, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
         let mut guard = self.inner.lock();
         let mut total_bytes = 0;
         for buf in bufs {
@@ -323,10 +352,6 @@ impl File for StdoutFile {
             }
         }
         Ok(total_bytes)
-    }
-
-    fn readv<'a, 'b>(&self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "Stdout does not support read"))
     }
 
     fn seek(&self, seek_pos: SeekFrom) -> Result<off_t, Error> {
@@ -390,11 +415,15 @@ impl File for StdinFile {
         Err(Error::new(Errno::EBADF, "Stdin does not support write"))
     }
 
-    fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
-        Err(Error::new(Errno::ESPIPE, "Stdin does not support seek"))
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+        unimplemented!()
     }
 
-    fn readv<'a, 'b>(&self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error> {
+        unimplemented!()
+    }
+
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
         let mut guard = self.inner.lock();
         let mut total_bytes = 0;
         for buf in bufs {
@@ -418,8 +447,12 @@ impl File for StdinFile {
         Ok(total_bytes)
     }
 
-    fn writev<'a, 'b>(&self, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
         Err(Error::new(Errno::EBADF, "Stdin does not support write"))
+    }
+
+    fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
+        Err(Error::new(Errno::ESPIPE, "Stdin does not support seek"))
     }
 
     fn metadata(&self) -> Result<Metadata, Error> {
