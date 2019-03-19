@@ -254,6 +254,74 @@ pub fn do_sync() -> Result<(), Error> {
     Ok(())
 }
 
+pub fn do_chdir(path: &str) -> Result<(), Error> {
+    let current_ref = process::get_current();
+    let mut current_process = current_ref.lock().unwrap();
+    let inode = current_process.lookup_inode(path)?;
+    let info = inode.metadata()?;
+    if info.type_ != FileType::Dir {
+        return Err(Error::new(ENOTDIR, ""));
+    }
+    current_process.change_cwd(path);
+    Ok(())
+}
+
+pub fn do_rename(oldpath: &str, newpath: &str) -> Result<(), Error> {
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    info!("rename: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
+
+    let (old_dir_path, old_file_name) = split_path(&oldpath);
+    let (new_dir_path, new_file_name) = split_path(&newpath);
+    let old_dir_inode = current_process.lookup_inode(old_dir_path)?;
+    let new_dir_inode = current_process.lookup_inode(new_dir_path)?;
+    // TODO: merge `rename` and `move` in VFS
+    if Arc::ptr_eq(&old_dir_inode, &new_dir_inode) {
+        old_dir_inode.rename(old_file_name, new_file_name)?;
+    } else {
+        old_dir_inode.move_(old_file_name, &new_dir_inode, new_file_name)?;
+    }
+    Ok(())
+}
+
+pub fn do_mkdir(path: &str, mode: usize) -> Result<(), Error> {
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    // TODO: check pathname
+    info!("mkdir: path: {:?}, mode: {:#o}", path, mode);
+
+    let (dir_path, file_name) = split_path(&path);
+    let inode = current_process.lookup_inode(dir_path)?;
+    if inode.find(file_name).is_ok() {
+        return Err(Error::new(EEXIST, ""));
+    }
+    inode.create(file_name, FileType::Dir, mode as u32)?;
+    Ok(())
+}
+
+pub fn do_link(oldpath: &str, newpath: &str) -> Result<(), Error> {
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    info!("link: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
+
+    let (new_dir_path, new_file_name) = split_path(&newpath);
+    let inode = current_process.lookup_inode(&oldpath)?;
+    let new_dir_inode = current_process.lookup_inode(new_dir_path)?;
+    new_dir_inode.link(new_file_name, &inode)?;
+    Ok(())
+}
+
+pub fn do_unlink(path: &str) -> Result<(), Error> {
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    info!("unlink: path: {:?}", path);
+
+    let (dir_path, file_name) = split_path(&path);
+    let dir_inode = current_process.lookup_inode(dir_path)?;
+    dir_inode.unlink(file_name)?;
+    Ok(())
+}
+
 extern "C" {
     fn ocall_sync() -> sgx_status_t;
 }
