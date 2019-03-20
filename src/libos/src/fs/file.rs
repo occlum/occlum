@@ -205,7 +205,7 @@ impl SgxFileInner {
         Ok(self.pos as off_t)
     }
 
-    pub fn writev<'a, 'b>(&mut self, bufs: &'a [&'b [u8]]) -> Result<usize, Error> {
+    pub fn writev(&mut self, bufs: &[&[u8]]) -> Result<usize, Error> {
         if !self.is_writable {
             return Err(Error::new(Errno::EINVAL, "File not writable"));
         }
@@ -245,7 +245,7 @@ impl SgxFileInner {
         Ok(total_bytes)
     }
 
-    fn readv<'a, 'b>(&mut self, bufs: &'a mut [&'b mut [u8]]) -> Result<usize, Error> {
+    fn readv(&mut self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
         if !self.is_readable {
             return Err(Error::new(Errno::EINVAL, "File not readable"));
         }
