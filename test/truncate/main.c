@@ -6,15 +6,16 @@
 #include <stdio.h>
 
 int main(int argc, const char* argv[]) {
-    const char* file_name = "tmp.txt";
+    const char* FILE_NAME = "tmp.txt";
     const int TRUNC_LEN = 256;
+    const int TRUNC_LEN1 = 128;
     const int MODE_MASK = 0777;
 
     int ret;
 
     int flags = O_WRONLY | O_CREAT| O_TRUNC;
     int mode = 00666;
-    int fd = open(file_name, flags, mode);
+    int fd = open(FILE_NAME, flags, mode);
     if (fd < 0) {
         printf("failed to open a file for write\n");
         return fd;
@@ -22,7 +23,7 @@ int main(int argc, const char* argv[]) {
 
     ret = ftruncate(fd, TRUNC_LEN);
     if (ret < 0) {
-        printf("failed to truncate the file\n");
+        printf("failed to ftruncate the file\n");
         return ret;
     }
 
@@ -51,6 +52,24 @@ int main(int argc, const char* argv[]) {
 
     close(fd);
 
-    printf("Truncate & fstat test succesful\n");
+	ret = truncate(FILE_NAME, TRUNC_LEN1);
+	if (ret < 0) {
+		printf("failed to truncate the file\n");
+		return ret;
+	}
+
+	ret = stat(FILE_NAME, &stat_buf);
+	if (ret < 0) {
+		printf("failed to stat the file\n");
+		return ret;
+	}
+
+	file_size = stat_buf.st_size;
+	if (file_size != TRUNC_LEN1) {
+		printf("Incorrect file size %d. Expected %d\n", file_size, TRUNC_LEN1);
+		return -1;
+	}
+
+    printf("(f)truncate, (f)stat test successful\n");
     return 0;
 }
