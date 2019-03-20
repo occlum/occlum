@@ -52,6 +52,7 @@ pub extern "C" fn dispatch_syscall(
         SYS_CHDIR => do_chdir(arg0 as *mut i8),
         SYS_RENAME => do_rename(arg0 as *const i8, arg1 as *const i8),
         SYS_MKDIR => do_mkdir(arg0 as *const i8, arg1 as usize),
+        SYS_RMDIR => do_rmdir(arg0 as *const i8),
         SYS_LINK => do_link(arg0 as *const i8, arg1 as *const i8),
         SYS_UNLINK => do_unlink(arg0 as *const i8),
 
@@ -508,7 +509,7 @@ fn do_getcwd(buf: *mut u8, size: usize) -> Result<isize, Error> {
     }
     safe_buf[..cwd.len()].copy_from_slice(cwd.as_bytes());
     safe_buf[cwd.len()] = 0;
-    Ok(0)
+    Ok(buf as isize)
 }
 
 fn do_chdir(path: *const i8) -> Result<isize, Error> {
@@ -527,6 +528,12 @@ fn do_rename(oldpath: *const i8, newpath: *const i8) -> Result<isize, Error> {
 fn do_mkdir(path: *const i8, mode: usize) -> Result<isize, Error> {
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     fs::do_mkdir(&path, mode)?;
+    Ok(0)
+}
+
+fn do_rmdir(path: *const i8) -> Result<isize, Error> {
+    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
+    fs::do_rmdir(&path)?;
     Ok(0)
 }
 

@@ -248,9 +248,7 @@ pub fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<FileDes
 }
 
 pub fn do_sync() -> Result<(), Error> {
-    unsafe {
-        ocall_sync();
-    }
+    ROOT_INODE.fs().sync()?;
     Ok(())
 }
 
@@ -299,6 +297,21 @@ pub fn do_mkdir(path: &str, mode: usize) -> Result<(), Error> {
     Ok(())
 }
 
+pub fn do_rmdir(path: &str) -> Result<(), Error> {
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    info!("rmdir: path: {:?}", path);
+
+    let (dir_path, file_name) = split_path(&path);
+    let dir_inode = current_process.lookup_inode(dir_path)?;
+    let file_inode = dir_inode.find(file_name)?;
+    if file_inode.metadata()?.type_ != FileType::Dir {
+        return Err(Error::new(ENOTDIR, "rmdir on not directory"));
+    }
+    dir_inode.unlink(file_name)?;
+    Ok(())
+}
+
 pub fn do_link(oldpath: &str, newpath: &str) -> Result<(), Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
@@ -318,6 +331,10 @@ pub fn do_unlink(path: &str) -> Result<(), Error> {
 
     let (dir_path, file_name) = split_path(&path);
     let dir_inode = current_process.lookup_inode(dir_path)?;
+    let file_inode = dir_inode.find(file_name)?;
+    if file_inode.metadata()?.type_ == FileType::Dir {
+        return Err(Error::new(EISDIR, "unlink on directory"));
+    }
     dir_inode.unlink(file_name)?;
     Ok(())
 }
