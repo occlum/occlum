@@ -62,6 +62,7 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
 }
 
 pub fn do_write(fd: FileDesc, buf: &[u8]) -> Result<usize, Error> {
+    info!("write: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_ref = current_process.get_files().get(fd)?;
@@ -69,6 +70,7 @@ pub fn do_write(fd: FileDesc, buf: &[u8]) -> Result<usize, Error> {
 }
 
 pub fn do_read(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
+    info!("read: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_ref = current_process.get_files().get(fd)?;
@@ -76,6 +78,7 @@ pub fn do_read(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
 }
 
 pub fn do_writev(fd: FileDesc, bufs: &[&[u8]]) -> Result<usize, Error> {
+    info!("writev: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_ref = current_process.get_files().get(fd)?;
@@ -83,6 +86,7 @@ pub fn do_writev(fd: FileDesc, bufs: &[&[u8]]) -> Result<usize, Error> {
 }
 
 pub fn do_readv(fd: FileDesc, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
+    info!("readv: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_ref = current_process.get_files().get(fd)?;
@@ -90,6 +94,7 @@ pub fn do_readv(fd: FileDesc, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
 }
 
 pub fn do_pwrite(fd: FileDesc, buf: &[u8], offset: usize) -> Result<usize, Error> {
+    info!("pwrite: fd: {}, offset: {}", fd, offset);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_ref = current_process.get_files().get(fd)?;
@@ -97,6 +102,7 @@ pub fn do_pwrite(fd: FileDesc, buf: &[u8], offset: usize) -> Result<usize, Error
 }
 
 pub fn do_pread(fd: FileDesc, buf: &mut [u8], offset: usize) -> Result<usize, Error> {
+    info!("pread: fd: {}, offset: {}", fd, offset);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_ref = current_process.get_files().get(fd)?;

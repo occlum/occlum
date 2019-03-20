@@ -71,11 +71,45 @@ impl File for INodeFile {
 
 
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
-        Err(Error::new(Errno::ENOSYS, "Not implemented"))
+        if !self.options.read {
+            return Err(Error::new(Errno::EBADF, "File not readable"));
+        }
+        let mut offset = self.offset.lock().unwrap();
+        let mut total_len = 0;
+        for buf in bufs {
+            match self.inode.read_at(*offset, buf) {
+                Ok(len) => {
+                    total_len += len;
+                    *offset += len;
+                },
+                Err(_) if total_len != 0 => break,
+                Err(e) => return Err(e.into()),
+            }
+        }
+        Ok(total_len)
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
-        Err(Error::new(Errno::ENOSYS, "Not implemented"))
+        if !self.options.write {
+            return Err(Error::new(Errno::EBADF, "File not writable"));
+        }
+        let mut offset = self.offset.lock().unwrap();
+        if self.options.append {
+            let info = self.inode.metadata()?;
+            *offset = info.size;
+        }
+        let mut total_len = 0;
+        for buf in bufs {
+            match self.inode.write_at(*offset, buf) {
+                Ok(len) => {
+                    total_len += len;
+                    *offset += len;
+                },
+                Err(_) if total_len != 0 => break,
+                Err(e) => return Err(e.into()),
+            }
+        }
+        Ok(total_len)
     }
 
     fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
