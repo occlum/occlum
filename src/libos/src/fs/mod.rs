@@ -7,6 +7,7 @@ mod file;
 mod file_table;
 mod pipe;
 mod inode_file;
+mod sgx_impl;
 
 pub use self::file::{File, FileRef, SgxFile, StdinFile, StdoutFile};
 pub use self::file_table::{FileDesc, FileTable};
@@ -282,12 +283,7 @@ pub fn do_rename(oldpath: &str, newpath: &str) -> Result<(), Error> {
     let (new_dir_path, new_file_name) = split_path(&newpath);
     let old_dir_inode = current_process.lookup_inode(old_dir_path)?;
     let new_dir_inode = current_process.lookup_inode(new_dir_path)?;
-    // TODO: merge `rename` and `move` in VFS
-    if Arc::ptr_eq(&old_dir_inode, &new_dir_inode) {
-        old_dir_inode.rename(old_file_name, new_file_name)?;
-    } else {
-        old_dir_inode.move_(old_file_name, &new_dir_inode, new_file_name)?;
-    }
+    old_dir_inode.move_(old_file_name, &new_dir_inode, new_file_name)?;
     Ok(())
 }
 

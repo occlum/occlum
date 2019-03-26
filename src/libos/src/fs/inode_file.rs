@@ -2,7 +2,8 @@ use super::*;
 
 use std::fmt;
 use rcore_fs::vfs::{INode, FileSystem, FsError};
-use rcore_fs_sefs::{SEFS, dev::sgx_impl::{SgxStorage, SgxTimeProvider}};
+use rcore_fs_sefs::{SEFS};
+use super::sgx_impl::SgxStorage;
 
 lazy_static! {
     /// The root of file system
@@ -136,13 +137,12 @@ impl File for INodeFile {
     }
 
     fn sync_all(&self) -> Result<(), Error> {
-        self.inode.sync()?;
+        self.inode.sync_all()?;
         Ok(())
     }
 
     fn sync_data(&self) -> Result<(), Error> {
-        // TODO: add sync_data to VFS
-        self.inode.sync()?;
+        self.inode.sync_data()?;
         Ok(())
     }
 
