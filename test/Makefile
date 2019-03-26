@@ -4,7 +4,7 @@ PROJECT_DIR := $(realpath $(CUR_DIR)/../)
 # Dependencies: need to be compiled but not to run by any Makefile target
 TEST_DEPS := dev_null
 # Tests: need to be compiled and run by test-% target
-TESTS := empty argv hello_world malloc file getpid spawn pipe time truncate readdir mkdir
+TESTS := empty argv hello_world malloc file getpid spawn pipe time truncate readdir mkdir link
 # Benchmarks: need to be compiled and run by bench-% target
 BENCHES := spawn_and_exit_latency pipe_throughput
 
