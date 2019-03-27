@@ -1,13 +1,16 @@
-use self::init_stack::{AuxKey, AuxTable};
-use super::task::Task;
-use super::*;
-use fs::{File, FileDesc, FileTable, StdinFile, StdoutFile, ROOT_INODE, INodeExt};
+use xmas_elf::{ElfFile, header, program, sections};
+use xmas_elf::symbol_table::Entry;
+
+use fs::{File, FileDesc, FileTable, INodeExt, ROOT_INODE, StdinFile, StdoutFile};
 use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::sgxfs::SgxFile;
 use vm::{ProcessVM, VMRangeTrait};
-use xmas_elf::symbol_table::Entry;
-use xmas_elf::{header, program, sections, ElfFile};
+
+use super::*;
+use super::task::Task;
+
+use self::init_stack::{AuxKey, AuxTable};
 
 mod elf_helper;
 mod init_stack;

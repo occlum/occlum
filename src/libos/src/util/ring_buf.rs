@@ -1,9 +1,11 @@
-use super::*;
+use alloc::alloc::{alloc, dealloc, Layout};
+
 use std::cmp::{max, min};
 use std::ptr;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
-use alloc::alloc::{Layout, alloc, dealloc};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+use super::*;
 
 #[derive(Debug)]
 pub struct RingBuf {
@@ -44,7 +46,7 @@ struct RingBufInner {
     closed: AtomicBool, // if reader has been dropped
 }
 
-const RING_BUF_ALIGN : usize = 16;
+const RING_BUF_ALIGN: usize = 16;
 
 impl RingBufInner {
     fn new(capacity: usize) -> RingBufInner {

@@ -1,19 +1,21 @@
-use super::*;
-use fs::{off_t, FileDesc};
+use {fs, process, std, vm};
+use fs::{FileDesc, off_t};
+use fs::File;
 use prelude::*;
-use process::{pid_t, ChildProcessFilter, FileAction};
+use process::{ChildProcessFilter, FileAction, pid_t};
 use std::ffi::{CStr, CString};
 use std::ptr;
 use time::timeval_t;
 use util::mem_util::from_user::*;
 use vm::{VMAreaFlags, VMResizeOptions};
-use {fs, process, std, vm};
+
+use super::*;
+
+use self::consts::*;
+
 // Use the internal syscall wrappers from sgx_tstd
 //use std::libc_fs as fs;
 //use std::libc_io as io;
-
-use self::consts::*;
-use fs::File;
 
 mod consts;
 
@@ -28,14 +30,27 @@ pub extern "C" fn dispatch_syscall(
     arg4: isize,
     arg5: isize,
 ) -> isize {
-    debug!("syscall {}: {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}", num, arg0, arg1, arg2, arg3, arg4, arg5);
+    debug!(
+        "syscall {}: {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}",
+        num, arg0, arg1, arg2, arg3, arg4, arg5
+    );
     let ret = match num {
         SYS_OPEN => do_open(arg0 as *const i8, arg1 as u32, arg2 as u32),
         SYS_CLOSE => do_close(arg0 as FileDesc),
         SYS_READ => do_read(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
         SYS_WRITE => do_write(arg0 as FileDesc, arg1 as *const u8, arg2 as usize),
-        SYS_PREAD64 => do_pread(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize, arg3 as usize),
-        SYS_PWRITE64 => do_pwrite(arg0 as FileDesc, arg1 as *const u8, arg2 as usize, arg3 as usize),
+        SYS_PREAD64 => do_pread(
+            arg0 as FileDesc,
+            arg1 as *mut u8,
+            arg2 as usize,
+            arg3 as usize,
+        ),
+        SYS_PWRITE64 => do_pwrite(
+            arg0 as FileDesc,
+            arg1 as *const u8,
+            arg2 as usize,
+            arg3 as usize,
+        ),
         SYS_READV => do_readv(arg0 as FileDesc, arg1 as *mut iovec_t, arg2 as i32),
         SYS_WRITEV => do_writev(arg0 as FileDesc, arg1 as *mut iovec_t, arg2 as i32),
         SYS_STAT => do_stat(arg0 as *const i8, arg1 as *mut fs::Stat),
@@ -171,7 +186,10 @@ fn do_spawn(
     let envp = clone_cstrings_safely(envp)?;
     let file_actions = clone_file_actions_safely(fdop_list)?;
     let parent = process::get_current();
-    info!("spawn: path: {:?}, argv: {:?}, envp: {:?}, fdop: {:?}", path, argv, envp, file_actions);
+    info!(
+        "spawn: path: {:?}, argv: {:?}, envp: {:?}, fdop: {:?}",
+        path, argv, envp, file_actions
+    );
 
     let child_pid = process::do_spawn(&path, &argv, &envp, &file_actions, &parent)?;
 
@@ -281,7 +299,9 @@ fn do_stat(path: *const i8, stat_buf: *mut fs::Stat) -> Result<isize, Error> {
     check_mut_ptr(stat_buf)?;
 
     let stat = fs::do_stat(&path)?;
-    unsafe { stat_buf.write(stat); }
+    unsafe {
+        stat_buf.write(stat);
+    }
     Ok(0)
 }
 
@@ -289,7 +309,9 @@ fn do_fstat(fd: FileDesc, stat_buf: *mut fs::Stat) -> Result<isize, Error> {
     check_mut_ptr(stat_buf)?;
 
     let stat = fs::do_fstat(fd)?;
-    unsafe { stat_buf.write(stat); }
+    unsafe {
+        stat_buf.write(stat);
+    }
     Ok(0)
 }
 
@@ -298,7 +320,9 @@ fn do_lstat(path: *const i8, stat_buf: *mut fs::Stat) -> Result<isize, Error> {
     check_mut_ptr(stat_buf)?;
 
     let stat = fs::do_lstat(&path)?;
-    unsafe { stat_buf.write(stat); }
+    unsafe {
+        stat_buf.write(stat);
+    }
     Ok(0)
 }
 
@@ -519,8 +543,12 @@ fn do_chdir(path: *const i8) -> Result<isize, Error> {
 }
 
 fn do_rename(oldpath: *const i8, newpath: *const i8) -> Result<isize, Error> {
-    let oldpath = clone_cstring_safely(oldpath)?.to_string_lossy().into_owned();
-    let newpath = clone_cstring_safely(newpath)?.to_string_lossy().into_owned();
+    let oldpath = clone_cstring_safely(oldpath)?
+        .to_string_lossy()
+        .into_owned();
+    let newpath = clone_cstring_safely(newpath)?
+        .to_string_lossy()
+        .into_owned();
     fs::do_rename(&oldpath, &newpath)?;
     Ok(0)
 }
@@ -538,8 +566,12 @@ fn do_rmdir(path: *const i8) -> Result<isize, Error> {
 }
 
 fn do_link(oldpath: *const i8, newpath: *const i8) -> Result<isize, Error> {
-    let oldpath = clone_cstring_safely(oldpath)?.to_string_lossy().into_owned();
-    let newpath = clone_cstring_safely(newpath)?.to_string_lossy().into_owned();
+    let oldpath = clone_cstring_safely(oldpath)?
+        .to_string_lossy()
+        .into_owned();
+    let newpath = clone_cstring_safely(newpath)?
+        .to_string_lossy()
+        .into_owned();
     fs::do_link(&oldpath, &newpath)?;
     Ok(0)
 }

@@ -23,8 +23,13 @@ impl Log for SimpleLogger {
         if self.enabled(record.metadata()) {
             let color = Color::from(record.level());
             let (show, code) = color.to_console_code();
-            println!("\u{1B}[{};{}m[{:>5}] {}\u{1B}[0m",
-                     show, code + 30, record.level(), record.args());
+            println!(
+                "\u{1B}[{};{}m[{:>5}] {}\u{1B}[0m",
+                show,
+                code + 30,
+                record.level(),
+                record.args()
+            );
         }
     }
     fn flush(&self) {}

@@ -1,21 +1,22 @@
-use super::*;
-use prelude::*;
-use std::sgxfs as fs_impl;
 use {process, std};
+use prelude::*;
+use process::Process;
+use rcore_fs::vfs::{FileType, FsError, INode, Metadata, Timespec};
+use std::sgxfs as fs_impl;
 
-mod file;
-mod file_table;
-mod pipe;
-mod inode_file;
-mod sgx_impl;
+use super::*;
 
 pub use self::file::{File, FileRef, SgxFile, StdinFile, StdoutFile};
 pub use self::file_table::{FileDesc, FileTable};
-pub use self::pipe::Pipe;
-pub use self::inode_file::{INodeFile, ROOT_INODE, INodeExt};
-use rcore_fs::vfs::{FsError, FileType, INode, Metadata, Timespec};
+pub use self::inode_file::{INodeExt, INodeFile, ROOT_INODE};
 use self::inode_file::OpenOptions;
-use process::Process;
+pub use self::pipe::Pipe;
+
+mod file;
+mod file_table;
+mod inode_file;
+mod pipe;
+mod sgx_impl;
 
 // TODO: use the type defined in Rust libc.
 //
@@ -26,34 +27,32 @@ pub type off_t = i64;
 
 pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
     let flags = OpenFlags::from_bits_truncate(flags);
-    info!("open: path: {:?}, flags: {:?}, mode: {:#o}", path, flags, mode);
+    info!(
+        "open: path: {:?}, flags: {:?}, mode: {:#o}",
+        path, flags, mode
+    );
 
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
 
-    let inode =
-        if flags.contains(OpenFlags::CREATE) {
-            let (dir_path, file_name) = split_path(&path);
-            let dir_inode = proc.lookup_inode(dir_path)?;
-            match dir_inode.find(file_name) {
-                Ok(file_inode) => {
-                    if flags.contains(OpenFlags::EXCLUSIVE) {
-                        return Err(Error::new(EEXIST, "file exists"));
-                    }
-                    file_inode
-                },
-                Err(FsError::EntryNotFound) => {
-                    dir_inode.create(file_name, FileType::File, mode)?
+    let inode = if flags.contains(OpenFlags::CREATE) {
+        let (dir_path, file_name) = split_path(&path);
+        let dir_inode = proc.lookup_inode(dir_path)?;
+        match dir_inode.find(file_name) {
+            Ok(file_inode) => {
+                if flags.contains(OpenFlags::EXCLUSIVE) {
+                    return Err(Error::new(EEXIST, "file exists"));
                 }
-                Err(e) => return Err(Error::from(e)),
+                file_inode
             }
-        } else {
-            proc.lookup_inode(&path)?
-        };
+            Err(FsError::EntryNotFound) => dir_inode.create(file_name, FileType::File, mode)?,
+            Err(e) => return Err(Error::from(e)),
+        }
+    } else {
+        proc.lookup_inode(&path)?
+    };
 
-    let file_ref: Arc<Box<File>> = Arc::new(Box::new(
-        INodeFile::open(inode, flags.to_options())?
-    ));
+    let file_ref: Arc<Box<File>> = Arc::new(Box::new(INodeFile::open(inode, flags.to_options())?));
 
     let fd = {
         let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
@@ -178,7 +177,12 @@ pub fn do_ftruncate(fd: FileDesc, len: usize) -> Result<(), Error> {
 }
 
 pub fn do_getdents64(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
-    info!("getdents64: fd: {}, buf: {:?}, buf_size: {}", fd, buf.as_ptr(), buf.len());
+    info!(
+        "getdents64: fd: {}, buf: {:?}, buf_size: {}",
+        fd,
+        buf.as_ptr(),
+        buf.len()
+    );
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_ref = current_process.get_files().get(fd)?;
@@ -194,7 +198,9 @@ pub fn do_getdents64(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
         }?;
         // TODO: get ino from dirent
         let ok = writer.try_write(0, 0, &name);
-        if !ok { break; }
+        if !ok {
+            break;
+        }
     }
     Ok(writer.written_size)
 }
@@ -591,7 +597,7 @@ impl From<Metadata> for Stat {
             atime: info.atime,
             mtime: info.mtime,
             ctime: info.ctime,
-            _pad0: 0
+            _pad0: 0,
         }
     }
 }
