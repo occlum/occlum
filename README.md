@@ -1,5 +1,5 @@
 # Occlum
-[![All Contributors](https://img.shields.io/badge/all_contributors-6-orange.svg?style=flat-square)](CONTRIBUTORS.md)
+[![All Contributors](https://img.shields.io/badge/all_contributors-7-orange.svg?style=flat-square)](CONTRIBUTORS.md)
 
 Occlum is a *memory-safe*, *multi-process* library OS (LibOS) for [Intel SGX](https://software.intel.com/en-us/sgx). As a LibOS, it enables *unmodified* applications to run on SGX, thus protecting the confidentiality and integrity of user workloads transparently. 
 
@@ -62,6 +62,8 @@ Then, compile the project and run tests with the following commands
 The current version is **only for technical preview, not ready for production use**. Yet, even with this early version, we can achieve a speedup of multitasking-related operations by up to three orders of magnitude, thus demonstrating the effectiveness of our multi-process-per-enclave approach.
 
 This project is being actively developed. We now focus on implementing more system calls and hopefully enable real-world applications on Occlum soon.
+
+The roadmap and development plan of Occlum LibOS and its related projects are managed and tracked using [organization-wide project boards](https://github.com/orgs/occlum/projects).
 
 ## Why the Name?
 
