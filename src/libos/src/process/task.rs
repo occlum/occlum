@@ -1,5 +1,6 @@
-use super::*;
 use std::mem;
+
+use super::*;
 
 /// Note: this definition must be in sync with task.h
 #[derive(Clone, Debug, Default)]
@@ -89,9 +90,7 @@ fn set_current(process: &ProcessRef) {
 }
 
 fn reset_current() {
-    let mut process_ptr = _CURRENT_PROCESS_PTR.with(|cp| {
-        cp.replace(0 as *const SgxMutex<Process>)
-    });
+    let mut process_ptr = _CURRENT_PROCESS_PTR.with(|cp| cp.replace(0 as *const SgxMutex<Process>));
 
     // Prevent memory leakage
     unsafe {

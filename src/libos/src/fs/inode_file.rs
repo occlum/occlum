@@ -1,8 +1,8 @@
-use super::*;
-
+use rcore_fs::vfs::{FileSystem, FsError, INode};
+use rcore_fs_sefs::SEFS;
 use std::fmt;
-use rcore_fs::vfs::{INode, FileSystem, FsError};
-use rcore_fs_sefs::{SEFS};
+
+use super::*;
 use super::sgx_impl::SgxStorage;
 
 lazy_static! {
@@ -70,7 +70,6 @@ impl File for INodeFile {
         Ok(len)
     }
 
-
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
         if !self.options.read {
             return Err(Error::new(Errno::EBADF, "File not readable"));
@@ -82,7 +81,7 @@ impl File for INodeFile {
                 Ok(len) => {
                     total_len += len;
                     *offset += len;
-                },
+                }
                 Err(_) if total_len != 0 => break,
                 Err(e) => return Err(e.into()),
             }
@@ -105,7 +104,7 @@ impl File for INodeFile {
                 Ok(len) => {
                     total_len += len;
                     *offset += len;
-                },
+                }
                 Err(_) if total_len != 0 => break,
                 Err(e) => return Err(e.into()),
             }
@@ -191,8 +190,12 @@ impl From<FsError> for Error {
 
 impl Debug for INodeFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "INodeFile {{ inode: ???, pos: {}, options: {:?} }}",
-               *self.offset.lock().unwrap(), self.options)
+        write!(
+            f,
+            "INodeFile {{ inode: ???, pos: {}, options: {:?} }}",
+            *self.offset.lock().unwrap(),
+            self.options
+        )
     }
 }
 
@@ -204,7 +207,9 @@ impl INodeExt for INode {
     fn read_as_vec(&self) -> Result<Vec<u8>, Error> {
         let size = self.metadata()?.size;
         let mut buf = Vec::with_capacity(size);
-        unsafe { buf.set_len(size); }
+        unsafe {
+            buf.set_len(size);
+        }
         self.read_at(0, buf.as_mut_slice())?;
         Ok(buf)
     }
