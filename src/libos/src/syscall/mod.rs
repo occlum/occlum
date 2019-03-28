@@ -1,6 +1,14 @@
-use {fs, process, std, vm};
-use fs::{FileDesc, off_t};
+//! System call handler
+//!
+//! # Syscall processing flow
+//!
+//! 1. User call `__occlum_syscall` (at `syscall_entry_x86_64.S`)
+//! 2. Do some bound checks then call `dispatch_syscall` (at this file)
+//! 3. Dispatch the syscall to `do_*` (at this file)
+//! 4. Do some memory checks then call `mod::do_*` (at each module)
+
 use fs::File;
+use fs::{off_t, FileDesc};
 use prelude::*;
 use process::{ChildProcessFilter, FileAction, pid_t, CloneFlags, FutexFlags, FutexOp};
 use std::ffi::{CStr, CString};
@@ -8,6 +16,7 @@ use std::ptr;
 use time::timeval_t;
 use util::mem_util::from_user::*;
 use vm::{VMAreaFlags, VMResizeOptions};
+use {fs, process, std, vm};
 
 use super::*;
 
@@ -35,6 +44,7 @@ pub extern "C" fn dispatch_syscall(
         num, arg0, arg1, arg2, arg3, arg4, arg5
     );
     let ret = match num {
+        // file
         SYS_OPEN => do_open(arg0 as *const i8, arg1 as u32, arg2 as u32),
         SYS_CLOSE => do_close(arg0 as FileDesc),
         SYS_READ => do_read(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
@@ -71,6 +81,7 @@ pub extern "C" fn dispatch_syscall(
         SYS_LINK => do_link(arg0 as *const i8, arg1 as *const i8),
         SYS_UNLINK => do_unlink(arg0 as *const i8),
 
+        // process
         SYS_EXIT => do_exit(arg0 as i32),
         SYS_SPAWN => do_spawn(
             arg0 as *mut u32,
@@ -100,6 +111,7 @@ pub extern "C" fn dispatch_syscall(
         SYS_ARCH_PRCTL => do_arch_prctl(arg0 as u32, arg1 as *mut usize),
         SYS_SET_TID_ADDRESS => do_set_tid_address(arg0 as *mut pid_t),
 
+        // memory
         SYS_MMAP => do_mmap(
             arg0 as usize,
             arg1 as usize,
@@ -130,6 +142,41 @@ pub extern "C" fn dispatch_syscall(
         SYS_DUP3 => do_dup3(arg0 as FileDesc, arg1 as FileDesc, arg2 as u32),
 
         SYS_GETTIMEOFDAY => do_gettimeofday(arg0 as *mut timeval_t),
+
+        // socket
+        SYS_SOCKET => do_socket(arg0 as c_int, arg1 as c_int, arg2 as c_int),
+        SYS_CONNECT => do_connect(
+            arg0 as c_int,
+            arg1 as *const libc::sockaddr,
+            arg2 as libc::socklen_t,
+        ),
+        SYS_ACCEPT => do_accept(
+            arg0 as c_int,
+            arg1 as *mut libc::sockaddr,
+            arg2 as *mut libc::socklen_t,
+            arg3 as c_int,
+        ),
+        SYS_SHUTDOWN => do_shutdown(arg0 as c_int, arg1 as c_int),
+        SYS_BIND => do_bind(
+            arg0 as c_int,
+            arg1 as *const libc::sockaddr,
+            arg2 as libc::socklen_t,
+        ),
+        SYS_LISTEN => do_listen(arg0 as c_int, arg1 as c_int),
+        SYS_SETSOCKOPT => do_setsockopt(
+            arg0 as c_int,
+            arg1 as c_int,
+            arg2 as c_int,
+            arg3 as *const c_void,
+            arg4 as libc::socklen_t,
+        ),
+        SYS_GETSOCKOPT => do_getsockopt(
+            arg0 as c_int,
+            arg1 as c_int,
+            arg2 as c_int,
+            arg3 as *mut c_void,
+            arg4 as *mut libc::socklen_t,
+        ),
 
         _ => do_unknown(num, arg0, arg1, arg2, arg3, arg4, arg5),
     };
@@ -695,4 +742,92 @@ fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize, Error> {
 fn do_set_tid_address(tidptr: *mut pid_t) -> Result<isize, Error> {
     check_mut_ptr(tidptr)?;
     process::do_set_tid_address(tidptr).map(|tid| tid as isize)
+}
+
+fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize, Error> {
+    info!(
+        "socket: domain: {}, socket_type: {}, protocol: {}",
+        domain, socket_type, protocol
+    );
+    let ret = unsafe { libc::ocall::socket(domain, socket_type, protocol) };
+    Ok(ret as isize)
+}
+
+fn do_connect(
+    fd: c_int,
+    addr: *const libc::sockaddr,
+    addr_len: libc::socklen_t,
+) -> Result<isize, Error> {
+    info!(
+        "connect: fd: {}, addr: {:?}, addr_len: {}",
+        fd, addr, addr_len
+    );
+    let ret = unsafe { libc::ocall::connect(fd, addr, addr_len) };
+    Ok(ret as isize)
+}
+
+fn do_accept(
+    fd: c_int,
+    addr: *mut libc::sockaddr,
+    addr_len: *mut libc::socklen_t,
+    flags: c_int,
+) -> Result<isize, Error> {
+    info!(
+        "accept: fd: {}, addr: {:?}, addr_len: {:?}, flags: {:#x}",
+        fd, addr, addr_len, flags
+    );
+    let ret = unsafe { libc::ocall::accept4(fd, addr, addr_len, flags) };
+    Ok(ret as isize)
+}
+
+fn do_shutdown(fd: c_int, how: c_int) -> Result<isize, Error> {
+    info!("shutdown: fd: {}, how: {}", fd, how);
+    let ret = unsafe { libc::ocall::shutdown(fd, how) };
+    Ok(ret as isize)
+}
+
+fn do_bind(
+    fd: c_int,
+    addr: *const libc::sockaddr,
+    addr_len: libc::socklen_t,
+) -> Result<isize, Error> {
+    info!("bind: fd: {}, addr: {:?}, addr_len: {}", fd, addr, addr_len);
+    let ret = unsafe { libc::ocall::bind(fd, addr, addr_len) };
+    Ok(ret as isize)
+}
+
+fn do_listen(fd: c_int, backlog: c_int) -> Result<isize, Error> {
+    info!("listen: fd: {}, backlog: {}", fd, backlog);
+    let ret = unsafe { libc::ocall::listen(fd, backlog) };
+    Ok(ret as isize)
+}
+
+fn do_setsockopt(
+    fd: c_int,
+    level: c_int,
+    optname: c_int,
+    optval: *const c_void,
+    optlen: libc::socklen_t,
+) -> Result<isize, Error> {
+    info!(
+        "setsockopt: fd: {}, level: {}, optname: {}, optval: {:?}, optlen: {:?}",
+        fd, level, optname, optval, optlen
+    );
+    let ret = unsafe { libc::ocall::setsockopt(fd, level, optname, optval, optlen) };
+    Ok(ret as isize)
+}
+
+fn do_getsockopt(
+    fd: c_int,
+    level: c_int,
+    optname: c_int,
+    optval: *mut c_void,
+    optlen: *mut libc::socklen_t,
+) -> Result<isize, Error> {
+    info!(
+        "getsockopt: fd: {}, level: {}, optname: {}, optval: {:?}, optlen: {:?}",
+        fd, level, optname, optval, optlen
+    );
+    let ret = unsafe { libc::ocall::getsockopt(fd, level, optname, optval, optlen) };
+    Ok(ret as isize)
 }
