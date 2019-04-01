@@ -19,15 +19,17 @@ pub use self::vm_range::{VMRange, VMRangeTrait};
 // TODO: accept fd and offset
 pub fn do_mmap(addr: usize, size: usize, flags: VMAreaFlags) -> Result<usize, Error> {
     let current_ref = get_current();
-    let mut current_process = current_ref.lock().unwrap();
-    let current_vm = current_process.get_vm_mut();
+    let current_process = current_ref.lock().unwrap();
+    let current_vm_ref = current_process.get_vm();
+    let mut current_vm = current_vm_ref.lock().unwrap();
     current_vm.mmap(addr, size, flags)
 }
 
 pub fn do_munmap(addr: usize, size: usize) -> Result<(), Error> {
     let current_ref = get_current();
-    let mut current_process = current_ref.lock().unwrap();
-    let current_vm = current_process.get_vm_mut();
+    let current_process = current_ref.lock().unwrap();
+    let current_vm_ref = current_process.get_vm();
+    let mut current_vm = current_vm_ref.lock().unwrap();
     current_vm.munmap(addr, size)
 }
 
@@ -38,15 +40,17 @@ pub fn do_mremap(
     options: &VMResizeOptions,
 ) -> Result<usize, Error> {
     let current_ref = get_current();
-    let mut current_process = current_ref.lock().unwrap();
-    let current_vm = current_process.get_vm_mut();
+    let current_process = current_ref.lock().unwrap();
+    let current_vm_ref = current_process.get_vm();
+    let mut current_vm = current_vm_ref.lock().unwrap();
     current_vm.mremap(old_addr, old_size, options)
 }
 
 pub fn do_brk(addr: usize) -> Result<usize, Error> {
     let current_ref = get_current();
-    let mut current_process = current_ref.lock().unwrap();
-    let current_vm = current_process.get_vm_mut();
+    let current_process = current_ref.lock().unwrap();
+    let current_vm_ref = current_process.get_vm();
+    let mut current_vm = current_vm_ref.lock().unwrap();
     current_vm.brk(addr)
 }
 

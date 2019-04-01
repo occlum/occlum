@@ -27,8 +27,8 @@ impl Process {
     pub fn new(
         cwd: &str,
         task: Task,
-        vm: ProcessVM,
-        file_table: FileTable,
+        vm_ref: ProcessVMRef,
+        file_table_ref: FileTableRef,
     ) -> Result<(pid_t, ProcessRef), Error> {
         let new_pid = process_table::alloc_pid();
         let new_process_ref = Arc::new(SgxMutex::new(Process {
@@ -42,8 +42,8 @@ impl Process {
             parent: None,
             children: Vec::new(),
             waiting_children: None,
-            vm: vm,
-            file_table: file_table,
+            vm: vm_ref,
+            file_table: file_table_ref,
         }));
         Ok((new_pid, new_process_ref))
     }
@@ -72,17 +72,11 @@ impl Process {
     pub fn get_cwd(&self) -> &str {
         &self.cwd
     }
-    pub fn get_vm(&self) -> &ProcessVM {
+    pub fn get_vm(&self) -> &ProcessVMRef {
         &self.vm
     }
-    pub fn get_vm_mut(&mut self) -> &mut ProcessVM {
-        &mut self.vm
-    }
-    pub fn get_files(&self) -> &FileTable {
+    pub fn get_files(&self) -> &FileTableRef {
         &self.file_table
-    }
-    pub fn get_files_mut(&mut self) -> &mut FileTable {
-        &mut self.file_table
     }
     pub fn get_parent(&self) -> &ProcessRef {
         self.parent.as_ref().unwrap()

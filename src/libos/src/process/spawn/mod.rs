@@ -52,6 +52,7 @@ pub fn do_spawn<P: AsRef<Path>>(
     };
 
     let (new_pid, new_process_ref) = {
+        let cwd = elf_path.as_ref().parent().unwrap().to_str().unwrap();
         let vm = init_vm::do_init(&elf_file, &elf_buf[..])?;
         let task = {
             let program_entry = {
@@ -64,9 +65,12 @@ pub fn do_spawn<P: AsRef<Path>>(
             let stack_top = vm.get_stack_top();
             init_task(program_entry, stack_top, argv, envp)?
         };
-        let files = init_files(parent_ref, file_actions)?;
-        let cwd = elf_path.as_ref().parent().unwrap().to_str().unwrap();
-        Process::new(cwd, task, vm, files)?
+        let vm_ref = Arc::new(SgxMutex::new(vm));
+        let files_ref = {
+            let files = init_files(parent_ref, file_actions)?;
+            Arc::new(SgxMutex::new(files))
+        };
+        Process::new(cwd, task, vm_ref, files_ref)?
     };
     parent_adopts_new_child(&parent_ref, &new_process_ref);
     process_table::put(new_pid, new_process_ref.clone());
@@ -79,7 +83,7 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
     let parent = parent_ref.lock().unwrap();
     let should_inherit_file_table = parent.get_pid() > 0;
     if should_inherit_file_table {
-        let mut cloned_file_table = parent.get_files().clone();
+        let mut cloned_file_table = parent.get_files().lock().unwrap().clone();
         // Perform file actions to modify the cloned file table
         for file_action in file_actions {
             match file_action {

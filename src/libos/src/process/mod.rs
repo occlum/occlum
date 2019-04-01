@@ -6,6 +6,7 @@ pub mod table {
 pub use self::exit::{do_exit, do_wait4, ChildProcessFilter};
 pub use self::spawn::{do_spawn, FileAction};
 pub use self::wait::{WaitQueue, Waiter};
+pub use self::thread::{do_clone, CloneFlags, ThreadGroup};
 
 #[allow(non_camel_case_types)]
 pub type pid_t = u32;
@@ -18,16 +19,20 @@ pub struct Process {
     pgid: pid_t,
     tgid: pid_t,
     exit_status: i32,
+    // TODO: move cwd, root_inode into a FileSystem structure
+    // TODO: should cwd be a String or INode?
     cwd: String,
     parent: Option<ProcessRef>,
     children: Vec<ProcessWeakRef>,
     waiting_children: Option<WaitQueue<ChildProcessFilter, pid_t>>,
-    vm: ProcessVM,
-    file_table: FileTable,
+    vm: ProcessVMRef,
+    file_table: FileTableRef,
 }
 
 pub type ProcessRef = Arc<SgxMutex<Process>>;
 pub type ProcessWeakRef = std::sync::Weak<SgxMutex<Process>>;
+pub type FileTableRef = Arc<SgxMutex<FileTable>>;
+pub type ProcessVMRef = Arc<SgxMutex<ProcessVM>>;
 
 pub fn do_getpid() -> pid_t {
     let current_ref = get_current();
@@ -57,6 +62,7 @@ mod process_table;
 mod spawn;
 mod task;
 mod wait;
+mod thread;
 
 use self::task::Task;
 use super::*;
