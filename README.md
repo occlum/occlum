@@ -43,6 +43,7 @@ Explicit dependencies are listed below:
    1. [Occlum's fork of LLVM toolchain](https://github.com/occlum/llvm/tree/for_occlum). See [README.occlum.md](https://github.com/occlum/llvm/blob/for_occlum/README.occlum.md) for how to compile and install.
    1. [Occlum's fork of musl libc](https://github.com/occlum/musl/tree/for_occlum). See [INSTALL](https://github.com/occlum/musl/blob/for_occlum/INSTALL) for how to compile and install.
    1. [Rust programming language](https://www.rust-lang.org/). We have tested with Rust nightly-2019-01-28. Other versions of Rust may or may not work.
+   1. [FUSE library](https://en.wikipedia.org/wiki/Filesystem_in_Userspace). Filesystem in Userspace (FUSE) library can be installed on Ubuntu with `sudo apt-get install libfuse-dev`.
 
 Implicit dependencies are managed by Git with [.gitmodules](https://github.com/occlum/libos/blob/master/.gitmodules) and compiled with Makefile. The most important implicit dependency is [Rust SGX SDK](https://github.com/baidu/rust-sgx-sdk). After downloading Occlum LibOS project, run the following command to set up the implicit dependecies:
 
