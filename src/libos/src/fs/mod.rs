@@ -56,7 +56,7 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
 
     let fd = {
         let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
-        proc.get_files_mut().put(file_ref, close_on_spawn)
+        proc.get_files().lock().unwrap().put(file_ref, close_on_spawn)
     };
     Ok(fd)
 }
@@ -65,7 +65,7 @@ pub fn do_write(fd: FileDesc, buf: &[u8]) -> Result<usize, Error> {
     info!("write: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)?;
+    let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
     file_ref.write(buf)
 }
 
@@ -73,7 +73,7 @@ pub fn do_read(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
     info!("read: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)?;
+    let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
     file_ref.read(buf)
 }
 
@@ -81,7 +81,7 @@ pub fn do_writev(fd: FileDesc, bufs: &[&[u8]]) -> Result<usize, Error> {
     info!("writev: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)?;
+    let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
     file_ref.writev(bufs)
 }
 
@@ -89,7 +89,7 @@ pub fn do_readv(fd: FileDesc, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
     info!("readv: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)?;
+    let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
     file_ref.readv(bufs)
 }
 
@@ -97,7 +97,7 @@ pub fn do_pwrite(fd: FileDesc, buf: &[u8], offset: usize) -> Result<usize, Error
     info!("pwrite: fd: {}, offset: {}", fd, offset);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)?;
+    let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
     file_ref.write_at(offset, buf)
 }
 
@@ -105,7 +105,7 @@ pub fn do_pread(fd: FileDesc, buf: &mut [u8], offset: usize) -> Result<usize, Er
     info!("pread: fd: {}, offset: {}", fd, offset);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)?;
+    let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
     file_ref.read_at(offset, buf)
 }
 
@@ -118,7 +118,7 @@ pub fn do_fstat(fd: u32) -> Result<Stat, Error> {
     info!("fstat: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)?;
+    let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
     let stat = Stat::from(file_ref.metadata()?);
     // TODO: handle symlink
     Ok(stat)
@@ -137,7 +137,7 @@ pub fn do_lstat(path: &str) -> Result<Stat, Error> {
 pub fn do_lseek(fd: FileDesc, offset: SeekFrom) -> Result<off_t, Error> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)?;
+    let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
     file_ref.seek(offset)
 }
 
@@ -145,7 +145,7 @@ pub fn do_fsync(fd: FileDesc) -> Result<(), Error> {
     info!("fsync: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)?;
+    let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
     file_ref.sync_all()?;
     Ok(())
 }
@@ -154,7 +154,7 @@ pub fn do_fdatasync(fd: FileDesc) -> Result<(), Error> {
     info!("fdatasync: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)?;
+    let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
     file_ref.sync_data()?;
     Ok(())
 }
@@ -171,7 +171,7 @@ pub fn do_ftruncate(fd: FileDesc, len: usize) -> Result<(), Error> {
     info!("ftruncate: fd: {}, len: {}", fd, len);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)?;
+    let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
     file_ref.set_len(len as u64)?;
     Ok(())
 }
@@ -185,7 +185,7 @@ pub fn do_getdents64(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
     );
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    let file_ref = current_process.get_files().get(fd)?;
+    let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
     let info = file_ref.metadata()?;
     if info.type_ != FileType::Dir {
         return Err(Error::new(ENOTDIR, ""));
@@ -207,8 +207,9 @@ pub fn do_getdents64(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
 
 pub fn do_close(fd: FileDesc) -> Result<(), Error> {
     let current_ref = process::get_current();
-    let mut current_process = current_ref.lock().unwrap();
-    let file_table = current_process.get_files_mut();
+    let current_process = current_ref.lock().unwrap();
+    let file_table_ref = current_process.get_files();
+    let mut file_table = file_table_ref.lock().unwrap();
     file_table.del(fd)?;
     Ok(())
 }
@@ -216,10 +217,11 @@ pub fn do_close(fd: FileDesc) -> Result<(), Error> {
 pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2], Error> {
     let flags = OpenFlags::from_bits_truncate(flags);
     let current_ref = process::get_current();
-    let mut current = current_ref.lock().unwrap();
+    let current = current_ref.lock().unwrap();
     let pipe = Pipe::new()?;
 
-    let mut file_table = current.get_files_mut();
+    let file_table_ref = current.get_files();
+    let mut file_table = file_table_ref.lock().unwrap();
     let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
     let reader_fd = file_table.put(Arc::new(Box::new(pipe.reader)), close_on_spawn);
     let writer_fd = file_table.put(Arc::new(Box::new(pipe.writer)), close_on_spawn);
@@ -228,8 +230,9 @@ pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2], Error> {
 
 pub fn do_dup(old_fd: FileDesc) -> Result<FileDesc, Error> {
     let current_ref = process::get_current();
-    let mut current = current_ref.lock().unwrap();
-    let file_table = current.get_files_mut();
+    let current = current_ref.lock().unwrap();
+    let file_table_ref = current.get_files();
+    let mut file_table = file_table_ref.lock().unwrap();
     let file = file_table.get(old_fd)?;
     let new_fd = file_table.put(file, false);
     Ok(new_fd)
@@ -237,8 +240,9 @@ pub fn do_dup(old_fd: FileDesc) -> Result<FileDesc, Error> {
 
 pub fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<FileDesc, Error> {
     let current_ref = process::get_current();
-    let mut current = current_ref.lock().unwrap();
-    let file_table = current.get_files_mut();
+    let current = current_ref.lock().unwrap();
+    let file_table_ref = current.get_files();
+    let mut file_table = file_table_ref.lock().unwrap();
     let file = file_table.get(old_fd)?;
     if old_fd != new_fd {
         file_table.put_at(new_fd, file, false);
@@ -249,8 +253,9 @@ pub fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<FileDesc, Error> {
 pub fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<FileDesc, Error> {
     let flags = OpenFlags::from_bits_truncate(flags);
     let current_ref = process::get_current();
-    let mut current = current_ref.lock().unwrap();
-    let file_table = current.get_files_mut();
+    let current = current_ref.lock().unwrap();
+    let file_table_ref = current.get_files();
+    let mut file_table = file_table_ref.lock().unwrap();
     let file = file_table.get(old_fd)?;
     if old_fd == new_fd {
         return errno!(EINVAL, "old_fd must not be equal to new_fd");

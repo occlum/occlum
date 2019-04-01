@@ -2,7 +2,7 @@ use {fs, process, std, vm};
 use fs::{FileDesc, off_t};
 use fs::File;
 use prelude::*;
-use process::{ChildProcessFilter, FileAction, pid_t};
+use process::{ChildProcessFilter, FileAction, pid_t, CloneFlags};
 use std::ffi::{CStr, CString};
 use std::ptr;
 use time::timeval_t;
@@ -78,6 +78,13 @@ pub extern "C" fn dispatch_syscall(
             arg2 as *const *const i8,
             arg3 as *const *const i8,
             arg4 as *const FdOp,
+        ),
+        SYS_CLONE => do_clone(
+            arg0 as u32,
+            arg1 as usize,
+            arg2 as *mut i32,
+            arg3 as *mut i32,
+            arg4 as usize,
         ),
         SYS_WAIT4 => do_wait4(arg0 as i32, arg1 as *mut i32),
         SYS_GETPID => do_getpid(),
@@ -195,6 +202,40 @@ fn do_spawn(
 
     unsafe { *child_pid_ptr = child_pid };
     Ok(0)
+}
+
+pub fn do_clone(
+    flags: u32,
+    stack_addr: usize,
+    ptid: *mut i32,
+    ctid: *mut i32,
+    new_tls: usize,
+) -> Result<isize, Error> {
+    let flags = CloneFlags::from_bits_truncate(flags);
+    check_mut_ptr(stack_addr as *mut u64)?;
+    let ptid = {
+        if ptid != ptr::null_mut() {
+            check_mut_ptr(ptid)?;
+            Some(ptid)
+        }
+        else {
+            None
+        }
+    };
+    let ctid = {
+        if ctid != ptr::null_mut() {
+            check_mut_ptr(ctid)?;
+            Some(ctid)
+        }
+        else {
+            None
+        }
+    };
+    check_mut_ptr(new_tls as *mut u64)?;
+
+    let child_pid = process::do_clone(flags, stack_addr, ptid, ctid, new_tls)?;
+
+    Ok(child_pid as isize)
 }
 
 fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize, Error> {
