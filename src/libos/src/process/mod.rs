@@ -7,6 +7,7 @@ pub use self::exit::{do_exit, do_wait4, ChildProcessFilter};
 pub use self::spawn::{do_spawn, FileAction};
 pub use self::wait::{WaitQueue, Waiter};
 pub use self::thread::{do_clone, CloneFlags, ThreadGroup};
+pub use self::futex::{FutexOp, FutexFlags, futex_op_and_flags_from_u32, futex_wake, futex_wait};
 
 #[allow(non_camel_case_types)]
 pub type pid_t = u32;
@@ -63,6 +64,7 @@ mod spawn;
 mod task;
 mod wait;
 mod thread;
+mod futex;
 
 use self::task::Task;
 use super::*;

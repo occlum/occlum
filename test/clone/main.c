@@ -1,27 +1,56 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
-#define _GNU_SOURCE
 #include <sched.h>
+#include <unistd.h>
+#include <sys/syscall.h>
 
-#define NTHREADS        4
-#define STACK_SIZE      (8 * 1024)
+/*
+ * Helper functions
+ */
 
-// From file arch/x86_64/atomic_arch.h in musl libc. MIT License.
-static inline void a_inc(volatile int *p)
-{
-    __asm__ __volatile__(
-        "lock ; incl %0"
-        : "=m"(*p) : "m"(*p) : "memory" );
+static inline int a_load(volatile int* x) {
+    return __atomic_load_n((int*)x, __ATOMIC_SEQ_CST);
 }
+
+static inline int a_add_fetch(volatile int* x, int a) {
+    return __atomic_add_fetch((int*)x, a, __ATOMIC_SEQ_CST);
+}
+
+/*
+ * Futex wrapper
+ */
+
+#define FUTEX_NUM           202
+
+#define FUTEX_WAIT          0
+#define FUTEX_WAKE          1
+
+// Libc does not provide a wrapper for futex, so we do it our own
+static int futex(volatile int *futex_addr, int futex_op, int val) {
+    return (int) syscall(FUTEX_NUM, futex_addr, futex_op, val);
+}
+
+
+/*
+ * Child threads
+ */
+
+#define NTHREADS            4
+#define STACK_SIZE          (8 * 1024)
 
 volatile int num_exit_threads = 0;
 
-int thread_func(void* arg) {
+static int thread_func(void* arg) {
     int* tid = arg;
     //printf("tid = %d\n", *tid);
-    a_inc(&num_exit_threads);
+    // Wake up the main thread if all child threads exit
+    if (a_add_fetch(&num_exit_threads, 1) == NTHREADS) {
+        futex(&num_exit_threads, FUTEX_WAKE, 1);
+    }
     return 0;
 }
+
 
 int main(int argc, const char* argv[]) {
     unsigned int clone_flags = CLONE_VM | CLONE_FS | CLONE_FILES |
@@ -47,7 +76,10 @@ int main(int argc, const char* argv[]) {
 
     printf("Waiting for %d threads to exit...", NTHREADS);
     // Wait for all threads to exit
-    while (num_exit_threads != NTHREADS);
+    int curr_num_exit_threads;
+    while ((curr_num_exit_threads = a_load(&num_exit_threads)) != NTHREADS) {
+        futex(&num_exit_threads, FUTEX_WAIT, curr_num_exit_threads);
+    }
     printf("done.\n");
 
     return 0;
