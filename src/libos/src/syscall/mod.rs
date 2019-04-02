@@ -7,8 +7,7 @@
 //! 3. Dispatch the syscall to `do_*` (at this file)
 //! 4. Do some memory checks then call `mod::do_*` (at each module)
 
-use fs::File;
-use fs::{off_t, FileDesc};
+use fs::{File, SocketFile, off_t, FileDesc, FileRef};
 use prelude::*;
 use process::{ChildProcessFilter, FileAction, pid_t, CloneFlags, FutexFlags, FutexOp};
 use std::ffi::{CStr, CString};
@@ -21,6 +20,7 @@ use {fs, process, std, vm};
 use super::*;
 
 use self::consts::*;
+use std::any::Any;
 
 // Use the internal syscall wrappers from sgx_tstd
 //use std::libc_fs as fs;
@@ -176,6 +176,22 @@ pub extern "C" fn dispatch_syscall(
             arg2 as c_int,
             arg3 as *mut c_void,
             arg4 as *mut libc::socklen_t,
+        ),
+        SYS_SENDTO => do_sendto(
+            arg0 as c_int,
+            arg1 as *const c_void,
+            arg2 as size_t,
+            arg3 as c_int,
+            arg4 as *const libc::sockaddr,
+            arg5 as libc::socklen_t,
+        ),
+        SYS_RECVFROM => do_recvfrom(
+            arg0 as c_int,
+            arg1 as *mut c_void,
+            arg2 as size_t,
+            arg3 as c_int,
+            arg4 as *mut libc::sockaddr,
+            arg5 as *mut libc::socklen_t,
         ),
 
         _ => do_unknown(num, arg0, arg1, arg2, arg3, arg4, arg5),
@@ -654,6 +670,7 @@ fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<isize, Error> {
 const MAP_FAILED: *const c_void = ((-1) as i64) as *const c_void;
 
 fn do_exit(status: i32) -> ! {
+    info!("exit: {}", status);
     extern "C" {
         fn do_exit_task() -> !;
     }
@@ -749,8 +766,15 @@ fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize
         "socket: domain: {}, socket_type: {}, protocol: {}",
         domain, socket_type, protocol
     );
-    let ret = unsafe { libc::ocall::socket(domain, socket_type, protocol) };
-    Ok(ret as isize)
+
+    let socket = SocketFile::new(domain, socket_type, protocol)?;
+    let file_ref: Arc<Box<File>> = Arc::new(Box::new(socket));
+
+    let current_ref = process::get_current();
+    let mut proc = current_ref.lock().unwrap();
+
+    let fd = proc.get_files().lock().unwrap().put(file_ref, false);
+    Ok(fd as isize)
 }
 
 fn do_connect(
@@ -762,7 +786,12 @@ fn do_connect(
         "connect: fd: {}, addr: {:?}, addr_len: {}",
         fd, addr, addr_len
     );
-    let ret = unsafe { libc::ocall::connect(fd, addr, addr_len) };
+    let current_ref = process::get_current();
+    let mut proc = current_ref.lock().unwrap();
+    let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
+    let socket = file_ref.as_socket()?;
+
+    let ret = unsafe { libc::ocall::connect(socket.fd(), addr, addr_len) };
     Ok(ret as isize)
 }
 
@@ -776,13 +805,26 @@ fn do_accept(
         "accept: fd: {}, addr: {:?}, addr_len: {:?}, flags: {:#x}",
         fd, addr, addr_len, flags
     );
-    let ret = unsafe { libc::ocall::accept4(fd, addr, addr_len, flags) };
-    Ok(ret as isize)
+    let current_ref = process::get_current();
+    let mut proc = current_ref.lock().unwrap();
+    let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
+    let socket = file_ref.as_socket()?;
+
+    let new_socket = socket.accept(addr, addr_len, flags)?;
+    let new_file_ref: Arc<Box<File>> = Arc::new(Box::new(new_socket));
+    let new_fd = proc.get_files().lock().unwrap().put(new_file_ref, false);
+
+    Ok(new_fd as isize)
 }
 
 fn do_shutdown(fd: c_int, how: c_int) -> Result<isize, Error> {
     info!("shutdown: fd: {}, how: {}", fd, how);
-    let ret = unsafe { libc::ocall::shutdown(fd, how) };
+    let current_ref = process::get_current();
+    let mut proc = current_ref.lock().unwrap();
+    let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
+    let socket = file_ref.as_socket()?;
+
+    let ret = unsafe { libc::ocall::shutdown(socket.fd(), how) };
     Ok(ret as isize)
 }
 
@@ -792,13 +834,23 @@ fn do_bind(
     addr_len: libc::socklen_t,
 ) -> Result<isize, Error> {
     info!("bind: fd: {}, addr: {:?}, addr_len: {}", fd, addr, addr_len);
-    let ret = unsafe { libc::ocall::bind(fd, addr, addr_len) };
+    let current_ref = process::get_current();
+    let mut proc = current_ref.lock().unwrap();
+    let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
+    let socket = file_ref.as_socket()?;
+
+    let ret = unsafe { libc::ocall::bind(socket.fd(), addr, addr_len) };
     Ok(ret as isize)
 }
 
 fn do_listen(fd: c_int, backlog: c_int) -> Result<isize, Error> {
     info!("listen: fd: {}, backlog: {}", fd, backlog);
-    let ret = unsafe { libc::ocall::listen(fd, backlog) };
+    let current_ref = process::get_current();
+    let mut proc = current_ref.lock().unwrap();
+    let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
+    let socket = file_ref.as_socket()?;
+
+    let ret = unsafe { libc::ocall::listen(socket.fd(), backlog) };
     Ok(ret as isize)
 }
 
@@ -813,7 +865,12 @@ fn do_setsockopt(
         "setsockopt: fd: {}, level: {}, optname: {}, optval: {:?}, optlen: {:?}",
         fd, level, optname, optval, optlen
     );
-    let ret = unsafe { libc::ocall::setsockopt(fd, level, optname, optval, optlen) };
+    let current_ref = process::get_current();
+    let mut proc = current_ref.lock().unwrap();
+    let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
+    let socket = file_ref.as_socket()?;
+
+    let ret = unsafe { libc::ocall::setsockopt(socket.fd(), level, optname, optval, optlen) };
     Ok(ret as isize)
 }
 
@@ -828,6 +885,65 @@ fn do_getsockopt(
         "getsockopt: fd: {}, level: {}, optname: {}, optval: {:?}, optlen: {:?}",
         fd, level, optname, optval, optlen
     );
-    let ret = unsafe { libc::ocall::getsockopt(fd, level, optname, optval, optlen) };
+    let current_ref = process::get_current();
+    let mut proc = current_ref.lock().unwrap();
+    let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
+    let socket = file_ref.as_socket()?;
+
+    let ret = unsafe { libc::ocall::getsockopt(socket.fd(), level, optname, optval, optlen) };
     Ok(ret as isize)
+}
+
+fn do_sendto(
+    fd: c_int,
+    base: *const c_void,
+    len: size_t,
+    flags: c_int,
+    addr: *const libc::sockaddr,
+    addr_len: libc::socklen_t,
+) -> Result<isize, Error> {
+    info!(
+        "sendto: fd: {}, base: {:?}, len: {}, addr: {:?}, addr_len: {}",
+        fd, base, len, addr, addr_len
+    );
+    let current_ref = process::get_current();
+    let mut proc = current_ref.lock().unwrap();
+    let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
+    let socket = file_ref.as_socket()?;
+
+    let ret = unsafe { libc::ocall::sendto(socket.fd(), base, len, flags, addr, addr_len) };
+    Ok(ret as isize)
+}
+
+fn do_recvfrom(
+    fd: c_int,
+    base: *mut c_void,
+    len: size_t,
+    flags: c_int,
+    addr: *mut libc::sockaddr,
+    addr_len: *mut libc::socklen_t,
+) -> Result<isize, Error> {
+    info!(
+        "recvfrom: fd: {}, base: {:?}, len: {}, flags: {}, addr: {:?}, addr_len: {:?}",
+        fd, base, len, flags, addr, addr_len
+    );
+    let current_ref = process::get_current();
+    let mut proc = current_ref.lock().unwrap();
+    let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
+    let socket = file_ref.as_socket()?;
+
+    let ret = unsafe { libc::ocall::recvfrom(socket.fd(), base, len, flags, addr, addr_len) };
+    Ok(ret as isize)
+}
+
+trait AsSocket {
+    fn as_socket(&self) -> Result<&SocketFile, Error>;
+}
+
+impl AsSocket for FileRef {
+    fn as_socket(&self) -> Result<&SocketFile, Error> {
+        self.as_any()
+            .downcast_ref::<SocketFile>()
+            .ok_or(Error::new(Errno::EBADF, "not a socket"))
+    }
 }

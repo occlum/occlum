@@ -9,12 +9,14 @@ use super::*;
 pub use self::file::{File, FileRef, SgxFile, StdinFile, StdoutFile};
 pub use self::file_table::{FileDesc, FileTable};
 pub use self::inode_file::{INodeExt, INodeFile, ROOT_INODE};
+pub use self::socket_file::SocketFile;
 use self::inode_file::OpenOptions;
 pub use self::pipe::Pipe;
 
 mod file;
 mod file_table;
 mod inode_file;
+mod socket_file;
 mod pipe;
 mod sgx_impl;
 
@@ -206,6 +208,7 @@ pub fn do_getdents64(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
 }
 
 pub fn do_close(fd: FileDesc) -> Result<(), Error> {
+    info!("close: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_table_ref = current_process.get_files();

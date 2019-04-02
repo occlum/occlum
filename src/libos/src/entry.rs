@@ -64,7 +64,7 @@ fn parse_arguments(
 
 // TODO: make sure do_boot can only be called once
 fn do_boot(path_str: &str, argv: &Vec<CString>) -> Result<(), Error> {
-    info!("boot: path: {:?}, argv: {:?}", path_str, argv);
+//    info!("boot: path: {:?}, argv: {:?}", path_str, argv);
     util::mpx_util::mpx_enable()?;
 
     let envp = std::vec::Vec::new();

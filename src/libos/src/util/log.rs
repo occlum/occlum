@@ -23,9 +23,10 @@ impl Log for SimpleLogger {
         if self.enabled(record.metadata()) {
             let color = Color::from(record.level());
             println!(
-                "\u{1B}[{}m[{:>5}] {}\u{1B}[0m",
+                "\u{1B}[{}m[{:>5}][{}] {}\u{1B}[0m",
                 color as u8,
                 record.level(),
+                crate::process::do_getpid(),
                 record.args()
             );
         }

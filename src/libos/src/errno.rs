@@ -39,6 +39,7 @@ impl fmt::Display for Error {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(u8)]
 pub enum Errno {
     EUNDEF = 0,
     EPERM = 1,
@@ -85,6 +86,14 @@ pub enum Errno {
 impl Errno {
     pub fn as_retval(&self) -> i32 {
         -(*self as i32)
+    }
+    pub fn from_retval(ret: i32) -> Self {
+        let ret = if ret <= 0 && ret >= -39 {
+            (-ret) as u8
+        } else {
+            0
+        };
+        unsafe { core::mem::transmute(ret) }
     }
 }
 

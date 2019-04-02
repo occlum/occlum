@@ -3,8 +3,9 @@ use std;
 use std::borrow::BorrowMut;
 use std::fmt;
 use std::io::SeekFrom;
+use std::any::Any;
 
-pub trait File: Debug + Sync + Send {
+pub trait File: Debug + Sync + Send + Any {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error>;
     fn write(&self, buf: &[u8]) -> Result<usize, Error>;
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error>;
@@ -17,6 +18,7 @@ pub trait File: Debug + Sync + Send {
     fn sync_all(&self) -> Result<(), Error>;
     fn sync_data(&self) -> Result<(), Error>;
     fn read_entry(&self) -> Result<String, Error>;
+    fn as_any(&self) -> &Any { unimplemented!() }
 }
 
 pub type FileRef = Arc<Box<File>>;

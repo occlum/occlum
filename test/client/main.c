@@ -14,7 +14,7 @@ int main(int argc, const char *argv[]) {
 
 	if (argc != 2) {
 		printf("usage: ./client <ipaddress>\n");
-		return -1;
+		return 0;
 	}
 
 	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
