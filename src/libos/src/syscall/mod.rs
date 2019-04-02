@@ -2,7 +2,7 @@ use {fs, process, std, vm};
 use fs::{FileDesc, off_t};
 use fs::File;
 use prelude::*;
-use process::{ChildProcessFilter, FileAction, pid_t, CloneFlags};
+use process::{ChildProcessFilter, FileAction, pid_t, CloneFlags, FutexFlags, FutexOp};
 use std::ffi::{CStr, CString};
 use std::ptr;
 use time::timeval_t;
@@ -87,6 +87,12 @@ pub extern "C" fn dispatch_syscall(
             arg4 as usize,
         ),
         SYS_WAIT4 => do_wait4(arg0 as i32, arg1 as *mut i32),
+        SYS_FUTEX => do_futex(
+            arg0 as *const i32,
+            arg1 as u32,
+            arg2 as i32,
+            // TODO: accept other optional arguments
+        ),
         SYS_GETPID => do_getpid(),
         SYS_GETPPID => do_getppid(),
 
@@ -236,6 +242,31 @@ pub fn do_clone(
     let child_pid = process::do_clone(flags, stack_addr, ptid, ctid, new_tls)?;
 
     Ok(child_pid as isize)
+}
+
+pub fn do_futex(
+    futex_addr: *const i32,
+    futex_op: u32,
+    futex_val: i32,
+) -> Result<isize, Error> {
+    check_ptr(futex_addr)?;
+    let (futex_op, futex_flags) = process::futex_op_and_flags_from_u32(futex_op)?;
+    match futex_op {
+        FutexOp::FUTEX_WAIT => {
+            process::futex_wait(futex_addr, futex_val).map(|_| 0)
+        }
+        FutexOp::FUTEX_WAKE => {
+            let max_count = {
+                if futex_val < 0 {
+                    return errno!(EINVAL, "the count must not be negative");
+                }
+                futex_val as usize
+            };
+            process::futex_wake(futex_addr, max_count)
+                .map(|count| count as isize)
+        },
+        _ => errno!(ENOSYS, "the futex operation is not supported"),
+    }
 }
 
 fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize, Error> {

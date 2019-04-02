@@ -52,7 +52,7 @@ pub fn do_spawn<P: AsRef<Path>>(
     };
 
     let (new_pid, new_process_ref) = {
-        let cwd = elf_path.as_ref().parent().unwrap().to_str().unwrap();
+        let cwd = parent_ref.lock().unwrap().get_cwd().to_owned();
         let vm = init_vm::do_init(&elf_file, &elf_buf[..])?;
         let task = {
             let program_entry = {
@@ -70,7 +70,7 @@ pub fn do_spawn<P: AsRef<Path>>(
             let files = init_files(parent_ref, file_actions)?;
             Arc::new(SgxMutex::new(files))
         };
-        Process::new(cwd, task, vm_ref, files_ref)?
+        Process::new(&cwd, task, vm_ref, files_ref)?
     };
     parent_adopts_new_child(&parent_ref, &new_process_ref);
     process_table::put(new_pid, new_process_ref.clone());
