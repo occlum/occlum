@@ -19,8 +19,10 @@ __occlum_syscall:
     bndcl %rsp, %bnd0
     bndcu %rsp, %bnd0
 
-    // Save the user stack
+    // Save the callee-saved registers
     pushq %rbp
+    pushq %r12
+    // Save the user stack
     movq %rsp, %rbp
 
     // Get current task
@@ -39,11 +41,13 @@ __occlum_syscall:
     // addq 0x08, %rsp
 
     // Use user fsbase
-    movq TASK_KERNEL_FSBASE_ADDR(%r12), %r11
+    movq TASK_USER_FSBASE_ADDR(%r12), %r11
     wrfsbase %r11
 
-    // Restore the user stack
+    // Switch to the user stack
     movq %rbp, %rsp
+    // Restore callee-saved registers
+    popq %r12
     popq %rbp
 
     // Check return target is a valid instruction (i.e., a cfi_label)

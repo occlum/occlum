@@ -58,7 +58,6 @@ pub fn do_init(
     let envp_cloned = clone_cstrings_on_stack(&stack_buf, envp)?;
     let argv_cloned = clone_cstrings_on_stack(&stack_buf, argv)?;
     dump_auxtbl_on_stack(&stack_buf, auxtbl)?;
-    dump_auxtbl_on_stack(&stack_buf, auxtbl)?;
     dump_cstrptrs_on_stack(&stack_buf, &envp_cloned);
     dump_cstrptrs_on_stack(&stack_buf, &argv_cloned);
     stack_buf.put(argv.len() as u64);

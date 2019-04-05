@@ -122,6 +122,8 @@ pub extern "C" fn dispatch_syscall(
 
         SYS_GETTIMEOFDAY => do_gettimeofday(arg0 as *mut timeval_t),
 
+        SYS_ARCH_PRCTL => do_arch_prctl(arg0 as u32, arg1 as *mut usize),
+
         _ => do_unknown(num),
     };
     debug!("syscall return: {:?}", ret);
@@ -653,3 +655,10 @@ fn do_unlink(path: *const i8) -> Result<isize, Error> {
     fs::do_unlink(&path)?;
     Ok(0)
 }
+
+fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize, Error> {
+    let code = process::ArchPrctlCode::from_u32(code)?;
+    check_mut_ptr(addr)?;
+    process::do_arch_prctl(code, addr).map(|_| 0)
+}
+
