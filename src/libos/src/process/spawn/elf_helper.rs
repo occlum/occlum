@@ -6,6 +6,22 @@ use xmas_elf::symbol_table::Entry;
 use xmas_elf::symbol_table::{DynEntry64, Entry64};
 use xmas_elf::{program, sections, ElfFile, P64};
 
+#[derive(Clone, Default, Copy, Debug)]
+pub struct ProgramHeaderInfo {
+    pub addr: usize,
+    pub entry_size: usize,
+    pub entry_num: usize,
+}
+
+pub fn get_program_header_info(elf_file: &ElfFile) -> Result<ProgramHeaderInfo, Error> {
+    let elf_header = &elf_file.header.pt2;
+    Ok(ProgramHeaderInfo {
+        addr: elf_header.ph_offset() as usize,
+        entry_size: elf_header.ph_entry_size() as usize,
+        entry_num: elf_header.ph_count() as usize,
+    })
+}
+
 pub fn print_program_headers(elf_file: &ElfFile) -> Result<(), Error> {
     println!("Program headers:");
     let ph_iter = elf_file.program_iter();
@@ -87,18 +103,8 @@ pub fn get_code_program_header<'b, 'a: 'b>(
 }
 
 pub fn get_start_address<'b, 'a: 'b>(elf_file: &'b ElfFile<'a>) -> Result<usize, Error> {
-    let sym_entries = get_sym_entries(elf_file)?;
-
-    for sym_entry in sym_entries {
-        let sym_str = sym_entry
-            .get_name(elf_file)
-            .map_err(|e| Error::new(Errno::ENOEXEC, "Failed to get the name of a symbol"))?;
-        if sym_str == "_start" {
-            return Ok(sym_entry.value() as usize);
-        }
-    }
-
-    Err((Errno::ENOEXEC, "Failed to get the _start symbol").into())
+    let elf_header = &elf_file.header.pt2;
+    Ok(elf_header.entry_point() as usize)
 }
 
 pub fn get_sym_entries<'b, 'a: 'b>(elf_file: &'b ElfFile<'a>) -> Result<&'a [Entry64], Error> {

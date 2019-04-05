@@ -8,6 +8,7 @@ pub use self::spawn::{do_spawn, FileAction};
 pub use self::wait::{WaitQueue, Waiter};
 pub use self::thread::{do_clone, CloneFlags, ThreadGroup};
 pub use self::futex::{FutexOp, FutexFlags, futex_op_and_flags_from_u32, futex_wake, futex_wait};
+pub use self::arch_prctl::{ArchPrctlCode, do_arch_prctl};
 
 #[allow(non_camel_case_types)]
 pub type pid_t = u32;
@@ -65,6 +66,7 @@ mod task;
 mod wait;
 mod thread;
 mod futex;
+mod arch_prctl;
 
 use self::task::Task;
 use super::*;

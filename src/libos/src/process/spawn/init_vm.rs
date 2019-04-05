@@ -25,10 +25,10 @@ pub fn do_init(elf_file: &ElfFile, elf_buf: &[u8]) -> Result<ProcessVM, Error> {
 
     // Calculate the "real" addresses
     let process_base_addr = process_vm.get_base_addr();
-    let code_start = process_base_addr + code_start;
-    let code_end = process_base_addr + code_end;
-    let data_start = process_base_addr + data_start;
-    let data_end = process_base_addr + data_end;
+    let code_start = code_start + process_base_addr;
+    let code_end = code_end + process_base_addr;
+    let data_start = data_start + process_base_addr;
+    let data_end = data_end + process_base_addr;
     code_seg.set_runtime_info(process_base_addr, code_start, code_end);
     data_seg.set_runtime_info(process_base_addr, data_start, data_end);
 
@@ -54,8 +54,8 @@ fn reloc_symbols(process_base_addr: usize, elf_file: &ElfFile) -> Result<(), Err
              rela_entry.get_addend());
         */
 
-        /* reloc type == R_X86_64_RELATIVE */
         match rela_entry.get_type() {
+            // reloc type == R_X86_64_RELATIVE
             8 if rela_entry.get_symbol_table_index() == 0 => {
                 let rela_addr = process_base_addr + rela_entry.get_offset() as usize;
                 let rela_val = process_base_addr + rela_entry.get_addend() as usize;

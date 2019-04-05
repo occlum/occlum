@@ -54,16 +54,18 @@ pub fn do_spawn<P: AsRef<Path>>(
     let (new_pid, new_process_ref) = {
         let cwd = parent_ref.lock().unwrap().get_cwd().to_owned();
         let vm = init_vm::do_init(&elf_file, &elf_buf[..])?;
+        let base_addr = vm.get_base_addr();
+        let program_entry = {
+            let program_entry = base_addr + elf_helper::get_start_address(&elf_file)?;
+            if !vm.get_code_vma().contains_obj(program_entry, 16) {
+                return Err(Error::new(Errno::EINVAL, "Invalid program entry"));
+            }
+            program_entry
+        };
+        let auxtbl = init_auxtbl(base_addr, program_entry, &elf_file)?;
         let task = {
-            let program_entry = {
-                let program_entry = vm.get_base_addr() + elf_helper::get_start_address(&elf_file)?;
-                if !vm.get_code_vma().contains_obj(program_entry, 16) {
-                    return Err(Error::new(Errno::EINVAL, "Invalid program entry"));
-                }
-                program_entry
-            };
             let stack_top = vm.get_stack_top();
-            init_task(program_entry, stack_top, argv, envp)?
+            init_task(program_entry, stack_top, argv, envp, &auxtbl)?
         };
         let vm_ref = Arc::new(SgxMutex::new(vm));
         let files_ref = {
@@ -119,8 +121,9 @@ fn init_task(
     stack_top: usize,
     argv: &[CString],
     envp: &[CString],
+    auxtbl: &AuxTable,
 ) -> Result<Task, Error> {
-    let user_stack = init_stack(stack_top, argv, envp)?;
+    let user_stack = init_stack::do_init(stack_top, 4096, argv, envp, auxtbl)?;
     Ok(Task {
         user_stack_addr: user_stack,
         user_entry_addr: user_entry,
@@ -128,7 +131,7 @@ fn init_task(
     })
 }
 
-fn init_stack(stack_top: usize, argv: &[CString], envp: &[CString]) -> Result<usize, Error> {
+fn init_auxtbl(base_addr: usize, program_entry: usize, elf_file: &ElfFile) -> Result<AuxTable, Error> {
     let mut auxtbl = AuxTable::new();
     auxtbl.set_val(AuxKey::AT_PAGESZ, 4096)?;
     auxtbl.set_val(AuxKey::AT_UID, 0)?;
@@ -137,7 +140,16 @@ fn init_stack(stack_top: usize, argv: &[CString], envp: &[CString]) -> Result<us
     auxtbl.set_val(AuxKey::AT_EGID, 0)?;
     auxtbl.set_val(AuxKey::AT_SECURE, 0)?;
 
-    init_stack::do_init(stack_top, 4096, argv, envp, &auxtbl)
+    let ph = elf_helper::get_program_header_info(elf_file)?;
+    auxtbl.set_val(AuxKey::AT_PHDR, (base_addr + ph.addr) as u64)?;
+    auxtbl.set_val(AuxKey::AT_PHENT, ph.entry_size as u64)?;
+    auxtbl.set_val(AuxKey::AT_PHNUM, ph.entry_num as u64)?;
+
+    auxtbl.set_val(AuxKey::AT_ENTRY, program_entry as u64)?;
+    // TODO: init AT_EXECFN
+    // auxtbl.set_val(AuxKey::AT_EXECFN, "program_name")?;
+
+    Ok(auxtbl)
 }
 
 fn parent_adopts_new_child(parent_ref: &ProcessRef, child_ref: &ProcessRef) {
