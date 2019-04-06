@@ -6,7 +6,7 @@ pub mod table {
 pub use self::exit::{do_exit, do_wait4, ChildProcessFilter};
 pub use self::spawn::{do_spawn, FileAction};
 pub use self::wait::{WaitQueue, Waiter};
-pub use self::thread::{do_clone, CloneFlags, ThreadGroup};
+pub use self::thread::{do_clone, CloneFlags, ThreadGroup, do_set_tid_address};
 pub use self::futex::{FutexOp, FutexFlags, futex_op_and_flags_from_u32, futex_wake, futex_wait};
 pub use self::arch_prctl::{ArchPrctlCode, do_arch_prctl};
 
@@ -24,6 +24,7 @@ pub struct Process {
     // TODO: move cwd, root_inode into a FileSystem structure
     // TODO: should cwd be a String or INode?
     cwd: String,
+    clear_child_tid: Option<*mut pid_t>,
     parent: Option<ProcessRef>,
     children: Vec<ProcessWeakRef>,
     waiting_children: Option<WaitQueue<ChildProcessFilter, pid_t>>,
@@ -42,7 +43,13 @@ pub fn do_getpid() -> pid_t {
     current.get_pid()
 }
 
-pub fn do_getgpid() -> pid_t {
+pub fn do_gettid() -> pid_t {
+    let current_ref = get_current();
+    let current = current_ref.lock().unwrap();
+    current.get_tid()
+}
+
+pub fn do_getpgid() -> pid_t {
     let current_ref = get_current();
     let current = current_ref.lock().unwrap();
     current.get_pgid()

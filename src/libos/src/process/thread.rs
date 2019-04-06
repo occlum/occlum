@@ -82,3 +82,11 @@ fn new_thread_task(user_stack: usize, new_tls: usize) -> Result<Task, Error> {
         ..Default::default()
     })
 }
+
+pub fn do_set_tid_address(tidptr: *mut pid_t) -> Result<pid_t, Error> {
+    info!("set_tid_address: tidptr: {:#x}", tidptr as usize);
+    let current_ref = get_current();
+    let mut current = current_ref.lock().unwrap();
+    current.clear_child_tid = Some(tidptr);
+    Ok(current.get_tid())
+}

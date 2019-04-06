@@ -14,6 +14,7 @@ lazy_static! {
             tgid: 0,
             exit_status: 0,
             cwd: "/".to_owned(),
+            clear_child_tid: None,
             parent: None,
             children: Vec::new(),
             waiting_children: Default::default(),
@@ -38,6 +39,7 @@ impl Process {
             pgid: new_pid,
             tgid: new_pid,
             cwd: cwd.to_owned(),
+            clear_child_tid: None,
             exit_status: 0,
             parent: None,
             children: Vec::new(),
@@ -54,14 +56,16 @@ impl Process {
     pub fn get_task_mut(&mut self) -> &mut Task {
         &mut self.task
     }
+    /// pid as seen by the user is actually the thread group ID
     pub fn get_pid(&self) -> pid_t {
+        self.tgid
+    }
+    /// tid as seen by the user is actually the process ID
+    pub fn get_tid(&self) -> pid_t {
         self.pid
     }
     pub fn get_pgid(&self) -> pid_t {
         self.pgid
-    }
-    pub fn get_tgid(&self) -> pid_t {
-        self.tgid
     }
     pub fn get_status(&self) -> Status {
         self.status
@@ -100,6 +104,9 @@ impl Drop for Process {
         process_table::free_pid(self.pid);
     }
 }
+
+unsafe impl Send for Process {}
+unsafe impl Sync for Process {}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Status {
