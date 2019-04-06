@@ -6,6 +6,7 @@
 #![feature(alloc)]
 #![feature(allocator_api)]
 #![feature(range_contains)]
+#![feature(core_intrinsics)]
 
 #[macro_use]
 extern crate alloc;
