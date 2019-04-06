@@ -81,6 +81,7 @@ pub extern "C" fn dispatch_syscall(
         ),
         SYS_WAIT4 => do_wait4(arg0 as i32, arg1 as *mut i32),
         SYS_GETPID => do_getpid(),
+        SYS_GETTID => do_gettid(),
         SYS_GETPPID => do_getppid(),
 
         SYS_CLONE => do_clone(
@@ -532,6 +533,11 @@ fn do_wait4(pid: i32, _exit_status: *mut i32) -> Result<isize, Error> {
 fn do_getpid() -> Result<isize, Error> {
     let pid = process::do_getpid();
     Ok(pid as isize)
+}
+
+fn do_gettid() -> Result<isize, Error> {
+    let tid = process::do_gettid();
+    Ok(tid as isize)
 }
 
 fn do_getppid() -> Result<isize, Error> {
