@@ -33,12 +33,12 @@ __occlum_syscall:
     movq TASK_KERNEL_FSBASE_ADDR(%r12), %r11
     wrfsbase %r11
 
-    // TODO: Pass arg5
-    // pushq 0x10(%rbp)
+    // Make %rsp 16-byte aligned before call
+    sub $0x8, %rsp
+    // Pass arg5
+    pushq 0x18(%rbp)
 
     call dispatch_syscall
-
-    // addq 0x08, %rsp
 
     // Use user fsbase
     movq TASK_USER_FSBASE_ADDR(%r12), %r11

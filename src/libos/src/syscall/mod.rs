@@ -124,7 +124,7 @@ pub extern "C" fn dispatch_syscall(
 
         SYS_ARCH_PRCTL => do_arch_prctl(arg0 as u32, arg1 as *mut usize),
 
-        _ => do_unknown(num),
+        _ => do_unknown(num, arg0, arg1, arg2, arg3, arg4, arg5),
     };
     debug!("syscall return: {:?}", ret);
 
@@ -587,10 +587,11 @@ fn do_exit(status: i32) -> ! {
     }
 }
 
-fn do_unknown(num: u32) -> Result<isize, Error> {
-    if cfg!(debug_assertions) {
-        //println!("[WARNING] Unknown syscall (num = {})", num);
-    }
+fn do_unknown(num: u32, arg0: isize, arg1: isize, arg2: isize, arg3: isize, arg4: isize, arg5: isize) -> Result<isize, Error> {
+    warn!(
+        "unknown or unsupported syscall (# = {}): {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}",
+        num, arg0, arg1, arg2, arg3, arg4, arg5
+    );
     Err(Error::new(ENOSYS, "Unknown syscall"))
 }
 
