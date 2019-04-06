@@ -79,6 +79,10 @@ pub extern "C" fn dispatch_syscall(
             arg3 as *const *const i8,
             arg4 as *const FdOp,
         ),
+        SYS_WAIT4 => do_wait4(arg0 as i32, arg1 as *mut i32),
+        SYS_GETPID => do_getpid(),
+        SYS_GETPPID => do_getppid(),
+
         SYS_CLONE => do_clone(
             arg0 as u32,
             arg1 as usize,
@@ -86,15 +90,14 @@ pub extern "C" fn dispatch_syscall(
             arg3 as *mut i32,
             arg4 as usize,
         ),
-        SYS_WAIT4 => do_wait4(arg0 as i32, arg1 as *mut i32),
         SYS_FUTEX => do_futex(
             arg0 as *const i32,
             arg1 as u32,
             arg2 as i32,
             // TODO: accept other optional arguments
         ),
-        SYS_GETPID => do_getpid(),
-        SYS_GETPPID => do_getppid(),
+        SYS_ARCH_PRCTL => do_arch_prctl(arg0 as u32, arg1 as *mut usize),
+        SYS_SET_TID_ADDRESS => do_set_tid_address(arg0 as *mut pid_t),
 
         SYS_MMAP => do_mmap(
             arg0 as usize,
@@ -121,8 +124,6 @@ pub extern "C" fn dispatch_syscall(
         SYS_DUP3 => do_dup3(arg0 as FileDesc, arg1 as FileDesc, arg2 as u32),
 
         SYS_GETTIMEOFDAY => do_gettimeofday(arg0 as *mut timeval_t),
-
-        SYS_ARCH_PRCTL => do_arch_prctl(arg0 as u32, arg1 as *mut usize),
 
         _ => do_unknown(num, arg0, arg1, arg2, arg3, arg4, arg5),
     };
@@ -506,8 +507,8 @@ fn do_wait4(pid: i32, _exit_status: *mut i32) -> Result<isize, Error> {
         pid if pid < -1 => process::ChildProcessFilter::WithPGID((-pid) as pid_t),
         -1 => process::ChildProcessFilter::WithAnyPID,
         0 => {
-            let gpid = process::do_getgpid();
-            process::ChildProcessFilter::WithPGID(gpid)
+            let pgid = process::do_getpgid();
+            process::ChildProcessFilter::WithPGID(pgid)
         }
         pid if pid > 0 => process::ChildProcessFilter::WithPID(pid as pid_t),
         _ => {
@@ -663,3 +664,7 @@ fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize, Error> {
     process::do_arch_prctl(code, addr).map(|_| 0)
 }
 
+fn do_set_tid_address(tidptr: *mut pid_t) -> Result<isize, Error> {
+    check_mut_ptr(tidptr)?;
+    process::do_set_tid_address(tidptr).map(|tid| tid as isize)
+}
