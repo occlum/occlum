@@ -1,4 +1,5 @@
 use super::*;
+use std::intrinsics::atomic_store;
 
 // TODO: make sure Processes are released eventually
 
@@ -26,7 +27,13 @@ pub fn do_exit(exit_status: i32) {
     }
     current.children.clear();
 
-    // Notify parent if necessary
+    // Notify another process, if any, that waits on ctid (see set_tid_address)
+    if let Some(ctid) = current.clear_child_tid {
+        unsafe { atomic_store(ctid, 0); }
+        futex_wake(ctid as *const i32, 1);
+    }
+
+    // Notify the parent process if necessary
     let parent_ref = current.get_parent().clone();
     let (mut parent, current) = {
         // Always lock parent before its child

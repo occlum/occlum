@@ -36,12 +36,13 @@ bitflags! {
 pub fn do_clone(
     flags: CloneFlags,
     stack_addr: usize,
-    ptid: Option<*mut i32>,
-    ctid: Option<*mut i32>,
-    new_tls: usize
+    ptid: Option<*mut pid_t>,
+    ctid: Option<*mut pid_t>,
+    new_tls: Option<usize>,
 ) -> Result<pid_t, Error> {
     info!("clone: flags: {:?}, stack_addr: {:?}, ptid: {:?}, ctid: {:?}, new_tls: {:?}",
           flags, stack_addr, ptid, ctid, new_tls);
+    // TODO: return error for unsupported flags
 
     let current_ref = get_current();
     let current = current_ref.lock().unwrap();
@@ -54,6 +55,11 @@ pub fn do_clone(
         Process::new(cwd, task, vm_ref, files_ref)?
     };
 
+    if let Some(ctid) = ctid {
+        let mut new_thread = new_thread_ref.lock().unwrap();
+        new_thread.clear_child_tid = Some(ctid);
+    }
+
     // TODO: always get parent lock first to avoid deadlock
     {
         let parent_ref = current.parent.as_ref().unwrap();
@@ -64,11 +70,16 @@ pub fn do_clone(
     }
 
     process_table::put(new_thread_pid, new_thread_ref.clone());
+
+    if let Some(ptid) = ptid {
+        unsafe { *ptid = new_thread_pid; }
+    }
+
     task::enqueue_task(new_thread_ref);
     Ok(new_thread_pid)
 }
 
-fn new_thread_task(user_stack: usize, new_tls: usize) -> Result<Task, Error> {
+fn new_thread_task(user_stack: usize, new_tls: Option<usize>) -> Result<Task, Error> {
     // The calling convention of Occlum clone syscall requires the user to
     // restore the entry point of the new thread at the top of the user stack.
     let user_entry = unsafe {
@@ -78,7 +89,8 @@ fn new_thread_task(user_stack: usize, new_tls: usize) -> Result<Task, Error> {
     Ok(Task {
         user_stack_addr: user_stack,
         user_entry_addr: user_entry,
-        user_fsbase_addr: new_tls,
+        // TODO: use 0 as the default value is not safe
+        user_fsbase_addr: new_tls.unwrap_or(0),
         ..Default::default()
     })
 }

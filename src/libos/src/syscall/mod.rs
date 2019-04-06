@@ -87,8 +87,8 @@ pub extern "C" fn dispatch_syscall(
         SYS_CLONE => do_clone(
             arg0 as u32,
             arg1 as usize,
-            arg2 as *mut i32,
-            arg3 as *mut i32,
+            arg2 as *mut pid_t,
+            arg3 as *mut pid_t,
             arg4 as usize,
         ),
         SYS_FUTEX => do_futex(
@@ -115,6 +115,11 @@ pub extern "C" fn dispatch_syscall(
             arg2 as usize,
             arg3 as i32,
             arg4 as usize,
+        ),
+        SYS_MPROTECT => do_mprotect(
+            arg0 as usize,
+            arg1 as usize,
+            arg2 as u32,
         ),
         SYS_BRK => do_brk(arg0 as usize),
 
@@ -217,14 +222,14 @@ fn do_spawn(
 pub fn do_clone(
     flags: u32,
     stack_addr: usize,
-    ptid: *mut i32,
-    ctid: *mut i32,
+    ptid: *mut pid_t,
+    ctid: *mut pid_t,
     new_tls: usize,
 ) -> Result<isize, Error> {
     let flags = CloneFlags::from_bits_truncate(flags);
     check_mut_ptr(stack_addr as *mut u64)?;
     let ptid = {
-        if ptid != ptr::null_mut() {
+        if flags.contains(CloneFlags::CLONE_PARENT_SETTID) {
             check_mut_ptr(ptid)?;
             Some(ptid)
         }
@@ -233,7 +238,7 @@ pub fn do_clone(
         }
     };
     let ctid = {
-        if ctid != ptr::null_mut() {
+        if flags.contains(CloneFlags::CLONE_CHILD_CLEARTID) {
             check_mut_ptr(ctid)?;
             Some(ctid)
         }
@@ -241,7 +246,15 @@ pub fn do_clone(
             None
         }
     };
-    check_mut_ptr(new_tls as *mut u64)?;
+    let new_tls = {
+        if flags.contains(CloneFlags::CLONE_SETTLS) {
+            check_mut_ptr(new_tls as *mut usize)?;
+            Some(new_tls)
+        }
+        else {
+            None
+        }
+    };
 
     let child_pid = process::do_clone(flags, stack_addr, ptid, ctid, new_tls)?;
 
@@ -492,6 +505,15 @@ fn do_mremap(
     // TODO: handle flags and new_addr
     let ret_addr = vm::do_mremap(old_addr, old_size, &options)?;
     Ok(ret_addr as isize)
+}
+
+fn do_mprotect(
+    addr: usize,
+    len: usize,
+    prot: u32,
+) -> Result<isize, Error> {
+    // TODO: implement it
+    Ok(0)
 }
 
 fn do_brk(new_brk_addr: usize) -> Result<isize, Error> {
