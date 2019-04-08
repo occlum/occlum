@@ -8,6 +8,7 @@ use std::ptr;
 use time::timeval_t;
 use util::mem_util::from_user::*;
 use vm::{VMAreaFlags, VMResizeOptions};
+use misc::{utsname_t};
 
 use super::*;
 
@@ -130,6 +131,8 @@ pub extern "C" fn dispatch_syscall(
         SYS_DUP3 => do_dup3(arg0 as FileDesc, arg1 as FileDesc, arg2 as u32),
 
         SYS_GETTIMEOFDAY => do_gettimeofday(arg0 as *mut timeval_t),
+
+        SYS_UNAME => do_uname(arg0 as *mut utsname_t),
 
         _ => do_unknown(num, arg0, arg1, arg2, arg3, arg4, arg5),
     };
@@ -695,4 +698,10 @@ fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize, Error> {
 fn do_set_tid_address(tidptr: *mut pid_t) -> Result<isize, Error> {
     check_mut_ptr(tidptr)?;
     process::do_set_tid_address(tidptr).map(|tid| tid as isize)
+}
+
+fn do_uname(name: *mut utsname_t) -> Result<isize, Error> {
+    check_mut_ptr(name)?;
+    let name = unsafe { &mut *name };
+    misc::do_uname(name).map(|_| 0)
 }

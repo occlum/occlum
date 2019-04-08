@@ -21,6 +21,7 @@ pub use std::iter::Iterator;
 pub use std::rc::Rc;
 pub use std::string::String;
 pub use std::vec::Vec;
+pub use std::cmp::{min, max};
 
 pub use errno::Errno;
 pub use errno::Errno::*;
