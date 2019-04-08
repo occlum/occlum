@@ -41,6 +41,7 @@ mod syscall;
 mod time;
 mod util;
 mod vm;
+mod misc;
 
 use prelude::*;
 
