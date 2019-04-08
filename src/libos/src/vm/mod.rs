@@ -1,4 +1,4 @@
-use fs::{off_t, FileDesc};
+use fs::FileDesc;
 use prelude::*;
 use process::{get_current, Process, ProcessRef};
 use std::fmt;

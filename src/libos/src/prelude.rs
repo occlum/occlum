@@ -1,4 +1,5 @@
 pub use sgx_trts::libc;
+pub use sgx_trts::libc::off_t;
 pub use sgx_types::*;
 use std;
 
@@ -25,8 +26,6 @@ pub use std::vec::Vec;
 pub use errno::Errno;
 pub use errno::Errno::*;
 pub use errno::Error;
-
-pub use fs::off_t;
 
 macro_rules! debug_trace {
     () => {

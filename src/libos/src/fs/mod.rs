@@ -20,12 +20,6 @@ mod socket_file;
 mod pipe;
 mod sgx_impl;
 
-// TODO: use the type defined in Rust libc.
-//
-// However, off_t is defined as u64 in the current Rust SGX SDK, which is
-// wrong (see issue https://github.com/baidu/rust-sgx-sdk/issues/46)
-#[allow(non_camel_case_types)]
-pub type off_t = i64;
 
 pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
     let flags = OpenFlags::from_bits_truncate(flags);

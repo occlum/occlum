@@ -7,7 +7,7 @@
 //! 3. Dispatch the syscall to `do_*` (at this file)
 //! 4. Do some memory checks then call `mod::do_*` (at each module)
 
-use fs::{File, SocketFile, off_t, FileDesc, FileRef};
+use fs::{File, SocketFile, FileDesc, FileRef};
 use prelude::*;
 use process::{ChildProcessFilter, FileAction, pid_t, CloneFlags, FutexFlags, FutexOp};
 use std::ffi::{CStr, CString};
