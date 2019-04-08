@@ -7,7 +7,7 @@
 //! 3. Dispatch the syscall to `do_*` (at this file)
 //! 4. Do some memory checks then call `mod::do_*` (at each module)
 
-use fs::{File, SocketFile, FileDesc, FileRef};
+use fs::{File, SocketFile, FileDesc, FileRef, EpollOp};
 use prelude::*;
 use process::{ChildProcessFilter, FileAction, pid_t, CloneFlags, FutexFlags, FutexOp};
 use std::ffi::{CStr, CString};
@@ -94,7 +94,8 @@ pub extern "C" fn dispatch_syscall(
             arg1 as libc::nfds_t,
             arg2 as c_int,
         ),
-        SYS_EPOLL_CREATE => do_epoll_create1(arg0 as c_int),
+        SYS_EPOLL_CREATE => do_epoll_create(arg0 as c_int),
+        SYS_EPOLL_CREATE1 => do_epoll_create1(arg0 as c_int),
         SYS_EPOLL_CTL => do_epoll_ctl(
             arg0 as c_int,
             arg1 as c_int,
@@ -1021,8 +1022,16 @@ fn do_poll(
     Ok(n as isize)
 }
 
+fn do_epoll_create(size: c_int) -> Result<isize, Error> {
+    if size <= 0 {
+        return Err(Error::new(EINVAL, "size is not positive"));
+    }
+    do_epoll_create1(0)
+}
+
 fn do_epoll_create1(flags: c_int) -> Result<isize, Error> {
-    unimplemented!()
+    let fd = fs::do_epoll_create1(flags)?;
+    Ok(fd as isize)
 }
 
 fn do_epoll_ctl(
@@ -1031,7 +1040,20 @@ fn do_epoll_ctl(
     fd: c_int,
     event: *const libc::epoll_event,
 ) -> Result<isize, Error> {
-    unimplemented!()
+    let event = if event.is_null() {
+        None
+    } else {
+        check_ptr(event)?;
+        Some(unsafe { event.read() })
+    };
+    let op = match (op, event) {
+        (libc::EPOLL_CTL_ADD, Some(event)) => EpollOp::Add(event),
+        (libc::EPOLL_CTL_MOD, Some(event)) => EpollOp::Modify(event),
+        (libc::EPOLL_CTL_DEL, _) => EpollOp::Delete,
+        _ => return Err(Error::new(EINVAL, "invalid epoll op or event ptr")),
+    };
+    fs::do_epoll_ctl(epfd as FileDesc, op, fd as FileDesc)?;
+    Ok(0)
 }
 
 fn do_epoll_wait(
@@ -1040,7 +1062,18 @@ fn do_epoll_wait(
     maxevents: c_int,
     timeout: c_int,
 ) -> Result<isize, Error> {
-    unimplemented!()
+    let maxevents = {
+        if maxevents <= 0 {
+            return Err(Error::new(EINVAL, "maxevents <= 0"));
+        }
+        maxevents as usize
+    };
+    let events = {
+        check_mut_array(events, maxevents)?;
+        unsafe { std::slice::from_raw_parts_mut(events, maxevents) }
+    };
+    let count = fs::do_epoll_wait(epfd as FileDesc, events, timeout)?;
+    Ok(count as isize)
 }
 
 pub trait AsSocket {
