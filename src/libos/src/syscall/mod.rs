@@ -81,6 +81,33 @@ pub extern "C" fn dispatch_syscall(
         SYS_LINK => do_link(arg0 as *const i8, arg1 as *const i8),
         SYS_UNLINK => do_unlink(arg0 as *const i8),
 
+        // IO multiplexing
+        SYS_SELECT => do_select(
+            arg0 as c_int,
+            arg1 as *mut libc::fd_set,
+            arg2 as *mut libc::fd_set,
+            arg3 as *mut libc::fd_set,
+            arg4 as *const libc::timeval,
+        ),
+        SYS_POLL => do_poll(
+            arg0 as *mut libc::pollfd,
+            arg1 as libc::nfds_t,
+            arg2 as c_int,
+        ),
+        SYS_EPOLL_CREATE => do_epoll_create1(arg0 as c_int),
+        SYS_EPOLL_CTL => do_epoll_ctl(
+            arg0 as c_int,
+            arg1 as c_int,
+            arg2 as c_int,
+            arg3 as *const libc::epoll_event,
+        ),
+        SYS_EPOLL_WAIT => do_epoll_wait(
+            arg0 as c_int,
+            arg1 as *mut libc::epoll_event,
+            arg2 as c_int,
+            arg3 as c_int,
+        ),
+
         // process
         SYS_EXIT => do_exit(arg0 as i32),
         SYS_SPAWN => do_spawn(
@@ -936,7 +963,87 @@ fn do_recvfrom(
     Ok(ret as isize)
 }
 
-trait AsSocket {
+fn do_select(
+    nfds: c_int,
+    readfds: *mut libc::fd_set,
+    writefds: *mut libc::fd_set,
+    exceptfds: *mut libc::fd_set,
+    timeout: *const libc::timeval
+) -> Result<isize, Error> {
+    // check arguments
+    if nfds < 0 || nfds >= libc::FD_SETSIZE as c_int {
+        return Err(Error::new(EINVAL, "nfds is negative or exceeds the resource limit"));
+    }
+    let nfds = nfds as usize;
+
+    let mut zero_fds0: libc::fd_set = unsafe { core::mem::zeroed() };
+    let mut zero_fds1: libc::fd_set = unsafe { core::mem::zeroed() };
+    let mut zero_fds2: libc::fd_set = unsafe { core::mem::zeroed() };
+
+    let readfds = if !readfds.is_null() {
+        check_mut_ptr(readfds)?;
+        unsafe { &mut *readfds }
+    } else {
+        &mut zero_fds0
+    };
+    let writefds = if !writefds.is_null() {
+        check_mut_ptr(writefds)?;
+        unsafe { &mut *writefds }
+    } else {
+        &mut zero_fds1
+    };
+    let exceptfds = if !exceptfds.is_null() {
+        check_mut_ptr(exceptfds)?;
+        unsafe { &mut *exceptfds }
+    } else {
+        &mut zero_fds2
+    };
+    let timeout = if !timeout.is_null() {
+        check_ptr(timeout)?;
+        Some(unsafe { timeout.read() })
+    } else {
+        None
+    };
+
+    let n = fs::do_select(nfds, readfds, writefds, exceptfds, timeout)?;
+    Ok(n as isize)
+}
+
+fn do_poll(
+    fds: *mut libc::pollfd,
+    nfds: libc::nfds_t,
+    timeout: c_int,
+) -> Result<isize, Error> {
+    check_mut_array(fds, nfds as usize)?;
+    let polls = unsafe { std::slice::from_raw_parts_mut(fds, nfds as usize) };
+
+    let n = fs::do_poll(polls, timeout)?;
+    Ok(n as isize)
+}
+
+fn do_epoll_create1(flags: c_int) -> Result<isize, Error> {
+    unimplemented!()
+}
+
+fn do_epoll_ctl(
+    epfd: c_int,
+    op: c_int,
+    fd: c_int,
+    event: *const libc::epoll_event,
+) -> Result<isize, Error> {
+    unimplemented!()
+}
+
+fn do_epoll_wait(
+    epfd: c_int,
+    events: *mut libc::epoll_event,
+    maxevents: c_int,
+    timeout: c_int,
+) -> Result<isize, Error> {
+    unimplemented!()
+}
+
+pub trait AsSocket {
     fn as_socket(&self) -> Result<&SocketFile, Error>;
 }
 

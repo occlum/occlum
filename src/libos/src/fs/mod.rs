@@ -12,6 +12,7 @@ pub use self::inode_file::{INodeExt, INodeFile, ROOT_INODE};
 pub use self::socket_file::SocketFile;
 use self::inode_file::OpenOptions;
 pub use self::pipe::Pipe;
+pub use self::io_multiplexing::*;
 
 mod file;
 mod file_table;
@@ -19,6 +20,7 @@ mod inode_file;
 mod socket_file;
 mod pipe;
 mod sgx_impl;
+mod io_multiplexing;
 
 
 pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
