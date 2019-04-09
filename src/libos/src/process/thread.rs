@@ -68,6 +68,8 @@ pub fn do_clone(
         let mut new_thread = new_thread_ref.lock().unwrap();
         parent.children.push(Arc::downgrade(&new_thread_ref));
         new_thread.parent = Some(parent_ref.clone());
+
+        new_thread.tgid = current.tgid;
     }
 
     process_table::put(new_thread_pid, new_thread_ref.clone());

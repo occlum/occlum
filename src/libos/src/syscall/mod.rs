@@ -86,6 +86,12 @@ pub extern "C" fn dispatch_syscall(
         SYS_GETPID => do_getpid(),
         SYS_GETTID => do_gettid(),
         SYS_GETPPID => do_getppid(),
+        SYS_GETPGID => do_getpgid(),
+
+        SYS_GETUID => do_getuid(),
+        SYS_GETGID => do_getgid(),
+        SYS_GETEUID => do_geteuid(),
+        SYS_GETEGID => do_getegid(),
 
         SYS_RT_SIGACTION => do_rt_sigaction(),
         SYS_RT_SIGPROCMASK => do_rt_sigprocmask(),
@@ -576,6 +582,30 @@ fn do_getppid() -> Result<isize, Error> {
     let ppid = process::do_getppid();
     Ok(ppid as isize)
 }
+
+fn do_getpgid() -> Result<isize, Error> {
+    let pgid = process::do_getpgid();
+    Ok(pgid as isize)
+}
+
+// TODO: implement uid, gid, euid, egid
+
+fn do_getuid() -> Result<isize, Error> {
+    Ok(0)
+}
+
+fn do_getgid() -> Result<isize, Error> {
+    Ok(0)
+}
+
+fn do_geteuid() -> Result<isize, Error> {
+    Ok(0)
+}
+
+fn do_getegid() -> Result<isize, Error> {
+    Ok(0)
+}
+
 
 fn do_pipe2(fds_u: *mut i32, flags: u32) -> Result<isize, Error> {
     check_mut_array(fds_u, 2)?;

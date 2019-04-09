@@ -10,7 +10,7 @@ lazy_static! {
             task: Default::default(),
             status: Default::default(),
             pid: 0,
-            pgid: 0,
+            pgid: 1,
             tgid: 0,
             exit_status: 0,
             cwd: "/".to_owned(),
@@ -38,7 +38,7 @@ impl Process {
             task: task,
             status: Default::default(),
             pid: new_pid,
-            pgid: new_pid,
+            pgid: 1, // TODO: implement pgid
             tgid: new_pid,
             cwd: cwd.to_owned(),
             clear_child_tid: None,
