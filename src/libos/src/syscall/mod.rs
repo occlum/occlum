@@ -8,7 +8,7 @@ use std::ptr;
 use time::timeval_t;
 use util::mem_util::from_user::*;
 use vm::{VMAreaFlags, VMResizeOptions};
-use misc::{utsname_t};
+use misc::{utsname_t, resource_t, rlimit_t};
 
 use super::*;
 
@@ -133,6 +133,8 @@ pub extern "C" fn dispatch_syscall(
         SYS_GETTIMEOFDAY => do_gettimeofday(arg0 as *mut timeval_t),
 
         SYS_UNAME => do_uname(arg0 as *mut utsname_t),
+
+        SYS_PRLIMIT64 => do_prlimit(arg0 as pid_t, arg1 as u32, arg2 as *const rlimit_t, arg3 as *mut rlimit_t),
 
         _ => do_unknown(num, arg0, arg1, arg2, arg3, arg4, arg5),
     };
@@ -704,4 +706,27 @@ fn do_uname(name: *mut utsname_t) -> Result<isize, Error> {
     check_mut_ptr(name)?;
     let name = unsafe { &mut *name };
     misc::do_uname(name).map(|_| 0)
+}
+
+fn do_prlimit(pid: pid_t, resource: u32, new_limit: *const rlimit_t, old_limit: *mut rlimit_t) -> Result<isize, Error> {
+    let resource = resource_t::from_u32(resource)?;
+    let new_limit = {
+        if new_limit != ptr::null() {
+            check_ptr(new_limit)?;
+            Some(unsafe { &*new_limit })
+        }
+        else {
+            None
+        }
+    };
+    let old_limit = {
+        if old_limit != ptr::null_mut() {
+            check_mut_ptr(old_limit)?;
+            Some(unsafe { &mut *old_limit })
+        }
+        else {
+            None
+        }
+    };
+    misc::do_prlimit(pid, resource, new_limit, old_limit).map(|_| 0)
 }
