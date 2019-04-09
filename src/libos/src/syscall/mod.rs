@@ -82,9 +82,13 @@ pub extern "C" fn dispatch_syscall(
             arg4 as *const FdOp,
         ),
         SYS_WAIT4 => do_wait4(arg0 as i32, arg1 as *mut i32),
+
         SYS_GETPID => do_getpid(),
         SYS_GETTID => do_gettid(),
         SYS_GETPPID => do_getppid(),
+
+        SYS_RT_SIGACTION => do_rt_sigaction(),
+        SYS_RT_SIGPROCMASK => do_rt_sigprocmask(),
 
         SYS_CLONE => do_clone(
             arg0 as u32,
@@ -750,4 +754,14 @@ fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) -> Result<is
     let mode = AccessModes::from_u32(mode)?;
     let flags = AccessFlags::from_u32(flags)?;
     fs::do_faccessat(dirfd, &path, mode, flags).map(|_| 0)
+}
+
+// TODO: implement signals
+
+fn do_rt_sigaction() -> Result<isize, Error> {
+    Ok(0)
+}
+
+fn do_rt_sigprocmask() -> Result<isize, Error> {
+    Ok(0)
 }
