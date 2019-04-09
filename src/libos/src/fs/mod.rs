@@ -11,12 +11,14 @@ pub use self::file_table::{FileDesc, FileTable};
 pub use self::inode_file::{INodeExt, INodeFile, ROOT_INODE};
 use self::inode_file::OpenOptions;
 pub use self::pipe::Pipe;
+pub use self::access::{AccessModes, AccessFlags, AT_FDCWD, do_access, do_faccessat};
 
 mod file;
 mod file_table;
 mod inode_file;
 mod pipe;
 mod sgx_impl;
+mod access;
 
 // TODO: use the type defined in Rust libc.
 //

@@ -21,6 +21,11 @@ int main(int argc, const char* argv[]) {
         return fd;
     }
 
+    if (access(FILE_NAME, F_OK) < 0) {
+        printf("cannot access the new file\n");
+        return -1;
+    }
+
     ret = ftruncate(fd, TRUNC_LEN);
     if (ret < 0) {
         printf("failed to ftruncate the file\n");
