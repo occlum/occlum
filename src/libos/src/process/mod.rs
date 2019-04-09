@@ -1,8 +1,6 @@
 pub use self::process::{Status, IDLE_PROCESS};
 pub use self::task::{get_current, run_task};
-pub mod table {
-    pub use super::process_table::get;
-}
+pub use self::process_table::{get};
 pub use self::exit::{do_exit, do_wait4, ChildProcessFilter};
 pub use self::spawn::{do_spawn, FileAction};
 pub use self::wait::{WaitQueue, Waiter};
@@ -30,6 +28,7 @@ pub struct Process {
     waiting_children: Option<WaitQueue<ChildProcessFilter, pid_t>>,
     vm: ProcessVMRef,
     file_table: FileTableRef,
+    rlimits: ResourceLimitsRef,
 }
 
 pub type ProcessRef = Arc<SgxMutex<Process>>;
@@ -79,3 +78,4 @@ use self::task::Task;
 use super::*;
 use fs::{File, FileRef, FileTable};
 use vm::{ProcessVM, VMRangeTrait};
+use misc::{ResourceLimitsRef};
