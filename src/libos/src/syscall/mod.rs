@@ -1,6 +1,5 @@
 use {fs, process, std, vm};
-use fs::{FileDesc, off_t};
-use fs::File;
+use fs::{File, FileDesc, off_t, AccessModes, AccessFlags, AT_FDCWD};
 use prelude::*;
 use process::{ChildProcessFilter, FileAction, pid_t, CloneFlags, FutexFlags, FutexOp};
 use std::ffi::{CStr, CString};
@@ -57,6 +56,8 @@ pub extern "C" fn dispatch_syscall(
         SYS_STAT => do_stat(arg0 as *const i8, arg1 as *mut fs::Stat),
         SYS_FSTAT => do_fstat(arg0 as FileDesc, arg1 as *mut fs::Stat),
         SYS_LSTAT => do_lstat(arg0 as *const i8, arg1 as *mut fs::Stat),
+        SYS_ACCESS => do_access(arg0 as *const i8, arg1 as u32),
+        SYS_FACCESSAT => do_faccessat(arg0 as i32, arg1 as *const i8, arg2 as u32, arg3 as u32),
         SYS_LSEEK => do_lseek(arg0 as FileDesc, arg1 as off_t, arg2 as i32),
         SYS_FSYNC => do_fsync(arg0 as FileDesc),
         SYS_FDATASYNC => do_fdatasync(arg0 as FileDesc),
@@ -729,4 +730,24 @@ fn do_prlimit(pid: pid_t, resource: u32, new_limit: *const rlimit_t, old_limit: 
         }
     };
     misc::do_prlimit(pid, resource, new_limit, old_limit).map(|_| 0)
+}
+
+fn do_access(path: *const i8, mode: u32) -> Result<isize, Error> {
+    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
+    let mode = AccessModes::from_u32(mode)?;
+    fs::do_access(&path, mode).map(|_| 0)
+}
+
+fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) -> Result<isize, Error> {
+    let dirfd = if dirfd >= 0 {
+        Some(dirfd as FileDesc)
+    } else if dirfd == AT_FDCWD {
+        None
+    } else {
+        return errno!(EINVAL, "invalid dirfd");
+    };
+    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
+    let mode = AccessModes::from_u32(mode)?;
+    let flags = AccessFlags::from_u32(flags)?;
+    fs::do_faccessat(dirfd, &path, mode, flags).map(|_| 0)
 }
