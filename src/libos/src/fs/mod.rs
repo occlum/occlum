@@ -695,3 +695,8 @@ pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize, Error> {
         },
     })
 }
+
+pub fn do_readlink(path: &str, buf: &mut [u8]) -> Result<usize, Error> {
+    // TODO: support symbolic links
+    errno!(EINVAL, "not a symbolic link")
+}
