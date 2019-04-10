@@ -101,11 +101,11 @@ impl VMAreaFlags {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Default)]
 pub struct VMAllocOptions {
     size: usize,
     addr: VMAddrOption,
-    growth: Option<VMGrowthType>,
+    growth: VMGrowthType,
 }
 
 impl VMAllocOptions {
@@ -128,7 +128,7 @@ impl VMAllocOptions {
     }
 
     pub fn growth(&mut self, growth: VMGrowthType) -> Result<&mut Self, Error> {
-        self.growth = Some(growth);
+        self.growth = growth;
         Ok(self)
     }
 }
@@ -143,15 +143,6 @@ impl fmt::Debug for VMAllocOptions {
     }
 }
 
-impl Default for VMAllocOptions {
-    fn default() -> VMAllocOptions {
-        VMAllocOptions {
-            size: 0,
-            addr: VMAddrOption::Any,
-            growth: None,
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VMAddrOption {
@@ -159,6 +150,12 @@ pub enum VMAddrOption {
     Hint(usize),   // Near the given address
     Fixed(usize),  // Must be the given address
     Beyond(usize), // Must be greater or equal to the given address
+}
+
+impl Default for VMAddrOption {
+    fn default() -> VMAddrOption {
+        VMAddrOption::Any
+    }
 }
 
 impl VMAddrOption {
@@ -179,18 +176,26 @@ impl VMAddrOption {
     }
 }
 
+
 /// How VMRange may grow:
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VMGrowthType {
+    Fixed,
     Upward,   // e.g., mmaped regions grow upward
     Downward, // e.g., stacks grows downward
-    Fixed,
 }
 
-#[derive(Clone, Debug)]
+impl Default for VMGrowthType {
+    fn default() -> VMGrowthType {
+        VMGrowthType::Fixed
+    }
+}
+
+
+#[derive(Clone, Debug, Default)]
 pub struct VMResizeOptions {
     new_size: usize,
-    new_addr: Option<VMAddrOption>,
+    new_addr: VMAddrOption,
 }
 
 impl VMResizeOptions {
@@ -205,16 +210,7 @@ impl VMResizeOptions {
     }
 
     pub fn addr(&mut self, new_addr: VMAddrOption) -> &mut Self {
-        self.new_addr = Some(new_addr);
+        self.new_addr = new_addr;
         self
-    }
-}
-
-impl Default for VMResizeOptions {
-    fn default() -> VMResizeOptions {
-        VMResizeOptions {
-            new_size: 0,
-            new_addr: None,
-        }
     }
 }

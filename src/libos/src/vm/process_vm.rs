@@ -156,7 +156,8 @@ impl ProcessVM {
                     if addr < mmap_start_addr {
                         return Err(Error::new(Errno::EINVAL, "Beyond valid memory range"));
                     }
-                    VMAddrOption::Fixed(addr)
+                    // TODO: Fixed or Hint? Should hanle mmap flags
+                    VMAddrOption::Hint(addr)
                 })?
                 .growth(VMGrowthType::Upward)?;
             alloc_options
@@ -168,11 +169,10 @@ impl ProcessVM {
         Ok(addr)
     }
 
+    // TODO: handle the case when the given range [addr, addr + size)
+    // does not match exactly with any vma. For example, when this range
+    // cover multiple ranges or cover some range partially.
     pub fn munmap(&mut self, addr: usize, size: usize) -> Result<(), Error> {
-        // TODO: handle the case when the given range [addr, addr + size)
-        // does not match exactly with any vma. For example, when this range
-        // cover multiple ranges or cover some range partially.
-
         let mmap_vma_i = {
             let mmap_vma_i = self
                 .get_mmap_vmas()

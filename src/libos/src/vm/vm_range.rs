@@ -60,107 +60,20 @@ impl VMRange {
     }
 
     pub fn alloc_subrange(&mut self, options: &VMAllocOptions) -> Result<VMRange, Error> {
-        // Get valid parameters from options
-        let size = options.size;
-        let addr = options.addr;
-        let growth = options.growth.unwrap_or(VMGrowthType::Fixed);
+        // Find a free space that satisfies the options
+        let free_space = self.look_for_free_space(options)?;
 
-        // Lazy initialize the subrange array upon the first allocation
-        if !self.has_subranges() {
-            self.init_subranges()?;
-        }
+        let (new_subrange_start, new_subrange_end) =
+            self.alloc_from_free_space(&free_space, options);
+        debug_assert!(free_space.contains(new_subrange_start));
+        debug_assert!(free_space.contains(new_subrange_end));
 
-        // Find a free space for allocating a VMRange
-        let free_space = {
-            // Look for the minimal big-enough free space
-            let mut min_big_enough_free_space: Option<FreeSpace> = None;
-            let sub_ranges = self.get_subranges();
-            for (idx, range_pair) in sub_ranges.windows(2).enumerate() {
-                let pre_range = &range_pair[0];
-                let next_range = &range_pair[1];
-
-                let mut free_range = {
-                    let free_range_start = pre_range.get_end();
-                    let free_range_end = next_range.get_start();
-
-                    let free_range_size = free_range_end - free_range_start;
-                    if free_range_size < size {
-                        continue;
-                    }
-
-                    free_range_start..free_range_end
-                };
-
-                match addr {
-                    VMAddrOption::Hint(addr) | VMAddrOption::Fixed(addr) => {
-                        if !free_range.contains(&addr) {
-                            continue;
-                        }
-                        free_range.start = addr;
-                    }
-                    VMAddrOption::Beyond(addr) => {
-                        if free_range.start < addr {
-                            continue;
-                        }
-                    }
-                    _ => {}
-                }
-
-                let free_space = Some(FreeSpace {
-                    index_in_subranges: idx + 1,
-                    start: free_range.start,
-                    end: free_range.end,
-                    may_neighbor_grow: (
-                        pre_range.growth == VMGrowthType::Upward,
-                        next_range.growth == VMGrowthType::Downward,
-                    ),
-                });
-
-                if min_big_enough_free_space == None || free_space < min_big_enough_free_space {
-                    min_big_enough_free_space = free_space;
-
-                    match addr {
-                        VMAddrOption::Hint(addr) | VMAddrOption::Fixed(addr) => break,
-                        _ => {}
-                    }
-                }
-            }
-
-            if min_big_enough_free_space.is_none() {
-                return errno!(ENOMEM, "No enough space");
-            }
-            min_big_enough_free_space.unwrap()
-        };
-
-        // Given the free space, determine the start and end of the sub-range
-        let (new_subrange_start, new_subrange_end) = match addr {
-            VMAddrOption::Any | VMAddrOption::Beyond(_) => {
-                let should_no_gap_to_pre_domain =
-                    free_space.may_neighbor_grow.0 == false && growth != VMGrowthType::Downward;
-                let should_no_gap_to_next_domain =
-                    free_space.may_neighbor_grow.1 == false && growth != VMGrowthType::Upward;
-                let domain_start = if should_no_gap_to_pre_domain {
-                    free_space.start
-                } else if should_no_gap_to_next_domain {
-                    free_space.end - size
-                } else {
-                    // We want to leave some space at both ends in case
-                    // this sub-range or neighbor sub-range needs to grow later.
-                    // As a simple heuristic, we put this sub-range near the
-                    // center between the previous and next sub-ranges.
-                    free_space.start + (free_space.get_size() - size) / 2
-                };
-                (domain_start, domain_start + size)
-            }
-            VMAddrOption::Fixed(addr) => (addr, addr + size),
-            VMAddrOption::Hint(addr) => {
-                return errno!(EINVAL, "Not implemented");
-            }
-        };
-
-        let new_subrange_inner = VMRangeInner::new(new_subrange_start, new_subrange_end, growth);
+        let new_subrange_inner = VMRangeInner::new(new_subrange_start,
+                                                   new_subrange_end,
+                                                   options.growth);
         self.get_subranges_mut()
             .insert(free_space.index_in_subranges, new_subrange_inner);
+
         // Although there are two copies of the newly created VMRangeInner obj,
         // we can keep them in sync as all mutation on VMRange object must
         // be carried out through dealloc_subrange() and resize_subrange() that
@@ -223,7 +136,7 @@ impl VMRange {
         }
     }
 
-    fn init_subranges(&mut self) -> Result<(), Error> {
+    fn init_subrange_array(&mut self) -> Result<(), Error> {
         // Use dummy VMRange as sentinel object at both ends to make the allocation
         // and deallocation algorithm simpler
         let start = self.get_start();
@@ -232,6 +145,132 @@ impl VMRange {
         let end_sentry = VMRangeInner::new(end, end, VMGrowthType::Fixed);
         self.sub_ranges = Some(vec![start_sentry, end_sentry]);
         Ok(())
+    }
+
+    // Find a free space for allocating a sub VMRange
+    fn look_for_free_space(&mut self, options: &VMAllocOptions) -> Result<FreeSpace, Error> {
+        // TODO: reduce the complexity from O(N) to O(log(N)), where N is
+        // the number of existing subranges.
+
+        // Lazy initialize the subrange array upon the first allocation
+        if !self.has_subranges() {
+            self.init_subrange_array()?;
+        }
+
+        // Get valid parameters from options
+        let size = options.size;
+        let addr = options.addr;
+        let growth = options.growth;
+
+        // Record the minimal free space that satisfies the options
+        let mut min_big_enough_free_space: Option<FreeSpace> = None;
+
+        let sub_ranges = self.get_subranges();
+        for (idx, range_pair) in sub_ranges.windows(2).enumerate() {
+            let pre_range = &range_pair[0];
+            let next_range = &range_pair[1];
+
+            let (free_range_start, free_range_end)= {
+                let free_range_start = pre_range.get_end();
+                let free_range_end = next_range.get_start();
+
+                let free_range_size = free_range_end - free_range_start;
+                if free_range_size < size {
+                    continue;
+                }
+
+                (free_range_start, free_range_end)
+            };
+            let mut free_space = FreeSpace {
+                index_in_subranges: idx + 1,
+                start: free_range_start,
+                end: free_range_end,
+                may_neighbor_grow: (
+                    pre_range.growth == VMGrowthType::Upward,
+                    next_range.growth == VMGrowthType::Downward,
+                ),
+            };
+
+            match addr {
+                // Want a minimal free_space
+                VMAddrOption::Any => { },
+                // Prefer to have free_space.start == addr
+                VMAddrOption::Hint(addr) => {
+                    if free_space.contains(addr) {
+                        if free_space.end - addr >= size {
+                            free_space.start = addr;
+                            return Ok(free_space);
+                        }
+                    }
+                },
+                // Must have free_space.start == addr
+                VMAddrOption::Fixed(addr) => {
+                    if !free_space.contains(addr) {
+                        continue;
+                    }
+                    if free_space.end - addr < size {
+                        return errno!(ENOMEM, "not enough memory");
+                    }
+                    free_space.start = addr;
+                    return Ok(free_space);
+                }
+                // Must have free_space.start >= addr
+                VMAddrOption::Beyond(addr) => {
+                    if free_space.end < addr {
+                        continue;
+                    }
+                    if free_space.contains(addr) {
+                        free_space.start = addr;
+                        if free_space.get_size() < size {
+                            continue;
+                        }
+                    }
+                },
+            }
+
+            if min_big_enough_free_space == None ||
+                free_space < *min_big_enough_free_space.as_ref().unwrap() {
+                min_big_enough_free_space = Some(free_space);
+            }
+        }
+
+        min_big_enough_free_space
+            .ok_or_else(|| Error::new(Errno::ENOMEM, "not enough space"))
+    }
+
+    fn alloc_from_free_space(&self, free_space: &FreeSpace, options: &VMAllocOptions) -> (usize, usize) {
+        // Get valid parameters from options
+        let size = options.size;
+        let addr_option = options.addr;
+        let growth = options.growth;
+
+        if let VMAddrOption::Fixed(addr) = addr_option {
+            return (addr, addr + size);
+        }
+        else if let VMAddrOption::Hint(addr) = addr_option {
+            if free_space.start == addr {
+                return (addr, addr + size);
+            }
+        }
+
+        let should_no_gap_to_pre_domain =
+            free_space.may_neighbor_grow.0 == false && growth != VMGrowthType::Downward;
+        let should_no_gap_to_next_domain =
+            free_space.may_neighbor_grow.1 == false && growth != VMGrowthType::Upward;
+
+        let addr = if should_no_gap_to_pre_domain {
+            free_space.start
+        } else if should_no_gap_to_next_domain {
+            free_space.end - size
+        } else {
+            // We want to leave some space at both ends in case
+            // this sub-range or neighbor sub-range needs to grow later.
+            // As a simple heuristic, we put this sub-range near the
+            // center between the previous and next sub-ranges.
+            free_space.start + (free_space.get_size() - size) / 2
+        };
+
+        (addr, addr + size)
     }
 
     fn ensure_subrange_is_a_child(&self, subrange: &VMRange) {
@@ -478,8 +517,13 @@ impl FreeSpace {
         pressure += if self.may_neighbor_grow.1 { 1 } else { 0 };
         pressure
     }
+
     fn get_size(&self) -> usize {
         self.end - self.start
+    }
+
+    fn contains(&self, addr: usize) -> bool {
+        self.start <= addr && addr < self.end
     }
 }
 
