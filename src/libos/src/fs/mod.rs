@@ -390,7 +390,7 @@ fn split_path(path: &str) -> (&str, &str) {
 }
 
 bitflags! {
-    struct OpenFlags: u32 {
+    pub struct OpenFlags: u32 {
         /// read only
         const RDONLY = 0;
         /// write only
@@ -613,4 +613,85 @@ impl From<Metadata> for Stat {
 pub unsafe fn write_cstr(ptr: *mut u8, s: &str) {
     ptr.copy_from(s.as_ptr(), s.len());
     ptr.add(s.len()).write(0);
+}
+
+
+#[derive(Debug)]
+pub enum FcntlCmd {
+    /// Duplicate the file descriptor fd using the lowest-numbered available
+    /// file descriptor greater than or equal to arg.
+    DupFd(FileDesc),
+    /// As for `DupFd`, but additionally set the close-on-exec flag for the
+    /// duplicate file descriptor.
+    DupFdCloexec(FileDesc),
+    /// Return (as the function result) the file descriptor flags
+    GetFd(),
+    /// Set the file descriptor to be close-on-exec or not
+    SetFd(u32),
+    /// Get the file status flags
+    GetFl(),
+    /// Set the file status flags
+    SetFl(OpenFlags),
+}
+
+pub const F_DUPFD : u32             = 0;
+pub const F_GETFD : u32             = 1;
+pub const F_SETFD : u32             = 2;
+pub const F_GETFL : u32             = 3;
+pub const F_SETFL : u32             = 4;
+pub const F_DUPFD_CLOEXEC : u32     = 1030;
+
+pub const FD_CLOEXEC : u32          = 1;
+
+impl FcntlCmd {
+    #[deny(unreachable_patterns)]
+    pub fn from_raw(cmd: u32, arg: u64) -> Result<FcntlCmd, Error> {
+        Ok(match cmd {
+            F_DUPFD => FcntlCmd::DupFd(arg as FileDesc),
+            F_DUPFD_CLOEXEC => FcntlCmd::DupFdCloexec(arg as FileDesc),
+            F_GETFD => FcntlCmd::GetFd(),
+            F_SETFD => FcntlCmd::SetFd(arg as u32),
+            F_GETFL => FcntlCmd::GetFl(),
+            F_SETFL => FcntlCmd::SetFl(OpenFlags::from_bits_truncate(arg as u32)),
+            _ => return errno!(EINVAL, "invalid command"),
+        })
+    }
+}
+
+pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize, Error> {
+    info!("do_fcntl: {:?}, {:?}", &fd, cmd);
+    let current_ref = process::get_current();
+    let mut current = current_ref.lock().unwrap();
+    let files_ref = current.get_files();
+    let mut files = files_ref.lock().unwrap();
+    Ok(match cmd {
+        FcntlCmd::DupFd(min_fd) => {
+            let dup_fd = files.dup(fd, *min_fd, false)?;
+            dup_fd as isize
+        },
+        FcntlCmd::DupFdCloexec(min_fd) => {
+            let dup_fd = files.dup(fd, *min_fd, true)?;
+            dup_fd as isize
+        },
+        FcntlCmd::GetFd() => {
+            let entry = files.get_entry(fd)?;
+            let fd_flags = if entry.is_close_on_spawn() {
+                FD_CLOEXEC
+            } else {
+                0
+            };
+            fd_flags as isize
+        },
+        FcntlCmd::SetFd(fd_flags) => {
+            let entry = files.get_entry_mut(fd)?;
+            entry.set_close_on_spawn((fd_flags & FD_CLOEXEC) != 0);
+            0
+        },
+        FcntlCmd::GetFl() => {
+            unimplemented!();
+        },
+        FcntlCmd::SetFl(flags) => {
+            unimplemented!();
+        },
+    })
 }
