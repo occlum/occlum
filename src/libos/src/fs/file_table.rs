@@ -11,12 +11,6 @@ pub struct FileTable {
     num_fds: usize,
 }
 
-#[derive(Debug, Clone)]
-struct FileTableEntry {
-    file: FileRef,
-    close_on_spawn: bool,
-}
-
 impl FileTable {
     pub fn new() -> FileTable {
         FileTable {
@@ -25,12 +19,38 @@ impl FileTable {
         }
     }
 
+    pub fn dup(&mut self, fd: FileDesc, min_fd: FileDesc, close_on_spawn: bool) -> Result<FileDesc, Error> {
+        let file_ref = self.get(fd)?;
+
+        let min_fd = min_fd as usize;
+        let min_free_fd = {
+            let mut table = &mut self.table;
+
+            // Make sure that min_fd does not exceed the capacity of the table
+            if min_fd >= table.len() {
+                let expand_size = min_fd - table.len() + 1;
+                for _ in 0..expand_size {
+                    table.push(None)
+                }
+            }
+
+            table.iter()
+                .enumerate()
+                .skip(min_fd as usize)
+                .find(|&(idx, opt)| opt.is_none())
+                .unwrap().0
+        } as FileDesc;
+
+        self.put_at(min_free_fd, file_ref, close_on_spawn);
+
+        Ok(min_free_fd)
+    }
+
     pub fn put(&mut self, file: FileRef, close_on_spawn: bool) -> FileDesc {
         let mut table = &mut self.table;
 
         let min_free_fd = if self.num_fds < table.len() {
-            table
-                .iter()
+            table.iter()
                 .enumerate()
                 .find(|&(idx, opt)| opt.is_none())
                 .unwrap()
@@ -59,13 +79,30 @@ impl FileTable {
     }
 
     pub fn get(&self, fd: FileDesc) -> Result<FileRef, Error> {
+        let entry = self.get_entry(fd)?;
+        Ok(entry.file.clone())
+    }
+
+    pub fn get_entry(&self, fd: FileDesc) -> Result<&FileTableEntry, Error> {
         if fd as usize >= self.table.len() {
             return errno!(EBADF, "Invalid file descriptor");
         }
 
         let table = &self.table;
         match table[fd as usize].as_ref() {
-            Some(table_entry) => Ok(table_entry.file.clone()),
+            Some(table_entry) => Ok(table_entry),
+            None => errno!(EBADF, "Invalid file descriptor"),
+        }
+    }
+
+    pub fn get_entry_mut(&mut self, fd: FileDesc) -> Result<&mut FileTableEntry, Error> {
+        if fd as usize >= self.table.len() {
+            return errno!(EBADF, "Invalid file descriptor");
+        }
+
+        let table = &mut self.table;
+        match table[fd as usize].as_mut() {
+            Some(table_entry) => Ok(table_entry),
             None => errno!(EBADF, "Invalid file descriptor"),
         }
     }
@@ -114,11 +151,33 @@ impl Clone for FileTable {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct FileTableEntry {
+    file: FileRef,
+    close_on_spawn: bool,
+}
+
 impl FileTableEntry {
-    fn new(file: FileRef, close_on_spawn: bool) -> FileTableEntry {
+    pub fn new(file: FileRef, close_on_spawn: bool) -> FileTableEntry {
         FileTableEntry {
             file,
             close_on_spawn,
         }
+    }
+
+    pub fn get_file(&self) -> &FileRef {
+        &self.file
+    }
+
+    pub fn is_close_on_spawn(&self) -> bool {
+        self.close_on_spawn
+    }
+
+    pub fn get_file_mut(&mut self) -> &mut FileRef {
+        &mut self.file
+    }
+
+    pub fn set_close_on_spawn(&mut self, close_on_spawn: bool) {
+        self.close_on_spawn = close_on_spawn;
     }
 }

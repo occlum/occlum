@@ -1,5 +1,5 @@
 use {fs, process, std, vm};
-use fs::{File, FileDesc, off_t, AccessModes, AccessFlags, AT_FDCWD};
+use fs::{File, FileDesc, off_t, AccessModes, AccessFlags, AT_FDCWD, FcntlCmd};
 use prelude::*;
 use process::{ChildProcessFilter, FileAction, pid_t, CloneFlags, FutexFlags, FutexOp};
 use std::ffi::{CStr, CString};
@@ -72,6 +72,7 @@ pub extern "C" fn dispatch_syscall(
         SYS_RMDIR => do_rmdir(arg0 as *const i8),
         SYS_LINK => do_link(arg0 as *const i8, arg1 as *const i8),
         SYS_UNLINK => do_unlink(arg0 as *const i8),
+        SYS_FCNTL => do_fcntl(arg0 as FileDesc, arg1 as u32, arg2 as u64),
 
         SYS_EXIT => do_exit(arg0 as i32),
         SYS_SPAWN => do_spawn(
@@ -724,6 +725,11 @@ fn do_unlink(path: *const i8) -> Result<isize, Error> {
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     fs::do_unlink(&path)?;
     Ok(0)
+}
+
+fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize, Error> {
+    let cmd = FcntlCmd::from_raw(cmd, arg)?;
+    fs::do_fcntl(fd, &cmd)
 }
 
 fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize, Error> {
