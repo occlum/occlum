@@ -72,6 +72,7 @@ pub extern "C" fn dispatch_syscall(
         SYS_RMDIR => do_rmdir(arg0 as *const i8),
         SYS_LINK => do_link(arg0 as *const i8, arg1 as *const i8),
         SYS_UNLINK => do_unlink(arg0 as *const i8),
+        SYS_READLINK => do_readlink(arg0 as *const i8, arg1 as *mut u8, arg2 as usize),
         SYS_FCNTL => do_fcntl(arg0 as FileDesc, arg1 as u32, arg2 as u64),
 
         SYS_EXIT => do_exit(arg0 as i32),
@@ -725,6 +726,16 @@ fn do_unlink(path: *const i8) -> Result<isize, Error> {
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     fs::do_unlink(&path)?;
     Ok(0)
+}
+
+fn do_readlink(path: *const i8, buf: *mut u8, size: usize) -> Result<isize, Error> {
+    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
+    let buf = {
+        check_array(buf, size)?;
+        unsafe { std::slice::from_raw_parts_mut(buf, size) }
+    };
+    let len = fs::do_readlink(&path, buf)?;
+    Ok(len as isize)
 }
 
 fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize, Error> {
