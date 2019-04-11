@@ -11,7 +11,7 @@ lazy_static! {
             (addr, size)
         };
         let vm_space = unsafe {
-            match VMSpace::new(addr, size, VMGuardAreaType::None) {
+            match VMSpace::new(addr, size, VMGuardAreaType::None, "DATA_SPACE") {
                 Ok(vm_space) => vm_space,
                 Err(_) => panic!("Failed to create a VMSpace"),
             }
@@ -27,11 +27,11 @@ extern "C" {
 #[derive(Debug, Default)]
 pub struct ProcessVM {
     //code_domain: VMDomain,
-    data_domain: VMDomain,
-    code_vma: VMArea,
-    data_vma: VMArea,
-    heap_vma: VMArea,
-    stack_vma: VMArea,
+    data_domain: Option<Box<VMDomain>>,
+    code_vma: Option<Box<VMArea>>,
+    data_vma: Option<Box<VMArea>>,
+    heap_vma: Option<Box<VMArea>>,
+    stack_vma: Option<Box<VMArea>>,
     mmap_vmas: Vec<Box<VMArea>>,
     brk: usize,
 }
@@ -44,29 +44,39 @@ impl ProcessVM {
         stack_size: usize,
         mmap_size: usize,
     ) -> Result<ProcessVM, Error> {
-        let data_domain_size = code_size + data_size + heap_size + stack_size + mmap_size;
-        let mut data_domain = DATA_SPACE.lock().unwrap().alloc_domain(data_domain_size)?;
-
-        let (code_vma, data_vma, heap_vma, stack_vma) = ProcessVM::alloc_vmas(
-            &mut data_domain,
-            code_size,
-            data_size,
-            heap_size,
-            stack_size,
-        )?;
+        // Allocate the data domain from the global data space
+        let mut data_domain = {
+            let data_domain_size = code_size + data_size + heap_size
+                                 + stack_size + mmap_size;
+            let data_domain = DATA_SPACE.lock().unwrap().alloc_domain(
+                                    data_domain_size, "data_domain")?;
+            data_domain
+        };
+        // Allocate vmas from the data domain
+        let (code_vma, data_vma, heap_vma, stack_vma) =
+            match ProcessVM::alloc_vmas(&mut data_domain, code_size,
+                                        data_size, heap_size, stack_size) {
+                Err(e) => {
+                    // Note: we need to handle error here so that we can
+                    // deallocate the data domain explictly.
+                    DATA_SPACE.lock().unwrap().dealloc_domain(data_domain);
+                    return Err(e);
+                },
+                Ok(vmas) => vmas,
+            };
         // Initial value of the program break
         let brk = heap_vma.get_start();
         // No mmapped vmas initially
         let mmap_vmas = Vec::new();
 
         let vm = ProcessVM {
-            data_domain,
-            code_vma,
-            data_vma,
-            heap_vma,
-            stack_vma,
-            mmap_vmas,
-            brk,
+            data_domain: Some(Box::new(data_domain)),
+            code_vma: Some(Box::new(code_vma)),
+            data_vma: Some(Box::new(data_vma)),
+            heap_vma: Some(Box::new(heap_vma)),
+            stack_vma: Some(Box::new(stack_vma)),
+            mmap_vmas: mmap_vmas,
+            brk: brk,
         };
         Ok(vm)
     }
@@ -79,11 +89,12 @@ impl ProcessVM {
         stack_size: usize,
     ) -> Result<(VMArea, VMArea, VMArea, VMArea), Error> {
         let mut addr = data_domain.get_start();
-
         let mut alloc_vma_continuously =
-            |addr: &mut usize, size, flags, growth| -> Result<_, Error> {
+            |addr: &mut usize, size, flags, growth, desc| -> Result<_, Error> {
                 let mut options = VMAllocOptions::new(size)?;
-                options.addr(VMAddrOption::Fixed(*addr))?.growth(growth)?;
+                options.addr(VMAddrOption::Fixed(*addr))?
+                    .growth(growth)?
+                    .description(desc)?;
                 let new_vma = data_domain.alloc_area(&options, flags)?;
                 *addr += size;
                 Ok(new_vma)
@@ -92,39 +103,39 @@ impl ProcessVM {
         let rx_flags = VMAreaFlags(VM_AREA_FLAG_R | VM_AREA_FLAG_X);
         let rw_flags = VMAreaFlags(VM_AREA_FLAG_R | VM_AREA_FLAG_W);
 
-        let code_vma = alloc_vma_continuously(&mut addr, code_size, rx_flags, VMGrowthType::Fixed)?;
-        let data_vma = alloc_vma_continuously(&mut addr, data_size, rw_flags, VMGrowthType::Fixed)?;
-        let heap_vma = alloc_vma_continuously(&mut addr, 0, rw_flags, VMGrowthType::Upward)?;
+        let code_vma = alloc_vma_continuously(&mut addr, code_size, rx_flags, VMGrowthType::Fixed, "code_vma")?;
+        let data_vma = alloc_vma_continuously(&mut addr, data_size, rw_flags, VMGrowthType::Fixed, "data_vma")?;
+        let heap_vma = alloc_vma_continuously(&mut addr, 0, rw_flags, VMGrowthType::Upward, "heap_vma")?;
         // Preserve the space for heap
         addr += heap_size;
         // After the heap is the stack
         let stack_vma =
-            alloc_vma_continuously(&mut addr, stack_size, rw_flags, VMGrowthType::Downward)?;
+            alloc_vma_continuously(&mut addr, stack_size, rw_flags, VMGrowthType::Downward, "stack_vma")?;
         Ok((code_vma, data_vma, heap_vma, stack_vma))
     }
 
     pub fn get_base_addr(&self) -> usize {
-        self.code_vma.get_start()
+        self.get_code_vma().get_start()
     }
 
     pub fn get_code_vma(&self) -> &VMArea {
-        &self.code_vma
+        &self.code_vma.as_ref().unwrap()
     }
 
     pub fn get_data_vma(&self) -> &VMArea {
-        &self.data_vma
+        &self.data_vma.as_ref().unwrap()
     }
 
     pub fn get_heap_vma(&self) -> &VMArea {
-        &self.heap_vma
+        &self.heap_vma.as_ref().unwrap()
     }
 
     pub fn get_stack_vma(&self) -> &VMArea {
-        &self.stack_vma
+        &self.stack_vma.as_ref().unwrap()
     }
 
     pub fn get_stack_top(&self) -> usize {
-        self.stack_vma.get_end()
+        self.get_stack_vma().get_end()
     }
 
     pub fn get_mmap_vmas(&self) -> &[Box<VMArea>] {
@@ -163,7 +174,8 @@ impl ProcessVM {
             alloc_options
         };
         // TODO: when failed, try to resize data_domain
-        let new_mmap_vma = self.data_domain.alloc_area(&alloc_options, flags)?;
+        let new_mmap_vma = self.get_data_domain_mut()
+            .alloc_area(&alloc_options, flags)?;
         let addr = new_mmap_vma.get_start();
         self.mmap_vmas.push(Box::new(new_mmap_vma));
         Ok(addr)
@@ -184,8 +196,8 @@ impl ProcessVM {
             mmap_vma_i.unwrap()
         };
 
-        let mut removed_mmap_vma = self.mmap_vmas.swap_remove(mmap_vma_i);
-        self.data_domain.dealloc_area(&mut removed_mmap_vma);
+        let removed_mmap_vma = self.mmap_vmas.swap_remove(mmap_vma_i);
+        self.get_data_domain_mut().dealloc_area(unbox(removed_mmap_vma));
         Ok(())
     }
 
@@ -200,43 +212,52 @@ impl ProcessVM {
     }
 
     pub fn brk(&mut self, new_brk: usize) -> Result<usize, Error> {
+        let (heap_start, heap_end) = {
+            let heap_vma = self.heap_vma.as_ref().unwrap();
+            (heap_vma.get_start(), heap_vma.get_end())
+        };
         if new_brk == 0 {
             return Ok(self.get_brk());
-        } else if new_brk < self.heap_vma.get_start() {
+        } else if new_brk < heap_start {
             return errno!(EINVAL, "New brk address is too low");
-        } else if new_brk <= self.heap_vma.get_end() {
-            self.brk = new_brk;
-            return Ok(new_brk);
+        } else if new_brk > heap_end {
+            // TODO: init the memory with zeros for the expanded area
+            let resize_options = {
+                let new_heap_end = align_up(new_brk, 4096);
+                let new_heap_size = new_heap_end - heap_start;
+                let mut options = VMResizeOptions::new(new_heap_size)?;
+                options.addr(VMAddrOption::Fixed(heap_start));
+                options
+            };
+            let heap_vma = self.heap_vma.as_mut().unwrap();
+            let data_domain = self.data_domain.as_mut().unwrap();
+            data_domain.resize_area(heap_vma, &resize_options)?;
         }
+        self.brk = new_brk;
+        return Ok(new_brk);
+    }
 
-        // TODO: init the memory with zeros for the expanded area
-        let resize_options = {
-            let brk_start = self.get_brk_start();
-            let new_heap_size = align_up(new_brk, 4096) - brk_start;
-            let mut options = VMResizeOptions::new(new_heap_size)?;
-            options.addr(VMAddrOption::Fixed(brk_start));
-            options
-        };
-        self.data_domain
-            .resize_area(&mut self.heap_vma, &resize_options)?;
-        Ok(new_brk)
+    fn get_data_domain_mut(&mut self) -> &mut Box<VMDomain> {
+        self.data_domain.as_mut().unwrap()
     }
 }
 
 impl Drop for ProcessVM {
     fn drop(&mut self) {
-        let data_domain = &mut self.data_domain;
-
         // Remove all vma from the domain
-        data_domain.dealloc_area(&mut self.code_vma);
-        data_domain.dealloc_area(&mut self.data_vma);
-        data_domain.dealloc_area(&mut self.heap_vma);
-        data_domain.dealloc_area(&mut self.stack_vma);
-        for mmap_vma in &mut self.mmap_vmas {
-            data_domain.dealloc_area(mmap_vma);
+        {
+            let data_domain = self.data_domain.as_mut().unwrap();
+            data_domain.dealloc_area(unbox(self.code_vma.take().unwrap()));
+            data_domain.dealloc_area(unbox(self.data_vma.take().unwrap()));
+            data_domain.dealloc_area(unbox(self.heap_vma.take().unwrap()));
+            data_domain.dealloc_area(unbox(self.stack_vma.take().unwrap()));
+            for mmap_vma in self.mmap_vmas.drain(..) {
+                data_domain.dealloc_area(unbox(mmap_vma));
+            }
         }
 
         // Remove the domain from its parent space
-        DATA_SPACE.lock().unwrap().dealloc_domain(data_domain);
+        DATA_SPACE.lock().unwrap().dealloc_domain(
+            unbox(self.data_domain.take().unwrap()));
     }
 }
