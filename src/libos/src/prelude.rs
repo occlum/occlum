@@ -55,3 +55,7 @@ pub fn align_up(addr: usize, align: usize) -> usize {
 pub fn align_down(addr: usize, align: usize) -> usize {
     addr & !(align - 1)
 }
+
+pub fn unbox<T>(value: Box<T>) -> T {
+    *value
+}
