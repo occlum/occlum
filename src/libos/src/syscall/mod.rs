@@ -7,7 +7,7 @@
 //! 3. Dispatch the syscall to `do_*` (at this file)
 //! 4. Do some memory checks then call `mod::do_*` (at each module)
 
-use fs::{File, SocketFile, FileDesc, FileRef, EpollOp};
+use fs::{File, SocketFile, FileDesc, FileRef, EpollOp, AccessModes, AccessFlags, AT_FDCWD, FcntlCmd};
 use prelude::*;
 use process::{ChildProcessFilter, FileAction, pid_t, CloneFlags, FutexFlags, FutexOp};
 use std::ffi::{CStr, CString};
@@ -16,6 +16,7 @@ use time::timeval_t;
 use util::mem_util::from_user::*;
 use vm::{VMAreaFlags, VMResizeOptions};
 use {fs, process, std, vm};
+use misc::{utsname_t, resource_t, rlimit_t};
 
 use super::*;
 
@@ -66,6 +67,8 @@ pub extern "C" fn dispatch_syscall(
         SYS_STAT => do_stat(arg0 as *const i8, arg1 as *mut fs::Stat),
         SYS_FSTAT => do_fstat(arg0 as FileDesc, arg1 as *mut fs::Stat),
         SYS_LSTAT => do_lstat(arg0 as *const i8, arg1 as *mut fs::Stat),
+        SYS_ACCESS => do_access(arg0 as *const i8, arg1 as u32),
+        SYS_FACCESSAT => do_faccessat(arg0 as i32, arg1 as *const i8, arg2 as u32, arg3 as u32),
         SYS_LSEEK => do_lseek(arg0 as FileDesc, arg1 as off_t, arg2 as i32),
         SYS_FSYNC => do_fsync(arg0 as FileDesc),
         SYS_FDATASYNC => do_fdatasync(arg0 as FileDesc),
@@ -80,6 +83,8 @@ pub extern "C" fn dispatch_syscall(
         SYS_RMDIR => do_rmdir(arg0 as *const i8),
         SYS_LINK => do_link(arg0 as *const i8, arg1 as *const i8),
         SYS_UNLINK => do_unlink(arg0 as *const i8),
+        SYS_READLINK => do_readlink(arg0 as *const i8, arg1 as *mut u8, arg2 as usize),
+        SYS_FCNTL => do_fcntl(arg0 as FileDesc, arg1 as u32, arg2 as u64),
 
         // IO multiplexing
         SYS_SELECT => do_select(
@@ -119,9 +124,19 @@ pub extern "C" fn dispatch_syscall(
             arg4 as *const FdOp,
         ),
         SYS_WAIT4 => do_wait4(arg0 as i32, arg1 as *mut i32),
+
         SYS_GETPID => do_getpid(),
         SYS_GETTID => do_gettid(),
         SYS_GETPPID => do_getppid(),
+        SYS_GETPGID => do_getpgid(),
+
+        SYS_GETUID => do_getuid(),
+        SYS_GETGID => do_getgid(),
+        SYS_GETEUID => do_geteuid(),
+        SYS_GETEGID => do_getegid(),
+
+        SYS_RT_SIGACTION => do_rt_sigaction(),
+        SYS_RT_SIGPROCMASK => do_rt_sigprocmask(),
 
         SYS_CLONE => do_clone(
             arg0 as u32,
@@ -170,6 +185,11 @@ pub extern "C" fn dispatch_syscall(
         SYS_DUP3 => do_dup3(arg0 as FileDesc, arg1 as FileDesc, arg2 as u32),
 
         SYS_GETTIMEOFDAY => do_gettimeofday(arg0 as *mut timeval_t),
+
+        SYS_UNAME => do_uname(arg0 as *mut utsname_t),
+
+        SYS_PRLIMIT64 => do_prlimit(arg0 as pid_t, arg1 as u32, arg2 as *const rlimit_t, arg3 as *mut rlimit_t),
+
 
         // socket
         SYS_SOCKET => do_socket(arg0 as c_int, arg1 as c_int, arg2 as c_int),
@@ -658,6 +678,30 @@ fn do_getppid() -> Result<isize, Error> {
     Ok(ppid as isize)
 }
 
+fn do_getpgid() -> Result<isize, Error> {
+    let pgid = process::do_getpgid();
+    Ok(pgid as isize)
+}
+
+// TODO: implement uid, gid, euid, egid
+
+fn do_getuid() -> Result<isize, Error> {
+    Ok(0)
+}
+
+fn do_getgid() -> Result<isize, Error> {
+    Ok(0)
+}
+
+fn do_geteuid() -> Result<isize, Error> {
+    Ok(0)
+}
+
+fn do_getegid() -> Result<isize, Error> {
+    Ok(0)
+}
+
+
 fn do_pipe2(fds_u: *mut i32, flags: u32) -> Result<isize, Error> {
     check_mut_array(fds_u, 2)?;
     // TODO: how to deal with open flags???
@@ -776,6 +820,21 @@ fn do_unlink(path: *const i8) -> Result<isize, Error> {
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     fs::do_unlink(&path)?;
     Ok(0)
+}
+
+fn do_readlink(path: *const i8, buf: *mut u8, size: usize) -> Result<isize, Error> {
+    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
+    let buf = {
+        check_array(buf, size)?;
+        unsafe { std::slice::from_raw_parts_mut(buf, size) }
+    };
+    let len = fs::do_readlink(&path, buf)?;
+    Ok(len as isize)
+}
+
+fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize, Error> {
+    let cmd = FcntlCmd::from_raw(cmd, arg)?;
+    fs::do_fcntl(fd, &cmd)
 }
 
 fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize, Error> {
@@ -1086,4 +1145,63 @@ impl AsSocket for FileRef {
             .downcast_ref::<SocketFile>()
             .ok_or(Error::new(Errno::EBADF, "not a socket"))
     }
+}
+
+fn do_uname(name: *mut utsname_t) -> Result<isize, Error> {
+    check_mut_ptr(name)?;
+    let name = unsafe { &mut *name };
+    misc::do_uname(name).map(|_| 0)
+}
+
+fn do_prlimit(pid: pid_t, resource: u32, new_limit: *const rlimit_t, old_limit: *mut rlimit_t) -> Result<isize, Error> {
+    let resource = resource_t::from_u32(resource)?;
+    let new_limit = {
+        if new_limit != ptr::null() {
+            check_ptr(new_limit)?;
+            Some(unsafe { &*new_limit })
+        }
+        else {
+            None
+        }
+    };
+    let old_limit = {
+        if old_limit != ptr::null_mut() {
+            check_mut_ptr(old_limit)?;
+            Some(unsafe { &mut *old_limit })
+        }
+        else {
+            None
+        }
+    };
+    misc::do_prlimit(pid, resource, new_limit, old_limit).map(|_| 0)
+}
+
+fn do_access(path: *const i8, mode: u32) -> Result<isize, Error> {
+    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
+    let mode = AccessModes::from_u32(mode)?;
+    fs::do_access(&path, mode).map(|_| 0)
+}
+
+fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) -> Result<isize, Error> {
+    let dirfd = if dirfd >= 0 {
+        Some(dirfd as FileDesc)
+    } else if dirfd == AT_FDCWD {
+        None
+    } else {
+        return errno!(EINVAL, "invalid dirfd");
+    };
+    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
+    let mode = AccessModes::from_u32(mode)?;
+    let flags = AccessFlags::from_u32(flags)?;
+    fs::do_faccessat(dirfd, &path, mode, flags).map(|_| 0)
+}
+
+// TODO: implement signals
+
+fn do_rt_sigaction() -> Result<isize, Error> {
+    Ok(0)
+}
+
+fn do_rt_sigprocmask() -> Result<isize, Error> {
+    Ok(0)
 }

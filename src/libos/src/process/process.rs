@@ -10,7 +10,7 @@ lazy_static! {
             task: Default::default(),
             status: Default::default(),
             pid: 0,
-            pgid: 0,
+            pgid: 1,
             tgid: 0,
             exit_status: 0,
             cwd: "/".to_owned(),
@@ -20,6 +20,7 @@ lazy_static! {
             waiting_children: Default::default(),
             vm: Default::default(),
             file_table: Default::default(),
+            rlimits: Default::default(),
         }))
     };
 }
@@ -30,13 +31,14 @@ impl Process {
         task: Task,
         vm_ref: ProcessVMRef,
         file_table_ref: FileTableRef,
+        rlimits_ref: ResourceLimitsRef,
     ) -> Result<(pid_t, ProcessRef), Error> {
         let new_pid = process_table::alloc_pid();
         let new_process_ref = Arc::new(SgxMutex::new(Process {
             task: task,
             status: Default::default(),
             pid: new_pid,
-            pgid: new_pid,
+            pgid: 1, // TODO: implement pgid
             tgid: new_pid,
             cwd: cwd.to_owned(),
             clear_child_tid: None,
@@ -46,6 +48,7 @@ impl Process {
             waiting_children: None,
             vm: vm_ref,
             file_table: file_table_ref,
+            rlimits: rlimits_ref,
         }));
         Ok((new_pid, new_process_ref))
     }
@@ -96,6 +99,9 @@ impl Process {
             // relative
             self.cwd += path;
         }
+    }
+    pub fn get_rlimits(&self) -> &ResourceLimitsRef {
+        &self.rlimits
     }
 }
 

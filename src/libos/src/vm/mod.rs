@@ -3,17 +3,15 @@ use prelude::*;
 use process::{get_current, Process, ProcessRef};
 use std::fmt;
 
-// TODO: Rename VMSpace to VMUniverse
-
 #[macro_use]
 mod vm_range;
-mod process_vm;
 mod vm_area;
-mod vm_domain;
-mod vm_space;
+mod process_vm;
 
-pub use self::process_vm::ProcessVM;
 pub use self::vm_range::{VMRange, VMRangeTrait};
+pub use self::vm_area::{VMSpace, VMDomain, VMArea, VMAreaFlags, VM_AREA_FLAG_R, VM_AREA_FLAG_W, VM_AREA_FLAG_X};
+pub use self::process_vm::ProcessVM;
+
 
 // TODO: separate proc and flags
 // TODO: accept fd and offset
@@ -56,23 +54,6 @@ pub fn do_brk(addr: usize) -> Result<usize, Error> {
 
 pub const PAGE_SIZE: usize = 4096;
 
-#[derive(Debug)]
-pub struct VMSpace {
-    range: VMRange,
-    guard_type: VMGuardAreaType,
-}
-
-#[derive(Debug, Default)]
-pub struct VMDomain {
-    range: VMRange,
-}
-
-#[derive(Debug, Default)]
-pub struct VMArea {
-    range: VMRange,
-    flags: VMAreaFlags,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VMGuardAreaType {
     None,
@@ -80,32 +61,14 @@ pub enum VMGuardAreaType {
     Dynamic { size: usize },
 }
 
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
-pub struct VMAreaFlags(pub u32);
 
-pub const VM_AREA_FLAG_R: u32 = 0x1;
-pub const VM_AREA_FLAG_W: u32 = 0x2;
-pub const VM_AREA_FLAG_X: u32 = 0x4;
-
-impl VMAreaFlags {
-    pub fn can_execute(&self) -> bool {
-        self.0 & VM_AREA_FLAG_X == VM_AREA_FLAG_X
-    }
-
-    pub fn can_write(&self) -> bool {
-        self.0 & VM_AREA_FLAG_W == VM_AREA_FLAG_W
-    }
-
-    pub fn can_read(&self) -> bool {
-        self.0 & VM_AREA_FLAG_R == VM_AREA_FLAG_R
-    }
-}
-
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, PartialEq, Default)]
 pub struct VMAllocOptions {
     size: usize,
     addr: VMAddrOption,
-    growth: Option<VMGrowthType>,
+    growth: VMGrowthType,
+    description: String,
+    fill_zeros: bool,
 }
 
 impl VMAllocOptions {
@@ -128,7 +91,17 @@ impl VMAllocOptions {
     }
 
     pub fn growth(&mut self, growth: VMGrowthType) -> Result<&mut Self, Error> {
-        self.growth = Some(growth);
+        self.growth = growth;
+        Ok(self)
+    }
+
+    pub fn description(&mut self, description: &str) -> Result<&mut Self, Error> {
+        self.description = description.to_owned();
+        Ok(self)
+    }
+
+    pub fn fill_zeros(&mut self, fill_zeros: bool) -> Result<&mut Self, Error> {
+        self.fill_zeros = fill_zeros;
         Ok(self)
     }
 }
@@ -143,15 +116,6 @@ impl fmt::Debug for VMAllocOptions {
     }
 }
 
-impl Default for VMAllocOptions {
-    fn default() -> VMAllocOptions {
-        VMAllocOptions {
-            size: 0,
-            addr: VMAddrOption::Any,
-            growth: None,
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VMAddrOption {
@@ -159,6 +123,12 @@ pub enum VMAddrOption {
     Hint(usize),   // Near the given address
     Fixed(usize),  // Must be the given address
     Beyond(usize), // Must be greater or equal to the given address
+}
+
+impl Default for VMAddrOption {
+    fn default() -> VMAddrOption {
+        VMAddrOption::Any
+    }
 }
 
 impl VMAddrOption {
@@ -179,18 +149,27 @@ impl VMAddrOption {
     }
 }
 
+
 /// How VMRange may grow:
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VMGrowthType {
+    Fixed,
     Upward,   // e.g., mmaped regions grow upward
     Downward, // e.g., stacks grows downward
-    Fixed,
 }
 
-#[derive(Clone, Debug)]
+impl Default for VMGrowthType {
+    fn default() -> VMGrowthType {
+        VMGrowthType::Fixed
+    }
+}
+
+
+#[derive(Clone, Debug, Default)]
 pub struct VMResizeOptions {
     new_size: usize,
-    new_addr: Option<VMAddrOption>,
+    new_addr: VMAddrOption,
+    fill_zeros: bool,
 }
 
 impl VMResizeOptions {
@@ -205,16 +184,12 @@ impl VMResizeOptions {
     }
 
     pub fn addr(&mut self, new_addr: VMAddrOption) -> &mut Self {
-        self.new_addr = Some(new_addr);
+        self.new_addr = new_addr;
         self
     }
-}
 
-impl Default for VMResizeOptions {
-    fn default() -> VMResizeOptions {
-        VMResizeOptions {
-            new_size: 0,
-            new_addr: None,
-        }
+    pub fn fill_zeros(&mut self, fill_zeros: bool) -> &mut Self {
+        self.fill_zeros = fill_zeros;
+        self
     }
 }

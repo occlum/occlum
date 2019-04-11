@@ -22,6 +22,7 @@ pub use std::iter::Iterator;
 pub use std::rc::Rc;
 pub use std::string::String;
 pub use std::vec::Vec;
+pub use std::cmp::{min, max};
 
 pub use errno::Errno;
 pub use errno::Errno::*;
@@ -52,4 +53,8 @@ pub fn align_up(addr: usize, align: usize) -> usize {
 
 pub fn align_down(addr: usize, align: usize) -> usize {
     addr & !(align - 1)
+}
+
+pub fn unbox<T>(value: Box<T>) -> T {
+    *value
 }

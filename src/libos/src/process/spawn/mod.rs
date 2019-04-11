@@ -6,6 +6,7 @@ use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::sgxfs::SgxFile;
 use vm::{ProcessVM, VMRangeTrait};
+use misc::{ResourceLimitsRef};
 
 use super::*;
 use super::task::Task;
@@ -72,7 +73,8 @@ pub fn do_spawn<P: AsRef<Path>>(
             let files = init_files(parent_ref, file_actions)?;
             Arc::new(SgxMutex::new(files))
         };
-        Process::new(&cwd, task, vm_ref, files_ref)?
+        let rlimits_ref = Default::default();
+        Process::new(&cwd, task, vm_ref, files_ref, rlimits_ref)?
     };
     parent_adopts_new_child(&parent_ref, &new_process_ref);
     process_table::put(new_pid, new_process_ref.clone());

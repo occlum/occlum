@@ -51,8 +51,9 @@ pub fn do_clone(
         let task = new_thread_task(stack_addr, new_tls)?;
         let vm_ref = current.get_vm().clone();
         let files_ref = current.get_files().clone();
+        let rlimits_ref = current.get_rlimits().clone();
         let cwd = &current.cwd;
-        Process::new(cwd, task, vm_ref, files_ref)?
+        Process::new(cwd, task, vm_ref, files_ref, rlimits_ref)?
     };
 
     if let Some(ctid) = ctid {
@@ -67,6 +68,8 @@ pub fn do_clone(
         let mut new_thread = new_thread_ref.lock().unwrap();
         parent.children.push(Arc::downgrade(&new_thread_ref));
         new_thread.parent = Some(parent_ref.clone());
+
+        new_thread.tgid = current.tgid;
     }
 
     process_table::put(new_thread_pid, new_thread_ref.clone());
