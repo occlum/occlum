@@ -90,11 +90,12 @@ impl ProcessVM {
     ) -> Result<(VMArea, VMArea, VMArea, VMArea), Error> {
         let mut addr = data_domain.get_start();
         let mut alloc_vma_continuously =
-            |addr: &mut usize, size, flags, growth, desc| -> Result<_, Error> {
+            |addr: &mut usize, desc, size, flags, growth, fill_zeros| -> Result<_, Error> {
                 let mut options = VMAllocOptions::new(size)?;
                 options.addr(VMAddrOption::Fixed(*addr))?
                     .growth(growth)?
-                    .description(desc)?;
+                    .description(desc)?
+                    .fill_zeros(fill_zeros)?;
                 let new_vma = data_domain.alloc_area(&options, flags)?;
                 *addr += size;
                 Ok(new_vma)
@@ -103,14 +104,17 @@ impl ProcessVM {
         let rx_flags = VMAreaFlags(VM_AREA_FLAG_R | VM_AREA_FLAG_X);
         let rw_flags = VMAreaFlags(VM_AREA_FLAG_R | VM_AREA_FLAG_W);
 
-        let code_vma = alloc_vma_continuously(&mut addr, code_size, rx_flags, VMGrowthType::Fixed, "code_vma")?;
-        let data_vma = alloc_vma_continuously(&mut addr, data_size, rw_flags, VMGrowthType::Fixed, "data_vma")?;
-        let heap_vma = alloc_vma_continuously(&mut addr, 0, rw_flags, VMGrowthType::Upward, "heap_vma")?;
+        let code_vma = alloc_vma_continuously(&mut addr, "code_vma", code_size,
+                                              rx_flags, VMGrowthType::Fixed, true)?;
+        let data_vma = alloc_vma_continuously(&mut addr, "data_vma", data_size,
+                                              rw_flags, VMGrowthType::Fixed, true)?;
+        let heap_vma = alloc_vma_continuously(&mut addr, "heap_vma", 0,
+                                              rw_flags, VMGrowthType::Upward, true)?;
         // Preserve the space for heap
         addr += heap_size;
         // After the heap is the stack
-        let stack_vma =
-            alloc_vma_continuously(&mut addr, stack_size, rw_flags, VMGrowthType::Downward, "stack_vma")?;
+        let stack_vma = alloc_vma_continuously(&mut addr, "stack_vma", stack_size,
+                                               rw_flags, VMGrowthType::Downward, false)?;
         Ok((code_vma, data_vma, heap_vma, stack_vma))
     }
 
@@ -191,7 +195,7 @@ impl ProcessVM {
                 .iter()
                 .position(|vma| vma.get_start() == addr && vma.get_end() == addr + size);
             if mmap_vma_i.is_none() {
-                return Ok(());
+                return errno!(EINVAL, "memory area not found");
             }
             mmap_vma_i.unwrap()
         };
@@ -221,12 +225,12 @@ impl ProcessVM {
         } else if new_brk < heap_start {
             return errno!(EINVAL, "New brk address is too low");
         } else if new_brk > heap_end {
-            // TODO: init the memory with zeros for the expanded area
             let resize_options = {
-                let new_heap_end = align_up(new_brk, 4096);
+                let new_heap_end = align_up(new_brk, PAGE_SIZE);
                 let new_heap_size = new_heap_end - heap_start;
                 let mut options = VMResizeOptions::new(new_heap_size)?;
-                options.addr(VMAddrOption::Fixed(heap_start));
+                options.addr(VMAddrOption::Fixed(heap_start))
+                    .fill_zeros(true);
                 options
             };
             let heap_vma = self.heap_vma.as_mut().unwrap();
