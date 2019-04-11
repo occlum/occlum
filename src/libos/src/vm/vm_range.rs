@@ -81,6 +81,15 @@ impl VMRange {
         self.get_subranges_mut()
             .insert(new_subrange_idx, new_subrange_inner);
 
+        if options.fill_zeros {
+            // Init the memory area with all zeros
+            unsafe {
+                let mem_ptr = new_subrange_inner.get_start() as *mut c_void;
+                let mem_size = new_subrange_inner.get_size() as size_t;
+                memset(mem_ptr, 0 as c_int, mem_size);
+            }
+        }
+
         // Although there are two copies of the newly created VMRangeInner obj,
         // we can keep them in sync as all mutation on VMRange object must
         // be carried out through dealloc_subrange() and resize_subrange() that
@@ -140,7 +149,7 @@ impl VMRange {
         }
         // Grow
         else {
-            self.grow_subrange_to(subrange, new_size)
+            self.grow_subrange_to(subrange, new_size, options.fill_zeros)
         }
     }
 
@@ -340,39 +349,58 @@ impl VMRange {
         Ok(())
     }
 
-    fn grow_subrange_to(&mut self, subrange: &mut VMRange, new_size: usize) -> Result<(), Error> {
+    fn grow_subrange_to(&mut self, subrange: &mut VMRange, new_size: usize, fill_zeros: bool) -> Result<(), Error> {
         let subrange_i = self.position_subrange(subrange);
         let subranges = self.get_subranges_mut();
 
+        let subrange_old_start = subrange.inner.start;
+        let subrange_old_end = subrange.inner.end;
+        let subrange_old_size = subrange.get_size();
+
         if subrange.inner.growth == VMGrowthType::Upward {
-            // Can we grow?
+            // Can we grow upward?
             let max_new_size = {
                 let next_subrange = &subranges[subrange_i + 1];
-                next_subrange.start - subrange.inner.start
+                next_subrange.start - subrange_old_start
             };
             if new_size > max_new_size {
                 return errno!(ENOMEM, "Cannot grow to new size");
             }
             // Do grow
-            let subrange_new_end = subrange.inner.start + new_size;
+            let subrange_new_end = subrange_old_start + new_size;
             subrange.inner.end = subrange_new_end;
             // Sync state
             subranges[subrange_i].end = subrange_new_end;
-        } else {
-            // self.growth == VMGrowthType::Downward
-            // Can we grow?
+            // Init memory
+            if fill_zeros {
+                unsafe {
+                    let mem_ptr = subrange_old_end as *mut c_void;
+                    let mem_size = (subrange_new_end - subrange_old_end) as size_t;
+                    memset(mem_ptr, 0 as c_int, mem_size);
+                }
+            }
+        } else { // self.growth == VMGrowthType::Downward
+            // Can we grow downard?
             let max_new_size = {
                 let pre_subrange = &subranges[subrange_i - 1];
-                subrange.inner.end - pre_subrange.end
+                subrange_old_end - pre_subrange.end
             };
             if new_size > max_new_size {
                 return errno!(ENOMEM, "Cannot grow to new size");
             }
             // Do grow
-            let subrange_new_start = subrange.inner.end - new_size;
+            let subrange_new_start = subrange_old_end - new_size;
             subrange.inner.start = subrange_new_start;
             // Sync state
             subranges[subrange_i].start = subrange_new_start;
+            // Init memory
+            if fill_zeros {
+                unsafe {
+                    let mem_ptr = subrange_new_start as *mut c_void;
+                    let mem_size = (subrange_old_start - subrange_new_start) as size_t;
+                    memset(mem_ptr, 0 as c_int, mem_size);
+                }
+            }
         }
         Ok(())
     }
@@ -531,4 +559,9 @@ impl PartialOrd for FreeSpace {
             }
         }
     }
+}
+
+#[link(name = "sgx_tstdc")]
+extern "C" {
+    pub fn memset(p: *mut c_void, c: c_int, n: size_t) -> *mut c_void;
 }

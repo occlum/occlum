@@ -68,6 +68,7 @@ pub struct VMAllocOptions {
     addr: VMAddrOption,
     growth: VMGrowthType,
     description: String,
+    fill_zeros: bool,
 }
 
 impl VMAllocOptions {
@@ -96,6 +97,11 @@ impl VMAllocOptions {
 
     pub fn description(&mut self, description: &str) -> Result<&mut Self, Error> {
         self.description = description.to_owned();
+        Ok(self)
+    }
+
+    pub fn fill_zeros(&mut self, fill_zeros: bool) -> Result<&mut Self, Error> {
+        self.fill_zeros = fill_zeros;
         Ok(self)
     }
 }
@@ -163,6 +169,7 @@ impl Default for VMGrowthType {
 pub struct VMResizeOptions {
     new_size: usize,
     new_addr: VMAddrOption,
+    fill_zeros: bool,
 }
 
 impl VMResizeOptions {
@@ -178,6 +185,11 @@ impl VMResizeOptions {
 
     pub fn addr(&mut self, new_addr: VMAddrOption) -> &mut Self {
         self.new_addr = new_addr;
+        self
+    }
+
+    pub fn fill_zeros(&mut self, fill_zeros: bool) -> &mut Self {
+        self.fill_zeros = fill_zeros;
         self
     }
 }
