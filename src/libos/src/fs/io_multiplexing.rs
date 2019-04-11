@@ -126,11 +126,15 @@ pub fn do_epoll_ctl(
 
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
-    let mut file_ref = proc.get_files().lock().unwrap().get(epfd)?;
+    let mut file_table_ref = proc.get_files().lock().unwrap();
+    let mut file_ref = file_table_ref.get(epfd)?;
     let mut epoll = file_ref.as_epoll()?.inner.lock().unwrap();
 
     match op {
-        EpollOp::Add(event) => epoll.add(fd, event)?,
+        EpollOp::Add(event) => {
+            let host_fd = file_table_ref.get(fd)?.as_socket()?.fd() as FileDesc;
+            epoll.add(fd, host_fd, event)?;
+        },
         EpollOp::Modify(event) => epoll.modify(fd, event)?,
         EpollOp::Delete => epoll.remove(fd)?,
     }
@@ -232,16 +236,10 @@ impl EpollFileInner {
 
     /// Add `fd` to the interest list and associate the settings
     /// specified in `event` with the internal file linked to `fd`.
-    pub fn add(&mut self, fd: FileDesc, mut event: libc::epoll_event) -> Result<(), Error> {
+    pub fn add(&mut self, fd: FileDesc, host_fd: FileDesc, mut event: libc::epoll_event) -> Result<(), Error> {
         if self.fd_to_host.contains_key(&fd) {
             return Err(Error::new(EEXIST, "fd is exist in epoll"));
         }
-        // query host fd
-        let current_ref = process::get_current();
-        let mut proc = current_ref.lock().unwrap();
-        let file_ref = proc.get_files().lock().unwrap().get(fd)?;
-        let host_fd = file_ref.as_socket()?.fd() as FileDesc;
-
         let ret = unsafe {
             libc::ocall::epoll_ctl(
                 self.epoll_fd,
