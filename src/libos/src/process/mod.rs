@@ -1,5 +1,5 @@
 pub use self::process::{Status, IDLE_PROCESS};
-pub use self::task::{get_current, run_task};
+pub use self::task::{get_current, run_task, current_pid};
 pub use self::process_table::{get};
 pub use self::exit::{do_exit, do_wait4, ChildProcessFilter};
 pub use self::spawn::{do_spawn, FileAction};

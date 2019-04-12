@@ -26,7 +26,7 @@ impl Log for SimpleLogger {
                 "\u{1B}[{}m[{:>5}][{}] {}\u{1B}[0m",
                 color as u8,
                 record.level(),
-                crate::process::do_getpid(),
+                crate::process::current_pid(),
                 record.args()
             );
         }

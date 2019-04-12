@@ -68,6 +68,12 @@ thread_local! {
     static _CURRENT_PROCESS_PTR: Cell<*const SgxMutex<Process>> = {
         Cell::new(0 as *const SgxMutex<Process>)
     };
+    // for log getting pid without locking process
+    static _PID: Cell<pid_t> = Cell::new(0);
+}
+
+pub fn current_pid() -> pid_t {
+    _PID.with(|p| p.get())
 }
 
 pub fn get_current() -> ProcessRef {
@@ -81,6 +87,9 @@ pub fn get_current() -> ProcessRef {
 }
 
 fn set_current(process: &ProcessRef) {
+    let pid = process.lock().unwrap().get_pid();
+    _PID.with(|p| p.set(pid));
+
     let process_ref_clone = process.clone();
     let process_ptr = Arc::into_raw(process_ref_clone);
 
@@ -90,6 +99,7 @@ fn set_current(process: &ProcessRef) {
 }
 
 fn reset_current() {
+    _PID.with(|p| p.set(0));
     let mut process_ptr = _CURRENT_PROCESS_PTR.with(|cp| cp.replace(0 as *const SgxMutex<Process>));
 
     // Prevent memory leakage
