@@ -198,7 +198,13 @@ pub extern "C" fn dispatch_syscall(
             arg1 as *const libc::sockaddr,
             arg2 as libc::socklen_t,
         ),
-        SYS_ACCEPT => do_accept(
+        SYS_ACCEPT => do_accept4(
+            arg0 as c_int,
+            arg1 as *mut libc::sockaddr,
+            arg2 as *mut libc::socklen_t,
+            0,
+        ),
+        SYS_ACCEPT4 => do_accept4(
             arg0 as c_int,
             arg1 as *mut libc::sockaddr,
             arg2 as *mut libc::socklen_t,
@@ -882,14 +888,14 @@ fn do_connect(
     Ok(ret as isize)
 }
 
-fn do_accept(
+fn do_accept4(
     fd: c_int,
     addr: *mut libc::sockaddr,
     addr_len: *mut libc::socklen_t,
     flags: c_int,
 ) -> Result<isize, Error> {
     info!(
-        "accept: fd: {}, addr: {:?}, addr_len: {:?}, flags: {:#x}",
+        "accept4: fd: {}, addr: {:?}, addr_len: {:?}, flags: {:#x}",
         fd, addr, addr_len, flags
     );
     let current_ref = process::get_current();

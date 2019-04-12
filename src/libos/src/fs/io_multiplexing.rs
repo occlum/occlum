@@ -313,14 +313,7 @@ impl EpollFileInner {
         if ret < 0 {
             return Err(Error::new(Errno::from_retval(ret as i32), ""));
         }
-        // convert host fd to libos
-        let count = ret as usize;
-        for event in events[0..count].iter_mut() {
-            let host_fd = event.u64 as FileDesc;
-            let fd = self.fd_to_libos[&host_fd];
-            event.u64 = fd as u64;
-        }
-        Ok(count)
+        Ok(ret as usize)
     }
 }
 
