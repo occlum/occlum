@@ -216,6 +216,7 @@ pub fn do_close(fd: FileDesc) -> Result<(), Error> {
 }
 
 pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2], Error> {
+    info!("pipe2: flags: {:#x}", flags);
     let flags = OpenFlags::from_bits_truncate(flags);
     let current_ref = process::get_current();
     let current = current_ref.lock().unwrap();
@@ -226,6 +227,7 @@ pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2], Error> {
     let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
     let reader_fd = file_table.put(Arc::new(Box::new(pipe.reader)), close_on_spawn);
     let writer_fd = file_table.put(Arc::new(Box::new(pipe.writer)), close_on_spawn);
+    info!("pipe2: reader_fd: {}, writer_fd: {}", reader_fd, writer_fd);
     Ok([reader_fd, writer_fd])
 }
 
@@ -658,7 +660,7 @@ impl FcntlCmd {
 }
 
 pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize, Error> {
-    info!("do_fcntl: {:?}, {:?}", &fd, cmd);
+    info!("fcntl: fd: {:?}, cmd: {:?}", &fd, cmd);
     let current_ref = process::get_current();
     let mut current = current_ref.lock().unwrap();
     let files_ref = current.get_files();
@@ -687,15 +689,33 @@ pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize, Error> {
             0
         },
         FcntlCmd::GetFl() => {
-            unimplemented!();
+            let _ = files.get_entry_mut(fd)?;
+            warn!("fcntl.getfl is unimplemented");
+            0
         },
         FcntlCmd::SetFl(flags) => {
-            unimplemented!();
+            let _ = files.get_entry_mut(fd)?;
+            warn!("fcntl.setfl is unimplemented");
+            0
         },
     })
 }
 
 pub fn do_readlink(path: &str, buf: &mut [u8]) -> Result<usize, Error> {
-    // TODO: support symbolic links
-    errno!(EINVAL, "not a symbolic link")
+    info!("readlink: path: {:?}", path);
+    match path {
+        "/proc/self/exe" => {
+            // get cwd
+            let current_ref = process::get_current();
+            let current = current_ref.lock().unwrap();
+            let cwd = current.get_cwd();
+            let len = cwd.len().min(buf.len());
+            buf[0..len].copy_from_slice(&cwd.as_bytes()[0..len]);
+            Ok(0)
+        }
+        _ => {
+            // TODO: support symbolic links
+            errno!(EINVAL, "not a symbolic link")
+        }
+    }
 }

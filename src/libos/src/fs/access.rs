@@ -35,6 +35,7 @@ impl AccessFlags {
 pub const AT_FDCWD : i32 = -100;
 
 pub fn do_faccessat(dirfd: Option<FileDesc>, path: &str, mode: AccessModes, flags: AccessFlags) -> Result<(), Error> {
+    info!("faccessat: dirfd: {:?}, path: {:?}, mode: {:?}, flags: {:?}", dirfd, path, mode, flags);
     match dirfd {
         // TODO: handle dirfd
         Some(dirfd) => errno!(ENOSYS, "cannot accept dirfd"),
@@ -43,6 +44,7 @@ pub fn do_faccessat(dirfd: Option<FileDesc>, path: &str, mode: AccessModes, flag
 }
 
 pub fn do_access(path: &str, mode: AccessModes) -> Result<(), Error> {
+    info!("access: path: {:?}, mode: {:?}", path, mode);
     let current_ref = process::get_current();
     let mut current = current_ref.lock().unwrap();
     let inode = current.lookup_inode(path)?;
