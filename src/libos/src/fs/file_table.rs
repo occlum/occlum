@@ -4,7 +4,7 @@ use std;
 
 pub type FileDesc = u32;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 #[repr(C)]
 pub struct FileTable {
     table: Vec<Option<FileTableEntry>>,
@@ -123,30 +123,19 @@ impl FileTable {
             None => errno!(EBADF, "Invalid file descriptor"),
         }
     }
-}
 
-impl Clone for FileTable {
-    fn clone(&self) -> FileTable {
-        // Only clone file descriptors that are not close-on-spawn
-        let mut num_cloned_fds = 0;
-        let cloned_table = self
-            .table
-            .iter()
-            .map(|entry| match entry {
-                Some(file_table_entry) => match file_table_entry.close_on_spawn {
-                    false => {
-                        num_cloned_fds += 1;
-                        Some(file_table_entry.clone())
-                    }
-                    true => None,
-                },
-                None => None,
-            })
-            .collect();
-
-        FileTable {
-            table: cloned_table,
-            num_fds: num_cloned_fds,
+    /// Remove file descriptors that are close-on-spawn
+    pub fn close_on_spawn(&mut self) {
+        for entry in self.table.iter_mut() {
+            let need_close = if let Some(entry) = entry {
+                entry.close_on_spawn
+            } else {
+                false
+            };
+            if need_close {
+                *entry = None;
+                self.num_fds -= 1;
+            }
         }
     }
 }

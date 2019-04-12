@@ -87,6 +87,7 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
     let parent = parent_ref.lock().unwrap();
     let should_inherit_file_table = parent.get_pid() > 0;
     if should_inherit_file_table {
+        // Fork: clone file table
         let mut cloned_file_table = parent.get_files().lock().unwrap().clone();
         // Perform file actions to modify the cloned file table
         for file_action in file_actions {
@@ -102,6 +103,8 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
                 }
             }
         }
+        // Exec: close fd with close_on_spawn
+        cloned_file_table.close_on_spawn();
         return Ok(cloned_file_table);
     }
     drop(parent);
