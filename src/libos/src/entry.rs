@@ -78,5 +78,11 @@ fn do_boot(path_str: &str, argv: &Vec<CString>) -> Result<(), Error> {
 // TODO: make sure do_run() cannot be called after do_boot()
 fn do_run() -> Result<i32, Error> {
     let exit_status = process::run_task()?;
+
+    // sync file system
+    // TODO: only sync when all processes exit
+    use rcore_fs::vfs::FileSystem;
+    crate::fs::ROOT_INODE.fs().sync()?;
+
     Ok(exit_status)
 }
