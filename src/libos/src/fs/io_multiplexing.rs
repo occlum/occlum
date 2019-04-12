@@ -119,8 +119,9 @@ pub fn do_epoll_create1(flags: c_int) -> Result<FileDesc, Error> {
 
 pub fn do_epoll_ctl(
     epfd: FileDesc,
-    op: EpollOp,
+    op: c_int,
     fd: FileDesc,
+    event: *const libc::epoll_event,
 ) -> Result<(), Error> {
     info!("epoll_ctl: epfd: {}, op: {:?}, fd: {}", epfd, op, fd);
 
@@ -130,14 +131,9 @@ pub fn do_epoll_ctl(
     let mut file_ref = file_table_ref.get(epfd)?;
     let mut epoll = file_ref.as_epoll()?.inner.lock().unwrap();
 
-    match op {
-        EpollOp::Add(event) => {
-            let host_fd = file_table_ref.get(fd)?.as_socket()?.fd() as FileDesc;
-            epoll.add(fd, host_fd, event)?;
-        },
-        EpollOp::Modify(event) => epoll.modify(fd, event)?,
-        EpollOp::Delete => epoll.remove(fd)?,
-    }
+    let host_fd = file_table_ref.get(fd)?.as_socket()?.fd() as FileDesc;
+    epoll.ctl(op, host_fd, event)?;
+
     Ok(())
 }
 
@@ -184,23 +180,6 @@ impl FdSetExt for libc::fd_set {
     }
 }
 
-pub enum EpollOp {
-    Add(libc::epoll_event),
-    Modify(libc::epoll_event),
-    Delete
-}
-
-impl Debug for EpollOp {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let s = match self {
-            EpollOp::Add(_) => "Add",
-            EpollOp::Modify(_) => "Modify",
-            EpollOp::Delete => "Delete",
-        };
-        write!(f, "{}", s)
-    }
-}
-
 pub struct EpollFile {
     inner: SgxMutex<EpollFileInner>,
 }
@@ -215,8 +194,6 @@ impl EpollFile {
 
 struct EpollFileInner {
     epoll_fd: c_int,
-    fd_to_host: BTreeMap<FileDesc, FileDesc>,
-    fd_to_libos: BTreeMap<FileDesc, FileDesc>,
 }
 
 // FIXME: What if a Linux fd is closed but still in an epoll?
@@ -229,69 +206,22 @@ impl EpollFileInner {
         }
         Ok(EpollFileInner {
             epoll_fd: ret,
-            fd_to_host: BTreeMap::new(),
-            fd_to_libos: BTreeMap::new(),
         })
     }
 
-    /// Add `fd` to the interest list and associate the settings
-    /// specified in `event` with the internal file linked to `fd`.
-    pub fn add(&mut self, fd: FileDesc, host_fd: FileDesc, mut event: libc::epoll_event) -> Result<(), Error> {
-        if self.fd_to_host.contains_key(&fd) {
-            return Err(Error::new(EEXIST, "fd is exist in epoll"));
-        }
-        let ret = unsafe {
-            libc::ocall::epoll_ctl(
-                self.epoll_fd,
-                libc::EPOLL_CTL_ADD,
-                host_fd as c_int,
-                &mut event,
-            )
-        };
-        if ret < 0 {
-            return Err(Error::new(Errno::from_retval(ret as i32), ""));
-        }
-        self.fd_to_host.insert(fd, host_fd);
-        self.fd_to_libos.insert(host_fd, fd);
-        Ok(())
-    }
 
-    /// Change the settings associated with `fd` in the interest list to
-    /// the new settings specified in `event`.
-    pub fn modify(&mut self, fd: FileDesc, mut event: libc::epoll_event) -> Result<(), Error> {
-        let host_fd = *self.fd_to_host.get(&fd)
-            .ok_or(Error::new(EINVAL, "fd is not exist in epoll"))?;
+    pub fn ctl(&mut self, op: c_int, host_fd: FileDesc, event: *const libc::epoll_event) -> Result<(), Error> {
         let ret = unsafe {
             libc::ocall::epoll_ctl(
                 self.epoll_fd,
-                libc::EPOLL_CTL_MOD,
+                op,
                 host_fd as c_int,
-                &mut event,
+                event as *mut _,
             )
         };
         if ret < 0 {
             return Err(Error::new(Errno::from_retval(ret as i32), ""));
         }
-        Ok(())
-    }
-
-    /// Remove the target file descriptor `fd` from the interest list.
-    pub fn remove(&mut self, fd: FileDesc) -> Result<(), Error> {
-        let host_fd = *self.fd_to_host.get(&fd)
-            .ok_or(Error::new(EINVAL, "fd is not exist in epoll"))?;
-        let ret = unsafe {
-            libc::ocall::epoll_ctl(
-                self.epoll_fd,
-                libc::EPOLL_CTL_DEL,
-                host_fd as c_int,
-                core::ptr::null_mut(),
-            )
-        };
-        if ret < 0 {
-            return Err(Error::new(Errno::from_retval(ret as i32), ""));
-        }
-        self.fd_to_host.remove(&fd);
-        self.fd_to_libos.remove(&host_fd);
         Ok(())
     }
 
@@ -384,8 +314,6 @@ impl Debug for EpollFile {
         let inner = self.inner.lock().unwrap();
         f.debug_struct("EpollFile")
             .field("epoll_fd", &inner.epoll_fd)
-            .field("fds", &inner.fd_to_host.keys())
-            .field("host_fds", &inner.fd_to_host.values())
             .finish()
     }
 }

@@ -7,7 +7,7 @@
 //! 3. Dispatch the syscall to `do_*` (at this file)
 //! 4. Do some memory checks then call `mod::do_*` (at each module)
 
-use fs::{File, SocketFile, FileDesc, FileRef, EpollOp, AccessModes, AccessFlags, AT_FDCWD, FcntlCmd};
+use fs::{File, SocketFile, FileDesc, FileRef, AccessModes, AccessFlags, AT_FDCWD, FcntlCmd};
 use prelude::*;
 use process::{ChildProcessFilter, FileAction, pid_t, CloneFlags, FutexFlags, FutexOp};
 use std::ffi::{CStr, CString};
@@ -1105,19 +1105,10 @@ fn do_epoll_ctl(
     fd: c_int,
     event: *const libc::epoll_event,
 ) -> Result<isize, Error> {
-    let event = if event.is_null() {
-        None
-    } else {
+    if !event.is_null() {
         check_ptr(event)?;
-        Some(unsafe { event.read() })
-    };
-    let op = match (op, event) {
-        (libc::EPOLL_CTL_ADD, Some(event)) => EpollOp::Add(event),
-        (libc::EPOLL_CTL_MOD, Some(event)) => EpollOp::Modify(event),
-        (libc::EPOLL_CTL_DEL, _) => EpollOp::Delete,
-        _ => return Err(Error::new(EINVAL, "invalid epoll op or event ptr")),
-    };
-    fs::do_epoll_ctl(epfd as FileDesc, op, fd as FileDesc)?;
+    }
+    fs::do_epoll_ctl(epfd as FileDesc, op, fd as FileDesc, event)?;
     Ok(0)
 }
 
