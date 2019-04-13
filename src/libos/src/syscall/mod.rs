@@ -283,7 +283,7 @@ pub struct FdOp {
     srcfd: u32,
     oflag: u32,
     mode: u32,
-    path: *const u8,
+    path: *const i8,
 }
 
 fn clone_file_actions_safely(fdop_ptr: *const FdOp) -> Result<Vec<FileAction>, Error> {
@@ -297,9 +297,12 @@ fn clone_file_actions_safely(fdop_ptr: *const FdOp) -> Result<Vec<FileAction>, E
         let file_action = match fdop.cmd {
             FDOP_CLOSE => FileAction::Close(fdop.fd),
             FDOP_DUP2 => FileAction::Dup2(fdop.srcfd, fdop.fd),
-            FDOP_OPEN => {
-                return errno!(EINVAL, "Not implemented");
-            }
+            FDOP_OPEN => FileAction::Open {
+                path: clone_cstring_safely(fdop.path)?.to_string_lossy().into_owned(),
+                mode: fdop.mode,
+                oflag: fdop.oflag,
+                fd: fdop.fd,
+            },
             _ => {
                 return errno!(EINVAL, "Unknown file action command");
             }

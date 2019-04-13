@@ -1,7 +1,7 @@
 use xmas_elf::{ElfFile, header, program, sections};
 use xmas_elf::symbol_table::Entry;
 
-use fs::{File, FileDesc, FileTable, INodeExt, ROOT_INODE, StdinFile, StdoutFile};
+use fs::{File, FileDesc, FileTable, INodeExt, ROOT_INODE, StdinFile, StdoutFile, OpenFlags};
 use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::sgxfs::SgxFile;
@@ -20,8 +20,14 @@ mod segment;
 
 #[derive(Debug)]
 pub enum FileAction {
-    // TODO: Add open action
-    // Open(...)
+    /// open(path, oflag, mode) had been called, and the returned file
+    /// descriptor, if not `fd`, had been changed to `fd`.
+    Open {
+        path: String,
+        mode: u32,
+        oflag: u32,
+        fd: FileDesc,
+    },
     Dup2(FileDesc, FileDesc),
     Close(FileDesc),
 }
@@ -92,14 +98,22 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
         // Perform file actions to modify the cloned file table
         for file_action in file_actions {
             match file_action {
-                FileAction::Dup2(old_fd, new_fd) => {
-                    let file = cloned_file_table.get(*old_fd)?;
+                &FileAction::Open { ref path, mode, oflag, fd} => {
+                    let flags = OpenFlags::from_bits_truncate(oflag);
+                    let file = parent.open_file(path.as_str(), flags, mode)?;
+                    let file_ref: Arc<Box<File>> = Arc::new(Box::new(file));
+
+                    let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
+                    cloned_file_table.put_at(fd, file_ref, close_on_spawn);
+                }
+                &FileAction::Dup2(old_fd, new_fd) => {
+                    let file = cloned_file_table.get(old_fd)?;
                     if old_fd != new_fd {
-                        cloned_file_table.put_at(*new_fd, file, false);
+                        cloned_file_table.put_at(new_fd, file, false);
                     }
                 }
-                FileAction::Close(fd) => {
-                    cloned_file_table.del(*fd)?;
+                &FileAction::Close(fd) => {
+                    cloned_file_table.del(fd)?;
                 }
             }
         }

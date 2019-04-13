@@ -35,24 +35,8 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
 
-    let inode = if flags.contains(OpenFlags::CREATE) {
-        let (dir_path, file_name) = split_path(&path);
-        let dir_inode = proc.lookup_inode(dir_path)?;
-        match dir_inode.find(file_name) {
-            Ok(file_inode) => {
-                if flags.contains(OpenFlags::EXCLUSIVE) {
-                    return Err(Error::new(EEXIST, "file exists"));
-                }
-                file_inode
-            }
-            Err(FsError::EntryNotFound) => dir_inode.create(file_name, FileType::File, mode)?,
-            Err(e) => return Err(Error::from(e)),
-        }
-    } else {
-        proc.lookup_inode(&path)?
-    };
-
-    let file_ref: Arc<Box<File>> = Arc::new(Box::new(INodeFile::open(inode, flags.to_options())?));
+    let file = proc.open_file(path, flags, mode)?;
+    let file_ref: Arc<Box<File>> = Arc::new(Box::new(file));
 
     let fd = {
         let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
@@ -363,6 +347,28 @@ extern "C" {
 }
 
 impl Process {
+    /// Open a file on the process. But DO NOT add it to file table.
+    pub fn open_file(&self, path: &str, flags: OpenFlags, mode: u32) -> Result<INodeFile, Error> {
+        let inode = if flags.contains(OpenFlags::CREATE) {
+            let (dir_path, file_name) = split_path(&path);
+            let dir_inode = self.lookup_inode(dir_path)?;
+            match dir_inode.find(file_name) {
+                Ok(file_inode) => {
+                    if flags.contains(OpenFlags::EXCLUSIVE) {
+                        return Err(Error::new(EEXIST, "file exists"));
+                    }
+                    file_inode
+                }
+                Err(FsError::EntryNotFound) => dir_inode.create(file_name, FileType::File, mode)?,
+                Err(e) => return Err(Error::from(e)),
+            }
+        } else {
+            self.lookup_inode(&path)?
+        };
+        INodeFile::open(inode, flags.to_options())
+    }
+
+    /// Lookup INode from the cwd of the process
     pub fn lookup_inode(&self, path: &str) -> Result<Arc<INode>, Error> {
         debug!("lookup_inode: cwd: {:?}, path: {:?}", self.get_cwd(), path);
         if path.len() > 0 && path.as_bytes()[0] == b'/' {
