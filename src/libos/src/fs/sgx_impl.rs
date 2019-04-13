@@ -64,6 +64,9 @@ unsafe impl Sync for LockedFile {}
 
 impl File for LockedFile {
     fn read_at(&self, buf: &mut [u8], offset: usize) -> DevResult<usize> {
+        if buf.len() == 0 {
+            return Ok(0);
+        }
         let mut file = self.0.lock().unwrap();
         let offset = offset as u64;
         file.seek(SeekFrom::Start(offset))
@@ -73,6 +76,9 @@ impl File for LockedFile {
     }
 
     fn write_at(&self, buf: &[u8], offset: usize) -> DevResult<usize> {
+        if buf.len() == 0 {
+            return Ok(0);
+        }
         let mut file = self.0.lock().unwrap();
         let offset = offset as u64;
         file.seek(SeekFrom::Start(offset))
