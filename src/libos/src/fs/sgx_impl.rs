@@ -4,7 +4,7 @@ use rcore_fs_sefs::dev::*;
 use std::boxed::Box;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::sgxfs::{OpenOptions, remove, SgxFile};
+use std::sgxfs::{remove, OpenOptions, SgxFile};
 use std::sync::SgxMutex as Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -80,6 +80,20 @@ impl File for LockedFile {
             return Ok(0);
         }
         let mut file = self.0.lock().unwrap();
+
+        // SgxFile do not support seek a position after the end.
+        // So check the size and padding zeros if necessary.
+        let file_size = file.seek(SeekFrom::End(0)).expect("failed to tell SgxFile") as usize;
+        if file_size < offset {
+            static ZEROS: [u8; 0x1000] = [0; 0x1000];
+            let mut rest_len = offset - file_size;
+            while rest_len != 0 {
+                let l = rest_len.min(0x1000);
+                let len = file.write(&ZEROS[..l]).expect("failed to write SgxFile");
+                rest_len -= len;
+            }
+        }
+
         let offset = offset as u64;
         file.seek(SeekFrom::Start(offset))
             .expect("failed to seek SgxFile");
