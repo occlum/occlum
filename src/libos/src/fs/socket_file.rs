@@ -64,20 +64,40 @@ impl File for SocketFile {
         }
     }
 
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
-        unimplemented!()
+    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+        self.read(buf)
     }
 
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error> {
-        unimplemented!()
+    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize, Error> {
+        self.write(buf)
     }
 
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
-        unimplemented!()
+        let mut total_len = 0;
+        for buf in bufs {
+            match self.read(buf) {
+                Ok(len) => {
+                    total_len += len;
+                }
+                Err(_) if total_len != 0 => break,
+                Err(e) => return Err(e.into()),
+            }
+        }
+        Ok(total_len)
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
-        unimplemented!()
+        let mut total_len = 0;
+        for buf in bufs {
+            match self.write(buf) {
+                Ok(len) => {
+                    total_len += len;
+                }
+                Err(_) if total_len != 0 => break,
+                Err(e) => return Err(e.into()),
+            }
+        }
+        Ok(total_len)
     }
 
     fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
