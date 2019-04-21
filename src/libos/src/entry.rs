@@ -35,6 +35,10 @@ pub extern "C" fn libos_run() -> i32 {
     .unwrap_or(EXIT_STATUS_INTERNAL_ERROR)
 }
 
+#[no_mangle]
+pub extern "C" fn dummy_ecall() -> i32 {
+    0
+}
 // Use 127 as a special value to indicate internal error from libos, not from
 // user programs, although it is completely ok for a user program to return 127.
 const EXIT_STATUS_INTERNAL_ERROR: i32 = 127;
