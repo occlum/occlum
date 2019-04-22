@@ -29,6 +29,8 @@ use std::any::Any;
 
 mod consts;
 
+static mut SYSCALL_TIMING: [usize; 361] = [0; 361];
+
 #[no_mangle]
 #[deny(unreachable_patterns)]
 pub extern "C" fn dispatch_syscall(
@@ -44,6 +46,14 @@ pub extern "C" fn dispatch_syscall(
         "syscall {}: {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}",
         num, arg0, arg1, arg2, arg3, arg4, arg5
     );
+    #[cfg(feature = "syscall_timing")]
+    let time_start = {
+        if crate::process::current_pid() == 1 && num == SYS_EXIT {
+            print_syscall_timing();
+        }
+        crate::time::do_gettimeofday().as_usec()
+    };
+
     let ret = match num {
         // file
         SYS_OPEN => do_open(arg0 as *const i8, arg1 as u32, arg2 as u32),
@@ -256,11 +266,32 @@ pub extern "C" fn dispatch_syscall(
 
         _ => do_unknown(num, arg0, arg1, arg2, arg3, arg4, arg5),
     };
+
+    #[cfg(feature = "syscall_timing")]
+    {
+        let time_end = crate::time::do_gettimeofday().as_usec();
+        let time = time_end - time_start;
+        unsafe {
+            SYSCALL_TIMING[num as usize] += time as usize;
+        }
+    }
+
     info!("=> {:?}", ret);
 
     match ret {
         Ok(code) => code as isize,
         Err(e) => e.errno.as_retval() as isize,
+    }
+}
+
+#[cfg(feature = "syscall_timing")]
+fn print_syscall_timing() {
+    println!("syscall timing:");
+    for (i, &time) in unsafe { SYSCALL_TIMING }.iter().enumerate() {
+        if time == 0 {
+            continue;
+        }
+        println!("{:>3}: {:>6} us", i, time);
     }
 }
 

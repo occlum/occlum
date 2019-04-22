@@ -15,6 +15,7 @@ rcore-fs-sefs = { path = "../../deps/sefs/rcore-fs-sefs" }
 
 [features]
 default = []
+syscall_timing = []
 
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
 xmas-elf = { path = "../../deps/xmas-elf" }

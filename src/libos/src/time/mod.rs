@@ -16,6 +16,12 @@ pub struct timeval_t {
     usec: suseconds_t,
 }
 
+impl timeval_t {
+    pub fn as_usec(&self) -> usize {
+        (self.sec * 1000000 + self.usec) as usize
+    }
+}
+
 pub fn do_gettimeofday() -> timeval_t {
     let mut tv: timeval_t = Default::default();
     unsafe {
