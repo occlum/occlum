@@ -51,4 +51,8 @@ impl File for NullFile {
     fn read_entry(&self) -> Result<String, Error> {
         unimplemented!()
     }
+
+    fn as_any(&self) -> &Any {
+        self
+    }
 }

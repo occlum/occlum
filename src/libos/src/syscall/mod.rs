@@ -101,6 +101,7 @@ pub extern "C" fn dispatch_syscall(
             arg3 as usize,
         ),
         SYS_FCNTL => do_fcntl(arg0 as FileDesc, arg1 as u32, arg2 as u64),
+        SYS_IOCTL => do_ioctl(arg0 as FileDesc, arg1 as c_int, arg2 as *mut c_int),
 
         // IO multiplexing
         SYS_SELECT => do_select(
@@ -280,6 +281,7 @@ pub extern "C" fn dispatch_syscall(
 
     match ret {
         Ok(code) => code as isize,
+        Err(e) if e.errno.as_retval() == 0 => panic!("undefined errno"),
         Err(e) => e.errno.as_retval() as isize,
     }
 }
@@ -898,6 +900,23 @@ fn do_sendfile(
 fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize, Error> {
     let cmd = FcntlCmd::from_raw(cmd, arg)?;
     fs::do_fcntl(fd, &cmd)
+}
+
+fn do_ioctl(fd: FileDesc, cmd: c_int, argp: *mut c_int) -> Result<isize, Error> {
+    info!(
+        "ioctl: fd: {}, cmd: {}, argp: {:?}",
+        fd, cmd, argp
+    );
+    let current_ref = process::get_current();
+    let mut proc = current_ref.lock().unwrap();
+    let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
+    if let Ok(socket) = file_ref.as_socket() {
+        let ret = try_libc!(libc::ocall::ioctl_arg1(socket.fd(), cmd, argp));
+        Ok(ret as isize)
+    } else {
+        warn!("ioctl is unimplemented");
+        errno!(ENOSYS, "ioctl is unimplemented")
+    }
 }
 
 fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize, Error> {

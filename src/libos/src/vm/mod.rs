@@ -16,6 +16,7 @@ pub use self::process_vm::ProcessVM;
 // TODO: separate proc and flags
 // TODO: accept fd and offset
 pub fn do_mmap(addr: usize, size: usize, flags: VMAreaFlags) -> Result<usize, Error> {
+    info!("mmap: addr: {:#x}, size: {:#x}, flags: {:?}", addr, size, flags);
     let current_ref = get_current();
     let current_process = current_ref.lock().unwrap();
     let current_vm_ref = current_process.get_vm();
@@ -24,6 +25,7 @@ pub fn do_mmap(addr: usize, size: usize, flags: VMAreaFlags) -> Result<usize, Er
 }
 
 pub fn do_munmap(addr: usize, size: usize) -> Result<(), Error> {
+    info!("munmap: addr: {:#x}, size: {:#x}", addr, size);
     let current_ref = get_current();
     let current_process = current_ref.lock().unwrap();
     let current_vm_ref = current_process.get_vm();
@@ -37,6 +39,10 @@ pub fn do_mremap(
     old_size: usize,
     options: &VMResizeOptions,
 ) -> Result<usize, Error> {
+    info!(
+        "mremap: oldaddr: {:#x}, oldsize: {:#x}, options: {:?}",
+        old_addr, old_size, options
+    );
     let current_ref = get_current();
     let current_process = current_ref.lock().unwrap();
     let current_vm_ref = current_process.get_vm();
@@ -45,6 +51,7 @@ pub fn do_mremap(
 }
 
 pub fn do_brk(addr: usize) -> Result<usize, Error> {
+    info!("brk: addr: {:#x}", addr);
     let current_ref = get_current();
     let current_process = current_ref.lock().unwrap();
     let current_vm_ref = current_process.get_vm();

@@ -154,6 +154,10 @@ impl File for INodeFile {
         *offset += 1;
         Ok(name)
     }
+
+    fn as_any(&self) -> &Any {
+        self
+    }
 }
 
 impl INodeFile {

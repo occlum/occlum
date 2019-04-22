@@ -99,6 +99,10 @@ impl File for PipeReader {
     fn read_entry(&self) -> Result<String, Error> {
         unimplemented!()
     }
+
+    fn as_any(&self) -> &Any {
+        self
+    }
 }
 
 unsafe impl Send for PipeReader {}
@@ -176,6 +180,10 @@ impl File for PipeWriter {
 
     fn read_entry(&self) -> Result<String, Error> {
         unimplemented!()
+    }
+
+    fn as_any(&self) -> &Any {
+        self
     }
 }
 

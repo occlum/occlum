@@ -3,7 +3,6 @@ use std;
 use std::borrow::BorrowMut;
 use std::fmt;
 use std::io::SeekFrom;
-use std::any::Any;
 
 pub trait File: Debug + Sync + Send + Any {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error>;
@@ -18,7 +17,7 @@ pub trait File: Debug + Sync + Send + Any {
     fn sync_all(&self) -> Result<(), Error>;
     fn sync_data(&self) -> Result<(), Error>;
     fn read_entry(&self) -> Result<String, Error>;
-    fn as_any(&self) -> &Any { unimplemented!() }
+    fn as_any(&self) -> &Any;
 }
 
 pub type FileRef = Arc<Box<File>>;
@@ -115,6 +114,10 @@ impl File for SgxFile {
 
     fn read_entry(&self) -> Result<String, Error> {
         unimplemented!()
+    }
+
+    fn as_any(&self) -> &Any {
+        self
     }
 }
 
@@ -379,6 +382,10 @@ impl File for StdoutFile {
     fn read_entry(&self) -> Result<String, Error> {
         unimplemented!()
     }
+
+    fn as_any(&self) -> &Any {
+        self
+    }
 }
 
 impl Debug for StdoutFile {
@@ -475,6 +482,10 @@ impl File for StdinFile {
 
     fn read_entry(&self) -> Result<String, Error> {
         unimplemented!()
+    }
+
+    fn as_any(&self) -> &Any {
+        self
     }
 }
 

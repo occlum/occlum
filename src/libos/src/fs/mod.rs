@@ -16,6 +16,7 @@ pub use self::io_multiplexing::*;
 pub use self::access::{AccessModes, AccessFlags, AT_FDCWD, do_access, do_faccessat};
 use self::null::NullFile;
 use std::mem::uninitialized;
+use std::any::Any;
 
 mod file;
 mod file_table;
@@ -468,6 +469,8 @@ bitflags! {
         const TRUNCATE = 1 << 9;
         /// append on each write
         const APPEND = 1 << 10;
+        /// non block
+        const NONBLOCK = 1 << 11;
         /// close on exec
         const CLOEXEC = 1 << 19;
     }
@@ -694,28 +697,19 @@ pub enum FcntlCmd {
     /// Get the file status flags
     GetFl(),
     /// Set the file status flags
-    SetFl(OpenFlags),
+    SetFl(u32),
 }
-
-pub const F_DUPFD : u32             = 0;
-pub const F_GETFD : u32             = 1;
-pub const F_SETFD : u32             = 2;
-pub const F_GETFL : u32             = 3;
-pub const F_SETFL : u32             = 4;
-pub const F_DUPFD_CLOEXEC : u32     = 1030;
-
-pub const FD_CLOEXEC : u32          = 1;
 
 impl FcntlCmd {
     #[deny(unreachable_patterns)]
     pub fn from_raw(cmd: u32, arg: u64) -> Result<FcntlCmd, Error> {
-        Ok(match cmd {
-            F_DUPFD => FcntlCmd::DupFd(arg as FileDesc),
-            F_DUPFD_CLOEXEC => FcntlCmd::DupFdCloexec(arg as FileDesc),
-            F_GETFD => FcntlCmd::GetFd(),
-            F_SETFD => FcntlCmd::SetFd(arg as u32),
-            F_GETFL => FcntlCmd::GetFl(),
-            F_SETFL => FcntlCmd::SetFl(OpenFlags::from_bits_truncate(arg as u32)),
+        Ok(match cmd as c_int {
+            libc::F_DUPFD => FcntlCmd::DupFd(arg as FileDesc),
+            libc::F_DUPFD_CLOEXEC => FcntlCmd::DupFdCloexec(arg as FileDesc),
+            libc::F_GETFD => FcntlCmd::GetFd(),
+            libc::F_SETFD => FcntlCmd::SetFd(arg as u32),
+            libc::F_GETFL => FcntlCmd::GetFl(),
+            libc::F_SETFL => FcntlCmd::SetFl(arg as u32),
             _ => return errno!(EINVAL, "invalid command"),
         })
     }
@@ -739,7 +733,7 @@ pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize, Error> {
         FcntlCmd::GetFd() => {
             let entry = files.get_entry(fd)?;
             let fd_flags = if entry.is_close_on_spawn() {
-                FD_CLOEXEC
+                libc::FD_CLOEXEC
             } else {
                 0
             };
@@ -747,19 +741,33 @@ pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize, Error> {
         },
         FcntlCmd::SetFd(fd_flags) => {
             let entry = files.get_entry_mut(fd)?;
-            entry.set_close_on_spawn((fd_flags & FD_CLOEXEC) != 0);
+            entry.set_close_on_spawn((fd_flags & libc::FD_CLOEXEC as u32) != 0);
             0
         },
         FcntlCmd::GetFl() => {
-            let _ = files.get_entry_mut(fd)?;
-            warn!("fcntl.getfl is unimplemented");
-            0
-        },
+            let file = files.get(fd)?;
+            if let Ok(socket) = file.as_socket() {
+                let ret = try_libc!(libc::ocall::fcntl_arg0(socket.fd(), libc::F_GETFL));
+                ret as isize
+            } else {
+                warn!("fcntl.getfl is unimplemented");
+                0
+            }
+        }
         FcntlCmd::SetFl(flags) => {
-            let _ = files.get_entry_mut(fd)?;
-            warn!("fcntl.setfl is unimplemented");
-            0
-        },
+            let file = files.get(fd)?;
+            if let Ok(socket) = file.as_socket() {
+                let ret = try_libc!(libc::ocall::fcntl_arg1(
+                    socket.fd(),
+                    libc::F_SETFL,
+                    *flags as c_int
+                ));
+                ret as isize
+            } else {
+                warn!("fcntl.setfl is unimplemented");
+                0
+            }
+        }
     })
 }
 
