@@ -7,16 +7,16 @@
 //! 3. Dispatch the syscall to `do_*` (at this file)
 //! 4. Do some memory checks then call `mod::do_*` (at each module)
 
-use fs::{File, SocketFile, FileDesc, FileRef, AccessModes, AccessFlags, AT_FDCWD, FcntlCmd};
+use fs::{AccessFlags, AccessModes, FcntlCmd, File, FileDesc, FileRef, SocketFile, AT_FDCWD};
+use misc::{resource_t, rlimit_t, utsname_t};
 use prelude::*;
-use process::{ChildProcessFilter, FileAction, pid_t, CloneFlags, FutexFlags, FutexOp};
+use process::{pid_t, ChildProcessFilter, CloneFlags, FileAction, FutexFlags, FutexOp};
 use std::ffi::{CStr, CString};
 use std::ptr;
 use time::timeval_t;
 use util::mem_util::from_user::*;
 use vm::{VMAreaFlags, VMResizeOptions};
 use {fs, process, std, vm};
-use misc::{utsname_t, resource_t, rlimit_t};
 
 use super::*;
 
@@ -84,6 +84,12 @@ pub extern "C" fn dispatch_syscall(
         SYS_LINK => do_link(arg0 as *const i8, arg1 as *const i8),
         SYS_UNLINK => do_unlink(arg0 as *const i8),
         SYS_READLINK => do_readlink(arg0 as *const i8, arg1 as *mut u8, arg2 as usize),
+        SYS_SENDFILE => do_sendfile(
+            arg0 as FileDesc,
+            arg1 as FileDesc,
+            arg2 as *mut off_t,
+            arg3 as usize,
+        ),
         SYS_FCNTL => do_fcntl(arg0 as FileDesc, arg1 as u32, arg2 as u64),
 
         // IO multiplexing
@@ -171,11 +177,7 @@ pub extern "C" fn dispatch_syscall(
             arg3 as i32,
             arg4 as usize,
         ),
-        SYS_MPROTECT => do_mprotect(
-            arg0 as usize,
-            arg1 as usize,
-            arg2 as u32,
-        ),
+        SYS_MPROTECT => do_mprotect(arg0 as usize, arg1 as usize, arg2 as u32),
         SYS_BRK => do_brk(arg0 as usize),
 
         SYS_PIPE => do_pipe2(arg0 as *mut i32, 0),
@@ -188,8 +190,12 @@ pub extern "C" fn dispatch_syscall(
 
         SYS_UNAME => do_uname(arg0 as *mut utsname_t),
 
-        SYS_PRLIMIT64 => do_prlimit(arg0 as pid_t, arg1 as u32, arg2 as *const rlimit_t, arg3 as *mut rlimit_t),
-
+        SYS_PRLIMIT64 => do_prlimit(
+            arg0 as pid_t,
+            arg1 as u32,
+            arg2 as *const rlimit_t,
+            arg3 as *mut rlimit_t,
+        ),
 
         // socket
         SYS_SOCKET => do_socket(arg0 as c_int, arg1 as c_int, arg2 as c_int),
@@ -250,7 +256,7 @@ pub extern "C" fn dispatch_syscall(
 
         _ => do_unknown(num, arg0, arg1, arg2, arg3, arg4, arg5),
     };
-    debug!("syscall return: {:?}", ret);
+    info!("=> {:?}", ret);
 
     match ret {
         Ok(code) => code as isize,
@@ -298,7 +304,9 @@ fn clone_file_actions_safely(fdop_ptr: *const FdOp) -> Result<Vec<FileAction>, E
             FDOP_CLOSE => FileAction::Close(fdop.fd),
             FDOP_DUP2 => FileAction::Dup2(fdop.srcfd, fdop.fd),
             FDOP_OPEN => FileAction::Open {
-                path: clone_cstring_safely(fdop.path)?.to_string_lossy().into_owned(),
+                path: clone_cstring_safely(fdop.path)?
+                    .to_string_lossy()
+                    .into_owned(),
                 mode: fdop.mode,
                 oflag: fdop.oflag,
                 fd: fdop.fd,
@@ -352,8 +360,7 @@ pub fn do_clone(
         if flags.contains(CloneFlags::CLONE_PARENT_SETTID) {
             check_mut_ptr(ptid)?;
             Some(ptid)
-        }
-        else {
+        } else {
             None
         }
     };
@@ -361,8 +368,7 @@ pub fn do_clone(
         if flags.contains(CloneFlags::CLONE_CHILD_CLEARTID) {
             check_mut_ptr(ctid)?;
             Some(ctid)
-        }
-        else {
+        } else {
             None
         }
     };
@@ -370,8 +376,7 @@ pub fn do_clone(
         if flags.contains(CloneFlags::CLONE_SETTLS) {
             check_mut_ptr(new_tls as *mut usize)?;
             Some(new_tls)
-        }
-        else {
+        } else {
             None
         }
     };
@@ -381,17 +386,11 @@ pub fn do_clone(
     Ok(child_pid as isize)
 }
 
-pub fn do_futex(
-    futex_addr: *const i32,
-    futex_op: u32,
-    futex_val: i32,
-) -> Result<isize, Error> {
+pub fn do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32) -> Result<isize, Error> {
     check_ptr(futex_addr)?;
     let (futex_op, futex_flags) = process::futex_op_and_flags_from_u32(futex_op)?;
     match futex_op {
-        FutexOp::FUTEX_WAIT => {
-            process::futex_wait(futex_addr, futex_val).map(|_| 0)
-        }
+        FutexOp::FUTEX_WAIT => process::futex_wait(futex_addr, futex_val).map(|_| 0),
         FutexOp::FUTEX_WAKE => {
             let max_count = {
                 if futex_val < 0 {
@@ -399,9 +398,8 @@ pub fn do_futex(
                 }
                 futex_val as usize
             };
-            process::futex_wake(futex_addr, max_count)
-                .map(|count| count as isize)
-        },
+            process::futex_wake(futex_addr, max_count).map(|count| count as isize)
+        }
         _ => errno!(ENOSYS, "the futex operation is not supported"),
     }
 }
@@ -627,11 +625,7 @@ fn do_mremap(
     Ok(ret_addr as isize)
 }
 
-fn do_mprotect(
-    addr: usize,
-    len: usize,
-    prot: u32,
-) -> Result<isize, Error> {
+fn do_mprotect(addr: usize, len: usize, prot: u32) -> Result<isize, Error> {
     // TODO: implement it
     Ok(0)
 }
@@ -710,7 +704,6 @@ fn do_getegid() -> Result<isize, Error> {
     Ok(0)
 }
 
-
 fn do_pipe2(fds_u: *mut i32, flags: u32) -> Result<isize, Error> {
     check_mut_array(fds_u, 2)?;
     // TODO: how to deal with open flags???
@@ -761,7 +754,15 @@ fn do_exit(status: i32) -> ! {
     }
 }
 
-fn do_unknown(num: u32, arg0: isize, arg1: isize, arg2: isize, arg3: isize, arg4: isize, arg5: isize) -> Result<isize, Error> {
+fn do_unknown(
+    num: u32,
+    arg0: isize,
+    arg1: isize,
+    arg2: isize,
+    arg3: isize,
+    arg4: isize,
+    arg5: isize,
+) -> Result<isize, Error> {
     warn!(
         "unknown or unsupported syscall (# = {}): {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}",
         num, arg0, arg1, arg2, arg3, arg4, arg5
@@ -838,6 +839,28 @@ fn do_readlink(path: *const i8, buf: *mut u8, size: usize) -> Result<isize, Erro
         unsafe { std::slice::from_raw_parts_mut(buf, size) }
     };
     let len = fs::do_readlink(&path, buf)?;
+    Ok(len as isize)
+}
+
+fn do_sendfile(
+    out_fd: FileDesc,
+    in_fd: FileDesc,
+    offset_ptr: *mut off_t,
+    count: usize,
+) -> Result<isize, Error> {
+    let offset = if offset_ptr.is_null() {
+        None
+    } else {
+        check_mut_ptr(offset_ptr)?;
+        Some(unsafe { offset_ptr.read() })
+    };
+
+    let (len, offset) = fs::do_sendfile(out_fd, in_fd, offset, count)?;
+    if !offset_ptr.is_null() {
+        unsafe {
+            offset_ptr.write(offset as off_t);
+        }
+    }
     Ok(len as isize)
 }
 
@@ -1037,11 +1060,14 @@ fn do_select(
     readfds: *mut libc::fd_set,
     writefds: *mut libc::fd_set,
     exceptfds: *mut libc::fd_set,
-    timeout: *const libc::timeval
+    timeout: *const libc::timeval,
 ) -> Result<isize, Error> {
     // check arguments
     if nfds < 0 || nfds >= libc::FD_SETSIZE as c_int {
-        return Err(Error::new(EINVAL, "nfds is negative or exceeds the resource limit"));
+        return Err(Error::new(
+            EINVAL,
+            "nfds is negative or exceeds the resource limit",
+        ));
     }
     let nfds = nfds as usize;
 
@@ -1078,11 +1104,7 @@ fn do_select(
     Ok(n as isize)
 }
 
-fn do_poll(
-    fds: *mut libc::pollfd,
-    nfds: libc::nfds_t,
-    timeout: c_int,
-) -> Result<isize, Error> {
+fn do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int) -> Result<isize, Error> {
     check_mut_array(fds, nfds as usize)?;
     let polls = unsafe { std::slice::from_raw_parts_mut(fds, nfds as usize) };
 
@@ -1153,14 +1175,18 @@ fn do_uname(name: *mut utsname_t) -> Result<isize, Error> {
     misc::do_uname(name).map(|_| 0)
 }
 
-fn do_prlimit(pid: pid_t, resource: u32, new_limit: *const rlimit_t, old_limit: *mut rlimit_t) -> Result<isize, Error> {
+fn do_prlimit(
+    pid: pid_t,
+    resource: u32,
+    new_limit: *const rlimit_t,
+    old_limit: *mut rlimit_t,
+) -> Result<isize, Error> {
     let resource = resource_t::from_u32(resource)?;
     let new_limit = {
         if new_limit != ptr::null() {
             check_ptr(new_limit)?;
             Some(unsafe { &*new_limit })
-        }
-        else {
+        } else {
             None
         }
     };
@@ -1168,8 +1194,7 @@ fn do_prlimit(pid: pid_t, resource: u32, new_limit: *const rlimit_t, old_limit: 
         if old_limit != ptr::null_mut() {
             check_mut_ptr(old_limit)?;
             Some(unsafe { &mut *old_limit })
-        }
-        else {
+        } else {
             None
         }
     };
