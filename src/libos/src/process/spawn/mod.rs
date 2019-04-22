@@ -101,7 +101,7 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
                 &FileAction::Open { ref path, mode, oflag, fd} => {
                     let flags = OpenFlags::from_bits_truncate(oflag);
                     let file = parent.open_file(path.as_str(), flags, mode)?;
-                    let file_ref: Arc<Box<File>> = Arc::new(Box::new(file));
+                    let file_ref: Arc<Box<File>> = Arc::new(file);
 
                     let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
                     cloned_file_table.put_at(fd, file_ref, close_on_spawn);

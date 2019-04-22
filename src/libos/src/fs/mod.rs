@@ -14,6 +14,7 @@ use self::inode_file::OpenOptions;
 pub use self::pipe::Pipe;
 pub use self::io_multiplexing::*;
 pub use self::access::{AccessModes, AccessFlags, AT_FDCWD, do_access, do_faccessat};
+use self::null::NullFile;
 use std::mem::uninitialized;
 
 mod file;
@@ -24,6 +25,7 @@ mod pipe;
 mod sgx_impl;
 mod io_multiplexing;
 mod access;
+mod null;
 
 
 pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
@@ -37,7 +39,7 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
     let mut proc = current_ref.lock().unwrap();
 
     let file = proc.open_file(path, flags, mode)?;
-    let file_ref: Arc<Box<File>> = Arc::new(Box::new(file));
+    let file_ref: Arc<Box<File>> = Arc::new(file);
 
     let fd = {
         let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
@@ -399,7 +401,10 @@ extern "C" {
 
 impl Process {
     /// Open a file on the process. But DO NOT add it to file table.
-    pub fn open_file(&self, path: &str, flags: OpenFlags, mode: u32) -> Result<INodeFile, Error> {
+    pub fn open_file(&self, path: &str, flags: OpenFlags, mode: u32) -> Result<Box<File>, Error> {
+        if path == "/dev/null" {
+            return Ok(Box::new(NullFile));
+        }
         let inode = if flags.contains(OpenFlags::CREATE) {
             let (dir_path, file_name) = split_path(&path);
             let dir_inode = self.lookup_inode(dir_path)?;
@@ -416,7 +421,7 @@ impl Process {
         } else {
             self.lookup_inode(&path)?
         };
-        INodeFile::open(inode, flags.to_options())
+        Ok(Box::new(INodeFile::open(inode, flags.to_options())?))
     }
 
     /// Lookup INode from the cwd of the process
