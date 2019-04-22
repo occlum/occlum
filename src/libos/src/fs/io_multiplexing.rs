@@ -57,11 +57,7 @@ pub fn do_select(
         Some(tv) => (tv.tv_sec * 1000 + tv.tv_usec / 1000) as i32,
     };
 
-    let ret = unsafe { libc::ocall::poll(polls.as_mut_ptr(), polls.len() as u64, timeout) };
-
-    if ret < 0 {
-        return errno!(Errno::from_retval(unsafe { libc::errno() }), "");
-    }
+    let ret = try_libc!(libc::ocall::poll(polls.as_mut_ptr(), polls.len() as u64, timeout));
 
     // convert fd back and write fdset
     readfds.clear();
@@ -96,14 +92,9 @@ pub fn do_poll(polls: &mut [libc::pollfd], timeout: c_int) -> Result<usize, Erro
         let socket = file_ref.as_socket()?;
         poll.fd = socket.fd();
     }
-    let ret = unsafe { libc::ocall::poll(polls.as_mut_ptr(), polls.len() as u64, timeout) };
+    let ret = try_libc!(libc::ocall::poll(polls.as_mut_ptr(), polls.len() as u64, timeout));
     // recover fd ?
-
-    if ret < 0 {
-        errno!(Errno::from_retval(unsafe { libc::errno() }), "")
-    } else {
-        Ok(ret as usize)
-    }
+    Ok(ret as usize)
 }
 
 pub fn do_epoll_create1(flags: c_int) -> Result<FileDesc, Error> {
@@ -211,10 +202,7 @@ struct EpollFileInner {
 impl EpollFileInner {
     /// Create a new Linux epoll file descriptor
     pub fn new() -> Result<Self, Error> {
-        let ret = unsafe { libc::ocall::epoll_create1(0) };
-        if ret < 0 {
-            return errno!(Errno::from_retval(unsafe { libc::errno() }), "");
-        }
+        let ret = try_libc!(libc::ocall::epoll_create1(0));
         Ok(EpollFileInner { epoll_fd: ret })
     }
 
@@ -225,10 +213,7 @@ impl EpollFileInner {
         event: *const libc::epoll_event,
     ) -> Result<(), Error> {
         let ret =
-            unsafe { libc::ocall::epoll_ctl(self.epoll_fd, op, host_fd as c_int, event as *mut _) };
-        if ret < 0 {
-            return errno!(Errno::from_retval(unsafe { libc::errno() }), "");
-        }
+            try_libc!(libc::ocall::epoll_ctl(self.epoll_fd, op, host_fd as c_int, event as *mut _));
         Ok(())
     }
 
@@ -239,17 +224,14 @@ impl EpollFileInner {
         events: &mut [libc::epoll_event],
         timeout: c_int,
     ) -> Result<usize, Error> {
-        let ret = unsafe {
+        let ret = try_libc!(
             libc::ocall::epoll_wait(
                 self.epoll_fd,
                 events.as_mut_ptr(),
                 events.len() as c_int,
                 timeout,
             )
-        };
-        if ret < 0 {
-            return errno!(Errno::from_retval(unsafe { libc::errno() }), "");
-        }
+        );
         Ok(ret as usize)
     }
 }

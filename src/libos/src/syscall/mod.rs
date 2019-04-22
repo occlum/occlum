@@ -941,10 +941,7 @@ fn do_connect(
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
     let socket = file_ref.as_socket()?;
 
-    let ret = unsafe { libc::ocall::connect(socket.fd(), addr, addr_len) };
-    if ret < 0 {
-        return errno!(Errno::from_retval(unsafe { libc::errno() }), "");
-    }
+    let ret = try_libc!(libc::ocall::connect(socket.fd(), addr, addr_len));
     Ok(ret as isize)
 }
 
@@ -977,10 +974,7 @@ fn do_shutdown(fd: c_int, how: c_int) -> Result<isize, Error> {
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
     let socket = file_ref.as_socket()?;
 
-    let ret = unsafe { libc::ocall::shutdown(socket.fd(), how) };
-    if ret < 0 {
-        return errno!(Errno::from_retval(unsafe { libc::errno() }), "");
-    }
+    let ret = try_libc!(libc::ocall::shutdown(socket.fd(), how));
     Ok(ret as isize)
 }
 
@@ -995,10 +989,7 @@ fn do_bind(
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
     let socket = file_ref.as_socket()?;
 
-    let ret = unsafe { libc::ocall::bind(socket.fd(), addr, addr_len) };
-    if ret < 0 {
-        return errno!(Errno::from_retval(unsafe { libc::errno() }), "");
-    }
+    let ret = try_libc!(libc::ocall::bind(socket.fd(), addr, addr_len));
     Ok(ret as isize)
 }
 
@@ -1009,10 +1000,7 @@ fn do_listen(fd: c_int, backlog: c_int) -> Result<isize, Error> {
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
     let socket = file_ref.as_socket()?;
 
-    let ret = unsafe { libc::ocall::listen(socket.fd(), backlog) };
-    if ret < 0 {
-        return errno!(Errno::from_retval(unsafe { libc::errno() }), "");
-    }
+    let ret = try_libc!(libc::ocall::listen(socket.fd(), backlog));
     Ok(ret as isize)
 }
 
@@ -1032,10 +1020,13 @@ fn do_setsockopt(
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
     let socket = file_ref.as_socket()?;
 
-    let ret = unsafe { libc::ocall::setsockopt(socket.fd(), level, optname, optval, optlen) };
-    if ret < 0 {
-        return errno!(Errno::from_retval(unsafe { libc::errno() }), "");
-    }
+    let ret = try_libc!(libc::ocall::setsockopt(
+        socket.fd(),
+        level,
+        optname,
+        optval,
+        optlen
+    ));
     Ok(ret as isize)
 }
 
@@ -1055,10 +1046,13 @@ fn do_getsockopt(
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
     let socket = file_ref.as_socket()?;
 
-    let ret = unsafe { libc::ocall::getsockopt(socket.fd(), level, optname, optval, optlen) };
-    if ret < 0 {
-        return errno!(Errno::from_retval(unsafe { libc::errno() }), "");
-    }
+    let ret = try_libc!(libc::ocall::getsockopt(
+        socket.fd(),
+        level,
+        optname,
+        optval,
+        optlen
+    ));
     Ok(ret as isize)
 }
 
@@ -1079,10 +1073,14 @@ fn do_sendto(
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
     let socket = file_ref.as_socket()?;
 
-    let ret = unsafe { libc::ocall::sendto(socket.fd(), base, len, flags, addr, addr_len) };
-    if ret < 0 {
-        return errno!(Errno::from_retval(unsafe { libc::errno() }), "");
-    }
+    let ret = try_libc!(libc::ocall::sendto(
+        socket.fd(),
+        base,
+        len,
+        flags,
+        addr,
+        addr_len
+    ));
     Ok(ret as isize)
 }
 
@@ -1103,10 +1101,14 @@ fn do_recvfrom(
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
     let socket = file_ref.as_socket()?;
 
-    let ret = unsafe { libc::ocall::recvfrom(socket.fd(), base, len, flags, addr, addr_len) };
-    if ret < 0 {
-        return errno!(Errno::from_retval(unsafe { libc::errno() }), "");
-    }
+    let ret = try_libc!(libc::ocall::recvfrom(
+        socket.fd(),
+        base,
+        len,
+        flags,
+        addr,
+        addr_len
+    ));
     Ok(ret as isize)
 }
 
