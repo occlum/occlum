@@ -1,9 +1,9 @@
 use super::*;
 use crate::syscall::AsSocket;
-use std::vec::Vec;
+use std::any::Any;
 use std::collections::btree_map::BTreeMap;
 use std::fmt;
-use std::any::Any;
+use std::vec::Vec;
 
 /// Forward to host `poll`
 /// (sgx_libc doesn't have `select`)
@@ -23,7 +23,11 @@ pub fn do_select(
     let file_table_ref = proc.get_files().lock().unwrap();
 
     for fd in 0..nfds {
-        let (r, w, e) = (readfds.is_set(fd), writefds.is_set(fd), exceptfds.is_set(fd));
+        let (r, w, e) = (
+            readfds.is_set(fd),
+            writefds.is_set(fd),
+            exceptfds.is_set(fd),
+        );
         if !(r || w || e) {
             continue;
         }
@@ -31,9 +35,15 @@ pub fn do_select(
 
         host_to_libos_fd[host_fd as usize] = fd;
         let mut events = 0;
-        if r { events |= libc::POLLIN; }
-        if w { events |= libc::POLLOUT; }
-        if e { events |= libc::POLLERR; }
+        if r {
+            events |= libc::POLLIN;
+        }
+        if w {
+            events |= libc::POLLOUT;
+        }
+        if e {
+            events |= libc::POLLERR;
+        }
 
         polls.push(libc::pollfd {
             fd: host_fd as c_int,
@@ -47,12 +57,10 @@ pub fn do_select(
         Some(tv) => (tv.tv_sec * 1000 + tv.tv_usec / 1000) as i32,
     };
 
-    let ret = unsafe {
-        libc::ocall::poll(polls.as_mut_ptr(), polls.len() as u64, timeout)
-    };
+    let ret = unsafe { libc::ocall::poll(polls.as_mut_ptr(), polls.len() as u64, timeout) };
 
     if ret < 0 {
-        return errno!(Errno::from_retval(ret as i32), "");
+        return errno!(Errno::from_retval(unsafe { libc::errno() }), "");
     }
 
     // convert fd back and write fdset
@@ -76,10 +84,7 @@ pub fn do_select(
     Ok(ret as usize)
 }
 
-pub fn do_poll(
-    polls: &mut [libc::pollfd],
-    timeout: c_int,
-) -> Result<usize, Error> {
+pub fn do_poll(polls: &mut [libc::pollfd], timeout: c_int) -> Result<usize, Error> {
     info!("poll: [..], timeout: {}", timeout);
 
     let current_ref = process::get_current();
@@ -91,13 +96,11 @@ pub fn do_poll(
         let socket = file_ref.as_socket()?;
         poll.fd = socket.fd();
     }
-    let ret = unsafe {
-        libc::ocall::poll(polls.as_mut_ptr(), polls.len() as u64, timeout)
-    };
+    let ret = unsafe { libc::ocall::poll(polls.as_mut_ptr(), polls.len() as u64, timeout) };
     // recover fd ?
 
     if ret < 0 {
-        errno!(Errno::from_retval(ret as i32), "")
+        errno!(Errno::from_retval(unsafe { libc::errno() }), "")
     } else {
         Ok(ret as usize)
     }
@@ -112,7 +115,10 @@ pub fn do_epoll_create1(flags: c_int) -> Result<FileDesc, Error> {
     let mut proc = current_ref.lock().unwrap();
     let fd = {
         let close_on_spawn = flags & libc::EPOLL_CLOEXEC != 0;
-        proc.get_files().lock().unwrap().put(file_ref, close_on_spawn)
+        proc.get_files()
+            .lock()
+            .unwrap()
+            .put(file_ref, close_on_spawn)
     };
     Ok(fd)
 }
@@ -142,7 +148,12 @@ pub fn do_epoll_wait(
     events: &mut [libc::epoll_event],
     timeout: c_int,
 ) -> Result<usize, Error> {
-    info!("epoll_wait: epfd: {}, len: {:?}, timeout: {}", epfd, events.len(), timeout);
+    info!(
+        "epoll_wait: epfd: {}, len: {:?}, timeout: {}",
+        epfd,
+        events.len(),
+        timeout
+    );
 
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
@@ -187,7 +198,7 @@ pub struct EpollFile {
 impl EpollFile {
     pub fn new() -> Result<Self, Error> {
         Ok(Self {
-            inner: SgxMutex::new(EpollFileInner::new()?)
+            inner: SgxMutex::new(EpollFileInner::new()?),
         })
     }
 }
@@ -202,25 +213,21 @@ impl EpollFileInner {
     pub fn new() -> Result<Self, Error> {
         let ret = unsafe { libc::ocall::epoll_create1(0) };
         if ret < 0 {
-            return errno!(Errno::from_retval(ret as i32), "");
+            return errno!(Errno::from_retval(unsafe { libc::errno() }), "");
         }
-        Ok(EpollFileInner {
-            epoll_fd: ret,
-        })
+        Ok(EpollFileInner { epoll_fd: ret })
     }
 
-
-    pub fn ctl(&mut self, op: c_int, host_fd: FileDesc, event: *const libc::epoll_event) -> Result<(), Error> {
-        let ret = unsafe {
-            libc::ocall::epoll_ctl(
-                self.epoll_fd,
-                op,
-                host_fd as c_int,
-                event as *mut _,
-            )
-        };
+    pub fn ctl(
+        &mut self,
+        op: c_int,
+        host_fd: FileDesc,
+        event: *const libc::epoll_event,
+    ) -> Result<(), Error> {
+        let ret =
+            unsafe { libc::ocall::epoll_ctl(self.epoll_fd, op, host_fd as c_int, event as *mut _) };
         if ret < 0 {
-            return errno!(Errno::from_retval(ret as i32), "");
+            return errno!(Errno::from_retval(unsafe { libc::errno() }), "");
         }
         Ok(())
     }
@@ -241,7 +248,7 @@ impl EpollFileInner {
             )
         };
         if ret < 0 {
-            return errno!(Errno::from_retval(ret as i32), "");
+            return errno!(Errno::from_retval(unsafe { libc::errno() }), "");
         }
         Ok(ret as usize)
     }

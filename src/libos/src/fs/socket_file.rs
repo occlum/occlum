@@ -11,7 +11,7 @@ impl SocketFile {
     pub fn new(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<Self, Error> {
         let ret = unsafe { libc::ocall::socket(domain, socket_type, protocol) };
         if ret < 0 {
-            errno!(Errno::from_retval(ret as i32), "")
+            errno!(Errno::from_retval(unsafe { libc::errno() }), "")
         } else {
             Ok(SocketFile { fd: ret })
         }
@@ -25,7 +25,7 @@ impl SocketFile {
     ) -> Result<Self, Error> {
         let ret = unsafe { libc::ocall::accept4(self.fd, addr, addr_len, flags) };
         if ret < 0 {
-            errno!(Errno::from_retval(ret as i32), "")
+            errno!(Errno::from_retval(unsafe { libc::errno() }), "")
         } else {
             Ok(SocketFile { fd: ret })
         }
@@ -49,7 +49,7 @@ impl File for SocketFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
         let ret = unsafe { libc::ocall::read(self.fd, buf.as_mut_ptr() as *mut c_void, buf.len()) };
         if ret < 0 {
-            errno!(Errno::from_retval(ret as i32), "")
+            errno!(Errno::from_retval(unsafe { libc::errno() }), "")
         } else {
             Ok(ret as usize)
         }
@@ -58,7 +58,7 @@ impl File for SocketFile {
     fn write(&self, buf: &[u8]) -> Result<usize, Error> {
         let ret = unsafe { libc::ocall::write(self.fd, buf.as_ptr() as *const c_void, buf.len()) };
         if ret < 0 {
-            errno!(Errno::from_retval(ret as i32), "")
+            errno!(Errno::from_retval(unsafe { libc::errno() }), "")
         } else {
             Ok(ret as usize)
         }
