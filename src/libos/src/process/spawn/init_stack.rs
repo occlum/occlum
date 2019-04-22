@@ -139,7 +139,7 @@ impl StackBuf {
             let old_pos = self.stack_pos.get();
             let new_pos = align_down(old_pos - size, align);
             if new_pos < self.stack_bottom {
-                return Err(Error::new(Errno::ENOMEM, "No enough space in buffer"));
+                return errno!(ENOMEM, "No enough space in buffer");
             }
             new_pos
         };
@@ -274,7 +274,7 @@ impl AuxTable {
 
     pub fn set_val(&mut self, key: AuxKey, val: u64) -> Result<(), Error> {
         if key == AuxKey::AT_NULL || key == AuxKey::AT_IGNORE {
-            return Err(Error::new(Errno::EINVAL, "Illegal key"));
+            return errno!(EINVAL, "Illegal key");
         }
         self.values[key as usize] = Some(val);
         Ok(())

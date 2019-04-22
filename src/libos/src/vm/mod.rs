@@ -74,7 +74,7 @@ pub struct VMAllocOptions {
 impl VMAllocOptions {
     pub fn new(size: usize) -> Result<VMAllocOptions, Error> {
         if size % PAGE_SIZE != 0 {
-            return Err(Error::new(Errno::EINVAL, "Size is not page-aligned"));
+            return errno!(EINVAL, "Size is not page-aligned");
         }
         Ok(VMAllocOptions {
             size,
@@ -84,7 +84,7 @@ impl VMAllocOptions {
 
     pub fn addr(&mut self, addr: VMAddrOption) -> Result<&mut Self, Error> {
         if addr.is_addr_given() && addr.get_addr() % PAGE_SIZE != 0 {
-            return Err(Error::new(Errno::EINVAL, "Invalid address"));
+            return errno!(EINVAL, "Invalid address");
         }
         self.addr = addr;
         Ok(self)
@@ -175,7 +175,7 @@ pub struct VMResizeOptions {
 impl VMResizeOptions {
     pub fn new(new_size: usize) -> Result<VMResizeOptions, Error> {
         if new_size % PAGE_SIZE != 0 {
-            return Err(Error::new(Errno::EINVAL, "Size is not page-aligned"));
+            return errno!(EINVAL, "Size is not page-aligned");
         }
         Ok(VMResizeOptions {
             new_size,

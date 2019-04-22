@@ -35,7 +35,7 @@ macro_rules! debug_trace {
 }
 
 macro_rules! errno {
-    ($errno: ident, $msg: expr) => {{
+    ($errno: expr, $msg: expr) => {{
         println!(
             "ERROR: {} ({}, line {} in file {})",
             $errno,

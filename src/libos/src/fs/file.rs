@@ -37,7 +37,7 @@ impl SgxFile {
         is_append: bool,
     ) -> Result<SgxFile, Error> {
         if !is_readable && !is_writable {
-            return Err(Error::new(Errno::EINVAL, "Invalid permissions"));
+            return errno!(EINVAL, "Invalid permissions");
         }
 
         Ok(SgxFile {
@@ -132,7 +132,7 @@ struct SgxFileInner {
 impl SgxFileInner {
     pub fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
         if !self.is_writable {
-            return Err(Error::new(Errno::EINVAL, "File not writable"));
+            return errno!(EINVAL, "File not writable");
         }
 
         let mut file_guard = self.file.lock().unwrap();
@@ -160,7 +160,7 @@ impl SgxFileInner {
 
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         if !self.is_readable {
-            return Err(Error::new(Errno::EINVAL, "File not readable"));
+            return errno!(EINVAL, "File not readable");
         }
 
         let mut file_guard = self.file.lock().unwrap();
@@ -193,7 +193,7 @@ impl SgxFileInner {
                     let backward_offset = (-relative_offset) as usize;
                     if self.pos < backward_offset {
                         // underflow
-                        return Err(Error::new(Errno::EINVAL, "Invalid seek position"));
+                        return errno!(EINVAL, "Invalid seek position");
                     }
                     SeekFrom::Start((self.pos - backward_offset) as u64)
                 }
@@ -209,7 +209,7 @@ impl SgxFileInner {
 
     pub fn writev(&mut self, bufs: &[&[u8]]) -> Result<usize, Error> {
         if !self.is_writable {
-            return Err(Error::new(Errno::EINVAL, "File not writable"));
+            return errno!(EINVAL, "File not writable");
         }
 
         let mut file_guard = self.file.lock().unwrap();
@@ -235,7 +235,7 @@ impl SgxFileInner {
                 Err(e) => {
                     match total_bytes {
                         // a complete failure
-                        0 => return Err(Error::new(Errno::EINVAL, "Failed to write")),
+                        0 => return errno!(EINVAL, "Failed to write"),
                         // a partially failure
                         _ => break,
                     }
@@ -249,7 +249,7 @@ impl SgxFileInner {
 
     fn readv(&mut self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
         if !self.is_readable {
-            return Err(Error::new(Errno::EINVAL, "File not readable"));
+            return errno!(EINVAL, "File not readable");
         }
 
         let mut file_guard = self.file.lock().unwrap();
@@ -271,7 +271,7 @@ impl SgxFileInner {
                 Err(e) => {
                     match total_bytes {
                         // a complete failure
-                        0 => return Err(Error::new(Errno::EINVAL, "Failed to write")),
+                        0 => return errno!(EINVAL, "Failed to write"),
                         // a partially failure
                         _ => break,
                     }
@@ -307,7 +307,7 @@ impl StdoutFile {
 
 impl File for StdoutFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "Stdout does not support read"))
+        errno!(EBADF, "Stdout does not support read")
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize, Error> {
@@ -329,7 +329,7 @@ impl File for StdoutFile {
     }
 
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "Stdout does not support read"))
+        errno!(EBADF, "Stdout does not support read")
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
@@ -346,7 +346,7 @@ impl File for StdoutFile {
                 Err(e) => {
                     match total_bytes {
                         // a complete failure
-                        0 => return Err(Error::new(Errno::EINVAL, "Failed to write")),
+                        0 => return errno!(EINVAL, "Failed to write"),
                         // a partially failure
                         _ => break,
                     }
@@ -357,7 +357,7 @@ impl File for StdoutFile {
     }
 
     fn seek(&self, seek_pos: SeekFrom) -> Result<off_t, Error> {
-        Err(Error::new(Errno::ESPIPE, "Stdout does not support seek"))
+        errno!(ESPIPE, "Stdout does not support seek")
     }
 
     fn metadata(&self) -> Result<Metadata, Error> {
@@ -414,7 +414,7 @@ impl File for StdinFile {
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "Stdin does not support write"))
+        errno!(EBADF, "Stdin does not support write")
     }
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
@@ -439,7 +439,7 @@ impl File for StdinFile {
                 Err(e) => {
                     match total_bytes {
                         // a complete failure
-                        0 => return Err(Error::new(Errno::EINVAL, "Failed to write")),
+                        0 => return errno!(EINVAL, "Failed to write"),
                         // a partially failure
                         _ => break,
                     }
@@ -450,11 +450,11 @@ impl File for StdinFile {
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "Stdin does not support write"))
+        errno!(EBADF, "Stdin does not support write")
     }
 
     fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
-        Err(Error::new(Errno::ESPIPE, "Stdin does not support seek"))
+        errno!(ESPIPE, "Stdin does not support seek")
     }
 
     fn metadata(&self) -> Result<Metadata, Error> {

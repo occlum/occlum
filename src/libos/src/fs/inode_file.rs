@@ -32,7 +32,7 @@ pub struct OpenOptions {
 impl File for INodeFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
         if !self.options.read {
-            return Err(Error::new(Errno::EBADF, "File not readable"));
+            return errno!(EBADF, "File not readable");
         }
         let mut offset = self.offset.lock().unwrap();
         let len = self.inode.read_at(*offset, buf)?;
@@ -42,7 +42,7 @@ impl File for INodeFile {
 
     fn write(&self, buf: &[u8]) -> Result<usize, Error> {
         if !self.options.write {
-            return Err(Error::new(Errno::EBADF, "File not writable"));
+            return errno!(EBADF, "File not writable");
         }
         let mut offset = self.offset.lock().unwrap();
         if self.options.append {
@@ -56,7 +56,7 @@ impl File for INodeFile {
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
         if !self.options.read {
-            return Err(Error::new(Errno::EBADF, "File not readable"));
+            return errno!(EBADF, "File not readable");
         }
         let len = self.inode.read_at(offset, buf)?;
         Ok(len)
@@ -64,7 +64,7 @@ impl File for INodeFile {
 
     fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error> {
         if !self.options.write {
-            return Err(Error::new(Errno::EBADF, "File not writable"));
+            return errno!(EBADF, "File not writable");
         }
         let len = self.inode.write_at(offset, buf)?;
         Ok(len)
@@ -72,7 +72,7 @@ impl File for INodeFile {
 
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
         if !self.options.read {
-            return Err(Error::new(Errno::EBADF, "File not readable"));
+            return errno!(EBADF, "File not readable");
         }
         let mut offset = self.offset.lock().unwrap();
         let mut total_len = 0;
@@ -91,7 +91,7 @@ impl File for INodeFile {
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
         if !self.options.write {
-            return Err(Error::new(Errno::EBADF, "File not writable"));
+            return errno!(EBADF, "File not writable");
         }
         let mut offset = self.offset.lock().unwrap();
         if self.options.append {
@@ -129,7 +129,7 @@ impl File for INodeFile {
 
     fn set_len(&self, len: u64) -> Result<(), Error> {
         if !self.options.write {
-            return Err(Error::new(EBADF, "File not writable. Can't set len."));
+            return errno!(EBADF, "File not writable. Can't set len.");
         }
         self.inode.resize(len as usize)?;
         Ok(())
@@ -147,7 +147,7 @@ impl File for INodeFile {
 
     fn read_entry(&self) -> Result<String, Error> {
         if !self.options.read {
-            return Err(Error::new(EBADF, "File not readable. Can't read entry."));
+            return errno!(EBADF, "File not readable. Can't read entry.");
         }
         let mut offset = self.offset.lock().unwrap();
         let name = self.inode.get_entry(*offset)?;

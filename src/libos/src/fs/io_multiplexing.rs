@@ -52,7 +52,7 @@ pub fn do_select(
     };
 
     if ret < 0 {
-        return Err(Error::new(Errno::from_retval(ret as i32), ""));
+        return errno!(Errno::from_retval(ret as i32), "");
     }
 
     // convert fd back and write fdset
@@ -97,7 +97,7 @@ pub fn do_poll(
     // recover fd ?
 
     if ret < 0 {
-        Err(Error::new(Errno::from_retval(ret as i32), ""))
+        errno!(Errno::from_retval(ret as i32), "")
     } else {
         Ok(ret as usize)
     }
@@ -202,7 +202,7 @@ impl EpollFileInner {
     pub fn new() -> Result<Self, Error> {
         let ret = unsafe { libc::ocall::epoll_create1(0) };
         if ret < 0 {
-            return Err(Error::new(Errno::from_retval(ret as i32), ""));
+            return errno!(Errno::from_retval(ret as i32), "");
         }
         Ok(EpollFileInner {
             epoll_fd: ret,
@@ -220,7 +220,7 @@ impl EpollFileInner {
             )
         };
         if ret < 0 {
-            return Err(Error::new(Errno::from_retval(ret as i32), ""));
+            return errno!(Errno::from_retval(ret as i32), "");
         }
         Ok(())
     }
@@ -241,7 +241,7 @@ impl EpollFileInner {
             )
         };
         if ret < 0 {
-            return Err(Error::new(Errno::from_retval(ret as i32), ""));
+            return errno!(Errno::from_retval(ret as i32), "");
         }
         Ok(ret as usize)
     }
@@ -281,7 +281,7 @@ impl File for EpollFile {
     }
 
     fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
-        Err(Error::new(Errno::ESPIPE, "Epoll does not support seek"))
+        errno!(ESPIPE, "Epoll does not support seek")
     }
 
     fn metadata(&self) -> Result<Metadata, Error> {

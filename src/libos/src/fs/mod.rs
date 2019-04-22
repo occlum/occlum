@@ -173,7 +173,7 @@ pub fn do_getdents64(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
     let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
     let info = file_ref.metadata()?;
     if info.type_ != FileType::Dir {
-        return Err(Error::new(ENOTDIR, ""));
+        return errno!(ENOTDIR, "");
     }
     let mut writer = unsafe { DirentBufWriter::new(buf) };
     loop {
@@ -267,7 +267,7 @@ pub fn do_chdir(path: &str) -> Result<(), Error> {
     let inode = current_process.lookup_inode(path)?;
     let info = inode.metadata()?;
     if info.type_ != FileType::Dir {
-        return Err(Error::new(ENOTDIR, ""));
+        return errno!(ENOTDIR, "");
     }
     current_process.change_cwd(path);
     Ok(())
@@ -295,7 +295,7 @@ pub fn do_mkdir(path: &str, mode: usize) -> Result<(), Error> {
     let (dir_path, file_name) = split_path(&path);
     let inode = current_process.lookup_inode(dir_path)?;
     if inode.find(file_name).is_ok() {
-        return Err(Error::new(EEXIST, ""));
+        return errno!(EEXIST, "");
     }
     inode.create(file_name, FileType::Dir, mode as u32)?;
     Ok(())
@@ -310,7 +310,7 @@ pub fn do_rmdir(path: &str) -> Result<(), Error> {
     let dir_inode = current_process.lookup_inode(dir_path)?;
     let file_inode = dir_inode.find(file_name)?;
     if file_inode.metadata()?.type_ != FileType::Dir {
-        return Err(Error::new(ENOTDIR, "rmdir on not directory"));
+        return errno!(ENOTDIR, "rmdir on not directory");
     }
     dir_inode.unlink(file_name)?;
     Ok(())
@@ -337,7 +337,7 @@ pub fn do_unlink(path: &str) -> Result<(), Error> {
     let dir_inode = current_process.lookup_inode(dir_path)?;
     let file_inode = dir_inode.find(file_name)?;
     if file_inode.metadata()?.type_ == FileType::Dir {
-        return Err(Error::new(EISDIR, "unlink on directory"));
+        return errno!(EISDIR, "unlink on directory");
     }
     dir_inode.unlink(file_name)?;
     Ok(())
@@ -381,7 +381,7 @@ pub fn do_sendfile(
         while bytes_written < read_len {
             let write_len = out_file.write(&buffer[bytes_written..])?;
             if write_len == 0 {
-                return Err(Error::new(EBADF, "sendfile write return 0"));
+                return errno!(EBADF, "sendfile write return 0");
             }
             bytes_written += write_len;
         }
@@ -406,7 +406,7 @@ impl Process {
             match dir_inode.find(file_name) {
                 Ok(file_inode) => {
                     if flags.contains(OpenFlags::EXCLUSIVE) {
-                        return Err(Error::new(EEXIST, "file exists"));
+                        return errno!(EEXIST, "file exists");
                     }
                     file_inode
                 }

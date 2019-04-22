@@ -169,7 +169,7 @@ impl ProcessVM {
                     VMAddrOption::Beyond(mmap_start_addr)
                 } else {
                     if addr < mmap_start_addr {
-                        return Err(Error::new(Errno::EINVAL, "Beyond valid memory range"));
+                        return errno!(EINVAL, "Beyond valid memory range");
                     }
                     // TODO: Fixed or Hint? Should hanle mmap flags
                     VMAddrOption::Hint(addr)
@@ -212,7 +212,7 @@ impl ProcessVM {
         options: &VMResizeOptions,
     ) -> Result<usize, Error> {
         // TODO: Implement this!
-        Err(Error::new(Errno::EINVAL, "Not implemented"))
+        errno!(EINVAL, "Not implemented")
     }
 
     pub fn brk(&mut self, new_brk: usize) -> Result<usize, Error> {

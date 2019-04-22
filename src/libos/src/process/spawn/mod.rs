@@ -65,7 +65,7 @@ pub fn do_spawn<P: AsRef<Path>>(
         let program_entry = {
             let program_entry = base_addr + elf_helper::get_start_address(&elf_file)?;
             if !vm.get_code_vma().contains_obj(program_entry, 16) {
-                return Err(Error::new(Errno::EINVAL, "Invalid program entry"));
+                return errno!(EINVAL, "Invalid program entry");
             }
             program_entry
         };

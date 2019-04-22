@@ -436,7 +436,7 @@ fn do_write(fd: FileDesc, buf: *const u8, size: usize) -> Result<isize, Error> {
 fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<isize, Error> {
     let count = {
         if count < 0 {
-            return Err(Error::new(Errno::EINVAL, "Invalid count of iovec"));
+            return errno!(EINVAL, "Invalid count of iovec");
         }
         count as usize
     };
@@ -461,7 +461,7 @@ fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<isize, Err
 fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize, Error> {
     let count = {
         if count < 0 {
-            return Err(Error::new(Errno::EINVAL, "Invalid count of iovec"));
+            return errno!(EINVAL, "Invalid count of iovec");
         }
         count as usize
     };
@@ -538,7 +538,7 @@ fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize, Error> {
         0 => {
             // SEEK_SET
             if offset < 0 {
-                return Err(Error::new(Errno::EINVAL, "Invalid offset"));
+                return errno!(EINVAL, "Invalid offset");
             }
             SeekFrom::Start(offset as u64)
         }
@@ -551,7 +551,7 @@ fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize, Error> {
             SeekFrom::End(offset)
         }
         _ => {
-            return Err(Error::new(Errno::EINVAL, "Invalid whence"));
+            return errno!(EINVAL, "Invalid whence");
         }
     };
 
@@ -767,7 +767,7 @@ fn do_unknown(
         "unknown or unsupported syscall (# = {}): {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}",
         num, arg0, arg1, arg2, arg3, arg4, arg5
     );
-    Err(Error::new(ENOSYS, "Unknown syscall"))
+    errno!(ENOSYS, "Unknown syscall")
 }
 
 fn do_getcwd(buf: *mut u8, size: usize) -> Result<isize, Error> {
@@ -779,7 +779,7 @@ fn do_getcwd(buf: *mut u8, size: usize) -> Result<isize, Error> {
     let mut proc = proc_ref.lock().unwrap();
     let cwd = proc.get_cwd();
     if cwd.len() + 1 > safe_buf.len() {
-        return Err(Error::new(ERANGE, "buf is not long enough"));
+        return errno!(ERANGE, "buf is not long enough");
     }
     safe_buf[..cwd.len()].copy_from_slice(cwd.as_bytes());
     safe_buf[cwd.len()] = 0;
@@ -1064,10 +1064,7 @@ fn do_select(
 ) -> Result<isize, Error> {
     // check arguments
     if nfds < 0 || nfds >= libc::FD_SETSIZE as c_int {
-        return Err(Error::new(
-            EINVAL,
-            "nfds is negative or exceeds the resource limit",
-        ));
+        return errno!(EINVAL, "nfds is negative or exceeds the resource limit");
     }
     let nfds = nfds as usize;
 
@@ -1114,7 +1111,7 @@ fn do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int) -> Result
 
 fn do_epoll_create(size: c_int) -> Result<isize, Error> {
     if size <= 0 {
-        return Err(Error::new(EINVAL, "size is not positive"));
+        return errno!(EINVAL, "size is not positive");
     }
     do_epoll_create1(0)
 }
@@ -1145,7 +1142,7 @@ fn do_epoll_wait(
 ) -> Result<isize, Error> {
     let maxevents = {
         if maxevents <= 0 {
-            return Err(Error::new(EINVAL, "maxevents <= 0"));
+            return errno!(EINVAL, "maxevents <= 0");
         }
         maxevents as usize
     };
