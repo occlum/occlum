@@ -22,6 +22,12 @@ impl convert::From<(Errno, &'static str)> for Error {
     }
 }
 
+impl convert::From<std::io::Error> for Error {
+    fn from(info: std::io::Error) -> Error {
+        Error::new(Errno::from_errno(info.raw_os_error().unwrap()), "std::io::Error")
+    }
+}
+
 impl error::Error for Error {
     fn description(&self) -> &str {
         self.desc

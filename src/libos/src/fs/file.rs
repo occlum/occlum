@@ -323,12 +323,12 @@ impl File for StdoutFile {
         Ok(write_len)
     }
 
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
-        unimplemented!()
+    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+        self.read(buf)
     }
 
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error> {
-        unimplemented!()
+    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize, Error> {
+        self.write(buf)
     }
 
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
@@ -364,23 +364,38 @@ impl File for StdoutFile {
     }
 
     fn metadata(&self) -> Result<Metadata, Error> {
-        unimplemented!()
+        Ok(Metadata {
+            dev: 0,
+            inode: 0,
+            size: 0,
+            blk_size: 0,
+            blocks: 0,
+            atime: Timespec { sec: 0, nsec: 0 },
+            mtime: Timespec { sec: 0, nsec: 0 },
+            ctime: Timespec { sec: 0, nsec: 0 },
+            type_: FileType::File,
+            mode: 0,
+            nlinks: 0,
+            uid: 0,
+            gid: 0
+        })
     }
 
-    fn set_len(&self, len: u64) -> Result<(), Error> {
-        unimplemented!()
+    fn set_len(&self, _len: u64) -> Result<(), Error> {
+        errno!(EINVAL, "Stdout does not support set_len")
     }
 
     fn sync_all(&self) -> Result<(), Error> {
-        unimplemented!()
+        self.sync_data()
     }
 
     fn sync_data(&self) -> Result<(), Error> {
-        unimplemented!()
+        self.inner.lock().flush()?;
+        Ok(())
     }
 
     fn read_entry(&self) -> Result<String, Error> {
-        unimplemented!()
+        errno!(ENOTDIR, "Stdout does not support read_entry")
     }
 
     fn as_any(&self) -> &Any {
@@ -465,23 +480,37 @@ impl File for StdinFile {
     }
 
     fn metadata(&self) -> Result<Metadata, Error> {
-        unimplemented!()
+        Ok(Metadata {
+            dev: 0,
+            inode: 0,
+            size: 0,
+            blk_size: 0,
+            blocks: 0,
+            atime: Timespec { sec: 0, nsec: 0 },
+            mtime: Timespec { sec: 0, nsec: 0 },
+            ctime: Timespec { sec: 0, nsec: 0 },
+            type_: FileType::File,
+            mode: 0,
+            nlinks: 0,
+            uid: 0,
+            gid: 0
+        })
     }
 
-    fn set_len(&self, len: u64) -> Result<(), Error> {
-        unimplemented!()
+    fn set_len(&self, _len: u64) -> Result<(), Error> {
+        errno!(EINVAL, "Stdin does not support set_len")
     }
 
     fn sync_all(&self) -> Result<(), Error> {
-        unimplemented!()
+        self.sync_data()
     }
 
     fn sync_data(&self) -> Result<(), Error> {
-        unimplemented!()
+        Ok(())
     }
 
     fn read_entry(&self) -> Result<String, Error> {
-        unimplemented!()
+        errno!(ENOTDIR, "Stdin does not support read_entry")
     }
 
     fn as_any(&self) -> &Any {
