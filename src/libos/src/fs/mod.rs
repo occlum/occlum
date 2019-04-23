@@ -9,7 +9,8 @@ use super::*;
 pub use self::file::{File, FileRef, SgxFile, StdinFile, StdoutFile};
 pub use self::file_table::{FileDesc, FileTable};
 pub use self::inode_file::{INodeExt, INodeFile, ROOT_INODE};
-pub use self::socket_file::SocketFile;
+pub use self::socket_file::{SocketFile, AsSocket};
+pub use self::unix_socket::{UnixSocketFile, AsUnixSocket};
 use self::inode_file::OpenOptions;
 pub use self::pipe::Pipe;
 pub use self::io_multiplexing::*;
@@ -27,6 +28,7 @@ mod sgx_impl;
 mod io_multiplexing;
 mod access;
 mod null;
+mod unix_socket;
 
 
 pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
@@ -363,7 +365,7 @@ pub fn do_sendfile(
 
     let in_file = file_table.get(in_fd)?;
     let out_file = file_table.get(out_fd)?;
-    let mut buffer: [u8; 1024] = unsafe { uninitialized() };
+    let mut buffer: [u8; 1024 * 11] = unsafe { uninitialized() };
 
     let mut read_offset = match offset {
         Some(offset) => offset,

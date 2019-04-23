@@ -113,7 +113,8 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
                     }
                 }
                 &FileAction::Close(fd) => {
-                    cloned_file_table.del(fd)?;
+                    // ignore error
+                    cloned_file_table.del(fd);
                 }
             }
         }

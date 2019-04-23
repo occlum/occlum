@@ -90,7 +90,21 @@ impl File for SocketFile {
     }
 
     fn metadata(&self) -> Result<Metadata, Error> {
-        unimplemented!()
+        Ok(Metadata {
+            dev: 0,
+            inode: 0,
+            size: 0,
+            blk_size: 0,
+            blocks: 0,
+            atime: Timespec { sec: 0, nsec: 0 },
+            mtime: Timespec { sec: 0, nsec: 0 },
+            ctime: Timespec { sec: 0, nsec: 0 },
+            type_: FileType::Socket,
+            mode: 0,
+            nlinks: 0,
+            uid: 0,
+            gid: 0
+        })
     }
 
     fn set_len(&self, len: u64) -> Result<(), Error> {
@@ -111,5 +125,17 @@ impl File for SocketFile {
 
     fn as_any(&self) -> &Any {
         self
+    }
+}
+
+pub trait AsSocket {
+    fn as_socket(&self) -> Result<&SocketFile, Error>;
+}
+
+impl AsSocket for FileRef {
+    fn as_socket(&self) -> Result<&SocketFile, Error> {
+        self.as_any()
+            .downcast_ref::<SocketFile>()
+            .ok_or(Error::new(Errno::EBADF, "not a socket"))
     }
 }

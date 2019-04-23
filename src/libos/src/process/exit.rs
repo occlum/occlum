@@ -101,7 +101,7 @@ pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32) -> Res
         waiter
     };
 
-    let child_pid = Waiter::sleep_until_woken_with_result(waiter);
+    let child_pid = waiter.sleep_until_woken_with_result();
 
     let mut current = current_ref.lock().unwrap();
     let child_i = {

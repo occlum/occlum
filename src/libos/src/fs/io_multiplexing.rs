@@ -1,5 +1,4 @@
 use super::*;
-use crate::syscall::AsSocket;
 use std::any::Any;
 use std::collections::btree_map::BTreeMap;
 use std::fmt;

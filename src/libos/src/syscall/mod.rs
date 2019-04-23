@@ -7,7 +7,7 @@
 //! 3. Dispatch the syscall to `do_*` (at this file)
 //! 4. Do some memory checks then call `mod::do_*` (at each module)
 
-use fs::{AccessFlags, AccessModes, FcntlCmd, File, FileDesc, FileRef, SocketFile, AT_FDCWD};
+use fs::*;
 use misc::{resource_t, rlimit_t, utsname_t};
 use prelude::*;
 use process::{pid_t, ChildProcessFilter, CloneFlags, FileAction, FutexFlags, FutexOp};
@@ -48,10 +48,15 @@ pub extern "C" fn dispatch_syscall(
     );
     #[cfg(feature = "syscall_timing")]
     let time_start = {
-        if crate::process::current_pid() == 1 && num == SYS_EXIT {
-            print_syscall_timing();
+        static mut LAST_PRINT: usize = 0;
+        let time = crate::time::do_gettimeofday().as_usec();
+        unsafe {
+            if time / 1000000 / 5 > LAST_PRINT {
+                LAST_PRINT = time / 1000000 / 5;
+                print_syscall_timing();
+            }
         }
-        crate::time::do_gettimeofday().as_usec()
+        time
     };
 
     let ret = match num {
@@ -248,6 +253,11 @@ pub extern "C" fn dispatch_syscall(
             arg3 as *mut c_void,
             arg4 as *mut libc::socklen_t,
         ),
+        SYS_GETPEERNAME => do_getpeername(
+            arg0 as c_int,
+            arg1 as *mut libc::sockaddr,
+            arg2 as *mut libc::socklen_t,
+        ),
         SYS_SENDTO => do_sendto(
             arg0 as c_int,
             arg1 as *const c_void,
@@ -294,6 +304,9 @@ fn print_syscall_timing() {
             continue;
         }
         println!("{:>3}: {:>6} us", i, time);
+    }
+    for x in unsafe { SYSCALL_TIMING.iter_mut() } {
+        *x = 0;
     }
 }
 
@@ -936,8 +949,16 @@ fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize
         domain, socket_type, protocol
     );
 
-    let socket = SocketFile::new(domain, socket_type, protocol)?;
-    let file_ref: Arc<Box<File>> = Arc::new(Box::new(socket));
+    let file_ref: Arc<Box<File>> = match domain {
+//        libc::AF_LOCAL => {
+//            let unix_socket = UnixSocketFile::new(socket_type, protocol)?;
+//            Arc::new(Box::new(unix_socket))
+//        }
+        _ => {
+            let socket = SocketFile::new(domain, socket_type, protocol)?;
+            Arc::new(Box::new(socket))
+        }
+    };
 
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
@@ -958,10 +979,18 @@ fn do_connect(
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
-    let socket = file_ref.as_socket()?;
-
-    let ret = try_libc!(libc::ocall::connect(socket.fd(), addr, addr_len));
-    Ok(ret as isize)
+    if let Ok(socket) = file_ref.as_socket() {
+        let ret = try_libc!(libc::ocall::connect(socket.fd(), addr, addr_len));
+        Ok(ret as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        let addr = addr as *const libc::sockaddr_un;
+        check_ptr(addr)?; // TODO: check addr_len
+        let path = clone_cstring_safely(unsafe { (&*addr).sun_path.as_ptr() })?.to_string_lossy().into_owned();
+        unix_socket.connect(path)?;
+        Ok(0)
+    } else {
+        errno!(EBADF, "not a socket")
+    }
 }
 
 fn do_accept4(
@@ -977,13 +1006,26 @@ fn do_accept4(
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
-    let socket = file_ref.as_socket()?;
+    if let Ok(socket) = file_ref.as_socket() {
+        let socket = file_ref.as_socket()?;
 
-    let new_socket = socket.accept(addr, addr_len, flags)?;
-    let new_file_ref: Arc<Box<File>> = Arc::new(Box::new(new_socket));
-    let new_fd = proc.get_files().lock().unwrap().put(new_file_ref, false);
+        let new_socket = socket.accept(addr, addr_len, flags)?;
+        let new_file_ref: Arc<Box<File>> = Arc::new(Box::new(new_socket));
+        let new_fd = proc.get_files().lock().unwrap().put(new_file_ref, false);
 
-    Ok(new_fd as isize)
+        Ok(new_fd as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        let addr = addr as *mut libc::sockaddr_un;
+        check_mut_ptr(addr)?; // TODO: check addr_len
+
+        let new_socket = unix_socket.accept()?;
+        let new_file_ref: Arc<Box<File>> = Arc::new(Box::new(new_socket));
+        let new_fd = proc.get_files().lock().unwrap().put(new_file_ref, false);
+
+        Ok(0)
+    } else {
+        errno!(EBADF, "not a socket")
+    }
 }
 
 fn do_shutdown(fd: c_int, how: c_int) -> Result<isize, Error> {
@@ -991,10 +1033,12 @@ fn do_shutdown(fd: c_int, how: c_int) -> Result<isize, Error> {
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
-    let socket = file_ref.as_socket()?;
-
-    let ret = try_libc!(libc::ocall::shutdown(socket.fd(), how));
-    Ok(ret as isize)
+    if let Ok(socket) = file_ref.as_socket() {
+        let ret = try_libc!(libc::ocall::shutdown(socket.fd(), how));
+        Ok(ret as isize)
+    } else {
+        errno!(EBADF, "not a socket")
+    }
 }
 
 fn do_bind(
@@ -1006,10 +1050,19 @@ fn do_bind(
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
-    let socket = file_ref.as_socket()?;
-
-    let ret = try_libc!(libc::ocall::bind(socket.fd(), addr, addr_len));
-    Ok(ret as isize)
+    if let Ok(socket) = file_ref.as_socket() {
+        check_ptr(addr)?; // TODO: check addr_len
+        let ret = try_libc!(libc::ocall::bind(socket.fd(), addr, addr_len));
+        Ok(ret as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        let addr = addr as *const libc::sockaddr_un;
+        check_ptr(addr)?; // TODO: check addr_len
+        let path = clone_cstring_safely(unsafe { (&*addr).sun_path.as_ptr() })?.to_string_lossy().into_owned();
+        unix_socket.bind(path)?;
+        Ok(0)
+    } else {
+        errno!(EBADF, "not a socket")
+    }
 }
 
 fn do_listen(fd: c_int, backlog: c_int) -> Result<isize, Error> {
@@ -1017,10 +1070,15 @@ fn do_listen(fd: c_int, backlog: c_int) -> Result<isize, Error> {
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
-    let socket = file_ref.as_socket()?;
-
-    let ret = try_libc!(libc::ocall::listen(socket.fd(), backlog));
-    Ok(ret as isize)
+    if let Ok(socket) = file_ref.as_socket() {
+        let ret = try_libc!(libc::ocall::listen(socket.fd(), backlog));
+        Ok(ret as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        unix_socket.listen()?;
+        Ok(0)
+    } else {
+        errno!(EBADF, "not a socket")
+    }
 }
 
 fn do_setsockopt(
@@ -1037,16 +1095,21 @@ fn do_setsockopt(
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
-    let socket = file_ref.as_socket()?;
-
-    let ret = try_libc!(libc::ocall::setsockopt(
-        socket.fd(),
-        level,
-        optname,
-        optval,
-        optlen
-    ));
-    Ok(ret as isize)
+    if let Ok(socket) = file_ref.as_socket() {
+        let ret = try_libc!(libc::ocall::setsockopt(
+            socket.fd(),
+            level,
+            optname,
+            optval,
+            optlen
+        ));
+        Ok(ret as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        warn!("setsockopt for unix socket is unimplemented");
+        Ok(0)
+    } else {
+        errno!(EBADF, "not a socket")
+    }
 }
 
 fn do_getsockopt(
@@ -1071,6 +1134,25 @@ fn do_getsockopt(
         optname,
         optval,
         optlen
+    ));
+    Ok(ret as isize)
+}
+
+fn do_getpeername(
+    fd: c_int,
+    addr: *mut libc::sockaddr,
+    addr_len: *mut libc::socklen_t,
+) -> Result<isize, Error> {
+    info!("getpeername: fd: {}, addr: {:?}, addr_len: {:?}", fd, addr, addr_len);
+    let current_ref = process::get_current();
+    let mut proc = current_ref.lock().unwrap();
+    let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
+    let socket = file_ref.as_socket()?;
+
+    let ret = try_libc!(libc::ocall::getpeername(
+        socket.fd(),
+        addr,
+        addr_len
     ));
     Ok(ret as isize)
 }
@@ -1228,18 +1310,6 @@ fn do_epoll_wait(
     };
     let count = fs::do_epoll_wait(epfd as FileDesc, events, timeout)?;
     Ok(count as isize)
-}
-
-pub trait AsSocket {
-    fn as_socket(&self) -> Result<&SocketFile, Error>;
-}
-
-impl AsSocket for FileRef {
-    fn as_socket(&self) -> Result<&SocketFile, Error> {
-        self.as_any()
-            .downcast_ref::<SocketFile>()
-            .ok_or(Error::new(Errno::EBADF, "not a socket"))
-    }
 }
 
 fn do_uname(name: *mut utsname_t) -> Result<isize, Error> {

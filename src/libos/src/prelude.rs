@@ -36,7 +36,7 @@ macro_rules! debug_trace {
 
 macro_rules! errno {
     ($errno: ident, $msg: expr) => {{
-        println!(
+        error!(
             "ERROR: {} ({}, line {} in file {})",
             $errno,
             $msg,
@@ -54,7 +54,7 @@ macro_rules! try_libc {
         if ret == -1 {
             let errno = unsafe { libc::errno() };
             // println will cause libc ocall and overwrite errno
-            println!(
+            error!(
                 "ERROR from libc: {} (line {} in file {})",
                 errno,
                 line!(),
