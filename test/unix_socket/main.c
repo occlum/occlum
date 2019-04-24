@@ -54,10 +54,6 @@ int create_client_socket() {
 }
 
 int main(int argc, const char* argv[]) {
-    // XXX: this is a hack! remove this in the future
-    void* ptr = malloc(64);
-    free(ptr);
-
 	int listen_fd = create_server_socket();
 	if (listen_fd == -1) {
 		printf("ERROR: failed to create server socket");
