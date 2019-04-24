@@ -3,6 +3,7 @@ use std::any::Any;
 use std::collections::btree_map::BTreeMap;
 use std::fmt;
 use std::vec::Vec;
+use std::sync::atomic::spin_loop_hint;
 
 /// Forward to host `poll`
 /// (sgx_libc doesn't have `select`)
@@ -13,6 +14,7 @@ pub fn do_select(
     exceptfds: &mut libc::fd_set,
     timeout: Option<libc::timeval>,
 ) -> Result<usize, Error> {
+    info!("select: nfds: {}", nfds);
     // convert libos fd to Linux fd
     let mut host_to_libos_fd = [0; libc::FD_SETSIZE];
     let mut polls = Vec::<libc::pollfd>::new();
@@ -29,6 +31,29 @@ pub fn do_select(
         );
         if !(r || w || e) {
             continue;
+        }
+        if let Ok(socket) = file_table_ref.get(fd as FileDesc)?.as_unix_socket() {
+            warn!("select unix socket is unimplemented, spin for read");
+            readfds.clear();
+            writefds.clear();
+            exceptfds.clear();
+
+            // FIXME: spin poll until can read (hack for php)
+            while r && socket.poll()?.0 == false {
+                spin_loop_hint();
+            }
+
+            let (rr, ww, ee) = socket.poll()?;
+            if r && rr {
+                readfds.set(fd);
+            }
+            if w && ww {
+                writefds.set(fd);
+            }
+            if e && ee {
+                writefds.set(fd);
+            }
+            return Ok(1);
         }
         let host_fd = file_table_ref.get(fd as FileDesc)?.as_socket()?.fd();
 
@@ -80,7 +105,7 @@ pub fn do_select(
 }
 
 pub fn do_poll(polls: &mut [libc::pollfd], timeout: c_int) -> Result<usize, Error> {
-    info!("poll: [..], timeout: {}", timeout);
+    info!("poll: {:?}, timeout: {}", polls.iter().map(|p| p.fd).collect::<Vec<_>>(), timeout);
 
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
@@ -88,8 +113,30 @@ pub fn do_poll(polls: &mut [libc::pollfd], timeout: c_int) -> Result<usize, Erro
     // convert libos fd to Linux fd
     for poll in polls.iter_mut() {
         let file_ref = proc.get_files().lock().unwrap().get(poll.fd as FileDesc)?;
-        let socket = file_ref.as_socket()?;
-        poll.fd = socket.fd();
+        if let Ok(socket) = file_ref.as_socket() {
+            poll.fd = socket.fd();
+        } else if let Ok(socket) = file_ref.as_unix_socket() {
+            // FIXME: spin poll until can read (hack for php)
+            while (poll.events & libc::POLLIN) != 0 && socket.poll()?.0 == false {
+                spin_loop_hint();
+            }
+
+            let (r, w, e) = socket.poll()?;
+            if r {
+                poll.revents |= libc::POLLIN;
+            }
+            if w {
+                poll.revents |= libc::POLLOUT;
+            }
+            if e {
+                poll.revents |= libc::POLLERR;
+            }
+            poll.revents &= poll.events;
+            warn!("poll unix socket is unimplemented, spin for read");
+            return Ok(1);
+        } else {
+            return errno!(EBADF, "not a socket");
+        }
     }
     let ret = try_libc!(libc::ocall::poll(polls.as_mut_ptr(), polls.len() as u64, timeout));
     // recover fd ?

@@ -258,6 +258,11 @@ pub extern "C" fn dispatch_syscall(
             arg1 as *mut libc::sockaddr,
             arg2 as *mut libc::socklen_t,
         ),
+        SYS_GETSOCKNAME => do_getsockname(
+            arg0 as c_int,
+            arg1 as *mut libc::sockaddr,
+            arg2 as *mut libc::socklen_t,
+        ),
         SYS_SENDTO => do_sendto(
             arg0 as c_int,
             arg1 as *const c_void,
@@ -926,6 +931,10 @@ fn do_ioctl(fd: FileDesc, cmd: c_int, argp: *mut c_int) -> Result<isize, Error> 
     if let Ok(socket) = file_ref.as_socket() {
         let ret = try_libc!(libc::ocall::ioctl_arg1(socket.fd(), cmd, argp));
         Ok(ret as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        // TODO: check argp
+        unix_socket.ioctl(cmd, argp)?;
+        Ok(0)
     } else {
         warn!("ioctl is unimplemented");
         errno!(ENOSYS, "ioctl is unimplemented")
@@ -1156,6 +1165,30 @@ fn do_getpeername(
         Ok(ret as isize)
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
         warn!("getpeername for unix socket is unimplemented");
+        errno!(ENOTCONN, "hack for php: Transport endpoint is not connected")
+    } else {
+        errno!(EBADF, "not a socket")
+    }
+}
+
+fn do_getsockname(
+    fd: c_int,
+    addr: *mut libc::sockaddr,
+    addr_len: *mut libc::socklen_t,
+) -> Result<isize, Error> {
+    info!("getsockname: fd: {}, addr: {:?}, addr_len: {:?}", fd, addr, addr_len);
+    let current_ref = process::get_current();
+    let mut proc = current_ref.lock().unwrap();
+    let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
+    if let Ok(socket) = file_ref.as_socket() {
+        let ret = try_libc!(libc::ocall::getsockname(
+            socket.fd(),
+            addr,
+            addr_len
+        ));
+        Ok(ret as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        warn!("getsockname for unix socket is unimplemented");
         Ok(0)
     } else {
         errno!(EBADF, "not a socket")

@@ -4,6 +4,7 @@ use util::ring_buf::{RingBufReader, RingBufWriter, RingBuf};
 use std::sync::SgxMutex as Mutex;
 use alloc::prelude::ToString;
 use std::fmt;
+use std::sync::atomic::spin_loop_hint;
 
 pub struct UnixSocketFile {
     inner: Mutex<UnixSocket>
@@ -127,6 +128,16 @@ impl UnixSocketFile {
         let mut inner = self.inner.lock().unwrap();
         inner.connect(path)
     }
+
+    pub fn poll(&self) -> Result<(bool, bool, bool), Error> {
+        let mut inner = self.inner.lock().unwrap();
+        inner.poll()
+    }
+
+    pub fn ioctl(&self, cmd: c_int, argp: *mut c_int) -> Result<(), Error> {
+        let mut inner = self.inner.lock().unwrap();
+        inner.ioctl(cmd, argp)
+    }
 }
 
 impl Debug for UnixSocketFile {
@@ -189,14 +200,19 @@ impl UnixSocket {
         Ok(())
     }
 
-    /// Server 4: Accept a connection on listening. Non-blocking.
+    /// Server 4: Accept a connection on listening.
     pub fn accept(&mut self) -> Result<UnixSocket, Error> {
         match self.status {
             Status::Listening => {}
             _ => return errno!(EINVAL, "unix socket is not listening"),
         };
-        let socket = self.obj.as_mut().unwrap().pop()
-            .ok_or(Error::new(EAGAIN, "no connections are present to be accepted"))?;
+        // FIXME: Block. Now spin loop.
+        let socket = loop {
+            if let Some(socket) = self.obj.as_mut().unwrap().pop() {
+                break socket;
+            }
+            spin_loop_hint();
+        };
         Ok(socket)
     }
 
@@ -217,16 +233,35 @@ impl UnixSocket {
     }
 
     pub fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
-        if let Status::Connected(channel) = &self.status {
-            channel.reader.read(buf)
-        } else {
-            errno!(EBADF, "UnixSocket is not connected")
-        }
+        self.channel()?.reader.read(buf)
     }
 
     pub fn write(&self, buf: &[u8]) -> Result<usize, Error> {
+        self.channel()?.writer.write(buf)
+    }
+
+    pub fn poll(&self) -> Result<(bool, bool, bool), Error> { // (read, write, error)
+        let channel = self.channel()?;
+        let r = channel.reader.can_read();
+        let w = channel.writer.can_write();
+        Ok((r, w, false))
+    }
+
+    pub fn ioctl(&self, cmd: c_int, argp: *mut c_int) -> Result<(), Error> {
+        const FIONREAD: c_int = 0x541B; // Get the number of bytes to read
+        if cmd == FIONREAD {
+            let bytes_to_read = self.channel()?.reader.bytes_to_read();
+            unsafe { argp.write(bytes_to_read as c_int); }
+            Ok(())
+        } else {
+            warn!("ioctl for unix socket is unimplemented");
+            errno!(ENOSYS, "ioctl for unix socket is unimplemented")
+        }
+    }
+
+    fn channel(&self) -> Result<&Channel, Error> {
         if let Status::Connected(channel) = &self.status {
-            channel.writer.write(buf)
+            Ok(channel)
         } else {
             errno!(EBADF, "UnixSocket is not connected")
         }
