@@ -950,10 +950,10 @@ fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize
     );
 
     let file_ref: Arc<Box<File>> = match domain {
-//        libc::AF_LOCAL => {
-//            let unix_socket = UnixSocketFile::new(socket_type, protocol)?;
-//            Arc::new(Box::new(unix_socket))
-//        }
+        libc::AF_LOCAL => {
+            let unix_socket = UnixSocketFile::new(socket_type, protocol)?;
+            Arc::new(Box::new(unix_socket))
+        }
         _ => {
             let socket = SocketFile::new(domain, socket_type, protocol)?;
             Arc::new(Box::new(socket))
@@ -1022,7 +1022,7 @@ fn do_accept4(
         let new_file_ref: Arc<Box<File>> = Arc::new(Box::new(new_socket));
         let new_fd = proc.get_files().lock().unwrap().put(new_file_ref, false);
 
-        Ok(0)
+        Ok(new_fd as isize)
     } else {
         errno!(EBADF, "not a socket")
     }
@@ -1147,14 +1147,19 @@ fn do_getpeername(
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
-    let socket = file_ref.as_socket()?;
-
-    let ret = try_libc!(libc::ocall::getpeername(
-        socket.fd(),
-        addr,
-        addr_len
-    ));
-    Ok(ret as isize)
+    if let Ok(socket) = file_ref.as_socket() {
+        let ret = try_libc!(libc::ocall::getpeername(
+            socket.fd(),
+            addr,
+            addr_len
+        ));
+        Ok(ret as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        warn!("getpeername for unix socket is unimplemented");
+        Ok(0)
+    } else {
+        errno!(EBADF, "not a socket")
+    }
 }
 
 fn do_sendto(
