@@ -13,7 +13,7 @@ const char SOCK_PATH[] = "echo_socket";
 int create_server_socket() {
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd == -1) {
-		printf("ERROR: failed to create a unix socket");
+		printf("ERROR: failed to create a unix socket\n");
 		return -1;
 	}
 
@@ -37,7 +37,7 @@ int create_server_socket() {
 int create_client_socket() {
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd == -1) {
-		printf("ERROR: failed to create a unix socket");
+		printf("ERROR: failed to create a unix socket\n");
 		return -1;
 	}
 
@@ -56,13 +56,13 @@ int create_client_socket() {
 int main(int argc, const char* argv[]) {
 	int listen_fd = create_server_socket();
 	if (listen_fd == -1) {
-		printf("ERROR: failed to create server socket");
+		printf("ERROR: failed to create server socket\n");
 		return -1;
 	}
 
 	int socket_rd_fd = create_client_socket();
 	if (socket_rd_fd == -1) {
-		printf("ERROR: failed to create client socket");
+		printf("ERROR: failed to create client socket\n");
 		return -1;
 	}
 
@@ -70,7 +70,7 @@ int main(int argc, const char* argv[]) {
 	socklen_t len = sizeof(remote);
 	int socket_wr_fd = accept(listen_fd, (struct sockaddr *)&remote, &len);
 	if (socket_wr_fd == -1) {
-		printf("ERROR: failed to accept socket");
+		printf("ERROR: failed to accept socket\n");
 		return -1;
 	}
 

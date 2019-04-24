@@ -23,13 +23,14 @@ const char SOCK_PATH[] = "echo_socket";
 int create_server_socket() {
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd == -1) {
-		printf("ERROR: failed to create a unix socket");
+		printf("ERROR: failed to create a unix socket\n");
 		return -1;
 	}
 
 	struct sockaddr_un local;
 	local.sun_family = AF_UNIX;
 	strcpy(local.sun_path, SOCK_PATH);
+	unlink(local.sun_path);
 	socklen_t len = strlen(local.sun_path) + sizeof(local.sun_family);
 
 	if (bind(fd, (struct sockaddr *)&local, len) == -1) {
@@ -47,7 +48,7 @@ int create_server_socket() {
 int create_client_socket() {
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd == -1) {
-		printf("ERROR: failed to create a unix socket");
+		printf("ERROR: failed to create a unix socket\n");
 		return -1;
 	}
 
@@ -64,15 +65,30 @@ int create_client_socket() {
 }
 
 int main(int argc, const char* argv[]) {
+	size_t buf_size, total_bytes;
+	if (argc >= 2) {
+		buf_size = atol(argv[1]);
+	} else {
+		buf_size = BUF_SIZE;
+	}
+	if (argc >= 3) {
+		total_bytes = atol(argv[2]);
+	} else {
+		// BUG: throughput fall down when buf_size > 65536
+		total_bytes = buf_size > 65536? buf_size << 15: buf_size << 21;
+	}
+	printf("buf_size = 0x%zx\n", buf_size);
+	printf("total_bytes = 0x%zx\n", total_bytes);
+
 	int listen_fd = create_server_socket();
 	if (listen_fd == -1) {
-		printf("ERROR: failed to create server socket");
+		printf("ERROR: failed to create server socket\n");
 		return -1;
 	}
 
 	int socket_rd_fd = create_client_socket();
 	if (socket_rd_fd == -1) {
-		printf("ERROR: failed to create client socket");
+		printf("ERROR: failed to create client socket\n");
 		return -1;
 	}
 
@@ -80,7 +96,7 @@ int main(int argc, const char* argv[]) {
 	socklen_t len = sizeof(remote);
 	int socket_wr_fd = accept(listen_fd, (struct sockaddr *)&remote, &len);
 	if (socket_wr_fd == -1) {
-		printf("ERROR: failed to accept socket");
+		printf("ERROR: failed to accept socket\n");
 		return -1;
 	}
 
@@ -93,8 +109,10 @@ int main(int argc, const char* argv[]) {
 	posix_spawn_file_actions_addclose(&file_actions, socket_wr_fd);
 
 	int child_pid;
+	extern char ** environ;
+	const char* new_argv[] = {"./dev_null", NULL};
 	if (posix_spawn(&child_pid, "dev_null", &file_actions,
-					NULL, NULL, NULL) < 0) {
+					NULL, new_argv, environ) < 0) {
 		printf("ERROR: failed to spawn a child process\n");
 		return -1;
 	}
@@ -105,14 +123,13 @@ int main(int argc, const char* argv[]) {
 	gettimeofday(&tv_start, NULL);
 
 	// Tell the reader how many data are to be transfered
-	size_t remain_bytes = TOTAL_BYTES;
+	size_t remain_bytes = total_bytes;
 	if (write(socket_wr_fd, &remain_bytes, sizeof(remain_bytes)) != sizeof(remain_bytes)) {
 		printf("ERROR: failed to write to pipe\n");
 		return -1;
 	}
 
 	// Tell the reader the buffer size that it should use
-	size_t buf_size = BUF_SIZE;
 	if (write(socket_wr_fd, &buf_size, sizeof(buf_size)) != sizeof(buf_size)) {
 		printf("ERROR: failed to write to pipe\n");
 		return -1;
@@ -146,7 +163,7 @@ int main(int argc, const char* argv[]) {
 		printf("WARNING: run long enough to get meaningful results\n");
 		if (total_s == 0) { return 0; }
 	}
-	double total_mb = (double)TOTAL_BYTES / MB;
+	double total_mb = (double)total_bytes / MB;
 	double throughput = total_mb / total_s;
 	printf("Throughput of unix socket is %.2f MB/s\n", throughput);
 	return 0;
