@@ -5,18 +5,22 @@ use std::fmt;
 
 #[macro_use]
 mod vm_range;
-mod vm_area;
 mod process_vm;
+mod vm_area;
 
-pub use self::vm_range::{VMRange, VMRangeTrait};
-pub use self::vm_area::{VMSpace, VMDomain, VMArea, VMAreaFlags, VM_AREA_FLAG_R, VM_AREA_FLAG_W, VM_AREA_FLAG_X};
 pub use self::process_vm::ProcessVM;
-
+pub use self::vm_area::{
+    VMArea, VMAreaFlags, VMDomain, VMSpace, VM_AREA_FLAG_R, VM_AREA_FLAG_W, VM_AREA_FLAG_X,
+};
+pub use self::vm_range::{VMRange, VMRangeTrait};
 
 // TODO: separate proc and flags
 // TODO: accept fd and offset
 pub fn do_mmap(addr: usize, size: usize, flags: VMAreaFlags) -> Result<usize, Error> {
-    info!("mmap: addr: {:#x}, size: {:#x}, flags: {:?}", addr, size, flags);
+    info!(
+        "mmap: addr: {:#x}, size: {:#x}, flags: {:?}",
+        addr, size, flags
+    );
     let current_ref = get_current();
     let current_process = current_ref.lock().unwrap();
     let current_vm_ref = current_process.get_vm();
@@ -67,7 +71,6 @@ pub enum VMGuardAreaType {
     Static { size: usize, align: usize },
     Dynamic { size: usize },
 }
-
 
 #[derive(Clone, PartialEq, Default)]
 pub struct VMAllocOptions {
@@ -123,7 +126,6 @@ impl fmt::Debug for VMAllocOptions {
     }
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VMAddrOption {
     Any,           // Free to choose any address
@@ -156,7 +158,6 @@ impl VMAddrOption {
     }
 }
 
-
 /// How VMRange may grow:
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VMGrowthType {
@@ -170,7 +171,6 @@ impl Default for VMGrowthType {
         VMGrowthType::Fixed
     }
 }
-
 
 #[derive(Clone, Debug, Default)]
 pub struct VMResizeOptions {

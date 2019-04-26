@@ -28,7 +28,9 @@ pub fn do_exit(exit_status: i32) {
 
     // Notify another process, if any, that waits on ctid (see set_tid_address)
     if let Some(ctid) = current.clear_child_tid {
-        unsafe { atomic_store(ctid, 0); }
+        unsafe {
+            atomic_store(ctid, 0);
+        }
         futex_wake(ctid as *const i32, 1);
     }
 

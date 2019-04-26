@@ -88,7 +88,7 @@ impl Process {
     pub fn get_parent(&self) -> &ProcessRef {
         self.parent.as_ref().unwrap()
     }
-    pub fn get_children_iter(&self) -> impl Iterator<Item=ProcessRef> + '_ {
+    pub fn get_children_iter(&self) -> impl Iterator<Item = ProcessRef> + '_ {
         self.children
             .iter()
             .filter_map(|child_weak| child_weak.upgrade())

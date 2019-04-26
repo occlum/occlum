@@ -14,6 +14,7 @@ pub use std::sync::{
 //pub use std::borrow::BorrowMut;
 pub use std::borrow::ToOwned;
 pub use std::boxed::Box;
+pub use std::cmp::{max, min};
 pub use std::cmp::{Ordering, PartialOrd};
 pub use std::collections::{HashMap, VecDeque};
 pub use std::fmt::{Debug, Display};
@@ -22,7 +23,6 @@ pub use std::iter::Iterator;
 pub use std::rc::Rc;
 pub use std::string::String;
 pub use std::vec::Vec;
-pub use std::cmp::{min, max};
 
 pub use errno::Errno;
 pub use errno::Errno::*;

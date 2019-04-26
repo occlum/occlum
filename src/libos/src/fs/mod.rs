@@ -1,35 +1,34 @@
-use {process, std};
 use prelude::*;
 use process::Process;
 use rcore_fs::vfs::{FileType, FsError, INode, Metadata, Timespec};
 use std::sgxfs as fs_impl;
+use {process, std};
 
 use super::*;
 
+pub use self::access::{do_access, do_faccessat, AccessFlags, AccessModes, AT_FDCWD};
 pub use self::file::{File, FileRef, SgxFile, StdinFile, StdoutFile};
 pub use self::file_table::{FileDesc, FileTable};
-pub use self::inode_file::{INodeExt, INodeFile, ROOT_INODE};
-pub use self::socket_file::{SocketFile, AsSocket};
-pub use self::unix_socket::{UnixSocketFile, AsUnixSocket};
 use self::inode_file::OpenOptions;
-pub use self::pipe::Pipe;
+pub use self::inode_file::{INodeExt, INodeFile, ROOT_INODE};
 pub use self::io_multiplexing::*;
-pub use self::access::{AccessModes, AccessFlags, AT_FDCWD, do_access, do_faccessat};
 use self::null::NullFile;
-use std::mem::uninitialized;
+pub use self::pipe::Pipe;
+pub use self::socket_file::{AsSocket, SocketFile};
+pub use self::unix_socket::{AsUnixSocket, UnixSocketFile};
 use std::any::Any;
+use std::mem::uninitialized;
 
+mod access;
 mod file;
 mod file_table;
 mod inode_file;
-mod socket_file;
+mod io_multiplexing;
+mod null;
 mod pipe;
 mod sgx_impl;
-mod io_multiplexing;
-mod access;
-mod null;
+mod socket_file;
 mod unix_socket;
-
 
 pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
     let flags = OpenFlags::from_bits_truncate(flags);
@@ -46,7 +45,10 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
 
     let fd = {
         let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
-        proc.get_files().lock().unwrap().put(file_ref, close_on_spawn)
+        proc.get_files()
+            .lock()
+            .unwrap()
+            .put(file_ref, close_on_spawn)
     };
     Ok(fd)
 }
@@ -353,7 +355,8 @@ pub fn do_sendfile(
     in_fd: FileDesc,
     offset: Option<off_t>,
     count: usize,
-) -> Result<(usize, usize), Error> { // (len, offset)
+) -> Result<(usize, usize), Error> {
+    // (len, offset)
     info!(
         "sendfile: out: {}, in: {}, offset: {:?}, count: {}",
         out_fd, in_fd, offset, count
@@ -683,7 +686,6 @@ pub unsafe fn write_cstr(ptr: *mut u8, s: &str) {
     ptr.add(s.len()).write(0);
 }
 
-
 #[derive(Debug)]
 pub enum FcntlCmd {
     /// Duplicate the file descriptor fd using the lowest-numbered available
@@ -727,11 +729,11 @@ pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize, Error> {
         FcntlCmd::DupFd(min_fd) => {
             let dup_fd = files.dup(fd, *min_fd, false)?;
             dup_fd as isize
-        },
+        }
         FcntlCmd::DupFdCloexec(min_fd) => {
             let dup_fd = files.dup(fd, *min_fd, true)?;
             dup_fd as isize
-        },
+        }
         FcntlCmd::GetFd() => {
             let entry = files.get_entry(fd)?;
             let fd_flags = if entry.is_close_on_spawn() {
@@ -740,12 +742,12 @@ pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize, Error> {
                 0
             };
             fd_flags as isize
-        },
+        }
         FcntlCmd::SetFd(fd_flags) => {
             let entry = files.get_entry_mut(fd)?;
             entry.set_close_on_spawn((fd_flags & libc::FD_CLOEXEC as u32) != 0);
             0
-        },
+        }
         FcntlCmd::GetFl() => {
             let file = files.get(fd)?;
             if let Ok(socket) = file.as_socket() {

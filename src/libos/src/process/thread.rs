@@ -4,7 +4,6 @@ pub struct ThreadGroup {
     threads: Vec<ProcessRef>,
 }
 
-
 bitflags! {
     pub struct CloneFlags : u32 {
         const CLONE_VM              = 0x00000100;
@@ -40,8 +39,10 @@ pub fn do_clone(
     ctid: Option<*mut pid_t>,
     new_tls: Option<usize>,
 ) -> Result<pid_t, Error> {
-    info!("clone: flags: {:?}, stack_addr: {:?}, ptid: {:?}, ctid: {:?}, new_tls: {:?}",
-          flags, stack_addr, ptid, ctid, new_tls);
+    info!(
+        "clone: flags: {:?}, stack_addr: {:?}, ptid: {:?}, ctid: {:?}, new_tls: {:?}",
+        flags, stack_addr, ptid, ctid, new_tls
+    );
     // TODO: return error for unsupported flags
 
     let current_ref = get_current();
@@ -75,7 +76,9 @@ pub fn do_clone(
     process_table::put(new_thread_pid, new_thread_ref.clone());
 
     if let Some(ptid) = ptid {
-        unsafe { *ptid = new_thread_pid; }
+        unsafe {
+            *ptid = new_thread_pid;
+        }
     }
 
     task::enqueue_task(new_thread_ref);

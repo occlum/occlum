@@ -2,8 +2,8 @@ use super::*;
 use std::any::Any;
 use std::collections::btree_map::BTreeMap;
 use std::fmt;
-use std::vec::Vec;
 use std::sync::atomic::spin_loop_hint;
+use std::vec::Vec;
 
 /// Forward to host `poll`
 /// (sgx_libc doesn't have `select`)
@@ -81,7 +81,11 @@ pub fn do_select(
         Some(tv) => (tv.tv_sec * 1000 + tv.tv_usec / 1000) as i32,
     };
 
-    let ret = try_libc!(libc::ocall::poll(polls.as_mut_ptr(), polls.len() as u64, timeout));
+    let ret = try_libc!(libc::ocall::poll(
+        polls.as_mut_ptr(),
+        polls.len() as u64,
+        timeout
+    ));
 
     // convert fd back and write fdset
     readfds.clear();
@@ -105,7 +109,11 @@ pub fn do_select(
 }
 
 pub fn do_poll(polls: &mut [libc::pollfd], timeout: c_int) -> Result<usize, Error> {
-    info!("poll: {:?}, timeout: {}", polls.iter().map(|p| p.fd).collect::<Vec<_>>(), timeout);
+    info!(
+        "poll: {:?}, timeout: {}",
+        polls.iter().map(|p| p.fd).collect::<Vec<_>>(),
+        timeout
+    );
 
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
@@ -138,7 +146,11 @@ pub fn do_poll(polls: &mut [libc::pollfd], timeout: c_int) -> Result<usize, Erro
             return errno!(EBADF, "not a socket");
         }
     }
-    let ret = try_libc!(libc::ocall::poll(polls.as_mut_ptr(), polls.len() as u64, timeout));
+    let ret = try_libc!(libc::ocall::poll(
+        polls.as_mut_ptr(),
+        polls.len() as u64,
+        timeout
+    ));
     // recover fd ?
     Ok(ret as usize)
 }
@@ -258,8 +270,12 @@ impl EpollFileInner {
         host_fd: FileDesc,
         event: *const libc::epoll_event,
     ) -> Result<(), Error> {
-        let ret =
-            try_libc!(libc::ocall::epoll_ctl(self.epoll_fd, op, host_fd as c_int, event as *mut _));
+        let ret = try_libc!(libc::ocall::epoll_ctl(
+            self.epoll_fd,
+            op,
+            host_fd as c_int,
+            event as *mut _
+        ));
         Ok(())
     }
 
@@ -270,14 +286,12 @@ impl EpollFileInner {
         events: &mut [libc::epoll_event],
         timeout: c_int,
     ) -> Result<usize, Error> {
-        let ret = try_libc!(
-            libc::ocall::epoll_wait(
-                self.epoll_fd,
-                events.as_mut_ptr(),
-                events.len() as c_int,
-                timeout,
-            )
-        );
+        let ret = try_libc!(libc::ocall::epoll_wait(
+            self.epoll_fd,
+            events.as_mut_ptr(),
+            events.len() as c_int,
+            timeout,
+        ));
         Ok(ret as usize)
     }
 }

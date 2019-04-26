@@ -7,18 +7,18 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 #[allow(non_camel_case_types)]
 pub enum FutexOp {
-    FUTEX_WAIT            = 0,
-    FUTEX_WAKE            = 1,
-    FUTEX_FD              = 2,
-    FUTEX_REQUEUE         = 3,
-    FUTEX_CMP_REQUEUE     = 4,
-    FUTEX_WAKE_OP         = 5,
-    FUTEX_LOCK_PI         = 6,
-    FUTEX_UNLOCK_PI       = 7,
-    FUTEX_TRYLOCK_PI      = 8,
-    FUTEX_WAIT_BITSET     = 9,
+    FUTEX_WAIT = 0,
+    FUTEX_WAKE = 1,
+    FUTEX_FD = 2,
+    FUTEX_REQUEUE = 3,
+    FUTEX_CMP_REQUEUE = 4,
+    FUTEX_WAKE_OP = 5,
+    FUTEX_LOCK_PI = 6,
+    FUTEX_UNLOCK_PI = 7,
+    FUTEX_TRYLOCK_PI = 8,
+    FUTEX_WAIT_BITSET = 9,
 }
-const FUTEX_OP_MASK : u32 = 0x0000_000F;
+const FUTEX_OP_MASK: u32 = 0x0000_000F;
 
 impl FutexOp {
     pub fn from_u32(bits: u32) -> Result<FutexOp, Error> {
@@ -44,12 +44,11 @@ bitflags! {
         const FUTEX_CLOCK_REALTIME  = 256;
     }
 }
-const FUTEX_FLAGS_MASK : u32 = 0xFFFF_FFF0;
+const FUTEX_FLAGS_MASK: u32 = 0xFFFF_FFF0;
 
 impl FutexFlags {
     pub fn from_u32(bits: u32) -> Result<FutexFlags, Error> {
-        FutexFlags::from_bits(bits).ok_or_else(||
-            Error::new(Errno::EINVAL, "Unknown futex flags"))
+        FutexFlags::from_bits(bits).ok_or_else(|| Error::new(Errno::EINVAL, "Unknown futex flags"))
     }
 }
 
@@ -65,12 +64,10 @@ pub fn futex_op_and_flags_from_u32(bits: u32) -> Result<(FutexOp, FutexFlags), E
     Ok((op, flags))
 }
 
-
 /// Do futex wait
 pub fn futex_wait(futex_addr: *const i32, futex_val: i32) -> Result<(), Error> {
     let futex_key = FutexKey::new(futex_addr);
-    let futex_item = FUTEX_TABLE.lock().unwrap()
-        .get_or_new_item(futex_key);
+    let futex_item = FUTEX_TABLE.lock().unwrap().get_or_new_item(futex_key);
 
     futex_item.wait(futex_val);
 
@@ -87,11 +84,8 @@ pub fn futex_wake(futex_addr: *const i32, max_count: usize) -> Result<usize, Err
     Ok(count)
 }
 
-
 lazy_static! {
-    static ref FUTEX_TABLE : SgxMutex<FutexTable> = {
-        SgxMutex::new(FutexTable::new())
-    };
+    static ref FUTEX_TABLE: SgxMutex<FutexTable> = { SgxMutex::new(FutexTable::new()) };
 }
 
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
@@ -126,7 +120,9 @@ impl FutexItem {
         while count < max_count {
             let waiter = {
                 let waiter_option = queue.pop_front();
-                if waiter_option.is_none() { break; }
+                if waiter_option.is_none() {
+                    break;
+                }
                 waiter_option.unwrap()
             };
             waiter.wake();
@@ -165,15 +161,17 @@ impl FutexTable {
 
     pub fn get_or_new_item(&mut self, key: FutexKey) -> FutexItemRef {
         let table = &mut self.table;
-        let item = table.entry(key).or_insert_with(|| {
-            Arc::new(FutexItem::new(key))
-        });
+        let item = table
+            .entry(key)
+            .or_insert_with(|| Arc::new(FutexItem::new(key)));
         item.clone()
     }
 
     pub fn get_item(&mut self, key: FutexKey) -> Result<FutexItemRef, Error> {
         let table = &mut self.table;
-        table.get_mut(&key).map(|item| item.clone())
+        table
+            .get_mut(&key)
+            .map(|item| item.clone())
             .ok_or_else(|| Error::new(Errno::ENOENT, "futex key cannot be found"))
     }
 
@@ -192,7 +190,6 @@ impl FutexTable {
         }
     }
 }
-
 
 #[derive(Debug)]
 struct Waiter {

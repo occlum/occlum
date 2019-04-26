@@ -2,8 +2,8 @@ use alloc::alloc::{alloc, dealloc, Layout};
 
 use std::cmp::{max, min};
 use std::ptr;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use super::*;
 

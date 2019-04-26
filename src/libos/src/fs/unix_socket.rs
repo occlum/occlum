@@ -1,13 +1,13 @@
 use super::*;
-use std::collections::btree_map::BTreeMap;
-use util::ring_buf::{RingBufReader, RingBufWriter, RingBuf};
-use std::sync::SgxMutex as Mutex;
 use alloc::prelude::ToString;
+use std::collections::btree_map::BTreeMap;
 use std::fmt;
 use std::sync::atomic::spin_loop_hint;
+use std::sync::SgxMutex as Mutex;
+use util::ring_buf::{RingBuf, RingBufReader, RingBufWriter};
 
 pub struct UnixSocketFile {
-    inner: Mutex<UnixSocket>
+    inner: Mutex<UnixSocket>,
 }
 
 impl File for UnixSocketFile {
@@ -77,7 +77,7 @@ impl File for UnixSocketFile {
             mode: 0,
             nlinks: 0,
             uid: 0,
-            gid: 0
+            gid: 0,
         })
     }
 
@@ -105,7 +105,9 @@ impl File for UnixSocketFile {
 impl UnixSocketFile {
     pub fn new(socket_type: c_int, protocol: c_int) -> Result<Self, Error> {
         let inner = UnixSocket::new(socket_type, protocol)?;
-        Ok(UnixSocketFile { inner: Mutex::new(inner) })
+        Ok(UnixSocketFile {
+            inner: Mutex::new(inner),
+        })
     }
 
     pub fn bind(&self, path: impl AsRef<str>) -> Result<(), Error> {
@@ -121,7 +123,9 @@ impl UnixSocketFile {
     pub fn accept(&self) -> Result<UnixSocketFile, Error> {
         let mut inner = self.inner.lock().unwrap();
         let new_socket = inner.accept()?;
-        Ok(UnixSocketFile { inner: Mutex::new(new_socket) })
+        Ok(UnixSocketFile {
+            inner: Mutex::new(new_socket),
+        })
     }
 
     pub fn connect(&self, path: impl AsRef<str>) -> Result<(), Error> {
@@ -146,7 +150,6 @@ impl Debug for UnixSocketFile {
     }
 }
 
-
 pub trait AsUnixSocket {
     fn as_unix_socket(&self) -> Result<&UnixSocketFile, Error>;
 }
@@ -158,7 +161,6 @@ impl AsUnixSocket for FileRef {
             .ok_or(Error::new(Errno::EBADF, "not a unix socket"))
     }
 }
-
 
 pub struct UnixSocket {
     obj: Option<Arc<UnixSocketObject>>,
@@ -177,7 +179,7 @@ impl UnixSocket {
         if socket_type == libc::SOCK_STREAM && protocol == 0 {
             Ok(UnixSocket {
                 obj: None,
-                status: Status::None
+                status: Status::None,
             })
         } else {
             errno!(ENOSYS, "unimplemented unix socket type")
@@ -221,8 +223,8 @@ impl UnixSocket {
         if let Status::Listening = self.status {
             return errno!(EINVAL, "unix socket is listening?");
         }
-        let obj = UnixSocketObject::get(path)
-            .ok_or(Error::new(EINVAL, "unix socket path not found"))?;
+        let obj =
+            UnixSocketObject::get(path).ok_or(Error::new(EINVAL, "unix socket path not found"))?;
         let (channel1, channel2) = Channel::new_pair();
         self.status = Status::Connected(channel1);
         obj.push(UnixSocket {
@@ -240,7 +242,8 @@ impl UnixSocket {
         self.channel()?.writer.write(buf)
     }
 
-    pub fn poll(&self) -> Result<(bool, bool, bool), Error> { // (read, write, error)
+    pub fn poll(&self) -> Result<(bool, bool, bool), Error> {
+        // (read, write, error)
         let channel = self.channel()?;
         let r = channel.reader.can_read();
         let w = channel.writer.can_write();
@@ -251,7 +254,9 @@ impl UnixSocket {
         const FIONREAD: c_int = 0x541B; // Get the number of bytes to read
         if cmd == FIONREAD {
             let bytes_to_read = self.channel()?.reader.bytes_to_read();
-            unsafe { argp.write(bytes_to_read as c_int); }
+            unsafe {
+                argp.write(bytes_to_read as c_int);
+            }
             Ok(())
         } else {
             warn!("ioctl for unix socket is unimplemented");
@@ -302,7 +307,7 @@ impl UnixSocketObject {
         }
         let obj = Arc::new(UnixSocketObject {
             path: path.as_ref().to_string(),
-            accepted_sockets: Mutex::new(VecDeque::new())
+            accepted_sockets: Mutex::new(VecDeque::new()),
         });
         paths.insert(path.as_ref().to_string(), obj.clone());
         Ok(obj)
@@ -315,7 +320,7 @@ impl UnixSocketObject {
 
 struct Channel {
     reader: RingBufReader,
-    writer: RingBufWriter
+    writer: RingBufWriter,
 }
 
 unsafe impl Send for Channel {}
@@ -340,6 +345,6 @@ impl Channel {
 pub const DEFAULT_BUF_SIZE: usize = 1 * 1024 * 1024;
 
 lazy_static! {
-    static ref UNIX_SOCKET_OBJS: Mutex<BTreeMap<String, Arc<UnixSocketObject>>>
-        = Mutex::new(BTreeMap::new());
+    static ref UNIX_SOCKET_OBJS: Mutex<BTreeMap<String, Arc<UnixSocketObject>>> =
+        Mutex::new(BTreeMap::new());
 }

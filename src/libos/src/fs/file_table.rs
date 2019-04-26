@@ -19,7 +19,12 @@ impl FileTable {
         }
     }
 
-    pub fn dup(&mut self, fd: FileDesc, min_fd: FileDesc, close_on_spawn: bool) -> Result<FileDesc, Error> {
+    pub fn dup(
+        &mut self,
+        fd: FileDesc,
+        min_fd: FileDesc,
+        close_on_spawn: bool,
+    ) -> Result<FileDesc, Error> {
         let file_ref = self.get(fd)?;
 
         let min_fd = min_fd as usize;
@@ -34,11 +39,13 @@ impl FileTable {
                 }
             }
 
-            table.iter()
+            table
+                .iter()
                 .enumerate()
                 .skip(min_fd as usize)
                 .find(|&(idx, opt)| opt.is_none())
-                .unwrap().0
+                .unwrap()
+                .0
         } as FileDesc;
 
         self.put_at(min_free_fd, file_ref, close_on_spawn);
@@ -50,7 +57,8 @@ impl FileTable {
         let mut table = &mut self.table;
 
         let min_free_fd = if self.num_fds < table.len() {
-            table.iter()
+            table
+                .iter()
                 .enumerate()
                 .find(|&(idx, opt)| opt.is_none())
                 .unwrap()

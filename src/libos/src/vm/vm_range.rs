@@ -46,7 +46,12 @@ pub struct VMRange {
 impl_vmrange_trait_for!(VMRange, inner);
 
 impl VMRange {
-    pub unsafe fn new(start: usize, end: usize, growth: VMGrowthType, description: &str) -> Result<VMRange, Error> {
+    pub unsafe fn new(
+        start: usize,
+        end: usize,
+        growth: VMGrowthType,
+        description: &str,
+    ) -> Result<VMRange, Error> {
         if start % PAGE_SIZE != 0 || end % PAGE_SIZE != 0 {
             return errno!(EINVAL, "Invalid start and/or end");
         }
@@ -75,8 +80,10 @@ impl VMRange {
             debug_assert!(free_space.contains(new_subrange_start));
             debug_assert!(free_space.contains(new_subrange_end));
 
-            (free_space.index_in_subranges, VMRangeInner::new(
-                    new_subrange_start, new_subrange_end, options.growth))
+            (
+                free_space.index_in_subranges,
+                VMRangeInner::new(new_subrange_start, new_subrange_end, options.growth),
+            )
         };
         self.get_subranges_mut()
             .insert(new_subrange_idx, new_subrange_inner);
@@ -186,7 +193,7 @@ impl VMRange {
             let pre_range = &range_pair[0];
             let next_range = &range_pair[1];
 
-            let (free_range_start, free_range_end)= {
+            let (free_range_start, free_range_end) = {
                 let free_range_start = pre_range.get_end();
                 let free_range_end = next_range.get_start();
 
@@ -209,7 +216,7 @@ impl VMRange {
 
             match addr {
                 // Want a minimal free_space
-                VMAddrOption::Any => { },
+                VMAddrOption::Any => {}
                 // Prefer to have free_space.start == addr
                 VMAddrOption::Hint(addr) => {
                     if free_space.contains(addr) {
@@ -218,7 +225,7 @@ impl VMRange {
                             return Ok(free_space);
                         }
                     }
-                },
+                }
                 // Must have free_space.start == addr
                 VMAddrOption::Fixed(addr) => {
                     if !free_space.contains(addr) {
@@ -241,20 +248,24 @@ impl VMRange {
                             continue;
                         }
                     }
-                },
+                }
             }
 
-            if min_big_enough_free_space == None ||
-                free_space < *min_big_enough_free_space.as_ref().unwrap() {
+            if min_big_enough_free_space == None
+                || free_space < *min_big_enough_free_space.as_ref().unwrap()
+            {
                 min_big_enough_free_space = Some(free_space);
             }
         }
 
-        min_big_enough_free_space
-            .ok_or_else(|| Error::new(Errno::ENOMEM, "not enough space"))
+        min_big_enough_free_space.ok_or_else(|| Error::new(Errno::ENOMEM, "not enough space"))
     }
 
-    fn alloc_from_free_space(&self, free_space: &FreeSpace, options: &VMAllocOptions) -> (usize, usize) {
+    fn alloc_from_free_space(
+        &self,
+        free_space: &FreeSpace,
+        options: &VMAllocOptions,
+    ) -> (usize, usize) {
         // Get valid parameters from options
         let size = options.size;
         let addr_option = options.addr;
@@ -262,8 +273,7 @@ impl VMRange {
 
         if let VMAddrOption::Fixed(addr) = addr_option {
             return (addr, addr + size);
-        }
-        else if let VMAddrOption::Hint(addr) = addr_option {
+        } else if let VMAddrOption::Hint(addr) = addr_option {
             if free_space.start == addr {
                 return (addr, addr + size);
             }
@@ -349,7 +359,12 @@ impl VMRange {
         Ok(())
     }
 
-    fn grow_subrange_to(&mut self, subrange: &mut VMRange, new_size: usize, fill_zeros: bool) -> Result<(), Error> {
+    fn grow_subrange_to(
+        &mut self,
+        subrange: &mut VMRange,
+        new_size: usize,
+        fill_zeros: bool,
+    ) -> Result<(), Error> {
         let subrange_i = self.position_subrange(subrange);
         let subranges = self.get_subranges_mut();
 
@@ -379,7 +394,8 @@ impl VMRange {
                     memset(mem_ptr, 0 as c_int, mem_size);
                 }
             }
-        } else { // self.growth == VMGrowthType::Downward
+        } else {
+            // self.growth == VMGrowthType::Downward
             // Can we grow downard?
             let max_new_size = {
                 let pre_subrange = &subranges[subrange_i - 1];
@@ -428,7 +444,6 @@ impl Drop for VMRange {
 
 unsafe impl Send for VMRange {}
 unsafe impl Sync for VMRange {}
-
 
 #[derive(Clone, Copy)]
 pub struct VMRangeInner {

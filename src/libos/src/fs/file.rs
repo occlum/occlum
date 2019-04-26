@@ -377,7 +377,7 @@ impl File for StdoutFile {
             mode: 0,
             nlinks: 0,
             uid: 0,
-            gid: 0
+            gid: 0,
         })
     }
 
@@ -493,7 +493,7 @@ impl File for StdinFile {
             mode: 0,
             nlinks: 0,
             uid: 0,
-            gid: 0
+            gid: 0,
         })
     }
 

@@ -1,15 +1,15 @@
-use xmas_elf::{ElfFile, header, program, sections};
 use xmas_elf::symbol_table::Entry;
+use xmas_elf::{header, program, sections, ElfFile};
 
-use fs::{File, FileDesc, FileTable, INodeExt, ROOT_INODE, StdinFile, StdoutFile, OpenFlags};
+use fs::{File, FileDesc, FileTable, INodeExt, OpenFlags, StdinFile, StdoutFile, ROOT_INODE};
+use misc::ResourceLimitsRef;
 use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::sgxfs::SgxFile;
 use vm::{ProcessVM, VMRangeTrait};
-use misc::{ResourceLimitsRef};
 
-use super::*;
 use super::task::Task;
+use super::*;
 
 use self::init_stack::{AuxKey, AuxTable};
 
@@ -98,7 +98,12 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
         // Perform file actions to modify the cloned file table
         for file_action in file_actions {
             match file_action {
-                &FileAction::Open { ref path, mode, oflag, fd} => {
+                &FileAction::Open {
+                    ref path,
+                    mode,
+                    oflag,
+                    fd,
+                } => {
                     let flags = OpenFlags::from_bits_truncate(oflag);
                     let file = parent.open_file(path.as_str(), flags, mode)?;
                     let file_ref: Arc<Box<File>> = Arc::new(file);
@@ -151,7 +156,11 @@ fn init_task(
     })
 }
 
-fn init_auxtbl(base_addr: usize, program_entry: usize, elf_file: &ElfFile) -> Result<AuxTable, Error> {
+fn init_auxtbl(
+    base_addr: usize,
+    program_entry: usize,
+    elf_file: &ElfFile,
+) -> Result<AuxTable, Error> {
     let mut auxtbl = AuxTable::new();
     auxtbl.set_val(AuxKey::AT_PAGESZ, 4096)?;
     auxtbl.set_val(AuxKey::AT_UID, 0)?;

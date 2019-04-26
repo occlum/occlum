@@ -17,7 +17,6 @@ impl AccessModes {
     }
 }
 
-
 bitflags! {
     pub struct AccessFlags : u32 {
         const AT_SYMLINK_NOFOLLOW = 0x100;
@@ -31,11 +30,18 @@ impl AccessFlags {
     }
 }
 
+pub const AT_FDCWD: i32 = -100;
 
-pub const AT_FDCWD : i32 = -100;
-
-pub fn do_faccessat(dirfd: Option<FileDesc>, path: &str, mode: AccessModes, flags: AccessFlags) -> Result<(), Error> {
-    info!("faccessat: dirfd: {:?}, path: {:?}, mode: {:?}, flags: {:?}", dirfd, path, mode, flags);
+pub fn do_faccessat(
+    dirfd: Option<FileDesc>,
+    path: &str,
+    mode: AccessModes,
+    flags: AccessFlags,
+) -> Result<(), Error> {
+    info!(
+        "faccessat: dirfd: {:?}, path: {:?}, mode: {:?}, flags: {:?}",
+        dirfd, path, mode, flags
+    );
     match dirfd {
         // TODO: handle dirfd
         Some(dirfd) => errno!(ENOSYS, "cannot accept dirfd"),

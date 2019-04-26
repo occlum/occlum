@@ -33,19 +33,30 @@ impl Drop for SocketFile {
         let ret = unsafe { libc::ocall::close(self.fd) };
         if ret < 0 {
             let errno = unsafe { libc::errno() };
-            warn!("socket (host fd: {}) close failed: errno = {}", self.fd, errno);
+            warn!(
+                "socket (host fd: {}) close failed: errno = {}",
+                self.fd, errno
+            );
         }
     }
 }
 
 impl File for SocketFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
-        let ret = try_libc!(libc::ocall::read(self.fd, buf.as_mut_ptr() as *mut c_void, buf.len()));
+        let ret = try_libc!(libc::ocall::read(
+            self.fd,
+            buf.as_mut_ptr() as *mut c_void,
+            buf.len()
+        ));
         Ok(ret as usize)
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize, Error> {
-        let ret = try_libc!(libc::ocall::write(self.fd, buf.as_ptr() as *const c_void, buf.len()));
+        let ret = try_libc!(libc::ocall::write(
+            self.fd,
+            buf.as_ptr() as *const c_void,
+            buf.len()
+        ));
         Ok(ret as usize)
     }
 
@@ -103,7 +114,7 @@ impl File for SocketFile {
             mode: 0,
             nlinks: 0,
             uid: 0,
-            gid: 0
+            gid: 0,
         })
     }
 

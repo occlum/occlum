@@ -2,12 +2,12 @@ use rcore_fs::dev::TimeProvider;
 use rcore_fs::vfs::Timespec;
 use rcore_fs_sefs::dev::*;
 use std::boxed::Box;
+use std::collections::BTreeMap;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sgxfs::{remove, OpenOptions, SgxFile};
-use std::sync::{SgxMutex as Mutex, Arc};
+use std::sync::{Arc, SgxMutex as Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::collections::BTreeMap;
 
 pub struct SgxStorage {
     path: PathBuf,
@@ -19,7 +19,7 @@ impl SgxStorage {
         //        assert!(path.as_ref().is_dir());
         SgxStorage {
             path: path.as_ref().to_path_buf(),
-            file_cache: Mutex::new(BTreeMap::new())
+            file_cache: Mutex::new(BTreeMap::new()),
         }
     }
     /// Get file by `file_id`.

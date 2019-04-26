@@ -921,10 +921,7 @@ fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize, Error> {
 }
 
 fn do_ioctl(fd: FileDesc, cmd: c_int, argp: *mut c_int) -> Result<isize, Error> {
-    info!(
-        "ioctl: fd: {}, cmd: {}, argp: {:?}",
-        fd, cmd, argp
-    );
+    info!("ioctl: fd: {}, cmd: {}, argp: {:?}", fd, cmd, argp);
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
@@ -994,7 +991,9 @@ fn do_connect(
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
         let addr = addr as *const libc::sockaddr_un;
         check_ptr(addr)?; // TODO: check addr_len
-        let path = clone_cstring_safely(unsafe { (&*addr).sun_path.as_ptr() })?.to_string_lossy().into_owned();
+        let path = clone_cstring_safely(unsafe { (&*addr).sun_path.as_ptr() })?
+            .to_string_lossy()
+            .into_owned();
         unix_socket.connect(path)?;
         Ok(0)
     } else {
@@ -1066,7 +1065,9 @@ fn do_bind(
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
         let addr = addr as *const libc::sockaddr_un;
         check_ptr(addr)?; // TODO: check addr_len
-        let path = clone_cstring_safely(unsafe { (&*addr).sun_path.as_ptr() })?.to_string_lossy().into_owned();
+        let path = clone_cstring_safely(unsafe { (&*addr).sun_path.as_ptr() })?
+            .to_string_lossy()
+            .into_owned();
         unix_socket.bind(path)?;
         Ok(0)
     } else {
@@ -1152,20 +1153,22 @@ fn do_getpeername(
     addr: *mut libc::sockaddr,
     addr_len: *mut libc::socklen_t,
 ) -> Result<isize, Error> {
-    info!("getpeername: fd: {}, addr: {:?}, addr_len: {:?}", fd, addr, addr_len);
+    info!(
+        "getpeername: fd: {}, addr: {:?}, addr_len: {:?}",
+        fd, addr, addr_len
+    );
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_socket() {
-        let ret = try_libc!(libc::ocall::getpeername(
-            socket.fd(),
-            addr,
-            addr_len
-        ));
+        let ret = try_libc!(libc::ocall::getpeername(socket.fd(), addr, addr_len));
         Ok(ret as isize)
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
         warn!("getpeername for unix socket is unimplemented");
-        errno!(ENOTCONN, "hack for php: Transport endpoint is not connected")
+        errno!(
+            ENOTCONN,
+            "hack for php: Transport endpoint is not connected"
+        )
     } else {
         errno!(EBADF, "not a socket")
     }
@@ -1176,16 +1179,15 @@ fn do_getsockname(
     addr: *mut libc::sockaddr,
     addr_len: *mut libc::socklen_t,
 ) -> Result<isize, Error> {
-    info!("getsockname: fd: {}, addr: {:?}, addr_len: {:?}", fd, addr, addr_len);
+    info!(
+        "getsockname: fd: {}, addr: {:?}, addr_len: {:?}",
+        fd, addr, addr_len
+    );
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_socket() {
-        let ret = try_libc!(libc::ocall::getsockname(
-            socket.fd(),
-            addr,
-            addr_len
-        ));
+        let ret = try_libc!(libc::ocall::getsockname(socket.fd(), addr, addr_len));
         Ok(ret as isize)
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
         warn!("getsockname for unix socket is unimplemented");

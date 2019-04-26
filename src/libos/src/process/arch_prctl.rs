@@ -22,22 +22,28 @@ impl ArchPrctlCode {
 }
 
 pub fn do_arch_prctl(code: ArchPrctlCode, addr: *mut usize) -> Result<(), Error> {
-    info!("do_arch_prctl: code: {:?}, addr: {:#o}", code, addr as usize);
+    info!(
+        "do_arch_prctl: code: {:?}, addr: {:#o}",
+        code, addr as usize
+    );
     match code {
-       ArchPrctlCode::ARCH_SET_FS => {
+        ArchPrctlCode::ARCH_SET_FS => {
             let current_ref = get_current();
             let mut current = current_ref.lock().unwrap();
             let task = &mut current.task;
             task.user_fsbase_addr = addr as usize;
-       },
-       ArchPrctlCode::ARCH_GET_FS => {
+        }
+        ArchPrctlCode::ARCH_GET_FS => {
             let current_ref = get_current();
             let current = current_ref.lock().unwrap();
             let task = &current.task;
-            unsafe { *addr = task.user_fsbase_addr; }
-       },
-       ArchPrctlCode::ARCH_SET_GS | ArchPrctlCode::ARCH_GET_GS
-           => return errno!(EINVAL, "GS cannot be accessed from the user space"),
+            unsafe {
+                *addr = task.user_fsbase_addr;
+            }
+        }
+        ArchPrctlCode::ARCH_SET_GS | ArchPrctlCode::ARCH_GET_GS => {
+            return errno!(EINVAL, "GS cannot be accessed from the user space");
+        }
     }
     Ok(())
 }

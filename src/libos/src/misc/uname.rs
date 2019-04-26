@@ -34,7 +34,7 @@ pub fn do_uname(name: &mut utsname_t) -> Result<(), Error> {
 }
 
 lazy_static! {
-    static ref SYSNAME : CString = CString::new("Occlum").unwrap();
+    static ref SYSNAME: CString = CString::new("Occlum").unwrap();
     static ref NODENAME: CString = CString::new("occlum-node").unwrap();
     static ref RELEASE: CString = CString::new("0.1").unwrap();
     static ref VERSION: CString = CString::new("0.1").unwrap();
@@ -43,9 +43,8 @@ lazy_static! {
 }
 
 fn copy_from_cstr_to_u8_array(src: &CStr, dst: &mut [u8]) {
-    let src : &[u8] = src.to_bytes_with_nul();
+    let src: &[u8] = src.to_bytes_with_nul();
     let len = min(dst.len() - 1, src.len());
     dst[..len].copy_from_slice(&src[..len]);
     dst[len] = 0;
 }
-
