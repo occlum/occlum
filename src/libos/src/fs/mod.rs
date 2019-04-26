@@ -499,7 +499,6 @@ impl OpenFlags {
     }
 }
 
-#[derive(Debug)]
 #[repr(packed)] // Don't use 'C'. Or its size will align up to 8 bytes.
 pub struct LinuxDirent64 {
     /// Inode number

@@ -66,10 +66,15 @@ impl Segment {
         let mut target_buf = unsafe {
             slice::from_raw_parts_mut(
                 (self.process_base_addr + self.mem_addr) as *mut u8,
-                self.file_size,
+                self.mem_size,
             )
         };
-        target_buf.copy_from_slice(&elf_buf[self.file_offset..(self.file_offset + self.file_size)]);
+        target_buf[0..self.file_size]
+            .copy_from_slice(&elf_buf[self.file_offset..(self.file_offset + self.file_size)]);
+        #[cfg(feature = "integrity_only_opt")]
+        for i in &mut target_buf[self.file_size..self.mem_size] {
+            *i = 0;
+        }
     }
 
     pub fn set_runtime_info(

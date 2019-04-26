@@ -25,6 +25,7 @@ impl SgxStorage {
     /// Get file by `file_id`.
     /// It lookups cache first, if miss, then call `open_fn` to open one,
     /// and add it to cache before return.
+    #[cfg(feature = "sgx_file_cache")]
     fn get(&self, file_id: usize, open_fn: impl FnOnce(&Self) -> LockedFile) -> LockedFile {
         // query cache
         let mut caches = self.file_cache.lock().unwrap();
@@ -37,6 +38,11 @@ impl SgxStorage {
         // add to cache
         caches.insert(file_id, locked_file.clone());
         locked_file
+    }
+    /// Get file by `file_id` without cache.
+    #[cfg(not(feature = "sgx_file_cache"))]
+    fn get(&self, file_id: usize, open_fn: impl FnOnce(&Self) -> LockedFile) -> LockedFile {
+        open_fn(self)
     }
 }
 

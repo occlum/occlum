@@ -116,7 +116,7 @@ impl ProcessVM {
             code_size,
             rx_flags,
             VMGrowthType::Fixed,
-            true,
+            !cfg!(feature = "integrity_only_opt"),
         )?;
         let data_vma = alloc_vma_continuously(
             &mut addr,
@@ -124,7 +124,7 @@ impl ProcessVM {
             data_size,
             rw_flags,
             VMGrowthType::Fixed,
-            true,
+            !cfg!(feature = "integrity_only_opt"),
         )?;
         let heap_vma = alloc_vma_continuously(
             &mut addr,
