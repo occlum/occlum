@@ -36,12 +36,12 @@ mod prelude;
 mod entry;
 mod errno;
 mod fs;
+mod misc;
 mod process;
 mod syscall;
 mod time;
 mod util;
 mod vm;
-mod misc;
 
 use prelude::*;
 

@@ -46,24 +46,29 @@ impl ProcessVM {
     ) -> Result<ProcessVM, Error> {
         // Allocate the data domain from the global data space
         let mut data_domain = {
-            let data_domain_size = code_size + data_size + heap_size
-                                 + stack_size + mmap_size;
-            let data_domain = DATA_SPACE.lock().unwrap().alloc_domain(
-                                    data_domain_size, "data_domain")?;
+            let data_domain_size = code_size + data_size + heap_size + stack_size + mmap_size;
+            let data_domain = DATA_SPACE
+                .lock()
+                .unwrap()
+                .alloc_domain(data_domain_size, "data_domain")?;
             data_domain
         };
         // Allocate vmas from the data domain
-        let (code_vma, data_vma, heap_vma, stack_vma) =
-            match ProcessVM::alloc_vmas(&mut data_domain, code_size,
-                                        data_size, heap_size, stack_size) {
-                Err(e) => {
-                    // Note: we need to handle error here so that we can
-                    // deallocate the data domain explictly.
-                    DATA_SPACE.lock().unwrap().dealloc_domain(data_domain);
-                    return Err(e);
-                },
-                Ok(vmas) => vmas,
-            };
+        let (code_vma, data_vma, heap_vma, stack_vma) = match ProcessVM::alloc_vmas(
+            &mut data_domain,
+            code_size,
+            data_size,
+            heap_size,
+            stack_size,
+        ) {
+            Err(e) => {
+                // Note: we need to handle error here so that we can
+                // deallocate the data domain explictly.
+                DATA_SPACE.lock().unwrap().dealloc_domain(data_domain);
+                return Err(e);
+            }
+            Ok(vmas) => vmas,
+        };
         // Initial value of the program break
         let brk = heap_vma.get_start();
         // No mmapped vmas initially
@@ -92,7 +97,8 @@ impl ProcessVM {
         let mut alloc_vma_continuously =
             |addr: &mut usize, desc, size, flags, growth, fill_zeros| -> Result<_, Error> {
                 let mut options = VMAllocOptions::new(size)?;
-                options.addr(VMAddrOption::Fixed(*addr))?
+                options
+                    .addr(VMAddrOption::Fixed(*addr))?
                     .growth(growth)?
                     .description(desc)?
                     .fill_zeros(fill_zeros)?;
@@ -104,17 +110,41 @@ impl ProcessVM {
         let rx_flags = VMAreaFlags(VM_AREA_FLAG_R | VM_AREA_FLAG_X);
         let rw_flags = VMAreaFlags(VM_AREA_FLAG_R | VM_AREA_FLAG_W);
 
-        let code_vma = alloc_vma_continuously(&mut addr, "code_vma", code_size,
-                                              rx_flags, VMGrowthType::Fixed, true)?;
-        let data_vma = alloc_vma_continuously(&mut addr, "data_vma", data_size,
-                                              rw_flags, VMGrowthType::Fixed, true)?;
-        let heap_vma = alloc_vma_continuously(&mut addr, "heap_vma", 0,
-                                              rw_flags, VMGrowthType::Upward, true)?;
+        let code_vma = alloc_vma_continuously(
+            &mut addr,
+            "code_vma",
+            code_size,
+            rx_flags,
+            VMGrowthType::Fixed,
+            !cfg!(feature = "integrity_only_opt"),
+        )?;
+        let data_vma = alloc_vma_continuously(
+            &mut addr,
+            "data_vma",
+            data_size,
+            rw_flags,
+            VMGrowthType::Fixed,
+            !cfg!(feature = "integrity_only_opt"),
+        )?;
+        let heap_vma = alloc_vma_continuously(
+            &mut addr,
+            "heap_vma",
+            0,
+            rw_flags,
+            VMGrowthType::Upward,
+            true,
+        )?;
         // Preserve the space for heap
         addr += heap_size;
         // After the heap is the stack
-        let stack_vma = alloc_vma_continuously(&mut addr, "stack_vma", stack_size,
-                                               rw_flags, VMGrowthType::Downward, false)?;
+        let stack_vma = alloc_vma_continuously(
+            &mut addr,
+            "stack_vma",
+            stack_size,
+            rw_flags,
+            VMGrowthType::Downward,
+            false,
+        )?;
         Ok((code_vma, data_vma, heap_vma, stack_vma))
     }
 
@@ -169,7 +199,7 @@ impl ProcessVM {
                     VMAddrOption::Beyond(mmap_start_addr)
                 } else {
                     if addr < mmap_start_addr {
-                        return Err(Error::new(Errno::EINVAL, "Beyond valid memory range"));
+                        return errno!(EINVAL, "Beyond valid memory range");
                     }
                     // TODO: Fixed or Hint? Should hanle mmap flags
                     VMAddrOption::Hint(addr)
@@ -178,7 +208,8 @@ impl ProcessVM {
             alloc_options
         };
         // TODO: when failed, try to resize data_domain
-        let new_mmap_vma = self.get_data_domain_mut()
+        let new_mmap_vma = self
+            .get_data_domain_mut()
             .alloc_area(&alloc_options, flags)?;
         let addr = new_mmap_vma.get_start();
         self.mmap_vmas.push(Box::new(new_mmap_vma));
@@ -201,7 +232,8 @@ impl ProcessVM {
         };
 
         let removed_mmap_vma = self.mmap_vmas.swap_remove(mmap_vma_i);
-        self.get_data_domain_mut().dealloc_area(unbox(removed_mmap_vma));
+        self.get_data_domain_mut()
+            .dealloc_area(unbox(removed_mmap_vma));
         Ok(())
     }
 
@@ -212,7 +244,7 @@ impl ProcessVM {
         options: &VMResizeOptions,
     ) -> Result<usize, Error> {
         // TODO: Implement this!
-        Err(Error::new(Errno::EINVAL, "Not implemented"))
+        errno!(EINVAL, "Not implemented")
     }
 
     pub fn brk(&mut self, new_brk: usize) -> Result<usize, Error> {
@@ -229,7 +261,8 @@ impl ProcessVM {
                 let new_heap_end = align_up(new_brk, PAGE_SIZE);
                 let new_heap_size = new_heap_end - heap_start;
                 let mut options = VMResizeOptions::new(new_heap_size)?;
-                options.addr(VMAddrOption::Fixed(heap_start))
+                options
+                    .addr(VMAddrOption::Fixed(heap_start))
                     .fill_zeros(true);
                 options
             };
@@ -261,7 +294,9 @@ impl Drop for ProcessVM {
         }
 
         // Remove the domain from its parent space
-        DATA_SPACE.lock().unwrap().dealloc_domain(
-            unbox(self.data_domain.take().unwrap()));
+        DATA_SPACE
+            .lock()
+            .unwrap()
+            .dealloc_domain(unbox(self.data_domain.take().unwrap()));
     }
 }

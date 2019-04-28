@@ -1,21 +1,26 @@
-use fs::{off_t, FileDesc};
+use fs::FileDesc;
 use prelude::*;
 use process::{get_current, Process, ProcessRef};
 use std::fmt;
 
 #[macro_use]
 mod vm_range;
-mod vm_area;
 mod process_vm;
+mod vm_area;
 
-pub use self::vm_range::{VMRange, VMRangeTrait};
-pub use self::vm_area::{VMSpace, VMDomain, VMArea, VMAreaFlags, VM_AREA_FLAG_R, VM_AREA_FLAG_W, VM_AREA_FLAG_X};
 pub use self::process_vm::ProcessVM;
-
+pub use self::vm_area::{
+    VMArea, VMAreaFlags, VMDomain, VMSpace, VM_AREA_FLAG_R, VM_AREA_FLAG_W, VM_AREA_FLAG_X,
+};
+pub use self::vm_range::{VMRange, VMRangeTrait};
 
 // TODO: separate proc and flags
 // TODO: accept fd and offset
 pub fn do_mmap(addr: usize, size: usize, flags: VMAreaFlags) -> Result<usize, Error> {
+    info!(
+        "mmap: addr: {:#x}, size: {:#x}, flags: {:?}",
+        addr, size, flags
+    );
     let current_ref = get_current();
     let current_process = current_ref.lock().unwrap();
     let current_vm_ref = current_process.get_vm();
@@ -24,6 +29,7 @@ pub fn do_mmap(addr: usize, size: usize, flags: VMAreaFlags) -> Result<usize, Er
 }
 
 pub fn do_munmap(addr: usize, size: usize) -> Result<(), Error> {
+    info!("munmap: addr: {:#x}, size: {:#x}", addr, size);
     let current_ref = get_current();
     let current_process = current_ref.lock().unwrap();
     let current_vm_ref = current_process.get_vm();
@@ -37,6 +43,10 @@ pub fn do_mremap(
     old_size: usize,
     options: &VMResizeOptions,
 ) -> Result<usize, Error> {
+    info!(
+        "mremap: oldaddr: {:#x}, oldsize: {:#x}, options: {:?}",
+        old_addr, old_size, options
+    );
     let current_ref = get_current();
     let current_process = current_ref.lock().unwrap();
     let current_vm_ref = current_process.get_vm();
@@ -45,6 +55,7 @@ pub fn do_mremap(
 }
 
 pub fn do_brk(addr: usize) -> Result<usize, Error> {
+    info!("brk: addr: {:#x}", addr);
     let current_ref = get_current();
     let current_process = current_ref.lock().unwrap();
     let current_vm_ref = current_process.get_vm();
@@ -61,7 +72,6 @@ pub enum VMGuardAreaType {
     Dynamic { size: usize },
 }
 
-
 #[derive(Clone, PartialEq, Default)]
 pub struct VMAllocOptions {
     size: usize,
@@ -74,7 +84,7 @@ pub struct VMAllocOptions {
 impl VMAllocOptions {
     pub fn new(size: usize) -> Result<VMAllocOptions, Error> {
         if size % PAGE_SIZE != 0 {
-            return Err(Error::new(Errno::EINVAL, "Size is not page-aligned"));
+            return errno!(EINVAL, "Size is not page-aligned");
         }
         Ok(VMAllocOptions {
             size,
@@ -84,7 +94,7 @@ impl VMAllocOptions {
 
     pub fn addr(&mut self, addr: VMAddrOption) -> Result<&mut Self, Error> {
         if addr.is_addr_given() && addr.get_addr() % PAGE_SIZE != 0 {
-            return Err(Error::new(Errno::EINVAL, "Invalid address"));
+            return errno!(EINVAL, "Invalid address");
         }
         self.addr = addr;
         Ok(self)
@@ -115,7 +125,6 @@ impl fmt::Debug for VMAllocOptions {
         )
     }
 }
-
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VMAddrOption {
@@ -149,7 +158,6 @@ impl VMAddrOption {
     }
 }
 
-
 /// How VMRange may grow:
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VMGrowthType {
@@ -164,7 +172,6 @@ impl Default for VMGrowthType {
     }
 }
 
-
 #[derive(Clone, Debug, Default)]
 pub struct VMResizeOptions {
     new_size: usize,
@@ -175,7 +182,7 @@ pub struct VMResizeOptions {
 impl VMResizeOptions {
     pub fn new(new_size: usize) -> Result<VMResizeOptions, Error> {
         if new_size % PAGE_SIZE != 0 {
-            return Err(Error::new(Errno::EINVAL, "Size is not page-aligned"));
+            return errno!(EINVAL, "Size is not page-aligned");
         }
         Ok(VMResizeOptions {
             new_size,

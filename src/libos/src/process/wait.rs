@@ -48,14 +48,14 @@ where
         self.inner.lock().unwrap().data
     }
 
-    pub fn sleep_until_woken_with_result(waiter: Waiter<D, R>) -> R {
-        while !waiter.inner.lock().unwrap().is_woken {
+    pub fn sleep_until_woken_with_result(self) -> R {
+        while !self.inner.lock().unwrap().is_woken {
             unsafe {
-                wait_event(waiter.thread);
+                wait_event(self.thread);
             }
         }
 
-        waiter.inner.lock().unwrap().result.unwrap()
+        self.inner.lock().unwrap().result.unwrap()
     }
 }
 

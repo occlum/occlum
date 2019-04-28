@@ -4,7 +4,7 @@ use std;
 
 pub type FileDesc = u32;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 #[repr(C)]
 pub struct FileTable {
     table: Vec<Option<FileTableEntry>>,
@@ -19,7 +19,12 @@ impl FileTable {
         }
     }
 
-    pub fn dup(&mut self, fd: FileDesc, min_fd: FileDesc, close_on_spawn: bool) -> Result<FileDesc, Error> {
+    pub fn dup(
+        &mut self,
+        fd: FileDesc,
+        min_fd: FileDesc,
+        close_on_spawn: bool,
+    ) -> Result<FileDesc, Error> {
         let file_ref = self.get(fd)?;
 
         let min_fd = min_fd as usize;
@@ -34,11 +39,13 @@ impl FileTable {
                 }
             }
 
-            table.iter()
+            table
+                .iter()
                 .enumerate()
                 .skip(min_fd as usize)
                 .find(|&(idx, opt)| opt.is_none())
-                .unwrap().0
+                .unwrap()
+                .0
         } as FileDesc;
 
         self.put_at(min_free_fd, file_ref, close_on_spawn);
@@ -50,7 +57,8 @@ impl FileTable {
         let mut table = &mut self.table;
 
         let min_free_fd = if self.num_fds < table.len() {
-            table.iter()
+            table
+                .iter()
                 .enumerate()
                 .find(|&(idx, opt)| opt.is_none())
                 .unwrap()
@@ -123,30 +131,19 @@ impl FileTable {
             None => errno!(EBADF, "Invalid file descriptor"),
         }
     }
-}
 
-impl Clone for FileTable {
-    fn clone(&self) -> FileTable {
-        // Only clone file descriptors that are not close-on-spawn
-        let mut num_cloned_fds = 0;
-        let cloned_table = self
-            .table
-            .iter()
-            .map(|entry| match entry {
-                Some(file_table_entry) => match file_table_entry.close_on_spawn {
-                    false => {
-                        num_cloned_fds += 1;
-                        Some(file_table_entry.clone())
-                    }
-                    true => None,
-                },
-                None => None,
-            })
-            .collect();
-
-        FileTable {
-            table: cloned_table,
-            num_fds: num_cloned_fds,
+    /// Remove file descriptors that are close-on-spawn
+    pub fn close_on_spawn(&mut self) {
+        for entry in self.table.iter_mut() {
+            let need_close = if let Some(entry) = entry {
+                entry.close_on_spawn
+            } else {
+                false
+            };
+            if need_close {
+                *entry = None;
+                self.num_fds -= 1;
+            }
         }
     }
 }

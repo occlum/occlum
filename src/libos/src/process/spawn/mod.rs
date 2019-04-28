@@ -1,15 +1,15 @@
-use xmas_elf::{ElfFile, header, program, sections};
 use xmas_elf::symbol_table::Entry;
+use xmas_elf::{header, program, sections, ElfFile};
 
-use fs::{File, FileDesc, FileTable, INodeExt, ROOT_INODE, StdinFile, StdoutFile};
+use fs::{File, FileDesc, FileTable, INodeExt, OpenFlags, StdinFile, StdoutFile, ROOT_INODE};
+use misc::ResourceLimitsRef;
 use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::sgxfs::SgxFile;
 use vm::{ProcessVM, VMRangeTrait};
-use misc::{ResourceLimitsRef};
 
-use super::*;
 use super::task::Task;
+use super::*;
 
 use self::init_stack::{AuxKey, AuxTable};
 
@@ -20,8 +20,14 @@ mod segment;
 
 #[derive(Debug)]
 pub enum FileAction {
-    // TODO: Add open action
-    // Open(...)
+    /// open(path, oflag, mode) had been called, and the returned file
+    /// descriptor, if not `fd`, had been changed to `fd`.
+    Open {
+        path: String,
+        mode: u32,
+        oflag: u32,
+        fd: FileDesc,
+    },
     Dup2(FileDesc, FileDesc),
     Close(FileDesc),
 }
@@ -59,7 +65,7 @@ pub fn do_spawn<P: AsRef<Path>>(
         let program_entry = {
             let program_entry = base_addr + elf_helper::get_start_address(&elf_file)?;
             if !vm.get_code_vma().contains_obj(program_entry, 16) {
-                return Err(Error::new(Errno::EINVAL, "Invalid program entry"));
+                return errno!(EINVAL, "Invalid program entry");
             }
             program_entry
         };
@@ -87,21 +93,38 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
     let parent = parent_ref.lock().unwrap();
     let should_inherit_file_table = parent.get_pid() > 0;
     if should_inherit_file_table {
+        // Fork: clone file table
         let mut cloned_file_table = parent.get_files().lock().unwrap().clone();
         // Perform file actions to modify the cloned file table
         for file_action in file_actions {
             match file_action {
-                FileAction::Dup2(old_fd, new_fd) => {
-                    let file = cloned_file_table.get(*old_fd)?;
+                &FileAction::Open {
+                    ref path,
+                    mode,
+                    oflag,
+                    fd,
+                } => {
+                    let flags = OpenFlags::from_bits_truncate(oflag);
+                    let file = parent.open_file(path.as_str(), flags, mode)?;
+                    let file_ref: Arc<Box<File>> = Arc::new(file);
+
+                    let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
+                    cloned_file_table.put_at(fd, file_ref, close_on_spawn);
+                }
+                &FileAction::Dup2(old_fd, new_fd) => {
+                    let file = cloned_file_table.get(old_fd)?;
                     if old_fd != new_fd {
-                        cloned_file_table.put_at(*new_fd, file, false);
+                        cloned_file_table.put_at(new_fd, file, false);
                     }
                 }
-                FileAction::Close(fd) => {
-                    cloned_file_table.del(*fd)?;
+                &FileAction::Close(fd) => {
+                    // ignore error
+                    cloned_file_table.del(fd);
                 }
             }
         }
+        // Exec: close fd with close_on_spawn
+        cloned_file_table.close_on_spawn();
         return Ok(cloned_file_table);
     }
     drop(parent);
@@ -133,7 +156,11 @@ fn init_task(
     })
 }
 
-fn init_auxtbl(base_addr: usize, program_entry: usize, elf_file: &ElfFile) -> Result<AuxTable, Error> {
+fn init_auxtbl(
+    base_addr: usize,
+    program_entry: usize,
+    elf_file: &ElfFile,
+) -> Result<AuxTable, Error> {
     let mut auxtbl = AuxTable::new();
     auxtbl.set_val(AuxKey::AT_PAGESZ, 4096)?;
     auxtbl.set_val(AuxKey::AT_UID, 0)?;

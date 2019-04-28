@@ -22,12 +22,11 @@ impl Log for SimpleLogger {
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             let color = Color::from(record.level());
-            let (show, code) = color.to_console_code();
             println!(
-                "\u{1B}[{};{}m[{:>5}] {}\u{1B}[0m",
-                show,
-                code + 30,
+                "\u{1B}[{}m[{:>5}][{}] {}\u{1B}[0m",
+                color as u8,
                 record.level(),
+                crate::process::current_pid(),
                 record.args()
             );
         }
@@ -42,7 +41,7 @@ impl From<Level> for Color {
             Level::Warn => Color::Yellow,
             Level::Info => Color::Blue,
             Level::Debug => Color::Green,
-            Level::Trace => Color::DarkGray,
+            Level::Trace => Color::BrightBlack,
         }
     }
 }
@@ -51,43 +50,20 @@ impl From<Level> for Color {
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[repr(u8)]
 pub enum Color {
-    Black = 0,
-    Blue = 1,
-    Green = 2,
-    Cyan = 3,
-    Red = 4,
-    Magenta = 5,
-    Brown = 6,
-    LightGray = 7,
-    DarkGray = 8,
-    LightBlue = 9,
-    LightGreen = 10,
-    LightCyan = 11,
-    LightRed = 12,
-    Pink = 13,
-    Yellow = 14,
-    White = 15,
-}
-
-impl Color {
-    fn to_console_code(&self) -> (u8, u8) {
-        match self {
-            Color::Black => (0, 0),
-            Color::Blue => (0, 4),
-            Color::Green => (0, 2),
-            Color::Cyan => (0, 6),
-            Color::Red => (0, 1),
-            Color::Magenta => (0, 5),
-            Color::Brown => (0, 3),
-            Color::LightGray => (1, 7),
-            Color::DarkGray => (0, 7),
-            Color::LightBlue => (1, 4),
-            Color::LightGreen => (1, 2),
-            Color::LightCyan => (1, 6),
-            Color::LightRed => (1, 1),
-            Color::Pink => (1, 5),
-            Color::Yellow => (1, 3),
-            Color::White => (1, 0),
-        }
-    }
+    Black = 30,
+    Red = 31,
+    Green = 32,
+    Yellow = 33,
+    Blue = 34,
+    Magenta = 35,
+    Cyan = 36,
+    White = 37,
+    BrightBlack = 90,
+    BrightRed = 91,
+    BrightGreen = 92,
+    BrightYellow = 93,
+    BrightBlue = 94,
+    BrightMagenta = 95,
+    BrightCyan = 96,
+    BrightWhite = 97,
 }

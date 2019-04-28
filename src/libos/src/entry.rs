@@ -35,6 +35,10 @@ pub extern "C" fn libos_run() -> i32 {
     .unwrap_or(EXIT_STATUS_INTERNAL_ERROR)
 }
 
+#[no_mangle]
+pub extern "C" fn dummy_ecall() -> i32 {
+    0
+}
 // Use 127 as a special value to indicate internal error from libos, not from
 // user programs, although it is completely ok for a user program to return 127.
 const EXIT_STATUS_INTERNAL_ERROR: i32 = 127;
@@ -64,7 +68,7 @@ fn parse_arguments(
 
 // TODO: make sure do_boot can only be called once
 fn do_boot(path_str: &str, argv: &Vec<CString>) -> Result<(), Error> {
-    info!("boot: path: {:?}, argv: {:?}", path_str, argv);
+    //    info!("boot: path: {:?}, argv: {:?}", path_str, argv);
     util::mpx_util::mpx_enable()?;
 
     let envp = std::vec::Vec::new();
@@ -78,5 +82,11 @@ fn do_boot(path_str: &str, argv: &Vec<CString>) -> Result<(), Error> {
 // TODO: make sure do_run() cannot be called after do_boot()
 fn do_run() -> Result<i32, Error> {
     let exit_status = process::run_task()?;
+
+    // sync file system
+    // TODO: only sync when all processes exit
+    use rcore_fs::vfs::FileSystem;
+    crate::fs::ROOT_INODE.fs().sync()?;
+
     Ok(exit_status)
 }

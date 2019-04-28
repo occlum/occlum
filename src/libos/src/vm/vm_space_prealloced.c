@@ -1,6 +1,6 @@
 #include <stddef.h>
 
-#define DATA_SPACE_SIZE (32*1024*1024)
+#define DATA_SPACE_SIZE (128*1024*1024)
 
 static char __prealloced_data_space[DATA_SPACE_SIZE]
     __attribute__ ((

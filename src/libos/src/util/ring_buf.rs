@@ -2,8 +2,8 @@ use alloc::alloc::{alloc, dealloc, Layout};
 
 use std::cmp::{max, min};
 use std::ptr;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use super::*;
 
@@ -155,6 +155,20 @@ impl RingBufReader {
         }
         Ok(buf_pos)
     }
+
+    pub fn can_read(&self) -> bool {
+        self.bytes_to_read() != 0
+    }
+
+    pub fn bytes_to_read(&self) -> usize {
+        let tail = self.inner.get_tail();
+        let head = self.inner.get_head();
+        if tail <= head {
+            head - tail
+        } else {
+            self.inner.capacity - tail + head
+        }
+    }
 }
 
 impl Drop for RingBufReader {
@@ -201,5 +215,16 @@ impl RingBufWriter {
             buf_remain -= write_nbytes;
         }
         Ok(buf_pos)
+    }
+
+    pub fn can_write(&self) -> bool {
+        let tail = self.inner.get_tail();
+        let head = self.inner.get_head();
+        let may_write_nbytes = if tail <= head {
+            self.inner.capacity - head
+        } else {
+            tail - head - 1
+        };
+        may_write_nbytes != 0
     }
 }

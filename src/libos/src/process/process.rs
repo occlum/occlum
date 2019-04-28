@@ -88,8 +88,10 @@ impl Process {
     pub fn get_parent(&self) -> &ProcessRef {
         self.parent.as_ref().unwrap()
     }
-    pub fn get_children(&self) -> &[ProcessWeakRef] {
-        &self.children
+    pub fn get_children_iter(&self) -> impl Iterator<Item = ProcessRef> + '_ {
+        self.children
+            .iter()
+            .filter_map(|child_weak| child_weak.upgrade())
     }
     pub fn change_cwd(&mut self, path: &str) {
         if path.len() > 0 && path.as_bytes()[0] == b'/' {

@@ -20,8 +20,7 @@ pub fn do_exit(exit_status: i32) {
     current.status = Status::ZOMBIE;
 
     // Update children
-    for child_weak in &current.children {
-        let child_ref = child_weak.upgrade().unwrap();
+    for child_ref in current.get_children_iter() {
         let mut child = child_ref.lock().unwrap();
         child.parent = Some(IDLE_PROCESS.clone());
     }
@@ -29,7 +28,9 @@ pub fn do_exit(exit_status: i32) {
 
     // Notify another process, if any, that waits on ctid (see set_tid_address)
     if let Some(ctid) = current.clear_child_tid {
-        unsafe { atomic_store(ctid, 0); }
+        unsafe {
+            atomic_store(ctid, 0);
+        }
         futex_wake(ctid as *const i32, 1);
     }
 
@@ -69,8 +70,7 @@ pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32) -> Res
         let mut current = current_ref.lock().unwrap();
 
         let mut any_child_to_wait_for = false;
-        for child_weak in current.get_children() {
-            let child_ref = child_weak.upgrade().unwrap();
+        for child_ref in current.get_children_iter() {
             let child = child_ref.lock().unwrap();
 
             let may_wait_for = match child_filter {
@@ -82,8 +82,9 @@ pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32) -> Res
                 continue;
             }
 
-            // Return immediately as a child that we wait for has alreay exited
+            // Return immediately as a child that we wait for has already exited
             if child.status == Status::ZOMBIE {
+                process_table::remove(child.pid);
                 return Ok(child.pid);
             }
 
@@ -102,13 +103,12 @@ pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32) -> Res
         waiter
     };
 
-    let child_pid = Waiter::sleep_until_woken_with_result(waiter);
+    let child_pid = waiter.sleep_until_woken_with_result();
 
     let mut current = current_ref.lock().unwrap();
     let child_i = {
         let mut child_i_opt = None;
-        for (child_i, child_weak) in current.children.iter().enumerate() {
-            let child_ref = child_weak.upgrade().unwrap();
+        for (child_i, child_ref) in current.get_children_iter().enumerate() {
             let child = child_ref.lock().unwrap();
             if child.get_pid() != child_pid {
                 continue;

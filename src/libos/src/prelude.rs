@@ -1,4 +1,5 @@
 pub use sgx_trts::libc;
+pub use sgx_trts::libc::off_t;
 pub use sgx_types::*;
 use std;
 
@@ -13,6 +14,7 @@ pub use std::sync::{
 //pub use std::borrow::BorrowMut;
 pub use std::borrow::ToOwned;
 pub use std::boxed::Box;
+pub use std::cmp::{max, min};
 pub use std::cmp::{Ordering, PartialOrd};
 pub use std::collections::{HashMap, VecDeque};
 pub use std::fmt::{Debug, Display};
@@ -21,13 +23,10 @@ pub use std::iter::Iterator;
 pub use std::rc::Rc;
 pub use std::string::String;
 pub use std::vec::Vec;
-pub use std::cmp::{min, max};
 
 pub use errno::Errno;
 pub use errno::Errno::*;
 pub use errno::Error;
-
-pub use fs::off_t;
 
 macro_rules! debug_trace {
     () => {
@@ -37,7 +36,7 @@ macro_rules! debug_trace {
 
 macro_rules! errno {
     ($errno: ident, $msg: expr) => {{
-        println!(
+        error!(
             "ERROR: {} ({}, line {} in file {})",
             $errno,
             $msg,
@@ -45,6 +44,25 @@ macro_rules! errno {
             file!()
         );
         Err(Error::new($errno, $msg))
+    }};
+}
+
+// return Err(errno) if libc return -1
+macro_rules! try_libc {
+    ($ret: expr) => {{
+        let ret = unsafe { $ret };
+        if ret == -1 {
+            let errno = unsafe { libc::errno() };
+            // println will cause libc ocall and overwrite errno
+            error!(
+                "ERROR from libc: {} (line {} in file {})",
+                errno,
+                line!(),
+                file!()
+            );
+            return Err(Error::new(Errno::from_errno(errno), "libc error"));
+        }
+        ret
     }};
 }
 

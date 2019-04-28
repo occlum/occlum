@@ -27,8 +27,7 @@ impl VMSpace {
 
     pub fn alloc_domain(&mut self, size: usize, desc: &str) -> Result<VMDomain, Error> {
         let mut options = VMAllocOptions::new(size)?;
-        options.growth(VMGrowthType::Upward)?
-            .description(desc)?;
+        options.growth(VMGrowthType::Upward)?.description(desc)?;
 
         let new_range = self.range.alloc_subrange(&options)?;
         Ok(VMDomain { range: new_range })
@@ -43,7 +42,6 @@ impl VMSpace {
         self.range.resize_subrange(&mut domain.range, &options)
     }
 }
-
 
 #[derive(Debug)]
 pub struct VMDomain {
@@ -78,7 +76,6 @@ impl VMDomain {
     }
 }
 
-
 #[derive(Debug)]
 pub struct VMArea {
     range: VMRange,
@@ -96,7 +93,6 @@ impl VMArea {
         &mut self.flags
     }
 }
-
 
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub struct VMAreaFlags(pub u32);

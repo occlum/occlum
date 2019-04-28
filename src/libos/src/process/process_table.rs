@@ -15,7 +15,10 @@ pub fn remove(pid: pid_t) {
 }
 
 pub fn get(pid: pid_t) -> Result<ProcessRef, Error> {
-    PROCESS_TABLE.lock().unwrap().get(&pid)
+    PROCESS_TABLE
+        .lock()
+        .unwrap()
+        .get(&pid)
         .map(|pr| pr.clone())
         .ok_or_else(|| Error::new(Errno::ENOENT, "process not found"))
 }

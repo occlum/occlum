@@ -37,10 +37,7 @@ impl File for PipeReader {
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize, Error> {
-        Err(Error::new(
-            Errno::EBADF,
-            "PipeReader does not support write",
-        ))
+        errno!(EBADF, "PipeReader does not support write")
     }
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
@@ -76,14 +73,11 @@ impl File for PipeReader {
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
-        Err(Error::new(
-            Errno::EBADF,
-            "PipeReader does not support write",
-        ))
+        errno!(EBADF, "PipeReader does not support write")
     }
 
     fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
-        Err(Error::new(Errno::ESPIPE, "Pipe does not support seek"))
+        errno!(ESPIPE, "Pipe does not support seek")
     }
 
     fn metadata(&self) -> Result<Metadata, Error> {
@@ -105,6 +99,10 @@ impl File for PipeReader {
     fn read_entry(&self) -> Result<String, Error> {
         unimplemented!()
     }
+
+    fn as_any(&self) -> &Any {
+        self
+    }
 }
 
 unsafe impl Send for PipeReader {}
@@ -117,7 +115,7 @@ pub struct PipeWriter {
 
 impl File for PipeWriter {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "PipeWriter does not support read"))
+        errno!(EBADF, "PipeWriter does not support read")
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize, Error> {
@@ -133,7 +131,7 @@ impl File for PipeWriter {
     }
 
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "PipeWriter does not support read"))
+        errno!(EBADF, "PipeWriter does not support read")
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
@@ -161,7 +159,7 @@ impl File for PipeWriter {
     }
 
     fn seek(&self, seek_pos: SeekFrom) -> Result<off_t, Error> {
-        Err(Error::new(Errno::ESPIPE, "Pipe does not support seek"))
+        errno!(ESPIPE, "Pipe does not support seek")
     }
 
     fn metadata(&self) -> Result<Metadata, Error> {
@@ -182,6 +180,10 @@ impl File for PipeWriter {
 
     fn read_entry(&self) -> Result<String, Error> {
         unimplemented!()
+    }
+
+    fn as_any(&self) -> &Any {
+        self
     }
 }
 

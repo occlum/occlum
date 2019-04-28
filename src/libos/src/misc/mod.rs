@@ -1,7 +1,7 @@
 use super::*;
 
-mod uname;
 mod rlimit;
+mod uname;
 
-pub use self::uname::{utsname_t, do_uname};
-pub use self::rlimit::{rlimit_t, resource_t, ResourceLimits, ResourceLimitsRef, do_prlimit};
+pub use self::rlimit::{do_prlimit, resource_t, rlimit_t, ResourceLimits, ResourceLimitsRef};
+pub use self::uname::{do_uname, utsname_t};

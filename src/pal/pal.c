@@ -213,6 +213,9 @@ void ocall_sync(void) {
 /* Application entry */
 int SGX_CDECL main(int argc, const char *argv[])
 {
+    struct timeval startup, libosready, appdie;
+
+    gettimeofday(&startup, NULL);
     sgx_status_t sgx_ret = SGX_SUCCESS;
     int status = 0;
     uint32_t sealed_log_size = 1024;
@@ -238,8 +241,21 @@ int SGX_CDECL main(int argc, const char *argv[])
         print_error_message(sgx_ret);
         return status;
     }
+    // First ecall do a lot initializations.
+    // Count it as startup time.
+    dummy_ecall(global_eid, &status);
+
+    gettimeofday(&libosready, NULL);
 
     status = wait_all_tasks();
+
+    gettimeofday(&appdie, NULL);
+
+    uint64_t libos_startup_time, app_runtime;
+    libos_startup_time = (libosready.tv_sec - startup.tv_sec) * 1000000 + (libosready.tv_usec - startup.tv_usec);
+    app_runtime = (appdie.tv_sec - libosready.tv_sec) * 1000000 + (appdie.tv_usec - libosready.tv_usec);
+    printf("LibOS startup time: %d microseconds\n", libos_startup_time);
+    printf("Apps running time: %d microseconds\n", app_runtime);
 
     /* Destroy the enclave */
     sgx_destroy_enclave(global_eid);

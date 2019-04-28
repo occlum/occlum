@@ -4,7 +4,7 @@ use std::borrow::BorrowMut;
 use std::fmt;
 use std::io::SeekFrom;
 
-pub trait File: Debug + Sync + Send {
+pub trait File: Debug + Sync + Send + Any {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error>;
     fn write(&self, buf: &[u8]) -> Result<usize, Error>;
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error>;
@@ -17,6 +17,7 @@ pub trait File: Debug + Sync + Send {
     fn sync_all(&self) -> Result<(), Error>;
     fn sync_data(&self) -> Result<(), Error>;
     fn read_entry(&self) -> Result<String, Error>;
+    fn as_any(&self) -> &Any;
 }
 
 pub type FileRef = Arc<Box<File>>;
@@ -35,7 +36,7 @@ impl SgxFile {
         is_append: bool,
     ) -> Result<SgxFile, Error> {
         if !is_readable && !is_writable {
-            return Err(Error::new(Errno::EINVAL, "Invalid permissions"));
+            return errno!(EINVAL, "Invalid permissions");
         }
 
         Ok(SgxFile {
@@ -114,6 +115,10 @@ impl File for SgxFile {
     fn read_entry(&self) -> Result<String, Error> {
         unimplemented!()
     }
+
+    fn as_any(&self) -> &Any {
+        self
+    }
 }
 
 #[derive(Clone)]
@@ -130,7 +135,7 @@ struct SgxFileInner {
 impl SgxFileInner {
     pub fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
         if !self.is_writable {
-            return Err(Error::new(Errno::EINVAL, "File not writable"));
+            return errno!(EINVAL, "File not writable");
         }
 
         let mut file_guard = self.file.lock().unwrap();
@@ -158,7 +163,7 @@ impl SgxFileInner {
 
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         if !self.is_readable {
-            return Err(Error::new(Errno::EINVAL, "File not readable"));
+            return errno!(EINVAL, "File not readable");
         }
 
         let mut file_guard = self.file.lock().unwrap();
@@ -191,7 +196,7 @@ impl SgxFileInner {
                     let backward_offset = (-relative_offset) as usize;
                     if self.pos < backward_offset {
                         // underflow
-                        return Err(Error::new(Errno::EINVAL, "Invalid seek position"));
+                        return errno!(EINVAL, "Invalid seek position");
                     }
                     SeekFrom::Start((self.pos - backward_offset) as u64)
                 }
@@ -207,7 +212,7 @@ impl SgxFileInner {
 
     pub fn writev(&mut self, bufs: &[&[u8]]) -> Result<usize, Error> {
         if !self.is_writable {
-            return Err(Error::new(Errno::EINVAL, "File not writable"));
+            return errno!(EINVAL, "File not writable");
         }
 
         let mut file_guard = self.file.lock().unwrap();
@@ -233,7 +238,7 @@ impl SgxFileInner {
                 Err(e) => {
                     match total_bytes {
                         // a complete failure
-                        0 => return Err(Error::new(Errno::EINVAL, "Failed to write")),
+                        0 => return errno!(EINVAL, "Failed to write"),
                         // a partially failure
                         _ => break,
                     }
@@ -247,7 +252,7 @@ impl SgxFileInner {
 
     fn readv(&mut self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
         if !self.is_readable {
-            return Err(Error::new(Errno::EINVAL, "File not readable"));
+            return errno!(EINVAL, "File not readable");
         }
 
         let mut file_guard = self.file.lock().unwrap();
@@ -269,7 +274,7 @@ impl SgxFileInner {
                 Err(e) => {
                     match total_bytes {
                         // a complete failure
-                        0 => return Err(Error::new(Errno::EINVAL, "Failed to write")),
+                        0 => return errno!(EINVAL, "Failed to write"),
                         // a partially failure
                         _ => break,
                     }
@@ -305,7 +310,7 @@ impl StdoutFile {
 
 impl File for StdoutFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "Stdout does not support read"))
+        errno!(EBADF, "Stdout does not support read")
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize, Error> {
@@ -318,16 +323,16 @@ impl File for StdoutFile {
         Ok(write_len)
     }
 
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
-        unimplemented!()
+    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+        self.read(buf)
     }
 
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error> {
-        unimplemented!()
+    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize, Error> {
+        self.write(buf)
     }
 
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "Stdout does not support read"))
+        errno!(EBADF, "Stdout does not support read")
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
@@ -344,7 +349,7 @@ impl File for StdoutFile {
                 Err(e) => {
                     match total_bytes {
                         // a complete failure
-                        0 => return Err(Error::new(Errno::EINVAL, "Failed to write")),
+                        0 => return errno!(EINVAL, "Failed to write"),
                         // a partially failure
                         _ => break,
                     }
@@ -355,27 +360,46 @@ impl File for StdoutFile {
     }
 
     fn seek(&self, seek_pos: SeekFrom) -> Result<off_t, Error> {
-        Err(Error::new(Errno::ESPIPE, "Stdout does not support seek"))
+        errno!(ESPIPE, "Stdout does not support seek")
     }
 
     fn metadata(&self) -> Result<Metadata, Error> {
-        unimplemented!()
+        Ok(Metadata {
+            dev: 0,
+            inode: 0,
+            size: 0,
+            blk_size: 0,
+            blocks: 0,
+            atime: Timespec { sec: 0, nsec: 0 },
+            mtime: Timespec { sec: 0, nsec: 0 },
+            ctime: Timespec { sec: 0, nsec: 0 },
+            type_: FileType::CharDevice,
+            mode: 0,
+            nlinks: 0,
+            uid: 0,
+            gid: 0,
+        })
     }
 
-    fn set_len(&self, len: u64) -> Result<(), Error> {
-        unimplemented!()
+    fn set_len(&self, _len: u64) -> Result<(), Error> {
+        errno!(EINVAL, "Stdout does not support set_len")
     }
 
     fn sync_all(&self) -> Result<(), Error> {
-        unimplemented!()
+        self.sync_data()
     }
 
     fn sync_data(&self) -> Result<(), Error> {
-        unimplemented!()
+        self.inner.lock().flush()?;
+        Ok(())
     }
 
     fn read_entry(&self) -> Result<String, Error> {
-        unimplemented!()
+        errno!(ENOTDIR, "Stdout does not support read_entry")
+    }
+
+    fn as_any(&self) -> &Any {
+        self
     }
 }
 
@@ -412,7 +436,7 @@ impl File for StdinFile {
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "Stdin does not support write"))
+        errno!(EBADF, "Stdin does not support write")
     }
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
@@ -437,7 +461,7 @@ impl File for StdinFile {
                 Err(e) => {
                     match total_bytes {
                         // a complete failure
-                        0 => return Err(Error::new(Errno::EINVAL, "Failed to write")),
+                        0 => return errno!(EINVAL, "Failed to write"),
                         // a partially failure
                         _ => break,
                     }
@@ -448,31 +472,49 @@ impl File for StdinFile {
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
-        Err(Error::new(Errno::EBADF, "Stdin does not support write"))
+        errno!(EBADF, "Stdin does not support write")
     }
 
     fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
-        Err(Error::new(Errno::ESPIPE, "Stdin does not support seek"))
+        errno!(ESPIPE, "Stdin does not support seek")
     }
 
     fn metadata(&self) -> Result<Metadata, Error> {
-        unimplemented!()
+        Ok(Metadata {
+            dev: 0,
+            inode: 0,
+            size: 0,
+            blk_size: 0,
+            blocks: 0,
+            atime: Timespec { sec: 0, nsec: 0 },
+            mtime: Timespec { sec: 0, nsec: 0 },
+            ctime: Timespec { sec: 0, nsec: 0 },
+            type_: FileType::CharDevice,
+            mode: 0,
+            nlinks: 0,
+            uid: 0,
+            gid: 0,
+        })
     }
 
-    fn set_len(&self, len: u64) -> Result<(), Error> {
-        unimplemented!()
+    fn set_len(&self, _len: u64) -> Result<(), Error> {
+        errno!(EINVAL, "Stdin does not support set_len")
     }
 
     fn sync_all(&self) -> Result<(), Error> {
-        unimplemented!()
+        self.sync_data()
     }
 
     fn sync_data(&self) -> Result<(), Error> {
-        unimplemented!()
+        Ok(())
     }
 
     fn read_entry(&self) -> Result<String, Error> {
-        unimplemented!()
+        errno!(ENOTDIR, "Stdin does not support read_entry")
+    }
+
+    fn as_any(&self) -> &Any {
+        self
     }
 }
 

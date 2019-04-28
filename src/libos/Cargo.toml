@@ -14,7 +14,10 @@ rcore-fs = { path = "../../deps/sefs/rcore-fs" }
 rcore-fs-sefs = { path = "../../deps/sefs/rcore-fs-sefs" }
 
 [features]
-default = []
+default = ["integrity_only_opt", "sgx_file_cache"]
+syscall_timing = []     # Timing for each syscall. But it has cost from more ocall.
+integrity_only_opt = [] # Clear bss only. It should be disabled if checking memory reads.
+sgx_file_cache = []     # Cache SgxFile objects. Invalidation is unimplemented.
 
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
 xmas-elf = { path = "../../deps/xmas-elf" }

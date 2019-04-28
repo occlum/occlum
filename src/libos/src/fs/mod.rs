@@ -1,31 +1,34 @@
-use {process, std};
 use prelude::*;
 use process::Process;
 use rcore_fs::vfs::{FileType, FsError, INode, Metadata, Timespec};
 use std::sgxfs as fs_impl;
+use {process, std};
 
 use super::*;
 
+pub use self::access::{do_access, do_faccessat, AccessFlags, AccessModes, AT_FDCWD};
 pub use self::file::{File, FileRef, SgxFile, StdinFile, StdoutFile};
 pub use self::file_table::{FileDesc, FileTable};
-pub use self::inode_file::{INodeExt, INodeFile, ROOT_INODE};
 use self::inode_file::OpenOptions;
+pub use self::inode_file::{INodeExt, INodeFile, ROOT_INODE};
+pub use self::io_multiplexing::*;
+use self::null::NullFile;
 pub use self::pipe::Pipe;
-pub use self::access::{AccessModes, AccessFlags, AT_FDCWD, do_access, do_faccessat};
+pub use self::socket_file::{AsSocket, SocketFile};
+pub use self::unix_socket::{AsUnixSocket, UnixSocketFile};
+use std::any::Any;
+use std::mem::uninitialized;
 
+mod access;
 mod file;
 mod file_table;
 mod inode_file;
+mod io_multiplexing;
+mod null;
 mod pipe;
 mod sgx_impl;
-mod access;
-
-// TODO: use the type defined in Rust libc.
-//
-// However, off_t is defined as u64 in the current Rust SGX SDK, which is
-// wrong (see issue https://github.com/baidu/rust-sgx-sdk/issues/46)
-#[allow(non_camel_case_types)]
-pub type off_t = i64;
+mod socket_file;
+mod unix_socket;
 
 pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
     let flags = OpenFlags::from_bits_truncate(flags);
@@ -37,28 +40,15 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
 
-    let inode = if flags.contains(OpenFlags::CREATE) {
-        let (dir_path, file_name) = split_path(&path);
-        let dir_inode = proc.lookup_inode(dir_path)?;
-        match dir_inode.find(file_name) {
-            Ok(file_inode) => {
-                if flags.contains(OpenFlags::EXCLUSIVE) {
-                    return Err(Error::new(EEXIST, "file exists"));
-                }
-                file_inode
-            }
-            Err(FsError::EntryNotFound) => dir_inode.create(file_name, FileType::File, mode)?,
-            Err(e) => return Err(Error::from(e)),
-        }
-    } else {
-        proc.lookup_inode(&path)?
-    };
-
-    let file_ref: Arc<Box<File>> = Arc::new(Box::new(INodeFile::open(inode, flags.to_options())?));
+    let file = proc.open_file(path, flags, mode)?;
+    let file_ref: Arc<Box<File>> = Arc::new(file);
 
     let fd = {
         let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
-        proc.get_files().lock().unwrap().put(file_ref, close_on_spawn)
+        proc.get_files()
+            .lock()
+            .unwrap()
+            .put(file_ref, close_on_spawn)
     };
     Ok(fd)
 }
@@ -190,7 +180,7 @@ pub fn do_getdents64(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
     let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
     let info = file_ref.metadata()?;
     if info.type_ != FileType::Dir {
-        return Err(Error::new(ENOTDIR, ""));
+        return errno!(ENOTDIR, "");
     }
     let mut writer = unsafe { DirentBufWriter::new(buf) };
     loop {
@@ -208,6 +198,7 @@ pub fn do_getdents64(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
 }
 
 pub fn do_close(fd: FileDesc) -> Result<(), Error> {
+    info!("close: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_table_ref = current_process.get_files();
@@ -217,6 +208,7 @@ pub fn do_close(fd: FileDesc) -> Result<(), Error> {
 }
 
 pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2], Error> {
+    info!("pipe2: flags: {:#x}", flags);
     let flags = OpenFlags::from_bits_truncate(flags);
     let current_ref = process::get_current();
     let current = current_ref.lock().unwrap();
@@ -227,6 +219,7 @@ pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2], Error> {
     let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
     let reader_fd = file_table.put(Arc::new(Box::new(pipe.reader)), close_on_spawn);
     let writer_fd = file_table.put(Arc::new(Box::new(pipe.writer)), close_on_spawn);
+    info!("pipe2: reader_fd: {}, writer_fd: {}", reader_fd, writer_fd);
     Ok([reader_fd, writer_fd])
 }
 
@@ -281,7 +274,7 @@ pub fn do_chdir(path: &str) -> Result<(), Error> {
     let inode = current_process.lookup_inode(path)?;
     let info = inode.metadata()?;
     if info.type_ != FileType::Dir {
-        return Err(Error::new(ENOTDIR, ""));
+        return errno!(ENOTDIR, "");
     }
     current_process.change_cwd(path);
     Ok(())
@@ -309,7 +302,7 @@ pub fn do_mkdir(path: &str, mode: usize) -> Result<(), Error> {
     let (dir_path, file_name) = split_path(&path);
     let inode = current_process.lookup_inode(dir_path)?;
     if inode.find(file_name).is_ok() {
-        return Err(Error::new(EEXIST, ""));
+        return errno!(EEXIST, "");
     }
     inode.create(file_name, FileType::Dir, mode as u32)?;
     Ok(())
@@ -324,7 +317,7 @@ pub fn do_rmdir(path: &str) -> Result<(), Error> {
     let dir_inode = current_process.lookup_inode(dir_path)?;
     let file_inode = dir_inode.find(file_name)?;
     if file_inode.metadata()?.type_ != FileType::Dir {
-        return Err(Error::new(ENOTDIR, "rmdir on not directory"));
+        return errno!(ENOTDIR, "rmdir on not directory");
     }
     dir_inode.unlink(file_name)?;
     Ok(())
@@ -351,10 +344,61 @@ pub fn do_unlink(path: &str) -> Result<(), Error> {
     let dir_inode = current_process.lookup_inode(dir_path)?;
     let file_inode = dir_inode.find(file_name)?;
     if file_inode.metadata()?.type_ == FileType::Dir {
-        return Err(Error::new(EISDIR, "unlink on directory"));
+        return errno!(EISDIR, "unlink on directory");
     }
     dir_inode.unlink(file_name)?;
     Ok(())
+}
+
+pub fn do_sendfile(
+    out_fd: FileDesc,
+    in_fd: FileDesc,
+    offset: Option<off_t>,
+    count: usize,
+) -> Result<(usize, usize), Error> {
+    // (len, offset)
+    info!(
+        "sendfile: out: {}, in: {}, offset: {:?}, count: {}",
+        out_fd, in_fd, offset, count
+    );
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    let file_table_ref = current_process.get_files();
+    let mut file_table = file_table_ref.lock().unwrap();
+
+    let in_file = file_table.get(in_fd)?;
+    let out_file = file_table.get(out_fd)?;
+    let mut buffer: [u8; 1024 * 11] = unsafe { uninitialized() };
+
+    let mut read_offset = match offset {
+        Some(offset) => offset,
+        None => in_file.seek(SeekFrom::Current(0))?,
+    } as usize;
+
+    // read from specified offset and write new offset back
+    let mut bytes_read = 0;
+    while bytes_read < count {
+        let len = min(buffer.len(), count - bytes_read);
+        let read_len = in_file.read_at(read_offset, &mut buffer[..len])?;
+        if read_len == 0 {
+            break;
+        }
+        bytes_read += read_len;
+        read_offset += read_len;
+        let mut bytes_written = 0;
+        while bytes_written < read_len {
+            let write_len = out_file.write(&buffer[bytes_written..])?;
+            if write_len == 0 {
+                return errno!(EBADF, "sendfile write return 0");
+            }
+            bytes_written += write_len;
+        }
+    }
+
+    if offset.is_none() {
+        in_file.seek(SeekFrom::Current(bytes_read as i64))?;
+    }
+    Ok((bytes_read, read_offset))
 }
 
 extern "C" {
@@ -362,6 +406,31 @@ extern "C" {
 }
 
 impl Process {
+    /// Open a file on the process. But DO NOT add it to file table.
+    pub fn open_file(&self, path: &str, flags: OpenFlags, mode: u32) -> Result<Box<File>, Error> {
+        if path == "/dev/null" {
+            return Ok(Box::new(NullFile));
+        }
+        let inode = if flags.contains(OpenFlags::CREATE) {
+            let (dir_path, file_name) = split_path(&path);
+            let dir_inode = self.lookup_inode(dir_path)?;
+            match dir_inode.find(file_name) {
+                Ok(file_inode) => {
+                    if flags.contains(OpenFlags::EXCLUSIVE) {
+                        return errno!(EEXIST, "file exists");
+                    }
+                    file_inode
+                }
+                Err(FsError::EntryNotFound) => dir_inode.create(file_name, FileType::File, mode)?,
+                Err(e) => return Err(Error::from(e)),
+            }
+        } else {
+            self.lookup_inode(&path)?
+        };
+        Ok(Box::new(INodeFile::open(inode, flags.to_options())?))
+    }
+
+    /// Lookup INode from the cwd of the process
     pub fn lookup_inode(&self, path: &str) -> Result<Arc<INode>, Error> {
         debug!("lookup_inode: cwd: {:?}, path: {:?}", self.get_cwd(), path);
         if path.len() > 0 && path.as_bytes()[0] == b'/' {
@@ -405,6 +474,8 @@ bitflags! {
         const TRUNCATE = 1 << 9;
         /// append on each write
         const APPEND = 1 << 10;
+        /// non block
+        const NONBLOCK = 1 << 11;
         /// close on exec
         const CLOEXEC = 1 << 19;
     }
@@ -428,7 +499,6 @@ impl OpenFlags {
     }
 }
 
-#[derive(Debug)]
 #[repr(packed)] // Don't use 'C'. Or its size will align up to 8 bytes.
 pub struct LinuxDirent64 {
     /// Inode number
@@ -615,7 +685,6 @@ pub unsafe fn write_cstr(ptr: *mut u8, s: &str) {
     ptr.add(s.len()).write(0);
 }
 
-
 #[derive(Debug)]
 pub enum FcntlCmd {
     /// Duplicate the file descriptor fd using the lowest-numbered available
@@ -631,35 +700,26 @@ pub enum FcntlCmd {
     /// Get the file status flags
     GetFl(),
     /// Set the file status flags
-    SetFl(OpenFlags),
+    SetFl(u32),
 }
-
-pub const F_DUPFD : u32             = 0;
-pub const F_GETFD : u32             = 1;
-pub const F_SETFD : u32             = 2;
-pub const F_GETFL : u32             = 3;
-pub const F_SETFL : u32             = 4;
-pub const F_DUPFD_CLOEXEC : u32     = 1030;
-
-pub const FD_CLOEXEC : u32          = 1;
 
 impl FcntlCmd {
     #[deny(unreachable_patterns)]
     pub fn from_raw(cmd: u32, arg: u64) -> Result<FcntlCmd, Error> {
-        Ok(match cmd {
-            F_DUPFD => FcntlCmd::DupFd(arg as FileDesc),
-            F_DUPFD_CLOEXEC => FcntlCmd::DupFdCloexec(arg as FileDesc),
-            F_GETFD => FcntlCmd::GetFd(),
-            F_SETFD => FcntlCmd::SetFd(arg as u32),
-            F_GETFL => FcntlCmd::GetFl(),
-            F_SETFL => FcntlCmd::SetFl(OpenFlags::from_bits_truncate(arg as u32)),
+        Ok(match cmd as c_int {
+            libc::F_DUPFD => FcntlCmd::DupFd(arg as FileDesc),
+            libc::F_DUPFD_CLOEXEC => FcntlCmd::DupFdCloexec(arg as FileDesc),
+            libc::F_GETFD => FcntlCmd::GetFd(),
+            libc::F_SETFD => FcntlCmd::SetFd(arg as u32),
+            libc::F_GETFL => FcntlCmd::GetFl(),
+            libc::F_SETFL => FcntlCmd::SetFl(arg as u32),
             _ => return errno!(EINVAL, "invalid command"),
         })
     }
 }
 
 pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize, Error> {
-    info!("do_fcntl: {:?}, {:?}", &fd, cmd);
+    info!("fcntl: fd: {:?}, cmd: {:?}", &fd, cmd);
     let current_ref = process::get_current();
     let mut current = current_ref.lock().unwrap();
     let files_ref = current.get_files();
@@ -668,35 +728,67 @@ pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize, Error> {
         FcntlCmd::DupFd(min_fd) => {
             let dup_fd = files.dup(fd, *min_fd, false)?;
             dup_fd as isize
-        },
+        }
         FcntlCmd::DupFdCloexec(min_fd) => {
             let dup_fd = files.dup(fd, *min_fd, true)?;
             dup_fd as isize
-        },
+        }
         FcntlCmd::GetFd() => {
             let entry = files.get_entry(fd)?;
             let fd_flags = if entry.is_close_on_spawn() {
-                FD_CLOEXEC
+                libc::FD_CLOEXEC
             } else {
                 0
             };
             fd_flags as isize
-        },
+        }
         FcntlCmd::SetFd(fd_flags) => {
             let entry = files.get_entry_mut(fd)?;
-            entry.set_close_on_spawn((fd_flags & FD_CLOEXEC) != 0);
+            entry.set_close_on_spawn((fd_flags & libc::FD_CLOEXEC as u32) != 0);
             0
-        },
+        }
         FcntlCmd::GetFl() => {
-            unimplemented!();
-        },
+            let file = files.get(fd)?;
+            if let Ok(socket) = file.as_socket() {
+                let ret = try_libc!(libc::ocall::fcntl_arg0(socket.fd(), libc::F_GETFL));
+                ret as isize
+            } else {
+                warn!("fcntl.getfl is unimplemented");
+                0
+            }
+        }
         FcntlCmd::SetFl(flags) => {
-            unimplemented!();
-        },
+            let file = files.get(fd)?;
+            if let Ok(socket) = file.as_socket() {
+                let ret = try_libc!(libc::ocall::fcntl_arg1(
+                    socket.fd(),
+                    libc::F_SETFL,
+                    *flags as c_int
+                ));
+                ret as isize
+            } else {
+                warn!("fcntl.setfl is unimplemented");
+                0
+            }
+        }
     })
 }
 
 pub fn do_readlink(path: &str, buf: &mut [u8]) -> Result<usize, Error> {
-    // TODO: support symbolic links
-    errno!(EINVAL, "not a symbolic link")
+    info!("readlink: path: {:?}", path);
+    match path {
+        "/proc/self/exe" => {
+            // get cwd
+            let current_ref = process::get_current();
+            let current = current_ref.lock().unwrap();
+            let cwd = current.get_cwd();
+            let len = cwd.len().min(buf.len());
+            buf[0..len].copy_from_slice(&cwd.as_bytes()[0..len]);
+            Ok(0)
+        }
+        _ => {
+            // TODO: support symbolic links
+            errno!(EINVAL, "not a symbolic link")
+        }
+    }
 }
