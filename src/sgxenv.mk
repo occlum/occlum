@@ -38,7 +38,7 @@ else
 endif
 
 RUST_SGX_SDK_DIR := $(PROJECT_DIR)/deps/rust-sgx-sdk
-SGX_COMMON_CFLAGS += -I$(RUST_SGX_SDK_DIR)/common/ -I$(RUST_SGX_SDK_DIR)/common/inc/ -I$(RUST_SGX_SDK_DIR)/edl/
+SGX_COMMON_CFLAGS += -I$(RUST_SGX_SDK_DIR)/common/ -I$(RUST_SGX_SDK_DIR)/edl/
 
 ifneq ($(SGX_MODE), HW)
 	Urts_Library_Name := sgx_urts_sim
@@ -76,7 +76,7 @@ endif
 # Export flags used to compile or link untrusted modules
 #
 SGX_CFLAGS_T := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fstack-protector
-SGX_CFLAGS_T += -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/stlport -I$(SGX_SDK)/include/epid
+SGX_CFLAGS_T += -I$(RUST_SGX_SDK_DIR)/common/inc/ -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/stlport -I$(SGX_SDK)/include/epid
 
 # Before use this linker flag, the user should define $(_Other_Enclave_Libs),
 # and $(_Other_Link_Flags)
