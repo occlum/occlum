@@ -254,8 +254,8 @@ int SGX_CDECL main(int argc, const char *argv[])
     uint64_t libos_startup_time, app_runtime;
     libos_startup_time = (libosready.tv_sec - startup.tv_sec) * 1000000 + (libosready.tv_usec - startup.tv_usec);
     app_runtime = (appdie.tv_sec - libosready.tv_sec) * 1000000 + (appdie.tv_usec - libosready.tv_usec);
-    printf("LibOS startup time: %d microseconds\n", libos_startup_time);
-    printf("Apps running time: %d microseconds\n", app_runtime);
+    printf("LibOS startup time: %lu microseconds\n", libos_startup_time);
+    printf("Apps running time: %lu microseconds\n", app_runtime);
 
     /* Destroy the enclave */
     sgx_destroy_enclave(global_eid);

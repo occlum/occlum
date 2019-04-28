@@ -4,8 +4,8 @@ use std::ptr;
 use xmas_elf::{header, program, sections, ElfFile};
 
 pub const DEFAULT_STACK_SIZE: usize = 1 * 1024 * 1024;
-pub const DEFAULT_HEAP_SIZE: usize = 10 * 1024 * 1024;
-pub const DEFAULT_MMAP_SIZE: usize = 40 * 1024 * 1024;
+pub const DEFAULT_HEAP_SIZE: usize = 8 * 1024 * 1024;
+pub const DEFAULT_MMAP_SIZE: usize = 8 * 1024 * 1024;
 
 pub fn do_init(elf_file: &ElfFile, elf_buf: &[u8]) -> Result<ProcessVM, Error> {
     let mut code_seg = get_code_segment(elf_file)?;
