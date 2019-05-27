@@ -3,7 +3,7 @@
 
 Occlum is a *memory-safe*, *multi-process* library OS (LibOS) for [Intel SGX](https://software.intel.com/en-us/sgx). As a LibOS, it enables *unmodified* applications to run on SGX, thus protecting the confidentiality and integrity of user workloads transparently. 
 
-Compared to existing LibOSes for SGX, Occlum has following salient features:
+Compared to existing LibOSes for SGX, Occlum has the following salient features:
 
   * **Efficient multitasking.** The LibOS has a complete and efficient multi-process support, including fast process creation, low-cost IPC, shared OS services (e.g., encrypted file systems).
   * **Fault isolation.** The crash of one user process cannot crash the LibOS or other user processes, which is good for security and robustness.
@@ -30,41 +30,53 @@ Occlum also improves the memory safety of LibOS-based, SGX-protected application
    1. User programs are made more resilient to memory safety vulnerabilities. Thanks to MDSFI, Occlum enforces Data Execution Prevention (DEP) to prevent code injection attacks and Control Flow Integrity (CFI) to mitigate Return-Oriented Programming (ROP) attacks. 
    1. LibOS itself is memory safe. Occlum LibOS is developed in Rust programming language, a memory-safe programming language. This reduces the odds of low-level memory-safety bugs in the LibOS, thus more trustworthy to the application developers.
 
-## How to Build?
+## How to Use?
 
-### Dependencies
+We have built and tested Occlum on Ubuntu 16.04 with hardware SGX support. We recommend using the Occlum Docker image to set up the development environment and give it a try quickly.
 
-Occlum LibOS has several *explicit* and *implicit* dependencies: the former ones must be installed manually, while the latter ones are downloaded and compiled automatically via Makefile.
+Here are the steps to build and test Occlum with Docker container. Step 1-4 are to be carried out on the host OS:
 
-Explicit dependencies are listed below:
+1. Install [Intel SGX driver for Linux](https://github.com/intel/linux-sgx), which is required by Intel SGX SDK.
 
-   1. [enable_rdfsbase kernel module](https://github.com/occlum/enable_rdfsbase), which enables rdfsbase instruction and its friends. See [README.md](https://github.com/occlum/enable_rdfsbase/blob/master/README.md) for how to compile and install.
-   1. [Occlum's fork of Intel SGX SDK](https://github.com/occlum/linux-sgx/tree/sgx_2.4_for_occlum). See [README.md](https://github.com/occlum/linux-sgx/blob/sgx_2.4_for_occlum/README.md) for how to compile and install.
-   1. [Occlum's fork of LLVM toolchain](https://github.com/occlum/llvm/tree/for_occlum). See [README.occlum.md](https://github.com/occlum/llvm/blob/for_occlum/README.occlum.md) for how to compile and install.
-   1. [Occlum's fork of musl libc](https://github.com/occlum/musl/tree/for_occlum). See [INSTALL](https://github.com/occlum/musl/blob/for_occlum/INSTALL) for how to compile and install.
-   1. [Rust programming language](https://www.rust-lang.org/). We have tested with Rust nightly-2019-01-28. Other versions of Rust may or may not work.
-   1. [FUSE library](https://en.wikipedia.org/wiki/Filesystem_in_Userspace). Filesystem in Userspace (FUSE) library can be installed on Ubuntu with `sudo apt-get install libfuse-dev`.
+2. Install [enable_rdfsbase kernel module](https://github.com/occlum/enable_rdfsbase), which enables Occlum to use `rdfsbase`-family instructions in enclaves.
 
-Implicit dependencies are managed by Git with [.gitmodules](https://github.com/occlum/libos/blob/master/.gitmodules) and compiled with Makefile. The most important implicit dependency is [Rust SGX SDK](https://github.com/baidu/rust-sgx-sdk). After downloading Occlum LibOS project, run the following command to set up the implicit dependecies:
+3. Download the latest source code of Occlum LibOS
 
-    cd path/to/occlum/libos
-    make submodule
+  cd /your/path/to/
+  git clone https://github.com/occlum/libos
 
-### Compile
+4. Run the Occlum Docker container
 
-Then, compile the project and run tests with the following commands
+  docker run -it \
+    --mount type=bind,source=/your/path/to/libos,target=/root/occlum/libos \
+    --device /dev/isgx \
+    occlum
 
-    cd path/to/occlum/libos
-    make
-    make test
+Step 5-8 are to be carried out on the guest OS running inside the container:
+
+5. Start the AESM service required by Intel SGX SDK
+
+   /opt/intel/libsgx-enclave-common/aesm/aesm_service &
+
+6. (Optional) Try the sample code of Intel SGX SDK
+
+   cd /opt/intel/sgxsdk/SampleCode/SampleEnclave && make && ./app
+
+7. Prepare the submodules required by Occlum LiboS
+
+   cd /root/occlum/libos && make submodule
+
+8. Compile and test Occlum LibOS
+
+   cd /root/occlum/libos && make && make test
+
+The Occlum Dockerfile can be found at [here](tools/docker/Dockerfile). Use it to build the container directly or read it to see the dependencies of Occlum LibOS.
 
 ## What is the Implementation Status?
 
-The current version is **only for technical preview, not ready for production use**. Yet, even with this early version, we can achieve a speedup of multitasking-related operations by up to three orders of magnitude, thus demonstrating the effectiveness of our multi-process-per-enclave approach.
+The current version is **only for technical preview, not ready for production use**. Yet, even with this early version, we are able to port real-world, multi-process applications such as [Fish shell](https://fishshell.com/), [GCC](https://gcc.gnu.org/), and [Lighttpd](http://www.lighttpd.net/) to SGX in less 100 LoC modifications. Thanks to the efficient multitasking support, Occlum significantly outperforms traditional SGX LibOSes on workloads that involve process spawning.
 
-This project is being actively developed. We now focus on implementing more system calls and hopefully enable real-world applications on Occlum soon.
-
-The roadmap and development plan of Occlum LibOS and its related projects are managed and tracked using [organization-wide project boards](https://github.com/orgs/occlum/projects).
+This project is being actively developed. We now focus on implementing more system calls and additional features required in the production environment.
 
 ## Why the Name?
 
@@ -81,7 +93,7 @@ Of course, Occlum must be run on Intel x86 CPUs with SGX support to do its magic
 ## Contributors
 
 The creators of Occlum project are
-  * Hongliang Tian and Shoumeng Yan from Intel Corporation; and
+  * Hongliang Tian and Shoumeng Yan from Intel Corporation (now work for Ant Financial); and
   * Youren Shen, Yu Chen, and Kang Chen from Tsinghua University.
 
 This project follows the [all-contributors](https://allcontributors.org) specification. Contributions of any kind are welcome! We will publish contributing guidelines and accept pull requests after the project gets more stable.
