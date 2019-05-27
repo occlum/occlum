@@ -34,47 +34,49 @@ Occlum also improves the memory safety of LibOS-based, SGX-protected application
 
 We have built and tested Occlum on Ubuntu 16.04 with hardware SGX support. We recommend using the Occlum Docker image to set up the development environment and give it a try quickly.
 
-Here are the steps to build and test Occlum with Docker container. Step 1-4 are to be carried out on the host OS:
+To build and test Occlum with Docker container, follow the steps listed below.
+
+Step 1-4 are to be done on the host OS:
 
 1. Install [Intel SGX driver for Linux](https://github.com/intel/linux-sgx), which is required by Intel SGX SDK.
 
 2. Install [enable_rdfsbase kernel module](https://github.com/occlum/enable_rdfsbase), which enables Occlum to use `rdfsbase`-family instructions in enclaves.
 
 3. Download the latest source code of Occlum LibOS
-
-  cd /your/path/to/
-  git clone https://github.com/occlum/libos
-
+```
+cd /your/path/to/
+git clone https://github.com/occlum/libos
+```
 4. Run the Occlum Docker container
-
-  docker run -it \
-    --mount type=bind,source=/your/path/to/libos,target=/root/occlum/libos \
-    --device /dev/isgx \
-    occlum
-
-Step 5-8 are to be carried out on the guest OS running inside the container:
+```
+docker run -it \
+  --mount type=bind,source=/your/path/to/libos,target=/root/occlum/libos \
+  --device /dev/isgx \
+  occlum
+```
+Step 5-8 are to be done on the guest OS running inside the container:
 
 5. Start the AESM service required by Intel SGX SDK
-
-   /opt/intel/libsgx-enclave-common/aesm/aesm_service &
-
+```
+/opt/intel/libsgx-enclave-common/aesm/aesm_service &
+```
 6. (Optional) Try the sample code of Intel SGX SDK
-
-   cd /opt/intel/sgxsdk/SampleCode/SampleEnclave && make && ./app
-
+```
+cd /opt/intel/sgxsdk/SampleCode/SampleEnclave && make && ./app
+```
 7. Prepare the submodules required by Occlum LiboS
-
-   cd /root/occlum/libos && make submodule
-
+```
+cd /root/occlum/libos && make submodule
+```
 8. Compile and test Occlum LibOS
-
-   cd /root/occlum/libos && make && make test
-
+```
+cd /root/occlum/libos && make && make test
+```
 The Occlum Dockerfile can be found at [here](tools/docker/Dockerfile). Use it to build the container directly or read it to see the dependencies of Occlum LibOS.
 
 ## What is the Implementation Status?
 
-The current version is **only for technical preview, not ready for production use**. Yet, even with this early version, we are able to port real-world, multi-process applications such as [Fish shell](https://fishshell.com/), [GCC](https://gcc.gnu.org/), and [Lighttpd](http://www.lighttpd.net/) to SGX in less 100 LoC modifications. Thanks to the efficient multitasking support, Occlum significantly outperforms traditional SGX LibOSes on workloads that involve process spawning.
+The current version is **only for technical preview, not ready for production use**. Yet, even with this early version, we are able to port real-world, multi-process applications such as [Fish shell](https://fishshell.com/), [GCC](https://gcc.gnu.org/), and [Lighttpd](http://www.lighttpd.net/) to SGX in less 100 LoC modifications. Thanks to the efficient multitasking support, Occlum \emph{significantly} outperforms traditional SGX LibOSes on workloads that involve process spawning.
 
 This project is being actively developed. We now focus on implementing more system calls and additional features required in the production environment.
 
