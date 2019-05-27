@@ -76,7 +76,7 @@ The Occlum Dockerfile can be found at [here](tools/docker/Dockerfile). Use it to
 
 ## What is the Implementation Status?
 
-The current version is **only for technical preview, not ready for production use**. Yet, even with this early version, we are able to port real-world, multi-process applications such as [Fish shell](https://fishshell.com/), [GCC](https://gcc.gnu.org/), and [Lighttpd](http://www.lighttpd.net/) to SGX in less 100 LoC modifications. Thanks to the efficient multitasking support, Occlum \emph{significantly} outperforms traditional SGX LibOSes on workloads that involve process spawning.
+The current version is **only for technical preview, not ready for production use**. Yet, even with this early version, we are able to port real-world, multi-process applications such as [Fish shell](https://fishshell.com/), [GCC](https://gcc.gnu.org/), and [Lighttpd](http://www.lighttpd.net/) to SGX in less 100 LoC modifications. Thanks to the efficient multitasking support, Occlum can outperform traditional SGX LibOSes on multi-process workloads *significanlty*, delivering one or two orders of magnitude speedups when the workloads involve process spawning.
 
 This project is being actively developed. We now focus on implementing more system calls and additional features required in the production environment.
 
