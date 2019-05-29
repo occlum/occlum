@@ -4,9 +4,11 @@ CUR_DIR := $(shell dirname $(realpath $(MAIN_MAKEFILE)))
 PROJECT_DIR := $(realpath $(CUR_DIR)/../../)
 
 CC := /usr/local/occlum/bin/musl-clang
+CXX := /usr/local/occlum/bin/musl-clang++
 C_SRCS := $(wildcard *.c)
-S_FILES := $(C_SRCS:%.c=%.S)
+CXX_SRCS := $(wildcard *.cc)
 C_OBJS := $(C_SRCS:%.c=%.o)
+CXX_OBJS := $(CXX_SRCS:%.cc=%.o)
 FS_PATH := ../fs
 BIN_NAME := $(shell basename $(CUR_DIR))
 BIN_FS_PATH := $(BIN_NAME)
@@ -44,13 +46,17 @@ $(READELF_FILE): $(BIN_NAME)
 	@readelf -a -d $(BIN_NAME) > $(READELF_FILE)
 	@echo "READELF => $@"
 
-$(BIN_NAME): $(C_OBJS)
-	@$(CC) $^ $(LINK_FLAGS) -o $(BIN_NAME)
+$(BIN_NAME): $(C_OBJS) $(CXX_OBJS)
+	@$(CXX) $^ $(LINK_FLAGS) -o $(BIN_NAME)
 	@echo "LINK => $@"
 
 $(C_OBJS): %.o: %.c
 	@$(CC) $(C_FLAGS) -c $< -o $@
 	@echo "CC <= $@"
+
+$(CXX_OBJS): %.o: %.cc
+	@$(CXX) $(C_FLAGS) -c $< -o $@
+	@echo "CXX <= $@"
 
 #############################################################################
 # Test
