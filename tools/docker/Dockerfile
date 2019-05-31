@@ -57,28 +57,8 @@ RUN curl https://sh.rustup.rs -sSf | \
     echo 'source /root/.cargo/env' >> /root/.bashrc && \
     rm -rf /root/.cargo/registry && rm -rf /root/.cargo/git
 
-# Install Occlum LLVM
-WORKDIR /root/occlum/llvm
-RUN git clone -b for_occlum https://github.com/occlum/llvm . && \
-    cd /root/occlum/llvm/tools && \
-    git clone https://github.com/llvm-mirror/clang && \
-        cd clang && \
-        git checkout 0513b409d5e && \
-    cd /root/occlum/llvm/tools && \
-        git clone -b for_occlum https://github.com/occlum/lld && \
-    mkdir /root/occlum/llvm-build && cd /root/occlum/llvm-build && \
-        cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=True -DLLVM_TARGETS_TO_BUILD="X86" -DCMAKE_INSTALL_PREFIX=/usr/local/occlum/ ../llvm/ && \
-        make && \
-        make install && \
-    rm -rf /root/occlum/llvm && rm -rf /root/occlum/llvm-build
-ENV PATH="/usr/local/occlum/bin:$PATH"
-
-# Install Occlum musl libc
-WORKDIR /root/occlum/musl
-RUN git clone -b for_occlum https://github.com/occlum/musl . && \
-    CC=clang ./configure --prefix=/usr/local/occlum --enable-wrapper=clang && \
-    make && \
-    make install && \
-    rm -rf /root/occlum/musl
-
+# Install Occlum toolchain
 WORKDIR /root/occlum/
+COPY build_toolchain.sh /root/occlum/
+RUN ./build_toolchain.sh
+ENV PATH="/usr/local/occlum/bin:$PATH"
