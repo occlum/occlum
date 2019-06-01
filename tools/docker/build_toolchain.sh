@@ -2,6 +2,9 @@
 BUILD_DIR=/root/occlum/toolchain
 INSTALL_DIR=/usr/local/occlum
 
+# Exit if any command fails
+set -e
+
 # Clean previous build and installation if any
 rm -rf ${BUILD_DIR}
 rm -rf ${INSTALL_DIR}
@@ -28,6 +31,7 @@ cmake -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_ENABLE_PROJECTS="clang;lld" \
     -DLLVM_TARGETS_TO_BUILD="X86" \
     ../llvm
+# Compile LLVM in a single thread (parallel compilation would consume too much memory)
 make install
 cd ..
 
@@ -37,7 +41,7 @@ export PATH=${INSTALL_DIR}/bin:${PATH}
 # Build musl libc
 cd musl
 CC=clang ./configure --prefix=${INSTALL_DIR} --enable-wrapper=clang
-make install
+make install -j
 cd ..
 
 # Link Linux headers
