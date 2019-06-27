@@ -6,7 +6,7 @@ use misc::ResourceLimitsRef;
 use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::sgxfs::SgxFile;
-use vm::{ProcessVM, VMRangeTrait};
+use vm::{ProcessVM};
 
 use super::task::Task;
 use super::*;
@@ -64,7 +64,7 @@ pub fn do_spawn<P: AsRef<Path>>(
         let base_addr = vm.get_base_addr();
         let program_entry = {
             let program_entry = base_addr + elf_helper::get_start_address(&elf_file)?;
-            if !vm.get_code_vma().contains_obj(program_entry, 16) {
+            if !vm.get_code_range().contains(program_entry) {
                 return errno!(EINVAL, "Invalid program entry");
             }
             program_entry

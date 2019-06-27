@@ -24,6 +24,8 @@ extern crate lazy_static;
 extern crate log;
 extern crate rcore_fs;
 extern crate rcore_fs_sefs;
+#[macro_use]
+extern crate derive_builder;
 
 use sgx_trts::libc;
 use sgx_types::*;

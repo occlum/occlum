@@ -78,4 +78,4 @@ use self::task::Task;
 use super::*;
 use fs::{File, FileRef, FileTable};
 use misc::ResourceLimitsRef;
-use vm::{ProcessVM, VMRangeTrait};
+use vm::{ProcessVM};
