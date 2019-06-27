@@ -15,7 +15,7 @@ use std::ffi::{CStr, CString};
 use std::ptr;
 use time::timeval_t;
 use util::mem_util::from_user::*;
-use vm::{VMAreaFlags, VMResizeOptions};
+use vm::{VMPerms, MMapFlags};
 use {fs, process, std, vm};
 
 use super::*;
@@ -648,13 +648,14 @@ fn do_sync() -> Result<isize, Error> {
 fn do_mmap(
     addr: usize,
     size: usize,
-    prot: i32,
+    perms: i32,
     flags: i32,
     fd: FileDesc,
     offset: off_t,
 ) -> Result<isize, Error> {
-    let flags = VMAreaFlags(prot as u32);
-    let addr = vm::do_mmap(addr, size, flags)?;
+    let perms = VMPerms::from_u32(perms as u32)?;
+    let flags = MMapFlags::from_u32(flags as u32)?;
+    let addr = vm::do_mmap(addr, size, perms, flags, fd, offset as usize)?;
     Ok(addr as isize)
 }
 
@@ -670,10 +671,8 @@ fn do_mremap(
     flags: i32,
     new_addr: usize,
 ) -> Result<isize, Error> {
-    let mut options = VMResizeOptions::new(new_size)?;
-    // TODO: handle flags and new_addr
-    let ret_addr = vm::do_mremap(old_addr, old_size, &options)?;
-    Ok(ret_addr as isize)
+    warn!("mremap: not implemented!");
+    errno!(ENOSYS, "not supported yet")
 }
 
 fn do_mprotect(addr: usize, len: usize, prot: u32) -> Result<isize, Error> {
