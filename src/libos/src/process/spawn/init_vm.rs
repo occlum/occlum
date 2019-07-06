@@ -3,13 +3,16 @@ use super::*;
 use std::ptr;
 use xmas_elf::{header, program, sections, ElfFile};
 
-pub const DEFAULT_STACK_SIZE: usize = 1 * 1024 * 1024;
-pub const DEFAULT_HEAP_SIZE: usize = 8 * 1024 * 1024;
-pub const DEFAULT_MMAP_SIZE: usize = 8 * 1024 * 1024;
-
-pub fn do_init(elf_file: &ElfFile, elf_buf: &[u8]) -> Result<ProcessVM, Error> {
+pub fn do_init(
+    elf_file: &ElfFile,
+    elf_buf: &[u8],
+    ldso_elf_file: &ElfFile,
+    ldso_elf_buf: &[u8]
+) -> Result<ProcessVM, Error> {
     let mut code_seg = get_code_segment(elf_file)?;
     let mut data_seg = get_data_segment(elf_file)?;
+    let mut ldso_code_seg = get_code_segment(ldso_elf_file)?;
+    let mut ldso_data_seg = get_data_segment(ldso_elf_file)?;
 
     // Alloc all virtual memory areas
     let code_start = 0;
@@ -18,23 +21,21 @@ pub fn do_init(elf_file: &ElfFile, elf_buf: &[u8]) -> Result<ProcessVM, Error> {
     let data_end = align_up(data_seg.get_mem_addr() + data_seg.get_mem_size(), 4096);
     let code_size = code_end - code_start;
     let data_size = data_end - data_start;
-    let stack_size = DEFAULT_STACK_SIZE;
-    let heap_size = DEFAULT_HEAP_SIZE;
-    let mmap_size = DEFAULT_MMAP_SIZE;
-    let mut process_vm = ProcessVM::new(code_size, data_size, heap_size, stack_size, mmap_size)?;
-
-    // Calculate the "real" addresses
-    let process_base_addr = process_vm.get_base_addr();
-    let code_start = code_start + process_base_addr;
-    let code_end = code_end + process_base_addr;
-    let data_start = data_start + process_base_addr;
-    let data_end = data_end + process_base_addr;
-    code_seg.set_runtime_info(process_base_addr, code_start, code_end);
-    data_seg.set_runtime_info(process_base_addr, data_start, data_end);
+    let mut process_vm = ProcessVMBuilder::new(code_size, data_size).build()?;
 
     // Load code and data
+    let process_base_addr = process_vm.get_code_range().start();
+    code_seg.set_runtime_base(process_base_addr);
+    data_seg.set_runtime_base(process_base_addr);
     code_seg.load_from_file(elf_buf);
     data_seg.load_from_file(elf_buf);
+
+    // Load code and data of ld.so
+    let ldso_base_addr = process_vm.get_ldso_code_range().start();
+    ldso_code_seg.set_runtime_base(ldso_base_addr);
+    ldso_data_seg.set_runtime_base(ldso_base_addr);
+    ldso_code_seg.load_from_file(ldso_elf_buf);
+    ldso_data_seg.load_from_file(ldso_elf_buf);
 
     // Relocate symbols
     reloc_symbols(process_base_addr, elf_file)?;

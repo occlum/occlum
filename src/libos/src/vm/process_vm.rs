@@ -3,12 +3,121 @@ use super::vm_manager::{VMRange, VMManager, VMMapOptionsBuilder, VMMapOptions, V
 use super::user_space_vm::{UserSpaceVMManager, UserSpaceVMRange, USER_SPACE_VM_MANAGER};
 use std::slice;
 
+
+#[derive(Debug, Default)]
+pub struct ProcessVMBuilder {
+    code_size: usize,
+    data_size: usize,
+    ldso_code_size: Option<usize>,
+    ldso_data_size: Option<usize>,
+    heap_size: Option<usize>,
+    stack_size: Option<usize>,
+    mmap_size: Option<usize>,
+}
+
+macro_rules! impl_setter_for_process_vm_builder {
+    ($field: ident) => {
+        pub fn $field(mut self, size: usize) -> Self {
+            self.$field = Some(size);
+            self
+        }
+    }
+}
+
+impl ProcessVMBuilder {
+    pub const DEFAULT_STACK_SIZE: usize = 1 * 1024 * 1024;
+    pub const DEFAULT_HEAP_SIZE: usize = 8 * 1024 * 1024;
+    pub const DEFAULT_MMAP_SIZE: usize = 8 * 1024 * 1024;
+
+    pub fn new(code_size: usize, data_size: usize) -> ProcessVMBuilder {
+        ProcessVMBuilder {
+            code_size,
+            data_size,
+            ..ProcessVMBuilder::default()
+        }
+    }
+
+    impl_setter_for_process_vm_builder!(ldso_data_size);
+    impl_setter_for_process_vm_builder!(ldso_code_size);
+    impl_setter_for_process_vm_builder!(heap_size);
+    impl_setter_for_process_vm_builder!(stack_size);
+    impl_setter_for_process_vm_builder!(mmap_size);
+
+    pub fn build(self) -> Result<ProcessVM, Error> {
+        self.validate()?;
+
+        let code_size = self.code_size;
+        let data_size = self.data_size;
+        let ldso_code_size = self.ldso_code_size.unwrap_or(0);
+        let ldso_data_size = self.ldso_data_size.unwrap_or(0);
+        let heap_size = self.heap_size.unwrap_or(ProcessVMBuilder::DEFAULT_HEAP_SIZE);
+        let stack_size = self.stack_size.unwrap_or(ProcessVMBuilder::DEFAULT_STACK_SIZE);
+        let mmap_size = self.mmap_size.unwrap_or(ProcessVMBuilder::DEFAULT_MMAP_SIZE);
+        let range_sizes = vec![
+            code_size, data_size,
+            ldso_code_size, ldso_data_size,
+            heap_size, stack_size,
+            mmap_size
+        ];
+
+        let process_range = {
+            let total_size = range_sizes.iter().sum();
+            USER_SPACE_VM_MANAGER.alloc(total_size)?
+        };
+
+        let vm_ranges = {
+            let mut curr_addr = process_range.range().start();
+            let mut vm_ranges = Vec::new();
+            for range_size in &range_sizes {
+                let range_start = curr_addr;
+                let range_end = curr_addr + range_size;
+                let range = VMRange::from(range_start, range_end)?;
+                vm_ranges.push(range);
+
+                curr_addr = range_end;
+            }
+            vm_ranges
+        };
+        let code_range = *&vm_ranges[0];
+        let data_range = *&vm_ranges[1];
+        let ldso_code_range = *&vm_ranges[2];
+        let ldso_data_range = *&vm_ranges[3];
+        let heap_range = *&vm_ranges[4];
+        let stack_range = *&vm_ranges[5];
+        let mmap_range = *&vm_ranges[6];
+
+        let brk = heap_range.start();
+
+        let mmap_manager = VMManager::from(mmap_range.start(), mmap_range.size())?;
+
+        Ok(ProcessVM {
+            process_range,
+            code_range,
+            data_range,
+            ldso_code_range,
+            ldso_data_range,
+            heap_range,
+            stack_range,
+            brk,
+            mmap_manager,
+        })
+    }
+
+    // TODO: implement this!
+    fn validate(&self) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+
 /// The per-process virtual memory
 #[derive(Debug)]
 pub struct ProcessVM {
     process_range: UserSpaceVMRange,
     code_range: VMRange,
     data_range: VMRange,
+    ldso_code_range: VMRange,
+    ldso_data_range: VMRange,
     heap_range: VMRange,
     stack_range: VMRange,
     brk: usize,
@@ -19,66 +128,19 @@ impl Default for ProcessVM {
     fn default() -> ProcessVM {
         ProcessVM {
             process_range: USER_SPACE_VM_MANAGER.alloc_dummy(),
-            code_range: VMRange::default(),
-            data_range: VMRange::default(),
-            heap_range: VMRange::default(),
-            stack_range: VMRange::default(),
-            brk: 0,
-            mmap_manager: VMManager::default(),
+            code_range: Default::default(),
+            data_range: Default::default(),
+            heap_range: Default::default(),
+            ldso_code_range: Default::default(),
+            ldso_data_range: Default::default(),
+            stack_range: Default::default(),
+            brk: Default::default(),
+            mmap_manager: Default::default(),
         }
     }
 }
 
 impl ProcessVM {
-    pub fn new(
-        code_size: usize,
-        data_size: usize,
-        heap_size: usize,
-        stack_size: usize,
-        mmap_size: usize,
-    ) -> Result<ProcessVM, Error> {
-        let process_range = {
-            let vm_range_size = code_size + data_size + heap_size + stack_size + mmap_size;
-            USER_SPACE_VM_MANAGER.alloc(vm_range_size)?
-        };
-        let process_addr = process_range.range().start();
-
-        let range_sizes = vec![code_size, data_size, heap_size, stack_size];
-        let mut curr_addr = process_addr;
-        let mut ranges = Vec::new();
-        for range_size in &range_sizes {
-            let range_start = curr_addr;
-            let range_end = curr_addr + range_size;
-            let range = VMRange::from(range_start, range_end)?;
-            ranges.push(range);
-
-            curr_addr = range_end;
-        }
-        let code_range = *&ranges[0];
-        let data_range = *&ranges[1];
-        let heap_range = *&ranges[2];
-        let stack_range = *&ranges[3];
-        unsafe {
-            fill_zeros(code_range.start(), code_range.size());
-            fill_zeros(data_range.start(), data_range.size());
-        }
-
-        let brk = heap_range.start();
-
-        let mmap_addr = stack_range.end();
-        let mmap_manager = VMManager::from(mmap_addr, mmap_size)?;
-
-        Ok(ProcessVM {
-            process_range,
-            code_range,
-            data_range,
-            heap_range,
-            stack_range,
-            brk,
-            mmap_manager,
-        })
-    }
-
     pub fn get_process_range(&self) -> &VMRange {
         self.process_range.range()
     }
@@ -89,6 +151,14 @@ impl ProcessVM {
 
     pub fn get_data_range(&self) -> &VMRange {
         &self.data_range
+    }
+
+    pub fn get_ldso_code_range(&self) -> &VMRange {
+        &self.ldso_code_range
+    }
+
+    pub fn get_ldso_data_range(&self) -> &VMRange {
+        &self.ldso_data_range
     }
 
     pub fn get_heap_range(&self) -> &VMRange {

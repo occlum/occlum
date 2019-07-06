@@ -6,7 +6,7 @@ use misc::ResourceLimitsRef;
 use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::sgxfs::SgxFile;
-use vm::{ProcessVM};
+use vm::{ProcessVM, ProcessVMBuilder};
 
 use super::task::Task;
 use super::*;
@@ -58,9 +58,29 @@ pub fn do_spawn<P: AsRef<Path>>(
         elf_file
     };
 
+    let mut ldso_elf_buf = {
+        let ldso_path = "/ld.so";
+        let ldso_inode = ROOT_INODE.lookup(ldso_path)?;
+        ldso_inode.read_as_vec()?
+    };
+
+    let ldso_elf_file = {
+        let ldso_elf_file =
+            ElfFile::new(&ldso_elf_buf).map_err(|e| (Errno::ENOEXEC, "Failed to parse the ELF file"))?;
+        header::sanity_check(&ldso_elf_file)
+            .map_err(|e| (Errno::ENOEXEC, "Failed to parse the ELF file"))?;
+        /*
+            elf_helper::print_program_headers(&elf_file)?;
+            elf_helper::print_sections(&elf_file)?;
+            elf_helper::print_pltrel_section(&elf_file)?;
+        */
+        ldso_elf_file
+    };
+
     let (new_pid, new_process_ref) = {
         let cwd = parent_ref.lock().unwrap().get_cwd().to_owned();
-        let vm = init_vm::do_init(&elf_file, &elf_buf[..])?;
+        let vm = init_vm::do_init(&elf_file, &elf_buf[..],
+                                  &ldso_elf_file, &ldso_elf_buf[..])?;
         let base_addr = vm.get_base_addr();
         let program_entry = {
             let program_entry = base_addr + elf_helper::get_start_address(&elf_file)?;

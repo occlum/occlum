@@ -11,9 +11,7 @@ pub struct Segment {
     file_offset: usize,
     file_size: usize,
     // Runtime info after loaded
-    process_base_addr: usize,
-    start_addr: usize,
-    end_addr: usize,
+    runtime_base_addr: Option<usize>,
 }
 
 pub const PERM_R: u32 = 0x1;
@@ -42,8 +40,7 @@ impl Segment {
             return Err((
                 Errno::EINVAL,
                 "Memory address and file offset is not equal, per modulo",
-            )
-                .into());
+            ).into());
         }
         if ph64.mem_size < ph64.file_size {
             return Err((Errno::EINVAL, "Memory size must be greater than file size").into());
@@ -65,7 +62,7 @@ impl Segment {
     pub fn load_from_file(&self, elf_buf: &[u8]) {
         let mut target_buf = unsafe {
             slice::from_raw_parts_mut(
-                (self.process_base_addr + self.mem_addr) as *mut u8,
+                (self.runtime_base_addr.unwrap() + self.mem_addr) as *mut u8,
                 self.mem_size,
             )
         };
@@ -77,15 +74,8 @@ impl Segment {
         }
     }
 
-    pub fn set_runtime_info(
-        &mut self,
-        process_base_addr: usize,
-        start_addr: usize,
-        end_addr: usize,
-    ) {
-        self.process_base_addr = process_base_addr;
-        self.start_addr = start_addr;
-        self.end_addr = end_addr;
+    pub fn set_runtime_base(&mut self, runtime_base_addr: usize) {
+        self.runtime_base_addr = Some(runtime_base_addr);
     }
 
     pub fn mprotect(&mut self, perm: u32) {

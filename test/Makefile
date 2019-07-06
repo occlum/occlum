@@ -45,6 +45,7 @@ $(BUILD_TARGETS): %:
 
 sefs:
 	@$(RM) -rf $(SEFS_PATH)
+	@cp ~/Workspace/occlum/musl.old/lib/libc.so $(FS_PATH)/ld.so
 	@cd $(PROJECT_DIR)/deps/sefs/sefs-fuse/bin/ && \
 		./app \
 			$(CUR_DIR)/$(SEFS_PATH) \
