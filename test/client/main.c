@@ -5,10 +5,11 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <spawn.h>
+#include <unistd.h>
 
 int main(int argc, const char *argv[]) {
-	const int BUF_SIZE = 0x1000;
 	const char* message = "Hello world!";
 	int ret;
 

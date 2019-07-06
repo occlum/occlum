@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <sys/epoll.h>
 #include <errno.h>
+#include <spawn.h>
 
 #define MAXEVENTS 64
 

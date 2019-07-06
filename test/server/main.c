@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <spawn.h>
+#include <unistd.h>
 
 int main(int argc, const char *argv[]) {
 	const int BUF_SIZE = 0x1000;

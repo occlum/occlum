@@ -29,7 +29,7 @@ int main(int argc, const char* argv[]) {
     const char* child_argv[3] = { child_prog, msg, NULL };
     int child_pid;
     if (posix_spawn(&child_pid, child_prog, &file_actions,
-            NULL, child_argv, NULL) < 0) {
+            NULL, (char*const *)child_argv, NULL) < 0) {
         printf("ERROR: failed to spawn a child process\n");
         return -1;
     }
