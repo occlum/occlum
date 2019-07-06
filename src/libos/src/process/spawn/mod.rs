@@ -44,7 +44,6 @@ pub fn do_spawn<P: AsRef<Path>>(
         let inode = parent_ref.lock().unwrap().lookup_inode(path)?;
         inode.read_as_vec()?
     };
-
     let elf_file = {
         let elf_file =
             ElfFile::new(&elf_buf).map_err(|e| (Errno::ENOEXEC, "Failed to parse the ELF file"))?;
@@ -82,20 +81,22 @@ pub fn do_spawn<P: AsRef<Path>>(
         let vm = init_vm::do_init(&elf_file, &elf_buf[..],
                                   &ldso_elf_file, &ldso_elf_buf[..])?;
         let base_addr = vm.get_base_addr();
-        let program_entry = {
-            let program_entry = base_addr + elf_helper::get_start_address(&elf_file)?;
-            if !vm.get_code_range().contains(program_entry) {
-                return errno!(EINVAL, "Invalid program entry");
-            }
-            program_entry
-        };
-        let auxtbl = init_auxtbl(base_addr, program_entry, &elf_file)?;
+        let auxtbl = init_auxtbl(&vm, &elf_file)?;
         let task = {
+            let ldso_entry = {
+                let ldso_base_addr = vm.get_ldso_code_range().start();
+                let ldso_entry = ldso_base_addr +
+                    elf_helper::get_start_address(&ldso_elf_file)?;
+                if !vm.get_ldso_code_range().contains(ldso_entry) {
+                    return errno!(EINVAL, "Invalid program entry");
+                }
+                ldso_entry
+            };
             let user_stack_base = vm.get_stack_base();
             let user_stack_limit = vm.get_stack_limit();
             let user_rsp = init_stack::do_init(user_stack_base, 4096, argv, envp, &auxtbl)?;
             unsafe {
-                Task::new(program_entry, user_rsp,
+                Task::new(ldso_entry, user_rsp,
                           user_stack_base, user_stack_limit, None)?
             }
         };
@@ -167,8 +168,7 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
 }
 
 fn init_auxtbl(
-    base_addr: usize,
-    program_entry: usize,
+    process_vm: &ProcessVM,
     elf_file: &ElfFile,
 ) -> Result<AuxTable, Error> {
     let mut auxtbl = AuxTable::new();
@@ -179,12 +179,17 @@ fn init_auxtbl(
     auxtbl.set(AuxKey::AT_EGID, 0)?;
     auxtbl.set(AuxKey::AT_SECURE, 0)?;
 
+    let process_base_addr = process_vm.get_process_range().start();
     let ph = elf_helper::get_program_header_info(elf_file)?;
-    auxtbl.set(AuxKey::AT_PHDR, (base_addr + ph.addr) as u64)?;
+    auxtbl.set(AuxKey::AT_PHDR, (process_base_addr + ph.addr) as u64)?;
     auxtbl.set(AuxKey::AT_PHENT, ph.entry_size as u64)?;
     auxtbl.set(AuxKey::AT_PHNUM, ph.entry_num as u64)?;
 
+    let program_entry = process_base_addr + elf_helper::get_start_address(&elf_file)?;
     auxtbl.set(AuxKey::AT_ENTRY, program_entry as u64)?;
+
+    let ldso_base = process_vm.get_ldso_code_range().start();
+    auxtbl.set(AuxKey::AT_BASE, ldso_base as u64)?;
 
     auxtbl.set(AuxKey::AT_SYSINFO, 123)?;
 
