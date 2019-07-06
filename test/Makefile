@@ -4,7 +4,7 @@ PROJECT_DIR := $(realpath $(CUR_DIR)/../)
 # Dependencies: need to be compiled but not to run by any Makefile target
 TEST_DEPS := dev_null
 # Tests: need to be compiled and run by test-% target
-TESTS := empty argv hello_world malloc mmap file getpid spawn pipe time \
+TESTS := empty env hello_world malloc mmap file getpid spawn pipe time \
 	truncate readdir mkdir link tls pthread uname rlimit client server \
 	server_epoll unix_socket cout hostfs cpuid rdtsc device
 # Benchmarks: need to be compiled and run by bench-% target

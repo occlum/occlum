@@ -67,10 +67,12 @@ macro_rules! try_libc {
 }
 
 pub fn align_up(addr: usize, align: usize) -> usize {
-    (addr + (align - 1)) / align * align
+    debug_assert!(align != 0 && align.is_power_of_two());
+    align_down(addr + (align - 1), align)
 }
 
 pub fn align_down(addr: usize, align: usize) -> usize {
+    debug_assert!(align != 0 && align.is_power_of_two());
     addr & !(align - 1)
 }
 

@@ -79,7 +79,10 @@ fn do_boot(path_str: &str, argv: &Vec<CString>) -> Result<(), Error> {
     //    info!("boot: path: {:?}, argv: {:?}", path_str, argv);
     util::mpx_util::mpx_enable()?;
 
-    let envp = std::vec::Vec::new();
+    // The default environment variables
+    let envp = vec![
+        CString::new("OCCLUM=yes").unwrap()
+    ];
     let file_actions = Vec::new();
     let parent = &process::IDLE_PROCESS;
     process::do_spawn(&path_str, argv, &envp, &file_actions, parent)?;

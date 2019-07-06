@@ -21,7 +21,7 @@ LLVM_PATH := $(abspath $(dir $(CLANG_BIN_PATH))../)
 
 C_FLAGS = -Wall -I../include -O2 -fPIC $(EXTRA_C_FLAGS)
 C_FLAGS += -Xclang -load -Xclang $(LLVM_PATH)/lib/LLVMMDSFIIRInserter.so
-LINK_FLAGS = $(C_FLAGS) -pie -locclum_stub $(EXTRA_LINK_FLAGS)
+LINK_FLAGS = $(C_FLAGS) -pie $(EXTRA_LINK_FLAGS)
 
 .PHONY: all test debug clean
 

@@ -152,19 +152,24 @@ fn init_auxtbl(
     elf_file: &ElfFile,
 ) -> Result<AuxTable, Error> {
     let mut auxtbl = AuxTable::new();
-    auxtbl.set_val(AuxKey::AT_PAGESZ, 4096)?;
-    auxtbl.set_val(AuxKey::AT_UID, 0)?;
-    auxtbl.set_val(AuxKey::AT_GID, 0)?;
-    auxtbl.set_val(AuxKey::AT_EUID, 0)?;
-    auxtbl.set_val(AuxKey::AT_EGID, 0)?;
-    auxtbl.set_val(AuxKey::AT_SECURE, 0)?;
+    auxtbl.set(AuxKey::AT_PAGESZ, 4096)?;
+    auxtbl.set(AuxKey::AT_UID, 0)?;
+    auxtbl.set(AuxKey::AT_GID, 0)?;
+    auxtbl.set(AuxKey::AT_EUID, 0)?;
+    auxtbl.set(AuxKey::AT_EGID, 0)?;
+    auxtbl.set(AuxKey::AT_SECURE, 0)?;
 
     let ph = elf_helper::get_program_header_info(elf_file)?;
-    auxtbl.set_val(AuxKey::AT_PHDR, (base_addr + ph.addr) as u64)?;
-    auxtbl.set_val(AuxKey::AT_PHENT, ph.entry_size as u64)?;
-    auxtbl.set_val(AuxKey::AT_PHNUM, ph.entry_num as u64)?;
+    auxtbl.set(AuxKey::AT_PHDR, (base_addr + ph.addr) as u64)?;
+    auxtbl.set(AuxKey::AT_PHENT, ph.entry_size as u64)?;
+    auxtbl.set(AuxKey::AT_PHNUM, ph.entry_num as u64)?;
 
-    auxtbl.set_val(AuxKey::AT_ENTRY, program_entry as u64)?;
+    auxtbl.set(AuxKey::AT_ENTRY, program_entry as u64)?;
+
+    auxtbl.set(AuxKey::AT_SYSINFO, 123)?;
+
+    let syscall_addr = __occlum_syscall as *const () as u64;
+    auxtbl.set(AuxKey::AT_OCCLUM_ENTRY, syscall_addr)?;
     // TODO: init AT_EXECFN
     // auxtbl.set_val(AuxKey::AT_EXECFN, "program_name")?;
 
@@ -176,4 +181,8 @@ fn parent_adopts_new_child(parent_ref: &ProcessRef, child_ref: &ProcessRef) {
     let mut child = child_ref.lock().unwrap();
     parent.children.push(Arc::downgrade(child_ref));
     child.parent = Some(parent_ref.clone());
+}
+
+extern "C" {
+    fn __occlum_syscall(num: i32, arg0: u64, arg1: u64, arg2: u64, arg3: u64, arg4: u64) -> i64;
 }

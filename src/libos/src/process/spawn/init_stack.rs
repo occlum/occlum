@@ -86,17 +86,13 @@ impl StackBuf {
         })
     }
 
-    pub fn put<T>(&self, val: T) -> Result<*const T, Error>
-    where
-        T: Copy,
+    pub fn put(&self, val: u64) -> Result<*const u64, Error>
     {
-        let val_size = mem::size_of::<T>();
-        let val_align = mem::align_of::<T>();
-        let val_ptr = self.alloc(val_size, val_align)? as *mut T;
+        let val_ptr = self.alloc(8, 8)? as *mut u64;
         unsafe {
             ptr::write(val_ptr, val);
         }
-        Ok(val_ptr as *const T)
+        Ok(val_ptr as *const u64)
     }
 
     pub fn put_slice<T>(&self, vals: &[T]) -> Result<*const T, Error>
@@ -164,12 +160,12 @@ fn clone_cstrings_on_stack<'a, 'b>(
 }
 
 fn dump_auxtbl_on_stack<'a, 'b>(stack: &'a StackBuf, auxtbl: &'b AuxTable) -> Result<(), Error> {
-    // For every key-value pari, dump the value first, then the key
+    // For every key-value pair, dump the value first, then the key
+    stack.put(0 as u64);
     stack.put(AuxKey::AT_NULL as u64);
-    stack.put(AuxKey::AT_NULL as u64);
-    for (aux_key, aux_val) in auxtbl {
-        stack.put(aux_val);
-        stack.put(aux_key as u64);
+    for (aux_key, aux_val) in auxtbl.table() {
+        stack.put(*aux_val as u64);
+        stack.put(*aux_key as u64);
     }
     Ok(())
 }
@@ -188,7 +184,7 @@ fn dump_cstrptrs_on_stack<'a, 'b>(
 /* Symbolic values for the entries in the auxiliary table
 put on the initial stack */
 #[allow(non_camel_case_types)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AuxKey {
     AT_NULL = 0,      /* end of vector */
     AT_IGNORE = 1,    /* entry should be ignored */
@@ -210,122 +206,53 @@ pub enum AuxKey {
     AT_CLKTCK = 17,   /* frequency at which times() increments */
 
     /* 18...22 not used */
-    AT_SECURE = 23, /* secure mode boolean */
+    AT_SECURE = 23,   /* secure mode boolean */
     AT_BASE_PLATFORM = 24, /* string identifying real platform, may
                      * differ from AT_PLATFORM. */
-    AT_RANDOM = 25, /* address of 16 random bytes */
-    AT_HWCAP2 = 26, /* extension of AT_HWCAP */
+    AT_RANDOM = 25,   /* address of 16 random bytes */
+    AT_HWCAP2 = 26,   /* extension of AT_HWCAP */
 
     /* 28...30 not used */
-    AT_EXECFN = 31, /* filename of program */
+    AT_EXECFN = 31,   /* filename of program */
+    AT_SYSINFO = 32,
+
+    /* Occlum-specific entries */
+    AT_OCCLUM_ENTRY = 48, /* the entry point of Occlum, i.e., syscall */
 }
 
-static AUX_KEYS: &'static [AuxKey] = &[
-    AuxKey::AT_NULL,
-    AuxKey::AT_IGNORE,
-    AuxKey::AT_EXECFD,
-    AuxKey::AT_PHDR,
-    AuxKey::AT_PHENT,
-    AuxKey::AT_PHNUM,
-    AuxKey::AT_PAGESZ,
-    AuxKey::AT_BASE,
-    AuxKey::AT_FLAGS,
-    AuxKey::AT_ENTRY,
-    AuxKey::AT_NOTELF,
-    AuxKey::AT_UID,
-    AuxKey::AT_EUID,
-    AuxKey::AT_GID,
-    AuxKey::AT_EGID,
-    AuxKey::AT_PLATFORM,
-    AuxKey::AT_HWCAP,
-    AuxKey::AT_CLKTCK,
-    AuxKey::AT_SECURE,
-    AuxKey::AT_BASE_PLATFORM,
-    AuxKey::AT_RANDOM,
-    AuxKey::AT_HWCAP2,
-    AuxKey::AT_EXECFN,
-];
-
-impl AuxKey {
-    pub const MAX: usize = 32;
-
-    pub fn next(&self) -> Option<AuxKey> {
-        let self_idx = AUX_KEYS.iter().position(|x| *x == *self).unwrap();
-        let next_idx = self_idx + 1;
-        if next_idx < AUX_KEYS.len() {
-            Some(AUX_KEYS[next_idx])
-        } else {
-            None
-        }
-    }
-}
-
-#[derive(Clone, Default, Copy, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct AuxTable {
-    values: [Option<u64>; AuxKey::MAX],
+    table: HashMap<AuxKey, u64>,
 }
 
 impl AuxTable {
     pub fn new() -> AuxTable {
         AuxTable {
-            values: [None; AuxKey::MAX],
+            table: HashMap::new(),
         }
     }
+}
 
-    pub fn set_val(&mut self, key: AuxKey, val: u64) -> Result<(), Error> {
+impl AuxTable {
+    pub fn set(&mut self, key: AuxKey, val: u64) -> Result<(), Error> {
         if key == AuxKey::AT_NULL || key == AuxKey::AT_IGNORE {
             return errno!(EINVAL, "Illegal key");
         }
-        self.values[key as usize] = Some(val);
+        self.table.entry(key)
+            .and_modify(|val_mut| *val_mut = val)
+            .or_insert(val);
         Ok(())
     }
 
-    pub fn get_val(&self, key: AuxKey) -> Option<u64> {
-        self.values[key as usize]
+    pub fn get(&self, key: AuxKey) -> Option<u64> {
+        self.table.get(&key).map(|val_ref| *val_ref)
     }
 
-    pub fn del_val(&mut self, key: AuxKey) {
-        self.values[key as usize] = None;
+    pub fn del(&mut self, key: AuxKey) -> Option<u64>{
+        self.table.remove(&key)
     }
 
-    pub fn iter<'a>(&'a self) -> AuxTableIter<'a> {
-        AuxTableIter {
-            tbl: self,
-            key: Some(AuxKey::AT_NULL),
-        }
-    }
-}
-
-impl<'a> IntoIterator for &'a AuxTable {
-    type Item = (AuxKey, u64);
-    type IntoIter = AuxTableIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-pub struct AuxTableIter<'a> {
-    tbl: &'a AuxTable,
-    key: Option<AuxKey>,
-}
-
-impl<'a> Iterator for AuxTableIter<'a> {
-    type Item = (AuxKey, u64);
-
-    fn next(&mut self) -> Option<(AuxKey, u64)> {
-        loop {
-            if self.key == None {
-                return None;
-            }
-            let key = self.key.unwrap();
-
-            let item = self.tbl.get_val(key).map(|val| (key, val));
-            self.key = key.next();
-
-            if item != None {
-                return item;
-            }
-        }
+    pub fn table(&self) -> &HashMap<AuxKey, u64> {
+        &self.table
     }
 }

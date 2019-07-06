@@ -38,7 +38,7 @@ pub fn do_init(elf_file: &ElfFile, elf_buf: &[u8]) -> Result<ProcessVM, Error> {
 
     // Relocate symbols
     reloc_symbols(process_base_addr, elf_file)?;
-    link_syscalls(process_base_addr, elf_file)?;
+    //link_syscalls(process_base_addr, elf_file)?;
 
     Ok(process_vm)
 }
@@ -69,7 +69,7 @@ fn reloc_symbols(process_base_addr: usize, elf_file: &ElfFile) -> Result<(), Err
     }
     Ok(())
 }
-
+/*
 fn link_syscalls(process_base_addr: usize, elf_file: &ElfFile) -> Result<(), Error> {
     let syscall_addr = __occlum_syscall as *const () as usize;
 
@@ -92,7 +92,7 @@ fn link_syscalls(process_base_addr: usize, elf_file: &ElfFile) -> Result<(), Err
 
     Ok(())
 }
-
+*/
 extern "C" {
     fn __occlum_syscall(num: i32, arg0: u64, arg1: u64, arg2: u64, arg3: u64, arg4: u64) -> i64;
 }
