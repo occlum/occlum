@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <pwd.h>
 #include <sys/time.h>
+#include <time.h>
 
 #define MAX_PATH FILENAME_MAX
 
@@ -203,6 +204,13 @@ void ocall_gettimeofday(long* seconds, long* microseconds) {
     gettimeofday(&tv, NULL);
     *seconds = tv.tv_sec;
     *microseconds = tv.tv_usec;
+}
+
+void ocall_clock_gettime(int clockid, time_t* sec, long* ns) {
+    struct timespec ts;
+    clock_gettime(clockid, &ts);
+    *sec = ts.tv_sec;
+    *ns = ts.tv_nsec;
 }
 
 void ocall_sync(void) {

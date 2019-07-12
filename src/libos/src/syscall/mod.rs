@@ -13,7 +13,7 @@ use prelude::*;
 use process::{pid_t, ChildProcessFilter, CloneFlags, FileAction, FutexFlags, FutexOp};
 use std::ffi::{CStr, CString};
 use std::ptr;
-use time::timeval_t;
+use time::{timeval_t, clockid_t, timespec_t};
 use util::mem_util::from_user::*;
 use vm::{VMPerms, MMapFlags};
 use {fs, process, std, vm};
@@ -203,6 +203,7 @@ pub extern "C" fn dispatch_syscall(
         SYS_DUP3 => do_dup3(arg0 as FileDesc, arg1 as FileDesc, arg2 as u32),
 
         SYS_GETTIMEOFDAY => do_gettimeofday(arg0 as *mut timeval_t),
+        SYS_CLOCK_GETTIME => do_clock_gettime(arg0 as clockid_t, arg1 as *mut timespec_t),
 
         SYS_UNAME => do_uname(arg0 as *mut utsname_t),
 
@@ -789,6 +790,17 @@ fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<isize, Error> {
     }
     Ok(0)
 }
+
+fn do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t) -> Result<isize, Error> {
+    check_mut_ptr(ts_u)?;
+    let clockid = time::ClockID::from_raw(clockid)?;
+    let ts = time::do_clock_gettime(clockid)?;
+    unsafe {
+        *ts_u = ts;
+    }
+    Ok(0)
+}
+
 
 // FIXME: use this
 const MAP_FAILED: *const c_void = ((-1) as i64) as *const c_void;

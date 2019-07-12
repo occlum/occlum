@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <string.h>
 #include <fcntl.h>
+#include "test.h"
 
 // ============================================================================
 // Helper macros
@@ -16,22 +17,8 @@
 #define MB                      (1024 * 1024UL)
 #define PAGE_SIZE               (4 * KB)
 
-#define _STR(x)                 #x
-#define STR(x)                  _STR(x)
-
-#define ARRAY_SIZE(array)       (sizeof(array)/sizeof(array[0]))
-
 #define ALIGN_DOWN(x, a)        ((x) & ~(a-1)) // a must be a power of two
 #define ALIGN_UP(x, a)          ALIGN_DOWN((x+(a-1)), (a))
-
-#define MIN(a, b)               ((a) <= (b) ? (a) : (b))
-#define MAX(a, b)               ((a) >= (b) ? (a) : (b))
-
-#define throw_error(msg)        while(1) {                  \
-    printf("ERROR: %s in func %s at line %d of file %s\n",  \
-           (msg), __func__, __LINE__, __FILE__);            \
-    return -1;                                              \
-}
 
 #define MAX_MMAP_USED_MEMORY    (4 * MB)
 
@@ -632,14 +619,6 @@ int test_munmap_with_non_page_aligned_len() {
 // Test suite main
 // ============================================================================
 
-typedef int(*test_case_func_t)(void);
-
-typedef struct {
-    const char*             name;
-    test_case_func_t        func;
-} test_case_t;
-
-#define TEST_CASE(name) { STR(name), name }
 static test_case_t test_cases[] = {
     TEST_CASE(test_anonymous_mmap),
     TEST_CASE(test_anonymous_mmap_randomly),
@@ -669,13 +648,5 @@ int main() {
         throw_error("test_suite_init failed");
     }
 
-    for (int ti = 0; ti < ARRAY_SIZE(test_cases); ti++) {
-        test_case_t* tc = &test_cases[ti];
-        if (tc->func() < 0) {
-            printf("  func %s - [ERR]\n", tc->name);
-            return -1;
-        }
-        printf("  func %s - [OK]\n", tc->name);
-    }
-    return 0;
+    return test_suite_run(test_cases, ARRAY_SIZE(test_cases));
 }
