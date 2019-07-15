@@ -7,7 +7,7 @@
 
 int main(int argc, const char* argv[]) {
 
-	const int BUF_SIZE = 10;
+	const int BUF_SIZE = 20;
 	char buf[10];
 	int ret;
 
@@ -17,14 +17,14 @@ int main(int argc, const char* argv[]) {
 		return -1;
 	}
 
-	const char expect_cwd[] = "/";
+	const char expect_cwd[] = "/test";
 	if(strcmp(buf, expect_cwd)) {
 		printf("incorrect cwd \"%s\". expect \"%s\".\n", buf, expect_cwd);
 		return -1;
 	}
 
 	const char DIR_NAME[] = "test_dir";
-	const char DIR_PATH[] = "/test_dir";
+	const char DIR_PATH[] = "/test/test_dir";
 	const int DIR_MODE = 0664;
 	ret = mkdir(DIR_NAME, DIR_MODE);
 	if(ret < 0) {

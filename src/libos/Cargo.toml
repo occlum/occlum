@@ -13,6 +13,8 @@ lazy_static = { version = "1.1.0", features = ["spin_no_std"] } # Implies nightl
 derive_builder = "0.7.2"
 rcore-fs = { path = "../../deps/sefs/rcore-fs" }
 rcore-fs-sefs = { path = "../../deps/sefs/rcore-fs-sefs" }
+rcore-fs-ramfs = { path = "../../deps/sefs/rcore-fs-ramfs" }
+rcore-fs-mountfs = { path = "../../deps/sefs/rcore-fs-mountfs" }
 
 [features]
 default = ["integrity_only_opt", "sgx_file_cache"]

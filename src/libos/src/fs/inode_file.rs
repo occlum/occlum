@@ -1,5 +1,7 @@
 use rcore_fs::vfs::{FileSystem, FsError, INode};
 use rcore_fs_sefs::SEFS;
+use rcore_fs_ramfs::RamFS;
+use rcore_fs_mountfs::MountFS;
 use std::fmt;
 
 use super::sgx_impl::SgxStorage;
@@ -8,10 +10,22 @@ use super::*;
 lazy_static! {
     /// The root of file system
     pub static ref ROOT_INODE: Arc<INode> = {
+        // ramfs as rootfs
+        let rootfs = MountFS::new(RamFS::new());
+        let root = rootfs.root_inode();
+        let bin = root.create("test", FileType::Dir, 0o777)
+            .expect("failed to mkdir: /test");
+
+        // sefs
         let device = Box::new(SgxStorage::new("sefs"));
         let sefs = SEFS::open(device, &time::OcclumTimeProvider)
             .expect("failed to open SEFS");
-        sefs.root_inode()
+
+        // mount sefs at /test
+        bin.mount(sefs)
+            .expect("failed to mount SEFS");
+
+        root
     };
 }
 
@@ -187,6 +201,11 @@ impl From<FsError> for Error {
             FsError::DirNotEmpty => ENOTEMPTY,
             FsError::WrongFs => EINVAL,
             FsError::DeviceError => EIO,
+            FsError::SymLoop => ELOOP,
+            FsError::NoDevice => ENXIO,
+            FsError::IOCTLError => EINVAL,
+            FsError::Again => EAGAIN,
+            FsError::Busy => EBUSY,
         };
         Error::new(errno, "")
     }

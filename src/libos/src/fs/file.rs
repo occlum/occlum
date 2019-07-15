@@ -378,6 +378,7 @@ impl File for StdoutFile {
             nlinks: 0,
             uid: 0,
             gid: 0,
+            rdev: 0,
         })
     }
 
@@ -494,6 +495,7 @@ impl File for StdinFile {
             nlinks: 0,
             uid: 0,
             gid: 0,
+            rdev: 0,
         })
     }
 

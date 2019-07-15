@@ -115,6 +115,7 @@ impl File for SocketFile {
             nlinks: 0,
             uid: 0,
             gid: 0,
+            rdev: 0,
         })
     }
 

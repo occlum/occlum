@@ -13,7 +13,7 @@ lazy_static! {
             pgid: 1,
             tgid: 0,
             exit_status: 0,
-            cwd: "/".to_owned(),
+            cwd: "/test".to_owned(),    // FIXME: hack for test
             clear_child_tid: None,
             parent: None,
             children: Vec::new(),
@@ -99,6 +99,7 @@ impl Process {
             self.cwd = path.to_owned();
         } else {
             // relative
+            self.cwd += "/";
             self.cwd += path;
         }
     }
