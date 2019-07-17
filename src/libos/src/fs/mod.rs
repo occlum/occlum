@@ -22,6 +22,7 @@ use std::mem::uninitialized;
 mod access;
 mod file;
 mod file_table;
+mod hostfs;
 mod inode_file;
 mod io_multiplexing;
 mod null;

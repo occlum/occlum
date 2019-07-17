@@ -1,9 +1,10 @@
 use rcore_fs::vfs::{FileSystem, FsError, INode};
-use rcore_fs_sefs::SEFS;
-use rcore_fs_ramfs::RamFS;
 use rcore_fs_mountfs::MountFS;
+use rcore_fs_ramfs::RamFS;
+use rcore_fs_sefs::SEFS;
 use std::fmt;
 
+use super::hostfs::HostFS;
 use super::sgx_impl::SgxStorage;
 use super::*;
 
@@ -13,8 +14,6 @@ lazy_static! {
         // ramfs as rootfs
         let rootfs = MountFS::new(RamFS::new());
         let root = rootfs.root_inode();
-        let bin = root.create("test", FileType::Dir, 0o777)
-            .expect("failed to mkdir: /test");
 
         // sefs
         let device = Box::new(SgxStorage::new("sefs"));
@@ -22,8 +21,19 @@ lazy_static! {
             .expect("failed to open SEFS");
 
         // mount sefs at /test
+        let bin = root.create("test", FileType::Dir, 0o777)
+            .expect("failed to mkdir: /test");
         bin.mount(sefs)
             .expect("failed to mount SEFS");
+
+        // HostFS
+        let hostfs = HostFS::new(".");
+
+        // mount HostFS at /host
+        let host = root.create("host", FileType::Dir, 0o777)
+            .expect("failed to mkdir: /host");
+        host.mount(hostfs)
+            .expect("failed to mount HostFS");
 
         root
     };
