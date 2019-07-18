@@ -6,9 +6,6 @@
 	path = deps/xmas-elf
 	url = https://github.com/occlum/xmas-elf
 	branch = master
-[submodule "deps/sgx_protect_file"]
-	path = deps/sgx_protect_file
-	url = https://github.com/occlum/sgx_protect_file
 [submodule "deps/sefs"]
 	path = deps/sefs
 	url = https://github.com/occlum/sefs.git

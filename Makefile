@@ -5,7 +5,6 @@ all: src
 submodule:
 	git submodule init
 	git submodule update
-	cd deps/sgx_protect_file && make
 	cd deps/sefs/sefs-fuse && make
 
 src:
