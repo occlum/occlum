@@ -1,4 +1,5 @@
 use super::*;
+use super::vm::{VMRange};
 
 pub struct ThreadGroup {
     threads: Vec<ProcessRef>,
@@ -34,23 +35,40 @@ bitflags! {
 
 pub fn do_clone(
     flags: CloneFlags,
-    stack_addr: usize,
+    user_rsp: usize,
     ptid: Option<*mut pid_t>,
     ctid: Option<*mut pid_t>,
     new_tls: Option<usize>,
 ) -> Result<pid_t, Error> {
     info!(
         "clone: flags: {:?}, stack_addr: {:?}, ptid: {:?}, ctid: {:?}, new_tls: {:?}",
-        flags, stack_addr, ptid, ctid, new_tls
+        flags, user_rsp, ptid, ctid, new_tls
     );
     // TODO: return error for unsupported flags
 
     let current_ref = get_current();
     let current = current_ref.lock().unwrap();
 
+    // The calling convention of Occlum clone syscall requires the user to
+    // store the entry point of the new thread at the top of the user stack.
+    let thread_entry = unsafe {
+        *(user_rsp as *mut usize)
+        // TODO: check user_entry is a cfi_label
+    };
+
     let (new_thread_pid, new_thread_ref) = {
-        let task = new_thread_task(stack_addr, new_tls)?;
         let vm_ref = current.get_vm().clone();
+        let task = {
+            let vm = vm_ref.lock().unwrap();
+            let user_stack_range = guess_user_stack_bound(&vm, user_rsp)?;
+            let user_stack_base = user_stack_range.end();
+            let user_stack_limit = user_stack_range.start();
+            unsafe {
+                Task::new(thread_entry, user_rsp,
+                          user_stack_base, user_stack_limit,
+                          new_tls)?
+            }
+        };
         let files_ref = current.get_files().clone();
         let rlimits_ref = current.get_rlimits().clone();
         let cwd = &current.cwd;
@@ -85,26 +103,31 @@ pub fn do_clone(
     Ok(new_thread_pid)
 }
 
-fn new_thread_task(user_stack: usize, new_tls: Option<usize>) -> Result<Task, Error> {
-    // The calling convention of Occlum clone syscall requires the user to
-    // restore the entry point of the new thread at the top of the user stack.
-    let user_entry = unsafe {
-        *(user_stack as *mut usize)
-        // TODO: check user_entry is a cfi_label
-    };
-    Ok(Task {
-        user_stack_addr: user_stack,
-        user_entry_addr: user_entry,
-        // TODO: use 0 as the default value is not safe
-        user_fsbase_addr: new_tls.unwrap_or(0),
-        ..Default::default()
-    })
-}
-
 pub fn do_set_tid_address(tidptr: *mut pid_t) -> Result<pid_t, Error> {
     info!("set_tid_address: tidptr: {:#x}", tidptr as usize);
     let current_ref = get_current();
     let mut current = current_ref.lock().unwrap();
     current.clear_child_tid = Some(tidptr);
     Ok(current.get_tid())
+}
+
+fn guess_user_stack_bound(vm: &ProcessVM, user_rsp: usize) -> Result<&VMRange, Error> {
+    // The first case is most likely
+    if let Ok(stack_range) = vm.find_mmap_region(user_rsp) {
+        Ok(stack_range)
+    }
+    // The next three cases are very unlikely, but valid
+    else if vm.get_stack_range().contains(user_rsp) {
+        Ok(vm.get_stack_range())
+    }
+    else if vm.get_heap_range().contains(user_rsp) {
+        Ok(vm.get_heap_range())
+    }
+    else if vm.get_data_range().contains(user_rsp) {
+        Ok(vm.get_data_range())
+    }
+    // Invalid
+    else {
+        errno!(ESRCH, "invalid rsp")
+    }
 }

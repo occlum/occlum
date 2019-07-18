@@ -8,6 +8,7 @@ mod user_space_vm;
 mod process_vm;
 
 pub use self::process_vm::{ProcessVM, MMapFlags, VMPerms};
+pub use self::vm_manager::{VMRange};
 
 pub fn do_mmap(
     addr: usize,

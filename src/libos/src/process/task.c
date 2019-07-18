@@ -5,6 +5,10 @@ extern void __run_task(struct Task* task);
 extern uint64_t __get_stack_guard(void);
 extern void __set_stack_guard(uint64_t new_val);
 
+// From SGX SDK
+int sgx_enable_user_stack(size_t stack_base, size_t stack_limit);
+void sgx_disable_user_stack(void);
+
 static uint64_t get_syscall_stack(struct Task* this_task) {
 #define LARGE_ENOUGH_GAP        (8192)
     char libos_stack_var = 0;
@@ -23,8 +27,11 @@ static uint64_t get_syscall_stack(struct Task* this_task) {
 int do_run_task(struct Task* task) {
     jmp_buf libos_state = {0};
     task->saved_state = &libos_state;
-    task->kernel_stack_addr = get_syscall_stack(task);
+    task->kernel_rsp = get_syscall_stack(task);
 
+    if (sgx_enable_user_stack(task->user_stack_base, task->user_stack_limit)) {
+        return -1;
+    }
     SET_CURRENT_TASK(task);
 
     int second = setjmp(libos_state);
@@ -32,8 +39,9 @@ int do_run_task(struct Task* task) {
         __run_task(task);
     }
 
-    // From occlum_exit
+    // Jump from do_exit_task
     RESET_CURRENT_TASK();
+    sgx_disable_user_stack();
     return 0;
 }
 

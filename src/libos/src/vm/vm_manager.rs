@@ -218,6 +218,13 @@ impl VMManager {
         Ok(())
     }
 
+    pub fn find_mmap_region(&self, addr: usize) -> Result<&VMRange, Error> {
+        self.sub_ranges.iter()
+            .find(|subrange| subrange.contains(addr))
+            .ok_or(Error::new(Errno::ESRCH,
+                              "no mmap regions that contains the address"))
+    }
+
     // Find the free subrange that satisfies the constraints of size and address
     fn find_free_subrange(
         &mut self,

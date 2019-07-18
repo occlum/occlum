@@ -28,9 +28,9 @@ __occlum_syscall:
     // Get current task
     movq %gs:(TD_TASK_OFFSET), %r12
     // Switch to the kernel stack
-    movq TASK_KERNEL_STACK_ADDR(%r12), %rsp
+    movq TASK_KERNEL_RSP(%r12), %rsp
     // Use kernel fsbase
-    movq TASK_KERNEL_FSBASE_ADDR(%r12), %r11
+    movq TASK_KERNEL_FS(%r12), %r11
     wrfsbase %r11
 
     // Make %rsp 16-byte aligned before call
@@ -41,7 +41,7 @@ __occlum_syscall:
     call dispatch_syscall
 
     // Use user fsbase
-    movq TASK_USER_FSBASE_ADDR(%r12), %r11
+    movq TASK_USER_FS(%r12), %r11
     wrfsbase %r11
 
     // Switch to the user stack

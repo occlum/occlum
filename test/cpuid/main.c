@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
 typedef struct t_cpuid {
     unsigned int eax;
@@ -10,6 +11,7 @@ typedef struct t_cpuid {
 
 static inline void native_cpuid(int leaf, int subleaf, t_cpuid_t *p)
 {
+    memset(p, 0, sizeof(*p));
     /* ecx is often an input as well as an output. */
     asm volatile("cpuid"
         : "=a" (p->eax),
@@ -22,7 +24,7 @@ static inline void native_cpuid(int leaf, int subleaf, t_cpuid_t *p)
 int main(int argc, char **argv)
 {
     /* Gets CPUID information and tests the SGX support of the CPU */
-    t_cpuid_t cpu = {0};
+    t_cpuid_t cpu;
     int leaf = 1;
     int subleaf = 0;
 
@@ -42,7 +44,6 @@ int main(int argc, char **argv)
     printf("\nExtended feature bits (EAX=07H, ECX=0H)\n");
     leaf = 7;
     subleaf = 0;
-    cpu = {0};
     native_cpuid(leaf, subleaf, &cpu);
     printf("eax: %x ebx: %x ecx: %x edx: %x\n", cpu.eax, cpu.ebx, cpu.ecx, cpu.edx);
 
@@ -61,7 +62,6 @@ int main(int argc, char **argv)
     printf("\nCPUID Leaf 12H, Sub-Leaf 0 of Intel SGX Capabilities (EAX=12H,ECX=0)\n");
     leaf = 0x12;
     subleaf = 0;
-    cpu = {0};
     native_cpuid(leaf, subleaf, &cpu);
     printf("eax: %x ebx: %x ecx: %x edx: %x\n", cpu.eax, cpu.ebx, cpu.ecx, cpu.edx);
 
@@ -74,7 +74,6 @@ int main(int argc, char **argv)
     printf("\nCPUID Leaf 12H, Sub-Leaf 1 of Intel SGX Capabilities (EAX=12H,ECX=1)\n");
     leaf = 0x12;
     subleaf = 1;
-    cpu = {0};
     native_cpuid(leaf, subleaf, &cpu);
     printf("eax: %x ebx: %x ecx: %x edx: %x\n", cpu.eax, cpu.ebx, cpu.ecx, cpu.edx);
 
@@ -84,7 +83,6 @@ int main(int argc, char **argv)
       printf("\nCPUID Leaf 12H, Sub-Leaf %d of Intel SGX Capabilities (EAX=12H,ECX=%d)\n", i, i);
       leaf = 0x12;
       subleaf = i;
-      cpu = {0};
       native_cpuid(leaf, subleaf, &cpu);
       printf("eax: %x ebx: %x ecx: %x edx: %x\n", cpu.eax, cpu.ebx, cpu.ecx, cpu.edx);
     }

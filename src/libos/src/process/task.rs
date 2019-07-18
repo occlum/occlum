@@ -6,13 +6,52 @@ use super::*;
 #[derive(Clone, Debug, Default)]
 #[repr(C)]
 pub struct Task {
-    pub kernel_stack_addr: usize,
-    pub kernel_fsbase_addr: usize,
-    pub user_stack_addr: usize,
-    pub user_fsbase_addr: usize,
-    pub user_entry_addr: usize,
-    pub saved_state: usize, // struct jmpbuf*
+    kernel_rsp: usize,
+    kernel_fs: usize,
+    user_rsp: usize,
+    user_stack_base: usize,
+    user_stack_limit: usize,
+    user_fs: usize,
+    user_entry_addr: usize,
+    saved_state: usize, // struct jmpbuf*
 }
+
+impl Task {
+    pub unsafe fn new(
+        user_entry_addr: usize,
+        user_rsp: usize,
+        user_stack_base: usize,
+        user_stack_limit: usize,
+        user_fs: Option<usize>,
+    ) -> Result<Task, Error> {
+        if !(user_stack_base >= user_rsp && user_rsp > user_stack_limit) {
+            return errno!(EINVAL, "Invalid user stack");
+        }
+
+        // Set the default user fsbase to an address on user stack, which is
+        // a relatively safe address in case the user program uses %fs before
+        // initializing fs base address.
+        let user_fs = user_fs.unwrap_or(user_stack_limit);
+
+        Ok(Task {
+            user_entry_addr,
+            user_rsp,
+            user_stack_base,
+            user_stack_limit,
+            user_fs,
+            ..Default::default()
+        })
+    }
+
+    pub fn set_user_fs(&mut self, user_fs: usize) {
+        self.user_fs = user_fs;
+    }
+
+    pub fn get_user_fs(&self) -> usize {
+        self.user_fs
+    }
+}
+
 
 lazy_static! {
     static ref NEW_PROCESS_QUEUE: SgxMutex<VecDeque<ProcessRef>> =

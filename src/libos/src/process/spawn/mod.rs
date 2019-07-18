@@ -71,8 +71,13 @@ pub fn do_spawn<P: AsRef<Path>>(
         };
         let auxtbl = init_auxtbl(base_addr, program_entry, &elf_file)?;
         let task = {
-            let stack_top = vm.get_stack_top();
-            init_task(program_entry, stack_top, argv, envp, &auxtbl)?
+            let user_stack_base = vm.get_stack_base();
+            let user_stack_limit = vm.get_stack_limit();
+            let user_rsp = init_stack::do_init(user_stack_base, 4096, argv, envp, &auxtbl)?;
+            unsafe {
+                Task::new(program_entry, user_rsp,
+                          user_stack_base, user_stack_limit, None)?
+            }
         };
         let vm_ref = Arc::new(SgxMutex::new(vm));
         let files_ref = {
@@ -139,21 +144,6 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
     file_table.put(stdout, false);
     file_table.put(stderr, false);
     Ok(file_table)
-}
-
-fn init_task(
-    user_entry: usize,
-    stack_top: usize,
-    argv: &[CString],
-    envp: &[CString],
-    auxtbl: &AuxTable,
-) -> Result<Task, Error> {
-    let user_stack = init_stack::do_init(stack_top, 4096, argv, envp, auxtbl)?;
-    Ok(Task {
-        user_stack_addr: user_stack,
-        user_entry_addr: user_entry,
-        ..Default::default()
-    })
 }
 
 fn init_auxtbl(

@@ -218,8 +218,6 @@ int SGX_CDECL main(int argc, const char *argv[])
     gettimeofday(&startup, NULL);
     sgx_status_t sgx_ret = SGX_SUCCESS;
     int status = 0;
-    uint32_t sealed_log_size = 1024;
-    uint8_t sealed_log[1024] = {0};
 
     if (argc < 2) {
         printf("ERROR: at least one argument must be provided\n\n");

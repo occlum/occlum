@@ -13,10 +13,12 @@ extern "C" {
 
 // See Struct Task in process.rs
 struct Task {
-    uint64_t            kernel_stack_addr;
-    uint64_t            kernel_fsbase_addr;
-    uint64_t            user_stack_addr;
-    uint64_t            user_fsbase_addr;
+    uint64_t            kernel_rsp;
+    uint64_t            kernel_fs;
+    uint64_t            user_rsp;
+    uint64_t            user_stack_base;
+    uint64_t            user_stack_limit;
+    uint64_t            user_fs;
     uint64_t            user_entry_addr;
     jmp_buf*            saved_state;
 };
@@ -38,11 +40,11 @@ void do_exit_task(void);
 /* Override the field for stack guard */
 #define TD_TASK_OFFSET              TD_STACKGUARD_OFFSET
 
-#define TASK_KERNEL_STACK_ADDR      (8 * 0)
-#define TASK_KERNEL_FSBASE_ADDR     (8 * 1)
-#define TASK_USER_STACK_ADDR        (8 * 2)
-#define TASK_USER_FSBASE_ADDR       (8 * 3)
-#define TASK_USER_ENTRY_ADDR        (8 * 4)
+#define TASK_KERNEL_RSP             (8 * 0)
+#define TASK_KERNEL_FS              (8 * 1)
+#define TASK_USER_RSP               (8 * 2)
+#define TASK_USER_FS                (8 * 5)
+#define TASK_USER_ENTRY_ADDR        (8 * 6)
 
 #endif /* __ASSEMBLY__ */
 

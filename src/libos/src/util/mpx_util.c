@@ -46,9 +46,6 @@ typedef struct {
  * components are to restored by this instruction.
  */
 static void xrstor(xsave_area_t* xsave_area, uint64_t rfbm) {
-    uint32_t rfbm_l= rfbm;
-    uint32_t rfbm_h = rfbm >> 32;
-
 #define REX_PREFIX  "0x48, "
 #define XRSTOR64    REX_PREFIX "0x0f,0xae,0x2f "
 

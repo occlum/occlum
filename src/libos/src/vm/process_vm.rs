@@ -103,8 +103,12 @@ impl ProcessVM {
         self.get_process_range().start()
     }
 
-    pub fn get_stack_top(&self) -> usize {
+    pub fn get_stack_base(&self) -> usize {
         self.get_stack_range().end()
+    }
+
+    pub fn get_stack_limit(&self) -> usize {
+        self.get_stack_range().start()
     }
 
     pub fn get_brk(&self) -> usize {
@@ -175,6 +179,10 @@ impl ProcessVM {
 
     pub fn munmap(&mut self, addr: usize, size: usize) -> Result<(), Error> {
         self.mmap_manager.munmap(addr, size)
+    }
+
+    pub fn find_mmap_region(&self, addr: usize) -> Result<&VMRange, Error> {
+        self.mmap_manager.find_mmap_region(addr)
     }
 }
 
