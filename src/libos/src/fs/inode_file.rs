@@ -1,5 +1,5 @@
-use rcore_fs::vfs::{FileSystem, FsError, INode};
-use rcore_fs_mountfs::MountFS;
+use rcore_fs::vfs::{FileSystem, FileType, FsError, INode};
+use rcore_fs_mountfs::{MountFS, MNode};
 use rcore_fs_ramfs::RamFS;
 use rcore_fs_sefs::SEFS;
 use std::fmt;
@@ -11,29 +11,36 @@ use super::*;
 lazy_static! {
     /// The root of file system
     pub static ref ROOT_INODE: Arc<INode> = {
-        // ramfs as rootfs
-        let rootfs = MountFS::new(RamFS::new());
-        let root = rootfs.root_inode();
-
-        // sefs
+        // Mount SEFS at /
         let device = Box::new(SgxStorage::new("sefs"));
         let sefs = SEFS::open(device, &time::OcclumTimeProvider)
             .expect("failed to open SEFS");
+        let rootfs = MountFS::new(sefs);
+        let root = rootfs.root_inode();
 
-        // mount sefs at /test
-        let bin = root.create("test", FileType::Dir, 0o777)
-            .expect("failed to mkdir: /test");
-        bin.mount(sefs)
-            .expect("failed to mount SEFS");
+        fn mount_default_fs(fs: Arc<dyn FileSystem>, root: &MNode, mount_at: &str) -> Result<(), Error> {
+            let mount_dir = match root.find(false, mount_at) {
+                Ok(existing_dir) => {
+                    if existing_dir.metadata()?.type_ != FileType::Dir {
+                        return errno!(EIO, "not a directory");
+                    }
+                    existing_dir
+                }
+                Err(_) => {
+                    root.create(mount_at, FileType::Dir, 0o777)?
+                }
+            };
+            mount_dir.mount(fs);
+            Ok(())
+        }
 
-        // HostFS
         let hostfs = HostFS::new(".");
+        mount_default_fs(hostfs, &root, "host")
+            .expect("failed to mount HostFS at /host");
 
-        // mount HostFS at /host
-        let host = root.create("host", FileType::Dir, 0o777)
-            .expect("failed to mkdir: /host");
-        host.mount(hostfs)
-            .expect("failed to mount HostFS");
+        let ramfs = RamFS::new();
+        mount_default_fs(ramfs, &root, "tmp")
+            .expect("failed to mount RamFS at /tmp");
 
         root
     };
