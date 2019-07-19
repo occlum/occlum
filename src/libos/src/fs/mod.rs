@@ -12,7 +12,9 @@ pub use self::file_table::{FileDesc, FileTable};
 use self::inode_file::OpenOptions;
 pub use self::inode_file::{INodeExt, INodeFile, ROOT_INODE};
 pub use self::io_multiplexing::*;
-use self::null::NullFile;
+use self::dev_null::DevNull;
+use self::dev_zero::DevZero;
+use self::dev_random::DevRandom;
 pub use self::pipe::Pipe;
 pub use self::socket_file::{AsSocket, SocketFile};
 pub use self::unix_socket::{AsUnixSocket, UnixSocketFile};
@@ -25,7 +27,9 @@ mod file_table;
 mod hostfs;
 mod inode_file;
 mod io_multiplexing;
-mod null;
+mod dev_null;
+mod dev_zero;
+mod dev_random;
 mod pipe;
 mod sgx_impl;
 mod socket_file;
@@ -410,7 +414,13 @@ impl Process {
     /// Open a file on the process. But DO NOT add it to file table.
     pub fn open_file(&self, path: &str, flags: OpenFlags, mode: u32) -> Result<Box<File>, Error> {
         if path == "/dev/null" {
-            return Ok(Box::new(NullFile));
+            return Ok(Box::new(DevNull));
+        }
+        if path == "/dev/zero" {
+            return Ok(Box::new(DevZero));
+        }
+        if path == "/dev/random" || path == "/dev/urandom" || path == "/dev/arandom" {
+            return Ok(Box::new(DevRandom));
         }
         let inode = if flags.contains(OpenFlags::CREATE) {
             let (dir_path, file_name) = split_path(&path);
