@@ -48,8 +48,8 @@ void setup_cpuid_info() {
 
 int handle_cpuid_exception(sgx_exception_info_t *info) {
     uint16_t ip_opcode = *(uint16_t *)(info->cpu_context.rip);
-    uint64_t leaf;
-    uint64_t subleaf;
+    uint32_t leaf;
+    uint32_t subleaf;
 
     if (info->exception_vector != SGX_EXCEPTION_VECTOR_UD ||
         info->exception_type != SGX_EXCEPTION_HARDWARE ||
@@ -57,8 +57,8 @@ int handle_cpuid_exception(sgx_exception_info_t *info) {
         return EXCEPTION_CONTINUE_SEARCH;
     }
 
-    leaf = info->cpu_context.rax;
-    subleaf = info->cpu_context.rcx;
+    leaf = (uint32_t)info->cpu_context.rax;
+    subleaf = (uint32_t)info->cpu_context.rcx;
 
     for (int i = 0; i < SUPPORTED_CPUID_LEAF_NUM; i++) {
         for (int j = 0; j < SUPPORTED_CPUID_SUBLEAF_NUM; j++) {
