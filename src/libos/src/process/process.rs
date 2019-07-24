@@ -12,6 +12,7 @@ lazy_static! {
             pid: 0,
             pgid: 1,
             tgid: 0,
+            host_tid: 0,
             exit_status: 0,
             cwd: "/".to_owned(),
             clear_child_tid: None,
@@ -40,6 +41,7 @@ impl Process {
             pid: new_pid,
             pgid: 1, // TODO: implement pgid
             tgid: new_pid,
+            host_tid: 0,
             cwd: cwd.to_owned(),
             clear_child_tid: None,
             exit_status: 0,
@@ -69,6 +71,12 @@ impl Process {
     }
     pub fn get_pgid(&self) -> pid_t {
         self.pgid
+    }
+    pub fn get_host_tid(&self) -> pid_t {
+        self.host_tid
+    }
+    pub fn set_host_tid(&mut self, host_tid: pid_t) {
+        self.host_tid = host_tid;
     }
     pub fn get_status(&self) -> Status {
         self.status

@@ -72,13 +72,14 @@ fn dequeue_task() -> Option<ProcessRef> {
     NEW_PROCESS_QUEUE.lock().unwrap().pop_front()
 }
 
-pub fn run_task() -> Result<i32, Error> {
+pub fn run_task(host_tid: pid_t) -> Result<i32, Error> {
     let new_process: ProcessRef =
         dequeue_task().ok_or_else(|| (Errno::EAGAIN, "No new processes to run"))?;
     set_current(&new_process);
 
     let (pid, task) = {
         let mut process = new_process.lock().unwrap();
+        process.set_host_tid(host_tid);
         let pid = process.get_pid();
         let task = process.get_task_mut() as *mut Task;
         (pid, task)

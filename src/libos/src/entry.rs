@@ -1,4 +1,5 @@
 use super::*;
+use process::pid_t;
 use std::ffi::{CStr, CString, OsString};
 use std::path::Path;
 use util::mem_util::from_untrusted::*;
@@ -32,10 +33,10 @@ pub extern "C" fn libos_boot(path_buf: *const c_char, argv: *const *const c_char
 }
 
 #[no_mangle]
-pub extern "C" fn libos_run() -> i32 {
+pub extern "C" fn libos_run(host_tid: i32) -> i32 {
     let _ = backtrace::enable_backtrace("libocclum.signed.so", PrintFormat::Short);
     panic::catch_unwind(|| {
-        backtrace::__rust_begin_short_backtrace(|| match do_run() {
+        backtrace::__rust_begin_short_backtrace(|| match do_run(host_tid as pid_t) {
             Ok(exit_status) => exit_status,
             Err(err) => EXIT_STATUS_INTERNAL_ERROR,
         })
@@ -91,8 +92,8 @@ fn do_boot(path_str: &str, argv: &Vec<CString>) -> Result<(), Error> {
 }
 
 // TODO: make sure do_run() cannot be called after do_boot()
-fn do_run() -> Result<i32, Error> {
-    let exit_status = process::run_task()?;
+fn do_run(host_tid: pid_t) -> Result<i32, Error> {
+    let exit_status = process::run_task(host_tid)?;
 
     // sync file system
     // TODO: only sync when all processes exit

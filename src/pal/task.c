@@ -1,10 +1,15 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
 #include "atomic.h"
 #include "futex.h"
 #include "sgx_urts.h"
 #include "Enclave_u.h"
+
+int syscall();
+#define gettid() syscall(__NR_gettid)
 
 static volatile int num_tasks = 0;
 static volatile int main_task_status = 0;
@@ -29,7 +34,7 @@ static void* __run_task_thread(void* _data) {
     int status = 0;
     struct task_thread_data* data = _data;
 
-    sgx_status_t sgx_ret = libos_run(data->eid, &status);
+    sgx_status_t sgx_ret = libos_run(data->eid, &status, gettid());
     if(sgx_ret != SGX_SUCCESS) {
         // TODO: deal with ECALL error
         printf("ERROR: ECall libos_run failed\n");

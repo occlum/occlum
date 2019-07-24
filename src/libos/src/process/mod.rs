@@ -7,6 +7,7 @@ pub use self::spawn::{do_spawn, FileAction};
 pub use self::task::{current_pid, get_current, run_task};
 pub use self::thread::{do_clone, do_set_tid_address, CloneFlags, ThreadGroup};
 pub use self::wait::{WaitQueue, Waiter};
+pub use self::sched::{CpuSet, do_sched_getaffinity, do_sched_setaffinity};
 
 #[allow(non_camel_case_types)]
 pub type pid_t = u32;
@@ -18,6 +19,7 @@ pub struct Process {
     pid: pid_t,
     pgid: pid_t,
     tgid: pid_t,
+    host_tid: pid_t,
     exit_status: i32,
     // TODO: move cwd, root_inode into a FileSystem structure
     // TODO: should cwd be a String or INode?
@@ -73,6 +75,7 @@ mod spawn;
 mod task;
 mod thread;
 mod wait;
+mod sched;
 
 use self::task::Task;
 use super::*;

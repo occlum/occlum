@@ -10,7 +10,7 @@
 use fs::*;
 use misc::{resource_t, rlimit_t, utsname_t};
 use prelude::*;
-use process::{pid_t, ChildProcessFilter, CloneFlags, FileAction, FutexFlags, FutexOp};
+use process::{pid_t, ChildProcessFilter, CloneFlags, FileAction, FutexFlags, FutexOp, CpuSet};
 use std::ffi::{CStr, CString};
 use std::ptr;
 use time::{timeval_t, clockid_t, timespec_t};
@@ -175,6 +175,8 @@ pub extern "C" fn dispatch_syscall(
         ),
         SYS_ARCH_PRCTL => do_arch_prctl(arg0 as u32, arg1 as *mut usize),
         SYS_SET_TID_ADDRESS => do_set_tid_address(arg0 as *mut pid_t),
+        SYS_SCHED_GETAFFINITY => do_sched_getaffinity(arg0 as pid_t, arg1 as size_t, arg2 as *mut c_uchar),
+        SYS_SCHED_SETAFFINITY => do_sched_setaffinity(arg0 as pid_t, arg1 as size_t, arg2 as *const c_uchar),
 
         // memory
         SYS_MMAP => do_mmap(
@@ -958,6 +960,45 @@ fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize, Error> {
 fn do_set_tid_address(tidptr: *mut pid_t) -> Result<isize, Error> {
     check_mut_ptr(tidptr)?;
     process::do_set_tid_address(tidptr).map(|tid| tid as isize)
+}
+
+fn do_sched_getaffinity(pid: pid_t, cpusize: size_t, buf: *mut c_uchar) ->  Result<isize, Error> {
+    // Construct safe Rust types
+    let mut buf_slice = {
+        check_mut_array(buf, cpusize)?;
+        if cpusize == 0 {
+            return errno!(EINVAL, "cpuset size must be greater than zero");
+        }
+        if buf as *const _ == std::ptr::null() {
+            return errno!(EFAULT, "cpuset mask must NOT be null");
+        }
+        unsafe { std::slice::from_raw_parts_mut(buf, cpusize) }
+    };
+    // Call the memory-safe do_sched_getaffinity
+    let mut cpuset = CpuSet::new(cpusize);
+    let ret = process::do_sched_getaffinity(pid, &mut cpuset)?;
+    debug!("sched_getaffinity cpuset: {:#x}", cpuset);
+    // Copy from Rust types to C types
+    buf_slice.copy_from_slice(cpuset.as_slice());
+    Ok(ret as isize)
+}
+
+fn do_sched_setaffinity(pid: pid_t, cpusize: size_t, buf: *const c_uchar) ->  Result<isize, Error> {
+    // Convert unsafe C types into safe Rust types
+    let cpuset = {
+        check_array(buf, cpusize)?;
+        if cpusize == 0 {
+            return errno!(EINVAL, "cpuset size must be greater than zero");
+        }
+        if buf as *const _ == std::ptr::null() {
+            return errno!(EFAULT, "cpuset mask must NOT be null");
+        }
+        CpuSet::from_raw_buf(buf, cpusize)
+    };
+    debug!("sched_setaffinity cpuset: {:#x}", cpuset);
+    // Call the memory-safe do_sched_setaffinity
+    let ret = process::do_sched_setaffinity(pid, &cpuset)?;
+    Ok(ret as isize)
 }
 
 fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize, Error> {
