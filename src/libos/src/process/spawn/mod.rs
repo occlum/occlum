@@ -58,7 +58,7 @@ pub fn do_spawn<P: AsRef<Path>>(
     };
 
     let mut ldso_elf_buf = {
-        let ldso_path = "/ld.so";
+        let ldso_path = "/lib/ld-musl-x86_64.so.1";
         let ldso_inode = ROOT_INODE.lookup(ldso_path)?;
         ldso_inode.read_as_vec()?
     };

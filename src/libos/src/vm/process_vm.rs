@@ -26,8 +26,8 @@ macro_rules! impl_setter_for_process_vm_builder {
 
 impl ProcessVMBuilder {
     pub const DEFAULT_STACK_SIZE: usize = 1 * 1024 * 1024;
-    pub const DEFAULT_HEAP_SIZE: usize = 8 * 1024 * 1024;
-    pub const DEFAULT_MMAP_SIZE: usize = 8 * 1024 * 1024;
+    pub const DEFAULT_HEAP_SIZE: usize = 16 * 1024 * 1024;
+    pub const DEFAULT_MMAP_SIZE: usize = 16 * 1024 * 1024;
 
     pub fn new(code_size: usize, data_size: usize) -> ProcessVMBuilder {
         ProcessVMBuilder {

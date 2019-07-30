@@ -45,7 +45,11 @@ $(BUILD_TARGETS): %:
 
 sefs:
 	@$(RM) -rf $(SEFS_PATH)
-	@cp /lib/ld-musl-x86_64.so.1 $(FS_PATH)/ld.so
+	@mkdir -p $(FS_PATH)/lib/
+	@cp /lib/ld-musl-x86_64.so.1 $(FS_PATH)/lib/
+	@cp /usr/local/occlum/lib/libc++.so.1 $(FS_PATH)/lib/
+	@cp /usr/local/occlum/lib/libc++abi.so.1 $(FS_PATH)/lib/
+	@cp /usr/local/occlum/lib/libunwind.so.1 $(FS_PATH)/lib/
 	@cd $(PROJECT_DIR)/deps/sefs/sefs-fuse/bin/ && \
 		./app \
 			$(CUR_DIR)/$(SEFS_PATH) \

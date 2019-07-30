@@ -242,16 +242,17 @@ int SGX_CDECL main(int argc, const char *argv[])
         return -1;
     }
 
-    sgx_ret = libos_boot(global_eid, &status, executable_path, &argv[2]);
-    if(sgx_ret != SGX_SUCCESS) {
-        print_error_message(sgx_ret);
-        return status;
-    }
     // First ecall do a lot initializations.
     // Count it as startup time.
     dummy_ecall(global_eid, &status);
 
     gettimeofday(&libosready, NULL);
+
+    sgx_ret = libos_boot(global_eid, &status, executable_path, &argv[2]);
+    if(sgx_ret != SGX_SUCCESS) {
+        print_error_message(sgx_ret);
+        return status;
+    }
 
     status = wait_all_tasks();
 

@@ -1,5 +1,5 @@
 #!/bin/sh
-BUILD_DIR=/root/occlum/toolchain
+BUILD_DIR=/tmp/occlum_toolchain
 INSTALL_DIR=/usr/local/occlum
 
 # Exit if any command fails
@@ -14,14 +14,15 @@ mkdir -p ${BUILD_DIR}
 cd ${BUILD_DIR}
 
 # Download all source code
-git clone -b for_occlum https://github.com/occlum/llvm
-git clone -b for_occlum https://github.com/occlum/musl
-git clone -b for_occlum https://github.com/occlum/lld
+# TODO: use Occlum's fork of LLVM for SFI
+git clone -b release_70 https://github.com/llvm-mirror/llvm
+git clone -b release_70 https://github.com/llvm-mirror/lld
 git clone -b release_70 https://github.com/llvm-mirror/clang
 git clone -b release_70 https://github.com/llvm-mirror/libcxx
 git clone -b release_70 https://github.com/llvm-mirror/libcxxabi
 git clone -b release_70 https://github.com/llvm-mirror/libunwind
 git clone -b release_70 https://github.com/llvm-mirror/compiler-rt
+git clone https://github.com/occlum/musl
 
 # Build LLVM
 mkdir llvm-build
@@ -31,7 +32,8 @@ cmake -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_ENABLE_PROJECTS="clang;lld" \
     -DLLVM_TARGETS_TO_BUILD="X86" \
     ../llvm
-# Compile LLVM in a single thread (parallel compilation would consume too much memory)
+# Compiling LLVM in many threads may consume too much memory
+make -j2
 make install
 cd ..
 
@@ -46,7 +48,7 @@ cd ..
 
 # Link Linux headers
 ln -s /usr/include/linux ${INSTALL_DIR}/include/linux
-ln -s /usr/include/asm ${INSTALL_DIR}/include/asm
+ln -s /usr/include/x86_64-linux-gnu/asm ${INSTALL_DIR}/include/asm
 ln -s /usr/include/asm-generic ${INSTALL_DIR}/include/asm-generic
 
 # Build libunwind
@@ -54,11 +56,10 @@ mkdir libunwind-build
 cd libunwind-build
 cmake -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=musl-clang \
-    -DCMAKE_C_FLAGS="-O2 -fPIC -locclum_stub" \
+    -DCMAKE_C_FLAGS="-O2 -fPIC" \
     -DCMAKE_CXX_COMPILER=musl-clang \
-    -DCMAKE_CXX_FLAGS="-O2 -fPIC -locclum_stub" \
+    -DCMAKE_CXX_FLAGS="-O2 -fPIC" \
     -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} \
-    -DLIBUNWIND_ENABLE_SHARED=OFF \
     -DLLVM_ENABLE_LIBCXX=ON \
     ../libunwind
 make install -j
@@ -69,11 +70,10 @@ mkdir libcxx-prebuild
 cd libcxx-prebuild
 cmake -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=musl-clang \
-    -DCMAKE_C_FLAGS="-O2 -fPIC -locclum_stub" \
+    -DCMAKE_C_FLAGS="-O2 -fPIC" \
     -DCMAKE_CXX_COMPILER=musl-clang \
-    -DCMAKE_CXX_FLAGS="-O2 -fPIC -locclum_stub" \
+    -DCMAKE_CXX_FLAGS="-O2 -fPIC" \
     -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} \
-    -DLIBCXX_ENABLE_SHARED=OFF \
     -DLIBCXX_HAS_MUSL_LIBC=ON \
     ../libcxx
 make install -j
@@ -84,12 +84,11 @@ mkdir libcxxabi-build
 cd libcxxabi-build
 cmake -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=musl-clang \
-    -DCMAKE_C_FLAGS="-O2 -fPIC -locclum_stub" \
+    -DCMAKE_C_FLAGS="-O2 -fPIC" \
     -DCMAKE_CXX_COMPILER=musl-clang \
-    -DCMAKE_CXX_FLAGS="-O2 -fPIC -locclum_stub" \
+    -DCMAKE_CXX_FLAGS="-O2 -fPIC" \
     -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} \
     -DLIBCXXABI_ENABLE_PIC=ON \
-    -DLIBCXXABI_ENABLE_SHARED=OFF \
     -DLIBCXXABI_ENABLE_STATIC_UNWINDER=OFF \
     -DLIBCXXABI_LIBCXX_PATH=${INSTALL_DIR} \
     -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
@@ -103,11 +102,10 @@ mkdir libcxx-build
 cd libcxx-build
 cmake -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=musl-clang \
-    -DCMAKE_C_FLAGS="-O2 -fPIC -locclum_stub" \
+    -DCMAKE_C_FLAGS="-O2 -fPIC" \
     -DCMAKE_CXX_COMPILER=musl-clang \
-    -DCMAKE_CXX_FLAGS="-O2 -fPIC -locclum_stub" \
+    -DCMAKE_CXX_FLAGS="-O2 -fPIC" \
     -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} \
-    -DLIBCXX_ENABLE_SHARED=OFF \
     -DLIBCXX_HAS_MUSL_LIBC=ON \
     -DLIBCXX_CXX_ABI=libcxxabi \
     -DLIBCXX_CXX_ABI_INCLUDE_PATHS=../libcxxabi/include \

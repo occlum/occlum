@@ -20,7 +20,6 @@ CLANG_BIN_PATH := $(shell clang -print-prog-name=clang)
 LLVM_PATH := $(abspath $(dir $(CLANG_BIN_PATH))../)
 
 C_FLAGS = -Wall -I../include -O2 -fPIC $(EXTRA_C_FLAGS)
-C_FLAGS += -Xclang -load -Xclang $(LLVM_PATH)/lib/LLVMMDSFIIRInserter.so
 LINK_FLAGS = $(C_FLAGS) -pie $(EXTRA_LINK_FLAGS)
 
 .PHONY: all test debug clean
@@ -36,18 +35,17 @@ $(BIN_PATH): $(BIN_NAME)
 	@cp $^ $@
 	@echo "COPY => $@"
 
-debug: $(OBJDUMP_FILE) $(READELF_FILE)
-
-$(OBJDUMP_FILE): $(BIN_NAME)
-	@objdump -d $(BIN_NAME) > $(OBJDUMP_FILE)
-	@echo "OBJDUMP => $@"
-
-$(READELF_FILE): $(BIN_NAME)
-	@readelf -a -d $(BIN_NAME) > $(READELF_FILE)
-	@echo "READELF => $@"
-
+# Compile C/C++ test program
+#
+# When compiling programs, we do not use CXX if we're not compilng any C++ files.
+# This ensures C++ libraries are only linked and loaded for C++ programs, not C 
+# programs.
 $(BIN_NAME): $(C_OBJS) $(CXX_OBJS)
-	@$(CXX) $^ $(LINK_FLAGS) -o $(BIN_NAME)
+	@if [ -z $(CXX_OBJS) ] ; then \
+		$(CC) $^ $(LINK_FLAGS) -o $(BIN_NAME); \
+	else \
+		$(CXX) $^ $(LINK_FLAGS) -o $(BIN_NAME); \
+	fi ;
 	@echo "LINK => $@"
 
 $(C_OBJS): %.o: %.c

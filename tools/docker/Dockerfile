@@ -39,16 +39,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # Install SGX SDK
-WORKDIR /root/occlum/linux-sgx
-RUN git clone -b for_occlum https://github.com/occlum/linux-sgx . && \
+WORKDIR /tmp
+RUN git clone https://github.com/occlum/linux-sgx . && \
     ./download_prebuilt.sh && \
-    make && \
-    make sdk_install_pkg && \
-    make deb_sgx_enclave_common_pkg && \
-    dpkg -i ./linux/installer/deb/libsgx-enclave-common/libsgx-enclave-common_*.deb && \
-    echo -e 'no\n/opt/intel' | ./linux/installer/bin/sgx_linux_x64_sdk_*.bin && \
+    ./compile.sh && \
+    ./install.sh && \
     echo 'source /opt/intel/sgxsdk/environment' >> /root/.bashrc && \
-    rm -rf /root/occlum/linux-sgx
+    rm -rf /tmp/linux-sgx
 
 # Install Rust
 ENV OCCLUM_RUST_VERSION=nightly-2019-01-28
@@ -58,7 +55,9 @@ RUN curl https://sh.rustup.rs -sSf | \
     rm -rf /root/.cargo/registry && rm -rf /root/.cargo/git
 
 # Install Occlum toolchain
-WORKDIR /root/occlum/
-COPY build_toolchain.sh /root/occlum/
+WORKDIR /tmp
+COPY build_toolchain.sh /tmp
 RUN ./build_toolchain.sh
 ENV PATH="/usr/local/occlum/bin:$PATH"
+
+WORKDIR /root
