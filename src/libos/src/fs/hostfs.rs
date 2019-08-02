@@ -23,7 +23,8 @@ pub struct HNode {
 
 impl FileSystem for HostFS {
     fn sync(&self) -> Result<()> {
-        unimplemented!()
+        warn!("HostFS: sync is unimplemented");
+        Ok(())
     }
 
     fn root_inode(&self) -> Arc<INode> {
