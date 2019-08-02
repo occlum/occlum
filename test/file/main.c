@@ -23,6 +23,12 @@ int main(int argc, const char* argv[]) {
         printf("ERROR: failed to write to the file\n");
         return -1;
     }
+
+    // lseek
+	if ((offset = lseek(fd, 0, SEEK_END)) != 12) {
+		printf("ERROR: failed to lseek the file\n");
+		return -1;
+	}
     close(fd);
 
     // read
