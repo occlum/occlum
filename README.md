@@ -1,7 +1,7 @@
 # Occlum
 [![All Contributors](https://img.shields.io/badge/all_contributors-7-orange.svg?style=flat-square)](CONTRIBUTORS.md)
 
-Occlum is a *memory-safe*, *multi-process* library OS (LibOS) for [Intel SGX](https://software.intel.com/en-us/sgx). As a LibOS, it enables *legacy** applications to run on SGX with *little or even no modifications* of source code, thus protecting the confidentiality and integrity of user workloads transparently. 
+Occlum is a *memory-safe*, *multi-process* library OS (LibOS) for [Intel SGX](https://software.intel.com/en-us/sgx). As a LibOS, it enables *legacy* applications to run on SGX with *little or even no modifications* of source code, thus protecting the confidentiality and integrity of user workloads transparently. 
 
 Compared to existing LibOSes for SGX, Occlum has the following salient features:
 
@@ -58,7 +58,7 @@ Step 5-8 are to be done on the guest OS running inside the container:
 
 5. Start the AESM service required by Intel SGX SDK
 ```
-/opt/intel/libsgx-enclave-common/aesm/aesm_service &
+/opt/intel/sgxpsw/aesm/aesm_service &
 ```
 6. (Optional) Try the sample code of Intel SGX SDK
 ```
