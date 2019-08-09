@@ -1,0 +1,35 @@
+{
+    "vm": {
+        "user_space_size": "128MB"
+    },
+    "process": {
+        "default_stack_size": "4MB",
+        "default_heap_size": "16MB",
+        "default_mmap_size": "32MB"
+    },
+    "mount": [
+        {
+            "target": "/",
+            "type": "sefs",
+            "source": "./root_sefs"
+        },
+        {
+            "target": "/bin",
+            "type": "sefs",
+            "source": "./bin_sefs",
+            "options": {
+                "integrity_only": true,
+                "MAC": "00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-"
+            }
+        },
+        {
+            "target": "/host",
+            "type": "hostfs",
+            "source": "."
+        },
+        {
+            "target": "/tmp",
+            "type": "ramfs"
+        }
+    ]
+}

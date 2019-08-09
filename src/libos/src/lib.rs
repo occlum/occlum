@@ -28,6 +28,8 @@ extern crate rcore_fs_ramfs;
 extern crate rcore_fs_mountfs;
 #[macro_use]
 extern crate derive_builder;
+extern crate serde;
+extern crate serde_json;
 
 use sgx_trts::libc;
 use sgx_types::*;
@@ -37,8 +39,9 @@ use std::panic;
 
 #[macro_use]
 mod prelude;
-mod entry;
 mod errno;
+mod entry;
+mod config;
 mod fs;
 mod misc;
 mod process;

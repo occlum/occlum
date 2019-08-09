@@ -1,0 +1,93 @@
+#!/bin/bash
+
+working_dir=`pwd`
+this_dir="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
+project_dir="$( cd "$( dirname "$this_dir/../../../"  )" >/dev/null 2>&1 && pwd )"
+
+SGX_SDK="${SGX_SDK:-/opt/intel/sgxsdk}"
+
+occlum_conf_json_path=$1
+enclave_conf_xml_path=$2
+enclave_key_pem_path=$3
+protected_occlum_conf_json_path=`basename $occlum_conf_json_path`".protected"
+
+occlum_conf_file_mac=
+occlum_user_space_size=
+
+
+report_arg_error() {
+    echo $1
+    echo ""
+    echo "Usage: occlum-build-enclave Occlum.json Enclave.xml Enclave.pem"
+}
+
+protect_occlum_json() {
+    cd $working_dir
+    "$project_dir/tools/bin/protect-integrity" protect $occlum_conf_json_path
+}
+
+print_occlum_conf_file_mac() {
+    cd $working_dir
+    "$project_dir/tools/bin/protect-integrity" show-mac $protected_occlum_conf_json_path
+}
+
+print_occlum_user_space_size() {
+    cd $working_dir
+    local size_with_unit=`cat $occlum_conf_json_path | \
+        python -c "import sys, json; print json.load(sys.stdin)['vm']['user_space_size']"`
+    numfmt --from=iec ${size_with_unit::-1}
+}
+
+build_enclave_so() {
+    cd $project_dir/src/libos/
+    make clean-builtin
+    make
+}
+
+sign_enclave_so() {
+    cd $working_dir
+    rm -f libocclum.signed.so
+    local enclave_so_path="$project_dir/src/libos/libocclum.so"
+    $SGX_SDK/bin/x64/sgx_sign sign \
+        -key $enclave_key_pem_path \
+        -enclave $enclave_so_path \
+        -out "libocclum.signed.so" \
+        -config $enclave_conf_xml_path
+}
+
+# ===========================================================================
+# Parse input arguments
+# ===========================================================================
+
+if [[ $occlum_conf_json_path != *.json ]] ; then
+    report_arg_error "Error: Expect a JSON file as the first argument!"
+    exit -1
+fi
+if [[ $enclave_conf_xml_path != *.xml ]] ; then
+    report_arg_error "Error: Expect a XML file as the second argument!"
+    exit -1
+fi
+if [[ $enclave_key_pem_path != *.pem ]] ; then
+    report_arg_error "Error: Expect a PEM file as the third argument!"
+    exit -1
+fi
+
+# ===========================================================================
+# Build Occlum.json.protected and libocclum.signed.so
+# ===========================================================================
+
+set -e
+
+protect_occlum_json
+echo "GEN => $protected_occlum_conf_json_path"
+
+export OCCLUM_BUILTIN_CONF_FILE_MAC=`print_occlum_conf_file_mac`
+echo "EXPORT => OCCLUM_BUILTIN_CONF_FILE_MAC = $OCCLUM_BUILTIN_CONF_FILE_MAC"
+
+export OCCLUM_BUILTIN_VM_USER_SPACE_SIZE=`print_occlum_user_space_size`
+echo "EXPORT => OCCLUM_BUILTIN_VM_USER_SPACE_SIZE = $OCCLUM_BUILTIN_VM_USER_SPACE_SIZE"
+
+build_enclave_so
+
+sign_enclave_so
+echo "SIGN => libocclum.signed.so"

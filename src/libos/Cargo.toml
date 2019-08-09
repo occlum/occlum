@@ -15,6 +15,8 @@ rcore-fs = { path = "../../deps/sefs/rcore-fs" }
 rcore-fs-sefs = { path = "../../deps/sefs/rcore-fs-sefs" }
 rcore-fs-ramfs = { path = "../../deps/sefs/rcore-fs-ramfs" }
 rcore-fs-mountfs = { path = "../../deps/sefs/rcore-fs-mountfs" }
+serde = { path = "../../deps/rust-sgx-sdk/third_party/serde-rs/serde/serde", features = ["derive"]  }
+serde_json = { path = "../../deps/rust-sgx-sdk/third_party/serde-rs/json" }
 
 [features]
 default = ["integrity_only_opt", "sgx_file_cache"]

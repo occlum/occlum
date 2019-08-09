@@ -1,6 +1,7 @@
 use super::*;
 use super::vm_manager::{VMRange, VMManager, VMMapOptionsBuilder, VMMapOptions, VMMapAddr, VMInitializer};
 use super::user_space_vm::{UserSpaceVMManager, UserSpaceVMRange, USER_SPACE_VM_MANAGER};
+use super::super::config;
 use std::slice;
 
 
@@ -25,10 +26,6 @@ macro_rules! impl_setter_for_process_vm_builder {
 }
 
 impl ProcessVMBuilder {
-    pub const DEFAULT_STACK_SIZE: usize = 1 * 1024 * 1024;
-    pub const DEFAULT_HEAP_SIZE: usize = 16 * 1024 * 1024;
-    pub const DEFAULT_MMAP_SIZE: usize = 16 * 1024 * 1024;
-
     pub fn new(code_size: usize, data_size: usize) -> ProcessVMBuilder {
         ProcessVMBuilder {
             code_size,
@@ -50,9 +47,12 @@ impl ProcessVMBuilder {
         let data_size = self.data_size;
         let ldso_code_size = self.ldso_code_size.unwrap_or(0);
         let ldso_data_size = self.ldso_data_size.unwrap_or(0);
-        let heap_size = self.heap_size.unwrap_or(ProcessVMBuilder::DEFAULT_HEAP_SIZE);
-        let stack_size = self.stack_size.unwrap_or(ProcessVMBuilder::DEFAULT_STACK_SIZE);
-        let mmap_size = self.mmap_size.unwrap_or(ProcessVMBuilder::DEFAULT_MMAP_SIZE);
+        let heap_size = self.heap_size.unwrap_or(
+            config::LIBOS_CONFIG.process.default_heap_size);
+        let stack_size = self.stack_size.unwrap_or(
+            config::LIBOS_CONFIG.process.default_stack_size);
+        let mmap_size = self.mmap_size.unwrap_or(
+            config::LIBOS_CONFIG.process.default_mmap_size);
         let range_sizes = vec![
             code_size, data_size,
             ldso_code_size, ldso_data_size,

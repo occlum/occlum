@@ -41,7 +41,7 @@ lazy_static! {
         let (addr, size) = {
             let mut addr: usize = 0;
             let mut size: usize = 0;
-            unsafe { vm_get_prealloced_data_space(&mut addr, &mut size) };
+            unsafe { vm_get_preallocated_user_space_memory(&mut addr, &mut size) };
             (addr, size)
         };
         let user_space_vm_manager = unsafe {
@@ -55,7 +55,7 @@ lazy_static! {
 }
 
 extern "C" {
-    pub fn vm_get_prealloced_data_space(addr: &mut usize, size: &mut usize);
+    pub fn vm_get_preallocated_user_space_memory(addr: &mut usize, size: &mut usize);
 }
 
 

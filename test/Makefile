@@ -36,7 +36,7 @@ SEFS_PATH := sefs
 
 all: build
 
-build: $(BUILD_TARGETS) sefs
+build: $(BUILD_TARGETS) sefs libocclum.signed.so
 
 $(BUILD_TARGETS): %:
 	@$(ECHO) "$(CYAN)BUILD TEST => $@$(NO_COLOR)"
@@ -57,6 +57,9 @@ sefs:
 			zip
 	@echo "SEFS => $@"
 
+libocclum.signed.so: Occlum.json Enclave_config.xml Enclave_private.pem
+	@$(PROJECT_DIR)/tools/bin/build-enclave Occlum.json Enclave_config.xml Enclave_private.pem
+
 #############################################################################
 # Test targets
 #############################################################################
@@ -65,9 +68,6 @@ test: build $(TEST_TARGETS)
 
 pal: $(PROJECT_DIR)/src/pal/pal
 	@cp $< pal
-
-libocclum.signed.so: $(PROJECT_DIR)/src/libos/libocclum.signed.so
-	@cp $< libocclum.signed.so
 
 $(TEST_TARGETS): test-%: % pal libocclum.signed.so
 	@$(ECHO) "$(CYAN)RUN TEST => $<$(NO_COLOR)"
@@ -98,7 +98,7 @@ $(BENCH_TARGETS): bench-%: % pal libocclum.signed.so
 #############################################################################
 
 clean: $(CLEAN_TARGETS)
-	@$(RM) -f pal libocclum.signed.so
+	@$(RM) -f pal libocclum.signed.so Occlum.json.protected
 	@$(RM) -rf $(FS_PATH) $(SEFS_PATH)
 
 $(CLEAN_TARGETS): clean-%:

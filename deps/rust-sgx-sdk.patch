@@ -1,0 +1,387 @@
+From 5a6f0000e5a5d644e547fcf8a7c9c87f89ae5935 Mon Sep 17 00:00:00 2001
+From: Liu Shuang <ls123674@antfin.com>
+Date: Tue, 6 Aug 2019 06:59:49 +0000
+Subject: [PATCH] Add support for integrity-only SGX protected files
+
+1. Add SgxFile::open_integrity_only API
+1. Add SgxFile::create_integrity_only API
+2. Add the unit test for integrity-only SgxFile
+---
+ samplecode/unit-test/enclave/src/lib.rs       |  2 +
+ samplecode/unit-test/enclave/src/test_file.rs | 41 +++++++++++++
+ sgx_tprotected_fs/src/fs.rs                   | 86 +++++++++++++++++++++++++++
+ sgx_tstd/src/sgxfs.rs                         | 39 +++++++++++-
+ sgx_tstd/src/sys/sgxfs.rs                     | 40 +++++++++++--
+ sgx_types/src/function.rs                     |  4 ++
+ 6 files changed, 205 insertions(+), 7 deletions(-)
+
+diff --git a/samplecode/unit-test/enclave/src/lib.rs b/samplecode/unit-test/enclave/src/lib.rs
+index e368e26..45579da 100644
+--- a/samplecode/unit-test/enclave/src/lib.rs
++++ b/samplecode/unit-test/enclave/src/lib.rs
+@@ -148,6 +148,8 @@ fn test_main_entrance() -> sgx_status_t {
+                      test_serialize_enum,
+                      // std::sgxfs
+                      test_sgxfs,
++                     // std::sgxfs in integrity-only mode
++                     test_sgxfs_integrity_only,
+                      // std::fs
+                      test_fs,
+                      // std::fs untrusted mode
+diff --git a/samplecode/unit-test/enclave/src/test_file.rs b/samplecode/unit-test/enclave/src/test_file.rs
+index e9a85a7..0dbc805 100644
+--- a/samplecode/unit-test/enclave/src/test_file.rs
++++ b/samplecode/unit-test/enclave/src/test_file.rs
+@@ -138,3 +138,44 @@ pub fn test_fs_untrusted_fs_feature_enabled() {
+         assert!(f.is_ok());
+     }
+ }
++
++pub fn test_sgxfs_integrity_only() {
++    let write_data = {
++        let read_result = std::fs::read_to_string("../Makefile");
++        assert!(read_result.is_ok());
++        read_result.unwrap()
++    };
++    let path = "sgx_file_integrity_only.data";
++    let mut new_file = {
++        let create_result = SgxFile::create_integrity_only(path);
++        assert!(create_result.is_ok());
++        create_result.unwrap()
++    };
++    let _ = new_file.write_all(&write_data.as_bytes());
++    let write_mac = {
++        let mac_result = new_file.get_mac();
++        assert!(mac_result.is_ok());
++        mac_result.unwrap()
++    };
++    drop(new_file);
++
++    let mut read_data = String::new();
++    let mut open_file = {
++        let open_result = SgxFile::open_integrity_only(path);
++        assert!(open_result.is_ok());
++        open_result.unwrap()
++    };
++    let _ = open_file.read_to_string(&mut read_data);
++    let read_mac = {
++        let mac_result = open_file.get_mac();
++        assert!(mac_result.is_ok());
++        mac_result.unwrap()
++    };
++    drop(open_file);
++
++    assert_eq!(&write_data[..], &read_data[..]);
++    assert_eq!(&write_mac, &read_mac);
++
++    let remove_result = remove_file(path);
++    assert!(remove_result.is_ok());
++}
+diff --git a/sgx_tprotected_fs/src/fs.rs b/sgx_tprotected_fs/src/fs.rs
+index d1e438c..b9e508f 100644
+--- a/sgx_tprotected_fs/src/fs.rs
++++ b/sgx_tprotected_fs/src/fs.rs
+@@ -47,6 +47,16 @@ unsafe fn rsgx_fopen(filename: &CStr, mode: &CStr, key: &sgx_key_128bit_t) -> Sy
+     }
+ }
+ 
++unsafe fn rsgx_fopen_integrity_only(filename: &CStr, mode: &CStr) -> SysResult<SGX_FILE> {
++
++    let file = sgx_fopen_integrity_only(filename.as_ptr(), mode.as_ptr());
++    if file.is_null() {
++        Err(errno())
++    } else {
++        Ok(file)
++    }
++}
++
+ unsafe fn rsgx_fopen_auto_key(filename: &CStr, mode: &CStr) -> SysResult<SGX_FILE> {
+ 
+     let file = sgx_fopen_auto_key(filename.as_ptr(), mode.as_ptr());
+@@ -218,6 +228,16 @@ unsafe fn rsgx_fimport_auto_key(filename: &CStr, key: &sgx_key_128bit_t) -> SysE
+     }
+ }
+ 
++unsafe fn rsgx_fget_mac(stream: SGX_FILE, mac: &mut sgx_aes_gcm_128bit_tag_t) -> SysError {
++
++    let ret = sgx_fget_mac(stream, mac as * mut sgx_aes_gcm_128bit_tag_t);
++    if ret == 0 {
++        Ok(())
++    } else {
++        Err(errno())
++    }
++}
++
+ pub struct SgxFileStream {
+     stream: SGX_FILE
+ }
+@@ -303,6 +323,48 @@ impl SgxFileStream {
+     }
+ 
+     ///
++    /// The open function creates or opens a protected file in the integrity-only mode.
++    ///
++    /// # Description
++    ///
++    /// open_integrity_only is different from open and open_auto_key.
++    /// The protected file opened by this function is in integrity-only mode.
++    /// In this mode, the content of the file is not encrypted, only MACed.
++    ///
++    /// A protected file created by open_integrity_only cannot later be openned
++    /// by open or open_auto_key and vice versa.
++    ///
++    /// # Parameters
++    ///
++    /// **filename**
++    ///
++    /// The name of the file to be created or opened.
++    ///
++    /// **mode**
++    ///
++    /// The file open mode string. Allowed values are any combination of ‘r’, ‘w’ or ‘a’, with possible ‘+’
++    /// and possible ‘b’ (since string functions are currently not sup- ported, ‘b’ is meaningless).
++    ///
++    /// # Requirements
++    ///
++    /// Header: sgx_tprotected_fs.edl
++    ///
++    /// Library: libsgx_tprotected_fs.a
++    ///
++    /// This API is provided by Occlum's fork of Intel SGX SDK.
++    ///
++    /// # Return value
++    ///
++    /// If the function succeeds, it returns a valid file pointer, which can be used by all the other functions
++    /// in the Protected FS API, otherwise, error code is returned.
++    ///
++    pub fn open_integrity_only(filename: &CStr, mode: &CStr) -> SysResult<SgxFileStream> {
++        unsafe {
++            rsgx_fopen_integrity_only(filename, mode).map(|f| SgxFileStream{ stream: f})
++        }
++    }
++
++    ///
+     /// The read function reads the requested amount of data from the file, and extends the file pointer by that amount.
+     ///
+     /// # Description
+@@ -542,6 +604,30 @@ impl SgxFileStream {
+     pub fn clear_cache(&self) -> SysError {
+         unsafe { rsgx_fclear_cache(self.stream) }
+     }
++
++    ///
++    /// The get_mac function returns the MAC of the protected file.
++    ///
++    /// # Description
++    ///
++    /// # Requirements
++    ///
++    /// Header: sgx_tprotected_fs.edl
++    ///
++    /// Library: libsgx_tprotected_fs.a
++    ///
++    /// This API is provided by Occlum's fork of Intel SGX SDK.
++    ///
++    /// # Return value
++    ///
++    /// If the function succeeded, the MAC is returned.
++    /// If the function failed, error code is returned.
++    ///
++    pub fn get_mac(&self) -> SysResult<sgx_aes_gcm_128bit_tag_t> {
++        let mut mac : sgx_aes_gcm_128bit_tag_t = Default::default();
++        unsafe { rsgx_fget_mac(self.stream, &mut mac)?; }
++        Ok(mac)
++    }
+ }
+ 
+ ///
+diff --git a/sgx_tstd/src/sgxfs.rs b/sgx_tstd/src/sgxfs.rs
+index b03d174..1b2ce52 100644
+--- a/sgx_tstd/src/sgxfs.rs
++++ b/sgx_tstd/src/sgxfs.rs
+@@ -28,7 +28,7 @@
+ 
+ //! Filesystem manipulation operations.
+ 
+-use sgx_types::sgx_key_128bit_t;
++use sgx_types::{sgx_key_128bit_t, sgx_aes_gcm_128bit_tag_t};
+ use io::{self, SeekFrom, Seek, Read, Initializer, Write};
+ use path::Path;
+ use sys::sgxfs as fs_imp;
+@@ -120,6 +120,19 @@ impl SgxFile {
+         OpenOptions::new().read(true).open(path.as_ref())
+     }
+ 
++    /// Attempts to open a file in read-only and integrity-only mode.
++    ///
++    /// See the [`OpenOptions::open`] method for more details.
++    ///
++    /// # Errors
++    ///
++    /// This function will return an error if `path` does not already exist.
++    /// Other errors may also be returned according to [`OpenOptions::open`].
++    ///
++    pub fn open_integrity_only<P: AsRef<Path>>(path: P) -> io::Result<SgxFile> {
++        OpenOptions::new().read(true).open_integrity_only(path.as_ref())
++    }
++
+     /// Opens a file in write-only mode.
+     ///
+     /// This function will create a file if it does not exist,
+@@ -129,6 +142,15 @@ impl SgxFile {
+         OpenOptions::new().write(true).open(path.as_ref())
+     }
+ 
++    /// Opens a file in write-only and integrity-only mode.
++    ///
++    /// This function will create a file if it does not exist,
++    /// and will truncate it if it does.
++    ///
++    pub fn create_integrity_only<P: AsRef<Path>>(path: P) -> io::Result<SgxFile> {
++        OpenOptions::new().write(true).open_integrity_only(path.as_ref())
++    }
++
+     pub fn open_ex<P: AsRef<Path>>(path: P, key: &sgx_key_128bit_t) -> io::Result<SgxFile> {
+         OpenOptions::new().read(true).open_ex(path.as_ref(), key)
+     }
+@@ -148,6 +170,12 @@ impl SgxFile {
+     pub fn clear_cache(&self) -> io::Result<()> {
+         self.inner.clear_cache()
+     }
++
++    /// Gets the MAC of the SGX protected file
++    ///
++    pub fn get_mac(&self) -> io::Result<sgx_aes_gcm_128bit_tag_t> {
++        self.inner.get_mac()
++    }
+ }
+ 
+ impl AsInner<fs_imp::SgxFile> for SgxFile {
+@@ -284,6 +312,10 @@ impl OpenOptions {
+         self._open_ex(path.as_ref(), key)
+     }
+ 
++    pub fn open_integrity_only<P: AsRef<Path>>(&self, path: P) -> io::Result<SgxFile> {
++        self._open_integrity_only(path.as_ref())
++    }
++
+     fn _open(&self, path: &Path) -> io::Result<SgxFile> {
+         let inner = fs_imp::SgxFile::open(path, &self.0)?;
+         Ok(SgxFile { inner: inner })
+@@ -293,6 +325,11 @@ impl OpenOptions {
+         let inner = fs_imp::SgxFile::open_ex(path, &self.0, key)?;
+         Ok(SgxFile { inner: inner })
+     }
++
++    fn _open_integrity_only(&self, path: &Path) -> io::Result<SgxFile> {
++        let inner = fs_imp::SgxFile::open_integrity_only(path, &self.0)?;
++        Ok(SgxFile { inner: inner })
++    }
+ }
+ 
+ impl AsInnerMut<fs_imp::OpenOptions> for OpenOptions {
+diff --git a/sgx_tstd/src/sys/sgxfs.rs b/sgx_tstd/src/sys/sgxfs.rs
+index a32814d..ebc3627 100644
+--- a/sgx_tstd/src/sys/sgxfs.rs
++++ b/sgx_tstd/src/sys/sgxfs.rs
+@@ -26,7 +26,7 @@
+ // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+-use sgx_types::{sgx_status_t, sgx_key_128bit_t};
++use sgx_types::{sgx_status_t, sgx_key_128bit_t, sgx_aes_gcm_128bit_tag_t};
+ use sgx_trts::libc;
+ use sgx_tprotected_fs::{self, SgxFileStream};
+ use os::unix::prelude::*;
+@@ -87,7 +87,7 @@ impl SgxFile {
+         let path = cstr(path)?;
+         let mode = opts.get_access_mode()?;
+         let opts = CString::new(mode.as_bytes())?;
+-        SgxFile::open_c(&path, &opts, &sgx_key_128bit_t::default(), true)
++        SgxFile::open_c(&path, &opts, &sgx_key_128bit_t::default(), true, false)
+     }
+ 
+     pub fn open_ex(path: &Path, opts: &OpenOptions, key: &sgx_key_128bit_t) -> io::Result<SgxFile> {
+@@ -95,12 +95,23 @@ impl SgxFile {
+         let path = cstr(path)?;
+         let mode = opts.get_access_mode()?;
+         let opts = CString::new(mode.as_bytes())?;
+-        SgxFile::open_c(&path, &opts, key, false)
++        SgxFile::open_c(&path, &opts, key, false, false)
+     }
+ 
+-    pub fn open_c(path: &CStr, opts: &CStr, key: &sgx_key_128bit_t, auto: bool) -> io::Result<SgxFile> {
++    pub fn open_integrity_only(path: &Path, opts: &OpenOptions) -> io::Result<SgxFile> {
+ 
+-        let file = if auto == true {
++        let path = cstr(path)?;
++        let mode = opts.get_access_mode()?;
++        let opts = CString::new(mode.as_bytes())?;
++        SgxFile::open_c(&path, &opts, &sgx_key_128bit_t::default(), false, true)
++
++    }
++
++    pub fn open_c(path: &CStr, opts: &CStr, key: &sgx_key_128bit_t, auto: bool, integrity_only: bool) -> io::Result<SgxFile> {
++
++        let file = if integrity_only == true {
++            SgxFileStream::open_integrity_only(path, opts)
++        } else if auto == true {
+             SgxFileStream::open_auto_key(path, opts)
+         } else {
+             SgxFileStream::open(path, opts, key)
+@@ -233,6 +244,23 @@ impl SgxFile {
+             }
+         })
+     }
++
++    pub fn get_mac(&self) -> io::Result<sgx_aes_gcm_128bit_tag_t> {
++
++        self.0.get_mac().map_err(|err| {
++            match err {
++                1 => Error::from_sgx_error(sgx_status_t::SGX_ERROR_UNEXPECTED),
++                2 => Error::from_sgx_error(sgx_status_t::SGX_ERROR_INVALID_PARAMETER),
++                3 => Error::from_sgx_error(sgx_status_t::SGX_ERROR_OUT_OF_MEMORY),
++                4 | 5 => Error::from_raw_os_error(err),
++                r if r > 4096 => {
++                    let status = sgx_status_t::from_repr(r as u32).unwrap_or(sgx_status_t::SGX_ERROR_UNEXPECTED);
++                    Error::from_sgx_error(status)
++                },
++                _ => Error::from_raw_os_error(err),
++            }
++        })
++    }
+ }
+ 
+ pub fn remove(path: &Path) -> io::Result<()> {
+@@ -324,4 +352,4 @@ pub fn copy(from: &Path, to: &Path) -> io::Result<u64> {
+     let ret = io::copy(&mut reader, &mut writer)?;
+     fs::set_permissions(to, perm)?;
+     Ok(ret)
+-}
+\ No newline at end of file
++}
+diff --git a/sgx_types/src/function.rs b/sgx_types/src/function.rs
+index 91869f7..fdd8a04 100644
+--- a/sgx_types/src/function.rs
++++ b/sgx_types/src/function.rs
+@@ -551,6 +551,8 @@ extern {
+ 
+     pub fn sgx_fopen_auto_key(filename: * const ::c_char, mode: * const ::c_char) -> SGX_FILE;
+ 
++    pub fn sgx_fopen_integrity_only(filename: * const ::c_char, mode: * const ::c_char) -> SGX_FILE;
++
+     pub fn sgx_fwrite(ptr: * const ::c_void,
+                       size: ::size_t,
+                       count: ::size_t,
+@@ -582,6 +584,8 @@ extern {
+     pub fn sgx_fimport_auto_key(filename: * const ::c_char, key: * const sgx_key_128bit_t) -> ::int32_t;
+ 
+     pub fn sgx_fclear_cache(stream: SGX_FILE) -> ::int32_t;
++
++    pub fn sgx_fget_mac(stream: SGX_FILE, mac: * mut sgx_aes_gcm_128bit_tag_t) -> ::int32_t;
+ }
+ 
+ /* intel sgx sdk 2.0 */
+-- 
+2.7.4
+

@@ -21,7 +21,7 @@ pub use std::fmt::{Debug, Display};
 pub use std::io::{Read, Seek, SeekFrom, Write};
 pub use std::iter::Iterator;
 pub use std::rc::Rc;
-pub use std::string::String;
+pub use std::string::{String, ToString};
 pub use std::vec::Vec;
 
 pub use errno::Errno;

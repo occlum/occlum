@@ -1,8 +1,7 @@
 include ../sgxenv.mk
 
-DEBUG=1
+DEBUG := 1
 
-LIBOS_ENCLAVE := libocclum.signed.so
 LIBOS_SO := libocclum.so # Link $(LIBOS_A), $(C_OBJS) and all dependencies
 LIBOS_A := libocclum_rs.a # Built from Rust code
 
@@ -17,17 +16,25 @@ ENCLAVE_CONFIG := Enclave_config.xml
 ENCLAVE_KEY := Enclave_private.pem
 
 C_FLAGS := $(SGX_CFLAGS_T) -fno-stack-protector -I./include/
+
+# Pass builtin values by defining macros
+#
+# The MAC of Occlum config file must be builtin into the binary
+ifdef OCCLUM_BUILTIN_CONF_FILE_MAC
+C_FLAGS += -DOCCLUM_BUILTIN_CONF_FILE_MAC='"$(OCCLUM_BUILTIN_CONF_FILE_MAC)"'
+endif
+# The total size of user-space memory must be builtin into the binary
+ifdef OCCLUM_BUILTIN_VM_USER_SPACE_SIZE
+C_FLAGS += -DOCCLUM_BUILTIN_VM_USER_SPACE_SIZE='($(OCCLUM_BUILTIN_VM_USER_SPACE_SIZE))'
+endif
+
 _Other_Link_Flags := -L$(RUST_SGX_SDK_DIR)/compiler-rt/ -L.
 _Other_Enclave_Libs := -lcompiler-rt-patch -locclum_rs -lsgx_tprotected_fs
 LINK_FLAGS := $(SGX_LFLAGS_T)
 
 .PHONY: all compiler-rt clean
 
-all: $(LIBOS_ENCLAVE)
-
-$(LIBOS_ENCLAVE): $(LIBOS_SO)
-	@$(SGX_ENCLAVE_SIGNER) sign -key $(ENCLAVE_KEY) -enclave $^ -out $@ -config $(ENCLAVE_CONFIG)
-	@echo "SIGN => $@"
+all: $(LIBOS_SO)
 
 $(LIBOS_SO): compiler-rt $(LIBOS_A) $(C_OBJS) $(S_OBJS)
 	@$(CC) $(C_OBJS) $(S_OBJS) -o $@ $(LINK_FLAGS)
@@ -60,6 +67,9 @@ $(LIBOS_A): $(RUST_SRCS)
 	@echo "CARGO (release) => $(LIBOS_A)"
 endif
 
+clean-builtin:
+	@-$(RM) src/builtin/*.o
+
 clean:
 	@cargo clean
-	@-$(RM) $(LIBOS_ENCLAVE) $(LIBOS_SO) $(LIBOS_A) $(C_OBJS) $(S_OBJS) $(EDL_C_SRCS)
+	@-$(RM) $(LIBOS_SO) $(LIBOS_A) $(C_OBJS) $(S_OBJS) $(EDL_C_SRCS)
