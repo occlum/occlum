@@ -1,8 +1,20 @@
 use super::*;
 
 extern "C" {
-    fn ocall_sched_getaffinity(ret: *mut i32, errno: *mut i32, pid: i32, cpusetsize: size_t, mask: *mut c_uchar) -> sgx_status_t;
-    fn ocall_sched_setaffinity(ret: *mut i32, errno: *mut i32, pid: i32, cpusetsize: size_t, mask: *const c_uchar) -> sgx_status_t;
+    fn ocall_sched_getaffinity(
+        ret: *mut i32,
+        errno: *mut i32,
+        pid: i32,
+        cpusetsize: size_t,
+        mask: *mut c_uchar,
+    ) -> sgx_status_t;
+    fn ocall_sched_setaffinity(
+        ret: *mut i32,
+        errno: *mut i32,
+        pid: i32,
+        cpusetsize: size_t,
+        mask: *const c_uchar,
+    ) -> sgx_status_t;
 }
 
 pub struct CpuSet {
@@ -11,13 +23,17 @@ pub struct CpuSet {
 
 impl CpuSet {
     pub fn new(len: usize) -> CpuSet {
-        let mut cpuset = CpuSet { vec: Vec::with_capacity(len) };
+        let mut cpuset = CpuSet {
+            vec: Vec::with_capacity(len),
+        };
         cpuset.vec.resize(len, 0);
         cpuset
     }
 
     pub fn from_raw_buf(ptr: *const u8, cpusize: usize) -> CpuSet {
-        let mut cpuset = CpuSet { vec: Vec::with_capacity(cpusize) };
+        let mut cpuset = CpuSet {
+            vec: Vec::with_capacity(cpusize),
+        };
         let buf_slice = unsafe { std::slice::from_raw_parts(ptr, cpusize) };
         cpuset.vec.extend_from_slice(buf_slice);
         cpuset
@@ -63,11 +79,7 @@ impl std::fmt::UpperHex for CpuSet {
 }
 
 fn find_host_tid(pid: pid_t) -> Result<pid_t, Error> {
-    let process_ref = if pid == 0 {
-        get_current()
-    } else {
-        get(pid)?
-    };
+    let process_ref = if pid == 0 { get_current() } else { get(pid)? };
     let mut process = process_ref.lock().unwrap();
     let host_tid = process.get_host_tid();
     Ok(host_tid)

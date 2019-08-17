@@ -64,8 +64,8 @@ pub fn do_spawn<P: AsRef<Path>>(
     };
 
     let ldso_elf_file = {
-        let ldso_elf_file =
-            ElfFile::new(&ldso_elf_buf).map_err(|e| (Errno::ENOEXEC, "Failed to parse the ELF file"))?;
+        let ldso_elf_file = ElfFile::new(&ldso_elf_buf)
+            .map_err(|e| (Errno::ENOEXEC, "Failed to parse the ELF file"))?;
         header::sanity_check(&ldso_elf_file)
             .map_err(|e| (Errno::ENOEXEC, "Failed to parse the ELF file"))?;
         /*
@@ -78,15 +78,13 @@ pub fn do_spawn<P: AsRef<Path>>(
 
     let (new_pid, new_process_ref) = {
         let cwd = parent_ref.lock().unwrap().get_cwd().to_owned();
-        let vm = init_vm::do_init(&elf_file, &elf_buf[..],
-                                  &ldso_elf_file, &ldso_elf_buf[..])?;
+        let vm = init_vm::do_init(&elf_file, &elf_buf[..], &ldso_elf_file, &ldso_elf_buf[..])?;
         let base_addr = vm.get_base_addr();
         let auxtbl = init_auxtbl(&vm, &elf_file)?;
         let task = {
             let ldso_entry = {
                 let ldso_base_addr = vm.get_ldso_code_range().start();
-                let ldso_entry = ldso_base_addr +
-                    elf_helper::get_start_address(&ldso_elf_file)?;
+                let ldso_entry = ldso_base_addr + elf_helper::get_start_address(&ldso_elf_file)?;
                 if !vm.get_ldso_code_range().contains(ldso_entry) {
                     return errno!(EINVAL, "Invalid program entry");
                 }
@@ -96,8 +94,13 @@ pub fn do_spawn<P: AsRef<Path>>(
             let user_stack_limit = vm.get_stack_limit();
             let user_rsp = init_stack::do_init(user_stack_base, 4096, argv, envp, &auxtbl)?;
             unsafe {
-                Task::new(ldso_entry, user_rsp,
-                          user_stack_base, user_stack_limit, None)?
+                Task::new(
+                    ldso_entry,
+                    user_rsp,
+                    user_stack_base,
+                    user_stack_limit,
+                    None,
+                )?
             }
         };
         let vm_ref = Arc::new(SgxMutex::new(vm));
@@ -167,10 +170,7 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
     Ok(file_table)
 }
 
-fn init_auxtbl(
-    process_vm: &ProcessVM,
-    elf_file: &ElfFile,
-) -> Result<AuxTable, Error> {
+fn init_auxtbl(process_vm: &ProcessVM, elf_file: &ElfFile) -> Result<AuxTable, Error> {
     let mut auxtbl = AuxTable::new();
     auxtbl.set(AuxKey::AT_PAGESZ, 4096)?;
     auxtbl.set(AuxKey::AT_UID, 0)?;

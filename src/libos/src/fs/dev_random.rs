@@ -31,9 +31,8 @@ impl File for DevRandom {
                 }
                 Err(e) => {
                     if total_nbytes > 0 {
-                        break
-                    }
-                    else {
+                        break;
+                    } else {
                         return Err(e);
                     }
                 }

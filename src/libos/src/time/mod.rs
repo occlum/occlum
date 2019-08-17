@@ -35,7 +35,6 @@ extern "C" {
     fn ocall_gettimeofday(sec: *mut time_t, usec: *mut suseconds_t) -> sgx_status_t;
 }
 
-
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 #[allow(non_camel_case_types)]
@@ -50,14 +49,14 @@ pub type clockid_t = i32;
 #[derive(Debug, Copy, Clone)]
 #[allow(non_camel_case_types)]
 pub enum ClockID {
-    CLOCK_REALTIME           = 0,
-    CLOCK_MONOTONIC          = 1,
+    CLOCK_REALTIME = 0,
+    CLOCK_MONOTONIC = 1,
     CLOCK_PROCESS_CPUTIME_ID = 2,
-    CLOCK_THREAD_CPUTIME_ID  = 3,
-    CLOCK_MONOTONIC_RAW      = 4,
-    CLOCK_REALTIME_COARSE    = 5,
-    CLOCK_MONOTONIC_COARSE   = 6,
-    CLOCK_BOOTTIME           = 7,
+    CLOCK_THREAD_CPUTIME_ID = 3,
+    CLOCK_MONOTONIC_RAW = 4,
+    CLOCK_REALTIME_COARSE = 5,
+    CLOCK_MONOTONIC_COARSE = 6,
+    CLOCK_BOOTTIME = 7,
 }
 
 impl ClockID {
@@ -81,7 +80,11 @@ pub fn do_clock_gettime(clockid: ClockID) -> Result<timespec_t, Error> {
     let mut sec = 0;
     let mut nsec = 0;
     unsafe {
-        ocall_clock_gettime(clockid as clockid_t, &mut sec as *mut time_t, &mut nsec as *mut i64);
+        ocall_clock_gettime(
+            clockid as clockid_t,
+            &mut sec as *mut time_t,
+            &mut nsec as *mut i64,
+        );
     }
     Ok(timespec_t { sec, nsec })
 }
@@ -89,7 +92,6 @@ pub fn do_clock_gettime(clockid: ClockID) -> Result<timespec_t, Error> {
 extern "C" {
     fn ocall_clock_gettime(clockid: clockid_t, sec: *mut time_t, ns: *mut i64) -> sgx_status_t;
 }
-
 
 // For SEFS
 

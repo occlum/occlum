@@ -40,7 +40,8 @@ impl Segment {
             return Err((
                 Errno::EINVAL,
                 "Memory address and file offset is not equal, per modulo",
-            ).into());
+            )
+                .into());
         }
         if ph64.mem_size < ph64.file_size {
             return Err((Errno::EINVAL, "Memory size must be greater than file size").into());

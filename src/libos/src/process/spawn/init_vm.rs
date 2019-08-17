@@ -7,7 +7,7 @@ pub fn do_init(
     elf_file: &ElfFile,
     elf_buf: &[u8],
     ldso_elf_file: &ElfFile,
-    ldso_elf_buf: &[u8]
+    ldso_elf_buf: &[u8],
 ) -> Result<ProcessVM, Error> {
     // Alloc all virtual memory areas
     let mut code_seg = get_code_segment(elf_file)?;
@@ -24,7 +24,10 @@ pub fn do_init(
     let ldso_code_start = 0;
     let ldso_code_end = align_down(ldso_data_seg.get_mem_addr(), ldso_data_seg.get_mem_align());
     let ldso_data_start = ldso_code_end;
-    let ldso_data_end = align_up(ldso_data_seg.get_mem_addr() + ldso_data_seg.get_mem_size(), 4096);
+    let ldso_data_end = align_up(
+        ldso_data_seg.get_mem_addr() + ldso_data_seg.get_mem_size(),
+        4096,
+    );
     let ldso_code_size = ldso_code_end - ldso_code_start;
     let ldso_data_size = ldso_data_end - ldso_data_start;
 

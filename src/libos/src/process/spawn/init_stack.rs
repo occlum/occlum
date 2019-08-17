@@ -86,8 +86,7 @@ impl StackBuf {
         })
     }
 
-    pub fn put(&self, val: u64) -> Result<*const u64, Error>
-    {
+    pub fn put(&self, val: u64) -> Result<*const u64, Error> {
         let val_ptr = self.alloc(8, 8)? as *mut u64;
         unsafe {
             ptr::write(val_ptr, val);
@@ -206,14 +205,14 @@ pub enum AuxKey {
     AT_CLKTCK = 17,   /* frequency at which times() increments */
 
     /* 18...22 not used */
-    AT_SECURE = 23,   /* secure mode boolean */
+    AT_SECURE = 23, /* secure mode boolean */
     AT_BASE_PLATFORM = 24, /* string identifying real platform, may
                      * differ from AT_PLATFORM. */
-    AT_RANDOM = 25,   /* address of 16 random bytes */
-    AT_HWCAP2 = 26,   /* extension of AT_HWCAP */
+    AT_RANDOM = 25, /* address of 16 random bytes */
+    AT_HWCAP2 = 26, /* extension of AT_HWCAP */
 
     /* 28...30 not used */
-    AT_EXECFN = 31,   /* filename of program */
+    AT_EXECFN = 31, /* filename of program */
     AT_SYSINFO = 32,
 
     /* Occlum-specific entries */
@@ -238,7 +237,8 @@ impl AuxTable {
         if key == AuxKey::AT_NULL || key == AuxKey::AT_IGNORE {
             return errno!(EINVAL, "Illegal key");
         }
-        self.table.entry(key)
+        self.table
+            .entry(key)
             .and_modify(|val_mut| *val_mut = val)
             .or_insert(val);
         Ok(())
@@ -248,7 +248,7 @@ impl AuxTable {
         self.table.get(&key).map(|val_ref| *val_ref)
     }
 
-    pub fn del(&mut self, key: AuxKey) -> Option<u64>{
+    pub fn del(&mut self, key: AuxKey) -> Option<u64> {
         self.table.remove(&key)
     }
 

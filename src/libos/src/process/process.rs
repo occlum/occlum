@@ -1,7 +1,7 @@
 use super::task::Task;
 use super::*;
 use fs::{File, FileRef, FileTable};
-use vm::{ProcessVM};
+use vm::ProcessVM;
 
 lazy_static! {
     // Dummy object to make all processes having a parent

@@ -1,4 +1,4 @@
-use super::{sgx_aes_gcm_128bit_tag_t};
+use super::sgx_aes_gcm_128bit_tag_t;
 use rcore_fs::dev::TimeProvider;
 use rcore_fs::vfs::Timespec;
 use rcore_fs_sefs::dev::*;
@@ -31,7 +31,11 @@ impl SgxStorage {
     /// It lookups cache first, if miss, then call `open_fn` to open one,
     /// and add it to cache before return.
     #[cfg(feature = "sgx_file_cache")]
-    fn get(&self, file_id: usize, open_fn: impl FnOnce(&Self) -> DevResult<LockedFile>) -> DevResult<LockedFile> {
+    fn get(
+        &self,
+        file_id: usize,
+        open_fn: impl FnOnce(&Self) -> DevResult<LockedFile>,
+    ) -> DevResult<LockedFile> {
         // query cache
         let mut caches = self.file_cache.lock().unwrap();
         if let Some(locked_file) = caches.get(&file_id) {
@@ -46,7 +50,11 @@ impl SgxStorage {
     }
     /// Get file by `file_id` without cache.
     #[cfg(not(feature = "sgx_file_cache"))]
-    fn get(&self, file_id: usize, open_fn: impl FnOnce(&Self) -> DevResult<LockedFile>) -> LockedFile {
+    fn get(
+        &self,
+        file_id: usize,
+        open_fn: impl FnOnce(&Self) -> DevResult<LockedFile>,
+    ) -> LockedFile {
         open_fn(self)
     }
 
@@ -84,11 +92,13 @@ impl Storage for SgxStorage {
 
             // Check the MAC of the root file against the given root MAC of the storage
             if file_id == 0 && self.root_mac.is_some() {
-                let root_file_mac = file.get_mac()
-                    .expect("Failed to get mac");
+                let root_file_mac = file.get_mac().expect("Failed to get mac");
                 if root_file_mac != self.root_mac.unwrap() {
-                    println!("Expected MAC = {:#?}, actual MAC = {:?}",
-                        self.root_mac.unwrap(), root_file_mac);
+                    println!(
+                        "Expected MAC = {:#?}, actual MAC = {:?}",
+                        self.root_mac.unwrap(),
+                        root_file_mac
+                    );
                     return Err(DeviceError);
                 }
             }

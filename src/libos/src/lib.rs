@@ -23,9 +23,9 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate rcore_fs;
-extern crate rcore_fs_sefs;
-extern crate rcore_fs_ramfs;
 extern crate rcore_fs_mountfs;
+extern crate rcore_fs_ramfs;
+extern crate rcore_fs_sefs;
 #[macro_use]
 extern crate derive_builder;
 extern crate serde;
@@ -39,9 +39,9 @@ use std::panic;
 
 #[macro_use]
 mod prelude;
-mod errno;
-mod entry;
 mod config;
+mod entry;
+mod errno;
 mod fs;
 mod misc;
 mod process;

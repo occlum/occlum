@@ -1,14 +1,14 @@
+use fs::{File, FileDesc, FileRef};
 use prelude::*;
 use process::{get_current, Process, ProcessRef};
-use fs::{FileDesc, FileRef, File};
 use std::fmt;
 
-mod vm_manager;
-mod user_space_vm;
 mod process_vm;
+mod user_space_vm;
+mod vm_manager;
 
-pub use self::process_vm::{ProcessVM, ProcessVMBuilder, MMapFlags, VMPerms};
-pub use self::vm_manager::{VMRange};
+pub use self::process_vm::{MMapFlags, ProcessVM, ProcessVMBuilder, VMPerms};
+pub use self::vm_manager::VMRange;
 
 pub fn do_mmap(
     addr: usize,

@@ -52,7 +52,6 @@ impl Task {
     }
 }
 
-
 lazy_static! {
     static ref NEW_PROCESS_QUEUE: SgxMutex<VecDeque<ProcessRef>> =
         { SgxMutex::new(VecDeque::new()) };

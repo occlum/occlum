@@ -1,5 +1,5 @@
 use super::*;
-use std::{slice};
+use std::slice;
 
 #[derive(Clone, Debug)]
 pub enum VMInitializer {
@@ -19,12 +19,12 @@ impl VMInitializer {
         match self {
             VMInitializer::DoNothing() => {
                 // Do nothing
-            },
+            }
             VMInitializer::FillZeros() => {
                 for b in buf {
                     *b = 0;
                 }
-            },
+            }
             VMInitializer::LoadFromFile { file, offset } => {
                 // TODO: make sure that read_at does not move file cursor
                 let len = file.read_at(*offset, buf)?;
@@ -37,12 +37,11 @@ impl VMInitializer {
     }
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VMMapAddr {
-    Any,           // Free to choose any address
-    Hint(usize),   // Prefer the given address
-    Fixed(usize),  // Must be the given address
+    Any,          // Free to choose any address
+    Hint(usize),  // Prefer the given address
+    Fixed(usize), // Must be the given address
 }
 
 impl Default for VMMapAddr {
@@ -51,21 +50,22 @@ impl Default for VMMapAddr {
     }
 }
 
-
 #[derive(Builder, Debug, Default)]
 #[builder(build_fn(skip), no_std)]
 pub struct VMMapOptions {
     size: usize,
     align: usize,
     addr: VMMapAddr,
-    initializer: VMInitializer
+    initializer: VMInitializer,
 }
 
 // VMMapOptionsBuilder is generated automatically, except the build function
 impl VMMapOptionsBuilder {
     pub fn build(&self) -> Result<VMMapOptions, Error> {
         let size = {
-            let size = self.size.ok_or_else(|| (Errno::EINVAL, "Invalid size for mmap"))?;
+            let size = self
+                .size
+                .ok_or_else(|| (Errno::EINVAL, "Invalid size for mmap"))?;
             if size == 0 {
                 return errno!(EINVAL, "Invalid size for mmap");
             }
@@ -82,9 +82,7 @@ impl VMMapOptionsBuilder {
             let addr = self.addr.unwrap_or_default();
             match addr {
                 // TODO: check addr + size overflow
-                VMMapAddr::Any => {
-                   VMMapAddr::Any
-                }
+                VMMapAddr::Any => VMMapAddr::Any,
                 VMMapAddr::Hint(addr) => {
                     let addr = align_down(addr, PAGE_SIZE);
                     VMMapAddr::Hint(addr)
@@ -98,8 +96,8 @@ impl VMMapOptionsBuilder {
             }
         };
         let initializer = match self.initializer.as_ref() {
-            Some(initializer) => { initializer.clone() }
-            None => { VMInitializer::default() }
+            Some(initializer) => initializer.clone(),
+            None => VMInitializer::default(),
         };
         Ok(VMMapOptions {
             size,
@@ -124,7 +122,6 @@ impl VMMapOptions {
     }
 }
 
-
 #[derive(Debug, Default)]
 pub struct VMManager {
     range: VMRange,
@@ -141,20 +138,14 @@ impl VMManager {
             let end_sentry = VMRange::from(end, end)?;
             vec![start_sentry, end_sentry]
         };
-        Ok(VMManager {
-            range,
-            sub_ranges,
-        })
+        Ok(VMManager { range, sub_ranges })
     }
 
     pub fn range(&self) -> &VMRange {
         &self.range
     }
 
-    pub fn mmap(
-        &mut self,
-        options: &VMMapOptions,
-    ) -> Result<usize, Error> {
+    pub fn mmap(&mut self, options: &VMMapOptions) -> Result<usize, Error> {
         // TODO: respect options.align when mmap
         let addr = *options.addr();
         let size = *options.size();
@@ -194,22 +185,24 @@ impl VMManager {
 
             let effective_munmap_range_opt = munmap_range.intersect(&self.range);
             if effective_munmap_range_opt.is_none() {
-                return Ok(())
+                return Ok(());
             }
 
             let effective_munmap_range = effective_munmap_range_opt.unwrap();
             if effective_munmap_range.empty() {
-                return Ok(())
+                return Ok(());
             }
             effective_munmap_range
         };
 
-        let new_sub_ranges = self.sub_ranges
+        let new_sub_ranges = self
+            .sub_ranges
             .iter()
             .flat_map(|subrange| {
                 if subrange.size() > 0 {
                     subrange.subtract(&munmap_range)
-                } else { // Keep the two sentry subranges intact
+                } else {
+                    // Keep the two sentry subranges intact
                     vec![*subrange]
                 }
             })
@@ -219,17 +212,20 @@ impl VMManager {
     }
 
     pub fn find_mmap_region(&self, addr: usize) -> Result<&VMRange, Error> {
-        self.sub_ranges.iter()
+        self.sub_ranges
+            .iter()
             .find(|subrange| subrange.contains(addr))
-            .ok_or(Error::new(Errno::ESRCH,
-                              "no mmap regions that contains the address"))
+            .ok_or(Error::new(
+                Errno::ESRCH,
+                "no mmap regions that contains the address",
+            ))
     }
 
     // Find the free subrange that satisfies the constraints of size and address
     fn find_free_subrange(
         &mut self,
         size: usize,
-        addr: VMMapAddr
+        addr: VMMapAddr,
     ) -> Result<(usize, VMRange), Error> {
         // TODO: reduce the complexity from O(N) to O(log(N)), where N is
         // the number of existing subranges.
@@ -253,9 +249,7 @@ impl VMManager {
                     continue;
                 }
 
-                unsafe {
-                    VMRange::from_unchecked(free_range_start, free_range_end)
-                }
+                unsafe { VMRange::from_unchecked(free_range_start, free_range_end) }
             };
 
             match addr {
@@ -289,7 +283,8 @@ impl VMManager {
             }
 
             if result_free_range == None
-                || result_free_range.as_ref().unwrap().size() > free_range.size() {
+                || result_free_range.as_ref().unwrap().size() > free_range.size()
+            {
                 result_free_range = Some(free_range);
                 result_idx = Some(idx);
             }
@@ -308,7 +303,7 @@ impl VMManager {
         &self,
         size: usize,
         addr: VMMapAddr,
-        free_subrange: &VMRange
+        free_subrange: &VMRange,
     ) -> VMRange {
         debug_assert!(free_subrange.size() >= size);
 
@@ -384,19 +379,22 @@ impl VMRange {
         let other_end = other.end();
 
         match (self_start < other_start, other_end < self_end) {
-            (false, false) => {
-                Vec::new()
-            }
+            (false, false) => Vec::new(),
             (false, true) => unsafe {
                 vec![VMRange::from_unchecked(self_start.max(other_end), self_end)]
-            }
+            },
             (true, false) => unsafe {
-                vec![VMRange::from_unchecked(self_start, self_end.min(other_start))]
-            }
+                vec![VMRange::from_unchecked(
+                    self_start,
+                    self_end.min(other_start),
+                )]
+            },
             (true, true) => unsafe {
-                vec![VMRange::from_unchecked(self_start, other_start),
-                     VMRange::from_unchecked(other_end, self_end)]
-            }
+                vec![
+                    VMRange::from_unchecked(self_start, other_start),
+                    VMRange::from_unchecked(other_end, self_end),
+                ]
+            },
         }
     }
 
@@ -407,7 +405,10 @@ impl VMRange {
             return None;
         }
         unsafe {
-            Some(VMRange::from_unchecked(intersection_start, intersection_end))
+            Some(VMRange::from_unchecked(
+                intersection_start,
+                intersection_end,
+            ))
         }
     }
 }

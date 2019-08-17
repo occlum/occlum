@@ -1,5 +1,5 @@
+use super::vm::VMRange;
 use super::*;
-use super::vm::{VMRange};
 
 pub struct ThreadGroup {
     threads: Vec<ProcessRef>,
@@ -64,9 +64,13 @@ pub fn do_clone(
             let user_stack_base = user_stack_range.end();
             let user_stack_limit = user_stack_range.start();
             unsafe {
-                Task::new(thread_entry, user_rsp,
-                          user_stack_base, user_stack_limit,
-                          new_tls)?
+                Task::new(
+                    thread_entry,
+                    user_rsp,
+                    user_stack_base,
+                    user_stack_limit,
+                    new_tls,
+                )?
             }
         };
         let files_ref = current.get_files().clone();
@@ -119,11 +123,9 @@ fn guess_user_stack_bound(vm: &ProcessVM, user_rsp: usize) -> Result<&VMRange, E
     // The next three cases are very unlikely, but valid
     else if vm.get_stack_range().contains(user_rsp) {
         Ok(vm.get_stack_range())
-    }
-    else if vm.get_heap_range().contains(user_rsp) {
+    } else if vm.get_heap_range().contains(user_rsp) {
         Ok(vm.get_heap_range())
-    }
-    else if vm.get_data_range().contains(user_rsp) {
+    } else if vm.get_data_range().contains(user_rsp) {
         Ok(vm.get_data_range())
     }
     // Invalid

@@ -1,9 +1,10 @@
-use super::*;
-use super::vm_manager::{VMRange, VMManager, VMMapOptionsBuilder, VMMapOptions, VMMapAddr, VMInitializer};
-use super::user_space_vm::{UserSpaceVMManager, UserSpaceVMRange, USER_SPACE_VM_MANAGER};
 use super::super::config;
+use super::user_space_vm::{UserSpaceVMManager, UserSpaceVMRange, USER_SPACE_VM_MANAGER};
+use super::vm_manager::{
+    VMInitializer, VMManager, VMMapAddr, VMMapOptions, VMMapOptionsBuilder, VMRange,
+};
+use super::*;
 use std::slice;
-
 
 #[derive(Debug, Default)]
 pub struct ProcessVMBuilder {
@@ -47,17 +48,23 @@ impl ProcessVMBuilder {
         let data_size = self.data_size;
         let ldso_code_size = self.ldso_code_size.unwrap_or(0);
         let ldso_data_size = self.ldso_data_size.unwrap_or(0);
-        let heap_size = self.heap_size.unwrap_or(
-            config::LIBOS_CONFIG.process.default_heap_size);
-        let stack_size = self.stack_size.unwrap_or(
-            config::LIBOS_CONFIG.process.default_stack_size);
-        let mmap_size = self.mmap_size.unwrap_or(
-            config::LIBOS_CONFIG.process.default_mmap_size);
+        let heap_size = self
+            .heap_size
+            .unwrap_or(config::LIBOS_CONFIG.process.default_heap_size);
+        let stack_size = self
+            .stack_size
+            .unwrap_or(config::LIBOS_CONFIG.process.default_stack_size);
+        let mmap_size = self
+            .mmap_size
+            .unwrap_or(config::LIBOS_CONFIG.process.default_mmap_size);
         let range_sizes = vec![
-            code_size, data_size,
-            ldso_code_size, ldso_data_size,
-            heap_size, stack_size,
-            mmap_size
+            code_size,
+            data_size,
+            ldso_code_size,
+            ldso_data_size,
+            heap_size,
+            stack_size,
+            mmap_size,
         ];
 
         let process_range = {
@@ -108,7 +115,6 @@ impl ProcessVMBuilder {
         Ok(())
     }
 }
-
 
 /// The per-process virtual memory
 #[derive(Debug)]
@@ -212,7 +218,7 @@ impl ProcessVM {
         perms: VMPerms,
         flags: MMapFlags,
         fd: FileDesc,
-        offset: usize
+        offset: usize,
     ) -> Result<usize, Error> {
         let addr_option = {
             if flags.contains(MMapFlags::MAP_FIXED) {
@@ -235,7 +241,10 @@ impl ProcessVM {
                 let current_ref = get_current();
                 let current_process = current_ref.lock().unwrap();
                 let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
-                VMInitializer::LoadFromFile { file: file_ref, offset: offset }
+                VMInitializer::LoadFromFile {
+                    file: file_ref,
+                    offset: offset,
+                }
             }
         };
         let mmap_options = VMMapOptionsBuilder::default()
@@ -255,7 +264,6 @@ impl ProcessVM {
         self.mmap_manager.find_mmap_region(addr)
     }
 }
-
 
 bitflags! {
     pub struct MMapFlags : u32 {
@@ -283,11 +291,9 @@ bitflags! {
 impl MMapFlags {
     pub fn from_u32(bits: u32) -> Result<MMapFlags, Error> {
         // TODO: detect non-supporting flags
-        MMapFlags::from_bits(bits)
-            .ok_or_else(|| (Errno::EINVAL, "Unknown mmap flags").into())
+        MMapFlags::from_bits(bits).ok_or_else(|| (Errno::EINVAL, "Unknown mmap flags").into())
     }
 }
-
 
 bitflags! {
     pub struct VMPerms : u32 {
@@ -311,11 +317,9 @@ impl VMPerms {
     }
 
     pub fn from_u32(bits: u32) -> Result<VMPerms, Error> {
-        VMPerms::from_bits(bits)
-            .ok_or_else(|| (Errno::EINVAL, "Unknown permission bits").into())
+        VMPerms::from_bits(bits).ok_or_else(|| (Errno::EINVAL, "Unknown permission bits").into())
     }
 }
-
 
 unsafe fn fill_zeros(addr: usize, size: usize) {
     let ptr = addr as *mut u8;
@@ -324,4 +328,3 @@ unsafe fn fill_zeros(addr: usize, size: usize) {
         *b = 0;
     }
 }
-
