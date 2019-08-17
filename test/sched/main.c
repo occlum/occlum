@@ -63,7 +63,7 @@ static int test_sched_xetaffinity_with_child_pid() {
     cpu_set_t mask;
     CPU_ZERO(&mask);
     CPU_SET(num - 1 , &mask);
-    int ret = posix_spawn(&child_pid, "getpid", NULL, NULL, NULL, NULL);
+    int ret = posix_spawn(&child_pid, "/bin/getpid", NULL, NULL, NULL, NULL);
     if (ret < 0 ) {
         throw_error("spawn process error");
     }

@@ -1,6 +1,7 @@
 use super::*;
 use serde::{Deserialize, Serialize};
 use std::sgxfs::{SgxFile};
+use std::path::{Path, PathBuf};
 
 const LIBOS_CONFIG_PATH : &str = "Occlum.json.protected";
 
@@ -103,16 +104,24 @@ pub struct ConfigProcess {
 
 #[derive(Debug)]
 pub struct ConfigMount {
-    pub type_: String,
-    pub target: String,
-    pub source: Option<String>,
+    pub type_: ConfigMountFsType,
+    pub target: PathBuf,
+    pub source: Option<PathBuf>,
     pub options: ConfigMountOptions,
+}
+
+#[derive(Debug, PartialEq)]
+#[allow(non_camel_case_types)]
+pub enum ConfigMountFsType {
+    TYPE_SEFS,
+    TYPE_HOSTFS,
+    TYPE_RAMFS,
 }
 
 #[derive(Debug)]
 pub struct ConfigMountOptions {
     pub integrity_only: bool,
-    pub mac: Option<String>,
+    pub mac: Option<sgx_aes_gcm_128bit_tag_t>,
 }
 
 
@@ -155,21 +164,22 @@ impl ConfigMount {
     fn from_input(input: &InputConfigMount) -> Result<ConfigMount, Error> {
         const ALL_FS_TYPES : [&str; 3] = [ "sefs", "hostfs", "ramfs" ];
 
-        let type_ = {
-            let type_ = input.type_.to_string();
-            if !ALL_FS_TYPES.contains(&type_.as_str()) {
+        let type_ = match input.type_.as_str() {
+            "sefs" => ConfigMountFsType::TYPE_SEFS,
+            "hostfs" => ConfigMountFsType::TYPE_HOSTFS,
+            "ramfs" => ConfigMountFsType::TYPE_RAMFS,
+            _ => {
                 return errno!(EINVAL, "Unsupported file system type");
             }
-            type_
         };
         let target = {
-            let target = input.target.clone();
+            let target = PathBuf::from(&input.target);
             if !target.starts_with("/") {
                 return errno!(EINVAL, "Target must be an absolute path");
             }
             target
         };
-        let source = input.source.clone();
+        let source = input.source.as_ref().map(|s| PathBuf::from(s));
         let options = ConfigMountOptions::from_input(&input.options)?;
         Ok(ConfigMount { type_, target, source, options, })
     }
@@ -184,7 +194,7 @@ impl ConfigMountOptions {
                 if input.mac.is_none() {
                     return errno!(EINVAL, "MAC is expected");
                 }
-                (true, input.mac.clone())
+                (true, Some(parse_mac(&input.mac.as_ref().unwrap())?))
             };
         Ok(ConfigMountOptions { integrity_only, mac })
     }

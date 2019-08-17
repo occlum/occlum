@@ -15,7 +15,7 @@ BUILD_TARGETS := $(TEST_DEPS) $(TESTS) $(BENCHES)
 TEST_TARGETS := $(TESTS:%=test-%)
 BENCH_TARGETS := $(BENCHES:%=bench-%)
 CLEAN_TARGETS := $(BUILD_TARGETS:%=clean-%)
-.PHONY: all build test clean sefs $(BUILD_TARGETS) $(TEST_TARGETS) $(BENCH_TARGETS) $(CLEAN_TARGETS)
+.PHONY: all build test clean sefs root-sefs bin-sefs lib-sefs $(BUILD_TARGETS) $(TEST_TARGETS) $(BENCH_TARGETS) $(CLEAN_TARGETS)
 
 # Use echo program instead of built-in echo command in shell. This ensures
 # that echo can recognize escaped sequences (with -e argument) regardless of
@@ -29,6 +29,8 @@ NO_COLOR := \033[0m
 
 FS_PATH := fs
 SEFS_PATH := sefs
+BIN_SEFS_ROOT_FILE := $(SEFS_PATH)/bin/0
+LIB_SEFS_ROOT_FILE := $(SEFS_PATH)/lib/0
 
 #############################################################################
 # Build targets
@@ -43,22 +45,52 @@ $(BUILD_TARGETS): %:
 	@$(MAKE) --no-print-directory -C $@
 	@$(ECHO) "$(GREEN)DONE$(NO_COLOR)"
 
-sefs:
-	@$(RM) -rf $(SEFS_PATH)
+sefs: root-sefs bin-sefs lib-sefs
+
+root-sefs:
+	@mkdir -p $(SEFS_PATH)/root/
+	@echo "SEFS => $@"
+
+bin-sefs:
+	@mkdir -p $(FS_PATH)/bin/
+	@for test in $(TESTS) ; do \
+		cp "$$test/$$test" $(FS_PATH)/bin/ ; \
+	done
+	@rm -rf $(SEFS_PATH)/bin
+	@mkdir -p $(SEFS_PATH)
+	@cd $(PROJECT_DIR)/deps/sefs/sefs-fuse/bin/ && \
+		./app \
+			--integrity-only \
+			$(CUR_DIR)/$(SEFS_PATH)/bin \
+			$(CUR_DIR)/$(FS_PATH)/bin \
+			zip
+	@echo "SEFS => $@"
+
+lib-sefs:
 	@mkdir -p $(FS_PATH)/lib/
 	@cp /lib/ld-musl-x86_64.so.1 $(FS_PATH)/lib/
 	@cp /usr/local/occlum/lib/libc++.so.1 $(FS_PATH)/lib/
 	@cp /usr/local/occlum/lib/libc++abi.so.1 $(FS_PATH)/lib/
 	@cp /usr/local/occlum/lib/libunwind.so.1 $(FS_PATH)/lib/
+	@rm -rf $(SEFS_PATH)/lib
+	@mkdir -p $(SEFS_PATH)
 	@cd $(PROJECT_DIR)/deps/sefs/sefs-fuse/bin/ && \
 		./app \
-			$(CUR_DIR)/$(SEFS_PATH) \
-			$(CUR_DIR)/$(FS_PATH) \
+			--integrity-only \
+			$(CUR_DIR)/$(SEFS_PATH)/lib \
+			$(CUR_DIR)/$(FS_PATH)/lib \
 			zip
 	@echo "SEFS => $@"
 
 libocclum.signed.so: Occlum.json Enclave_config.xml Enclave_private.pem
 	@$(PROJECT_DIR)/tools/bin/build-enclave Occlum.json Enclave_config.xml Enclave_private.pem
+
+Occlum.json: Occlum.json.sh $(BIN_SEFS_ROOT_FILE) $(LIB_SEFS_ROOT_FILE)
+	@./Occlum.json.sh \
+		`$(PROJECT_DIR)/tools/bin/protect-integrity show-mac $(BIN_SEFS_ROOT_FILE)` \
+		`$(PROJECT_DIR)/tools/bin/protect-integrity show-mac $(LIB_SEFS_ROOT_FILE)` \
+		> $@
+	@echo "GEN => $@"
 
 #############################################################################
 # Test targets
@@ -66,10 +98,7 @@ libocclum.signed.so: Occlum.json Enclave_config.xml Enclave_private.pem
 
 test: build $(TEST_TARGETS)
 
-pal: $(PROJECT_DIR)/src/pal/pal
-	@cp $< pal
-
-$(TEST_TARGETS): test-%: % pal libocclum.signed.so
+$(TEST_TARGETS): test-%: % pal
 	@$(ECHO) "$(CYAN)RUN TEST => $<$(NO_COLOR)"
 	@$(MAKE) --no-print-directory -C $< test ; \
 		if [ $$? -eq 0 ] ; then \
@@ -77,6 +106,13 @@ $(TEST_TARGETS): test-%: % pal libocclum.signed.so
 		else \
 			$(ECHO) "$(RED)FAILED$(NO_COLOR)" ; \
 		fi ;
+
+pal: $(PROJECT_DIR)/src/pal/pal
+	@cp $< pal
+
+$(PROJECT_DIR)/src/pal/pal:
+	@cd $(PROJECT_DIR)/src/pal && make
+
 
 #############################################################################
 # Benchmark targets
@@ -98,7 +134,7 @@ $(BENCH_TARGETS): bench-%: % pal libocclum.signed.so
 #############################################################################
 
 clean: $(CLEAN_TARGETS)
-	@$(RM) -f pal libocclum.signed.so Occlum.json.protected
+	@$(RM) -f pal libocclum.signed.so Occlum.json.protected Occlum.json
 	@$(RM) -rf $(FS_PATH) $(SEFS_PATH)
 
 $(CLEAN_TARGETS): clean-%:

@@ -83,7 +83,7 @@ int main(int argc, const char* argv[]) {
     posix_spawn_file_actions_addclose(&file_actions, socket_rd_fd);
 
     const char* msg = "Echo!\n";
-    const char* child_prog = "hello_world";
+    const char* child_prog = "/bin/hello_world";
     const char* child_argv[3] = { child_prog, msg, NULL };
     int child_pid;
     if (posix_spawn(&child_pid, child_prog, &file_actions,

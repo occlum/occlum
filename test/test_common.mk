@@ -11,8 +11,6 @@ C_OBJS := $(C_SRCS:%.c=%.o)
 CXX_OBJS := $(CXX_SRCS:%.cc=%.o)
 FS_PATH := ../fs
 BIN_NAME := $(shell basename $(CUR_DIR))
-BIN_FS_PATH := $(BIN_NAME)
-BIN_PATH := $(FS_PATH)/$(BIN_FS_PATH)
 OBJDUMP_FILE := bin.objdump
 READELF_FILE := bin.readelf
 
@@ -28,12 +26,7 @@ LINK_FLAGS = $(C_FLAGS) -pie $(EXTRA_LINK_FLAGS)
 # Build
 #############################################################################
 
-all: $(BIN_PATH)
-
-$(BIN_PATH): $(BIN_NAME)
-	@mkdir -p $(shell dirname $@)
-	@cp $^ $@
-	@echo "COPY => $@"
+all: $(BIN_NAME)
 
 # Compile C/C++ test program
 #
@@ -61,7 +54,7 @@ $(CXX_OBJS): %.o: %.cc
 #############################################################################
 
 test: $(BIN_ENC_NAME)
-	@cd $(CUR_DIR)/.. && RUST_BACKTRACE=1 ./pal $(BIN_FS_PATH) $(BIN_ARGS)
+	@cd $(CUR_DIR)/.. && RUST_BACKTRACE=1 ./pal /bin/$(BIN_NAME) $(BIN_ARGS)
 
 #############################################################################
 # Misc

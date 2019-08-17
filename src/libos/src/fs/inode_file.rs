@@ -1,50 +1,5 @@
-use rcore_fs::vfs::{FileSystem, FileType, FsError, INode};
-use rcore_fs_mountfs::{MountFS, MNode};
-use rcore_fs_ramfs::RamFS;
-use rcore_fs_sefs::SEFS;
-use std::fmt;
-
-use super::hostfs::HostFS;
-use super::sgx_impl::SgxStorage;
 use super::*;
-
-lazy_static! {
-    /// The root of file system
-    pub static ref ROOT_INODE: Arc<INode> = {
-        // Mount SEFS at /
-        let device = Box::new(SgxStorage::new("sefs"));
-        let sefs = SEFS::open(device, &time::OcclumTimeProvider)
-            .expect("failed to open SEFS");
-        let rootfs = MountFS::new(sefs);
-        let root = rootfs.root_inode();
-
-        fn mount_default_fs(fs: Arc<dyn FileSystem>, root: &MNode, mount_at: &str) -> Result<(), Error> {
-            let mount_dir = match root.find(false, mount_at) {
-                Ok(existing_dir) => {
-                    if existing_dir.metadata()?.type_ != FileType::Dir {
-                        return errno!(EIO, "not a directory");
-                    }
-                    existing_dir
-                }
-                Err(_) => {
-                    root.create(mount_at, FileType::Dir, 0o777)?
-                }
-            };
-            mount_dir.mount(fs);
-            Ok(())
-        }
-
-        let hostfs = HostFS::new(".");
-        mount_default_fs(hostfs, &root, "host")
-            .expect("failed to mount HostFS at /host");
-
-        let ramfs = RamFS::new();
-        mount_default_fs(ramfs, &root, "tmp")
-            .expect("failed to mount RamFS at /tmp");
-
-        root
-    };
-}
+use std::fmt;
 
 pub struct INodeFile {
     inode: Arc<INode>,

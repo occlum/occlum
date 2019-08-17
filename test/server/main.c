@@ -38,7 +38,7 @@ int main(int argc, const char *argv[]) {
 
 	int client_pid;
 	char* client_argv[] = {"client", "127.0.0.1"};
-	ret = posix_spawn(&client_pid, "client", NULL, NULL, client_argv, NULL);
+	ret = posix_spawn(&client_pid, "/bin/client", NULL, NULL, client_argv, NULL);
 	if (ret < 0) {
 		printf("spawn client process error: %s(errno: %d)\n", strerror(errno), errno);
 		return -1;

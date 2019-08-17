@@ -10,7 +10,8 @@ pub use self::access::{do_access, do_faccessat, AccessFlags, AccessModes, AT_FDC
 pub use self::file::{File, FileRef, SgxFile, StdinFile, StdoutFile};
 pub use self::file_table::{FileDesc, FileTable};
 use self::inode_file::OpenOptions;
-pub use self::inode_file::{INodeExt, INodeFile, ROOT_INODE};
+pub use self::inode_file::{INodeExt, INodeFile};
+pub use self::root_inode::{ROOT_INODE};
 pub use self::io_multiplexing::*;
 use self::dev_null::DevNull;
 use self::dev_zero::DevZero;
@@ -26,6 +27,7 @@ mod file;
 mod file_table;
 mod hostfs;
 mod inode_file;
+mod root_inode;
 mod io_multiplexing;
 mod dev_null;
 mod dev_zero;

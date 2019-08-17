@@ -1,3 +1,4 @@
+use super::{sgx_aes_gcm_128bit_tag_t};
 use rcore_fs::dev::TimeProvider;
 use rcore_fs::vfs::Timespec;
 use rcore_fs_sefs::dev::*;
@@ -11,38 +12,51 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct SgxStorage {
     path: PathBuf,
+    integrity_only: bool,
     file_cache: Mutex<BTreeMap<usize, LockedFile>>,
+    root_mac: Option<sgx_aes_gcm_128bit_tag_t>,
 }
 
 impl SgxStorage {
-    pub fn new(path: impl AsRef<Path>) -> Self {
+    pub fn new(path: impl AsRef<Path>, integrity_only: bool) -> Self {
         //        assert!(path.as_ref().is_dir());
         SgxStorage {
             path: path.as_ref().to_path_buf(),
+            integrity_only: integrity_only,
             file_cache: Mutex::new(BTreeMap::new()),
+            root_mac: None,
         }
     }
     /// Get file by `file_id`.
     /// It lookups cache first, if miss, then call `open_fn` to open one,
     /// and add it to cache before return.
     #[cfg(feature = "sgx_file_cache")]
-    fn get(&self, file_id: usize, open_fn: impl FnOnce(&Self) -> LockedFile) -> LockedFile {
+    fn get(&self, file_id: usize, open_fn: impl FnOnce(&Self) -> DevResult<LockedFile>) -> DevResult<LockedFile> {
         // query cache
         let mut caches = self.file_cache.lock().unwrap();
         if let Some(locked_file) = caches.get(&file_id) {
             // hit, return
-            return locked_file.clone();
+            return Ok(locked_file.clone());
         }
         // miss, open one
-        let locked_file = open_fn(self);
+        let locked_file = open_fn(self)?;
         // add to cache
         caches.insert(file_id, locked_file.clone());
-        locked_file
+        Ok(locked_file)
     }
     /// Get file by `file_id` without cache.
     #[cfg(not(feature = "sgx_file_cache"))]
-    fn get(&self, file_id: usize, open_fn: impl FnOnce(&Self) -> LockedFile) -> LockedFile {
+    fn get(&self, file_id: usize, open_fn: impl FnOnce(&Self) -> DevResult<LockedFile>) -> LockedFile {
         open_fn(self)
+    }
+
+    /// Set the expected root MAC of the SGX storage.
+    ///
+    /// By giving this root MAC, we can be sure that the root file (file_id = 0) opened
+    /// by the storage has a MAC that is equal to the given root MAC.
+    pub fn set_root_mac(&mut self, mac: sgx_aes_gcm_128bit_tag_t) -> DevResult<()> {
+        self.root_mac = Some(mac);
+        Ok(())
     }
 }
 
@@ -51,15 +65,36 @@ impl Storage for SgxStorage {
         let locked_file = self.get(file_id, |this| {
             let mut path = this.path.to_path_buf();
             path.push(format!("{}", file_id));
-            // TODO: key
-            let key = [0u8; 16];
-            let file = OpenOptions::new()
-                .read(true)
-                .update(true)
-                .open_ex(path, &key)
-                .expect("failed to open SgxFile");
-            LockedFile(Arc::new(Mutex::new(file)))
-        });
+            let options = {
+                let mut options = OpenOptions::new();
+                options.read(true).update(true);
+                options
+            };
+            let file = {
+                let open_res = if !self.integrity_only {
+                    options.open(path)
+                } else {
+                    options.open_integrity_only(path)
+                };
+                if open_res.is_err() {
+                    return Err(DeviceError);
+                }
+                open_res.unwrap()
+            };
+
+            // Check the MAC of the root file against the given root MAC of the storage
+            if file_id == 0 && self.root_mac.is_some() {
+                let root_file_mac = file.get_mac()
+                    .expect("Failed to get mac");
+                if root_file_mac != self.root_mac.unwrap() {
+                    println!("Expected MAC = {:#?}, actual MAC = {:?}",
+                        self.root_mac.unwrap(), root_file_mac);
+                    return Err(DeviceError);
+                }
+            }
+
+            Ok(LockedFile(Arc::new(Mutex::new(file))))
+        })?;
         Ok(Box::new(locked_file))
     }
 
@@ -67,15 +102,24 @@ impl Storage for SgxStorage {
         let locked_file = self.get(file_id, |this| {
             let mut path = this.path.to_path_buf();
             path.push(format!("{}", file_id));
-            // TODO: key
-            let key = [0u8; 16];
-            let file = OpenOptions::new()
-                .write(true)
-                .update(true)
-                .open_ex(path, &key)
-                .expect("failed to create SgxFile");
-            LockedFile(Arc::new(Mutex::new(file)))
-        });
+            let options = {
+                let mut options = OpenOptions::new();
+                options.write(true).update(true);
+                options
+            };
+            let file = {
+                let open_res = if !self.integrity_only {
+                    options.open(path)
+                } else {
+                    options.open_integrity_only(path)
+                };
+                if open_res.is_err() {
+                    return Err(DeviceError);
+                }
+                open_res.unwrap()
+            };
+            Ok(LockedFile(Arc::new(Mutex::new(file))))
+        })?;
         Ok(Box::new(locked_file))
     }
 
