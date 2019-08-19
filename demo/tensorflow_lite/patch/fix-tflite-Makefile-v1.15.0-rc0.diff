@@ -1,0 +1,99 @@
+diff --git a/tensorflow/lite/tools/make/Makefile b/tensorflow/lite/tools/make/Makefile
+index 73c50d3..3cef7fa 100644
+--- a/tensorflow/lite/tools/make/Makefile
++++ b/tensorflow/lite/tools/make/Makefile
+@@ -42,7 +42,7 @@ INCLUDES := \
+ -I$(OBJDIR)
+ # This is at the end so any globally-installed frameworks like protobuf don't
+ # override local versions in the source tree.
+-INCLUDES += -I/usr/local/include
++INCLUDES += -I/usr/local/occlum/x86_64-linux-musl/include
+ 
+ # These are the default libraries needed, but they can be added to or
+ # overridden by the platform-specific settings in target makefiles.
+@@ -59,7 +59,8 @@ CXXFLAGS := -O3 -DNDEBUG -fPIC
+ CXXFLAGS += $(EXTRA_CXXFLAGS)
+ CFLAGS := ${CXXFLAGS}
+ CXXFLAGS += --std=c++11
+-LDOPTS := -L/usr/local/lib
++LDOPTS := -L/usr/local/occlum/x86_64-linux-musl/lib
++LDFLAGS := -pie $(LDOPTS)
+ ARFLAGS := -r
+ TARGET_TOOLCHAIN_PREFIX :=
+ CC_PREFIX :=
+@@ -80,6 +81,12 @@ BENCHMARK_BINARY_NAME := benchmark_model
+ MINIMAL_SRCS := \
+ 	tensorflow/lite/examples/minimal/minimal.cc
+ 
++# Add label image example.
++LABEL_IMAGE_SRCS := \
++tensorflow/lite/tools/evaluation/utils.cc \
++tensorflow/lite/examples/label_image/label_image.cc \
++tensorflow/lite/examples/label_image/bitmap_helpers.cc
++
+ # What sources we want to compile, must be kept in sync with the main Bazel
+ # build files.
+ 
+@@ -133,7 +140,8 @@ $(wildcard tensorflow/lite/*/*/*test.cc) \
+ $(wildcard tensorflow/lite/*/*/*/*test.cc) \
+ $(wildcard tensorflow/lite/kernels/*test_main.cc) \
+ $(wildcard tensorflow/lite/kernels/*test_util.cc) \
+-$(MINIMAL_SRCS)
++$(MINIMAL_SRCS) \
++$(LABEL_IMAGE_SRCS)
+ 
+ BUILD_WITH_MMAP ?= true
+ ifeq ($(BUILD_TYPE),micro)
+@@ -209,6 +217,7 @@ include $(wildcard $(MAKEFILE_DIR)/targets/*_makefile.inc)
+ 
+ ALL_SRCS := \
+ 	$(MINIMAL_SRCS) \
++	$(LABEL_IMAGE_SRCS) \
+ 	$(PROFILER_SRCS) \
+ 	$(PROFILER_SUMMARIZER_SRCS) \
+ 	$(TF_LITE_CC_SRCS) \
+@@ -225,14 +234,18 @@ LIB_PATH := $(LIBDIR)$(LIB_NAME)
+ BENCHMARK_LIB := $(LIBDIR)$(BENCHMARK_LIB_NAME)
+ BENCHMARK_BINARY := $(BINDIR)$(BENCHMARK_BINARY_NAME)
+ MINIMAL_BINARY := $(BINDIR)minimal
++LABEL_IMAGE_BINARY := $(BINDIR)label_image
+ 
+-CXX := $(CC_PREFIX)${TARGET_TOOLCHAIN_PREFIX}g++
+-CC := $(CC_PREFIX)${TARGET_TOOLCHAIN_PREFIX}gcc
++CXX := occlum-g++
++CC := occlum-gcc
+ AR := $(CC_PREFIX)${TARGET_TOOLCHAIN_PREFIX}ar
+ 
+ MINIMAL_OBJS := $(addprefix $(OBJDIR), \
+ $(patsubst %.cc,%.o,$(patsubst %.c,%.o,$(MINIMAL_SRCS))))
+ 
++LABEL_IMAGE_OBJS := $(addprefix $(OBJDIR), \
++$(patsubst %.cc,%.o,$(patsubst %.c,%.o,$(LABEL_IMAGE_SRCS))))
++
+ LIB_OBJS := $(addprefix $(OBJDIR), \
+ $(patsubst %.cc,%.o,$(patsubst %.c,%.o,$(patsubst %.cpp,%.o,$(TF_LITE_CC_SRCS)))))
+ 
+@@ -252,7 +265,7 @@ $(OBJDIR)%.o: %.cpp
+ 	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+ 
+ # The target that's compiled if there's no command-line arguments.
+-all: $(LIB_PATH)  $(MINIMAL_BINARY) $(BENCHMARK_BINARY)
++all: $(LIB_PATH)  $(MINIMAL_BINARY) $(LABEL_IMAGE_BINARY) $(BENCHMARK_BINARY)
+ 
+ # The target that's compiled for micro-controllers
+ micro: $(LIB_PATH)
+@@ -276,6 +289,14 @@ $(MINIMAL_BINARY): $(MINIMAL_OBJS) $(LIB_PATH)
+ 
+ minimal: $(MINIMAL_BINARY)
+ 
++$(LABEL_IMAGE_BINARY): $(LIB_PATH) $(LABEL_IMAGE_OBJS)
++	@mkdir -p $(dir $@)
++	$(CXX) $(CXXFLAGS) $(INCLUDES) \
++	-o $(LABEL_IMAGE_BINARY) $(LABEL_IMAGE_OBJS) \
++	$(LIBFLAGS) $(LIB_PATH) $(LDFLAGS) $(LIBS)
++
++label_image: $(LABEL_IMAGE_BINARY)
++
+ $(BENCHMARK_LIB) : $(LIB_PATH) $(BENCHMARK_OBJS)
+ 	@mkdir -p $(dir $@)
+ 	$(AR) $(ARFLAGS) $(BENCHMARK_LIB) $(LIB_OBJS) $(BENCHMARK_OBJS)

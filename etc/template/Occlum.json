@@ -1,11 +1,11 @@
 {
     "vm": {
-        "user_space_size": "128MB"
+        "user_space_size": "256MB"
     },
     "process": {
         "default_stack_size": "4MB",
-        "default_heap_size": "16MB",
-        "default_mmap_size": "32MB"
+        "default_heap_size": "32MB",
+        "default_mmap_size": "80MB"
     },
     "env": [
         "OCCLUM=yes"
