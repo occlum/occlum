@@ -27,7 +27,7 @@ LINK_FLAGS = $(C_FLAGS) -pie $(EXTRA_LINK_FLAGS)
 # Build
 #############################################################################
 
-all: $(ALL_BUILD_SUBDIRS) $(BIN)
+all: $(ALL_BUILD_SUBDIRS) $(BIN) $(DEPS_FILE)
 
 $(ALL_BUILD_SUBDIRS):
 	@mkdir -p $@
@@ -52,7 +52,6 @@ $(BUILD_DIR)/test/obj/$(TEST_NAME)/%.o: %.c
 $(BUILD_DIR)/test/obj/$(TEST_NAME)/%.o: %.cc
 	@$(CXX) $(C_FLAGS) -c $< -o $@
 	@echo "CXX <= $@"
-
 #############################################################################
 # Test
 #############################################################################
@@ -69,4 +68,4 @@ test-native:
 #############################################################################
 
 clean:
-	@-$(RM) -f $(BIN) $(C_OBJS) $(CXX_OBJS)
+	@-$(RM) -f $(BIN) $(DEPS_FILE) $(C_OBJS) $(CXX_OBJS)

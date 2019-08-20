@@ -1,4 +1,5 @@
 use super::*;
+use exception::*;
 use process::pid_t;
 use std::ffi::{CStr, CString, OsString};
 use std::path::Path;
@@ -14,13 +15,8 @@ pub extern "C" fn libos_boot(path_buf: *const c_char, argv: *const *const c_char
         }
     };
 
-    // register exception handlers (support CPUID for now)
-    extern "C" {
-        fn register_exception_handlers() -> ();
-    }
-    unsafe {
-        register_exception_handlers();
-    }
+    // register exception handlers (support cpuid & rdtsc for now)
+    register_exception_handlers();
 
     let _ = backtrace::enable_backtrace("libocclum.signed.so", PrintFormat::Short);
     panic::catch_unwind(|| {

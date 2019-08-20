@@ -38,6 +38,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Install depend cpuid test tool
+WORKDIR /tmp
+RUN wget http://www.etallen.com/cpuid/cpuid-20180519.x86_64.tar.gz && \
+    tar -xf ./cpuid-20180519.x86_64.tar.gz && \
+    cp ./cpuid-20180519/cpuid /usr/bin/ && \
+    rm -rf /tmp/cpuid-20180519*
+
 # Install SGX SDK
 WORKDIR /tmp
 RUN git clone https://github.com/occlum/linux-sgx . && \

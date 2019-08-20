@@ -42,6 +42,7 @@ mod prelude;
 mod config;
 mod entry;
 mod errno;
+mod exception;
 mod fs;
 mod misc;
 mod process;
