@@ -1,5 +1,5 @@
 use prelude::*;
-use std::{convert, error, fmt};
+use std::{convert, error, ffi, fmt};
 
 // TODO: remove errno.h
 
@@ -28,6 +28,12 @@ impl convert::From<std::io::Error> for Error {
             Errno::from_errno(info.raw_os_error().unwrap()),
             "std::io::Error",
         )
+    }
+}
+
+impl convert::From<std::ffi::NulError> for Error {
+    fn from(info: std::ffi::NulError) -> Error {
+        Error::new(Errno::EINVAL, "std::ffi::NulError")
     }
 }
 

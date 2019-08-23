@@ -36,7 +36,7 @@ all: build
 build: prebuild $(BUILD_TARGETS) postbuild
 
 prebuild:
-	@$(RM) -rf $(BUILD_DIR)/test/*
+	@$(RM) -rf $(BUILD_DIR)/test
 	@mkdir -p $(BUILD_DIR)/test
 	@cd $(BUILD_DIR)/test && \
 		$(PROJECT_DIR)/build/bin/occlum init
@@ -86,4 +86,4 @@ $(BENCH_TARGETS): bench-%: %
 #############################################################################
 
 clean:
-	@$(RM) -rf $(BUILD_DIR)/test/*
+	@$(RM) -rf $(BUILD_DIR)/test

@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         expect \
         gdb \
         git-core \
+        jq \
         kmod \
         libboost-system-dev \
         libboost-thread-dev \

@@ -103,7 +103,10 @@ cmd_build() {
     export OCCLUM_CONF_DEFAULT_MMAP_SIZE=`get_conf_default_mmap_size`
     cd "$context_dir/build"
     "$occlum_dir/build/bin/occlum-gen-default-occlum-json"\
+        > "Occlum_new.json"
+    jq -s '.[0] + .[1]' "../../Occlum.json" "Occlum_new.json"\
         > "Occlum.json"
+    rm -f "Occlum_new.json"
     "$occlum_dir/build/bin/occlum-protect-integrity" protect Occlum.json
 
     export OCCLUM_BUILTIN_CONF_FILE_MAC=`get_occlum_conf_file_mac`

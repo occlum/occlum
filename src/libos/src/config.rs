@@ -1,5 +1,6 @@
 use super::*;
 use serde::{Deserialize, Serialize};
+use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::sgxfs::SgxFile;
 
@@ -96,6 +97,7 @@ fn parse_mac(mac_str: &str) -> Result<sgx_aes_gcm_128bit_tag_t, Error> {
 pub struct Config {
     pub vm: ConfigVM,
     pub process: ConfigProcess,
+    pub env: Vec<CString>,
     pub mount: Vec<ConfigMount>,
 }
 
@@ -137,6 +139,13 @@ impl Config {
     fn from_input(input: &InputConfig) -> Result<Config, Error> {
         let vm = ConfigVM::from_input(&input.vm)?;
         let process = ConfigProcess::from_input(&input.process)?;
+        let env = {
+            let mut env = Vec::new();
+            for input_env in &input.env {
+                env.push(CString::new(input_env.clone())?);
+            }
+            env
+        };
         let mount = {
             let mut mount = Vec::new();
             for input_mount in &input.mount {
@@ -144,7 +153,12 @@ impl Config {
             }
             mount
         };
-        Ok(Config { vm, process, mount })
+        Ok(Config {
+            vm,
+            process,
+            env,
+            mount,
+        })
     }
 }
 
@@ -247,6 +261,8 @@ struct InputConfig {
     pub vm: InputConfigVM,
     #[serde(default)]
     pub process: InputConfigProcess,
+    #[serde(default)]
+    pub env: Vec<String>,
     #[serde(default)]
     pub mount: Vec<InputConfigMount>,
 }

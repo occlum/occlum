@@ -7,6 +7,10 @@
         "default_heap_size": "16MB",
         "default_mmap_size": "32MB"
     },
+    "env": [
+        "OCCLUM=yes",
+        "TEST=true"
+    ],
     "mount": [
         {
             "target": "/",

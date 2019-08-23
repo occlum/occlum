@@ -65,7 +65,7 @@ main(int argc, char *argv[]) {
 
 	// spawn clients
 	int client_pid;
-	char* client_argv[] = {"client", "127.0.0.1"};
+	char* client_argv[] = {"client", "127.0.0.1", NULL};
 	for(int i=0; i<3; ++i) {
 		int ret = posix_spawn(&client_pid, "/bin/client", NULL, NULL, client_argv, NULL);
 		if (ret < 0) {
