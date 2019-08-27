@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sgxfs::SgxFile;
 
-const LIBOS_CONFIG_PATH: &str = "Occlum.json.protected";
+const LIBOS_CONFIG_PATH: &str = "./.occlum/build/Occlum.json.protected";
 
 lazy_static! {
     pub static ref LIBOS_CONFIG: Config = {

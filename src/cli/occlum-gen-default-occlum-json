@@ -1,0 +1,38 @@
+#!/bin/bash
+cat <<EOF
+{
+    "vm": {
+        "user_space_size": "$OCCLUM_CONF_USER_SPACE_SIZE"
+    },
+    "process": {
+        "default_stack_size": "$OCCLUM_CONF_DEFAULT_STACK_SIZE",
+        "default_heap_size": "$OCCLUM_CONF_DEFAULT_HEAP_SIZE",
+        "default_mmap_size": "$OCCLUM_CONF_DEFAULT_MMAP_SIZE"
+    },
+    "mount": [
+        {
+            "target": "/",
+            "type": "sefs",
+            "source": ".occlum/build/mount/__ROOT",
+            "options": {
+                "integrity_only": true,
+                "MAC": "$OCCLUM_CONF_ROOT_FS_MAC"
+            }
+        },
+        {
+            "target": "/root",
+            "type": "sefs",
+            "source": ".occlum/run/mount/root"
+        },
+        {
+            "target": "/host",
+            "type": "hostfs",
+            "source": "."
+        },
+        {
+            "target": "/tmp",
+            "type": "ramfs"
+        }
+    ]
+}
+EOF

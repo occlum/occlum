@@ -1,8 +1,3 @@
-#!/bin/bash
-bin_sefs_mac=$1
-lib_sefs_mac=$2
-
-cat <<EOF
 {
     "vm": {
         "user_space_size": "128MB"
@@ -16,25 +11,14 @@ cat <<EOF
         {
             "target": "/",
             "type": "sefs",
-            "source": "./sefs/root"
-        },
-        {
-            "target": "/bin",
-            "type": "sefs",
-            "source": "./sefs/bin",
+            "source": "./image",
             "options": {
-                "integrity_only": true,
-                "MAC": "$bin_sefs_mac"
+                "integrity_only": true
             }
         },
         {
-            "target": "/lib",
-            "type": "sefs",
-            "source": "./sefs/lib",
-            "options": {
-                "integrity_only": true,
-                "MAC": "$lib_sefs_mac"
-            }
+            "target": "/root",
+            "type": "sefs"
         },
         {
             "target": "/host",
@@ -47,4 +31,3 @@ cat <<EOF
         }
     ]
 }
-EOF

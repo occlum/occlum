@@ -1,19 +1,32 @@
 include ../sgxenv.mk
 
-DEBUG := 1
+RELEASE ?= 0
+ONLY_REBUILD_BUILTIN ?= 0
 
-LIBOS_SO := libocclum.so # Link $(LIBOS_A), $(C_OBJS) and all dependencies
-LIBOS_A := libocclum_rs.a # Built from Rust code
+# The final and intermediate libraries
+#
+# The relationships between the three Occlum libraries
+#    $(LIBOS_SO) > $(LIBOS_CORE_A) > $(LIBOS_RS_A)
+LIBOS_SO := $(BUILD_DIR)/lib/libocclum.so
+LIBOS_CORE_A := $(BUILD_DIR)/lib/libocclum_core.a
+LIBOS_RS_A := $(BUILD_DIR)/lib/libocclum_rs.a
+# The dependent libraries
+LIBCOMPILER_RT_PATCH_A := $(BUILD_DIR)/lib/libcompiler-rt-patch.a
 
+# All source code
 RUST_SRCS := $(wildcard src/*.rs src/*/*.rs src/*/*/*.rs)
-C_SRCS := $(sort $(filter-out src/Enclave_t.c, $(wildcard src/*.c src/*/*.c))) src/Enclave_t.c
-C_OBJS := $(C_SRCS:.c=.o)
-S_SRCS := $(wildcard src/*.S src/*/*.S)
-S_OBJS := $(S_SRCS:.S=.o)
-EDL_C_SRCS := src/Enclave_t.c src/Enclave_t.h
+RUST_TARGET_DIR := $(BUILD_DIR)/src/libos/cargo-target
+RUST_OUT_DIR := $(BUILD_DIR)/lib
+EDL_C_SRCS := $(addprefix $(BUILD_DIR)/src/libos/,src/Enclave_t.c src/Enclave_t.h)
+EDL_C_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,src/Enclave_t.o)
+BUILTIN_C_SRCS := $(sort $(wildcard src/builtin/*.c))
+BUILTIN_C_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(BUILTIN_C_SRCS:.c=.o))
+C_SRCS := $(filter-out $(BUILTIN_C_SRCS),$(sort $(wildcard src/*.c src/*/*.c)))
+C_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(C_SRCS:.c=.o))
+S_SRCS := $(sort $(wildcard src/*.S src/*/*.S))
+S_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(S_SRCS:.S=.o))
 
-ENCLAVE_CONFIG := Enclave_config.xml
-ENCLAVE_KEY := Enclave_private.pem
+ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(LIBOS_SO) $(EDL_C_OBJS) $(BUILTIN_C_OBJS) $(C_OBJS) $(S_OBJS)) $(RUST_TARGET_DIR) $(RUST_OUT_DIR)))
 
 C_FLAGS := $(SGX_CFLAGS_T) -fno-stack-protector -I./include/
 
@@ -28,48 +41,68 @@ ifdef OCCLUM_BUILTIN_VM_USER_SPACE_SIZE
 C_FLAGS += -DOCCLUM_BUILTIN_VM_USER_SPACE_SIZE='($(OCCLUM_BUILTIN_VM_USER_SPACE_SIZE))'
 endif
 
-_Other_Link_Flags := -L$(RUST_SGX_SDK_DIR)/compiler-rt/ -L.
-_Other_Enclave_Libs := -lcompiler-rt-patch -locclum_rs -lsgx_tprotected_fs
+_Other_Link_Flags := -L$(RUST_SGX_SDK_DIR)/compiler-rt/ -L$(BUILD_DIR)/lib
+_Other_Enclave_Libs := -lcompiler-rt-patch -locclum_core -lsgx_tprotected_fs
 LINK_FLAGS := $(SGX_LFLAGS_T)
 
-.PHONY: all compiler-rt clean
+.PHONY: all clean
 
-all: $(LIBOS_SO)
+all: $(ALL_BUILD_SUBDIRS) $(LIBOS_SO)
 
-$(LIBOS_SO): compiler-rt $(LIBOS_A) $(C_OBJS) $(S_OBJS)
-	@$(CC) $(C_OBJS) $(S_OBJS) -o $@ $(LINK_FLAGS)
+$(ALL_BUILD_SUBDIRS):
+	@mkdir -p $@
+
+LIBOS_SO_DEPS := $(BUILTIN_C_OBJS) $(LIBOS_CORE_A) $(LIBCOMPILER_RT_PATCH_A)
+ifeq ($(ONLY_REBUILD_BUILTIN), 0)
+$(LIBOS_SO): $(BUILTIN_C_OBJS) $(LIBOS_CORE_A) $(LIBCOMPILER_RT_PATCH_A)
+	@$(CC) $(LIBOS_SO_DEPS) -o $@ $(LINK_FLAGS)
 	@echo "LINK => $@"
-
-$(C_OBJS): %.o: %.c
-	@$(CC) $(C_FLAGS) -c $< -o $@
-	@echo "CC <= $@"
-
-$(S_OBJS): %.o: %.S
-	@$(CC) $(C_FLAGS) -c $< -o $@
-	@echo "CC <= $@"
-
-$(EDL_C_SRCS): $(SGX_EDGER8R) ../Enclave.edl
-	@cd src/ && $(SGX_EDGER8R) --trusted ../../Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_DIR)/edl/
-	@echo "GEN  <= $(EDL_C_SRCS)"
-
-compiler-rt:
-	@$(MAKE) --no-print-directory -C $(RUST_SGX_SDK_DIR)/compiler-rt/ > /dev/null
-
-ifeq ($(DEBUG), 1)
-$(LIBOS_A): $(RUST_SRCS)
-	@RUSTC_BOOTSTRAP=1 cargo build
-	@cp ./target/debug/$(LIBOS_A) $(LIBOS_A)
-	@echo "CARGO (debug) => $(LIBOS_A)"
 else
-$(LIBOS_A): $(RUST_SRCS)
-	@RUSTC_BOOTSTRAP=1 cargo build --release
-	@cp ./target/release/$(LIBOS_A) $(LIBOS_A)
-	@echo "CARGO (release) => $(LIBOS_A)"
+$(LIBOS_SO): $(BUILTIN_C_OBJS)
+	@$(CC) $(LIBOS_SO_DEPS) -o $@ $(LINK_FLAGS)
+	@echo "LINK => $@"
 endif
 
-clean-builtin:
-	@-$(RM) src/builtin/*.o
+$(LIBOS_CORE_A): $(LIBOS_RS_A) $(C_OBJS) $(S_OBJS) $(EDL_C_OBJS)
+	@cp $(LIBOS_RS_A) $(LIBOS_CORE_A)
+	@ar r $@ $(C_OBJS) $(S_OBJS) $(EDL_C_OBJS)
+	@echo "GEN => $@"
 
-clean:
-	@cargo clean
-	@-$(RM) $(LIBOS_SO) $(LIBOS_A) $(C_OBJS) $(S_OBJS) $(EDL_C_SRCS)
+ifeq ($(RELEASE), 0)
+$(LIBOS_RS_A): $(RUST_SRCS)
+	@RUSTC_BOOTSTRAP=1 cargo build --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR)
+	@echo "CARGO (debug) => $@"
+else
+$(LIBOS_RS_A): $(RUST_SRCS)
+	@RUSTC_BOOTSTRAP=1 cargo build --release --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR)
+	@echo "CARGO (release) => $@"
+endif
+
+$(BUILD_DIR)/src/libos/src/Enclave_t.o: $(BUILD_DIR)/src/libos/src/Enclave_t.c
+	@$(CC) $(C_FLAGS) -c $< -o $@
+	@echo "CC <= $@"
+
+$(BUILD_DIR)/src/libos/src/Enclave_t.c: $(SGX_EDGER8R) ../Enclave.edl
+	@cd $(BUILD_DIR)/src/libos/src && $(SGX_EDGER8R) --trusted $(CUR_DIR)/../Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_DIR)/edl/
+	@echo "GEN <= $@"
+
+$(BUILD_DIR)/src/libos/%.o: %.c
+	@$(CC) $(C_FLAGS) -c $< -o $@
+	@echo "CC <= $@"
+
+$(BUILD_DIR)/src/libos/%.o: %.S
+	@$(CC) $(C_FLAGS) -c $< -o $@
+	@echo "CC <= $@"
+
+$(LIBCOMPILER_RT_PATCH_A):
+	@$(MAKE) --no-print-directory -C $(RUST_SGX_SDK_DIR)/compiler-rt/ > /dev/null
+	@cp $(RUST_SGX_SDK_DIR)/compiler-rt/libcompiler-rt-patch.a $(LIBCOMPILER_RT_PATCH_A)
+	@echo "GEN <= $@"
+
+clean-builtin:
+	@-$(RM) -f $(BUILTIN_C_OBJS)
+
+clean: clean-builtin
+	@-$(RM) -f $(LIBOS_SO) $(LIBOS_CORE_A) $(LIBOS_RS_A) \
+		$(LIBCOMPILER_RT_PATCH_A) $(EDL_C_OBJS) $(EDL_C_SRCS) $(C_OBJS) $(S_OBJS)
+	@-$(RM) -rf $(RUST_TARGET_DIR)

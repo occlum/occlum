@@ -2,50 +2,54 @@ MAIN_MAKEFILE := $(firstword $(MAKEFILE_LIST))
 INCLUDE_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 CUR_DIR := $(shell dirname $(realpath $(MAIN_MAKEFILE)))
 PROJECT_DIR := $(realpath $(CUR_DIR)/../../)
+BUILD_DIR := $(PROJECT_DIR)/build
+
+TEST_NAME := $(shell basename $(CUR_DIR))
+IMAGE_DIR := $(BUILD_DIR)/test/image
+BIN := $(IMAGE_DIR)/bin/$(TEST_NAME)
+
+C_SRCS := $(wildcard *.c)
+C_OBJS := $(addprefix $(BUILD_DIR)/test/obj/$(TEST_NAME)/,$(C_SRCS:%.c=%.o))
+CXX_SRCS := $(wildcard *.cc)
+CXX_OBJS := $(addprefix $(BUILD_DIR)/test/obj/$(TEST_NAME)/,$(CXX_SRCS:%.cc=%.o))
+
+ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(BIN) $(C_OBJS) $(CXX_OBJS))))
 
 CC := /usr/local/occlum/bin/musl-clang
 CXX := /usr/local/occlum/bin/musl-clang++
-C_SRCS := $(wildcard *.c)
-CXX_SRCS := $(wildcard *.cc)
-C_OBJS := $(C_SRCS:%.c=%.o)
-CXX_OBJS := $(CXX_SRCS:%.cc=%.o)
-FS_PATH := ../fs
-BIN_NAME := $(shell basename $(CUR_DIR))
-OBJDUMP_FILE := bin.objdump
-READELF_FILE := bin.readelf
-
-CLANG_BIN_PATH := $(shell clang -print-prog-name=clang)
-LLVM_PATH := $(abspath $(dir $(CLANG_BIN_PATH))../)
 
 C_FLAGS = -Wall -I../include -O2 -fPIC $(EXTRA_C_FLAGS)
 LINK_FLAGS = $(C_FLAGS) -pie $(EXTRA_LINK_FLAGS)
 
-.PHONY: all test debug clean
+.PHONY: all test test-native clean
 
 #############################################################################
 # Build
 #############################################################################
 
-all: $(BIN_NAME)
+all: $(ALL_BUILD_SUBDIRS) $(BIN)
+
+$(ALL_BUILD_SUBDIRS):
+	@mkdir -p $@
 
 # Compile C/C++ test program
 #
 # When compiling programs, we do not use CXX if we're not compilng any C++ files.
 # This ensures C++ libraries are only linked and loaded for C++ programs, not C 
 # programs.
-$(BIN_NAME): $(C_OBJS) $(CXX_OBJS)
+$(BIN): $(C_OBJS) $(CXX_OBJS)
 	@if [ -z $(CXX_OBJS) ] ; then \
-		$(CC) $^ $(LINK_FLAGS) -o $(BIN_NAME); \
+		$(CC) $^ $(LINK_FLAGS) -o $(BIN); \
 	else \
-		$(CXX) $^ $(LINK_FLAGS) -o $(BIN_NAME); \
+		$(CXX) $^ $(LINK_FLAGS) -o $(BIN); \
 	fi ;
 	@echo "LINK => $@"
 
-$(C_OBJS): %.o: %.c
+$(BUILD_DIR)/test/obj/$(TEST_NAME)/%.o: %.c
 	@$(CC) $(C_FLAGS) -c $< -o $@
 	@echo "CC <= $@"
 
-$(CXX_OBJS): %.o: %.cc
+$(BUILD_DIR)/test/obj/$(TEST_NAME)/%.o: %.cc
 	@$(CXX) $(C_FLAGS) -c $< -o $@
 	@echo "CXX <= $@"
 
@@ -53,12 +57,16 @@ $(CXX_OBJS): %.o: %.cc
 # Test
 #############################################################################
 
-test: $(BIN_ENC_NAME)
-	@cd $(CUR_DIR)/.. && RUST_BACKTRACE=1 ./pal /bin/$(BIN_NAME) $(BIN_ARGS)
+test:
+	@cd $(BUILD_DIR)/test && \
+		$(PROJECT_DIR)/src/cli/occlum run /bin/$(TEST_NAME) $(BIN_ARGS)
+
+test-native:
+	@LD_LIBRARY_PATH=/usr/local/occlum/lib cd $(IMAGE_DIR) && ./bin/$(TEST_NAME) $(BIN_ARGS)
 
 #############################################################################
 # Misc
 #############################################################################
 
 clean:
-	@-$(RM) -f *.o *.S $(BIN_NAME) $(BIN_ENC_NAME) $(OBJDUMP_FILE) $(READELF_FILE)
+	@-$(RM) -f $(BIN) $(C_OBJS) $(CXX_OBJS)

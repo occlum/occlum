@@ -7,8 +7,9 @@
 
 int main(int argc, const char* argv[]) {
     int fd, len;
+    // TODO: rewrite this test so that it does not need to depend on sample.txt
+#if 0
     char read_buf[128] = {0};
-
     // read
     if ((fd = open("/host/hostfs/sample.txt", O_RDONLY)) < 0) {
         printf("ERROR: failed to open a file for read\n");
@@ -25,9 +26,9 @@ int main(int argc, const char* argv[]) {
         return -1;
     }
     printf("Read file from hostfs successfully!\n");
-
+#endif
     // write
-    if ((fd = open("/host/hostfs/test_write.txt", O_WRONLY | O_CREAT)) < 0) {
+    if ((fd = open("/host/hostfs_test_write.txt", O_WRONLY | O_CREAT)) < 0) {
         printf("ERROR: failed to open a file for write\n");
         return -1;
     }

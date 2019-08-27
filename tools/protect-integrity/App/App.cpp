@@ -1,20 +1,20 @@
-#include <stdio.h>
-#include <string.h>
+#include "Enclave_u.h"
+
 #include <assert.h>
-#include <sys/time.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <string.h>
 #include <fcntl.h>
 #include <libgen.h>
 #include <pwd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-#include <sgx_urts.h>
-#include <sgx_error.h>
 #include <sgx_eid.h>
-#include "Enclave_u.h"
+#include <sgx_error.h>
+#include <sgx_urts.h>
 
 #define MAX_PATH            FILENAME_MAX
 #define TOKEN_FILENAME      "enclave.token"
@@ -32,8 +32,6 @@ typedef struct _sgx_errlist_t {
     const char *msg;
     const char *sug; /* Suggestion */
 } sgx_errlist_t;
-
-#define REPEATS 500000
 
 /* Error code returned by sgx_create_enclave */
 static sgx_errlist_t sgx_errlist[] = {

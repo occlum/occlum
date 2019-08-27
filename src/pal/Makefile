@@ -1,38 +1,48 @@
 include ../sgxenv.mk
 
-EDL_Gen_Files := Enclave_u.c Enclave_u.h
+BIN := $(BUILD_DIR)/bin/occlum-pal
 
-Srcs := $(sort $(filter-out Enclave_u.c, $(wildcard *.c)))
-Objs := $(Srcs:.c=.o) Enclave_u.o
-Bin := pal
+# A dependency on Rust SGX SDK
+LIBSGX_USTDC_A := $(BUILD_DIR)/lib/libsgx_ustdc.a
 
-C_Flags := $(SGX_CFLAGS_U)
-Link_Flags := $(SGX_LFLAGS_U)
-Link_Flags += -L$(RUST_SGX_SDK_DIR)/sgx_ustdc/ -lsgx_ustdc -lsgx_uprotected_fs
+EDL_C_SRCS := $(addprefix $(BUILD_DIR)/src/pal/,Enclave_u.c Enclave_u.h)
+EDL_C_OBJS := $(addprefix $(BUILD_DIR)/src/pal/,Enclave_u.o)
+C_SRCS := $(sort $(wildcard *.c))
+C_OBJS := $(addprefix $(BUILD_DIR)/src/pal/,$(C_SRCS:.c=.o))
 
+C_FLAGS := $(SGX_CFLAGS_U) -I$(BUILD_DIR)/src/pal -Wno-unused-result
+LINK_FLAGS := $(SGX_LFLAGS_U)
+LINK_FLAGS += -L$(RUST_SGX_SDK_DIR)/sgx_ustdc/ -lsgx_ustdc -lsgx_uprotected_fs
 
-.PHONY: all
-all: $(Bin)
+ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(BIN) $(EDL_C_OBJS) $(C_OBJS))))
 
-$(Bin): $(EDL_Gen_Files) $(Objs) sgx_ustdc
-	@$(CC) $(Objs) -o $@ $(Link_Flags)
-	@echo "LINK =>  $@"
+.PHONY: all clean
 
-$(EDL_Gen_Files): $(SGX_EDGER8R) ../Enclave.edl
-	@$(SGX_EDGER8R) --untrusted ../Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_DIR)/edl/
-	@echo "GEN  => $(EDL_Gen_Files)"
+all: $(ALL_BUILD_SUBDIRS) $(BIN)
 
-$(Objs): %.o: %.c
-	@$(CC) $(C_Flags) -c $< -o $@
+$(ALL_BUILD_SUBDIRS):
+	@mkdir -p $@
+
+$(BIN): $(LIBSGX_USTDC_A) $(EDL_C_OBJS) $(C_OBJS)
+	@$(CC) $^ -o $@ $(LINK_FLAGS)
+	@echo "LINK => $@"
+
+$(BUILD_DIR)/src/pal/Enclave_u.o: $(BUILD_DIR)/src/pal/Enclave_u.c
+	@$(CC) $(C_FLAGS) -c $< -o $@
 	@echo "CC <= $@"
 
-#
-# Compile dependencies in Rust SGX SDK
-#
-.PHONY: sgx_ustdc
-sgx_ustdc:
-	@$(MAKE) --no-print-directory -C $(RUST_SGX_SDK_DIR)/sgx_ustdc/ > /dev/null
+$(BUILD_DIR)/src/pal/Enclave_u.c: $(SGX_EDGER8R) ../Enclave.edl
+	@cd $(BUILD_DIR)/src/pal && $(SGX_EDGER8R) --untrusted $(CUR_DIR)/../Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_DIR)/edl/
+	@echo "GEN <= $@"
 
-.PHONY: clean
+$(BUILD_DIR)/src/pal/%.o: %.c
+	@$(CC) $(C_FLAGS) -c $< -o $@
+	@echo "CC <= $@"
+
+$(LIBSGX_USTDC_A):
+	@$(MAKE) --no-print-directory -C $(RUST_SGX_SDK_DIR)/sgx_ustdc/ > /dev/null
+	@cp $(RUST_SGX_SDK_DIR)/sgx_ustdc/libsgx_ustdc.a $(LIBSGX_USTDC_A)
+	@echo "GEN <= $@"
+
 clean:
-	@-$(RM) -f $(EDL_Gen_Files) $(Objs) $(Bin)
+	@-$(RM) -f $(BIN) $(LIBSGX_USTDC_A) $(C_OBJS) $(EDL_C_OBJS) $(EDL_C_SRCS)

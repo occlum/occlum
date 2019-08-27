@@ -1,0 +1,173 @@
+#!/bin/bash
+
+working_dir=`pwd`
+this_dir="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
+project_dir="$( cd "$( dirname "$this_dir/../../../"  )" >/dev/null 2>&1 && pwd )"
+context_dir="$working_dir/.occlum"
+
+SGX_SDK="${SGX_SDK:-/opt/intel/sgxsdk}"
+
+report_arg_error() {
+    echo $1
+    echo ""
+    echo "Usage:"
+    echo "    occlum init"
+    echo "    occlum build"
+    echo "    occlum run <program_name> <program_args>"
+}
+
+
+get_conf_user_space_size() {
+    cat "$working_dir/Occlum.json" | \
+        python -c "import sys, json; print json.load(sys.stdin)['vm']['user_space_size']"
+}
+
+get_conf_default_stack_size() {
+    cat "$working_dir/Occlum.json" | \
+        python -c "import sys, json; print json.load(sys.stdin)['process']['default_stack_size']"
+}
+
+get_conf_default_heap_size() {
+    cat "$working_dir/Occlum.json" | \
+        python -c "import sys, json; print json.load(sys.stdin)['process']['default_heap_size']"
+}
+
+get_conf_default_mmap_size() {
+    cat "$working_dir/Occlum.json" | \
+        python -c "import sys, json; print json.load(sys.stdin)['process']['default_mmap_size']"
+}
+
+
+get_occlum_conf_file_mac() {
+    "$project_dir/tools/bin/protect-integrity" show-mac "$context_dir/build/Occlum.json.protected"
+}
+
+parse_occlum_user_space_size() {
+    local size_with_unit=`get_conf_user_space_size`
+    numfmt --from=iec ${size_with_unit::-1}
+}
+
+
+cmd_init() {
+    cd "$working_dir"
+    mkdir -p .occlum
+    cd "$context_dir"
+    echo "initialized" > status
+
+    cd "$working_dir"
+    mkdir -p image
+    mkdir -p image/bin
+    mkdir -p image/lib
+    mkdir -p image/root
+    mkdir -p image/host
+    mkdir -p image/tmp
+
+    cp \
+        /lib/ld-musl-x86_64.so.1 \
+        /usr/local/occlum/lib/libc++.so.1 \
+        /usr/local/occlum/lib/libc++abi.so.1 \
+        /usr/local/occlum/lib/libunwind.so.1 \
+        image/lib/
+
+    cp "$project_dir"/etc/template/* "$working_dir"/
+
+    echo "Initialized an Occlum context in $working_dir"
+}
+
+cmd_build() {
+    cd "$context_dir"
+    echo "building" > status
+
+    rm -rf build
+
+    mkdir -p build/bin
+    cp "$project_dir/build/bin/occlum-pal" build/bin/
+    mkdir -p build/lib
+    cp "$project_dir/build/lib/libocclum_core.a" build/lib/
+    cp "$project_dir/build/lib/libcompiler-rt-patch.a" build/lib/
+    mkdir -p build/src/libos/src/builtin
+
+    mkdir -p build/mount/
+    cd "$project_dir/deps/sefs/sefs-fuse/bin/" && \
+        ./app \
+            --integrity-only \
+            "$context_dir/build/mount/__ROOT" \
+            "$working_dir/image" \
+            zip
+
+    export OCCLUM_CONF_ROOT_FS_MAC=`"$project_dir/tools/bin/protect-integrity" show-mac "$context_dir/build/mount/__ROOT/0"`
+    export OCCLUM_CONF_USER_SPACE_SIZE=`get_conf_user_space_size`
+    export OCCLUM_CONF_DEFAULT_STACK_SIZE=`get_conf_default_stack_size`
+    export OCCLUM_CONF_DEFAULT_HEAP_SIZE=`get_conf_default_heap_size`
+    export OCCLUM_CONF_DEFAULT_MMAP_SIZE=`get_conf_default_mmap_size`
+    cd "$context_dir/build"
+    "$project_dir/src/cli/occlum-gen-default-occlum-json"\
+        > "Occlum.json"
+    "$project_dir/tools/bin/protect-integrity" protect Occlum.json
+
+    export OCCLUM_BUILTIN_CONF_FILE_MAC=`get_occlum_conf_file_mac`
+    echo "EXPORT => OCCLUM_BUILTIN_CONF_FILE_MAC = $OCCLUM_BUILTIN_CONF_FILE_MAC"
+    export OCCLUM_BUILTIN_VM_USER_SPACE_SIZE=`parse_occlum_user_space_size`
+    echo "EXPORT => OCCLUM_BUILTIN_VM_USER_SPACE_SIZE = $OCCLUM_BUILTIN_VM_USER_SPACE_SIZE"
+
+    cd "$context_dir"
+    mkdir -p src/libos/src/
+    cp "$project_dir/src/sgxenv.mk" src/
+    cp "$project_dir/src/libos/Makefile" src/libos/
+    cp "$project_dir/src/libos/Enclave.lds" src/libos/
+    cp -r "$project_dir/src/libos/src/builtin" src/libos/src/builtin
+    cd src/libos && \
+        make clean-builtin && \
+        make "$context_dir/build/lib/libocclum.so" ONLY_REBUILD_BUILTIN=1
+
+    $SGX_SDK/bin/x64/sgx_sign sign \
+        -key "$working_dir/Enclave.pem" \
+        -config "$working_dir/Enclave.xml" \
+        -enclave "$context_dir/build/lib/libocclum.so" \
+        -out "$context_dir/build/lib/libocclum.signed.so" \
+
+    cd "$context_dir"
+    echo "built" > status
+
+    echo "Built the Occlum image and enclave successfully"
+}
+
+cmd_run() {
+    cd "$working_dir"
+    echo "running" > "$context_dir/status"
+
+    mkdir -p "$context_dir/run/mount/root"
+    RUST_BACKTRACE=1 "$context_dir/build/bin/occlum-pal" "$@"
+
+    echo "built" > "$context_dir/status"
+}
+
+cmd_status() {
+    cat "$context_dir/status"
+}
+
+set -e
+
+if [[ ( "$#" < 1 ) ]] ; then
+    report_arg_error "Error: no sub-command is given"
+    exit 1
+fi
+
+cmd=$1
+case "$cmd" in
+    init)
+        cmd_init
+        ;;
+    build)
+        cmd_build
+        ;;
+    run)
+        cmd_run "${@:2}"
+        ;;
+    status)
+        cmd_status
+        ;;
+    *)
+        report_arg_error "Error: unknown sub-command $cmd"
+        exit 1
+esac

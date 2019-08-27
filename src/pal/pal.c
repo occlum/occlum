@@ -1,22 +1,34 @@
-#include <stdio.h>
-#include <string.h>
-#include <assert.h>
-
-#include <unistd.h>
-#include <pwd.h>
-#include <sys/time.h>
-#include <time.h>
-#include <sys/syscall.h>
-#include <errno.h>
-
-#define MAX_PATH FILENAME_MAX
-
-#include "sgx_urts.h"
-#include "pal.h"
-#include "task.h"
 #include "Enclave_u.h"
 
-sgx_enclave_id_t global_eid = 0;
+#include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <libgen.h>
+#include <pwd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
+#include <sys/time.h>
+#include <unistd.h>
+
+#include <sgx_eid.h>
+#include <sgx_error.h>
+#include <sgx_urts.h>
+
+#include "task.h"
+
+#define MAX_PATH            FILENAME_MAX
+#define TOKEN_FILENAME      "enclave.token"
+#define ENCLAVE_FILENAME    "libocclum.signed.so"
+
+// ==========================================================================
+//  Enclave Initialization
+// ==========================================================================
+
+static sgx_enclave_id_t global_eid = 0;
 
 typedef struct _sgx_errlist_t {
     sgx_status_t err;
@@ -104,7 +116,7 @@ static sgx_errlist_t sgx_errlist[] = {
 };
 
 /* Check error conditions for loading enclave */
-void print_error_message(sgx_status_t ret)
+static void print_error_message(sgx_status_t ret)
 {
     size_t idx = 0;
     size_t ttl = sizeof sgx_errlist/sizeof sgx_errlist[0];
@@ -122,12 +134,24 @@ void print_error_message(sgx_status_t ret)
         printf("Error: Unexpected error occurred.\n");
 }
 
+static const char* get_enclave_absolute_path() {
+    static char enclave_path[MAX_PATH] = {0};
+    // Get the absolute path of the executable
+    readlink("/proc/self/exe", enclave_path, sizeof(enclave_path));
+    // Get the absolute path of the containing directory
+    dirname(enclave_path);
+    // Get the absolute path of the enclave
+    strncat(enclave_path, "/../lib/", sizeof(enclave_path));
+    strncat(enclave_path, ENCLAVE_FILENAME, sizeof(enclave_path));
+    return (const char*)enclave_path;
+}
+
 /* Initialize the enclave:
  *   Step 1: try to retrieve the launch token saved by last transaction
  *   Step 2: call sgx_create_enclave to initialize an enclave instance
  *   Step 3: save the launch token if it is updated
  */
-int initialize_enclave(const char* enclave_path)
+static int initialize_enclave()
 {
     char token_path[MAX_PATH] = {'\0'};
     sgx_launch_token_t token = {0};
@@ -167,6 +191,7 @@ int initialize_enclave(const char* enclave_path)
     }
     /* Step 2: call sgx_create_enclave to initialize an enclave instance */
     /* Debug Support: set 2nd parameter to 1 */
+    const char* enclave_path = get_enclave_absolute_path();
     ret = sgx_create_enclave(enclave_path, SGX_DEBUG_FLAG, &token, &updated, &global_eid, NULL);
     if (ret != SGX_SUCCESS) {
         print_error_message(ret);
@@ -175,7 +200,7 @@ int initialize_enclave(const char* enclave_path)
     }
 
     /* Step 3: save the launch token if it is updated */
-    if (updated == FALSE || fp == NULL) {
+    if (updated == 0 || fp == NULL) {
         /* if the token is not updated, or file handler is invalid, do not perform saving */
         if (fp != NULL) fclose(fp);
         return 0;
@@ -191,7 +216,10 @@ int initialize_enclave(const char* enclave_path)
     return 0;
 }
 
-// Debug
+// ==========================================================================
+//  OCalls
+// ==========================================================================
+
 void ocall_print_string(const char* msg) {
     printf("%s", msg);
 }
@@ -235,6 +263,9 @@ void ocall_sync(void) {
     sync();
 }
 
+// ==========================================================================
+//  Main
+// ==========================================================================
 
 /* Application entry */
 int SGX_CDECL main(int argc, const char *argv[])
@@ -252,9 +283,8 @@ int SGX_CDECL main(int argc, const char *argv[])
     }
     const char* executable_path = argv[1];
 
-    const char* enclave_path = "libocclum.signed.so";
     /* Initialize the enclave */
-    if(initialize_enclave(enclave_path) < 0){
+    if(initialize_enclave() < 0){
         printf("Enter a character before exit ...\n");
         getchar();
         return -1;

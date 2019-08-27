@@ -15,7 +15,7 @@ lazy_static! {
     pub static ref ROOT_INODE: Arc<INode> = {
         let mount_config = &config::LIBOS_CONFIG.mount;
 
-        let rootfs = open_or_create_root_fs_according_to(mount_config)
+        let rootfs = open_root_fs_according_to(mount_config)
             .expect("failed to create or open SEFS for /");
         let root = rootfs.root_inode();
 
@@ -26,9 +26,7 @@ lazy_static! {
     };
 }
 
-fn open_or_create_root_fs_according_to(
-    mount_config: &Vec<ConfigMount>,
-) -> Result<Arc<MountFS>, Error> {
+fn open_root_fs_according_to(mount_config: &Vec<ConfigMount>) -> Result<Arc<MountFS>, Error> {
     let root_sefs_source = {
         let root_mount_config = mount_config
             .iter()
@@ -38,11 +36,8 @@ fn open_or_create_root_fs_according_to(
         if root_mount_config.type_ != ConfigMountFsType::TYPE_SEFS {
             return errno!(EINVAL, "The mount point at / must be SEFS");
         }
-        if root_mount_config.options.integrity_only {
-            return errno!(
-                EINVAL,
-                "The root SEFS at / must be encrypted (i.e., integrity-only is not enough)"
-            );
+        if !root_mount_config.options.integrity_only {
+            return errno!(EINVAL, "The root SEFS at / must be integrity-only");
         }
         if root_mount_config.source.is_none() {
             return errno!(
@@ -53,18 +48,10 @@ fn open_or_create_root_fs_according_to(
         root_mount_config.source.as_ref().unwrap()
     };
 
-    let root_sefs = {
-        SEFS::open(
-            Box::new(SgxStorage::new(root_sefs_source, false)),
-            &time::OcclumTimeProvider,
-        )
-    }
-    .or_else(|_| {
-        SEFS::create(
-            Box::new(SgxStorage::new(root_sefs_source, false)),
-            &time::OcclumTimeProvider,
-        )
-    })?;
+    let root_sefs = SEFS::open(
+        Box::new(SgxStorage::new(root_sefs_source, true)),
+        &time::OcclumTimeProvider,
+    )?;
     let root_mountable_sefs = MountFS::new(root_sefs);
     Ok(root_mountable_sefs)
 }
@@ -89,23 +76,25 @@ fn mount_nonroot_fs_according_to(
         use self::ConfigMountFsType::*;
         match mc.type_ {
             TYPE_SEFS => {
-                if !mc.options.integrity_only {
-                    return errno!(EINVAL, "Must be integrity-only SEFS");
+                if mc.options.integrity_only {
+                    return errno!(EINVAL, "Cannot mount integrity-only SEFS at non-root path");
                 }
                 if mc.source.is_none() {
-                    return errno!(
-                        EINVAL,
-                        "Source is expected for integrity-only SEFS is supported"
-                    );
+                    return errno!(EINVAL, "Source is expected for SEFS");
                 }
                 let source_path = mc.source.as_ref().unwrap();
-
-                let device = {
-                    let mut device = Box::new(SgxStorage::new(source_path, true));
-                    device.set_root_mac(mc.options.mac.unwrap());
-                    device
-                };
-                let sefs = SEFS::open(device, &time::OcclumTimeProvider)?;
+                let sefs = {
+                    SEFS::open(
+                        Box::new(SgxStorage::new(source_path, false)),
+                        &time::OcclumTimeProvider,
+                    )
+                }
+                .or_else(|_| {
+                    SEFS::create(
+                        Box::new(SgxStorage::new(source_path, false)),
+                        &time::OcclumTimeProvider,
+                    )
+                })?;
                 mount_fs_at(sefs, &root, target_dirname)?;
             }
             TYPE_HOSTFS => {
@@ -134,7 +123,7 @@ fn mount_fs_at(fs: Arc<dyn FileSystem>, parent_inode: &MNode, dirname: &str) -> 
             }
             existing_dir
         }
-        Err(_) => parent_inode.create(dirname, FileType::Dir, 0o777)?,
+        Err(_) => return errno!(ENOENT, "Mount point does not exist"),
     };
     mount_dir.mount(fs);
     Ok(())
