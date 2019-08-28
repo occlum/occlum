@@ -1,8 +1,12 @@
-.PHONY: all src test clean
+.PHONY: all submodule githooks src test clean
 
 all: src
 
-submodule:
+githooks:
+	@find .git/hooks -type l -exec rm {} \; && find .githooks -type f -exec ln -sf ../../{} .git/hooks/ \;
+	@echo "Add Git hooks that check Rust code format issues before commits and pushes"
+
+submodule: githooks
 	git submodule init
 	git submodule update
 	cd deps/rust-sgx-sdk && git apply ../rust-sgx-sdk.patch
