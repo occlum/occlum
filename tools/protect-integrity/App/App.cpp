@@ -18,7 +18,7 @@
 
 #define MAX_PATH            FILENAME_MAX
 #define TOKEN_FILENAME      "enclave.token"
-#define ENCLAVE_FILENAME    "protect-integrity-enclave.signed.so"
+#define ENCLAVE_FILENAME    "occlum-protect-integrity.signed.so"
 
 // ==========================================================================
 //  Enclave Initialization
@@ -138,7 +138,7 @@ static const char* get_enclave_absolute_path() {
     // Get the absolute path of the containing directory
     dirname(enclave_path);
     // Get the absolute path of the enclave
-    strncat(enclave_path, "/", sizeof(enclave_path));
+    strncat(enclave_path, "/../lib/", sizeof(enclave_path));
     strncat(enclave_path, ENCLAVE_FILENAME, sizeof(enclave_path));
     return (const char*)enclave_path;
 }

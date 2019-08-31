@@ -58,6 +58,6 @@ RUN curl https://sh.rustup.rs -sSf | \
 WORKDIR /tmp
 COPY build_toolchain.sh /tmp
 RUN ./build_toolchain.sh
-ENV PATH="/usr/local/occlum/bin:$PATH"
+ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
 
 WORKDIR /root

@@ -1,8 +1,9 @@
 #!/bin/bash
 
-working_dir=`pwd`
 this_dir="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
-project_dir="$( cd "$( dirname "$this_dir/../../../"  )" >/dev/null 2>&1 && pwd )"
+occlum_dir="$( cd "$( dirname "$this_dir/../../../"  )" >/dev/null 2>&1 && pwd )"
+
+working_dir=`pwd`
 context_dir="$working_dir/.occlum"
 
 SGX_SDK="${SGX_SDK:-/opt/intel/sgxsdk}"
@@ -39,7 +40,7 @@ get_conf_default_mmap_size() {
 
 
 get_occlum_conf_file_mac() {
-    "$project_dir/tools/bin/protect-integrity" show-mac "$context_dir/build/Occlum.json.protected"
+    "$occlum_dir/build/bin/occlum-protect-integrity" show-mac "$context_dir/build/Occlum.json.protected"
 }
 
 parse_occlum_user_space_size() {
@@ -69,7 +70,7 @@ cmd_init() {
         /usr/local/occlum/lib/libunwind.so.1 \
         image/lib/
 
-    cp "$project_dir"/etc/template/* "$working_dir"/
+    cp "$occlum_dir"/etc/template/* "$working_dir"/
 
     echo "Initialized an Occlum context in $working_dir"
 }
@@ -81,29 +82,29 @@ cmd_build() {
     rm -rf build
 
     mkdir -p build/bin
-    cp "$project_dir/build/bin/occlum-pal" build/bin/
+    cp "$occlum_dir/build/bin/occlum-pal" build/bin/
     mkdir -p build/lib
-    cp "$project_dir/build/lib/libocclum_core.a" build/lib/
-    cp "$project_dir/build/lib/libcompiler-rt-patch.a" build/lib/
+    cp "$occlum_dir/build/lib/libocclum_core.a" build/lib/
+    cp "$occlum_dir/build/lib/libcompiler-rt-patch.a" build/lib/
     mkdir -p build/src/libos/src/builtin
 
     mkdir -p build/mount/
-    cd "$project_dir/deps/sefs/sefs-fuse/bin/" && \
+    cd "$occlum_dir/deps/sefs/sefs-fuse/bin/" && \
         ./app \
             --integrity-only \
             "$context_dir/build/mount/__ROOT" \
             "$working_dir/image" \
             zip
 
-    export OCCLUM_CONF_ROOT_FS_MAC=`"$project_dir/tools/bin/protect-integrity" show-mac "$context_dir/build/mount/__ROOT/0"`
+    export OCCLUM_CONF_ROOT_FS_MAC=`"$occlum_dir/build/bin/occlum-protect-integrity" show-mac "$context_dir/build/mount/__ROOT/0"`
     export OCCLUM_CONF_USER_SPACE_SIZE=`get_conf_user_space_size`
     export OCCLUM_CONF_DEFAULT_STACK_SIZE=`get_conf_default_stack_size`
     export OCCLUM_CONF_DEFAULT_HEAP_SIZE=`get_conf_default_heap_size`
     export OCCLUM_CONF_DEFAULT_MMAP_SIZE=`get_conf_default_mmap_size`
     cd "$context_dir/build"
-    "$project_dir/src/cli/occlum-gen-default-occlum-json"\
+    "$occlum_dir/build/bin/occlum-gen-default-occlum-json"\
         > "Occlum.json"
-    "$project_dir/tools/bin/protect-integrity" protect Occlum.json
+    "$occlum_dir/build/bin/occlum-protect-integrity" protect Occlum.json
 
     export OCCLUM_BUILTIN_CONF_FILE_MAC=`get_occlum_conf_file_mac`
     echo "EXPORT => OCCLUM_BUILTIN_CONF_FILE_MAC = $OCCLUM_BUILTIN_CONF_FILE_MAC"
@@ -112,10 +113,10 @@ cmd_build() {
 
     cd "$context_dir"
     mkdir -p src/libos/src/
-    cp "$project_dir/src/sgxenv.mk" src/
-    cp "$project_dir/src/libos/Makefile" src/libos/
-    cp "$project_dir/src/libos/Enclave.lds" src/libos/
-    cp -r "$project_dir/src/libos/src/builtin" src/libos/src/builtin
+    cp "$occlum_dir/src/sgxenv.mk" src/
+    cp "$occlum_dir/src/libos/Makefile" src/libos/
+    cp "$occlum_dir/src/libos/Enclave.lds" src/libos/
+    cp -r "$occlum_dir/src/libos/src/builtin" src/libos/src/builtin
     cd src/libos && \
         make clean-builtin && \
         make "$context_dir/build/lib/libocclum.so" ONLY_REBUILD_BUILTIN=1

@@ -1,5 +1,10 @@
 ######## SGX SDK Settings ########
 
+CUR_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+PROJECT_DIR := $(realpath $(CUR_DIR)/../../)
+BUILD_DIR := $(PROJECT_DIR)/build
+OBJS_DIR := $(BUILD_DIR)/tools/protect-integrity
+
 SGX_SDK ?= /opt/intel/sgxsdk
 SGX_MODE ?= HW
 SGX_ARCH ?= x64
@@ -40,58 +45,61 @@ endif
 ######## App Settings ########
 
 ifneq ($(SGX_MODE), HW)
-	Urts_Library_Name := sgx_urts_sim
+	URTS_LIBRARY_NAME := sgx_urts_sim
 else
-	Urts_Library_Name := sgx_urts
+	URTS_LIBRARY_NAME := sgx_urts
 endif
 
-App_Cpp_Files := App/App.cpp
-App_Include_Paths := -IInclude -IApp -I$(SGX_SDK)/include
+APP_C_FILES := App/Enclave_u.c
+APP_CPP_FILES := App/App.cpp
+APP_INCLUDE_PATHS := -IInclude -IApp -I$(SGX_SDK)/include -I$(OBJS_DIR)/App
 
-App_C_Flags := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes $(App_Include_Paths)
+APP_C_FLAGS := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes $(APP_INCLUDE_PATHS)
 
 # Three configuration modes - Debug, prerelease, release
 #   Debug - Macro DEBUG enabled.
 #   Prerelease - Macro NDEBUG and EDEBUG enabled.
 #   Release - Macro NDEBUG enabled.
 ifeq ($(SGX_DEBUG), 1)
-        App_C_Flags += -DDEBUG -UNDEBUG -UEDEBUG
+	APP_C_FLAGS += -DDEBUG -UNDEBUG -UEDEBUG
 else ifeq ($(SGX_PRERELEASE), 1)
-        App_C_Flags += -DNDEBUG -DEDEBUG -UDEBUG
+	APP_C_FLAGS += -DNDEBUG -DEDEBUG -UDEBUG
 else
-        App_C_Flags += -DNDEBUG -UEDEBUG -UDEBUG
+	APP_C_FLAGS += -DNDEBUG -UEDEBUG -UDEBUG
 endif
 
-App_Cpp_Flags := $(App_C_Flags) -std=c++11
-App_Link_Flags := $(SGX_COMMON_CFLAGS) -L$(SGX_LIBRARY_PATH) -l$(Urts_Library_Name) -lsgx_uprotected_fs -lpthread
+APP_CPP_FLAGS := $(APP_C_FLAGS) -std=c++11
+APP_LINK_FLAGS := $(SGX_COMMON_CFLAGS) -L$(SGX_LIBRARY_PATH) -l$(URTS_LIBRARY_NAME) -lsgx_uprotected_fs -lpthread
 
 ifneq ($(SGX_MODE), HW)
-	App_Link_Flags += -lsgx_uae_service_sim
+	APP_LINK_FLAGS += -lsgx_uae_service_sim
 else
-	App_Link_Flags += -lsgx_uae_service
+	APP_LINK_FLAGS += -lsgx_uae_service
 endif
 
-App_Cpp_Objects := $(App_Cpp_Files:.cpp=.o)
+APP_C_OBJS := $(addprefix $(OBJS_DIR)/,$(APP_C_FILES:.c=.o))
+APP_CPP_OBJS := $(addprefix $(OBJS_DIR)/,$(APP_CPP_FILES:.cpp=.o))
+APP_OBJS := $(APP_C_OBJS) $(APP_CPP_OBJS)
 
-App_Name := protect-integrity
+APP_NAME := $(BUILD_DIR)/bin/occlum-protect-integrity
 
 ######## Enclave Settings ########
 
 ifneq ($(SGX_MODE), HW)
-	Trts_Library_Name := sgx_trts_sim
-	Service_Library_Name := sgx_tservice_sim
+	TRTS_LIBRARY_NAME := sgx_trts_sim
+	SERVICE_LIBRARY_NAME := sgx_tservice_sim
 else
-	Trts_Library_Name := sgx_trts
-	Service_Library_Name := sgx_tservice
+	TRTS_LIBRARY_NAME := sgx_trts
+	SERVICE_LIBRARY_NAME := sgx_tservice
 endif
-Crypto_Library_Name := sgx_tcrypto
+CRYPTO_LIBRARY_NAME := sgx_tcrypto
 
-Enclave_Cpp_Files := Enclave/Enclave.cpp
-Enclave_C_Files :=
-Enclave_Include_Paths := -IInclude -IEnclave -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/stlport
+ENCLAVE_C_FILES := Enclave/Enclave_t.c
+ENCLAVE_CPP_FILES := Enclave/Enclave.cpp
+ENCLAVE_INCLUDE_PATHS := -IInclude -IEnclave -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/stlport -I$(OBJS_DIR)/Enclave
 
-Enclave_C_Flags := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fPIC -fstack-protector $(Enclave_Include_Paths)
-Enclave_Cpp_Flags := $(Enclave_C_Flags) -std=c++03 -nostdinc++
+ENCLAVE_C_FLAGS := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fPIC -fstack-protector $(ENCLAVE_INCLUDE_PATHS)
+ENCLAVE_CPP_FLAGS := $(ENCLAVE_C_FLAGS) -std=c++03 -nostdinc++
 
 # To generate a proper enclave, it is recommended to follow below guideline to link the trusted libraries:
 #    1. Link sgx_trts with the `--whole-archive' and `--no-whole-archive' options,
@@ -100,105 +108,110 @@ Enclave_Cpp_Flags := $(Enclave_C_Flags) -std=c++03 -nostdinc++
 #       Use `--start-group' and `--end-group' to link these libraries.
 # Do NOT move the libraries linked with `--start-group' and `--end-group' within `--whole-archive' and `--no-whole-archive' options.
 # Otherwise, you may get some undesirable errors.
-Enclave_Link_Flags := $(SGX_COMMON_CFLAGS) -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L$(SGX_LIBRARY_PATH) \
-	-Wl,--whole-archive -l$(Trts_Library_Name) -Wl,--no-whole-archive \
-	-Wl,--start-group -lsgx_tstdc -lsgx_tcxx -lsgx_tprotected_fs -l$(Crypto_Library_Name) -l$(Service_Library_Name) -Wl,--end-group \
+ENCLAVE_LINK_FLAGS := $(SGX_COMMON_CFLAGS) -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L$(SGX_LIBRARY_PATH) \
+	-Wl,--whole-archive -l$(TRTS_LIBRARY_NAME) -Wl,--no-whole-archive \
+	-Wl,--start-group -lsgx_tstdc -lsgx_tcxx -lsgx_tprotected_fs -l$(CRYPTO_LIBRARY_NAME) -l$(SERVICE_LIBRARY_NAME) -Wl,--end-group \
 	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined \
 	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic  \
 	-Wl,--defsym,__ImageBase=0 \
 	-Wl,--version-script=Enclave/Enclave.lds
 
-Enclave_Cpp_Objects := $(Enclave_Cpp_Files:.cpp=.o)
-Enclave_C_Objects := $(Enclave_C_Files:.c=.o)
+ENCLAVE_C_OBJS := $(addprefix $(OBJS_DIR)/,$(ENCLAVE_C_FILES:.c=.o))
+ENCLAVE_CPP_OBJS := $(addprefix $(OBJS_DIR)/,$(ENCLAVE_CPP_FILES:.cpp=.o))
+ENCLAVE_OBJS := $(ENCLAVE_C_OBJS) $(ENCLAVE_CPP_OBJS)
 
-Enclave_Name := protect-integrity-enclave.so
-Signed_Enclave_Name := protect-integrity-enclave.signed.so
-Enclave_Config_File := Enclave/Enclave.config.xml
+ENCLAVE_NAME := $(BUILD_DIR)/lib/occlum-protect-integrity.so
+SIGNED_ENCLAVE_NAME := $(BUILD_DIR)/lib/occlum-protect-integrity.signed.so
+ENCLAVE_CONFIG_FILE := Enclave/Enclave.config.xml
+
+ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(APP_NAME) $(SIGNED_ENCLAVE_NAME) $(ENCLAVE_OBJS) $(APP_OBJS))))
 
 ifeq ($(SGX_MODE), HW)
 ifneq ($(SGX_DEBUG), 1)
 ifneq ($(SGX_PRERELEASE), 1)
-Build_Mode = HW_RELEASE
+BUILD_MODE = HW_RELEASE
 endif
 endif
 endif
 
 
-.PHONY: all run
+.PHONY: all test clean
 
-ifeq ($(Build_Mode), HW_RELEASE)
-all: $(App_Name) $(Enclave_Name)
+ifeq ($(BUILD_MODE), HW_RELEASE)
+all: $(APP_NAME) $(ENCLAVE_NAME)
 	@echo "The project has been built in release hardware mode."
-	@echo "Please sign the $(Enclave_Name) first with your signing key before you run the $(App_Name) to launch and access the enclave."
+	@echo "Please sign the $(ENCLAVE_NAME) first with your signing key before you run the $(APP_NAME) to launch and access the enclave."
 	@echo "To sign the enclave use the command:"
-	@echo "   $(SGX_ENCLAVE_SIGNER) sign -key <your key> -enclave $(Enclave_Name) -out <$(Signed_Enclave_Name)> -config $(Enclave_Config_File)"
+	@echo "   $(SGX_ENCLAVE_SIGNER) sign -key <your key> -enclave $(ENCLAVE_NAME) -out <$(SIGNED_ENCLAVE_NAME)> -config $(ENCLAVE_CONFIG_FILE)"
 	@echo "You can also sign the enclave using an external signing tool."
 	@echo "To build the project in simulation mode set SGX_MODE=SIM. To build the project in prerelease mode set SGX_PRERELEASE=1 and SGX_MODE=HW."
 else
 
-all: $(App_Name) $(Signed_Enclave_Name)
+all: $(ALL_BUILD_SUBDIRS) $(APP_NAME) $(SIGNED_ENCLAVE_NAME)
 
 endif
 
+$(ALL_BUILD_SUBDIRS):
+	@mkdir -p $@
 
 ######## App Objects ########
 
-App/Enclave_u.c: $(SGX_EDGER8R) Enclave/Enclave.edl
-	@cd App && $(SGX_EDGER8R) --untrusted ../Enclave/Enclave.edl --search-path ../Enclave --search-path $(SGX_SDK)/include
-	@echo "GEN  =>  $@"
+$(OBJS_DIR)/App/Enclave_u.c: $(SGX_EDGER8R) Enclave.edl
+	@cd $(OBJS_DIR)/App && $(SGX_EDGER8R) --untrusted $(CUR_DIR)/Enclave.edl --search-path $(SGX_SDK)/include
+	@echo "GEN <=  $@"
 
-App/Enclave_u.o: App/Enclave_u.c
-	@$(CC) $(App_C_Flags) -c $< -o $@
-	@echo "CC   <=  $<"
+$(OBJS_DIR)/App/Enclave_u.o: $(OBJS_DIR)/App/Enclave_u.c
+	@$(CC) $(APP_C_FLAGS) -c $< -o $@
+	@echo "CC <= $@"
 
-App/%.o: App/%.cpp
-	@$(CXX) $(App_Cpp_Flags) -c $< -o $@
-	@echo "CXX  <=  $<"
+$(OBJS_DIR)/App/%.o: App/%.cpp
+	@$(CXX) $(APP_CPP_FLAGS) -c $< -o $@
+	@echo "CXX <= $@"
 
-$(App_Name): App/Enclave_u.o $(App_Cpp_Objects)
-	@$(CXX) $^ -o $@ $(App_Link_Flags)
-	@cp $(App_Name) ../bin/
+$(OBJS_DIR)/App/%.o: App/%.c
+	@$(CC) $(APP_C_FLAGS) -c $< -o $@
+	@echo "CC <= $@"
+
+$(APP_NAME): $(APP_OBJS)
+	@$(CXX) $^ -o $@ $(APP_LINK_FLAGS)
 	@echo "LINK =>  $@"
 
 
 ######## Enclave Objects ########
 
-Enclave/Enclave_t.c: $(SGX_EDGER8R) Enclave/Enclave.edl
-	@cd Enclave && $(SGX_EDGER8R) --trusted ../Enclave/Enclave.edl --search-path ../Enclave --search-path $(SGX_SDK)/include
-	@echo "GEN  =>  $@"
+$(OBJS_DIR)/Enclave/Enclave_t.c: $(SGX_EDGER8R) Enclave.edl
+	@cd $(OBJS_DIR)/Enclave && $(SGX_EDGER8R) --trusted $(CUR_DIR)/Enclave.edl --search-path $(SGX_SDK)/include
+	@echo "GEN <=  $@"
 
-Enclave/Enclave_t.o: Enclave/Enclave_t.c
-	@$(CC) $(Enclave_C_Flags) -c $< -o $@
-	@echo "CC   <=  $<"
+$(OBJS_DIR)/Enclave/Enclave_t.o: $(OBJS_DIR)/Enclave/Enclave_t.c
+	@$(CXX) $(ENCLAVE_CPP_FLAGS) -c $< -o $@
+	@echo "CXX <=  $@"
 
-$(Enclave_Cpp_Objects): Enclave/%.o: Enclave/%.cpp
-	@$(CXX) $(Enclave_Cpp_Flags) -c $< -o $@
-	@echo "CXX  <=  $<"
+$(OBJS_DIR)/Enclave/%.o: Enclave/%.cpp
+	@$(CXX) $(ENCLAVE_CPP_FLAGS) -c $< -o $@
+	@echo "CXX <=  $@"
 
-$(Enclave_C_Objects): Enclave/%.o: Enclave/%.c
-	@$(CC) $(Enclave_C_Flags) -c $< -o $@
-	@echo "CC  <=  $<"
+$(OBJS_DIR)/Enclave/%.o: Enclave/%.c
+	@$(CC) $(ENCLAVE_C_FLAGS) -c $< -o $@
+	@echo "CC  <=  $@"
 
-$(Enclave_Name): Enclave/Enclave_t.o $(Enclave_Cpp_Objects) $(Enclave_C_Objects)
-	$(CXX) $^ -o $@ $(Enclave_Link_Flags)
+$(ENCLAVE_NAME): $(ENCLAVE_OBJS)
+	@$(CXX) $^ -o $@ $(ENCLAVE_LINK_FLAGS)
 	@echo "LINK =>  $@"
 
-$(Signed_Enclave_Name): $(Enclave_Name)
-	@$(SGX_ENCLAVE_SIGNER) sign -key Enclave/Enclave_private.pem -enclave $(Enclave_Name) -out $@ -config $(Enclave_Config_File)
-	@cp $(Signed_Enclave_Name) ../bin/
+$(SIGNED_ENCLAVE_NAME): $(ENCLAVE_NAME)
+	@$(SGX_ENCLAVE_SIGNER) sign -key Enclave/Enclave_private.pem -enclave $(ENCLAVE_NAME) -out $@ -config $(ENCLAVE_CONFIG_FILE)
 	@echo "SIGN =>  $@"
 
-.PHONY: test
 test: all random.txt
-	./protect-integrity protect random.txt
-	./protect-integrity show random.txt.protected > random.txt.unprotected
-	./protect-integrity show-mac random.txt.protected
+	$(APP_NAME) protect random.txt
+	$(APP_NAME) show random.txt.protected > random.txt.unprotected
+	$(APP_NAME) show-mac random.txt.protected
 	diff random.txt random.txt.unprotected
 	@echo "Pass ^_^"
 
 random.txt:
 	@base64 /dev/urandom | head -c 10000000 > random.txt
 
-.PHONY: clean
 clean:
-	@rm -f $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name) $(App_Cpp_Objects) App/Enclave_u.* $(Enclave_Cpp_Objects) $(Enclave_C_Objects) Enclave/Enclave_t.* *.test.txt random.txt*
+	@rm -f $(APP_NAME) $(ENCLAVE_NAME) $(SIGNED_ENCLAVE_NAME) $(APP_OBJS) $(OBJS_DIR)/App/Enclave_u.* $(ENCLAVE_OBJS) $(OBJS_DIR)/Enclave/Enclave_t.* *.test.txt random.txt*

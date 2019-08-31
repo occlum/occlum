@@ -39,7 +39,7 @@ prebuild:
 	@$(RM) -rf $(BUILD_DIR)/test/*
 	@mkdir -p $(BUILD_DIR)/test
 	@cd $(BUILD_DIR)/test && \
-		$(PROJECT_DIR)/src/cli/occlum init
+		$(PROJECT_DIR)/build/bin/occlum init
 	@cp Occlum.json Enclave.xml $(BUILD_DIR)/test/
 
 $(BUILD_TARGETS): %:
@@ -49,7 +49,7 @@ $(BUILD_TARGETS): %:
 
 postbuild:
 	@cd $(BUILD_DIR)/test && \
-		$(PROJECT_DIR)/src/cli/occlum build
+		$(PROJECT_DIR)/build/bin/occlum build
 
 #############################################################################
 # Test targets
