@@ -1,5 +1,5 @@
 use super::hostfs::HostFS;
-use super::sgx_impl::SgxStorage;
+use super::sgx_impl::{SgxStorage, SgxUuidProvider};
 use super::*;
 use config::{ConfigMount, ConfigMountFsType};
 use std::path::{Path, PathBuf};
@@ -51,6 +51,7 @@ fn open_root_fs_according_to(mount_config: &Vec<ConfigMount>) -> Result<Arc<Moun
     let root_sefs = SEFS::open(
         Box::new(SgxStorage::new(root_sefs_source, true)),
         &time::OcclumTimeProvider,
+        &SgxUuidProvider,
     )?;
     let root_mountable_sefs = MountFS::new(root_sefs);
     Ok(root_mountable_sefs)
@@ -87,12 +88,14 @@ fn mount_nonroot_fs_according_to(
                     SEFS::open(
                         Box::new(SgxStorage::new(source_path, false)),
                         &time::OcclumTimeProvider,
+                        &SgxUuidProvider,
                     )
                 }
                 .or_else(|_| {
                     SEFS::create(
                         Box::new(SgxStorage::new(source_path, false)),
                         &time::OcclumTimeProvider,
+                        &SgxUuidProvider,
                     )
                 })?;
                 mount_fs_at(sefs, &root, target_dirname)?;

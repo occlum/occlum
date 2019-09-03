@@ -1,19 +1,43 @@
 use super::sgx_aes_gcm_128bit_tag_t;
+use alloc::prelude::ToString;
 use rcore_fs::dev::TimeProvider;
 use rcore_fs::vfs::Timespec;
 use rcore_fs_sefs::dev::*;
+use sgx_trts::libc;
+use sgx_types::*;
 use std::boxed::Box;
 use std::collections::BTreeMap;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sgxfs::{remove, OpenOptions, SgxFile};
+use std::string::String;
 use std::sync::{Arc, SgxMutex as Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+
+extern "C" {
+    fn sgx_read_rand(rand_buf: *mut u8, buf_size: usize) -> sgx_status_t;
+}
+
+pub struct SgxUuidProvider;
+
+impl UuidProvider for SgxUuidProvider {
+    fn generate_uuid(&self) -> SefsUuid {
+        let mut uuid: [u8; 16] = Default::default();
+        let status = unsafe { sgx_read_rand(uuid.as_mut_ptr(), uuid.len()) };
+        if status != sgx_status_t::SGX_SUCCESS {
+            panic!("sgx_read_rand failed");
+        }
+        SefsUuid::new(uuid)
+    }
+}
 
 pub struct SgxStorage {
     path: PathBuf,
     integrity_only: bool,
-    file_cache: Mutex<BTreeMap<usize, LockedFile>>,
+    file_cache: Mutex<BTreeMap<u64, LockedFile>>,
     root_mac: Option<sgx_aes_gcm_128bit_tag_t>,
 }
 
@@ -33,26 +57,33 @@ impl SgxStorage {
     #[cfg(feature = "sgx_file_cache")]
     fn get(
         &self,
-        file_id: usize,
+        file_id: &str,
         open_fn: impl FnOnce(&Self) -> DevResult<LockedFile>,
     ) -> DevResult<LockedFile> {
         // query cache
+        let key = self.calculate_hash(file_id);
         let mut caches = self.file_cache.lock().unwrap();
-        if let Some(locked_file) = caches.get(&file_id) {
+        if let Some(locked_file) = caches.get(&key) {
             // hit, return
             return Ok(locked_file.clone());
         }
         // miss, open one
         let locked_file = open_fn(self)?;
         // add to cache
-        caches.insert(file_id, locked_file.clone());
+        caches.insert(key, locked_file.clone());
         Ok(locked_file)
+    }
+
+    fn calculate_hash(&self, t: &str) -> u64 {
+        let mut s = DefaultHasher::new();
+        t.hash(&mut s);
+        s.finish()
     }
     /// Get file by `file_id` without cache.
     #[cfg(not(feature = "sgx_file_cache"))]
     fn get(
         &self,
-        file_id: usize,
+        file_id: &str,
         open_fn: impl FnOnce(&Self) -> DevResult<LockedFile>,
     ) -> LockedFile {
         open_fn(self)
@@ -69,10 +100,10 @@ impl SgxStorage {
 }
 
 impl Storage for SgxStorage {
-    fn open(&self, file_id: usize) -> DevResult<Box<File>> {
+    fn open(&self, file_id: &str) -> DevResult<Box<File>> {
         let locked_file = self.get(file_id, |this| {
             let mut path = this.path.to_path_buf();
-            path.push(format!("{}", file_id));
+            path.push(file_id);
             let options = {
                 let mut options = OpenOptions::new();
                 options.read(true).update(true);
@@ -91,7 +122,7 @@ impl Storage for SgxStorage {
             };
 
             // Check the MAC of the root file against the given root MAC of the storage
-            if file_id == 0 && self.root_mac.is_some() {
+            if file_id == "metadata" && self.root_mac.is_some() {
                 let root_file_mac = file.get_mac().expect("Failed to get mac");
                 if root_file_mac != self.root_mac.unwrap() {
                     println!(
@@ -108,10 +139,10 @@ impl Storage for SgxStorage {
         Ok(Box::new(locked_file))
     }
 
-    fn create(&self, file_id: usize) -> DevResult<Box<File>> {
+    fn create(&self, file_id: &str) -> DevResult<Box<File>> {
         let locked_file = self.get(file_id, |this| {
             let mut path = this.path.to_path_buf();
-            path.push(format!("{}", file_id));
+            path.push(file_id);
             let options = {
                 let mut options = OpenOptions::new();
                 options.write(true).update(true);
@@ -133,13 +164,14 @@ impl Storage for SgxStorage {
         Ok(Box::new(locked_file))
     }
 
-    fn remove(&self, file_id: usize) -> DevResult<()> {
+    fn remove(&self, file_id: &str) -> DevResult<()> {
         let mut path = self.path.to_path_buf();
-        path.push(format!("{}", file_id));
+        path.push(file_id);
         remove(path).expect("failed to remove SgxFile");
         // remove from cache
+        let key = self.calculate_hash(file_id);
         let mut caches = self.file_cache.lock().unwrap();
-        caches.remove(&file_id);
+        caches.remove(&key);
         Ok(())
     }
 }

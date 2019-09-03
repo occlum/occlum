@@ -100,7 +100,7 @@ cmd_build() {
             "$working_dir/image" \
             zip
 
-    export OCCLUM_CONF_ROOT_FS_MAC=`"$occlum_dir/build/bin/occlum-protect-integrity" show-mac "$context_dir/build/mount/__ROOT/0"`
+    export OCCLUM_CONF_ROOT_FS_MAC=`"$occlum_dir/build/bin/occlum-protect-integrity" show-mac "$context_dir/build/mount/__ROOT/metadata"`
     export OCCLUM_CONF_USER_SPACE_SIZE=`get_conf_user_space_size`
     export OCCLUM_CONF_DEFAULT_STACK_SIZE=`get_conf_default_stack_size`
     export OCCLUM_CONF_DEFAULT_HEAP_SIZE=`get_conf_default_heap_size`
