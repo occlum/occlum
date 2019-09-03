@@ -329,7 +329,11 @@ int SGX_CDECL main(int argc, const char *argv[])
         return status;
     }
 
-    status = wait_all_tasks();
+    // TODO: exit all tasks gracefully, instead of killing all remaining
+    // tasks automatically after the main task exits and the process
+    // terminates.
+    //status = wait_all_tasks();
+    status = wait_main_task();
 
     gettimeofday(&appdie, NULL);
 
@@ -339,8 +343,12 @@ int SGX_CDECL main(int argc, const char *argv[])
     printf("LibOS startup time: %lu microseconds\n", libos_startup_time);
     printf("Apps running time: %lu microseconds\n", app_runtime);
 
-    /* Destroy the enclave */
-    sgx_destroy_enclave(global_eid);
+    // TODO: destroy the enclave gracefully
+    // We cannot destroy the enclave gracefully  since we may still have
+    // running threads that are using the enclave at this point, which blocks
+    // sgx_destory_enclave call. This issue is related to "TODO: exit all tasks
+    // gracefully" above.
+    //sgx_destroy_enclave(global_eid);
 
     return status;
 }

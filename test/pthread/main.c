@@ -1,21 +1,26 @@
 #include <sys/types.h>
 #include <pthread.h>
 #include <stdio.h>
+#include "test.h"
 
-/*
- * Child threads
- */
+// ============================================================================
+// Helper macros
+// ============================================================================
 
 #define NTHREADS                (4)
 #define STACK_SIZE              (8 * 1024)
 
-#define LOCAL_COUNT             (100000L)
+// ============================================================================
+// The test case of concurrent counter
+// ============================================================================
+
+#define LOCAL_COUNT             (100000UL)
 #define EXPECTED_GLOBAL_COUNT   (LOCAL_COUNT * NTHREADS)
 
 struct thread_arg {
     int                         ti;
     long                        local_count;
-    volatile long*              global_count;
+    volatile unsigned long*     global_count;
     pthread_mutex_t*            mutex;
 };
 
@@ -31,11 +36,11 @@ static void* thread_func(void* _arg) {
     return NULL;
 }
 
-int main(int argc, const char* argv[]) {
+static int test_mutex_with_concurrent_counter(void) {
     /*
      * Multiple threads are to increase a global counter concurrently
      */
-    volatile long global_count = 0;
+    volatile unsigned long global_count = 0;
     pthread_t threads[NTHREADS];
     struct thread_arg thread_args[NTHREADS];
     /*
@@ -78,4 +83,16 @@ int main(int argc, const char* argv[]) {
 
     pthread_mutex_destroy(&mutex);
     return 0;
+}
+
+// ============================================================================
+// Test suite main
+// ============================================================================
+
+static test_case_t test_cases[] = {
+    TEST_CASE(test_mutex_with_concurrent_counter)
+};
+
+int main() {
+    return test_suite_run(test_cases, ARRAY_SIZE(test_cases));
 }

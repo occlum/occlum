@@ -55,9 +55,11 @@ pub extern "C" fn libos_run(host_tid: i32) -> i32 {
 pub extern "C" fn dummy_ecall() -> i32 {
     0
 }
-// Use 127 as a special value to indicate internal error from libos, not from
-// user programs, although it is completely ok for a user program to return 127.
-const EXIT_STATUS_INTERNAL_ERROR: i32 = 127;
+
+// Use -128 as a special value to indicate internal error from libos, not from
+// user programs. The LibOS ensures that an user program can only return a
+// value between 0 and 255 (inclusive).
+const EXIT_STATUS_INTERNAL_ERROR: i32 = -128;
 
 fn parse_arguments(
     path_ptr: *const c_char,
@@ -110,6 +112,16 @@ fn do_run(host_tid: pid_t) -> Result<i32> {
     use rcore_fs::vfs::FileSystem;
     crate::fs::ROOT_INODE.fs().sync()?;
 
+    // Only return the least significant 8 bits of the exit status
+    //
+    // From The Open Group Base Specifications Issue 7, 2018 edition:
+    // > The shell shall recognize the entire status value retrieved for the
+    // > command by the equivalent of the wait() function WEXITSTATUS macro...
+    //
+    // From the man page of wait() syscall:
+    // > WEXITSTATUS macro returns the exit status of the child. This consists of the least
+    // > significant 8 bits of the status
+    let exit_status = exit_status & 0x0000_00FF_i32;
     Ok(exit_status)
 }
 

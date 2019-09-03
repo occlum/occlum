@@ -28,6 +28,7 @@ pub struct Process {
     parent: Option<ProcessRef>,
     children: Vec<ProcessWeakRef>,
     waiting_children: Option<WaitQueue<ChildProcessFilter, pid_t>>,
+    //thread_group: ThreadGroupRef,
     vm: ProcessVMRef,
     file_table: FileTableRef,
     rlimits: ResourceLimitsRef,
@@ -37,6 +38,7 @@ pub type ProcessRef = Arc<SgxMutex<Process>>;
 pub type ProcessWeakRef = std::sync::Weak<SgxMutex<Process>>;
 pub type FileTableRef = Arc<SgxMutex<FileTable>>;
 pub type ProcessVMRef = Arc<SgxMutex<ProcessVM>>;
+pub type ThreadGroupRef = Arc<SgxMutex<ThreadGroup>>;
 
 pub fn do_getpid() -> pid_t {
     let current_ref = get_current();

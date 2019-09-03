@@ -5,6 +5,8 @@ pub struct ThreadGroup {
     threads: Vec<ProcessRef>,
 }
 
+impl ThreadGroup {}
+
 bitflags! {
     pub struct CloneFlags : u32 {
         const CLONE_VM              = 0x00000100;

@@ -1,3 +1,5 @@
+
+#include <limits.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,8 +14,12 @@ int syscall();
 #define gettid() syscall(__NR_gettid)
 
 static volatile int num_tasks = 0;
-static volatile int main_task_status = 0;
 static volatile int any_fatal_error = 0;
+
+// The LibOS never returns INT_MIN. As long as the main_task_status == INT_MIN,
+// the main task must not have returned.
+#define MAIN_TASK_NOT_RETURNED INT_MIN
+static volatile int main_task_status = MAIN_TASK_NOT_RETURNED;
 
 static int BEGIN_TASK(void) {
     return a_fetch_and_add(&num_tasks, 1) == 0;
@@ -41,7 +47,10 @@ static void* __run_task_thread(void* _data) {
         any_fatal_error = 1;
     }
 
-    if (data->is_main_task) main_task_status = status;
+    if (data->is_main_task) {
+        a_store(&main_task_status, status);
+        futex_wakeup(&main_task_status);
+    }
 
     free(data);
     END_TASK();
@@ -64,6 +73,13 @@ int run_new_task(sgx_enclave_id_t eid) {
     pthread_detach(thread);
 
     return 0;
+}
+
+int wait_main_task(void) {
+    while ((a_load(&main_task_status)) == MAIN_TASK_NOT_RETURNED) {
+        futex_wait(&main_task_status, MAIN_TASK_NOT_RETURNED);
+    }
+    return main_task_status;
 }
 
 int wait_all_tasks(void) {
