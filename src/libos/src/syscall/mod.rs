@@ -211,6 +211,8 @@ pub extern "C" fn dispatch_syscall(
         SYS_GETTIMEOFDAY => do_gettimeofday(arg0 as *mut timeval_t),
         SYS_CLOCK_GETTIME => do_clock_gettime(arg0 as clockid_t, arg1 as *mut timespec_t),
 
+        SYS_NANOSLEEP => do_nanosleep(arg0 as *const timespec_t, arg1 as *mut timespec_t),
+
         SYS_UNAME => do_uname(arg0 as *mut utsname_t),
 
         SYS_PRLIMIT64 => do_prlimit(
@@ -809,6 +811,18 @@ fn do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t) -> Result<isize> 
     unsafe {
         *ts_u = ts;
     }
+    Ok(0)
+}
+
+// TODO: handle remainder
+fn do_nanosleep(req_u: *const timespec_t, rem_u: *mut timespec_t) -> Result<isize> {
+    check_ptr(req_u)?;
+    if !rem_u.is_null() {
+        check_mut_ptr(rem_u)?;
+    }
+
+    let req = timespec_t::from_raw_ptr(req_u)?;
+    time::do_nanosleep(&req)?;
     Ok(0)
 }
 

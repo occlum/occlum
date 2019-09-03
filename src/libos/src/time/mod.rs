@@ -43,6 +43,16 @@ pub struct timespec_t {
     nsec: i64,
 }
 
+impl timespec_t {
+    pub fn from_raw_ptr(ptr: *const timespec_t) -> Result<timespec_t> {
+        let ts = unsafe { *ptr };
+        if ts.sec < 0 || ts.nsec < 0 || ts.nsec >= 1_000_000_000 {
+            return_errno!(EINVAL, "Invalid timespec fields");
+        }
+        Ok(ts)
+    }
+}
+
 #[allow(non_camel_case_types)]
 pub type clockid_t = i32;
 
@@ -77,6 +87,10 @@ impl ClockID {
 }
 
 pub fn do_clock_gettime(clockid: ClockID) -> Result<timespec_t> {
+    extern "C" {
+        fn ocall_clock_gettime(clockid: clockid_t, sec: *mut time_t, ns: *mut i64) -> sgx_status_t;
+    }
+
     let mut sec = 0;
     let mut nsec = 0;
     unsafe {
@@ -89,12 +103,17 @@ pub fn do_clock_gettime(clockid: ClockID) -> Result<timespec_t> {
     Ok(timespec_t { sec, nsec })
 }
 
-extern "C" {
-    fn ocall_clock_gettime(clockid: clockid_t, sec: *mut time_t, ns: *mut i64) -> sgx_status_t;
+pub fn do_nanosleep(req: &timespec_t) -> Result<()> {
+    extern "C" {
+        fn ocall_nanosleep(sec: time_t, nsec: i64) -> sgx_status_t;
+    }
+    unsafe {
+        ocall_nanosleep(req.sec, req.nsec);
+    }
+    Ok(())
 }
 
 // For SEFS
-
 pub struct OcclumTimeProvider;
 
 impl TimeProvider for OcclumTimeProvider {

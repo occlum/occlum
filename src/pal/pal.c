@@ -265,6 +265,11 @@ void ocall_clock_gettime(int clockid, time_t* sec, long* ns) {
     *ns = ts.tv_nsec;
 }
 
+void ocall_nanosleep(time_t sec, long nsec) {
+    struct timespec tv = { .tv_sec = sec, .tv_nsec = nsec };
+    nanosleep(&tv, NULL);
+}
+
 int ocall_sched_getaffinity(int* error, int pid, size_t cpusize, unsigned char* buf) {
     int ret = syscall(__NR_sched_getaffinity, pid, cpusize, buf);
     if (error) {

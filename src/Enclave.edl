@@ -19,6 +19,7 @@ enclave {
         int ocall_run_new_task(void);
         void ocall_gettimeofday([out] long* sec, [out] long* us);
         void ocall_clock_gettime(int clockid, [out] long* sec, [out] long* ns);
+        void ocall_nanosleep(long sec, long nsec);
         void ocall_sync(void);
         int ocall_sched_getaffinity([out] int *error, int pid, size_t cpusize, [out, size=cpusize] unsigned char* buf);
         int ocall_sched_setaffinity([out] int *error, int pid, size_t cpusize, [in, size=cpusize] const unsigned char* buf);

@@ -9,21 +9,29 @@ pub mod from_user {
 
     /// Check the user pointer is within the readable memory range of the user process
     pub fn check_ptr<T>(user_ptr: *const T) -> Result<()> {
+        if user_ptr.is_null() {
+            return_errno!(EINVAL, "Address 0 is invalid");
+        }
         Ok(())
     }
 
     /// Check the mutable user pointer is within the writable memory of the user process
     pub fn check_mut_ptr<T>(user_ptr: *mut T) -> Result<()> {
+        if user_ptr.is_null() {
+            return_errno!(EINVAL, "Address 0 is invalid");
+        }
         Ok(())
     }
 
     /// Check the readonly array is within the readable memory of the user process
     pub fn check_array<T>(user_buf: *const T, count: usize) -> Result<()> {
+        check_ptr(user_buf);
         Ok(())
     }
 
     /// Check the mutable array is within the writable memory of the user process
     pub fn check_mut_array<T>(user_buf: *mut T, count: usize) -> Result<()> {
+        check_mut_ptr(user_buf);
         Ok(())
     }
 
