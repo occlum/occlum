@@ -27,7 +27,7 @@ const char* expect_argv[EXPECT_ARGC] = {
 
 // Expected child arguments
 const int child_argc = 2;
-const char* child_argv[child_argc + 1] = {
+const char* child_argv[3] = {
     "env",
     "child",
     NULL

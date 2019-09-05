@@ -121,9 +121,6 @@ static int test_cpuid_with_basic_leaf_one() {
     if (cpu.eax == 0) {
         throw_error("faild to call cpuid with eax=1");
     }
-    if (!((cpu.ecx >> 6) & 1)) {
-        throw_error("smx is not enabled");
-    }
     return 0;
 }
 

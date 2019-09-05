@@ -17,12 +17,6 @@ report_arg_error() {
     echo "    occlum run <program_name> <program_args>"
 }
 
-
-get_conf_user_space_size() {
-    cat "$working_dir/Occlum.json" | \
-        python -c "import sys, json; print json.load(sys.stdin)['vm']['user_space_size']"
-}
-
 get_conf_default_stack_size() {
     cat "$working_dir/Occlum.json" | \
         python -c "import sys, json; print json.load(sys.stdin)['process']['default_stack_size']"
@@ -38,6 +32,15 @@ get_conf_default_mmap_size() {
         python -c "import sys, json; print json.load(sys.stdin)['process']['default_mmap_size']"
 }
 
+get_conf_user_space_size() {
+    cat "$working_dir/Occlum.json" | \
+        python -c "import sys, json; print json.load(sys.stdin)['vm']['user_space_size']"
+}
+
+get_conf_env() {
+    cat "$working_dir/Occlum.json" | \
+        python -c "import sys, json; print json.dumps(json.load(sys.stdin)['env'])"
+}
 
 get_occlum_conf_file_mac() {
     "$occlum_dir/build/bin/occlum-protect-integrity" show-mac "$context_dir/build/Occlum.json.protected"
@@ -63,12 +66,13 @@ cmd_init() {
     mkdir -p image/host
     mkdir -p image/tmp
 
-    cp \
-        /lib/ld-musl-x86_64.so.1 \
-        /usr/local/occlum/lib/libc++.so.1 \
-        /usr/local/occlum/lib/libc++abi.so.1 \
-        /usr/local/occlum/lib/libunwind.so.1 \
-        image/lib/
+    local occlum_gcc_lib=/usr/local/occlum/x86_64-linux-musl/lib
+    cp -t image/lib/ \
+    	/lib/ld-musl-x86_64.so.1 \
+        "$occlum_gcc_lib/libc.so" \
+        "$occlum_gcc_lib/libstdc++.so.6" \
+        "$occlum_gcc_lib/libgcc_s.so.1" \
+        "$occlum_gcc_lib/libgomp.so.1"
 
     cp "$occlum_dir"/etc/template/* "$working_dir"/
 
@@ -101,12 +105,10 @@ cmd_build() {
     export OCCLUM_CONF_DEFAULT_STACK_SIZE=`get_conf_default_stack_size`
     export OCCLUM_CONF_DEFAULT_HEAP_SIZE=`get_conf_default_heap_size`
     export OCCLUM_CONF_DEFAULT_MMAP_SIZE=`get_conf_default_mmap_size`
+    export OCCLUM_CONF_ENV=`get_conf_env`
     cd "$context_dir/build"
     "$occlum_dir/build/bin/occlum-gen-default-occlum-json"\
-        > "Occlum_new.json"
-    jq -s '.[0] + .[1]' "../../Occlum.json" "Occlum_new.json"\
         > "Occlum.json"
-    rm -f "Occlum_new.json"
     "$occlum_dir/build/bin/occlum-protect-integrity" protect Occlum.json
 
     export OCCLUM_BUILTIN_CONF_FILE_MAC=`get_occlum_conf_file_mac`

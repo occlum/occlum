@@ -33,6 +33,7 @@ cat <<EOF
             "target": "/tmp",
             "type": "ramfs"
         }
-    ]
+    ],
+    "env": $OCCLUM_CONF_ENV
 }
 EOF

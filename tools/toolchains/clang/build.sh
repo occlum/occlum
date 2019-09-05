@@ -1,6 +1,6 @@
 #!/bin/sh
-BUILD_DIR=/tmp/occlum_toolchain
-INSTALL_DIR=/usr/local/occlum
+BUILD_DIR=/tmp/occlum_clang_toolchain
+INSTALL_DIR=/opt/occlum/toolchains/clang
 
 # Exit if any command fails
 set -e
@@ -117,3 +117,6 @@ cd ..
 
 # Remove all source code and build files
 rm -rf ${BUILD_DIR}
+
+# Link the toolchain directory
+ln -s -f ${INSTALL_DIR} /usr/local/occlum

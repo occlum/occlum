@@ -110,7 +110,7 @@ int main(int argc, const char* argv[]) {
 
 	int child_pid;
 	extern char ** environ;
-	const char* new_argv[] = {"./dev_null", NULL};
+	char* new_argv[] = {"./dev_null", NULL};
 	if (posix_spawn(&child_pid, "dev_null", &file_actions,
 					NULL, new_argv, environ) < 0) {
 		printf("ERROR: failed to spawn a child process\n");

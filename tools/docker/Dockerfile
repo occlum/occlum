@@ -63,9 +63,9 @@ RUN curl https://sh.rustup.rs -sSf | \
     rm -rf /root/.cargo/registry && rm -rf /root/.cargo/git
 
 # Install Occlum toolchain
-WORKDIR /tmp
-COPY build_toolchain.sh /tmp
-RUN ./build_toolchain.sh
+COPY toolchains/gcc /tmp
+WORKDIR /tmp/gcc
+RUN ./build.sh
 ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
 
 WORKDIR /root

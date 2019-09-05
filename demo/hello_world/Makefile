@@ -1,4 +1,4 @@
-CC := musl-clang
+CC := occlum-gcc
 CFLAGS := -fPIC -pie
 
 .PHONY: all test test-native clean
@@ -9,7 +9,7 @@ hello_world: hello_world.c
 	$(CC) $(CFLAGS) $^ -o $@
 
 # Run hello_world on Occlum inside an SGX enclave
-test:
+test: hello_world
 	rm -rf occlum_workspace
 	mkdir occlum_workspace
 	cd occlum_workspace && \
