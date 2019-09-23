@@ -96,7 +96,7 @@ We have built and tested Occlum on Ubuntu 16.04 with hardware SGX support. We re
 
 Step 1-4 are to be done on the host OS:
 
-1. Install [Intel SGX driver for Linux](https://github.com/intel/linux-sgx), which is required by Intel SGX SDK.
+1. Install [Intel SGX driver for Linux](https://github.com/intel/linux-sgx-driver), which is required by Intel SGX SDK.
 
 2. Install [enable_rdfsbase kernel module](https://github.com/occlum/enable_rdfsbase), which enables Occlum to use `rdfsbase`-family instructions in enclaves.
 
@@ -110,7 +110,7 @@ Step 1-4 are to be done on the host OS:
     docker run -it \
       --mount type=bind,source=/your/path/to/occlum,target=/root/occlum \
       --device /dev/isgx \
-      occlum/occlum:latest
+      occlum/occlum:0.5.0
     ```
 Step 5-9 are to be done on the guest OS running inside the container:
 
