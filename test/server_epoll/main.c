@@ -12,6 +12,7 @@
 #include <spawn.h>
 
 #define MAXEVENTS 64
+#define DEFAULT_PROC_NUM 3
 
 static int
 create_and_bind() {
@@ -25,7 +26,7 @@ create_and_bind() {
 	memset(&servaddr, 0, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	servaddr.sin_port = htons(6666);
+	servaddr.sin_port = htons(6667);
 
 	int ret = bind(listenfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
 	if (ret < 0) {
@@ -65,18 +66,25 @@ main(int argc, char *argv[]) {
 
 	// spawn clients
 	int client_pid;
-	char* client_argv[] = {"client", "127.0.0.1", NULL};
-	for(int i=0; i<3; ++i) {
+	int proc_num = DEFAULT_PROC_NUM;
+	char* client_argv[] = {"client", "127.0.0.1", "6667", NULL};
+	for(int i=0; i<DEFAULT_PROC_NUM; ++i) {
 		int ret = posix_spawn(&client_pid, "/bin/client", NULL, NULL, client_argv, NULL);
 		if (ret < 0) {
-			printf("spawn client process error: %s(errno: %d)\n", strerror(errno), errno);
-			return -1;
+			printf("spawn client process error: %s(errno: %d), %d process(es) spawned\n", strerror(errno), errno, i);
+			if (i == 0) {
+			    perror("no client is successfully spawned");
+			    return -1;
+			} else {
+			    proc_num = i;
+			    break;
+			}
 		}
 	}
 
 	/* The event loop */
 	int done_count = 0;
-	while (done_count < 3) {
+	while (done_count < proc_num) {
 		int n = epoll_wait(efd, events, MAXEVENTS, -1);
 		for (int i = 0; i < n; i++) {
 			if ((events[i].events & EPOLLERR) ||

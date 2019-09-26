@@ -13,8 +13,8 @@ int main(int argc, const char *argv[]) {
 	const char* message = "Hello world!";
 	int ret;
 
-	if (argc != 2) {
-		printf("usage: ./client <ipaddress>\n");
+	if (argc != 3) {
+		printf("usage: ./client <ipaddress> <port>\n");
 		return 0;
 	}
 
@@ -27,7 +27,7 @@ int main(int argc, const char *argv[]) {
 	struct sockaddr_in servaddr;
 	memset(&servaddr, 0, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
-	servaddr.sin_port = htons(6666);
+	servaddr.sin_port = htons((uint16_t)strtol(argv[2], NULL, 10));
 
 	ret = inet_pton(AF_INET, argv[1], &servaddr.sin_addr);
 	if (ret <= 0) {

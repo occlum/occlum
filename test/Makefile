@@ -3,10 +3,10 @@ PROJECT_DIR := $(realpath $(CUR_DIR)/../)
 BUILD_DIR := $(PROJECT_DIR)/build
 
 # Dependencies: need to be compiled but not to run by any Makefile target
-TEST_DEPS := dev_null
+TEST_DEPS := dev_null client
 # Tests: need to be compiled and run by test-% target
 TESTS := empty env hello_world malloc mmap file getpid spawn sched pipe time \
-	truncate readdir mkdir link tls pthread uname rlimit client server \
+	truncate readdir mkdir link tls pthread uname rlimit server \
 	server_epoll unix_socket cout hostfs cpuid rdtsc device
 # Benchmarks: need to be compiled and run by bench-% target
 BENCHES := spawn_and_exit_latency pipe_throughput unix_socket_throughput
