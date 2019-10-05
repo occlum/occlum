@@ -167,11 +167,11 @@ impl CpuId {
         cpuid
     }
 
-    fn lookup_cpuid_from_cache(&self, cpuid_input: CpuIdInput) -> Result<CpuIdResult, Error> {
+    fn lookup_cpuid_from_cache(&self, cpuid_input: CpuIdInput) -> Result<CpuIdResult> {
         self.cache
             .lookup(&cpuid_input)
             .map(|result| result.clone())
-            .ok_or_else(|| Error::new(Errno::ENOENT, "cpuid_result not found"))
+            .ok_or_else(|| errno!(ENOENT, "cpuid_result not found"))
     }
 
     pub fn get_max_basic_leaf(&self) -> u32 {

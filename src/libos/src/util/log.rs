@@ -2,14 +2,14 @@ use log::*;
 
 pub fn init() {
     static LOGGER: SimpleLogger = SimpleLogger;
-    log::set_logger(&LOGGER).unwrap();
-    log::set_max_level(match option_env!("LOG") {
+    log::set_logger(&LOGGER).expect("logger cannot be set twice");
+    log::set_max_level(match option_env!("LIBOS_LOG") {
         Some("error") => LevelFilter::Error,
         Some("warn") => LevelFilter::Warn,
         Some("info") => LevelFilter::Info,
         Some("debug") => LevelFilter::Debug,
         Some("trace") => LevelFilter::Trace,
-        _ => LevelFilter::Off,
+        _ => LevelFilter::Error, // errors are printed be default
     });
 }
 
@@ -22,11 +22,13 @@ impl Log for SimpleLogger {
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             let color = Color::from(record.level());
+            // TODO: add process info
             println!(
-                "\u{1B}[{}m[{:>5}][{}] {}\u{1B}[0m",
+                //"\u{1B}[{}m[{:>5}][{}] {}\u{1B}[0m",
+                "\u{1B}[{}m[{:>5}] {}\u{1B}[0m",
                 color as u8,
                 record.level(),
-                crate::process::current_pid(),
+                //crate::process::current_pid(),
                 record.args()
             );
         }

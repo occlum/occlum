@@ -1,5 +1,4 @@
 use super::*;
-use std::slice;
 
 #[derive(Clone, Debug)]
 pub enum VMInitializer {
@@ -15,7 +14,7 @@ impl Default for VMInitializer {
 }
 
 impl VMInitializer {
-    pub fn initialize(&self, buf: &mut [u8]) -> Result<(), Error> {
+    pub fn initialize(&self, buf: &mut [u8]) -> Result<()> {
         match self {
             VMInitializer::DoNothing() => {
                 // Do nothing
@@ -27,7 +26,9 @@ impl VMInitializer {
             }
             VMInitializer::LoadFromFile { file, offset } => {
                 // TODO: make sure that read_at does not move file cursor
-                let len = file.read_at(*offset, buf)?;
+                let len = file
+                    .read_at(*offset, buf)
+                    .cause_err(|_| errno!(EIO, "failed to init memory from file"))?;
                 for b in &mut buf[len..] {
                     *b = 0;
                 }
@@ -61,20 +62,20 @@ pub struct VMMapOptions {
 
 // VMMapOptionsBuilder is generated automatically, except the build function
 impl VMMapOptionsBuilder {
-    pub fn build(&self) -> Result<VMMapOptions, Error> {
+    pub fn build(&self) -> Result<VMMapOptions> {
         let size = {
             let size = self
                 .size
-                .ok_or_else(|| (Errno::EINVAL, "Invalid size for mmap"))?;
+                .ok_or_else(|| errno!(EINVAL, "invalid size for mmap"))?;
             if size == 0 {
-                return errno!(EINVAL, "Invalid size for mmap");
+                return_errno!(EINVAL, "invalid size for mmap");
             }
             align_up(size, PAGE_SIZE)
         };
         let align = {
             let align = self.align.unwrap_or(PAGE_SIZE);
             if align == 0 || align % PAGE_SIZE != 0 {
-                return errno!(EINVAL, "Invalid size for mmap");
+                return_errno!(EINVAL, "invalid size for mmap");
             }
             align
         };
@@ -89,7 +90,7 @@ impl VMMapOptionsBuilder {
                 }
                 VMMapAddr::Fixed(addr) => {
                     if addr % align != 0 {
-                        return errno!(EINVAL, "Unaligned addr for fixed mmap");
+                        return_errno!(EINVAL, "unaligned addr for fixed mmap");
                     }
                     VMMapAddr::Fixed(addr)
                 }
@@ -129,7 +130,7 @@ pub struct VMManager {
 }
 
 impl VMManager {
-    pub fn from(addr: usize, size: usize) -> Result<VMManager, Error> {
+    pub fn from(addr: usize, size: usize) -> Result<VMManager> {
         let range = VMRange::from(addr, addr + size)?;
         let sub_ranges = {
             let start = range.start();
@@ -145,7 +146,7 @@ impl VMManager {
         &self.range
     }
 
-    pub fn mmap(&mut self, options: &VMMapOptions) -> Result<usize, Error> {
+    pub fn mmap(&mut self, options: &VMMapOptions) -> Result<usize> {
         // TODO: respect options.align when mmap
         let addr = *options.addr();
         let size = *options.size();
@@ -163,7 +164,7 @@ impl VMManager {
         unsafe {
             let buf_ptr = new_subrange.start() as *mut u8;
             let buf_size = new_subrange.size() as usize;
-            let buf = slice::from_raw_parts_mut(buf_ptr, buf_size);
+            let buf = std::slice::from_raw_parts_mut(buf_ptr, buf_size);
             options.initializer.initialize(buf)?;
         }
 
@@ -173,10 +174,10 @@ impl VMManager {
         Ok(new_subrange_addr)
     }
 
-    pub fn munmap(&mut self, addr: usize, size: usize) -> Result<(), Error> {
+    pub fn munmap(&mut self, addr: usize, size: usize) -> Result<()> {
         let size = {
             if size == 0 {
-                return errno!(EINVAL, "size of munmap must not be zero");
+                return_errno!(EINVAL, "size of munmap must not be zero");
             }
             align_up(size, PAGE_SIZE)
         };
@@ -211,22 +212,15 @@ impl VMManager {
         Ok(())
     }
 
-    pub fn find_mmap_region(&self, addr: usize) -> Result<&VMRange, Error> {
+    pub fn find_mmap_region(&self, addr: usize) -> Result<&VMRange> {
         self.sub_ranges
             .iter()
             .find(|subrange| subrange.contains(addr))
-            .ok_or(Error::new(
-                Errno::ESRCH,
-                "no mmap regions that contains the address",
-            ))
+            .ok_or_else(|| errno!(ESRCH, "no mmap regions that contains the address"))
     }
 
     // Find the free subrange that satisfies the constraints of size and address
-    fn find_free_subrange(
-        &mut self,
-        size: usize,
-        addr: VMMapAddr,
-    ) -> Result<(usize, VMRange), Error> {
+    fn find_free_subrange(&mut self, size: usize, addr: VMMapAddr) -> Result<(usize, VMRange)> {
         // TODO: reduce the complexity from O(N) to O(log(N)), where N is
         // the number of existing subranges.
 
@@ -268,13 +262,13 @@ impl VMManager {
                 // Must have free_range.start == addr
                 VMMapAddr::Fixed(addr) => {
                     if free_range.start() > addr {
-                        return errno!(ENOMEM, "Not enough memory for fixed mmap");
+                        return_errno!(ENOMEM, "not enough memory for fixed mmap");
                     }
                     if !free_range.contains(addr) {
                         continue;
                     }
                     if free_range.end() - addr < size {
-                        return errno!(ENOMEM, "Not enough memory for fixed mmap");
+                        return_errno!(ENOMEM, "not enough memory for fixed mmap");
                     }
                     free_range.start = addr;
                     let insert_idx = idx + 1;
@@ -291,7 +285,7 @@ impl VMManager {
         }
 
         if result_free_range.is_none() {
-            return errno!(ENOMEM, "Cannot find enough memory");
+            return_errno!(ENOMEM, "not enough memory");
         }
 
         let free_range = result_free_range.unwrap();
@@ -324,9 +318,9 @@ pub struct VMRange {
 }
 
 impl VMRange {
-    pub fn from(start: usize, end: usize) -> Result<VMRange, Error> {
+    pub fn from(start: usize, end: usize) -> Result<VMRange> {
         if start % PAGE_SIZE != 0 || end % PAGE_SIZE != 0 || start > end {
-            return errno!(EINVAL, "invalid start or end");
+            return_errno!(EINVAL, "invalid start or end");
         }
         Ok(VMRange {
             start: start,

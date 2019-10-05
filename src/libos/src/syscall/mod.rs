@@ -9,7 +9,6 @@
 
 use fs::*;
 use misc::{resource_t, rlimit_t, utsname_t};
-use prelude::*;
 use process::{pid_t, ChildProcessFilter, CloneFlags, CpuSet, FileAction, FutexFlags, FutexOp};
 use std::ffi::{CStr, CString};
 use std::ptr;
@@ -22,6 +21,7 @@ use super::*;
 
 use self::consts::*;
 use std::any::Any;
+use std::io::{Read, Seek, SeekFrom, Write};
 
 // Use the internal syscall wrappers from sgx_tstd
 //use std::libc_fs as fs;
@@ -302,9 +302,14 @@ pub extern "C" fn dispatch_syscall(
     info!("=> {:?}", ret);
 
     match ret {
-        Ok(code) => code as isize,
-        Err(e) if e.errno.as_retval() == 0 => panic!("undefined errno"),
-        Err(e) => e.errno.as_retval() as isize,
+        Ok(retval) => retval as isize,
+        Err(e) => {
+            warn!("{}", e.backtrace());
+
+            let retval = -(e.errno() as isize);
+            debug_assert!(retval == 0);
+            retval
+        }
     }
 }
 
@@ -350,7 +355,7 @@ pub struct FdOp {
     path: *const i8,
 }
 
-fn clone_file_actions_safely(fdop_ptr: *const FdOp) -> Result<Vec<FileAction>, Error> {
+fn clone_file_actions_safely(fdop_ptr: *const FdOp) -> Result<Vec<FileAction>> {
     let mut file_actions = Vec::new();
 
     let mut fdop_ptr = fdop_ptr;
@@ -370,7 +375,7 @@ fn clone_file_actions_safely(fdop_ptr: *const FdOp) -> Result<Vec<FileAction>, E
                 fd: fdop.fd,
             },
             _ => {
-                return errno!(EINVAL, "Unknown file action command");
+                return_errno!(EINVAL, "Unknown file action command");
             }
         };
         file_actions.push(file_action);
@@ -387,7 +392,7 @@ fn do_spawn(
     argv: *const *const i8,
     envp: *const *const i8,
     fdop_list: *const FdOp,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     check_mut_ptr(child_pid_ptr)?;
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     let argv = clone_cstrings_safely(argv)?;
@@ -411,7 +416,7 @@ pub fn do_clone(
     ptid: *mut pid_t,
     ctid: *mut pid_t,
     new_tls: usize,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     let flags = CloneFlags::from_bits_truncate(flags);
     check_mut_ptr(stack_addr as *mut u64)?;
     let ptid = {
@@ -444,7 +449,7 @@ pub fn do_clone(
     Ok(child_pid as isize)
 }
 
-pub fn do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32) -> Result<isize, Error> {
+pub fn do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32) -> Result<isize> {
     check_ptr(futex_addr)?;
     let (futex_op, futex_flags) = process::futex_op_and_flags_from_u32(futex_op)?;
     match futex_op {
@@ -452,28 +457,28 @@ pub fn do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32) -> Result
         FutexOp::FUTEX_WAKE => {
             let max_count = {
                 if futex_val < 0 {
-                    return errno!(EINVAL, "the count must not be negative");
+                    return_errno!(EINVAL, "the count must not be negative");
                 }
                 futex_val as usize
             };
             process::futex_wake(futex_addr, max_count).map(|count| count as isize)
         }
-        _ => errno!(ENOSYS, "the futex operation is not supported"),
+        _ => return_errno!(ENOSYS, "the futex operation is not supported"),
     }
 }
 
-fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize, Error> {
+fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize> {
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     let fd = fs::do_open(&path, flags, mode)?;
     Ok(fd as isize)
 }
 
-fn do_close(fd: FileDesc) -> Result<isize, Error> {
+fn do_close(fd: FileDesc) -> Result<isize> {
     fs::do_close(fd)?;
     Ok(0)
 }
 
-fn do_read(fd: FileDesc, buf: *mut u8, size: usize) -> Result<isize, Error> {
+fn do_read(fd: FileDesc, buf: *mut u8, size: usize) -> Result<isize> {
     let safe_buf = {
         check_mut_array(buf, size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, size) }
@@ -482,7 +487,7 @@ fn do_read(fd: FileDesc, buf: *mut u8, size: usize) -> Result<isize, Error> {
     Ok(len as isize)
 }
 
-fn do_write(fd: FileDesc, buf: *const u8, size: usize) -> Result<isize, Error> {
+fn do_write(fd: FileDesc, buf: *const u8, size: usize) -> Result<isize> {
     let safe_buf = {
         check_array(buf, size)?;
         unsafe { std::slice::from_raw_parts(buf, size) }
@@ -491,10 +496,10 @@ fn do_write(fd: FileDesc, buf: *const u8, size: usize) -> Result<isize, Error> {
     Ok(len as isize)
 }
 
-fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<isize, Error> {
+fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<isize> {
     let count = {
         if count < 0 {
-            return errno!(EINVAL, "Invalid count of iovec");
+            return_errno!(EINVAL, "Invalid count of iovec");
         }
         count as usize
     };
@@ -516,10 +521,10 @@ fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<isize, Err
     Ok(len as isize)
 }
 
-fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize, Error> {
+fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize> {
     let count = {
         if count < 0 {
-            return errno!(EINVAL, "Invalid count of iovec");
+            return_errno!(EINVAL, "Invalid count of iovec");
         }
         count as usize
     };
@@ -541,7 +546,7 @@ fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize, Error>
     Ok(len as isize)
 }
 
-fn do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: usize) -> Result<isize, Error> {
+fn do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: usize) -> Result<isize> {
     let safe_buf = {
         check_mut_array(buf, size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, size) }
@@ -550,7 +555,7 @@ fn do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: usize) -> Result<is
     Ok(len as isize)
 }
 
-fn do_pwrite(fd: FileDesc, buf: *const u8, size: usize, offset: usize) -> Result<isize, Error> {
+fn do_pwrite(fd: FileDesc, buf: *const u8, size: usize, offset: usize) -> Result<isize> {
     let safe_buf = {
         check_array(buf, size)?;
         unsafe { std::slice::from_raw_parts(buf, size) }
@@ -559,7 +564,7 @@ fn do_pwrite(fd: FileDesc, buf: *const u8, size: usize, offset: usize) -> Result
     Ok(len as isize)
 }
 
-fn do_stat(path: *const i8, stat_buf: *mut fs::Stat) -> Result<isize, Error> {
+fn do_stat(path: *const i8, stat_buf: *mut fs::Stat) -> Result<isize> {
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     check_mut_ptr(stat_buf)?;
 
@@ -570,7 +575,7 @@ fn do_stat(path: *const i8, stat_buf: *mut fs::Stat) -> Result<isize, Error> {
     Ok(0)
 }
 
-fn do_fstat(fd: FileDesc, stat_buf: *mut fs::Stat) -> Result<isize, Error> {
+fn do_fstat(fd: FileDesc, stat_buf: *mut fs::Stat) -> Result<isize> {
     check_mut_ptr(stat_buf)?;
 
     let stat = fs::do_fstat(fd)?;
@@ -580,7 +585,7 @@ fn do_fstat(fd: FileDesc, stat_buf: *mut fs::Stat) -> Result<isize, Error> {
     Ok(0)
 }
 
-fn do_lstat(path: *const i8, stat_buf: *mut fs::Stat) -> Result<isize, Error> {
+fn do_lstat(path: *const i8, stat_buf: *mut fs::Stat) -> Result<isize> {
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     check_mut_ptr(stat_buf)?;
 
@@ -591,12 +596,12 @@ fn do_lstat(path: *const i8, stat_buf: *mut fs::Stat) -> Result<isize, Error> {
     Ok(0)
 }
 
-fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize, Error> {
+fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize> {
     let seek_from = match whence {
         0 => {
             // SEEK_SET
             if offset < 0 {
-                return errno!(EINVAL, "Invalid offset");
+                return_errno!(EINVAL, "Invalid offset");
             }
             SeekFrom::Start(offset as u64)
         }
@@ -609,7 +614,7 @@ fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize, Error> {
             SeekFrom::End(offset)
         }
         _ => {
-            return errno!(EINVAL, "Invalid whence");
+            return_errno!(EINVAL, "Invalid whence");
         }
     };
 
@@ -617,28 +622,28 @@ fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize, Error> {
     Ok(offset as isize)
 }
 
-fn do_fsync(fd: FileDesc) -> Result<isize, Error> {
+fn do_fsync(fd: FileDesc) -> Result<isize> {
     fs::do_fsync(fd)?;
     Ok(0)
 }
 
-fn do_fdatasync(fd: FileDesc) -> Result<isize, Error> {
+fn do_fdatasync(fd: FileDesc) -> Result<isize> {
     fs::do_fdatasync(fd)?;
     Ok(0)
 }
 
-fn do_truncate(path: *const i8, len: usize) -> Result<isize, Error> {
+fn do_truncate(path: *const i8, len: usize) -> Result<isize> {
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     fs::do_truncate(&path, len)?;
     Ok(0)
 }
 
-fn do_ftruncate(fd: FileDesc, len: usize) -> Result<isize, Error> {
+fn do_ftruncate(fd: FileDesc, len: usize) -> Result<isize> {
     fs::do_ftruncate(fd, len)?;
     Ok(0)
 }
 
-fn do_getdents64(fd: FileDesc, buf: *mut u8, buf_size: usize) -> Result<isize, Error> {
+fn do_getdents64(fd: FileDesc, buf: *mut u8, buf_size: usize) -> Result<isize> {
     let safe_buf = {
         check_mut_array(buf, buf_size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, buf_size) }
@@ -647,7 +652,7 @@ fn do_getdents64(fd: FileDesc, buf: *mut u8, buf_size: usize) -> Result<isize, E
     Ok(len as isize)
 }
 
-fn do_sync() -> Result<isize, Error> {
+fn do_sync() -> Result<isize> {
     fs::do_sync()?;
     Ok(0)
 }
@@ -659,14 +664,14 @@ fn do_mmap(
     flags: i32,
     fd: FileDesc,
     offset: off_t,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     let perms = VMPerms::from_u32(perms as u32)?;
     let flags = MMapFlags::from_u32(flags as u32)?;
     let addr = vm::do_mmap(addr, size, perms, flags, fd, offset as usize)?;
     Ok(addr as isize)
 }
 
-fn do_munmap(addr: usize, size: usize) -> Result<isize, Error> {
+fn do_munmap(addr: usize, size: usize) -> Result<isize> {
     vm::do_munmap(addr, size)?;
     Ok(0)
 }
@@ -677,22 +682,22 @@ fn do_mremap(
     new_size: usize,
     flags: i32,
     new_addr: usize,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     warn!("mremap: not implemented!");
-    errno!(ENOSYS, "not supported yet")
+    return_errno!(ENOSYS, "not supported yet")
 }
 
-fn do_mprotect(addr: usize, len: usize, prot: u32) -> Result<isize, Error> {
+fn do_mprotect(addr: usize, len: usize, prot: u32) -> Result<isize> {
     // TODO: implement it
     Ok(0)
 }
 
-fn do_brk(new_brk_addr: usize) -> Result<isize, Error> {
+fn do_brk(new_brk_addr: usize) -> Result<isize> {
     let ret_brk_addr = vm::do_brk(new_brk_addr)?;
     Ok(ret_brk_addr as isize)
 }
 
-fn do_wait4(pid: i32, _exit_status: *mut i32) -> Result<isize, Error> {
+fn do_wait4(pid: i32, _exit_status: *mut i32) -> Result<isize> {
     if !_exit_status.is_null() {
         check_mut_ptr(_exit_status)?;
     }
@@ -723,45 +728,45 @@ fn do_wait4(pid: i32, _exit_status: *mut i32) -> Result<isize, Error> {
     }
 }
 
-fn do_getpid() -> Result<isize, Error> {
+fn do_getpid() -> Result<isize> {
     let pid = process::do_getpid();
     Ok(pid as isize)
 }
 
-fn do_gettid() -> Result<isize, Error> {
+fn do_gettid() -> Result<isize> {
     let tid = process::do_gettid();
     Ok(tid as isize)
 }
 
-fn do_getppid() -> Result<isize, Error> {
+fn do_getppid() -> Result<isize> {
     let ppid = process::do_getppid();
     Ok(ppid as isize)
 }
 
-fn do_getpgid() -> Result<isize, Error> {
+fn do_getpgid() -> Result<isize> {
     let pgid = process::do_getpgid();
     Ok(pgid as isize)
 }
 
 // TODO: implement uid, gid, euid, egid
 
-fn do_getuid() -> Result<isize, Error> {
+fn do_getuid() -> Result<isize> {
     Ok(0)
 }
 
-fn do_getgid() -> Result<isize, Error> {
+fn do_getgid() -> Result<isize> {
     Ok(0)
 }
 
-fn do_geteuid() -> Result<isize, Error> {
+fn do_geteuid() -> Result<isize> {
     Ok(0)
 }
 
-fn do_getegid() -> Result<isize, Error> {
+fn do_getegid() -> Result<isize> {
     Ok(0)
 }
 
-fn do_pipe2(fds_u: *mut i32, flags: u32) -> Result<isize, Error> {
+fn do_pipe2(fds_u: *mut i32, flags: u32) -> Result<isize> {
     check_mut_array(fds_u, 2)?;
     // TODO: how to deal with open flags???
     let fds = fs::do_pipe2(flags as u32)?;
@@ -772,23 +777,23 @@ fn do_pipe2(fds_u: *mut i32, flags: u32) -> Result<isize, Error> {
     Ok(0)
 }
 
-fn do_dup(old_fd: FileDesc) -> Result<isize, Error> {
+fn do_dup(old_fd: FileDesc) -> Result<isize> {
     let new_fd = fs::do_dup(old_fd)?;
     Ok(new_fd as isize)
 }
 
-fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<isize, Error> {
+fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<isize> {
     let new_fd = fs::do_dup2(old_fd, new_fd)?;
     Ok(new_fd as isize)
 }
 
-fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<isize, Error> {
+fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<isize> {
     let new_fd = fs::do_dup3(old_fd, new_fd, flags)?;
     Ok(new_fd as isize)
 }
 
 // TODO: handle tz: timezone_t
-fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<isize, Error> {
+fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<isize> {
     check_mut_ptr(tv_u)?;
     let tv = time::do_gettimeofday();
     unsafe {
@@ -797,7 +802,7 @@ fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<isize, Error> {
     Ok(0)
 }
 
-fn do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t) -> Result<isize, Error> {
+fn do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t) -> Result<isize> {
     check_mut_ptr(ts_u)?;
     let clockid = time::ClockID::from_raw(clockid)?;
     let ts = time::do_clock_gettime(clockid)?;
@@ -829,15 +834,15 @@ fn do_unknown(
     arg3: isize,
     arg4: isize,
     arg5: isize,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     warn!(
         "unknown or unsupported syscall (# = {}): {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}",
         num, arg0, arg1, arg2, arg3, arg4, arg5
     );
-    errno!(ENOSYS, "Unknown syscall")
+    return_errno!(ENOSYS, "Unknown syscall")
 }
 
-fn do_getcwd(buf: *mut u8, size: usize) -> Result<isize, Error> {
+fn do_getcwd(buf: *mut u8, size: usize) -> Result<isize> {
     let safe_buf = {
         check_mut_array(buf, size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, size) }
@@ -846,20 +851,20 @@ fn do_getcwd(buf: *mut u8, size: usize) -> Result<isize, Error> {
     let mut proc = proc_ref.lock().unwrap();
     let cwd = proc.get_cwd();
     if cwd.len() + 1 > safe_buf.len() {
-        return errno!(ERANGE, "buf is not long enough");
+        return_errno!(ERANGE, "buf is not long enough");
     }
     safe_buf[..cwd.len()].copy_from_slice(cwd.as_bytes());
     safe_buf[cwd.len()] = 0;
     Ok(buf as isize)
 }
 
-fn do_chdir(path: *const i8) -> Result<isize, Error> {
+fn do_chdir(path: *const i8) -> Result<isize> {
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     fs::do_chdir(&path)?;
     Ok(0)
 }
 
-fn do_rename(oldpath: *const i8, newpath: *const i8) -> Result<isize, Error> {
+fn do_rename(oldpath: *const i8, newpath: *const i8) -> Result<isize> {
     let oldpath = clone_cstring_safely(oldpath)?
         .to_string_lossy()
         .into_owned();
@@ -870,19 +875,19 @@ fn do_rename(oldpath: *const i8, newpath: *const i8) -> Result<isize, Error> {
     Ok(0)
 }
 
-fn do_mkdir(path: *const i8, mode: usize) -> Result<isize, Error> {
+fn do_mkdir(path: *const i8, mode: usize) -> Result<isize> {
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     fs::do_mkdir(&path, mode)?;
     Ok(0)
 }
 
-fn do_rmdir(path: *const i8) -> Result<isize, Error> {
+fn do_rmdir(path: *const i8) -> Result<isize> {
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     fs::do_rmdir(&path)?;
     Ok(0)
 }
 
-fn do_link(oldpath: *const i8, newpath: *const i8) -> Result<isize, Error> {
+fn do_link(oldpath: *const i8, newpath: *const i8) -> Result<isize> {
     let oldpath = clone_cstring_safely(oldpath)?
         .to_string_lossy()
         .into_owned();
@@ -893,13 +898,13 @@ fn do_link(oldpath: *const i8, newpath: *const i8) -> Result<isize, Error> {
     Ok(0)
 }
 
-fn do_unlink(path: *const i8) -> Result<isize, Error> {
+fn do_unlink(path: *const i8) -> Result<isize> {
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     fs::do_unlink(&path)?;
     Ok(0)
 }
 
-fn do_readlink(path: *const i8, buf: *mut u8, size: usize) -> Result<isize, Error> {
+fn do_readlink(path: *const i8, buf: *mut u8, size: usize) -> Result<isize> {
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     let buf = {
         check_array(buf, size)?;
@@ -914,7 +919,7 @@ fn do_sendfile(
     in_fd: FileDesc,
     offset_ptr: *mut off_t,
     count: usize,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     let offset = if offset_ptr.is_null() {
         None
     } else {
@@ -931,12 +936,12 @@ fn do_sendfile(
     Ok(len as isize)
 }
 
-fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize, Error> {
+fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize> {
     let cmd = FcntlCmd::from_raw(cmd, arg)?;
     fs::do_fcntl(fd, &cmd)
 }
 
-fn do_ioctl(fd: FileDesc, cmd: c_int, argp: *mut c_int) -> Result<isize, Error> {
+fn do_ioctl(fd: FileDesc, cmd: c_int, argp: *mut c_int) -> Result<isize> {
     info!("ioctl: fd: {}, cmd: {}, argp: {:?}", fd, cmd, argp);
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
@@ -950,30 +955,30 @@ fn do_ioctl(fd: FileDesc, cmd: c_int, argp: *mut c_int) -> Result<isize, Error> 
         Ok(0)
     } else {
         warn!("ioctl is unimplemented");
-        errno!(ENOSYS, "ioctl is unimplemented")
+        return_errno!(ENOSYS, "ioctl is unimplemented")
     }
 }
 
-fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize, Error> {
+fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize> {
     let code = process::ArchPrctlCode::from_u32(code)?;
     check_mut_ptr(addr)?;
     process::do_arch_prctl(code, addr).map(|_| 0)
 }
 
-fn do_set_tid_address(tidptr: *mut pid_t) -> Result<isize, Error> {
+fn do_set_tid_address(tidptr: *mut pid_t) -> Result<isize> {
     check_mut_ptr(tidptr)?;
     process::do_set_tid_address(tidptr).map(|tid| tid as isize)
 }
 
-fn do_sched_getaffinity(pid: pid_t, cpusize: size_t, buf: *mut c_uchar) -> Result<isize, Error> {
+fn do_sched_getaffinity(pid: pid_t, cpusize: size_t, buf: *mut c_uchar) -> Result<isize> {
     // Construct safe Rust types
     let mut buf_slice = {
         check_mut_array(buf, cpusize)?;
         if cpusize == 0 {
-            return errno!(EINVAL, "cpuset size must be greater than zero");
+            return_errno!(EINVAL, "cpuset size must be greater than zero");
         }
         if buf as *const _ == std::ptr::null() {
-            return errno!(EFAULT, "cpuset mask must NOT be null");
+            return_errno!(EFAULT, "cpuset mask must NOT be null");
         }
         unsafe { std::slice::from_raw_parts_mut(buf, cpusize) }
     };
@@ -986,15 +991,15 @@ fn do_sched_getaffinity(pid: pid_t, cpusize: size_t, buf: *mut c_uchar) -> Resul
     Ok(ret as isize)
 }
 
-fn do_sched_setaffinity(pid: pid_t, cpusize: size_t, buf: *const c_uchar) -> Result<isize, Error> {
+fn do_sched_setaffinity(pid: pid_t, cpusize: size_t, buf: *const c_uchar) -> Result<isize> {
     // Convert unsafe C types into safe Rust types
     let cpuset = {
         check_array(buf, cpusize)?;
         if cpusize == 0 {
-            return errno!(EINVAL, "cpuset size must be greater than zero");
+            return_errno!(EINVAL, "cpuset size must be greater than zero");
         }
         if buf as *const _ == std::ptr::null() {
-            return errno!(EFAULT, "cpuset mask must NOT be null");
+            return_errno!(EFAULT, "cpuset mask must NOT be null");
         }
         CpuSet::from_raw_buf(buf, cpusize)
     };
@@ -1004,7 +1009,7 @@ fn do_sched_setaffinity(pid: pid_t, cpusize: size_t, buf: *const c_uchar) -> Res
     Ok(ret as isize)
 }
 
-fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize, Error> {
+fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize> {
     info!(
         "socket: domain: {}, socket_type: {}, protocol: {}",
         domain, socket_type, protocol
@@ -1028,11 +1033,7 @@ fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize
     Ok(fd as isize)
 }
 
-fn do_connect(
-    fd: c_int,
-    addr: *const libc::sockaddr,
-    addr_len: libc::socklen_t,
-) -> Result<isize, Error> {
+fn do_connect(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t) -> Result<isize> {
     info!(
         "connect: fd: {}, addr: {:?}, addr_len: {}",
         fd, addr, addr_len
@@ -1052,7 +1053,7 @@ fn do_connect(
         unix_socket.connect(path)?;
         Ok(0)
     } else {
-        errno!(EBADF, "not a socket")
+        return_errno!(EBADF, "not a socket")
     }
 }
 
@@ -1061,7 +1062,7 @@ fn do_accept4(
     addr: *mut libc::sockaddr,
     addr_len: *mut libc::socklen_t,
     flags: c_int,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     info!(
         "accept4: fd: {}, addr: {:?}, addr_len: {:?}, flags: {:#x}",
         fd, addr, addr_len, flags
@@ -1087,11 +1088,11 @@ fn do_accept4(
 
         Ok(new_fd as isize)
     } else {
-        errno!(EBADF, "not a socket")
+        return_errno!(EBADF, "not a socket")
     }
 }
 
-fn do_shutdown(fd: c_int, how: c_int) -> Result<isize, Error> {
+fn do_shutdown(fd: c_int, how: c_int) -> Result<isize> {
     info!("shutdown: fd: {}, how: {}", fd, how);
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
@@ -1100,15 +1101,11 @@ fn do_shutdown(fd: c_int, how: c_int) -> Result<isize, Error> {
         let ret = try_libc!(libc::ocall::shutdown(socket.fd(), how));
         Ok(ret as isize)
     } else {
-        errno!(EBADF, "not a socket")
+        return_errno!(EBADF, "not a socket")
     }
 }
 
-fn do_bind(
-    fd: c_int,
-    addr: *const libc::sockaddr,
-    addr_len: libc::socklen_t,
-) -> Result<isize, Error> {
+fn do_bind(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t) -> Result<isize> {
     info!("bind: fd: {}, addr: {:?}, addr_len: {}", fd, addr, addr_len);
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
@@ -1126,11 +1123,11 @@ fn do_bind(
         unix_socket.bind(path)?;
         Ok(0)
     } else {
-        errno!(EBADF, "not a socket")
+        return_errno!(EBADF, "not a socket")
     }
 }
 
-fn do_listen(fd: c_int, backlog: c_int) -> Result<isize, Error> {
+fn do_listen(fd: c_int, backlog: c_int) -> Result<isize> {
     info!("listen: fd: {}, backlog: {}", fd, backlog);
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
@@ -1142,7 +1139,7 @@ fn do_listen(fd: c_int, backlog: c_int) -> Result<isize, Error> {
         unix_socket.listen()?;
         Ok(0)
     } else {
-        errno!(EBADF, "not a socket")
+        return_errno!(EBADF, "not a socket")
     }
 }
 
@@ -1152,7 +1149,7 @@ fn do_setsockopt(
     optname: c_int,
     optval: *const c_void,
     optlen: libc::socklen_t,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     info!(
         "setsockopt: fd: {}, level: {}, optname: {}, optval: {:?}, optlen: {:?}",
         fd, level, optname, optval, optlen
@@ -1173,7 +1170,7 @@ fn do_setsockopt(
         warn!("setsockopt for unix socket is unimplemented");
         Ok(0)
     } else {
-        errno!(EBADF, "not a socket")
+        return_errno!(EBADF, "not a socket")
     }
 }
 
@@ -1183,7 +1180,7 @@ fn do_getsockopt(
     optname: c_int,
     optval: *mut c_void,
     optlen: *mut libc::socklen_t,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     info!(
         "getsockopt: fd: {}, level: {}, optname: {}, optval: {:?}, optlen: {:?}",
         fd, level, optname, optval, optlen
@@ -1207,7 +1204,7 @@ fn do_getpeername(
     fd: c_int,
     addr: *mut libc::sockaddr,
     addr_len: *mut libc::socklen_t,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     info!(
         "getpeername: fd: {}, addr: {:?}, addr_len: {:?}",
         fd, addr, addr_len
@@ -1220,12 +1217,12 @@ fn do_getpeername(
         Ok(ret as isize)
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
         warn!("getpeername for unix socket is unimplemented");
-        errno!(
+        return_errno!(
             ENOTCONN,
             "hack for php: Transport endpoint is not connected"
         )
     } else {
-        errno!(EBADF, "not a socket")
+        return_errno!(EBADF, "not a socket")
     }
 }
 
@@ -1233,7 +1230,7 @@ fn do_getsockname(
     fd: c_int,
     addr: *mut libc::sockaddr,
     addr_len: *mut libc::socklen_t,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     info!(
         "getsockname: fd: {}, addr: {:?}, addr_len: {:?}",
         fd, addr, addr_len
@@ -1248,7 +1245,7 @@ fn do_getsockname(
         warn!("getsockname for unix socket is unimplemented");
         Ok(0)
     } else {
-        errno!(EBADF, "not a socket")
+        return_errno!(EBADF, "not a socket")
     }
 }
 
@@ -1259,7 +1256,7 @@ fn do_sendto(
     flags: c_int,
     addr: *const libc::sockaddr,
     addr_len: libc::socklen_t,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     info!(
         "sendto: fd: {}, base: {:?}, len: {}, addr: {:?}, addr_len: {}",
         fd, base, len, addr, addr_len
@@ -1287,7 +1284,7 @@ fn do_recvfrom(
     flags: c_int,
     addr: *mut libc::sockaddr,
     addr_len: *mut libc::socklen_t,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     info!(
         "recvfrom: fd: {}, base: {:?}, len: {}, flags: {}, addr: {:?}, addr_len: {:?}",
         fd, base, len, flags, addr, addr_len
@@ -1314,10 +1311,10 @@ fn do_select(
     writefds: *mut libc::fd_set,
     exceptfds: *mut libc::fd_set,
     timeout: *const libc::timeval,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     // check arguments
     if nfds < 0 || nfds >= libc::FD_SETSIZE as c_int {
-        return errno!(EINVAL, "nfds is negative or exceeds the resource limit");
+        return_errno!(EINVAL, "nfds is negative or exceeds the resource limit");
     }
     let nfds = nfds as usize;
 
@@ -1354,7 +1351,7 @@ fn do_select(
     Ok(n as isize)
 }
 
-fn do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int) -> Result<isize, Error> {
+fn do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int) -> Result<isize> {
     check_mut_array(fds, nfds as usize)?;
     let polls = unsafe { std::slice::from_raw_parts_mut(fds, nfds as usize) };
 
@@ -1362,14 +1359,14 @@ fn do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int) -> Result
     Ok(n as isize)
 }
 
-fn do_epoll_create(size: c_int) -> Result<isize, Error> {
+fn do_epoll_create(size: c_int) -> Result<isize> {
     if size <= 0 {
-        return errno!(EINVAL, "size is not positive");
+        return_errno!(EINVAL, "size is not positive");
     }
     do_epoll_create1(0)
 }
 
-fn do_epoll_create1(flags: c_int) -> Result<isize, Error> {
+fn do_epoll_create1(flags: c_int) -> Result<isize> {
     let fd = fs::do_epoll_create1(flags)?;
     Ok(fd as isize)
 }
@@ -1379,7 +1376,7 @@ fn do_epoll_ctl(
     op: c_int,
     fd: c_int,
     event: *const libc::epoll_event,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     if !event.is_null() {
         check_ptr(event)?;
     }
@@ -1392,10 +1389,10 @@ fn do_epoll_wait(
     events: *mut libc::epoll_event,
     maxevents: c_int,
     timeout: c_int,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     let maxevents = {
         if maxevents <= 0 {
-            return errno!(EINVAL, "maxevents <= 0");
+            return_errno!(EINVAL, "maxevents <= 0");
         }
         maxevents as usize
     };
@@ -1407,7 +1404,7 @@ fn do_epoll_wait(
     Ok(count as isize)
 }
 
-fn do_uname(name: *mut utsname_t) -> Result<isize, Error> {
+fn do_uname(name: *mut utsname_t) -> Result<isize> {
     check_mut_ptr(name)?;
     let name = unsafe { &mut *name };
     misc::do_uname(name).map(|_| 0)
@@ -1418,7 +1415,7 @@ fn do_prlimit(
     resource: u32,
     new_limit: *const rlimit_t,
     old_limit: *mut rlimit_t,
-) -> Result<isize, Error> {
+) -> Result<isize> {
     let resource = resource_t::from_u32(resource)?;
     let new_limit = {
         if new_limit != ptr::null() {
@@ -1439,19 +1436,19 @@ fn do_prlimit(
     misc::do_prlimit(pid, resource, new_limit, old_limit).map(|_| 0)
 }
 
-fn do_access(path: *const i8, mode: u32) -> Result<isize, Error> {
+fn do_access(path: *const i8, mode: u32) -> Result<isize> {
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     let mode = AccessModes::from_u32(mode)?;
     fs::do_access(&path, mode).map(|_| 0)
 }
 
-fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) -> Result<isize, Error> {
+fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) -> Result<isize> {
     let dirfd = if dirfd >= 0 {
         Some(dirfd as FileDesc)
     } else if dirfd == AT_FDCWD {
         None
     } else {
-        return errno!(EINVAL, "invalid dirfd");
+        return_errno!(EINVAL, "invalid dirfd");
     };
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     let mode = AccessModes::from_u32(mode)?;
@@ -1461,10 +1458,10 @@ fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) -> Result<is
 
 // TODO: implement signals
 
-fn do_rt_sigaction() -> Result<isize, Error> {
+fn do_rt_sigaction() -> Result<isize> {
     Ok(0)
 }
 
-fn do_rt_sigprocmask() -> Result<isize, Error> {
+fn do_rt_sigprocmask() -> Result<isize> {
     Ok(0)
 }

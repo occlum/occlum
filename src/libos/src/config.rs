@@ -1,64 +1,47 @@
 use super::*;
 use serde::{Deserialize, Serialize};
 use std::ffi::CString;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sgxfs::SgxFile;
 
-const LIBOS_CONFIG_PATH: &str = "./.occlum/build/Occlum.json.protected";
-
 lazy_static! {
     pub static ref LIBOS_CONFIG: Config = {
-        let mut config_file = {
-            let config_file = match SgxFile::open_integrity_only(LIBOS_CONFIG_PATH) {
-                Err(_) => panic!(
-                    "Failed to find or open Occlum's config file: {}",
-                    LIBOS_CONFIG_PATH
-                ),
-                Ok(file) => file,
-            };
+        fn load_config(config_path: &str) -> Result<Config> {
+            let mut config_file = {
+                let config_file =
+                    SgxFile::open_integrity_only(config_path).map_err(|e| errno!(e))?;
 
-            let actual_mac = match config_file.get_mac() {
-                Err(_) => panic!(
-                    "Failed to get the MAC of Occlum's config file: {}",
-                    LIBOS_CONFIG_PATH
-                ),
-                Ok(mac) => mac,
+                let actual_mac = config_file.get_mac().map_err(|e| errno!(e))?;
+                let expected_mac = conf_get_hardcoded_file_mac();
+                if actual_mac != expected_mac {
+                    return_errno!(EINVAL, "unexpected file MAC");
+                }
+
+                config_file
             };
-            let expected_mac = conf_get_hardcoded_file_mac();
-            if actual_mac != expected_mac {
-                panic!(
-                    "The MAC of Occlum's config file is not as expected: {}",
-                    LIBOS_CONFIG_PATH
-                );
+            let config_json = {
+                let mut config_json = String::new();
+                config_file
+                    .read_to_string(&mut config_json)
+                    .map_err(|e| errno!(e))?;
+                config_json
+            };
+            let config_input: InputConfig =
+                serde_json::from_str(&config_json).map_err(|e| errno!(e))?;
+            let config = Config::from_input(&config_input)
+                .cause_err(|e| errno!(EINVAL, "invalid config JSON"))?;
+            Ok(config)
+        }
+
+        let config_path = "./.occlum/build/Occlum.json.protected";
+        match load_config(config_path) {
+            Err(e) => {
+                error!("failed to load config: {}", e.backtrace());
+                panic!();
             }
-
-            config_file
-        };
-        let config_json = {
-            let mut config_json = String::new();
-            config_file.read_to_string(&mut config_json).map_err(|_| {
-                panic!(
-                    "Failed to read from Occlum's config file: {}",
-                    LIBOS_CONFIG_PATH
-                );
-            });
-            config_json
-        };
-        let config_input: InputConfig = match serde_json::from_str(&config_json) {
-            Err(_) => panic!(
-                "Failed to parse JSON from Occlum's config file: {}",
-                LIBOS_CONFIG_PATH
-            ),
-            Ok(config_input) => config_input,
-        };
-        let config = match Config::from_input(&config_input) {
-            Err(_) => panic!(
-                "Found invalid config in Occlum's config file: {}",
-                LIBOS_CONFIG_PATH
-            ),
             Ok(config) => config,
-        };
-        config
+        }
     };
 }
 
@@ -77,18 +60,17 @@ fn conf_get_hardcoded_file_mac() -> sgx_aes_gcm_128bit_tag_t {
     mac
 }
 
-fn parse_mac(mac_str: &str) -> Result<sgx_aes_gcm_128bit_tag_t, Error> {
+fn parse_mac(mac_str: &str) -> Result<sgx_aes_gcm_128bit_tag_t> {
     let bytes_str_vec = {
         let bytes_str_vec: Vec<&str> = mac_str.split("-").collect();
         if bytes_str_vec.len() != 16 {
-            return errno!(EINVAL, "The length or format of MAC string is invalid");
+            return_errno!(EINVAL, "The length or format of MAC string is invalid");
         }
         bytes_str_vec
     };
     let mut mac: sgx_aes_gcm_128bit_tag_t = Default::default();
     for (byte_i, byte_str) in bytes_str_vec.iter().enumerate() {
-        mac[byte_i] = u8::from_str_radix(byte_str, 16)
-            .map_err(|_| Error::new(Errno::EINVAL, "The format of MAC string is invalid"))?;
+        mac[byte_i] = u8::from_str_radix(byte_str, 16).map_err(|e| errno!(e))?;
     }
     Ok(mac)
 }
@@ -136,7 +118,7 @@ pub struct ConfigMountOptions {
 }
 
 impl Config {
-    fn from_input(input: &InputConfig) -> Result<Config, Error> {
+    fn from_input(input: &InputConfig) -> Result<Config> {
         let vm = ConfigVM::from_input(&input.vm)?;
         let process = ConfigProcess::from_input(&input.process)?;
         let env = {
@@ -163,14 +145,14 @@ impl Config {
 }
 
 impl ConfigVM {
-    fn from_input(input: &InputConfigVM) -> Result<ConfigVM, Error> {
+    fn from_input(input: &InputConfigVM) -> Result<ConfigVM> {
         let user_space_size = parse_memory_size(&input.user_space_size)?;
         Ok(ConfigVM { user_space_size })
     }
 }
 
 impl ConfigProcess {
-    fn from_input(input: &InputConfigProcess) -> Result<ConfigProcess, Error> {
+    fn from_input(input: &InputConfigProcess) -> Result<ConfigProcess> {
         let default_stack_size = parse_memory_size(&input.default_stack_size)?;
         let default_heap_size = parse_memory_size(&input.default_heap_size)?;
         let default_mmap_size = parse_memory_size(&input.default_mmap_size)?;
@@ -183,7 +165,7 @@ impl ConfigProcess {
 }
 
 impl ConfigMount {
-    fn from_input(input: &InputConfigMount) -> Result<ConfigMount, Error> {
+    fn from_input(input: &InputConfigMount) -> Result<ConfigMount> {
         const ALL_FS_TYPES: [&str; 3] = ["sefs", "hostfs", "ramfs"];
 
         let type_ = match input.type_.as_str() {
@@ -191,13 +173,13 @@ impl ConfigMount {
             "hostfs" => ConfigMountFsType::TYPE_HOSTFS,
             "ramfs" => ConfigMountFsType::TYPE_RAMFS,
             _ => {
-                return errno!(EINVAL, "Unsupported file system type");
+                return_errno!(EINVAL, "Unsupported file system type");
             }
         };
         let target = {
             let target = PathBuf::from(&input.target);
             if !target.starts_with("/") {
-                return errno!(EINVAL, "Target must be an absolute path");
+                return_errno!(EINVAL, "Target must be an absolute path");
             }
             target
         };
@@ -213,12 +195,12 @@ impl ConfigMount {
 }
 
 impl ConfigMountOptions {
-    fn from_input(input: &InputConfigMountOptions) -> Result<ConfigMountOptions, Error> {
+    fn from_input(input: &InputConfigMountOptions) -> Result<ConfigMountOptions> {
         let (integrity_only, mac) = if !input.integrity_only {
             (false, None)
         } else {
             if input.mac.is_none() {
-                return errno!(EINVAL, "MAC is expected");
+                return_errno!(EINVAL, "MAC is expected");
             }
             (true, Some(parse_mac(&input.mac.as_ref().unwrap())?))
         };
@@ -229,7 +211,7 @@ impl ConfigMountOptions {
     }
 }
 
-fn parse_memory_size(mem_str: &str) -> Result<usize, Error> {
+fn parse_memory_size(mem_str: &str) -> Result<usize> {
     const UNIT2FACTOR: [(&str, usize); 5] = [
         ("KB", 1024),
         ("MB", 1024 * 1024),
@@ -242,13 +224,13 @@ fn parse_memory_size(mem_str: &str) -> Result<usize, Error> {
     let (unit, factor) = UNIT2FACTOR
         .iter()
         .position(|(unit, _)| mem_str.ends_with(unit))
-        .ok_or_else(|| Error::new(Errno::EINVAL, "No unit"))
+        .ok_or_else(|| errno!(EINVAL, "No unit"))
         .map(|unit_i| &UNIT2FACTOR[unit_i])?;
     let number = match mem_str[0..mem_str.len() - unit.len()]
         .trim()
         .parse::<usize>()
     {
-        Err(_) => return errno!(EINVAL, "No number"),
+        Err(_) => return_errno!(EINVAL, "No number"),
         Ok(number) => number,
     };
     Ok(number * factor)

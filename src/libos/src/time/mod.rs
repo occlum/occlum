@@ -61,7 +61,7 @@ pub enum ClockID {
 
 impl ClockID {
     #[deny(unreachable_patterns)]
-    pub fn from_raw(clockid: clockid_t) -> Result<ClockID, Error> {
+    pub fn from_raw(clockid: clockid_t) -> Result<ClockID> {
         Ok(match clockid as i32 {
             0 => ClockID::CLOCK_REALTIME,
             1 => ClockID::CLOCK_MONOTONIC,
@@ -71,12 +71,12 @@ impl ClockID {
             5 => ClockID::CLOCK_REALTIME_COARSE,
             6 => ClockID::CLOCK_MONOTONIC_COARSE,
             7 => ClockID::CLOCK_BOOTTIME,
-            _ => return errno!(EINVAL, "invalid command"),
+            _ => return_errno!(EINVAL, "invalid command"),
         })
     }
 }
 
-pub fn do_clock_gettime(clockid: ClockID) -> Result<timespec_t, Error> {
+pub fn do_clock_gettime(clockid: ClockID) -> Result<timespec_t> {
     let mut sec = 0;
     let mut nsec = 0;
     unsafe {

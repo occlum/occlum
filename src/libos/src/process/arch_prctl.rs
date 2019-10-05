@@ -10,18 +10,18 @@ pub enum ArchPrctlCode {
 }
 
 impl ArchPrctlCode {
-    pub fn from_u32(bits: u32) -> Result<ArchPrctlCode, Error> {
+    pub fn from_u32(bits: u32) -> Result<ArchPrctlCode> {
         match bits {
             0x1001 => Ok(ArchPrctlCode::ARCH_SET_GS),
             0x1002 => Ok(ArchPrctlCode::ARCH_SET_FS),
             0x1003 => Ok(ArchPrctlCode::ARCH_GET_FS),
             0x1004 => Ok(ArchPrctlCode::ARCH_GET_GS),
-            _ => errno!(EINVAL, "Unknown code for arch_prctl"),
+            _ => return_errno!(EINVAL, "Unknown code for arch_prctl"),
         }
     }
 }
 
-pub fn do_arch_prctl(code: ArchPrctlCode, addr: *mut usize) -> Result<(), Error> {
+pub fn do_arch_prctl(code: ArchPrctlCode, addr: *mut usize) -> Result<()> {
     info!(
         "do_arch_prctl: code: {:?}, addr: {:#o}",
         code, addr as usize
@@ -42,7 +42,7 @@ pub fn do_arch_prctl(code: ArchPrctlCode, addr: *mut usize) -> Result<(), Error>
             }
         }
         ArchPrctlCode::ARCH_SET_GS | ArchPrctlCode::ARCH_GET_GS => {
-            return errno!(EINVAL, "GS cannot be accessed from the user space");
+            return_errno!(EINVAL, "GS cannot be accessed from the user space");
         }
     }
     Ok(())

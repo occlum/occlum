@@ -1,6 +1,22 @@
 include ../sgxenv.mk
 
-RELEASE ?= 0
+# Build LibOS in debug or release mode
+LIBOS_RELEASE ?= 0
+
+# The log level for LibOS
+#
+# There are five levels:
+# 1 - error
+# 2 - warn
+# 3 - info
+# 4 - debug
+# 5 - trace
+#
+# By setting the log level to a specific value (say warn), all log messages
+# whose levels are no greater than the value (error and warn <= warn) will
+# be printed.
+LIBOS_LOG ?= error
+
 ONLY_REBUILD_BUILTIN ?= 0
 
 # The final and intermediate libraries

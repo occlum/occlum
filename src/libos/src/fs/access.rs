@@ -12,8 +12,8 @@ bitflags! {
 }
 
 impl AccessModes {
-    pub fn from_u32(bits: u32) -> Result<AccessModes, Error> {
-        AccessModes::from_bits(bits).ok_or_else(|| Error::new(Errno::EINVAL, "invalid mode"))
+    pub fn from_u32(bits: u32) -> Result<AccessModes> {
+        AccessModes::from_bits(bits).ok_or_else(|| errno!(EINVAL, "invalid mode"))
     }
 }
 
@@ -25,8 +25,8 @@ bitflags! {
 }
 
 impl AccessFlags {
-    pub fn from_u32(bits: u32) -> Result<AccessFlags, Error> {
-        AccessFlags::from_bits(bits).ok_or_else(|| Error::new(Errno::EINVAL, "invalid flags"))
+    pub fn from_u32(bits: u32) -> Result<AccessFlags> {
+        AccessFlags::from_bits(bits).ok_or_else(|| errno!(EINVAL, "invalid flags"))
     }
 }
 
@@ -37,19 +37,19 @@ pub fn do_faccessat(
     path: &str,
     mode: AccessModes,
     flags: AccessFlags,
-) -> Result<(), Error> {
+) -> Result<()> {
     info!(
         "faccessat: dirfd: {:?}, path: {:?}, mode: {:?}, flags: {:?}",
         dirfd, path, mode, flags
     );
     match dirfd {
         // TODO: handle dirfd
-        Some(dirfd) => errno!(ENOSYS, "cannot accept dirfd"),
+        Some(dirfd) => return_errno!(ENOSYS, "cannot accept dirfd"),
         None => do_access(path, mode),
     }
 }
 
-pub fn do_access(path: &str, mode: AccessModes) -> Result<(), Error> {
+pub fn do_access(path: &str, mode: AccessModes) -> Result<()> {
     info!("access: path: {:?}, mode: {:?}", path, mode);
     let current_ref = process::get_current();
     let mut current = current_ref.lock().unwrap();

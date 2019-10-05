@@ -33,7 +33,7 @@ impl Process {
         vm_ref: ProcessVMRef,
         file_table_ref: FileTableRef,
         rlimits_ref: ResourceLimitsRef,
-    ) -> Result<(pid_t, ProcessRef), Error> {
+    ) -> Result<(pid_t, ProcessRef)> {
         let new_pid = process_table::alloc_pid();
         let new_process_ref = Arc::new(SgxMutex::new(Process {
             task: task,

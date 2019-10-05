@@ -1,9 +1,9 @@
 use super::*;
 
-pub fn mpx_enable() -> Result<(), Error> {
+pub fn mpx_enable() -> Result<()> {
     match unsafe { __mpx_enable() } {
         0 => Ok(()),
-        _ => errno!(EPERM, "MPX cannot be enabled"),
+        _ => Err(errno!(EPERM, "MPX cannot be enabled")),
     }
 }
 
@@ -14,10 +14,10 @@ pub enum MpxReg {
     BND3,
 }
 
-pub fn mpx_bndmk(bndreg: MpxReg, base: usize, size: usize) -> Result<(), Error> {
+pub fn mpx_bndmk(bndreg: MpxReg, base: usize, size: usize) -> Result<()> {
     /* Check whether the upper bound overflows the max of 64-bit */
     if base.checked_add(size).is_none() {
-        return errno!(ERANGE, "Upper bound overflows");
+        return_errno!(ERANGE, "Upper bound overflows");
     }
 
     match bndreg {

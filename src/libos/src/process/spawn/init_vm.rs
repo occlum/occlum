@@ -8,7 +8,7 @@ pub fn do_init(
     elf_buf: &[u8],
     ldso_elf_file: &ElfFile,
     ldso_elf_buf: &[u8],
-) -> Result<ProcessVM, Error> {
+) -> Result<ProcessVM> {
     // Alloc all virtual memory areas
     let mut code_seg = get_code_segment(elf_file)?;
     let mut data_seg = get_data_segment(elf_file)?;
@@ -34,7 +34,8 @@ pub fn do_init(
     let mut process_vm = ProcessVMBuilder::new(code_size, data_size)
         .ldso_code_size(ldso_code_size)
         .ldso_data_size(ldso_data_size)
-        .build()?;
+        .build()
+        .cause_err(|e| errno!(e.errno(), "failed to create process VM"))?;
 
     // Load code and data
     let process_base_addr = process_vm.get_code_range().start();
@@ -57,7 +58,7 @@ pub fn do_init(
     Ok(process_vm)
 }
 
-fn reloc_symbols(process_base_addr: usize, elf_file: &ElfFile) -> Result<(), Error> {
+fn reloc_symbols(process_base_addr: usize, elf_file: &ElfFile) -> Result<()> {
     let rela_entries = elf_helper::get_rela_entries(elf_file, ".rela.dyn")?;
     for rela_entry in rela_entries {
         /*
@@ -84,7 +85,7 @@ fn reloc_symbols(process_base_addr: usize, elf_file: &ElfFile) -> Result<(), Err
     Ok(())
 }
 /*
-fn link_syscalls(process_base_addr: usize, elf_file: &ElfFile) -> Result<(), Error> {
+fn link_syscalls(process_base_addr: usize, elf_file: &ElfFile) -> Result<()> {
     let syscall_addr = __occlum_syscall as *const () as usize;
 
     let rela_entries = elf_helper::get_rela_entries(elf_file, ".rela.plt")?;

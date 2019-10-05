@@ -23,7 +23,7 @@ pub struct utsname_t {
     domainname: [u8; 65],
 }
 
-pub fn do_uname(name: &mut utsname_t) -> Result<(), Error> {
+pub fn do_uname(name: &mut utsname_t) -> Result<()> {
     copy_from_cstr_to_u8_array(&SYSNAME, &mut name.sysname);
     copy_from_cstr_to_u8_array(&NODENAME, &mut name.nodename);
     copy_from_cstr_to_u8_array(&RELEASE, &mut name.release);

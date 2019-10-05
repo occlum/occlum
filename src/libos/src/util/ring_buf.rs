@@ -122,7 +122,7 @@ impl Drop for RingBufInner {
 }
 
 impl RingBufReader {
-    pub fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let mut tail = self.inner.get_tail();
         let mut buf_remain = buf.len();
         let mut buf_pos = 0;
@@ -179,9 +179,9 @@ impl Drop for RingBufReader {
 }
 
 impl RingBufWriter {
-    pub fn write(&self, buf: &[u8]) -> Result<usize, Error> {
+    pub fn write(&self, buf: &[u8]) -> Result<usize> {
         if self.inner.is_closed() {
-            return errno!(EPIPE, "Reader has been closed");
+            return_errno!(EPIPE, "Reader has been closed");
         }
 
         let mut head = self.inner.get_head();

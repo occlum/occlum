@@ -21,7 +21,7 @@ pub enum FutexOp {
 const FUTEX_OP_MASK: u32 = 0x0000_000F;
 
 impl FutexOp {
-    pub fn from_u32(bits: u32) -> Result<FutexOp, Error> {
+    pub fn from_u32(bits: u32) -> Result<FutexOp> {
         match bits {
             0 => Ok(FutexOp::FUTEX_WAIT),
             1 => Ok(FutexOp::FUTEX_WAKE),
@@ -33,7 +33,7 @@ impl FutexOp {
             7 => Ok(FutexOp::FUTEX_UNLOCK_PI),
             8 => Ok(FutexOp::FUTEX_TRYLOCK_PI),
             9 => Ok(FutexOp::FUTEX_WAIT_BITSET),
-            _ => errno!(EINVAL, "Unknown futex op"),
+            _ => return_errno!(EINVAL, "Unknown futex op"),
         }
     }
 }
@@ -47,12 +47,12 @@ bitflags! {
 const FUTEX_FLAGS_MASK: u32 = 0xFFFF_FFF0;
 
 impl FutexFlags {
-    pub fn from_u32(bits: u32) -> Result<FutexFlags, Error> {
-        FutexFlags::from_bits(bits).ok_or_else(|| Error::new(Errno::EINVAL, "Unknown futex flags"))
+    pub fn from_u32(bits: u32) -> Result<FutexFlags> {
+        FutexFlags::from_bits(bits).ok_or_else(|| errno!(EINVAL, "unknown futex flags"))
     }
 }
 
-pub fn futex_op_and_flags_from_u32(bits: u32) -> Result<(FutexOp, FutexFlags), Error> {
+pub fn futex_op_and_flags_from_u32(bits: u32) -> Result<(FutexOp, FutexFlags)> {
     let op = {
         let op_bits = bits & FUTEX_OP_MASK;
         FutexOp::from_u32(op_bits)?
@@ -65,7 +65,7 @@ pub fn futex_op_and_flags_from_u32(bits: u32) -> Result<(FutexOp, FutexFlags), E
 }
 
 /// Do futex wait
-pub fn futex_wait(futex_addr: *const i32, futex_val: i32) -> Result<(), Error> {
+pub fn futex_wait(futex_addr: *const i32, futex_val: i32) -> Result<()> {
     let futex_key = FutexKey::new(futex_addr);
     let futex_item = FUTEX_TABLE.lock().unwrap().get_or_new_item(futex_key);
 
@@ -76,7 +76,7 @@ pub fn futex_wait(futex_addr: *const i32, futex_val: i32) -> Result<(), Error> {
 }
 
 /// Do futex wake
-pub fn futex_wake(futex_addr: *const i32, max_count: usize) -> Result<usize, Error> {
+pub fn futex_wake(futex_addr: *const i32, max_count: usize) -> Result<usize> {
     let futex_key = FutexKey::new(futex_addr);
     let futex_item = FUTEX_TABLE.lock().unwrap().get_item(futex_key)?;
     let count = futex_item.wake(max_count);
@@ -167,12 +167,12 @@ impl FutexTable {
         item.clone()
     }
 
-    pub fn get_item(&mut self, key: FutexKey) -> Result<FutexItemRef, Error> {
+    pub fn get_item(&mut self, key: FutexKey) -> Result<FutexItemRef> {
         let table = &mut self.table;
         table
             .get_mut(&key)
             .map(|item| item.clone())
-            .ok_or_else(|| Error::new(Errno::ENOENT, "futex key cannot be found"))
+            .ok_or_else(|| errno!(ENOENT, "futex key cannot be found"))
     }
 
     pub fn put_item(&mut self, item: FutexItemRef) {

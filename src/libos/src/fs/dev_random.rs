@@ -8,21 +8,21 @@ extern "C" {
 }
 
 impl File for DevRandom {
-    fn read(&self, _buf: &mut [u8]) -> Result<usize, Error> {
+    fn read(&self, _buf: &mut [u8]) -> Result<usize> {
         let buf = _buf.as_mut_ptr();
         let size = _buf.len();
         let status = unsafe { sgx_read_rand(buf, size) };
         if status != sgx_status_t::SGX_SUCCESS {
-            return errno!(EAGAIN, "failed to get random number from sgx");
+            return_errno!(EAGAIN, "failed to get random number from sgx");
         }
         Ok(size)
     }
 
-    fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize, Error> {
+    fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize> {
         self.read(_buf)
     }
 
-    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
         let mut total_nbytes = 0;
         for buf in bufs {
             match self.read(buf) {
@@ -41,40 +41,40 @@ impl File for DevRandom {
         Ok(total_nbytes)
     }
 
-    fn write(&self, _buf: &[u8]) -> Result<usize, Error> {
-        errno!(EINVAL, "device not support writes")
+    fn write(&self, _buf: &[u8]) -> Result<usize> {
+        return_errno!(EINVAL, "device not support writes")
     }
 
-    fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize, Error> {
-        errno!(EINVAL, "device not support writes")
+    fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {
+        return_errno!(EINVAL, "device not support writes")
     }
 
-    fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
-        errno!(EINVAL, "device not support writes")
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
+        return_errno!(EINVAL, "device not support writes")
     }
 
-    fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
-        errno!(EINVAL, "device not support seeks")
+    fn seek(&self, pos: SeekFrom) -> Result<off_t> {
+        return_errno!(EINVAL, "device not support seeks")
     }
 
-    fn metadata(&self) -> Result<Metadata, Error> {
+    fn metadata(&self) -> Result<Metadata> {
         unimplemented!()
     }
 
-    fn set_len(&self, len: u64) -> Result<(), Error> {
-        errno!(EINVAL, "device not support resizing")
+    fn set_len(&self, len: u64) -> Result<()> {
+        return_errno!(EINVAL, "device not support resizing")
     }
 
-    fn sync_all(&self) -> Result<(), Error> {
+    fn sync_all(&self) -> Result<()> {
         Ok(())
     }
 
-    fn sync_data(&self) -> Result<(), Error> {
+    fn sync_data(&self) -> Result<()> {
         Ok(())
     }
 
-    fn read_entry(&self) -> Result<String, Error> {
-        errno!(ENOTDIR, "device is not a directory")
+    fn read_entry(&self) -> Result<String> {
+        return_errno!(ENOTDIR, "device is not a directory")
     }
 
     fn as_any(&self) -> &Any {

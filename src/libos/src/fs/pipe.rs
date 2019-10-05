@@ -12,7 +12,7 @@ pub struct Pipe {
 }
 
 impl Pipe {
-    pub fn new() -> Result<Pipe, Error> {
+    pub fn new() -> Result<Pipe> {
         let mut ring_buf = RingBuf::new(PIPE_BUF_SIZE);
         Ok(Pipe {
             reader: PipeReader {
@@ -31,24 +31,24 @@ pub struct PipeReader {
 }
 
 impl File for PipeReader {
-    fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
+    fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let ringbuf = self.inner.lock().unwrap();
         ringbuf.read(buf)
     }
 
-    fn write(&self, buf: &[u8]) -> Result<usize, Error> {
-        errno!(EBADF, "PipeReader does not support write")
+    fn write(&self, buf: &[u8]) -> Result<usize> {
+        return_errno!(EBADF, "PipeReader does not support write")
     }
 
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         unimplemented!()
     }
 
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error> {
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
         unimplemented!()
     }
 
-    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
         let mut ringbuf = self.inner.lock().unwrap();
         let mut total_bytes = 0;
         for buf in bufs {
@@ -72,31 +72,31 @@ impl File for PipeReader {
         Ok(total_bytes)
     }
 
-    fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
-        errno!(EBADF, "PipeReader does not support write")
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
+        return_errno!(EBADF, "PipeReader does not support write")
     }
 
-    fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
-        errno!(ESPIPE, "Pipe does not support seek")
+    fn seek(&self, pos: SeekFrom) -> Result<off_t> {
+        return_errno!(ESPIPE, "Pipe does not support seek")
     }
 
-    fn metadata(&self) -> Result<Metadata, Error> {
+    fn metadata(&self) -> Result<Metadata> {
         unimplemented!()
     }
 
-    fn set_len(&self, len: u64) -> Result<(), Error> {
+    fn set_len(&self, len: u64) -> Result<()> {
         unimplemented!()
     }
 
-    fn sync_all(&self) -> Result<(), Error> {
+    fn sync_all(&self) -> Result<()> {
         unimplemented!()
     }
 
-    fn sync_data(&self) -> Result<(), Error> {
+    fn sync_data(&self) -> Result<()> {
         unimplemented!()
     }
 
-    fn read_entry(&self) -> Result<String, Error> {
+    fn read_entry(&self) -> Result<String> {
         unimplemented!()
     }
 
@@ -114,27 +114,27 @@ pub struct PipeWriter {
 }
 
 impl File for PipeWriter {
-    fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
-        errno!(EBADF, "PipeWriter does not support read")
+    fn read(&self, buf: &mut [u8]) -> Result<usize> {
+        return_errno!(EBADF, "PipeWriter does not support read")
     }
 
-    fn write(&self, buf: &[u8]) -> Result<usize, Error> {
+    fn write(&self, buf: &[u8]) -> Result<usize> {
         let ringbuf = self.inner.lock().unwrap();
         ringbuf.write(buf)
     }
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         unimplemented!()
     }
 
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error> {
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
         unimplemented!()
     }
 
-    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
-        errno!(EBADF, "PipeWriter does not support read")
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
+        return_errno!(EBADF, "PipeWriter does not support read")
     }
 
-    fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
         let ringbuf = self.inner.lock().unwrap();
         let mut total_bytes = 0;
         for buf in bufs {
@@ -158,27 +158,27 @@ impl File for PipeWriter {
         Ok(total_bytes)
     }
 
-    fn seek(&self, seek_pos: SeekFrom) -> Result<off_t, Error> {
-        errno!(ESPIPE, "Pipe does not support seek")
+    fn seek(&self, seek_pos: SeekFrom) -> Result<off_t> {
+        return_errno!(ESPIPE, "Pipe does not support seek")
     }
 
-    fn metadata(&self) -> Result<Metadata, Error> {
+    fn metadata(&self) -> Result<Metadata> {
         unimplemented!()
     }
 
-    fn set_len(&self, len: u64) -> Result<(), Error> {
+    fn set_len(&self, len: u64) -> Result<()> {
         unimplemented!()
     }
 
-    fn sync_all(&self) -> Result<(), Error> {
+    fn sync_all(&self) -> Result<()> {
         unimplemented!()
     }
 
-    fn sync_data(&self) -> Result<(), Error> {
+    fn sync_data(&self) -> Result<()> {
         unimplemented!()
     }
 
-    fn read_entry(&self) -> Result<String, Error> {
+    fn read_entry(&self) -> Result<String> {
         unimplemented!()
     }
 

@@ -38,17 +38,23 @@ pub fn do_spawn<P: AsRef<Path>>(
     envp: &[CString],
     file_actions: &[FileAction],
     parent_ref: &ProcessRef,
-) -> Result<u32, Error> {
+) -> Result<u32> {
     let mut elf_buf = {
         let path = elf_path.as_ref().to_str().unwrap();
-        let inode = parent_ref.lock().unwrap().lookup_inode(path)?;
-        inode.read_as_vec()?
+        let inode = parent_ref
+            .lock()
+            .unwrap()
+            .lookup_inode(path)
+            .map_err(|e| errno!(e.errno(), "cannot find the executable"))?;
+        inode
+            .read_as_vec()
+            .map_err(|e| errno!(e.errno(), "failed to read the executable ELF"))?
     };
     let elf_file = {
-        let elf_file =
-            ElfFile::new(&elf_buf).map_err(|e| (Errno::ENOEXEC, "Failed to parse the ELF file"))?;
+        let elf_file = ElfFile::new(&elf_buf)
+            .map_err(|e| errno!(ENOEXEC, "failed to parse the executable ELF"))?;
         header::sanity_check(&elf_file)
-            .map_err(|e| (Errno::ENOEXEC, "Failed to parse the ELF file"))?;
+            .map_err(|e| errno!(ENOEXEC, "failed to parse the executable ELF"))?;
         /*
             elf_helper::print_program_headers(&elf_file)?;
             elf_helper::print_sections(&elf_file)?;
@@ -59,15 +65,22 @@ pub fn do_spawn<P: AsRef<Path>>(
 
     let mut ldso_elf_buf = {
         let ldso_path = "/lib/ld-musl-x86_64.so.1";
-        let ldso_inode = ROOT_INODE.lookup(ldso_path)?;
-        ldso_inode.read_as_vec()?
+        let ldso_inode = ROOT_INODE.lookup(ldso_path).map_err(|e| {
+            errno!(
+                e.errno(),
+                "cannot find the loader at /lib/ld-musl-x86_64.so.1"
+            )
+        })?;
+        ldso_inode
+            .read_as_vec()
+            .map_err(|e| errno!(e.errno(), "failed to read the ld.so ELF"))?
     };
 
     let ldso_elf_file = {
         let ldso_elf_file = ElfFile::new(&ldso_elf_buf)
-            .map_err(|e| (Errno::ENOEXEC, "Failed to parse the ELF file"))?;
+            .map_err(|e| errno!(ENOEXEC, "failed to parse the ld.so ELF"))?;
         header::sanity_check(&ldso_elf_file)
-            .map_err(|e| (Errno::ENOEXEC, "Failed to parse the ELF file"))?;
+            .map_err(|e| errno!(ENOEXEC, "failed to parse the ld.so ELF"))?;
         /*
             elf_helper::print_program_headers(&elf_file)?;
             elf_helper::print_sections(&elf_file)?;
@@ -86,7 +99,7 @@ pub fn do_spawn<P: AsRef<Path>>(
                 let ldso_base_addr = vm.get_ldso_code_range().start();
                 let ldso_entry = ldso_base_addr + elf_helper::get_start_address(&ldso_elf_file)?;
                 if !vm.get_ldso_code_range().contains(ldso_entry) {
-                    return errno!(EINVAL, "Invalid program entry");
+                    return_errno!(EINVAL, "Invalid program entry");
                 }
                 ldso_entry
             };
@@ -117,7 +130,7 @@ pub fn do_spawn<P: AsRef<Path>>(
     Ok(new_pid)
 }
 
-fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<FileTable, Error> {
+fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<FileTable> {
     // Usually, we just inherit the file table from the parent
     let parent = parent_ref.lock().unwrap();
     let should_inherit_file_table = parent.get_pid() > 0;
@@ -170,7 +183,7 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
     Ok(file_table)
 }
 
-fn init_auxtbl(process_vm: &ProcessVM, elf_file: &ElfFile) -> Result<AuxTable, Error> {
+fn init_auxtbl(process_vm: &ProcessVM, elf_file: &ElfFile) -> Result<AuxTable> {
     let mut auxtbl = AuxTable::new();
     auxtbl.set(AuxKey::AT_PAGESZ, 4096)?;
     auxtbl.set(AuxKey::AT_UID, 0)?;

@@ -8,12 +8,12 @@ pub struct UserSpaceVMManager {
 }
 
 impl UserSpaceVMManager {
-    pub unsafe fn from(addr: usize, size: usize) -> Result<UserSpaceVMManager, Error> {
+    pub unsafe fn from(addr: usize, size: usize) -> Result<UserSpaceVMManager> {
         let vm_manager = Arc::new(SgxMutex::new(VMManager::from(addr, size)?));
         Ok(UserSpaceVMManager { vm_manager })
     }
 
-    pub fn alloc(&self, size: usize) -> Result<UserSpaceVMRange, Error> {
+    pub fn alloc(&self, size: usize) -> Result<UserSpaceVMRange> {
         let user_vm_range = unsafe {
             let mmap_options = VMMapOptionsBuilder::default().size(size).build()?;
 

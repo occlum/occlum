@@ -129,8 +129,8 @@ impl Storage for SgxStorage {
             if file_id == "metadata" && self.root_mac.is_some() {
                 let root_file_mac = file.get_mac().expect("Failed to get mac");
                 if root_file_mac != self.root_mac.unwrap() {
-                    println!(
-                        "Expected MAC = {:#?}, actual MAC = {:?}",
+                    error!(
+                        "MAC validation for metadata file failed: expected = {:#?}, found = {:?}",
                         self.root_mac.unwrap(),
                         root_file_mac
                     );

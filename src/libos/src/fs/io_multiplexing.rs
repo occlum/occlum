@@ -13,7 +13,7 @@ pub fn do_select(
     writefds: &mut libc::fd_set,
     exceptfds: &mut libc::fd_set,
     timeout: Option<libc::timeval>,
-) -> Result<usize, Error> {
+) -> Result<usize> {
     info!("select: nfds: {}", nfds);
     // convert libos fd to Linux fd
     let mut host_to_libos_fd = [0; libc::FD_SETSIZE];
@@ -108,7 +108,7 @@ pub fn do_select(
     Ok(ret as usize)
 }
 
-pub fn do_poll(polls: &mut [libc::pollfd], timeout: c_int) -> Result<usize, Error> {
+pub fn do_poll(polls: &mut [libc::pollfd], timeout: c_int) -> Result<usize> {
     info!(
         "poll: {:?}, timeout: {}",
         polls.iter().map(|p| p.fd).collect::<Vec<_>>(),
@@ -143,7 +143,7 @@ pub fn do_poll(polls: &mut [libc::pollfd], timeout: c_int) -> Result<usize, Erro
             warn!("poll unix socket is unimplemented, spin for read");
             return Ok(1);
         } else {
-            return errno!(EBADF, "not a socket");
+            return_errno!(EBADF, "not a socket");
         }
     }
     let ret = try_libc!(libc::ocall::poll(
@@ -155,7 +155,7 @@ pub fn do_poll(polls: &mut [libc::pollfd], timeout: c_int) -> Result<usize, Erro
     Ok(ret as usize)
 }
 
-pub fn do_epoll_create1(flags: c_int) -> Result<FileDesc, Error> {
+pub fn do_epoll_create1(flags: c_int) -> Result<FileDesc> {
     info!("epoll_create1: flags: {}", flags);
 
     let epoll = EpollFile::new()?;
@@ -177,7 +177,7 @@ pub fn do_epoll_ctl(
     op: c_int,
     fd: FileDesc,
     event: *const libc::epoll_event,
-) -> Result<(), Error> {
+) -> Result<()> {
     info!("epoll_ctl: epfd: {}, op: {:?}, fd: {}", epfd, op, fd);
 
     let current_ref = process::get_current();
@@ -196,7 +196,7 @@ pub fn do_epoll_wait(
     epfd: FileDesc,
     events: &mut [libc::epoll_event],
     timeout: c_int,
-) -> Result<usize, Error> {
+) -> Result<usize> {
     info!(
         "epoll_wait: epfd: {}, len: {:?}, timeout: {}",
         epfd,
@@ -245,7 +245,7 @@ pub struct EpollFile {
 }
 
 impl EpollFile {
-    pub fn new() -> Result<Self, Error> {
+    pub fn new() -> Result<Self> {
         Ok(Self {
             inner: SgxMutex::new(EpollFileInner::new()?),
         })
@@ -259,7 +259,7 @@ struct EpollFileInner {
 // FIXME: What if a Linux fd is closed but still in an epoll?
 impl EpollFileInner {
     /// Create a new Linux epoll file descriptor
-    pub fn new() -> Result<Self, Error> {
+    pub fn new() -> Result<Self> {
         let ret = try_libc!(libc::ocall::epoll_create1(0));
         Ok(EpollFileInner { epoll_fd: ret })
     }
@@ -269,7 +269,7 @@ impl EpollFileInner {
         op: c_int,
         host_fd: FileDesc,
         event: *const libc::epoll_event,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let ret = try_libc!(libc::ocall::epoll_ctl(
             self.epoll_fd,
             op,
@@ -281,11 +281,7 @@ impl EpollFileInner {
 
     /// Wait for an I/O event on the epoll.
     /// Returns the number of file descriptors ready for the requested I/O.
-    pub fn wait(
-        &mut self,
-        events: &mut [libc::epoll_event],
-        timeout: c_int,
-    ) -> Result<usize, Error> {
+    pub fn wait(&mut self, events: &mut [libc::epoll_event], timeout: c_int) -> Result<usize> {
         let ret = try_libc!(libc::ocall::epoll_wait(
             self.epoll_fd,
             events.as_mut_ptr(),
@@ -305,51 +301,51 @@ impl Drop for EpollFileInner {
 }
 
 impl File for EpollFile {
-    fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
+    fn read(&self, buf: &mut [u8]) -> Result<usize> {
         unimplemented!()
     }
 
-    fn write(&self, buf: &[u8]) -> Result<usize, Error> {
+    fn write(&self, buf: &[u8]) -> Result<usize> {
         unimplemented!()
     }
 
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         unimplemented!()
     }
 
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error> {
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
         unimplemented!()
     }
 
-    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
         unimplemented!()
     }
 
-    fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
         unimplemented!()
     }
 
-    fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
-        errno!(ESPIPE, "Epoll does not support seek")
+    fn seek(&self, pos: SeekFrom) -> Result<off_t> {
+        return_errno!(ESPIPE, "Epoll does not support seek")
     }
 
-    fn metadata(&self) -> Result<Metadata, Error> {
+    fn metadata(&self) -> Result<Metadata> {
         unimplemented!()
     }
 
-    fn set_len(&self, len: u64) -> Result<(), Error> {
+    fn set_len(&self, len: u64) -> Result<()> {
         unimplemented!()
     }
 
-    fn sync_all(&self) -> Result<(), Error> {
+    fn sync_all(&self) -> Result<()> {
         unimplemented!()
     }
 
-    fn sync_data(&self) -> Result<(), Error> {
+    fn sync_data(&self) -> Result<()> {
         unimplemented!()
     }
 
-    fn read_entry(&self) -> Result<String, Error> {
+    fn read_entry(&self) -> Result<String> {
         unimplemented!()
     }
 
@@ -368,13 +364,13 @@ impl Debug for EpollFile {
 }
 
 pub trait AsEpoll {
-    fn as_epoll(&self) -> Result<&EpollFile, Error>;
+    fn as_epoll(&self) -> Result<&EpollFile>;
 }
 
 impl AsEpoll for FileRef {
-    fn as_epoll(&self) -> Result<&EpollFile, Error> {
+    fn as_epoll(&self) -> Result<&EpollFile> {
         self.as_any()
             .downcast_ref::<EpollFile>()
-            .ok_or(Error::new(Errno::EBADF, "not a epoll"))
+            .ok_or_else(|| errno!(EBADF, "not a epoll"))
     }
 }

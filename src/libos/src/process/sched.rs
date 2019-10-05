@@ -61,7 +61,7 @@ impl CpuSet {
 }
 
 impl std::fmt::LowerHex for CpuSet {
-    fn fmt(&self, fmtr: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, fmtr: &mut std::fmt::Formatter) -> std::fmt::Result {
         for byte in &(self.vec) {
             try!(fmtr.write_fmt(format_args!("{:02x}", byte)));
         }
@@ -70,7 +70,7 @@ impl std::fmt::LowerHex for CpuSet {
 }
 
 impl std::fmt::UpperHex for CpuSet {
-    fn fmt(&self, fmtr: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, fmtr: &mut std::fmt::Formatter) -> std::fmt::Result {
         for byte in &(self.vec) {
             try!(fmtr.write_fmt(format_args!("{:02X}", byte)));
         }
@@ -78,14 +78,14 @@ impl std::fmt::UpperHex for CpuSet {
     }
 }
 
-fn find_host_tid(pid: pid_t) -> Result<pid_t, Error> {
+fn find_host_tid(pid: pid_t) -> Result<pid_t> {
     let process_ref = if pid == 0 { get_current() } else { get(pid)? };
     let mut process = process_ref.lock().unwrap();
     let host_tid = process.get_host_tid();
     Ok(host_tid)
 }
 
-pub fn do_sched_getaffinity(pid: pid_t, cpu_set: &mut CpuSet) -> Result<i32, Error> {
+pub fn do_sched_getaffinity(pid: pid_t, cpu_set: &mut CpuSet) -> Result<i32> {
     let host_tid = match pid {
         0 => 0,
         _ => find_host_tid(pid)?,
@@ -98,13 +98,13 @@ pub fn do_sched_getaffinity(pid: pid_t, cpu_set: &mut CpuSet) -> Result<i32, Err
         ocall_sched_getaffinity(&mut ret, &mut error, host_tid as i32, cpusize, buf);
     }
     if (ret < 0) {
-        let errno = Errno::from_errno(error);
-        return errno!(errno, "ocall_sched_getaffinity failed");
+        let errno = Errno::from(error as u32);
+        return_errno!(errno, "ocall_sched_getaffinity failed");
     }
     Ok(ret)
 }
 
-pub fn do_sched_setaffinity(pid: pid_t, cpu_set: &CpuSet) -> Result<i32, Error> {
+pub fn do_sched_setaffinity(pid: pid_t, cpu_set: &CpuSet) -> Result<i32> {
     let host_tid = match pid {
         0 => 0,
         _ => find_host_tid(pid)?,
@@ -117,8 +117,8 @@ pub fn do_sched_setaffinity(pid: pid_t, cpu_set: &CpuSet) -> Result<i32, Error> 
         ocall_sched_setaffinity(&mut ret, &mut error, host_tid as i32, cpusize, buf);
     }
     if (ret < 0) {
-        let errno = Errno::from_errno(error);
-        return errno!(errno, "ocall_sched_setaffinity failed");
+        let errno = Errno::from(error as u32);
+        return_errno!(errno, "ocall_sched_setaffinity failed");
     }
     Ok(ret)
 }

@@ -24,7 +24,7 @@ impl FileTable {
         fd: FileDesc,
         min_fd: FileDesc,
         close_on_spawn: bool,
-    ) -> Result<FileDesc, Error> {
+    ) -> Result<FileDesc> {
         let file_ref = self.get(fd)?;
 
         let min_fd = min_fd as usize;
@@ -86,38 +86,38 @@ impl FileTable {
         }
     }
 
-    pub fn get(&self, fd: FileDesc) -> Result<FileRef, Error> {
+    pub fn get(&self, fd: FileDesc) -> Result<FileRef> {
         let entry = self.get_entry(fd)?;
         Ok(entry.file.clone())
     }
 
-    pub fn get_entry(&self, fd: FileDesc) -> Result<&FileTableEntry, Error> {
+    pub fn get_entry(&self, fd: FileDesc) -> Result<&FileTableEntry> {
         if fd as usize >= self.table.len() {
-            return errno!(EBADF, "Invalid file descriptor");
+            return_errno!(EBADF, "Invalid file descriptor");
         }
 
         let table = &self.table;
         match table[fd as usize].as_ref() {
             Some(table_entry) => Ok(table_entry),
-            None => errno!(EBADF, "Invalid file descriptor"),
+            None => return_errno!(EBADF, "Invalid file descriptor"),
         }
     }
 
-    pub fn get_entry_mut(&mut self, fd: FileDesc) -> Result<&mut FileTableEntry, Error> {
+    pub fn get_entry_mut(&mut self, fd: FileDesc) -> Result<&mut FileTableEntry> {
         if fd as usize >= self.table.len() {
-            return errno!(EBADF, "Invalid file descriptor");
+            return_errno!(EBADF, "Invalid file descriptor");
         }
 
         let table = &mut self.table;
         match table[fd as usize].as_mut() {
             Some(table_entry) => Ok(table_entry),
-            None => errno!(EBADF, "Invalid file descriptor"),
+            None => return_errno!(EBADF, "Invalid file descriptor"),
         }
     }
 
-    pub fn del(&mut self, fd: FileDesc) -> Result<FileRef, Error> {
+    pub fn del(&mut self, fd: FileDesc) -> Result<FileRef> {
         if fd as usize >= self.table.len() {
-            return errno!(EBADF, "Invalid file descriptor");
+            return_errno!(EBADF, "Invalid file descriptor");
         }
 
         let mut del_table_entry = None;
@@ -128,7 +128,7 @@ impl FileTable {
                 self.num_fds -= 1;
                 Ok(del_table_entry.file)
             }
-            None => errno!(EBADF, "Invalid file descriptor"),
+            None => return_errno!(EBADF, "Invalid file descriptor"),
         }
     }
 

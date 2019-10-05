@@ -1,5 +1,5 @@
+use super::*;
 use fs::{File, FileDesc, FileRef};
-use prelude::*;
 use process::{get_current, Process, ProcessRef};
 use std::fmt;
 
@@ -17,7 +17,7 @@ pub fn do_mmap(
     flags: MMapFlags,
     fd: FileDesc,
     offset: usize,
-) -> Result<usize, Error> {
+) -> Result<usize> {
     if flags.contains(MMapFlags::MAP_ANONYMOUS) {
         info!(
             "mmap: addr: {:#x}, size: {:#x}, perms: {:?}, flags: {:?}",
@@ -39,7 +39,7 @@ pub fn do_mmap(
     current_vm.mmap(addr, size, perms, flags, fd, offset)
 }
 
-pub fn do_munmap(addr: usize, size: usize) -> Result<(), Error> {
+pub fn do_munmap(addr: usize, size: usize) -> Result<()> {
     info!("munmap: addr: {:#x}, size: {:#x}", addr, size);
     let mut current_vm_ref = {
         let current_ref = get_current();
@@ -50,7 +50,7 @@ pub fn do_munmap(addr: usize, size: usize) -> Result<(), Error> {
     current_vm.munmap(addr, size)
 }
 
-pub fn do_brk(addr: usize) -> Result<usize, Error> {
+pub fn do_brk(addr: usize) -> Result<usize> {
     info!("brk: addr: {:#x}", addr);
     let current_ref = get_current();
     let current_process = current_ref.lock().unwrap();

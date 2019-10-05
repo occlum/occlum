@@ -53,7 +53,7 @@ pub fn do_init(
     argv: &[CString],
     envp: &[CString],
     auxtbl: &AuxTable,
-) -> Result<usize, Error> {
+) -> Result<usize> {
     let stack_buf = unsafe { StackBuf::new(stack_top, init_area_size)? };
     let envp_cloned = clone_cstrings_on_stack(&stack_buf, envp)?;
     let argv_cloned = clone_cstrings_on_stack(&stack_buf, argv)?;
@@ -75,9 +75,9 @@ pub struct StackBuf {
 }
 
 impl StackBuf {
-    pub unsafe fn new(stack_top: usize, stack_size: usize) -> Result<StackBuf, Error> {
+    pub unsafe fn new(stack_top: usize, stack_size: usize) -> Result<StackBuf> {
         if stack_top % 16 != 0 || stack_size == 0 || stack_top < stack_size {
-            return errno!(EINVAL, "Invalid stack range");
+            return_errno!(EINVAL, "Invalid stack range");
         };
         Ok(StackBuf {
             stack_top: stack_top,
@@ -86,7 +86,7 @@ impl StackBuf {
         })
     }
 
-    pub fn put(&self, val: u64) -> Result<*const u64, Error> {
+    pub fn put(&self, val: u64) -> Result<*const u64> {
         let val_ptr = self.alloc(8, 8)? as *mut u64;
         unsafe {
             ptr::write(val_ptr, val);
@@ -94,7 +94,7 @@ impl StackBuf {
         Ok(val_ptr as *const u64)
     }
 
-    pub fn put_slice<T>(&self, vals: &[T]) -> Result<*const T, Error>
+    pub fn put_slice<T>(&self, vals: &[T]) -> Result<*const T>
     where
         T: Copy,
     {
@@ -120,7 +120,7 @@ impl StackBuf {
         Ok(base_ptr as *const T)
     }
 
-    pub fn put_cstr(&self, cstr: &CStr) -> Result<*const u8, Error> {
+    pub fn put_cstr(&self, cstr: &CStr) -> Result<*const u8> {
         let bytes = cstr.to_bytes_with_nul();
         self.put_slice(bytes)
     }
@@ -129,12 +129,12 @@ impl StackBuf {
         self.stack_pos.get()
     }
 
-    fn alloc(&self, size: usize, align: usize) -> Result<*mut u8, Error> {
+    fn alloc(&self, size: usize, align: usize) -> Result<*mut u8> {
         let new_pos = {
             let old_pos = self.stack_pos.get();
             let new_pos = align_down(old_pos - size, align);
             if new_pos < self.stack_bottom {
-                return errno!(ENOMEM, "No enough space in buffer");
+                return_errno!(ENOMEM, "No enough space in buffer");
             }
             new_pos
         };
@@ -147,7 +147,7 @@ impl StackBuf {
 fn clone_cstrings_on_stack<'a, 'b>(
     stack: &'a StackBuf,
     cstrings: &'b [CString],
-) -> Result<Vec<&'a CStr>, Error> {
+) -> Result<Vec<&'a CStr>> {
     let mut cstrs_cloned = Vec::new();
     for cs in cstrings.iter().rev() {
         let cstrp_cloned = stack.put_cstr(cs)?;
@@ -158,7 +158,7 @@ fn clone_cstrings_on_stack<'a, 'b>(
     Ok(cstrs_cloned)
 }
 
-fn dump_auxtbl_on_stack<'a, 'b>(stack: &'a StackBuf, auxtbl: &'b AuxTable) -> Result<(), Error> {
+fn dump_auxtbl_on_stack<'a, 'b>(stack: &'a StackBuf, auxtbl: &'b AuxTable) -> Result<()> {
     // For every key-value pair, dump the value first, then the key
     stack.put(0 as u64);
     stack.put(AuxKey::AT_NULL as u64);
@@ -169,10 +169,7 @@ fn dump_auxtbl_on_stack<'a, 'b>(stack: &'a StackBuf, auxtbl: &'b AuxTable) -> Re
     Ok(())
 }
 
-fn dump_cstrptrs_on_stack<'a, 'b>(
-    stack: &'a StackBuf,
-    strptrs: &'b [&'a CStr],
-) -> Result<(), Error> {
+fn dump_cstrptrs_on_stack<'a, 'b>(stack: &'a StackBuf, strptrs: &'b [&'a CStr]) -> Result<()> {
     stack.put(0 as u64); // End with a NULL pointer
     for sp in strptrs.iter().rev() {
         stack.put(sp.as_ptr() as u64);
@@ -233,9 +230,9 @@ impl AuxTable {
 }
 
 impl AuxTable {
-    pub fn set(&mut self, key: AuxKey, val: u64) -> Result<(), Error> {
+    pub fn set(&mut self, key: AuxKey, val: u64) -> Result<()> {
         if key == AuxKey::AT_NULL || key == AuxKey::AT_IGNORE {
-            return errno!(EINVAL, "Illegal key");
+            return_errno!(EINVAL, "Illegal key");
         }
         self.table
             .entry(key)

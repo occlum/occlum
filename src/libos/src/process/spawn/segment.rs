@@ -29,25 +29,24 @@ impl Segment {
         self.mem_size
     }
 
-    pub fn from_program_header(ph: &ProgramHeader) -> Result<Segment, Error> {
+    pub fn from_program_header(ph: &ProgramHeader) -> Result<Segment> {
         let ph64 = match ph {
             ProgramHeader::Ph32(ph) => {
-                return Err((Errno::ENOEXEC, "Not support 32-bit ELF").into());
+                return_errno!(ENOEXEC, "not support 32-bit ELF");
             }
             ProgramHeader::Ph64(ph64) => ph64,
         };
         if ph64.align > 1 && ((ph64.offset % ph64.align) != (ph64.virtual_addr % ph64.align)) {
-            return Err((
-                Errno::EINVAL,
-                "Memory address and file offset is not equal, per modulo",
-            )
-                .into());
+            return_errno!(
+                EINVAL,
+                "memory address and file offset is not equal, per modulo"
+            );
         }
         if ph64.mem_size < ph64.file_size {
-            return Err((Errno::EINVAL, "Memory size must be greater than file size").into());
+            return_errno!(EINVAL, "memory size must be greater than file size");
         }
         if !ph64.align.is_power_of_two() {
-            return Err((Errno::EINVAL, "Memory alignment must be a power of two").into());
+            return_errno!(EINVAL, "memory alignment must be a power of two");
         }
 
         Ok(Segment {
@@ -90,15 +89,15 @@ impl Segment {
     }
 }
 
-pub fn get_code_segment(elf_file: &ElfFile) -> Result<Segment, Error> {
+pub fn get_code_segment(elf_file: &ElfFile) -> Result<Segment> {
     let code_ph = elf_helper::get_code_program_header(elf_file)
-        .map_err(|e| (Errno::ENOEXEC, "Failed to get the program header of code"))?;
+        .map_err(|e| errno!(ENOEXEC, "failed to get the program header of code"))?;
     Segment::from_program_header(&code_ph)
 }
 
-pub fn get_data_segment(elf_file: &ElfFile) -> Result<Segment, Error> {
+pub fn get_data_segment(elf_file: &ElfFile) -> Result<Segment> {
     let data_ph = elf_helper::get_data_program_header(elf_file)
-        .map_err(|e| (Errno::ENOEXEC, "Failed to get the program header of code"))?;
+        .map_err(|e| errno!(ENOEXEC, "failed to get the program header of code"))?;
     Segment::from_program_header(&data_ph)
 }
 

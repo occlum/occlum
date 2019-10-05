@@ -23,9 +23,9 @@ impl Task {
         user_stack_base: usize,
         user_stack_limit: usize,
         user_fs: Option<usize>,
-    ) -> Result<Task, Error> {
+    ) -> Result<Task> {
         if !(user_stack_base >= user_rsp && user_rsp > user_stack_limit) {
-            return errno!(EINVAL, "Invalid user stack");
+            return_errno!(EINVAL, "Invalid user stack");
         }
 
         // Set the default user fsbase to an address on user stack, which is
@@ -71,9 +71,9 @@ fn dequeue_task() -> Option<ProcessRef> {
     NEW_PROCESS_QUEUE.lock().unwrap().pop_front()
 }
 
-pub fn run_task(host_tid: pid_t) -> Result<i32, Error> {
+pub fn run_task(host_tid: pid_t) -> Result<i32> {
     let new_process: ProcessRef =
-        dequeue_task().ok_or_else(|| (Errno::EAGAIN, "No new processes to run"))?;
+        dequeue_task().ok_or_else(|| errno!(EAGAIN, "no new processes to run"))?;
     set_current(&new_process);
 
     let (pid, task) = {

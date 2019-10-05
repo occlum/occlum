@@ -8,7 +8,7 @@ pub struct SocketFile {
 }
 
 impl SocketFile {
-    pub fn new(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<Self, Error> {
+    pub fn new(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<Self> {
         let ret = try_libc!(libc::ocall::socket(domain, socket_type, protocol));
         Ok(SocketFile { fd: ret })
     }
@@ -18,7 +18,7 @@ impl SocketFile {
         addr: *mut libc::sockaddr,
         addr_len: *mut libc::socklen_t,
         flags: c_int,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let ret = try_libc!(libc::ocall::accept4(self.fd, addr, addr_len, flags));
         Ok(SocketFile { fd: ret })
     }
@@ -42,7 +42,7 @@ impl Drop for SocketFile {
 }
 
 impl File for SocketFile {
-    fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
+    fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let ret = try_libc!(libc::ocall::read(
             self.fd,
             buf.as_mut_ptr() as *mut c_void,
@@ -51,7 +51,7 @@ impl File for SocketFile {
         Ok(ret as usize)
     }
 
-    fn write(&self, buf: &[u8]) -> Result<usize, Error> {
+    fn write(&self, buf: &[u8]) -> Result<usize> {
         let ret = try_libc!(libc::ocall::write(
             self.fd,
             buf.as_ptr() as *const c_void,
@@ -60,15 +60,15 @@ impl File for SocketFile {
         Ok(ret as usize)
     }
 
-    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
         self.read(buf)
     }
 
-    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize, Error> {
+    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         self.write(buf)
     }
 
-    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
         let mut total_len = 0;
         for buf in bufs {
             match self.read(buf) {
@@ -82,7 +82,7 @@ impl File for SocketFile {
         Ok(total_len)
     }
 
-    fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
         let mut total_len = 0;
         for buf in bufs {
             match self.write(buf) {
@@ -96,11 +96,11 @@ impl File for SocketFile {
         Ok(total_len)
     }
 
-    fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
-        errno!(ESPIPE, "Socket does not support seek")
+    fn seek(&self, pos: SeekFrom) -> Result<off_t> {
+        return_errno!(ESPIPE, "Socket does not support seek")
     }
 
-    fn metadata(&self) -> Result<Metadata, Error> {
+    fn metadata(&self) -> Result<Metadata> {
         Ok(Metadata {
             dev: 0,
             inode: 0,
@@ -119,19 +119,19 @@ impl File for SocketFile {
         })
     }
 
-    fn set_len(&self, len: u64) -> Result<(), Error> {
+    fn set_len(&self, len: u64) -> Result<()> {
         unimplemented!()
     }
 
-    fn sync_all(&self) -> Result<(), Error> {
+    fn sync_all(&self) -> Result<()> {
         unimplemented!()
     }
 
-    fn sync_data(&self) -> Result<(), Error> {
+    fn sync_data(&self) -> Result<()> {
         unimplemented!()
     }
 
-    fn read_entry(&self) -> Result<String, Error> {
+    fn read_entry(&self) -> Result<String> {
         unimplemented!()
     }
 
@@ -141,13 +141,13 @@ impl File for SocketFile {
 }
 
 pub trait AsSocket {
-    fn as_socket(&self) -> Result<&SocketFile, Error>;
+    fn as_socket(&self) -> Result<&SocketFile>;
 }
 
 impl AsSocket for FileRef {
-    fn as_socket(&self) -> Result<&SocketFile, Error> {
+    fn as_socket(&self) -> Result<&SocketFile> {
         self.as_any()
             .downcast_ref::<SocketFile>()
-            .ok_or(Error::new(Errno::EBADF, "not a socket"))
+            .ok_or_else(|| errno!(EBADF, "not a socket"))
     }
 }

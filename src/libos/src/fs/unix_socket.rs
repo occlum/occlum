@@ -11,25 +11,25 @@ pub struct UnixSocketFile {
 }
 
 impl File for UnixSocketFile {
-    fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
+    fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let mut inner = self.inner.lock().unwrap();
         inner.read(buf)
     }
 
-    fn write(&self, buf: &[u8]) -> Result<usize, Error> {
+    fn write(&self, buf: &[u8]) -> Result<usize> {
         let mut inner = self.inner.lock().unwrap();
         inner.write(buf)
     }
 
-    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
         self.read(buf)
     }
 
-    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize, Error> {
+    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         self.write(buf)
     }
 
-    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
         let mut inner = self.inner.lock().unwrap();
         let mut total_len = 0;
         for buf in bufs {
@@ -44,7 +44,7 @@ impl File for UnixSocketFile {
         Ok(total_len)
     }
 
-    fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
         let mut inner = self.inner.lock().unwrap();
         let mut total_len = 0;
         for buf in bufs {
@@ -59,11 +59,11 @@ impl File for UnixSocketFile {
         Ok(total_len)
     }
 
-    fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
-        errno!(ESPIPE, "UnixSocket does not support seek")
+    fn seek(&self, pos: SeekFrom) -> Result<off_t> {
+        return_errno!(ESPIPE, "UnixSocket does not support seek")
     }
 
-    fn metadata(&self) -> Result<Metadata, Error> {
+    fn metadata(&self) -> Result<Metadata> {
         Ok(Metadata {
             dev: 0,
             inode: 0,
@@ -82,19 +82,19 @@ impl File for UnixSocketFile {
         })
     }
 
-    fn set_len(&self, len: u64) -> Result<(), Error> {
+    fn set_len(&self, len: u64) -> Result<()> {
         unimplemented!()
     }
 
-    fn sync_all(&self) -> Result<(), Error> {
+    fn sync_all(&self) -> Result<()> {
         unimplemented!()
     }
 
-    fn sync_data(&self) -> Result<(), Error> {
+    fn sync_data(&self) -> Result<()> {
         unimplemented!()
     }
 
-    fn read_entry(&self) -> Result<String, Error> {
+    fn read_entry(&self) -> Result<String> {
         unimplemented!()
     }
 
@@ -104,24 +104,24 @@ impl File for UnixSocketFile {
 }
 
 impl UnixSocketFile {
-    pub fn new(socket_type: c_int, protocol: c_int) -> Result<Self, Error> {
+    pub fn new(socket_type: c_int, protocol: c_int) -> Result<Self> {
         let inner = UnixSocket::new(socket_type, protocol)?;
         Ok(UnixSocketFile {
             inner: Mutex::new(inner),
         })
     }
 
-    pub fn bind(&self, path: impl AsRef<str>) -> Result<(), Error> {
+    pub fn bind(&self, path: impl AsRef<str>) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
         inner.bind(path)
     }
 
-    pub fn listen(&self) -> Result<(), Error> {
+    pub fn listen(&self) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
         inner.listen()
     }
 
-    pub fn accept(&self) -> Result<UnixSocketFile, Error> {
+    pub fn accept(&self) -> Result<UnixSocketFile> {
         let mut inner = self.inner.lock().unwrap();
         let new_socket = inner.accept()?;
         Ok(UnixSocketFile {
@@ -129,17 +129,17 @@ impl UnixSocketFile {
         })
     }
 
-    pub fn connect(&self, path: impl AsRef<str>) -> Result<(), Error> {
+    pub fn connect(&self, path: impl AsRef<str>) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
         inner.connect(path)
     }
 
-    pub fn poll(&self) -> Result<(bool, bool, bool), Error> {
+    pub fn poll(&self) -> Result<(bool, bool, bool)> {
         let mut inner = self.inner.lock().unwrap();
         inner.poll()
     }
 
-    pub fn ioctl(&self, cmd: c_int, argp: *mut c_int) -> Result<(), Error> {
+    pub fn ioctl(&self, cmd: c_int, argp: *mut c_int) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
         inner.ioctl(cmd, argp)
     }
@@ -152,14 +152,14 @@ impl Debug for UnixSocketFile {
 }
 
 pub trait AsUnixSocket {
-    fn as_unix_socket(&self) -> Result<&UnixSocketFile, Error>;
+    fn as_unix_socket(&self) -> Result<&UnixSocketFile>;
 }
 
 impl AsUnixSocket for FileRef {
-    fn as_unix_socket(&self) -> Result<&UnixSocketFile, Error> {
+    fn as_unix_socket(&self) -> Result<&UnixSocketFile> {
         self.as_any()
             .downcast_ref::<UnixSocketFile>()
-            .ok_or(Error::new(Errno::EBADF, "not a unix socket"))
+            .ok_or_else(|| errno!(EBADF, "not a unix socket"))
     }
 }
 
@@ -176,38 +176,38 @@ enum Status {
 
 impl UnixSocket {
     /// C/S 1: Create a new unix socket
-    pub fn new(socket_type: c_int, protocol: c_int) -> Result<Self, Error> {
+    pub fn new(socket_type: c_int, protocol: c_int) -> Result<Self> {
         if socket_type == libc::SOCK_STREAM && protocol == 0 {
             Ok(UnixSocket {
                 obj: None,
                 status: Status::None,
             })
         } else {
-            errno!(ENOSYS, "unimplemented unix socket type")
+            return_errno!(ENOSYS, "unimplemented unix socket type")
         }
     }
 
     /// Server 2: Bind the socket to a file system path
-    pub fn bind(&mut self, path: impl AsRef<str>) -> Result<(), Error> {
+    pub fn bind(&mut self, path: impl AsRef<str>) -> Result<()> {
         // TODO: check permission
         if self.obj.is_some() {
-            return errno!(EINVAL, "The socket is already bound to an address.");
+            return_errno!(EINVAL, "The socket is already bound to an address.");
         }
         self.obj = Some(UnixSocketObject::create(path)?);
         Ok(())
     }
 
     /// Server 3: Listen to a socket
-    pub fn listen(&mut self) -> Result<(), Error> {
+    pub fn listen(&mut self) -> Result<()> {
         self.status = Status::Listening;
         Ok(())
     }
 
     /// Server 4: Accept a connection on listening.
-    pub fn accept(&mut self) -> Result<UnixSocket, Error> {
+    pub fn accept(&mut self) -> Result<UnixSocket> {
         match self.status {
             Status::Listening => {}
-            _ => return errno!(EINVAL, "unix socket is not listening"),
+            _ => return_errno!(EINVAL, "unix socket is not listening"),
         };
         // FIXME: Block. Now spin loop.
         let socket = loop {
@@ -220,12 +220,12 @@ impl UnixSocket {
     }
 
     /// Client 2: Connect to a path
-    pub fn connect(&mut self, path: impl AsRef<str>) -> Result<(), Error> {
+    pub fn connect(&mut self, path: impl AsRef<str>) -> Result<()> {
         if let Status::Listening = self.status {
-            return errno!(EINVAL, "unix socket is listening?");
+            return_errno!(EINVAL, "unix socket is listening?");
         }
-        let obj =
-            UnixSocketObject::get(path).ok_or(Error::new(EINVAL, "unix socket path not found"))?;
+        let obj = UnixSocketObject::get(path)
+            .ok_or_else(|| errno!(EINVAL, "unix socket path not found"))?;
         let (channel1, channel2) = Channel::new_pair();
         self.status = Status::Connected(channel1);
         obj.push(UnixSocket {
@@ -235,15 +235,15 @@ impl UnixSocket {
         Ok(())
     }
 
-    pub fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
         self.channel()?.reader.read(buf)
     }
 
-    pub fn write(&self, buf: &[u8]) -> Result<usize, Error> {
+    pub fn write(&self, buf: &[u8]) -> Result<usize> {
         self.channel()?.writer.write(buf)
     }
 
-    pub fn poll(&self) -> Result<(bool, bool, bool), Error> {
+    pub fn poll(&self) -> Result<(bool, bool, bool)> {
         // (read, write, error)
         let channel = self.channel()?;
         let r = channel.reader.can_read();
@@ -251,7 +251,7 @@ impl UnixSocket {
         Ok((r, w, false))
     }
 
-    pub fn ioctl(&self, cmd: c_int, argp: *mut c_int) -> Result<(), Error> {
+    pub fn ioctl(&self, cmd: c_int, argp: *mut c_int) -> Result<()> {
         const FIONREAD: c_int = 0x541B; // Get the number of bytes to read
         if cmd == FIONREAD {
             let bytes_to_read = self.channel()?.reader.bytes_to_read();
@@ -261,15 +261,15 @@ impl UnixSocket {
             Ok(())
         } else {
             warn!("ioctl for unix socket is unimplemented");
-            errno!(ENOSYS, "ioctl for unix socket is unimplemented")
+            return_errno!(ENOSYS, "ioctl for unix socket is unimplemented")
         }
     }
 
-    fn channel(&self) -> Result<&Channel, Error> {
+    fn channel(&self) -> Result<&Channel> {
         if let Status::Connected(channel) = &self.status {
             Ok(channel)
         } else {
-            errno!(EBADF, "UnixSocket is not connected")
+            return_errno!(EBADF, "UnixSocket is not connected")
         }
     }
 }
@@ -301,10 +301,10 @@ impl UnixSocketObject {
         let mut paths = UNIX_SOCKET_OBJS.lock().unwrap();
         paths.get(path.as_ref()).map(|obj| obj.clone())
     }
-    fn create(path: impl AsRef<str>) -> Result<Arc<Self>, Error> {
+    fn create(path: impl AsRef<str>) -> Result<Arc<Self>> {
         let mut paths = UNIX_SOCKET_OBJS.lock().unwrap();
         if paths.contains_key(path.as_ref()) {
-            return errno!(EADDRINUSE, "unix socket path already exists");
+            return_errno!(EADDRINUSE, "unix socket path already exists");
         }
         let obj = Arc::new(UnixSocketObject {
             path: path.as_ref().to_string(),

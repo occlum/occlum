@@ -1,10 +1,10 @@
-use prelude::*;
+use super::*;
+
 use process::Process;
 use rcore_fs::vfs::{FileType, FsError, INode, Metadata, Timespec};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::sgxfs as fs_impl;
 use {process, std};
-
-use super::*;
 
 pub use self::access::{do_access, do_faccessat, AccessFlags, AccessModes, AT_FDCWD};
 use self::dev_null::DevNull;
@@ -38,7 +38,7 @@ mod sgx_impl;
 mod socket_file;
 mod unix_socket;
 
-pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
+pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc> {
     let flags = OpenFlags::from_bits_truncate(flags);
     info!(
         "open: path: {:?}, flags: {:?}, mode: {:#o}",
@@ -61,7 +61,7 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc, Error> {
     Ok(fd)
 }
 
-pub fn do_write(fd: FileDesc, buf: &[u8]) -> Result<usize, Error> {
+pub fn do_write(fd: FileDesc, buf: &[u8]) -> Result<usize> {
     info!("write: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
@@ -69,7 +69,7 @@ pub fn do_write(fd: FileDesc, buf: &[u8]) -> Result<usize, Error> {
     file_ref.write(buf)
 }
 
-pub fn do_read(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
+pub fn do_read(fd: FileDesc, buf: &mut [u8]) -> Result<usize> {
     info!("read: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
@@ -77,7 +77,7 @@ pub fn do_read(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
     file_ref.read(buf)
 }
 
-pub fn do_writev(fd: FileDesc, bufs: &[&[u8]]) -> Result<usize, Error> {
+pub fn do_writev(fd: FileDesc, bufs: &[&[u8]]) -> Result<usize> {
     info!("writev: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
@@ -85,7 +85,7 @@ pub fn do_writev(fd: FileDesc, bufs: &[&[u8]]) -> Result<usize, Error> {
     file_ref.writev(bufs)
 }
 
-pub fn do_readv(fd: FileDesc, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
+pub fn do_readv(fd: FileDesc, bufs: &mut [&mut [u8]]) -> Result<usize> {
     info!("readv: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
@@ -93,7 +93,7 @@ pub fn do_readv(fd: FileDesc, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
     file_ref.readv(bufs)
 }
 
-pub fn do_pwrite(fd: FileDesc, buf: &[u8], offset: usize) -> Result<usize, Error> {
+pub fn do_pwrite(fd: FileDesc, buf: &[u8], offset: usize) -> Result<usize> {
     info!("pwrite: fd: {}, offset: {}", fd, offset);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
@@ -101,7 +101,7 @@ pub fn do_pwrite(fd: FileDesc, buf: &[u8], offset: usize) -> Result<usize, Error
     file_ref.write_at(offset, buf)
 }
 
-pub fn do_pread(fd: FileDesc, buf: &mut [u8], offset: usize) -> Result<usize, Error> {
+pub fn do_pread(fd: FileDesc, buf: &mut [u8], offset: usize) -> Result<usize> {
     info!("pread: fd: {}, offset: {}", fd, offset);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
@@ -109,12 +109,12 @@ pub fn do_pread(fd: FileDesc, buf: &mut [u8], offset: usize) -> Result<usize, Er
     file_ref.read_at(offset, buf)
 }
 
-pub fn do_stat(path: &str) -> Result<Stat, Error> {
+pub fn do_stat(path: &str) -> Result<Stat> {
     warn!("stat is partial implemented as lstat");
     do_lstat(path)
 }
 
-pub fn do_fstat(fd: u32) -> Result<Stat, Error> {
+pub fn do_fstat(fd: u32) -> Result<Stat> {
     info!("fstat: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
@@ -124,7 +124,7 @@ pub fn do_fstat(fd: u32) -> Result<Stat, Error> {
     Ok(stat)
 }
 
-pub fn do_lstat(path: &str) -> Result<Stat, Error> {
+pub fn do_lstat(path: &str) -> Result<Stat> {
     info!("lstat: path: {}", path);
 
     let current_ref = process::get_current();
@@ -134,14 +134,14 @@ pub fn do_lstat(path: &str) -> Result<Stat, Error> {
     Ok(stat)
 }
 
-pub fn do_lseek(fd: FileDesc, offset: SeekFrom) -> Result<off_t, Error> {
+pub fn do_lseek(fd: FileDesc, offset: SeekFrom) -> Result<off_t> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
     file_ref.seek(offset)
 }
 
-pub fn do_fsync(fd: FileDesc) -> Result<(), Error> {
+pub fn do_fsync(fd: FileDesc) -> Result<()> {
     info!("fsync: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
@@ -150,7 +150,7 @@ pub fn do_fsync(fd: FileDesc) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn do_fdatasync(fd: FileDesc) -> Result<(), Error> {
+pub fn do_fdatasync(fd: FileDesc) -> Result<()> {
     info!("fdatasync: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
@@ -159,7 +159,7 @@ pub fn do_fdatasync(fd: FileDesc) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn do_truncate(path: &str, len: usize) -> Result<(), Error> {
+pub fn do_truncate(path: &str, len: usize) -> Result<()> {
     info!("truncate: path: {:?}, len: {}", path, len);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
@@ -167,7 +167,7 @@ pub fn do_truncate(path: &str, len: usize) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn do_ftruncate(fd: FileDesc, len: usize) -> Result<(), Error> {
+pub fn do_ftruncate(fd: FileDesc, len: usize) -> Result<()> {
     info!("ftruncate: fd: {}, len: {}", fd, len);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
@@ -176,7 +176,7 @@ pub fn do_ftruncate(fd: FileDesc, len: usize) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn do_getdents64(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
+pub fn do_getdents64(fd: FileDesc, buf: &mut [u8]) -> Result<usize> {
     info!(
         "getdents64: fd: {}, buf: {:?}, buf_size: {}",
         fd,
@@ -188,24 +188,30 @@ pub fn do_getdents64(fd: FileDesc, buf: &mut [u8]) -> Result<usize, Error> {
     let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
     let info = file_ref.metadata()?;
     if info.type_ != FileType::Dir {
-        return errno!(ENOTDIR, "");
+        return_errno!(ENOTDIR, "");
     }
     let mut writer = unsafe { DirentBufWriter::new(buf) };
     loop {
         let name = match file_ref.read_entry() {
-            Err(e) if e.errno == ENOENT => break,
-            r => r,
-        }?;
+            Err(e) => {
+                let errno = e.errno();
+                if errno == ENOENT {
+                    break;
+                }
+                return Err(e.cause_err(|_| errno!(errno, "failed to read entry")));
+            }
+            Ok(name) => name,
+        };
         // TODO: get ino from dirent
         let ok = writer.try_write(0, 0, &name);
         if !ok {
-            break;
+            return_errno!(EINVAL, "the given buffer is too small");
         }
     }
     Ok(writer.written_size)
 }
 
-pub fn do_close(fd: FileDesc) -> Result<(), Error> {
+pub fn do_close(fd: FileDesc) -> Result<()> {
     info!("close: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
@@ -215,7 +221,7 @@ pub fn do_close(fd: FileDesc) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2], Error> {
+pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2]> {
     info!("pipe2: flags: {:#x}", flags);
     let flags = OpenFlags::from_bits_truncate(flags);
     let current_ref = process::get_current();
@@ -231,7 +237,7 @@ pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2], Error> {
     Ok([reader_fd, writer_fd])
 }
 
-pub fn do_dup(old_fd: FileDesc) -> Result<FileDesc, Error> {
+pub fn do_dup(old_fd: FileDesc) -> Result<FileDesc> {
     let current_ref = process::get_current();
     let current = current_ref.lock().unwrap();
     let file_table_ref = current.get_files();
@@ -241,7 +247,7 @@ pub fn do_dup(old_fd: FileDesc) -> Result<FileDesc, Error> {
     Ok(new_fd)
 }
 
-pub fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<FileDesc, Error> {
+pub fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<FileDesc> {
     let current_ref = process::get_current();
     let current = current_ref.lock().unwrap();
     let file_table_ref = current.get_files();
@@ -253,7 +259,7 @@ pub fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<FileDesc, Error> {
     Ok(new_fd)
 }
 
-pub fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<FileDesc, Error> {
+pub fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<FileDesc> {
     let flags = OpenFlags::from_bits_truncate(flags);
     let current_ref = process::get_current();
     let current = current_ref.lock().unwrap();
@@ -261,20 +267,20 @@ pub fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<FileDes
     let mut file_table = file_table_ref.lock().unwrap();
     let file = file_table.get(old_fd)?;
     if old_fd == new_fd {
-        return errno!(EINVAL, "old_fd must not be equal to new_fd");
+        return_errno!(EINVAL, "old_fd must not be equal to new_fd");
     }
     let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
     file_table.put_at(new_fd, file, close_on_spawn);
     Ok(new_fd)
 }
 
-pub fn do_sync() -> Result<(), Error> {
+pub fn do_sync() -> Result<()> {
     info!("sync:");
     ROOT_INODE.fs().sync()?;
     Ok(())
 }
 
-pub fn do_chdir(path: &str) -> Result<(), Error> {
+pub fn do_chdir(path: &str) -> Result<()> {
     let current_ref = process::get_current();
     let mut current_process = current_ref.lock().unwrap();
     info!("chdir: path: {:?}", path);
@@ -282,13 +288,13 @@ pub fn do_chdir(path: &str) -> Result<(), Error> {
     let inode = current_process.lookup_inode(path)?;
     let info = inode.metadata()?;
     if info.type_ != FileType::Dir {
-        return errno!(ENOTDIR, "");
+        return_errno!(ENOTDIR, "");
     }
     current_process.change_cwd(path);
     Ok(())
 }
 
-pub fn do_rename(oldpath: &str, newpath: &str) -> Result<(), Error> {
+pub fn do_rename(oldpath: &str, newpath: &str) -> Result<()> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     info!("rename: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
@@ -301,7 +307,7 @@ pub fn do_rename(oldpath: &str, newpath: &str) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn do_mkdir(path: &str, mode: usize) -> Result<(), Error> {
+pub fn do_mkdir(path: &str, mode: usize) -> Result<()> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     // TODO: check pathname
@@ -310,16 +316,16 @@ pub fn do_mkdir(path: &str, mode: usize) -> Result<(), Error> {
     let (dir_path, file_name) = split_path(&path);
     let inode = current_process.lookup_inode(dir_path)?;
     if inode.find(file_name).is_ok() {
-        return errno!(EEXIST, "");
+        return_errno!(EEXIST, "");
     }
     if !inode.allow_write()? {
-        return errno!(EPERM, "dir cannot be written");
+        return_errno!(EPERM, "dir cannot be written");
     }
     inode.create(file_name, FileType::Dir, mode as u32)?;
     Ok(())
 }
 
-pub fn do_rmdir(path: &str) -> Result<(), Error> {
+pub fn do_rmdir(path: &str) -> Result<()> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     info!("rmdir: path: {:?}", path);
@@ -328,13 +334,13 @@ pub fn do_rmdir(path: &str) -> Result<(), Error> {
     let dir_inode = current_process.lookup_inode(dir_path)?;
     let file_inode = dir_inode.find(file_name)?;
     if file_inode.metadata()?.type_ != FileType::Dir {
-        return errno!(ENOTDIR, "rmdir on not directory");
+        return_errno!(ENOTDIR, "rmdir on not directory");
     }
     dir_inode.unlink(file_name)?;
     Ok(())
 }
 
-pub fn do_link(oldpath: &str, newpath: &str) -> Result<(), Error> {
+pub fn do_link(oldpath: &str, newpath: &str) -> Result<()> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     info!("link: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
@@ -346,7 +352,7 @@ pub fn do_link(oldpath: &str, newpath: &str) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn do_unlink(path: &str) -> Result<(), Error> {
+pub fn do_unlink(path: &str) -> Result<()> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     info!("unlink: path: {:?}", path);
@@ -355,7 +361,7 @@ pub fn do_unlink(path: &str) -> Result<(), Error> {
     let dir_inode = current_process.lookup_inode(dir_path)?;
     let file_inode = dir_inode.find(file_name)?;
     if file_inode.metadata()?.type_ == FileType::Dir {
-        return errno!(EISDIR, "unlink on directory");
+        return_errno!(EISDIR, "unlink on directory");
     }
     dir_inode.unlink(file_name)?;
     Ok(())
@@ -366,7 +372,7 @@ pub fn do_sendfile(
     in_fd: FileDesc,
     offset: Option<off_t>,
     count: usize,
-) -> Result<(usize, usize), Error> {
+) -> Result<(usize, usize)> {
     // (len, offset)
     info!(
         "sendfile: out: {}, in: {}, offset: {:?}, count: {}",
@@ -400,7 +406,7 @@ pub fn do_sendfile(
         while bytes_written < read_len {
             let write_len = out_file.write(&buffer[bytes_written..])?;
             if write_len == 0 {
-                return errno!(EBADF, "sendfile write return 0");
+                return_errno!(EBADF, "sendfile write return 0");
             }
             bytes_written += write_len;
         }
@@ -418,7 +424,7 @@ extern "C" {
 
 impl Process {
     /// Open a file on the process. But DO NOT add it to file table.
-    pub fn open_file(&self, path: &str, flags: OpenFlags, mode: u32) -> Result<Box<File>, Error> {
+    pub fn open_file(&self, path: &str, flags: OpenFlags, mode: u32) -> Result<Box<File>> {
         if path == "/dev/null" {
             return Ok(Box::new(DevNull));
         }
@@ -434,13 +440,13 @@ impl Process {
             match dir_inode.find(file_name) {
                 Ok(file_inode) => {
                     if flags.contains(OpenFlags::EXCLUSIVE) {
-                        return errno!(EEXIST, "file exists");
+                        return_errno!(EEXIST, "file exists");
                     }
                     file_inode
                 }
                 Err(FsError::EntryNotFound) => {
                     if !dir_inode.allow_write()? {
-                        return errno!(EPERM, "file cannot be created");
+                        return_errno!(EPERM, "file cannot be created");
                     }
                     dir_inode.create(file_name, FileType::File, mode)?
                 }
@@ -453,7 +459,7 @@ impl Process {
     }
 
     /// Lookup INode from the cwd of the process
-    pub fn lookup_inode(&self, path: &str) -> Result<Arc<INode>, Error> {
+    pub fn lookup_inode(&self, path: &str) -> Result<Arc<INode>> {
         debug!("lookup_inode: cwd: {:?}, path: {:?}", self.get_cwd(), path);
         if path.len() > 0 && path.as_bytes()[0] == b'/' {
             // absolute path
@@ -727,7 +733,7 @@ pub enum FcntlCmd {
 
 impl FcntlCmd {
     #[deny(unreachable_patterns)]
-    pub fn from_raw(cmd: u32, arg: u64) -> Result<FcntlCmd, Error> {
+    pub fn from_raw(cmd: u32, arg: u64) -> Result<FcntlCmd> {
         Ok(match cmd as c_int {
             libc::F_DUPFD => FcntlCmd::DupFd(arg as FileDesc),
             libc::F_DUPFD_CLOEXEC => FcntlCmd::DupFdCloexec(arg as FileDesc),
@@ -735,12 +741,12 @@ impl FcntlCmd {
             libc::F_SETFD => FcntlCmd::SetFd(arg as u32),
             libc::F_GETFL => FcntlCmd::GetFl(),
             libc::F_SETFL => FcntlCmd::SetFl(arg as u32),
-            _ => return errno!(EINVAL, "invalid command"),
+            _ => return_errno!(EINVAL, "invalid command"),
         })
     }
 }
 
-pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize, Error> {
+pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize> {
     info!("fcntl: fd: {:?}, cmd: {:?}", &fd, cmd);
     let current_ref = process::get_current();
     let mut current = current_ref.lock().unwrap();
@@ -796,7 +802,7 @@ pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize, Error> {
     })
 }
 
-pub fn do_readlink(path: &str, buf: &mut [u8]) -> Result<usize, Error> {
+pub fn do_readlink(path: &str, buf: &mut [u8]) -> Result<usize> {
     info!("readlink: path: {:?}", path);
     match path {
         "/proc/self/exe" => {
@@ -810,7 +816,7 @@ pub fn do_readlink(path: &str, buf: &mut [u8]) -> Result<usize, Error> {
         }
         _ => {
             // TODO: support symbolic links
-            errno!(EINVAL, "not a symbolic link")
+            return_errno!(EINVAL, "not a symbolic link")
         }
     }
 }

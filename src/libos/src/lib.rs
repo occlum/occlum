@@ -37,11 +37,18 @@ use std::backtrace::{self, PrintFormat};
 use std::ffi::CStr; // a borrowed C string
 use std::panic;
 
+use error::*;
+use prelude::*;
+
+// Override prelude::Result with error::Result
+use error::Result;
+
 #[macro_use]
 mod prelude;
+#[macro_use]
+mod error;
 mod config;
 mod entry;
-mod errno;
 mod exception;
 mod fs;
 mod misc;
@@ -50,8 +57,6 @@ mod syscall;
 mod time;
 mod util;
 mod vm;
-
-use prelude::*;
 
 // Export system calls
 pub use syscall::*;

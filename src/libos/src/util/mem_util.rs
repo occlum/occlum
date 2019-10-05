@@ -8,27 +8,27 @@ pub mod from_user {
     use super::*;
 
     /// Check the user pointer is within the readable memory range of the user process
-    pub fn check_ptr<T>(user_ptr: *const T) -> Result<(), Error> {
+    pub fn check_ptr<T>(user_ptr: *const T) -> Result<()> {
         Ok(())
     }
 
     /// Check the mutable user pointer is within the writable memory of the user process
-    pub fn check_mut_ptr<T>(user_ptr: *mut T) -> Result<(), Error> {
+    pub fn check_mut_ptr<T>(user_ptr: *mut T) -> Result<()> {
         Ok(())
     }
 
     /// Check the readonly array is within the readable memory of the user process
-    pub fn check_array<T>(user_buf: *const T, count: usize) -> Result<(), Error> {
+    pub fn check_array<T>(user_buf: *const T, count: usize) -> Result<()> {
         Ok(())
     }
 
     /// Check the mutable array is within the writable memory of the user process
-    pub fn check_mut_array<T>(user_buf: *mut T, count: usize) -> Result<(), Error> {
+    pub fn check_mut_array<T>(user_buf: *mut T, count: usize) -> Result<()> {
         Ok(())
     }
 
     /// Clone a C-string from the user process safely
-    pub fn clone_cstring_safely(out_ptr: *const c_char) -> Result<CString, Error> {
+    pub fn clone_cstring_safely(out_ptr: *const c_char) -> Result<CString> {
         check_ptr(out_ptr)?;
         // TODO: using from_ptr directly is not safe
         let cstr = unsafe { CStr::from_ptr(out_ptr) };
@@ -39,7 +39,7 @@ pub mod from_user {
     /// Clone a C-string array (const char*[]) from the user process safely
     ///
     /// This array must be ended with a NULL pointer.
-    pub fn clone_cstrings_safely(user_ptr: *const *const c_char) -> Result<Vec<CString>, Error> {
+    pub fn clone_cstrings_safely(user_ptr: *const *const c_char) -> Result<Vec<CString>> {
         let mut cstrings = Vec::new();
         if user_ptr == ptr::null() {
             return Ok(cstrings);
@@ -70,17 +70,20 @@ pub mod from_untrusted {
     use super::*;
 
     /// Check the untrusted pointer is outside the enclave
-    pub fn check_ptr<T>(out_ptr: *const T) -> Result<(), Error> {
+    // TODO: implement this!
+    pub fn check_ptr<T>(out_ptr: *const T) -> Result<()> {
         Ok(())
     }
 
     /// Check the untrusted array is outside the enclave
-    pub fn check_array<T>(out_ptr: *const T, count: usize) -> Result<(), Error> {
+    // TODO: implement this!
+    pub fn check_array<T>(out_ptr: *const T, count: usize) -> Result<()> {
         Ok(())
     }
 
     /// Clone a C-string from outside the enclave
-    pub fn clone_cstring_safely(out_ptr: *const c_char) -> Result<CString, Error> {
+    // TODO: strict check!
+    pub fn clone_cstring_safely(out_ptr: *const c_char) -> Result<CString> {
         check_ptr(out_ptr)?;
         // TODO: using from_ptr directly is not safe
         let cstr = unsafe { CStr::from_ptr(out_ptr) };
@@ -91,7 +94,8 @@ pub mod from_untrusted {
     /// Clone a C-string array (const char*[]) from outside the enclave
     ///
     /// This array must be ended with a NULL pointer.
-    pub fn clone_cstrings_safely(out_ptr: *const *const c_char) -> Result<Vec<CString>, Error> {
+    // TODO: strict check!
+    pub fn clone_cstrings_safely(out_ptr: *const *const c_char) -> Result<Vec<CString>> {
         let mut cstrings = Vec::new();
         if out_ptr == ptr::null() {
             return Ok(cstrings);

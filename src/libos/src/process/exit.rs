@@ -64,7 +64,7 @@ pub fn do_exit(exit_status: i32) {
     });
 }
 
-pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32) -> Result<pid_t, Error> {
+pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32) -> Result<pid_t> {
     let current_ref = get_current();
     let waiter = {
         let mut current = current_ref.lock().unwrap();
@@ -91,7 +91,7 @@ pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32) -> Res
             any_child_to_wait_for = true;
         }
         if !any_child_to_wait_for {
-            return errno!(ECHILD, "No such child");
+            return_errno!(ECHILD, "No such child");
         }
 
         let waiter = Waiter::new(child_filter);

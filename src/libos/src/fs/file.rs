@@ -5,18 +5,18 @@ use std::fmt;
 use std::io::SeekFrom;
 
 pub trait File: Debug + Sync + Send + Any {
-    fn read(&self, buf: &mut [u8]) -> Result<usize, Error>;
-    fn write(&self, buf: &[u8]) -> Result<usize, Error>;
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error>;
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error>;
-    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error>;
-    fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error>;
-    fn seek(&self, pos: SeekFrom) -> Result<off_t, Error>;
-    fn metadata(&self) -> Result<Metadata, Error>;
-    fn set_len(&self, len: u64) -> Result<(), Error>;
-    fn sync_all(&self) -> Result<(), Error>;
-    fn sync_data(&self) -> Result<(), Error>;
-    fn read_entry(&self) -> Result<String, Error>;
+    fn read(&self, buf: &mut [u8]) -> Result<usize>;
+    fn write(&self, buf: &[u8]) -> Result<usize>;
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize>;
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize>;
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize>;
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize>;
+    fn seek(&self, pos: SeekFrom) -> Result<off_t>;
+    fn metadata(&self) -> Result<Metadata>;
+    fn set_len(&self, len: u64) -> Result<()>;
+    fn sync_all(&self) -> Result<()>;
+    fn sync_data(&self) -> Result<()>;
+    fn read_entry(&self) -> Result<String>;
     fn as_any(&self) -> &Any;
 }
 
@@ -34,9 +34,9 @@ impl SgxFile {
         is_readable: bool,
         is_writable: bool,
         is_append: bool,
-    ) -> Result<SgxFile, Error> {
+    ) -> Result<SgxFile> {
         if !is_readable && !is_writable {
-            return errno!(EINVAL, "Invalid permissions");
+            return_errno!(EINVAL, "Invalid permissions");
         }
 
         Ok(SgxFile {
@@ -52,67 +52,67 @@ impl SgxFile {
 }
 
 impl File for SgxFile {
-    fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
+    fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let mut inner_guard = self.inner.lock().unwrap();
         let inner = inner_guard.borrow_mut();
         inner.read(buf)
     }
 
-    fn write(&self, buf: &[u8]) -> Result<usize, Error> {
+    fn write(&self, buf: &[u8]) -> Result<usize> {
         let mut inner_guard = self.inner.lock().unwrap();
         let inner = inner_guard.borrow_mut();
         inner.write(buf)
     }
 
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         let mut inner_guard = self.inner.lock().unwrap();
         let inner = inner_guard.borrow_mut();
         inner.seek(SeekFrom::Start(offset as u64))?;
         inner.read(buf)
     }
 
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error> {
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
         let mut inner_guard = self.inner.lock().unwrap();
         let inner = inner_guard.borrow_mut();
         inner.seek(SeekFrom::Start(offset as u64))?;
         inner.write(buf)
     }
 
-    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
         let mut inner_guard = self.inner.lock().unwrap();
         let inner = inner_guard.borrow_mut();
         inner.readv(bufs)
     }
 
-    fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
         let mut inner_guard = self.inner.lock().unwrap();
         let inner = inner_guard.borrow_mut();
         inner.writev(bufs)
     }
 
-    fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
+    fn seek(&self, pos: SeekFrom) -> Result<off_t> {
         let mut inner_guard = self.inner.lock().unwrap();
         let inner = inner_guard.borrow_mut();
         inner.seek(pos)
     }
 
-    fn metadata(&self) -> Result<Metadata, Error> {
+    fn metadata(&self) -> Result<Metadata> {
         unimplemented!()
     }
 
-    fn set_len(&self, len: u64) -> Result<(), Error> {
+    fn set_len(&self, len: u64) -> Result<()> {
         unimplemented!()
     }
 
-    fn sync_all(&self) -> Result<(), Error> {
+    fn sync_all(&self) -> Result<()> {
         unimplemented!()
     }
 
-    fn sync_data(&self) -> Result<(), Error> {
+    fn sync_data(&self) -> Result<()> {
         unimplemented!()
     }
 
-    fn read_entry(&self) -> Result<String, Error> {
+    fn read_entry(&self) -> Result<String> {
         unimplemented!()
     }
 
@@ -133,9 +133,9 @@ struct SgxFileInner {
 }
 
 impl SgxFileInner {
-    pub fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
+    pub fn write(&mut self, buf: &[u8]) -> Result<usize> {
         if !self.is_writable {
-            return errno!(EINVAL, "File not writable");
+            return_errno!(EINVAL, "File not writable");
         }
 
         let mut file_guard = self.file.lock().unwrap();
@@ -147,13 +147,9 @@ impl SgxFileInner {
             SeekFrom::End(0)
         };
         // TODO: recover from error
-        file.seek(seek_pos)
-            .map_err(|e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
+        file.seek(seek_pos).map_err(|e| errno!(e))?;
 
-        let write_len = {
-            file.write(buf)
-                .map_err(|e| Error::new(Errno::EINVAL, "Failed to write"))?
-        };
+        let write_len = { file.write(buf).map_err(|e| errno!(e))? };
 
         if !self.is_append {
             self.pos += write_len;
@@ -161,28 +157,24 @@ impl SgxFileInner {
         Ok(write_len)
     }
 
-    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         if !self.is_readable {
-            return errno!(EINVAL, "File not readable");
+            return_errno!(EINVAL, "File not readable");
         }
 
         let mut file_guard = self.file.lock().unwrap();
         let file = file_guard.borrow_mut();
 
         let seek_pos = SeekFrom::Start(self.pos as u64);
-        file.seek(seek_pos)
-            .map_err(|e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
+        file.seek(seek_pos).map_err(|e| errno!(e))?;
 
-        let read_len = {
-            file.read(buf)
-                .map_err(|e| Error::new(Errno::EINVAL, "Failed to write"))?
-        };
+        let read_len = { file.read(buf).map_err(|e| errno!(e))? };
 
         self.pos += read_len;
         Ok(read_len)
     }
 
-    pub fn seek(&mut self, pos: SeekFrom) -> Result<off_t, Error> {
+    pub fn seek(&mut self, pos: SeekFrom) -> Result<off_t> {
         let mut file_guard = self.file.lock().unwrap();
         let file = file_guard.borrow_mut();
 
@@ -196,23 +188,20 @@ impl SgxFileInner {
                     let backward_offset = (-relative_offset) as usize;
                     if self.pos < backward_offset {
                         // underflow
-                        return errno!(EINVAL, "Invalid seek position");
+                        return_errno!(EINVAL, "Invalid seek position");
                     }
                     SeekFrom::Start((self.pos - backward_offset) as u64)
                 }
             }
         };
 
-        self.pos = file
-            .seek(pos)
-            .map_err(|e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?
-            as usize;
+        self.pos = file.seek(pos).map_err(|e| errno!(e))? as usize;
         Ok(self.pos as off_t)
     }
 
-    pub fn writev(&mut self, bufs: &[&[u8]]) -> Result<usize, Error> {
+    pub fn writev(&mut self, bufs: &[&[u8]]) -> Result<usize> {
         if !self.is_writable {
-            return errno!(EINVAL, "File not writable");
+            return_errno!(EINVAL, "File not writable");
         }
 
         let mut file_guard = self.file.lock().unwrap();
@@ -223,8 +212,7 @@ impl SgxFileInner {
         } else {
             SeekFrom::End(0)
         };
-        file.seek(seek_pos)
-            .map_err(|e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
+        file.seek(seek_pos).map_err(|e| errno!(e))?;
 
         let mut total_bytes = 0;
         for buf in bufs {
@@ -238,7 +226,7 @@ impl SgxFileInner {
                 Err(e) => {
                     match total_bytes {
                         // a complete failure
-                        0 => return errno!(EINVAL, "Failed to write"),
+                        0 => return_errno!(EINVAL, "Failed to write"),
                         // a partially failure
                         _ => break,
                     }
@@ -250,17 +238,16 @@ impl SgxFileInner {
         Ok(total_bytes)
     }
 
-    fn readv(&mut self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
+    fn readv(&mut self, bufs: &mut [&mut [u8]]) -> Result<usize> {
         if !self.is_readable {
-            return errno!(EINVAL, "File not readable");
+            return_errno!(EINVAL, "File not readable");
         }
 
         let mut file_guard = self.file.lock().unwrap();
         let file = file_guard.borrow_mut();
 
         let seek_pos = SeekFrom::Start(self.pos as u64);
-        file.seek(seek_pos)
-            .map_err(|e| Error::new(Errno::EINVAL, "Failed to seek to a position"))?;
+        file.seek(seek_pos).map_err(|e| errno!(e))?;
 
         let mut total_bytes = 0;
         for buf in bufs {
@@ -274,7 +261,7 @@ impl SgxFileInner {
                 Err(e) => {
                     match total_bytes {
                         // a complete failure
-                        0 => return errno!(EINVAL, "Failed to write"),
+                        0 => return_errno!(EINVAL, "Failed to write"),
                         // a partially failure
                         _ => break,
                     }
@@ -309,33 +296,28 @@ impl StdoutFile {
 }
 
 impl File for StdoutFile {
-    fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
-        errno!(EBADF, "Stdout does not support read")
+    fn read(&self, buf: &mut [u8]) -> Result<usize> {
+        return_errno!(EBADF, "Stdout does not support read")
     }
 
-    fn write(&self, buf: &[u8]) -> Result<usize, Error> {
-        let write_len = {
-            self.inner
-                .lock()
-                .write(buf)
-                .map_err(|e| (Errno::EINVAL, "Failed to write"))?
-        };
+    fn write(&self, buf: &[u8]) -> Result<usize> {
+        let write_len = { self.inner.lock().write(buf).map_err(|e| errno!(e))? };
         Ok(write_len)
     }
 
-    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
         self.read(buf)
     }
 
-    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize, Error> {
+    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         self.write(buf)
     }
 
-    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
-        errno!(EBADF, "Stdout does not support read")
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
+        return_errno!(EBADF, "Stdout does not support read")
     }
 
-    fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
         let mut guard = self.inner.lock();
         let mut total_bytes = 0;
         for buf in bufs {
@@ -349,7 +331,7 @@ impl File for StdoutFile {
                 Err(e) => {
                     match total_bytes {
                         // a complete failure
-                        0 => return errno!(EINVAL, "Failed to write"),
+                        0 => return_errno!(EINVAL, "Failed to write"),
                         // a partially failure
                         _ => break,
                     }
@@ -359,11 +341,11 @@ impl File for StdoutFile {
         Ok(total_bytes)
     }
 
-    fn seek(&self, seek_pos: SeekFrom) -> Result<off_t, Error> {
-        errno!(ESPIPE, "Stdout does not support seek")
+    fn seek(&self, seek_pos: SeekFrom) -> Result<off_t> {
+        return_errno!(ESPIPE, "Stdout does not support seek")
     }
 
-    fn metadata(&self) -> Result<Metadata, Error> {
+    fn metadata(&self) -> Result<Metadata> {
         Ok(Metadata {
             dev: 0,
             inode: 0,
@@ -382,21 +364,21 @@ impl File for StdoutFile {
         })
     }
 
-    fn set_len(&self, _len: u64) -> Result<(), Error> {
-        errno!(EINVAL, "Stdout does not support set_len")
+    fn set_len(&self, _len: u64) -> Result<()> {
+        return_errno!(EINVAL, "Stdout does not support set_len")
     }
 
-    fn sync_all(&self) -> Result<(), Error> {
+    fn sync_all(&self) -> Result<()> {
         self.sync_data()
     }
 
-    fn sync_data(&self) -> Result<(), Error> {
+    fn sync_data(&self) -> Result<()> {
         self.inner.lock().flush()?;
         Ok(())
     }
 
-    fn read_entry(&self) -> Result<String, Error> {
-        errno!(ENOTDIR, "Stdout does not support read_entry")
+    fn read_entry(&self) -> Result<String> {
+        return_errno!(ENOTDIR, "Stdout does not support read_entry")
     }
 
     fn as_any(&self) -> &Any {
@@ -426,29 +408,24 @@ impl StdinFile {
 }
 
 impl File for StdinFile {
-    fn read(&self, buf: &mut [u8]) -> Result<usize, Error> {
-        let read_len = {
-            self.inner
-                .lock()
-                .read(buf)
-                .map_err(|e| (Errno::EINVAL, "Failed to read"))?
-        };
+    fn read(&self, buf: &mut [u8]) -> Result<usize> {
+        let read_len = { self.inner.lock().read(buf).map_err(|e| errno!(e))? };
         Ok(read_len)
     }
 
-    fn write(&self, buf: &[u8]) -> Result<usize, Error> {
-        errno!(EBADF, "Stdin does not support write")
+    fn write(&self, buf: &[u8]) -> Result<usize> {
+        return_errno!(EBADF, "Stdin does not support write")
     }
 
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, Error> {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         unimplemented!()
     }
 
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, Error> {
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
         unimplemented!()
     }
 
-    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize, Error> {
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
         let mut guard = self.inner.lock();
         let mut total_bytes = 0;
         for buf in bufs {
@@ -462,7 +439,7 @@ impl File for StdinFile {
                 Err(e) => {
                     match total_bytes {
                         // a complete failure
-                        0 => return errno!(EINVAL, "Failed to write"),
+                        0 => return_errno!(EINVAL, "Failed to write"),
                         // a partially failure
                         _ => break,
                     }
@@ -472,15 +449,15 @@ impl File for StdinFile {
         Ok(total_bytes)
     }
 
-    fn writev(&self, bufs: &[&[u8]]) -> Result<usize, Error> {
-        errno!(EBADF, "Stdin does not support write")
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
+        return_errno!(EBADF, "Stdin does not support write")
     }
 
-    fn seek(&self, pos: SeekFrom) -> Result<off_t, Error> {
-        errno!(ESPIPE, "Stdin does not support seek")
+    fn seek(&self, pos: SeekFrom) -> Result<off_t> {
+        return_errno!(ESPIPE, "Stdin does not support seek")
     }
 
-    fn metadata(&self) -> Result<Metadata, Error> {
+    fn metadata(&self) -> Result<Metadata> {
         Ok(Metadata {
             dev: 0,
             inode: 0,
@@ -499,20 +476,20 @@ impl File for StdinFile {
         })
     }
 
-    fn set_len(&self, _len: u64) -> Result<(), Error> {
-        errno!(EINVAL, "Stdin does not support set_len")
+    fn set_len(&self, _len: u64) -> Result<()> {
+        return_errno!(EINVAL, "Stdin does not support set_len")
     }
 
-    fn sync_all(&self) -> Result<(), Error> {
+    fn sync_all(&self) -> Result<()> {
         self.sync_data()
     }
 
-    fn sync_data(&self) -> Result<(), Error> {
+    fn sync_data(&self) -> Result<()> {
         Ok(())
     }
 
-    fn read_entry(&self) -> Result<String, Error> {
-        errno!(ENOTDIR, "Stdin does not support read_entry")
+    fn read_entry(&self) -> Result<String> {
+        return_errno!(ENOTDIR, "Stdin does not support read_entry")
     }
 
     fn as_any(&self) -> &Any {

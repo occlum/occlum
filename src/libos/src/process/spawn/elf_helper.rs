@@ -13,7 +13,7 @@ pub struct ProgramHeaderInfo {
     pub entry_num: usize,
 }
 
-pub fn get_program_header_info(elf_file: &ElfFile) -> Result<ProgramHeaderInfo, Error> {
+pub fn get_program_header_info(elf_file: &ElfFile) -> Result<ProgramHeaderInfo> {
     let elf_header = &elf_file.header.pt2;
     Ok(ProgramHeaderInfo {
         addr: elf_header.ph_offset() as usize,
@@ -22,37 +22,37 @@ pub fn get_program_header_info(elf_file: &ElfFile) -> Result<ProgramHeaderInfo, 
     })
 }
 
-pub fn print_program_headers(elf_file: &ElfFile) -> Result<(), Error> {
+pub fn print_program_headers(elf_file: &ElfFile) -> Result<()> {
     println!("Program headers:");
     let ph_iter = elf_file.program_iter();
     for sect in ph_iter {
         program::sanity_check(sect, &elf_file)
-            .map_err(|e| (Errno::ENOEXEC, "Sanity check for program header failed"))?;
+            .map_err(|e| errno!(ENOEXEC, "sanity check for program header failed"))?;
         println!("\t{:?}", sect.get_type());
     }
     Ok(())
 }
 
-pub fn print_sections(elf_file: &ElfFile) -> Result<(), Error> {
+pub fn print_sections(elf_file: &ElfFile) -> Result<()> {
     println!("Sections:");
     let mut sect_iter = elf_file.section_iter();
     sect_iter.next(); // Skip the first, dummy section
     for sect in sect_iter {
         sections::sanity_check(sect, &elf_file)
-            .map_err(|e| (Errno::ENOEXEC, "Sanity check for program header failed"))?;
+            .map_err(|e| errno!(ENOEXEC, "sanity check for program header failed"))?;
         let sec_name = sect
             .get_name(&elf_file)
-            .map_err(|e| (Errno::ENOEXEC, "Failed to get section name"))?;
+            .map_err(|e| errno!(ENOEXEC, "failed to get section name"))?;
         println!("\t{}\n{:?}", sec_name, sect);
     }
     Ok(())
 }
 
-pub fn print_rela_plt_section(elf_file: &ElfFile) -> Result<(), Error> {
+pub fn print_rela_plt_section(elf_file: &ElfFile) -> Result<()> {
     let rela_entries = get_rela_entries(elf_file, ".rela.plt")
-        .map_err(|e| (Errno::ENOEXEC, "Failed to get .pltrel entries"))?;
+        .map_err(|e| errno!(ENOEXEC, "failed to get .pltrel entries"))?;
     let dynsym_entries = get_dynsym_entries(elf_file)
-        .map_err(|e| (Errno::ENOEXEC, "Failed to get .dynsym entries"))?;
+        .map_err(|e| errno!(ENOEXEC, "failed to get .dynsym entries"))?;
 
     println!(".rela.plt section:");
     for entry in rela_entries {
@@ -68,15 +68,13 @@ pub fn print_rela_plt_section(elf_file: &ElfFile) -> Result<(), Error> {
         let dynsym_entry = &dynsym_entries[symidx];
         let dynsym_name = dynsym_entry
             .get_name(&elf_file)
-            .map_err(|e| (Errno::ENOEXEC, "Failed to get the name of a dynamic symbol"))?;
+            .map_err(|e| errno!(ENOEXEC, "failed to get the name of a dynamic symbol"))?;
         println!("\t\t{} = {:?}", dynsym_name, dynsym_entry);
     }
     Ok(())
 }
 
-pub fn get_data_program_header<'b, 'a: 'b>(
-    elf_file: &'b ElfFile<'a>,
-) -> Result<ProgramHeader<'a>, Error> {
+pub fn get_data_program_header<'b, 'a: 'b>(elf_file: &'b ElfFile<'a>) -> Result<ProgramHeader<'a>> {
     let mut ph_iter = elf_file.program_iter();
     ph_iter
         .find(|&ph| {
@@ -85,12 +83,10 @@ pub fn get_data_program_header<'b, 'a: 'b>(
                 && ph.flags().is_write()
                 && ph.flags().is_read()
         })
-        .ok_or_else(|| (Errno::ENOEXEC, "Failed to get the data segment").into())
+        .ok_or_else(|| errno!(ENOEXEC, "failed to get the data segment"))
 }
 
-pub fn get_code_program_header<'b, 'a: 'b>(
-    elf_file: &'b ElfFile<'a>,
-) -> Result<ProgramHeader<'a>, Error> {
+pub fn get_code_program_header<'b, 'a: 'b>(elf_file: &'b ElfFile<'a>) -> Result<ProgramHeader<'a>> {
     let mut ph_iter = elf_file.program_iter();
     ph_iter
         .find(|&ph| {
@@ -99,15 +95,15 @@ pub fn get_code_program_header<'b, 'a: 'b>(
                 && !ph.flags().is_write()
                 && ph.flags().is_read()
         })
-        .ok_or_else(|| (Errno::ENOEXEC, "Failed to get the code segment").into())
+        .ok_or_else(|| errno!(ENOEXEC, "failed to get the code segment"))
 }
 
-pub fn get_start_address<'b, 'a: 'b>(elf_file: &'b ElfFile<'a>) -> Result<usize, Error> {
+pub fn get_start_address<'b, 'a: 'b>(elf_file: &'b ElfFile<'a>) -> Result<usize> {
     let elf_header = &elf_file.header.pt2;
     Ok(elf_header.entry_point() as usize)
 }
 
-pub fn get_sym_entries<'b, 'a: 'b>(elf_file: &'b ElfFile<'a>) -> Result<&'a [Entry64], Error> {
+pub fn get_sym_entries<'b, 'a: 'b>(elf_file: &'b ElfFile<'a>) -> Result<&'a [Entry64]> {
     elf_file
         .find_section_by_name(".symtab")
         .and_then(|symtab_section| symtab_section.get_data(&elf_file).ok())
@@ -115,13 +111,13 @@ pub fn get_sym_entries<'b, 'a: 'b>(elf_file: &'b ElfFile<'a>) -> Result<&'a [Ent
             sections::SectionData::SymbolTable64(entries) => Some(entries),
             _ => None,
         })
-        .ok_or_else(|| (Errno::ENOEXEC, "Failed get the symbol entries").into())
+        .ok_or_else(|| errno!(ENOEXEC, "failed get the symbol entries"))
 }
 
 pub fn get_rela_entries<'b, 'a: 'b>(
     elf_file: &'b ElfFile<'a>,
     sec_name: &'b str,
-) -> Result<&'a [Rela<P64>], Error> {
+) -> Result<&'a [Rela<P64>]> {
     elf_file
         .find_section_by_name(sec_name)
         .and_then(|plt_rela_section| plt_rela_section.get_data(&elf_file).ok())
@@ -129,12 +125,10 @@ pub fn get_rela_entries<'b, 'a: 'b>(
             sections::SectionData::Rela64(entries) => Some(entries),
             _ => None,
         })
-        .ok_or_else(|| (Errno::ENOEXEC, "Failed to get .rela.plt entries").into())
+        .ok_or_else(|| errno!(ENOEXEC, "failed to get .rela.plt entries"))
 }
 
-pub fn get_dynsym_entries<'b, 'a: 'b>(
-    elf_file: &'b ElfFile<'a>,
-) -> Result<&'a [DynEntry64], Error> {
+pub fn get_dynsym_entries<'b, 'a: 'b>(elf_file: &'b ElfFile<'a>) -> Result<&'a [DynEntry64]> {
     elf_file
         .find_section_by_name(".dynsym")
         .and_then(|dynamic_section| dynamic_section.get_data(&elf_file).ok())
@@ -142,5 +136,5 @@ pub fn get_dynsym_entries<'b, 'a: 'b>(
             sections::SectionData::DynSymbolTable64(entries) => Some(entries),
             _ => None,
         })
-        .ok_or_else(|| (Errno::ENOEXEC, "Failed to get .dynsym entries").into())
+        .ok_or_else(|| errno!(ENOEXEC, "failed to get .dynsym entries"))
 }

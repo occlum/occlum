@@ -14,13 +14,13 @@ pub fn remove(pid: pid_t) {
     PROCESS_TABLE.lock().unwrap().remove(&pid);
 }
 
-pub fn get(pid: pid_t) -> Result<ProcessRef, Error> {
+pub fn get(pid: pid_t) -> Result<ProcessRef> {
     PROCESS_TABLE
         .lock()
         .unwrap()
         .get(&pid)
         .map(|pr| pr.clone())
-        .ok_or_else(|| Error::new(Errno::ENOENT, "process not found"))
+        .ok_or_else(|| errno!(ENOENT, "process not found"))
 }
 
 static NEXT_PID: AtomicU32 = AtomicU32::new(1);

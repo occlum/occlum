@@ -65,7 +65,7 @@ pub enum resource_t {
 const RLIMIT_COUNT: usize = 15;
 
 impl resource_t {
-    pub fn from_u32(bits: u32) -> Result<resource_t, Error> {
+    pub fn from_u32(bits: u32) -> Result<resource_t> {
         match bits {
             0 => Ok(resource_t::RLIMIT_CPU),
             1 => Ok(resource_t::RLIMIT_FSIZE),
@@ -82,7 +82,7 @@ impl resource_t {
             12 => Ok(resource_t::RLIMIT_MSGQUEUE),
             13 => Ok(resource_t::RLIMIT_NICE),
             14 => Ok(resource_t::RLIMIT_RTPRIO),
-            _ => errno!(EINVAL, "invalid resource"),
+            _ => return_errno!(EINVAL, "invalid resource"),
         }
     }
 }
@@ -92,11 +92,11 @@ pub fn do_prlimit(
     resource: resource_t,
     new_limit: Option<&rlimit_t>,
     old_limit: Option<&mut rlimit_t>,
-) -> Result<(), Error> {
+) -> Result<()> {
     let process_ref = if pid == 0 {
         process::get_current()
     } else {
-        process::get(pid)?
+        process::get(pid).cause_err(|_| errno!(ESRCH, "invalid pid"))?
     };
     let mut process = process_ref.lock().unwrap();
     let rlimits_ref = process.get_rlimits();
@@ -110,10 +110,10 @@ pub fn do_prlimit(
     Ok(())
 }
 
-pub fn do_getrlimit(resource: resource_t, old_limit: &mut rlimit_t) -> Result<(), Error> {
+pub fn do_getrlimit(resource: resource_t, old_limit: &mut rlimit_t) -> Result<()> {
     do_prlimit(0 as pid_t, resource, None, Some(old_limit))
 }
 
-pub fn do_setrlimit(resource: resource_t, new_limit: &rlimit_t) -> Result<(), Error> {
+pub fn do_setrlimit(resource: resource_t, new_limit: &rlimit_t) -> Result<()> {
     do_prlimit(0 as pid_t, resource, Some(new_limit), None)
 }

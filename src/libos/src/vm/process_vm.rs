@@ -41,7 +41,7 @@ impl ProcessVMBuilder {
     impl_setter_for_process_vm_builder!(stack_size);
     impl_setter_for_process_vm_builder!(mmap_size);
 
-    pub fn build(self) -> Result<ProcessVM, Error> {
+    pub fn build(self) -> Result<ProcessVM> {
         self.validate()?;
 
         let code_size = self.code_size;
@@ -111,7 +111,7 @@ impl ProcessVMBuilder {
     }
 
     // TODO: implement this!
-    fn validate(&self) -> Result<(), Error> {
+    fn validate(&self) -> Result<()> {
         Ok(())
     }
 }
@@ -191,16 +191,16 @@ impl ProcessVM {
         self.brk
     }
 
-    pub fn brk(&mut self, new_brk: usize) -> Result<usize, Error> {
+    pub fn brk(&mut self, new_brk: usize) -> Result<usize> {
         let heap_start = self.heap_range.start();
         let heap_end = self.heap_range.end();
 
         if new_brk == 0 {
             return Ok(self.get_brk());
         } else if new_brk < heap_start {
-            return errno!(EINVAL, "New brk address is too low");
+            return_errno!(EINVAL, "New brk address is too low");
         } else if new_brk > heap_end {
-            return errno!(EINVAL, "New brk address is too high");
+            return_errno!(EINVAL, "New brk address is too high");
         }
 
         if self.brk < new_brk {
@@ -219,11 +219,11 @@ impl ProcessVM {
         flags: MMapFlags,
         fd: FileDesc,
         offset: usize,
-    ) -> Result<usize, Error> {
+    ) -> Result<usize> {
         let addr_option = {
             if flags.contains(MMapFlags::MAP_FIXED) {
                 if !self.process_range.range().contains(addr) {
-                    return errno!(EINVAL, "Beyond valid memory range");
+                    return_errno!(EINVAL, "Beyond valid memory range");
                 }
                 VMMapAddr::Fixed(addr)
             } else {
@@ -256,11 +256,11 @@ impl ProcessVM {
         Ok(mmap_addr)
     }
 
-    pub fn munmap(&mut self, addr: usize, size: usize) -> Result<(), Error> {
+    pub fn munmap(&mut self, addr: usize, size: usize) -> Result<()> {
         self.mmap_manager.munmap(addr, size)
     }
 
-    pub fn find_mmap_region(&self, addr: usize) -> Result<&VMRange, Error> {
+    pub fn find_mmap_region(&self, addr: usize) -> Result<&VMRange> {
         self.mmap_manager.find_mmap_region(addr)
     }
 }
@@ -289,9 +289,9 @@ bitflags! {
 }
 
 impl MMapFlags {
-    pub fn from_u32(bits: u32) -> Result<MMapFlags, Error> {
+    pub fn from_u32(bits: u32) -> Result<MMapFlags> {
         // TODO: detect non-supporting flags
-        MMapFlags::from_bits(bits).ok_or_else(|| (Errno::EINVAL, "Unknown mmap flags").into())
+        MMapFlags::from_bits(bits).ok_or_else(|| errno!(EINVAL, "unknown mmap flags"))
     }
 }
 
@@ -316,8 +316,8 @@ impl VMPerms {
         self.contains(VMPerms::EXEC)
     }
 
-    pub fn from_u32(bits: u32) -> Result<VMPerms, Error> {
-        VMPerms::from_bits(bits).ok_or_else(|| (Errno::EINVAL, "Unknown permission bits").into())
+    pub fn from_u32(bits: u32) -> Result<VMPerms> {
+        VMPerms::from_bits(bits).ok_or_else(|| errno!(EINVAL, "unknown permission bits"))
     }
 }
 

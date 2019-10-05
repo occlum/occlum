@@ -39,7 +39,7 @@ pub fn do_clone(
     ptid: Option<*mut pid_t>,
     ctid: Option<*mut pid_t>,
     new_tls: Option<usize>,
-) -> Result<pid_t, Error> {
+) -> Result<pid_t> {
     info!(
         "clone: flags: {:?}, stack_addr: {:?}, ptid: {:?}, ctid: {:?}, new_tls: {:?}",
         flags, user_rsp, ptid, ctid, new_tls
@@ -107,7 +107,7 @@ pub fn do_clone(
     Ok(new_thread_pid)
 }
 
-pub fn do_set_tid_address(tidptr: *mut pid_t) -> Result<pid_t, Error> {
+pub fn do_set_tid_address(tidptr: *mut pid_t) -> Result<pid_t> {
     info!("set_tid_address: tidptr: {:#x}", tidptr as usize);
     let current_ref = get_current();
     let mut current = current_ref.lock().unwrap();
@@ -115,7 +115,7 @@ pub fn do_set_tid_address(tidptr: *mut pid_t) -> Result<pid_t, Error> {
     Ok(current.get_tid())
 }
 
-fn guess_user_stack_bound(vm: &ProcessVM, user_rsp: usize) -> Result<&VMRange, Error> {
+fn guess_user_stack_bound(vm: &ProcessVM, user_rsp: usize) -> Result<&VMRange> {
     // The first case is most likely
     if let Ok(stack_range) = vm.find_mmap_region(user_rsp) {
         Ok(stack_range)
@@ -130,6 +130,6 @@ fn guess_user_stack_bound(vm: &ProcessVM, user_rsp: usize) -> Result<&VMRange, E
     }
     // Invalid
     else {
-        errno!(ESRCH, "invalid rsp")
+        return_errno!(ESRCH, "invalid rsp")
     }
 }
