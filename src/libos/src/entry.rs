@@ -5,6 +5,8 @@ use std::ffi::{CStr, CString, OsString};
 use std::path::Path;
 use util::mem_util::from_untrusted::*;
 
+const ENCLAVE_PATH: &'static str = ".occlum/build/lib/libocclum.signed.so";
+
 #[no_mangle]
 pub extern "C" fn libos_boot(path_buf: *const c_char, argv: *const *const c_char) -> i32 {
     util::log::init();
@@ -18,7 +20,7 @@ pub extern "C" fn libos_boot(path_buf: *const c_char, argv: *const *const c_char
     // register exception handlers (support cpuid & rdtsc for now)
     register_exception_handlers();
 
-    let _ = backtrace::enable_backtrace("libocclum.signed.so", PrintFormat::Short);
+    let _ = backtrace::enable_backtrace(ENCLAVE_PATH, PrintFormat::Short);
     panic::catch_unwind(|| {
         backtrace::__rust_begin_short_backtrace(|| match do_boot(&path, &args) {
             Ok(()) => 0,
@@ -30,7 +32,7 @@ pub extern "C" fn libos_boot(path_buf: *const c_char, argv: *const *const c_char
 
 #[no_mangle]
 pub extern "C" fn libos_run(host_tid: i32) -> i32 {
-    let _ = backtrace::enable_backtrace("libocclum.signed.so", PrintFormat::Short);
+    let _ = backtrace::enable_backtrace(ENCLAVE_PATH, PrintFormat::Short);
     panic::catch_unwind(|| {
         backtrace::__rust_begin_short_backtrace(|| match do_run(host_tid as pid_t) {
             Ok(exit_status) => exit_status,
