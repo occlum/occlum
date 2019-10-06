@@ -75,6 +75,9 @@ cmd_init() {
         "$occlum_gcc_lib/libgomp.so.1"
 
     cp "$occlum_dir"/etc/template/* "$working_dir"/
+    chmod 644 "$working_dir"/Enclave.pem
+    chmod 644 "$working_dir"/Enclave.xml
+    chmod 644 "$working_dir"/Occlum.json
 
     echo "Initialized an Occlum context in $working_dir"
 }
