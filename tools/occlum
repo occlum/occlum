@@ -7,14 +7,24 @@ working_dir=`pwd`
 context_dir="$working_dir/.occlum"
 
 SGX_SDK="${SGX_SDK:-/opt/intel/sgxsdk}"
+ENCLAVE_SIGN_TOOL="$SGX_SDK/bin/x64/sgx_sign"
+ENCLAVE_SIGN_KEY="$occlum_dir/etc/template/Enclave.pem"
+
+exit_error() {
+    echo "Error: $@" >&2
+    exit 1
+}
 
 report_arg_error() {
-    echo $1
+    echo $1 >&2
     echo ""
     echo "Usage:"
     echo "    occlum init"
-    echo "    occlum build"
+    echo "    occlum build [--sign-key <key_path>] [--sign-tool <tool_path>]"
     echo "    occlum run <program_name> <program_args>"
+    echo ""
+    echo "    Run enclave in sgx release mode:"
+    echo "        OCCLUM_RELEASE_ENCLAVE=1 occlum run <program_name> <program_args>"
 }
 
 get_conf_default_stack_size() {
@@ -74,8 +84,8 @@ cmd_init() {
         "$occlum_gcc_lib/libgcc_s.so.1" \
         "$occlum_gcc_lib/libgomp.so.1"
 
-    cp "$occlum_dir"/etc/template/* "$working_dir"/
-    chmod 644 "$working_dir"/Enclave.pem
+    cp "$occlum_dir"/etc/template/Enclave.xml "$working_dir"/
+    cp "$occlum_dir"/etc/template/Occlum.json "$working_dir"/
     chmod 644 "$working_dir"/Enclave.xml
     chmod 644 "$working_dir"/Occlum.json
 
@@ -130,13 +140,22 @@ cmd_build() {
     cd src/libos && \
         make clean-builtin && \
         make "$context_dir/build/lib/libocclum.so" ONLY_REBUILD_BUILTIN=1
-
-    $SGX_SDK/bin/x64/sgx_sign sign \
-        -key "$working_dir/Enclave.pem" \
+    while [ -n "$1" ]; do
+        case "$1" in
+        --sign-key)     [ -n "$2" ] && ENCLAVE_SIGN_KEY=$2 ; shift 2 || exit_error "empty signing key path"     ;;
+        --sign-tool)    [ -n "$2" ] && ENCLAVE_SIGN_TOOL=$2 ; shift 2 || exit_error "empty signing tool path"   ;;
+        *) exit_error "Unknown option: $1"                                                                      ;;
+        esac
+    done
+    [ -e "$ENCLAVE_SIGN_KEY" ] || exit_error "invalid signing key path: $ENCLAVE_SIGN_KEY"
+    [ -e "$ENCLAVE_SIGN_TOOL" ] || exit_error "invalid signing tool path: $ENCLAVE_SIGN_TOOL"
+    echo "Enclave sign-tool: $ENCLAVE_SIGN_TOOL"
+    echo "Enclave sign-key: $ENCLAVE_SIGN_KEY"
+    $ENCLAVE_SIGN_TOOL sign \
+        -key $ENCLAVE_SIGN_KEY \
         -config "$working_dir/Enclave.xml" \
         -enclave "$context_dir/build/lib/libocclum.so" \
-        -out "$context_dir/build/lib/libocclum.signed.so" \
-
+        -out "$context_dir/build/lib/libocclum.signed.so"
     cd "$context_dir"
     echo "built" > status
 
@@ -170,7 +189,7 @@ case "$cmd" in
         cmd_init
         ;;
     build)
-        cmd_build
+        cmd_build "${@:2}"
         ;;
     run)
         cmd_run "${@:2}"

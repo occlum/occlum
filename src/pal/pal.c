@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -113,19 +114,25 @@ static sgx_errlist_t sgx_errlist[] = {
         "Can't open enclave file.",
         NULL
     },
+    {
+        SGX_ERROR_SERVICE_INVALID_PRIVILEGE,
+        "Enclave has no privilege to get run in the release mode.",
+        "Please rebuild the Occlum enclave with a legal signing key "
+        "(e.g., occlum build --sign-key <key_path>), "
+        "to get a legal signing key, please contact Intel."
+    },
 };
 
 /* Check error conditions for loading enclave */
-static void print_error_message(sgx_status_t ret)
-{
+static void print_error_message(sgx_status_t ret) {
     size_t idx = 0;
     size_t ttl = sizeof sgx_errlist/sizeof sgx_errlist[0];
 
     for (idx = 0; idx < ttl; idx++) {
         if(ret == sgx_errlist[idx].err) {
+            printf("Error: %s\n", sgx_errlist[idx].msg);
             if(NULL != sgx_errlist[idx].sug)
                 printf("Info: %s\n", sgx_errlist[idx].sug);
-            printf("Error: %s\n", sgx_errlist[idx].msg);
             break;
         }
     }
@@ -144,6 +151,20 @@ static const char* get_enclave_absolute_path() {
     strncat(enclave_path, "/../lib/", sizeof(enclave_path));
     strncat(enclave_path, ENCLAVE_FILENAME, sizeof(enclave_path));
     return (const char*)enclave_path;
+}
+
+/* Get enclave debug flag according to env "OCCLUM_RELEASE_ENCLAVE" */
+static int get_enclave_debug_flag() {
+    const char* release_enclave_val = getenv("OCCLUM_RELEASE_ENCLAVE");
+    if (release_enclave_val) {
+        if (!strcmp(release_enclave_val, "1") ||
+            !strcasecmp(release_enclave_val, "y") ||
+            !strcasecmp(release_enclave_val, "yes") ||
+            !strcasecmp(release_enclave_val, "true")) {
+            return 0;
+        }
+    }
+    return 1;
 }
 
 /* Initialize the enclave:
@@ -192,7 +213,8 @@ static int initialize_enclave()
     /* Step 2: call sgx_create_enclave to initialize an enclave instance */
     /* Debug Support: set 2nd parameter to 1 */
     const char* enclave_path = get_enclave_absolute_path();
-    ret = sgx_create_enclave(enclave_path, SGX_DEBUG_FLAG, &token, &updated, &global_eid, NULL);
+    int sgx_debug_flag = get_enclave_debug_flag();
+    ret = sgx_create_enclave(enclave_path, sgx_debug_flag, &token, &updated, &global_eid, NULL);
     if (ret != SGX_SUCCESS) {
         print_error_message(ret);
         if (fp != NULL) fclose(fp);
