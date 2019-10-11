@@ -28,6 +28,10 @@ create_and_bind() {
 	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	servaddr.sin_port = htons(6667);
 
+	int reuse = 1;
+	if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
+		perror("setsockopt port to reuse failed");
+
 	int ret = bind(listenfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
 	if (ret < 0) {
 		printf("bind socket error: %s(errno: %d)\n", strerror(errno), errno);

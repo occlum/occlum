@@ -24,6 +24,10 @@ int main(int argc, const char *argv[]) {
 	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	servaddr.sin_port = htons(6666);
 
+	int reuse = 1;
+	if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
+		perror("setsockopt port to reuse failed");
+
 	ret = bind(listenfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
 	if (ret < 0) {
 		printf("bind socket error: %s(errno: %d)\n", strerror(errno), errno);
@@ -54,7 +58,8 @@ int main(int argc, const char *argv[]) {
 	int n = recv(connect_fd, buff, BUF_SIZE, 0);
 	buff[n] = '\0';
 	printf("recv msg from client: %s\n", buff);
+	
 	close(connect_fd);
-
 	close(listenfd);
+	return 0;
 }
