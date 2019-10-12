@@ -72,4 +72,12 @@ WORKDIR /tmp/gcc
 RUN ./build.sh
 ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
 
+# Start AESM service automatically
+#
+# To do so, we add the script to ~/.bashrc. We cannot use systemd to run AESM
+# as a "real" service since the pid 1 is not systemd in Docker. So we start
+# up AESM service when an user login with an interative shell.
+COPY docker/start_aesm.sh /root
+RUN echo './root/start_aesm.sh' >> /root/.bashrc
+
 WORKDIR /root

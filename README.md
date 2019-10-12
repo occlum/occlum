@@ -114,28 +114,24 @@ Step 1-4 are to be done on the host OS:
     ```
 Step 5-9 are to be done on the guest OS running inside the container:
 
-5. Start the AESM service required by Intel SGX SDK
-    ```
-    /opt/intel/sgxpsw/aesm/aesm_service &
-    ```
-6. (Optional) Try the sample code of Intel SGX SDK
+5. (Optional) Try the sample code of Intel SGX SDK
     ```
     cd /opt/intel/sgxsdk/SampleCode/SampleEnclave && make && ./app
     ```
-7. Prepare the submodules required by Occlum LiboS
+6. Prepare the submodules required by Occlum LiboS
     ```
     cd /root/occlum/ && make submodule
     ```
-8. Compile and test Occlum LibOS
+7. Compile and test Occlum LibOS
     ```
     cd /root/occlum && make && make test
     ```
-9. Install Occlum LibOS
+8. Install Occlum LibOS
     ```
     cd /root/occlum && sudo make install
     ```
    which will install the occlum command-line tool.
-10. Try the Hello World sample project
+9. Try the Hello World sample project
     ```
     cd /root/occlum/demo/hello_world && make test
     ```
