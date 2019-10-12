@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 int main(int argc, const char* argv[]) {
-    const char* FILE_NAME = "tmp.txt";
+    const char* FILE_NAME = "root/test_filesystem_truncate.txt";
     const int TRUNC_LEN = 256;
     const int TRUNC_LEN1 = 128;
     const int MODE_MASK = 0777;

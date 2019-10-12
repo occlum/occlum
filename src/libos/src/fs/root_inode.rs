@@ -27,7 +27,7 @@ lazy_static! {
 }
 
 fn open_root_fs_according_to(mount_config: &Vec<ConfigMount>) -> Result<Arc<MountFS>, Error> {
-    let root_sefs_source = {
+    let (root_sefs_mac, root_sefs_source) = {
         let root_mount_config = mount_config
             .iter()
             .find(|m| m.target == Path::new("/"))
@@ -45,11 +45,14 @@ fn open_root_fs_according_to(mount_config: &Vec<ConfigMount>) -> Result<Arc<Moun
                 "The root SEFS must be given a source path (on host)"
             );
         }
-        root_mount_config.source.as_ref().unwrap()
+        (
+            root_mount_config.options.mac,
+            root_mount_config.source.as_ref().unwrap(),
+        )
     };
 
     let root_sefs = SEFS::open(
-        Box::new(SgxStorage::new(root_sefs_source, true)),
+        Box::new(SgxStorage::new(root_sefs_source, true, root_sefs_mac)),
         &time::OcclumTimeProvider,
         &SgxUuidProvider,
     )?;
@@ -86,14 +89,14 @@ fn mount_nonroot_fs_according_to(
                 let source_path = mc.source.as_ref().unwrap();
                 let sefs = {
                     SEFS::open(
-                        Box::new(SgxStorage::new(source_path, false)),
+                        Box::new(SgxStorage::new(source_path, false, None)),
                         &time::OcclumTimeProvider,
                         &SgxUuidProvider,
                     )
                 }
                 .or_else(|_| {
                     SEFS::create(
-                        Box::new(SgxStorage::new(source_path, false)),
+                        Box::new(SgxStorage::new(source_path, false, None)),
                         &time::OcclumTimeProvider,
                         &SgxUuidProvider,
                     )

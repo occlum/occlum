@@ -95,6 +95,8 @@ cmd_build() {
     cp "$occlum_dir/build/lib/libcompiler-rt-patch.a" build/lib/
     mkdir -p build/src/libos/src/builtin
 
+    chmod 531 -R $working_dir/image/bin
+    chmod 531 -R $working_dir/image/lib
     mkdir -p build/mount/
     cd "$occlum_dir/deps/sefs/sefs-fuse/bin/" && \
         ./app \

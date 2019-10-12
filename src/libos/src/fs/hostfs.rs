@@ -99,19 +99,23 @@ impl INode for HNode {
     }
 
     fn set_metadata(&self, metadata: &Metadata) -> Result<()> {
-        unimplemented!()
+        warn!("HostFS: set_metadata() is unimplemented");
+        Ok(())
     }
 
     fn sync_all(&self) -> Result<()> {
-        unimplemented!()
+        warn!("HostFS: sync_all() is unimplemented");
+        Ok(())
     }
 
     fn sync_data(&self) -> Result<()> {
-        unimplemented!()
+        warn!("HostFS: sync_data() is unimplemented");
+        Ok(())
     }
 
     fn resize(&self, len: usize) -> Result<()> {
-        unimplemented!()
+        warn!("HostFS: resize() is unimplemented");
+        Ok(())
     }
 
     fn create(&self, name: &str, type_: FileType, mode: u32) -> Result<Arc<dyn INode>> {
@@ -185,7 +189,8 @@ impl INode for HNode {
     }
 
     fn io_control(&self, cmd: u32, data: usize) -> Result<()> {
-        unimplemented!()
+        warn!("HostFS: io_control is unimplemented");
+        Ok(())
     }
 
     fn fs(&self) -> Arc<FileSystem> {

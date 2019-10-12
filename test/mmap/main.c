@@ -254,7 +254,7 @@ int test_anonymous_mmap_with_non_page_aligned_len() {
 // ============================================================================
 
 int test_file_mmap() {
-    const char* file_path = "mmap_file.data";
+    const char* file_path = "/root/mmap_file.data";
     int fd = open(file_path, O_CREAT | O_TRUNC | O_WRONLY, 0644);
     if (fd < 0) {
         throw_error("file creation failed");
@@ -292,7 +292,7 @@ int test_file_mmap() {
 }
 
 int test_file_mmap_with_offset() {
-    const char* file_path = "mmap_file.data";
+    const char* file_path = "/root/mmap_file.data";
     int fd = open(file_path, O_CREAT | O_TRUNC | O_RDWR, 0644);
     if (fd < 0) {
         throw_error("file creation failed");
@@ -352,7 +352,7 @@ int test_file_mmap_with_invalid_fd() {
 }
 
 int test_file_mmap_with_non_page_aligned_offset() {
-    const char* file_path = "mmap_file.data";
+    const char* file_path = "/root/mmap_file.data";
     int fd = open(file_path, O_CREAT | O_TRUNC | O_RDWR, 0644);
     if (fd < 0) {
         throw_error("file creation failed");

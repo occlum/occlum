@@ -7,8 +7,8 @@
 #include <errno.h>
 
 int main(int argc, const char* argv[]) {
-	const char* file_name = "tmp.txt";
-	const char* link_name = "link.txt";
+	const char* file_name = "/root/test_filesystem_link.txt";
+	const char* link_name = "/root/link.txt";
 	const char* write_msg = "Hello World\n";
 	char read_buf[128] = {0};
 	int ret;

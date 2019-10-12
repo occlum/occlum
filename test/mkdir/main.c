@@ -23,8 +23,10 @@ int main(int argc, const char* argv[]) {
 		return -1;
 	}
 
-	const char DIR_NAME[] = "test_dir";
-	const char DIR_PATH[] = "/test_dir";
+	//const char DIR_NAME[] = "test_dir";
+	//const char DIR_PATH[] = "/test_dir";
+	const char DIR_NAME[] = "/root/test_dir";
+	const char DIR_PATH[] = "/root/test_dir";
 	const int DIR_MODE = 0664;
 	ret = mkdir(DIR_NAME, DIR_MODE);
 	if(ret < 0) {

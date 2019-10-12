@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 int main(int argc, const char* argv[]) {
-    const char* file_name = "tmp.txt";
+    const char* file_name = "/root/test_filesystem_file_read_write.txt";
     int fd, flags, mode, len;
     off_t offset;
     const char* write_msg = "Hello World\n";

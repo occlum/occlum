@@ -1,4 +1,6 @@
 use super::*;
+use rcore_fs_sefs::dev::SefsMac;
+use sgx_trts::libc::S_IRUSR;
 use std::fmt;
 
 pub struct INodeFile {
@@ -148,6 +150,13 @@ impl File for INodeFile {
 
 impl INodeFile {
     pub fn open(inode: Arc<INode>, options: OpenOptions) -> Result<Self, Error> {
+        if (options.read && !inode.allow_read()?) {
+            return errno!(EBADF, "File not readable");
+        }
+        if (options.write && !inode.allow_write()?) {
+            return errno!(EBADF, "File not writable");
+        }
+
         Ok(INodeFile {
             inode,
             offset: SgxMutex::new(0),
@@ -178,6 +187,9 @@ impl From<FsError> for Error {
             FsError::IOCTLError => EINVAL,
             FsError::Again => EAGAIN,
             FsError::Busy => EBUSY,
+            FsError::WrProtected => EROFS,
+            FsError::NoIntegrity => EROFS,
+            FsError::PermError => EPERM,
         };
         Error::new(errno, "")
     }
@@ -196,6 +208,8 @@ impl Debug for INodeFile {
 
 pub trait INodeExt {
     fn read_as_vec(&self) -> Result<Vec<u8>, Error>;
+    fn allow_write(&self) -> Result<bool, Error>;
+    fn allow_read(&self) -> Result<bool, Error>;
 }
 
 impl INodeExt for INode {
@@ -207,5 +221,19 @@ impl INodeExt for INode {
         }
         self.read_at(0, buf.as_mut_slice())?;
         Ok(buf)
+    }
+
+    fn allow_write(&self) -> Result<bool, Error> {
+        let info = self.metadata()?;
+        let perms = info.mode as u32;
+        let writable = (perms & S_IWUSR) == S_IWUSR;
+        Ok(writable)
+    }
+
+    fn allow_read(&self) -> Result<bool, Error> {
+        let info = self.metadata()?;
+        let perms = info.mode as u32;
+        let readable = (perms & S_IRUSR) == S_IRUSR;
+        Ok(readable)
     }
 }

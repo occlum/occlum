@@ -25,12 +25,12 @@ pub struct SgxUuidProvider;
 
 impl UuidProvider for SgxUuidProvider {
     fn generate_uuid(&self) -> SefsUuid {
-        let mut uuid: [u8; 16] = Default::default();
-        let status = unsafe { sgx_read_rand(uuid.as_mut_ptr(), uuid.len()) };
-        if status != sgx_status_t::SGX_SUCCESS {
-            panic!("sgx_read_rand failed");
-        }
-        SefsUuid::new(uuid)
+        let mut uuid: [u8; 16] = [0u8; 16];
+        let buf = uuid.as_mut_ptr();
+        let size = 16;
+        let status = unsafe { sgx_read_rand(buf, size) };
+        assert!(status == sgx_status_t::SGX_SUCCESS);
+        SefsUuid(uuid)
     }
 }
 
@@ -42,13 +42,17 @@ pub struct SgxStorage {
 }
 
 impl SgxStorage {
-    pub fn new(path: impl AsRef<Path>, integrity_only: bool) -> Self {
+    pub fn new(
+        path: impl AsRef<Path>,
+        integrity_only: bool,
+        file_mac: Option<sgx_aes_gcm_128bit_tag_t>,
+    ) -> Self {
         //        assert!(path.as_ref().is_dir());
         SgxStorage {
             path: path.as_ref().to_path_buf(),
             integrity_only: integrity_only,
             file_cache: Mutex::new(BTreeMap::new()),
-            root_mac: None,
+            root_mac: file_mac,
         }
     }
     /// Get file by `file_id`.
@@ -174,6 +178,10 @@ impl Storage for SgxStorage {
         caches.remove(&key);
         Ok(())
     }
+
+    fn is_integrity_only(&self) -> bool {
+        self.integrity_only
+    }
 }
 
 #[derive(Clone)]
@@ -231,5 +239,10 @@ impl File for LockedFile {
         let mut file = self.0.lock().unwrap();
         file.flush().expect("failed to flush SgxFile");
         Ok(())
+    }
+
+    fn get_file_mac(&self) -> DevResult<SefsMac> {
+        let file = self.0.lock().unwrap();
+        Ok(SefsMac(file.get_mac().unwrap()))
     }
 }

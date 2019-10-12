@@ -19,6 +19,7 @@ pub use self::pipe::Pipe;
 pub use self::root_inode::ROOT_INODE;
 pub use self::socket_file::{AsSocket, SocketFile};
 pub use self::unix_socket::{AsUnixSocket, UnixSocketFile};
+use sgx_trts::libc::S_IWUSR;
 use std::any::Any;
 use std::mem::uninitialized;
 
@@ -311,6 +312,9 @@ pub fn do_mkdir(path: &str, mode: usize) -> Result<(), Error> {
     if inode.find(file_name).is_ok() {
         return errno!(EEXIST, "");
     }
+    if !inode.allow_write()? {
+        return errno!(EPERM, "dir cannot be written");
+    }
     inode.create(file_name, FileType::Dir, mode as u32)?;
     Ok(())
 }
@@ -434,7 +438,12 @@ impl Process {
                     }
                     file_inode
                 }
-                Err(FsError::EntryNotFound) => dir_inode.create(file_name, FileType::File, mode)?,
+                Err(FsError::EntryNotFound) => {
+                    if !dir_inode.allow_write()? {
+                        return errno!(EPERM, "file cannot be created");
+                    }
+                    dir_inode.create(file_name, FileType::File, mode)?
+                }
                 Err(e) => return Err(Error::from(e)),
             }
         } else {
