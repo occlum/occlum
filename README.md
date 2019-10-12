@@ -10,7 +10,7 @@ Occlum has the following salient features:
   * **Memory safety.** Occlum is the _first_ SGX LibOS written in a memory-safe programming language ([Rust](https://www.rust-lang.org/)). Thus, Occlum is much less likely to contain low-level, memory-safety bugs and more trustworthy to host security-critical applications.
   * **Ease-of-use.** Occlum provides user-friendly build and command-line tools. Running applications on Occlum inside SGX enclaves can be as simple as only typing several shell commands (see the next section).
 
-## How to Use?
+## Introduction
 
 ### Hello Occlum
 
@@ -90,51 +90,52 @@ Occlum can be configured easily via a config file named `Occlum.json`, which is 
 ```
 (Limitation: the `mount` key should not be modified at the moment. We will support the configuration of mount points in future version.)
 
-## How to Build and Install?
+## How to Use
 
-We have built and tested Occlum on Ubuntu 16.04 with hardware SGX support. We recommend using the Occlum Docker image to set up the development environment. To build and test Occlum with Docker container, follow the steps listed below.
+We have built and tested Occlum on Ubuntu 16.04 with hardware SGX support. To give Occlum a quick try, one can use the Occlum Docker image by following the steps below:
 
-Step 1-4 are to be done on the host OS:
+Step 1-3 are to be done on the host OS (Linux):
 
 1. Install [Intel SGX driver for Linux](https://github.com/intel/linux-sgx-driver), which is required by Intel SGX SDK.
 
 2. Install [enable_rdfsbase kernel module](https://github.com/occlum/enable_rdfsbase), which enables Occlum to use `rdfsbase`-family instructions in enclaves.
 
-3. Download the latest source code of Occlum
+3. Run the Occlum Docker container, which has Occlum and its demos preinstalled:
     ```
-    cd /your/path/to/
-    git clone https://github.com/occlum/occlum
+    docker run -it --device /dev/isgx occlum/occlum:0.6.0
     ```
-4. Run the Occlum Docker container
-    ```
-    docker run -it \
-      --mount type=bind,source=/your/path/to/occlum,target=/root/occlum \
-      --device /dev/isgx \
-      occlum/occlum:0.5.0
-    ```
-Step 5-9 are to be done on the guest OS running inside the container:
 
-5. (Optional) Try the sample code of Intel SGX SDK
+Step 4-5 are to be done on the guest OS running inside the Docker container:
+
+4. (Optional) Try the sample code of Intel SGX SDK to make sure that SGX is working
     ```
     cd /opt/intel/sgxsdk/SampleCode/SampleEnclave && make && ./app
     ```
-6. Prepare the submodules required by Occlum LiboS
+5. Check out Occlum's demos preinstalled at `/root/occlum/demos`, whose README can be found [here](demo/README.md). Or you can try to build and run your own SGX-protected applications using Occlum like these demos.
+
+## How to Build and Install
+
+To build Occlum from the latest source code, do the following steps in an Occlum Docker container (which can be prepared as shown in the last section):
+
+1. Download the latest source code of Occlum
     ```
-    cd /root/occlum/ && make submodule
+    mkdir occlum && cd occlum
+    git clone https://github.com/occlum/occlum .
     ```
-7. Compile and test Occlum LibOS
+2. Prepare the submodules required by Occlum
     ```
-    cd /root/occlum && make && make test
+    make submodule
     ```
-8. Install Occlum LibOS
+3. Compile and test Occlum
     ```
-    cd /root/occlum && sudo make install
+    make
+    make test
     ```
-   which will install the occlum command-line tool.
-9. Try the Hello World sample project
+4. Install Occlum
     ```
-    cd /root/occlum/demo/hello_world && make test
+    make install
     ```
+   which will install the `occlum` command-line tool and other files at `/opt/occlum`.
 
 The Occlum Dockerfile can be found at [here](tools/docker/Dockerfile). Use it to build the container directly or read it to see the dependencies of Occlum.
 

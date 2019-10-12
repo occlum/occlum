@@ -43,7 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install depend cpuid test tool
+# Install cpuid tool for tests
 WORKDIR /tmp
 RUN wget http://www.etallen.com/cpuid/cpuid-20180519.x86_64.tar.gz && \
     tar -xf ./cpuid-20180519.x86_64.tar.gz && \
@@ -71,6 +71,16 @@ COPY toolchains/gcc /tmp
 WORKDIR /tmp/gcc
 RUN ./build.sh
 ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
+
+# Install the latest version of Occlum
+WORKDIR /root
+RUN git clone https://github.com/occlum/occlum && \
+    cd occlum && \
+    make submodule && \
+    make RELEASE=1 && \
+    make install && \
+    cp -r demos /root/demos && \
+    rm -rf /root/occlum
 
 # Start AESM service automatically
 #
