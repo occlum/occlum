@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         debhelper \
         expect \
+        g++ \
         gdb \
         git-core \
         jq \
@@ -31,10 +32,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         pkg-config \
         protobuf-compiler \
         python \
+        python-pip \
         sudo \
+        unzip \
         uuid-dev \
         vim \
         wget \
+        zip \
         && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
