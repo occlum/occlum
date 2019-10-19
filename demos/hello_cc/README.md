@@ -1,6 +1,6 @@
-# C Sample Project with Makefile and CMake
+# A Sample C++ Project with Makefile and CMake
 
-This project demonstrates how to use Makefile/CMake to build C projects for Occlum.
+This project demonstrates how to use Makefile/CMake to build C++ projects for Occlum.
 
 1. Build `hello_world` with Makefile
 ```
@@ -9,7 +9,7 @@ make
 Or you can build `hello_world` with CMake
 ```
 mkdir build && cd build
-cmake ../ -DCMAKE_C_COMPILER=occlum-gcc -DCMAKE_C_FLAGS="-fPIC -pie"
+cmake ../ -DCMAKE_CXX_COMPILER=occlum-g++ -DCMAKE_CXX_FLAGS="-fPIC -pie"
 make
 cd ..
 cp build/hello_world .
@@ -18,7 +18,7 @@ Either way, the resulting `hello_world` can be found in the current directory.
 
 2. (Optional) Run `hello_world` on Linux
 ```
-./hello_world
+LD_LIBRARY_PATH=/usr/local/occlum/x86_64-linux-musl/lib ./hello_world
 ```
 
 3. Run `hello_world` on Occlum

@@ -111,7 +111,7 @@ Step 4-5 are to be done on the guest OS running inside the Docker container:
     ```
     cd /opt/intel/sgxsdk/SampleCode/SampleEnclave && make && ./app
     ```
-5. Check out Occlum's demos preinstalled at `/root/occlum/demos`, whose README can be found [here](demo/README.md). Or you can try to build and run your own SGX-protected applications using Occlum like these demos.
+5. Check out Occlum's demos preinstalled at `/root/occlum/demos`, whose README can be found [here](demos/README.md). Or you can try to build and run your own SGX-protected applications using Occlum as shown in the demos.
 
 ## How to Build and Install
 

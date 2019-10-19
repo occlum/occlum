@@ -1,4 +1,4 @@
-# C++ Sample Project with Bazel
+# A Sample C++ Project with Bazel
 
 This project demonstrates how to use Bazel to build C++ projects for Occlum. To install Bazel on Ubuntu, follow the instructions [here](https://docs.bazel.build/versions/master/install-ubuntu.html).
 
