@@ -63,12 +63,12 @@ RUN git clone https://github.com/occlum/linux-sgx . && \
 ENV OCCLUM_RUST_VERSION=nightly-2019-01-28
 RUN curl https://sh.rustup.rs -sSf | \
         sh -s -- --default-toolchain ${OCCLUM_RUST_VERSION} -y && \
-    echo 'source /root/.cargo/env' >> /root/.bashrc && \
     rm -rf /root/.cargo/registry && rm -rf /root/.cargo/git
+ENV PATH="/root/.cargo/bin:$PATH"
 
 # Install Occlum toolchain
-COPY toolchains/gcc /tmp
-WORKDIR /tmp/gcc
+COPY toolchains/gcc/* /tmp/
+WORKDIR /tmp
 RUN ./build.sh
 ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
 
@@ -87,7 +87,7 @@ RUN git clone https://github.com/occlum/occlum && \
 # To do so, we add the script to ~/.bashrc. We cannot use systemd to run AESM
 # as a "real" service since the pid 1 is not systemd in Docker. So we start
 # up AESM service when an user login with an interative shell.
-COPY docker/start_aesm.sh /root
-RUN echo './root/start_aesm.sh' >> /root/.bashrc
+COPY docker/start_aesm.sh /opt/occlum/
+RUN echo '/opt/occlum/start_aesm.sh' >> /root/.bashrc
 
 WORKDIR /root
