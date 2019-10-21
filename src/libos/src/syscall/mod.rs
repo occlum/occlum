@@ -307,7 +307,7 @@ pub extern "C" fn dispatch_syscall(
             warn!("{}", e.backtrace());
 
             let retval = -(e.errno() as isize);
-            debug_assert!(retval == 0);
+            debug_assert!(retval != 0);
             retval
         }
     }
