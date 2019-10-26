@@ -7,6 +7,7 @@
 #![feature(allocator_api)]
 #![feature(range_contains)]
 #![feature(core_intrinsics)]
+#![feature(stmt_expr_attributes)]
 
 #[macro_use]
 extern crate alloc;
@@ -47,6 +48,7 @@ use error::Result;
 mod prelude;
 #[macro_use]
 mod error;
+
 mod config;
 mod entry;
 mod exception;

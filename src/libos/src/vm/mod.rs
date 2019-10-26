@@ -5,10 +5,15 @@ use std::fmt;
 
 mod process_vm;
 mod user_space_vm;
+mod vm_layout;
 mod vm_manager;
+mod vm_range;
+
+use self::vm_layout::VMLayout;
+use self::vm_manager::{VMManager, VMMapOptionsBuilder};
 
 pub use self::process_vm::{MMapFlags, ProcessVM, ProcessVMBuilder, VMPerms};
-pub use self::vm_manager::VMRange;
+pub use self::vm_range::VMRange;
 
 pub fn do_mmap(
     addr: usize,

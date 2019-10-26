@@ -4,7 +4,7 @@ pub use self::futex::{futex_op_and_flags_from_u32, futex_wait, futex_wake, Futex
 pub use self::process::{Status, IDLE_PROCESS};
 pub use self::process_table::get;
 pub use self::sched::{do_sched_getaffinity, do_sched_setaffinity, CpuSet};
-pub use self::spawn::{do_spawn, FileAction};
+pub use self::spawn::{do_spawn, ElfFile, FileAction, ProgramHeaderExt};
 pub use self::task::{current_pid, get_current, run_task};
 pub use self::thread::{do_clone, do_set_tid_address, CloneFlags, ThreadGroup};
 pub use self::wait::{WaitQueue, Waiter};

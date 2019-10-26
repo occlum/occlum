@@ -1,53 +1,46 @@
-use super::super::config;
-use super::user_space_vm::{UserSpaceVMManager, UserSpaceVMRange, USER_SPACE_VM_MANAGER};
-use super::vm_manager::{
-    VMInitializer, VMManager, VMMapAddr, VMMapOptions, VMMapOptionsBuilder, VMRange,
-};
 use super::*;
-use std::slice;
 
-#[derive(Debug, Default)]
-pub struct ProcessVMBuilder {
-    code_size: usize,
-    data_size: usize,
-    ldso_code_size: Option<usize>,
-    ldso_data_size: Option<usize>,
+use super::config;
+use super::process::{ElfFile, ProgramHeaderExt};
+use super::user_space_vm::{UserSpaceVMManager, UserSpaceVMRange, USER_SPACE_VM_MANAGER};
+use super::vm_manager::{VMInitializer, VMManager, VMMapAddr, VMMapOptions, VMMapOptionsBuilder};
+
+#[derive(Debug)]
+pub struct ProcessVMBuilder<'a, 'b> {
+    elfs: Vec<&'b ElfFile<'a>>,
     heap_size: Option<usize>,
     stack_size: Option<usize>,
     mmap_size: Option<usize>,
 }
 
-macro_rules! impl_setter_for_process_vm_builder {
-    ($field: ident) => {
-        pub fn $field(mut self, size: usize) -> Self {
-            self.$field = Some(size);
-            self
-        }
-    }
-}
-
-impl ProcessVMBuilder {
-    pub fn new(code_size: usize, data_size: usize) -> ProcessVMBuilder {
+impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
+    pub fn new(elfs: Vec<&'b ElfFile<'a>>) -> ProcessVMBuilder<'a, 'b> {
         ProcessVMBuilder {
-            code_size,
-            data_size,
-            ..ProcessVMBuilder::default()
+            elfs: elfs,
+            heap_size: None,
+            stack_size: None,
+            mmap_size: None,
         }
     }
 
-    impl_setter_for_process_vm_builder!(ldso_data_size);
-    impl_setter_for_process_vm_builder!(ldso_code_size);
-    impl_setter_for_process_vm_builder!(heap_size);
-    impl_setter_for_process_vm_builder!(stack_size);
-    impl_setter_for_process_vm_builder!(mmap_size);
+    pub fn set_heap_size(&mut self, heap_size: usize) -> &mut Self {
+        self.heap_size = Some(heap_size);
+        self
+    }
+
+    pub fn set_stack_size(&mut self, stack_size: usize) -> &mut Self {
+        self.stack_size = Some(stack_size);
+        self
+    }
+
+    pub fn set_mmap_size(&mut self, mmap_size: usize) -> &mut Self {
+        self.mmap_size = Some(mmap_size);
+        self
+    }
 
     pub fn build(self) -> Result<ProcessVM> {
         self.validate()?;
 
-        let code_size = self.code_size;
-        let data_size = self.data_size;
-        let ldso_code_size = self.ldso_code_size.unwrap_or(0);
-        let ldso_data_size = self.ldso_data_size.unwrap_or(0);
         let heap_size = self
             .heap_size
             .unwrap_or(config::LIBOS_CONFIG.process.default_heap_size);
@@ -57,52 +50,103 @@ impl ProcessVMBuilder {
         let mmap_size = self
             .mmap_size
             .unwrap_or(config::LIBOS_CONFIG.process.default_mmap_size);
-        let range_sizes = vec![
-            code_size,
-            data_size,
-            ldso_code_size,
-            ldso_data_size,
-            heap_size,
-            stack_size,
-            mmap_size,
+
+        // Before allocating memory, let's first calcualte how much memory
+        // we need in total by iterating the memory layouts required by
+        // all the memory regions
+        let elf_layouts: Vec<VMLayout> = self
+            .elfs
+            .iter()
+            .map(|elf| {
+                elf.program_headers()
+                    .filter(|segment| segment.loadable())
+                    .fold(VMLayout::new_empty(), |mut elf_layout, segment| {
+                        let segment_size = (segment.virtual_addr() + segment.mem_size()) as usize;
+                        let segment_align = segment.align() as usize;
+                        let segment_layout = VMLayout::new(segment_size, segment_align).unwrap();
+                        elf_layout.extend(&segment_layout);
+                        elf_layout
+                    })
+            })
+            .collect();
+        let other_layouts = vec![
+            VMLayout::new(heap_size, PAGE_SIZE)?,
+            VMLayout::new(stack_size, PAGE_SIZE)?,
+            VMLayout::new(mmap_size, PAGE_SIZE)?,
         ];
+        let process_layout = elf_layouts.iter().chain(other_layouts.iter()).fold(
+            VMLayout::new_empty(),
+            |mut process_layout, sub_layout| {
+                process_layout.extend(&sub_layout);
+                process_layout
+            },
+        );
 
+        // Now that we end up with the memory layout required by the process,
+        // let's allocate the memory for the process
         let process_range = {
-            let total_size = range_sizes.iter().sum();
-            USER_SPACE_VM_MANAGER.alloc(total_size)?
+            // TODO: ensure alignment through USER_SPACE_VM_MANAGER, not by
+            // preserving extra space for alignment
+            USER_SPACE_VM_MANAGER.alloc(process_layout.align() + process_layout.size())?
         };
+        let process_base = process_range.range().start();
 
-        let vm_ranges = {
-            let mut curr_addr = process_range.range().start();
-            let mut vm_ranges = Vec::new();
-            for range_size in &range_sizes {
-                let range_start = curr_addr;
-                let range_end = curr_addr + range_size;
-                let range = VMRange::from(range_start, range_end)?;
-                vm_ranges.push(range);
+        // Init the memory for ELFs in the process
+        let elf_ranges: Vec<VMRange> = {
+            let mut min_elf_start = process_base;
+            elf_layouts
+                .iter()
+                .map(|elf_layout| {
+                    let new_elf_range = VMRange::new_with_layout(elf_layout, min_elf_start);
+                    min_elf_start = new_elf_range.end();
+                    new_elf_range
+                })
+                .collect()
+        };
+        self.elfs
+            .iter()
+            .zip(elf_ranges.iter())
+            .try_for_each(|(elf, elf_range)| Self::init_elf_memory(elf_range, elf))?;
 
-                curr_addr = range_end;
+        // Init the heap memory in the process
+        let heap_layout = &other_layouts[0];
+        let heap_min_start = {
+            let last_elf_range = elf_ranges.iter().last().unwrap();
+            last_elf_range.end()
+        };
+        let heap_range = VMRange::new_with_layout(heap_layout, heap_min_start);
+        unsafe {
+            let heap_buf = heap_range.as_slice_mut();
+            for b in heap_buf {
+                *b = 0;
             }
-            vm_ranges
-        };
-        let code_range = *&vm_ranges[0];
-        let data_range = *&vm_ranges[1];
-        let ldso_code_range = *&vm_ranges[2];
-        let ldso_data_range = *&vm_ranges[3];
-        let heap_range = *&vm_ranges[4];
-        let stack_range = *&vm_ranges[5];
-        let mmap_range = *&vm_ranges[6];
-
+        }
         let brk = heap_range.start();
 
+        // Init the stack memory in the process
+        let stack_layout = &other_layouts[1];
+        let stack_min_start = heap_range.end();
+        let stack_range = VMRange::new_with_layout(stack_layout, stack_min_start);
+        // Note: we do not need to fill zeros for stack
+
+        // Init the mmap memory in the process
+        let mmap_layout = &other_layouts[2];
+        let mmap_min_start = stack_range.end();
+        let mmap_range = VMRange::new_with_layout(mmap_layout, mmap_min_start);
         let mmap_manager = VMManager::from(mmap_range.start(), mmap_range.size())?;
+        // Note: we do not need to fill zeros of the mmap region.
+        // VMManager will fill zeros (if necessary) on mmap.
+
+        debug_assert!(elf_ranges
+            .iter()
+            .all(|elf_range| process_range.range().is_superset_of(elf_range)));
+        debug_assert!(process_range.range().is_superset_of(&heap_range));
+        debug_assert!(process_range.range().is_superset_of(&stack_range));
+        debug_assert!(process_range.range().is_superset_of(&mmap_range));
 
         Ok(ProcessVM {
             process_range,
-            code_range,
-            data_range,
-            ldso_code_range,
-            ldso_data_range,
+            elf_ranges,
             heap_range,
             stack_range,
             brk,
@@ -110,8 +154,45 @@ impl ProcessVMBuilder {
         })
     }
 
-    // TODO: implement this!
     fn validate(&self) -> Result<()> {
+        let validate_size = |size_opt| -> Result<()> {
+            if let Some(size) = size_opt {
+                if size == 0 || size % PAGE_SIZE != 0 {
+                    return_errno!(EINVAL, "invalid size");
+                }
+            }
+            Ok(())
+        };
+        validate_size(self.heap_size)?;
+        validate_size(self.stack_size)?;
+        validate_size(self.mmap_size)?;
+        Ok(())
+    }
+
+    fn init_elf_memory(elf_range: &VMRange, elf_file: &ElfFile) -> Result<()> {
+        // Destination buffer: ELF appeared in the process
+        let elf_proc_buf = unsafe { elf_range.as_slice_mut() };
+        // Source buffer: ELF stored in the ELF file
+        let elf_file_buf = elf_file.as_slice();
+        // Init all loadable segements
+        let loadable_segments = elf_file
+            .program_headers()
+            .filter(|segment| segment.loadable())
+            .for_each(|segment| {
+                let file_size = segment.file_size() as usize;
+                let file_offset = segment.offset() as usize;
+                let mem_addr = segment.virtual_addr() as usize;
+                let mem_size = segment.mem_size() as usize;
+                debug_assert!(file_size <= mem_size);
+
+                // The first file_size bytes are loaded from the ELF file
+                elf_proc_buf[mem_addr..mem_addr + file_size]
+                    .copy_from_slice(&elf_file_buf[file_offset..file_offset + file_size]);
+                // The remaining (mem_size - file_size) bytes are zeros
+                for b in &mut elf_proc_buf[mem_addr + file_size..mem_addr + mem_size] {
+                    *b = 0;
+                }
+            });
         Ok(())
     }
 }
@@ -120,10 +201,7 @@ impl ProcessVMBuilder {
 #[derive(Debug)]
 pub struct ProcessVM {
     process_range: UserSpaceVMRange,
-    code_range: VMRange,
-    data_range: VMRange,
-    ldso_code_range: VMRange,
-    ldso_data_range: VMRange,
+    elf_ranges: Vec<VMRange>,
     heap_range: VMRange,
     stack_range: VMRange,
     brk: usize,
@@ -134,11 +212,8 @@ impl Default for ProcessVM {
     fn default() -> ProcessVM {
         ProcessVM {
             process_range: USER_SPACE_VM_MANAGER.alloc_dummy(),
-            code_range: Default::default(),
-            data_range: Default::default(),
+            elf_ranges: Default::default(),
             heap_range: Default::default(),
-            ldso_code_range: Default::default(),
-            ldso_data_range: Default::default(),
             stack_range: Default::default(),
             brk: Default::default(),
             mmap_manager: Default::default(),
@@ -151,20 +226,8 @@ impl ProcessVM {
         self.process_range.range()
     }
 
-    pub fn get_code_range(&self) -> &VMRange {
-        &self.code_range
-    }
-
-    pub fn get_data_range(&self) -> &VMRange {
-        &self.data_range
-    }
-
-    pub fn get_ldso_code_range(&self) -> &VMRange {
-        &self.ldso_code_range
-    }
-
-    pub fn get_ldso_data_range(&self) -> &VMRange {
-        &self.ldso_data_range
+    pub fn get_elf_ranges(&self) -> &[VMRange] {
+        &self.elf_ranges
     }
 
     pub fn get_heap_range(&self) -> &VMRange {
@@ -323,7 +386,7 @@ impl VMPerms {
 
 unsafe fn fill_zeros(addr: usize, size: usize) {
     let ptr = addr as *mut u8;
-    let buf = slice::from_raw_parts_mut(ptr, size);
+    let buf = std::slice::from_raw_parts_mut(ptr, size);
     for b in buf {
         *b = 0;
     }

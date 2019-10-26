@@ -14,7 +14,7 @@ impl Default for VMInitializer {
 }
 
 impl VMInitializer {
-    pub fn initialize(&self, buf: &mut [u8]) -> Result<()> {
+    pub fn init_slice(&self, buf: &mut [u8]) -> Result<()> {
         match self {
             VMInitializer::DoNothing() => {
                 // Do nothing
@@ -131,12 +131,12 @@ pub struct VMManager {
 
 impl VMManager {
     pub fn from(addr: usize, size: usize) -> Result<VMManager> {
-        let range = VMRange::from(addr, addr + size)?;
+        let range = VMRange::new(addr, addr + size)?;
         let sub_ranges = {
             let start = range.start();
             let end = range.end();
-            let start_sentry = VMRange::from(start, start)?;
-            let end_sentry = VMRange::from(end, end)?;
+            let start_sentry = VMRange::new(start, start)?;
+            let end_sentry = VMRange::new(end, end)?;
             vec![start_sentry, end_sentry]
         };
         Ok(VMManager { range, sub_ranges })
@@ -162,10 +162,8 @@ impl VMManager {
 
         // Initialize the memory of the new subrange
         unsafe {
-            let buf_ptr = new_subrange.start() as *mut u8;
-            let buf_size = new_subrange.size() as usize;
-            let buf = std::slice::from_raw_parts_mut(buf_ptr, buf_size);
-            options.initializer.initialize(buf)?;
+            let buf = new_subrange.as_slice_mut();
+            options.initializer.init_slice(buf)?;
         }
 
         // After initializing, we can safely add the new subrange
@@ -182,7 +180,7 @@ impl VMManager {
             align_up(size, PAGE_SIZE)
         };
         let munmap_range = {
-            let munmap_range = VMRange::from(addr, addr + size)?;
+            let munmap_range = VMRange::new(addr, addr + size)?;
 
             let effective_munmap_range_opt = munmap_range.intersect(&self.range);
             if effective_munmap_range_opt.is_none() {
@@ -308,101 +306,5 @@ impl VMManager {
 
         new_subrange.resize(size);
         new_subrange
-    }
-}
-
-#[derive(Clone, Copy, Default, Debug, PartialEq)]
-pub struct VMRange {
-    start: usize,
-    end: usize,
-}
-
-impl VMRange {
-    pub fn from(start: usize, end: usize) -> Result<VMRange> {
-        if start % PAGE_SIZE != 0 || end % PAGE_SIZE != 0 || start > end {
-            return_errno!(EINVAL, "invalid start or end");
-        }
-        Ok(VMRange {
-            start: start,
-            end: end,
-        })
-    }
-
-    pub unsafe fn from_unchecked(start: usize, end: usize) -> VMRange {
-        debug_assert!(start % PAGE_SIZE == 0);
-        debug_assert!(end % PAGE_SIZE == 0);
-        debug_assert!(start <= end);
-        VMRange {
-            start: start,
-            end: end,
-        }
-    }
-
-    pub fn start(&self) -> usize {
-        self.start
-    }
-
-    pub fn end(&self) -> usize {
-        self.end
-    }
-
-    pub fn size(&self) -> usize {
-        self.end - self.start
-    }
-
-    pub fn resize(&mut self, new_size: usize) {
-        self.end = self.start + new_size;
-    }
-
-    pub fn empty(&self) -> bool {
-        self.start == self.end
-    }
-
-    pub fn is_superset_of(&self, other: &VMRange) -> bool {
-        self.start() <= other.start() && other.end() <= self.end()
-    }
-
-    pub fn contains(&self, addr: usize) -> bool {
-        self.start() <= addr && addr < self.end()
-    }
-
-    pub fn subtract(&self, other: &VMRange) -> Vec<VMRange> {
-        let self_start = self.start();
-        let self_end = self.end();
-        let other_start = other.start();
-        let other_end = other.end();
-
-        match (self_start < other_start, other_end < self_end) {
-            (false, false) => Vec::new(),
-            (false, true) => unsafe {
-                vec![VMRange::from_unchecked(self_start.max(other_end), self_end)]
-            },
-            (true, false) => unsafe {
-                vec![VMRange::from_unchecked(
-                    self_start,
-                    self_end.min(other_start),
-                )]
-            },
-            (true, true) => unsafe {
-                vec![
-                    VMRange::from_unchecked(self_start, other_start),
-                    VMRange::from_unchecked(other_end, self_end),
-                ]
-            },
-        }
-    }
-
-    pub fn intersect(&self, other: &VMRange) -> Option<VMRange> {
-        let intersection_start = self.start().max(other.start());
-        let intersection_end = self.end().min(other.end());
-        if intersection_start > intersection_end {
-            return None;
-        }
-        unsafe {
-            Some(VMRange::from_unchecked(
-                intersection_start,
-                intersection_end,
-            ))
-        }
     }
 }

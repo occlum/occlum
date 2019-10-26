@@ -1,4 +1,3 @@
-use super::vm_manager::{VMManager, VMMapOptions, VMMapOptionsBuilder, VMRange};
 use super::*;
 
 /// The virtual memory manager for the entire user space

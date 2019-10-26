@@ -84,7 +84,7 @@ $(LIBOS_CORE_A): $(LIBOS_RS_A) $(C_OBJS) $(S_OBJS) $(EDL_C_OBJS)
 	@ar r $@ $(C_OBJS) $(S_OBJS) $(EDL_C_OBJS)
 	@echo "GEN => $@"
 
-ifeq ($(RELEASE), 0)
+ifeq ($(LIBOS_RELEASE), 0)
 $(LIBOS_RS_A): $(RUST_SRCS)
 	@RUSTC_BOOTSTRAP=1 cargo build --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR)
 	@echo "CARGO (debug) => $@"

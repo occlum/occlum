@@ -125,8 +125,6 @@ fn guess_user_stack_bound(vm: &ProcessVM, user_rsp: usize) -> Result<&VMRange> {
         Ok(vm.get_stack_range())
     } else if vm.get_heap_range().contains(user_rsp) {
         Ok(vm.get_heap_range())
-    } else if vm.get_data_range().contains(user_rsp) {
-        Ok(vm.get_data_range())
     }
     // Invalid
     else {

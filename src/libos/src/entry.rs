@@ -95,7 +95,8 @@ fn do_boot(program_path: &PathBuf, argv: &Vec<CString>) -> Result<()> {
     let envp = &config::LIBOS_CONFIG.env;
     let file_actions = Vec::new();
     let parent = &process::IDLE_PROCESS;
-    process::do_spawn(&program_path, argv, envp, &file_actions, parent)?;
+    let program_path_str = program_path.to_str().unwrap();
+    process::do_spawn(&program_path_str, argv, envp, &file_actions, parent)?;
 
     Ok(())
 }

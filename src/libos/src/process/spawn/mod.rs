@@ -1,22 +1,21 @@
-use xmas_elf::symbol_table::Entry;
-use xmas_elf::{header, program, sections, ElfFile};
+use super::*;
 
-use fs::{File, FileDesc, FileTable, INodeExt, OpenFlags, StdinFile, StdoutFile, ROOT_INODE};
-use misc::ResourceLimitsRef;
 use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::sgxfs::SgxFile;
-use vm::{ProcessVM, ProcessVMBuilder};
 
-use super::task::Task;
-use super::*;
+use super::fs::{
+    File, FileDesc, FileTable, INodeExt, OpenFlags, StdinFile, StdoutFile, ROOT_INODE,
+};
+use super::misc::ResourceLimitsRef;
+use super::vm::{ProcessVM, ProcessVMBuilder};
 
+pub use self::elf_file::{ElfFile, ProgramHeaderExt};
 use self::init_stack::{AuxKey, AuxTable};
 
-mod elf_helper;
+mod elf_file;
 mod init_stack;
 mod init_vm;
-mod segment;
 
 #[derive(Debug)]
 pub enum FileAction {
@@ -32,73 +31,34 @@ pub enum FileAction {
     Close(FileDesc),
 }
 
-pub fn do_spawn<P: AsRef<Path>>(
-    elf_path: &P,
+pub fn do_spawn(
+    elf_path: &str,
     argv: &[CString],
     envp: &[CString],
     file_actions: &[FileAction],
     parent_ref: &ProcessRef,
 ) -> Result<u32> {
-    let mut elf_buf = {
-        let path = elf_path.as_ref().to_str().unwrap();
-        let inode = parent_ref
-            .lock()
-            .unwrap()
-            .lookup_inode(path)
-            .map_err(|e| errno!(e.errno(), "cannot find the executable"))?;
-        inode
-            .read_as_vec()
-            .map_err(|e| errno!(e.errno(), "failed to read the executable ELF"))?
-    };
-    let elf_file = {
-        let elf_file = ElfFile::new(&elf_buf)
-            .map_err(|e| errno!(ENOEXEC, "failed to parse the executable ELF"))?;
-        header::sanity_check(&elf_file)
-            .map_err(|e| errno!(ENOEXEC, "failed to parse the executable ELF"))?;
-        /*
-            elf_helper::print_program_headers(&elf_file)?;
-            elf_helper::print_sections(&elf_file)?;
-            elf_helper::print_pltrel_section(&elf_file)?;
-        */
-        elf_file
-    };
+    let elf_buf = load_elf_to_vec(elf_path, parent_ref)
+        .cause_err(|e| errno!(e.errno(), "cannot load the executable"))?;
+    let ldso_path = "/lib/ld-musl-x86_64.so.1";
+    let ldso_elf_buf = load_elf_to_vec(ldso_path, parent_ref)
+        .cause_err(|e| errno!(e.errno(), "cannot load ld.so"))?;
 
-    let mut ldso_elf_buf = {
-        let ldso_path = "/lib/ld-musl-x86_64.so.1";
-        let ldso_inode = ROOT_INODE.lookup(ldso_path).map_err(|e| {
-            errno!(
-                e.errno(),
-                "cannot find the loader at /lib/ld-musl-x86_64.so.1"
-            )
-        })?;
-        ldso_inode
-            .read_as_vec()
-            .map_err(|e| errno!(e.errno(), "failed to read the ld.so ELF"))?
-    };
-
-    let ldso_elf_file = {
-        let ldso_elf_file = ElfFile::new(&ldso_elf_buf)
-            .map_err(|e| errno!(ENOEXEC, "failed to parse the ld.so ELF"))?;
-        header::sanity_check(&ldso_elf_file)
-            .map_err(|e| errno!(ENOEXEC, "failed to parse the ld.so ELF"))?;
-        /*
-            elf_helper::print_program_headers(&elf_file)?;
-            elf_helper::print_sections(&elf_file)?;
-            elf_helper::print_pltrel_section(&elf_file)?;
-        */
-        ldso_elf_file
-    };
+    let exec_elf_file =
+        ElfFile::new(&elf_buf).cause_err(|e| errno!(e.errno(), "invalid executable"))?;
+    let ldso_elf_file =
+        ElfFile::new(&ldso_elf_buf).cause_err(|e| errno!(e.errno(), "invalid ld.so"))?;
 
     let (new_pid, new_process_ref) = {
         let cwd = parent_ref.lock().unwrap().get_cwd().to_owned();
-        let vm = init_vm::do_init(&elf_file, &elf_buf[..], &ldso_elf_file, &ldso_elf_buf[..])?;
-        let base_addr = vm.get_base_addr();
-        let auxtbl = init_auxtbl(&vm, &elf_file)?;
+        let vm = init_vm::do_init(&exec_elf_file, &ldso_elf_file)?;
+        let auxtbl = init_auxtbl(&vm, &exec_elf_file)?;
         let task = {
             let ldso_entry = {
-                let ldso_base_addr = vm.get_ldso_code_range().start();
-                let ldso_entry = ldso_base_addr + elf_helper::get_start_address(&ldso_elf_file)?;
-                if !vm.get_ldso_code_range().contains(ldso_entry) {
+                let ldso_range = vm.get_elf_ranges()[1];
+                let ldso_entry =
+                    ldso_range.start() + ldso_elf_file.elf_header().entry_point() as usize;
+                if !ldso_range.contains(ldso_entry) {
                     return_errno!(EINVAL, "Invalid program entry");
                 }
                 ldso_entry
@@ -128,6 +88,17 @@ pub fn do_spawn<P: AsRef<Path>>(
     process_table::put(new_pid, new_process_ref.clone());
     task::enqueue_task(new_process_ref);
     Ok(new_pid)
+}
+
+fn load_elf_to_vec(elf_path: &str, parent_ref: &ProcessRef) -> Result<Vec<u8>> {
+    #[rustfmt::skip]
+    parent_ref
+        .lock()
+        .unwrap()
+        .lookup_inode(elf_path)
+            .map_err(|e| errno!(e.errno(), "cannot find the ELF"))?
+        .read_as_vec()
+            .map_err(|e| errno!(e.errno(), "failed to read the executable ELF"))
 }
 
 fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<FileTable> {
@@ -183,7 +154,7 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
     Ok(file_table)
 }
 
-fn init_auxtbl(process_vm: &ProcessVM, elf_file: &ElfFile) -> Result<AuxTable> {
+fn init_auxtbl(process_vm: &ProcessVM, exec_elf_file: &ElfFile) -> Result<AuxTable> {
     let mut auxtbl = AuxTable::new();
     auxtbl.set(AuxKey::AT_PAGESZ, 4096)?;
     auxtbl.set(AuxKey::AT_UID, 0)?;
@@ -191,20 +162,20 @@ fn init_auxtbl(process_vm: &ProcessVM, elf_file: &ElfFile) -> Result<AuxTable> {
     auxtbl.set(AuxKey::AT_EUID, 0)?;
     auxtbl.set(AuxKey::AT_EGID, 0)?;
     auxtbl.set(AuxKey::AT_SECURE, 0)?;
+    auxtbl.set(AuxKey::AT_SYSINFO, 0)?;
 
-    let process_base_addr = process_vm.get_process_range().start();
-    let ph = elf_helper::get_program_header_info(elf_file)?;
-    auxtbl.set(AuxKey::AT_PHDR, (process_base_addr + ph.addr) as u64)?;
-    auxtbl.set(AuxKey::AT_PHENT, ph.entry_size as u64)?;
-    auxtbl.set(AuxKey::AT_PHNUM, ph.entry_num as u64)?;
+    let exec_elf_base = process_vm.get_elf_ranges()[0].start() as u64;
+    let exec_elf_header = exec_elf_file.elf_header();
+    auxtbl.set(AuxKey::AT_PHENT, exec_elf_header.ph_entry_size() as u64)?;
+    auxtbl.set(AuxKey::AT_PHNUM, exec_elf_header.ph_count() as u64)?;
+    auxtbl.set(AuxKey::AT_PHDR, exec_elf_base + exec_elf_header.ph_offset())?;
+    auxtbl.set(
+        AuxKey::AT_ENTRY,
+        exec_elf_base + exec_elf_header.entry_point(),
+    )?;
 
-    let program_entry = process_base_addr + elf_helper::get_start_address(&elf_file)?;
-    auxtbl.set(AuxKey::AT_ENTRY, program_entry as u64)?;
-
-    let ldso_base = process_vm.get_ldso_code_range().start();
-    auxtbl.set(AuxKey::AT_BASE, ldso_base as u64)?;
-
-    auxtbl.set(AuxKey::AT_SYSINFO, 123)?;
+    let ldso_elf_base = process_vm.get_elf_ranges()[1].start() as u64;
+    auxtbl.set(AuxKey::AT_BASE, ldso_elf_base)?;
 
     let syscall_addr = __occlum_syscall as *const () as u64;
     auxtbl.set(AuxKey::AT_OCCLUM_ENTRY, syscall_addr)?;
