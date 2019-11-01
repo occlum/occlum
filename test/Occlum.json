@@ -11,6 +11,9 @@
         "OCCLUM=yes",
         "TEST=true"
     ],
+    "entry_points": [
+        "/bin"
+    ],
     "mount": [
         {
             "target": "/",

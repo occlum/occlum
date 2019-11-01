@@ -80,6 +80,7 @@ pub struct Config {
     pub vm: ConfigVM,
     pub process: ConfigProcess,
     pub env: Vec<CString>,
+    pub entry_points: Vec<PathBuf>,
     pub mount: Vec<ConfigMount>,
 }
 
@@ -128,6 +129,17 @@ impl Config {
             }
             env
         };
+        let entry_points = {
+            let mut entry_points = Vec::new();
+            for ep in &input.entry_points {
+                let ep_path = Path::new(ep).to_path_buf();
+                if !ep_path.is_absolute() {
+                    return_errno!(EINVAL, "entry point must be an absolute path")
+                }
+                entry_points.push(ep_path);
+            }
+            entry_points
+        };
         let mount = {
             let mut mount = Vec::new();
             for input_mount in &input.mount {
@@ -139,6 +151,7 @@ impl Config {
             vm,
             process,
             env,
+            entry_points,
             mount,
         })
     }
@@ -246,6 +259,8 @@ struct InputConfig {
     #[serde(default)]
     pub env: Vec<String>,
     #[serde(default)]
+    pub entry_points: Vec<String>,
+    #[serde(default)]
     pub mount: Vec<InputConfigMount>,
 }
 
@@ -269,7 +284,6 @@ impl Default for InputConfigVM {
         }
     }
 }
-
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 struct InputConfigProcess {

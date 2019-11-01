@@ -34,6 +34,7 @@ cat <<EOF
             "type": "ramfs"
         }
     ],
-    "env": $OCCLUM_CONF_ENV
+    "env": $OCCLUM_CONF_ENV,
+    "entry_points": $OCCLUM_CONF_ENTRY_POINTS
 }
 EOF
