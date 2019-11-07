@@ -1,0 +1,18 @@
+diff --git a/tracker/dmlc_tracker/local.py b/tracker/dmlc_tracker/local.py
+index dff7c17..fca0f9d 100644
+--- a/tracker/dmlc_tracker/local.py
++++ b/tracker/dmlc_tracker/local.py
+@@ -24,6 +24,13 @@ def exec_cmd(cmd, role, taskid, pass_env):
+ 
+     num_retry = env.get('DMLC_NUM_ATTEMPT', 0)
+ 
++    cmd_str = ''
++    for k, v in env.items():
++        if str(k)[0:4] == 'DMLC':
++            strenv = str(k) + '=' + str(v);
++            cmd_str = cmd_str + ' ' + strenv
++    cmd = cmd + cmd_str
++
+     while True:
+         if os.name == 'nt':
+             ret = subprocess.call(cmd, shell=True, env=env)

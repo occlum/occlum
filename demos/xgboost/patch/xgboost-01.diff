@@ -1,0 +1,21 @@
+diff --git a/src/cli_main.cc b/src/cli_main.cc
+index faa93ad..a201615 100644
+--- a/src/cli_main.cc
++++ b/src/cli_main.cc
+@@ -339,6 +339,16 @@ int CLIRunTask(int argc, char *argv[]) {
+     printf("Usage: <config>\n");
+     return 0;
+   }
++
++  //FIXME:workaroud for local distributed machine learning on Occlum
++  for (int i = 2; i < argc; ++i) {
++    char name[128], val[128];
++    if (sscanf(argv[i], "%[^=]=%s", name, val) == 2) {
++      //LOG(CONSOLE) << "setenv: " << std::string(name) << " = " << std::string(val);
++      setenv(std::string(name).c_str(), std::string(val).c_str(), 1);
++    }
++  }
++
+   rabit::Init(argc, argv);
+ 
+   std::vector<std::pair<std::string, std::string> > cfg;

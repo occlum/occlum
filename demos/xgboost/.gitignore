@@ -1,0 +1,5 @@
+xgboost_src/
+data/
+host/
+occlum_workspace/
+tmp_*
