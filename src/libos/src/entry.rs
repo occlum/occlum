@@ -149,7 +149,7 @@ fn validate_program_path(target_path: &PathBuf) -> Result<()> {
         .iter()
         .any(|valid_path_prefix| target_path.starts_with(valid_path_prefix));
     if !is_valid_entry_point {
-        return_errno!(EINVAL, "program path is a valid entry point");
+        return_errno!(EINVAL, "program path is NOT a valid entry point");
     }
     Ok(())
 }
