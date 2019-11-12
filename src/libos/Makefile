@@ -39,12 +39,16 @@ BUILTIN_C_SRCS := $(sort $(wildcard src/builtin/*.c))
 BUILTIN_C_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(BUILTIN_C_SRCS:.c=.o))
 C_SRCS := $(filter-out $(BUILTIN_C_SRCS),$(sort $(wildcard src/*.c src/*/*.c)))
 C_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(C_SRCS:.c=.o))
+CXX_SRCS := $(sort $(wildcard src/*.cpp src/*/*.cpp))
+CXX_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(CXX_SRCS:.cpp=.o))
 S_SRCS := $(sort $(wildcard src/*.S src/*/*.S))
 S_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(S_SRCS:.S=.o))
 
-ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(LIBOS_SO) $(EDL_C_OBJS) $(BUILTIN_C_OBJS) $(C_OBJS) $(S_OBJS)) $(RUST_TARGET_DIR) $(RUST_OUT_DIR)))
+ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(LIBOS_SO) $(EDL_C_OBJS) $(BUILTIN_C_OBJS) $(C_OBJS) $(CXX_OBJS) $(S_OBJS)) $(RUST_TARGET_DIR) $(RUST_OUT_DIR)))
 
-C_FLAGS := $(SGX_CFLAGS_T) -fno-stack-protector -I./include/
+C_COMMON_FLAGS := -fno-stack-protector -I./include/
+C_FLAGS := $(SGX_CFLAGS_T) $(C_COMMON_FLAGS)
+CXX_FLAGS := $(SGX_CXXFLAGS_T) $(C_COMMON_FLAGS)
 
 # Pass builtin values by defining macros
 #
@@ -79,9 +83,9 @@ $(LIBOS_SO): $(BUILTIN_C_OBJS)
 	@echo "LINK => $@"
 endif
 
-$(LIBOS_CORE_A): $(LIBOS_RS_A) $(C_OBJS) $(S_OBJS) $(EDL_C_OBJS)
+$(LIBOS_CORE_A): $(LIBOS_RS_A) $(C_OBJS) $(CXX_OBJS) $(S_OBJS) $(EDL_C_OBJS)
 	@cp $(LIBOS_RS_A) $(LIBOS_CORE_A)
-	@ar r $@ $(C_OBJS) $(S_OBJS) $(EDL_C_OBJS)
+	@ar r $@ $(C_OBJS) $(CXX_OBJS) $(S_OBJS) $(EDL_C_OBJS)
 	@echo "GEN => $@"
 
 ifeq ($(LIBOS_RELEASE), 0)
@@ -106,9 +110,13 @@ $(BUILD_DIR)/src/libos/%.o: %.c
 	@$(CC) $(C_FLAGS) -c $< -o $@
 	@echo "CC <= $@"
 
+$(BUILD_DIR)/src/libos/%.o: %.cpp
+	@$(CXX) $(CXX_FLAGS) -c $< -o $@
+	@echo "CXX <= $@"
+
 $(BUILD_DIR)/src/libos/%.o: %.S
 	@$(CC) $(C_FLAGS) -c $< -o $@
-	@echo "CC <= $@"
+	@echo "AS <= $@"
 
 $(LIBCOMPILER_RT_PATCH_A):
 	@$(MAKE) --no-print-directory -C $(RUST_SGX_SDK_DIR)/compiler-rt/ > /dev/null
@@ -120,5 +128,5 @@ clean-builtin:
 
 clean: clean-builtin
 	@-$(RM) -f $(LIBOS_SO) $(LIBOS_CORE_A) $(LIBOS_RS_A) \
-		$(LIBCOMPILER_RT_PATCH_A) $(EDL_C_OBJS) $(EDL_C_SRCS) $(C_OBJS) $(S_OBJS)
+		$(LIBCOMPILER_RT_PATCH_A) $(EDL_C_OBJS) $(EDL_C_SRCS) $(C_OBJS) $(CXX_OBJS) $(S_OBJS)
 	@-$(RM) -rf $(RUST_TARGET_DIR)

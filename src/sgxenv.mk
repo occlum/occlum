@@ -64,11 +64,10 @@ ProtectedFs_Library_Name := sgx_tprotected_fs
 #
 # Export flags used to compile or link untrusted modules
 #
-SGX_CFLAGS_U := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes
-SGX_CFLAGS_U += -I$(SGX_SDK)/include
+SGX_CFLAGS_U := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes -I$(SGX_SDK)/include
+SGX_CXXFLAGS_U := $(SGX_CFLAGS_U) -std=c++11
 
-SGX_LFLAGS_U := $(SGX_COMMON_CFLAGS) -lpthread
-SGX_LFLAGS_U += -L$(SGX_LIBRARY_PATH) -l$(Urts_Library_Name)
+SGX_LFLAGS_U := $(SGX_COMMON_CFLAGS) -lpthread -L$(SGX_LIBRARY_PATH) -l$(Urts_Library_Name)
 ifneq ($(SGX_MODE), HW)
 	SGX_LFLAGS_U += -lsgx_uae_service_sim
 else
@@ -78,8 +77,9 @@ endif
 #
 # Export flags used to compile or link untrusted modules
 #
-SGX_CFLAGS_T := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fstack-protector
-SGX_CFLAGS_T += -I$(RUST_SGX_SDK_DIR)/common/inc/ -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/stlport -I$(SGX_SDK)/include/epid
+SGX_CFLAGS_T := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fstack-protector \
+	-I$(RUST_SGX_SDK_DIR)/common/inc/ -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc
+SGX_CXXFLAGS_T := $(SGX_CFLAGS_T) -std=c++11 -nostdinc++ -I$(SGX_SDK)/include/libcxx
 
 # Before use this linker flag, the user should define $(_Other_Enclave_Libs),
 # and $(_Other_Link_Flags)
