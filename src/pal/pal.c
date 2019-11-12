@@ -306,15 +306,15 @@ int SGX_CDECL main(int argc, const char *argv[])
     if (argc < 2) {
         printf("ERROR: at least one argument must be provided\n\n");
         printf("Usage: pal <executable> <arg1> <arg2>...\n");
-        return -1;
+        return EXIT_FAILURE;
     }
     const char* executable_path = argv[1];
 
     /* Initialize the enclave */
-    if(initialize_enclave() < 0){
+    if (initialize_enclave() < 0){
         printf("Enter a character before exit ...\n");
         getchar();
-        return -1;
+        return EXIT_FAILURE;
     }
 
     // First ecall do a lot initializations.
@@ -324,9 +324,12 @@ int SGX_CDECL main(int argc, const char *argv[])
     gettimeofday(&libosready, NULL);
 
     sgx_ret = libos_boot(global_eid, &status, executable_path, &argv[2]);
-    if(sgx_ret != SGX_SUCCESS) {
+    if (sgx_ret != SGX_SUCCESS) {
         print_error_message(sgx_ret);
-        return status;
+        return EXIT_FAILURE;
+    }
+    if (status != 0) {
+        return EXIT_FAILURE;
     }
 
     // TODO: exit all tasks gracefully, instead of killing all remaining
