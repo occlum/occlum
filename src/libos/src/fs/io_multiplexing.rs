@@ -186,7 +186,14 @@ pub fn do_epoll_ctl(
     let mut file_ref = file_table_ref.get(epfd)?;
     let mut epoll = file_ref.as_epoll()?.inner.lock().unwrap();
 
-    let host_fd = file_table_ref.get(fd)?.as_socket()?.fd() as FileDesc;
+    let fd_ref = file_table_ref.get(fd)?;
+    let sock_result = fd_ref.as_socket();
+    if sock_result.is_err() {
+        //FIXME: workaround for grpc, other fd types including pipe should be supported
+        return Ok(());
+    }
+
+    let host_fd = sock_result.unwrap().fd() as FileDesc;
     epoll.ctl(op, host_fd, event)?;
 
     Ok(())
