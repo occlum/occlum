@@ -9,45 +9,138 @@
 #include <spawn.h>
 #include <unistd.h>
 
+#include "test.h"
+
+#define RESPONSE "ACK"
+#define DEFAULT_MSG "Hello World!\n"
+
+int connect_with_server(const char *addr_string, const char *port_string) {
+    //"NULL" addr means connectionless, no need to connect to server
+    if (strcmp(addr_string, "NULL") == 0)
+        return 0;
+
+    int ret = 0;
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0)
+        THROW_ERROR("create socket error");
+
+    struct sockaddr_in servaddr;
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons((uint16_t)strtol(port_string, NULL, 10));
+    ret = inet_pton(AF_INET, addr_string, &servaddr.sin_addr);
+    if (ret <= 0) {
+        close(sockfd);
+        THROW_ERROR("inet_pton error");
+    }
+
+    ret = connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+    if (ret < 0) {
+        close(sockfd);
+        THROW_ERROR("connect error");
+    }
+
+    return sockfd;
+}
+
+int neogotiate_msg(int server_fd, char *buf, int buf_size) {
+    if (read(server_fd, buf, buf_size) < 0)
+        THROW_ERROR("read failed");
+
+    if (write(server_fd, RESPONSE, sizeof(RESPONSE)) < 0) {
+        THROW_ERROR("write failed");
+    }
+    return 0;
+}
+
+int client_send(int server_fd, char *buf) {
+    if (send(server_fd, buf, strlen(buf), 0) < 0)
+        THROW_ERROR("send msg error");
+    return 0;
+}
+
+int client_sendmsg(int server_fd, char *buf) {
+    int ret = 0;
+    struct msghdr msg;
+    struct iovec iov[1];
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
+    iov[0].iov_base = buf;
+    iov[0].iov_len = strlen(buf);
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = 0;
+    msg.msg_controllen = 0;
+    msg.msg_flags = 0;
+
+    ret = sendmsg(server_fd, &msg, 0);
+    if (ret <= 0)
+        THROW_ERROR("sendmsg failed");
+    return ret;
+}
+
+int client_connectionless_sendmsg(char *buf) {
+    int ret = 0;
+    struct msghdr msg;
+    struct iovec iov[1];
+    struct sockaddr_in servaddr;
+    memset(&servaddr, 0, sizeof(servaddr));
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(9900);
+    servaddr.sin_addr.s_addr= htonl(INADDR_ANY);
+
+    msg.msg_name = &servaddr;
+    msg.msg_namelen = sizeof(servaddr);
+    iov[0].iov_base = buf;
+    iov[0].iov_len = strlen(buf);
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = 0;
+    msg.msg_controllen = 0;
+    msg.msg_flags = 0;
+
+    int server_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (server_fd < 0)
+        THROW_ERROR("create socket error");
+
+    ret = sendmsg(server_fd, &msg, 0);
+    if (ret <= 0)
+        THROW_ERROR("sendmsg failed");
+    return ret;
+}
+
 int main(int argc, const char *argv[]) {
-	const char* message = "Hello world!";
-	int ret;
+    if (argc != 3) {
+        THROW_ERROR("usage: ./client <ipaddress> <port>\n");
+    }
 
-	if (argc != 3) {
-		printf("usage: ./client <ipaddress> <port>\n");
-		return 0;
-	}
+    int ret = 0;
+    const int buf_size = 100;
+    char buf[buf_size];
+    int port = strtol(argv[2], NULL, 10);
+    int server_fd = connect_with_server(argv[1], argv[2]);
 
-	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockfd < 0) {
-		printf("create socket error: %s(errno: %d)\n", strerror(errno), errno);
-		return -1;
-	}
+    switch (port)
+    {
+        case 8800:
+            neogotiate_msg(server_fd, buf, buf_size);
+            break;
+        case 8801:
+            neogotiate_msg(server_fd, buf, buf_size);
+            ret = client_send(server_fd, buf);
+            break;
+        case 8802:
+            neogotiate_msg(server_fd, buf, buf_size);
+            ret = client_sendmsg(server_fd, buf);
+            break;
+        case 8803:
+            ret = client_connectionless_sendmsg(DEFAULT_MSG);
+            break;
+        default:
+            ret = client_send(server_fd, DEFAULT_MSG);
+    }
 
-	struct sockaddr_in servaddr;
-	memset(&servaddr, 0, sizeof(servaddr));
-	servaddr.sin_family = AF_INET;
-	servaddr.sin_port = htons((uint16_t)strtol(argv[2], NULL, 10));
-
-	ret = inet_pton(AF_INET, argv[1], &servaddr.sin_addr);
-	if (ret <= 0) {
-		printf("inet_pton error for %s\n", argv[1]);
-		return -1;
-	}
-
-	ret = connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
-	if (ret < 0) {
-		printf("connect error: %s(errno: %d)\n", strerror(errno), errno);
-		return -1;
-	}
-
-	printf("send msg to server: %s\n", message);
-	ret = send(sockfd, message, strlen(message), 0);
-	if (ret < 0) {
-		printf("send msg error: %s(errno: %d)\n", strerror(errno), errno);
-		return -1;
-	}
-
-	close(sockfd);
-	return 0;
+    close(server_fd);
+    return ret;
 }

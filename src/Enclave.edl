@@ -40,5 +40,30 @@ enclave {
             [out] sgx_report_t* qe_report,
             [out, size=quote_buf_len] uint8_t* quote_buf,
             uint32_t quote_buf_len);
-        };
+
+        int64_t ocall_sendmsg(
+            int sockfd,
+            [in, size=msg_namelen] const void* msg_name,
+            socklen_t msg_namelen,
+            [in, size=buf_len] const void* buf,
+            size_t buf_len,
+            [in, size=msg_controllen] const void* msg_control,
+            size_t msg_controllen,
+            int flags
+        ) propagate_errno;
+
+        int64_t ocall_recvmsg(
+            int sockfd,
+            [out, size=msg_namelen] void *msg_name,
+            socklen_t msg_namelen,
+            [out] socklen_t* msg_namelen_recv,
+            [out, size=buf_len] void* buf,
+            size_t buf_len,
+            [out, size=msg_controllen] void *msg_control,
+            size_t msg_controllen,
+            [out] size_t* msg_controllen_recv,
+            [out] int* msg_flags_recv,
+            int flags
+        ) propagate_errno;
+    };
 };

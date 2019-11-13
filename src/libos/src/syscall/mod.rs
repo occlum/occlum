@@ -7,8 +7,12 @@
 //! 3. Dispatch the syscall to `do_*` (at this file)
 //! 4. Do some memory checks then call `mod::do_*` (at each module)
 
-use fs::*;
+use fs::{
+    AccessFlags, AccessModes, AsUnixSocket, FcntlCmd, File, FileDesc, FileRef, IoctlCmd,
+    UnixSocketFile, AT_FDCWD,
+};
 use misc::{resource_t, rlimit_t, utsname_t};
+use net::{msghdr, msghdr_mut, AsSocket, SocketFile};
 use process::{pid_t, ChildProcessFilter, CloneFlags, CpuSet, FileAction, FutexFlags, FutexOp};
 use std::ffi::{CStr, CString};
 use std::ptr;
@@ -307,12 +311,16 @@ pub extern "C" fn dispatch_syscall(
             arg4 as *mut libc::sockaddr,
             arg5 as *mut libc::socklen_t,
         ),
+
         SYS_SOCKETPAIR => do_socketpair(
             arg0 as c_int,
             arg1 as c_int,
             arg2 as c_int,
             arg3 as *mut c_int,
         ),
+
+        SYS_SENDMSG => net::do_sendmsg(arg0 as c_int, arg1 as *const msghdr, arg2 as c_int),
+        SYS_RECVMSG => net::do_recvmsg(arg0 as c_int, arg1 as *mut msghdr_mut, arg2 as c_int),
 
         _ => do_unknown(num, arg0, arg1, arg2, arg3, arg4, arg5),
     };

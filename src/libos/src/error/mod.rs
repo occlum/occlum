@@ -44,7 +44,7 @@ macro_rules! return_errno {
 macro_rules! try_libc {
     ($ret: expr) => {{
         let ret = unsafe { $ret };
-        if ret == -1 {
+        if ret < 0 {
             let errno = unsafe { libc::errno() };
             return_errno!(Errno::from(errno as u32), "libc error");
         }

@@ -1,5 +1,6 @@
 use super::*;
 
+use net::{AsSocket, SocketFile};
 use process::Process;
 use rcore_fs::vfs::{FileType, FsError, INode, Metadata, Timespec};
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -19,7 +20,6 @@ pub use self::io_multiplexing::*;
 pub use self::ioctl::*;
 pub use self::pipe::Pipe;
 pub use self::root_inode::ROOT_INODE;
-pub use self::socket_file::{AsSocket, SocketFile};
 pub use self::unix_socket::{AsUnixSocket, UnixSocketFile};
 use sgx_trts::libc::S_IWUSR;
 use std::any::Any;
@@ -39,7 +39,6 @@ mod ioctl;
 mod pipe;
 mod root_inode;
 mod sgx_impl;
-mod socket_file;
 mod unix_socket;
 
 pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc> {

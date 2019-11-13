@@ -1,16 +1,22 @@
 use super::*;
+
+mod recv;
+mod send;
+
+use fs::{File, FileRef, IoctlCmd};
 use std::any::Any;
+use std::io::{Read, Seek, SeekFrom, Write};
 
 /// Native Linux socket
 #[derive(Debug)]
 pub struct SocketFile {
-    fd: c_int,
+    host_fd: c_int,
 }
 
 impl SocketFile {
     pub fn new(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<Self> {
         let ret = try_libc!(libc::ocall::socket(domain, socket_type, protocol));
-        Ok(SocketFile { fd: ret })
+        Ok(SocketFile { host_fd: ret })
     }
 
     pub fn accept(
@@ -19,32 +25,28 @@ impl SocketFile {
         addr_len: *mut libc::socklen_t,
         flags: c_int,
     ) -> Result<Self> {
-        let ret = try_libc!(libc::ocall::accept4(self.fd, addr, addr_len, flags));
-        Ok(SocketFile { fd: ret })
+        let ret = try_libc!(libc::ocall::accept4(self.host_fd, addr, addr_len, flags));
+        Ok(SocketFile { host_fd: ret })
     }
 
     pub fn fd(&self) -> c_int {
-        self.fd
+        self.host_fd
     }
 }
 
 impl Drop for SocketFile {
     fn drop(&mut self) {
-        let ret = unsafe { libc::ocall::close(self.fd) };
-        if ret < 0 {
-            let errno = unsafe { libc::errno() };
-            warn!(
-                "socket (host fd: {}) close failed: errno = {}",
-                self.fd, errno
-            );
-        }
+        let ret = unsafe { libc::ocall::close(self.host_fd) };
+        assert!(ret == 0);
     }
 }
 
+// TODO: rewrite read/write/readv/writev as send/recv
+// TODO: implement readfrom/sendto
 impl File for SocketFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let ret = try_libc!(libc::ocall::read(
-            self.fd,
+            self.host_fd,
             buf.as_mut_ptr() as *mut c_void,
             buf.len()
         ));
@@ -53,7 +55,7 @@ impl File for SocketFile {
 
     fn write(&self, buf: &[u8]) -> Result<usize> {
         let ret = try_libc!(libc::ocall::write(
-            self.fd,
+            self.host_fd,
             buf.as_ptr() as *const c_void,
             buf.len()
         ));
@@ -98,25 +100,6 @@ impl File for SocketFile {
 
     fn seek(&self, pos: SeekFrom) -> Result<off_t> {
         return_errno!(ESPIPE, "Socket does not support seek")
-    }
-
-    fn metadata(&self) -> Result<Metadata> {
-        Ok(Metadata {
-            dev: 0,
-            inode: 0,
-            size: 0,
-            blk_size: 0,
-            blocks: 0,
-            atime: Timespec { sec: 0, nsec: 0 },
-            mtime: Timespec { sec: 0, nsec: 0 },
-            ctime: Timespec { sec: 0, nsec: 0 },
-            type_: FileType::Socket,
-            mode: 0,
-            nlinks: 0,
-            uid: 0,
-            gid: 0,
-            rdev: 0,
-        })
     }
 
     fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<()> {

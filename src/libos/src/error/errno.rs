@@ -141,6 +141,7 @@ pub enum Errno {
     EHWPOISON = 133,
     // Note: always keep the last item in sync with ERRNO_MAX
 }
+const ERRNO_MIN: u32 = Errno::EPERM as u32;
 const ERRNO_MAX: u32 = Errno::EHWPOISON as u32;
 
 impl Errno {
@@ -192,10 +193,8 @@ impl Errno {
 }
 
 impl From<u32> for Errno {
-    fn from(mut raw_errno: u32) -> Self {
-        if raw_errno > ERRNO_MAX {
-            raw_errno = 0;
-        }
+    fn from(raw_errno: u32) -> Self {
+        assert!(ERRNO_MIN <= raw_errno && raw_errno <= ERRNO_MAX);
         unsafe { core::mem::transmute(raw_errno as u8) }
     }
 }

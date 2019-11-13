@@ -57,6 +57,7 @@ mod entry;
 mod exception;
 mod fs;
 mod misc;
+mod net;
 mod process;
 mod syscall;
 mod time;
