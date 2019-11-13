@@ -4,19 +4,69 @@ use std::borrow::BorrowMut;
 use std::fmt;
 use std::io::SeekFrom;
 
+macro_rules! return_op_unsupported_error {
+    ($op_name: expr, $errno: expr) => {{
+        let errno = $errno;
+        // FIXME: use the safe core::any::type_name when we upgrade to Rust 1.38 or above
+        let type_name = unsafe { core::intrinsics::type_name::<Self>() };
+        let op_name = $op_name;
+        let error = FileOpNotSupportedError::new(errno, type_name, op_name);
+        return_errno!(error)
+    }};
+    ($op_name: expr) => {{
+        return_op_unsupported_error!($op_name, ENOSYS)
+    }};
+}
+
 pub trait File: Debug + Sync + Send + Any {
-    fn read(&self, buf: &mut [u8]) -> Result<usize>;
-    fn write(&self, buf: &[u8]) -> Result<usize>;
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize>;
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize>;
-    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize>;
-    fn writev(&self, bufs: &[&[u8]]) -> Result<usize>;
-    fn seek(&self, pos: SeekFrom) -> Result<off_t>;
-    fn metadata(&self) -> Result<Metadata>;
-    fn set_len(&self, len: u64) -> Result<()>;
-    fn sync_all(&self) -> Result<()>;
-    fn sync_data(&self) -> Result<()>;
-    fn read_entry(&self) -> Result<String>;
+    fn read(&self, buf: &mut [u8]) -> Result<usize> {
+        return_op_unsupported_error!("read")
+    }
+
+    fn write(&self, buf: &[u8]) -> Result<usize> {
+        return_op_unsupported_error!("write")
+    }
+
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+        return_op_unsupported_error!("read_at")
+    }
+
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+        return_op_unsupported_error!("write_at")
+    }
+
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
+        return_op_unsupported_error!("readv")
+    }
+
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
+        return_op_unsupported_error!("writev")
+    }
+
+    fn seek(&self, pos: SeekFrom) -> Result<off_t> {
+        return_op_unsupported_error!("seek")
+    }
+
+    fn metadata(&self) -> Result<Metadata> {
+        return_op_unsupported_error!("metadata")
+    }
+
+    fn set_len(&self, len: u64) -> Result<()> {
+        return_op_unsupported_error!("set_len")
+    }
+
+    fn read_entry(&self) -> Result<String> {
+        return_op_unsupported_error!("read_entry", ENOTDIR)
+    }
+
+    fn sync_all(&self) -> Result<()> {
+        Ok(())
+    }
+
+    fn sync_data(&self) -> Result<()> {
+        Ok(())
+    }
+
     fn as_any(&self) -> &Any;
 }
 
@@ -94,26 +144,6 @@ impl File for SgxFile {
         let mut inner_guard = self.inner.lock().unwrap();
         let inner = inner_guard.borrow_mut();
         inner.seek(pos)
-    }
-
-    fn metadata(&self) -> Result<Metadata> {
-        unimplemented!()
-    }
-
-    fn set_len(&self, len: u64) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn sync_all(&self) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn sync_data(&self) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn read_entry(&self) -> Result<String> {
-        unimplemented!()
     }
 
     fn as_any(&self) -> &Any {
@@ -296,25 +326,13 @@ impl StdoutFile {
 }
 
 impl File for StdoutFile {
-    fn read(&self, buf: &mut [u8]) -> Result<usize> {
-        return_errno!(EBADF, "Stdout does not support read")
-    }
-
     fn write(&self, buf: &[u8]) -> Result<usize> {
         let write_len = { self.inner.lock().write(buf).map_err(|e| errno!(e))? };
         Ok(write_len)
     }
 
-    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
-        self.read(buf)
-    }
-
     fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         self.write(buf)
-    }
-
-    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-        return_errno!(EBADF, "Stdout does not support read")
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
@@ -341,10 +359,6 @@ impl File for StdoutFile {
         Ok(total_bytes)
     }
 
-    fn seek(&self, seek_pos: SeekFrom) -> Result<off_t> {
-        return_errno!(ESPIPE, "Stdout does not support seek")
-    }
-
     fn metadata(&self) -> Result<Metadata> {
         Ok(Metadata {
             dev: 0,
@@ -364,10 +378,6 @@ impl File for StdoutFile {
         })
     }
 
-    fn set_len(&self, _len: u64) -> Result<()> {
-        return_errno!(EINVAL, "Stdout does not support set_len")
-    }
-
     fn sync_all(&self) -> Result<()> {
         self.sync_data()
     }
@@ -375,10 +385,6 @@ impl File for StdoutFile {
     fn sync_data(&self) -> Result<()> {
         self.inner.lock().flush()?;
         Ok(())
-    }
-
-    fn read_entry(&self) -> Result<String> {
-        return_errno!(ENOTDIR, "Stdout does not support read_entry")
     }
 
     fn as_any(&self) -> &Any {
@@ -413,18 +419,6 @@ impl File for StdinFile {
         Ok(read_len)
     }
 
-    fn write(&self, buf: &[u8]) -> Result<usize> {
-        return_errno!(EBADF, "Stdin does not support write")
-    }
-
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        unimplemented!()
-    }
-
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
-        unimplemented!()
-    }
-
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
         let mut guard = self.inner.lock();
         let mut total_bytes = 0;
@@ -449,14 +443,6 @@ impl File for StdinFile {
         Ok(total_bytes)
     }
 
-    fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
-        return_errno!(EBADF, "Stdin does not support write")
-    }
-
-    fn seek(&self, pos: SeekFrom) -> Result<off_t> {
-        return_errno!(ESPIPE, "Stdin does not support seek")
-    }
-
     fn metadata(&self) -> Result<Metadata> {
         Ok(Metadata {
             dev: 0,
@@ -476,22 +462,6 @@ impl File for StdinFile {
         })
     }
 
-    fn set_len(&self, _len: u64) -> Result<()> {
-        return_errno!(EINVAL, "Stdin does not support set_len")
-    }
-
-    fn sync_all(&self) -> Result<()> {
-        self.sync_data()
-    }
-
-    fn sync_data(&self) -> Result<()> {
-        Ok(())
-    }
-
-    fn read_entry(&self) -> Result<String> {
-        return_errno!(ENOTDIR, "Stdin does not support read_entry")
-    }
-
     fn as_any(&self) -> &Any {
         self
     }
@@ -505,3 +475,36 @@ impl Debug for StdinFile {
 
 unsafe impl Send for StdinFile {}
 unsafe impl Sync for StdinFile {}
+
+#[derive(Copy, Clone, Debug)]
+struct FileOpNotSupportedError {
+    errno: Errno,
+    type_name: &'static str,
+    op_name: &'static str,
+}
+
+impl FileOpNotSupportedError {
+    pub fn new(
+        errno: Errno,
+        type_name: &'static str,
+        op_name: &'static str,
+    ) -> FileOpNotSupportedError {
+        FileOpNotSupportedError {
+            errno,
+            type_name,
+            op_name,
+        }
+    }
+}
+
+impl fmt::Display for FileOpNotSupportedError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} does not support {}", self.type_name, self.op_name)
+    }
+}
+
+impl ToErrno for FileOpNotSupportedError {
+    fn errno(&self) -> Errno {
+        self.errno
+    }
+}

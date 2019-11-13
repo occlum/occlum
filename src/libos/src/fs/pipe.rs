@@ -36,18 +36,6 @@ impl File for PipeReader {
         ringbuf.read(buf)
     }
 
-    fn write(&self, buf: &[u8]) -> Result<usize> {
-        return_errno!(EBADF, "PipeReader does not support write")
-    }
-
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        unimplemented!()
-    }
-
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
-        unimplemented!()
-    }
-
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
         let mut ringbuf = self.inner.lock().unwrap();
         let mut total_bytes = 0;
@@ -72,34 +60,6 @@ impl File for PipeReader {
         Ok(total_bytes)
     }
 
-    fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
-        return_errno!(EBADF, "PipeReader does not support write")
-    }
-
-    fn seek(&self, pos: SeekFrom) -> Result<off_t> {
-        return_errno!(ESPIPE, "Pipe does not support seek")
-    }
-
-    fn metadata(&self) -> Result<Metadata> {
-        unimplemented!()
-    }
-
-    fn set_len(&self, len: u64) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn sync_all(&self) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn sync_data(&self) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn read_entry(&self) -> Result<String> {
-        unimplemented!()
-    }
-
     fn as_any(&self) -> &Any {
         self
     }
@@ -114,24 +74,9 @@ pub struct PipeWriter {
 }
 
 impl File for PipeWriter {
-    fn read(&self, buf: &mut [u8]) -> Result<usize> {
-        return_errno!(EBADF, "PipeWriter does not support read")
-    }
-
     fn write(&self, buf: &[u8]) -> Result<usize> {
         let ringbuf = self.inner.lock().unwrap();
         ringbuf.write(buf)
-    }
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        unimplemented!()
-    }
-
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
-        unimplemented!()
-    }
-
-    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-        return_errno!(EBADF, "PipeWriter does not support read")
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
@@ -158,28 +103,8 @@ impl File for PipeWriter {
         Ok(total_bytes)
     }
 
-    fn seek(&self, seek_pos: SeekFrom) -> Result<off_t> {
+    fn seek(&self, pos: SeekFrom) -> Result<off_t> {
         return_errno!(ESPIPE, "Pipe does not support seek")
-    }
-
-    fn metadata(&self) -> Result<Metadata> {
-        unimplemented!()
-    }
-
-    fn set_len(&self, len: u64) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn sync_all(&self) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn sync_data(&self) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn read_entry(&self) -> Result<String> {
-        unimplemented!()
     }
 
     fn as_any(&self) -> &Any {

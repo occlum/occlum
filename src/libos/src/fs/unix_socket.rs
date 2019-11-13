@@ -59,10 +59,6 @@ impl File for UnixSocketFile {
         Ok(total_len)
     }
 
-    fn seek(&self, pos: SeekFrom) -> Result<off_t> {
-        return_errno!(ESPIPE, "UnixSocket does not support seek")
-    }
-
     fn metadata(&self) -> Result<Metadata> {
         Ok(Metadata {
             dev: 0,
@@ -80,22 +76,6 @@ impl File for UnixSocketFile {
             gid: 0,
             rdev: 0,
         })
-    }
-
-    fn set_len(&self, len: u64) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn sync_all(&self) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn sync_data(&self) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn read_entry(&self) -> Result<String> {
-        unimplemented!()
     }
 
     fn as_any(&self) -> &Any {

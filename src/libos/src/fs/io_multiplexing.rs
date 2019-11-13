@@ -308,54 +308,6 @@ impl Drop for EpollFileInner {
 }
 
 impl File for EpollFile {
-    fn read(&self, buf: &mut [u8]) -> Result<usize> {
-        unimplemented!()
-    }
-
-    fn write(&self, buf: &[u8]) -> Result<usize> {
-        unimplemented!()
-    }
-
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        unimplemented!()
-    }
-
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
-        unimplemented!()
-    }
-
-    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-        unimplemented!()
-    }
-
-    fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
-        unimplemented!()
-    }
-
-    fn seek(&self, pos: SeekFrom) -> Result<off_t> {
-        return_errno!(ESPIPE, "Epoll does not support seek")
-    }
-
-    fn metadata(&self) -> Result<Metadata> {
-        unimplemented!()
-    }
-
-    fn set_len(&self, len: u64) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn sync_all(&self) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn sync_data(&self) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn read_entry(&self) -> Result<String> {
-        unimplemented!()
-    }
-
     fn as_any(&self) -> &Any {
         self
     }

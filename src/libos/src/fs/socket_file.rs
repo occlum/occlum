@@ -119,22 +119,6 @@ impl File for SocketFile {
         })
     }
 
-    fn set_len(&self, len: u64) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn sync_all(&self) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn sync_data(&self) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn read_entry(&self) -> Result<String> {
-        unimplemented!()
-    }
-
     fn as_any(&self) -> &Any {
         self
     }
