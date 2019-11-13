@@ -89,7 +89,7 @@ main(int argc, char *argv[]) {
 	/* The event loop */
 	int done_count = 0;
 	while (done_count < proc_num) {
-		int n = epoll_wait(efd, events, MAXEVENTS, -1);
+		int n = epoll_pwait(efd, events, MAXEVENTS, -1, NULL);
 		for (int i = 0; i < n; i++) {
 			if ((events[i].events & EPOLLERR) ||
 				(events[i].events & EPOLLHUP) ||

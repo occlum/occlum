@@ -135,6 +135,13 @@ pub extern "C" fn dispatch_syscall(
             arg2 as c_int,
             arg3 as c_int,
         ),
+        SYS_EPOLL_PWAIT => do_epoll_pwait(
+            arg0 as c_int,
+            arg1 as *mut libc::epoll_event,
+            arg2 as c_int,
+            arg3 as c_int,
+            arg4 as *const usize, //TODO:add sigset_t
+        ),
 
         // process
         SYS_EXIT => do_exit(arg0 as i32),
@@ -1416,6 +1423,18 @@ fn do_epoll_wait(
     };
     let count = fs::do_epoll_wait(epfd as FileDesc, events, timeout)?;
     Ok(count as isize)
+}
+
+fn do_epoll_pwait(
+    epfd: c_int,
+    events: *mut libc::epoll_event,
+    maxevents: c_int,
+    timeout: c_int,
+    sigmask: *const usize, //TODO:add sigset_t
+) -> Result<isize> {
+    info!("epoll_pwait");
+    //TODO:add signal support
+    do_epoll_wait(epfd, events, maxevents, 0)
 }
 
 fn do_uname(name: *mut utsname_t) -> Result<isize> {
