@@ -78,6 +78,11 @@ impl File for UnixSocketFile {
         })
     }
 
+    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<()> {
+        let mut inner = self.inner.lock().unwrap();
+        inner.ioctl(cmd)
+    }
+
     fn as_any(&self) -> &Any {
         self
     }
@@ -117,11 +122,6 @@ impl UnixSocketFile {
     pub fn poll(&self) -> Result<(bool, bool, bool)> {
         let mut inner = self.inner.lock().unwrap();
         inner.poll()
-    }
-
-    pub fn ioctl(&self, cmd: c_int, argp: *mut c_int) -> Result<()> {
-        let mut inner = self.inner.lock().unwrap();
-        inner.ioctl(cmd, argp)
     }
 }
 
@@ -231,18 +231,19 @@ impl UnixSocket {
         Ok((r, w, false))
     }
 
-    pub fn ioctl(&self, cmd: c_int, argp: *mut c_int) -> Result<()> {
-        const FIONREAD: c_int = 0x541B; // Get the number of bytes to read
-        if cmd == FIONREAD {
-            let bytes_to_read = self.channel()?.reader.bytes_to_read();
-            unsafe {
-                argp.write(bytes_to_read as c_int);
+    pub fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<()> {
+        match cmd {
+            IoctlCmd::FIONREAD(arg) => {
+                let bytes_to_read = self
+                    .channel()?
+                    .reader
+                    .bytes_to_read()
+                    .min(std::i32::MAX as usize) as i32;
+                **arg = bytes_to_read;
             }
-            Ok(())
-        } else {
-            warn!("ioctl for unix socket is unimplemented");
-            return_errno!(ENOSYS, "ioctl for unix socket is unimplemented")
+            _ => return_errno!(EINVAL, "unknown ioctl cmd for unix socket"),
         }
+        Ok(())
     }
 
     fn channel(&self) -> Result<&Channel> {

@@ -106,7 +106,7 @@ pub extern "C" fn dispatch_syscall(
             arg3 as usize,
         ),
         SYS_FCNTL => do_fcntl(arg0 as FileDesc, arg1 as u32, arg2 as u64),
-        SYS_IOCTL => do_ioctl(arg0 as FileDesc, arg1 as c_int, arg2 as *mut c_int),
+        SYS_IOCTL => do_ioctl(arg0 as FileDesc, arg1 as u32, arg2 as *mut u8),
 
         // IO multiplexing
         SYS_SELECT => do_select(
@@ -962,22 +962,16 @@ fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize> {
     fs::do_fcntl(fd, &cmd)
 }
 
-fn do_ioctl(fd: FileDesc, cmd: c_int, argp: *mut c_int) -> Result<isize> {
+fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
     info!("ioctl: fd: {}, cmd: {}, argp: {:?}", fd, cmd, argp);
-    let current_ref = process::get_current();
-    let mut proc = current_ref.lock().unwrap();
-    let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
-    if let Ok(socket) = file_ref.as_socket() {
-        let ret = try_libc!(libc::ocall::ioctl_arg1(socket.fd(), cmd, argp));
-        Ok(ret as isize)
-    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
-        // TODO: check argp
-        unix_socket.ioctl(cmd, argp)?;
-        Ok(0)
-    } else {
-        warn!("ioctl is unimplemented");
-        return_errno!(ENOSYS, "ioctl is unimplemented")
-    }
+    let mut ioctl_cmd = unsafe {
+        if argp.is_null() == false {
+            check_mut_ptr(argp)?;
+        }
+        IoctlCmd::new(cmd, argp)?
+    };
+    fs::do_ioctl(fd, &mut ioctl_cmd)?;
+    Ok(0)
 }
 
 fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize> {

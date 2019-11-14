@@ -67,6 +67,10 @@ pub trait File: Debug + Sync + Send + Any {
         Ok(())
     }
 
+    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<()> {
+        return_op_unsupported_error!("ioctl")
+    }
+
     fn as_any(&self) -> &Any;
 }
 
@@ -384,6 +388,32 @@ impl File for StdoutFile {
 
     fn sync_data(&self) -> Result<()> {
         self.inner.lock().flush()?;
+        Ok(())
+    }
+
+    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<()> {
+        let can_delegate_to_host = match cmd {
+            IoctlCmd::TIOCGWINSZ(_) => true,
+            IoctlCmd::TIOCSWINSZ(_) => true,
+            _ => false,
+        };
+        if !can_delegate_to_host {
+            return_errno!(EINVAL, "unknown ioctl cmd for stdout");
+        }
+
+        let cmd_bits = cmd.cmd_num() as c_int;
+        let cmd_arg_ptr = cmd.arg_ptr() as *const c_int;
+        let host_stdout_fd = {
+            use std::os::unix::io::AsRawFd;
+            self.inner.as_raw_fd() as i32
+        };
+        try_libc!(libc::ocall::ioctl_arg1(
+            host_stdout_fd,
+            cmd_bits,
+            cmd_arg_ptr
+        ));
+        cmd.validate_arg_val()?;
+
         Ok(())
     }
 

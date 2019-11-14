@@ -9,12 +9,14 @@ use {process, std};
 pub use self::access::{do_access, do_faccessat, AccessFlags, AccessModes, AT_FDCWD};
 use self::dev_null::DevNull;
 use self::dev_random::DevRandom;
+use self::dev_sgx::DevSgx;
 use self::dev_zero::DevZero;
 pub use self::file::{File, FileRef, SgxFile, StdinFile, StdoutFile};
 pub use self::file_table::{FileDesc, FileTable};
 use self::inode_file::OpenOptions;
 pub use self::inode_file::{INodeExt, INodeFile};
 pub use self::io_multiplexing::*;
+pub use self::ioctl::*;
 pub use self::pipe::Pipe;
 pub use self::root_inode::ROOT_INODE;
 pub use self::socket_file::{AsSocket, SocketFile};
@@ -26,12 +28,14 @@ use std::mem::uninitialized;
 mod access;
 mod dev_null;
 mod dev_random;
+mod dev_sgx;
 mod dev_zero;
 mod file;
 mod file_table;
 mod hostfs;
 mod inode_file;
 mod io_multiplexing;
+mod ioctl;
 mod pipe;
 mod root_inode;
 mod sgx_impl;
@@ -219,6 +223,14 @@ pub fn do_close(fd: FileDesc) -> Result<()> {
     let mut file_table = file_table_ref.lock().unwrap();
     file_table.del(fd)?;
     Ok(())
+}
+
+pub fn do_ioctl(fd: FileDesc, cmd: &mut IoctlCmd) -> Result<()> {
+    info!("ioctl: fd: {}, cmd: {:?}", fd, cmd);
+    let current_ref = process::get_current();
+    let current_process = current_ref.lock().unwrap();
+    let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
+    file_ref.ioctl(cmd)
 }
 
 pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2]> {
@@ -433,6 +445,9 @@ impl Process {
         }
         if path == "/dev/random" || path == "/dev/urandom" || path == "/dev/arandom" {
             return Ok(Box::new(DevRandom));
+        }
+        if path == "/dev/sgx" {
+            return Ok(Box::new(DevSgx));
         }
         let inode = if flags.contains(OpenFlags::CREATE) {
             let (dir_path, file_name) = split_path(&path);
