@@ -3,14 +3,29 @@ use exception::*;
 use process::pid_t;
 use std::ffi::{CStr, CString, OsString};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Once;
 use util::mem_util::from_untrusted::*;
 
 const ENCLAVE_PATH: &'static str = ".occlum/build/lib/libocclum.signed.so";
 
+lazy_static! {
+    static ref INIT_ONCE: Once = Once::new();
+    static ref ALLOW_RUN: AtomicBool = AtomicBool::new(false);
+}
+
 #[no_mangle]
 pub extern "C" fn libos_boot(path_buf: *const c_char, argv: *const *const c_char) -> i32 {
-    // Init the log infrastructure first so that log messages will be printed afterwards
-    util::log::init();
+    INIT_ONCE.call_once(|| {
+        // Init the log infrastructure first so that log messages will be printed afterwards
+        util::log::init();
+        // Init OpenMP for SFI
+        util::mpx_util::mpx_enable();
+        // Register exception handlers (support cpuid & rdtsc for now)
+        register_exception_handlers();
+
+        ALLOW_RUN.store(true, Ordering::SeqCst);
+    });
 
     let (path, args) = match parse_arguments(path_buf, argv) {
         Ok(path_and_args) => path_and_args,
@@ -19,10 +34,7 @@ pub extern "C" fn libos_boot(path_buf: *const c_char, argv: *const *const c_char
             return EXIT_STATUS_INTERNAL_ERROR;
         }
     };
-
     // register exception handlers (support cpuid & rdtsc for now)
-    register_exception_handlers();
-
     let _ = backtrace::enable_backtrace(ENCLAVE_PATH, PrintFormat::Short);
     panic::catch_unwind(|| {
         backtrace::__rust_begin_short_backtrace(|| match do_boot(&path, &args) {
@@ -38,6 +50,10 @@ pub extern "C" fn libos_boot(path_buf: *const c_char, argv: *const *const c_char
 
 #[no_mangle]
 pub extern "C" fn libos_run(host_tid: i32) -> i32 {
+    if ALLOW_RUN.load(Ordering::SeqCst) == false {
+        return EXIT_STATUS_INTERNAL_ERROR;
+    }
+
     let _ = backtrace::enable_backtrace(ENCLAVE_PATH, PrintFormat::Short);
     panic::catch_unwind(|| {
         backtrace::__rust_begin_short_backtrace(|| match do_run(host_tid as pid_t) {
@@ -87,11 +103,7 @@ fn parse_arguments(
     Ok((path_buf, args))
 }
 
-// TODO: make sure do_boot can only be called once
 fn do_boot(program_path: &PathBuf, argv: &Vec<CString>) -> Result<()> {
-    //    info!("boot: path: {:?}, argv: {:?}", path_str, argv);
-    util::mpx_util::mpx_enable()?;
-
     validate_program_path(program_path)?;
 
     let envp = &config::LIBOS_CONFIG.env;
@@ -99,11 +111,9 @@ fn do_boot(program_path: &PathBuf, argv: &Vec<CString>) -> Result<()> {
     let parent = &process::IDLE_PROCESS;
     let program_path_str = program_path.to_str().unwrap();
     process::do_spawn(&program_path_str, argv, envp, &file_actions, parent)?;
-
     Ok(())
 }
 
-// TODO: make sure do_run() cannot be called after do_boot()
 fn do_run(host_tid: pid_t) -> Result<i32> {
     let exit_status = process::run_task(host_tid)?;
 
