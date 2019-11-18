@@ -86,11 +86,89 @@ static int test_mutex_with_concurrent_counter(void) {
 }
 
 // ============================================================================
+// The test case of waiting condition variable
+// ============================================================================
+
+#define WAIT_ROUND          (100000)
+
+struct thread_cond_arg {
+    int                         ti;
+    volatile unsigned int*      val;
+    volatile int*               exit_thread_count;
+    pthread_cond_t*             cond_val;
+    pthread_mutex_t*            mutex;
+};
+
+static void* thread_cond_wait(void* _arg) {
+    struct thread_cond_arg* arg = _arg;
+    printf("Thread #%d: start to wait on condition variable.\n", arg->ti);
+    for (unsigned int i = 0; i < WAIT_ROUND; ++i) {
+        pthread_mutex_lock(arg->mutex);
+        while (*(arg->val) == 0) {
+            pthread_cond_wait(arg->cond_val, arg->mutex);
+        }
+        pthread_mutex_unlock(arg->mutex);
+    }
+    (*arg->exit_thread_count)++;
+    printf("Thread #%d: exited.\n", arg->ti);
+    return NULL;
+}
+
+static int test_mutex_with_cond_wait(void) {
+    volatile unsigned int val = 0;
+    volatile int exit_thread_count = 0;
+    pthread_t threads[NTHREADS];
+    struct thread_cond_arg thread_args[NTHREADS];
+    pthread_cond_t cond_val = PTHREAD_COND_INITIALIZER;
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+    /*
+     * Start the threads waiting on the condition variable
+     */
+    for (int ti = 0; ti < NTHREADS; ti++) {
+        struct thread_cond_arg* thread_arg = &thread_args[ti];
+        thread_arg->ti = ti;
+        thread_arg->val = &val;
+        thread_arg->exit_thread_count = &exit_thread_count;
+        thread_arg->cond_val = &cond_val;
+        thread_arg->mutex = &mutex;
+
+        if (pthread_create(&threads[ti], NULL, thread_cond_wait, thread_arg) < 0) {
+            printf("ERROR: pthread_create failed (ti = %d)\n", ti);
+            return -1;
+        }
+    }
+    /*
+     * Unblock all threads currently waiting on the condition variable
+     */
+    while (exit_thread_count < NTHREADS) {
+        pthread_mutex_lock(&mutex);
+        val = 1;
+        pthread_cond_broadcast(&cond_val);
+        pthread_mutex_unlock(&mutex);
+
+        pthread_mutex_lock(&mutex);
+        val = 0;
+        pthread_mutex_unlock(&mutex);
+    }
+    /*
+     * Wait for the threads to finish
+     */
+    for (int ti = 0; ti < NTHREADS; ti++) {
+        if (pthread_join(threads[ti], NULL) < 0) {
+            printf("ERROR: pthread_join failed (ti = %d)\n", ti);
+            return -1;
+        }
+    }
+    return 0;
+}
+
+// ============================================================================
 // Test suite main
 // ============================================================================
 
 static test_case_t test_cases[] = {
-    TEST_CASE(test_mutex_with_concurrent_counter)
+    TEST_CASE(test_mutex_with_concurrent_counter),
+    TEST_CASE(test_mutex_with_cond_wait),
 };
 
 int main() {

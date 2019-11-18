@@ -1,6 +1,8 @@
 pub use self::arch_prctl::{do_arch_prctl, ArchPrctlCode};
 pub use self::exit::{do_exit, do_wait4, ChildProcessFilter};
-pub use self::futex::{futex_op_and_flags_from_u32, futex_wait, futex_wake, FutexFlags, FutexOp};
+pub use self::futex::{
+    futex_op_and_flags_from_u32, futex_requeue, futex_wait, futex_wake, FutexFlags, FutexOp,
+};
 pub use self::process::{Status, IDLE_PROCESS};
 pub use self::process_table::get;
 pub use self::sched::{do_sched_getaffinity, do_sched_setaffinity, do_sched_yield, CpuSet};

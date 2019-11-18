@@ -43,8 +43,15 @@ pub extern "C" fn dispatch_syscall(
     arg5: isize,
 ) -> isize {
     debug!(
-        "syscall {}: {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}",
-        num, arg0, arg1, arg2, arg3, arg4, arg5
+        "syscall tid:{}, num:{}: {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}",
+        process::do_gettid(),
+        num,
+        arg0,
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5
     );
     #[cfg(feature = "syscall_timing")]
     let time_start = {
@@ -178,6 +185,8 @@ pub extern "C" fn dispatch_syscall(
             arg0 as *const i32,
             arg1 as u32,
             arg2 as i32,
+            arg3 as i32,
+            arg4 as *const i32,
             // TODO: accept other optional arguments
         ),
         SYS_ARCH_PRCTL => do_arch_prctl(arg0 as u32, arg1 as *mut usize),
@@ -467,19 +476,35 @@ pub fn do_clone(
     Ok(child_pid as isize)
 }
 
-pub fn do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32) -> Result<isize> {
+pub fn do_futex(
+    futex_addr: *const i32,
+    futex_op: u32,
+    futex_val: i32,
+    timeout: i32,
+    futex_new_addr: *const i32,
+) -> Result<isize> {
     check_ptr(futex_addr)?;
     let (futex_op, futex_flags) = process::futex_op_and_flags_from_u32(futex_op)?;
+
+    let get_futex_val = |val| -> Result<usize> {
+        if val < 0 {
+            return_errno!(EINVAL, "the futex val must not be negative");
+        }
+        Ok(val as usize)
+    };
+
     match futex_op {
         FutexOp::FUTEX_WAIT => process::futex_wait(futex_addr, futex_val).map(|_| 0),
         FutexOp::FUTEX_WAKE => {
-            let max_count = {
-                if futex_val < 0 {
-                    return_errno!(EINVAL, "the count must not be negative");
-                }
-                futex_val as usize
-            };
+            let max_count = get_futex_val(futex_val)?;
             process::futex_wake(futex_addr, max_count).map(|count| count as isize)
+        }
+        FutexOp::FUTEX_REQUEUE => {
+            check_ptr(futex_new_addr)?;
+            let max_nwakes = get_futex_val(futex_val)?;
+            let max_nrequeues = get_futex_val(timeout)?;
+            process::futex_requeue(futex_addr, max_nwakes, max_nrequeues, futex_new_addr)
+                .map(|nwakes| nwakes as isize)
         }
         _ => return_errno!(ENOSYS, "the futex operation is not supported"),
     }
