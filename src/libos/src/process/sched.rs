@@ -15,6 +15,7 @@ extern "C" {
         cpusetsize: size_t,
         mask: *const c_uchar,
     ) -> sgx_status_t;
+    fn ocall_sched_yield() -> sgx_status_t;
 }
 
 pub struct CpuSet {
@@ -121,4 +122,11 @@ pub fn do_sched_setaffinity(pid: pid_t, cpu_set: &CpuSet) -> Result<i32> {
         return_errno!(errno, "ocall_sched_setaffinity failed");
     }
     Ok(ret)
+}
+
+pub fn do_sched_yield() {
+    unsafe {
+        let status = ocall_sched_yield();
+        assert!(status == sgx_status_t::SGX_SUCCESS);
+    }
 }

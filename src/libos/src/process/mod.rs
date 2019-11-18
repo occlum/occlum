@@ -3,7 +3,7 @@ pub use self::exit::{do_exit, do_wait4, ChildProcessFilter};
 pub use self::futex::{futex_op_and_flags_from_u32, futex_wait, futex_wake, FutexFlags, FutexOp};
 pub use self::process::{Status, IDLE_PROCESS};
 pub use self::process_table::get;
-pub use self::sched::{do_sched_getaffinity, do_sched_setaffinity, CpuSet};
+pub use self::sched::{do_sched_getaffinity, do_sched_setaffinity, do_sched_yield, CpuSet};
 pub use self::spawn::{do_spawn, ElfFile, FileAction, ProgramHeaderExt};
 pub use self::task::{current_pid, get_current, run_task};
 pub use self::thread::{do_clone, do_set_tid_address, CloneFlags, ThreadGroup};

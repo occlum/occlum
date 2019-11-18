@@ -155,6 +155,18 @@ static int test_sched_setaffinity_with_null_buffer() {
 }
 
 // ============================================================================
+// Test cases for sched_yield
+// ============================================================================
+
+static int test_sched_yield() {
+    // In the Linux implementation, sched_yield() always succeeds.
+    if (sched_yield() < 0) {
+        THROW_ERROR("check sched yield fail");
+    }
+    return 0;
+}
+
+// ============================================================================
 // Test suite main
 // ============================================================================
 
@@ -168,6 +180,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_sched_setaffinity_with_zero_cpusetsize),
     TEST_CASE(test_sched_getaffinity_with_null_buffer),
     TEST_CASE(test_sched_setaffinity_with_null_buffer),
+    TEST_CASE(test_sched_yield),
 };
 
 int main() {

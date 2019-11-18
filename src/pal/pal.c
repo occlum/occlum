@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <libgen.h>
 #include <pwd.h>
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -284,6 +285,11 @@ int ocall_sched_setaffinity(int* error, int pid, size_t cpusize, const unsigned 
         *error = (ret == -1) ? errno : 0;
     }
     return ret;
+}
+
+/* In the Linux implementation, sched_yield() always succeeds */
+void ocall_sched_yield(void) {
+    sched_yield();
 }
 
 void ocall_sync(void) {

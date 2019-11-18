@@ -182,6 +182,9 @@ pub extern "C" fn dispatch_syscall(
         ),
         SYS_ARCH_PRCTL => do_arch_prctl(arg0 as u32, arg1 as *mut usize),
         SYS_SET_TID_ADDRESS => do_set_tid_address(arg0 as *mut pid_t),
+
+        // sched
+        SYS_SCHED_YIELD => do_sched_yield(),
         SYS_SCHED_GETAFFINITY => {
             do_sched_getaffinity(arg0 as pid_t, arg1 as size_t, arg2 as *mut c_uchar)
         }
@@ -989,6 +992,11 @@ fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize> {
 fn do_set_tid_address(tidptr: *mut pid_t) -> Result<isize> {
     check_mut_ptr(tidptr)?;
     process::do_set_tid_address(tidptr).map(|tid| tid as isize)
+}
+
+fn do_sched_yield() -> Result<isize> {
+    process::do_sched_yield();
+    Ok(0)
 }
 
 fn do_sched_getaffinity(pid: pid_t, cpusize: size_t, buf: *mut c_uchar) -> Result<isize> {
