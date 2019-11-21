@@ -1,27 +1,8 @@
 diff --git a/tensorflow/lite/tools/make/Makefile b/tensorflow/lite/tools/make/Makefile
-index 73c50d3..3cef7fa 100644
+index 73c50d3..4a6445a 100644
 --- a/tensorflow/lite/tools/make/Makefile
 +++ b/tensorflow/lite/tools/make/Makefile
-@@ -42,7 +42,7 @@ INCLUDES := \
- -I$(OBJDIR)
- # This is at the end so any globally-installed frameworks like protobuf don't
- # override local versions in the source tree.
--INCLUDES += -I/usr/local/include
-+INCLUDES += -I/usr/local/occlum/x86_64-linux-musl/include
- 
- # These are the default libraries needed, but they can be added to or
- # overridden by the platform-specific settings in target makefiles.
-@@ -59,7 +59,8 @@ CXXFLAGS := -O3 -DNDEBUG -fPIC
- CXXFLAGS += $(EXTRA_CXXFLAGS)
- CFLAGS := ${CXXFLAGS}
- CXXFLAGS += --std=c++11
--LDOPTS := -L/usr/local/lib
-+LDOPTS := -L/usr/local/occlum/x86_64-linux-musl/lib
-+LDFLAGS := -pie $(LDOPTS)
- ARFLAGS := -r
- TARGET_TOOLCHAIN_PREFIX :=
- CC_PREFIX :=
-@@ -80,6 +81,12 @@ BENCHMARK_BINARY_NAME := benchmark_model
+@@ -80,6 +80,12 @@ BENCHMARK_BINARY_NAME := benchmark_model
  MINIMAL_SRCS := \
  	tensorflow/lite/examples/minimal/minimal.cc
  
@@ -34,7 +15,7 @@ index 73c50d3..3cef7fa 100644
  # What sources we want to compile, must be kept in sync with the main Bazel
  # build files.
  
-@@ -133,7 +140,8 @@ $(wildcard tensorflow/lite/*/*/*test.cc) \
+@@ -133,7 +139,8 @@ $(wildcard tensorflow/lite/*/*/*test.cc) \
  $(wildcard tensorflow/lite/*/*/*/*test.cc) \
  $(wildcard tensorflow/lite/kernels/*test_main.cc) \
  $(wildcard tensorflow/lite/kernels/*test_util.cc) \
@@ -44,7 +25,7 @@ index 73c50d3..3cef7fa 100644
  
  BUILD_WITH_MMAP ?= true
  ifeq ($(BUILD_TYPE),micro)
-@@ -209,6 +217,7 @@ include $(wildcard $(MAKEFILE_DIR)/targets/*_makefile.inc)
+@@ -209,6 +216,7 @@ include $(wildcard $(MAKEFILE_DIR)/targets/*_makefile.inc)
  
  ALL_SRCS := \
  	$(MINIMAL_SRCS) \
@@ -52,7 +33,7 @@ index 73c50d3..3cef7fa 100644
  	$(PROFILER_SRCS) \
  	$(PROFILER_SUMMARIZER_SRCS) \
  	$(TF_LITE_CC_SRCS) \
-@@ -225,14 +234,18 @@ LIB_PATH := $(LIBDIR)$(LIB_NAME)
+@@ -225,14 +233,18 @@ LIB_PATH := $(LIBDIR)$(LIB_NAME)
  BENCHMARK_LIB := $(LIBDIR)$(BENCHMARK_LIB_NAME)
  BENCHMARK_BINARY := $(BINDIR)$(BENCHMARK_BINARY_NAME)
  MINIMAL_BINARY := $(BINDIR)minimal
@@ -73,7 +54,7 @@ index 73c50d3..3cef7fa 100644
  LIB_OBJS := $(addprefix $(OBJDIR), \
  $(patsubst %.cc,%.o,$(patsubst %.c,%.o,$(patsubst %.cpp,%.o,$(TF_LITE_CC_SRCS)))))
  
-@@ -252,7 +265,7 @@ $(OBJDIR)%.o: %.cpp
+@@ -252,7 +264,7 @@ $(OBJDIR)%.o: %.cpp
  	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
  
  # The target that's compiled if there's no command-line arguments.
@@ -82,7 +63,7 @@ index 73c50d3..3cef7fa 100644
  
  # The target that's compiled for micro-controllers
  micro: $(LIB_PATH)
-@@ -276,6 +289,14 @@ $(MINIMAL_BINARY): $(MINIMAL_OBJS) $(LIB_PATH)
+@@ -276,6 +288,14 @@ $(MINIMAL_BINARY): $(MINIMAL_OBJS) $(LIB_PATH)
  
  minimal: $(MINIMAL_BINARY)
  

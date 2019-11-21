@@ -10,7 +10,7 @@ When completed, the resulting `hello-world` can be found in `examples/cpp-tutori
 
 2. (Optional) Run `hello-world` on Linux
 ```
-LD_LIBRARY_PATH=/usr/local/occlum/x86_64-linux-musl/lib ./examples/cpp-tutorial/stage3/bazel-bin/main/hello-world
+./examples/cpp-tutorial/stage3/bazel-bin/main/hello-world
 ```
 
 3. Run `hello-world` on Occlum

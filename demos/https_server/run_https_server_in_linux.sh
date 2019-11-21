@@ -1,5 +1,4 @@
 #!/bin/bash
-export LD_LIBRARY_PATH=/usr/local/occlum/x86_64-linux-musl/lib:$LD_LIBRARY_PATH
 https_server=simplest_web_server_ssl
 set -e
 

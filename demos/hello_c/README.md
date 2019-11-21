@@ -9,7 +9,7 @@ make
 Or you can build `hello_world` with CMake
 ```
 mkdir build && cd build
-cmake ../ -DCMAKE_C_COMPILER=occlum-gcc -DCMAKE_C_FLAGS="-fPIC -pie"
+cmake ../ -DCMAKE_C_COMPILER=occlum-gcc
 make
 cd ..
 cp build/hello_world .

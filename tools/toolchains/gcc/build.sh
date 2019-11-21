@@ -47,9 +47,26 @@ make install
 # Remove all source code and build files
 rm -rf ${BUILD_DIR}
 
-# Link the toolchain directory
-ln -sf ${INSTALL_DIR}/bin/${TARGET}-gcc ${INSTALL_DIR}/bin/occlum-gcc
-ln -sf ${INSTALL_DIR}/bin/${TARGET}-g++ ${INSTALL_DIR}/bin/occlum-g++
-ln -sf ${INSTALL_DIR}/bin/${TARGET}-ld ${INSTALL_DIR}/bin/occlum-ld
-ln -sf ${INSTALL_DIR}/x86_64-linux-musl/lib/libc.so /lib/ld-musl-x86_64.so.1
+# Generate the wrappers for executables
+cat > ${INSTALL_DIR}/bin/occlum-gcc <<EOF
+#!/bin/bash
+${INSTALL_DIR}/bin/${TARGET}-gcc -fPIC -pie -Wl,-rpath,${INSTALL_DIR}/${TARGET}/lib "\$@"
+EOF
+
+cat > ${INSTALL_DIR}/bin/occlum-g++ <<EOF
+#!/bin/bash
+${INSTALL_DIR}/bin/${TARGET}-g++ -fPIC -pie -Wl,-rpath,${INSTALL_DIR}/${TARGET}/lib "\$@"
+EOF
+
+cat > ${INSTALL_DIR}/bin/occlum-ld <<EOF
+#!/bin/bash
+${INSTALL_DIR}/bin/${TARGET}-ld -pie -rpath ${INSTALL_DIR}/${TARGET}/lib "\$@"
+EOF
+
+chmod +x ${INSTALL_DIR}/bin/occlum-gcc
+chmod +x ${INSTALL_DIR}/bin/occlum-g++
+chmod +x ${INSTALL_DIR}/bin/occlum-ld
+
+# Make symbolic links
+ln -sf ${INSTALL_DIR}/${TARGET}/lib/libc.so /lib/ld-musl-x86_64.so.1
 ln -sf ${INSTALL_DIR} /usr/local/occlum

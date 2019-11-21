@@ -1,5 +1,4 @@
 #!/bin/bash
-export LD_LIBRARY_PATH=/usr/local/occlum/x86_64-linux-musl/lib:$LD_LIBRARY_PATH
 set -e
 
 show_usage() {

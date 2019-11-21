@@ -1,5 +1,5 @@
 CXX := occlum-g++
-CXXFLAGS := -std=c++11 -fPIC -pie
+CXXFLAGS := -std=c++11
 
 .PHONY: all clean
 

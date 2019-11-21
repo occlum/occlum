@@ -10,8 +10,7 @@ CC=occlum-gcc ./config \
   --prefix=/usr/local/occlum/x86_64-linux-musl \
   --openssldir=/usr/local/occlum/ssl \
   --with-rand-seed=rdcpu \
-  no-zlib no-async no-tests \
-  -fPIC -pie
+  no-zlib no-async no-tests
 make -j
 sudo make install
 popd
@@ -25,5 +24,5 @@ popd
 
 # 3. Build the https server example in mongoose
 pushd mongoose_src/examples/simplest_web_server_ssl
-CC=occlum-gcc CFLAGS_EXTRA="-Wno-format-truncation -fPIC -pie" make
+CC=occlum-gcc CFLAGS_EXTRA="-Wno-format-truncation" make
 popd
