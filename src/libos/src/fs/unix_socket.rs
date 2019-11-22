@@ -2,7 +2,7 @@ use super::*;
 use alloc::prelude::ToString;
 use std::collections::btree_map::BTreeMap;
 use std::fmt;
-use std::sync::atomic::spin_loop_hint;
+use std::sync::atomic::{spin_loop_hint, AtomicUsize, Ordering};
 use std::sync::SgxMutex as Mutex;
 use util::ring_buf::{RingBuf, RingBufReader, RingBufWriter};
 
@@ -88,6 +88,9 @@ impl File for UnixSocketFile {
     }
 }
 
+static SOCKETPAIR_NUM: AtomicUsize = AtomicUsize::new(0);
+const SOCK_PATH_PREFIX: &str = "socketpair_";
+
 impl UnixSocketFile {
     pub fn new(socket_type: c_int, protocol: c_int) -> Result<Self> {
         let inner = UnixSocket::new(socket_type, protocol)?;
@@ -122,6 +125,34 @@ impl UnixSocketFile {
     pub fn poll(&self) -> Result<(bool, bool, bool)> {
         let mut inner = self.inner.lock().unwrap();
         inner.poll()
+    }
+
+    pub fn socketpair(socket_type: i32, protocol: i32) -> Result<(Self, Self)> {
+        let listen_socket = Self::new(socket_type, protocol)?;
+        let bound_path = listen_socket.bind_until_success();
+        listen_socket.listen()?;
+
+        let client_socket = Self::new(socket_type, protocol)?;
+        client_socket.connect(&bound_path)?;
+
+        let accepted_socket = listen_socket.accept()?;
+        Ok((client_socket, accepted_socket))
+    }
+
+    fn bind_until_success(&self) -> String {
+        let mut path = SOCK_PATH_PREFIX.to_string();
+        let mut index = SOCKETPAIR_NUM.load(Ordering::SeqCst);
+        path.push_str(&index.to_string());
+        while self.bind(&path).is_err() {
+            if index == std::usize::MAX {
+                SOCKETPAIR_NUM.store(0, Ordering::SeqCst); //flip SOCKETPAIR_NUM
+            }
+            index += 1;
+            path = SOCK_PATH_PREFIX.to_string();
+            path.push_str(&index.to_string());
+        }
+        SOCKETPAIR_NUM.fetch_max(index + 1, Ordering::SeqCst);
+        path
     }
 }
 

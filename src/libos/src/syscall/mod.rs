@@ -295,6 +295,12 @@ pub extern "C" fn dispatch_syscall(
             arg4 as *mut libc::sockaddr,
             arg5 as *mut libc::socklen_t,
         ),
+        SYS_SOCKETPAIR => do_socketpair(
+            arg0 as c_int,
+            arg1 as c_int,
+            arg2 as c_int,
+            arg3 as *mut c_int,
+        ),
 
         _ => do_unknown(num, arg0, arg1, arg2, arg3, arg4, arg5),
     };
@@ -1026,7 +1032,7 @@ fn do_sched_setaffinity(pid: pid_t, cpusize: size_t, buf: *const c_uchar) -> Res
 
 fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize> {
     info!(
-        "socket: domain: {}, socket_type: {}, protocol: {}",
+        "socket: domain: {}, socket_type: 0x{:x}, protocol: {}",
         domain, socket_type, protocol
     );
 
@@ -1318,6 +1324,46 @@ fn do_recvfrom(
         addr_len
     ));
     Ok(ret as isize)
+}
+
+fn do_socketpair(
+    domain: c_int,
+    socket_type: c_int,
+    protocol: c_int,
+    sv: *mut c_int,
+) -> Result<isize> {
+    info!(
+        "socketpair: domain: {}, type:0x{:x}, protocol: {}",
+        domain, socket_type, protocol
+    );
+    let mut sock_pair = unsafe {
+        check_mut_array(sv, 2)?;
+        std::slice::from_raw_parts_mut(sv as *mut u32, 2)
+    };
+
+    if (domain == libc::AF_UNIX) {
+        let (client_socket, server_socket) =
+            UnixSocketFile::socketpair(socket_type as i32, protocol as i32)?;
+        let current_ref = process::get_current();
+        let mut proc = current_ref.lock().unwrap();
+        sock_pair[0] = proc
+            .get_files()
+            .lock()
+            .unwrap()
+            .put(Arc::new(Box::new(client_socket)), false);
+        sock_pair[1] = proc
+            .get_files()
+            .lock()
+            .unwrap()
+            .put(Arc::new(Box::new(server_socket)), false);
+
+        info!("socketpair: ({}, {})", sock_pair[0], sock_pair[1]);
+        Ok(0)
+    } else if (domain == libc::AF_TIPC) {
+        return_errno!(EAFNOSUPPORT, "cluster domain sockets not supported")
+    } else {
+        return_errno!(EAFNOSUPPORT, "domain not supported")
+    }
 }
 
 fn do_select(

@@ -8,6 +8,7 @@
 #![feature(range_contains)]
 #![feature(core_intrinsics)]
 #![feature(stmt_expr_attributes)]
+#![feature(atomic_min_max)]
 
 #[macro_use]
 extern crate alloc;
