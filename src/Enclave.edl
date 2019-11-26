@@ -1,10 +1,12 @@
 enclave {
-    from "sgx_stdio.edl" import *;
     from "sgx_backtrace.edl" import *;
+    from "sgx_stdio.edl" import *;
     from "sgx_tstdc.edl" import *;
     from "sgx_tstd.edl" import *;
     from "sgx_tprotected_fs.edl" import *;
     from "sgx_net.edl" import *;
+
+    include "sgx_quote.h"
 
     trusted {
         /* define ECALLs here. */
@@ -24,5 +26,19 @@ enclave {
         void ocall_sched_yield(void);
         int ocall_sched_getaffinity([out] int *error, int pid, size_t cpusize, [out, size=cpusize] unsigned char* buf);
         int ocall_sched_setaffinity([out] int *error, int pid, size_t cpusize, [in, size=cpusize] const unsigned char* buf);
-    };
+
+        sgx_status_t ocall_sgx_init_quote(
+            [out] sgx_target_info_t *target_info,
+            [out] sgx_epid_group_id_t *epid_group_id);
+        sgx_status_t ocall_sgx_get_quote(
+            [in, size=sigrl_len] uint8_t* sigrl,
+            uint32_t sigrl_len,
+            [in] sgx_report_t* report,
+            sgx_quote_sign_type_t quote_type,
+            [in] sgx_spid_t* spid,
+            [in] sgx_quote_nonce_t* nonce,
+            [out] sgx_report_t* qe_report,
+            [out, size=quote_buf_len] uint8_t* quote_buf,
+            uint32_t quote_buf_len);
+        };
 };

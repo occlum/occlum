@@ -14,7 +14,9 @@ dependencies = [
  "rcore-fs-sefs 0.1.0",
  "serde 1.0.84",
  "serde_json 1.0.36",
+ "sgx_tcrypto 1.0.6",
  "sgx_trts 1.0.6",
+ "sgx_tse 1.0.6",
  "sgx_tstd 1.0.6",
  "sgx_types 1.0.6",
  "xmas-elf 0.6.2",
@@ -355,6 +357,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sgx_tcrypto"
+version = "1.0.6"
+dependencies = [
+ "sgx_types 1.0.6",
+]
+
+[[package]]
 name = "sgx_tprotected_fs"
 version = "1.0.6"
 dependencies = [
@@ -367,6 +376,13 @@ name = "sgx_trts"
 version = "1.0.6"
 dependencies = [
  "sgx_libc 1.0.6",
+ "sgx_types 1.0.6",
+]
+
+[[package]]
+name = "sgx_tse"
+version = "1.0.6"
+dependencies = [
  "sgx_types 1.0.6",
 ]
 

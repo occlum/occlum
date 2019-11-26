@@ -29,3 +29,5 @@ xmas-elf = { path = "../../deps/xmas-elf" }
 sgx_types = { path = "../../deps/rust-sgx-sdk/sgx_types" }
 sgx_tstd = { path = "../../deps/rust-sgx-sdk/sgx_tstd", features = ["backtrace"] }
 sgx_trts = { path = "../../deps/rust-sgx-sdk/sgx_trts" }
+sgx_tse = { path = "../../deps/rust-sgx-sdk/sgx_tse" }
+sgx_tcrypto = { path = "../../deps/rust-sgx-sdk/sgx_tcrypto" }
