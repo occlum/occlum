@@ -18,13 +18,13 @@
 static int test_sched_getaffinity_with_self_pid() {
     cpu_set_t mask;
     if (sched_getaffinity(0, sizeof(cpu_set_t), &mask) < 0) {
-        throw_error("failed to call sched_getaffinity");
+        THROW_ERROR("failed to call sched_getaffinity");
     }
     if (CPU_COUNT(&mask) <= 0) {
-        throw_error("failed to get cpuset mask");
+        THROW_ERROR("failed to get cpuset mask");
     }
     if (sysconf(_SC_NPROCESSORS_ONLN) != CPU_COUNT(&mask)) {
-        throw_error("cpuset num wrong");
+        THROW_ERROR("cpuset num wrong");
     }
     return 0;
 }
@@ -39,17 +39,17 @@ static int test_sched_setaffinity_with_self_pid() {
     CPU_ZERO(&mask);
     CPU_SET(0, &mask);
     if (sched_setaffinity(0, sizeof(cpu_set_t), &mask) < 0) {
-        throw_error("failed to call sched_setaffinity \n");
+        THROW_ERROR("failed to call sched_setaffinity \n");
     }
     cpu_set_t mask2;
     if (sched_getaffinity(0, sizeof(cpu_set_t), &mask2) < 0) {
-        throw_error("failed to call sched_getaffinity");
+        THROW_ERROR("failed to call sched_getaffinity");
     }
     if (!CPU_EQUAL(&mask, &mask2)) {
-        throw_error("cpuset is wrong after get");
+        THROW_ERROR("cpuset is wrong after get");
     }
     if (sched_setaffinity(0, sizeof(cpu_set_t), &mask_old) < 0) {
-        throw_error("recover cpuset error");
+        THROW_ERROR("recover cpuset error");
     }
     return 0;
 }
@@ -58,29 +58,29 @@ static int test_sched_xetaffinity_with_child_pid() {
     int status, child_pid;
     int num = sysconf(_SC_NPROCESSORS_CONF);
     if (num <= 0) {
-        throw_error("failed to get cpu number");
+        THROW_ERROR("failed to get cpu number");
     }
     cpu_set_t mask;
     CPU_ZERO(&mask);
     CPU_SET(num - 1 , &mask);
     int ret = posix_spawn(&child_pid, "/bin/getpid", NULL, NULL, NULL, NULL);
     if (ret < 0 ) {
-        throw_error("spawn process error");
+        THROW_ERROR("spawn process error");
     }
     printf("Spawn a child process with pid=%d\n", child_pid);
     if (sched_setaffinity(child_pid, sizeof(cpu_set_t), &mask) < 0) {
-        throw_error("failed to set child affinity");
+        THROW_ERROR("failed to set child affinity");
     }
     cpu_set_t mask2;
     if (sched_getaffinity(child_pid, sizeof(cpu_set_t), &mask2) < 0) {
-        throw_error("failed to get child affinity");
+        THROW_ERROR("failed to get child affinity");
     }
     if (!CPU_EQUAL(&mask, &mask2)) {
-        throw_error("cpuset is wrong in child");
+        THROW_ERROR("cpuset is wrong in child");
     }
     ret = wait4(-1, &status, 0, NULL);
     if (ret < 0) {
-        throw_error("failed to wait4 the child proces");
+        THROW_ERROR("failed to wait4 the child proces");
     }
     return 0;
 }
@@ -91,7 +91,7 @@ static int test_sched_getaffinity_via_explicit_syscall() {
     unsigned char buf[CPU_SET_SIZE_LIMIT] = { 0 };
     int ret = syscall(__NR_sched_getaffinity, 0, CPU_SET_SIZE_LIMIT, buf);
     if (ret <= 0) {
-        throw_error("failed to call __NR_sched_getaffinity");
+        THROW_ERROR("failed to call __NR_sched_getaffinity");
     }
     return 0;
 }
@@ -106,18 +106,18 @@ static int test_sched_setaffinity_via_explicit_syscall() {
     CPU_ZERO(&mask);
     CPU_SET(0, &mask);
     if (syscall(__NR_sched_setaffinity, 0, sizeof(cpu_set_t), &mask) < 0) {
-        throw_error("failed to call __NR_sched_setaffinity");
+        THROW_ERROR("failed to call __NR_sched_setaffinity");
     }
     cpu_set_t mask2;
     int ret_nproc = syscall(__NR_sched_getaffinity, 0, sizeof(cpu_set_t), &mask2);
     if (ret_nproc <= 0) {
-        throw_error("failed to call __NR_sched_getaffinity");
+        THROW_ERROR("failed to call __NR_sched_getaffinity");
     }
     if (!CPU_EQUAL(&mask, &mask2)) {
-        throw_error("explicit syscall cpuset is wrong");
+        THROW_ERROR("explicit syscall cpuset is wrong");
     }
     if (syscall(__NR_sched_setaffinity, 0, sizeof(cpu_set_t), &mask_old) < 0) {
-        throw_error("recover cpuset error");
+        THROW_ERROR("recover cpuset error");
     }
     return 0;
 }
@@ -125,7 +125,7 @@ static int test_sched_setaffinity_via_explicit_syscall() {
 static int test_sched_getaffinity_with_zero_cpusetsize() {
     cpu_set_t mask;
     if (sched_getaffinity(0, 0, &mask) != -1) {
-        throw_error("check invalid cpusetsize(0) fail");
+        THROW_ERROR("check invalid cpusetsize(0) fail");
     }
     return 0;
 }
@@ -133,7 +133,7 @@ static int test_sched_getaffinity_with_zero_cpusetsize() {
 static int test_sched_setaffinity_with_zero_cpusetsize() {
     cpu_set_t mask;
     if (sched_setaffinity(0, 0, &mask) != -1) {
-        throw_error("check invalid cpusetsize(0) fail");
+        THROW_ERROR("check invalid cpusetsize(0) fail");
     }
     return 0;
 }
@@ -141,7 +141,7 @@ static int test_sched_setaffinity_with_zero_cpusetsize() {
 static int test_sched_getaffinity_with_null_buffer() {
     unsigned char *buf = NULL;
     if (sched_getaffinity(0, sizeof(cpu_set_t), (cpu_set_t*)buf) != -1) {
-        throw_error("check invalid buffer pointer(NULL) fail");
+        THROW_ERROR("check invalid buffer pointer(NULL) fail");
     }
     return 0;
 }
@@ -149,7 +149,7 @@ static int test_sched_getaffinity_with_null_buffer() {
 static int test_sched_setaffinity_with_null_buffer() {
     unsigned char *buf = NULL;
     if (sched_setaffinity(0, sizeof(cpu_set_t), (cpu_set_t*)buf) != -1) {
-        throw_error("check invalid buffer pointer(NULL) fail");
+        THROW_ERROR("check invalid buffer pointer(NULL) fail");
     }
     return 0;
 }

@@ -84,7 +84,7 @@ static int check_nanosleep(struct timespec* expected_sleep_period) {
     clock_gettime(CLOCK_MONOTONIC, &begin_timestamp);
 
     if (nanosleep(expected_sleep_period, NULL) != 0) {
-        throw_error("nanosleep failed");
+        THROW_ERROR("nanosleep failed");
     }
 
     clock_gettime(CLOCK_MONOTONIC, &end_timestamp);
@@ -120,7 +120,7 @@ int test_nanosleep_10ms() {
 
 int test_nanosleep_with_null_req() {
     if (nanosleep(NULL, NULL) != -1 && errno != EINVAL) {
-        throw_error("nanosleep should report error");
+        THROW_ERROR("nanosleep should report error");
     }
     return 0;
 }
@@ -129,7 +129,7 @@ int test_nanosleep_with_negative_tv_sec() {
     // nanosleep returns EINVAL if the value in the tv_sec field is negative
     struct timespec invalid_period = { .tv_sec = -1, .tv_nsec = 0};
     if (nanosleep(&invalid_period, NULL) != -1 && errno != EINVAL) {
-        throw_error("nanosleep should report EINVAL error");
+        THROW_ERROR("nanosleep should report EINVAL error");
     }
     return 0;
 }
@@ -139,7 +139,7 @@ int test_nanosleep_with_negative_tv_nsec() {
     // was not in the range 0 to 999999999.
     struct timespec invalid_period = { .tv_sec = 0, .tv_nsec = -1};
     if (nanosleep(&invalid_period, NULL) != -1 && errno != EINVAL) {
-        throw_error("nanosleep should report EINVAL error");
+        THROW_ERROR("nanosleep should report EINVAL error");
     }
     return 0;
 }
@@ -149,7 +149,7 @@ int test_nanosleep_with_too_large_tv_nsec() {
     // was not in the range 0 to 999999999 (10^6 - 1).
     struct timespec invalid_period = { .tv_sec = 0, .tv_nsec = S};
     if (nanosleep(&invalid_period, NULL) != -1 && errno != EINVAL) {
-        throw_error("nanosleep should report EINVAL error");
+        THROW_ERROR("nanosleep should report EINVAL error");
     }
     return 0;
 }

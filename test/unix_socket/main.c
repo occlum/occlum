@@ -12,11 +12,6 @@
 #include "test.h"
 
 #define ECHO_MSG "echo msg for unix_socket test"
-#define THROW_ERROR(msg)    do {                      \
-    printf("\t\tERROR: %s in func %s at line %d of file %s\n",  \
-           (msg), __func__, __LINE__, __FILE__);            \
-    return -1;                                              \
-} while(0)
 
 int create_connected_sockets(int *sockets, char *sock_path) {
     int listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);

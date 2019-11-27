@@ -19,11 +19,11 @@ typedef struct {
 
 #define TEST_CASE(name)     { STR(name), name }
 
-#define throw_error(msg)    while(1) {                      \
-    printf("\t\tERROR: %s in func %s at line %d of file %s\n",  \
-           (msg), __func__, __LINE__, __FILE__);            \
-    return -1;                                              \
-}
+#define THROW_ERROR(msg)    do { \
+    printf("\t\tERROR: %s in func %s at line %d of file %s\n", \
+            (msg), __func__, __LINE__, __FILE__); \
+    return -1; \
+} while (0)
 
 int test_suite_run(test_case_t* test_cases, int num_test_cases) {
     for (int ti = 0; ti < num_test_cases; ti++) {

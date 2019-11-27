@@ -14,7 +14,7 @@
 int test_tty_ioctl_TIOCGWINSZ(void) {
     struct winsize winsize;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &winsize) < 0) {
-        throw_error("failed to ioctl TIOCGWINSZ");
+        THROW_ERROR("failed to ioctl TIOCGWINSZ");
     }
     return 0;
 }
@@ -28,15 +28,15 @@ int test_tty_ioctl_TIOCGWINSZ(void) {
 int test_sgx_ioctl_SGXIOC_IS_EDDM_SUPPORTED(void) {
     int sgx_fd;
     if ((sgx_fd = open("/dev/sgx", O_RDONLY)) < 0) {
-        throw_error("failed to open /dev/sgx ");
+        THROW_ERROR("failed to open /dev/sgx ");
     }
 
     int is_edmm_supported = 0;
     if (ioctl(sgx_fd, SGXIOC_IS_EDDM_SUPPORTED, &is_edmm_supported) < 0) {
-        throw_error("failed to ioctl /dev/sgx");
+        THROW_ERROR("failed to ioctl /dev/sgx");
     }
     if (is_edmm_supported != 0) {
-        throw_error("SGX EDMM supported are not expected to be enabled");
+        THROW_ERROR("SGX EDMM supported are not expected to be enabled");
     }
 
     close(sgx_fd);

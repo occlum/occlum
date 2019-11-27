@@ -9,7 +9,7 @@
 int test_gettimeofday() {
     struct timeval tv;
     if (gettimeofday(&tv, NULL)) {
-        throw_error("gettimeofday failed");
+        THROW_ERROR("gettimeofday failed");
     }
     return 0;
 }
@@ -21,10 +21,10 @@ int test_gettimeofday() {
 int test_clock_gettime() {
     struct timespec ts;
     if (clock_gettime(CLOCK_REALTIME, &ts)) {
-        throw_error("clock_gettime(CLOCK_REALTIME, ...) failed");
+        THROW_ERROR("clock_gettime(CLOCK_REALTIME, ...) failed");
     }
     if (clock_gettime(CLOCK_MONOTONIC, &ts)) {
-        throw_error("clock_gettime(CLOCK_MONOTONIC, ...) failed");
+        THROW_ERROR("clock_gettime(CLOCK_MONOTONIC, ...) failed");
     }
     return 0;
 }

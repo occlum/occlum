@@ -63,7 +63,7 @@ static int test_cpuid_with_basic_leaf_zero() {
     native_cpuid(leaf, subleaf, &cpu);
     // cpu should support sgx
     if (cpu.eax < 0x12) {
-        throw_error("failed to call cpuid with eax=0");
+        THROW_ERROR("failed to call cpuid with eax=0");
     }
     g_max_basic_leaf = cpu.eax;
     return 0;
@@ -76,7 +76,7 @@ static int test_cpuid_with_basic_leaf_zero_with_subleaf() {
 
     native_cpuid(leaf, subleaf, &cpu);
     if (cpu.eax != g_max_basic_leaf) {
-        throw_error("failed to call cpuid with eax=0 and subleaf");
+        THROW_ERROR("failed to call cpuid with eax=0 and subleaf");
     }
     return 0;
 }
@@ -88,7 +88,7 @@ static int test_cpuid_with_extend_leaf_zero() {
 
     native_cpuid(leaf, subleaf, &cpu);
     if (cpu.eax < 0x80000000) {
-        throw_error("failed to call cpuid with eax=0x80000000");
+        THROW_ERROR("failed to call cpuid with eax=0x80000000");
     }
     g_max_extend_leaf = cpu.eax;
     return 0;
@@ -101,7 +101,7 @@ static int test_cpuid_with_extend_leaf_zero_with_subleaf() {
 
     native_cpuid(leaf, subleaf, &cpu);
     if (cpu.eax != g_max_extend_leaf) {
-        throw_error("failed to call cpuid with eax=0x80000000");
+        THROW_ERROR("failed to call cpuid with eax=0x80000000");
     }
     return 0;
 }
@@ -119,7 +119,7 @@ static int test_cpuid_with_basic_leaf_one() {
     printf("Extended Model %d\n", (cpu.eax >> 16) & 0xF); // Bit 19-16
     printf("Extended Family %d\n", (cpu.eax >> 20) & 0xFF); // Bit 27-20
     if (cpu.eax == 0) {
-        throw_error("faild to call cpuid with eax=1");
+        THROW_ERROR("faild to call cpuid with eax=1");
     }
     return 0;
 }
@@ -133,7 +133,7 @@ static int test_cpuid_with_sgx_verify() {
     //CPUID.(EAX=07H, ECX=0H):EBX.SGX = 1,
     // Bit 02: SGX. Supports Intel® Software Guard Extensions (Intel® SGX Extensions) if 1.
     if (((cpu.ebx >> 2) & 0x1) != 1) {
-        throw_error("failed to call cpuid to verify sgx");
+        THROW_ERROR("failed to call cpuid to verify sgx");
     }
     return 0;
 }
@@ -147,16 +147,16 @@ static int test_cpuid_with_sgx_enumeration() {
     printf("Sgx 1 supported: %d\n", cpu.eax & 0x1);
     printf("Sgx 2 supported: %d\n", (cpu.eax >> 1) & 0x1);
     if (((cpu.eax & 0x1) | ((cpu.eax >> 1) & 0x1)) == 0) {
-        throw_error("failed to call cpuid to get SGX Capbilities");
+        THROW_ERROR("failed to call cpuid to get SGX Capbilities");
     }
     if (((cpu.edx & 0xFF) | ((cpu.edx >> 8) & 0xFF)) == 0) {
-        throw_error("get MaxEnclaveSize failed");
+        THROW_ERROR("get MaxEnclaveSize failed");
     }
     leaf = 0x12;
     subleaf = 1;
     native_cpuid(leaf, subleaf, &cpu);
     if ((cpu.eax | cpu.ebx | cpu.ecx | cpu.edx) == 0) {
-        throw_error("failed to call cpuid to get SGX Attributes");
+        THROW_ERROR("failed to call cpuid to get SGX Attributes");
     }
     return 0;
 }
@@ -168,25 +168,25 @@ static int test_cpuid_with_invalid_leaf() {
 
     native_cpuid(leaf, subleaf, &cpu);
     if (cpu.eax | cpu.ebx | cpu.ecx | cpu.edx) {
-        throw_error("faild to call cpuid with invalid leaf 0x8");
+        THROW_ERROR("faild to call cpuid with invalid leaf 0x8");
     }
 
     leaf = 0xC;
     native_cpuid(leaf, subleaf, &cpu);
     if (cpu.eax | cpu.ebx | cpu.ecx | cpu.edx) {
-        throw_error("faild to call cpuid with invalid leaf 0xC");
+        THROW_ERROR("faild to call cpuid with invalid leaf 0xC");
     }
 
     leaf = 0xE;
     native_cpuid(leaf, subleaf, &cpu);
     if (cpu.eax | cpu.ebx | cpu.ecx | cpu.edx) {
-        throw_error("faild to call cpuid with invalid leaf 0xE");
+        THROW_ERROR("faild to call cpuid with invalid leaf 0xE");
     }
 
     leaf = 0x11;
     native_cpuid(leaf, subleaf, &cpu);
     if (cpu.eax | cpu.ebx | cpu.ecx | cpu.edx) {
-        throw_error("faild to call cpuid with invalid leaf 0x11");
+        THROW_ERROR("faild to call cpuid with invalid leaf 0x11");
     }
     return 0;
 }
@@ -204,7 +204,7 @@ static int test_cpuid_with_oversized_leaf() {
 
     if ((cpu.eax != cpu_max.eax) || (cpu.ebx != cpu_max.ebx) ||
         (cpu.ecx != cpu_max.ecx) || (cpu.edx != cpu_max.edx)) {
-        throw_error("failed to call cpuid with oversize leaf");
+        THROW_ERROR("failed to call cpuid with oversize leaf");
     }
     return 0;
 }
@@ -230,7 +230,7 @@ static int test_cpuid_with_host_cpuidinfo() {
     char buff[BUFF_SIZE] = {0};
     FILE * fp = fopen("./test_cpuid.txt","r");
     if (fp == NULL) {
-        throw_error("failed to open host cpuid.txt");
+        THROW_ERROR("failed to open host cpuid.txt");
     }
     while (fgets(buff, BUFF_SIZE, fp)) {
         uint32_t leaf = 0;
@@ -249,7 +249,7 @@ static int test_cpuid_with_host_cpuidinfo() {
                     cpu.eax, cpu.ebx, cpu.ecx, cpu.edx);
             printf("sgx_eax:0x%x sgx_ebx:0x%x sgx_ecx:0x%x sgx_edx:0x%x\n",
                     cpu_sgx.eax, cpu_sgx.ebx, cpu_sgx.ecx, cpu_sgx.edx);
-            throw_error("failed to check cpuid info");
+            THROW_ERROR("failed to check cpuid info");
         }
     }
     fclose(fp);

@@ -74,11 +74,11 @@ static int test_env_getargv() {
     // Test argc
     if (g_argc != EXPECT_ARGC) {
         printf("ERROR: expect %d arguments, but %d are given\n", EXPECT_ARGC, g_argc);
-        throw_error("arguments count is not expected");
+        THROW_ERROR("arguments count is not expected");
     }
     // Test argv
     if (test_argv_val(expect_argv) < 0) {
-        throw_error("argument variables are not expected");
+        THROW_ERROR("argument variables are not expected");
     }
     return 0;
 }
@@ -90,7 +90,7 @@ static int test_env_getargv() {
 static int test_env_getauxval() {
     unsigned long page_size = getauxval(AT_PAGESZ);
     if (errno != 0 || page_size != 4096) {
-        throw_error("auxilary vector does not pass correct the value");
+        THROW_ERROR("auxilary vector does not pass correct the value");
     }
 
     return 0;
@@ -103,13 +103,13 @@ static int test_env_getauxval() {
 // The environment variables are specified in Occlum.json
 static int test_env_getenv() {
     if (test_env_val("OCCLUM", "yes") < 0) {
-        throw_error("get environment variable failed");
+        THROW_ERROR("get environment variable failed");
     }
 
     // Here we call getenv() again to make sure that
     // LibOS can handle several environment variables in Occlum.json correctly
     if (test_env_val("TEST", "true") < 0) {
-        throw_error("get environment variable failed");
+        THROW_ERROR("get environment variable failed");
     }
     return 0;
 }
@@ -121,15 +121,15 @@ static int test_env_set_child_env_and_argv() {
                           (char *const *)child_argv,
                           (char *const *)child_envp);
     if (ret < 0) {
-        throw_error("spawn process error");
+        THROW_ERROR("spawn process error");
     }
     printf("Spawn a child process with pid=%d\n", child_pid);
     ret = wait4(-1, &status, 0, NULL);
     if (ret < 0) {
-        throw_error("failed to wait4 the child process");
+        THROW_ERROR("failed to wait4 the child process");
     }
     if (!WIFEXITED(status)) {
-        throw_error("test cases in child faild");
+        THROW_ERROR("test cases in child faild");
     }
     return 0;
 }
@@ -142,11 +142,11 @@ static int test_env_child_getargv() {
     // Test argc
     if (g_argc != child_argc) {
         printf("ERROR: expect %d arguments, but %d are given\n", child_argc, g_argc);
-        throw_error("arguments count is not expected");
+        THROW_ERROR("arguments count is not expected");
     }
     // Test argv
     if (test_argv_val(child_argv) < 0) {
-        throw_error("argument variables are not expected");
+        THROW_ERROR("argument variables are not expected");
     }
     return 0;
 }
@@ -162,10 +162,10 @@ static int test_env_child_getenv() {
     for (int i = 0; child_envp[i] != NULL; ++i) {
         int num = sscanf(child_envp[i], "%[^=]=%s", env_key, env_val);
         if (num != 2) {
-            throw_error("parse environment variable failed");
+            THROW_ERROR("parse environment variable failed");
         }
         if (test_env_val(env_key, env_val) < 0) {
-            throw_error("get environment variable failed");
+            THROW_ERROR("get environment variable failed");
         }
     }
     return 0;
