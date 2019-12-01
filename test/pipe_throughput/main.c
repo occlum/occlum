@@ -33,7 +33,7 @@ int main(int argc, const char* argv[]) {
     posix_spawn_file_actions_addclose(&file_actions, pipe_wr_fd);
 
     int child_pid;
-    if (posix_spawn(&child_pid, "dev_null", &file_actions,
+    if (posix_spawn(&child_pid, "/bin/data_sink", &file_actions,
             NULL, NULL, NULL) < 0) {
         printf("ERROR: failed to spawn a child process\n");
         return -1;

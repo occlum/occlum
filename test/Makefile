@@ -3,7 +3,7 @@ PROJECT_DIR := $(realpath $(CUR_DIR)/../)
 BUILD_DIR := $(PROJECT_DIR)/build
 
 # Dependencies: need to be compiled but not to run by any Makefile target
-TEST_DEPS := dev_null client
+TEST_DEPS := client data_sink
 # Tests: need to be compiled and run by test-% target
 TESTS := empty env hello_world malloc mmap file fs_perms getpid spawn sched pipe time \
 	truncate readdir mkdir link tls pthread uname rlimit server \
