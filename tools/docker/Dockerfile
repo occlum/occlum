@@ -77,7 +77,7 @@ WORKDIR /root
 RUN git clone https://github.com/occlum/occlum && \
     cd occlum && \
     make submodule && \
-    make RELEASE=1 && \
+    make LIBOS_RELEASE=1 && \
     make install && \
     cp -r demos /root/demos && \
     rm -rf /root/occlum
