@@ -140,19 +140,13 @@ impl UnixSocketFile {
     }
 
     fn bind_until_success(&self) -> String {
-        let mut path = SOCK_PATH_PREFIX.to_string();
-        let mut index = SOCKETPAIR_NUM.load(Ordering::SeqCst);
-        path.push_str(&index.to_string());
-        while self.bind(&path).is_err() {
-            if index == std::usize::MAX {
-                SOCKETPAIR_NUM.store(0, Ordering::SeqCst); //flip SOCKETPAIR_NUM
+        loop {
+            let sock_path_suffix = SOCKETPAIR_NUM.fetch_add(1, Ordering::SeqCst);
+            let sock_path = format!("{}{}", SOCK_PATH_PREFIX, sock_path_suffix);
+            if self.bind(&sock_path).is_ok() {
+                return sock_path;
             }
-            index += 1;
-            path = SOCK_PATH_PREFIX.to_string();
-            path.push_str(&index.to_string());
         }
-        SOCKETPAIR_NUM.fetch_max(index + 1, Ordering::SeqCst);
-        path
     }
 }
 
