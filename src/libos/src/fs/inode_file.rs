@@ -6,20 +6,13 @@ use std::fmt;
 pub struct INodeFile {
     inode: Arc<INode>,
     offset: SgxMutex<usize>,
-    options: OpenOptions,
-}
-
-#[derive(Debug, Clone)]
-pub struct OpenOptions {
-    pub read: bool,
-    pub write: bool,
-    /// Before each write, the file offset is positioned at the end of the file.
-    pub append: bool,
+    access_mode: AccessMode,
+    status_flags: SgxRwLock<StatusFlags>,
 }
 
 impl File for INodeFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
-        if !self.options.read {
+        if !self.access_mode.readable() {
             return_errno!(EBADF, "File not readable");
         }
         let mut offset = self.offset.lock().unwrap();
@@ -29,11 +22,11 @@ impl File for INodeFile {
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize> {
-        if !self.options.write {
+        if !self.access_mode.writable() {
             return_errno!(EBADF, "File not writable");
         }
         let mut offset = self.offset.lock().unwrap();
-        if self.options.append {
+        if self.status_flags.read().unwrap().always_append() {
             let info = self.inode.metadata()?;
             *offset = info.size;
         }
@@ -43,7 +36,7 @@ impl File for INodeFile {
     }
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        if !self.options.read {
+        if !self.access_mode.readable() {
             return_errno!(EBADF, "File not readable");
         }
         let len = self.inode.read_at(offset, buf)?;
@@ -51,7 +44,7 @@ impl File for INodeFile {
     }
 
     fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
-        if !self.options.write {
+        if !self.access_mode.writable() {
             return_errno!(EBADF, "File not writable");
         }
         let len = self.inode.write_at(offset, buf)?;
@@ -59,7 +52,7 @@ impl File for INodeFile {
     }
 
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-        if !self.options.read {
+        if !self.access_mode.readable() {
             return_errno!(EBADF, "File not readable");
         }
         let mut offset = self.offset.lock().unwrap();
@@ -78,11 +71,11 @@ impl File for INodeFile {
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
-        if !self.options.write {
+        if !self.access_mode.writable() {
             return_errno!(EBADF, "File not writable");
         }
         let mut offset = self.offset.lock().unwrap();
-        if self.options.append {
+        if self.status_flags.read().unwrap().always_append() {
             let info = self.inode.metadata()?;
             *offset = info.size;
         }
@@ -116,7 +109,7 @@ impl File for INodeFile {
     }
 
     fn set_len(&self, len: u64) -> Result<()> {
-        if !self.options.write {
+        if !self.access_mode.writable() {
             return_errno!(EBADF, "File not writable. Can't set len.");
         }
         self.inode.resize(len as usize)?;
@@ -134,7 +127,7 @@ impl File for INodeFile {
     }
 
     fn read_entry(&self) -> Result<String> {
-        if !self.options.read {
+        if !self.access_mode.readable() {
             return_errno!(EBADF, "File not readable. Can't read entry.");
         }
         let mut offset = self.offset.lock().unwrap();
@@ -143,24 +136,48 @@ impl File for INodeFile {
         Ok(name)
     }
 
+    fn get_access_mode(&self) -> Result<AccessMode> {
+        Ok(self.access_mode.clone())
+    }
+
+    fn get_status_flags(&self) -> Result<StatusFlags> {
+        let status_flags = self.status_flags.read().unwrap();
+        Ok(status_flags.clone())
+    }
+
+    fn set_status_flags(&self, new_status_flags: StatusFlags) -> Result<()> {
+        let mut status_flags = self.status_flags.write().unwrap();
+        // Currently, F_SETFL can change only the O_APPEND,
+        // O_ASYNC, O_NOATIME, and O_NONBLOCK flags
+        let valid_flags_mask = StatusFlags::O_APPEND
+            | StatusFlags::O_ASYNC
+            | StatusFlags::O_NOATIME
+            | StatusFlags::O_NONBLOCK;
+        status_flags.remove(valid_flags_mask);
+        status_flags.insert(new_status_flags & valid_flags_mask);
+        Ok(())
+    }
+
     fn as_any(&self) -> &Any {
         self
     }
 }
 
 impl INodeFile {
-    pub fn open(inode: Arc<INode>, options: OpenOptions) -> Result<Self> {
-        if (options.read && !inode.allow_read()?) {
+    pub fn open(inode: Arc<INode>, flags: u32) -> Result<Self> {
+        let access_mode = AccessMode::from_u32(flags)?;
+        if (access_mode.readable() && !inode.allow_read()?) {
             return_errno!(EBADF, "File not readable");
         }
-        if (options.write && !inode.allow_write()?) {
+        if (access_mode.writable() && !inode.allow_write()?) {
             return_errno!(EBADF, "File not writable");
         }
-
+        let status_flags = StatusFlags::from_bits_truncate(flags);
         Ok(INodeFile {
             inode,
             offset: SgxMutex::new(0),
-            options,
+            access_mode,
+            status_flags: SgxRwLock::new(status_flags),
         })
     }
 }
@@ -169,9 +186,10 @@ impl Debug for INodeFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "INodeFile {{ inode: ???, pos: {}, options: {:?} }}",
+            "INodeFile {{ inode: ???, pos: {}, access_mode: {:?}, status_flags: {:#o} }}",
             *self.offset.lock().unwrap(),
-            self.options
+            self.access_mode,
+            *self.status_flags.read().unwrap()
         )
     }
 }

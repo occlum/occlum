@@ -5,7 +5,7 @@ use std::path::Path;
 use std::sgxfs::SgxFile;
 
 use super::fs::{
-    File, FileDesc, FileTable, INodeExt, OpenFlags, StdinFile, StdoutFile, ROOT_INODE,
+    CreationFlags, File, FileDesc, FileTable, INodeExt, StdinFile, StdoutFile, ROOT_INODE,
 };
 use super::misc::ResourceLimitsRef;
 use super::vm::{ProcessVM, ProcessVMBuilder};
@@ -117,12 +117,10 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
                     oflag,
                     fd,
                 } => {
-                    let flags = OpenFlags::from_bits_truncate(oflag);
-                    let file = parent.open_file(path.as_str(), flags, mode)?;
+                    let file = parent.open_file(path.as_str(), oflag, mode)?;
                     let file_ref: Arc<Box<File>> = Arc::new(file);
-
-                    let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
-                    cloned_file_table.put_at(fd, file_ref, close_on_spawn);
+                    let creation_flags = CreationFlags::from_bits_truncate(oflag);
+                    cloned_file_table.put_at(fd, file_ref, creation_flags.must_close_on_spawn());
                 }
                 &FileAction::Dup2(old_fd, new_fd) => {
                     let file = cloned_file_table.get(old_fd)?;

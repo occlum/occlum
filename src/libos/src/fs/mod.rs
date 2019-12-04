@@ -12,9 +12,10 @@ use self::dev_null::DevNull;
 use self::dev_random::DevRandom;
 use self::dev_sgx::DevSgx;
 use self::dev_zero::DevZero;
+pub use self::fcntl::FcntlCmd;
 pub use self::file::{File, FileRef, SgxFile, StdinFile, StdoutFile};
+pub use self::file_flags::{AccessMode, CreationFlags, StatusFlags};
 pub use self::file_table::{FileDesc, FileTable};
-use self::inode_file::OpenOptions;
 pub use self::inode_file::{INodeExt, INodeFile};
 pub use self::io_multiplexing::*;
 pub use self::ioctl::*;
@@ -30,7 +31,9 @@ mod dev_null;
 mod dev_random;
 mod dev_sgx;
 mod dev_zero;
+mod fcntl;
 mod file;
+mod file_flags;
 mod file_table;
 mod hostfs;
 mod inode_file;
@@ -42,9 +45,8 @@ mod sgx_impl;
 mod unix_socket;
 
 pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc> {
-    let flags = OpenFlags::from_bits_truncate(flags);
     info!(
-        "open: path: {:?}, flags: {:?}, mode: {:#o}",
+        "open: path: {:?}, flags: {:#o}, mode: {:#o}",
         path, flags, mode
     );
 
@@ -55,11 +57,11 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc> {
     let file_ref: Arc<Box<File>> = Arc::new(file);
 
     let fd = {
-        let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
+        let creation_flags = CreationFlags::from_bits_truncate(flags);
         proc.get_files()
             .lock()
             .unwrap()
-            .put(file_ref, close_on_spawn)
+            .put(file_ref, creation_flags.must_close_on_spawn())
     };
     Ok(fd)
 }
@@ -238,14 +240,14 @@ pub fn do_ioctl(fd: FileDesc, cmd: &mut IoctlCmd) -> Result<()> {
 
 pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2]> {
     info!("pipe2: flags: {:#x}", flags);
-    let flags = OpenFlags::from_bits_truncate(flags);
+    let creation_flags = CreationFlags::from_bits_truncate(flags);
     let current_ref = process::get_current();
     let current = current_ref.lock().unwrap();
     let pipe = Pipe::new()?;
 
     let file_table_ref = current.get_files();
     let mut file_table = file_table_ref.lock().unwrap();
-    let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
+    let close_on_spawn = creation_flags.must_close_on_spawn();
     let reader_fd = file_table.put(Arc::new(Box::new(pipe.reader)), close_on_spawn);
     let writer_fd = file_table.put(Arc::new(Box::new(pipe.writer)), close_on_spawn);
     info!("pipe2: reader_fd: {}, writer_fd: {}", reader_fd, writer_fd);
@@ -275,7 +277,7 @@ pub fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<FileDesc> {
 }
 
 pub fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<FileDesc> {
-    let flags = OpenFlags::from_bits_truncate(flags);
+    let creation_flags = CreationFlags::from_bits_truncate(flags);
     let current_ref = process::get_current();
     let current = current_ref.lock().unwrap();
     let file_table_ref = current.get_files();
@@ -284,8 +286,7 @@ pub fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<FileDes
     if old_fd == new_fd {
         return_errno!(EINVAL, "old_fd must not be equal to new_fd");
     }
-    let close_on_spawn = flags.contains(OpenFlags::CLOEXEC);
-    file_table.put_at(new_fd, file, close_on_spawn);
+    file_table.put_at(new_fd, file, creation_flags.must_close_on_spawn());
     Ok(new_fd)
 }
 
@@ -439,7 +440,7 @@ extern "C" {
 
 impl Process {
     /// Open a file on the process. But DO NOT add it to file table.
-    pub fn open_file(&self, path: &str, flags: OpenFlags, mode: u32) -> Result<Box<File>> {
+    pub fn open_file(&self, path: &str, flags: u32, mode: u32) -> Result<Box<File>> {
         if path == "/dev/null" {
             return Ok(Box::new(DevNull));
         }
@@ -452,12 +453,13 @@ impl Process {
         if path == "/dev/sgx" {
             return Ok(Box::new(DevSgx));
         }
-        let inode = if flags.contains(OpenFlags::CREATE) {
+        let creation_flags = CreationFlags::from_bits_truncate(flags);
+        let inode = if creation_flags.can_create() {
             let (dir_path, file_name) = split_path(&path);
             let dir_inode = self.lookup_inode(dir_path)?;
             match dir_inode.find(file_name) {
                 Ok(file_inode) => {
-                    if flags.contains(OpenFlags::EXCLUSIVE) {
+                    if creation_flags.is_exclusive() {
                         return_errno!(EEXIST, "file exists");
                     }
                     file_inode
@@ -473,7 +475,7 @@ impl Process {
         } else {
             self.lookup_inode(&path)?
         };
-        Ok(Box::new(INodeFile::open(inode, flags.to_options())?))
+        Ok(Box::new(INodeFile::open(inode, flags)?))
     }
 
     /// Lookup INode from the cwd of the process
@@ -502,47 +504,6 @@ fn split_path(path: &str) -> (&str, &str) {
         dir_path = "/";
     }
     (dir_path, file_name)
-}
-
-bitflags! {
-    pub struct OpenFlags: u32 {
-        /// read only
-        const RDONLY = 0;
-        /// write only
-        const WRONLY = 1;
-        /// read write
-        const RDWR = 2;
-        /// create file if it does not exist
-        const CREATE = 1 << 6;
-        /// error if CREATE and the file exists
-        const EXCLUSIVE = 1 << 7;
-        /// truncate file upon open
-        const TRUNCATE = 1 << 9;
-        /// append on each write
-        const APPEND = 1 << 10;
-        /// non block
-        const NONBLOCK = 1 << 11;
-        /// close on exec
-        const CLOEXEC = 1 << 19;
-    }
-}
-
-impl OpenFlags {
-    fn readable(&self) -> bool {
-        let b = self.bits() & 0b11;
-        b == OpenFlags::RDONLY.bits() || b == OpenFlags::RDWR.bits()
-    }
-    fn writable(&self) -> bool {
-        let b = self.bits() & 0b11;
-        b == OpenFlags::WRONLY.bits() || b == OpenFlags::RDWR.bits()
-    }
-    fn to_options(&self) -> OpenOptions {
-        OpenOptions {
-            read: self.readable(),
-            write: self.writable(),
-            append: self.contains(OpenFlags::APPEND),
-        }
-    }
 }
 
 #[repr(packed)] // Don't use 'C'. Or its size will align up to 8 bytes.
@@ -731,93 +692,13 @@ pub unsafe fn write_cstr(ptr: *mut u8, s: &str) {
     ptr.add(s.len()).write(0);
 }
 
-#[derive(Debug)]
-pub enum FcntlCmd {
-    /// Duplicate the file descriptor fd using the lowest-numbered available
-    /// file descriptor greater than or equal to arg.
-    DupFd(FileDesc),
-    /// As for `DupFd`, but additionally set the close-on-exec flag for the
-    /// duplicate file descriptor.
-    DupFdCloexec(FileDesc),
-    /// Return (as the function result) the file descriptor flags
-    GetFd(),
-    /// Set the file descriptor to be close-on-exec or not
-    SetFd(u32),
-    /// Get the file status flags
-    GetFl(),
-    /// Set the file status flags
-    SetFl(u32),
-}
-
-impl FcntlCmd {
-    #[deny(unreachable_patterns)]
-    pub fn from_raw(cmd: u32, arg: u64) -> Result<FcntlCmd> {
-        Ok(match cmd as c_int {
-            libc::F_DUPFD => FcntlCmd::DupFd(arg as FileDesc),
-            libc::F_DUPFD_CLOEXEC => FcntlCmd::DupFdCloexec(arg as FileDesc),
-            libc::F_GETFD => FcntlCmd::GetFd(),
-            libc::F_SETFD => FcntlCmd::SetFd(arg as u32),
-            libc::F_GETFL => FcntlCmd::GetFl(),
-            libc::F_SETFL => FcntlCmd::SetFl(arg as u32),
-            _ => return_errno!(EINVAL, "invalid command"),
-        })
-    }
-}
-
 pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize> {
     info!("fcntl: fd: {:?}, cmd: {:?}", &fd, cmd);
     let current_ref = process::get_current();
     let mut current = current_ref.lock().unwrap();
-    let files_ref = current.get_files();
-    let mut files = files_ref.lock().unwrap();
-    Ok(match cmd {
-        FcntlCmd::DupFd(min_fd) => {
-            let dup_fd = files.dup(fd, *min_fd, false)?;
-            dup_fd as isize
-        }
-        FcntlCmd::DupFdCloexec(min_fd) => {
-            let dup_fd = files.dup(fd, *min_fd, true)?;
-            dup_fd as isize
-        }
-        FcntlCmd::GetFd() => {
-            let entry = files.get_entry(fd)?;
-            let fd_flags = if entry.is_close_on_spawn() {
-                libc::FD_CLOEXEC
-            } else {
-                0
-            };
-            fd_flags as isize
-        }
-        FcntlCmd::SetFd(fd_flags) => {
-            let entry = files.get_entry_mut(fd)?;
-            entry.set_close_on_spawn((fd_flags & libc::FD_CLOEXEC as u32) != 0);
-            0
-        }
-        FcntlCmd::GetFl() => {
-            let file = files.get(fd)?;
-            if let Ok(socket) = file.as_socket() {
-                let ret = try_libc!(libc::ocall::fcntl_arg0(socket.fd(), libc::F_GETFL));
-                ret as isize
-            } else {
-                warn!("fcntl.getfl is unimplemented");
-                0
-            }
-        }
-        FcntlCmd::SetFl(flags) => {
-            let file = files.get(fd)?;
-            if let Ok(socket) = file.as_socket() {
-                let ret = try_libc!(libc::ocall::fcntl_arg1(
-                    socket.fd(),
-                    libc::F_SETFL,
-                    *flags as c_int
-                ));
-                ret as isize
-            } else {
-                warn!("fcntl.setfl is unimplemented");
-                0
-            }
-        }
-    })
+    let file_table_ref = current.get_files();
+    let ret = fcntl::do_fcntl(file_table_ref, fd, cmd)?;
+    Ok(ret)
 }
 
 pub fn do_readlink(path: &str, buf: &mut [u8]) -> Result<usize> {

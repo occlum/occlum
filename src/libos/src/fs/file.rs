@@ -71,6 +71,18 @@ pub trait File: Debug + Sync + Send + Any {
         return_op_unsupported_error!("ioctl")
     }
 
+    fn get_access_mode(&self) -> Result<AccessMode> {
+        return_op_unsupported_error!("get_access_mode")
+    }
+
+    fn get_status_flags(&self) -> Result<StatusFlags> {
+        return_op_unsupported_error!("get_status_flags")
+    }
+
+    fn set_status_flags(&self, new_status_flags: StatusFlags) -> Result<()> {
+        return_op_unsupported_error!("set_status_flags")
+    }
+
     fn as_any(&self) -> &Any;
 }
 
