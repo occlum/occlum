@@ -1,0 +1,4 @@
+deps/
+openvino_src/
+model/
+occlum_context/
