@@ -125,7 +125,7 @@ Step 1-3 are to be done on the host OS (Linux):
 
 3. Run the Occlum Docker container, which has Occlum and its demos preinstalled:
     ```
-    docker run -it --device /dev/isgx occlum/occlum:0.7.0
+    docker run -it --device /dev/isgx occlum/occlum:0.8.0
     ```
 
 Step 4-5 are to be done on the guest OS running inside the Docker container:
