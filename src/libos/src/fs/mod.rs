@@ -16,7 +16,7 @@ pub use self::fcntl::FcntlCmd;
 pub use self::file::{File, FileRef, SgxFile, StdinFile, StdoutFile};
 pub use self::file_flags::{AccessMode, CreationFlags, StatusFlags};
 pub use self::file_table::{FileDesc, FileTable};
-pub use self::inode_file::{INodeExt, INodeFile};
+pub use self::inode_file::{AsINodeFile, INodeExt, INodeFile};
 pub use self::io_multiplexing::*;
 pub use self::ioctl::*;
 pub use self::pipe::Pipe;
@@ -319,6 +319,7 @@ pub fn do_rename(oldpath: &str, newpath: &str) -> Result<()> {
     let (new_dir_path, new_file_name) = split_path(&newpath);
     let old_dir_inode = current_process.lookup_inode(old_dir_path)?;
     let new_dir_inode = current_process.lookup_inode(new_dir_path)?;
+    // TODO: support to modify file's absolute path
     old_dir_inode.move_(old_file_name, &new_dir_inode, new_file_name)?;
     Ok(())
 }
@@ -475,7 +476,8 @@ impl Process {
         } else {
             self.lookup_inode(&path)?
         };
-        Ok(Box::new(INodeFile::open(inode, flags)?))
+        let abs_path = self.convert_to_abs_path(&path);
+        Ok(Box::new(INodeFile::open(inode, &abs_path, flags)?))
     }
 
     /// Lookup INode from the cwd of the process
@@ -492,6 +494,27 @@ impl Process {
             let inode = ROOT_INODE.lookup(cwd)?.lookup(path)?;
             Ok(inode)
         }
+    }
+
+    /// Convert the path to be absolute
+    pub fn convert_to_abs_path(&self, path: &str) -> String {
+        debug!(
+            "convert_to_abs_path: cwd: {:?}, path: {:?}",
+            self.get_cwd(),
+            path
+        );
+        if path.len() > 0 && path.as_bytes()[0] == b'/' {
+            // path is absolute path already
+            return path.to_owned();
+        }
+        let cwd = {
+            if !self.get_cwd().ends_with("/") {
+                self.get_cwd().to_owned() + "/"
+            } else {
+                self.get_cwd().to_owned()
+            }
+        };
+        cwd + path
     }
 }
 
@@ -703,19 +726,31 @@ pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize> {
 
 pub fn do_readlink(path: &str, buf: &mut [u8]) -> Result<usize> {
     info!("readlink: path: {:?}", path);
-    match path {
-        "/proc/self/exe" => {
-            // get cwd
+    let file_path = {
+        if path == "/proc/self/exe" {
             let current_ref = process::get_current();
             let current = current_ref.lock().unwrap();
-            let cwd = current.get_cwd();
-            let len = cwd.len().min(buf.len());
-            buf[0..len].copy_from_slice(&cwd.as_bytes()[0..len]);
-            Ok(0)
-        }
-        _ => {
+            current.get_elf_path().to_owned()
+        } else if path.starts_with("/proc/self/fd") {
+            let fd = path
+                .trim_start_matches("/proc/self/fd/")
+                .parse::<FileDesc>()
+                .map_err(|e| errno!(EBADF, "Invalid file descriptor"))?;
+            let current_ref = process::get_current();
+            let current = current_ref.lock().unwrap();
+            let file_ref = current.get_files().lock().unwrap().get(fd)?;
+            if let Ok(inode_file) = file_ref.as_inode_file() {
+                inode_file.get_abs_path().to_owned()
+            } else {
+                // TODO: support special device files
+                return_errno!(EINVAL, "not a normal file link")
+            }
+        } else {
             // TODO: support symbolic links
             return_errno!(EINVAL, "not a symbolic link")
         }
-    }
+    };
+    let len = file_path.len().min(buf.len());
+    buf[0..len].copy_from_slice(&file_path.as_bytes()[0..len]);
+    Ok(len)
 }

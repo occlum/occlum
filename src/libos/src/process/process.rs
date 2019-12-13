@@ -15,6 +15,7 @@ lazy_static! {
             host_tid: 0,
             exit_status: 0,
             cwd: "/".to_owned(),
+            elf_path: "/".to_owned(),
             clear_child_tid: None,
             parent: None,
             children: Vec::new(),
@@ -29,6 +30,7 @@ lazy_static! {
 impl Process {
     pub fn new(
         cwd: &str,
+        elf_path: &str,
         task: Task,
         vm_ref: ProcessVMRef,
         file_table_ref: FileTableRef,
@@ -43,6 +45,7 @@ impl Process {
             tgid: new_pid,
             host_tid: 0,
             cwd: cwd.to_owned(),
+            elf_path: elf_path.to_owned(),
             clear_child_tid: None,
             exit_status: 0,
             parent: None,
@@ -86,6 +89,9 @@ impl Process {
     }
     pub fn get_cwd(&self) -> &str {
         &self.cwd
+    }
+    pub fn get_elf_path(&self) -> &str {
+        &self.elf_path
     }
     pub fn get_vm(&self) -> &ProcessVMRef {
         &self.vm

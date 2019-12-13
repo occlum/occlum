@@ -6,7 +6,7 @@ BUILD_DIR := $(PROJECT_DIR)/build
 TEST_DEPS := client data_sink
 # Tests: need to be compiled and run by test-% target
 TESTS := empty env hello_world malloc mmap file fs_perms getpid spawn sched pipe time \
-	truncate readdir mkdir link tls pthread uname rlimit server \
+	truncate readdir mkdir link symlink tls pthread uname rlimit server \
 	server_epoll unix_socket cout hostfs cpuid rdtsc device sleep exit_group \
 	ioctl fcntl
 # Benchmarks: need to be compiled and run by bench-% target

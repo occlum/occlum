@@ -19,9 +19,9 @@ typedef struct {
 
 #define TEST_CASE(name)     { STR(name), name }
 
-#define THROW_ERROR(msg)    do { \
-    printf("\t\tERROR: %s in func %s at line %d of file %s\n", \
-            (msg), __func__, __LINE__, __FILE__); \
+#define THROW_ERROR(fmt, ...)   do { \
+    printf("\t\tERROR:" fmt " in func %s at line %d of file %s\n", \
+    ##__VA_ARGS__, __func__, __LINE__, __FILE__); \
     return -1; \
 } while (0)
 

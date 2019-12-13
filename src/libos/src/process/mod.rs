@@ -26,6 +26,7 @@ pub struct Process {
     // TODO: move cwd, root_inode into a FileSystem structure
     // TODO: should cwd be a String or INode?
     cwd: String,
+    elf_path: String,
     clear_child_tid: Option<*mut pid_t>,
     parent: Option<ProcessRef>,
     children: Vec<ProcessWeakRef>,

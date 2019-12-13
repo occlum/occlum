@@ -5,6 +5,7 @@ use std::fmt;
 
 pub struct INodeFile {
     inode: Arc<INode>,
+    abs_path: String,
     offset: SgxMutex<usize>,
     access_mode: AccessMode,
     status_flags: SgxRwLock<StatusFlags>,
@@ -164,7 +165,7 @@ impl File for INodeFile {
 }
 
 impl INodeFile {
-    pub fn open(inode: Arc<INode>, flags: u32) -> Result<Self> {
+    pub fn open(inode: Arc<INode>, abs_path: &str, flags: u32) -> Result<Self> {
         let access_mode = AccessMode::from_u32(flags)?;
         if (access_mode.readable() && !inode.allow_read()?) {
             return_errno!(EBADF, "File not readable");
@@ -175,10 +176,15 @@ impl INodeFile {
         let status_flags = StatusFlags::from_bits_truncate(flags);
         Ok(INodeFile {
             inode,
+            abs_path: abs_path.to_owned(),
             offset: SgxMutex::new(0),
             access_mode,
             status_flags: SgxRwLock::new(status_flags),
         })
+    }
+
+    pub fn get_abs_path(&self) -> &str {
+        &self.abs_path
     }
 }
 
@@ -186,7 +192,8 @@ impl Debug for INodeFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "INodeFile {{ inode: ???, pos: {}, access_mode: {:?}, status_flags: {:#o} }}",
+            "INodeFile {{ inode: ???, abs_path: {}, pos: {}, access_mode: {:?}, status_flags: {:#o} }}",
+            self.abs_path,
             *self.offset.lock().unwrap(),
             self.access_mode,
             *self.status_flags.read().unwrap()
@@ -223,5 +230,17 @@ impl INodeExt for INode {
         let perms = info.mode as u32;
         let readable = (perms & S_IRUSR) == S_IRUSR;
         Ok(readable)
+    }
+}
+
+pub trait AsINodeFile {
+    fn as_inode_file(&self) -> Result<&INodeFile>;
+}
+
+impl AsINodeFile for FileRef {
+    fn as_inode_file(&self) -> Result<&INodeFile> {
+        self.as_any()
+            .downcast_ref::<INodeFile>()
+            .ok_or_else(|| errno!(EBADF, "not an inode file"))
     }
 }
