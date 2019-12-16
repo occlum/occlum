@@ -1,10 +1,10 @@
 #!/bin/bash
-install_dir=/usr/local/occlum/x86_64-linux-musl
-export PATH=$PATH:$install_dir/bin
+INSTALL_DIR=/usr/local/occlum/x86_64-linux-musl
+export PATH=$PATH:$INSTALL_DIR/bin
 
 cd server
 
-make -j8
+make -j$(nproc)
 if [ $? -ne 0 ]
 then
   echo "demo make failed"
@@ -25,9 +25,9 @@ fi
 mkdir -p image/etc
 cp /etc/resolv.conf image/etc
 cp ../greeter_server image/bin
-cp $install_dir/lib/libprotobuf.so.3.10.0.0 image/lib
-cp $install_dir/lib/libcares.so.2 image/lib
-cp $install_dir/lib/libz.so.1 image/lib
+cp $INSTALL_DIR/lib/libprotobuf.so.3.10.0.0 image/lib
+cp $INSTALL_DIR/lib/libcares.so.2 image/lib
+cp $INSTALL_DIR/lib/libz.so.1 image/lib
 if [ $? -ne 0 ]
 then
   echo "libraries copied failed"

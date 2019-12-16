@@ -1,15 +1,17 @@
 #!/bin/sh
+DEMO_DIR=$PWD
 
-cd grpc/examples/cpp/helloworld
-git apply  ../../../../Makefile.patch
+cd $DEMO_DIR/grpc/examples/cpp/helloworld
+git apply $DEMO_DIR/Makefile.patch
 if [ $? -ne 0 ]
 then
   echo "patch failed"
   exit 1
 fi
-cp ../../protos/helloworld.proto .
 
-cd ../../../../
+cp $DEMO_DIR/grpc/examples/protos/helloworld.proto .
+
+cd $DEMO_DIR
 
 mkdir -p client
 mkdir -p server

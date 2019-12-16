@@ -32,7 +32,7 @@ if [ ! -d "$CURLDIR" ] ; then
     mv curl-curl-7_29_0 curl && \
     echo "Download curl successfully" || exit 1
 else
-    echo "The openssl code is already existent"
+    echo "The curl code is already existent"
 fi
 
 # Download other dependencies
@@ -88,7 +88,8 @@ if [ ! -f "$INSTALLDIR/lib/libcurl.so" ] ; then
     echo "Building curl ..."
     CC=occlum-gcc CXX=occlum-g++ ./configure \
       --prefix=$INSTALLDIR \
-      --with-ssl=$INSTALLDIR && \
+      --with-ssl=$INSTALLDIR \
+      --without-zlib && \
     make -j${nproc} && \
     sudo make install && \
     echo "Build curl successfully" || exit 1

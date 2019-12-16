@@ -1,12 +1,12 @@
 #!/bin/sh
 
-install_dir=/usr/local/occlum/x86_64-linux-musl
+INSTALL_DIR=/usr/local/occlum/x86_64-linux-musl
 
-export PATH=$PATH:$install_dir/bin
+export PATH=$PATH:$INSTALL_DIR/bin
 
 cd server
 
-make -j8
+make -j$(nproc)
 if [ $? -ne 0 ]
 then
   echo "demo make failed"
