@@ -49,7 +49,7 @@ impl SocketFile {
             let flags = flags.to_u32() as i32;
 
             // Do OCall
-            let status = ocall_sendmsg(
+            let status = occlum_ocall_sendmsg(
                 &mut retval as *mut isize,
                 host_fd,
                 msg_name,
@@ -70,7 +70,7 @@ impl SocketFile {
 }
 
 extern "C" {
-    fn ocall_sendmsg(
+    fn occlum_ocall_sendmsg(
         ret: *mut ssize_t,
         fd: c_int,
         msg_name: *const c_void,

@@ -1,13 +1,14 @@
-#include "sgx_uae_service.h"
+#include <sgx_uae_service.h>
+#include "ocalls.h"
 
-sgx_status_t ocall_sgx_init_quote(
-    sgx_target_info_t *target_info,
-    sgx_epid_group_id_t *epid_group_id)
+sgx_status_t occlum_ocall_sgx_init_quote(
+    sgx_target_info_t* target_info,
+    sgx_epid_group_id_t* epid_group_id)
 {
     return sgx_init_quote(target_info, epid_group_id);
 }
 
-sgx_status_t ocall_sgx_get_quote(
+sgx_status_t occlum_ocall_sgx_get_quote(
     uint8_t* sigrl,
     uint32_t sigrl_len,
     sgx_report_t* report,

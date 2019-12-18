@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 use util::mem_util::from_untrusted::*;
 
-const ENCLAVE_PATH: &'static str = ".occlum/build/lib/libocclum.signed.so";
+const ENCLAVE_PATH: &'static str = ".occlum/build/lib/libocclum-libos.signed.so";
 
 lazy_static! {
     static ref INIT_ONCE: Once = Once::new();
@@ -15,7 +15,10 @@ lazy_static! {
 }
 
 #[no_mangle]
-pub extern "C" fn libos_boot(path_buf: *const c_char, argv: *const *const c_char) -> i32 {
+pub extern "C" fn occlum_ecall_new_process(
+    path_buf: *const c_char,
+    argv: *const *const c_char,
+) -> i32 {
     INIT_ONCE.call_once(|| {
         // Init the log infrastructure first so that log messages will be printed afterwards
         util::log::init();
@@ -37,8 +40,8 @@ pub extern "C" fn libos_boot(path_buf: *const c_char, argv: *const *const c_char
     // register exception handlers (support cpuid & rdtsc for now)
     let _ = backtrace::enable_backtrace(ENCLAVE_PATH, PrintFormat::Short);
     panic::catch_unwind(|| {
-        backtrace::__rust_begin_short_backtrace(|| match do_boot(&path, &args) {
-            Ok(()) => 0,
+        backtrace::__rust_begin_short_backtrace(|| match do_new_process(&path, &args) {
+            Ok(pid_t) => pid_t as i32,
             Err(e) => {
                 error!("failed to boot up LibOS: {}", e.backtrace());
                 EXIT_STATUS_INTERNAL_ERROR
@@ -49,18 +52,20 @@ pub extern "C" fn libos_boot(path_buf: *const c_char, argv: *const *const c_char
 }
 
 #[no_mangle]
-pub extern "C" fn libos_run(host_tid: i32) -> i32 {
+pub extern "C" fn occlum_ecall_exec_thread(libos_pid: i32, host_tid: i32) -> i32 {
     if ALLOW_RUN.load(Ordering::SeqCst) == false {
         return EXIT_STATUS_INTERNAL_ERROR;
     }
 
     let _ = backtrace::enable_backtrace(ENCLAVE_PATH, PrintFormat::Short);
     panic::catch_unwind(|| {
-        backtrace::__rust_begin_short_backtrace(|| match do_run(host_tid as pid_t) {
-            Ok(exit_status) => exit_status,
-            Err(e) => {
-                error!("failed to execute a process: {}", e.backtrace());
-                EXIT_STATUS_INTERNAL_ERROR
+        backtrace::__rust_begin_short_backtrace(|| {
+            match do_exec_thread(libos_pid as pid_t, host_tid as pid_t) {
+                Ok(exit_status) => exit_status,
+                Err(e) => {
+                    error!("failed to execute a process: {}", e.backtrace());
+                    EXIT_STATUS_INTERNAL_ERROR
+                }
             }
         })
     })
@@ -68,9 +73,7 @@ pub extern "C" fn libos_run(host_tid: i32) -> i32 {
 }
 
 #[no_mangle]
-pub extern "C" fn dummy_ecall() -> i32 {
-    0
-}
+pub extern "C" fn occlum_ecall_nop() {}
 
 // Use -128 as a special value to indicate internal error from libos, not from
 // user programs. The LibOS ensures that an user program can only return a
@@ -103,19 +106,20 @@ fn parse_arguments(
     Ok((path_buf, args))
 }
 
-fn do_boot(program_path: &PathBuf, argv: &Vec<CString>) -> Result<()> {
+fn do_new_process(program_path: &PathBuf, argv: &Vec<CString>) -> Result<pid_t> {
     validate_program_path(program_path)?;
 
     let envp = &config::LIBOS_CONFIG.env;
     let file_actions = Vec::new();
     let parent = &process::IDLE_PROCESS;
     let program_path_str = program_path.to_str().unwrap();
-    process::do_spawn(&program_path_str, argv, envp, &file_actions, parent)?;
-    Ok(())
+    let new_tid =
+        process::do_spawn_without_exec(&program_path_str, argv, envp, &file_actions, parent)?;
+    Ok(new_tid)
 }
 
-fn do_run(host_tid: pid_t) -> Result<i32> {
-    let exit_status = process::run_task(host_tid)?;
+fn do_exec_thread(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
+    let exit_status = process::run_task(libos_tid, host_tid)?;
 
     // sync file system
     // TODO: only sync when all processes exit

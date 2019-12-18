@@ -56,7 +56,7 @@ impl InnerAgent {
 
     fn init_fields() -> Result<(sgx_target_info_t, sgx_epid_group_id_t)> {
         extern "C" {
-            pub fn ocall_sgx_init_quote(
+            pub fn occlum_ocall_sgx_init_quote(
                 retval: *mut sgx_status_t,
                 target_info: *mut sgx_target_info_t,
                 epid_group_id: *mut sgx_epid_group_id_t,
@@ -67,7 +67,7 @@ impl InnerAgent {
         let mut epid_group_id = Default::default();
         unsafe {
             let mut retval = Default::default();
-            let status = ocall_sgx_init_quote(
+            let status = occlum_ocall_sgx_init_quote(
                 &mut retval as *mut sgx_status_t,
                 &mut target_info as *mut sgx_target_info_t,
                 &mut epid_group_id as *mut sgx_epid_group_id_t,
@@ -75,7 +75,7 @@ impl InnerAgent {
             assert!(status == sgx_status_t::SGX_SUCCESS);
 
             if (retval != sgx_status_t::SGX_SUCCESS) {
-                return_errno!(EINVAL, "ocall_sgx_init_quote failed");
+                return_errno!(EINVAL, "occlum_ocall_sgx_init_quote failed");
             }
         }
 
@@ -95,7 +95,7 @@ impl InnerAgent {
         nonce: &sgx_quote_nonce_t,
     ) -> Result<SgxQuote> {
         extern "C" {
-            pub fn ocall_sgx_get_quote(
+            pub fn occlum_ocall_sgx_get_quote(
                 retval: *mut sgx_status_t,         // Output
                 sigrl: *const u8,                  // Input (optional)
                 sigrl_len: u32,                    // Input (optional)
@@ -137,7 +137,7 @@ impl InnerAgent {
         // Do OCall
         unsafe {
             let mut retval = Default::default();
-            let status = ocall_sgx_get_quote(
+            let status = occlum_ocall_sgx_get_quote(
                 &mut retval as *mut sgx_status_t,
                 sigrl_ptr,
                 sigrl_size,
@@ -154,9 +154,9 @@ impl InnerAgent {
             if retval != sgx_status_t::SGX_SUCCESS {
                 match retval {
                     sgx_status_t::SGX_ERROR_BUSY => {
-                        return_errno!(EBUSY, "ocall_sgx_get_quote is temporarily busy")
+                        return_errno!(EBUSY, "occlum_ocall_sgx_get_quote is temporarily busy")
                     }
-                    _ => return_errno!(EINVAL, "ocall_sgx_get_quote failed"),
+                    _ => return_errno!(EINVAL, "occlum_ocall_sgx_get_quote failed"),
                 }
             }
         }

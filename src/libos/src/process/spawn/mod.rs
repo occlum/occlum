@@ -17,27 +17,37 @@ mod elf_file;
 mod init_stack;
 mod init_vm;
 
-#[derive(Debug)]
-pub enum FileAction {
-    /// open(path, oflag, mode) had been called, and the returned file
-    /// descriptor, if not `fd`, had been changed to `fd`.
-    Open {
-        path: String,
-        mode: u32,
-        oflag: u32,
-        fd: FileDesc,
-    },
-    Dup2(FileDesc, FileDesc),
-    Close(FileDesc),
-}
-
 pub fn do_spawn(
     elf_path: &str,
     argv: &[CString],
     envp: &[CString],
     file_actions: &[FileAction],
     parent_ref: &ProcessRef,
-) -> Result<u32> {
+) -> Result<pid_t> {
+    let (new_tid, new_process_ref) = new_process(elf_path, argv, envp, file_actions, parent_ref)?;
+    task::enqueue_and_exec_task(new_tid, new_process_ref);
+    Ok(new_tid)
+}
+
+pub fn do_spawn_without_exec(
+    elf_path: &str,
+    argv: &[CString],
+    envp: &[CString],
+    file_actions: &[FileAction],
+    parent_ref: &ProcessRef,
+) -> Result<pid_t> {
+    let (new_tid, new_process_ref) = new_process(elf_path, argv, envp, file_actions, parent_ref)?;
+    task::enqueue_task(new_tid, new_process_ref);
+    Ok(new_tid)
+}
+
+fn new_process(
+    elf_path: &str,
+    argv: &[CString],
+    envp: &[CString],
+    file_actions: &[FileAction],
+    parent_ref: &ProcessRef,
+) -> Result<(pid_t, ProcessRef)> {
     let elf_buf = load_elf_to_vec(elf_path, parent_ref)
         .cause_err(|e| errno!(e.errno(), "cannot load the executable"))?;
     let ldso_path = "/lib/ld-musl-x86_64.so.1";
@@ -86,8 +96,22 @@ pub fn do_spawn(
     };
     parent_adopts_new_child(&parent_ref, &new_process_ref);
     process_table::put(new_pid, new_process_ref.clone());
-    task::enqueue_task(new_process_ref);
-    Ok(new_pid)
+    let new_tid = new_pid;
+    Ok((new_tid, new_process_ref))
+}
+
+#[derive(Debug)]
+pub enum FileAction {
+    /// open(path, oflag, mode) had been called, and the returned file
+    /// descriptor, if not `fd`, had been changed to `fd`.
+    Open {
+        path: String,
+        mode: u32,
+        oflag: u32,
+        fd: FileDesc,
+    },
+    Dup2(FileDesc, FileDesc),
+    Close(FileDesc),
 }
 
 fn load_elf_to_vec(elf_path: &str, parent_ref: &ProcessRef) -> Result<Vec<u8>> {

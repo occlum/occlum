@@ -436,7 +436,7 @@ pub fn do_sendfile(
 }
 
 extern "C" {
-    fn ocall_sync() -> sgx_status_t;
+    fn occlum_ocall_sync() -> sgx_status_t;
 }
 
 impl Process {

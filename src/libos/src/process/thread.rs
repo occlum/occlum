@@ -106,7 +106,7 @@ pub fn do_clone(
         }
     }
 
-    task::enqueue_task(new_thread_ref);
+    task::enqueue_and_exec_task(new_thread_pid, new_thread_ref);
     Ok(new_thread_pid)
 }
 

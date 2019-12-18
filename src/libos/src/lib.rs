@@ -1,5 +1,5 @@
 #![allow(unused)]
-#![crate_name = "occlum_rs"]
+#![crate_name = "occlum_libos_core_rs"]
 #![crate_type = "staticlib"]
 #![cfg_attr(not(target_env = "sgx"), no_std)]
 #![cfg_attr(target_env = "sgx", feature(rustc_private))]

@@ -75,7 +75,7 @@ impl SocketFile {
         // Do OCall
         let retval = try_libc!({
             let mut retval = 0_isize;
-            let status = ocall_recvmsg(
+            let status = occlum_ocall_recvmsg(
                 &mut retval as *mut isize,
                 host_fd,
                 msg_name,
@@ -121,7 +121,7 @@ impl SocketFile {
 }
 
 extern "C" {
-    fn ocall_recvmsg(
+    fn occlum_ocall_recvmsg(
         ret: *mut ssize_t,
         fd: c_int,
         msg_name: *mut c_void,

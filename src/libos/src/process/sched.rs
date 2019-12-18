@@ -1,21 +1,21 @@
 use super::*;
 
 extern "C" {
-    fn ocall_sched_getaffinity(
+    fn occlum_ocall_sched_getaffinity(
         ret: *mut i32,
         errno: *mut i32,
         pid: i32,
         cpusetsize: size_t,
         mask: *mut c_uchar,
     ) -> sgx_status_t;
-    fn ocall_sched_setaffinity(
+    fn occlum_ocall_sched_setaffinity(
         ret: *mut i32,
         errno: *mut i32,
         pid: i32,
         cpusetsize: size_t,
         mask: *const c_uchar,
     ) -> sgx_status_t;
-    fn ocall_sched_yield() -> sgx_status_t;
+    fn occlum_ocall_sched_yield() -> sgx_status_t;
 }
 
 pub struct CpuSet {
@@ -96,11 +96,11 @@ pub fn do_sched_getaffinity(pid: pid_t, cpu_set: &mut CpuSet) -> Result<i32> {
     let mut ret = 0;
     let mut error = 0;
     unsafe {
-        ocall_sched_getaffinity(&mut ret, &mut error, host_tid as i32, cpusize, buf);
+        occlum_ocall_sched_getaffinity(&mut ret, &mut error, host_tid as i32, cpusize, buf);
     }
     if (ret < 0) {
         let errno = Errno::from(error as u32);
-        return_errno!(errno, "ocall_sched_getaffinity failed");
+        return_errno!(errno, "occlum_ocall_sched_getaffinity failed");
     }
     Ok(ret)
 }
@@ -115,18 +115,18 @@ pub fn do_sched_setaffinity(pid: pid_t, cpu_set: &CpuSet) -> Result<i32> {
     let mut ret = 0;
     let mut error = 0;
     unsafe {
-        ocall_sched_setaffinity(&mut ret, &mut error, host_tid as i32, cpusize, buf);
+        occlum_ocall_sched_setaffinity(&mut ret, &mut error, host_tid as i32, cpusize, buf);
     }
     if (ret < 0) {
         let errno = Errno::from(error as u32);
-        return_errno!(errno, "ocall_sched_setaffinity failed");
+        return_errno!(errno, "occlum_ocall_sched_setaffinity failed");
     }
     Ok(ret)
 }
 
 pub fn do_sched_yield() {
     unsafe {
-        let status = ocall_sched_yield();
+        let status = occlum_ocall_sched_yield();
         assert!(status == sgx_status_t::SGX_SUCCESS);
     }
 }

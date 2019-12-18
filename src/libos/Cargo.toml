@@ -3,7 +3,7 @@ name = "Occlum"
 version = "0.8.0"
 
 [lib]
-name = "occlum_rs"
+name = "occlum_libos_core_rs"
 crate-type = ["staticlib"]
 
 [dependencies]

@@ -1,5 +1,38 @@
 include ../sgxenv.mk
 
+# An overview of the build process
+#
+# The target library:
+#     libocclum-libos.so
+#
+# The intermediate libraries:
+#     libocclum-libos-core.a
+#     libocclum_libos_core_rs.a
+#
+# Diagram:
+#
+# +-------------------+
+# |LibOS (Enclave)<--------+ libocclum-libos.so
+# | +---------------| |
+# | |LibOS Core <----------+ libocclum-libos-core.a
+# | |  +----------| | |
+# | |  |Rust <-------------+ libocclum_libos_core_rs.a
+# | |  +----------+ | |      (Rust forbids the use of hypens in library names)
+# | |  |C         | | |
+# | |  +----------+ | |
+# | |  |Assembly  | | |
+# | |  +----------+ | |
+# | +---------------+ |
+# | |LibOS Builtins<-------+ Configurable by Occlum.json
+# | +---------------+ |
+# |                   |
+# | +---------------+ |
+# | |Rust SGX SDK <-----+
+# | +---------------| | +--+ Dependencies
+# | |Intel SGX SDK<-----+
+# | +---------------| |
+# +-------------------+
+
 # Build LibOS in debug or release mode
 LIBOS_RELEASE ?= 0
 
@@ -19,13 +52,9 @@ LIBOS_LOG ?= error
 
 ONLY_REBUILD_BUILTIN ?= 0
 
-# The final and intermediate libraries
-#
-# The relationships between the three Occlum libraries
-#    $(LIBOS_SO) > $(LIBOS_CORE_A) > $(LIBOS_RS_A)
-LIBOS_SO := $(BUILD_DIR)/lib/libocclum.so
-LIBOS_CORE_A := $(BUILD_DIR)/lib/libocclum_core.a
-LIBOS_RS_A := $(BUILD_DIR)/lib/libocclum_rs.a
+LIBOS_SO := $(BUILD_DIR)/lib/libocclum-libos.so
+LIBOS_CORE_A := $(BUILD_DIR)/lib/libocclum-libos-core.a
+LIBOS_CORE_RS_A := $(BUILD_DIR)/lib/libocclum_libos_core_rs.a
 # The dependent libraries
 LIBCOMPILER_RT_PATCH_A := $(BUILD_DIR)/lib/libcompiler-rt-patch.a
 
@@ -62,7 +91,7 @@ C_FLAGS += -DOCCLUM_BUILTIN_VM_USER_SPACE_SIZE='($(OCCLUM_BUILTIN_VM_USER_SPACE_
 endif
 
 _Other_Link_Flags := -L$(RUST_SGX_SDK_DIR)/compiler-rt/ -L$(BUILD_DIR)/lib
-_Other_Enclave_Libs := -lcompiler-rt-patch -locclum_core -lsgx_tprotected_fs
+_Other_Enclave_Libs := -lcompiler-rt-patch -locclum-libos-core -lsgx_tprotected_fs
 LINK_FLAGS := $(SGX_LFLAGS_T)
 
 .PHONY: all clean
@@ -83,17 +112,17 @@ $(LIBOS_SO): $(BUILTIN_C_OBJS)
 	@echo "LINK => $@"
 endif
 
-$(LIBOS_CORE_A): $(LIBOS_RS_A) $(C_OBJS) $(CXX_OBJS) $(S_OBJS) $(EDL_C_OBJS)
-	@cp $(LIBOS_RS_A) $(LIBOS_CORE_A)
+$(LIBOS_CORE_A): $(LIBOS_CORE_RS_A) $(C_OBJS) $(CXX_OBJS) $(S_OBJS) $(EDL_C_OBJS)
+	@cp $(LIBOS_CORE_RS_A) $(LIBOS_CORE_A)
 	@ar r $@ $(C_OBJS) $(CXX_OBJS) $(S_OBJS) $(EDL_C_OBJS)
 	@echo "GEN => $@"
 
 ifeq ($(LIBOS_RELEASE), 0)
-$(LIBOS_RS_A): $(RUST_SRCS)
+$(LIBOS_CORE_RS_A): $(RUST_SRCS)
 	@RUSTC_BOOTSTRAP=1 cargo build --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR)
 	@echo "CARGO (debug) => $@"
 else
-$(LIBOS_RS_A): $(RUST_SRCS)
+$(LIBOS_CORE_RS_A): $(RUST_SRCS)
 	@RUSTC_BOOTSTRAP=1 cargo build --release --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR)
 	@echo "CARGO (release) => $@"
 endif
@@ -127,6 +156,6 @@ clean-builtin:
 	@-$(RM) -f $(BUILTIN_C_OBJS)
 
 clean: clean-builtin
-	@-$(RM) -f $(LIBOS_SO) $(LIBOS_CORE_A) $(LIBOS_RS_A) \
+	@-$(RM) -f $(LIBOS_SO) $(LIBOS_CORE_A) $(LIBOS_CORE_RS_A) \
 		$(LIBCOMPILER_RT_PATCH_A) $(EDL_C_OBJS) $(EDL_C_SRCS) $(C_OBJS) $(CXX_OBJS) $(S_OBJS)
 	@-$(RM) -rf $(RUST_TARGET_DIR)

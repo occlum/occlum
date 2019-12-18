@@ -104,10 +104,11 @@ cmd_build() {
     rm -rf build
 
     mkdir -p build/bin
-    cp "$occlum_dir/build/bin/occlum-pal" build/bin/
+    cp "$occlum_dir/build/bin/occlum-run" build/bin/
     mkdir -p build/lib
-    cp "$occlum_dir/build/lib/libocclum_core.a" build/lib/
+    cp "$occlum_dir/build/lib/libocclum-libos-core.a" build/lib/
     cp "$occlum_dir/build/lib/libcompiler-rt-patch.a" build/lib/
+    cp "$occlum_dir/build/lib/libocclum-pal.so" build/lib/
     mkdir -p build/src/libos/src/builtin
 
     chmod 531 -R $working_dir/image/bin
@@ -145,7 +146,7 @@ cmd_build() {
     cp -r "$occlum_dir/src/libos/src/builtin" src/libos/src/builtin
     cd src/libos && \
         make clean-builtin && \
-        make "$context_dir/build/lib/libocclum.so" ONLY_REBUILD_BUILTIN=1
+        make "$context_dir/build/lib/libocclum-libos.so" ONLY_REBUILD_BUILTIN=1
     while [ -n "$1" ]; do
         case "$1" in
         --sign-key)     [ -n "$2" ] && ENCLAVE_SIGN_KEY=$2 ; shift 2 || exit_error "empty signing key path"     ;;
@@ -160,10 +161,12 @@ cmd_build() {
     $ENCLAVE_SIGN_TOOL sign \
         -key $ENCLAVE_SIGN_KEY \
         -config "$working_dir/Enclave.xml" \
-        -enclave "$context_dir/build/lib/libocclum.so" \
-        -out "$context_dir/build/lib/libocclum.signed.so"
+        -enclave "$context_dir/build/lib/libocclum-libos.so" \
+        -out "$context_dir/build/lib/libocclum-libos.signed.so"
     cd "$context_dir"
     echo "built" > status
+
+    mkdir -p "$context_dir/run/mount/root"
 
     echo "Built the Occlum image and enclave successfully"
 }
@@ -172,8 +175,7 @@ cmd_run() {
     cd "$working_dir"
     echo "running" > "$context_dir/status"
 
-    mkdir -p "$context_dir/run/mount/root"
-    RUST_BACKTRACE=1 "$context_dir/build/bin/occlum-pal" "$@"
+    RUST_BACKTRACE=1 LD_LIBRARY_PATH="$context_dir/build/lib" "$context_dir/build/bin/occlum-run" "$@"
 
     echo "built" > "$context_dir/status"
 }

@@ -9,28 +9,61 @@ enclave {
     include "sgx_quote.h"
 
     trusted {
-        /* define ECALLs here. */
-        public int libos_boot([in, string] const char* executable_path, [user_check] const char** argv);
-        public int libos_run(int host_tid);
-        /* This is only for debug usage */
-        public int dummy_ecall(void);
+        /*
+         * Create a new LibOS process to do the task specified by the given 
+         * arguments.
+         *
+         * @retval On success, return the thread ID of the 
+         * newly-created process (pid == tid for a new process). On error, 
+         * return -1. The user can check errno for the concrete error type.
+         */
+        public int occlum_ecall_new_process(
+            [in, string] const char* executable_path,
+            [user_check] const char** argv);
+
+        /*
+         * Execute the LibOS thread specified by the TID.
+         *
+         * This API is synchronous: it returns until the LibOS thread exits.
+         *
+         * @retval On success, return the exit status of the thread. On error, 
+         * return -1. The user can check errno for the concrete error type.
+         */
+        public int occlum_ecall_exec_thread(int libos_tid, int host_tid);
+
+        /*
+         * A do-nothing ECall for debug purpose only.
+         */
+        public void occlum_ecall_nop(void);
     };
 
     untrusted {
-        void ocall_print_string([in, string] const char* msg);
-        int ocall_run_new_task(void);
-        void ocall_gettimeofday([out] long* sec, [out] long* us);
-        void ocall_clock_gettime(int clockid, [out] long* sec, [out] long* ns);
-        void ocall_nanosleep(long sec, long nsec);
-        void ocall_sync(void);
-        void ocall_sched_yield(void);
-        int ocall_sched_getaffinity([out] int *error, int pid, size_t cpusize, [out, size=cpusize] unsigned char* buf);
-        int ocall_sched_setaffinity([out] int *error, int pid, size_t cpusize, [in, size=cpusize] const unsigned char* buf);
+        /*
+         * Execute the LibOS thread specified by a TID in a new host OS thread.
+         *
+         * This API is asynchronous: it immediately returns after successfully 
+         * creating a new host OS thread that will enter the enclave and execute the
+         * the LibOS thread (using occlum_ecall_exec_process).
+         *
+         * @retval On success, return 0. On error, return -1.
+         */
+        int occlum_ocall_exec_thread_async(int libos_tid);
 
-        sgx_status_t ocall_sgx_init_quote(
-            [out] sgx_target_info_t *target_info,
-            [out] sgx_epid_group_id_t *epid_group_id);
-        sgx_status_t ocall_sgx_get_quote(
+        void occlum_ocall_gettimeofday([out] long* sec, [out] long* us);
+        void occlum_ocall_clock_gettime(int clockid, [out] long* sec, [out] long* ns);
+
+        void occlum_ocall_nanosleep(long sec, long nsec);
+
+        void occlum_ocall_sync(void);
+
+        void occlum_ocall_sched_yield(void);
+        int occlum_ocall_sched_getaffinity([out] int *error, int pid, size_t cpusize, [out, size=cpusize] unsigned char* buf);
+        int occlum_ocall_sched_setaffinity([out] int *error, int pid, size_t cpusize, [in, size=cpusize] const unsigned char* buf);
+
+        sgx_status_t occlum_ocall_sgx_init_quote(
+            [out] sgx_target_info_t* target_info,
+            [out] sgx_epid_group_id_t* epid_group_id);
+        sgx_status_t occlum_ocall_sgx_get_quote(
             [in, size=sigrl_len] uint8_t* sigrl,
             uint32_t sigrl_len,
             [in] sgx_report_t* report,
@@ -38,10 +71,10 @@ enclave {
             [in] sgx_spid_t* spid,
             [in] sgx_quote_nonce_t* nonce,
             [out] sgx_report_t* qe_report,
-            [out, size=quote_buf_len] uint8_t* quote_buf,
+            [out, size=quote_buf_len] sgx_quote_t* quote_buf,
             uint32_t quote_buf_len);
 
-        int64_t ocall_sendmsg(
+        int64_t occlum_ocall_sendmsg(
             int sockfd,
             [in, size=msg_namelen] const void* msg_name,
             socklen_t msg_namelen,
@@ -51,8 +84,7 @@ enclave {
             size_t msg_controllen,
             int flags
         ) propagate_errno;
-
-        int64_t ocall_recvmsg(
+        int64_t occlum_ocall_recvmsg(
             int sockfd,
             [out, size=msg_namelen] void *msg_name,
             socklen_t msg_namelen,
