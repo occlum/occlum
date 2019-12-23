@@ -206,9 +206,13 @@ pub fn do_getdents64(fd: FileDesc, buf: &mut [u8]) -> Result<usize> {
             Ok(name) => name,
         };
         // TODO: get ino from dirent
-        let ok = writer.try_write(0, 0, &name);
-        if !ok {
-            return_errno!(EINVAL, "the given buffer is too small");
+        if let Err(e) = writer.try_write(0, 0, &name) {
+            file_ref.seek(SeekFrom::Current(-1))?;
+            if writer.written_size == 0 {
+                return Err(e);
+            } else {
+                break;
+            }
         }
     }
     Ok(writer.written_size)
@@ -570,11 +574,11 @@ impl<'a> DirentBufWriter<'a> {
             written_size: 0,
         }
     }
-    fn try_write(&mut self, inode: u64, type_: u8, name: &str) -> bool {
+    fn try_write(&mut self, inode: u64, type_: u8, name: &str) -> Result<()> {
         let len = ::core::mem::size_of::<LinuxDirent64>() + name.len() + 1;
         let len = (len + 7) / 8 * 8; // align up
         if self.rest_size < len {
-            return false;
+            return_errno!(EINVAL, "the given buffer is too small");
         }
         let dent = LinuxDirent64 {
             ino: inode,
@@ -591,7 +595,7 @@ impl<'a> DirentBufWriter<'a> {
         }
         self.rest_size -= len;
         self.written_size += len;
-        true
+        Ok(())
     }
 }
 
