@@ -1,0 +1,104 @@
+FROM centos:7.2.1511
+
+LABEL maintainer="He Sun <bochang.sh@antfin.com>"
+
+RUN yum update -y && \
+    yum install -y \
+        autoconf \
+        automake \
+        ca-certificates \
+        boost-devel \
+        cmake \
+        curl \
+        curl-devel \
+        expect \
+        fuse-devel \
+        fuse-libs \
+        gcc \
+        gcc-c++ \
+        glibc-headers \
+        gdb \
+        git \
+        git-core \
+        gmp-devel \
+        libmpc-devel \
+        libxml2-devel \
+        libtool \
+        pkgconfig \
+        python \
+        kmod \
+        make \
+        mod_ssl \
+        mpfr-devel \
+        ocaml \
+        ocaml-ocamlbuild \
+        openssl \
+        openssl-devel \
+        protobuf-compiler \
+        protobuf-devel \
+        sudo \
+        uuid-devel \
+        vim \
+        wget && \
+    yum groupinstall 'Development Tools' -y && \
+    yum clean all
+
+# Install cpuid tool for tests
+WORKDIR /tmp
+RUN wget http://www.etallen.com/cpuid/cpuid-20180519.x86_64.tar.gz && \
+    tar -xf ./cpuid-20180519.x86_64.tar.gz && \
+    cp ./cpuid-20180519/cpuid /usr/bin/ && \
+    rm -rf /tmp/cpuid-20180519*
+
+# Install SGX SDK
+WORKDIR /tmp
+RUN git clone https://github.com/occlum/linux-sgx && \
+    cd linux-sgx && \
+    ./download_prebuilt.sh && \
+    ./compile.sh && \
+    ./install.sh && \
+    echo 'source /opt/intel/sgxsdk/environment' >> /root/.bashrc && \
+    rm -rf /tmp/linux-sgx
+
+# Install Rust
+ENV OCCLUM_RUST_VERSION=nightly-2019-01-28
+RUN curl https://sh.rustup.rs -sSf | \
+        sh -s -- --default-toolchain ${OCCLUM_RUST_VERSION} -y && \
+    rm -rf /root/.cargo/registry && rm -rf /root/.cargo/git
+ENV PATH="/root/.cargo/bin:$PATH"
+
+# Upgrade gcc to compile occlum toolchain.
+# Use Developer Toolset 8 from Software Collections (SCLs) to have a newer gcc (8.3.1) than
+# the native one (4.8.5) and enable it during the build.
+RUN yum install centos-release-scl-rh -y && \
+    yum install devtoolset-8-toolchain -y && \
+    printf "unset BASH_ENV PROMPT_COMMAND ENV\nsource scl_source enable devtoolset-8\n" > /usr/bin/scl_enable
+ARG BASH_ENV="/usr/bin/scl_enable"
+ARG ENV="/usr/bin/scl_enable"
+ARG PROMPT_COMMAND=". /usr/bin/scl_enable"
+
+# Install Occlum toolchain
+COPY toolchains/gcc/* /tmp/
+WORKDIR /tmp
+RUN ./build.sh
+ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
+
+# Install the latest version of Occlum
+WORKDIR /root
+RUN git clone https://github.com/occlum/occlum && \
+    cd occlum && \
+    make submodule && \
+    make LIBOS_RELEASE=1 && \
+    make install && \
+    cp -r demos /root/demos && \
+    rm -rf /root/occlum
+
+# Start AESM service automatically
+#
+# To do so, we add the script to ~/.bashrc. We cannot use systemd to run AESM
+# as a "real" service since the pid 1 is not systemd in Docker. So we start
+# up AESM service when an user login with an interative shell.
+COPY docker/start_aesm.sh /opt/occlum/
+RUN echo '/opt/occlum/start_aesm.sh' >> /root/.bashrc
+
+WORKDIR /root

@@ -41,7 +41,7 @@ GCC_VER = ${GCC_VER}
 MUSL_VER = git-${MUSL_VER}
 MUSL_REPO = ${MUSL_REPO}
 EOF
-make
+make -j$(nproc)
 make install
 
 # Remove all source code and build files
