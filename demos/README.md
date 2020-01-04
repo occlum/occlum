@@ -20,6 +20,7 @@ This set of demos shows how real-world apps can be easily run inside SGX enclave
 * `tensorflow_lite/`: A demo and benchmark of [Tensorflow Lite](https://www.tensorflow.org/lite) inference engine.
 * `xgboost/`: A demo of [XGBoost](https://xgboost.readthedocs.io/en/latest/).
 
-## SGX capability demos
+## Other demos
 
 * `remote_attestation/`: This project demonstrates how an app running upon Occlum can perform SGX remote attestation.
+* `embedded_mode/`: A cross-enclave memory throughput benchmark enabled by the embedded mode of Occlum.
