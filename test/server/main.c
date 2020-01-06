@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
@@ -250,11 +251,39 @@ int test_sendmsg_recvmsg_connectionless() {
 
     return ret;
 }
+
+int test_fcntl_setfl_and_getfl() {
+    int ret = 0;
+    int child_pid = 0;
+    int client_fd = -1;
+    int original_flags, actual_flags;
+
+    client_fd = connect_with_child(8804, &child_pid);
+    if (client_fd < 0)
+        THROW_ERROR("connect failed");
+    original_flags = fcntl(client_fd, F_GETFL, 0);
+    if (original_flags < 0)
+        THROW_ERROR("fcntl getfl failed");
+
+    ret = fcntl(client_fd, F_SETFL, original_flags | O_NONBLOCK);
+    if (ret < 0)
+        THROW_ERROR("fcntl setfl failed");
+
+    actual_flags = fcntl(client_fd, F_GETFL, 0);
+    if (actual_flags != (original_flags | O_NONBLOCK))
+        THROW_ERROR("check the getfl value after setfl failed");
+
+    ret = wait_for_child_exit(child_pid);
+
+    return ret;
+}
+
 static test_case_t test_cases[] = {
     TEST_CASE(test_read_write),
     TEST_CASE(test_send_recv),
     TEST_CASE(test_sendmsg_recvmsg),
     TEST_CASE(test_sendmsg_recvmsg_connectionless),
+    TEST_CASE(test_fcntl_setfl_and_getfl),
 };
 
 int main(int argc, const char* argv[]) {
