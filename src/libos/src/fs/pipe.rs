@@ -60,7 +60,7 @@ impl File for PipeReader {
         Ok(total_bytes)
     }
 
-    fn as_any(&self) -> &Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 }
@@ -107,7 +107,7 @@ impl File for PipeWriter {
         return_errno!(ESPIPE, "Pipe does not support seek")
     }
 
-    fn as_any(&self) -> &Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 }

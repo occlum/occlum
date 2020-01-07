@@ -83,10 +83,10 @@ pub trait File: Debug + Sync + Send + Any {
         return_op_unsupported_error!("set_status_flags")
     }
 
-    fn as_any(&self) -> &Any;
+    fn as_any(&self) -> &dyn Any;
 }
 
-pub type FileRef = Arc<Box<File>>;
+pub type FileRef = Arc<Box<dyn File>>;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -162,7 +162,7 @@ impl File for SgxFile {
         inner.seek(pos)
     }
 
-    fn as_any(&self) -> &Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 }
@@ -429,7 +429,7 @@ impl File for StdoutFile {
         Ok(())
     }
 
-    fn as_any(&self) -> &Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 }
@@ -504,7 +504,7 @@ impl File for StdinFile {
         })
     }
 
-    fn as_any(&self) -> &Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 }

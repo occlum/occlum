@@ -132,7 +132,7 @@ $(BUILD_DIR)/src/libos/src/Enclave_t.o: $(BUILD_DIR)/src/libos/src/Enclave_t.c
 	@echo "CC <= $@"
 
 $(BUILD_DIR)/src/libos/src/Enclave_t.c: $(SGX_EDGER8R) ../Enclave.edl
-	@cd $(BUILD_DIR)/src/libos/src && $(SGX_EDGER8R) --trusted $(CUR_DIR)/../Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_DIR)/edl/
+	@cd $(BUILD_DIR)/src/libos/src && $(SGX_EDGER8R) --trusted $(CUR_DIR)/../Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_DIR)/edl
 	@echo "GEN <= $@"
 
 $(BUILD_DIR)/src/libos/%.o: %.c

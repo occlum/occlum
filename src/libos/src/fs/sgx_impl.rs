@@ -1,5 +1,5 @@
 use super::sgx_aes_gcm_128bit_tag_t;
-use alloc::prelude::ToString;
+use alloc::string::ToString;
 use rcore_fs::dev::TimeProvider;
 use rcore_fs::vfs::Timespec;
 use rcore_fs_sefs::dev::*;
@@ -104,7 +104,7 @@ impl SgxStorage {
 }
 
 impl Storage for SgxStorage {
-    fn open(&self, file_id: &str) -> DevResult<Box<File>> {
+    fn open(&self, file_id: &str) -> DevResult<Box<dyn File>> {
         let locked_file = self.get(file_id, |this| {
             let mut path = this.path.to_path_buf();
             path.push(file_id);
@@ -143,7 +143,7 @@ impl Storage for SgxStorage {
         Ok(Box::new(locked_file))
     }
 
-    fn create(&self, file_id: &str) -> DevResult<Box<File>> {
+    fn create(&self, file_id: &str) -> DevResult<Box<dyn File>> {
         let locked_file = self.get(file_id, |this| {
             let mut path = this.path.to_path_buf();
             path.push(file_id);

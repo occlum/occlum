@@ -67,7 +67,7 @@ impl File for DevSgx {
         Ok(())
     }
 
-    fn as_any(&self) -> &Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 }

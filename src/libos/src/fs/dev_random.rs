@@ -41,7 +41,7 @@ impl File for DevRandom {
         Ok(total_nbytes)
     }
 
-    fn as_any(&self) -> &Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 }

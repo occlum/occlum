@@ -1077,7 +1077,7 @@ fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize
         domain, socket_type, protocol
     );
 
-    let file_ref: Arc<Box<File>> = match domain {
+    let file_ref: Arc<Box<dyn File>> = match domain {
         libc::AF_LOCAL => {
             let unix_socket = UnixSocketFile::new(socket_type, protocol)?;
             Arc::new(Box::new(unix_socket))
@@ -1136,7 +1136,7 @@ fn do_accept4(
         let socket = file_ref.as_socket()?;
 
         let new_socket = socket.accept(addr, addr_len, flags)?;
-        let new_file_ref: Arc<Box<File>> = Arc::new(Box::new(new_socket));
+        let new_file_ref: Arc<Box<dyn File>> = Arc::new(Box::new(new_socket));
         let new_fd = proc.get_files().lock().unwrap().put(new_file_ref, false);
 
         Ok(new_fd as isize)
@@ -1145,7 +1145,7 @@ fn do_accept4(
         check_mut_ptr(addr)?; // TODO: check addr_len
 
         let new_socket = unix_socket.accept()?;
-        let new_file_ref: Arc<Box<File>> = Arc::new(Box::new(new_socket));
+        let new_file_ref: Arc<Box<dyn File>> = Arc::new(Box::new(new_socket));
         let new_fd = proc.get_files().lock().unwrap().put(new_file_ref, false);
 
         Ok(new_fd as isize)

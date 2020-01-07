@@ -4,7 +4,7 @@ use sgx_trts::libc::S_IRUSR;
 use std::fmt;
 
 pub struct INodeFile {
-    inode: Arc<INode>,
+    inode: Arc<dyn INode>,
     abs_path: String,
     offset: SgxMutex<usize>,
     access_mode: AccessMode,
@@ -159,13 +159,13 @@ impl File for INodeFile {
         Ok(())
     }
 
-    fn as_any(&self) -> &Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 }
 
 impl INodeFile {
-    pub fn open(inode: Arc<INode>, abs_path: &str, flags: u32) -> Result<Self> {
+    pub fn open(inode: Arc<dyn INode>, abs_path: &str, flags: u32) -> Result<Self> {
         let access_mode = AccessMode::from_u32(flags)?;
         if (access_mode.readable() && !inode.allow_read()?) {
             return_errno!(EBADF, "File not readable");
@@ -207,7 +207,7 @@ pub trait INodeExt {
     fn allow_read(&self) -> Result<bool>;
 }
 
-impl INodeExt for INode {
+impl INodeExt for dyn INode {
     fn read_as_vec(&self) -> Result<Vec<u8>> {
         let size = self.metadata()?.size;
         let mut buf = Vec::with_capacity(size);

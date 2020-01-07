@@ -1,6 +1,6 @@
 [submodule "deps/rust-sgx-sdk"]
 	path = deps/rust-sgx-sdk
-	url = https://github.com/baidu/rust-sgx-sdk
+	url = https://github.com/apache/incubator-teaclave-sgx-sdk
 	branch = master
 [submodule "deps/xmas-elf"]
 	path = deps/xmas-elf
@@ -9,3 +9,12 @@
 [submodule "deps/sefs"]
 	path = deps/sefs
 	url = https://github.com/occlum/sefs.git
+[submodule "deps/serde-sgx"]
+	path = deps/serde-sgx
+	url = https://github.com/mesalock-linux/serde-sgx
+[submodule "deps/itoa-sgx"]
+	path = deps/itoa-sgx
+	url = https://github.com/mesalock-linux/itoa-sgx
+[submodule "deps/serde-json-sgx"]
+	path = deps/serde-json-sgx
+	url = https://github.com/mesalock-linux/serde-json-sgx

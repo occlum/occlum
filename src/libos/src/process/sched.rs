@@ -64,7 +64,7 @@ impl CpuSet {
 impl std::fmt::LowerHex for CpuSet {
     fn fmt(&self, fmtr: &mut std::fmt::Formatter) -> std::fmt::Result {
         for byte in &(self.vec) {
-            try!(fmtr.write_fmt(format_args!("{:02x}", byte)));
+            fmtr.write_fmt(format_args!("{:02x}", byte))?;
         }
         Ok(())
     }
@@ -73,7 +73,7 @@ impl std::fmt::LowerHex for CpuSet {
 impl std::fmt::UpperHex for CpuSet {
     fn fmt(&self, fmtr: &mut std::fmt::Formatter) -> std::fmt::Result {
         for byte in &(self.vec) {
-            try!(fmtr.write_fmt(format_args!("{:02X}", byte)));
+            fmtr.write_fmt(format_args!("{:02X}", byte))?;
         }
         Ok(())
     }

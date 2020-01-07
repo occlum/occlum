@@ -24,7 +24,7 @@ pub use self::root_inode::ROOT_INODE;
 pub use self::unix_socket::{AsUnixSocket, UnixSocketFile};
 use sgx_trts::libc::S_IWUSR;
 use std::any::Any;
-use std::mem::uninitialized;
+use std::mem::MaybeUninit;
 
 mod access;
 mod dev_null;
@@ -54,7 +54,7 @@ pub fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc> {
     let mut proc = current_ref.lock().unwrap();
 
     let file = proc.open_file(path, flags, mode)?;
-    let file_ref: Arc<Box<File>> = Arc::new(file);
+    let file_ref: Arc<Box<dyn File>> = Arc::new(file);
 
     let fd = {
         let creation_flags = CreationFlags::from_bits_truncate(flags);
@@ -402,7 +402,7 @@ pub fn do_sendfile(
 
     let in_file = file_table.get(in_fd)?;
     let out_file = file_table.get(out_fd)?;
-    let mut buffer: [u8; 1024 * 11] = unsafe { uninitialized() };
+    let mut buffer: [u8; 1024 * 11] = unsafe { MaybeUninit::uninit().assume_init() };
 
     let mut read_offset = match offset {
         Some(offset) => offset,
@@ -441,7 +441,7 @@ extern "C" {
 
 impl Process {
     /// Open a file on the process. But DO NOT add it to file table.
-    pub fn open_file(&self, path: &str, flags: u32, mode: u32) -> Result<Box<File>> {
+    pub fn open_file(&self, path: &str, flags: u32, mode: u32) -> Result<Box<dyn File>> {
         if path == "/dev/null" {
             return Ok(Box::new(DevNull));
         }
@@ -481,7 +481,7 @@ impl Process {
     }
 
     /// Lookup INode from the cwd of the process
-    pub fn lookup_inode(&self, path: &str) -> Result<Arc<INode>> {
+    pub fn lookup_inode(&self, path: &str) -> Result<Arc<dyn INode>> {
         debug!("lookup_inode: cwd: {:?}, path: {:?}", self.get_cwd(), path);
         if path.len() > 0 && path.as_bytes()[0] == b'/' {
             // absolute path

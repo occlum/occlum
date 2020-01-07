@@ -16,7 +16,7 @@ impl File for DevNull {
         Ok(bufs.iter().map(|buf| buf.len()).sum())
     }
 
-    fn as_any(&self) -> &Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 }

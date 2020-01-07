@@ -142,7 +142,7 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
                     fd,
                 } => {
                     let file = parent.open_file(path.as_str(), oflag, mode)?;
-                    let file_ref: Arc<Box<File>> = Arc::new(file);
+                    let file_ref: Arc<Box<dyn File>> = Arc::new(file);
                     let creation_flags = CreationFlags::from_bits_truncate(oflag);
                     cloned_file_table.put_at(fd, file_ref, creation_flags.must_close_on_spawn());
                 }
@@ -166,8 +166,8 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
 
     // But, for init process, we initialize file table for it
     let mut file_table = FileTable::new();
-    let stdin: Arc<Box<File>> = Arc::new(Box::new(StdinFile::new()));
-    let stdout: Arc<Box<File>> = Arc::new(Box::new(StdoutFile::new()));
+    let stdin: Arc<Box<dyn File>> = Arc::new(Box::new(StdinFile::new()));
+    let stdout: Arc<Box<dyn File>> = Arc::new(Box::new(StdoutFile::new()));
     // TODO: implement and use a real stderr
     let stderr = stdout.clone();
     file_table.put(stdin, false);

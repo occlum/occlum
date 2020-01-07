@@ -41,7 +41,6 @@ else
 endif
 
 RUST_SGX_SDK_DIR := $(PROJECT_DIR)/deps/rust-sgx-sdk
-SGX_COMMON_CFLAGS += -I$(RUST_SGX_SDK_DIR)/common/ -I$(RUST_SGX_SDK_DIR)/edl/
 
 ifneq ($(SGX_MODE), HW)
 	Urts_Library_Name := sgx_urts_sim
@@ -64,7 +63,8 @@ ProtectedFs_Library_Name := sgx_tprotected_fs
 #
 # Export flags used to compile or link untrusted modules
 #
-SGX_CFLAGS_U := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes -I$(SGX_SDK)/include
+SGX_CFLAGS_U := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes \
+	-I$(RUST_SGX_SDK_DIR)/edl -I$(SGX_SDK)/include
 SGX_CXXFLAGS_U := $(SGX_CFLAGS_U) -std=c++11
 
 SGX_LFLAGS_U := $(SGX_COMMON_CFLAGS) -lpthread -L$(SGX_LIBRARY_PATH) -l$(Urts_Library_Name)
@@ -78,7 +78,7 @@ endif
 # Export flags used to compile or link untrusted modules
 #
 SGX_CFLAGS_T := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fstack-protector \
-	-I$(RUST_SGX_SDK_DIR)/common/inc/ -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc
+	-I$(RUST_SGX_SDK_DIR)/common/inc -I$(RUST_SGX_SDK_DIR)/edl -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc
 SGX_CXXFLAGS_T := $(SGX_CFLAGS_T) -std=c++11 -nostdinc++ -I$(SGX_SDK)/include/libcxx
 
 # Before use this linker flag, the user should define $(_Other_Enclave_Libs),
@@ -105,7 +105,7 @@ SGX_CXXFLAGS_T := $(SGX_CFLAGS_T) -std=c++11 -nostdinc++ -I$(SGX_SDK)/include/li
 #  linked.
 SGX_LFLAGS_T = $(SGX_COMMON_CFLAGS) -nostdlib -L$(SGX_LIBRARY_PATH) $(_Other_Link_Flags) \
 	-Wl,--whole-archive -l$(Trts_Library_Name) -Wl,--no-whole-archive \
-	-Wl,--start-group -lsgx_tstdc -lsgx_tcxx -l$(Crypto_Library_Name) -l$(Service_Library_Name) $(_Other_Enclave_Libs) -Wl,--end-group \
+	-Wl,--start-group -lsgx_tcxx -lsgx_tstdc -l$(Crypto_Library_Name) -l$(Service_Library_Name) $(_Other_Enclave_Libs) -Wl,--end-group \
 	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined \
 	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic  \
 	-Wl,--defsym,__ImageBase=0 \

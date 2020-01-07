@@ -1,5 +1,5 @@
 use super::*;
-use alloc::prelude::ToString;
+use alloc::string::ToString;
 use std::collections::btree_map::BTreeMap;
 use std::fmt;
 use std::sync::atomic::{spin_loop_hint, AtomicUsize, Ordering};
@@ -83,7 +83,7 @@ impl File for UnixSocketFile {
         inner.ioctl(cmd)
     }
 
-    fn as_any(&self) -> &Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 }

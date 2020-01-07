@@ -135,7 +135,7 @@ impl File for SocketFile {
         Ok(())
     }
 
-    fn as_any(&self) -> &Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 }

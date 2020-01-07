@@ -159,7 +159,7 @@ pub fn do_epoll_create1(flags: c_int) -> Result<FileDesc> {
     info!("epoll_create1: flags: {}", flags);
 
     let epoll = EpollFile::new()?;
-    let file_ref: Arc<Box<File>> = Arc::new(Box::new(epoll));
+    let file_ref: Arc<Box<dyn File>> = Arc::new(Box::new(epoll));
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
     let fd = {
@@ -308,7 +308,7 @@ impl Drop for EpollFileInner {
 }
 
 impl File for EpollFile {
-    fn as_any(&self) -> &Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 }

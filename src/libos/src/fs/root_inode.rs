@@ -12,8 +12,8 @@ use rcore_fs_sefs::SEFS;
 
 lazy_static! {
     /// The root of file system
-    pub static ref ROOT_INODE: Arc<INode> = {
-        fn init_root_inode() -> Result<Arc<INode>> {
+    pub static ref ROOT_INODE: Arc<dyn INode> = {
+        fn init_root_inode() -> Result<Arc<dyn INode>> {
             let mount_config = &config::LIBOS_CONFIG.mount;
             let root_inode = {
                 let rootfs = open_root_fs_according_to(mount_config)?;

@@ -1,6 +1,7 @@
 [package]
 name = "Occlum"
 version = "0.8.0"
+edition = "2018"
 
 [lib]
 name = "occlum_libos_core_rs"
@@ -15,8 +16,11 @@ rcore-fs = { path = "../../deps/sefs/rcore-fs" }
 rcore-fs-sefs = { path = "../../deps/sefs/rcore-fs-sefs" }
 rcore-fs-ramfs = { path = "../../deps/sefs/rcore-fs-ramfs" }
 rcore-fs-mountfs = { path = "../../deps/sefs/rcore-fs-mountfs" }
-serde = { path = "../../deps/rust-sgx-sdk/third_party/serde-rs/serde/serde", features = ["derive"]  }
-serde_json = { path = "../../deps/rust-sgx-sdk/third_party/serde-rs/json" }
+serde = { path = "../../deps/serde-sgx/serde", features = ["derive"] }
+serde_json = { path = "../../deps/serde-json-sgx" }
+
+[patch.'https://github.com/apache/teaclave-sgx-sdk.git']
+sgx_tstd = { path = "../../deps/rust-sgx-sdk/sgx_tstd" }
 
 [features]
 default = ["integrity_only_opt", "sgx_file_cache"]

@@ -27,7 +27,7 @@ impl FileSystem for HostFS {
         Ok(())
     }
 
-    fn root_inode(&self) -> Arc<INode> {
+    fn root_inode(&self) -> Arc<dyn INode> {
         Arc::new(HNode {
             path: self.path.clone(),
             file: Mutex::new(None),
@@ -136,7 +136,7 @@ impl INode for HNode {
         }))
     }
 
-    fn link(&self, name: &str, other: &Arc<INode>) -> Result<()> {
+    fn link(&self, name: &str, other: &Arc<dyn INode>) -> Result<()> {
         let other = other.downcast_ref::<Self>().ok_or(FsError::NotSameFs)?;
         try_std!(fs::hard_link(&other.path, &self.path.join(name)));
         Ok(())
@@ -155,11 +155,11 @@ impl INode for HNode {
         Ok(())
     }
 
-    fn move_(&self, old_name: &str, target: &Arc<INode>, new_name: &str) -> Result<()> {
+    fn move_(&self, old_name: &str, target: &Arc<dyn INode>, new_name: &str) -> Result<()> {
         unimplemented!()
     }
 
-    fn find(&self, name: &str) -> Result<Arc<INode>> {
+    fn find(&self, name: &str) -> Result<Arc<dyn INode>> {
         let new_path = self.path.join(name);
         if !new_path.exists() {
             return Err(FsError::EntryNotFound);
@@ -193,11 +193,11 @@ impl INode for HNode {
         Ok(())
     }
 
-    fn fs(&self) -> Arc<FileSystem> {
+    fn fs(&self) -> Arc<dyn FileSystem> {
         self.fs.clone()
     }
 
-    fn as_any_ref(&self) -> &Any {
+    fn as_any_ref(&self) -> &dyn Any {
         self
     }
 }
@@ -250,7 +250,7 @@ trait IntoFsMetadata {
 
 impl IntoFsMetadata for fs::Metadata {
     fn into_fs_metadata(self) -> Metadata {
-        use libc;
+        use sgx_trts::libc;
         use std::os::fs::MetadataExt;
         Metadata {
             dev: self.st_dev() as usize,
