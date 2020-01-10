@@ -9,7 +9,7 @@ Occlum has the following salient features:
 
   * **Efficient multitasking.** Occlum offers _light-weight_ LibOS processes: they are light-weight in the sense that all LibOS processes share the same SGX enclave. Compared to the heavy-weight, per-enclave LibOS processes, Occlum's light-weight LibOS processes is up to _1,000X faster_ on startup and _3X faster_ on IPC. In addition, Occlum offers an optional _multi-domain [Software Fault Isolation](http://www.cse.psu.edu/~gxt29/papers/sfi-final.pdf) scheme_ to isolate the Occlum LibOS processes if needed.
   * **Multiple file system support.** Occlum supports various types of file systems, e.g., _read-only hashed FS_ (for integrity protection), _writable encrypted FS_ (for confidentiality protection), _untrusted host FS_ (for convenient data exchange between the LibOS and the host OS).
-  * **Memory safety.** Occlum is the _first_ SGX LibOS written in a memory-safe programming language ([Rust](https://www.rust-lang.org/)). Thus, Occlum is much less likely to contain low-level, memory-safety bugs and more trustworthy to host security-critical applications.
+  * **Memory safety.** Occlum is the _first_ SGX LibOS written in a memory-safe programming language ([Rust](https://www.rust-lang.org/)). Thus, Occlum is much less likely to contain low-level, memory-safety bugs and is more trustworthy to host security-critical applications.
   * **Ease-of-use.** Occlum provides user-friendly build and command-line tools. Running applications on Occlum inside SGX enclaves can be as simple as only typing several shell commands (see the next section).
 
 ## Introduction
@@ -86,7 +86,7 @@ Occlum can be configured easily via a config file named `Occlum.json`, which is 
     // Mount points and their file systems
     //
     // Limitation: configuring mount points by modifying this config file is not
-    // supported at the momement. The default configuration is shown below.
+    // supported at the moment. The default configuration is shown below.
     "mount": [
         {
             "target": "/",
@@ -172,15 +172,15 @@ The two aforementioned requirements are not only satisfied by the Occlum toolcha
 
 Occlum is being actively developed. We now focus on implementing more system calls and additional features required in the production environment.
 
-While this project is still not mature or stable (we are halfway through reaching version 1.0.0), we have used Occlum to port many real-world applications (like Tensorflow Lite, XGBoost, GCC, Lighttpd, etc.) to SGX with little or no source code modifications. We believe that the current implementation of Occlum is already useful to many users and ready to be deployed in some use cases. 
+While this project is still not mature or stable (we are halfway through reaching version 1.0.0), we have used Occlum to port many real-world applications (like Tensorflow Lite, XGBoost, GCC, Lighttpd, etc.) to SGX with little or no source code modifications. We believe that the current implementation of Occlum is already useful to many users and ready to be deployed in some use cases.
 
 ## Why the Name?
 
-The project name Occlum stems from the word *Occlumency* coined in Harry Porter series by J. K. Rowling. In *Harry Porter and the Order of Pheonix*, Occlumency is described as:
+The project name Occlum stems from the word *Occlumency* coined in Harry Potter series by J. K. Rowling. In *Harry Potter and the Order of Phoenix*, Occlumency is described as:
 
 > The magical defence of the mind against external penetration. An obscure branch of magic, but a highly useful one... Used properly, the power of Occlumency will help shield you from access or influence.
 
-The same thing can be said to Occlum, not for mind, but program:
+The same thing can be said for Occlum, not the for the mind, but for the program:
 
 > The magical defence of the program against external penetration. An obscure branch of technology, but a highly useful one... Used properly, the power of Occlum will help shield your program from access or influence.
 
@@ -194,7 +194,7 @@ The founders of Occlum project are
 
 This project follows the [all-contributors](https://allcontributors.org) specification. Contributions of any kind are welcome! We will publish contributing guidelines and accept pull requests after the project gets more stable.
 
-Thanks go to [all these wonderful contributors for this project](CONTRIBUTORS.md).
+Thanks go to [all these wonderful contributors to this project](CONTRIBUTORS.md).
 
 ## License
 
