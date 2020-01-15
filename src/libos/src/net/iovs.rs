@@ -1,6 +1,8 @@
 //! I/O vectors
 
 use super::*;
+use crate::untrusted::SliceAsPtrAndLen;
+use std::iter::Iterator;
 
 /// A memory safe, immutable version of C iovec array
 pub struct Iovs<'a> {
@@ -18,19 +20,6 @@ impl<'a> Iovs<'a> {
 
     pub fn total_bytes(&self) -> usize {
         self.iovs.iter().map(|s| s.len()).sum()
-    }
-
-    pub fn gather_to_vec(&self) -> Vec<u8> {
-        Self::gather_slices_to_vec(&self.iovs[..])
-    }
-
-    fn gather_slices_to_vec(slices: &[&[u8]]) -> Vec<u8> {
-        let vec_len = slices.iter().map(|slice| slice.len()).sum();
-        let mut vec = Vec::with_capacity(vec_len);
-        for slice in slices {
-            vec.extend_from_slice(slice);
-        }
-        vec
     }
 }
 
@@ -59,30 +48,41 @@ impl<'a> IovsMut<'a> {
         self.iovs.iter().map(|s| s.len()).sum()
     }
 
-    pub fn gather_to_vec(&self) -> Vec<u8> {
-        Iovs::gather_slices_to_vec(self.as_slices())
-    }
-
-    pub fn scatter_copy_from(&mut self, data: &[u8]) -> usize {
-        let mut total_nbytes = 0;
-        let mut remain_slice = data;
-        for iov in &mut self.iovs {
-            if remain_slice.len() == 0 {
-                break;
-            }
-
-            let copy_nbytes = remain_slice.len().min(iov.len());
-            let dst_slice = unsafe {
-                debug_assert!(iov.len() >= copy_nbytes);
-                iov.get_unchecked_mut(..copy_nbytes)
-            };
-            let (src_slice, _remain_slice) = remain_slice.split_at(copy_nbytes);
-            dst_slice.copy_from_slice(src_slice);
-
-            remain_slice = _remain_slice;
-            total_nbytes += copy_nbytes;
+    /// Copy as many bytes from an u8 iterator as possible
+    pub fn copy_from_iter<'b, T>(&mut self, src_iter: &mut T) -> usize
+    where
+        T: Iterator<Item = &'b u8>,
+    {
+        let mut bytes_copied = 0;
+        let mut dst_iter = self
+            .as_slices_mut()
+            .iter_mut()
+            .flat_map(|mut slice| slice.iter_mut());
+        while let (Some(mut d), Some(s)) = (dst_iter.next(), src_iter.next()) {
+            *d = *s;
+            bytes_copied += 1;
         }
-        debug_assert!(remain_slice.len() == 0);
-        total_nbytes
+        bytes_copied
+    }
+}
+
+/// An extention trait that converts slice to libc::iovec
+pub trait SliceAsLibcIovec {
+    fn as_libc_iovec(&self) -> libc::iovec;
+}
+
+impl SliceAsLibcIovec for &[u8] {
+    fn as_libc_iovec(&self) -> libc::iovec {
+        let (iov_base, iov_len) = self.as_ptr_and_len();
+        let iov_base = iov_base as *mut u8 as *mut c_void;
+        libc::iovec { iov_base, iov_len }
+    }
+}
+
+impl SliceAsLibcIovec for &mut [u8] {
+    fn as_libc_iovec(&self) -> libc::iovec {
+        let (iov_base, iov_len) = self.as_ptr_and_len();
+        let iov_base = iov_base as *mut u8 as *mut c_void;
+        libc::iovec { iov_base, iov_len }
     }
 }

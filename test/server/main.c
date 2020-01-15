@@ -64,13 +64,13 @@ int connect_with_child(int port, int *child_pid) {
 
 int neogotiate_msg(int client_fd) {
     char buf[16];
-    if (write(client_fd, ECHO_MSG, sizeof(ECHO_MSG)) < 0)
+    if (write(client_fd, ECHO_MSG, strlen(ECHO_MSG)) < 0)
         THROW_ERROR("write failed");
 
     if (read(client_fd, buf, 16) < 0)
         THROW_ERROR("read failed");
 
-    if (strncmp(buf, RESPONSE, sizeof(RESPONSE)) != 0) {
+    if (strncmp(buf, RESPONSE, strlen(RESPONSE)) != 0) {
         THROW_ERROR("msg recv mismatch");
     }
     return 0;
@@ -83,7 +83,7 @@ int server_recv(int client_fd) {
     if (recv(client_fd, buf, buf_size, 0) <= 0)
         THROW_ERROR("msg recv failed");
 
-    if (strncmp(buf, ECHO_MSG, sizeof(ECHO_MSG)) != 0) {
+    if (strncmp(buf, ECHO_MSG, strlen(ECHO_MSG)) != 0) {
         THROW_ERROR("msg recv mismatch");
     }
     return 0;
@@ -91,17 +91,21 @@ int server_recv(int client_fd) {
 
 int server_recvmsg(int client_fd) {
     int ret = 0;
-    const int buf_size = 1000;
-    char buf[buf_size];
+    const int buf_size = 10;
+    char buf[3][buf_size];
     struct msghdr msg;
-    struct iovec iov[1];
+    struct iovec iov[3];
 
     msg.msg_name  = NULL;
     msg.msg_namelen  = 0;
-    iov[0].iov_base = buf;
+    iov[0].iov_base = buf[0];
     iov[0].iov_len = buf_size;
+    iov[1].iov_base = buf[1];
+    iov[1].iov_len = buf_size;
+    iov[2].iov_base = buf[2];
+    iov[2].iov_len = buf_size;
     msg.msg_iov = iov;
-    msg.msg_iovlen = 1;
+    msg.msg_iovlen = 3;
     msg.msg_control = 0;
     msg.msg_controllen = 0;
     msg.msg_flags = 0;
@@ -110,11 +114,18 @@ int server_recvmsg(int client_fd) {
     if (ret <= 0) {
         THROW_ERROR("recvmsg failed");
     } else {
-        if (strncmp(buf, ECHO_MSG, sizeof(ECHO_MSG)) != 0) {
-            printf("recvmsg : %d, msg: %s\n", ret, buf);
+        if (strncmp(buf[0], ECHO_MSG, buf_size) != 0 &&
+                strstr(ECHO_MSG, buf[1]) != NULL &&
+                strstr(ECHO_MSG, buf[2]) != NULL) {
+            printf("recvmsg : %d, msg: %s,  %s, %s\n", ret, buf[0], buf[1], buf[2]);
             THROW_ERROR("msg recvmsg mismatch");
         }
     }
+    msg.msg_iov = NULL;
+    msg.msg_iovlen = 0;
+    ret = recvmsg(client_fd, &msg, 0);
+    if (ret != 0)
+        THROW_ERROR("recvmsg empty failed");
     return ret;
 }
 
@@ -157,7 +168,7 @@ int server_connectionless_recvmsg() {
     if (ret <= 0) {
         THROW_ERROR("recvmsg failed");
     } else {
-        if (strncmp(buf, DEFAULT_MSG, sizeof(DEFAULT_MSG)) != 0) {
+        if (strncmp(buf, DEFAULT_MSG, strlen(DEFAULT_MSG)) != 0) {
             printf("recvmsg : %d, msg: %s\n", ret, buf);
             THROW_ERROR("msg recvmsg mismatch");
         } else {

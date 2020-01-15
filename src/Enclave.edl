@@ -57,6 +57,9 @@ enclave {
 
         void occlum_ocall_sync(void);
 
+        void* occlum_ocall_posix_memalign(size_t alignment, size_t size);
+        void occlum_ocall_free([user_check] void* ptr);
+
         void occlum_ocall_sched_yield(void);
         int occlum_ocall_sched_getaffinity(
             int host_tid,
@@ -87,8 +90,8 @@ enclave {
             int sockfd,
             [in, size=msg_namelen] const void* msg_name,
             socklen_t msg_namelen,
-            [in, size=buf_len] const void* buf,
-            size_t buf_len,
+            [in, count=msg_iovlen] const struct iovec* msg_iov,
+            size_t msg_iovlen,
             [in, size=msg_controllen] const void* msg_control,
             size_t msg_controllen,
             int flags
@@ -98,8 +101,8 @@ enclave {
             [out, size=msg_namelen] void *msg_name,
             socklen_t msg_namelen,
             [out] socklen_t* msg_namelen_recv,
-            [out, size=buf_len] void* buf,
-            size_t buf_len,
+            [in, count=msg_iovlen] struct iovec* msg_iov,
+            size_t msg_iovlen,
             [out, size=msg_controllen] void *msg_control,
             size_t msg_controllen,
             [out] size_t* msg_controllen_recv,

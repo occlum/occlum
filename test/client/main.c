@@ -76,6 +76,13 @@ int client_sendmsg(int server_fd, char *buf) {
     ret = sendmsg(server_fd, &msg, 0);
     if (ret <= 0)
         THROW_ERROR("sendmsg failed");
+
+    msg.msg_iov = NULL;
+    msg.msg_iovlen = 0;
+
+    ret = sendmsg(server_fd, &msg, 0);
+    if (ret != 0)
+        THROW_ERROR("empty sendmsg failed");
     return ret;
 }
 

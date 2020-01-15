@@ -98,3 +98,15 @@ impl ToErrno for rcore_fs::vfs::FsError {
         }
     }
 }
+
+impl ToErrno for std::alloc::AllocErr {
+    fn errno(&self) -> Errno {
+        ENOMEM
+    }
+}
+
+impl ToErrno for std::alloc::LayoutErr {
+    fn errno(&self) -> Errno {
+        EINVAL
+    }
+}

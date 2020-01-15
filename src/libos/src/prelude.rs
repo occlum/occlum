@@ -31,29 +31,3 @@ pub fn align_down(addr: usize, align: usize) -> usize {
 pub fn unbox<T>(value: Box<T>) -> T {
     *value
 }
-
-pub trait SliceOptionExt<T> {
-    fn get_ptr_and_len(&self) -> (*const T, usize);
-}
-
-impl<T> SliceOptionExt<T> for Option<&[T]> {
-    fn get_ptr_and_len(&self) -> (*const T, usize) {
-        match self {
-            Some(self_slice) => (self_slice.as_ptr(), self_slice.len()),
-            None => (std::ptr::null(), 0),
-        }
-    }
-}
-
-pub trait MutSliceOptionExt<T> {
-    fn get_mut_ptr_and_len(&mut self) -> (*mut T, usize);
-}
-
-impl<T> MutSliceOptionExt<T> for Option<&mut [T]> {
-    fn get_mut_ptr_and_len(&mut self) -> (*mut T, usize) {
-        match self {
-            Some(self_slice) => (self_slice.as_mut_ptr(), self_slice.len()),
-            None => (std::ptr::null_mut(), 0),
-        }
-    }
-}

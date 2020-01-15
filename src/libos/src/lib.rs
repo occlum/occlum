@@ -7,6 +7,8 @@
 #![feature(core_intrinsics)]
 #![feature(stmt_expr_attributes)]
 #![feature(atomic_min_max)]
+#![feature(no_more_cas)]
+#![feature(alloc_layout_extra)]
 
 #[macro_use]
 extern crate alloc;
@@ -59,6 +61,7 @@ mod net;
 mod process;
 mod syscall;
 mod time;
+mod untrusted;
 mod util;
 mod vm;
 
