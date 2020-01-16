@@ -243,7 +243,7 @@ pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2]> {
     let creation_flags = CreationFlags::from_bits_truncate(flags);
     let current_ref = process::get_current();
     let current = current_ref.lock().unwrap();
-    let pipe = Pipe::new()?;
+    let pipe = Pipe::new(StatusFlags::from_bits_truncate(flags))?;
 
     let file_table_ref = current.get_files();
     let mut file_table = file_table_ref.lock().unwrap();
