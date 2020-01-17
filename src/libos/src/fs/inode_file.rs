@@ -96,11 +96,19 @@ impl File for INodeFile {
 
     fn seek(&self, pos: SeekFrom) -> Result<off_t> {
         let mut offset = self.offset.lock().unwrap();
-        *offset = match pos {
-            SeekFrom::Start(off) => off as usize,
-            SeekFrom::End(off) => (self.inode.metadata()?.size as i64 + off) as usize,
-            SeekFrom::Current(off) => (*offset as i64 + off) as usize,
+        let new_offset = match pos {
+            SeekFrom::Start(off) => off as i64,
+            SeekFrom::End(off) => (self.inode.metadata()?.size as i64)
+                .checked_add(off)
+                .ok_or_else(|| errno!(EOVERFLOW, "file offset overflow"))?,
+            SeekFrom::Current(off) => (*offset as i64)
+                .checked_add(off)
+                .ok_or_else(|| errno!(EOVERFLOW, "file offset overflow"))?,
         };
+        if new_offset < 0 {
+            return_errno!(EINVAL, "file offset is negative");
+        }
+        *offset = new_offset as usize;
         Ok(*offset as i64)
     }
 
