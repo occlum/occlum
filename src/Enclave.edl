@@ -50,6 +50,8 @@ enclave {
          */
         int occlum_ocall_exec_thread_async(int libos_tid);
 
+        int occlum_ocall_thread_getcpuclock([out] struct timespec* ts) propagate_errno;
+
         void occlum_ocall_gettimeofday([out] struct timeval* tv);
         void occlum_ocall_clock_gettime(clockid_t clockid, [out] struct timespec* ts);
 

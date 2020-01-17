@@ -1,7 +1,15 @@
+use super::*;
+use core::convert::TryFrom;
+use process::pid_t;
 use rcore_fs::dev::TimeProvider;
 use rcore_fs::vfs::Timespec;
+use std::time::Duration;
+use std::{fmt, u64};
+use syscall::SyscallNum;
 
-use super::*;
+mod profiler;
+
+pub use profiler::GLOBAL_PROFILER;
 
 #[allow(non_camel_case_types)]
 pub type time_t = i64;
@@ -18,16 +26,16 @@ pub struct timeval_t {
 }
 
 impl timeval_t {
-    pub fn as_usec(&self) -> usize {
-        (self.sec * 1000000 + self.usec) as usize
-    }
-
     pub fn validate(&self) -> Result<()> {
         if self.sec >= 0 && self.usec >= 0 && self.usec < 1_000_000 {
             Ok(())
         } else {
             return_errno!(EINVAL, "invalid value for timeval_t");
         }
+    }
+
+    pub fn as_duration(&self) -> Duration {
+        Duration::new(self.sec as u64, (self.usec * 1_000) as u32)
     }
 }
 
@@ -55,9 +63,7 @@ pub struct timespec_t {
 impl timespec_t {
     pub fn from_raw_ptr(ptr: *const timespec_t) -> Result<timespec_t> {
         let ts = unsafe { *ptr };
-        if ts.sec < 0 || ts.nsec < 0 || ts.nsec >= 1_000_000_000 {
-            return_errno!(EINVAL, "Invalid timespec fields");
-        }
+        ts.validate()?;
         Ok(ts)
     }
 
@@ -67,6 +73,10 @@ impl timespec_t {
         } else {
             return_errno!(EINVAL, "invalid value for timespec_t");
         }
+    }
+
+    pub fn as_duration(&self) -> Duration {
+        Duration::new(self.sec as u64, self.nsec as u32)
     }
 }
 
@@ -124,6 +134,22 @@ pub fn do_nanosleep(req: &timespec_t) -> Result<()> {
         occlum_ocall_nanosleep(req as *const timespec_t);
     }
     Ok(())
+}
+
+pub fn do_thread_getcpuclock() -> Result<timespec_t> {
+    extern "C" {
+        fn occlum_ocall_thread_getcpuclock(ret: *mut c_int, tp: *mut timespec_t) -> sgx_status_t;
+    }
+
+    let mut tv: timespec_t = Default::default();
+    try_libc!({
+        let mut retval: i32 = 0;
+        let status = occlum_ocall_thread_getcpuclock(&mut retval, &mut tv as *mut timespec_t);
+        assert!(status == sgx_status_t::SGX_SUCCESS);
+        retval
+    });
+    tv.validate()?;
+    Ok(tv)
 }
 
 // For SEFS

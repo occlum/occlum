@@ -98,10 +98,24 @@ pub fn run_task(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
         (pid, task)
     };
 
+    #[cfg(feature = "syscall_timing")]
+    GLOBAL_PROFILER
+        .lock()
+        .unwrap()
+        .thread_enter()
+        .expect("unexpected error from profiler to enter thread");
+
     unsafe {
         // task may only be modified by this function; so no lock is needed
         do_run_task(task);
     }
+
+    #[cfg(feature = "syscall_timing")]
+    GLOBAL_PROFILER
+        .lock()
+        .unwrap()
+        .thread_exit()
+        .expect("unexpected error from profiler to exit thread");
 
     let (exit_status, parent_pid) = {
         let mut process = new_process.lock().unwrap();

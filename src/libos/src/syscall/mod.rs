@@ -6,31 +6,29 @@
 //! 2. Do some bound checks then call `dispatch_syscall` (at this file)
 //! 3. Dispatch the syscall to `do_*` (at this file)
 //! 4. Do some memory checks then call `mod::do_*` (at each module)
+pub use self::syscall_num::SyscallNum;
 
 use fs::{File, FileDesc, FileRef, Stat};
 use misc::{resource_t, rlimit_t, utsname_t};
 use net::{msghdr, msghdr_mut, AsSocket, AsUnixSocket, SocketFile, UnixSocketFile};
 use process::{pid_t, ChildProcessFilter, CloneFlags, CpuSet, FileAction, FutexFlags, FutexOp};
+use std::any::Any;
+use std::convert::TryFrom;
 use std::ffi::{CStr, CString};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::ptr;
-use time::{clockid_t, timespec_t, timeval_t};
+use time::{clockid_t, timespec_t, timeval_t, GLOBAL_PROFILER};
 use util::mem_util::from_user::*;
 use vm::{MMapFlags, VMPerms};
 use {fs, process, std, vm};
 
 use super::*;
 
-use self::consts::*;
-use std::any::Any;
-use std::io::{Read, Seek, SeekFrom, Write};
+mod syscall_num;
 
 // Use the internal syscall wrappers from sgx_tstd
 //use std::libc_fs as fs;
 //use std::libc_io as io;
-
-mod consts;
-
-static mut SYSCALL_TIMING: [usize; 361] = [0; 361];
 
 #[no_mangle]
 #[deny(unreachable_patterns)]
@@ -43,167 +41,159 @@ pub extern "C" fn dispatch_syscall(
     arg4: isize,
     arg5: isize,
 ) -> isize {
-    debug!(
-        "syscall tid:{}, num:{}: {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}",
-        process::do_gettid(),
-        num,
-        arg0,
-        arg1,
-        arg2,
-        arg3,
-        arg4,
-        arg5
-    );
-    #[cfg(feature = "syscall_timing")]
-    let time_start = {
-        static mut LAST_PRINT: usize = 0;
-        let time = crate::time::do_gettimeofday().as_usec();
-        unsafe {
-            if time / 1000000 / 5 > LAST_PRINT {
-                LAST_PRINT = time / 1000000 / 5;
-                print_syscall_timing();
-            }
-        }
-        time
-    };
+    let pid = process::do_gettid();
+    let syscall_num = SyscallNum::try_from(num).unwrap();
 
-    let ret = match num {
+    debug!(
+        "syscall tid:{}, {:?}: {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}",
+        pid, syscall_num, arg0, arg1, arg2, arg3, arg4, arg5
+    );
+
+    #[cfg(feature = "syscall_timing")]
+    GLOBAL_PROFILER
+        .lock()
+        .unwrap()
+        .syscall_enter(syscall_num)
+        .expect("unexpected error from profiler to enter syscall");
+
+    use self::syscall_num::SyscallNum::*;
+    let ret = match syscall_num {
         // file
-        SYS_OPEN => fs::do_open(arg0 as *const i8, arg1 as u32, arg2 as u32),
-        SYS_CLOSE => fs::do_close(arg0 as FileDesc),
-        SYS_READ => fs::do_read(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
-        SYS_WRITE => fs::do_write(arg0 as FileDesc, arg1 as *const u8, arg2 as usize),
-        SYS_PREAD64 => fs::do_pread(
+        SysOpen => fs::do_open(arg0 as *const i8, arg1 as u32, arg2 as u32),
+        SysClose => fs::do_close(arg0 as FileDesc),
+        SysRead => fs::do_read(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
+        SysWrite => fs::do_write(arg0 as FileDesc, arg1 as *const u8, arg2 as usize),
+        SysPread64 => fs::do_pread(
             arg0 as FileDesc,
             arg1 as *mut u8,
             arg2 as usize,
             arg3 as usize,
         ),
-        SYS_PWRITE64 => fs::do_pwrite(
+        SysPwrite64 => fs::do_pwrite(
             arg0 as FileDesc,
             arg1 as *const u8,
             arg2 as usize,
             arg3 as usize,
         ),
-        SYS_READV => fs::do_readv(arg0 as FileDesc, arg1 as *mut fs::iovec_t, arg2 as i32),
-        SYS_WRITEV => fs::do_writev(arg0 as FileDesc, arg1 as *mut fs::iovec_t, arg2 as i32),
-        SYS_STAT => fs::do_stat(arg0 as *const i8, arg1 as *mut Stat),
-        SYS_FSTAT => fs::do_fstat(arg0 as FileDesc, arg1 as *mut Stat),
-        SYS_LSTAT => fs::do_lstat(arg0 as *const i8, arg1 as *mut Stat),
-        SYS_ACCESS => fs::do_access(arg0 as *const i8, arg1 as u32),
-        SYS_FACCESSAT => fs::do_faccessat(arg0 as i32, arg1 as *const i8, arg2 as u32, arg3 as u32),
-        SYS_LSEEK => fs::do_lseek(arg0 as FileDesc, arg1 as off_t, arg2 as i32),
-        SYS_FSYNC => fs::do_fsync(arg0 as FileDesc),
-        SYS_FDATASYNC => fs::do_fdatasync(arg0 as FileDesc),
-        SYS_TRUNCATE => fs::do_truncate(arg0 as *const i8, arg1 as usize),
-        SYS_FTRUNCATE => fs::do_ftruncate(arg0 as FileDesc, arg1 as usize),
-        SYS_GETDENTS64 => fs::do_getdents64(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
-        SYS_SYNC => fs::do_sync(),
-        SYS_GETCWD => do_getcwd(arg0 as *mut u8, arg1 as usize),
-        SYS_CHDIR => fs::do_chdir(arg0 as *mut i8),
-        SYS_RENAME => fs::do_rename(arg0 as *const i8, arg1 as *const i8),
-        SYS_MKDIR => fs::do_mkdir(arg0 as *const i8, arg1 as usize),
-        SYS_RMDIR => fs::do_rmdir(arg0 as *const i8),
-        SYS_LINK => fs::do_link(arg0 as *const i8, arg1 as *const i8),
-        SYS_UNLINK => fs::do_unlink(arg0 as *const i8),
-        SYS_READLINK => fs::do_readlink(arg0 as *const i8, arg1 as *mut u8, arg2 as usize),
-        SYS_SENDFILE => fs::do_sendfile(
+        SysReadv => fs::do_readv(arg0 as FileDesc, arg1 as *mut fs::iovec_t, arg2 as i32),
+        SysWritev => fs::do_writev(arg0 as FileDesc, arg1 as *mut fs::iovec_t, arg2 as i32),
+        SysStat => fs::do_stat(arg0 as *const i8, arg1 as *mut Stat),
+        SysFstat => fs::do_fstat(arg0 as FileDesc, arg1 as *mut Stat),
+        SysLstat => fs::do_lstat(arg0 as *const i8, arg1 as *mut Stat),
+        SysAccess => fs::do_access(arg0 as *const i8, arg1 as u32),
+        SysFaccessat => fs::do_faccessat(arg0 as i32, arg1 as *const i8, arg2 as u32, arg3 as u32),
+        SysLseek => fs::do_lseek(arg0 as FileDesc, arg1 as off_t, arg2 as i32),
+        SysFsync => fs::do_fsync(arg0 as FileDesc),
+        SysFdatasync => fs::do_fdatasync(arg0 as FileDesc),
+        SysTruncate => fs::do_truncate(arg0 as *const i8, arg1 as usize),
+        SysFtruncate => fs::do_ftruncate(arg0 as FileDesc, arg1 as usize),
+        SysGetdents64 => fs::do_getdents64(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
+        SysSync => fs::do_sync(),
+        SysGetcwd => do_getcwd(arg0 as *mut u8, arg1 as usize),
+        SysChdir => fs::do_chdir(arg0 as *mut i8),
+        SysRename => fs::do_rename(arg0 as *const i8, arg1 as *const i8),
+        SysMkdir => fs::do_mkdir(arg0 as *const i8, arg1 as usize),
+        SysRmdir => fs::do_rmdir(arg0 as *const i8),
+        SysLink => fs::do_link(arg0 as *const i8, arg1 as *const i8),
+        SysUnlink => fs::do_unlink(arg0 as *const i8),
+        SysReadlink => fs::do_readlink(arg0 as *const i8, arg1 as *mut u8, arg2 as usize),
+        SysSendfile => fs::do_sendfile(
             arg0 as FileDesc,
             arg1 as FileDesc,
             arg2 as *mut off_t,
             arg3 as usize,
         ),
-        SYS_FCNTL => fs::do_fcntl(arg0 as FileDesc, arg1 as u32, arg2 as u64),
-        SYS_IOCTL => fs::do_ioctl(arg0 as FileDesc, arg1 as u32, arg2 as *mut u8),
+        SysFcntl => fs::do_fcntl(arg0 as FileDesc, arg1 as u32, arg2 as u64),
+        SysIoctl => fs::do_ioctl(arg0 as FileDesc, arg1 as u32, arg2 as *mut u8),
 
-        // IO multiplexing
-        SYS_SELECT => net::do_select(
+        // Io multiplexing
+        SysSelect => net::do_select(
             arg0 as c_int,
             arg1 as *mut libc::fd_set,
             arg2 as *mut libc::fd_set,
             arg3 as *mut libc::fd_set,
             arg4 as *const libc::timeval,
         ),
-        SYS_POLL => net::do_poll(
+        SysPoll => net::do_poll(
             arg0 as *mut libc::pollfd,
             arg1 as libc::nfds_t,
             arg2 as c_int,
         ),
-        SYS_EPOLL_CREATE => net::do_epoll_create(arg0 as c_int),
-        SYS_EPOLL_CREATE1 => net::do_epoll_create1(arg0 as c_int),
-        SYS_EPOLL_CTL => net::do_epoll_ctl(
+        SysEpollCreate => net::do_epoll_create(arg0 as c_int),
+        SysEpollCreate1 => net::do_epoll_create1(arg0 as c_int),
+        SysEpollCtl => net::do_epoll_ctl(
             arg0 as c_int,
             arg1 as c_int,
             arg2 as c_int,
             arg3 as *const libc::epoll_event,
         ),
-        SYS_EPOLL_WAIT => net::do_epoll_wait(
+        SysEpollWait => net::do_epoll_wait(
             arg0 as c_int,
             arg1 as *mut libc::epoll_event,
             arg2 as c_int,
             arg3 as c_int,
         ),
-        SYS_EPOLL_PWAIT => net::do_epoll_pwait(
+        SysEpollPwait => net::do_epoll_pwait(
             arg0 as c_int,
             arg1 as *mut libc::epoll_event,
             arg2 as c_int,
             arg3 as c_int,
-            arg4 as *const usize, //TODO:add sigset_t
+            arg4 as *const usize, //Todo:add sigset_t
         ),
 
         // process
-        SYS_EXIT => do_exit(arg0 as i32),
-        SYS_SPAWN => do_spawn(
+        SysExit => do_exit(arg0 as i32),
+        SysSpawn => do_spawn(
             arg0 as *mut u32,
             arg1 as *mut i8,
             arg2 as *const *const i8,
             arg3 as *const *const i8,
             arg4 as *const FdOp,
         ),
-        SYS_WAIT4 => do_wait4(arg0 as i32, arg1 as *mut i32),
+        SysWait4 => do_wait4(arg0 as i32, arg1 as *mut i32),
 
-        SYS_GETPID => do_getpid(),
-        SYS_GETTID => do_gettid(),
-        SYS_GETPPID => do_getppid(),
-        SYS_GETPGID => do_getpgid(),
+        SysGetpid => do_getpid(),
+        SysGettid => do_gettid(),
+        SysGetppid => do_getppid(),
+        SysGetpgid => do_getpgid(),
 
-        SYS_GETUID => do_getuid(),
-        SYS_GETGID => do_getgid(),
-        SYS_GETEUID => do_geteuid(),
-        SYS_GETEGID => do_getegid(),
+        SysGetuid => do_getuid(),
+        SysGetgid => do_getgid(),
+        SysGeteuid => do_geteuid(),
+        SysGetegid => do_getegid(),
 
-        SYS_RT_SIGACTION => do_rt_sigaction(),
-        SYS_RT_SIGPROCMASK => do_rt_sigprocmask(),
+        SysRtSigaction => do_rt_sigaction(),
+        SysRtSigprocmask => do_rt_sigprocmask(),
 
-        SYS_CLONE => do_clone(
+        SysClone => do_clone(
             arg0 as u32,
             arg1 as usize,
             arg2 as *mut pid_t,
             arg3 as *mut pid_t,
             arg4 as usize,
         ),
-        SYS_FUTEX => do_futex(
+        SysFutex => do_futex(
             arg0 as *const i32,
             arg1 as u32,
             arg2 as i32,
             arg3 as i32,
             arg4 as *const i32,
-            // TODO: accept other optional arguments
+            // Todo: accept other optional arguments
         ),
-        SYS_ARCH_PRCTL => do_arch_prctl(arg0 as u32, arg1 as *mut usize),
-        SYS_SET_TID_ADDRESS => do_set_tid_address(arg0 as *mut pid_t),
+        SysArchPrctl => do_arch_prctl(arg0 as u32, arg1 as *mut usize),
+        SysSetTidAddress => do_set_tid_address(arg0 as *mut pid_t),
 
         // sched
-        SYS_SCHED_YIELD => do_sched_yield(),
-        SYS_SCHED_GETAFFINITY => {
+        SysSchedYield => do_sched_yield(),
+        SysSchedGetaffinity => {
             do_sched_getaffinity(arg0 as pid_t, arg1 as size_t, arg2 as *mut c_uchar)
         }
-        SYS_SCHED_SETAFFINITY => {
+        SysSchedSetaffinity => {
             do_sched_setaffinity(arg0 as pid_t, arg1 as size_t, arg2 as *const c_uchar)
         }
 
         // memory
-        SYS_MMAP => do_mmap(
+        SysMmap => do_mmap(
             arg0 as usize,
             arg1 as usize,
             arg2 as i32,
@@ -211,31 +201,31 @@ pub extern "C" fn dispatch_syscall(
             arg4 as FileDesc,
             arg5 as off_t,
         ),
-        SYS_MUNMAP => do_munmap(arg0 as usize, arg1 as usize),
-        SYS_MREMAP => do_mremap(
+        SysMunmap => do_munmap(arg0 as usize, arg1 as usize),
+        SysMremap => do_mremap(
             arg0 as usize,
             arg1 as usize,
             arg2 as usize,
             arg3 as i32,
             arg4 as usize,
         ),
-        SYS_MPROTECT => do_mprotect(arg0 as usize, arg1 as usize, arg2 as u32),
-        SYS_BRK => do_brk(arg0 as usize),
+        SysMprotect => do_mprotect(arg0 as usize, arg1 as usize, arg2 as u32),
+        SysBrk => do_brk(arg0 as usize),
 
-        SYS_PIPE => fs::do_pipe2(arg0 as *mut i32, 0),
-        SYS_PIPE2 => fs::do_pipe2(arg0 as *mut i32, arg1 as u32),
-        SYS_DUP => fs::do_dup(arg0 as FileDesc),
-        SYS_DUP2 => fs::do_dup2(arg0 as FileDesc, arg1 as FileDesc),
-        SYS_DUP3 => fs::do_dup3(arg0 as FileDesc, arg1 as FileDesc, arg2 as u32),
+        SysPipe => fs::do_pipe2(arg0 as *mut i32, 0),
+        SysPipe2 => fs::do_pipe2(arg0 as *mut i32, arg1 as u32),
+        SysDup => fs::do_dup(arg0 as FileDesc),
+        SysDup2 => fs::do_dup2(arg0 as FileDesc, arg1 as FileDesc),
+        SysDup3 => fs::do_dup3(arg0 as FileDesc, arg1 as FileDesc, arg2 as u32),
 
-        SYS_GETTIMEOFDAY => do_gettimeofday(arg0 as *mut timeval_t),
-        SYS_CLOCK_GETTIME => do_clock_gettime(arg0 as clockid_t, arg1 as *mut timespec_t),
+        SysGettimeofday => do_gettimeofday(arg0 as *mut timeval_t),
+        SysClockGettime => do_clock_gettime(arg0 as clockid_t, arg1 as *mut timespec_t),
 
-        SYS_NANOSLEEP => do_nanosleep(arg0 as *const timespec_t, arg1 as *mut timespec_t),
+        SysNanosleep => do_nanosleep(arg0 as *const timespec_t, arg1 as *mut timespec_t),
 
-        SYS_UNAME => do_uname(arg0 as *mut utsname_t),
+        SysUname => do_uname(arg0 as *mut utsname_t),
 
-        SYS_PRLIMIT64 => do_prlimit(
+        SysPrlimit64 => do_prlimit(
             arg0 as pid_t,
             arg1 as u32,
             arg2 as *const rlimit_t,
@@ -243,56 +233,56 @@ pub extern "C" fn dispatch_syscall(
         ),
 
         // socket
-        SYS_SOCKET => do_socket(arg0 as c_int, arg1 as c_int, arg2 as c_int),
-        SYS_CONNECT => do_connect(
+        SysSocket => do_socket(arg0 as c_int, arg1 as c_int, arg2 as c_int),
+        SysConnect => do_connect(
             arg0 as c_int,
             arg1 as *const libc::sockaddr,
             arg2 as libc::socklen_t,
         ),
-        SYS_ACCEPT => do_accept4(
+        SysAccept => do_accept4(
             arg0 as c_int,
             arg1 as *mut libc::sockaddr,
             arg2 as *mut libc::socklen_t,
             0,
         ),
-        SYS_ACCEPT4 => do_accept4(
+        SysAccept4 => do_accept4(
             arg0 as c_int,
             arg1 as *mut libc::sockaddr,
             arg2 as *mut libc::socklen_t,
             arg3 as c_int,
         ),
-        SYS_SHUTDOWN => do_shutdown(arg0 as c_int, arg1 as c_int),
-        SYS_BIND => do_bind(
+        SysShutdown => do_shutdown(arg0 as c_int, arg1 as c_int),
+        SysBind => do_bind(
             arg0 as c_int,
             arg1 as *const libc::sockaddr,
             arg2 as libc::socklen_t,
         ),
-        SYS_LISTEN => do_listen(arg0 as c_int, arg1 as c_int),
-        SYS_SETSOCKOPT => do_setsockopt(
+        SysListen => do_listen(arg0 as c_int, arg1 as c_int),
+        SysSetsockopt => do_setsockopt(
             arg0 as c_int,
             arg1 as c_int,
             arg2 as c_int,
             arg3 as *const c_void,
             arg4 as libc::socklen_t,
         ),
-        SYS_GETSOCKOPT => do_getsockopt(
+        SysGetsockopt => do_getsockopt(
             arg0 as c_int,
             arg1 as c_int,
             arg2 as c_int,
             arg3 as *mut c_void,
             arg4 as *mut libc::socklen_t,
         ),
-        SYS_GETPEERNAME => do_getpeername(
+        SysGetpeername => do_getpeername(
             arg0 as c_int,
             arg1 as *mut libc::sockaddr,
             arg2 as *mut libc::socklen_t,
         ),
-        SYS_GETSOCKNAME => do_getsockname(
+        SysGetsockname => do_getsockname(
             arg0 as c_int,
             arg1 as *mut libc::sockaddr,
             arg2 as *mut libc::socklen_t,
         ),
-        SYS_SENDTO => do_sendto(
+        SysSendto => do_sendto(
             arg0 as c_int,
             arg1 as *const c_void,
             arg2 as size_t,
@@ -300,7 +290,7 @@ pub extern "C" fn dispatch_syscall(
             arg4 as *const libc::sockaddr,
             arg5 as libc::socklen_t,
         ),
-        SYS_RECVFROM => do_recvfrom(
+        SysRecvfrom => do_recvfrom(
             arg0 as c_int,
             arg1 as *mut c_void,
             arg2 as size_t,
@@ -309,29 +299,27 @@ pub extern "C" fn dispatch_syscall(
             arg5 as *mut libc::socklen_t,
         ),
 
-        SYS_SOCKETPAIR => do_socketpair(
+        SysSocketpair => do_socketpair(
             arg0 as c_int,
             arg1 as c_int,
             arg2 as c_int,
             arg3 as *mut c_int,
         ),
 
-        SYS_SENDMSG => net::do_sendmsg(arg0 as c_int, arg1 as *const msghdr, arg2 as c_int),
-        SYS_RECVMSG => net::do_recvmsg(arg0 as c_int, arg1 as *mut msghdr_mut, arg2 as c_int),
+        SysSendmsg => net::do_sendmsg(arg0 as c_int, arg1 as *const msghdr, arg2 as c_int),
+        SysRecvmsg => net::do_recvmsg(arg0 as c_int, arg1 as *mut msghdr_mut, arg2 as c_int),
 
         _ => do_unknown(num, arg0, arg1, arg2, arg3, arg4, arg5),
     };
 
     #[cfg(feature = "syscall_timing")]
-    {
-        let time_end = crate::time::do_gettimeofday().as_usec();
-        let time = time_end - time_start;
-        unsafe {
-            SYSCALL_TIMING[num as usize] += time as usize;
-        }
-    }
+    GLOBAL_PROFILER
+        .lock()
+        .unwrap()
+        .syscall_exit(syscall_num, ret.is_err())
+        .expect("unexpected error from profiler to exit syscall");
 
-    info!("=> {:?}", ret);
+    info!("tid: {} => {:?} ", process::do_gettid(), ret);
 
     match ret {
         Ok(retval) => retval as isize,
@@ -342,20 +330,6 @@ pub extern "C" fn dispatch_syscall(
             debug_assert!(retval != 0);
             retval
         }
-    }
-}
-
-#[cfg(feature = "syscall_timing")]
-fn print_syscall_timing() {
-    println!("syscall timing:");
-    for (i, &time) in unsafe { SYSCALL_TIMING }.iter().enumerate() {
-        if time == 0 {
-            continue;
-        }
-        println!("{:>3}: {:>6} us", i, time);
-    }
-    for x in unsafe { SYSCALL_TIMING.iter_mut() } {
-        *x = 0;
     }
 }
 
