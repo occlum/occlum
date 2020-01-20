@@ -33,9 +33,6 @@ include ../sgxenv.mk
 # | +---------------| |
 # +-------------------+
 
-# Build LibOS in debug or release mode
-LIBOS_RELEASE ?= 0
-
 # The log level for LibOS
 #
 # There are five levels:
@@ -117,14 +114,14 @@ $(LIBOS_CORE_A): $(LIBOS_CORE_RS_A) $(C_OBJS) $(CXX_OBJS) $(S_OBJS) $(EDL_C_OBJS
 	@ar r $@ $(C_OBJS) $(CXX_OBJS) $(S_OBJS) $(EDL_C_OBJS)
 	@echo "GEN => $@"
 
-ifeq ($(LIBOS_RELEASE), 0)
-$(LIBOS_CORE_RS_A): $(RUST_SRCS)
-	@RUSTC_BOOTSTRAP=1 cargo build --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR)
-	@echo "CARGO (debug) => $@"
-else
+ifeq ($(OCCLUM_RELEASE_BUILD), 1)
 $(LIBOS_CORE_RS_A): $(RUST_SRCS)
 	@RUSTC_BOOTSTRAP=1 cargo build --release --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR)
 	@echo "CARGO (release) => $@"
+else
+$(LIBOS_CORE_RS_A): $(RUST_SRCS)
+	@RUSTC_BOOTSTRAP=1 cargo build --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR)
+	@echo "CARGO (debug) => $@"
 endif
 
 $(BUILD_DIR)/src/libos/src/Enclave_t.o: $(BUILD_DIR)/src/libos/src/Enclave_t.c

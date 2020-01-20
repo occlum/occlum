@@ -8,6 +8,14 @@ SGX_SDK ?= /opt/intel/sgxsdk
 SGX_MODE ?= HW
 SGX_ARCH ?= x64
 
+# If OCCLUM_RELEASE_BUILD equals to 1, y, or yes, then build in release mode
+OCCLUM_RELEASE_BUILD ?= 0
+ifeq ($(OCCLUM_RELEASE_BUILD), yes)
+	OCCLUM_RELEASE_BUILD := 1
+else ifeq ($(OCCLUM_RELEASE_BUILD), y)
+	OCCLUM_RELEASE_BUILD := 1
+endif
+
 ifeq ($(shell getconf LONG_BIT), 32)
 	SGX_ARCH := x86
 else ifeq ($(findstring -m32, $(CXXFLAGS)), -m32)
@@ -28,16 +36,10 @@ else
 	SGX_EDGER8R := $(SGX_SDK)/bin/x64/sgx_edger8r
 endif
 
-ifeq ($(SGX_DEBUG), 1)
-ifeq ($(SGX_PRERELEASE), 1)
-$(error Cannot set SGX_DEBUG and SGX_PRERELEASE at the same time!!)
-endif
-endif
-
-ifeq ($(SGX_DEBUG), 1)
-	SGX_COMMON_CFLAGS += -O0 -g
-else
+ifeq ($(OCCLUM_RELEASE_BUILD), 1)
 	SGX_COMMON_CFLAGS += -O2
+else
+	SGX_COMMON_CFLAGS += -O0 -g
 endif
 
 RUST_SGX_SDK_DIR := $(PROJECT_DIR)/deps/rust-sgx-sdk
