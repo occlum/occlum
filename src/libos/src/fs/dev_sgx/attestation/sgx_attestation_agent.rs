@@ -74,8 +74,13 @@ impl InnerAgent {
             );
             assert!(status == sgx_status_t::SGX_SUCCESS);
 
-            if (retval != sgx_status_t::SGX_SUCCESS) {
-                return_errno!(EINVAL, "occlum_ocall_sgx_init_quote failed");
+            if retval != sgx_status_t::SGX_SUCCESS {
+                match retval {
+                    sgx_status_t::SGX_ERROR_BUSY => {
+                        return_errno!(EBUSY, "occlum_ocall_sgx_init_quote is temporarily busy")
+                    }
+                    _ => return_errno!(EINVAL, "occlum_ocall_sgx_init_quote failed"),
+                }
             }
         }
 

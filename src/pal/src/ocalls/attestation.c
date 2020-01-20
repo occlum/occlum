@@ -5,6 +5,9 @@ sgx_status_t occlum_ocall_sgx_init_quote(
     sgx_target_info_t* target_info,
     sgx_epid_group_id_t* epid_group_id)
 {
+    // Intel's manual:
+    // It's suggested that the caller should wait (typically several seconds
+    // to ten of seconds) and retry this API if SGX_ERROR_BUSY is returned.
     return sgx_init_quote(target_info, epid_group_id);
 }
 

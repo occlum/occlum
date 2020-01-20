@@ -44,6 +44,9 @@ typedef struct {
 #define SGXIOC_GET_EPID_GROUP_ID _IOR('s', 1, sgx_epid_group_id_t)
 #define SGXIOC_GEN_QUOTE         _IOWR('s', 2, sgxioc_gen_quote_arg_t)
 
+// The max number of retries if ioctl returns EBUSY
+#define IOCTL_MAX_RETRIES       20
+
 typedef int(*sgx_ioctl_test_body_t)(int sgx_fd);
 
 static int do_SGXIOC_IS_EDDM_SUPPORTED(int sgx_fd) {
@@ -57,10 +60,25 @@ static int do_SGXIOC_IS_EDDM_SUPPORTED(int sgx_fd) {
     return 0;
 }
 
+
 static int do_SGXIOC_GET_EPID_GROUP_ID(int sgx_fd) {
-    sgx_epid_group_id_t epid_group_id = { 0 };
-    if (ioctl(sgx_fd, SGXIOC_GET_EPID_GROUP_ID, &epid_group_id) < 0) {
-        THROW_ERROR("failed to ioctl /dev/sgx");
+    int nretries = 0;
+    while (nretries < IOCTL_MAX_RETRIES) {
+        sgx_epid_group_id_t epid_group_id = { 0 };
+        int ret = ioctl(sgx_fd, SGXIOC_GET_EPID_GROUP_ID, &epid_group_id);
+        if (ret == 0) {
+            break;
+        }
+        else if (errno != EBUSY) {
+            THROW_ERROR("failed to ioctl /dev/sgx");
+        }
+
+        printf("WARN: /dev/sgx is temporarily busy. Try again after 1 second.");
+        sleep(1);
+        nretries++;
+    }
+    if (nretries == IOCTL_MAX_RETRIES) {
+        THROW_ERROR("failed to ioctl /dev/sgx due to timeout");
     }
     return 0;
 }
@@ -77,19 +95,22 @@ static int do_SGXIOC_GEN_QUOTE(int sgx_fd) {
         .quote_buf_len = sizeof(quote_buf),             // input
         .quote = { .as_buf = (uint8_t*) quote_buf }     // output
     };
-
-    while (1) {
+    int nretries = 0;
+    while (nretries < IOCTL_MAX_RETRIES) {
         int ret = ioctl(sgx_fd, SGXIOC_GEN_QUOTE, &gen_quote_arg);
         if (ret == 0) {
             break;
         }
-        else if (errno == EAGAIN) {
-            printf("WARN: /dev/sgx is temporarily busy. Try again after 1 second.");
-            sleep(1);
-        }
-        else {
+        else if (errno != EBUSY) {
             THROW_ERROR("failed to ioctl /dev/sgx");
         }
+
+        printf("WARN: /dev/sgx is temporarily busy. Try again after 1 second.");
+        sleep(1);
+        nretries++;
+    }
+    if (nretries == IOCTL_MAX_RETRIES) {
+        THROW_ERROR("failed to ioctl /dev/sgx due to timeout");
     }
 
     sgx_quote_t* quote = (sgx_quote_t*)quote_buf;
