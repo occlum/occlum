@@ -1,4 +1,4 @@
-# A Demo for Occlum's Embedded Mode 
+# A Demo for Occlum's Embedded Mode
 
 ## Background
 
@@ -9,7 +9,7 @@ application by partitioning it into trusted and untrusted halves, while the
 LibOS-based approach runs the entire application inside an enclave.
 
 Both approaches have their pros and cons. The SDK-based approach lets the 
-developers decide which components are to be or not to be put into the enclave. 
+developers decide which components are to be or not to be put into enclaves. 
 Thus, it provides the flexibility and customizability that is attractive to 
 advanced developers. However, this requires non-trivial efforts from the 
 developers, especially when porting existing applications or libraries into 
@@ -44,12 +44,12 @@ is `memcpy`'ed from an untrusted component outside the enclave to a trusted
 program inside the enclave.
 
 The trusted program is under `trusted_memcpy_bench/`. Running upon Occlum, this 
-program is given an untrusted buffer outside the enclave and measures the I/O 
-throughput achieved by repeatedly `memcpy` from it.
+program is given an untrusted buffer outside the enclave and measures the 
+memory throughput achieved by repeatedly `memcpy`ing.
 
 The untrusted component is under `bench_driver/`, which is a normal Linux 
 program except that is linked with the Occlum PAL library and uses Occlum PAL 
-APIS to load and execute `trusted_memcpy_bench` program. The untrusted buffer 
+APIs to load and execute `trusted_memcpy_bench` program. The untrusted buffer 
 required by `trusted_memcpy_bench` is prepared by `bench_driver`.
 
 ## How to Build and Run

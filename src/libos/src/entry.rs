@@ -22,7 +22,7 @@ pub extern "C" fn occlum_ecall_new_process(
     INIT_ONCE.call_once(|| {
         // Init the log infrastructure first so that log messages will be printed afterwards
         util::log::init();
-        // Init OpenMP for SFI
+        // Init MPX for SFI
         util::mpx_util::mpx_enable();
         // Register exception handlers (support cpuid & rdtsc for now)
         register_exception_handlers();
@@ -37,7 +37,6 @@ pub extern "C" fn occlum_ecall_new_process(
             return EXIT_STATUS_INTERNAL_ERROR;
         }
     };
-    // register exception handlers (support cpuid & rdtsc for now)
     let _ = backtrace::enable_backtrace(ENCLAVE_PATH, PrintFormat::Short);
     panic::catch_unwind(|| {
         backtrace::__rust_begin_short_backtrace(|| match do_new_process(&path, &args) {

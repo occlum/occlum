@@ -21,7 +21,7 @@ macro_rules! errno {
             let msg: &'static str = $error_msg;
             (errno, msg)
         };
-        let error = Error::embeded(inner_error, Some(ErrorLocation::new(file!(), line!())));
+        let error = Error::embedded(inner_error, Some(ErrorLocation::new(file!(), line!())));
         error
     }};
     ($error_expr: expr) => {{

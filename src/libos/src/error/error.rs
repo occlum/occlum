@@ -20,7 +20,7 @@ pub struct ErrorLocation {
 }
 
 impl Error {
-    pub fn embeded(inner: (Errno, &'static str), location: Option<ErrorLocation>) -> Error {
+    pub fn embedded(inner: (Errno, &'static str), location: Option<ErrorLocation>) -> Error {
         Error {
             inner: Error__::Embedded(inner),
             location: location,
