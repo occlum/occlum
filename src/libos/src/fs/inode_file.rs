@@ -1,7 +1,6 @@
 use super::*;
 use rcore_fs_sefs::dev::SefsMac;
-use sgx_trts::libc::S_IRUSR;
-use std::fmt;
+use sgx_trts::libc::{S_IRUSR, S_IWUSR};
 
 pub struct INodeFile {
     inode: Arc<dyn INode>,

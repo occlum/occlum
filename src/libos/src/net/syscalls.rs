@@ -1,6 +1,7 @@
 use super::*;
 
-use fs::{AsUnixSocket, File, FileDesc, FileRef, UnixSocketFile};
+use super::io_multiplexing;
+use fs::{File, FileDesc, FileRef};
 use process::Process;
 use util::mem_util::from_user;
 
@@ -123,4 +124,115 @@ impl c_msghdr_ext for msghdr_mut {
     fn check_member_ptrs(&self) -> Result<()> {
         Ok(())
     }
+}
+
+pub fn do_select(
+    nfds: c_int,
+    readfds: *mut libc::fd_set,
+    writefds: *mut libc::fd_set,
+    exceptfds: *mut libc::fd_set,
+    timeout: *const libc::timeval,
+) -> Result<isize> {
+    // check arguments
+    if nfds < 0 || nfds >= libc::FD_SETSIZE as c_int {
+        return_errno!(EINVAL, "nfds is negative or exceeds the resource limit");
+    }
+    let nfds = nfds as usize;
+
+    let mut zero_fds0: libc::fd_set = unsafe { core::mem::zeroed() };
+    let mut zero_fds1: libc::fd_set = unsafe { core::mem::zeroed() };
+    let mut zero_fds2: libc::fd_set = unsafe { core::mem::zeroed() };
+
+    let readfds = if !readfds.is_null() {
+        from_user::check_mut_ptr(readfds)?;
+        unsafe { &mut *readfds }
+    } else {
+        &mut zero_fds0
+    };
+    let writefds = if !writefds.is_null() {
+        from_user::check_mut_ptr(writefds)?;
+        unsafe { &mut *writefds }
+    } else {
+        &mut zero_fds1
+    };
+    let exceptfds = if !exceptfds.is_null() {
+        from_user::check_mut_ptr(exceptfds)?;
+        unsafe { &mut *exceptfds }
+    } else {
+        &mut zero_fds2
+    };
+    let timeout = if !timeout.is_null() {
+        from_user::check_ptr(timeout)?;
+        Some(unsafe { timeout.read() })
+    } else {
+        None
+    };
+
+    let n = io_multiplexing::do_select(nfds, readfds, writefds, exceptfds, timeout)?;
+    Ok(n as isize)
+}
+
+pub fn do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int) -> Result<isize> {
+    from_user::check_mut_array(fds, nfds as usize)?;
+    let polls = unsafe { std::slice::from_raw_parts_mut(fds, nfds as usize) };
+
+    let n = io_multiplexing::do_poll(polls, timeout)?;
+    Ok(n as isize)
+}
+
+pub fn do_epoll_create(size: c_int) -> Result<isize> {
+    if size <= 0 {
+        return_errno!(EINVAL, "size is not positive");
+    }
+    do_epoll_create1(0)
+}
+
+pub fn do_epoll_create1(flags: c_int) -> Result<isize> {
+    let fd = io_multiplexing::do_epoll_create1(flags)?;
+    Ok(fd as isize)
+}
+
+pub fn do_epoll_ctl(
+    epfd: c_int,
+    op: c_int,
+    fd: c_int,
+    event: *const libc::epoll_event,
+) -> Result<isize> {
+    if !event.is_null() {
+        from_user::check_ptr(event)?;
+    }
+    io_multiplexing::do_epoll_ctl(epfd as FileDesc, op, fd as FileDesc, event)?;
+    Ok(0)
+}
+
+pub fn do_epoll_wait(
+    epfd: c_int,
+    events: *mut libc::epoll_event,
+    maxevents: c_int,
+    timeout: c_int,
+) -> Result<isize> {
+    let maxevents = {
+        if maxevents <= 0 {
+            return_errno!(EINVAL, "maxevents <= 0");
+        }
+        maxevents as usize
+    };
+    let events = {
+        from_user::check_mut_array(events, maxevents)?;
+        unsafe { std::slice::from_raw_parts_mut(events, maxevents) }
+    };
+    let count = io_multiplexing::do_epoll_wait(epfd as FileDesc, events, timeout)?;
+    Ok(count as isize)
+}
+
+pub fn do_epoll_pwait(
+    epfd: c_int,
+    events: *mut libc::epoll_event,
+    maxevents: c_int,
+    timeout: c_int,
+    sigmask: *const usize, //TODO:add sigset_t
+) -> Result<isize> {
+    info!("epoll_pwait");
+    //TODO:add signal support
+    do_epoll_wait(epfd, events, maxevents, 0)
 }

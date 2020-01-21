@@ -7,12 +7,9 @@
 //! 3. Dispatch the syscall to `do_*` (at this file)
 //! 4. Do some memory checks then call `mod::do_*` (at each module)
 
-use fs::{
-    AccessFlags, AccessModes, AsUnixSocket, FcntlCmd, File, FileDesc, FileRef, IoctlCmd,
-    UnixSocketFile, AT_FDCWD,
-};
+use fs::{File, FileDesc, FileRef, Stat};
 use misc::{resource_t, rlimit_t, utsname_t};
-use net::{msghdr, msghdr_mut, AsSocket, SocketFile};
+use net::{msghdr, msghdr_mut, AsSocket, AsUnixSocket, SocketFile, UnixSocketFile};
 use process::{pid_t, ChildProcessFilter, CloneFlags, CpuSet, FileAction, FutexFlags, FutexOp};
 use std::ffi::{CStr, CString};
 use std::ptr;
@@ -72,81 +69,81 @@ pub extern "C" fn dispatch_syscall(
 
     let ret = match num {
         // file
-        SYS_OPEN => do_open(arg0 as *const i8, arg1 as u32, arg2 as u32),
-        SYS_CLOSE => do_close(arg0 as FileDesc),
-        SYS_READ => do_read(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
-        SYS_WRITE => do_write(arg0 as FileDesc, arg1 as *const u8, arg2 as usize),
-        SYS_PREAD64 => do_pread(
+        SYS_OPEN => fs::do_open(arg0 as *const i8, arg1 as u32, arg2 as u32),
+        SYS_CLOSE => fs::do_close(arg0 as FileDesc),
+        SYS_READ => fs::do_read(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
+        SYS_WRITE => fs::do_write(arg0 as FileDesc, arg1 as *const u8, arg2 as usize),
+        SYS_PREAD64 => fs::do_pread(
             arg0 as FileDesc,
             arg1 as *mut u8,
             arg2 as usize,
             arg3 as usize,
         ),
-        SYS_PWRITE64 => do_pwrite(
+        SYS_PWRITE64 => fs::do_pwrite(
             arg0 as FileDesc,
             arg1 as *const u8,
             arg2 as usize,
             arg3 as usize,
         ),
-        SYS_READV => do_readv(arg0 as FileDesc, arg1 as *mut iovec_t, arg2 as i32),
-        SYS_WRITEV => do_writev(arg0 as FileDesc, arg1 as *mut iovec_t, arg2 as i32),
-        SYS_STAT => do_stat(arg0 as *const i8, arg1 as *mut fs::Stat),
-        SYS_FSTAT => do_fstat(arg0 as FileDesc, arg1 as *mut fs::Stat),
-        SYS_LSTAT => do_lstat(arg0 as *const i8, arg1 as *mut fs::Stat),
-        SYS_ACCESS => do_access(arg0 as *const i8, arg1 as u32),
-        SYS_FACCESSAT => do_faccessat(arg0 as i32, arg1 as *const i8, arg2 as u32, arg3 as u32),
-        SYS_LSEEK => do_lseek(arg0 as FileDesc, arg1 as off_t, arg2 as i32),
-        SYS_FSYNC => do_fsync(arg0 as FileDesc),
-        SYS_FDATASYNC => do_fdatasync(arg0 as FileDesc),
-        SYS_TRUNCATE => do_truncate(arg0 as *const i8, arg1 as usize),
-        SYS_FTRUNCATE => do_ftruncate(arg0 as FileDesc, arg1 as usize),
-        SYS_GETDENTS64 => do_getdents64(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
-        SYS_SYNC => do_sync(),
+        SYS_READV => fs::do_readv(arg0 as FileDesc, arg1 as *mut fs::iovec_t, arg2 as i32),
+        SYS_WRITEV => fs::do_writev(arg0 as FileDesc, arg1 as *mut fs::iovec_t, arg2 as i32),
+        SYS_STAT => fs::do_stat(arg0 as *const i8, arg1 as *mut Stat),
+        SYS_FSTAT => fs::do_fstat(arg0 as FileDesc, arg1 as *mut Stat),
+        SYS_LSTAT => fs::do_lstat(arg0 as *const i8, arg1 as *mut Stat),
+        SYS_ACCESS => fs::do_access(arg0 as *const i8, arg1 as u32),
+        SYS_FACCESSAT => fs::do_faccessat(arg0 as i32, arg1 as *const i8, arg2 as u32, arg3 as u32),
+        SYS_LSEEK => fs::do_lseek(arg0 as FileDesc, arg1 as off_t, arg2 as i32),
+        SYS_FSYNC => fs::do_fsync(arg0 as FileDesc),
+        SYS_FDATASYNC => fs::do_fdatasync(arg0 as FileDesc),
+        SYS_TRUNCATE => fs::do_truncate(arg0 as *const i8, arg1 as usize),
+        SYS_FTRUNCATE => fs::do_ftruncate(arg0 as FileDesc, arg1 as usize),
+        SYS_GETDENTS64 => fs::do_getdents64(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
+        SYS_SYNC => fs::do_sync(),
         SYS_GETCWD => do_getcwd(arg0 as *mut u8, arg1 as usize),
-        SYS_CHDIR => do_chdir(arg0 as *mut i8),
-        SYS_RENAME => do_rename(arg0 as *const i8, arg1 as *const i8),
-        SYS_MKDIR => do_mkdir(arg0 as *const i8, arg1 as usize),
-        SYS_RMDIR => do_rmdir(arg0 as *const i8),
-        SYS_LINK => do_link(arg0 as *const i8, arg1 as *const i8),
-        SYS_UNLINK => do_unlink(arg0 as *const i8),
-        SYS_READLINK => do_readlink(arg0 as *const i8, arg1 as *mut u8, arg2 as usize),
-        SYS_SENDFILE => do_sendfile(
+        SYS_CHDIR => fs::do_chdir(arg0 as *mut i8),
+        SYS_RENAME => fs::do_rename(arg0 as *const i8, arg1 as *const i8),
+        SYS_MKDIR => fs::do_mkdir(arg0 as *const i8, arg1 as usize),
+        SYS_RMDIR => fs::do_rmdir(arg0 as *const i8),
+        SYS_LINK => fs::do_link(arg0 as *const i8, arg1 as *const i8),
+        SYS_UNLINK => fs::do_unlink(arg0 as *const i8),
+        SYS_READLINK => fs::do_readlink(arg0 as *const i8, arg1 as *mut u8, arg2 as usize),
+        SYS_SENDFILE => fs::do_sendfile(
             arg0 as FileDesc,
             arg1 as FileDesc,
             arg2 as *mut off_t,
             arg3 as usize,
         ),
-        SYS_FCNTL => do_fcntl(arg0 as FileDesc, arg1 as u32, arg2 as u64),
-        SYS_IOCTL => do_ioctl(arg0 as FileDesc, arg1 as u32, arg2 as *mut u8),
+        SYS_FCNTL => fs::do_fcntl(arg0 as FileDesc, arg1 as u32, arg2 as u64),
+        SYS_IOCTL => fs::do_ioctl(arg0 as FileDesc, arg1 as u32, arg2 as *mut u8),
 
         // IO multiplexing
-        SYS_SELECT => do_select(
+        SYS_SELECT => net::do_select(
             arg0 as c_int,
             arg1 as *mut libc::fd_set,
             arg2 as *mut libc::fd_set,
             arg3 as *mut libc::fd_set,
             arg4 as *const libc::timeval,
         ),
-        SYS_POLL => do_poll(
+        SYS_POLL => net::do_poll(
             arg0 as *mut libc::pollfd,
             arg1 as libc::nfds_t,
             arg2 as c_int,
         ),
-        SYS_EPOLL_CREATE => do_epoll_create(arg0 as c_int),
-        SYS_EPOLL_CREATE1 => do_epoll_create1(arg0 as c_int),
-        SYS_EPOLL_CTL => do_epoll_ctl(
+        SYS_EPOLL_CREATE => net::do_epoll_create(arg0 as c_int),
+        SYS_EPOLL_CREATE1 => net::do_epoll_create1(arg0 as c_int),
+        SYS_EPOLL_CTL => net::do_epoll_ctl(
             arg0 as c_int,
             arg1 as c_int,
             arg2 as c_int,
             arg3 as *const libc::epoll_event,
         ),
-        SYS_EPOLL_WAIT => do_epoll_wait(
+        SYS_EPOLL_WAIT => net::do_epoll_wait(
             arg0 as c_int,
             arg1 as *mut libc::epoll_event,
             arg2 as c_int,
             arg3 as c_int,
         ),
-        SYS_EPOLL_PWAIT => do_epoll_pwait(
+        SYS_EPOLL_PWAIT => net::do_epoll_pwait(
             arg0 as c_int,
             arg1 as *mut libc::epoll_event,
             arg2 as c_int,
@@ -225,11 +222,11 @@ pub extern "C" fn dispatch_syscall(
         SYS_MPROTECT => do_mprotect(arg0 as usize, arg1 as usize, arg2 as u32),
         SYS_BRK => do_brk(arg0 as usize),
 
-        SYS_PIPE => do_pipe2(arg0 as *mut i32, 0),
-        SYS_PIPE2 => do_pipe2(arg0 as *mut i32, arg1 as u32),
-        SYS_DUP => do_dup(arg0 as FileDesc),
-        SYS_DUP2 => do_dup2(arg0 as FileDesc, arg1 as FileDesc),
-        SYS_DUP3 => do_dup3(arg0 as FileDesc, arg1 as FileDesc, arg2 as u32),
+        SYS_PIPE => fs::do_pipe2(arg0 as *mut i32, 0),
+        SYS_PIPE2 => fs::do_pipe2(arg0 as *mut i32, arg1 as u32),
+        SYS_DUP => fs::do_dup(arg0 as FileDesc),
+        SYS_DUP2 => fs::do_dup2(arg0 as FileDesc, arg1 as FileDesc),
+        SYS_DUP3 => fs::do_dup3(arg0 as FileDesc, arg1 as FileDesc, arg2 as u32),
 
         SYS_GETTIMEOFDAY => do_gettimeofday(arg0 as *mut timeval_t),
         SYS_CLOCK_GETTIME => do_clock_gettime(arg0 as clockid_t, arg1 as *mut timespec_t),
@@ -360,12 +357,6 @@ fn print_syscall_timing() {
     for x in unsafe { SYSCALL_TIMING.iter_mut() } {
         *x = 0;
     }
-}
-
-#[allow(non_camel_case_types)]
-pub struct iovec_t {
-    base: *const c_void,
-    len: size_t,
 }
 
 /*
@@ -518,196 +509,6 @@ pub fn do_futex(
     }
 }
 
-fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize> {
-    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
-    let fd = fs::do_open(&path, flags, mode)?;
-    Ok(fd as isize)
-}
-
-fn do_close(fd: FileDesc) -> Result<isize> {
-    fs::do_close(fd)?;
-    Ok(0)
-}
-
-fn do_read(fd: FileDesc, buf: *mut u8, size: usize) -> Result<isize> {
-    let safe_buf = {
-        check_mut_array(buf, size)?;
-        unsafe { std::slice::from_raw_parts_mut(buf, size) }
-    };
-    let len = fs::do_read(fd, safe_buf)?;
-    Ok(len as isize)
-}
-
-fn do_write(fd: FileDesc, buf: *const u8, size: usize) -> Result<isize> {
-    let safe_buf = {
-        check_array(buf, size)?;
-        unsafe { std::slice::from_raw_parts(buf, size) }
-    };
-    let len = fs::do_write(fd, safe_buf)?;
-    Ok(len as isize)
-}
-
-fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<isize> {
-    let count = {
-        if count < 0 {
-            return_errno!(EINVAL, "Invalid count of iovec");
-        }
-        count as usize
-    };
-
-    check_array(iov, count);
-    let bufs_vec = {
-        let mut bufs_vec = Vec::with_capacity(count);
-        for iov_i in 0..count {
-            let iov_ptr = unsafe { iov.offset(iov_i as isize) };
-            let iov = unsafe { &*iov_ptr };
-            let buf = unsafe { std::slice::from_raw_parts(iov.base as *const u8, iov.len) };
-            bufs_vec.push(buf);
-        }
-        bufs_vec
-    };
-    let bufs = &bufs_vec[..];
-
-    let len = fs::do_writev(fd, bufs)?;
-    Ok(len as isize)
-}
-
-fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize> {
-    let count = {
-        if count < 0 {
-            return_errno!(EINVAL, "Invalid count of iovec");
-        }
-        count as usize
-    };
-
-    check_array(iov, count);
-    let mut bufs_vec = {
-        let mut bufs_vec = Vec::with_capacity(count);
-        for iov_i in 0..count {
-            let iov_ptr = unsafe { iov.offset(iov_i as isize) };
-            let iov = unsafe { &*iov_ptr };
-            let buf = unsafe { std::slice::from_raw_parts_mut(iov.base as *mut u8, iov.len) };
-            bufs_vec.push(buf);
-        }
-        bufs_vec
-    };
-    let bufs = &mut bufs_vec[..];
-
-    let len = fs::do_readv(fd, bufs)?;
-    Ok(len as isize)
-}
-
-fn do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: usize) -> Result<isize> {
-    let safe_buf = {
-        check_mut_array(buf, size)?;
-        unsafe { std::slice::from_raw_parts_mut(buf, size) }
-    };
-    let len = fs::do_pread(fd, safe_buf, offset)?;
-    Ok(len as isize)
-}
-
-fn do_pwrite(fd: FileDesc, buf: *const u8, size: usize, offset: usize) -> Result<isize> {
-    let safe_buf = {
-        check_array(buf, size)?;
-        unsafe { std::slice::from_raw_parts(buf, size) }
-    };
-    let len = fs::do_pwrite(fd, safe_buf, offset)?;
-    Ok(len as isize)
-}
-
-fn do_stat(path: *const i8, stat_buf: *mut fs::Stat) -> Result<isize> {
-    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
-    check_mut_ptr(stat_buf)?;
-
-    let stat = fs::do_stat(&path)?;
-    unsafe {
-        stat_buf.write(stat);
-    }
-    Ok(0)
-}
-
-fn do_fstat(fd: FileDesc, stat_buf: *mut fs::Stat) -> Result<isize> {
-    check_mut_ptr(stat_buf)?;
-
-    let stat = fs::do_fstat(fd)?;
-    unsafe {
-        stat_buf.write(stat);
-    }
-    Ok(0)
-}
-
-fn do_lstat(path: *const i8, stat_buf: *mut fs::Stat) -> Result<isize> {
-    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
-    check_mut_ptr(stat_buf)?;
-
-    let stat = fs::do_lstat(&path)?;
-    unsafe {
-        stat_buf.write(stat);
-    }
-    Ok(0)
-}
-
-fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize> {
-    let seek_from = match whence {
-        0 => {
-            // SEEK_SET
-            if offset < 0 {
-                return_errno!(EINVAL, "Invalid offset");
-            }
-            SeekFrom::Start(offset as u64)
-        }
-        1 => {
-            // SEEK_CUR
-            SeekFrom::Current(offset)
-        }
-        2 => {
-            // SEEK_END
-            SeekFrom::End(offset)
-        }
-        _ => {
-            return_errno!(EINVAL, "Invalid whence");
-        }
-    };
-
-    let offset = fs::do_lseek(fd, seek_from)?;
-    Ok(offset as isize)
-}
-
-fn do_fsync(fd: FileDesc) -> Result<isize> {
-    fs::do_fsync(fd)?;
-    Ok(0)
-}
-
-fn do_fdatasync(fd: FileDesc) -> Result<isize> {
-    fs::do_fdatasync(fd)?;
-    Ok(0)
-}
-
-fn do_truncate(path: *const i8, len: usize) -> Result<isize> {
-    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
-    fs::do_truncate(&path, len)?;
-    Ok(0)
-}
-
-fn do_ftruncate(fd: FileDesc, len: usize) -> Result<isize> {
-    fs::do_ftruncate(fd, len)?;
-    Ok(0)
-}
-
-fn do_getdents64(fd: FileDesc, buf: *mut u8, buf_size: usize) -> Result<isize> {
-    let safe_buf = {
-        check_mut_array(buf, buf_size)?;
-        unsafe { std::slice::from_raw_parts_mut(buf, buf_size) }
-    };
-    let len = fs::do_getdents64(fd, safe_buf)?;
-    Ok(len as isize)
-}
-
-fn do_sync() -> Result<isize> {
-    fs::do_sync()?;
-    Ok(0)
-}
-
 fn do_mmap(
     addr: usize,
     size: usize,
@@ -817,32 +618,6 @@ fn do_getegid() -> Result<isize> {
     Ok(0)
 }
 
-fn do_pipe2(fds_u: *mut i32, flags: u32) -> Result<isize> {
-    check_mut_array(fds_u, 2)?;
-    // TODO: how to deal with open flags???
-    let fds = fs::do_pipe2(flags as u32)?;
-    unsafe {
-        *fds_u.offset(0) = fds[0] as c_int;
-        *fds_u.offset(1) = fds[1] as c_int;
-    }
-    Ok(0)
-}
-
-fn do_dup(old_fd: FileDesc) -> Result<isize> {
-    let new_fd = fs::do_dup(old_fd)?;
-    Ok(new_fd as isize)
-}
-
-fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<isize> {
-    let new_fd = fs::do_dup2(old_fd, new_fd)?;
-    Ok(new_fd as isize)
-}
-
-fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<isize> {
-    let new_fd = fs::do_dup3(old_fd, new_fd, flags)?;
-    Ok(new_fd as isize)
-}
-
 // TODO: handle tz: timezone_t
 fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<isize> {
     check_mut_ptr(tv_u)?;
@@ -919,101 +694,6 @@ fn do_getcwd(buf: *mut u8, size: usize) -> Result<isize> {
     safe_buf[..cwd.len()].copy_from_slice(cwd.as_bytes());
     safe_buf[cwd.len()] = 0;
     Ok(buf as isize)
-}
-
-fn do_chdir(path: *const i8) -> Result<isize> {
-    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
-    fs::do_chdir(&path)?;
-    Ok(0)
-}
-
-fn do_rename(oldpath: *const i8, newpath: *const i8) -> Result<isize> {
-    let oldpath = clone_cstring_safely(oldpath)?
-        .to_string_lossy()
-        .into_owned();
-    let newpath = clone_cstring_safely(newpath)?
-        .to_string_lossy()
-        .into_owned();
-    fs::do_rename(&oldpath, &newpath)?;
-    Ok(0)
-}
-
-fn do_mkdir(path: *const i8, mode: usize) -> Result<isize> {
-    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
-    fs::do_mkdir(&path, mode)?;
-    Ok(0)
-}
-
-fn do_rmdir(path: *const i8) -> Result<isize> {
-    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
-    fs::do_rmdir(&path)?;
-    Ok(0)
-}
-
-fn do_link(oldpath: *const i8, newpath: *const i8) -> Result<isize> {
-    let oldpath = clone_cstring_safely(oldpath)?
-        .to_string_lossy()
-        .into_owned();
-    let newpath = clone_cstring_safely(newpath)?
-        .to_string_lossy()
-        .into_owned();
-    fs::do_link(&oldpath, &newpath)?;
-    Ok(0)
-}
-
-fn do_unlink(path: *const i8) -> Result<isize> {
-    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
-    fs::do_unlink(&path)?;
-    Ok(0)
-}
-
-fn do_readlink(path: *const i8, buf: *mut u8, size: usize) -> Result<isize> {
-    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
-    let buf = {
-        check_array(buf, size)?;
-        unsafe { std::slice::from_raw_parts_mut(buf, size) }
-    };
-    let len = fs::do_readlink(&path, buf)?;
-    Ok(len as isize)
-}
-
-fn do_sendfile(
-    out_fd: FileDesc,
-    in_fd: FileDesc,
-    offset_ptr: *mut off_t,
-    count: usize,
-) -> Result<isize> {
-    let offset = if offset_ptr.is_null() {
-        None
-    } else {
-        check_mut_ptr(offset_ptr)?;
-        Some(unsafe { offset_ptr.read() })
-    };
-
-    let (len, offset) = fs::do_sendfile(out_fd, in_fd, offset, count)?;
-    if !offset_ptr.is_null() {
-        unsafe {
-            offset_ptr.write(offset as off_t);
-        }
-    }
-    Ok(len as isize)
-}
-
-fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize> {
-    let cmd = FcntlCmd::from_raw(cmd, arg)?;
-    fs::do_fcntl(fd, &cmd)
-}
-
-fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
-    info!("ioctl: fd: {}, cmd: {}, argp: {:?}", fd, cmd, argp);
-    let mut ioctl_cmd = unsafe {
-        if argp.is_null() == false {
-            check_mut_ptr(argp)?;
-        }
-        IoctlCmd::new(cmd, argp)?
-    };
-    fs::do_ioctl(fd, &mut ioctl_cmd)?;
-    Ok(0)
 }
 
 fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize> {
@@ -1406,117 +1086,6 @@ fn do_socketpair(
     }
 }
 
-fn do_select(
-    nfds: c_int,
-    readfds: *mut libc::fd_set,
-    writefds: *mut libc::fd_set,
-    exceptfds: *mut libc::fd_set,
-    timeout: *const libc::timeval,
-) -> Result<isize> {
-    // check arguments
-    if nfds < 0 || nfds >= libc::FD_SETSIZE as c_int {
-        return_errno!(EINVAL, "nfds is negative or exceeds the resource limit");
-    }
-    let nfds = nfds as usize;
-
-    let mut zero_fds0: libc::fd_set = unsafe { core::mem::zeroed() };
-    let mut zero_fds1: libc::fd_set = unsafe { core::mem::zeroed() };
-    let mut zero_fds2: libc::fd_set = unsafe { core::mem::zeroed() };
-
-    let readfds = if !readfds.is_null() {
-        check_mut_ptr(readfds)?;
-        unsafe { &mut *readfds }
-    } else {
-        &mut zero_fds0
-    };
-    let writefds = if !writefds.is_null() {
-        check_mut_ptr(writefds)?;
-        unsafe { &mut *writefds }
-    } else {
-        &mut zero_fds1
-    };
-    let exceptfds = if !exceptfds.is_null() {
-        check_mut_ptr(exceptfds)?;
-        unsafe { &mut *exceptfds }
-    } else {
-        &mut zero_fds2
-    };
-    let timeout = if !timeout.is_null() {
-        check_ptr(timeout)?;
-        Some(unsafe { timeout.read() })
-    } else {
-        None
-    };
-
-    let n = fs::do_select(nfds, readfds, writefds, exceptfds, timeout)?;
-    Ok(n as isize)
-}
-
-fn do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int) -> Result<isize> {
-    check_mut_array(fds, nfds as usize)?;
-    let polls = unsafe { std::slice::from_raw_parts_mut(fds, nfds as usize) };
-
-    let n = fs::do_poll(polls, timeout)?;
-    Ok(n as isize)
-}
-
-fn do_epoll_create(size: c_int) -> Result<isize> {
-    if size <= 0 {
-        return_errno!(EINVAL, "size is not positive");
-    }
-    do_epoll_create1(0)
-}
-
-fn do_epoll_create1(flags: c_int) -> Result<isize> {
-    let fd = fs::do_epoll_create1(flags)?;
-    Ok(fd as isize)
-}
-
-fn do_epoll_ctl(
-    epfd: c_int,
-    op: c_int,
-    fd: c_int,
-    event: *const libc::epoll_event,
-) -> Result<isize> {
-    if !event.is_null() {
-        check_ptr(event)?;
-    }
-    fs::do_epoll_ctl(epfd as FileDesc, op, fd as FileDesc, event)?;
-    Ok(0)
-}
-
-fn do_epoll_wait(
-    epfd: c_int,
-    events: *mut libc::epoll_event,
-    maxevents: c_int,
-    timeout: c_int,
-) -> Result<isize> {
-    let maxevents = {
-        if maxevents <= 0 {
-            return_errno!(EINVAL, "maxevents <= 0");
-        }
-        maxevents as usize
-    };
-    let events = {
-        check_mut_array(events, maxevents)?;
-        unsafe { std::slice::from_raw_parts_mut(events, maxevents) }
-    };
-    let count = fs::do_epoll_wait(epfd as FileDesc, events, timeout)?;
-    Ok(count as isize)
-}
-
-fn do_epoll_pwait(
-    epfd: c_int,
-    events: *mut libc::epoll_event,
-    maxevents: c_int,
-    timeout: c_int,
-    sigmask: *const usize, //TODO:add sigset_t
-) -> Result<isize> {
-    info!("epoll_pwait");
-    //TODO:add signal support
-    do_epoll_wait(epfd, events, maxevents, 0)
-}
-
 fn do_uname(name: *mut utsname_t) -> Result<isize> {
     check_mut_ptr(name)?;
     let name = unsafe { &mut *name };
@@ -1547,26 +1116,6 @@ fn do_prlimit(
         }
     };
     misc::do_prlimit(pid, resource, new_limit, old_limit).map(|_| 0)
-}
-
-fn do_access(path: *const i8, mode: u32) -> Result<isize> {
-    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
-    let mode = AccessModes::from_u32(mode)?;
-    fs::do_access(&path, mode).map(|_| 0)
-}
-
-fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) -> Result<isize> {
-    let dirfd = if dirfd >= 0 {
-        Some(dirfd as FileDesc)
-    } else if dirfd == AT_FDCWD {
-        None
-    } else {
-        return_errno!(EINVAL, "invalid dirfd");
-    };
-    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
-    let mode = AccessModes::from_u32(mode)?;
-    let flags = AccessFlags::from_u32(flags)?;
-    fs::do_faccessat(dirfd, &path, mode, flags).map(|_| 0)
 }
 
 // TODO: implement signals

@@ -1,6 +1,4 @@
-use super::file::{File, FileRef};
 use super::*;
-use std;
 
 pub type FileDesc = u32;
 

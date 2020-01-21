@@ -1,10 +1,9 @@
 use super::hostfs::HostFS;
-use super::sgx_impl::{SgxStorage, SgxUuidProvider};
+use super::sefs::{SgxStorage, SgxUuidProvider};
 use super::*;
 use config::{ConfigMount, ConfigMountFsType};
 use std::path::{Path, PathBuf};
 
-use rcore_fs::vfs::{FileSystem, FileType, FsError, INode};
 use rcore_fs_mountfs::{MNode, MountFS};
 use rcore_fs_ramfs::RamFS;
 use rcore_fs_sefs::dev::*;

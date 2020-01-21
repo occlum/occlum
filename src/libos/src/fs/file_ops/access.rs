@@ -1,32 +1,29 @@
 use super::*;
 
-//int faccessat(int dirfd, const char *pathname, int mode, int flags);
-//int access(const char *pathname, int mode);
-
 bitflags! {
-    pub struct AccessModes : u32 {
+    pub struct AccessibilityCheckMode : u32 {
         const X_OK = 1;
         const W_OK = 2;
         const R_OK = 4;
     }
 }
 
-impl AccessModes {
-    pub fn from_u32(bits: u32) -> Result<AccessModes> {
-        AccessModes::from_bits(bits).ok_or_else(|| errno!(EINVAL, "invalid mode"))
+impl AccessibilityCheckMode {
+    pub fn from_u32(bits: u32) -> Result<AccessibilityCheckMode> {
+        AccessibilityCheckMode::from_bits(bits).ok_or_else(|| errno!(EINVAL, "invalid mode"))
     }
 }
 
 bitflags! {
-    pub struct AccessFlags : u32 {
+    pub struct AccessibilityCheckFlags : u32 {
         const AT_SYMLINK_NOFOLLOW = 0x100;
         const AT_EACCESS          = 0x200;
     }
 }
 
-impl AccessFlags {
-    pub fn from_u32(bits: u32) -> Result<AccessFlags> {
-        AccessFlags::from_bits(bits).ok_or_else(|| errno!(EINVAL, "invalid flags"))
+impl AccessibilityCheckFlags {
+    pub fn from_u32(bits: u32) -> Result<AccessibilityCheckFlags> {
+        AccessibilityCheckFlags::from_bits(bits).ok_or_else(|| errno!(EINVAL, "invalid flags"))
     }
 }
 
@@ -35,8 +32,8 @@ pub const AT_FDCWD: i32 = -100;
 pub fn do_faccessat(
     dirfd: Option<FileDesc>,
     path: &str,
-    mode: AccessModes,
-    flags: AccessFlags,
+    mode: AccessibilityCheckMode,
+    flags: AccessibilityCheckFlags,
 ) -> Result<()> {
     info!(
         "faccessat: dirfd: {:?}, path: {:?}, mode: {:?}, flags: {:?}",
@@ -49,7 +46,7 @@ pub fn do_faccessat(
     }
 }
 
-pub fn do_access(path: &str, mode: AccessModes) -> Result<()> {
+pub fn do_access(path: &str, mode: AccessibilityCheckMode) -> Result<()> {
     info!("access: path: {:?}, mode: {:?}", path, mode);
     let current_ref = process::get_current();
     let mut current = current_ref.lock().unwrap();

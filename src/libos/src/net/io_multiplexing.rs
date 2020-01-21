@@ -1,4 +1,5 @@
 use super::*;
+use fs::{File, FileDesc, FileRef};
 use std::any::Any;
 use std::collections::btree_map::BTreeMap;
 use std::fmt;

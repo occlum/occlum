@@ -1,14 +1,17 @@
 use super::*;
-use std::*;
+use std;
 
+mod io_multiplexing;
 mod iovs;
 mod msg;
 mod msg_flags;
 mod socket_file;
 mod syscalls;
+mod unix_socket;
 
 pub use self::iovs::{Iovs, IovsMut, SliceAsLibcIovec};
 pub use self::msg::{msghdr, msghdr_mut, MsgHdr, MsgHdrMut};
 pub use self::msg_flags::MsgFlags;
 pub use self::socket_file::{AsSocket, SocketFile};
-pub use self::syscalls::{do_recvmsg, do_sendmsg};
+pub use self::syscalls::*;
+pub use self::unix_socket::{AsUnixSocket, UnixSocketFile};

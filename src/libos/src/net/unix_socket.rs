@@ -1,5 +1,7 @@
 use super::*;
-use alloc::string::ToString;
+use fs::{File, FileRef, IoctlCmd};
+use rcore_fs::vfs::{FileType, Metadata, Timespec};
+use std::any::Any;
 use std::collections::btree_map::BTreeMap;
 use std::fmt;
 use std::sync::atomic::{spin_loop_hint, AtomicUsize, Ordering};

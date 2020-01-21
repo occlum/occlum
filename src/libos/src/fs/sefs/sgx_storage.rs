@@ -1,38 +1,13 @@
-use super::sgx_aes_gcm_128bit_tag_t;
-use alloc::string::ToString;
-use rcore_fs::dev::TimeProvider;
-use rcore_fs::vfs::Timespec;
-use rcore_fs_sefs::dev::*;
-use sgx_trts::libc;
-use sgx_types::*;
+use super::*;
+use rcore_fs_sefs::dev::{DevResult, DeviceError, File, SefsMac, Storage};
 use std::boxed::Box;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeMap;
+use std::hash::{Hash, Hasher};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sgxfs::{remove, OpenOptions, SgxFile};
-use std::string::String;
 use std::sync::{Arc, SgxMutex as Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
-
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-
-extern "C" {
-    fn sgx_read_rand(rand_buf: *mut u8, buf_size: usize) -> sgx_status_t;
-}
-
-pub struct SgxUuidProvider;
-
-impl UuidProvider for SgxUuidProvider {
-    fn generate_uuid(&self) -> SefsUuid {
-        let mut uuid: [u8; 16] = [0u8; 16];
-        let buf = uuid.as_mut_ptr();
-        let size = 16;
-        let status = unsafe { sgx_read_rand(buf, size) };
-        assert!(status == sgx_status_t::SGX_SUCCESS);
-        SefsUuid(uuid)
-    }
-}
 
 pub struct SgxStorage {
     path: PathBuf,

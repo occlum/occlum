@@ -1,5 +1,4 @@
 use super::*;
-use process::FileTableRef;
 
 #[derive(Debug)]
 pub enum FcntlCmd {
@@ -34,7 +33,11 @@ impl FcntlCmd {
     }
 }
 
-pub fn do_fcntl(file_table_ref: &FileTableRef, fd: FileDesc, cmd: &FcntlCmd) -> Result<isize> {
+pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize> {
+    info!("fcntl: fd: {:?}, cmd: {:?}", &fd, cmd);
+    let current_ref = process::get_current();
+    let mut current = current_ref.lock().unwrap();
+    let file_table_ref = current.get_files();
     let mut file_table = file_table_ref.lock().unwrap();
     let ret = match cmd {
         FcntlCmd::DupFd(min_fd) => {
