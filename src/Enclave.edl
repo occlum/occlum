@@ -7,6 +7,7 @@ enclave {
     from "sgx_net.edl" import *;
 
     include "sgx_quote.h"
+    include "occlum_edl_types.h"
 
     trusted {
         /*
@@ -49,16 +50,24 @@ enclave {
          */
         int occlum_ocall_exec_thread_async(int libos_tid);
 
-        void occlum_ocall_gettimeofday([out] long* sec, [out] long* us);
-        void occlum_ocall_clock_gettime(int clockid, [out] long* sec, [out] long* ns);
+        void occlum_ocall_gettimeofday([out] struct timeval* tv);
+        void occlum_ocall_clock_gettime(clockid_t clockid, [out] struct timespec* ts);
 
-        void occlum_ocall_nanosleep(long sec, long nsec);
+        void occlum_ocall_nanosleep([in] const struct timespec* req);
 
         void occlum_ocall_sync(void);
 
         void occlum_ocall_sched_yield(void);
-        int occlum_ocall_sched_getaffinity([out] int *error, int pid, size_t cpusize, [out, size=cpusize] unsigned char* buf);
-        int occlum_ocall_sched_setaffinity([out] int *error, int pid, size_t cpusize, [in, size=cpusize] const unsigned char* buf);
+        int occlum_ocall_sched_getaffinity(
+            int host_tid,
+            size_t cpusize,
+            [out, size=cpusize] unsigned char* buf
+        ) propagate_errno;
+        int occlum_ocall_sched_setaffinity(
+            int host_tid,
+            size_t cpusize,
+            [in, size=cpusize] const unsigned char* buf
+        ) propagate_errno;
 
         sgx_status_t occlum_ocall_sgx_init_quote(
             [out] sgx_target_info_t* target_info,

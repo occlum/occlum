@@ -21,18 +21,27 @@ impl timeval_t {
     pub fn as_usec(&self) -> usize {
         (self.sec * 1000000 + self.usec) as usize
     }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.sec >= 0 && self.usec >= 0 && self.usec < 1_000_000 {
+            Ok(())
+        } else {
+            return_errno!(EINVAL, "invalid value for timeval_t");
+        }
+    }
 }
 
 pub fn do_gettimeofday() -> timeval_t {
+    extern "C" {
+        fn occlum_ocall_gettimeofday(tv: *mut timeval_t) -> sgx_status_t;
+    }
+
     let mut tv: timeval_t = Default::default();
     unsafe {
-        occlum_ocall_gettimeofday(&mut tv.sec as *mut time_t, &mut tv.usec as *mut suseconds_t);
+        occlum_ocall_gettimeofday(&mut tv as *mut timeval_t);
     }
+    tv.validate().expect("ocall returned invalid timeval_t");
     tv
-}
-
-extern "C" {
-    fn occlum_ocall_gettimeofday(sec: *mut time_t, usec: *mut suseconds_t) -> sgx_status_t;
 }
 
 #[repr(C)]
@@ -50,6 +59,14 @@ impl timespec_t {
             return_errno!(EINVAL, "Invalid timespec fields");
         }
         Ok(ts)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.sec >= 0 && self.nsec >= 0 && self.nsec < 1_000_000_000 {
+            Ok(())
+        } else {
+            return_errno!(EINVAL, "invalid value for timespec_t");
+        }
     }
 }
 
@@ -88,31 +105,23 @@ impl ClockID {
 
 pub fn do_clock_gettime(clockid: ClockID) -> Result<timespec_t> {
     extern "C" {
-        fn occlum_ocall_clock_gettime(
-            clockid: clockid_t,
-            sec: *mut time_t,
-            ns: *mut i64,
-        ) -> sgx_status_t;
+        fn occlum_ocall_clock_gettime(clockid: clockid_t, tp: *mut timespec_t) -> sgx_status_t;
     }
 
-    let mut sec = 0;
-    let mut nsec = 0;
+    let mut tv: timespec_t = Default::default();
     unsafe {
-        occlum_ocall_clock_gettime(
-            clockid as clockid_t,
-            &mut sec as *mut time_t,
-            &mut nsec as *mut i64,
-        );
+        occlum_ocall_clock_gettime(clockid as clockid_t, &mut tv as *mut timespec_t);
     }
-    Ok(timespec_t { sec, nsec })
+    tv.validate().expect("ocall returned invalid timespec");
+    Ok(tv)
 }
 
 pub fn do_nanosleep(req: &timespec_t) -> Result<()> {
     extern "C" {
-        fn occlum_ocall_nanosleep(sec: time_t, nsec: i64) -> sgx_status_t;
+        fn occlum_ocall_nanosleep(req: *const timespec_t) -> sgx_status_t;
     }
     unsafe {
-        occlum_ocall_nanosleep(req.sec, req.nsec);
+        occlum_ocall_nanosleep(req as *const timespec_t);
     }
     Ok(())
 }

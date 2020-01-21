@@ -125,7 +125,7 @@ $(LIBOS_CORE_RS_A): $(RUST_SRCS)
 endif
 
 $(BUILD_DIR)/src/libos/src/Enclave_t.o: $(BUILD_DIR)/src/libos/src/Enclave_t.c
-	@$(CC) $(C_FLAGS) -c $< -o $@
+	@$(CC) $(C_FLAGS) -Iinclude/edl -c $< -o $@
 	@echo "CC <= $@"
 
 $(BUILD_DIR)/src/libos/src/Enclave_t.c: $(SGX_EDGER8R) ../Enclave.edl

@@ -47,7 +47,7 @@ install:
 	install -d $(OCCLUM_PREFIX)/src/libos/src/builtin/
 	install -t $(OCCLUM_PREFIX)/src/libos/src/builtin/ -m 444 src/libos/src/builtin/*
 	install -d $(OCCLUM_PREFIX)/include/
-	install -t $(OCCLUM_PREFIX)/include/ -m 444 src/pal/include/*
+	install -t $(OCCLUM_PREFIX)/include/ -m 444 src/pal/include/*.h
 	install -d $(OCCLUM_PREFIX)/etc/template/
 	install -t $(OCCLUM_PREFIX)/etc/template/ -m 444 etc/template/*
 

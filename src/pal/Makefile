@@ -12,7 +12,7 @@ C_OBJS := $(addprefix $(BUILD_DIR)/src/pal/,$(C_SRCS:.c=.o))
 CXX_SRCS := $(sort $(wildcard src/*.cpp src/*/*.cpp))
 CXX_OBJS := $(addprefix $(BUILD_DIR)/src/pal/,$(CXX_SRCS:.cpp=.o))
 
-C_COMMON_FLAGS := -I$(BUILD_DIR)/src/pal/src -Iinclude
+C_COMMON_FLAGS := -I$(BUILD_DIR)/src/pal/src -Iinclude -Iinclude/edl
 C_FLAGS := $(C_COMMON_FLAGS) $(SGX_CFLAGS_U)
 CXX_FLAGS := $(C_COMMON_FLAGS) $(SGX_CXXFLAGS_U)
 LINK_FLAGS := $(SGX_LFLAGS_U) -shared -L$(RUST_SGX_SDK_DIR)/sgx_ustdc/ -lsgx_ustdc -lsgx_uprotected_fs
@@ -36,7 +36,10 @@ $(BUILD_DIR)/src/pal/src/Enclave_u.o: $(BUILD_DIR)/src/pal/src/Enclave_u.c
 	@echo "CC <= $@"
 
 $(BUILD_DIR)/src/pal/src/Enclave_u.c: $(SGX_EDGER8R) ../Enclave.edl
-	@cd $(BUILD_DIR)/src/pal/src && $(SGX_EDGER8R) --untrusted $(CUR_DIR)/../Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_DIR)/edl/
+	@cd $(BUILD_DIR)/src/pal/src && \
+		$(SGX_EDGER8R) --untrusted $(CUR_DIR)/../Enclave.edl \
+		--search-path $(SGX_SDK)/include \
+		--search-path $(RUST_SGX_SDK_DIR)/edl/
 	@echo "GEN <= $@"
 
 $(BUILD_DIR)/src/pal/%.o: %.c

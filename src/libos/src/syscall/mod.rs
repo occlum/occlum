@@ -1046,11 +1046,10 @@ fn do_sched_getaffinity(pid: pid_t, cpusize: size_t, buf: *mut c_uchar) -> Resul
     };
     // Call the memory-safe do_sched_getaffinity
     let mut cpuset = CpuSet::new(cpusize);
-    let ret = process::do_sched_getaffinity(pid, &mut cpuset)?;
-    debug!("sched_getaffinity cpuset: {:#x}", cpuset);
+    let retval = process::do_sched_getaffinity(pid, &mut cpuset)?;
     // Copy from Rust types to C types
     buf_slice.copy_from_slice(cpuset.as_slice());
-    Ok(ret as isize)
+    Ok(retval as isize)
 }
 
 fn do_sched_setaffinity(pid: pid_t, cpusize: size_t, buf: *const c_uchar) -> Result<isize> {
@@ -1067,8 +1066,8 @@ fn do_sched_setaffinity(pid: pid_t, cpusize: size_t, buf: *const c_uchar) -> Res
     };
     debug!("sched_setaffinity cpuset: {:#x}", cpuset);
     // Call the memory-safe do_sched_setaffinity
-    let ret = process::do_sched_setaffinity(pid, &cpuset)?;
-    Ok(ret as isize)
+    process::do_sched_setaffinity(pid, &cpuset)?;
+    Ok(0)
 }
 
 fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize> {
