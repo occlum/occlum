@@ -1,7 +1,7 @@
 # Occlum
 [![All Contributors](https://img.shields.io/badge/all_contributors-7-orange.svg?style=flat-square)](CONTRIBUTORS.md)
 
-**NEWS:** Our paper _Occlum: Secure and Efficient Multitasking Inside a Single Enclave of Intel SGX_ has been accepted by [ASPLOS'20](https://asplos-conference.org/). We will release a preprint version of the paper shortly.
+**NEWS:** Our paper _Occlum: Secure and Efficient Multitasking Inside a Single Enclave of Intel SGX_ has been accepted by [ASPLOS'20](https://asplos-conference.org/programs/). This research paper highlights the advantages of the single-address-space architecture adopted by Occlum and describes a novel in-enclave isolation mechanism that complements this approach. A preprint version of the paper can be found on [arxiv.org](https://arxiv.org/abs/2001.07450).
 
 Occlum is a *memory-safe*, *multi-process* library OS (LibOS) for [Intel SGX](https://software.intel.com/en-us/sgx). As a LibOS, it enables *legacy* applications to run on SGX with *little or even no modifications* of source code, thus protecting the confidentiality and integrity of user workloads transparently.
 
@@ -125,7 +125,7 @@ Step 1-3 are to be done on the host OS (Linux):
 
 3. Run the Occlum Docker container, which has Occlum and its demos preinstalled:
     ```
-    docker run -it --device /dev/isgx occlum/occlum:0.8.0
+    docker run -it --device /dev/isgx occlum/occlum:0.9.0-ubuntu18.04
     ```
 
 Step 4-5 are to be done on the guest OS running inside the Docker container:
@@ -180,7 +180,7 @@ The project name Occlum stems from the word *Occlumency* coined in Harry Potter 
 
 > The magical defence of the mind against external penetration. An obscure branch of magic, but a highly useful one... Used properly, the power of Occlumency will help shield you from access or influence.
 
-The same thing can be said for Occlum, not the for the mind, but for the program:
+The same thing can be said for Occlum, not for the mind, but for the program:
 
 > The magical defence of the program against external penetration. An obscure branch of technology, but a highly useful one... Used properly, the power of Occlum will help shield your program from access or influence.
 
