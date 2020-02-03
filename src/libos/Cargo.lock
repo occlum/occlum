@@ -127,7 +127,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "itoa"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "sgx_tstd 1.1.0",
 ]
@@ -353,7 +353,7 @@ dependencies = [
 name = "serde_json"
 version = "1.0.40"
 dependencies = [
- "itoa 0.4.4",
+ "itoa 0.4.5",
  "ryu 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.104",
  "sgx_tstd 1.1.0",
