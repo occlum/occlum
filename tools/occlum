@@ -7,6 +7,7 @@ working_dir=`pwd`
 context_dir="$working_dir/.occlum"
 
 SGX_SDK="${SGX_SDK:-/opt/intel/sgxsdk}"
+SGX_GDB="$SGX_SDK/bin/sgx-gdb"
 ENCLAVE_SIGN_TOOL="$SGX_SDK/bin/x64/sgx_sign"
 ENCLAVE_SIGN_KEY="$occlum_dir/etc/template/Enclave.pem"
 
@@ -18,13 +19,22 @@ exit_error() {
 report_arg_error() {
     echo $1 >&2
     echo ""
-    echo "Usage:"
-    echo "    occlum init"
-    echo "    occlum build [--sign-key <key_path>] [--sign-tool <tool_path>]"
-    echo "    occlum run <program_name> <program_args>"
-    echo ""
-    echo "    Run enclave in sgx release mode:"
-    echo "        OCCLUM_RELEASE_ENCLAVE=1 occlum run <program_name> <program_args>"
+    cat <<EOF
+Usage:
+    occlum init
+        Initialize a directory as the Occlum context
+
+    occlum build [--sign-key <key_path>] [--sign-tool <tool_path>]
+        Generate a secure Occlum FS image and Occlum SGX enclave.
+
+    occlum run <program_name> <program_args>
+        Run the user program inside an SGX enclave.
+        To run the enclave in SGX hardware release mode, use:
+        OCCLUM_RELEASE_ENCLAVE=1 occlum run <program_name> <program_args>
+
+    occlum gdb <program_name> <program_args>
+        Debug the program running inside an SGX enclave with GDB.
+EOF
 }
 
 get_conf_default_stack_size() {
@@ -180,6 +190,15 @@ cmd_run() {
     echo "built" > "$context_dir/status"
 }
 
+cmd_gdb() {
+    cd "$working_dir"
+    echo "debugging" > "$context_dir/status"
+
+    OCCLUM_GDB=1 LD_LIBRARY_PATH="$context_dir/build/lib" $SGX_GDB --args "$context_dir/build/bin/occlum-run" "$@"
+
+    echo "built" > "$context_dir/status"
+}
+
 cmd_status() {
     cat "$context_dir/status"
 }
@@ -201,6 +220,9 @@ case "$cmd" in
         ;;
     run)
         cmd_run "${@:2}"
+        ;;
+    gdb)
+        cmd_gdb "${@:2}"
         ;;
     status)
         cmd_status

@@ -23,5 +23,6 @@ This set of demos shows how real-world apps can be easily run inside SGX enclave
 
 ## Other demos
 
-* `remote_attestation/`: This project demonstrates how an app running upon Occlum can perform SGX remote attestation.
 * `embedded_mode/`: A cross-enclave memory throughput benchmark enabled by the embedded mode of Occlum.
+* `gdb_support/`: This demo explains the technical detail of GDB support and demonstrates how to debug an app running upon Occlum with GDB.
+* `remote_attestation/`: This project demonstrates how an app running upon Occlum can perform SGX remote attestation.

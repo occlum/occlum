@@ -41,6 +41,10 @@ pub fn do_spawn_without_exec(
     Ok(new_tid)
 }
 
+// This function is used to provide information to debugger, so it is empty. Please do not remove it.
+#[no_mangle]
+pub extern "C" fn occlum_gdb_hook_load_elf(elf_base: u64, elf_path: &str, elf_path_len: usize) {}
+
 fn new_process(
     elf_path: &str,
     argv: &[CString],
@@ -63,6 +67,13 @@ fn new_process(
         let cwd = parent_ref.lock().unwrap().get_cwd().to_owned();
         let vm = init_vm::do_init(&exec_elf_file, &ldso_elf_file)?;
         let auxtbl = init_auxtbl(&vm, &exec_elf_file)?;
+
+        // Notify debugger to load the symbols from elf file
+        let ldso_elf_base = vm.get_elf_ranges()[1].start() as u64;
+        occlum_gdb_hook_load_elf(ldso_elf_base, ldso_path, ldso_path.len());
+        let exec_elf_base = vm.get_elf_ranges()[0].start() as u64;
+        occlum_gdb_hook_load_elf(exec_elf_base, elf_path, elf_path.len());
+
         let task = {
             let ldso_entry = {
                 let ldso_range = vm.get_elf_ranges()[1];
