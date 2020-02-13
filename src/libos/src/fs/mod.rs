@@ -10,6 +10,7 @@ use std::mem::MaybeUninit;
 
 pub use self::file::{File, FileRef};
 pub use self::file_ops::{AccessMode, CreationFlags, Stat, StatusFlags};
+pub use self::file_ops::{Flock, FlockType};
 pub use self::file_ops::{IoctlCmd, StructuredIoctlArgType, StructuredIoctlNum};
 pub use self::file_table::{FileDesc, FileTable};
 pub use self::inode_file::{AsINodeFile, INodeExt, INodeFile};

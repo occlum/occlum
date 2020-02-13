@@ -347,8 +347,8 @@ pub fn do_sendfile(
 }
 
 pub fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize> {
-    let cmd = FcntlCmd::from_raw(cmd, arg)?;
-    file_ops::do_fcntl(fd, &cmd)
+    let mut cmd = FcntlCmd::from_raw(cmd, arg)?;
+    file_ops::do_fcntl(fd, &mut cmd)
 }
 
 pub fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {

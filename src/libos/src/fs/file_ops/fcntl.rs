@@ -1,7 +1,9 @@
+use super::flock::flock;
 use super::*;
+use util::mem_util::from_user;
 
 #[derive(Debug)]
-pub enum FcntlCmd {
+pub enum FcntlCmd<'a> {
     /// Duplicate the file descriptor fd using the lowest-numbered available
     /// file descriptor greater than or equal to arg.
     DupFd(FileDesc),
@@ -16,11 +18,15 @@ pub enum FcntlCmd {
     GetFl(),
     /// Set the file status flags
     SetFl(u32),
+    /// Test a file lock
+    GetLk(&'a mut flock),
+    /// Acquire or release a file lock
+    SetLk(&'a flock),
 }
 
-impl FcntlCmd {
+impl<'a> FcntlCmd<'a> {
     #[deny(unreachable_patterns)]
-    pub fn from_raw(cmd: u32, arg: u64) -> Result<FcntlCmd> {
+    pub fn from_raw(cmd: u32, arg: u64) -> Result<FcntlCmd<'a>> {
         Ok(match cmd as c_int {
             libc::F_DUPFD => FcntlCmd::DupFd(arg as FileDesc),
             libc::F_DUPFD_CLOEXEC => FcntlCmd::DupFdCloexec(arg as FileDesc),
@@ -28,12 +34,24 @@ impl FcntlCmd {
             libc::F_SETFD => FcntlCmd::SetFd(arg as u32),
             libc::F_GETFL => FcntlCmd::GetFl(),
             libc::F_SETFL => FcntlCmd::SetFl(arg as u32),
+            libc::F_GETLK => {
+                let flock_mut_ptr = arg as *mut flock;
+                from_user::check_mut_ptr(flock_mut_ptr)?;
+                let flock_mut_c = unsafe { &mut *flock_mut_ptr };
+                FcntlCmd::GetLk(flock_mut_c)
+            }
+            libc::F_SETLK => {
+                let flock_ptr = arg as *const flock;
+                from_user::check_ptr(flock_ptr)?;
+                let flock_c = unsafe { &*flock_ptr };
+                FcntlCmd::SetLk(flock_c)
+            }
             _ => return_errno!(EINVAL, "unsupported command"),
         })
     }
 }
 
-pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize> {
+pub fn do_fcntl(fd: FileDesc, cmd: &mut FcntlCmd) -> Result<isize> {
     info!("fcntl: fd: {:?}, cmd: {:?}", &fd, cmd);
     let current_ref = process::get_current();
     let mut current = current_ref.lock().unwrap();
@@ -59,7 +77,7 @@ pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize> {
         }
         FcntlCmd::SetFd(fd_flags) => {
             let entry = file_table.get_entry_mut(fd)?;
-            entry.set_close_on_spawn((fd_flags & libc::FD_CLOEXEC as u32) != 0);
+            entry.set_close_on_spawn((*fd_flags & libc::FD_CLOEXEC as u32) != 0);
             0
         }
         FcntlCmd::GetFl() => {
@@ -72,6 +90,22 @@ pub fn do_fcntl(fd: FileDesc, cmd: &FcntlCmd) -> Result<isize> {
             let file = file_table.get(fd)?;
             let status_flags = StatusFlags::from_bits_truncate(*flags);
             file.set_status_flags(status_flags)?;
+            0
+        }
+        FcntlCmd::GetLk(flock_mut_c) => {
+            let file = file_table.get(fd)?;
+            let mut lock = Flock::from_c(*flock_mut_c)?;
+            if let FlockType::F_UNLCK = lock.l_type {
+                return_errno!(EINVAL, "invalid flock type for getlk");
+            }
+            file.test_advisory_lock(&mut lock)?;
+            (*flock_mut_c).copy_from_safe(&lock);
+            0
+        }
+        FcntlCmd::SetLk(flock_c) => {
+            let file = file_table.get(fd)?;
+            let lock = Flock::from_c(*flock_c)?;
+            file.set_advisory_lock(&lock)?;
             0
         }
     };

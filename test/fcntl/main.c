@@ -43,6 +43,32 @@ static int __fcntl_setfl(int fd, int open_flags) {
     return 0;
 }
 
+static int __fcntl_getlk_and_setlk(int fd, int open_flags) {
+    int ret;
+    struct flock fl = { F_WRLCK, SEEK_SET, 0, 0, 0 };
+
+    // getlk
+    ret = fcntl(fd, F_GETLK, &fl);
+    if (ret < 0) {
+        THROW_ERROR("failed to call getlk");
+    }
+    if (fl.l_type != F_UNLCK) {
+        THROW_ERROR("failed to get correct fl type");
+    }
+
+    // setlk
+    if ((open_flags & O_WRONLY) || (open_flags & O_RDWR))
+        fl.l_type = F_WRLCK;
+    else
+        fl.l_type = F_RDLCK;
+    ret = fcntl(fd, F_SETLK, &fl);
+    if (ret < 0) {
+        THROW_ERROR("failed to call setlk");
+    }
+
+    return 0;
+}
+
 typedef int(*test_fcntl_func_t)(int fd, int open_flags);
 
 static int test_fcntl_framework(test_fcntl_func_t fn) {
@@ -74,6 +100,10 @@ static int test_fcntl_setfl() {
     return test_fcntl_framework(__fcntl_setfl);
 }
 
+static int test_getlk_and_setlk() {
+    return test_fcntl_framework(__fcntl_getlk_and_setlk);
+}
+
 // ============================================================================
 // Test suite
 // ============================================================================
@@ -81,6 +111,7 @@ static int test_fcntl_setfl() {
 static test_case_t test_cases[] = {
     TEST_CASE(test_fcntl_getfl),
     TEST_CASE(test_fcntl_setfl),
+    TEST_CASE(test_getlk_and_setlk),
 };
 
 int main() {

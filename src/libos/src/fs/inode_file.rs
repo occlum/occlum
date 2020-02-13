@@ -166,6 +166,32 @@ impl File for INodeFile {
         Ok(())
     }
 
+    fn test_advisory_lock(&self, lock: &mut Flock) -> Result<()> {
+        // Let the advisory lock could be placed
+        // TODO: Implement the real advisory lock
+        lock.l_type = FlockType::F_UNLCK;
+        Ok(())
+    }
+
+    fn set_advisory_lock(&self, lock: &Flock) -> Result<()> {
+        match lock.l_type {
+            FlockType::F_RDLCK => {
+                if !self.access_mode.readable() {
+                    return_errno!(EBADF, "File not readable");
+                }
+            }
+            FlockType::F_WRLCK => {
+                if !self.access_mode.writable() {
+                    return_errno!(EBADF, "File not writable");
+                }
+            }
+            _ => (),
+        }
+        // Let the advisory lock could be acquired or released
+        // TODO: Implement the real advisory lock
+        Ok(())
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
