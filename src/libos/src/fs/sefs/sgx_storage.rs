@@ -172,6 +172,14 @@ impl File for LockedFile {
             return Ok(0);
         }
         let mut file = self.0.lock().unwrap();
+
+        // SgxFile does not support to seek a position beyond the end.
+        // So check if file_size < offset and return zero(indicates end of file).
+        let file_size = file.seek(SeekFrom::End(0)).expect("failed to tell SgxFile") as usize;
+        if file_size < offset {
+            return Ok(0);
+        }
+
         let offset = offset as u64;
         file.seek(SeekFrom::Start(offset))
             .expect("failed to seek SgxFile");
@@ -185,8 +193,8 @@ impl File for LockedFile {
         }
         let mut file = self.0.lock().unwrap();
 
-        // SgxFile do not support seek a position after the end.
-        // So check the size and padding zeros if necessary.
+        // SgxFile does not support to seek a position beyond the end.
+        // So check if file_size < offset and padding null bytes.
         let file_size = file.seek(SeekFrom::End(0)).expect("failed to tell SgxFile") as usize;
         if file_size < offset {
             static ZEROS: [u8; 0x1000] = [0; 0x1000];
