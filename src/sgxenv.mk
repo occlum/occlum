@@ -22,7 +22,7 @@ else ifeq ($(findstring -m32, $(CXXFLAGS)), -m32)
 	SGX_ARCH := x86
 endif
 
-SGX_COMMON_CFLAGS := -Wall
+SGX_COMMON_CFLAGS := -Wall -std=gnu11
 
 ifeq ($(SGX_ARCH), x86)
 	SGX_COMMON_CFLAGS += -m32
