@@ -18,6 +18,7 @@ This set of demos shows how real-world apps can be easily run inside SGX enclave
 * `grpc/`: A client and server communicating through [gRPC](https://grpc.io/).
 * `openvino/` A benchmark of [OpenVINO Inference Engine](https://docs.openvinotoolkit.org/2019_R3/_docs_IE_DG_inference_engine_intro.html).
 * `python` A demo of [Python](https://www.python.org).
+* `sqlite` A demo of [SQLite](https://www.sqlite.org) SQL database engine.
 * `tensorflow_lite/`: A demo and benchmark of [Tensorflow Lite](https://www.tensorflow.org/lite) inference engine.
 * `xgboost/`: A demo of [XGBoost](https://xgboost.readthedocs.io/en/latest/).
 
