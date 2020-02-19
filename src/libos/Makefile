@@ -56,7 +56,7 @@ LIBOS_CORE_RS_A := $(BUILD_DIR)/lib/libocclum_libos_core_rs.a
 LIBCOMPILER_RT_PATCH_A := $(BUILD_DIR)/lib/libcompiler-rt-patch.a
 
 # All source code
-RUST_SRCS := $(wildcard src/*.rs src/*/*.rs src/*/*/*.rs src/*/*/*/*.rs)
+RUST_SRCS := $(wildcard src/*.rs src/*/*.rs src/*/*/*.rs src/*/*/*/*.rs src/*/*/*/*/*.rs)
 RUST_TARGET_DIR := $(BUILD_DIR)/src/libos/cargo-target
 RUST_OUT_DIR := $(BUILD_DIR)/lib
 EDL_C_SRCS := $(addprefix $(BUILD_DIR)/src/libos/,src/Enclave_t.c src/Enclave_t.h)

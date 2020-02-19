@@ -7,6 +7,7 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <sgx_report.h>
 #include <sgx_quote.h>
 #include "test.h"
 
@@ -40,18 +41,27 @@ typedef struct {
     } quote;                                        // output
 } sgxioc_gen_quote_arg_t;
 
-#define SGXIOC_IS_EDDM_SUPPORTED _IOR('s', 0, int)
+typedef struct {
+    const sgx_target_info_t*    target_info;        // input (optinal)
+    const sgx_report_data_t*    report_data;        // input (optional)
+    sgx_report_t*               report;             // output
+} sgxioc_create_report_arg_t;
+
+#define SGXIOC_IS_EDMM_SUPPORTED _IOR('s', 0, int)
 #define SGXIOC_GET_EPID_GROUP_ID _IOR('s', 1, sgx_epid_group_id_t)
 #define SGXIOC_GEN_QUOTE         _IOWR('s', 2, sgxioc_gen_quote_arg_t)
+#define SGXIOC_SELF_TARGET       _IOR('s', 3, sgx_target_info_t)
+#define SGXIOC_CREATE_REPORT     _IOWR('s', 4, sgxioc_create_report_arg_t)
+#define SGXIOC_VERIFY_REPORT     _IOW('s', 5, sgx_report_t)
 
 // The max number of retries if ioctl returns EBUSY
 #define IOCTL_MAX_RETRIES       20
 
 typedef int(*sgx_ioctl_test_body_t)(int sgx_fd);
 
-static int do_SGXIOC_IS_EDDM_SUPPORTED(int sgx_fd) {
+static int do_SGXIOC_IS_EDMM_SUPPORTED(int sgx_fd) {
     int is_edmm_supported = 0;
-    if (ioctl(sgx_fd, SGXIOC_IS_EDDM_SUPPORTED, &is_edmm_supported) < 0) {
+    if (ioctl(sgx_fd, SGXIOC_IS_EDMM_SUPPORTED, &is_edmm_supported) < 0) {
         THROW_ERROR("failed to ioctl /dev/sgx");
     }
     if (is_edmm_supported != 0) {
@@ -59,7 +69,6 @@ static int do_SGXIOC_IS_EDDM_SUPPORTED(int sgx_fd) {
     }
     return 0;
 }
-
 
 static int do_SGXIOC_GET_EPID_GROUP_ID(int sgx_fd) {
     int nretries = 0;
@@ -141,8 +150,49 @@ static int do_sgx_ioctl_test(sgx_ioctl_test_body_t test_body) {
     return ret;
 }
 
-int test_sgx_ioctl_SGXIOC_IS_EDDM_SUPPORTED(void) {
-    return do_sgx_ioctl_test(do_SGXIOC_IS_EDDM_SUPPORTED);
+static int do_SGXIOC_SELF_TARGET(int sgx_fd) {
+    sgx_target_info_t target_info;
+    if (ioctl(sgx_fd, SGXIOC_SELF_TARGET, &target_info) < 0) {
+        THROW_ERROR("failed to ioctl /dev/sgx");
+    }
+    return 0;
+}
+
+static int do_SGXIOC_CREATE_AND_VERIFY_REPORT(int sgx_fd) {
+    sgx_target_info_t target_info;
+    if (ioctl(sgx_fd, SGXIOC_SELF_TARGET, &target_info) < 0) {
+        THROW_ERROR("failed to ioctl /dev/sgx");
+    }
+    sgx_report_t report_data;
+    sgx_report_t report;
+
+    sgxioc_create_report_arg_t args[] = {
+        {
+            .target_info = (const sgx_target_info_t*) &target_info,
+            .report_data = NULL,
+            .report = &report
+        },
+        {
+            .target_info = (const sgx_target_info_t*) &target_info,
+            .report_data = (const sgx_report_data_t*) &report_data,
+            .report = &report
+        }
+    };
+    for (int arg_i = 0; arg_i < ARRAY_SIZE(args); arg_i++) {
+        memset(&report, 0, sizeof(report));
+        sgxioc_create_report_arg_t* arg = &args[arg_i];
+        if (ioctl(sgx_fd, SGXIOC_CREATE_REPORT, arg) < 0) {
+            THROW_ERROR("failed to create report");
+        }
+        if (ioctl(sgx_fd, SGXIOC_VERIFY_REPORT, &report) < 0) {
+            THROW_ERROR("failed to verify report");
+        }
+    }
+    return 0;
+}
+
+int test_sgx_ioctl_SGXIOC_IS_EDMM_SUPPORTED(void) {
+    return do_sgx_ioctl_test(do_SGXIOC_IS_EDMM_SUPPORTED);
 }
 
 int test_sgx_ioctl_SGXIOC_GET_EPID_GROUP_ID(void) {
@@ -153,15 +203,25 @@ int test_sgx_ioctl_SGXIOC_GEN_QUOTE(void) {
     return do_sgx_ioctl_test(do_SGXIOC_GEN_QUOTE);
 }
 
+int test_sgx_ioctl_SGXIOC_SELF_TARGET(void) {
+    return do_sgx_ioctl_test(do_SGXIOC_SELF_TARGET);
+}
+
+int test_sgx_ioctl_SGXIOC_CREATE_AND_VERIFY_REPORT(void) {
+    return do_sgx_ioctl_test(do_SGXIOC_CREATE_AND_VERIFY_REPORT);
+}
+
 // ============================================================================
 // Test suite
 // ============================================================================
 
 static test_case_t test_cases[] = {
     TEST_CASE(test_tty_ioctl_TIOCGWINSZ),
-    TEST_CASE(test_sgx_ioctl_SGXIOC_IS_EDDM_SUPPORTED),
+    TEST_CASE(test_sgx_ioctl_SGXIOC_IS_EDMM_SUPPORTED),
     TEST_CASE(test_sgx_ioctl_SGXIOC_GET_EPID_GROUP_ID),
-    TEST_CASE(test_sgx_ioctl_SGXIOC_GEN_QUOTE)
+    TEST_CASE(test_sgx_ioctl_SGXIOC_GEN_QUOTE),
+    TEST_CASE(test_sgx_ioctl_SGXIOC_SELF_TARGET),
+    TEST_CASE(test_sgx_ioctl_SGXIOC_CREATE_AND_VERIFY_REPORT)
 };
 
 int main() {

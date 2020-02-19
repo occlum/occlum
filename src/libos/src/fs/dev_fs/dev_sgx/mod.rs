@@ -60,8 +60,37 @@ impl File for DevSgx {
                 )?;
                 quote.dump_to_buf(quote_output_buf)?;
             }
+            SGX_CMD_NUM_SELF_TARGET => {
+                let arg = nonbuiltin_cmd.arg_mut::<sgx_target_info_t>()?;
+                *arg = get_self_target()?;
+            }
+            SGX_CMD_NUM_CREATE_REPORT => {
+                // Prepare the arguments
+                let arg = nonbuiltin_cmd.arg_mut::<IoctlCreateReportArg>()?;
+                let target_info = if !arg.target_info.is_null() {
+                    Some(unsafe { &*arg.target_info })
+                } else {
+                    None
+                };
+                let report_data = if !arg.report_data.is_null() {
+                    Some(unsafe { &*arg.report_data })
+                } else {
+                    None
+                };
+                let report = {
+                    if arg.report.is_null() {
+                        return_errno!(EINVAL, "output pointer for report must not be null");
+                    }
+                    unsafe { &mut *arg.report }
+                };
+                *report = create_report(target_info, report_data)?;
+            }
+            SGX_CMD_NUM_VERIFY_REPORT => {
+                let arg = nonbuiltin_cmd.arg::<sgx_report_t>()?;
+                verify_report(arg)?;
+            }
             _ => {
-                return_errno!(EINVAL, "unknown ioctl cmd for /dev/sgx");
+                return_errno!(ENOSYS, "unknown ioctl cmd for /dev/sgx");
             }
         }
         Ok(())
@@ -89,4 +118,11 @@ struct IoctlGenQuoteArg {
     sigrl_len: u32,                    // Input (optional)
     quote_buf_len: u32,                // Input
     quote_buf: *mut u8,                // Output
+}
+
+#[repr(C)]
+struct IoctlCreateReportArg {
+    target_info: *const sgx_target_info_t, // Input (optional)
+    report_data: *const sgx_report_data_t, // Input (optional)
+    report: *mut sgx_report_t,             // Output
 }

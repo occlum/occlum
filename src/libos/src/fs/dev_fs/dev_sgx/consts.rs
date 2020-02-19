@@ -17,6 +17,21 @@ pub const SGX_CMD_NUM_GEN_QUOTE: u32 = StructuredIoctlNum::new::<IoctlGenQuoteAr
     StructuredIoctlArgType::InputOutput,
 )
 .as_u32();
+/// Ioctl to get the target info of the current enclave
+pub const SGX_CMD_NUM_SELF_TARGET: u32 =
+    StructuredIoctlNum::new::<sgx_target_info_t>(3, SGX_MAGIC_CHAR, StructuredIoctlArgType::Output)
+        .as_u32();
+/// Ioctl to create a report
+pub const SGX_CMD_NUM_CREATE_REPORT: u32 = StructuredIoctlNum::new::<IoctlCreateReportArg>(
+    4,
+    SGX_MAGIC_CHAR,
+    StructuredIoctlArgType::InputOutput,
+)
+.as_u32();
+/// Ioctl to verify a report
+pub const SGX_CMD_NUM_VERIFY_REPORT: u32 =
+    StructuredIoctlNum::new::<sgx_report_t>(5, SGX_MAGIC_CHAR, StructuredIoctlArgType::Input)
+        .as_u32();
 
 /// A magical number that distinguishes SGX ioctls for other ioctls
 const SGX_MAGIC_CHAR: u8 = 's' as u8;
