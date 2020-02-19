@@ -63,7 +63,7 @@ EDL_C_SRCS := $(addprefix $(BUILD_DIR)/src/libos/,src/Enclave_t.c src/Enclave_t.
 EDL_C_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,src/Enclave_t.o)
 BUILTIN_C_SRCS := $(sort $(wildcard src/builtin/*.c))
 BUILTIN_C_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(BUILTIN_C_SRCS:.c=.o))
-C_SRCS := $(filter-out $(BUILTIN_C_SRCS),$(sort $(wildcard src/*.c src/*/*.c)))
+C_SRCS := $(filter-out $(BUILTIN_C_SRCS),$(sort $(wildcard src/*.c src/*/*.c src/*/*/*.c)))
 C_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(C_SRCS:.c=.o))
 CXX_SRCS := $(sort $(wildcard src/*.cpp src/*/*.cpp))
 CXX_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(CXX_SRCS:.cpp=.o))
@@ -73,6 +73,8 @@ S_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(S_SRCS:.S=.o))
 ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(LIBOS_SO) $(EDL_C_OBJS) $(BUILTIN_C_OBJS) $(C_OBJS) $(CXX_OBJS) $(S_OBJS)) $(RUST_TARGET_DIR) $(RUST_OUT_DIR)))
 
 C_COMMON_FLAGS := -fno-stack-protector -I./include/
+# SGX GDB support
+C_COMMON_FLAGS += -g
 C_FLAGS := $(SGX_CFLAGS_T) $(C_COMMON_FLAGS)
 CXX_FLAGS := $(SGX_CXXFLAGS_T) $(C_COMMON_FLAGS)
 

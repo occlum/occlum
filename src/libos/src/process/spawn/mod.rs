@@ -41,10 +41,6 @@ pub fn do_spawn_without_exec(
     Ok(new_tid)
 }
 
-// This function is used to provide information to debugger, so it is empty. Please do not remove it.
-#[no_mangle]
-pub extern "C" fn occlum_gdb_hook_load_elf(elf_base: u64, elf_path: &str, elf_path_len: usize) {}
-
 fn new_process(
     elf_path: &str,
     argv: &[CString],
@@ -70,9 +66,21 @@ fn new_process(
 
         // Notify debugger to load the symbols from elf file
         let ldso_elf_base = vm.get_elf_ranges()[1].start() as u64;
-        occlum_gdb_hook_load_elf(ldso_elf_base, ldso_path, ldso_path.len());
+        unsafe {
+            occlum_gdb_hook_load_elf(
+                ldso_elf_base,
+                ldso_path.as_ptr() as *const u8,
+                ldso_path.len() as u64,
+            );
+        }
         let exec_elf_base = vm.get_elf_ranges()[0].start() as u64;
-        occlum_gdb_hook_load_elf(exec_elf_base, elf_path, elf_path.len());
+        unsafe {
+            occlum_gdb_hook_load_elf(
+                exec_elf_base,
+                elf_path.as_ptr() as *const u8,
+                elf_path.len() as u64,
+            );
+        }
 
         let task = {
             let ldso_entry = {
@@ -227,4 +235,5 @@ fn parent_adopts_new_child(parent_ref: &ProcessRef, child_ref: &ProcessRef) {
 
 extern "C" {
     fn __occlum_syscall(num: i32, arg0: u64, arg1: u64, arg2: u64, arg3: u64, arg4: u64) -> i64;
+    fn occlum_gdb_hook_load_elf(elf_base: u64, elf_path: *const u8, elf_path_len: u64);
 }
