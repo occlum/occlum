@@ -46,8 +46,10 @@ RUST_SGX_SDK_DIR := $(PROJECT_DIR)/deps/rust-sgx-sdk
 
 ifneq ($(SGX_MODE), HW)
 	Urts_Library_Name := sgx_urts_sim
+	SGX_COMMON_CFLAGS += -D SGX_MODE_SIM
 else
 	Urts_Library_Name := sgx_urts
+	SGX_COMMON_CFLAGS += -D SGX_MODE_HW
 endif
 
 ifneq ($(SGX_MODE), HW)

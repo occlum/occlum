@@ -108,6 +108,10 @@ cmd_init() {
 }
 
 cmd_build() {
+    if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SGX_SDK/lib64
+    fi
+
     cd "$context_dir"
     echo "building" > status
 
@@ -182,19 +186,31 @@ cmd_build() {
 }
 
 cmd_run() {
+    if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
+        export LD_LIBRARY_PATH="$context_dir/build/lib:$SGX_SDK/lib64/"
+    else
+        export LD_LIBRARY_PATH="$context_dir/build/lib"
+    fi
+
     cd "$working_dir"
     echo "running" > "$context_dir/status"
 
-    RUST_BACKTRACE=1 LD_LIBRARY_PATH="$context_dir/build/lib" "$context_dir/build/bin/occlum-run" "$@"
+    RUST_BACKTRACE=1 "$context_dir/build/bin/occlum-run" "$@"
 
     echo "built" > "$context_dir/status"
 }
 
 cmd_gdb() {
+    if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
+        export LD_LIBRARY_PATH="$context_dir/build/lib:$SGX_SDK/lib64/"
+    else
+        export LD_LIBRARY_PATH="$context_dir/build/lib"
+    fi
+
     cd "$working_dir"
     echo "debugging" > "$context_dir/status"
 
-    OCCLUM_GDB=1 LD_LIBRARY_PATH="$context_dir/build/lib" $SGX_GDB --args "$context_dir/build/bin/occlum-run" "$@"
+    OCCLUM_GDB=1 $SGX_GDB --args "$context_dir/build/bin/occlum-run" "$@"
 
     echo "built" > "$context_dir/status"
 }

@@ -46,6 +46,11 @@ void do_exit_task(void);
 #define TASK_USER_FS                (8 * 5)
 #define TASK_USER_ENTRY_ADDR        (8 * 6)
 
+/* arch_prctl syscall number and parameter */
+#define ARCH_PRCTL                  0x9E
+#define ARCH_SET_FS                 0x01002
+#define ARCH_GET_FS                 0x01003
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* __OCCLUM_TASK_H__ */

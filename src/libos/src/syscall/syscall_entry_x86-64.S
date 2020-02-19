@@ -29,9 +29,22 @@ __occlum_syscall:
     movq %gs:(TD_TASK_OFFSET), %r12
     // Switch to the kernel stack
     movq TASK_KERNEL_RSP(%r12), %rsp
-    // Use kernel fsbase
+
+    // Use kernel fsbase. Different implementation for HW and SIM.
+#if SGX_MODE_SIM
+    pushq %rdi
+    pushq %rsi
+
+    movq $ARCH_SET_FS, %rdi
+    movq TASK_KERNEL_FS(%r12), %rsi
+    call __arch_prctl
+
+    popq %rsi
+    popq %rdi
+#else // SGX_MODE_HW
     movq TASK_KERNEL_FS(%r12), %r11
     wrfsbase %r11
+#endif
 
     // Make %rsp 16-byte aligned before call
     sub $0x8, %rsp
@@ -40,9 +53,23 @@ __occlum_syscall:
 
     call dispatch_syscall
 
-    // Use user fsbase
+    // Use user fsbase. Different implementation for HW and SIM.
+#if SGX_MODE_SIM
+    pushq %rdi
+    pushq %rsi
+    pushq %rax // RAX must be saved here otherwise the progrom may crash.
+
+    movq $ARCH_SET_FS, %rdi
+    movq TASK_USER_FS(%r12), %rsi
+    call __arch_prctl
+
+    popq %rax
+    popq %rsi
+    popq %rdi
+#else // SGX_MODE_HW
     movq TASK_USER_FS(%r12), %r11
     wrfsbase %r11
+#endif
 
     // Switch to the user stack
     movq %rbp, %rsp
