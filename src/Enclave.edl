@@ -112,5 +112,10 @@ enclave {
             [out] int* msg_flags_recv,
             int flags
         ) propagate_errno;
+
+        int occlum_ocall_eventfd(
+            unsigned int initval,
+            int flags
+        ) propagate_errno;
     };
 };

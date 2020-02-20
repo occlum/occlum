@@ -1,3 +1,4 @@
+use super::event_file::EventCreationFlags;
 use super::file_ops;
 use super::file_ops::{
     AccessibilityCheckFlags, AccessibilityCheckMode, DirFd, FcntlCmd, StatFlags,
@@ -10,6 +11,26 @@ use util::mem_util::from_user;
 pub struct iovec_t {
     base: *const c_void,
     len: size_t,
+}
+
+pub fn do_eventfd2(init_val: u32, flags: i32) -> Result<isize> {
+    info!("eventfd: initval {}, flags {} ", init_val, flags);
+
+    let inner_flags =
+        EventCreationFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
+    let file_ref: Arc<Box<dyn File>> = {
+        let event = EventFile::new(init_val, inner_flags)?;
+        Arc::new(Box::new(event))
+    };
+
+    let current_ref = process::get_current();
+    let mut proc = current_ref.lock().unwrap();
+
+    let fd = proc.get_files().lock().unwrap().put(
+        file_ref,
+        inner_flags.contains(EventCreationFlags::EFD_CLOEXEC),
+    );
+    Ok(fd as isize)
 }
 
 pub fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize> {

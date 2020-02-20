@@ -232,7 +232,11 @@ pub fn do_epoll_pwait(
     timeout: c_int,
     sigmask: *const usize, //TODO:add sigset_t
 ) -> Result<isize> {
-    info!("epoll_pwait");
+    if sigmask.is_null() {
+        info!("epoll_wait");
+    } else {
+        info!("epoll_pwait")
+    }
     //TODO:add signal support
-    do_epoll_wait(epfd, events, maxevents, 0)
+    do_epoll_wait(epfd, events, maxevents, timeout)
 }

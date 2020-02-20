@@ -2,6 +2,7 @@
 #define __TEST_H
 
 #include <stdio.h>
+#include <stdarg.h>
 
 #define _STR(x)             #x
 #define STR(x)              _STR(x)
@@ -35,6 +36,15 @@ int test_suite_run(test_case_t* test_cases, int num_test_cases) {
         printf("  func %s - [OK]\n", tc->name);
     }
     return 0;
+}
+
+void close_files(int count, ...) {
+    va_list ap;
+    va_start(ap, count);
+    for (int i = 0; i < count; i++) {
+        close(va_arg(ap, int));
+    }
+    va_end(ap);
 }
 
 #endif /* __TEST_H */

@@ -1,5 +1,5 @@
 use super::*;
-use fs::{AsDevRandom, File, FileDesc, FileRef};
+use fs::{AsDevRandom, AsEvent, File, FileDesc, FileRef};
 use std::any::Any;
 use std::collections::btree_map::BTreeMap;
 use std::fmt;
@@ -25,6 +25,7 @@ pub fn do_select(
     let file_table_ref = proc.get_files().lock().unwrap();
 
     for fd in 0..nfds {
+        let fd_ref = file_table_ref.get(fd as FileDesc)?;
         let (r, w, e) = (
             readfds.is_set(fd),
             writefds.is_set(fd),
@@ -33,7 +34,7 @@ pub fn do_select(
         if !(r || w || e) {
             continue;
         }
-        if let Ok(socket) = file_table_ref.get(fd as FileDesc)?.as_unix_socket() {
+        if let Ok(socket) = fd_ref.as_unix_socket() {
             warn!("select unix socket is unimplemented, spin for read");
             readfds.clear();
             writefds.clear();
@@ -56,7 +57,13 @@ pub fn do_select(
             }
             return Ok(1);
         }
-        let host_fd = file_table_ref.get(fd as FileDesc)?.as_socket()?.fd();
+        let host_fd = if let Ok(socket) = fd_ref.as_socket() {
+            socket.fd()
+        } else if let Ok(eventfd) = fd_ref.as_event() {
+            eventfd.get_host_fd()
+        } else {
+            return_errno!(EBADF, "unsupported file type");
+        };
 
         host_to_libos_fd[host_fd as usize] = fd;
         let mut events = 0;
@@ -131,6 +138,9 @@ pub fn do_poll(pollfds: &mut [libc::pollfd], timeout: c_int) -> Result<usize> {
         if let Ok(socket) = file_ref.as_socket() {
             // convert libos fd to host fd in the copy to keep pollfds unchanged
             u_pollfds[i].fd = socket.fd();
+            u_pollfds[i].revents = 0;
+        } else if let Ok(eventfd) = file_ref.as_event() {
+            u_pollfds[i].fd = eventfd.get_host_fd();
             u_pollfds[i].revents = 0;
         } else if let Ok(socket) = file_ref.as_unix_socket() {
             // FIXME: spin poll until can read (hack for php)
@@ -210,13 +220,16 @@ pub fn do_epoll_ctl(
     let mut epoll = file_ref.as_epoll()?.inner.lock().unwrap();
 
     let fd_ref = file_table_ref.get(fd)?;
-    let sock_result = fd_ref.as_socket();
-    if sock_result.is_err() {
-        //FIXME: workaround for grpc, other fd types including pipe should be supported
-        return Ok(());
-    }
 
-    let host_fd = sock_result.unwrap().fd() as FileDesc;
+    let host_fd = if let Ok(socket) = fd_ref.as_socket() {
+        socket.fd() as FileDesc
+    } else if let Ok(eventfd) = fd_ref.as_event() {
+        eventfd.get_host_fd() as FileDesc
+    } else {
+        warn!("unsupported file type");
+        return Ok(());
+    };
+
     epoll.ctl(op, host_fd, event)?;
 
     Ok(())

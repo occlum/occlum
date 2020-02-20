@@ -10,6 +10,7 @@ use std::mem::MaybeUninit;
 use std::path::Path;
 
 pub use self::dev_fs::AsDevRandom;
+pub use self::event_file::{AsEvent, EventFile};
 pub use self::file::{File, FileRef};
 pub use self::file_ops::{AccessMode, CreationFlags, Stat, StatusFlags};
 pub use self::file_ops::{Flock, FlockType};
@@ -22,6 +23,7 @@ pub use self::stdio::{StdinFile, StdoutFile};
 pub use self::syscalls::*;
 
 mod dev_fs;
+mod event_file;
 mod file;
 mod file_ops;
 mod file_table;

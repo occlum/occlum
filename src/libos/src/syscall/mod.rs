@@ -221,6 +221,8 @@ pub extern "C" fn dispatch_syscall(
 
         SysPipe => fs::do_pipe2(arg0 as *mut i32, 0),
         SysPipe2 => fs::do_pipe2(arg0 as *mut i32, arg1 as u32),
+        SysEventfd => fs::do_eventfd2(arg0 as u32, 0),
+        SysEventfd2 => fs::do_eventfd2(arg0 as u32, arg1 as i32),
         SysDup => fs::do_dup(arg0 as FileDesc),
         SysDup2 => fs::do_dup2(arg0 as FileDesc, arg1 as FileDesc),
         SysDup3 => fs::do_dup3(arg0 as FileDesc, arg1 as FileDesc, arg2 as u32),

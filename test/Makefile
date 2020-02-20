@@ -14,7 +14,7 @@ TEST_DEPS := client data_sink
 TESTS ?= empty env hello_world malloc mmap file fs_perms getpid spawn sched pipe time \
 	truncate readdir mkdir open stat link symlink tls pthread uname rlimit server \
 	server_epoll unix_socket cout hostfs cpuid rdtsc device sleep exit_group \
-	ioctl fcntl
+	ioctl fcntl eventfd
 # Benchmarks: need to be compiled and run by bench-% target
 BENCHES := spawn_and_exit_latency pipe_throughput unix_socket_throughput
 
