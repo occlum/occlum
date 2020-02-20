@@ -101,14 +101,15 @@ pub fn run_task(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
         do_run_task(task);
     }
 
-    let exit_status = {
+    let (exit_status, parent_pid) = {
         let mut process = new_process.lock().unwrap();
-        process.get_exit_status()
+        let parent = process.get_parent().lock().unwrap();
+        (process.get_exit_status(), parent.get_tid())
     };
 
-    // Init process does not have any parent, so it has to release itself
-    if pid == 1 {
-        process_table::remove(1);
+    // If process's parent is the IDLE_PROCESS (pid = 0), so it has to release itself
+    if parent_pid == 0 {
+        process_table::remove(pid);
     }
 
     reset_current();
