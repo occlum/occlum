@@ -1,0 +1,386 @@
+From a99d284c16a46f02bff4ff56c8e7361ebc0ae7b2 Mon Sep 17 00:00:00 2001
+From: "Hui,Chunyang" <sanqian.hcy@antfin.com>
+Date: Tue, 3 Mar 2020 09:45:53 +0000
+Subject: [PATCH] Diffie-hellman library change for Occlum local attestation
+ demo
+
+---
+ .../DiffieHellmanLibrary/crypto_aes_gcm.cpp   |   7 +-
+ .../DiffieHellmanLibrary/ec_dh.cpp            | 221 +++++++++++++++++-
+ .../include/sgx_dh_internal.h                 |   3 +-
+ .../DiffieHellmanLibrary/sgx_cmac128.cpp      |   1 -
+ .../DiffieHellmanLibrary/sgx_ecc256.cpp       |  11 +-
+ .../DiffieHellmanLibrary/sgx_sha256_msg.cpp   |   1 -
+ 6 files changed, 225 insertions(+), 19 deletions(-)
+
+diff --git a/demos/local_attestation/DiffieHellmanLibrary/crypto_aes_gcm.cpp b/demos/local_attestation/DiffieHellmanLibrary/crypto_aes_gcm.cpp
+index 329338b..bb0c604 100644
+--- a/demos/local_attestation/DiffieHellmanLibrary/crypto_aes_gcm.cpp
++++ b/demos/local_attestation/DiffieHellmanLibrary/crypto_aes_gcm.cpp
+@@ -31,8 +31,7 @@
+ 
+ #include "stdlib.h"
+ #include "string.h"
+-#include "ssl_crypto.h"
+-#include "sgx_memset_s.h"
++#include "sgx_tcrypto.h"
+ #include <openssl/aes.h>
+ #include <openssl/evp.h>
+ 
+@@ -143,7 +142,7 @@ sgx_status_t sgx_rijndael128GCM_decrypt(const sgx_aes_gcm_128bit_key_t *p_key, c
+ 
+     // Autenthication Tag returned by Decrypt to be compared with Tag created during seal
+     //
+-    memset_s(&l_tag, SGX_AESGCM_MAC_SIZE, 0, SGX_AESGCM_MAC_SIZE);
++    memset(&l_tag, 0, SGX_AESGCM_MAC_SIZE);
+     memcpy(l_tag, p_in_mac, SGX_AESGCM_MAC_SIZE);
+ 
+     do {
+@@ -205,6 +204,6 @@ sgx_status_t sgx_rijndael128GCM_decrypt(const sgx_aes_gcm_128bit_key_t *p_key, c
+     {
+         EVP_CIPHER_CTX_free(pState);
+     }
+-    memset_s(&l_tag, SGX_AESGCM_MAC_SIZE, 0, SGX_AESGCM_MAC_SIZE);
++    memset(&l_tag, 0, SGX_AESGCM_MAC_SIZE);
+     return ret;
+ }
+diff --git a/demos/local_attestation/DiffieHellmanLibrary/ec_dh.cpp b/demos/local_attestation/DiffieHellmanLibrary/ec_dh.cpp
+index 40c1539..dd8ab9e 100644
+--- a/demos/local_attestation/DiffieHellmanLibrary/ec_dh.cpp
++++ b/demos/local_attestation/DiffieHellmanLibrary/ec_dh.cpp
+@@ -29,21 +29,25 @@
+  *
+  */
+ 
+-#include <sgx_secure_align.h>
++#define __STDC_WANT_LIB_EXT1__ 1
+ #include <limits.h>
+-#include "stdlib.h"
+-#include "string.h"
++#include <stdlib.h>
++#include <string.h>
++#include <sys/ioctl.h>
++#include <fcntl.h>
++#include <stdio.h>
++#include <unistd.h>
++#include "sgx_secure_align.h"
+ #include "sgx.h"
+ #include "sgx_defs.h"
+-#include "sgx_utils.h"
+ #include "sgx_ecp_types.h"
+ #include "sgx_key.h"
+ #include "sgx_report.h"
+ #include "sgx_attributes.h"
+-#include "sgx_trts.h"
+ #include "ecp_interface.h"
+ #include "sgx_dh_internal.h"
+ #include "sgx_lfence.h"
++#include "sgx_dh.h"
+ 
+ #define NONCE_SIZE              16
+ #define MSG_BUF_LEN             (static_cast<uint32_t>(sizeof(sgx_ec256_public_t)*2))
+@@ -53,6 +57,213 @@
+ #define SAFE_FREE(ptr)          {if (NULL != (ptr)) {free(ptr); (ptr)=NULL;}}
+ #endif
+ 
++typedef struct {
++    const sgx_target_info_t*    target_info;        // input (optinal)
++    const sgx_report_data_t*    report_data;        // input (optional)
++    sgx_report_t*               report;             // output
++} sgxioc_create_report_arg_t;
++
++#define SGXIOC_SELF_TARGET       _IOR('s', 3, sgx_target_info_t)
++#define SGXIOC_CREATE_REPORT     _IOWR('s', 4, sgxioc_create_report_arg_t)
++#define SGXIOC_VERIFY_REPORT     _IOW('s', 5, sgx_report_t)
++
++sgx_status_t sgx_create_report(const sgx_target_info_t *target_info, const sgx_report_data_t *report_data, sgx_report_t *report)
++{
++    sgxioc_create_report_arg_t  arg;
++    arg.target_info = target_info;
++    arg.report_data = report_data;
++    arg.report=report;
++    int sgx_fd;
++
++    if ((sgx_fd = open("/dev/sgx", O_RDONLY)) < 0) {
++        printf("open sgx device error\n");
++        return SGX_ERROR_UNEXPECTED;
++    }
++
++    if (ioctl(sgx_fd, SGXIOC_CREATE_REPORT, &arg) < 0) {
++        close(sgx_fd);
++        printf("ioctl error\n");
++        return SGX_ERROR_UNEXPECTED;
++    }
++    close(sgx_fd);
++    return SGX_SUCCESS;
++}
++
++sgx_status_t sgx_verify_report(const sgx_report_t *report)
++{
++    int sgx_fd;
++    if ((sgx_fd = open("/dev/sgx", O_RDONLY)) < 0) {
++        return SGX_ERROR_UNEXPECTED;
++    }
++    if (ioctl(sgx_fd, SGXIOC_VERIFY_REPORT, report) < 0) {
++        printf("failed to verify report");
++        close(sgx_fd);
++        return SGX_ERROR_UNEXPECTED;
++    }
++    close(sgx_fd);
++    return SGX_SUCCESS;
++}
++
++const sgx_report_t *sgx_self_report(void)
++{
++    static sgx_report_t _report = {
++        .body = {
++            .cpu_svn         = {0},
++            .misc_select     = 0,
++            .reserved1       = {0},
++            .isv_ext_prod_id = {0},
++            .attributes      = {0, 0},
++            .mr_enclave      = {0},
++            .reserved2       = {0},
++            .mr_signer       = {0},
++            .reserved3       = {0},
++            .config_id       = {0},
++            .isv_prod_id     = 0,
++            .isv_svn        = 0,
++            .config_svn      = 0,
++            .reserved4       = {0},
++            .isv_family_id   = {0},
++            .report_data     = {0}
++        },
++        .key_id = {0},
++        .mac = {0}
++    };
++    if (0 == _report.body.attributes.flags)
++        sgx_create_report(nullptr, nullptr, &_report);
++
++    return &_report;
++}
++
++#ifndef ERROR_BREAK
++#define ERROR_BREAK(x)  if(x != ippStsNoErr){break;}
++#endif
++#ifndef NULL_BREAK
++#define NULL_BREAK(x)   if(!x){break;}
++#endif
++#ifndef SAFE_FREE
++#define SAFE_FREE(ptr) {if (NULL != (ptr)) {free(ptr); (ptr)=NULL;}}
++#endif
++
++#define MAC_KEY_SIZE       16
++
++#define EC_DERIVATION_BUFFER_SIZE(label_length) ((label_length) +4)
++
++sgx_status_t derive_key(
++    const sgx_ec256_dh_shared_t* shared_key,
++    const char* label,
++    uint32_t label_length,
++    sgx_ec_key_128bit_t* derived_key)
++{
++    sgx_status_t se_ret = SGX_SUCCESS;
++    uint8_t cmac_key[MAC_KEY_SIZE];
++    sgx_ec_key_128bit_t key_derive_key;
++    if (!shared_key || !derived_key || !label) {
++        return SGX_ERROR_INVALID_PARAMETER;
++    }
++
++    /*check integer overflow */
++    if (label_length > EC_DERIVATION_BUFFER_SIZE(label_length)) {
++        return SGX_ERROR_INVALID_PARAMETER;
++    }
++    memset(cmac_key, 0, MAC_KEY_SIZE);
++    se_ret = sgx_rijndael128_cmac_msg((sgx_cmac_128bit_key_t *)cmac_key,
++                                      (uint8_t*)shared_key,
++                                      sizeof(sgx_ec256_dh_shared_t),
++                                      (sgx_cmac_128bit_tag_t *)&key_derive_key);
++    if (SGX_SUCCESS != se_ret) {
++        memset(&key_derive_key,  0, sizeof(key_derive_key));
++        INTERNAL_SGX_ERROR_CODE_CONVERTOR(se_ret);
++        return se_ret;
++    }
++    /* derivation_buffer = counter(0x01) || label || 0x00 || output_key_len(0x0080) */
++    uint32_t derivation_buffer_length = EC_DERIVATION_BUFFER_SIZE(label_length);
++    uint8_t *p_derivation_buffer = (uint8_t *)malloc(derivation_buffer_length);
++    if (p_derivation_buffer == NULL) {
++        return SGX_ERROR_OUT_OF_MEMORY;
++    }
++    memset(p_derivation_buffer, 0, derivation_buffer_length);
++
++    /*counter = 0x01 */
++    p_derivation_buffer[0] = 0x01;
++    /*label*/
++    memcpy(&p_derivation_buffer[1], label, label_length);
++    /*output_key_len=0x0080*/
++    uint16_t *key_len = (uint16_t *)&p_derivation_buffer[derivation_buffer_length - 2];
++    *key_len = 0x0080;
++
++    se_ret = sgx_rijndael128_cmac_msg((sgx_cmac_128bit_key_t *)&key_derive_key,
++                                      p_derivation_buffer,
++                                      derivation_buffer_length,
++                                      (sgx_cmac_128bit_tag_t *)derived_key);
++    memset(&key_derive_key,  0, sizeof(key_derive_key));
++    free(p_derivation_buffer);
++    if(SGX_SUCCESS != se_ret) {
++        INTERNAL_SGX_ERROR_CODE_CONVERTOR(se_ret);
++    }
++    return se_ret;
++}
++
++static void * (* const volatile __memset_vp)(void *, int, size_t)
++    = (memset);
++
++#undef memset_s /* in case it was defined as a macro */
++
++int memset_s(void *s, size_t smax, int c, size_t n)
++{
++    int  err = 0;
++
++    if (s == NULL) {
++        err = -1;
++        goto out;
++    }
++    if (smax > SIZE_MAX) {
++        err = -1;
++        goto out;
++    }
++    if (n > SIZE_MAX) {
++        err = -1;
++        n = smax;
++    }
++    if (n > smax) {
++        err = -1;
++        n = smax;
++    }
++
++    /* Calling through a volatile pointer should never be optimised away. */
++    (*__memset_vp)(s, c, n);
++
++out:
++    if (err == 0)
++        return 0;
++    else {
++        /* XXX call runtime-constraint handler */
++        return err;
++    }
++}
++
++int consttime_memequal(const void *b1, const void *b2, size_t len)
++{
++    const unsigned char *c1 = (const unsigned char *)b1, *c2 =(const unsigned char *) b2;
++    unsigned int res = 0;
++
++    while (len--)
++        res |= *c1++ ^ *c2++;
++
++    /*
++     * Map 0 to 1 and [1, 256) to 0 using only constant-time
++     * arithmetic.
++     *
++     * This is not simply `!res' because although many CPUs support
++     * branchless conditional moves and many compilers will take
++     * advantage of them, certain compilers generate branches on
++     * certain CPUs for `!res'.
++     */
++    return (1 & ((res - 1) >> 8));
++}
++
++#define sgx_is_within_enclave(ptr, len) (1)
++#define offsetof(type,field)    ((char *) &((type *) 0)->field - (char *) 0)
++
+ static bool LAv2_verify_message2(const sgx_dh_msg2_t *, const sgx_key_128bit_t *);
+ static sgx_status_t LAv2_generate_message3(const sgx_dh_msg2_t *,
+     const sgx_ec256_public_t *, const sgx_key_128bit_t *, sgx_dh_msg3_t *);
+diff --git a/demos/local_attestation/DiffieHellmanLibrary/include/sgx_dh_internal.h b/demos/local_attestation/DiffieHellmanLibrary/include/sgx_dh_internal.h
+index 98b7d3f..5a7a75a 100644
+--- a/demos/local_attestation/DiffieHellmanLibrary/include/sgx_dh_internal.h
++++ b/demos/local_attestation/DiffieHellmanLibrary/include/sgx_dh_internal.h
+@@ -36,7 +36,6 @@
+ #include "sgx.h"
+ #include "sgx_defs.h"
+ #include "sgx_ecp_types.h"
+-#include "arch.h"
+ 
+ // Disable SGX_USE_LAv2_INITIATOR to allow compiling both LAv1/2 APIs
+ #ifdef  SGX_USE_LAv2_INITIATOR
+@@ -81,7 +80,7 @@ typedef struct _sgx_internal_dh_session_t{
+     };
+ } sgx_internal_dh_session_t;
+ 
+-se_static_assert(sizeof(sgx_internal_dh_session_t) == SGX_DH_SESSION_DATA_SIZE); /*size mismatch on sgx_internal_dh_session_t and sgx_dh_session_t*/
++//se_static_assert(sizeof(sgx_internal_dh_session_t) == SGX_DH_SESSION_DATA_SIZE); /*size mismatch on sgx_internal_dh_session_t and sgx_dh_session_t*/
+ 
+ #pragma pack(pop)
+ 
+diff --git a/demos/local_attestation/DiffieHellmanLibrary/sgx_cmac128.cpp b/demos/local_attestation/DiffieHellmanLibrary/sgx_cmac128.cpp
+index a810542..53f9b90 100644
+--- a/demos/local_attestation/DiffieHellmanLibrary/sgx_cmac128.cpp
++++ b/demos/local_attestation/DiffieHellmanLibrary/sgx_cmac128.cpp
+@@ -32,7 +32,6 @@
+ #include "stdlib.h"
+ #include "string.h"
+ #include "sgx_tcrypto.h"
+-#include "se_tcrypto_common.h"
+ #include "openssl/cmac.h"
+ #include "openssl/err.h"
+ 
+diff --git a/demos/local_attestation/DiffieHellmanLibrary/sgx_ecc256.cpp b/demos/local_attestation/DiffieHellmanLibrary/sgx_ecc256.cpp
+index 85a482e..ed8ec46 100644
+--- a/demos/local_attestation/DiffieHellmanLibrary/sgx_ecc256.cpp
++++ b/demos/local_attestation/DiffieHellmanLibrary/sgx_ecc256.cpp
+@@ -30,7 +30,6 @@
+  */
+ 
+ #include "string.h"
+-#include "se_tcrypto_common.h"
+ #include <openssl/evp.h>
+ #include <openssl/ec.h>
+ #include <openssl/err.h>
+@@ -170,9 +169,9 @@ sgx_status_t sgx_ecc256_create_key_pair(sgx_ec256_private_t *p_private,
+ 	if (SGX_SUCCESS != ret) {
+ 		// in case of error, clear output buffers
+ 		//
+-		memset_s(p_private, sizeof(p_private), 0, sizeof(p_private));
+-		memset_s(p_public->gx, sizeof(p_public->gx), 0, sizeof(p_public->gx));
+-		memset_s(p_public->gy, sizeof(p_public->gy), 0, sizeof(p_public->gy));
++		memset(p_private, 0, sizeof(p_private));
++		memset(p_public->gx, 0, sizeof(p_public->gx));
++		memset(p_public->gy, 0, sizeof(p_public->gy));
+ 	}
+ 
+ 	//free temp data
+@@ -367,7 +366,7 @@ sgx_status_t sgx_ecc256_compute_shared_dhkey(sgx_ec256_private_t *p_private_b,
+ 	} while(0);
+ 
+ 	if (ret != SGX_SUCCESS) {
+-		memset_s(p_shared_key->s, sizeof(p_shared_key->s), 0, sizeof(p_shared_key->s));
++		memset(p_shared_key->s, 0, sizeof(p_shared_key->s));
+ 	}
+ 
+ 	// clear and free memory
+@@ -470,7 +469,7 @@ sgx_status_t sgx_ecc256_calculate_pub_from_priv(const sgx_ec256_private_t *p_att
+     //in case of failure clear public key
+     //
+     if (ret != SGX_SUCCESS) {
+-        (void)memset_s(p_att_pub_key, sizeof(sgx_ec256_public_t), 0, sizeof(sgx_ec256_public_t));
++        (void)memset(p_att_pub_key, 0, sizeof(sgx_ec256_public_t));
+     }
+ 
+     BN_clear_free(bn_o);
+diff --git a/demos/local_attestation/DiffieHellmanLibrary/sgx_sha256_msg.cpp b/demos/local_attestation/DiffieHellmanLibrary/sgx_sha256_msg.cpp
+index 44fd1e2..b3ee3ed 100644
+--- a/demos/local_attestation/DiffieHellmanLibrary/sgx_sha256_msg.cpp
++++ b/demos/local_attestation/DiffieHellmanLibrary/sgx_sha256_msg.cpp
+@@ -29,7 +29,6 @@
+  *
+  */
+ 
+-#include "se_tcrypto_common.h"
+ #include <openssl/sha.h>
+ #include <openssl/err.h>
+ #include "sgx_tcrypto.h"
+-- 
+2.17.1
+

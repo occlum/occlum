@@ -163,7 +163,7 @@ static int do_SGXIOC_CREATE_AND_VERIFY_REPORT(int sgx_fd) {
     if (ioctl(sgx_fd, SGXIOC_SELF_TARGET, &target_info) < 0) {
         THROW_ERROR("failed to ioctl /dev/sgx");
     }
-    sgx_report_t report_data;
+    sgx_report_data_t report_data;
     sgx_report_t report;
 
     sgxioc_create_report_arg_t args[] = {
