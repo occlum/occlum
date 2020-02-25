@@ -41,7 +41,54 @@ impl File for DevRandom {
         Ok(total_nbytes)
     }
 
+    fn metadata(&self) -> Result<Metadata> {
+        Ok(Metadata {
+            dev: 0,
+            inode: 0,
+            size: 0,
+            blk_size: 0,
+            blocks: 0,
+            atime: Timespec { sec: 0, nsec: 0 },
+            mtime: Timespec { sec: 0, nsec: 0 },
+            ctime: Timespec { sec: 0, nsec: 0 },
+            type_: FileType::CharDevice,
+            mode: 0444,
+            nlinks: 0,
+            uid: 0,
+            gid: 0,
+            rdev: 0,
+        })
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+impl DevRandom {
+    pub fn poll(&self, fd: &mut libc::pollfd) -> Result<usize> {
+        // Just support POLLIN event, because the device is read-only currently
+        let (num, revents_option) = if (fd.events & libc::POLLIN) != 0 {
+            (1, Some(libc::POLLIN))
+        } else {
+            // Device is not ready
+            (0, None)
+        };
+        if let Some(revents) = revents_option {
+            fd.revents = revents;
+        }
+        Ok(num)
+    }
+}
+
+pub trait AsDevRandom {
+    fn as_dev_random(&self) -> Result<&DevRandom>;
+}
+
+impl AsDevRandom for FileRef {
+    fn as_dev_random(&self) -> Result<&DevRandom> {
+        self.as_any()
+            .downcast_ref::<DevRandom>()
+            .ok_or_else(|| errno!(EBADF, "not random device"))
     }
 }

@@ -1,5 +1,5 @@
 use super::*;
-use fs::{File, FileDesc, FileRef};
+use fs::{AsDevRandom, File, FileDesc, FileRef};
 use std::any::Any;
 use std::collections::btree_map::BTreeMap;
 use std::fmt;
@@ -143,6 +143,8 @@ pub fn do_poll(polls: &mut [libc::pollfd], timeout: c_int) -> Result<usize> {
             poll.revents &= poll.events;
             warn!("poll unix socket is unimplemented, spin for read");
             return Ok(1);
+        } else if let Ok(dev_random) = file_ref.as_dev_random() {
+            return Ok(dev_random.poll(poll)?);
         } else {
             return_errno!(EBADF, "not a socket");
         }

@@ -8,6 +8,7 @@ use std::fmt;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::mem::MaybeUninit;
 
+pub use self::dev_fs::AsDevRandom;
 pub use self::file::{File, FileRef};
 pub use self::file_ops::{AccessMode, CreationFlags, Stat, StatusFlags};
 pub use self::file_ops::{Flock, FlockType};
