@@ -16,6 +16,7 @@ use time::{clockid_t, timespec_t, timeval_t, GLOBAL_PROFILER};
 use util::log::{self, LevelFilter};
 use util::mem_util::from_user::*;
 
+use crate::exception::do_handle_exception;
 use crate::fs::{
     do_access, do_chdir, do_chmod, do_chown, do_close, do_dup, do_dup2, do_dup3, do_eventfd,
     do_eventfd2, do_faccessat, do_fchmod, do_fchown, do_fcntl, do_fdatasync, do_fstat, do_fstatat,
@@ -400,7 +401,7 @@ macro_rules! process_syscall_table_with_callback {
             // Occlum-specific system calls
             (Spawn = 360) => do_spawn(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp),
             // Exception handling
-            (Rdtsc = 361) => do_rdtsc(low_ptr: *mut u32, high_ptr: *mut u32),
+            (Exception = 361) => do_handle_exception(info: *mut sgx_exception_info_t),
         }
     };
 }
@@ -710,18 +711,6 @@ fn do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t) -> Result<isize> 
     let ts = time::do_clock_gettime(clockid)?;
     unsafe {
         *ts_u = ts;
-    }
-    Ok(0)
-}
-
-fn do_rdtsc(low_ptr: *mut u32, high_ptr: *mut u32) -> Result<isize> {
-    check_mut_ptr(low_ptr)?;
-    check_mut_ptr(high_ptr)?;
-    let (low, high) = time::do_rdtsc()?;
-    debug!("do_rdtsc result {{ low: {:#x} high: {:#x}}}", low, high);
-    unsafe {
-        *low_ptr = low;
-        *high_ptr = high;
     }
     Ok(0)
 }

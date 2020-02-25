@@ -3,7 +3,7 @@ use sgx_types::*;
 use std::collections::HashMap;
 use std::rsgx_cpuidex;
 
-const CPUID_OPCODE: u16 = 0xA20F;
+pub const CPUID_OPCODE: u16 = 0xA20F;
 const CPUID_MIN_BASIC_LEAF: u32 = 0;
 const CPUID_MAX_BASIC_LEAF: u32 = 0x1F;
 const CPUID_MIN_EXTEND_LEAF: u32 = 0x8000_0000;
@@ -18,7 +18,7 @@ struct CpuIdInput {
 }
 
 #[repr(C)]
-#[derive(Eq, PartialEq, Hash, Clone, Copy)]
+#[derive(Eq, PartialEq, Hash, Clone, Copy, Debug)]
 struct CpuIdResult {
     eax: u32,
     ebx: u32,
@@ -261,19 +261,12 @@ pub fn setup_cpuid_info() {
     let max_basic_leaf = CPUID.get_max_basic_leaf();
 }
 
-#[no_mangle]
-pub extern "C" fn handle_cpuid_exception(info: *mut sgx_exception_info_t) -> u32 {
-    let info = unsafe { &mut *info };
-    let ip_opcode = unsafe { *(info.cpu_context.rip as *const u16) };
-    if info.exception_vector != sgx_exception_vector_t::SGX_EXCEPTION_VECTOR_UD
-        || info.exception_type != sgx_exception_type_t::SGX_EXCEPTION_HARDWARE
-        || ip_opcode != CPUID_OPCODE
-    {
-        return EXCEPTION_CONTINUE_SEARCH;
-    }
+pub fn handle_cpuid_exception(info: &mut sgx_exception_info_t) -> u32 {
+    debug!("handle CPUID exception");
     let leaf = info.cpu_context.rax as u32;
     let subleaf = info.cpu_context.rcx as u32;
     let cpuid_result = CPUID.get_cpuid_info(leaf, subleaf);
+    trace!("cpuid result: {:?}", cpuid_result);
     info.cpu_context.rax = cpuid_result.eax as u64;
     info.cpu_context.rbx = cpuid_result.ebx as u64;
     info.cpu_context.rcx = cpuid_result.ecx as u64;
