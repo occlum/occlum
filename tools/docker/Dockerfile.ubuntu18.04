@@ -46,10 +46,10 @@ RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-i
 
 # Install cpuid tool for tests
 WORKDIR /tmp
-RUN wget http://www.etallen.com/cpuid/cpuid-20180519.x86_64.tar.gz && \
-    tar -xf ./cpuid-20180519.x86_64.tar.gz && \
-    cp ./cpuid-20180519/cpuid /usr/bin/ && \
-    rm -rf /tmp/cpuid-20180519*
+RUN wget http://www.etallen.com/cpuid/cpuid-20200211.x86_64.tar.gz && \
+    tar -xf ./cpuid-20200211.x86_64.tar.gz && \
+    cp ./cpuid-20200211/cpuid /usr/bin/ && \
+    rm -rf /tmp/cpuid-20200211*
 
 # Install SGX SDK
 WORKDIR /tmp

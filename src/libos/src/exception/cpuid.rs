@@ -5,7 +5,7 @@ use std::rsgx_cpuidex;
 
 const CPUID_OPCODE: u16 = 0xA20F;
 const CPUID_MIN_BASIC_LEAF: u32 = 0;
-const CPUID_MAX_BASIC_LEAF: u32 = 0x17;
+const CPUID_MAX_BASIC_LEAF: u32 = 0x1F;
 const CPUID_MIN_EXTEND_LEAF: u32 = 0x8000_0000;
 const CPUID_MAX_EXTEND_LEAF: u32 = 0x8000_0008;
 const CPUID_MAX_SUBLEAF: u32 = u32::max_value();
@@ -75,7 +75,7 @@ impl CpuIdCache {
                 if subleaf == 0 {
                     max_subleaf = match leaf {
                         // EAX Bits 31 - 00: Reports the maximum sub-leaf supported.
-                        0x7 | 0x14 | 0x17 => cpuid_result.eax,
+                        0x7 | 0x14 | 0x17 | 0x18 => cpuid_result.eax,
                         // Reports valid resource type starting at bit position 1 of EDX.
                         // EDX Bit 00: Reserved.
                         //     Bit 01: Supports L3 Cache Intel RDT Monitoring if 1.
@@ -85,9 +85,11 @@ impl CpuIdCache {
                         // EBX Bit 00: Reserved.
                         //     Bit 01: Supports L3 Cache Allocation Technology if 1.
                         //     Bit 02: Supports L2 Cache Allocation Technology if 1.
-                        //     Bits 31 - 03: Reserved.
-                        0x10 => match cpuid_result.ebx & 0x0000_0006 {
-                            0x0000_0006 => 2,
+                        //     Bit 03: Supports Memory Bandwidth Allocation if 1.
+                        //     Bits 31 - 04: Reserved.
+                        0x10 => match cpuid_result.ebx & 0x0000_000E {
+                            0x0000_0008 | 0x0000_000A | 0x0000_000C | 0x0000_000E => 3,
+                            0x0000_0004 | 0x0000_0006 => 2,
                             0x0000_0002 => 1,
                             _ => 0,
                         },
@@ -95,7 +97,7 @@ impl CpuIdCache {
                         0xD => 63,
                         // (Sub-leaf == 0) can not decide max_subleaf for these leaf,
                         // later match expression will decide the max_subleaf.
-                        0x4 | 0xB | 0x12 => CPUID_MAX_SUBLEAF,
+                        0x4 | 0xB | 0x12 | 0x1F => CPUID_MAX_SUBLEAF,
                         // Default max_subleaf is 0.
                         _ => 0,
                     };
@@ -119,6 +121,9 @@ impl CpuIdCache {
                         // EAX Bit 03 - 00: Sub-leaf Type.
                         //         0000b: Indicates this sub-leaf is invalid.
                         0x12 if subleaf >= 2 && (cpuid_result.eax & 0x0000000F) == 0 => subleaf,
+                        // V2 Extended Topology Enumeration Leaf
+                        // CPUID leaf 0x1F is a preferred superset to leaf 0xB.
+                        0x1F if (cpuid_result.ecx & 0x0000_FF00) == 0 => subleaf,
                         // Condition not met.
                         _ => max_subleaf,
                     };
@@ -230,7 +235,8 @@ fn is_valid_cpuid_extend_leaf(leaf: u32) -> bool {
 }
 
 fn is_cpuid_leaf_has_subleaves(leaf: u32) -> bool {
-    const CPUID_LEAF_WITH_SUBLEAF: [u32; 9] = [0x4, 0x7, 0xB, 0xD, 0xF, 0x10, 0x12, 0x14, 0x17];
+    const CPUID_LEAF_WITH_SUBLEAF: [u32; 11] =
+        [0x4, 0x7, 0xB, 0xD, 0xF, 0x10, 0x12, 0x14, 0x17, 0x18, 0x1F];
     CPUID_LEAF_WITH_SUBLEAF.contains(&leaf)
 }
 
