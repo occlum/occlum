@@ -42,6 +42,15 @@ $ occlum build
 ```
 The content of the `image` directory is initialized by the `occlum init` command. The structure of the `image` directory mimics that of an ordinary UNIX FS, containing directories like `/bin`, `/lib`, `/root`, `/tmp`, etc. After copying the user program `hello_world` into `image/bin/`, the `image` directory is packaged by the `occlum build` command to generate a secure Occlum FS image as well as the Occlum SGX enclave.
 
+For platforms that don't have SGX feature supported, Occlum can also be evaluated in SGX simulation mode.
+```
+$ occlum build --sgx-mode SIM
+```
+Or
+```
+$ SGX_MODE=SIM occlum build
+```
+
 **Step 4. Run the user program inside an SGX enclave via `occlum run`**
 ```
 $ occlum run /bin/hello_world
@@ -153,6 +162,12 @@ To build Occlum from the latest source code, do the following steps in an Occlum
     ```
     make
     make test
+    ```
+
+    For platforms that don't support SGX
+    ```
+    SGX_MODE=SIM make
+    SGX_MODE=SIM make test
     ```
 4. Install Occlum
     ```
