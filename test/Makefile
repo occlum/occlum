@@ -11,8 +11,8 @@ endif
 # Dependencies: need to be compiled but not to run by any Makefile target
 TEST_DEPS := client data_sink
 # Tests: need to be compiled and run by test-% target
-TESTS := empty env hello_world malloc mmap file fs_perms getpid spawn sched pipe time \
-	truncate readdir mkdir link symlink tls pthread uname rlimit server \
+TESTS ?= empty env hello_world malloc mmap file fs_perms getpid spawn sched pipe time \
+	truncate readdir mkdir open stat link symlink tls pthread uname rlimit server \
 	server_epoll unix_socket cout hostfs cpuid rdtsc device sleep exit_group \
 	ioctl fcntl
 # Benchmarks: need to be compiled and run by bench-% target

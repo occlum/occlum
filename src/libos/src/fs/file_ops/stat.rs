@@ -105,6 +105,14 @@ impl StatMode {
     }
 }
 
+bitflags! {
+    pub struct StatFlags: u32 {
+        const AT_EMPTY_PATH = 1 << 12;
+        const AT_NO_AUTOMOUNT = 1 << 11;
+        const AT_SYMLINK_NOFOLLOW = 1 << 8;
+    }
+}
+
 impl From<Metadata> for Stat {
     fn from(info: Metadata) -> Self {
         Stat {
@@ -126,7 +134,7 @@ impl From<Metadata> for Stat {
     }
 }
 
-pub fn do_stat(path: &str) -> Result<Stat> {
+fn do_stat(path: &str) -> Result<Stat> {
     warn!("stat is partial implemented as lstat");
     do_lstat(path)
 }
@@ -148,4 +156,32 @@ pub fn do_lstat(path: &str) -> Result<Stat> {
     let inode = current_process.lookup_inode(&path)?;
     let stat = Stat::from(inode.metadata()?);
     Ok(stat)
+}
+
+pub fn do_fstatat(dirfd: DirFd, path: &str, flags: StatFlags) -> Result<Stat> {
+    info!(
+        "fstatat: dirfd: {:?}, path: {:?}, flags: {:?}",
+        dirfd, path, flags
+    );
+    if path.len() == 0 && !flags.contains(StatFlags::AT_EMPTY_PATH) {
+        return_errno!(ENOENT, "path is an empty string");
+    }
+    if Path::new(path).is_absolute() {
+        // Path is absolute, so dirfd is ignored
+        return Ok(do_stat(path)?);
+    }
+    match dirfd {
+        DirFd::Fd(dirfd) => {
+            if path.len() == 0 {
+                // Path is an empty string, and the flags contiains AT_EMPTY_PATH,
+                // so the behavior of fstatat() is similar to that of fstat().
+                do_fstat(dirfd)
+            } else {
+                let dir_path = get_dir_path(dirfd)?;
+                let path = dir_path + "/" + path;
+                do_stat(&path)
+            }
+        }
+        DirFd::Cwd => do_stat(path),
+    }
 }

@@ -2,12 +2,11 @@ use super::dev_fs::{DevNull, DevRandom, DevSgx, DevZero};
 use super::*;
 use process::Process;
 
-pub use self::access::{
-    do_access, do_faccessat, AccessibilityCheckFlags, AccessibilityCheckMode, AT_FDCWD,
-};
+pub use self::access::{do_access, do_faccessat, AccessibilityCheckFlags, AccessibilityCheckMode};
 pub use self::chdir::do_chdir;
 pub use self::close::do_close;
 pub use self::dirent::do_getdents64;
+pub use self::dirfd::{get_dir_path, DirFd};
 pub use self::dup::{do_dup, do_dup2, do_dup3};
 pub use self::fcntl::{do_fcntl, FcntlCmd};
 pub use self::file_flags::{AccessMode, CreationFlags, StatusFlags};
@@ -17,12 +16,12 @@ pub use self::ioctl::{do_ioctl, IoctlCmd, StructuredIoctlArgType, StructuredIoct
 pub use self::link::do_link;
 pub use self::lseek::do_lseek;
 pub use self::mkdir::do_mkdir;
-pub use self::open::do_open;
+pub use self::open::do_openat;
 pub use self::read::{do_pread, do_read, do_readv};
 pub use self::rename::do_rename;
 pub use self::rmdir::do_rmdir;
 pub use self::sendfile::do_sendfile;
-pub use self::stat::{do_fstat, do_lstat, do_stat, Stat};
+pub use self::stat::{do_fstat, do_fstatat, do_lstat, Stat, StatFlags};
 pub use self::symlink::do_readlink;
 pub use self::truncate::{do_ftruncate, do_truncate};
 pub use self::unlink::do_unlink;
@@ -32,6 +31,7 @@ mod access;
 mod chdir;
 mod close;
 mod dirent;
+mod dirfd;
 mod dup;
 mod fcntl;
 mod file_flags;

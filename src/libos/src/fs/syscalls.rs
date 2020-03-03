@@ -1,5 +1,7 @@
 use super::file_ops;
-use super::file_ops::{AccessibilityCheckFlags, AccessibilityCheckMode, FcntlCmd, AT_FDCWD};
+use super::file_ops::{
+    AccessibilityCheckFlags, AccessibilityCheckMode, DirFd, FcntlCmd, StatFlags,
+};
 use super::fs_ops;
 use super::*;
 use util::mem_util::from_user;
@@ -14,7 +16,16 @@ pub fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    let fd = file_ops::do_open(&path, flags, mode)?;
+    let fd = file_ops::do_openat(DirFd::Cwd, &path, flags, mode)?;
+    Ok(fd as isize)
+}
+
+pub fn do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u32) -> Result<isize> {
+    let dirfd = DirFd::from_i32(dirfd)?;
+    let path = from_user::clone_cstring_safely(path)?
+        .to_string_lossy()
+        .into_owned();
+    let fd = file_ops::do_openat(dirfd, &path, flags, mode)?;
     Ok(fd as isize)
 }
 
@@ -115,7 +126,7 @@ pub fn do_stat(path: *const i8, stat_buf: *mut Stat) -> Result<isize> {
         .into_owned();
     from_user::check_mut_ptr(stat_buf)?;
 
-    let stat = file_ops::do_stat(&path)?;
+    let stat = file_ops::do_fstatat(DirFd::Cwd, &path, StatFlags::empty())?;
     unsafe {
         stat_buf.write(stat);
     }
@@ -145,6 +156,20 @@ pub fn do_lstat(path: *const i8, stat_buf: *mut Stat) -> Result<isize> {
     Ok(0)
 }
 
+pub fn do_fstatat(dirfd: i32, path: *const i8, stat_buf: *mut Stat, flags: u32) -> Result<isize> {
+    let dirfd = DirFd::from_i32(dirfd)?;
+    let path = from_user::clone_cstring_safely(path)?
+        .to_string_lossy()
+        .into_owned();
+    from_user::check_mut_ptr(stat_buf)?;
+    let flags = StatFlags::from_bits_truncate(flags);
+    let stat = file_ops::do_fstatat(dirfd, &path, flags)?;
+    unsafe {
+        stat_buf.write(stat);
+    }
+    Ok(0)
+}
+
 pub fn do_access(path: *const i8, mode: u32) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
@@ -154,13 +179,7 @@ pub fn do_access(path: *const i8, mode: u32) -> Result<isize> {
 }
 
 pub fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) -> Result<isize> {
-    let dirfd = if dirfd >= 0 {
-        Some(dirfd as FileDesc)
-    } else if dirfd == AT_FDCWD {
-        None
-    } else {
-        return_errno!(EINVAL, "invalid dirfd");
-    };
+    let dirfd = DirFd::from_i32(dirfd)?;
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();

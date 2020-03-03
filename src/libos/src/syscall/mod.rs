@@ -60,6 +60,7 @@ pub extern "C" fn dispatch_syscall(
     let ret = match syscall_num {
         // file
         SysOpen => fs::do_open(arg0 as *const i8, arg1 as u32, arg2 as u32),
+        SysOpenat => fs::do_openat(arg0 as i32, arg1 as *const i8, arg2 as u32, arg3 as u32),
         SysClose => fs::do_close(arg0 as FileDesc),
         SysRead => fs::do_read(arg0 as FileDesc, arg1 as *mut u8, arg2 as usize),
         SysWrite => fs::do_write(arg0 as FileDesc, arg1 as *const u8, arg2 as usize),
@@ -80,6 +81,12 @@ pub extern "C" fn dispatch_syscall(
         SysStat => fs::do_stat(arg0 as *const i8, arg1 as *mut Stat),
         SysFstat => fs::do_fstat(arg0 as FileDesc, arg1 as *mut Stat),
         SysLstat => fs::do_lstat(arg0 as *const i8, arg1 as *mut Stat),
+        SysNewfstatat => fs::do_fstatat(
+            arg0 as i32,
+            arg1 as *const i8,
+            arg2 as *mut Stat,
+            arg3 as u32,
+        ),
         SysAccess => fs::do_access(arg0 as *const i8, arg1 as u32),
         SysFaccessat => fs::do_faccessat(arg0 as i32, arg1 as *const i8, arg2 as u32, arg3 as u32),
         SysLseek => fs::do_lseek(arg0 as FileDesc, arg1 as off_t, arg2 as i32),

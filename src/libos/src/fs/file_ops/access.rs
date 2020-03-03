@@ -27,10 +27,8 @@ impl AccessibilityCheckFlags {
     }
 }
 
-pub const AT_FDCWD: i32 = -100;
-
 pub fn do_faccessat(
-    dirfd: Option<FileDesc>,
+    dirfd: DirFd,
     path: &str,
     mode: AccessibilityCheckMode,
     flags: AccessibilityCheckFlags,
@@ -41,8 +39,8 @@ pub fn do_faccessat(
     );
     match dirfd {
         // TODO: handle dirfd
-        Some(dirfd) => return_errno!(ENOSYS, "cannot accept dirfd"),
-        None => do_access(path, mode),
+        DirFd::Fd(dirfd) => return_errno!(ENOSYS, "cannot accept dirfd"),
+        DirFd::Cwd => do_access(path, mode),
     }
 }
 

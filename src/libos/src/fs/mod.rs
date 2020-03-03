@@ -7,6 +7,7 @@ use std::any::Any;
 use std::fmt;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::mem::MaybeUninit;
+use std::path::Path;
 
 pub use self::dev_fs::AsDevRandom;
 pub use self::file::{File, FileRef};
