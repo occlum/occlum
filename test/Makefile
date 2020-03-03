@@ -1,6 +1,12 @@
 CUR_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 PROJECT_DIR := $(realpath $(CUR_DIR)/../)
-BUILD_DIR := $(PROJECT_DIR)/build
+SGX_MODE ?= HW
+
+ifneq ($(SGX_MODE), HW)
+	BUILD_DIR := $(PROJECT_DIR)/build_sim
+else
+	BUILD_DIR := $(PROJECT_DIR)/build
+endif
 
 # Dependencies: need to be compiled but not to run by any Makefile target
 TEST_DEPS := client data_sink
@@ -40,7 +46,7 @@ prebuild:
 	@$(RM) -rf $(BUILD_DIR)/test
 	@mkdir -p $(BUILD_DIR)/test
 	@cd $(BUILD_DIR)/test && \
-		$(PROJECT_DIR)/build/bin/occlum init
+		$(BUILD_DIR)/bin/occlum init
 	@cp Occlum.json Enclave.xml $(BUILD_DIR)/test/
 
 $(BUILD_TARGETS): %:
@@ -50,7 +56,7 @@ $(BUILD_TARGETS): %:
 
 postbuild:
 	@cd $(BUILD_DIR)/test && \
-		$(PROJECT_DIR)/build/bin/occlum build
+		$(BUILD_DIR)/bin/occlum build
 
 #############################################################################
 # Test targets

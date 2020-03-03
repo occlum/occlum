@@ -68,7 +68,7 @@ get_conf_entry_points() {
 }
 
 get_occlum_conf_file_mac() {
-    "$occlum_dir/build/bin/occlum-protect-integrity" show-mac "$context_dir/build/Occlum.json.protected"
+    "$occlum_dir/$build_dir/bin/occlum-protect-integrity" show-mac "$context_dir/build/Occlum.json.protected"
 }
 
 parse_occlum_user_space_size() {
@@ -108,8 +108,27 @@ cmd_init() {
 }
 
 cmd_build() {
+    build_dir=build
+
+    while [ -n "$1" ]; do
+        case "$1" in
+        --sign-key)     [ -n "$2" ] && ENCLAVE_SIGN_KEY=$2 ; shift 2 || exit_error "empty signing key path"     ;;
+        --sign-tool)    [ -n "$2" ] && ENCLAVE_SIGN_TOOL=$2 ; shift 2 || exit_error "empty signing tool path"   ;;
+        --sgx-mode)     [[ -n "$2" && "$2" != "HW" ]] && export SGX_MODE=SW && build_dir=build_sim ; shift 2 || exit_error "empty sgx mode";;
+        *) exit_error "Unknown option: $1"                                                                      ;;
+        esac
+    done
+    [ -e "$ENCLAVE_SIGN_KEY" ] || exit_error "invalid signing key path: $ENCLAVE_SIGN_KEY"
+    [ -e "$ENCLAVE_SIGN_TOOL" ] || exit_error "invalid signing tool path: $ENCLAVE_SIGN_TOOL"
+    echo "Enclave sign-tool: $ENCLAVE_SIGN_TOOL"
+    echo "Enclave sign-key: $ENCLAVE_SIGN_KEY"
+
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SGX_SDK/lib64
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SGX_SDK/sdk_libs
+        build_dir=build_sim
+        echo "SGX mode: $SGX_MODE"
+    else
+        echo "SGX mode: HW"
     fi
 
     cd "$context_dir"
@@ -118,24 +137,24 @@ cmd_build() {
     rm -rf build
 
     mkdir -p build/bin
-    cp "$occlum_dir/build/bin/occlum-run" build/bin/
+    cp "$occlum_dir/$build_dir/bin/occlum-run" build/bin/
     mkdir -p build/lib
-    cp "$occlum_dir/build/lib/libocclum-libos-core.a" build/lib/
-    cp "$occlum_dir/build/lib/libcompiler-rt-patch.a" build/lib/
-    cp "$occlum_dir/build/lib/libocclum-pal.so" build/lib/
+    cp "$occlum_dir/$build_dir/lib/libocclum-libos-core.a" build/lib/
+    cp "$occlum_dir/$build_dir/lib/libcompiler-rt-patch.a" build/lib/
+    cp "$occlum_dir/$build_dir/lib/libocclum-pal.so" build/lib/
     mkdir -p build/src/libos/src/builtin
 
     chmod 531 -R $working_dir/image/bin
     chmod 531 -R $working_dir/image/lib
     mkdir -p build/mount/
-    cd "$occlum_dir/deps/sefs/sefs-fuse/bin/" && \
-        ./app \
-            --integrity-only \
-            "$context_dir/build/mount/__ROOT" \
-            "$working_dir/image" \
-            zip
+    cd "$occlum_dir/$build_dir/bin/" && \
+    ./sefs-fuse \
+        --integrity-only \
+        "$context_dir/build/mount/__ROOT" \
+        "$working_dir/image" \
+        zip
 
-    export OCCLUM_CONF_ROOT_FS_MAC=`"$occlum_dir/build/bin/occlum-protect-integrity" show-mac "$context_dir/build/mount/__ROOT/metadata"`
+    export OCCLUM_CONF_ROOT_FS_MAC=`"$occlum_dir/$build_dir/bin/occlum-protect-integrity" show-mac "$context_dir/build/mount/__ROOT/metadata"`
     export OCCLUM_CONF_USER_SPACE_SIZE=`get_conf_user_space_size`
     export OCCLUM_CONF_DEFAULT_STACK_SIZE=`get_conf_default_stack_size`
     export OCCLUM_CONF_DEFAULT_HEAP_SIZE=`get_conf_default_heap_size`
@@ -143,9 +162,9 @@ cmd_build() {
     export OCCLUM_CONF_ENV=`get_conf_env`
     export OCCLUM_CONF_ENTRY_POINTS=`get_conf_entry_points`
     cd "$context_dir/build"
-    "$occlum_dir/build/bin/occlum-gen-default-occlum-json"\
+    "$occlum_dir/$build_dir/bin/occlum-gen-default-occlum-json"\
         > "Occlum.json"
-    "$occlum_dir/build/bin/occlum-protect-integrity" protect Occlum.json
+    "$occlum_dir/$build_dir/bin/occlum-protect-integrity" protect Occlum.json
 
     export OCCLUM_BUILTIN_CONF_FILE_MAC=`get_occlum_conf_file_mac`
     echo "EXPORT => OCCLUM_BUILTIN_CONF_FILE_MAC = $OCCLUM_BUILTIN_CONF_FILE_MAC"
@@ -160,18 +179,7 @@ cmd_build() {
     cp -r "$occlum_dir/src/libos/src/builtin" src/libos/src/builtin
     cd src/libos && \
         make clean-builtin && \
-        make "$context_dir/build/lib/libocclum-libos.so" ONLY_REBUILD_BUILTIN=1
-    while [ -n "$1" ]; do
-        case "$1" in
-        --sign-key)     [ -n "$2" ] && ENCLAVE_SIGN_KEY=$2 ; shift 2 || exit_error "empty signing key path"     ;;
-        --sign-tool)    [ -n "$2" ] && ENCLAVE_SIGN_TOOL=$2 ; shift 2 || exit_error "empty signing tool path"   ;;
-        *) exit_error "Unknown option: $1"                                                                      ;;
-        esac
-    done
-    [ -e "$ENCLAVE_SIGN_KEY" ] || exit_error "invalid signing key path: $ENCLAVE_SIGN_KEY"
-    [ -e "$ENCLAVE_SIGN_TOOL" ] || exit_error "invalid signing tool path: $ENCLAVE_SIGN_TOOL"
-    echo "Enclave sign-tool: $ENCLAVE_SIGN_TOOL"
-    echo "Enclave sign-key: $ENCLAVE_SIGN_KEY"
+        make "$context_dir/build/lib/libocclum-libos.so" ONLY_REBUILD_BUILTIN=1 CONTEXT=1
     $ENCLAVE_SIGN_TOOL sign \
         -key $ENCLAVE_SIGN_KEY \
         -config "$working_dir/Enclave.xml" \
@@ -182,12 +190,19 @@ cmd_build() {
 
     mkdir -p "$context_dir/run/mount/root"
 
+    if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
+        echo "SIM" > .sgx_mode
+    else
+        echo "HW" > .sgx_mode
+    fi
+
     echo "Built the Occlum image and enclave successfully"
 }
 
 cmd_run() {
+    SGX_MODE=$(cat $context_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$context_dir/build/lib:$SGX_SDK/lib64/"
+        export LD_LIBRARY_PATH="$context_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
         export LD_LIBRARY_PATH="$context_dir/build/lib"
     fi
@@ -201,8 +216,9 @@ cmd_run() {
 }
 
 cmd_gdb() {
+    SGX_MODE=$(cat $context_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$context_dir/build/lib:$SGX_SDK/lib64/"
+        export LD_LIBRARY_PATH="$context_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
         export LD_LIBRARY_PATH="$context_dir/build/lib"
     fi

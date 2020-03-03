@@ -2,13 +2,18 @@
 
 CUR_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 PROJECT_DIR := $(realpath $(CUR_DIR)/../../)
-BUILD_DIR := $(PROJECT_DIR)/build
-OBJS_DIR := $(BUILD_DIR)/tools/protect-integrity
 
 SGX_SDK ?= /opt/intel/sgxsdk
 SGX_MODE ?= HW
 SGX_ARCH ?= x64
 SGX_DEBUG ?= 1
+
+ifneq ($(SGX_MODE), HW)
+	BUILD_DIR := $(PROJECT_DIR)/build_sim
+else
+	BUILD_DIR := $(PROJECT_DIR)/build
+endif
+OBJS_DIR := $(BUILD_DIR)/tools/protect-integrity
 
 ifeq ($(shell getconf LONG_BIT), 32)
 	SGX_ARCH := x86

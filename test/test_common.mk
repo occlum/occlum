@@ -2,7 +2,13 @@ MAIN_MAKEFILE := $(firstword $(MAKEFILE_LIST))
 INCLUDE_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 CUR_DIR := $(shell dirname $(realpath $(MAIN_MAKEFILE)))
 PROJECT_DIR := $(realpath $(CUR_DIR)/../../)
-BUILD_DIR := $(PROJECT_DIR)/build
+SGX_MODE ?= HW
+
+ifneq ($(SGX_MODE), HW)
+	BUILD_DIR := $(PROJECT_DIR)/build_sim
+else
+	BUILD_DIR := $(PROJECT_DIR)/build
+endif
 
 TEST_NAME := $(shell basename $(CUR_DIR))
 IMAGE_DIR := $(BUILD_DIR)/test/image
@@ -58,7 +64,7 @@ $(BUILD_DIR)/test/obj/$(TEST_NAME)/%.o: %.cc
 
 test:
 	@cd $(BUILD_DIR)/test && \
-		$(PROJECT_DIR)/build/bin/occlum run /bin/$(TEST_NAME) $(BIN_ARGS)
+		$(BUILD_DIR)/bin/occlum run /bin/$(TEST_NAME) $(BIN_ARGS)
 
 test-native:
 	@LD_LIBRARY_PATH=/usr/local/occlum/lib cd $(IMAGE_DIR) && ./bin/$(TEST_NAME) $(BIN_ARGS)

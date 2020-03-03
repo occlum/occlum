@@ -2,11 +2,21 @@ MAIN_MAKEFILE := $(firstword $(MAKEFILE_LIST))
 INCLUDE_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 CUR_DIR := $(shell dirname $(realpath $(MAIN_MAKEFILE)))
 PROJECT_DIR := $(realpath $(CUR_DIR)/../../)
-BUILD_DIR := $(PROJECT_DIR)/build
 
 SGX_SDK ?= /opt/intel/sgxsdk
 SGX_MODE ?= HW
 SGX_ARCH ?= x64
+
+ifneq ($(SGX_MODE), HW)
+	BUILD_DIR := $(PROJECT_DIR)/build_sim
+else
+	BUILD_DIR := $(PROJECT_DIR)/build
+endif
+
+# for sgxenv.mk in .occlum
+ifeq ($(CONTEXT), 1)
+	BUILD_DIR := $(PROJECT_DIR)/build
+endif
 
 # If OCCLUM_RELEASE_BUILD equals to 1, y, or yes, then build in release mode
 OCCLUM_RELEASE_BUILD ?= 0

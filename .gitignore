@@ -2,3 +2,4 @@
 *.a
 *.so
 build/
+build_sim/
