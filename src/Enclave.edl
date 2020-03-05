@@ -27,7 +27,8 @@ enclave {
          */
         public int occlum_ecall_new_process(
             [in, string] const char* executable_path,
-            [user_check] const char** argv);
+            [user_check] const char** argv,
+            [in] const struct occlum_stdio_fds* io_fds);
 
         /*
          * Execute the LibOS thread specified by the TID.

@@ -19,7 +19,7 @@ pub use self::file_table::{FileDesc, FileTable};
 pub use self::inode_file::{AsINodeFile, INodeExt, INodeFile};
 pub use self::pipe::Pipe;
 pub use self::rootfs::ROOT_INODE;
-pub use self::stdio::{StdinFile, StdoutFile};
+pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
 pub use self::syscalls::*;
 
 mod dev_fs;

@@ -1,5 +1,6 @@
 use super::*;
 use exception::*;
+use fs::HostStdioFds;
 use process::pid_t;
 use std::ffi::{CStr, CString, OsString};
 use std::path::{Path, PathBuf};
@@ -56,13 +57,14 @@ pub extern "C" fn occlum_ecall_init(log_level: *const c_char) -> i32 {
 pub extern "C" fn occlum_ecall_new_process(
     path_buf: *const c_char,
     argv: *const *const c_char,
+    host_stdio_fds: *const HostStdioFds,
 ) -> i32 {
     if HAS_INIT.load(Ordering::SeqCst) == false {
         return EXIT_STATUS_INTERNAL_ERROR;
     }
 
-    let (path, args) = match parse_arguments(path_buf, argv) {
-        Ok(path_and_args) => path_and_args,
+    let (path, args, host_stdio_fds) = match parse_arguments(path_buf, argv, host_stdio_fds) {
+        Ok(path_and_args_and_host_stdio_fds) => path_and_args_and_host_stdio_fds,
         Err(e) => {
             eprintln!("invalid arguments for LibOS: {}", e.backtrace());
             return EXIT_STATUS_INTERNAL_ERROR;
@@ -70,11 +72,13 @@ pub extern "C" fn occlum_ecall_new_process(
     };
     let _ = backtrace::enable_backtrace(ENCLAVE_PATH, PrintFormat::Short);
     panic::catch_unwind(|| {
-        backtrace::__rust_begin_short_backtrace(|| match do_new_process(&path, &args) {
-            Ok(pid_t) => pid_t as i32,
-            Err(e) => {
-                eprintln!("failed to boot up LibOS: {}", e.backtrace());
-                EXIT_STATUS_INTERNAL_ERROR
+        backtrace::__rust_begin_short_backtrace(|| {
+            match do_new_process(&path, &args, &host_stdio_fds) {
+                Ok(pid_t) => pid_t as i32,
+                Err(e) => {
+                    eprintln!("failed to boot up LibOS: {}", e.backtrace());
+                    EXIT_STATUS_INTERNAL_ERROR
+                }
             }
         })
     })
@@ -135,7 +139,8 @@ fn parse_log_level(level_chars: *const c_char) -> Result<LevelFilter> {
 fn parse_arguments(
     path_ptr: *const c_char,
     argv: *const *const c_char,
-) -> Result<(PathBuf, Vec<CString>)> {
+    host_stdio_fds: *const HostStdioFds,
+) -> Result<(PathBuf, Vec<CString>, HostStdioFds)> {
     let path_buf = {
         let path_cstring = clone_cstring_safely(path_ptr)?;
         let path_string = path_cstring
@@ -155,18 +160,31 @@ fn parse_arguments(
 
     let mut args = clone_cstrings_safely(argv)?;
     args.insert(0, program_cstring);
-    Ok((path_buf, args))
+
+    let host_stdio_fds = HostStdioFds::from_user(host_stdio_fds)?;
+
+    Ok((path_buf, args, host_stdio_fds))
 }
 
-fn do_new_process(program_path: &PathBuf, argv: &Vec<CString>) -> Result<pid_t> {
+fn do_new_process(
+    program_path: &PathBuf,
+    argv: &Vec<CString>,
+    host_stdio_fds: &HostStdioFds,
+) -> Result<pid_t> {
     validate_program_path(program_path)?;
 
     let envp = &config::LIBOS_CONFIG.env;
     let file_actions = Vec::new();
     let parent = &process::IDLE_PROCESS;
     let program_path_str = program_path.to_str().unwrap();
-    let new_tid =
-        process::do_spawn_without_exec(&program_path_str, argv, envp, &file_actions, parent)?;
+    let new_tid = process::do_spawn_without_exec(
+        &program_path_str,
+        argv,
+        envp,
+        &file_actions,
+        host_stdio_fds,
+        parent,
+    )?;
     Ok(new_tid)
 }
 

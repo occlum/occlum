@@ -1,6 +1,7 @@
 #include <linux/limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <occlum_pal_api.h>
 
 static const char* get_instance_dir(void) {
@@ -32,8 +33,13 @@ int main(int argc, char* argv[]) {
     }
 
     // Use Occlum PAL to execute the cmd
+    struct occlum_stdio_fds io_fds = {
+        .stdin_fd = STDIN_FILENO,
+        .stdout_fd = STDOUT_FILENO,
+        .stderr_fd = STDERR_FILENO,
+    };
     int exit_status = 0;
-    if (occlum_pal_exec(cmd_path, cmd_args, &exit_status) < 0) {
+    if (occlum_pal_exec(cmd_path, cmd_args, &io_fds, &exit_status) < 0) {
         return EXIT_FAILURE;
     }
 

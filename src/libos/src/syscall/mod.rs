@@ -12,7 +12,8 @@ use fs::{
     do_fcntl, do_fdatasync, do_fstat, do_fstatat, do_fsync, do_ftruncate, do_getdents64, do_ioctl,
     do_link, do_lseek, do_lstat, do_mkdir, do_open, do_openat, do_pipe, do_pipe2, do_pread,
     do_pwrite, do_read, do_readlink, do_readv, do_rename, do_rmdir, do_sendfile, do_stat, do_sync,
-    do_truncate, do_unlink, do_write, do_writev, iovec_t, File, FileDesc, FileRef, Stat,
+    do_truncate, do_unlink, do_write, do_writev, iovec_t, File, FileDesc, FileRef, HostStdioFds,
+    Stat,
 };
 use misc::{resource_t, rlimit_t, utsname_t};
 use net::{

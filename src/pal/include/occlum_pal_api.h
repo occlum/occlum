@@ -34,6 +34,15 @@ typedef struct {
 }
 
 /*
+ * The struct which consists of file descriptors of standard I/O
+ */
+struct occlum_stdio_fds {
+    int stdin_fd;
+    int stdout_fd;
+    int stderr_fd;
+};
+
+/*
  * @brief Initialize an Occlum enclave
  *
  * @param attr  Mandatory input. Attributes for Occlum.
@@ -48,13 +57,19 @@ int occlum_pal_init(occlum_pal_attr_t* attr);
  * @param cmd_path      The path of the command to be executed
  * @param cmd_args      The arguments to the command. The array must be NULL
  *                      terminated.
+ * @param io_fds        The file descriptors of the redirected standard I/O
+ *                      (i.e., stdin, stdout, stderr), If set to NULL, will
+ *                      use the original standard I/O file descriptors.
  * @param exit_status   Output. The exit status of the command. Note that the
  *                      exit status is returned if and only if the function
  *                      succeeds.
  *
  * @retval If 0, then success; otherwise, check errno for the exact error type.
  */
-int occlum_pal_exec(const char* cmd_path, const char** cmd_args, int* exit_status);
+int occlum_pal_exec(const char* cmd_path,
+                    const char** cmd_args,
+                    const struct occlum_stdio_fds* io_fds,
+                    int* exit_status);
 
 /*
  * @brief Destroy teh Occlum enclave

@@ -10,4 +10,10 @@ struct timeval {
     suseconds_t tv_usec;    /* microseconds */
 };
 
+struct occlum_stdio_fds {
+    int stdin_fd;
+    int stdout_fd;
+    int stderr_fd;
+};
+
 #endif /* __OCCLUM_EDL_TYPES_H__ */

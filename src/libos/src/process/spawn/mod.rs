@@ -5,7 +5,8 @@ use std::path::Path;
 use std::sgxfs::SgxFile;
 
 use super::fs::{
-    CreationFlags, File, FileDesc, FileTable, INodeExt, StdinFile, StdoutFile, ROOT_INODE,
+    CreationFlags, File, FileDesc, FileTable, HostStdioFds, INodeExt, StdinFile, StdoutFile,
+    ROOT_INODE,
 };
 use super::misc::ResourceLimitsRef;
 use super::vm::{ProcessVM, ProcessVMBuilder};
@@ -24,7 +25,8 @@ pub fn do_spawn(
     file_actions: &[FileAction],
     parent_ref: &ProcessRef,
 ) -> Result<pid_t> {
-    let (new_tid, new_process_ref) = new_process(elf_path, argv, envp, file_actions, parent_ref)?;
+    let (new_tid, new_process_ref) =
+        new_process(elf_path, argv, envp, file_actions, None, parent_ref)?;
     task::enqueue_and_exec_task(new_tid, new_process_ref);
     Ok(new_tid)
 }
@@ -34,9 +36,17 @@ pub fn do_spawn_without_exec(
     argv: &[CString],
     envp: &[CString],
     file_actions: &[FileAction],
+    host_stdio_fds: &HostStdioFds,
     parent_ref: &ProcessRef,
 ) -> Result<pid_t> {
-    let (new_tid, new_process_ref) = new_process(elf_path, argv, envp, file_actions, parent_ref)?;
+    let (new_tid, new_process_ref) = new_process(
+        elf_path,
+        argv,
+        envp,
+        file_actions,
+        Some(host_stdio_fds),
+        parent_ref,
+    )?;
     task::enqueue_task(new_tid, new_process_ref);
     Ok(new_tid)
 }
@@ -46,6 +56,7 @@ fn new_process(
     argv: &[CString],
     envp: &[CString],
     file_actions: &[FileAction],
+    host_stdio_fds: Option<&HostStdioFds>,
     parent_ref: &ProcessRef,
 ) -> Result<(pid_t, ProcessRef)> {
     let elf_buf = load_elf_to_vec(elf_path, parent_ref)
@@ -107,7 +118,7 @@ fn new_process(
         };
         let vm_ref = Arc::new(SgxMutex::new(vm));
         let files_ref = {
-            let files = init_files(parent_ref, file_actions)?;
+            let files = init_files(parent_ref, file_actions, host_stdio_fds)?;
             Arc::new(SgxMutex::new(files))
         };
         let rlimits_ref = Default::default();
@@ -145,7 +156,11 @@ fn load_elf_to_vec(elf_path: &str, parent_ref: &ProcessRef) -> Result<Vec<u8>> {
             .map_err(|e| errno!(e.errno(), "failed to read the executable ELF"))
 }
 
-fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<FileTable> {
+fn init_files(
+    parent_ref: &ProcessRef,
+    file_actions: &[FileAction],
+    host_stdio_fds: Option<&HostStdioFds>,
+) -> Result<FileTable> {
     // Usually, we just inherit the file table from the parent
     let parent = parent_ref.lock().unwrap();
     let should_inherit_file_table = parent.get_pid() > 0;
@@ -186,10 +201,16 @@ fn init_files(parent_ref: &ProcessRef, file_actions: &[FileAction]) -> Result<Fi
 
     // But, for init process, we initialize file table for it
     let mut file_table = FileTable::new();
-    let stdin: Arc<Box<dyn File>> = Arc::new(Box::new(StdinFile::new()));
-    let stdout: Arc<Box<dyn File>> = Arc::new(Box::new(StdoutFile::new()));
-    // TODO: implement and use a real stderr
-    let stderr = stdout.clone();
+    let stdin: Arc<Box<dyn File>> = Arc::new(Box::new(StdinFile::new(
+        host_stdio_fds.unwrap().stdin_fd as FileDesc,
+    )));
+    let stdout: Arc<Box<dyn File>> = Arc::new(Box::new(StdoutFile::new(
+        host_stdio_fds.unwrap().stdout_fd as FileDesc,
+    )));
+    let stderr: Arc<Box<dyn File>> = Arc::new(Box::new(StdoutFile::new(
+        host_stdio_fds.unwrap().stderr_fd as FileDesc,
+    )));
+
     file_table.put(stdin, false);
     file_table.put(stdout, false);
     file_table.put(stderr, false);

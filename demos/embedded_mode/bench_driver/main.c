@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
 
     // Use Occlum PAL to execute the cmd
     int exit_status = 0;
-    if (occlum_pal_exec(cmd_path, cmd_args, &exit_status) < 0) {
+    if (occlum_pal_exec(cmd_path, cmd_args, NULL, &exit_status) < 0) {
         return EXIT_FAILURE;
     }
 
