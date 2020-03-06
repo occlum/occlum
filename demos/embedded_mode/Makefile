@@ -1,3 +1,12 @@
+SGX_SDK ?= /opt/intel/sgxsdk
+SGX_MODE ?= HW
+
+ifneq ($(SGX_MODE), HW)
+	OCCLUM_LIB := /opt/occlum/build_sim/lib
+else
+	OCCLUM_LIB := /opt/occlum/build/lib
+endif
+
 .PHONY: all build_src test clean
 
 all: occlum_context
@@ -16,7 +25,7 @@ build_src:
 
 TOTAL_BYTES := 10000000000 # 10GB
 test:
-	LD_LIBRARY_PATH=/opt/occlum/build/lib RUST_BACKTRACE=1 \
+	LD_LIBRARY_PATH=$(OCCLUM_LIB):$(SGX_SDK)/sdk_libs RUST_BACKTRACE=1 \
 		./bench_driver/build/bench_driver $(TOTAL_BYTES)
 
 clean:

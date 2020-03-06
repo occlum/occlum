@@ -63,3 +63,9 @@ To run the benchmark, use the following command
 ```
 make test
 ```
+
+To test in SGX simulation mode, use the following command
+```
+SGX_MODE=SIM make
+SGX_MODE=SIM make test
+```
