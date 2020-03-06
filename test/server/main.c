@@ -1,15 +1,16 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
+#include <spawn.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <spawn.h>
-#include <unistd.h>
 
 #include "test.h"
 
@@ -289,12 +290,34 @@ int test_fcntl_setfl_and_getfl() {
     return ret;
 }
 
+int test_poll_sockets() {
+    int socks[2], ret;
+    socks[0] = socket(AF_INET, SOCK_STREAM, 0);
+    socks[1] = socket(AF_INET, SOCK_STREAM, 0);
+    struct pollfd pollfds[] = {
+        { .fd = socks[0], .events = POLLIN },
+        { .fd = socks[1], .events = POLLIN },
+    };
+
+    ret = poll(pollfds, 2, 0);
+    if (ret < 0)
+        THROW_ERROR("poll error");
+
+    if (pollfds[0].fd != socks[0] ||
+        pollfds[0].events != POLLIN ||
+        pollfds[1].fd != socks[1] ||
+        pollfds[1].events != POLLIN)
+        THROW_ERROR("fd and events of pollfd should remain unchanged");
+    return 0;
+}
+
 static test_case_t test_cases[] = {
     TEST_CASE(test_read_write),
     TEST_CASE(test_send_recv),
     TEST_CASE(test_sendmsg_recvmsg),
     TEST_CASE(test_sendmsg_recvmsg_connectionless),
     TEST_CASE(test_fcntl_setfl_and_getfl),
+    TEST_CASE(test_poll_sockets),
 };
 
 int main(int argc, const char* argv[]) {
