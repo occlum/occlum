@@ -46,6 +46,13 @@ __occlum_syscall:
     wrfsbase %r11
 #endif
 
+    // Use kernel stack base and limit
+    movq TASK_KERNEL_STACK_BASE(%r12), %r11
+    movq %r11, %gs:TD_STACK_BASE
+
+    movq TASK_KERNEL_STACK_LIMIT(%r12), %r11
+    movq %r11, %gs:TD_STACK_LIMIT
+
     // Make %rsp 16-byte aligned before call
     sub $0x8, %rsp
     // Pass arg5
@@ -70,6 +77,13 @@ __occlum_syscall:
     movq TASK_USER_FS(%r12), %r11
     wrfsbase %r11
 #endif
+
+    // Use user stack base and limit
+    movq TASK_USER_STACK_BASE(%r12), %r11
+    movq %r11, %gs:TD_STACK_BASE
+
+    movq TASK_USER_STACK_LIMIT(%r12), %r11
+    movq %r11, %gs:TD_STACK_LIMIT
 
     // Switch to the user stack
     movq %rbp, %rsp

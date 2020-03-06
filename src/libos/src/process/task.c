@@ -1,5 +1,18 @@
 #include "task.h"
 
+/* See /<path-to-linux-sgx>/common/inc/internal/thread_data.h */
+typedef struct _thread_data_t
+{
+    uint64_t  reserved1[2];
+    uint64_t  stack_base_addr;
+    uint64_t  stack_limit_addr;
+    uint64_t  reserved2[15];
+    uint64_t  stack_commit_addr;
+} thread_data_t;
+
+extern thread_data_t *get_thread_data(void);
+
+
 extern void __run_task(struct Task* task);
 
 extern uint64_t __get_stack_guard(void);
@@ -26,12 +39,19 @@ static uint64_t get_syscall_stack(struct Task* this_task) {
 
 int do_run_task(struct Task* task) {
     jmp_buf libos_state = {0};
+    thread_data_t* td = get_thread_data();
     task->saved_state = &libos_state;
     task->kernel_rsp = get_syscall_stack(task);
+    task->kernel_stack_base = td->stack_base_addr;
+    task->kernel_stack_limit = td->stack_limit_addr;
 
-    if (sgx_enable_user_stack(task->user_stack_base, task->user_stack_limit)) {
-        return -1;
-    }
+    //Do do not support stack expansion, need a new design on SGX2 platform.
+    //Set the stack_commit_addr to 0, as the result no stack expansion happens at any situations
+    __atomic_store_n(&td->stack_commit_addr, 0, __ATOMIC_RELAXED);
+    td->stack_base_addr = task->user_stack_base;
+    td->stack_limit_addr = task->user_stack_limit;
+    td->stack_commit_addr = task->user_stack_limit;
+
     SET_CURRENT_TASK(task);
 
     int second = setjmp(libos_state);
@@ -41,12 +61,19 @@ int do_run_task(struct Task* task) {
 
     // Jump from do_exit_task
     RESET_CURRENT_TASK();
-    sgx_disable_user_stack();
     return 0;
 }
 
 void do_exit_task(void) {
     struct Task* task = __get_current_task();
     jmp_buf* jb = task->saved_state;
+    thread_data_t* td = get_thread_data();
+
+    //Do do not support stack expansion, need a new design on SGX2 platform.
+    //Set the stack_commit_addr to 0, as the result no stack expansion happens at any situations
+    __atomic_store_n(&td->stack_commit_addr, 0, __ATOMIC_RELAXED);
+    td->stack_base_addr = task->kernel_stack_base;
+    td->stack_limit_addr = task->kernel_stack_limit;
+    td->stack_commit_addr = task->kernel_stack_limit;
     longjmp(*jb, 1);
 }

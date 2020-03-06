@@ -14,6 +14,8 @@ extern "C" {
 // See Struct Task in process.rs
 struct Task {
     uint64_t            kernel_rsp;
+    uint64_t            kernel_stack_base;
+    uint64_t            kernel_stack_limit;
     uint64_t            kernel_fs;
     uint64_t            user_rsp;
     uint64_t            user_stack_base;
@@ -36,15 +38,21 @@ void do_exit_task(void);
 #else  /* __ASSEMBLY__ */
 
 /* See /<path-to-linux-sgx>/common/inc/internal/thread_data.h */
+#define TD_STACK_BASE               (8 * 2)
+#define TD_STACK_LIMIT              (8 * 3)
 #define TD_STACKGUARD_OFFSET        (8 * 5)
 /* Override the field for stack guard */
 #define TD_TASK_OFFSET              TD_STACKGUARD_OFFSET
 
 #define TASK_KERNEL_RSP             (8 * 0)
-#define TASK_KERNEL_FS              (8 * 1)
-#define TASK_USER_RSP               (8 * 2)
-#define TASK_USER_FS                (8 * 5)
-#define TASK_USER_ENTRY_ADDR        (8 * 6)
+#define TASK_KERNEL_STACK_BASE      (8 * 1)
+#define TASK_KERNEL_STACK_LIMIT     (8 * 2)
+#define TASK_KERNEL_FS              (8 * 3)
+#define TASK_USER_RSP               (8 * 4)
+#define TASK_USER_STACK_BASE        (8 * 5)
+#define TASK_USER_STACK_LIMIT       (8 * 6)
+#define TASK_USER_FS                (8 * 7)
+#define TASK_USER_ENTRY_ADDR        (8 * 8)
 
 /* arch_prctl syscall number and parameter */
 #define ARCH_PRCTL                  0x9E

@@ -7,6 +7,8 @@ use super::*;
 #[repr(C)]
 pub struct Task {
     kernel_rsp: usize,
+    kernel_stack_base: usize,
+    kernel_stack_limit: usize,
     kernel_fs: usize,
     user_rsp: usize,
     user_stack_base: usize,
