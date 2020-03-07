@@ -124,7 +124,7 @@ Occlum can be configured easily via a config file named `Occlum.json`, which is 
 
 ## How to Use
 
-We have built and tested Occlum on Ubuntu 16.04 with hardware SGX support. To give Occlum a quick try, one can use the Occlum Docker image by following the steps below:
+We have built and tested Occlum on Ubuntu 18.04/16.04 with or without hardware SGX support (if the CPU does not support SGX, Occlum can be run in the SGX simulation mode). To give Occlum a quick try, one can use the Occlum Docker image by following the steps below:
 
 Step 1-3 are to be done on the host OS (Linux):
 
@@ -134,7 +134,7 @@ Step 1-3 are to be done on the host OS (Linux):
 
 3. Run the Occlum Docker container, which has Occlum and its demos preinstalled:
     ```
-    docker run -it --device /dev/isgx occlum/occlum:0.9.0-ubuntu18.04
+    docker run -it --device /dev/isgx occlum/occlum:0.10.0-ubuntu18.04
     ```
 
 Step 4-5 are to be done on the guest OS running inside the Docker container:
