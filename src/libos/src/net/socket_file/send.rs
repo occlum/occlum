@@ -18,7 +18,7 @@ impl SocketFile {
     }
     */
 
-    pub fn sendmsg<'a, 'b>(&self, msg: &'b MsgHdr<'a>, flags: MsgFlags) -> Result<usize> {
+    pub fn sendmsg<'a, 'b>(&self, msg: &'b MsgHdr<'a>, flags: SendFlags) -> Result<usize> {
         // Copy message's iovecs into untrusted iovecs
         let msg_iov = msg.get_iovs();
         let u_slice_alloc = UntrustedSliceAlloc::new(msg_iov.total_bytes())?;
@@ -39,7 +39,7 @@ impl SocketFile {
     fn do_sendmsg(
         &self,
         data: &[&[u8]],
-        flags: MsgFlags,
+        flags: SendFlags,
         name: Option<&[u8]>,
         control: Option<&[u8]>,
     ) -> Result<usize> {
@@ -57,7 +57,7 @@ impl SocketFile {
         let (msg_control, msg_controllen) = control.as_ptr_and_len();
         let msg_control = msg_control as *const c_void;
         // Flags
-        let flags = flags.to_u32() as i32;
+        let flags = flags.bits();
 
         let bytes_sent = try_libc!({
             // Do OCall

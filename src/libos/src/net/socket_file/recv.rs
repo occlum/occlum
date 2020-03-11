@@ -4,12 +4,12 @@ use crate::untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen, UntrustedSliceAllo
 impl SocketFile {
     // TODO: need sockaddr type to implement send/sento
     /*
-    pub fn recv(&self, buf: &mut [u8], flags: MsgFlags) -> Result<usize> {
+    pub fn recv(&self, buf: &mut [u8], flags: MsgHdrFlags) -> Result<usize> {
         let (bytes_recvd, _) = self.recvfrom(buf, flags, None)?;
         Ok(bytes_recvd)
     }
 
-    pub fn recvfrom(&self, buf: &mut [u8], flags: MsgFlags, src_addr: Option<&mut [u8]>) -> Result<(usize, usize)> {
+    pub fn recvfrom(&self, buf: &mut [u8], flags: MsgHdrFlags, src_addr: Option<&mut [u8]>) -> Result<(usize, usize)> {
         let (bytes_recvd, src_addr_len, _, _) = self.do_recvmsg(
             &mut buf[..],
             flags,
@@ -19,7 +19,7 @@ impl SocketFile {
         Ok((bytes_recvd, src_addr_len))
     }*/
 
-    pub fn recvmsg<'a, 'b>(&self, msg: &'b mut MsgHdrMut<'a>, flags: MsgFlags) -> Result<usize> {
+    pub fn recvmsg<'a, 'b>(&self, msg: &'b mut MsgHdrMut<'a>, flags: RecvFlags) -> Result<usize> {
         // Alloc untrusted iovecs to receive data via OCall
         let msg_iov = msg.get_iovs();
         let u_slice_alloc = UntrustedSliceAlloc::new(msg_iov.total_bytes())?;
@@ -62,10 +62,10 @@ impl SocketFile {
     fn do_recvmsg(
         &self,
         data: &mut [&mut [u8]],
-        flags: MsgFlags,
+        flags: RecvFlags,
         mut name: Option<&mut [u8]>,
         mut control: Option<&mut [u8]>,
-    ) -> Result<(usize, usize, usize, MsgFlags)> {
+    ) -> Result<(usize, usize, usize, MsgHdrFlags)> {
         // Prepare the arguments for OCall
         // Host socket fd
         let host_fd = self.host_fd;
@@ -82,7 +82,7 @@ impl SocketFile {
         let msg_control = msg_control as *mut c_void;
         let mut msg_controllen_recvd = 0;
         // Flags
-        let flags = flags.to_u32() as i32;
+        let flags = flags.bits();
         let mut msg_flags_recvd = 0;
 
         // Do OCall
@@ -123,7 +123,7 @@ impl SocketFile {
         let msg_namelen_recvd = msg_namelen_recvd as usize;
         assert!(msg_namelen_recvd <= msg_namelen);
         assert!(msg_controllen_recvd <= msg_controllen);
-        let flags_recvd = MsgFlags::from_u32(msg_flags_recvd as u32)?;
+        let flags_recvd = MsgHdrFlags::from_bits(msg_flags_recvd).unwrap();
 
         Ok((
             bytes_recvd,

@@ -32,7 +32,7 @@ pub struct MsgHdr<'a> {
     name: Option<&'a [u8]>,
     iovs: Iovs<'a>,
     control: Option<&'a [u8]>,
-    flags: MsgFlags,
+    flags: MsgHdrFlags,
     c_self: &'a msghdr,
 }
 
@@ -51,7 +51,7 @@ impl<'a> MsgHdr<'a> {
             c_msg.msg_controllen as usize,
         );
 
-        let flags = MsgFlags::from_u32(c_msg.msg_flags as u32)?;
+        let flags = MsgHdrFlags::from_bits_truncate(c_msg.msg_flags);
 
         let iovs = {
             let iovs_vec = match iovs_opt_slice {
@@ -85,7 +85,7 @@ impl<'a> MsgHdr<'a> {
         self.control
     }
 
-    pub fn get_flags(&self) -> MsgFlags {
+    pub fn get_flags(&self) -> MsgHdrFlags {
         self.flags
     }
 }
@@ -95,7 +95,7 @@ pub struct MsgHdrMut<'a> {
     name: Option<&'a mut [u8]>,
     iovs: IovsMut<'a>,
     control: Option<&'a mut [u8]>,
-    flags: MsgFlags,
+    flags: MsgHdrFlags,
     c_self: &'a mut msghdr_mut,
 }
 
@@ -111,7 +111,7 @@ impl<'a> MsgHdrMut<'a> {
         let control_opt_slice =
             new_optional_slice_mut(c_msg.msg_control as *mut u8, c_msg.msg_controllen as usize);
 
-        let flags = MsgFlags::from_u32(c_msg.msg_flags as u32)?;
+        let flags = MsgHdrFlags::from_bits_truncate(c_msg.msg_flags);
 
         let iovs = {
             let iovs_vec = match iovs_opt_slice {
@@ -149,7 +149,7 @@ impl<'a> MsgHdrMut<'a> {
         self.control.as_ref().map(|control| &control[..])
     }
 
-    pub fn get_flags(&self) -> MsgFlags {
+    pub fn get_flags(&self) -> MsgHdrFlags {
         self.flags
     }
 
@@ -203,9 +203,9 @@ impl<'a> MsgHdrMut<'a> {
         )
     }
 
-    pub fn set_flags(&mut self, flags: MsgFlags) {
+    pub fn set_flags(&mut self, flags: MsgHdrFlags) {
         self.flags = flags;
-        self.c_self.msg_flags = flags.to_u32() as i32;
+        self.c_self.msg_flags = flags.bits();
     }
 }
 

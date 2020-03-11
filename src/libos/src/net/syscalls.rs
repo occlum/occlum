@@ -23,7 +23,7 @@ pub fn do_sendmsg(fd: c_int, msg_ptr: *const msghdr, flags_c: c_int) -> Result<i
         };
         let msg = unsafe { MsgHdr::from_c(&msg_c)? };
 
-        let flags = MsgFlags::from_u32(flags_c as u32)?;
+        let flags = SendFlags::from_bits_truncate(flags_c);
 
         socket
             .sendmsg(&msg, flags)
@@ -53,7 +53,7 @@ pub fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut msghdr_mut, flags_c: c_int) -> Re
         };
         let mut msg_mut = unsafe { MsgHdrMut::from_c(msg_mut_c)? };
 
-        let flags = MsgFlags::from_u32(flags_c as u32)?;
+        let flags = RecvFlags::from_bits_truncate(flags_c);
 
         socket
             .recvmsg(&mut msg_mut, flags)
