@@ -156,7 +156,13 @@ impl INode for HNode {
     }
 
     fn move_(&self, old_name: &str, target: &Arc<dyn INode>, new_name: &str) -> Result<()> {
-        unimplemented!()
+        let old_path = self.path.join(old_name);
+        let new_path = {
+            let target = target.downcast_ref::<Self>().ok_or(FsError::NotSameFs)?;
+            target.path.join(new_name)
+        };
+        try_std!(fs::rename(&old_path, &new_path));
+        Ok(())
     }
 
     fn find(&self, name: &str) -> Result<Arc<dyn INode>> {

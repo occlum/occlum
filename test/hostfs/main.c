@@ -1,44 +1,121 @@
-#include <sys/types.h>
-#include <sys/uio.h>
+#include <sys/stat.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include "test.h"
 
-int main(int argc, const char* argv[]) {
-    int fd, len;
-    // TODO: rewrite this test so that it does not need to depend on sample.txt
-#if 0
-    char read_buf[128] = {0};
-    // read
-    if ((fd = open("/host/hostfs/sample.txt", O_RDONLY)) < 0) {
-        printf("ERROR: failed to open a file for read\n");
-        return -1;
-    }
-    if ((len = read(fd, read_buf, sizeof(read_buf) - 1)) <= 0) {
-        printf("ERROR: failed to read from the file\n");
-        return -1;
+// ============================================================================
+// Helper function
+// ============================================================================
+
+static int create_file(const char *file_path) {
+    int fd;
+    int flags = O_RDONLY | O_CREAT| O_TRUNC;
+    int mode = 00666;
+    fd = open(file_path, flags, mode);
+    if (fd < 0) {
+        THROW_ERROR("failed to create a file");
     }
     close(fd);
-
-    if (strcmp("HostFS works!", read_buf) != 0) {
-        printf("ERROR: the message read from the file is not expected\n");
-        return -1;
-    }
-    printf("Read file from hostfs successfully!\n");
-#endif
-    // write
-    if ((fd = open("/host/hostfs_test_write.txt", O_WRONLY | O_CREAT)) < 0) {
-        printf("ERROR: failed to open a file for write\n");
-        return -1;
-    }
-    const char WRITE_STR[] = "Write to hostfs successfully!";
-    if ((len = write(fd, WRITE_STR, sizeof(WRITE_STR))) <= 0) {
-        printf("ERROR: failed to write to the file\n");
-        return -1;
-    }
-    close(fd);
-
-    printf("Write file to hostfs finished. Please check its content.\n");
     return 0;
+}
+
+static int remove_file(const char *file_path) {
+    int ret;
+    ret = unlink(file_path);
+    if (ret < 0) {
+        THROW_ERROR("failed to unlink the created file");
+    }
+    return 0;
+}
+
+// ============================================================================
+// Test cases for hostfs
+// ============================================================================
+
+static int __test_write_read(const char *file_path) {
+    char *write_str = "Write to hostfs successfully!";
+	char read_buf[128] = { 0 };
+    int fd;
+
+    fd = open(file_path, O_WRONLY);
+    if (fd < 0) {
+        THROW_ERROR("failed to open a file to write");
+    }
+    if (write(fd, write_str, strlen(write_str)) <= 0) {
+        THROW_ERROR("failed to write to the file");
+    }
+    close(fd);
+    fd = open(file_path, O_RDONLY);
+    if (fd < 0) {
+        THROW_ERROR("failed to open a file to read");
+    }
+	if (read(fd, read_buf, sizeof(read_buf)) != strlen(write_str)) {
+		THROW_ERROR("failed to read to the file");
+	}
+	if (strcmp(write_str, read_buf) != 0) {
+		THROW_ERROR("the message read from the file is not as it was written");
+	}
+    close(fd);
+    return 0;
+}
+
+static int __test_rename(const char *file_path) {
+	char *rename_path = "/host/hostfs_rename.txt";
+	struct stat stat_buf;
+	int ret;
+
+	ret = rename(file_path, rename_path);
+	if (ret < 0) {
+        THROW_ERROR("failed to rename");
+    }
+	ret = stat(file_path, &stat_buf);
+	if (!(ret < 0 && errno == ENOENT)) {
+		THROW_ERROR("stat should return ENOENT");
+	}
+	ret = stat(rename_path, &stat_buf);
+	if (ret < 0) {
+		THROW_ERROR("failed to stat the file");
+	}
+	if (rename(rename_path, file_path) < 0) {
+        THROW_ERROR("failed to rename back");
+    }
+    return 0;
+}
+
+typedef int(*test_hostfs_func_t)(const char *);
+
+static int test_hostfs_framework(test_hostfs_func_t fn) {
+    const char *file_path = "/host/hostfs_test.txt";
+
+	if (create_file(file_path) < 0)
+		return -1;
+	if (fn(file_path) < 0)
+        return -1;
+    if (remove_file(file_path) < 0)
+        return -1;
+    return 0;
+}
+
+static int test_write_read() {
+    return test_hostfs_framework(__test_write_read);
+}
+
+static int test_rename() {
+    return test_hostfs_framework(__test_rename);
+}
+
+// ============================================================================
+// Test suite main
+// ============================================================================
+
+static test_case_t test_cases[] = {
+    TEST_CASE(test_write_read),
+    TEST_CASE(test_rename),
+};
+
+int main(int argc, const char *argv[]) {
+    return test_suite_run(test_cases, ARRAY_SIZE(test_cases));
 }
