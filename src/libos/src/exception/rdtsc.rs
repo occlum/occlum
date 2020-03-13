@@ -1,9 +1,15 @@
 use super::*;
+use process::Task;
 use sgx_types::*;
 
 const RDTSC_OPCODE: u16 = 0x310F;
-static mut FAKE_RDTSC_VALUE: u64 = 0;
-static FAKE_RDTSC_INC_VALUE: u64 = 1000;
+
+extern "C" {
+    fn occlum_ocall_rdtsc(low: *mut u32, high: *mut u32) -> sgx_status_t;
+    fn __get_current_task() -> *const Task;
+    fn switch_td_to_kernel(task: *const Task);
+    fn switch_td_to_user(task: *const Task);
+}
 
 #[no_mangle]
 pub extern "C" fn handle_rdtsc_exception(info: *mut sgx_exception_info_t) -> u32 {
@@ -15,11 +21,19 @@ pub extern "C" fn handle_rdtsc_exception(info: *mut sgx_exception_info_t) -> u32
     {
         return EXCEPTION_CONTINUE_SEARCH;
     }
-    // rdtsc support here is temporary, only for SKL, later CPU's will support this inside enclave
     unsafe {
-        FAKE_RDTSC_VALUE += FAKE_RDTSC_INC_VALUE;
-        info.cpu_context.rax = (FAKE_RDTSC_VALUE & 0xFFFFFFFF);
-        info.cpu_context.rdx = (FAKE_RDTSC_VALUE >> 32);
+        let task = __get_current_task();
+        switch_td_to_kernel(task);
+        let (low, high) = {
+            let mut low = 0;
+            let mut high = 0;
+            let sgx_status = occlum_ocall_rdtsc(&mut low, &mut high);
+            assert!(sgx_status == sgx_status_t::SGX_SUCCESS);
+            (low, high)
+        };
+        info.cpu_context.rax = low as u64;
+        info.cpu_context.rdx = high as u64;
+        switch_td_to_user(task);
     }
     info.cpu_context.rip += 2;
 

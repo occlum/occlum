@@ -37,6 +37,28 @@ static uint64_t get_syscall_stack(struct Task* this_task) {
 #define RESET_CURRENT_TASK()                    \
     __set_stack_guard(stack_guard);
 
+void switch_td_to_kernel(const struct Task* task) {
+    thread_data_t* td = get_thread_data();
+
+    // TODO: do do not support stack expansion, need a new design on SGX2 platform.
+    // Set the stack_commit_addr to 0, as the result no stack expansion happens at any situations
+    __atomic_store_n(&td->stack_commit_addr, 0, __ATOMIC_RELAXED);
+    td->stack_base_addr = task->kernel_stack_base;
+    td->stack_limit_addr = task->kernel_stack_limit;
+    td->stack_commit_addr = task->kernel_stack_limit;
+}
+
+void switch_td_to_user(const struct Task* task) {
+    thread_data_t* td = get_thread_data();
+
+    // TODO: do do not support stack expansion, need a new design on SGX2 platform.
+    // Set the stack_commit_addr to 0, as the result no stack expansion happens at any situations
+    __atomic_store_n(&td->stack_commit_addr, 0, __ATOMIC_RELAXED);
+    td->stack_base_addr = task->user_stack_base;
+    td->stack_limit_addr = task->user_stack_limit;
+    td->stack_commit_addr = task->user_stack_limit;
+}
+
 int do_run_task(struct Task* task) {
     jmp_buf libos_state = {0};
     thread_data_t* td = get_thread_data();
@@ -45,12 +67,7 @@ int do_run_task(struct Task* task) {
     task->kernel_stack_base = td->stack_base_addr;
     task->kernel_stack_limit = td->stack_limit_addr;
 
-    //Do do not support stack expansion, need a new design on SGX2 platform.
-    //Set the stack_commit_addr to 0, as the result no stack expansion happens at any situations
-    __atomic_store_n(&td->stack_commit_addr, 0, __ATOMIC_RELAXED);
-    td->stack_base_addr = task->user_stack_base;
-    td->stack_limit_addr = task->user_stack_limit;
-    td->stack_commit_addr = task->user_stack_limit;
+    switch_td_to_user(task);
 
     SET_CURRENT_TASK(task);
 
@@ -67,13 +84,7 @@ int do_run_task(struct Task* task) {
 void do_exit_task(void) {
     struct Task* task = __get_current_task();
     jmp_buf* jb = task->saved_state;
-    thread_data_t* td = get_thread_data();
 
-    //Do do not support stack expansion, need a new design on SGX2 platform.
-    //Set the stack_commit_addr to 0, as the result no stack expansion happens at any situations
-    __atomic_store_n(&td->stack_commit_addr, 0, __ATOMIC_RELAXED);
-    td->stack_base_addr = task->kernel_stack_base;
-    td->stack_limit_addr = task->kernel_stack_limit;
-    td->stack_commit_addr = task->kernel_stack_limit;
+    switch_td_to_kernel(task);
     longjmp(*jb, 1);
 }

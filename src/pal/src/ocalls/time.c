@@ -24,3 +24,10 @@ int occlum_ocall_thread_getcpuclock(struct timespec *tp) {
 
     return clock_gettime(thread_clock_id, tp);
 }
+
+void occlum_ocall_rdtsc(uint32_t* low, uint32_t* high) {
+    uint64_t rax, rdx;
+    asm volatile("rdtsc" : "=a"(rax), "=d"(rdx));
+    *low = (uint32_t)rax;
+    *high = (uint32_t)rdx;
+}

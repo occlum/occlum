@@ -1,19 +1,41 @@
 #include <stdio.h>
 #include <stdint.h>
+#include "test.h"
+
+// ============================================================================
+// Helper functions for rdtsc
+// ============================================================================
 
 static inline uint64_t native_rdtsc() {
-    uint32_t hi, lo;
-    asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
-    return (( (uint64_t)lo)|( ((uint64_t)hi)<<32 ));
+    uint64_t low, high;
+    asm volatile("rdtsc" : "=a"(low), "=d"(high));
+    return (high << 32) | low;
 }
 
-int main(int argc, char **argv)
-{
-    /* Gets rdtsc information and tests the SGX support of the rdtsc */
-    uint64_t r;
+// ============================================================================
+// Test cases for rdtsc
+// ============================================================================
 
-    r = native_rdtsc();
-    printf("rdtsc: %lu\n", r);
-
+int test_rdtsc() {
+    uint64_t start_count = native_rdtsc();
+    if (start_count == 0) {
+        THROW_ERROR("call rdtsc failed");
+    }
+    uint64_t end_count = native_rdtsc();
+    if (end_count <= start_count) {
+        THROW_ERROR("check rdtsc return value failed");
+    }
     return 0;
+}
+
+// ============================================================================
+// Test suite main
+// ============================================================================
+
+static test_case_t test_cases[] = {
+    TEST_CASE(test_rdtsc),
+};
+
+int main() {
+    return test_suite_run(test_cases, ARRAY_SIZE(test_cases));
 }
