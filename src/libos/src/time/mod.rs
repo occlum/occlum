@@ -75,6 +75,14 @@ impl timespec_t {
         }
     }
 
+    pub fn sec(&self) -> time_t {
+        self.sec
+    }
+
+    pub fn nsec(&self) -> i64 {
+        self.nsec
+    }
+
     pub fn as_duration(&self) -> Duration {
         Duration::new(self.sec as u64, self.nsec as u32)
     }

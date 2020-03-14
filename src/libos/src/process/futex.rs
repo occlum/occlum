@@ -3,6 +3,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::intrinsics::atomic_load;
 use std::sync::atomic::{AtomicBool, Ordering};
+use time::timespec_t;
 
 /// `FutexOp`, `FutexFlags`, and `futex_op_and_flags_from_u32` are helper types and
 /// functions for handling the versatile commands and arguments of futex system
@@ -68,7 +69,15 @@ pub fn futex_op_and_flags_from_u32(bits: u32) -> Result<(FutexOp, FutexFlags)> {
 }
 
 /// Do futex wait
-pub fn futex_wait(futex_addr: *const i32, futex_val: i32) -> Result<()> {
+pub fn futex_wait(
+    futex_addr: *const i32,
+    futex_val: i32,
+    timeout: &Option<timespec_t>,
+) -> Result<()> {
+    info!(
+        "futex_wait addr: {:#x}, val: {}, timeout: {:?}",
+        futex_addr as usize, futex_val, timeout
+    );
     // Get and lock the futex bucket
     let futex_key = FutexKey::new(futex_addr);
     let (_, futex_bucket_ref) = FUTEX_BUCKETS.get_bucket(futex_key);
@@ -76,7 +85,7 @@ pub fn futex_wait(futex_addr: *const i32, futex_val: i32) -> Result<()> {
 
     // Check the futex value
     if futex_key.load_val() != futex_val {
-        return_errno!(EAGAIN, "futex value does not match")
+        return_errno!(EAGAIN, "futex value does not match");
     }
     // Why we first lock the bucket then check the futex value?
     //
@@ -115,7 +124,7 @@ pub fn futex_wait(futex_addr: *const i32, futex_val: i32) -> Result<()> {
 
     // Must make sure that no locks are holded by this thread before wait
     drop(futex_bucket);
-    futex_item.wait()
+    futex_item.wait_timeout(timeout)
 }
 
 /// Do futex wake
@@ -202,7 +211,7 @@ impl FutexKey {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 struct FutexItem {
     key: FutexKey,
     waiter: WaiterRef,
@@ -220,8 +229,19 @@ impl FutexItem {
         self.waiter.wake()
     }
 
-    pub fn wait(&self) -> Result<()> {
-        self.waiter.wait()
+    pub fn wait_timeout(&self, timeout: &Option<timespec_t>) -> Result<()> {
+        match timeout {
+            None => self.waiter.wait(),
+            Some(ts) => {
+                if let Err(e) = self.waiter.wait_timeout(&ts) {
+                    let (_, futex_bucket_ref) = FUTEX_BUCKETS.get_bucket(self.key);
+                    let mut futex_bucket = futex_bucket_ref.lock().unwrap();
+                    futex_bucket.dequeue_item(self);
+                    return_errno!(e.errno(), "futex wait with timeout error");
+                }
+                Ok(())
+            }
+        }
     }
 }
 
@@ -240,6 +260,14 @@ impl FutexBucket {
 
     pub fn enqueue_item(&mut self, item: FutexItem) {
         self.queue.push_back(item);
+    }
+
+    pub fn dequeue_item(&mut self, futex_item: &FutexItem) -> Option<FutexItem> {
+        let item_i = self.queue.iter().position(|item| *item == *futex_item);
+        if item_i.is_none() {
+            return None;
+        }
+        self.queue.swap_remove_back(item_i.unwrap())
     }
 
     pub fn dequeue_and_wake_items(&mut self, key: FutexKey, max_count: usize) -> usize {
@@ -349,10 +377,32 @@ impl Waiter {
         Ok(())
     }
 
+    pub fn wait_timeout(&self, timeout: &timespec_t) -> Result<()> {
+        let current = unsafe { sgx_thread_get_self() };
+        if current != self.thread {
+            return Ok(());
+        }
+        while self.is_woken.load(Ordering::SeqCst) == false {
+            if let Err(e) = wait_event_timeout(self.thread, timeout) {
+                self.is_woken.store(true, Ordering::SeqCst);
+                // Do sanity check here, only possible errnos here are ETIMEDOUT, EAGAIN and EINTR
+                debug_assert!(e.errno() == ETIMEDOUT || e.errno() == EAGAIN || e.errno() == EINTR);
+                return_errno!(e.errno(), "wait_timeout error");
+            }
+        }
+        Ok(())
+    }
+
     pub fn wake(&self) {
         if self.is_woken.fetch_or(true, Ordering::SeqCst) == false {
             set_event(self.thread);
         }
+    }
+}
+
+impl PartialEq for Waiter {
+    fn eq(&self, other: &Self) -> bool {
+        self.thread == other.thread
     }
 }
 
@@ -368,6 +418,31 @@ fn wait_event(thread: *const c_void) {
     if ret != 0 || sgx_ret != 0 {
         panic!("ERROR: sgx_thread_wait_untrusted_event_ocall failed");
     }
+}
+
+fn wait_event_timeout(thread: *const c_void, timeout: &timespec_t) -> Result<()> {
+    let mut ret: c_int = 0;
+    let mut sgx_ret: c_int = 0;
+    let mut errno: c_int = 0;
+    unsafe {
+        sgx_ret = sgx_thread_wait_untrusted_event_timeout_ocall(
+            &mut ret as *mut c_int,
+            thread,
+            timeout.sec(),
+            timeout.nsec(),
+            &mut errno as *mut c_int,
+        );
+    }
+    if ret != 0 || sgx_ret != 0 {
+        panic!("ERROR: sgx_thread_wait_untrusted_event_timeout_ocall failed");
+    }
+    if errno != 0 {
+        return_errno!(
+            Errno::from(errno as u32),
+            "sgx_thread_wait_untrusted_event_timeout_ocall error"
+        );
+    }
+    Ok(())
 }
 
 fn set_event(thread: *const c_void) {
@@ -386,6 +461,14 @@ extern "C" {
 
     /* Go outside and wait on my untrusted event */
     fn sgx_thread_wait_untrusted_event_ocall(ret: *mut c_int, self_thread: *const c_void) -> c_int;
+
+    fn sgx_thread_wait_untrusted_event_timeout_ocall(
+        ret: *mut c_int,
+        self_thread: *const c_void,
+        sec: c_long,
+        nsec: c_long,
+        errno: *mut c_int,
+    ) -> c_int;
 
     /* Wake a thread waiting on its untrusted event */
     fn sgx_thread_set_untrusted_event_ocall(ret: *mut c_int, waiter_thread: *const c_void)

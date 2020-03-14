@@ -183,7 +183,7 @@ pub extern "C" fn dispatch_syscall(
             arg0 as *const i32,
             arg1 as u32,
             arg2 as i32,
-            arg3 as i32,
+            arg3 as u64,
             arg4 as *const i32,
             // Todo: accept other optional arguments
         ),
@@ -460,7 +460,7 @@ pub fn do_futex(
     futex_addr: *const i32,
     futex_op: u32,
     futex_val: i32,
-    timeout: i32,
+    timeout: u64,
     futex_new_addr: *const i32,
 ) -> Result<isize> {
     check_ptr(futex_addr)?;
@@ -474,7 +474,22 @@ pub fn do_futex(
     };
 
     match futex_op {
-        FutexOp::FUTEX_WAIT => process::futex_wait(futex_addr, futex_val).map(|_| 0),
+        FutexOp::FUTEX_WAIT => {
+            let timeout = {
+                let timeout = timeout as *const timespec_t;
+                if timeout.is_null() {
+                    None
+                } else {
+                    let ts = timespec_t::from_raw_ptr(timeout)?;
+                    ts.validate()?;
+                    if futex_flags.contains(FutexFlags::FUTEX_CLOCK_REALTIME) {
+                        warn!("CLOCK_REALTIME is not supported yet, use monotonic clock");
+                    }
+                    Some(ts)
+                }
+            };
+            process::futex_wait(futex_addr, futex_val, &timeout).map(|_| 0)
+        }
         FutexOp::FUTEX_WAKE => {
             let max_count = get_futex_val(futex_val)?;
             process::futex_wake(futex_addr, max_count).map(|count| count as isize)
@@ -482,7 +497,7 @@ pub fn do_futex(
         FutexOp::FUTEX_REQUEUE => {
             check_ptr(futex_new_addr)?;
             let max_nwakes = get_futex_val(futex_val)?;
-            let max_nrequeues = get_futex_val(timeout)?;
+            let max_nrequeues = get_futex_val(timeout as i32)?;
             process::futex_requeue(futex_addr, max_nwakes, max_nrequeues, futex_new_addr)
                 .map(|nwakes| nwakes as isize)
         }

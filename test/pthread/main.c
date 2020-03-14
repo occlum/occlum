@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <errno.h>
 #include "test.h"
 
 // ============================================================================
@@ -163,12 +164,35 @@ static int test_mutex_with_cond_wait(void) {
 }
 
 // ============================================================================
+// The test case of timed lock
+// ============================================================================
+
+static int test_mutex_timedlock() {
+    int err;
+    struct timespec ts;
+    pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
+    pthread_mutex_lock(&lock);
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += 1;
+    /*
+     * This will cause a deadlock, a timeout error will return
+     */
+    err = pthread_mutex_timedlock(&lock, &ts);
+    if (err != ETIMEDOUT) {
+        THROW_ERROR("mutex timed lock failed");
+    }
+    return 0;
+}
+
+// ============================================================================
 // Test suite main
 // ============================================================================
 
 static test_case_t test_cases[] = {
     TEST_CASE(test_mutex_with_concurrent_counter),
     TEST_CASE(test_mutex_with_cond_wait),
+    TEST_CASE(test_mutex_timedlock),
 };
 
 int main() {
