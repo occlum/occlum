@@ -64,6 +64,7 @@ build_openvino() {
     pushd openvino_src
     git clone https://github.com/opencv/dldt .
     git checkout tags/2019_R3 -b 2019_R3
+    git apply ../0001-Fix-passing-pre-increment-parameter-cpu-to-CPU_ISSET.patch
     cd inference-engine
     git submodule init
     git submodule update --recursive

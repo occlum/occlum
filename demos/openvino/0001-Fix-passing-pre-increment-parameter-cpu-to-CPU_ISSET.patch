@@ -1,0 +1,32 @@
+From 2e6be0606c79f11d0bc7400dc97732431ea42c00 Mon Sep 17 00:00:00 2001
+From: He Sun <bochang.sh@antfin.com>
+Date: Fri, 20 Mar 2020 15:52:08 +0800
+Subject: [PATCH] Fix passing pre-increment parameter cpu to CPU_ISSET_S
+
+Fix the incompatibility between OpenVINO and musl libc. The problem is
+that the CPU_ISSET_S macro defined in musl libc is not quite robust: it
+expands the first argument more than once (Glibc's counterpart does not
+have this issue). So if the first argument has any side effect, then the
+macro will have unexpected consequences. Unfortunately, this is exactly
+what happens in the orignal code of OpenVINO.
+---
+ inference-engine/src/mkldnn_plugin/mkldnn_streams.cpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/inference-engine/src/mkldnn_plugin/mkldnn_streams.cpp b/inference-engine/src/mkldnn_plugin/mkldnn_streams.cpp
+index a0c2159..7a9c3e8 100644
+--- a/inference-engine/src/mkldnn_plugin/mkldnn_streams.cpp
++++ b/inference-engine/src/mkldnn_plugin/mkldnn_streams.cpp
+@@ -78,7 +78,8 @@ bool pin_thread_to_vacant_core(int thr_idx, int hyperthreads, int ncores, const
+     // Find index of 'cpu_idx'-th bit that equals to 1
+     int mapped_idx = -1;
+     while (cpu_idx >= 0) {
+-        if (CPU_ISSET_S(++mapped_idx, size, proc_mask))
++        ++mapped_idx;
++        if (CPU_ISSET_S(mapped_idx, size, proc_mask))
+             --cpu_idx;
+     }
+ 
+-- 
+2.7.4
+
