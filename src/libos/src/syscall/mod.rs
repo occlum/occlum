@@ -17,8 +17,8 @@ use fs::{
 use misc::{resource_t, rlimit_t, utsname_t};
 use net::{
     do_epoll_create, do_epoll_create1, do_epoll_ctl, do_epoll_pwait, do_epoll_wait, do_poll,
-    do_recvmsg, do_select, do_sendmsg, msghdr, msghdr_mut, AsSocket, AsUnixSocket, SocketFile,
-    UnixSocketFile,
+    do_recvmsg, do_select, do_sendmsg, msghdr, msghdr_mut, AsSocket, AsUnixSocket, EpollEvent,
+    SocketFile, UnixSocketFile,
 };
 use process::{pid_t, ChildProcessFilter, CloneFlags, CpuSet, FileAction, FutexFlags, FutexOp};
 use std::any::Any;

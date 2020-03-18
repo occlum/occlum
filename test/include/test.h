@@ -3,13 +3,13 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <unistd.h>
 
 #define _STR(x)             #x
 #define STR(x)              _STR(x)
 #define MIN(a, b)               ((a) <= (b) ? (a) : (b))
 #define MAX(a, b)               ((a) >= (b) ? (a) : (b))
 #define ARRAY_SIZE(array)   (sizeof(array)/sizeof(array[0]))
-
 
 typedef int(*test_case_func_t)(void);
 

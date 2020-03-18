@@ -1,199 +1,155 @@
-// Modified from https://banu.com/blog/2/how-to-use-epoll-a-complete-example-in-c/epoll-example.c
+#include <errno.h>
+#include <fcntl.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/epoll.h>
-#include <errno.h>
 #include <spawn.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/epoll.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+
+#include "test.h"
 
 #define MAXEVENTS 64
 #define DEFAULT_PROC_NUM 3
+#define DEFAULT_MSG "Hello World!\n"
 
-static int
-create_and_bind() {
-	int listenfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
-	if (listenfd < 0) {
-		printf("create socket error: %s(errno: %d)\n", strerror(errno), errno);
-		return -1;
-	}
+static int create_and_bind() {
+    int listenfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    if (listenfd < 0) {
+        printf("create socket error: %s(errno: %d)\n", strerror(errno), errno);
+        return -1;
+    }
 
-	struct sockaddr_in servaddr;
-	memset(&servaddr, 0, sizeof(servaddr));
-	servaddr.sin_family = AF_INET;
-	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	servaddr.sin_port = htons(6667);
+    struct sockaddr_in servaddr = {0};
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(6667);
 
-	int reuse = 1;
-	if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
-		perror("setsockopt port to reuse failed");
+    int reuse = 1;
+    if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
+        THROW_ERROR("setsockopt port to reuse failed");
 
-	int ret = bind(listenfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
-	if (ret < 0) {
-		printf("bind socket error: %s(errno: %d)\n", strerror(errno), errno);
-		return -1;
-	}
-	return listenfd;
+    int ret = bind(listenfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+    if (ret < 0) {
+        printf("bind socket error: %s(errno: %d)\n", strerror(errno), errno);
+        return -1;
+    }
+    return listenfd;
 }
 
-int
-main(int argc, char *argv[]) {
-	int sfd = create_and_bind();
+int test_ip_socket() {
+    int ret = 0;
+    int server_fd = create_and_bind();
 
-	int s = listen(sfd, SOMAXCONN);
-	if (s == -1) {
-		perror("listen");
-		return -1;
-	}
+    ret = listen(server_fd, DEFAULT_PROC_NUM);
+    if (ret == -1) {
+        THROW_ERROR("failed to listen");
+    }
 
-	int efd = epoll_create1(0);
-	if (efd == -1) {
-		perror("epoll_create");
-		return -1;
-	}
+    int epfd = epoll_create1(0);
+    if (epfd == -1) {
+        close(server_fd);
+        THROW_ERROR("epoll_create failed");
+    }
 
-	struct epoll_event event;
-	event.data.fd = sfd;
-	event.events = EPOLLIN | EPOLLET;
-	s = epoll_ctl(efd, EPOLL_CTL_ADD, sfd, &event);
-	if (s == -1) {
-		perror("epoll_ctl");
-		return -1;
-	}
+    struct epoll_event listened_event;
+    listened_event.data.fd = server_fd;
+    listened_event.events = EPOLLIN | EPOLLET;
+    ret = epoll_ctl(epfd, EPOLL_CTL_ADD, server_fd, &listened_event);
+    if (ret == -1) {
+        close_files(2, server_fd, epfd);
+        THROW_ERROR("epoll_ctl failed");
+    }
 
-	/* Buffer where events are returned */
-	struct epoll_event *events = calloc(MAXEVENTS, sizeof event);
+    int client_pid;
+    int proc_num = DEFAULT_PROC_NUM;
+    char* client_argv[] = {"client", "127.0.0.1", "6667", NULL};
+    for(int i=0; i<DEFAULT_PROC_NUM; ++i) {
+        int ret = posix_spawn(&client_pid, "/bin/client", NULL, NULL, client_argv, NULL);
+        if (ret < 0) {
+            if (i == 0) {
+                close_files(2, server_fd, epfd);
+                THROW_ERROR("no client is successfully spawned");
+            } else {
+                printf("%d client(s) spawned\n", i);
+                proc_num = i;
+                break;
+            }
+        }
+    }
 
-	// spawn clients
-	int client_pid;
-	int proc_num = DEFAULT_PROC_NUM;
-	char* client_argv[] = {"client", "127.0.0.1", "6667", NULL};
-	for(int i=0; i<DEFAULT_PROC_NUM; ++i) {
-		int ret = posix_spawn(&client_pid, "/bin/client", NULL, NULL, client_argv, NULL);
-		if (ret < 0) {
-			printf("spawn client process error: %s(errno: %d), %d process(es) spawned\n", strerror(errno), errno, i);
-			if (i == 0) {
-			    perror("no client is successfully spawned");
-			    return -1;
-			} else {
-			    proc_num = i;
-			    break;
-			}
-		}
-	}
+    int count = 0;
+    while (count < proc_num) {
+        struct epoll_event events[MAXEVENTS] = {0};
+        int nfds = epoll_pwait(epfd, events, MAXEVENTS, -1, NULL);
+        if (nfds == -1) {
+            close_files(2, server_fd, epfd);
+            THROW_ERROR("epoll_wait failed");
+        }
 
-	/* The event loop */
-	int done_count = 0;
-	while (done_count < proc_num) {
-		int n = epoll_pwait(efd, events, MAXEVENTS, -1, NULL);
-		for (int i = 0; i < n; i++) {
-			if ((events[i].events & EPOLLERR) ||
-				(events[i].events & EPOLLHUP) ||
-				(!(events[i].events & EPOLLIN))) {
-				/* An error has occured on this fd, or the socket is not
-				   ready for reading (why were we notified then?) */
-				fprintf(stderr, "epoll error\n");
-				close(events[i].data.fd);
-				continue;
-			} else if (sfd == events[i].data.fd) {
-				/* We have a notification on the listening socket, which
-				   means one or more incoming connections. */
-				while (1) {
-					struct sockaddr in_addr;
-					socklen_t in_len;
-					int infd;
-					char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+        for (int i = 0; i < nfds; i++) {
+            if (server_fd == events[i].data.fd) {
+                // There is incoming connection to server_fd.
+                // Loop to accept all the connections.
+                while (1) {
+                    struct sockaddr in_addr = {0};
+                    socklen_t in_len;
+                    int in_fd;
+                    in_len = sizeof(in_addr);
+                    in_fd = accept4(server_fd, &in_addr, &in_len, SOCK_NONBLOCK);
+                    if (in_fd == -1) {
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                            // No pending connections are present.
+                            break;
+                        } else {
+                            close_files(2, server_fd, epfd);
+                            THROW_ERROR("unexpected accept error");
+                        }
+                    }
 
-					in_len = sizeof in_addr;
-					infd = accept4(sfd, &in_addr, &in_len, SOCK_NONBLOCK);
-					if (infd == -1) {
-						if ((errno == EAGAIN) ||
-							(errno == EWOULDBLOCK)) {
-							/* We have processed all incoming
-							   connections. */
-							break;
-						} else {
-							perror("accept");
-							break;
-						}
-					}
+                    struct epoll_event client_event;
+                    client_event.data.fd = in_fd;
+                    client_event.events = EPOLLIN | EPOLLET;
+                    ret = epoll_ctl(epfd, EPOLL_CTL_ADD, in_fd, &client_event);
+                    if (ret == -1) {
+                        close_files(2, server_fd, epfd);
+                        THROW_ERROR("epoll_ctl failed");
+                    }
+                }
+            } else if (events[i].events & EPOLLIN) {
+                // Channel is ready to read.
+                char buf[36];
+                if ((read(events[i].data.fd, buf, sizeof buf)) != 0) {
+                    if(strcmp(buf, DEFAULT_MSG) != 0) {
+                        close_files(2, server_fd, epfd);
+                        THROW_ERROR("msg mismatched");
+                    }
+                } else {
+                    close_files(2, server_fd, epfd);
+                    THROW_ERROR("read error");
+                }
 
-					s = getnameinfo(&in_addr, in_len,
-									hbuf, sizeof hbuf,
-									sbuf, sizeof sbuf,
-									NI_NUMERICHOST | NI_NUMERICSERV);
-					if (s == 0) {
-						printf("Accepted connection on descriptor %d "
-							   "(host=%s, port=%s)\n", infd, hbuf, sbuf);
-					}
+                close(events[i].data.fd);
+                // Finish communication with one process.
+                count++;
+            } else {
+                close_files(2, server_fd, epfd);
+                THROW_ERROR("should never reach here");
+            }
+        }
+    }
 
-					// add it to the list of fds to monitor
-					event.data.fd = infd;
-					event.events = EPOLLIN | EPOLLET;
-					s = epoll_ctl(efd, EPOLL_CTL_ADD, infd, &event);
-					if (s == -1) {
-						perror("epoll_ctl");
-						return -1;
-					}
-				}
-				continue;
-			} else {
-				/* We have data on the fd waiting to be read. Read and
-				   display it. We must read whatever data is available
-				   completely, as we are running in edge-triggered mode
-				   and won't get a notification again for the same
-				   data. */
-				int done = 0;
+    close_files(2, server_fd, epfd);
+    return 0;
+}
 
-				while (1) {
-					ssize_t count;
-					char buf[512];
+static test_case_t test_cases[] = {
+    TEST_CASE(test_ip_socket),
+};
 
-					count = read(events[i].data.fd, buf, sizeof buf);
-					if (count == -1) {
-						/* If errno == EAGAIN, that means we have read all
-						   data. So go back to the main loop. */
-						if (errno != EAGAIN) {
-							perror("read");
-							done = 1;
-						}
-						break;
-					} else if (count == 0) {
-						/* End of file. The remote has closed the
-						   connection. */
-						done = 1;
-						break;
-					}
-
-					/* Write the buffer to standard output */
-					s = write(1, buf, count);
-					if (s == -1) {
-						perror("write");
-						return -1;
-					}
-				}
-
-				if (done) {
-					printf("Closed connection on descriptor %d\n",
-						   events[i].data.fd);
-
-					/* Closing the descriptor will make epoll remove it
-					   from the set of descriptors which are monitored. */
-					close(events[i].data.fd);
-
-					done_count ++;
-				}
-			}
-		}
-	}
-
-	free(events);
-
-	close(sfd);
-
-	return EXIT_SUCCESS;
+int main(int argc, const char* argv[]) {
+    return test_suite_run(test_cases, ARRAY_SIZE(test_cases));
 }
