@@ -42,7 +42,7 @@ pub fn do_clone(
     ctid: Option<*mut pid_t>,
     new_tls: Option<usize>,
 ) -> Result<pid_t> {
-    info!(
+    debug!(
         "clone: flags: {:?}, stack_addr: {:?}, ptid: {:?}, ctid: {:?}, new_tls: {:?}",
         flags, user_rsp, ptid, ctid, new_tls
     );
@@ -99,6 +99,7 @@ pub fn do_clone(
     }
 
     process_table::put(new_thread_pid, new_thread_ref.clone());
+    info!("Thread created: tid = {}", new_thread_pid);
 
     if let Some(ptid) = ptid {
         unsafe {
@@ -111,7 +112,7 @@ pub fn do_clone(
 }
 
 pub fn do_set_tid_address(tidptr: *mut pid_t) -> Result<pid_t> {
-    info!("set_tid_address: tidptr: {:#x}", tidptr as usize);
+    debug!("set_tid_address: tidptr: {:#x}", tidptr as usize);
     let current_ref = get_current();
     let mut current = current_ref.lock().unwrap();
     current.clear_child_tid = Some(tidptr);

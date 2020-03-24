@@ -1,4 +1,3 @@
-use super::process;
 /// Log infrastructure.
 ///
 /// There are five APIs for producing log messages:
@@ -9,6 +8,27 @@ use super::process;
 /// 5. `trace!`
 /// which corresponds to five different log levels.
 ///
+/// To give all developers a common sense of "when to use which log level", we give some guidelines
+/// and examples here:
+///
+/// 1. Use `errno!` to mark errors or unexpected conditions, e.g., a `Result::Err` returned from a
+///    system call.
+///
+/// 2. Use `warn!` to warn about potentially problematic issues, e.g., executing a workaround or
+///    fake implementation.
+///
+/// 3. Use `info!` to show important events (from users' perspective) in normal execution,
+///    e.g., creating/exiting a process/thread.
+///
+/// 4. Use `debug!` to track major events in normal execution, e.g., the high-level
+///    arguments of a system call.
+///
+/// 5. Use `trace` to record the most detailed info, e.g., when a system call enters
+///    and exits the LibOS.
+///
+/// One of the most important principles for effective logging is "don't log too much or too little".
+/// So log messages should be inserted with discretion.
+///
 /// Safety. Sensitive, internal info may be leaked though log messages. To prevent
 /// this from happening, the current solution is to turn off the log entirely
 /// when initializing the log infrastructure, if the enclave is in release mode.
@@ -16,6 +36,7 @@ use super::process;
 /// Note. Do not use log as a way to display critical info to users as log may be
 /// turned off (even the error messages). For such messages, use `println!` or
 /// `eprintln!` directly.
+use super::process;
 use log::*;
 use std::cell::Cell;
 

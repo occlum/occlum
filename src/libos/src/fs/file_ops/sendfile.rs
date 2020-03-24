@@ -7,7 +7,7 @@ pub fn do_sendfile(
     count: usize,
 ) -> Result<(usize, usize)> {
     // (len, offset)
-    info!(
+    debug!(
         "sendfile: out: {}, in: {}, offset: {:?}, count: {}",
         out_fd, in_fd, offset, count
     );

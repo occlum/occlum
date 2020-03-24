@@ -400,7 +400,6 @@ pub fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize> {
 }
 
 pub fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
-    info!("ioctl: fd: {}, cmd: {}, argp: {:?}", fd, cmd, argp);
     let mut ioctl_cmd = unsafe {
         if argp.is_null() == false {
             from_user::check_mut_ptr(argp)?;

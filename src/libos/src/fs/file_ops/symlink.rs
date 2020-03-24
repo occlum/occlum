@@ -1,7 +1,7 @@
 use super::*;
 
 pub fn do_readlink(path: &str, buf: &mut [u8]) -> Result<usize> {
-    info!("readlink: path: {:?}", path);
+    debug!("readlink: path: {:?}", path);
     let file_path = {
         if path == "/proc/self/exe" {
             let current_ref = process::get_current();

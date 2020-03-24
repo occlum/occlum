@@ -34,7 +34,6 @@ impl GlobalProfiler {
         self.syscall_exit(SyscallNum::Exit, false);
 
         let tid = process::do_gettid();
-        println!("thread {} exits", tid);
 
         let mut exiting_profiler = self.inner.remove(&tid).ok_or_else(|| {
             errno!(
@@ -99,7 +98,6 @@ impl ThreadProfiler {
 
     fn stop(&mut self) -> Result<()> {
         if self.status != Status::Running {
-            error!("wrong status is {:?}", self.status);
             return_errno!(EINVAL, "fail to stop thread profiler");
         }
         let real = time::do_gettimeofday().as_duration() - self.start_time.get_realtime().unwrap();

@@ -33,7 +33,7 @@ pub fn do_faccessat(
     mode: AccessibilityCheckMode,
     flags: AccessibilityCheckFlags,
 ) -> Result<()> {
-    info!(
+    debug!(
         "faccessat: dirfd: {:?}, path: {:?}, mode: {:?}, flags: {:?}",
         dirfd, path, mode, flags
     );
@@ -45,7 +45,7 @@ pub fn do_faccessat(
 }
 
 pub fn do_access(path: &str, mode: AccessibilityCheckMode) -> Result<()> {
-    info!("access: path: {:?}, mode: {:?}", path, mode);
+    debug!("access: path: {:?}, mode: {:?}", path, mode);
     let current_ref = process::get_current();
     let mut current = current_ref.lock().unwrap();
     let inode = current.lookup_inode(path)?;

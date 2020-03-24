@@ -116,6 +116,7 @@ fn new_process(
     parent_adopts_new_child(&parent_ref, &new_process_ref);
     process_table::put(new_pid, new_process_ref.clone());
     let new_tid = new_pid;
+    info!("Process created: elf = {}, tid = {}", elf_path, new_tid);
     Ok((new_tid, new_process_ref))
 }
 

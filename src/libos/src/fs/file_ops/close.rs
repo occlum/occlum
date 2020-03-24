@@ -1,7 +1,7 @@
 use super::*;
 
 pub fn do_close(fd: FileDesc) -> Result<()> {
-    info!("close: fd: {}", fd);
+    debug!("close: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_table_ref = current_process.get_files();

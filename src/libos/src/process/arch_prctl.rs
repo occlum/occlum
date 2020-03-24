@@ -22,7 +22,7 @@ impl ArchPrctlCode {
 }
 
 pub fn do_arch_prctl(code: ArchPrctlCode, addr: *mut usize) -> Result<()> {
-    info!(
+    debug!(
         "do_arch_prctl: code: {:?}, addr: {:#o}",
         code, addr as usize
     );

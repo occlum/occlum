@@ -1,7 +1,7 @@
 use super::*;
 
 pub fn do_sync() -> Result<()> {
-    info!("sync:");
+    debug!("sync:");
     ROOT_INODE.fs().sync()?;
     Ok(())
 }

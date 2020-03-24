@@ -703,7 +703,7 @@ fn do_spawn(
     let envp = clone_cstrings_safely(envp)?;
     let file_actions = clone_file_actions_safely(fdop_list)?;
     let parent = process::get_current();
-    info!(
+    debug!(
         "spawn: path: {:?}, argv: {:?}, envp: {:?}, fdop: {:?}",
         path, argv, envp, file_actions
     );
@@ -947,7 +947,7 @@ fn do_nanosleep(req_u: *const timespec_t, rem_u: *mut timespec_t) -> Result<isiz
 const MAP_FAILED: *const c_void = ((-1) as i64) as *const c_void;
 
 fn do_exit(status: i32) -> ! {
-    info!("exit: {}", status);
+    debug!("exit: {}", status);
     extern "C" {
         fn do_exit_task() -> !;
     }
@@ -1028,7 +1028,7 @@ fn do_sched_setaffinity(pid: pid_t, cpusize: size_t, buf: *const c_uchar) -> Res
 }
 
 fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize> {
-    info!(
+    debug!(
         "socket: domain: {}, socket_type: 0x{:x}, protocol: {}",
         domain, socket_type, protocol
     );
@@ -1052,7 +1052,7 @@ fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize
 }
 
 fn do_connect(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t) -> Result<isize> {
-    info!(
+    debug!(
         "connect: fd: {}, addr: {:?}, addr_len: {}",
         fd, addr, addr_len
     );
@@ -1089,7 +1089,7 @@ fn do_accept4(
     addr_len: *mut libc::socklen_t,
     flags: c_int,
 ) -> Result<isize> {
-    info!(
+    debug!(
         "accept4: fd: {}, addr: {:?}, addr_len: {:?}, flags: {:#x}",
         fd, addr, addr_len, flags
     );
@@ -1119,7 +1119,7 @@ fn do_accept4(
 }
 
 fn do_shutdown(fd: c_int, how: c_int) -> Result<isize> {
-    info!("shutdown: fd: {}, how: {}", fd, how);
+    debug!("shutdown: fd: {}, how: {}", fd, how);
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
@@ -1132,7 +1132,7 @@ fn do_shutdown(fd: c_int, how: c_int) -> Result<isize> {
 }
 
 fn do_bind(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t) -> Result<isize> {
-    info!("bind: fd: {}, addr: {:?}, addr_len: {}", fd, addr, addr_len);
+    debug!("bind: fd: {}, addr: {:?}, addr_len: {}", fd, addr, addr_len);
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
@@ -1154,7 +1154,7 @@ fn do_bind(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t) ->
 }
 
 fn do_listen(fd: c_int, backlog: c_int) -> Result<isize> {
-    info!("listen: fd: {}, backlog: {}", fd, backlog);
+    debug!("listen: fd: {}, backlog: {}", fd, backlog);
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
     let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
@@ -1176,7 +1176,7 @@ fn do_setsockopt(
     optval: *const c_void,
     optlen: libc::socklen_t,
 ) -> Result<isize> {
-    info!(
+    debug!(
         "setsockopt: fd: {}, level: {}, optname: {}, optval: {:?}, optlen: {:?}",
         fd, level, optname, optval, optlen
     );
@@ -1207,7 +1207,7 @@ fn do_getsockopt(
     optval: *mut c_void,
     optlen: *mut libc::socklen_t,
 ) -> Result<isize> {
-    info!(
+    debug!(
         "getsockopt: fd: {}, level: {}, optname: {}, optval: {:?}, optlen: {:?}",
         fd, level, optname, optval, optlen
     );
@@ -1231,7 +1231,7 @@ fn do_getpeername(
     addr: *mut libc::sockaddr,
     addr_len: *mut libc::socklen_t,
 ) -> Result<isize> {
-    info!(
+    debug!(
         "getpeername: fd: {}, addr: {:?}, addr_len: {:?}",
         fd, addr, addr_len
     );
@@ -1257,7 +1257,7 @@ fn do_getsockname(
     addr: *mut libc::sockaddr,
     addr_len: *mut libc::socklen_t,
 ) -> Result<isize> {
-    info!(
+    debug!(
         "getsockname: fd: {}, addr: {:?}, addr_len: {:?}",
         fd, addr, addr_len
     );
@@ -1283,7 +1283,7 @@ fn do_sendto(
     addr: *const libc::sockaddr,
     addr_len: libc::socklen_t,
 ) -> Result<isize> {
-    info!(
+    debug!(
         "sendto: fd: {}, base: {:?}, len: {}, addr: {:?}, addr_len: {}",
         fd, base, len, addr, addr_len
     );
@@ -1311,7 +1311,7 @@ fn do_recvfrom(
     addr: *mut libc::sockaddr,
     addr_len: *mut libc::socklen_t,
 ) -> Result<isize> {
-    info!(
+    debug!(
         "recvfrom: fd: {}, base: {:?}, len: {}, flags: {}, addr: {:?}, addr_len: {:?}",
         fd, base, len, flags, addr, addr_len
     );
@@ -1337,7 +1337,7 @@ fn do_socketpair(
     protocol: c_int,
     sv: *mut c_int,
 ) -> Result<isize> {
-    info!(
+    debug!(
         "socketpair: domain: {}, type:0x{:x}, protocol: {}",
         domain, socket_type, protocol
     );
@@ -1362,7 +1362,7 @@ fn do_socketpair(
             .unwrap()
             .put(Arc::new(Box::new(server_socket)), false);
 
-        info!("socketpair: ({}, {})", sock_pair[0], sock_pair[1]);
+        debug!("socketpair: ({}, {})", sock_pair[0], sock_pair[1]);
         Ok(0)
     } else if (domain == libc::AF_TIPC) {
         return_errno!(EAFNOSUPPORT, "cluster domain sockets not supported")

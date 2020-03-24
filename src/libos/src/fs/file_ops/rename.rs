@@ -3,7 +3,7 @@ use super::*;
 pub fn do_rename(oldpath: &str, newpath: &str) -> Result<()> {
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
-    info!("rename: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
+    debug!("rename: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
 
     let (old_dir_path, old_file_name) = split_path(&oldpath);
     let (new_dir_path, new_file_name) = split_path(&newpath);

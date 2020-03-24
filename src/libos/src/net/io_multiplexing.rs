@@ -15,7 +15,7 @@ pub fn do_select(
     exceptfds: &mut libc::fd_set,
     timeout: Option<libc::timeval>,
 ) -> Result<usize> {
-    info!("select: nfds: {}", nfds);
+    debug!("select: nfds: {}", nfds);
     // convert libos fd to Linux fd
     let mut host_to_libos_fd = [0; libc::FD_SETSIZE];
     let mut polls = Vec::<libc::pollfd>::new();
@@ -117,7 +117,7 @@ pub fn do_select(
 }
 
 pub fn do_poll(pollfds: &mut [libc::pollfd], timeout: c_int) -> Result<usize> {
-    info!(
+    debug!(
         "poll: {:?}, timeout: {}",
         pollfds.iter().map(|p| p.fd).collect::<Vec<_>>(),
         timeout
@@ -189,7 +189,7 @@ pub fn do_poll(pollfds: &mut [libc::pollfd], timeout: c_int) -> Result<usize> {
 }
 
 pub fn do_epoll_create1(flags: c_int) -> Result<FileDesc> {
-    info!("epoll_create1: flags: {}", flags);
+    debug!("epoll_create1: flags: {}", flags);
 
     let epoll = EpollFile::new()?;
     let file_ref: Arc<Box<dyn File>> = Arc::new(Box::new(epoll));
@@ -211,7 +211,7 @@ pub fn do_epoll_ctl(
     fd: FileDesc,
     event: *const libc::epoll_event,
 ) -> Result<()> {
-    info!("epoll_ctl: epfd: {}, op: {:?}, fd: {}", epfd, op, fd);
+    debug!("epoll_ctl: epfd: {}, op: {:?}, fd: {}", epfd, op, fd);
 
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
@@ -240,7 +240,7 @@ pub fn do_epoll_wait(
     events: &mut [libc::epoll_event],
     timeout: c_int,
 ) -> Result<usize> {
-    info!(
+    debug!(
         "epoll_wait: epfd: {}, len: {:?}, timeout: {}",
         epfd,
         events.len(),

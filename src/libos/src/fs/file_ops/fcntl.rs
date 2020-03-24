@@ -52,7 +52,7 @@ impl<'a> FcntlCmd<'a> {
 }
 
 pub fn do_fcntl(fd: FileDesc, cmd: &mut FcntlCmd) -> Result<isize> {
-    info!("fcntl: fd: {:?}, cmd: {:?}", &fd, cmd);
+    debug!("fcntl: fd: {:?}, cmd: {:?}", &fd, cmd);
     let current_ref = process::get_current();
     let mut current = current_ref.lock().unwrap();
     let file_table_ref = current.get_files();

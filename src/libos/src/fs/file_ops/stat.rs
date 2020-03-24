@@ -140,7 +140,7 @@ fn do_stat(path: &str) -> Result<Stat> {
 }
 
 pub fn do_fstat(fd: u32) -> Result<Stat> {
-    info!("fstat: fd: {}", fd);
+    debug!("fstat: fd: {}", fd);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
@@ -150,7 +150,7 @@ pub fn do_fstat(fd: u32) -> Result<Stat> {
 }
 
 pub fn do_lstat(path: &str) -> Result<Stat> {
-    info!("lstat: path: {}", path);
+    debug!("lstat: path: {}", path);
     let current_ref = process::get_current();
     let current_process = current_ref.lock().unwrap();
     let inode = current_process.lookup_inode(&path)?;
@@ -159,7 +159,7 @@ pub fn do_lstat(path: &str) -> Result<Stat> {
 }
 
 pub fn do_fstatat(dirfd: DirFd, path: &str, flags: StatFlags) -> Result<Stat> {
-    info!(
+    debug!(
         "fstatat: dirfd: {:?}, path: {:?}, flags: {:?}",
         dirfd, path, flags
     );

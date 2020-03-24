@@ -14,7 +14,7 @@ pub use std::sync::{
 
 macro_rules! debug_trace {
     () => {
-        println!("> Line = {}, File = {}", line!(), file!())
+        debug!("> Line = {}, File = {}", line!(), file!())
     };
 }
 

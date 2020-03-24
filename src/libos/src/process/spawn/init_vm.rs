@@ -19,7 +19,7 @@ pub fn do_init<'a, 'b>(
 fn reloc_symbols(process_base_addr: usize, elf_file: &ElfFile) -> Result<()> {
     let rela_entries = elf_helper::get_rela_entries(elf_file, ".rela.dyn")?;
     for rela_entry in rela_entries {
-        println!(
+        trace!(
             "\toffset: {:#X}, symbol index: {}, type: {}, addend: {:#X}",
             rela_entry.get_offset(),
             rela_entry.get_symbol_table_index(),

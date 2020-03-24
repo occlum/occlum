@@ -61,7 +61,7 @@ unsafe fn write_cstr(ptr: *mut u8, s: &str) {
 }
 
 pub fn do_getdents64(fd: FileDesc, buf: &mut [u8]) -> Result<usize> {
-    info!(
+    debug!(
         "getdents64: fd: {}, buf: {:?}, buf_size: {}",
         fd,
         buf.as_ptr(),

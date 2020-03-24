@@ -123,6 +123,8 @@ pub fn run_task(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
         (process.get_exit_status(), parent.get_tid())
     };
 
+    info!("Thread exited: tid = {}", libos_tid);
+
     // If process's parent is the IDLE_PROCESS (pid = 0), so it has to release itself
     if parent_pid == 0 {
         process_table::remove(pid);

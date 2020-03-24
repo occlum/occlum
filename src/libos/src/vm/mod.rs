@@ -24,12 +24,12 @@ pub fn do_mmap(
     offset: usize,
 ) -> Result<usize> {
     if flags.contains(MMapFlags::MAP_ANONYMOUS) {
-        info!(
+        debug!(
             "mmap: addr: {:#x}, size: {:#x}, perms: {:?}, flags: {:?}",
             addr, size, perms, flags,
         );
     } else {
-        info!(
+        debug!(
             "mmap: addr: {:#x}, size: {:#x}, perms: {:?}, flags: {:?}, fd: {:?}, offset: {:?}",
             addr, size, perms, flags, fd, offset
         );
@@ -45,7 +45,7 @@ pub fn do_mmap(
 }
 
 pub fn do_munmap(addr: usize, size: usize) -> Result<()> {
-    info!("munmap: addr: {:#x}, size: {:#x}", addr, size);
+    debug!("munmap: addr: {:#x}, size: {:#x}", addr, size);
     let mut current_vm_ref = {
         let current_ref = get_current();
         let current_process = current_ref.lock().unwrap();
@@ -56,7 +56,7 @@ pub fn do_munmap(addr: usize, size: usize) -> Result<()> {
 }
 
 pub fn do_brk(addr: usize) -> Result<usize> {
-    info!("brk: addr: {:#x}", addr);
+    debug!("brk: addr: {:#x}", addr);
     let current_ref = get_current();
     let current_process = current_ref.lock().unwrap();
     let current_vm_ref = current_process.get_vm();

@@ -18,7 +18,7 @@ fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc> {
 }
 
 pub fn do_openat(dirfd: DirFd, path: &str, flags: u32, mode: u32) -> Result<FileDesc> {
-    info!(
+    debug!(
         "openat: dirfd: {:?}, path: {:?}, flags: {:#o}, mode: {:#o}",
         dirfd, path, flags, mode
     );

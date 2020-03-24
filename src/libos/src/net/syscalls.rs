@@ -6,7 +6,7 @@ use process::Process;
 use util::mem_util::from_user;
 
 pub fn do_sendmsg(fd: c_int, msg_ptr: *const msghdr, flags_c: c_int) -> Result<isize> {
-    info!(
+    debug!(
         "sendmsg: fd: {}, msg: {:?}, flags: 0x{:x}",
         fd, msg_ptr, flags_c
     );
@@ -36,7 +36,7 @@ pub fn do_sendmsg(fd: c_int, msg_ptr: *const msghdr, flags_c: c_int) -> Result<i
 }
 
 pub fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut msghdr_mut, flags_c: c_int) -> Result<isize> {
-    info!(
+    debug!(
         "recvmsg: fd: {}, msg: {:?}, flags: 0x{:x}",
         fd, msg_mut_ptr, flags_c
     );
@@ -232,11 +232,8 @@ pub fn do_epoll_pwait(
     timeout: c_int,
     sigmask: *const usize, //TODO:add sigset_t
 ) -> Result<isize> {
-    if sigmask.is_null() {
-        info!("epoll_wait");
-    } else {
-        info!("epoll_pwait")
+    if !sigmask.is_null() {
+        warn!("epoll_pwait cannot handle signal mask, yet");
     }
-    //TODO:add signal support
     do_epoll_wait(epfd, events, maxevents, timeout)
 }
