@@ -117,5 +117,8 @@ enclave {
             unsigned int initval,
             int flags
         ) propagate_errno;
+
+        void occlum_ocall_print_log(uint32_t level, [in, string] const char* msg);
+        void occlum_ocall_flush_log(void);
     };
 };

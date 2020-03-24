@@ -21,7 +21,16 @@ pub extern "C" fn occlum_ecall_new_process(
 ) -> i32 {
     INIT_ONCE.call_once(|| {
         // Init the log infrastructure first so that log messages will be printed afterwards
-        util::log::init();
+        use util::log::LevelFilter;
+        let log_level = match option_env!("LIBOS_LOG") {
+            Some("error") => LevelFilter::Error,
+            Some("warn") => LevelFilter::Warn,
+            Some("info") => LevelFilter::Info,
+            Some("debug") => LevelFilter::Debug,
+            Some("trace") => LevelFilter::Trace,
+            _ => LevelFilter::Error, // errors are printed be default
+        };
+        util::log::init(log_level);
         // Init MPX for SFI
         util::mpx_util::mpx_enable();
         // Register exception handlers (support cpuid & rdtsc for now)
@@ -33,7 +42,7 @@ pub extern "C" fn occlum_ecall_new_process(
     let (path, args) = match parse_arguments(path_buf, argv) {
         Ok(path_and_args) => path_and_args,
         Err(e) => {
-            error!("invalid arguments for LibOS: {}", e.backtrace());
+            eprintln!("invalid arguments for LibOS: {}", e.backtrace());
             return EXIT_STATUS_INTERNAL_ERROR;
         }
     };
@@ -42,7 +51,7 @@ pub extern "C" fn occlum_ecall_new_process(
         backtrace::__rust_begin_short_backtrace(|| match do_new_process(&path, &args) {
             Ok(pid_t) => pid_t as i32,
             Err(e) => {
-                error!("failed to boot up LibOS: {}", e.backtrace());
+                eprintln!("failed to boot up LibOS: {}", e.backtrace());
                 EXIT_STATUS_INTERNAL_ERROR
             }
         })
@@ -62,7 +71,7 @@ pub extern "C" fn occlum_ecall_exec_thread(libos_pid: i32, host_tid: i32) -> i32
             match do_exec_thread(libos_pid as pid_t, host_tid as pid_t) {
                 Ok(exit_status) => exit_status,
                 Err(e) => {
-                    error!("failed to execute a process: {}", e.backtrace());
+                    eprintln!("failed to execute a process: {}", e.backtrace());
                     EXIT_STATUS_INTERNAL_ERROR
                 }
             }

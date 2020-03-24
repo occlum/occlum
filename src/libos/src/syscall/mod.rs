@@ -27,6 +27,7 @@ use std::ffi::{CStr, CString};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::ptr;
 use time::{clockid_t, timespec_t, timeval_t, GLOBAL_PROFILER};
+use util::log::{self, LevelFilter};
 use util::mem_util::from_user::*;
 use vm::{MMapFlags, VMPerms};
 use {fs, process, std, vm};
@@ -416,6 +417,18 @@ macro_rules! impl_syscall_nums {
             )*
         }
 
+        impl SyscallNum {
+            pub fn as_str(&self) -> &'static str {
+                use SyscallNum::*;
+                match *self {
+                    #![deny(unreachable_patterns)]
+                    $(
+                        $name => stringify!($name),
+                    )*
+                }
+            }
+        }
+
         impl TryFrom<u32> for SyscallNum {
             type Error = error::Error;
 
@@ -428,7 +441,6 @@ macro_rules! impl_syscall_nums {
                 }
             }
         }
-
 
         #[derive(Copy, Clone, Debug)]
         pub struct SyscallNumError {
@@ -565,7 +577,10 @@ pub extern "C" fn occlum_syscall(
     arg4: isize,
     arg5: isize,
 ) -> isize {
-    let pid = process::do_gettid();
+    // Start a new round of log messages for this system call. But we do not
+    // set the description of this round, yet. We will do so after checking the
+    // given system call number is a valid.
+    log::next_round(None);
 
     #[cfg(feature = "syscall_timing")]
     GLOBAL_PROFILER
@@ -574,12 +589,12 @@ pub extern "C" fn occlum_syscall(
         .syscall_enter(syscall_num)
         .expect("unexpected error from profiler to enter syscall");
 
-    let ret = {
-        let syscall = Syscall::new(num, arg0, arg1, arg2, arg3, arg4, arg5).unwrap();
-        info!("{:?}", &syscall);
+    let ret = Syscall::new(num, arg0, arg1, arg2, arg3, arg4, arg5).and_then(|syscall| {
+        log::set_round_desc(Some(syscall.num.as_str()));
+        trace!("{:?}", &syscall);
 
         dispatch_syscall(syscall)
-    };
+    });
 
     #[cfg(feature = "syscall_timing")]
     GLOBAL_PROFILER
@@ -588,18 +603,38 @@ pub extern "C" fn occlum_syscall(
         .syscall_exit(syscall_num, ret.is_err())
         .expect("unexpected error from profiler to exit syscall");
 
-    info!("tid: {} => {:?} ", pid, ret);
-
-    match ret {
+    let retval = match ret {
         Ok(retval) => retval as isize,
         Err(e) => {
-            warn!("{}", e.backtrace());
+            let should_log_err = |errno| {
+                // If the log level requires every detail, don't ignore any error
+                if log::max_level() == LevelFilter::Trace {
+                    return true;
+                }
+
+                // All other log levels require errors to be outputed. But
+                // some errnos are usually benign and may occur in a very high
+                // frequency. So we want to ignore them to keep noises at a
+                // minimum level in the log.
+                //
+                // TODO: use a smarter, frequency-based strategy to decide whether
+                // to suppress error messages.
+                match errno {
+                    EAGAIN | ETIMEDOUT => false,
+                    _ => true,
+                }
+            };
+            if should_log_err(e.errno()) {
+                error!("Error = {}", e.backtrace());
+            }
 
             let retval = -(e.errno() as isize);
             debug_assert!(retval != 0);
             retval
         }
-    }
+    };
+    trace!("Retval = {:?}", retval);
+    retval
 }
 
 /*
