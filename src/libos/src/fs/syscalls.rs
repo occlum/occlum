@@ -13,6 +13,10 @@ pub struct iovec_t {
     len: size_t,
 }
 
+pub fn do_eventfd(init_val: u32) -> Result<isize> {
+    do_eventfd2(init_val, 0)
+}
+
 pub fn do_eventfd2(init_val: u32, flags: i32) -> Result<isize> {
     info!("eventfd: initval {}, flags {} ", init_val, flags);
 
@@ -270,6 +274,10 @@ pub fn do_getdents64(fd: FileDesc, buf: *mut u8, buf_size: usize) -> Result<isiz
 pub fn do_sync() -> Result<isize> {
     fs_ops::do_sync()?;
     Ok(0)
+}
+
+pub fn do_pipe(fds_u: *mut i32) -> Result<isize> {
+    do_pipe2(fds_u, 0)
 }
 
 pub fn do_pipe2(fds_u: *mut i32, flags: u32) -> Result<isize> {

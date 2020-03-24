@@ -58,7 +58,7 @@ __occlum_syscall:
     // Pass arg5
     pushq 0x18(%rbp)
 
-    call dispatch_syscall
+    call occlum_syscall
 
     // Use user fsbase. Different implementation for HW and SIM.
 #if SGX_MODE_SIM

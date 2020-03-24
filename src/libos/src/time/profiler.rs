@@ -29,9 +29,9 @@ impl GlobalProfiler {
     }
 
     pub fn thread_exit(&mut self) -> Result<()> {
-        // A thread exits by invoking SysExit syscall which
+        // A thread exits by invoking exit syscall which
         // will never return
-        self.syscall_exit(SyscallNum::SysExit, false);
+        self.syscall_exit(SyscallNum::Exit, false);
 
         let tid = process::do_gettid();
         println!("thread {} exits", tid);

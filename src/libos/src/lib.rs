@@ -9,6 +9,8 @@
 #![feature(atomic_min_max)]
 #![feature(no_more_cas)]
 #![feature(alloc_layout_extra)]
+#![feature(concat_idents)]
+#![feature(trace_macros)]
 
 #[macro_use]
 extern crate alloc;
