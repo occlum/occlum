@@ -8,14 +8,14 @@
 // Helper macros
 // ============================================================================
 
-#define NTHREADS                (4)
+#define NTHREADS                (3)
 #define STACK_SIZE              (8 * 1024)
 
 // ============================================================================
 // The test case of concurrent counter
 // ============================================================================
 
-#define LOCAL_COUNT             (100000UL)
+#define LOCAL_COUNT             (1000UL)
 #define EXPECTED_GLOBAL_COUNT   (LOCAL_COUNT * NTHREADS)
 
 struct thread_arg {

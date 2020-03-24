@@ -96,7 +96,9 @@ impl Log for SimpleLogger {
         }
     }
     fn flush(&self) {
-        //unsafe { occlum_ocall_flush_log();  }
+        unsafe {
+            occlum_ocall_flush_log();
+        }
     }
 }
 

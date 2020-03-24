@@ -11,12 +11,19 @@ enclave {
 
     trusted {
         /*
+         * Initialize the LibOS according to the specified attributes.
+         *
+         * @retval On success, return 0; otherwise, return -1.
+         */
+        public int occlum_ecall_init([in, string] const char* log_level);
+
+        /*
          * Create a new LibOS process to do the task specified by the given 
          * arguments.
          *
          * @retval On success, return the thread ID of the 
          * newly-created process (pid == tid for a new process). On error, 
-         * return -1. The user can check errno for the concrete error type.
+         * return -1.
          */
         public int occlum_ecall_new_process(
             [in, string] const char* executable_path,
@@ -28,14 +35,9 @@ enclave {
          * This API is synchronous: it returns until the LibOS thread exits.
          *
          * @retval On success, return the exit status of the thread. On error, 
-         * return -1. The user can check errno for the concrete error type.
+         * return -1.
          */
         public int occlum_ecall_exec_thread(int libos_tid, int host_tid);
-
-        /*
-         * A do-nothing ECall for debug purpose only.
-         */
-        public void occlum_ecall_nop(void);
     };
 
     untrusted {

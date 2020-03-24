@@ -2,11 +2,10 @@
 
 use super::*;
 
-mod attestation;
 mod consts;
 
-use self::attestation::*;
 use self::consts::*;
+use util::sgx::*;
 
 #[derive(Debug)]
 pub struct DevSgx;

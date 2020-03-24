@@ -6,19 +6,41 @@ extern "C" {
 #endif
 
 /*
+ * Occlum PAL attributes
+ */
+typedef struct {
+    // Occlum instance dir.
+    //
+    // Specifies the path of an Occlum instance directory. Usually, this
+    // directory is initialized by executing "occlum init" command, which
+    // creates a hidden directory named ".occlum/". This ".occlum/" is an
+    // Occlum instance directory. The name of the directory is not necesarrily
+    // ".occlum"; it can be renamed to an arbitrary name.
+    //
+    // Mandatory field. Must not be NULL.
+    const char*     instance_dir;
+    // Log level.
+    //
+    // Specifies the log level of Occlum LibOS. Valid values: "off", "error",
+    // "warn", "info", and "trace". Case insensitive.
+    //
+    // Optional field. If NULL, the LibOS will treat it as "off".
+    const char*     log_level;
+} occlum_pal_attr_t;
+
+#define OCCLUM_PAL_ATTR_INITVAL         { \
+    .instance_dir = NULL,                 \
+    .log_level = NULL                     \
+}
+
+/*
  * @brief Initialize an Occlum enclave
  *
- * @param instance_dir  Specifies the path of an Occlum instance directory.
- *                      Usually, this directory is initialized by executing
- *                      "occlum init" command, which creates a hidden
- *                      directory named ".occlum/". This ".occlum/" is an
- *                      Occlum instance directory. The name of the directory is
- *                      not necesarrily ".occlum"; it can be renamed to an
- *                      arbitrary name.
+ * @param attr  Mandatory input. Attributes for Occlum.
  *
  * @retval If 0, then success; otherwise, check errno for the exact error type.
  */
-int occlum_pal_init(const char* instance_dir);
+int occlum_pal_init(occlum_pal_attr_t* attr);
 
 /*
  * @brief Execute a command inside the Occlum enclave

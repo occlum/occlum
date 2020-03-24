@@ -5,10 +5,14 @@
 #include "pal_log.h"
 #include "pal_syscall.h"
 
-int occlum_pal_init(const char* instance_dir) {
+int occlum_pal_init(occlum_pal_attr_t* attr) {
     errno = 0;
 
-    if (instance_dir == NULL) {
+    if (attr == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (attr->instance_dir == NULL) {
         errno = EINVAL;
         return -1;
     }
@@ -20,7 +24,7 @@ int occlum_pal_init(const char* instance_dir) {
         return -1;
     }
 
-    if (pal_init_enclave(instance_dir) < 0) {
+    if (pal_init_enclave(attr->instance_dir) < 0) {
         return -1;
     }
 
@@ -29,13 +33,17 @@ int occlum_pal_init(const char* instance_dir) {
     // 2) Initialize the global data structures inside the enclave (which is
     // automatically done by Intel SGX SDK).
     eid = pal_get_enclave_id();
-    sgx_status_t ecall_status = occlum_ecall_nop(eid);
+    int ret;
+    sgx_status_t ecall_status = occlum_ecall_init(eid, &ret, attr->log_level);
     if (ecall_status != SGX_SUCCESS) {
         const char* sgx_err = pal_get_sgx_error_msg(ecall_status);
         PAL_ERROR("Failed to do ECall: %s", sgx_err);
         return -1;
     }
-
+    if (ret < 0) {
+        errno = EINVAL;
+        return -1;
+    }
     return 0;
 }
 

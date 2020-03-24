@@ -93,6 +93,9 @@ pub mod from_untrusted {
     // TODO: strict check!
     pub fn clone_cstring_safely(out_ptr: *const c_char) -> Result<CString> {
         check_ptr(out_ptr)?;
+        if out_ptr.is_null() {
+            return_errno!(EINVAL, "null ptr");
+        }
         // TODO: using from_ptr directly is not safe
         let cstr = unsafe { CStr::from_ptr(out_ptr) };
         let cstring = CString::from(cstr);

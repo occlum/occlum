@@ -5,13 +5,51 @@ use std::ffi::{CStr, CString, OsString};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
+use util::log::LevelFilter;
 use util::mem_util::from_untrusted::*;
+use util::sgx::allow_debug as sgx_allow_debug;
 
 const ENCLAVE_PATH: &'static str = ".occlum/build/lib/libocclum-libos.signed.so";
 
 lazy_static! {
     static ref INIT_ONCE: Once = Once::new();
-    static ref ALLOW_RUN: AtomicBool = AtomicBool::new(false);
+    static ref HAS_INIT: AtomicBool = AtomicBool::new(false);
+}
+
+#[no_mangle]
+pub extern "C" fn occlum_ecall_init(log_level: *const c_char) -> i32 {
+    if HAS_INIT.load(Ordering::SeqCst) == true {
+        return EXIT_STATUS_INTERNAL_ERROR;
+    }
+
+    let log_level = {
+        let input_log_level = match parse_log_level(log_level) {
+            Err(e) => {
+                eprintln!("invalid log level: {}", e.backtrace());
+                return EXIT_STATUS_INTERNAL_ERROR;
+            }
+            Ok(log_level) => log_level,
+        };
+        // Use the input log level if and only if the enclave allows debug
+        if sgx_allow_debug() {
+            input_log_level
+        } else {
+            LevelFilter::Off
+        }
+    };
+
+    INIT_ONCE.call_once(|| {
+        // Init the log infrastructure first so that log messages will be printed afterwards
+        util::log::init(log_level);
+        // Init MPX for SFI
+        util::mpx_util::mpx_enable();
+        // Register exception handlers (support cpuid & rdtsc for now)
+        register_exception_handlers();
+
+        HAS_INIT.store(true, Ordering::SeqCst);
+    });
+
+    0
 }
 
 #[no_mangle]
@@ -19,25 +57,9 @@ pub extern "C" fn occlum_ecall_new_process(
     path_buf: *const c_char,
     argv: *const *const c_char,
 ) -> i32 {
-    INIT_ONCE.call_once(|| {
-        // Init the log infrastructure first so that log messages will be printed afterwards
-        use util::log::LevelFilter;
-        let log_level = match option_env!("LIBOS_LOG") {
-            Some("error") => LevelFilter::Error,
-            Some("warn") => LevelFilter::Warn,
-            Some("info") => LevelFilter::Info,
-            Some("debug") => LevelFilter::Debug,
-            Some("trace") => LevelFilter::Trace,
-            _ => LevelFilter::Error, // errors are printed be default
-        };
-        util::log::init(log_level);
-        // Init MPX for SFI
-        util::mpx_util::mpx_enable();
-        // Register exception handlers (support cpuid & rdtsc for now)
-        register_exception_handlers();
-
-        ALLOW_RUN.store(true, Ordering::SeqCst);
-    });
+    if HAS_INIT.load(Ordering::SeqCst) == false {
+        return EXIT_STATUS_INTERNAL_ERROR;
+    }
 
     let (path, args) = match parse_arguments(path_buf, argv) {
         Ok(path_and_args) => path_and_args,
@@ -61,7 +83,7 @@ pub extern "C" fn occlum_ecall_new_process(
 
 #[no_mangle]
 pub extern "C" fn occlum_ecall_exec_thread(libos_pid: i32, host_tid: i32) -> i32 {
-    if ALLOW_RUN.load(Ordering::SeqCst) == false {
+    if HAS_INIT.load(Ordering::SeqCst) == false {
         return EXIT_STATUS_INTERNAL_ERROR;
     }
 
@@ -80,13 +102,35 @@ pub extern "C" fn occlum_ecall_exec_thread(libos_pid: i32, host_tid: i32) -> i32
     .unwrap_or(EXIT_STATUS_INTERNAL_ERROR)
 }
 
-#[no_mangle]
-pub extern "C" fn occlum_ecall_nop() {}
-
 // Use -128 as a special value to indicate internal error from libos, not from
 // user programs. The LibOS ensures that an user program can only return a
 // value between 0 and 255 (inclusive).
 const EXIT_STATUS_INTERNAL_ERROR: i32 = -128;
+
+fn parse_log_level(level_chars: *const c_char) -> Result<LevelFilter> {
+    const DEFAULT_LEVEL: LevelFilter = LevelFilter::Off;
+
+    if level_chars.is_null() {
+        return Ok(DEFAULT_LEVEL);
+    }
+
+    let level_string = {
+        let level_cstring = clone_cstring_safely(level_chars)?;
+        level_cstring
+            .into_string()
+            .map_err(|e| errno!(EINVAL, "log_level contains valid utf-8 data"))?
+            .to_lowercase()
+    };
+    Ok(match level_string.as_str() {
+        "off" => LevelFilter::Off,
+        "error" => LevelFilter::Error,
+        "warn" => LevelFilter::Warn,
+        "info" => LevelFilter::Info,
+        "debug" => LevelFilter::Debug,
+        "trace" => LevelFilter::Trace,
+        _ => DEFAULT_LEVEL, // Default
+    })
+}
 
 fn parse_arguments(
     path_ptr: *const c_char,
