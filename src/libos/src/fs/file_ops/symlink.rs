@@ -12,9 +12,7 @@ pub fn do_readlink(path: &str, buf: &mut [u8]) -> Result<usize> {
                 .trim_start_matches("/proc/self/fd/")
                 .parse::<FileDesc>()
                 .map_err(|e| errno!(EBADF, "Invalid file descriptor"))?;
-            let current_ref = process::get_current();
-            let current = current_ref.lock().unwrap();
-            let file_ref = current.get_files().lock().unwrap().get(fd)?;
+            let file_ref = process::get_file(fd)?;
             if let Ok(inode_file) = file_ref.as_inode_file() {
                 inode_file.get_abs_path().to_owned()
             } else {

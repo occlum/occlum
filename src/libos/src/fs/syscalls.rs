@@ -27,13 +27,10 @@ pub fn do_eventfd2(init_val: u32, flags: i32) -> Result<isize> {
         Arc::new(Box::new(event))
     };
 
-    let current_ref = process::get_current();
-    let mut proc = current_ref.lock().unwrap();
-
-    let fd = proc.get_files().lock().unwrap().put(
+    let fd = process::put_file(
         file_ref,
         inner_flags.contains(EventCreationFlags::EFD_CLOEXEC),
-    );
+    )?;
     Ok(fd as isize)
 }
 

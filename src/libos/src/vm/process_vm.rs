@@ -301,9 +301,7 @@ impl ProcessVM {
             if flags.contains(MMapFlags::MAP_ANONYMOUS) {
                 VMInitializer::FillZeros()
             } else {
-                let current_ref = get_current();
-                let current_process = current_ref.lock().unwrap();
-                let file_ref = current_process.get_files().lock().unwrap().get(fd)?;
+                let file_ref = process::get_file(fd)?;
                 VMInitializer::LoadFromFile {
                     file: file_ref,
                     offset: offset,

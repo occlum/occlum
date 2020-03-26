@@ -10,10 +10,8 @@ pub fn do_sendmsg(fd: c_int, msg_ptr: *const msghdr, flags_c: c_int) -> Result<i
         "sendmsg: fd: {}, msg: {:?}, flags: 0x{:x}",
         fd, msg_ptr, flags_c
     );
-    let current_ref = process::get_current();
-    let mut proc = current_ref.lock().unwrap();
-    let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
 
+    let file_ref = process::get_file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_socket() {
         let msg_c = {
             from_user::check_ptr(msg_ptr)?;
@@ -40,10 +38,8 @@ pub fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut msghdr_mut, flags_c: c_int) -> Re
         "recvmsg: fd: {}, msg: {:?}, flags: 0x{:x}",
         fd, msg_mut_ptr, flags_c
     );
-    let current_ref = process::get_current();
-    let mut proc = current_ref.lock().unwrap();
-    let file_ref = proc.get_files().lock().unwrap().get(fd as FileDesc)?;
 
+    let file_ref = process::get_file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_socket() {
         let msg_mut_c = {
             from_user::check_mut_ptr(msg_mut_ptr)?;

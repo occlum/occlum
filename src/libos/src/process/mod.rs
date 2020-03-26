@@ -82,8 +82,28 @@ mod task;
 mod thread;
 mod wait;
 
+/// Get a file from the file table of the current process
+pub fn get_file(fd: FileDesc) -> Result<FileRef> {
+    let current_ref = get_current();
+    let current = current_ref.lock().unwrap();
+    let file_ref = current.get_files().lock().unwrap().get(fd as FileDesc)?;
+    Ok(file_ref)
+}
+
+/// Put a file into the file table of the current process
+pub fn put_file(new_file: FileRef, close_on_spawn: bool) -> Result<FileDesc> {
+    let current_ref = get_current();
+    let current = current_ref.lock().unwrap();
+    let new_fd = current
+        .get_files()
+        .lock()
+        .unwrap()
+        .put(new_file, close_on_spawn);
+    Ok(new_fd)
+}
+
 use super::*;
-use fs::{File, FileRef, FileTable};
+use fs::{File, FileDesc, FileRef, FileTable};
 use misc::ResourceLimitsRef;
 use time::GLOBAL_PROFILER;
 use vm::ProcessVM;
