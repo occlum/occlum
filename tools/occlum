@@ -76,10 +76,30 @@ parse_occlum_user_space_size() {
     numfmt --from=iec ${size_with_unit::-1}
 }
 
+check_has_init() {
+    if [ ! -d "$context_dir"  ]; then
+        echo "Error: the current working directory is not initialized as an Occlum context. Need to run \"occlum init\" first."
+        exit 1
+    fi
+}
+
+check_has_built() {
+    check_has_init
+
+    if [ ! -d "$context_dir/run/mount/root"  ]; then
+        echo "Error: the Occlum image and enclave are not built yet. Need to run \"occlum build\" first."
+        exit 1
+    fi
+}
+
 
 cmd_init() {
-    cd "$working_dir"
-    mkdir -p .occlum
+    if [ -d "$context_dir"  ]; then
+        echo "Error: the current working directory has been initialized as an Occlum context"
+        exit 1
+    fi
+    mkdir "$context_dir"
+
     cd "$context_dir"
     echo "initialized" > status
 
@@ -108,6 +128,8 @@ cmd_init() {
 }
 
 cmd_build() {
+    check_has_init
+
     build_dir=build
 
     while [ -n "$1" ]; do
@@ -135,6 +157,7 @@ cmd_build() {
     echo "building" > status
 
     rm -rf build
+    rm -rf run
 
     mkdir -p build/bin
     cp "$occlum_dir/$build_dir/bin/occlum-run" build/bin/
@@ -188,18 +211,20 @@ cmd_build() {
     cd "$context_dir"
     echo "built" > status
 
-    mkdir -p "$context_dir/run/mount/root"
-
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
         echo "SIM" > .sgx_mode
     else
         echo "HW" > .sgx_mode
     fi
 
+    mkdir -p "$context_dir/run/mount/root"
+
     echo "Built the Occlum image and enclave successfully"
 }
 
 cmd_run() {
+    check_has_built
+
     SGX_MODE=$(cat $context_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
         export LD_LIBRARY_PATH="$context_dir/build/lib:$SGX_SDK/sdk_libs/"
@@ -216,6 +241,8 @@ cmd_run() {
 }
 
 cmd_gdb() {
+    check_has_built
+
     SGX_MODE=$(cat $context_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
         export LD_LIBRARY_PATH="$context_dir/build/lib:$SGX_SDK/sdk_libs/"
