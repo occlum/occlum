@@ -132,6 +132,13 @@ pub fn do_poll(pollfds: &mut [libc::pollfd], timeout: c_int) -> Result<usize> {
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
     for (i, pollfd) in pollfds.iter_mut().enumerate() {
+        // Poll should just ignore negative fds
+        if pollfd.fd < 0 {
+            u_pollfds[i].fd = -1;
+            u_pollfds[i].revents = 0;
+            continue;
+        }
+
         let file_ref = proc
             .get_files()
             .lock()
