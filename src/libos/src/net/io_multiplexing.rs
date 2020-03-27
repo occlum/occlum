@@ -22,10 +22,10 @@ pub fn do_select(
 
     let current_ref = process::get_current();
     let mut proc = current_ref.lock().unwrap();
-    let file_table_ref = proc.get_files().lock().unwrap();
+    let file_table = proc.get_files().lock().unwrap();
 
     for fd in 0..nfds {
-        let fd_ref = file_table_ref.get(fd as FileDesc)?;
+        let fd_ref = file_table.get(fd as FileDesc)?;
         let (r, w, e) = (
             readfds.is_set(fd),
             writefds.is_set(fd),
@@ -83,6 +83,9 @@ pub fn do_select(
             revents: 0,
         });
     }
+    // Unlock the current process and its file table as early as possible
+    drop(file_table);
+    drop(proc);
 
     let timeout = match timeout {
         None => -1,
@@ -123,12 +126,11 @@ pub fn do_poll(pollfds: &mut [libc::pollfd], timeout: c_int) -> Result<usize> {
         timeout
     );
 
-    let current_ref = process::get_current();
-    let mut proc = current_ref.lock().unwrap();
-
     // Untrusted pollfd's that will be modified by OCall
     let mut u_pollfds: Vec<libc::pollfd> = pollfds.to_vec();
 
+    let current_ref = process::get_current();
+    let mut proc = current_ref.lock().unwrap();
     for (i, pollfd) in pollfds.iter_mut().enumerate() {
         let file_ref = proc
             .get_files()
@@ -167,6 +169,8 @@ pub fn do_poll(pollfds: &mut [libc::pollfd], timeout: c_int) -> Result<usize> {
             return_errno!(EBADF, "not a supported file type");
         }
     }
+    // Unlock the current process as early as possible
+    drop(proc);
 
     let num_events = try_libc!(libc::ocall::poll(
         u_pollfds.as_mut_ptr(),
@@ -193,15 +197,8 @@ pub fn do_epoll_create1(flags: c_int) -> Result<FileDesc> {
 
     let epoll = EpollFile::new()?;
     let file_ref: Arc<Box<dyn File>> = Arc::new(Box::new(epoll));
-    let current_ref = process::get_current();
-    let mut proc = current_ref.lock().unwrap();
-    let fd = {
-        let close_on_spawn = flags & libc::EPOLL_CLOEXEC != 0;
-        proc.get_files()
-            .lock()
-            .unwrap()
-            .put(file_ref, close_on_spawn)
-    };
+    let close_on_spawn = flags & libc::EPOLL_CLOEXEC != 0;
+    let fd = process::put_file(file_ref, close_on_spawn)?;
     Ok(fd)
 }
 
@@ -213,25 +210,25 @@ pub fn do_epoll_ctl(
 ) -> Result<()> {
     debug!("epoll_ctl: epfd: {}, op: {:?}, fd: {}", epfd, op, fd);
 
-    let current_ref = process::get_current();
-    let mut proc = current_ref.lock().unwrap();
-    let mut file_table_ref = proc.get_files().lock().unwrap();
-    let mut file_ref = file_table_ref.get(epfd)?;
-    let mut epoll = file_ref.as_epoll()?.inner.lock().unwrap();
-
-    let fd_ref = file_table_ref.get(fd)?;
-
-    let host_fd = if let Ok(socket) = fd_ref.as_socket() {
-        socket.fd() as FileDesc
-    } else if let Ok(eventfd) = fd_ref.as_event() {
-        eventfd.get_host_fd() as FileDesc
-    } else {
-        warn!("unsupported file type");
-        return Ok(());
+    let host_fd = {
+        let fd_ref = process::get_file(fd)?;
+        if let Ok(socket) = fd_ref.as_socket() {
+            socket.fd() as FileDesc
+        } else if let Ok(eventfd) = fd_ref.as_event() {
+            eventfd.get_host_fd() as FileDesc
+        } else {
+            return_errno!(EPERM, "unsupported file type");
+        }
+        // Notes on deadlock.
+        //
+        // All locks on fd (if any) will be released at this point. This means
+        // we don't have to worry about the potential deadlock caused by
+        // locking two files (say, fd and epfd) in an inconsistent order.
     };
 
+    let epoll_file_ref = process::get_file(epfd)?;
+    let epoll = &epoll_file_ref.as_epoll()?.inner;
     epoll.ctl(op, host_fd, event)?;
-
     Ok(())
 }
 
@@ -247,11 +244,8 @@ pub fn do_epoll_wait(
         timeout
     );
 
-    let current_ref = process::get_current();
-    let mut proc = current_ref.lock().unwrap();
-    let mut file_ref = proc.get_files().lock().unwrap().get(epfd)?;
-    let mut epoll = file_ref.as_epoll()?.inner.lock().unwrap();
-
+    let epoll_file_ref = process::get_file(epfd)?;
+    let epoll = &epoll_file_ref.as_epoll()?.inner;
     let count = epoll.wait(events, timeout)?;
     Ok(count)
 }
@@ -284,13 +278,13 @@ impl FdSetExt for libc::fd_set {
 }
 
 pub struct EpollFile {
-    inner: SgxMutex<EpollFileInner>,
+    inner: EpollFileInner,
 }
 
 impl EpollFile {
     pub fn new() -> Result<Self> {
         Ok(Self {
-            inner: SgxMutex::new(EpollFileInner::new()?),
+            inner: EpollFileInner::new()?,
         })
     }
 }
@@ -307,13 +301,8 @@ impl EpollFileInner {
         Ok(EpollFileInner { epoll_fd: ret })
     }
 
-    pub fn ctl(
-        &mut self,
-        op: c_int,
-        host_fd: FileDesc,
-        event: *const libc::epoll_event,
-    ) -> Result<()> {
-        let ret = try_libc!(libc::ocall::epoll_ctl(
+    pub fn ctl(&self, op: c_int, host_fd: FileDesc, event: *const libc::epoll_event) -> Result<()> {
+        try_libc!(libc::ocall::epoll_ctl(
             self.epoll_fd,
             op,
             host_fd as c_int,
@@ -324,7 +313,7 @@ impl EpollFileInner {
 
     /// Wait for an I/O event on the epoll.
     /// Returns the number of file descriptors ready for the requested I/O.
-    pub fn wait(&mut self, events: &mut [libc::epoll_event], timeout: c_int) -> Result<usize> {
+    pub fn wait(&self, events: &mut [libc::epoll_event], timeout: c_int) -> Result<usize> {
         let ret = try_libc!(libc::ocall::epoll_wait(
             self.epoll_fd,
             events.as_mut_ptr(),
@@ -351,7 +340,7 @@ impl File for EpollFile {
 
 impl Debug for EpollFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let inner = self.inner.lock().unwrap();
+        let inner = &self.inner;
         f.debug_struct("EpollFile")
             .field("epoll_fd", &inner.epoll_fd)
             .finish()
