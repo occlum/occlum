@@ -79,7 +79,7 @@ pub fn do_clone(
         let rlimits_ref = current.get_rlimits().clone();
         let elf_path = &current.elf_path;
         let cwd = &current.cwd;
-        Process::new(cwd, elf_path, task, vm_ref, files_ref, rlimits_ref)?
+        Process::new(cwd, elf_path, task, vm_ref, files_ref, rlimits_ref, true)?
     };
 
     if let Some(ctid) = ctid {

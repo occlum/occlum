@@ -23,6 +23,7 @@ pub struct Process {
     tgid: pid_t,
     host_tid: pid_t,
     exit_status: i32,
+    is_detached: bool,
     // TODO: move cwd, root_inode into a FileSystem structure
     // TODO: should cwd be a String or INode?
     cwd: String,

@@ -15,6 +15,7 @@ unsafe impl Send for ChildProcessFilter {}
 pub fn do_exit(exit_status: i32) {
     let current_ref = get_current();
     let mut current = current_ref.lock().unwrap();
+    let parent_ref = current.get_parent().clone();
     // Update current
     current.exit_status = exit_status;
     current.status = Status::ZOMBIE;
@@ -34,8 +35,15 @@ pub fn do_exit(exit_status: i32) {
         futex_wake(ctid as *const i32, 1);
     }
 
+    // If the process is detached, no need to notify the parent
+    if current.is_detached {
+        let current_tid = current.get_tid();
+        drop(current);
+        remove_zombie_child(&parent_ref, current_tid);
+        return;
+    }
+
     // Notify the parent process if necessary
-    let parent_ref = current.get_parent().clone();
     let (mut parent, current) = {
         // Always lock parent before its child
         drop(current);
@@ -103,32 +111,42 @@ pub fn do_wait4(child_filter: &ChildProcessFilter, exit_status: &mut i32) -> Res
         waiter
     };
 
+    // Wait until a child has interesting events
     let child_pid = waiter.sleep_until_woken_with_result();
 
-    let mut current = current_ref.lock().unwrap();
-    let child_i = {
-        let mut child_i_opt = None;
-        for (child_i, child_ref) in current.get_children_iter().enumerate() {
-            let child = child_ref.lock().unwrap();
-            if child.get_pid() != child_pid {
-                continue;
-            }
+    // Remove the child from the parent
+    *exit_status = remove_zombie_child(&current_ref, child_pid);
 
-            if child.get_status() != Status::ZOMBIE {
-                panic!("THIS SHOULD NEVER HAPPEN!");
-            }
-            child_i_opt = Some(child_i);
-            *exit_status = child.get_exit_status();
-        }
-        child_i_opt.unwrap()
-    };
-    current.children.swap_remove(child_i);
+    let mut current = current_ref.lock().unwrap();
     current.waiting_children = None;
 
-    // Release the last reference to the child process
-    process_table::remove(child_pid);
-
     Ok(child_pid)
+}
+
+fn remove_zombie_child(parent_ref: &ProcessRef, child_tid: pid_t) -> i32 {
+    // Find the zombie child process
+    let mut parent = parent_ref.lock().unwrap();
+    let (child_i, child_ref) = parent
+        .get_children_iter()
+        .enumerate()
+        .find(|(child_i, child_ref)| {
+            let child = child_ref.lock().unwrap();
+            if child.get_tid() != child_tid {
+                return false;
+            }
+            assert!(child.get_status() == Status::ZOMBIE);
+            true
+        })
+        .expect("cannot find the zombie child");
+
+    // Remove the zombie child from parent
+    parent.children.swap_remove(child_i);
+    // Remove the zombie child from process table
+    process_table::remove(child_tid);
+
+    // Return the exit status
+    let child = child_ref.lock().unwrap();
+    child.get_exit_status()
 }
 
 fn lock_two_in_order<'a>(

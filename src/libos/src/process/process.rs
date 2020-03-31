@@ -14,6 +14,7 @@ lazy_static! {
             tgid: 0,
             host_tid: 0,
             exit_status: 0,
+            is_detached: false,
             cwd: "/".to_owned(),
             elf_path: "/".to_owned(),
             clear_child_tid: None,
@@ -28,6 +29,7 @@ lazy_static! {
 }
 
 impl Process {
+    // TODO: this constructor has become complicated enough to justify using builders
     pub fn new(
         cwd: &str,
         elf_path: &str,
@@ -35,6 +37,7 @@ impl Process {
         vm_ref: ProcessVMRef,
         file_table_ref: FileTableRef,
         rlimits_ref: ResourceLimitsRef,
+        is_detached: bool,
     ) -> Result<(pid_t, ProcessRef)> {
         let new_pid = process_table::alloc_pid();
         let new_process_ref = Arc::new(SgxMutex::new(Process {
@@ -48,6 +51,7 @@ impl Process {
             elf_path: elf_path.to_owned(),
             clear_child_tid: None,
             exit_status: 0,
+            is_detached: is_detached,
             parent: None,
             children: Vec::new(),
             waiting_children: None,

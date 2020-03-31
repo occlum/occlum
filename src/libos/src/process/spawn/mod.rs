@@ -111,7 +111,7 @@ fn new_process(
             Arc::new(SgxMutex::new(files))
         };
         let rlimits_ref = Default::default();
-        Process::new(&cwd, elf_path, task, vm_ref, files_ref, rlimits_ref)?
+        Process::new(&cwd, elf_path, task, vm_ref, files_ref, rlimits_ref, false)?
     };
     parent_adopts_new_child(&parent_ref, &new_process_ref);
     process_table::put(new_pid, new_process_ref.clone());
