@@ -47,6 +47,10 @@ pub trait File: Debug + Sync + Send + Any {
         return_op_unsupported_error!("metadata")
     }
 
+    fn set_metadata(&self, metadata: &Metadata) -> Result<()> {
+        return_op_unsupported_error!("set_metadata")
+    }
+
     fn set_len(&self, len: u64) -> Result<()> {
         return_op_unsupported_error!("set_len")
     }

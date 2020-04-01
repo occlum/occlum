@@ -369,6 +369,42 @@ pub fn do_readlink(path: *const i8, buf: *mut u8, size: usize) -> Result<isize> 
     Ok(len as isize)
 }
 
+pub fn do_chmod(path: *const i8, mode: u16) -> Result<isize> {
+    let path = from_user::clone_cstring_safely(path)?
+        .to_string_lossy()
+        .into_owned();
+    let mode = FileMode::from_bits_truncate(mode);
+    file_ops::do_chmod(&path, mode)?;
+    Ok(0)
+}
+
+pub fn do_fchmod(fd: FileDesc, mode: u16) -> Result<isize> {
+    let mode = FileMode::from_bits_truncate(mode);
+    file_ops::do_fchmod(fd, mode)?;
+    Ok(0)
+}
+
+pub fn do_chown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
+    let path = from_user::clone_cstring_safely(path)?
+        .to_string_lossy()
+        .into_owned();
+    file_ops::do_chown(&path, uid, gid)?;
+    Ok(0)
+}
+
+pub fn do_fchown(fd: FileDesc, uid: u32, gid: u32) -> Result<isize> {
+    file_ops::do_fchown(fd, uid, gid)?;
+    Ok(0)
+}
+
+pub fn do_lchown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
+    let path = from_user::clone_cstring_safely(path)?
+        .to_string_lossy()
+        .into_owned();
+    file_ops::do_lchown(&path, uid, gid)?;
+    Ok(0)
+}
+
 pub fn do_sendfile(
     out_fd: FileDesc,
     in_fd: FileDesc,

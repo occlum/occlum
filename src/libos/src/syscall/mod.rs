@@ -8,12 +8,12 @@
 //! 4. Call `do_*` to process the system call (in other modules)
 
 use fs::{
-    do_access, do_chdir, do_close, do_dup, do_dup2, do_dup3, do_eventfd, do_eventfd2, do_faccessat,
-    do_fcntl, do_fdatasync, do_fstat, do_fstatat, do_fsync, do_ftruncate, do_getdents64, do_ioctl,
-    do_link, do_lseek, do_lstat, do_mkdir, do_open, do_openat, do_pipe, do_pipe2, do_pread,
-    do_pwrite, do_read, do_readlink, do_readv, do_rename, do_rmdir, do_sendfile, do_stat, do_sync,
-    do_truncate, do_unlink, do_write, do_writev, iovec_t, File, FileDesc, FileRef, HostStdioFds,
-    Stat,
+    do_access, do_chdir, do_chmod, do_chown, do_close, do_dup, do_dup2, do_dup3, do_eventfd,
+    do_eventfd2, do_faccessat, do_fchmod, do_fchown, do_fcntl, do_fdatasync, do_fstat, do_fstatat,
+    do_fsync, do_ftruncate, do_getdents64, do_ioctl, do_lchown, do_link, do_lseek, do_lstat,
+    do_mkdir, do_open, do_openat, do_pipe, do_pipe2, do_pread, do_pwrite, do_read, do_readlink,
+    do_readv, do_rename, do_rmdir, do_sendfile, do_stat, do_sync, do_truncate, do_unlink, do_write,
+    do_writev, iovec_t, File, FileDesc, FileRef, HostStdioFds, Stat,
 };
 use misc::{resource_t, rlimit_t, utsname_t};
 use net::{
@@ -154,11 +154,11 @@ macro_rules! process_syscall_table_with_callback {
                 (Unlink = 87) => do_unlink(path: *const i8),
                 (Symlink = 88) => handle_unsupported(),
                 (Readlink = 89) => do_readlink(path: *const i8, buf: *mut u8, size: usize),
-                (Chmod = 90) => handle_unsupported(),
-                (Fchmod = 91) => handle_unsupported(),
-                (Chown = 92) => handle_unsupported(),
-                (Fchown = 93) => handle_unsupported(),
-                (Lchown = 94) => handle_unsupported(),
+                (Chmod = 90) => do_chmod(path: *const i8, mode: u16),
+                (Fchmod = 91) => do_fchmod(fd: FileDesc, mode: u16),
+                (Chown = 92) => do_chown(path: *const i8, uid: u32, gid: u32),
+                (Fchown = 93) => do_fchown(fd: FileDesc, uid: u32, gid: u32),
+                (Lchown = 94) => do_lchown(path: *const i8, uid: u32, gid: u32),
                 (Umask = 95) => handle_unsupported(),
                 (Gettimeofday = 96) => do_gettimeofday(tv_u: *mut timeval_t),
                 (Getrlimit = 97) => handle_unsupported(),

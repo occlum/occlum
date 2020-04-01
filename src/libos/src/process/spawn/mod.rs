@@ -5,8 +5,8 @@ use std::path::Path;
 use std::sgxfs::SgxFile;
 
 use super::fs::{
-    CreationFlags, File, FileDesc, FileTable, HostStdioFds, INodeExt, StdinFile, StdoutFile,
-    ROOT_INODE,
+    CreationFlags, File, FileDesc, FileMode, FileTable, HostStdioFds, INodeExt, StdinFile,
+    StdoutFile, ROOT_INODE,
 };
 use super::misc::ResourceLimitsRef;
 use super::vm::{ProcessVM, ProcessVMBuilder};
@@ -146,14 +146,27 @@ pub enum FileAction {
 }
 
 fn load_elf_to_vec(elf_path: &str, parent_ref: &ProcessRef) -> Result<Vec<u8>> {
-    #[rustfmt::skip]
-    parent_ref
+    let inode = parent_ref
         .lock()
         .unwrap()
         .lookup_inode(elf_path)
-            .map_err(|e| errno!(e.errno(), "cannot find the ELF"))?
+        .map_err(|e| errno!(e.errno(), "cannot find the ELF"))?;
+    let file_mode = {
+        let info = inode.metadata()?;
+        FileMode::from_bits_truncate(info.mode)
+    };
+    if !file_mode.is_executable() {
+        return_errno!(EACCES, "elf file is not executable");
+    }
+    if file_mode.has_set_uid() || file_mode.has_set_gid() {
+        warn!(
+            "set-user-ID and set-group-ID are not supportted, FileMode:{:?}",
+            file_mode
+        );
+    }
+    inode
         .read_as_vec()
-            .map_err(|e| errno!(e.errno(), "failed to read the executable ELF"))
+        .map_err(|e| errno!(e.errno(), "failed to read the executable ELF"))
 }
 
 fn init_files(

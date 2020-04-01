@@ -4,6 +4,8 @@ use process::Process;
 
 pub use self::access::{do_access, do_faccessat, AccessibilityCheckFlags, AccessibilityCheckMode};
 pub use self::chdir::do_chdir;
+pub use self::chmod::{do_chmod, do_fchmod, FileMode};
+pub use self::chown::{do_chown, do_fchown, do_lchown};
 pub use self::close::do_close;
 pub use self::dirent::do_getdents64;
 pub use self::dirfd::{get_dir_path, DirFd};
@@ -29,6 +31,8 @@ pub use self::write::{do_pwrite, do_write, do_writev};
 
 mod access;
 mod chdir;
+mod chmod;
+mod chown;
 mod close;
 mod dirent;
 mod dirfd;

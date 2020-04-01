@@ -52,7 +52,7 @@ impl File for DevRandom {
             mtime: Timespec { sec: 0, nsec: 0 },
             ctime: Timespec { sec: 0, nsec: 0 },
             type_: FileType::CharDevice,
-            mode: 0444,
+            mode: (FileMode::S_IRUSR | FileMode::S_IRGRP | FileMode::S_IROTH).bits(),
             nlinks: 0,
             uid: 0,
             gid: 0,

@@ -10,8 +10,13 @@ pub fn do_unlink(path: &str) -> Result<()> {
         current_process.lookup_inode(dir_path)?
     };
     let file_inode = dir_inode.find(file_name)?;
-    if file_inode.metadata()?.type_ == FileType::Dir {
+    let metadata = file_inode.metadata()?;
+    if metadata.type_ == FileType::Dir {
         return_errno!(EISDIR, "unlink on directory");
+    }
+    let file_mode = FileMode::from_bits_truncate(metadata.mode);
+    if file_mode.has_sticky_bit() {
+        warn!("ignoring the sticky bit");
     }
     dir_inode.unlink(file_name)?;
     Ok(())

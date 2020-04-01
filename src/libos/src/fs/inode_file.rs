@@ -1,6 +1,5 @@
 use super::*;
 use rcore_fs_sefs::dev::SefsMac;
-use sgx_trts::libc::{S_IRUSR, S_IWUSR};
 
 pub struct INodeFile {
     inode: Arc<dyn INode>,
@@ -13,7 +12,7 @@ pub struct INodeFile {
 impl File for INodeFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
         if !self.access_mode.readable() {
-            return_errno!(EBADF, "File not readable");
+            return_errno!(EACCES, "File not readable");
         }
         let mut offset = self.offset.lock().unwrap();
         let len = self.inode.read_at(*offset, buf).map_err(|e| errno!(e))?;
@@ -23,7 +22,7 @@ impl File for INodeFile {
 
     fn write(&self, buf: &[u8]) -> Result<usize> {
         if !self.access_mode.writable() {
-            return_errno!(EBADF, "File not writable");
+            return_errno!(EACCES, "File not writable");
         }
         let mut offset = self.offset.lock().unwrap();
         if self.status_flags.read().unwrap().always_append() {
@@ -37,7 +36,7 @@ impl File for INodeFile {
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         if !self.access_mode.readable() {
-            return_errno!(EBADF, "File not readable");
+            return_errno!(EACCES, "File not readable");
         }
         let len = self.inode.read_at(offset, buf)?;
         Ok(len)
@@ -45,7 +44,7 @@ impl File for INodeFile {
 
     fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
         if !self.access_mode.writable() {
-            return_errno!(EBADF, "File not writable");
+            return_errno!(EACCES, "File not writable");
         }
         let len = self.inode.write_at(offset, buf)?;
         Ok(len)
@@ -53,7 +52,7 @@ impl File for INodeFile {
 
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
         if !self.access_mode.readable() {
-            return_errno!(EBADF, "File not readable");
+            return_errno!(EACCES, "File not readable");
         }
         let mut offset = self.offset.lock().unwrap();
         let mut total_len = 0;
@@ -72,7 +71,7 @@ impl File for INodeFile {
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
         if !self.access_mode.writable() {
-            return_errno!(EBADF, "File not writable");
+            return_errno!(EACCES, "File not writable");
         }
         let mut offset = self.offset.lock().unwrap();
         if self.status_flags.read().unwrap().always_append() {
@@ -116,9 +115,14 @@ impl File for INodeFile {
         Ok(metadata)
     }
 
+    fn set_metadata(&self, metadata: &Metadata) -> Result<()> {
+        self.inode.set_metadata(metadata)?;
+        Ok(())
+    }
+
     fn set_len(&self, len: u64) -> Result<()> {
         if !self.access_mode.writable() {
-            return_errno!(EBADF, "File not writable. Can't set len.");
+            return_errno!(EACCES, "File not writable. Can't set len.");
         }
         self.inode.resize(len as usize)?;
         Ok(())
@@ -136,7 +140,7 @@ impl File for INodeFile {
 
     fn read_entry(&self) -> Result<String> {
         if !self.access_mode.readable() {
-            return_errno!(EBADF, "File not readable. Can't read entry.");
+            return_errno!(EACCES, "File not readable. Can't read entry.");
         }
         let mut offset = self.offset.lock().unwrap();
         let name = self.inode.get_entry(*offset)?;
@@ -177,12 +181,12 @@ impl File for INodeFile {
         match lock.l_type {
             FlockType::F_RDLCK => {
                 if !self.access_mode.readable() {
-                    return_errno!(EBADF, "File not readable");
+                    return_errno!(EACCES, "File not readable");
                 }
             }
             FlockType::F_WRLCK => {
                 if !self.access_mode.writable() {
-                    return_errno!(EBADF, "File not writable");
+                    return_errno!(EACCES, "File not writable");
                 }
             }
             _ => (),
@@ -201,10 +205,10 @@ impl INodeFile {
     pub fn open(inode: Arc<dyn INode>, abs_path: &str, flags: u32) -> Result<Self> {
         let access_mode = AccessMode::from_u32(flags)?;
         if (access_mode.readable() && !inode.allow_read()?) {
-            return_errno!(EBADF, "File not readable");
+            return_errno!(EACCES, "File not readable");
         }
         if (access_mode.writable() && !inode.allow_write()?) {
-            return_errno!(EBADF, "File not writable");
+            return_errno!(EACCES, "File not writable");
         }
         let status_flags = StatusFlags::from_bits_truncate(flags);
         Ok(INodeFile {
@@ -253,16 +257,14 @@ impl INodeExt for dyn INode {
 
     fn allow_write(&self) -> Result<bool> {
         let info = self.metadata()?;
-        let perms = info.mode as u32;
-        let writable = (perms & S_IWUSR) == S_IWUSR;
-        Ok(writable)
+        let file_mode = FileMode::from_bits_truncate(info.mode);
+        Ok(file_mode.is_writable())
     }
 
     fn allow_read(&self) -> Result<bool> {
         let info = self.metadata()?;
-        let perms = info.mode as u32;
-        let readable = (perms & S_IRUSR) == S_IRUSR;
-        Ok(readable)
+        let file_mode = FileMode::from_bits_truncate(info.mode);
+        Ok(file_mode.is_readable())
     }
 }
 
