@@ -33,17 +33,23 @@ impl FileTable {
             if min_fd >= table.len() {
                 let expand_size = min_fd - table.len() + 1;
                 for _ in 0..expand_size {
-                    table.push(None)
+                    table.push(None);
                 }
             }
 
-            table
+            let free_fd = table
                 .iter()
                 .enumerate()
                 .skip(min_fd as usize)
-                .find(|&(idx, opt)| opt.is_none())
-                .unwrap()
-                .0
+                .find(|&(idx, opt)| opt.is_none());
+
+            if let Some((index, _)) = free_fd {
+                index
+            } else {
+                // Span table when no free fd is found
+                table.push(None);
+                table.len() - 1
+            }
         } as FileDesc;
 
         self.put_at(min_free_fd, file_ref, close_on_spawn);

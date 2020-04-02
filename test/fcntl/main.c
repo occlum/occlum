@@ -69,6 +69,12 @@ static int __fcntl_getlk_and_setlk(int fd, int open_flags) {
     return 0;
 }
 
+static int __fcntl_dupfd(int fd, int open_flags) {
+    if (fcntl(fd, F_DUPFD, 0) < 0)
+        THROW_ERROR("failed to duplicate the fd");
+    return 0;
+}
+
 typedef int(*test_fcntl_func_t)(int fd, int open_flags);
 
 static int test_fcntl_framework(test_fcntl_func_t fn) {
@@ -104,6 +110,10 @@ static int test_getlk_and_setlk() {
     return test_fcntl_framework(__fcntl_getlk_and_setlk);
 }
 
+static int test_fcntl_dupfd() {
+    return test_fcntl_framework(__fcntl_dupfd);
+}
+
 // ============================================================================
 // Test suite
 // ============================================================================
@@ -112,6 +122,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_fcntl_getfl),
     TEST_CASE(test_fcntl_setfl),
     TEST_CASE(test_getlk_and_setlk),
+    TEST_CASE(test_fcntl_dupfd),
 };
 
 int main() {
