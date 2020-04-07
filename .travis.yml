@@ -1,0 +1,13 @@
+sudo: required
+
+services:
+  - docker
+
+before_install:
+- pwd
+- cd ..
+- docker run -v /home/travis/build/jessehui/occlum:/root/occlum occlum/occlum:0.10.0-ubuntu18.04 /bin/bash -c "cd /root/occlum; make submodule; SGX_MODE=SIM make; SGX_MODE=SIM make test"
+
+script:
+- echo done
+- sleep 3
