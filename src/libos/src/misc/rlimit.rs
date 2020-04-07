@@ -5,7 +5,6 @@ use process::pid_t;
 pub struct ResourceLimits {
     rlimits: [rlimit_t; RLIMIT_COUNT],
 }
-pub type ResourceLimitsRef = Arc<SgxMutex<ResourceLimits>>;
 
 impl ResourceLimits {
     pub fn get(&self, resource: resource_t) -> &rlimit_t {
@@ -87,20 +86,25 @@ impl resource_t {
     }
 }
 
+/// Get or set resource limits.
+///
+/// The man page suggests that this system call works on a per-process basis
+/// and the input argument pid can only be process ID, not thread ID. This
+/// (unnecessary) restriction is lifted by our implementation. Nevertheless,
+/// since the rlimits object is shared between threads in a process, the
+/// semantic of limiting resource usage on a per-process basisi is preserved.
 pub fn do_prlimit(
     pid: pid_t,
     resource: resource_t,
     new_limit: Option<&rlimit_t>,
     old_limit: Option<&mut rlimit_t>,
 ) -> Result<()> {
-    let process_ref = if pid == 0 {
-        process::get_current()
+    let process = if pid == 0 {
+        current!()
     } else {
-        process::get(pid).cause_err(|_| errno!(ESRCH, "invalid pid"))?
+        process::table::get_thread(pid).cause_err(|_| errno!(ESRCH, "invalid pid"))?
     };
-    let mut process = process_ref.lock().unwrap();
-    let rlimits_ref = process.get_rlimits();
-    let mut rlimits = rlimits_ref.lock().unwrap();
+    let mut rlimits = process.rlimits().lock().unwrap();
     if let Some(old_limit) = old_limit {
         *old_limit = *rlimits.get(resource)
     }

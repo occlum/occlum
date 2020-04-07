@@ -14,9 +14,8 @@ pub fn do_select(
     let mut host_to_libos_fd = [0; libc::FD_SETSIZE];
     let mut polls = Vec::<libc::pollfd>::new();
 
-    let current_ref = process::get_current();
-    let mut proc = current_ref.lock().unwrap();
-    let file_table = proc.get_files().lock().unwrap();
+    let current = current!();
+    let file_table = current.files().lock().unwrap();
 
     for fd in 0..nfds {
         let fd_ref = file_table.get(fd as FileDesc)?;
@@ -78,9 +77,8 @@ pub fn do_select(
         });
     }
 
-    // Unlock the current process and its file table as early as possible
+    // Unlock the file table as early as possible
     drop(file_table);
-    drop(proc);
 
     let timeout = match timeout {
         None => -1,

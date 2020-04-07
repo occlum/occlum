@@ -1,7 +1,7 @@
 use super::*;
 
 use super::config;
-use super::process::{ElfFile, ProgramHeaderExt};
+use super::process::elf_file::{ElfFile, ProgramHeaderExt};
 use super::user_space_vm::{UserSpaceVMManager, UserSpaceVMRange, USER_SPACE_VM_MANAGER};
 use super::vm_manager::{VMInitializer, VMManager, VMMapAddr, VMMapOptions, VMMapOptionsBuilder};
 
@@ -301,7 +301,7 @@ impl ProcessVM {
             if flags.contains(MMapFlags::MAP_ANONYMOUS) {
                 VMInitializer::FillZeros()
             } else {
-                let file_ref = process::get_file(fd)?;
+                let file_ref = current!().file(fd)?;
                 VMInitializer::LoadFromFile {
                     file: file_ref,
                     offset: offset,

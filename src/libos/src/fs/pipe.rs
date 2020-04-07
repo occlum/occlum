@@ -160,15 +160,11 @@ pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2]> {
     let status_flags = StatusFlags::from_bits_truncate(flags);
     debug!("pipe2: flags: {:?} {:?}", creation_flags, status_flags);
 
-    let current_ref = process::get_current();
-    let current = current_ref.lock().unwrap();
+    let current = current!();
     let pipe = Pipe::new(status_flags)?;
-
-    let file_table_ref = current.get_files();
-    let mut file_table = file_table_ref.lock().unwrap();
     let close_on_spawn = creation_flags.must_close_on_spawn();
-    let reader_fd = file_table.put(Arc::new(Box::new(pipe.reader)), close_on_spawn);
-    let writer_fd = file_table.put(Arc::new(Box::new(pipe.writer)), close_on_spawn);
+    let reader_fd = current.add_file(Arc::new(Box::new(pipe.reader)), close_on_spawn);
+    let writer_fd = current.add_file(Arc::new(Box::new(pipe.writer)), close_on_spawn);
     trace!("pipe2: reader_fd: {}, writer_fd: {}", reader_fd, writer_fd);
     Ok([reader_fd, writer_fd])
 }

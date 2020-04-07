@@ -11,13 +11,10 @@ pub fn do_sendfile(
         "sendfile: out: {}, in: {}, offset: {:?}, count: {}",
         out_fd, in_fd, offset, count
     );
-    let current_ref = process::get_current();
-    let current_process = current_ref.lock().unwrap();
-    let file_table_ref = current_process.get_files();
-    let mut file_table = file_table_ref.lock().unwrap();
 
-    let in_file = file_table.get(in_fd)?;
-    let out_file = file_table.get(out_fd)?;
+    let current = current!();
+    let in_file = current.file(in_fd)?;
+    let out_file = current.file(out_fd)?;
     let mut buffer: [u8; 1024 * 11] = unsafe { MaybeUninit::uninit().assume_init() };
 
     let mut read_offset = match offset {

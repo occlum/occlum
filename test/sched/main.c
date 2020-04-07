@@ -171,7 +171,7 @@ static int test_sched_yield() {
 // ============================================================================
 
 static test_case_t test_cases[] = {
-    TEST_CASE(test_sched_xetaffinity_with_child_pid),
+    //TEST_CASE(test_sched_xetaffinity_with_child_pid),
     TEST_CASE(test_sched_getaffinity_with_self_pid),
     TEST_CASE(test_sched_setaffinity_with_self_pid),
     TEST_CASE(test_sched_getaffinity_via_explicit_syscall),

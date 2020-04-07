@@ -175,7 +175,7 @@ fn do_new_process(
 
     let envp = &config::LIBOS_CONFIG.env;
     let file_actions = Vec::new();
-    let parent = &process::IDLE_PROCESS;
+    let current = &process::IDLE;
     let program_path_str = program_path.to_str().unwrap();
     let new_tid = process::do_spawn_without_exec(
         &program_path_str,
@@ -183,13 +183,13 @@ fn do_new_process(
         envp,
         &file_actions,
         host_stdio_fds,
-        parent,
+        current,
     )?;
     Ok(new_tid)
 }
 
 fn do_exec_thread(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
-    let exit_status = process::run_task(libos_tid, host_tid)?;
+    let exit_status = process::task::exec(libos_tid, host_tid)?;
 
     // sync file system
     // TODO: only sync when all processes exit

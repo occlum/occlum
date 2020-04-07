@@ -6,9 +6,9 @@ pub fn do_mkdir(path: &str, mode: usize) -> Result<()> {
 
     let (dir_path, file_name) = split_path(&path);
     let inode = {
-        let current_ref = process::get_current();
-        let current_process = current_ref.lock().unwrap();
-        current_process.lookup_inode(dir_path)?
+        let current = current!();
+        let fs = current.fs().lock().unwrap();
+        fs.lookup_inode(dir_path)?
     };
     if inode.find(file_name).is_ok() {
         return_errno!(EEXIST, "");

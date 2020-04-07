@@ -13,7 +13,7 @@ typedef struct _thread_data_t
 extern thread_data_t *get_thread_data(void);
 
 
-extern void __run_task(struct Task* task);
+extern void __exec_task(struct Task* task);
 
 extern uint64_t __get_stack_guard(void);
 extern void __set_stack_guard(uint64_t new_val);
@@ -59,7 +59,7 @@ void switch_td_to_user(const struct Task* task) {
     td->stack_commit_addr = task->user_stack_limit;
 }
 
-int do_run_task(struct Task* task) {
+int do_exec_task(struct Task* task) {
     jmp_buf libos_state = {0};
     thread_data_t* td = get_thread_data();
     task->saved_state = &libos_state;
@@ -73,7 +73,7 @@ int do_run_task(struct Task* task) {
 
     int second = setjmp(libos_state);
     if (!second) {
-        __run_task(task);
+        __exec_task(task);
     }
 
     // Jump from do_exit_task

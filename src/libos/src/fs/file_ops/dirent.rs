@@ -67,7 +67,7 @@ pub fn do_getdents64(fd: FileDesc, buf: &mut [u8]) -> Result<usize> {
         buf.as_ptr(),
         buf.len()
     );
-    let file_ref = process::get_file(fd)?;
+    let file_ref = current!().file(fd)?;
     let info = file_ref.metadata()?;
     if info.type_ != FileType::Dir {
         return_errno!(ENOTDIR, "");

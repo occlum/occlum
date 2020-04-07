@@ -43,11 +43,8 @@ use std::backtrace::{self, PrintFormat};
 use std::ffi::CStr; // a borrowed C string
 use std::panic;
 
-use error::*;
-use prelude::*;
-
-// Override prelude::Result with error::Result
-use error::Result;
+use crate::prelude::*;
+use crate::process::pid_t;
 
 #[macro_use]
 mod prelude;

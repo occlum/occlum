@@ -1,4 +1,56 @@
-use super::*;
+use super::table;
+/// Process scheduling.
+use crate::prelude::*;
+
+pub fn do_sched_getaffinity(tid: pid_t, cpu_set: &mut CpuSet) -> Result<usize> {
+    let host_tid = match tid {
+        0 => 0,
+        _ => find_host_tid(tid)?,
+    };
+    let buf = cpu_set.as_mut_ptr();
+    let cpusize = cpu_set.len();
+    let retval = try_libc!({
+        let mut retval = 0;
+        let sgx_status = occlum_ocall_sched_getaffinity(&mut retval, host_tid as i32, cpusize, buf);
+        assert!(sgx_status == sgx_status_t::SGX_SUCCESS);
+        retval
+    }) as usize;
+    // Note: the first retval bytes in CpuSet are valid
+    Ok(retval)
+}
+
+pub fn do_sched_setaffinity(tid: pid_t, cpu_set: &CpuSet) -> Result<()> {
+    let host_tid = match tid {
+        0 => 0,
+        _ => find_host_tid(tid)?,
+    };
+    let buf = cpu_set.as_ptr();
+    let cpusize = cpu_set.len();
+    try_libc!({
+        let mut retval = 0;
+        let sgx_status = occlum_ocall_sched_setaffinity(&mut retval, host_tid as i32, cpusize, buf);
+        assert!(sgx_status == sgx_status_t::SGX_SUCCESS);
+        retval
+    });
+    Ok(())
+}
+
+pub fn do_sched_yield() {
+    unsafe {
+        let status = occlum_ocall_sched_yield();
+        assert!(status == sgx_status_t::SGX_SUCCESS);
+    }
+}
+
+fn find_host_tid(tid: pid_t) -> Result<pid_t> {
+    let thread = table::get_thread(tid)?;
+    // TODO: fix the race condition of host_tid being available.
+    let host_tid = thread
+        .inner()
+        .host_tid()
+        .ok_or_else(|| errno!(ESRCH, "host_tid is not available"))?;
+    Ok(host_tid)
+}
 
 pub struct CpuSet {
     vec: Vec<u8>,
@@ -58,53 +110,6 @@ impl std::fmt::UpperHex for CpuSet {
             fmtr.write_fmt(format_args!("{:02X}", byte))?;
         }
         Ok(())
-    }
-}
-
-fn find_host_tid(pid: pid_t) -> Result<pid_t> {
-    let process_ref = if pid == 0 { get_current() } else { get(pid)? };
-    let mut process = process_ref.lock().unwrap();
-    let host_tid = process.get_host_tid();
-    Ok(host_tid)
-}
-
-pub fn do_sched_getaffinity(pid: pid_t, cpu_set: &mut CpuSet) -> Result<usize> {
-    let host_tid = match pid {
-        0 => 0,
-        _ => find_host_tid(pid)?,
-    };
-    let buf = cpu_set.as_mut_ptr();
-    let cpusize = cpu_set.len();
-    let retval = try_libc!({
-        let mut retval = 0;
-        let sgx_status = occlum_ocall_sched_getaffinity(&mut retval, host_tid as i32, cpusize, buf);
-        assert!(sgx_status == sgx_status_t::SGX_SUCCESS);
-        retval
-    }) as usize;
-    // Note: the first retval bytes in CpuSet are valid
-    Ok(retval)
-}
-
-pub fn do_sched_setaffinity(pid: pid_t, cpu_set: &CpuSet) -> Result<()> {
-    let host_tid = match pid {
-        0 => 0,
-        _ => find_host_tid(pid)?,
-    };
-    let buf = cpu_set.as_ptr();
-    let cpusize = cpu_set.len();
-    try_libc!({
-        let mut retval = 0;
-        let sgx_status = occlum_ocall_sched_setaffinity(&mut retval, host_tid as i32, cpusize, buf);
-        assert!(sgx_status == sgx_status_t::SGX_SUCCESS);
-        retval
-    });
-    Ok(())
-}
-
-pub fn do_sched_yield() {
-    unsafe {
-        let status = occlum_ocall_sched_yield();
-        assert!(status == sgx_status_t::SGX_SUCCESS);
     }
 }
 

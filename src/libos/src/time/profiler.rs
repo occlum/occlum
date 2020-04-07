@@ -18,7 +18,7 @@ impl GlobalProfiler {
     }
 
     pub fn thread_enter(&mut self) -> Result<()> {
-        let tid = process::do_gettid();
+        let tid = current!().tid();
         if self.inner.insert(tid, ThreadProfiler::new()).is_some() {
             return_errno!(
                 EINVAL,
@@ -33,7 +33,7 @@ impl GlobalProfiler {
         // will never return
         self.syscall_exit(SyscallNum::Exit, false);
 
-        let tid = process::do_gettid();
+        let tid = current!().tid();
 
         let mut exiting_profiler = self.inner.remove(&tid).ok_or_else(|| {
             errno!(
@@ -47,13 +47,13 @@ impl GlobalProfiler {
     }
 
     pub fn syscall_enter(&mut self, syscall_num: SyscallNum) -> Result<()> {
-        let tid = process::do_gettid();
+        let tid = current!().tid();
         let mut prof = self.inner.get_mut(&tid).unwrap();
         prof.syscall_enter(syscall_num)
     }
 
     pub fn syscall_exit(&mut self, syscall_num: SyscallNum, is_err: bool) -> Result<()> {
-        let tid = process::do_gettid();
+        let tid = current!().tid();
         let mut prof = self.inner.get_mut(&tid).unwrap();
         prof.syscall_exit(syscall_num, is_err)
     }

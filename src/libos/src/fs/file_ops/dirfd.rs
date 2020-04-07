@@ -24,7 +24,7 @@ impl DirFd {
 // Get the absolute path of directory
 pub fn get_dir_path(dirfd: FileDesc) -> Result<String> {
     let dir_path = {
-        let file_ref = process::get_file(dirfd)?;
+        let file_ref = current!().file(dirfd)?;
         if let Ok(inode_file) = file_ref.as_inode_file() {
             if inode_file.metadata()?.type_ != FileType::Dir {
                 return_errno!(ENOTDIR, "not a directory");

@@ -12,9 +12,21 @@ pub use std::sync::{
     Arc, SgxMutex, SgxMutexGuard, SgxRwLock, SgxRwLockReadGuard, SgxRwLockWriteGuard,
 };
 
+// Override prelude::Result with error::Result
+pub use crate::error::Result;
+pub use crate::error::*;
+pub use crate::fs::{File, FileDesc, FileRef};
+pub use crate::process::pid_t;
+
 macro_rules! debug_trace {
     () => {
         debug!("> Line = {}, File = {}", line!(), file!())
+    };
+}
+
+macro_rules! current {
+    () => {
+        crate::process::current::get()
     };
 }
 

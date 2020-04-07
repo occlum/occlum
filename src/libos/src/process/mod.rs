@@ -1,110 +1,54 @@
-pub use self::arch_prctl::{do_arch_prctl, ArchPrctlCode};
-pub use self::exit::{do_exit, do_wait4, ChildProcessFilter};
-pub use self::futex::{
-    futex_op_and_flags_from_u32, futex_requeue, futex_wait, futex_wake, FutexFlags, FutexOp,
-};
-pub use self::process::{Status, IDLE_PROCESS};
-pub use self::process_table::get;
-pub use self::sched::{do_sched_getaffinity, do_sched_setaffinity, do_sched_yield, CpuSet};
-pub use self::spawn::{do_spawn, do_spawn_without_exec, ElfFile, FileAction, ProgramHeaderExt};
-pub use self::task::{get_current, get_current_tid, run_task, Task};
-pub use self::thread::{do_clone, do_set_tid_address, CloneFlags, ThreadGroup};
-pub use self::wait::{WaitQueue, Waiter};
+/// Process/thread subsystem.
+///
+/// The subsystem implements process/thread-related system calls, which are
+/// mainly based on the three concepts below:
+///
+/// * [`Process`]. A process has a parent and may have multiple child processes and
+/// can own multiple threads.
+/// * [`Thread`]. A thread belongs to one and only one process and owns a set
+/// of OS resources, e.g., virtual memory, file tables, etc.
+/// * [`Task`]. A task belongs to one and only one thread, for which it deals with
+/// the low-level details about thread execution.
+use crate::fs::{FileRef, FileTable, FsView};
+use crate::misc::ResourceLimits;
+use crate::prelude::*;
+use crate::vm::ProcessVM;
+
+use self::process::{ChildProcessFilter, ProcessBuilder, ProcessInner};
+use self::thread::{ThreadBuilder, ThreadId, ThreadInner};
+use self::wait::{WaitQueue, Waiter};
+
+pub use self::do_spawn::do_spawn_without_exec;
+pub use self::process::{Process, ProcessStatus, IDLE};
+pub use self::syscalls::*;
+pub use self::task::Task;
+pub use self::thread::{Thread, ThreadStatus};
+
+mod do_arch_prctl;
+mod do_clone;
+mod do_exit;
+mod do_futex;
+mod do_getpid;
+mod do_sched;
+mod do_set_tid_address;
+mod do_spawn;
+mod do_wait4;
+mod process;
+mod syscalls;
+mod thread;
+mod wait;
+
+pub mod current;
+pub mod elf_file;
+pub mod table;
+pub mod task;
 
 #[allow(non_camel_case_types)]
 pub type pid_t = u32;
 
-#[derive(Debug)]
-pub struct Process {
-    task: Task,
-    status: Status,
-    pid: pid_t,
-    pgid: pid_t,
-    tgid: pid_t,
-    host_tid: pid_t,
-    exit_status: i32,
-    is_detached: bool,
-    // TODO: move cwd, root_inode into a FileSystem structure
-    // TODO: should cwd be a String or INode?
-    cwd: String,
-    elf_path: String,
-    clear_child_tid: Option<*mut pid_t>,
-    parent: Option<ProcessRef>,
-    children: Vec<ProcessWeakRef>,
-    waiting_children: Option<WaitQueue<ChildProcessFilter, pid_t>>,
-    //thread_group: ThreadGroupRef,
-    vm: ProcessVMRef,
-    file_table: FileTableRef,
-    rlimits: ResourceLimitsRef,
-}
-
-pub type ProcessRef = Arc<SgxMutex<Process>>;
-pub type ProcessWeakRef = std::sync::Weak<SgxMutex<Process>>;
+pub type ProcessRef = Arc<Process>;
+pub type ThreadRef = Arc<Thread>;
 pub type FileTableRef = Arc<SgxMutex<FileTable>>;
 pub type ProcessVMRef = Arc<SgxMutex<ProcessVM>>;
-pub type ThreadGroupRef = Arc<SgxMutex<ThreadGroup>>;
-
-pub fn do_getpid() -> pid_t {
-    let current_ref = get_current();
-    let current = current_ref.lock().unwrap();
-    current.get_pid()
-}
-
-pub fn do_gettid() -> pid_t {
-    let current_ref = get_current();
-    let current = current_ref.lock().unwrap();
-    current.get_tid()
-}
-
-pub fn do_getpgid() -> pid_t {
-    let current_ref = get_current();
-    let current = current_ref.lock().unwrap();
-    current.get_pgid()
-}
-
-pub fn do_getppid() -> pid_t {
-    let parent_ref = {
-        let current_ref = get_current();
-        let current = current_ref.lock().unwrap();
-        current.get_parent().clone()
-    };
-    let parent = parent_ref.lock().unwrap();
-    parent.get_pid()
-}
-
-mod arch_prctl;
-mod exit;
-mod futex;
-mod process;
-mod process_table;
-mod sched;
-mod spawn;
-mod task;
-mod thread;
-mod wait;
-
-/// Get a file from the file table of the current process
-pub fn get_file(fd: FileDesc) -> Result<FileRef> {
-    let current_ref = get_current();
-    let current = current_ref.lock().unwrap();
-    let file_ref = current.get_files().lock().unwrap().get(fd as FileDesc)?;
-    Ok(file_ref)
-}
-
-/// Put a file into the file table of the current process
-pub fn put_file(new_file: FileRef, close_on_spawn: bool) -> Result<FileDesc> {
-    let current_ref = get_current();
-    let current = current_ref.lock().unwrap();
-    let new_fd = current
-        .get_files()
-        .lock()
-        .unwrap()
-        .put(new_file, close_on_spawn);
-    Ok(new_fd)
-}
-
-use super::*;
-use fs::{File, FileDesc, FileRef, FileTable};
-use misc::ResourceLimitsRef;
-use time::GLOBAL_PROFILER;
-use vm::ProcessVM;
+pub type FsViewRef = Arc<SgxMutex<FsView>>;
+pub type ResourceLimitsRef = Arc<SgxMutex<ResourceLimits>>;

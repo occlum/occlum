@@ -1,4 +1,5 @@
-use super::*;
+/// A wait/wakeup mechanism that connects wait4 and exit system calls.
+use crate::prelude::*;
 
 #[derive(Debug)]
 pub struct Waiter<D, R>

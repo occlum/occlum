@@ -92,7 +92,7 @@ impl EpollFile {
 
     pub fn control(&self, op: EpollCtlCmd, fd: FileDesc, event: Option<&EpollEvent>) -> Result<()> {
         let host_fd = {
-            let fd_ref = process::get_file(fd)?;
+            let fd_ref = current!().file(fd)?;
             if let Ok(socket) = fd_ref.as_socket() {
                 socket.fd()
             } else if let Ok(eventfd) = fd_ref.as_event() {

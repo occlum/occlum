@@ -1,7 +1,7 @@
-use super::*;
-
 use xmas_elf::symbol_table::Entry;
 use xmas_elf::{header, program, sections};
+
+use crate::prelude::*;
 
 pub use xmas_elf::header::HeaderPt2 as ElfHeader;
 pub use xmas_elf::program::{ProgramHeader, ProgramIter};

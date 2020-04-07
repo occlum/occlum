@@ -27,10 +27,10 @@ pub fn do_eventfd2(init_val: u32, flags: i32) -> Result<isize> {
         Arc::new(Box::new(event))
     };
 
-    let fd = process::put_file(
+    let fd = current!().add_file(
         file_ref,
         inner_flags.contains(EventCreationFlags::EFD_CLOEXEC),
-    )?;
+    );
     Ok(fd as isize)
 }
 
@@ -307,8 +307,26 @@ pub fn do_chdir(path: *const i8) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    file_ops::do_chdir(&path)?;
+    fs_ops::do_chdir(&path)?;
     Ok(0)
+}
+
+pub fn do_getcwd(buf_ptr: *mut u8, size: usize) -> Result<isize> {
+    let buf = {
+        from_user::check_mut_array(buf_ptr, size)?;
+        unsafe { std::slice::from_raw_parts_mut(buf_ptr, size) }
+    };
+
+    let cwd = fs_ops::do_getcwd()?;
+
+    if cwd.len() + 1 > buf.len() {
+        return_errno!(ERANGE, "buf is not long enough");
+    }
+    buf[..cwd.len()].copy_from_slice(cwd.as_bytes());
+    buf[cwd.len()] = 0;
+
+    // getcwd requires returning buf_ptr if success
+    Ok(buf_ptr as isize)
 }
 
 pub fn do_rename(oldpath: *const i8, newpath: *const i8) -> Result<isize> {

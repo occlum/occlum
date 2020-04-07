@@ -27,13 +27,11 @@ struct thread_arg {
 
 static void* thread_func(void* _arg) {
     struct thread_arg* arg = _arg;
-    printf("Thread #%d: started\n", arg->ti);
     for (long i = 0; i < arg->local_count; i++) {
         pthread_mutex_lock(arg->mutex);
         (*arg->global_count)++;
         pthread_mutex_unlock(arg->mutex);
     }
-    printf("Thread #%d: completed\n", arg->ti);
     return NULL;
 }
 

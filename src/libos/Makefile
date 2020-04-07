@@ -67,7 +67,7 @@ C_SRCS := $(filter-out $(BUILTIN_C_SRCS),$(sort $(wildcard src/*.c src/*/*.c src
 C_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(C_SRCS:.c=.o))
 CXX_SRCS := $(sort $(wildcard src/*.cpp src/*/*.cpp))
 CXX_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(CXX_SRCS:.cpp=.o))
-S_SRCS := $(sort $(wildcard src/*.S src/*/*.S))
+S_SRCS := $(sort $(wildcard src/*.S src/*/*.S src/*/*/*.S))
 S_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(S_SRCS:.S=.o))
 
 ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(LIBOS_SO) $(EDL_C_OBJS) $(BUILTIN_C_OBJS) $(C_OBJS) $(CXX_OBJS) $(S_OBJS)) $(RUST_TARGET_DIR) $(RUST_OUT_DIR)))

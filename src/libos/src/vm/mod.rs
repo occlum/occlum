@@ -1,6 +1,6 @@
 use super::*;
 use fs::{File, FileDesc, FileRef};
-use process::{get_current, Process, ProcessRef};
+use process::{Process, ProcessRef};
 use std::fmt;
 
 mod process_vm;
@@ -35,32 +35,22 @@ pub fn do_mmap(
         );
     }
 
-    let mut current_vm_ref = {
-        let current_ref = get_current();
-        let current_process = current_ref.lock().unwrap();
-        current_process.get_vm().clone()
-    };
-    let mut current_vm = current_vm_ref.lock().unwrap();
+    let current = current!();
+    let mut current_vm = current.vm().lock().unwrap();
     current_vm.mmap(addr, size, perms, flags, fd, offset)
 }
 
 pub fn do_munmap(addr: usize, size: usize) -> Result<()> {
     debug!("munmap: addr: {:#x}, size: {:#x}", addr, size);
-    let mut current_vm_ref = {
-        let current_ref = get_current();
-        let current_process = current_ref.lock().unwrap();
-        current_process.get_vm().clone()
-    };
-    let mut current_vm = current_vm_ref.lock().unwrap();
+    let current = current!();
+    let mut current_vm = current.vm().lock().unwrap();
     current_vm.munmap(addr, size)
 }
 
 pub fn do_brk(addr: usize) -> Result<usize> {
     debug!("brk: addr: {:#x}", addr);
-    let current_ref = get_current();
-    let current_process = current_ref.lock().unwrap();
-    let current_vm_ref = current_process.get_vm();
-    let mut current_vm = current_vm_ref.lock().unwrap();
+    let current = current!();
+    let mut current_vm = current.vm().lock().unwrap();
     current_vm.brk(addr)
 }
 

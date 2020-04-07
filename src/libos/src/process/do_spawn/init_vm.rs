@@ -1,5 +1,8 @@
-use super::*;
 use std::ptr;
+
+use super::super::elf_file::ElfFile;
+use crate::prelude::*;
+use crate::vm::{ProcessVM, ProcessVMBuilder};
 
 pub fn do_init<'a, 'b>(
     elf_file: &'b ElfFile<'a>,

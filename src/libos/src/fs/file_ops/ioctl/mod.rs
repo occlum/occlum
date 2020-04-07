@@ -66,6 +66,6 @@ impl<'a> IoctlCmd<'a> {
 
 pub fn do_ioctl(fd: FileDesc, cmd: &mut IoctlCmd) -> Result<()> {
     debug!("ioctl: fd: {}, cmd: {:?}", fd, cmd);
-    let file_ref = process::get_file(fd)?;
+    let file_ref = current!().file(fd)?;
     file_ref.ioctl(cmd)
 }

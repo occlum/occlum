@@ -1,18 +1,15 @@
 use super::*;
 
 fn do_open(path: &str, flags: u32, mode: u32) -> Result<FileDesc> {
-    let current_ref = process::get_current();
-    let mut proc = current_ref.lock().unwrap();
+    let current = current!();
+    let fs = current.fs().lock().unwrap();
 
-    let file = proc.open_file(path, flags, mode)?;
+    let file = fs.open_file(path, flags, mode)?;
     let file_ref: Arc<Box<dyn File>> = Arc::new(file);
 
     let fd = {
         let creation_flags = CreationFlags::from_bits_truncate(flags);
-        proc.get_files()
-            .lock()
-            .unwrap()
-            .put(file_ref, creation_flags.must_close_on_spawn())
+        current.add_file(file_ref, creation_flags.must_close_on_spawn())
     };
     Ok(fd)
 }

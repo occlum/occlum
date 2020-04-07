@@ -58,9 +58,9 @@ impl FileMode {
 pub fn do_chmod(path: &str, mode: FileMode) -> Result<()> {
     debug!("chmod: path: {:?}, mode: {:?}", path, mode);
     let inode = {
-        let current_ref = process::get_current();
-        let mut current = current_ref.lock().unwrap();
-        current.lookup_inode(path)?
+        let current = current!();
+        let fs = current.fs().lock().unwrap();
+        fs.lookup_inode(path)?
     };
     let mut info = inode.metadata()?;
     info.mode = mode.bits();
@@ -70,7 +70,7 @@ pub fn do_chmod(path: &str, mode: FileMode) -> Result<()> {
 
 pub fn do_fchmod(fd: FileDesc, mode: FileMode) -> Result<()> {
     debug!("fchmod: fd: {}, mode: {:?}", fd, mode);
-    let file_ref = process::get_file(fd)?;
+    let file_ref = current!().file(fd)?;
     let mut info = file_ref.metadata()?;
     info.mode = mode.bits();
     file_ref.set_metadata(&info)?;

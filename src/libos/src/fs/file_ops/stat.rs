@@ -141,7 +141,7 @@ fn do_stat(path: &str) -> Result<Stat> {
 
 pub fn do_fstat(fd: u32) -> Result<Stat> {
     debug!("fstat: fd: {}", fd);
-    let file_ref = process::get_file(fd as FileDesc)?;
+    let file_ref = current!().file(fd as FileDesc)?;
     let stat = Stat::from(file_ref.metadata()?);
     // TODO: handle symlink
     Ok(stat)
@@ -150,9 +150,9 @@ pub fn do_fstat(fd: u32) -> Result<Stat> {
 pub fn do_lstat(path: &str) -> Result<Stat> {
     debug!("lstat: path: {}", path);
     let inode = {
-        let current_ref = process::get_current();
-        let current_process = current_ref.lock().unwrap();
-        current_process.lookup_inode(&path)?
+        let current = current!();
+        let fs = current.fs().lock().unwrap();
+        fs.lookup_inode(&path)?
     };
     let stat = Stat::from(inode.metadata()?);
     Ok(stat)

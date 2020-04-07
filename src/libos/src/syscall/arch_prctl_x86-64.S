@@ -1,3 +1,5 @@
+# In SGX simulation mode, we don't use wrfsbase directly. Instead, we use arch_prctl syscall.
+
 #if SGX_MODE_SIM
 
 #define __ASSEMBLY__

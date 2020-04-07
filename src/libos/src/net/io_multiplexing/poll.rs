@@ -10,8 +10,7 @@ pub fn do_poll(pollfds: &mut [libc::pollfd], timeout: c_int) -> Result<usize> {
     // Untrusted pollfd's that will be modified by OCall
     let mut u_pollfds: Vec<libc::pollfd> = pollfds.to_vec();
 
-    let current_ref = process::get_current();
-    let mut proc = current_ref.lock().unwrap();
+    let current = current!();
     for (i, pollfd) in pollfds.iter_mut().enumerate() {
         // Poll should just ignore negative fds
         if pollfd.fd < 0 {
@@ -20,11 +19,7 @@ pub fn do_poll(pollfds: &mut [libc::pollfd], timeout: c_int) -> Result<usize> {
             continue;
         }
 
-        let file_ref = proc
-            .get_files()
-            .lock()
-            .unwrap()
-            .get(pollfd.fd as FileDesc)?;
+        let file_ref = current.file(pollfd.fd as FileDesc)?;
         if let Ok(socket) = file_ref.as_socket() {
             // convert libos fd to host fd in the copy to keep pollfds unchanged
             u_pollfds[i].fd = socket.fd();
@@ -57,9 +52,6 @@ pub fn do_poll(pollfds: &mut [libc::pollfd], timeout: c_int) -> Result<usize> {
             return_errno!(EBADF, "not a supported file type");
         }
     }
-
-    // Unlock the current process as early as possible
-    drop(proc);
 
     let num_events = try_libc!(libc::ocall::poll(
         u_pollfds.as_mut_ptr(),

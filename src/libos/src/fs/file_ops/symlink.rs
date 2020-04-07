@@ -4,15 +4,13 @@ pub fn do_readlink(path: &str, buf: &mut [u8]) -> Result<usize> {
     debug!("readlink: path: {:?}", path);
     let file_path = {
         if path == "/proc/self/exe" {
-            let current_ref = process::get_current();
-            let current = current_ref.lock().unwrap();
-            current.get_elf_path().to_owned()
+            current!().process().exec_path().to_owned()
         } else if path.starts_with("/proc/self/fd") {
             let fd = path
                 .trim_start_matches("/proc/self/fd/")
                 .parse::<FileDesc>()
                 .map_err(|e| errno!(EBADF, "Invalid file descriptor"))?;
-            let file_ref = process::get_file(fd)?;
+            let file_ref = current!().file(fd)?;
             if let Ok(inode_file) = file_ref.as_inode_file() {
                 inode_file.get_abs_path().to_owned()
             } else {

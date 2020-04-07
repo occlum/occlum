@@ -94,7 +94,7 @@ impl Log for SimpleLogger {
         if self.enabled(record.metadata()) {
             // Parts of message
             let level = record.level();
-            let tid = process::get_current_tid();
+            let tid = current!().tid();
             let rounds = round_count();
             let desc = round_desc();
             // Message (null-terminated)

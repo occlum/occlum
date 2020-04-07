@@ -53,10 +53,10 @@ impl<'a> FcntlCmd<'a> {
 
 pub fn do_fcntl(fd: FileDesc, cmd: &mut FcntlCmd) -> Result<isize> {
     debug!("fcntl: fd: {:?}, cmd: {:?}", &fd, cmd);
-    let current_ref = process::get_current();
-    let mut current = current_ref.lock().unwrap();
-    let file_table_ref = current.get_files();
-    let mut file_table = file_table_ref.lock().unwrap();
+
+    let current = current!();
+    let mut file_table = current.files().lock().unwrap();
+
     let ret = match cmd {
         FcntlCmd::DupFd(min_fd) => {
             let dup_fd = file_table.dup(fd, *min_fd, false)?;

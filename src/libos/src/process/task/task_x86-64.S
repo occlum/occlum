@@ -27,9 +27,9 @@ __set_stack_guard:
     mov %rdi, %gs:(TD_TASK_OFFSET)
     ret
 
-    .global __run_task
-    .type __run_task, @function
-__run_task:
+    .global __exec_task
+    .type __exec_task, @function
+__exec_task:
     // Save kernel fsbase and use user fsbase
     //
     // SGX HW Mode and SIM Mode require different implementations. In SGX hardware

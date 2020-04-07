@@ -1,9 +1,10 @@
-use super::*;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::intrinsics::atomic_load;
 use std::sync::atomic::{AtomicBool, Ordering};
-use time::timespec_t;
+
+use crate::prelude::*;
+use crate::time::timespec_t;
 
 /// `FutexOp`, `FutexFlags`, and `futex_op_and_flags_from_u32` are helper types and
 /// functions for handling the versatile commands and arguments of futex system

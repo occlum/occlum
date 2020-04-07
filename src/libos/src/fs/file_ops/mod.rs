@@ -3,7 +3,6 @@ use super::*;
 use process::Process;
 
 pub use self::access::{do_access, do_faccessat, AccessibilityCheckFlags, AccessibilityCheckMode};
-pub use self::chdir::do_chdir;
 pub use self::chmod::{do_chmod, do_fchmod, FileMode};
 pub use self::chown::{do_chown, do_fchown, do_lchown};
 pub use self::close::do_close;
@@ -30,7 +29,6 @@ pub use self::unlink::do_unlink;
 pub use self::write::{do_pwrite, do_write, do_writev};
 
 mod access;
-mod chdir;
 mod chmod;
 mod chown;
 mod close;
@@ -55,85 +53,6 @@ mod symlink;
 mod truncate;
 mod unlink;
 mod write;
-
-impl Process {
-    /// Open a file on the process. But DO NOT add it to file table.
-    pub fn open_file(&self, path: &str, flags: u32, mode: u32) -> Result<Box<dyn File>> {
-        if path == "/dev/null" {
-            return Ok(Box::new(DevNull));
-        }
-        if path == "/dev/zero" {
-            return Ok(Box::new(DevZero));
-        }
-        if path == "/dev/random" || path == "/dev/urandom" || path == "/dev/arandom" {
-            return Ok(Box::new(DevRandom));
-        }
-        if path == "/dev/sgx" {
-            return Ok(Box::new(DevSgx));
-        }
-        let creation_flags = CreationFlags::from_bits_truncate(flags);
-        let inode = if creation_flags.can_create() {
-            let (dir_path, file_name) = split_path(&path);
-            let dir_inode = self.lookup_inode(dir_path)?;
-            match dir_inode.find(file_name) {
-                Ok(file_inode) => {
-                    if creation_flags.is_exclusive() {
-                        return_errno!(EEXIST, "file exists");
-                    }
-                    file_inode
-                }
-                Err(FsError::EntryNotFound) => {
-                    if !dir_inode.allow_write()? {
-                        return_errno!(EPERM, "file cannot be created");
-                    }
-                    dir_inode.create(file_name, FileType::File, mode)?
-                }
-                Err(e) => return Err(Error::from(e)),
-            }
-        } else {
-            self.lookup_inode(&path)?
-        };
-        let abs_path = self.convert_to_abs_path(&path);
-        Ok(Box::new(INodeFile::open(inode, &abs_path, flags)?))
-    }
-
-    /// Lookup INode from the cwd of the process
-    pub fn lookup_inode(&self, path: &str) -> Result<Arc<dyn INode>> {
-        debug!("lookup_inode: cwd: {:?}, path: {:?}", self.get_cwd(), path);
-        if path.len() > 0 && path.as_bytes()[0] == b'/' {
-            // absolute path
-            let abs_path = path.trim_start_matches('/');
-            let inode = ROOT_INODE.lookup(abs_path)?;
-            Ok(inode)
-        } else {
-            // relative path
-            let cwd = self.get_cwd().trim_start_matches('/');
-            let inode = ROOT_INODE.lookup(cwd)?.lookup(path)?;
-            Ok(inode)
-        }
-    }
-
-    /// Convert the path to be absolute
-    pub fn convert_to_abs_path(&self, path: &str) -> String {
-        debug!(
-            "convert_to_abs_path: cwd: {:?}, path: {:?}",
-            self.get_cwd(),
-            path
-        );
-        if path.len() > 0 && path.as_bytes()[0] == b'/' {
-            // path is absolute path already
-            return path.to_owned();
-        }
-        let cwd = {
-            if !self.get_cwd().ends_with("/") {
-                self.get_cwd().to_owned() + "/"
-            } else {
-                self.get_cwd().to_owned()
-            }
-        };
-        cwd + path
-    }
-}
 
 /// Split a `path` str to `(base_path, file_name)`
 pub fn split_path(path: &str) -> (&str, &str) {

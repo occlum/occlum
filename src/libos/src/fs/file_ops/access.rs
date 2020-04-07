@@ -47,9 +47,9 @@ pub fn do_faccessat(
 pub fn do_access(path: &str, mode: AccessibilityCheckMode) -> Result<()> {
     debug!("access: path: {:?}, mode: {:?}", path, mode);
     let inode = {
-        let current_ref = process::get_current();
-        let mut current = current_ref.lock().unwrap();
-        current.lookup_inode(path)?
+        let current = current!();
+        let fs = current.fs().lock().unwrap();
+        fs.lookup_inode(path)?
     };
     //let metadata = inode.get_metadata();
     // TODO: check metadata.mode with mode

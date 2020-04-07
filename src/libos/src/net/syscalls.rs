@@ -12,7 +12,7 @@ pub fn do_sendmsg(fd: c_int, msg_ptr: *const msghdr, flags_c: c_int) -> Result<i
         fd, msg_ptr, flags_c
     );
 
-    let file_ref = process::get_file(fd as FileDesc)?;
+    let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_socket() {
         let msg_c = {
             from_user::check_ptr(msg_ptr)?;
@@ -40,7 +40,7 @@ pub fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut msghdr_mut, flags_c: c_int) -> Re
         fd, msg_mut_ptr, flags_c
     );
 
-    let file_ref = process::get_file(fd as FileDesc)?;
+    let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_socket() {
         let msg_mut_c = {
             from_user::check_mut_ptr(msg_mut_ptr)?;
@@ -192,7 +192,7 @@ pub fn do_epoll_create1(raw_flags: c_int) -> Result<isize> {
     let epoll_file = io_multiplexing::EpollFile::new(flags)?;
     let file_ref: Arc<Box<dyn File>> = Arc::new(Box::new(epoll_file));
     let close_on_spawn = flags.contains(CreationFlags::O_CLOEXEC);
-    let fd = process::put_file(file_ref, close_on_spawn)?;
+    let fd = current!().add_file(file_ref, close_on_spawn);
 
     Ok(fd as isize)
 }
@@ -211,7 +211,7 @@ pub fn do_epoll_ctl(
         None
     };
 
-    let epfile_ref = process::get_file(epfd as FileDesc)?;
+    let epfile_ref = current!().file(epfd as FileDesc)?;
     let epoll_file = epfile_ref.as_epfile()?;
 
     epoll_file.control(
@@ -250,7 +250,7 @@ pub fn do_epoll_wait(
         timeout
     );
 
-    let epfile_ref = process::get_file(epfd as FileDesc)?;
+    let epfile_ref = current!().file(epfd as FileDesc)?;
     let epoll_file = epfile_ref.as_epfile()?;
 
     let count = epoll_file.wait(&mut inner_events, timeout)?;

@@ -1,14 +1,15 @@
 use super::*;
 
 pub fn do_rename(oldpath: &str, newpath: &str) -> Result<()> {
-    let current_ref = process::get_current();
-    let current_process = current_ref.lock().unwrap();
     debug!("rename: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
+
+    let current = current!();
+    let fs = current.fs().lock().unwrap();
 
     let (old_dir_path, old_file_name) = split_path(&oldpath);
     let (new_dir_path, new_file_name) = split_path(&newpath);
-    let old_dir_inode = current_process.lookup_inode(old_dir_path)?;
-    let new_dir_inode = current_process.lookup_inode(new_dir_path)?;
+    let old_dir_inode = fs.lookup_inode(old_dir_path)?;
+    let new_dir_inode = fs.lookup_inode(new_dir_path)?;
     let old_file_mode = {
         let old_file_inode = old_dir_inode.find(old_file_name)?;
         let metadata = old_file_inode.metadata()?;
