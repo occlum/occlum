@@ -8,6 +8,9 @@ else
 	BUILD_DIR := $(PROJECT_DIR)/build
 endif
 
+PASS_LOG = $(BUILD_DIR)/test/.pass
+FAIL_LOG = $(BUILD_DIR)/test/.fail
+
 # Dependencies: need to be compiled but not to run by any Makefile target
 TEST_DEPS := client data_sink
 # Tests: need to be compiled and run by test-% target
@@ -63,18 +66,23 @@ postbuild:
 #############################################################################
 
 test: build pretest $(TEST_TARGETS) posttest
+
 pretest:
+	@$(RM) $(PASS_LOG) $(FAIL_LOG)
 	@cd $(BUILD_DIR)/test && \
 		$(BUILD_DIR)/bin/occlum start
 
 $(TEST_TARGETS): test-%: %
+	@touch $(PASS_LOG) $(FAIL_LOG)
 	@$(ECHO) "$(CYAN)RUN TEST => $<$(NO_COLOR)"
 	@# Restart server if test failed
 	@$(MAKE) --no-print-directory -C $< test ; \
 		if [ $$? -eq 0 ] ; then \
 			$(ECHO) "$(GREEN)PASS$(NO_COLOR)" ; \
+			$(ECHO) "$< PASS" >> $(PASS_LOG) ; \
 		else \
 			$(ECHO) "$(RED)FAILED$(NO_COLOR)" ; \
+			$(ECHO) "$< FAILED" >> $(FAIL_LOG) ; \
 			cd $(BUILD_DIR)/test && \
 			$(BUILD_DIR)/bin/occlum start ; \
 		fi ;
@@ -82,6 +90,13 @@ $(TEST_TARGETS): test-%: %
 posttest:
 	@cd $(BUILD_DIR)/test && \
 		$(BUILD_DIR)/bin/occlum stop
+	@PASS_NUM=$(shell wc -l < $(PASS_LOG)); \
+		FAIL_NUM=$(shell wc -l < $(FAIL_LOG)); \
+		$(ECHO) "\nTotal:" ; \
+		$(ECHO) "$(GREEN)PASS: $$PASS_NUM  $(RED)FAILED: $$FAIL_NUM $(NO_COLOR)" ; \
+		if [ $$FAIL_NUM -ne 0 ] ; then \
+			exit 1; \
+		fi ;
 
 #############################################################################
 # Benchmark targets
