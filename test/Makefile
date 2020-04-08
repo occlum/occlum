@@ -15,6 +15,7 @@ TESTS := empty env hello_world malloc mmap file fs_perms getpid spawn sched pipe
 	truncate readdir mkdir link symlink tls pthread uname rlimit server \
 	server_epoll unix_socket cout hostfs cpuid rdtsc device sleep exit_group \
 	ioctl fcntl
+TESTS := empty getpid sched pipe ioctl
 # Benchmarks: need to be compiled and run by bench-% target
 BENCHES := spawn_and_exit_latency pipe_throughput unix_socket_throughput
 
@@ -62,16 +63,29 @@ postbuild:
 # Test targets
 #############################################################################
 
-test: build $(TEST_TARGETS)
+test: build pretest $(TEST_TARGETS) posttest
+pretest:
+	@$(RM) -rf .pass .failed
 
 $(TEST_TARGETS): test-%: %
+	@touch .pass .failed
 	@$(ECHO) "$(CYAN)RUN TEST => $<$(NO_COLOR)"
 	@$(MAKE) --no-print-directory -C $< test ; \
 		if [ $$? -eq 0 ] ; then \
-			$(ECHO) "$(GREEN)PASS$(NO_COLOR)" ; \
+			$(ECHO) "$(GREEN)PASS$(NO_COLOR)" | tee -a .pass; \
 		else \
-			$(ECHO) "$(RED)FAILED$(NO_COLOR)" ; \
+			$(ECHO) "$(RED)FAILED$(NO_COLOR)" | tee -a .failed; \
 		fi ;
+
+posttest:
+	@PASS_COUNTER=$(shell wc -l < .pass); \
+	FAIL_COUNTER=$(shell wc -l < .failed); \
+	$(ECHO) "\nTotal:" ; \
+	$(ECHO) "$(GREEN)PASS: $$PASS_COUNTER , $(RED)FAILED: $$FAIL_COUNTER $(NO_COLOR)" ; \
+	$(RM) -rf .pass .failed; \
+	if [ $$FAIL_COUNTER -ne 0 ] ; then \
+		exit 1; \
+	fi ;
 
 #############################################################################
 # Benchmark targets
