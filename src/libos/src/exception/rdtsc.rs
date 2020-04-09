@@ -1,15 +1,8 @@
 use super::*;
-use process::Task;
+use crate::syscall::SyscallNum;
 use sgx_types::*;
 
 const RDTSC_OPCODE: u16 = 0x310F;
-
-extern "C" {
-    fn occlum_ocall_rdtsc(low: *mut u32, high: *mut u32) -> sgx_status_t;
-    fn __get_current_task() -> *const Task;
-    fn switch_td_to_kernel(task: *const Task);
-    fn switch_td_to_user(task: *const Task);
-}
 
 #[no_mangle]
 pub extern "C" fn handle_rdtsc_exception(info: *mut sgx_exception_info_t) -> u32 {
@@ -21,21 +14,21 @@ pub extern "C" fn handle_rdtsc_exception(info: *mut sgx_exception_info_t) -> u32
     {
         return EXCEPTION_CONTINUE_SEARCH;
     }
-    unsafe {
-        let task = __get_current_task();
-        switch_td_to_kernel(task);
-        let (low, high) = {
-            let mut low = 0;
-            let mut high = 0;
-            let sgx_status = occlum_ocall_rdtsc(&mut low, &mut high);
-            assert!(sgx_status == sgx_status_t::SGX_SUCCESS);
-            (low, high)
-        };
-        info.cpu_context.rax = low as u64;
-        info.cpu_context.rdx = high as u64;
-        switch_td_to_user(task);
-    }
+
+    let (low, high) = {
+        let mut low = 0;
+        let mut high = 0;
+        let ret = unsafe { __occlum_syscall(SyscallNum::Rdtsc as u32, &mut low, &mut high) };
+        assert!(ret == 0);
+        (low, high)
+    };
+    info.cpu_context.rax = low as u64;
+    info.cpu_context.rdx = high as u64;
     info.cpu_context.rip += 2;
 
     EXCEPTION_CONTINUE_EXECUTION
+}
+
+extern "C" {
+    fn __occlum_syscall(num: u32, arg0: *mut u32, arg1: *mut u32) -> i64;
 }

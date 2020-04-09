@@ -160,6 +160,17 @@ pub fn do_thread_getcpuclock() -> Result<timespec_t> {
     Ok(tv)
 }
 
+pub fn do_rdtsc() -> Result<(u32, u32)> {
+    extern "C" {
+        fn occlum_ocall_rdtsc(low: *mut u32, high: *mut u32) -> sgx_status_t;
+    }
+    let mut low = 0;
+    let mut high = 0;
+    let sgx_status = unsafe { occlum_ocall_rdtsc(&mut low, &mut high) };
+    assert!(sgx_status == sgx_status_t::SGX_SUCCESS);
+    Ok((low, high))
+}
+
 // For SEFS
 pub struct OcclumTimeProvider;
 

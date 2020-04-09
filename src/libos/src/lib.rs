@@ -67,7 +67,5 @@ mod untrusted;
 mod util;
 mod vm;
 
-// Export system calls
-pub use syscall::*;
 // Export ECalls
 pub use entry::*;

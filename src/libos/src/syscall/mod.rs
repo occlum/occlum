@@ -393,6 +393,8 @@ macro_rules! process_syscall_table_with_callback {
 
                 // Occlum-specific sytem calls
                 (Spawn = 360) => do_spawn(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp),
+                // Exception handling
+                (Rdtsc = 361) => do_rdtsc(low_ptr: *mut u32, high_ptr: *mut u32),
             }
     };
 }
@@ -928,6 +930,18 @@ fn do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t) -> Result<isize> 
     let ts = time::do_clock_gettime(clockid)?;
     unsafe {
         *ts_u = ts;
+    }
+    Ok(0)
+}
+
+fn do_rdtsc(low_ptr: *mut u32, high_ptr: *mut u32) -> Result<isize> {
+    check_mut_ptr(low_ptr)?;
+    check_mut_ptr(high_ptr)?;
+    let (low, high) = time::do_rdtsc()?;
+    debug!("do_rdtsc result {{ low: {:#x} high: {:#x}}}", low, high);
+    unsafe {
+        *low_ptr = low;
+        *high_ptr = high;
     }
     Ok(0)
 }
