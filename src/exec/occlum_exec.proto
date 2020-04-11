@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package occlumexec;
+
+// Interface exported by the server.
+service OcclumExec {
+  // Client check the server status
+  rpc StatusCheck(HealthCheckRequest) returns (HealthCheckResponse) {}
+
+  // Client asks the server to execute the command
+  rpc ExecCommand(ExecComm) returns (ExecCommResponse) {}
+
+  // Client gets the return value
+  rpc GetResult(GetResultRequest) returns (GetResultResponse) {}
+
+  // Client sends heart beats to server
+  rpc HeartBeat(stream HealthCheckRequest) returns (stream HealthCheckResponse) {}
+
+  //Client stops the server
+  rpc StopServer(StopRequest) returns (StopResponse){}
+}
+
+message GetResultRequest {
+  uint32 process_id = 1;
+}
+
+message GetResultResponse {
+  enum ExecutionStatus {
+    UNKNOWN = 0;
+    RUNNING = 1;
+    STOPPED = 2;
+  }
+  ExecutionStatus status = 1;
+  int32 result = 2;
+}
+
+message ExecComm {
+  uint32 process_id = 1;
+  string sockpath = 2;
+  string command = 3;
+  repeated string parameters = 4;
+}
+
+message ExecCommResponse {
+  uint32 process_id = 1;
+}
+
+message HealthCheckRequest {
+  uint32 process_id = 1;
+}
+
+message HealthCheckResponse {
+  enum ServingStatus {
+    UNKNOWN = 0;
+    SERVING = 1;
+    NOT_SERVING = 2;
+  }
+  ServingStatus status = 1;
+}
+
+message StopRequest {
+  uint32 time = 1;
+}
+
+message StopResponse {
+}

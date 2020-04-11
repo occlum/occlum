@@ -1,0 +1,38 @@
+[package]
+name = "occlum_exec"
+version = "0.1.0"
+edition = "2018"
+
+[lib]
+doctest = false
+test = false
+
+[dependencies.grpc]
+path = "../../deps/grpc-rust/grpc"
+[dependencies.grpc-protobuf]
+path = "../../deps/grpc-rust/grpc-protobuf"
+
+[dependencies]
+protobuf        = "2.14"
+futures         = "0.3"
+env_logger      = "0.7"
+tempdir         = "0.3"
+clap            = "2.33"
+timer           = "0.2"
+chrono          = "0.4"
+libc            = "0.2"
+sendfd          = "0.3"
+signal-hook     = "0.1"
+nix             = "0.17"
+log             = "0.4.8"
+
+[build-dependencies]
+protoc-rust-grpc = { path = "../../deps/grpc-rust/protoc-rust-grpc" }
+
+[[bin]]
+name = "occlum_exec_client"
+test = false
+
+[[bin]]
+name = "occlum_exec_server"
+test = false

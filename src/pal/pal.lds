@@ -3,6 +3,7 @@
         occlum_pal_get_version;
         occlum_pal_init;
         occlum_pal_exec;
+        occlum_pal_kill;
         occlum_pal_destroy;
     local:
         *;

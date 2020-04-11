@@ -71,7 +71,7 @@ $(BUILD_DIR)/test/obj/$(TEST_NAME)/%.o: %.cc
 
 test:
 	@cd $(BUILD_DIR)/test && \
-		$(BUILD_DIR)/bin/occlum run /bin/$(TEST_NAME) $(BIN_ARGS)
+		$(BUILD_DIR)/bin/occlum exec /bin/$(TEST_NAME) $(BIN_ARGS)
 
 test-native:
 	@LD_LIBRARY_PATH=/usr/local/occlum/lib cd $(IMAGE_DIR) && ./bin/$(TEST_NAME) $(BIN_ARGS)

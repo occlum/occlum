@@ -18,3 +18,7 @@
 [submodule "deps/serde-json-sgx"]
 	path = deps/serde-json-sgx
 	url = https://github.com/occlum/serde-json-sgx
+[submodule "deps/grpc-rust"]
+	path = deps/grpc-rust
+	url = https://github.com/stepancheg/grpc-rust.git
+	branch = v0.7

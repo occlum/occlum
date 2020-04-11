@@ -6,7 +6,7 @@ githooks:
 	@find .git/hooks -type l -exec rm {} \; && find .githooks -type f -exec ln -sf ../../{} .git/hooks/ \;
 	@echo "Add Git hooks that check Rust code format issues before commits and pushes"
 
-OCCLUM_GIT_OPTIONS ?=
+OCCLUM_GIT_OPTIONS ?= 
 GIT_MIN_VERSION := 2.11.0
 GIT_CURRENT_VERSION := $(shell git --version | sed 's/[^0-9.]*//g')
 GIT_NEED_PROGRESS := $(shell /bin/echo -e "$(GIT_MIN_VERSION)\n$(GIT_CURRENT_VERSION)" \

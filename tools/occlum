@@ -227,6 +227,9 @@ cmd_build() {
 
     mkdir -p "$context_dir/run/mount/root"
 
+    ln -s $occlum_dir/$build_dir/bin/occlum_exec_client $context_dir/build/bin/occlum_exec_client
+    ln -s $occlum_dir/$build_dir/bin/occlum_exec_server $context_dir/build/bin/occlum_exec_server
+
     echo "Built the Occlum image and enclave successfully"
 }
 
@@ -244,6 +247,60 @@ cmd_run() {
     echo "running" > "$context_dir/status"
 
     RUST_BACKTRACE=1 "$context_dir/build/bin/occlum-run" "$@"
+
+    echo "built" > "$context_dir/status"
+}
+
+cmd_start() {
+    check_has_built
+
+    SGX_MODE=$(cat $context_dir/.sgx_mode)
+    if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
+        export LD_LIBRARY_PATH="$context_dir/build/lib:$SGX_SDK/sdk_libs/"
+    else
+        export LD_LIBRARY_PATH="$context_dir/build/lib"
+    fi
+
+    cd "$working_dir"
+    echo "running" > "$context_dir/status"
+
+    RUST_BACKTRACE=1 "$context_dir/build/bin/occlum_exec_client" start
+
+    echo "built" > "$context_dir/status"
+}
+
+cmd_exec() {
+    check_has_built
+
+    SGX_MODE=$(cat $context_dir/.sgx_mode)
+    if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
+        export LD_LIBRARY_PATH="$context_dir/build/lib:$SGX_SDK/sdk_libs/"
+    else
+        export LD_LIBRARY_PATH="$context_dir/build/lib"
+    fi
+
+    cd "$working_dir"
+    echo "running" > "$context_dir/status"
+
+    RUST_BACKTRACE=1 "$context_dir/build/bin/occlum_exec_client" exec -- "$@"
+
+    echo "built" > "$context_dir/status"
+}
+
+cmd_stop() {
+    check_has_built
+
+    SGX_MODE=$(cat $context_dir/.sgx_mode)
+    if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
+        export LD_LIBRARY_PATH="$context_dir/build/lib:$SGX_SDK/sdk_libs/"
+    else
+        export LD_LIBRARY_PATH="$context_dir/build/lib"
+    fi
+
+    cd "$working_dir"
+    echo "running" > "$context_dir/status"
+
+    RUST_BACKTRACE=1 "$context_dir/build/bin/occlum_exec_client" stop -t 0
 
     echo "built" > "$context_dir/status"
 }
@@ -287,6 +344,15 @@ case "$cmd" in
         ;;
     run)
         cmd_run "${@:2}"
+        ;;
+    start)
+        cmd_start
+        ;;
+    exec)
+        cmd_exec "${@:2}"
+        ;;
+    stop)
+        cmd_stop
         ;;
     gdb)
         cmd_gdb "${@:2}"

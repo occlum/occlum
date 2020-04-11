@@ -11,7 +11,7 @@ endif
 # Dependencies: need to be compiled but not to run by any Makefile target
 TEST_DEPS := client data_sink
 # Tests: need to be compiled and run by test-% target
-TESTS ?= empty env hello_world malloc mmap file fs_perms getpid spawn sched pipe time \
+TESTS ?= env empty hello_world malloc mmap file fs_perms getpid spawn sched pipe time \
 	truncate readdir mkdir open stat link symlink chmod chown tls pthread uname rlimit \
 	server server_epoll unix_socket cout hostfs cpuid rdtsc device sleep exit_group \
 	ioctl fcntl eventfd emulate_syscall access signal
@@ -62,16 +62,26 @@ postbuild:
 # Test targets
 #############################################################################
 
-test: build $(TEST_TARGETS)
+test: build pretest $(TEST_TARGETS) posttest
+pretest:
+	@cd $(BUILD_DIR)/test && \
+		$(BUILD_DIR)/bin/occlum start
 
 $(TEST_TARGETS): test-%: %
 	@$(ECHO) "$(CYAN)RUN TEST => $<$(NO_COLOR)"
+	@# Restart server if test failed
 	@$(MAKE) --no-print-directory -C $< test ; \
 		if [ $$? -eq 0 ] ; then \
 			$(ECHO) "$(GREEN)PASS$(NO_COLOR)" ; \
 		else \
 			$(ECHO) "$(RED)FAILED$(NO_COLOR)" ; \
+			cd $(BUILD_DIR)/test && \
+			$(BUILD_DIR)/bin/occlum start ; \
 		fi ;
+
+posttest:
+	@cd $(BUILD_DIR)/test && \
+		$(BUILD_DIR)/bin/occlum stop
 
 #############################################################################
 # Benchmark targets

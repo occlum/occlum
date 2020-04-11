@@ -66,8 +66,10 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
         let mut parent_inner = super::IDLE.process().inner();
         let mut process_inner = process.inner();
 
-        table::del_thread(thread.tid()).expect("tid must be in the table");
-        table::del_process(process.pid()).expect("pid must be in the table");
+        let pid = process.pid();
+        let main_tid = pid;
+        table::del_thread(main_tid).expect("tid must be in the table");
+        table::del_process(pid).expect("pid must be in the table");
 
         process_inner.exit(term_status);
         parent_inner.remove_zombie_child(process.pid());
