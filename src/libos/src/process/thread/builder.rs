@@ -1,8 +1,8 @@
 use std::ptr::NonNull;
 
 use super::{
-    FileTableRef, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef, ResourceLimitsRef, Task, Thread,
-    ThreadId, ThreadInner, ThreadRef,
+    FileTableRef, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef, ResourceLimitsRef, SchedAgentRef,
+    Task, Thread, ThreadId, ThreadInner, ThreadRef,
 };
 use crate::prelude::*;
 
@@ -16,6 +16,7 @@ pub struct ThreadBuilder {
     // Optional fields
     fs: Option<FsViewRef>,
     files: Option<FileTableRef>,
+    sched: Option<SchedAgentRef>,
     rlimits: Option<ResourceLimitsRef>,
     clear_ctid: Option<NonNull<pid_t>>,
 }
@@ -29,6 +30,7 @@ impl ThreadBuilder {
             vm: None,
             fs: None,
             files: None,
+            sched: None,
             rlimits: None,
             clear_ctid: None,
         }
@@ -64,6 +66,11 @@ impl ThreadBuilder {
         self
     }
 
+    pub fn sched(mut self, sched: SchedAgentRef) -> Self {
+        self.sched = Some(sched);
+        self
+    }
+
     pub fn rlimits(mut self, rlimits: ResourceLimitsRef) -> Self {
         self.rlimits = Some(rlimits);
         self
@@ -87,6 +94,7 @@ impl ThreadBuilder {
             .ok_or_else(|| errno!(EINVAL, "memory is mandatory"))?;
         let fs = self.fs.unwrap_or_default();
         let files = self.files.unwrap_or_default();
+        let sched = self.sched.unwrap_or_default();
         let rlimits = self.rlimits.unwrap_or_default();
         let clear_ctid = SgxRwLock::new(self.clear_ctid);
         let inner = SgxMutex::new(ThreadInner::new());
@@ -100,6 +108,7 @@ impl ThreadBuilder {
             vm,
             fs,
             files,
+            sched,
             rlimits,
         });
 

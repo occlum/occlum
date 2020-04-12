@@ -12,6 +12,7 @@
 use crate::fs::{FileRef, FileTable, FsView};
 use crate::misc::ResourceLimits;
 use crate::prelude::*;
+use crate::sched::SchedAgent;
 use crate::vm::ProcessVM;
 
 use self::process::{ChildProcessFilter, ProcessBuilder, ProcessInner};
@@ -29,7 +30,6 @@ mod do_clone;
 mod do_exit;
 mod do_futex;
 mod do_getpid;
-mod do_sched;
 mod do_set_tid_address;
 mod do_spawn;
 mod do_wait4;
@@ -51,4 +51,5 @@ pub type ThreadRef = Arc<Thread>;
 pub type FileTableRef = Arc<SgxMutex<FileTable>>;
 pub type ProcessVMRef = Arc<SgxMutex<ProcessVM>>;
 pub type FsViewRef = Arc<SgxMutex<FsView>>;
+pub type SchedAgentRef = Arc<SgxMutex<SchedAgent>>;
 pub type ResourceLimitsRef = Arc<SgxMutex<ResourceLimits>>;

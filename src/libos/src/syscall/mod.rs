@@ -32,9 +32,10 @@ use crate::net::{
 };
 use crate::process::{
     do_arch_prctl, do_clone, do_exit, do_futex, do_getegid, do_geteuid, do_getgid, do_getpgid,
-    do_getpid, do_getppid, do_gettid, do_getuid, do_sched_getaffinity, do_sched_setaffinity,
-    do_sched_yield, do_set_tid_address, do_spawn, do_wait4, pid_t, FdOp,
+    do_getpid, do_getppid, do_gettid, do_getuid, do_set_tid_address, do_spawn, do_wait4, pid_t,
+    FdOp,
 };
+use crate::sched::{do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
 use crate::vm::{MMapFlags, VMPerms};
 use crate::{fs, process, std, vm};
 

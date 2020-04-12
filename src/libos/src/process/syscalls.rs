@@ -3,7 +3,6 @@ use std::ptr::NonNull;
 use super::do_arch_prctl::ArchPrctlCode;
 use super::do_clone::CloneFlags;
 use super::do_futex::{FutexFlags, FutexOp};
-use super::do_sched::CpuSet;
 use super::do_spawn::FileAction;
 use super::process::ChildProcessFilter;
 use crate::prelude::*;
@@ -183,49 +182,6 @@ pub fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize> {
 pub fn do_set_tid_address(tidptr: *mut pid_t) -> Result<isize> {
     check_mut_ptr(tidptr)?;
     super::do_set_tid_address::do_set_tid_address(tidptr).map(|tid| tid as isize)
-}
-
-pub fn do_sched_yield() -> Result<isize> {
-    super::do_sched::do_sched_yield();
-    Ok(0)
-}
-
-pub fn do_sched_getaffinity(pid: pid_t, cpusize: size_t, buf: *mut c_uchar) -> Result<isize> {
-    // Construct safe Rust types
-    let mut buf_slice = {
-        check_mut_array(buf, cpusize)?;
-        if cpusize == 0 {
-            return_errno!(EINVAL, "cpuset size must be greater than zero");
-        }
-        if buf as *const _ == std::ptr::null() {
-            return_errno!(EFAULT, "cpuset mask must NOT be null");
-        }
-        unsafe { std::slice::from_raw_parts_mut(buf, cpusize) }
-    };
-    // Call the memory-safe do_sched_getaffinity
-    let mut cpuset = CpuSet::new(cpusize);
-    let retval = super::do_sched::do_sched_getaffinity(pid, &mut cpuset)?;
-    // Copy from Rust types to C types
-    buf_slice.copy_from_slice(cpuset.as_slice());
-    Ok(retval as isize)
-}
-
-pub fn do_sched_setaffinity(pid: pid_t, cpusize: size_t, buf: *const c_uchar) -> Result<isize> {
-    // Convert unsafe C types into safe Rust types
-    let cpuset = {
-        check_array(buf, cpusize)?;
-        if cpusize == 0 {
-            return_errno!(EINVAL, "cpuset size must be greater than zero");
-        }
-        if buf as *const _ == std::ptr::null() {
-            return_errno!(EFAULT, "cpuset mask must NOT be null");
-        }
-        CpuSet::from_raw_buf(buf, cpusize)
-    };
-    debug!("sched_setaffinity cpuset: {:#x}", cpuset);
-    // Call the memory-safe do_sched_setaffinity
-    super::do_sched::do_sched_setaffinity(pid, &cpuset)?;
-    Ok(0)
 }
 
 pub fn do_exit(status: i32) -> ! {

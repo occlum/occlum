@@ -3,7 +3,8 @@ use std::ptr::NonNull;
 
 use super::task::Task;
 use super::{
-    FileTableRef, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef, ResourceLimitsRef, ThreadRef,
+    FileTableRef, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef, ResourceLimitsRef, SchedAgentRef,
+    ThreadRef,
 };
 use crate::prelude::*;
 
@@ -27,6 +28,7 @@ pub struct Thread {
     vm: ProcessVMRef,
     fs: FsViewRef,
     files: FileTableRef,
+    sched: SchedAgentRef,
     rlimits: ResourceLimitsRef,
 }
 
@@ -62,6 +64,10 @@ impl Thread {
         &self.files
     }
 
+    pub fn sched(&self) -> &SchedAgentRef {
+        &self.sched
+    }
+
     /// Get a file from the file table.
     pub fn file(&self, fd: FileDesc) -> Result<FileRef> {
         self.files().lock().unwrap().get(fd)
@@ -89,10 +95,13 @@ impl Thread {
     }
 
     pub(super) fn start(&self, host_tid: pid_t) {
-        self.inner().start(host_tid);
+        self.sched().lock().unwrap().attach(host_tid);
+        self.inner().start();
     }
 
     pub(super) fn exit(&self, exit_status: i32) -> usize {
+        self.sched().lock().unwrap().detach();
+
         // Remove this thread from its owner process
         let mut process_inner = self.process.inner();
         let threads = process_inner.threads_mut().unwrap();
@@ -143,7 +152,7 @@ unsafe impl Sync for Thread {}
 #[derive(Debug)]
 pub enum ThreadInner {
     Init,
-    Live { host_tid: pid_t },
+    Running,
     Exited { exit_status: i32 },
 }
 
@@ -155,7 +164,7 @@ impl ThreadInner {
     pub fn status(&self) -> ThreadStatus {
         match self {
             Self::Init { .. } => ThreadStatus::Init,
-            Self::Live { .. } => ThreadStatus::Running,
+            Self::Running { .. } => ThreadStatus::Running,
             Self::Exited { .. } => ThreadStatus::Exited,
         }
     }
@@ -167,16 +176,9 @@ impl ThreadInner {
         }
     }
 
-    pub fn host_tid(&self) -> Option<pid_t> {
-        match self {
-            Self::Live { host_tid } => Some(*host_tid),
-            _ => None,
-        }
-    }
-
-    pub fn start(&mut self, host_tid: pid_t) {
+    pub fn start(&mut self) {
         debug_assert!(self.status() == ThreadStatus::Init);
-        *self = Self::Live { host_tid };
+        *self = Self::Running;
     }
 
     pub fn exit(&mut self, exit_status: i32) {

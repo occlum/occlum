@@ -16,6 +16,8 @@
 extern crate alloc;
 #[macro_use]
 extern crate bitflags;
+#[macro_use]
+extern crate bitvec;
 extern crate sgx_types;
 #[cfg(not(target_env = "sgx"))]
 #[macro_use]
@@ -58,6 +60,7 @@ mod fs;
 mod misc;
 mod net;
 mod process;
+mod sched;
 mod syscall;
 mod time;
 mod untrusted;

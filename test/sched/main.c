@@ -97,24 +97,28 @@ static int test_sched_getaffinity_via_explicit_syscall() {
 }
 
 static int test_sched_setaffinity_via_explicit_syscall() {
-    int nproc = sysconf(_SC_NPROCESSORS_ONLN);
-    cpu_set_t mask_old;
-    for (int i = 0; i < nproc; ++i) {
-        CPU_SET(i, &mask_old);
-    }
     cpu_set_t mask;
     CPU_ZERO(&mask);
     CPU_SET(0, &mask);
     if (syscall(__NR_sched_setaffinity, 0, sizeof(cpu_set_t), &mask) < 0) {
         THROW_ERROR("failed to call __NR_sched_setaffinity");
     }
+
     cpu_set_t mask2;
+    CPU_ZERO(&mask2);
     int ret_nproc = syscall(__NR_sched_getaffinity, 0, sizeof(cpu_set_t), &mask2);
     if (ret_nproc <= 0) {
         THROW_ERROR("failed to call __NR_sched_getaffinity");
     }
     if (!CPU_EQUAL(&mask, &mask2)) {
         THROW_ERROR("explicit syscall cpuset is wrong");
+    }
+
+    // Recover the affinity mask
+    int nproc = sysconf(_SC_NPROCESSORS_ONLN);
+    cpu_set_t mask_old;
+    for (int i = 0; i < nproc; ++i) {
+        CPU_SET(i, &mask_old);
     }
     if (syscall(__NR_sched_setaffinity, 0, sizeof(cpu_set_t), &mask_old) < 0) {
         THROW_ERROR("recover cpuset error");
@@ -171,7 +175,7 @@ static int test_sched_yield() {
 // ============================================================================
 
 static test_case_t test_cases[] = {
-    //TEST_CASE(test_sched_xetaffinity_with_child_pid),
+    TEST_CASE(test_sched_xetaffinity_with_child_pid),
     TEST_CASE(test_sched_getaffinity_with_self_pid),
     TEST_CASE(test_sched_setaffinity_with_self_pid),
     TEST_CASE(test_sched_getaffinity_via_explicit_syscall),
