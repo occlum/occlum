@@ -17,8 +17,14 @@
 
 int test_tty_ioctl_TIOCGWINSZ(void) {
     struct winsize winsize;
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &winsize) < 0) {
-        THROW_ERROR("failed to ioctl TIOCGWINSZ");
+    if (isatty(STDOUT_FILENO)) {
+        if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &winsize) < 0) {
+            THROW_ERROR("failed to ioctl TIOCGWINSZ");
+        }
+    } else {
+        // FIXME: /dev/tty should be opened. But it has not been implemented in Occlum yet.
+        // So we just skip this test if STDOUT is redirected.
+        printf("Warning: test_tty_ioctl_TIOCGWINSZ is skipped\n");
     }
     return 0;
 }
