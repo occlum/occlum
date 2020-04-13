@@ -1,5 +1,6 @@
 # Occlum
 [![All Contributors](https://img.shields.io/badge/all_contributors-7-orange.svg?style=flat-square)](CONTRIBUTORS.md)
+[![Build Status](https://travis-ci.com/occlum/occlum.svg?branch=master)](https://travis-ci.com/occlum/occlum)
 
 **NEWS:** Our paper _Occlum: Secure and Efficient Multitasking Inside a Single Enclave of Intel SGX_ has been accepted by [ASPLOS'20](https://asplos-conference.org/programs/). This research paper highlights the advantages of the single-address-space architecture adopted by Occlum and describes a novel in-enclave isolation mechanism that complements this approach. A preprint version of the paper can be found on [arxiv.org](https://arxiv.org/abs/2001.07450).
 
