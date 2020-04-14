@@ -36,7 +36,7 @@ build_opencv() {
       -DBUILD_opencv_python=OFF -DBUILD_PYTHON_SUPPORT=OFF \
       -DBUILD_EXAMPLES=OFF -DWITH_FFMPEG=OFF \
       -DWITH_QT=OFF -DWITH_CUDA=OFF
-    make -j
+    make -j4
     sudo make install
     popd
 }
@@ -104,6 +104,9 @@ while [ -n "$1" ]; do
         show_usage
     esac
 done
+
+# Tell CMake to search for packages in Occlum toolchain's directory only
+export PKG_CONFIG_LIBDIR=$PREFIX/lib
 
 if [ "$THREADING" == "TBB" ] ; then
     echo "Build OpenVINO with TBB threading"

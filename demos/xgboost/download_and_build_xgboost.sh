@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Tell CMake to search for packages in Occlum toolchain's directory only
+export PKG_CONFIG_LIBDIR=/usr/local/occlum/x86_64-linux-musl/lib
+
 # Install the dependencies
 apt-get update
 apt-get install -y python3.5
@@ -30,7 +33,7 @@ cd build
 cmake ../ \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_COMPILER=occlum-gcc -DCMAKE_CXX_COMPILER=occlum-g++
-make -j
+make -j4
 popd
 
 # Prepare data

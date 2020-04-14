@@ -2,7 +2,7 @@
 
 Step 1: Download XGBoost and its dependencies, and then build XGBoost
 ```
-./build_xgboost.sh
+./download_and_build_xgboost.sh
 ```
 When completed, the resulting XGBoost can be found in `xgboost_src` directory.
 

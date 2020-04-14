@@ -1,7 +1,9 @@
 #!/bin/sh
-INSTALL_DIR=/usr/local/occlum/x86_64-linux-musl/
+INSTALL_DIR=/usr/local/occlum/x86_64-linux-musl
 GRPC_SRC_DIR=$PWD/grpc
 export PATH=$PATH:$INSTALL_DIR/bin
+# Tell CMake to search for packages in Occlum toolchain's directory only
+export PKG_CONFIG_LIBDIR=$INSTALL_DIR/lib
 
 git clone https://github.com/grpc/grpc.git 
 cd grpc
