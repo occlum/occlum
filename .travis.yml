@@ -4,4 +4,4 @@ services:
   - docker
 
 script:
-- docker run -v /home/travis/build/jessehui/occlum:/root/occlum occlum/occlum:0.10.0-ubuntu18.04 /bin/bash -c "cd /root/occlum; make submodule; SGX_MODE=SIM make; SGX_MODE=SIM make test"
+- docker run -v /home/travis/build/jessehui/occlum:/root/occlum occlum/occlum:0.10.0-ubuntu18.04 /bin/bash -c "cpuid; cd /root/occlum; make submodule; SGX_MODE=SIM make; SGX_MODE=SIM make test"

@@ -15,7 +15,7 @@ TESTS := empty env hello_world malloc mmap file fs_perms getpid spawn sched pipe
 	truncate readdir mkdir link symlink tls pthread uname rlimit server \
 	server_epoll unix_socket cout hostfs cpuid rdtsc device sleep exit_group \
 	ioctl fcntl
-TESTS := empty getpid sched pipe ioctl
+TESTS := empty getpid sched pipe ioctl cpuid
 # Benchmarks: need to be compiled and run by bench-% target
 BENCHES := spawn_and_exit_latency pipe_throughput unix_socket_throughput
 

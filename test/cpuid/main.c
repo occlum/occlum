@@ -50,6 +50,14 @@ static bool is_cpuidinfo_equal(int leaf, t_cpuid_t *cpu, t_cpuid_t *cpu_sgx) {
 
 static int g_max_basic_leaf = 0;
 static int g_max_extend_leaf = 0;
+static bool g_sgx_supported = true;
+
+#define SKIP_IF_SGX_NOT_SUPPORTED() do { \
+    if (!g_sgx_supported) { \
+        printf("Warning: SGX is not supported. Skip %s of file %s\n", __func__, __FILE__); \
+        return 0; \
+    } \
+} while (0)
 
 // ============================================================================
 // Test cases for cpuid
@@ -61,9 +69,15 @@ static int test_cpuid_with_basic_leaf_zero() {
     int subleaf = 0;
 
     native_cpuid(leaf, subleaf, &cpu);
-    // cpu should support sgx
+    // check if sgx is supported
     if (cpu.eax < 0x12) {
-        THROW_ERROR("failed to call cpuid with eax=0");
+        g_sgx_supported = false;
+        printf("SGX is not supported\n");
+    }
+
+    // check if max basic leaf is valid
+    if (cpu.eax < 0 || cpu.eax >= 0xFF) {
+        THROW_ERROR("max basic leaf is invalid");
     }
     g_max_basic_leaf = cpu.eax;
     return 0;
@@ -129,6 +143,8 @@ static int test_cpuid_with_sgx_verify() {
     int leaf = 0x7;
     int subleaf = 0;
 
+    SKIP_IF_SGX_NOT_SUPPORTED();
+
     native_cpuid(leaf, subleaf, &cpu);
     //CPUID.(EAX=07H, ECX=0H):EBX.SGX = 1,
     // Bit 02: SGX. Supports Intel® Software Guard Extensions (Intel® SGX Extensions) if 1.
@@ -142,6 +158,8 @@ static int test_cpuid_with_sgx_enumeration() {
     t_cpuid_t cpu;
     int leaf = 0x12;
     int subleaf = 0;
+
+    SKIP_IF_SGX_NOT_SUPPORTED();
 
     native_cpuid(leaf, subleaf, &cpu);
     printf("Sgx 1 supported: %d\n", cpu.eax & 0x1);
@@ -163,30 +181,19 @@ static int test_cpuid_with_sgx_enumeration() {
 
 static int test_cpuid_with_invalid_leaf() {
     t_cpuid_t cpu;
-    int leaf = 0x8;
+    int leaf[] = {0x8, 0xC, 0xE, 0x11};
     int subleaf = 0;
 
-    native_cpuid(leaf, subleaf, &cpu);
-    if (cpu.eax | cpu.ebx | cpu.ecx | cpu.edx) {
-        THROW_ERROR("faild to call cpuid with invalid leaf 0x8");
-    }
+    for (int i = 0; i < sizeof(leaf)/sizeof(leaf[0]); i++) {
+        if (leaf[i] > g_max_basic_leaf) {
+            printf("Warning: test leaf 0x%x is greater than CPU max basic leaf. Skipped.\n", leaf[i]);
+            continue;
+        }
 
-    leaf = 0xC;
-    native_cpuid(leaf, subleaf, &cpu);
-    if (cpu.eax | cpu.ebx | cpu.ecx | cpu.edx) {
-        THROW_ERROR("faild to call cpuid with invalid leaf 0xC");
-    }
-
-    leaf = 0xE;
-    native_cpuid(leaf, subleaf, &cpu);
-    if (cpu.eax | cpu.ebx | cpu.ecx | cpu.edx) {
-        THROW_ERROR("faild to call cpuid with invalid leaf 0xE");
-    }
-
-    leaf = 0x11;
-    native_cpuid(leaf, subleaf, &cpu);
-    if (cpu.eax | cpu.ebx | cpu.ecx | cpu.edx) {
-        THROW_ERROR("faild to call cpuid with invalid leaf 0x11");
+        native_cpuid(leaf[i], subleaf, &cpu);
+        if (cpu.eax | cpu.ebx | cpu.ecx | cpu.edx) {
+            THROW_ERROR("faild to call cpuid with invalid leaf 0x%x", leaf[i]);
+        }
     }
     return 0;
 }
