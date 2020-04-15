@@ -2,7 +2,7 @@
 [![All Contributors](https://img.shields.io/badge/all_contributors-7-orange.svg?style=flat-square)](CONTRIBUTORS.md)
 [![Build Status](https://travis-ci.com/occlum/occlum.svg?branch=master)](https://travis-ci.com/occlum/occlum)
 
-**NEWS:** Our paper _Occlum: Secure and Efficient Multitasking Inside a Single Enclave of Intel SGX_ has been accepted by [ASPLOS'20](https://asplos-conference.org/programs/). This research paper highlights the advantages of the single-address-space architecture adopted by Occlum and describes a novel in-enclave isolation mechanism that complements this approach. A preprint version of the paper can be found on [arxiv.org](https://arxiv.org/abs/2001.07450).
+**NEWS:** Our paper _Occlum: Secure and Efficient Multitasking Inside a Single Enclave of Intel SGX_ has been accepted by [ASPLOS'20](https://asplos-conference.org/programs/). This research paper highlights the advantages of the single-address-space architecture adopted by Occlum and describes a novel in-enclave isolation mechanism that complements this approach. The paper can be found on [ACM Digital Library](https://dl.acm.org/doi/abs/10.1145/3373376.3378469) and [Arxiv](https://arxiv.org/abs/2001.07450).
 
 Occlum is a *memory-safe*, *multi-process* library OS (LibOS) for [Intel SGX](https://software.intel.com/en-us/sgx). As a LibOS, it enables *legacy* applications to run on SGX with *little or even no modifications* of source code, thus protecting the confidentiality and integrity of user workloads transparently.
 
@@ -43,11 +43,11 @@ $ occlum build
 ```
 The content of the `image` directory is initialized by the `occlum init` command. The structure of the `image` directory mimics that of an ordinary UNIX FS, containing directories like `/bin`, `/lib`, `/root`, `/tmp`, etc. After copying the user program `hello_world` into `image/bin/`, the `image` directory is packaged by the `occlum build` command to generate a secure Occlum FS image as well as the Occlum SGX enclave.
 
-For platforms that don't have SGX feature supported, Occlum can also be evaluated in SGX simulation mode.
+For platforms that don't support SGX, it is also possible to run Occlum in SGX simulation mode. To switch to the simulation mode, `occlum build` command must be given an extra argument or an environment variable as shown below:
 ```
 $ occlum build --sgx-mode SIM
 ```
-Or
+or
 ```
 $ SGX_MODE=SIM occlum build
 ```
@@ -123,9 +123,9 @@ Occlum can be configured easily via a config file named `Occlum.json`, which is 
 }
 ```
 
-## How to Use
+## How to Use?
 
-We have built and tested Occlum on Ubuntu 18.04/16.04 with or without hardware SGX support (if the CPU does not support SGX, Occlum can be run in the SGX simulation mode). To give Occlum a quick try, one can use the Occlum Docker image by following the steps below:
+We have built and tested Occlum on Ubuntu 18.04 with or without hardware SGX support (if the CPU does not support SGX, Occlum can be run in the SGX simulation mode). To give Occlum a quick try, one can use the Occlum Docker image by following the steps below:
 
 Step 1-3 are to be done on the host OS (Linux):
 
@@ -135,7 +135,7 @@ Step 1-3 are to be done on the host OS (Linux):
 
 3. Run the Occlum Docker container, which has Occlum and its demos preinstalled:
     ```
-    docker run -it --device /dev/isgx occlum/occlum:0.10.0-ubuntu18.04
+    docker run -it --device /dev/isgx occlum/occlum:0.11.0-ubuntu18.04
     ```
 
 Step 4-5 are to be done on the guest OS running inside the Docker container:
@@ -146,7 +146,7 @@ Step 4-5 are to be done on the guest OS running inside the Docker container:
     ```
 5. Check out Occlum's demos preinstalled at `/root/demos`, whose README can be found [here](demos/README.md). Or you can try to build and run your own SGX-protected applications using Occlum as shown in the demos.
 
-## How to Build and Install
+## How to Build and Install?
 
 To build Occlum from the latest source code, do the following steps in an Occlum Docker container (which can be prepared as shown in the last section):
 
@@ -182,7 +182,25 @@ The Occlum Dockerfile can be found at [here](tools/docker/Dockerfile). Use it to
 
 Occlum supports running any executable binaries that are 1) based on [musl libc](https://www.musl-libc.org/) and 2) position independent. We chose musl libc instead of Glibc since the codebase of musl libc is 10X smaller than Glibc, which means a much smaller Trusted Computing Base (TCB) and attack surface. We argue this is an important consideration for Occlum, which targets security-critical apps running inside SGX enclaves.
 
-The two aforementioned requirements are not only satisfied by the Occlum toolchain, but also the native toolchains from some Linux distributions, e.g., [Alpine Linux](https://www.alpinelinux.org/). We think Alpine Linux, a popular Linux distribution that emphasizes simplicity and security, is a natural fit for Occlum. We will provide demos to run unmodified apps from [Alpine Linux packages](https://pkgs.alpinelinux.org/packages).
+The two aforementioned requirements are not only satisfied by the Occlum toolchain, but also the native toolchains from some Linux distributions, e.g., [Alpine Linux](https://www.alpinelinux.org/). We think Alpine Linux, a popular Linux distribution that emphasizes simplicity and security, is a natural fit for Occlum. We have provided demos (see [Python](demos/python/)) to run unmodified apps from [Alpine Linux packages](https://pkgs.alpinelinux.org/packages).
+
+## How to Debug?
+
+To debug an app running upon Occlum, one can harness Occlum's builtin support for GDB via `occlum gdb` command. More info can be found [here](demos/gdb_support/).
+
+If the cause of a problem does not seem to be the app but Occlum itself, then one can take a glimpse into the inner workings of Occlum by checking out its log. Occlum's log level can be adjusted through `OCCLUM_LOG_LEVEL` environment variable. It has six levels: `off`, `error`, `warn`, `debug`, `info`, and `trace`. The default value is `off`, i.e., showing no log messages at all. The most verbose level is `trace`.
+
+## How to Build and Run Release-Mode Enclaves?
+
+By default, the `occlum build` command builds and signs enclaves in debug mode. These SGX debug-mode enclaves are intended for development and testing purposes only. For production usage, the enclaves must be signed by a key acquired from Intel (a restriction that will be lifted in the future when Flexible Launch Control is ready) and run with SGX debug support disabled.
+
+Occlum has built-in support for both building and running enclaves in release mode. The commands are shown below:
+```
+$ occlum build --sign-key=<path_to/your_key.pem>
+$ OCCLUM_RELEASE_ENCLAVE=yes occlum run <prog_path> <prog_args>
+```
+
+Ultimately, whether an enclave is running in the release mode should be checked and judged by a trusted client through remotely attesting the enclave. See the remote attestation demo [here](demos/remote_attestation).
 
 ## What is the Implementation Status?
 

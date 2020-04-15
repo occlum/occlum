@@ -2,7 +2,7 @@
 # It is not intended for manual editing.
 [[package]]
 name = "Occlum"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitvec 0.17.4 (registry+https://github.com/rust-lang/crates.io-index)",
