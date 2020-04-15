@@ -43,7 +43,7 @@ pub extern "C" fn occlum_ecall_init(log_level: *const c_char) -> i32 {
         // Init the log infrastructure first so that log messages will be printed afterwards
         util::log::init(log_level);
         // Init MPX for SFI
-        util::mpx_util::mpx_enable();
+        //util::mpx_util::mpx_enable();
         // Register exception handlers (support cpuid & rdtsc for now)
         register_exception_handlers();
 
