@@ -5,7 +5,7 @@
 #include "pal_log.h"
 #include "pal_syscall.h"
 
-int occlum_pal_init(occlum_pal_attr_t* attr) {
+int occlum_pal_init(const struct occlum_pal_attr* attr) {
     errno = 0;
 
     if (attr == NULL) {

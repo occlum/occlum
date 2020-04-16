@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
     const char** cmd_args = (const char**) &argv[2];
 
     // Init Occlum PAL
-    occlum_pal_attr_t attr = OCCLUM_PAL_ATTR_INITVAL;
+    struct occlum_pal_attr attr = OCCLUM_PAL_ATTR_INITVAL;
     attr.instance_dir = get_instance_dir();
     attr.log_level = getenv("OCCLUM_LOG_LEVEL");
     if (occlum_pal_init(&attr) < 0) {

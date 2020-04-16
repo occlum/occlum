@@ -8,7 +8,7 @@ extern "C" {
 /*
  * Occlum PAL attributes
  */
-typedef struct {
+typedef struct occlum_pal_attr {
     // Occlum instance dir.
     //
     // Specifies the path of an Occlum instance directory. Usually, this
@@ -36,11 +36,11 @@ typedef struct {
 /*
  * The struct which consists of file descriptors of standard I/O
  */
-struct occlum_stdio_fds {
+typedef struct occlum_stdio_fds {
     int stdin_fd;
     int stdout_fd;
     int stderr_fd;
-};
+} occlum_stdio_fds_t;
 
 /*
  * @brief Initialize an Occlum enclave
@@ -49,7 +49,7 @@ struct occlum_stdio_fds {
  *
  * @retval If 0, then success; otherwise, check errno for the exact error type.
  */
-int occlum_pal_init(occlum_pal_attr_t* attr);
+int occlum_pal_init(const struct occlum_pal_attr* attr);
 
 /*
  * @brief Execute a command inside the Occlum enclave
