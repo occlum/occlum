@@ -8,7 +8,7 @@
 
 static char __preallocated_memory[OCCLUM_BUILTIN_VM_USER_SPACE_SIZE]
     __attribute__ ((
-        section(".exectuable_data,\"awx\",@nobits#"),
+        section(".executable_data,\"awx\",@nobits#"),
         aligned(4096))) = {0};
 
 void vm_get_preallocated_user_space_memory(void** paddr, size_t* psize) {
