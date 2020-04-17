@@ -6,5 +6,5 @@ EXTRA_LINK_FLAGS :=
 BIN_ARGS :=
 
 test_cpuid.txt:
-	@/usr/bin/cpuid -r > $@
+	@/usr/bin/cpuid -r -1 > $@
 	@mv $@ $(IMAGE_DIR)/$@
