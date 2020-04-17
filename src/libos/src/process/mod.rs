@@ -13,16 +13,19 @@ use crate::fs::{FileRef, FileTable, FsView};
 use crate::misc::ResourceLimits;
 use crate::prelude::*;
 use crate::sched::SchedAgent;
+use crate::signal::{SigDispositions, SigQueues};
 use crate::vm::ProcessVM;
 
-use self::process::{ChildProcessFilter, ProcessBuilder, ProcessInner};
+use self::process::{ProcessBuilder, ProcessInner};
 use self::thread::{ThreadBuilder, ThreadId, ThreadInner};
 use self::wait::{WaitQueue, Waiter};
 
+pub use self::do_exit::handle_force_exit;
 pub use self::do_spawn::do_spawn_without_exec;
-pub use self::process::{Process, ProcessStatus, IDLE};
+pub use self::process::{Process, ProcessFilter, ProcessStatus, IDLE};
 pub use self::syscalls::*;
 pub use self::task::Task;
+pub use self::term_status::TermStatus;
 pub use self::thread::{Thread, ThreadStatus};
 
 mod do_arch_prctl;
@@ -35,6 +38,7 @@ mod do_spawn;
 mod do_wait4;
 mod process;
 mod syscalls;
+mod term_status;
 mod thread;
 mod wait;
 
@@ -43,8 +47,14 @@ pub mod elf_file;
 pub mod table;
 pub mod task;
 
+// TODO: need to separate C's version pid_t with Rust version Pid.
+// pid_t must be signed as negative values may have special meaning
+// (check wait4 and kill for examples), while Pid should be a
+// non-negative value.
 #[allow(non_camel_case_types)]
 pub type pid_t = u32;
+#[allow(non_camel_case_types)]
+pub type uid_t = u32;
 
 pub type ProcessRef = Arc<Process>;
 pub type ThreadRef = Arc<Thread>;

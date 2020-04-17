@@ -1,4 +1,5 @@
 use super::*;
+use crate::syscall::CpuContext;
 use sgx_types::*;
 use std::collections::HashMap;
 use std::rsgx_cpuidex;
@@ -261,17 +262,17 @@ pub fn setup_cpuid_info() {
     let max_basic_leaf = CPUID.get_max_basic_leaf();
 }
 
-pub fn handle_cpuid_exception(info: &mut sgx_exception_info_t) -> u32 {
+pub fn handle_cpuid_exception(user_context: &mut CpuContext) -> Result<isize> {
     debug!("handle CPUID exception");
-    let leaf = info.cpu_context.rax as u32;
-    let subleaf = info.cpu_context.rcx as u32;
+    let leaf = user_context.rax as u32;
+    let subleaf = user_context.rcx as u32;
     let cpuid_result = CPUID.get_cpuid_info(leaf, subleaf);
     trace!("cpuid result: {:?}", cpuid_result);
-    info.cpu_context.rax = cpuid_result.eax as u64;
-    info.cpu_context.rbx = cpuid_result.ebx as u64;
-    info.cpu_context.rcx = cpuid_result.ecx as u64;
-    info.cpu_context.rdx = cpuid_result.edx as u64;
-    info.cpu_context.rip += 2;
+    user_context.rax = cpuid_result.eax as u64;
+    user_context.rbx = cpuid_result.ebx as u64;
+    user_context.rcx = cpuid_result.ecx as u64;
+    user_context.rdx = cpuid_result.edx as u64;
+    user_context.rip += 2;
 
-    EXCEPTION_CONTINUE_EXECUTION
+    Ok(0)
 }

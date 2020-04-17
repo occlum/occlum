@@ -32,11 +32,15 @@ use crate::net::{
     SocketFile, UnixSocketFile,
 };
 use crate::process::{
-    do_arch_prctl, do_clone, do_exit, do_futex, do_getegid, do_geteuid, do_getgid, do_getpgid,
-    do_getpid, do_getppid, do_gettid, do_getuid, do_set_tid_address, do_spawn, do_wait4, pid_t,
-    FdOp,
+    do_arch_prctl, do_clone, do_exit, do_exit_group, do_futex, do_getegid, do_geteuid, do_getgid,
+    do_getpgid, do_getpid, do_getppid, do_gettid, do_getuid, do_set_tid_address, do_spawn,
+    do_wait4, pid_t, FdOp, ThreadStatus,
 };
 use crate::sched::{do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
+use crate::signal::{
+    do_kill, do_rt_sigaction, do_rt_sigpending, do_rt_sigprocmask, do_rt_sigreturn, do_tgkill,
+    do_tkill, sigaction_t, sigset_t,
+};
 use crate::vm::{MMapFlags, VMPerms};
 use crate::{fs, process, std, vm};
 
@@ -84,9 +88,9 @@ macro_rules! process_syscall_table_with_callback {
             (Mprotect = 10) => do_mprotect(addr: usize, len: usize, prot: u32),
             (Munmap = 11) => do_munmap(addr: usize, size: usize),
             (Brk = 12) => do_brk(new_brk_addr: usize),
-            (RtSigaction = 13) => do_rt_sigaction(),
-            (RtSigprocmask = 14) => do_rt_sigprocmask(),
-            (RtSigreturn = 15) => handle_unsupported(),
+            (RtSigaction = 13) => do_rt_sigaction(signum_c: c_int, new_sa_c: *const sigaction_t, old_sa_c: *mut sigaction_t),
+            (RtSigprocmask = 14) => do_rt_sigprocmask(how: c_int, set: *const sigset_t, oldset: *mut sigset_t, sigset_size: size_t),
+            (RtSigreturn = 15) => do_rt_sigreturn(context: *mut CpuContext),
             (Ioctl = 16) => do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8),
             (Pread64 = 17) => do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: off_t),
             (Pwrite64 = 18) => do_pwrite(fd: FileDesc, buf: *const u8, size: usize, offset: off_t),
@@ -133,7 +137,7 @@ macro_rules! process_syscall_table_with_callback {
             (Execve = 59) => handle_unsupported(),
             (Exit = 60) => do_exit(exit_status: i32),
             (Wait4 = 61) => do_wait4(pid: i32, _exit_status: *mut i32),
-            (Kill = 62) => handle_unsupported(),
+            (Kill = 62) => do_kill(pid: i32, sig: c_int),
             (Uname = 63) => do_uname(name: *mut utsname_t),
             (Semget = 64) => handle_unsupported(),
             (Semop = 65) => handle_unsupported(),
@@ -198,7 +202,7 @@ macro_rules! process_syscall_table_with_callback {
             (Getsid = 124) => handle_unsupported(),
             (Capget = 125) => handle_unsupported(),
             (Capset = 126) => handle_unsupported(),
-            (RtSigpending = 127) => handle_unsupported(),
+            (RtSigpending = 127) => do_rt_sigpending(buf_ptr: *mut sigset_t, buf_size: usize),
             (RtSigtimedwait = 128) => handle_unsupported(),
             (RtSigqueueinfo = 129) => handle_unsupported(),
             (RtSigsuspend = 130) => handle_unsupported(),
@@ -271,7 +275,7 @@ macro_rules! process_syscall_table_with_callback {
             (Removexattr = 197) => handle_unsupported(),
             (Lremovexattr = 198) => handle_unsupported(),
             (Fremovexattr = 199) => handle_unsupported(),
-            (Tkill = 200) => handle_unsupported(),
+            (Tkill = 200) => do_tkill(tid: pid_t, sig: c_int),
             (Time = 201) => handle_unsupported(),
             (Futex = 202) => do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32, timeout: u64, futex_new_addr: *const i32),
             (SchedSetaffinity = 203) => do_sched_setaffinity(pid: pid_t, cpusize: size_t, buf: *const c_uchar),
@@ -302,10 +306,10 @@ macro_rules! process_syscall_table_with_callback {
             (ClockGettime = 228) => do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t),
             (ClockGetres = 229) => handle_unsupported(),
             (ClockNanosleep = 230) => handle_unsupported(),
-            (ExitGroup = 231) => handle_unsupported(),
+            (ExitGroup = 231) => do_exit_group(exit_status: i32),
             (EpollWait = 232) => do_epoll_wait(epfd: c_int, events: *mut libc::epoll_event, maxevents: c_int, timeout: c_int),
             (EpollCtl = 233) => do_epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *const libc::epoll_event),
-            (Tgkill = 234) => handle_unsupported(),
+            (Tgkill = 234) => do_tgkill(pid: i32, tid: pid_t, sig: c_int),
             (Utimes = 235) => handle_unsupported(),
             (Vserver = 236) => handle_unsupported(),
             (Mbind = 237) => handle_unsupported(),
@@ -401,7 +405,7 @@ macro_rules! process_syscall_table_with_callback {
             // Occlum-specific system calls
             (Spawn = 360) => do_spawn(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp),
             // Exception handling
-            (Exception = 361) => do_handle_exception(info: *mut sgx_exception_info_t),
+            (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, context: *mut CpuContext),
         }
     };
 }
@@ -562,7 +566,7 @@ macro_rules! impl_dispatch_syscall {
                     //     let fd = self.args[0] as FileDesc;
                     //     let buf = self.args[1] as *mut u8;
                     //     let size = self.args[2] as usize;
-                    //     do_read(fd, buuf, size)
+                    //     do_read(fd, buf, size)
                     // }
                     SyscallNum::$name => {
                         impl_dispatch_syscall!(@do_syscall $fn, syscall, 0, ($($args)*,) -> ())
@@ -574,24 +578,36 @@ macro_rules! impl_dispatch_syscall {
 }
 process_syscall_table_with_callback!(impl_dispatch_syscall);
 
-/// The system call entry point in Rust.
-///
-/// This function is called by __occlum_syscall.
 #[no_mangle]
-pub extern "C" fn occlum_syscall(
-    num: u32,
-    arg0: isize,
-    arg1: isize,
-    arg2: isize,
-    arg3: isize,
-    arg4: isize,
-    arg5: isize,
-) -> isize {
+pub extern "C" fn occlum_syscall(user_context: *mut CpuContext) -> ! {
     // Start a new round of log messages for this system call. But we do not
     // set the description of this round, yet. We will do so after checking the
     // given system call number is a valid.
     log::next_round(None);
 
+    let user_context = unsafe {
+        // TODO: validate pointer
+        &mut *user_context
+    };
+
+    // Do system call
+    do_syscall(user_context);
+
+    // Back to the user space
+    do_sysret(user_context)
+}
+
+fn do_syscall(user_context: &mut CpuContext) {
+    // Extract arguments from the CPU context. The arguments follows Linux's syscall ABI.
+    let num = user_context.rax as u32;
+    let arg0 = user_context.rdi as isize;
+    let arg1 = user_context.rsi as isize;
+    let arg2 = user_context.rdx as isize;
+    let arg3 = user_context.r10 as isize;
+    let arg4 = user_context.r8 as isize;
+    let arg5 = user_context.r9 as isize;
+
+    // TODO: the profiler will trigger panic for syscall simulation
     #[cfg(feature = "syscall_timing")]
     GLOBAL_PROFILER
         .lock()
@@ -599,9 +615,18 @@ pub extern "C" fn occlum_syscall(
         .syscall_enter(syscall_num)
         .expect("unexpected error from profiler to enter syscall");
 
-    let ret = Syscall::new(num, arg0, arg1, arg2, arg3, arg4, arg5).and_then(|syscall| {
+    let ret = Syscall::new(num, arg0, arg1, arg2, arg3, arg4, arg5).and_then(|mut syscall| {
         log::set_round_desc(Some(syscall.num.as_str()));
         trace!("{:?}", &syscall);
+
+        // Pass user_context as an extra argument to two special syscalls that
+        // need to modify it
+        if syscall.num == SyscallNum::RtSigreturn {
+            syscall.args[0] = user_context as *mut _ as isize;
+        } else if syscall.num == SyscallNum::HandleException {
+            // syscall.args[0] == info
+            syscall.args[1] = user_context as *mut _ as isize;
+        }
 
         dispatch_syscall(syscall)
     });
@@ -644,7 +669,35 @@ pub extern "C" fn occlum_syscall(
         }
     };
     trace!("Retval = {:?}", retval);
-    retval
+
+    // Put the return value into user_context.rax, except for syscalls that may
+    // modify user_context directly. Currently, there are two such syscalls:
+    // SigReturn and HandleException.
+    //
+    // Sigreturn restores `user_context` to the state when the last signal
+    // handler is executed. So in the case of sigreturn, `user_context` should
+    // be kept intact.
+    if num != SyscallNum::RtSigreturn as u32 && num != SyscallNum::HandleException as u32 {
+        user_context.rax = retval as u64;
+    }
+
+    crate::signal::deliver_signal(user_context);
+
+    crate::process::handle_force_exit();
+}
+
+/// Return to the user space according to the given CPU context
+fn do_sysret(user_context: &mut CpuContext) -> ! {
+    extern "C" {
+        fn __occlum_sysret(user_context: *mut CpuContext) -> !;
+        fn do_exit_task() -> !;
+    }
+    if current!().status() != ThreadStatus::Exited {
+        unsafe { __occlum_sysret(user_context) } // jump to user space
+    } else {
+        unsafe { do_exit_task() } // exit enclave
+    }
+    unreachable!("__occlum_sysret never returns!");
 }
 
 /*
@@ -1100,16 +1153,58 @@ fn do_prlimit(
     misc::do_prlimit(pid, resource, new_limit, old_limit).map(|_| 0)
 }
 
-// TODO: implement signals
-
-fn do_rt_sigaction() -> Result<isize> {
-    Ok(0)
-}
-
-fn do_rt_sigprocmask() -> Result<isize> {
-    Ok(0)
-}
-
 fn handle_unsupported() -> Result<isize> {
     return_errno!(ENOSYS, "Unimplemented or unknown syscall")
+}
+
+/// Cpu context.
+///
+/// Note. The definition of this struct must be kept in sync with the assembly
+/// code in `syscall_entry_x86-64.S`.
+#[derive(Clone, Copy, Debug, Default)]
+#[repr(C)]
+pub struct CpuContext {
+    pub r8: u64,
+    pub r9: u64,
+    pub r10: u64,
+    pub r11: u64,
+    pub r12: u64,
+    pub r13: u64,
+    pub r14: u64,
+    pub r15: u64,
+    pub rdi: u64,
+    pub rsi: u64,
+    pub rbp: u64,
+    pub rbx: u64,
+    pub rdx: u64,
+    pub rax: u64,
+    pub rcx: u64,
+    pub rsp: u64,
+    pub rip: u64,
+    pub rflags: u64,
+}
+
+impl CpuContext {
+    pub fn from_sgx(src: &sgx_cpu_context_t) -> CpuContext {
+        Self {
+            r8: src.r8,
+            r9: src.r9,
+            r10: src.r10,
+            r11: src.r11,
+            r12: src.r12,
+            r13: src.r13,
+            r14: src.r14,
+            r15: src.r15,
+            rdi: src.rdi,
+            rsi: src.rsi,
+            rbp: src.rbp,
+            rbx: src.rbx,
+            rdx: src.rdx,
+            rax: src.rax,
+            rcx: src.rcx,
+            rsp: src.rsp,
+            rip: src.rip,
+            rflags: src.rflags,
+        }
+    }
 }

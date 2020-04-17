@@ -4,7 +4,7 @@ use super::do_arch_prctl::ArchPrctlCode;
 use super::do_clone::CloneFlags;
 use super::do_futex::{FutexFlags, FutexOp};
 use super::do_spawn::FileAction;
-use super::process::ChildProcessFilter;
+use super::process::ProcessFilter;
 use crate::prelude::*;
 use crate::time::timespec_t;
 use crate::util::mem_util::from_user::*;
@@ -184,16 +184,16 @@ pub fn do_set_tid_address(tidptr: *mut pid_t) -> Result<isize> {
     super::do_set_tid_address::do_set_tid_address(tidptr).map(|tid| tid as isize)
 }
 
-pub fn do_exit(status: i32) -> ! {
+pub fn do_exit(status: i32) -> Result<isize> {
     debug!("exit: {}", status);
     super::do_exit::do_exit(status);
+    Ok(0)
+}
 
-    extern "C" {
-        fn do_exit_task() -> !;
-    }
-    unsafe {
-        do_exit_task();
-    }
+pub fn do_exit_group(status: i32) -> Result<isize> {
+    debug!("exit_group: {}", status);
+    super::do_exit::do_exit_group(status);
+    Ok(0)
 }
 
 pub fn do_wait4(pid: i32, exit_status_ptr: *mut i32) -> Result<isize> {
@@ -202,16 +202,14 @@ pub fn do_wait4(pid: i32, exit_status_ptr: *mut i32) -> Result<isize> {
     }
 
     let child_process_filter = match pid {
-        pid if pid < -1 => ChildProcessFilter::WithPgid((-pid) as pid_t),
-        -1 => ChildProcessFilter::WithAnyPid,
+        pid if pid < -1 => ProcessFilter::WithPgid((-pid) as pid_t),
+        -1 => ProcessFilter::WithAnyPid,
         0 => {
             let pgid = current!().process().pgid();
-            ChildProcessFilter::WithPgid(pgid)
+            ProcessFilter::WithPgid(pgid)
         }
-        pid if pid > 0 => ChildProcessFilter::WithPid(pid as pid_t),
-        _ => {
-            panic!("THIS SHOULD NEVER HAPPEN!");
-        }
+        pid if pid > 0 => ProcessFilter::WithPid(pid as pid_t),
+        _ => unreachable!(),
     };
     let mut exit_status = 0;
     match super::do_wait4::do_wait4(&child_process_filter) {

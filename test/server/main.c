@@ -207,6 +207,7 @@ int test_read_write() {
         THROW_ERROR("failed to wait4 the child process");
     }
 
+    printf("test_read_write finished!\n");
     return ret;
 }
 
@@ -314,10 +315,12 @@ int test_poll_sockets() {
 static test_case_t test_cases[] = {
     TEST_CASE(test_read_write),
     TEST_CASE(test_send_recv),
+/*
     TEST_CASE(test_sendmsg_recvmsg),
     TEST_CASE(test_sendmsg_recvmsg_connectionless),
     TEST_CASE(test_fcntl_setfl_and_getfl),
     TEST_CASE(test_poll_sockets),
+    */
 };
 
 int main(int argc, const char* argv[]) {

@@ -16,7 +16,7 @@ pub use std::sync::{
 pub use crate::error::Result;
 pub use crate::error::*;
 pub use crate::fs::{File, FileDesc, FileRef};
-pub use crate::process::pid_t;
+pub use crate::process::{pid_t, uid_t};
 
 macro_rules! debug_trace {
     () => {

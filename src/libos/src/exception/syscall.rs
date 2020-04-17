@@ -1,30 +1,25 @@
 use super::*;
-use crate::syscall::{occlum_syscall, SyscallNum};
+use crate::syscall::{occlum_syscall, CpuContext, SyscallNum};
 use sgx_types::*;
 
 pub const SYSCALL_OPCODE: u16 = 0x050F;
 
-pub fn handle_syscall_exception(info: &mut sgx_exception_info_t) -> u32 {
+pub fn handle_syscall_exception(user_context: &mut CpuContext) -> ! {
     debug!("handle SYSCALL exception");
-    // SYSCALL, save RIP into RCX and RFLAGS into R11
-    info.cpu_context.rcx = info.cpu_context.rip + 2;
-    info.cpu_context.r11 = info.cpu_context.rflags;
-    let num = info.cpu_context.rax as u32;
-    let arg0 = info.cpu_context.rdi as isize;
-    let arg1 = info.cpu_context.rsi as isize;
-    let arg2 = info.cpu_context.rdx as isize;
-    let arg3 = info.cpu_context.r10 as isize;
-    let arg4 = info.cpu_context.r8 as isize;
-    let arg5 = info.cpu_context.r9 as isize;
-    // syscall should not be an exception in Occlum
-    assert!(num != SyscallNum::Exception as u32);
-    let ret = occlum_syscall(num, arg0, arg1, arg2, arg3, arg4, arg5);
-    info.cpu_context.rax = ret as u64;
 
-    // SYSRET, load RIP from RCX and loading RFLAGS from R11
-    info.cpu_context.rip = info.cpu_context.rcx;
-    // Clear RF, VM, reserved bits; set bit 1
-    info.cpu_context.rflags = (info.cpu_context.r11 & 0x3C7FD7) | 2;
+    // SYSCALL instruction saves RIP into RCX and RFLAGS into R11. This is to
+    // comply with hardware's behavoir. Not useful for us.
+    user_context.rcx = user_context.rip;
+    user_context.r11 = user_context.rflags;
 
-    EXCEPTION_CONTINUE_EXECUTION
+    // The target RIP should be the next instruction
+    user_context.rip += 2;
+    // Set target RFLAGS: clear RF, VM, reserved bits; set bit 1
+    user_context.rflags = (user_context.rflags & 0x3C7FD7) | 2;
+
+    let num = user_context.rax as u32;
+    assert!(num != SyscallNum::HandleException as u32);
+
+    // FIXME: occlum syscall must use Linux ABI
+    occlum_syscall(user_context);
 }

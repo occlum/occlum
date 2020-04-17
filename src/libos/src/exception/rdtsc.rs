@@ -1,15 +1,15 @@
-use super::*;
-use sgx_types::*;
+use crate::prelude::*;
+use crate::syscall::CpuContext;
 
 pub const RDTSC_OPCODE: u16 = 0x310F;
 
-pub fn handle_rdtsc_exception(info: &mut sgx_exception_info_t) -> u32 {
+pub fn handle_rdtsc_exception(user_context: &mut CpuContext) -> Result<isize> {
     debug!("handle RDTSC exception");
-    let (low, high) = time::do_rdtsc();
+    let (low, high) = crate::time::do_rdtsc();
     trace!("do_rdtsc result {{ low: {:#x} high: {:#x}}}", low, high);
-    info.cpu_context.rax = low as u64;
-    info.cpu_context.rdx = high as u64;
-    info.cpu_context.rip += 2;
+    user_context.rax = low as u64;
+    user_context.rdx = high as u64;
+    user_context.rip += 2;
 
-    EXCEPTION_CONTINUE_EXECUTION
+    Ok(0)
 }

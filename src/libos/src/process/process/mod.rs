@@ -1,8 +1,9 @@
 use std::fmt;
 
 use super::wait::WaitQueue;
-use super::{ProcessRef, ThreadRef};
+use super::{ProcessRef, TermStatus, ThreadRef};
 use crate::prelude::*;
+use crate::signal::{SigDispositions, SigNum, SigQueues};
 
 pub use self::builder::ProcessBuilder;
 pub use self::idle::IDLE;
@@ -17,6 +18,10 @@ pub struct Process {
     // Mutable info
     parent: Option<SgxRwLock<ProcessRef>>,
     inner: SgxMutex<ProcessInner>,
+    // Signal
+    sig_dispositions: SgxRwLock<SigDispositions>,
+    sig_queues: SgxMutex<SigQueues>,
+    forced_exit: SgxRwLock<Option<TermStatus>>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -35,7 +40,7 @@ impl Process {
     /// Get process group ID
     // TODO: implement process group
     pub fn pgid(&self) -> pid_t {
-        0
+        self.pid
     }
 
     /// Get the parent process.
@@ -76,6 +81,14 @@ impl Process {
         self.inner().leader_thread()
     }
 
+    /// Get threads.
+    pub fn threads(&self) -> Vec<ThreadRef> {
+        self.inner()
+            .threads()
+            .map(|vec_ref| vec_ref.clone())
+            .unwrap_or_else(|| Vec::new())
+    }
+
     /// Get status.
     pub fn status(&self) -> ProcessStatus {
         self.inner().status()
@@ -84,6 +97,33 @@ impl Process {
     /// Get the path of the executable
     pub fn exec_path(&self) -> &str {
         &self.exec_path
+    }
+
+    /// Get the signal queues for process-directed signals.
+    pub fn sig_queues(&self) -> &SgxMutex<SigQueues> {
+        &self.sig_queues
+    }
+
+    /// Get the process-wide signal dispositions.
+    pub fn sig_dispositions(&self) -> &SgxRwLock<SigDispositions> {
+        &self.sig_dispositions
+    }
+
+    /// Check whether the process has been forced to exit.
+    pub fn is_forced_exit(&self) -> Option<TermStatus> {
+        *self.forced_exit.read().unwrap()
+    }
+
+    /// Force a process to exit.
+    ///
+    /// There are two reasons to force a process to exit:
+    /// 1. Receiving a fatal signal;
+    /// 2. Performing exit_group syscall.
+    ///
+    /// A process may be forced to exit many times, but only the first time counts.
+    pub fn force_exit(&self, term_status: TermStatus) {
+        let mut forced_exit = self.forced_exit.write().unwrap();
+        forced_exit.get_or_insert(term_status);
     }
 
     /// Get the internal representation of the process.
@@ -98,11 +138,11 @@ pub enum ProcessInner {
     Live {
         status: LiveStatus,
         children: Vec<ProcessRef>,
-        waiting_children: WaitQueue<ChildProcessFilter, pid_t>,
+        waiting_children: WaitQueue<ProcessFilter, pid_t>,
         threads: Vec<ThreadRef>,
     },
     Zombie {
-        exit_status: i32,
+        term_status: TermStatus,
     },
 }
 
@@ -172,7 +212,7 @@ impl ProcessInner {
         }
     }
 
-    pub fn waiting_children_mut(&mut self) -> Option<&mut WaitQueue<ChildProcessFilter, pid_t>> {
+    pub fn waiting_children_mut(&mut self) -> Option<&mut WaitQueue<ProcessFilter, pid_t>> {
         match self {
             Self::Live {
                 waiting_children, ..
@@ -190,7 +230,7 @@ impl ProcessInner {
         children.swap_remove(zombie_i)
     }
 
-    pub fn exit(&mut self, exit_status: i32) {
+    pub fn exit(&mut self, term_status: TermStatus) {
         // Check preconditions
         debug_assert!(self.status() == ProcessStatus::Running);
         debug_assert!(self.num_threads() == 0);
@@ -201,15 +241,15 @@ impl ProcessInner {
             *parent = IDLE.process().clone();
         }
 
-        *self = Self::Zombie { exit_status };
+        *self = Self::Zombie { term_status };
     }
 
-    pub fn exit_status(&self) -> Option<i32> {
+    pub fn term_status(&self) -> Option<TermStatus> {
         // Check preconditions
         debug_assert!(self.status() == ProcessStatus::Zombie);
 
         match self {
-            Self::Zombie { exit_status } => Some(*exit_status),
+            Self::Zombie { term_status } => Some(*term_status),
             _ => None,
         }
     }
@@ -270,9 +310,9 @@ impl fmt::Debug for ProcessInner {
                         .collect::<Vec<pid_t>>(),
                 )
                 .finish(),
-            ProcessInner::Zombie { exit_status, .. } => f
+            ProcessInner::Zombie { term_status, .. } => f
                 .debug_struct("ProcessInner::Zombie")
-                .field("exit_status", exit_status)
+                .field("term_status", term_status)
                 .finish(),
         }
     }
@@ -294,11 +334,11 @@ impl Into<ProcessStatus> for LiveStatus {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum ChildProcessFilter {
+pub enum ProcessFilter {
     WithAnyPid,
     WithPid(pid_t),
     WithPgid(pid_t),
 }
 
 // TODO: is this necessary?
-unsafe impl Send for ChildProcessFilter {}
+unsafe impl Send for ProcessFilter {}

@@ -61,6 +61,7 @@ mod misc;
 mod net;
 mod process;
 mod sched;
+mod signal;
 mod syscall;
 mod time;
 mod untrusted;

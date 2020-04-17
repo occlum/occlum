@@ -15,17 +15,15 @@
 // Three types of threads that will not exit voluntarily
 //
 
-// FIXME: Disable this test for NOW because exit_group does not have a real implementation yet
-// and SGX simlulation mode will fail this test.
 // Type 1: a busy loop thread
-// static void* busyloop_thread_func(void* _) {
-//     while (1) {
-//         // By calling getpid, we give the LibOS a chance to force the thread
-//         // to terminate if exit_group is called by any thread in a thread group
-//         getpid();
-//     }
-//     return NULL;
-// }
+static void* busyloop_thread_func(void* _) {
+    while (1) {
+        // By calling getpid, we give the LibOS a chance to force the thread
+        // to terminate if exit_group is called by any thread in a thread group
+        getpid();
+    }
+    return NULL;
+}
 
 // Type 2: a sleeping thread
 static void* sleeping_thread_func(void* _) {
@@ -46,11 +44,11 @@ static void* futex_wait_thread_func(void* _) {
 // exit_group syscall should terminate all threads in a thread group.
 int test_exit_group_to_force_threads_terminate(void) {
     // Create three types of threads that will not exit voluntarily
-    // pthread_t busyloop_thread;
-    // if (pthread_create(&busyloop_thread, NULL, busyloop_thread_func, NULL) < 0) {
-    //     printf("ERROR: pthread_create failed\n");
-    //     return -1;
-    // }
+    pthread_t busyloop_thread;
+    if (pthread_create(&busyloop_thread, NULL, busyloop_thread_func, NULL) < 0) {
+        printf("ERROR: pthread_create failed\n");
+        return -1;
+    }
     pthread_t sleeping_thread;
     if (pthread_create(&sleeping_thread, NULL, sleeping_thread_func, NULL) < 0) {
         printf("ERROR: pthread_create failed\n");

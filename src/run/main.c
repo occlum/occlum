@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <occlum_pal_api.h>
 
 static const char* get_instance_dir(void) {
@@ -40,7 +42,15 @@ int main(int argc, char* argv[]) {
     };
     int exit_status = 0;
     if (occlum_pal_exec(cmd_path, cmd_args, &io_fds, &exit_status) < 0) {
-        return EXIT_FAILURE;
+        // Command not found or other internal errors
+        return 127;
+    }
+
+    // Convert the exit status to a value in a shell-like encoding
+    if (WIFEXITED(exit_status)) { // terminated normally
+        exit_status = WEXITSTATUS(exit_status) & 0x7F; // [0, 127]
+    } else { // killed by signal
+        exit_status = 128 + WTERMSIG(exit_status); // [128 + 1, 128 + 64]
     }
 
     // Destroy Occlum PAL

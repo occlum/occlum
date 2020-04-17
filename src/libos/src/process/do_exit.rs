@@ -1,14 +1,39 @@
 use std::intrinsics::atomic_store;
 
 use super::do_futex::futex_wake;
-use super::process::ChildProcessFilter;
-use super::{table, ThreadRef};
+use super::process::ProcessFilter;
+use super::{table, TermStatus, ThreadRef, ThreadStatus};
 use crate::prelude::*;
+use crate::signal::SigNum;
 
-pub fn do_exit(exit_status: i32) {
+pub fn do_exit_group(status: i32) {
+    let term_status = TermStatus::Exited(status as u8);
+    current!().process().force_exit(term_status);
+    exit_thread(term_status);
+}
+
+pub fn do_exit(status: i32) {
+    let term_status = TermStatus::Exited(status as u8);
+    exit_thread(term_status);
+}
+
+/// Exit this thread if its has been forced to exit.
+///
+/// A thread may be forced to exit for two reasons: 1) a fatal signal; 2)
+/// exit_group syscall.
+pub fn handle_force_exit() {
+    if let Some(term_status) = current!().process().is_forced_exit() {
+        exit_thread(term_status);
+    }
+}
+
+fn exit_thread(term_status: TermStatus) {
     let thread = current!();
+    if thread.status() == ThreadStatus::Exited {
+        return;
+    }
 
-    let num_remaining_threads = thread.exit(exit_status);
+    let num_remaining_threads = thread.exit(term_status);
 
     // Notify a thread, if any, that waits on ctid. See set_tid_address(2) for more info.
     if let Some(ctid_ptr) = thread.clear_ctid() {
@@ -28,11 +53,11 @@ pub fn do_exit(exit_status: i32) {
 
     // If this thread is the last thread, then exit the process
     if num_remaining_threads == 0 {
-        do_exit_process(&thread, exit_status);
+        exit_process(&thread, term_status);
     }
 }
 
-fn do_exit_process(thread: &ThreadRef, exit_status: i32) {
+fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
     let process = thread.process();
 
     // If the parent process is the idle process, we can release the process directly.
@@ -44,7 +69,7 @@ fn do_exit_process(thread: &ThreadRef, exit_status: i32) {
         table::del_thread(thread.tid()).expect("tid must be in the table");
         table::del_process(process.pid()).expect("pid must be in the table");
 
-        process_inner.exit(exit_status);
+        process_inner.exit(term_status);
         parent_inner.remove_zombie_child(process.pid());
         return;
     }
@@ -55,19 +80,19 @@ fn do_exit_process(thread: &ThreadRef, exit_status: i32) {
     // Deadlock note: Always lock parent then child.
     let parent = process.parent();
     let mut parent_inner = parent.inner();
-    process.inner().exit(exit_status);
+    process.inner().exit(term_status);
 
     // Wake up the parent if it is waiting on this child
     let waiting_children = parent_inner.waiting_children_mut().unwrap();
     waiting_children.del_and_wake_one_waiter(|waiter_data| -> Option<pid_t> {
         match waiter_data {
-            ChildProcessFilter::WithAnyPid => {}
-            ChildProcessFilter::WithPid(required_pid) => {
+            ProcessFilter::WithAnyPid => {}
+            ProcessFilter::WithPid(required_pid) => {
                 if process.pid() != *required_pid {
                     return None;
                 }
             }
-            ChildProcessFilter::WithPgid(required_pgid) => {
+            ProcessFilter::WithPgid(required_pgid) => {
                 if process.pgid() != *required_pgid {
                     return None;
                 }

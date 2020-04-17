@@ -4,9 +4,10 @@ use std::ptr::NonNull;
 use super::task::Task;
 use super::{
     FileTableRef, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef, ResourceLimitsRef, SchedAgentRef,
-    ThreadRef,
+    TermStatus, ThreadRef,
 };
 use crate::prelude::*;
+use crate::signal::{SigQueues, SigSet};
 
 pub use self::builder::ThreadBuilder;
 pub use self::id::ThreadId;
@@ -30,6 +31,10 @@ pub struct Thread {
     files: FileTableRef,
     sched: SchedAgentRef,
     rlimits: ResourceLimitsRef,
+    // Signal
+    sig_queues: SgxMutex<SigQueues>,
+    sig_mask: SgxRwLock<SigSet>,
+    sig_tmp_mask: SgxRwLock<SigSet>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -68,6 +73,24 @@ impl Thread {
         &self.sched
     }
 
+    /// Get the signal queues for thread-directed signals.
+    pub fn sig_queues(&self) -> &SgxMutex<SigQueues> {
+        &self.sig_queues
+    }
+
+    /// Get the per-thread signal mask.
+    pub fn sig_mask(&self) -> &SgxRwLock<SigSet> {
+        &self.sig_mask
+    }
+
+    /// Get the per-thread, temporary signal mask.
+    ///
+    /// The tmp mask is always cleared at the end of the execution
+    /// of a syscall.
+    pub fn sig_tmp_mask(&self) -> &SgxRwLock<SigSet> {
+        &self.sig_tmp_mask
+    }
+
     /// Get a file from the file table.
     pub fn file(&self, fd: FileDesc) -> Result<FileRef> {
         self.files().lock().unwrap().get(fd)
@@ -99,7 +122,7 @@ impl Thread {
         self.inner().start();
     }
 
-    pub(super) fn exit(&self, exit_status: i32) -> usize {
+    pub(super) fn exit(&self, term_status: TermStatus) -> usize {
         self.sched().lock().unwrap().detach();
 
         // Remove this thread from its owner process
@@ -111,7 +134,7 @@ impl Thread {
             .expect("the thread must belong to the process");
         threads.swap_remove(thread_i);
 
-        self.inner().exit(exit_status);
+        self.inner().exit(term_status);
 
         threads.len()
     }
@@ -153,7 +176,7 @@ unsafe impl Sync for Thread {}
 pub enum ThreadInner {
     Init,
     Running,
-    Exited { exit_status: i32 },
+    Exited { term_status: TermStatus },
 }
 
 impl ThreadInner {
@@ -169,9 +192,9 @@ impl ThreadInner {
         }
     }
 
-    pub fn exit_status(&self) -> Option<i32> {
+    pub fn term_status(&self) -> Option<TermStatus> {
         match self {
-            Self::Exited { exit_status } => Some(*exit_status),
+            Self::Exited { term_status } => Some(*term_status),
             _ => None,
         }
     }
@@ -181,8 +204,8 @@ impl ThreadInner {
         *self = Self::Running;
     }
 
-    pub fn exit(&mut self, exit_status: i32) {
+    pub fn exit(&mut self, term_status: TermStatus) {
         debug_assert!(self.status() == ThreadStatus::Running);
-        *self = Self::Exited { exit_status };
+        *self = Self::Exited { term_status };
     }
 }

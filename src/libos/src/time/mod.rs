@@ -17,6 +17,9 @@ pub type time_t = i64;
 #[allow(non_camel_case_types)]
 pub type suseconds_t = i64;
 
+#[allow(non_camel_case_types)]
+pub type clock_t = i64;
+
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 #[allow(non_camel_case_types)]

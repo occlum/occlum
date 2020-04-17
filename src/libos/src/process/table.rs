@@ -5,6 +5,15 @@ pub fn get_process(pid: pid_t) -> Result<ProcessRef> {
     PROCESS_TABLE.lock().unwrap().get(pid)
 }
 
+pub fn get_all_processes() -> Vec<ProcessRef> {
+    PROCESS_TABLE
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(_, proc_ref)| proc_ref.clone())
+        .collect()
+}
+
 pub(super) fn add_process(process: ProcessRef) -> Result<()> {
     PROCESS_TABLE.lock().unwrap().add(process.pid(), process)
 }
@@ -48,6 +57,10 @@ impl<I: Debug + Clone + Send + Sync> Table<I> {
         Self {
             map: HashMap::with_capacity(capacity),
         }
+    }
+
+    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, pid_t, I> {
+        self.map.iter()
     }
 
     pub fn get(&self, id: pid_t) -> Result<I> {

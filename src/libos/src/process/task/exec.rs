@@ -1,4 +1,4 @@
-use super::super::{current, ThreadRef};
+use super::super::{current, TermStatus, ThreadRef};
 use super::Task;
 use crate::prelude::*;
 
@@ -33,11 +33,11 @@ fn dequeue(libos_tid: pid_t) -> Result<ThreadRef> {
 
 /// Execute the specified LibOS thread in the current host thread.
 pub fn exec(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
-    let new_thread: ThreadRef = dequeue(libos_tid)?;
-    new_thread.start(host_tid);
+    let this_thread: ThreadRef = dequeue(libos_tid)?;
+    this_thread.start(host_tid);
 
     // Enable current::get() from now on
-    current::set(new_thread.clone());
+    current::set(this_thread.clone());
 
     #[cfg(feature = "syscall_timing")]
     GLOBAL_PROFILER
@@ -48,7 +48,7 @@ pub fn exec(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
 
     unsafe {
         // task may only be modified by this function; so no lock is needed
-        do_exec_task(new_thread.task() as *const Task as *mut Task);
+        do_exec_task(this_thread.task() as *const Task as *mut Task);
     }
 
     #[cfg(feature = "syscall_timing")]
@@ -58,16 +58,20 @@ pub fn exec(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
         .thread_exit()
         .expect("unexpected error from profiler to exit thread");
 
-    let exit_status = new_thread.inner().exit_status().unwrap();
-    info!(
-        "Thread exited: tid = {}, exit_status = {}",
-        libos_tid, exit_status
-    );
+    let term_status = this_thread.inner().term_status().unwrap();
+    match term_status {
+        TermStatus::Exited(status) => {
+            info!("Thread exited: tid = {}, status = {}", libos_tid, status);
+        }
+        TermStatus::Killed(signum) => {
+            info!("Thread killed: tid = {}, signum = {:?}", libos_tid, signum);
+        }
+    }
 
     // Disable current::get()
     current::reset();
 
-    Ok(exit_status)
+    Ok(term_status.as_u32() as i32)
 }
 
 lazy_static! {

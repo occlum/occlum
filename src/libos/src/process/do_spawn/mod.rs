@@ -311,8 +311,8 @@ fn init_auxvec(process_vm: &ProcessVM, exec_elf_file: &ElfFile) -> Result<AuxVec
     let ldso_elf_base = process_vm.get_elf_ranges()[1].start() as u64;
     auxvec.set(AuxKey::AT_BASE, ldso_elf_base)?;
 
-    let syscall_native_addr = __occlum_syscall_native as *const () as u64;
-    auxvec.set(AuxKey::AT_OCCLUM_ENTRY, syscall_native_addr)?;
+    let syscall_addr = __occlum_syscall_linux_abi as *const () as u64;
+    auxvec.set(AuxKey::AT_OCCLUM_ENTRY, syscall_addr)?;
     // TODO: init AT_EXECFN
     // auxvec.set_val(AuxKey::AT_EXECFN, "program_name")?;
 
@@ -320,6 +320,6 @@ fn init_auxvec(process_vm: &ProcessVM, exec_elf_file: &ElfFile) -> Result<AuxVec
 }
 
 extern "C" {
-    fn __occlum_syscall_native() -> i64;
+    fn __occlum_syscall_linux_abi() -> i64;
     fn occlum_gdb_hook_load_elf(elf_base: u64, elf_path: *const u8, elf_path_len: u64);
 }

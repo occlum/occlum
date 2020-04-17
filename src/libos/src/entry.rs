@@ -213,24 +213,16 @@ fn do_new_process(
 }
 
 fn do_exec_thread(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
-    let exit_status = process::task::exec(libos_tid, host_tid)?;
+    let status = process::task::exec(libos_tid, host_tid)?;
 
     // sync file system
     // TODO: only sync when all processes exit
     use rcore_fs::vfs::FileSystem;
     crate::fs::ROOT_INODE.fs().sync()?;
 
-    // Only return the least significant 8 bits of the exit status
-    //
-    // From The Open Group Base Specifications Issue 7, 2018 edition:
-    // > The shell shall recognize the entire status value retrieved for the
-    // > command by the equivalent of the wait() function WEXITSTATUS macro...
-    //
-    // From the man page of wait() syscall:
-    // > WEXITSTATUS macro returns the exit status of the child. This consists of the least
-    // > significant 8 bits of the status
-    let exit_status = exit_status & 0x0000_00FF_i32;
-    Ok(exit_status)
+    // Not to be confused with the return value of a main function.
+    // The exact meaning of status is described in wait(2) man page.
+    Ok(status)
 }
 
 fn validate_program_path(target_path: &PathBuf) -> Result<()> {

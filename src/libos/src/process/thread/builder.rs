@@ -2,7 +2,7 @@ use std::ptr::NonNull;
 
 use super::{
     FileTableRef, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef, ResourceLimitsRef, SchedAgentRef,
-    Task, Thread, ThreadId, ThreadInner, ThreadRef,
+    SigQueues, SigSet, Task, Thread, ThreadId, ThreadInner, ThreadRef,
 };
 use crate::prelude::*;
 
@@ -82,10 +82,12 @@ impl ThreadBuilder {
     }
 
     pub fn build(self) -> Result<ThreadRef> {
-        let tid = self.tid.unwrap_or_else(|| ThreadId::new());
         let task = self
             .task
             .ok_or_else(|| errno!(EINVAL, "task is mandatory"))?;
+        let tid = self.tid.unwrap_or_else(|| ThreadId::new());
+        let clear_ctid = SgxRwLock::new(self.clear_ctid);
+        let inner = SgxMutex::new(ThreadInner::new());
         let process = self
             .process
             .ok_or_else(|| errno!(EINVAL, "process is mandatory"))?;
@@ -96,8 +98,9 @@ impl ThreadBuilder {
         let files = self.files.unwrap_or_default();
         let sched = self.sched.unwrap_or_default();
         let rlimits = self.rlimits.unwrap_or_default();
-        let clear_ctid = SgxRwLock::new(self.clear_ctid);
-        let inner = SgxMutex::new(ThreadInner::new());
+        let sig_queues = SgxMutex::new(SigQueues::new());
+        let sig_mask = SgxRwLock::new(SigSet::new_empty());
+        let sig_tmp_mask = SgxRwLock::new(SigSet::new_empty());
 
         let new_thread = Arc::new(Thread {
             task,
@@ -110,6 +113,9 @@ impl ThreadBuilder {
             files,
             sched,
             rlimits,
+            sig_queues,
+            sig_mask,
+            sig_tmp_mask,
         });
 
         let mut inner = new_thread.process().inner();

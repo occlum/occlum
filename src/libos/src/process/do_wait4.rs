@@ -1,9 +1,9 @@
-use super::process::{ChildProcessFilter, ProcessInner};
+use super::process::{ProcessFilter, ProcessInner};
 use super::wait::Waiter;
 use super::{table, ProcessRef, ProcessStatus};
 use crate::prelude::*;
 
-pub fn do_wait4(child_filter: &ChildProcessFilter) -> Result<(pid_t, i32)> {
+pub fn do_wait4(child_filter: &ProcessFilter) -> Result<(pid_t, i32)> {
     // Lock the process early to ensure that we do not miss any changes in
     // children processes
     let thread = current!();
@@ -16,9 +16,9 @@ pub fn do_wait4(child_filter: &ChildProcessFilter) -> Result<(pid_t, i32)> {
         .unwrap()
         .iter()
         .filter(|child| match child_filter {
-            ChildProcessFilter::WithAnyPid => true,
-            ChildProcessFilter::WithPid(required_pid) => child.pid() == *required_pid,
-            ChildProcessFilter::WithPgid(required_pgid) => child.pgid() == *required_pgid,
+            ProcessFilter::WithAnyPid => true,
+            ProcessFilter::WithPid(required_pid) => child.pid() == *required_pid,
+            ProcessFilter::WithPgid(required_pgid) => child.pgid() == *required_pgid,
         })
         .collect::<Vec<&ProcessRef>>();
 
@@ -60,8 +60,6 @@ fn free_zombie_child(mut parent_inner: SgxMutexGuard<ProcessInner>, zombie_pid: 
     let zombie = parent_inner.remove_zombie_child(zombie_pid);
     debug_assert!(zombie.status() == ProcessStatus::Zombie);
 
-    // Remove zombie from its parent
-
     let zombie_inner = zombie.inner();
-    zombie_inner.exit_status().unwrap()
+    zombie_inner.term_status().unwrap().as_u32() as i32
 }

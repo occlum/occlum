@@ -3,6 +3,7 @@ use super::super::thread::{ThreadBuilder, ThreadId};
 use super::super::{FileTableRef, FsViewRef, ProcessRef, ProcessVMRef, ResourceLimitsRef};
 use super::{Process, ProcessInner};
 use crate::prelude::*;
+use crate::signal::{SigDispositions, SigQueues};
 
 #[derive(Debug)]
 pub struct ProcessBuilder {
@@ -87,11 +88,17 @@ impl ProcessBuilder {
             let exec_path = self.exec_path.take().unwrap_or_default();
             let parent = self.parent.take().map(|parent| SgxRwLock::new(parent));
             let inner = SgxMutex::new(ProcessInner::new());
+            let sig_dispositions = SgxRwLock::new(SigDispositions::new());
+            let sig_queues = SgxMutex::new(SigQueues::new());
+            let forced_exit = SgxRwLock::new(None);
             Arc::new(Process {
                 pid,
                 exec_path,
                 parent,
                 inner,
+                sig_dispositions,
+                sig_queues,
+                forced_exit,
             })
         };
 

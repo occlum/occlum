@@ -60,9 +60,11 @@ int occlum_pal_init(const struct occlum_pal_attr* attr);
  * @param io_fds        The file descriptors of the redirected standard I/O
  *                      (i.e., stdin, stdout, stderr), If set to NULL, will
  *                      use the original standard I/O file descriptors.
- * @param exit_status   Output. The exit status of the command. Note that the
- *                      exit status is returned if and only if the function
- *                      succeeds.
+ * @param exit_status   Output. The exit status of the command. The semantic of
+ *                      this value follows the one described in wait(2) man
+ *                      page. For example, if the program terminated normally,
+ *                      then WEXITSTATUS(exit_status) gives the value returned
+ *                      from a main function.
  *
  * @retval If 0, then success; otherwise, check errno for the exact error type.
  */
