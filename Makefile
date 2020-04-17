@@ -6,20 +6,21 @@ githooks:
 	@find .git/hooks -type l -exec rm {} \; && find .githooks -type f -exec ln -sf ../../{} .git/hooks/ \;
 	@echo "Add Git hooks that check Rust code format issues before commits and pushes"
 
+OCCLUM_GIT_OPTIONS ?=
 GIT_MIN_VERSION := 2.11.0
 GIT_CURRENT_VERSION := $(shell git --version | sed 's/[^0-9.]*//g')
 GIT_NEED_PROGRESS := $(shell /bin/echo -e "$(GIT_MIN_VERSION)\n$(GIT_CURRENT_VERSION)" \
 			| sort -V | head -n1 | grep -q $(GIT_MIN_VERSION) && echo "true" || echo "false")
 # If git version >= min_version, append the `--progress` option to show progress status
 ifeq ($(GIT_NEED_PROGRESS), true)
-	GIT_OPTION := --progress
+	OCCLUM_GIT_OPTIONS += --progress
 else
-	GIT_OPTION :=
+	OCCLUM_GIT_OPTIONS +=
 endif
 
 submodule: githooks
 	git submodule init
-	git submodule update $(GIT_OPTION)
+	git submodule update $(OCCLUM_GIT_OPTIONS)
 	@# Try to apply the patches. If failed, check if the patches are already applied
 	cd deps/rust-sgx-sdk && git apply ../rust-sgx-sdk.patch >/dev/null 2>&1 || git apply ../rust-sgx-sdk.patch -R --check
 	cd deps/serde-json-sgx && git apply ../serde-json-sgx.patch >/dev/null 2>&1 || git apply ../serde-json-sgx.patch -R --check
