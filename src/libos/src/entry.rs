@@ -9,6 +9,7 @@ use std::sync::Once;
 use util::log::LevelFilter;
 use util::mem_util::from_untrusted::*;
 use util::sgx::allow_debug as sgx_allow_debug;
+use sgx_tse::*;
 
 const ENCLAVE_PATH: &'static str = ".occlum/build/lib/libocclum-libos.signed.so";
 
@@ -42,8 +43,13 @@ pub extern "C" fn occlum_ecall_init(log_level: *const c_char) -> i32 {
     INIT_ONCE.call_once(|| {
         // Init the log infrastructure first so that log messages will be printed afterwards
         util::log::init(log_level);
-        // Init MPX for SFI
-        //util::mpx_util::mpx_enable();
+ 
+        // Init MPX for SFI if MPX is available
+        let report = rsgx_self_report();
+        if (report.body.attributes.xfrm & SGX_XFRM_MPX != 0) {
+            util::mpx_util::mpx_enable();
+        }
+
         // Register exception handlers (support cpuid & rdtsc for now)
         register_exception_handlers();
 
