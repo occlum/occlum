@@ -1,5 +1,7 @@
 use super::*;
 
+#[cfg(feature = "cov")]
+mod coverage;
 mod rlimit;
 mod sysinfo;
 mod uname;

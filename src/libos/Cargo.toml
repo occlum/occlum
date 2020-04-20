@@ -35,6 +35,7 @@ integrity_only_opt = [] # Clear bss only. It should be disabled if checking memo
 sgx_file_cache = []     # Cache SgxFile objects. Invalidation is unimplemented.
 sgx1_exception_sim = [] # Simulate #PF and #GP exceptions on SGX 1
 dcap = []               # DCAP support. The compilation relies on DCAP package.
+cov = ["sgx_cov"]       # Enable coverage colletcion.
 
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
 xmas-elf = { path = "../../deps/xmas-elf" }
@@ -43,3 +44,4 @@ sgx_tstd = { path = "../../deps/rust-sgx-sdk/sgx_tstd", features = ["backtrace"]
 sgx_trts = { path = "../../deps/rust-sgx-sdk/sgx_trts" }
 sgx_tse = { path = "../../deps/rust-sgx-sdk/sgx_tse" }
 sgx_tcrypto = { path = "../../deps/rust-sgx-sdk/sgx_tcrypto" }
+sgx_cov = { path = "../../deps/rust-sgx-sdk/sgx_cov", optional = true }
