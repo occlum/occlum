@@ -1,7 +1,7 @@
-From daf3f6e0723c28a34c80cfcc4a4c5595226f3459 Mon Sep 17 00:00:00 2001
+From 1393af9fa81a3c05e09b18210274367cec18b50e Mon Sep 17 00:00:00 2001
 From: "zongmin.gu" <zongmin.gzm@antgroup.com>
 Date: Tue, 15 Sep 2020 13:26:05 +0800
-Subject: [PATCH] Update Rust SDK for Occlum
+Subject: [PATCH 01/10] Update Rust SDK for Occlum
 
 ---
  samplecode/unit-test/enclave/src/lib.rs       |  2 +
@@ -415,6 +415,887 @@ index 05cb12f2..ad639fda 100644
      }
  }
  
+-- 
+2.17.1
+
+
+From 406357a8489093559bccee4f75b244e670d91adb Mon Sep 17 00:00:00 2001
+From: Yu Ding <dingelish@gmail.com>
+Date: Mon, 28 Dec 2020 21:14:55 -0800
+Subject: [PATCH 02/10] fix sgx-cov to be compatible with LLVM 10 profiler API
+
+---
+ samplecode/sgx-cov/Makefile                  |   4 +-
+ samplecode/sgx-cov/enclave/enclave-cov-rustc |   0
+ samplecode/sgx-cov/enclave/llvm-gcov         |   2 +-
+ samplecode/sgx-cov/enclave/src/lib.rs        |   3 +
+ sgx_cov/lib.rs                               | 233 +++++++++++--------
+ 5 files changed, 141 insertions(+), 101 deletions(-)
+ mode change 100644 => 100755 samplecode/sgx-cov/enclave/enclave-cov-rustc
+ mode change 100644 => 100755 samplecode/sgx-cov/enclave/llvm-gcov
+
+diff --git a/samplecode/sgx-cov/Makefile b/samplecode/sgx-cov/Makefile
+index 696112a6..c94092b6 100644
+--- a/samplecode/sgx-cov/Makefile
++++ b/samplecode/sgx-cov/Makefile
+@@ -160,8 +160,8 @@ enclave:
+ 
+ .PHONY: gen_cov_html
+ gen_cov_html:
+-	lcov --gcov-tool $(PWD)/enclave/llvm-gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --capture --directory ${Target_Dir} -o ./all.tag.info
+-	lcov --gcov-tool $(PWD)/enclave/llvm-gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --extract all.tag.info `find "$$(cd enclave/src; pwd)" -name "*.rs"` -o final.info
++	lcov --gcov-tool gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --capture --directory ${Target_Dir} -o ./all.tag.info
++	lcov --gcov-tool gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --extract all.tag.info `find "$$(cd enclave/src; pwd)" -name "*.rs"` -o final.info
+ 	genhtml --branch-coverage --demangle-cpp --legend ./final.info -o ./html/ --ignore-errors source
+ 
+ .PHONY: clean
+diff --git a/samplecode/sgx-cov/enclave/enclave-cov-rustc b/samplecode/sgx-cov/enclave/enclave-cov-rustc
+old mode 100644
+new mode 100755
+diff --git a/samplecode/sgx-cov/enclave/llvm-gcov b/samplecode/sgx-cov/enclave/llvm-gcov
+old mode 100644
+new mode 100755
+index 0191fd3e..d5923e41
+--- a/samplecode/sgx-cov/enclave/llvm-gcov
++++ b/samplecode/sgx-cov/enclave/llvm-gcov
+@@ -1,2 +1,2 @@
+ #!/bin/sh -e
+-llvm-cov gcov $*
+\ No newline at end of file
++llvm-cov gcov $*
+diff --git a/samplecode/sgx-cov/enclave/src/lib.rs b/samplecode/sgx-cov/enclave/src/lib.rs
+index 420a5055..5af1431e 100644
+--- a/samplecode/sgx-cov/enclave/src/lib.rs
++++ b/samplecode/sgx-cov/enclave/src/lib.rs
+@@ -99,5 +99,8 @@ pub extern "C" fn say_something(some_string: *const u8, some_len: usize) -> sgx_
+     // Ocall to normal world for output
+     println!("{}", &hello_string);
+ 
++    #[cfg(feature = "cov")]
++    sgx_cov::cov_writeout();
++
+     sgx_status_t::SGX_SUCCESS
+ }
+diff --git a/sgx_cov/lib.rs b/sgx_cov/lib.rs
+index 34b7dd0d..5a21b517 100644
+--- a/sgx_cov/lib.rs
++++ b/sgx_cov/lib.rs
+@@ -45,9 +45,14 @@ use std::sync::{Once, SgxMutex};
+ use std::untrusted::fs::{copy, File, OpenOptions};
+ 
+ static INIT: Once = Once::new();
++const GCOV_DATA_MAGIC: u32 = 0x6763_6461;
++const GCOV_TAG_FUNCTION: u32 = 0x0100_0000;
++const GCOV_TAG_COUNTER_ARCS: u32 = 0x01a1_0000;
++const GCOV_TAG_OBJECT_SUMMARY: u32 = 0xa100_0000;
++const GCOV_TAG_PROGRAM_SUMMARY: u32 = 0xa300_0000;
+ 
+ lazy_static! {
+-    static ref GCDA_FILE: SgxMutex<c_int> = SgxMutex::new(-1);
++    static ref GCDA_FILE: SgxMutex<(c_int, c_int)> = SgxMutex::new((-1, -1));
+     static ref WROUT_FNS: SgxMutex<Vec<extern "C" fn()>> = SgxMutex::new(Vec::new());
+     static ref RND: SgxMutex<u32> = SgxMutex::new(0);
+ }
+@@ -59,7 +64,11 @@ pub fn cov_writeout() {
+ }
+ 
+ #[no_mangle]
+-pub extern "C" fn llvm_gcov_init(writeout: extern "C" fn(), _flush: extern "C" fn()) {
++pub extern "C" fn llvm_gcov_init(
++    writeout: extern "C" fn(),
++    _flush: extern "C" fn(),
++    _reset: extern "C" fn(),
++) {
+     INIT.call_once(|| {
+         let mut rng = sgx_rand::thread_rng();
+         let mut rnd = RND.lock().unwrap();
+@@ -71,109 +80,89 @@ pub extern "C" fn llvm_gcov_init(writeout: extern "C" fn(), _flush: extern "C" f
+ 
+ #[no_mangle]
+ pub extern "C" fn llvm_gcda_summary_info() {
+-    match GCDA_FILE.lock() {
+-        Ok(fd) => {
+-            let mut file = unsafe { File::from_raw_fd(*fd) };
+-
+-            let summary_tag: u32 = 0xa1;
+-            file.write_all(&summary_tag.to_be_bytes()).unwrap();
+-            let len: u32 = 9;
+-            file.write_all(&len.to_le_bytes()).unwrap();
+-            let zero: u32 = 0;
+-            let one: u32 = 1;
+-            file.write_all(&zero.to_le_bytes()).unwrap();
+-            file.write_all(&zero.to_le_bytes()).unwrap();
+-            file.write_all(&one.to_le_bytes()).unwrap();
+-            for _ in 0..(len - 3) {
+-                file.write_all(&zero.to_le_bytes()).unwrap();
++    GCDA_FILE
++        .lock()
++        .map_or_else(
++            |e| panic!("llvm_gcda_summary_info failed {:?}", e),
++            |tup| Ok((unsafe { File::from_raw_fd(tup.0) }, tup.1)),
++        )
++        .and_then(|(mut file, gcov_version)| {
++            if gcov_version >= 90 {
++                file.write_all(&GCOV_TAG_OBJECT_SUMMARY.to_le_bytes())?;
++                file.write_all(&(2 as u32).to_le_bytes())?;
++                file.write_all(&(1 as u32).to_le_bytes())?; // runs. we never merge so it's always 1
++                file.write_all(&(0 as u32).to_le_bytes())?; // sum_max
++            } else {
++                file.write_all(&GCOV_TAG_PROGRAM_SUMMARY.to_le_bytes())?;
++                file.write_all(&(3 as u32).to_le_bytes())?;
++                file.write_all(&(0 as u32).to_le_bytes())?;
++                file.write_all(&(0 as u32).to_le_bytes())?;
++                file.write_all(&(1 as u32).to_le_bytes())?; // runs. we never merge so it's always 1
+             }
+-            let prog_tag: u32 = 0xa3;
+-            file.write_all(&prog_tag.to_be_bytes()).unwrap();
+-            file.write_all(&zero.to_le_bytes()).unwrap();
+-
+-            // Prevent it from drop
+             let _ = file.into_raw_fd();
+-        }
+-        Err(_) => panic!("llvm_gcda_emit_arcs failed"),
+-    }
++            Ok(())
++        })
++        .unwrap_or_else(|e: std::io::Error| panic!("llvm_gcda_summary_info failed {:?}", e))
+ }
+ 
+ #[no_mangle]
+ pub extern "C" fn llvm_gcda_emit_arcs(num_counters: u32, counters: *const u64) {
++    // we never merge
++    // so `counters` is no longer * mut u64
+     let cnts = unsafe { slice::from_raw_parts(counters, num_counters as usize) };
+-    match GCDA_FILE.lock() {
+-        Ok(fd) => {
+-            let mut file = unsafe { File::from_raw_fd(*fd) };
+ 
+-            let arcs_tag: u32 = 0xa101;
+-            file.write_all(&arcs_tag.to_be_bytes()).unwrap();
++    GCDA_FILE
++        .lock()
++        .map_or_else(
++            |e| panic!("llvm_gcda_emit_arcs failed {:?}", e),
++            |tup| Ok(unsafe { File::from_raw_fd(tup.0) }),
++        )
++        .and_then(|mut file| {
++            file.write_all(&GCOV_TAG_COUNTER_ARCS.to_le_bytes())?;
+             let len: u32 = num_counters * 2;
+-            file.write_all(&len.to_le_bytes()).unwrap();
+-            for i in 0..num_counters {
+-                file.write_all(&cnts[i as usize].to_le_bytes()).unwrap();
++            file.write_all(&len.to_le_bytes())?;
++            for c in cnts {
++                file.write_all(&c.to_le_bytes())?;
+             }
+-
+-            // Prevent it from drop
+             let _ = file.into_raw_fd();
+-        }
+-        Err(_) => panic!("llvm_gcda_emit_arcs failed"),
+-    }
++            Ok(())
++        })
++        .unwrap_or_else(|e: std::io::Error| panic!("llvm_gcda_emit_arcs failed {:?}", e))
+ }
+ 
+ #[no_mangle]
+-pub extern "C" fn llvm_gcda_emit_function(
+-    ident: u32,
+-    raw_func_name: *const c_char,
+-    fchecksum: u32,
+-    use_extra_checksum: u8,
+-    cfg_checksum: u32,
+-) {
+-    let func_name_str: &CStr = unsafe { CStr::from_ptr(raw_func_name) };
+-    let func_name = func_name_str.to_str().unwrap();
++pub extern "C" fn llvm_gcda_emit_function(ident: u32, func_checksum: u32, cfg_checksum: u32) {
+     let mut len: u32 = 2;
+-    if use_extra_checksum != 0 {
++    let use_extra_checksum: bool = GCDA_FILE.lock().map(|tup| tup.1 >= 47).unwrap();
++
++    if use_extra_checksum {
+         len += 1;
+     }
+-    let str_len = (1 + func_name.len() / 4) as u32;
+-    len += str_len;
+-
+-    match GCDA_FILE.lock() {
+-        Ok(fd) => {
+-            let mut file = unsafe { File::from_raw_fd(*fd) };
+-
+-            let func_tag: u32 = 1;
+-            file.write_all(&func_tag.to_be_bytes()).unwrap();
+-            file.write_all(&len.to_le_bytes()).unwrap();
+-            file.write_all(&ident.to_le_bytes()).unwrap();
+-            file.write_all(&fchecksum.to_le_bytes()).unwrap();
+-            if use_extra_checksum != 0 {
+-                file.write_all(&cfg_checksum.to_le_bytes()).unwrap();
+-            }
+-            file.write_all(&str_len.to_le_bytes()).unwrap();
+-            file.write_all(func_name.as_bytes()).unwrap();
+ 
+-            let zero: u8 = 0;
+-            let padding_size = 4 - func_name.len() % 4;
+-            for _ in 0..padding_size {
+-                file.write_all(&zero.to_le_bytes()).unwrap();
++    GCDA_FILE
++        .lock()
++        .map_or_else(
++            |e| panic!("llvm_gcda_emit_function failed {:?}", e),
++            |tup| Ok(unsafe { File::from_raw_fd(tup.0) }),
++        )
++        .and_then(|mut file| {
++            file.write_all(&GCOV_TAG_FUNCTION.to_le_bytes())?;
++            file.write_all(&len.to_le_bytes())?;
++            file.write_all(&ident.to_le_bytes())?;
++            file.write_all(&func_checksum.to_le_bytes())?;
++            if use_extra_checksum {
++                file.write_all(&cfg_checksum.to_le_bytes())?;
+             }
+-
+-            // Prevent it from drop
+             let _ = file.into_raw_fd();
+-        }
+-        Err(_) => panic!("llvm_gcda_emit_function failed"),
+-    }
++            Ok(())
++        })
++        .unwrap_or_else(|e: std::io::Error| panic!("llvm_gcda_emit_function failed {:?}", e))
+ }
+ 
+ #[no_mangle]
+-pub extern "C" fn llvm_gcda_start_file(
+-    raw_file_name: *const c_char,
+-    ver: *const u8,
+-    checksum: u32,
+-) {
+-    let file_name_str: &CStr = unsafe { CStr::from_ptr(raw_file_name) };
++pub extern "C" fn llvm_gcda_start_file(orig_filename: *const c_char, version: u32, checksum: u32) {
++    let file_name_str: &CStr = unsafe { CStr::from_ptr(orig_filename) };
+     let file_name = file_name_str.to_str().unwrap();
+-    let version = unsafe { slice::from_raw_parts(ver, 4) };
+ 
+     let mut prefix = String::from(file_name);
+     prefix.truncate(file_name.len() - 5);
+@@ -182,35 +171,83 @@ pub extern "C" fn llvm_gcda_start_file(
+     let new_gcno_name = format!("{}.{:08x}.gcno", prefix, *rnd);
+     let new_gcda_name = format!("{}.{:08x}.gcda", prefix, *rnd);
+ 
+-    match GCDA_FILE.lock() {
+-        Ok(mut fd) => {
+-            copy(orig_gcno_name, new_gcno_name).unwrap();
++    GCDA_FILE
++        .lock()
++        .map_or_else(
++            |e| panic!("llvm_gcda_emit_function failed {:?}", e),
++            |tup| Ok(tup),
++        )
++        .and_then(|mut tup| {
++            copy(orig_gcno_name, new_gcno_name)?;
+             let mut file = match OpenOptions::new()
+                 .write(true)
+                 .append(false)
+                 .open(&new_gcda_name)
+             {
+                 Ok(file) => file,
+-                Err(_) => File::create(&new_gcda_name).unwrap(),
++                Err(_) => File::create(&new_gcda_name)?,
++            };
++
++            let c3: u8 = ((version >> 24) & 0x000000FF) as u8;
++            let c2: u8 = ((version >> 16) & 0x000000FF) as u8;
++            let c1: u8 = ((version >> 8) & 0x000000FF) as u8;
++            let parsed_gcov_version: i32 = if c3 >= 'A' as u8 {
++                ((c3 - 'A' as u8) as i32) * 100
++                    + ((c2 - '0' as u8) as i32) * 10
++                    + (c1 - '0' as u8) as i32
++            } else {
++                ((c3 - '0' as u8) as i32) * 10 + (c1 - '0' as u8) as i32
+             };
+-            file.write_all(b"adcg").unwrap();
+-            file.write_all(version).unwrap();
++
++            tup.1 = parsed_gcov_version;
++
++            file.write_all(&GCOV_DATA_MAGIC.to_le_bytes()).unwrap();
++            file.write_all(&parsed_gcov_version.to_le_bytes()).unwrap();
+             file.write_all(&checksum.to_le_bytes()).unwrap();
+-            *fd = file.into_raw_fd();
+-        }
+-        Err(_) => panic!("llvm_gcda_start_file failed!"),
+-    }
++
++            tup.0 = file.into_raw_fd();
++
++            Ok(())
++        })
++        .unwrap_or_else(|e: std::io::Error| panic!("llvm_gcda_start_file failed {:?}", e))
+ }
+ 
+ #[no_mangle]
+ pub extern "C" fn llvm_gcda_end_file() {
+-    match GCDA_FILE.lock() {
+-        Ok(fd) => {
+-            let mut file = unsafe { File::from_raw_fd(*fd) };
+-            let eof: u64 = 0;
+-            file.write_all(&eof.to_be_bytes()).unwrap();
+-            // Let it drop
++    if let Ok(ref tup) = GCDA_FILE.lock() {
++        let fd = &tup.0;
++        let mut file = unsafe { File::from_raw_fd(*fd) };
++        let eof: u64 = 0;
++        file.write_all(&eof.to_be_bytes()).unwrap();
++    // Let it drop
++    } else {
++        panic!("llvm_gcda_end_file failed!");
++    }
++}
++
++#[no_mangle]
++pub extern "C" fn llvm_gcda_increment_indirect_counter(
++    predecessor: *mut u32,
++    counters: *mut *mut u64,
++) {
++    let counter: *mut u64;
++    let pred: u32;
++
++    if predecessor.is_null() || counters.is_null() {
++        return;
++    }
++
++    pred = unsafe { *predecessor };
++
++    if pred == 0xFFFF_FFFF {
++        return;
++    }
++
++    counter = unsafe { *counters.offset(pred as isize) };
++
++    if !counter.is_null() {
++        unsafe {
++            *counter = *counter + 1;
+         }
+-        Err(_) => panic!("llvm_gcda_end_file failed!"),
+     }
+ }
+-- 
+2.17.1
+
+
+From 5e0ec46d351457bf4f4bf8396a350490e898f422 Mon Sep 17 00:00:00 2001
+From: Yu Ding <dingelish@gmail.com>
+Date: Mon, 28 Dec 2020 22:20:12 -0800
+Subject: [PATCH 03/10] Update readme. add gcov version requirement
+
+---
+ samplecode/sgx-cov/Readme.md | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/samplecode/sgx-cov/Readme.md b/samplecode/sgx-cov/Readme.md
+index 7a4ee2b6..be4d1017 100644
+--- a/samplecode/sgx-cov/Readme.md
++++ b/samplecode/sgx-cov/Readme.md
+@@ -1,6 +1,9 @@
+ # SGX Code Coverage Support
+ 
+-Prerequisite: lcov. Install via `sudo apt-get install lcov`
++Prerequisite:
++
++- lcov. Install via `sudo apt-get install lcov`
++- gcov <= 7. Install gcc `sudo apt-get install gcc`. If your platform canot install gcov <=7, you can use another platform to analyze the generated `gcno` and `gcda` files. Ubuntu 18.04 has gcc-7 by default.
+ 
+ ## One shot
+ 
+-- 
+2.17.1
+
+
+From ca9a47dee9cc8bfef796d8c6cccc1ef3ad3db171 Mon Sep 17 00:00:00 2001
+From: Yu Ding <dingelish@gmail.com>
+Date: Tue, 29 Dec 2020 14:51:41 -0800
+Subject: [PATCH 04/10] temp fail cannot find final.info
+
+---
+ samplecode/sgx-cov/Makefile           |  4 +-
+ samplecode/sgx-cov/enclave/llvm-gcov  | 58 ++++++++++++++++++++++++++-
+ samplecode/sgx-cov/enclave/src/lib.rs |  3 --
+ sgx_cov/lib.rs                        | 18 +++++----
+ 4 files changed, 71 insertions(+), 12 deletions(-)
+
+diff --git a/samplecode/sgx-cov/Makefile b/samplecode/sgx-cov/Makefile
+index c94092b6..fabc5ebc 100644
+--- a/samplecode/sgx-cov/Makefile
++++ b/samplecode/sgx-cov/Makefile
+@@ -160,8 +160,10 @@ enclave:
+ 
+ .PHONY: gen_cov_html
+ gen_cov_html:
++	#lcov --gcov-tool $(PWD)/enclave/llvm-gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --capture --directory ${Target_Dir} -o ./all.tag.info
++	#lcov --gcov-tool $(PWD)/enclave/llvm-gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --capture --directory ${Target_Dir} -o ./all.tag.info
++	lcov --gcov-tool gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --capture --directory ${Target_Dir} -o ./all.tag.info
+ 	lcov --gcov-tool gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --capture --directory ${Target_Dir} -o ./all.tag.info
+-	lcov --gcov-tool gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --extract all.tag.info `find "$$(cd enclave/src; pwd)" -name "*.rs"` -o final.info
+ 	genhtml --branch-coverage --demangle-cpp --legend ./final.info -o ./html/ --ignore-errors source
+ 
+ .PHONY: clean
+diff --git a/samplecode/sgx-cov/enclave/llvm-gcov b/samplecode/sgx-cov/enclave/llvm-gcov
+index d5923e41..647cae96 100755
+--- a/samplecode/sgx-cov/enclave/llvm-gcov
++++ b/samplecode/sgx-cov/enclave/llvm-gcov
+@@ -1,2 +1,58 @@
+ #!/bin/sh -e
+-llvm-cov gcov $*
++##!/usr/bin/env bash
++
++#LLVM_COV=""
++#
++#verlte() {
++#    [  "$1" = "`echo -e "$1\n$2" | sort -V | head -n1`" ]
++#}
++#
++#verlt() {
++#    [ "$1" = "$2" ] && return 1 || verlte $1 $2
++#}
++#
++#check_llvm_cov() {
++#    if [ -z `which $1` ];
++#    then
++#        return
++#    else
++#        p=$(which $1)
++#        verinfo=`${p} --version`
++#        first_word=$(echo ${verinfo} | awk "{ print \$1 }")
++#        gcov_ver=$(echo ${verinfo} | awk "{ print \$4 }")
++#        llvm_cov_ver=$(echo ${verinfo} | awk "{ print \$5 }")
++#
++#        if [ "$first_word" = "gcov" ]; then
++#            echo "gcov detected, ver = " ${gcov_ver}
++#            verlt "${gcov_ver}" "8.0.0" && LLVM_COV=$1 || LLVM_COV=""
++#            return
++#        elif [ "$first_word" = "LLVM" ]; then
++#            echo "llvm-cov detected, ver = " ${llvm_cov_ver}
++#            verlte "11.0.0" "${gcov_ver}" && LLVM_COV=$1 || LLVM_COV=""
++#            return
++#        else
++#            echo "neither llvm-cov or gcov ... skipping"
++#            return
++#        fi
++#    fi
++#}
++#
++## search priority
++##for c in "llvm-cov-11" "gcov" "llvm-cov" "gcov-7"
++#for c in "gcov-7"
++#do
++#    check_llvm_cov $c
++#    if [[ ! -z "${LLVM_COV}" ]];
++#    then
++#        break
++#    fi
++#done
++#
++#if [[ -z "${LLVM_COV}" ]];
++#then
++#    echo "You need gcov < 8.0, or llvm-cov >= 11.0 to analyze Rust generated gcno/gcda files!"
++#    exit 1
++#fi
++
++#${LLVM_COV} gcov $*
++llvm-cov-11 gcov $*
+diff --git a/samplecode/sgx-cov/enclave/src/lib.rs b/samplecode/sgx-cov/enclave/src/lib.rs
+index 5af1431e..420a5055 100644
+--- a/samplecode/sgx-cov/enclave/src/lib.rs
++++ b/samplecode/sgx-cov/enclave/src/lib.rs
+@@ -99,8 +99,5 @@ pub extern "C" fn say_something(some_string: *const u8, some_len: usize) -> sgx_
+     // Ocall to normal world for output
+     println!("{}", &hello_string);
+ 
+-    #[cfg(feature = "cov")]
+-    sgx_cov::cov_writeout();
+-
+     sgx_status_t::SGX_SUCCESS
+ }
+diff --git a/sgx_cov/lib.rs b/sgx_cov/lib.rs
+index 5a21b517..fdf19f32 100644
+--- a/sgx_cov/lib.rs
++++ b/sgx_cov/lib.rs
+@@ -52,7 +52,7 @@ const GCOV_TAG_OBJECT_SUMMARY: u32 = 0xa100_0000;
+ const GCOV_TAG_PROGRAM_SUMMARY: u32 = 0xa300_0000;
+ 
+ lazy_static! {
+-    static ref GCDA_FILE: SgxMutex<(c_int, c_int)> = SgxMutex::new((-1, -1));
++    static ref GCDA_FILE: SgxMutex<(c_int, u32)> = SgxMutex::new((-1, u32::MAX));
+     static ref WROUT_FNS: SgxMutex<Vec<extern "C" fn()>> = SgxMutex::new(Vec::new());
+     static ref RND: SgxMutex<u32> = SgxMutex::new(0);
+ }
+@@ -188,21 +188,25 @@ pub extern "C" fn llvm_gcda_start_file(orig_filename: *const c_char, version: u3
+                 Err(_) => File::create(&new_gcda_name)?,
+             };
+ 
++            println!("opened file {}", new_gcda_name);
++
+             let c3: u8 = ((version >> 24) & 0x000000FF) as u8;
+             let c2: u8 = ((version >> 16) & 0x000000FF) as u8;
+             let c1: u8 = ((version >> 8) & 0x000000FF) as u8;
+-            let parsed_gcov_version: i32 = if c3 >= 'A' as u8 {
+-                ((c3 - 'A' as u8) as i32) * 100
+-                    + ((c2 - '0' as u8) as i32) * 10
+-                    + (c1 - '0' as u8) as i32
++            let parsed_gcov_version: u32 = if c3 >= 'A' as u8 {
++                ((c3 - 'A' as u8) as u32) * 100
++                    + ((c2 - '0' as u8) as u32) * 10
++                    + (c1 - '0' as u8) as u32
+             } else {
+-                ((c3 - '0' as u8) as i32) * 10 + (c1 - '0' as u8) as i32
++                ((c3 - '0' as u8) as u32) * 10 + (c1 - '0' as u8) as u32
+             };
++            println!("parsed_gcov_version = {}", parsed_gcov_version);
++            println!("parsed_gcov_version = {:?}", &parsed_gcov_version.to_le_bytes());
+ 
+             tup.1 = parsed_gcov_version;
+ 
+             file.write_all(&GCOV_DATA_MAGIC.to_le_bytes()).unwrap();
+-            file.write_all(&parsed_gcov_version.to_le_bytes()).unwrap();
++            file.write_all(&version.to_le_bytes()).unwrap();
+             file.write_all(&checksum.to_le_bytes()).unwrap();
+ 
+             tup.0 = file.into_raw_fd();
+-- 
+2.17.1
+
+
+From 85e16fc192608559f0743f509b83171b96abad40 Mon Sep 17 00:00:00 2001
+From: Yu Ding <dingelish@gmail.com>
+Date: Tue, 29 Dec 2020 16:23:11 -0800
+Subject: [PATCH 05/10] cov: fix Makefile and support llvm-cov-12
+
+---
+ samplecode/sgx-cov/Makefile          |   7 +-
+ samplecode/sgx-cov/Readme.md         |  15 +++-
+ samplecode/sgx-cov/enclave/llvm-gcov | 113 +++++++++++++--------------
+ 3 files changed, 71 insertions(+), 64 deletions(-)
+
+diff --git a/samplecode/sgx-cov/Makefile b/samplecode/sgx-cov/Makefile
+index fabc5ebc..7c0c08f2 100644
+--- a/samplecode/sgx-cov/Makefile
++++ b/samplecode/sgx-cov/Makefile
+@@ -160,10 +160,9 @@ enclave:
+ 
+ .PHONY: gen_cov_html
+ gen_cov_html:
+-	#lcov --gcov-tool $(PWD)/enclave/llvm-gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --capture --directory ${Target_Dir} -o ./all.tag.info
+-	#lcov --gcov-tool $(PWD)/enclave/llvm-gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --capture --directory ${Target_Dir} -o ./all.tag.info
+-	lcov --gcov-tool gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --capture --directory ${Target_Dir} -o ./all.tag.info
+-	lcov --gcov-tool gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --capture --directory ${Target_Dir} -o ./all.tag.info
++	lcov --gcov-tool $(PWD)/enclave/llvm-gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --capture --directory ${Target_Dir} -o ./all.tag.info
++	lcov --gcov-tool $(PWD)/enclave/llvm-gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --capture --directory ${Target_Dir} -o ./all.tag.info
++	lcov --gcov-tool $(PWD)/enclave/llvm-gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --extract all.tag.info `find "$$(cd enclave/src; pwd)" -name "*.rs"` -o final.info
+ 	genhtml --branch-coverage --demangle-cpp --legend ./final.info -o ./html/ --ignore-errors source
+ 
+ .PHONY: clean
+diff --git a/samplecode/sgx-cov/Readme.md b/samplecode/sgx-cov/Readme.md
+index be4d1017..005af3b6 100644
+--- a/samplecode/sgx-cov/Readme.md
++++ b/samplecode/sgx-cov/Readme.md
+@@ -2,8 +2,19 @@
+ 
+ Prerequisite:
+ 
+-- lcov. Install via `sudo apt-get install lcov`
+-- gcov <= 7. Install gcc `sudo apt-get install gcc`. If your platform canot install gcov <=7, you can use another platform to analyze the generated `gcno` and `gcda` files. Ubuntu 18.04 has gcc-7 by default.
++1. `lcov`. Install via `sudo apt-get install lcov`
++
++2. Either of `gcov <= 7`, or `llvm-cov >= 11`
++- `gcov <= 7`. Install gcc `sudo apt-get install gcc`.
++- `llvm-cov >= 11`. You can either install using apt/yum/dnf, or the official LLVM installation script:
++
++```
++wget https://apt.llvm.org/llvm.sh
++chmod +x llvm.sh
++sudo ./llvm.sh 11
++```
++
++If your platform cannot install either of them, you can use another platform to analyze the generated `gcno` and `gcda` files. Ubuntu 18.04 has gcc-7 by default, and can install llvm 11 using the above script.
+ 
+ ## One shot
+ 
+diff --git a/samplecode/sgx-cov/enclave/llvm-gcov b/samplecode/sgx-cov/enclave/llvm-gcov
+index 647cae96..8fd17380 100755
+--- a/samplecode/sgx-cov/enclave/llvm-gcov
++++ b/samplecode/sgx-cov/enclave/llvm-gcov
+@@ -1,58 +1,55 @@
+-#!/bin/sh -e
+-##!/usr/bin/env bash
+-
+-#LLVM_COV=""
+-#
+-#verlte() {
+-#    [  "$1" = "`echo -e "$1\n$2" | sort -V | head -n1`" ]
+-#}
+-#
+-#verlt() {
+-#    [ "$1" = "$2" ] && return 1 || verlte $1 $2
+-#}
+-#
+-#check_llvm_cov() {
+-#    if [ -z `which $1` ];
+-#    then
+-#        return
+-#    else
+-#        p=$(which $1)
+-#        verinfo=`${p} --version`
+-#        first_word=$(echo ${verinfo} | awk "{ print \$1 }")
+-#        gcov_ver=$(echo ${verinfo} | awk "{ print \$4 }")
+-#        llvm_cov_ver=$(echo ${verinfo} | awk "{ print \$5 }")
+-#
+-#        if [ "$first_word" = "gcov" ]; then
+-#            echo "gcov detected, ver = " ${gcov_ver}
+-#            verlt "${gcov_ver}" "8.0.0" && LLVM_COV=$1 || LLVM_COV=""
+-#            return
+-#        elif [ "$first_word" = "LLVM" ]; then
+-#            echo "llvm-cov detected, ver = " ${llvm_cov_ver}
+-#            verlte "11.0.0" "${gcov_ver}" && LLVM_COV=$1 || LLVM_COV=""
+-#            return
+-#        else
+-#            echo "neither llvm-cov or gcov ... skipping"
+-#            return
+-#        fi
+-#    fi
+-#}
+-#
+-## search priority
+-##for c in "llvm-cov-11" "gcov" "llvm-cov" "gcov-7"
+-#for c in "gcov-7"
+-#do
+-#    check_llvm_cov $c
+-#    if [[ ! -z "${LLVM_COV}" ]];
+-#    then
+-#        break
+-#    fi
+-#done
+-#
+-#if [[ -z "${LLVM_COV}" ]];
+-#then
+-#    echo "You need gcov < 8.0, or llvm-cov >= 11.0 to analyze Rust generated gcno/gcda files!"
+-#    exit 1
+-#fi
+-
+-#${LLVM_COV} gcov $*
+-llvm-cov-11 gcov $*
++#!/usr/bin/env bash
++
++LLVM_COV=""
++
++verlte() {
++    [  "$1" = "`echo -e "$1\n$2" | sort -V | head -n1`" ]
++}
++
++verlt() {
++    [ "$1" = "$2" ] && return 1 || verlte $1 $2
++}
++
++check_llvm_cov() {
++    if [ -z `which $1` ];
++    then
++        return
++    else
++        p=$(which $1)
++        verinfo=`${p} --version`
++        first_word=$(echo ${verinfo} | awk "{ print \$1 }")
++        gcov_ver=$(echo ${verinfo} | awk "{ print \$4 }")
++        llvm_cov_ver=$(echo ${verinfo} | awk "{ print \$5 }")
++
++        if [ "$first_word" = "gcov" ]; then
++            echo "gcov detected, ver = " ${gcov_ver}
++            verlt "${gcov_ver}" "8.0.0" && LLVM_COV=$1 || LLVM_COV=""
++            return
++        elif [ "$first_word" = "LLVM" ]; then
++            echo "llvm-cov detected, ver = " ${llvm_cov_ver}
++            verlte "11.0.0" "${gcov_ver}" && LLVM_COV="$1 gcov" || LLVM_COV=""
++            return
++        else
++            echo "neither llvm-cov or gcov ... skipping"
++            return
++        fi
++    fi
++}
++
++# search priority
++for c in "llvm-cov-11" "gcov-7" "llvm-cov" "gcov"
++do
++    check_llvm_cov $c
++    if [[ ! -z "${LLVM_COV}" ]];
++    then
++        break
++    fi
++done
++
++if [[ -z "${LLVM_COV}" ]];
++then
++    echo "You need gcov < 8.0, or llvm-cov >= 11.0 to analyze Rust generated gcno/gcda files! See Readme.md for more details."
++    exit 1
++fi
++
++${LLVM_COV} $*
+-- 
+2.17.1
+
+
+From eba5bdb71809318c22e1adfe4dd0d29f94f5485b Mon Sep 17 00:00:00 2001
+From: Yu Ding <dingelish@gmail.com>
+Date: Tue, 29 Dec 2020 16:47:31 -0800
+Subject: [PATCH 06/10] cov: remove redundent line
+
+---
+ samplecode/sgx-cov/Makefile | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/samplecode/sgx-cov/Makefile b/samplecode/sgx-cov/Makefile
+index 7c0c08f2..696112a6 100644
+--- a/samplecode/sgx-cov/Makefile
++++ b/samplecode/sgx-cov/Makefile
+@@ -160,7 +160,6 @@ enclave:
+ 
+ .PHONY: gen_cov_html
+ gen_cov_html:
+-	lcov --gcov-tool $(PWD)/enclave/llvm-gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --capture --directory ${Target_Dir} -o ./all.tag.info
+ 	lcov --gcov-tool $(PWD)/enclave/llvm-gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --capture --directory ${Target_Dir} -o ./all.tag.info
+ 	lcov --gcov-tool $(PWD)/enclave/llvm-gcov --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --extract all.tag.info `find "$$(cd enclave/src; pwd)" -name "*.rs"` -o final.info
+ 	genhtml --branch-coverage --demangle-cpp --legend ./final.info -o ./html/ --ignore-errors source
+-- 
+2.17.1
+
+
+From 328ea375fb0cd1bf6b83a6e4f38d0fbbc261bd09 Mon Sep 17 00:00:00 2001
+From: Yu Ding <dingelish@gmail.com>
+Date: Tue, 29 Dec 2020 16:49:10 -0800
+Subject: [PATCH 07/10] cov: remove redundent line
+
+---
+ sgx_cov/lib.rs | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/sgx_cov/lib.rs b/sgx_cov/lib.rs
+index fdf19f32..8b1565eb 100644
+--- a/sgx_cov/lib.rs
++++ b/sgx_cov/lib.rs
+@@ -188,8 +188,6 @@ pub extern "C" fn llvm_gcda_start_file(orig_filename: *const c_char, version: u3
+                 Err(_) => File::create(&new_gcda_name)?,
+             };
+ 
+-            println!("opened file {}", new_gcda_name);
+-
+             let c3: u8 = ((version >> 24) & 0x000000FF) as u8;
+             let c2: u8 = ((version >> 16) & 0x000000FF) as u8;
+             let c1: u8 = ((version >> 8) & 0x000000FF) as u8;
+@@ -200,8 +198,6 @@ pub extern "C" fn llvm_gcda_start_file(orig_filename: *const c_char, version: u3
+             } else {
+                 ((c3 - '0' as u8) as u32) * 10 + (c1 - '0' as u8) as u32
+             };
+-            println!("parsed_gcov_version = {}", parsed_gcov_version);
+-            println!("parsed_gcov_version = {:?}", &parsed_gcov_version.to_le_bytes());
+ 
+             tup.1 = parsed_gcov_version;
+ 
+-- 
+2.17.1
+
+
+From 9ba64839ca3bb853d6d6c09cf5616e416ccecfbe Mon Sep 17 00:00:00 2001
+From: Yu Ding <dingelish@gmail.com>
+Date: Tue, 29 Dec 2020 17:16:20 -0800
+Subject: [PATCH 08/10] cov: improve Readme
+
+---
+ samplecode/sgx-cov/Readme.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/samplecode/sgx-cov/Readme.md b/samplecode/sgx-cov/Readme.md
+index 005af3b6..984b5be9 100644
+--- a/samplecode/sgx-cov/Readme.md
++++ b/samplecode/sgx-cov/Readme.md
+@@ -5,7 +5,7 @@ Prerequisite:
+ 1. `lcov`. Install via `sudo apt-get install lcov`
+ 
+ 2. Either of `gcov <= 7`, or `llvm-cov >= 11`
+-- `gcov <= 7`. Install gcc `sudo apt-get install gcc`.
++- `gcov <= 7`. Install gcc `sudo apt-get install gcc`. For more information around managing multiple gcc/toolchains, please refer to [this article](https://linuxize.com/post/how-to-install-gcc-compiler-on-ubuntu-18-04/).
+ - `llvm-cov >= 11`. You can either install using apt/yum/dnf, or the official LLVM installation script:
+ 
+ ```
+-- 
+2.17.1
+
+
+From 96209ccc4c7561b0c6963593631076c1e11e2834 Mon Sep 17 00:00:00 2001
+From: volcano <volcano_dr@163.com>
+Date: Wed, 30 Dec 2020 14:06:32 +0800
+Subject: [PATCH 09/10] Add profile settings in the Cargo.toml
+
+---
+ samplecode/sgx-cov/enclave/Cargo.toml | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/samplecode/sgx-cov/enclave/Cargo.toml b/samplecode/sgx-cov/enclave/Cargo.toml
+index 31499de8..9cd5c371 100644
+--- a/samplecode/sgx-cov/enclave/Cargo.toml
++++ b/samplecode/sgx-cov/enclave/Cargo.toml
+@@ -7,6 +7,12 @@ authors = ["The Teaclave Authors"]
+ name = "sgxcovenclave"
+ crate-type = ["staticlib"]
+ 
++[profile.dev]
++panic = "abort"
++
++[profile.release]
++panic = "abort"
++
+ [features]
+ default = []
+ cov = ["sgx_cov"]
+-- 
+2.17.1
+
+
+From cf080174571ff69cbaeb57c732f7be85fffdbbd4 Mon Sep 17 00:00:00 2001
+From: He Sun <bochang.sh@antgroup.com>
+Date: Thu, 7 Jan 2021 10:54:19 +0800
+Subject: [PATCH 10/10] Remove dependencies on thread-local storage
+
+The TLS of Rust SGX SDK enforces a bound TCSPolicy. Occlum uses the
+ubound policy. Using the TLS causes panic in occlum.
+---
+ sgx_cov/Cargo.toml | 1 +
+ sgx_cov/lib.rs     | 5 +++--
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/sgx_cov/Cargo.toml b/sgx_cov/Cargo.toml
+index 2f3a06de..d752a20d 100644
+--- a/sgx_cov/Cargo.toml
++++ b/sgx_cov/Cargo.toml
+@@ -20,3 +20,4 @@ profiler_builtins = { git = "https://github.com/mesalock-linux/sgx-fake-profiler
+ sgx_types   = { path = "../sgx_types" }
+ sgx_tstd    = { path = "../sgx_tstd" }
+ sgx_rand    = { path = "../sgx_rand" }
++sgx_trts    = { path = "../sgx_trts" }
+diff --git a/sgx_cov/lib.rs b/sgx_cov/lib.rs
+index 8b1565eb..30bb31c5 100644
+--- a/sgx_cov/lib.rs
++++ b/sgx_cov/lib.rs
+@@ -70,9 +70,10 @@ pub extern "C" fn llvm_gcov_init(
+     _reset: extern "C" fn(),
+ ) {
+     INIT.call_once(|| {
+-        let mut rng = sgx_rand::thread_rng();
++        let mut rand_buf: [u8; 4] = [0; 4];
++        sgx_trts::trts::rsgx_read_rand(&mut rand_buf).unwrap();
+         let mut rnd = RND.lock().unwrap();
+-        *rnd = rng.gen();
++        *rnd = u32::from_le_bytes(rand_buf);
+     });
+     let mut writeout_fns = WROUT_FNS.lock().unwrap();
+     writeout_fns.push(writeout);
 -- 
 2.17.1
 

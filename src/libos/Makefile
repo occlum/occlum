@@ -91,8 +91,7 @@ _Other_Enclave_Libs += -lsgx_dcap_tvl
 endif
 LINK_FLAGS := $(SGX_LFLAGS_T)
 
-.PHONY: all clean format format-c format-rust format-check format-check-c format-check-rust
-
+.PHONY: all clean format format-c format-rust format-check format-check-c format-check-rust gen_cov_report
 all: $(ALL_BUILD_SUBDIRS) $(LIBOS_SO_REAL)
 
 $(ALL_BUILD_SUBDIRS):
@@ -121,10 +120,24 @@ ifndef OCCLUM_DISABLE_DCAP
     LIBOS_FEATURES += dcap
 endif
 
+ifneq ($(OCCLUM_COV),)
+    LIBOS_FEATURES += cov
+    COV_FLAGS += "-Zprofile -Ccodegen-units=1 \
+        -Cllvm_args=-inline-threshold=0 -Clink-dead-code \
+        -Coverflow-checks=off -Cpanic=abort"
+endif
+
+# Release build is for production use. We enable code coverage only for debug
+# build.  It also simplifies the implementation as the release and debug build
+# have different output paths.
 ifeq ($(OCCLUM_RELEASE_BUILD), 1)
 $(LIBOS_CORE_RS_A): $(RUST_SRCS)
 	@RUSTC_BOOTSTRAP=1 RUSTC_WRAPPER=$(RUSTC_WRAPPER) cargo build --release --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR) --features "$(LIBOS_FEATURES)"
 	@echo "CARGO (release) => $@"
+else ifneq ($(OCCLUM_COV),)
+$(LIBOS_CORE_RS_A): $(RUST_SRCS)
+	@CARGO_INCREMENTAL=0 RUSTC_BOOTSTRAP=1 RUSTFLAGS=$(COV_FLAGS) cargo build --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR) --features "$(LIBOS_FEATURES)"
+	@echo "CARGO (debug + cov) => $@"
 else
 $(LIBOS_CORE_RS_A): $(RUST_SRCS)
 	@RUSTC_BOOTSTRAP=1 RUSTC_WRAPPER=$(RUSTC_WRAPPER) cargo build --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR) --features "$(LIBOS_FEATURES)"
@@ -167,6 +180,22 @@ format-check-c: $(C_SRCS) $(CXX_SRCS)
 format-check-rust: $(RUST_SRCS)
 	@$(call format-check-rust)
 
+COV_TARGET_DIR := $(RUST_TARGET_DIR)/debug/deps
+DEPS_DIR := $(shell pwd)/../../deps
+LLVM_GCOV := $(DEPS_DIR)/rust-sgx-sdk/samplecode/sgx-cov/enclave/llvm-gcov
+ALL_TAG_INFO := all.tag.info
+FINAL_INFO := final.info
+COV_REPORT := cov_report
+
+gen_cov_report:
+	# The path of the rust source code is relative in .d file, so gcov will
+	# look for the source code under COV_TARGET_DIR.
+	ln -sf $(shell pwd)/src $(COV_TARGET_DIR)/src
+	lcov --gcov-tool $(LLVM_GCOV) --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --exclude 'occlum/deps' --capture --directory ${COV_TARGET_DIR} -o $(ALL_TAG_INFO)
+	lcov --gcov-tool $(LLVM_GCOV) --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --extract $(ALL_TAG_INFO) `find -L $(COV_TARGET_DIR) -name *.rs` -o $(FINAL_INFO)
+	genhtml --branch-coverage --demangle-cpp --legend $(FINAL_INFO) -o $(COV_REPORT) --ignore-errors source
+
 clean:
 	@-$(RM) -rf $(OBJ_DIR)/libos
 	@-$(RM) -f $(LIBOS_SO_REAL)
+	@-$(RM) -rf $(ALL_TAG_INFO) $(FINAL_INFO) $(COV_REPORT)
