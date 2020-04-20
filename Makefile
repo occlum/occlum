@@ -1,4 +1,4 @@
-.PHONY: all submodule githooks src test tools install format format-check clean
+.PHONY: all submodule githooks src test tools install format format-check gen_cov_report clean
 
 all: src
 
@@ -113,6 +113,9 @@ format-check:
 	@$(MAKE) --no-print-directory -C test format-check
 	@$(MAKE) --no-print-directory -C tools format-check
 	@$(MAKE) --no-print-directory -C src format-check
+
+gen_cov_report:
+	@$(MAKE) --no-print-directory -C src gen_cov_report
 
 clean:
 	@$(MAKE) --no-print-directory -C src clean
