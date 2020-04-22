@@ -233,7 +233,8 @@ impl UnixSocket {
         }
         let obj = UnixSocketObject::get(path)
             .ok_or_else(|| errno!(EINVAL, "unix socket path not found"))?;
-        let (channel1, channel2) = Channel::new_pair();
+        // TODO: Mov the buffer allocation to function new to comply with the bahavior of unix
+        let (channel1, channel2) = Channel::new_pair()?;
         self.status = Status::Connected(channel1);
         obj.push(UnixSocket {
             obj: Some(obj.clone()),
@@ -336,9 +337,9 @@ unsafe impl Send for Channel {}
 unsafe impl Sync for Channel {}
 
 impl Channel {
-    fn new_pair() -> (Channel, Channel) {
-        let buf1 = RingBuf::new(DEFAULT_BUF_SIZE);
-        let buf2 = RingBuf::new(DEFAULT_BUF_SIZE);
+    fn new_pair() -> Result<(Channel, Channel)> {
+        let buf1 = RingBuf::new(DEFAULT_BUF_SIZE)?;
+        let buf2 = RingBuf::new(DEFAULT_BUF_SIZE)?;
         let channel1 = Channel {
             reader: buf1.reader,
             writer: buf2.writer,
@@ -347,11 +348,13 @@ impl Channel {
             reader: buf2.reader,
             writer: buf1.writer,
         };
-        (channel1, channel2)
+        Ok((channel1, channel2))
     }
 }
 
-pub const DEFAULT_BUF_SIZE: usize = 1 * 1024 * 1024;
+// TODO: Add SO_SNDBUF and SO_RCVBUF to set/getsockopt to dynamcally change the size.
+// This value is got from /proc/sys/net/core/rmem_max and wmem_max that are same on linux.
+pub const DEFAULT_BUF_SIZE: usize = 208 * 1024;
 
 lazy_static! {
     static ref UNIX_SOCKET_OBJS: Mutex<BTreeMap<String, Arc<UnixSocketObject>>> =

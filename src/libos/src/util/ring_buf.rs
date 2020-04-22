@@ -14,16 +14,16 @@ pub struct RingBuf {
 }
 
 impl RingBuf {
-    pub fn new(capacity: usize) -> RingBuf {
-        let inner = Arc::new(RingBufInner::new(capacity));
+    pub fn new(capacity: usize) -> Result<RingBuf> {
+        let inner = Arc::new(RingBufInner::new(capacity)?);
         let reader = RingBufReader {
             inner: inner.clone(),
         };
         let writer = RingBufWriter { inner: inner };
-        RingBuf {
+        Ok(RingBuf {
             reader: reader,
             writer: writer,
-        }
+        })
     }
 }
 
@@ -49,20 +49,22 @@ struct RingBufInner {
 const RING_BUF_ALIGN: usize = 16;
 
 impl RingBufInner {
-    fn new(capacity: usize) -> RingBufInner {
+    fn new(capacity: usize) -> Result<RingBufInner> {
+        // Capacity should be power of two as capacity - 1 is used as mask
         let capacity = max(capacity, RING_BUF_ALIGN).next_power_of_two();
-        RingBufInner {
-            buf: unsafe {
-                let buf_layout = Layout::from_size_align_unchecked(capacity, RING_BUF_ALIGN);
-                let buf_ptr = alloc(buf_layout);
-                assert!(buf_ptr != ptr::null_mut());
-                buf_ptr
-            },
+        let buf_layout = Layout::from_size_align(capacity, RING_BUF_ALIGN)?;
+        let buf_ptr = unsafe { alloc(buf_layout) };
+        if buf_ptr.is_null() {
+            return_errno!(ENOMEM, "no memory for new ring buffers");
+        }
+
+        Ok(RingBufInner {
+            buf: buf_ptr,
             capacity: capacity,
             head: AtomicUsize::new(0),
             tail: AtomicUsize::new(0),
             closed: AtomicBool::new(false),
-        }
+        })
     }
 
     fn get_mask(&self) -> usize {
@@ -114,8 +116,8 @@ impl RingBufInner {
 
 impl Drop for RingBufInner {
     fn drop(&mut self) {
+        let buf_layout = Layout::from_size_align(self.capacity, RING_BUF_ALIGN).unwrap();
         unsafe {
-            let buf_layout = Layout::from_size_align_unchecked(self.capacity, RING_BUF_ALIGN);
             dealloc(self.buf, buf_layout);
         }
     }

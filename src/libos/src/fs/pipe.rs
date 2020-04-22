@@ -2,8 +2,9 @@ use super::*;
 use util::ring_buf::*;
 
 // TODO: Use Waiter and WaitQueue infrastructure to sleep when blocking
-
-pub const PIPE_BUF_SIZE: usize = 2 * 1024 * 1024;
+// TODO: Add F_SETPIPE_SZ in fcntl to dynamically change the size of pipe
+// to improve memory efficiency. This value is got from /proc/sys/fs/pipe-max-size on linux.
+pub const PIPE_BUF_SIZE: usize = 1024 * 1024;
 
 #[derive(Debug)]
 pub struct Pipe {
@@ -13,7 +14,8 @@ pub struct Pipe {
 
 impl Pipe {
     pub fn new(flags: StatusFlags) -> Result<Pipe> {
-        let mut ring_buf = RingBuf::new(PIPE_BUF_SIZE);
+        let mut ring_buf =
+            RingBuf::new(PIPE_BUF_SIZE).map_err(|e| errno!(ENFILE, "No memory for new pipes"))?;
         // Only O_NONBLOCK and O_DIRECT can be applied during pipe creation
         let valid_flags = flags & (StatusFlags::O_NONBLOCK | StatusFlags::O_DIRECT);
         Ok(Pipe {
