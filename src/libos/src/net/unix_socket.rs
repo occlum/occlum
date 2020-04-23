@@ -286,8 +286,10 @@ impl UnixSocket {
 impl Drop for UnixSocket {
     fn drop(&mut self) {
         if let Status::Listening = self.status {
-            let path = &self.obj.as_ref().unwrap().path;
-            UnixSocketObject::remove(path);
+            // Only remove the object when there is one
+            if let Some(obj) = self.obj.as_ref() {
+                UnixSocketObject::remove(&obj.path);
+            }
         }
     }
 }
