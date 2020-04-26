@@ -9,8 +9,7 @@ extern "C" {
 
 impl File for DevRandom {
     fn read(&self, _buf: &mut [u8]) -> Result<usize> {
-        let buf = _buf.as_mut_ptr();
-        let size = _buf.len();
+        let (buf, size) = _buf.as_mut().as_mut_ptr_and_len();
         let status = unsafe { sgx_read_rand(buf, size) };
         if status != sgx_status_t::SGX_SUCCESS {
             return_errno!(EAGAIN, "failed to get random number from sgx");

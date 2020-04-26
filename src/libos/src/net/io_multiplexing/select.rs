@@ -85,11 +85,8 @@ pub fn do_select(
         Some(tv) => (tv.tv_sec * 1000 + tv.tv_usec / 1000) as i32,
     };
 
-    let ret = try_libc!(libc::ocall::poll(
-        polls.as_mut_ptr(),
-        polls.len() as u64,
-        timeout
-    ));
+    let (polls_ptr, polls_len) = polls.as_mut_slice().as_mut_ptr_and_len();
+    let ret = try_libc!(libc::ocall::poll(polls_ptr, polls_len as u64, timeout));
 
     // convert fd back and write fdset
     readfds.clear();

@@ -63,9 +63,10 @@ impl StdoutRaw {
 impl std::io::Write for StdoutRaw {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let writting_len = cmp::min(buf.len(), size_t::max_value() as usize);
+        let (buf_ptr, _) = buf.as_ptr_and_len();
         let ret = try_libc_stdio!(libc::ocall::write(
             self.host_fd,
-            buf.as_ptr() as *const c_void,
+            buf_ptr as *const c_void,
             writting_len,
         ))
         .unwrap_or_else(|err| {
@@ -220,9 +221,10 @@ impl StdinRaw {
 impl std::io::Read for StdinRaw {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let reading_len = cmp::min(buf.len(), size_t::max_value() as usize);
+        let (buf_ptr, _) = buf.as_mut().as_mut_ptr_and_len();
         let ret = try_libc_stdio!(libc::ocall::read(
             self.host_fd,
-            buf.as_mut_ptr() as *mut c_void,
+            buf_ptr as *mut c_void,
             reading_len,
         ))
         .unwrap_or_else(|err| {

@@ -53,9 +53,11 @@ pub fn do_poll(pollfds: &mut [libc::pollfd], timeout: c_int) -> Result<usize> {
         }
     }
 
+    let (u_pollfds_ptr, u_pollfds_len) = u_pollfds.as_mut_slice().as_mut_ptr_and_len();
+
     let num_events = try_libc!(libc::ocall::poll(
-        u_pollfds.as_mut_ptr(),
-        u_pollfds.len() as u64,
+        u_pollfds_ptr,
+        u_pollfds_len as u64,
         timeout
     )) as usize;
     assert!(num_events <= pollfds.len());

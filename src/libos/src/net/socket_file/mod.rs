@@ -45,21 +45,25 @@ impl Drop for SocketFile {
 // TODO: implement readfrom/sendto
 impl File for SocketFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
+        let (buf_ptr, buf_len) = buf.as_mut().as_mut_ptr_and_len();
         let ret = try_libc!(libc::ocall::read(
             self.host_fd,
-            buf.as_mut_ptr() as *mut c_void,
-            buf.len()
-        ));
-        Ok(ret as usize)
+            buf_ptr as *mut c_void,
+            buf_len
+        )) as usize;
+        assert!(ret <= buf_len);
+        Ok(ret)
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize> {
+        let (buf_ptr, buf_len) = buf.as_ptr_and_len();
         let ret = try_libc!(libc::ocall::write(
             self.host_fd,
-            buf.as_ptr() as *const c_void,
-            buf.len()
-        ));
-        Ok(ret as usize)
+            buf_ptr as *const c_void,
+            buf_len
+        )) as usize;
+        assert!(ret <= buf_len);
+        Ok(ret)
     }
 
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {

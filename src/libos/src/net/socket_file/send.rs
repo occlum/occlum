@@ -1,5 +1,4 @@
 use super::*;
-use crate::untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen, UntrustedSliceAlloc};
 
 impl SocketFile {
     // TODO: need sockaddr type to implement send/sento

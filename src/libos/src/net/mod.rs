@@ -1,5 +1,6 @@
 use super::*;
 use std;
+use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen, UntrustedSliceAlloc};
 
 mod io_multiplexing;
 mod iovs;
