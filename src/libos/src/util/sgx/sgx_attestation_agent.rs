@@ -120,12 +120,9 @@ impl InnerAgent {
                 Some(sigrl) => {
                     let sigrl_ptr = sigrl.as_ptr();
                     let sigrl_size = {
-                        // FIXME: u32::MAX is not provided by Rust SGX SDK
-                        /*
-                        if sigrl.len() > u32::MAX {
+                        if sigrl.len() > std::u32::MAX as usize {
                             return_errno!(EINVAL, "sigrl is too large");
                         }
-                        */
                         sigrl.len() as u32
                     };
                     (sigrl_ptr, sigrl_size)
