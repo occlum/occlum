@@ -108,12 +108,11 @@ impl EpollFile {
         // we don't have to worry about the potential deadlock caused by
         // locking two files (say, fd and epfd) in an inconsistent order.
 
-        let raw_epevent_ptr: *mut libc::epoll_event = match event {
-            Some(epevent) => {
-                //TODO: Shoud be const.
-                // Cast const to mut to be compatiable with the ocall from rust sdk.
-                &mut epevent.to_raw()
-            }
+        //TODO: Shoud be const.
+        // Cast const to mut to be compatiable with the ocall from rust sdk.
+        let mut epevent = event.map(|e| e.to_raw());
+        let raw_epevent_ptr: *mut libc::epoll_event = match epevent {
+            Some(ref mut e) => e as *mut _,
             _ => std::ptr::null_mut(),
         };
 
