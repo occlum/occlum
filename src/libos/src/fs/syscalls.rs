@@ -82,7 +82,7 @@ pub fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<isize>
         count as usize
     };
 
-    from_user::check_array(iov, count);
+    from_user::check_array(iov, count)?;
     let bufs_vec = {
         let mut bufs_vec = Vec::with_capacity(count);
         for iov_i in 0..count {
@@ -107,7 +107,7 @@ pub fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize> {
         count as usize
     };
 
-    from_user::check_array(iov, count);
+    from_user::check_array(iov, count)?;
     let mut bufs_vec = {
         let mut bufs_vec = Vec::with_capacity(count);
         for iov_i in 0..count {

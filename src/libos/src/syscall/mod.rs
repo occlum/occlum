@@ -753,13 +753,24 @@ fn do_connect(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t)
         "connect: fd: {}, addr: {:?}, addr_len: {}",
         fd, addr, addr_len
     );
+    // For SOCK_DGRAM sockets not initiated in connection-mode,
+    // if address is a null address for the protocol,
+    // the socket's peer address shall be reset.
+    let need_check: bool = !addr.is_null();
+    if need_check {
+        check_array(addr as *const u8, addr_len as usize)?;
+    }
+
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_socket() {
+        if need_check {
+            check_ptr(addr as *const libc::sockaddr_in)?;
+        }
         let ret = try_libc!(libc::ocall::connect(socket.fd(), addr, addr_len));
         Ok(ret as isize)
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
         let addr = addr as *const libc::sockaddr_un;
-        check_ptr(addr)?; // TODO: check addr_len
+        check_ptr(addr)?;
         let path = clone_cstring_safely(unsafe { (&*addr).sun_path.as_ptr() })?
             .to_string_lossy()
             .into_owned();
@@ -788,9 +799,21 @@ fn do_accept4(
         "accept4: fd: {}, addr: {:?}, addr_len: {:?}, flags: {:#x}",
         fd, addr, addr_len, flags
     );
+
+    let need_check: bool = !addr.is_null();
+
+    if addr.is_null() ^ addr_len.is_null() {
+        return_errno!(EINVAL, "addr and ddr_len should be both null");
+    }
+    if need_check {
+        check_mut_array(addr as *mut u8, unsafe { *addr_len } as usize)?;
+    }
+
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_socket() {
-        let socket = file_ref.as_socket()?;
+        if need_check {
+            check_mut_ptr(addr as *mut libc::sockaddr_in)?;
+        }
 
         let new_socket = socket.accept(addr, addr_len, flags)?;
         let new_file_ref: Arc<Box<dyn File>> = Arc::new(Box::new(new_socket));
@@ -799,8 +822,10 @@ fn do_accept4(
         Ok(new_fd as isize)
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
         let addr = addr as *mut libc::sockaddr_un;
-        check_mut_ptr(addr)?; // TODO: check addr_len
-
+        if need_check {
+            check_mut_ptr(addr)?;
+        }
+        // TODO: handle addr
         let new_socket = unix_socket.accept()?;
         let new_file_ref: Arc<Box<dyn File>> = Arc::new(Box::new(new_socket));
         let new_fd = current!().add_file(new_file_ref, false);
@@ -824,14 +849,19 @@ fn do_shutdown(fd: c_int, how: c_int) -> Result<isize> {
 
 fn do_bind(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t) -> Result<isize> {
     debug!("bind: fd: {}, addr: {:?}, addr_len: {}", fd, addr, addr_len);
+    if addr.is_null() && addr_len == 0 {
+        return_errno!(EINVAL, "no address is specified");
+    }
+    check_array(addr as *const u8, addr_len as usize)?;
+
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_socket() {
-        check_ptr(addr)?; // TODO: check addr_len
+        check_ptr(addr as *const libc::sockaddr_in)?;
         let ret = try_libc!(libc::ocall::bind(socket.fd(), addr, addr_len));
         Ok(ret as isize)
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
         let addr = addr as *const libc::sockaddr_un;
-        check_ptr(addr)?; // TODO: check addr_len
+        check_ptr(addr)?;
         let path = clone_cstring_safely(unsafe { (&*addr).sun_path.as_ptr() })?
             .to_string_lossy()
             .into_owned();

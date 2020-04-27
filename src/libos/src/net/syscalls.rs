@@ -170,7 +170,11 @@ pub fn do_select(
 }
 
 pub fn do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int) -> Result<isize> {
-    from_user::check_mut_array(fds, nfds as usize)?;
+    // It behaves like sleep when fds is null and nfds is zero.
+    if !fds.is_null() || nfds != 0 {
+        from_user::check_mut_array(fds, nfds as usize)?;
+    }
+
     let polls = unsafe { std::slice::from_raw_parts_mut(fds, nfds as usize) };
 
     let n = io_multiplexing::do_poll(polls, timeout)?;

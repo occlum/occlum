@@ -135,7 +135,9 @@ fn parse_log_level(level_chars: *const c_char) -> Result<LevelFilter> {
     }
 
     let level_string = {
-        let level_cstring = clone_cstring_safely(level_chars)?;
+        // level_chars has been guaranteed to be inside enclave
+        // and null terminated by ECall
+        let level_cstring = CString::from(unsafe { CStr::from_ptr(level_chars) });
         level_cstring
             .into_string()
             .map_err(|e| errno!(EINVAL, "log_level contains valid utf-8 data"))?
@@ -158,7 +160,13 @@ fn parse_arguments(
     host_stdio_fds: *const HostStdioFds,
 ) -> Result<(PathBuf, Vec<CString>, HostStdioFds)> {
     let path_buf = {
-        let path_cstring = clone_cstring_safely(path_ptr)?;
+        if path_ptr.is_null() {
+            return_errno!(EINVAL, "empty path");
+        }
+        // path_ptr has been guaranteed to be inside enclave
+        // and null terminated by ECall
+        let path_cstring = CString::from(unsafe { CStr::from_ptr(path_ptr) });
+
         let path_string = path_cstring
             .into_string()
             .map_err(|e| errno!(EINVAL, "path contains valid utf-8 data"))?;
