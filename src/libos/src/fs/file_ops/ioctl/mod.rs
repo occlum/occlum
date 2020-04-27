@@ -48,9 +48,12 @@ impl<'a> IoctlCmd<'a> {
     pub fn validate_arg_val(&self) -> Result<()> {
         match self {
             IoctlCmd::TIOCGWINSZ(winsize_ref) => {
-                // ws_row and ws_col are not supposed to be zeros
+                // ws_row and ws_col are usually not zeros
                 if winsize_ref.ws_row == 0 || winsize_ref.ws_col == 0 {
-                    return_errno!(EINVAL, "invalid data from host");
+                    warn!(
+                        "window size: row: {:?}, col: {:?}",
+                        winsize_ref.ws_row, winsize_ref.ws_col
+                    );
                 }
             }
             IoctlCmd::FIONREAD(nread_ref) => {
