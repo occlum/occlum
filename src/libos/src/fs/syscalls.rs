@@ -124,7 +124,7 @@ pub fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize> {
     Ok(len as isize)
 }
 
-pub fn do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: usize) -> Result<isize> {
+pub fn do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: off_t) -> Result<isize> {
     let safe_buf = {
         from_user::check_mut_array(buf, size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, size) }
@@ -133,7 +133,7 @@ pub fn do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: usize) -> Resul
     Ok(len as isize)
 }
 
-pub fn do_pwrite(fd: FileDesc, buf: *const u8, size: usize, offset: usize) -> Result<isize> {
+pub fn do_pwrite(fd: FileDesc, buf: *const u8, size: usize, offset: off_t) -> Result<isize> {
     let safe_buf = {
         from_user::check_array(buf, size)?;
         unsafe { std::slice::from_raw_parts(buf, size) }
