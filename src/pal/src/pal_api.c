@@ -34,7 +34,7 @@ int occlum_pal_init(const struct occlum_pal_attr* attr) {
     // automatically done by Intel SGX SDK).
     eid = pal_get_enclave_id();
     int ret;
-    sgx_status_t ecall_status = occlum_ecall_init(eid, &ret, attr->log_level);
+    sgx_status_t ecall_status = occlum_ecall_init(eid, &ret, attr->log_level, attr->instance_dir);
     if (ecall_status != SGX_SUCCESS) {
         const char* sgx_err = pal_get_sgx_error_msg(ecall_status);
         PAL_ERROR("Failed to do ECall: %s", sgx_err);

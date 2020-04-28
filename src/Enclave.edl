@@ -15,7 +15,7 @@ enclave {
          *
          * @retval On success, return 0; otherwise, return -1.
          */
-        public int occlum_ecall_init([in, string] const char* log_level);
+        public int occlum_ecall_init([in, string] const char* log_level, [in, string] const char* instance_dir);
 
         /*
          * Create a new LibOS process to do the task specified by the given 

@@ -33,9 +33,8 @@ lazy_static! {
                 .cause_err(|e| errno!(EINVAL, "invalid config JSON"))?;
             Ok(config)
         }
-
-        let config_path = "./.occlum/build/Occlum.json.protected";
-        match load_config(config_path) {
+        let config_path = unsafe { format!("{}{}", INSTANCE_DIR, "/build/Occlum.json.protected") };
+        match load_config(&config_path) {
             Err(e) => {
                 error!("failed to load config: {}", e.backtrace());
                 panic!();

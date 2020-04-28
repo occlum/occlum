@@ -1,4 +1,9 @@
 #!/bin/bash
+
+if [ -z $OCCLUM_INSTANCE_DIR ];then
+    OCCLUM_INSTANCE_DIR=".occlum"
+fi
+
 cat <<EOF
 {
     "vm": {
@@ -13,7 +18,7 @@ cat <<EOF
         {
             "target": "/",
             "type": "sefs",
-            "source": ".occlum/build/mount/__ROOT",
+            "source": "$OCCLUM_INSTANCE_DIR/build/mount/__ROOT",
             "options": {
                 "integrity_only": true,
                 "MAC": "$OCCLUM_CONF_ROOT_FS_MAC"
@@ -22,7 +27,7 @@ cat <<EOF
         {
             "target": "/root",
             "type": "sefs",
-            "source": ".occlum/run/mount/root"
+            "source": "$OCCLUM_INSTANCE_DIR/run/mount/root"
         },
         {
             "target": "/host",

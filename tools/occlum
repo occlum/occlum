@@ -3,8 +3,11 @@
 this_dir="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
 occlum_dir="$( cd "$( dirname "$this_dir/../../../"  )" >/dev/null 2>&1 && pwd )"
 
+if [ -z $OCCLUM_INSTANCE_DIR ];then
+    OCCLUM_INSTANCE_DIR=".occlum"
+fi
 working_dir=`pwd`
-context_dir="$working_dir/.occlum"
+context_dir="$working_dir/$OCCLUM_INSTANCE_DIR"
 
 SGX_SDK="${SGX_SDK:-/opt/intel/sgxsdk}"
 SGX_GDB="$SGX_SDK/bin/sgx-gdb"

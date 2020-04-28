@@ -11,7 +11,8 @@ use util::mem_util::from_untrusted::*;
 use util::sgx::allow_debug as sgx_allow_debug;
 use sgx_tse::*;
 
-const ENCLAVE_PATH: &'static str = ".occlum/build/lib/libocclum-libos.signed.so";
+pub static mut INSTANCE_DIR: String = String::new();
+static mut ENCLAVE_PATH: String = String::new();
 
 lazy_static! {
     static ref INIT_ONCE: Once = Once::new();
@@ -19,10 +20,12 @@ lazy_static! {
 }
 
 #[no_mangle]
-pub extern "C" fn occlum_ecall_init(log_level: *const c_char) -> i32 {
+pub extern "C" fn occlum_ecall_init(log_level: *const c_char, instance_dir: *const c_char) -> i32 {
     if HAS_INIT.load(Ordering::SeqCst) == true {
         return EXIT_STATUS_INTERNAL_ERROR;
     }
+
+    assert!(!instance_dir.is_null());
 
     let log_level = {
         let input_log_level = match parse_log_level(log_level) {
@@ -52,6 +55,12 @@ pub extern "C" fn occlum_ecall_init(log_level: *const c_char) -> i32 {
 
         // Register exception handlers (support cpuid & rdtsc for now)
         register_exception_handlers();
+        unsafe {
+            let dir_str: &str = CStr::from_ptr(instance_dir).to_str().unwrap();
+            INSTANCE_DIR.push_str(dir_str);
+            ENCLAVE_PATH.push_str(&INSTANCE_DIR);
+            ENCLAVE_PATH.push_str("/build/lib/libocclum-libos.signed.so");
+        }
 
         HAS_INIT.store(true, Ordering::SeqCst);
     });
@@ -76,7 +85,8 @@ pub extern "C" fn occlum_ecall_new_process(
             return EXIT_STATUS_INTERNAL_ERROR;
         }
     };
-    let _ = backtrace::enable_backtrace(ENCLAVE_PATH, PrintFormat::Short);
+
+    let _ = unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
     panic::catch_unwind(|| {
         backtrace::__rust_begin_short_backtrace(|| {
             match do_new_process(&path, &args, &host_stdio_fds) {
@@ -97,7 +107,7 @@ pub extern "C" fn occlum_ecall_exec_thread(libos_pid: i32, host_tid: i32) -> i32
         return EXIT_STATUS_INTERNAL_ERROR;
     }
 
-    let _ = backtrace::enable_backtrace(ENCLAVE_PATH, PrintFormat::Short);
+    let _ = unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
     panic::catch_unwind(|| {
         backtrace::__rust_begin_short_backtrace(|| {
             match do_exec_thread(libos_pid as pid_t, host_tid as pid_t) {
