@@ -197,7 +197,8 @@ pub fn do_access(path: *const i8, mode: u32) -> Result<isize> {
         .to_string_lossy()
         .into_owned();
     let mode = AccessibilityCheckMode::from_u32(mode)?;
-    file_ops::do_access(&path, mode).map(|_| 0)
+    let flags = AccessibilityCheckFlags::empty();
+    file_ops::do_faccessat(DirFd::Cwd, &path, mode, flags).map(|_| 0)
 }
 
 pub fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) -> Result<isize> {

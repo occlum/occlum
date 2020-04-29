@@ -2,27 +2,37 @@ use super::*;
 
 bitflags! {
     pub struct AccessibilityCheckMode : u32 {
+        /// F_OK = 0, test for the existence of the file
+        /// X_OK, test for execute permission
         const X_OK = 1;
+        /// W_OK, test for write permission
         const W_OK = 2;
+        /// R_OK, test for read permission
         const R_OK = 4;
     }
 }
 
 impl AccessibilityCheckMode {
-    pub fn from_u32(bits: u32) -> Result<AccessibilityCheckMode> {
+    pub fn from_u32(bits: u32) -> Result<Self> {
         AccessibilityCheckMode::from_bits(bits).ok_or_else(|| errno!(EINVAL, "invalid mode"))
+    }
+
+    pub fn test_for_exist(&self) -> bool {
+        self.bits == 0
     }
 }
 
 bitflags! {
     pub struct AccessibilityCheckFlags : u32 {
+        /// If path is a symbolic link, do not dereference it
         const AT_SYMLINK_NOFOLLOW = 0x100;
+        /// Perform access checks using the effective user and group IDs
         const AT_EACCESS          = 0x200;
     }
 }
 
 impl AccessibilityCheckFlags {
-    pub fn from_u32(bits: u32) -> Result<AccessibilityCheckFlags> {
+    pub fn from_u32(bits: u32) -> Result<Self> {
         AccessibilityCheckFlags::from_bits(bits).ok_or_else(|| errno!(EINVAL, "invalid flags"))
     }
 }
@@ -37,21 +47,36 @@ pub fn do_faccessat(
         "faccessat: dirfd: {:?}, path: {:?}, mode: {:?}, flags: {:?}",
         dirfd, path, mode, flags
     );
-    match dirfd {
-        // TODO: handle dirfd
-        DirFd::Fd(dirfd) => return_errno!(ENOSYS, "cannot accept dirfd"),
-        DirFd::Cwd => do_access(path, mode),
+    if Path::new(path).is_absolute() {
+        // Path is absolute, so dirfd is ignored
+        return Ok(do_access(path, mode)?);
     }
+    let path = match dirfd {
+        DirFd::Fd(dirfd) => {
+            let dir_path = get_dir_path(dirfd)?;
+            dir_path + "/" + path
+        }
+        DirFd::Cwd => path.to_owned(),
+    };
+    do_access(&path, mode)
 }
 
-pub fn do_access(path: &str, mode: AccessibilityCheckMode) -> Result<()> {
-    debug!("access: path: {:?}, mode: {:?}", path, mode);
+fn do_access(path: &str, mode: AccessibilityCheckMode) -> Result<()> {
     let inode = {
         let current = current!();
         let fs = current.fs().lock().unwrap();
         fs.lookup_inode(path)?
     };
-    //let metadata = inode.get_metadata();
-    // TODO: check metadata.mode with mode
+    if mode.test_for_exist() {
+        return Ok(());
+    }
+    // Check the permissions of file owner
+    let owner_file_mode = {
+        let metadata = inode.metadata()?;
+        AccessibilityCheckMode::from_u32((metadata.mode >> 6) as u32 & 0b111)?
+    };
+    if !owner_file_mode.contains(mode) {
+        return_errno!(EACCES, "the requested access is denied");
+    }
     Ok(())
 }

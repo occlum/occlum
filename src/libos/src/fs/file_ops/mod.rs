@@ -2,7 +2,7 @@ use super::dev_fs::{DevNull, DevRandom, DevSgx, DevZero};
 use super::*;
 use process::Process;
 
-pub use self::access::{do_access, do_faccessat, AccessibilityCheckFlags, AccessibilityCheckMode};
+pub use self::access::{do_faccessat, AccessibilityCheckFlags, AccessibilityCheckMode};
 pub use self::chmod::{do_chmod, do_fchmod, FileMode};
 pub use self::chown::{do_chown, do_fchown, do_lchown};
 pub use self::close::do_close;
