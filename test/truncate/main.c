@@ -45,35 +45,35 @@ int main(int argc, const char* argv[]) {
         return -1;
     }
     int file_mode = stat_buf.st_mode & MODE_MASK;
-	if (file_mode != mode) {
-		printf("Incorrect file mode %o. Expected %o\n", file_mode, mode);
-		return -1;
-	}
-	int file_type = stat_buf.st_mode & S_IFMT;
-	if (file_type != S_IFREG) {
-		printf("Incorrect file type %o. Expected %o\n", file_type, S_IFREG);
-		return -1;
-	}
+    if (file_mode != mode) {
+        printf("Incorrect file mode %o. Expected %o\n", file_mode, mode);
+        return -1;
+    }
+    int file_type = stat_buf.st_mode & S_IFMT;
+    if (file_type != S_IFREG) {
+        printf("Incorrect file type %o. Expected %o\n", file_type, S_IFREG);
+        return -1;
+    }
 
     close(fd);
 
-	ret = truncate(FILE_NAME, TRUNC_LEN1);
-	if (ret < 0) {
-		printf("failed to truncate the file\n");
-		return ret;
-	}
+    ret = truncate(FILE_NAME, TRUNC_LEN1);
+    if (ret < 0) {
+        printf("failed to truncate the file\n");
+        return ret;
+    }
 
-	ret = stat(FILE_NAME, &stat_buf);
-	if (ret < 0) {
-		printf("failed to stat the file\n");
-		return ret;
-	}
+    ret = stat(FILE_NAME, &stat_buf);
+    if (ret < 0) {
+        printf("failed to stat the file\n");
+        return ret;
+    }
 
-	file_size = stat_buf.st_size;
-	if (file_size != TRUNC_LEN1) {
-		printf("Incorrect file size %d. Expected %d\n", file_size, TRUNC_LEN1);
-		return -1;
-	}
+    file_size = stat_buf.st_size;
+    if (file_size != TRUNC_LEN1) {
+        printf("Incorrect file size %d. Expected %d\n", file_size, TRUNC_LEN1);
+        return -1;
+    }
 
     printf("(f)truncate, (f)stat test successful\n");
     return 0;

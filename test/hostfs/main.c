@@ -37,7 +37,7 @@ static int remove_file(const char *file_path) {
 
 static int __test_write_read(const char *file_path) {
     char *write_str = "Write to hostfs successfully!";
-	char read_buf[128] = { 0 };
+    char read_buf[128] = { 0 };
     int fd;
 
     fd = open(file_path, O_WRONLY);
@@ -52,34 +52,34 @@ static int __test_write_read(const char *file_path) {
     if (fd < 0) {
         THROW_ERROR("failed to open a file to read");
     }
-	if (read(fd, read_buf, sizeof(read_buf)) != strlen(write_str)) {
-		THROW_ERROR("failed to read to the file");
-	}
-	if (strcmp(write_str, read_buf) != 0) {
-		THROW_ERROR("the message read from the file is not as it was written");
-	}
+    if (read(fd, read_buf, sizeof(read_buf)) != strlen(write_str)) {
+        THROW_ERROR("failed to read to the file");
+    }
+    if (strcmp(write_str, read_buf) != 0) {
+        THROW_ERROR("the message read from the file is not as it was written");
+    }
     close(fd);
     return 0;
 }
 
 static int __test_rename(const char *file_path) {
-	char *rename_path = "/host/hostfs_rename.txt";
-	struct stat stat_buf;
-	int ret;
+    char *rename_path = "/host/hostfs_rename.txt";
+    struct stat stat_buf;
+    int ret;
 
-	ret = rename(file_path, rename_path);
-	if (ret < 0) {
+    ret = rename(file_path, rename_path);
+    if (ret < 0) {
         THROW_ERROR("failed to rename");
     }
-	ret = stat(file_path, &stat_buf);
-	if (!(ret < 0 && errno == ENOENT)) {
-		THROW_ERROR("stat should return ENOENT");
-	}
-	ret = stat(rename_path, &stat_buf);
-	if (ret < 0) {
-		THROW_ERROR("failed to stat the file");
-	}
-	if (rename(rename_path, file_path) < 0) {
+    ret = stat(file_path, &stat_buf);
+    if (!(ret < 0 && errno == ENOENT)) {
+        THROW_ERROR("stat should return ENOENT");
+    }
+    ret = stat(rename_path, &stat_buf);
+    if (ret < 0) {
+        THROW_ERROR("failed to stat the file");
+    }
+    if (rename(rename_path, file_path) < 0) {
         THROW_ERROR("failed to rename back");
     }
     return 0;
@@ -90,9 +90,9 @@ typedef int(*test_hostfs_func_t)(const char *);
 static int test_hostfs_framework(test_hostfs_func_t fn) {
     const char *file_path = "/host/hostfs_test.txt";
 
-	if (create_file(file_path) < 0)
-		return -1;
-	if (fn(file_path) < 0)
+    if (create_file(file_path) < 0)
+        return -1;
+    if (fn(file_path) < 0)
         return -1;
     if (remove_file(file_path) < 0)
         return -1;

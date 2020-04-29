@@ -133,7 +133,7 @@ int test_multiple_socketpairs() {
             ret = -1;
             goto cleanup;
         }
-        
+
         if(verify_connection(sockets[i][1], sockets[i][0]) < 0) {
             ret = -1;
             goto cleanup;
