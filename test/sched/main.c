@@ -12,6 +12,37 @@
 #include "test.h"
 
 // ============================================================================
+// Helper function
+// ============================================================================
+
+#define MAX_CPU_NUM 1024
+
+static int* g_online_cpu_idxs;
+
+int get_online_cpu() {
+    int online_num = sysconf(_SC_NPROCESSORS_ONLN);
+    cpu_set_t mask;
+    int index = 0;
+
+    g_online_cpu_idxs = (int*)calloc(online_num, sizeof(int));
+    CPU_ZERO(&mask);
+    if (sched_getaffinity(0, sizeof(cpu_set_t), &mask) < 0) {
+        THROW_ERROR("failed to call sched_getaffinity");
+    }
+
+    printf("Online Core No: ");
+    for (int i = 0; index < online_num && i < MAX_CPU_NUM; i++) {
+        if (CPU_ISSET(i, &mask)) {
+            g_online_cpu_idxs[index] = i;
+            index++;
+            printf("%d ", i);
+        }
+    }
+    printf("\n");
+    return 0;
+}
+
+// ============================================================================
 // Test cases for sched_cpu_affinity
 // ============================================================================
 
@@ -32,12 +63,13 @@ static int test_sched_getaffinity_with_self_pid() {
 static int test_sched_setaffinity_with_self_pid() {
     int nproc = sysconf(_SC_NPROCESSORS_ONLN);
     cpu_set_t mask_old;
+    CPU_ZERO(&mask_old);
     for (int i = 0; i < nproc; ++i) {
-        CPU_SET(i, &mask_old);
+        CPU_SET(g_online_cpu_idxs[i], &mask_old);
     }
     cpu_set_t mask;
     CPU_ZERO(&mask);
-    CPU_SET(0, &mask);
+    CPU_SET(g_online_cpu_idxs[0], &mask);
     if (sched_setaffinity(0, sizeof(cpu_set_t), &mask) < 0) {
         THROW_ERROR("failed to call sched_setaffinity \n");
     }
@@ -56,13 +88,13 @@ static int test_sched_setaffinity_with_self_pid() {
 
 static int test_sched_xetaffinity_with_child_pid() {
     int status, child_pid;
-    int num = sysconf(_SC_NPROCESSORS_CONF);
+    int num = sysconf(_SC_NPROCESSORS_ONLN);
     if (num <= 0) {
         THROW_ERROR("failed to get cpu number");
     }
     cpu_set_t mask;
     CPU_ZERO(&mask);
-    CPU_SET(num - 1 , &mask);
+    CPU_SET(g_online_cpu_idxs[num - 1] , &mask);
     int ret = posix_spawn(&child_pid, "/bin/getpid", NULL, NULL, NULL, NULL);
     if (ret < 0 ) {
         THROW_ERROR("spawn process error");
@@ -99,7 +131,7 @@ static int test_sched_getaffinity_via_explicit_syscall() {
 static int test_sched_setaffinity_via_explicit_syscall() {
     cpu_set_t mask;
     CPU_ZERO(&mask);
-    CPU_SET(0, &mask);
+    CPU_SET(g_online_cpu_idxs[0], &mask);
     if (syscall(__NR_sched_setaffinity, 0, sizeof(cpu_set_t), &mask) < 0) {
         THROW_ERROR("failed to call __NR_sched_setaffinity");
     }
@@ -117,8 +149,9 @@ static int test_sched_setaffinity_via_explicit_syscall() {
     // Recover the affinity mask
     int nproc = sysconf(_SC_NPROCESSORS_ONLN);
     cpu_set_t mask_old;
+    CPU_ZERO(&mask_old);
     for (int i = 0; i < nproc; ++i) {
-        CPU_SET(i, &mask_old);
+        CPU_SET(g_online_cpu_idxs[i], &mask_old);
     }
     if (syscall(__NR_sched_setaffinity, 0, sizeof(cpu_set_t), &mask_old) < 0) {
         THROW_ERROR("recover cpuset error");
@@ -188,5 +221,9 @@ static test_case_t test_cases[] = {
 };
 
 int main() {
-    return test_suite_run(test_cases, ARRAY_SIZE(test_cases));
+    int ret;
+    get_online_cpu();
+    ret = test_suite_run(test_cases, ARRAY_SIZE(test_cases));
+    free(g_online_cpu_idxs);
+    return ret;
 }

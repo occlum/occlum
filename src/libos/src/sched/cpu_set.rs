@@ -52,6 +52,11 @@ impl CpuSet {
         self.bits.count_ones() == 0
     }
 
+    // Returns if the CpuSet is a subset of available cpu set
+    pub fn is_subset_of(&self, other: &CpuSet) -> bool {
+        (self.bits.clone() & other.bits.clone()) == self.bits
+    }
+
     /// Create a CpuSet from bits given in a byte slice.
     pub fn from_slice(slice: &[u8]) -> Result<Self> {
         if slice.len() < Self::len() {
@@ -69,6 +74,10 @@ impl CpuSet {
     /// The last, unused bits in the byte slice are guaranteed to be zero.
     pub fn as_slice(&self) -> &[u8] {
         self.bits.as_slice()
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+        self.bits.as_mut_slice()
     }
 
     /// Returns an iterator that allows accessing the underlying bits.
@@ -119,5 +128,30 @@ lazy_static! {
             );
             ncores as usize
         }
+    };
+
+    /// The set of all available CPU cores.
+    ///
+    /// While `AVAIL_CPUSET` is likely to be equal to `CpuSet::new_full()`, this is not always the
+    /// case.  For example, when the enclave is running on a container or a virtual machine on a public
+    /// cloud platform, the container or vm is usually given access to a subset of the CPU cores on
+    /// the host machine.
+    ///
+    /// Property: `AVAIL_CPU.empty() == false`.
+    pub static ref AVAIL_CPUSET: CpuSet = {
+        extern "C" {
+            fn occlum_ocall_sched_getaffinity(
+                ret: *mut i32,
+                cpusetsize: size_t,
+                mask: *mut c_uchar,
+            ) -> sgx_status_t;
+        }
+        let mut cpuset = CpuSet::new_empty();
+        let mut retval = 0;
+        let sgx_status = unsafe{occlum_ocall_sched_getaffinity(&mut retval, CpuSet::len(), cpuset.as_mut_slice().as_mut_ptr())};
+        assert!(sgx_status == sgx_status_t::SGX_SUCCESS);
+        CpuSet::clear_unused(&mut cpuset.bits);
+        assert!(!cpuset.empty());
+        cpuset
     };
 }

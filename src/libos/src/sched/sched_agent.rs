@@ -21,7 +21,7 @@
 //! immediately to the host OS thread---until SchedAgent is detached from the
 //! host OS thread.
 
-use super::cpu_set::CpuSet;
+use super::cpu_set::{CpuSet, AVAIL_CPUSET};
 use crate::prelude::*;
 use crate::util::dirty::Dirty;
 
@@ -42,7 +42,7 @@ enum Inner {
 impl SchedAgent {
     pub fn new() -> Self {
         let inner = Some({
-            let affinity = Dirty::new(CpuSet::new_full());
+            let affinity = Dirty::new(AVAIL_CPUSET.clone());
             Inner::Detached { affinity }
         });
         Self { inner }
@@ -58,6 +58,12 @@ impl SchedAgent {
     pub fn set_affinity(&mut self, new_affinity: CpuSet) -> Result<()> {
         if new_affinity.empty() {
             return_errno!(EINVAL, "there must be at least one CPU core in the CpuSet");
+        }
+        if !new_affinity.is_subset_of(&AVAIL_CPUSET) {
+            return_errno!(
+                EINVAL,
+                "one or some of the CPU cores are not available to set"
+            );
         }
         match self.inner_mut() {
             Inner::Detached { affinity } => {

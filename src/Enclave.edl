@@ -72,6 +72,10 @@ enclave {
             size_t cpusize,
             [in, size=cpusize] const unsigned char* buf
         ) propagate_errno;
+        int occlum_ocall_sched_getaffinity(
+            size_t cpusize,
+            [out, size=cpusize] unsigned char* buf
+        ) propagate_errno;
         int occlum_ocall_ncores(void);
 
         sgx_status_t occlum_ocall_sgx_init_quote(
