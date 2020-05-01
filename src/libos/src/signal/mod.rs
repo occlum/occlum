@@ -6,6 +6,7 @@ use sig_action::{SigAction, SigActionFlags, SigDefaultAction};
 
 pub use self::c_types::{sigaction_t, sigset_t};
 pub use self::constants::*;
+pub use self::do_kill::do_kill_from_outside_enclave;
 pub use self::do_sigreturn::{deliver_signal, force_signal};
 pub use self::sig_dispositions::SigDispositions;
 pub use self::sig_num::SigNum;

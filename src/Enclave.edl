@@ -61,6 +61,23 @@ enclave {
          *      ESRCH - Cannot find the LibOS thread.
          */
         public int occlum_ecall_exec_thread(int libos_tid, int host_tid);
+
+        /*
+         * Send a signal to one or multiple LibOS processes.
+         *
+         * If pid == -1, send the signal to all processes. If pid > 0, send
+         * the signal to the specific process. For the purpose of security,
+         * the only allowed signals for now are SIGKILL and SIGTERM.
+         *
+         * @retval On success, return 0. On error, return -errno.
+         *
+         * The possible values of errno are
+         *      EAGAIN - The LibOS is not initialized.
+         *      EINVAL - The value of an argument are invalid.
+         *      ESRCH - Cannot find the process specified by pid.
+         *      EPERM - No permission to send the signal or to the process.
+         */
+        public int occlum_ecall_kill(int pid, int sig);
     };
 
     untrusted {

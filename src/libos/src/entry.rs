@@ -1,14 +1,16 @@
-use super::*;
-use exception::*;
-use fs::HostStdioFds;
-use process::pid_t;
 use std::ffi::{CStr, CString, OsString};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
-use util::log::LevelFilter;
-use util::mem_util::from_untrusted::*;
-use util::sgx::allow_debug as sgx_allow_debug;
+
+use super::*;
+use crate::exception::*;
+use crate::fs::HostStdioFds;
+use crate::process::ProcessFilter;
+use crate::signal::SigNum;
+use crate::util::log::LevelFilter;
+use crate::util::mem_util::from_untrusted::*;
+use crate::util::sgx::allow_debug as sgx_allow_debug;
 use sgx_tse::*;
 
 pub static mut INSTANCE_DIR: String = String::new();
@@ -53,7 +55,7 @@ pub extern "C" fn occlum_ecall_init(log_level: *const c_char, instance_dir: *con
     INIT_ONCE.call_once(|| {
         // Init the log infrastructure first so that log messages will be printed afterwards
         util::log::init(log_level);
- 
+
         // Init MPX for SFI if MPX is available
         let report = rsgx_self_report();
         if (report.body.attributes.xfrm & SGX_XFRM_MPX != 0) {
@@ -123,6 +125,25 @@ pub extern "C" fn occlum_ecall_exec_thread(libos_pid: i32, host_tid: i32) -> i32
                     eprintln!("failed to execute a process: {}", e.backtrace());
                     ecall_errno!(e.errno())
                 }
+            }
+        })
+    })
+    .unwrap_or(ecall_errno!(EFAULT))
+}
+
+#[no_mangle]
+pub extern "C" fn occlum_ecall_kill(pid: i32, sig: i32) -> i32 {
+    if HAS_INIT.load(Ordering::SeqCst) == false {
+        return ecall_errno!(EAGAIN);
+    }
+
+    let _ = unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
+    panic::catch_unwind(|| {
+        backtrace::__rust_begin_short_backtrace(|| match do_kill(pid, sig) {
+            Ok(()) => 0,
+            Err(e) => {
+                eprintln!("failed to kill: {}", e.backtrace());
+                ecall_errno!(e.errno())
             }
         })
     })
@@ -254,4 +275,24 @@ fn validate_program_path(target_path: &PathBuf) -> Result<()> {
         return_errno!(EACCES, "program path is NOT a valid entry point");
     }
     Ok(())
+}
+
+fn do_kill(pid: i32, sig: i32) -> Result<()> {
+    let filter = if pid > 0 {
+        ProcessFilter::WithPid(pid as pid_t)
+    } else if pid == -1 {
+        ProcessFilter::WithAnyPid
+    } else if pid < 0 {
+        return_errno!(EINVAL, "Invalid pid");
+    } else {
+        // pid == 0
+        return_errno!(EPERM, "Process 0 cannot be killed");
+    };
+    let signum = {
+        if sig < 0 {
+            return_errno!(EINVAL, "invalid arguments");
+        }
+        SigNum::from_u8(sig as u8)?
+    };
+    crate::signal::do_kill_from_outside_enclave(filter, signum)
 }

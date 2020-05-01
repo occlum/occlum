@@ -1,4 +1,5 @@
-use super::signals::{UserSignal, UserSignalKind};
+use super::constants::*;
+use super::signals::{KernelSignal, UserSignal, UserSignalKind};
 use super::{SigNum, Signal};
 use crate::prelude::*;
 use crate::process::{table, ProcessFilter, ProcessRef, ProcessStatus, ThreadRef, ThreadStatus};
@@ -17,6 +18,32 @@ pub fn do_kill(filter: ProcessFilter, signum: SigNum) -> Result<()> {
         let signal = Box::new(UserSignal::new(signum, UserSignalKind::Kill, pid, uid));
         let mut sig_queues = process.sig_queues().lock().unwrap();
         sig_queues.enqueue(signal);
+    }
+    Ok(())
+}
+
+/// Send a signal from the outside the enclave.
+///
+/// Such a call must be performed very carefully. The obvious reason
+/// is that the call is not trusted. And there is a less obvious reason:
+/// the function is not executed during a normal syscall. Thus, current!() does
+/// not refer to a valid LibOS thread. So let's implement this function with
+/// these two insights in mind.
+pub fn do_kill_from_outside_enclave(filter: ProcessFilter, signum: SigNum) -> Result<()> {
+    let signal = {
+        if signum != SIGKILL && signum != SIGTERM {
+            return_errno!(EPERM, "The signal is not allowed");
+        }
+        Box::new(KernelSignal::new(signum))
+    };
+    let processes = get_processes(&filter)?;
+    for process in processes {
+        if process.status() == ProcessStatus::Zombie {
+            continue;
+        }
+
+        let mut sig_queues = process.sig_queues().lock().unwrap();
+        sig_queues.enqueue(signal.clone());
     }
     Ok(())
 }

@@ -74,6 +74,18 @@ int occlum_pal_exec(const char* cmd_path,
                     int* exit_status);
 
 /*
+ * @brief Send a signal to one or multiple LibOS processes
+ *
+ * @param pid   If pid > 0, send the signal to the process with the
+ *              pid; if pid == -1, send the signal to all processes.
+ * @param sig   The signal number. For the purpose of security, the
+ *              only allowed signals for now are SIGKILL and SIGTERM.
+ *
+ * @retval If 0, then success; otherwise, check errno for the exact error type.
+ */
+int occlum_pal_kill(int pid, int sig);
+
+/*
  * @brief Destroy teh Occlum enclave
  *
  * @retval if 0, then success; otherwise, check errno for the exact error type.
