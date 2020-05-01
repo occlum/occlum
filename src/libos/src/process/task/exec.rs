@@ -28,7 +28,7 @@ fn dequeue(libos_tid: pid_t) -> Result<ThreadRef> {
         .lock()
         .unwrap()
         .remove(&libos_tid)
-        .ok_or_else(|| errno!(EAGAIN, "the given TID does not match any pending thread"))
+        .ok_or_else(|| errno!(ESRCH, "the given TID does not match any pending thread"))
 }
 
 /// Execute the specified LibOS thread in the current host thread.

@@ -19,10 +19,17 @@ lazy_static! {
     static ref HAS_INIT: AtomicBool = AtomicBool::new(false);
 }
 
+macro_rules! ecall_errno {
+    ($errno:expr) => {{
+        let errno: Errno = $errno;
+        -(errno as i32)
+    }};
+}
+
 #[no_mangle]
 pub extern "C" fn occlum_ecall_init(log_level: *const c_char, instance_dir: *const c_char) -> i32 {
     if HAS_INIT.load(Ordering::SeqCst) == true {
-        return EXIT_STATUS_INTERNAL_ERROR;
+        return ecall_errno!(EEXIST);
     }
 
     assert!(!instance_dir.is_null());
@@ -31,7 +38,7 @@ pub extern "C" fn occlum_ecall_init(log_level: *const c_char, instance_dir: *con
         let input_log_level = match parse_log_level(log_level) {
             Err(e) => {
                 eprintln!("invalid log level: {}", e.backtrace());
-                return EXIT_STATUS_INTERNAL_ERROR;
+                return ecall_errno!(EINVAL);
             }
             Ok(log_level) => log_level,
         };
@@ -75,14 +82,14 @@ pub extern "C" fn occlum_ecall_new_process(
     host_stdio_fds: *const HostStdioFds,
 ) -> i32 {
     if HAS_INIT.load(Ordering::SeqCst) == false {
-        return EXIT_STATUS_INTERNAL_ERROR;
+        return ecall_errno!(EAGAIN);
     }
 
     let (path, args, host_stdio_fds) = match parse_arguments(path_buf, argv, host_stdio_fds) {
         Ok(path_and_args_and_host_stdio_fds) => path_and_args_and_host_stdio_fds,
         Err(e) => {
             eprintln!("invalid arguments for LibOS: {}", e.backtrace());
-            return EXIT_STATUS_INTERNAL_ERROR;
+            return ecall_errno!(e.errno());
         }
     };
 
@@ -93,18 +100,18 @@ pub extern "C" fn occlum_ecall_new_process(
                 Ok(pid_t) => pid_t as i32,
                 Err(e) => {
                     eprintln!("failed to boot up LibOS: {}", e.backtrace());
-                    EXIT_STATUS_INTERNAL_ERROR
+                    ecall_errno!(e.errno())
                 }
             }
         })
     })
-    .unwrap_or(EXIT_STATUS_INTERNAL_ERROR)
+    .unwrap_or(ecall_errno!(EFAULT))
 }
 
 #[no_mangle]
 pub extern "C" fn occlum_ecall_exec_thread(libos_pid: i32, host_tid: i32) -> i32 {
     if HAS_INIT.load(Ordering::SeqCst) == false {
-        return EXIT_STATUS_INTERNAL_ERROR;
+        return ecall_errno!(EAGAIN);
     }
 
     let _ = unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
@@ -114,18 +121,13 @@ pub extern "C" fn occlum_ecall_exec_thread(libos_pid: i32, host_tid: i32) -> i32
                 Ok(exit_status) => exit_status,
                 Err(e) => {
                     eprintln!("failed to execute a process: {}", e.backtrace());
-                    EXIT_STATUS_INTERNAL_ERROR
+                    ecall_errno!(e.errno())
                 }
             }
         })
     })
-    .unwrap_or(EXIT_STATUS_INTERNAL_ERROR)
+    .unwrap_or(ecall_errno!(EFAULT))
 }
-
-// Use -128 as a special value to indicate internal error from libos, not from
-// user programs. The LibOS ensures that an user program can only return a
-// value between 0 and 255 (inclusive).
-const EXIT_STATUS_INTERNAL_ERROR: i32 = -128;
 
 fn parse_log_level(level_chars: *const c_char) -> Result<LevelFilter> {
     const DEFAULT_LEVEL: LevelFilter = LevelFilter::Off;
@@ -249,7 +251,7 @@ fn validate_program_path(target_path: &PathBuf) -> Result<()> {
         .iter()
         .any(|valid_path_prefix| target_path.starts_with(valid_path_prefix));
     if !is_valid_entry_point {
-        return_errno!(EINVAL, "program path is NOT a valid entry point");
+        return_errno!(EACCES, "program path is NOT a valid entry point");
     }
     Ok(())
 }

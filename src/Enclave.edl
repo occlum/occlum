@@ -13,7 +13,11 @@ enclave {
         /*
          * Initialize the LibOS according to the specified attributes.
          *
-         * @retval On success, return 0; otherwise, return -1.
+         * @retval On success, return 0; otherwise, return -errno.
+         *
+         * The possible values of errno are
+         *      EEXIST - The LibOS has already been initialized.
+         *      EINVAL - The value of an argument are invalid.
          */
         public int occlum_ecall_init([in, string] const char* log_level, [in, string] const char* instance_dir);
 
@@ -23,7 +27,13 @@ enclave {
          *
          * @retval On success, return the thread ID of the 
          * newly-created process (pid == tid for a new process). On error, 
-         * return -1.
+         * return -errno.
+         *
+         * The possible values of errno are
+         *      EAGAIN - The LibOS is not initialized.
+         *      EINVAL - The value of an argument are invalid.
+         *      ENOMEM - Not enough memory to create the new process.
+         *      EACCES - The path of the executable is not accessible.
          */
         public int occlum_ecall_new_process(
             [in, string] const char* executable_path,
@@ -33,10 +43,22 @@ enclave {
         /*
          * Execute the LibOS thread specified by the TID.
          *
-         * This API is synchronous: it returns until the LibOS thread exits.
+         * This API is synchronous: it returns until the LibOS thread 
+         * terminates.
          *
-         * @retval On success, return the exit status of the thread. On error, 
-         * return -1.
+         * @retval On success, return the exit status of the thread, whose 
+         * value is always greater than or equal to zero. To unify the two 
+         * cases of terminating normally and being killed by a signal, the
+         * exit status is encoded in the way described in wait(2) man page.
+         * This means if the thread exits normally (e.g., returning from the
+         * main page or call exit(2) explictly), then the exit status is 
+         * can be gained by WEXITSTATUS(status). If the thread is killed by a
+         * signal, then the signal number is WTERMSIG(status).
+         *
+         * The possible values of errno are
+         *      EAGAIN - The LibOS is not initialized.
+         *      EINVAL - The value of an argument are invalid.
+         *      ESRCH - Cannot find the LibOS thread.
          */
         public int occlum_ecall_exec_thread(int libos_tid, int host_tid);
     };
