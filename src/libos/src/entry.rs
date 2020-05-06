@@ -145,8 +145,8 @@ fn parse_log_level(level_chars: *const c_char) -> Result<LevelFilter> {
     };
     Ok(match level_string.as_str() {
         "off" => LevelFilter::Off,
-        "error" => LevelFilter::Error,
-        "warn" => LevelFilter::Warn,
+        "panic" | "fatal" | "error" => LevelFilter::Error,
+        "warning" | "warn" => LevelFilter::Warn, // Panic, fatal and warning are log levels defined in OCI (Open Container Initiative)
         "info" => LevelFilter::Info,
         "debug" => LevelFilter::Debug,
         "trace" => LevelFilter::Trace,
