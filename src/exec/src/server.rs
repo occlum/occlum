@@ -231,12 +231,13 @@ impl OcclumExec for OcclumExecImpl {
 
         let cmd = req.command.clone();
         let args = req.parameters.into_vec().clone();
+        let envs = req.enviroments.into_vec().clone();
         let client_process_id = req.process_id;
 
         //Run the command in a thread
         thread::spawn(move || {
             let mut exit_status = Box::new(0);
-            rust_occlum_pal_exec(&cmd, &args, &stdio_fds, &mut exit_status)
+            rust_occlum_pal_exec(&cmd, &args, &envs, &stdio_fds, &mut exit_status)
                 .expect("failed to execute the command");
 
             reset_stop_timer(_execution_lock, _stop_timer, crate::DEFAULT_SERVER_TIMER);
@@ -336,6 +337,7 @@ extern "C" {
     fn occlum_pal_exec(
         cmd_path: *const libc::c_char,
         cmd_args: *const *const libc::c_char,
+        cmd_env: *const *const libc::c_char,
         io_fds: *const occlum_stdio_fds,
         exit_status: *mut i32,
     ) -> i32;
@@ -353,32 +355,38 @@ extern "C" {
     fn occlum_pal_kill(pid: i32, sig: i32) -> i32;
 }
 
+fn vec_strings_to_cchars(strings: &Vec<String>) -> Result<(Vec<*const libc::c_char>,Vec<CString>), i32> {
+    let mut strings_content = Vec::<CString>::new();
+    let mut cchar_strings = Vec::<*const libc::c_char>::new();
+    for string in strings {
+        let string = CString::new(string.as_str()).expect("arg: new failed");
+        cchar_strings.push(string.as_ptr());
+        strings_content.push(string);
+    }
+
+    cchar_strings.push(0 as *const libc::c_char);
+    Ok((cchar_strings, strings_content))
+}
+
 /// Executes the command inside Occlum enclave
 fn rust_occlum_pal_exec(
     cmd: &str,
     args: &Vec<String>,
+    envs: &Vec<String>,
     stdio: &occlum_stdio_fds,
     exit_status: &mut i32,
 ) -> Result<(), i32> {
     let cmd_path = CString::new(cmd).expect("cmd_path: new failed");
-    let mut cmd_args = Vec::<CString>::new();
-    let mut cmd_args_array = Vec::<*const libc::c_char>::new();
-    for arg in args {
-        let arg = CString::new(arg.as_str()).expect("arg: new failed");
-        &cmd_args_array.push(arg.as_ptr());
-        &cmd_args.push(arg);
-    }
-
-    cmd_args_array.push(0 as *const libc::c_char);
+    let (cmd_args_array, _cmd_args) = vec_strings_to_cchars(args)?;
+    let (cmd_envs_array, _cmd_envs) = vec_strings_to_cchars(envs)?;
 
     let stdio_raw = Box::new(stdio);
-
-    info!("{:?} {:?}", cmd_path, cmd_args);
 
     let ret = unsafe {
         occlum_pal_exec(
             cmd_path.as_ptr() as *const libc::c_char,
             Box::into_raw(cmd_args_array.into_boxed_slice()) as *const *const libc::c_char,
+            Box::into_raw(cmd_envs_array.into_boxed_slice()) as *const *const libc::c_char,
             *stdio_raw,
             exit_status as *mut i32,
         )

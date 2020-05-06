@@ -25,6 +25,7 @@ int main(int argc, char* argv[]) {
     }
     const char* cmd_path = (const char*) argv[1];
     const char** cmd_args = (const char**) &argv[2];
+    extern const char **environ;
 
     // Check Occlum PAL version
     int pal_version = occlum_pal_get_version();
@@ -47,7 +48,7 @@ int main(int argc, char* argv[]) {
         .stderr_fd = STDERR_FILENO,
     };
     int exit_status = 0;
-    if (occlum_pal_exec(cmd_path, cmd_args, &io_fds, &exit_status) < 0) {
+    if (occlum_pal_exec(cmd_path, cmd_args, environ, &io_fds, &exit_status) < 0) {
         // Command not found or other internal errors
         return 127;
     }

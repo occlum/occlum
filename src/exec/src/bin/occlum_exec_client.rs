@@ -49,12 +49,18 @@ fn exec_command(
     client: &OcclumExecClient,
     command: &str,
     parameters: &[&str],
+    envs: &[&str],
 ) -> Result<u32, String> {
-    debug!("exec_command {:?} {:?}", command, parameters);
+    debug!("exec_command {:?} {:?} {:?}", command, parameters, envs);
 
     let mut parameter_list = RepeatedField::default();
     for p in parameters {
         parameter_list.push(p.to_string());
+    }
+
+    let mut enviroments_list = RepeatedField::default();
+    for env in envs {
+        enviroments_list.push(env.to_string());
     }
 
     let tmp_dir = TempDir::new("occlum_tmp").expect("create temp dir");
@@ -87,6 +93,7 @@ fn exec_command(
                     process_id: process::id(),
                     command: command.to_string(),
                     parameters: parameter_list,
+                    enviroments: enviroments_list,
                     sockpath: String::from(sockpath.as_path().to_str().unwrap()),
                     ..Default::default()
                 },
@@ -296,6 +303,7 @@ fn main() -> Result<(), i32> {
         .get_matches();
 
     let args: Vec<String> = env::args().collect();
+    let env: Vec<String> = env::vars().into_iter().map(|(key, val)| format!("{}={}", key, val)).collect();
 
     let mut sock_file = String::from(args[0].as_str());
     let sock_file = str::replace(
@@ -334,8 +342,9 @@ fn main() -> Result<(), i32> {
         };
 
         let (cmd, args) = cmd_args.split_first().unwrap();
+        let env: Vec<&str> = env.iter().map(|string| string.as_str()).collect();
 
-        match exec_command(&client, cmd, args) {
+        match exec_command(&client, cmd, args, &env) {
             Ok(process_id) => {
                 let signals = Signals::new(&[SIGUSR1]).unwrap();
                 let signal_thread = thread::spawn(move || {

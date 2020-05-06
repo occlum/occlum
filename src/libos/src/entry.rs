@@ -81,24 +81,26 @@ pub extern "C" fn occlum_ecall_init(log_level: *const c_char, instance_dir: *con
 pub extern "C" fn occlum_ecall_new_process(
     path_buf: *const c_char,
     argv: *const *const c_char,
+    env: *const *const c_char,
     host_stdio_fds: *const HostStdioFds,
 ) -> i32 {
     if HAS_INIT.load(Ordering::SeqCst) == false {
         return ecall_errno!(EAGAIN);
     }
 
-    let (path, args, host_stdio_fds) = match parse_arguments(path_buf, argv, host_stdio_fds) {
-        Ok(path_and_args_and_host_stdio_fds) => path_and_args_and_host_stdio_fds,
-        Err(e) => {
-            eprintln!("invalid arguments for LibOS: {}", e.backtrace());
-            return ecall_errno!(e.errno());
-        }
-    };
+    let (path, args, env, host_stdio_fds) =
+        match parse_arguments(path_buf, argv, env, host_stdio_fds) {
+            Ok(all_parsed_args) => all_parsed_args,
+            Err(e) => {
+                eprintln!("invalid arguments for LibOS: {}", e.backtrace());
+                return ecall_errno!(e.errno());
+            }
+        };
 
     let _ = unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
     panic::catch_unwind(|| {
         backtrace::__rust_begin_short_backtrace(|| {
-            match do_new_process(&path, &args, &host_stdio_fds) {
+            match do_new_process(&path, &args, env, &host_stdio_fds) {
                 Ok(pid_t) => pid_t as i32,
                 Err(e) => {
                     eprintln!("failed to boot up LibOS: {}", e.backtrace());
@@ -180,8 +182,9 @@ fn parse_log_level(level_chars: *const c_char) -> Result<LevelFilter> {
 fn parse_arguments(
     path_ptr: *const c_char,
     argv: *const *const c_char,
+    env: *const *const c_char,
     host_stdio_fds: *const HostStdioFds,
-) -> Result<(PathBuf, Vec<CString>, HostStdioFds)> {
+) -> Result<(PathBuf, Vec<CString>, Vec<CString>, HostStdioFds)> {
     let path_buf = {
         if path_ptr.is_null() {
             return_errno!(EINVAL, "empty path");
@@ -208,26 +211,32 @@ fn parse_arguments(
     let mut args = clone_cstrings_safely(argv)?;
     args.insert(0, program_cstring);
 
+    let env_merged = merge_env(env)?;
+    trace!(
+        "env_merged = {:?}  (default env and untrusted env)",
+        env_merged
+    );
+
     let host_stdio_fds = HostStdioFds::from_user(host_stdio_fds)?;
 
-    Ok((path_buf, args, host_stdio_fds))
+    Ok((path_buf, args, env_merged, host_stdio_fds))
 }
 
 fn do_new_process(
     program_path: &PathBuf,
     argv: &Vec<CString>,
+    env_concat: Vec<CString>,
     host_stdio_fds: &HostStdioFds,
 ) -> Result<pid_t> {
     validate_program_path(program_path)?;
 
-    let envp = &config::LIBOS_CONFIG.env;
     let file_actions = Vec::new();
     let current = &process::IDLE;
     let program_path_str = program_path.to_str().unwrap();
     let new_tid = process::do_spawn_without_exec(
         &program_path_str,
         argv,
-        envp,
+        &env_concat,
         &file_actions,
         host_stdio_fds,
         current,
@@ -295,4 +304,43 @@ fn do_kill(pid: i32, sig: i32) -> Result<()> {
         SigNum::from_u8(sig as u8)?
     };
     crate::signal::do_kill_from_outside_enclave(filter, signum)
+}
+
+fn merge_env(env: *const *const c_char) -> Result<Vec<CString>> {
+    #[derive(Debug)]
+    struct EnvDefaultInner {
+        content: Vec<CString>,
+        helper: HashMap<String, usize>, // Env key: index of content
+    }
+
+    let env_listed = &config::LIBOS_CONFIG.env.untrusted;
+    let mut env_checked: Vec<CString> = Vec::new();
+    let mut env_default = EnvDefaultInner {
+        content: Vec::new(),
+        helper: HashMap::new(),
+    };
+
+    // Use inner struct to parse env default
+    for (idx, val) in config::LIBOS_CONFIG.env.default.iter().enumerate() {
+        env_default.content.push(CString::new(val.clone())?);
+        let kv: Vec<&str> = val.to_str().unwrap().splitn(2, '=').collect(); // only split the first "="
+        env_default.helper.insert(kv[0].to_string(), idx);
+    }
+
+    // Filter out env which are not listed in Occlum.json env untrusted section
+    // and remove env default element if it is overrided
+    if (!env.is_null()) {
+        let env_untrusted = clone_cstrings_safely(env)?;
+        for iter in env_untrusted.iter() {
+            let env_kv: Vec<&str> = iter.to_str().unwrap().splitn(2, '=').collect();
+            if env_listed.contains(env_kv[0]) {
+                env_checked.push(iter.clone());
+                if let Some(idx) = env_default.helper.get(env_kv[0]) {
+                    env_default.content.remove(*idx);
+                }
+            }
+        }
+    }
+    trace!("env_checked from env untrusted: {:?}", env_checked);
+    Ok([env_default.content, env_checked].concat())
 }

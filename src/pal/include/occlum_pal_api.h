@@ -8,7 +8,7 @@ extern "C" {
 /*
  * Occlum PAL API version number
  */
-#define OCCLUM_PAL_VERSION 1
+#define OCCLUM_PAL_VERSION 2
 
 /*
  * @brief Get version of Occlum PAL API
@@ -69,6 +69,8 @@ int occlum_pal_init(const struct occlum_pal_attr* attr);
  * @param cmd_path      The path of the command to be executed
  * @param cmd_args      The arguments to the command. The array must be NULL
  *                      terminated.
+ * @param cmd_env       The untrusted env vars to the command. The array must
+ *                      be NULL terminated.
  * @param io_fds        The file descriptors of the redirected standard I/O
  *                      (i.e., stdin, stdout, stderr), If set to NULL, will
  *                      use the original standard I/O file descriptors.
@@ -82,6 +84,7 @@ int occlum_pal_init(const struct occlum_pal_attr* attr);
  */
 int occlum_pal_exec(const char* cmd_path,
                     const char** cmd_args,
+                    const char** cmd_env,
                     const struct occlum_stdio_fds* io_fds,
                     int* exit_status);
 

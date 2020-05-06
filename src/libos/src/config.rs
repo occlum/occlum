@@ -1,5 +1,6 @@
 use super::*;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::ffi::CString;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -78,7 +79,7 @@ fn parse_mac(mac_str: &str) -> Result<sgx_aes_gcm_128bit_tag_t> {
 pub struct Config {
     pub vm: ConfigVM,
     pub process: ConfigProcess,
-    pub env: Vec<CString>,
+    pub env: ConfigEnv,
     pub entry_points: Vec<PathBuf>,
     pub mount: Vec<ConfigMount>,
 }
@@ -93,6 +94,12 @@ pub struct ConfigProcess {
     pub default_stack_size: usize,
     pub default_heap_size: usize,
     pub default_mmap_size: usize,
+}
+
+#[derive(Debug)]
+pub struct ConfigEnv {
+    pub default: Vec<CString>,
+    pub untrusted: HashSet<String>,
 }
 
 #[derive(Debug)]
@@ -121,13 +128,7 @@ impl Config {
     fn from_input(input: &InputConfig) -> Result<Config> {
         let vm = ConfigVM::from_input(&input.vm)?;
         let process = ConfigProcess::from_input(&input.process)?;
-        let env = {
-            let mut env = Vec::new();
-            for input_env in &input.env {
-                env.push(CString::new(input_env.clone())?);
-            }
-            env
-        };
+        let env = ConfigEnv::from_input(&input.env)?;
         let entry_points = {
             let mut entry_points = Vec::new();
             for ep in &input.entry_points {
@@ -172,6 +173,15 @@ impl ConfigProcess {
             default_stack_size,
             default_heap_size,
             default_mmap_size,
+        })
+    }
+}
+
+impl ConfigEnv {
+    fn from_input(input: &InputConfigEnv) -> Result<ConfigEnv> {
+        Ok(ConfigEnv {
+            default: input.default.clone(),
+            untrusted: input.untrusted.clone(),
         })
     }
 }
@@ -256,7 +266,7 @@ struct InputConfig {
     #[serde(default)]
     pub process: InputConfigProcess,
     #[serde(default)]
-    pub env: Vec<String>,
+    pub env: InputConfigEnv,
     #[serde(default)]
     pub entry_points: Vec<String>,
     #[serde(default)]
@@ -314,6 +324,22 @@ impl Default for InputConfigProcess {
             default_stack_size: InputConfigProcess::get_default_stack_size(),
             default_heap_size: InputConfigProcess::get_default_heap_size(),
             default_mmap_size: InputConfigProcess::get_default_mmap_size(),
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+struct InputConfigEnv {
+    pub default: Vec<CString>,
+    pub untrusted: HashSet<String>,
+}
+
+impl Default for InputConfigEnv {
+    fn default() -> InputConfigEnv {
+        InputConfigEnv {
+            default: Vec::new(),
+            untrusted: HashSet::new(),
         }
     }
 }

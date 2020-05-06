@@ -7,10 +7,17 @@
         "default_heap_size": "8MB",
         "default_mmap_size": "32MB"
     },
-    "env": [
-        "OCCLUM=yes",
-        "TEST=true"
-    ],
+    "env": {
+        "default": [
+            "OCCLUM=yes",
+            "STABLE=yes",
+            "OVERRIDE=N"
+        ],
+        "untrusted": [
+            "TEST",
+            "OVERRIDE"
+        ]
+    },
     "entry_points": [
         "/bin"
     ],

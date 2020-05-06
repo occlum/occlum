@@ -81,11 +81,21 @@ Occlum can be configured easily via a config file named `Occlum.json`, which is 
     },
     // Environment variables
     //
-    // This gives a list of trusted environment variables for the "root"
-    // process started by `occlum run` command.
-    "env": [
-        "OCCLUM=yes"
-    ],
+    // This gives a list of environment variables for the "root"
+    // process started by `occlum exec` command.
+    "env": {
+        // The default env vars given to each "root" LibOS process. As these env vars
+        // are specified in this config file, they are considered trusted.
+        "default": [
+            "OCCLUM=yes"
+        ],
+        // The untrusted env vars that are captured by Occlum from the host environment
+        // and passed to the "root" LibOS processes. These untrusted env vars can
+        // override the trusted, default envs specified above.
+        "untrusted": [
+            "EXAMPLE"
+        ]
+    },
     // Entry points
     //
     // Entry points specify all valid path prefixes for <path> in `occlum run

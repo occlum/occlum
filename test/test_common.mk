@@ -3,6 +3,7 @@ INCLUDE_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 CUR_DIR := $(shell dirname $(realpath $(MAIN_MAKEFILE)))
 PROJECT_DIR := $(realpath $(CUR_DIR)/../../)
 SGX_MODE ?= HW
+EXTRA_ENV :=
 
 ifneq ($(SGX_MODE), HW)
 	BUILD_DIR := $(PROJECT_DIR)/build_sim
@@ -71,7 +72,7 @@ $(BUILD_DIR)/test/obj/$(TEST_NAME)/%.o: %.cc
 
 test:
 	@cd $(BUILD_DIR)/test && \
-		$(BUILD_DIR)/bin/occlum exec /bin/$(TEST_NAME) $(BIN_ARGS)
+		$(EXTRA_ENV) $(BUILD_DIR)/bin/occlum exec /bin/$(TEST_NAME) $(BIN_ARGS)
 
 test-native:
 	@LD_LIBRARY_PATH=/usr/local/occlum/lib cd $(IMAGE_DIR) && ./bin/$(TEST_NAME) $(BIN_ARGS)
