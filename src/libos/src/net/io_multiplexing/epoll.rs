@@ -97,6 +97,12 @@ impl EpollFile {
                 socket.fd()
             } else if let Ok(eventfd) = fd_ref.as_event() {
                 eventfd.get_host_fd()
+            } else if let Ok(epoll_file) = fd_ref.as_epfile() {
+                let target_host_fd = epoll_file.get_host_fd();
+                if self.host_fd == target_host_fd {
+                    return_errno!(EINVAL, "epfd should not be same as the target fd");
+                }
+                target_host_fd
             } else {
                 return_errno!(EPERM, "unsupported file type");
             }
@@ -144,6 +150,10 @@ impl EpollFile {
         }
 
         Ok(ret)
+    }
+
+    fn get_host_fd(&self) -> c_int {
+        self.host_fd
     }
 }
 
