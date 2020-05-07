@@ -17,17 +17,25 @@ cat <<EOF
     "mount": [
         {
             "target": "/",
-            "type": "sefs",
-            "source": "$OCCLUM_INSTANCE_DIR/build/mount/__ROOT",
+            "type": "unionfs",
             "options": {
-                "integrity_only": true,
-                "MAC": "$OCCLUM_CONF_ROOT_FS_MAC"
+                "layers": [
+                    {
+                        "target": "/",
+                        "type": "sefs",
+                        "source": "$OCCLUM_INSTANCE_DIR/build/mount/__ROOT",
+                        "options": {
+                            "integrity_only": true,
+                            "MAC": "$OCCLUM_CONF_ROOT_FS_MAC"
+                        }
+                    },
+                    {
+                        "target": "/",
+                        "type": "sefs",
+                        "source": "$OCCLUM_INSTANCE_DIR/run/mount/__ROOT"
+                    }
+                ]
             }
-        },
-        {
-            "target": "/root",
-            "type": "sefs",
-            "source": "$OCCLUM_INSTANCE_DIR/run/mount/root"
         },
         {
             "target": "/host",

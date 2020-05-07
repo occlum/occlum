@@ -75,6 +75,9 @@ static int do_perm_tests(
         int expected_result = expected_results[i];
 
         int fd = open_file(filename, flags, 0666);
+        if (fd < 0 && fd != expected_result) {
+            return -1;
+        }
         int result = do_write ? write_file(fd) : read_file(fd);
         if (result != expected_result) {
             return -1;
@@ -101,15 +104,15 @@ static int test_expected_results[NUM_TEST_CASES][NUM_TEST_FILES] = {
     // test_open_ro_then_write()
     {NG, NG, NG, NG, NG},
     // test_open_wo_then_write()
-    {NG, NG, NG, OK, OK},
+    {OK, OK, OK, OK, OK},
     // test_open_rw_then_write()
-    {NG, NG, NG, OK, OK},
+    {OK, OK, OK, OK, OK},
     // test_open_ro_then_read()
-    {NG, NG, NG, OK, OK},
+    {OK, OK, OK, OK, OK},
     // test_open_wo_then_read()
     {NG, NG, NG, NG, NG},
     // test_open_rw_then_read()
-    {NG, NG, NG, OK, OK},
+    {OK, OK, OK, OK, OK},
 };
 
 int test_open_ro_then_write() {

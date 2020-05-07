@@ -8,6 +8,7 @@ use rcore_fs_mountfs::{MNode, MountFS};
 use rcore_fs_ramfs::RamFS;
 use rcore_fs_sefs::dev::*;
 use rcore_fs_sefs::SEFS;
+use rcore_fs_unionfs::UnionFS;
 
 lazy_static! {
     /// The root of file system
@@ -29,38 +30,61 @@ lazy_static! {
     };
 }
 
-fn open_root_fs_according_to(mount_config: &Vec<ConfigMount>) -> Result<Arc<MountFS>> {
-    let (root_sefs_mac, root_sefs_source) = {
-        let root_mount_config = mount_config
+fn open_root_fs_according_to(mount_configs: &Vec<ConfigMount>) -> Result<Arc<MountFS>> {
+    let mount_config = mount_configs
+        .iter()
+        .find(|m| m.target == Path::new("/") && m.type_ == ConfigMountFsType::TYPE_UNIONFS)
+        .ok_or_else(|| errno!(Errno::ENOENT, "the root UnionFS is not valid"))?;
+    if mount_config.options.layers.is_none() {
+        return_errno!(EINVAL, "The root UnionFS must be given the layers");
+    }
+    let layer_mount_configs = mount_config.options.layers.as_ref().unwrap();
+    // image SEFS in layers
+    let (root_image_sefs_mac, root_image_sefs_source) = {
+        let mount_config = layer_mount_configs
             .iter()
-            .find(|m| m.target == Path::new("/"))
-            .ok_or_else(|| errno!(Errno::ENOENT, "the mount point at / is not specified"))?;
-
-        if root_mount_config.type_ != ConfigMountFsType::TYPE_SEFS {
-            return_errno!(EINVAL, "The mount point at / must be SEFS");
-        }
-        if !root_mount_config.options.integrity_only {
-            return_errno!(EINVAL, "The root SEFS at / must be integrity-only");
-        }
-        if root_mount_config.source.is_none() {
-            return_errno!(
-                EINVAL,
-                "The root SEFS must be given a source path (on host)"
-            );
-        }
+            .find(|m| m.type_ == ConfigMountFsType::TYPE_SEFS && m.options.integrity_only)
+            .ok_or_else(|| errno!(Errno::ENOENT, "the image SEFS in layers is not valid"))?;
         (
-            root_mount_config.options.mac,
-            root_mount_config.source.as_ref().unwrap(),
+            mount_config.options.mac,
+            mount_config.source.as_ref().unwrap(),
         )
     };
-
-    let root_sefs = SEFS::open(
-        Box::new(SgxStorage::new(root_sefs_source, true, root_sefs_mac)),
+    let root_image_sefs = SEFS::open(
+        Box::new(SgxStorage::new(
+            root_image_sefs_source,
+            true,
+            root_image_sefs_mac,
+        )),
         &time::OcclumTimeProvider,
         &SgxUuidProvider,
     )?;
-    let root_mountable_sefs = MountFS::new(root_sefs);
-    Ok(root_mountable_sefs)
+    // container SEFS in layers
+    let root_container_sefs_source = {
+        let mount_config = layer_mount_configs
+            .iter()
+            .find(|m| m.type_ == ConfigMountFsType::TYPE_SEFS && !m.options.integrity_only)
+            .ok_or_else(|| errno!(Errno::ENOENT, "the container SEFS in layers is not valid"))?;
+        mount_config.source.as_ref().unwrap()
+    };
+    let root_container_sefs = {
+        SEFS::open(
+            Box::new(SgxStorage::new(root_container_sefs_source, false, None)),
+            &time::OcclumTimeProvider,
+            &SgxUuidProvider,
+        )
+    }
+    .or_else(|_| {
+        SEFS::create(
+            Box::new(SgxStorage::new(root_container_sefs_source, false, None)),
+            &time::OcclumTimeProvider,
+            &SgxUuidProvider,
+        )
+    })?;
+
+    let root_unionfs = UnionFS::new(vec![root_container_sefs, root_image_sefs])?;
+    let root_mountable_unionfs = MountFS::new(root_unionfs);
+    Ok(root_mountable_unionfs)
 }
 
 fn mount_nonroot_fs_according_to(mount_config: &Vec<ConfigMount>, root: &MNode) -> Result<()> {
@@ -115,6 +139,9 @@ fn mount_nonroot_fs_according_to(mount_config: &Vec<ConfigMount>, root: &MNode) 
             TYPE_RAMFS => {
                 let ramfs = RamFS::new();
                 mount_fs_at(ramfs, &root, target_dirname)?;
+            }
+            TYPE_UNIONFS => {
+                return_errno!(EINVAL, "Cannot mount UnionFS at non-root path");
             }
         }
     }

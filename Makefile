@@ -35,10 +35,10 @@ submodule: githooks
 	@# Enclaves used by tools are running in simulation mode by default to run faster.
 	@rm -rf build build_sim
 	@$(MAKE) SGX_MODE=SIM --no-print-directory -C tools
-	@$(MAKE) --no-print-directory -C deps/sefs/sefs-fuse clean
-	@$(MAKE) SGX_MODE=SIM --no-print-directory -C deps/sefs/sefs-fuse
-	@cp deps/sefs/sefs-fuse/bin/sefs-fuse build/bin
-	@cp deps/sefs/sefs-fuse/lib/libsefs-fuse.signed.so build/lib
+	@$(MAKE) --no-print-directory -C deps/sefs/sefs-cli clean
+	@$(MAKE) SGX_MODE=SIM --no-print-directory -C deps/sefs/sefs-cli
+	@cp deps/sefs/sefs-cli/bin/sefs-cli build/bin
+	@cp deps/sefs/sefs-cli/lib/libsefs-cli.signed.so build/lib
 
 src:
 	@$(MAKE) --no-print-directory -C src

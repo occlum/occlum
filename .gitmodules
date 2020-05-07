@@ -9,6 +9,7 @@
 [submodule "deps/sefs"]
 	path = deps/sefs
 	url = https://github.com/occlum/sefs.git
+	branch = unionfs
 [submodule "deps/serde-sgx"]
 	path = deps/serde-sgx
 	url = https://github.com/occlum/serde-sgx

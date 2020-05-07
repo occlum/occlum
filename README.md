@@ -127,15 +127,23 @@ Occlum can be configured easily via a config file named `Occlum.json`, which is 
     "mount": [
         {
             "target": "/",
-            "type": "sefs",
-            "source": "./image",
+            "type": "unionfs",
             "options": {
-                "integrity_only": true
+                "layers": [
+                    {
+                        "target": "/",
+                        "type": "sefs",
+                        "source": "./image",
+                        "options": {
+                            "integrity_only": true
+                        }
+                    },
+                    {
+                        "target": "/",
+                        "type": "sefs"
+                    }
+                ]
             }
-        },
-        {
-            "target": "/root",
-            "type": "sefs"
         },
         {
             "target": "/host",
