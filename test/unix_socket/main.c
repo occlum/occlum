@@ -34,7 +34,7 @@ int create_connected_sockets(int *sockets, char *sock_path) {
         THROW_ERROR("failed to listen");
     }
 
-    int client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    int client_fd = socket(AF_UNIX, SOCK_STREAM, PF_UNIX);
     if (client_fd == -1) {
         close(listen_fd);
         THROW_ERROR("failed to create a unix socket");

@@ -184,12 +184,13 @@ enum Status {
 impl UnixSocket {
     /// C/S 1: Create a new unix socket
     pub fn new(socket_type: c_int, protocol: c_int) -> Result<Self> {
-        if socket_type == libc::SOCK_STREAM && protocol == 0 {
+        if socket_type == libc::SOCK_STREAM && (protocol == 0 || protocol == libc::PF_UNIX) {
             Ok(UnixSocket {
                 obj: None,
                 status: Status::None,
             })
         } else {
+            // Return different error numbers according to input
             return_errno!(ENOSYS, "unimplemented unix socket type")
         }
     }
