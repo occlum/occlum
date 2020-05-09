@@ -52,16 +52,20 @@ RUN wget http://www.etallen.com/cpuid/cpuid-20200211.x86_64.tar.gz && \
 
 # Install SGX SDK
 WORKDIR /tmp
-RUN git clone -b sgx_2.7.1_for_occlum https://github.com/occlum/linux-sgx && \
+RUN git clone -b sgx_2.9.1_for_occlum https://github.com/occlum/linux-sgx && \
     cd linux-sgx && \
     ./download_prebuilt.sh && \
+    cp ./external/toolset/as /usr/local/bin/ && \
+    cp ./external/toolset/ld /usr/local/bin/ && \
+    cp ./external/toolset/ld.gold /usr/local/bin/ && \
+    cp ./external/toolset/objdump /usr/local/bin/ && \
     ./compile_and_install.sh && \
     echo 'source /opt/intel/sgxsdk/environment' >> /root/.bashrc && \
     rm -rf /tmp/linux-sgx
 
 # Install Rust
 ENV PATH="/root/.cargo/bin:$PATH"
-ENV OCCLUM_RUST_VERSION=nightly-2019-11-25
+ENV OCCLUM_RUST_VERSION=nightly-2020-04-07
 RUN curl https://sh.rustup.rs -sSf | \
         sh -s -- --default-toolchain ${OCCLUM_RUST_VERSION} -y && \
     rm -rf /root/.cargo/registry && rm -rf /root/.cargo/git && \

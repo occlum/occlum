@@ -1,5 +1,5 @@
 use super::*;
-use std::alloc::{Alloc, AllocErr, Layout};
+use std::alloc::{AllocErr, AllocInit, AllocRef, Layout, MemoryBlock};
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -26,7 +26,13 @@ impl UntrustedSliceAlloc {
         }
 
         let layout = Layout::from_size_align(buf_size, 1)?;
-        let buf_ptr = unsafe { UNTRUSTED_ALLOC.alloc(layout)?.as_ptr() };
+        let buf_ptr = unsafe {
+            UNTRUSTED_ALLOC
+                .alloc(layout, AllocInit::Uninitialized)?
+                .ptr
+                .as_ptr()
+        };
+
         let buf_pos = AtomicUsize::new(0);
         Ok(Self {
             buf_ptr,

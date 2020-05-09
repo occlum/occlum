@@ -23,7 +23,7 @@ pub fn register_exception_handlers() {
 }
 
 #[no_mangle]
-extern "C" fn handle_exception(info: *mut sgx_exception_info_t) -> u32 {
+extern "C" fn handle_exception(info: *mut sgx_exception_info_t) -> i32 {
     extern "C" {
         fn __occlum_syscall_c_abi(num: u32, info: *mut sgx_exception_info_t) -> u32;
     }

@@ -52,8 +52,6 @@ ONLY_REBUILD_BUILTIN ?= 0
 LIBOS_SO := $(BUILD_DIR)/lib/libocclum-libos.so
 LIBOS_CORE_A := $(BUILD_DIR)/lib/libocclum-libos-core.a
 LIBOS_CORE_RS_A := $(BUILD_DIR)/lib/libocclum_libos_core_rs.a
-# The dependent libraries
-LIBCOMPILER_RT_PATCH_A := $(BUILD_DIR)/lib/libcompiler-rt-patch.a
 
 # All source code
 RUST_SRCS := $(wildcard src/*.rs src/*/*.rs src/*/*/*.rs src/*/*/*/*.rs src/*/*/*/*/*.rs)
@@ -90,7 +88,7 @@ C_FLAGS += -DOCCLUM_BUILTIN_VM_USER_SPACE_SIZE='($(OCCLUM_BUILTIN_VM_USER_SPACE_
 endif
 
 _Other_Link_Flags := -L$(RUST_SGX_SDK_DIR)/compiler-rt/ -L$(BUILD_DIR)/lib
-_Other_Enclave_Libs := -lcompiler-rt-patch -locclum-libos-core -lsgx_tprotected_fs
+_Other_Enclave_Libs := -locclum-libos-core -lsgx_tprotected_fs
 LINK_FLAGS := $(SGX_LFLAGS_T)
 
 .PHONY: all clean
@@ -146,15 +144,10 @@ $(BUILD_DIR)/src/libos/%.o: %.S
 	@$(CC) $(C_FLAGS) -c $< -o $@
 	@echo "AS <= $@"
 
-$(LIBCOMPILER_RT_PATCH_A):
-	@$(MAKE) --no-print-directory -C $(RUST_SGX_SDK_DIR)/compiler-rt/ > /dev/null
-	@cp $(RUST_SGX_SDK_DIR)/compiler-rt/libcompiler-rt-patch.a $(LIBCOMPILER_RT_PATCH_A)
-	@echo "GEN <= $@"
-
 clean-builtin:
 	@-$(RM) -f $(BUILTIN_C_OBJS)
 
 clean: clean-builtin
 	@-$(RM) -f $(LIBOS_SO) $(LIBOS_CORE_A) $(LIBOS_CORE_RS_A) \
-		$(LIBCOMPILER_RT_PATCH_A) $(EDL_C_OBJS) $(EDL_C_SRCS) $(C_OBJS) $(CXX_OBJS) $(S_OBJS)
+		$(EDL_C_OBJS) $(EDL_C_SRCS) $(C_OBJS) $(CXX_OBJS) $(S_OBJS)
 	@-$(RM) -rf $(RUST_TARGET_DIR)

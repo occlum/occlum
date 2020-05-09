@@ -1,14 +1,18 @@
 use super::*;
-use std::alloc::{Alloc, AllocErr, Layout};
-use std::ptr::{self, NonNull};
+use std::alloc::{AllocErr, AllocInit, AllocRef, Layout, MemoryBlock};
+use std::ptr::{self, write_bytes, NonNull};
 
 /// The global memory allocator for untrusted memory
 pub static mut UNTRUSTED_ALLOC: UntrustedAlloc = UntrustedAlloc;
 
 pub struct UntrustedAlloc;
 
-unsafe impl Alloc for UntrustedAlloc {
-    unsafe fn alloc(&mut self, layout: Layout) -> std::result::Result<NonNull<u8>, AllocErr> {
+unsafe impl AllocRef for UntrustedAlloc {
+    fn alloc(
+        &mut self,
+        layout: Layout,
+        init: AllocInit,
+    ) -> std::result::Result<MemoryBlock, AllocErr> {
         if layout.size() == 0 {
             return Err(AllocErr);
         }
@@ -29,6 +33,12 @@ unsafe impl Alloc for UntrustedAlloc {
             return Err(AllocErr);
         }
 
+        if init == AllocInit::Zeroed {
+            unsafe {
+                write_bytes(mem_ptr, 0, layout.size());
+            }
+        }
+
         // Sanity checks
         // Post-condition 1: alignment
         debug_assert!(mem_ptr as usize % layout.align() == 0);
@@ -37,7 +47,10 @@ unsafe impl Alloc for UntrustedAlloc {
             mem_ptr as *const u8,
             layout.size()
         ));
-        Ok(NonNull::new(mem_ptr).unwrap())
+        Ok(MemoryBlock {
+            ptr: NonNull::new(mem_ptr).unwrap(),
+            size: layout.size(),
+        })
     }
 
     unsafe fn dealloc(&mut self, ptr: NonNull<u8>, layout: Layout) {

@@ -180,7 +180,7 @@ impl File for StdoutFile {
         }
 
         let cmd_bits = cmd.cmd_num() as c_int;
-        let cmd_arg_ptr = cmd.arg_ptr() as *const c_int;
+        let cmd_arg_ptr = cmd.arg_ptr() as *mut c_int;
         let host_stdout_fd = self.get_host_fd() as i32;
         try_libc!(libc::ocall::ioctl_arg1(
             host_stdout_fd,
@@ -321,7 +321,7 @@ impl File for StdinFile {
         }
 
         let cmd_bits = cmd.cmd_num() as c_int;
-        let cmd_arg_ptr = cmd.arg_ptr() as *const c_int;
+        let cmd_arg_ptr = cmd.arg_ptr() as *mut c_int;
         let host_stdin_fd = self.get_host_fd() as i32;
         try_libc!(libc::ocall::ioctl_arg1(
             host_stdin_fd,

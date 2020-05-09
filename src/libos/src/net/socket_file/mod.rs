@@ -108,7 +108,7 @@ impl File for SocketFile {
 
     fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<()> {
         let cmd_num = cmd.cmd_num() as c_int;
-        let cmd_arg_ptr = cmd.arg_ptr() as *const c_int;
+        let cmd_arg_ptr = cmd.arg_ptr() as *mut c_int;
         try_libc!(libc::ocall::ioctl_arg1(self.fd(), cmd_num, cmd_arg_ptr));
         // FIXME: add sanity checks for results returned for socket-related ioctls
         cmd.validate_arg_val()?;

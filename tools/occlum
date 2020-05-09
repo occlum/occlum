@@ -166,7 +166,6 @@ cmd_build() {
     cp "$occlum_dir/$build_dir/bin/occlum-run" build/bin/
     mkdir -p build/lib
     cp "$occlum_dir/$build_dir/lib/libocclum-libos-core.a" build/lib/
-    cp "$occlum_dir/$build_dir/lib/libcompiler-rt-patch.a" build/lib/
     cp "$occlum_dir/$build_dir/lib/libocclum-pal.so" build/lib/
     mkdir -p build/src/libos/src/builtin
 
