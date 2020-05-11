@@ -80,7 +80,7 @@ impl File for UnixSocketFile {
         })
     }
 
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<()> {
+    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
         let mut inner = self.inner.lock().unwrap();
         inner.ioctl(cmd)
     }
@@ -260,7 +260,7 @@ impl UnixSocket {
         Ok((r, w, false))
     }
 
-    pub fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<()> {
+    pub fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
         match cmd {
             IoctlCmd::FIONREAD(arg) => {
                 let bytes_to_read = self
@@ -272,7 +272,7 @@ impl UnixSocket {
             }
             _ => return_errno!(EINVAL, "unknown ioctl cmd for unix socket"),
         }
-        Ok(())
+        Ok(0)
     }
 
     fn channel(&self) -> Result<&Channel> {

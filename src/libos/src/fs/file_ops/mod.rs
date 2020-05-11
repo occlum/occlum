@@ -13,7 +13,9 @@ pub use self::fcntl::{do_fcntl, FcntlCmd};
 pub use self::file_flags::{AccessMode, CreationFlags, StatusFlags};
 pub use self::flock::{Flock, FlockType};
 pub use self::fsync::{do_fdatasync, do_fsync};
-pub use self::ioctl::{do_ioctl, IoctlCmd, StructuredIoctlArgType, StructuredIoctlNum};
+pub use self::ioctl::{
+    do_ioctl, occlum_ocall_ioctl, IoctlCmd, StructuredIoctlArgType, StructuredIoctlNum,
+};
 pub use self::link::do_link;
 pub use self::lseek::do_lseek;
 pub use self::mkdir::do_mkdir;

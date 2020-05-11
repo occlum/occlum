@@ -65,6 +65,10 @@ impl<'a> NonBuiltinIoctlCmd<'a> {
             .as_ref()
             .map_or(std::ptr::null(), |arg_slice| arg_slice.as_ptr())
     }
+
+    pub fn arg_len(&self) -> usize {
+        self.cmd_num.arg_size()
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

@@ -11,7 +11,7 @@ use util::sgx::*;
 pub struct DevSgx;
 
 impl File for DevSgx {
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<()> {
+    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
         let nonbuiltin_cmd = match cmd {
             IoctlCmd::NonBuiltin(nonbuiltin_cmd) => nonbuiltin_cmd,
             _ => return_errno!(EINVAL, "unknown ioctl cmd for /dev/sgx"),
@@ -92,7 +92,7 @@ impl File for DevSgx {
                 return_errno!(ENOSYS, "unknown ioctl cmd for /dev/sgx");
             }
         }
-        Ok(())
+        Ok(0)
     }
 
     fn as_any(&self) -> &dyn Any {

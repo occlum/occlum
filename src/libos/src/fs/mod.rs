@@ -13,7 +13,9 @@ use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
 pub use self::dev_fs::AsDevRandom;
 pub use self::event_file::{AsEvent, EventFile};
 pub use self::file::{File, FileRef};
-pub use self::file_ops::{AccessMode, CreationFlags, FileMode, Stat, StatusFlags};
+pub use self::file_ops::{
+    occlum_ocall_ioctl, AccessMode, CreationFlags, FileMode, Stat, StatusFlags,
+};
 pub use self::file_ops::{Flock, FlockType};
 pub use self::file_ops::{IoctlCmd, StructuredIoctlArgType, StructuredIoctlNum};
 pub use self::file_table::{FileDesc, FileTable};

@@ -112,6 +112,15 @@ macro_rules! impl_ioctl_cmds {
                 }
             }
 
+            pub fn arg_len(&self) -> usize {
+                match self {
+                    $(
+                        IoctlCmd::$ioctl_name(_) => get_arg_len!($($ioctl_type_tt)*),
+                    )*
+                    IoctlCmd::NonBuiltin(inner) => inner.arg_len(),
+                }
+            }
+
             pub fn cmd_num(&self) -> u32 {
                 match self {
                     $(
@@ -139,6 +148,18 @@ macro_rules! get_arg_type {
     };
     ($($ioctl_type_tt: tt)*) => {
         &'a $($ioctl_type_tt)*
+    };
+}
+
+macro_rules! get_arg_len {
+    (()) => {
+        0
+    };
+    (mut $type: ty) => {
+        std::mem::size_of::<$type>()
+    };
+    ($type: ty) => {
+        std::mem::size_of::<$type>()
     };
 }
 

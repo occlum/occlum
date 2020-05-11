@@ -3,7 +3,7 @@ use super::*;
 mod recv;
 mod send;
 
-use fs::{AccessMode, CreationFlags, File, FileRef, IoctlCmd, StatusFlags};
+use fs::{occlum_ocall_ioctl, AccessMode, CreationFlags, File, FileRef, IoctlCmd, StatusFlags};
 use std::any::Any;
 use std::io::{Read, Seek, SeekFrom, Write};
 
@@ -106,13 +106,24 @@ impl File for SocketFile {
         return_errno!(ESPIPE, "Socket does not support seek")
     }
 
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<()> {
+    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
         let cmd_num = cmd.cmd_num() as c_int;
-        let cmd_arg_ptr = cmd.arg_ptr() as *mut c_int;
-        try_libc!(libc::ocall::ioctl_arg1(self.fd(), cmd_num, cmd_arg_ptr));
+        let cmd_arg_ptr = cmd.arg_ptr() as *mut c_void;
+        let ret = try_libc!({
+            let mut retval: i32 = 0;
+            let status = occlum_ocall_ioctl(
+                &mut retval as *mut i32,
+                self.fd(),
+                cmd_num,
+                cmd_arg_ptr,
+                cmd.arg_len(),
+            );
+            assert!(status == sgx_status_t::SGX_SUCCESS);
+            retval
+        });
         // FIXME: add sanity checks for results returned for socket-related ioctls
-        cmd.validate_arg_val()?;
-        Ok(())
+        cmd.validate_arg_and_ret_vals(ret)?;
+        Ok(ret)
     }
 
     fn get_access_mode(&self) -> Result<AccessMode> {

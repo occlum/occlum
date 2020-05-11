@@ -45,7 +45,7 @@ impl_ioctl_nums_and_cmds! {
 /// Sanity checks are mostly useful when the argument values are returned from
 /// the untrusted host OS.
 impl<'a> IoctlCmd<'a> {
-    pub fn validate_arg_val(&self) -> Result<()> {
+    pub fn validate_arg_and_ret_vals(&self, ret: i32) -> Result<()> {
         match self {
             IoctlCmd::TIOCGWINSZ(winsize_ref) => {
                 // ws_row and ws_col are usually not zeros
@@ -63,12 +63,27 @@ impl<'a> IoctlCmd<'a> {
             }
             _ => {}
         }
+
+        // Current ioctl commands all return zero
+        if ret != 0 {
+            return_errno!(EINVAL, "return value should be zero");
+        }
         Ok(())
     }
 }
 
-pub fn do_ioctl(fd: FileDesc, cmd: &mut IoctlCmd) -> Result<()> {
+pub fn do_ioctl(fd: FileDesc, cmd: &mut IoctlCmd) -> Result<i32> {
     debug!("ioctl: fd: {}, cmd: {:?}", fd, cmd);
     let file_ref = current!().file(fd)?;
     file_ref.ioctl(cmd)
+}
+
+extern "C" {
+    pub fn occlum_ocall_ioctl(
+        ret: *mut i32,
+        fd: c_int,
+        request: c_int,
+        arg: *mut c_void,
+        len: size_t,
+    ) -> sgx_status_t;
 }

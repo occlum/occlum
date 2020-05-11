@@ -162,5 +162,12 @@ enclave {
 
         void occlum_ocall_print_log(uint32_t level, [in, string] const char* msg);
         void occlum_ocall_flush_log(void);
+
+        int occlum_ocall_ioctl(
+            int fd,
+            int request,
+            [in, out, size=len] void *arg,
+            size_t len
+        ) propagate_errno;
     };
 };
