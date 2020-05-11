@@ -1,5 +1,6 @@
 use super::c_types::{mcontext_t, siginfo_t, ucontext_t};
 use super::constants::SIGKILL;
+use super::sig_stack::SigStackFlags;
 use super::{SigAction, SigActionFlags, SigDefaultAction, SigSet, Signal};
 use crate::prelude::*;
 use crate::process::{ProcessRef, TermStatus, ThreadRef};
@@ -176,10 +177,26 @@ fn handle_signals_by_user(
 ) -> Result<()> {
     // Represent the user stack in a memory safe way
     let mut user_stack = {
-        const BIG_ENOUGH_GAP: u64 = 1024;
-        const BIG_ENOUGH_SIZE: u64 = 4096;
-        let stack_top = (curr_user_ctxt.rsp - BIG_ENOUGH_GAP) as usize;
-        let stack_size = BIG_ENOUGH_SIZE as usize;
+        let get_stack_top = || -> usize {
+            if flags.contains(SigActionFlags::SA_ONSTACK) {
+                let thread = current!();
+                let sig_stack = thread.sig_stack().lock().unwrap();
+                if let Some(stack) = *sig_stack {
+                    if !stack.contains(curr_user_ctxt.rsp as usize) {
+                        let stack_top = stack.sp() + stack.size();
+                        return stack_top;
+                    }
+                }
+            }
+            const BIG_ENOUGH_GAP: u64 = 1024;
+            let stack_top = (curr_user_ctxt.rsp - BIG_ENOUGH_GAP) as usize;
+            stack_top
+        };
+        let stack_top = get_stack_top();
+        let stack_size = {
+            const BIG_ENOUGH_SIZE: u64 = 4096;
+            BIG_ENOUGH_SIZE as usize
+        };
         // TODO: validate the memory range of the stack
         unsafe { Stack::new(stack_top, stack_size)? }
     };

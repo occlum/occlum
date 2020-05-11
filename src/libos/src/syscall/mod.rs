@@ -38,8 +38,8 @@ use crate::process::{
 };
 use crate::sched::{do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
 use crate::signal::{
-    do_kill, do_rt_sigaction, do_rt_sigpending, do_rt_sigprocmask, do_rt_sigreturn, do_tgkill,
-    do_tkill, sigaction_t, sigset_t,
+    do_kill, do_rt_sigaction, do_rt_sigpending, do_rt_sigprocmask, do_rt_sigreturn, do_sigaltstack,
+    do_tgkill, do_tkill, sigaction_t, sigset_t, stack_t,
 };
 use crate::vm::{MMapFlags, VMPerms};
 use crate::{fs, process, std, vm};
@@ -206,7 +206,7 @@ macro_rules! process_syscall_table_with_callback {
             (RtSigtimedwait = 128) => handle_unsupported(),
             (RtSigqueueinfo = 129) => handle_unsupported(),
             (RtSigsuspend = 130) => handle_unsupported(),
-            (Sigaltstack = 131) => handle_unsupported(),
+            (Sigaltstack = 131) => do_sigaltstack(ss: *const stack_t, old_ss: *mut stack_t, context: *const CpuContext),
             (Utime = 132) => handle_unsupported(),
             (Mknod = 133) => handle_unsupported(),
             (Uselib = 134) => handle_unsupported(),
@@ -626,6 +626,10 @@ fn do_syscall(user_context: &mut CpuContext) {
         } else if syscall.num == SyscallNum::HandleException {
             // syscall.args[0] == info
             syscall.args[1] = user_context as *mut _ as isize;
+        } else if syscall.num == SyscallNum::Sigaltstack {
+            // syscall.args[0] == new_ss
+            // syscall.args[1] == old_ss
+            syscall.args[2] = user_context as *const _ as isize;
         }
 
         dispatch_syscall(syscall)

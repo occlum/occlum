@@ -1,10 +1,11 @@
 use super::constants::*;
 use super::do_sigprocmask::MaskOp;
 use super::signals::FaultSignal;
-use super::{sigaction_t, sigset_t, SigAction, SigNum, SigSet};
+use super::{sigaction_t, sigset_t, stack_t, SigAction, SigNum, SigSet, SigStack};
 use crate::prelude::*;
 use crate::process::ProcessFilter;
 use crate::syscall::CpuContext;
+use crate::util::mem_util::from_user;
 
 pub fn do_rt_sigaction(
     signum_c: c_int,
@@ -117,5 +118,42 @@ pub fn do_rt_sigpending(buf_ptr: *mut sigset_t, buf_size: usize) -> Result<isize
     };
     let pending = super::do_sigpending::do_sigpending()?;
     *buf = pending.to_c();
+    Ok(0)
+}
+
+pub fn do_sigaltstack(
+    new_ss_c: *const stack_t,
+    old_ss_c: *mut stack_t,
+    user_context: *const CpuContext,
+) -> Result<isize> {
+    // C types -> Rust types
+    let new_ss = {
+        if !new_ss_c.is_null() {
+            from_user::check_ptr(new_ss_c)?;
+            let new_ss_c = unsafe { &*new_ss_c };
+            let new_ss = SigStack::from_c(new_ss_c)?;
+            Some(new_ss)
+        } else {
+            None
+        }
+    };
+    let mut old_ss_c = {
+        if !old_ss_c.is_null() {
+            from_user::check_mut_ptr(old_ss_c)?;
+            let old_ss_c = unsafe { &mut *old_ss_c };
+            Some(old_ss_c)
+        } else {
+            None
+        }
+    };
+    let user_context = unsafe { &*user_context };
+
+    // Do sigaltstack
+    let old_ss = super::do_sigaltstack::do_sigaltstack(&new_ss, user_context)?;
+
+    // Retrieve old signal stack, if needed
+    if let Some(old_ss_c) = old_ss_c {
+        *old_ss_c = old_ss.to_c();
+    }
     Ok(0)
 }

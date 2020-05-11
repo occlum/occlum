@@ -7,7 +7,7 @@ use super::{
     TermStatus, ThreadRef,
 };
 use crate::prelude::*;
-use crate::signal::{SigQueues, SigSet};
+use crate::signal::{SigQueues, SigSet, SigStack};
 
 pub use self::builder::ThreadBuilder;
 pub use self::id::ThreadId;
@@ -35,6 +35,7 @@ pub struct Thread {
     sig_queues: SgxMutex<SigQueues>,
     sig_mask: SgxRwLock<SigSet>,
     sig_tmp_mask: SgxRwLock<SigSet>,
+    sig_stack: SgxMutex<Option<SigStack>>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -89,6 +90,11 @@ impl Thread {
     /// of a syscall.
     pub fn sig_tmp_mask(&self) -> &SgxRwLock<SigSet> {
         &self.sig_tmp_mask
+    }
+
+    /// Get the alternate signal stack.
+    pub fn sig_stack(&self) -> &SgxMutex<Option<SigStack>> {
+        &self.sig_stack
     }
 
     /// Get a file from the file table.

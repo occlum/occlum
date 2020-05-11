@@ -101,6 +101,7 @@ impl ThreadBuilder {
         let sig_queues = SgxMutex::new(SigQueues::new());
         let sig_mask = SgxRwLock::new(SigSet::new_empty());
         let sig_tmp_mask = SgxRwLock::new(SigSet::new_empty());
+        let sig_stack = SgxMutex::new(None);
 
         let new_thread = Arc::new(Thread {
             task,
@@ -116,6 +117,7 @@ impl ThreadBuilder {
             sig_queues,
             sig_mask,
             sig_tmp_mask,
+            sig_stack,
         });
 
         let mut inner = new_thread.process().inner();
