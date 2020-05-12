@@ -40,6 +40,11 @@ Usage:
 EOF
 }
 
+get_conf_root_fs_mac() {
+    LD_LIBRARY_PATH="$SGX_SDK/sdk_libs" \
+    "$occlum_dir/$build_dir/bin/occlum-protect-integrity" show-mac "$context_dir/build/mount/__ROOT/metadata"
+}
+
 get_conf_default_stack_size() {
     cat "$working_dir/Occlum.json" | \
         python -c "import sys, json; print json.load(sys.stdin)['process']['default_stack_size']"
@@ -71,6 +76,7 @@ get_conf_entry_points() {
 }
 
 get_occlum_conf_file_mac() {
+    LD_LIBRARY_PATH="$SGX_SDK/sdk_libs" \
     "$occlum_dir/$build_dir/bin/occlum-protect-integrity" show-mac "$context_dir/build/Occlum.json.protected"
 }
 
@@ -173,13 +179,13 @@ cmd_build() {
     chmod 531 -R $working_dir/image/lib
     mkdir -p build/mount/
     cd "$occlum_dir/$build_dir/bin/" && \
-    ./sefs-fuse \
+    LD_LIBRARY_PATH="$SGX_SDK/sdk_libs" ./sefs-fuse \
         --integrity-only \
         "$context_dir/build/mount/__ROOT" \
         "$working_dir/image" \
         zip
 
-    export OCCLUM_CONF_ROOT_FS_MAC=`"$occlum_dir/$build_dir/bin/occlum-protect-integrity" show-mac "$context_dir/build/mount/__ROOT/metadata"`
+    export OCCLUM_CONF_ROOT_FS_MAC=`get_conf_root_fs_mac`
     export OCCLUM_CONF_USER_SPACE_SIZE=`get_conf_user_space_size`
     export OCCLUM_CONF_DEFAULT_STACK_SIZE=`get_conf_default_stack_size`
     export OCCLUM_CONF_DEFAULT_HEAP_SIZE=`get_conf_default_heap_size`
@@ -189,7 +195,7 @@ cmd_build() {
     cd "$context_dir/build"
     "$occlum_dir/$build_dir/bin/occlum-gen-default-occlum-json"\
         > "Occlum.json"
-    "$occlum_dir/$build_dir/bin/occlum-protect-integrity" protect Occlum.json
+    LD_LIBRARY_PATH="$SGX_SDK/sdk_libs" "$occlum_dir/$build_dir/bin/occlum-protect-integrity" protect Occlum.json
 
     export OCCLUM_BUILTIN_CONF_FILE_MAC=`get_occlum_conf_file_mac`
     echo "EXPORT => OCCLUM_BUILTIN_CONF_FILE_MAC = $OCCLUM_BUILTIN_CONF_FILE_MAC"

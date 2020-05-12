@@ -155,7 +155,7 @@ To build Occlum from the latest source code, do the following steps in an Occlum
     mkdir occlum && cd occlum
     git clone https://github.com/occlum/occlum .
     ```
-2. Prepare the submodules required by Occlum
+2. Prepare the submodules and tools required by Occlum.
     ```
     make submodule
     ```
