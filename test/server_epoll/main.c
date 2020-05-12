@@ -9,6 +9,7 @@
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
 #include "test.h"
 
@@ -139,6 +140,14 @@ int test_ip_socket() {
                 close_files(2, server_fd, epfd);
                 THROW_ERROR("should never reach here");
             }
+        }
+    }
+
+    // Wait for all the children to exit
+    for (int i = 0; i < proc_num; i++) {
+        if (wait(NULL) < 0) {
+            close_files(2, server_fd, epfd);
+            THROW_ERROR("failed to wait");
         }
     }
 
