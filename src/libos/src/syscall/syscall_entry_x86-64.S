@@ -65,13 +65,8 @@ __occlum_syscall_linux_abi:
 #else // SGX_MODE_HW
     movq TASK_KERNEL_FS(%r12), %r11
     wrfsbase %r11
-#endif  
-    // Switch to kernel stack base and limit
-    movq TASK_KERNEL_STACK_BASE(%r12), %r11
-    movq %r11, %gs:TD_STACK_BASE
-    movq TASK_KERNEL_STACK_LIMIT(%r12), %r11
-    movq %r11, %gs:TD_STACK_LIMIT
-
+#endif
+    
     call occlum_syscall
 
     // This should never happen!
@@ -116,12 +111,6 @@ __occlum_sysret:
     movq TASK_USER_FS(%r12), %r11
     wrfsbase %r11
 #endif
-    // Switch to user stack base and limit
-    movq TASK_USER_STACK_BASE(%r12), %r11
-    movq %r11, %gs:TD_STACK_BASE
-    movq TASK_USER_STACK_LIMIT(%r12), %r11
-    movq %r11, %gs:TD_STACK_LIMIT
-
     // Restore flags first
     leaq (17*8)(%rdi), %rsp
     popfq

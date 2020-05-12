@@ -1,3 +1,4 @@
+#include <assert.h>
 #include "task.h"
 
 /* See /<path-to-linux-sgx>/common/inc/internal/thread_data.h */
@@ -22,6 +23,8 @@ extern void __set_stack_guard(uint64_t new_val);
 int sgx_enable_user_stack(size_t stack_base, size_t stack_limit);
 void sgx_disable_user_stack(void);
 
+#define OCCLUM_PAGE_SIZE 4096
+
 static uint64_t get_syscall_stack(struct Task* this_task) {
 #define LARGE_ENOUGH_GAP        (8192)
     char libos_stack_var = 0;
@@ -37,28 +40,6 @@ static uint64_t get_syscall_stack(struct Task* this_task) {
 #define RESET_CURRENT_TASK()                    \
     __set_stack_guard(stack_guard);
 
-void switch_td_to_kernel(const struct Task* task) {
-    thread_data_t* td = get_thread_data();
-
-    // TODO: do do not support stack expansion, need a new design on SGX2 platform.
-    // Set the stack_commit_addr to 0, as the result no stack expansion happens at any situations
-    __atomic_store_n(&td->stack_commit_addr, 0, __ATOMIC_RELAXED);
-    td->stack_base_addr = task->kernel_stack_base;
-    td->stack_limit_addr = task->kernel_stack_limit;
-    td->stack_commit_addr = task->kernel_stack_limit;
-}
-
-void switch_td_to_user(const struct Task* task) {
-    thread_data_t* td = get_thread_data();
-
-    // TODO: do do not support stack expansion, need a new design on SGX2 platform.
-    // Set the stack_commit_addr to 0, as the result no stack expansion happens at any situations
-    __atomic_store_n(&td->stack_commit_addr, 0, __ATOMIC_RELAXED);
-    td->stack_base_addr = task->user_stack_base;
-    td->stack_limit_addr = task->user_stack_limit;
-    td->stack_commit_addr = task->user_stack_limit;
-}
-
 int do_exec_task(struct Task* task) {
     jmp_buf libos_state = {0};
     thread_data_t* td = get_thread_data();
@@ -67,7 +48,10 @@ int do_exec_task(struct Task* task) {
     task->kernel_stack_base = td->stack_base_addr;
     task->kernel_stack_limit = td->stack_limit_addr;
 
-    switch_td_to_user(task);
+    //Reserve two pages stack for exception handler
+    //The SGX SDK exception handler depends on the two pages as stack to handle exceptions in user's code
+    //TODO:Add a check in the sysreturn logic to confirm the stack is not corrupted 
+    assert(task->kernel_stack_limit+OCCLUM_PAGE_SIZE*2 <= task->kernel_rsp);
 
     SET_CURRENT_TASK(task);
 
@@ -84,7 +68,5 @@ int do_exec_task(struct Task* task) {
 void do_exit_task(void) {
     struct Task* task = __get_current_task();
     jmp_buf* jb = task->saved_state;
-
-    switch_td_to_kernel(task);
     longjmp(*jb, 1);
 }

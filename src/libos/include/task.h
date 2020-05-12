@@ -38,8 +38,6 @@ void do_exit_task(void);
 #else  /* __ASSEMBLY__ */
 
 /* See /<path-to-linux-sgx>/common/inc/internal/thread_data.h */
-#define TD_STACK_BASE               (8 * 2)
-#define TD_STACK_LIMIT              (8 * 3)
 #define TD_STACKGUARD_OFFSET        (8 * 5)
 /* Override the field for stack guard */
 #define TD_TASK_OFFSET              TD_STACKGUARD_OFFSET
