@@ -2,6 +2,7 @@ use super::*;
 
 use super::io_multiplexing::{AsEpollFile, EpollCtlCmd, EpollEventFlags, EpollFile};
 use fs::{CreationFlags, File, FileDesc, FileRef};
+use misc::resource_t;
 use process::Process;
 use std::convert::TryFrom;
 use util::mem_util::from_user;
@@ -173,6 +174,17 @@ pub fn do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int) -> Re
     // It behaves like sleep when fds is null and nfds is zero.
     if !fds.is_null() || nfds != 0 {
         from_user::check_mut_array(fds, nfds as usize)?;
+    }
+
+    let soft_rlimit_nofile = current!()
+        .rlimits()
+        .lock()
+        .unwrap()
+        .get(resource_t::RLIMIT_NOFILE)
+        .get_cur();
+    // TODO: Check nfds against the size of the stack used in ocall to prevent stack overflow
+    if nfds > soft_rlimit_nofile {
+        return_errno!(EINVAL, "The nfds value exceeds the RLIMIT_NOFILE value.");
     }
 
     let polls = unsafe { std::slice::from_raw_parts_mut(fds, nfds as usize) };

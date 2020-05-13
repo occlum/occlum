@@ -33,6 +33,16 @@ pub struct rlimit_t {
     max: u64,
 }
 
+impl rlimit_t {
+    pub fn get_cur(&self) -> u64 {
+        self.cur
+    }
+
+    pub fn get_max(&self) -> u64 {
+        self.max
+    }
+}
+
 impl Default for rlimit_t {
     fn default() -> rlimit_t {
         rlimit_t {
