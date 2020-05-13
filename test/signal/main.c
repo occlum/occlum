@@ -326,6 +326,34 @@ int test_sigaltstack() {
 }
 
 // ============================================================================
+// Test SIGCHLD signal
+// ============================================================================
+int sigchld = 0;
+
+void proc_exit() {
+    sigchld = 1;
+}
+
+int test_sigchld() {
+    signal(SIGCHLD, proc_exit);
+
+    int ret, child_pid;
+    printf("Run a parent process has pid = %d and ppid = %d\n", getpid(), getppid());
+
+    ret = posix_spawn(&child_pid, "/bin/getpid", NULL, NULL, NULL, NULL);
+    if (ret < 0){
+        printf("ERROR: failed to spawn a child process\n");
+        return -1;
+    }
+    printf("Spawn a new proces successfully (pid = %d)\n", child_pid);
+
+    wait(NULL);
+    if (sigchld == 0) THROW_ERROR("Did not receive SIGCHLD");
+
+    return 0;
+}
+
+// ============================================================================
 // Test suite main
 // ============================================================================
 
@@ -336,6 +364,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_kill),
     TEST_CASE(test_catch_fault),
     TEST_CASE(test_sigaltstack),
+    TEST_CASE(test_sigchld),
 };
 
 int main(int argc, const char* argv[]) {

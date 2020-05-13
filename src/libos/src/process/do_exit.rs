@@ -1,10 +1,11 @@
+use crate::signal::constants::*;
 use std::intrinsics::atomic_store;
 
 use super::do_futex::futex_wake;
-use super::process::ProcessFilter;
+use super::process::{Process, ProcessFilter};
 use super::{table, TermStatus, ThreadRef, ThreadStatus};
 use crate::prelude::*;
-use crate::signal::SigNum;
+use crate::signal::{KernelSignal, SigNum};
 
 pub fn do_exit_group(status: i32) {
     let term_status = TermStatus::Exited(status as u8);
@@ -84,6 +85,9 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
     let mut parent_inner = parent.inner();
     process.inner().exit(term_status);
 
+    //Send SIGCHLD to parent
+    send_sigchld_to(&parent);
+
     // Wake up the parent if it is waiting on this child
     let waiting_children = parent_inner.waiting_children_mut().unwrap();
     waiting_children.del_and_wake_one_waiter(|waiter_data| -> Option<pid_t> {
@@ -102,4 +106,10 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
         }
         Some(process.pid())
     });
+}
+
+fn send_sigchld_to(parent: &Arc<Process>) {
+    let signal = Box::new(KernelSignal::new(SigNum::from(SIGCHLD)));
+    let mut sig_queues = parent.sig_queues().lock().unwrap();
+    sig_queues.enqueue(signal);
 }
