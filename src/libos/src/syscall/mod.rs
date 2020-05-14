@@ -98,7 +98,7 @@ macro_rules! process_syscall_table_with_callback {
             (Writev = 20) => do_writev(fd: FileDesc, iov: *const iovec_t, count: i32),
             (Access = 21) => do_access(path: *const i8, mode: u32),
             (Pipe = 22) => do_pipe(fds_u: *mut i32),
-            (Select = 23) => do_select(nfds: c_int, readfds: *mut libc::fd_set, writefds: *mut libc::fd_set, exceptfds: *mut libc::fd_set, timeout: *const libc::timeval),
+            (Select = 23) => do_select(nfds: c_int, readfds: *mut libc::fd_set, writefds: *mut libc::fd_set, exceptfds: *mut libc::fd_set, timeout: *mut timeval_t),
             (SchedYield = 24) => do_sched_yield(),
             (Mremap = 25) => do_mremap(old_addr: usize, old_size: usize, new_size: usize, flags: i32, new_addr: usize),
             (Msync = 26) => handle_unsupported(),

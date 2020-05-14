@@ -145,7 +145,8 @@ int test_read_write() {
 }
 
 int test_select_with_socket() {
-    fd_set wfds;
+    fd_set rfds, wfds;
+    int ret = 0;
 
     struct timeval tv = { .tv_sec = 60, .tv_usec = 0 };
 
@@ -155,13 +156,22 @@ int test_select_with_socket() {
         THROW_ERROR("failed to create files");
     }
 
+    FD_ZERO(&rfds);
     FD_ZERO(&wfds);
+    FD_SET(sock, &rfds);
     FD_SET(sock, &wfds);
+    FD_SET(event_fd, &rfds);
     FD_SET(event_fd, &wfds);
-
-    if (select(sock > event_fd? sock + 1: event_fd + 1, NULL, &wfds, NULL, &tv) <= 0) {
+    ret = select(sock > event_fd? sock + 1: event_fd + 1, &rfds, &wfds, NULL, &tv);
+    if (ret != 3) {
         close_files(2, sock, event_fd);
         THROW_ERROR("select failed");
+    }
+
+    if (FD_ISSET(event_fd, &rfds) == 1 || FD_ISSET(event_fd, &wfds) == 0 ||
+        FD_ISSET(sock, &rfds) == 0 || FD_ISSET(sock, &wfds) == 0) {
+        close_files(2, sock, event_fd);
+        THROW_ERROR("bad select return");
     }
 
     close_files(2, sock, event_fd);

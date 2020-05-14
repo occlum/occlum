@@ -1,4 +1,5 @@
 #include <sys/types.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <stddef.h>
 #include "ocalls.h"
@@ -52,4 +53,12 @@ ssize_t occlum_ocall_recvmsg(int sockfd,
     *msg_controllen_recv = msg.msg_controllen;
     *msg_flags_recv = msg.msg_flags;
     return ret;
+}
+
+int occlum_ocall_select(int nfds,
+                        fd_set *readfds,
+                        fd_set *writefds,
+                        fd_set *exceptfds,
+                        struct timeval *timeout) {
+    return select(nfds, readfds, writefds, exceptfds, timeout);
 }
