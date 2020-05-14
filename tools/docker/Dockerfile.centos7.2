@@ -11,6 +11,7 @@ RUN yum update -y && \
         cmake \
         curl \
         curl-devel \
+        epel-release \
         expect \
         fuse-devel \
         fuse-libs \
@@ -41,6 +42,7 @@ RUN yum update -y && \
         vim \
         wget && \
     yum groupinstall 'Development Tools' -y && \
+    yum install -y golang && \
     yum clean all
 
 # Install cpuid tool for tests
@@ -86,6 +88,12 @@ COPY toolchains/gcc/* /tmp/
 WORKDIR /tmp
 RUN ./build.sh
 ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
+
+# Install Occlum Golang toolchain
+COPY toolchains/golang/* /tmp/
+WORKDIR /tmp
+RUN ./build.sh
+ENV PATH="/usr/local/occlum/golang/bin:$PATH"
 
 # Install the latest version of Occlum
 WORKDIR /root

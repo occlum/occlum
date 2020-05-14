@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         g++ \
         gdb \
         git-core \
+        golang-go \
         jq \
         kmod \
         libboost-system-dev \
@@ -76,6 +77,12 @@ COPY toolchains/gcc/* /tmp/
 WORKDIR /tmp
 RUN ./build.sh
 ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
+
+# Install Occlum Golang toolchain
+COPY toolchains/golang/* /tmp/
+WORKDIR /tmp
+RUN ./build.sh
+ENV PATH="/usr/local/occlum/golang/bin:$PATH"
 
 # Install the latest version of Occlum
 WORKDIR /root
