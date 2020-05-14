@@ -26,6 +26,12 @@ int main(int argc, char* argv[]) {
     const char* cmd_path = (const char*) argv[1];
     const char** cmd_args = (const char**) &argv[2];
 
+    // Check Occlum PAL version
+    int pal_version = occlum_pal_get_version();
+    if (pal_version <= 0) {
+        return EXIT_FAILURE;
+    }
+
     // Init Occlum PAL
     struct occlum_pal_attr attr = OCCLUM_PAL_ATTR_INITVAL;
     attr.instance_dir = get_instance_dir();

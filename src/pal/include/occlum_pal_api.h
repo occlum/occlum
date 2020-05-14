@@ -6,6 +6,18 @@ extern "C" {
 #endif
 
 /*
+ * Occlum PAL API version number
+ */
+#define OCCLUM_PAL_VERSION 1
+
+/*
+ * @brief Get version of Occlum PAL API
+ *
+ * @retval If > 0, then success; otherwise, it is an invalid version.
+ */
+int occlum_pal_get_version(void);
+
+/*
  * Occlum PAL attributes
  */
 typedef struct occlum_pal_attr {

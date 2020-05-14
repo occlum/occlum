@@ -6,6 +6,10 @@
 #include "pal_syscall.h"
 #include "errno2str.h"
 
+int occlum_pal_get_version(void) {
+    return OCCLUM_PAL_VERSION;
+}
+
 int occlum_pal_init(const struct occlum_pal_attr* attr) {
     errno = 0;
 
