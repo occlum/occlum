@@ -123,6 +123,19 @@ Occlum can be configured easily via a config file named `Occlum.json`, which is 
 }
 ```
 
+### Try Experimental Features
+
+Occlum has added several new experimental commands, which provide a more container-like experience to users, as shown below:
+```
+occlum init
+occlum build
+occlum start
+occlum exec <cmd1> <args1>
+occlum exec <cmd2> <args2>
+occlum exec <cmd3> <args3>
+occlum stop
+```
+
 ## How to Use?
 
 We have built and tested Occlum on Ubuntu 18.04 with or without hardware SGX support (if the CPU does not support SGX, Occlum can be run in the SGX simulation mode). To give Occlum a quick try, one can use the Occlum Docker image by following the steps below:
@@ -135,7 +148,7 @@ Step 1-3 are to be done on the host OS (Linux):
 
 3. Run the Occlum Docker container, which has Occlum and its demos preinstalled:
     ```
-    docker run -it --device /dev/isgx occlum/occlum:0.11.0-ubuntu18.04
+    docker run -it --device /dev/isgx occlum/occlum:0.12.0-ubuntu18.04
     ```
 
 Step 4-5 are to be done on the guest OS running inside the Docker container:
@@ -221,10 +234,6 @@ The same thing can be said for Occlum, not for the mind, but for the program:
 Of course, Occlum must be run on Intel x86 CPUs with SGX support to do its magic.
 
 ## Contributors
-
-The founders of Occlum project are
-  * Hongliang Tian and Shoumeng Yan at Ant Financial; and
-  * Youren Shen, Yu Chen, and Kang Chen at Tsinghua University.
 
 This project follows the [all-contributors](https://allcontributors.org) specification. Contributions of any kind are welcome! We will publish contributing guidelines and accept pull requests after the project gets more stable.
 
