@@ -68,10 +68,10 @@ int neogotiate_msg(int client_fd) {
     if (write(client_fd, ECHO_MSG, strlen(ECHO_MSG)) < 0)
         THROW_ERROR("write failed");
 
-    if (read(client_fd, buf, 16) < 0)
+    if (read(client_fd, buf, sizeof(RESPONSE)) < 0)
         THROW_ERROR("read failed");
 
-    if (strncmp(buf, RESPONSE, strlen(RESPONSE)) != 0) {
+    if (strncmp(buf, RESPONSE, sizeof(RESPONSE)) != 0) {
         THROW_ERROR("msg recv mismatch");
     }
     return 0;
@@ -313,9 +313,8 @@ int test_poll_sockets() {
 
 static test_case_t test_cases[] = {
     TEST_CASE(test_read_write),
-    // FIXME: mysterious failure that cannot be reproduced reliably
-    //TEST_CASE(test_send_recv),
-    //TEST_CASE(test_sendmsg_recvmsg),
+    TEST_CASE(test_send_recv),
+    TEST_CASE(test_sendmsg_recvmsg),
     TEST_CASE(test_sendmsg_recvmsg_connectionless),
     TEST_CASE(test_fcntl_setfl_and_getfl),
     TEST_CASE(test_poll_sockets),
