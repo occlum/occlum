@@ -34,7 +34,7 @@ pub fn do_sendfile(
         read_offset += read_len;
         let mut bytes_written = 0;
         while bytes_written < read_len {
-            let write_len = out_file.write(&buffer[bytes_written..])?;
+            let write_len = out_file.write(&buffer[bytes_written..read_len])?;
             if write_len == 0 {
                 return_errno!(EBADF, "sendfile write return 0");
             }
