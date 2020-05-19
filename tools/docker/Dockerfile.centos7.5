@@ -1,48 +1,57 @@
-FROM ubuntu:16.04
+FROM centos:7.5.1804
 
-LABEL maintainer="Tate, Hongliang Tian <tate.thl@antfin.com>"
+LABEL maintainer="He Sun <bochang.sh@antfin.com>"
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        alien \
+RUN yum update -y && \
+    yum install -y \
         autoconf \
         automake \
-        build-essential \
         ca-certificates \
+        boost-devel \
         cmake \
         curl \
-        debhelper \
+        curl-devel \
+        epel-release \
         expect \
-        g++ \
+        fuse-devel \
+        fuse-libs \
+        gcc \
+        gcc-c++ \
+        glibc-headers \
         gdb \
+        git \
         git-core \
-        golang-go \
-        jq \
-        kmod \
-        libboost-system-dev \
-        libboost-thread-dev \
-        libcurl4-openssl-dev \
-        libfuse-dev \
-        libjsoncpp-dev \
-        liblog4cpp5-dev \
-        libprotobuf-c0-dev \
-        libprotobuf-dev \
-        libssl-dev \
+        gmp-devel \
+        libmpc-devel \
+        libxml2-devel \
         libtool \
-        libxml2-dev \
-        ocaml \
-        pkg-config \
-        protobuf-compiler \
+        pkgconfig \
         python \
-        python-pip \
+        kmod \
+        make \
+        mod_ssl \
+        mpfr-devel \
+        ocaml \
+        ocaml-ocamlbuild \
+        openssl \
+        openssl-devel \
         sudo \
-        unzip \
-        uuid-dev \
+        uuid-devel \
         vim \
-        wget \
-        zip \
-        && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+        wget && \
+    yum groupinstall 'Development Tools' -y && \
+    yum install -y golang && \
+    yum clean all
+
+# Install Protobuf (version >= 3.0)
+WORKDIR /tmp
+RUN yum install -y https://cbs.centos.org/kojifiles/packages/protobuf/3.6.1/4.el7/x86_64/protobuf-3.6.1-4.el7.x86_64.rpm && \
+    yum install -y https://cbs.centos.org/kojifiles/packages/protobuf/3.6.1/4.el7/x86_64/protobuf-compiler-3.6.1-4.el7.x86_64.rpm && \
+    yum install -y https://cbs.centos.org/kojifiles/packages/protobuf/3.6.1/4.el7/x86_64/protobuf-devel-3.6.1-4.el7.x86_64.rpm
+
+# Upgrade git (version >= 1.8.4)
+RUN yum install -y http://opensource.wandisco.com/centos/7/git/x86_64/wandisco-git-release-7-2.noarch.rpm && \
+    yum install -y git
 
 # Install cpuid tool for tests
 WORKDIR /tmp
@@ -51,16 +60,23 @@ RUN wget http://www.etallen.com/cpuid/cpuid-20200211.x86_64.tar.gz && \
     cp ./cpuid-20200211/cpuid /usr/bin/ && \
     rm -rf /tmp/cpuid-20200211*
 
+# Upgrade GCC
+# Use Developer Toolset 8 from Software Collections (SCLs) to have a newer gcc (8.3.1) than
+# the native one (4.8.5) and enable it during the build.
+RUN yum install centos-release-scl-rh -y && \
+    yum install devtoolset-8-toolchain -y && \
+    printf "unset BASH_ENV PROMPT_COMMAND ENV\nsource scl_source enable devtoolset-8\n" > /usr/bin/scl_enable && \
+    echo 'source /opt/rh/devtoolset-8/enable' >> /root/.bashrc
+ARG BASH_ENV="/usr/bin/scl_enable"
+ARG ENV="/usr/bin/scl_enable"
+ARG PROMPT_COMMAND=". /usr/bin/scl_enable"
+
 # Install SGX SDK
 WORKDIR /tmp
 RUN git clone -b sgx_2.9.1_for_occlum https://github.com/occlum/linux-sgx && \
     cd linux-sgx && \
     ./download_prebuilt.sh && \
-    cp ./external/toolset/as /usr/local/bin/ && \
-    cp ./external/toolset/ld /usr/local/bin/ && \
-    cp ./external/toolset/ld.gold /usr/local/bin/ && \
-    cp ./external/toolset/objdump /usr/local/bin/ && \
-    ./compile_and_install.sh && \
+    ./compile_and_install.sh no_mitigation && \
     echo 'source /opt/intel/sgxsdk/environment' >> /root/.bashrc && \
     rm -rf /tmp/linux-sgx
 
@@ -88,6 +104,7 @@ ENV PATH="/usr/local/occlum/golang/bin:$PATH"
 WORKDIR /root
 RUN git clone https://github.com/occlum/occlum && \
     cd occlum && \
+    source /root/.bashrc && \
     make submodule && \
     OCCLUM_RELEASE_BUILD=1 make && \
     make install && \
