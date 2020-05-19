@@ -1,6 +1,8 @@
 use super::super::task::Task;
 use super::super::thread::{ThreadBuilder, ThreadId};
-use super::super::{FileTableRef, FsViewRef, ProcessRef, ProcessVMRef, ResourceLimitsRef};
+use super::super::{
+    FileTableRef, FsViewRef, ProcessRef, ProcessVMRef, ResourceLimitsRef, SchedAgentRef,
+};
 use super::{Process, ProcessInner};
 use crate::prelude::*;
 use crate::signal::{SigDispositions, SigQueues};
@@ -52,6 +54,10 @@ impl ProcessBuilder {
 
     pub fn task(mut self, task: Task) -> Self {
         self.thread_builder(|tb| tb.task(task))
+    }
+
+    pub fn sched(mut self, sched: SchedAgentRef) -> Self {
+        self.thread_builder(|tb| tb.sched(sched))
     }
 
     pub fn vm(mut self, vm: ProcessVMRef) -> Self {

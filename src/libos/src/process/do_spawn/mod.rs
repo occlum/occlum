@@ -162,12 +162,14 @@ fn new_process(
             Arc::new(SgxMutex::new(files))
         };
         let fs_ref = Arc::new(SgxMutex::new(current_ref.fs().lock().unwrap().clone()));
+        let sched_ref = Arc::new(SgxMutex::new(current_ref.sched().lock().unwrap().clone()));
 
         ProcessBuilder::new()
             .vm(vm_ref)
             .exec_path(elf_path)
             .parent(process_ref)
             .task(task)
+            .sched(sched_ref)
             .fs(fs_ref)
             .files(files_ref)
             .build()?

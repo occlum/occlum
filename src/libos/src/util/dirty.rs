@@ -21,6 +21,10 @@ impl<T> Dirty<T> {
         self.dirty = false;
     }
 
+    pub fn set_dirty(&mut self) {
+        self.dirty = true;
+    }
+
     pub fn unwrap(self) -> T {
         self.inner
     }

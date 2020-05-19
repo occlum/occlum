@@ -117,6 +117,55 @@ static int test_sched_xetaffinity_with_child_pid() {
     return 0;
 }
 
+static int test_sched_xetaffinity_children_inheritance() {
+    int status, child_pid;
+    int num_core = sysconf(_SC_NPROCESSORS_ONLN);
+    if (num_core <= 0) {
+        THROW_ERROR("failed to get cpu number");
+    }
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    CPU_SET(g_online_cpu_idxs[num_core - 1], &mask);
+    if (sched_setaffinity(0, sizeof(cpu_set_t), &mask) < 0) {
+        THROW_ERROR("failed to set parent affinity");
+    }
+
+    int ret = posix_spawn(&child_pid, "/bin/getpid", NULL, NULL, NULL, NULL);
+    if (ret < 0 ) {
+        THROW_ERROR("spawn process error");
+    }
+    printf("Spawn a child process with pid=%d\n", child_pid);
+
+    cpu_set_t mask2;
+    if (sched_getaffinity(child_pid, sizeof(cpu_set_t), &mask2) < 0) {
+        THROW_ERROR("failed to get child affinity");
+    }
+    if (!CPU_EQUAL(&mask, &mask2)) {
+        THROW_ERROR("affinity inherited from parent is wrong in child");
+    }
+
+    // Set affinity to child should not affect parent process
+    CPU_SET(g_online_cpu_idxs[0], &mask2);
+    if (sched_setaffinity(child_pid, sizeof(cpu_set_t), &mask2) < 0) {
+        THROW_ERROR("failed to set child affinity");
+    }
+
+    CPU_ZERO(&mask2);
+    if (sched_getaffinity(0, sizeof(cpu_set_t), &mask2) < 0) {
+        THROW_ERROR("failed to get parent process affinity");
+    }
+
+    if (!CPU_EQUAL(&mask, &mask2)) {
+        THROW_ERROR("cpuset is wrong in parent process");
+    }
+
+    ret = wait4(-1, &status, 0, NULL);
+    if (ret < 0) {
+        THROW_ERROR("failed to wait4 the child procces");
+    }
+    return 0;
+}
+
 #define CPU_SET_SIZE_LIMIT (1024)
 
 static int test_sched_getaffinity_via_explicit_syscall() {
@@ -218,6 +267,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_sched_getaffinity_with_null_buffer),
     TEST_CASE(test_sched_setaffinity_with_null_buffer),
     TEST_CASE(test_sched_yield),
+    TEST_CASE(test_sched_xetaffinity_children_inheritance),
 };
 
 int main() {

@@ -25,12 +25,40 @@ use super::cpu_set::{CpuSet, AVAIL_CPUSET};
 use crate::prelude::*;
 use crate::util::dirty::Dirty;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SchedAgent {
     // The use of Option does not mean inner is optional. In contrast, we maintain
     // the invariant of `inner.is_some() == true`. We use Option so that we can
     // move the Inner out of SchedAgent without upsetting Rust's borrow checker.
     inner: Option<Inner>,
+}
+
+impl Clone for SchedAgent {
+    /// Clone a SchedAgent in a way that works well with clone and spawn syscall.
+    ///
+    /// We cannot use the auto-derived implementation of clone for SchedAgent, which
+    /// would copy the fields of SchedAgent bit-by-bit. The reason is two-fold.
+    ///
+    /// First, a SchedAgent, if in the attached mode, actually holds a host OS
+    /// resource (`host_tid`). Copying a SchedAgent bit-by-bit would result in
+    /// multiple instances of SchedAgent refer to the same host thread.
+    ///
+    /// Second, we need to ensure that the scheduler settings in a cloned SchedAgent
+    /// instance will take effect when the SchedAgent is attached to a host thread.
+    ///
+    /// This implementation carefully handles the two points above.
+    fn clone(&self) -> Self {
+        let mut affinity = Dirty::new(match self.inner() {
+            Inner::Detached { affinity } => affinity.as_ref().clone(),
+            Inner::Attached { affinity, .. } => affinity.clone(),
+        });
+        if affinity.as_ref().as_slice() != AVAIL_CPUSET.as_slice() {
+            affinity.set_dirty();
+        }
+        Self {
+            inner: Some(Inner::Detached { affinity }),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
