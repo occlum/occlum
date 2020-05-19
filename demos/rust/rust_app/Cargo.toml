@@ -1,0 +1,11 @@
+[package]
+name = "rust_app"
+version = "1.0.0"
+authors = ["He Sun <bochang.sh@antfin.com>"]
+build = "build.rs"
+
+[dependencies]
+libc = "0.2"
+
+[build-dependencies]
+cc = "1.0"
