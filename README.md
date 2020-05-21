@@ -1,4 +1,5 @@
-# Occlum
+![Occlum logo](docs/images/logo.png)
+## <!-- render a nicely looking grey line to separate the logo from the content  -->
 [![All Contributors](https://img.shields.io/badge/all_contributors-7-orange.svg?style=flat-square)](CONTRIBUTORS.md)
 [![Build Status](https://travis-ci.com/occlum/occlum.svg?branch=master)](https://travis-ci.com/occlum/occlum)
 
@@ -220,6 +221,12 @@ Ultimately, whether an enclave is running in the release mode should be checked 
 Occlum is being actively developed. We now focus on implementing more system calls and additional features required in the production environment.
 
 While this project is still not mature or stable (we are halfway through reaching version 1.0.0), we have used Occlum to port many real-world applications (like Tensorflow Lite, XGBoost, GCC, Lighttpd, etc.) to SGX with little or no source code modifications. We believe that the current implementation of Occlum is already useful to many users and ready to be deployed in some use cases.
+
+## How about the Internal Working?
+
+The high-level architecture of Occlum is summarized in the figure below:
+
+![Arch Overview](docs/images/arch_overview.png)
 
 ## Why the Name?
 
