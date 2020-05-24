@@ -6,7 +6,7 @@ fi
 
 cat <<EOF
 {
-    "vm": {
+    "resource_limits": {
         "user_space_size": "$OCCLUM_CONF_USER_SPACE_SIZE"
     },
     "process": {

@@ -77,7 +77,7 @@ fn parse_mac(mac_str: &str) -> Result<sgx_aes_gcm_128bit_tag_t> {
 
 #[derive(Debug)]
 pub struct Config {
-    pub vm: ConfigVM,
+    pub resource_limits: ConfigResourceLimits,
     pub process: ConfigProcess,
     pub env: ConfigEnv,
     pub entry_points: Vec<PathBuf>,
@@ -85,7 +85,7 @@ pub struct Config {
 }
 
 #[derive(Debug)]
-pub struct ConfigVM {
+pub struct ConfigResourceLimits {
     pub user_space_size: usize,
 }
 
@@ -126,7 +126,7 @@ pub struct ConfigMountOptions {
 
 impl Config {
     fn from_input(input: &InputConfig) -> Result<Config> {
-        let vm = ConfigVM::from_input(&input.vm)?;
+        let resource_limits = ConfigResourceLimits::from_input(&input.resource_limits)?;
         let process = ConfigProcess::from_input(&input.process)?;
         let env = ConfigEnv::from_input(&input.env)?;
         let entry_points = {
@@ -148,7 +148,7 @@ impl Config {
             mount
         };
         Ok(Config {
-            vm,
+            resource_limits,
             process,
             env,
             entry_points,
@@ -157,10 +157,10 @@ impl Config {
     }
 }
 
-impl ConfigVM {
-    fn from_input(input: &InputConfigVM) -> Result<ConfigVM> {
+impl ConfigResourceLimits {
+    fn from_input(input: &InputConfigResourceLimits) -> Result<ConfigResourceLimits> {
         let user_space_size = parse_memory_size(&input.user_space_size)?;
-        Ok(ConfigVM { user_space_size })
+        Ok(ConfigResourceLimits { user_space_size })
     }
 }
 
@@ -262,7 +262,7 @@ fn parse_memory_size(mem_str: &str) -> Result<usize> {
 #[serde(deny_unknown_fields)]
 struct InputConfig {
     #[serde(default)]
-    pub vm: InputConfigVM,
+    pub resource_limits: InputConfigResourceLimits,
     #[serde(default)]
     pub process: InputConfigProcess,
     #[serde(default)]
@@ -275,21 +275,21 @@ struct InputConfig {
 
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
-struct InputConfigVM {
-    #[serde(default = "InputConfigVM::get_user_space_size")]
+struct InputConfigResourceLimits {
+    #[serde(default = "InputConfigResourceLimits::get_user_space_size")]
     pub user_space_size: String,
 }
 
-impl InputConfigVM {
+impl InputConfigResourceLimits {
     fn get_user_space_size() -> String {
         "128MB".to_string()
     }
 }
 
-impl Default for InputConfigVM {
-    fn default() -> InputConfigVM {
-        InputConfigVM {
-            user_space_size: InputConfigVM::get_user_space_size(),
+impl Default for InputConfigResourceLimits {
+    fn default() -> InputConfigResourceLimits {
+        InputConfigResourceLimits {
+            user_space_size: InputConfigResourceLimits::get_user_space_size(),
         }
     }
 }

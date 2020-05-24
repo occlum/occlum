@@ -55,7 +55,7 @@ prebuild:
 	@mkdir -p $(BUILD_DIR)/test
 	@cd $(BUILD_DIR)/test && \
 		$(BUILD_DIR)/bin/occlum init
-	@cp Occlum.json Enclave.xml $(BUILD_DIR)/test/
+	@cp Occlum.json $(BUILD_DIR)/test/
 
 $(BUILD_TARGETS): %:
 	@$(ECHO) "$(CYAN)BUILD TEST => $@$(NO_COLOR)"

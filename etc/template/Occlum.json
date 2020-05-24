@@ -1,5 +1,13 @@
 {
-    "vm": {
+    "metadata": {
+        "product_id": 0,
+        "version_number": 0,
+        "debuggable": true
+    },
+    "resource_limits": {
+        "max_num_of_threads": 32,
+        "kernel_space_heap_size": "32MB",
+        "kernel_space_stack_size": "1MB",
         "user_space_size": "256MB"
     },
     "process": {

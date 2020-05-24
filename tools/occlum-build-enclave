@@ -7,8 +7,7 @@ project_dir="$( cd "$( dirname "$this_dir/../../../"  )" >/dev/null 2>&1 && pwd 
 SGX_SDK="${SGX_SDK:-/opt/intel/sgxsdk}"
 
 occlum_conf_json_path=$1
-enclave_conf_xml_path=$2
-enclave_key_pem_path=$3
+enclave_key_pem_path=$2
 protected_occlum_conf_json_path=`basename $occlum_conf_json_path`".protected"
 
 occlum_conf_file_mac=
@@ -18,7 +17,7 @@ occlum_user_space_size=
 report_arg_error() {
     echo $1
     echo ""
-    echo "Usage: occlum-build-enclave Occlum.json Enclave.xml Enclave.pem"
+    echo "Usage: occlum-build-enclave Occlum.json Enclave.pem"
 }
 
 protect_occlum_json() {
@@ -44,6 +43,11 @@ build_enclave_so() {
     make
 }
 
+generate_enclave_config() {
+    cd $working_dir
+    "$project_dir/tools/bin/gen_enclave_conf" -i $occlum_conf_json_path -o "enclave.config.xml"
+}
+
 sign_enclave_so() {
     cd $working_dir
     rm -f libocclum-libos.signed.so
@@ -52,7 +56,8 @@ sign_enclave_so() {
         -key $enclave_key_pem_path \
         -enclave $enclave_so_path \
         -out "libocclum-libos.signed.so" \
-        -config $enclave_conf_xml_path
+        -config enclave.config.xml
+    rm -f enclave.config.xml
 }
 
 # ===========================================================================
@@ -88,6 +93,6 @@ export OCCLUM_BUILTIN_VM_USER_SPACE_SIZE=`print_occlum_user_space_size`
 echo "EXPORT => OCCLUM_BUILTIN_VM_USER_SPACE_SIZE = $OCCLUM_BUILTIN_VM_USER_SPACE_SIZE"
 
 build_enclave_so
-
+generate_enclave_config
 sign_enclave_so
 echo "SIGN => libocclum-libos.signed.so"

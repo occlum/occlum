@@ -62,7 +62,7 @@ get_conf_default_mmap_size() {
 
 get_conf_user_space_size() {
     cat "$working_dir/Occlum.json" | \
-        python -c "import sys, json; print json.load(sys.stdin)['vm']['user_space_size']"
+        python -c "import sys, json; print json.load(sys.stdin)['resource_limits']['user_space_size']"
 }
 
 get_conf_env() {
@@ -128,9 +128,7 @@ cmd_init() {
         "$occlum_gcc_lib/libgcc_s.so.1" \
         "$occlum_gcc_lib/libgomp.so.1"
 
-    cp "$occlum_dir"/etc/template/Enclave.xml "$working_dir"/
     cp "$occlum_dir"/etc/template/Occlum.json "$working_dir"/
-    chmod 644 "$working_dir"/Enclave.xml
     chmod 644 "$working_dir"/Occlum.json
 
     echo "Initialized an Occlum context in $working_dir"
@@ -211,11 +209,14 @@ cmd_build() {
     cd src/libos && \
         make clean-builtin && \
         make "$context_dir/build/lib/libocclum-libos.so" ONLY_REBUILD_BUILTIN=1 CONTEXT=1
+    
+    $occlum_dir/$build_dir/bin/gen_enclave_conf -i "$working_dir/Occlum.json" -o "$context_dir/build/Enclave.xml"
     $ENCLAVE_SIGN_TOOL sign \
         -key $ENCLAVE_SIGN_KEY \
-        -config "$working_dir/Enclave.xml" \
+        -config "$context_dir/build/Enclave.xml" \
         -enclave "$context_dir/build/lib/libocclum-libos.so" \
         -out "$context_dir/build/lib/libocclum-libos.signed.so"
+    rm -f "$context_dir/build/Enclave.xml"
     cd "$context_dir"
     echo "built" > status
 
