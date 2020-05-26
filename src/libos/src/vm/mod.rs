@@ -12,7 +12,7 @@ mod vm_range;
 use self::vm_layout::VMLayout;
 use self::vm_manager::{VMManager, VMMapOptionsBuilder};
 
-pub use self::process_vm::{MMapFlags, ProcessVM, ProcessVMBuilder, VMPerms};
+pub use self::process_vm::{MMapFlags, MRemapFlags, ProcessVM, ProcessVMBuilder, VMPerms};
 pub use self::vm_range::VMRange;
 
 pub fn do_mmap(
@@ -45,6 +45,22 @@ pub fn do_munmap(addr: usize, size: usize) -> Result<()> {
     let current = current!();
     let mut current_vm = current.vm().lock().unwrap();
     current_vm.munmap(addr, size)
+}
+
+pub fn do_mremap(
+    old_addr: usize,
+    old_size: usize,
+    new_size: usize,
+    flags: MRemapFlags,
+    new_addr: usize,
+) -> Result<usize> {
+    debug!(
+        "mremap: old_addr: {:#x}, old_size: {:#x}, new_size: {:#x}, flags: {:?}, new_addr: {:#x}",
+        old_addr, old_size, new_size, flags, new_addr
+    );
+    let current = current!();
+    let mut current_vm = current.vm().lock().unwrap();
+    current_vm.mremap(old_addr, old_size, new_size, flags, new_addr)
 }
 
 pub fn do_brk(addr: usize) -> Result<usize> {

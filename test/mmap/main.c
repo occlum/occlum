@@ -1,9 +1,11 @@
+#define _GNU_SOURCE
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <assert.h>
 #include <string.h>
 #include <fcntl.h>
@@ -616,6 +618,119 @@ int test_munmap_with_non_page_aligned_len() {
 }
 
 // ============================================================================
+// Test cases for mremap
+// ============================================================================
+
+int test_mremap() {
+    int prot = PROT_READ | PROT_WRITE;
+    int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+
+    for (size_t len = PAGE_SIZE; len < MAX_MMAP_USED_MEMORY; len *= 2) {
+        void *buf = mmap(NULL, len, prot, flags, -1, 0);
+        if (buf == MAP_FAILED) {
+            THROW_ERROR("mmap failed");
+        }
+
+        if (check_bytes_in_buf(buf, len, 0) < 0) {
+            THROW_ERROR("the buffer is not initialized to zeros");
+        }
+        void *expand_buf = mremap(buf, len, 2 * len, MREMAP_MAYMOVE);
+        if (expand_buf == MAP_FAILED) {
+            THROW_ERROR("mremap with big size failed");
+        }
+        if (check_bytes_in_buf(expand_buf, len, 0) < 0) {
+            THROW_ERROR("the old part of expand buffer is not zero");
+        }
+        memset(expand_buf, 'a', len * 2);
+        void *shrink_buf = mremap(expand_buf, 2 * len, len, 0);
+        if (shrink_buf == MAP_FAILED) {
+            THROW_ERROR("mmap with small size failed");
+        }
+        if (check_bytes_in_buf(shrink_buf, len, 'a') < 0) {
+            THROW_ERROR("the shrink buffer is not correct");
+        }
+        int ret = munmap(shrink_buf, len);
+        if (ret < 0) {
+            THROW_ERROR("munmap failed");
+        }
+    }
+    return 0;
+}
+
+int test_mremap_subrange() {
+    int prot = PROT_READ | PROT_WRITE;
+    int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+
+    size_t len = PAGE_SIZE * 4;
+    void *buf = mmap(NULL, len, prot, flags, -1, 0);
+    if (buf == MAP_FAILED) {
+        THROW_ERROR("mmap failed");
+    }
+    if (check_bytes_in_buf(buf, len, 0) < 0) {
+        THROW_ERROR("the buffer is not initialized to zeros");
+    }
+    /* remap a subrange in the buffer */
+    void *new_part_buf = mremap(buf + len / 4, len / 4, len, MREMAP_MAYMOVE);
+    if (new_part_buf == MAP_FAILED) {
+        THROW_ERROR("mremap with subrange failed");
+    }
+    if (check_bytes_in_buf(new_part_buf, len / 4, 0) < 0) {
+        THROW_ERROR("the old part of buffer is not zero");
+    }
+    void *rear_buf = buf + len / 2;
+    /* now the length of rear buffer is (len / 2), remap the second part */
+    void *new_part_rear_buf = mremap(rear_buf + len / 4, len / 4, len, MREMAP_MAYMOVE);
+    if (new_part_rear_buf == MAP_FAILED) {
+        THROW_ERROR("mremap with rear subrange failed");
+    }
+    if (check_bytes_in_buf(new_part_rear_buf, len / 4, 0) < 0) {
+        THROW_ERROR("the old part of rear buffer is not zero");
+    }
+    int ret = munmap(buf, len / 4) || munmap(new_part_buf, len) ||
+              munmap(rear_buf, len / 4) || munmap(new_part_rear_buf, len);
+    if (ret < 0) {
+        THROW_ERROR("munmap failed");
+    }
+    return 0;
+}
+
+int test_mremap_with_fixed_addr() {
+    int prot = PROT_READ | PROT_WRITE;
+    int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+
+    size_t len = PAGE_SIZE * 2;
+    void *buf = mmap(NULL, len, prot, flags, -1, 0);
+    if (buf == MAP_FAILED) {
+        THROW_ERROR("mmap failed");
+    }
+
+    if (check_bytes_in_buf(buf, len, 0) < 0) {
+        THROW_ERROR("the buffer is not initialized to zeros");
+    }
+    void *new_addr = buf + len * 2;
+    void *new_buf = mremap(buf, len, len, MREMAP_FIXED, new_addr);
+    if (new_buf != MAP_FAILED || errno != EINVAL) {
+        THROW_ERROR("check mremap with invalid flags failed");
+    }
+    new_buf = mremap(buf, len, len, MREMAP_FIXED | MREMAP_MAYMOVE, buf);
+    if (new_buf != MAP_FAILED || errno != EINVAL) {
+        THROW_ERROR("check mremap with overlap addr failed");
+    }
+    new_buf = mremap(buf, len, len, MREMAP_FIXED | MREMAP_MAYMOVE, new_addr);
+    if (new_buf == MAP_FAILED) {
+        THROW_ERROR("mmap with a fixed address failed");
+    }
+    if (check_bytes_in_buf(new_buf, len, 0) < 0) {
+        THROW_ERROR("the new buffer is not zero");
+    }
+    int ret = munmap(new_buf, len);
+    if (ret < 0) {
+        THROW_ERROR("munmap failed");
+    }
+    return 0;
+}
+
+// ============================================================================
 // Test suite main
 // ============================================================================
 
@@ -640,7 +755,10 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_munmap_whose_range_intersects_with_multiple_mmap_regions),
     TEST_CASE(test_munmap_with_null_addr),
     TEST_CASE(test_munmap_with_zero_len),
-    TEST_CASE(test_munmap_with_non_page_aligned_len)
+    TEST_CASE(test_munmap_with_non_page_aligned_len),
+    TEST_CASE(test_mremap),
+    TEST_CASE(test_mremap_subrange),
+    TEST_CASE(test_mremap_with_fixed_addr),
 };
 
 int main() {

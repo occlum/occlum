@@ -71,6 +71,10 @@ impl VMRange {
         self.start() <= addr && addr < self.end()
     }
 
+    pub fn overlap_with(&self, other: &VMRange) -> bool {
+        self.start() < other.end() && other.start() < self.end()
+    }
+
     pub fn subtract(&self, other: &VMRange) -> Vec<VMRange> {
         let self_start = self.start();
         let self_end = self.end();

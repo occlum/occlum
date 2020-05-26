@@ -3,7 +3,9 @@ use super::*;
 use super::config;
 use super::process::elf_file::{ElfFile, ProgramHeaderExt};
 use super::user_space_vm::{UserSpaceVMManager, UserSpaceVMRange, USER_SPACE_VM_MANAGER};
-use super::vm_manager::{VMInitializer, VMManager, VMMapAddr, VMMapOptions, VMMapOptionsBuilder};
+use super::vm_manager::{
+    VMInitializer, VMManager, VMMapAddr, VMMapOptions, VMMapOptionsBuilder, VMRemapOptions,
+};
 
 #[derive(Debug)]
 pub struct ProcessVMBuilder<'a, 'b> {
@@ -317,6 +319,27 @@ impl ProcessVM {
         Ok(mmap_addr)
     }
 
+    pub fn mremap(
+        &mut self,
+        old_addr: usize,
+        old_size: usize,
+        new_size: usize,
+        flags: MRemapFlags,
+        new_addr: usize,
+    ) -> Result<usize> {
+        let new_addr_option = if flags.contains(MRemapFlags::MREMAP_FIXED) {
+            if !self.process_range.range().contains(new_addr) {
+                return_errno!(EINVAL, "new_addr is beyond valid memory range");
+            }
+            Some(new_addr)
+        } else {
+            None
+        };
+        let mremap_option =
+            VMRemapOptions::new(old_addr, old_size, new_addr_option, new_size, flags)?;
+        self.mmap_manager.mremap(&mremap_option)
+    }
+
     pub fn munmap(&mut self, addr: usize, size: usize) -> Result<()> {
         self.mmap_manager.munmap(addr, size)
     }
@@ -353,6 +376,25 @@ impl MMapFlags {
     pub fn from_u32(bits: u32) -> Result<MMapFlags> {
         // TODO: detect non-supporting flags
         MMapFlags::from_bits(bits).ok_or_else(|| errno!(EINVAL, "unknown mmap flags"))
+    }
+}
+
+bitflags! {
+    pub struct MRemapFlags : u32 {
+        const MREMAP_MAYMOVE      = 1;
+        const MREMAP_FIXED        = 2;
+    }
+}
+
+impl MRemapFlags {
+    pub fn from_u32(bits: u32) -> Result<MRemapFlags> {
+        let flags =
+            MRemapFlags::from_bits(bits).ok_or_else(|| errno!(EINVAL, "unknown mremap flags"))?;
+        if flags.contains(MRemapFlags::MREMAP_FIXED) && !flags.contains(MRemapFlags::MREMAP_MAYMOVE)
+        {
+            return_errno!(EINVAL, "MREMAP_FIXED was specified without MREMAP_MAYMOVE");
+        }
+        Ok(flags)
     }
 }
 

@@ -41,7 +41,7 @@ use crate::signal::{
     do_kill, do_rt_sigaction, do_rt_sigpending, do_rt_sigprocmask, do_rt_sigreturn, do_sigaltstack,
     do_tgkill, do_tkill, sigaction_t, sigset_t, stack_t,
 };
-use crate::vm::{MMapFlags, VMPerms};
+use crate::vm::{MMapFlags, MRemapFlags, VMPerms};
 use crate::{fs, process, std, vm};
 
 use super::*;
@@ -738,8 +738,9 @@ fn do_mremap(
     flags: i32,
     new_addr: usize,
 ) -> Result<isize> {
-    warn!("mremap: not implemented!");
-    return_errno!(ENOSYS, "not supported yet")
+    let flags = MRemapFlags::from_u32(flags as u32)?;
+    let addr = vm::do_mremap(old_addr, old_size, new_size, flags, new_addr)?;
+    Ok(addr as isize)
 }
 
 fn do_mprotect(addr: usize, len: usize, prot: u32) -> Result<isize> {
