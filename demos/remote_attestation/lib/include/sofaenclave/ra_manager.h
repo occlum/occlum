@@ -49,7 +49,7 @@ SofaeErrorCode GetQuote(SofaeQuoteArgs* quote_args);
  *   @retval Others when failed
  */
 SofaeErrorCode FetchIasSigRL(const SofaeServerCfg& ias_server,
-                             sgx_epid_group_id_t* gid,
+                             const sgx_epid_group_id_t& gid,
                              std::string* sigrl);
 
 /**

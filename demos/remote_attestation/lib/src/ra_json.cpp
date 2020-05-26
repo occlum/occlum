@@ -46,7 +46,7 @@ JsonConfig* JsonConfig::GetInstance() {
 template <typename T>
 bool JsonConfig::CheckString(const T& conf, const char* name) {
   if (!conf.HasMember(name) || !conf[name].IsString()) {
-    SOFAE_LOG_ERROR("%s is missed or not string in config file", name);
+    SOFAE_LOG_DEBUG("%s is missed or not string in config file", name);
     return false;
   }
   return true;
@@ -55,7 +55,7 @@ bool JsonConfig::CheckString(const T& conf, const char* name) {
 template <typename T>
 bool JsonConfig::CheckArray(const T& conf, const char* name) {
   if (!conf.HasMember(name) || !conf[name].IsArray()) {
-    SOFAE_LOG_ERROR("%s is missed or not array in config file", name);
+    SOFAE_LOG_DEBUG("%s is missed or not array in config file", name);
     return false;
   }
   return true;
@@ -64,7 +64,7 @@ bool JsonConfig::CheckArray(const T& conf, const char* name) {
 template <typename T>
 bool JsonConfig::CheckInt(const T& conf, const char* name) {
   if (!conf.HasMember(name) || !conf[name].IsInt()) {
-    SOFAE_LOG_ERROR("%s is missed or not integer in config file", name);
+    SOFAE_LOG_DEBUG("%s is missed or not integer in config file", name);
     return false;
   }
   return true;
@@ -73,7 +73,7 @@ bool JsonConfig::CheckInt(const T& conf, const char* name) {
 template <typename T>
 bool JsonConfig::CheckObj(const T& conf, const char* name) {
   if (!conf.HasMember(name) || !conf[name].IsObject()) {
-    SOFAE_LOG_ERROR("%s is missed or not object in config file", name);
+    SOFAE_LOG_DEBUG("%s is missed or not object in config file", name);
     return false;
   }
   return true;

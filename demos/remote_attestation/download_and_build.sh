@@ -7,6 +7,9 @@ THISDIR="$(dirname $(readlink -f $0))"
 INSTALLDIR="/usr/local/occlum/x86_64-linux-musl"
 DEPSDIR="$THISDIR/deps"
 
+BUILDMODE="Release"
+[ "$1" == "--debug" ] && BUILDMODE="Debug"
+
 mkdir -p $DEPSDIR || exit 1
 
 # Download OpenSSL 1.1.1
@@ -27,9 +30,9 @@ CURLDIR="${DEPSDIR}/curl"
 if [ ! -d "$CURLDIR" ] ; then
     echo "Downloading curl ..."
     cd "$DEPSDIR" && \
-    wget  https://github.com/curl/curl/archive/curl-7_29_0.tar.gz && \
-    tar -xvf curl-7_29_0.tar.gz && \
-    mv curl-curl-7_29_0 curl && \
+    wget  https://github.com/curl/curl/archive/curl-7_70_0.tar.gz && \
+    tar -xvf curl-7_70_0.tar.gz && \
+    mv curl-curl-7_70_0 curl && \
     echo "Download curl successfully" || exit 1
 else
     echo "The curl code is already existent"
@@ -101,5 +104,5 @@ fi
 echo "Build demo source code"
 cd "$THISDIR" && rm -rf ./build && mkdir -p build
 cd build && \
-cmake -DCMAKE_CXX_COMPILER=occlum-g++ ../ && \
+cmake -DCMAKE_CXX_COMPILER=occlum-g++ -DBUILD_MODE=${BUILDMODE} ../ && \
 make -j$(nproc)

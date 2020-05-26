@@ -14,8 +14,7 @@ mkdir -p image/etc
 mkdir -p image/etc/certs
 cp /etc/resolv.conf image/etc
 cp /etc/hosts image/etc
-cp $THISDIR/conf/ra_config.example.json image/etc/ra_config.json
-cp $THISDIR/conf/certs/* image/etc/certs
+cp $THISDIR/conf/ra_config.json image/etc/
 cp $THISDIR/build/$DEMPOAPP image/bin
 cp /usr/local/occlum/x86_64-linux-musl/lib/libssl.so.1.1 image/lib
 cp /usr/local/occlum/x86_64-linux-musl/lib/libcrypto.so.1.1 image/lib

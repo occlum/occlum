@@ -17,6 +17,7 @@ constexpr char kRaConf[] = "ra_config.json";
 constexpr char kConfIasServer[] = "ias_url";
 constexpr char kConfIasCert[] = "ias_sp_cert_file";
 constexpr char kConfIasKey[] = "ias_sp_key_file";
+constexpr char kConfIasAccessKey[] = "ias_access_key";
 constexpr char kConfSPID[] = "enclave_spid";
 
 #define RA_CONF_STR(name) SofaeConfGetStr(kRaConf, name)

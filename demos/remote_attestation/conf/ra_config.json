@@ -1,0 +1,5 @@
+{
+  "ias_url": "https://api.trustedservices.intel.com/sgx/dev/attestation/v4",
+  "ias_access_key": "",
+  "enclave_spid": ""
+}

@@ -53,6 +53,7 @@ typedef struct {
   std::string endpoint;
   std::string cert;
   std::string key;
+  std::string accesskey;
 } SofaeServerCfg;
 
 #endif  // REMOTE_ATTESTATION_LIB_INCLUDE_SOFAENCLAVE_COMMON_TYPE_H_

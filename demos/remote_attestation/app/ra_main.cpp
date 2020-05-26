@@ -37,6 +37,7 @@ int main() {
   std::string endpoint = RA_CONF_STR(kConfIasServer);
   std::string cert = RA_CONF_STR(kConfIasCert);
   std::string key = RA_CONF_STR(kConfIasKey);
+  std::string access_key = RA_CONF_STR(kConfIasAccessKey);
   std::string spid_str = RA_CONF_STR(kConfSPID);
 
   if (spid_str.empty()) {
@@ -44,7 +45,7 @@ int main() {
     return -1;
   }
 
-  SofaeServerCfg ias_server = {endpoint, cert, key};
+  SofaeServerCfg ias_server = {endpoint, cert, key, access_key};
   SofaeEnclaveQuote quote = {0};
   SofaeQuoteArgs quote_args = {0};
   quote_args.quote_type = SGX_LINKABLE_SIGNATURE;

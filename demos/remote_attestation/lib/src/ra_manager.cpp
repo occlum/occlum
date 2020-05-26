@@ -35,7 +35,7 @@ SofaeErrorCode GetQuote(SofaeQuoteArgs* quote_args) {
 }
 
 SofaeErrorCode FetchIasSigRL(const SofaeServerCfg& ias_server,
-                             sgx_epid_group_id_t* gid,
+                             const sgx_epid_group_id_t& gid,
                              std::string* sigrl) {
   sofaenclave::occlum::RaIasClient ias_client(ias_server);
   return ias_client.GetSigRL(gid, sigrl);
@@ -63,7 +63,7 @@ SofaeErrorCode GetQuoteAndFetchIasReport(const SofaeServerCfg& ias_server,
   // If there is no SigRL, try to fetch it.
   if (!quote_args->sigrl_ptr || (quote_args->sigrl_len == 0)) {
     std::string sigrl_str;
-    ret = FetchIasSigRL(ias_server, &gid, &sigrl_str);
+    ret = FetchIasSigRL(ias_server, gid, &sigrl_str);
     if (ret != SOFAE_SUCCESS) {
       return ret;
     }

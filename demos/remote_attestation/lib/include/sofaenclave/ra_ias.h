@@ -4,7 +4,7 @@
 #include <mutex>
 #include <string>
 
-#include "./sgx_uae_service.h"
+#include "./sgx_uae_epid.h"
 #include "./sgx_urts.h"
 #include "./sgx_utils.h"
 
@@ -27,7 +27,7 @@ class RaIasClient {
 
   ~RaIasClient();
 
-  SofaeErrorCode GetSigRL(const sgx_epid_group_id_t* gid, std::string* sigrl);
+  SofaeErrorCode GetSigRL(const sgx_epid_group_id_t& gid, std::string* sigrl);
   SofaeErrorCode FetchReport(const std::string& quote, IasReport* ias_report);
 
  private:

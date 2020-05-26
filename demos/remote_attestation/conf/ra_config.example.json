@@ -1,6 +1,0 @@
-{
-  "ias_url": "",
-  "ias_sp_cert_file": "/etc/certs/sp_client.crt",
-  "ias_sp_key_file": "/etc/certs/sp_client.key",
-  "enclave_spid": ""
-}

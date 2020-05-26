@@ -20,8 +20,10 @@ constexpr char kStrQuoteStatus[] = "isvEnclaveQuoteStatus";
 constexpr char kStrPlatform[] = "platformInfoBlob";
 constexpr char kStrQuoteBody[] = "isvEnclaveQuoteBody";
 constexpr char kStrHeaderSig[] = "x-iasreport-signature:";
-constexpr char kStrHeaderCA[] = "x-iasreport-signing-certificate:";
-constexpr char kStrHeaderAdvisoryURL[] = "advisory-url:";
+constexpr char kStrHeaderSigAk[] = "X-IASReport-Signature:";
+constexpr char kStrHeaderCa[] = "x-iasreport-signing-certificate:";
+constexpr char kStrHeaderCaAk[] = "X-IASReport-Signing-Certificate:";
+constexpr char kStrHeaderAdvisoryUrl[] = "advisory-url:";
 constexpr char kStrHeaderAdvisoryIDs[] = "advisory-ids:";
 
 typedef struct {
@@ -95,11 +97,15 @@ static size_t ParseReportResponseHeader(const void* contents, size_t size,
 
   if (strncmp(header, kStrHeaderSig, strlen(kStrHeaderSig)) == 0) {
     report->set_b64_signature(GetHeaderValue(header, kStrHeaderSig));
-  } else if (strncmp(header, kStrHeaderCA, strlen(kStrHeaderCA)) == 0) {
-    report->set_signing_cert(GetHeaderValue(header, kStrHeaderCA));
-  } else if (strncmp(header, kStrHeaderAdvisoryURL,
-                     strlen(kStrHeaderAdvisoryURL)) == 0) {
-    report->set_advisory_url(GetHeaderValue(header, kStrHeaderAdvisoryURL));
+  } else if (strncmp(header, kStrHeaderSigAk, strlen(kStrHeaderSigAk)) == 0) {
+    report->set_b64_signature(GetHeaderValue(header, kStrHeaderSigAk));
+  } else if (strncmp(header, kStrHeaderCa, strlen(kStrHeaderCa)) == 0) {
+    report->set_signing_cert(GetHeaderValue(header, kStrHeaderCa));
+  } else if (strncmp(header, kStrHeaderCaAk, strlen(kStrHeaderCaAk)) == 0) {
+    report->set_signing_cert(GetHeaderValue(header, kStrHeaderCaAk));
+  } else if (strncmp(header, kStrHeaderAdvisoryUrl,
+                     strlen(kStrHeaderAdvisoryUrl)) == 0) {
+    report->set_advisory_url(GetHeaderValue(header, kStrHeaderAdvisoryUrl));
   } else if (strncmp(header, kStrHeaderAdvisoryIDs,
                      strlen(kStrHeaderAdvisoryIDs)) == 0) {
     report->set_advisory_ids(GetHeaderValue(header, kStrHeaderAdvisoryIDs));
@@ -144,6 +150,8 @@ void RaIasClient::InitIasConnection(const std::string& endpoint) {
   curl_easy_setopt(curl_, CURLOPT_NOSIGNAL, 1L);
   curl_easy_setopt(curl_, CURLOPT_TIMEOUT, 60L);
   curl_easy_setopt(curl_, CURLOPT_CONNECTTIMEOUT, 10L);
+  curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYPEER, 0L);
+  curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYHOST, 0L);
 
   server_endpoint_ = endpoint;
 }
@@ -157,13 +165,19 @@ RaIasClient::RaIasClient(const SofaeServerCfg& ias_server) {
   InitIasConnection(ias_server.endpoint);
 
   // Check the HTTPS server addr and set the cert/key settings
-  if (curl_ && (ias_server.endpoint.find("https://") != std::string::npos)) {
+  // Or use the Access key authentication
+  std::string header_access_key = "Ocp-Apim-Subscription-Key: ";
+  if (!ias_server.accesskey.empty()) {
+    header_access_key += ias_server.accesskey;
+    headers_ = curl_slist_append(headers_, header_access_key.c_str());
+  }
+
+  if (curl_ && (ias_server.endpoint.find("https://") != std::string::npos) && \
+      (ias_server.accesskey.empty())) {
     const char *ias_cert_key_type = "PEM";
     SOFAE_LOG_DEBUG("IAS cert: %s", ias_server.cert.c_str());
     SOFAE_LOG_DEBUG("IAS key: %s", ias_server.key.c_str());
 
-    curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYPEER, 0L);
-    curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYHOST, 0L);
     curl_easy_setopt(curl_, CURLOPT_SSLCERT, ias_server.cert.c_str());
     curl_easy_setopt(curl_, CURLOPT_SSLKEY, ias_server.key.c_str());
     curl_easy_setopt(curl_, CURLOPT_SSLCERTTYPE, ias_cert_key_type);
@@ -186,7 +200,7 @@ RaIasClient::~RaIasClient() {
   }
 }
 
-SofaeErrorCode RaIasClient::GetSigRL(const sgx_epid_group_id_t *gid,
+SofaeErrorCode RaIasClient::GetSigRL(const sgx_epid_group_id_t& gid,
                                      std::string *sigrl) {
   if (!curl_) {
     SOFAE_LOG_ERROR("IAS client is not initialized");
@@ -194,8 +208,8 @@ SofaeErrorCode RaIasClient::GetSigRL(const sgx_epid_group_id_t *gid,
   }
 
   /* Set the URL */
-  std::string url = server_endpoint_ + "/attestation/sgx/v3/sigrl/";
-  std::vector<char> tmp_gid_vec(sizeof(sgx_epid_group_id_t) * 2, 0);
+  std::string url = server_endpoint_ + "/sigrl/";
+  std::vector<char> tmp_gid_vec(sizeof(sgx_epid_group_id_t) * 2 + 1, 0);
   snprintf(tmp_gid_vec.data(), tmp_gid_vec.size(), "%02X%02X%02X%02X", gid[3],
            gid[2], gid[1], gid[0]);
   url += std::string(tmp_gid_vec.data());
@@ -242,7 +256,7 @@ SofaeErrorCode RaIasClient::FetchReport(const std::string& quote,
   }
 
   /* Set the report url */
-  std::string url = server_endpoint_ + "/attestation/sgx/v3/report";
+  std::string url = server_endpoint_ + "/report";
   SOFAE_LOG_DEBUG("URL: %s", url.c_str());
   curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
 
