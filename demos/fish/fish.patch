@@ -1,0 +1,13 @@
+diff --git a/src/exec.cpp b/src/exec.cpp
+index 1557caf0b..254dd0e2e 100644
+--- a/src/exec.cpp
++++ b/src/exec.cpp
+@@ -565,7 +565,7 @@ static bool exec_external_command(parser_t &parser, const std::shared_ptr<job_t>
+ 
+ #if FISH_USE_POSIX_SPAWN
+     // Prefer to use posix_spawn, since it's faster on some systems like OS X.
+-    bool use_posix_spawn = g_use_posix_spawn && can_use_posix_spawn_for_job(j, dup2s);
++    bool use_posix_spawn = g_use_posix_spawn; //&& can_use_posix_spawn_for_job(j, dup2s);
+     if (use_posix_spawn) {
+         s_fork_count++;  // spawn counts as a fork+exec
+         // Create posix spawn attributes and actions.

@@ -70,3 +70,5 @@ chmod +x ${INSTALL_DIR}/bin/occlum-ld
 # Make symbolic links
 ln -sf ${INSTALL_DIR}/${TARGET}/lib/libc.so /lib/ld-musl-x86_64.so.1
 ln -sf ${INSTALL_DIR} /usr/local/occlum
+ln -sf ${INSTALL_DIR}/bin/x86_64-linux-musl-gcc-ar ${INSTALL_DIR}/bin/occlum-ar
+ln -sf ${INSTALL_DIR}/bin/x86_64-linux-musl-strip ${INSTALL_DIR}/bin/occlum-strip
