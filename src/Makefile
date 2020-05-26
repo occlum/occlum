@@ -1,10 +1,18 @@
-.PHONY: all clean
+.PHONY: all format format-check clean
 
 all:
 	@$(MAKE) --no-print-directory -C libos
 	@$(MAKE) --no-print-directory -C pal
 	@$(MAKE) --no-print-directory -C run
 	@$(MAKE) --no-print-directory -C exec
+
+format:
+	@$(MAKE) --no-print-directory -C pal format
+	@$(MAKE) --no-print-directory -C run format
+
+format-check:
+	@$(MAKE) --no-print-directory -C pal format-check
+	@$(MAKE) --no-print-directory -C run format-check
 
 clean:
 	@$(MAKE) --no-print-directory -C libos clean

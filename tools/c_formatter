@@ -1,0 +1,13 @@
+#!/bin/bash
+
+current_dir=$(pwd)
+script_dir=$(dirname $0)
+project_dir="$script_dir/.."
+astyle_cfg="$project_dir/.astylerc"
+relative_path=$(realpath --relative-to=$project_dir $current_dir)
+
+if [ $1 == "--check" ]; then
+    astyle --options=$astyle_cfg --dry-run ${@:2} 2>&1 | sed -e "s|Formatted  |Format Error in $relative_path/|g" | grep --color=always "^Format.*" || true
+else
+    astyle --options=$astyle_cfg $@ 2>&1 | sed -e "s|Formatted  |Formatted  $relative_path/|g" | grep --color=always "^Formatted.*" || true
+fi

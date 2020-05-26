@@ -11,7 +11,7 @@ LINK_FLAGS := $(SGX_LFLAGS_U) -L$(BUILD_DIR)/lib -lsgx_uprotected_fs -locclum-pa
 
 ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(BIN) $(C_OBJS))))
 
-.PHONY: all clean
+.PHONY: all format format-check clean
 
 all: $(ALL_BUILD_SUBDIRS) $(BIN)
 
@@ -25,6 +25,12 @@ $(BIN): $(C_OBJS)
 $(BUILD_DIR)/src/run/%.o: %.c
 	@$(CC) $(C_FLAGS) -c $< -o $@
 	@echo "CC <= $@"
+
+format: $(C_SRCS) $(CXX_SRCS)
+	@$(C_FORMATTER) $^
+
+format-check: $(C_SRCS) $(CXX_SRCS)
+	@$(C_FORMATTER) --check $^
 
 clean:
 	@-$(RM) -f $(BIN) $(C_OBJS)

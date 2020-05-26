@@ -7,6 +7,8 @@ SGX_SDK ?= /opt/intel/sgxsdk
 SGX_MODE ?= HW
 SGX_ARCH ?= x64
 
+C_FORMATTER := $(PROJECT_DIR)/tools/c_formatter
+
 ifneq ($(SGX_MODE), HW)
 	BUILD_DIR := $(PROJECT_DIR)/build_sim
 else

@@ -4,6 +4,7 @@ LABEL maintainer="Qing Li <geding.lq@alibaba-inc.com>"
 
 RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-install-recommends \
         alien \
+        astyle \
         autoconf \
         automake \
         build-essential \

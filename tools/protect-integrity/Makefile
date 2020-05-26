@@ -8,6 +8,8 @@ SGX_MODE ?= HW
 SGX_ARCH ?= x64
 SGX_DEBUG ?= 1
 
+C_FORMATTER := $(PROJECT_DIR)/tools/c_formatter
+
 ifneq ($(SGX_MODE), HW)
 	BUILD_DIR := $(PROJECT_DIR)/build_sim
 else
@@ -57,6 +59,7 @@ endif
 
 APP_C_FILES := App/Enclave_u.c
 APP_CPP_FILES := App/App.cpp
+APP_HEADER_FILES := App/App.h
 APP_INCLUDE_PATHS := -IInclude -IApp -I$(SGX_SDK)/include -I$(OBJS_DIR)/App
 
 APP_C_FLAGS := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes $(APP_INCLUDE_PATHS)
@@ -101,6 +104,7 @@ CRYPTO_LIBRARY_NAME := sgx_tcrypto
 
 ENCLAVE_C_FILES := Enclave/Enclave_t.c
 ENCLAVE_CPP_FILES := Enclave/Enclave.cpp
+ENCLAVE_HEADER_FILES := Enclave/Enclave.h
 ENCLAVE_INCLUDE_PATHS := -IInclude -IEnclave -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/stlport -I$(OBJS_DIR)/Enclave
 
 ENCLAVE_C_FLAGS := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fPIC -fstack-protector $(ENCLAVE_INCLUDE_PATHS)
@@ -140,7 +144,7 @@ endif
 endif
 
 
-.PHONY: all test clean
+.PHONY: all test format format-check clean
 
 ifeq ($(BUILD_MODE), HW_RELEASE)
 all: $(APP_NAME) $(ENCLAVE_NAME)
@@ -217,6 +221,14 @@ test: all random.txt
 
 random.txt:
 	@base64 /dev/urandom | head -c 10000000 > random.txt
+
+
+format: $(APP_HEADER_FILES) $(APP_CPP_FILES) $(ENCLAVE_HEADER_FILES) $(ENCLAVE_CPP_FILES)
+	@$(C_FORMATTER) $^
+
+format-check: $(APP_HEADER_FILES) $(APP_CPP_FILES) $(ENCLAVE_HEADER_FILES) $(ENCLAVE_CPP_FILES)
+	@$(C_FORMATTER) --check $^
+
 
 clean:
 	@rm -f $(APP_NAME) $(ENCLAVE_NAME) $(SIGNED_ENCLAVE_NAME) $(APP_OBJS) $(OBJS_DIR)/App/Enclave_u.* $(ENCLAVE_OBJS) $(OBJS_DIR)/Enclave/Enclave_t.* *.test.txt random.txt*

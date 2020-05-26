@@ -2,6 +2,11 @@ CUR_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 PROJECT_DIR := $(realpath $(CUR_DIR)/../)
 SGX_MODE ?= HW
 
+C_SRCS := $(wildcard */*.c */*.h)
+CXX_SRCS := $(wildcard */*.cc)
+
+C_FORMATTER := $(PROJECT_DIR)/tools/c_formatter
+
 ifneq ($(SGX_MODE), HW)
 	BUILD_DIR := $(PROJECT_DIR)/build_sim
 else
@@ -25,7 +30,7 @@ BENCHES := spawn_and_exit_latency pipe_throughput unix_socket_throughput
 BUILD_TARGETS := $(TEST_DEPS) $(TESTS) $(BENCHES)
 TEST_TARGETS := $(TESTS:%=test-%)
 BENCH_TARGETS := $(BENCHES:%=bench-%)
-.PHONY: all prebuild build postbuild test clean $(BUILD_TARGETS) $(TEST_TARGETS) $(BENCH_TARGETS)
+.PHONY: all prebuild build postbuild test clean $(BUILD_TARGETS) $(TEST_TARGETS) $(BENCH_TARGETS) format format-check
 
 # Use echo program instead of built-in echo command in shell. This ensures
 # that echo can recognize escaped sequences (with -e argument) regardless of
@@ -116,6 +121,12 @@ $(BENCH_TARGETS): bench-%: %
 #############################################################################
 # Misc
 #############################################################################
+
+format: $(C_SRCS) $(CXX_SRCS)
+	@$(C_FORMATTER) $^
+
+format-check: $(C_SRCS) $(CXX_SRCS)
+	@$(C_FORMATTER) --check $^
 
 clean:
 	@$(RM) -rf $(BUILD_DIR)/test

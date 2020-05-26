@@ -1,4 +1,4 @@
-.PHONY: all submodule githooks src test tools install clean
+.PHONY: all submodule githooks src test tools install format format-check clean
 
 all: src
 
@@ -83,6 +83,16 @@ install:
 	install -t $(OCCLUM_PREFIX)/include/ -m 444 src/pal/include/*.h
 	install -d $(OCCLUM_PREFIX)/etc/template/
 	install -t $(OCCLUM_PREFIX)/etc/template/ -m 444 etc/template/*
+
+format:
+	@$(MAKE) --no-print-directory -C test format
+	@$(MAKE) --no-print-directory -C tools format
+	@$(MAKE) --no-print-directory -C src format
+
+format-check:
+	@$(MAKE) --no-print-directory -C test format-check
+	@$(MAKE) --no-print-directory -C tools format-check
+	@$(MAKE) --no-print-directory -C src format-check
 
 clean:
 	@$(MAKE) --no-print-directory -C src clean
