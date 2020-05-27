@@ -47,7 +47,24 @@ int main(int argc, char *argv[]) {
         .stderr_fd = STDERR_FILENO,
     };
     int exit_status = 0;
-    if (occlum_pal_exec(cmd_path, cmd_args, environ, &io_fds, &exit_status) < 0) {
+    int libos_tid = 0;
+    struct occlum_pal_create_process_args create_process_args = {
+        .path = cmd_path,
+        .argv = cmd_args,
+        .env = environ,
+        .stdio = (const struct occlum_stdio_fds *) &io_fds,
+        .pid = &libos_tid,
+    };
+    if (occlum_pal_create_process(&create_process_args) < 0) {
+        // Command not found or other internal errors
+        return 127;
+    }
+
+    struct occlum_pal_exec_args exec_args = {
+        .pid = libos_tid,
+        .exit_value = &exit_status,
+    };
+    if (occlum_pal_exec(&exec_args) < 0) {
         // Command not found or other internal errors
         return 127;
     }

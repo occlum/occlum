@@ -55,6 +55,67 @@ typedef struct occlum_stdio_fds {
 } occlum_stdio_fds_t;
 
 /*
+ * The struct which consists of arguments needed by occlum_pal_create_process
+ */
+struct occlum_pal_create_process_args {
+
+    // Path to new process.
+    //
+    // The path of the command which will be created as a new process.
+    //
+    // Mandatory field. Must not be NULL.
+    const char *path;
+
+    // Argments array pass to new process.
+    //
+    // The arguments to the command. The array must be NULL terminated.
+    //
+    // Mandatory field. Must not be NULL.
+    const char **argv;
+
+    // Untrusted environment variable array pass to new process.
+    //
+    // The untrusted env vars to the command. The array must be NULL terminated.
+    //
+    // Optional field.
+    const char **env;
+
+    // File descriptors of the redirected standard I/O (i.e., stdin, stdout, stderr)
+    //
+    // If set to NULL, will use the original standard I/O file descriptors.
+    //
+    // Optional field.
+    const struct occlum_stdio_fds *stdio;
+
+    // Output. Pid of new process in libos.
+    //
+    // If occlum_pal_create_process returns success, pid of the new process will
+    // be updated.
+    //
+    // Mandatory field. Must not be NULL.
+    int *pid;
+};
+
+/*
+ * The struct which consists of arguments needed by occlum_pal_exec
+ */
+struct occlum_pal_exec_args {
+    // Pid of new process created with occlum_pal_create_process.
+    //
+    // Mandatory field.
+    int pid;
+
+    // Output. The exit status of the command. The semantic of
+    // this value follows the one described in wait(2) man
+    // page. For example, if the program terminated normally,
+    // then WEXITSTATUS(exit_status) gives the value returned
+    // from a main function.
+    //
+    // Mandatory field. Must not be NULL.
+    int *exit_value;
+};
+
+/*
  * @brief Initialize an Occlum enclave
  *
  * @param attr  Mandatory input. Attributes for Occlum.
@@ -64,29 +125,22 @@ typedef struct occlum_stdio_fds {
 int occlum_pal_init(const struct occlum_pal_attr *attr);
 
 /*
- * @brief Execute a command inside the Occlum enclave
+ * @brief Create a new process inside the Occlum enclave
  *
- * @param cmd_path      The path of the command to be executed
- * @param cmd_args      The arguments to the command. The array must be NULL
- *                      terminated.
- * @param cmd_env       The untrusted env vars to the command. The array must
- *                      be NULL terminated.
- * @param io_fds        The file descriptors of the redirected standard I/O
- *                      (i.e., stdin, stdout, stderr), If set to NULL, will
- *                      use the original standard I/O file descriptors.
- * @param exit_status   Output. The exit status of the command. The semantic of
- *                      this value follows the one described in wait(2) man
- *                      page. For example, if the program terminated normally,
- *                      then WEXITSTATUS(exit_status) gives the value returned
- *                      from a main function.
+ * @param args  Mandatory input. Arguments for occlum_pal_create_process.
  *
  * @retval If 0, then success; otherwise, check errno for the exact error type.
  */
-int occlum_pal_exec(const char *cmd_path,
-                    const char **cmd_args,
-                    const char **cmd_env,
-                    const struct occlum_stdio_fds *io_fds,
-                    int *exit_status);
+int occlum_pal_create_process(struct occlum_pal_create_process_args *args);
+
+/*
+ * @brief Execute the process inside the Occlum enclave
+ *
+ * @param args  Mandatory input. Arguments for occlum_pal_exec.
+ *
+ * @retval If 0, then success; otherwise, check errno for the exact error type.
+ */
+int occlum_pal_exec(struct occlum_pal_exec_args *args);
 
 /*
  * @brief Send a signal to one or multiple LibOS processes

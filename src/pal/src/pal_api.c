@@ -50,14 +50,11 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
     return 0;
 }
 
-int occlum_pal_exec(const char *cmd_path,
-                    const char **cmd_args,
-                    const char **cmd_env,
-                    const struct occlum_stdio_fds *io_fds,
-                    int *exit_status) {
-    errno = 0;
+int occlum_pal_create_process(struct occlum_pal_create_process_args *args) {
+    int ecall_ret = 0; // libos_tid
 
-    if (cmd_path == NULL || cmd_args == NULL || exit_status == NULL) {
+    errno = 0;
+    if (args->path == NULL || args->argv == NULL || args->pid == NULL) {
         errno = EINVAL;
         return -1;
     }
@@ -69,9 +66,8 @@ int occlum_pal_exec(const char *cmd_path,
         return -1;
     }
 
-    int ecall_ret = 0; // libos_tid
-    sgx_status_t ecall_status = occlum_ecall_new_process(eid, &ecall_ret, cmd_path, cmd_args,
-                                cmd_env, io_fds);
+    sgx_status_t ecall_status = occlum_ecall_new_process(eid, &ecall_ret, args->path,
+                                args->argv, args->env, args->stdio);
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
         PAL_ERROR("Failed to do ECall: %s", sgx_err);
@@ -83,9 +79,28 @@ int occlum_pal_exec(const char *cmd_path,
         return -1;
     }
 
-    int libos_tid = ecall_ret;
+    *args->pid = ecall_ret;
+    return 0;
+}
+
+int occlum_pal_exec(struct occlum_pal_exec_args *args) {
     int host_tid = gettid();
-    ecall_status = occlum_ecall_exec_thread(eid, &ecall_ret, libos_tid, host_tid);
+    int ecall_ret = 0;
+
+    if (args->exit_value == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    sgx_enclave_id_t eid = pal_get_enclave_id();
+    if (eid == SGX_INVALID_ENCLAVE_ID) {
+        PAL_ERROR("Enclave is not initialized yet.");
+        errno = ENOENT;
+        return -1;
+    }
+
+    sgx_status_t ecall_status = occlum_ecall_exec_thread(eid, &ecall_ret, args->pid,
+                                host_tid);
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
         PAL_ERROR("Failed to do ECall: %s", sgx_err);
@@ -97,7 +112,7 @@ int occlum_pal_exec(const char *cmd_path,
         return -1;
     }
 
-    *exit_status = ecall_ret;
+    *args->exit_value = ecall_ret;
     return 0;
 }
 

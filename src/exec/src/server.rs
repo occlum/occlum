@@ -318,29 +318,45 @@ pub struct occlum_stdio_fds {
     pub stderr_fd: i32,
 }
 
+/*
+ * The struct which consists of arguments needed by occlum_pal_create_process
+ */
+#[repr(C)]
+pub struct occlum_pal_create_process_args {
+    pub path: *const libc::c_char,
+    pub argv: *const *const libc::c_char,
+    pub env: *const *const libc::c_char,
+    pub stdio: *const occlum_stdio_fds,
+    pub pid: *mut i32,
+}
+
+/*
+ * The struct which consists of arguments needed by occlum_pal_exec
+ */
+#[repr(C)]
+pub struct occlum_pal_exec_args {
+    pub pid: i32,
+    pub exit_value: *mut i32,
+}
+
 extern "C" {
     /*
-     * @brief Execute a command inside the Occlum enclave
+     * @brief Create a new process inside the Occlum enclave
      *
-     * @param cmd_path      The path of the command to be executed
-     * @param cmd_args      The arguments to the command. The array must be NULL
-     *                      terminated.
-     * @param io_fds        The file descriptors of the redirected standard I/O
-     *                      (i.e., stdin, stdout, stderr), If set to NULL, will
-     *                      use the original standard I/O file descriptors.
-     * @param exit_status   Output. The exit status of the command. Note that the
-     *                      exit status is returned if and only if the function
-     *                      succeeds.
+     * @param args  Mandatory input. Arguments for occlum_pal_create_process.
      *
      * @retval If 0, then success; otherwise, check errno for the exact error type.
      */
-    fn occlum_pal_exec(
-        cmd_path: *const libc::c_char,
-        cmd_args: *const *const libc::c_char,
-        cmd_env: *const *const libc::c_char,
-        io_fds: *const occlum_stdio_fds,
-        exit_status: *mut i32,
-    ) -> i32;
+    fn occlum_pal_create_process(args: *mut occlum_pal_create_process_args) -> i32;
+
+    /*
+     * @brief Execute the process inside the Occlum enclave
+     *
+     * @param args  Mandatory input. Arguments for occlum_pal_exec.
+     *
+     * @retval If 0, then success; otherwise, check errno for the exact error type.
+     */
+    fn occlum_pal_exec(args: *mut occlum_pal_exec_args) -> i32;
 
     /*
      * @brief Send a signal to one or multiple LibOS processes
@@ -381,16 +397,26 @@ fn rust_occlum_pal_exec(
     let (cmd_envs_array, _cmd_envs) = vec_strings_to_cchars(envs)?;
 
     let stdio_raw = Box::new(stdio);
+    let mut libos_tid = 0;
+    let create_process_args = Box::new(occlum_pal_create_process_args {
+        path: cmd_path.as_ptr() as *const libc::c_char,
+        argv: Box::into_raw(cmd_args_array.into_boxed_slice()) as *const *const libc::c_char,
+        env: Box::into_raw(cmd_envs_array.into_boxed_slice()) as *const *const libc::c_char,
+        stdio: *stdio_raw,
+        pid: &mut libos_tid as *mut i32,
+    });
 
-    let ret = unsafe {
-        occlum_pal_exec(
-            cmd_path.as_ptr() as *const libc::c_char,
-            Box::into_raw(cmd_args_array.into_boxed_slice()) as *const *const libc::c_char,
-            Box::into_raw(cmd_envs_array.into_boxed_slice()) as *const *const libc::c_char,
-            *stdio_raw,
-            exit_status as *mut i32,
-        )
-    };
+    let ret = unsafe{occlum_pal_create_process(Box::into_raw(create_process_args))};
+    if ret != 0 {
+        return Err(ret);
+    }
+
+    let exec_args = Box::new(occlum_pal_exec_args {
+        pid: libos_tid,
+        exit_value: exit_status as *mut i32,
+    });
+
+    let ret = unsafe {occlum_pal_exec(Box::into_raw(exec_args))};
 
     match ret {
         0 => Ok(()),
