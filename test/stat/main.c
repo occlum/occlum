@@ -12,7 +12,7 @@
 
 static int create_file(const char *file_path) {
     int fd;
-    int flags = O_RDONLY | O_CREAT| O_TRUNC;
+    int flags = O_RDONLY | O_CREAT | O_TRUNC;
     int mode = 00666;
 
     fd = open(file_path, flags, mode);
@@ -145,12 +145,15 @@ typedef int(*test_stat_func_t)(const char *);
 static int test_stat_framework(test_stat_func_t fn) {
     const char *file_path = "/root/test_filesystem_stat.txt";
 
-    if (create_file(file_path) < 0)
+    if (create_file(file_path) < 0) {
         return -1;
-    if (fn(file_path) < 0)
+    }
+    if (fn(file_path) < 0) {
         return -1;
-    if (remove_file(file_path) < 0)
+    }
+    if (remove_file(file_path) < 0) {
         return -1;
+    }
     return 0;
 }
 

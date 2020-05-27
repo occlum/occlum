@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-const char* errno2str(int errno_);
+const char *errno2str(int errno_);
 
 #ifdef __cplusplus
 }

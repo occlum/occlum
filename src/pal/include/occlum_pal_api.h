@@ -30,14 +30,14 @@ typedef struct occlum_pal_attr {
     // ".occlum"; it can be renamed to an arbitrary name.
     //
     // Mandatory field. Must not be NULL.
-    const char*     instance_dir;
+    const char     *instance_dir;
     // Log level.
     //
     // Specifies the log level of Occlum LibOS. Valid values: "off", "error",
     // "warn", "info", and "trace". Case insensitive.
     //
     // Optional field. If NULL, the LibOS will treat it as "off".
-    const char*     log_level;
+    const char     *log_level;
 } occlum_pal_attr_t;
 
 #define OCCLUM_PAL_ATTR_INITVAL         { \
@@ -61,7 +61,7 @@ typedef struct occlum_stdio_fds {
  *
  * @retval If 0, then success; otherwise, check errno for the exact error type.
  */
-int occlum_pal_init(const struct occlum_pal_attr* attr);
+int occlum_pal_init(const struct occlum_pal_attr *attr);
 
 /*
  * @brief Execute a command inside the Occlum enclave
@@ -82,11 +82,11 @@ int occlum_pal_init(const struct occlum_pal_attr* attr);
  *
  * @retval If 0, then success; otherwise, check errno for the exact error type.
  */
-int occlum_pal_exec(const char* cmd_path,
-                    const char** cmd_args,
-                    const char** cmd_env,
-                    const struct occlum_stdio_fds* io_fds,
-                    int* exit_status);
+int occlum_pal_exec(const char *cmd_path,
+                    const char **cmd_args,
+                    const char **cmd_env,
+                    const struct occlum_stdio_fds *io_fds,
+                    int *exit_status);
 
 /*
  * @brief Send a signal to one or multiple LibOS processes

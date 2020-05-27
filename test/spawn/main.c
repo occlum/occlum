@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <spawn.h>
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[]) {
     int ret, child_pid, status;
     printf("Run a parent process has pid = %d and ppid = %d\n", getpid(), getppid());
 

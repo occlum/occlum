@@ -79,10 +79,10 @@ static sgx_err_msg_t err_msg_table[] = {
     },
 };
 
-const char* pal_get_sgx_error_msg(sgx_status_t error) {
-    int err_max = sizeof err_msg_table/sizeof err_msg_table[0];
+const char *pal_get_sgx_error_msg(sgx_status_t error) {
+    int err_max = sizeof err_msg_table / sizeof err_msg_table[0];
     for (int err_i = 0; err_i < err_max; err_i++) {
-        if(error == err_msg_table[err_i].err) {
+        if (error == err_msg_table[err_i].err) {
             return err_msg_table[err_i].msg;
         }
     }

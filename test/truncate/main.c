@@ -5,15 +5,15 @@
 #include <string.h>
 #include <stdio.h>
 
-int main(int argc, const char* argv[]) {
-    const char* FILE_NAME = "root/test_filesystem_truncate.txt";
+int main(int argc, const char *argv[]) {
+    const char *FILE_NAME = "root/test_filesystem_truncate.txt";
     const int TRUNC_LEN = 256;
     const int TRUNC_LEN1 = 128;
     const int MODE_MASK = 0777;
 
     int ret;
 
-    int flags = O_WRONLY | O_CREAT| O_TRUNC;
+    int flags = O_WRONLY | O_CREAT | O_TRUNC;
     int mode = 00666;
     int fd = open(FILE_NAME, flags, mode);
     if (fd < 0) {

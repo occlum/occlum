@@ -29,8 +29,8 @@ static inline uint64_t native_syscall(syscall_args_t *p) {
     register unsigned long arg5 asm ("r9") = p->arg5;
 
     asm volatile("syscall"
-        : "=a" (ret)
-        : "r" (num), "r" (arg0), "r" (arg1), "r" (arg2), "r" (arg3), "r" (arg4), "r" (arg5));
+                 : "=a" (ret)
+                 : "r" (num), "r" (arg0), "r" (arg1), "r" (arg2), "r" (arg3), "r" (arg4), "r" (arg5));
     return ret;
 }
 
@@ -47,13 +47,13 @@ static inline uint64_t native_syscall(syscall_args_t *p) {
 int test_mmap_and_munmap_via_syscall_instruction() {
     int len = PAGE_SIZE;
     syscall_args_t mmap_arg = {
-            .num= __NR_mmap,
-            .arg0 = (unsigned long) NULL,
-            .arg1 = len,
-            .arg2 = PROT_READ | PROT_WRITE,
-            .arg3 = MAP_PRIVATE | MAP_ANONYMOUS,
-            .arg4 = -1,
-            .arg5 = 0,
+        .num = __NR_mmap,
+        .arg0 = (unsigned long) NULL,
+        .arg1 = len,
+        .arg2 = PROT_READ | PROT_WRITE,
+        .arg3 = MAP_PRIVATE | MAP_ANONYMOUS,
+        .arg4 = -1,
+        .arg5 = 0,
     };
     char *buf = (char *) native_syscall(&mmap_arg);
     if (buf == MAP_FAILED) {
@@ -66,9 +66,9 @@ int test_mmap_and_munmap_via_syscall_instruction() {
     }
 
     syscall_args_t munmap_arg = {
-            .num= __NR_munmap,
-            .arg0 = (unsigned long) buf,
-            .arg1 = len,
+        .num = __NR_munmap,
+        .arg0 = (unsigned long) buf,
+        .arg1 = len,
     };
     int ret = native_syscall(&munmap_arg);
     if (ret < 0) {
@@ -84,6 +84,6 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_mmap_and_munmap_via_syscall_instruction),
 };
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[]) {
     return test_suite_run(test_cases, ARRAY_SIZE(test_cases));
 }

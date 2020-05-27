@@ -99,13 +99,14 @@ int test_sigprocmask() {
 
 #define MAX_RECURSION_LEVEL     3
 
-static void handle_sigio(int num, siginfo_t* info, void* context) {
+static void handle_sigio(int num, siginfo_t *info, void *context) {
     static volatile int recursion_level = 0;
     printf("Hello from SIGIO signal handler (recursion_level = %d)!\n", recursion_level);
 
     recursion_level++;
-    if (recursion_level <= MAX_RECURSION_LEVEL)
+    if (recursion_level <= MAX_RECURSION_LEVEL) {
         raise(SIGIO);
+    }
     recursion_level--;
 }
 
@@ -134,7 +135,7 @@ int test_raise() {
 
 int test_abort() {
     pid_t child_pid;
-    char* child_argv[] = {"signal", "aborted_child", NULL};
+    char *child_argv[] = {"signal", "aborted_child", NULL};
     int ret;
     int status;
 
@@ -170,7 +171,7 @@ static int aborted_child() {
 
 int test_kill() {
     pid_t child_pid;
-    char* child_argv[] = {"signal", "killed_child", NULL};
+    char *child_argv[] = {"signal", "killed_child", NULL};
     int ret;
     int status;
 
@@ -207,13 +208,13 @@ static int killed_child() {
 // Test catching and handling hardware exception
 // ============================================================================
 
-static void handle_sigfpe(int num, siginfo_t* info, void* _context) {
+static void handle_sigfpe(int num, siginfo_t *info, void *_context) {
     printf("SIGFPE Caught\n");
     assert(num == SIGFPE);
     assert(info->si_signo == SIGFPE);
 
-    ucontext_t* ucontext = _context;
-    mcontext_t* mcontext = &ucontext->uc_mcontext;
+    ucontext_t *ucontext = _context;
+    mcontext_t *mcontext = &ucontext->uc_mcontext;
     // The faulty instruction should be `idiv %esi` (f7 fe)
     mcontext->gregs[REG_RIP] += 2;
 
@@ -230,7 +231,7 @@ int div_maybe_zero(int x, int y) {
 int test_catch_fault() {
 #ifdef SGX_MODE_SIM
     printf("WARNING: Skip this test case as we do not support "
-            "capturing hardware exception in SGX simulation mode\n");
+           "capturing hardware exception in SGX simulation mode\n");
     return 0;
 #else
     // Set up a signal handler that handles divide-by-zero exception
@@ -268,10 +269,10 @@ int test_catch_fault() {
 
 stack_t g_old_ss;
 
-static void handle_sigpipe(int num, siginfo_t* info, void* context) {
+static void handle_sigpipe(int num, siginfo_t *info, void *context) {
     static volatile int recursion_level = 0;
     printf("Hello from SIGPIPE signal handler on the alternate signal stack (recursion_level = %d)\n",
-            recursion_level);
+           recursion_level);
 
     // save old_ss to check if we are on stack
     stack_t old_ss;
@@ -279,8 +280,9 @@ static void handle_sigpipe(int num, siginfo_t* info, void* context) {
     g_old_ss = old_ss;
 
     recursion_level++;
-    if (recursion_level <= MAX_ALTSTACK_RECURSION_LEVEL)
+    if (recursion_level <= MAX_ALTSTACK_RECURSION_LEVEL) {
         raise(SIGPIPE);
+    }
     recursion_level--;
 }
 
@@ -299,8 +301,8 @@ int test_sigaltstack() {
         THROW_ERROR("failed to call sigaltstack");
     }
     if (actual_ss.ss_size != expected_ss.ss_size
-        || actual_ss.ss_sp != expected_ss.ss_sp
-        || actual_ss.ss_flags != expected_ss.ss_flags) {
+            || actual_ss.ss_sp != expected_ss.ss_sp
+            || actual_ss.ss_flags != expected_ss.ss_flags) {
         THROW_ERROR("failed to check the signal stack after set");
     }
 
@@ -341,14 +343,14 @@ int test_sigchld() {
     printf("Run a parent process has pid = %d and ppid = %d\n", getpid(), getppid());
 
     ret = posix_spawn(&child_pid, "/bin/getpid", NULL, NULL, NULL, NULL);
-    if (ret < 0){
+    if (ret < 0) {
         printf("ERROR: failed to spawn a child process\n");
         return -1;
     }
     printf("Spawn a new proces successfully (pid = %d)\n", child_pid);
 
     wait(NULL);
-    if (sigchld == 0) THROW_ERROR("Did not receive SIGCHLD");
+    if (sigchld == 0) { THROW_ERROR("Did not receive SIGCHLD"); }
 
     return 0;
 }
@@ -367,16 +369,14 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_sigchld),
 };
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[]) {
     if (argc > 1) {
-        const char* cmd = argv[1];
+        const char *cmd = argv[1];
         if (strcmp(cmd, "aborted_child") == 0) {
             return aborted_child();
-        }
-        else if (strcmp(cmd, "killed_child") == 0) {
+        } else if (strcmp(cmd, "killed_child") == 0) {
             return killed_child();
-        }
-        else {
+        } else {
             fprintf(stderr, "ERROR: unknown command: %s\n", cmd);
             return EXIT_FAILURE;
         }

@@ -131,7 +131,7 @@ int test_read_write() {
             THROW_ERROR("received length is not as expected");
         }
         data_recv += cur_data;
-    } while (data_recv != TEST_DATA*CHILD_NUM);
+    } while (data_recv != TEST_DATA * CHILD_NUM);
 
     close(event_fd);
 
@@ -162,14 +162,14 @@ int test_select_with_socket() {
     FD_SET(sock, &wfds);
     FD_SET(event_fd, &rfds);
     FD_SET(event_fd, &wfds);
-    ret = select(sock > event_fd? sock + 1: event_fd + 1, &rfds, &wfds, NULL, &tv);
+    ret = select(sock > event_fd ? sock + 1 : event_fd + 1, &rfds, &wfds, NULL, &tv);
     if (ret != 3) {
         close_files(2, sock, event_fd);
         THROW_ERROR("select failed");
     }
 
     if (FD_ISSET(event_fd, &rfds) == 1 || FD_ISSET(event_fd, &wfds) == 0 ||
-        FD_ISSET(sock, &rfds) == 0 || FD_ISSET(sock, &wfds) == 0) {
+            FD_ISSET(sock, &rfds) == 0 || FD_ISSET(sock, &wfds) == 0) {
         close_files(2, sock, event_fd);
         THROW_ERROR("bad select return");
     }
@@ -211,15 +211,15 @@ int test_epoll_with_socket() {
 
     struct epoll_event ctl_events[2] = {0};
     // Add eventfd to the interest list
-	ctl_events[0].data.fd = event_fd;
-	ctl_events[0].events = EPOLLIN | EPOLLET;
+    ctl_events[0].data.fd = event_fd;
+    ctl_events[0].events = EPOLLIN | EPOLLET;
     // Add socket to the interest list
-	ctl_events[1].data.fd = sock;
-	ctl_events[1].events = EPOLLIN | EPOLLET;
-	if (epoll_ctl(epfd, EPOLL_CTL_ADD, event_fd, &ctl_events[0]) == -1 ||
+    ctl_events[1].data.fd = sock;
+    ctl_events[1].events = EPOLLIN | EPOLLET;
+    if (epoll_ctl(epfd, EPOLL_CTL_ADD, event_fd, &ctl_events[0]) == -1 ||
             epoll_ctl(epfd, EPOLL_CTL_ADD, sock, &ctl_events[1]) == -1) {
         close_files(3, event_fd, sock, epfd);
-		THROW_ERROR("epoll_ctl");
+        THROW_ERROR("epoll_ctl");
     }
 
     struct thread_arg child_arg = { .tid = 0, .fd = event_fd, .data = TEST_DATA };
@@ -229,7 +229,7 @@ int test_epoll_with_socket() {
     }
 
     struct epoll_event events[MAXEVENTS] = {0};
-    if (epoll_pwait(epfd, events, MAXEVENTS, -1, NULL) <= 0){
+    if (epoll_pwait(epfd, events, MAXEVENTS, -1, NULL) <= 0) {
         close_files(3, event_fd, sock, epfd);
         THROW_ERROR("epoll failed");
     }
@@ -256,6 +256,6 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_select_with_socket),
 };
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[]) {
     return test_suite_run(test_cases, ARRAY_SIZE(test_cases));
 }

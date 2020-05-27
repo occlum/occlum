@@ -17,14 +17,14 @@
 
 #define MAX_CPU_NUM 1024
 
-static int* g_online_cpu_idxs;
+static int *g_online_cpu_idxs;
 
 int get_online_cpu() {
     int online_num = sysconf(_SC_NPROCESSORS_ONLN);
     cpu_set_t mask;
     int index = 0;
 
-    g_online_cpu_idxs = (int*)calloc(online_num, sizeof(int));
+    g_online_cpu_idxs = (int *)calloc(online_num, sizeof(int));
     CPU_ZERO(&mask);
     if (sched_getaffinity(0, sizeof(cpu_set_t), &mask) < 0) {
         THROW_ERROR("failed to call sched_getaffinity");
@@ -94,7 +94,7 @@ static int test_sched_xetaffinity_with_child_pid() {
     }
     cpu_set_t mask;
     CPU_ZERO(&mask);
-    CPU_SET(g_online_cpu_idxs[num - 1] , &mask);
+    CPU_SET(g_online_cpu_idxs[num - 1], &mask);
     int ret = posix_spawn(&child_pid, "/bin/getpid", NULL, NULL, NULL, NULL);
     if (ret < 0 ) {
         THROW_ERROR("spawn process error");
@@ -177,7 +177,7 @@ static int test_sched_setaffinity_with_zero_cpusetsize() {
 
 static int test_sched_getaffinity_with_null_buffer() {
     unsigned char *buf = NULL;
-    if (sched_getaffinity(0, sizeof(cpu_set_t), (cpu_set_t*)buf) != -1) {
+    if (sched_getaffinity(0, sizeof(cpu_set_t), (cpu_set_t *)buf) != -1) {
         THROW_ERROR("check invalid buffer pointer(NULL) fail");
     }
     return 0;
@@ -185,7 +185,7 @@ static int test_sched_getaffinity_with_null_buffer() {
 
 static int test_sched_setaffinity_with_null_buffer() {
     unsigned char *buf = NULL;
-    if (sched_setaffinity(0, sizeof(cpu_set_t), (cpu_set_t*)buf) != -1) {
+    if (sched_setaffinity(0, sizeof(cpu_set_t), (cpu_set_t *)buf) != -1) {
         THROW_ERROR("check invalid buffer pointer(NULL) fail");
     }
     return 0;

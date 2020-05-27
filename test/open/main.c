@@ -74,13 +74,15 @@ typedef int(*test_open_func_t)(const char *, int, int);
 
 static int test_open_framework(test_open_func_t fn) {
     const char *file_path = "/root/test_filesystem_open.txt";
-    int flags = O_RDONLY | O_CREAT| O_TRUNC;
+    int flags = O_RDONLY | O_CREAT | O_TRUNC;
     int mode = 00666;
 
-    if (fn(file_path, flags, mode) < 0)
+    if (fn(file_path, flags, mode) < 0) {
         return -1;
-    if (remove_file(file_path) < 0)
+    }
+    if (remove_file(file_path) < 0) {
         return -1;
+    }
     return 0;
 }
 

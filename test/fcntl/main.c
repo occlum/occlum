@@ -57,10 +57,11 @@ static int __fcntl_getlk_and_setlk(int fd, int open_flags) {
     }
 
     // setlk
-    if ((open_flags & O_WRONLY) || (open_flags & O_RDWR))
+    if ((open_flags & O_WRONLY) || (open_flags & O_RDWR)) {
         fl.l_type = F_WRLCK;
-    else
+    } else {
         fl.l_type = F_RDLCK;
+    }
     ret = fcntl(fd, F_SETLK, &fl);
     if (ret < 0) {
         THROW_ERROR("failed to call setlk");
@@ -70,8 +71,9 @@ static int __fcntl_getlk_and_setlk(int fd, int open_flags) {
 }
 
 static int __fcntl_dupfd(int fd, int open_flags) {
-    if (fcntl(fd, F_DUPFD, 0) < 0)
+    if (fcntl(fd, F_DUPFD, 0) < 0) {
         THROW_ERROR("failed to duplicate the fd");
+    }
     return 0;
 }
 
@@ -87,8 +89,9 @@ static int test_fcntl_framework(test_fcntl_func_t fn) {
     if (fd < 0) {
         THROW_ERROR("failed to open & create file");
     }
-    if (fn(fd, open_flags) < 0)
+    if (fn(fd, open_flags) < 0) {
         return -1;
+    }
     close(fd);
     ret = unlink(file_path);
     if (ret < 0) {

@@ -6,15 +6,15 @@
 #include <stdio.h>
 #include <errno.h>
 
-int main(int argc, const char* argv[]) {
-    const char* file_name = "/root/test_filesystem_link.txt";
-    const char* link_name = "/root/link.txt";
-    const char* write_msg = "Hello World\n";
+int main(int argc, const char *argv[]) {
+    const char *file_name = "/root/test_filesystem_link.txt";
+    const char *link_name = "/root/link.txt";
+    const char *write_msg = "Hello World\n";
     char read_buf[128] = {0};
     int ret;
 
     // create a file and write message
-    int flags = O_WRONLY | O_CREAT| O_TRUNC;
+    int flags = O_WRONLY | O_CREAT | O_TRUNC;
     int mode = 00666;
     int fd = open(file_name, flags, mode);
     if (fd < 0) {
@@ -30,7 +30,7 @@ int main(int argc, const char* argv[]) {
 
     // link
     ret = link(file_name, link_name);
-    if(ret < 0) {
+    if (ret < 0) {
         printf("ERROR: failed to link the file\n");
         return -1;
     }
@@ -54,7 +54,7 @@ int main(int argc, const char* argv[]) {
 
     // unlink
     ret = unlink(link_name);
-    if(ret < 0) {
+    if (ret < 0) {
         printf("ERROR: failed to link the file\n");
         return -1;
     }
@@ -62,26 +62,26 @@ int main(int argc, const char* argv[]) {
     // stat
     struct stat stat_buf;
     ret = stat(link_name, &stat_buf);
-    if(!(ret < 0 && errno == ENOENT)) {
+    if (!(ret < 0 && errno == ENOENT)) {
         printf("ERROR: stat on \"%s\" should return ENOENT", link_name);
         return -1;
     }
 
     // rename
     ret = rename(file_name, link_name);
-    if(ret < 0) {
+    if (ret < 0) {
         printf("ERROR: failed to rename the file");
         return -1;
     }
 
     // stat
     ret = stat(file_name, &stat_buf);
-    if(!(ret < 0 && errno == ENOENT)) {
+    if (!(ret < 0 && errno == ENOENT)) {
         printf("ERROR: stat on \"%s\" should return ENOENT", file_name);
         return -1;
     }
     ret = stat(link_name, &stat_buf);
-    if(ret < 0) {
+    if (ret < 0) {
         printf("ERROR: failed to stat the file");
         return -1;
     }

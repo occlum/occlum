@@ -10,7 +10,7 @@
 // Test utilities
 // ============================================================================
 
-static int check_file_readable(const char* filename) {
+static int check_file_readable(const char *filename) {
     int fd;
     char buf[512] = {0};
     int len;
@@ -24,7 +24,7 @@ static int check_file_readable(const char* filename) {
     return 0;
 }
 
-static int check_file_writable(const char* filename) {
+static int check_file_writable(const char *filename) {
     int fd;
     char buf[512] = {0};
     int len;

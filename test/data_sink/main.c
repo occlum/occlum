@@ -6,7 +6,7 @@
 #define MIN(x, y)           ((x) <= (y) ? (x) : (y))
 
 // This program consumes a specific amount of data from stdin
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[]) {
     // Get the total number of bytes to read
     size_t remain_bytes = 0;
     while (read(0, &remain_bytes, sizeof(remain_bytes)) != sizeof(remain_bytes));

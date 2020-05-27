@@ -30,8 +30,9 @@ static int create_and_bind() {
     servaddr.sin_port = htons(6667);
 
     int reuse = 1;
-    if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
+    if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
         THROW_ERROR("setsockopt port to reuse failed");
+    }
 
     int ret = bind(listenfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
     if (ret < 0) {
@@ -67,8 +68,8 @@ int test_ip_socket() {
 
     int client_pid;
     int proc_num = DEFAULT_PROC_NUM;
-    char* client_argv[] = {"client", "127.0.0.1", "6667", NULL};
-    for(int i=0; i<DEFAULT_PROC_NUM; ++i) {
+    char *client_argv[] = {"client", "127.0.0.1", "6667", NULL};
+    for (int i = 0; i < DEFAULT_PROC_NUM; ++i) {
         int ret = posix_spawn(&client_pid, "/bin/client", NULL, NULL, client_argv, NULL);
         if (ret < 0) {
             if (i == 0) {
@@ -124,7 +125,7 @@ int test_ip_socket() {
                 // Channel is ready to read.
                 char buf[36];
                 if ((read(events[i].data.fd, buf, sizeof buf)) != 0) {
-                    if(strcmp(buf, DEFAULT_MSG) != 0) {
+                    if (strcmp(buf, DEFAULT_MSG) != 0) {
                         close_files(2, server_fd, epfd);
                         THROW_ERROR("msg mismatched");
                     }
@@ -159,6 +160,6 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_ip_socket),
 };
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[]) {
     return test_suite_run(test_cases, ARRAY_SIZE(test_cases));
 }

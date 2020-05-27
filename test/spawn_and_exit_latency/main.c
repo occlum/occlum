@@ -7,13 +7,13 @@
 
 #define NREPEATS 5000
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[]) {
     struct timeval tv_start, tv_end;
 
     gettimeofday(&tv_start, NULL);
     for (unsigned long i = 0; i < NREPEATS; i++) {
         int child_pid, status;
-        if (posix_spawn(&child_pid, "/bin/empty", NULL, NULL, NULL, NULL) <0) {
+        if (posix_spawn(&child_pid, "/bin/empty", NULL, NULL, NULL, NULL) < 0) {
             printf("ERROR: failed to spawn (# of repeats = %lu)\n", i);
             return -1;
         }
@@ -29,7 +29,7 @@ int main(int argc, const char* argv[]) {
     gettimeofday(&tv_end, NULL);
 
     suseconds_t total_us = (tv_end.tv_sec - tv_start.tv_sec) * 1000000UL +
-                         + (tv_end.tv_usec - tv_start.tv_usec);
+                           + (tv_end.tv_usec - tv_start.tv_usec);
     suseconds_t latency = total_us / NREPEATS;
     printf("Latency of spawn/exit = %lu us\n", latency);
     return 0;

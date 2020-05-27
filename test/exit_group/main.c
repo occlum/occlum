@@ -16,7 +16,7 @@
 //
 
 // Type 1: a busy loop thread
-static void* busyloop_thread_func(void* _) {
+static void *busyloop_thread_func(void *_) {
     while (1) {
         // By calling getpid, we give the LibOS a chance to force the thread
         // to terminate if exit_group is called by any thread in a thread group
@@ -49,7 +49,7 @@ int test_exit_group_to_force_threads_terminate(void) {
         return -1;
     }
 
-    // Disable below two test cases, needs interrupt support 
+    // Disable below two test cases, needs interrupt support
     // pthread_t sleeping_thread;
     // if (pthread_create(&sleeping_thread, NULL, sleeping_thread_func, NULL) < 0) {
     //     printf("ERROR: pthread_create failed\n");

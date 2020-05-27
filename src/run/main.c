@@ -6,25 +6,24 @@
 #include <sys/wait.h>
 #include <occlum_pal_api.h>
 
-static const char* get_instance_dir(void) {
-    const char* instance_dir_from_env = (const char*) getenv("OCCLUM_INSTANCE_DIR");
+static const char *get_instance_dir(void) {
+    const char *instance_dir_from_env = (const char *) getenv("OCCLUM_INSTANCE_DIR");
     if (instance_dir_from_env != NULL) {
         return instance_dir_from_env;
-    }
-    else {
+    } else {
         return "./.occlum";
     }
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     // Parse arguments
     if (argc < 2) {
         fprintf(stderr, "[ERROR] occlum-run: at least one argument must be provided\n\n");
         fprintf(stderr, "Usage: occlum-run <executable> [<args>]\n");
         return EXIT_FAILURE;
     }
-    const char* cmd_path = (const char*) argv[1];
-    const char** cmd_args = (const char**) &argv[2];
+    const char *cmd_path = (const char *) argv[1];
+    const char **cmd_args = (const char **) &argv[2];
     extern const char **environ;
 
     // Check Occlum PAL version

@@ -64,8 +64,8 @@ int create_connceted_sockets_default(int *sockets) {
 }
 
 int verify_child_echo(int *connected_sockets) {
-    const char* child_prog = "/bin/hello_world";
-    const char* child_argv[3] = { child_prog, ECHO_MSG, NULL };
+    const char *child_prog = "/bin/hello_world";
+    const char *child_argv[3] = { child_prog, ECHO_MSG, NULL };
     int child_pid;
     posix_spawn_file_actions_t file_actions;
 
@@ -74,7 +74,7 @@ int verify_child_echo(int *connected_sockets) {
     posix_spawn_file_actions_addclose(&file_actions, connected_sockets[1]);
 
     if (posix_spawn(&child_pid, child_prog, &file_actions,
-            NULL, (char*const*)child_argv, NULL) < 0) {
+                    NULL, (char *const *)child_argv, NULL) < 0) {
         THROW_ERROR("failed to spawn a child process");
     }
 
@@ -124,24 +124,24 @@ int test_multiple_socketpairs() {
     int i;
     int ret = 0;
 
-    for(i = 0; i < PAIR_NUM; i++) {
+    for (i = 0; i < PAIR_NUM; i++) {
         if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets[i]) < 0) {
             THROW_ERROR("opening stream socket pair");
         }
 
-        if(verify_connection(sockets[i][0], sockets[i][1]) < 0) {
+        if (verify_connection(sockets[i][0], sockets[i][1]) < 0) {
             ret = -1;
             goto cleanup;
         }
 
-        if(verify_connection(sockets[i][1], sockets[i][0]) < 0) {
+        if (verify_connection(sockets[i][1], sockets[i][0]) < 0) {
             ret = -1;
             goto cleanup;
         }
     }
     i--;
 cleanup:
-    for(; i >= 0; i--){
+    for (; i >= 0; i--) {
         close(sockets[i][0]);
         close(sockets[i][1]);
     }
@@ -156,8 +156,9 @@ typedef int(*create_connection_func_t)(int *);
 int test_connected_sockets_inter_process(create_connection_func_t fn) {
     int ret = 0;
     int sockets[2];
-    if (fn(sockets) < 0)
+    if (fn(sockets) < 0) {
         return -1;
+    }
 
     ret = verify_child_echo(sockets);
 
@@ -180,6 +181,6 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_multiple_socketpairs),
 };
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[]) {
     return test_suite_run(test_cases, ARRAY_SIZE(test_cases));
 }

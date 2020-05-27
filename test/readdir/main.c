@@ -14,7 +14,7 @@
 
 static int test_readdir() {
     struct dirent *dp;
-    DIR* dirp;
+    DIR *dirp;
 
     dirp = opendir("/");
     if (dirp == NULL) {

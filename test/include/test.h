@@ -14,7 +14,7 @@
 typedef int(*test_case_func_t)(void);
 
 typedef struct {
-    const char*             name;
+    const char             *name;
     test_case_func_t        func;
 } test_case_t;
 
@@ -26,9 +26,9 @@ typedef struct {
     return -1; \
 } while (0)
 
-int test_suite_run(test_case_t* test_cases, int num_test_cases) {
+int test_suite_run(test_case_t *test_cases, int num_test_cases) {
     for (int ti = 0; ti < num_test_cases; ti++) {
-        test_case_t* tc = &test_cases[ti];
+        test_case_t *tc = &test_cases[ti];
         if (tc->func() < 0) {
             printf("  func %s - [ERR]\n", tc->name);
             return -1;

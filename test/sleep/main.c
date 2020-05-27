@@ -17,14 +17,13 @@
 // Helper functions
 // ============================================================================
 
-static inline void validate_timespec(const struct timespec* tv) {
+static inline void validate_timespec(const struct timespec *tv) {
     assert(tv->tv_sec >= 0 && tv->tv_nsec >= 0 && tv->tv_nsec < S);
 }
 
 
 // retval = (a < b) ? -1 : ((a > b) ? 1 : 0)
-static int timespec_cmp(const struct timespec *a, const struct timespec *b)
-{
+static int timespec_cmp(const struct timespec *a, const struct timespec *b) {
     validate_timespec(a);
     validate_timespec(b);
 
@@ -34,22 +33,23 @@ static int timespec_cmp(const struct timespec *a, const struct timespec *b)
         return 1;
     } else {
         return a->tv_nsec < b->tv_nsec ? -1 :
-                (a->tv_nsec > b->tv_nsec ? 1 : 0);
+               (a->tv_nsec > b->tv_nsec ? 1 : 0);
     }
 }
 
 // diff = | a - b |
 static void timespec_diff(const struct timespec *a, const struct timespec *b,
-    struct timespec *diff)
-{
+                          struct timespec *diff) {
     validate_timespec(a);
     validate_timespec(b);
 
     const struct timespec *begin, *end;
     if (timespec_cmp(a, b) <= 0) {
-        begin = a; end = b;
+        begin = a;
+        end = b;
     } else {
-        begin = b; end = a;
+        begin = b;
+        end = a;
     }
 
     diff->tv_nsec = end->tv_nsec - begin->tv_nsec;
@@ -64,15 +64,14 @@ static void timespec_diff(const struct timespec *a, const struct timespec *b,
 
 // retval = | a - b | <= precision
 static int timespec_equal(const struct timespec *a, const struct timespec *b,
-    const struct timespec *precision)
-{
+                          const struct timespec *precision) {
     struct timespec diff;
     timespec_diff(a, b, &diff);
     return timespec_cmp(&diff, precision) <= 0;
 }
 
 
-static int check_nanosleep(struct timespec* expected_sleep_period) {
+static int check_nanosleep(struct timespec *expected_sleep_period) {
     // The time obtained from Occlum is not very precise.
     // Here we take 1 millisecond as the time precision of Occlum.
     static struct timespec OS_TIME_PRECISION = {

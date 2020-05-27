@@ -16,13 +16,15 @@
 
 int connect_with_server(const char *addr_string, const char *port_string) {
     //"NULL" addr means connectionless, no need to connect to server
-    if (strcmp(addr_string, "NULL") == 0)
+    if (strcmp(addr_string, "NULL") == 0) {
         return 0;
+    }
 
     int ret = 0;
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0)
+    if (sockfd < 0) {
         THROW_ERROR("create socket error");
+    }
 
     struct sockaddr_in servaddr;
     memset(&servaddr, 0, sizeof(servaddr));
@@ -44,8 +46,9 @@ int connect_with_server(const char *addr_string, const char *port_string) {
 }
 
 int neogotiate_msg(int server_fd, char *buf, int buf_size) {
-    if (read(server_fd, buf, buf_size) < 0)
+    if (read(server_fd, buf, buf_size) < 0) {
         THROW_ERROR("read failed");
+    }
 
     if (write(server_fd, RESPONSE, sizeof(RESPONSE)) < 0) {
         THROW_ERROR("write failed");
@@ -54,8 +57,9 @@ int neogotiate_msg(int server_fd, char *buf, int buf_size) {
 }
 
 int client_send(int server_fd, char *buf) {
-    if (send(server_fd, buf, strlen(buf), 0) < 0)
+    if (send(server_fd, buf, strlen(buf), 0) < 0) {
         THROW_ERROR("send msg error");
+    }
     return 0;
 }
 
@@ -74,15 +78,17 @@ int client_sendmsg(int server_fd, char *buf) {
     msg.msg_flags = 0;
 
     ret = sendmsg(server_fd, &msg, 0);
-    if (ret <= 0)
+    if (ret <= 0) {
         THROW_ERROR("sendmsg failed");
+    }
 
     msg.msg_iov = NULL;
     msg.msg_iovlen = 0;
 
     ret = sendmsg(server_fd, &msg, 0);
-    if (ret != 0)
+    if (ret != 0) {
         THROW_ERROR("empty sendmsg failed");
+    }
     return ret;
 }
 
@@ -95,7 +101,7 @@ int client_connectionless_sendmsg(char *buf) {
 
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(9900);
-    servaddr.sin_addr.s_addr= htonl(INADDR_ANY);
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     msg.msg_name = &servaddr;
     msg.msg_namelen = sizeof(servaddr);
@@ -108,12 +114,14 @@ int client_connectionless_sendmsg(char *buf) {
     msg.msg_flags = 0;
 
     int server_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (server_fd < 0)
+    if (server_fd < 0) {
         THROW_ERROR("create socket error");
+    }
 
     ret = sendmsg(server_fd, &msg, 0);
-    if (ret <= 0)
+    if (ret <= 0) {
         THROW_ERROR("sendmsg failed");
+    }
     return ret;
 }
 
@@ -128,8 +136,7 @@ int main(int argc, const char *argv[]) {
     int port = strtol(argv[2], NULL, 10);
     int server_fd = connect_with_server(argv[1], argv[2]);
 
-    switch (port)
-    {
+    switch (port) {
         case 8800:
             neogotiate_msg(server_fd, buf, buf_size);
             break;

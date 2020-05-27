@@ -17,16 +17,15 @@ typedef struct t_cpuid {
     unsigned int edx;
 } t_cpuid_t;
 
-static inline void native_cpuid(int leaf, int subleaf, t_cpuid_t *p)
-{
+static inline void native_cpuid(int leaf, int subleaf, t_cpuid_t *p) {
     memset(p, 0, sizeof(*p));
     /* ecx is often an input as well as an output. */
     asm volatile("cpuid"
-        : "=a" (p->eax),
-          "=b" (p->ebx),
-          "=c" (p->ecx),
-          "=d" (p->edx)
-        : "a" (leaf), "c" (subleaf));
+                 : "=a" (p->eax),
+                 "=b" (p->ebx),
+                 "=c" (p->ecx),
+                 "=d" (p->edx)
+                 : "a" (leaf), "c" (subleaf));
 }
 
 static bool is_cpuidinfo_equal(int leaf, t_cpuid_t *cpu, t_cpuid_t *cpu_sgx) {
@@ -184,7 +183,7 @@ static int test_cpuid_with_invalid_leaf() {
     int leaf[] = {0x8, 0xC, 0xE, 0x11};
     int subleaf = 0;
 
-    for (int i = 0; i < sizeof(leaf)/sizeof(leaf[0]); i++) {
+    for (int i = 0; i < sizeof(leaf) / sizeof(leaf[0]); i++) {
         if (leaf[i] > g_max_basic_leaf) {
             printf("Warning: test leaf 0x%x is greater than CPU max basic leaf. Skipped.\n", leaf[i]);
             continue;
@@ -210,7 +209,7 @@ static int test_cpuid_with_oversized_leaf() {
     native_cpuid(leaf, subleaf, &cpu_max);
 
     if ((cpu.eax != cpu_max.eax) || (cpu.ebx != cpu_max.ebx) ||
-        (cpu.ecx != cpu_max.ecx) || (cpu.edx != cpu_max.edx)) {
+            (cpu.ecx != cpu_max.ecx) || (cpu.edx != cpu_max.edx)) {
         THROW_ERROR("failed to call cpuid with oversize leaf");
     }
     return 0;
@@ -235,7 +234,7 @@ static int test_cpuid_with_random_leaf() {
 #define BUFF_SIZE (1024)
 static int test_cpuid_with_host_cpuidinfo() {
     char buff[BUFF_SIZE] = {0};
-    FILE * fp = fopen("./test_cpuid.txt","r");
+    FILE *fp = fopen("./test_cpuid.txt", "r");
     if (fp == NULL) {
         THROW_ERROR("failed to open host cpuid.txt");
     }
@@ -244,7 +243,7 @@ static int test_cpuid_with_host_cpuidinfo() {
         uint32_t subleaf = 0;
         t_cpuid_t cpu = {0};
         int num = sscanf(buff, "   %x %x: eax=%x ebx=%x ecx=%x edx=%x", &leaf, &subleaf,
-                        &cpu.eax, &cpu.ebx, &cpu.ecx, &cpu.edx);
+                         &cpu.eax, &cpu.ebx, &cpu.ecx, &cpu.edx);
         if (num != 6) {
             continue;
         }
@@ -253,9 +252,9 @@ static int test_cpuid_with_host_cpuidinfo() {
         if (!is_cpuidinfo_equal(leaf, &cpu, &cpu_sgx)) {
             printf("leaf:0x%x subleaf:0x%x\n", leaf, subleaf);
             printf("ori_eax:0x%x ori_ebx:0x%x ori_ecx:0x%x ori_edx:0x%x\n",
-                    cpu.eax, cpu.ebx, cpu.ecx, cpu.edx);
+                   cpu.eax, cpu.ebx, cpu.ecx, cpu.edx);
             printf("sgx_eax:0x%x sgx_ebx:0x%x sgx_ecx:0x%x sgx_edx:0x%x\n",
-                    cpu_sgx.eax, cpu_sgx.ebx, cpu_sgx.ecx, cpu_sgx.edx);
+                   cpu_sgx.eax, cpu_sgx.ebx, cpu_sgx.ecx, cpu_sgx.edx);
             THROW_ERROR("failed to check cpuid info");
         }
     }

@@ -13,7 +13,7 @@
 
 static int create_file(const char *file_path) {
     int fd;
-    int flags = O_RDONLY | O_CREAT| O_TRUNC;
+    int flags = O_RDONLY | O_CREAT | O_TRUNC;
     int mode = 00666;
     fd = open(file_path, flags, mode);
     if (fd < 0) {
@@ -99,7 +99,7 @@ static int __test_pwrite_pread(const char *file_path) {
 }
 
 static int __test_writev_readv(const char *file_path) {
-    const char* iov_msg[2] = {"hello_", "world!"};
+    const char *iov_msg[2] = {"hello_", "world!"};
     char read_buf[128] = { 0 };
     struct iovec iov[2];
     int fd, len = 0;
@@ -108,8 +108,8 @@ static int __test_writev_readv(const char *file_path) {
     if (fd < 0) {
         THROW_ERROR("failed to open a file to writev");
     }
-    for(int i = 0; i < 2; ++i) {
-        iov[i].iov_base = (void*)iov_msg[i];
+    for (int i = 0; i < 2; ++i) {
+        iov[i].iov_base = (void *)iov_msg[i];
         iov[i].iov_len = strlen(iov_msg[i]);
         len += iov[i].iov_len;
     }
@@ -130,7 +130,7 @@ static int __test_writev_readv(const char *file_path) {
         THROW_ERROR("failed to read vectors from the file");
     }
     if (memcmp(read_buf, iov_msg[0], strlen(iov_msg[0])) != 0 ||
-        memcmp(read_buf + strlen(iov_msg[0]), iov_msg[1], strlen(iov_msg[1])) != 0) {
+            memcmp(read_buf + strlen(iov_msg[0]), iov_msg[1], strlen(iov_msg[1])) != 0) {
         THROW_ERROR("the message read from the file is not as it was written");
     }
     close(fd);
@@ -177,12 +177,15 @@ typedef int(*test_file_func_t)(const char *);
 static int test_file_framework(test_file_func_t fn) {
     const char *file_path = "/root/test_filesystem_file_read_write.txt";
 
-    if (create_file(file_path) < 0)
+    if (create_file(file_path) < 0) {
         return -1;
-    if (fn(file_path) < 0)
+    }
+    if (fn(file_path) < 0) {
         return -1;
-    if (remove_file(file_path) < 0)
+    }
+    if (remove_file(file_path) < 0) {
         return -1;
+    }
     return 0;
 }
 

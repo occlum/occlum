@@ -11,7 +11,7 @@
 // ============================================================================
 
 static int create_file(const char *file_path, mode_t mode) {
-    int flags = O_RDONLY | O_CREAT| O_TRUNC;
+    int flags = O_RDONLY | O_CREAT | O_TRUNC;
     int fd;
 
     fd = open(file_path, flags, mode);
@@ -116,8 +116,9 @@ static int test_access_framework(test_access_func_t fn) {
     if (create_file(file_path, mode) < 0) {
         return -1;
     }
-    if (fn(file_path) < 0)
+    if (fn(file_path) < 0) {
         return -1;
+    }
     return 0;
 }
 

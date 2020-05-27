@@ -21,11 +21,13 @@
 int connect_with_child(int port, int *child_pid) {
     int ret = 0;
     int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (listen_fd < 0)
+    if (listen_fd < 0) {
         THROW_ERROR("create socket error");
+    }
     int reuse = 1;
-    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
+    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
         THROW_ERROR("setsockopt port to reuse failed");
+    }
 
     struct sockaddr_in servaddr;
     memset(&servaddr, 0, sizeof(servaddr));
@@ -46,7 +48,7 @@ int connect_with_child(int port, int *child_pid) {
 
     char port_string[8];
     sprintf(port_string, "%d", port);
-    char* client_argv[] = {"client", "127.0.0.1", port_string, NULL};
+    char *client_argv[] = {"client", "127.0.0.1", port_string, NULL};
     ret = posix_spawn(child_pid, "/bin/client", NULL, NULL, client_argv, NULL);
     if (ret < 0) {
         close(listen_fd);
@@ -65,11 +67,13 @@ int connect_with_child(int port, int *child_pid) {
 
 int neogotiate_msg(int client_fd) {
     char buf[16];
-    if (write(client_fd, ECHO_MSG, strlen(ECHO_MSG)) < 0)
+    if (write(client_fd, ECHO_MSG, strlen(ECHO_MSG)) < 0) {
         THROW_ERROR("write failed");
+    }
 
-    if (read(client_fd, buf, sizeof(RESPONSE)) < 0)
+    if (read(client_fd, buf, sizeof(RESPONSE)) < 0) {
         THROW_ERROR("read failed");
+    }
 
     if (strncmp(buf, RESPONSE, sizeof(RESPONSE)) != 0) {
         THROW_ERROR("msg recv mismatch");
@@ -81,8 +85,9 @@ int server_recv(int client_fd) {
     const int buf_size = 32;
     char buf[buf_size];
 
-    if (recv(client_fd, buf, buf_size, 0) <= 0)
+    if (recv(client_fd, buf, buf_size, 0) <= 0) {
         THROW_ERROR("msg recv failed");
+    }
 
     if (strncmp(buf, ECHO_MSG, strlen(ECHO_MSG)) != 0) {
         THROW_ERROR("msg recv mismatch");
@@ -125,8 +130,9 @@ int server_recvmsg(int client_fd) {
     msg.msg_iov = NULL;
     msg.msg_iovlen = 0;
     ret = recvmsg(client_fd, &msg, 0);
-    if (ret != 0)
+    if (ret != 0) {
         THROW_ERROR("recvmsg empty failed");
+    }
     return ret;
 }
 
@@ -143,8 +149,9 @@ int server_connectionless_recvmsg() {
     memset(&clientaddr, 0, sizeof(clientaddr));
 
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sock < 0)
+    if (sock < 0) {
         THROW_ERROR("create socket error");
+    }
 
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -174,8 +181,8 @@ int server_connectionless_recvmsg() {
             THROW_ERROR("msg recvmsg mismatch");
         } else {
             inet_ntop(AF_INET, &clientaddr.sin_addr,
-                                    buf, sizeof(buf));
-            if(strcmp(buf, "127.0.0.1") !=0) {
+                      buf, sizeof(buf));
+            if (strcmp(buf, "127.0.0.1") != 0) {
                 printf("from port %d and address %s\n", ntohs(clientaddr.sin_port), buf);
                 THROW_ERROR("client addr mismatch");
             }
@@ -196,10 +203,11 @@ int test_read_write() {
     int ret = 0;
     int child_pid = 0;
     int client_fd = connect_with_child(8800, &child_pid);
-    if (client_fd < 0)
+    if (client_fd < 0) {
         THROW_ERROR("connect failed");
-    else
+    } else {
         ret = neogotiate_msg(client_fd);
+    }
 
     //wait for the child to exit for next spawn
     int status = 0;
@@ -214,14 +222,16 @@ int test_send_recv() {
     int ret = 0;
     int child_pid = 0;
     int client_fd = connect_with_child(8801, &child_pid);
-    if (client_fd < 0)
+    if (client_fd < 0) {
         THROW_ERROR("connect failed");
+    }
 
-    if (neogotiate_msg(client_fd) < 0)
+    if (neogotiate_msg(client_fd) < 0) {
         THROW_ERROR("neogotiate failed");
+    }
 
     ret = server_recv(client_fd);
-    if (ret < 0) return -1;
+    if (ret < 0) { return -1; }
 
     ret = wait_for_child_exit(child_pid);
 
@@ -232,14 +242,16 @@ int test_sendmsg_recvmsg() {
     int ret = 0;
     int child_pid = 0;
     int client_fd = connect_with_child(8802, &child_pid);
-    if (client_fd < 0)
+    if (client_fd < 0) {
         THROW_ERROR("connect failed");
+    }
 
-    if (neogotiate_msg(client_fd) < 0)
+    if (neogotiate_msg(client_fd) < 0) {
         THROW_ERROR("neogotiate failed");
+    }
 
     ret = server_recvmsg(client_fd);
-    if (ret < 0) return -1;
+    if (ret < 0) { return -1; }
 
     ret = wait_for_child_exit(child_pid);
 
@@ -250,14 +262,14 @@ int test_sendmsg_recvmsg_connectionless() {
     int ret = 0;
     int child_pid = 0;
 
-    char* client_argv[] = {"client", "NULL", "8803", NULL};
+    char *client_argv[] = {"client", "NULL", "8803", NULL};
     ret = posix_spawn(&child_pid, "/bin/client", NULL, NULL, client_argv, NULL);
     if (ret < 0) {
         THROW_ERROR("spawn client process error");
     }
 
     ret = server_connectionless_recvmsg();
-    if (ret < 0) return -1;
+    if (ret < 0) { return -1; }
 
     ret = wait_for_child_exit(child_pid);
 
@@ -271,19 +283,23 @@ int test_fcntl_setfl_and_getfl() {
     int original_flags, actual_flags;
 
     client_fd = connect_with_child(8804, &child_pid);
-    if (client_fd < 0)
+    if (client_fd < 0) {
         THROW_ERROR("connect failed");
+    }
     original_flags = fcntl(client_fd, F_GETFL, 0);
-    if (original_flags < 0)
+    if (original_flags < 0) {
         THROW_ERROR("fcntl getfl failed");
+    }
 
     ret = fcntl(client_fd, F_SETFL, original_flags | O_NONBLOCK);
-    if (ret < 0)
+    if (ret < 0) {
         THROW_ERROR("fcntl setfl failed");
+    }
 
     actual_flags = fcntl(client_fd, F_GETFL, 0);
-    if (actual_flags != (original_flags | O_NONBLOCK))
+    if (actual_flags != (original_flags | O_NONBLOCK)) {
         THROW_ERROR("check the getfl value after setfl failed");
+    }
 
     ret = wait_for_child_exit(child_pid);
 
@@ -300,14 +316,16 @@ int test_poll_sockets() {
     };
 
     ret = poll(pollfds, 2, 0);
-    if (ret < 0)
+    if (ret < 0) {
         THROW_ERROR("poll error");
+    }
 
     if (pollfds[0].fd != socks[0] ||
-        pollfds[0].events != POLLIN ||
-        pollfds[1].fd != socks[1] ||
-        pollfds[1].events != POLLIN)
+            pollfds[0].events != POLLIN ||
+            pollfds[1].fd != socks[1] ||
+            pollfds[1].events != POLLIN) {
         THROW_ERROR("fd and events of pollfd should remain unchanged");
+    }
     return 0;
 }
 
@@ -320,6 +338,6 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_poll_sockets),
 };
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[]) {
     return test_suite_run(test_cases, ARRAY_SIZE(test_cases));
 }

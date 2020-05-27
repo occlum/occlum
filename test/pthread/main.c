@@ -21,12 +21,12 @@
 struct thread_arg {
     int                         ti;
     long                        local_count;
-    volatile unsigned long*     global_count;
-    pthread_mutex_t*            mutex;
+    volatile unsigned long     *global_count;
+    pthread_mutex_t            *mutex;
 };
 
-static void* thread_func(void* _arg) {
-    struct thread_arg* arg = _arg;
+static void *thread_func(void *_arg) {
+    struct thread_arg *arg = _arg;
     for (long i = 0; i < arg->local_count; i++) {
         pthread_mutex_lock(arg->mutex);
         (*arg->global_count)++;
@@ -51,7 +51,7 @@ static int test_mutex_with_concurrent_counter(void) {
      * Start the threads
      */
     for (int ti = 0; ti < NTHREADS; ti++) {
-        struct thread_arg* thread_arg = &thread_args[ti];
+        struct thread_arg *thread_arg = &thread_args[ti];
         thread_arg->ti = ti;
         thread_arg->local_count = LOCAL_COUNT;
         thread_arg->global_count = &global_count;
@@ -76,7 +76,7 @@ static int test_mutex_with_concurrent_counter(void) {
      */
     if (global_count != EXPECTED_GLOBAL_COUNT) {
         printf("ERROR: incorrect global_count (actual = %ld, expected = %ld)\n",
-                global_count, EXPECTED_GLOBAL_COUNT);
+               global_count, EXPECTED_GLOBAL_COUNT);
         return -1;
     }
 
@@ -92,14 +92,14 @@ static int test_mutex_with_concurrent_counter(void) {
 
 struct thread_cond_arg {
     int                         ti;
-    volatile unsigned int*      val;
-    volatile int*               exit_thread_count;
-    pthread_cond_t*             cond_val;
-    pthread_mutex_t*            mutex;
+    volatile unsigned int      *val;
+    volatile int               *exit_thread_count;
+    pthread_cond_t             *cond_val;
+    pthread_mutex_t            *mutex;
 };
 
-static void* thread_cond_wait(void* _arg) {
-    struct thread_cond_arg* arg = _arg;
+static void *thread_cond_wait(void *_arg) {
+    struct thread_cond_arg *arg = _arg;
     printf("Thread #%d: start to wait on condition variable.\n", arg->ti);
     for (unsigned int i = 0; i < WAIT_ROUND; ++i) {
         pthread_mutex_lock(arg->mutex);
@@ -124,7 +124,7 @@ static int test_mutex_with_cond_wait(void) {
      * Start the threads waiting on the condition variable
      */
     for (int ti = 0; ti < NTHREADS; ti++) {
-        struct thread_cond_arg* thread_arg = &thread_args[ti];
+        struct thread_cond_arg *thread_arg = &thread_args[ti];
         thread_arg->ti = ti;
         thread_arg->val = &val;
         thread_arg->exit_thread_count = &exit_thread_count;

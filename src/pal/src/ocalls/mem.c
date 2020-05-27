@@ -1,15 +1,15 @@
 #include <stdlib.h>
 #include "ocalls.h"
 
-void* occlum_ocall_posix_memalign(size_t alignment, size_t size) {
-    void* ptr = NULL;
+void *occlum_ocall_posix_memalign(size_t alignment, size_t size) {
+    void *ptr = NULL;
     int ret = posix_memalign(&ptr, alignment, size);
     if (ret == 0) {
         return ptr;
     }
 
     // Handle errors
-    switch(ret) {
+    switch (ret) {
         case ENOMEM:
             PAL_ERROR("Out of memory on the untrusted side");
             break;
@@ -22,6 +22,6 @@ void* occlum_ocall_posix_memalign(size_t alignment, size_t size) {
     return NULL;
 }
 
-void occlum_ocall_free(void* ptr) {
+void occlum_ocall_free(void *ptr) {
     free(ptr);
 }

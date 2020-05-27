@@ -16,18 +16,18 @@ typedef enum {
 #define COLOR_GREEN     "\x1B[32m"
 
 static level_t new_level(unsigned int level) {
-    if (level >= 5) level = 5;
+    if (level >= 5) { level = 5; }
     return (level_t) level;
 }
 
-void occlum_ocall_print_log(unsigned int _level, const char* msg) {
+void occlum_ocall_print_log(unsigned int _level, const char *msg) {
     level_t level = new_level(_level);
     if (level == LEVEL_OFF) {
         return;
     }
 
-    const char* color;
-    switch(level) {
+    const char *color;
+    switch (level) {
         case LEVEL_ERROR:
             color = COLOR_RED;
             break;

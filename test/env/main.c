@@ -13,12 +13,12 @@
 // Helper structs & variables & functions
 // ============================================================================
 
-const char** g_argv;
+const char **g_argv;
 int g_argc;
 
 // Expected arguments are given by Makefile throught macro ARGC, ARG1, ARG2 and
 // ARG3
-const char* expect_argv[EXPECT_ARGC] = {
+const char *expect_argv[EXPECT_ARGC] = {
     "env",
     EXPECT_ARG1,
     EXPECT_ARG2,
@@ -27,40 +27,40 @@ const char* expect_argv[EXPECT_ARGC] = {
 
 // Expected child arguments
 const int child_argc = 2;
-const char* child_argv[3] = {
+const char *child_argv[3] = {
     "env",
     "child",
     NULL
 };
 
 // Expected child environment variables
-const char* child_envp[] = {
+const char *child_envp[] = {
     "ENV_CHILD=ok",
     NULL
 };
 
-static int test_argv_val(const char** expect_argv) {
+static int test_argv_val(const char **expect_argv) {
     for (int arg_i = 0; arg_i < g_argc; arg_i++) {
-        const char* actual_arg = *(g_argv + arg_i);
-        const char* expect_arg = *(expect_argv + arg_i);
+        const char *actual_arg = *(g_argv + arg_i);
+        const char *expect_arg = *(expect_argv + arg_i);
         if (strcmp(actual_arg, expect_arg) != 0) {
             printf("ERROR: expect argument %d is %s, but given %s\n",
-                    arg_i, expect_arg, actual_arg);
+                   arg_i, expect_arg, actual_arg);
             return -1;
         }
     }
     return 0;
 }
 
-static int test_env_val(const char* expect_env_key, const char* expect_env_val) {
-    const char* actual_env_val = getenv(expect_env_key);
+static int test_env_val(const char *expect_env_key, const char *expect_env_val) {
+    const char *actual_env_val = getenv(expect_env_key);
     if (actual_env_val == NULL) {
         printf("ERROR: cannot find %s\n", expect_env_key);
         return -1;
     }
     if (strcmp(actual_env_val, expect_env_val) != 0) {
         printf("ERROR: environment variable %s=%s expected, but given %s\n",
-                expect_env_key, expect_env_val, actual_env_val);
+               expect_env_key, expect_env_val, actual_env_val);
         return -1;
     }
     return 0;
@@ -204,7 +204,7 @@ static test_case_t child_test_cases[] = {
     TEST_CASE(test_env_child_getenv),
 };
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[]) {
     // Save argument for test cases
     g_argc = argc;
     g_argv = argv;

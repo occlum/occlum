@@ -64,7 +64,7 @@ int create_client_socket() {
     return fd;
 }
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[]) {
     size_t buf_size, total_bytes;
     if (argc >= 2) {
         buf_size = atol(argv[1]);
@@ -75,7 +75,7 @@ int main(int argc, const char* argv[]) {
         total_bytes = atol(argv[2]);
     } else {
         // BUG: throughput fall down when buf_size > 65536
-        total_bytes = buf_size > 65536? buf_size << 15: buf_size << 21;
+        total_bytes = buf_size > 65536 ? buf_size << 15 : buf_size << 21;
     }
     printf("buf_size = 0x%zx\n", buf_size);
     printf("total_bytes = 0x%zx\n", total_bytes);
@@ -109,8 +109,8 @@ int main(int argc, const char* argv[]) {
     posix_spawn_file_actions_addclose(&file_actions, socket_wr_fd);
 
     int child_pid;
-    extern char ** environ;
-    char* new_argv[] = {"/bin/data_sink", NULL};
+    extern char **environ;
+    char *new_argv[] = {"/bin/data_sink", NULL};
     if (posix_spawn(&child_pid, "/bin/data_sink", &file_actions,
                     NULL, new_argv, environ) < 0) {
         printf("ERROR: failed to spawn a child process\n");

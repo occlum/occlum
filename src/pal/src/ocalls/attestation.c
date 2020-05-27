@@ -2,9 +2,8 @@
 #include "ocalls.h"
 
 sgx_status_t occlum_ocall_sgx_init_quote(
-    sgx_target_info_t* target_info,
-    sgx_epid_group_id_t* epid_group_id)
-{
+    sgx_target_info_t *target_info,
+    sgx_epid_group_id_t *epid_group_id) {
     // Intel's manual:
     // It's suggested that the caller should wait (typically several seconds
     // to ten of seconds) and retry this API if SGX_ERROR_BUSY is returned.
@@ -12,16 +11,15 @@ sgx_status_t occlum_ocall_sgx_init_quote(
 }
 
 sgx_status_t occlum_ocall_sgx_get_quote(
-    uint8_t* sigrl,
+    uint8_t *sigrl,
     uint32_t sigrl_len,
-    sgx_report_t* report,
+    sgx_report_t *report,
     sgx_quote_sign_type_t quote_type,
-    sgx_spid_t* spid,
-    sgx_quote_nonce_t* nonce,
-    sgx_report_t* qe_report,
-    sgx_quote_t* quote_buf,
-    uint32_t quote_buf_len)
-{
+    sgx_spid_t *spid,
+    sgx_quote_nonce_t *nonce,
+    sgx_report_t *qe_report,
+    sgx_quote_t *quote_buf,
+    uint32_t quote_buf_len) {
     sgx_status_t ret = SGX_SUCCESS;
 
     uint32_t real_quote_len;
