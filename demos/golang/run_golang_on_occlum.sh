@@ -16,8 +16,8 @@ fi
 rm -rf occlum_context && mkdir occlum_context
 cd occlum_context
 occlum init
-jq '.vm.user_space_size = "320MB"' Occlum.json > temp_Occlum.json
-jq '.process.default_mmap_size = "256MB"' temp_Occlum.json > Occlum.json
+jq '.vm.user_space_size = "380MB"' Occlum.json > temp_Occlum.json
+jq '.process.default_mmap_size = "300MB"' temp_Occlum.json > Occlum.json
 
 # 2. Copy program into Occlum Workspace and build
 cp ../web_server image/bin

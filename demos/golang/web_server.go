@@ -1,29 +1,26 @@
 package main
 
-import "net/http"
-import "log"
-import "flag"
-import "fmt"
+import (
+    "io"
+    "os"
 
-type Controller struct {}
-func (c Controller)ServeHTTP(writer http.ResponseWriter, request *http.Request){
-    writer.Write([]byte("hello,1\n"));
-}
+    "github.com/gin-gonic/gin"
+)
 
-func hello(writer http.ResponseWriter, request *http.Request) {
-    writer.Write([]byte("hello,2\n"));
-}
+func main() {
+    // Disable console color, you don't need console color when writing the logs to file.
+    gin.DisableConsoleColor()
 
-var port string
+    // Use a file for logging
+    f, _ := os.Create("/root/gin.log")
+    gin.DefaultWriter = io.MultiWriter(f, os.Stdout)
 
-func init() {
-        flag.StringVar(&port, "port", "8090", "port number, default value is 8090")
-}
-
-func main(){
-    flag.Parse()
-    fmt.Println("Web Server port is:", port)
-    http.Handle("/hello1",&Controller{})
-    http.Handle("/hello2",http.HandlerFunc(hello))
-    log.Fatal(http.ListenAndServe(":" + port, nil))
+    r := gin.Default()
+    r.GET("/ping", func(c *gin.Context) {
+        c.JSON(200, gin.H{
+            "message": "pong",
+        })
+    })
+    // Listen and serve on 0.0.0.0:8090
+    r.Run(":8090")
 }
