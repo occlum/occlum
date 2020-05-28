@@ -101,8 +101,14 @@ int verify_connection(int src_sock, int dest_sock) {
     char buf[1024];
     int i;
     for (i = 0; i < 100; i++) {
-        if (write(src_sock, ECHO_MSG, sizeof(ECHO_MSG)) < 0) {
-            THROW_ERROR("writing server message");
+        if (i % 2 == 0) {
+            if (write(src_sock, ECHO_MSG, sizeof(ECHO_MSG)) < 0) {
+                THROW_ERROR("writing server message");
+            }
+        } else {
+            if (sendto(src_sock, ECHO_MSG, sizeof(ECHO_MSG), 0, NULL, 0) < 0) {
+                THROW_ERROR("sendto server message");
+            }
         }
 
         if (read(dest_sock, buf, 1024) < 0) {

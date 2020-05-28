@@ -278,21 +278,37 @@ pub fn do_sendto(
     addr_len: libc::socklen_t,
 ) -> Result<isize> {
     debug!(
-        "sendto: fd: {}, base: {:?}, len: {}, addr: {:?}, addr_len: {}",
-        fd, base, len, addr, addr_len
+        "sendto: fd: {}, base: {:?}, len: {}, flags: {} addr: {:?}, addr_len: {}",
+        fd, base, len, flags, addr, addr_len
     );
-    let file_ref = current!().file(fd as FileDesc)?;
-    let socket = file_ref.as_socket()?;
+    from_user::check_array(base as *const u8, len)?;
 
-    let ret = try_libc!(libc::ocall::sendto(
-        socket.fd(),
-        base,
-        len,
-        flags,
-        addr,
-        addr_len
-    ));
-    Ok(ret as isize)
+    let file_ref = current!().file(fd as FileDesc)?;
+    if let Ok(socket) = file_ref.as_socket() {
+        // TODO: check addr and addr_len according to connection mode
+        let ret = try_libc!(libc::ocall::sendto(
+            socket.fd(),
+            base,
+            len,
+            flags,
+            addr,
+            addr_len
+        ));
+        Ok(ret as isize)
+    } else if let Ok(unix) = file_ref.as_unix_socket() {
+        if !addr.is_null() || addr_len != 0 {
+            return_errno!(EISCONN, "Only connection-mode socket is supported");
+        }
+
+        if !unix.is_connected() {
+            return_errno!(ENOTCONN, "the socket has not been connected yet");
+        }
+
+        let data = unsafe { std::slice::from_raw_parts(base as *const u8, len) };
+        unix.write(data).map(|u| u as isize)
+    } else {
+        return_errno!(EBADF, "unsupported file type");
+    }
 }
 
 pub fn do_recvfrom(

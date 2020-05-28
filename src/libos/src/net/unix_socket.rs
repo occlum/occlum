@@ -150,6 +150,14 @@ impl UnixSocketFile {
             }
         }
     }
+
+    pub fn is_connected(&self) -> bool {
+        if let Status::Connected(_) = self.inner.lock().unwrap().status {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl Debug for UnixSocketFile {
