@@ -8,6 +8,351 @@ use std::convert::TryFrom;
 use time::timeval_t;
 use util::mem_util::from_user;
 
+pub fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize> {
+    debug!(
+        "socket: domain: {}, socket_type: 0x{:x}, protocol: {}",
+        domain, socket_type, protocol
+    );
+
+    let file_ref: Arc<Box<dyn File>> = match domain {
+        libc::AF_LOCAL => {
+            let unix_socket = UnixSocketFile::new(socket_type, protocol)?;
+            Arc::new(Box::new(unix_socket))
+        }
+        _ => {
+            let socket = SocketFile::new(domain, socket_type, protocol)?;
+            Arc::new(Box::new(socket))
+        }
+    };
+
+    let fd = current!().add_file(file_ref, false);
+    Ok(fd as isize)
+}
+
+pub fn do_connect(
+    fd: c_int,
+    addr: *const libc::sockaddr,
+    addr_len: libc::socklen_t,
+) -> Result<isize> {
+    debug!(
+        "connect: fd: {}, addr: {:?}, addr_len: {}",
+        fd, addr, addr_len
+    );
+    // For SOCK_DGRAM sockets not initiated in connection-mode,
+    // if address is a null address for the protocol,
+    // the socket's peer address shall be reset.
+    let need_check: bool = !addr.is_null();
+    if need_check {
+        from_user::check_array(addr as *const u8, addr_len as usize)?;
+    }
+
+    let file_ref = current!().file(fd as FileDesc)?;
+    if let Ok(socket) = file_ref.as_socket() {
+        if need_check {
+            from_user::check_ptr(addr as *const libc::sockaddr_in)?;
+        }
+        let ret = try_libc!(libc::ocall::connect(socket.fd(), addr, addr_len));
+        Ok(ret as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        let addr = addr as *const libc::sockaddr_un;
+        from_user::check_ptr(addr)?;
+        let path = from_user::clone_cstring_safely(unsafe { (&*addr).sun_path.as_ptr() })?
+            .to_string_lossy()
+            .into_owned();
+        unix_socket.connect(path)?;
+        Ok(0)
+    } else {
+        return_errno!(EBADF, "not a socket")
+    }
+}
+
+pub fn do_accept(
+    fd: c_int,
+    addr: *mut libc::sockaddr,
+    addr_len: *mut libc::socklen_t,
+) -> Result<isize> {
+    do_accept4(fd, addr, addr_len, 0)
+}
+
+pub fn do_accept4(
+    fd: c_int,
+    addr: *mut libc::sockaddr,
+    addr_len: *mut libc::socklen_t,
+    flags: c_int,
+) -> Result<isize> {
+    debug!(
+        "accept4: fd: {}, addr: {:?}, addr_len: {:?}, flags: {:#x}",
+        fd, addr, addr_len, flags
+    );
+
+    let need_check: bool = !addr.is_null();
+
+    if addr.is_null() ^ addr_len.is_null() {
+        return_errno!(EINVAL, "addr and ddr_len should be both null");
+    }
+    if need_check {
+        from_user::check_mut_array(addr as *mut u8, unsafe { *addr_len } as usize)?;
+    }
+
+    let file_ref = current!().file(fd as FileDesc)?;
+    if let Ok(socket) = file_ref.as_socket() {
+        if need_check {
+            from_user::check_mut_ptr(addr as *mut libc::sockaddr_in)?;
+        }
+
+        let new_socket = socket.accept(addr, addr_len, flags)?;
+        let new_file_ref: Arc<Box<dyn File>> = Arc::new(Box::new(new_socket));
+        let new_fd = current!().add_file(new_file_ref, false);
+
+        Ok(new_fd as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        let addr = addr as *mut libc::sockaddr_un;
+        if need_check {
+            from_user::check_mut_ptr(addr)?;
+        }
+        // TODO: handle addr
+        let new_socket = unix_socket.accept()?;
+        let new_file_ref: Arc<Box<dyn File>> = Arc::new(Box::new(new_socket));
+        let new_fd = current!().add_file(new_file_ref, false);
+
+        Ok(new_fd as isize)
+    } else {
+        return_errno!(EBADF, "not a socket")
+    }
+}
+
+pub fn do_shutdown(fd: c_int, how: c_int) -> Result<isize> {
+    debug!("shutdown: fd: {}, how: {}", fd, how);
+    let file_ref = current!().file(fd as FileDesc)?;
+    if let Ok(socket) = file_ref.as_socket() {
+        let ret = try_libc!(libc::ocall::shutdown(socket.fd(), how));
+        Ok(ret as isize)
+    } else {
+        return_errno!(EBADF, "not a socket")
+    }
+}
+
+pub fn do_bind(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t) -> Result<isize> {
+    debug!("bind: fd: {}, addr: {:?}, addr_len: {}", fd, addr, addr_len);
+    if addr.is_null() && addr_len == 0 {
+        return_errno!(EINVAL, "no address is specified");
+    }
+    from_user::check_array(addr as *const u8, addr_len as usize)?;
+
+    let file_ref = current!().file(fd as FileDesc)?;
+    if let Ok(socket) = file_ref.as_socket() {
+        from_user::check_ptr(addr as *const libc::sockaddr_in)?;
+        let ret = try_libc!(libc::ocall::bind(socket.fd(), addr, addr_len));
+        Ok(ret as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        let addr = addr as *const libc::sockaddr_un;
+        from_user::check_ptr(addr)?;
+        let path = from_user::clone_cstring_safely(unsafe { (&*addr).sun_path.as_ptr() })?
+            .to_string_lossy()
+            .into_owned();
+        unix_socket.bind(path)?;
+        Ok(0)
+    } else {
+        return_errno!(EBADF, "not a socket")
+    }
+}
+
+pub fn do_listen(fd: c_int, backlog: c_int) -> Result<isize> {
+    debug!("listen: fd: {}, backlog: {}", fd, backlog);
+    let file_ref = current!().file(fd as FileDesc)?;
+    if let Ok(socket) = file_ref.as_socket() {
+        let ret = try_libc!(libc::ocall::listen(socket.fd(), backlog));
+        Ok(ret as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        unix_socket.listen()?;
+        Ok(0)
+    } else {
+        return_errno!(EBADF, "not a socket")
+    }
+}
+
+pub fn do_setsockopt(
+    fd: c_int,
+    level: c_int,
+    optname: c_int,
+    optval: *const c_void,
+    optlen: libc::socklen_t,
+) -> Result<isize> {
+    debug!(
+        "setsockopt: fd: {}, level: {}, optname: {}, optval: {:?}, optlen: {:?}",
+        fd, level, optname, optval, optlen
+    );
+    let file_ref = current!().file(fd as FileDesc)?;
+    if let Ok(socket) = file_ref.as_socket() {
+        let ret = try_libc!(libc::ocall::setsockopt(
+            socket.fd(),
+            level,
+            optname,
+            optval,
+            optlen
+        ));
+        Ok(ret as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        warn!("setsockopt for unix socket is unimplemented");
+        Ok(0)
+    } else {
+        return_errno!(EBADF, "not a socket")
+    }
+}
+
+pub fn do_getsockopt(
+    fd: c_int,
+    level: c_int,
+    optname: c_int,
+    optval: *mut c_void,
+    optlen: *mut libc::socklen_t,
+) -> Result<isize> {
+    debug!(
+        "getsockopt: fd: {}, level: {}, optname: {}, optval: {:?}, optlen: {:?}",
+        fd, level, optname, optval, optlen
+    );
+    let file_ref = current!().file(fd as FileDesc)?;
+    let socket = file_ref.as_socket()?;
+
+    let ret = try_libc!(libc::ocall::getsockopt(
+        socket.fd(),
+        level,
+        optname,
+        optval,
+        optlen
+    ));
+    Ok(ret as isize)
+}
+
+pub fn do_getpeername(
+    fd: c_int,
+    addr: *mut libc::sockaddr,
+    addr_len: *mut libc::socklen_t,
+) -> Result<isize> {
+    debug!(
+        "getpeername: fd: {}, addr: {:?}, addr_len: {:?}",
+        fd, addr, addr_len
+    );
+    let file_ref = current!().file(fd as FileDesc)?;
+    if let Ok(socket) = file_ref.as_socket() {
+        let ret = try_libc!(libc::ocall::getpeername(socket.fd(), addr, addr_len));
+        Ok(ret as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        warn!("getpeername for unix socket is unimplemented");
+        return_errno!(
+            ENOTCONN,
+            "hack for php: Transport endpoint is not connected"
+        )
+    } else {
+        return_errno!(EBADF, "not a socket")
+    }
+}
+
+pub fn do_getsockname(
+    fd: c_int,
+    addr: *mut libc::sockaddr,
+    addr_len: *mut libc::socklen_t,
+) -> Result<isize> {
+    debug!(
+        "getsockname: fd: {}, addr: {:?}, addr_len: {:?}",
+        fd, addr, addr_len
+    );
+    let file_ref = current!().file(fd as FileDesc)?;
+    if let Ok(socket) = file_ref.as_socket() {
+        let ret = try_libc!(libc::ocall::getsockname(socket.fd(), addr, addr_len));
+        Ok(ret as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        warn!("getsockname for unix socket is unimplemented");
+        Ok(0)
+    } else {
+        return_errno!(EBADF, "not a socket")
+    }
+}
+
+pub fn do_sendto(
+    fd: c_int,
+    base: *const c_void,
+    len: size_t,
+    flags: c_int,
+    addr: *const libc::sockaddr,
+    addr_len: libc::socklen_t,
+) -> Result<isize> {
+    debug!(
+        "sendto: fd: {}, base: {:?}, len: {}, addr: {:?}, addr_len: {}",
+        fd, base, len, addr, addr_len
+    );
+    let file_ref = current!().file(fd as FileDesc)?;
+    let socket = file_ref.as_socket()?;
+
+    let ret = try_libc!(libc::ocall::sendto(
+        socket.fd(),
+        base,
+        len,
+        flags,
+        addr,
+        addr_len
+    ));
+    Ok(ret as isize)
+}
+
+pub fn do_recvfrom(
+    fd: c_int,
+    base: *mut c_void,
+    len: size_t,
+    flags: c_int,
+    addr: *mut libc::sockaddr,
+    addr_len: *mut libc::socklen_t,
+) -> Result<isize> {
+    debug!(
+        "recvfrom: fd: {}, base: {:?}, len: {}, flags: {}, addr: {:?}, addr_len: {:?}",
+        fd, base, len, flags, addr, addr_len
+    );
+    let file_ref = current!().file(fd as FileDesc)?;
+    let socket = file_ref.as_socket()?;
+
+    let ret = try_libc!(libc::ocall::recvfrom(
+        socket.fd(),
+        base,
+        len,
+        flags,
+        addr,
+        addr_len
+    ));
+    Ok(ret as isize)
+}
+
+pub fn do_socketpair(
+    domain: c_int,
+    socket_type: c_int,
+    protocol: c_int,
+    sv: *mut c_int,
+) -> Result<isize> {
+    debug!(
+        "socketpair: domain: {}, type:0x{:x}, protocol: {}",
+        domain, socket_type, protocol
+    );
+    let mut sock_pair = unsafe {
+        from_user::check_mut_array(sv, 2)?;
+        std::slice::from_raw_parts_mut(sv as *mut u32, 2)
+    };
+
+    if (domain == libc::AF_UNIX) {
+        let (client_socket, server_socket) =
+            UnixSocketFile::socketpair(socket_type as i32, protocol as i32)?;
+        let current = current!();
+        let mut files = current.files().lock().unwrap();
+        sock_pair[0] = files.put(Arc::new(Box::new(client_socket)), false);
+        sock_pair[1] = files.put(Arc::new(Box::new(server_socket)), false);
+
+        debug!("socketpair: ({}, {})", sock_pair[0], sock_pair[1]);
+        Ok(0)
+    } else if (domain == libc::AF_TIPC) {
+        return_errno!(EAFNOSUPPORT, "cluster domain sockets not supported")
+    } else {
+        return_errno!(EAFNOSUPPORT, "domain not supported")
+    }
+}
+
 pub fn do_sendmsg(fd: c_int, msg_ptr: *const msghdr, flags_c: c_int) -> Result<isize> {
     debug!(
         "sendmsg: fd: {}, msg: {:?}, flags: 0x{:x}",
