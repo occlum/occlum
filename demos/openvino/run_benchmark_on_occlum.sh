@@ -9,8 +9,8 @@ rm -rf occlum_context
 mkdir occlum_context
 cd occlum_context
 occlum init
-jq '.resource_limits.user_space_size = "320MB"' Occlum.json > temp_Occlum.json
-jq '.process.default_mmap_size = "256MB"' temp_Occlum.json > Occlum.json
+new_json="$(jq '.resource_limits.user_space_size = "320MB" | .process.default_mmap_size = "256MB"' Occlum.json)" && \
+echo "${new_json}" > Occlum.json
 
 # 2. Copy files into Occlum Workspace and Build
 cp ../$inference_bin/$benchmark image/bin
