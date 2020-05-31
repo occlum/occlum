@@ -1,6 +1,6 @@
 # Quick Start: rune on Occlum
 
-[Rune](https://github.com/alibaba/inclavare-containers) is a set of tools for running trusted applications in containers with the hardware-assisted enclave technology.
+[rune](https://github.com/alibaba/inclavare-containers) is a set of tools for running trusted applications in containers with the hardware-assisted enclave technology.
 
 ## Hardware requirements
 - Install [Intel SGX driver for Linux](https://github.com/intel/linux-sgx-driver#build-and-install-the-intelr-sgx-driver), required by Intel SGX SDK && PSW.
@@ -20,25 +20,30 @@ Please refer to [this guide](https://github.com/alibaba/inclavare-containers#run
 ``` shell
 yum install -y libseccomp-devel
 mkdir "$HOME/rune_workdir"
-docker pull occlum/occlum:0.12.0-centos7.2
+docker pull occlum/occlum:0.12.0-centos7.5
 docker run -it --device /dev/isgx \
   -v $HOME/rune_workdir:/root/rune_workdir \
-  occlum/occlum:0.12.0-centos7.2
+  occlum/occlum:0.12.0-centos7.5
 ```
 
-You can then build a hello world demo program or your product code using an [Occlum CentOS Docker image](https://hub.docker.com/r/occlum/occlum/tags).
+### Prepare the materials
+Before Occlum build, execute the following command to set your Occlum instance dir:
+``` shell
+export OCCLUM_INSTANCE_DIR=occlum-app
+```
+You can build a "hello world" demo application or your own product with the [Occlum CentOS Docker image](https://hub.docker.com/r/occlum/occlum/tags).
 
 [This guide](https://github.com/occlum/occlum#hello-occlum) can help you to create your first occlum build.
 
-### Prepare the materials
-After your Occlum build, execute the following commands in Occlum sdk container environment:
+After Occlum build, execute the following commands in Occlum sdk container environment:
 
 ``` shell
-cp -a .occlum /root/rune_workdir
+yum install -y libseccomp-devel
+cp -a occlum-app /root/rune_workdir
 cd /root/rune_workdir
 mkdir lib
 cp /usr/lib64/libseccomp.so.2 lib
-cp /usr/lib64/libprotobuf.so.8 lib
+cp /usr/lib64/libprotobuf.so.* lib
 cp /usr/lib64/libsgx_u*.so* lib
 cp /usr/lib64/libsgx_enclave_common.so.1 lib
 cp /usr/lib64/libsgx_launch.so.1 lib
@@ -50,15 +55,15 @@ Now you can build your occlum application image in the `$HOME/rune_workdir` dire
 Type the following commands to create a `Dockerfile`:
 ``` Dockerfile
 cat >Dockerfile <<EOF
-FROM centos:7.2.1511
+FROM centos:7.5.1804
 
-RUN mkdir -p /run/rune/.occlum
+RUN mkdir -p /run/rune/occlum-app
 WORKDIR /run/rune
 
 COPY lib /lib
-COPY .occlum .occlum
+COPY occlum-app occlum-app
 
-RUN ln -sfn .occlum/build/lib/libocclum-pal.so liberpal-occlum.so
+RUN ln -sfn occlum-app/build/lib/libocclum-pal.so liberpal-occlum.so
 RUN ldconfig
 
 ENTRYPOINT ["/bin/hello_world"]
@@ -108,7 +113,7 @@ and then configure enclave runtime as following:
   "annotations": {
       "enclave.type": "intelSgx",
       "enclave.runtime.path": "/run/rune/liberpal-occlum.so",
-      "enclave.runtime.args": ".occlum"
+      "enclave.runtime.args": "occlum-app"
   }
 ```
 
