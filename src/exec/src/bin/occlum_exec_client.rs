@@ -10,12 +10,12 @@ extern crate log;
 
 use clap::{App, Arg};
 use futures::executor;
-use futures::stream::StreamExt;
 use grpc::prelude::*;
 use grpc::ClientConf;
 use occlum_exec::occlum_exec::{
-    ExecComm, GetResultRequest, GetResultResponse_ExecutionStatus, HealthCheckRequest,
-    HealthCheckResponse_ServingStatus, StopRequest,
+    ExecCommRequest, ExecCommResponse_ExecutionStatus, GetResultRequest,
+    GetResultResponse_ExecutionStatus, HealthCheckRequest, HealthCheckResponse_ServingStatus,
+    KillProcessRequest, StopRequest,
 };
 use occlum_exec::occlum_exec_grpc::OcclumExecClient;
 use occlum_exec::{
@@ -23,6 +23,8 @@ use occlum_exec::{
 };
 use protobuf::RepeatedField;
 use sendfd::SendWithFd;
+use signal_hook::iterator::Signals;
+use signal_hook::{SIGINT, SIGKILL, SIGQUIT, SIGTERM, SIGUSR1};
 use std::cmp;
 use std::env;
 use std::os::unix::net::UnixListener;
@@ -31,9 +33,6 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 use tempdir::TempDir;
-
-use signal_hook::iterator::Signals;
-use signal_hook::SIGUSR1;
 
 /// Execute the command on server
 ///
@@ -50,7 +49,7 @@ fn exec_command(
     command: &str,
     parameters: &[&str],
     envs: &[&str],
-) -> Result<u32, String> {
+) -> Result<i32, String> {
     debug!("exec_command {:?} {:?} {:?}", command, parameters, envs);
 
     let mut parameter_list = RepeatedField::default();
@@ -89,7 +88,7 @@ fn exec_command(
         client
             .exec_command(
                 grpc::RequestOptions::new(),
-                ExecComm {
+                ExecCommRequest {
                     process_id: process::id(),
                     command: command.to_string(),
                     parameters: parameter_list,
@@ -102,10 +101,15 @@ fn exec_command(
     ); // Drop response metadata
 
     match resp {
-        Ok(resp) => {
-            sendfd_thread.join().unwrap();
-            Ok(resp.process_id)
-        }
+        Ok(resp) => match resp.status {
+            ExecCommResponse_ExecutionStatus::LAUNCH_FAILED => {
+                Err(String::from("failed to launch the process."))
+            }
+            ExecCommResponse_ExecutionStatus::RUNNING => {
+                sendfd_thread.join().unwrap();
+                Ok(resp.process_id)
+            }
+        },
         Err(_) => Err(String::from("failed to send request.")),
     }
 }
@@ -113,7 +117,6 @@ fn exec_command(
 /// Starts the server if the server is not running
 fn start_server(client: &OcclumExecClient, server_name: &str) -> Result<u32, String> {
     let mut server_launched = false;
-    let mut server_connection_retry_time = 0;
 
     loop {
         let resp = executor::block_on(
@@ -121,23 +124,17 @@ fn start_server(client: &OcclumExecClient, server_name: &str) -> Result<u32, Str
                 .status_check(
                     grpc::RequestOptions::new(),
                     HealthCheckRequest {
-                        process_id: 0,
                         ..Default::default()
                     },
                 )
                 .join_metadata_result(),
         );
 
-        server_connection_retry_time += 1;
-
         match resp {
             Ok((_, resp, _)) => {
-                match resp.status {
-                    HealthCheckResponse_ServingStatus::NOT_SERVING => {
-                        return Err("no process".to_string())
-                    }
-                    _ => {}
-                };
+                if resp.status == HealthCheckResponse_ServingStatus::NOT_SERVING {
+                    return Err("server is not running. It is not able to start.".to_string());
+                }
                 debug!("server is running.");
                 return Ok(0);
             }
@@ -157,11 +154,6 @@ fn start_server(client: &OcclumExecClient, server_name: &str) -> Result<u32, Str
                         }
                     };
                 } else {
-                    if server_connection_retry_time < 100 {
-                        //wait server 100 millis
-                        thread::sleep(time::Duration::from_millis(100));
-                        continue;
-                    }
                     return Err("Failed to launch server".to_string());
                 }
             }
@@ -190,60 +182,8 @@ fn stop_server(client: &OcclumExecClient, time: u32) {
     }
 }
 
-/// Sends heart beats to server. When server responses NOT_SERVING, the app exit with return value.
-fn start_heart_beat(client: &OcclumExecClient, process_id: u32) {
-    let process_stopped = Arc::new(Mutex::new(false));
-    let c_process_stopped = process_stopped.clone();
-
-    let (mut req, resp) =
-        executor::block_on(client.heart_beat(grpc::RequestOptions::new())).unwrap();
-
-    thread::spawn(move || {
-        loop {
-            thread::sleep(time::Duration::from_millis(500));
-            match *c_process_stopped.lock().unwrap() {
-                true => {
-                    //the application stopped
-                    break;
-                }
-                false => {
-                    executor::block_on(req.wait()).unwrap();
-                    req.send_data(HealthCheckRequest {
-                        process_id: process_id,
-                        ..Default::default()
-                    })
-                    .expect("send failed");
-                }
-            };
-        }
-        req.finish().expect("req finish failed");
-    });
-
-    let mut responses = resp.drop_metadata();
-    'a: loop {
-        while let Some(message) = executor::block_on(responses.next()) {
-            let status = match message {
-                Ok(m) => m.status,
-                Err(_e) => {
-                    //stop the client for any issue
-                    //Todo: How to report the crash issue?
-                    HealthCheckResponse_ServingStatus::NOT_SERVING
-                }
-            };
-
-            if status != HealthCheckResponse_ServingStatus::SERVING {
-                //the application has stopped
-                *process_stopped.lock().unwrap() = true;
-                break 'a;
-            }
-
-            thread::sleep(time::Duration::from_millis(100));
-        }
-    }
-}
-
 //Gets the application return value
-fn get_return_value(client: &OcclumExecClient, process_id: &u32) -> Result<i32, ()> {
+fn get_return_value(client: &OcclumExecClient, process_id: &i32) -> Result<i32, ()> {
     let resp = executor::block_on(
         client
             .get_result(
@@ -264,6 +204,26 @@ fn get_return_value(client: &OcclumExecClient, process_id: &u32) -> Result<i32, 
             }
         }
         Err(_) => Err(()),
+    }
+}
+
+// Kill the process running in server
+fn kill_process(client: &OcclumExecClient, process_id: &i32, signal: &i32) {
+    if executor::block_on(
+        client
+            .kill_process(
+                grpc::RequestOptions::new(),
+                KillProcessRequest {
+                    process_id: *process_id,
+                    signal: *signal,
+                    ..Default::default()
+                },
+            )
+            .join_metadata_result(),
+    )
+    .is_err()
+    {
+        debug!("send signal failed");
     }
 }
 
@@ -303,7 +263,10 @@ fn main() -> Result<(), i32> {
         .get_matches();
 
     let args: Vec<String> = env::args().collect();
-    let env: Vec<String> = env::vars().into_iter().map(|(key, val)| format!("{}={}", key, val)).collect();
+    let env: Vec<String> = env::vars()
+        .into_iter()
+        .map(|(key, val)| format!("{}={}", key, val))
+        .collect();
 
     let mut sock_file = String::from(args[0].as_str());
     let sock_file = str::replace(
@@ -325,12 +288,14 @@ fn main() -> Result<(), i32> {
         );
 
         if let Err(s) = start_server(&client, &server_name) {
-            debug!("start_server failed {}", s);
+            println!("start_server failed {}", s);
             return Err(-1);
         }
+        println!("server is running.");
     } else if let Some(ref matches) = matches.subcommand_matches("stop") {
         let stop_time = matches.value_of("time").unwrap().parse::<u32>().unwrap();
         stop_server(&client, stop_time);
+        println!("server stopped.");
     } else if let Some(ref matches) = matches.subcommand_matches("exec") {
         let cmd_args: Vec<&str> = match matches
             .values_of("args")
@@ -344,24 +309,48 @@ fn main() -> Result<(), i32> {
         let (cmd, args) = cmd_args.split_first().unwrap();
         let env: Vec<&str> = env.iter().map(|string| string.as_str()).collect();
 
-        match exec_command(&client, cmd, args, &env) {
-            Ok(process_id) => {
-                let signals = Signals::new(&[SIGUSR1]).unwrap();
-                let signal_thread = thread::spawn(move || {
-                    for sig in signals.forever() {
-                        debug!("Received signal {:?}", sig);
+        // Create the signal handler
+        let process_killed = Arc::new(Mutex::new(false));
+        let process_killed_clone = Arc::clone(&process_killed);
+        let signals = Signals::new(&[SIGUSR1, SIGINT, SIGQUIT, SIGTERM]).unwrap();
+        let signal_thread = thread::spawn(move || {
+            for signal in signals.forever() {
+                debug!("Received signal {:?}", signal);
+                match signal {
+                    SIGUSR1 => {
                         break;
                     }
-                });
+                    SIGINT | SIGQUIT | SIGTERM => {
+                        let mut process_killed = process_killed_clone.lock().unwrap();
+                        *process_killed = true;
+                        break;
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        });
 
-                //Notifies the server, if client killed by KILL
-                start_heart_beat(&client, process_id.clone());
-
+        match exec_command(&client, cmd, args, &env) {
+            Ok(process_id) => {
+                // the signal thread exit if server finished execution or user kill the client
                 signal_thread.join().unwrap();
-                let result = get_return_value(&client, &process_id).unwrap();
 
-                if result != 0 {
-                    return Err(result);
+                // check the signal type:
+                // if client killed by user, send SIGTERM and SIGKILL to server
+                if *process_killed.lock().unwrap() {
+                    // stop the process in server
+                    kill_process(&client, &process_id, &SIGTERM);
+                    kill_process(&client, &process_id, &SIGKILL);
+                    return Err(-1);
+                } else {
+                    if let Ok(result) = get_return_value(&client, &process_id) {
+                        if result != 0 {
+                            return Err(result);
+                        }
+                    } else {
+                        debug!("get the return value failed");
+                        return Err(-1);
+                    }
                 }
             }
             Err(s) => {

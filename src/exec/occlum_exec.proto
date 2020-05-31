@@ -8,21 +8,26 @@ service OcclumExec {
   rpc StatusCheck(HealthCheckRequest) returns (HealthCheckResponse) {}
 
   // Client asks the server to execute the command
-  rpc ExecCommand(ExecComm) returns (ExecCommResponse) {}
+  rpc ExecCommand(ExecCommRequest) returns (ExecCommResponse) {}
 
   // Client gets the return value
   rpc GetResult(GetResultRequest) returns (GetResultResponse) {}
 
-  // Client sends heart beats to server
-  rpc HeartBeat(stream HealthCheckRequest) returns (stream HealthCheckResponse) {}
+  // Client stops the server
+  rpc StopServer(StopRequest) returns (StopResponse) {}
 
-  //Client stops the server
-  rpc StopServer(StopRequest) returns (StopResponse){}
+  // Client send signal to server
+  rpc KillProcess(KillProcessRequest) returns (KillProcessResponse) {}
 }
 
-message GetResultRequest {
-  uint32 process_id = 1;
+message KillProcessRequest {
+  int32 process_id = 1;
+  int32 signal = 2;
 }
+
+message KillProcessResponse {}
+
+message GetResultRequest { int32 process_id = 1; }
 
 message GetResultResponse {
   enum ExecutionStatus {
@@ -34,7 +39,7 @@ message GetResultResponse {
   int32 result = 2;
 }
 
-message ExecComm {
+message ExecCommRequest {
   uint32 process_id = 1;
   string sockpath = 2;
   string command = 3;
@@ -43,25 +48,24 @@ message ExecComm {
 }
 
 message ExecCommResponse {
-  uint32 process_id = 1;
+  enum ExecutionStatus {
+    RUNNING = 0;
+    LAUNCH_FAILED = 1;
+  }
+  ExecutionStatus status = 1;
+  int32 process_id = 2;
 }
 
-message HealthCheckRequest {
-  uint32 process_id = 1;
-}
+message HealthCheckRequest {}
 
 message HealthCheckResponse {
   enum ServingStatus {
-    UNKNOWN = 0;
-    SERVING = 1;
-    NOT_SERVING = 2;
+    SERVING = 0;
+    NOT_SERVING = 1;
   }
   ServingStatus status = 1;
 }
 
-message StopRequest {
-  uint32 time = 1;
-}
+message StopRequest { uint32 time = 1; }
 
-message StopResponse {
-}
+message StopResponse {}

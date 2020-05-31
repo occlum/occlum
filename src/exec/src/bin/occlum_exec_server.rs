@@ -36,7 +36,6 @@ fn check_server_status(sock_file: &str) -> bool {
             .status_check(
                 grpc::RequestOptions::new(),
                 HealthCheckRequest {
-                    process_id: 0,
                     ..Default::default()
                 },
             )

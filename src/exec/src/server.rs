@@ -2,19 +2,15 @@ extern crate chrono;
 extern crate nix;
 extern crate timer;
 use crate::occlum_exec::{
-    ExecComm, ExecCommResponse, GetResultRequest, GetResultResponse,
-    GetResultResponse_ExecutionStatus, HealthCheckRequest, HealthCheckResponse,
-    HealthCheckResponse_ServingStatus, StopRequest, StopResponse,
+    ExecCommRequest, ExecCommResponse, ExecCommResponse_ExecutionStatus, GetResultRequest,
+    GetResultResponse, GetResultResponse_ExecutionStatus, HealthCheckRequest, HealthCheckResponse,
+    HealthCheckResponse_ServingStatus, KillProcessRequest, KillProcessResponse, StopRequest,
+    StopResponse,
 };
 use crate::occlum_exec_grpc::OcclumExec;
-
-use futures::stream::StreamExt;
-use grpc::Metadata;
-use grpc::ServerHandlerContext;
-use grpc::ServerRequest;
-use grpc::ServerRequestSingle;
-use grpc::ServerResponseSink;
-use grpc::ServerResponseUnarySink;
+use grpc::{ServerHandlerContext, ServerRequestSingle, ServerResponseUnarySink};
+use nix::sys::signal::{self, Signal};
+use nix::unistd::Pid;
 use sendfd::RecvWithFd;
 use std::cmp;
 use std::collections::HashMap;
@@ -22,20 +18,15 @@ use std::ffi::CString;
 use std::os::unix::io::RawFd;
 use std::os::unix::net::UnixStream;
 use std::sync::{Arc, Condvar, Mutex};
-use std::task::Poll;
 use std::thread;
 use timer::{Guard, Timer};
-
-use nix::sys::signal::{self, Signal};
-use nix::unistd::Pid;
 
 #[derive(Default)]
 pub struct OcclumExecImpl {
     //process_id, return value, execution status
-    commands: Arc<Mutex<HashMap<u32, (Option<i32>, bool)>>>,
+    commands: Arc<Mutex<HashMap<i32, (Option<i32>, bool)>>>,
     execution_lock: Arc<(Mutex<bool>, Condvar)>,
     stop_timer: Arc<Mutex<Option<(Timer, Guard)>>>,
-    process_id: Arc<Mutex<u32>>,
 }
 
 impl OcclumExecImpl {
@@ -47,7 +38,6 @@ impl OcclumExecImpl {
             commands: Default::default(),
             execution_lock: lock,
             stop_timer: Arc::new(Mutex::new(Some(timer))),
-            process_id: Arc::new(Mutex::new(1)),
         }
     }
 }
@@ -60,7 +50,7 @@ fn reset_stop_timer(
     //New a timer to stop the server
     let timer = timer::Timer::new();
     let guard = timer.schedule_with_delay(chrono::Duration::seconds(time as i64), move || {
-        if rust_occlum_pal_kill(-1, SIGKILL).is_err(){
+        if rust_occlum_pal_kill(-1, SIGKILL).is_err() {
             warn!("SIGKILL failed.")
         }
         let (execution_lock, cvar) = &*lock;
@@ -79,6 +69,22 @@ fn clear_stop_timer(old_timer: &Arc<Mutex<Option<(Timer, Guard)>>>) {
 }
 
 impl OcclumExec for OcclumExecImpl {
+    fn kill_process(
+        &self,
+        _o: ::grpc::ServerHandlerContext,
+        mut req: ::grpc::ServerRequestSingle<KillProcessRequest>,
+        resp: ::grpc::ServerResponseUnarySink<KillProcessResponse>,
+    ) -> ::grpc::Result<()> {
+        let req = req.take_message();
+        if rust_occlum_pal_kill(req.process_id, req.signal).is_err() {
+            warn!("failed to send signal to process.");
+        }
+
+        resp.finish(KillProcessResponse {
+            ..Default::default()
+        })
+    }
+
     fn get_result(
         &self,
         _o: ServerHandlerContext,
@@ -123,7 +129,7 @@ impl OcclumExec for OcclumExecImpl {
         mut req: ServerRequestSingle<StopRequest>,
         resp: ServerResponseUnarySink<StopResponse>,
     ) -> grpc::Result<()> {
-        if rust_occlum_pal_kill(-1, SIGTERM).is_err(){
+        if rust_occlum_pal_kill(-1, SIGTERM).is_err() {
             warn!("SIGTERM failed.");
         }
         let time = cmp::min(req.take_message().time, crate::DEFAULT_SERVER_TIMER);
@@ -134,7 +140,7 @@ impl OcclumExec for OcclumExecImpl {
     fn status_check(
         &self,
         _o: ServerHandlerContext,
-        mut req: ServerRequestSingle<HealthCheckRequest>,
+        _req: ServerRequestSingle<HealthCheckRequest>,
         resp: ServerResponseUnarySink<HealthCheckResponse>,
     ) -> grpc::Result<()> {
         //Reset the timer
@@ -155,33 +161,16 @@ impl OcclumExec for OcclumExecImpl {
             break;
         }
 
-        //Get the process id from the request
-        let process_id = req.take_message().process_id;
-
-        match process_id {
-            0 => resp.finish(HealthCheckResponse::default()),
-            process_id => {
-                let commands = self.commands.clone();
-                let mut commands = commands.lock().unwrap();
-
-                match commands.get_mut(&process_id) {
-                    Some(_) => resp.finish(HealthCheckResponse {
-                        status: HealthCheckResponse_ServingStatus::SERVING,
-                        ..Default::default()
-                    }),
-                    _ => resp.finish(HealthCheckResponse {
-                        status: HealthCheckResponse_ServingStatus::NOT_SERVING,
-                        ..Default::default()
-                    }),
-                }
-            }
-        }
+        resp.finish(HealthCheckResponse {
+            status: HealthCheckResponse_ServingStatus::SERVING,
+            ..Default::default()
+        })
     }
 
     fn exec_command(
         &self,
         _o: ServerHandlerContext,
-        mut req: ServerRequestSingle<ExecComm>,
+        mut req: ServerRequestSingle<ExecCommRequest>,
         resp: ServerResponseUnarySink<ExecCommResponse>,
     ) -> grpc::Result<()> {
         clear_stop_timer(&self.stop_timer.clone());
@@ -215,96 +204,53 @@ impl OcclumExec for OcclumExecImpl {
             }
         };
 
-        let gpid = self.process_id.clone();
-        let mut gpid = gpid.lock().unwrap();
-        let process_id: u32 = *gpid;
-        *gpid += 1;
-        drop(gpid);
-
         let _commands = self.commands.clone();
         let _execution_lock = self.execution_lock.clone();
         let _stop_timer = self.stop_timer.clone();
-
-        let mut commands = _commands.lock().unwrap();
-        commands.entry(process_id).or_insert((None, true));
-        drop(commands);
 
         let cmd = req.command.clone();
         let args = req.parameters.into_vec().clone();
         let envs = req.enviroments.into_vec().clone();
         let client_process_id = req.process_id;
 
-        //Run the command in a thread
-        thread::spawn(move || {
-            let mut exit_status = Box::new(0);
-            rust_occlum_pal_exec(&cmd, &args, &envs, &stdio_fds, &mut exit_status)
-                .expect("failed to execute the command");
-
-            reset_stop_timer(_execution_lock, _stop_timer, crate::DEFAULT_SERVER_TIMER);
+        if let Ok(process_id) = rust_occlum_pal_create_process(&cmd, &args, &envs, &stdio_fds) {
             let mut commands = _commands.lock().unwrap();
-            *commands.get_mut(&process_id).expect("get process") = (Some(*exit_status), false);
+            commands.entry(process_id).or_insert((None, true));
+            drop(commands);
 
-            //Notifies the client to application stopped
-            debug!(
-                "process:{} finished, send signal to {}",
-                process_id, client_process_id
-            );
+            //Run the command in a thread
+            thread::spawn(move || {
+                let mut exit_status = Box::new(0);
 
-            //TODO: fix me if the client has been killed
-            signal::kill(Pid::from_raw(client_process_id as i32), Signal::SIGUSR1).unwrap();
-        });
+                rust_occlum_pal_exec(process_id, &mut exit_status)
+                    .expect("failed to execute the command");
 
-        resp.finish(ExecCommResponse {
-            process_id: process_id,
-            ..Default::default()
-        })
-    }
+                reset_stop_timer(_execution_lock, _stop_timer, crate::DEFAULT_SERVER_TIMER);
+                let mut commands = _commands.lock().unwrap();
+                *commands.get_mut(&process_id).expect("get process") = (Some(*exit_status), false);
 
-    fn heart_beat(
-        &self,
-        o: ServerHandlerContext,
-        req: ServerRequest<HealthCheckRequest>,
-        mut resp: ServerResponseSink<HealthCheckResponse>,
-    ) -> grpc::Result<()> {
-        let mut req = req.into_stream();
-        let commands = self.commands.clone();
+                //Notifies the client to application stopped
+                debug!(
+                    "process:{} finished, send signal to {}",
+                    process_id, client_process_id
+                );
 
-        o.spawn_poll_fn(move |cx| {
-            loop {
-                // Wait until resp is writable
-                if let Poll::Pending = resp.poll(cx)? {
-                    return Poll::Pending;
-                }
+                //TODO: fix me if the client has been killed
+                signal::kill(Pid::from_raw(client_process_id as i32), Signal::SIGUSR1).unwrap();
+            });
 
-                match req.poll_next_unpin(cx)? {
-                    Poll::Pending => {
-                        return Poll::Pending;
-                    }
-                    Poll::Ready(Some(note)) => {
-                        let process_id = note.process_id;
-                        let commands = commands.lock().unwrap();
-                        let process_status = match &commands.get(&process_id) {
-                            None => HealthCheckResponse_ServingStatus::UNKNOWN,
-                            Some(&(exit_status, _)) => match exit_status {
-                                None => HealthCheckResponse_ServingStatus::SERVING,
-                                Some(_) => HealthCheckResponse_ServingStatus::NOT_SERVING,
-                            },
-                        };
-
-                        resp.send_data(HealthCheckResponse {
-                            status: process_status,
-                            ..Default::default()
-                        })
-                        .unwrap();
-                    }
-                    Poll::Ready(None) => {
-                        resp.send_trailers(Metadata::new()).expect("send");
-                        return Poll::Ready(Ok(()));
-                    }
-                }
-            }
-        });
-        Ok(())
+            resp.finish(ExecCommResponse {
+                status: ExecCommResponse_ExecutionStatus::RUNNING,
+                process_id: process_id,
+                ..Default::default()
+            })
+        } else {
+            resp.finish(ExecCommResponse {
+                status: ExecCommResponse_ExecutionStatus::LAUNCH_FAILED,
+                process_id: 0,
+                ..Default::default()
+            })
+        }
     }
 }
 
@@ -371,7 +317,9 @@ extern "C" {
     fn occlum_pal_kill(pid: i32, sig: i32) -> i32;
 }
 
-fn vec_strings_to_cchars(strings: &Vec<String>) -> Result<(Vec<*const libc::c_char>,Vec<CString>), i32> {
+fn vec_strings_to_cchars(
+    strings: &Vec<String>,
+) -> Result<(Vec<*const libc::c_char>, Vec<CString>), i32> {
     let mut strings_content = Vec::<CString>::new();
     let mut cchar_strings = Vec::<*const libc::c_char>::new();
     for string in strings {
@@ -385,13 +333,12 @@ fn vec_strings_to_cchars(strings: &Vec<String>) -> Result<(Vec<*const libc::c_ch
 }
 
 /// Executes the command inside Occlum enclave
-fn rust_occlum_pal_exec(
+fn rust_occlum_pal_create_process(
     cmd: &str,
     args: &Vec<String>,
     envs: &Vec<String>,
     stdio: &occlum_stdio_fds,
-    exit_status: &mut i32,
-) -> Result<(), i32> {
+) -> Result<i32, i32> {
     let cmd_path = CString::new(cmd).expect("cmd_path: new failed");
     let (cmd_args_array, _cmd_args) = vec_strings_to_cchars(args)?;
     let (cmd_envs_array, _cmd_envs) = vec_strings_to_cchars(envs)?;
@@ -406,17 +353,20 @@ fn rust_occlum_pal_exec(
         pid: &mut libos_tid as *mut i32,
     });
 
-    let ret = unsafe{occlum_pal_create_process(Box::into_raw(create_process_args))};
-    if ret != 0 {
-        return Err(ret);
+    let ret = unsafe { occlum_pal_create_process(Box::into_raw(create_process_args)) };
+    match ret {
+        0 => Ok(libos_tid),
+        _ => Err(ret),
     }
+}
 
+fn rust_occlum_pal_exec(occlum_process_id: i32, exit_status: &mut i32) -> Result<(), i32> {
     let exec_args = Box::new(occlum_pal_exec_args {
-        pid: libos_tid,
+        pid: occlum_process_id,
         exit_value: exit_status as *mut i32,
     });
 
-    let ret = unsafe {occlum_pal_exec(Box::into_raw(exec_args))};
+    let ret = unsafe { occlum_pal_exec(Box::into_raw(exec_args)) };
 
     match ret {
         0 => Ok(()),
@@ -424,16 +374,16 @@ fn rust_occlum_pal_exec(
     }
 }
 
-/// Send a signal to one or multiple LibOS processes 
-// only support SIGKILL and SIGTERM 
+/// Send a signal to one or multiple LibOS processes
+// only support SIGKILL and SIGTERM
 const SIGKILL: i32 = 9;
 const SIGTERM: i32 = 15;
 
-fn rust_occlum_pal_kill(pid: i32, sig: i32) -> Result<i32, i32> {
+fn rust_occlum_pal_kill(pid: i32, sig: i32) -> Result<(), i32> {
     let ret = unsafe { occlum_pal_kill(pid, sig) };
 
     if ret == 0 {
-        return Ok(0);
+        return Ok(());
     } else {
         return Err(ret);
     }
