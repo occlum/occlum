@@ -80,16 +80,37 @@ impl FsView {
 
     /// Lookup INode from the cwd of the process
     pub fn lookup_inode(&self, path: &str) -> Result<Arc<dyn INode>> {
-        debug!("lookup_inode: cwd: {:?}, path: {:?}", self.cwd(), path);
+        self.lookup_inode_follow_with_max_times(path, 0)
+    }
+
+    /// Lookup INode from the cwd of the process, follow symlinks
+    pub fn lookup_inode_follow(&self, path: &str) -> Result<Arc<dyn INode>> {
+        // Linux uses 40 as the upper limit for resolving symbolic links,
+        // so Occlum use it as a reasonable value
+        const MAX_SYMLINKS: usize = 40;
+        self.lookup_inode_follow_with_max_times(path, MAX_SYMLINKS)
+    }
+
+    fn lookup_inode_follow_with_max_times(
+        &self,
+        path: &str,
+        max_times: usize,
+    ) -> Result<Arc<dyn INode>> {
+        debug!(
+            "lookup_inode_follow_with_max_times: cwd: {:?}, path: {:?}, max_times: {}",
+            self.cwd(),
+            path,
+            max_times
+        );
         if path.len() > 0 && path.as_bytes()[0] == b'/' {
             // absolute path
             let abs_path = path.trim_start_matches('/');
-            let inode = ROOT_INODE.lookup(abs_path)?;
+            let inode = ROOT_INODE.lookup_follow(abs_path, max_times)?;
             Ok(inode)
         } else {
             // relative path
             let cwd = self.cwd().trim_start_matches('/');
-            let inode = ROOT_INODE.lookup(cwd)?.lookup(path)?;
+            let inode = ROOT_INODE.lookup(cwd)?.lookup_follow(path, max_times)?;
             Ok(inode)
         }
     }

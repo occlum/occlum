@@ -206,7 +206,7 @@ fn load_elf_to_vec(elf_path: &str, current_ref: &ThreadRef) -> Result<Vec<u8>> {
         .fs()
         .lock()
         .unwrap()
-        .lookup_inode(elf_path)
+        .lookup_inode_follow(elf_path)
         .map_err(|e| errno!(e.errno(), "cannot find the ELF"))?;
     let file_mode = {
         let info = inode.metadata()?;
