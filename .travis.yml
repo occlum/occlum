@@ -1,11 +1,12 @@
-sudo: required
+os: linux
+dist: bionic
+sudo: true
 
 services:
   - docker
 
+before_script:
+- cd /home/travis/build/occlum/occlum; info=$(make format-check); if [ -n "$info" ]; then echo "Format error detected."; exit 1; fi
+
 script:
-- docker run -v /home/travis/build/occlum/occlum:/root/occlum occlum/occlum:0.12.0-ubuntu18.04 /bin/bash -c "cd /root/occlum; \
-                info=$(make format-check); \
-                if [ -n "$info" ]; then echo "Format error detected."; exit 1; \
-                fi; \
-                make submodule; SGX_MODE=SIM make; SGX_MODE=SIM make test"
+- docker run -v /home/travis/build/occlum/occlum:/root/occlum occlum/occlum:0.12.0-ubuntu18.04 /bin/bash -c "cd /root/occlum; make submodule; SGX_MODE=SIM make; SGX_MODE=SIM make test"
