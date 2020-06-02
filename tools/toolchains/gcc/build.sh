@@ -23,7 +23,7 @@ git checkout d969dea983a2cc54a1e0308a0cdeb6c3307e4bfa
 TARGET=x86_64-linux-musl
 # We will check out the branch ${MUSL_VER} from ${MUSL_REPO}
 MUSL_REPO=https://github.com/occlum/musl
-MUSL_VER=1.1.20
+MUSL_VER=1.1.24
 # We will use this version of GCC
 GCC_VER=8.3.0
 
