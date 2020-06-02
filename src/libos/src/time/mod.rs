@@ -8,6 +8,7 @@ use std::{fmt, u64};
 use syscall::SyscallNum;
 
 mod profiler;
+pub mod up_time;
 
 pub use profiler::GLOBAL_PROFILER;
 

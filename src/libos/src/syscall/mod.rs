@@ -25,7 +25,7 @@ use crate::fs::{
     do_readlink, do_readv, do_rename, do_rmdir, do_sendfile, do_stat, do_sync, do_truncate,
     do_unlink, do_write, do_writev, iovec_t, File, FileDesc, FileRef, HostStdioFds, Stat,
 };
-use crate::misc::{resource_t, rlimit_t, utsname_t};
+use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t};
 use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
     do_epoll_pwait, do_epoll_wait, do_getpeername, do_getsockname, do_getsockopt, do_listen,
@@ -176,7 +176,7 @@ macro_rules! process_syscall_table_with_callback {
             (Gettimeofday = 96) => do_gettimeofday(tv_u: *mut timeval_t),
             (Getrlimit = 97) => handle_unsupported(),
             (Getrusage = 98) => handle_unsupported(),
-            (SysInfo = 99) => handle_unsupported(),
+            (SysInfo = 99) => do_sysinfo(info: *mut sysinfo_t),
             (Times = 100) => handle_unsupported(),
             (Ptrace = 101) => handle_unsupported(),
             (Getuid = 102) => do_getuid(),
@@ -753,6 +753,13 @@ fn do_mprotect(addr: usize, len: usize, prot: u32) -> Result<isize> {
 fn do_brk(new_brk_addr: usize) -> Result<isize> {
     let ret_brk_addr = vm::do_brk(new_brk_addr)?;
     Ok(ret_brk_addr as isize)
+}
+
+fn do_sysinfo(info: *mut sysinfo_t) -> Result<isize> {
+    check_mut_ptr(info)?;
+    let info = unsafe { &mut *info };
+    *info = misc::do_sysinfo()?;
+    Ok(0)
 }
 
 // TODO: handle tz: timezone_t

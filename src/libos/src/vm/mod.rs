@@ -13,6 +13,7 @@ use self::vm_layout::VMLayout;
 use self::vm_manager::{VMManager, VMMapOptionsBuilder};
 
 pub use self::process_vm::{MMapFlags, MRemapFlags, ProcessVM, ProcessVMBuilder, VMPerms};
+pub use self::user_space_vm::USER_SPACE_VM_MANAGER;
 pub use self::vm_range::VMRange;
 
 pub fn do_mmap(

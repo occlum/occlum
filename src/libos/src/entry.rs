@@ -8,6 +8,7 @@ use crate::exception::*;
 use crate::fs::HostStdioFds;
 use crate::process::ProcessFilter;
 use crate::signal::SigNum;
+use crate::time::up_time::init;
 use crate::util::log::LevelFilter;
 use crate::util::mem_util::from_untrusted::*;
 use crate::util::sgx::allow_debug as sgx_allow_debug;
@@ -72,6 +73,9 @@ pub extern "C" fn occlum_ecall_init(log_level: *const c_char, instance_dir: *con
         }
 
         HAS_INIT.store(true, Ordering::SeqCst);
+
+        // Init boot up time stamp here.
+        time::up_time::init();
     });
 
     0
