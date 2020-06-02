@@ -306,7 +306,7 @@ macro_rules! process_syscall_table_with_callback {
             (TimerDelete = 226) => handle_unsupported(),
             (ClockSettime = 227) => handle_unsupported(),
             (ClockGettime = 228) => do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t),
-            (ClockGetres = 229) => handle_unsupported(),
+            (ClockGetres = 229) => do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t),
             (ClockNanosleep = 230) => handle_unsupported(),
             (ExitGroup = 231) => do_exit_group(exit_status: i32),
             (EpollWait = 232) => do_epoll_wait(epfd: c_int, events: *mut libc::epoll_event, maxevents: c_int, timeout: c_int),
@@ -771,6 +771,19 @@ fn do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t) -> Result<isize> 
     let ts = time::do_clock_gettime(clockid)?;
     unsafe {
         *ts_u = ts;
+    }
+    Ok(0)
+}
+
+fn do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t) -> Result<isize> {
+    if res_u.is_null() {
+        return Ok(0);
+    }
+    check_mut_ptr(res_u)?;
+    let clockid = time::ClockID::from_raw(clockid)?;
+    let res = time::do_clock_getres(clockid)?;
+    unsafe {
+        *res_u = res;
     }
     Ok(0)
 }

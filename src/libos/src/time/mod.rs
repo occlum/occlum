@@ -137,6 +137,28 @@ pub fn do_clock_gettime(clockid: ClockID) -> Result<timespec_t> {
     Ok(tv)
 }
 
+pub fn do_clock_getres(clockid: ClockID) -> Result<timespec_t> {
+    extern "C" {
+        fn occlum_ocall_clock_getres(clockid: clockid_t, res: *mut timespec_t) -> sgx_status_t;
+    }
+
+    let mut res: timespec_t = Default::default();
+    unsafe {
+        occlum_ocall_clock_getres(clockid as clockid_t, &mut res as *mut timespec_t);
+    }
+    let validate_resolution = |res: &timespec_t| -> Result<()> {
+        // The resolution can be ranged from 1 nanosecond to a few milliseconds
+        if res.sec == 0 && res.nsec > 0 && res.nsec < 1_000_000_000 {
+            Ok(())
+        } else {
+            return_errno!(EINVAL, "invalid value for resolution");
+        }
+    };
+    // do sanity check
+    validate_resolution(&res).expect("ocall returned invalid resolution");
+    Ok(res)
+}
+
 pub fn do_nanosleep(req: &timespec_t) -> Result<()> {
     extern "C" {
         fn occlum_ocall_nanosleep(req: *const timespec_t) -> sgx_status_t;

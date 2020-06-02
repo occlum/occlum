@@ -30,12 +30,34 @@ int test_clock_gettime() {
 }
 
 // ============================================================================
+// Test cases for clock_getres
+// ============================================================================
+
+int test_clock_getres() {
+    struct timespec res;
+    if (clock_getres(CLOCK_REALTIME, &res)) {
+        THROW_ERROR("clock_getres(CLOCK_REALTIME, ...) failed");
+    }
+    if (clock_getres(CLOCK_MONOTONIC, &res)) {
+        THROW_ERROR("clock_getres(CLOCK_MONOTONIC, ...) failed");
+    }
+    if (clock_getres(CLOCK_MONOTONIC_COARSE, &res)) {
+        THROW_ERROR("clock_getres(CLOCK_MONOTONIC_COARSE, ...) failed");
+    }
+    if (clock_getres(CLOCK_REALTIME, NULL)) {
+        THROW_ERROR("clock_getres(CLOCK_REALTIME, NULL) failed");
+    }
+    return 0;
+}
+
+// ============================================================================
 // Test suite
 // ============================================================================
 
 static test_case_t test_cases[] = {
     TEST_CASE(test_gettimeofday),
     TEST_CASE(test_clock_gettime),
+    TEST_CASE(test_clock_getres),
 };
 
 int main() {
