@@ -228,7 +228,7 @@ int div_maybe_zero(int x, int y) {
     return x / y;
 }
 
-int test_catch_fault() {
+int test_handle_sigfpe() {
 #ifdef SGX_MODE_SIM
     printf("WARNING: Skip this test case as we do not support "
            "capturing hardware exception in SGX simulation mode\n");
@@ -255,6 +255,56 @@ int test_catch_fault() {
     printf("Signal handler successfully jumped over the divide-by-zero instruction\n");
 
     if (sigaction(SIGFPE, &old_action, NULL) < 0) {
+        THROW_ERROR("restoring old signal handler failed");
+    }
+    return 0;
+#endif /* SGX_MODE_SIM */
+}
+
+
+// TODO: rewrite this in assembly
+int read_maybe_null(int *p) {
+    return *p;
+}
+
+static void handle_sigsegv(int num, siginfo_t *info, void *_context) {
+    printf("SIGSEGV Caught\n");
+    assert(num == SIGSEGV);
+    assert(info->si_signo == SIGSEGV);
+
+    ucontext_t *ucontext = _context;
+    mcontext_t *mcontext = &ucontext->uc_mcontext;
+    // TODO: how long is the instruction?
+    // The faulty instruction should be `idiv %esi` (f7 fe)
+    mcontext->gregs[REG_RIP] += 2;
+
+    return;
+}
+
+
+int test_handle_sigsegv() {
+#ifdef SGX_MODE_SIM
+    printf("WARNING: Skip this test case as we do not support "
+           "capturing hardware exception in SGX simulation mode\n");
+    return 0;
+#else
+    // Set up a signal handler that handles divide-by-zero exception
+    struct sigaction new_action, old_action;
+    new_action.sa_sigaction = handle_sigsegv;
+    new_action.sa_flags = SA_SIGINFO;
+    if (sigaction(SIGSEGV, &new_action, &old_action) < 0) {
+        THROW_ERROR("registering new signal handler failed");
+    }
+    if (old_action.sa_handler != SIG_DFL) {
+        THROW_ERROR("unexpected old sig handler");
+    }
+
+    int *addr = NULL;
+    volatile int val = read_maybe_null(addr);
+
+    printf("Signal handler successfully jumped over a null-dereferencing instruction\n");
+
+    if (sigaction(SIGSEGV, &old_action, NULL) < 0) {
         THROW_ERROR("restoring old signal handler failed");
     }
     return 0;
@@ -364,7 +414,8 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_raise),
     TEST_CASE(test_abort),
     TEST_CASE(test_kill),
-    TEST_CASE(test_catch_fault),
+    TEST_CASE(test_handle_sigfpe),
+    TEST_CASE(test_handle_sigsegv),
     TEST_CASE(test_sigaltstack),
     TEST_CASE(test_sigchld),
 };

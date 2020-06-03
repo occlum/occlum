@@ -37,9 +37,7 @@ pub fn do_handle_exception(
     user_context: *mut CpuContext,
 ) -> Result<isize> {
     let info = unsafe { &mut *info };
-    if info.exception_type != sgx_exception_type_t::SGX_EXCEPTION_HARDWARE {
-        return_errno!(EINVAL, "Can only handle hardware exceptions");
-    }
+    check_exception_type(info.exception_type)?;
 
     let user_context = unsafe { &mut *user_context };
     *user_context = CpuContext::from_sgx(&info.cpu_context);
@@ -71,4 +69,33 @@ pub fn do_handle_exception(
     crate::signal::force_signal(signal, user_context);
 
     Ok(0)
+}
+
+// Notes about #PF and #GP exception simulation for SGX 1.
+//
+// SGX 1 cannot capture #PF and #GP exceptions inside enclaves. This leaves us
+// no choice but to rely on untrusted info about #PF or #PG exceptions from
+// outside the enclave. Due to the obvious security risk, the feature can be
+// disabled.
+//
+// On the bright side, SGX 2 has native support for #PF and #GP exceptions. So
+// this exception simulation and its security risk is not a problem in the long
+// run.
+
+#[cfg(not(feature = "sgx1_exception_sim"))]
+fn check_exception_type(type_: sgx_exception_type_t) -> Result<()> {
+    if type_ != sgx_exception_type_t::SGX_EXCEPTION_HARDWARE {
+        return_errno!(EINVAL, "Can only handle hardware exceptions");
+    }
+    Ok(())
+}
+
+#[cfg(feature = "sgx1_exception_sim")]
+fn check_exception_type(type_: sgx_exception_type_t) -> Result<()> {
+    if type_ != sgx_exception_type_t::SGX_EXCEPTION_HARDWARE
+        && type_ != sgx_exception_type_t::SGX_EXCEPTION_SIMULATED
+    {
+        return_errno!(EINVAL, "Can only handle hardware / simulated exceptions");
+    }
+    Ok(())
 }
