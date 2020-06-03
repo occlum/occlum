@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -e
 
 export CC=occlum-gcc
 export CXX=occlum-g++
@@ -7,6 +8,7 @@ THISDIR="$(dirname $(readlink -f $0))"
 INSTALLDIR="/usr/local/occlum/x86_64-linux-musl"
 DEPSDIR="$THISDIR/deps"
 TARGET_SO="$DEPSDIR/openssl/libcrypto.so"
+SGX_VER="2.9.1"
 
 mkdir -p $DEPSDIR || exit 1
 
@@ -32,20 +34,19 @@ if [ ! -f "$TARGET_SO" ] ; then
       --openssldir=/usr/local/occlum/ssl \
       --with-rand-seed=rdcpu \
       no-zlib no-async no-tests && \
-    make -j${nproc} && \
+    make -j${nproc} && make install && \
     echo "Build openssl successfully" || exit 1
 else
     echo "The openssl library is aleady existent"
 fi
 
-SGX_VER=2.8
 # Download SGX SDK
 SGX_SDK="${DEPSDIR}/linux-sgx-sdk"
 if [ ! -d "$SGX_SDK" ] ; then
     echo "Downloading linux-sgx-sdk ..."
     cd "$DEPSDIR" && \
     wget https://github.com/intel/linux-sgx/archive/sgx_$SGX_VER.tar.gz && \
-    tar -xvzf "sgx_$(SGX_VER).tar.gz" && \
+    tar -xvzf sgx_$SGX_VER.tar.gz && \
     mv linux-sgx-sgx_$SGX_VER linux-sgx-sdk && \
     echo "Download sgx-sdk successfully" || exit 1
 else
@@ -75,6 +76,7 @@ cd - >/dev/null 2>&1
 echo "DiffieHellmanLibrary is ready"
 
 # Copy header files from linux-sgx-sdk local attestation demo
+cd $THISDIR
 mkdir -p Include
 cp $SGX_SDK/SampleCode/LocalAttestation/Include/{datatypes.h,\
 dh_session_protocol.h,\

@@ -17,6 +17,6 @@ int exchange_report(sgx_dh_msg2_t *dh_msg2,
                     sgx_dh_msg3_t *dh_msg3,
                     uint32_t session_id);
 int end_session(uint32_t session_id);
-dh_session_t* get_session_info(uint32_t session_id );
+dh_session_t *get_session_info(uint32_t session_id );
 
 #endif

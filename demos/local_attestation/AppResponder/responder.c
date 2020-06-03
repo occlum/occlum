@@ -20,8 +20,7 @@
 int m_server_sock_fd;
 int m_shutdown;
 
-int server_init()
-{
+int server_init() {
     struct sockaddr_in srv_addr;
 
     memset(&srv_addr, 0, sizeof(srv_addr));
@@ -30,22 +29,19 @@ int server_init()
     srv_addr.sin_port = htons(SERVER_PORT);
 
     m_server_sock_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);;
-    if (m_server_sock_fd == -1)
-    {
+    if (m_server_sock_fd == -1) {
         printf("socket initiazation error: %d\n", errno);
         return -1;
     }
 
-    int bind_result = bind(m_server_sock_fd, (struct sockaddr*)&srv_addr, sizeof(srv_addr));
-    if (bind_result == -1)
-    {
+    int bind_result = bind(m_server_sock_fd, (struct sockaddr *)&srv_addr, sizeof(srv_addr));
+    if (bind_result == -1) {
         printf("bind error: %d\n", errno);
         close(m_server_sock_fd);
         return -1;
     }
 
-    if (listen(m_server_sock_fd, BACKLOG) == -1)
-    {
+    if (listen(m_server_sock_fd, BACKLOG) == -1) {
         printf("listen error: %d\n", errno);
         close(m_server_sock_fd);
         return -1;
@@ -55,8 +51,7 @@ int server_init()
     return 0;
 }
 
-int work()
-{
+int work() {
     int client_fds[CONCURRENT_MAX] = {0};
     fd_set server_fd_set;
     int max_fd = -1;
@@ -65,42 +60,37 @@ int work()
     char recv_msg[BUFFER_SIZE];
     int ret;
 
-    while (!m_shutdown)
-    {
+    while (!m_shutdown) {
         // set 10s timeout for select()
         tv.tv_sec = 10;
         tv.tv_usec = 0;
         FD_ZERO(&server_fd_set);
         // listening on server socket
         FD_SET(m_server_sock_fd, &server_fd_set);
-        if (max_fd < m_server_sock_fd)
+        if (max_fd < m_server_sock_fd) {
             max_fd = m_server_sock_fd;
+        }
 
         // listening on all client connections
-        for(int i =0; i < CONCURRENT_MAX; i++)
-        {
-            if(client_fds[i] != 0)
-            {
+        for (int i = 0; i < CONCURRENT_MAX; i++) {
+            if (client_fds[i] != 0) {
                 FD_SET(client_fds[i], &server_fd_set);
-                if(max_fd < client_fds[i])
+                if (max_fd < client_fds[i]) {
                     max_fd = client_fds[i];
+                }
             }
         }
 
         ret = select(max_fd + 1, &server_fd_set, NULL, NULL, &tv);
-        if (ret < 0)
-        {
+        if (ret < 0) {
             printf("Warning: server would shutdown\n");
             continue;
-        }
-        else if(ret == 0)
-        {
+        } else if (ret == 0) {
             // timeout
             continue;
         }
 
-        if(FD_ISSET(m_server_sock_fd, &server_fd_set))
-        {
+        if (FD_ISSET(m_server_sock_fd, &server_fd_set)) {
             // if there is new connection request
             struct sockaddr_in clt_addr;
             socklen_t len = sizeof(clt_addr);
@@ -108,54 +98,45 @@ int work()
             // accept this connection request
             int client_sock_fd = accept(m_server_sock_fd, (struct sockaddr *)&clt_addr, &len);
 
-            if (client_sock_fd > 0)
-            {
+            if (client_sock_fd > 0) {
                 // add new connection to connection pool if it's not full
                 int index = -1;
-                for(int i = 0; i < CONCURRENT_MAX; i++)
-                {
-                    if(client_fds[i] == 0)
-                    {
+                for (int i = 0; i < CONCURRENT_MAX; i++) {
+                    if (client_fds[i] == 0) {
                         index = i;
                         client_fds[i] = client_sock_fd;
                         break;
                     }
                 }
 
-                if(index < 0)
-                {
+                if (index < 0) {
                     printf("server reach maximum connection!\n");
                     bzero(input_msg, BUFFER_SIZE);
                     strcpy(input_msg, "server reach maximum connection\n");
                     send(client_sock_fd, input_msg, BUFFER_SIZE, 0);
                 }
-            }
-            else if (client_sock_fd < 0)
-            {
+            } else if (client_sock_fd < 0) {
                 printf("server: accept() return failure, %s, would exit.\n", strerror(errno));
                 close(m_server_sock_fd);
                 break;
             }
         }
 
-        for(int i =0; i < CONCURRENT_MAX; i++)
-        {
-            if ((client_fds[i] !=0)
-                    && (FD_ISSET(client_fds[i], &server_fd_set)))
-            {
+        for (int i = 0; i < CONCURRENT_MAX; i++) {
+            if ((client_fds[i] != 0)
+                    && (FD_ISSET(client_fds[i], &server_fd_set))) {
                 // there is request messages from client connectsions
-                FIFO_MSG * msg;
+                FIFO_MSG *msg;
                 bzero(recv_msg, BUFFER_SIZE);
                 long byte_num = recv(client_fds[i], recv_msg, BUFFER_SIZE, 0);
-                if (byte_num > 0)
-                {
-                    if(byte_num > BUFFER_SIZE)
+                if (byte_num > 0) {
+                    if (byte_num > BUFFER_SIZE) {
                         byte_num = BUFFER_SIZE;
+                    }
 
                     recv_msg[byte_num] = '\0';
                     msg = (FIFO_MSG *)malloc(byte_num);
-                    if (!msg)
-                    {
+                    if (!msg) {
                         printf("memory allocation failure\n");
                         continue;
                     }
@@ -163,13 +144,9 @@ int work()
                     memcpy(msg, recv_msg, byte_num);
                     msg->header.sockfd = client_fds[i];
                     proc(msg);
-                }
-                else if(byte_num < 0)
-                {
+                } else if (byte_num < 0) {
                     printf("failed to receive message.\n");
-                }
-                else
-                {
+                } else {
                     // client connect is closed
                     FD_CLR(client_fds[i], &server_fd_set);
                     close(client_fds[i]);
@@ -180,13 +157,11 @@ int work()
     }
 }
 
-int main()
-{
+int main() {
     int rc;
 
     rc = server_init();
-    if (rc != 0)
-    {
+    if (rc != 0) {
         printf("server init failure\n");
         return rc;
     }
