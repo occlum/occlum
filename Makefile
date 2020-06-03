@@ -73,12 +73,6 @@ install:
 	install -t $(OCCLUM_PREFIX)/build_sim/bin/ -D build_sim/bin/*
 	install -d $(OCCLUM_PREFIX)/build_sim/lib/
 	install -t $(OCCLUM_PREFIX)/build_sim/lib/ -D build_sim/lib/*
-	install -d $(OCCLUM_PREFIX)/src/
-	install -t $(OCCLUM_PREFIX)/src/ -m 444 src/sgxenv.mk
-	install -d $(OCCLUM_PREFIX)/src/libos/
-	install -t $(OCCLUM_PREFIX)/src/libos/ -m 444 src/libos/Makefile src/libos/Enclave.lds
-	install -d $(OCCLUM_PREFIX)/src/libos/src/builtin/
-	install -t $(OCCLUM_PREFIX)/src/libos/src/builtin/ -m 444 src/libos/src/builtin/*
 	install -d $(OCCLUM_PREFIX)/include/
 	install -t $(OCCLUM_PREFIX)/include/ -m 444 src/pal/include/*.h
 	install -d $(OCCLUM_PREFIX)/etc/template/

@@ -45,18 +45,24 @@ lazy_static! {
     };
 }
 
+// This value will be modified during occlum build
+#[no_mangle]
+#[link_section = ".builtin_config"]
+static OCCLUM_JSON_MAC: [i8; 48] = [0; 48];
+
 fn conf_get_hardcoded_file_mac() -> sgx_aes_gcm_128bit_tag_t {
-    // Wrap the unsafe C version to get the safe Rust version
-    extern "C" {
-        fn conf_get_hardcoded_file_mac() -> *const c_char;
-    }
+    assert!(
+        *OCCLUM_JSON_MAC.last().unwrap() == 0,
+        "must be a null-terminated C string"
+    );
 
     let mac_str = unsafe {
-        CStr::from_ptr(conf_get_hardcoded_file_mac())
+        CStr::from_ptr(&OCCLUM_JSON_MAC as *const i8)
             .to_str()
-            .expect("Invalid MAC")
+            .expect("MAC contains non UTF-8 characters")
     };
-    let mac = parse_mac(mac_str).expect("Invalid MAC");
+
+    let mac = parse_mac(mac_str).expect("MAC string cannot be converted to numbers");
     mac
 }
 
@@ -68,6 +74,7 @@ fn parse_mac(mac_str: &str) -> Result<sgx_aes_gcm_128bit_tag_t> {
         }
         bytes_str_vec
     };
+
     let mut mac: sgx_aes_gcm_128bit_tag_t = Default::default();
     for (byte_i, byte_str) in bytes_str_vec.iter().enumerate() {
         mac[byte_i] = u8::from_str_radix(byte_str, 16).map_err(|e| errno!(e))?;

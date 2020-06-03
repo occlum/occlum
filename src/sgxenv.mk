@@ -15,11 +15,6 @@ else
 	BUILD_DIR := $(PROJECT_DIR)/build
 endif
 
-# for sgxenv.mk in .occlum
-ifeq ($(CONTEXT), 1)
-	BUILD_DIR := $(PROJECT_DIR)/build
-endif
-
 # If OCCLUM_RELEASE_BUILD equals to 1, y, or yes, then build in release mode
 OCCLUM_RELEASE_BUILD ?= 0
 ifeq ($(OCCLUM_RELEASE_BUILD), yes)
@@ -74,7 +69,6 @@ endif
 Crypto_Library_Name := sgx_tcrypto
 KeyExchange_Library_Name := sgx_tkey_exchange
 ProtectedFs_Library_Name := sgx_tprotected_fs
-
 
 #
 # Export flags used to compile or link untrusted modules

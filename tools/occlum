@@ -169,9 +169,7 @@ cmd_build() {
     mkdir -p build/bin
     cp "$occlum_dir/$build_dir/bin/occlum-run" build/bin/
     mkdir -p build/lib
-    cp "$occlum_dir/$build_dir/lib/libocclum-libos-core.a" build/lib/
     cp "$occlum_dir/$build_dir/lib/libocclum-pal.so" build/lib/
-    mkdir -p build/src/libos/src/builtin
 
     chmod 531 -R $working_dir/image/bin
     chmod 531 -R $working_dir/image/lib
@@ -200,17 +198,14 @@ cmd_build() {
     export OCCLUM_BUILTIN_VM_USER_SPACE_SIZE=`parse_occlum_user_space_size`
     echo "EXPORT => OCCLUM_BUILTIN_VM_USER_SPACE_SIZE = $OCCLUM_BUILTIN_VM_USER_SPACE_SIZE"
 
-    cd "$context_dir"
-    mkdir -p src/libos/src/
-    cp "$occlum_dir/src/sgxenv.mk" src/
-    cp "$occlum_dir/src/libos/Makefile" src/libos/
-    cp "$occlum_dir/src/libos/Enclave.lds" src/libos/
-    cp -r "$occlum_dir/src/libos/src/builtin" src/libos/src/builtin
-    cd src/libos && \
-        make clean-builtin && \
-        make "$context_dir/build/lib/libocclum-libos.so" ONLY_REBUILD_BUILTIN=1 CONTEXT=1
-    
+    cd $context_dir/build/lib && \
+    cp "$occlum_dir/$build_dir/lib/libocclum-libos.so" .
+    echo -e "$OCCLUM_BUILTIN_CONF_FILE_MAC\c" > temp_mac_file && \
+    objcopy --update-section .builtin_config=temp_mac_file libocclum-libos.so && \
+    rm temp_mac_file
+
     $occlum_dir/$build_dir/bin/gen_enclave_conf -i "$working_dir/Occlum.json" -o "$context_dir/build/Enclave.xml"
+
     $ENCLAVE_SIGN_TOOL sign \
         -key $ENCLAVE_SIGN_KEY \
         -config "$context_dir/build/Enclave.xml" \
