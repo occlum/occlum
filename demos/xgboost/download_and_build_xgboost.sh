@@ -6,13 +6,8 @@ export PKG_CONFIG_LIBDIR=/usr/local/occlum/x86_64-linux-musl/lib
 
 # Install the dependencies
 apt-get update
-apt-get install -y python3.5
-apt-get install -y python3-pip
-apt-get install -y python3-setuptools
-apt-get install -y python-pip
-apt-get install -y python-setuptools
+apt-get install -y python3-pip python3-setuptools
 pip3 install kubernetes
-pip install kubernetes
 
 # Download and build XGBoost
 rm -rf xgboost_src && mkdir xgboost_src
