@@ -117,7 +117,7 @@ int pal_init_enclave(const char *instance_dir) {
     /* reopen the file with write capablity */
     fp = freopen(token_path, "wb", fp);
     if (fp == NULL) { return 0; }
-    size_t write_num = fwrite(token, 1, sizeof(sgx_launch_token_t), fp);
+    size_t write_num = fwrite(&token, 1, sizeof(sgx_launch_token_t), fp);
     if (write_num != sizeof(sgx_launch_token_t)) {
         PAL_WARN("Warning: Failed to save launch token to \"%s\".\n", token_path);
     }
