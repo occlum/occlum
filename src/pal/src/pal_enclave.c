@@ -68,8 +68,9 @@ int pal_init_enclave(const char *instance_dir) {
     /* try to get the token saved in $HOME */
     const char *home_dir = NULL;
     struct passwd *pw = getpwuid(getuid());
-    if (pw != NULL)
+    if (pw != NULL) {
         home_dir = pw->pw_dir;
+    }
 
     if (home_dir != NULL &&
             (strlen(home_dir) + strlen("/") + sizeof(TOKEN_FILENAME) + 1) <= MAX_PATH) {
