@@ -82,10 +82,6 @@ CXX_FLAGS := $(SGX_CXXFLAGS_T) $(C_COMMON_FLAGS)
 ifdef OCCLUM_BUILTIN_CONF_FILE_MAC
 C_FLAGS += -DOCCLUM_BUILTIN_CONF_FILE_MAC='"$(OCCLUM_BUILTIN_CONF_FILE_MAC)"'
 endif
-# The total size of user-space memory must be builtin into the binary
-ifdef OCCLUM_BUILTIN_VM_USER_SPACE_SIZE
-C_FLAGS += -DOCCLUM_BUILTIN_VM_USER_SPACE_SIZE='($(OCCLUM_BUILTIN_VM_USER_SPACE_SIZE))'
-endif
 
 _Other_Link_Flags := -L$(RUST_SGX_SDK_DIR)/compiler-rt/ -L$(BUILD_DIR)/lib
 _Other_Enclave_Libs := -locclum-libos-core -lsgx_tprotected_fs

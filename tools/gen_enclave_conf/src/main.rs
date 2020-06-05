@@ -84,6 +84,16 @@ fn main() {
         return;
     }
 
+    // get the user space size
+    let user_space_size = parse_memory_size(&occlum_config.resource_limits.user_space_size);
+    if user_space_size.is_err() {
+        println!(
+            "The user_space_size \"{}\" is not correct.",
+            occlum_config.resource_limits.user_space_size
+        );
+        return;
+    }
+
     let sgx_enclave_configuration = EnclaveConfiguration {
         ProdID: occlum_config.metadata.product_id,
         ISVSVN: occlum_config.metadata.version_number,
@@ -97,6 +107,10 @@ fn main() {
         },
         MiscSelect: "0".to_string(),
         MiscMask: "0xFFFFFFFF".to_string(),
+        ReservedMemMaxSize: user_space_size.unwrap() as u64,
+        ReservedMemMinSize: user_space_size.unwrap() as u64,
+        ReservedMemInitSize: user_space_size.unwrap() as u64,
+        ReservedMemExecutable: 1,
     };
 
     // Generate the enclave configuration
@@ -175,4 +189,8 @@ struct EnclaveConfiguration {
     DisableDebug: u32,
     MiscSelect: String,
     MiscMask: String,
+    ReservedMemMaxSize: u64,
+    ReservedMemMinSize: u64,
+    ReservedMemInitSize: u64,
+    ReservedMemExecutable: u32,
 }
