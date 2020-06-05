@@ -1,20 +1,18 @@
 {
-    "metadata": {
-        "product_id": 0,
-        "version_number": 0,
-        "debuggable": true
-    },
     "resource_limits": {
-        "max_num_of_threads": 32,
+        "user_space_size": "256MB",
         "kernel_space_heap_size": "32MB",
         "kernel_space_stack_size": "1MB",
-        "user_space_size": "256MB"
+        "max_num_of_threads": 32
     },
     "process": {
         "default_stack_size": "4MB",
         "default_heap_size": "32MB",
         "default_mmap_size": "80MB"
     },
+    "entry_points": [
+        "/bin"
+    ],
     "env": {
         "default": [
             "OCCLUM=yes"
@@ -23,9 +21,11 @@
             "EXAMPLE"
         ]
     },
-    "entry_points": [
-        "/bin"
-    ],
+    "metadata": {
+        "product_id": 0,
+        "version_number": 0,
+        "debuggable": true
+    },
     "mount": [
         {
             "target": "/",
