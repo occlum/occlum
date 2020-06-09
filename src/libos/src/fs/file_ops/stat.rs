@@ -135,8 +135,14 @@ impl From<Metadata> for Stat {
 }
 
 fn do_stat(path: &str) -> Result<Stat> {
-    warn!("stat is partial implemented as lstat");
-    do_lstat(path)
+    debug!("stat: path: {}", path);
+    let inode = {
+        let current = current!();
+        let fs = current.fs().lock().unwrap();
+        fs.lookup_inode_follow(&path)?
+    };
+    let stat = Stat::from(inode.metadata()?);
+    Ok(stat)
 }
 
 pub fn do_fstat(fd: u32) -> Result<Stat> {
