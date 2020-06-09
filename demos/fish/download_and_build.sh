@@ -6,7 +6,7 @@ git clone -b v6.1 --depth 1 https://github.com/mirror/ncurses.git
 cd ncurses
 CC=occlum-gcc CXX=occlum-g++ CFLAGS="-O2 -fPIC" CXXFLAGS="-O2 -fPIC" LDFLAGS="-pie"  \
 ./configure --without-shared --without-cxx-shared --prefix=/usr/local/occlum --enable-overwrite
-make && make install
+make -j$(nproc) && make install
 cd ..
 
 # download and build FISH
@@ -22,7 +22,7 @@ cmake ../  -DCMAKE_BUILD_TYPE=Debug -DCURSES_LIBRARY=/opt/occlum/toolchains/gcc/
 -DCMAKE_C_COMPILER_RANLIB=/usr/local/occlum/bin/occlum-ranlib \
 -DCMAKE_LINKER=/usr/local/occlum/bin/occlum-ld -DCMAKE_C_FLAGS="-I/usr/local/occlum/include -fpic -pie" \
 -DCMAKE_CXX_FLAGS="-I/usr/local/occlum/include -fpic -pie"
-make
+make -j$(nproc)
 cd ../../
 
 # download and build busybox
@@ -31,4 +31,4 @@ cd busybox
 CROSS_COMPILE=/opt/occlum/toolchains/gcc/bin/occlum-
 make CROSS_COMPILE="$CROSS_COMPILE" defconfig
 cp ../.config .
-make CROSS_COMPILE="$CROSS_COMPILE"
+make CROSS_COMPILE="$CROSS_COMPILE" -j$(nproc)

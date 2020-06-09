@@ -11,12 +11,15 @@ for most of the utilities you usually find in GNU fileutils, shellutils, etc.
 
 This shell script contains executable binaries, pipe symbols and output redirection like this:
 ```
-busybox echo "Hello-world-from-fish" | busybox awk '$1=$1' FS="-" OFS=" " > /root/output.txt
+command echo "Hello-world-from-fish" | awk '$1=$1' FS="-" OFS=" " > /root/output.txt
+cat /root/output.txt
 ```
 
 which is defined in `fish_script.sh`. `awk` will replace `-` to `space` and should output result
 string `Hello world from fish` and store in `/root/output.txt` of Occlum SEFS and can only be read
-inside Occlum.
+inside Occlum. `echo`, `awk`, `cat` here are actually symbolic files linked to busybox and in this way, we don't need
+to write `busybox` prefix. The `command` keyword tells FISH that `echo` is an external command because FISH also provides
+builtin `echo` command.
 
 ## Step 1:
 Downlaod FISH and busybox and build them with Occlum tool chain:
@@ -25,26 +28,13 @@ Downlaod FISH and busybox and build them with Occlum tool chain:
 ```
 
 ## Step 2:
-Prepare environment by running:
+Run command to prepare context and execute script:
 ```
-./env_setup.sh
+./run_fish_test.sh
 ```
-
-If user wants to run this demo on non-SGX platform, run command:
+Or if this demo is running on non-SGX platform, use:
 ```
-SGX_MODE=SIM ./env_setup.sh
-```
-
-## Step 3:
-Run command to execute script:
-```
-cd occlum-context && occlum run /bin/fish /fish_script.sh
-```
-
-## Step 4:
-Go to `occlum-context` and check result by running:
-```
-occlum run /bin/busybox cat /root/output.txt
+SGX_MODE=SIM ./run_fish_test.sh
 ```
 
 And you should see `Hello world from fish`.
