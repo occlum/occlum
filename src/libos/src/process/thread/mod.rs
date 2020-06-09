@@ -8,6 +8,7 @@ use super::{
 };
 use crate::prelude::*;
 use crate::signal::{SigQueues, SigSet, SigStack};
+use crate::time::ThreadProfiler;
 
 pub use self::builder::ThreadBuilder;
 pub use self::id::ThreadId;
@@ -36,6 +37,8 @@ pub struct Thread {
     sig_mask: SgxRwLock<SigSet>,
     sig_tmp_mask: SgxRwLock<SigSet>,
     sig_stack: SgxMutex<Option<SigStack>>,
+    // System call timing
+    profiler: SgxMutex<Option<ThreadProfiler>>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -97,6 +100,11 @@ impl Thread {
         &self.sig_stack
     }
 
+    /// Get the alternate thread performance profiler
+    pub fn profiler(&self) -> &SgxMutex<Option<ThreadProfiler>> {
+        &self.profiler
+    }
+
     /// Get a file from the file table.
     pub fn file(&self, fd: FileDesc) -> Result<FileRef> {
         self.files().lock().unwrap().get(fd)
@@ -126,9 +134,27 @@ impl Thread {
     pub(super) fn start(&self, host_tid: pid_t) {
         self.sched().lock().unwrap().attach(host_tid);
         self.inner().start();
+
+        #[cfg(feature = "syscall_timing")]
+        self.profiler()
+            .lock()
+            .unwrap()
+            .as_mut()
+            .unwrap()
+            .start()
+            .unwrap();
     }
 
     pub(super) fn exit(&self, term_status: TermStatus) -> usize {
+        #[cfg(feature = "syscall_timing")]
+        self.profiler()
+            .lock()
+            .unwrap()
+            .as_mut()
+            .unwrap()
+            .stop()
+            .unwrap();
+
         self.sched().lock().unwrap().detach();
 
         // Remove this thread from its owner process
@@ -171,6 +197,7 @@ impl fmt::Debug for Thread {
             .field("vm", self.vm())
             .field("fs", self.fs())
             .field("files", self.files())
+            .field("profiler", self.profiler())
             .finish()
     }
 }

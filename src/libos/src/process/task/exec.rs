@@ -39,24 +39,10 @@ pub fn exec(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
     // Enable current::get() from now on
     current::set(this_thread.clone());
 
-    #[cfg(feature = "syscall_timing")]
-    GLOBAL_PROFILER
-        .lock()
-        .unwrap()
-        .thread_enter()
-        .expect("unexpected error from profiler to enter thread");
-
     unsafe {
         // task may only be modified by this function; so no lock is needed
         do_exec_task(this_thread.task() as *const Task as *mut Task);
     }
-
-    #[cfg(feature = "syscall_timing")]
-    GLOBAL_PROFILER
-        .lock()
-        .unwrap()
-        .thread_exit()
-        .expect("unexpected error from profiler to exit thread");
 
     let term_status = this_thread.inner().term_status().unwrap();
     match term_status {

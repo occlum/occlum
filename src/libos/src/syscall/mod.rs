@@ -12,7 +12,7 @@ use std::convert::TryFrom;
 use std::ffi::{CStr, CString};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::ptr;
-use time::{clockid_t, timespec_t, timeval_t, GLOBAL_PROFILER};
+use time::{clockid_t, timespec_t, timeval_t};
 use util::log::{self, LevelFilter};
 use util::mem_util::from_user::*;
 
@@ -609,40 +609,48 @@ fn do_syscall(user_context: &mut CpuContext) {
     let arg4 = user_context.r8 as isize;
     let arg5 = user_context.r9 as isize;
 
-    // TODO: the profiler will trigger panic for syscall simulation
-    #[cfg(feature = "syscall_timing")]
-    GLOBAL_PROFILER
-        .lock()
-        .unwrap()
-        .syscall_enter(syscall_num)
-        .expect("unexpected error from profiler to enter syscall");
-
     let ret = Syscall::new(num, arg0, arg1, arg2, arg3, arg4, arg5).and_then(|mut syscall| {
         log::set_round_desc(Some(syscall.num.as_str()));
         trace!("{:?}", &syscall);
+        let syscall_num = syscall.num;
 
         // Pass user_context as an extra argument to two special syscalls that
         // need to modify it
-        if syscall.num == SyscallNum::RtSigreturn {
+        if syscall_num == SyscallNum::RtSigreturn {
             syscall.args[0] = user_context as *mut _ as isize;
-        } else if syscall.num == SyscallNum::HandleException {
+        } else if syscall_num == SyscallNum::HandleException {
             // syscall.args[0] == info
             syscall.args[1] = user_context as *mut _ as isize;
-        } else if syscall.num == SyscallNum::Sigaltstack {
+        } else if syscall_num == SyscallNum::Sigaltstack {
             // syscall.args[0] == new_ss
             // syscall.args[1] == old_ss
             syscall.args[2] = user_context as *const _ as isize;
         }
 
-        dispatch_syscall(syscall)
-    });
+        #[cfg(feature = "syscall_timing")]
+        current!()
+            .profiler()
+            .lock()
+            .unwrap()
+            .as_mut()
+            .unwrap()
+            .syscall_enter(syscall_num)
+            .expect("unexpected error from profiler to enter syscall");
 
-    #[cfg(feature = "syscall_timing")]
-    GLOBAL_PROFILER
-        .lock()
-        .unwrap()
-        .syscall_exit(syscall_num, ret.is_err())
-        .expect("unexpected error from profiler to exit syscall");
+        let ret = dispatch_syscall(syscall);
+
+        #[cfg(feature = "syscall_timing")]
+        current!()
+            .profiler()
+            .lock()
+            .unwrap()
+            .as_mut()
+            .unwrap()
+            .syscall_exit(syscall_num, ret.is_err())
+            .expect("unexpected error from profiler to exit syscall");
+
+        ret
+    });
 
     let retval = match ret {
         Ok(retval) => retval as isize,

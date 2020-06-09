@@ -5,6 +5,7 @@ use super::{
     SigQueues, SigSet, Task, Thread, ThreadId, ThreadInner, ThreadRef,
 };
 use crate::prelude::*;
+use crate::time::ThreadProfiler;
 
 #[derive(Debug)]
 pub struct ThreadBuilder {
@@ -102,6 +103,11 @@ impl ThreadBuilder {
         let sig_mask = SgxRwLock::new(SigSet::new_empty());
         let sig_tmp_mask = SgxRwLock::new(SigSet::new_empty());
         let sig_stack = SgxMutex::new(None);
+        let profiler = if cfg!(feature = "syscall_timing") {
+            SgxMutex::new(Some(ThreadProfiler::new()))
+        } else {
+            SgxMutex::new(None)
+        };
 
         let new_thread = Arc::new(Thread {
             task,
@@ -118,6 +124,7 @@ impl ThreadBuilder {
             sig_mask,
             sig_tmp_mask,
             sig_stack,
+            profiler,
         });
 
         let mut inner = new_thread.process().inner();

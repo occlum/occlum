@@ -1,66 +1,8 @@
 use super::*;
+use std::fmt::Write;
 
-lazy_static! {
-    pub static ref GLOBAL_PROFILER: SgxMutex<GlobalProfiler> = SgxMutex::new(GlobalProfiler::new());
-}
-
-/// A profiler that can be used across threads.
-// TODO: Use light-weight thread_local storage other than mutex
-pub struct GlobalProfiler {
-    inner: HashMap<pid_t, ThreadProfiler>,
-}
-
-impl GlobalProfiler {
-    pub fn new() -> Self {
-        Self {
-            inner: HashMap::new(),
-        }
-    }
-
-    pub fn thread_enter(&mut self) -> Result<()> {
-        let tid = current!().tid();
-        if self.inner.insert(tid, ThreadProfiler::new()).is_some() {
-            return_errno!(
-                EINVAL,
-                "global profiler should exit the thread before entering"
-            );
-        }
-        self.inner.get_mut(&tid).unwrap().start()
-    }
-
-    pub fn thread_exit(&mut self) -> Result<()> {
-        // A thread exits by invoking exit syscall which
-        // will never return
-        self.syscall_exit(SyscallNum::Exit, false);
-
-        let tid = current!().tid();
-
-        let mut exiting_profiler = self.inner.remove(&tid).ok_or_else(|| {
-            errno!(
-                EINVAL,
-                "global profiler should enter a thread before exit one"
-            )
-        })?;
-        exiting_profiler.stop()?;
-        exiting_profiler.display()?;
-        Ok(())
-    }
-
-    pub fn syscall_enter(&mut self, syscall_num: SyscallNum) -> Result<()> {
-        let tid = current!().tid();
-        let mut prof = self.inner.get_mut(&tid).unwrap();
-        prof.syscall_enter(syscall_num)
-    }
-
-    pub fn syscall_exit(&mut self, syscall_num: SyscallNum, is_err: bool) -> Result<()> {
-        let tid = current!().tid();
-        let mut prof = self.inner.get_mut(&tid).unwrap();
-        prof.syscall_exit(syscall_num, is_err)
-    }
-}
 /// A profiler used inside a thread.
-// TODO: add support for exception
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ThreadProfiler {
     syscall_data: HashMap<SyscallNum, PerfEntry>,
     start_time: ProfileTime,
@@ -83,7 +25,7 @@ impl ThreadProfiler {
         }
     }
 
-    fn start(&mut self) -> Result<()> {
+    pub fn start(&mut self) -> Result<()> {
         match self.status {
             Status::Stopped(..) => {
                 self.status = Status::Running;
@@ -96,21 +38,26 @@ impl ThreadProfiler {
         }
     }
 
-    fn stop(&mut self) -> Result<()> {
-        if self.status != Status::Running {
-            return_errno!(EINVAL, "fail to stop thread profiler");
-        }
-        let real = time::do_gettimeofday().as_duration() - self.start_time.get_realtime().unwrap();
-
+    pub fn stop(&mut self) -> Result<()> {
         let total_cputime =
             time::do_thread_getcpuclock()?.as_duration() - self.start_time.get_cputime().unwrap();
+
+        let real = time::do_gettimeofday().as_duration() - self.start_time.get_realtime().unwrap();
         let sys = self.get_syscall_total_time()?;
         let usr = total_cputime - sys;
+
         self.status = Status::Stopped(TimeSummary::new(real, usr, sys));
+
+        self.display()?;
+
         Ok(())
     }
 
-    fn syscall_enter(&mut self, syscall_num: SyscallNum) -> Result<()> {
+    pub fn syscall_enter(&mut self, syscall_num: SyscallNum) -> Result<()> {
+        if Self::is_not_traced(syscall_num) {
+            return Ok(());
+        }
+
         match self.status {
             Status::Running => {
                 let mut cur_time = ProfileTime::CpuTime(Default::default());
@@ -124,17 +71,28 @@ impl ThreadProfiler {
                     .or_insert(PerfEntry::new());
                 Ok(())
             }
-            _ => return_errno!(
-                EINVAL,
-                "threa profiler should be started before entering syscall"
-            ),
+            _ => {
+                eprintln!(
+                    "The wrong status is {:?} the input syscall is {:?}",
+                    self.status, syscall_num
+                );
+                return_errno!(
+                    EINVAL,
+                    "thread profiler should be started before entering syscall"
+                )
+            }
         }
     }
 
-    fn syscall_exit(&mut self, syscall_num: SyscallNum, is_err: bool) -> Result<()> {
+    pub fn syscall_exit(&mut self, syscall_num: SyscallNum, is_err: bool) -> Result<()> {
+        if Self::is_not_traced(syscall_num) {
+            return Ok(());
+        }
+
         match self.status {
             Status::InSyscall { start_cpu, num } => {
                 if syscall_num != num {
+                    eprintln!("current {:?} exit: {:?}", num, syscall_num);
                     return_errno!(EINVAL, "syscall number mismatches");
                 }
                 self.status = Status::Running;
@@ -151,6 +109,19 @@ impl ThreadProfiler {
                 EINVAL,
                 "thread profiler should be in one syscall before exiting the syscall"
             ),
+        }
+    }
+
+    // Do not trace special system calls
+    // HandleException: one exception can be invoked by another exception,
+    //      resulting in nested calling
+    // Exit and ExitGroup: stop would be called inside these two system calls,
+    //      where only entering is traced
+    // TODO: add support for the above system calls
+    fn is_not_traced(syscall_num: SyscallNum) -> bool {
+        match syscall_num {
+            SyscallNum::HandleException | SyscallNum::Exit | SyscallNum::ExitGroup => true,
+            _ => false,
         }
     }
 
@@ -176,10 +147,13 @@ impl ThreadProfiler {
     fn display(&self) -> Result<()> {
         match self.status {
             Status::Stopped(report) => {
-                // Pretty-print the Debug formatting report of the profiled thread
-                println!("{:#?}", report);
-                // Print the syscall statistics of the profiled thread
-                self.display_syscall_stat()
+                let mut s = String::new();
+                write!(&mut s, "Thread {}: \n", current!().tid());
+                write!(&mut s, "{:#?}\n", report);
+                // Print all the statitics in one function to prevent
+                // overlap of information from different threads
+                eprintln!("{}", s + &self.format_syscall_statistics()?);
+                Ok(())
             }
             _ => return_errno!(EINVAL, "thread profiler can report only in stopped status"),
         }
@@ -197,13 +171,17 @@ impl ThreadProfiler {
     /// SysWritev             0.40    0.000131          26         5         0 [12, 47]
     /// SysMprotect           0.03    0.000009           4         2         0 [4, 4]
     /// ------------------- ------ ----------- ----------- --------- --------- -----------
-    fn display_syscall_stat(&self) -> Result<()> {
-        println!(
-            "{:<19} {:>6} {:>11} {:>11} {:>9} {:>9} {}",
+    fn format_syscall_statistics(&self) -> Result<String> {
+        let mut s = String::new();
+
+        write!(
+            &mut s,
+            "{:<19} {:>6} {:>11} {:>11} {:>9} {:>9} {}\n",
             "syscall", "% time", "seconds", "us/call", "calls", "errors", "range(us)",
         );
-        println!(
-            "{:-<19} {:-<6} {:-<11} {:-<11} {:-<9} {:-<9} {:-<11}",
+        write!(
+            s,
+            "{:-<19} {:-<6} {:-<11} {:-<11} {:-<9} {:-<9} {:-<11}\n",
             "", "", "", "", "", "", ""
         );
 
@@ -217,28 +195,31 @@ impl ThreadProfiler {
         for (syscall_num, entry) in syscall_data_ref {
             let time_percentage =
                 entry.get_total_time().as_secs_f64() / total_time.as_secs_f64() * 100_f64;
-            println!(
-                "{:<19} {:>6.2} {:?}",
+            write!(
+                &mut s,
+                "{:<19} {:>6.2} {:?}\n",
                 format!("{:?}", syscall_num),
                 time_percentage,
                 entry,
             );
         }
 
-        println!(
-            "{:-<19} {:-<6} {:-<11} {:-<11} {:-<9} {:-<9} {:-<11}",
+        write!(
+            &mut s,
+            "{:-<19} {:-<6} {:-<11} {:-<11} {:-<9} {:-<9} {:-<11}\n",
             "", "", "", "", "", "", ""
         );
 
-        println!(
-            "{} {:>20} {:>11.6} {:>21} {:>9}",
+        write!(
+            &mut s,
+            "{} {:>20} {:>11.6} {:>21} {:>9}\n",
             "total",
             "100",
             total_time.as_secs_f64(),
             total_calls,
             total_errors,
         );
-        Ok(())
+        Ok(s)
     }
 }
 
