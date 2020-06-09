@@ -52,10 +52,8 @@ endif
 RUST_SGX_SDK_DIR := $(PROJECT_DIR)/deps/rust-sgx-sdk
 
 ifneq ($(SGX_MODE), HW)
-	Urts_Library_Name := sgx_urts_sim
 	SGX_COMMON_CFLAGS += -D SGX_MODE_SIM
 else
-	Urts_Library_Name := sgx_urts
 	SGX_COMMON_CFLAGS += -D SGX_MODE_HW
 endif
 
@@ -77,11 +75,10 @@ SGX_CFLAGS_U := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes \
 	-I$(RUST_SGX_SDK_DIR)/edl -I$(SGX_SDK)/include
 SGX_CXXFLAGS_U := $(SGX_CFLAGS_U) -std=c++11
 
-SGX_LFLAGS_U := $(SGX_COMMON_CFLAGS) -lpthread -L$(SGX_LIBRARY_PATH) -l$(Urts_Library_Name)
 ifneq ($(SGX_MODE), HW)
-	SGX_LFLAGS_U += -lsgx_uae_service_sim
+	SGX_LFLAGS_U := $(SGX_COMMON_CFLAGS) -lpthread -L$(SGX_LIBRARY_PATH) -lsgx_urts_sim -lsgx_uae_service_sim
 else
-	SGX_LFLAGS_U += -lsgx_uae_service
+	SGX_LFLAGS_U := $(SGX_COMMON_CFLAGS) -lpthread -L$(SGX_LIBRARY_PATH) -Wl,-Bstatic -lsgx_urts -Wl,-Bdynamic -lsgx_uae_service -lsgx_enclave_common
 endif
 
 #
