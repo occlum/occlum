@@ -29,8 +29,8 @@ Build the code in debug mode with "--debug", otherwise it's in Relese mode by de
 
 **Step 2.** Run this demo on Occlum
 
-Build the occlum image and run the RA test application.
+Build the occlum image and run the RA test application. Log level is "off" by default.
 ```
-./run_on_occlum.sh
+./run_on_occlum.sh [off|trace]
 ```
 

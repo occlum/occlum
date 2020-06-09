@@ -1,5 +1,5 @@
-#ifndef REMOTE_ATTESTATION_LIB_INCLUDE_SOFAENCLAVE_COMMON_TYPE_H_
-#define REMOTE_ATTESTATION_LIB_INCLUDE_SOFAENCLAVE_COMMON_TYPE_H_
+#ifndef REMOTE_ATTESTATION_LIB_INCLUDE_TEE_COMMON_TYPE_H_
+#define REMOTE_ATTESTATION_LIB_INCLUDE_TEE_COMMON_TYPE_H_
 
 #include <string>
 
@@ -10,10 +10,12 @@
 #define RCAST(t, v) reinterpret_cast<t>((v))
 #define SCAST(t, v) static_cast<t>((v))
 #define CCAST(t, v) const_cast<t>((v))
+#define RCCAST(t, v) reinterpret_cast<t>(const_cast<char*>((v)))
 
-#define SOFAE_UNREFERENCED_PARAMETER(p) static_cast<void>((p))
-
-typedef uint8_t SofaeEnclaveQuote[4096];
+#define TEE_UNREFERENCED_PARAMETER(p) \
+  do {                                \
+    static_cast<void>((p));           \
+  } while (0)
 
 /**
  * report_data    Input report data which will be included in quote data.
@@ -40,20 +42,20 @@ typedef struct {
     uint8_t* as_buf;
     sgx_quote_t* as_quote;
   } quote;  // output
-} SofaeQuoteArgs;
+} EnclaveQuoteArgs;
 
 /**
- * endpoint       http://xxx.xxx.xxx.xxx:<port> for HTTP IAS proxy server
- *                or https://xxx.xxx.xxx.xxx:<port> for IAS server. Key and
- *                certificate must be provoided for HTTPS IAS server.
- * cert           Service provider certificate file path
- * key            Service provider private key file path
+ * endpoint       https://xxx.xxx.xxx.xxx:<port> for Intel Attestation Service.
+ * cert           Service provider certificate file path.
+ * key            Service provider private key file path.
+ * accesskey      Service provider access key, see also here:
+ *                https://api.portal.trustedservices.intel.com/EPID-attestation
  */
 typedef struct {
   std::string endpoint;
   std::string cert;
   std::string key;
   std::string accesskey;
-} SofaeServerCfg;
+} RaIasServerCfg;
 
-#endif  // REMOTE_ATTESTATION_LIB_INCLUDE_SOFAENCLAVE_COMMON_TYPE_H_
+#endif  // REMOTE_ATTESTATION_LIB_INCLUDE_TEE_COMMON_TYPE_H_

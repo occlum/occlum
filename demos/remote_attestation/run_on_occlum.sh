@@ -22,4 +22,5 @@ cp /usr/local/occlum/x86_64-linux-musl/lib/libcurl.so.4 image/lib
 occlum build
 
 # 3. Run application
-occlum run /bin/$DEMPOAPP
+LOG_LEVEL=${1:-off}
+OCCLUM_LOG_LEVEL=$LEVEL occlum run /bin/$DEMPOAPP

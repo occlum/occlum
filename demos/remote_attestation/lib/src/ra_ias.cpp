@@ -2,17 +2,18 @@
 #include <string>
 #include <vector>
 
-#include "sofaenclave/common/error.h"
-#include "sofaenclave/common/log.h"
-#include "sofaenclave/common/type.h"
-#include "sofaenclave/ra_json.h"
-#include "sofaenclave/ra_ias.h"
+#include "tee/common/error.h"
+#include "tee/common/log.h"
+#include "tee/common/type.h"
+
+#include "tee/ra_ias.h"
+#include "tee/ra_json.h"
 
 // use cppcodec/base64
 #include "cppcodec/base64_rfc4648.hpp"
 using base64 = cppcodec::base64_rfc4648;
 
-namespace sofaenclave {
+namespace ra {
 namespace occlum {
 
 constexpr char kStrEpidPseudonym[] = "epidPseudonym";
@@ -26,11 +27,7 @@ constexpr char kStrHeaderCaAk[] = "X-IASReport-Signing-Certificate:";
 constexpr char kStrHeaderAdvisoryUrl[] = "advisory-url:";
 constexpr char kStrHeaderAdvisoryIDs[] = "advisory-ids:";
 
-typedef struct {
-  std::string b64_sigrl;
-} SofaeIasSigrl;
-
-static std::string GetHeaderValue(const char *header, const char *name) {
+static std::string GetHeaderValue(const char* header, const char* name) {
   std::string header_str = header;
   std::string ending("\n\r");
 
@@ -47,14 +44,14 @@ static std::string GetHeaderValue(const char *header, const char *name) {
 static size_t ParseSigrlResponseBody(const void* contents, size_t size,
                                      size_t nmemb, void* response) {
   size_t content_length = size * nmemb;
-  SofaeIasSigrl *sigrl = RCAST(SofaeIasSigrl *, response);
+  RaIasSigrl* sigrl = RCAST(RaIasSigrl*, response);
 
   if (content_length == 0) {
     sigrl->b64_sigrl.clear();
-    SOFAE_LOG_DEBUG("GetSigRL: Empty");
+    TEE_LOG_DEBUG("GetSigRL: Empty");
   } else {
-    sigrl->b64_sigrl.assign(RCAST(const char *, contents), content_length);
-    SOFAE_LOG_DEBUG("GetSigRL: %s", sigrl->b64_sigrl.c_str());
+    sigrl->b64_sigrl.assign(RCAST(const char*, contents), content_length);
+    TEE_LOG_DEBUG("GetSigRL: %s", sigrl->b64_sigrl.c_str());
   }
   return content_length;
 }
@@ -62,28 +59,29 @@ static size_t ParseSigrlResponseBody(const void* contents, size_t size,
 static size_t ParseSigrlResponseHeader(const void* contents, size_t size,
                                        size_t nmemb, void* response) {
   size_t len = size * nmemb;
-  const char *header = RCAST(const char *, contents);
+  const char* header = RCAST(const char*, contents);
 
-  SOFAE_LOG_DEBUG("IAS Get SigRL %s", header);
+  TEE_LOG_DEBUG("IAS Get SigRL %s", header);
   return len;
 }
 
 static size_t ParseReportResponseBody(const void* contents, size_t size,
                                       size_t nmemb, void* response) {
-  const char *body = RCAST(const char *, contents);
+  const char* body = RCAST(const char*, contents);
   size_t content_length = size * nmemb;
-  IasReport *report = RCAST(IasReport *, response);
+  RaIasReport* report = RCAST(RaIasReport*, response);
 
-  report->set_response_body(body, content_length);
+  // The json response body maybe will be splited into two times
+  report->mutable_response_body()->append(body, content_length);
 
   rapidjson::Document doc;
-  if (doc.Parse(body).HasParseError()) {
-    SOFAE_LOG_ERROR("Fail to parse report response body");
-  } else {
+  if (!doc.Parse(report->response_body().data()).HasParseError()) {
     report->set_epid_pseudonym(JsonConfig::GetStr(doc, kStrEpidPseudonym));
     report->set_quote_status(JsonConfig::GetStr(doc, kStrQuoteStatus));
     report->set_b16_platform_info_blob(JsonConfig::GetStr(doc, kStrPlatform));
     report->set_b64_quote_body(JsonConfig::GetStr(doc, kStrQuoteBody));
+  } else if (body[content_length - 1] == '}') {
+    TEE_LOG_ERROR("Fail to parse report response body");
   }
 
   return content_length;
@@ -92,8 +90,8 @@ static size_t ParseReportResponseBody(const void* contents, size_t size,
 static size_t ParseReportResponseHeader(const void* contents, size_t size,
                                         size_t nmemb, void* response) {
   size_t len = size * nmemb;
-  const char *header = RCAST(const char *, contents);
-  IasReport *report = RCAST(IasReport *, response);
+  const char* header = RCAST(const char*, contents);
+  RaIasReport* report = RCAST(RaIasReport*, response);
 
   if (strncmp(header, kStrHeaderSig, strlen(kStrHeaderSig)) == 0) {
     report->set_b64_signature(GetHeaderValue(header, kStrHeaderSig));
@@ -156,11 +154,7 @@ void RaIasClient::InitIasConnection(const std::string& endpoint) {
   server_endpoint_ = endpoint;
 }
 
-RaIasClient::RaIasClient(const std::string& endpoint) {
-  InitIasConnection(endpoint);
-}
-
-RaIasClient::RaIasClient(const SofaeServerCfg& ias_server) {
+RaIasClient::RaIasClient(const RaIasServerCfg& ias_server) {
   // Configure the other normal settings firstly.
   InitIasConnection(ias_server.endpoint);
 
@@ -172,11 +166,11 @@ RaIasClient::RaIasClient(const SofaeServerCfg& ias_server) {
     headers_ = curl_slist_append(headers_, header_access_key.c_str());
   }
 
-  if (curl_ && (ias_server.endpoint.find("https://") != std::string::npos) && \
+  if (curl_ && (ias_server.endpoint.find("https://") != std::string::npos) &&
       (ias_server.accesskey.empty())) {
-    const char *ias_cert_key_type = "PEM";
-    SOFAE_LOG_DEBUG("IAS cert: %s", ias_server.cert.c_str());
-    SOFAE_LOG_DEBUG("IAS key: %s", ias_server.key.c_str());
+    const char* ias_cert_key_type = "PEM";
+    TEE_LOG_DEBUG("IAS cert: %s", ias_server.cert.c_str());
+    TEE_LOG_DEBUG("IAS key: %s", ias_server.key.c_str());
 
     curl_easy_setopt(curl_, CURLOPT_SSLCERT, ias_server.cert.c_str());
     curl_easy_setopt(curl_, CURLOPT_SSLKEY, ias_server.key.c_str());
@@ -200,11 +194,11 @@ RaIasClient::~RaIasClient() {
   }
 }
 
-SofaeErrorCode RaIasClient::GetSigRL(const sgx_epid_group_id_t& gid,
-                                     std::string *sigrl) {
+TeeErrorCode RaIasClient::GetSigRL(const sgx_epid_group_id_t& gid,
+                                   std::string* sigrl) {
   if (!curl_) {
-    SOFAE_LOG_ERROR("IAS client is not initialized");
-    return SOFAE_ERROR_IAS_CLIENT_INIT;
+    TEE_LOG_ERROR("IAS client is not initialized");
+    return TEE_ERROR_IAS_CLIENT_INIT;
   }
 
   /* Set the URL */
@@ -213,20 +207,20 @@ SofaeErrorCode RaIasClient::GetSigRL(const sgx_epid_group_id_t& gid,
   snprintf(tmp_gid_vec.data(), tmp_gid_vec.size(), "%02X%02X%02X%02X", gid[3],
            gid[2], gid[1], gid[0]);
   url += std::string(tmp_gid_vec.data());
-  SOFAE_LOG_DEBUG("URL: %s", url.c_str());
+  TEE_LOG_DEBUG("URL: %s", url.c_str());
   curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
 
   /* Set the sigrl request header and body handler function and data */
-  SofaeIasSigrl ias_sigrl;
+  RaIasSigrl ias_sigrl;
   curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, ParseSigrlResponseBody);
   curl_easy_setopt(curl_, CURLOPT_HEADERFUNCTION, ParseSigrlResponseHeader);
-  curl_easy_setopt(curl_, CURLOPT_WRITEDATA, RCAST(void *, &ias_sigrl));
-  curl_easy_setopt(curl_, CURLOPT_WRITEHEADER, RCAST(void *, &ias_sigrl));
+  curl_easy_setopt(curl_, CURLOPT_WRITEDATA, RCAST(void*, &ias_sigrl));
+  curl_easy_setopt(curl_, CURLOPT_WRITEHEADER, RCAST(void*, &ias_sigrl));
 
   CURLcode rc = curl_easy_perform(curl_);
   if (rc != CURLE_OK) {
-    SOFAE_LOG_ERROR("Fail to connect server: %s\n", curl_easy_strerror(rc));
-    return SOFAE_ERROR_IAS_CLIENT_CONNECT;
+    TEE_LOG_ERROR("Fail to connect server: %s\n", curl_easy_strerror(rc));
+    return TEE_ERROR_IAS_CLIENT_CONNECT;
   }
 
   if (!ias_sigrl.b64_sigrl.empty()) {
@@ -234,37 +228,37 @@ SofaeErrorCode RaIasClient::GetSigRL(const sgx_epid_group_id_t& gid,
     try {
       sigrl_vec = base64::decode(ias_sigrl.b64_sigrl);
     } catch (std::exception& e) {
-      SOFAE_LOG_ERROR("Cannot decode base64 sigrl: %s", e.what());
-      return SOFAE_ERROR_IAS_CLIENT_GETSIGRL;
+      TEE_LOG_ERROR("Cannot decode base64 sigrl: %s", e.what());
+      return TEE_ERROR_IAS_CLIENT_GETSIGRL;
     }
-    sigrl->assign(RCAST(const char *, sigrl_vec.data()), sigrl_vec.size());
+    sigrl->assign(RCAST(const char*, sigrl_vec.data()), sigrl_vec.size());
   }
-  return SOFAE_SUCCESS;
+  return TEE_SUCCESS;
 }
 
-SofaeErrorCode RaIasClient::FetchReport(const std::string& quote,
-                                        IasReport *ias_report) {
+TeeErrorCode RaIasClient::FetchReport(const std::string& quote,
+                                      RaIasReport* ias_report) {
   /* should not be empty is not to use cache */
   if (quote.empty()) {
-    SOFAE_LOG_ERROR("Invalid base64 quote value");
-    return SOFAE_ERROR_PARAMETERS;
+    TEE_LOG_ERROR("Invalid base64 quote value");
+    return TEE_ERROR_PARAMETERS;
   }
 
   if (!curl_) {
-    SOFAE_LOG_ERROR("IAS client is not initialized!");
-    return SOFAE_ERROR_IAS_CLIENT_INIT;
+    TEE_LOG_ERROR("IAS client is not initialized!");
+    return TEE_ERROR_IAS_CLIENT_INIT;
   }
 
   /* Set the report url */
   std::string url = server_endpoint_ + "/report";
-  SOFAE_LOG_DEBUG("URL: %s", url.c_str());
+  TEE_LOG_DEBUG("URL: %s", url.c_str());
   curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
 
   /* Set the post data */
-  SOFAE_LOG_DEBUG("Quote length: %ld", quote.length());
-  std::string b64_quote = base64::encode(RCAST(const char *, quote.c_str()),
+  TEE_LOG_DEBUG("Quote length: %ld", quote.length());
+  std::string b64_quote = base64::encode(RCAST(const char*, quote.c_str()),
                                          SCAST(size_t, quote.length()));
-  SOFAE_LOG_DEBUG("QUTEO[%lu]: %s", b64_quote.length(), b64_quote.c_str());
+  TEE_LOG_DEBUG("QUTEO[%lu]: %s", b64_quote.length(), b64_quote.c_str());
   std::string post_data = "{\"isvEnclaveQuote\": \"";
   post_data += b64_quote;
   post_data += "\"}";
@@ -273,35 +267,35 @@ SofaeErrorCode RaIasClient::FetchReport(const std::string& quote,
   /* Set the report request header and body handler function and data */
   curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, ParseReportResponseBody);
   curl_easy_setopt(curl_, CURLOPT_HEADERFUNCTION, ParseReportResponseHeader);
-  curl_easy_setopt(curl_, CURLOPT_WRITEDATA, RCAST(void *, ias_report));
-  curl_easy_setopt(curl_, CURLOPT_WRITEHEADER, RCAST(void *, ias_report));
+  curl_easy_setopt(curl_, CURLOPT_WRITEDATA, RCAST(void*, ias_report));
+  curl_easy_setopt(curl_, CURLOPT_WRITEHEADER, RCAST(void*, ias_report));
 
   CURLcode rc = curl_easy_perform(curl_);
   if (rc != CURLE_OK) {
-    SOFAE_LOG_ERROR("Fail to connect server: %s\n", curl_easy_strerror(rc));
-    return SOFAE_ERROR_IAS_CLIENT_CONNECT;
+    TEE_LOG_ERROR("Fail to connect server: %s\n", curl_easy_strerror(rc));
+    return TEE_ERROR_IAS_CLIENT_CONNECT;
   }
 
   /* deal with the escaped certificates */
   std::string signing_cert = ias_report->signing_cert();
   if (!signing_cert.empty()) {
     int unescape_len = 0;
-    char *p_unescape = curl_easy_unescape(curl_, signing_cert.data(),
+    char* p_unescape = curl_easy_unescape(curl_, signing_cert.data(),
                                           signing_cert.length(), &unescape_len);
     if (p_unescape && unescape_len) {
       ias_report->set_signing_cert(p_unescape, unescape_len);
       curl_free(p_unescape);
     } else {
-      SOFAE_LOG_ERROR("Fail to convert the escaped certificate in response.");
-      return SOFAE_ERROR_IAS_CLIENT_UNESCAPE;
+      TEE_LOG_ERROR("Fail to convert the escaped certificate in response.");
+      return TEE_ERROR_IAS_CLIENT_UNESCAPE;
     }
   } else {
-    SOFAE_LOG_ERROR("Fail to get quote report from IAS");
-    return SOFAE_ERROR_IAS_CLIENT_GETREPORT;
+    TEE_LOG_ERROR("Fail to get quote report from IAS");
+    return TEE_ERROR_IAS_CLIENT_GETREPORT;
   }
 
-  return SOFAE_SUCCESS;
+  return TEE_SUCCESS;
 }
 
 }  // namespace occlum
-}  // namespace sofaenclave
+}  // namespace ra

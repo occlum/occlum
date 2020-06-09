@@ -3,14 +3,9 @@
 
 #include <string>
 
-#include "sofaenclave/common/error.h"
-#include "sofaenclave/common/log.h"
-#include "sofaenclave/ra_conf.h"
-
-constexpr char kConfValueEnable[] = "enable";
-constexpr char kConfValueDisable[] = "disable";
-constexpr char kConfValueTrue[] = "true";
-constexpr char kConfValueFalse[] = "false";
+#include "tee/common/error.h"
+#include "tee/common/log.h"
+#include "tee/ra_conf_api.h"
 
 constexpr char kRaConf[] = "ra_config.json";
 
@@ -20,8 +15,7 @@ constexpr char kConfIasKey[] = "ias_sp_key_file";
 constexpr char kConfIasAccessKey[] = "ias_access_key";
 constexpr char kConfSPID[] = "enclave_spid";
 
-#define RA_CONF_STR(name) SofaeConfGetStr(kRaConf, name)
-#define RA_CONF_INT(name, value) SofaeConfGetInt(kRaConf, name, value)
-#define RA_CONF_ARRARY(name, value) SofaeConfGetStrArray(kRaConf, name, value)
+#define RA_CONF_STR(name) TeeConfGetStr(kRaConf, name)
+#define RA_CONF_FILE(name) TeeConfGetStr(kRaConf, name)
 
 #endif  // REMOTE_ATTESTATION_RA_CONFIG_H_
