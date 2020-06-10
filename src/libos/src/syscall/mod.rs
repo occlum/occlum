@@ -740,8 +740,8 @@ fn do_mremap(
     flags: i32,
     new_addr: usize,
 ) -> Result<isize> {
-    let flags = MRemapFlags::from_u32(flags as u32)?;
-    let addr = vm::do_mremap(old_addr, old_size, new_size, flags, new_addr)?;
+    let flags = MRemapFlags::from_raw(flags as u32, new_addr)?;
+    let addr = vm::do_mremap(old_addr, old_size, new_size, flags)?;
     Ok(addr as isize)
 }
 

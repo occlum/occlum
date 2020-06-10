@@ -52,15 +52,14 @@ pub fn do_mremap(
     old_size: usize,
     new_size: usize,
     flags: MRemapFlags,
-    new_addr: usize,
 ) -> Result<usize> {
     debug!(
-        "mremap: old_addr: {:#x}, old_size: {:#x}, new_size: {:#x}, flags: {:?}, new_addr: {:#x}",
-        old_addr, old_size, new_size, flags, new_addr
+        "mremap: old_addr: {:#x}, old_size: {:#x}, new_size: {:#x}, flags: {:?}",
+        old_addr, old_size, new_size, flags
     );
     let current = current!();
     let mut current_vm = current.vm().lock().unwrap();
-    current_vm.mremap(old_addr, old_size, new_size, flags, new_addr)
+    current_vm.mremap(old_addr, old_size, new_size, flags)
 }
 
 pub fn do_brk(addr: usize) -> Result<usize> {

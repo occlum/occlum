@@ -290,7 +290,7 @@ impl ProcessVM {
                 if !self.process_range.range().contains(addr) {
                     return_errno!(EINVAL, "Beyond valid memory range");
                 }
-                VMMapAddr::Fixed(addr)
+                VMMapAddr::Force(addr)
             } else {
                 if addr == 0 {
                     VMMapAddr::Any
@@ -325,18 +325,14 @@ impl ProcessVM {
         old_size: usize,
         new_size: usize,
         flags: MRemapFlags,
-        new_addr: usize,
     ) -> Result<usize> {
-        let new_addr_option = if flags.contains(MRemapFlags::MREMAP_FIXED) {
+        if let Some(new_addr) = flags.new_addr() {
             if !self.process_range.range().contains(new_addr) {
                 return_errno!(EINVAL, "new_addr is beyond valid memory range");
             }
-            Some(new_addr)
-        } else {
-            None
-        };
-        let mremap_option =
-            VMRemapOptions::new(old_addr, old_size, new_addr_option, new_size, flags)?;
+        }
+
+        let mremap_option = VMRemapOptions::new(old_addr, old_size, new_size, flags)?;
         self.mmap_manager.mremap(&mremap_option)
     }
 
@@ -379,22 +375,40 @@ impl MMapFlags {
     }
 }
 
-bitflags! {
-    pub struct MRemapFlags : u32 {
-        const MREMAP_MAYMOVE      = 1;
-        const MREMAP_FIXED        = 2;
-    }
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum MRemapFlags {
+    None,
+    MayMove,
+    FixedAddr(usize),
 }
 
 impl MRemapFlags {
-    pub fn from_u32(bits: u32) -> Result<MRemapFlags> {
-        let flags =
-            MRemapFlags::from_bits(bits).ok_or_else(|| errno!(EINVAL, "unknown mremap flags"))?;
-        if flags.contains(MRemapFlags::MREMAP_FIXED) && !flags.contains(MRemapFlags::MREMAP_MAYMOVE)
-        {
-            return_errno!(EINVAL, "MREMAP_FIXED was specified without MREMAP_MAYMOVE");
-        }
+    pub fn from_raw(raw_flags: u32, new_addr: usize) -> Result<Self> {
+        const MREMAP_NONE: u32 = 0;
+        const MREMAP_MAYMOVE: u32 = 1;
+        const MREMAP_FIXED: u32 = 3;
+
+        #[deny(unreachable_patterns)]
+        let flags = match raw_flags {
+            MREMAP_NONE => Self::None,
+            MREMAP_MAYMOVE => Self::MayMove,
+            MREMAP_FIXED => Self::FixedAddr(new_addr),
+            _ => return_errno!(EINVAL, "unsupported flags"),
+        };
         Ok(flags)
+    }
+
+    pub fn new_addr(&self) -> Option<usize> {
+        match self {
+            MRemapFlags::FixedAddr(new_addr) => Some(*new_addr),
+            _ => None,
+        }
+    }
+}
+
+impl Default for MRemapFlags {
+    fn default() -> Self {
+        MRemapFlags::None
     }
 }
 

@@ -630,10 +630,10 @@ int test_mremap() {
         if (buf == MAP_FAILED) {
             THROW_ERROR("mmap failed");
         }
-
         if (check_bytes_in_buf(buf, len, 0) < 0) {
             THROW_ERROR("the buffer is not initialized to zeros");
         }
+
         void *expand_buf = mremap(buf, len, 2 * len, MREMAP_MAYMOVE);
         if (expand_buf == MAP_FAILED) {
             THROW_ERROR("mremap with big size failed");
@@ -642,6 +642,7 @@ int test_mremap() {
             THROW_ERROR("the old part of expand buffer is not zero");
         }
         memset(expand_buf, 'a', len * 2);
+
         void *shrink_buf = mremap(expand_buf, 2 * len, len, 0);
         if (shrink_buf == MAP_FAILED) {
             THROW_ERROR("mmap with small size failed");
@@ -649,6 +650,7 @@ int test_mremap() {
         if (check_bytes_in_buf(shrink_buf, len, 'a') < 0) {
             THROW_ERROR("the shrink buffer is not correct");
         }
+
         int ret = munmap(shrink_buf, len);
         if (ret < 0) {
             THROW_ERROR("munmap failed");
@@ -694,6 +696,7 @@ int test_mremap_subrange() {
     return 0;
 }
 
+// FIXME: may cause segfault on Linux
 int test_mremap_with_fixed_addr() {
     int prot = PROT_READ | PROT_WRITE;
     int flags = MAP_PRIVATE | MAP_ANONYMOUS;
@@ -703,10 +706,10 @@ int test_mremap_with_fixed_addr() {
     if (buf == MAP_FAILED) {
         THROW_ERROR("mmap failed");
     }
-
     if (check_bytes_in_buf(buf, len, 0) < 0) {
         THROW_ERROR("the buffer is not initialized to zeros");
     }
+
     void *new_addr = buf + len * 2;
     void *new_buf = mremap(buf, len, len, MREMAP_FIXED, new_addr);
     if (new_buf != MAP_FAILED || errno != EINVAL) {

@@ -4,6 +4,7 @@ use super::*;
 pub enum VMInitializer {
     DoNothing(),
     FillZeros(),
+    CopyFrom { range: VMRange },
     LoadFromFile { file: FileRef, offset: usize },
 }
 
@@ -24,6 +25,14 @@ impl VMInitializer {
                     *b = 0;
                 }
             }
+            VMInitializer::CopyFrom { range } => {
+                let src_slice = unsafe { range.as_slice() };
+                let copy_len = min(buf.len(), src_slice.len());
+                buf[..copy_len].copy_from_slice(&src_slice[..copy_len]);
+                for b in &mut buf[copy_len..] {
+                    *b = 0;
+                }
+            }
             VMInitializer::LoadFromFile { file, offset } => {
                 // TODO: make sure that read_at does not move file cursor
                 let len = file
@@ -41,8 +50,9 @@ impl VMInitializer {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VMMapAddr {
     Any,          // Free to choose any address
-    Hint(usize),  // Prefer the given address
-    Fixed(usize), // Must be the given address
+    Hint(usize),  // Prefer the address, but can use other address
+    Need(usize),  // Need to use the address, otherwise report error
+    Force(usize), // Force using the address by munmap first
 }
 
 impl Default for VMMapAddr {
@@ -88,11 +98,11 @@ impl VMMapOptionsBuilder {
                     let addr = align_down(addr, PAGE_SIZE);
                     VMMapAddr::Hint(addr)
                 }
-                VMMapAddr::Fixed(addr) => {
-                    if addr % align != 0 {
+                VMMapAddr::Need(addr_) | VMMapAddr::Force(addr_) => {
+                    if addr_ % align != 0 {
                         return_errno!(EINVAL, "unaligned addr for fixed mmap");
                     }
-                    VMMapAddr::Fixed(addr)
+                    addr
                 }
             }
         };
@@ -127,7 +137,6 @@ impl VMMapOptions {
 pub struct VMRemapOptions {
     old_addr: usize,
     old_size: usize,
-    new_addr: Option<usize>,
     new_size: usize,
     flags: MRemapFlags,
 }
@@ -136,7 +145,6 @@ impl VMRemapOptions {
     pub fn new(
         old_addr: usize,
         old_size: usize,
-        new_addr: Option<usize>,
         new_size: usize,
         flags: MRemapFlags,
     ) -> Result<Self> {
@@ -152,14 +160,11 @@ impl VMRemapOptions {
         } else {
             align_up(old_size, PAGE_SIZE)
         };
-        let new_addr = {
-            if let Some(addr) = new_addr {
-                if addr % PAGE_SIZE != 0 {
-                    return_errno!(EINVAL, "unaligned new address");
-                }
+        if let Some(new_addr) = flags.new_addr() {
+            if new_addr % PAGE_SIZE != 0 {
+                return_errno!(EINVAL, "unaligned new address");
             }
-            new_addr
-        };
+        }
         let new_size = if new_size == 0 {
             return_errno!(EINVAL, "invalid new size");
         } else {
@@ -168,7 +173,6 @@ impl VMRemapOptions {
         Ok(Self {
             old_addr,
             old_size,
-            new_addr,
             new_size,
             flags,
         })
@@ -186,15 +190,46 @@ impl VMRemapOptions {
         self.new_size
     }
 
-    pub fn new_addr(&self) -> Option<usize> {
-        self.new_addr
-    }
-
     pub fn flags(&self) -> MRemapFlags {
         self.flags
     }
 }
 
+/// Memory manager.
+///
+/// VMManager provides useful memory management APIs such as mmap, munmap, mremap, etc.
+///
+/// # Invariants
+///
+/// Behind the scene, VMManager maintains a list of VMRange that have been allocated.
+/// (denoted as `self.sub_ranges`). To reason about the correctness of VMManager, we give
+/// the set of invariants hold by VMManager.
+///
+/// 1. The rule of sentry:
+/// ```
+/// self.range.begin() == self.sub_ranges[0].start() == self.sub_ranges[0].end()
+/// ```
+/// and
+/// ```
+/// self.range.end() == self.sub_ranges[N-1].start() == self.sub_ranges[N-1].end()
+/// ```
+/// where `N = self.sub_ranges.len()`.
+///
+/// 2. The rule of non-emptyness:
+/// ```
+/// self.sub_ranges[i].size() > 0, for 1 <= i < self.sub_ranges.len() - 1
+/// ```
+///
+/// 3. The rule of ordering:
+/// ```
+/// self.sub_ranges[i].end() <= self.sub_ranges[i+1].start() for 0 <= i < self.sub_ranges.len() - 1
+/// ```
+///
+/// 4. The rule of non-mergablility:
+/// ```
+/// self.sub_ranges[i].end() !=  self.sub_ranges[i+1].start() for 1 <= i < self.sub_ranges.len() - 2
+/// ```
+///
 #[derive(Debug, Default)]
 pub struct VMManager {
     range: VMRange,
@@ -223,7 +258,7 @@ impl VMManager {
         let addr = *options.addr();
         let size = *options.size();
 
-        if let VMMapAddr::Fixed(addr) = addr {
+        if let VMMapAddr::Force(addr) = addr {
             self.munmap(addr, size)?;
         }
 
@@ -238,80 +273,10 @@ impl VMManager {
             options.initializer.init_slice(buf)?;
         }
 
-        // After initializing, we can safely add the new subrange
-        self.sub_ranges.insert(insert_idx, new_subrange);
+        // After initializing, we can safely insert the new subrange
+        self.insert_new_subrange(insert_idx, new_subrange);
 
         Ok(new_subrange_addr)
-    }
-
-    pub fn mremap(&mut self, options: &VMRemapOptions) -> Result<usize> {
-        let old_addr = options.old_addr();
-        let old_size = options.old_size();
-        let new_size = options.new_size();
-        let (vm_subrange, idx) = {
-            let idx = self.find_mmap_region_idx(old_addr)?;
-            let vm_subrange = self.sub_ranges[idx];
-            if (vm_subrange.end() - old_addr < old_size) {
-                // Across the vm range
-                return_errno!(EFAULT, "can not remap across vm range");
-            } else if (vm_subrange.end() - old_addr == old_size) {
-                // Exactly the vm range
-                (vm_subrange, idx)
-            } else {
-                // Part of the vm range
-                let old_subrange = VMRange::new(old_addr, old_addr + old_size)?;
-                let (subranges, offset) = {
-                    let mut subranges = vm_subrange.subtract(&old_subrange);
-                    let idx = subranges
-                        .iter()
-                        .position(|subrange| old_subrange.start() < subrange.start())
-                        .unwrap_or_else(|| subranges.len());
-                    subranges.insert(idx, old_subrange);
-                    (subranges, idx)
-                };
-                self.sub_ranges.splice(idx..=idx, subranges.iter().cloned());
-                (old_subrange, idx + offset)
-            }
-        };
-        // Remap with a fixed new_addr, move it to new_addr
-        if let Some(new_addr) = options.new_addr() {
-            let new_subrange = VMRange::new(new_addr, new_addr + new_size)?;
-            if vm_subrange.overlap_with(&new_subrange) {
-                return_errno!(EINVAL, "old/new vm range overlap");
-            }
-            let new_addr = VMMapAddr::Fixed(new_addr);
-            let (insert_idx, free_subrange) = self.find_free_subrange(new_size, new_addr)?;
-            let new_subrange = self.alloc_subrange_from(new_size, new_addr, &free_subrange);
-            return self.move_mmap_region(&vm_subrange, (insert_idx, &new_subrange));
-        }
-        // Remap without a fixed new_addr
-        if old_size > new_size {
-            // Shrink the mmap range, just unmap the useless range
-            self.munmap(old_addr + new_size, old_size - new_size)?;
-            Ok(old_addr)
-        } else if old_size == new_size {
-            // Same size, do nothing
-            Ok(old_addr)
-        } else {
-            // Need to expand the mmap range, check if we can expand it
-            if let Some(next_subrange) = self.sub_ranges.get(idx + 1) {
-                let expand_size = new_size - old_size;
-                if next_subrange.start() - vm_subrange.end() >= expand_size {
-                    // Memory between subranges is enough, resize it
-                    let vm_subrange = self.sub_ranges.get_mut(idx).unwrap();
-                    vm_subrange.resize(new_size);
-                    return Ok(vm_subrange.start());
-                }
-            }
-            // Not enough memory to expand, must move it to a new place
-            if !options.flags().contains(MRemapFlags::MREMAP_MAYMOVE) {
-                return_errno!(ENOMEM, "not enough memory to expand");
-            }
-            let new_addr = VMMapAddr::Any;
-            let (insert_idx, free_subrange) = self.find_free_subrange(new_size, new_addr)?;
-            let new_subrange = self.alloc_subrange_from(new_size, new_addr, &free_subrange);
-            self.move_mmap_region(&vm_subrange, (insert_idx, &new_subrange))
-        }
     }
 
     pub fn munmap(&mut self, addr: usize, size: usize) -> Result<()> {
@@ -340,16 +305,141 @@ impl VMManager {
             .sub_ranges
             .iter()
             .flat_map(|subrange| {
-                if subrange.size() > 0 {
-                    subrange.subtract(&munmap_range)
-                } else {
-                    // Keep the two sentry subranges intact
-                    vec![*subrange]
+                // Keep the two sentry subranges intact
+                if subrange.size() == 0 {
+                    return vec![*subrange];
                 }
+
+                let unmapped_subrange = match subrange.intersect(&munmap_range) {
+                    None => return vec![*subrange],
+                    Some(unmapped_subrange) => unmapped_subrange,
+                };
+
+                subrange.subtract(&unmapped_subrange)
             })
             .collect();
         self.sub_ranges = new_sub_ranges;
         Ok(())
+    }
+
+    pub fn mremap(&mut self, options: &VMRemapOptions) -> Result<usize> {
+        let old_addr = options.old_addr();
+        let old_size = options.old_size();
+        let old_range = VMRange::new_with_size(old_addr, old_size)?;
+        let new_size = options.new_size();
+        let flags = options.flags();
+
+        #[derive(Clone, Copy, PartialEq)]
+        enum SizeType {
+            Same,
+            Shrinking,
+            Growing,
+        };
+        let size_type = if new_size == old_size {
+            SizeType::Same
+        } else if new_size < old_size {
+            SizeType::Shrinking
+        } else {
+            SizeType::Growing
+        };
+
+        // The old range must not span over multiple sub-ranges
+        self.find_containing_subrange_idx(&old_range)
+            .ok_or_else(|| errno!(EFAULT, "invalid range"))?;
+
+        // Implement mremap as one optional mmap followed by one optional munmap.
+        //
+        // The exact arguments for the mmap and munmap are determined by the values of MRemapFlags
+        // and SizeType. There is a total of 9 combinations between MRemapFlags and SizeType.
+        // As some combinations result in the same mmap and munmap operations, the following code
+        // only needs to match four patterns of (MRemapFlags, SizeType) and treat each case
+        // accordingly.
+
+        // Determine whether need to do mmap. And when possible, determine the returned address
+        // TODO: should fill zeros even when extending a file-backed mapping?
+        let (need_mmap, mut ret_addr) = match (flags, size_type) {
+            (MRemapFlags::None, SizeType::Growing) => {
+                let mmap_opts = VMMapOptionsBuilder::default()
+                    .size(new_size - old_size)
+                    .addr(VMMapAddr::Need(old_range.end()))
+                    .initializer(VMInitializer::FillZeros())
+                    .build()?;
+                let ret_addr = Some(old_addr);
+                (Some(mmap_opts), ret_addr)
+            }
+            (MRemapFlags::MayMove, SizeType::Growing) => {
+                let prefered_new_range =
+                    VMRange::new_with_size(old_addr + old_size, new_size - old_size)?;
+                if self.is_free_range(&prefered_new_range) {
+                    let mmap_ops = VMMapOptionsBuilder::default()
+                        .size(prefered_new_range.size())
+                        .addr(VMMapAddr::Need(prefered_new_range.start()))
+                        .initializer(VMInitializer::FillZeros())
+                        .build()?;
+                    (Some(mmap_ops), Some(old_addr))
+                } else {
+                    let mmap_ops = VMMapOptionsBuilder::default()
+                        .size(new_size)
+                        .addr(VMMapAddr::Any)
+                        .initializer(VMInitializer::CopyFrom { range: old_range })
+                        .build()?;
+                    // Cannot determine the returned address for now, which can only be obtained after calling mmap
+                    let ret_addr = None;
+                    (Some(mmap_ops), ret_addr)
+                }
+            }
+            (MRemapFlags::FixedAddr(new_addr), _) => {
+                let mmap_opts = VMMapOptionsBuilder::default()
+                    .size(new_size)
+                    .addr(VMMapAddr::Force(new_addr))
+                    .initializer(VMInitializer::CopyFrom { range: old_range })
+                    .build()?;
+                let ret_addr = Some(new_addr);
+                (Some(mmap_opts), ret_addr)
+            }
+            _ => (None, Some(old_addr)),
+        };
+
+        let need_munmap = match (flags, size_type) {
+            (MRemapFlags::None, SizeType::Shrinking)
+            | (MRemapFlags::MayMove, SizeType::Shrinking) => {
+                let unmap_addr = old_addr + new_size;
+                let unmap_size = old_size - new_size;
+                Some((unmap_addr, unmap_size))
+            }
+            (MRemapFlags::MayMove, SizeType::Growing) => {
+                if ret_addr.is_none() {
+                    // We must need to do mmap. Thus unmap the old range
+                    Some((old_addr, old_size))
+                } else {
+                    // We must choose to reuse the old range. Thus, no need to unmap
+                    None
+                }
+            }
+            (MRemapFlags::FixedAddr(new_addr), _) => {
+                let new_range = VMRange::new_with_size(new_addr, new_size)?;
+                if new_range.overlap_with(&old_range) {
+                    return_errno!(EINVAL, "new range cannot overlap with the old one");
+                }
+                Some((old_addr, old_size))
+            }
+            _ => None,
+        };
+
+        // Perform mmap and munmap if needed
+        if let Some(mmap_options) = need_mmap {
+            let mmap_addr = self.mmap(&mmap_options)?;
+
+            if ret_addr.is_none() {
+                ret_addr = Some(mmap_addr);
+            }
+        }
+        if let Some((addr, size)) = need_munmap {
+            self.munmap(addr, size).expect("never fail");
+        }
+
+        debug_assert!(ret_addr.is_some());
+        Ok(ret_addr.unwrap())
     }
 
     pub fn find_mmap_region(&self, addr: usize) -> Result<&VMRange> {
@@ -359,34 +449,24 @@ impl VMManager {
             .ok_or_else(|| errno!(ESRCH, "no mmap regions that contains the address"))
     }
 
-    fn find_mmap_region_idx(&self, addr: usize) -> Result<usize> {
+    // Find a subrange that contains the given range and returns the index of the subrange
+    fn find_containing_subrange_idx(&self, target_range: &VMRange) -> Option<usize> {
         self.sub_ranges
             .iter()
-            .position(|subrange| subrange.contains(addr))
-            .ok_or_else(|| errno!(ESRCH, "no mmap regions that contains the address"))
+            .position(|subrange| subrange.is_superset_of(target_range))
     }
 
-    fn move_mmap_region(
-        &mut self,
-        src_subrange: &VMRange,
-        dst_idx_and_subrange: (usize, &VMRange),
-    ) -> Result<usize> {
-        let dst_idx = dst_idx_and_subrange.0;
-        let dst_subrange = dst_idx_and_subrange.1;
-        unsafe {
-            let src_buf = src_subrange.as_slice_mut();
-            let dst_buf = dst_subrange.as_slice_mut();
-            for (d, s) in dst_buf.iter_mut().zip(src_buf.iter()) {
-                *d = *s;
-            }
-        }
-        self.sub_ranges.insert(dst_idx, *dst_subrange);
-        self.munmap(src_subrange.start(), src_subrange.size())?;
-        Ok(dst_subrange.start())
+    // Returns whether the requested range is free
+    fn is_free_range(&self, request_range: &VMRange) -> bool {
+        self.range.is_superset_of(request_range)
+            && self
+                .sub_ranges
+                .iter()
+                .all(|range| range.overlap_with(request_range) == false)
     }
 
     // Find the free subrange that satisfies the constraints of size and address
-    fn find_free_subrange(&mut self, size: usize, addr: VMMapAddr) -> Result<(usize, VMRange)> {
+    fn find_free_subrange(&self, size: usize, addr: VMMapAddr) -> Result<(usize, VMRange)> {
         // TODO: reduce the complexity from O(N) to O(log(N)), where N is
         // the number of existing subranges.
 
@@ -426,7 +506,7 @@ impl VMManager {
                     }
                 }
                 // Must have free_range.start == addr
-                VMMapAddr::Fixed(addr) => {
+                VMMapAddr::Need(addr) | VMMapAddr::Force(addr) => {
                     if free_range.start() > addr {
                         return_errno!(ENOMEM, "not enough memory for fixed mmap");
                     }
@@ -468,11 +548,59 @@ impl VMManager {
         debug_assert!(free_subrange.size() >= size);
 
         let mut new_subrange = *free_subrange;
-        if let VMMapAddr::Fixed(addr) = addr {
+
+        if let VMMapAddr::Need(addr) = addr {
+            debug_assert!(addr == new_subrange.start());
+        }
+        if let VMMapAddr::Force(addr) = addr {
             debug_assert!(addr == new_subrange.start());
         }
 
         new_subrange.resize(size);
         new_subrange
+    }
+
+    // Insert the new sub-range, and when possible, merge it with its neighbors.
+    fn insert_new_subrange(&mut self, insert_idx: usize, new_subrange: VMRange) {
+        // New sub-range can only be inserted between the two sentry sub-ranges
+        debug_assert!(0 < insert_idx && insert_idx < self.sub_ranges.len());
+
+        let left_idx = insert_idx - 1;
+        let right_idx = insert_idx;
+
+        // Double check the order
+        debug_assert!(self.sub_ranges[left_idx].end() <= new_subrange.start());
+        debug_assert!(new_subrange.end() <= self.sub_ranges[right_idx].start());
+
+        let left_mergable = if left_idx > 0 {
+            // Mergable if there is no gap between the left neighbor and the new sub-range
+            self.sub_ranges[left_idx].end() == new_subrange.start()
+        } else {
+            // The left sentry sub-range is NOT mergable with any sub-range
+            false
+        };
+        let right_mergable = if right_idx < self.sub_ranges.len() - 1 {
+            // Mergable if there is no gap between the right neighbor and the new sub-range
+            self.sub_ranges[right_idx].start() == new_subrange.end()
+        } else {
+            // The right sentry sub-range is NOT mergable with any sub-range
+            false
+        };
+
+        match (left_mergable, right_mergable) {
+            (false, false) => {
+                self.sub_ranges.insert(insert_idx, new_subrange);
+            }
+            (true, false) => {
+                self.sub_ranges[left_idx].end = new_subrange.end;
+            }
+            (false, true) => {
+                self.sub_ranges[right_idx].start = new_subrange.start;
+            }
+            (true, true) => {
+                self.sub_ranges[left_idx].end = self.sub_ranges[right_idx].end;
+                self.sub_ranges.remove(right_idx);
+            }
+        }
     }
 }

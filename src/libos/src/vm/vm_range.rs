@@ -17,6 +17,10 @@ impl VMRange {
         })
     }
 
+    pub fn new_with_size(start: usize, size: usize) -> Result<VMRange> {
+        Self::new(start, start + size)
+    }
+
     pub fn new_empty(start: usize) -> Result<VMRange> {
         if start % PAGE_SIZE != 0 {
             return_errno!(EINVAL, "invalid start or end");
