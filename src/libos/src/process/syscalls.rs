@@ -1,13 +1,13 @@
-use std::ptr::NonNull;
-
 use super::do_arch_prctl::ArchPrctlCode;
 use super::do_clone::CloneFlags;
 use super::do_futex::{FutexFlags, FutexOp};
 use super::do_spawn::FileAction;
+use super::prctl::PrctlCmd;
 use super::process::ProcessFilter;
 use crate::prelude::*;
 use crate::time::timespec_t;
 use crate::util::mem_util::from_user::*;
+use std::ptr::NonNull;
 
 pub fn do_spawn(
     child_pid_ptr: *mut u32,
@@ -171,6 +171,11 @@ pub fn do_futex(
         }
         _ => return_errno!(ENOSYS, "the futex operation is not supported"),
     }
+}
+
+pub fn do_prctl(option: i32, arg2: u64, arg3: u64, arg4: u64, arg5: u64) -> Result<isize> {
+    let prctl_cmd = super::prctl::PrctlCmd::from_raw(option, arg2, arg3, arg4, arg5)?;
+    super::prctl::do_prctl(prctl_cmd).map(|_| 0)
 }
 
 pub fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize> {

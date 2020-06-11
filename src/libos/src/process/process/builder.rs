@@ -1,5 +1,5 @@
 use super::super::task::Task;
-use super::super::thread::{ThreadBuilder, ThreadId};
+use super::super::thread::{ThreadBuilder, ThreadId, ThreadName};
 use super::super::{
     FileTableRef, ForcedExitStatus, FsViewRef, ProcessRef, ProcessVMRef, ResourceLimitsRef,
     SchedAgentRef,
@@ -75,6 +75,10 @@ impl ProcessBuilder {
 
     pub fn rlimits(mut self, rlimits: ResourceLimitsRef) -> Self {
         self.thread_builder(|tb| tb.rlimits(rlimits))
+    }
+
+    pub fn name(mut self, name: ThreadName) -> Self {
+        self.thread_builder(|tb| tb.name(name))
     }
 
     pub fn build(mut self) -> Result<ProcessRef> {

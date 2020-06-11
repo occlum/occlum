@@ -2,7 +2,7 @@ use std::ptr::NonNull;
 
 use super::{
     FileTableRef, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef, ResourceLimitsRef, SchedAgentRef,
-    SigQueues, SigSet, Task, Thread, ThreadId, ThreadInner, ThreadRef,
+    SigQueues, SigSet, Task, Thread, ThreadId, ThreadInner, ThreadName, ThreadRef,
 };
 use crate::prelude::*;
 use crate::time::ThreadProfiler;
@@ -20,6 +20,7 @@ pub struct ThreadBuilder {
     sched: Option<SchedAgentRef>,
     rlimits: Option<ResourceLimitsRef>,
     clear_ctid: Option<NonNull<pid_t>>,
+    name: Option<ThreadName>,
 }
 
 impl ThreadBuilder {
@@ -34,6 +35,7 @@ impl ThreadBuilder {
             sched: None,
             rlimits: None,
             clear_ctid: None,
+            name: None,
         }
     }
 
@@ -82,6 +84,11 @@ impl ThreadBuilder {
         self
     }
 
+    pub fn name(mut self, name: ThreadName) -> Self {
+        self.name = Some(name);
+        self
+    }
+
     pub fn build(self) -> Result<ThreadRef> {
         let task = self
             .task
@@ -99,6 +106,7 @@ impl ThreadBuilder {
         let files = self.files.unwrap_or_default();
         let sched = self.sched.unwrap_or_default();
         let rlimits = self.rlimits.unwrap_or_default();
+        let name = SgxRwLock::new(self.name.unwrap_or_default());
         let sig_queues = SgxMutex::new(SigQueues::new());
         let sig_mask = SgxRwLock::new(SigSet::new_empty());
         let sig_tmp_mask = SgxRwLock::new(SigSet::new_empty());
@@ -120,6 +128,7 @@ impl ThreadBuilder {
             files,
             sched,
             rlimits,
+            name,
             sig_queues,
             sig_mask,
             sig_tmp_mask,

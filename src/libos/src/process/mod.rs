@@ -36,6 +36,7 @@ mod do_getpid;
 mod do_set_tid_address;
 mod do_spawn;
 mod do_wait4;
+mod prctl;
 mod process;
 mod syscalls;
 mod term_status;

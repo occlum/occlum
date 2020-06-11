@@ -6,6 +6,7 @@ use self::exec_loader::{load_exec_file_to_vec, load_file_to_vec};
 use super::elf_file::{ElfFile, ElfHeader, ProgramHeader, ProgramHeaderExt};
 use super::process::ProcessBuilder;
 use super::task::Task;
+use super::thread::ThreadName;
 use super::{table, task, ProcessRef, ThreadRef};
 use crate::fs::{
     CreationFlags, File, FileDesc, FileTable, FsView, HostStdioFds, StdinFile, StdoutFile,
@@ -180,6 +181,10 @@ fn new_process(
         let fs_ref = Arc::new(SgxMutex::new(current_ref.fs().lock().unwrap().clone()));
         let sched_ref = Arc::new(SgxMutex::new(current_ref.sched().lock().unwrap().clone()));
 
+        // Make the default thread name to be the process's corresponding elf file name
+        let elf_name = elf_path.rsplit('/').collect::<Vec<&str>>()[0];
+        let thread_name = ThreadName::new(elf_name);
+
         ProcessBuilder::new()
             .vm(vm_ref)
             .exec_path(&elf_path)
@@ -188,6 +193,7 @@ fn new_process(
             .sched(sched_ref)
             .fs(fs_ref)
             .files(files_ref)
+            .name(thread_name)
             .build()?
     };
 

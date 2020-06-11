@@ -35,8 +35,8 @@ use crate::net::{
 };
 use crate::process::{
     do_arch_prctl, do_clone, do_exit, do_exit_group, do_futex, do_getegid, do_geteuid, do_getgid,
-    do_getpgid, do_getpid, do_getppid, do_gettid, do_getuid, do_set_tid_address, do_spawn,
-    do_wait4, pid_t, FdOp, ThreadStatus,
+    do_getpgid, do_getpid, do_getppid, do_gettid, do_getuid, do_prctl, do_set_tid_address,
+    do_spawn, do_wait4, pid_t, FdOp, ThreadStatus,
 };
 use crate::sched::{do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
 use crate::signal::{
@@ -234,7 +234,7 @@ macro_rules! process_syscall_table_with_callback {
             (ModifyLdt = 154) => handle_unsupported(),
             (PivotRoot = 155) => handle_unsupported(),
             (SysCtl = 156) => handle_unsupported(),
-            (Prctl = 157) => handle_unsupported(),
+            (Prctl = 157) => do_prctl(option: i32, arg2: u64, arg3: u64, arg4: u64, arg5: u64),
             (ArchPrctl = 158) => do_arch_prctl(code: u32, addr: *mut usize),
             (Adjtimex = 159) => handle_unsupported(),
             (Setrlimit = 160) => handle_unsupported(),

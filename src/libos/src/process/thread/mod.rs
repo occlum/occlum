@@ -12,9 +12,11 @@ use crate::time::ThreadProfiler;
 
 pub use self::builder::ThreadBuilder;
 pub use self::id::ThreadId;
+pub use self::name::ThreadName;
 
 mod builder;
 mod id;
+mod name;
 
 pub struct Thread {
     // Low-level info
@@ -24,6 +26,7 @@ pub struct Thread {
     // Mutable info
     clear_ctid: SgxRwLock<Option<NonNull<pid_t>>>,
     inner: SgxMutex<ThreadInner>,
+    name: SgxRwLock<ThreadName>,
     // Process
     process: ProcessRef,
     // Resources
@@ -129,6 +132,14 @@ impl Thread {
 
     pub fn set_clear_ctid(&self, new_clear_ctid: Option<NonNull<pid_t>>) {
         *self.clear_ctid.write().unwrap() = new_clear_ctid;
+    }
+
+    pub fn name(&self) -> ThreadName {
+        self.name.read().unwrap().clone()
+    }
+
+    pub fn set_name(&self, new_name: ThreadName) {
+        *self.name.write().unwrap() = new_name;
     }
 
     pub(super) fn start(&self, host_tid: pid_t) {
