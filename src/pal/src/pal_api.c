@@ -157,3 +157,18 @@ int occlum_pal_destroy(void) {
     }
     return 0;
 }
+
+int pal_get_version(void) __attribute__((weak, alias ("occlum_pal_get_version")));
+
+int pal_init(const struct occlum_pal_attr *attr)\
+__attribute__ ((weak, alias ("occlum_pal_init")));
+
+int pal_create_process(struct occlum_pal_create_process_args *args)\
+__attribute__ ((weak, alias ("occlum_pal_create_process")));
+
+int pal_exec(struct occlum_pal_exec_args *args)\
+__attribute__ ((weak, alias ("occlum_pal_exec")));
+
+int pal_kill(int pid, int sig) __attribute__ ((weak, alias ("occlum_pal_kill")));
+
+int pal_destroy(void) __attribute__ ((weak, alias ("occlum_pal_destroy")));
