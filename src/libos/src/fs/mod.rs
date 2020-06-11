@@ -1,7 +1,7 @@
 use super::*;
 
 use process;
-use rcore_fs::vfs::{FileSystem, FileType, FsError, INode, Metadata, Timespec};
+use rcore_fs::vfs::{FileSystem, FileType, FsError, INode, Metadata, Timespec, PATH_MAX};
 use std;
 use std::any::Any;
 use std::fmt;

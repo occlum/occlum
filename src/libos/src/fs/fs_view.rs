@@ -53,64 +53,120 @@ impl FsView {
             return Ok(Box::new(DevSgx));
         }
         let creation_flags = CreationFlags::from_bits_truncate(flags);
-        let inode = if creation_flags.can_create() {
-            let (dir_path, file_name) = split_path(&path);
-            let dir_inode = self.lookup_inode(dir_path)?;
-            match dir_inode.find(file_name) {
-                Ok(file_inode) => {
-                    if creation_flags.is_exclusive() {
+        let inode = if creation_flags.no_follow_symlink() {
+            match self.lookup_inode_no_follow(path) {
+                Ok(inode) => {
+                    let status_flags = StatusFlags::from_bits_truncate(flags);
+                    if inode.metadata()?.type_ == FileType::SymLink && !status_flags.is_fast_open()
+                    {
+                        return_errno!(ELOOP, "file is a symlink");
+                    }
+                    if creation_flags.can_create() && creation_flags.is_exclusive() {
                         return_errno!(EEXIST, "file exists");
                     }
-                    file_inode
+                    inode
                 }
-                Err(FsError::EntryNotFound) => {
+                Err(e) if e.errno() == ENOENT && creation_flags.can_create() => {
+                    let (dir_path, file_name) = split_path(&path);
+                    let dir_inode = self.lookup_inode(dir_path)?;
                     if !dir_inode.allow_write()? {
                         return_errno!(EPERM, "file cannot be created");
                     }
                     dir_inode.create(file_name, FileType::File, mode)?
                 }
-                Err(e) => return Err(Error::from(e)),
+                Err(e) => return Err(e),
             }
         } else {
-            self.lookup_inode(&path)?
+            match self.lookup_inode(path) {
+                Ok(inode) => {
+                    if creation_flags.can_create() && creation_flags.is_exclusive() {
+                        return_errno!(EEXIST, "file exists");
+                    }
+                    inode
+                }
+                Err(e) if e.errno() == ENOENT && creation_flags.can_create() => {
+                    let real_path = self.lookup_real_path(&path)?;
+                    let (dir_path, file_name) = split_path(&real_path);
+                    let dir_inode = self.lookup_inode(dir_path)?;
+                    if !dir_inode.allow_write()? {
+                        return_errno!(EPERM, "file cannot be created");
+                    }
+                    dir_inode.create(file_name, FileType::File, mode)?
+                }
+                Err(e) => return Err(e),
+            }
         };
         let abs_path = self.convert_to_abs_path(&path);
         Ok(Box::new(INodeFile::open(inode, &abs_path, flags)?))
     }
 
-    /// Lookup INode from the cwd of the process
-    pub fn lookup_inode(&self, path: &str) -> Result<Arc<dyn INode>> {
-        self.lookup_inode_follow_with_max_times(path, 0)
+    /// Recursively lookup the real path of giving path, dereference symlinks
+    pub fn lookup_real_path(&self, path: &str) -> Result<String> {
+        let (dir_path, file_name) = split_path(&path);
+        let dir_inode = self.lookup_inode(dir_path)?;
+        match dir_inode.find(file_name) {
+            // Handle symlink
+            Ok(inode) if inode.metadata()?.type_ == FileType::SymLink => {
+                let new_path = {
+                    let mut content = vec![0u8; PATH_MAX];
+                    let len = inode.read_at(0, &mut content)?;
+                    let path = std::str::from_utf8(&content[..len])
+                        .map_err(|_| errno!(ENOENT, "invalid symlink content"))?;
+                    let path = String::from(path);
+                    match path.chars().next() {
+                        None => unreachable!(),
+                        // absolute path
+                        Some('/') => path,
+                        // relative path
+                        _ => {
+                            let dir_path = if dir_path.ends_with("/") {
+                                String::from(dir_path)
+                            } else {
+                                String::from(dir_path) + "/"
+                            };
+                            dir_path + &path
+                        }
+                    }
+                };
+                self.lookup_real_path(&new_path)
+            }
+            Err(FsError::EntryNotFound) | Ok(_) => {
+                debug!("real_path: cwd: {:?}, path: {:?}", self.cwd(), path);
+                Ok(String::from(path))
+            }
+            Err(e) => return Err(Error::from(e)),
+        }
     }
 
-    /// Lookup INode from the cwd of the process, follow symlinks
-    pub fn lookup_inode_follow(&self, path: &str) -> Result<Arc<dyn INode>> {
+    /// Lookup INode from the cwd of the process. If path is a symlink, do not dereference it
+    pub fn lookup_inode_no_follow(&self, path: &str) -> Result<Arc<dyn INode>> {
+        debug!("lookup_inode: cwd: {:?}, path: {:?}", self.cwd(), path);
+        let (dir_path, file_name) = split_path(&path);
+        let dir_inode = self.lookup_inode(dir_path)?;
+        Ok(dir_inode.lookup(file_name)?)
+    }
+
+    /// Lookup INode from the cwd of the process, dereference symlink
+    pub fn lookup_inode(&self, path: &str) -> Result<Arc<dyn INode>> {
         // Linux uses 40 as the upper limit for resolving symbolic links,
         // so Occlum use it as a reasonable value
         const MAX_SYMLINKS: usize = 40;
-        self.lookup_inode_follow_with_max_times(path, MAX_SYMLINKS)
-    }
-
-    fn lookup_inode_follow_with_max_times(
-        &self,
-        path: &str,
-        max_times: usize,
-    ) -> Result<Arc<dyn INode>> {
         debug!(
-            "lookup_inode_follow_with_max_times: cwd: {:?}, path: {:?}, max_times: {}",
+            "lookup_inode_follow: cwd: {:?}, path: {:?}",
             self.cwd(),
-            path,
-            max_times
+            path
         );
         if path.len() > 0 && path.as_bytes()[0] == b'/' {
             // absolute path
             let abs_path = path.trim_start_matches('/');
-            let inode = ROOT_INODE.lookup_follow(abs_path, max_times)?;
+            let inode = ROOT_INODE.lookup_follow(abs_path, MAX_SYMLINKS)?;
             Ok(inode)
         } else {
             // relative path
             let cwd = self.cwd().trim_start_matches('/');
-            let inode = ROOT_INODE.lookup(cwd)?.lookup_follow(path, max_times)?;
+            let inode = ROOT_INODE
+                .lookup_follow(cwd, MAX_SYMLINKS)?
+                .lookup_follow(path, MAX_SYMLINKS)?;
             Ok(inode)
         }
     }

@@ -71,6 +71,10 @@ impl CreationFlags {
     pub fn is_exclusive(&self) -> bool {
         self.contains(CreationFlags::O_EXCL)
     }
+
+    pub fn no_follow_symlink(&self) -> bool {
+        self.contains(CreationFlags::O_NOFOLLOW)
+    }
 }
 
 bitflags! {
@@ -98,5 +102,9 @@ bitflags! {
 impl StatusFlags {
     pub fn always_append(&self) -> bool {
         self.contains(StatusFlags::O_APPEND)
+    }
+
+    pub fn is_fast_open(&self) -> bool {
+        self.contains(StatusFlags::O_PATH)
     }
 }

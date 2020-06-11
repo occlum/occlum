@@ -49,7 +49,7 @@ pub fn do_faccessat(
     );
     if Path::new(path).is_absolute() {
         // Path is absolute, so dirfd is ignored
-        return Ok(do_access(path, mode)?);
+        return Ok(do_access(path, mode, flags)?);
     }
     let path = match dirfd {
         DirFd::Fd(dirfd) => {
@@ -58,14 +58,22 @@ pub fn do_faccessat(
         }
         DirFd::Cwd => path.to_owned(),
     };
-    do_access(&path, mode)
+    do_access(&path, mode, flags)
 }
 
-fn do_access(path: &str, mode: AccessibilityCheckMode) -> Result<()> {
+fn do_access(
+    path: &str,
+    mode: AccessibilityCheckMode,
+    flags: AccessibilityCheckFlags,
+) -> Result<()> {
     let inode = {
         let current = current!();
         let fs = current.fs().lock().unwrap();
-        fs.lookup_inode(path)?
+        if flags.contains(AccessibilityCheckFlags::AT_SYMLINK_NOFOLLOW) {
+            fs.lookup_inode_no_follow(path)?
+        } else {
+            fs.lookup_inode(path)?
+        }
     };
     if mode.test_for_exist() {
         return Ok(());

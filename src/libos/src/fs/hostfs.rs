@@ -127,7 +127,10 @@ impl INode for HNode {
             FileType::File => {
                 try_std!(fs::File::create(&new_path));
             }
-            _ => unimplemented!("only support creating files in HostFS"),
+            _ => {
+                warn!("only support creating regular files in HostFS");
+                return Err(FsError::PermError);
+            }
         }
         Ok(Arc::new(HNode {
             path: new_path,

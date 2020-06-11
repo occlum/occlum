@@ -64,7 +64,7 @@ pub fn load_file_to_vec(file_path: &str, current_ref: &ThreadRef) -> Result<Vec<
         .fs()
         .lock()
         .unwrap()
-        .lookup_inode_follow(file_path)
+        .lookup_inode(file_path)
         .map_err(|e| errno!(e.errno(), "cannot find the file"))?;
     let file_mode = {
         let info = inode.metadata()?;

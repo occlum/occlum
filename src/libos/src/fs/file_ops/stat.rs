@@ -139,7 +139,7 @@ fn do_stat(path: &str) -> Result<Stat> {
     let inode = {
         let current = current!();
         let fs = current.fs().lock().unwrap();
-        fs.lookup_inode_follow(&path)?
+        fs.lookup_inode(&path)?
     };
     let stat = Stat::from(inode.metadata()?);
     Ok(stat)
@@ -149,7 +149,6 @@ pub fn do_fstat(fd: u32) -> Result<Stat> {
     debug!("fstat: fd: {}", fd);
     let file_ref = current!().file(fd as FileDesc)?;
     let stat = Stat::from(file_ref.metadata()?);
-    // TODO: handle symlink
     Ok(stat)
 }
 
@@ -158,7 +157,7 @@ pub fn do_lstat(path: &str) -> Result<Stat> {
     let inode = {
         let current = current!();
         let fs = current.fs().lock().unwrap();
-        fs.lookup_inode(&path)?
+        fs.lookup_inode_no_follow(&path)?
     };
     let stat = Stat::from(inode.metadata()?);
     Ok(stat)
@@ -185,9 +184,14 @@ pub fn do_fstatat(dirfd: DirFd, path: &str, flags: StatFlags) -> Result<Stat> {
             } else {
                 let dir_path = get_dir_path(dirfd)?;
                 let path = dir_path + "/" + path;
-                do_stat(&path)
+                if !flags.contains(StatFlags::AT_SYMLINK_NOFOLLOW) {
+                    do_stat(&path)
+                } else {
+                    do_lstat(&path)
+                }
             }
         }
-        DirFd::Cwd => do_stat(path),
+        DirFd::Cwd if !flags.contains(StatFlags::AT_SYMLINK_NOFOLLOW) => do_stat(path),
+        DirFd::Cwd => do_lstat(path),
     }
 }

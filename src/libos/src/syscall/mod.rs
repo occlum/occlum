@@ -22,8 +22,9 @@ use crate::fs::{
     do_eventfd2, do_faccessat, do_fchmod, do_fchown, do_fcntl, do_fdatasync, do_fstat, do_fstatat,
     do_fsync, do_ftruncate, do_getcwd, do_getdents64, do_ioctl, do_lchown, do_link, do_lseek,
     do_lstat, do_mkdir, do_open, do_openat, do_pipe, do_pipe2, do_pread, do_pwrite, do_read,
-    do_readlink, do_readv, do_rename, do_rmdir, do_sendfile, do_stat, do_sync, do_truncate,
-    do_unlink, do_write, do_writev, iovec_t, File, FileDesc, FileRef, HostStdioFds, Stat,
+    do_readlink, do_readv, do_rename, do_rmdir, do_sendfile, do_stat, do_symlink, do_symlinkat,
+    do_sync, do_truncate, do_unlink, do_write, do_writev, iovec_t, File, FileDesc, FileRef,
+    HostStdioFds, Stat,
 };
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t};
 use crate::net::{
@@ -165,7 +166,7 @@ macro_rules! process_syscall_table_with_callback {
             (Creat = 85) => handle_unsupported(),
             (Link = 86) => do_link(oldpath: *const i8, newpath: *const i8),
             (Unlink = 87) => do_unlink(path: *const i8),
-            (Symlink = 88) => handle_unsupported(),
+            (Symlink = 88) => do_symlink(target: *const i8, link_path: *const i8),
             (Readlink = 89) => do_readlink(path: *const i8, buf: *mut u8, size: usize),
             (Chmod = 90) => do_chmod(path: *const i8, mode: u16),
             (Fchmod = 91) => do_fchmod(fd: FileDesc, mode: u16),
@@ -343,7 +344,7 @@ macro_rules! process_syscall_table_with_callback {
             (Unlinkat = 263) => handle_unsupported(),
             (Renameat = 264) => handle_unsupported(),
             (Linkat = 265) => handle_unsupported(),
-            (Symlinkat = 266) => handle_unsupported(),
+            (Symlinkat = 266) => do_symlinkat(target: *const i8, new_dirfd: i32, link_path: *const i8),
             (Readlinkat = 267) => handle_unsupported(),
             (Fchmodat = 268) => handle_unsupported(),
             (Faccessat = 269) => do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32),

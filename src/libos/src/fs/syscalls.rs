@@ -388,6 +388,34 @@ pub fn do_readlink(path: *const i8, buf: *mut u8, size: usize) -> Result<isize> 
     Ok(len as isize)
 }
 
+pub fn do_symlink(target: *const i8, link_path: *const i8) -> Result<isize> {
+    let target = from_user::clone_cstring_safely(target)?
+        .to_string_lossy()
+        .into_owned();
+    let link_path = from_user::clone_cstring_safely(link_path)?
+        .to_string_lossy()
+        .into_owned();
+    file_ops::do_symlinkat(&target, DirFd::Cwd, &link_path)?;
+    Ok(0)
+}
+
+pub fn do_symlinkat(target: *const i8, new_dirfd: i32, link_path: *const i8) -> Result<isize> {
+    let target = from_user::clone_cstring_safely(target)?
+        .to_string_lossy()
+        .into_owned();
+    let link_path = from_user::clone_cstring_safely(link_path)?
+        .to_string_lossy()
+        .into_owned();
+    let new_dirfd = if Path::new(&link_path).is_absolute() {
+        // Link path is absolute, new_dirfd is treated as Cwd
+        DirFd::Cwd
+    } else {
+        DirFd::from_i32(new_dirfd)?
+    };
+    file_ops::do_symlinkat(&target, new_dirfd, &link_path)?;
+    Ok(0)
+}
+
 pub fn do_chmod(path: *const i8, mode: u16) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()

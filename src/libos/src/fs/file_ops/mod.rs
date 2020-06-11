@@ -25,7 +25,7 @@ pub use self::rename::do_rename;
 pub use self::rmdir::do_rmdir;
 pub use self::sendfile::do_sendfile;
 pub use self::stat::{do_fstat, do_fstatat, do_lstat, Stat, StatFlags};
-pub use self::symlink::do_readlink;
+pub use self::symlink::{do_readlink, do_symlinkat};
 pub use self::truncate::{do_ftruncate, do_truncate};
 pub use self::unlink::do_unlink;
 pub use self::write::{do_pwrite, do_write, do_writev};

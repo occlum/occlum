@@ -7,7 +7,7 @@ pub fn do_link(oldpath: &str, newpath: &str) -> Result<()> {
     let (inode, new_dir_inode) = {
         let current = current!();
         let fs = current.fs().lock().unwrap();
-        let inode = fs.lookup_inode(&oldpath)?;
+        let inode = fs.lookup_inode_no_follow(&oldpath)?;
         let new_dir_inode = fs.lookup_inode(new_dir_path)?;
         (inode, new_dir_inode)
     };
