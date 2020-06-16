@@ -180,7 +180,9 @@ pub fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize> {
 }
 
 pub fn do_set_tid_address(tidptr: *mut pid_t) -> Result<isize> {
-    check_mut_ptr(tidptr)?;
+    if !tidptr.is_null() {
+        check_mut_ptr(tidptr)?;
+    }
     super::do_set_tid_address::do_set_tid_address(tidptr).map(|tid| tid as isize)
 }
 
