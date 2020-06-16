@@ -107,6 +107,8 @@ enclave {
         void* occlum_ocall_posix_memalign(size_t alignment, size_t size);
         void occlum_ocall_free([user_check] void* ptr);
 
+        int occlum_ocall_mprotect([user_check] void* addr, size_t len, int prot);
+
         void occlum_ocall_sched_yield(void);
         int occlum_ocall_sched_setaffinity(
             int host_tid,

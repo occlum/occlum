@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <sys/mman.h>
 #include "ocalls.h"
 
 void *occlum_ocall_posix_memalign(size_t alignment, size_t size) {
@@ -24,4 +25,8 @@ void *occlum_ocall_posix_memalign(size_t alignment, size_t size) {
 
 void occlum_ocall_free(void *ptr) {
     free(ptr);
+}
+
+int occlum_ocall_mprotect(void *addr, size_t len, int prot) {
+    return mprotect(addr, len, prot);
 }

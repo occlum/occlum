@@ -1,5 +1,8 @@
 use super::*;
 
+use super::vm_area::VMArea;
+use super::vm_perms::VMPerms;
+
 #[derive(Clone, Debug)]
 pub enum VMInitializer {
     DoNothing(),
@@ -66,6 +69,7 @@ impl Default for VMMapAddr {
 pub struct VMMapOptions {
     size: usize,
     align: usize,
+    perms: VMPerms,
     addr: VMMapAddr,
     initializer: VMInitializer,
 }
@@ -89,6 +93,9 @@ impl VMMapOptionsBuilder {
             }
             align
         };
+        let perms = self
+            .perms
+            .ok_or_else(|| errno!(EINVAL, "perms must be given"))?;
         let addr = {
             let addr = self.addr.unwrap_or_default();
             match addr {
@@ -113,6 +120,7 @@ impl VMMapOptionsBuilder {
         Ok(VMMapOptions {
             size,
             align,
+            perms,
             addr,
             initializer,
         })
@@ -126,6 +134,10 @@ impl VMMapOptions {
 
     pub fn addr(&self) -> &VMMapAddr {
         &self.addr
+    }
+
+    pub fn perms(&self) -> &VMPerms {
+        &self.perms
     }
 
     pub fn initializer(&self) -> &VMInitializer {
@@ -201,52 +213,61 @@ impl VMRemapOptions {
 ///
 /// # Invariants
 ///
-/// Behind the scene, VMManager maintains a list of VMRange that have been allocated.
-/// (denoted as `self.sub_ranges`). To reason about the correctness of VMManager, we give
+/// Behind the scene, VMManager maintains a list of VMArea that have been allocated.
+/// (denoted as `self.vmas`). To reason about the correctness of VMManager, we give
 /// the set of invariants hold by VMManager.
 ///
 /// 1. The rule of sentry:
 /// ```
-/// self.range.begin() == self.sub_ranges[0].start() == self.sub_ranges[0].end()
+/// self.range.begin() == self.vmas[0].start() == self.vmas[0].end()
 /// ```
 /// and
 /// ```
-/// self.range.end() == self.sub_ranges[N-1].start() == self.sub_ranges[N-1].end()
+/// self.range.end() == self.vmas[N-1].start() == self.vmas[N-1].end()
 /// ```
-/// where `N = self.sub_ranges.len()`.
+/// where `N = self.vmas.len()`.
 ///
 /// 2. The rule of non-emptyness:
 /// ```
-/// self.sub_ranges[i].size() > 0, for 1 <= i < self.sub_ranges.len() - 1
+/// self.vmas[i].size() > 0, for 1 <= i < self.vmas.len() - 1
 /// ```
 ///
 /// 3. The rule of ordering:
 /// ```
-/// self.sub_ranges[i].end() <= self.sub_ranges[i+1].start() for 0 <= i < self.sub_ranges.len() - 1
+/// self.vmas[i].end() <= self.vmas[i+1].start() for 0 <= i < self.vmas.len() - 1
 /// ```
 ///
 /// 4. The rule of non-mergablility:
 /// ```
-/// self.sub_ranges[i].end() !=  self.sub_ranges[i+1].start() for 1 <= i < self.sub_ranges.len() - 2
+/// self.vmas[i].end() !=  self.vmas[i+1].start() || self.vmas[i].perms() !=  self.vmas[i+1].perms()
+///     for 1 <= i < self.vmas.len() - 2
 /// ```
 ///
 #[derive(Debug, Default)]
 pub struct VMManager {
     range: VMRange,
-    sub_ranges: Vec<VMRange>,
+    vmas: Vec<VMArea>,
 }
 
 impl VMManager {
     pub fn from(addr: usize, size: usize) -> Result<VMManager> {
         let range = VMRange::new(addr, addr + size)?;
-        let sub_ranges = {
+        let vmas = {
             let start = range.start();
             let end = range.end();
-            let start_sentry = VMRange::new(start, start)?;
-            let end_sentry = VMRange::new(end, end)?;
+            let start_sentry = {
+                let range = VMRange::new_empty(start)?;
+                let perms = VMPerms::empty();
+                VMArea::new(range, perms)
+            };
+            let end_sentry = {
+                let range = VMRange::new_empty(end)?;
+                let perms = VMPerms::empty();
+                VMArea::new(range, perms)
+            };
             vec![start_sentry, end_sentry]
         };
-        Ok(VMManager { range, sub_ranges })
+        Ok(VMManager { range, vmas })
     }
 
     pub fn range(&self) -> &VMRange {
@@ -262,21 +283,24 @@ impl VMManager {
             self.munmap(addr, size)?;
         }
 
-        // Allocate a new subrange for this mmap request
-        let (insert_idx, free_subrange) = self.find_free_subrange(size, addr)?;
-        let new_subrange = self.alloc_subrange_from(size, addr, &free_subrange);
-        let new_subrange_addr = new_subrange.start();
+        // Allocate a new range for this mmap request
+        let (insert_idx, free_range) = self.find_free_range(size, addr)?;
+        let new_range = self.alloc_range_from(size, addr, &free_range);
+        let new_addr = new_range.start();
+        let new_vma = VMArea::new(new_range, *options.perms());
 
-        // Initialize the memory of the new subrange
+        // Initialize the memory of the new range
         unsafe {
-            let buf = new_subrange.as_slice_mut();
+            let buf = new_vma.as_slice_mut();
             options.initializer.init_slice(buf)?;
         }
+        // Set memory permissions
+        Self::apply_perms(&new_vma, new_vma.perms());
 
-        // After initializing, we can safely insert the new subrange
-        self.insert_new_subrange(insert_idx, new_subrange);
+        // After initializing, we can safely insert the new VMA
+        self.insert_new_vma(insert_idx, new_vma);
 
-        Ok(new_subrange_addr)
+        Ok(new_addr)
     }
 
     pub fn munmap(&mut self, addr: usize, size: usize) -> Result<()> {
@@ -301,24 +325,27 @@ impl VMManager {
             effective_munmap_range
         };
 
-        let new_sub_ranges = self
-            .sub_ranges
+        let new_vmas = self
+            .vmas
             .iter()
-            .flat_map(|subrange| {
-                // Keep the two sentry subranges intact
-                if subrange.size() == 0 {
-                    return vec![*subrange];
+            .flat_map(|vma| {
+                // Keep the two sentry VMA intact
+                if vma.size() == 0 {
+                    return vec![*vma];
                 }
 
-                let unmapped_subrange = match subrange.intersect(&munmap_range) {
-                    None => return vec![*subrange],
-                    Some(unmapped_subrange) => unmapped_subrange,
+                let intersection_range = match vma.intersect(&munmap_range) {
+                    None => return vec![*vma],
+                    Some(intersection_range) => intersection_range,
                 };
 
-                subrange.subtract(&unmapped_subrange)
+                // Reset memory permissions
+                Self::apply_perms(&intersection_range, VMPerms::default());
+
+                vma.subtract(&intersection_range)
             })
             .collect();
-        self.sub_ranges = new_sub_ranges;
+        self.vmas = new_vmas;
         Ok(())
     }
 
@@ -343,9 +370,15 @@ impl VMManager {
             SizeType::Growing
         };
 
-        // The old range must not span over multiple sub-ranges
-        self.find_containing_subrange_idx(&old_range)
-            .ok_or_else(|| errno!(EFAULT, "invalid range"))?;
+        // Get the memory permissions of the old range
+        let perms = {
+            // The old range must be contained in one VMA
+            let idx = self
+                .find_containing_vma_idx(&old_range)
+                .ok_or_else(|| errno!(EFAULT, "invalid range"))?;
+            let containing_vma = &self.vmas[idx];
+            containing_vma.perms()
+        };
 
         // Implement mremap as one optional mmap followed by one optional munmap.
         //
@@ -362,6 +395,7 @@ impl VMManager {
                 let mmap_opts = VMMapOptionsBuilder::default()
                     .size(new_size - old_size)
                     .addr(VMMapAddr::Need(old_range.end()))
+                    .perms(perms)
                     .initializer(VMInitializer::FillZeros())
                     .build()?;
                 let ret_addr = Some(old_addr);
@@ -374,6 +408,7 @@ impl VMManager {
                     let mmap_ops = VMMapOptionsBuilder::default()
                         .size(prefered_new_range.size())
                         .addr(VMMapAddr::Need(prefered_new_range.start()))
+                        .perms(perms)
                         .initializer(VMInitializer::FillZeros())
                         .build()?;
                     (Some(mmap_ops), Some(old_addr))
@@ -381,6 +416,7 @@ impl VMManager {
                     let mmap_ops = VMMapOptionsBuilder::default()
                         .size(new_size)
                         .addr(VMMapAddr::Any)
+                        .perms(perms)
                         .initializer(VMInitializer::CopyFrom { range: old_range })
                         .build()?;
                     // Cannot determine the returned address for now, which can only be obtained after calling mmap
@@ -392,6 +428,7 @@ impl VMManager {
                 let mmap_opts = VMMapOptionsBuilder::default()
                     .size(new_size)
                     .addr(VMMapAddr::Force(new_addr))
+                    .perms(perms)
                     .initializer(VMInitializer::CopyFrom { range: old_range })
                     .build()?;
                 let ret_addr = Some(new_addr);
@@ -442,41 +479,109 @@ impl VMManager {
         Ok(ret_addr.unwrap())
     }
 
+    pub fn mprotect(&mut self, addr: usize, size: usize, new_perms: VMPerms) -> Result<()> {
+        let protect_range = VMRange::new_with_size(addr, size)?;
+
+        // FIXME: the current implementation requires the target range to be
+        // contained in exact one VMA.
+        let containing_idx = self
+            .find_containing_vma_idx(&protect_range)
+            .ok_or_else(|| errno!(ENOMEM, "invalid range"))?;
+        let containing_vma = &self.vmas[containing_idx];
+
+        let old_perms = containing_vma.perms();
+        if new_perms == old_perms {
+            return Ok(());
+        }
+
+        let same_start = protect_range.start() == containing_vma.start();
+        let same_end = protect_range.end() == containing_vma.end();
+        let containing_vma = &mut self.vmas[containing_idx];
+        match (same_start, same_end) {
+            (true, true) => {
+                containing_vma.set_perms(new_perms);
+
+                Self::apply_perms(containing_vma, containing_vma.perms());
+            }
+            (false, true) => {
+                containing_vma.set_end(protect_range.start());
+
+                let new_vma = VMArea::new(protect_range, new_perms);
+                Self::apply_perms(&new_vma, new_vma.perms());
+                self.insert_new_vma(containing_idx + 1, new_vma);
+            }
+            (true, false) => {
+                containing_vma.set_start(protect_range.end());
+
+                let new_vma = VMArea::new(protect_range, new_perms);
+                Self::apply_perms(&new_vma, new_vma.perms());
+                self.insert_new_vma(containing_idx, new_vma);
+            }
+            (false, false) => {
+                // The containing VMA is divided into three VMAs:
+                // Shrinked old VMA:    [containing_vma.start,     protect_range.start)
+                // New VMA:             [protect_range.start,      protect_range.end)
+                // Another new vma:     [protect_range.end,        containing_vma.end)
+
+                let old_end = containing_vma.end();
+                let protect_end = protect_range.end();
+
+                // Shrinked old VMA
+                containing_vma.set_end(protect_range.start());
+
+                // New VMA
+                let new_vma = VMArea::new(protect_range, new_perms);
+                Self::apply_perms(&new_vma, new_vma.perms());
+                self.insert_new_vma(containing_idx + 1, new_vma);
+
+                // Another new VMA
+                let new_vma2 = {
+                    let range = VMRange::new(protect_end, old_end).unwrap();
+                    VMArea::new(range, old_perms)
+                };
+                self.insert_new_vma(containing_idx + 2, new_vma2);
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn find_mmap_region(&self, addr: usize) -> Result<&VMRange> {
-        self.sub_ranges
+        self.vmas
             .iter()
-            .find(|subrange| subrange.contains(addr))
+            .map(|vma| vma.range())
+            .find(|vma| vma.contains(addr))
             .ok_or_else(|| errno!(ESRCH, "no mmap regions that contains the address"))
     }
 
-    // Find a subrange that contains the given range and returns the index of the subrange
-    fn find_containing_subrange_idx(&self, target_range: &VMRange) -> Option<usize> {
-        self.sub_ranges
+    // Find a VMA that contains the given range, returning the VMA's index
+    fn find_containing_vma_idx(&self, target_range: &VMRange) -> Option<usize> {
+        self.vmas
             .iter()
-            .position(|subrange| subrange.is_superset_of(target_range))
+            .position(|vma| vma.is_superset_of(target_range))
     }
 
     // Returns whether the requested range is free
     fn is_free_range(&self, request_range: &VMRange) -> bool {
         self.range.is_superset_of(request_range)
             && self
-                .sub_ranges
+                .vmas
                 .iter()
                 .all(|range| range.overlap_with(request_range) == false)
     }
 
-    // Find the free subrange that satisfies the constraints of size and address
-    fn find_free_subrange(&self, size: usize, addr: VMMapAddr) -> Result<(usize, VMRange)> {
+    // Find the free range that satisfies the constraints of size and address
+    fn find_free_range(&self, size: usize, addr: VMMapAddr) -> Result<(usize, VMRange)> {
         // TODO: reduce the complexity from O(N) to O(log(N)), where N is
-        // the number of existing subranges.
+        // the number of existing VMAs.
 
         // Record the minimal free range that satisfies the contraints
         let mut result_free_range: Option<VMRange> = None;
         let mut result_idx: Option<usize> = None;
 
-        for (idx, range_pair) in self.sub_ranges.windows(2).enumerate() {
-            // Since we have two sentry sub_ranges at both ends, we can be sure that the free
-            // space only appears between two consecutive sub_ranges.
+        for (idx, range_pair) in self.vmas.windows(2).enumerate() {
+            // Since we have two sentry vmas at both ends, we can be sure that the free
+            // space only appears between two consecutive vmas.
             let pre_range = &range_pair[0];
             let next_range = &range_pair[1];
 
@@ -539,68 +644,101 @@ impl VMManager {
         Ok((insert_idx, free_range))
     }
 
-    fn alloc_subrange_from(
-        &self,
-        size: usize,
-        addr: VMMapAddr,
-        free_subrange: &VMRange,
-    ) -> VMRange {
-        debug_assert!(free_subrange.size() >= size);
+    fn alloc_range_from(&self, size: usize, addr: VMMapAddr, free_range: &VMRange) -> VMRange {
+        debug_assert!(free_range.size() >= size);
 
-        let mut new_subrange = *free_subrange;
+        let mut new_range = *free_range;
 
         if let VMMapAddr::Need(addr) = addr {
-            debug_assert!(addr == new_subrange.start());
+            debug_assert!(addr == new_range.start());
         }
         if let VMMapAddr::Force(addr) = addr {
-            debug_assert!(addr == new_subrange.start());
+            debug_assert!(addr == new_range.start());
         }
 
-        new_subrange.resize(size);
-        new_subrange
+        new_range.resize(size);
+        new_range
     }
 
-    // Insert the new sub-range, and when possible, merge it with its neighbors.
-    fn insert_new_subrange(&mut self, insert_idx: usize, new_subrange: VMRange) {
-        // New sub-range can only be inserted between the two sentry sub-ranges
-        debug_assert!(0 < insert_idx && insert_idx < self.sub_ranges.len());
+    // Insert a new VMA, and when possible, merge it with its neighbors.
+    fn insert_new_vma(&mut self, insert_idx: usize, new_vma: VMArea) {
+        // New VMA can only be inserted between the two sentry VMAs
+        debug_assert!(0 < insert_idx && insert_idx < self.vmas.len());
 
         let left_idx = insert_idx - 1;
         let right_idx = insert_idx;
 
-        // Double check the order
-        debug_assert!(self.sub_ranges[left_idx].end() <= new_subrange.start());
-        debug_assert!(new_subrange.end() <= self.sub_ranges[right_idx].start());
+        let left_vma = &self.vmas[left_idx];
+        let right_vma = &self.vmas[right_idx];
 
-        let left_mergable = if left_idx > 0 {
-            // Mergable if there is no gap between the left neighbor and the new sub-range
-            self.sub_ranges[left_idx].end() == new_subrange.start()
-        } else {
-            // The left sentry sub-range is NOT mergable with any sub-range
-            false
-        };
-        let right_mergable = if right_idx < self.sub_ranges.len() - 1 {
-            // Mergable if there is no gap between the right neighbor and the new sub-range
-            self.sub_ranges[right_idx].start() == new_subrange.end()
-        } else {
-            // The right sentry sub-range is NOT mergable with any sub-range
-            false
-        };
+        // Double check the order
+        debug_assert!(left_vma.end() <= new_vma.start());
+        debug_assert!(new_vma.end() <= right_vma.start());
+
+        let left_mergable = Self::can_merge_vmas(left_vma, &new_vma);
+        let right_mergable = Self::can_merge_vmas(&new_vma, right_vma);
+
+        drop(left_vma);
+        drop(right_vma);
 
         match (left_mergable, right_mergable) {
             (false, false) => {
-                self.sub_ranges.insert(insert_idx, new_subrange);
+                self.vmas.insert(insert_idx, new_vma);
             }
             (true, false) => {
-                self.sub_ranges[left_idx].end = new_subrange.end;
+                self.vmas[left_idx].set_end(new_vma.end);
             }
             (false, true) => {
-                self.sub_ranges[right_idx].start = new_subrange.start;
+                self.vmas[right_idx].set_start(new_vma.start);
             }
             (true, true) => {
-                self.sub_ranges[left_idx].end = self.sub_ranges[right_idx].end;
-                self.sub_ranges.remove(right_idx);
+                let left_new_end = self.vmas[right_idx].end();
+                self.vmas[left_idx].set_end(left_new_end);
+                self.vmas.remove(right_idx);
             }
+        }
+    }
+
+    fn can_merge_vmas(left: &VMArea, right: &VMArea) -> bool {
+        debug_assert!(left.end() <= right.start());
+
+        // Both of the two VMAs are not sentry (whose size == 0)
+        left.size() > 0 && right.size() > 0 &&
+            // Two VMAs must border with each other
+            left.end() == right.start() &&
+            // Two VMAs must have the same memory permissions
+            left.perms() == right.perms()
+    }
+
+    fn apply_perms(protect_range: &VMRange, perms: VMPerms) {
+        extern "C" {
+            pub fn occlum_ocall_mprotect(
+                retval: *mut i32,
+                addr: *const c_void,
+                len: usize,
+                prot: i32,
+            ) -> sgx_status_t;
+        };
+
+        unsafe {
+            let mut retval = 0;
+            let addr = protect_range.start() as *const c_void;
+            let len = protect_range.size();
+            let prot = perms.bits() as i32;
+            let sgx_status = occlum_ocall_mprotect(&mut retval, addr, len, prot);
+            assert!(sgx_status == sgx_status_t::SGX_SUCCESS && retval == 0);
+        }
+    }
+}
+
+impl Drop for VMManager {
+    fn drop(&mut self) {
+        // Ensure that memory permissions are recovered
+        for vma in &self.vmas {
+            if vma.size() == 0 || vma.perms() == VMPerms::default() {
+                continue;
+            }
+            Self::apply_perms(vma, VMPerms::default());
         }
     }
 }

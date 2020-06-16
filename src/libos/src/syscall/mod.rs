@@ -745,8 +745,9 @@ fn do_mremap(
     Ok(addr as isize)
 }
 
-fn do_mprotect(addr: usize, len: usize, prot: u32) -> Result<isize> {
-    // TODO: implement it
+fn do_mprotect(addr: usize, len: usize, perms: u32) -> Result<isize> {
+    let perms = VMPerms::from_u32(perms as u32)?;
+    vm::do_mprotect(addr, len, perms)?;
     Ok(0)
 }
 

@@ -5,15 +5,18 @@ use std::fmt;
 
 mod process_vm;
 mod user_space_vm;
+mod vm_area;
 mod vm_layout;
 mod vm_manager;
+mod vm_perms;
 mod vm_range;
 
 use self::vm_layout::VMLayout;
 use self::vm_manager::{VMManager, VMMapOptionsBuilder};
 
-pub use self::process_vm::{MMapFlags, MRemapFlags, ProcessVM, ProcessVMBuilder, VMPerms};
+pub use self::process_vm::{MMapFlags, MRemapFlags, ProcessVM, ProcessVMBuilder};
 pub use self::user_space_vm::USER_SPACE_VM_MANAGER;
+pub use self::vm_perms::VMPerms;
 pub use self::vm_range::VMRange;
 
 pub fn do_mmap(
@@ -61,6 +64,16 @@ pub fn do_mremap(
     let current = current!();
     let mut current_vm = current.vm().lock().unwrap();
     current_vm.mremap(old_addr, old_size, new_size, flags)
+}
+
+pub fn do_mprotect(addr: usize, size: usize, perms: VMPerms) -> Result<()> {
+    debug!(
+        "mprotect: addr: {:#x}, size: {:#x}, perms: {:?}",
+        addr, size, perms
+    );
+    let current = current!();
+    let mut current_vm = current.vm().lock().unwrap();
+    current_vm.mprotect(addr, size, perms)
 }
 
 pub fn do_brk(addr: usize) -> Result<usize> {

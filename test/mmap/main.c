@@ -734,6 +734,227 @@ int test_mremap_with_fixed_addr() {
 }
 
 // ============================================================================
+// Test cases for mprotect
+// ============================================================================
+
+int test_mprotect_once() {
+    // The memory permissions initially looks like below:
+    //
+    // Pages:            #0   #1   #2   #3
+    // -------------------------------------
+    // Memory perms:     [   ][   ][   ][   ]
+    size_t total_len = 4; // in pages
+    int init_prot = PROT_NONE;
+
+    // The four settings for mprotect and its resulting memory perms.
+    //
+    // Pages:            #0   #1   #2   #3
+    // -------------------------------------
+    // Setting (i = 0):
+    //  mprotect:        [RW ][RW ][RW ][RW ]
+    //  result:          [RW ][RW ][RW ][RW ]
+    // Setting (i = 1):
+    //  mprotect:        [RW ]
+    //  result:          [RW ][   ][   ][   ]
+    // Setting (i = 2):
+    //  mprotect:                  [RW ][RW ]
+    //  result:          [   ][   ][RW ][RW ]
+    // Setting (i = 3):
+    //  mprotect:             [RW ][RW ]
+    //  result:          [   ][RW ][RW ][   ]
+    size_t lens[] = { 4, 1, 2, 2}; // in pages
+    size_t offsets[] = { 0, 0, 2, 1}; // in pages
+    for (int i = 0; i < ARRAY_SIZE(lens); i++) {
+        int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+        void *buf = mmap(NULL, total_len * PAGE_SIZE, init_prot, flags, -1, 0);
+        if (buf == MAP_FAILED) {
+            THROW_ERROR("mmap failed");
+        }
+
+        size_t len = lens[i] * PAGE_SIZE;
+        size_t offset = offsets[i] * PAGE_SIZE;
+        int prot = PROT_READ | PROT_WRITE;
+        void *tmp_buf = (char *)buf + offset;
+        int ret = mprotect(tmp_buf, len, prot);
+        if (ret < 0) {
+            THROW_ERROR("mprotect failed");
+        }
+
+        ret = munmap(buf, total_len * PAGE_SIZE);
+        if (ret < 0) {
+            THROW_ERROR("munmap failed");
+        }
+    }
+
+    return 0;
+}
+
+int test_mprotect_twice() {
+    // The memory permissions initially looks like below:
+    //
+    // Pages:              #0   #1   #2   #3
+    // -------------------------------------
+    // Memory perms:       [   ][   ][   ][   ]
+    size_t total_len = 4; // in pages
+    int init_prot = PROT_NONE;
+
+    // The four settings for mprotects and their results
+    //
+    // Pages:              #0   #1   #2   #3
+    // -------------------------------------
+    // Setting (i = 0):
+    //  mprotect (j = 0):  [RW ][RW ]
+    //  mprotect (j = 1):            [RW ][RW ]
+    //  result:            [RW ][RW ][RW ][RW ]
+    // Setting (i = 1):
+    //  mprotect (j = 0):       [RW ]
+    //  mprotect (j = 1):                 [RW ]
+    //  result:            [   ][RW ][   ][RW ]
+    // Setting (i = 2):
+    //  mprotect (j = 0):       [RW ][RW ]
+    //  mprotect (j = 1):       [ WX][ WX]
+    //  result:            [   ][ WX][ WX][  ]
+    // Setting (i = 3):
+    //  mprotect (j = 0):       [RW ][RW ]
+    //  mprotect (j = 1):       [   ]
+    //  result:            [   ][   ][RW ][   ]
+    size_t lens[][2] = {
+        { 2, 2 },
+        { 1, 1 },
+        { 2, 2 },
+        { 2, 1 }
+    }; // in pages
+    size_t offsets[][2] = {
+        { 0, 2 },
+        { 1, 3 },
+        { 1, 1 },
+        { 1, 1 }
+    }; // in pages
+    int prots[][2] = {
+        { PROT_READ | PROT_WRITE, PROT_READ | PROT_WRITE },
+        { PROT_READ | PROT_WRITE, PROT_READ | PROT_WRITE },
+        { PROT_READ | PROT_WRITE, PROT_WRITE | PROT_EXEC },
+        { PROT_READ | PROT_WRITE, PROT_NONE }
+    };
+    for (int i = 0; i < ARRAY_SIZE(lens); i++) {
+        int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+        void *buf = mmap(NULL, total_len * PAGE_SIZE, init_prot, flags, -1, 0);
+        if (buf == MAP_FAILED) {
+            THROW_ERROR("mmap failed");
+        }
+
+        for (int j = 0; j < 2; j++) {
+            size_t len = lens[i][j] * PAGE_SIZE;
+            size_t offset = offsets[i][j] * PAGE_SIZE;
+            int prot = prots[i][j];
+            void *tmp_buf = (char *)buf + offset;
+            int ret = mprotect(tmp_buf, len, prot);
+            if (ret < 0) {
+                THROW_ERROR("mprotect failed");
+            }
+        }
+
+        int ret = munmap(buf, total_len * PAGE_SIZE);
+        if (ret < 0) {
+            THROW_ERROR("munmap failed");
+        }
+    }
+    return 0;
+}
+
+int test_mprotect_triple() {
+    // The memory permissions initially looks like below:
+    //
+    // Pages:              #0   #1   #2   #3
+    // -------------------------------------
+    // Memory perms:       [RWX][RWX][RWX][RWX]
+    size_t total_len = 4; // in pages
+    int init_prot = PROT_READ | PROT_WRITE | PROT_EXEC;
+
+    // The four settings for mprotects and their results
+    //
+    // Pages:              #0   #1   #2   #3
+    // -------------------------------------
+    // Setting (i = 0):
+    //  mprotect (j = 0):  [   ][   ]
+    //  mprotect (j = 1):                 [   ]
+    //  mprotect (j = 2):            [   ]
+    //  result:            [   ][   ][   ][   ]
+    size_t lens[][3] = {
+        { 2, 1, 1 },
+    }; // in pages
+    size_t offsets[][3] = {
+        { 0, 3, 2 },
+    }; // in pages
+    int prots[][3] = {
+        { PROT_NONE, PROT_NONE, PROT_NONE },
+    };
+    for (int i = 0; i < ARRAY_SIZE(lens); i++) {
+        int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+        void *buf = mmap(NULL, total_len * PAGE_SIZE, init_prot, flags, -1, 0);
+        if (buf == MAP_FAILED) {
+            THROW_ERROR("mmap failed");
+        }
+
+        for (int j = 0; j < 3; j++) {
+            size_t len = lens[i][j] * PAGE_SIZE;
+            size_t offset = offsets[i][j] * PAGE_SIZE;
+            int prot = prots[i][j];
+            void *tmp_buf = (char *)buf + offset;
+            int ret = mprotect(tmp_buf, len, prot);
+            if (ret < 0) {
+                THROW_ERROR("mprotect failed");
+            }
+        }
+
+        int ret = munmap(buf, total_len * PAGE_SIZE);
+        if (ret < 0) {
+            THROW_ERROR("munmap failed");
+        }
+    }
+    return 0;
+}
+
+int test_mprotect_with_zero_len() {
+    int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+    void *buf = mmap(NULL, PAGE_SIZE, PROT_NONE, flags, -1, 0);
+    if (buf == MAP_FAILED) {
+        THROW_ERROR("mmap failed");
+    }
+
+    int ret = mprotect(buf, 0, PROT_NONE);
+    if (ret < 0) {
+        THROW_ERROR("mprotect failed");
+    }
+
+    ret = munmap(buf, PAGE_SIZE);
+    if (ret < 0) {
+        THROW_ERROR("munmap failed");
+    }
+
+    return 0;
+}
+
+int test_mprotect_with_invalid_addr() {
+    int ret = mprotect(NULL, PAGE_SIZE, PROT_NONE);
+    if (ret == 0 || errno != ENOMEM) {
+        THROW_ERROR("using invalid addr should have failed");
+    }
+    return 0;
+}
+
+int test_mprotect_with_invalid_prot() {
+    int invalid_prot = 0x1234; // invalid protection bits
+    void *valid_addr = &invalid_prot;
+    size_t valid_len = PAGE_SIZE;
+    int ret = mprotect(valid_addr, valid_len, invalid_prot);
+    if (ret == 0 || errno != EINVAL) {
+        THROW_ERROR("using invalid addr should have failed");
+    }
+    return 0;
+}
+
+// ============================================================================
 // Test suite main
 // ============================================================================
 
@@ -762,6 +983,12 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_mremap),
     TEST_CASE(test_mremap_subrange),
     TEST_CASE(test_mremap_with_fixed_addr),
+    TEST_CASE(test_mprotect_once),
+    TEST_CASE(test_mprotect_twice),
+    TEST_CASE(test_mprotect_triple),
+    TEST_CASE(test_mprotect_with_zero_len),
+    TEST_CASE(test_mprotect_with_invalid_addr),
+    TEST_CASE(test_mprotect_with_invalid_prot),
 };
 
 int main() {

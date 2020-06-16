@@ -6,6 +6,7 @@ use super::user_space_vm::{UserSpaceVMManager, UserSpaceVMRange, USER_SPACE_VM_M
 use super::vm_manager::{
     VMInitializer, VMManager, VMMapAddr, VMMapOptions, VMMapOptionsBuilder, VMRemapOptions,
 };
+use super::vm_perms::VMPerms;
 
 #[derive(Debug)]
 pub struct ProcessVMBuilder<'a, 'b> {
@@ -202,12 +203,18 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
 /// The per-process virtual memory
 #[derive(Debug)]
 pub struct ProcessVM {
-    process_range: UserSpaceVMRange,
+    mmap_manager: VMManager,
     elf_ranges: Vec<VMRange>,
     heap_range: VMRange,
     stack_range: VMRange,
     brk: usize,
-    mmap_manager: VMManager,
+    // Memory safety notes: the process_range field must be the last one.
+    //
+    // Rust drops fields in the same order as they are declared. So by making
+    // process_range the last field, we ensure that when all other fields are
+    // dropped, their drop methods (if provided) can still access the memory
+    // region represented by the process_range field.
+    process_range: UserSpaceVMRange,
 }
 
 impl Default for ProcessVM {
@@ -313,6 +320,7 @@ impl ProcessVM {
         let mmap_options = VMMapOptionsBuilder::default()
             .size(size)
             .addr(addr_option)
+            .perms(perms)
             .initializer(initializer)
             .build()?;
         let mmap_addr = self.mmap_manager.mmap(&mmap_options)?;
@@ -338,6 +346,20 @@ impl ProcessVM {
 
     pub fn munmap(&mut self, addr: usize, size: usize) -> Result<()> {
         self.mmap_manager.munmap(addr, size)
+    }
+
+    pub fn mprotect(&mut self, addr: usize, size: usize, perms: VMPerms) -> Result<()> {
+        let protect_range = VMRange::new_with_size(addr, size)?;
+        if !self.process_range.range().is_superset_of(&protect_range) {
+            return_errno!(ENOMEM, "invalid range");
+        }
+        // TODO: support mprotect vm regions in addition to mmap
+        if !self.mmap_manager.range().is_superset_of(&protect_range) {
+            warn!("Do not support mprotect memory outside the mmap region yet");
+            return Ok(());
+        }
+
+        self.mmap_manager.mprotect(addr, size, perms)
     }
 
     pub fn find_mmap_region(&self, addr: usize) -> Result<&VMRange> {
@@ -409,32 +431,6 @@ impl MRemapFlags {
 impl Default for MRemapFlags {
     fn default() -> Self {
         MRemapFlags::None
-    }
-}
-
-bitflags! {
-    pub struct VMPerms : u32 {
-        const READ        = 0x1;
-        const WRITE       = 0x2;
-        const EXEC        = 0x4;
-    }
-}
-
-impl VMPerms {
-    pub fn can_read(&self) -> bool {
-        self.contains(VMPerms::READ)
-    }
-
-    pub fn can_write(&self) -> bool {
-        self.contains(VMPerms::WRITE)
-    }
-
-    pub fn can_execute(&self) -> bool {
-        self.contains(VMPerms::EXEC)
-    }
-
-    pub fn from_u32(bits: u32) -> Result<VMPerms> {
-        VMPerms::from_bits(bits).ok_or_else(|| errno!(EINVAL, "unknown permission bits"))
     }
 }
 

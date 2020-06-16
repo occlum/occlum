@@ -60,7 +60,18 @@ impl VMRange {
     }
 
     pub fn resize(&mut self, new_size: usize) {
+        debug_assert!(new_size % PAGE_SIZE == 0);
         self.end = self.start + new_size;
+    }
+
+    pub fn set_start(&mut self, start: usize) {
+        debug_assert!(start % PAGE_SIZE == 0 && start <= self.end);
+        self.start = start;
+    }
+
+    pub fn set_end(&mut self, end: usize) {
+        debug_assert!(end % PAGE_SIZE == 0 && end >= self.start);
+        self.end = end;
     }
 
     pub fn empty(&self) -> bool {
@@ -75,36 +86,47 @@ impl VMRange {
         self.start() <= addr && addr < self.end()
     }
 
+    // Returns whether two ranges have non-empty interesection.
     pub fn overlap_with(&self, other: &VMRange) -> bool {
-        self.start() < other.end() && other.start() < self.end()
+        let intersection_start = self.start().max(other.start());
+        let intersection_end = self.end().min(other.end());
+        intersection_start < intersection_end
     }
 
+    // Returns a set of ranges by subtracting self with the other.
+    //
+    // Post-condition: the returned ranges have non-zero sizes.
     pub fn subtract(&self, other: &VMRange) -> Vec<VMRange> {
+        if self.size() == 0 {
+            return vec![];
+        }
+
+        let intersection = match self.intersect(other) {
+            None => return vec![*self],
+            Some(intersection) => intersection,
+        };
+
         let self_start = self.start();
         let self_end = self.end();
-        let other_start = other.start();
-        let other_end = other.end();
+        let inter_start = intersection.start();
+        let inter_end = intersection.end();
+        debug_assert!(self_start <= inter_start);
+        debug_assert!(inter_end <= self_end);
 
-        match (self_start < other_start, other_end < self_end) {
+        match (self_start < inter_start, inter_end < self_end) {
             (false, false) => Vec::new(),
-            (false, true) => unsafe {
-                vec![VMRange::from_unchecked(self_start.max(other_end), self_end)]
-            },
-            (true, false) => unsafe {
-                vec![VMRange::from_unchecked(
-                    self_start,
-                    self_end.min(other_start),
-                )]
-            },
+            (false, true) => unsafe { vec![VMRange::from_unchecked(inter_end, self_end)] },
+            (true, false) => unsafe { vec![VMRange::from_unchecked(self_start, inter_start)] },
             (true, true) => unsafe {
                 vec![
-                    VMRange::from_unchecked(self_start, other_start),
-                    VMRange::from_unchecked(other_end, self_end),
+                    VMRange::from_unchecked(self_start, inter_start),
+                    VMRange::from_unchecked(inter_end, self_end),
                 ]
             },
         }
     }
 
+    // Returns an non-empty intersection if where is any
     pub fn intersect(&self, other: &VMRange) -> Option<VMRange> {
         let intersection_start = self.start().max(other.start());
         let intersection_end = self.end().min(other.end());
