@@ -2,18 +2,20 @@ use std::ffi::{CStr, CString};
 use std::path::Path;
 
 use self::aux_vec::{AuxKey, AuxVec};
+use self::exec_loader::{load_exec_file_to_vec, load_file_to_vec};
 use super::elf_file::{ElfFile, ElfHeader, ProgramHeader, ProgramHeaderExt};
 use super::process::ProcessBuilder;
 use super::task::Task;
 use super::{table, task, ProcessRef, ThreadRef};
 use crate::fs::{
-    CreationFlags, File, FileDesc, FileMode, FileTable, FsView, HostStdioFds, INodeExt, StdinFile,
-    StdoutFile, ROOT_INODE,
+    CreationFlags, File, FileDesc, FileTable, FsView, HostStdioFds, StdinFile, StdoutFile,
+    ROOT_INODE,
 };
 use crate::prelude::*;
 use crate::vm::ProcessVM;
 
 mod aux_vec;
+mod exec_loader;
 mod init_stack;
 mod init_vm;
 
@@ -91,17 +93,31 @@ fn do_spawn_common(
 
 /// Create a new process and its main thread.
 fn new_process(
-    elf_path: &str,
+    file_path: &str,
     argv: &[CString],
     envp: &[CString],
     file_actions: &[FileAction],
     host_stdio_fds: Option<&HostStdioFds>,
     current_ref: &ThreadRef,
 ) -> Result<ProcessRef> {
-    let elf_buf = load_elf_to_vec(elf_path, current_ref)
-        .cause_err(|e| errno!(e.errno(), "cannot load the executable"))?;
+    let mut argv = argv.clone().to_vec();
+    let (is_script, elf_buf) = load_exec_file_to_vec(file_path, current_ref)?;
+
+    // elf_path might be different from file_path because file_path could lead to a script text file.
+    // And intepreter will be the loaded ELF.
+    let elf_path = if let Some(interpreter_path) = is_script {
+        if argv.len() == 0 {
+            return_errno!(EINVAL, "argv[0] not found");
+        }
+        argv.insert(0, CString::new(interpreter_path.as_str())?);
+        argv[1] = CString::new(file_path)?; // script file needs to be the full path
+        interpreter_path
+    } else {
+        file_path.to_string()
+    };
+
     let ldso_path = "/lib/ld-musl-x86_64.so.1";
-    let ldso_elf_buf = load_elf_to_vec(ldso_path, current_ref)
+    let ldso_elf_buf = load_file_to_vec(ldso_path, current_ref)
         .cause_err(|e| errno!(e.errno(), "cannot load ld.so"))?;
 
     let exec_elf_file =
@@ -145,7 +161,7 @@ fn new_process(
             };
             let user_stack_base = vm.get_stack_base();
             let user_stack_limit = vm.get_stack_limit();
-            let user_rsp = init_stack::do_init(user_stack_base, 4096, argv, envp, &auxvec)?;
+            let user_rsp = init_stack::do_init(user_stack_base, 4096, &argv, envp, &auxvec)?;
             unsafe {
                 Task::new(
                     ldso_entry,
@@ -166,7 +182,7 @@ fn new_process(
 
         ProcessBuilder::new()
             .vm(vm_ref)
-            .exec_path(elf_path)
+            .exec_path(&elf_path)
             .parent(process_ref)
             .task(task)
             .sched(sched_ref)
@@ -199,31 +215,6 @@ pub enum FileAction {
     },
     Dup2(FileDesc, FileDesc),
     Close(FileDesc),
-}
-
-fn load_elf_to_vec(elf_path: &str, current_ref: &ThreadRef) -> Result<Vec<u8>> {
-    let inode = current_ref
-        .fs()
-        .lock()
-        .unwrap()
-        .lookup_inode_follow(elf_path)
-        .map_err(|e| errno!(e.errno(), "cannot find the ELF"))?;
-    let file_mode = {
-        let info = inode.metadata()?;
-        FileMode::from_bits_truncate(info.mode)
-    };
-    if !file_mode.is_executable() {
-        return_errno!(EACCES, "elf file is not executable");
-    }
-    if file_mode.has_set_uid() || file_mode.has_set_gid() {
-        warn!(
-            "set-user-ID and set-group-ID are not supportted, FileMode:{:?}",
-            file_mode
-        );
-    }
-    inode
-        .read_as_vec()
-        .map_err(|e| errno!(e.errno(), "failed to read the executable ELF"))
 }
 
 fn init_files(
