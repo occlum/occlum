@@ -21,6 +21,13 @@ inside Occlum. `echo`, `awk`, `cat` here are actually symbolic files linked to b
 to write `busybox` prefix. The `command` keyword tells FISH that `echo` is an external command because FISH also provides
 builtin `echo` command.
 
+The script can be executed by Occlum directly as shown below:
+```
+occlum run /bin/fish_script.sh
+```
+As demonstrated here, Occlum supports executing any script file that begins with a [shebang](https://en.wikipedia.org/wiki/Shebang_(Unix))
+at its first line by invoking the interpreter program specified with the shebang.
+
 ## Step 1:
 Downlaod FISH and busybox and build them with Occlum tool chain:
 ```
