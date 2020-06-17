@@ -23,8 +23,8 @@ pub fn do_exit(status: i32) {
 /// A thread may be forced to exit for two reasons: 1) a fatal signal; 2)
 /// exit_group syscall.
 pub fn handle_force_exit() {
-    if let Some(term_status) = current!().process().is_forced_exit() {
-        exit_thread(term_status);
+    if current!().process().is_forced_to_exit() {
+        exit_thread(current!().process().term_status().unwrap());
     }
 }
 

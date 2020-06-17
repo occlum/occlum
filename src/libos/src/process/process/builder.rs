@@ -1,7 +1,8 @@
 use super::super::task::Task;
 use super::super::thread::{ThreadBuilder, ThreadId};
 use super::super::{
-    FileTableRef, FsViewRef, ProcessRef, ProcessVMRef, ResourceLimitsRef, SchedAgentRef,
+    FileTableRef, ForcedExitStatus, FsViewRef, ProcessRef, ProcessVMRef, ResourceLimitsRef,
+    SchedAgentRef,
 };
 use super::{Process, ProcessInner};
 use crate::prelude::*;
@@ -96,7 +97,7 @@ impl ProcessBuilder {
             let inner = SgxMutex::new(ProcessInner::new());
             let sig_dispositions = SgxRwLock::new(SigDispositions::new());
             let sig_queues = SgxMutex::new(SigQueues::new());
-            let forced_exit = SgxRwLock::new(None);
+            let forced_exit_status = ForcedExitStatus::new();
             Arc::new(Process {
                 pid,
                 exec_path,
@@ -104,7 +105,7 @@ impl ProcessBuilder {
                 inner,
                 sig_dispositions,
                 sig_queues,
-                forced_exit,
+                forced_exit_status,
             })
         };
 

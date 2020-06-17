@@ -1,7 +1,7 @@
 use std::fmt;
 
 use super::wait::WaitQueue;
-use super::{ProcessRef, TermStatus, ThreadRef};
+use super::{ForcedExitStatus, ProcessRef, TermStatus, ThreadRef};
 use crate::prelude::*;
 use crate::signal::{SigDispositions, SigNum, SigQueues};
 
@@ -21,7 +21,7 @@ pub struct Process {
     // Signal
     sig_dispositions: SgxRwLock<SigDispositions>,
     sig_queues: SgxMutex<SigQueues>,
-    forced_exit: SgxRwLock<Option<TermStatus>>,
+    forced_exit_status: ForcedExitStatus,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -109,9 +109,13 @@ impl Process {
         &self.sig_dispositions
     }
 
+    pub fn term_status(&self) -> Option<TermStatus> {
+        self.forced_exit_status.term_status()
+    }
+
     /// Check whether the process has been forced to exit.
-    pub fn is_forced_exit(&self) -> Option<TermStatus> {
-        *self.forced_exit.read().unwrap()
+    pub fn is_forced_to_exit(&self) -> bool {
+        self.forced_exit_status.is_forced_to_exit()
     }
 
     /// Force a process to exit.
@@ -122,8 +126,7 @@ impl Process {
     ///
     /// A process may be forced to exit many times, but only the first time counts.
     pub fn force_exit(&self, term_status: TermStatus) {
-        let mut forced_exit = self.forced_exit.write().unwrap();
-        forced_exit.get_or_insert(term_status);
+        self.forced_exit_status.force_exit(term_status);
     }
 
     /// Get the internal representation of the process.

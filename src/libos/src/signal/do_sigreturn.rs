@@ -52,7 +52,7 @@ pub fn deliver_signal(cpu_context: &mut CpuContext) {
     let thread = current!();
     let process = thread.process();
 
-    if process.is_forced_exit().is_none() {
+    if !process.is_forced_to_exit() {
         do_deliver_signal(&thread, &process, cpu_context);
     }
 

@@ -3,8 +3,8 @@ use std::ptr::NonNull;
 
 use super::task::Task;
 use super::{
-    FileTableRef, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef, ResourceLimitsRef, SchedAgentRef,
-    TermStatus, ThreadRef,
+    FileTableRef, ForcedExitStatus, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef,
+    ResourceLimitsRef, SchedAgentRef, TermStatus, ThreadRef,
 };
 use crate::prelude::*;
 use crate::signal::{SigQueues, SigSet, SigStack};

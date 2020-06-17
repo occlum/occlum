@@ -25,7 +25,7 @@ pub use self::do_spawn::do_spawn_without_exec;
 pub use self::process::{Process, ProcessFilter, ProcessStatus, IDLE};
 pub use self::syscalls::*;
 pub use self::task::Task;
-pub use self::term_status::TermStatus;
+pub use self::term_status::{ForcedExitStatus, TermStatus};
 pub use self::thread::{Thread, ThreadStatus};
 
 mod do_arch_prctl;
