@@ -87,8 +87,7 @@ pub mod from_user {
     /// len: the length in byte
     fn is_inside_user_space(addr: *const u8, len: usize) -> bool {
         let current = current!();
-        let current_vm = current.vm().lock().unwrap();
-        let user_range = current_vm.get_process_range();
+        let user_range = current.vm().get_process_range();
         let ur_start = user_range.start();
         let ur_end = user_range.end();
         let addr_start = addr as usize;

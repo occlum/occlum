@@ -156,7 +156,7 @@ fn new_process(
                 )?
             }
         };
-        let vm_ref = Arc::new(SgxMutex::new(vm));
+        let vm_ref = Arc::new(vm);
         let files_ref = {
             let files = init_files(current_ref, file_actions, host_stdio_fds)?;
             Arc::new(SgxMutex::new(files))

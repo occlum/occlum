@@ -16,7 +16,7 @@ lazy_static! {
 fn create_idle_thread() -> Result<ThreadRef> {
     // Create dummy values for the mandatory fields
     let dummy_tid = ThreadId::zero();
-    let dummy_vm = Arc::new(SgxMutex::new(ProcessVM::default()));
+    let dummy_vm = Arc::new(ProcessVM::default());
     let dummy_task = Task::default();
 
     // Assemble the idle process

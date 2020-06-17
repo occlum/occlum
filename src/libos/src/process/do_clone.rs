@@ -34,7 +34,6 @@ pub fn do_clone(
         let current = current!();
         let vm = current.vm().clone();
         let task = {
-            let vm = vm.lock().unwrap();
             let user_stack_range = guess_user_stack_bound(&vm, user_rsp)?;
             let user_stack_base = user_stack_range.end();
             let user_stack_limit = user_stack_range.start();
@@ -230,16 +229,16 @@ fn check_clone_flags(flags: CloneFlags) -> Result<()> {
     Ok(())
 }
 
-fn guess_user_stack_bound(vm: &ProcessVM, user_rsp: usize) -> Result<&VMRange> {
+fn guess_user_stack_bound(vm: &ProcessVM, user_rsp: usize) -> Result<VMRange> {
     // The first case is most likely
     if let Ok(stack_range) = vm.find_mmap_region(user_rsp) {
         Ok(stack_range)
     }
     // The next three cases are very unlikely, but valid
     else if vm.get_stack_range().contains(user_rsp) {
-        Ok(vm.get_stack_range())
+        Ok(*vm.get_stack_range())
     } else if vm.get_heap_range().contains(user_rsp) {
-        Ok(vm.get_heap_range())
+        Ok(*vm.get_heap_range())
     }
     // Invalid
     else {

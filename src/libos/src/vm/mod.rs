@@ -39,16 +39,13 @@ pub fn do_mmap(
         );
     }
 
-    let current = current!();
-    let mut current_vm = current.vm().lock().unwrap();
-    current_vm.mmap(addr, size, perms, flags, fd, offset)
+    current!().vm().mmap(addr, size, perms, flags, fd, offset)
 }
 
 pub fn do_munmap(addr: usize, size: usize) -> Result<()> {
     debug!("munmap: addr: {:#x}, size: {:#x}", addr, size);
     let current = current!();
-    let mut current_vm = current.vm().lock().unwrap();
-    current_vm.munmap(addr, size)
+    current!().vm().munmap(addr, size)
 }
 
 pub fn do_mremap(
@@ -61,9 +58,7 @@ pub fn do_mremap(
         "mremap: old_addr: {:#x}, old_size: {:#x}, new_size: {:#x}, flags: {:?}",
         old_addr, old_size, new_size, flags
     );
-    let current = current!();
-    let mut current_vm = current.vm().lock().unwrap();
-    current_vm.mremap(old_addr, old_size, new_size, flags)
+    current!().vm().mremap(old_addr, old_size, new_size, flags)
 }
 
 pub fn do_mprotect(addr: usize, size: usize, perms: VMPerms) -> Result<()> {
@@ -71,16 +66,12 @@ pub fn do_mprotect(addr: usize, size: usize, perms: VMPerms) -> Result<()> {
         "mprotect: addr: {:#x}, size: {:#x}, perms: {:?}",
         addr, size, perms
     );
-    let current = current!();
-    let mut current_vm = current.vm().lock().unwrap();
-    current_vm.mprotect(addr, size, perms)
+    current!().vm().mprotect(addr, size, perms)
 }
 
 pub fn do_brk(addr: usize) -> Result<usize> {
     debug!("brk: addr: {:#x}", addr);
-    let current = current!();
-    let mut current_vm = current.vm().lock().unwrap();
-    current_vm.brk(addr)
+    current!().vm().brk(addr)
 }
 
 pub const PAGE_SIZE: usize = 4096;
