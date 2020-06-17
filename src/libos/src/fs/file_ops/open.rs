@@ -19,10 +19,6 @@ pub fn do_openat(dirfd: DirFd, path: &str, flags: u32, mode: u32) -> Result<File
         "openat: dirfd: {:?}, path: {:?}, flags: {:#o}, mode: {:#o}",
         dirfd, path, flags, mode
     );
-    if Path::new(path).is_absolute() {
-        // Path is absolute, so dirfd is ignored
-        return Ok(do_open(path, flags, mode)?);
-    }
     let path = match dirfd {
         DirFd::Fd(dirfd) => {
             let dir_path = get_dir_path(dirfd)?;

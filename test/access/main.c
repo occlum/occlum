@@ -62,6 +62,9 @@ static int __test_faccessat_with_abs_path(const char *file_path) {
     if (faccessat(AT_FDCWD, file_path, F_OK, 0) < 0) {
         THROW_ERROR("failed to faccessat file with abs path");
     }
+    if (faccessat(-1, file_path, F_OK, 0) < 0) {
+        THROW_ERROR("failed to faccessat file with abs path and invalid dirfd");
+    }
     if (remove_file(file_path) < 0) {
         return -1;
     }

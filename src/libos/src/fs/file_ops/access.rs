@@ -47,10 +47,6 @@ pub fn do_faccessat(
         "faccessat: dirfd: {:?}, path: {:?}, mode: {:?}, flags: {:?}",
         dirfd, path, mode, flags
     );
-    if Path::new(path).is_absolute() {
-        // Path is absolute, so dirfd is ignored
-        return Ok(do_access(path, mode, flags)?);
-    }
     let path = match dirfd {
         DirFd::Fd(dirfd) => {
             let dir_path = get_dir_path(dirfd)?;

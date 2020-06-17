@@ -79,11 +79,13 @@ static int __test_lstat(const char *file_path) {
 
 static int __test_fstatat_with_abs_path(const char *file_path) {
     struct stat stat_buf;
-    int ret;
 
-    ret = fstatat(AT_FDCWD, file_path, &stat_buf, 0);
-    if (ret < 0) {
+    if (fstatat(AT_FDCWD, file_path, &stat_buf, 0) < 0) {
         THROW_ERROR("failed to fstatat file with abs path");
+    }
+
+    if (fstatat(-1, file_path, &stat_buf, 0) < 0) {
+        THROW_ERROR("failed to fstatat file with abs path and invalid dirfd");
     }
     return 0;
 }

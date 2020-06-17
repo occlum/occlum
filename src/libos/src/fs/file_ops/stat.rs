@@ -171,10 +171,6 @@ pub fn do_fstatat(dirfd: DirFd, path: &str, flags: StatFlags) -> Result<Stat> {
     if path.len() == 0 && !flags.contains(StatFlags::AT_EMPTY_PATH) {
         return_errno!(ENOENT, "path is an empty string");
     }
-    if Path::new(path).is_absolute() {
-        // Path is absolute, so dirfd is ignored
-        return Ok(do_stat(path)?);
-    }
     match dirfd {
         DirFd::Fd(dirfd) => {
             if path.len() == 0 {

@@ -37,6 +37,12 @@ static int __test_openat_with_abs_path(const char *file_path, int flags, int mod
         THROW_ERROR("failed to openat a file with abs path");
     }
     close(fd);
+
+    fd = openat(-1, file_path, flags, mode);
+    if (fd < 0) {
+        THROW_ERROR("failed to openat a file with abs path and invalid dirfd");
+    }
+    close(fd);
     return 0;
 }
 
