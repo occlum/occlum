@@ -1,6 +1,8 @@
 include ../sgxenv.mk
 
 LIBOCCLUM_PAL_SO := $(BUILD_DIR)/lib/libocclum-pal.so
+LIBOCCLUM_PAL_SONAME := $(LIBOCCLUM_PAL_SO).$(MAJOR_VER_NUM)
+LIBOCCLUM_PAL_SO_REAL := $(LIBOCCLUM_PAL_SO).$(VERSION_NUM)
 
 # A dependency on Rust SGX SDK
 LIBSGX_USTDC_A := $(BUILD_DIR)/lib/libsgx_ustdc.a
@@ -23,13 +25,15 @@ ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(LIBOCCLUM_PAL_SO) $(EDL_C_OB
 
 .PHONY: all format format-check clean
 
-all: $(ALL_BUILD_SUBDIRS) $(LIBOCCLUM_PAL_SO)
+all: $(ALL_BUILD_SUBDIRS) $(LIBOCCLUM_PAL_SO_REAL)
 
 $(ALL_BUILD_SUBDIRS):
 	@mkdir -p $@
 
-$(LIBOCCLUM_PAL_SO): $(LIBSGX_USTDC_A) $(EDL_C_OBJS) $(C_OBJS) $(CXX_OBJS)
-	@$(CXX) $^ -o $@ $(LINK_FLAGS)
+$(LIBOCCLUM_PAL_SO_REAL): $(LIBSGX_USTDC_A) $(EDL_C_OBJS) $(C_OBJS) $(CXX_OBJS)
+	@$(CXX) $^ -o $@ $(LINK_FLAGS) -Wl,-soname=$(LIBOCCLUM_PAL_SONAME)
+	@cd $(BUILD_DIR)/lib && ln -sf $(notdir $(LIBOCCLUM_PAL_SO_REAL)) $(notdir $(LIBOCCLUM_PAL_SONAME)) && \
+		ln -sf $(notdir $(LIBOCCLUM_PAL_SONAME)) $(notdir $(LIBOCCLUM_PAL_SO))
 	@echo "LINK => $@"
 
 $(BUILD_DIR)/src/pal/src/Enclave_u.o: $(BUILD_DIR)/src/pal/src/Enclave_u.c
@@ -63,4 +67,4 @@ format-check: $(C_SRCS) $(CXX_SRCS) $(HEADER_FILES)
 	@$(C_FORMATTER) --check $^
 
 clean:
-	@-$(RM) -f $(LIBOCCLUM_PAL_SO) $(LIBSGX_USTDC_A) $(C_OBJS) $(CXX_OBJS) $(EDL_C_OBJS) $(EDL_C_SRCS)
+	@-$(RM) -f $(LIBOCCLUM_PAL_SO) $(LIBOCCLUM_PAL_SO_REAL) $(LIBOCCLUM_PAL_SONAME) $(LIBSGX_USTDC_A) $(C_OBJS) $(CXX_OBJS) $(EDL_C_OBJS) $(EDL_C_SRCS)

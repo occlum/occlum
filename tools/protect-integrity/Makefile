@@ -3,6 +3,11 @@
 CUR_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 PROJECT_DIR := $(realpath $(CUR_DIR)/../../)
 
+MAJOR_VER_NUM = $(shell grep '\#define OCCLUM_MAJOR_VERSION' $(PROJECT_DIR)/src/pal/include/occlum_version.h |  awk '{print $$3}')
+MINOR_VER_NUM = $(shell grep '\#define OCCLUM_MINOR_VERSION' $(PROJECT_DIR)/src/pal/include/occlum_version.h |  awk '{print $$3}')
+PATCH_VER_NUM = $(shell grep '\#define OCCLUM_PATCH_VERSION' $(PROJECT_DIR)/src/pal/include/occlum_version.h |  awk '{print $$3}')
+VERSION_NUM = $(MAJOR_VER_NUM).$(MINOR_VER_NUM).$(PATCH_VER_NUM)
+
 SGX_SDK ?= /opt/intel/sgxsdk
 SGX_MODE ?= HW
 SGX_ARCH ?= x64
@@ -130,7 +135,9 @@ ENCLAVE_CPP_OBJS := $(addprefix $(OBJS_DIR)/,$(ENCLAVE_CPP_FILES:.cpp=.o))
 ENCLAVE_OBJS := $(ENCLAVE_C_OBJS) $(ENCLAVE_CPP_OBJS)
 
 ENCLAVE_NAME := $(BUILD_DIR)/lib/occlum-protect-integrity.so
-SIGNED_ENCLAVE_NAME := $(BUILD_DIR)/lib/occlum-protect-integrity.signed.so
+ENCLAVE_REAL_NAME := $(ENCLAVE_NAME).$(VERSION_NUM)
+SIGNED_ENCLAVE_NAME := $(BUILD_DIR)/lib/occlum-protect-integrity.signed.so.$(VERSION_NUM)
+SIGNED_ENCLAVE_SONAME := $(BUILD_DIR)/lib/occlum-protect-integrity.signed.so.$(MAJOR_VER_NUM) # used for soft link
 ENCLAVE_CONFIG_FILE := Enclave/Enclave.config.xml
 
 ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(APP_NAME) $(SIGNED_ENCLAVE_NAME) $(ENCLAVE_OBJS) $(APP_OBJS))))
@@ -147,16 +154,16 @@ endif
 .PHONY: all test format format-check clean
 
 ifeq ($(BUILD_MODE), HW_RELEASE)
-all: $(APP_NAME) $(ENCLAVE_NAME)
+all: $(APP_NAME) $(ENCLAVE_REAL_NAME)
 	@echo "The project has been built in release hardware mode."
-	@echo "Please sign the $(ENCLAVE_NAME) first with your signing key before you run the $(APP_NAME) to launch and access the enclave."
+	@echo "Please sign the $(ENCLAVE_REAL_NAME) first with your signing key before you run the $(APP_NAME) to launch and access the enclave."
 	@echo "To sign the enclave use the command:"
-	@echo "   $(SGX_ENCLAVE_SIGNER) sign -key <your key> -enclave $(ENCLAVE_NAME) -out <$(SIGNED_ENCLAVE_NAME)> -config $(ENCLAVE_CONFIG_FILE)"
+	@echo "   $(SGX_ENCLAVE_SIGNER) sign -key <your key> -enclave $(ENCLAVE_REAL_NAME) -out <$(SIGNED_ENCLAVE_NAME)> -config $(ENCLAVE_CONFIG_FILE)"
 	@echo "You can also sign the enclave using an external signing tool."
 	@echo "To build the project in simulation mode set SGX_MODE=SIM. To build the project in prerelease mode set SGX_PRERELEASE=1 and SGX_MODE=HW."
 else
 
-all: $(ALL_BUILD_SUBDIRS) $(APP_NAME) $(SIGNED_ENCLAVE_NAME)
+all: $(ALL_BUILD_SUBDIRS) $(APP_NAME) $(SIGNED_ENCLAVE_SONAME)
 
 endif
 
@@ -204,12 +211,13 @@ $(OBJS_DIR)/Enclave/%.o: Enclave/%.c
 	@$(CC) $(ENCLAVE_C_FLAGS) -c $< -o $@
 	@echo "CC  <=  $@"
 
-$(ENCLAVE_NAME): $(ENCLAVE_OBJS)
+$(ENCLAVE_REAL_NAME): $(ENCLAVE_OBJS)
 	@$(CXX) $^ -o $@ $(ENCLAVE_LINK_FLAGS)
 	@echo "LINK =>  $@"
 
-$(SIGNED_ENCLAVE_NAME): $(ENCLAVE_NAME)
-	@$(SGX_ENCLAVE_SIGNER) sign -key Enclave/Enclave_private.pem -enclave $(ENCLAVE_NAME) -out $@ -config $(ENCLAVE_CONFIG_FILE)
+$(SIGNED_ENCLAVE_SONAME): $(ENCLAVE_REAL_NAME)
+	@$(SGX_ENCLAVE_SIGNER) sign -key Enclave/Enclave_private.pem -enclave $(ENCLAVE_REAL_NAME) -out $(SIGNED_ENCLAVE_NAME) -config $(ENCLAVE_CONFIG_FILE)
+	@cd $(BUILD_DIR)/lib && ln -sf $(notdir $(SIGNED_ENCLAVE_NAME)) $(notdir $(SIGNED_ENCLAVE_SONAME))
 	@echo "SIGN =>  $@"
 
 test: all random.txt
@@ -231,4 +239,4 @@ format-check: $(APP_HEADER_FILES) $(APP_CPP_FILES) $(ENCLAVE_HEADER_FILES) $(ENC
 
 
 clean:
-	@rm -f $(APP_NAME) $(ENCLAVE_NAME) $(SIGNED_ENCLAVE_NAME) $(APP_OBJS) $(OBJS_DIR)/App/Enclave_u.* $(ENCLAVE_OBJS) $(OBJS_DIR)/Enclave/Enclave_t.* *.test.txt random.txt*
+	@rm -f $(APP_NAME) $(ENCLAVE_REAL_NAME) $(SIGNED_ENCLAVE_NAME) $(SIGNED_ENCLAVE_SONAME) $(APP_OBJS) $(OBJS_DIR)/App/Enclave_u.* $(ENCLAVE_OBJS) $(OBJS_DIR)/Enclave/Enclave_t.* *.test.txt random.txt*

@@ -16,9 +16,11 @@
 #include <sgx_error.h>
 #include <sgx_urts.h>
 
+#include "../../../src/pal/include/occlum_version.h"
+
 #define MAX_PATH            FILENAME_MAX
 #define TOKEN_FILENAME      "enclave.token"
-#define ENCLAVE_FILENAME    "occlum-protect-integrity.signed.so"
+#define ENCLAVE_FILENAME    "occlum-protect-integrity.signed.so." STRINGIZE(OCCLUM_MAJOR_VERSION)
 
 // ==========================================================================
 //  Enclave Initialization

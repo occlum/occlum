@@ -63,20 +63,29 @@ test:
 OCCLUM_PREFIX ?= /opt/occlum
 install:
 	@# Install both libraries for HW mode and SIM mode
-	@$(MAKE) --no-print-directory -C src
+	@$(MAKE) SGX_MODE=HW --no-print-directory -C src
 	@$(MAKE) SGX_MODE=SIM --no-print-directory -C src
-	install -d $(OCCLUM_PREFIX)/build/bin/
-	install -t $(OCCLUM_PREFIX)/build/bin/ -D build/bin/*
-	install -d $(OCCLUM_PREFIX)/build/lib/
-	install -t $(OCCLUM_PREFIX)/build/lib/ -D build/lib/*
-	install -d $(OCCLUM_PREFIX)/build_sim/bin/
-	install -t $(OCCLUM_PREFIX)/build_sim/bin/ -D build_sim/bin/*
-	install -d $(OCCLUM_PREFIX)/build_sim/lib/
-	install -t $(OCCLUM_PREFIX)/build_sim/lib/ -D build_sim/lib/*
-	install -d $(OCCLUM_PREFIX)/include/
-	install -t $(OCCLUM_PREFIX)/include/ -m 444 src/pal/include/*.h
-	install -d $(OCCLUM_PREFIX)/etc/template/
-	install -t $(OCCLUM_PREFIX)/etc/template/ -m 444 etc/template/*
+
+	@echo "Install libraries for SGX hardware mode ..."
+	@mkdir -p $(OCCLUM_PREFIX)/build/bin/
+	@cp build/bin/* $(OCCLUM_PREFIX)/build/bin
+	@mkdir -p $(OCCLUM_PREFIX)/build/lib/
+	@cp --no-dereference build/lib/* $(OCCLUM_PREFIX)/build/lib/
+
+	@echo "Install libraries for SGX simulation mode ..."
+	@mkdir -p $(OCCLUM_PREFIX)/build_sim/bin/
+	@cp build_sim/bin/* $(OCCLUM_PREFIX)/build_sim/bin
+	@mkdir -p $(OCCLUM_PREFIX)/build_sim/lib/
+	@cp --no-dereference build_sim/lib/* $(OCCLUM_PREFIX)/build_sim/lib/
+
+	@echo "Install headers and miscs ..."
+	@mkdir -p $(OCCLUM_PREFIX)/include/
+	@cp -r src/pal/include/*.h $(OCCLUM_PREFIX)/include
+	@chmod 444 $(OCCLUM_PREFIX)/include/*.h
+	@mkdir -p $(OCCLUM_PREFIX)/etc/template/
+	@cp etc/template/* $(OCCLUM_PREFIX)/etc/template
+	@chmod 444 $(OCCLUM_PREFIX)/etc/template/*
+	@echo "Installation is done."
 
 format:
 	@$(MAKE) --no-print-directory -C test format
