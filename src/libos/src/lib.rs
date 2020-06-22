@@ -11,6 +11,7 @@
 #![feature(alloc_layout_extra)]
 #![feature(concat_idents)]
 #![feature(trace_macros)]
+#![feature(slice_fill)]
 
 #[macro_use]
 extern crate alloc;
