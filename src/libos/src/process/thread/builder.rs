@@ -107,7 +107,7 @@ impl ThreadBuilder {
         let sched = self.sched.unwrap_or_default();
         let rlimits = self.rlimits.unwrap_or_default();
         let name = SgxRwLock::new(self.name.unwrap_or_default());
-        let sig_queues = SgxMutex::new(SigQueues::new());
+        let sig_queues = RwLock::new(SigQueues::new());
         let sig_mask = SgxRwLock::new(SigSet::new_empty());
         let sig_tmp_mask = SgxRwLock::new(SigSet::new_empty());
         let sig_stack = SgxMutex::new(None);

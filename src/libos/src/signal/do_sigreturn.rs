@@ -66,12 +66,23 @@ pub fn deliver_signal(cpu_context: &mut CpuContext) {
 
 fn do_deliver_signal(thread: &ThreadRef, process: &ProcessRef, cpu_context: &mut CpuContext) {
     loop {
-        // Dequeue a signal, respecting the signal mask and tmp mask
-        let sig_mask = *thread.sig_mask().read().unwrap() | *thread.sig_tmp_mask().read().unwrap();
+        if process.sig_queues().read().unwrap().empty()
+            && thread.sig_queues().read().unwrap().empty()
+        {
+            return;
+        }
+
         let signal = {
-            #[rustfmt::skip]
-            let signal_opt = process.sig_queues().lock().unwrap().dequeue(&sig_mask)
-                .or_else(|| thread.sig_queues().lock().unwrap().dequeue(&sig_mask));
+            // Dequeue a signal, respecting the signal mask and tmp mask
+            let sig_mask =
+                *thread.sig_mask().read().unwrap() | *thread.sig_tmp_mask().read().unwrap();
+
+            let signal_opt = process
+                .sig_queues()
+                .write()
+                .unwrap()
+                .dequeue(&sig_mask)
+                .or_else(|| thread.sig_queues().write().unwrap().dequeue(&sig_mask));
             if signal_opt.is_none() {
                 return;
             }

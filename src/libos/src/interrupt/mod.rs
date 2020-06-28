@@ -38,8 +38,8 @@ pub fn broadcast_interrupts() -> Result<usize> {
     let should_interrupt_thread = |thread: &&ThreadRef| -> bool {
         // TODO: check Thread::sig_mask to reduce false positives
         thread.process().is_forced_to_exit()
-            || !thread.sig_queues().lock().unwrap().empty()
-            || !thread.process().sig_queues().lock().unwrap().empty()
+            || !thread.sig_queues().read().unwrap().empty()
+            || !thread.process().sig_queues().read().unwrap().empty()
     };
 
     let num_signaled_threads = crate::process::table::get_all_threads()

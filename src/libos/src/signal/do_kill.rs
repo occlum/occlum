@@ -16,7 +16,7 @@ pub fn do_kill(filter: ProcessFilter, signum: SigNum) -> Result<()> {
         }
 
         let signal = Box::new(UserSignal::new(signum, UserSignalKind::Kill, pid, uid));
-        let mut sig_queues = process.sig_queues().lock().unwrap();
+        let mut sig_queues = process.sig_queues().write().unwrap();
         sig_queues.enqueue(signal);
     }
     Ok(())
@@ -42,7 +42,7 @@ pub fn do_kill_from_outside_enclave(filter: ProcessFilter, signum: SigNum) -> Re
             continue;
         }
 
-        let mut sig_queues = process.sig_queues().lock().unwrap();
+        let mut sig_queues = process.sig_queues().write().unwrap();
         sig_queues.enqueue(signal.clone());
     }
     Ok(())
@@ -97,7 +97,7 @@ pub fn do_tgkill(pid: Option<pid_t>, tid: pid_t, signum: SigNum) -> Result<()> {
             src_uid,
         ))
     };
-    let mut sig_queues = thread.sig_queues().lock().unwrap();
+    let mut sig_queues = thread.sig_queues().write().unwrap();
     sig_queues.enqueue(signal);
     Ok(())
 }

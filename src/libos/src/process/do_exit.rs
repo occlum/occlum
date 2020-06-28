@@ -130,6 +130,6 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
 
 fn send_sigchld_to(parent: &Arc<Process>) {
     let signal = Box::new(KernelSignal::new(SigNum::from(SIGCHLD)));
-    let mut sig_queues = parent.sig_queues().lock().unwrap();
+    let mut sig_queues = parent.sig_queues().write().unwrap();
     sig_queues.enqueue(signal);
 }

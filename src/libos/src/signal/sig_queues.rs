@@ -7,7 +7,6 @@ use crate::prelude::*;
 
 pub struct SigQueues {
     count: usize,
-    has_kill: bool,
     std_queues: Vec<Option<Box<dyn Signal>>>,
     rt_queues: Vec<VecDeque<Box<dyn Signal>>>,
 }
@@ -15,12 +14,10 @@ pub struct SigQueues {
 impl SigQueues {
     pub fn new() -> Self {
         let count = 0;
-        let has_kill = false;
         let std_queues = (0..COUNT_STD_SIGS).map(|_| None).collect();
         let rt_queues = (0..COUNT_RT_SIGS).map(|_| Default::default()).collect();
         SigQueues {
             count,
-            has_kill,
             std_queues,
             rt_queues,
         }

@@ -36,7 +36,7 @@ pub struct Thread {
     sched: SchedAgentRef,
     rlimits: ResourceLimitsRef,
     // Signal
-    sig_queues: SgxMutex<SigQueues>,
+    sig_queues: RwLock<SigQueues>,
     sig_mask: SgxRwLock<SigSet>,
     sig_tmp_mask: SgxRwLock<SigSet>,
     sig_stack: SgxMutex<Option<SigStack>>,
@@ -81,7 +81,7 @@ impl Thread {
     }
 
     /// Get the signal queues for thread-directed signals.
-    pub fn sig_queues(&self) -> &SgxMutex<SigQueues> {
+    pub fn sig_queues(&self) -> &RwLock<SigQueues> {
         &self.sig_queues
     }
 

@@ -20,7 +20,7 @@ pub struct Process {
     inner: SgxMutex<ProcessInner>,
     // Signal
     sig_dispositions: SgxRwLock<SigDispositions>,
-    sig_queues: SgxMutex<SigQueues>,
+    sig_queues: RwLock<SigQueues>,
     forced_exit_status: ForcedExitStatus,
 }
 
@@ -100,7 +100,7 @@ impl Process {
     }
 
     /// Get the signal queues for process-directed signals.
-    pub fn sig_queues(&self) -> &SgxMutex<SigQueues> {
+    pub fn sig_queues(&self) -> &RwLock<SigQueues> {
         &self.sig_queues
     }
 

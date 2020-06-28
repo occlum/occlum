@@ -100,7 +100,7 @@ impl ProcessBuilder {
             let parent = self.parent.take().map(|parent| SgxRwLock::new(parent));
             let inner = SgxMutex::new(ProcessInner::new());
             let sig_dispositions = SgxRwLock::new(SigDispositions::new());
-            let sig_queues = SgxMutex::new(SigQueues::new());
+            let sig_queues = RwLock::new(SigQueues::new());
             let forced_exit_status = ForcedExitStatus::new();
             Arc::new(Process {
                 pid,
