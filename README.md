@@ -236,7 +236,7 @@ By default, the `occlum build` command builds and signs enclaves in debug mode. 
 
 Occlum has built-in support for both building and running enclaves in release mode. The commands are shown below:
 ```
-$ occlum build --sign-key=<path_to/your_key.pem>
+$ occlum build --sign-key <path_to/your_key.pem>
 $ OCCLUM_RELEASE_ENCLAVE=yes occlum run <prog_path> <prog_args>
 ```
 
