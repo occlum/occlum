@@ -20,3 +20,6 @@ break-after-logical # For if statements, wrap to the next line after logical ope
 
 # Line endings
 lineend=linux # LF line endings
+
+# No backup file
+suffix=none
