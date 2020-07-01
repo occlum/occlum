@@ -125,7 +125,7 @@ pub fn futex_wait(
 
     // Must make sure that no locks are holded by this thread before wait
     drop(futex_bucket);
-    futex_item.wait_timeout(timeout)
+    futex_item.wait(timeout)
 }
 
 /// Do futex wake
@@ -230,19 +230,14 @@ impl FutexItem {
         self.waiter.wake()
     }
 
-    pub fn wait_timeout(&self, timeout: &Option<timespec_t>) -> Result<()> {
-        match timeout {
-            None => self.waiter.wait(),
-            Some(ts) => {
-                if let Err(e) = self.waiter.wait_timeout(&ts) {
-                    let (_, futex_bucket_ref) = FUTEX_BUCKETS.get_bucket(self.key);
-                    let mut futex_bucket = futex_bucket_ref.lock().unwrap();
-                    futex_bucket.dequeue_item(self);
-                    return_errno!(e.errno(), "futex wait with timeout error");
-                }
-                Ok(())
-            }
+    pub fn wait(&self, timeout: &Option<timespec_t>) -> Result<()> {
+        if let Err(e) = self.waiter.wait_timeout(&timeout) {
+            let (_, futex_bucket_ref) = FUTEX_BUCKETS.get_bucket(self.key);
+            let mut futex_bucket = futex_bucket_ref.lock().unwrap();
+            futex_bucket.dequeue_item(self);
+            return_errno!(e.errno(), "futex wait timeout or interrupted");
         }
+        Ok(())
     }
 }
 
@@ -367,18 +362,7 @@ impl Waiter {
         }
     }
 
-    pub fn wait(&self) -> Result<()> {
-        let current = unsafe { sgx_thread_get_self() };
-        if current != self.thread {
-            return Ok(());
-        }
-        while self.is_woken.load(Ordering::SeqCst) == false {
-            wait_event(self.thread);
-        }
-        Ok(())
-    }
-
-    pub fn wait_timeout(&self, timeout: &timespec_t) -> Result<()> {
+    pub fn wait_timeout(&self, timeout: &Option<timespec_t>) -> Result<()> {
         let current = unsafe { sgx_thread_get_self() };
         if current != self.thread {
             return Ok(());
@@ -386,8 +370,6 @@ impl Waiter {
         while self.is_woken.load(Ordering::SeqCst) == false {
             if let Err(e) = wait_event_timeout(self.thread, timeout) {
                 self.is_woken.store(true, Ordering::SeqCst);
-                // Do sanity check here, only possible errnos here are ETIMEDOUT, EAGAIN and EINTR
-                debug_assert!(e.errno() == ETIMEDOUT || e.errno() == EAGAIN || e.errno() == EINTR);
                 return_errno!(e.errno(), "wait_timeout error");
             }
         }
@@ -410,34 +392,31 @@ impl PartialEq for Waiter {
 unsafe impl Send for Waiter {}
 unsafe impl Sync for Waiter {}
 
-fn wait_event(thread: *const c_void) {
+fn wait_event_timeout(thread: *const c_void, timeout: &Option<timespec_t>) -> Result<()> {
     let mut ret: c_int = 0;
     let mut sgx_ret: c_int = 0;
-    unsafe {
-        sgx_ret = sgx_thread_wait_untrusted_event_ocall(&mut ret as *mut c_int, thread);
-    }
-    if ret != 0 || sgx_ret != 0 {
-        panic!("ERROR: sgx_thread_wait_untrusted_event_ocall failed");
-    }
-}
-
-fn wait_event_timeout(thread: *const c_void, timeout: &timespec_t) -> Result<()> {
-    let mut ret: c_int = 0;
-    let mut sgx_ret: c_int = 0;
+    let timeout_ptr = timeout
+        .as_ref()
+        .map(|timeout_ref| timeout_ref as *const _)
+        .unwrap_or(0 as *const _);
     let mut errno: c_int = 0;
     unsafe {
         sgx_ret = sgx_thread_wait_untrusted_event_timeout_ocall(
             &mut ret as *mut c_int,
             thread,
-            timeout.sec(),
-            timeout.nsec(),
+            timeout_ptr,
             &mut errno as *mut c_int,
         );
-    }
-    if ret != 0 || sgx_ret != 0 {
-        panic!("ERROR: sgx_thread_wait_untrusted_event_timeout_ocall failed");
+        assert!(sgx_ret == 0);
+        assert!(ret == 0);
     }
     if errno != 0 {
+        // Do sanity check here, only possible errnos here are ETIMEDOUT, EAGAIN and EINTR
+        assert!(
+            (timeout.is_some() && errno == Errno::ETIMEDOUT as i32)
+                || errno == Errno::EINTR as i32
+                || errno == Errno::EAGAIN as i32
+        );
         return_errno!(
             Errno::from(errno as u32),
             "sgx_thread_wait_untrusted_event_timeout_ocall error"
@@ -460,14 +439,10 @@ fn set_event(thread: *const c_void) {
 extern "C" {
     fn sgx_thread_get_self() -> *const c_void;
 
-    /* Go outside and wait on my untrusted event */
-    fn sgx_thread_wait_untrusted_event_ocall(ret: *mut c_int, self_thread: *const c_void) -> c_int;
-
     fn sgx_thread_wait_untrusted_event_timeout_ocall(
         ret: *mut c_int,
         self_thread: *const c_void,
-        sec: c_long,
-        nsec: c_long,
+        ts: *const timespec_t,
         errno: *mut c_int,
     ) -> c_int;
 

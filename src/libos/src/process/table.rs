@@ -14,6 +14,15 @@ pub fn get_all_processes() -> Vec<ProcessRef> {
         .collect()
 }
 
+pub fn get_all_threads() -> Vec<ThreadRef> {
+    THREAD_TABLE
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(_, proc_ref)| proc_ref.clone())
+        .collect()
+}
+
 pub(super) fn add_process(process: ProcessRef) -> Result<()> {
     PROCESS_TABLE.lock().unwrap().add(process.pid(), process)
 }

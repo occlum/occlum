@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include "ocalls.h"
+#include "../pal_thread_counter.h"
 
 typedef struct {
     sgx_enclave_id_t    enclave_id;
@@ -17,11 +18,13 @@ void *exec_libos_thread(void *_thread_data) {
                           host_tid);
     if (status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(status);
-        PAL_ERROR("Failed to enter the enclave to execute a LibOS thread: %s", sgx_err);
+        PAL_ERROR("Failed to enter the enclave to execute a LibOS thread (host tid = %d): %s",
+                  host_tid, sgx_err);
         exit(EXIT_FAILURE);
     }
 
     free(thread_data);
+    pal_thread_counter_dec();
     return NULL;
 }
 
@@ -34,13 +37,15 @@ int occlum_ocall_exec_thread_async(int libos_tid) {
     thread_data->enclave_id = pal_get_enclave_id();
     thread_data->libos_tid = libos_tid;
 
+    pal_thread_counter_inc();
     if ((ret = pthread_create(&thread, NULL, exec_libos_thread, thread_data)) < 0) {
+        pal_thread_counter_dec();
         free(thread_data);
         return -1;
     }
     pthread_detach(thread);
 
-    // Note: thread_data is freed just before the thread exits
+    // Note: thread_data is freed and thread counter is decreased just before the thread exits
 
     return 0;
 }

@@ -26,6 +26,7 @@ use crate::fs::{
     do_sync, do_truncate, do_unlink, do_write, do_writev, iovec_t, File, FileDesc, FileRef,
     HostStdioFds, Stat,
 };
+use crate::interrupt::{do_handle_interrupt, sgx_interrupt_info_t};
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t};
 use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
@@ -407,8 +408,8 @@ macro_rules! process_syscall_table_with_callback {
 
             // Occlum-specific system calls
             (Spawn = 360) => do_spawn(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp),
-            // Exception handling
             (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, context: *mut CpuContext),
+            (HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, context: *mut CpuContext),
         }
     };
 }
@@ -622,7 +623,10 @@ fn do_syscall(user_context: &mut CpuContext) {
         } else if syscall_num == SyscallNum::HandleException {
             // syscall.args[0] == info
             syscall.args[1] = user_context as *mut _ as isize;
-        } else if syscall_num == SyscallNum::Sigaltstack {
+        } else if syscall.num == SyscallNum::HandleInterrupt {
+            // syscall.args[0] == info
+            syscall.args[1] = user_context as *mut _ as isize;
+        } else if syscall.num == SyscallNum::Sigaltstack {
             // syscall.args[0] == new_ss
             // syscall.args[1] == old_ss
             syscall.args[2] = user_context as *const _ as isize;
@@ -686,13 +690,16 @@ fn do_syscall(user_context: &mut CpuContext) {
     trace!("Retval = {:?}", retval);
 
     // Put the return value into user_context.rax, except for syscalls that may
-    // modify user_context directly. Currently, there are two such syscalls:
-    // SigReturn and HandleException.
+    // modify user_context directly. Currently, there are three such syscalls:
+    // SigReturn, HandleException, and HandleInterrupt.
     //
     // Sigreturn restores `user_context` to the state when the last signal
     // handler is executed. So in the case of sigreturn, `user_context` should
     // be kept intact.
-    if num != SyscallNum::RtSigreturn as u32 && num != SyscallNum::HandleException as u32 {
+    if num != SyscallNum::RtSigreturn as u32
+        && num != SyscallNum::HandleException as u32
+        && num != SyscallNum::HandleInterrupt as u32
+    {
         user_context.rax = retval as u64;
     }
 
@@ -807,13 +814,17 @@ fn do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t) -> Result<isize> 
 
 // TODO: handle remainder
 fn do_nanosleep(req_u: *const timespec_t, rem_u: *mut timespec_t) -> Result<isize> {
-    check_ptr(req_u)?;
-    if !rem_u.is_null() {
+    let req = {
+        check_ptr(req_u)?;
+        timespec_t::from_raw_ptr(req_u)?
+    };
+    let rem = if !rem_u.is_null() {
         check_mut_ptr(rem_u)?;
-    }
-
-    let req = timespec_t::from_raw_ptr(req_u)?;
-    time::do_nanosleep(&req)?;
+        Some(unsafe { &mut *rem_u })
+    } else {
+        None
+    };
+    time::do_nanosleep(&req, rem)?;
     Ok(0)
 }
 

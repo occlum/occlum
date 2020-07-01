@@ -160,12 +160,27 @@ pub fn do_clock_getres(clockid: ClockID) -> Result<timespec_t> {
     Ok(res)
 }
 
-pub fn do_nanosleep(req: &timespec_t) -> Result<()> {
+pub fn do_nanosleep(req: &timespec_t, rem: Option<&mut timespec_t>) -> Result<()> {
     extern "C" {
-        fn occlum_ocall_nanosleep(req: *const timespec_t) -> sgx_status_t;
+        fn occlum_ocall_nanosleep(
+            ret: *mut i32,
+            req: *const timespec_t,
+            rem: *mut timespec_t,
+        ) -> sgx_status_t;
     }
     unsafe {
-        occlum_ocall_nanosleep(req as *const timespec_t);
+        let mut ret = 0;
+        let mut u_rem: timespec_t = timespec_t { sec: 0, nsec: 0 };
+        let sgx_status = occlum_ocall_nanosleep(&mut ret, req, &mut u_rem);
+        assert!(sgx_status == sgx_status_t::SGX_SUCCESS);
+        assert!(ret == 0 || libc::errno() == Errno::EINTR as i32);
+        if ret != 0 {
+            assert!(u_rem.as_duration() <= req.as_duration());
+            if let Some(rem) = rem {
+                *rem = u_rem;
+            }
+            return_errno!(EINTR, "sleep interrupted");
+        }
     }
     Ok(())
 }

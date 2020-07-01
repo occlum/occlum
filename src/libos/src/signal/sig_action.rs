@@ -83,6 +83,9 @@ impl SigActionFlags {
     pub fn from_u32(bits: u32) -> Result<SigActionFlags> {
         let flags =
             Self::from_bits(bits).ok_or_else(|| errno!(EINVAL, "invalid sigaction flags"))?;
+        if flags.contains(SigActionFlags::SA_RESTART) {
+            warn!("SA_RESTART is not supported");
+        }
         Ok(flags)
     }
 

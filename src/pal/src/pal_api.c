@@ -2,8 +2,10 @@
 #include "Enclave_u.h"
 #include "pal_enclave.h"
 #include "pal_error.h"
+#include "pal_interrupt_thread.h"
 #include "pal_log.h"
 #include "pal_syscall.h"
+#include "pal_thread_counter.h"
 #include "errno2str.h"
 
 int occlum_pal_get_version(void) {
@@ -11,8 +13,6 @@ int occlum_pal_get_version(void) {
 }
 
 int occlum_pal_init(const struct occlum_pal_attr *attr) {
-    errno = 0;
-
     if (attr == NULL) {
         errno = EINVAL;
         return -1;
@@ -40,20 +40,30 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
         PAL_ERROR("Failed to do ECall: %s", sgx_err);
-        return -1;
+        goto on_destroy_enclave;
     }
     if (ecall_ret < 0) {
         errno = -ecall_ret;
         PAL_ERROR("occlum_ecall_init returns %s", errno2str(errno));
-        return -1;
+        goto on_destroy_enclave;
     }
+
+    if (pal_interrupt_thread_start() < 0) {
+        PAL_ERROR("Failed to start the interrupt thread: %s", errno2str(errno));
+        goto on_destroy_enclave;
+    }
+
     return 0;
+on_destroy_enclave:
+    if (pal_destroy_enclave() < 0) {
+        PAL_WARN("Cannot destroy the enclave");
+    }
+    return -1;
 }
 
 int occlum_pal_create_process(struct occlum_pal_create_process_args *args) {
     int ecall_ret = 0; // libos_tid
 
-    errno = 0;
     if (args->path == NULL || args->argv == NULL || args->pid == NULL) {
         errno = EINVAL;
         return -1;
@@ -99,8 +109,10 @@ int occlum_pal_exec(struct occlum_pal_exec_args *args) {
         return -1;
     }
 
+    pal_thread_counter_inc();
     sgx_status_t ecall_status = occlum_ecall_exec_thread(eid, &ecall_ret, args->pid,
                                 host_tid);
+    pal_thread_counter_dec();
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
         PAL_ERROR("Failed to do ECall: %s", sgx_err);
@@ -113,12 +125,11 @@ int occlum_pal_exec(struct occlum_pal_exec_args *args) {
     }
 
     *args->exit_value = ecall_ret;
+
     return 0;
 }
 
 int occlum_pal_kill(int pid, int sig) {
-    errno = 0;
-
     sgx_enclave_id_t eid = pal_get_enclave_id();
     if (eid == SGX_INVALID_ENCLAVE_ID) {
         errno = ENOENT;
@@ -143,8 +154,6 @@ int occlum_pal_kill(int pid, int sig) {
 }
 
 int occlum_pal_destroy(void) {
-    errno = 0;
-
     sgx_enclave_id_t eid = pal_get_enclave_id();
     if (eid == SGX_INVALID_ENCLAVE_ID) {
         PAL_ERROR("Enclave is not initialized yet.");
@@ -152,10 +161,17 @@ int occlum_pal_destroy(void) {
         return -1;
     }
 
-    if (pal_destroy_enclave() < 0) {
-        return -1;
+    int ret = 0;
+
+    if (pal_interrupt_thread_stop() < 0) {
+        ret = -1;
+        PAL_WARN("Cannot stop the interrupt thread: %s", errno2str(errno));
     }
-    return 0;
+    if (pal_destroy_enclave() < 0) {
+        ret = -1;
+        PAL_WARN("Cannot destroy the enclave");
+    }
+    return ret;
 }
 
 int pal_get_version(void) __attribute__((weak, alias ("occlum_pal_get_version")));

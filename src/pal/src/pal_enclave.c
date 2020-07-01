@@ -130,12 +130,8 @@ int pal_init_enclave(const char *instance_dir) {
 }
 
 int pal_destroy_enclave(void) {
-    // TODO: destroy the enclave gracefully
-    // We cannot destroy the enclave gracefully since we may still have
-    // running threads that are using the enclave at this point, which blocks
-    // sgx_destory_enclave call. We need to implement exit_group syscall and
-    // handle signal and exceptions properly.
-    //sgx_destroy_enclave(global_eid);
+    sgx_destroy_enclave(global_eid);
+    global_eid = SGX_INVALID_ENCLAVE_ID;
     return 0;
 }
 

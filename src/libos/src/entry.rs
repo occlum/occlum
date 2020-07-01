@@ -6,6 +6,7 @@ use std::sync::Once;
 use super::*;
 use crate::exception::*;
 use crate::fs::HostStdioFds;
+use crate::interrupt;
 use crate::process::ProcessFilter;
 use crate::signal::SigNum;
 use crate::time::up_time::init;
@@ -65,12 +66,15 @@ pub extern "C" fn occlum_ecall_init(log_level: *const c_char, instance_dir: *con
 
         // Register exception handlers (support cpuid & rdtsc for now)
         register_exception_handlers();
+
         unsafe {
             let dir_str: &str = CStr::from_ptr(instance_dir).to_str().unwrap();
             INSTANCE_DIR.push_str(dir_str);
             ENCLAVE_PATH.push_str(&INSTANCE_DIR);
             ENCLAVE_PATH.push_str("/build/lib/libocclum-libos.signed.so");
         }
+
+        interrupt::init();
 
         HAS_INIT.store(true, Ordering::SeqCst);
 
@@ -149,6 +153,25 @@ pub extern "C" fn occlum_ecall_kill(pid: i32, sig: i32) -> i32 {
             Ok(()) => 0,
             Err(e) => {
                 eprintln!("failed to kill: {}", e.backtrace());
+                ecall_errno!(e.errno())
+            }
+        })
+    })
+    .unwrap_or(ecall_errno!(EFAULT))
+}
+
+#[no_mangle]
+pub extern "C" fn occlum_ecall_broadcast_interrupts() -> i32 {
+    if HAS_INIT.load(Ordering::SeqCst) == false {
+        return ecall_errno!(EAGAIN);
+    }
+
+    let _ = unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
+    panic::catch_unwind(|| {
+        backtrace::__rust_begin_short_backtrace(|| match interrupt::broadcast_interrupts() {
+            Ok(count) => count as i32,
+            Err(e) => {
+                eprintln!("failed to broadcast interrupts: {}", e.backtrace());
                 ecall_errno!(e.errno())
             }
         })

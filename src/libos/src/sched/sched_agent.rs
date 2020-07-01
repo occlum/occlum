@@ -76,6 +76,13 @@ impl SchedAgent {
         Self { inner }
     }
 
+    pub fn host_tid(&self) -> Option<pid_t> {
+        match self.inner() {
+            Inner::Detached { .. } => None,
+            Inner::Attached { host_tid, .. } => Some(*host_tid),
+        }
+    }
+
     pub fn affinity(&self) -> &CpuSet {
         match self.inner() {
             Inner::Detached { affinity } => affinity.as_ref(),

@@ -79,6 +79,24 @@ enclave {
          *      EPERM - No permission to send the signal or to the process.
          */
         public int occlum_ecall_kill(int pid, int sig);
+
+
+        /*
+         * Broadcast interrupts to LibOS threads.
+         *
+         * Interrupts are sent to whichever LibOS threads that have pending
+         * events (e.g., signals). By interrupting the execution of these 
+         * threads, the LibOS is given a chance to handle these events despite
+         * of the specific user workloads.
+         *
+         * @retval On success, return a non-negative value, which is the number
+         * of LibOS threads to which interrupts are sent. On error, return 
+         * -errno.
+         *
+         * The possible values of errno are
+         *      EAGAIN - The LibOS is not initialized.
+         */
+        public int occlum_ecall_broadcast_interrupts(void);
     };
 
     untrusted {
@@ -100,7 +118,10 @@ enclave {
         void occlum_ocall_clock_getres(clockid_t clockid, [out] struct timespec* res);
         void occlum_ocall_rdtsc([out] uint32_t* low, [out] uint32_t* high);
 
-        void occlum_ocall_nanosleep([in] const struct timespec* req);
+        int occlum_ocall_nanosleep(
+            [in] const struct timespec* req,
+            [out] struct timespec* rem
+        ) propagate_errno;
 
         void occlum_ocall_sync(void);
 
@@ -181,5 +202,7 @@ enclave {
             [in, out, size=len] void *arg,
             size_t len
         ) propagate_errno;
+
+        int occlum_ocall_tkill(int tid, int signum) propagate_errno;
     };
 };
