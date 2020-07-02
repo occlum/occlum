@@ -233,15 +233,27 @@ impl ProcessInner {
         children.swap_remove(zombie_i)
     }
 
-    pub fn exit(&mut self, term_status: TermStatus) {
+    /// Exit means two things: 1) transfer all children to a new parent; 2) update the status.
+    ///
+    /// A lock guard for the new parent process is passed so that the transfer can be done
+    /// atomically.
+    pub fn exit(
+        &mut self,
+        term_status: TermStatus,
+        new_parent_ref: &ProcessRef,
+        new_parent_inner: &mut SgxMutexGuard<ProcessInner>,
+    ) {
         // Check preconditions
         debug_assert!(self.status() == ProcessStatus::Running);
         debug_assert!(self.num_threads() == 0);
 
         // When this process exits, its children are adopted by the init process
         for child in self.children().unwrap() {
+            let child_inner = child.inner();
             let mut parent = child.parent.as_ref().unwrap().write().unwrap();
-            *parent = IDLE.process().clone();
+            *parent = new_parent_ref.clone();
+
+            new_parent_inner.children_mut().unwrap().push(child.clone());
         }
 
         *self = Self::Zombie { term_status };

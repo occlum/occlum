@@ -61,29 +61,49 @@ fn exit_thread(term_status: TermStatus) {
 fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
     let process = thread.process();
 
-    // If the parent process is the idle process, we can release the process directly.
-    if process.parent().pid() == 0 {
-        // Deadlock note: Always lock parent then child.
-        let mut parent_inner = super::IDLE.process().inner();
-        let mut process_inner = process.inner();
+    // Deadlock note: always lock parent first, then child.
+
+    // Lock the idle process since it may adopt new children.
+    let idle_ref = super::IDLE.process().clone();
+    let mut idle_inner = idle_ref.inner();
+    // Lock the parent process as we want to prevent race conditions between
+    // current's exit() and parent's wait5().
+    let mut parent;
+    let mut parent_inner = loop {
+        parent = process.parent();
+        if parent.pid() == 0 {
+            // If the parent is the idle process, don't need to lock again
+            break None;
+        }
+
+        let parent_inner = parent.inner();
+        // To prevent the race condition that parent is changed after `parent()`,
+        // but before `parent().innner()`, we need to check again here.
+        if parent.pid() != process.parent().pid() {
+            continue;
+        }
+        break Some(parent_inner);
+    };
+    // Lock the current process
+    let mut process_inner = process.inner();
+
+    // The parent is the idle process
+    if parent_inner.is_none() {
+        debug_assert!(parent.pid() == 0);
 
         let pid = process.pid();
         let main_tid = pid;
         table::del_thread(main_tid).expect("tid must be in the table");
         table::del_process(pid).expect("pid must be in the table");
 
-        process_inner.exit(term_status);
-        parent_inner.remove_zombie_child(process.pid());
+        process_inner.exit(term_status, &idle_ref, &mut idle_inner);
+        idle_inner.remove_zombie_child(pid);
         return;
     }
     // Otherwise, we need to notify the parent process
+    let mut parent_inner = parent_inner.unwrap();
 
-    // Lock the parent process to ensure that parent's wait4 cannot miss the current
-    // process's exit.
-    // Deadlock note: Always lock parent then child.
-    let parent = process.parent();
-    let mut parent_inner = parent.inner();
-    process.inner().exit(term_status);
+    process_inner.exit(term_status, &idle_ref, &mut idle_inner);
 
     //Send SIGCHLD to parent
     send_sigchld_to(&parent);
