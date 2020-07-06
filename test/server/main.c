@@ -306,7 +306,7 @@ int test_fcntl_setfl_and_getfl() {
     return ret;
 }
 
-int test_poll_sockets() {
+int test_poll_events_unchanged() {
     int socks[2], ret;
     socks[0] = socket(AF_INET, SOCK_STREAM, 0);
     socks[1] = socket(AF_INET, SOCK_STREAM, 0);
@@ -329,13 +329,52 @@ int test_poll_sockets() {
     return 0;
 }
 
+int test_poll() {
+    int child_pid = 0;
+    int client_fd = connect_with_child(8805, &child_pid);
+    if (client_fd < 0) {
+        THROW_ERROR("connect failed");
+    }
+
+    struct pollfd polls[] = {
+        { .fd = client_fd, .events = POLLIN }
+    };
+    int ret = poll(polls, 1, -1);
+    if (ret <= 0) {
+        THROW_ERROR("poll error");
+    }
+
+    if (polls[0].revents & POLLIN) {
+        ssize_t count;
+        char buf[512];
+        if ((count = read(client_fd, buf, sizeof buf)) != 0) {
+            if (strcmp(buf, DEFAULT_MSG) != 0) {
+                printf(buf);
+                THROW_ERROR("msg mismatched");
+            }
+        } else {
+            THROW_ERROR("read error");
+        }
+    } else {
+        THROW_ERROR("unexpected return events");
+    }
+
+    int status = 0;
+    if (wait4(child_pid, &status, 0, NULL) < 0) {
+        THROW_ERROR("failed to wait4 the child process");
+    }
+    close(client_fd);
+    return 0;
+}
+
 static test_case_t test_cases[] = {
     TEST_CASE(test_read_write),
     TEST_CASE(test_send_recv),
     TEST_CASE(test_sendmsg_recvmsg),
     TEST_CASE(test_sendmsg_recvmsg_connectionless),
     TEST_CASE(test_fcntl_setfl_and_getfl),
-    TEST_CASE(test_poll_sockets),
+    TEST_CASE(test_poll),
+    TEST_CASE(test_poll_events_unchanged),
 };
 
 int main(int argc, const char *argv[]) {

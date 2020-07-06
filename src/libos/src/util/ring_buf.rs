@@ -1,232 +1,428 @@
 use alloc::alloc::{alloc, dealloc, Layout};
 
+use crate::net::{
+    clear_notifier_status, notify_thread, wait_for_notification, IoEvent, PollEventFlags,
+};
 use std::cmp::{max, min};
 use std::ptr;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use super::*;
+use ringbuf::{Consumer, Producer, RingBuffer};
 
-#[derive(Debug)]
-pub struct RingBuf {
-    pub reader: RingBufReader,
-    pub writer: RingBufWriter,
+pub fn ring_buffer(capacity: usize) -> Result<(RingBufReader, RingBufWriter)> {
+    let meta = RingBufMeta::new();
+    let buffer = RingBuffer::<u8>::new(capacity);
+    let (producer, consumer) = buffer.split();
+    let meta_ref = Arc::new(meta);
+
+    let reader = RingBufReader {
+        inner: consumer,
+        buffer: meta_ref.clone(),
+    };
+    let writer = RingBufWriter {
+        inner: producer,
+        buffer: meta_ref,
+    };
+    Ok((reader, writer))
 }
 
-impl RingBuf {
-    pub fn new(capacity: usize) -> Result<RingBuf> {
-        let inner = Arc::new(RingBufInner::new(capacity)?);
-        let reader = RingBufReader {
-            inner: inner.clone(),
-        };
-        let writer = RingBufWriter { inner: inner };
-        Ok(RingBuf {
-            reader: reader,
-            writer: writer,
-        })
+struct RingBufMeta {
+    lock: Arc<SgxMutex<bool>>, // lock for the synchronization of reader and writer
+    reader_closed: AtomicBool, // if reader has been dropped
+    writer_closed: AtomicBool, // if writer has been dropped
+    reader_wait_queue: SgxMutex<HashMap<pid_t, IoEvent>>,
+    writer_wait_queue: SgxMutex<HashMap<pid_t, IoEvent>>,
+    // TODO: support O_ASYNC and O_DIRECT in ringbuffer
+    blocking_read: AtomicBool,  // if the read is blocking
+    blocking_write: AtomicBool, // if the write is blocking
+}
+
+impl RingBufMeta {
+    pub fn new() -> RingBufMeta {
+        Self {
+            lock: Arc::new(SgxMutex::new(true)),
+            reader_closed: AtomicBool::new(false),
+            writer_closed: AtomicBool::new(false),
+            reader_wait_queue: SgxMutex::new(HashMap::new()),
+            writer_wait_queue: SgxMutex::new(HashMap::new()),
+            blocking_read: AtomicBool::new(true),
+            blocking_write: AtomicBool::new(true),
+        }
+    }
+
+    pub fn is_reader_closed(&self) -> bool {
+        self.reader_closed.load(Ordering::SeqCst)
+    }
+
+    pub fn close_reader(&self) {
+        self.reader_closed.store(true, Ordering::SeqCst);
+    }
+
+    pub fn is_writer_closed(&self) -> bool {
+        self.writer_closed.load(Ordering::SeqCst)
+    }
+
+    pub fn close_writer(&self) {
+        self.writer_closed.store(true, Ordering::SeqCst);
+    }
+
+    pub fn reader_wait_queue(&self) -> &SgxMutex<HashMap<pid_t, IoEvent>> {
+        &self.reader_wait_queue
+    }
+
+    pub fn writer_wait_queue(&self) -> &SgxMutex<HashMap<pid_t, IoEvent>> {
+        &self.writer_wait_queue
+    }
+
+    pub fn enqueue_reader_event(&self, event: IoEvent) -> Result<()> {
+        self.reader_wait_queue
+            .lock()
+            .unwrap()
+            .insert(current!().tid(), event);
+        Ok(())
+    }
+
+    pub fn dequeue_reader_event(&self) -> Result<()> {
+        self.reader_wait_queue
+            .lock()
+            .unwrap()
+            .remove(&current!().tid())
+            .unwrap();
+        Ok(())
+    }
+
+    pub fn enqueue_writer_event(&self, event: IoEvent) -> Result<()> {
+        self.writer_wait_queue
+            .lock()
+            .unwrap()
+            .insert(current!().tid(), event);
+        Ok(())
+    }
+
+    pub fn dequeue_writer_event(&self) -> Result<()> {
+        self.writer_wait_queue
+            .lock()
+            .unwrap()
+            .remove(&current!().tid())
+            .unwrap();
+        Ok(())
+    }
+
+    pub fn blocking_read(&self) -> bool {
+        self.blocking_read.load(Ordering::SeqCst)
+    }
+
+    pub fn set_non_blocking_read(&self) {
+        self.blocking_read.store(false, Ordering::SeqCst);
+    }
+
+    pub fn set_blocking_read(&self) {
+        self.blocking_read.store(true, Ordering::SeqCst);
+    }
+
+    pub fn blocking_write(&self) -> bool {
+        self.blocking_write.load(Ordering::SeqCst)
+    }
+
+    pub fn set_non_blocking_write(&self) {
+        self.blocking_write.store(false, Ordering::SeqCst);
+    }
+
+    pub fn set_blocking_write(&self) {
+        self.blocking_write.store(true, Ordering::SeqCst);
     }
 }
 
-#[derive(Debug)]
 pub struct RingBufReader {
-    inner: Arc<RingBufInner>,
-}
-
-#[derive(Debug)]
-pub struct RingBufWriter {
-    inner: Arc<RingBufInner>,
-}
-
-#[derive(Debug)]
-struct RingBufInner {
-    buf: *mut u8,
-    capacity: usize,
-    head: AtomicUsize,  // write to head
-    tail: AtomicUsize,  // read from tail
-    closed: AtomicBool, // if reader has been dropped
-}
-
-const RING_BUF_ALIGN: usize = 16;
-
-impl RingBufInner {
-    fn new(capacity: usize) -> Result<RingBufInner> {
-        // Capacity should be power of two as capacity - 1 is used as mask
-        let capacity = max(capacity, RING_BUF_ALIGN).next_power_of_two();
-        let buf_layout = Layout::from_size_align(capacity, RING_BUF_ALIGN)?;
-        let buf_ptr = unsafe { alloc(buf_layout) };
-        if buf_ptr.is_null() {
-            return_errno!(ENOMEM, "no memory for new ring buffers");
-        }
-
-        Ok(RingBufInner {
-            buf: buf_ptr,
-            capacity: capacity,
-            head: AtomicUsize::new(0),
-            tail: AtomicUsize::new(0),
-            closed: AtomicBool::new(false),
-        })
-    }
-
-    fn get_mask(&self) -> usize {
-        self.capacity - 1 // Note that capacity is a power of two
-    }
-
-    fn get_head(&self) -> usize {
-        self.head.load(Ordering::SeqCst)
-    }
-
-    fn get_tail(&self) -> usize {
-        self.tail.load(Ordering::SeqCst)
-    }
-
-    fn set_head(&self, new_head: usize) {
-        self.head.store(new_head, Ordering::SeqCst)
-    }
-
-    fn set_tail(&self, new_tail: usize) {
-        self.tail.store(new_tail, Ordering::SeqCst)
-    }
-
-    fn is_closed(&self) -> bool {
-        self.closed.load(Ordering::SeqCst)
-    }
-
-    fn close(&self) {
-        self.closed.store(true, Ordering::SeqCst);
-    }
-
-    unsafe fn read_at(&self, pos: usize, dst_buf: &mut [u8]) {
-        let dst_ptr = dst_buf.as_mut_ptr();
-        let dst_len = dst_buf.len();
-        let src_ptr = self.buf.offset(pos as isize);
-        unsafe {
-            src_ptr.copy_to_nonoverlapping(dst_ptr, dst_len);
-        }
-    }
-
-    unsafe fn write_at(&self, pos: usize, src_buf: &[u8]) {
-        let src_ptr = src_buf.as_ptr();
-        let src_len = src_buf.len();
-        let dst_ptr = self.buf.offset(pos as isize);
-        unsafe {
-            dst_ptr.copy_from_nonoverlapping(src_ptr, src_len);
-        }
-    }
-}
-
-impl Drop for RingBufInner {
-    fn drop(&mut self) {
-        let buf_layout = Layout::from_size_align(self.capacity, RING_BUF_ALIGN).unwrap();
-        unsafe {
-            dealloc(self.buf, buf_layout);
-        }
-    }
+    inner: Consumer<u8>,
+    buffer: Arc<RingBufMeta>,
 }
 
 impl RingBufReader {
-    pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
-        let mut tail = self.inner.get_tail();
-        let mut buf_remain = buf.len();
-        let mut buf_pos = 0;
-        while buf_remain > 0 {
-            let head = self.inner.get_head();
-
-            let read_nbytes = {
-                let may_read_nbytes = if tail <= head {
-                    head - tail
-                } else {
-                    self.inner.capacity - tail
-                };
-                if may_read_nbytes == 0 {
-                    break;
-                }
-
-                min(may_read_nbytes, buf_remain)
-            };
-
-            let dst_buf = &mut buf[buf_pos..(buf_pos + read_nbytes)];
-            unsafe {
-                self.inner.read_at(tail, dst_buf);
-            }
-
-            tail = (tail + read_nbytes) & self.inner.get_mask();
-            self.inner.set_tail(tail);
-
-            buf_pos += read_nbytes;
-            buf_remain -= read_nbytes;
-        }
-        Ok(buf_pos)
-    }
-
     pub fn can_read(&self) -> bool {
         self.bytes_to_read() != 0
     }
 
-    pub fn bytes_to_read(&self) -> usize {
-        let tail = self.inner.get_tail();
-        let head = self.inner.get_head();
-        if tail <= head {
-            head - tail
+    pub fn read_from_buffer(&mut self, buffer: &mut [u8]) -> Result<usize> {
+        self.read(Some(buffer), None)
+    }
+
+    pub fn read_from_vector(&mut self, buffers: &mut [&mut [u8]]) -> Result<usize> {
+        self.read(None, Some(buffers))
+    }
+
+    fn read(
+        &mut self,
+        buffer: Option<&mut [u8]>,
+        buffers: Option<&mut [&mut [u8]]>,
+    ) -> Result<usize> {
+        assert!(buffer.is_some() ^ buffers.is_some());
+        // In case of write after can_read is false
+        let lock_ref = self.buffer.lock.clone();
+        let lock_holder = lock_ref.lock();
+
+        if self.can_read() {
+            let count = if buffer.is_some() {
+                self.inner.pop_slice(buffer.unwrap())
+            } else {
+                self.pop_slices(buffers.unwrap())
+            };
+            assert!(count > 0);
+            self.read_end();
+            Ok(count)
         } else {
-            self.inner.capacity - tail + head
+            if self.is_peer_closed() {
+                return Ok(0);
+            }
+
+            if !self.buffer.blocking_read() {
+                return_errno!(EAGAIN, "No data to read");
+            } else {
+                // Clear the status of notifier before enqueue
+                clear_notifier_status(current!().tid())?;
+                self.enqueue_event(IoEvent::BlockingRead)?;
+                drop(lock_holder);
+                drop(lock_ref);
+                let ret = wait_for_notification();
+                self.dequeue_event()?;
+                ret?;
+
+                let lock_ref = self.buffer.lock.clone();
+                let lock_holder = lock_ref.lock();
+                let count = if buffer.is_some() {
+                    self.inner.pop_slice(buffer.unwrap())
+                } else {
+                    self.pop_slices(buffers.unwrap())
+                };
+
+                if count > 0 {
+                    self.read_end()?;
+                } else {
+                    assert!(self.is_peer_closed());
+                }
+                Ok(count)
+            }
+        }
+    }
+
+    fn pop_slices(&mut self, buffers: &mut [&mut [u8]]) -> usize {
+        let mut total = 0;
+        for buf in buffers {
+            let count = self.inner.pop_slice(buf);
+            total += count;
+            if count < buf.len() {
+                break;
+            }
+        }
+        total
+    }
+
+    pub fn bytes_to_read(&self) -> usize {
+        self.inner.len()
+    }
+
+    fn read_end(&self) -> Result<()> {
+        for (tid, event) in &*self.buffer.writer_wait_queue().lock().unwrap() {
+            match event {
+                IoEvent::Poll(poll_events) => {
+                    if !(poll_events.events()
+                        & (PollEventFlags::POLLOUT | PollEventFlags::POLLWRNORM))
+                        .is_empty()
+                    {
+                        notify_thread(*tid)?;
+                    }
+                }
+                IoEvent::Epoll(epoll_file) => unimplemented!(),
+                IoEvent::BlockingRead => unreachable!(),
+                IoEvent::BlockingWrite => notify_thread(*tid)?,
+            }
+        }
+        Ok(())
+    }
+
+    pub fn is_peer_closed(&self) -> bool {
+        self.buffer.is_writer_closed()
+    }
+
+    pub fn enqueue_event(&self, event: IoEvent) -> Result<()> {
+        self.buffer.enqueue_reader_event(event)
+    }
+
+    pub fn dequeue_event(&self) -> Result<()> {
+        self.buffer.dequeue_reader_event()
+    }
+
+    pub fn set_non_blocking(&self) {
+        self.buffer.set_non_blocking_read()
+    }
+
+    pub fn set_blocking(&self) {
+        self.buffer.set_blocking_read()
+    }
+
+    fn before_drop(&self) {
+        for (tid, event) in &*self.buffer.writer_wait_queue().lock().unwrap() {
+            match event {
+                IoEvent::Poll(_) | IoEvent::BlockingWrite => notify_thread(*tid).unwrap(),
+                IoEvent::Epoll(epoll_file) => unimplemented!(),
+                IoEvent::BlockingRead => unreachable!(),
+            }
         }
     }
 }
 
 impl Drop for RingBufReader {
     fn drop(&mut self) {
-        // So the writer knows when a reader is finished
-        self.inner.close();
+        debug!("reader drop");
+        self.buffer.close_reader();
+        if self.buffer.blocking_write() {
+            self.before_drop();
+        }
     }
 }
 
+pub struct RingBufWriter {
+    inner: Producer<u8>,
+    buffer: Arc<RingBufMeta>,
+}
+
 impl RingBufWriter {
-    pub fn write(&self, buf: &[u8]) -> Result<usize> {
-        if self.inner.is_closed() {
-            return_errno!(EPIPE, "Reader has been closed");
+    pub fn write_to_buffer(&mut self, buffer: &[u8]) -> Result<usize> {
+        self.write(Some(buffer), None)
+    }
+
+    pub fn write_to_vector(&mut self, buffers: &[&[u8]]) -> Result<usize> {
+        self.write(None, Some(buffers))
+    }
+
+    fn write(&mut self, buffer: Option<&[u8]>, buffers: Option<&[&[u8]]>) -> Result<usize> {
+        assert!(buffer.is_some() ^ buffers.is_some());
+
+        // TODO: send SIGPIPE to the caller
+        if self.is_peer_closed() {
+            return_errno!(EPIPE, "reader side is closed");
         }
 
-        let mut head = self.inner.get_head();
-        let mut buf_remain = buf.len();
-        let mut buf_pos = 0;
-        while buf_remain > 0 {
-            let tail = self.inner.get_tail();
+        // In case of read after can_write is false
+        let lock_ref = self.buffer.lock.clone();
+        let lock_holder = lock_ref.lock();
 
-            let write_nbytes = {
-                let may_write_nbytes = if tail <= head {
-                    self.inner.capacity - head
-                } else {
-                    tail - head - 1
-                };
-                if may_write_nbytes == 0 {
-                    break;
-                }
-
-                min(may_write_nbytes, buf_remain)
+        if self.can_write() {
+            let count = if buffer.is_some() {
+                self.inner.push_slice(buffer.unwrap())
+            } else {
+                self.push_slices(buffers.unwrap())
             };
-
-            let src_buf = &buf[buf_pos..(buf_pos + write_nbytes)];
-            unsafe {
-                self.inner.write_at(head, src_buf);
+            assert!(count > 0);
+            self.write_end();
+            Ok(count)
+        } else {
+            if !self.buffer.blocking_write() {
+                return_errno!(EAGAIN, "No space to write");
             }
 
-            head = (head + write_nbytes) & self.inner.get_mask();
-            self.inner.set_head(head);
+            // Clear the status of notifier before enqueue
+            clear_notifier_status(current!().tid());
+            self.enqueue_event(IoEvent::BlockingWrite)?;
+            drop(lock_holder);
+            drop(lock_ref);
+            let ret = wait_for_notification();
+            self.dequeue_event()?;
+            ret?;
 
-            buf_pos += write_nbytes;
-            buf_remain -= write_nbytes;
+            let lock_ref = self.buffer.lock.clone();
+            let lock_holder = lock_ref.lock();
+            let count = if buffer.is_some() {
+                self.inner.push_slice(buffer.unwrap())
+            } else {
+                self.push_slices(buffers.unwrap())
+            };
+
+            if count > 0 {
+                self.write_end();
+                Ok(count)
+            } else {
+                return_errno!(EPIPE, "reader side is closed");
+            }
         }
-        Ok(buf_pos)
+    }
+
+    fn write_end(&self) -> Result<()> {
+        for (tid, event) in &*self.buffer.reader_wait_queue().lock().unwrap() {
+            match event {
+                IoEvent::Poll(poll_events) => {
+                    if !(poll_events.events()
+                        & (PollEventFlags::POLLIN | PollEventFlags::POLLRDNORM))
+                        .is_empty()
+                    {
+                        notify_thread(*tid)?;
+                    }
+                }
+                IoEvent::Epoll(epoll_file) => unimplemented!(),
+                IoEvent::BlockingRead => notify_thread(*tid)?,
+                IoEvent::BlockingWrite => unreachable!(),
+            }
+        }
+        Ok(())
+    }
+
+    fn push_slices(&mut self, buffers: &[&[u8]]) -> usize {
+        let mut total = 0;
+        for buf in buffers {
+            let count = self.inner.push_slice(buf);
+            total += count;
+            if count < buf.len() {
+                break;
+            }
+        }
+        total
     }
 
     pub fn can_write(&self) -> bool {
-        let tail = self.inner.get_tail();
-        let head = self.inner.get_head();
-        let may_write_nbytes = if tail <= head {
-            self.inner.capacity - head
-        } else {
-            tail - head - 1
-        };
-        may_write_nbytes != 0
+        !self.inner.is_full()
+    }
+
+    pub fn is_peer_closed(&self) -> bool {
+        self.buffer.is_reader_closed()
+    }
+
+    pub fn enqueue_event(&self, event: IoEvent) -> Result<()> {
+        self.buffer.enqueue_writer_event(event)
+    }
+
+    pub fn dequeue_event(&self) -> Result<()> {
+        self.buffer.dequeue_writer_event()
+    }
+
+    pub fn set_non_blocking(&self) {
+        self.buffer.set_non_blocking_write()
+    }
+
+    pub fn set_blocking(&self) {
+        self.buffer.set_blocking_write()
+    }
+
+    fn before_drop(&self) {
+        for (tid, event) in &*self.buffer.reader_wait_queue().lock().unwrap() {
+            match event {
+                IoEvent::Poll(_) | IoEvent::BlockingRead => {
+                    notify_thread(*tid).unwrap();
+                }
+                IoEvent::Epoll(epoll_file) => unimplemented!(),
+                IoEvent::BlockingWrite => unreachable!(),
+            }
+        }
+    }
+}
+
+impl Drop for RingBufWriter {
+    fn drop(&mut self) {
+        debug!("writer drop");
+        self.buffer.close_writer();
+        if self.buffer.blocking_read() {
+            self.before_drop();
+        }
     }
 }

@@ -6,6 +6,8 @@ use super::{
     FileTableRef, ForcedExitStatus, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef,
     ResourceLimitsRef, SchedAgentRef, TermStatus, ThreadRef,
 };
+use crate::fs::{EventCreationFlags, EventFile};
+use crate::net::THREAD_NOTIFIERS;
 use crate::prelude::*;
 use crate::signal::{SigQueues, SigSet, SigStack};
 use crate::time::ThreadProfiler;
@@ -146,6 +148,18 @@ impl Thread {
         self.sched().lock().unwrap().attach(host_tid);
         self.inner().start();
 
+        let eventfd = EventFile::new(
+            0,
+            EventCreationFlags::EFD_CLOEXEC | EventCreationFlags::EFD_NONBLOCK,
+        )
+        .unwrap();
+
+        THREAD_NOTIFIERS
+            .lock()
+            .unwrap()
+            .insert(self.tid(), eventfd)
+            .expect_none("this thread should not have an eventfd before start");
+
         #[cfg(feature = "syscall_timing")]
         self.profiler()
             .lock()
@@ -164,6 +178,12 @@ impl Thread {
             .as_mut()
             .unwrap()
             .stop()
+            .unwrap();
+
+        THREAD_NOTIFIERS
+            .lock()
+            .unwrap()
+            .remove(&self.tid())
             .unwrap();
 
         self.sched().lock().unwrap().detach();

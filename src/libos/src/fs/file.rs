@@ -91,6 +91,18 @@ pub trait File: Debug + Sync + Send + Any {
         return_op_unsupported_error!("set_advisory_lock")
     }
 
+    fn poll(&self) -> Result<(crate::net::PollEventFlags)> {
+        return_op_unsupported_error!("poll")
+    }
+
+    fn enqueue_event(&self, _: crate::net::IoEvent) -> Result<()> {
+        return_op_unsupported_error!("enqueue_event");
+    }
+
+    fn dequeue_event(&self) -> Result<()> {
+        return_op_unsupported_error!("dequeue_event");
+    }
+
     fn as_any(&self) -> &dyn Any;
 }
 

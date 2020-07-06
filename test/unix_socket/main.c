@@ -2,6 +2,7 @@
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <poll.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -181,10 +182,32 @@ int test_socketpair_inter_process() {
     return test_connected_sockets_inter_process(create_connceted_sockets_default);
 }
 
+int test_poll() {
+    int socks[2];
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, socks) < 0) {
+        THROW_ERROR("socketpair failed");
+    }
+
+    write(socks[0], "not today\n", 10);
+
+    struct pollfd polls[] = {
+        { .fd = socks[1], .events = POLLIN },
+        { .fd = socks[0], .events = POLLOUT },
+    };
+
+    int ret = poll(polls, 2, 5000);
+    if (ret <= 0) { THROW_ERROR("poll error"); }
+    if ((polls[0].revents & POLLOUT) && (polls[1].revents && POLLIN) == 0) {
+        THROW_ERROR("wrong return events");
+    }
+    return 0;
+}
+
 static test_case_t test_cases[] = {
     TEST_CASE(test_unix_socket_inter_process),
     TEST_CASE(test_socketpair_inter_process),
     TEST_CASE(test_multiple_socketpairs),
+    TEST_CASE(test_poll),
 };
 
 int main(int argc, const char *argv[]) {

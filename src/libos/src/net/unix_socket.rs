@@ -6,12 +6,13 @@ use std::collections::btree_map::BTreeMap;
 use std::fmt;
 use std::sync::atomic::{spin_loop_hint, AtomicUsize, Ordering};
 use std::sync::SgxMutex as Mutex;
-use util::ring_buf::{RingBuf, RingBufReader, RingBufWriter};
+use util::ring_buf::{ring_buffer, RingBufReader, RingBufWriter};
 
 pub struct UnixSocketFile {
     inner: Mutex<UnixSocket>,
 }
 
+// TODO: add enqueue_event and dequeue_event
 impl File for UnixSocketFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let mut inner = self.inner.lock().unwrap();
@@ -33,32 +34,12 @@ impl File for UnixSocketFile {
 
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
         let mut inner = self.inner.lock().unwrap();
-        let mut total_len = 0;
-        for buf in bufs {
-            match inner.read(buf) {
-                Ok(len) => {
-                    total_len += len;
-                }
-                Err(_) if total_len != 0 => break,
-                Err(e) => return Err(e.into()),
-            }
-        }
-        Ok(total_len)
+        inner.readv(bufs)
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
         let mut inner = self.inner.lock().unwrap();
-        let mut total_len = 0;
-        for buf in bufs {
-            match inner.write(buf) {
-                Ok(len) => {
-                    total_len += len;
-                }
-                Err(_) if total_len != 0 => break,
-                Err(e) => return Err(e.into()),
-            }
-        }
-        Ok(total_len)
+        inner.writev(bufs)
     }
 
     fn metadata(&self) -> Result<Metadata> {
@@ -83,6 +64,11 @@ impl File for UnixSocketFile {
     fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
         let mut inner = self.inner.lock().unwrap();
         inner.ioctl(cmd)
+    }
+
+    fn poll(&self) -> Result<PollEventFlags> {
+        let mut inner = self.inner.lock().unwrap();
+        inner.poll()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -122,11 +108,6 @@ impl UnixSocketFile {
     pub fn connect(&self, path: impl AsRef<str>) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
         inner.connect(path)
-    }
-
-    pub fn poll(&self) -> Result<(bool, bool, bool)> {
-        let mut inner = self.inner.lock().unwrap();
-        inner.poll()
     }
 
     pub fn socketpair(socket_type: i32, protocol: i32) -> Result<(Self, Self)> {
@@ -252,20 +233,48 @@ impl UnixSocket {
         Ok(())
     }
 
-    pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
-        self.channel()?.reader.read(buf)
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        self.channel_mut()?.reader.read_from_buffer(buf)
     }
 
-    pub fn write(&self, buf: &[u8]) -> Result<usize> {
-        self.channel()?.writer.write(buf)
+    pub fn readv(&mut self, bufs: &mut [&mut [u8]]) -> Result<usize> {
+        self.channel_mut()?.reader.read_from_vector(bufs)
     }
 
-    pub fn poll(&self) -> Result<(bool, bool, bool)> {
-        // (read, write, error)
-        let channel = self.channel()?;
-        let r = channel.reader.can_read();
-        let w = channel.writer.can_write();
-        Ok((r, w, false))
+    pub fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        self.channel_mut()?.writer.write_to_buffer(buf)
+    }
+
+    pub fn writev(&mut self, bufs: &[&[u8]]) -> Result<usize> {
+        self.channel_mut()?.writer.write_to_vector(bufs)
+    }
+
+    fn poll(&self) -> Result<PollEventFlags> {
+        let channel_result = self.channel();
+        if let Ok(channel) = channel_result {
+            let readable = channel.reader.can_read() && !channel.reader.is_peer_closed();
+            let writable = channel.writer.can_write() && !channel.writer.is_peer_closed();
+            let events = if readable ^ writable {
+                if channel.reader.can_read() {
+                    PollEventFlags::POLLRDHUP | PollEventFlags::POLLIN | PollEventFlags::POLLRDNORM
+                } else {
+                    PollEventFlags::POLLRDHUP
+                }
+            // both readable and writable
+            } else if readable {
+                PollEventFlags::POLLIN
+                    | PollEventFlags::POLLOUT
+                    | PollEventFlags::POLLRDNORM
+                    | PollEventFlags::POLLWRNORM
+            } else {
+                PollEventFlags::POLLHUP
+            };
+            Ok(events)
+        } else {
+            // For the unconnected socket
+            // TODO: add write support for unconnected sockets like linux does
+            Ok(PollEventFlags::POLLHUP)
+        }
     }
 
     pub fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
@@ -281,6 +290,14 @@ impl UnixSocket {
             _ => return_errno!(EINVAL, "unknown ioctl cmd for unix socket"),
         }
         Ok(0)
+    }
+
+    fn channel_mut(&mut self) -> Result<&mut Channel> {
+        if let Status::Connected(ref mut channel) = &mut self.status {
+            Ok(channel)
+        } else {
+            return_errno!(EBADF, "UnixSocket is not connected")
+        }
     }
 
     fn channel(&self) -> Result<&Channel> {
@@ -349,15 +366,15 @@ unsafe impl Sync for Channel {}
 
 impl Channel {
     fn new_pair() -> Result<(Channel, Channel)> {
-        let buf1 = RingBuf::new(DEFAULT_BUF_SIZE)?;
-        let buf2 = RingBuf::new(DEFAULT_BUF_SIZE)?;
+        let (reader1, writer1) = ring_buffer(DEFAULT_BUF_SIZE)?;
+        let (reader2, writer2) = ring_buffer(DEFAULT_BUF_SIZE)?;
         let channel1 = Channel {
-            reader: buf1.reader,
-            writer: buf2.writer,
+            reader: reader1,
+            writer: writer2,
         };
         let channel2 = Channel {
-            reader: buf2.reader,
-            writer: buf1.writer,
+            reader: reader2,
+            writer: writer1,
         };
         Ok((channel1, channel2))
     }

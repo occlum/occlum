@@ -1,0 +1,40 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 92b7e5a..d41b5af 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -17,4 +17,8 @@ license = "MIT/Apache-2.0"
+ default = []
+ benchmark = []
+ 
++[patch.'https://github.com/apache/teaclave-sgx-sdk.git']
++sgx_tstd = { path = "../rust-sgx-sdk/sgx_tstd" }
++
+ [dependencies]
++sgx_tstd = { path = "../rust-sgx-sdk/sgx_tstd", features = ["backtrace"] }
+diff --git a/src/lib.rs b/src/lib.rs
+index 5b45f90..6ec90f1 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -116,6 +116,10 @@
+ 
+ #![cfg_attr(feature = "benchmark", feature(test))]
+ 
++#![no_std]
++#[macro_use]
++extern crate sgx_tstd as std;
++
+ #[cfg(feature = "benchmark")]
+ extern crate test;
+ 
+diff --git a/src/ring_buffer.rs b/src/ring_buffer.rs
+index 8ae68af..aa4fb28 100644
+--- a/src/ring_buffer.rs
++++ b/src/ring_buffer.rs
+@@ -7,6 +7,7 @@ use std::{
+         atomic::{AtomicUsize, Ordering},
+         Arc,
+     },
++    vec::Vec,
+ };
+ 
+ use crate::{consumer::Consumer, producer::Producer};

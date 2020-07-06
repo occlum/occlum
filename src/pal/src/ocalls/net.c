@@ -1,6 +1,9 @@
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <errno.h>
+#include <stdio.h>
 #include <stddef.h>
 #include "ocalls.h"
 
@@ -53,10 +56,35 @@ ssize_t occlum_ocall_recvmsg(int sockfd,
     return ret;
 }
 
-int occlum_ocall_select(int nfds,
-                        fd_set *readfds,
-                        fd_set *writefds,
-                        fd_set *exceptfds,
-                        struct timeval *timeout) {
-    return select(nfds, readfds, writefds, exceptfds, timeout);
+int occlum_ocall_poll(struct pollfd *fds,
+                      nfds_t nfds,
+                      struct timeval *timeout,
+                      int efd) {
+    struct timeval start_tv, end_tv, elapsed_tv;
+    int real_timeout = (timeout == NULL) ? -1 :
+                       (timeout->tv_sec * 1000 + timeout->tv_usec / 1000);
+    if (timeout != NULL) {
+        gettimeofday(&start_tv, NULL);
+    }
+
+    int ret = poll(fds, nfds, real_timeout);
+
+    if (timeout != NULL) {
+        gettimeofday(&end_tv, NULL);
+        timersub(&end_tv, &start_tv, &elapsed_tv);
+        if timercmp(timeout, &elapsed_tv, >= ) {
+            timersub(timeout, &elapsed_tv, timeout);
+        } else {
+            timeout->tv_sec = 0;
+            timeout->tv_usec = 0;
+        }
+    }
+
+    int saved_errno = errno;
+    // clear the status of the eventfd
+    uint64_t u = 0;
+    read(efd, &u, sizeof(uint64_t));
+    // restore the errno of poll
+    errno = saved_errno;
+    return ret;
 }

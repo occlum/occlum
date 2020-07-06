@@ -1,6 +1,8 @@
+#include <sys/select.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -69,7 +71,103 @@ int test_create_with_flags() {
     return 0;
 }
 
-int test_read_write() {
+int test_select_timeout() {
+    fd_set rfds;
+
+    int pipe_fds[2];
+    if (pipe(pipe_fds) < 0) {
+        THROW_ERROR("failed to create a pipe");
+    }
+
+    struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
+
+    FD_ZERO(&rfds);
+    FD_SET(pipe_fds[0], &rfds);
+    struct timeval tv_start, tv_end;
+    gettimeofday(&tv_start, NULL);
+    select(pipe_fds[0] + 1, &rfds, NULL, NULL, &tv);
+    gettimeofday(&tv_end, NULL);
+    double total_s = tv_end.tv_sec - tv_start.tv_sec;
+    if (total_s < 1) {
+        printf("time consumed is %f\n",
+               total_s + (double)(tv_end.tv_usec - tv_start.tv_usec) / 1000000);
+        THROW_ERROR("select timer does not work correctly");
+    }
+
+    free_pipe(pipe_fds);
+    return 0;
+}
+
+int test_poll_timeout() {
+    // Start the timer
+    struct timeval tv_start, tv_end;
+    gettimeofday(&tv_start, NULL);
+    int fds[2];
+    if (pipe(fds) < 0) {
+        THROW_ERROR("pipe failed");
+    }
+    struct pollfd polls[] = {
+        { .fd = fds[0], .events = POLLOUT },
+        { .fd = fds[1], .events = POLLIN }
+    };
+
+    poll(polls, 2, 1000);
+    // Stop the timer
+    gettimeofday(&tv_end, NULL);
+    double total_s = tv_end.tv_sec - tv_start.tv_sec;
+    if ((int)total_s < 1) {
+        printf("time consumed is %f\n",
+               total_s + (double)(tv_end.tv_usec - tv_start.tv_usec) / 1000000);
+        THROW_ERROR("poll timer does not work correctly");
+    }
+    return 0;
+}
+
+int test_select_no_timeout() {
+    fd_set wfds;
+    int ret = 0;
+
+    int pipe_fds[2];
+    if (pipe(pipe_fds) < 0) {
+        THROW_ERROR("failed to create a pipe");
+    }
+
+    FD_ZERO(&wfds);
+    FD_SET(pipe_fds[1], &wfds);
+    ret = select(pipe_fds[1] + 1, NULL, &wfds, NULL, NULL);
+    if (ret != 1) {
+        free_pipe(pipe_fds);
+        THROW_ERROR("select failed");
+    }
+
+    if (FD_ISSET(pipe_fds[1], &wfds) == 0) {
+        free_pipe(pipe_fds);
+        THROW_ERROR("bad select return");
+    }
+
+    free_pipe(pipe_fds);
+    return 0;
+}
+
+int test_poll_no_timeout() {
+    int pipe_fds[2];
+    if (pipe(pipe_fds) < 0) {
+        THROW_ERROR("failed to create a pipe");
+    }
+    struct pollfd polls[] = {
+        { .fd = pipe_fds[0], .events = POLLIN },
+        { .fd = pipe_fds[1], .events = POLLOUT },
+        { .fd = pipe_fds[1], .events = POLLOUT },
+    };
+    int ret = poll(polls, 3, -1);
+    if (ret < 0) { THROW_ERROR("poll error"); }
+
+    if (polls[0].revents != 0 || (polls[1].revents & POLLOUT) == 0 ||
+            (polls[2].revents & POLLOUT) == 0 || ret != 2) { THROW_ERROR("wrong return events"); }
+    return 0;
+}
+
+int test_select_read_write() {
     int pipe_fds[2];
     if (pipe(pipe_fds) < 0) {
         THROW_ERROR("failed to create a pipe");
@@ -96,10 +194,19 @@ int test_read_write() {
     const char *expected_str = msg;
     size_t expected_len = strlen(expected_str);
     char actual_str[32] = {0};
-    ssize_t actual_len;
-    do {
-        actual_len = read(pipe_rd_fd, actual_str, sizeof(actual_str) - 1);
-    } while (actual_len == 0);
+    fd_set rfds;
+
+    FD_ZERO(&rfds);
+    FD_SET(pipe_fds[0], &rfds);
+    if (select(pipe_fds[0] + 1, &rfds, NULL, NULL, NULL) != 1) {
+        free_pipe(pipe_fds);
+        THROW_ERROR("select failed");
+    }
+
+    if (read(pipe_rd_fd, actual_str, sizeof(actual_str) - 1) < 0) {
+        THROW_ERROR("reading pipe failed");
+    };
+
     if (strncmp(expected_str, actual_str, expected_len) != 0) {
         THROW_ERROR("received string is not as expected");
     }
@@ -120,7 +227,11 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_fcntl_get_flags),
     TEST_CASE(test_fcntl_set_flags),
     TEST_CASE(test_create_with_flags),
-    TEST_CASE(test_read_write),
+    TEST_CASE(test_select_timeout),
+    TEST_CASE(test_poll_timeout),
+    TEST_CASE(test_select_no_timeout),
+    TEST_CASE(test_poll_no_timeout),
+    TEST_CASE(test_select_read_write),
 };
 
 int main(int argc, const char *argv[]) {

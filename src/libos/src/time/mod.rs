@@ -30,6 +30,13 @@ pub struct timeval_t {
 }
 
 impl timeval_t {
+    pub fn new(sec: time_t, usec: suseconds_t) -> Self {
+        let time = Self { sec, usec };
+
+        time.validate().unwrap();
+        time
+    }
+
     pub fn validate(&self) -> Result<()> {
         if self.sec >= 0 && self.usec >= 0 && self.usec < 1_000_000 {
             Ok(())

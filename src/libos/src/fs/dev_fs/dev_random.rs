@@ -1,4 +1,5 @@
 use super::*;
+use crate::net::PollEventFlags;
 
 #[derive(Debug)]
 pub struct DevRandom;
@@ -59,24 +60,12 @@ impl File for DevRandom {
         })
     }
 
+    fn poll(&self) -> Result<(PollEventFlags)> {
+        Ok(PollEventFlags::POLLIN)
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
-    }
-}
-
-impl DevRandom {
-    pub fn poll(&self, fd: &mut libc::pollfd) -> Result<usize> {
-        // Just support POLLIN event, because the device is read-only currently
-        let (num, revents_option) = if (fd.events & libc::POLLIN) != 0 {
-            (1, Some(libc::POLLIN))
-        } else {
-            // Device is not ready
-            (0, None)
-        };
-        if let Some(revents) = revents_option {
-            fd.revents = revents;
-        }
-        Ok(num)
     }
 }
 

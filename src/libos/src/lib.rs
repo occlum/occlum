@@ -15,6 +15,7 @@
 #![feature(negative_impls)]
 // for may_dangle in rw_lock
 #![feature(dropck_eyepatch)]
+#![feature(option_expect_none)]
 
 #[macro_use]
 extern crate alloc;
@@ -40,6 +41,7 @@ extern crate rcore_fs_ramfs;
 extern crate rcore_fs_sefs;
 #[macro_use]
 extern crate derive_builder;
+extern crate ringbuf;
 extern crate serde;
 extern crate serde_json;
 

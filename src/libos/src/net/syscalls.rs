@@ -507,6 +507,13 @@ pub fn do_select(
         );
     }
 
+    if !timeout.is_null() {
+        from_user::check_ptr(timeout)?;
+        unsafe {
+            (*timeout).validate()?;
+        }
+    }
+
     // Select handles empty set and null in the same way
     // TODO: Elegently handle the empty fd_set without allocating redundant fd_set
     let mut empty_set_for_read = libc::fd_set::new_empty();
@@ -532,21 +539,11 @@ pub fn do_select(
         &mut empty_set_for_except
     };
 
-    let timeout_option = if !timeout.is_null() {
-        from_user::check_ptr(timeout)?;
-        unsafe {
-            (*timeout).validate()?;
-            Some(&mut *timeout)
-        }
-    } else {
-        None
-    };
-
-    let ret = io_multiplexing::select(nfds, readfds, writefds, exceptfds, timeout_option)?;
+    let ret = io_multiplexing::select(nfds, readfds, writefds, exceptfds, timeout)?;
     Ok(ret)
 }
 
-pub fn do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int) -> Result<isize> {
+pub fn do_poll(fds: *mut PollEvent, nfds: libc::nfds_t, timeout: c_int) -> Result<isize> {
     // It behaves like sleep when fds is null and nfds is zero.
     if !fds.is_null() || nfds != 0 {
         from_user::check_mut_array(fds, nfds as usize)?;
@@ -564,8 +561,19 @@ pub fn do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int) -> Re
     }
 
     let polls = unsafe { std::slice::from_raw_parts_mut(fds, nfds as usize) };
+    debug!("poll: {:?}, timeout: {}", polls, timeout);
 
-    let n = io_multiplexing::do_poll(polls, timeout)?;
+    let mut time_val = timeval_t::new(
+        ((timeout as u32) / 1000) as i64,
+        ((timeout as u32) % 1000 * 1000) as i64,
+    );
+    let tmp_to = if timeout == -1 {
+        std::ptr::null_mut()
+    } else {
+        &mut time_val
+    };
+
+    let n = io_multiplexing::do_poll(polls, tmp_to)?;
     Ok(n as isize)
 }
 

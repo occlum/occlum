@@ -32,8 +32,8 @@ use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
     do_epoll_pwait, do_epoll_wait, do_getpeername, do_getsockname, do_getsockopt, do_listen,
     do_poll, do_recvfrom, do_recvmsg, do_select, do_sendmsg, do_sendto, do_setsockopt, do_shutdown,
-    do_socket, do_socketpair, msghdr, msghdr_mut, AsSocket, AsUnixSocket, EpollEvent, SocketFile,
-    UnixSocketFile,
+    do_socket, do_socketpair, msghdr, msghdr_mut, AsSocket, AsUnixSocket, EpollEvent, PollEvent,
+    SocketFile, UnixSocketFile,
 };
 use crate::process::{
     do_arch_prctl, do_clone, do_exit, do_exit_group, do_futex, do_getegid, do_geteuid, do_getgid,
@@ -86,7 +86,7 @@ macro_rules! process_syscall_table_with_callback {
             (Stat = 4) => do_stat(path: *const i8, stat_buf: *mut Stat),
             (Fstat = 5) => do_fstat(fd: FileDesc, stat_buf: *mut Stat),
             (Lstat = 6) => do_lstat(path: *const i8, stat_buf: *mut Stat),
-            (Poll = 7) => do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int),
+            (Poll = 7) => do_poll(fds: *mut PollEvent, nfds: libc::nfds_t, timeout: c_int),
             (Lseek = 8) => do_lseek(fd: FileDesc, offset: off_t, whence: i32),
             (Mmap = 9) => do_mmap(addr: usize, size: usize, perms: i32, flags: i32, fd: FileDesc, offset: off_t),
             (Mprotect = 10) => do_mprotect(addr: usize, len: usize, prot: u32),
@@ -369,7 +369,7 @@ macro_rules! process_syscall_table_with_callback {
             (TimerfdGettime = 287) => handle_unsupported(),
             (Accept4 = 288) => do_accept4(fd: c_int, addr: *mut libc::sockaddr, addr_len: *mut libc::socklen_t, flags: c_int),
             (Signalfd4 = 289) => handle_unsupported(),
-            (Eventfd2 = 290) => do_eventfd2(init_val: u32, flaggs: i32),
+            (Eventfd2 = 290) => do_eventfd2(init_val: u32, flags: i32),
             (EpollCreate1 = 291) => do_epoll_create1(flags: c_int),
             (Dup3 = 292) => do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32),
             (Pipe2 = 293) => do_pipe2(fds_u: *mut i32, flags: u32),

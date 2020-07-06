@@ -11,17 +11,16 @@ use std::path::Path;
 use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
 
 pub use self::dev_fs::AsDevRandom;
-pub use self::event_file::{AsEvent, EventFile};
+pub use self::event_file::{AsEvent, EventCreationFlags, EventFile};
 pub use self::file::{File, FileRef};
 pub use self::file_ops::{
-    occlum_ocall_ioctl, AccessMode, CreationFlags, FileMode, Stat, StatusFlags,
+    occlum_ocall_ioctl, AccessMode, CreationFlags, FileMode, Flock, FlockType, IoctlCmd, Stat,
+    StatusFlags, StructuredIoctlArgType, StructuredIoctlNum,
 };
-pub use self::file_ops::{Flock, FlockType};
-pub use self::file_ops::{IoctlCmd, StructuredIoctlArgType, StructuredIoctlNum};
 pub use self::file_table::{FileDesc, FileTable};
 pub use self::fs_view::FsView;
 pub use self::inode_file::{AsINodeFile, INodeExt, INodeFile};
-pub use self::pipe::Pipe;
+pub use self::pipe::PipeType;
 pub use self::rootfs::ROOT_INODE;
 pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
 pub use self::syscalls::*;
