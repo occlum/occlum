@@ -23,7 +23,7 @@ HEADER_FILES := $(sort $(wildcard include/*.h include/*/*.h))
 C_COMMON_FLAGS := -I$(BUILD_DIR)/src/pal/src -Iinclude -Iinclude/edl
 C_FLAGS := $(C_COMMON_FLAGS) $(SGX_CFLAGS_U)
 CXX_FLAGS := $(C_COMMON_FLAGS) $(SGX_CXXFLAGS_U)
-LINK_FLAGS := $(SGX_LFLAGS_U) -shared -L$(RUST_SGX_SDK_DIR)/sgx_ustdc/ -lsgx_ustdc -lsgx_uprotected_fs
+LINK_FLAGS := $(SGX_LFLAGS_U) -shared -L$(RUST_SGX_SDK_DIR)/sgx_ustdc/ -lsgx_ustdc -lsgx_uprotected_fs -ldl
 LINK_FLAGS += -Wl,--version-script=pal.lds
 
 ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(LIBOCCLUM_PAL_SO_REAL) $(EDL_C_OBJS) $(C_OBJS) $(CXX_OBJS))))
