@@ -12,4 +12,4 @@ pub mod server;
 pub const DEFAULT_SERVER_FILE: &'static str = "occlum_exec_server";
 pub const DEFAULT_CLIENT_FILE: &'static str = "occlum_exec_client";
 pub const DEFAULT_SOCK_FILE: &'static str = "occlum_exec.sock";
-pub const DEFAULT_SERVER_TIMER: u32 = 30;
+pub const DEFAULT_SERVER_TIMER: u32 = 3;

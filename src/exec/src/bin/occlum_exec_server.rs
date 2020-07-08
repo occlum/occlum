@@ -5,18 +5,17 @@ extern crate occlum_exec;
 extern crate protobuf;
 #[macro_use]
 extern crate log;
+use futures::executor;
+use grpc::prelude::*;
+use grpc::ClientConf;
 use occlum_exec::occlum_exec::HealthCheckRequest;
 use occlum_exec::occlum_exec_grpc::{OcclumExecClient, OcclumExecServer};
 use occlum_exec::server::OcclumExecImpl;
-use occlum_exec::{DEFAULT_SERVER_FILE, DEFAULT_SERVER_TIMER, DEFAULT_SOCK_FILE};
+use occlum_exec::{DEFAULT_SERVER_FILE, DEFAULT_SOCK_FILE};
 use std::env;
 use std::ffi::{CStr, OsString};
 use std::os::unix::ffi::OsStrExt;
 use std::sync::{Arc, Condvar, Mutex};
-
-use futures::executor;
-use grpc::prelude::*;
-use grpc::ClientConf;
 
 //Checks the server status, if the server is running return true, else recover the socket file and return false.
 fn check_server_status(sock_file: &str) -> bool {
@@ -69,25 +68,10 @@ fn main() {
     }
 
     let server_stopped = Arc::new((Mutex::new(true), Condvar::new()));
-    let _server_stopped = server_stopped.clone();
 
-    //new a timer to stop the server
-    let stop_timer = timer::Timer::new();
-    let stop_timer_guard = stop_timer.schedule_with_delay(
-        chrono::Duration::seconds(DEFAULT_SERVER_TIMER as i64),
-        move || {
-            let (lock, cvar) = &*_server_stopped;
-            let mut stopped = lock.lock().unwrap();
-            *stopped = true;
-            cvar.notify_one();
-        },
+    let service_def = OcclumExecServer::new_service_def(
+        OcclumExecImpl::new_and_save_execution_lock(server_stopped.clone()),
     );
-
-    let service_def =
-        OcclumExecServer::new_service_def(OcclumExecImpl::new_and_save_execution_lock(
-            server_stopped.clone(),
-            (stop_timer, stop_timer_guard),
-        ));
     let mut server_builder = grpc::ServerBuilder::new_plain();
     server_builder.add_service(service_def);
     match server_builder.http.set_unix_addr(sockfile) {
