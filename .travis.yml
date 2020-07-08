@@ -5,7 +5,23 @@ sudo: true
 services:
   - docker
 
-script:
-- docker run -v /home/travis/build/occlum/occlum:/root/occlum occlum/occlum:0.13.0-ubuntu18.04 /bin/bash -c 'cd /root/occlum;
-                info=$(make format-check); if [ -n "$info" ]; then echo "Format error detected."; exit 1; fi;
-                make submodule; SGX_MODE=SIM make; SGX_MODE=SIM make test'
+env:
+  - OCCLUM_VERSION=0.13.0
+
+before_install:
+  - docker pull occlum/occlum:${OCCLUM_VERSION}-ubuntu18.04
+
+jobs:
+  include:
+    - stage: Check Format
+      script: docker run -v /home/travis/build/occlum/occlum:/root/occlum occlum/occlum:${OCCLUM_VERSION}-ubuntu18.04 /bin/bash -c 'cd /root/occlum;
+                            info=$(make format-check); if [ -n "$info" ]; then echo "Format error detected."; exit 1; fi'
+    - stage: Build Submodule
+      script: docker run -v /home/travis/build/occlum/occlum:/root/occlum occlum/occlum:${OCCLUM_VERSION}-ubuntu18.04 /bin/bash -c 'cd /root/occlum;
+                            make submodule'
+    - stage: Build Occlum
+      script: docker run -v /home/travis/build/occlum/occlum:/root/occlum occlum/occlum:${OCCLUM_VERSION}-ubuntu18.04 /bin/bash -c 'cd /root/occlum;
+                            OCCLUM_RELEASE_BUILD=y SGX_MODE=SIM make'
+    - stage: Integration Test
+      script: docker run -v /home/travis/build/occlum/occlum:/root/occlum occlum/occlum:${OCCLUM_VERSION}-ubuntu18.04 /bin/bash -c 'cd /root/occlum;
+                            SGX_MODE=SIM make test'
