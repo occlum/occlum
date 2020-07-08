@@ -64,14 +64,14 @@ impl VMRange {
         self.end = self.start + new_size;
     }
 
-    pub fn set_start(&mut self, start: usize) {
-        debug_assert!(start % PAGE_SIZE == 0 && start <= self.end);
-        self.start = start;
+    pub fn set_start(&mut self, new_start: usize) {
+        debug_assert!(new_start % PAGE_SIZE == 0 && new_start <= self.end);
+        self.start = new_start;
     }
 
-    pub fn set_end(&mut self, end: usize) {
-        debug_assert!(end % PAGE_SIZE == 0 && end >= self.start);
-        self.end = end;
+    pub fn set_end(&mut self, new_end: usize) {
+        debug_assert!(new_end % PAGE_SIZE == 0 && new_end >= self.start);
+        self.end = new_end;
     }
 
     pub fn empty(&self) -> bool {

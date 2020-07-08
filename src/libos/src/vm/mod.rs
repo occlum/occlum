@@ -14,7 +14,7 @@ mod vm_range;
 use self::vm_layout::VMLayout;
 use self::vm_manager::{VMManager, VMMapOptionsBuilder};
 
-pub use self::process_vm::{MMapFlags, MRemapFlags, ProcessVM, ProcessVMBuilder};
+pub use self::process_vm::{MMapFlags, MRemapFlags, MSyncFlags, ProcessVM, ProcessVMBuilder};
 pub use self::user_space_vm::USER_SPACE_VM_MANAGER;
 pub use self::vm_perms::VMPerms;
 pub use self::vm_range::VMRange;
@@ -72,6 +72,20 @@ pub fn do_mprotect(addr: usize, size: usize, perms: VMPerms) -> Result<()> {
 pub fn do_brk(addr: usize) -> Result<usize> {
     debug!("brk: addr: {:#x}", addr);
     current!().vm().brk(addr)
+}
+
+pub fn do_msync(addr: usize, size: usize, flags: MSyncFlags) -> Result<()> {
+    debug!(
+        "msync: addr: {:#x}, size: {:#x}, flags: {:?}",
+        addr, size, flags
+    );
+    if flags.contains(MSyncFlags::MS_INVALIDATE) {
+        return_errno!(EINVAL, "not support MS_INVALIDATE");
+    }
+    if flags.contains(MSyncFlags::MS_ASYNC) {
+        warn!("not support MS_ASYNC");
+    }
+    current!().vm().msync(addr, size)
 }
 
 pub const PAGE_SIZE: usize = 4096;

@@ -56,6 +56,28 @@ static int check_bytes_in_buf(char *buf, size_t len, int expected_byte_val) {
     return 0;
 }
 
+static int check_file_with_repeated_bytes(int fd, size_t len, int expected_byte_val) {
+    size_t remain = len;
+    char read_buf[512];
+    while (remain > 0) {
+        int read_nbytes = read(fd, read_buf, sizeof(read_buf));
+        if (read_nbytes < 0) {
+            // I/O error
+            return -1;
+        }
+        remain -= read_nbytes;
+        if (read_nbytes == 0 && remain > 0) {
+            // Not enough data in the file
+            return -1;
+        }
+        if (check_bytes_in_buf(read_buf, read_nbytes, expected_byte_val) < 0) {
+            // Incorrect data
+            return -1;
+        }
+    }
+    return 0;
+}
+
 static void *get_a_stack_ptr() {
     volatile int a = 0;
     return (void *) &a;
@@ -254,7 +276,7 @@ int test_anonymous_mmap_with_non_page_aligned_len() {
 // Test cases for file-backed mmap
 // ============================================================================
 
-int test_file_mmap() {
+int test_private_file_mmap() {
     const char *file_path = "/root/mmap_file.data";
     int fd = open(file_path, O_CREAT | O_TRUNC | O_WRONLY, 0644);
     if (fd < 0) {
@@ -292,7 +314,7 @@ int test_file_mmap() {
     return 0;
 }
 
-int test_file_mmap_with_offset() {
+int test_private_file_mmap_with_offset() {
     const char *file_path = "/root/mmap_file.data";
     int fd = open(file_path, O_CREAT | O_TRUNC | O_RDWR, 0644);
     if (fd < 0) {
@@ -340,7 +362,7 @@ int test_file_mmap_with_offset() {
     return 0;
 }
 
-int test_file_mmap_with_invalid_fd() {
+int test_private_file_mmap_with_invalid_fd() {
     size_t len = PAGE_SIZE;
     int prot = PROT_READ | PROT_WRITE;
     int flags = MAP_PRIVATE;
@@ -353,7 +375,7 @@ int test_file_mmap_with_invalid_fd() {
     return 0;
 }
 
-int test_file_mmap_with_non_page_aligned_offset() {
+int test_private_file_mmap_with_non_page_aligned_offset() {
     const char *file_path = "/root/mmap_file.data";
     int fd = open(file_path, O_CREAT | O_TRUNC | O_RDWR, 0644);
     if (fd < 0) {
@@ -378,6 +400,91 @@ int test_file_mmap_with_non_page_aligned_offset() {
 }
 
 // TODO: what if offset > file size or offset + len > file size?
+
+
+typedef int (*flush_file_mmap_func_t)(int /*fd*/, void * /*addr*/, size_t /*size*/);
+
+static int __test_shared_file_mmap_flushing_file(flush_file_mmap_func_t flush_fn) {
+    // Update a file by writing to its file-backed memory mapping
+    const char *file_path = "/root/mmap_file.data";
+    int fd = open(file_path, O_CREAT | O_TRUNC | O_RDWR, 0644);
+    if (fd < 0) {
+        THROW_ERROR("file creation failed");
+    }
+    if (fill_file_with_repeated_bytes(fd, PAGE_SIZE, 0) < 0) {
+        THROW_ERROR("file init failed");
+    }
+
+    int byte_val = 0xde;
+    char *write_buf = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (write_buf == MAP_FAILED) {
+        THROW_ERROR("mmap failed");
+    }
+    for (int i = 0; i < PAGE_SIZE; i++) { write_buf[i] = byte_val; }
+
+    int ret = flush_fn(fd, write_buf, PAGE_SIZE);
+    if (ret < 0) {
+        THROW_ERROR("fdatasync failed");
+    }
+    close(fd);
+
+    // Read the file back to see if the updates are durable
+    fd = open(file_path, O_RDONLY);
+    if (fd < 0) {
+        THROW_ERROR("file open failed");
+    }
+    if (check_file_with_repeated_bytes(fd, PAGE_SIZE, byte_val) < 0) {
+        THROW_ERROR("unexpected file content");
+    }
+    close(fd);
+
+    unlink(file_path);
+    return 0;
+}
+
+static int flush_shared_file_mmap_with_msync(int _fd, void *addr, size_t size) {
+    return msync(addr, size, MS_SYNC);
+}
+
+static int flush_shared_file_mmap_with_munmap(int _fd, void *addr, size_t size) {
+    return munmap(addr, size);
+}
+
+static int flush_shared_file_mmap_with_fdatasync(int fd, void *_addr, size_t _size) {
+    return fsync(fd);
+}
+
+static int flush_shared_file_mmap_with_fsync(int fd, void *_addr, size_t _size) {
+    return fdatasync(fd);
+}
+
+int test_shared_file_mmap_flushing_with_msync(void) {
+    if (__test_shared_file_mmap_flushing_file(flush_shared_file_mmap_with_msync)) {
+        THROW_ERROR("unexpected file content");
+    }
+    return 0;
+}
+
+int test_shared_file_mmap_flushing_with_munmap(void) {
+    if (__test_shared_file_mmap_flushing_file(flush_shared_file_mmap_with_munmap)) {
+        THROW_ERROR("unexpected file content");
+    }
+    return 0;
+}
+
+int test_shared_file_mmap_flushing_with_fdatasync(void) {
+    if (__test_shared_file_mmap_flushing_file(flush_shared_file_mmap_with_fdatasync)) {
+        THROW_ERROR("unexpected file content");
+    }
+    return 0;
+}
+
+int test_shared_file_mmap_flushing_with_fsync(void) {
+    if (__test_shared_file_mmap_flushing_file(flush_shared_file_mmap_with_fsync)) {
+        THROW_ERROR("unexpected file content");
+    }
+    return 0;
+}
 
 // ============================================================================
 // Test cases for fixed mmap
@@ -965,10 +1072,14 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_anonymous_mmap_with_bad_hints),
     TEST_CASE(test_anonymous_mmap_with_zero_len),
     TEST_CASE(test_anonymous_mmap_with_non_page_aligned_len),
-    TEST_CASE(test_file_mmap),
-    TEST_CASE(test_file_mmap_with_offset),
-    TEST_CASE(test_file_mmap_with_invalid_fd),
-    TEST_CASE(test_file_mmap_with_non_page_aligned_offset),
+    TEST_CASE(test_private_file_mmap),
+    TEST_CASE(test_private_file_mmap_with_offset),
+    TEST_CASE(test_private_file_mmap_with_invalid_fd),
+    TEST_CASE(test_private_file_mmap_with_non_page_aligned_offset),
+    TEST_CASE(test_shared_file_mmap_flushing_with_msync),
+    TEST_CASE(test_shared_file_mmap_flushing_with_munmap),
+    TEST_CASE(test_shared_file_mmap_flushing_with_fdatasync),
+    TEST_CASE(test_shared_file_mmap_flushing_with_fsync),
     TEST_CASE(test_fixed_mmap_that_does_not_override_any_mmaping),
     TEST_CASE(test_fixed_mmap_that_overrides_existing_mmaping),
     TEST_CASE(test_fixed_mmap_with_non_page_aligned_addr),

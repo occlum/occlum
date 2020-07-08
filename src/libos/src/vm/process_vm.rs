@@ -311,13 +311,24 @@ impl ProcessVM {
                 }
             }
         };
+        // Only shared, file-backed memory mappings have write-back files
+        let writeback_file = if flags.contains(MMapFlags::MAP_SHARED) {
+            if let VMInitializer::LoadFromFile { file, offset } = &initializer {
+                Some((file.clone(), *offset))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
         let mmap_options = VMMapOptionsBuilder::default()
             .size(size)
             .addr(addr_option)
             .perms(perms)
             .initializer(initializer)
+            .writeback_file(writeback_file)
             .build()?;
-        let mmap_addr = self.mmap_manager.lock().unwrap().mmap(&mmap_options)?;
+        let mmap_addr = self.mmap_manager.lock().unwrap().mmap(mmap_options)?;
         Ok(mmap_addr)
     }
 
@@ -356,6 +367,17 @@ impl ProcessVM {
         }
 
         mmap_manager.mprotect(addr, size, perms)
+    }
+
+    pub fn msync(&self, addr: usize, size: usize) -> Result<()> {
+        let sync_range = VMRange::new_with_size(addr, size)?;
+        let mut mmap_manager = self.mmap_manager.lock().unwrap();
+        mmap_manager.msync_by_range(&sync_range)
+    }
+
+    pub fn msync_by_file(&self, sync_file: &FileRef) {
+        let mut mmap_manager = self.mmap_manager.lock().unwrap();
+        mmap_manager.msync_by_file(sync_file);
     }
 
     // Return: a copy of the found region
@@ -432,5 +454,24 @@ impl MRemapFlags {
 impl Default for MRemapFlags {
     fn default() -> Self {
         MRemapFlags::None
+    }
+}
+
+bitflags! {
+    pub struct MSyncFlags : u32 {
+        const MS_ASYNC      = 0x1;
+        const MS_INVALIDATE = 0x2;
+        const MS_SYNC       = 0x4;
+    }
+}
+
+impl MSyncFlags {
+    pub fn from_u32(bits: u32) -> Result<Self> {
+        let flags =
+            MSyncFlags::from_bits(bits).ok_or_else(|| errno!(EINVAL, "containing unknown bits"))?;
+        if flags.contains(Self::MS_ASYNC | Self::MS_SYNC) {
+            return_errno!(EINVAL, "must be either sync or async");
+        }
+        Ok(flags)
     }
 }

@@ -45,7 +45,7 @@ use crate::signal::{
     do_kill, do_rt_sigaction, do_rt_sigpending, do_rt_sigprocmask, do_rt_sigreturn, do_sigaltstack,
     do_tgkill, do_tkill, sigaction_t, sigset_t, stack_t,
 };
-use crate::vm::{MMapFlags, MRemapFlags, VMPerms};
+use crate::vm::{MMapFlags, MRemapFlags, MSyncFlags, VMPerms};
 use crate::{fs, process, std, vm};
 
 use super::*;
@@ -105,7 +105,7 @@ macro_rules! process_syscall_table_with_callback {
             (Select = 23) => do_select(nfds: c_int, readfds: *mut libc::fd_set, writefds: *mut libc::fd_set, exceptfds: *mut libc::fd_set, timeout: *mut timeval_t),
             (SchedYield = 24) => do_sched_yield(),
             (Mremap = 25) => do_mremap(old_addr: usize, old_size: usize, new_size: usize, flags: i32, new_addr: usize),
-            (Msync = 26) => handle_unsupported(),
+            (Msync = 26) => do_msync(addr: usize, size: usize, flags: u32),
             (Mincore = 27) => handle_unsupported(),
             (Madvise = 28) => handle_unsupported(),
             (Shmget = 29) => handle_unsupported(),
@@ -770,6 +770,12 @@ fn do_mprotect(addr: usize, len: usize, perms: u32) -> Result<isize> {
 fn do_brk(new_brk_addr: usize) -> Result<isize> {
     let ret_brk_addr = vm::do_brk(new_brk_addr)?;
     Ok(ret_brk_addr as isize)
+}
+
+fn do_msync(addr: usize, size: usize, flags: u32) -> Result<isize> {
+    let flags = MSyncFlags::from_u32(flags)?;
+    vm::do_msync(addr, size, flags)?;
+    Ok(0)
 }
 
 fn do_sysinfo(info: *mut sysinfo_t) -> Result<isize> {

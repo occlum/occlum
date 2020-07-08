@@ -64,19 +64,21 @@ impl Default for VMMapAddr {
     }
 }
 
-#[derive(Builder, Debug, Default)]
-#[builder(build_fn(skip), no_std)]
+#[derive(Builder, Debug)]
+#[builder(pattern = "owned", build_fn(skip), no_std)]
 pub struct VMMapOptions {
     size: usize,
     align: usize,
     perms: VMPerms,
     addr: VMMapAddr,
     initializer: VMInitializer,
+    // The content of the VMA can be written back to a given file at a given offset
+    writeback_file: Option<(FileRef, usize)>,
 }
 
 // VMMapOptionsBuilder is generated automatically, except the build function
 impl VMMapOptionsBuilder {
-    pub fn build(&self) -> Result<VMMapOptions> {
+    pub fn build(mut self) -> Result<VMMapOptions> {
         let size = {
             let size = self
                 .size
@@ -117,12 +119,14 @@ impl VMMapOptionsBuilder {
             Some(initializer) => initializer.clone(),
             None => VMInitializer::default(),
         };
+        let writeback_file = self.writeback_file.take().unwrap_or_default();
         Ok(VMMapOptions {
             size,
             align,
             perms,
             addr,
             initializer,
+            writeback_file,
         })
     }
 }
@@ -142,6 +146,10 @@ impl VMMapOptions {
 
     pub fn initializer(&self) -> &VMInitializer {
         &self.initializer
+    }
+
+    pub fn writeback_file(&self) -> &Option<(FileRef, usize)> {
+        &self.writeback_file
     }
 }
 
@@ -258,12 +266,12 @@ impl VMManager {
             let start_sentry = {
                 let range = VMRange::new_empty(start)?;
                 let perms = VMPerms::empty();
-                VMArea::new(range, perms)
+                VMArea::new(range, perms, None)
             };
             let end_sentry = {
                 let range = VMRange::new_empty(end)?;
                 let perms = VMPerms::empty();
-                VMArea::new(range, perms)
+                VMArea::new(range, perms, None)
             };
             vec![start_sentry, end_sentry]
         };
@@ -274,7 +282,7 @@ impl VMManager {
         &self.range
     }
 
-    pub fn mmap(&mut self, options: &VMMapOptions) -> Result<usize> {
+    pub fn mmap(&mut self, mut options: VMMapOptions) -> Result<usize> {
         // TODO: respect options.align when mmap
         let addr = *options.addr();
         let size = *options.size();
@@ -287,7 +295,8 @@ impl VMManager {
         let (insert_idx, free_range) = self.find_free_range(size, addr)?;
         let new_range = self.alloc_range_from(size, addr, &free_range);
         let new_addr = new_range.start();
-        let new_vma = VMArea::new(new_range, *options.perms());
+        let writeback_file = options.writeback_file.take();
+        let new_vma = VMArea::new(new_range, *options.perms(), writeback_file);
 
         // Initialize the memory of the new range
         unsafe {
@@ -325,24 +334,31 @@ impl VMManager {
             effective_munmap_range
         };
 
-        let new_vmas = self
-            .vmas
-            .iter()
+        let old_vmas = {
+            let mut old_vmas = Vec::new();
+            std::mem::swap(&mut self.vmas, &mut old_vmas);
+            old_vmas
+        };
+        let new_vmas = old_vmas
+            .into_iter()
             .flat_map(|vma| {
                 // Keep the two sentry VMA intact
                 if vma.size() == 0 {
-                    return vec![*vma];
+                    return vec![vma];
                 }
 
-                let intersection_range = match vma.intersect(&munmap_range) {
-                    None => return vec![*vma],
-                    Some(intersection_range) => intersection_range,
+                let intersection_vma = match vma.intersect(&munmap_range) {
+                    None => return vec![vma],
+                    Some(intersection_vma) => intersection_vma,
                 };
 
-                // Reset memory permissions
-                Self::apply_perms(&intersection_range, VMPerms::default());
+                // File-backed VMA needs to be flushed upon munmap
+                Self::flush_file_vma(&intersection_vma);
 
-                vma.subtract(&intersection_range)
+                // Reset memory permissions
+                Self::apply_perms(&intersection_vma, VMPerms::default());
+
+                vma.subtract(&intersection_vma)
             })
             .collect();
         self.vmas = new_vmas;
@@ -465,7 +481,7 @@ impl VMManager {
 
         // Perform mmap and munmap if needed
         if let Some(mmap_options) = need_mmap {
-            let mmap_addr = self.mmap(&mmap_options)?;
+            let mmap_addr = self.mmap(mmap_options)?;
 
             if ret_addr.is_none() {
                 ret_addr = Some(mmap_addr);
@@ -506,14 +522,14 @@ impl VMManager {
             (false, true) => {
                 containing_vma.set_end(protect_range.start());
 
-                let new_vma = VMArea::new(protect_range, new_perms);
+                let new_vma = VMArea::inherits_file_from(containing_vma, protect_range, new_perms);
                 Self::apply_perms(&new_vma, new_vma.perms());
                 self.insert_new_vma(containing_idx + 1, new_vma);
             }
             (true, false) => {
                 containing_vma.set_start(protect_range.end());
 
-                let new_vma = VMArea::new(protect_range, new_perms);
+                let new_vma = VMArea::inherits_file_from(containing_vma, protect_range, new_perms);
                 Self::apply_perms(&new_vma, new_vma.perms());
                 self.insert_new_vma(containing_idx, new_vma);
             }
@@ -530,20 +546,73 @@ impl VMManager {
                 containing_vma.set_end(protect_range.start());
 
                 // New VMA
-                let new_vma = VMArea::new(protect_range, new_perms);
+                let new_vma = VMArea::inherits_file_from(containing_vma, protect_range, new_perms);
                 Self::apply_perms(&new_vma, new_vma.perms());
-                self.insert_new_vma(containing_idx + 1, new_vma);
 
                 // Another new VMA
                 let new_vma2 = {
                     let range = VMRange::new(protect_end, old_end).unwrap();
-                    VMArea::new(range, old_perms)
+                    VMArea::inherits_file_from(containing_vma, range, old_perms)
                 };
+
+                drop(containing_vma);
+                self.insert_new_vma(containing_idx + 1, new_vma);
                 self.insert_new_vma(containing_idx + 2, new_vma2);
             }
         }
 
         Ok(())
+    }
+
+    /// Sync all shared, file-backed memory mappings in the given range by flushing the
+    /// memory content to its underlying file.
+    pub fn msync_by_range(&mut self, sync_range: &VMRange) -> Result<()> {
+        if !self.range().is_superset_of(&sync_range) {
+            return_errno!(ENOMEM, "invalid range");
+        }
+
+        // FIXME: check if sync_range covers unmapped memory
+        for vma in &self.vmas {
+            let vma = match vma.intersect(sync_range) {
+                None => continue,
+                Some(vma) => vma,
+            };
+            Self::flush_file_vma(&vma);
+        }
+        Ok(())
+    }
+
+    /// Sync all shared, file-backed memory mappings of the given file by flushing
+    /// the memory content to the file.
+    pub fn msync_by_file(&mut self, sync_file: &FileRef) {
+        for vma in &self.vmas {
+            let is_same_file = |file: &FileRef| -> bool { Arc::ptr_eq(&file, &sync_file) };
+            Self::flush_file_vma_with_cond(vma, is_same_file);
+        }
+    }
+
+    /// Flush a file-backed VMA to its file. This has no effect on anonymous VMA.
+    fn flush_file_vma(vma: &VMArea) {
+        Self::flush_file_vma_with_cond(vma, |_| true)
+    }
+
+    /// Same as flush_vma, except that an extra condition on the file needs to satisfy.
+    fn flush_file_vma_with_cond<F: Fn(&FileRef) -> bool>(vma: &VMArea, cond_fn: F) {
+        let (file, file_offset) = match vma.writeback_file().as_ref() {
+            None => return,
+            Some((file_and_offset)) => file_and_offset,
+        };
+        let file_writable = file
+            .get_access_mode()
+            .map(|ac| ac.writable())
+            .unwrap_or_default();
+        if !file_writable {
+            return;
+        }
+        if !cond_fn(file) {
+            return;
+        }
+        file.write_at(*file_offset, unsafe { vma.as_slice() });
     }
 
     pub fn find_mmap_region(&self, addr: usize) -> Result<&VMRange> {
@@ -702,12 +771,33 @@ impl VMManager {
     fn can_merge_vmas(left: &VMArea, right: &VMArea) -> bool {
         debug_assert!(left.end() <= right.start());
 
-        // Both of the two VMAs are not sentry (whose size == 0)
-        left.size() > 0 && right.size() > 0 &&
-            // Two VMAs must border with each other
-            left.end() == right.start() &&
-            // Two VMAs must have the same memory permissions
-            left.perms() == right.perms()
+        // Both of the two VMAs must not be sentry (whose size == 0)
+        if left.size() == 0 || right.size() == 0 {
+            return false;
+        }
+        // The two VMAs must border with each other
+        if left.end() != right.start() {
+            return false;
+        }
+        // The two VMAs must have the same memory permissions
+        if left.perms() != right.perms() {
+            return false;
+        }
+
+        // If the two VMAs have write-back files, the files must be the same and
+        // the two file regions must be continuous.
+        let left_writeback_file = left.writeback_file();
+        let right_writeback_file = right.writeback_file();
+        match (left_writeback_file, right_writeback_file) {
+            (None, None) => true,
+            (Some(_), None) => false,
+            (None, Some(_)) => false,
+            (Some((left_file, left_offset)), Some((right_file, right_offset))) => {
+                Arc::ptr_eq(&left_file, &right_file)
+                    && right_offset > left_offset
+                    && right_offset - left_offset == left.size()
+            }
+        }
     }
 
     fn apply_perms(protect_range: &VMRange, perms: VMPerms) {
