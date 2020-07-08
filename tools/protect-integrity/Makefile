@@ -15,11 +15,7 @@ SGX_DEBUG ?= 1
 
 C_FORMATTER := $(PROJECT_DIR)/tools/c_formatter
 
-ifneq ($(SGX_MODE), HW)
-	BUILD_DIR := $(PROJECT_DIR)/build_sim
-else
-	BUILD_DIR := $(PROJECT_DIR)/build
-endif
+BUILD_DIR := $(PROJECT_DIR)/build
 OBJS_DIR := $(BUILD_DIR)/tools/protect-integrity
 
 ifeq ($(shell getconf LONG_BIT), 32)

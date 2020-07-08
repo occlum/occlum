@@ -7,11 +7,7 @@ CXX_SRCS := $(wildcard */*.cc)
 
 C_FORMATTER := $(PROJECT_DIR)/tools/c_formatter
 
-ifneq ($(SGX_MODE), HW)
-	BUILD_DIR := $(PROJECT_DIR)/build_sim
-else
-	BUILD_DIR := $(PROJECT_DIR)/build
-endif
+BUILD_DIR := $(PROJECT_DIR)/build
 
 PASS_LOG = $(BUILD_DIR)/test/.pass
 FAIL_LOG = $(BUILD_DIR)/test/.fail

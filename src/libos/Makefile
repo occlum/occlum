@@ -43,9 +43,14 @@ include ../sgxenv.mk
 # be printed.
 LIBOS_LOG ?= error
 
-LIBOS_SO := $(BUILD_DIR)/lib/libocclum-libos.so
-LIBOS_SONAME := $(LIBOS_SO).$(MAJOR_VER_NUM)
-LIBOS_SO_REAL := $(LIBOS_SO).$(VERSION_NUM)
+LIBOS_SONAME := libocclum-libos.so.$(MAJOR_VER_NUM)
+
+ifneq ($(SGX_MODE), HW)
+	LIBOS_SO_REAL := $(BUILD_DIR)/lib/libocclum-libos_sim.so.$(VERSION_NUM)
+else
+	LIBOS_SO_REAL := $(BUILD_DIR)/lib/libocclum-libos.so.$(VERSION_NUM)
+endif
+
 LIBOS_CORE_A := $(BUILD_DIR)/lib/libocclum-libos-core.a
 LIBOS_CORE_RS_A := $(BUILD_DIR)/lib/libocclum_libos_core_rs.a
 
@@ -85,7 +90,6 @@ LIBOS_SO_DEPS := $(LIBOS_CORE_A) $(LIBCOMPILER_RT_PATCH_A)
 
 $(LIBOS_SO_REAL): $(LIBOS_CORE_A) $(LIBCOMPILER_RT_PATCH_A)
 	@$(CC) $(LIBOS_SO_DEPS) -o $@ $(LINK_FLAGS) -Wl,-soname=$(LIBOS_SONAME)
-	@cd $(BUILD_DIR)/lib && ln -sf $(notdir $(LIBOS_SO_REAL)) $(notdir $(LIBOS_SONAME))
 	@echo "LINK => $@"
 
 $(LIBOS_CORE_A): $(LIBOS_CORE_RS_A) $(C_OBJS) $(CXX_OBJS) $(S_OBJS) $(EDL_C_OBJS)
@@ -124,6 +128,6 @@ $(BUILD_DIR)/src/libos/%.o: %.S
 	@echo "AS <= $@"
 
 clean:
-	@-$(RM) -f $(LIBOS_SONAME) $(LIBOS_SO_REAL) $(LIBOS_CORE_A) $(LIBOS_CORE_RS_A) \
+	@-$(RM) -f $(LIBOS_SO_REAL) $(LIBOS_CORE_A) $(LIBOS_CORE_RS_A) \
 		$(EDL_C_OBJS) $(EDL_C_SRCS) $(C_OBJS) $(CXX_OBJS) $(S_OBJS)
 	@-$(RM) -rf $(RUST_TARGET_DIR)

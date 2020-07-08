@@ -18,10 +18,11 @@ else
 	OCCLUM_GIT_OPTIONS +=
 endif
 
-# Enclaves using by tools are running in simulation mode by default to run faster.
-# If a user really wants to run the tools in SGX hardware mode, please use command
-# `OCCLUM_TOOLS_SIM_MODE_ONLY=N make submodule`.
-OCCLUM_TOOLS_SIM_MODE_ONLY ?= Y
+# Occlum major version
+MAJOR_VER_NUM = $(shell grep '\#define OCCLUM_MAJOR_VERSION' ./src/pal/include/occlum_version.h |  awk '{print $$3}')
+
+# Exclude files when install
+EXCLUDE_FILES = "libocclum-libos.so.$(MAJOR_VER_NUM)\$$|libocclum-pal.so.$(MAJOR_VER_NUM)\$$|libocclum-pal.so\$$|.a\$$|occlum-protect-integrity.so.*"
 
 submodule: githooks
 	git submodule init
@@ -30,29 +31,13 @@ submodule: githooks
 	cd deps/rust-sgx-sdk && git apply ../rust-sgx-sdk.patch >/dev/null 2>&1 || git apply ../rust-sgx-sdk.patch -R --check
 	cd deps/serde-json-sgx && git apply ../serde-json-sgx.patch >/dev/null 2>&1 || git apply ../serde-json-sgx.patch -R --check
 
-ifeq ($(OCCLUM_TOOLS_SIM_MODE_ONLY), Y)
-	@# Tools and sefs-fuse are used in SIM mode by default
+	@# Enclaves used by tools are running in simulation mode by default to run faster.
 	@rm -rf build build_sim
 	@$(MAKE) SGX_MODE=SIM --no-print-directory -C tools
 	@$(MAKE) --no-print-directory -C deps/sefs/sefs-fuse clean
 	@$(MAKE) SGX_MODE=SIM --no-print-directory -C deps/sefs/sefs-fuse
-	@cp deps/sefs/sefs-fuse/bin/sefs-fuse build_sim/bin
-	@cp deps/sefs/sefs-fuse/lib/libsefs-fuse.signed.so build_sim/lib
-	@cp -r build_sim build
-else
-	@# Tools and sefs-fuse are built for both HW mode and SIM mode
-	@rm -rf build build_sim
-	@$(MAKE) SGX_MODE=HW --no-print-directory -C tools
-	@$(MAKE) --no-print-directory -C deps/sefs/sefs-fuse clean
-	@$(MAKE) SGX_MODE=HW --no-print-directory -C deps/sefs/sefs-fuse
 	@cp deps/sefs/sefs-fuse/bin/sefs-fuse build/bin
 	@cp deps/sefs/sefs-fuse/lib/libsefs-fuse.signed.so build/lib
-	@$(MAKE) SGX_MODE=SIM --no-print-directory -C tools
-	@$(MAKE) --no-print-directory -C deps/sefs/sefs-fuse clean
-	@$(MAKE) SGX_MODE=SIM --no-print-directory -C deps/sefs/sefs-fuse
-	@cp deps/sefs/sefs-fuse/bin/sefs-fuse build_sim/bin
-	@cp deps/sefs/sefs-fuse/lib/libsefs-fuse.signed.so build_sim/lib
-endif
 
 src:
 	@$(MAKE) --no-print-directory -C src
@@ -66,17 +51,12 @@ install:
 	@$(MAKE) SGX_MODE=HW --no-print-directory -C src
 	@$(MAKE) SGX_MODE=SIM --no-print-directory -C src
 
-	@echo "Install libraries for SGX hardware mode ..."
+	@echo "Install libraries ..."
 	@mkdir -p $(OCCLUM_PREFIX)/build/bin/
 	@cp build/bin/* $(OCCLUM_PREFIX)/build/bin
 	@mkdir -p $(OCCLUM_PREFIX)/build/lib/
-	@cp --no-dereference build/lib/* $(OCCLUM_PREFIX)/build/lib/
-
-	@echo "Install libraries for SGX simulation mode ..."
-	@mkdir -p $(OCCLUM_PREFIX)/build_sim/bin/
-	@cp build_sim/bin/* $(OCCLUM_PREFIX)/build_sim/bin
-	@mkdir -p $(OCCLUM_PREFIX)/build_sim/lib/
-	@cp --no-dereference build_sim/lib/* $(OCCLUM_PREFIX)/build_sim/lib/
+	@# Don't copy libos library and pal library symbolic files to install dir
+	@cd build/lib && cp --no-dereference `ls | grep -Ev $(EXCLUDE_FILES)` $(OCCLUM_PREFIX)/build/lib/ && cd -
 
 	@echo "Install headers and miscs ..."
 	@mkdir -p $(OCCLUM_PREFIX)/include/

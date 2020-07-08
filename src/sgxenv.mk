@@ -14,11 +14,7 @@ VERSION_NUM = $(MAJOR_VER_NUM).$(MINOR_VER_NUM).$(PATCH_VER_NUM)
 
 C_FORMATTER := $(PROJECT_DIR)/tools/c_formatter
 
-ifneq ($(SGX_MODE), HW)
-	BUILD_DIR := $(PROJECT_DIR)/build_sim
-else
-	BUILD_DIR := $(PROJECT_DIR)/build
-endif
+BUILD_DIR := $(PROJECT_DIR)/build
 
 # If OCCLUM_RELEASE_BUILD equals to 1, y, or yes, then build in release mode
 OCCLUM_RELEASE_BUILD ?= 0

@@ -5,12 +5,7 @@ PROJECT_DIR := $(realpath $(CUR_DIR)/../../)
 SGX_MODE ?= HW
 EXTRA_ENV :=
 
-ifneq ($(SGX_MODE), HW)
-	BUILD_DIR := $(PROJECT_DIR)/build_sim
-else
-	BUILD_DIR := $(PROJECT_DIR)/build
-endif
-
+BUILD_DIR := $(PROJECT_DIR)/build
 TEST_NAME := $(shell basename $(CUR_DIR))
 IMAGE_DIR := $(BUILD_DIR)/test/image
 BIN := $(IMAGE_DIR)/bin/$(TEST_NAME)

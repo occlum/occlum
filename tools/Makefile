@@ -1,10 +1,5 @@
 SGX_MODE ?= HW
-
-ifneq ($(SGX_MODE), HW)
-	BUILD_DIR := build_sim
-else
-	BUILD_DIR := build
-endif
+BUILD_DIR := build
 
 .PHONY: all format format-check clean
 
