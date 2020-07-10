@@ -97,9 +97,9 @@ impl ProcessBuilder {
         // Build a new process
         let new_process = {
             let exec_path = self.exec_path.take().unwrap_or_default();
-            let parent = self.parent.take().map(|parent| SgxRwLock::new(parent));
+            let parent = self.parent.take().map(|parent| RwLock::new(parent));
             let inner = SgxMutex::new(ProcessInner::new());
-            let sig_dispositions = SgxRwLock::new(SigDispositions::new());
+            let sig_dispositions = RwLock::new(SigDispositions::new());
             let sig_queues = RwLock::new(SigQueues::new());
             let forced_exit_status = ForcedExitStatus::new();
             Arc::new(Process {

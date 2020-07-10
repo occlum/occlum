@@ -94,7 +94,7 @@ impl ThreadBuilder {
             .task
             .ok_or_else(|| errno!(EINVAL, "task is mandatory"))?;
         let tid = self.tid.unwrap_or_else(|| ThreadId::new());
-        let clear_ctid = SgxRwLock::new(self.clear_ctid);
+        let clear_ctid = RwLock::new(self.clear_ctid);
         let inner = SgxMutex::new(ThreadInner::new());
         let process = self
             .process
@@ -106,10 +106,10 @@ impl ThreadBuilder {
         let files = self.files.unwrap_or_default();
         let sched = self.sched.unwrap_or_default();
         let rlimits = self.rlimits.unwrap_or_default();
-        let name = SgxRwLock::new(self.name.unwrap_or_default());
+        let name = RwLock::new(self.name.unwrap_or_default());
         let sig_queues = RwLock::new(SigQueues::new());
-        let sig_mask = SgxRwLock::new(SigSet::new_empty());
-        let sig_tmp_mask = SgxRwLock::new(SigSet::new_empty());
+        let sig_mask = RwLock::new(SigSet::new_empty());
+        let sig_tmp_mask = RwLock::new(SigSet::new_empty());
         let sig_stack = SgxMutex::new(None);
         let profiler = if cfg!(feature = "syscall_timing") {
             SgxMutex::new(Some(ThreadProfiler::new()))

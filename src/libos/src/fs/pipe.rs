@@ -21,11 +21,11 @@ impl Pipe {
         Ok(Pipe {
             reader: PipeReader {
                 inner: SgxMutex::new(ring_buf.reader),
-                status_flags: SgxRwLock::new(valid_flags),
+                status_flags: RwLock::new(valid_flags),
             },
             writer: PipeWriter {
                 inner: SgxMutex::new(ring_buf.writer),
-                status_flags: SgxRwLock::new(valid_flags),
+                status_flags: RwLock::new(valid_flags),
             },
         })
     }
@@ -34,7 +34,7 @@ impl Pipe {
 #[derive(Debug)]
 pub struct PipeReader {
     inner: SgxMutex<RingBufReader>,
-    status_flags: SgxRwLock<StatusFlags>,
+    status_flags: RwLock<StatusFlags>,
 }
 
 impl File for PipeReader {
@@ -95,7 +95,7 @@ unsafe impl Sync for PipeReader {}
 #[derive(Debug)]
 pub struct PipeWriter {
     inner: SgxMutex<RingBufWriter>,
-    status_flags: SgxRwLock<StatusFlags>,
+    status_flags: RwLock<StatusFlags>,
 }
 
 impl File for PipeWriter {

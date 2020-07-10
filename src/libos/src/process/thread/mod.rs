@@ -24,9 +24,9 @@ pub struct Thread {
     // Immutable info
     tid: ThreadId,
     // Mutable info
-    clear_ctid: SgxRwLock<Option<NonNull<pid_t>>>,
+    clear_ctid: RwLock<Option<NonNull<pid_t>>>,
     inner: SgxMutex<ThreadInner>,
-    name: SgxRwLock<ThreadName>,
+    name: RwLock<ThreadName>,
     // Process
     process: ProcessRef,
     // Resources
@@ -37,8 +37,8 @@ pub struct Thread {
     rlimits: ResourceLimitsRef,
     // Signal
     sig_queues: RwLock<SigQueues>,
-    sig_mask: SgxRwLock<SigSet>,
-    sig_tmp_mask: SgxRwLock<SigSet>,
+    sig_mask: RwLock<SigSet>,
+    sig_tmp_mask: RwLock<SigSet>,
     sig_stack: SgxMutex<Option<SigStack>>,
     // System call timing
     profiler: SgxMutex<Option<ThreadProfiler>>,
@@ -86,7 +86,7 @@ impl Thread {
     }
 
     /// Get the per-thread signal mask.
-    pub fn sig_mask(&self) -> &SgxRwLock<SigSet> {
+    pub fn sig_mask(&self) -> &RwLock<SigSet> {
         &self.sig_mask
     }
 
@@ -94,7 +94,7 @@ impl Thread {
     ///
     /// The tmp mask is always cleared at the end of the execution
     /// of a syscall.
-    pub fn sig_tmp_mask(&self) -> &SgxRwLock<SigSet> {
+    pub fn sig_tmp_mask(&self) -> &RwLock<SigSet> {
         &self.sig_tmp_mask
     }
 

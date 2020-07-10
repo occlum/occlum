@@ -16,10 +16,10 @@ pub struct Process {
     pid: pid_t,
     exec_path: String,
     // Mutable info
-    parent: Option<SgxRwLock<ProcessRef>>,
+    parent: Option<RwLock<ProcessRef>>,
     inner: SgxMutex<ProcessInner>,
     // Signal
-    sig_dispositions: SgxRwLock<SigDispositions>,
+    sig_dispositions: RwLock<SigDispositions>,
     sig_queues: RwLock<SigQueues>,
     forced_exit_status: ForcedExitStatus,
 }
@@ -105,7 +105,7 @@ impl Process {
     }
 
     /// Get the process-wide signal dispositions.
-    pub fn sig_dispositions(&self) -> &SgxRwLock<SigDispositions> {
+    pub fn sig_dispositions(&self) -> &RwLock<SigDispositions> {
         &self.sig_dispositions
     }
 

@@ -6,7 +6,7 @@ pub struct INodeFile {
     abs_path: String,
     offset: SgxMutex<usize>,
     access_mode: AccessMode,
-    status_flags: SgxRwLock<StatusFlags>,
+    status_flags: RwLock<StatusFlags>,
 }
 
 impl File for INodeFile {
@@ -216,7 +216,7 @@ impl INodeFile {
             abs_path: abs_path.to_owned(),
             offset: SgxMutex::new(0),
             access_mode,
-            status_flags: SgxRwLock::new(status_flags),
+            status_flags: RwLock::new(status_flags),
         })
     }
 
