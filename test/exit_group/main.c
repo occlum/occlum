@@ -38,6 +38,11 @@ static void *futex_wait_thread_func(void *_) {
 
 // exit_group syscall should terminate all threads in a thread group.
 int test_exit_group_to_force_threads_terminate(void) {
+#ifdef SGX_MODE_SIM
+    printf("WARNING: Skip this test case as we do not support "
+           "enclave interruption in SGX simulation mode\n");
+    return 0;
+#else
     // Create three types of threads that will not exit voluntarily
     pthread_t busyloop_thread;
     if (pthread_create(&busyloop_thread, NULL, busyloop_thread_func, NULL) < 0) {
@@ -63,6 +68,7 @@ int test_exit_group_to_force_threads_terminate(void) {
     // main function returns. If Occlum can terminate normally, this means
     // exit_group syscall taking effect.
     return 0;
+#endif
 }
 
 // ============================================================================

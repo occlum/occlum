@@ -4,6 +4,7 @@
 #include "pal_error.h"
 #include "pal_interrupt_thread.h"
 #include "pal_log.h"
+#include "pal_sig_handler.h"
 #include "pal_syscall.h"
 #include "pal_thread_counter.h"
 #include "errno2str.h"
@@ -26,6 +27,10 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
     if (eid != SGX_INVALID_ENCLAVE_ID) {
         PAL_ERROR("Enclave has been initialized.");
         errno = EEXIST;
+        return -1;
+    }
+
+    if (pal_register_sig_handlers() < 0) {
         return -1;
     }
 
