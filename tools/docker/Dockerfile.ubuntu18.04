@@ -92,6 +92,7 @@ COPY toolchains/rust/* /tmp/
 WORKDIR /tmp
 RUN ./build.sh
 ENV PATH="/opt/occlum/toolchains/rust/bin:$PATH"
+ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/opt/intel/sgxsdk/sdk_libs"
 
 # Install the latest version of Occlum
 WORKDIR /root
