@@ -6,6 +6,6 @@ services:
   - docker
 
 script:
-- docker run -v /home/travis/build/occlum/occlum:/root/occlum occlum/occlum:0.13.0-ubuntu18.04 /bin/bash -c 'cd /root/occlum;
+- docker run -v /home/travis/build/occlum/occlum:/root/occlum occlum/occlum:0.13.1-ubuntu18.04 /bin/bash -c 'cd /root/occlum;
                 info=$(make format-check); if [ -n "$info" ]; then echo "Format error detected."; exit 1; fi;
                 make submodule; SGX_MODE=SIM make; SGX_MODE=SIM make test'
