@@ -1,4 +1,4 @@
-use super::cpu_set::CpuSet;
+use super::cpu_set::{CpuSet, AVAIL_CPUSET};
 use crate::prelude::*;
 use crate::util::mem_util::from_user::*;
 
@@ -10,7 +10,7 @@ pub fn do_sched_yield() -> Result<isize> {
 pub fn do_sched_getaffinity(pid: pid_t, buf_size: size_t, buf_ptr: *mut u8) -> Result<isize> {
     // Construct safe Rust types
     let buf_size = {
-        if buf_size < CpuSet::len() {
+        if buf_size * 8 < AVAIL_CPUSET.cpu_count() {
             return_errno!(EINVAL, "buf size is not big enough");
         }
 
@@ -39,7 +39,7 @@ pub fn do_sched_getaffinity(pid: pid_t, buf_size: size_t, buf_ptr: *mut u8) -> R
 pub fn do_sched_setaffinity(pid: pid_t, buf_size: size_t, buf_ptr: *const u8) -> Result<isize> {
     // Convert unsafe C types into safe Rust types
     let buf_size = {
-        if buf_size < CpuSet::len() {
+        if buf_size * 8 < AVAIL_CPUSET.cpu_count() {
             return_errno!(EINVAL, "buf size is not big enough");
         }
         CpuSet::len()

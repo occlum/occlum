@@ -52,6 +52,11 @@ impl CpuSet {
         self.bits.count_ones() == 0
     }
 
+    /// Returns the number of CPUs in set.
+    pub fn cpu_count(&self) -> usize {
+        self.bits.count_ones()
+    }
+
     // Returns if the CpuSet is a subset of available cpu set
     pub fn is_subset_of(&self, other: &CpuSet) -> bool {
         (self.bits.clone() & other.bits.clone()) == self.bits
@@ -137,7 +142,7 @@ lazy_static! {
     /// cloud platform, the container or vm is usually given access to a subset of the CPU cores on
     /// the host machine.
     ///
-    /// Property: `AVAIL_CPU.empty() == false`.
+    /// Property: `AVAIL_CPUSET.empty() == false`.
     pub static ref AVAIL_CPUSET: CpuSet = {
         extern "C" {
             fn occlum_ocall_sched_getaffinity(
