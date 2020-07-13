@@ -8,12 +8,12 @@ use crate::syscall::CpuContext;
 
 pub fn do_rt_sigreturn(curr_user_ctxt: &mut CpuContext) -> Result<()> {
     debug!("do_rt_sigreturn");
-    let last_user_ctxt = {
-        let last_user_ctxt = PRE_USER_CONTEXTS.with(|ref_cell| {
+    let last_ucontext = {
+        let last_ucontext = PRE_UCONTEXTS.with(|ref_cell| {
             let mut stack = ref_cell.borrow_mut();
             stack.pop()
         });
-        if last_user_ctxt.is_none() {
+        if last_ucontext.is_none() {
             let term_status = TermStatus::Killed(SIGKILL);
             current!().process().force_exit(term_status);
             return_errno!(
@@ -21,9 +21,12 @@ pub fn do_rt_sigreturn(curr_user_ctxt: &mut CpuContext) -> Result<()> {
                 "sigreturn should not have been called; kill this process"
             );
         }
-        unsafe { &*last_user_ctxt.unwrap() }
+        unsafe { &*last_ucontext.unwrap() }
     };
-    *curr_user_ctxt = *last_user_ctxt;
+    // Restore sigmask
+    *current!().sig_mask().write().unwrap() = SigSet::from_c(last_ucontext.uc_sigmask);
+    // Restore user context
+    *curr_user_ctxt = last_ucontext.uc_mcontext.inner;
     Ok(())
 }
 
@@ -109,7 +112,7 @@ fn handle_signal(
     process: &ProcessRef,
     cpu_context: &mut CpuContext,
 ) -> bool {
-    let is_sig_stack_full = PRE_USER_CONTEXTS.with(|ref_cell| {
+    let is_sig_stack_full = PRE_UCONTEXTS.with(|ref_cell| {
         let stack = ref_cell.borrow();
         stack.full()
     });
@@ -152,6 +155,7 @@ fn handle_signal(
         } => {
             let ret = handle_signals_by_user(
                 signal,
+                thread,
                 handler_addr,
                 flags,
                 restorer_addr,
@@ -169,12 +173,24 @@ fn handle_signal(
 
 fn handle_signals_by_user(
     signal: Box<dyn Signal>,
+    thread: &ThreadRef,
     handler_addr: usize,
     flags: SigActionFlags,
     restorer_addr: usize,
-    mask: SigSet,
+    new_sigmask: SigSet,
     curr_user_ctxt: &mut CpuContext,
 ) -> Result<()> {
+    let old_sigmask = {
+        let mut sigmask = thread.sig_mask().write().unwrap();
+        let old_sigmask = *sigmask;
+        *sigmask = new_sigmask;
+        if !flags.contains(SigActionFlags::SA_NODEFER) {
+            // Block the current signal while executing the signal handler
+            *sigmask += signal.num();
+        }
+        old_sigmask
+    };
+
     // Represent the user stack in a memory safe way
     let mut user_stack = {
         let get_stack_top = || -> usize {
@@ -218,22 +234,18 @@ fn handle_signals_by_user(
         let ucontext = user_stack.alloc_aligned::<ucontext_t>(16)?;
         // TODO: set all fields in ucontext
         *ucontext = unsafe { std::mem::zeroed() };
+        // Save the old sigmask
+        ucontext.uc_sigmask = old_sigmask.to_c();
+        // Save the user context
+        ucontext.uc_mcontext.inner = *curr_user_ctxt;
         ucontext as *mut ucontext_t
     };
-    // 3. Save the current user CPU context on the stack of the signal handler
-    // so that we can restore the CPU context upon `sigreturn` syscall.
-    let saved_user_ctxt = {
-        let saved_user_ctxt = unsafe { &mut (*ucontext).uc_mcontext.inner };
-        *saved_user_ctxt = *curr_user_ctxt;
-        saved_user_ctxt as *mut CpuContext
-    };
-    // 4. Set up the call return address on the stack before we "call" the signal handler
+    // 3. Set up the call return address on the stack before we "call" the signal handler
     let handler_stack_top = {
         let handler_stack_top = user_stack.alloc::<usize>()?;
         *handler_stack_top = restorer_addr;
         handler_stack_top as *mut usize
     };
-    // TODO: mask signals while the signal handler is executing
 
     // Modify the current user CPU context so that the signal handler will
     // be "called" upon returning back to the user space and when the signal
@@ -245,9 +257,9 @@ fn handle_signals_by_user(
     curr_user_ctxt.rsi = info as u64;
     curr_user_ctxt.rdx = ucontext as u64;
 
-    PRE_USER_CONTEXTS.with(|ref_cell| {
+    PRE_UCONTEXTS.with(|ref_cell| {
         let mut stack = ref_cell.borrow_mut();
-        stack.push(saved_user_ctxt).unwrap();
+        stack.push(ucontext).unwrap();
     });
     Ok(())
 }
@@ -322,12 +334,12 @@ impl Stack {
 }
 
 thread_local! {
-    static PRE_USER_CONTEXTS: RefCell<CpuContextStack> = Default::default();
+    static PRE_UCONTEXTS: RefCell<CpuContextStack> = Default::default();
 }
 
 #[derive(Debug, Default)]
 struct CpuContextStack {
-    stack: [Option<*mut CpuContext>; 32],
+    stack: [Option<*mut ucontext_t>; 32],
     count: usize,
 }
 
@@ -344,7 +356,7 @@ impl CpuContextStack {
         self.count == 0
     }
 
-    pub fn push(&mut self, cpu_context: *mut CpuContext) -> Result<()> {
+    pub fn push(&mut self, cpu_context: *mut ucontext_t) -> Result<()> {
         if self.full() {
             return_errno!(ENOMEM, "cpu context stack is full");
         }
@@ -353,7 +365,7 @@ impl CpuContextStack {
         Ok(())
     }
 
-    pub fn pop(&mut self) -> Option<*mut CpuContext> {
+    pub fn pop(&mut self) -> Option<*mut ucontext_t> {
         if self.empty() {
             return None;
         }
