@@ -152,7 +152,7 @@ Occlum can be configured easily via a config file named `Occlum.json`, which is 
 
 ### Try Experimental Features
 
-Occlum has added several new experimental commands, which provide a more container-like experience to users, as shown below:
+1. Occlum has added several new experimental commands, which provide a more container-like experience to users, as shown below:
 ```
 occlum init
 occlum build
@@ -162,6 +162,8 @@ occlum exec <cmd2> <args2>
 occlum exec <cmd3> <args3>
 occlum stop
 ```
+
+2. Occlum has enabled per process resource configuration via `prlimit` syscall (https://man7.org/linux/man-pages//man2/prlimit.2.html) and shell built-in command `ulimit` (https://fishshell.com/docs/current/cmds/ulimit.html). For more info, please read [README.md](demos/fish/README.md) of `demos/fish`.
 
 ## How to Use?
 

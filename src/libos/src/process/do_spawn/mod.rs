@@ -180,6 +180,7 @@ fn new_process(
         };
         let fs_ref = Arc::new(SgxMutex::new(current_ref.fs().lock().unwrap().clone()));
         let sched_ref = Arc::new(SgxMutex::new(current_ref.sched().lock().unwrap().clone()));
+        let rlimit_ref = Arc::new(SgxMutex::new(current_ref.rlimits().lock().unwrap().clone()));
 
         // Make the default thread name to be the process's corresponding elf file name
         let elf_name = elf_path.rsplit('/').collect::<Vec<&str>>()[0];
@@ -191,6 +192,7 @@ fn new_process(
             .parent(process_ref)
             .task(task)
             .sched(sched_ref)
+            .rlimits(rlimit_ref)
             .fs(fs_ref)
             .files(files_ref)
             .name(thread_name)

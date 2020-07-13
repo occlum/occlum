@@ -1,6 +1,7 @@
 use std::ptr;
 
 use super::super::elf_file::ElfFile;
+use crate::misc::{resource_t, rlimit_t};
 use crate::prelude::*;
 use crate::vm::{ProcessVM, ProcessVMBuilder};
 
@@ -8,9 +9,33 @@ pub fn do_init<'a, 'b>(
     elf_file: &'b ElfFile<'a>,
     ldso_elf_file: &'b ElfFile<'a>,
 ) -> Result<ProcessVM> {
-    let mut process_vm = ProcessVMBuilder::new(vec![elf_file, ldso_elf_file])
-        .build()
-        .cause_err(|e| errno!(e.errno(), "failed to create process VM"))?;
+    let mut process_vm = if current!().process().pid() == 0 {
+        // Parent process is idle process and we can skip checking rlimit because main
+        // process will directly use memory configuration in Occlum.json
+        ProcessVMBuilder::new(vec![elf_file, ldso_elf_file])
+            .build()
+            .cause_err(|e| errno!(e.errno(), "failed to create process VM"))?
+    } else {
+        // Parent process is not idle process. Inherit parent process's resource limit.
+        let rlimit = current!().rlimits().lock().unwrap().clone();
+        let child_heap_size = rlimit.get(resource_t::RLIMIT_DATA).get_cur();
+        let child_stack_size = rlimit.get(resource_t::RLIMIT_STACK).get_cur();
+        let child_mmap_size =
+            rlimit.get(resource_t::RLIMIT_AS).get_cur() - child_heap_size - child_stack_size;
+
+        debug!(
+            "new process: heap_size = {:?}, stack_size = {:?}, mmap_size = {:?}",
+            child_heap_size, child_stack_size, child_mmap_size
+        );
+
+        ProcessVMBuilder::new(vec![elf_file, ldso_elf_file])
+            .set_heap_size(child_heap_size as usize)
+            .set_stack_size(child_stack_size as usize)
+            .set_mmap_size(child_mmap_size as usize)
+            .clone()
+            .build()
+            .cause_err(|e| errno!(e.errno(), "failed to create process VM"))?
+    };
 
     // Relocate symbols
     //reloc_symbols(process_base_addr, elf_file)?;

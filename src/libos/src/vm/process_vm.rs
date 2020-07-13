@@ -9,7 +9,7 @@ use super::vm_manager::{
 use super::vm_perms::VMPerms;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ProcessVMBuilder<'a, 'b> {
     elfs: Vec<&'b ElfFile<'a>>,
     heap_size: Option<usize>,

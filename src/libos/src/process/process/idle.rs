@@ -1,6 +1,7 @@
 use super::super::task::Task;
 use super::super::thread::ThreadId;
 use super::{ProcessBuilder, ThreadRef};
+use crate::misc::ResourceLimits;
 /// Process 0, a.k.a, the idle process.
 ///
 /// The idle process has no practical use except making process 1 (a.k.a, the init proess)
@@ -19,11 +20,15 @@ fn create_idle_thread() -> Result<ThreadRef> {
     let dummy_vm = Arc::new(ProcessVM::default());
     let dummy_task = Task::default();
 
+    // rlimit get from Occlum.json
+    let rlimits = Arc::new(SgxMutex::new(ResourceLimits::default()));
+
     // Assemble the idle process
     let idle_process = ProcessBuilder::new()
         .tid(dummy_tid)
         .vm(dummy_vm)
         .task(dummy_task)
+        .rlimits(rlimits)
         .no_parent(true)
         .build()?;
     debug_assert!(idle_process.pid() == 0);

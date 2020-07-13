@@ -18,10 +18,27 @@ impl ResourceLimits {
 
 impl Default for ResourceLimits {
     fn default() -> ResourceLimits {
-        // TODO: set appropriate limits for resources
+        // Get memory space limit from Occlum.json
+        let cfg_heap_size: u64 = config::LIBOS_CONFIG.process.default_heap_size as u64;
+        let cfg_stack_size: u64 = config::LIBOS_CONFIG.process.default_stack_size as u64;
+        let cfg_mmap_size: u64 = config::LIBOS_CONFIG.process.default_mmap_size as u64;
+
+        let stack_size = rlimit_t::new(cfg_stack_size);
+
+        // Data segment consists of three parts: initialized data, uninitialized data, and heap.
+        // Here we just approximatively consider this equal to the size of heap size.
+        let data_size = rlimit_t::new(cfg_heap_size);
+        // Address space can be approximatively considered equal to the sum of application's
+        // heap, stack and mmap size.
+        let address_space = rlimit_t::new(cfg_heap_size + cfg_stack_size + cfg_mmap_size);
+
         let mut rlimits = ResourceLimits {
             rlimits: [Default::default(); RLIMIT_COUNT],
         };
+        *rlimits.get_mut(resource_t::RLIMIT_DATA) = data_size;
+        *rlimits.get_mut(resource_t::RLIMIT_STACK) = stack_size;
+        *rlimits.get_mut(resource_t::RLIMIT_AS) = address_space;
+
         rlimits
     }
 }
@@ -34,6 +51,13 @@ pub struct rlimit_t {
 }
 
 impl rlimit_t {
+    fn new(cur: u64) -> rlimit_t {
+        rlimit_t {
+            cur: cur,
+            max: u64::max_value(),
+        }
+    }
+
     pub fn get_cur(&self) -> u64 {
         self.cur
     }
@@ -103,6 +127,8 @@ impl resource_t {
 /// (unnecessary) restriction is lifted by our implementation. Nevertheless,
 /// since the rlimits object is shared between threads in a process, the
 /// semantic of limiting resource usage on a per-process basisi is preserved.
+///
+/// Limitation: Current implementation only takes effect on child processes.
 pub fn do_prlimit(
     pid: pid_t,
     resource: resource_t,
@@ -119,6 +145,39 @@ pub fn do_prlimit(
         *old_limit = *rlimits.get(resource)
     }
     if let Some(new_limit) = new_limit {
+        // Privilege is not granted for setting hard limit
+        if new_limit.get_max() != u64::max_value() {
+            return_errno!(EPERM, "setting hard limit is not permitted")
+        }
+        if new_limit.get_cur() > new_limit.get_max() {
+            return_errno!(EINVAL, "soft limit is greater than hard limit");
+        }
+
+        let mut soft_rlimit_stack_size = rlimits.get(resource_t::RLIMIT_STACK).get_cur();
+        let mut soft_rlimit_data_size = rlimits.get(resource_t::RLIMIT_DATA).get_cur();
+        let mut soft_rlimit_address_space_size = rlimits.get(resource_t::RLIMIT_AS).get_cur();
+        match resource {
+            resource_t::RLIMIT_DATA => {
+                soft_rlimit_data_size = new_limit.get_cur();
+            }
+            resource_t::RLIMIT_STACK => {
+                soft_rlimit_stack_size = new_limit.get_cur();
+            }
+            resource_t::RLIMIT_AS => {
+                soft_rlimit_address_space_size = new_limit.get_cur();
+            }
+            _ => warn!("resource type not supported"),
+        }
+
+        let soft_data_and_stack_size = soft_rlimit_data_size
+            .checked_add(soft_rlimit_stack_size)
+            .ok_or_else(|| errno!(EOVERFLOW, "memory size overflow"))?;
+
+        // Mmap space size can't be zero at least.
+        if soft_rlimit_address_space_size <= soft_data_and_stack_size {
+            return_errno!(EINVAL, "RLIMIT_AS size is too small");
+        }
+
         *rlimits.get_mut(resource) = *new_limit;
     }
     Ok(())
