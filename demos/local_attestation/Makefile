@@ -2,15 +2,9 @@ CUR_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 OPENSSL ?= $(CUR_DIR)/deps/openssl
 SGX_SDK ?= /opt/intel/sgxsdk
 
-BIN_DIR := bin
-APP := $(BIN_DIR)/appinitiator
+BUILD_DIR := build
+APP := $(BUILD_DIR)/appinitiator
 SGX_MODE ?= HW
-
-ifneq ($(SGX_MODE), HW)
-	OCCLUM_LIB := /opt/occlum/build_sim/lib
-else
-	OCCLUM_LIB := /opt/occlum/build/lib
-endif
 
 occlum_=$(CUR_DIR)/../..
 
@@ -35,7 +29,7 @@ build_src:
 	@$(MAKE) --no-print-directory -C EnclaveInitiator
 
 test: build_src
-	LD_LIBRARY_PATH=$(OCCLUM_LIB):$(SGX_SDK)/sdk_libs RUST_BACKTRACE=1 \
+	LD_LIBRARY_PATH=$(BUILD_DIR):$(SGX_SDK)/sdk_libs RUST_BACKTRACE=1 \
 		./$(APP)
 
 clean:
@@ -43,4 +37,4 @@ clean:
 	@$(MAKE) --no-print-directory -C AppResponder  clean
 	@$(MAKE) --no-print-directory -C EnclaveInitiator clean
 	@$(MAKE) --no-print-directory -C DiffieHellmanLibrary clean
-	@rm -rf .occlum occlum_context bin
+	@rm -rf .occlum occlum_context $(BUILD_DIR)

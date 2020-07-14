@@ -35,7 +35,6 @@ TARGET = appinitiator
 
 RM = rm -f
 
-#SGX_SDK ?= /opt/intel/sgxsdk
 OCCLUM_PREFIX ?= /opt/occlum
 
 CFLAGS := -Wall \
@@ -50,12 +49,17 @@ CXXFLAGS := -Wall \
 ifneq ($(SGX_MODE), HW)
 	URTS_LIB_NAME := sgx_urts_sim
 	UAE_SERVICE_LIB := sgx_uae_service_sim
-	BUILD_DIR:= build_sim
+	OCCLUM_PAL_LIB := occlum-pal_sim
 else
 	URTS_LIB_NAME := sgx_urts
 	UAE_SERVICE_LIB := sgx_uae_service
-	BUILD_DIR:= build
+	OCCLUM_PAL_LIB := occlum-pal
 endif
+
+MAJOR_VER_NUM = $(shell grep '\#define OCCLUM_MAJOR_VERSION' $(OCCLUM_PREFIX)/include/occlum_version.h |  awk '{print $$3}')
+MINOR_VER_NUM = $(shell grep '\#define OCCLUM_MINOR_VERSION' $(OCCLUM_PREFIX)/include/occlum_version.h |  awk '{print $$3}')
+PATCH_VER_NUM = $(shell grep '\#define OCCLUM_PATCH_VERSION' $(OCCLUM_PREFIX)/include/occlum_version.h |  awk '{print $$3}')
+VERSION_NUM = $(MAJOR_VER_NUM).$(MINOR_VER_NUM).$(PATCH_VER_NUM)
 
 INC:=-I$(SGX_SDK)/include -I../Include
 LIB := -l$(URTS_LIB_NAME) -l$(UAE_SERVICE_LIB) -L$(SGX_SDK)/lib64 -lpthread
@@ -74,8 +78,8 @@ else
 endif
 
 LINK_FLAGS := $(CXXFLAGS) -lpthread \
-        -L$(SGX_SDK)/lib64 -lsgx_uprotected_fs \
-        -L$(OCCLUM_PREFIX)/$(BUILD_DIR)/lib -locclum-pal
+		-L$(SGX_SDK)/lib64 -lsgx_uprotected_fs \
+		-L$(TOPDIR)/$(OUTDIR) -locclum-pal
 
 SRC_CPP=$(wildcard *.cpp)
 
@@ -108,11 +112,15 @@ EnclaveInitiator_u.o: EnclaveInitiator_u.c
 EnclaveInitiator_u.c:
 	@$(SGX_EDGER8R) --untrusted ../EnclaveInitiator/EnclaveInitiator.edl --search-path $(SGX_SDK)/include
 
-$(TARGET): EnclaveInitiator_u.o $(SRC_OBJ)
-	@$(CXX) $^ $(LINK_FLAGS) -o $@
-	@echo "GEN  =>  $@"
+libocclum-pal.so:
 	@mkdir -p $(TOPDIR)/$(OUTDIR)
+	@cd $(TOPDIR)/$(OUTDIR) && ln -sf $(OCCLUM_PREFIX)/build/lib/lib$(OCCLUM_PAL_LIB).so.$(VERSION_NUM) libocclum-pal.so.$(MAJOR_VER_NUM) && \
+		ln -sf libocclum-pal.so.$(MAJOR_VER_NUM) libocclum-pal.so
+
+$(TARGET): EnclaveInitiator_u.o $(SRC_OBJ) libocclum-pal.so
+	@$(CXX) EnclaveInitiator_u.o $(SRC_OBJ) $(LINK_FLAGS) -o $@
+	@echo "GEN  =>  $@"
 	@mv $@ $(TOPDIR)/$(OUTDIR)/
 
 clean:
-	@$(RM) $(TARGET) *.o *_u.c *_u.h
+	@$(RM) $(TARGET) *.o *_u.c *_u.h libocclum-pal.so.$(MAJOR_VER_NUM) libocclum-pal.so

@@ -13,7 +13,7 @@
 
 #include "EnclaveInitiator_u.h"
 
-#define ENCLAVE_INITIATOR_NAME "./bin/libenclave_initiator.signed.so"
+#define ENCLAVE_INITIATOR_NAME "./build/libenclave_initiator.signed.so"
 
 pthread_t thread;
 sgx_enclave_id_t initiator_enclave_id = 0;

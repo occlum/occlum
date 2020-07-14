@@ -61,9 +61,9 @@ SGX_SDK_PATH ?= $(SGX_SDK)
 #-------------------------------------------------------------------
 # This is the output folder.
 #-------------------------------------------------------------------
-BIN_DIR := bin
+BUILD_DIR := build
 TOPDIR = $(ROOT_DIR)
-OUTDIR := $(BIN_DIR)
+OUTDIR := $(BUILD_DIR)
 
 CP = cp
 CC ?= gcc

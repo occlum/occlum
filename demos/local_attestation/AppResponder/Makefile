@@ -20,4 +20,4 @@ proc_msg.o : proc_msg.c
 	$(CC)  -c proc_msg.c $(CFLAGS) $(INCLUDE_PATH) -o proc_msg.o
 
 clean:
-	rm -rf *.o  responder
+	@rm -rf *.o  responder

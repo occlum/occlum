@@ -26,4 +26,4 @@ crypto_aes_gcm.o : crypto_aes_gcm.cpp
 	$(CXX)  -c crypto_aes_gcm.cpp  $(CFLAGS)  -o crypto_aes_gcm.o
 
 clean:
-	rm -rf *.o ec_dh *.so
+	@rm -rf *.o ec_dh *.so
