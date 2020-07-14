@@ -24,18 +24,26 @@ impl VMInitializer {
                 // Do nothing
             }
             VMInitializer::FillZeros() => {
-                // Filling zero is done in munmap
+                for b in buf {
+                    *b = 0;
+                }
             }
             VMInitializer::CopyFrom { range } => {
                 let src_slice = unsafe { range.as_slice() };
                 let copy_len = min(buf.len(), src_slice.len());
                 buf[..copy_len].copy_from_slice(&src_slice[..copy_len]);
+                for b in &mut buf[copy_len..] {
+                    *b = 0;
+                }
             }
             VMInitializer::LoadFromFile { file, offset } => {
                 // TODO: make sure that read_at does not move file cursor
                 let len = file
                     .read_at(*offset, buf)
                     .cause_err(|_| errno!(EIO, "failed to init memory from file"))?;
+                for b in &mut buf[len..] {
+                    *b = 0;
+                }
             }
         }
         Ok(())
@@ -333,9 +341,6 @@ impl VMManager {
 
                 // Reset memory permissions
                 Self::apply_perms(&intersection_range, VMPerms::default());
-                unsafe {
-                    intersection_range.as_slice_mut().fill(0);
-                }
 
                 vma.subtract(&intersection_range)
             })
@@ -728,18 +733,12 @@ impl VMManager {
 
 impl Drop for VMManager {
     fn drop(&mut self) {
-        // Ensure that all allocated memories are restored to the default permissions and zeroed
+        // Ensure that memory permissions are recovered
         for vma in &self.vmas {
-            if vma.size() != 0 {
-                warn!("There are unmapped memories");
-
-                if vma.perms() != VMPerms::default() {
-                    Self::apply_perms(vma, VMPerms::default());
-                }
-                unsafe {
-                    vma.as_slice_mut().fill(0);
-                }
+            if vma.size() == 0 || vma.perms() == VMPerms::default() {
+                continue;
             }
+            Self::apply_perms(vma, VMPerms::default());
         }
     }
 }
