@@ -51,6 +51,29 @@ static int g_max_basic_leaf = 0;
 static int g_max_extend_leaf = 0;
 static bool g_sgx_supported = true;
 
+#define SGX_LEAF 0x12
+#define CPUID_FEATURE_FLAGS 0x7
+#define SGX_FEATURE_SHIFT 2
+#define SGX1_SHIFT 0
+
+static bool is_sgx_supported(void) {
+    t_cpuid_t cpu;
+
+    // check sgx feature supported
+    native_cpuid(CPUID_FEATURE_FLAGS, 0, &cpu);
+    if (!(cpu.ebx & (1 << SGX_FEATURE_SHIFT))) {
+        return false;
+    }
+
+    // check sgx1 supported
+    native_cpuid(SGX_LEAF, 0, &cpu);
+    if (!(cpu.eax & (1 << SGX1_SHIFT))) {
+        return false;
+    }
+
+    return true;
+}
+
 #define SKIP_IF_SGX_NOT_SUPPORTED() do { \
     if (!g_sgx_supported) { \
         printf("Warning: SGX is not supported. Skip %s\n", __func__); \
@@ -68,11 +91,6 @@ static int test_cpuid_with_basic_leaf_zero() {
     int subleaf = 0;
 
     native_cpuid(leaf, subleaf, &cpu);
-    // check if sgx is supported
-    if (cpu.eax < 0x12) {
-        g_sgx_supported = false;
-        printf("SGX is not supported\n");
-    }
 
     // check if max basic leaf is valid
     if (cpu.eax < 0 || cpu.eax >= 0xFF) {
@@ -139,7 +157,7 @@ static int test_cpuid_with_basic_leaf_one() {
 
 static int test_cpuid_with_sgx_verify() {
     t_cpuid_t cpu;
-    int leaf = 0x7;
+    int leaf = CPUID_FEATURE_FLAGS;
     int subleaf = 0;
 
     SKIP_IF_SGX_NOT_SUPPORTED();
@@ -155,7 +173,7 @@ static int test_cpuid_with_sgx_verify() {
 
 static int test_cpuid_with_sgx_enumeration() {
     t_cpuid_t cpu;
-    int leaf = 0x12;
+    int leaf = SGX_LEAF;
     int subleaf = 0;
 
     SKIP_IF_SGX_NOT_SUPPORTED();
@@ -169,7 +187,7 @@ static int test_cpuid_with_sgx_enumeration() {
     if (((cpu.edx & 0xFF) | ((cpu.edx >> 8) & 0xFF)) == 0) {
         THROW_ERROR("get MaxEnclaveSize failed");
     }
-    leaf = 0x12;
+    leaf = SGX_LEAF;
     subleaf = 1;
     native_cpuid(leaf, subleaf, &cpu);
     if ((cpu.eax | cpu.ebx | cpu.ecx | cpu.edx) == 0) {
@@ -281,5 +299,6 @@ static test_case_t test_cases[] = {
 };
 
 int main() {
+    g_sgx_supported = is_sgx_supported();
     return test_suite_run(test_cases, ARRAY_SIZE(test_cases));
 }
