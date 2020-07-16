@@ -107,6 +107,12 @@ RUN cd rust && ./build.sh && rm -rf /tmp/rust
 ENV PATH="/opt/occlum/toolchains/rust/bin:$PATH"
 ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/opt/intel/sgxsdk/sdk_libs"
 
+# Install Occlum Java toolchain (JDK 11)
+COPY toolchains/java /tmp/java
+WORKDIR /tmp
+RUN cd java && ./install.sh && rm -rf /tmp/java
+ENV PATH="/opt/occlum/toolchains/jvm/bin:$PATH"
+
 # Install the latest version of Occlum
 WORKDIR /root
 RUN git clone https://github.com/occlum/occlum && \

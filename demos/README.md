@@ -15,14 +15,20 @@ This set of demos shows how the Occlum toolchain can be used with different buil
 This set of demos shows how real-world apps can be easily run inside SGX enclaves with Occlum.
 
 * [https_server](https_server/): A HTTPS file server based on [Mongoose Embedded Web Server Library](https://github.com/cesanta/mongoose).
-* [golang](golang/): A [Golang](https://golang.org) web server demo app.
-* [grpc](grpc/): A client and server communicating through [gRPC](https://grpc.io/).
+* [grpc](grpc/): A client and server communicating through [gRPC](https://grpc.io).
 * [openvino](openvino/) A benchmark of [OpenVINO Inference Engine](https://docs.openvinotoolkit.org/2019_R3/_docs_IE_DG_inference_engine_intro.html).
-* [python](python/) A demo of [Python](https://www.python.org).
-* [rust](rust/) A demo of [Rust](https://www.rust-lang.org/).
 * [sqlite](sqlite/) A demo of [SQLite](https://www.sqlite.org) SQL database engine.
 * [tensorflow_lite](tensorflow_lite/): A demo and benchmark of [Tensorflow Lite](https://www.tensorflow.org/lite) inference engine.
-* [xgboost](xgboost/): A demo of [XGBoost](https://xgboost.readthedocs.io/en/latest/).
+* [xgboost](xgboost/): A demo of [XGBoost](https://xgboost.readthedocs.io/en/latest).
+
+## Programming language demos
+
+This set of demos shows how apps written with popular programming languages can be run inside SGX enclaves with Occlum.
+
+* [golang](golang/): A [Golang](https://golang.org) web server demo app.
+* [java](java/): A demo of [Java](https://openjdk.java.net) program.
+* [python](python/) A demo of [Python](https://www.python.org) program.
+* [rust](rust/) A demo of [Rust](https://www.rust-lang.org) program.
 
 ## Other demos
 
