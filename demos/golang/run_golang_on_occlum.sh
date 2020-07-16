@@ -23,6 +23,6 @@ echo "${new_json}" > Occlum.json
 cp ../web_server image/bin
 occlum build
 
-# 3. Run the hello world sample
+# 3. Run the web server sample
 echo -e "${BLUE}occlum run /bin/web_server${NC}"
 occlum run /bin/web_server

@@ -89,21 +89,21 @@ RUN curl https://sh.rustup.rs -sSf | \
     cargo -V
 
 # Install Occlum toolchain
-COPY toolchains/gcc/* /tmp/
+COPY toolchains/gcc /tmp/gcc
 WORKDIR /tmp
-RUN ./build.sh
+RUN cd gcc && ./build.sh && ./install_zlib.sh && rm -rf /tmp/gcc
 ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
 
 # Install Occlum Golang toolchain
-COPY toolchains/golang/* /tmp/
+COPY toolchains/golang /tmp/golang
 WORKDIR /tmp
-RUN ./build.sh
-ENV PATH="/usr/local/occlum/golang/bin:$PATH"
+RUN cd golang && ./build.sh && rm -rf /tmp/golang
+ENV PATH="/opt/occlum/toolchains/golang/bin:$PATH"
 
 # Install Occlum Rust toolchain
-COPY toolchains/rust/* /tmp/
+COPY toolchains/rust /tmp/rust
 WORKDIR /tmp
-RUN ./build.sh
+RUN cd rust && ./build.sh && rm -rf /tmp/rust
 ENV PATH="/opt/occlum/toolchains/rust/bin:$PATH"
 ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/opt/intel/sgxsdk/sdk_libs"
 

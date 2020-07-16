@@ -36,29 +36,6 @@ then
 fi
 make install
 
-# Install zlib
-cd $GRPC_SRC_DIR/third_party/zlib
-git submodule update --init .
-git checkout tags/v1.2.11
-mkdir -p build
-cd build
-cmake ../ \
-	-DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=occlum-gcc \
-	-DCMAKE_CXX_COMPILER=occlum-g++ -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
-	-DCMAKE_NO_SYSTEM_FROM_IMPORTED=TRUE
-if [ $? -ne 0 ]
-then
-  echo "zlib cmake failed"
-  exit 1
-fi
-make -j$(nproc)
-if [ $? -ne 0 ]
-then
-  echo "zlib make failed"
-  exit 1
-fi
-make install
-
 # Install protobuf
 cd $GRPC_SRC_DIR/third_party/protobuf
 git submodule update --init .

@@ -7,7 +7,7 @@ Downlaod, build and install openssl into `/usr/local/occlum/x86_64-linux-musl/li
 ```
 
 ## Step 2:
-Download, build and install cares, zlib, protobuf and finally gRPC into `/usr/local/occlum/x86_64-linux-musl/lib`:
+Download, build and install cares, protobuf and finally gRPC into `/usr/local/occlum/x86_64-linux-musl/lib`:
 ```
 ./download_and_install_grpc.sh
 ```

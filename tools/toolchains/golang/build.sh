@@ -34,6 +34,3 @@ CC=\$OCCLUM_GCC ${INSTALL_DIR}/bin/go "\$@"
 EOF
 
 chmod +x ${INSTALL_DIR}/bin/occlum-go
-
-# Make symbolic links
-ln -sf ${INSTALL_DIR} /usr/local/occlum/golang

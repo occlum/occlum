@@ -11,14 +11,6 @@ show_usage() {
 }
 
 build_opencv() {
-    rm -rf deps/zlib && mkdir -p deps/zlib
-    pushd deps/zlib
-    git clone https://github.com/madler/zlib .
-    CC=occlum-gcc CXX=occlum-g++ ./configure --prefix=$PREFIX
-    make
-    sudo make install
-    popd
-
     rm -rf deps/opencv && mkdir -p deps/opencv
     pushd deps/opencv
     git clone https://github.com/opencv/opencv .
