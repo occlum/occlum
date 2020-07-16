@@ -19,12 +19,14 @@ use std::os::unix::io::RawFd;
 use std::os::unix::net::UnixStream;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
+use timer::{Guard, Timer};
 
 #[derive(Default)]
 pub struct OcclumExecImpl {
     //process_id, return value, execution status
     commands: Arc<Mutex<HashMap<i32, (Option<i32>, bool)>>>,
     execution_lock: Arc<(Mutex<bool>, Condvar)>,
+    stop_timer: Arc<Mutex<Option<(Timer, Guard)>>>,
 }
 
 impl OcclumExecImpl {
@@ -32,6 +34,7 @@ impl OcclumExecImpl {
         OcclumExecImpl {
             commands: Default::default(),
             execution_lock: lock,
+            stop_timer: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -95,10 +98,14 @@ impl OcclumExec for OcclumExecImpl {
         }
         let time = cmp::min(req.take_message().time, crate::DEFAULT_SERVER_TIMER);
 
-        //New a timer to stop the server
+        // New a timer to stop the server
+        // If no new commands comes from the client, the SIGKILL would be send to all the process.
+        // After that, the enclave would be destroyed and the server itself would exit.
+        // If one status query command or execute new command request comes from client, and at that
+        // time the timer is still waiting, the timer would be cancelled.
         let lock = self.execution_lock.clone();
         let timer = timer::Timer::new();
-        timer.schedule_with_delay(chrono::Duration::seconds(time as i64), move || {
+        let guard = timer.schedule_with_delay(chrono::Duration::seconds(time as i64), move || {
             if rust_occlum_pal_kill(-1, SIGKILL).is_err() {
                 warn!("SIGKILL failed.")
             }
@@ -107,6 +114,9 @@ impl OcclumExec for OcclumExecImpl {
             *server_stopped = true;
             cvar.notify_one();
         });
+
+        // We could not drop the timer and guard until timer is triggered.
+        *self.stop_timer.lock().unwrap() = Some((timer, guard));
 
         resp.finish(StopResponse::default())
     }
@@ -117,6 +127,9 @@ impl OcclumExec for OcclumExecImpl {
         _req: ServerRequestSingle<HealthCheckRequest>,
         resp: ServerResponseUnarySink<HealthCheckResponse>,
     ) -> grpc::Result<()> {
+        // Clear the timer for we need the server continue service
+        *self.stop_timer.lock().unwrap() = None;
+
         //Waits for the Occlum loaded
         let (lock, _) = &*self.execution_lock.clone();
         loop {
@@ -140,6 +153,9 @@ impl OcclumExec for OcclumExecImpl {
         mut req: ServerRequestSingle<ExecCommRequest>,
         resp: ServerResponseUnarySink<ExecCommResponse>,
     ) -> grpc::Result<()> {
+        // Clear the timer for we need the server continue service
+        *self.stop_timer.lock().unwrap() = None;
+
         let req = req.take_message();
 
         //Get the client stdio
