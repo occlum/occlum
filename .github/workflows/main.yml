@@ -19,8 +19,9 @@ jobs:
     - name: Set Toolchains
       run: |
         echo $PATH
-        echo $OCCLUM_RUST_VERSION
-        rustup default nightly-2020-04-06
+        echo "rust version: $OCCLUM_RUST_VERSION"
+        echo '::set-env name=OCCLUM_RUST_VERSION::nightly-2020-04-07'
+        echo "rust version2: $OCCLUM_RUST_VERSION"
 
     - name: Check Format
       run: |
