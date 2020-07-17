@@ -112,6 +112,8 @@ static void handle_sigio(int num, siginfo_t *info, void *context) {
 
 int test_raise() {
     struct sigaction new_action, old_action;
+    memset(&new_action, 0, sizeof(struct sigaction));
+    memset(&old_action, 0, sizeof(struct sigaction));
     new_action.sa_sigaction = handle_sigio;
     new_action.sa_flags = SA_SIGINFO | SA_NODEFER;
     if (sigaction(SIGIO, &new_action, &old_action) < 0) {
@@ -236,6 +238,8 @@ int test_handle_sigfpe() {
 #else
     // Set up a signal handler that handles divide-by-zero exception
     struct sigaction new_action, old_action;
+    memset(&new_action, 0, sizeof(struct sigaction));
+    memset(&old_action, 0, sizeof(struct sigaction));
     new_action.sa_sigaction = handle_sigfpe;
     new_action.sa_flags = SA_SIGINFO;
     if (sigaction(SIGFPE, &new_action, &old_action) < 0) {
@@ -290,6 +294,8 @@ int test_handle_sigsegv() {
 #else
     // Set up a signal handler that handles divide-by-zero exception
     struct sigaction new_action, old_action;
+    memset(&new_action, 0, sizeof(struct sigaction));
+    memset(&old_action, 0, sizeof(struct sigaction));
     new_action.sa_sigaction = handle_sigsegv;
     new_action.sa_flags = SA_SIGINFO;
     if (sigaction(SIGSEGV, &new_action, &old_action) < 0) {
@@ -357,6 +363,8 @@ int test_sigaltstack() {
     }
 
     struct sigaction new_action, old_action;
+    memset(&new_action, 0, sizeof(struct sigaction));
+    memset(&old_action, 0, sizeof(struct sigaction));
     new_action.sa_sigaction = handle_sigpipe;
     new_action.sa_flags = SA_SIGINFO | SA_NODEFER | SA_ONSTACK;
     if (sigaction(SIGPIPE, &new_action, &old_action) < 0) {

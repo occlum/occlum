@@ -34,7 +34,7 @@ impl SigSet {
     }
 
     pub fn empty(&self) -> bool {
-        self.bits != 0
+        self.bits == 0
     }
 
     pub fn full(&self) -> bool {
