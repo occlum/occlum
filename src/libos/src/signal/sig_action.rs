@@ -31,7 +31,14 @@ impl SigAction {
                 handler_addr: sa_c.handler as usize,
                 flags: SigActionFlags::from_u32(sa_c.flags)?,
                 restorer_addr: sa_c.restorer as usize,
-                mask: SigSet::from_c(sa_c.mask),
+                mask: {
+                    let mut mask = SigSet::from_c(sa_c.mask);
+                    // According to man pages, "it is not possible to block SIGKILL or SIGSTOP.
+                    // Attempts to do so are silently ignored."
+                    mask -= SIGKILL;
+                    mask -= SIGSTOP;
+                    mask
+                },
             },
         };
         Ok(sa)
