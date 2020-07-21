@@ -14,6 +14,14 @@ VERSION_NUM = $(MAJOR_VER_NUM).$(MINOR_VER_NUM).$(PATCH_VER_NUM)
 
 C_FORMATTER := $(PROJECT_DIR)/tools/c_formatter
 
+# Save code and object file generated during building src
+OBJ_DIR := $(PROJECT_DIR)/build/internal/src
+ifneq ($(SGX_MODE), HW)
+	SRC_OBJ := src_sim
+else
+	SRC_OBJ := src
+endif
+
 BUILD_DIR := $(PROJECT_DIR)/build
 
 # If OCCLUM_RELEASE_BUILD equals to 1, y, or yes, then build in release mode

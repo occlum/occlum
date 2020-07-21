@@ -12,15 +12,22 @@ endif
 # A dependency on Rust SGX SDK
 LIBSGX_USTDC_A := $(BUILD_DIR)/lib/libsgx_ustdc.a
 
-EDL_C_SRCS := $(addprefix $(BUILD_DIR)/src/pal/src/,Enclave_u.c Enclave_u.h)
-EDL_C_OBJS := $(addprefix $(BUILD_DIR)/src/pal/src/,Enclave_u.o)
+EDL_C_SRCS := $(addprefix $(OBJ_DIR)/pal/$(SRC_OBJ)/,Enclave_u.c Enclave_u.h)
+EDL_C_OBJS := $(addprefix $(OBJ_DIR)/pal/$(SRC_OBJ)/,Enclave_u.o)
 C_SRCS := $(sort $(wildcard src/*.c src/*/*.c))
-C_OBJS := $(addprefix $(BUILD_DIR)/src/pal/,$(C_SRCS:.c=.o))
 CXX_SRCS := $(sort $(wildcard src/*.cpp src/*/*.cpp))
-CXX_OBJS := $(addprefix $(BUILD_DIR)/src/pal/,$(CXX_SRCS:.cpp=.o))
+C_OBJS := $(addprefix $(OBJ_DIR)/pal/,$(C_SRCS:.c=.o))
+CXX_OBJS := $(addprefix $(OBJ_DIR)/pal/,$(CXX_SRCS:.cpp=.o))
+
+# Object files for simulation mode are stored in libos/src_sim
+ifneq ($(SGX_MODE), HW)
+	C_OBJS := $(subst pal/src,pal/src_sim,$(C_OBJS))
+	CXX_OBJS := $(subst pal/src,pal/src_sim,$(CXX_OBJS))
+endif
+
 HEADER_FILES := $(sort $(wildcard include/*.h include/*/*.h))
 
-C_COMMON_FLAGS := -I$(BUILD_DIR)/src/pal/src -Iinclude -Iinclude/edl
+C_COMMON_FLAGS := -I$(OBJ_DIR)/pal/$(SRC_OBJ) -Iinclude -Iinclude/edl
 C_FLAGS := $(C_COMMON_FLAGS) $(SGX_CFLAGS_U)
 CXX_FLAGS := $(C_COMMON_FLAGS) $(SGX_CXXFLAGS_U)
 LINK_FLAGS := $(SGX_LFLAGS_U) -shared -L$(RUST_SGX_SDK_DIR)/sgx_ustdc/ -lsgx_ustdc -lsgx_uprotected_fs -ldl
@@ -42,22 +49,22 @@ $(LIBOCCLUM_PAL_SO_REAL): $(LIBSGX_USTDC_A) $(EDL_C_OBJS) $(C_OBJS) $(CXX_OBJS)
 		ln -sf $(notdir $(LIBOCCLUM_PAL_SONAME)) $(notdir $(LIBOCCLUM_PAL_SO))
 	@echo "LINK => $@"
 
-$(BUILD_DIR)/src/pal/src/Enclave_u.o: $(BUILD_DIR)/src/pal/src/Enclave_u.c
+$(OBJ_DIR)/pal/$(SRC_OBJ)/Enclave_u.o: $(OBJ_DIR)/pal/$(SRC_OBJ)/Enclave_u.c
 	@$(CC) $(C_FLAGS) -c $< -o $@
 	@echo "CC <= $@"
 
-$(BUILD_DIR)/src/pal/src/Enclave_u.c: $(SGX_EDGER8R) ../Enclave.edl
-	@cd $(BUILD_DIR)/src/pal/src && \
+$(OBJ_DIR)/pal/$(SRC_OBJ)/Enclave_u.c: $(SGX_EDGER8R) ../Enclave.edl
+	@cd $(OBJ_DIR)/pal/$(SRC_OBJ) && \
 		$(SGX_EDGER8R) --untrusted $(CUR_DIR)/../Enclave.edl \
 		--search-path $(SGX_SDK)/include \
 		--search-path $(RUST_SGX_SDK_DIR)/edl/
 	@echo "GEN <= $@"
 
-$(BUILD_DIR)/src/pal/%.o: %.c
+$(OBJ_DIR)/pal/$(SRC_OBJ)/%.o: src/%.c
 	@$(CC) $(C_FLAGS) -c $< -o $@
 	@echo "CC <= $@"
 
-$(BUILD_DIR)/src/pal/%.o: %.cpp
+$(OBJ_DIR)/pal/$(SRC_OBJ)/%.o: src/%.cpp
 	@$(CXX) $(CXX_FLAGS) -c $< -o $@
 	@echo "CXX <= $@"
 
@@ -73,4 +80,5 @@ format-check: $(C_SRCS) $(CXX_SRCS) $(HEADER_FILES)
 	@$(C_FORMATTER) --check $^
 
 clean:
-	@-$(RM) -f $(LIBOCCLUM_PAL_SO) $(LIBOCCLUM_PAL_SO_REAL) $(LIBOCCLUM_PAL_SONAME) $(LIBSGX_USTDC_A) $(C_OBJS) $(CXX_OBJS) $(EDL_C_OBJS) $(EDL_C_SRCS)
+	@-$(RM) -f $(BUILD_DIR)/lib/$(LIBOCCLUM_PAL_SONAME) $(LIBOCCLUM_PAL_SO) $(LIBOCCLUM_PAL_SO_REAL) $(LIBSGX_USTDC_A)
+	@-$(RM) -rf $(OBJ_DIR)/pal

@@ -3,7 +3,7 @@ include ../sgxenv.mk
 BIN := $(BUILD_DIR)/bin/occlum-run
 
 C_SRCS := $(sort $(wildcard *.c))
-C_OBJS := $(addprefix $(BUILD_DIR)/src/run/,$(C_SRCS:.c=.o))
+C_OBJS := $(addprefix $(OBJ_DIR)/run/,$(C_SRCS:.c=.o))
 
 C_COMMON_FLAGS := -I$(PROJECT_DIR)/src/pal/include
 C_FLAGS := $(C_COMMON_FLAGS) $(SGX_CFLAGS_U)
@@ -22,7 +22,7 @@ $(BIN): $(C_OBJS)
 	@$(CC) $^ -o $@ $(LINK_FLAGS)
 	@echo "LINK => $@"
 
-$(BUILD_DIR)/src/run/%.o: %.c
+$(OBJ_DIR)/run/%.o: %.c
 	@$(CC) $(C_FLAGS) -c $< -o $@
 	@echo "CC <= $@"
 

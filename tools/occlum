@@ -53,7 +53,7 @@ EOF
 
 get_conf_root_fs_mac() {
     LD_LIBRARY_PATH="$SGX_SDK/sdk_libs" \
-    "$occlum_dir/$build_dir/bin/occlum-protect-integrity" show-mac "$context_dir/build/mount/__ROOT/metadata"
+    "$occlum_dir/build/bin/occlum-protect-integrity" show-mac "$context_dir/build/mount/__ROOT/metadata"
 }
 
 get_conf_default_stack_size() {
@@ -88,7 +88,7 @@ get_conf_entry_points() {
 
 get_occlum_conf_file_mac() {
     LD_LIBRARY_PATH="$SGX_SDK/sdk_libs" \
-    "$occlum_dir/$build_dir/bin/occlum-protect-integrity" show-mac "$context_dir/build/Occlum.json.protected"
+    "$occlum_dir/build/bin/occlum-protect-integrity" show-mac "$context_dir/build/Occlum.json.protected"
 }
 
 parse_occlum_user_space_size() {
@@ -148,7 +148,6 @@ cmd_init() {
 cmd_build() {
     check_has_init
 
-    build_dir=build
     pal_lib=libocclum-pal.so
     libos_lib=libocclum-libos.so
 
@@ -156,7 +155,7 @@ cmd_build() {
         case "$1" in
         --sign-key)     [ -n "$2" ] && ENCLAVE_SIGN_KEY=$2 ; shift 2 || exit_error "empty signing key path"     ;;
         --sign-tool)    [ -n "$2" ] && ENCLAVE_SIGN_TOOL=$2 ; shift 2 || exit_error "empty signing tool path"   ;;
-        --sgx-mode)     [[ -n "$2" && "$2" != "HW" ]] && export SGX_MODE=SW && build_dir=build_sim ; shift 2 || exit_error "empty sgx mode";;
+        --sgx-mode)     [[ -n "$2" && "$2" != "HW" ]] && export SGX_MODE=SIM; shift 2 || exit_error "empty sgx mode";;
         *) exit_error "Unknown option: $1"                                                                      ;;
         esac
     done
@@ -181,14 +180,14 @@ cmd_build() {
     rm -rf run
 
     mkdir -p build/bin
-    ln -s $occlum_dir/$build_dir/bin/occlum-run $context_dir/build/bin/occlum-run
+    ln -s $occlum_dir/build/bin/occlum-run $context_dir/build/bin/occlum-run
     mkdir -p build/lib
-    cp "$occlum_dir/$build_dir/lib/$pal_lib.$occlum_version" build/lib/
+    cp "$occlum_dir/build/lib/$pal_lib.$occlum_version" build/lib/
     cd build/lib && ln -sf "$pal_lib.$occlum_version" "libocclum-pal.so.$major_ver" && \
     ln -sf "libocclum-pal.so.$major_ver" libocclum-pal.so && cd -
 
     mkdir -p build/mount/
-    cd "$occlum_dir/$build_dir/bin/" && \
+    cd "$occlum_dir/build/bin/" && \
     LD_LIBRARY_PATH="$SGX_SDK/sdk_libs" ./sefs-cli \
         --integrity-only \
         "$context_dir/build/mount/__ROOT" \
@@ -203,9 +202,9 @@ cmd_build() {
     export OCCLUM_CONF_ENV=`get_conf_env`
     export OCCLUM_CONF_ENTRY_POINTS=`get_conf_entry_points`
     cd "$context_dir/build"
-    "$occlum_dir/$build_dir/bin/occlum-gen-default-occlum-json"\
+    "$occlum_dir/build/bin/occlum-gen-default-occlum-json"\
         > "Occlum.json"
-    LD_LIBRARY_PATH="$SGX_SDK/sdk_libs" "$occlum_dir/$build_dir/bin/occlum-protect-integrity" protect Occlum.json
+    LD_LIBRARY_PATH="$SGX_SDK/sdk_libs" "$occlum_dir/build/bin/occlum-protect-integrity" protect Occlum.json
 
     export OCCLUM_BUILTIN_CONF_FILE_MAC=`get_occlum_conf_file_mac`
     echo "EXPORT => OCCLUM_BUILTIN_CONF_FILE_MAC = $OCCLUM_BUILTIN_CONF_FILE_MAC"
@@ -213,12 +212,13 @@ cmd_build() {
     echo "EXPORT => OCCLUM_BUILTIN_VM_USER_SPACE_SIZE = $OCCLUM_BUILTIN_VM_USER_SPACE_SIZE"
 
     cd $context_dir/build/lib && \
-    cp "$occlum_dir/$build_dir/lib/$libos_lib.$occlum_version" . && ln -sf "$libos_lib.$occlum_version" "libocclum-libos.so.$major_ver"
+    cp "$occlum_dir/build/lib/$libos_lib.$occlum_version" . && ln -sf "$libos_lib.$occlum_version" "libocclum-libos.so.$major_ver" && \
+        ln -sf "libocclum-libos.so.$major_ver" libocclum-libos.so
     echo -e "$OCCLUM_BUILTIN_CONF_FILE_MAC\c" > temp_mac_file && \
     objcopy --update-section .builtin_config=temp_mac_file libocclum-libos.so.$major_ver && \
     rm temp_mac_file
 
-    $occlum_dir/$build_dir/bin/gen_enclave_conf -i "$working_dir/Occlum.json" -o "$context_dir/build/Enclave.xml"
+    $occlum_dir/build/bin/gen_enclave_conf -i "$working_dir/Occlum.json" -o "$context_dir/build/Enclave.xml"
 
     $ENCLAVE_SIGN_TOOL sign \
         -key $ENCLAVE_SIGN_KEY \
@@ -237,8 +237,8 @@ cmd_build() {
 
     mkdir -p "$context_dir/run/mount/__ROOT"
 
-    ln -s $occlum_dir/$build_dir/bin/occlum_exec_client $context_dir/build/bin/occlum_exec_client
-    ln -s $occlum_dir/$build_dir/bin/occlum_exec_server $context_dir/build/bin/occlum_exec_server
+    ln -s $occlum_dir/build/bin/occlum_exec_client $context_dir/build/bin/occlum_exec_client
+    ln -s $occlum_dir/build/bin/occlum_exec_server $context_dir/build/bin/occlum_exec_server
 
     echo "Built the Occlum image and enclave successfully"
 }

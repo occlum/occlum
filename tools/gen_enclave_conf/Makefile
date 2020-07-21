@@ -1,7 +1,7 @@
 include ../../src/sgxenv.mk
 
 SRC_FILES := $(shell find . -type f -name '*.rs') Cargo.toml
-RUST_TARGET_DIR := $(BUILD_DIR)/tools/genconf/cargo-target
+RUST_TARGET_DIR := $(BUILD_DIR)/internal/tools/genconf/cargo-target
 RUST_OUT_DIR := $(BUILD_DIR)/bin
 TARGET_BINARY := $(RUST_OUT_DIR)/gen_enclave_conf
 

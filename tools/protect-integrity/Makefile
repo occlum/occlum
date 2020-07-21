@@ -16,7 +16,7 @@ SGX_DEBUG ?= 1
 C_FORMATTER := $(PROJECT_DIR)/tools/c_formatter
 
 BUILD_DIR := $(PROJECT_DIR)/build
-OBJS_DIR := $(BUILD_DIR)/tools/protect-integrity
+OBJS_DIR := $(BUILD_DIR)/internal/tools/protect-integrity
 
 ifeq ($(shell getconf LONG_BIT), 32)
 	SGX_ARCH := x86
