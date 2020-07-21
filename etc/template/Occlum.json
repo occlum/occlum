@@ -54,7 +54,10 @@
         },
         {
             "target": "/tmp",
-            "type": "ramfs"
+            "type": "sefs",
+            "options": {
+                "temporary": true
+            }
         }
     ]
 }

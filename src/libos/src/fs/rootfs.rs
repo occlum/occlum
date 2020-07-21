@@ -111,20 +111,28 @@ fn mount_nonroot_fs_according_to(mount_config: &Vec<ConfigMount>, root: &MNode) 
                     return_errno!(EINVAL, "Source is expected for SEFS");
                 }
                 let source_path = mc.source.as_ref().unwrap();
-                let sefs = {
-                    SEFS::open(
-                        Box::new(SgxStorage::new(source_path, false, None)),
-                        &time::OcclumTimeProvider,
-                        &SgxUuidProvider,
-                    )
-                }
-                .or_else(|_| {
+                let sefs = if !mc.options.temporary {
+                    {
+                        SEFS::open(
+                            Box::new(SgxStorage::new(source_path, false, None)),
+                            &time::OcclumTimeProvider,
+                            &SgxUuidProvider,
+                        )
+                    }
+                    .or_else(|_| {
+                        SEFS::create(
+                            Box::new(SgxStorage::new(source_path, false, None)),
+                            &time::OcclumTimeProvider,
+                            &SgxUuidProvider,
+                        )
+                    })?
+                } else {
                     SEFS::create(
                         Box::new(SgxStorage::new(source_path, false, None)),
                         &time::OcclumTimeProvider,
                         &SgxUuidProvider,
-                    )
-                })?;
+                    )?
+                };
                 mount_fs_at(sefs, &root, target_dirname)?;
             }
             TYPE_HOSTFS => {

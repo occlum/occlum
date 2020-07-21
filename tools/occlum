@@ -236,6 +236,7 @@ cmd_build() {
     fi
 
     mkdir -p "$context_dir/run/mount/__ROOT"
+    mkdir -p "$context_dir/run/mount/tmp"
 
     ln -s $occlum_dir/build/bin/occlum_exec_client $context_dir/build/bin/occlum_exec_client
     ln -s $occlum_dir/build/bin/occlum_exec_server $context_dir/build/bin/occlum_exec_server

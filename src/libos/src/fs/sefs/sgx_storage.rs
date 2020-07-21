@@ -8,6 +8,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sgxfs::{remove, OpenOptions, SgxFile};
 use std::sync::{Arc, SgxMutex as Mutex};
+use std::untrusted::fs;
 
 pub struct SgxStorage {
     path: PathBuf,
@@ -156,6 +157,17 @@ impl Storage for SgxStorage {
 
     fn is_integrity_only(&self) -> bool {
         self.integrity_only
+    }
+
+    fn clear(&self) -> DevResult<()> {
+        for child in fs::read_dir(&self.path).expect("faild to read dir") {
+            let child = child.expect("faild to get dir entry");
+            remove(&child.path()).expect("failed to remove SgxFile");
+        }
+        // clear cache
+        let mut caches = self.file_cache.lock().unwrap();
+        caches.clear();
+        Ok(())
     }
 }
 

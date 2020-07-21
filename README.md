@@ -152,7 +152,10 @@ Occlum can be configured easily via a config file named `Occlum.json`, which is 
         },
         {
             "target": "/tmp",
-            "type": "ramfs"
+            "type": "sefs",
+            "options": {
+                "temporary": true
+            }
         }
     ]
 }

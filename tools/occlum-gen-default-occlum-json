@@ -44,7 +44,11 @@ cat <<EOF
         },
         {
             "target": "/tmp",
-            "type": "ramfs"
+            "type": "sefs",
+            "source": "$OCCLUM_INSTANCE_DIR/run/mount/tmp",
+            "options": {
+                "temporary": true
+            }
         }
     ],
     "env": $OCCLUM_CONF_ENV,

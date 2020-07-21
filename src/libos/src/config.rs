@@ -131,6 +131,7 @@ pub struct ConfigMountOptions {
     pub integrity_only: bool,
     pub mac: Option<sgx_aes_gcm_128bit_tag_t>,
     pub layers: Option<Vec<ConfigMount>>,
+    pub temporary: bool,
 }
 
 impl Config {
@@ -249,6 +250,7 @@ impl ConfigMountOptions {
             integrity_only,
             mac,
             layers,
+            temporary: input.temporary,
         })
     }
 }
@@ -385,4 +387,6 @@ struct InputConfigMountOptions {
     pub mac: Option<String>,
     #[serde(default)]
     pub layers: Option<Vec<InputConfigMount>>,
+    #[serde(default)]
+    pub temporary: bool,
 }
