@@ -57,6 +57,11 @@ impl CpuSet {
         self.bits.count_ones()
     }
 
+    /// Returns the first index of CPUs in set.
+    pub fn first_cpu_idx(&self) -> Option<usize> {
+        self.iter().position(|&b| b == true)
+    }
+
     // Returns if the CpuSet is a subset of available cpu set
     pub fn is_subset_of(&self, other: &CpuSet) -> bool {
         (self.bits.clone() & other.bits.clone()) == self.bits

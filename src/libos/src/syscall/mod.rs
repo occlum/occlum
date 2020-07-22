@@ -40,7 +40,7 @@ use crate::process::{
     do_getpgid, do_getpid, do_getppid, do_gettid, do_getuid, do_prctl, do_set_tid_address,
     do_spawn, do_wait4, pid_t, FdOp, ThreadStatus,
 };
-use crate::sched::{do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
+use crate::sched::{do_getcpu, do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
 use crate::signal::{
     do_kill, do_rt_sigaction, do_rt_sigpending, do_rt_sigprocmask, do_rt_sigreturn, do_sigaltstack,
     do_tgkill, do_tkill, sigaction_t, sigset_t, stack_t,
@@ -388,7 +388,7 @@ macro_rules! process_syscall_table_with_callback {
             (Syncfs = 306) => handle_unsupported(),
             (Sendmmsg = 307) => handle_unsupported(),
             (Setns = 308) => handle_unsupported(),
-            (Getcpu = 309) => handle_unsupported(),
+            (Getcpu = 309) => do_getcpu(cpu_ptr: *mut u32, node_ptr: *mut u32),
             (ProcessVmReadv = 310) => handle_unsupported(),
             (ProcessVmWritev = 311) => handle_unsupported(),
             (Kcmp = 312) => handle_unsupported(),

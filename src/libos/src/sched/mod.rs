@@ -1,5 +1,6 @@
 /// CPU scheduling for threads.
 mod cpu_set;
+mod do_getcpu;
 mod do_sched_affinity;
 mod do_sched_yield;
 mod sched_agent;
