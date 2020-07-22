@@ -19,8 +19,8 @@ check_file_exist() {
     fi
 }
 
-init_workspace() {
-    # Init Occlum Workspace
+init_instance() {
+    # Init Occlum instance
     rm -rf occlum_instance && mkdir occlum_instance
     cd occlum_instance
     occlum init
@@ -29,15 +29,15 @@ init_workspace() {
                 .resource_limits.max_num_of_threads = 64 |
                 .process.default_heap_size = "256MB" |
                 .process.default_mmap_size = "1120MB" |
-                .entry_points = [ "/usr/lib/jvm/java-11-openjdk/jre/bin" ] |
-                .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-11-openjdk/jre/lib/server:/usr/lib/jvm/java-11-openjdk/jre/lib:/usr/lib/jvm/java-11-openjdk/jre/../lib" ]' Occlum.json)" && \
+                .entry_points = [ "/usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin" ] |
+                .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-11-alibaba-dragonwell/jre/lib/server:/usr/lib/jvm/java-11-alibaba-dragonwell/jre/lib:/usr/lib/jvm/java-11-alibaba-dragonwell/jre/../lib" ]' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
 }
 
 build_web() {
-    # Copy JVM and JAR file into Occlum Workspace and build
-    mkdir -p image/usr/lib
-    cp -r /opt/occlum/toolchains/jvm image/usr/lib/
+    # Copy JVM and JAR file into Occlum instance and build
+    mkdir -p image/usr/lib/jvm
+    cp -r /opt/occlum/toolchains/jvm/java-11-alibaba-dragonwell image/usr/lib/jvm
     cp /usr/local/occlum/x86_64-linux-musl/lib/libz.so.1 image/lib
     mkdir -p image/usr/lib/spring
     cp ../${jar_path} image/usr/lib/spring/
@@ -48,16 +48,16 @@ run_web() {
     jar_path=./gs-messaging-stomp-websocket/complete/target/gs-messaging-stomp-websocket-0.1.0.jar
     check_file_exist ${jar_path}
     jar_file=`basename "${jar_path}"`
-    init_workspace
+    init_instance
     build_web
     echo -e "${BLUE}occlum run JVM web app${NC}"
-    occlum run /usr/lib/jvm/java-11-openjdk/jre/bin/java -Xmx512m -XX:MaxMetaspaceSize=64m -Dos.name=Linux -jar /usr/lib/spring/${jar_file}
+    occlum run /usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin/java -Xmx512m -XX:MaxMetaspaceSize=64m -Dos.name=Linux -jar /usr/lib/spring/${jar_file}
 }
 
 build_hello() {
-    # Copy JVM and class file into Occlum Workspace and build
-    mkdir -p image/usr/lib
-    cp -r /opt/occlum/toolchains/jvm image/usr/lib/
+    # Copy JVM and class file into Occlum instance and build
+    mkdir -p image/usr/lib/jvm
+    cp -r /opt/occlum/toolchains/jvm/java-11-alibaba-dragonwell image/usr/lib/jvm
     cp /usr/local/occlum/x86_64-linux-musl/lib/libz.so.1 image/lib
     cp ../${hello} image
     occlum build
@@ -66,10 +66,10 @@ build_hello() {
 run_hello() {
     hello=./hello_world/Main.class
     check_file_exist ${hello}
-    init_workspace
+    init_instance
     build_hello
     echo -e "${BLUE}occlum run JVM hello${NC}"
-    occlum run /usr/lib/jvm/java-11-openjdk/jre/bin/java -Xmx512m -XX:MaxMetaspaceSize=64m -Dos.name=Linux Main
+    occlum run /usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin/java -Xmx512m -XX:MaxMetaspaceSize=64m -Dos.name=Linux Main
 }
 
 arg=$1

@@ -4,7 +4,9 @@ This project demonstrates how Occlum enables _unmodified_ Java programs running 
 
 # About JDK
 
-JDK 11 is supported currently. The source code of JDK 11 can be found [here](https://hg.openjdk.java.net/portola/jdk11). In order for it to cooperate with Occlum, a [minor modification](../../tools/toolchains/java/) has been made to it. The modified JDK is compiled in Alpine Linux with `bash configure && make images` commands. We have installed it at `/opt/occlum/toolchains/jvm/java-11-openjdk/jre` while making the Docker image.
+Both the unmodified [OpenJDK 11](https://hg.openjdk.java.net/portola/jdk11), which is imported from Alpine Linux, and the [Alibaba Dragonwell](https://github.com/alibaba/dragonwell11/tree/dragonwell-for-enclave), which is a downstream version of OpenJDK, are supported now. We have already installed OpenJDK and Dragonwell while building the Docker image, the OpenJDK is installed at `/opt/occlum/toolchains/jvm/java-11-openjdk`, and the Dragonwell is installed at `/opt/occlum/toolchains/jvm/java-11-alibaba-dragonwell`.
+
+Our demos use Dragonwell as the default JDK, you are free to change to OpenJDK by setting the `JAVA_HOME` to point to the installation directory of OpenJDK and copying it into Occlum instance.
 
 ## Demo: Hello World
 
