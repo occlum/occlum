@@ -5,5 +5,6 @@ mod do_sched_yield;
 mod sched_agent;
 mod syscalls;
 
+pub use cpu_set::NCORES;
 pub use sched_agent::SchedAgent;
 pub use syscalls::*;

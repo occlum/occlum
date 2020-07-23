@@ -117,7 +117,7 @@ impl Index<usize> for CpuSet {
 
 lazy_static! {
     /// The number of all CPU cores on the platform
-    static ref NCORES: usize = {
+    pub static ref NCORES: usize = {
         extern "C" {
             fn occlum_ocall_ncores(ret: *mut i32) -> sgx_status_t;
         }
