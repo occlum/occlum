@@ -8,7 +8,7 @@ pub fn do_rt_sigaction(signum: SigNum, new_sa: Option<SigAction>) -> Result<SigA
         &signum, &new_sa
     );
 
-    if signum == SIGKILL || signum == SIGSTOP {
+    if (signum == SIGKILL || signum == SIGSTOP) && new_sa.is_some() {
         return_errno!(
             EINVAL,
             "The actions for SIGKILL or SIGSTOP cannot be changed"
