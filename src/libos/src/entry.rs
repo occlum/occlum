@@ -225,18 +225,8 @@ fn parse_arguments(
             .map_err(|e| errno!(EINVAL, "path contains valid utf-8 data"))?;
         Path::new(&path_string).to_path_buf()
     };
-    let program_cstring = {
-        let program_osstr = path_buf
-            .file_name()
-            .ok_or_else(|| errno!(EINVAL, "invalid path"))?;
-        let program_str = program_osstr
-            .to_str()
-            .ok_or_else(|| errno!(EINVAL, "invalid path"))?;
-        CString::new(program_str).map_err(|e| errno!(e))?
-    };
 
     let mut args = clone_cstrings_safely(argv)?;
-    args.insert(0, program_cstring);
 
     let env_merged = merge_env(env)?;
     trace!(

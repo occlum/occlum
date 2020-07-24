@@ -64,7 +64,8 @@ struct occlum_pal_create_process_args {
 
     // Argments array pass to new process.
     //
-    // The arguments to the command. The array must be NULL terminated.
+    // The arguments to the command. By convention, the argv[0] should be the program name.
+    // And the array must be NULL terminated.
     //
     // Mandatory field. Must not be NULL.
     const char **argv;

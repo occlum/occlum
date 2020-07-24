@@ -58,6 +58,7 @@ int main(int argc, char *argv[]) {
     snprintf(buf_ptr_str, sizeof buf_ptr_str, "%lu", (unsigned long) shared_buf);
     snprintf(buf_size_str, sizeof buf_size_str, "%lu", sizeof shared_buf);
     const char *cmd_args[] = {
+        cmd_path,
         buf_ptr_str, // buf_ptr
         buf_size_str, // buf_size
         total_bytes_str, // total_bytes

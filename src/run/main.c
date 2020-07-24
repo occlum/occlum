@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
+#include <libgen.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <occlum_pal_api.h>
@@ -13,9 +15,16 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Usage: occlum-run <executable> [<args>]\n");
         return EXIT_FAILURE;
     }
-    const char *cmd_path = (const char *) argv[1];
-    const char **cmd_args = (const char **) &argv[2];
+
+    char **cmd_args = &argv[1];
+    char *cmd_path = strdup(argv[1]);
     extern const char **environ;
+
+    // Change cmd_args[0] from program path to program name in place (e.g., "/bin/abc" to "abc")
+    char *cmd_path_tmp = strdup(cmd_path);
+    const char *program_name = (const char *) basename(cmd_path_tmp);
+    memset(cmd_args[0], 0, strlen(cmd_args[0]));
+    memcpy(cmd_args[0], program_name, strlen(program_name));
 
     // Check Occlum PAL version
     int pal_version = occlum_pal_get_version();
@@ -39,8 +48,8 @@ int main(int argc, char *argv[]) {
     int exit_status = 0;
     int libos_tid = 0;
     struct occlum_pal_create_process_args create_process_args = {
-        .path = cmd_path,
-        .argv = cmd_args,
+        .path = (const char *) cmd_path,
+        .argv = (const char **) cmd_args,
         .env = environ,
         .stdio = (const struct occlum_stdio_fds *) &io_fds,
         .pid = &libos_tid,
