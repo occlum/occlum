@@ -33,6 +33,10 @@ if [[ ( "$#" < 2 ) ]] ; then
     report_error
 fi
 
+HTTP_PROXY=${http_proxy}
+HTTPS_PROXY=${https_proxy}
+NO_PROXY=${no_proxy}
+
 occlum_label=$1
 os_name=$2
 
@@ -45,4 +49,8 @@ function check_item_in_list() {
 check_item_in_list "$os_name" "ubuntu18.04 centos7.5" || report_error
 
 cd "$script_dir/.."
-docker build -f "$script_dir/Dockerfile.$os_name" -t "occlum/occlum:$occlum_label-$os_name" .
+docker build --build-arg https_proxy=${HTTP_PROXY} \
+             --build-arg http_proxy=${HTTPS_PROXY} \
+             --build-arg no_proxy=${NO_PROXY} \
+             -f "$script_dir/Dockerfile.$os_name" \
+             -t "occlum/occlum:$occlum_label-$os_name" .
