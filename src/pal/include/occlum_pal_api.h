@@ -21,15 +21,11 @@ int occlum_pal_get_version(void);
  * Occlum PAL attributes
  */
 typedef struct occlum_pal_attr {
-    // Occlum instance dir.
+	// Occlum instance directory.
     //
-    // Specifies the path of an Occlum instance directory. Usually, this
-    // directory is initialized by executing "occlum init" command, which
-    // creates a hidden directory named ".occlum/". This ".occlum/" is an
-    // Occlum instance directory. The name of the directory is not necesarrily
-    // ".occlum"; it can be renamed to an arbitrary name.
-    //
-    // Mandatory field. Must not be NULL.
+    // Specifies the path of an Occlum instance directory, which is usually created with the 
+    // `occlum new` command. The default value is "."; that is, the current working directory
+    // is the Occlum instance directory.
     const char     *instance_dir;
     // Log level.
     //
@@ -41,7 +37,7 @@ typedef struct occlum_pal_attr {
 } occlum_pal_attr_t;
 
 #define OCCLUM_PAL_ATTR_INITVAL         { \
-    .instance_dir = NULL,                 \
+    .instance_dir = ".",                 \
     .log_level = NULL                     \
 }
 

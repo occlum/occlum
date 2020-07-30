@@ -44,7 +44,6 @@ int main(int argc, char *argv[]) {
 
     // Init Occlum PAL
     occlum_pal_attr_t pal_attr = OCCLUM_PAL_ATTR_INITVAL;
-    pal_attr.instance_dir = ".occlum";
     if (occlum_pal_init(&pal_attr) < 0) {
         return EXIT_FAILURE;
     }

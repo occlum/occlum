@@ -6,15 +6,6 @@
 #include <sys/wait.h>
 #include <occlum_pal_api.h>
 
-static const char *get_instance_dir(void) {
-    const char *instance_dir_from_env = (const char *) getenv("OCCLUM_INSTANCE_DIR");
-    if (instance_dir_from_env != NULL) {
-        return instance_dir_from_env;
-    } else {
-        return "./.occlum";
-    }
-}
-
 int main(int argc, char *argv[]) {
     // Parse arguments
     if (argc < 2) {
@@ -34,7 +25,6 @@ int main(int argc, char *argv[]) {
 
     // Init Occlum PAL
     struct occlum_pal_attr attr = OCCLUM_PAL_ATTR_INITVAL;
-    attr.instance_dir = get_instance_dir();
     attr.log_level = getenv("OCCLUM_LOG_LEVEL");
     if (occlum_pal_init(&attr) < 0) {
         return EXIT_FAILURE;

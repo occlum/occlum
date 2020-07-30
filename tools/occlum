@@ -2,6 +2,7 @@
 
 this_dir="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
 occlum_dir="$( cd "$( dirname "$this_dir/../../../"  )" >/dev/null 2>&1 && pwd )"
+build_makefile=$occlum_dir/build/bin/occlum_build.mk
 
 if [[ "$occlum_dir" == "/opt/occlum" ]]; then
     version_header=$occlum_dir/include/occlum_version.h
@@ -14,11 +15,9 @@ minor_ver=`grep '\#define OCCLUM_MINOR_VERSION' $version_header |  awk '{print $
 patch_ver=`grep '\#define OCCLUM_PATCH_VERSION' $version_header |  awk '{print $3}'`
 occlum_version="$major_ver.$minor_ver.$patch_ver"
 
-if [ -z $OCCLUM_INSTANCE_DIR ];then
-    OCCLUM_INSTANCE_DIR=".occlum"
-fi
-working_dir=`pwd`
-context_dir="$working_dir/$OCCLUM_INSTANCE_DIR"
+instance_dir=`pwd`
+
+status_file=$instance_dir/.__occlum_status
 
 SGX_SDK="${SGX_SDK:-/opt/intel/sgxsdk}"
 SGX_GDB="$SGX_SDK/bin/sgx-gdb"
@@ -36,10 +35,13 @@ report_arg_error() {
     cat <<EOF
 Usage:
     occlum init
-        Initialize a directory as the Occlum context
+        Initialize a directory as the Occlum instance
 
-    occlum build [--sign-key <key_path>] [--sign-tool <tool_path>]
-        Generate a secure Occlum FS image and Occlum SGX enclave.
+    occlum build [--sign-key <key_path>] [--sign-tool <tool_path>] [-f/--force]
+        Build and sign an Occlum SGX enclave (.so) and generate its associated secure FS image
+        according to the user-provided image directory and Occlum.json config file.
+        The whole building process is incremental: the building artifacts are built only when needed.
+        To force rebuilding all artifacts, give the [-f/--force] flag.
 
     occlum run <program_name> <program_args>
         Run the user program inside an SGX enclave.
@@ -51,54 +53,9 @@ Usage:
 EOF
 }
 
-get_conf_root_fs_mac() {
-    LD_LIBRARY_PATH="$SGX_SDK/sdk_libs" \
-    "$occlum_dir/build/bin/occlum-protect-integrity" show-mac "$context_dir/build/mount/__ROOT/metadata"
-}
-
-get_conf_default_stack_size() {
-    cat "$working_dir/Occlum.json" | \
-        python -c "import sys, json; print json.load(sys.stdin)['process']['default_stack_size']"
-}
-
-get_conf_default_heap_size() {
-    cat "$working_dir/Occlum.json" | \
-        python -c "import sys, json; print json.load(sys.stdin)['process']['default_heap_size']"
-}
-
-get_conf_default_mmap_size() {
-    cat "$working_dir/Occlum.json" | \
-        python -c "import sys, json; print json.load(sys.stdin)['process']['default_mmap_size']"
-}
-
-get_conf_user_space_size() {
-    cat "$working_dir/Occlum.json" | \
-        python -c "import sys, json; print json.load(sys.stdin)['resource_limits']['user_space_size']"
-}
-
-get_conf_env() {
-    cat "$working_dir/Occlum.json" | \
-        python -c "import sys, json; print json.dumps(json.load(sys.stdin)['env'])"
-}
-
-get_conf_entry_points() {
-    cat "$working_dir/Occlum.json" | \
-        python -c "import sys, json; print json.dumps(json.load(sys.stdin)['entry_points'])"
-}
-
-get_occlum_conf_file_mac() {
-    LD_LIBRARY_PATH="$SGX_SDK/sdk_libs" \
-    "$occlum_dir/build/bin/occlum-protect-integrity" show-mac "$context_dir/build/Occlum.json.protected"
-}
-
-parse_occlum_user_space_size() {
-    local size_with_unit=`get_conf_user_space_size`
-    numfmt --from=iec ${size_with_unit::-1}
-}
-
 check_has_init() {
-    if [ ! -d "$context_dir"  ]; then
-        echo "Error: the current working directory is not initialized as an Occlum context. Need to run \"occlum init\" first."
+    if [ ! -f "$status_file"  ]; then
+        echo "Error: the current working directory is not initialized as an Occlum instance. Need to run \"occlum init\" first."
         exit 1
     fi
 }
@@ -106,7 +63,7 @@ check_has_init() {
 check_has_built() {
     check_has_init
 
-    if [ ! -d "$context_dir/run/mount/__ROOT"  ]; then
+    if [ ! -d "$instance_dir/run/mount/__ROOT"  ]; then
         echo "Error: the Occlum image and enclave are not built yet. Need to run \"occlum build\" first."
         exit 1
     fi
@@ -114,16 +71,14 @@ check_has_built() {
 
 
 cmd_init() {
-    if [ -d "$context_dir"  ]; then
-        echo "Error: the current working directory has been initialized as an Occlum context"
+    if [ -f "$status_file"  ]; then
+        echo "Error: the current working directory has been initialized as an Occlum instance"
         exit 1
     fi
-    mkdir "$context_dir"
 
-    cd "$context_dir"
-    echo "initialized" > status
+    echo "initialized" > $status_file
 
-    cd "$working_dir"
+    cd "$instance_dir"
     mkdir -p image
     mkdir -p image/bin
     mkdir -p image/lib
@@ -139,10 +94,10 @@ cmd_init() {
         "$occlum_gcc_lib/libgcc_s.so.1" \
         "$occlum_gcc_lib/libgomp.so.1"
 
-    cp "$occlum_dir"/etc/template/Occlum.json "$working_dir"/
-    chmod 644 "$working_dir"/Occlum.json
+    cp "$occlum_dir"/etc/template/Occlum.json "$instance_dir"/
+    chmod 644 "$instance_dir"/Occlum.json
 
-    echo "Initialized an Occlum context in $working_dir"
+    echo "$instance_dir initialized as an Occlum instance"
 }
 
 cmd_build() {
@@ -155,7 +110,8 @@ cmd_build() {
         case "$1" in
         --sign-key)     [ -n "$2" ] && ENCLAVE_SIGN_KEY=$2 ; shift 2 || exit_error "empty signing key path"     ;;
         --sign-tool)    [ -n "$2" ] && ENCLAVE_SIGN_TOOL=$2 ; shift 2 || exit_error "empty signing tool path"   ;;
-        --sgx-mode)     [[ -n "$2" && "$2" != "HW" ]] && export SGX_MODE=SIM; shift 2 || exit_error "empty sgx mode";;
+        --sgx-mode)     [[ -n "$2" && "$2" != "HW" ]] && export SGX_MODE=SIM ; shift 2 || exit_error "empty sgx mode";;
+        --force | -f)   MAKE_OPTION="--always-make" ; shift ;;
         *) exit_error "Unknown option: $1"                                                                      ;;
         esac
     done
@@ -173,61 +129,27 @@ cmd_build() {
         echo "SGX mode: HW"
     fi
 
-    cd "$context_dir"
-    echo "building" > status
+    # If sgx mode is changed, build thoroughly again
+    if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
+        if [ "$(cat $instance_dir/.sgx_mode 2>/dev/null)" != "SIM" ]; then
+            MAKE_OPTION="--always-make"
+        fi
+    else
+        #HW mode
+        if [ "$(cat $instance_dir/.sgx_mode 2>/dev/null)" != "HW" ]; then
+            MAKE_OPTION="--always-make"
+        fi
+    fi
 
-    rm -rf build
-    rm -rf run
+    rm -rf "$instance_dir/run"
 
-    mkdir -p build/bin
-    ln -s $occlum_dir/build/bin/occlum-run $context_dir/build/bin/occlum-run
-    mkdir -p build/lib
-    cp "$occlum_dir/build/lib/$pal_lib.$occlum_version" build/lib/
-    cd build/lib && ln -sf "$pal_lib.$occlum_version" "libocclum-pal.so.$major_ver" && \
-    ln -sf "libocclum-pal.so.$major_ver" libocclum-pal.so && cd -
+    occlum_dir=$occlum_dir instance_dir=$instance_dir pal_lib=$pal_lib major_ver=$major_ver \
+    occlum_version=$occlum_version libos_lib=$libos_lib ENCLAVE_SIGN_KEY=$ENCLAVE_SIGN_KEY \
+    ENCLAVE_SIGN_TOOL=$ENCLAVE_SIGN_TOOL \
+    make -f $build_makefile $MAKE_OPTION
 
-    mkdir -p build/mount/
-    cd "$occlum_dir/build/bin/" && \
-    LD_LIBRARY_PATH="$SGX_SDK/sdk_libs" ./sefs-cli \
-        --integrity-only \
-        "$context_dir/build/mount/__ROOT" \
-        "$working_dir/image" \
-        zip
-
-    export OCCLUM_CONF_ROOT_FS_MAC=`get_conf_root_fs_mac`
-    export OCCLUM_CONF_USER_SPACE_SIZE=`get_conf_user_space_size`
-    export OCCLUM_CONF_DEFAULT_STACK_SIZE=`get_conf_default_stack_size`
-    export OCCLUM_CONF_DEFAULT_HEAP_SIZE=`get_conf_default_heap_size`
-    export OCCLUM_CONF_DEFAULT_MMAP_SIZE=`get_conf_default_mmap_size`
-    export OCCLUM_CONF_ENV=`get_conf_env`
-    export OCCLUM_CONF_ENTRY_POINTS=`get_conf_entry_points`
-    cd "$context_dir/build"
-    "$occlum_dir/build/bin/occlum-gen-default-occlum-json"\
-        > "Occlum.json"
-    LD_LIBRARY_PATH="$SGX_SDK/sdk_libs" "$occlum_dir/build/bin/occlum-protect-integrity" protect Occlum.json
-
-    export OCCLUM_BUILTIN_CONF_FILE_MAC=`get_occlum_conf_file_mac`
-    echo "EXPORT => OCCLUM_BUILTIN_CONF_FILE_MAC = $OCCLUM_BUILTIN_CONF_FILE_MAC"
-    export OCCLUM_BUILTIN_VM_USER_SPACE_SIZE=`parse_occlum_user_space_size`
-    echo "EXPORT => OCCLUM_BUILTIN_VM_USER_SPACE_SIZE = $OCCLUM_BUILTIN_VM_USER_SPACE_SIZE"
-
-    cd $context_dir/build/lib && \
-    cp "$occlum_dir/build/lib/$libos_lib.$occlum_version" . && ln -sf "$libos_lib.$occlum_version" "libocclum-libos.so.$major_ver" && \
-        ln -sf "libocclum-libos.so.$major_ver" libocclum-libos.so
-    echo -e "$OCCLUM_BUILTIN_CONF_FILE_MAC\c" > temp_mac_file && \
-    objcopy --update-section .builtin_config=temp_mac_file libocclum-libos.so.$major_ver && \
-    rm temp_mac_file
-
-    $occlum_dir/build/bin/gen_enclave_conf -i "$working_dir/Occlum.json" -o "$context_dir/build/Enclave.xml"
-
-    $ENCLAVE_SIGN_TOOL sign \
-        -key $ENCLAVE_SIGN_KEY \
-        -config "$context_dir/build/Enclave.xml" \
-        -enclave "$context_dir/build/lib/libocclum-libos.so.$major_ver" \
-        -out "$context_dir/build/lib/libocclum-libos.signed.so"
-    rm -f "$context_dir/build/Enclave.xml"
-    cd "$context_dir"
-    echo "built" > status
+    cd "$instance_dir"
+    echo "built" > $status_file
 
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
         echo "SIM" > .sgx_mode
@@ -235,11 +157,8 @@ cmd_build() {
         echo "HW" > .sgx_mode
     fi
 
-    mkdir -p "$context_dir/run/mount/__ROOT"
-    mkdir -p "$context_dir/run/mount/tmp"
-
-    ln -s $occlum_dir/build/bin/occlum_exec_client $context_dir/build/bin/occlum_exec_client
-    ln -s $occlum_dir/build/bin/occlum_exec_server $context_dir/build/bin/occlum_exec_server
+    mkdir -p "$instance_dir/run/mount/__ROOT"
+    mkdir -p "$instance_dir/run/mount/tmp"
 
     echo "Built the Occlum image and enclave successfully"
 }
@@ -247,95 +166,90 @@ cmd_build() {
 cmd_run() {
     check_has_built
 
-    SGX_MODE=$(cat $context_dir/.sgx_mode)
+    SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$context_dir/build/lib:$SGX_SDK/sdk_libs/"
+        export LD_LIBRARY_PATH="$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
-        export LD_LIBRARY_PATH="$context_dir/build/lib"
+        export LD_LIBRARY_PATH="$instance_dir/build/lib"
     fi
 
-    cd "$working_dir"
-    echo "running" > "$context_dir/status"
+    echo "running" > $status_file
 
-    RUST_BACKTRACE=1 "$context_dir/build/bin/occlum-run" "$@"
+    RUST_BACKTRACE=1 "$instance_dir/build/bin/occlum-run" "$@"
 
-    echo "built" > "$context_dir/status"
+    echo "built" > $status_file
 }
 
 cmd_start() {
     check_has_built
 
-    SGX_MODE=$(cat $context_dir/.sgx_mode)
+    SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$context_dir/build/lib:$SGX_SDK/sdk_libs/"
+        export LD_LIBRARY_PATH="$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
-        export LD_LIBRARY_PATH="$context_dir/build/lib"
+        export LD_LIBRARY_PATH="$instance_dir/build/lib"
     fi
 
-    cd "$working_dir"
-    echo "running" > "$context_dir/status"
+    echo "running" > $status_file
 
-    RUST_BACKTRACE=1 "$context_dir/build/bin/occlum_exec_client" start
+    RUST_BACKTRACE=1 "$instance_dir/build/bin/occlum_exec_client" start
 
-    echo "built" > "$context_dir/status"
+    echo "built" > $status_file
 }
 
 cmd_exec() {
     check_has_built
 
-    SGX_MODE=$(cat $context_dir/.sgx_mode)
+    SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$context_dir/build/lib:$SGX_SDK/sdk_libs/"
+        export LD_LIBRARY_PATH="$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
-        export LD_LIBRARY_PATH="$context_dir/build/lib"
+        export LD_LIBRARY_PATH="$instance_dir/build/lib"
     fi
 
-    cd "$working_dir"
-    echo "running" > "$context_dir/status"
+    echo "running" > "$status_file"
 
-    RUST_BACKTRACE=1 "$context_dir/build/bin/occlum_exec_client" exec -- "$@"
+    RUST_BACKTRACE=1 "$instance_dir/build/bin/occlum_exec_client" exec -- "$@"
 
-    echo "built" > "$context_dir/status"
+    echo "built" > "$status_file"
 }
 
 cmd_stop() {
     check_has_built
 
-    SGX_MODE=$(cat $context_dir/.sgx_mode)
+    SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$context_dir/build/lib:$SGX_SDK/sdk_libs/"
+        export LD_LIBRARY_PATH="$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
-        export LD_LIBRARY_PATH="$context_dir/build/lib"
+        export LD_LIBRARY_PATH="$instance_dir/build/lib"
     fi
 
-    cd "$working_dir"
-    echo "running" > "$context_dir/status"
+    echo "running" > "$status_file"
 
-    RUST_BACKTRACE=1 "$context_dir/build/bin/occlum_exec_client" stop -t 0
+    RUST_BACKTRACE=1 "$instance_dir/build/bin/occlum_exec_client" stop -t 0
 
-    echo "built" > "$context_dir/status"
+    echo "built" > "$status_file"
 }
 
 cmd_gdb() {
     check_has_built
 
-    SGX_MODE=$(cat $context_dir/.sgx_mode)
+    SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$context_dir/build/lib:$SGX_SDK/sdk_libs/"
+        export LD_LIBRARY_PATH="$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
-        export LD_LIBRARY_PATH="$context_dir/build/lib"
+        export LD_LIBRARY_PATH="$instance_dir/build/lib"
     fi
 
-    cd "$working_dir"
-    echo "debugging" > "$context_dir/status"
+    echo "debugging" > "$status_file"
 
-    OCCLUM_GDB=1 $SGX_GDB --args "$context_dir/build/bin/occlum-run" "$@"
+    OCCLUM_GDB=1 $SGX_GDB --args "$instance_dir/build/bin/occlum-run" "$@"
 
-    echo "built" > "$context_dir/status"
+    echo "built" > "$status_file"
 }
 
 cmd_status() {
-    cat "$context_dir/status"
+    cat "$status_file"
 }
 
 set -e

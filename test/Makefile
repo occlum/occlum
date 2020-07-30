@@ -60,7 +60,7 @@ $(BUILD_TARGETS): %:
 
 postbuild:
 	@cd $(BUILD_DIR)/test && \
-		$(BUILD_DIR)/bin/occlum build
+		$(BUILD_DIR)/bin/occlum build -f
 
 #############################################################################
 # Test targets

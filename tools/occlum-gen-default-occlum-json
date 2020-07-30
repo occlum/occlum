@@ -1,8 +1,6 @@
 #!/bin/bash
 
-if [ -z $OCCLUM_INSTANCE_DIR ];then
-    OCCLUM_INSTANCE_DIR=".occlum"
-fi
+OCCLUM_INSTANCE_DIR="."
 
 cat <<EOF
 {

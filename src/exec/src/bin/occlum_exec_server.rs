@@ -118,15 +118,11 @@ extern "C" {
 #[repr(C)]
 /// Occlum PAL attributes. Defined by occlum pal.
 pub struct occlum_pal_attr_t {
-    /// Occlum instance dir.
+    /// Occlum instance directory.
     ///
-    /// Specifies the path of an Occlum instance directory. Usually, this
-    /// directory is initialized by executing "occlum init" command, which
-    /// creates a hidden directory named ".occlum/". This ".occlum/" is an
-    /// Occlum instance directory. The name of the directory is not necesarrily
-    /// ".occlum"; it can be renamed to an arbitrary name.
-    ///
-    /// Mandatory field. Must not be NULL.
+    /// Specifies the path of an Occlum instance directory, which is usually created with the 
+    /// `occlum new` command. The default value is "."; that is, the current working directory
+    /// is the Occlum instance directory.
     pub instance_dir: *const libc::c_char,
     /// Log level.
     ///
@@ -139,12 +135,7 @@ pub struct occlum_pal_attr_t {
 
 /// Loads and initializes the Occlum enclave image
 fn rust_occlum_pal_init() -> Result<(), i32> {
-    let mut instance_dir = OsString::from("./.occlum\0");
-    if let Some(val) = env::var_os("OCCLUM_INSTANCE_DIR") {
-        instance_dir = val;
-        instance_dir.push("\0");
-    };
-
+    let instance_dir = OsString::from(".\0");
     let mut log_level = OsString::from("off\0");
     if let Some(val) = env::var_os("OCCLUM_LOG_LEVEL") {
         log_level = val;
