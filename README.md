@@ -30,12 +30,16 @@ Hello World
 ```
 Note that the Occlum toolchain is not cross-compiling in the traditional sense: the binaries built by the Occlum toolchain is also runnable on Linux. This property makes it convenient to compile, debug, and test user programs intended for Occlum.
 
-**Step 2. Initialize a directory as the Occlum instance via `occlum init`**
+**Step 2. Initialize a directory as the Occlum instance via `occlum init` or `occlum new`**
 ```
 $ mkdir occlum_instance && cd occlum_instance
 $ occlum init
 ```
-The `occlum init` command creates the compile-time and run-time state of Occlum in the current working directory. Each Occlum instance directory should be used for a single instance of an application; multiple applications or different instances of a single application should use different Occlum instances.
+or
+```
+$ occlum new occlum_instance
+```
+The `occlum init` command creates the compile-time and run-time state of Occlum in the current working directory. The `occlum new` command does basically the same thing but in a new instance diretory. Each Occlum instance directory should be used for a single instance of an application; multiple applications or different instances of a single application should use different Occlum instances.
 
 **Step 3. Generate a secure Occlum FS image and Occlum SGX enclave via `occlum build`**
 ```

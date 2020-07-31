@@ -34,8 +34,11 @@ report_arg_error() {
     echo ""
     cat <<EOF
 Usage:
+    occlum new <path>
+        Create a new directory at <path> and initialize as the Occlum instance.
+
     occlum init
-        Initialize a directory as the Occlum instance
+        Initialize a directory as the Occlum instance.
 
     occlum build [--sign-key <key_path>] [--sign-tool <tool_path>] [-f/--force]
         Build and sign an Occlum SGX enclave (.so) and generate its associated secure FS image
@@ -69,6 +72,28 @@ check_has_built() {
     fi
 }
 
+
+cmd_new() {
+    if [ -z $@ ]; then
+        echo "Error: target directory is not set"
+        exit 1
+    fi
+
+    dir_path="$@"
+    if [[ "$dir_path" != "/"* ]]; then
+        dir_path="$instance_dir/$@"
+    fi
+
+    if [[ -e "$dir_path" ]]; then
+        echo "Error: destination \"$dir_path\" already exists"
+        exit 1
+    fi
+
+    mkdir -p $dir_path
+    instance_dir=$dir_path
+    status_file=$instance_dir/.__occlum_status
+    cd $dir_path && cmd_init
+}
 
 cmd_init() {
     if [ -f "$status_file"  ]; then
@@ -261,6 +286,9 @@ fi
 
 cmd=$1
 case "$cmd" in
+    new)
+        cmd_new "${@:2:1}"
+        ;;
     init)
         cmd_init
         ;;
