@@ -259,6 +259,10 @@ $ OCCLUM_RELEASE_ENCLAVE=yes occlum run <prog_path> <prog_args>
 
 Ultimately, whether an enclave is running in the release mode should be checked and judged by a trusted client through remotely attesting the enclave. See the remote attestation demo [here](demos/remote_attestation).
 
+## How to Run Occlum Without Docker?
+
+One easy way to run Occlum without Docker is to use the Occlum Installer. We have prepared the RPM installer for Occlum, which can be downloaded with every release of Occlum. For more info about the installer, see [here](tools/installer/README.md).
+
 ## What is the Implementation Status?
 
 Occlum is being actively developed. We now focus on implementing more system calls and additional features required in the production environment.

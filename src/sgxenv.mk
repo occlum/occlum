@@ -85,7 +85,7 @@ SGX_CFLAGS_U := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes \
 SGX_CXXFLAGS_U := $(SGX_CFLAGS_U) -std=c++11
 
 ifneq ($(SGX_MODE), HW)
-	SGX_LFLAGS_U := $(SGX_COMMON_CFLAGS) -lpthread -L$(SGX_LIBRARY_PATH) -lsgx_urts_sim -lsgx_uae_service_sim
+	SGX_LFLAGS_U := $(SGX_COMMON_CFLAGS) -lpthread -L$(SGX_LIBRARY_PATH) -Wl,-Bstatic -lsgx_urts_sim -Wl,-Bdynamic -lsgx_uae_service_sim
 else
 	SGX_LFLAGS_U := $(SGX_COMMON_CFLAGS) -lpthread -L$(SGX_LIBRARY_PATH) -Wl,-Bstatic -lsgx_urts -Wl,-Bdynamic -lsgx_uae_service -lsgx_enclave_common
 endif

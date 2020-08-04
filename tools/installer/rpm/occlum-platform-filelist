@@ -1,0 +1,5 @@
+/opt/occlum/build/bin/occlum
+/opt/occlum/build/bin/occlum_build.mk
+/opt/occlum/build/bin/occlum-run
+/opt/occlum/build/bin/occlum_exec_client
+/opt/occlum/build/bin/occlum_exec_server

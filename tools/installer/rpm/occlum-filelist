@@ -1,0 +1,11 @@
+/opt/occlum/build/bin/gen_enclave_conf
+/opt/occlum/build/bin/occlum-gen-default-occlum-json
+/opt/occlum/build/bin/occlum-protect-integrity
+/opt/occlum/build/bin/sefs-cli
+/opt/occlum/build/lib/libocclum-pal_sim.so*
+/opt/occlum/build/lib/libocclum-libos.so*
+/opt/occlum/build/lib/libocclum-libos_sim.so*
+/opt/occlum/build/lib/libsefs-cli.signed.so
+/opt/occlum/build/lib/occlum-protect-integrity.signed.so*
+/opt/occlum/etc/template/*
+/opt/occlum/include/*

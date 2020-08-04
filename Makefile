@@ -83,3 +83,4 @@ clean:
 	@$(MAKE) --no-print-directory -C test clean
 	@$(MAKE) SGX_MODE=SIM --no-print-directory -C src clean
 	@$(MAKE) SGX_MODE=SIM --no-print-directory -C test clean
+	@$(MAKE) --no-print-directory -C tools/installer/rpm clean

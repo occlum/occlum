@@ -53,7 +53,9 @@ endif
 ######## App Settings ########
 
 ifneq ($(SGX_MODE), HW)
-	URTS_LIBRARY_NAME := sgx_urts_sim
+	# Tools are built in simulation mode by default and should be built with sgx_urts_sim_with_se_event
+	# to resolve undefined symbols
+	URTS_LIBRARY_NAME := sgx_urts_sim_with_se_event
 else
 	URTS_LIBRARY_NAME := sgx_urts
 endif
@@ -78,7 +80,9 @@ else
 endif
 
 APP_CPP_FLAGS := $(APP_C_FLAGS) -std=c++11
-APP_LINK_FLAGS := $(SGX_COMMON_CFLAGS) -L$(SGX_LIBRARY_PATH) -l$(URTS_LIBRARY_NAME) -lsgx_uprotected_fs -lpthread
+APP_LINK_FLAGS := $(SGX_COMMON_CFLAGS) -lpthread -L$(SGX_LIBRARY_PATH) -Wl,-Bstatic -l$(URTS_LIBRARY_NAME) -Wl,-Bdynamic
+
+APP_LINK_FLAGS += -lsgx_uprotected_fs -ldl -lcrypto
 
 ifneq ($(SGX_MODE), HW)
 	APP_LINK_FLAGS += -lsgx_uae_service_sim
