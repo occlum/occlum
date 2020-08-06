@@ -112,6 +112,12 @@ impl InnerAgent {
                 quote_buf_ptr: *mut u8,            // Output
                 quote_buf_len: u32,                // Input
             ) -> sgx_status_t;
+            fn occlum_ocall_sgx_calc_quote_size(
+                p_retval: *mut sgx_status_t,
+                p_sig_rl: *const u8,
+                sig_rl_size: u32,
+                p_quote_size: *mut u32,
+            ) -> sgx_status_t;
         }
 
         // Prepare argments for OCall
@@ -133,8 +139,16 @@ impl InnerAgent {
         let report = rsgx_create_report(&self.target_info, report_data)
             .map_err(|_e| errno!(EINVAL, "sgx_error"))?;
         let mut qe_report = sgx_report_t::default();
-        // TODO: what if quote_buf is not big enough?
-        let mut quote_buf = [0_u8; 4096];
+        let mut quote_len: u32 = 0;
+        let mut rt = Default::default();
+        let status = unsafe {
+            occlum_ocall_sgx_calc_quote_size(&mut rt as _, sigrl_ptr, sigrl_size, &mut quote_len as _)
+        };
+        assert!(status == sgx_status_t::SGX_SUCCESS);
+        if rt != sgx_status_t::SGX_SUCCESS {
+            return_errno!(EINVAL, "occlum_ocall_sgx_calc_quote_size failed");
+        }
+        let mut quote_buf = vec![0_u8; quote_len as usize];
 
         // Do OCall
         unsafe {

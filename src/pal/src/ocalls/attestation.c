@@ -45,3 +45,10 @@ sgx_status_t occlum_ocall_sgx_get_quote(
                         real_quote_len);
     return ret;
 }
+
+sgx_status_t occlum_ocall_sgx_calc_quote_size (
+    uint8_t *p_sig_rl,
+    uint32_t sig_rl_size,
+    uint32_t *p_quote_size) {
+    return sgx_calc_quote_size(p_sig_rl, sig_rl_size, p_quote_size);
+}

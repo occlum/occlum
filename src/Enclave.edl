@@ -204,5 +204,11 @@ enclave {
         ) propagate_errno;
 
         int occlum_ocall_tkill(int tid, int signum) propagate_errno;
+
+        sgx_status_t occlum_ocall_sgx_calc_quote_size (
+           [in, size=sig_rl_size] uint8_t * p_sig_rl,
+           uint32_t sig_rl_size,
+           [out] uint32_t* p_quote_size
+        );
     };
 };
