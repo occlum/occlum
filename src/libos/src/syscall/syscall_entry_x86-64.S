@@ -13,25 +13,29 @@ __occlum_syscall_linux_abi:
     //      arg3 - %r10
     //      arg4 - %r8
     //      arg5 - *r9
-    //      return address - *(%rsp)
+    //      return address - %rcx
 
-    push %rbp
-    movq %rsp, %rbp
-    // The return address is now in 8(%rbp).
-    // The original %rbp is now in (%rbp).
-    // The original %rsp is now in %rbp + 8.
+    // Save rsp in r11
+    // r11 is used to store RFLAGS. Since the FLAGS is not changed before pushfq,
+    // r11 is used to save original rsp.
+    movq %rsp, %r11
+
+    // Get current task
+    movq %gs:(TD_TASK_OFFSET), %rsp
+    // Switch to the kernel stack
+    movq TASK_KERNEL_RSP(%rsp), %rsp
 
     // Save the target CPU state when `call __occlum_syscall` is returned in
     // a CpuContext struct. The registers are saved in the reverse order of 
     // the fields in CpuContext.
     pushfq
-    push 8(%rbp)    // save %rip
-    push %rbp       // save %rsp, but not the final value, to be adjusted later
+    push %rcx       // save %rip
+    push %r11       // save %rsp
     push %rcx
     push %rax
     push %rdx
     push %rbx
-    push (%rbp)     // save %rbp
+    push %rbp
     push %rsi
     push %rdi
     push %r15
@@ -44,13 +48,10 @@ __occlum_syscall_linux_abi:
     push %r8
     // Make %rdi points to CpuContext.
     mov %rsp, %rdi
-    // The target %rsp is actuall the saved one plus 16
-    addq $16, (15*8)(%rdi)
 
     // Get current task
     movq %gs:(TD_TASK_OFFSET), %r12
-    // Switch to the kernel stack
-    movq TASK_KERNEL_RSP(%r12), %rsp
+
     // Switch to the kernel TLS by setting fsbase. Different implementation for HW and SIM modes.
 #if SGX_MODE_SIM
     pushq %rdi
@@ -67,6 +68,10 @@ __occlum_syscall_linux_abi:
     wrfsbase %r11
 #endif
     
+    // Keep the stack 16 bytes alignment
+    and $-16, %rsp
+
+    // Do syscall
     call occlum_syscall
 
     // This should never happen!
@@ -78,23 +83,6 @@ __occlum_syscall_linux_abi:
 __occlum_sysret:
     // Arguments:
     //      %rdi - user_context: &mut CpuContext
-
-    // Jumping back to the user space itself is easy, but not so easy when 
-    // we need to set all other registers to some specified values. To overcome 
-    // this difficulty, the most obvious choice is using a ret instruction, which
-    // can set %rip and %rsp at the same time. So we must set -8(%rsp) to the 
-    // value of the target %rip before ret, where %rsp has the value of target
-    // %rsp.
-    //
-    // But there is a catch: it is dangerous to modify the value at -8(%rsp), 
-    // which may still be used by the user space (remember red zone and 
-    // signal handler?). So we need to use a stack location outside the 
-    // 128-byte red zone. So in this function, we store the target %rip value
-    // in $-136(%rsp) and do `ret 128` at the end of this function.
-    subq $136, (15*8)(%rdi)
-    movq (15*8)(%rdi), %r11
-    movq (16*8)(%rdi), %r12
-    movq %r12, (%r11)
 
     // Get current task
     movq %gs:(TD_TASK_OFFSET), %r12
@@ -115,6 +103,10 @@ __occlum_sysret:
     leaq (17*8)(%rdi), %rsp
     popfq
 
+    // Restore the return address
+    movq (16*8)(%rdi), %rcx       //save the return address in %rcx
+    movq %rcx, %gs:(TD_SYSCALL_RET_ADDR_OFFSET)
+
     // Make %rsp points to the CPU context
     mov %rdi, %rsp
     // Restore the CPU context of the user space
@@ -134,9 +126,7 @@ __occlum_sysret:
     pop %rax
     pop %rcx
     pop %rsp
-    // Continue executing the user code
-    ret $128
-
+    jmp *%gs:(TD_SYSCALL_RET_ADDR_OFFSET)
 
     .global __occlum_syscall_c_abi
     .type __occlum_syscall_c_abi, @function
@@ -148,5 +138,7 @@ __occlum_syscall_c_abi:
     movq %r8,%r10
     movq %r9,%r8
     movq 8(%rsp),%r9
-    call __occlum_syscall_linux_abi
+    lea syscall_return(%rip), %rcx
+    jmp __occlum_syscall_linux_abi
+syscall_return:
     ret
