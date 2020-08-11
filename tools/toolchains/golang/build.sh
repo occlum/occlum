@@ -16,8 +16,8 @@ cd ${BUILD_DIR}
 
 # Download Golang
 git clone https://github.com/golang/go .
-# Swtich to Golang 1.13.4
-git checkout -b go1.13.4 tags/go1.13.4
+# Swtich to Golang 1.13.7
+git checkout -b go1.13.7 tags/go1.13.7
 # Apply the patch to adapt Golang to Occlum
 git apply ${THIS_DIR}/0001-adapt-golang-to-occlum-libos.patch
 
@@ -30,7 +30,8 @@ mv ${BUILD_DIR} ${INSTALL_DIR}
 cat > ${INSTALL_DIR}/bin/occlum-go <<EOF
 #!/bin/bash
 OCCLUM_GCC="\$(which occlum-gcc)"
-CC=\$OCCLUM_GCC ${INSTALL_DIR}/bin/go "\$@"
+OCCLUM_GOFLAGS="-buildmode=pie \$GOFLAGS"
+CC=\$OCCLUM_GCC GOFLAGS=\$OCCLUM_GOFLAGS ${INSTALL_DIR}/bin/go "\$@"
 EOF
 
 chmod +x ${INSTALL_DIR}/bin/occlum-go
