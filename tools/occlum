@@ -12,10 +12,13 @@ else
     occlum_sgx_env=$occlum_dir/etc/environment
 fi
 
-major_ver=`grep '\#define OCCLUM_MAJOR_VERSION' $version_header |  awk '{print $3}'`
-minor_ver=`grep '\#define OCCLUM_MINOR_VERSION' $version_header |  awk '{print $3}'`
-patch_ver=`grep '\#define OCCLUM_PATCH_VERSION' $version_header |  awk '{print $3}'`
-occlum_version="$major_ver.$minor_ver.$patch_ver"
+# For deploy environment, version header file may not exist
+if [ -f "$version_header" ]; then
+    major_ver=`grep '\#define OCCLUM_MAJOR_VERSION' $version_header |  awk '{print $3}'`
+    minor_ver=`grep '\#define OCCLUM_MINOR_VERSION' $version_header |  awk '{print $3}'`
+    patch_ver=`grep '\#define OCCLUM_PATCH_VERSION' $version_header |  awk '{print $3}'`
+    occlum_version="$major_ver.$minor_ver.$patch_ver"
+fi
 
 instance_dir=`pwd`
 
@@ -25,6 +28,11 @@ source $occlum_sgx_env
 SGX_GDB="$SGX_SDK/bin/sgx-gdb"
 ENCLAVE_SIGN_TOOL="$SGX_SDK/bin/x64/sgx_sign"
 ENCLAVE_SIGN_KEY="$occlum_dir/etc/template/Enclave.pem"
+
+get_enclave_debuggable_flag() {
+    cat "$instance_dir/Occlum.json" | \
+        python -c "import sys, json; print json.load(sys.stdin)['metadata']['debuggable']"
+}
 
 exit_error() {
     echo "Error: $@" >&2
@@ -43,15 +51,24 @@ Usage:
         Initialize a directory as the Occlum instance.
 
     occlum build [--sign-key <key_path>] [--sign-tool <tool_path>] [-f/--force]
-        Build and sign an Occlum SGX enclave (.so) and generate its associated secure FS image
-        according to the user-provided image directory and Occlum.json config file.
-        The whole building process is incremental: the building artifacts are built only when needed.
+        Build and sign an Occlum SGX enclave (.so) and generate its associated secure
+        FS image according to the user-provided image directory and Occlum.json config file.
+        The whole building process is incremental: the building artifacts are built only
+        when needed.
         To force rebuilding all artifacts, give the [-f/--force] flag.
 
     occlum run <program_name> <program_args>
         Run the user program inside an SGX enclave.
         To run the enclave in SGX hardware release mode, use:
         OCCLUM_RELEASE_ENCLAVE=1 occlum run <program_name> <program_args>
+
+    occlum package [<package_name>.tar.gz]
+        Generate a minimal, self-contained package (.tar.gz) for the Occlum instance.
+        The resulting package can then be copied to a deployment environment and unpacked
+        as a runnable Occlum instance.
+        All runtime dependencies required by the Occlum instance---except Intel SGX driver,
+        enable_rdfsbase kernel module, and Intel SGX PSW---are included in the package.
+        If package_name is not specified, the directory name of Occlum instance will be used.
 
     occlum gdb <program_name> <program_args>
         Debug the program running inside an SGX enclave with GDB.
@@ -77,7 +94,6 @@ check_has_built() {
         exit 1
     fi
 }
-
 
 cmd_new() {
     if [ -z $@ ]; then
@@ -265,6 +281,42 @@ cmd_stop() {
     echo "built" > "$status_file"
 }
 
+cmd_package() {
+    check_has_built
+
+    SGX_MODE=$(cat $instance_dir/.sgx_mode)
+    if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
+        echo '"occlum package" command should only be used for an Occlum instance of SGX hardware mode, not the simulation mode.'
+        echo 'Please run "occlum build --sgx-mode HW" and then use "occlum package"'
+        exit 1
+    fi
+
+    instance_base_name=$(basename $instance_dir)
+    if [[ -z "$@" ]]; then
+        package_name="$instance_base_name.tar.gz"
+    else
+        if [[ "$@" == *.tar.gz ]];then
+            package_name="$@"
+        else
+            package_name="$@.tar.gz"
+        fi
+    fi
+
+    rm -f $package_name
+
+    cd .. && tar -cvzf $instance_dir/$package_name $instance_base_name/Occlum.json $instance_base_name/build/bin \
+        $instance_base_name/build/lib/libocclum-libos.signed.so $instance_base_name/build/lib/libocclum-pal.so* \
+        $instance_base_name/build/mount $instance_base_name/build/Occlum.json.protected $instance_base_name/run \
+        $instance_base_name/.__occlum_status $instance_base_name/.sgx_mode
+
+    if [ "`get_enclave_debuggable_flag`" == "True" ]; then
+        echo 'Warning: current Occlum instance is configured as "debuggable".'
+        echo '(If it is not expected, you can modify the Occlum.json "metadata" - "debuggable" field to "false" and build again. And then use "occlum package")'
+    fi
+
+    echo "The package $package_name is generated successfully"
+}
+
 cmd_gdb() {
     check_has_built
 
@@ -371,6 +423,9 @@ case "$cmd" in
         ;;
     stop)
         cmd_stop
+        ;;
+    package)
+        cmd_package "${@:2}"
         ;;
     gdb)
         cmd_gdb "${@:2}"
