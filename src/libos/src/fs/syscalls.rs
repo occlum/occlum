@@ -1,7 +1,8 @@
 use super::event_file::EventCreationFlags;
 use super::file_ops;
 use super::file_ops::{
-    AccessibilityCheckFlags, AccessibilityCheckMode, DirFd, FcntlCmd, StatFlags,
+    AccessibilityCheckFlags, AccessibilityCheckMode, ChmodFlags, ChownFlags, FcntlCmd, FsPath,
+    LinkFlags, StatFlags, UnlinkFlags, AT_FDCWD,
 };
 use super::fs_ops;
 use super::*;
@@ -35,24 +36,15 @@ pub fn do_eventfd2(init_val: u32, flags: i32) -> Result<isize> {
 }
 
 pub fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize> {
-    let path = from_user::clone_cstring_safely(path)?
-        .to_string_lossy()
-        .into_owned();
-    let fd = file_ops::do_openat(DirFd::Cwd, &path, flags, mode)?;
-    Ok(fd as isize)
+    self::do_openat(AT_FDCWD, path, flags, mode)
 }
 
 pub fn do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u32) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    let dirfd = if Path::new(&path).is_absolute() {
-        // Path is absolute, dirfd is treated as Cwd
-        DirFd::Cwd
-    } else {
-        DirFd::from_i32(dirfd)?
-    };
-    let fd = file_ops::do_openat(dirfd, &path, flags, mode)?;
+    let fs_path = FsPath::new(&path, dirfd, false)?;
+    let fd = file_ops::do_openat(&fs_path, flags, mode)?;
     Ok(fd as isize)
 }
 
@@ -147,19 +139,6 @@ pub fn do_pwrite(fd: FileDesc, buf: *const u8, size: usize, offset: off_t) -> Re
     Ok(len as isize)
 }
 
-pub fn do_stat(path: *const i8, stat_buf: *mut Stat) -> Result<isize> {
-    let path = from_user::clone_cstring_safely(path)?
-        .to_string_lossy()
-        .into_owned();
-    from_user::check_mut_ptr(stat_buf)?;
-
-    let stat = file_ops::do_fstatat(DirFd::Cwd, &path, StatFlags::empty())?;
-    unsafe {
-        stat_buf.write(stat);
-    }
-    Ok(0)
-}
-
 pub fn do_fstat(fd: FileDesc, stat_buf: *mut Stat) -> Result<isize> {
     from_user::check_mut_ptr(stat_buf)?;
 
@@ -170,32 +149,27 @@ pub fn do_fstat(fd: FileDesc, stat_buf: *mut Stat) -> Result<isize> {
     Ok(0)
 }
 
-pub fn do_lstat(path: *const i8, stat_buf: *mut Stat) -> Result<isize> {
-    let path = from_user::clone_cstring_safely(path)?
-        .to_string_lossy()
-        .into_owned();
-    from_user::check_mut_ptr(stat_buf)?;
+pub fn do_stat(path: *const i8, stat_buf: *mut Stat) -> Result<isize> {
+    self::do_fstatat(AT_FDCWD, path, stat_buf, 0)
+}
 
-    let stat = file_ops::do_lstat(&path)?;
-    unsafe {
-        stat_buf.write(stat);
-    }
-    Ok(0)
+pub fn do_lstat(path: *const i8, stat_buf: *mut Stat) -> Result<isize> {
+    self::do_fstatat(
+        AT_FDCWD,
+        path,
+        stat_buf,
+        StatFlags::AT_SYMLINK_NOFOLLOW.bits(),
+    )
 }
 
 pub fn do_fstatat(dirfd: i32, path: *const i8, stat_buf: *mut Stat, flags: u32) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    let dirfd = if Path::new(&path).is_absolute() {
-        // Path is absolute, dirfd is treated as Cwd
-        DirFd::Cwd
-    } else {
-        DirFd::from_i32(dirfd)?
-    };
+    let flags = StatFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
+    let fs_path = FsPath::new(&path, dirfd, flags.contains(StatFlags::AT_EMPTY_PATH))?;
     from_user::check_mut_ptr(stat_buf)?;
-    let flags = StatFlags::from_bits_truncate(flags);
-    let stat = file_ops::do_fstatat(dirfd, &path, flags)?;
+    let stat = file_ops::do_fstatat(&fs_path, flags)?;
     unsafe {
         stat_buf.write(stat);
     }
@@ -203,27 +177,17 @@ pub fn do_fstatat(dirfd: i32, path: *const i8, stat_buf: *mut Stat, flags: u32) 
 }
 
 pub fn do_access(path: *const i8, mode: u32) -> Result<isize> {
-    let path = from_user::clone_cstring_safely(path)?
-        .to_string_lossy()
-        .into_owned();
-    let mode = AccessibilityCheckMode::from_u32(mode)?;
-    let flags = AccessibilityCheckFlags::empty();
-    file_ops::do_faccessat(DirFd::Cwd, &path, mode, flags).map(|_| 0)
+    self::do_faccessat(AT_FDCWD, path, mode, 0)
 }
 
 pub fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    let dirfd = if Path::new(&path).is_absolute() {
-        // Path is absolute, dirfd is treated as Cwd
-        DirFd::Cwd
-    } else {
-        DirFd::from_i32(dirfd)?
-    };
+    let fs_path = FsPath::new(&path, dirfd, false)?;
     let mode = AccessibilityCheckMode::from_u32(mode)?;
     let flags = AccessibilityCheckFlags::from_u32(flags)?;
-    file_ops::do_faccessat(dirfd, &path, mode, flags).map(|_| 0)
+    file_ops::do_faccessat(&fs_path, mode, flags).map(|_| 0)
 }
 
 pub fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize> {
@@ -346,21 +310,37 @@ pub fn do_getcwd(buf_ptr: *mut u8, size: usize) -> Result<isize> {
 }
 
 pub fn do_rename(oldpath: *const i8, newpath: *const i8) -> Result<isize> {
+    self::do_renameat(AT_FDCWD, oldpath, AT_FDCWD, newpath)
+}
+
+pub fn do_renameat(
+    olddirfd: i32,
+    oldpath: *const i8,
+    newdirfd: i32,
+    newpath: *const i8,
+) -> Result<isize> {
     let oldpath = from_user::clone_cstring_safely(oldpath)?
         .to_string_lossy()
         .into_owned();
     let newpath = from_user::clone_cstring_safely(newpath)?
         .to_string_lossy()
         .into_owned();
-    file_ops::do_rename(&oldpath, &newpath)?;
+    let old_fs_path = FsPath::new(&oldpath, olddirfd, false)?;
+    let new_fs_path = FsPath::new(&newpath, newdirfd, false)?;
+    file_ops::do_renameat(&old_fs_path, &new_fs_path)?;
     Ok(0)
 }
 
 pub fn do_mkdir(path: *const i8, mode: usize) -> Result<isize> {
+    self::do_mkdirat(AT_FDCWD, path, mode)
+}
+
+pub fn do_mkdirat(dirfd: i32, path: *const i8, mode: usize) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    file_ops::do_mkdir(&path, mode)?;
+    let fs_path = FsPath::new(&path, dirfd, false)?;
+    file_ops::do_mkdirat(&fs_path, mode)?;
     Ok(0)
 }
 
@@ -373,25 +353,49 @@ pub fn do_rmdir(path: *const i8) -> Result<isize> {
 }
 
 pub fn do_link(oldpath: *const i8, newpath: *const i8) -> Result<isize> {
+    self::do_linkat(AT_FDCWD, oldpath, AT_FDCWD, newpath, 0)
+}
+
+pub fn do_linkat(
+    olddirfd: i32,
+    oldpath: *const i8,
+    newdirfd: i32,
+    newpath: *const i8,
+    flags: i32,
+) -> Result<isize> {
     let oldpath = from_user::clone_cstring_safely(oldpath)?
         .to_string_lossy()
         .into_owned();
     let newpath = from_user::clone_cstring_safely(newpath)?
         .to_string_lossy()
         .into_owned();
-    file_ops::do_link(&oldpath, &newpath)?;
+    let flags = LinkFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
+    let old_fs_path = FsPath::new(&oldpath, olddirfd, flags.contains(LinkFlags::AT_EMPTY_PATH))?;
+    let new_fs_path = FsPath::new(&newpath, newdirfd, false)?;
+    file_ops::do_linkat(&old_fs_path, &new_fs_path, flags)?;
     Ok(0)
 }
 
 pub fn do_unlink(path: *const i8) -> Result<isize> {
+    self::do_unlinkat(AT_FDCWD, path, 0)
+}
+
+pub fn do_unlinkat(dirfd: i32, path: *const i8, flags: i32) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    file_ops::do_unlink(&path)?;
+    let fs_path = FsPath::new(&path, dirfd, false)?;
+    let flags =
+        UnlinkFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flag value"))?;
+    file_ops::do_unlinkat(&fs_path, flags)?;
     Ok(0)
 }
 
 pub fn do_readlink(path: *const i8, buf: *mut u8, size: usize) -> Result<isize> {
+    self::do_readlinkat(AT_FDCWD, path, buf, size)
+}
+
+pub fn do_readlinkat(dirfd: i32, path: *const i8, buf: *mut u8, size: usize) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
@@ -399,19 +403,13 @@ pub fn do_readlink(path: *const i8, buf: *mut u8, size: usize) -> Result<isize> 
         from_user::check_array(buf, size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, size) }
     };
-    let len = file_ops::do_readlink(&path, buf)?;
+    let fs_path = FsPath::new(&path, dirfd, false)?;
+    let len = file_ops::do_readlinkat(&fs_path, buf)?;
     Ok(len as isize)
 }
 
 pub fn do_symlink(target: *const i8, link_path: *const i8) -> Result<isize> {
-    let target = from_user::clone_cstring_safely(target)?
-        .to_string_lossy()
-        .into_owned();
-    let link_path = from_user::clone_cstring_safely(link_path)?
-        .to_string_lossy()
-        .into_owned();
-    file_ops::do_symlinkat(&target, DirFd::Cwd, &link_path)?;
-    Ok(0)
+    self::do_symlinkat(target, AT_FDCWD, link_path)
 }
 
 pub fn do_symlinkat(target: *const i8, new_dirfd: i32, link_path: *const i8) -> Result<isize> {
@@ -421,23 +419,13 @@ pub fn do_symlinkat(target: *const i8, new_dirfd: i32, link_path: *const i8) -> 
     let link_path = from_user::clone_cstring_safely(link_path)?
         .to_string_lossy()
         .into_owned();
-    let new_dirfd = if Path::new(&link_path).is_absolute() {
-        // Link path is absolute, new_dirfd is treated as Cwd
-        DirFd::Cwd
-    } else {
-        DirFd::from_i32(new_dirfd)?
-    };
-    file_ops::do_symlinkat(&target, new_dirfd, &link_path)?;
+    let fs_path = FsPath::new(&link_path, new_dirfd, false)?;
+    file_ops::do_symlinkat(&target, &fs_path)?;
     Ok(0)
 }
 
 pub fn do_chmod(path: *const i8, mode: u16) -> Result<isize> {
-    let path = from_user::clone_cstring_safely(path)?
-        .to_string_lossy()
-        .into_owned();
-    let mode = FileMode::from_bits_truncate(mode);
-    file_ops::do_chmod(&path, mode)?;
-    Ok(0)
+    self::do_fchmodat(AT_FDCWD, path, mode, 0)
 }
 
 pub fn do_fchmod(fd: FileDesc, mode: u16) -> Result<isize> {
@@ -446,12 +434,19 @@ pub fn do_fchmod(fd: FileDesc, mode: u16) -> Result<isize> {
     Ok(0)
 }
 
-pub fn do_chown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
+pub fn do_fchmodat(dirfd: i32, path: *const i8, mode: u16, flags: i32) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    file_ops::do_chown(&path, uid, gid)?;
+    let mode = FileMode::from_bits_truncate(mode);
+    let fs_path = FsPath::new(&path, dirfd, false)?;
+    let flags = ChmodFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
+    file_ops::do_fchmodat(&fs_path, mode, flags)?;
     Ok(0)
+}
+
+pub fn do_chown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
+    self::do_fchownat(AT_FDCWD, path, uid, gid, 0)
 }
 
 pub fn do_fchown(fd: FileDesc, uid: u32, gid: u32) -> Result<isize> {
@@ -459,12 +454,24 @@ pub fn do_fchown(fd: FileDesc, uid: u32, gid: u32) -> Result<isize> {
     Ok(0)
 }
 
-pub fn do_lchown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
+pub fn do_fchownat(dirfd: i32, path: *const i8, uid: u32, gid: u32, flags: i32) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    file_ops::do_lchown(&path, uid, gid)?;
+    let flags = ChownFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
+    let fs_path = FsPath::new(&path, dirfd, flags.contains(ChownFlags::AT_EMPTY_PATH))?;
+    file_ops::do_fchownat(&fs_path, uid, gid, flags)?;
     Ok(0)
+}
+
+pub fn do_lchown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
+    self::do_fchownat(
+        AT_FDCWD,
+        path,
+        uid,
+        gid,
+        ChownFlags::AT_SYMLINK_NOFOLLOW.bits(),
+    )
 }
 
 pub fn do_sendfile(

@@ -1,10 +1,7 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <fcntl.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdio.h>
-#include "test.h"
+#include "test_fs.h"
 
 // ============================================================================
 // Helper macros

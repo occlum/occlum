@@ -134,17 +134,6 @@ impl From<Metadata> for Stat {
     }
 }
 
-fn do_stat(path: &str) -> Result<Stat> {
-    debug!("stat: path: {}", path);
-    let inode = {
-        let current = current!();
-        let fs = current.fs().lock().unwrap();
-        fs.lookup_inode(&path)?
-    };
-    let stat = Stat::from(inode.metadata()?);
-    Ok(stat)
-}
-
 pub fn do_fstat(fd: u32) -> Result<Stat> {
     debug!("fstat: fd: {}", fd);
     let file_ref = current!().file(fd as FileDesc)?;
@@ -152,42 +141,19 @@ pub fn do_fstat(fd: u32) -> Result<Stat> {
     Ok(stat)
 }
 
-pub fn do_lstat(path: &str) -> Result<Stat> {
-    debug!("lstat: path: {}", path);
+pub fn do_fstatat(fs_path: &FsPath, flags: StatFlags) -> Result<Stat> {
+    debug!("fstatat: fs_path: {:?}, flags: {:?}", fs_path, flags);
+
     let inode = {
+        let path = fs_path.to_abs_path()?;
         let current = current!();
         let fs = current.fs().lock().unwrap();
-        fs.lookup_inode_no_follow(&path)?
+        if flags.contains(StatFlags::AT_SYMLINK_NOFOLLOW) {
+            fs.lookup_inode_no_follow(&path)?
+        } else {
+            fs.lookup_inode(&path)?
+        }
     };
     let stat = Stat::from(inode.metadata()?);
     Ok(stat)
-}
-
-pub fn do_fstatat(dirfd: DirFd, path: &str, flags: StatFlags) -> Result<Stat> {
-    debug!(
-        "fstatat: dirfd: {:?}, path: {:?}, flags: {:?}",
-        dirfd, path, flags
-    );
-    if path.len() == 0 && !flags.contains(StatFlags::AT_EMPTY_PATH) {
-        return_errno!(ENOENT, "path is an empty string");
-    }
-    match dirfd {
-        DirFd::Fd(dirfd) => {
-            if path.len() == 0 {
-                // Path is an empty string, and the flags contiains AT_EMPTY_PATH,
-                // so the behavior of fstatat() is similar to that of fstat().
-                do_fstat(dirfd)
-            } else {
-                let dir_path = get_dir_path(dirfd)?;
-                let path = dir_path + "/" + path;
-                if !flags.contains(StatFlags::AT_SYMLINK_NOFOLLOW) {
-                    do_stat(&path)
-                } else {
-                    do_lstat(&path)
-                }
-            }
-        }
-        DirFd::Cwd if !flags.contains(StatFlags::AT_SYMLINK_NOFOLLOW) => do_stat(path),
-        DirFd::Cwd => do_lstat(path),
-    }
 }

@@ -1,8 +1,6 @@
-#include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <stdio.h>
-#include "test.h"
+#include "test_fs.h"
 
 // ============================================================================
 // Helper macro

@@ -1,14 +1,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <libgen.h>
 #include <limits.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-#include "test.h"
+#include "test_fs.h"
 
 // ============================================================================
 // Helper variable and function
@@ -82,16 +78,13 @@ static int __test_readlink_from_proc_self_fd(const char *file_path) {
 
 static int __test_realpath(const char *file_path) {
     char buf[128] = { 0 };
-    char dirc[128] = { 0 };
-    char basec[128] = { 0 };
+    char dir_buf[PATH_MAX] = { 0 };
+    char base_buf[PATH_MAX] = { 0 };
     char *dir_name, *file_name, *res;
 
-    if (snprintf(dirc, sizeof(dirc), "%s", file_path) < 0 ||
-            snprintf(basec, sizeof(dirc), "%s", file_path) < 0) {
-        THROW_ERROR("failed to copy file path");
+    if (fs_split_path(file_path, dir_buf, &dir_name, base_buf, &file_name) < 0) {
+        THROW_ERROR("failed to split path");
     }
-    dir_name = dirname(dirc);
-    file_name = basename(basec);
     if (chdir(dir_name) < 0) {
         THROW_ERROR("failed to chdir to %s", dir_name);
     }
@@ -109,6 +102,37 @@ static int __test_realpath(const char *file_path) {
         THROW_ERROR("failed to chdir to '/'");
     }
 
+    return 0;
+}
+
+static int __test_readlinkat(const char *file_path) {
+    int dirfd;
+    size_t n;
+    char buf[128] = { 0 };
+#define LINK_DIR "/root"
+#define LINK_NAME "test_symlink.link"
+    const char *link_path = LINK_DIR"/"LINK_NAME;
+    if (symlink(file_path, link_path) < 0) {
+        THROW_ERROR("failed to create symlink");
+    }
+
+    dirfd = open(LINK_DIR, O_RDONLY);
+    if (dirfd < 0) {
+        THROW_ERROR("failed to open dir");
+    }
+    n = readlinkat(dirfd, LINK_NAME, buf, sizeof(buf));
+    if (n < 0) {
+        THROW_ERROR("failed to readlinkat from %s", link_path);
+    } else if (n != strlen(file_path)) {
+        THROW_ERROR("readlink from %s length is wrong", link_path);
+    }
+    if (strncmp(buf, file_path, n) != 0) {
+        THROW_ERROR("check the content from %s failed", link_path);
+    }
+    close(dirfd);
+    if (remove_file(link_path) < 0) {
+        THROW_ERROR("failed to delete link file");
+    }
     return 0;
 }
 
@@ -138,6 +162,10 @@ static int test_realpath() {
     return test_readlink_framework(__test_realpath);
 }
 
+static int test_readlinkat() {
+    return test_readlink_framework(__test_readlinkat);
+}
+
 static int test_readlink_from_proc_self_exe() {
     char exe_buf[128] = { 0 };
     char absolute_path[128] = { 0 };
@@ -165,18 +193,69 @@ static int test_readlink_from_proc_self_exe() {
 // Test cases for symlink
 // ============================================================================
 
+static int __test_symlinkat(const char *target, const char *link_path) {
+    char dir_buf[PATH_MAX] = { 0 };
+    char base_buf[PATH_MAX] = { 0 };
+    char *dir_name, *link_name;
+
+    if (create_file(target) < 0) {
+        THROW_ERROR("failed to create target file");
+    }
+    int fd = open(target, O_WRONLY);
+    if (fd < 0) {
+        THROW_ERROR("failed to open target to write");
+    }
+    char *write_str = "Hello World\n";
+    if (write(fd, write_str, strlen(write_str)) <= 0) {
+        THROW_ERROR("failed to write");
+    }
+    close(fd);
+
+    if (fs_split_path(link_path, dir_buf, &dir_name, base_buf, &link_name) < 0) {
+        THROW_ERROR("failed to split path");
+    }
+    int dirfd = open(dir_name, O_RDONLY);
+    if (dirfd < 0) {
+        THROW_ERROR("failed to open dir");
+    }
+    if (symlinkat(target, dirfd, link_name) < 0) {
+        THROW_ERROR("failed to create symlink");
+    }
+    close(dirfd);
+
+    fd = open(link_path, O_RDONLY);
+    if (fd < 0) {
+        THROW_ERROR("failed to open link file to read");
+    }
+    char read_buf[128] = { 0 };
+    if (read(fd, read_buf, sizeof(read_buf)) != strlen(write_str)) {
+        THROW_ERROR("failed to read");
+    }
+    if (strcmp(write_str, read_buf) != 0) {
+        THROW_ERROR("the message read from the file is not as it was written");
+    }
+    close(fd);
+
+    if (remove_file(target) < 0) {
+        THROW_ERROR("failed to delete target file");
+    }
+    return 0;
+}
+
+
 static int __test_symlink(const char *target, const char *link_path) {
-    char dir_buf[128] = { 0 };
+    char dir_buf[PATH_MAX] = { 0 };
     char *dir_name;
-    char target_path[256] = { 0 };
+    char target_path[PATH_MAX * 2] = { 0 };
 
     if (target[0] == '/') {
         snprintf(target_path, sizeof(target_path), "%s", target);
     } else {
         // If `target` is not an absolute path,
         // it must be a path relative to the directory of the `link_path`
-        snprintf(dir_buf, sizeof(dir_buf), "%s", link_path);
-        dir_name = dirname(dir_buf);
+        if (fs_split_path(link_path, dir_buf, &dir_name, NULL, NULL) < 0) {
+            THROW_ERROR("failed to split path");
+        }
         snprintf(target_path, sizeof(target_path), "%s/%s", dir_name, target);
     }
     if (create_file(target_path) < 0) {
@@ -231,17 +310,18 @@ static int __test_symlink(const char *target, const char *link_path) {
 }
 
 static int __test_create_file_from_symlink(const char *target, const char *link_path) {
-    char dir_buf[128] = { 0 };
+    char dir_buf[PATH_MAX] = { 0 };
     char *dir_name;
-    char target_path[256] = { 0 };
+    char target_path[PATH_MAX * 2] = { 0 };
 
     if (target[0] == '/') {
         snprintf(target_path, sizeof(target_path), "%s", target);
     } else {
         // If `target` is not an absolute path,
         // it must be a path relative to the directory of the `link_path`
-        snprintf(dir_buf, sizeof(dir_buf), "%s", link_path);
-        dir_name = dirname(dir_buf);
+        if (fs_split_path(link_path, dir_buf, &dir_name, NULL, NULL) < 0) {
+            THROW_ERROR("failed to split path");
+        }
         snprintf(target_path, sizeof(target_path), "%s/%s", dir_name, target);
     }
 
@@ -281,6 +361,12 @@ static int test_symlink_framework(test_symlink_func_t fn, const char *target,
     }
 
     return 0;
+}
+
+static int test_symlinkat() {
+    char *target = "/root/test_symlink.file";
+    char *link = "/root/test_symlink.link";
+    return test_symlink_framework(__test_symlinkat, target, link);
 }
 
 static int test_symlink_to_absolute_target() {
@@ -356,6 +442,8 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_readlink_from_proc_self_fd),
     TEST_CASE(test_realpath),
     TEST_CASE(test_readlink_from_proc_self_exe),
+    TEST_CASE(test_readlinkat),
+    TEST_CASE(test_symlinkat),
     TEST_CASE(test_symlink_to_absolute_target),
     TEST_CASE(test_symlink_to_relative_target),
     TEST_CASE(test_symlink_from_ramfs),

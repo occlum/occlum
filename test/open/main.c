@@ -1,8 +1,5 @@
 #include <fcntl.h>
-#include <libgen.h>
-#include <unistd.h>
-#include <stdio.h>
-#include "test.h"
+#include "test_fs.h"
 
 // ============================================================================
 // Helper function
@@ -47,21 +44,14 @@ static int __test_openat_with_abs_path(const char *file_path, int flags, int mod
 }
 
 static int __test_openat_with_dirfd(const char *file_path, int flags, int mode) {
-    char dir_buf[128] = { 0 };
-    char base_buf[128] = { 0 };
+    char dir_buf[PATH_MAX] = { 0 };
+    char base_buf[PATH_MAX] = { 0 };
     char *dir_name, *file_name;
-    int dirfd, fd, ret;
+    int dirfd, fd;
 
-    ret = snprintf(dir_buf, sizeof(dir_buf), "%s", file_path);
-    if (ret >= sizeof(dir_buf) || ret < 0) {
-        THROW_ERROR("failed to copy file path to the dir buffer");
+    if (fs_split_path(file_path, dir_buf, &dir_name, base_buf, &file_name) < 0) {
+        THROW_ERROR("failed to split path");
     }
-    ret = snprintf(base_buf, sizeof(base_buf), "%s", file_path);
-    if (ret >= sizeof(base_buf) || ret < 0) {
-        THROW_ERROR("failed to copy file path to the base buffer");
-    }
-    dir_name = dirname(dir_buf);
-    file_name = basename(base_buf);
     dirfd = open(dir_name, O_RDONLY);
     if (dirfd < 0) {
         THROW_ERROR("failed to open dir");

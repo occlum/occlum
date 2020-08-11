@@ -1,8 +1,13 @@
 use super::*;
 
-pub fn do_rename(oldpath: &str, newpath: &str) -> Result<()> {
-    debug!("rename: oldpath: {:?}, newpath: {:?}", oldpath, newpath);
+pub fn do_renameat(old_fs_path: &FsPath, new_fs_path: &FsPath) -> Result<()> {
+    debug!(
+        "renameat: old_fs_path: {:?}, new_fs_path: {:?}",
+        old_fs_path, new_fs_path
+    );
 
+    let oldpath = old_fs_path.to_abs_path()?;
+    let newpath = new_fs_path.to_abs_path()?;
     let current = current!();
     let fs = current.fs().lock().unwrap();
 

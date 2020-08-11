@@ -3,10 +3,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <string.h>
-#include <stdio.h>
-#include <unistd.h>
-#include "test.h"
+#include "test_fs.h"
 
 // ============================================================================
 // The test case of readdir

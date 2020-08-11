@@ -1,9 +1,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <unistd.h>
-#include <stdio.h>
-#include "test.h"
+#include "test_fs.h"
 
 // ============================================================================
 // Helper function
@@ -33,7 +31,7 @@ static int remove_file(const char *file_path) {
 }
 
 // ============================================================================
-// Test cases for stat
+// Test cases for chmod
 // ============================================================================
 
 static int __test_chmod(const char *file_path) {
@@ -66,7 +64,6 @@ static int __test_fchmod(const char *file_path) {
     }
     ret = fchmod(fd, mode);
     if (ret < 0) {
-        close(fd);
         THROW_ERROR("failed to fchmod file");
     }
     close(fd);
@@ -76,6 +73,36 @@ static int __test_fchmod(const char *file_path) {
     }
     if ((stat_buf.st_mode & 07777) != mode) {
         THROW_ERROR("check fchmod result failed");
+    }
+    return 0;
+}
+
+static int __test_fchmodat(const char *file_path) {
+    struct stat stat_buf;
+    mode_t mode = 00664;
+    char dir_buf[PATH_MAX] = { 0 };
+    char base_buf[PATH_MAX] = { 0 };
+    char *dir_name, *file_name;
+    int dirfd, ret;
+
+    if (fs_split_path(file_path, dir_buf, &dir_name, base_buf, &file_name) < 0) {
+        THROW_ERROR("failed to split path");
+    }
+    dirfd = open(dir_name, O_RDONLY);
+    if (dirfd < 0) {
+        THROW_ERROR("failed to open dir");
+    }
+    ret = fchmodat(dirfd, file_name, mode, 0);
+    if (ret < 0) {
+        THROW_ERROR("failed to fchmodat file with dirfd");
+    }
+    close(dirfd);
+    ret = stat(file_path, &stat_buf);
+    if (ret < 0) {
+        THROW_ERROR("failed to stat file");
+    }
+    if ((stat_buf.st_mode & 07777) != mode) {
+        THROW_ERROR("check fchmodat result failed");
     }
     return 0;
 }
@@ -105,6 +132,10 @@ static int test_fchmod() {
     return test_chmod_framework(__test_fchmod);
 }
 
+static int test_fchmodat() {
+    return test_chmod_framework(__test_fchmodat);
+}
+
 // ============================================================================
 // Test suite main
 // ============================================================================
@@ -112,6 +143,7 @@ static int test_fchmod() {
 static test_case_t test_cases[] = {
     TEST_CASE(test_chmod),
     TEST_CASE(test_fchmod),
+    TEST_CASE(test_fchmodat),
 };
 
 int main(int argc, const char *argv[]) {

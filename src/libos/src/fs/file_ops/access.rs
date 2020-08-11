@@ -38,37 +38,23 @@ impl AccessibilityCheckFlags {
 }
 
 pub fn do_faccessat(
-    dirfd: DirFd,
-    path: &str,
+    fs_path: &FsPath,
     mode: AccessibilityCheckMode,
     flags: AccessibilityCheckFlags,
 ) -> Result<()> {
     debug!(
-        "faccessat: dirfd: {:?}, path: {:?}, mode: {:?}, flags: {:?}",
-        dirfd, path, mode, flags
+        "faccessat: fs_path: {:?}, mode: {:?}, flags: {:?}",
+        fs_path, mode, flags
     );
-    let path = match dirfd {
-        DirFd::Fd(dirfd) => {
-            let dir_path = get_dir_path(dirfd)?;
-            dir_path + "/" + path
-        }
-        DirFd::Cwd => path.to_owned(),
-    };
-    do_access(&path, mode, flags)
-}
 
-fn do_access(
-    path: &str,
-    mode: AccessibilityCheckMode,
-    flags: AccessibilityCheckFlags,
-) -> Result<()> {
     let inode = {
+        let path = fs_path.to_abs_path()?;
         let current = current!();
         let fs = current.fs().lock().unwrap();
         if flags.contains(AccessibilityCheckFlags::AT_SYMLINK_NOFOLLOW) {
-            fs.lookup_inode_no_follow(path)?
+            fs.lookup_inode_no_follow(&path)?
         } else {
-            fs.lookup_inode(path)?
+            fs.lookup_inode(&path)?
         }
     };
     if mode.test_for_exist() {

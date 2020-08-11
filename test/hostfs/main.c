@@ -2,12 +2,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <dirent.h>
-#include <libgen.h>
-#include <unistd.h>
-#include <string.h>
 #include <stdbool.h>
-#include <stdio.h>
-#include "test.h"
+#include "test_fs.h"
 
 // ============================================================================
 // Helper function
@@ -40,7 +36,6 @@ static int remove_file(const char *file_path) {
 
 static int __test_write_read(const char *file_path) {
     char *write_str = "Write to hostfs successfully!";
-    char read_buf[128] = { 0 };
     int fd;
 
     fd = open(file_path, O_WRONLY);
@@ -51,17 +46,10 @@ static int __test_write_read(const char *file_path) {
         THROW_ERROR("failed to write to the file");
     }
     close(fd);
-    fd = open(file_path, O_RDONLY);
-    if (fd < 0) {
-        THROW_ERROR("failed to open a file to read");
+
+    if (fs_check_file_content(file_path, write_str) < 0) {
+        THROW_ERROR("failed to check file content");
     }
-    if (read(fd, read_buf, sizeof(read_buf)) != strlen(write_str)) {
-        THROW_ERROR("failed to read to the file");
-    }
-    if (strcmp(write_str, read_buf) != 0) {
-        THROW_ERROR("the message read from the file is not as it was written");
-    }
-    close(fd);
     return 0;
 }
 
@@ -91,17 +79,13 @@ static int __test_rename(const char *file_path) {
 static int __test_readdir(const char *file_path) {
     struct dirent *dp;
     DIR *dirp;
-    char base_buf[128] = { 0 };
+    char base_buf[PATH_MAX] = { 0 };
     char *base_name;
     bool found = false;
-    int ret;
 
-    ret = snprintf(base_buf, sizeof(base_buf), "%s", file_path);
-    if (ret >= sizeof(base_buf) || ret < 0) {
-        THROW_ERROR("failed to copy file path to the base buffer");
+    if (fs_split_path(file_path, NULL, NULL, base_buf, &base_name) < 0) {
+        THROW_ERROR("failed to split path");
     }
-    base_name = basename(base_buf);
-
     dirp = opendir("/host");
     if (dirp == NULL) {
         THROW_ERROR("failed to open host directory");

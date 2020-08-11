@@ -1,9 +1,9 @@
 use super::*;
 
-pub fn do_mkdir(path: &str, mode: usize) -> Result<()> {
-    // TODO: check pathname
-    debug!("mkdir: path: {:?}, mode: {:#o}", path, mode);
+pub fn do_mkdirat(fs_path: &FsPath, mode: usize) -> Result<()> {
+    debug!("mkdirat: fs_path: {:?}, mode: {:#o}", fs_path, mode);
 
+    let path = fs_path.to_abs_path()?;
     let (dir_path, file_name) = split_path(&path);
     let inode = {
         let current = current!();

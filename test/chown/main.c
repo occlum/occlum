@@ -1,9 +1,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <unistd.h>
-#include <stdio.h>
-#include "test.h"
+#include "test_fs.h"
 
 // ============================================================================
 // Helper function
@@ -33,7 +31,7 @@ static int remove_file(const char *file_path) {
 }
 
 // ============================================================================
-// Test cases for stat
+// Test cases for chown
 // ============================================================================
 
 static int __test_chown(const char *file_path) {
@@ -88,7 +86,6 @@ static int __test_fchown(const char *file_path) {
     }
     ret = fchown(fd, uid, gid);
     if (ret < 0) {
-        close(fd);
         THROW_ERROR("failed to fchown file");
     }
     close(fd);
@@ -98,6 +95,73 @@ static int __test_fchown(const char *file_path) {
     }
     if (stat_buf.st_uid != uid || stat_buf.st_gid != gid) {
         THROW_ERROR("check fchown result failed");
+    }
+    return 0;
+}
+
+static int __test_fchownat(const char *file_path) {
+    struct stat stat_buf;
+    uid_t uid = 100;
+    gid_t gid = 1000;
+    char dir_buf[PATH_MAX] = { 0 };
+    char base_buf[PATH_MAX] = { 0 };
+    char *dir_name, *file_name;
+    int dirfd, ret;
+
+    if (fs_split_path(file_path, dir_buf, &dir_name, base_buf, &file_name) < 0) {
+        THROW_ERROR("failed to split path");
+    }
+    dirfd = open(dir_name, O_RDONLY);
+    if (dirfd < 0) {
+        THROW_ERROR("failed to open dir");
+    }
+    ret = fchownat(dirfd, file_name, uid, gid, 0);
+    if (ret < 0) {
+        THROW_ERROR("failed to fchownat file with dirfd");
+    }
+    close(dirfd);
+    ret = stat(file_path, &stat_buf);
+    if (ret < 0) {
+        THROW_ERROR("failed to stat file");
+    }
+    if (stat_buf.st_uid != uid || stat_buf.st_gid != gid) {
+        THROW_ERROR("check fchownat result failed");
+    }
+    return 0;
+}
+
+static int __test_fchownat_with_empty_path(const char *file_path) {
+    struct stat stat_buf;
+    uid_t uid = 100;
+    gid_t gid = 1000;
+    char dir_buf[128] = { 0 };
+    char *dir_name;
+    int dirfd, ret;
+
+    if (fs_split_path(file_path, dir_buf, &dir_name, NULL, NULL) < 0) {
+        THROW_ERROR("failed to split path");
+    }
+    dirfd = open(dir_name, O_RDONLY);
+    if (dirfd < 0) {
+        THROW_ERROR("failed to open dir");
+    }
+
+    ret = fchownat(dirfd, "", uid, gid, 0);
+    if (!(ret < 0 && errno == ENOENT)) {
+        THROW_ERROR("fchownat with empty path should return ENOENT");
+    }
+
+    ret = fchownat(dirfd, "", uid, gid, AT_EMPTY_PATH);
+    if (ret < 0) {
+        THROW_ERROR("failed to fchownat with empty path");
+    }
+    close(dirfd);
+    ret = stat(dir_name, &stat_buf);
+    if (ret < 0) {
+        THROW_ERROR("failed to stat dir");
+    }
+    if (stat_buf.st_uid != uid || stat_buf.st_gid != gid) {
+        THROW_ERROR("check fchownat result failed");
     }
     return 0;
 }
@@ -131,6 +195,14 @@ static int test_fchown() {
     return test_chown_framework(__test_fchown);
 }
 
+static int test_fchownat() {
+    return test_chown_framework(__test_fchownat);
+}
+
+static int test_fchownat_with_empty_path() {
+    return test_chown_framework(__test_fchownat_with_empty_path);
+}
+
 // ============================================================================
 // Test suite main
 // ============================================================================
@@ -139,6 +211,8 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_chown),
     TEST_CASE(test_lchown),
     TEST_CASE(test_fchown),
+    TEST_CASE(test_fchownat),
+    TEST_CASE(test_fchownat_with_empty_path),
 };
 
 int main(int argc, const char *argv[]) {

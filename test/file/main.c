@@ -2,10 +2,7 @@
 #include <sys/uio.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdio.h>
-#include "test.h"
+#include "test_fs.h"
 
 // ============================================================================
 // Helper function
@@ -38,7 +35,6 @@ static int remove_file(const char *file_path) {
 
 static int __test_write_read(const char *file_path) {
     char *write_str = "Hello World\n";
-    char read_buf[128] = { 0 };
     int fd;
 
     fd = open(file_path, O_WRONLY);
@@ -49,17 +45,11 @@ static int __test_write_read(const char *file_path) {
         THROW_ERROR("failed to write");
     }
     close(fd);
-    fd = open(file_path, O_RDONLY);
-    if (fd < 0) {
-        THROW_ERROR("failed to open a file to read");
+
+    if (fs_check_file_content(file_path, write_str) < 0) {
+        THROW_ERROR("failed to check file content");
     }
-    if (read(fd, read_buf, sizeof(read_buf)) != strlen(write_str)) {
-        THROW_ERROR("failed to read");
-    }
-    if (strcmp(write_str, read_buf) != 0) {
-        THROW_ERROR("the message read from the file is not as it was written");
-    }
-    close(fd);
+
     return 0;
 }
 
