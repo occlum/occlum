@@ -1,0 +1,12 @@
+syntax = "proto3";
+package pingpong;
+
+message PingPongMesg {
+  string ping = 1;
+  string pong = 2;
+  string timestamp = 3;
+}
+
+service PingPongService {
+  rpc PingPong(PingPongMesg) returns (PingPongMesg) {}
+}
