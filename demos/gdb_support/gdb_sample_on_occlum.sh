@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-rm -rf occlum_context && mkdir -p occlum_context
-cd occlum_context
+rm -rf occlum_instance && mkdir -p occlum_instance
+cd occlum_instance
 # 1. Initialize a directory as the Occlum instance
 occlum init
 

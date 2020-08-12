@@ -21,8 +21,8 @@ check_file_exist() {
 
 init_workspace() {
     # Init Occlum Workspace
-    rm -rf occlum_context && mkdir occlum_context
-    cd occlum_context
+    rm -rf occlum_instance && mkdir occlum_instance
+    cd occlum_instance
     occlum init
     new_json="$(jq '.resource_limits.user_space_size = "1400MB" |
                 .resource_limits.kernel_space_heap_size="64MB" |

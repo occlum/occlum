@@ -13,8 +13,8 @@ if [ ! -f $web_server ];then
 fi
 
 # 1. Init Occlum Workspace
-rm -rf occlum_context && mkdir occlum_context
-cd occlum_context
+rm -rf occlum_instance && mkdir occlum_instance
+cd occlum_instance
 occlum init
 new_json="$(jq '.resource_limits.user_space_size = "380MB" |
                 .process.default_mmap_size = "300MB"' Occlum.json)" && \

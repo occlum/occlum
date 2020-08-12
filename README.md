@@ -32,7 +32,7 @@ Note that the Occlum toolchain is not cross-compiling in the traditional sense: 
 
 **Step 2. Initialize a directory as the Occlum instance via `occlum init`**
 ```
-$ mkdir occlum_context && cd occlum_context
+$ mkdir occlum_instance && cd occlum_instance
 $ occlum init
 ```
 The `occlum init` command creates the compile-time and run-time state of Occlum in the current working directory. Each Occlum instance directory should be used for a single instance of an application; multiple applications or different instances of a single application should use different Occlum instances.

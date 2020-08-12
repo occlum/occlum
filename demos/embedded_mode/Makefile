@@ -3,15 +3,15 @@ SGX_MODE ?= HW
 
 .PHONY: all build_src test clean
 
-all: occlum_context
+all: occlum_instance
 
-occlum_context: build_src
-	@mkdir -p occlum_context
-	@cd occlum_context && \
+occlum_instance: build_src
+	@mkdir -p occlum_instance
+	@cd occlum_instance && \
 		occlum init && \
 		cp ../trusted_memcpy_bench/build/trusted_memcpy_bench image/bin/ && \
 		occlum build
-	@cp -r occlum_context/.occlum .occlum
+	@cp -r occlum_instance/.occlum .occlum
 
 build_src:
 	@$(MAKE) --no-print-directory -C trusted_memcpy_bench
@@ -25,4 +25,4 @@ test:
 clean:
 	@$(MAKE) --no-print-directory -C trusted_memcpy_bench clean
 	@$(MAKE) --no-print-directory -C bench_driver clean
-	@rm -rf .occlum occlum_context
+	@rm -rf .occlum occlum_instance

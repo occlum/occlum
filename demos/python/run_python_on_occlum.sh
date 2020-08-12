@@ -12,8 +12,8 @@ if [ ! -d $alpine_fs ];then
 fi
 
 # 1. Init Occlum Workspace
-[ -d occlum_context ] || mkdir occlum_context
-cd occlum_context
+[ -d occlum_instance ] || mkdir occlum_instance
+cd occlum_instance
 [ -d image ] || occlum init
 
 # 2. Copy files into Occlum Workspace and build

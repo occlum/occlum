@@ -11,9 +11,9 @@ then
   exit 1
 fi
 
-rm -rf occlum_context
-mkdir occlum_context
-cd occlum_context
+rm -rf occlum_instance
+mkdir occlum_instance
+cd occlum_instance
 
 occlum init
 if [ $? -ne 0 ]

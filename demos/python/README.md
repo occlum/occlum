@@ -38,4 +38,4 @@ Step 4 (in the Occlum container): Run the sample code on Occlum via
 ```
 ./run_python_on_occlum.sh
 ```
-It will process CSV data files and generate a file (`smvlight.dat`) in `./occlum_context`.
+It will process CSV data files and generate a file (`smvlight.dat`) in `./occlum_instance`.
