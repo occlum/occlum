@@ -1,8 +1,9 @@
+pub use self::sgx::sgx_interrupt_info_t;
 use crate::prelude::*;
 use crate::process::ThreadRef;
 use crate::syscall::{CpuContext, SyscallNum};
-
-pub use self::sgx::sgx_interrupt_info_t;
+use aligned::{Aligned, A16};
+use core::arch::x86_64::_fxsave;
 
 mod sgx;
 
@@ -15,14 +16,25 @@ pub fn init() {
 
 extern "C" fn handle_interrupt(info: *mut sgx_interrupt_info_t) -> i32 {
     extern "C" {
-        fn __occlum_syscall_c_abi(num: u32, info: *mut sgx_interrupt_info_t) -> u32;
+        fn __occlum_syscall_c_abi(
+            num: u32,
+            info: *mut sgx_interrupt_info_t,
+            fpregs: *mut u8,
+        ) -> u32;
     }
-    unsafe { __occlum_syscall_c_abi(SyscallNum::HandleInterrupt as u32, info) };
+
+    let mut fpregs: Aligned<A16, _> = Aligned([0u8; 512]);
+    let mut fpregs = fpregs.as_mut_ptr();
+    unsafe {
+        _fxsave(fpregs);
+        __occlum_syscall_c_abi(SyscallNum::HandleInterrupt as u32, info, fpregs)
+    };
     unreachable!();
 }
 
 pub fn do_handle_interrupt(
     info: *mut sgx_interrupt_info_t,
+    fpregs: *mut u8,
     cpu_context: *mut CpuContext,
 ) -> Result<isize> {
     let info = unsafe { &*info };
@@ -30,6 +42,7 @@ pub fn do_handle_interrupt(
     // The cpu context is overriden so that it is as if the syscall is called from where the
     // interrupt happened
     *context = CpuContext::from_sgx(&info.cpu_context);
+    context.fpregs = fpregs;
     Ok(0)
 }
 

@@ -2,9 +2,13 @@ use super::c_types::{mcontext_t, siginfo_t, ucontext_t};
 use super::constants::SIGKILL;
 use super::sig_stack::SigStackFlags;
 use super::{SigAction, SigActionFlags, SigDefaultAction, SigSet, Signal};
+use crate::lazy_static::__Deref;
 use crate::prelude::*;
 use crate::process::{ProcessRef, TermStatus, ThreadRef};
 use crate::syscall::CpuContext;
+use aligned::{Aligned, A16};
+use core::arch::x86_64::{_fxrstor, _fxsave};
+use std::{ptr, slice};
 
 pub fn do_rt_sigreturn(curr_user_ctxt: &mut CpuContext) -> Result<()> {
     debug!("do_rt_sigreturn");
@@ -23,10 +27,19 @@ pub fn do_rt_sigreturn(curr_user_ctxt: &mut CpuContext) -> Result<()> {
         }
         unsafe { &*last_ucontext.unwrap() }
     };
+
     // Restore sigmask
     *current!().sig_mask().write().unwrap() = SigSet::from_c(last_ucontext.uc_sigmask);
     // Restore user context
     *curr_user_ctxt = last_ucontext.uc_mcontext.inner;
+
+    // Restore the floating point registers to a temp area
+    // The floating point registers would be recoved just
+    // before return to user's code
+    let mut fpregs: Box<Aligned<A16, [u8]>> = Box::new(Aligned([0u8; 512]));
+    fpregs.copy_from_slice(&last_ucontext.fpregs);
+    curr_user_ctxt.fpregs = Box::into_raw(fpregs) as *mut u8;
+    curr_user_ctxt.fpregs_on_heap = 1; // indicates the fpregs is on heap
     Ok(())
 }
 
@@ -243,12 +256,30 @@ fn handle_signals_by_user(
         // signal handler. So we need to make sure the allocation is at least
         // 16-byte aligned.
         let ucontext = user_stack.alloc_aligned::<ucontext_t>(16)?;
+
         // TODO: set all fields in ucontext
         *ucontext = unsafe { std::mem::zeroed() };
         // Save the old sigmask
         ucontext.uc_sigmask = old_sigmask.to_c();
         // Save the user context
         ucontext.uc_mcontext.inner = *curr_user_ctxt;
+
+        // Save the floating point registers
+        if curr_user_ctxt.fpregs != ptr::null_mut() {
+            let fpregs =
+                unsafe { slice::from_raw_parts(curr_user_ctxt.fpregs, ucontext.fpregs.len()) };
+            ucontext.fpregs.copy_from_slice(fpregs);
+            // Clear the floating point registers, since we do not need to recover is when this syscall return
+            curr_user_ctxt.fpregs = ptr::null_mut();
+        } else {
+            // We need a correct fxsave structure in the buffer,
+            // because the app may modify part of it to update the
+            // floating point after the signal handler finished.
+            let mut fpregs: Aligned<A16, _> = Aligned([0u8; 512]);
+            unsafe { _fxsave(fpregs.as_mut_ptr()) };
+            ucontext.fpregs.copy_from_slice(fpregs.deref());
+        }
+
         ucontext as *mut ucontext_t
     };
     // 3. Set up the call return address on the stack before we "call" the signal handler

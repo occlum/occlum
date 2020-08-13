@@ -207,7 +207,7 @@ pub struct ucontext_t {
     pub uc_stack: stack_t,
     pub uc_mcontext: mcontext_t,
     pub uc_sigmask: sigset_t,
-    __fpregs_mem: [u64; 64],
+    pub fpregs: [u8; 64 * 8], //fxsave structure
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -220,7 +220,7 @@ pub struct sigaltstack_t {
 
 pub type stack_t = sigaltstack_t;
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct mcontext_t {
     pub inner: CpuContext,

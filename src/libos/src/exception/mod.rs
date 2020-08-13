@@ -6,6 +6,8 @@ use self::syscall::{handle_syscall_exception, SYSCALL_OPCODE};
 use super::*;
 use crate::signal::{FaultSignal, SigSet};
 use crate::syscall::{CpuContext, SyscallNum};
+use aligned::{Aligned, A16};
+use core::arch::x86_64::_fxsave;
 use sgx_types::*;
 
 // Modules for instruction simulation
@@ -25,15 +27,26 @@ pub fn register_exception_handlers() {
 #[no_mangle]
 extern "C" fn handle_exception(info: *mut sgx_exception_info_t) -> i32 {
     extern "C" {
-        fn __occlum_syscall_c_abi(num: u32, info: *mut sgx_exception_info_t) -> u32;
+        fn __occlum_syscall_c_abi(
+            num: u32,
+            info: *mut sgx_exception_info_t,
+            fpregs: *mut u8,
+        ) -> u32;
     }
-    unsafe { __occlum_syscall_c_abi(SyscallNum::HandleException as u32, info) };
+
+    let mut fpregs: Aligned<A16, _> = Aligned([0u8; 512]);
+    let mut fpregs = fpregs.as_mut_ptr();
+    unsafe {
+        _fxsave(fpregs);
+        __occlum_syscall_c_abi(SyscallNum::HandleException as u32, info, fpregs)
+    };
     unreachable!();
 }
 
 /// Exceptions are handled as a special kind of system calls.
 pub fn do_handle_exception(
     info: *mut sgx_exception_info_t,
+    fpregs: *mut u8,
     user_context: *mut CpuContext,
 ) -> Result<isize> {
     let info = unsafe { &mut *info };
@@ -65,6 +78,7 @@ pub fn do_handle_exception(
     //
     // As the thread cannot proceed without handling the exception, we choose to force
     // delivering the signal regardless of the current signal mask.
+    user_context.fpregs = fpregs;
     let signal = Box::new(FaultSignal::new(info));
     crate::signal::force_signal(signal, user_context);
 

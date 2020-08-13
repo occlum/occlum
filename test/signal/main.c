@@ -230,6 +230,8 @@ int div_maybe_zero(int x, int y) {
     return x / y;
 }
 
+#define	fxsave(addr) __asm __volatile("fxsave %0" : "=m" (*(addr)))
+
 int test_handle_sigfpe() {
 #ifdef SGX_MODE_SIM
     printf("WARNING: Skip this test case as we do not support "
@@ -249,12 +251,21 @@ int test_handle_sigfpe() {
         THROW_ERROR("unexpected old sig handler");
     }
 
+    char x[512] __attribute__((aligned(16))) = {};
+    char y[512] __attribute__((aligned(16))) = {};
+
     // Trigger divide-by-zero exception
     int a = 1;
     int b = 0;
     // Use volatile to prevent compiler optimization
     volatile int c;
+    fxsave(x);
     c = div_maybe_zero(a, b);
+    fxsave(y);
+
+    if (memcmp(x, y, 512) != 0) {
+        THROW_ERROR("floating point registers are modified");
+    }
 
     printf("Signal handler successfully jumped over the divide-by-zero instruction\n");
 
