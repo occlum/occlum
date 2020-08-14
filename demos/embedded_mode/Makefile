@@ -11,7 +11,6 @@ occlum_instance: build_src
 		occlum init && \
 		cp ../trusted_memcpy_bench/build/trusted_memcpy_bench image/bin/ && \
 		occlum build
-	@cp -r occlum_instance/.occlum .occlum
 
 build_src:
 	@$(MAKE) --no-print-directory -C trusted_memcpy_bench
@@ -19,8 +18,8 @@ build_src:
 
 TOTAL_BYTES := 10000000000 # 10GB
 test:
-	LD_LIBRARY_PATH=bench_driver/build:$(SGX_SDK)/sdk_libs RUST_BACKTRACE=1 \
-		./bench_driver/build/bench_driver $(TOTAL_BYTES)
+	cd occlum_instance && LD_LIBRARY_PATH=../bench_driver/build:$(SGX_SDK)/sdk_libs RUST_BACKTRACE=1 \
+		../bench_driver/build/bench_driver $(TOTAL_BYTES)
 
 clean:
 	@$(MAKE) --no-print-directory -C trusted_memcpy_bench clean
