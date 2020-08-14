@@ -1,6 +1,6 @@
 # Use Golang and gRPC with Occlum
 
-This project demonstrates how Occlum enables [Golang](https://golang.org) programs with gRPC (google.golang.org/grpc) calls running in SGX enclaves. The client program invokes a gRPC call with a ping message, and receives a pong message sent by the server program.
+This project demonstrates how Occlum enables [Golang](https://golang.org) programs with [gRPC](google.golang.org/grpc) calls running in SGX enclaves. The client program invokes a gRPC call with a ping message, and receives a pong message sent by the server program.
 
 Step 1: Build the Golang gRPC application using the Occlum Golang toolchain via
 ```
