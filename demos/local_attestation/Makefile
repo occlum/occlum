@@ -20,7 +20,7 @@ occlum_instance: build_src
 		cp $(OPENSSL)/libcrypto.so.1.1 image/lib/ && \
 		cp $(CUR_DIR)/DiffieHellmanLibrary/libecdh.so image/lib/ && \
 		occlum build
-	@cp -r occlum_instance/.occlum .occlum
+	@cp -t occlum_instance $(APP) $(BUILD_DIR)/libenclave_initiator.signed.so
 
 build_src:
 	@$(MAKE) --no-print-directory -C DiffieHellmanLibrary
@@ -29,8 +29,8 @@ build_src:
 	@$(MAKE) --no-print-directory -C EnclaveInitiator
 
 test: build_src
-	LD_LIBRARY_PATH=$(BUILD_DIR):$(SGX_SDK)/sdk_libs RUST_BACKTRACE=1 \
-		./$(APP)
+	cd occlum_instance && LD_LIBRARY_PATH=../$(BUILD_DIR):$(SGX_SDK)/sdk_libs RUST_BACKTRACE=1 \
+		./appinitiator
 
 clean:
 	@$(MAKE) --no-print-directory -C AppInitiator clean
