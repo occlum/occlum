@@ -1,34 +1,34 @@
-#!/bin/bash -x
+#!/bin/bash
 set -e
 
 BLUE='\033[1;34m'
 NC='\033[0m'
 
 # sanity check
-CURR_FILE=go.mod
-if [ -f "$CURR_FILE" ]; then
-        rm $CURR_FILE
-fi
-CURR_FILE=go.sum
-if [ -f "$CURR_FILE" ]; then
-        rm $CURR_FILE
-fi
-CURR_FILE=ping
-if [ -f "$CURR_FILE" ]; then
-        rm $CURR_FILE
-fi
-CURR_FILE=pong
-if [ -f "$CURR_FILE" ]; then
-        rm $CURR_FILE
-fi
-CURR_FILE=pingpong/pingpong_grpc.pb.go
-if [ -f "$CURR_FILE" ]; then
-        rm $CURR_FILE
-fi
-CURR_FILE=pingpong/pingpong.pb.go
-if [ -f "$CURR_FILE" ]; then
-        rm $CURR_FILE
-fi
+FILE_SET="go.mod
+ping
+pong
+occlum_ping
+occlum_pong
+go.mod
+go.sum
+pingpong/pingpong.pb.go
+pingpong/pingpong_grpc.pb.go"
+for CURR_FILE in $FILE_SET
+do
+        if [ -f "$CURR_FILE" ]; then
+                rm $CURR_FILE
+        fi
+done
+
+DIR_SET="occlum_ping_context
+occlum_pong_context"
+for CURR_DIR in $DIR_SET
+do
+        if [ -d "$CURR_DIR" ]; then
+                rm -fr $CURR_DIR
+        fi
+done
 
 # assume that protoc is installed
 CURR_FILE=$(which protoc)
