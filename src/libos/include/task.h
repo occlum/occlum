@@ -46,7 +46,7 @@ void do_exit_task(void);
 /*In SGX SDK the GS register point to thread_data_t structure and a whole page is
 assigned to the structure. So any offset larger than sizeof(thread_data_t) and
 less than 4096 is unused by anyone. We can use it.*/
-#define TD_SYSCALL_RET_ADDR_OFFSET   0x40
+#define TD_SYSCALL_RET_ADDR_OFFSET   0x100
 
 #define TASK_KERNEL_RSP             (8 * 0)
 #define TASK_KERNEL_STACK_BASE      (8 * 1)
