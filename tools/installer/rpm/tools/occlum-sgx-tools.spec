@@ -1,7 +1,7 @@
 %define centos_base_release 1
 
 Name: occlum-sgx-tools
-Version: 0.14.0
+Version: 0.15.0
 Release: %{centos_base_release}%{?dist}
 Summary: Occlum sgx tools
 

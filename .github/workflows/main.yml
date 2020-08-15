@@ -7,7 +7,7 @@ jobs:
   make-test-on-ubuntu:
     # The type of runner that the job will run on
     runs-on: ubuntu-18.04
-    container: occlum/occlum:0.14.0-ubuntu18.04
+    container: occlum/occlum:0.15.0-ubuntu18.04
 
     # Below steps are running directly in docker container
     steps:
