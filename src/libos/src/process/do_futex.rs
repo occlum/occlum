@@ -75,7 +75,7 @@ pub fn futex_wait(
     futex_val: i32,
     timeout: &Option<timespec_t>,
 ) -> Result<()> {
-    info!(
+    debug!(
         "futex_wait addr: {:#x}, val: {}, timeout: {:?}",
         futex_addr as usize, futex_val, timeout
     );
@@ -130,6 +130,11 @@ pub fn futex_wait(
 
 /// Do futex wake
 pub fn futex_wake(futex_addr: *const i32, max_count: usize) -> Result<usize> {
+    debug!(
+        "futex_wake addr: {:#x}, max_count: {}",
+        futex_addr as usize, max_count
+    );
+
     // Get and lock the futex bucket
     let futex_key = FutexKey::new(futex_addr);
     let (_, futex_bucket_ref) = FUTEX_BUCKETS.get_bucket(futex_key);
@@ -187,12 +192,11 @@ pub fn futex_requeue(
     Ok(nwakes)
 }
 
-// Make sure futex bucket count is the power of 2
-const BUCKET_COUNT: usize = 1 << 8;
-const BUCKET_MASK: usize = BUCKET_COUNT - 1;
-
 lazy_static! {
-    static ref FUTEX_BUCKETS: FutexBucketVec = { FutexBucketVec::new(BUCKET_COUNT) };
+    // Use the same count as linux kernel to keep the same performance
+    static ref BUCKET_COUNT: usize = ((1 << 8) * (*crate::sched::NCORES)).next_power_of_two();
+    static ref BUCKET_MASK: usize = *BUCKET_COUNT - 1;
+    static ref FUTEX_BUCKETS: FutexBucketVec = { FutexBucketVec::new(*BUCKET_COUNT) };
 }
 
 #[derive(PartialEq, Copy, Clone)]
@@ -227,7 +231,7 @@ impl FutexItem {
     }
 
     pub fn wake(&self) {
-        self.waiter.wake()
+        self.waiter().wake()
     }
 
     pub fn wait(&self, timeout: &Option<timespec_t>) -> Result<()> {
@@ -238,6 +242,15 @@ impl FutexItem {
             return_errno!(e.errno(), "futex wait timeout or interrupted");
         }
         Ok(())
+    }
+
+    pub fn waiter(&self) -> &WaiterRef {
+        &self.waiter
+    }
+
+    pub fn batch_wake(items: &[FutexItem]) {
+        let waiters: Vec<&WaiterRef> = items.iter().map(|item| item.waiter()).collect();
+        Waiter::batch_wake(&waiters);
     }
 }
 
@@ -258,27 +271,31 @@ impl FutexBucket {
         self.queue.push_back(item);
     }
 
+    // TODO: this is an O(N) operation. Try to make it more efficient
     pub fn dequeue_item(&mut self, futex_item: &FutexItem) -> Option<FutexItem> {
         let item_i = self.queue.iter().position(|item| *item == *futex_item);
         if item_i.is_none() {
             return None;
         }
-        self.queue.swap_remove_back(item_i.unwrap())
+        self.queue.remove(item_i.unwrap())
     }
 
+    // TODO: consider using std::future to improve the readability
     pub fn dequeue_and_wake_items(&mut self, key: FutexKey, max_count: usize) -> usize {
         let mut count = 0;
-        let mut idx = 0;
-        while count < max_count && idx < self.queue.len() {
-            if key == self.queue[idx].key {
-                if let Some(item) = self.queue.swap_remove_back(idx) {
-                    item.wake();
-                    count += 1;
-                }
+        let mut items_to_wake = Vec::new();
+
+        self.queue.retain(|item| {
+            if count >= max_count || key != item.key {
+                true
             } else {
-                idx += 1;
+                items_to_wake.push(item.clone());
+                count += 1;
+                false
             }
-        }
+        });
+
+        FutexItem::batch_wake(&items_to_wake);
         count
     }
 
@@ -303,18 +320,18 @@ impl FutexBucket {
         max_nrequeues: usize,
     ) -> () {
         let mut count = 0;
-        let mut idx = 0;
-        while count < max_nrequeues && idx < self.queue.len() {
-            if key == self.queue[idx].key {
-                if let Some(mut item) = self.queue.swap_remove_back(idx) {
-                    item.key = new_key;
-                    another.enqueue_item(item);
-                    count += 1;
-                }
+
+        self.queue.retain(|item| {
+            if count >= max_nrequeues || key != item.key {
+                true
             } else {
-                idx += 1;
+                let mut new_item = item.clone();
+                new_item.key = new_key;
+                another.enqueue_item(new_item);
+                count += 1;
+                false
             }
-        }
+        });
     }
 }
 
@@ -335,7 +352,7 @@ impl FutexBucketVec {
     }
 
     pub fn get_bucket(&self, key: FutexKey) -> (usize, FutexBucketRef) {
-        let idx = BUCKET_MASK & {
+        let idx = *BUCKET_MASK & {
             // The addr is the multiples of 4, so we ignore the last 2 bits
             let addr = key.addr() >> 2;
             let mut s = DefaultHasher::new();
@@ -377,9 +394,34 @@ impl Waiter {
     }
 
     pub fn wake(&self) {
-        if self.is_woken.fetch_or(true, Ordering::SeqCst) == false {
-            set_event(self.thread);
+        if self.is_woken().fetch_or(true, Ordering::SeqCst) == false {
+            set_events(&[self.thread])
         }
+    }
+
+    pub fn thread(&self) -> *const c_void {
+        self.thread
+    }
+
+    pub fn is_woken(&self) -> &AtomicBool {
+        &self.is_woken
+    }
+
+    pub fn batch_wake(waiters: &[&WaiterRef]) {
+        let threads: Vec<*const c_void> = waiters
+            .iter()
+            .filter_map(|waiter| {
+                // Only wake up items that are not woken.
+                // Set the item to be woken if it is not woken.
+                if waiter.is_woken().fetch_or(true, Ordering::SeqCst) == false {
+                    Some(waiter.thread())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        set_events(&threads);
     }
 }
 
@@ -425,15 +467,24 @@ fn wait_event_timeout(thread: *const c_void, timeout: &Option<timespec_t>) -> Re
     Ok(())
 }
 
-fn set_event(thread: *const c_void) {
+fn set_events(threads: &[*const c_void]) {
+    if threads.is_empty() {
+        return;
+    }
+
     let mut ret: c_int = 0;
-    let mut sgx_ret: c_int = 0;
-    unsafe {
-        sgx_ret = sgx_thread_set_untrusted_event_ocall(&mut ret as *mut c_int, thread);
-    }
-    if ret != 0 || sgx_ret != 0 {
-        panic!("ERROR: sgx_thread_set_untrusted_event_ocall failed");
-    }
+    let sgx_ret = unsafe {
+        sgx_thread_set_multiple_untrusted_events_ocall(
+            &mut ret as *mut c_int,
+            threads.as_ptr(),
+            threads.len(),
+        )
+    };
+
+    assert!(
+        ret == 0 && sgx_ret == 0,
+        "ERROR: sgx_thread_set_multiple_untrusted_events_ocall failed"
+    );
 }
 
 extern "C" {
@@ -446,7 +497,9 @@ extern "C" {
         errno: *mut c_int,
     ) -> c_int;
 
-    /* Wake a thread waiting on its untrusted event */
-    fn sgx_thread_set_untrusted_event_ocall(ret: *mut c_int, waiter_thread: *const c_void)
-        -> c_int;
+    fn sgx_thread_set_multiple_untrusted_events_ocall(
+        ret: *mut c_int,
+        waiters: *const *const c_void,
+        total: usize,
+    ) -> c_int;
 }

@@ -1,4 +1,4 @@
 deps/
 openvino_src/
 model/
-occlum_context/
+occlum_instance/

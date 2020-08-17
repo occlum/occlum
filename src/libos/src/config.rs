@@ -123,12 +123,15 @@ pub enum ConfigMountFsType {
     TYPE_SEFS,
     TYPE_HOSTFS,
     TYPE_RAMFS,
+    TYPE_UNIONFS,
 }
 
 #[derive(Debug)]
 pub struct ConfigMountOptions {
     pub integrity_only: bool,
     pub mac: Option<sgx_aes_gcm_128bit_tag_t>,
+    pub layers: Option<Vec<ConfigMount>>,
+    pub temporary: bool,
 }
 
 impl Config {
@@ -195,12 +198,13 @@ impl ConfigEnv {
 
 impl ConfigMount {
     fn from_input(input: &InputConfigMount) -> Result<ConfigMount> {
-        const ALL_FS_TYPES: [&str; 3] = ["sefs", "hostfs", "ramfs"];
+        const ALL_FS_TYPES: [&str; 4] = ["sefs", "hostfs", "ramfs", "unionfs"];
 
         let type_ = match input.type_.as_str() {
             "sefs" => ConfigMountFsType::TYPE_SEFS,
             "hostfs" => ConfigMountFsType::TYPE_HOSTFS,
             "ramfs" => ConfigMountFsType::TYPE_RAMFS,
+            "unionfs" => ConfigMountFsType::TYPE_UNIONFS,
             _ => {
                 return_errno!(EINVAL, "Unsupported file system type");
             }
@@ -233,9 +237,20 @@ impl ConfigMountOptions {
             }
             (true, Some(parse_mac(&input.mac.as_ref().unwrap())?))
         };
+        let layers = if let Some(layers) = &input.layers {
+            let layers = layers
+                .iter()
+                .map(|config| ConfigMount::from_input(config).expect("invalid mount config"))
+                .collect();
+            Some(layers)
+        } else {
+            None
+        };
         Ok(ConfigMountOptions {
             integrity_only,
             mac,
+            layers,
+            temporary: input.temporary,
         })
     }
 }
@@ -370,4 +385,8 @@ struct InputConfigMountOptions {
     #[serde(rename = "MAC")]
     #[serde(default)]
     pub mac: Option<String>,
+    #[serde(default)]
+    pub layers: Option<Vec<InputConfigMount>>,
+    #[serde(default)]
+    pub temporary: bool,
 }

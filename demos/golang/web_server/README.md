@@ -9,7 +9,7 @@ occlum-go get -u -v github.com/gin-gonic/gin
 
 Step 2: Build the Golang web server using the Occlum Golang toolchain(i.e., `occlum-go`)
 ```
-occlum-go build -o web_server -buildmode=pie ./web_server.go
+occlum-go build -o web_server ./web_server.go
 ```
 
 Step 3: You can run the web server demo on Occlum via

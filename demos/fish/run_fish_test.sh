@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-rm -rf occlum-context
-mkdir occlum-context && cd occlum-context
+rm -rf occlum-instance
+mkdir occlum-instance && cd occlum-instance
 occlum init
 mkdir -p image/usr/bin
 cp ../Occlum.json .

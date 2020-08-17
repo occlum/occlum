@@ -46,26 +46,35 @@ LIBOS_LOG ?= error
 LIBOS_SONAME := libocclum-libos.so.$(MAJOR_VER_NUM)
 
 ifneq ($(SGX_MODE), HW)
+	LIBOS_CORE_LIB_NAME := occlum-libos-core_sim
 	LIBOS_SO_REAL := $(BUILD_DIR)/lib/libocclum-libos_sim.so.$(VERSION_NUM)
 else
+	LIBOS_CORE_LIB_NAME := occlum-libos-core
 	LIBOS_SO_REAL := $(BUILD_DIR)/lib/libocclum-libos.so.$(VERSION_NUM)
 endif
 
-LIBOS_CORE_A := $(BUILD_DIR)/lib/libocclum-libos-core.a
-LIBOS_CORE_RS_A := $(BUILD_DIR)/lib/libocclum_libos_core_rs.a
+LIBOS_CORE_A := $(OBJ_DIR)/libos/lib/lib$(LIBOS_CORE_LIB_NAME).a
+LIBOS_CORE_RS_A := $(OBJ_DIR)/libos/lib/libocclum_libos_core_rs.a
 
 # All source code
 RUST_SRCS := $(wildcard src/*.rs src/*/*.rs src/*/*/*.rs src/*/*/*/*.rs src/*/*/*/*/*.rs)
-RUST_TARGET_DIR := $(BUILD_DIR)/src/libos/cargo-target
-RUST_OUT_DIR := $(BUILD_DIR)/lib
-EDL_C_SRCS := $(addprefix $(BUILD_DIR)/src/libos/,src/Enclave_t.c src/Enclave_t.h)
-EDL_C_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,src/Enclave_t.o)
+RUST_TARGET_DIR := $(OBJ_DIR)/libos/cargo-target
+RUST_OUT_DIR := $(OBJ_DIR)/libos/lib
+EDL_C_SRCS := $(addprefix $(OBJ_DIR)/libos/,$(SRC_OBJ)/Enclave_t.c $(SRC_OBJ)/Enclave_t.h)
+EDL_C_OBJS := $(addprefix $(OBJ_DIR)/libos/,$(SRC_OBJ)/Enclave_t.o)
 C_SRCS := $(sort $(wildcard src/*.c src/*/*.c src/*/*/*.c))
-C_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(C_SRCS:.c=.o))
 CXX_SRCS := $(sort $(wildcard src/*.cpp src/*/*.cpp))
-CXX_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(CXX_SRCS:.cpp=.o))
 S_SRCS := $(sort $(wildcard src/*.S src/*/*.S src/*/*/*.S))
-S_OBJS := $(addprefix $(BUILD_DIR)/src/libos/,$(S_SRCS:.S=.o))
+C_OBJS := $(addprefix $(OBJ_DIR)/libos/,$(C_SRCS:.c=.o))
+CXX_OBJS := $(addprefix $(OBJ_DIR)/libos/,$(CXX_SRCS:.cpp=.o))
+S_OBJS := $(addprefix $(OBJ_DIR)/libos/,$(S_SRCS:.S=.o))
+
+# Object files for simulation mode are stored in libos/src_sim
+ifneq ($(SGX_MODE), HW)
+	C_OBJS := $(subst libos/src,libos/src_sim,$(C_OBJS))
+	CXX_OBJS := $(subst libos/src,libos/src_sim,$(CXX_OBJS))
+	S_OBJS := $(subst libos/src,libos/src_sim,$(S_OBJS))
+endif
 
 ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(LIBOS_SO_REAL) $(EDL_C_OBJS) $(C_OBJS) $(CXX_OBJS) $(S_OBJS)) $(RUST_TARGET_DIR) $(RUST_OUT_DIR)))
 
@@ -75,8 +84,8 @@ C_COMMON_FLAGS += -g
 C_FLAGS := $(SGX_CFLAGS_T) $(C_COMMON_FLAGS)
 CXX_FLAGS := $(SGX_CXXFLAGS_T) $(C_COMMON_FLAGS)
 
-_Other_Link_Flags := -L$(RUST_SGX_SDK_DIR)/compiler-rt/ -L$(BUILD_DIR)/lib
-_Other_Enclave_Libs := -locclum-libos-core -lsgx_tprotected_fs
+_Other_Link_Flags := -L$(RUST_SGX_SDK_DIR)/compiler-rt/ -L$(BUILD_DIR)/lib -L$(RUST_OUT_DIR)
+_Other_Enclave_Libs := -l$(LIBOS_CORE_LIB_NAME) -lsgx_tprotected_fs
 LINK_FLAGS := $(SGX_LFLAGS_T)
 
 .PHONY: all clean
@@ -107,27 +116,26 @@ $(LIBOS_CORE_RS_A): $(RUST_SRCS)
 	@echo "CARGO (debug) => $@"
 endif
 
-$(BUILD_DIR)/src/libos/src/Enclave_t.o: $(BUILD_DIR)/src/libos/src/Enclave_t.c
+$(OBJ_DIR)/libos/$(SRC_OBJ)/Enclave_t.o: $(OBJ_DIR)/libos/$(SRC_OBJ)/Enclave_t.c
 	@$(CC) $(C_FLAGS) -Iinclude/edl -c $< -o $@
 	@echo "CC <= $@"
 
-$(BUILD_DIR)/src/libos/src/Enclave_t.c: $(SGX_EDGER8R) ../Enclave.edl
-	@cd $(BUILD_DIR)/src/libos/src && $(SGX_EDGER8R) --trusted $(CUR_DIR)/../Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_DIR)/edl
+$(OBJ_DIR)/libos/$(SRC_OBJ)/Enclave_t.c: $(SGX_EDGER8R) ../Enclave.edl
+	@cd $(OBJ_DIR)/libos/$(SRC_OBJ) && $(SGX_EDGER8R) --trusted $(CUR_DIR)/../Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_DIR)/edl
 	@echo "GEN <= $@"
 
-$(BUILD_DIR)/src/libos/%.o: %.c
+$(C_OBJS):$(OBJ_DIR)/libos/$(SRC_OBJ)/%.o: src/%.c
 	@$(CC) $(C_FLAGS) -c $< -o $@
 	@echo "CC <= $@"
 
-$(BUILD_DIR)/src/libos/%.o: %.cpp
+$(CXX_OBJS): $(OBJ_DIR)/libos/$(SRC_OBJ)/%.o: src/%.cpp
 	@$(CXX) $(CXX_FLAGS) -c $< -o $@
 	@echo "CXX <= $@"
 
-$(BUILD_DIR)/src/libos/%.o: %.S
+$(S_OBJS):$(OBJ_DIR)/libos/$(SRC_OBJ)/%.o: src/%.S
 	@$(CC) $(C_FLAGS) -c $< -o $@
 	@echo "AS <= $@"
 
 clean:
-	@-$(RM) -f $(LIBOS_SO_REAL) $(LIBOS_CORE_A) $(LIBOS_CORE_RS_A) \
-		$(EDL_C_OBJS) $(EDL_C_SRCS) $(C_OBJS) $(CXX_OBJS) $(S_OBJS)
-	@-$(RM) -rf $(RUST_TARGET_DIR)
+	@-$(RM) -rf $(OBJ_DIR)/libos
+	@-$(RM) -f $(LIBOS_SO_REAL)

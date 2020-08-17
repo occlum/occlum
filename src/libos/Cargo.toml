@@ -1,6 +1,6 @@
 [package]
 name = "Occlum"
-version = "0.14.0"
+version = "0.15.0"
 edition = "2018"
 
 [lib]
@@ -11,6 +11,7 @@ crate-type = ["staticlib"]
 bitflags = "1.0"
 bitvec = { version = "0.17", default-features = false, features = ["alloc"]  }
 log = "0.4"
+aligned = "0.3.4"
 lazy_static = { version = "1.1.0", features = ["spin_no_std"] } # Implies nightly
 derive_builder = "0.7.2"
 ringbuf = { path = "../../deps/ringbuf" }
@@ -18,6 +19,7 @@ rcore-fs = { path = "../../deps/sefs/rcore-fs" }
 rcore-fs-sefs = { path = "../../deps/sefs/rcore-fs-sefs" }
 rcore-fs-ramfs = { path = "../../deps/sefs/rcore-fs-ramfs" }
 rcore-fs-mountfs = { path = "../../deps/sefs/rcore-fs-mountfs" }
+rcore-fs-unionfs = { path = "../../deps/sefs/rcore-fs-unionfs" }
 serde = { path = "../../deps/serde-sgx/serde", features = ["derive"] }
 serde_json = { path = "../../deps/serde-json-sgx" }
 

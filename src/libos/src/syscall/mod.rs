@@ -7,6 +7,8 @@
 //! 3. Preprocess the system call and then call `dispatch_syscall` (in this file)
 //! 4. Call `do_*` to process the system call (in other modules)
 
+use aligned::{Aligned, A16};
+use core::arch::x86_64::_fxrstor;
 use std::any::Any;
 use std::convert::TryFrom;
 use std::ffi::{CStr, CString};
@@ -40,7 +42,7 @@ use crate::process::{
     do_getpgid, do_getpid, do_getppid, do_gettid, do_getuid, do_prctl, do_set_tid_address,
     do_spawn, do_wait4, pid_t, FdOp, ThreadStatus,
 };
-use crate::sched::{do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
+use crate::sched::{do_getcpu, do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
 use crate::signal::{
     do_kill, do_rt_sigaction, do_rt_sigpending, do_rt_sigprocmask, do_rt_sigreturn, do_sigaltstack,
     do_tgkill, do_tkill, sigaction_t, sigset_t, stack_t,
@@ -388,7 +390,7 @@ macro_rules! process_syscall_table_with_callback {
             (Syncfs = 306) => handle_unsupported(),
             (Sendmmsg = 307) => handle_unsupported(),
             (Setns = 308) => handle_unsupported(),
-            (Getcpu = 309) => handle_unsupported(),
+            (Getcpu = 309) => do_getcpu(cpu_ptr: *mut u32, node_ptr: *mut u32),
             (ProcessVmReadv = 310) => handle_unsupported(),
             (ProcessVmWritev = 311) => handle_unsupported(),
             (Kcmp = 312) => handle_unsupported(),
@@ -408,8 +410,8 @@ macro_rules! process_syscall_table_with_callback {
 
             // Occlum-specific system calls
             (Spawn = 360) => do_spawn(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp),
-            (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, context: *mut CpuContext),
-            (HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, context: *mut CpuContext),
+            (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, fpregs: *mut u8, context: *mut CpuContext),
+            (HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, fpregs: *mut u8, context: *mut CpuContext),
         }
     };
 }
@@ -622,10 +624,12 @@ fn do_syscall(user_context: &mut CpuContext) {
             syscall.args[0] = user_context as *mut _ as isize;
         } else if syscall_num == SyscallNum::HandleException {
             // syscall.args[0] == info
-            syscall.args[1] = user_context as *mut _ as isize;
+            // syscall.args[1] == fpregs
+            syscall.args[2] = user_context as *mut _ as isize;
         } else if syscall.num == SyscallNum::HandleInterrupt {
             // syscall.args[0] == info
-            syscall.args[1] = user_context as *mut _ as isize;
+            // syscall.args[1] == fpregs
+            syscall.args[2] = user_context as *mut _ as isize;
         } else if syscall.num == SyscallNum::Sigaltstack {
             // syscall.args[0] == new_ss
             // syscall.args[1] == old_ss
@@ -715,6 +719,20 @@ fn do_sysret(user_context: &mut CpuContext) -> ! {
         fn do_exit_task() -> !;
     }
     if current!().status() != ThreadStatus::Exited {
+        // Restore the floating point registers
+        // Todo: Is it correct to do fxstor in kernel?
+        let fpregs: *const u8 = user_context.fpregs;
+        if (fpregs != ptr::null()) {
+            unsafe { _fxrstor(fpregs) };
+
+            if user_context.fpregs_on_heap == 1 {
+                // Converting the raw pointer back into a Box with Box::from_raw for automatic cleanup
+                unsafe {
+                    let buf: &mut [u8] = core::slice::from_raw_parts_mut(user_context.fpregs, 512);
+                    let _ = Box::from_raw(buf);
+                }
+            }
+        }
         unsafe { __occlum_sysret(user_context) } // jump to user space
     } else {
         unsafe { do_exit_task() } // exit enclave
@@ -874,7 +892,7 @@ fn handle_unsupported() -> Result<isize> {
 ///
 /// Note. The definition of this struct must be kept in sync with the assembly
 /// code in `syscall_entry_x86-64.S`.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct CpuContext {
     pub r8: u64,
@@ -895,6 +913,8 @@ pub struct CpuContext {
     pub rsp: u64,
     pub rip: u64,
     pub rflags: u64,
+    pub fpregs_on_heap: u64,
+    pub fpregs: *mut u8,
 }
 
 impl CpuContext {
@@ -918,6 +938,8 @@ impl CpuContext {
             rsp: src.rsp,
             rip: src.rip,
             rflags: src.rflags,
+            fpregs_on_heap: 0,
+            fpregs: ptr::null_mut(),
         }
     }
 }

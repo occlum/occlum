@@ -57,6 +57,11 @@ impl CpuSet {
         self.bits.count_ones()
     }
 
+    /// Returns the first index of CPUs in set.
+    pub fn first_cpu_idx(&self) -> Option<usize> {
+        self.iter().position(|&b| b == true)
+    }
+
     // Returns if the CpuSet is a subset of available cpu set
     pub fn is_subset_of(&self, other: &CpuSet) -> bool {
         (self.bits.clone() & other.bits.clone()) == self.bits
@@ -117,7 +122,7 @@ impl Index<usize> for CpuSet {
 
 lazy_static! {
     /// The number of all CPU cores on the platform
-    static ref NCORES: usize = {
+    pub static ref NCORES: usize = {
         extern "C" {
             fn occlum_ocall_ncores(ret: *mut i32) -> sgx_status_t;
         }

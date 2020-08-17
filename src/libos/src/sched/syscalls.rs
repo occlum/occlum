@@ -56,3 +56,30 @@ pub fn do_sched_setaffinity(pid: pid_t, buf_size: size_t, buf_ptr: *const u8) ->
     super::do_sched_affinity::do_sched_setaffinity(pid, affinity)?;
     Ok(0)
 }
+
+pub fn do_getcpu(cpu_ptr: *mut u32, node_ptr: *mut u32) -> Result<isize> {
+    // Do pointers check
+    match (cpu_ptr.is_null(), node_ptr.is_null()) {
+        (true, true) => return Ok(0),
+        (false, true) => check_mut_ptr(cpu_ptr)?,
+        (true, false) => check_mut_ptr(node_ptr)?,
+        (false, false) => {
+            check_mut_ptr(cpu_ptr)?;
+            check_mut_ptr(node_ptr)?;
+        }
+    }
+    // Call the memory-safe do_getcpu
+    let (cpu, node) = super::do_getcpu::do_getcpu()?;
+    // Copy to user
+    if !cpu_ptr.is_null() {
+        unsafe {
+            cpu_ptr.write(cpu);
+        }
+    }
+    if !node_ptr.is_null() {
+        unsafe {
+            node_ptr.write(node);
+        }
+    }
+    Ok(0)
+}

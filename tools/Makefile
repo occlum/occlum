@@ -5,6 +5,7 @@ BUILD_DIR := build
 
 all:
 	@mkdir -p ../$(BUILD_DIR)/bin/
+	@ln -s -f ../../tools/occlum_build.mk ../$(BUILD_DIR)/bin/occlum_build.mk
 	@ln -s -f ../../tools/occlum ../$(BUILD_DIR)/bin/occlum
 	@ln -s -f ../../tools/occlum-gen-default-occlum-json ../$(BUILD_DIR)/bin/occlum-gen-default-occlum-json
 	@$(MAKE) --no-print-directory -C protect-integrity

@@ -10,17 +10,17 @@ occlum_=$(CUR_DIR)/../..
 
 .PHONY: all build_src test clean
 
-all: occlum_context
+all: occlum_instance
 
-occlum_context: build_src
-	@mkdir -p occlum_context
-	@cd occlum_context && \
+occlum_instance: build_src
+	@mkdir -p occlum_instance
+	@cd occlum_instance && \
 		occlum init && \
 		cp $(CUR_DIR)/AppResponder/responder image/bin/ && \
 		cp $(OPENSSL)/libcrypto.so.1.1 image/lib/ && \
 		cp $(CUR_DIR)/DiffieHellmanLibrary/libecdh.so image/lib/ && \
 		occlum build
-	@cp -r occlum_context/.occlum .occlum
+	@cp -t occlum_instance $(APP) $(BUILD_DIR)/libenclave_initiator.signed.so
 
 build_src:
 	@$(MAKE) --no-print-directory -C DiffieHellmanLibrary
@@ -29,12 +29,12 @@ build_src:
 	@$(MAKE) --no-print-directory -C EnclaveInitiator
 
 test: build_src
-	LD_LIBRARY_PATH=$(BUILD_DIR):$(SGX_SDK)/sdk_libs RUST_BACKTRACE=1 \
-		./$(APP)
+	cd occlum_instance && LD_LIBRARY_PATH=../$(BUILD_DIR):$(SGX_SDK)/sdk_libs RUST_BACKTRACE=1 \
+		./appinitiator
 
 clean:
 	@$(MAKE) --no-print-directory -C AppInitiator clean
 	@$(MAKE) --no-print-directory -C AppResponder  clean
 	@$(MAKE) --no-print-directory -C EnclaveInitiator clean
 	@$(MAKE) --no-print-directory -C DiffieHellmanLibrary clean
-	@rm -rf .occlum occlum_context $(BUILD_DIR)
+	@rm -rf .occlum occlum_instance $(BUILD_DIR)

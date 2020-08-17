@@ -27,6 +27,7 @@ use signal_hook::iterator::Signals;
 use signal_hook::{SIGINT, SIGKILL, SIGQUIT, SIGTERM, SIGUSR1};
 use std::cmp;
 use std::env;
+use std::path::Path;
 use std::os::unix::net::UnixListener;
 use std::process;
 use std::process::{Command, Stdio};
@@ -297,7 +298,7 @@ fn main() -> Result<(), i32> {
         stop_server(&client, stop_time);
         println!("server stopped.");
     } else if let Some(ref matches) = matches.subcommand_matches("exec") {
-        let cmd_args: Vec<&str> = match matches
+        let mut cmd_args: Vec<&str> = match matches
             .values_of("args")
             .map(|vals| vals.collect::<Vec<_>>())
         {
@@ -306,7 +307,9 @@ fn main() -> Result<(), i32> {
             _ => panic!(),
         };
 
-        let (cmd, args) = cmd_args.split_first().unwrap();
+        let cmd = cmd_args[0];
+        // Change cmd_args[0] from path name to program name
+        cmd_args[0] = Path::new(cmd_args[0]).file_name().unwrap().to_str().unwrap();
         let env: Vec<&str> = env.iter().map(|string| string.as_str()).collect();
 
         // Create the signal handler
@@ -330,7 +333,7 @@ fn main() -> Result<(), i32> {
             }
         });
 
-        match exec_command(&client, cmd, args, &env) {
+        match exec_command(&client, cmd, &cmd_args, &env) {
             Ok(process_id) => {
                 // the signal thread exit if server finished execution or user kill the client
                 signal_thread.join().unwrap();

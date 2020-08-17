@@ -253,6 +253,57 @@ static int test_sched_yield() {
 }
 
 // ============================================================================
+// Test cases for getcpu
+// ============================================================================
+
+static int test_getcpu() {
+    int cpu, node;
+    if (syscall(__NR_getcpu, &cpu, &node, NULL) < 0) {
+        THROW_ERROR("getcpu with cpu&node fail");
+    }
+    if (syscall(__NR_getcpu, &cpu, NULL, NULL) < 0) {
+        THROW_ERROR("getcpu with cpu fail");
+    }
+    if (syscall(__NR_getcpu, NULL, &node, NULL) < 0) {
+        THROW_ERROR("getcpu with node fail");
+    }
+    if (syscall(__NR_getcpu, NULL, NULL, NULL) < 0) {
+        THROW_ERROR("getcpu with null fail");
+    }
+    return 0;
+}
+
+static int test_getcpu_after_setaffinity() {
+    int nproc = sysconf(_SC_NPROCESSORS_ONLN);
+    cpu_set_t mask_old;
+    CPU_ZERO(&mask_old);
+    for (int i = 0; i < nproc; ++i) {
+        CPU_SET(g_online_cpu_idxs[i], &mask_old);
+    }
+
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    CPU_SET(g_online_cpu_idxs[0], &mask);
+    if (sched_setaffinity(0, sizeof(cpu_set_t), &mask) < 0) {
+        THROW_ERROR("failed to call sched_setaffinity \n");
+    }
+
+    int cpu;
+    int ret = syscall(__NR_getcpu, &cpu, NULL, NULL);
+    if (ret < 0) {
+        THROW_ERROR("getcpu fail");
+    }
+    if (cpu != g_online_cpu_idxs[0]) {
+        THROW_ERROR("check processor id fail");
+    }
+
+    if (sched_setaffinity(0, sizeof(cpu_set_t), &mask_old) < 0) {
+        THROW_ERROR("recover cpuset error");
+    }
+    return 0;
+}
+
+// ============================================================================
 // Test suite main
 // ============================================================================
 
@@ -268,6 +319,8 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_sched_setaffinity_with_null_buffer),
     TEST_CASE(test_sched_yield),
     TEST_CASE(test_sched_xetaffinity_children_inheritance),
+    TEST_CASE(test_getcpu),
+    TEST_CASE(test_getcpu_after_setaffinity),
 };
 
 int main() {

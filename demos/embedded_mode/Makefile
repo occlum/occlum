@@ -3,15 +3,14 @@ SGX_MODE ?= HW
 
 .PHONY: all build_src test clean
 
-all: occlum_context
+all: occlum_instance
 
-occlum_context: build_src
-	@mkdir -p occlum_context
-	@cd occlum_context && \
+occlum_instance: build_src
+	@mkdir -p occlum_instance
+	@cd occlum_instance && \
 		occlum init && \
 		cp ../trusted_memcpy_bench/build/trusted_memcpy_bench image/bin/ && \
 		occlum build
-	@cp -r occlum_context/.occlum .occlum
 
 build_src:
 	@$(MAKE) --no-print-directory -C trusted_memcpy_bench
@@ -19,10 +18,10 @@ build_src:
 
 TOTAL_BYTES := 10000000000 # 10GB
 test:
-	LD_LIBRARY_PATH=bench_driver/build:$(SGX_SDK)/sdk_libs RUST_BACKTRACE=1 \
-		./bench_driver/build/bench_driver $(TOTAL_BYTES)
+	cd occlum_instance && LD_LIBRARY_PATH=../bench_driver/build:$(SGX_SDK)/sdk_libs RUST_BACKTRACE=1 \
+		../bench_driver/build/bench_driver $(TOTAL_BYTES)
 
 clean:
 	@$(MAKE) --no-print-directory -C trusted_memcpy_bench clean
 	@$(MAKE) --no-print-directory -C bench_driver clean
-	@rm -rf .occlum occlum_context
+	@rm -rf .occlum occlum_instance

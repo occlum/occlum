@@ -39,6 +39,7 @@ extern crate rcore_fs;
 extern crate rcore_fs_mountfs;
 extern crate rcore_fs_ramfs;
 extern crate rcore_fs_sefs;
+extern crate rcore_fs_unionfs;
 #[macro_use]
 extern crate derive_builder;
 extern crate ringbuf;

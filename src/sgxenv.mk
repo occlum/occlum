@@ -14,6 +14,14 @@ VERSION_NUM = $(MAJOR_VER_NUM).$(MINOR_VER_NUM).$(PATCH_VER_NUM)
 
 C_FORMATTER := $(PROJECT_DIR)/tools/c_formatter
 
+# Save code and object file generated during building src
+OBJ_DIR := $(PROJECT_DIR)/build/internal/src
+ifneq ($(SGX_MODE), HW)
+	SRC_OBJ := src_sim
+else
+	SRC_OBJ := src
+endif
+
 BUILD_DIR := $(PROJECT_DIR)/build
 
 # If OCCLUM_RELEASE_BUILD equals to 1, y, or yes, then build in release mode
@@ -77,7 +85,7 @@ SGX_CFLAGS_U := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes \
 SGX_CXXFLAGS_U := $(SGX_CFLAGS_U) -std=c++11
 
 ifneq ($(SGX_MODE), HW)
-	SGX_LFLAGS_U := $(SGX_COMMON_CFLAGS) -lpthread -L$(SGX_LIBRARY_PATH) -lsgx_urts_sim -lsgx_uae_service_sim
+	SGX_LFLAGS_U := $(SGX_COMMON_CFLAGS) -lpthread -L$(SGX_LIBRARY_PATH) -Wl,-Bstatic -lsgx_urts_sim -Wl,-Bdynamic -lsgx_uae_service_sim
 else
 	SGX_LFLAGS_U := $(SGX_COMMON_CFLAGS) -lpthread -L$(SGX_LIBRARY_PATH) -Wl,-Bstatic -lsgx_urts -Wl,-Bdynamic -lsgx_uae_service -lsgx_enclave_common
 endif

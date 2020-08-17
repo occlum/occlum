@@ -5,9 +5,9 @@ occlum_lib=/usr/local/occlum/x86_64-linux-musl/lib
 set -e
 
 # 1. Init Occlum Workspace
-rm -rf occlum_context
-mkdir occlum_context
-cd occlum_context
+rm -rf occlum_instance
+mkdir occlum_instance
+cd occlum_instance
 occlum init
 new_json="$(jq '.resource_limits.user_space_size = "320MB" |
                 .process.default_mmap_size = "256MB"' Occlum.json)" && \

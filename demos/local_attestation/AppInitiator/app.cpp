@@ -13,7 +13,7 @@
 
 #include "EnclaveInitiator_u.h"
 
-#define ENCLAVE_INITIATOR_NAME "./build/libenclave_initiator.signed.so"
+#define ENCLAVE_INITIATOR_NAME "./libenclave_initiator.signed.so"
 
 pthread_t thread;
 sgx_enclave_id_t initiator_enclave_id = 0;
@@ -24,7 +24,6 @@ int main(int argc, char *argv[]) {
     sgx_launch_token_t token = {0};
     sgx_status_t status;
     int exit_status = 0;
-    const char *occlum_instance_dir = ".occlum";
     const char *cmd_path = "/bin/responder"; // Prepare cmd path and arguments
     const char *cmd_args[] = {NULL};
 
@@ -38,10 +37,8 @@ int main(int argc, char *argv[]) {
     }
     printf("succeed to load enclave %s\n", ENCLAVE_INITIATOR_NAME);
 
-    struct occlum_pal_attr attr {
-        .instance_dir = occlum_instance_dir,
-        .log_level = (const char *) getenv("OCCLUM_LOG_LEVEL"),
-    };
+    occlum_pal_attr_t attr = OCCLUM_PAL_ATTR_INITVAL;
+    attr.log_level = (const char *) getenv("OCCLUM_LOG_LEVEL");
     if (occlum_pal_init(&attr) < 0) {
         return EXIT_FAILURE;
     }

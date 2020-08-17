@@ -1,0 +1,38 @@
+name: OCCLUM CI
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+on: [push, pull_request]
+
+jobs:
+  make-test-on-ubuntu:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-18.04
+    container: occlum/occlum:0.15.0-ubuntu18.04
+
+    # Below steps are running directly in docker container
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Set Toolchains
+      run: rustup default $OCCLUM_RUST_VERSION
+
+    - name: Check Format
+      run: |
+        info=$(make format-check)
+        if [ -n "$info" ]; then
+          echo "Format error detected.";
+          exit 1;
+        fi
+
+    - name: Build Dependencies
+      run:  make submodule
+
+    - name: Build Source
+      run: |
+        OCCLUM_RELEASE_BUILD=y SGX_MODE=SIM make
+
+    - name: Integration Test
+      run: |
+        SGX_MODE=SIM make test

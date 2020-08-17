@@ -32,15 +32,23 @@
     "mount": [
         {
             "target": "/",
-            "type": "sefs",
-            "source": "./image",
+            "type": "unionfs",
             "options": {
-                "integrity_only": true
+                "layers": [
+                    {
+                        "target": "/",
+                        "type": "sefs",
+                        "source": "./image",
+                        "options": {
+                            "integrity_only": true
+                        }
+                    },
+                    {
+                        "target": "/",
+                        "type": "sefs"
+                    }
+                ]
             }
-        },
-        {
-            "target": "/root",
-            "type": "sefs"
         },
         {
             "target": "/host",
@@ -49,7 +57,10 @@
         },
         {
             "target": "/tmp",
-            "type": "ramfs"
+            "type": "sefs",
+            "options": {
+                "temporary": true
+            }
         }
     ]
 }

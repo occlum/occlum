@@ -1,6 +1,6 @@
 bin
 deps
-occlum_context
+occlum_instance
 DiffieHellmanLibrary/*.cpp
 DiffieHellmanLibrary/*.so
 DiffieHellmanLibrary/*.o

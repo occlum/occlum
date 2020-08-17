@@ -3,5 +3,4 @@
 *.so
 *.orig
 build/
-build_sim/
 .DS_Store

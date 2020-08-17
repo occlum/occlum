@@ -1,3 +1,10 @@
+FROM alpine:3.11 AS alpine
+
+LABEL maintainer="Qing Li <geding.lq@antgroup.com>"
+
+RUN apk update && \
+    apk --no-cache add openjdk11 --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
+
 FROM centos:7.5.1804
 
 LABEL maintainer="He Sun <bochang.sh@antfin.com>"
@@ -108,9 +115,13 @@ ENV PATH="/opt/occlum/toolchains/rust/bin:$PATH"
 ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/opt/intel/sgxsdk/sdk_libs"
 
 # Install Occlum Java toolchain (JDK 11)
+ARG JDK11_PATH=/opt/occlum/toolchains/jvm/java-11-openjdk
+COPY --from=alpine /usr/lib/jvm/java-11-openjdk $JDK11_PATH
+RUN rm $JDK11_PATH/lib/security/cacerts
+COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK11_PATH/lib/security/cacerts
 COPY toolchains/java /tmp/java
 WORKDIR /tmp
-RUN cd java && ./install.sh && rm -rf /tmp/java
+RUN cd java && ./install_dragonwell.sh && rm -rf /tmp/java
 ENV PATH="/opt/occlum/toolchains/jvm/bin:$PATH"
 
 # Install the latest version of Occlum
