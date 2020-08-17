@@ -13,8 +13,8 @@ if [ ! -f $occlum_pong ];then
 fi
 
 # Init Occlum Workspace
-rm -rf occlum_pong_context && mkdir occlum_pong_context
-cd occlum_pong_context
+rm -rf occlum_pong_instance && mkdir occlum_pong_instance
+cd occlum_pong_instance
 occlum init
 sed -i 's/256MB/2560MB/g' ./Occlum.json
 sed -i 's/32MB/320MB/g' ./Occlum.json

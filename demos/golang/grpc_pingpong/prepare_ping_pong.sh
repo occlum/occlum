@@ -21,8 +21,8 @@ do
         fi
 done
 
-DIR_SET="occlum_ping_context
-occlum_pong_context"
+DIR_SET="occlum_ping_instance
+occlum_pong_instance"
 for CURR_DIR in $DIR_SET
 do
         if [ -d "$CURR_DIR" ]; then

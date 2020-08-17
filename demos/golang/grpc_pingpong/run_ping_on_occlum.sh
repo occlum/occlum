@@ -13,8 +13,8 @@ if [ ! -f $occlum_ping ];then
 fi
 
 # Init Occlum Workspace
-rm -rf occlum_ping_context && mkdir occlum_ping_context
-cd occlum_ping_context
+rm -rf occlum_ping_instance && mkdir occlum_ping_instance
+cd occlum_ping_instance
 occlum init
 sed -i 's/256MB/2560MB/g' ./Occlum.json
 sed -i 's/32MB/320MB/g' ./Occlum.json
