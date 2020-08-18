@@ -14,8 +14,8 @@ pub use self::dev_fs::AsDevRandom;
 pub use self::event_file::{AsEvent, EventCreationFlags, EventFile};
 pub use self::file::{File, FileRef};
 pub use self::file_ops::{
-    occlum_ocall_ioctl, AccessMode, CreationFlags, FileMode, Flock, FlockType, IoctlCmd, Stat,
-    StatusFlags, StructuredIoctlArgType, StructuredIoctlNum,
+    occlum_ocall_ioctl, AccessMode, BuiltinIoctlNum, CreationFlags, FileMode, Flock, FlockType,
+    IfConf, IoctlCmd, Stat, StatusFlags, StructuredIoctlArgType, StructuredIoctlNum,
 };
 pub use self::file_table::{FileDesc, FileTable};
 pub use self::fs_view::FsView;

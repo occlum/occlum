@@ -1,9 +1,11 @@
 use super::*;
+use crate::fs::IfConf;
 
+mod ioctl_impl;
 mod recv;
 mod send;
 
-use fs::{occlum_ocall_ioctl, AccessMode, CreationFlags, File, FileRef, IoctlCmd, StatusFlags};
+use fs::{AccessMode, CreationFlags, File, FileRef, IoctlCmd, StatusFlags};
 use std::any::Any;
 use std::io::{Read, Seek, SeekFrom, Write};
 
@@ -107,23 +109,7 @@ impl File for SocketFile {
     }
 
     fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-        let cmd_num = cmd.cmd_num() as c_int;
-        let cmd_arg_ptr = cmd.arg_ptr() as *mut c_void;
-        let ret = try_libc!({
-            let mut retval: i32 = 0;
-            let status = occlum_ocall_ioctl(
-                &mut retval as *mut i32,
-                self.fd(),
-                cmd_num,
-                cmd_arg_ptr,
-                cmd.arg_len(),
-            );
-            assert!(status == sgx_status_t::SGX_SUCCESS);
-            retval
-        });
-        // FIXME: add sanity checks for results returned for socket-related ioctls
-        cmd.validate_arg_and_ret_vals(ret)?;
-        Ok(ret)
+        self.ioctl_impl(cmd)
     }
 
     fn get_access_mode(&self) -> Result<AccessMode> {

@@ -1,3 +1,5 @@
+#include <net/if.h>
+#include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
@@ -216,6 +218,62 @@ int test_sgx_ioctl_SGXIOC_CREATE_AND_VERIFY_REPORT(void) {
     return do_sgx_ioctl_test(do_SGXIOC_CREATE_AND_VERIFY_REPORT);
 }
 
+#define CONFIG_SIZE  512
+int test_ioctl_SIOCGIFCONF(void) {
+    struct ifreq *req;
+    struct ifconf conf;
+    char buf[CONFIG_SIZE];
+    memset(buf, 0, CONFIG_SIZE);
+
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    conf.ifc_len = 0;
+    conf.ifc_buf = buf;
+    if (ioctl(sock, SIOCGIFCONF, &conf) < 0) {
+        close(sock);
+        THROW_ERROR("empty length ioctl failed");
+    }
+
+    if (conf.ifc_len != 0) {
+        close(sock);
+        THROW_ERROR("wrong returned length");
+    }
+
+    conf.ifc_len = CONFIG_SIZE;
+    conf.ifc_buf = 0;
+    if (ioctl(sock, SIOCGIFCONF, &conf) < 0) {
+        close(sock);
+        THROW_ERROR("empty buffer ioctl failed");
+    }
+
+    int ret_len = conf.ifc_len;
+
+    conf.ifc_len = CONFIG_SIZE;
+    conf.ifc_buf = buf;
+    if (ioctl(sock, SIOCGIFCONF, &conf) < 0) {
+        close(sock);
+        THROW_ERROR("buffer passed ioctl failed");
+    }
+
+    if (conf.ifc_len != ret_len) {
+        close(sock);
+        THROW_ERROR("wrong return length");
+    }
+
+    close(sock);
+
+    req = (struct ifreq *)buf;
+    int num = conf.ifc_len / sizeof (struct ifreq);
+
+    printf("    interface names got:\n");
+    for (int i = 0; i < num; i++) {
+        printf("    %d: %s\n", i + 1, req->ifr_name);
+        req ++;
+    }
+
+    return 0;
+}
+
 // ============================================================================
 // Test suite
 // ============================================================================
@@ -226,7 +284,8 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_sgx_ioctl_SGXIOC_GET_EPID_GROUP_ID),
     TEST_CASE(test_sgx_ioctl_SGXIOC_GEN_QUOTE),
     TEST_CASE(test_sgx_ioctl_SGXIOC_SELF_TARGET),
-    TEST_CASE(test_sgx_ioctl_SGXIOC_CREATE_AND_VERIFY_REPORT)
+    TEST_CASE(test_sgx_ioctl_SGXIOC_CREATE_AND_VERIFY_REPORT),
+    TEST_CASE(test_ioctl_SIOCGIFCONF),
 };
 
 int main() {

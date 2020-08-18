@@ -6,7 +6,7 @@
 
 use super::*;
 
-pub use self::builtin::WinSize;
+pub use self::builtin::*;
 pub use self::non_builtin::{NonBuiltinIoctlCmd, StructuredIoctlArgType, StructuredIoctlNum};
 
 #[macro_use]
@@ -37,6 +37,21 @@ impl_ioctl_nums_and_cmds! {
     TIOCNOTTY => (0x5422, ()),
     // Get the number of bytes in the input buffer
     FIONREAD => (0x541B, mut i32),
+    // Low-level access to Linux network devices on man7/netdevice.7
+    // Only non-privileged operations are supported for now
+    SIOCGIFNAME => (0x8910, mut IfReq),
+    SIOCGIFCONF => (0x8912, mut IfConf),
+    SIOCGIFFLAGS => (0x8913, mut IfReq),
+    SIOCGIFADDR => (0x8915, mut IfReq),
+    SIOCGIFDSTADDR => (0x8917, mut IfReq),
+    SIOCGIFBRDADDR => (0x8919, mut IfReq),
+    SIOCGIFNETMASK => (0x891B, mut IfReq),
+    SIOCGIFMTU => (0x8921, mut IfReq),
+    SIOCGIFHWADDR => (0x8927, mut IfReq),
+    SIOCGIFINDEX => (0x8933, mut IfReq),
+    SIOCGIFPFLAGS => (0x8935, mut IfReq),
+    SIOCGIFTXQLEN => (0x8942, mut IfReq),
+    SIOCGIFMAP => (0x8970, mut IfReq),
 }
 
 /// This is the centralized place to add sanity checks for the argument values

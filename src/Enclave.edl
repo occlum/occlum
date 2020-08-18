@@ -200,6 +200,14 @@ enclave {
         void occlum_ocall_print_log(uint32_t level, [in, string] const char* msg);
         void occlum_ocall_flush_log(void);
 
+        int occlum_ocall_ioctl_repack(
+            int fd,
+            int request,
+            [in, out, size=len] char *buf,
+            int len,
+            [out] int* recv_len
+        ) propagate_errno;
+
         int occlum_ocall_ioctl(
             int fd,
             int request,
