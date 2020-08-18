@@ -30,28 +30,30 @@ do
         fi
 done
 
+# enable Go modules for package management 
+export GO111MODULE=on
+
+# update PATH so that the protoc compiler can find the plugin:
+export PATH="$PATH:$(go env GOPATH)/bin"
+
 # assume that protoc is installed
-CURR_FILE=$(which protoc)
-if [ ! -f "$CURR_FILE" ]; then
+if ! type "protoc" > /dev/null; then
         echo "Please install protoc"
         exit 1
 fi
 
 # install protoc-gen-go and protoc-gen-go-grpc plugin
-CURR_FILE=$(which protoc-gen-go)
-if [ ! -f "$CURR_FILE" ]; then
-        go install google.golang.org/protobuf/cmd/protoc-gen-go
+if ! type "protoc-gen-go" > /dev/null; then
+        go get google.golang.org/protobuf/cmd/protoc-gen-go
 fi
-CURR_FILE=$(which protoc-gen-go-grpc)
-if [ ! -f "$CURR_FILE" ]; then
-        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc
+if ! type "protoc-gen-go-grpc" > /dev/null; then
+        go get google.golang.org/grpc/cmd/protoc-gen-go-grpc
 fi
 
 # compiling pingpong gRPC .proto file
 protoc --go-grpc_out=. --go_out=. pingpong/pingpong.proto
 
-# enable and initialize Go modules for package management 
-export GO111MODULE=on
+# initialize Go modules for package management 
 go mod init grpc_pingpong
 
 # build pong image
@@ -61,5 +63,5 @@ go build pong.go
 go build ping.go
 
 # prepare occlum images
-occlum-go build -o occlum_pong -buildmode=pie pong.go
-occlum-go build -o occlum_ping -buildmode=pie ping.go
+occlum-go build -o occlum_pong pong.go
+occlum-go build -o occlum_ping ping.go
