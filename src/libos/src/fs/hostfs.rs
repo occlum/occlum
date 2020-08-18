@@ -184,17 +184,14 @@ impl INode for HNode {
         if !self.path.is_dir() {
             return Err(FsError::NotDir);
         }
-        unimplemented!("no read_dir in sgx_std?")
-        // FIXME: read_dir
-
-        // self.path
-        //     .read_dir()
-        //     .map_err(|_| FsError::NotDir)?
-        //     .nth(id)
-        //     .map_err(|_| FsError::EntryNotFound)?
-        //     .file_name()
-        //     .into_string()
-        //     .map_err(|_| FsError::InvalidParam)
+        if let Some(entry) = try_std!(self.path.read_dir()).nth(id) {
+            try_std!(entry)
+                .file_name()
+                .into_string()
+                .map_err(|_| FsError::InvalidParam)
+        } else {
+            return Err(FsError::EntryNotFound);
+        }
     }
 
     fn io_control(&self, cmd: u32, data: usize) -> Result<()> {
