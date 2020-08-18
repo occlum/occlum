@@ -4,7 +4,7 @@
 
 ### How to Build
 
-To build RPM packages, a docker container with Occlum CentOS image is needed. Execute below commands under the occlum directory:
+To build RPM packages, a docker container with Occlum CentOS image (based on CentOS 8.1) is needed. Execute below commands under the occlum directory:
 ```
 cd tools/installer/rpm
 make
@@ -59,5 +59,6 @@ source /etc/profile
 
 Finally, you are good to go!
 
-### Build DEB Installer
+
+## DEB Installer
 TBD

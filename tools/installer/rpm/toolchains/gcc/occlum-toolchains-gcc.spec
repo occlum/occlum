@@ -16,7 +16,7 @@ Group: Development/Libraries
 License: BSD License
 URL: https://github.com/occlum/occlum
 Source0: https://github.com/occlum/occlum/archive/%{_musl_version}.tar.gz
-Source1: https://github.com/richfelker/musl-cross-make/archive/v0.9.9.tar.gz
+Source1: https://github.com/occlum/musl-cross-make/archive/0.9.9.hotfix.tar.gz
 Source2: https://ftp.gnu.org/pub/gnu/gcc/gcc-%{GCC_VER}/gcc-%{GCC_VER}.tar.xz
 Source3: config.sub
 Source4: https://ftp.gnu.org/pub/gnu/binutils/binutils-2.33.1.tar.xz
@@ -33,7 +33,6 @@ Patch0: musl-cross-make-disable-download.patch
 ExclusiveArch: x86_64
 
 BuildRequires: git
-BuildRequires: devtoolset-9-gcc-c++
 
 %description
 Occlum toolchains gcc
@@ -43,9 +42,9 @@ Occlum toolchains gcc
 %setup -q -T -D -a 1
 
 # This patch replaces syscall instruction with libc's syscall wrapper
-cp occlum-%{version}/tools/toolchains/gcc/0014-libgomp-*.diff musl-cross-make-0.9.9/patches/gcc-%{GCC_VER}/
+cp occlum-%{version}/tools/toolchains/gcc/0014-libgomp-*.diff musl-cross-make-0.9.9.hotfix/patches/gcc-%{GCC_VER}/
 
-pushd musl-cross-make-0.9.9
+pushd musl-cross-make-0.9.9.hotfix
 mkdir -p sources/gcc-%{GCC_VER}.tar.xz.tmp && cp %{SOURCE2} sources/gcc-%{GCC_VER}.tar.xz.tmp
 mkdir -p sources/config.sub.tmp && cp %{SOURCE3} sources/config.sub.tmp
 mkdir -p sources/binutils-2.33.1.tar.xz.tmp && cp %{SOURCE4} sources/binutils-2.33.1.tar.xz.tmp
@@ -58,8 +57,7 @@ tar xf %{SOURCE9}
 popd
 
 %build
-source /opt/rh/devtoolset-9/enable
-cd musl-cross-make-0.9.9
+cd musl-cross-make-0.9.9.hotfix
 cat > config.mak <<EOF
 TARGET = %{TARGET}
 COMMON_CONFIG += CFLAGS="-fPIC" CXXFLAGS="-fPIC" LDFLAGS="-pie"
@@ -70,7 +68,7 @@ make %{?_smp_mflags}
 
 %install
 mkdir -p %{buildroot}%{INSTALL_DIR}
-cd musl-cross-make-0.9.9
+cd musl-cross-make-0.9.9.hotfix
 make install OUTPUT=%{buildroot}%{INSTALL_DIR}
 
 # Generate the wrappers for executables

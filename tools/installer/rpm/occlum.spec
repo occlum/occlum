@@ -25,7 +25,7 @@ BuildRequires: cmake
 BuildRequires: libtool
 BuildRequires: ocaml
 BuildRequires: ocaml-ocamlbuild
-BuildRequires: python
+BuildRequires: python2
 BuildRequires: openssl-devel
 BuildRequires: libcurl-devel
 BuildRequires: git
