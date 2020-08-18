@@ -127,8 +127,11 @@ impl INode for HNode {
             FileType::File => {
                 try_std!(fs::File::create(&new_path));
             }
+            FileType::Dir => {
+                try_std!(fs::create_dir(&new_path));
+            }
             _ => {
-                warn!("only support creating regular files in HostFS");
+                warn!("only support creating regular file or directory in HostFS");
                 return Err(FsError::PermError);
             }
         }
@@ -150,8 +153,7 @@ impl INode for HNode {
         if new_path.is_file() {
             try_std!(fs::remove_file(new_path));
         } else if new_path.is_dir() {
-            unimplemented!("no remove_dir in sgx_std?")
-        // fs::remove_dir(new_path)?;
+            try_std!(fs::remove_dir(new_path));
         } else {
             return Err(FsError::EntryNotFound);
         }

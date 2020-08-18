@@ -155,6 +155,26 @@ static int test_readdir() {
     return test_hostfs_framework(__test_readdir);
 }
 
+static int test_mkdir_then_rmdir() {
+    const char *dir_path = "/host/hostfs_dir";
+    struct stat stat_buf;
+
+    if (mkdir(dir_path, 00775) < 0) {
+        THROW_ERROR("failed to create the dir");
+    }
+    if (stat(dir_path, &stat_buf) < 0) {
+        THROW_ERROR("failed to stat dir");
+    }
+    if (!S_ISDIR(stat_buf.st_mode)) {
+        THROW_ERROR("failed to check if it is dir");
+    }
+
+    if (rmdir(dir_path) < 0) {
+        THROW_ERROR("failed to remove the created dir");
+    }
+    return 0;
+}
+
 // ============================================================================
 // Test suite main
 // ============================================================================
@@ -163,6 +183,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_write_read),
     TEST_CASE(test_rename),
     TEST_CASE(test_readdir),
+    TEST_CASE(test_mkdir_then_rmdir),
 };
 
 int main(int argc, const char *argv[]) {
