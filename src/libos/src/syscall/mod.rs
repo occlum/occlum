@@ -8,11 +8,13 @@
 //! 4. Call `do_*` to process the system call (in other modules)
 
 use aligned::{Aligned, A16};
-use core::arch::x86_64::_fxrstor;
+use core::arch::x86_64::{_fxrstor, _fxsave};
 use std::any::Any;
 use std::convert::TryFrom;
+use std::default::Default;
 use std::ffi::{CStr, CString};
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::mem::MaybeUninit;
 use std::ptr;
 use time::{clockid_t, timespec_t, timeval_t};
 use util::log::{self, LevelFilter};
@@ -410,8 +412,8 @@ macro_rules! process_syscall_table_with_callback {
 
             // Occlum-specific system calls
             (Spawn = 360) => do_spawn(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp),
-            (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, fpregs: *mut u8, context: *mut CpuContext),
-            (HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, fpregs: *mut u8, context: *mut CpuContext),
+            (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
+            (HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
         }
     };
 }
@@ -714,6 +716,11 @@ fn do_syscall(user_context: &mut CpuContext) {
 
 /// Return to the user space according to the given CPU context
 fn do_sysret(user_context: &mut CpuContext) -> ! {
+    // Rust compiler would complain about passing to external C functions a CpuContext
+    // pointer, which includes a FpRegs pointer that is not safe to use by external
+    // modules. In our case, the FpRegs pointer will not be used actually. So the
+    // Rust warning is a false alarm. We suppress it here.
+    #[allow(improper_ctypes)]
     extern "C" {
         fn __occlum_sysret(user_context: *mut CpuContext) -> !;
         fn do_exit_task() -> !;
@@ -721,20 +728,20 @@ fn do_sysret(user_context: &mut CpuContext) -> ! {
     if current!().status() != ThreadStatus::Exited {
         // Restore the floating point registers
         // Todo: Is it correct to do fxstor in kernel?
-        let fpregs: *const u8 = user_context.fpregs;
-        if (fpregs != ptr::null()) {
-            unsafe { _fxrstor(fpregs) };
-
+        let fpregs = user_context.fpregs;
+        if (fpregs != ptr::null_mut()) {
             if user_context.fpregs_on_heap == 1 {
-                // Converting the raw pointer back into a Box with Box::from_raw for automatic cleanup
-                unsafe {
-                    let buf: &mut [u8] = core::slice::from_raw_parts_mut(user_context.fpregs, 512);
-                    let _ = Box::from_raw(buf);
-                }
+                let fpregs = unsafe { Box::from_raw(user_context.fpregs as *mut FpRegs) };
+                fpregs.restore();
+            } else {
+                unsafe { fpregs.as_ref().unwrap().restore() };
             }
         }
         unsafe { __occlum_sysret(user_context) } // jump to user space
     } else {
+        if user_context.fpregs != ptr::null_mut() && user_context.fpregs_on_heap == 1 {
+            drop(unsafe { Box::from_raw(user_context.fpregs as *mut FpRegs) });
+        }
         unsafe { do_exit_task() } // exit enclave
     }
     unreachable!("__occlum_sysret never returns!");
@@ -888,6 +895,49 @@ fn handle_unsupported() -> Result<isize> {
     return_errno!(ENOSYS, "Unimplemented or unknown syscall")
 }
 
+/// Floating point registers
+///
+/// Note. The area is used to save fxsave result
+//#[derive(Clone, Copy)]
+#[repr(C)]
+pub struct FpRegs {
+    inner: Aligned<A16, [u8; 512]>,
+}
+
+impl FpRegs {
+    /// Save the current CPU floating pointer states to an instance of FpRegs
+    pub fn save() -> Self {
+        let mut fpregs = FpRegs {
+            inner: Aligned([0u8; 512]),
+        };
+        unsafe { _fxsave(fpregs.inner.as_mut_ptr()) };
+        fpregs
+    }
+
+    /// Restore the current CPU floating pointer states from this FpRegs instance
+    pub fn restore(&self) {
+        unsafe { _fxrstor(self.inner.as_ptr()) };
+    }
+
+    /// Construct a FpRegs from a slice of u8.
+    ///
+    /// It is up to the caller to ensure that the src slice contains data that
+    /// is the xsave/xrstor format.
+    pub unsafe fn from_slice(src: &[u8]) -> Self {
+        let mut uninit = MaybeUninit::<Self>::uninit();
+        let dst_buf: &mut [u8] = std::slice::from_raw_parts_mut(
+            uninit.as_mut_ptr() as *mut u8,
+            std::mem::size_of::<FpRegs>(),
+        );
+        dst_buf.copy_from_slice(&src);
+        uninit.assume_init()
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        self.inner.as_ref()
+    }
+}
+
 /// Cpu context.
 ///
 /// Note. The definition of this struct must be kept in sync with the assembly
@@ -914,7 +964,7 @@ pub struct CpuContext {
     pub rip: u64,
     pub rflags: u64,
     pub fpregs_on_heap: u64,
-    pub fpregs: *mut u8,
+    pub fpregs: *mut FpRegs,
 }
 
 impl CpuContext {

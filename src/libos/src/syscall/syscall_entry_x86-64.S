@@ -28,8 +28,8 @@ __occlum_syscall_linux_abi:
     // Save the target CPU state when `call __occlum_syscall` is returned in
     // a CpuContext struct. The registers are saved in the reverse order of 
     // the fields in CpuContext.
-    push $0         // default fpregs is NULL 
-    push $0         // default fpregs is allocated on stack
+    pushq $0         // default fpregs is NULL 
+    pushq $0         // default fpregs is allocated on stack
     pushfq
     push %rcx       // save %rip
     push %r11       // save %rsp

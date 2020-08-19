@@ -142,7 +142,12 @@ impl InnerAgent {
         let mut quote_len: u32 = 0;
         let mut rt = Default::default();
         let status = unsafe {
-            occlum_ocall_sgx_calc_quote_size(&mut rt as _, sigrl_ptr, sigrl_size, &mut quote_len as _)
+            occlum_ocall_sgx_calc_quote_size(
+                &mut rt as _,
+                sigrl_ptr,
+                sigrl_size,
+                &mut quote_len as _,
+            )
         };
         assert!(status == sgx_status_t::SGX_SUCCESS);
         if rt != sgx_status_t::SGX_SUCCESS {
