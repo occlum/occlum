@@ -1,0 +1,51 @@
+#!/usr/bin/make -f
+export DH_VERBOSE = 1
+export deb_build_dir = /tmp/deb_build
+export name = occlum
+
+# Generate all files need by three packages
+export buildroot := $(deb_build_dir)/occlum-$(VERSION)/debian/buildroot
+
+# For package
+export occlum-buildroot := $(deb_build_dir)/occlum-$(VERSION)/debian/occlum
+export occlum-pal-buildroot := $(deb_build_dir)/occlum-$(VERSION)/debian/occlum-pal
+export occlum-runtime-buildroot := $(deb_build_dir)/occlum-$(VERSION)/debian/occlum-runtime
+export occlum-sgx-tools-buildroot := $(deb_build_dir)/occlum-$(VERSION)/debian/occlum-sgx-tools
+
+SHELL = /bin/bash
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	cd $(deb_build_dir)/occlum-$(VERSION)/occlum-src; make submodule
+
+override_dh_install:
+	# install Occlum
+	cd $(deb_build_dir)/occlum-$(VERSION)/occlum-src; OCCLUM_RELEASE_BUILD=1 OCCLUM_PREFIX=$(buildroot)/opt/occlum make install
+	mkdir -p $(buildroot)/etc/profile.d
+	cp $(deb_build_dir)/occlum-$(VERSION)/debian/{occlum-pal.sh,occlum-runtime.sh} $(buildroot)/etc/profile.d
+	chmod 644 $(buildroot)/etc/profile.d/{occlum-pal.sh,occlum-runtime.sh}
+
+	# generate occlum-runtime
+	mkdir -p $(occlum-runtime-buildroot)
+	cd $(buildroot) && cat $(deb_build_dir)/occlum-$(VERSION)/debian/occlum-runtime-filelist | xargs -I files bash -c "cp --parents --target-directory=$(occlum-runtime-buildroot) files"
+
+	# generate occlum-pal
+	mkdir -p $(occlum-pal-buildroot)
+	cd $(buildroot) && cat $(deb_build_dir)/occlum-$(VERSION)/debian/occlum-pal-filelist | xargs -I files bash -c "cp --parents --target-directory=$(occlum-pal-buildroot) files"
+
+	# generate occlum-sgx-tools
+	mkdir -p $(occlum-sgx-tools-buildroot)/opt/occlum
+	cp -r $(buildroot)/opt/occlum/sgxsdk-tools $(occlum-sgx-tools-buildroot)/opt/occlum
+
+	# generate occlum package
+	mkdir -p $(occlum-buildroot)
+	cd $(buildroot) && cat $(deb_build_dir)/occlum-$(VERSION)/debian/occlum-filelist | xargs -I files bash -c "cp --parents --target-directory=$(occlum-buildroot) files"
+
+clean:
+	dh_clean
+	rm -f $(buildroot) $(occlum-buildroot) $(occlum-pal-buildroot) $(occlum-runtime-buildroot)
+
+override_dh_shlibdeps:
+	echo "skip ..."

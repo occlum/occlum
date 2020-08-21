@@ -265,7 +265,7 @@ To cut off the complexity of self-hosted infrastructure, one can deploy Occlum-p
 
 ## How to Run Occlum Without Docker?
 
-One easy way to run Occlum without Docker is to use the Occlum Installer. We have prepared the RPM installer for Occlum, which can be downloaded with every release of Occlum. For more info about the installer, see [here](tools/installer/README.md).
+One easy way to run Occlum without Docker is to use the Occlum Installer. We have prepared the RPM and DEB installers for Occlum, which can be downloaded with every release of Occlum. For more info about the installer, see [here](tools/installer/README.md).
 
 ## What is the Implementation Status?
 

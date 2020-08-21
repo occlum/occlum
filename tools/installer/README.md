@@ -1,8 +1,18 @@
 # Occlum Installer
 
+To evaluate Occlum in non-docker environment, installers are needed. Occlum provides a variety of installers to support different scenarios. Users can choose to install different minimum subsets of Occlum installers to meet their needs.
+
+- **occlum-runtime**: necessary binaries for `occlum run/exec`. For deployment scenarios, this must be installed.
+- **occlum-pal**: only contains the Occlum PAL library (a thin layer to hide details of libOS and provide API for applications)
+- **occlum-sgx-tools**: minimum dependencies from Intel SGX SDK e.g. sgx-gdb, sgx_sign
+- **occlum-toolchains-\<language\>**: toolchain components for specific language
+- **occlum**: complete package to support all Occlum commands. `occlum-toolchains-gcc` is also installed by default. Please install packages of other programming languages based on your need.
+
 ## RPM Installer
 
 ### How to Build
+
+Normally, Occlum installers should be provided together with release. However, users can also build them on their own.
 
 To build RPM packages, a docker container with Occlum CentOS image (based on CentOS 8.1) is needed. Execute below commands under the occlum directory:
 ```
@@ -42,14 +52,18 @@ rpm -i libsgx-uae-service-2.9.101.2-1.el7.x86_64.rpm
 **Step 3. Install Occlum Installer and Toolchains Installer**
 ```
 rpm -i occlum-sgx-tools-*.rpm
-rpm -i occlum-"$occlum_version"-*.rpm
 rpm -i occlum-pal-*.rpm
-rpm -i occlum-platform-*.rpm
+rpm -i occlum-runtime-*.rpm
 ```
 
 Toolchains are needed when compile applications and also during runtime. Choose to install the toolchain installer based on the application's language. Currently, we only supports `C/C++`. More language toolchain installers are on the way. To install `C/C++` toolchain, just run the command:
 ```
 rpm -i occlum-toolchains-gcc-*.rpm
+```
+
+At last, install `occlum` package to get complete support of Occlum:
+```
+rpm -i occlum_*.rpm
 ```
 
 To make the new installed binaries and libraries work, this command must be executed:
@@ -61,4 +75,78 @@ Finally, you are good to go!
 
 
 ## DEB Installer
-TBD
+
+### How to Build
+
+Normally, Occlum installers should be provided together with release. However, users can also build them on their own.
+
+To build deb packages, a docker container with Occlum Ubuntu image (based on Ubuntu 18.04) is needed. Execute below commands under the occlum directory:
+```
+cd tools/installer/deb
+make
+```
+and occlum deb installer can be found under `build/debs`.
+
+If a user wants to build his application on a platform installed with Occlum installer, toolchain installers are also needed. To build language specific toolchain installer, just run the command:
+```
+cd tools/installer/deb
+make <language option>
+```
+Now, only `c/c++` option is supported. And the installer can be found under `build/debs`.
+
+### How to Use
+
+DEB installer should be found together with Occlum release package at [this page](https://github.com/occlum/occlum/releases).
+To run Occlum on clean Ubuntu 18.04, please follow below steps:
+
+**Step 1. Install Prerequisites**
+```
+apt-get update
+apt-get install -y --no-install-recommends libcurl4-openssl-dev libssl-dev libprotobuf-dev libfuse-dev autoconf automake make cmake libtool gdb python jq ca-certificates gnupg wget vim
+```
+
+**Step 2. Install Intel® SGX driver and Intel® SGX PSW**
+Please follow [Intel SGX Installation Guide](https://download.01.org/intel-sgx/sgx-linux/2.9.1/docs/Intel_SGX_Installation_Guide_Linux_2.9.1_Open_Source.pdf) to install SGX driver and SGX PSW. SGX SDK is not required. Using PSW installer is recommanded.
+
+To install PSW, follow the guide to add Intel® SGX repository to apt source. And then run:
+```
+apt-get update
+apt-get install -y libsgx-epid libsgx-urts libsgx-quote-ex libsgx-uae-service
+```
+
+After installing PSW, please make sure that the aesm service is running:
+```
+service status aesmd
+```
+
+**Step 3. Install enable_RDFSBASE Kernel Module**
+Please follow [this README](https://github.com/occlum/enable_rdfsbase/blob/master/README.md) to install `enable_rdfsbase` kernel module.
+
+**Step 4. Install Occlum Installer and Toolchains Installer**
+```
+cd <path to installer>
+apt install -y ./occlum-runtime*.deb
+apt install -y ./occlum-pal*.deb
+apt install -y ./occlum-sgx-tools*.deb
+```
+
+Currently, we only supports `C/C++`. More language toolchain installers are on the way. To install `C/C++` toolchain, just run the command:
+```
+apt install -y ./occlum-toolchains-gcc*.deb
+```
+
+At last, install `occlum` package to get complete support of Occlum:
+```
+apt install -y ./occlum_*.deb
+```
+
+To make the new installed binaries and libraries work, this command must be executed:
+```
+source /etc/profile
+```
+
+**Step 5. Install Debug Symbol Packages (OPTIONAL)**
+If users want to debug the application running inside the libos, debug symbol packages are also needed. Just run:
+```
+apt install -y ./occlum-dbgsym*.ddeb ./occlum-pal-dbgsym*.ddeb ./occlum-runtime-dbgsym*.ddeb ./occlum-toolchains-gcc-dbgsym*.ddeb ./occlum-sgx-tools-dbgsym*.ddeb
+```

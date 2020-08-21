@@ -56,7 +56,7 @@ occlum-platform contains command for occlum enclave.
 %build
 # build occlum
 cd %{?_builddir}/%{name}-%{_version}/occlum-%{_version}
-NOT_GIT=true make submodule
+make submodule
 
 %install
 # set sgxsdk env
