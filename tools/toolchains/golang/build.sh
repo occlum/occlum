@@ -19,7 +19,7 @@ git clone https://github.com/golang/go .
 # Swtich to Golang 1.13.7
 git checkout -b go1.13.7 tags/go1.13.7
 # Apply the patch to adapt Golang to Occlum
-git apply ${THIS_DIR}/0001-adapt-golang-to-occlum-libos.patch
+git apply ${THIS_DIR}/adapt-golang-to-occlum.patch
 
 # Build Golang
 cd src
