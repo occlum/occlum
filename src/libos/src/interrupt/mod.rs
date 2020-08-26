@@ -1,7 +1,7 @@
 pub use self::sgx::sgx_interrupt_info_t;
 use crate::prelude::*;
 use crate::process::ThreadRef;
-use crate::syscall::{CpuContext, SyscallNum};
+use crate::syscall::{CpuContext, FpRegs, SyscallNum};
 use aligned::{Aligned, A16};
 use core::arch::x86_64::_fxsave;
 
@@ -15,26 +15,33 @@ pub fn init() {
 }
 
 extern "C" fn handle_interrupt(info: *mut sgx_interrupt_info_t) -> i32 {
+    // Rust compiler would complain about passing to external C functions a CpuContext
+    // pointer, which includes a FpRegs pointer that is not safe to use by external
+    // modules. In our case, the FpRegs pointer will not be used actually. So the
+    // Rust warning is a false alarm. We suppress it here.
+    #[allow(improper_ctypes)]
     extern "C" {
         fn __occlum_syscall_c_abi(
             num: u32,
             info: *mut sgx_interrupt_info_t,
-            fpregs: *mut u8,
+            fpregs: *mut FpRegs,
         ) -> u32;
     }
 
-    let mut fpregs: Aligned<A16, _> = Aligned([0u8; 512]);
-    let mut fpregs = fpregs.as_mut_ptr();
+    let mut fpregs = FpRegs::save();
     unsafe {
-        _fxsave(fpregs);
-        __occlum_syscall_c_abi(SyscallNum::HandleInterrupt as u32, info, fpregs)
+        __occlum_syscall_c_abi(
+            SyscallNum::HandleInterrupt as u32,
+            info,
+            &mut fpregs as *mut FpRegs,
+        )
     };
     unreachable!();
 }
 
 pub fn do_handle_interrupt(
     info: *mut sgx_interrupt_info_t,
-    fpregs: *mut u8,
+    fpregs: *mut FpRegs,
     cpu_context: *mut CpuContext,
 ) -> Result<isize> {
     let info = unsafe { &*info };

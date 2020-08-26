@@ -127,8 +127,11 @@ impl INode for HNode {
             FileType::File => {
                 try_std!(fs::File::create(&new_path));
             }
+            FileType::Dir => {
+                try_std!(fs::create_dir(&new_path));
+            }
             _ => {
-                warn!("only support creating regular files in HostFS");
+                warn!("only support creating regular file or directory in HostFS");
                 return Err(FsError::PermError);
             }
         }
@@ -150,8 +153,7 @@ impl INode for HNode {
         if new_path.is_file() {
             try_std!(fs::remove_file(new_path));
         } else if new_path.is_dir() {
-            unimplemented!("no remove_dir in sgx_std?")
-        // fs::remove_dir(new_path)?;
+            try_std!(fs::remove_dir(new_path));
         } else {
             return Err(FsError::EntryNotFound);
         }
@@ -184,17 +186,14 @@ impl INode for HNode {
         if !self.path.is_dir() {
             return Err(FsError::NotDir);
         }
-        unimplemented!("no read_dir in sgx_std?")
-        // FIXME: read_dir
-
-        // self.path
-        //     .read_dir()
-        //     .map_err(|_| FsError::NotDir)?
-        //     .nth(id)
-        //     .map_err(|_| FsError::EntryNotFound)?
-        //     .file_name()
-        //     .into_string()
-        //     .map_err(|_| FsError::InvalidParam)
+        if let Some(entry) = try_std!(self.path.read_dir()).nth(id) {
+            try_std!(entry)
+                .file_name()
+                .into_string()
+                .map_err(|_| FsError::InvalidParam)
+        } else {
+            return Err(FsError::EntryNotFound);
+        }
     }
 
     fn io_control(&self, cmd: u32, data: usize) -> Result<()> {

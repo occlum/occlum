@@ -15,9 +15,9 @@ mkdir -p ${BUILD_DIR}
 cd ${BUILD_DIR}
 
 # Download musl-cross-make project
-git clone https://github.com/richfelker/musl-cross-make
+git clone https://github.com/occlum/musl-cross-make
 cd musl-cross-make
-git checkout v0.9.9
+git checkout 0.9.9.hotfix
 
 # Let musl-cross-make build for x86-64 Linux
 TARGET=x86_64-linux-musl

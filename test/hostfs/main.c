@@ -1,8 +1,11 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <dirent.h>
+#include <libgen.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include "test.h"
 
@@ -85,6 +88,44 @@ static int __test_rename(const char *file_path) {
     return 0;
 }
 
+static int __test_readdir(const char *file_path) {
+    struct dirent *dp;
+    DIR *dirp;
+    char base_buf[128] = { 0 };
+    char *base_name;
+    bool found = false;
+    int ret;
+
+    ret = snprintf(base_buf, sizeof(base_buf), "%s", file_path);
+    if (ret >= sizeof(base_buf) || ret < 0) {
+        THROW_ERROR("failed to copy file path to the base buffer");
+    }
+    base_name = basename(base_buf);
+
+    dirp = opendir("/host");
+    if (dirp == NULL) {
+        THROW_ERROR("failed to open host directory");
+    }
+    while (1) {
+        errno = 0;
+        dp = readdir(dirp);
+        if (dp == NULL) {
+            if (errno != 0) {
+                THROW_ERROR("faild to call readdir");
+            }
+            break;
+        }
+        if (strncmp(base_name, dp->d_name, strlen(base_name)) == 0) {
+            found = true;
+        }
+    }
+    if (!found) {
+        THROW_ERROR("faild to read file entry");
+    }
+    closedir(dirp);
+    return 0;
+}
+
 typedef int(*test_hostfs_func_t)(const char *);
 
 static int test_hostfs_framework(test_hostfs_func_t fn) {
@@ -110,6 +151,30 @@ static int test_rename() {
     return test_hostfs_framework(__test_rename);
 }
 
+static int test_readdir() {
+    return test_hostfs_framework(__test_readdir);
+}
+
+static int test_mkdir_then_rmdir() {
+    const char *dir_path = "/host/hostfs_dir";
+    struct stat stat_buf;
+
+    if (mkdir(dir_path, 00775) < 0) {
+        THROW_ERROR("failed to create the dir");
+    }
+    if (stat(dir_path, &stat_buf) < 0) {
+        THROW_ERROR("failed to stat dir");
+    }
+    if (!S_ISDIR(stat_buf.st_mode)) {
+        THROW_ERROR("failed to check if it is dir");
+    }
+
+    if (rmdir(dir_path) < 0) {
+        THROW_ERROR("failed to remove the created dir");
+    }
+    return 0;
+}
+
 // ============================================================================
 // Test suite main
 // ============================================================================
@@ -117,6 +182,8 @@ static int test_rename() {
 static test_case_t test_cases[] = {
     TEST_CASE(test_write_read),
     TEST_CASE(test_rename),
+    TEST_CASE(test_readdir),
+    TEST_CASE(test_mkdir_then_rmdir),
 };
 
 int main(int argc, const char *argv[]) {
