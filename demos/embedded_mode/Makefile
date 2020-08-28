@@ -18,8 +18,8 @@ build_src:
 
 TOTAL_BYTES := 10000000000 # 10GB
 test:
-	cd occlum_instance && LD_LIBRARY_PATH=../bench_driver/build:$(SGX_SDK)/sdk_libs RUST_BACKTRACE=1 \
-		../bench_driver/build/bench_driver $(TOTAL_BYTES)
+	LD_LIBRARY_PATH=bench_driver/build:$(SGX_SDK)/sdk_libs RUST_BACKTRACE=1 \
+		bench_driver/build/bench_driver $(TOTAL_BYTES)
 
 clean:
 	@$(MAKE) --no-print-directory -C trusted_memcpy_bench clean

@@ -8,6 +8,7 @@
 #include "pal_syscall.h"
 #include "pal_thread_counter.h"
 #include "errno2str.h"
+#include <linux/limits.h>
 
 int occlum_pal_get_version(void) {
     return OCCLUM_PAL_VERSION;
@@ -20,6 +21,12 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
     }
     if (attr->instance_dir == NULL) {
         errno = EINVAL;
+        return -1;
+    }
+
+    char resolved_path[PATH_MAX] = {0};
+    if (realpath(attr->instance_dir, resolved_path) == NULL) {
+        PAL_ERROR("realpath returns %s", errno2str(errno));
         return -1;
     }
 
@@ -36,14 +43,14 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
     }
 #endif
 
-    if (pal_init_enclave(attr->instance_dir) < 0) {
+    if (pal_init_enclave(resolved_path) < 0) {
         return -1;
     }
     eid = pal_get_enclave_id();
 
     int ecall_ret = 0;
     sgx_status_t ecall_status = occlum_ecall_init(eid, &ecall_ret, attr->log_level,
-                                attr->instance_dir);
+                                resolved_path);
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
         PAL_ERROR("Failed to do ECall: %s", sgx_err);

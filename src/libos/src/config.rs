@@ -1,4 +1,5 @@
 use super::*;
+use crate::std::untrusted::path::PathEx;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::ffi::CString;
@@ -217,6 +218,12 @@ impl ConfigMount {
             target
         };
         let source = input.source.as_ref().map(|s| PathBuf::from(s));
+        let source = if source.is_none() {
+            None
+        } else {
+            let path = unsafe { PathBuf::from(&INSTANCE_DIR) };
+            path.join(source.unwrap()).canonicalize().ok()
+        };
         let options = ConfigMountOptions::from_input(&input.options)?;
         Ok(ConfigMount {
             type_,
