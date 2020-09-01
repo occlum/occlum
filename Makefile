@@ -41,9 +41,14 @@ submodule: githooks
 	@rm -rf build build_sim
 	@$(MAKE) SGX_MODE=SIM --no-print-directory -C tools
 	@$(MAKE) --no-print-directory -C deps/sefs/sefs-cli clean
-	@$(MAKE) SGX_MODE=SIM --no-print-directory -C deps/sefs/sefs-cli
+	@$(MAKE) --no-print-directory -C deps/sefs/sefs-cli no_sign SGX_MODE=HW
 	@cp deps/sefs/sefs-cli/bin/sefs-cli build/bin
+	@cp deps/sefs/sefs-cli/lib/libsefs-cli.so build/lib
+	@$(MAKE) --no-print-directory -C deps/sefs/sefs-cli SGX_MODE=SIM
+	@cp deps/sefs/sefs-cli/bin/sefs-cli_sim build/bin
+	@cp deps/sefs/sefs-cli/lib/libsefs-cli_sim.so build/lib
 	@cp deps/sefs/sefs-cli/lib/libsefs-cli.signed.so build/lib
+	@cp deps/sefs/sefs-cli/enclave/Enclave.config.xml build/sefs-cli.Enclave.xml
 
 src:
 	@$(MAKE) --no-print-directory -C src
@@ -74,6 +79,8 @@ install: $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/libsgx_uae_service_sim.so
 	@mkdir -p $(OCCLUM_PREFIX)/etc/template/
 	@cp etc/template/* $(OCCLUM_PREFIX)/etc/template
 	@chmod 444 $(OCCLUM_PREFIX)/etc/template/*
+	@cp build/sefs-cli.Enclave.xml $(OCCLUM_PREFIX)/build
+	@chmod 644 $(OCCLUM_PREFIX)/build/sefs-cli.Enclave.xml
 
 	@echo "Installation is done."
 

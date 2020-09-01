@@ -55,6 +55,10 @@ Usage:
 
     occlum gdb <program_name> <program_args>
         Debug the program running inside an SGX enclave with GDB.
+
+    occlum mount [--sign-key <key_path>] [--sign-tool <tool_path>] <path>
+        Mount the secure FS image of the Occlum instance as a Linux FS at an existing <path>.
+        This makes it easy to access and manipulate Occlum's secure FS for debug purpose.
 EOF
 }
 
@@ -174,8 +178,8 @@ cmd_build() {
     rm -rf "$instance_dir/run"
 
     occlum_dir=$occlum_dir instance_dir=$instance_dir pal_lib=$pal_lib major_ver=$major_ver \
-    occlum_version=$occlum_version libos_lib=$libos_lib ENCLAVE_SIGN_KEY=$ENCLAVE_SIGN_KEY \
-    ENCLAVE_SIGN_TOOL=$ENCLAVE_SIGN_TOOL \
+    occlum_version=$occlum_version libos_lib=$libos_lib \
+    ENCLAVE_SIGN_KEY=$ENCLAVE_SIGN_KEY ENCLAVE_SIGN_TOOL=$ENCLAVE_SIGN_TOOL \
     make -f $build_makefile $MAKE_OPTION
 
     cd "$instance_dir"
@@ -278,6 +282,62 @@ cmd_gdb() {
     echo "built" > "$status_file"
 }
 
+cmd_mount() {
+    check_has_built
+
+    while [ -n "$1" ]; do
+        case "$1" in
+        --sign-key)     [ -n "$2" ] && ENCLAVE_SIGN_KEY=$2 ; shift 2 || exit_error "empty signing key path"     ;;
+        --sign-tool)    [ -n "$2" ] && ENCLAVE_SIGN_TOOL=$2 ; shift 2 || exit_error "empty signing tool path"   ;;
+        *) MNT_POINT=$1 ; shift ;;
+        esac
+    done
+    [ -e "$ENCLAVE_SIGN_KEY" ] || exit_error "invalid signing key path: $ENCLAVE_SIGN_KEY"
+    [ -e "$ENCLAVE_SIGN_TOOL" ] || exit_error "invalid signing tool path: $ENCLAVE_SIGN_TOOL"
+    [ -d "$MNT_POINT" ] || exit_error "invalid mount point: $MNT_POINT"
+    echo "Mount tool sign-tool: $ENCLAVE_SIGN_TOOL"
+    echo "Mount tool sign-key: $ENCLAVE_SIGN_KEY"
+    echo "Mount point: $MNT_POINT"
+
+    SGX_MODE=$(cat $instance_dir/.sgx_mode)
+    if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
+        sefs_cli="$occlum_dir/build/bin/sefs-cli_sim"
+        sefs_cli_lib="$occlum_dir/build/lib/libsefs-cli_sim.so"
+        echo "SGX mode: $SGX_MODE"
+    else
+        sefs_cli="$occlum_dir/build/bin/sefs-cli"
+        sefs_cli_lib="$occlum_dir/build/lib/libsefs-cli.so"
+        echo "SGX mode: HW"
+    fi
+
+    signed_sefs_cli_lib="$instance_dir/build/lib/libsefs-cli.signed.so"
+    echo "Signing the mount tool..."
+    "$ENCLAVE_SIGN_TOOL" sign \
+        -key "$ENCLAVE_SIGN_KEY" \
+        -config "$occlum_dir/build/sefs-cli.Enclave.xml" \
+        -enclave "$sefs_cli_lib" \
+        -out "$signed_sefs_cli_lib"
+
+    image_fs="$instance_dir/build/mount/__ROOT"
+    if [ -e "$instance_dir/run/mount/__ROOT/metadata" ]; then
+        container_fs="$instance_dir/run/mount/__ROOT"
+    else
+        container_fs=""
+    fi
+
+    echo "Start to mount the FS..."
+    LD_LIBRARY_PATH="$SGX_SDK/sdk_libs" "$sefs_cli" \
+        --integrity-only \
+        "$signed_sefs_cli_lib" \
+        "$image_fs" \
+        "$container_fs" \
+        "$MNT_POINT" \
+        mount
+
+    # After mounting the FS, remove the signed mount tool
+    rm -f "$signed_sefs_cli_lib"
+}
+
 cmd_status() {
     cat "$status_file"
 }
@@ -314,6 +374,9 @@ case "$cmd" in
         ;;
     gdb)
         cmd_gdb "${@:2}"
+        ;;
+    mount)
+        cmd_mount "${@:2}"
         ;;
     status)
         cmd_status

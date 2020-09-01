@@ -7,6 +7,9 @@ JSON_CONF := $(instance_dir)/Occlum.json
 LIBOS := $(instance_dir)/build/lib/$(libos_lib).$(occlum_version)
 SIGNED_ENCLAVE := $(instance_dir)/build/lib/libocclum-libos.signed.so
 
+SEFS_CLI_SIM := $(occlum_dir)/build/bin/sefs-cli_sim
+SIGNED_SEFS_CLI_LIB := $(occlum_dir)/build/lib/libsefs-cli.signed.so
+
 BIN_LINKS := occlum_exec_client occlum_exec_server occlum-run
 BIN_LINKS := $(addprefix $(instance_dir)/build/bin/, $(BIN_LINKS))
 
@@ -67,7 +70,9 @@ endef
 
 .PHONY : all
 
-all: $(SIGNED_ENCLAVE) $(BIN_LINKS) $(LIB_LINKS)
+ALL_TARGETS := $(SIGNED_ENCLAVE) $(BIN_LINKS) $(LIB_LINKS)
+
+all: $(ALL_TARGETS)
 
 $(SIGNED_ENCLAVE): $(LIBOS)
 	@echo "Signing the enclave..."
@@ -124,16 +129,17 @@ $(instance_dir)/build/lib:
 
 # If image dir not exist, just use the secure Occlum FS image
 ifneq ($(wildcard $(IMAGE)/. ),)
-$(SECURE_IMAGE): $(IMAGE) $(IMAGE_DIRS) $(IMAGE_FILES)
+$(SECURE_IMAGE): $(IMAGE) $(IMAGE_DIRS) $(IMAGE_FILES) $(SEFS_CLI_SIM) $(SIGNED_SEFS_CLI_LIB)
 	@echo "Building new image..."
 
 	@rm -rf build/mount
 
 	@mkdir -p build/mount/
-	@cd "$(occlum_dir)/build/bin/" && \
-	LD_LIBRARY_PATH="$(SGX_SDK)/sdk_libs" ./sefs-cli \
+	@LD_LIBRARY_PATH="$(SGX_SDK)/sdk_libs" $(SEFS_CLI_SIM) \
 		--integrity-only \
+		"$(SIGNED_SEFS_CLI_LIB)" \
 		"$(instance_dir)/build/mount/__ROOT" \
+		"" \
 		"$(instance_dir)/image" \
 		zip
 endif
