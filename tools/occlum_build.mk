@@ -1,4 +1,4 @@
-SGX_SDK ?= /opt/intel/sgxsdk
+SGX_SDK ?= /opt/occlum/sgxsdk-tools
 
 IMAGE := $(instance_dir)/image
 SECURE_IMAGE := $(instance_dir)/build/mount/__ROOT/metadata

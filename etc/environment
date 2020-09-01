@@ -1,0 +1,13 @@
+if [ -d "/opt/occlum/sgxsdk-tools" ]; then
+     export SGX_SDK=/opt/occlum/sgxsdk-tools
+else
+     export SGX_SDK=/opt/intel/sgxsdk
+fi
+export SGX_LIBRARY_PATH=$SGX_SDK/lib64
+export PATH=$SGX_SDK/bin:$SGX_SDK/bin/x64:$PATH
+export PKG_CONFIG_PATH=$SGX_SDK/pkgconfig:$PKG_CONFIG_PATH
+if [ -z "$LD_LIBRARY_PATH" ]; then
+     export LD_LIBRARY_PATH=$SGX_SDK/sdk_libs
+else
+     export LD_LIBRARY_PATH=$SGX_SDK/sdk_libs:$LD_LIBRARY_PATH
+fi

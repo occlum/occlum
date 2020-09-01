@@ -19,10 +19,15 @@ else
 endif
 
 # Occlum major version
-MAJOR_VER_NUM = $(shell grep '\#define OCCLUM_MAJOR_VERSION' ./src/pal/include/occlum_version.h |  awk '{print $$3}')
+MAJOR_VER_NUM = $(shell grep '\#define OCCLUM_MAJOR_VERSION' ./src/pal/include/occlum_version.h | awk '{print $$3}')
+MINOR_VER_NUM = $(shell grep '\#define OCCLUM_MINOR_VERSION' ./src/pal/include/occlum_version.h | awk '{print $$3}')
+PATCH_VER_NUM = $(shell grep '\#define OCCLUM_PATCH_VERSION' ./src/pal/include/occlum_version.h | awk '{print $$3}')
+VERSION_NUM = $(MAJOR_VER_NUM).$(MINOR_VER_NUM).$(PATCH_VER_NUM)
 
 # Exclude files when install
 EXCLUDE_FILES = "libocclum-libos.so.$(MAJOR_VER_NUM)\$$|libocclum-pal.so.$(MAJOR_VER_NUM)\$$|libocclum-pal.so\$$|.a\$$|occlum-protect-integrity.so.*"
+
+SHELL := bash
 
 submodule: githooks
 	git submodule init
@@ -47,7 +52,7 @@ test:
 	@$(MAKE) --no-print-directory -C test test
 
 OCCLUM_PREFIX ?= /opt/occlum
-install:
+install: $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/libsgx_uae_service_sim.so
 	@# Install both libraries for HW mode and SIM mode
 	@$(MAKE) SGX_MODE=HW --no-print-directory -C src
 	@$(MAKE) SGX_MODE=SIM --no-print-directory -C src
@@ -58,6 +63,9 @@ install:
 	@mkdir -p $(OCCLUM_PREFIX)/build/lib/
 	@# Don't copy libos library and pal library symbolic files to install dir
 	@cd build/lib && cp --no-dereference `ls | grep -Ev $(EXCLUDE_FILES)` $(OCCLUM_PREFIX)/build/lib/ && cd -
+	@# Create symbolic for pal library of hardware mode
+	@cd $(OCCLUM_PREFIX)/build/lib && ln -sf libocclum-pal.so.$(VERSION_NUM) libocclum-pal.so.$(MAJOR_VER_NUM) && \
+		ln -sf libocclum-pal.so.$(MAJOR_VER_NUM) libocclum-pal.so
 
 	@echo "Install headers and miscs ..."
 	@mkdir -p $(OCCLUM_PREFIX)/include/
@@ -66,7 +74,20 @@ install:
 	@mkdir -p $(OCCLUM_PREFIX)/etc/template/
 	@cp etc/template/* $(OCCLUM_PREFIX)/etc/template
 	@chmod 444 $(OCCLUM_PREFIX)/etc/template/*
+
 	@echo "Installation is done."
+
+# Install minimum sgx-sdk set to support Occlum cmd execution in non-customized sgx-sdk environment
+$(OCCLUM_PREFIX)/sgxsdk-tools/lib64/libsgx_uae_service_sim.so: /opt/intel/sgxsdk/lib64/libsgx_uae_service_sim.so
+	@echo "Install needed sgx-sdk tools ..."
+	@mkdir -p $(OCCLUM_PREFIX)/sgxsdk-tools/lib64
+	@cp /opt/intel/sgxsdk/lib64/{libsgx_ptrace.so,libsgx_uae_service_sim.so} $(OCCLUM_PREFIX)/sgxsdk-tools/lib64
+	@mkdir -p $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/gdb-sgx-plugin
+	@cd /opt/intel/sgxsdk/lib64/gdb-sgx-plugin/ && cp $$(ls -A | grep -v __pycache__) $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/gdb-sgx-plugin
+	@cd /opt/intel/sgxsdk && cp --parents {bin/sgx-gdb,bin/x64/sgx_sign,sdk_libs/libsgx_uae_service_sim.so} $(OCCLUM_PREFIX)/sgxsdk-tools/
+	@# Delete SGX_LIBRARY_PATH env in sgx-gdb which are defined in etc/environment
+	@sed -i '/^SGX_LIBRARY_PATH=/d' $(OCCLUM_PREFIX)/sgxsdk-tools/bin/sgx-gdb
+	@cp etc/environment $(OCCLUM_PREFIX)/sgxsdk-tools/
 
 format:
 	@$(MAKE) --no-print-directory -C test format

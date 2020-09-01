@@ -6,8 +6,10 @@ build_makefile=$occlum_dir/build/bin/occlum_build.mk
 
 if [[ "$occlum_dir" == "/opt/occlum" ]]; then
     version_header=$occlum_dir/include/occlum_version.h
+    occlum_sgx_env=$occlum_dir/sgxsdk-tools/environment
 else
     version_header=$occlum_dir/src/pal/include/occlum_version.h
+    occlum_sgx_env=$occlum_dir/etc/environment
 fi
 
 major_ver=`grep '\#define OCCLUM_MAJOR_VERSION' $version_header |  awk '{print $3}'`
@@ -19,7 +21,7 @@ instance_dir=`pwd`
 
 status_file=$instance_dir/.__occlum_status
 
-SGX_SDK="${SGX_SDK:-/opt/intel/sgxsdk}"
+source $occlum_sgx_env
 SGX_GDB="$SGX_SDK/bin/sgx-gdb"
 ENCLAVE_SIGN_TOOL="$SGX_SDK/bin/x64/sgx_sign"
 ENCLAVE_SIGN_KEY="$occlum_dir/etc/template/Enclave.pem"
