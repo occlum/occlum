@@ -126,6 +126,19 @@ static int test_prctl_get_default_thread_name(void) {
     return 0;
 }
 
+static int test_prctl_get_timerslack(void) {
+    int nanoseconds = prctl(PR_GET_TIMERSLACK, 0, 0, 0, 0);
+    if (nanoseconds < 0) {
+        THROW_ERROR("test prctl get timer slack failed");
+    };
+    printf("timer slack = %d ns\n", nanoseconds);
+    // Kernel default timer slack is 50us
+    if (nanoseconds != 50000) {
+        THROW_ERROR("timer slack is not 50us");
+    }
+    return 0;
+}
+
 // ============================================================================
 // Test suite main
 // ============================================================================
@@ -133,6 +146,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_prctl_set_get_long_name), // over 16 bytes
     TEST_CASE(test_prctl_set_get_normal_name),
     TEST_CASE(test_prctl_get_default_thread_name),
+    TEST_CASE(test_prctl_get_timerslack),
 };
 
 int main() {

@@ -1,5 +1,6 @@
 #include <pthread.h>
 #include <sys/time.h>
+#include <sys/prctl.h>
 #include "ocalls.h"
 
 void occlum_ocall_gettimeofday(struct timeval *tv) {
@@ -34,4 +35,9 @@ void occlum_ocall_rdtsc(uint32_t *low, uint32_t *high) {
     asm volatile("rdtsc" : "=a"(rax), "=d"(rdx));
     *low = (uint32_t)rax;
     *high = (uint32_t)rdx;
+}
+
+void occlum_ocall_get_timerslack(int *timer_slack) {
+    int nanoseconds = prctl(PR_GET_TIMERSLACK, 0, 0, 0, 0);
+    *timer_slack = nanoseconds;
 }

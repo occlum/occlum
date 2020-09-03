@@ -1,3 +1,4 @@
+use self::timer_slack::*;
 use super::*;
 use core::convert::TryFrom;
 use process::pid_t;
@@ -8,6 +9,7 @@ use std::{fmt, u64};
 use syscall::SyscallNum;
 
 mod profiler;
+pub mod timer_slack;
 pub mod up_time;
 
 pub use profiler::ThreadProfiler;
@@ -182,7 +184,7 @@ pub fn do_nanosleep(req: &timespec_t, rem: Option<&mut timespec_t>) -> Result<()
         assert!(sgx_status == sgx_status_t::SGX_SUCCESS);
         assert!(ret == 0 || libc::errno() == Errno::EINTR as i32);
         if ret != 0 {
-            assert!(u_rem.as_duration() <= req.as_duration());
+            assert!(u_rem.as_duration() <= req.as_duration() + (*TIMERSLACK).to_duration());
             if let Some(rem) = rem {
                 *rem = u_rem;
             }

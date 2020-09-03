@@ -175,7 +175,7 @@ pub fn do_futex(
 
 pub fn do_prctl(option: i32, arg2: u64, arg3: u64, arg4: u64, arg5: u64) -> Result<isize> {
     let prctl_cmd = super::prctl::PrctlCmd::from_raw(option, arg2, arg3, arg4, arg5)?;
-    super::prctl::do_prctl(prctl_cmd).map(|_| 0)
+    super::prctl::do_prctl(prctl_cmd)
 }
 
 pub fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize> {

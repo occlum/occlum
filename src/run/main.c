@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <occlum_pal_api.h>
+#include <sys/prctl.h>
 
 int main(int argc, char *argv[]) {
     // Parse arguments

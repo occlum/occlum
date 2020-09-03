@@ -1,3 +1,4 @@
+use super::super::time::timer_slack::TIMERSLACK;
 use super::*;
 
 pub fn select(
@@ -63,7 +64,10 @@ pub fn select(
     if !timeout.is_null() {
         let time_left = unsafe { *(timeout) };
         time_left.validate()?;
-        assert!(time_left.as_duration() <= origin_timeout.as_duration());
+        assert!(
+            // Note: TIMERSLACK is a single value use maintained by the libOS and will not vary for different threads.
+            time_left.as_duration() <= origin_timeout.as_duration() + (*TIMERSLACK).to_duration()
+        );
     }
 
     debug!("returned pollfds are {:?}", pollfds);
