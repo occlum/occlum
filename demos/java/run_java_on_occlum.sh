@@ -51,7 +51,7 @@ run_web() {
     init_instance
     build_web
     echo -e "${BLUE}occlum run JVM web app${NC}"
-    occlum run /usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin/java -Xmx512m -XX:MaxMetaspaceSize=64m -Dos.name=Linux -jar /usr/lib/spring/${jar_file}
+    occlum run /usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin/java -Xmx512m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=64m -Dos.name=Linux -jar /usr/lib/spring/${jar_file}
 }
 
 build_hello() {
@@ -69,7 +69,7 @@ run_hello() {
     init_instance
     build_hello
     echo -e "${BLUE}occlum run JVM hello${NC}"
-    occlum run /usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin/java -Xmx512m -XX:MaxMetaspaceSize=64m -Dos.name=Linux Main
+    occlum run /usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin/java -Xmx512m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=64m -Dos.name=Linux Main
 }
 
 arg=$1
