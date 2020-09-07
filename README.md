@@ -259,6 +259,10 @@ $ OCCLUM_RELEASE_ENCLAVE=yes occlum run <prog_path> <prog_args>
 
 Ultimately, whether an enclave is running in the release mode should be checked and judged by a trusted client through remotely attesting the enclave. See the remote attestation demo [here](demos/remote_attestation).
 
+## How to Run Occlum on Public Cloud?
+
+To cut off the complexity of self-hosted infrastructure, one can deploy Occlum-powered SGX apps on public clouds with SGX support. For example, we have tested and successfully deployed Occlum Docker containers on [Azure Kubernetes Service (AKS)](https://azure.microsoft.com/en-us/services/kubernetes-service/#getting-started). Please check out [this doc](docs/azure_aks_deployment_guide.md) for more details.
+
 ## How to Run Occlum Without Docker?
 
 One easy way to run Occlum without Docker is to use the Occlum Installer. We have prepared the RPM installer for Occlum, which can be downloaded with every release of Occlum. For more info about the installer, see [here](tools/installer/README.md).
