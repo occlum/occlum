@@ -51,3 +51,20 @@ macro_rules! try_libc {
         ret
     }};
 }
+
+// return Err(errno) if libc return -1
+// raise SIGPIPE if errno == EPIPE
+macro_rules! try_libc_may_epipe {
+    ($ret: expr) => {{
+        let ret = unsafe { $ret };
+        if ret < 0 {
+            let errno = unsafe { libc::errno() };
+            if errno == Errno::EPIPE as i32 {
+                // SIGPIPE = 12
+                crate::signal::do_tkill(current!().tid(), 12);
+            }
+            return_errno!(Errno::from(errno as u32), "libc error");
+        }
+        ret
+    }};
+}

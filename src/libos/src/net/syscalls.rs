@@ -286,7 +286,7 @@ pub fn do_sendto(
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_socket() {
         // TODO: check addr and addr_len according to connection mode
-        let ret = try_libc!(libc::ocall::sendto(
+        let ret = try_libc_may_epipe!(libc::ocall::sendto(
             socket.fd(),
             base,
             len,

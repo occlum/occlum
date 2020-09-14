@@ -7,12 +7,16 @@
 #define SIGRT_INTERRUPT     64
 
 int pal_register_sig_handlers(void) {
-    struct sigaction action;
-    action.sa_handler = SIG_IGN;
-    memset(&action.sa_mask, 0, sizeof(action.sa_mask));
-    action.sa_flags = 0;
-    if (sigaction(SIGRT_INTERRUPT, &action, NULL) < 0) {
-        PAL_ERROR("Failed to regiter signal handlers");
+    // FIXME: enable interruptable signal in SIM mode
+#ifndef SGX_MODE_SIM
+    if (signal(SIGRT_INTERRUPT, SIG_IGN) == SIG_ERR) {
+        PAL_ERROR("Failed to regiter the SIG64 handler");
+        return -1;
+    }
+#endif
+
+    if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
+        PAL_ERROR("Failed to regiter the SIGPIPE handler");
         return -1;
     }
     return 0;

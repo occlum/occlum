@@ -56,10 +56,10 @@ impl SocketFile {
         let (msg_control, msg_controllen) = control.as_ptr_and_len();
         let msg_control = msg_control as *const c_void;
         // Flags
-        let flags = flags.bits();
+        let raw_flags = flags.bits();
 
-        let bytes_sent = try_libc!({
-            // Do OCall
+        // Do OCall
+        unsafe {
             let status = occlum_ocall_sendmsg(
                 &mut retval as *mut isize,
                 host_fd,
@@ -69,12 +69,17 @@ impl SocketFile {
                 msg_iovlen,
                 msg_control,
                 msg_controllen,
-                flags,
+                raw_flags,
             );
             assert!(status == sgx_status_t::SGX_SUCCESS);
+        }
 
-            retval
-        });
+        let bytes_sent = if flags.contains(SendFlags::MSG_NOSIGNAL) {
+            try_libc!(retval)
+        } else {
+            try_libc_may_epipe!(retval)
+        };
+
         debug_assert!(bytes_sent >= 0);
         Ok(bytes_sent as usize)
     }

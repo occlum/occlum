@@ -36,12 +36,10 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
         errno = EEXIST;
         return -1;
     }
-// FIXME
-#ifndef SGX_MODE_SIM
+
     if (pal_register_sig_handlers() < 0) {
         return -1;
     }
-#endif
 
     if (pal_init_enclave(resolved_path) < 0) {
         return -1;

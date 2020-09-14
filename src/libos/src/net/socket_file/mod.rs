@@ -59,7 +59,7 @@ impl File for SocketFile {
 
     fn write(&self, buf: &[u8]) -> Result<usize> {
         let (buf_ptr, buf_len) = buf.as_ptr_and_len();
-        let ret = try_libc!(libc::ocall::write(
+        let ret = try_libc_may_epipe!(libc::ocall::write(
             self.host_fd,
             buf_ptr as *const c_void,
             buf_len
