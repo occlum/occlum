@@ -49,14 +49,17 @@ Also, UAE service libraries are needed but may not installed together with SGX P
 rpm -i libsgx-uae-service-2.9.101.2-1.el7.x86_64.rpm
 ```
 
-**Step 3. Install Occlum Installer and Toolchains Installer**
+**Step 3. Install enable_RDFSBASE Kernel Module**
+Please follow [this README](https://github.com/occlum/enable_rdfsbase/blob/master/README.md) to install `enable_rdfsbase` kernel module.
+
+**Step 4. Install Occlum Installer and Toolchains Installer**
 ```
 rpm -i occlum-sgx-tools-*.rpm
 rpm -i occlum-pal-*.rpm
 rpm -i occlum-runtime-*.rpm
 ```
 
-Toolchains are needed when compile applications and also during runtime. Choose to install the toolchain installer based on the application's language. Currently, we only supports `C/C++`. More language toolchain installers are on the way. To install `C/C++` toolchain, just run the command:
+Toolchains are needed when compiling applications and also during runtime. Choose to install the toolchain installer based on the application's language. Currently, we only supports `C/C++`. More language toolchain installers are on the way. To install `C/C++` toolchain, just run the command:
 ```
 rpm -i occlum-toolchains-gcc-*.rpm
 ```
@@ -71,7 +74,11 @@ To make the new installed binaries and libraries work, this command must be exec
 source /etc/profile
 ```
 
-Finally, you are good to go!
+**Step 5. Install Debug Packages (OPTIONAL)**
+If users want to debug the application running inside the libos, debug packages are also needed. Just run:
+```
+rpm -i occlum-debuginfo*.rpm occlum-debugsource*.rpm occlum-pal-debuginfo*.rpm occlum-runtime-debuginfo*.rpm occlum-sgx-tools-debuginfo*.rpm occlum-toolchains-gcc-debuginfo*.rpm occlum-toolchains-gcc-debugsource*.rpm
+```
 
 
 ## DEB Installer

@@ -1,7 +1,0 @@
-/opt/intel/sgxsdk/lib64/libsgx_uae_service_sim.so
-/opt/intel/sgxsdk/sdk_libs/libsgx_uae_service_sim.so
-/opt/intel/sgxsdk/lib64/libsgx_ptrace.so
-/opt/intel/sgxsdk/lib64/gdb-sgx-plugin/*
-/opt/intel/sgxsdk/bin/sgx-gdb
-/opt/intel/sgxsdk/bin/x64/sgx_sign
-/opt/intel/sgxsdk/environment

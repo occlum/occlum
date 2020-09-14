@@ -3,6 +3,9 @@
 %define _unpackaged_files_terminate_build 0
 %define sgxsdk_install_dir /opt/intel
 
+# Remove checking for python shebang error in sgx-gdb
+%undefine __brp_mangle_shebangs
+
 Name: occlum
 Version: %{_version}
 Release: %{centos_base_release}%{?dist}
@@ -14,8 +17,8 @@ Source0: https://github.com/occlum/occlum/archive/%{_version}.tar.gz
 Source10: occlum-pal.sh
 Source11: occlum-filelist
 Source12: occlum-pal-filelist
-Source13: occlum-platform-filelist
-SOURCE14: occlum-platform.sh
+Source13: occlum-runtime-filelist
+SOURCE14: occlum-runtime.sh
 
 ExclusiveArch: x86_64
 
@@ -32,6 +35,8 @@ BuildRequires: git
 BuildRequires: fuse-devel
 BuildRequires: fuse-libs
 
+Requires: occlum-pal, occlum-runtime, occlum-toolchains-gcc, occlum-sgx-tools
+
 %description
 Occlum is a memory-safe, multi-process library OS (LibOS) for Intel SGX.
 As a LibOS, it enables legacy applications to run on SGX with little or even no modifications of source code,
@@ -44,11 +49,17 @@ Summary: Platform Abstraction Layer of Occlum enclave
 occlum-pal is the Platform Abstraction Layer of Occlum enclave.
 It provides interfaces to execute trused applications inside enclave.
 
-%package platform
-Summary: Platform Abstraction Layer command for occlum enclave
+%package runtime
+Summary: Necessary binaries for occlum run/exec
 
-%description platform
-occlum-platform contains command for occlum enclave.
+%description runtime
+occlum-runtime contains command for occlum run/exec.
+
+%package sgx-tools
+Summary: minimum dependencies from Intel SGX SDK e.g. sgx-gdb, sgx_sign
+
+%description sgx-tools
+minimum dependencies from Intel SGX SDK e.g. sgx-gdb, sgx_sign
 
 %prep
 %setup -q -c -n %{name}-%{_version}
@@ -76,13 +87,16 @@ install -p -m 644 %{SOURCE14} $RPM_BUILD_ROOT%{_sysconfdir}/profile.d/
 %files pal -f %{SOURCE12}
 /etc/profile.d/occlum-pal.sh
 
-%files platform -f %{SOURCE13}
-/etc/profile.d/occlum-platform.sh
+%files runtime -f %{SOURCE13}
+/etc/profile.d/occlum-runtime.sh
+
+%files sgx-tools
+/opt/occlum/sgxsdk-tools
 
 %post pal
 echo 'Please execute command "source /etc/profile" to validate envs immediately'
 
-%post platform
+%post runtime
 echo 'Please execute command "source /etc/profile" to validate envs immediately'
 
 %changelog
