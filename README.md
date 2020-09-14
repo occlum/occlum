@@ -253,10 +253,11 @@ If the cause of a problem does not seem to be the app but Occlum itself, then on
 
 By default, the `occlum build` command builds and signs enclaves in debug mode. These SGX debug-mode enclaves are intended for development and testing purposes only. For production usage, the enclaves must be signed by a key acquired from Intel (a restriction that will be lifted in the future when Flexible Launch Control is ready) and run with SGX debug support disabled.
 
-Occlum has built-in support for both building and running enclaves in release mode. The commands are shown below:
+Occlum has built-in support for both building and running enclaves in release mode.
+To do that, modify `Occlum.json` [metadata]-[debuggable] field to `false`. And then run the commands below:
 ```
 $ occlum build --sign-key <path_to/your_key.pem>
-$ OCCLUM_RELEASE_ENCLAVE=yes occlum run <prog_path> <prog_args>
+$ occlum run <prog_path> <prog_args>
 ```
 
 Ultimately, whether an enclave is running in the release mode should be checked and judged by a trusted client through remotely attesting the enclave. See the remote attestation demo [here](demos/remote_attestation).

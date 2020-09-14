@@ -12,7 +12,7 @@ else
     occlum_sgx_env=$occlum_dir/etc/environment
 fi
 
-# For deploy environment, version header file may not exist
+# For deployment environment, version header file may not exist
 if [ -f "$version_header" ]; then
     major_ver=`grep '\#define OCCLUM_MAJOR_VERSION' $version_header |  awk '{print $3}'`
     minor_ver=`grep '\#define OCCLUM_MINOR_VERSION' $version_header |  awk '{print $3}'`
@@ -24,10 +24,13 @@ instance_dir=`pwd`
 
 status_file=$instance_dir/.__occlum_status
 
-source $occlum_sgx_env
-SGX_GDB="$SGX_SDK/bin/sgx-gdb"
-ENCLAVE_SIGN_TOOL="$SGX_SDK/bin/x64/sgx_sign"
-ENCLAVE_SIGN_KEY="$occlum_dir/etc/template/Enclave.pem"
+# For deployment environment, env for sgx-sdk may not exist
+if [ -f "$occlum_sgx_env" ]; then
+    source $occlum_sgx_env
+    SGX_GDB="$SGX_SDK/bin/sgx-gdb"
+    ENCLAVE_SIGN_TOOL="$SGX_SDK/bin/x64/sgx_sign"
+    ENCLAVE_SIGN_KEY="$occlum_dir/etc/template/Enclave.pem"
+fi
 
 get_enclave_debuggable_flag() {
     cat "$instance_dir/Occlum.json" | \
@@ -59,8 +62,6 @@ Usage:
 
     occlum run <program_name> <program_args>
         Run the user program inside an SGX enclave.
-        To run the enclave in SGX hardware release mode, use:
-        OCCLUM_RELEASE_ENCLAVE=1 occlum run <program_name> <program_args>
 
     occlum package [<package_name>.tar.gz]
         Generate a minimal, self-contained package (.tar.gz) for the Occlum instance.
@@ -225,6 +226,9 @@ cmd_run() {
 
     echo "running" > $status_file
 
+    if [ "`get_enclave_debuggable_flag`" == "False" ]; then
+        export OCCLUM_RELEASE_ENCLAVE=1
+    fi
     RUST_BACKTRACE=1 "$instance_dir/build/bin/occlum-run" "$@"
 
     echo "built" > $status_file
@@ -242,6 +246,9 @@ cmd_start() {
 
     echo "running" > $status_file
 
+    if [ "`get_enclave_debuggable_flag`" == "False" ]; then
+        export OCCLUM_RELEASE_ENCLAVE=1
+    fi
     RUST_BACKTRACE=1 "$instance_dir/build/bin/occlum_exec_client" start
 
     echo "built" > $status_file
