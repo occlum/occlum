@@ -1,7 +1,7 @@
-From ebd4f84dd2561d5ef381312ef9934a6076e62915 Mon Sep 17 00:00:00 2001
-From: "Tate, Hongliang Tian" <tate.thl@antfin.com>
-Date: Wed, 3 Jun 2020 08:11:35 +0000
-Subject: [PATCH 1/4] Add support for integrity-only SGX files
+From daf3f6e0723c28a34c80cfcc4a4c5595226f3459 Mon Sep 17 00:00:00 2001
+From: "zongmin.gu" <zongmin.gzm@antgroup.com>
+Date: Tue, 15 Sep 2020 13:26:05 +0800
+Subject: [PATCH] Update Rust SDK for Occlum
 
 ---
  samplecode/unit-test/enclave/src/lib.rs       |  2 +
@@ -10,7 +10,8 @@ Subject: [PATCH 1/4] Add support for integrity-only SGX files
  sgx_tstd/src/sgxfs.rs                         | 39 ++++++++-
  sgx_tstd/src/sys/sgxfs.rs                     | 38 +++++++--
  sgx_types/src/function.rs                     |  6 +-
- 6 files changed, 203 insertions(+), 7 deletions(-)
+ sgx_types/src/types.rs                        | 14 +++-
+ 7 files changed, 215 insertions(+), 9 deletions(-)
 
 diff --git a/samplecode/unit-test/enclave/src/lib.rs b/samplecode/unit-test/enclave/src/lib.rs
 index b9ea49be..d740753f 100644
@@ -75,10 +76,10 @@ index 766ba674..eeefd9eb 100644
 +    assert!(remove_result.is_ok());
 +}
 diff --git a/sgx_tprotected_fs/src/fs.rs b/sgx_tprotected_fs/src/fs.rs
-index 93767e4b..9ddac357 100644
+index 241a7d7f..69608907 100644
 --- a/sgx_tprotected_fs/src/fs.rs
 +++ b/sgx_tprotected_fs/src/fs.rs
-@@ -35,6 +35,15 @@ unsafe fn rsgx_fopen(filename: &CStr, mode: &CStr, key: &sgx_key_128bit_t) -> Sy
+@@ -39,6 +39,15 @@ unsafe fn rsgx_fopen(filename: &CStr, mode: &CStr, key: &sgx_key_128bit_t) -> Sy
      }
  }
  
@@ -94,7 +95,7 @@ index 93767e4b..9ddac357 100644
  unsafe fn rsgx_fopen_auto_key(filename: &CStr, mode: &CStr) -> SysResult<SGX_FILE> {
      let file = sgx_fopen_auto_key(filename.as_ptr(), mode.as_ptr());
      if file.is_null() {
-@@ -192,6 +201,15 @@ unsafe fn rsgx_fimport_auto_key(filename: &CStr, key: &sgx_key_128bit_t) -> SysE
+@@ -196,6 +205,15 @@ unsafe fn rsgx_fimport_auto_key(filename: &CStr, key: &sgx_key_128bit_t) -> SysE
      }
  }
  
@@ -108,10 +109,10 @@ index 93767e4b..9ddac357 100644
 +}
 +
  pub struct SgxFileStream {
-     stream: SGX_FILE
+     stream: SGX_FILE,
  }
 @@ -275,6 +293,48 @@ impl SgxFileStream {
-         }
+         unsafe { rsgx_fopen_auto_key(filename, mode).map(|f| SgxFileStream { stream: f }) }
      }
  
 +    ///
@@ -347,10 +348,10 @@ index 7d6f24f3..0a6acef9 100644
  
  pub fn remove(path: &Path) -> io::Result<()> {
 diff --git a/sgx_types/src/function.rs b/sgx_types/src/function.rs
-index 3c2db3a4..f96cd9e8 100644
+index b74afd75..527e4bf9 100644
 --- a/sgx_types/src/function.rs
 +++ b/sgx_types/src/function.rs
-@@ -629,7 +629,10 @@ extern "C" {
+@@ -644,7 +644,10 @@ extern "C" {
  
      pub fn sgx_fopen_auto_key(filename: *const c_char, mode: *const c_char) -> SGX_FILE;
  
@@ -362,7 +363,7 @@ index 3c2db3a4..f96cd9e8 100644
                        size: size_t,
                        count: size_t,
                        stream: SGX_FILE) -> size_t;
-@@ -650,6 +653,7 @@ extern "C" {
+@@ -665,6 +668,7 @@ extern "C" {
      pub fn sgx_fexport_auto_key(filename: *const c_char, key: *mut sgx_key_128bit_t) -> int32_t;
      pub fn sgx_fimport_auto_key(filename: *const c_char, key: *const sgx_key_128bit_t) -> int32_t;
      pub fn sgx_fclear_cache(stream: SGX_FILE) -> int32_t;
@@ -370,33 +371,30 @@ index 3c2db3a4..f96cd9e8 100644
  }
  
  /* intel sgx sdk 2.0 */
--- 
-2.17.1
-
-
-From b126b99cd8cf12ac4971915d408d48a557bc5399 Mon Sep 17 00:00:00 2001
-From: "Tate, Hongliang Tian" <tate.thl@antfin.com>
-Date: Wed, 3 Jun 2020 08:35:53 +0000
-Subject: [PATCH 2/4] Add data structures for #PF and #GP exceptions
-
----
- sgx_types/src/types.rs | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
 diff --git a/sgx_types/src/types.rs b/sgx_types/src/types.rs
-index 4f191364..651d088e 100644
+index 05cb12f2..ad639fda 100644
 --- a/sgx_types/src/types.rs
 +++ b/sgx_types/src/types.rs
-@@ -865,6 +865,8 @@ impl_enum! {
+@@ -897,8 +897,8 @@ impl_enum! {
          SGX_EXCEPTION_VECTOR_BP = 3,  /* INT 3 instruction */
          SGX_EXCEPTION_VECTOR_BR = 5,  /* BOUND instruction */
          SGX_EXCEPTION_VECTOR_UD = 6,  /* UD2 instruction or reserved opcode */
+-        SGX_EXCEPTION_VECTOR_GP = 13, /* General protection exception */
+-        SGX_EXCEPTION_VECTOR_PF = 14, /* Page fault exception */
 +        SGX_EXCEPTION_VECTOR_GP = 13, /* General protection */
 +        SGX_EXCEPTION_VECTOR_PF = 14, /* Page fault */
          SGX_EXCEPTION_VECTOR_MF = 16, /* x87 FPU floating-point or WAIT/FWAIT instruction */
          SGX_EXCEPTION_VECTOR_AC = 17, /* Any data reference in memory */
          SGX_EXCEPTION_VECTOR_XM = 19, /* SSE/SSE2/SSE3 floating-point instruction */
-@@ -922,11 +924,20 @@ cfg_if! {
+@@ -912,6 +912,7 @@ impl_enum! {
+     pub enum sgx_exception_type_t {
+         SGX_EXCEPTION_HARDWARE = 3,
+         SGX_EXCEPTION_SOFTWARE = 6,
++        SGX_EXCEPTION_SIMULATED = 7,
+     }
+ }
+ 
+@@ -957,11 +958,20 @@ cfg_if! {
      }
  }
  
@@ -417,56 +415,6 @@ index 4f191364..651d088e 100644
      }
  }
  
--- 
-2.17.1
-
-
-From 3b224780e7f948753ef27e67677a5fc6a2a49961 Mon Sep 17 00:00:00 2001
-From: "Tate, Hongliang Tian" <tate.thl@antfin.com>
-Date: Wed, 3 Jun 2020 08:37:47 +0000
-Subject: [PATCH 3/4] Add a new exception type: simulated
-
----
- sgx_types/src/types.rs | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/sgx_types/src/types.rs b/sgx_types/src/types.rs
-index 651d088e..ef43d7d6 100644
---- a/sgx_types/src/types.rs
-+++ b/sgx_types/src/types.rs
-@@ -879,6 +879,7 @@ impl_enum!{
-     pub enum sgx_exception_type_t {
-         SGX_EXCEPTION_HARDWARE = 3,
-         SGX_EXCEPTION_SOFTWARE = 6,
-+        SGX_EXCEPTION_SIMULATED = 7,
-     }
- }
- 
--- 
-2.17.1
-
-
-From 53707096d65d2c2439246274328484094be28c05 Mon Sep 17 00:00:00 2001
-From: volcano <volcano_dr@163.com>
-Date: Mon, 31 Aug 2020 11:12:44 +0800
-Subject: [PATCH 4/4] fix no return value of u_malloc_ocall
-
----
- sgx_ustdc/mem.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/sgx_ustdc/mem.c b/sgx_ustdc/mem.c
-index 3dceb037..5e4aea84 100644
---- a/sgx_ustdc/mem.c
-+++ b/sgx_ustdc/mem.c
-@@ -26,6 +26,7 @@ void *u_malloc_ocall(int *error, size_t size)
-     if (error) {
-         *error = ret == NULL ? errno : 0;
-     }
-+    return ret;
- }
- 
- void u_free_ocall(void *p)
 -- 
 2.17.1
 

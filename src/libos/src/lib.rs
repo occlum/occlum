@@ -16,6 +16,8 @@
 // for may_dangle in rw_lock
 #![feature(dropck_eyepatch)]
 #![feature(option_expect_none)]
+// for UntrustedSliceAlloc in slice_alloc
+#![feature(slice_ptr_get)]
 
 #[macro_use]
 extern crate alloc;

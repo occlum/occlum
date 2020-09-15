@@ -1,5 +1,5 @@
 use super::*;
-use std::alloc::{AllocErr, AllocInit, AllocRef, Layout, MemoryBlock};
+use std::alloc::{AllocErr, AllocRef, Layout};
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -26,12 +26,7 @@ impl UntrustedSliceAlloc {
         }
 
         let layout = Layout::from_size_align(buf_size, 1)?;
-        let buf_ptr = unsafe {
-            UNTRUSTED_ALLOC
-                .alloc(layout, AllocInit::Uninitialized)?
-                .ptr
-                .as_ptr()
-        };
+        let buf_ptr = unsafe { UNTRUSTED_ALLOC.alloc(layout)?.as_mut_ptr() };
 
         let buf_pos = AtomicUsize::new(0);
         Ok(Self {
@@ -52,18 +47,14 @@ impl UntrustedSliceAlloc {
             // Move self.buf_pos forward if enough space _atomically_.
             let old_pos = self
                 .buf_pos
-                .fetch_update(
-                    |old_pos| {
-                        let new_pos = old_pos + new_slice_len;
-                        if new_pos <= self.buf_size {
-                            Some(new_pos)
-                        } else {
-                            None
-                        }
-                    },
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |old_pos| {
+                    let new_pos = old_pos + new_slice_len;
+                    if new_pos <= self.buf_size {
+                        Some(new_pos)
+                    } else {
+                        None
+                    }
+                })
                 .map_err(|e| errno!(ENOMEM, "No enough space"))?;
             unsafe { self.buf_ptr.add(old_pos) }
         };

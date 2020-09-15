@@ -273,7 +273,7 @@ impl ProcessVM {
         }
 
         self.brk
-            .fetch_update(|old_brk| Some(new_brk), Ordering::SeqCst, Ordering::SeqCst);
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |old_brk| Some(new_brk));
         Ok(new_brk)
     }
 
