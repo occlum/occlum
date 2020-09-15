@@ -3,36 +3,61 @@ name: OCCLUM CI
 # Controls when the action will run. Triggers the workflow on push or pull request
 on: [push, pull_request]
 
-jobs:
-  make-test-on-ubuntu:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-18.04
-    container: occlum/occlum:0.15.1-ubuntu18.04
+env:
+  OCCLUM_VERSION: 0.15.1
 
-    # Below steps are running directly in docker container
+jobs:
+  make-test-on-ubuntu-with-format-checking:
+    runs-on: ubuntu-18.04
+
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: true
 
-    - name: Set Toolchains
-      run: rustup default $OCCLUM_RUST_VERSION
+    - name: Create container with ubuntu image
+      run: docker run -itd --name=ubuntu-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
 
-    - name: Check Format
-      run: |
-        info=$(make format-check)
-        if [ -n "$info" ]; then
+    - name: Check C/C++ Format
+      run:  docker exec ubuntu-test bash -c 'cd /root/occlum; info=$(make format-check);
+        if [[ -n $info ]]; then
           echo "Format error detected.";
           exit 1;
-        fi
+        fi'
+
+    - name: Check Rust Format
+      run: docker exec ubuntu-test bash -c 'cd /root/occlum/src/libos; output=$(cargo fmt -- --check 2>&1);retval=$?;
+        if [[ retval -eq 1 ]]; then
+          echo "Format error detected.";
+          exit 1;
+        fi'
 
     - name: Build Dependencies
-      run:  make submodule
+      run:  docker exec ubuntu-test bash -c "cd /root/occlum; make submodule"
 
     - name: Build Source
-      run: |
-        OCCLUM_RELEASE_BUILD=y SGX_MODE=SIM make
+      run:  docker exec ubuntu-test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y SGX_MODE=SIM make"
 
     - name: Integration Test
-      run: |
-        SGX_MODE=SIM make test
+      run:  docker exec ubuntu-test bash -c "cd /root/occlum; SGX_MODE=SIM make test"
+
+
+  make-test-on-centos:
+    runs-on: ubuntu-18.04
+
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Create container with centos image
+      run: docker run -itd --name=centos-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-centos8.1
+
+    - name: Build Dependencies
+      run:  docker exec centos-test bash -c "cd /root/occlum; make submodule"
+
+    - name: Build Source
+      run:  docker exec centos-test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y SGX_MODE=SIM make"
+
+    - name: Integration Test
+      run:  docker exec centos-test bash -c "cd /root/occlum; SGX_MODE=SIM make test"
