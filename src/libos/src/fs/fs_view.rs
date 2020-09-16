@@ -64,6 +64,14 @@ impl FsView {
                     if creation_flags.can_create() && creation_flags.is_exclusive() {
                         return_errno!(EEXIST, "file exists");
                     }
+                    if creation_flags.must_be_directory()
+                        && inode.metadata()?.type_ != FileType::Dir
+                    {
+                        return_errno!(
+                            ENOTDIR,
+                            "O_DIRECTORY is specified but file is not a directory"
+                        );
+                    }
                     inode
                 }
                 Err(e) if e.errno() == ENOENT && creation_flags.can_create() => {
@@ -81,6 +89,14 @@ impl FsView {
                 Ok(inode) => {
                     if creation_flags.can_create() && creation_flags.is_exclusive() {
                         return_errno!(EEXIST, "file exists");
+                    }
+                    if creation_flags.must_be_directory()
+                        && inode.metadata()?.type_ != FileType::Dir
+                    {
+                        return_errno!(
+                            ENOTDIR,
+                            "O_DIRECTORY is specified but file is not a directory"
+                        );
                     }
                     inode
                 }

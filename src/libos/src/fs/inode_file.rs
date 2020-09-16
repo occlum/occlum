@@ -210,6 +210,9 @@ impl INodeFile {
         if (access_mode.writable() && !inode.allow_write()?) {
             return_errno!(EACCES, "File not writable");
         }
+        if access_mode.writable() && inode.metadata()?.type_ == FileType::Dir {
+            return_errno!(EISDIR, "Directory cannot be open to write");
+        }
         let status_flags = StatusFlags::from_bits_truncate(flags);
         Ok(INodeFile {
             inode,

@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <errno.h>
 #include "test_fs.h"
 
 // ============================================================================
@@ -25,6 +26,41 @@ static int __test_open(const char *file_path, int flags, int mode) {
         THROW_ERROR("failed to open a file");
     }
     close(fd);
+    return 0;
+}
+
+static int __test_open_file_with_dir_flags(const char *file_path, int flags, int mode) {
+    flags = O_DIRECTORY | O_RDWR | O_CREAT;
+    int fd = open(file_path, flags, mode);
+    if (fd < 0) {
+        THROW_ERROR("failed to check creating file with O_DIRECTORY");
+    }
+    close(fd);
+
+    fd = open(file_path, flags, mode);
+    if (!(fd < 0 && errno == ENOTDIR)) {
+        THROW_ERROR("open file with O_DIRECTORY should return ENOTDIR");
+    }
+    return 0;
+}
+
+static int __test_open_dir_with_write_flags(const char *file_path, int flags, int mode) {
+    char dir_buf[PATH_MAX] = { 0 };
+    char *dir_name;
+    int fd;
+
+    if (__test_open(file_path, flags, mode) < 0) {
+        THROW_ERROR("failed to create file");
+    }
+    if (fs_split_path(file_path, dir_buf, &dir_name, NULL, NULL) < 0) {
+        THROW_ERROR("failed to split path");
+    }
+
+    flags = O_WRONLY;
+    fd = open(dir_name, flags, mode);
+    if (!(fd < 0 && errno == EISDIR)) {
+        THROW_ERROR("open dir with write flags should return EISDIR");
+    }
     return 0;
 }
 
@@ -86,6 +122,14 @@ static int test_open() {
     return test_open_framework(__test_open);
 }
 
+static int test_open_file_with_dir_flags() {
+    return test_open_framework(__test_open_file_with_dir_flags);
+}
+
+static int test_open_dir_with_write_flags() {
+    return test_open_framework(__test_open_dir_with_write_flags);
+}
+
 static int test_openat_with_abs_path() {
     return test_open_framework(__test_openat_with_abs_path);
 }
@@ -100,6 +144,8 @@ static int test_openat_with_dirfd() {
 
 static test_case_t test_cases[] = {
     TEST_CASE(test_open),
+    TEST_CASE(test_open_file_with_dir_flags),
+    TEST_CASE(test_open_dir_with_write_flags),
     TEST_CASE(test_openat_with_abs_path),
     TEST_CASE(test_openat_with_dirfd),
 };

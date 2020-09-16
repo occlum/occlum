@@ -55,6 +55,7 @@ bitflags! {
         /// close on exec
         const O_CLOEXEC = 1 << 19;
         /// create an unnamed temporary regular file
+        /// O_TMPFILE is (_O_TMPFILE | O_DIRECTORY)
         const _O_TMPFILE = 1 << 22;
     }
 }
@@ -74,6 +75,14 @@ impl CreationFlags {
 
     pub fn no_follow_symlink(&self) -> bool {
         self.contains(CreationFlags::O_NOFOLLOW)
+    }
+
+    pub fn must_be_directory(&self) -> bool {
+        if self.contains(CreationFlags::_O_TMPFILE) {
+            warn!("O_TMPFILE is not supported, handle it as O_DIRECTORY");
+            return true;
+        }
+        self.contains(CreationFlags::O_DIRECTORY)
     }
 }
 
