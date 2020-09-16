@@ -112,6 +112,9 @@ cmd_init() {
     mkdir -p image/root
     mkdir -p image/host
     mkdir -p image/tmp
+    # add default /etc/hosts
+    mkdir -p image/etc
+    echo "127.0.0.1   localhost" > image/etc/hosts
 
     local occlum_gcc_lib=/usr/local/occlum/x86_64-linux-musl/lib
     cp -t image/lib/ \
