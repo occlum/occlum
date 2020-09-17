@@ -120,7 +120,7 @@ extern "C" {
 pub struct occlum_pal_attr_t {
     /// Occlum instance directory.
     ///
-    /// Specifies the path of an Occlum instance directory, which is usually created with the 
+    /// Specifies the path of an Occlum instance directory, which is usually created with the
     /// `occlum new` command. The default value is "."; that is, the current working directory
     /// is the Occlum instance directory.
     pub instance_dir: *const libc::c_char,

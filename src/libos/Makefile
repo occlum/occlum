@@ -88,7 +88,7 @@ _Other_Link_Flags := -L$(RUST_SGX_SDK_DIR)/compiler-rt/ -L$(BUILD_DIR)/lib -L$(R
 _Other_Enclave_Libs := -l$(LIBOS_CORE_LIB_NAME) -lsgx_tprotected_fs
 LINK_FLAGS := $(SGX_LFLAGS_T)
 
-.PHONY: all clean
+.PHONY: all clean format format-c format-rust format-check format-check-c format-check-rust
 
 all: $(ALL_BUILD_SUBDIRS) $(LIBOS_SO_REAL)
 
@@ -135,6 +135,22 @@ $(CXX_OBJS): $(OBJ_DIR)/libos/$(SRC_OBJ)/%.o: src/%.cpp
 $(S_OBJS):$(OBJ_DIR)/libos/$(SRC_OBJ)/%.o: src/%.S
 	@$(CC) $(C_FLAGS) -c $< -o $@
 	@echo "AS <= $@"
+
+format: format-c format-rust
+
+format-c: $(C_SRCS) $(CXX_SRCS)
+	@$(C_FORMATTER) $^
+
+format-rust: $(RUST_SRCS)
+	@$(call format-rust)
+
+format-check: format-check-c format-check-rust
+
+format-check-c: $(C_SRCS) $(CXX_SRCS)
+	@$(C_FORMATTER) --check $^
+
+format-check-rust: $(RUST_SRCS)
+	@$(call format-check-rust)
 
 clean:
 	@-$(RM) -rf $(OBJ_DIR)/libos

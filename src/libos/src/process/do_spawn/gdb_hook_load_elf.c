@@ -16,6 +16,6 @@
  */
 void __attribute__((optimize("O0"))) occlum_gdb_hook_load_elf(
     uint64_t elf_base,
-    const char* elf_path,
+    const char *elf_path,
     uint64_t elf_path_len) {
 }

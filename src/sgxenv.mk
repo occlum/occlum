@@ -13,6 +13,15 @@ PATCH_VER_NUM = $(shell grep '\#define OCCLUM_PATCH_VERSION' $(PROJECT_DIR)/src/
 VERSION_NUM = $(MAJOR_VER_NUM).$(MINOR_VER_NUM).$(PATCH_VER_NUM)
 
 C_FORMATTER := $(PROJECT_DIR)/tools/c_formatter
+# Use echo program instead of built-in echo command in shell. This ensures
+# that echo can recognize escaped sequences (with -e argument) regardless of
+# the specific shell (e.g., bash, zash, etc.)
+ECHO := /bin/echo -e
+# Shell escaped sequences for colorful output
+CYAN := \033[1;36m
+GREEN := \033[1;32m
+RED := \033[1;31m
+NO_COLOR := \033[0m
 
 # Save code and object file generated during building src
 OBJ_DIR := $(PROJECT_DIR)/build/internal/src
@@ -127,3 +136,18 @@ SGX_LFLAGS_T = $(SGX_COMMON_CFLAGS) -nostdlib -L$(SGX_LIBRARY_PATH) $(_Other_Lin
 	-Wl,--defsym,__ImageBase=0 \
 	-Wl,--gc-sections \
 	-Wl,--version-script=Enclave.lds
+
+define format-rust
+	output=$$(cargo fmt -- --check 2>&1); retval=$$?; \
+		if [[ $$retval -eq 1 ]]; then \
+			$(ECHO) "$$output"; cargo fmt; $(ECHO) "$(GREEN)\nRust code format corrected.$(NO_COLOR)"; \
+		fi
+endef
+
+define format-check-rust
+	output=$$(cargo fmt -- --check 2>&1); retval=$$?; \
+		if [[ $$retval -eq 1 ]]; then \
+			$(ECHO) "$(RED)\nSome format issues of Rust code are detected:$(NO_COLOR)"; $(ECHO) "\n$$output"; \
+			$(ECHO) "\nTo get rid of the format warnings above, run $(CYAN)"make format"$(NO_COLOR) to correct"; \
+		fi
+endef
