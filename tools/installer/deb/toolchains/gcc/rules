@@ -40,7 +40,6 @@ prepare_musl:
 	EOF
 
 override_dh_auto_build: prepare_musl
-	cd $(tmp_build_dir)/musl-cross-make
 	cd $(tmp_build_dir)/musl-cross-make; \
 		make -j$(nproc)
 

@@ -1,0 +1,64 @@
+#!/usr/bin/make -f
+export DH_VERBOSE = 1
+export deb_build_dir = /tmp/deb_build
+export name = occlum-toolchains-golang
+export buildroot := $(deb_build_dir)/$(name)/debian/$(name)
+
+export tmp_build_dir = $(deb_build_dir)/$(name)/tmp_build
+export install_dir = $(buildroot)/opt/occlum/toolchains/golang
+
+SHELL = /bin/bash
+
+# Needed by musl-cross-make config
+TARGET = x86_64-linux-musl
+GCC_VER = 8.3.0
+GO_VERSION = 1.13.7
+GO_REPO = https://github.com/golang/go/archive/go$(GO_VERSION).tar.gz
+GO_PATCH = adapt-golang-to-occlum.patch
+
+.ONESHELL: prepare override_dh_install
+
+%:
+	dh $@
+
+# All rules executed in one shell
+prepare:
+	rm -rf $(tmp_build_dir)
+	rm -rf $(install_dir)
+	mkdir -p $(tmp_build_dir)
+	cd $(tmp_build_dir)
+	wget $(GO_REPO)
+	tar -xvzf go$(GO_VERSION).tar.gz
+	cd go-go$(GO_VERSION)
+	patch -p1 < $(deb_build_dir)/$(name)/debian/$(GO_PATCH)
+
+override_dh_auto_build: prepare
+	cd $(tmp_build_dir)/go-go$(GO_VERSION)/src; \
+		export GO_LDFLAGS="-compressdwarf=false"; \
+		./make.bash
+
+override_dh_install:
+	mkdir -p $(buildroot)/opt/occlum/toolchains
+	mv $(tmp_build_dir)/go-go$(GO_VERSION)/ $(install_dir)
+	rm -rf $(install_dir)/.git*
+	cat > $(install_dir)/bin/occlum-go <<EOF
+		#!/bin/bash
+		OCCLUM_GCC="\$$(which occlum-gcc)"
+		OCCLUM_GOFLAGS="-buildmode=pie \$$GOFLAGS"
+		CC=\$$OCCLUM_GCC GOFLAGS=\$$OCCLUM_GOFLAGS /opt/occlum/toolchains/golang/bin/go "\$$@"
+	EOF
+	chmod +x $(install_dir)/bin/occlum-go
+
+	mkdir -p $(buildroot)/etc/profile.d
+	cp $(deb_build_dir)/$(name)/debian/occlum-go.sh $(buildroot)/etc/profile.d
+	chmod 644 $(buildroot)/etc/profile.d/occlum-go.sh
+
+clean:
+	dh_clean
+	rm -f $(buildroot)
+
+# Skip stripping
+override_dh_strip_nondeterminism:
+override_dh_strip:
+override_dh_shlibdeps:
+	echo "skip ..."
