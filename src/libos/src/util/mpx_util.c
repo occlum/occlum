@@ -45,15 +45,15 @@ typedef struct {
  * rfbm is the requested-feature bitmap, whose bits specifies which state
  * components are to restored by this instruction.
  */
-static void xrstor(xsave_area_t* xsave_area, uint64_t rfbm) {
+static void xrstor(xsave_area_t *xsave_area, uint64_t rfbm) {
 #define REX_PREFIX  "0x48, "
 #define XRSTOR64    REX_PREFIX "0x0f,0xae,0x2f "
 
     __asm__ __volatile__ (
         ".byte " XRSTOR64 "\n\t"
-            :
-            : "D" (xsave_area), "m" (*xsave_area), "a" (rfbm), "d" (rfbm)
-            : "memory");
+        :
+        : "D" (xsave_area), "m" (*xsave_area), "a" (rfbm), "d" (rfbm)
+        : "memory");
 }
 
 /* The state component bitmaps for MPX

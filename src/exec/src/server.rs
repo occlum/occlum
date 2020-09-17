@@ -214,7 +214,8 @@ impl OcclumExec for OcclumExecImpl {
                     "process:{} finished, send signal to {}",
                     process_id, client_process_id
                 );
-                signal::kill(Pid::from_raw(client_process_id as i32), Signal::SIGUSR1).unwrap_or_default();
+                signal::kill(Pid::from_raw(client_process_id as i32), Signal::SIGUSR1)
+                    .unwrap_or_default();
             });
 
             resp.finish(ExecCommResponse {

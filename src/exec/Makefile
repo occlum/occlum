@@ -17,6 +17,12 @@ else
 	@echo "CARGO (debug) => exec"
 endif
 
+format: $(SRC_FILES)
+	@$(call format-rust)
+
+format-check: $(SRC_FILES)
+	@$(call format-check-rust)
+
 clean:
 	@cargo clean --target-dir=$(RUST_TARGET_DIR)
 	@-$(RM) -f $(EXEC_TARGET)

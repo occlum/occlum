@@ -27,8 +27,8 @@ use signal_hook::iterator::Signals;
 use signal_hook::{SIGINT, SIGKILL, SIGQUIT, SIGTERM, SIGUSR1};
 use std::cmp;
 use std::env;
-use std::path::Path;
 use std::os::unix::net::UnixListener;
+use std::path::Path;
 use std::process;
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -309,7 +309,11 @@ fn main() -> Result<(), i32> {
 
         let cmd = cmd_args[0];
         // Change cmd_args[0] from path name to program name
-        cmd_args[0] = Path::new(cmd_args[0]).file_name().unwrap().to_str().unwrap();
+        cmd_args[0] = Path::new(cmd_args[0])
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap();
         let env: Vec<&str> = env.iter().map(|string| string.as_str()).collect();
 
         // Create the signal handler
