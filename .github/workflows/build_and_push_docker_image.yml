@@ -1,0 +1,91 @@
+name: Occlum Docker Build and Push
+
+# Triggers the workflow on pre-release events
+on:
+  release:
+    types: [prereleased]
+
+jobs:
+  generate-centos-image:
+      # GitHub Actions doesn't have CentOS VM provided
+      runs-on: ubuntu-18.04
+
+      steps:
+      - name: Prepare tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install yum
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Because "Build and push" step `context` field can't be subdir,
+      # we need to copy files needed by dockerfile to root dir of the project
+      - name: Copy context for docker build
+        run: |
+          cp -r tools/toolchains .
+          cp -r tools/docker .
+
+      - name: Get release version
+        id: get_version
+        run: echo ::set-env name=RELEASE_VERSION::$(echo ${GITHUB_REF:10})
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./tools/docker/Dockerfile.centos8.1
+          platforms: linux/amd64
+          push: true
+          tags: occlum/occlum:${{ env.RELEASE_VERSION }}-centos8.1
+
+
+  generate-ubuntu-image:
+      runs-on: ubuntu-18.04
+
+      steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Because "Build and push" step `context` field can't be subdir,
+      # we need to copy files needed by dockerfile to root dir of the project
+      - name: Copy context for docker build
+        run: |
+          cp -r tools/toolchains .
+          cp -r tools/docker .
+
+      - name: Get release version
+        id: get_version
+        run: echo ::set-env name=RELEASE_VERSION::$(echo ${GITHUB_REF:10})
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./tools/docker/Dockerfile.ubuntu18.04
+          platforms: linux/amd64
+          push: true
+          tags: occlum/occlum:${{ env.RELEASE_VERSION }}-ubuntu18.04
