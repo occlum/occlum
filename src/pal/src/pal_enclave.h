@@ -3,7 +3,7 @@
 
 #include <sgx_eid.h>
 
-int pal_init_enclave(const char* instance_dir);
+int pal_init_enclave(const char *instance_dir);
 int pal_destroy_enclave(void);
 
 #define SGX_INVALID_ENCLAVE_ID          (-1)

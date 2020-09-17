@@ -25,7 +25,7 @@ ifneq ($(SGX_MODE), HW)
 	CXX_OBJS := $(subst pal/src,pal/src_sim,$(CXX_OBJS))
 endif
 
-HEADER_FILES := $(sort $(wildcard include/*.h include/*/*.h))
+HEADER_FILES := $(sort $(wildcard src/*.h include/*.h include/*/*.h))
 
 C_COMMON_FLAGS := -I$(OBJ_DIR)/pal/$(SRC_OBJ) -Iinclude -Iinclude/edl
 C_FLAGS := $(C_COMMON_FLAGS) $(SGX_CFLAGS_U)
