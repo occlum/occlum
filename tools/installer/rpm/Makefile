@@ -16,9 +16,12 @@ EXPORT_SCRIPT = occlum-pal.sh occlum-runtime.sh
 GCC_PATCH = toolchains/gcc/musl-cross-make-disable-download.patch
 GCC_SCRIPT = toolchains/gcc/occlum-gcc.sh
 
+GO_PATCH = $(PROJECT_DIR)/tools/toolchains/golang/adapt-golang-to-occlum.patch
+GO_SCRIPT = toolchains/golang/occlum-go.sh
+
 PACKAGE_DIR = /tmp
 
-.PHONY: all main main_deps c/c++ deps_c clean
+.PHONY: all main main_deps c/c++ deps_c clean golang
 
 all: main
 
@@ -61,7 +64,23 @@ $$HOME/rpmbuild/SOURCES/$(GCC_PATCH):
 	@spectool -g -R --define '_musl_version $(MUSL_VERSION)' toolchains/gcc/occlum-toolchains-gcc.spec
 	@cp -t $$HOME/rpmbuild/SOURCES $(GCC_PATCH) $(GCC_SCRIPT)
 
+golang: $$HOME/rpmbuild/SOURCES/$(GO_PATCH)
+	@rpmbuild -ba toolchains/golang/occlum-toolchains-golang.spec
+	@mv $$HOME/rpmbuild $$HOME/rpmbuild-occlum-toolchains-golang
+	@cp $$HOME/rpmbuild-occlum-toolchains-golang/RPMS/x86_64/*.rpm $(TARGET_DIR)
+	@echo "$$(ls $$HOME/rpmbuild-occlum-toolchains-golang/RPMS/x86_64) can be found at $(TARGET_DIR)"
+
+$$HOME/rpmbuild/SOURCES/$(GO_PATCH):
+	@mkdir -p $(TARGET_DIR)
+	@yum install -y rpmdevtools
+	@if [ -d $$HOME/rpmbuild ]; then \
+		mv $$HOME/rpmbuild $$HOME/rpmbuild-old-$$(date +%Y%m%d-%T); fi
+	@rm -rf $$HOME/rpmbuild/{BUILD,RPMS,SPECS,SRPMS} # tmp
+	@mkdir -p $$HOME/rpmbuild/{BUILD,RPMS,SPECS,SOURCES,SRPMS}
+	@spectool -g -R toolchains/golang/occlum-toolchains-golang.spec
+	@cp -t $$HOME/rpmbuild/SOURCES $(GO_PATCH) $(GO_SCRIPT)
+
 clean:
 	@rm -rf $(PACKAGE_DIR)/occlum-$(VERSION_NUM)
-	@rm -rf $$HOME/rpmbuild $$HOME/rpmbuild-occlum-toolchains-gcc $$HOME/rpmbuild-occlum
+	@rm -rf $$HOME/rpmbuild $$HOME/rpmbuild-occlum-toolchains* $$HOME/rpmbuild-occlum
 	@rm -rf $(TARGET_DIR)

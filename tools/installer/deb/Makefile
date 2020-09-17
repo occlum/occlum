@@ -10,6 +10,8 @@ VERSION_NUM = $(MAJOR_VER_NUM).$(MINOR_VER_NUM).$(PATCH_VER_NUM)
 DEB_BUILD_DIR := /tmp/deb_build
 PACKAGE_DIR := /tmp
 
+GO_PATCH = $(PROJECT_DIR)/tools/toolchains/golang/adapt-golang-to-occlum.patch
+
 .PHONY: all main config_files main_deps c/c++ deps_c clean clean-build
 
 all: main
@@ -52,6 +54,17 @@ deps_c:
 	cp $(PROJECT_DIR)/tools/toolchains/gcc/0014-libgomp-futex-occlum.diff $(DEB_BUILD_DIR)/occlum-toolchains-gcc/debian
 	cp $(PROJECT_DIR)/tools/installer/rpm/toolchains/gcc/occlum-gcc.sh $(DEB_BUILD_DIR)/occlum-toolchains-gcc/debian
 	echo " echo 'Please execute command \"source /etc/profile\" to validate envs immediately' " > $(DEB_BUILD_DIR)/occlum-toolchains-gcc/debian/occlum-gcc.postinst
+
+golang: deps_golang
+	cd $(DEB_BUILD_DIR)/occlum-toolchains-golang ; \
+		dpkg-buildpackage -us -uc
+	cp -t $(TARGET_DIR) $(DEB_BUILD_DIR)/occlum-toolchains-golang*.deb
+
+deps_golang:
+	mkdir -p $(TARGET_DIR)
+	mkdir -p $(DEB_BUILD_DIR)/occlum-toolchains-golang
+	cp -r toolchains/golang $(DEB_BUILD_DIR)/occlum-toolchains-golang/debian
+	cp -t $(DEB_BUILD_DIR)/occlum-toolchains-golang/debian $(GO_PATCH) $(PROJECT_DIR)/tools/installer/rpm/toolchains/golang/occlum-go.sh
 
 clean-build:
 	rm -rf $(DEB_BUILD_DIR)

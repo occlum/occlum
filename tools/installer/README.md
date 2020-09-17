@@ -26,7 +26,7 @@ If a user wants to build his application on a platform installed with Occlum ins
 cd tools/installer/rpm
 make <language option>
 ```
-Now, only `c/c++` option is supported. And the installer can be found under `build/rpms`.
+Now, only `c/c++` and `golang` options are supported. And the installer can be found under `build/rpms`.
 
 ### How to Use
 
@@ -59,9 +59,17 @@ rpm -i occlum-pal-*.rpm
 rpm -i occlum-runtime-*.rpm
 ```
 
-Toolchains are needed when compiling applications and also during runtime. Choose to install the toolchain installer based on the application's language. Currently, we only supports `C/C++`. More language toolchain installers are on the way. To install `C/C++` toolchain, just run the command:
+Toolchains are needed when compiling applications and also during runtime. C/C++ toolchain is a must for Occlum commands.
+To install C/C++ toolchain, just run the command:
 ```
 rpm -i occlum-toolchains-gcc-*.rpm
+```
+
+Besides, users can choose to install the toolchain installer based on the application's language. Currently, we also supports Golang. More language toolchain installers are on the way. To install Golang toolchain, run the below commands:
+```
+yum install -y epel-release
+yum install -y rc
+rpm -i occlum-toolchains-golang-*.rpm
 ```
 
 At last, install `occlum` package to get complete support of Occlum:
@@ -99,7 +107,7 @@ If a user wants to build his application on a platform installed with Occlum ins
 cd tools/installer/deb
 make <language option>
 ```
-Now, only `c/c++` option is supported. And the installer can be found under `build/debs`.
+Now, only `c/c++` and `golang` options are supported. And the installer can be found under `build/debs`.
 
 ### How to Use
 
@@ -137,9 +145,15 @@ apt install -y ./occlum-pal*.deb
 apt install -y ./occlum-sgx-tools*.deb
 ```
 
-Currently, we only supports `C/C++`. More language toolchain installers are on the way. To install `C/C++` toolchain, just run the command:
+Toolchains are needed when compiling applications and also during runtime. C/C++ toolchain is a must for Occlum commands.
+To install C/C++ toolchain, just run the command:
 ```
 apt install -y ./occlum-toolchains-gcc*.deb
+```
+
+Besides, users can choose to install the toolchain installer based on the application's language. Currently, we also supports Golang. More language toolchain installers are on the way. To install Golang toolchain, run the below commands:
+```
+apt install -y ./occlum-toolchains-golang*.deb
 ```
 
 At last, install `occlum` package to get complete support of Occlum:

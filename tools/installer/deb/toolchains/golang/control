@@ -1,0 +1,12 @@
+Source: occlum-toolchains-golang
+Section: libs
+Priority: optional
+Maintainer: Chunyang Hui <sanqian.hcy@antfin.com>
+Build-Depends: debhelper (>=9), libfile-stripnondeterminism-perl (>= 0.028~), autoconf, automake, cmake, libtool, ocaml, ocamlbuild, python, libssl-dev, libcurl4-openssl-dev, libprotobuf-dev, git, protobuf-compiler
+Standards-Version: 4.1.2
+Homepage: https://github.com/golang/go
+
+Package: occlum-toolchains-golang
+Architecture: amd64
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: Occlum go toolchains
