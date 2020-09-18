@@ -18,7 +18,7 @@ Occlum has the following salient features:
 
 ### Hello Occlum
 
-If you were to write an SGX Hello World project using some SGX SDK, the project would consist of hundreds of lines of code. And to do that, you have to spend a great deal of time to learn the APIs, the programming model, and the built system of the SGX SDK.
+If you were to write an SGX Hello World project using some SGX SDK, the project would consist of hundreds of lines of code. And to do that, you have to spend a great deal of time to learn the APIs, the programming model, and the build system of the SGX SDK.
 
 Thanks to Occlum, you can be freed from writing any extra SGX-aware code and only need to type some simple commands to protect your application with SGX transparently---in four easy steps.
 
@@ -203,7 +203,9 @@ Step 4-5 are to be done on the guest OS running inside the Docker container:
     ```
 5. Check out Occlum's demos preinstalled at `/root/demos`, whose README can be found [here](demos/README.md). Or you can try to build and run your own SGX-protected applications using Occlum as shown in the demos.
 
-## How to Build and Install?
+Alternatively, to use Occlum without Docker, one can install Occlum on popular Linux distributions like Ubuntu and CentOS with the Occlum DEB and RPM packages, respectively. These packages are provided for every release of Occlum. For more info about the installation packages, see [here](tools/installer/README.md).
+
+## How to Build?
 
 To build Occlum from the latest source code, do the following steps in an Occlum Docker container (which can be prepared as shown in the last section):
 
@@ -265,10 +267,6 @@ Ultimately, whether an enclave is running in the release mode should be checked 
 ## How to Run Occlum on Public Cloud?
 
 To cut off the complexity of self-hosted infrastructure, one can deploy Occlum-powered SGX apps on public clouds with SGX support. For example, we have tested and successfully deployed Occlum Docker containers on [Azure Kubernetes Service (AKS)](https://azure.microsoft.com/en-us/services/kubernetes-service/#getting-started). Please check out [this doc](docs/azure_aks_deployment_guide.md) for more details.
-
-## How to Run Occlum Without Docker?
-
-One easy way to run Occlum without Docker is to use the Occlum Installer. We have prepared the RPM and DEB installers for Occlum, which can be downloaded with every release of Occlum. For more info about the installer, see [here](tools/installer/README.md).
 
 ## What is the Implementation Status?
 
