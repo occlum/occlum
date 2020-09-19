@@ -26,7 +26,6 @@ echo "${new_json}" > Occlum.json
 
 # 2. Copy program into Occlum Workspace and build
 cp ../occlum_pong image/bin
-mkdir image/etc/
 cp /etc/hosts image/etc/
 occlum build
 

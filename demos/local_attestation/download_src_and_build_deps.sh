@@ -8,7 +8,7 @@ THISDIR="$(dirname $(readlink -f $0))"
 INSTALLDIR="/usr/local/occlum/x86_64-linux-musl"
 DEPSDIR="$THISDIR/deps"
 TARGET_SO="$DEPSDIR/openssl/libcrypto.so"
-SGX_VER="2.9.1"
+SGX_VER="2.11"
 
 mkdir -p $DEPSDIR || exit 1
 
@@ -70,7 +70,7 @@ sdk/tlibcrypto/sgxssl/sgx_ecc256.cpp,\
 sdk/tlibcrypto/sgxssl/sgx_sha256_msg.cpp\
 } $DH_DIR
 
-cd $DH_DIR && git apply $DH_PATCH >/dev/null 2>&1 || git apply $DH_PATCH -R --check
+cd $DH_DIR && patch -p4 < $DH_PATCH >/dev/null 2>&1 || git apply $DH_PATCH -R --check
 cd - >/dev/null 2>&1
 
 echo "DiffieHellmanLibrary is ready"
