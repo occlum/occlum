@@ -13,6 +13,7 @@ pub mod timer_slack;
 pub mod up_time;
 
 pub use profiler::ThreadProfiler;
+pub use timer_slack::TIMERSLACK;
 
 #[allow(non_camel_case_types)]
 pub type time_t = i64;
@@ -71,6 +72,15 @@ pub fn do_gettimeofday() -> timeval_t {
 pub struct timespec_t {
     sec: time_t,
     nsec: i64,
+}
+
+impl From<Duration> for timespec_t {
+    fn from(duration: Duration) -> timespec_t {
+        let sec = duration.as_secs() as time_t;
+        let nsec = duration.subsec_nanos() as i64;
+        debug_assert!(sec >= 0); // nsec >= 0 always holds
+        timespec_t { sec, nsec }
+    }
 }
 
 impl timespec_t {

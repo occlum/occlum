@@ -12,5 +12,6 @@
 #define tgkill(tgid, tid, signum)       ((int)syscall(__NR_tgkill, (tgid), (tid), (signum)));
 #define futex_wait(addr, val, timeout)  ((int)syscall(__NR_futex, (addr), FUTEX_WAIT, (val), (timeout)))
 #define futex_wake(addr)                ((int)syscall(__NR_futex, (addr), FUTEX_WAKE, 1))
+#define raw_ppoll(fds, nfds, timeout)   ((int)syscall(__NR_ppoll, (fds), (nfds), (timeout), NULL, 0))
 
 #endif /* __PAL_SYSCALL_H__ */

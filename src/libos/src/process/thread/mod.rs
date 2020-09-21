@@ -6,6 +6,7 @@ use super::{
     FileTableRef, ForcedExitStatus, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef,
     ResourceLimitsRef, SchedAgentRef, TermStatus, ThreadRef,
 };
+use crate::events::HostEventFd;
 use crate::fs::{EventCreationFlags, EventFile};
 use crate::net::THREAD_NOTIFIERS;
 use crate::prelude::*;
@@ -44,6 +45,8 @@ pub struct Thread {
     sig_stack: SgxMutex<Option<SigStack>>,
     // System call timing
     profiler: SgxMutex<Option<ThreadProfiler>>,
+    // Misc
+    host_eventfd: Arc<HostEventFd>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -142,6 +145,10 @@ impl Thread {
 
     pub fn set_name(&self, new_name: ThreadName) {
         *self.name.write().unwrap() = new_name;
+    }
+
+    pub fn host_eventfd(&self) -> &Arc<HostEventFd> {
+        &self.host_eventfd
     }
 
     pub(super) fn start(&self, host_tid: pid_t) {
