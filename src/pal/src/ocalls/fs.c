@@ -2,15 +2,10 @@
 #include <errno.h>
 #include <net/if.h>
 #include <unistd.h>
-#include <sys/eventfd.h>
 #include <sys/ioctl.h>
 
 void occlum_ocall_sync(void) {
     sync();
-}
-
-int occlum_ocall_eventfd(unsigned int initval, int flags) {
-    return eventfd(initval, flags);
 }
 
 int occlum_ocall_ioctl_repack(int fd, int request, char *buf, int len, int *recv_len) {

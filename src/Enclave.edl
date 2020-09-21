@@ -190,6 +190,15 @@ enclave {
             unsigned int initval,
             int flags
         ) propagate_errno;
+        int occlum_ocall_eventfd_poll(
+            int eventfd,
+            [in, out] struct timespec *timeout
+        ) propagate_errno;
+        void occlum_ocall_eventfd_write_batch(
+            [in, count=num_fds] int* eventfds,
+            size_t num_fds,
+            uint64_t val
+        );
 
         int occlum_ocall_poll(
             [in, out, count=nfds] struct pollfd *fds,
