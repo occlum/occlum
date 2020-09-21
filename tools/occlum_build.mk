@@ -136,10 +136,9 @@ $(SECURE_IMAGE): $(IMAGE) $(IMAGE_DIRS) $(IMAGE_FILES) $(SEFS_CLI_SIM) $(SIGNED_
 
 	@mkdir -p build/mount/
 	@LD_LIBRARY_PATH="$(SGX_SDK)/sdk_libs" $(SEFS_CLI_SIM) \
-		--integrity-only \
-		"$(SIGNED_SEFS_CLI_LIB)" \
-		"$(instance_dir)/build/mount/__ROOT" \
-		"" \
+		--enclave "$(SIGNED_SEFS_CLI_LIB)" \
+		zip \
 		"$(instance_dir)/image" \
-		zip
+		"$(instance_dir)/build/mount/__ROOT" \
+		--integrity-only
 endif
