@@ -386,12 +386,11 @@ cmd_mount() {
 
     echo "Start to mount the FS..."
     LD_LIBRARY_PATH="$SGX_SDK/sdk_libs" "$sefs_cli" \
-        --integrity-only \
-        "$signed_sefs_cli_lib" \
+        --enclave "$signed_sefs_cli_lib" \
+        mount \
         "$image_fs" \
         "$container_fs" \
-        "$MNT_POINT" \
-        mount
+        "$MNT_POINT"
 
     # After mounting the FS, remove the signed mount tool
     rm -f "$signed_sefs_cli_lib"
