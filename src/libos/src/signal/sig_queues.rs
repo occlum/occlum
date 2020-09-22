@@ -3,12 +3,14 @@ use std::fmt;
 
 use super::constants::*;
 use super::{SigNum, SigSet, Signal};
+use crate::events::Notifier;
 use crate::prelude::*;
 
 pub struct SigQueues {
     count: usize,
     std_queues: Vec<Option<Box<dyn Signal>>>,
     rt_queues: Vec<VecDeque<Box<dyn Signal>>>,
+    notifier: Notifier<SigNum, SigSet>,
 }
 
 impl SigQueues {
@@ -16,10 +18,12 @@ impl SigQueues {
         let count = 0;
         let std_queues = (0..COUNT_STD_SIGS).map(|_| None).collect();
         let rt_queues = (0..COUNT_RT_SIGS).map(|_| Default::default()).collect();
+        let notifier = Notifier::new();
         SigQueues {
             count,
             std_queues,
             rt_queues,
+            notifier,
         }
     }
 
@@ -56,6 +60,8 @@ impl SigQueues {
             queue.push_back(signal);
             self.count += 1;
         }
+
+        self.notifier.broadcast(&signum);
     }
 
     pub fn dequeue(&mut self, blocked: &SigSet) -> Option<Box<dyn Signal>> {
@@ -118,6 +124,10 @@ impl SigQueues {
 
         // There must be pending but blocked signals
         None
+    }
+
+    pub fn notifier(&self) -> &Notifier<SigNum, SigSet> {
+        &self.notifier
     }
 
     pub fn pending(&self) -> SigSet {
