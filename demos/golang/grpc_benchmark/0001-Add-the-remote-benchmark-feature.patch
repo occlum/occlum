@@ -1,0 +1,34 @@
+From 38c366141d60c873234e8d14ed0876d79770e3b0 Mon Sep 17 00:00:00 2001
+From: yuanwu <yuan.wu@intel.com>
+Date: Wed, 16 Sep 2020 16:18:11 +0000
+Subject: [PATCH] Add the remote benchmark feature
+
+Signed-off-by: yuanwu <yuan.wu@intel.com>
+---
+ benchmark/client/main.go | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/benchmark/client/main.go b/benchmark/client/main.go
+index f750c5c3..50694a6c 100644
+--- a/benchmark/client/main.go
++++ b/benchmark/client/main.go
+@@ -57,6 +57,7 @@ import (
+ )
+ 
+ var (
++	ip        = flag.String("ip", "localhost", "ip to connect to.")
+ 	port      = flag.String("port", "50051", "Localhost port to connect to.")
+ 	numRPC    = flag.Int("r", 1, "The number of concurrent RPCs on each connection.")
+ 	numConn   = flag.Int("c", 1, "The number of parallel connections.")
+@@ -133,7 +134,7 @@ func main() {
+ func buildConnections(ctx context.Context) []*grpc.ClientConn {
+ 	ccs := make([]*grpc.ClientConn, *numConn)
+ 	for i := range ccs {
+-		ccs[i] = benchmark.NewClientConnWithContext(ctx, "localhost:"+*port, grpc.WithInsecure(), grpc.WithBlock())
++		ccs[i] = benchmark.NewClientConnWithContext(ctx, *ip +":"+*port, grpc.WithInsecure(), grpc.WithBlock())
+ 	}
+ 	return ccs
+ }
+-- 
+2.17.1
+
