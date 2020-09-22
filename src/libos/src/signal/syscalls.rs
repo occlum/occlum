@@ -1,10 +1,13 @@
+use std::time::Duration;
+
 use super::constants::*;
 use super::do_sigprocmask::MaskOp;
 use super::signals::FaultSignal;
-use super::{sigaction_t, sigset_t, stack_t, SigAction, SigNum, SigSet, SigStack};
+use super::{sigaction_t, siginfo_t, sigset_t, stack_t, SigAction, SigNum, SigSet, SigStack};
 use crate::prelude::*;
 use crate::process::ProcessFilter;
 use crate::syscall::CpuContext;
+use crate::time::timespec_t;
 use crate::util::mem_util::from_user;
 
 pub fn do_rt_sigaction(
@@ -155,5 +158,39 @@ pub fn do_sigaltstack(
     if let Some(old_ss_c) = old_ss_c {
         *old_ss_c = old_ss.to_c();
     }
+    Ok(0)
+}
+
+pub fn do_rt_sigtimedwait(
+    mask_ptr: *const sigset_t,
+    info_ptr: *mut siginfo_t,
+    timeout_ptr: *const timespec_t,
+    mask_size: usize,
+) -> Result<isize> {
+    let mask: SigSet = {
+        if mask_size < std::mem::size_of::<sigset_t>() {
+            return_errno!(EINVAL, "mask size is not big enough");
+        }
+        if mask_ptr.is_null() {
+            return_errno!(EINVAL, "ptr must not be null");
+        }
+        SigSet::from_c(unsafe { *mask_ptr })
+    };
+    let info: &mut siginfo_t = {
+        if info_ptr.is_null() {
+            return_errno!(EINVAL, "ptr must not be null");
+        }
+        unsafe { &mut *info_ptr }
+    };
+    let timeout: Option<Duration> = {
+        if timeout_ptr.is_null() {
+            None
+        } else {
+            let timeout = timespec_t::from_raw_ptr(timeout_ptr)?;
+            Some(timeout.as_duration())
+        }
+    };
+
+    *info = super::do_sigtimedwait::do_sigtimedwait(mask, timeout.as_ref())?;
     Ok(0)
 }

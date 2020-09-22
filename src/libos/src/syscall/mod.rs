@@ -47,8 +47,9 @@ use crate::process::{
 };
 use crate::sched::{do_getcpu, do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
 use crate::signal::{
-    do_kill, do_rt_sigaction, do_rt_sigpending, do_rt_sigprocmask, do_rt_sigreturn, do_sigaltstack,
-    do_tgkill, do_tkill, sigaction_t, sigset_t, stack_t,
+    do_kill, do_rt_sigaction, do_rt_sigpending, do_rt_sigprocmask, do_rt_sigreturn,
+    do_rt_sigtimedwait, do_sigaltstack, do_tgkill, do_tkill, sigaction_t, siginfo_t, sigset_t,
+    stack_t,
 };
 use crate::vm::{MMapFlags, MRemapFlags, MSyncFlags, VMPerms};
 use crate::{fs, process, std, vm};
@@ -212,7 +213,7 @@ macro_rules! process_syscall_table_with_callback {
             (Capget = 125) => handle_unsupported(),
             (Capset = 126) => handle_unsupported(),
             (RtSigpending = 127) => do_rt_sigpending(buf_ptr: *mut sigset_t, buf_size: usize),
-            (RtSigtimedwait = 128) => handle_unsupported(),
+            (RtSigtimedwait = 128) => do_rt_sigtimedwait(mask_ptr: *const sigset_t, info_ptr: *mut siginfo_t, timeout_ptr: *const timespec_t, mask_size: usize),
             (RtSigqueueinfo = 129) => handle_unsupported(),
             (RtSigsuspend = 130) => handle_unsupported(),
             (Sigaltstack = 131) => do_sigaltstack(ss: *const stack_t, old_ss: *mut stack_t, context: *const CpuContext),

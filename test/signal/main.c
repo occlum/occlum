@@ -13,6 +13,9 @@
 #include <string.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <pthread.h>
+#include <errno.h>
+#include <time.h>
 #include "test.h"
 
 // ============================================================================
@@ -230,7 +233,7 @@ int div_maybe_zero(int x, int y) {
     return x / y;
 }
 
-#define	fxsave(addr) __asm __volatile("fxsave %0" : "=m" (*(addr)))
+#define fxsave(addr) __asm __volatile("fxsave %0" : "=m" (*(addr)))
 
 int test_handle_sigfpe() {
 #ifdef SGX_MODE_SIM
@@ -318,6 +321,7 @@ int test_handle_sigsegv() {
 
     int *addr = NULL;
     volatile int val = read_maybe_null(addr);
+    (void)val; // to suppress "unused variables" warning
 
     printf("Signal handler successfully jumped over a null-dereferencing instruction\n");
 
@@ -425,6 +429,96 @@ int test_sigchld() {
 }
 
 // ============================================================================
+// Test sigtimedwait syscall
+// ============================================================================
+
+struct send_signal_data {
+    pthread_t           target;
+    int                 signum;
+    struct timespec     delay;
+};
+
+static void *send_signal_with_delay(void *_data) {
+    int ret;
+    struct send_signal_data *data = _data;
+
+    // Ensure data->delay time elapsed
+    while ((ret = nanosleep(&data->delay, NULL) < 0 && errno == EINTR)) ;
+    // Send the signal to the target thread
+    pthread_kill(data->target, data->signum);
+
+    free(data);
+
+    return NULL;
+}
+
+// Raise a signal for the current thread asynchronously by spawning another
+// thread to send the signal to the parent thread after some specified delay.
+// The delay is meant to ensure some operation in the parent thread is
+// completed by the time the signal is sent.
+static void raise_async(int signum, const struct timespec *delay) {
+    pthread_t thread;
+    int ret;
+    struct send_signal_data *data = malloc(sizeof(*data));
+    data->target = pthread_self();
+    data->signum = signum;
+    data->delay = *delay;
+    if ((ret = pthread_create(&thread, NULL, send_signal_with_delay, (void *)data)) < 0) {
+        printf("ERROR: pthread_create failed unexpectedly\n");
+        abort();
+    }
+    pthread_detach(thread);
+}
+
+int test_sigtimedwait() {
+    int ret;
+    siginfo_t info;
+    sigset_t new_mask, old_mask;
+    struct timespec delay, timeout;
+
+    // Update signal mask to block SIGIO
+    sigemptyset(&new_mask);
+    sigaddset(&new_mask, SIGIO);
+    if ((ret = sigprocmask(SIG_BLOCK, &new_mask, &old_mask)) < 0) {
+        THROW_ERROR("sigprocmask failed unexpectedly");
+    }
+
+    // There is no pending signal, yet; so the syscall must return EAGAIN error
+    ret = sigtimedwait(&new_mask, &info, NULL);
+    if (ret == 0 || (ret < 0 && errno != EAGAIN)) {
+        THROW_ERROR("sigprocmask must return with EAGAIN error");
+    }
+
+    // Let's generate a pending signal and then get it
+    raise(SIGIO);
+    if ((ret = sigtimedwait(&new_mask, &info, NULL)) < 0 || info.si_signo != SIGIO) {
+        THROW_ERROR("sigtimedwait should return the SIGIO");
+    }
+
+    // Now let's generate a pending signal in an async way. The pending signal
+    // does not exist yet at the time when sigtimedwait is called. So the
+    // current thread will be put to sleep and waken up until the
+    // asynchronously raised signal is sent to the current thread and becomes
+    // pending.
+    delay.tv_sec = 0;
+    delay.tv_nsec = 10 * 1000 * 1000; // 10ms
+    raise_async(SIGIO, &delay);
+
+    timeout.tv_sec = 0;
+    timeout.tv_nsec = 2 * delay.tv_nsec;
+
+    if ((ret = sigtimedwait(&new_mask, &info, &timeout)) < 0 || info.si_signo != SIGIO) {
+        THROW_ERROR("sigtimedwait should return the SIGIO");
+    }
+
+    // Restore the signal mask
+    if ((ret = sigprocmask(SIG_SETMASK, &old_mask, NULL)) < 0) {
+        THROW_ERROR("sigprocmask failed unexpectedly");
+    }
+    return 0;
+}
+
+// ============================================================================
 // Test suite main
 // ============================================================================
 
@@ -437,6 +531,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_handle_sigsegv),
     TEST_CASE(test_sigaltstack),
     TEST_CASE(test_sigchld),
+    TEST_CASE(test_sigtimedwait),
 };
 
 int main(int argc, const char *argv[]) {
