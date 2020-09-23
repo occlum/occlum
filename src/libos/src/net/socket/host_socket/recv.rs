@@ -1,45 +1,19 @@
 use super::*;
 use crate::untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen, UntrustedSliceAlloc};
 
-impl SocketFile {
-    // TODO: need sockaddr type to implement send/sento
-    /*
-    pub fn recv(&self, buf: &mut [u8], flags: MsgHdrFlags) -> Result<usize> {
-        let (bytes_recvd, _) = self.recvfrom(buf, flags, None)?;
+impl HostSocket {
+    pub fn recv(&self, buf: &mut [u8], flags: RecvFlags) -> Result<usize> {
+        let (bytes_recvd, _) = self.recvfrom(buf, flags)?;
         Ok(bytes_recvd)
     }
 
-    pub fn recvfrom(&self, buf: &mut [u8], flags: MsgHdrFlags, src_addr: Option<&mut [u8]>) -> Result<(usize, usize)> {
-        let (bytes_recvd, src_addr_len, _, _) = self.do_recvmsg(
-            &mut buf[..],
-            flags,
-            src_addr,
-            None,
-        )?;
-        Ok((bytes_recvd, src_addr_len))
-    }*/
-
     pub fn recvmsg<'a, 'b>(&self, msg: &'b mut MsgHdrMut<'a>, flags: RecvFlags) -> Result<usize> {
-        // Alloc untrusted iovecs to receive data via OCall
-        let msg_iov = msg.get_iovs();
-        let u_slice_alloc = UntrustedSliceAlloc::new(msg_iov.total_bytes())?;
-        let mut u_slices = msg_iov
-            .as_slices()
-            .iter()
-            .map(|slice| {
-                u_slice_alloc
-                    .new_slice_mut(slice.len())
-                    .expect("unexpected out of memory error in UntrustedSliceAlloc")
-            })
-            .collect();
-        let mut u_iovs = IovsMut::new(u_slices);
-
         // Do OCall-based recvmsg
         let (bytes_recvd, namelen_recvd, controllen_recvd, flags_recvd) = {
             // Acquire mutable references to the name and control buffers
-            let (name, control) = msg.get_name_and_control_mut();
+            let (iovs, name, control) = msg.get_iovs_name_and_control_mut();
             // Fill the data, the name, and the control buffers
-            self.do_recvmsg(u_iovs.as_slices_mut(), flags, name, control)?
+            self.do_recvmsg(iovs.as_slices_mut(), flags, name, control)?
         };
 
         // Update the output lengths and flags
@@ -47,19 +21,39 @@ impl SocketFile {
         msg.set_control_len(controllen_recvd)?;
         msg.set_flags(flags_recvd);
 
-        // Copy data from untrusted iovecs into the output iovecs
-        let mut msg_iov = msg.get_iovs_mut();
-        let mut u_iovs_iter = u_iovs
-            .as_slices()
-            .iter()
-            .flat_map(|slice| slice.iter())
-            .take(bytes_recvd);
-        msg_iov.copy_from_iter(&mut u_iovs_iter);
-
         Ok(bytes_recvd)
     }
 
-    fn do_recvmsg(
+    pub(super) fn do_recvmsg(
+        &self,
+        data: &mut [&mut [u8]],
+        flags: RecvFlags,
+        mut name: Option<&mut [u8]>,
+        mut control: Option<&mut [u8]>,
+    ) -> Result<(usize, usize, usize, MsgHdrFlags)> {
+        let data_length = data.iter().map(|s| s.len()).sum();
+        let u_allocator = UntrustedSliceAlloc::new(data_length)?;
+        let mut u_data = {
+            let mut bufs = Vec::new();
+            for ref buf in data.iter() {
+                bufs.push(u_allocator.new_slice_mut(buf.len())?);
+            }
+            bufs
+        };
+        let retval = self.do_recvmsg_untrusted_data(&mut u_data, flags, name, control)?;
+
+        let mut copied = 0;
+        for (i, buf) in data.iter_mut().enumerate() {
+            buf.copy_from_slice(u_data[i]);
+            copied += buf.len();
+            if copied >= retval.0 {
+                break;
+            }
+        }
+        Ok(retval)
+    }
+
+    fn do_recvmsg_untrusted_data(
         &self,
         data: &mut [&mut [u8]],
         flags: RecvFlags,
@@ -68,7 +62,7 @@ impl SocketFile {
     ) -> Result<(usize, usize, usize, MsgHdrFlags)> {
         // Prepare the arguments for OCall
         // Host socket fd
-        let host_fd = self.host_fd;
+        let host_fd = self.host_fd();
         // Name
         let (msg_name, msg_namelen) = name.as_mut_ptr_and_len();
         let msg_name = msg_name as *mut c_void;

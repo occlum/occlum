@@ -34,3 +34,10 @@ bitflags! {
         const MSG_NOTIFICATION = 0x8000;     // Only applicable to SCTP socket
     }
 }
+
+bitflags! {
+    pub struct FileFlags: i32 {
+        const SOCK_NONBLOCK = 0x800;
+        const SOCK_CLOEXEC  = 0x80000;
+    }
+}
