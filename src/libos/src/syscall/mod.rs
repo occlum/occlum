@@ -37,8 +37,7 @@ use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
     do_epoll_pwait, do_epoll_wait, do_getpeername, do_getsockname, do_getsockopt, do_listen,
     do_poll, do_recvfrom, do_recvmsg, do_select, do_sendmsg, do_sendto, do_setsockopt, do_shutdown,
-    do_socket, do_socketpair, msghdr, msghdr_mut, AsSocket, AsUnixSocket, EpollEvent, PollEvent,
-    SocketFile, UnixSocketFile,
+    do_socket, do_socketpair, msghdr, msghdr_mut, PollEvent,
 };
 use crate::process::{
     do_arch_prctl, do_clone, do_exit, do_exit_group, do_futex, do_getegid, do_geteuid, do_getgid,

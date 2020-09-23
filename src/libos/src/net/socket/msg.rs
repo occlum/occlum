@@ -196,8 +196,11 @@ impl<'a> MsgHdrMut<'a> {
         Ok(())
     }
 
-    pub fn get_name_and_control_mut(&mut self) -> (Option<&mut [u8]>, Option<&mut [u8]>) {
+    pub fn get_iovs_name_and_control_mut(
+        &mut self,
+    ) -> (&mut IovsMut<'a>, Option<&mut [u8]>, Option<&mut [u8]>) {
         (
+            &mut self.iovs,
             self.name.as_mut().map(|name| &mut name[..]),
             self.control.as_mut().map(|control| &mut control[..]),
         )

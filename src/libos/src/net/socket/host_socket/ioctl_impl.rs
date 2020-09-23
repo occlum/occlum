@@ -1,7 +1,7 @@
 use super::*;
-use fs::{occlum_ocall_ioctl, BuiltinIoctlNum, IoctlCmd};
+use fs::{occlum_ocall_ioctl, BuiltinIoctlNum, IfConf, IoctlCmd};
 
-impl SocketFile {
+impl HostSocket {
     pub(super) fn ioctl_impl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
         if let IoctlCmd::SIOCGIFCONF(arg_ref) = cmd {
             return self.ioctl_getifconf(arg_ref);
@@ -13,7 +13,7 @@ impl SocketFile {
             let mut retval: i32 = 0;
             let status = occlum_ocall_ioctl(
                 &mut retval as *mut i32,
-                self.fd(),
+                self.host_fd(),
                 cmd_num,
                 cmd_arg_ptr,
                 cmd.arg_len(),
@@ -36,7 +36,7 @@ impl SocketFile {
             let mut retval: i32 = 0;
             let status = occlum_ocall_ioctl_repack(
                 &mut retval as *mut i32,
-                self.fd(),
+                self.host_fd(),
                 BuiltinIoctlNum::SIOCGIFCONF as i32,
                 arg_ref.ifc_buf,
                 arg_ref.ifc_len,
