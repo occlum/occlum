@@ -213,43 +213,6 @@ jobs:
         docker exec https_test bash -c "curl -k https://127.0.0.1:8443"
 
 
-  Grpc_test:
-    runs-on: ubuntu-18.04
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        submodules: true
-
-    - name: Get occlum version
-      run: echo ::set-env name=OCCLUM_VERSION::$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')
-
-    - name: Create container
-      run: docker run -itd --name=grpc_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
-
-    - name: Build dependencies
-      run: docker exec grpc_test bash -c "cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec grpc_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
-
-    - name: Install openssl
-      run: docker exec grpc_test bash -c "cd /root/occlum/demos/grpc && ./download_and_install_openssl.sh"
-
-    - name: Build grpc dependencies
-      run: docker exec grpc_test bash -c "cd /root/occlum/demos/grpc && ./download_and_install_grpc.sh"
-
-    - name: Prepare grpc sample project
-      run: docker exec grpc_test bash -c "cd /root/occlum/demos/grpc && ./prepare_client_server.sh"
-
-    - name: Run grpc server
-      run: docker exec grpc_test bash -c "cd /root/occlum/demos/grpc && SGX_MODE=SIM ./run_server_on_occlum.sh" &
-
-    - name: Run grpc client
-      run: |
-        sleep ${{ env.nap_time }};
-        docker exec grpc_test bash -c "cd /root/occlum/demos/grpc && SGX_MODE=SIM ./run_client_on_occlum.sh"
-
-
   Local_attestation_test:
     runs-on: ubuntu-18.04
     steps:
@@ -332,3 +295,81 @@ jobs:
     # TODO: Remove " || true " because in simulation mode, process exits brutely and can cause segmentation fault in some cases.
     - name: Run xgboost cluster test
       run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test-local-cluster" || true
+
+
+  Tensorflow_lite_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get occlum version
+      run: echo ::set-env name=OCCLUM_VERSION::$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')
+
+    - name: Create container
+      run: docker run -itd --name=tflite_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+
+    - name: Build dependencies
+      run: docker exec tflite_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec tflite_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+
+    - name: Build Tensorflow-lite dependencies
+      run: docker exec tflite_test bash -c "cd /root/occlum/demos/tensorflow_lite && ./download_and_build_tflite.sh"
+
+    - name: Run Tensorflow-lite demo
+      run: docker exec tflite_test bash -c "cd /root/occlum/demos/tensorflow_lite && SGX_MODE=SIM ./run_tflite_in_occlum.sh demo"
+
+    - name: Run Tensorflow-lite benchmark
+      run: docker exec tflite_test bash -c "cd /root/occlum/demos/tensorflow_lite && SGX_MODE=SIM ./run_tflite_in_occlum.sh benchmark"
+
+
+# Below tests needs test image to run faster
+  Grpc_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Create container
+      run: docker run -itd --name=grpc_test -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-grpc
+
+    - name: Build dependencies
+      run: docker exec grpc_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec grpc_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+
+    - name: Prepare grpc sample project
+      run: docker exec grpc_test bash -c "cd /root/demos/grpc && ./prepare_client_server.sh"
+
+    - name: Run grpc server
+      run: docker exec grpc_test bash -c "cd /root/demos/grpc && SGX_MODE=SIM ./run_server_on_occlum.sh" &
+
+    - name: Run grpc client
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec grpc_test bash -c "cd /root/demos/grpc && SGX_MODE=SIM ./run_client_on_occlum.sh"
+
+
+  Openvino_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Create container
+      run: docker run -itd --name=openvino_test -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-openvino
+
+    - name: Build dependencies
+      run: docker exec openvino_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec openvino_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+
+    - name: Run openVINO benchmark
+      run: docker exec openvino_test bash -c "cd /root/demos/openvino && SGX_MODE=SIM ./run_benchmark_on_occlum.sh"
