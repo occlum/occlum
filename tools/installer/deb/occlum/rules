@@ -29,11 +29,11 @@ override_dh_install:
 
 	# generate occlum-runtime
 	mkdir -p $(occlum-runtime-buildroot)
-	cd $(buildroot) && cat $(deb_build_dir)/occlum-$(VERSION)/debian/occlum-runtime-filelist | xargs -I files bash -c "cp --parents --target-directory=$(occlum-runtime-buildroot) files"
+	cd $(buildroot) && cat $(deb_build_dir)/occlum-$(VERSION)/debian/occlum-runtime-filelist | xargs -I files bash -c "cp -a --parents --target-directory=$(occlum-runtime-buildroot) files"
 
 	# generate occlum-pal
 	mkdir -p $(occlum-pal-buildroot)
-	cd $(buildroot) && cat $(deb_build_dir)/occlum-$(VERSION)/debian/occlum-pal-filelist | xargs -I files bash -c "cp --parents --target-directory=$(occlum-pal-buildroot) files"
+	cd $(buildroot) && cat $(deb_build_dir)/occlum-$(VERSION)/debian/occlum-pal-filelist | xargs -I files bash -c "cp -a --parents --target-directory=$(occlum-pal-buildroot) files"
 
 	# generate occlum-sgx-tools
 	mkdir -p $(occlum-sgx-tools-buildroot)/opt/occlum
@@ -41,7 +41,7 @@ override_dh_install:
 
 	# generate occlum package
 	mkdir -p $(occlum-buildroot)
-	cd $(buildroot) && cat $(deb_build_dir)/occlum-$(VERSION)/debian/occlum-filelist | xargs -I files bash -c "cp --parents --target-directory=$(occlum-buildroot) files"
+	cd $(buildroot) && cat $(deb_build_dir)/occlum-$(VERSION)/debian/occlum-filelist | xargs -I files bash -c "cp -a --parents --target-directory=$(occlum-buildroot) files"
 
 clean:
 	dh_clean
