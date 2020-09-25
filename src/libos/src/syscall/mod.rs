@@ -994,3 +994,24 @@ impl CpuContext {
         }
     }
 }
+
+// exception and interrupt syscalls share the same c abi
+//
+// num: occlum syscall number
+// info: pointer to sgx_exception_info_t or sgx_interrupt_info_t
+// fpregs: pointer to FpRegs. Rust compiler would complain about passing
+//  to external C functions a CpuContext pointer, which includes a FpRegs
+//  pointer that is not safe to use by external modules. In our case, the
+//  FpRegs pointer will not be used actually. So the Rust warning is a
+//  false alarm. We suppress it here.
+pub unsafe fn exception_interrupt_syscall_c_abi(
+    num: u32,
+    info: *mut c_void,
+    fpregs: *mut FpRegs,
+) -> u32 {
+    #[allow(improper_ctypes)]
+    extern "C" {
+        pub fn __occlum_syscall_c_abi(num: u32, info: *mut c_void, fpregs: *mut FpRegs) -> u32;
+    }
+    __occlum_syscall_c_abi(num, info, fpregs)
+}

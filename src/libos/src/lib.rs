@@ -6,8 +6,6 @@
 #![feature(allocator_api)]
 #![feature(core_intrinsics)]
 #![feature(stmt_expr_attributes)]
-#![feature(atomic_min_max)]
-#![feature(no_more_cas)]
 #![feature(alloc_layout_extra)]
 #![feature(concat_idents)]
 #![feature(trace_macros)]
