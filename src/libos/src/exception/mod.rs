@@ -5,6 +5,7 @@ use self::rdtsc::{handle_rdtsc_exception, RDTSC_OPCODE};
 use self::syscall::{handle_syscall_exception, SYSCALL_OPCODE};
 use super::*;
 use crate::signal::{FaultSignal, SigSet};
+use crate::syscall::exception_interrupt_syscall_c_abi;
 use crate::syscall::{CpuContext, FpRegs, SyscallNum};
 use aligned::{Aligned, A16};
 use core::arch::x86_64::_fxsave;
@@ -26,24 +27,11 @@ pub fn register_exception_handlers() {
 
 #[no_mangle]
 extern "C" fn handle_exception(info: *mut sgx_exception_info_t) -> i32 {
-    // Rust compiler would complain about passing to external C functions a CpuContext
-    // pointer, which includes a FpRegs pointer that is not safe to use by external
-    // modules. In our case, the FpRegs pointer will not be used actually. So the
-    // Rust warning is a false alarm. We suppress it here.
-    #[allow(improper_ctypes)]
-    extern "C" {
-        fn __occlum_syscall_c_abi(
-            num: u32,
-            info: *mut sgx_exception_info_t,
-            fpregs: *mut FpRegs,
-        ) -> u32;
-    }
-
     let mut fpregs = FpRegs::save();
     unsafe {
-        __occlum_syscall_c_abi(
+        exception_interrupt_syscall_c_abi(
             SyscallNum::HandleException as u32,
-            info,
+            info as *mut _,
             &mut fpregs as *mut FpRegs,
         )
     };
