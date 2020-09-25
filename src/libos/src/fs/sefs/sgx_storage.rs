@@ -1,5 +1,7 @@
 use super::*;
-use rcore_fs_sefs::dev::{DevResult, DeviceError, File, SefsMac, Storage};
+use crate::error::*;
+use rcore_fs::dev::{DevError, DevResult};
+use rcore_fs_sefs::dev::{File, SefsMac, Storage};
 use std::boxed::Box;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeMap;
@@ -9,6 +11,20 @@ use std::path::{Path, PathBuf};
 use std::sgxfs::{remove, OpenOptions, SgxFile};
 use std::sync::{Arc, SgxMutex as Mutex};
 use std::untrusted::fs;
+
+/// A helper macro to automatically convert a block of code that returns `std::result::Result<T, E1>`
+/// to one that returns `std::result::Result<T, E2>`, where `E1` satisfies `impl From<E1> for Error`
+/// and `E2` satisfies `impl From<Error> for E2`.
+///
+/// This macro is designed to workaround the limitation that `From<E1>` cannot be implemented for
+/// `E2` when both `E1` and `E2` are foreign types. For example, when `E1` is `std::io::Error` and
+/// `E2` is `rcore_fs::dev::DevError`.
+macro_rules! convert_result {
+    ($body: block) => {{
+        let mut closure_fn = || -> Result<_> { $body };
+        Ok(closure_fn()?)
+    }};
+}
 
 pub struct SgxStorage {
     path: PathBuf,
@@ -23,7 +39,7 @@ impl SgxStorage {
         integrity_only: bool,
         file_mac: Option<sgx_aes_gcm_128bit_tag_t>,
     ) -> Self {
-        //        assert!(path.as_ref().is_dir());
+        // assert!(path.as_ref().is_dir());
         SgxStorage {
             path: path.as_ref().to_path_buf(),
             integrity_only: integrity_only,
@@ -38,8 +54,8 @@ impl SgxStorage {
     fn get(
         &self,
         file_id: &str,
-        open_fn: impl FnOnce(&Self) -> DevResult<LockedFile>,
-    ) -> DevResult<LockedFile> {
+        open_fn: impl FnOnce(&Self) -> Result<LockedFile>,
+    ) -> Result<LockedFile> {
         // query cache
         let key = self.calculate_hash(file_id);
         let mut caches = self.file_cache.lock().unwrap();
@@ -64,8 +80,8 @@ impl SgxStorage {
     fn get(
         &self,
         file_id: &str,
-        open_fn: impl FnOnce(&Self) -> DevResult<LockedFile>,
-    ) -> LockedFile {
+        open_fn: impl FnOnce(&Self) -> Result<LockedFile>,
+    ) -> Result<LockedFile> {
         open_fn(self)
     }
 
@@ -73,7 +89,7 @@ impl SgxStorage {
     ///
     /// By giving this root MAC, we can be sure that the root file (file_id = 0) opened
     /// by the storage has a MAC that is equal to the given root MAC.
-    pub fn set_root_mac(&mut self, mac: sgx_aes_gcm_128bit_tag_t) -> DevResult<()> {
+    pub fn set_root_mac(&mut self, mac: sgx_aes_gcm_128bit_tag_t) -> Result<()> {
         self.root_mac = Some(mac);
         Ok(())
     }
@@ -89,16 +105,10 @@ impl Storage for SgxStorage {
                 options.read(true).update(true);
                 options
             };
-            let file = {
-                let open_res = if !self.integrity_only {
-                    options.open(path)
-                } else {
-                    options.open_integrity_only(path)
-                };
-                if open_res.is_err() {
-                    return Err(DeviceError);
-                }
-                open_res.unwrap()
+            let file = if !self.integrity_only {
+                options.open(path)?
+            } else {
+                options.open_integrity_only(path)?
             };
 
             // Check the MAC of the root file against the given root MAC of the storage
@@ -110,7 +120,7 @@ impl Storage for SgxStorage {
                         self.root_mac.unwrap(),
                         root_file_mac
                     );
-                    return Err(DeviceError);
+                    return_errno!(EACCES);
                 }
             }
 
@@ -128,16 +138,10 @@ impl Storage for SgxStorage {
                 options.write(true).update(true);
                 options
             };
-            let file = {
-                let open_res = if !self.integrity_only {
-                    options.open(path)
-                } else {
-                    options.open_integrity_only(path)
-                };
-                if open_res.is_err() {
-                    return Err(DeviceError);
-                }
-                open_res.unwrap()
+            let file = if !self.integrity_only {
+                options.open(path)?
+            } else {
+                options.open_integrity_only(path)?
             };
             Ok(LockedFile(Arc::new(Mutex::new(file))))
         })?;
@@ -145,14 +149,16 @@ impl Storage for SgxStorage {
     }
 
     fn remove(&self, file_id: &str) -> DevResult<()> {
-        let mut path = self.path.to_path_buf();
-        path.push(file_id);
-        remove(path).expect("failed to remove SgxFile");
-        // remove from cache
-        let key = self.calculate_hash(file_id);
-        let mut caches = self.file_cache.lock().unwrap();
-        caches.remove(&key);
-        Ok(())
+        convert_result!({
+            let mut path = self.path.to_path_buf();
+            path.push(file_id);
+            remove(path)?;
+            // remove from cache
+            let key = self.calculate_hash(file_id);
+            let mut caches = self.file_cache.lock().unwrap();
+            caches.remove(&key);
+            Ok(())
+        })
     }
 
     fn is_integrity_only(&self) -> bool {
@@ -160,14 +166,16 @@ impl Storage for SgxStorage {
     }
 
     fn clear(&self) -> DevResult<()> {
-        for child in fs::read_dir(&self.path).expect("faild to read dir") {
-            let child = child.expect("faild to get dir entry");
-            remove(&child.path()).expect("failed to remove SgxFile");
-        }
-        // clear cache
-        let mut caches = self.file_cache.lock().unwrap();
-        caches.clear();
-        Ok(())
+        convert_result!({
+            for child in fs::read_dir(&self.path)? {
+                let child = child?;
+                remove(&child.path())?;
+            }
+            // clear cache
+            let mut caches = self.file_cache.lock().unwrap();
+            caches.clear();
+            Ok(())
+        })
     }
 }
 
@@ -180,49 +188,51 @@ unsafe impl Sync for LockedFile {}
 
 impl File for LockedFile {
     fn read_at(&self, buf: &mut [u8], offset: usize) -> DevResult<usize> {
-        if buf.len() == 0 {
-            return Ok(0);
-        }
-        let mut file = self.0.lock().unwrap();
+        convert_result!({
+            if buf.len() == 0 {
+                return Ok(0);
+            }
+            let mut file = self.0.lock().unwrap();
 
-        // SgxFile does not support to seek a position beyond the end.
-        // So check if file_size < offset and return zero(indicates end of file).
-        let file_size = file.seek(SeekFrom::End(0)).expect("failed to tell SgxFile") as usize;
-        if file_size < offset {
-            return Ok(0);
-        }
+            // SgxFile does not support to seek a position beyond the end.
+            // So check if file_size < offset and return zero(indicates end of file).
+            let file_size = file.seek(SeekFrom::End(0))? as usize;
+            if file_size < offset {
+                return Ok(0);
+            }
 
-        let offset = offset as u64;
-        file.seek(SeekFrom::Start(offset))
-            .expect("failed to seek SgxFile");
-        let len = file.read(buf).expect("failed to read SgxFile");
-        Ok(len)
+            let offset = offset as u64;
+            file.seek(SeekFrom::Start(offset))?;
+            let len = file.read(buf)?;
+            Ok(len)
+        })
     }
 
     fn write_at(&self, buf: &[u8], offset: usize) -> DevResult<usize> {
-        if buf.len() == 0 {
-            return Ok(0);
-        }
-        let mut file = self.0.lock().unwrap();
-
-        // SgxFile does not support to seek a position beyond the end.
-        // So check if file_size < offset and padding null bytes.
-        let file_size = file.seek(SeekFrom::End(0)).expect("failed to tell SgxFile") as usize;
-        if file_size < offset {
-            static ZEROS: [u8; 0x1000] = [0; 0x1000];
-            let mut rest_len = offset - file_size;
-            while rest_len != 0 {
-                let l = rest_len.min(0x1000);
-                let len = file.write(&ZEROS[..l]).expect("failed to write SgxFile");
-                rest_len -= len;
+        convert_result!({
+            if buf.len() == 0 {
+                return Ok(0);
             }
-        }
+            let mut file = self.0.lock().unwrap();
 
-        let offset = offset as u64;
-        file.seek(SeekFrom::Start(offset))
-            .expect("failed to seek SgxFile");
-        let len = file.write(buf).expect("failed to write SgxFile");
-        Ok(len)
+            // SgxFile does not support to seek a position beyond the end.
+            // So check if file_size < offset and padding null bytes.
+            let file_size = file.seek(SeekFrom::End(0))? as usize;
+            if file_size < offset {
+                static ZEROS: [u8; 0x1000] = [0; 0x1000];
+                let mut rest_len = offset - file_size;
+                while rest_len != 0 {
+                    let l = rest_len.min(0x1000);
+                    let len = file.write(&ZEROS[..l])?;
+                    rest_len -= len;
+                }
+            }
+
+            let offset = offset as u64;
+            file.seek(SeekFrom::Start(offset))?;
+            let len = file.write(buf)?;
+            Ok(len)
+        })
     }
 
     fn set_len(&self, len: usize) -> DevResult<()> {
@@ -231,13 +241,22 @@ impl File for LockedFile {
     }
 
     fn flush(&self) -> DevResult<()> {
-        let mut file = self.0.lock().unwrap();
-        file.flush().expect("failed to flush SgxFile");
-        Ok(())
+        convert_result!({
+            let mut file = self.0.lock().unwrap();
+            file.flush()?;
+            Ok(())
+        })
     }
 
     fn get_file_mac(&self) -> DevResult<SefsMac> {
         let file = self.0.lock().unwrap();
         Ok(SefsMac(file.get_mac().unwrap()))
+    }
+}
+
+impl From<Error> for DevError {
+    fn from(e: Error) -> Self {
+        error!("SGX protected file I/O error: {}", e.backtrace());
+        DevError(e.errno() as i32)
     }
 }

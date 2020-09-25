@@ -86,7 +86,7 @@ impl ToErrno for rcore_fs::vfs::FsError {
             FsError::DirRemoved => ENOENT,
             FsError::DirNotEmpty => ENOTEMPTY,
             FsError::WrongFs => EINVAL,
-            FsError::DeviceError => EIO,
+            FsError::DeviceError(err) => EIO,
             FsError::SymLoop => ELOOP,
             FsError::NoDevice => ENXIO,
             FsError::IOCTLError => EINVAL,

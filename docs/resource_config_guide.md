@@ -36,7 +36,13 @@ resources.
 
     - Solution: Enlarge `resource_limits.kernel_space_heap_size`
 
-5. LibOS thread execution error:
+5. SGX protected file I/O error:
+    - Error message: `SGX protected file I/O error: EIO (#5, I/O error): Cannot
+      allocate memory (os error: 12)`
+
+    - Solution: Enlarge `resource_limits.kernel_space_heap_size`
+
+6. LibOS thread execution error:
     - Error message: `[ERROR] occlum-pal: Failed to enter the enclave to
       execute a LibOS thread (host tid = XXX): Unknown SGX error`
 
