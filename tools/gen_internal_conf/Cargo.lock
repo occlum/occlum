@@ -70,8 +70,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "gen_enclave_conf"
-version = "0.1.0"
+name = "gen_internal_conf"
+version = "0.2.0"
 dependencies = [
  "clap",
  "env_logger",

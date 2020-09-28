@@ -28,43 +28,9 @@ define get_conf_root_fs_mac
 		"$(occlum_dir)/build/bin/occlum-protect-integrity" show-mac "$(instance_dir)/build/mount/__ROOT/metadata"
 endef
 
-define get_conf_default_stack_size
-	cat "$(JSON_CONF)" | \
-		python -c "import sys, json; print json.load(sys.stdin)['process']['default_stack_size']"
-endef
-
-define get_conf_default_heap_size
-	cat "$(JSON_CONF)" | \
-		python -c "import sys, json; print json.load(sys.stdin)['process']['default_heap_size']"
-endef
-
-define get_conf_default_mmap_size
-	cat "$(JSON_CONF)" | \
-		python -c "import sys, json; print json.load(sys.stdin)['process']['default_mmap_size']" ['resource_limits']['user_space_size']
-endef
-
-define get_conf_user_space_size
-	cat "$(JSON_CONF)" | \
-		python -c "import sys, json; print json.load(sys.stdin)['resource_limits']['user_space_size']"
-endef
-
-define get_conf_env
-	cat "$(JSON_CONF)" | \
-		python -c "import sys, json; print json.dumps(json.load(sys.stdin)['env'])"
-endef
-
-define get_conf_entry_points
-	cat "$(JSON_CONF)" | \
-		python -c "import sys, json; print json.dumps(json.load(sys.stdin)['entry_points'])"
-endef
-
 define get_occlum_conf_file_mac
 	LD_LIBRARY_PATH="$(SGX_SDK)/sdk_libs" \
 		"$(occlum_dir)/build/bin/occlum-protect-integrity" show-mac "$(instance_dir)/build/Occlum.json.protected"
-endef
-
-define parse_occlum_user_space_size
-	size_with_unit=$$($(get_conf_user_space_size)); echo $${size_with_unit:0:-1} | numfmt --from=iec
 endef
 
 
@@ -76,7 +42,6 @@ all: $(ALL_TARGETS)
 
 $(SIGNED_ENCLAVE): $(LIBOS)
 	@echo "Signing the enclave..."
-	@$(occlum_dir)/build/bin/gen_enclave_conf -i "$(instance_dir)/Occlum.json" -o "$(instance_dir)/build/Enclave.xml"
 
 	@$(ENCLAVE_SIGN_TOOL) sign \
 		-key $(ENCLAVE_SIGN_KEY) \
@@ -88,8 +53,6 @@ $(LIBOS): $(instance_dir)/build/Occlum.json.protected
 	@echo "Building libOS..."
 	@export OCCLUM_BUILTIN_CONF_FILE_MAC=`$(get_occlum_conf_file_mac)` ; \
 		echo "EXPORT => OCCLUM_BUILTIN_CONF_FILE_MAC = $$OCCLUM_BUILTIN_CONF_FILE_MAC" ; \
-		export OCCLUM_BUILTIN_VM_USER_SPACE_SIZE=$$($(parse_occlum_user_space_size)) ; \
-		echo "EXPORT => OCCLUM_BUILTIN_VM_USER_SPACE_SIZE = $$OCCLUM_BUILTIN_VM_USER_SPACE_SIZE" ; \
 		cd $(instance_dir)/build/lib && \
 		cp "$(occlum_dir)/build/lib/$(libos_lib).$(occlum_version)" . && ln -sf "$(libos_lib).$(occlum_version)" "libocclum-libos.so.$(major_ver)" && \
 		ln -sf "libocclum-libos.so.$(major_ver)" libocclum-libos.so ; \
@@ -101,16 +64,10 @@ $(instance_dir)/build/Occlum.json.protected: $(instance_dir)/build/Occlum.json
 	@cd "$(instance_dir)/build" ; \
 		LD_LIBRARY_PATH="$(SGX_SDK)/sdk_libs" "$(occlum_dir)/build/bin/occlum-protect-integrity" protect Occlum.json ;
 
+$(instance_dir)/build/Enclave.xml:
 $(instance_dir)/build/Occlum.json: $(SECURE_IMAGE) $(JSON_CONF) | $(instance_dir)/build/lib
-	@export OCCLUM_CONF_ROOT_FS_MAC=`$(get_conf_root_fs_mac)` ; \
-		export OCCLUM_CONF_USER_SPACE_SIZE=`$(get_conf_user_space_size)` ; \
-		export OCCLUM_CONF_DEFAULT_STACK_SIZE=`$(get_conf_default_stack_size)` ; \
-		export OCCLUM_CONF_DEFAULT_HEAP_SIZE=`$(get_conf_default_heap_size)` ; \
-		export OCCLUM_CONF_DEFAULT_MMAP_SIZE=`$(get_conf_default_mmap_size)` ; \
-		export OCCLUM_CONF_ENV="`$(get_conf_env)`" ; \
-		export OCCLUM_CONF_ENTRY_POINTS=`$(get_conf_entry_points)` ; \
-		cd "$(instance_dir)/build" ; \
-		"$(occlum_dir)/build/bin/occlum-gen-default-occlum-json" > "Occlum.json"
+	@$(occlum_dir)/build/bin/gen_internal_conf --user_json "$(instance_dir)/Occlum.json" --fs_mac `$(get_conf_root_fs_mac)` \
+		--sdk_xml "$(instance_dir)/build/Enclave.xml" --sys_json $(instance_dir)/build/Occlum.json
 
 $(BIN_LINKS): $(instance_dir)/build/bin/%: $(occlum_dir)/build/bin/% | $(instance_dir)/build/bin
 	@ln -sf $< $@
