@@ -1,6 +1,6 @@
 [package]
-name = "gen_enclave_conf"
-version = "0.1.0"
+name = "gen_internal_conf"
+version = "0.2.0"
 authors = ["zongmin.gu <zongmin.gzm@alibaba-inc.com>"]
 edition = "2018"
 

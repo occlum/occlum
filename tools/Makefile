@@ -7,9 +7,8 @@ all:
 	@mkdir -p ../$(BUILD_DIR)/bin/
 	@ln -s -f ../../tools/occlum_build.mk ../$(BUILD_DIR)/bin/occlum_build.mk
 	@ln -s -f ../../tools/occlum ../$(BUILD_DIR)/bin/occlum
-	@ln -s -f ../../tools/occlum-gen-default-occlum-json ../$(BUILD_DIR)/bin/occlum-gen-default-occlum-json
 	@$(MAKE) --no-print-directory -C protect-integrity
-	@$(MAKE) --no-print-directory -C gen_enclave_conf
+	@$(MAKE) --no-print-directory -C gen_internal_conf
 
 format:
 	@$(MAKE) --no-print-directory -C protect-integrity format
@@ -19,4 +18,4 @@ format-check:
 
 clean:
 	@$(MAKE) --no-print-directory -C protect-integrity clean
-	@$(MAKE) --no-print-directory -C gen_enclave_conf clean
+	@$(MAKE) --no-print-directory -C gen_internal_conf clean

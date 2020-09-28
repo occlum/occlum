@@ -1,4 +1,4 @@
-/opt/occlum/build/bin/gen_enclave_conf
+/opt/occlum/build/bin/gen_internal_conf
 /opt/occlum/build/bin/occlum-gen-default-occlum-json
 /opt/occlum/build/bin/occlum-protect-integrity
 /opt/occlum/build/bin/sefs-cli
