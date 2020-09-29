@@ -73,6 +73,10 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec language_support_test bash -c "cd /root/occlum/demos/golang/grpc_pingpong && SGX_MODE=SIM ./run_ping_on_occlum.sh" &
 
+    # TODO: Remove " || true " because in simulation mode, process exits brutely and can cause segmentation fault in some cases.
+    - name: Run Golang sqlite test
+      run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh" || true
+
     # TODO: When sgx simulation mode can handle interrupt signal, remove this.
     - name: Kill the container
       run: |
