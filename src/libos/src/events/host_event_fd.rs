@@ -65,6 +65,10 @@ impl HostEventFd {
     ///
     /// Precondition. The caller must ensure that the host fds are valid.
     pub unsafe fn write_u64_raw_and_batch(host_fds: &[FileDesc], val: u64) {
+        if host_fds.len() == 0 {
+            return;
+        }
+
         ocall_eventfd_write_batch(host_fds, val);
     }
 
