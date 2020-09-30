@@ -33,8 +33,7 @@ if [ -f "$occlum_sgx_env" ]; then
 fi
 
 get_enclave_debuggable_flag() {
-    cat "$instance_dir/Occlum.json" | \
-        python -c "import sys, json; print json.load(sys.stdin)['metadata']['debuggable']"
+    jq '.metadata.debuggable' $instance_dir/Occlum.json
 }
 
 exit_error() {
