@@ -8,6 +8,7 @@ name = "occlum_libos_core_rs"
 crate-type = ["staticlib"]
 
 [dependencies]
+atomic = "0.5"
 bitflags = "1.0"
 bitvec = { version = "0.17", default-features = false, features = ["alloc"]  }
 log = "0.4"

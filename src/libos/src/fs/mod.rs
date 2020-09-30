@@ -12,6 +12,7 @@ use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
 
 pub use self::dev_fs::AsDevRandom;
 pub use self::event_file::{AsEvent, EventCreationFlags, EventFile};
+pub use self::events::{IoEvents, IoNotifier};
 pub use self::file::{File, FileRef};
 pub use self::file_ops::{
     occlum_ocall_ioctl, AccessMode, BuiltinIoctlNum, CreationFlags, FileMode, Flock, FlockType,
@@ -25,8 +26,10 @@ pub use self::rootfs::ROOT_INODE;
 pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
 pub use self::syscalls::*;
 
+pub mod channel;
 mod dev_fs;
 mod event_file;
+mod events;
 mod file;
 mod file_ops;
 mod file_table;
