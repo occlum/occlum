@@ -8,7 +8,6 @@ env:
 
 
 jobs:
-  # TODO: Add python test
   C_cpp_rust_golang_embedded_mode_support_test:
     runs-on: ubuntu-18.04
     steps:
@@ -373,3 +372,23 @@ jobs:
 
     - name: Run openVINO benchmark
       run: docker exec openvino_test bash -c "cd /root/demos/openvino && SGX_MODE=SIM ./run_benchmark_on_occlum.sh"
+
+
+  # Python test also needs its own image because in Alpine environment, modules are built locally and consumes a lot of time.
+  Python_support_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+    - name: Create container
+      run: docker run -itd --name=python_support_test -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-python
+
+    - name: Build dependencies
+      run: docker exec python_support_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec python_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+
+    - name: Run python support test
+      run: docker exec python_support_test bash -c "cd /root/occlum/demos/python; SGX_MODE=SIM ./run_python_on_occlum.sh"
