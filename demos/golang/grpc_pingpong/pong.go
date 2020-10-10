@@ -11,13 +11,17 @@ import (
 	"grpc_pingpong/github.com/occlum/demos/grpc_pingpong/pingpong"
 )
 
-func PingPong(ctx context.Context, in *pingpong.PingPongMesg) (*pingpong.PingPongMesg, error) {
+type PingPongServer struct {
+        pingpong.UnimplementedPingPongServiceServer
+}
+
+func (s *PingPongServer) PingPong(ctx context.Context, in *pingpong.PingPongMesg) (*pingpong.PingPongMesg, error) {
 	currentTime := time.Now()
 	fmt.Printf("Receiving Ping: %s (at %s)\n", in.Ping, currentTime.Format("2006-01-02T15:04:05.999999999Z07:00"))
 	return &pingpong.PingPongMesg{Ping: in.Ping,
 				      Pong: fmt.Sprintf("Greetings from Pong! Ping Echoed: %s", in.Ping),
 				      Timestamp: currentTime.Format("2006-01-02T15:04:05.999999999Z07:00")}, nil
-			      }
+}
 
 func main() {
 	fmt.Println("grpc_pingpong server is waiting for service requests ...")
@@ -29,7 +33,7 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 
-	pingpong.RegisterPingPongServiceService(grpcServer, &pingpong.PingPongServiceService{PingPong: PingPong})
+	pingpong.RegisterPingPongServiceServer(grpcServer, &PingPongServer{})
 
 	if err := grpcServer.Serve(conn); err != nil {
 		fmt.Printf("Failed to serve: %s\n", err)
