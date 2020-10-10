@@ -1,0 +1,639 @@
+638
+DejaVuLGCSans-Bold.ttf -misc-dejavu lgc sans-bold-r-normal--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSans-Bold.ttf -misc-dejavu lgc sans-bold-r-normal--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSans-Bold.ttf -misc-dejavu lgc sans-bold-r-normal--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSans-Bold.ttf -misc-dejavu lgc sans-bold-r-normal--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSans-Bold.ttf -misc-dejavu lgc sans-bold-r-normal--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSans-Bold.ttf -misc-dejavu lgc sans-bold-r-normal--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSans-Bold.ttf -misc-dejavu lgc sans-bold-r-normal--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSans-Bold.ttf -misc-dejavu lgc sans-bold-r-normal--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSans-Bold.ttf -misc-dejavu lgc sans-bold-r-normal--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSans-Bold.ttf -misc-dejavu lgc sans-bold-r-normal--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSans-Bold.ttf -misc-dejavu lgc sans-bold-r-normal--0-0-0-0-p-0-koi8-e
+DejaVuLGCSans-Bold.ttf -misc-dejavu lgc sans-bold-r-normal--0-0-0-0-p-0-koi8-r
+DejaVuLGCSans-Bold.ttf -misc-dejavu lgc sans-bold-r-normal--0-0-0-0-p-0-koi8-ru
+DejaVuLGCSans-Bold.ttf -misc-dejavu lgc sans-bold-r-normal--0-0-0-0-p-0-koi8-u
+DejaVuLGCSans-Bold.ttf -misc-dejavu lgc sans-bold-r-normal--0-0-0-0-p-0-koi8-uni
+DejaVuLGCSans-BoldOblique.ttf -misc-dejavu lgc sans-bold-o-normal--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSans-BoldOblique.ttf -misc-dejavu lgc sans-bold-o-normal--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSans-BoldOblique.ttf -misc-dejavu lgc sans-bold-o-normal--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSans-BoldOblique.ttf -misc-dejavu lgc sans-bold-o-normal--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSans-BoldOblique.ttf -misc-dejavu lgc sans-bold-o-normal--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSans-BoldOblique.ttf -misc-dejavu lgc sans-bold-o-normal--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSans-BoldOblique.ttf -misc-dejavu lgc sans-bold-o-normal--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSans-BoldOblique.ttf -misc-dejavu lgc sans-bold-o-normal--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSans-BoldOblique.ttf -misc-dejavu lgc sans-bold-o-normal--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSans-BoldOblique.ttf -misc-dejavu lgc sans-bold-o-normal--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSans-BoldOblique.ttf -misc-dejavu lgc sans-bold-o-normal--0-0-0-0-p-0-koi8-e
+DejaVuLGCSans-BoldOblique.ttf -misc-dejavu lgc sans-bold-o-normal--0-0-0-0-p-0-koi8-r
+DejaVuLGCSans-BoldOblique.ttf -misc-dejavu lgc sans-bold-o-normal--0-0-0-0-p-0-koi8-ru
+DejaVuLGCSans-BoldOblique.ttf -misc-dejavu lgc sans-bold-o-normal--0-0-0-0-p-0-koi8-u
+DejaVuLGCSans-BoldOblique.ttf -misc-dejavu lgc sans-bold-o-normal--0-0-0-0-p-0-koi8-uni
+DejaVuLGCSans-ExtraLight.ttf -misc-dejavu lgc sans light-extralight-r-normal--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSans-ExtraLight.ttf -misc-dejavu lgc sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSans-ExtraLight.ttf -misc-dejavu lgc sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSans-ExtraLight.ttf -misc-dejavu lgc sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSans-ExtraLight.ttf -misc-dejavu lgc sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSans-ExtraLight.ttf -misc-dejavu lgc sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSans-ExtraLight.ttf -misc-dejavu lgc sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSans-ExtraLight.ttf -misc-dejavu lgc sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSans-ExtraLight.ttf -misc-dejavu lgc sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSans-ExtraLight.ttf -misc-dejavu lgc sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSans-ExtraLight.ttf -misc-dejavu lgc sans light-extralight-r-normal--0-0-0-0-p-0-koi8-e
+DejaVuLGCSans-Oblique.ttf -misc-dejavu lgc sans-medium-o-normal--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSans-Oblique.ttf -misc-dejavu lgc sans-medium-o-normal--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSans-Oblique.ttf -misc-dejavu lgc sans-medium-o-normal--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSans-Oblique.ttf -misc-dejavu lgc sans-medium-o-normal--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSans-Oblique.ttf -misc-dejavu lgc sans-medium-o-normal--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSans-Oblique.ttf -misc-dejavu lgc sans-medium-o-normal--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSans-Oblique.ttf -misc-dejavu lgc sans-medium-o-normal--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSans-Oblique.ttf -misc-dejavu lgc sans-medium-o-normal--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSans-Oblique.ttf -misc-dejavu lgc sans-medium-o-normal--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSans-Oblique.ttf -misc-dejavu lgc sans-medium-o-normal--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSans-Oblique.ttf -misc-dejavu lgc sans-medium-o-normal--0-0-0-0-p-0-koi8-e
+DejaVuLGCSans-Oblique.ttf -misc-dejavu lgc sans-medium-o-normal--0-0-0-0-p-0-koi8-r
+DejaVuLGCSans-Oblique.ttf -misc-dejavu lgc sans-medium-o-normal--0-0-0-0-p-0-koi8-ru
+DejaVuLGCSans-Oblique.ttf -misc-dejavu lgc sans-medium-o-normal--0-0-0-0-p-0-koi8-u
+DejaVuLGCSans-Oblique.ttf -misc-dejavu lgc sans-medium-o-normal--0-0-0-0-p-0-koi8-uni
+DejaVuLGCSans.ttf -misc-dejavu lgc sans-medium-r-normal--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSans.ttf -misc-dejavu lgc sans-medium-r-normal--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSans.ttf -misc-dejavu lgc sans-medium-r-normal--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSans.ttf -misc-dejavu lgc sans-medium-r-normal--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSans.ttf -misc-dejavu lgc sans-medium-r-normal--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSans.ttf -misc-dejavu lgc sans-medium-r-normal--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSans.ttf -misc-dejavu lgc sans-medium-r-normal--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSans.ttf -misc-dejavu lgc sans-medium-r-normal--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSans.ttf -misc-dejavu lgc sans-medium-r-normal--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSans.ttf -misc-dejavu lgc sans-medium-r-normal--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSans.ttf -misc-dejavu lgc sans-medium-r-normal--0-0-0-0-p-0-koi8-e
+DejaVuLGCSans.ttf -misc-dejavu lgc sans-medium-r-normal--0-0-0-0-p-0-koi8-r
+DejaVuLGCSans.ttf -misc-dejavu lgc sans-medium-r-normal--0-0-0-0-p-0-koi8-ru
+DejaVuLGCSans.ttf -misc-dejavu lgc sans-medium-r-normal--0-0-0-0-p-0-koi8-u
+DejaVuLGCSans.ttf -misc-dejavu lgc sans-medium-r-normal--0-0-0-0-p-0-koi8-uni
+DejaVuLGCSansCondensed-Bold.ttf -misc-dejavu lgc sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSansCondensed-Bold.ttf -misc-dejavu lgc sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSansCondensed-Bold.ttf -misc-dejavu lgc sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSansCondensed-Bold.ttf -misc-dejavu lgc sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSansCondensed-Bold.ttf -misc-dejavu lgc sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSansCondensed-Bold.ttf -misc-dejavu lgc sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSansCondensed-Bold.ttf -misc-dejavu lgc sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSansCondensed-Bold.ttf -misc-dejavu lgc sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSansCondensed-Bold.ttf -misc-dejavu lgc sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSansCondensed-Bold.ttf -misc-dejavu lgc sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSansCondensed-Bold.ttf -misc-dejavu lgc sans condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-e
+DejaVuLGCSansCondensed-Bold.ttf -misc-dejavu lgc sans condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-r
+DejaVuLGCSansCondensed-Bold.ttf -misc-dejavu lgc sans condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-ru
+DejaVuLGCSansCondensed-Bold.ttf -misc-dejavu lgc sans condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-u
+DejaVuLGCSansCondensed-Bold.ttf -misc-dejavu lgc sans condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-uni
+DejaVuLGCSansCondensed-BoldOblique.ttf -misc-dejavu lgc sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSansCondensed-BoldOblique.ttf -misc-dejavu lgc sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSansCondensed-BoldOblique.ttf -misc-dejavu lgc sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSansCondensed-BoldOblique.ttf -misc-dejavu lgc sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSansCondensed-BoldOblique.ttf -misc-dejavu lgc sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSansCondensed-BoldOblique.ttf -misc-dejavu lgc sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSansCondensed-BoldOblique.ttf -misc-dejavu lgc sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSansCondensed-BoldOblique.ttf -misc-dejavu lgc sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSansCondensed-BoldOblique.ttf -misc-dejavu lgc sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSansCondensed-BoldOblique.ttf -misc-dejavu lgc sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSansCondensed-BoldOblique.ttf -misc-dejavu lgc sans condensed-bold-o-semicondensed--0-0-0-0-p-0-koi8-e
+DejaVuLGCSansCondensed-BoldOblique.ttf -misc-dejavu lgc sans condensed-bold-o-semicondensed--0-0-0-0-p-0-koi8-r
+DejaVuLGCSansCondensed-BoldOblique.ttf -misc-dejavu lgc sans condensed-bold-o-semicondensed--0-0-0-0-p-0-koi8-ru
+DejaVuLGCSansCondensed-BoldOblique.ttf -misc-dejavu lgc sans condensed-bold-o-semicondensed--0-0-0-0-p-0-koi8-u
+DejaVuLGCSansCondensed-BoldOblique.ttf -misc-dejavu lgc sans condensed-bold-o-semicondensed--0-0-0-0-p-0-koi8-uni
+DejaVuLGCSansCondensed-Oblique.ttf -misc-dejavu lgc sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSansCondensed-Oblique.ttf -misc-dejavu lgc sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSansCondensed-Oblique.ttf -misc-dejavu lgc sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSansCondensed-Oblique.ttf -misc-dejavu lgc sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSansCondensed-Oblique.ttf -misc-dejavu lgc sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSansCondensed-Oblique.ttf -misc-dejavu lgc sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSansCondensed-Oblique.ttf -misc-dejavu lgc sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSansCondensed-Oblique.ttf -misc-dejavu lgc sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSansCondensed-Oblique.ttf -misc-dejavu lgc sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSansCondensed-Oblique.ttf -misc-dejavu lgc sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSansCondensed-Oblique.ttf -misc-dejavu lgc sans condensed-medium-o-semicondensed--0-0-0-0-p-0-koi8-e
+DejaVuLGCSansCondensed-Oblique.ttf -misc-dejavu lgc sans condensed-medium-o-semicondensed--0-0-0-0-p-0-koi8-r
+DejaVuLGCSansCondensed-Oblique.ttf -misc-dejavu lgc sans condensed-medium-o-semicondensed--0-0-0-0-p-0-koi8-ru
+DejaVuLGCSansCondensed-Oblique.ttf -misc-dejavu lgc sans condensed-medium-o-semicondensed--0-0-0-0-p-0-koi8-u
+DejaVuLGCSansCondensed-Oblique.ttf -misc-dejavu lgc sans condensed-medium-o-semicondensed--0-0-0-0-p-0-koi8-uni
+DejaVuLGCSansCondensed.ttf -misc-dejavu lgc sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSansCondensed.ttf -misc-dejavu lgc sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSansCondensed.ttf -misc-dejavu lgc sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSansCondensed.ttf -misc-dejavu lgc sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSansCondensed.ttf -misc-dejavu lgc sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSansCondensed.ttf -misc-dejavu lgc sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSansCondensed.ttf -misc-dejavu lgc sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSansCondensed.ttf -misc-dejavu lgc sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSansCondensed.ttf -misc-dejavu lgc sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSansCondensed.ttf -misc-dejavu lgc sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSansCondensed.ttf -misc-dejavu lgc sans condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-e
+DejaVuLGCSansCondensed.ttf -misc-dejavu lgc sans condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-r
+DejaVuLGCSansCondensed.ttf -misc-dejavu lgc sans condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-ru
+DejaVuLGCSansCondensed.ttf -misc-dejavu lgc sans condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-u
+DejaVuLGCSansCondensed.ttf -misc-dejavu lgc sans condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-uni
+DejaVuLGCSansMono-Bold.ttf -misc-dejavu lgc sans mono-bold-r-normal--0-0-0-0-m-0-iso10646-1
+DejaVuLGCSansMono-Bold.ttf -misc-dejavu lgc sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-1
+DejaVuLGCSansMono-Bold.ttf -misc-dejavu lgc sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-10
+DejaVuLGCSansMono-Bold.ttf -misc-dejavu lgc sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-15
+DejaVuLGCSansMono-Bold.ttf -misc-dejavu lgc sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-2
+DejaVuLGCSansMono-Bold.ttf -misc-dejavu lgc sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-3
+DejaVuLGCSansMono-Bold.ttf -misc-dejavu lgc sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-4
+DejaVuLGCSansMono-Bold.ttf -misc-dejavu lgc sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-5
+DejaVuLGCSansMono-Bold.ttf -misc-dejavu lgc sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-7
+DejaVuLGCSansMono-Bold.ttf -misc-dejavu lgc sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-9
+DejaVuLGCSansMono-Bold.ttf -misc-dejavu lgc sans mono-bold-r-normal--0-0-0-0-m-0-koi8-e
+DejaVuLGCSansMono-Bold.ttf -misc-dejavu lgc sans mono-bold-r-normal--0-0-0-0-m-0-koi8-r
+DejaVuLGCSansMono-Bold.ttf -misc-dejavu lgc sans mono-bold-r-normal--0-0-0-0-m-0-koi8-ru
+DejaVuLGCSansMono-Bold.ttf -misc-dejavu lgc sans mono-bold-r-normal--0-0-0-0-m-0-koi8-u
+DejaVuLGCSansMono-Bold.ttf -misc-dejavu lgc sans mono-bold-r-normal--0-0-0-0-m-0-koi8-uni
+DejaVuLGCSansMono-BoldOblique.ttf -misc-dejavu lgc sans mono-bold-o-normal--0-0-0-0-m-0-iso10646-1
+DejaVuLGCSansMono-BoldOblique.ttf -misc-dejavu lgc sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-1
+DejaVuLGCSansMono-BoldOblique.ttf -misc-dejavu lgc sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-10
+DejaVuLGCSansMono-BoldOblique.ttf -misc-dejavu lgc sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-15
+DejaVuLGCSansMono-BoldOblique.ttf -misc-dejavu lgc sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-2
+DejaVuLGCSansMono-BoldOblique.ttf -misc-dejavu lgc sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-3
+DejaVuLGCSansMono-BoldOblique.ttf -misc-dejavu lgc sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-4
+DejaVuLGCSansMono-BoldOblique.ttf -misc-dejavu lgc sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-5
+DejaVuLGCSansMono-BoldOblique.ttf -misc-dejavu lgc sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-7
+DejaVuLGCSansMono-BoldOblique.ttf -misc-dejavu lgc sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-9
+DejaVuLGCSansMono-BoldOblique.ttf -misc-dejavu lgc sans mono-bold-o-normal--0-0-0-0-m-0-koi8-e
+DejaVuLGCSansMono-BoldOblique.ttf -misc-dejavu lgc sans mono-bold-o-normal--0-0-0-0-m-0-koi8-r
+DejaVuLGCSansMono-BoldOblique.ttf -misc-dejavu lgc sans mono-bold-o-normal--0-0-0-0-m-0-koi8-ru
+DejaVuLGCSansMono-BoldOblique.ttf -misc-dejavu lgc sans mono-bold-o-normal--0-0-0-0-m-0-koi8-u
+DejaVuLGCSansMono-BoldOblique.ttf -misc-dejavu lgc sans mono-bold-o-normal--0-0-0-0-m-0-koi8-uni
+DejaVuLGCSansMono-Oblique.ttf -misc-dejavu lgc sans mono-medium-o-normal--0-0-0-0-m-0-iso10646-1
+DejaVuLGCSansMono-Oblique.ttf -misc-dejavu lgc sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-1
+DejaVuLGCSansMono-Oblique.ttf -misc-dejavu lgc sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-10
+DejaVuLGCSansMono-Oblique.ttf -misc-dejavu lgc sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-15
+DejaVuLGCSansMono-Oblique.ttf -misc-dejavu lgc sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-2
+DejaVuLGCSansMono-Oblique.ttf -misc-dejavu lgc sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-3
+DejaVuLGCSansMono-Oblique.ttf -misc-dejavu lgc sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-4
+DejaVuLGCSansMono-Oblique.ttf -misc-dejavu lgc sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-5
+DejaVuLGCSansMono-Oblique.ttf -misc-dejavu lgc sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-7
+DejaVuLGCSansMono-Oblique.ttf -misc-dejavu lgc sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-9
+DejaVuLGCSansMono-Oblique.ttf -misc-dejavu lgc sans mono-medium-o-normal--0-0-0-0-m-0-koi8-e
+DejaVuLGCSansMono-Oblique.ttf -misc-dejavu lgc sans mono-medium-o-normal--0-0-0-0-m-0-koi8-r
+DejaVuLGCSansMono-Oblique.ttf -misc-dejavu lgc sans mono-medium-o-normal--0-0-0-0-m-0-koi8-ru
+DejaVuLGCSansMono-Oblique.ttf -misc-dejavu lgc sans mono-medium-o-normal--0-0-0-0-m-0-koi8-u
+DejaVuLGCSansMono-Oblique.ttf -misc-dejavu lgc sans mono-medium-o-normal--0-0-0-0-m-0-koi8-uni
+DejaVuLGCSansMono.ttf -misc-dejavu lgc sans mono-medium-r-normal--0-0-0-0-m-0-iso10646-1
+DejaVuLGCSansMono.ttf -misc-dejavu lgc sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-1
+DejaVuLGCSansMono.ttf -misc-dejavu lgc sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-10
+DejaVuLGCSansMono.ttf -misc-dejavu lgc sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-15
+DejaVuLGCSansMono.ttf -misc-dejavu lgc sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-2
+DejaVuLGCSansMono.ttf -misc-dejavu lgc sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-3
+DejaVuLGCSansMono.ttf -misc-dejavu lgc sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-4
+DejaVuLGCSansMono.ttf -misc-dejavu lgc sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-5
+DejaVuLGCSansMono.ttf -misc-dejavu lgc sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-7
+DejaVuLGCSansMono.ttf -misc-dejavu lgc sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-9
+DejaVuLGCSansMono.ttf -misc-dejavu lgc sans mono-medium-r-normal--0-0-0-0-m-0-koi8-e
+DejaVuLGCSansMono.ttf -misc-dejavu lgc sans mono-medium-r-normal--0-0-0-0-m-0-koi8-r
+DejaVuLGCSansMono.ttf -misc-dejavu lgc sans mono-medium-r-normal--0-0-0-0-m-0-koi8-ru
+DejaVuLGCSansMono.ttf -misc-dejavu lgc sans mono-medium-r-normal--0-0-0-0-m-0-koi8-u
+DejaVuLGCSansMono.ttf -misc-dejavu lgc sans mono-medium-r-normal--0-0-0-0-m-0-koi8-uni
+DejaVuLGCSerif-Bold.ttf -misc-dejavu lgc serif-bold-r-normal--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSerif-Bold.ttf -misc-dejavu lgc serif-bold-r-normal--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSerif-Bold.ttf -misc-dejavu lgc serif-bold-r-normal--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSerif-Bold.ttf -misc-dejavu lgc serif-bold-r-normal--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSerif-Bold.ttf -misc-dejavu lgc serif-bold-r-normal--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSerif-Bold.ttf -misc-dejavu lgc serif-bold-r-normal--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSerif-Bold.ttf -misc-dejavu lgc serif-bold-r-normal--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSerif-Bold.ttf -misc-dejavu lgc serif-bold-r-normal--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSerif-Bold.ttf -misc-dejavu lgc serif-bold-r-normal--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSerif-Bold.ttf -misc-dejavu lgc serif-bold-r-normal--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSerif-Bold.ttf -misc-dejavu lgc serif-bold-r-normal--0-0-0-0-p-0-koi8-e
+DejaVuLGCSerif-Bold.ttf -misc-dejavu lgc serif-bold-r-normal--0-0-0-0-p-0-koi8-r
+DejaVuLGCSerif-Bold.ttf -misc-dejavu lgc serif-bold-r-normal--0-0-0-0-p-0-koi8-ru
+DejaVuLGCSerif-Bold.ttf -misc-dejavu lgc serif-bold-r-normal--0-0-0-0-p-0-koi8-u
+DejaVuLGCSerif-Bold.ttf -misc-dejavu lgc serif-bold-r-normal--0-0-0-0-p-0-koi8-uni
+DejaVuLGCSerif-BoldItalic.ttf -misc-dejavu lgc serif-bold-i-normal--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSerif-BoldItalic.ttf -misc-dejavu lgc serif-bold-i-normal--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSerif-BoldItalic.ttf -misc-dejavu lgc serif-bold-i-normal--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSerif-BoldItalic.ttf -misc-dejavu lgc serif-bold-i-normal--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSerif-BoldItalic.ttf -misc-dejavu lgc serif-bold-i-normal--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSerif-BoldItalic.ttf -misc-dejavu lgc serif-bold-i-normal--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSerif-BoldItalic.ttf -misc-dejavu lgc serif-bold-i-normal--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSerif-BoldItalic.ttf -misc-dejavu lgc serif-bold-i-normal--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSerif-BoldItalic.ttf -misc-dejavu lgc serif-bold-i-normal--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSerif-BoldItalic.ttf -misc-dejavu lgc serif-bold-i-normal--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSerif-BoldItalic.ttf -misc-dejavu lgc serif-bold-i-normal--0-0-0-0-p-0-koi8-e
+DejaVuLGCSerif-BoldItalic.ttf -misc-dejavu lgc serif-bold-i-normal--0-0-0-0-p-0-koi8-r
+DejaVuLGCSerif-BoldItalic.ttf -misc-dejavu lgc serif-bold-i-normal--0-0-0-0-p-0-koi8-ru
+DejaVuLGCSerif-BoldItalic.ttf -misc-dejavu lgc serif-bold-i-normal--0-0-0-0-p-0-koi8-u
+DejaVuLGCSerif-BoldItalic.ttf -misc-dejavu lgc serif-bold-i-normal--0-0-0-0-p-0-koi8-uni
+DejaVuLGCSerif-Italic.ttf -misc-dejavu lgc serif-medium-i-normal--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSerif-Italic.ttf -misc-dejavu lgc serif-medium-i-normal--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSerif-Italic.ttf -misc-dejavu lgc serif-medium-i-normal--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSerif-Italic.ttf -misc-dejavu lgc serif-medium-i-normal--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSerif-Italic.ttf -misc-dejavu lgc serif-medium-i-normal--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSerif-Italic.ttf -misc-dejavu lgc serif-medium-i-normal--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSerif-Italic.ttf -misc-dejavu lgc serif-medium-i-normal--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSerif-Italic.ttf -misc-dejavu lgc serif-medium-i-normal--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSerif-Italic.ttf -misc-dejavu lgc serif-medium-i-normal--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSerif-Italic.ttf -misc-dejavu lgc serif-medium-i-normal--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSerif-Italic.ttf -misc-dejavu lgc serif-medium-i-normal--0-0-0-0-p-0-koi8-e
+DejaVuLGCSerif-Italic.ttf -misc-dejavu lgc serif-medium-i-normal--0-0-0-0-p-0-koi8-r
+DejaVuLGCSerif-Italic.ttf -misc-dejavu lgc serif-medium-i-normal--0-0-0-0-p-0-koi8-ru
+DejaVuLGCSerif-Italic.ttf -misc-dejavu lgc serif-medium-i-normal--0-0-0-0-p-0-koi8-u
+DejaVuLGCSerif-Italic.ttf -misc-dejavu lgc serif-medium-i-normal--0-0-0-0-p-0-koi8-uni
+DejaVuLGCSerif.ttf -misc-dejavu lgc serif-medium-r-normal--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSerif.ttf -misc-dejavu lgc serif-medium-r-normal--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSerif.ttf -misc-dejavu lgc serif-medium-r-normal--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSerif.ttf -misc-dejavu lgc serif-medium-r-normal--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSerif.ttf -misc-dejavu lgc serif-medium-r-normal--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSerif.ttf -misc-dejavu lgc serif-medium-r-normal--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSerif.ttf -misc-dejavu lgc serif-medium-r-normal--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSerif.ttf -misc-dejavu lgc serif-medium-r-normal--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSerif.ttf -misc-dejavu lgc serif-medium-r-normal--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSerif.ttf -misc-dejavu lgc serif-medium-r-normal--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSerif.ttf -misc-dejavu lgc serif-medium-r-normal--0-0-0-0-p-0-koi8-e
+DejaVuLGCSerif.ttf -misc-dejavu lgc serif-medium-r-normal--0-0-0-0-p-0-koi8-r
+DejaVuLGCSerif.ttf -misc-dejavu lgc serif-medium-r-normal--0-0-0-0-p-0-koi8-ru
+DejaVuLGCSerif.ttf -misc-dejavu lgc serif-medium-r-normal--0-0-0-0-p-0-koi8-u
+DejaVuLGCSerif.ttf -misc-dejavu lgc serif-medium-r-normal--0-0-0-0-p-0-koi8-uni
+DejaVuLGCSerifCondensed-Bold.ttf -misc-dejavu lgc serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSerifCondensed-Bold.ttf -misc-dejavu lgc serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSerifCondensed-Bold.ttf -misc-dejavu lgc serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSerifCondensed-Bold.ttf -misc-dejavu lgc serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSerifCondensed-Bold.ttf -misc-dejavu lgc serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSerifCondensed-Bold.ttf -misc-dejavu lgc serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSerifCondensed-Bold.ttf -misc-dejavu lgc serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSerifCondensed-Bold.ttf -misc-dejavu lgc serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSerifCondensed-Bold.ttf -misc-dejavu lgc serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSerifCondensed-Bold.ttf -misc-dejavu lgc serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSerifCondensed-Bold.ttf -misc-dejavu lgc serif condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-e
+DejaVuLGCSerifCondensed-Bold.ttf -misc-dejavu lgc serif condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-r
+DejaVuLGCSerifCondensed-Bold.ttf -misc-dejavu lgc serif condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-ru
+DejaVuLGCSerifCondensed-Bold.ttf -misc-dejavu lgc serif condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-u
+DejaVuLGCSerifCondensed-Bold.ttf -misc-dejavu lgc serif condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-uni
+DejaVuLGCSerifCondensed-BoldItalic.ttf -misc-dejavu lgc serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSerifCondensed-BoldItalic.ttf -misc-dejavu lgc serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSerifCondensed-BoldItalic.ttf -misc-dejavu lgc serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSerifCondensed-BoldItalic.ttf -misc-dejavu lgc serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSerifCondensed-BoldItalic.ttf -misc-dejavu lgc serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSerifCondensed-BoldItalic.ttf -misc-dejavu lgc serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSerifCondensed-BoldItalic.ttf -misc-dejavu lgc serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSerifCondensed-BoldItalic.ttf -misc-dejavu lgc serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSerifCondensed-BoldItalic.ttf -misc-dejavu lgc serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSerifCondensed-BoldItalic.ttf -misc-dejavu lgc serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSerifCondensed-BoldItalic.ttf -misc-dejavu lgc serif condensed-bold-i-semicondensed--0-0-0-0-p-0-koi8-e
+DejaVuLGCSerifCondensed-BoldItalic.ttf -misc-dejavu lgc serif condensed-bold-i-semicondensed--0-0-0-0-p-0-koi8-r
+DejaVuLGCSerifCondensed-BoldItalic.ttf -misc-dejavu lgc serif condensed-bold-i-semicondensed--0-0-0-0-p-0-koi8-ru
+DejaVuLGCSerifCondensed-BoldItalic.ttf -misc-dejavu lgc serif condensed-bold-i-semicondensed--0-0-0-0-p-0-koi8-u
+DejaVuLGCSerifCondensed-BoldItalic.ttf -misc-dejavu lgc serif condensed-bold-i-semicondensed--0-0-0-0-p-0-koi8-uni
+DejaVuLGCSerifCondensed-Italic.ttf -misc-dejavu lgc serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSerifCondensed-Italic.ttf -misc-dejavu lgc serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSerifCondensed-Italic.ttf -misc-dejavu lgc serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSerifCondensed-Italic.ttf -misc-dejavu lgc serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSerifCondensed-Italic.ttf -misc-dejavu lgc serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSerifCondensed-Italic.ttf -misc-dejavu lgc serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSerifCondensed-Italic.ttf -misc-dejavu lgc serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSerifCondensed-Italic.ttf -misc-dejavu lgc serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSerifCondensed-Italic.ttf -misc-dejavu lgc serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSerifCondensed-Italic.ttf -misc-dejavu lgc serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSerifCondensed-Italic.ttf -misc-dejavu lgc serif condensed-medium-i-semicondensed--0-0-0-0-p-0-koi8-e
+DejaVuLGCSerifCondensed-Italic.ttf -misc-dejavu lgc serif condensed-medium-i-semicondensed--0-0-0-0-p-0-koi8-r
+DejaVuLGCSerifCondensed-Italic.ttf -misc-dejavu lgc serif condensed-medium-i-semicondensed--0-0-0-0-p-0-koi8-ru
+DejaVuLGCSerifCondensed-Italic.ttf -misc-dejavu lgc serif condensed-medium-i-semicondensed--0-0-0-0-p-0-koi8-u
+DejaVuLGCSerifCondensed-Italic.ttf -misc-dejavu lgc serif condensed-medium-i-semicondensed--0-0-0-0-p-0-koi8-uni
+DejaVuLGCSerifCondensed.ttf -misc-dejavu lgc serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso10646-1
+DejaVuLGCSerifCondensed.ttf -misc-dejavu lgc serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-1
+DejaVuLGCSerifCondensed.ttf -misc-dejavu lgc serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-10
+DejaVuLGCSerifCondensed.ttf -misc-dejavu lgc serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-15
+DejaVuLGCSerifCondensed.ttf -misc-dejavu lgc serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-2
+DejaVuLGCSerifCondensed.ttf -misc-dejavu lgc serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-3
+DejaVuLGCSerifCondensed.ttf -misc-dejavu lgc serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-4
+DejaVuLGCSerifCondensed.ttf -misc-dejavu lgc serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-5
+DejaVuLGCSerifCondensed.ttf -misc-dejavu lgc serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-7
+DejaVuLGCSerifCondensed.ttf -misc-dejavu lgc serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-9
+DejaVuLGCSerifCondensed.ttf -misc-dejavu lgc serif condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-e
+DejaVuLGCSerifCondensed.ttf -misc-dejavu lgc serif condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-r
+DejaVuLGCSerifCondensed.ttf -misc-dejavu lgc serif condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-ru
+DejaVuLGCSerifCondensed.ttf -misc-dejavu lgc serif condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-u
+DejaVuLGCSerifCondensed.ttf -misc-dejavu lgc serif condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-uni
+DejaVuMathTeXGyre.ttf -misc-dejavu math tex gyre-medium-r-normal--0-0-0-0-p-0-iso10646-1
+DejaVuMathTeXGyre.ttf -misc-dejavu math tex gyre-medium-r-normal--0-0-0-0-p-0-iso8859-2
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-iso10646-1
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-iso8859-1
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-iso8859-10
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-iso8859-15
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-iso8859-2
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-iso8859-3
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-iso8859-4
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-iso8859-5
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-iso8859-6
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-iso8859-7
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-iso8859-8
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-iso8859-9
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-koi8-e
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-koi8-r
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-koi8-ru
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-koi8-u
+DejaVuSans-Bold.ttf -misc-dejavu sans-bold-r-normal--0-0-0-0-p-0-koi8-uni
+DejaVuSans-BoldOblique.ttf -misc-dejavu sans-bold-o-normal--0-0-0-0-p-0-iso10646-1
+DejaVuSans-BoldOblique.ttf -misc-dejavu sans-bold-o-normal--0-0-0-0-p-0-iso8859-1
+DejaVuSans-BoldOblique.ttf -misc-dejavu sans-bold-o-normal--0-0-0-0-p-0-iso8859-10
+DejaVuSans-BoldOblique.ttf -misc-dejavu sans-bold-o-normal--0-0-0-0-p-0-iso8859-15
+DejaVuSans-BoldOblique.ttf -misc-dejavu sans-bold-o-normal--0-0-0-0-p-0-iso8859-2
+DejaVuSans-BoldOblique.ttf -misc-dejavu sans-bold-o-normal--0-0-0-0-p-0-iso8859-3
+DejaVuSans-BoldOblique.ttf -misc-dejavu sans-bold-o-normal--0-0-0-0-p-0-iso8859-4
+DejaVuSans-BoldOblique.ttf -misc-dejavu sans-bold-o-normal--0-0-0-0-p-0-iso8859-5
+DejaVuSans-BoldOblique.ttf -misc-dejavu sans-bold-o-normal--0-0-0-0-p-0-iso8859-7
+DejaVuSans-BoldOblique.ttf -misc-dejavu sans-bold-o-normal--0-0-0-0-p-0-iso8859-8
+DejaVuSans-BoldOblique.ttf -misc-dejavu sans-bold-o-normal--0-0-0-0-p-0-iso8859-9
+DejaVuSans-BoldOblique.ttf -misc-dejavu sans-bold-o-normal--0-0-0-0-p-0-koi8-e
+DejaVuSans-BoldOblique.ttf -misc-dejavu sans-bold-o-normal--0-0-0-0-p-0-koi8-r
+DejaVuSans-BoldOblique.ttf -misc-dejavu sans-bold-o-normal--0-0-0-0-p-0-koi8-ru
+DejaVuSans-BoldOblique.ttf -misc-dejavu sans-bold-o-normal--0-0-0-0-p-0-koi8-u
+DejaVuSans-BoldOblique.ttf -misc-dejavu sans-bold-o-normal--0-0-0-0-p-0-koi8-uni
+DejaVuSans-ExtraLight.ttf -misc-dejavu sans light-extralight-r-normal--0-0-0-0-p-0-iso10646-1
+DejaVuSans-ExtraLight.ttf -misc-dejavu sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-1
+DejaVuSans-ExtraLight.ttf -misc-dejavu sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-10
+DejaVuSans-ExtraLight.ttf -misc-dejavu sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-15
+DejaVuSans-ExtraLight.ttf -misc-dejavu sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-2
+DejaVuSans-ExtraLight.ttf -misc-dejavu sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-3
+DejaVuSans-ExtraLight.ttf -misc-dejavu sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-4
+DejaVuSans-ExtraLight.ttf -misc-dejavu sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-5
+DejaVuSans-ExtraLight.ttf -misc-dejavu sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-7
+DejaVuSans-ExtraLight.ttf -misc-dejavu sans light-extralight-r-normal--0-0-0-0-p-0-iso8859-9
+DejaVuSans-ExtraLight.ttf -misc-dejavu sans light-extralight-r-normal--0-0-0-0-p-0-koi8-e
+DejaVuSans-Oblique.ttf -misc-dejavu sans-medium-o-normal--0-0-0-0-p-0-iso10646-1
+DejaVuSans-Oblique.ttf -misc-dejavu sans-medium-o-normal--0-0-0-0-p-0-iso8859-1
+DejaVuSans-Oblique.ttf -misc-dejavu sans-medium-o-normal--0-0-0-0-p-0-iso8859-10
+DejaVuSans-Oblique.ttf -misc-dejavu sans-medium-o-normal--0-0-0-0-p-0-iso8859-15
+DejaVuSans-Oblique.ttf -misc-dejavu sans-medium-o-normal--0-0-0-0-p-0-iso8859-2
+DejaVuSans-Oblique.ttf -misc-dejavu sans-medium-o-normal--0-0-0-0-p-0-iso8859-3
+DejaVuSans-Oblique.ttf -misc-dejavu sans-medium-o-normal--0-0-0-0-p-0-iso8859-4
+DejaVuSans-Oblique.ttf -misc-dejavu sans-medium-o-normal--0-0-0-0-p-0-iso8859-5
+DejaVuSans-Oblique.ttf -misc-dejavu sans-medium-o-normal--0-0-0-0-p-0-iso8859-7
+DejaVuSans-Oblique.ttf -misc-dejavu sans-medium-o-normal--0-0-0-0-p-0-iso8859-8
+DejaVuSans-Oblique.ttf -misc-dejavu sans-medium-o-normal--0-0-0-0-p-0-iso8859-9
+DejaVuSans-Oblique.ttf -misc-dejavu sans-medium-o-normal--0-0-0-0-p-0-koi8-e
+DejaVuSans-Oblique.ttf -misc-dejavu sans-medium-o-normal--0-0-0-0-p-0-koi8-r
+DejaVuSans-Oblique.ttf -misc-dejavu sans-medium-o-normal--0-0-0-0-p-0-koi8-ru
+DejaVuSans-Oblique.ttf -misc-dejavu sans-medium-o-normal--0-0-0-0-p-0-koi8-u
+DejaVuSans-Oblique.ttf -misc-dejavu sans-medium-o-normal--0-0-0-0-p-0-koi8-uni
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-iso10646-1
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-iso8859-1
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-iso8859-10
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-iso8859-15
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-iso8859-2
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-iso8859-3
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-iso8859-4
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-iso8859-5
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-iso8859-6
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-iso8859-7
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-iso8859-8
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-iso8859-9
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-koi8-e
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-koi8-r
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-koi8-ru
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-koi8-u
+DejaVuSans.ttf -misc-dejavu sans-medium-r-normal--0-0-0-0-p-0-koi8-uni
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso10646-1
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-1
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-10
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-15
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-2
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-3
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-4
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-5
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-6
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-7
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-8
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-9
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-e
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-r
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-ru
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-u
+DejaVuSansCondensed-Bold.ttf -misc-dejavu sans condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-uni
+DejaVuSansCondensed-BoldOblique.ttf -misc-dejavu sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso10646-1
+DejaVuSansCondensed-BoldOblique.ttf -misc-dejavu sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-1
+DejaVuSansCondensed-BoldOblique.ttf -misc-dejavu sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-10
+DejaVuSansCondensed-BoldOblique.ttf -misc-dejavu sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-15
+DejaVuSansCondensed-BoldOblique.ttf -misc-dejavu sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-2
+DejaVuSansCondensed-BoldOblique.ttf -misc-dejavu sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-3
+DejaVuSansCondensed-BoldOblique.ttf -misc-dejavu sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-4
+DejaVuSansCondensed-BoldOblique.ttf -misc-dejavu sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-5
+DejaVuSansCondensed-BoldOblique.ttf -misc-dejavu sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-7
+DejaVuSansCondensed-BoldOblique.ttf -misc-dejavu sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-8
+DejaVuSansCondensed-BoldOblique.ttf -misc-dejavu sans condensed-bold-o-semicondensed--0-0-0-0-p-0-iso8859-9
+DejaVuSansCondensed-BoldOblique.ttf -misc-dejavu sans condensed-bold-o-semicondensed--0-0-0-0-p-0-koi8-e
+DejaVuSansCondensed-BoldOblique.ttf -misc-dejavu sans condensed-bold-o-semicondensed--0-0-0-0-p-0-koi8-r
+DejaVuSansCondensed-BoldOblique.ttf -misc-dejavu sans condensed-bold-o-semicondensed--0-0-0-0-p-0-koi8-ru
+DejaVuSansCondensed-BoldOblique.ttf -misc-dejavu sans condensed-bold-o-semicondensed--0-0-0-0-p-0-koi8-u
+DejaVuSansCondensed-BoldOblique.ttf -misc-dejavu sans condensed-bold-o-semicondensed--0-0-0-0-p-0-koi8-uni
+DejaVuSansCondensed-Oblique.ttf -misc-dejavu sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso10646-1
+DejaVuSansCondensed-Oblique.ttf -misc-dejavu sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-1
+DejaVuSansCondensed-Oblique.ttf -misc-dejavu sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-10
+DejaVuSansCondensed-Oblique.ttf -misc-dejavu sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-15
+DejaVuSansCondensed-Oblique.ttf -misc-dejavu sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-2
+DejaVuSansCondensed-Oblique.ttf -misc-dejavu sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-3
+DejaVuSansCondensed-Oblique.ttf -misc-dejavu sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-4
+DejaVuSansCondensed-Oblique.ttf -misc-dejavu sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-5
+DejaVuSansCondensed-Oblique.ttf -misc-dejavu sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-7
+DejaVuSansCondensed-Oblique.ttf -misc-dejavu sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-8
+DejaVuSansCondensed-Oblique.ttf -misc-dejavu sans condensed-medium-o-semicondensed--0-0-0-0-p-0-iso8859-9
+DejaVuSansCondensed-Oblique.ttf -misc-dejavu sans condensed-medium-o-semicondensed--0-0-0-0-p-0-koi8-e
+DejaVuSansCondensed-Oblique.ttf -misc-dejavu sans condensed-medium-o-semicondensed--0-0-0-0-p-0-koi8-r
+DejaVuSansCondensed-Oblique.ttf -misc-dejavu sans condensed-medium-o-semicondensed--0-0-0-0-p-0-koi8-ru
+DejaVuSansCondensed-Oblique.ttf -misc-dejavu sans condensed-medium-o-semicondensed--0-0-0-0-p-0-koi8-u
+DejaVuSansCondensed-Oblique.ttf -misc-dejavu sans condensed-medium-o-semicondensed--0-0-0-0-p-0-koi8-uni
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso10646-1
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-1
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-10
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-15
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-2
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-3
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-4
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-5
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-6
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-7
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-8
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-9
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-e
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-r
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-ru
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-u
+DejaVuSansCondensed.ttf -misc-dejavu sans condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-uni
+DejaVuSansMono-Bold.ttf -misc-dejavu sans mono-bold-r-normal--0-0-0-0-m-0-iso10646-1
+DejaVuSansMono-Bold.ttf -misc-dejavu sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-1
+DejaVuSansMono-Bold.ttf -misc-dejavu sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-10
+DejaVuSansMono-Bold.ttf -misc-dejavu sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-15
+DejaVuSansMono-Bold.ttf -misc-dejavu sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-2
+DejaVuSansMono-Bold.ttf -misc-dejavu sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-3
+DejaVuSansMono-Bold.ttf -misc-dejavu sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-4
+DejaVuSansMono-Bold.ttf -misc-dejavu sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-5
+DejaVuSansMono-Bold.ttf -misc-dejavu sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-6
+DejaVuSansMono-Bold.ttf -misc-dejavu sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-7
+DejaVuSansMono-Bold.ttf -misc-dejavu sans mono-bold-r-normal--0-0-0-0-m-0-iso8859-9
+DejaVuSansMono-Bold.ttf -misc-dejavu sans mono-bold-r-normal--0-0-0-0-m-0-koi8-e
+DejaVuSansMono-Bold.ttf -misc-dejavu sans mono-bold-r-normal--0-0-0-0-m-0-koi8-r
+DejaVuSansMono-Bold.ttf -misc-dejavu sans mono-bold-r-normal--0-0-0-0-m-0-koi8-ru
+DejaVuSansMono-Bold.ttf -misc-dejavu sans mono-bold-r-normal--0-0-0-0-m-0-koi8-u
+DejaVuSansMono-Bold.ttf -misc-dejavu sans mono-bold-r-normal--0-0-0-0-m-0-koi8-uni
+DejaVuSansMono-BoldOblique.ttf -misc-dejavu sans mono-bold-o-normal--0-0-0-0-m-0-iso10646-1
+DejaVuSansMono-BoldOblique.ttf -misc-dejavu sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-1
+DejaVuSansMono-BoldOblique.ttf -misc-dejavu sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-10
+DejaVuSansMono-BoldOblique.ttf -misc-dejavu sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-15
+DejaVuSansMono-BoldOblique.ttf -misc-dejavu sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-2
+DejaVuSansMono-BoldOblique.ttf -misc-dejavu sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-3
+DejaVuSansMono-BoldOblique.ttf -misc-dejavu sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-4
+DejaVuSansMono-BoldOblique.ttf -misc-dejavu sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-5
+DejaVuSansMono-BoldOblique.ttf -misc-dejavu sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-7
+DejaVuSansMono-BoldOblique.ttf -misc-dejavu sans mono-bold-o-normal--0-0-0-0-m-0-iso8859-9
+DejaVuSansMono-BoldOblique.ttf -misc-dejavu sans mono-bold-o-normal--0-0-0-0-m-0-koi8-e
+DejaVuSansMono-BoldOblique.ttf -misc-dejavu sans mono-bold-o-normal--0-0-0-0-m-0-koi8-r
+DejaVuSansMono-BoldOblique.ttf -misc-dejavu sans mono-bold-o-normal--0-0-0-0-m-0-koi8-ru
+DejaVuSansMono-BoldOblique.ttf -misc-dejavu sans mono-bold-o-normal--0-0-0-0-m-0-koi8-u
+DejaVuSansMono-BoldOblique.ttf -misc-dejavu sans mono-bold-o-normal--0-0-0-0-m-0-koi8-uni
+DejaVuSansMono-Oblique.ttf -misc-dejavu sans mono-medium-o-normal--0-0-0-0-m-0-iso10646-1
+DejaVuSansMono-Oblique.ttf -misc-dejavu sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-1
+DejaVuSansMono-Oblique.ttf -misc-dejavu sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-10
+DejaVuSansMono-Oblique.ttf -misc-dejavu sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-15
+DejaVuSansMono-Oblique.ttf -misc-dejavu sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-2
+DejaVuSansMono-Oblique.ttf -misc-dejavu sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-3
+DejaVuSansMono-Oblique.ttf -misc-dejavu sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-4
+DejaVuSansMono-Oblique.ttf -misc-dejavu sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-5
+DejaVuSansMono-Oblique.ttf -misc-dejavu sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-7
+DejaVuSansMono-Oblique.ttf -misc-dejavu sans mono-medium-o-normal--0-0-0-0-m-0-iso8859-9
+DejaVuSansMono-Oblique.ttf -misc-dejavu sans mono-medium-o-normal--0-0-0-0-m-0-koi8-e
+DejaVuSansMono-Oblique.ttf -misc-dejavu sans mono-medium-o-normal--0-0-0-0-m-0-koi8-r
+DejaVuSansMono-Oblique.ttf -misc-dejavu sans mono-medium-o-normal--0-0-0-0-m-0-koi8-ru
+DejaVuSansMono-Oblique.ttf -misc-dejavu sans mono-medium-o-normal--0-0-0-0-m-0-koi8-u
+DejaVuSansMono-Oblique.ttf -misc-dejavu sans mono-medium-o-normal--0-0-0-0-m-0-koi8-uni
+DejaVuSansMono.ttf -misc-dejavu sans mono-medium-r-normal--0-0-0-0-m-0-iso10646-1
+DejaVuSansMono.ttf -misc-dejavu sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-1
+DejaVuSansMono.ttf -misc-dejavu sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-10
+DejaVuSansMono.ttf -misc-dejavu sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-15
+DejaVuSansMono.ttf -misc-dejavu sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-2
+DejaVuSansMono.ttf -misc-dejavu sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-3
+DejaVuSansMono.ttf -misc-dejavu sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-4
+DejaVuSansMono.ttf -misc-dejavu sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-5
+DejaVuSansMono.ttf -misc-dejavu sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-6
+DejaVuSansMono.ttf -misc-dejavu sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-7
+DejaVuSansMono.ttf -misc-dejavu sans mono-medium-r-normal--0-0-0-0-m-0-iso8859-9
+DejaVuSansMono.ttf -misc-dejavu sans mono-medium-r-normal--0-0-0-0-m-0-koi8-e
+DejaVuSansMono.ttf -misc-dejavu sans mono-medium-r-normal--0-0-0-0-m-0-koi8-r
+DejaVuSansMono.ttf -misc-dejavu sans mono-medium-r-normal--0-0-0-0-m-0-koi8-ru
+DejaVuSansMono.ttf -misc-dejavu sans mono-medium-r-normal--0-0-0-0-m-0-koi8-u
+DejaVuSansMono.ttf -misc-dejavu sans mono-medium-r-normal--0-0-0-0-m-0-koi8-uni
+DejaVuSerif-Bold.ttf -misc-dejavu serif-bold-r-normal--0-0-0-0-p-0-iso10646-1
+DejaVuSerif-Bold.ttf -misc-dejavu serif-bold-r-normal--0-0-0-0-p-0-iso8859-1
+DejaVuSerif-Bold.ttf -misc-dejavu serif-bold-r-normal--0-0-0-0-p-0-iso8859-10
+DejaVuSerif-Bold.ttf -misc-dejavu serif-bold-r-normal--0-0-0-0-p-0-iso8859-15
+DejaVuSerif-Bold.ttf -misc-dejavu serif-bold-r-normal--0-0-0-0-p-0-iso8859-2
+DejaVuSerif-Bold.ttf -misc-dejavu serif-bold-r-normal--0-0-0-0-p-0-iso8859-3
+DejaVuSerif-Bold.ttf -misc-dejavu serif-bold-r-normal--0-0-0-0-p-0-iso8859-4
+DejaVuSerif-Bold.ttf -misc-dejavu serif-bold-r-normal--0-0-0-0-p-0-iso8859-5
+DejaVuSerif-Bold.ttf -misc-dejavu serif-bold-r-normal--0-0-0-0-p-0-iso8859-7
+DejaVuSerif-Bold.ttf -misc-dejavu serif-bold-r-normal--0-0-0-0-p-0-iso8859-9
+DejaVuSerif-Bold.ttf -misc-dejavu serif-bold-r-normal--0-0-0-0-p-0-koi8-e
+DejaVuSerif-Bold.ttf -misc-dejavu serif-bold-r-normal--0-0-0-0-p-0-koi8-r
+DejaVuSerif-Bold.ttf -misc-dejavu serif-bold-r-normal--0-0-0-0-p-0-koi8-ru
+DejaVuSerif-Bold.ttf -misc-dejavu serif-bold-r-normal--0-0-0-0-p-0-koi8-u
+DejaVuSerif-Bold.ttf -misc-dejavu serif-bold-r-normal--0-0-0-0-p-0-koi8-uni
+DejaVuSerif-BoldItalic.ttf -misc-dejavu serif-bold-i-normal--0-0-0-0-p-0-iso10646-1
+DejaVuSerif-BoldItalic.ttf -misc-dejavu serif-bold-i-normal--0-0-0-0-p-0-iso8859-1
+DejaVuSerif-BoldItalic.ttf -misc-dejavu serif-bold-i-normal--0-0-0-0-p-0-iso8859-10
+DejaVuSerif-BoldItalic.ttf -misc-dejavu serif-bold-i-normal--0-0-0-0-p-0-iso8859-15
+DejaVuSerif-BoldItalic.ttf -misc-dejavu serif-bold-i-normal--0-0-0-0-p-0-iso8859-2
+DejaVuSerif-BoldItalic.ttf -misc-dejavu serif-bold-i-normal--0-0-0-0-p-0-iso8859-3
+DejaVuSerif-BoldItalic.ttf -misc-dejavu serif-bold-i-normal--0-0-0-0-p-0-iso8859-4
+DejaVuSerif-BoldItalic.ttf -misc-dejavu serif-bold-i-normal--0-0-0-0-p-0-iso8859-5
+DejaVuSerif-BoldItalic.ttf -misc-dejavu serif-bold-i-normal--0-0-0-0-p-0-iso8859-7
+DejaVuSerif-BoldItalic.ttf -misc-dejavu serif-bold-i-normal--0-0-0-0-p-0-iso8859-9
+DejaVuSerif-BoldItalic.ttf -misc-dejavu serif-bold-i-normal--0-0-0-0-p-0-koi8-e
+DejaVuSerif-BoldItalic.ttf -misc-dejavu serif-bold-i-normal--0-0-0-0-p-0-koi8-r
+DejaVuSerif-BoldItalic.ttf -misc-dejavu serif-bold-i-normal--0-0-0-0-p-0-koi8-ru
+DejaVuSerif-BoldItalic.ttf -misc-dejavu serif-bold-i-normal--0-0-0-0-p-0-koi8-u
+DejaVuSerif-BoldItalic.ttf -misc-dejavu serif-bold-i-normal--0-0-0-0-p-0-koi8-uni
+DejaVuSerif-Italic.ttf -misc-dejavu serif-medium-i-normal--0-0-0-0-p-0-iso10646-1
+DejaVuSerif-Italic.ttf -misc-dejavu serif-medium-i-normal--0-0-0-0-p-0-iso8859-1
+DejaVuSerif-Italic.ttf -misc-dejavu serif-medium-i-normal--0-0-0-0-p-0-iso8859-10
+DejaVuSerif-Italic.ttf -misc-dejavu serif-medium-i-normal--0-0-0-0-p-0-iso8859-15
+DejaVuSerif-Italic.ttf -misc-dejavu serif-medium-i-normal--0-0-0-0-p-0-iso8859-2
+DejaVuSerif-Italic.ttf -misc-dejavu serif-medium-i-normal--0-0-0-0-p-0-iso8859-3
+DejaVuSerif-Italic.ttf -misc-dejavu serif-medium-i-normal--0-0-0-0-p-0-iso8859-4
+DejaVuSerif-Italic.ttf -misc-dejavu serif-medium-i-normal--0-0-0-0-p-0-iso8859-5
+DejaVuSerif-Italic.ttf -misc-dejavu serif-medium-i-normal--0-0-0-0-p-0-iso8859-7
+DejaVuSerif-Italic.ttf -misc-dejavu serif-medium-i-normal--0-0-0-0-p-0-iso8859-9
+DejaVuSerif-Italic.ttf -misc-dejavu serif-medium-i-normal--0-0-0-0-p-0-koi8-e
+DejaVuSerif-Italic.ttf -misc-dejavu serif-medium-i-normal--0-0-0-0-p-0-koi8-r
+DejaVuSerif-Italic.ttf -misc-dejavu serif-medium-i-normal--0-0-0-0-p-0-koi8-ru
+DejaVuSerif-Italic.ttf -misc-dejavu serif-medium-i-normal--0-0-0-0-p-0-koi8-u
+DejaVuSerif-Italic.ttf -misc-dejavu serif-medium-i-normal--0-0-0-0-p-0-koi8-uni
+DejaVuSerif.ttf -misc-dejavu serif-medium-r-normal--0-0-0-0-p-0-iso10646-1
+DejaVuSerif.ttf -misc-dejavu serif-medium-r-normal--0-0-0-0-p-0-iso8859-1
+DejaVuSerif.ttf -misc-dejavu serif-medium-r-normal--0-0-0-0-p-0-iso8859-10
+DejaVuSerif.ttf -misc-dejavu serif-medium-r-normal--0-0-0-0-p-0-iso8859-15
+DejaVuSerif.ttf -misc-dejavu serif-medium-r-normal--0-0-0-0-p-0-iso8859-2
+DejaVuSerif.ttf -misc-dejavu serif-medium-r-normal--0-0-0-0-p-0-iso8859-3
+DejaVuSerif.ttf -misc-dejavu serif-medium-r-normal--0-0-0-0-p-0-iso8859-4
+DejaVuSerif.ttf -misc-dejavu serif-medium-r-normal--0-0-0-0-p-0-iso8859-5
+DejaVuSerif.ttf -misc-dejavu serif-medium-r-normal--0-0-0-0-p-0-iso8859-7
+DejaVuSerif.ttf -misc-dejavu serif-medium-r-normal--0-0-0-0-p-0-iso8859-9
+DejaVuSerif.ttf -misc-dejavu serif-medium-r-normal--0-0-0-0-p-0-koi8-e
+DejaVuSerif.ttf -misc-dejavu serif-medium-r-normal--0-0-0-0-p-0-koi8-r
+DejaVuSerif.ttf -misc-dejavu serif-medium-r-normal--0-0-0-0-p-0-koi8-ru
+DejaVuSerif.ttf -misc-dejavu serif-medium-r-normal--0-0-0-0-p-0-koi8-u
+DejaVuSerif.ttf -misc-dejavu serif-medium-r-normal--0-0-0-0-p-0-koi8-uni
+DejaVuSerifCondensed-Bold.ttf -misc-dejavu serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso10646-1
+DejaVuSerifCondensed-Bold.ttf -misc-dejavu serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-1
+DejaVuSerifCondensed-Bold.ttf -misc-dejavu serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-10
+DejaVuSerifCondensed-Bold.ttf -misc-dejavu serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-15
+DejaVuSerifCondensed-Bold.ttf -misc-dejavu serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-2
+DejaVuSerifCondensed-Bold.ttf -misc-dejavu serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-3
+DejaVuSerifCondensed-Bold.ttf -misc-dejavu serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-4
+DejaVuSerifCondensed-Bold.ttf -misc-dejavu serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-5
+DejaVuSerifCondensed-Bold.ttf -misc-dejavu serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-7
+DejaVuSerifCondensed-Bold.ttf -misc-dejavu serif condensed-bold-r-semicondensed--0-0-0-0-p-0-iso8859-9
+DejaVuSerifCondensed-Bold.ttf -misc-dejavu serif condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-e
+DejaVuSerifCondensed-Bold.ttf -misc-dejavu serif condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-r
+DejaVuSerifCondensed-Bold.ttf -misc-dejavu serif condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-ru
+DejaVuSerifCondensed-Bold.ttf -misc-dejavu serif condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-u
+DejaVuSerifCondensed-Bold.ttf -misc-dejavu serif condensed-bold-r-semicondensed--0-0-0-0-p-0-koi8-uni
+DejaVuSerifCondensed-BoldItalic.ttf -misc-dejavu serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso10646-1
+DejaVuSerifCondensed-BoldItalic.ttf -misc-dejavu serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-1
+DejaVuSerifCondensed-BoldItalic.ttf -misc-dejavu serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-10
+DejaVuSerifCondensed-BoldItalic.ttf -misc-dejavu serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-15
+DejaVuSerifCondensed-BoldItalic.ttf -misc-dejavu serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-2
+DejaVuSerifCondensed-BoldItalic.ttf -misc-dejavu serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-3
+DejaVuSerifCondensed-BoldItalic.ttf -misc-dejavu serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-4
+DejaVuSerifCondensed-BoldItalic.ttf -misc-dejavu serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-5
+DejaVuSerifCondensed-BoldItalic.ttf -misc-dejavu serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-7
+DejaVuSerifCondensed-BoldItalic.ttf -misc-dejavu serif condensed-bold-i-semicondensed--0-0-0-0-p-0-iso8859-9
+DejaVuSerifCondensed-BoldItalic.ttf -misc-dejavu serif condensed-bold-i-semicondensed--0-0-0-0-p-0-koi8-e
+DejaVuSerifCondensed-BoldItalic.ttf -misc-dejavu serif condensed-bold-i-semicondensed--0-0-0-0-p-0-koi8-r
+DejaVuSerifCondensed-BoldItalic.ttf -misc-dejavu serif condensed-bold-i-semicondensed--0-0-0-0-p-0-koi8-ru
+DejaVuSerifCondensed-BoldItalic.ttf -misc-dejavu serif condensed-bold-i-semicondensed--0-0-0-0-p-0-koi8-u
+DejaVuSerifCondensed-BoldItalic.ttf -misc-dejavu serif condensed-bold-i-semicondensed--0-0-0-0-p-0-koi8-uni
+DejaVuSerifCondensed-Italic.ttf -misc-dejavu serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso10646-1
+DejaVuSerifCondensed-Italic.ttf -misc-dejavu serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-1
+DejaVuSerifCondensed-Italic.ttf -misc-dejavu serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-10
+DejaVuSerifCondensed-Italic.ttf -misc-dejavu serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-15
+DejaVuSerifCondensed-Italic.ttf -misc-dejavu serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-2
+DejaVuSerifCondensed-Italic.ttf -misc-dejavu serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-3
+DejaVuSerifCondensed-Italic.ttf -misc-dejavu serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-4
+DejaVuSerifCondensed-Italic.ttf -misc-dejavu serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-5
+DejaVuSerifCondensed-Italic.ttf -misc-dejavu serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-7
+DejaVuSerifCondensed-Italic.ttf -misc-dejavu serif condensed-medium-i-semicondensed--0-0-0-0-p-0-iso8859-9
+DejaVuSerifCondensed-Italic.ttf -misc-dejavu serif condensed-medium-i-semicondensed--0-0-0-0-p-0-koi8-e
+DejaVuSerifCondensed-Italic.ttf -misc-dejavu serif condensed-medium-i-semicondensed--0-0-0-0-p-0-koi8-r
+DejaVuSerifCondensed-Italic.ttf -misc-dejavu serif condensed-medium-i-semicondensed--0-0-0-0-p-0-koi8-ru
+DejaVuSerifCondensed-Italic.ttf -misc-dejavu serif condensed-medium-i-semicondensed--0-0-0-0-p-0-koi8-u
+DejaVuSerifCondensed-Italic.ttf -misc-dejavu serif condensed-medium-i-semicondensed--0-0-0-0-p-0-koi8-uni
+DejaVuSerifCondensed.ttf -misc-dejavu serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso10646-1
+DejaVuSerifCondensed.ttf -misc-dejavu serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-1
+DejaVuSerifCondensed.ttf -misc-dejavu serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-10
+DejaVuSerifCondensed.ttf -misc-dejavu serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-15
+DejaVuSerifCondensed.ttf -misc-dejavu serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-2
+DejaVuSerifCondensed.ttf -misc-dejavu serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-3
+DejaVuSerifCondensed.ttf -misc-dejavu serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-4
+DejaVuSerifCondensed.ttf -misc-dejavu serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-5
+DejaVuSerifCondensed.ttf -misc-dejavu serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-7
+DejaVuSerifCondensed.ttf -misc-dejavu serif condensed-medium-r-semicondensed--0-0-0-0-p-0-iso8859-9
+DejaVuSerifCondensed.ttf -misc-dejavu serif condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-e
+DejaVuSerifCondensed.ttf -misc-dejavu serif condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-r
+DejaVuSerifCondensed.ttf -misc-dejavu serif condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-ru
+DejaVuSerifCondensed.ttf -misc-dejavu serif condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-u
+DejaVuSerifCondensed.ttf -misc-dejavu serif condensed-medium-r-semicondensed--0-0-0-0-p-0-koi8-uni
