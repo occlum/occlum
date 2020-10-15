@@ -30,6 +30,8 @@ impl_ioctl_nums_and_cmds! {
     TIOCGWINSZ => (0x5413, mut WinSize),
     // Set window size
     TIOCSWINSZ => (0x5414, WinSize),
+    // Set the nonblocking mode for socket
+    FIONBIO => (0x5421, i32),
     // If the given terminal was the controlling terminal of the calling process, give up this
     // controlling terminal. If the process was session leader, then send SIGHUP and SIGCONT to
     // the foreground process group and all processes in the current session lose their controlling

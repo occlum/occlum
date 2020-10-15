@@ -274,6 +274,25 @@ int test_ioctl_SIOCGIFCONF(void) {
     return 0;
 }
 
+int test_ioctl_FIONBIO(void) {
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    int on = 1;
+    if (ioctl(sock, FIONBIO, &on) < 0) {
+        close(sock);
+        THROW_ERROR("ioctl FIONBIO failed");
+    }
+
+    int actual_flags = fcntl(sock, F_GETFL);
+    if ((actual_flags & O_NONBLOCK) == 0) {
+        close(sock);
+        THROW_ERROR("failed to check the O_NONBLOCK flag after FIONBIO");
+    }
+
+    close(sock);
+    return 0;
+}
+
 // ============================================================================
 // Test suite
 // ============================================================================
@@ -286,6 +305,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_sgx_ioctl_SGXIOC_SELF_TARGET),
     TEST_CASE(test_sgx_ioctl_SGXIOC_CREATE_AND_VERIFY_REPORT),
     TEST_CASE(test_ioctl_SIOCGIFCONF),
+    TEST_CASE(test_ioctl_FIONBIO),
 };
 
 int main() {
