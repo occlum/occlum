@@ -68,9 +68,10 @@ install: $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/libsgx_uae_service_sim.so
 	@mkdir -p $(OCCLUM_PREFIX)/build/lib/
 	@# Don't copy libos library and pal library symbolic files to install dir
 	@cd build/lib && cp --no-dereference `ls | grep -Ev $(EXCLUDE_FILES)` $(OCCLUM_PREFIX)/build/lib/ && cd -
-	@# Create symbolic for pal library of hardware mode
+	@# Create symbolic for pal library and libos (hardware mode)
 	@cd $(OCCLUM_PREFIX)/build/lib && ln -sf libocclum-pal.so.$(VERSION_NUM) libocclum-pal.so.$(MAJOR_VER_NUM) && \
-		ln -sf libocclum-pal.so.$(MAJOR_VER_NUM) libocclum-pal.so
+		ln -sf libocclum-pal.so.$(MAJOR_VER_NUM) libocclum-pal.so && \
+		ln -sf libocclum-libos.so.$(VERSION_NUM) libocclum-libos.so.$(MAJOR_VER_NUM) && ln -sf libocclum-libos.so.$(MAJOR_VER_NUM) libocclum-libos.so
 
 	@echo "Install headers and miscs ..."
 	@mkdir -p $(OCCLUM_PREFIX)/include/
