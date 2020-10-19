@@ -1,3 +1,4 @@
+#!/bin/bash
 #*
 #*
 #* Copyright 2014 gRPC authors.
@@ -15,8 +16,6 @@
 #* limitations under the License.
 #*
 
-
-#!/bin/bash
 set -e
 
 rpcs=(1)
