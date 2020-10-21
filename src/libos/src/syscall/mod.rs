@@ -908,11 +908,11 @@ pub struct FpRegs {
 impl FpRegs {
     /// Save the current CPU floating pointer states to an instance of FpRegs
     pub fn save() -> Self {
-        let mut fpregs = FpRegs {
-            inner: Aligned([0u8; 512]),
-        };
-        unsafe { _fxsave(fpregs.inner.as_mut_ptr()) };
-        fpregs
+        let mut fpregs = MaybeUninit::<Self>::uninit();
+        unsafe {
+            _fxsave(fpregs.as_mut_ptr() as *mut u8);
+            fpregs.assume_init()
+        }
     }
 
     /// Restore the current CPU floating pointer states from this FpRegs instance
