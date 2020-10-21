@@ -30,6 +30,6 @@ Step 1: Create and build demo, also collect font dependency occlum needs
 
 Step 2: Create occlum instance and run the demo in occlum's latest docker image release
 
-docker run -it --device /dev/isgx --rm -v `pwd`:`pwd` -w `pwd` occlum/occlum:0.16.0-ubuntu18.04 `pwd`/run_java_font_app_internal.sh
+docker run -it --device /dev/isgx --rm -v `pwd`:`pwd` -w `pwd` occlum/occlum:[latest version]-ubuntu18.04 `pwd`/run_java_font_app_internal.sh
 
 Step 3: To check whether it works, a Demo.xlsx file should be created in occlum image host path.
