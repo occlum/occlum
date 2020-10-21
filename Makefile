@@ -92,7 +92,9 @@ $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/libsgx_uae_service_sim.so: /opt/intel/sgxsdk
 	@cp /opt/intel/sgxsdk/lib64/{libsgx_ptrace.so,libsgx_uae_service_sim.so} $(OCCLUM_PREFIX)/sgxsdk-tools/lib64
 	@mkdir -p $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/gdb-sgx-plugin
 	@cd /opt/intel/sgxsdk/lib64/gdb-sgx-plugin/ && cp $$(ls -A | grep -v __pycache__) $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/gdb-sgx-plugin
-	@cd /opt/intel/sgxsdk && cp -a --parents {bin/sgx-gdb,bin/x64/sgx_sign,sdk_libs/libsgx_uae_service_sim.so} $(OCCLUM_PREFIX)/sgxsdk-tools/
+	@cd /opt/intel/sgxsdk && cp -a --parents {bin/sgx-gdb,bin/x64/sgx_sign} $(OCCLUM_PREFIX)/sgxsdk-tools/
+	@mkdir -p $(OCCLUM_PREFIX)/sgxsdk-tools/sdk_libs && \
+		ln -sf $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/libsgx_uae_service_sim.so $(OCCLUM_PREFIX)/sgxsdk-tools/sdk_libs/libsgx_uae_service_sim.so
 	@# Delete SGX_LIBRARY_PATH env in sgx-gdb which are defined in etc/environment
 	@sed -i '/^SGX_LIBRARY_PATH=/d' $(OCCLUM_PREFIX)/sgxsdk-tools/bin/sgx-gdb
 	@cp etc/environment $(OCCLUM_PREFIX)/sgxsdk-tools/
