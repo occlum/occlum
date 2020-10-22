@@ -16,6 +16,8 @@
 #define MAXEVENTS 64
 #define DEFAULT_PROC_NUM 3
 #define DEFAULT_MSG "Hello World!\n"
+// The recv buf length should be longer than that of DEFAULT_MSG
+#define RECV_BUF_LENGTH 32
 
 static int create_and_bind() {
     int listenfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
@@ -123,9 +125,12 @@ int test_ip_socket() {
                 }
             } else if (events[i].events & EPOLLIN) {
                 // Channel is ready to read.
-                char buf[36];
+                char buf[RECV_BUF_LENGTH];
                 if ((read(events[i].data.fd, buf, sizeof buf)) != 0) {
-                    if (strcmp(buf, DEFAULT_MSG) != 0) {
+                    if (strncmp(buf, DEFAULT_MSG, strlen(DEFAULT_MSG)) != 0) {
+                        for (int i = 0; i < RECV_BUF_LENGTH; i++) {
+                            printf("%c, ", buf[i]);
+                        }
                         close_files(2, server_fd, epfd);
                         THROW_ERROR("msg mismatched");
                     }
