@@ -7,7 +7,7 @@ C_OBJS := $(addprefix $(OBJ_DIR)/run/,$(C_SRCS:.c=.o))
 
 C_COMMON_FLAGS := -I$(PROJECT_DIR)/src/pal/include
 C_FLAGS := $(C_COMMON_FLAGS) $(SGX_CFLAGS_U)
-LINK_FLAGS := $(SGX_LFLAGS_U) -L$(BUILD_DIR)/lib -lsgx_uprotected_fs -locclum-pal
+LINK_FLAGS := $(SGX_COMMON_CFLAGS) -L$(SGX_LIBRARY_PATH) -L$(BUILD_DIR)/lib -lsgx_uprotected_fs -locclum-pal
 
 ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(BIN) $(C_OBJS))))
 
