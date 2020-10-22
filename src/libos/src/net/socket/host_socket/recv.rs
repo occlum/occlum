@@ -42,11 +42,13 @@ impl HostSocket {
         };
         let retval = self.do_recvmsg_untrusted_data(&mut u_data, flags, name, control)?;
 
-        let mut copied = 0;
+        let mut remain = retval.0;
         for (i, buf) in data.iter_mut().enumerate() {
-            buf.copy_from_slice(u_data[i]);
-            copied += buf.len();
-            if copied >= retval.0 {
+            if remain >= buf.len() {
+                buf.copy_from_slice(u_data[i]);
+                remain -= buf.len();
+            } else {
+                buf[0..remain].copy_from_slice(&u_data[i][0..remain]);
                 break;
             }
         }
