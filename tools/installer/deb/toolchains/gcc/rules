@@ -15,6 +15,12 @@ MUSL_REPO = https://github.com/occlum/musl
 MUSL_VER = 1.1.24
 GCC_VER = 8.3.0
 
+# Users can pass "-j$(nproc)" by specifying this env.
+# This is not enabled by default because under certain scenarios,
+# make will use too many jobs and gcc will be killed because out
+# of memory.
+BUILD_OPTIONS +=
+
 .ONESHELL: prepare_musl override_dh_install
 
 %:
@@ -41,7 +47,7 @@ prepare_musl:
 
 override_dh_auto_build: prepare_musl
 	cd $(tmp_build_dir)/musl-cross-make; \
-		make -j$(nproc)
+		make $(BUILD_OPTIONS)
 
 # We create symlinks in /usr/local
 override_dh_usrlocal:
