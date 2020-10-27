@@ -214,7 +214,7 @@ Step 4-5 are to be done on the guest OS running inside the Docker container:
     ```
 5. Check out Occlum's demos preinstalled at `/root/demos`, whose README can be found [here](demos/README.md). Or you can try to build and run your own SGX-protected applications using Occlum as shown in the demos.
 
-Alternatively, to use Occlum without Docker, one can install Occlum on popular Linux distributions like Ubuntu and CentOS with the Occlum DEB and RPM packages, respectively. These packages are provided for every release of Occlum. For more info about the installation packages, see [here](tools/installer/README.md).
+Alternatively, to use Occlum without Docker, one can install Occlum on popular Linux distributions like Ubuntu and CentOS with the Occlum DEB and RPM packages, respectively. These packages are provided for every release of Occlum since `0.16.0`. For more info about the packages, see [here](docs/install_occlum_packages.md).
 
 ## How to Build?
 
