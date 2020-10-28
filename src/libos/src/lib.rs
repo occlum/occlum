@@ -81,5 +81,9 @@ mod untrusted;
 mod util;
 mod vm;
 
+#[cfg(feature = "unit_testing")]
+#[macro_use]
+mod unit_testing;
+
 // Export ECalls
 pub use entry::*;

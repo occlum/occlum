@@ -101,7 +101,12 @@ $(ALL_BUILD_SUBDIRS):
 LIBOS_SO_DEPS := $(LIBOS_CORE_A) $(LIBCOMPILER_RT_PATCH_A)
 
 $(LIBOS_SO_REAL): $(LIBOS_CORE_A) $(LIBCOMPILER_RT_PATCH_A)
+ifeq ($(OCCLUM_RELEASE_BUILD), 1)
 	@$(CC) $(LIBOS_SO_DEPS) -o $@ $(LINK_FLAGS) -Wl,-soname=$(LIBOS_SONAME)
+else
+	# use whole-archive to include unused symbols
+	@$(CC) -Wl,-whole-archive $(LIBOS_SO_DEPS) -Wl,-no-whole-archive -o $@ $(LINK_FLAGS) -Wl,-soname=$(LIBOS_SONAME)
+endif
 	@echo "LINK => $@"
 
 $(LIBOS_CORE_A): $(LIBOS_CORE_RS_A) $(C_OBJS) $(CXX_OBJS) $(S_OBJS) $(EDL_C_OBJS)
@@ -122,10 +127,16 @@ ifndef OCCLUM_DISABLE_DCAP
 endif
 
 ifeq ($(OCCLUM_RELEASE_BUILD), 1)
+ifeq ($(OCCLUM_UT), 1)
+    LIBOS_FEATURES += unit_testing
+endif
+
 $(LIBOS_CORE_RS_A): $(RUST_SRCS)
 	@RUSTC_BOOTSTRAP=1 RUSTC_WRAPPER=$(RUSTC_WRAPPER) cargo build --release --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR) --features "$(LIBOS_FEATURES)"
 	@echo "CARGO (release) => $@"
 else
+    LIBOS_FEATURES += unit_testing
+
 $(LIBOS_CORE_RS_A): $(RUST_SRCS)
 	@RUSTC_BOOTSTRAP=1 RUSTC_WRAPPER=$(RUSTC_WRAPPER) cargo build --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR) --features "$(LIBOS_FEATURES)"
 	@echo "CARGO (debug) => $@"
