@@ -18,7 +18,7 @@ pub fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<i
 
     let file_ref: Arc<dyn File> = match sock_domain {
         AddressFamily::LOCAL => {
-            let unix_socket = UnixSocketFile::new(socket_type, protocol)?;
+            let unix_socket = unix_socket(sock_type, file_flags, protocol)?;
             Arc::new(unix_socket)
         }
         _ => {
@@ -38,19 +38,15 @@ pub fn do_bind(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t
     }
     from_user::check_array(addr as *const u8, addr_len as usize)?;
 
-    let sock_addr = unsafe { SockAddr::try_from_raw(addr, addr_len)? };
-    trace!("bind to addr: {:?}", sock_addr);
-
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_host_socket() {
+        let sock_addr = unsafe { SockAddr::try_from_raw(addr, addr_len)? };
+        trace!("bind to addr: {:?}", sock_addr);
         socket.bind(&sock_addr)?;
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
-        let addr = addr as *const libc::sockaddr_un;
-        from_user::check_ptr(addr)?;
-        let path = from_user::clone_cstring_safely(unsafe { (&*addr).sun_path.as_ptr() })?
-            .to_string_lossy()
-            .into_owned();
-        unix_socket.bind(path)?;
+        let unix_addr = unsafe { UnixAddr::try_from_raw(addr, addr_len)? };
+        trace!("bind to addr: {:?}", unix_addr);
+        unix_socket.bind(&unix_addr)?;
     } else {
         return_errno!(EBADF, "not a socket");
     }
@@ -63,7 +59,7 @@ pub fn do_listen(fd: c_int, backlog: c_int) -> Result<isize> {
     if let Ok(socket) = file_ref.as_host_socket() {
         socket.listen(backlog)?;
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
-        unix_socket.listen()?;
+        unix_socket.listen(backlog)?;
     } else {
         return_errno!(EBADF, "not a socket");
     }
@@ -84,24 +80,26 @@ pub fn do_connect(
         from_user::check_array(addr as *const u8, addr_len as usize)?;
     }
 
-    let addr_option = if addr_set {
-        Some(unsafe { SockAddr::try_from_raw(addr, addr_len)? })
-    } else {
-        None
-    };
-
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_host_socket() {
+        let addr_option = if addr_set {
+            Some(unsafe { SockAddr::try_from_raw(addr, addr_len)? })
+        } else {
+            None
+        };
+
         socket.connect(&addr_option)?;
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
-        let addr = addr as *const libc::sockaddr_un;
-        from_user::check_ptr(addr)?;
-        let path = from_user::clone_cstring_safely(unsafe { (&*addr).sun_path.as_ptr() })?
-            .to_string_lossy()
-            .into_owned();
-        unix_socket.connect(path)?;
+        // TODO: support AF_UNSPEC address for datagram socket use
+        let addr = if addr_set {
+            unsafe { UnixAddr::try_from_raw(addr, addr_len)? }
+        } else {
+            return_errno!(EINVAL, "invalid address");
+        };
+
+        unix_socket.connect(&addr)?;
     } else {
-        return_errno!(EBADF, "not a socket")
+        return_errno!(EBADF, "not a socket");
     }
 
     Ok(0)
@@ -131,47 +129,65 @@ pub fn do_accept4(
     let close_on_spawn = file_flags.contains(FileFlags::SOCK_CLOEXEC);
 
     let file_ref = current!().file(fd as FileDesc)?;
-    let new_fd = if let Ok(socket) = file_ref.as_host_socket() {
+    if let Ok(socket) = file_ref.as_host_socket() {
         let (new_socket_file, sock_addr_option) = socket.accept(file_flags)?;
         let new_file_ref: Arc<dyn File> = Arc::new(new_socket_file);
         let new_fd = current!().add_file(new_file_ref, close_on_spawn);
 
-        if addr_set && sock_addr_option.is_some() {
-            let sock_addr = sock_addr_option.unwrap();
-            let mut buf =
-                unsafe { std::slice::from_raw_parts_mut(addr as *mut u8, *addr_len as usize) };
-            sock_addr.copy_to_slice(&mut buf);
-            unsafe {
-                *addr_len = sock_addr.len() as u32;
+        if addr_set {
+            if let Some(sock_addr) = sock_addr_option {
+                let mut buf =
+                    unsafe { std::slice::from_raw_parts_mut(addr as *mut u8, *addr_len as usize) };
+                sock_addr.copy_to_slice(&mut buf);
+                unsafe {
+                    *addr_len = sock_addr.len() as u32;
+                }
+            } else {
+                unsafe {
+                    *addr_len = 0;
+                }
             }
         }
-        new_fd
+        Ok(new_fd as isize)
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
-        let addr = addr as *mut libc::sockaddr_un;
+        let (new_socket_file, sock_addr_option) = unix_socket.accept(file_flags)?;
+        let new_file_ref: Arc<dyn File> = Arc::new(new_socket_file);
+        let new_fd = current!().add_file(new_file_ref, close_on_spawn);
+
         if addr_set {
-            from_user::check_mut_ptr(addr)?;
+            if let Some(sock_addr) = sock_addr_option {
+                let mut buf =
+                    unsafe { std::slice::from_raw_parts_mut(addr as *mut u8, *addr_len as usize) };
+                sock_addr.copy_to_slice(&mut buf);
+                unsafe {
+                    *addr_len = sock_addr.raw_len() as u32;
+                }
+            } else {
+                unsafe {
+                    *addr_len = 0;
+                }
+            }
         }
-        // TODO: handle addr
-        let new_socket = unix_socket.accept()?;
-        let new_file_ref: Arc<dyn File> = Arc::new(new_socket);
-        current!().add_file(new_file_ref, false)
+        Ok(new_fd as isize)
     } else {
         return_errno!(EBADF, "not a socket");
-    };
-
-    Ok(new_fd as isize)
+    }
 }
 
 pub fn do_shutdown(fd: c_int, how: c_int) -> Result<isize> {
     debug!("shutdown: fd: {}, how: {}", fd, how);
+    let how = HowToShut::try_from_raw(how)?;
+
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_host_socket() {
-        let ret = try_libc!(libc::ocall::shutdown(socket.raw_host_fd() as i32, how));
-        Ok(ret as isize)
+        socket.shutdown(how)?;
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        unix_socket.shutdown(how)?;
     } else {
-        // TODO: support unix socket
-        return_errno!(EBADF, "not a socket")
+        return_errno!(EBADF, "not a host socket")
     }
+
+    Ok(0)
 }
 
 pub fn do_setsockopt(
@@ -232,10 +248,14 @@ pub fn do_getpeername(
     addr: *mut libc::sockaddr,
     addr_len: *mut libc::socklen_t,
 ) -> Result<isize> {
-    debug!(
-        "getpeername: fd: {}, addr: {:?}, addr_len: {:?}",
-        fd, addr, addr_len
-    );
+    let addr_set: bool = !addr.is_null();
+    if addr_set {
+        from_user::check_ptr(addr_len)?;
+        from_user::check_mut_array(addr as *mut u8, unsafe { *addr_len } as usize)?;
+    } else {
+        return Ok(0);
+    }
+
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_host_socket() {
         let ret = try_libc!(libc::ocall::getpeername(
@@ -245,11 +265,15 @@ pub fn do_getpeername(
         ));
         Ok(ret as isize)
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
-        warn!("getpeername for unix socket is unimplemented");
-        return_errno!(
-            ENOTCONN,
-            "hack for php: Transport endpoint is not connected"
-        )
+        let name = unix_socket.peer_addr()?;
+        let mut dst = unsafe {
+            std::slice::from_raw_parts_mut(addr as *mut _ as *mut u8, *addr_len as usize)
+        };
+        name.copy_to_slice(dst);
+        unsafe {
+            *addr_len = name.raw_len() as u32;
+        }
+        Ok(0)
     } else {
         return_errno!(EBADF, "not a socket")
     }
@@ -260,10 +284,18 @@ pub fn do_getsockname(
     addr: *mut libc::sockaddr,
     addr_len: *mut libc::socklen_t,
 ) -> Result<isize> {
-    debug!(
-        "getsockname: fd: {}, addr: {:?}, addr_len: {:?}",
-        fd, addr, addr_len
-    );
+    let addr_set: bool = !addr.is_null();
+    if addr_set {
+        from_user::check_ptr(addr_len)?;
+        from_user::check_mut_array(addr as *mut u8, unsafe { *addr_len } as usize)?;
+    } else {
+        return Ok(0);
+    }
+
+    if unsafe { *addr_len } < std::mem::size_of::<libc::sa_family_t>() as u32 {
+        return_errno!(EINVAL, "input length is too short");
+    }
+
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_host_socket() {
         let ret = try_libc!(libc::ocall::getsockname(
@@ -273,10 +305,24 @@ pub fn do_getsockname(
         ));
         Ok(ret as isize)
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
-        warn!("getsockname for unix socket is unimplemented");
+        let name_opt = unix_socket.addr();
+        if let Some(name) = name_opt {
+            let mut dst = unsafe {
+                std::slice::from_raw_parts_mut(addr as *mut _ as *mut u8, *addr_len as usize)
+            };
+            name.copy_to_slice(dst);
+            unsafe {
+                *addr_len = name.raw_len() as u32;
+            }
+        } else {
+            unsafe {
+                (*addr).sa_family = AddressFamily::LOCAL as u16;
+                *addr_len = 2;
+            }
+        }
         Ok(0)
     } else {
-        return_errno!(EBADF, "not a socket")
+        return_errno!(EBADF, "not a socket");
     }
 }
 
@@ -306,24 +352,27 @@ pub fn do_sendto(
 
     let send_flags = SendFlags::from_bits(flags).unwrap();
 
-    let addr_option = if addr_set {
-        Some(unsafe { SockAddr::try_from_raw(addr, addr_len)? })
-    } else {
-        None
-    };
-
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_host_socket() {
+        let addr_option = if addr_set {
+            Some(unsafe { SockAddr::try_from_raw(addr, addr_len)? })
+        } else {
+            None
+        };
+
         socket
             .sendto(buf, send_flags, &addr_option)
             .map(|u| u as isize)
-    } else if let Ok(unix) = file_ref.as_unix_socket() {
-        if !unix.is_connected() {
-            return_errno!(ENOTCONN, "the socket has not been connected yet");
-        }
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        let addr_option = if addr_set {
+            Some(unsafe { UnixAddr::try_from_raw(addr, addr_len)? })
+        } else {
+            None
+        };
 
-        let data = unsafe { std::slice::from_raw_parts(base as *const u8, len) };
-        unix.write(data).map(|u| u as isize)
+        unix_socket
+            .sendto(buf, send_flags, &addr_option)
+            .map(|u| u as isize)
     } else {
         return_errno!(EBADF, "unsupported file type");
     }
@@ -356,23 +405,43 @@ pub fn do_recvfrom(
     }
 
     let file_ref = current!().file(fd as FileDesc)?;
-    let (data_len, sock_addr_option) = if let Ok(socket) = file_ref.as_host_socket() {
-        socket.recvfrom(buf, recv_flags)?
+    if let Ok(socket) = file_ref.as_host_socket() {
+        let (data_len, sock_addr_option) = socket.recvfrom(buf, recv_flags)?;
+        if addr_set {
+            if let Some(sock_addr) = sock_addr_option {
+                let mut buf =
+                    unsafe { std::slice::from_raw_parts_mut(addr as *mut u8, *addr_len as usize) };
+                sock_addr.copy_to_slice(&mut buf);
+                unsafe {
+                    *addr_len = sock_addr.len() as u32;
+                }
+            } else {
+                unsafe {
+                    *addr_len = 0;
+                }
+            }
+        }
+        Ok(data_len as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        let (data_len, sock_addr_option) = unix_socket.recvfrom(buf, recv_flags)?;
+        if addr_set {
+            if let Some(sock_addr) = sock_addr_option {
+                let mut buf =
+                    unsafe { std::slice::from_raw_parts_mut(addr as *mut u8, *addr_len as usize) };
+                sock_addr.copy_to_slice(&mut buf);
+                unsafe {
+                    *addr_len = sock_addr.raw_len() as u32;
+                }
+            } else {
+                unsafe {
+                    *addr_len = 0;
+                }
+            }
+        }
+        Ok(data_len as isize)
     } else {
         return_errno!(EBADF, "not a socket");
-    };
-
-    if addr_set && sock_addr_option.is_some() {
-        let sock_addr = sock_addr_option.unwrap();
-        let mut buf =
-            unsafe { std::slice::from_raw_parts_mut(addr as *mut u8, *addr_len as usize) };
-        sock_addr.copy_to_slice(&mut buf);
-        unsafe {
-            *addr_len = sock_addr.len() as u32;
-        }
     }
-
-    Ok(data_len as isize)
 }
 
 pub fn do_socketpair(
@@ -388,11 +457,11 @@ pub fn do_socketpair(
 
     let file_flags = FileFlags::from_bits_truncate(socket_type);
     let close_on_spawn = file_flags.contains(FileFlags::SOCK_CLOEXEC);
+    let sock_type = SocketType::try_from(socket_type & (!file_flags.bits()))?;
 
     let domain = AddressFamily::try_from(domain as u16)?;
     if (domain == AddressFamily::LOCAL) {
-        let (client_socket, server_socket) =
-            UnixSocketFile::socketpair(socket_type as i32, protocol as i32)?;
+        let (client_socket, server_socket) = socketpair(sock_type, file_flags, protocol as i32)?;
 
         let current = current!();
         let mut files = current.files().lock().unwrap();

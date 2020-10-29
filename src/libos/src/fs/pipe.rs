@@ -41,27 +41,7 @@ impl File for PipeReader {
     }
 
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-        let mut total_count = 0;
-        for buf in bufs {
-            match self.consumer.pop_slice(buf) {
-                Ok(count) => {
-                    total_count += count;
-                    if count < buf.len() {
-                        break;
-                    } else {
-                        continue;
-                    }
-                }
-                Err(e) => {
-                    if total_count > 0 {
-                        break;
-                    } else {
-                        return Err(e);
-                    }
-                }
-            }
-        }
-        Ok(total_count)
+        self.consumer.pop_slices(bufs)
     }
 
     fn get_access_mode(&self) -> Result<AccessMode> {
@@ -120,27 +100,7 @@ impl File for PipeWriter {
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
-        let mut total_count = 0;
-        for buf in bufs {
-            match self.producer.push_slice(buf) {
-                Ok(count) => {
-                    total_count += count;
-                    if count < buf.len() {
-                        break;
-                    } else {
-                        continue;
-                    }
-                }
-                Err(e) => {
-                    if total_count > 0 {
-                        break;
-                    } else {
-                        return Err(e);
-                    }
-                }
-            }
-        }
-        Ok(total_count)
+        self.producer.push_slices(bufs)
     }
 
     fn seek(&self, pos: SeekFrom) -> Result<off_t> {

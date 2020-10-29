@@ -132,6 +132,11 @@ impl HostSocket {
     pub fn raw_host_fd(&self) -> FileDesc {
         self.host_fd.to_raw()
     }
+
+    pub fn shutdown(&self, how: HowToShut) -> Result<()> {
+        try_libc!(libc::ocall::shutdown(self.raw_host_fd() as i32, how.bits()));
+        Ok(())
+    }
 }
 
 pub trait HostSocketType {

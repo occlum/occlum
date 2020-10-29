@@ -11,6 +11,7 @@ dependencies = [
  "derive_builder",
  "lazy_static",
  "log",
+ "memoffset",
  "rcore-fs",
  "rcore-fs-mountfs",
  "rcore-fs-ramfs",
@@ -240,6 +241,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fabed175da42fed1fa0746b0ea71f412aa9d35e76e95e59b192c64b9dc2bf8b"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "memoffset"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "157b4208e3059a8f9e78d559edc658e13df41410cb3ae03979c83130067fdd87"
+dependencies = [
+ "autocfg 1.0.1",
 ]
 
 [[package]]

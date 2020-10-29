@@ -203,6 +203,40 @@ int test_poll() {
     return 0;
 }
 
+int test_getname() {
+    char name[] = "unix_socket_path";
+    int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sock == -1) {
+        THROW_ERROR("failed to create a unix socket");
+    }
+
+    struct sockaddr_un addr = {0};
+    memset(&addr, 0, sizeof(struct sockaddr_un)); //Clear structure
+    addr.sun_family = AF_UNIX;
+    strcpy(addr.sun_path, name);
+    socklen_t addr_len = strlen(addr.sun_path) + sizeof(addr.sun_family) + 1;
+    if (bind(sock, (struct sockaddr *)&addr, addr_len) == -1) {
+        close(sock);
+        THROW_ERROR("failed to bind");
+    }
+
+    struct sockaddr_un ret_addr = {0};
+    socklen_t ret_addr_len = sizeof(ret_addr);
+
+    if (getsockname(sock, (struct sockaddr *)&ret_addr, &ret_addr_len) < 0) {
+        close(sock);
+        THROW_ERROR("failed to getsockname");
+    }
+
+    if (ret_addr_len != addr_len || strcmp(ret_addr.sun_path, name) != 0) {
+        close(sock);
+        THROW_ERROR("got name mismatched");
+    }
+
+    close(sock);
+    return 0;
+}
+
 static test_case_t test_cases[] = {
     TEST_CASE(test_unix_socket_inter_process),
     TEST_CASE(test_socketpair_inter_process),
@@ -210,6 +244,7 @@ static test_case_t test_cases[] = {
     // TODO: recover the test after the unix sockets are rewritten by using
     // the new event subsystem
     //TEST_CASE(test_poll),
+    TEST_CASE(test_getname),
 };
 
 int main(int argc, const char *argv[]) {

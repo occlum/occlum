@@ -17,6 +17,7 @@
 // for UntrustedSliceAlloc in slice_alloc
 #![feature(slice_ptr_get)]
 #![feature(maybe_uninit_extra)]
+#![feature(get_mut_unchecked)]
 
 #[macro_use]
 extern crate alloc;
@@ -46,6 +47,8 @@ extern crate derive_builder;
 extern crate ringbuf;
 extern crate serde;
 extern crate serde_json;
+#[macro_use]
+extern crate memoffset;
 
 use sgx_trts::libc;
 use sgx_types::*;
