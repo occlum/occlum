@@ -1,128 +1,147 @@
-# Quick Start: rune on Occlum
+# Quick Start: running Occlum with OCI runtime rune
 
-[rune](https://github.com/alibaba/inclavare-containers) is a set of tools for running trusted applications in containers with the hardware-assisted enclave technology.
+This user guide provides the steps to run Occlum with OCI Runtime `rune`.
 
-## Hardware requirements
-- Install [Intel SGX driver for Linux](https://github.com/intel/linux-sgx-driver#build-and-install-the-intelr-sgx-driver), required by Intel SGX SDK && PSW.
-- Install [enable_rdfsbase kernel module](https://github.com/occlum/enable_rdfsbase#how-to-build), allowing to use `rdfsbase` -family instructions in Occlum.
+[rune](https://github.com/alibaba/inclavare-containers/tree/master/rune) is a novel OCI Runtime used to run trusted applications in containers with the hardware-assisted enclave technology.
 
----
+[Occlum](https://github.com/occlum/occlum) is a memory-safe, multi-process library OS for Intel SGX.
 
-## Build and install rune
-`rune` is a CLI tool for spawning and running enclaves in containers according to the OCI specification.
+# Requirements
 
-Please refer to [this guide](https://github.com/alibaba/inclavare-containers#rune) to build `rune` from scratch.
+- Ensure that you have one of the following required operating systems to build an Occlum container image:
+  - CentOS 8.1
+  - Ubuntu 18.04-server
 
----
+- Please follow [Intel SGX Installation Guide](https://download.01.org/intel-sgx/sgx-linux/2.11/docs/Intel_SGX_Installation_Guide_Linux_2.11_Open_Source.pdf) to install Intel SGX driver, Intel SGX SDK & PSW for Linux.
+  - For CentOS 8.1, UAE service libraries are needed but may not be installed if SGX PSW installer is used. Please manually install it:
+    ```shell
+    rpm -i libsgx-uae-service-2.11.100.2-1.el8.x86_64.rpm
+    ```
 
-## Build Occlum application bundle
-### Download Occlum sdk image
-``` shell
-yum install -y libseccomp-devel
-mkdir "$HOME/rune_workdir"
-docker pull occlum/occlum:0.12.0-centos7.5
-docker run -it --device /dev/isgx \
-  -v $HOME/rune_workdir:/root/rune_workdir \
-  occlum/occlum:0.12.0-centos7.5
+- Install [enable_rdfsbase kernel module](https://github.com/occlum/enable_rdfsbase#how-to-build), allowing to use FSGSBASE instructions in Occlum. Please skip this step when using kernel 5.9. Note that you are not able to run Occlum with kernel disabled FSGSBASE feature even you have installed this module.
+
+- Install rune and occlum.
+  - For CentOS 8.1:
+    1. Add the repository to your sources.
+    ```shell
+    cat >/etc/yum.repos.d/inclavare-containers.repo <<EOF
+    [inclavare-containers]
+    name=inclavare-containers
+    enabled=1
+    baseurl=https://mirrors.openanolis.org/inclavare-containers/rpm-repo/
+    gpgcheck=1
+    repo_gpgcheck=1
+    gpgkey=https://mirrors.openanolis.org/inclavare-containers/rpm-repo/RPM-GPG-KEY-rpm-sign
+    gpgcakey=https://mirrors.openanolis.org/inclavare-containers/rpm-repo/RPM-GPG-KEY-rpm-sign-ca
+    EOF
+    ```
+
+    2. Install the RPM packages.
+    ```shell
+    sudo yum install -y rune occlum
+    source /etc/profile
+    ```
+
+  - For Ubuntu 18.04-server:
+    1. Add the repository to your sources.
+    ```shell
+    echo 'deb [arch=amd64] https://mirrors.openanolis.org/inclavare-containers/deb-repo bionic main' | tee /etc/apt/sources.list.d/inclavare-containers.list
+    ```
+
+    2. Add the key to the list of trusted keys used by the apt to authenticate packages.
+    ```shell
+    wget -qO - https://mirrors.openanolis.org/inclavare-containers/deb-repo/DEB-GPG-KEY.key | sudo apt-key add -
+    ```
+
+    3. Update the apt and install the packages.
+    ```shell
+    sudo apt-get update
+    sudo apt-get install -y rune occlum
+    source /etc/profile
+    ```
+
+# Building Occlum container image
+
+## Prepare "hello world" demo program
+
+[This tutorial](https://github.com/occlum/occlum#hello-occlum) can help you to create your first occlum build.
+
+Assuming the "hello world" demo program in `occlum_instance` directory is built.
+
+Type the following commands to generate a minimal, self-contained package (.tar.gz) for the Occlum instance.
+
+```shell
+cd occlum_instance
+occlum package occlum_instance.tar.gz
 ```
 
-### Prepare the materials
-Before Occlum build, execute the following command to set your Occlum instance dir:
-``` shell
-export OCCLUM_INSTANCE_DIR=occlum-app
-```
-You can build a "hello world" demo application or your own product with the [Occlum CentOS Docker image](https://hub.docker.com/r/occlum/occlum/tags).
+## Create Occlum container image
 
-[This guide](https://github.com/occlum/occlum#hello-occlum) can help you to create your first occlum build.
-
-After Occlum build, execute the following commands in Occlum sdk container environment:
-
-``` shell
-yum install -y libseccomp-devel
-cp -a occlum-app /root/rune_workdir
-cd /root/rune_workdir
-mkdir lib
-cp /usr/lib64/libseccomp.so.2 lib
-cp /usr/lib64/libprotobuf.so.* lib
-cp /usr/lib64/libsgx_u*.so* lib
-cp /usr/lib64/libsgx_enclave_common.so.1 lib
-cp /usr/lib64/libsgx_launch.so.1 lib
-```
-
-### Build occlum application image
-Now you can build your occlum application image in the `$HOME/rune_workdir` directory of your host system.
+Now you can build your occlum container image in `occlum_instance` directory on your host system.
 
 Type the following commands to create a `Dockerfile`:
-``` Dockerfile
-cat >Dockerfile <<EOF
-FROM centos:7.5.1804
 
-RUN mkdir -p /run/rune/occlum-app
+```Dockerfile
+cat >Dockerfile <<EOF
+FROM centos:8.1.1911
+
+RUN mkdir -p /run/rune
 WORKDIR /run/rune
 
-COPY lib /lib
-COPY occlum-app occlum-app
-
-RUN ln -sfn occlum-app/build/lib/libocclum-pal.so liberpal-occlum.so
-RUN ldconfig
+ADD occlum_instance.tar.gz /run/rune
 
 ENTRYPOINT ["/bin/hello_world"]
 EOF
 ```
 
-and then build it with the command:
+then build the Occlum container image with the command:
+
 ```shell
 docker build . -t occlum-app
 ```
 
-### Create bundle
-In order to use `rune` you must have your container in the format of an OCI bundle. If you have Docker installed you can use its `export` method to acquire a root filesystem from an existing Docker container.
+# Configuring OCI Runtime rune for Docker
 
-``` shell
-# create the top most bundle directory
-cd "$HOME/rune_workdir"
-mkdir rune-container
-cd rune-container
+Add the associated configuration for `rune` in dockerd config file, e.g, `/etc/docker/daemon.json`, on your system.
 
-# create the rootfs directory
-mkdir rootfs
-
-# export occlum-app via Docker into the rootfs directory
-docker export $(docker create occlum-app) | sudo tar -C rootfs -xvf -
+```json
+{
+	"runtimes": {
+		"rune": {
+			"path": "/usr/bin/rune",
+			"runtimeArgs": []
+		}
+	}
+}
 ```
 
-After a root filesystem is populated you just generate a spec in the format of a config.json file inside your bundle. `rune` provides a spec command which is similar to `runc` to generate a template file that you are then able to edit.
+then restart dockerd on your system.
 
-``` shell
-rune spec
+You can check whether `rune` is correctly enabled or not with:
+
+```shell
+docker info | grep rune
 ```
 
-To find features and documentation for fields in the spec please refer to the [specs](https://github.com/opencontainers/runtime-spec) repository.
+The expected result would be:
 
-In order to run the hello world demo program in Occlum with `rune`, you need to change the entrypoint from `sh` to `/bin/hello_world`
-``` json
-  "process": {
-      "args": [
-          "/bin/hello_world"
-      ],
-  }
+```
+Runtimes: rune runc
 ```
 
-and then configure enclave runtime as following:
-``` json
-  "annotations": {
-      "enclave.type": "intelSgx",
-      "enclave.runtime.path": "/run/rune/liberpal-occlum.so",
-      "enclave.runtime.args": "occlum-app"
-  }
+# Running Occlum container image
+
+You need to specify a set of parameters to `docker run` to run:
+
+```shell
+docker run -it --rm --runtime=rune \
+  -e ENCLAVE_TYPE=intelSgx \
+  -e ENCLAVE_RUNTIME_PATH=/opt/occlum/build/lib/libocclum-pal.so \
+  -e ENCLAVE_RUNTIME_ARGS=occlum_instance \
+  occlum-app
 ```
 
----
-
-## Run Occlum application
-Assuming you have an OCI bundle from the previous step you can execute the container in this way.
-
-``` shell
-cd "$HOME/rune_workdir/rune-container"
-sudo rune run rune-container
-```
+where:
+- @ENCLAVE_TYPE: specify the type of enclave hardware to use, such as `intelSgx`.
+- @ENCLAVE_PATH: specify the path to enclave runtime PAL to launch.
+- @ENCLAVE_ARGS: specify the specific arguments to enclave runtime PAL, separated by the comma.
