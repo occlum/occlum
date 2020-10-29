@@ -7,9 +7,9 @@ pub use self::io_multiplexing::{
     PollEventFlags, PollFd, THREAD_NOTIFIERS,
 };
 pub use self::socket::{
-    msghdr, msghdr_mut, AddressFamily, AsUnixSocket, FileFlags, HostSocket, HostSocketType, Iovs,
-    IovsMut, MsgHdr, MsgHdrFlags, MsgHdrMut, RecvFlags, SendFlags, SliceAsLibcIovec, SockAddr,
-    SocketType, UnixSocketFile,
+    msghdr, msghdr_mut, socketpair, unix_socket, AddressFamily, AsUnixSocket, FileFlags,
+    HostSocket, HostSocketType, HowToShut, Iovs, IovsMut, MsgHdr, MsgHdrFlags, MsgHdrMut,
+    RecvFlags, SendFlags, SliceAsLibcIovec, SockAddr, SocketType, UnixAddr,
 };
 pub use self::syscalls::*;
 

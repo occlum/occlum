@@ -76,6 +76,20 @@ impl<I> Channel<I> {
         let Channel { producer, consumer } = self;
         (producer, consumer)
     }
+
+    pub fn items_to_consume(&self) -> usize {
+        self.consumer.items_to_consume()
+    }
+
+    pub fn set_nonblocking(&self, nonblocking: bool) {
+        self.consumer.set_nonblocking(nonblocking);
+        self.producer.set_nonblocking(nonblocking);
+    }
+
+    pub fn shutdown(&self) {
+        self.consumer.shutdown();
+        self.producer.shutdown();
+    }
 }
 
 impl<I: Copy> Channel<I> {
@@ -264,7 +278,12 @@ impl<I> Producer<I> {
 
 impl<I: Copy> Producer<I> {
     pub fn push_slice(&self, items: &[I]) -> Result<usize> {
-        if items.len() == 0 {
+        self.push_slices(&[items])
+    }
+
+    pub fn push_slices(&self, item_slices: &[&[I]]) -> Result<usize> {
+        let len: usize = item_slices.iter().map(|slice| slice.len()).sum();
+        if len == 0 {
             return Ok(0);
         }
 
@@ -275,11 +294,21 @@ impl<I: Copy> Producer<I> {
                     return_errno!(EPIPE, "one or both endpoints have been shutdown");
                 }
 
-                let count = rb_producer.push_slice(items);
-                if count > 0 {
+                let mut total_count = 0;
+                for items in item_slices {
+                    let count = rb_producer.push_slice(items);
+                    total_count += count;
+                    if count < items.len() {
+                        break;
+                    } else {
+                        continue;
+                    }
+                }
+
+                if total_count > 0 {
                     drop(rb_producer);
                     self.trigger_peer_events(&IoEvents::IN);
-                    return Ok(count);
+                    return Ok(total_count);
                 }
 
                 if self.is_nonblocking() {
@@ -374,11 +403,20 @@ impl<I> Consumer<I> {
     pub fn is_peer_shutdown(&self) -> bool {
         self.state.is_producer_shutdown()
     }
+
+    pub fn items_to_consume(&self) -> usize {
+        self.inner.lock().unwrap().len()
+    }
 }
 
 impl<I: Copy> Consumer<I> {
     pub fn pop_slice(&self, items: &mut [I]) -> Result<usize> {
-        if items.len() == 0 {
+        self.pop_slices(&mut [items])
+    }
+
+    pub fn pop_slices(&self, item_slices: &mut [&mut [I]]) -> Result<usize> {
+        let len: usize = item_slices.iter().map(|slice| slice.len()).sum();
+        if len == 0 {
             return Ok(0);
         }
 
@@ -389,11 +427,21 @@ impl<I: Copy> Consumer<I> {
                     return_errno!(EPIPE, "this endpoint has been shutdown");
                 }
 
-                let count = rb_consumer.pop_slice(items);
-                if count > 0 {
+                let mut total_count = 0;
+                for items in item_slices.iter_mut() {
+                    let count = rb_consumer.pop_slice(items);
+                    total_count += count;
+                    if count < items.len() {
+                        break;
+                    } else {
+                        continue;
+                    }
+                }
+
+                if total_count > 0 {
                     drop(rb_consumer);
                     self.trigger_peer_events(&IoEvents::OUT);
-                    return Ok(count);
+                    return Ok(total_count);
                 };
 
                 if self.is_peer_shutdown() {
