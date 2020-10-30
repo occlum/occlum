@@ -1,10 +1,13 @@
-use super::*;
-
-use crate::fs::{
-    occlum_ocall_ioctl, AccessMode, CreationFlags, File, FileRef, IoctlCmd, StatusFlags,
-};
 use std::any::Any;
 use std::io::{Read, Seek, SeekFrom, Write};
+
+use atomic::{Atomic, Ordering};
+
+use super::*;
+use crate::fs::{
+    occlum_ocall_ioctl, AccessMode, CreationFlags, File, FileRef, HostFd, IoEvents, IoctlCmd,
+    StatusFlags,
+};
 
 //TODO: refactor write syscall to allow zero length with non-zero buffer
 impl File for HostSocket {
@@ -52,7 +55,10 @@ impl File for HostSocket {
     }
 
     fn get_status_flags(&self) -> Result<StatusFlags> {
-        let ret = try_libc!(libc::ocall::fcntl_arg0(self.host_fd(), libc::F_GETFL));
+        let ret = try_libc!(libc::ocall::fcntl_arg0(
+            self.raw_host_fd() as i32,
+            libc::F_GETFL
+        ));
         Ok(StatusFlags::from_bits_truncate(ret as u32))
     }
 
@@ -64,11 +70,31 @@ impl File for HostSocket {
             | StatusFlags::O_NONBLOCK;
         let raw_status_flags = (new_status_flags & valid_flags_mask).bits();
         try_libc!(libc::ocall::fcntl_arg1(
-            self.host_fd(),
+            self.raw_host_fd() as i32,
             libc::F_SETFL,
             raw_status_flags as c_int
         ));
         Ok(())
+    }
+
+    fn poll_new(&self) -> IoEvents {
+        self.host_events.load(Ordering::Acquire)
+    }
+
+    fn host_fd(&self) -> Option<&HostFd> {
+        Some(&self.host_fd)
+    }
+
+    fn notifier(&self) -> Option<&IoNotifier> {
+        Some(&self.notifier)
+    }
+
+    fn recv_host_events(&self, events: &IoEvents, trigger_notifier: bool) {
+        self.host_events.store(*events, Ordering::Release);
+
+        if trigger_notifier {
+            self.notifier.broadcast(events);
+        }
     }
 
     fn as_any(&self) -> &dyn Any {

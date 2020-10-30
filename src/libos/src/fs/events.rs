@@ -1,8 +1,8 @@
-use crate::events::{Event, EventFilter, Notifier};
+use crate::events::{Event, EventFilter, Notifier, Observer};
 use crate::prelude::*;
 
 bitflags! {
-    pub struct IoEvents: u16 {
+    pub struct IoEvents: u32 {
         const IN = 0x001; // = POLLIN
         const OUT = 0x004; // = POLLOUT
         const PRI = 0x002; // = POLLPRI

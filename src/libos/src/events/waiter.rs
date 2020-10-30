@@ -70,6 +70,13 @@ impl Waiter {
             inner: Arc::downgrade(&self.inner),
         }
     }
+
+    /// Expose the internal host eventfd.
+    ///
+    /// This host eventfd should be used by an external user carefully.
+    pub fn host_eventfd(&self) -> &HostEventFd {
+        self.inner.host_eventfd()
+    }
 }
 
 impl !Send for Waiter {}
@@ -168,5 +175,9 @@ impl Inner {
         unsafe {
             HostEventFd::write_u64_raw_and_batch(&host_eventfds, 1);
         }
+    }
+
+    pub fn host_eventfd(&self) -> &HostEventFd {
+        &self.host_eventfd
     }
 }

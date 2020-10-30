@@ -1,25 +1,36 @@
 use super::*;
 
+use atomic::{Atomic, Ordering};
+
 /// Native Linux eventfd
 // TODO: move the implementaion of eventfd into libos to defend against Iago attacks from OCalls
 #[derive(Debug)]
 pub struct EventFile {
-    host_fd: c_int,
+    host_fd: HostFd,
+    host_events: Atomic<IoEvents>,
+    notifier: IoNotifier,
 }
 
 impl EventFile {
     pub fn new(init_val: u32, flags: EventCreationFlags) -> Result<Self> {
-        let host_fd = try_libc!({
+        let raw_host_fd = try_libc!({
             let mut ret: i32 = 0;
             let status = occlum_ocall_eventfd(&mut ret, init_val, flags.bits());
             assert!(status == sgx_status_t::SGX_SUCCESS);
             ret
-        });
-        Ok(Self { host_fd })
+        }) as FileDesc;
+        let host_fd = HostFd::new(raw_host_fd);
+        let host_events = Atomic::new(IoEvents::empty());
+        let notifier = IoNotifier::new();
+        Ok(Self {
+            host_fd,
+            host_events,
+            notifier,
+        })
     }
 
     pub fn get_host_fd(&self) -> c_int {
-        self.host_fd
+        self.host_fd.to_raw() as c_int
     }
 }
 
@@ -40,7 +51,7 @@ extern "C" {
 
 impl Drop for EventFile {
     fn drop(&mut self) {
-        let ret = unsafe { libc::ocall::close(self.host_fd) };
+        let ret = unsafe { libc::ocall::close(self.host_fd.to_raw() as i32) };
         assert!(ret == 0);
     }
 }
@@ -50,7 +61,7 @@ impl File for EventFile {
         let (buf_ptr, buf_len) = buf.as_mut().as_mut_ptr_and_len();
 
         let ret = try_libc!(libc::ocall::read(
-            self.host_fd,
+            self.host_fd.to_raw() as i32,
             buf_ptr as *mut c_void,
             buf_len
         )) as usize;
@@ -61,7 +72,7 @@ impl File for EventFile {
     fn write(&self, buf: &[u8]) -> Result<usize> {
         let (buf_ptr, buf_len) = buf.as_ptr_and_len();
         let ret = try_libc!(libc::ocall::write(
-            self.host_fd,
+            self.host_fd.to_raw() as i32,
             buf_ptr as *const c_void,
             buf_len
         )) as usize;
@@ -91,6 +102,26 @@ impl File for EventFile {
             raw_status_flags as c_int
         ));
         Ok(())
+    }
+
+    fn poll_new(&self) -> IoEvents {
+        self.host_events.load(Ordering::Acquire)
+    }
+
+    fn notifier(&self) -> Option<&IoNotifier> {
+        Some(&self.notifier)
+    }
+
+    fn host_fd(&self) -> Option<&HostFd> {
+        Some(&self.host_fd)
+    }
+
+    fn recv_host_events(&self, events: &IoEvents, trigger_notifier: bool) {
+        self.host_events.store(*events, Ordering::Release);
+
+        if trigger_notifier {
+            self.notifier.broadcast(events);
+        }
     }
 
     fn as_any(&self) -> &dyn Any {

@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::sync::Weak;
 
 use super::Event;
 use crate::prelude::*;
@@ -15,5 +16,5 @@ pub trait Observer<E: Event>: Send + Sync {
     /// by a specific implementation of `Observer::on_event`. Thus, to avoid
     /// the odds of deadlocks, the `on_event` method should be written short
     /// and sweet.
-    fn on_event(&self, event: &E, metadata: &Option<Box<dyn Any + Send + Sync>>) -> ();
+    fn on_event(&self, event: &E, metadata: &Option<Weak<dyn Any + Send + Sync>>) -> ();
 }

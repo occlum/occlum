@@ -1,3 +1,5 @@
+#include <errno.h>
+#include <sys/epoll.h>
 #include <sys/select.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
@@ -98,6 +100,51 @@ int test_select_timeout() {
     return 0;
 }
 
+int test_epoll_timeout() {
+    int pipe_fds[2];
+    if (pipe(pipe_fds) < 0) {
+        THROW_ERROR("failed to create a pipe");
+    }
+    int pipe_read_fd = pipe_fds[0];
+    int pipe_write_fd = pipe_fds[1];
+
+    int ep_fd = epoll_create1(0);
+    if (ep_fd < 0) {
+        THROW_ERROR("failed to create an epoll");
+    }
+
+    int ret;
+    struct epoll_event event;
+
+    event.events = EPOLLIN; // we want the write end to be readable
+    event.data.u32 = pipe_write_fd;
+    ret = epoll_ctl(ep_fd, EPOLL_CTL_ADD, pipe_write_fd, &event);
+    if (ret < 0) {
+        THROW_ERROR("failed to do epoll ctl");
+    }
+
+    event.events = EPOLLOUT; // we want the read end to be writable
+    event.data.u32 = pipe_read_fd;
+    ret = epoll_ctl(ep_fd, EPOLL_CTL_ADD, pipe_read_fd, &event);
+    if (ret < 0) {
+        THROW_ERROR("failed to do epoll ctl");
+    }
+
+    // We are waiting for the write end to be readable or the read end to be
+    // writable, which can never happen. So the epoll_wait must end with
+    // timeout.
+    errno = 0;
+    struct epoll_event events[2];
+    ret = epoll_wait(ep_fd, events, ARRAY_SIZE(events), 10 /* ms */);
+    if (ret != 0 || errno != 0) {
+        THROW_ERROR("failed to do epoll ctl");
+    }
+
+    free_pipe(pipe_fds);
+    close(ep_fd);
+    return 0;
+}
+
 int test_poll_timeout() {
     // Start the timer
     struct timeval tv_start, tv_end;
@@ -167,6 +214,48 @@ int test_poll_no_timeout() {
     return 0;
 }
 
+int test_epoll_no_timeout() {
+    int pipe_fds[2];
+    if (pipe(pipe_fds) < 0) {
+        THROW_ERROR("failed to create a pipe");
+    }
+    int pipe_read_fd = pipe_fds[0];
+    int pipe_write_fd = pipe_fds[1];
+
+    int ep_fd = epoll_create1(0);
+    if (ep_fd < 0) {
+        THROW_ERROR("failed to create an epoll");
+    }
+
+    int ret;
+    struct epoll_event event;
+
+    event.events = EPOLLOUT; // writable
+    event.data.u32 = pipe_write_fd;
+    ret = epoll_ctl(ep_fd, EPOLL_CTL_ADD, pipe_write_fd, &event);
+    if (ret < 0) {
+        THROW_ERROR("failed to do epoll ctl");
+    }
+
+    event.events = EPOLLIN; // readable
+    event.data.u32 = pipe_read_fd;
+    ret = epoll_ctl(ep_fd, EPOLL_CTL_ADD, pipe_read_fd, &event);
+    if (ret < 0) {
+        THROW_ERROR("failed to do epoll ctl");
+    }
+
+    struct epoll_event events[2];
+    ret = epoll_wait(ep_fd, events, ARRAY_SIZE(events), -1);
+    // pipe_write_fd is ready, while pipe_read_fd is not
+    if (ret != 1) {
+        THROW_ERROR("failed to do epoll ctl");
+    }
+
+    free_pipe(pipe_fds);
+    close(ep_fd);
+    return 0;
+}
+
 int test_select_read_write() {
     int pipe_fds[2];
     if (pipe(pipe_fds) < 0) {
@@ -229,8 +318,10 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_create_with_flags),
     //TEST_CASE(test_select_timeout),
     //TEST_CASE(test_poll_timeout),
+    TEST_CASE(test_epoll_timeout),
     //TEST_CASE(test_select_no_timeout),
     //TEST_CASE(test_poll_no_timeout),
+    TEST_CASE(test_epoll_no_timeout),
     //TEST_CASE(test_select_read_write),
 };
 

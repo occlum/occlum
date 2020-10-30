@@ -41,3 +41,31 @@ void occlum_ocall_eventfd_write_batch(
         write(eventfds[fd_i], &val, sizeof(val));
     }
 }
+
+int occlum_ocall_poll_with_eventfd(
+    struct pollfd *pollfds,
+    nfds_t nfds,
+    struct timespec *timeout,
+    int eventfd_idx
+) {
+    if (eventfd_idx >= 0) {
+        pollfds[eventfd_idx].events |= POLLIN;
+    }
+
+    // We use the ppoll syscall directly instead of the libc wrapper. This
+    // is because the syscall version updates the timeout argument to indicate
+    // how much time was left (which what we want), while the libc wrapper
+    // keeps the timeout argument unchanged.
+    int ret = RAW_PPOLL(pollfds, nfds, timeout);
+    if (ret < 0) {
+        return -1;
+    }
+
+    if (eventfd_idx >= 0 && (pollfds[eventfd_idx].revents & POLLIN) != 0) {
+        int eventfd = pollfds[eventfd_idx].fd;
+        char buf[8];
+        read(eventfd, buf, 8);
+    }
+
+    return ret;
+}

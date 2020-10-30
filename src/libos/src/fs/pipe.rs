@@ -96,6 +96,14 @@ impl File for PipeReader {
         Ok(events)
     }
 
+    fn poll_new(&self) -> IoEvents {
+        self.consumer.poll()
+    }
+
+    fn notifier(&self) -> Option<&IoNotifier> {
+        Some(self.consumer.notifier())
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -169,6 +177,14 @@ impl File for PipeWriter {
         warn!("poll is not supported for pipe");
         let events = PollEventFlags::empty();
         Ok(events)
+    }
+
+    fn poll_new(&self) -> IoEvents {
+        self.producer.poll()
+    }
+
+    fn notifier(&self) -> Option<&IoNotifier> {
+        Some(self.producer.notifier())
     }
 
     fn as_any(&self) -> &dyn Any {
