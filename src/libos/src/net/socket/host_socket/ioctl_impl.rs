@@ -13,7 +13,7 @@ impl HostSocket {
             let mut retval: i32 = 0;
             let status = occlum_ocall_ioctl(
                 &mut retval as *mut i32,
-                self.host_fd(),
+                self.raw_host_fd() as i32,
                 cmd_num,
                 cmd_arg_ptr,
                 cmd.arg_len(),
@@ -36,7 +36,7 @@ impl HostSocket {
             let mut retval: i32 = 0;
             let status = occlum_ocall_ioctl_repack(
                 &mut retval as *mut i32,
-                self.host_fd(),
+                self.raw_host_fd() as i32,
                 BuiltinIoctlNum::SIOCGIFCONF as i32,
                 arg_ref.ifc_buf,
                 arg_ref.ifc_len,

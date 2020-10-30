@@ -91,17 +91,45 @@ pub trait File: Debug + Sync + Send + Any {
         return_op_unsupported_error!("set_advisory_lock")
     }
 
+    // TODO: remove this function after all users of this code are removed
     fn poll(&self) -> Result<(crate::net::PollEventFlags)> {
         return_op_unsupported_error!("poll")
     }
 
+    // TODO: remove this function after all users of this code are removed
     fn enqueue_event(&self, _: crate::net::IoEvent) -> Result<()> {
         return_op_unsupported_error!("enqueue_event");
     }
 
+    // TODO: remove this function after all users of this code are removed
     fn dequeue_event(&self) -> Result<()> {
         return_op_unsupported_error!("dequeue_event");
     }
+
+    // TODO: rename poll_new to poll
+    fn poll_new(&self) -> IoEvents {
+        IoEvents::empty()
+    }
+
+    /// Returns a notifier that broadcast events on this file.
+    ///
+    /// Not every file has an associated event notifier.
+    fn notifier(&self) -> Option<&IoNotifier> {
+        None
+    }
+
+    /// Return the host fd, if the file is backed by an underlying host file.
+    fn host_fd(&self) -> Option<&HostFd> {
+        return None;
+    }
+
+    /// Receive events from the host.
+    ///
+    /// After calling this method, the `poll` method of the `File` trait will
+    /// return the latest events on the `HostFile`.
+    ///
+    /// This method has no effect if the `host_fd` method returns `None`.
+    fn recv_host_events(&self, events: &IoEvents, trigger_notifier: bool) {}
 
     fn as_any(&self) -> &dyn Any;
 }

@@ -113,7 +113,7 @@ pub fn do_poll(pollfds: &mut [PollEvent], timeout: *mut timeval_t) -> Result<usi
         }
 
         if let Ok(socket) = file_ref.as_host_socket() {
-            let fd = socket.host_fd() as FileDesc;
+            let fd = socket.host_fd().unwrap().to_raw();
             index_host_pollfds.push(i);
             host_pollfds.push(PollEvent::new(fd, pollfd.events()));
         } else if let Ok(eventfd) = file_ref.as_event() {

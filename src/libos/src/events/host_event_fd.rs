@@ -49,12 +49,23 @@ impl HostEventFd {
         match timeout {
             None => ocall_eventfd_poll(self.host_fd, std::ptr::null_mut()),
             Some(timeout) => {
+                const ZERO: Duration = Duration::from_secs(0);
+                if *timeout == ZERO {
+                    return_errno!(ETIMEDOUT, "should return immediately");
+                }
+
                 let mut remain_c = timespec_t::from(*timeout);
                 let ret = ocall_eventfd_poll(self.host_fd, &mut remain_c);
 
                 let remain = remain_c.as_duration();
                 assert!(remain <= *timeout + TIMERSLACK.to_duration());
                 *timeout = remain;
+
+                // Poll syscall does not treat timeout as error. So we need
+                // to distinguish the case by ourselves.
+                if *timeout == ZERO {
+                    return_errno!(ETIMEDOUT, "time is up");
+                }
 
                 ret
             }

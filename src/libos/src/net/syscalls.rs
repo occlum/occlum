@@ -1,6 +1,9 @@
 use super::*;
 
-use super::io_multiplexing::{AsEpollFile, EpollCtlCmd, EpollEventFlags, EpollFile, FdSetExt};
+use std::mem::MaybeUninit;
+use std::time::Duration;
+
+use super::io_multiplexing::{AsEpollFile, EpollCtl, EpollFile, EpollFlags, FdSetExt};
 use fs::{CreationFlags, File, FileDesc, FileRef};
 use misc::resource_t;
 use process::Process;
@@ -163,7 +166,7 @@ pub fn do_shutdown(fd: c_int, how: c_int) -> Result<isize> {
     debug!("shutdown: fd: {}, how: {}", fd, how);
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_host_socket() {
-        let ret = try_libc!(libc::ocall::shutdown(socket.host_fd(), how));
+        let ret = try_libc!(libc::ocall::shutdown(socket.raw_host_fd() as i32, how));
         Ok(ret as isize)
     } else {
         // TODO: support unix socket
@@ -185,7 +188,7 @@ pub fn do_setsockopt(
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_host_socket() {
         let ret = try_libc!(libc::ocall::setsockopt(
-            socket.host_fd(),
+            socket.raw_host_fd() as i32,
             level,
             optname,
             optval,
@@ -215,7 +218,7 @@ pub fn do_getsockopt(
     let socket = file_ref.as_host_socket()?;
 
     let ret = try_libc!(libc::ocall::getsockopt(
-        socket.host_fd(),
+        socket.raw_host_fd() as i32,
         level,
         optname,
         optval,
@@ -235,7 +238,11 @@ pub fn do_getpeername(
     );
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_host_socket() {
-        let ret = try_libc!(libc::ocall::getpeername(socket.host_fd(), addr, addr_len));
+        let ret = try_libc!(libc::ocall::getpeername(
+            socket.raw_host_fd() as i32,
+            addr,
+            addr_len
+        ));
         Ok(ret as isize)
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
         warn!("getpeername for unix socket is unimplemented");
@@ -259,7 +266,11 @@ pub fn do_getsockname(
     );
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_host_socket() {
-        let ret = try_libc!(libc::ocall::getsockname(socket.host_fd(), addr, addr_len));
+        let ret = try_libc!(libc::ocall::getsockname(
+            socket.raw_host_fd() as i32,
+            addr,
+            addr_len
+        ));
         Ok(ret as isize)
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
         warn!("getsockname for unix socket is unimplemented");
@@ -611,40 +622,53 @@ pub fn do_epoll_create(size: c_int) -> Result<isize> {
 }
 
 pub fn do_epoll_create1(raw_flags: c_int) -> Result<isize> {
+    debug!("epoll_create: raw_flags: {:?}", raw_flags);
+
     // Only O_CLOEXEC is valid
     let flags = CreationFlags::from_bits(raw_flags as u32)
         .ok_or_else(|| errno!(EINVAL, "invalid flags"))?
         & CreationFlags::O_CLOEXEC;
-    let epoll_file = io_multiplexing::EpollFile::new(flags)?;
-    let file_ref: Arc<dyn File> = Arc::new(epoll_file);
+    let epoll_file: Arc<EpollFile> = EpollFile::new();
     let close_on_spawn = flags.contains(CreationFlags::O_CLOEXEC);
-    let fd = current!().add_file(file_ref, close_on_spawn);
-
-    Ok(fd as isize)
+    let epfd = current!().add_file(epoll_file, close_on_spawn);
+    Ok(epfd as isize)
 }
 
 pub fn do_epoll_ctl(
     epfd: c_int,
     op: c_int,
     fd: c_int,
-    event: *const libc::epoll_event,
+    event_ptr: *const libc::epoll_event,
 ) -> Result<isize> {
     debug!("epoll_ctl: epfd: {}, op: {:?}, fd: {}", epfd, op, fd);
-    let inner_event = if !event.is_null() {
-        from_user::check_ptr(event)?;
-        Some(EpollEvent::from_raw(unsafe { &*event })?)
-    } else {
-        None
+
+    let get_c_event = |event_ptr| -> Result<&libc::epoll_event> {
+        from_user::check_ptr(event_ptr)?;
+        Ok(unsafe { &*event_ptr })
+    };
+
+    let fd = fd as FileDesc;
+    let ctl_cmd = match op {
+        libc::EPOLL_CTL_ADD => {
+            let c_event = get_c_event(event_ptr)?;
+            let event = EpollEvent::from_c(c_event);
+            let flags = EpollFlags::from_c(c_event);
+            EpollCtl::Add(fd, event, flags)
+        }
+        libc::EPOLL_CTL_DEL => EpollCtl::Del(fd),
+        libc::EPOLL_CTL_MOD => {
+            let c_event = get_c_event(event_ptr)?;
+            let event = EpollEvent::from_c(c_event);
+            let flags = EpollFlags::from_c(c_event);
+            EpollCtl::Mod(fd, event, flags)
+        }
+        _ => return_errno!(EINVAL, "invalid op"),
     };
 
     let epfile_ref = current!().file(epfd as FileDesc)?;
-    let epoll_file = epfile_ref.as_epfile()?;
+    let epoll_file = epfile_ref.as_epoll_file()?;
 
-    epoll_file.control(
-        EpollCtlCmd::try_from(op)?,
-        fd as FileDesc,
-        inner_event.as_ref(),
-    )?;
+    epoll_file.control(&ctl_cmd)?;
     Ok(0)
 }
 
@@ -652,8 +676,13 @@ pub fn do_epoll_wait(
     epfd: c_int,
     events: *mut libc::epoll_event,
     max_events: c_int,
-    timeout: c_int,
+    timeout_ms: c_int,
 ) -> Result<isize> {
+    debug!(
+        "epoll_wait: epfd: {}, max_events: {:?}, timeout_ms: {}",
+        epfd, max_events, timeout_ms
+    );
+
     let max_events = {
         if max_events <= 0 {
             return_errno!(EINVAL, "maxevents <= 0");
@@ -666,23 +695,26 @@ pub fn do_epoll_wait(
     };
 
     // A new vector to store EpollEvent, which may degrade the performance due to extra copy.
-    let mut inner_events: Vec<EpollEvent> =
-        vec![EpollEvent::new(EpollEventFlags::empty(), 0); max_events];
+    let mut inner_events: Vec<MaybeUninit<EpollEvent>> = vec![MaybeUninit::uninit(); max_events];
 
     debug!(
         "epoll_wait: epfd: {}, len: {:?}, timeout: {}",
         epfd,
         raw_events.len(),
-        timeout
+        timeout_ms,
     );
 
     let epfile_ref = current!().file(epfd as FileDesc)?;
-    let epoll_file = epfile_ref.as_epfile()?;
-
-    let count = epoll_file.wait(&mut inner_events, timeout)?;
+    let epoll_file = epfile_ref.as_epoll_file()?;
+    let timeout = if timeout_ms >= 0 {
+        Some(Duration::from_millis(timeout_ms as u64))
+    } else {
+        None
+    };
+    let count = epoll_file.wait(&mut inner_events, timeout.as_ref())?;
 
     for i in 0..count {
-        raw_events[i] = inner_events[i].to_raw();
+        raw_events[i] = unsafe { inner_events[i].assume_init() }.to_c();
     }
 
     Ok(count as isize)
@@ -698,7 +730,7 @@ pub fn do_epoll_pwait(
     if !sigmask.is_null() {
         warn!("epoll_pwait cannot handle signal mask, yet");
     } else {
-        info!("epoll_wait");
+        debug!("epoll_wait");
     }
     do_epoll_wait(epfd, events, maxevents, timeout)
 }

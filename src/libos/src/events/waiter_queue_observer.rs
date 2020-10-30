@@ -1,5 +1,6 @@
 use std::any::Any;
 use std::marker::PhantomData;
+use std::sync::Weak;
 
 use super::{Event, Observer, WaiterQueue};
 use crate::prelude::*;
@@ -29,7 +30,7 @@ impl<E: Event> WaiterQueueObserver<E> {
 }
 
 impl<E: Event> Observer<E> for WaiterQueueObserver<E> {
-    fn on_event(&self, event: &E, _metadata: &Option<Box<dyn Any + Send + Sync>>) {
+    fn on_event(&self, event: &E, _metadata: &Option<Weak<dyn Any + Send + Sync>>) {
         self.waiter_queue.dequeue_and_wake_all();
     }
 }

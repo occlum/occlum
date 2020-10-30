@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::fmt;
 use std::marker::PhantomData;
 use std::sync::Weak;
 
@@ -13,7 +14,7 @@ pub struct Notifier<E: Event, F: EventFilter<E> = DummyEventFilter<E>> {
 struct Subscriber<E: Event, F: EventFilter<E>> {
     observer: Weak<dyn Observer<E>>,
     filter: Option<F>,
-    metadata: Option<Box<dyn Any + Send + Sync>>,
+    metadata: Option<Weak<dyn Any + Send + Sync>>,
 }
 
 impl<E: Event, F: EventFilter<E>> Notifier<E, F> {
@@ -28,7 +29,7 @@ impl<E: Event, F: EventFilter<E>> Notifier<E, F> {
         &self,
         observer: Weak<dyn Observer<E>>,
         filter: Option<F>,
-        metadata: Option<Box<dyn Any + Send + Sync>>,
+        metadata: Option<Weak<dyn Any + Send + Sync>>,
     ) {
         let mut subscribers = self.subscribers.lock().unwrap();
         subscribers.push_back(Subscriber {
@@ -61,6 +62,12 @@ impl<E: Event, F: EventFilter<E>> Notifier<E, F> {
 
             observer.on_event(event, &subscriber.metadata);
         }
+    }
+}
+
+impl<E: Event, F: EventFilter<E>> fmt::Debug for Notifier<E, F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Notifier {{ .. }}")
     }
 }
 

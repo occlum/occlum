@@ -190,6 +190,8 @@ enclave {
             unsigned int initval,
             int flags
         ) propagate_errno;
+        // TODO: the usage of this OCall should be replaced with 
+        // occlum_ocall_poll_with_eventfd, which is a more general form.
         int occlum_ocall_eventfd_poll(
             int eventfd,
             [in, out] struct timespec *timeout
@@ -200,12 +202,20 @@ enclave {
             uint64_t val
         );
 
+        // TODO: the usage of this OCall should be replaced with 
+        // occlum_ocall_poll_with_eventfd, which is a more general form.
         int occlum_ocall_poll(
             [in, out, count=nfds] struct pollfd *fds,
             nfds_t nfds,
             [in, out] struct timeval *timeout,
             int efd
-        )propagate_errno;
+        ) propagate_errno;
+        int occlum_ocall_poll_with_eventfd(
+            [in, out, count=nfds] struct pollfd *fds,
+            nfds_t nfds,
+            [in, out] struct timespec *timeout,
+            int eventfd_idx
+        ) propagate_errno;
 
         void occlum_ocall_print_log(uint32_t level, [in, string] const char* msg);
         void occlum_ocall_flush_log(void);

@@ -46,7 +46,7 @@ impl HostSocket {
         // Prepare the arguments for OCall
         let mut retval: isize = 0;
         // Host socket fd
-        let host_fd = self.host_fd();
+        let host_fd = self.raw_host_fd() as i32;
         // Name
         let (msg_name, msg_namelen) = name.as_ptr_and_len();
         let msg_name = msg_name as *const c_void;
