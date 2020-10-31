@@ -13,14 +13,14 @@ pub fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<i
     let file_flags = FileFlags::from_bits_truncate(socket_type);
     let sock_type = SocketType::try_from(socket_type & (!file_flags.bits()))?;
 
-    let file_ref: Arc<Box<dyn File>> = match sock_domain {
+    let file_ref: Arc<dyn File> = match sock_domain {
         AddressFamily::LOCAL => {
             let unix_socket = UnixSocketFile::new(socket_type, protocol)?;
-            Arc::new(Box::new(unix_socket))
+            Arc::new(unix_socket)
         }
         _ => {
             let socket = HostSocket::new(sock_domain, sock_type, file_flags, protocol)?;
-            Arc::new(Box::new(socket))
+            Arc::new(socket)
         }
     };
 
@@ -130,7 +130,7 @@ pub fn do_accept4(
     let file_ref = current!().file(fd as FileDesc)?;
     let new_fd = if let Ok(socket) = file_ref.as_host_socket() {
         let (new_socket_file, sock_addr_option) = socket.accept(file_flags)?;
-        let new_file_ref: Arc<Box<dyn File>> = Arc::new(Box::new(new_socket_file));
+        let new_file_ref: Arc<dyn File> = Arc::new(new_socket_file);
         let new_fd = current!().add_file(new_file_ref, close_on_spawn);
 
         if addr_set && sock_addr_option.is_some() {
@@ -150,7 +150,7 @@ pub fn do_accept4(
         }
         // TODO: handle addr
         let new_socket = unix_socket.accept()?;
-        let new_file_ref: Arc<Box<dyn File>> = Arc::new(Box::new(new_socket));
+        let new_file_ref: Arc<dyn File> = Arc::new(new_socket);
         current!().add_file(new_file_ref, false)
     } else {
         return_errno!(EBADF, "not a socket");
@@ -385,8 +385,8 @@ pub fn do_socketpair(
 
         let current = current!();
         let mut files = current.files().lock().unwrap();
-        sock_pair[0] = files.put(Arc::new(Box::new(client_socket)), close_on_spawn);
-        sock_pair[1] = files.put(Arc::new(Box::new(server_socket)), close_on_spawn);
+        sock_pair[0] = files.put(Arc::new(client_socket), close_on_spawn);
+        sock_pair[1] = files.put(Arc::new(server_socket), close_on_spawn);
 
         debug!("socketpair: ({}, {})", sock_pair[0], sock_pair[1]);
         Ok(0)
@@ -616,7 +616,7 @@ pub fn do_epoll_create1(raw_flags: c_int) -> Result<isize> {
         .ok_or_else(|| errno!(EINVAL, "invalid flags"))?
         & CreationFlags::O_CLOEXEC;
     let epoll_file = io_multiplexing::EpollFile::new(flags)?;
-    let file_ref: Arc<Box<dyn File>> = Arc::new(Box::new(epoll_file));
+    let file_ref: Arc<dyn File> = Arc::new(epoll_file);
     let close_on_spawn = flags.contains(CreationFlags::O_CLOEXEC);
     let fd = current!().add_file(file_ref, close_on_spawn);
 

@@ -106,7 +106,7 @@ pub trait File: Debug + Sync + Send + Any {
     fn as_any(&self) -> &dyn Any;
 }
 
-pub type FileRef = Arc<Box<dyn File>>;
+pub type FileRef = Arc<dyn File>;
 
 #[derive(Copy, Clone, Debug)]
 struct FileOpNotSupportedError {

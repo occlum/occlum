@@ -23,9 +23,9 @@ pub fn do_eventfd2(init_val: u32, flags: i32) -> Result<isize> {
 
     let inner_flags =
         EventCreationFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
-    let file_ref: Arc<Box<dyn File>> = {
+    let file_ref: Arc<dyn File> = {
         let event = EventFile::new(init_val, inner_flags)?;
-        Arc::new(Box::new(event))
+        Arc::new(event)
     };
 
     let fd = current!().add_file(
