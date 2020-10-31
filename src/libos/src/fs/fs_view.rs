@@ -39,18 +39,18 @@ impl FsView {
     }
 
     /// Open a file on the process. But DO NOT add it to file table.
-    pub fn open_file(&self, path: &str, flags: u32, mode: u32) -> Result<Box<dyn File>> {
+    pub fn open_file(&self, path: &str, flags: u32, mode: u32) -> Result<Arc<dyn File>> {
         if path == "/dev/null" {
-            return Ok(Box::new(DevNull));
+            return Ok(Arc::new(DevNull));
         }
         if path == "/dev/zero" {
-            return Ok(Box::new(DevZero));
+            return Ok(Arc::new(DevZero));
         }
         if path == "/dev/random" || path == "/dev/urandom" || path == "/dev/arandom" {
-            return Ok(Box::new(DevRandom));
+            return Ok(Arc::new(DevRandom));
         }
         if path == "/dev/sgx" {
-            return Ok(Box::new(DevSgx));
+            return Ok(Arc::new(DevSgx));
         }
         let creation_flags = CreationFlags::from_bits_truncate(flags);
         let inode = if creation_flags.no_follow_symlink() {
@@ -113,7 +113,7 @@ impl FsView {
             }
         };
         let abs_path = self.convert_to_abs_path(&path);
-        Ok(Box::new(INodeFile::open(inode, &abs_path, flags)?))
+        Ok(Arc::new(INodeFile::open(inode, &abs_path, flags)?))
     }
 
     /// Recursively lookup the real path of giving path, dereference symlinks
