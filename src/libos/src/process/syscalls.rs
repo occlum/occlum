@@ -9,7 +9,7 @@ use crate::time::{timespec_t, ClockID};
 use crate::util::mem_util::from_user::*;
 use std::ptr::NonNull;
 
-pub fn do_spawn(
+pub fn do_spawn_for_musl(
     child_pid_ptr: *mut u32,
     path: *const i8,
     argv: *const *const i8,
@@ -36,7 +36,7 @@ pub fn do_spawn(
 #[repr(C)]
 #[derive(Debug)]
 pub struct FdOp {
-    // We actually switch the prev and next fields in the libc definition.
+    // We actually switch the prev and next fields in the musl definition.
     prev: *const FdOp,
     next: *const FdOp,
     cmd: u32,
@@ -80,6 +80,122 @@ fn clone_file_actions_safely(fdop_ptr: *const FdOp) -> Result<Vec<FileAction>> {
         file_actions.push(file_action);
 
         fdop_ptr = fdop.next;
+    }
+
+    Ok(file_actions)
+}
+
+pub fn do_spawn_for_glibc(
+    child_pid_ptr: *mut u32,
+    path: *const i8,
+    argv: *const *const i8,
+    envp: *const *const i8,
+    fa: *const SpawnFileActions,
+) -> Result<isize> {
+    check_mut_ptr(child_pid_ptr)?;
+    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
+    let argv = clone_cstrings_safely(argv)?;
+    let envp = clone_cstrings_safely(envp)?;
+    let file_actions = clone_file_actions_from_fa_safely(fa)?;
+    let current = current!();
+    debug!(
+        "spawn: path: {:?}, argv: {:?}, envp: {:?}, actions: {:?}",
+        path, argv, envp, file_actions
+    );
+
+    let child_pid = super::do_spawn::do_spawn(&path, &argv, &envp, &file_actions, &current)?;
+
+    unsafe { *child_pid_ptr = child_pid };
+    Ok(0)
+}
+
+#[repr(C)]
+pub struct SpawnFileActions {
+    allocated: u32,
+    used: u32,
+    actions: *const SpawnAction,
+    pad: [u32; 16],
+}
+
+#[repr(C)]
+struct SpawnAction {
+    tag: u32,
+    action: Action,
+}
+
+impl SpawnAction {
+    pub fn to_file_action(&self) -> Result<FileAction> {
+        #[deny(unreachable_patterns)]
+        Ok(match self.tag {
+            SPAWN_DO_CLOSE => FileAction::Close(unsafe { self.action.close_action.fd }),
+            SPAWN_DO_DUP2 => FileAction::Dup2(unsafe { self.action.dup2_action.fd }, unsafe {
+                self.action.dup2_action.newfd
+            }),
+            SPAWN_DO_OPEN => FileAction::Open {
+                path: clone_cstring_safely(unsafe { self.action.open_action.path })?
+                    .to_string_lossy()
+                    .into_owned(),
+                mode: unsafe { self.action.open_action.mode },
+                oflag: unsafe { self.action.open_action.oflag },
+                fd: unsafe { self.action.open_action.fd },
+            },
+            _ => return_errno!(EINVAL, "Unknown file action tag"),
+        })
+    }
+}
+
+// See <path_to_glibc>/posix/spawn_int.h
+const SPAWN_DO_CLOSE: u32 = 0;
+const SPAWN_DO_DUP2: u32 = 1;
+const SPAWN_DO_OPEN: u32 = 2;
+
+#[repr(C)]
+union Action {
+    close_action: CloseAction,
+    dup2_action: Dup2Action,
+    open_action: OpenAction,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct CloseAction {
+    fd: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct Dup2Action {
+    fd: u32,
+    newfd: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct OpenAction {
+    fd: u32,
+    path: *const i8,
+    oflag: u32,
+    mode: u32,
+}
+
+fn clone_file_actions_from_fa_safely(fa_ptr: *const SpawnFileActions) -> Result<Vec<FileAction>> {
+    let mut file_actions = Vec::new();
+    if fa_ptr == std::ptr::null() {
+        return Ok(file_actions);
+    }
+
+    let sa_slice = {
+        check_ptr(fa_ptr)?;
+        let fa = unsafe { &*fa_ptr };
+        let sa_ptr = fa.actions;
+        let sa_len = fa.used as usize;
+        check_array(sa_ptr, sa_len)?;
+        unsafe { std::slice::from_raw_parts(sa_ptr, sa_len) }
+    };
+
+    for sa in sa_slice {
+        let file_action = sa.to_file_action()?;
+        file_actions.push(file_action);
     }
 
     Ok(file_actions)
