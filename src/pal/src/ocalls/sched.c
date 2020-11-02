@@ -9,7 +9,7 @@ int occlum_ocall_sched_getaffinity(size_t cpusize, unsigned char *buf) {
     cpu_set_t mask;
     CPU_ZERO(&mask);
 
-    ret = syscall(__NR_sched_getaffinity, gettid(), sizeof(cpu_set_t), &mask);
+    ret = syscall(__NR_sched_getaffinity, GETTID(), sizeof(cpu_set_t), &mask);
     memcpy(buf, &mask, cpusize);
     return ret;
 }
