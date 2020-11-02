@@ -109,7 +109,7 @@ int occlum_pal_create_process(struct occlum_pal_create_process_args *args) {
 }
 
 int occlum_pal_exec(struct occlum_pal_exec_args *args) {
-    int host_tid = gettid();
+    int host_tid = GETTID();
     int ecall_ret = 0;
 
     if (args->exit_value == NULL) {

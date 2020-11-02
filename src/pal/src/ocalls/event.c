@@ -22,7 +22,7 @@ int occlum_ocall_eventfd_poll(int eventfd, struct timespec *timeout) {
     // is because the syscall version updates the timeout argument to indicate
     // how much time was left (which what we want), while the libc wrapper
     // keeps the timeout argument unchanged.
-    ret = raw_ppoll(pollfds, 1, timeout);
+    ret = RAW_PPOLL(pollfds, 1, timeout);
     if (ret < 0) {
         return -1;
     }

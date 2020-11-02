@@ -11,7 +11,7 @@ typedef struct {
 void *exec_libos_thread(void *_thread_data) {
     thread_data_t *thread_data = _thread_data;
     sgx_enclave_id_t eid = thread_data->enclave_id;
-    int host_tid = gettid();
+    int host_tid = GETTID();
     int libos_tid = thread_data->libos_tid;
     int libos_exit_status = -1;
     sgx_status_t status = occlum_ecall_exec_thread(eid, &libos_exit_status, libos_tid,
