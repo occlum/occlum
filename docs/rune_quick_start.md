@@ -108,7 +108,7 @@ Add the associated configuration for `rune` in dockerd config file, e.g, `/etc/d
 {
 	"runtimes": {
 		"rune": {
-			"path": "/usr/bin/rune",
+			"path": "/usr/local/bin/rune",
 			"runtimeArgs": []
 		}
 	}
