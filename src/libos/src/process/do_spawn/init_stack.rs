@@ -58,10 +58,11 @@ pub fn do_init(
     let stack_buf = unsafe { StackBuf::new(stack_top, init_area_size)? };
     let envp_cloned = clone_cstrings_on_stack(&stack_buf, envp)?;
     let argv_cloned = clone_cstrings_on_stack(&stack_buf, argv)?;
+    adjust_alignment(&stack_buf, auxtbl, &envp_cloned, &argv_cloned)?;
     dump_auxtbl_on_stack(&stack_buf, auxtbl)?;
-    dump_cstrptrs_on_stack(&stack_buf, &envp_cloned);
-    dump_cstrptrs_on_stack(&stack_buf, &argv_cloned);
-    stack_buf.put(argv.len() as u64);
+    dump_cstrptrs_on_stack(&stack_buf, &envp_cloned)?;
+    dump_cstrptrs_on_stack(&stack_buf, &argv_cloned)?;
+    stack_buf.put(argv.len() as u64)?;
     Ok(stack_buf.get_pos())
 }
 
@@ -159,21 +160,56 @@ fn clone_cstrings_on_stack<'a, 'b>(
     Ok(cstrs_cloned)
 }
 
-fn dump_auxtbl_on_stack<'a, 'b>(stack: &'a StackBuf, auxtbl: &'b AuxVec) -> Result<()> {
-    // For every key-value pair, dump the value first, then the key
-    stack.put(0 as u64);
-    stack.put(AuxKey::AT_NULL as u64);
-    for (aux_key, aux_val) in auxtbl.table() {
-        stack.put(*aux_val as u64);
-        stack.put(*aux_key as u64);
+fn adjust_alignment(
+    stack: &StackBuf,
+    auxtbl: &AuxVec,
+    envp: &[&CStr],
+    argv: &[&CStr],
+) -> Result<()> {
+    // Put 8 byte to make the postion of stack 8-byte aligned
+    stack.put(0 as u64)?;
+    let current_pos = stack.get_pos();
+    let to_alloc_size = {
+        let auxtbl_size = calc_auxtbl_size_on_stack(auxtbl);
+        let envp_size = calc_cstrptrs_size_on_stack(&envp);
+        let argv_size = calc_cstrptrs_size_on_stack(&argv);
+        let argc_size = mem::size_of::<u64>();
+        auxtbl_size + envp_size + argv_size + argc_size
+    };
+    // Libc ABI requires 16-byte alignment of the stack entrypoint.
+    // Current postion of the stack is 8-byte aligned already, insert 8 byte
+    // to meet the requirement if necessary.
+    if (current_pos - to_alloc_size) % 16 != 0 {
+        stack.put(0 as u64)?;
     }
     Ok(())
 }
 
-fn dump_cstrptrs_on_stack<'a, 'b>(stack: &'a StackBuf, strptrs: &'b [&'a CStr]) -> Result<()> {
-    stack.put(0 as u64); // End with a NULL pointer
-    for sp in strptrs.iter().rev() {
-        stack.put(sp.as_ptr() as u64);
+fn dump_auxtbl_on_stack<'a, 'b>(stack: &'a StackBuf, auxtbl: &'b AuxVec) -> Result<()> {
+    // For every key-value pair, dump the value first, then the key
+    stack.put(0 as u64)?;
+    stack.put(AuxKey::AT_NULL as u64)?;
+    for (aux_key, aux_val) in auxtbl.table() {
+        stack.put(*aux_val as u64)?;
+        stack.put(*aux_key as u64)?;
     }
     Ok(())
+}
+
+fn calc_auxtbl_size_on_stack(auxtbl: &AuxVec) -> usize {
+    let auxtbl_item_size = mem::size_of::<u64>() * 2;
+    (auxtbl.table().len() + 1) * auxtbl_item_size
+}
+
+fn dump_cstrptrs_on_stack<'a, 'b>(stack: &'a StackBuf, strptrs: &'b [&'a CStr]) -> Result<()> {
+    stack.put(0 as u64)?; // End with a NULL pointer
+    for sp in strptrs.iter().rev() {
+        stack.put(sp.as_ptr() as u64)?;
+    }
+    Ok(())
+}
+
+fn calc_cstrptrs_size_on_stack(strptrs: &[&CStr]) -> usize {
+    let cstrptrs_item_size = mem::size_of::<u64>();
+    (strptrs.len() + 1) * cstrptrs_item_size
 }
