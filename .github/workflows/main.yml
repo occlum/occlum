@@ -20,9 +20,11 @@ jobs:
 
     - name: Check Format
       run: |
+        ls -al /__w/occlum/occlum/src/exec/src
         info=$(make format-check)
         if [ -n "$info" ]; then
           echo "Format error detected.";
+          echo "$info";
           exit 1;
         fi
 
