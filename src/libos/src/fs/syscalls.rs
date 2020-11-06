@@ -305,8 +305,7 @@ pub fn do_getcwd(buf_ptr: *mut u8, size: usize) -> Result<isize> {
     buf[..cwd.len()].copy_from_slice(cwd.as_bytes());
     buf[cwd.len()] = 0;
 
-    // getcwd requires returning buf_ptr if success
-    Ok(buf_ptr as isize)
+    Ok(buf.len() as isize)
 }
 
 pub fn do_rename(oldpath: *const i8, newpath: *const i8) -> Result<isize> {
