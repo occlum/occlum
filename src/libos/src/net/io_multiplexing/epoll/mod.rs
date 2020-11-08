@@ -55,7 +55,7 @@ impl EpollEvent {
     }
 
     pub fn from_c(c_event: &libc::epoll_event) -> Self {
-        let mask = IoEvents::from_bits_truncate(c_event.events as u32);
+        let mask = IoEvents::from_raw(c_event.events as u32);
         let user_data = c_event.u64;
         Self { mask, user_data }
     }
