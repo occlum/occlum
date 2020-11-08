@@ -156,7 +156,7 @@ impl HostFileEpoller {
         let mut host_files = self.host_files.lock().unwrap();
         for raw_event in &raw_events[..count] {
             let raw_event = unsafe { raw_event.assume_init() };
-            let io_events = IoEvents::from_bits_truncate(raw_event.events as u32);
+            let io_events = IoEvents::from_raw(raw_event.events as u32);
             let host_fd = raw_event.u64 as u32;
 
             let host_file = match host_files.get(&host_fd) {
