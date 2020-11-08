@@ -4,7 +4,7 @@ use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen, UntrustedSliceAlloc};
 
 pub use self::io_multiplexing::{
     clear_notifier_status, notify_thread, wait_for_notification, EpollEvent, IoEvent, PollEvent,
-    PollEventFlags, THREAD_NOTIFIERS,
+    PollEventFlags, PollFd, THREAD_NOTIFIERS,
 };
 pub use self::socket::{
     msghdr, msghdr_mut, AddressFamily, AsUnixSocket, FileFlags, HostSocket, HostSocketType, Iovs,
