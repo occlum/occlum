@@ -1,6 +1,7 @@
 use super::*;
 
 mod epoll;
+mod poll_new;
 // TODO: the following three modules will soon be removed
 mod io_event;
 mod poll;
@@ -11,6 +12,7 @@ pub use self::io_event::{
     clear_notifier_status, notify_thread, wait_for_notification, IoEvent, THREAD_NOTIFIERS,
 };
 pub use self::poll::{do_poll, PollEvent, PollEventFlags};
+pub use self::poll_new::{do_poll_new, PollFd};
 pub use self::select::{select, FdSetExt};
 
 use fs::{AsDevRandom, AsEvent, CreationFlags, File, FileDesc, FileRef, HostFd, PipeType};

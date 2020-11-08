@@ -3,7 +3,7 @@ use super::*;
 use std::mem::MaybeUninit;
 use std::time::Duration;
 
-use super::io_multiplexing::{AsEpollFile, EpollCtl, EpollFile, EpollFlags, FdSetExt};
+use super::io_multiplexing::{AsEpollFile, EpollCtl, EpollFile, EpollFlags, FdSetExt, PollFd};
 use fs::{CreationFlags, File, FileDesc, FileRef};
 use misc::resource_t;
 use process::Process;
@@ -580,7 +580,7 @@ pub fn do_select(
     Ok(ret)
 }
 
-pub fn do_poll(fds: *mut PollEvent, nfds: libc::nfds_t, timeout: c_int) -> Result<isize> {
+pub fn do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout_ms: c_int) -> Result<isize> {
     // It behaves like sleep when fds is null and nfds is zero.
     if !fds.is_null() || nfds != 0 {
         from_user::check_mut_array(fds, nfds as usize)?;
@@ -597,21 +597,24 @@ pub fn do_poll(fds: *mut PollEvent, nfds: libc::nfds_t, timeout: c_int) -> Resul
         return_errno!(EINVAL, "The nfds value exceeds the RLIMIT_NOFILE value.");
     }
 
-    let polls = unsafe { std::slice::from_raw_parts_mut(fds, nfds as usize) };
-    debug!("poll: {:?}, timeout: {}", polls, timeout);
+    let raw_poll_fds = unsafe { std::slice::from_raw_parts_mut(fds, nfds as usize) };
+    let poll_fds: Vec<PollFd> = raw_poll_fds
+        .iter()
+        .map(|raw| PollFd::from_raw(raw))
+        .collect();
 
-    let mut time_val = timeval_t::new(
-        ((timeout as u32) / 1000) as i64,
-        ((timeout as u32) % 1000 * 1000) as i64,
-    );
-    let tmp_to = if timeout == -1 {
-        std::ptr::null_mut()
+    let mut timeout = if timeout_ms >= 0 {
+        Some(Duration::from_millis(timeout_ms as u64))
     } else {
-        &mut time_val
+        None
     };
 
-    let n = io_multiplexing::do_poll(polls, tmp_to)?;
-    Ok(n as isize)
+    let count = io_multiplexing::do_poll_new(&poll_fds, timeout.as_mut())?;
+
+    for (raw_poll_fd, poll_fd) in raw_poll_fds.iter_mut().zip(poll_fds.iter()) {
+        raw_poll_fd.revents = poll_fd.revents().get().to_raw() as i16;
+    }
+    Ok(count as isize)
 }
 
 pub fn do_epoll_create(size: c_int) -> Result<isize> {

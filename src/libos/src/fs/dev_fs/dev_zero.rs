@@ -23,6 +23,10 @@ impl File for DevZero {
         Ok(total_nbytes)
     }
 
+    fn poll_new(&self) -> IoEvents {
+        IoEvents::IN
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }

@@ -16,6 +16,10 @@ impl File for DevNull {
         Ok(bufs.iter().map(|buf| buf.len()).sum())
     }
 
+    fn poll_new(&self) -> IoEvents {
+        IoEvents::IN
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }

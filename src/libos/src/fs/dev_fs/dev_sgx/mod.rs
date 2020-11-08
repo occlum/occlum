@@ -95,6 +95,10 @@ impl File for DevSgx {
         Ok(0)
     }
 
+    fn poll_new(&self) -> IoEvents {
+        IoEvents::IN
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
