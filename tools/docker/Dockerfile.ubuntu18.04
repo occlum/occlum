@@ -14,6 +14,7 @@ RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-i
         astyle \
         autoconf \
         automake \
+        bison \
         build-essential \
         ca-certificates \
         cmake \
@@ -21,6 +22,7 @@ RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-i
         debhelper \
         expect \
         g++ \
+        gawk \
         gdb \
         git-core \
         golang-go \
@@ -79,10 +81,15 @@ RUN curl https://sh.rustup.rs -sSf | \
     cargo install sccache
 
 # Install Occlum toolchain
-COPY toolchains/gcc /tmp/gcc
+COPY toolchains/musl-gcc /tmp/musl-gcc
 WORKDIR /tmp
-RUN cd gcc && ./build.sh && ./install_zlib.sh && rm -rf /tmp/gcc
+RUN cd musl-gcc && ./build.sh && ./install_zlib.sh && rm -rf /tmp/musl-gcc
 ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
+
+# Install glibc
+COPY toolchains/glibc /tmp/glibc
+WORKDIR /tmp
+RUN cd glibc && ./build.sh && rm -rf /tmp/glibc
 
 # Install Occlum Golang toolchain
 COPY toolchains/golang /tmp/golang
@@ -95,7 +102,7 @@ COPY toolchains/rust /tmp/rust
 WORKDIR /tmp
 RUN cd rust && ./build.sh && rm -rf /tmp/rust
 ENV PATH="/opt/occlum/toolchains/rust/bin:$PATH"
-ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/opt/intel/sgxsdk/sdk_libs"
+ENV LD_LIBRARY_PATH="/opt/intel/sgxsdk/sdk_libs"
 
 # Install Occlum Java toolchain (JDK 11)
 ARG JDK11_PATH=/opt/occlum/toolchains/jvm/java-11-openjdk

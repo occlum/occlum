@@ -45,8 +45,10 @@ static int getdents_with_big_enough_buffer(bool use_explicit_syscall) {
     while (1) {
         if (use_explicit_syscall) {
             len = syscall(__NR_getdents, fd, buf, sizeof(buf));
+#ifndef __GLIBC__
         } else {
             len = getdents(fd, (struct dirent *)buf, sizeof(buf));
+#endif
         }
         if (len < 0) {
             close(fd);
@@ -60,10 +62,12 @@ static int getdents_with_big_enough_buffer(bool use_explicit_syscall) {
     return 0;
 }
 
+#ifndef __GLIBC__
 static int test_getdents_with_big_enough_buffer() {
     bool use_explicit_syscall = false;
     return getdents_with_big_enough_buffer(use_explicit_syscall);
 }
+#endif
 
 static int test_getdents_via_explicit_syscall_with_big_enough_buffer() {
     bool use_explicit_syscall = true;
@@ -80,8 +84,10 @@ static int getdents_with_too_small_buffer(bool use_explicit_syscall) {
     }
     if (use_explicit_syscall) {
         len = syscall(__NR_getdents, fd, buf, sizeof(buf));
+#ifndef __GLIBC__
     } else {
         len = getdents(fd, (struct dirent *)buf, sizeof(buf));
+#endif
     }
     if (len >= 0 || errno != EINVAL) {
         close(fd);
@@ -91,10 +97,12 @@ static int getdents_with_too_small_buffer(bool use_explicit_syscall) {
     return 0;
 }
 
+#ifndef __GLIBC__
 static int test_getdents_with_too_small_buffer() {
     bool use_explicit_syscall = false;
     return getdents_with_too_small_buffer(use_explicit_syscall);
 }
+#endif
 
 static int test_getdents_via_explicit_syscall_with_too_small_buffer() {
     bool use_explicit_syscall = true;
@@ -107,9 +115,13 @@ static int test_getdents_via_explicit_syscall_with_too_small_buffer() {
 
 static test_case_t test_cases[] = {
     TEST_CASE(test_readdir),
+#ifndef __GLIBC__
     TEST_CASE(test_getdents_with_big_enough_buffer),
+#endif
     TEST_CASE(test_getdents_via_explicit_syscall_with_big_enough_buffer),
+#ifndef __GLIBC__
     TEST_CASE(test_getdents_with_too_small_buffer),
+#endif
     TEST_CASE(test_getdents_via_explicit_syscall_with_too_small_buffer),
 };
 

@@ -77,7 +77,7 @@ static int __test_readlink_from_proc_self_fd(const char *file_path) {
 }
 
 static int __test_realpath(const char *file_path) {
-    char buf[128] = { 0 };
+    char buf[PATH_MAX] = { 0 };
     char dir_buf[PATH_MAX] = { 0 };
     char base_buf[PATH_MAX] = { 0 };
     char *dir_name, *file_name, *res;

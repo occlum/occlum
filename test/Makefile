@@ -66,6 +66,9 @@ postbuild:
 # Test targets
 #############################################################################
 
+test-glibc:
+	@OCCLUM_TEST_GLIBC=1 $(MAKE) test
+
 test: build pretest $(TEST_TARGETS) posttest
 
 pretest:

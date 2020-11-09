@@ -1,8 +1,10 @@
+#define _GNU_SOURCE
 #include <errno.h>
 #include <sys/epoll.h>
 #include <sys/select.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <unistd.h>

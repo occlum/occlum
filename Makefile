@@ -56,6 +56,9 @@ src:
 test:
 	@$(MAKE) --no-print-directory -C test test
 
+test-glibc:
+	@$(MAKE) --no-print-directory -C test test-glibc
+
 OCCLUM_PREFIX ?= /opt/occlum
 install: $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/libsgx_uae_service_sim.so
 	@# Install both libraries for HW mode and SIM mode

@@ -17,8 +17,13 @@ CXX_OBJS := $(addprefix $(BUILD_DIR)/test/obj/$(TEST_NAME)/,$(CXX_SRCS:%.cc=%.o)
 
 ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(BIN) $(C_OBJS) $(CXX_OBJS))))
 
-CC := occlum-gcc
-CXX := occlum-g++
+ifeq ($(OCCLUM_TEST_GLIBC), 1)
+	CC = gcc
+	CXX = g++
+else
+	CC = occlum-gcc
+	CXX = occlum-g++
+endif
 
 C_FLAGS = -Wall -Wno-return-local-addr -I../include -O2 -fPIC $(EXTRA_C_FLAGS)
 ifeq ($(SGX_MODE), SIM)
