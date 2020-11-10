@@ -1,0 +1,176 @@
+name: Rune Test
+
+# Controls when the action will run. Triggers the workflow on push.
+on: [push]
+
+env:
+  REPO: https://mirrors.openanolis.org/inclavare-containers
+
+jobs:
+  # TODO: add rune circtl test on ubuntu image.
+  Rune_with_docker_ubuntu_test:
+    runs-on: [self-hosted, SGX1-HW]
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get version
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+        echo "RUNE_VERSION=$(wget -q https://raw.githubusercontent.com/alibaba/inclavare-containers/master/VERSION && cat VERSION)" >> $GITHUB_ENV && rm -f VERSION
+
+    - name: Create container
+      run: docker rm -f rune_docker_test_ubuntu || true;
+        docker run -itd --privileged --rm --name=rune_docker_test_ubuntu --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04
+
+    - name: Change download source of crates.io
+      run: |
+        docker exec rune_docker_test_ubuntu bash -c "cat <<- EOF >/root/.cargo/config
+        [source.crates-io]
+        registry = \"https://github.com/rust-lang/crates.io-index\"
+        replace-with = 'ustc'
+        [source.ustc]
+        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+        EOF"
+
+    - name: Build Occlum dependencies
+      run: docker exec rune_docker_test_ubuntu bash -c "cd /root/occlum; make submodule"
+
+    - name: Install Occlum
+      run: docker exec rune_docker_test_ubuntu bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make && make install"
+
+    - name: Install rune
+      run: docker exec rune_docker_test_ubuntu bash -c "wget $REPO/deb-repo/pool/main/r/rune/rune_$RUNE_VERSION-1_amd64.deb;
+        dpkg -i rune_$RUNE_VERSION-1_amd64.deb"
+
+    - name: Install and configure docker
+      run: |
+        docker exec rune_docker_test_ubuntu bash -c "apt-get update;
+        apt-get install -y apt-transport-https ca-certificates curl software-properties-common;
+        curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | apt-key add -;
+        add-apt-repository 'deb [arch=amd64] https://mirrors.aliyun.com/docker-ce/linux/ubuntu bionic stable';
+        apt-get install -y docker-ce"
+
+        docker exec rune_docker_test_ubuntu bash -c "mkdir /etc/docker;
+        cat <<- EOF >/etc/docker/daemon.json
+        {
+            \"runtimes\":{
+                \"rune\":{
+                    \"path\":\"/usr/local/bin/rune\",
+                    \"runtimeArgs\":[]
+                  }
+              },
+              \"storage-driver\": \"vfs\"
+        }
+        EOF"
+
+        docker exec rune_docker_test_ubuntu bash -c "service docker start"
+
+    - name: Build Occlum application image
+      run: |
+        docker exec rune_docker_test_ubuntu bash -c "cat <<- EOF >/root/hello_world.c
+        "#include\<stdio.h\>"
+        int main ()
+        {
+            printf(\"Hello World\n\");
+            return 0;
+        }
+        EOF"
+
+        docker exec rune_docker_test_ubuntu bash -c "occlum-gcc -o hello_world hello_world.c;
+        occlum new occlum_instance && cd occlum_instance;
+        cp ../hello_world image/bin/ && occlum build;
+        occlum package occlum_instance.tar.gz"
+
+        docker exec rune_docker_test_ubuntu bash -c "cat <<- EOF >/root/occlum_instance/Dockerfile
+        FROM centos:8.1.1911
+        RUN mkdir -p /run/rune
+        WORKDIR /run/rune
+        ADD occlum_instance.tar.gz /run/rune
+        ENTRYPOINT [\"/bin/hello_world\"]
+        EOF"
+
+        docker exec rune_docker_test_ubuntu bash -c "cd /root/occlum_instance;
+        docker build . -t occlum-app"
+
+    - name: Run Occlum image
+      run: docker exec rune_docker_test_ubuntu bash -c "docker run -i --rm --runtime=rune -e ENCLAVE_TYPE=intelSgx -e ENCLAVE_RUNTIME_PATH=/opt/occlum/build/lib/libocclum-pal.so -e ENCLAVE_RUNTIME_ARGS=occlum_instance occlum-app"
+
+    - name: Kill the container
+      run: docker stop rune_docker_test_ubuntu
+
+  Rune_with_docker_and_crictl_centos_test:
+    runs-on: [self-hosted, SGX1-HW]
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Create container
+      run: docker rm -f rune-crictl-centos || true;
+        docker run -itd --privileged --rm --name=rune-crictl-centos --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum crictl-occlum:centos8.1
+
+    - name: Change download source of crates.io
+      run: |
+        docker exec rune-crictl-centos bash -c "cat <<- EOF >/root/.cargo/config
+        [source.crates-io]
+        registry = \"https://github.com/rust-lang/crates.io-index\"
+        replace-with = 'ustc'
+        [source.ustc]
+        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+        EOF"
+
+    - name: Build Occlum dependencies
+      run: docker exec rune-crictl-centos bash -c "cd /root/occlum; make submodule"
+
+    - name: Install Occlum
+      run: docker exec rune-crictl-centos bash -c "cd /root/occlum;
+        OCCLUM_RELEASE_BUILD=1 make && make install"
+
+    - name: Get version
+      run: echo "RUNE_VERSION=$(wget -q https://raw.githubusercontent.com/alibaba/inclavare-containers/master/VERSION && cat VERSION)" >> $GITHUB_ENV && rm -f VERSION
+
+    - name: Install rune and shim-rune package
+      run: docker exec rune-crictl-centos bash -c "rpm -ivh $REPO/rpm-repo/rune-$RUNE_VERSION-1.el8.x86_64.rpm $REPO/rpm-repo/shim-rune-$RUNE_VERSION-1.el8.x86_64.rpm"
+
+    - name: Build Occlum application image
+      run: docker exec rune-crictl-centos bash -c "dockerd -b docker0 --storage-driver=vfs &"
+
+        docker exec rune-crictl-centos bash -c "occlum-gcc -o hello_world hello_world.c;
+        occlum new occlum_instance && cd occlum_instance;
+        cp ../hello_world image/bin/ && occlum build;
+        occlum package occlum_instance.tar.gz;
+        cp /root/Dockerfile /root/occlum_instance;
+        docker build . -t occlum-app"
+
+    - name: Run Occlum application image
+      run: docker exec rune-crictl-centos bash -c "docker run -i --rm --runtime=rune -e ENCLAVE_TYPE=intelSgx -e ENCLAVE_RUNTIME_PATH=/opt/occlum/build/lib/libocclum-pal.so -e ENCLAVE_RUNTIME_ARGS=occlum_instance occlum-app"
+
+    - name: Run occlum-hello pod
+      run: docker exec rune-crictl-centos bash -c "containerd" &
+
+        docker exec rune-crictl-centos bash -c "cd /root/samples && ./clean.sh;
+        crictl run --timeout 3s hello.yaml pod.yaml && ./show.sh"
+
+    - name: Run dragonwell-web pod
+      run: docker exec rune-crictl-centos bash -c "cd /root/samples && ./clean.sh;
+        crictl run --timeout 3s dragonwell.yaml pod.yaml && ./show.sh"
+
+    - name: Run openjdk-web pod
+      run: docker exec rune-crictl-centos bash -c "cd /root/samples && ./clean.sh;
+        crictl run --timeout 3s jdk.yaml pod.yaml && ./show.sh"
+
+    - name: Run golang-web pod
+      run: docker exec rune-crictl-centos bash -c "cd /root/samples && ./clean.sh;
+        crictl run --timeout 3s golang.yaml pod.yaml && ./show.sh"
+
+    - name: Kill the container
+      run: docker stop rune-crictl-centos
