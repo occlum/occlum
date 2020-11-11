@@ -287,7 +287,7 @@ int test_select_read_write() {
 
     FD_ZERO(&rfds);
     FD_SET(pipe_fds[0], &rfds);
-    if (select(pipe_fds[0] + 1, &rfds, NULL, NULL, NULL) != 1) {
+    if (select(pipe_fds[0] + 1, &rfds, NULL, NULL, NULL) <= 0) {
         free_pipe(pipe_fds);
         THROW_ERROR("select failed");
     }
@@ -316,13 +316,13 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_fcntl_get_flags),
     TEST_CASE(test_fcntl_set_flags),
     TEST_CASE(test_create_with_flags),
-    //TEST_CASE(test_select_timeout),
+    TEST_CASE(test_select_timeout),
     TEST_CASE(test_poll_timeout),
     TEST_CASE(test_epoll_timeout),
-    //TEST_CASE(test_select_no_timeout),
+    TEST_CASE(test_select_no_timeout),
     TEST_CASE(test_poll_no_timeout),
     TEST_CASE(test_epoll_no_timeout),
-    //TEST_CASE(test_select_read_write),
+    TEST_CASE(test_select_read_write),
 };
 
 int main(int argc, const char *argv[]) {

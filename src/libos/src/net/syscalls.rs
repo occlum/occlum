@@ -530,54 +530,58 @@ pub fn do_select(
     exceptfds: *mut libc::fd_set,
     timeout: *mut timeval_t,
 ) -> Result<isize> {
-    // check arguments
-    let soft_rlimit_nofile = current!()
-        .rlimits()
-        .lock()
-        .unwrap()
-        .get(resource_t::RLIMIT_NOFILE)
-        .get_cur();
-    if nfds < 0 || nfds > libc::FD_SETSIZE as i32 || nfds as u64 > soft_rlimit_nofile {
-        return_errno!(
-            EINVAL,
-            "nfds is negative or exceeds the resource limit or FD_SETSIZE"
-        );
-    }
-
-    if !timeout.is_null() {
-        from_user::check_ptr(timeout)?;
-        unsafe {
-            (*timeout).validate()?;
+    let nfds = {
+        let soft_rlimit_nofile = current!()
+            .rlimits()
+            .lock()
+            .unwrap()
+            .get(resource_t::RLIMIT_NOFILE)
+            .get_cur();
+        if nfds < 0 || nfds > libc::FD_SETSIZE as i32 || nfds as u64 > soft_rlimit_nofile {
+            return_errno!(
+                EINVAL,
+                "nfds is negative or exceeds the resource limit or FD_SETSIZE"
+            );
         }
-    }
+        nfds as FileDesc
+    };
 
-    // Select handles empty set and null in the same way
-    // TODO: Elegently handle the empty fd_set without allocating redundant fd_set
-    let mut empty_set_for_read = libc::fd_set::new_empty();
-    let mut empty_set_for_write = libc::fd_set::new_empty();
-    let mut empty_set_for_except = libc::fd_set::new_empty();
+    let mut timeout_c = if !timeout.is_null() {
+        from_user::check_ptr(timeout)?;
+        let timeval = unsafe { &mut *timeout };
+        timeval.validate()?;
+        Some(timeval)
+    } else {
+        None
+    };
+    let mut timeout = timeout_c.as_ref().map(|timeout_c| timeout_c.as_duration());
 
     let readfds = if !readfds.is_null() {
         from_user::check_mut_ptr(readfds)?;
-        unsafe { &mut *readfds }
+        Some(unsafe { &mut *readfds })
     } else {
-        &mut empty_set_for_read
+        None
     };
     let writefds = if !writefds.is_null() {
         from_user::check_mut_ptr(writefds)?;
-        unsafe { &mut *writefds }
+        Some(unsafe { &mut *writefds })
     } else {
-        &mut empty_set_for_write
+        None
     };
     let exceptfds = if !exceptfds.is_null() {
         from_user::check_mut_ptr(exceptfds)?;
-        unsafe { &mut *exceptfds }
+        Some(unsafe { &mut *exceptfds })
     } else {
-        &mut empty_set_for_except
+        None
     };
 
-    let ret = io_multiplexing::select(nfds, readfds, writefds, exceptfds, timeout)?;
-    Ok(ret)
+    let ret = io_multiplexing::do_select(nfds, readfds, writefds, exceptfds, timeout.as_mut());
+
+    if let Some(timeout_c) = timeout_c {
+        *timeout_c = timeout.unwrap().into();
+    }
+
+    ret
 }
 
 pub fn do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout_ms: c_int) -> Result<isize> {

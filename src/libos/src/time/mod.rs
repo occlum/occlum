@@ -53,6 +53,15 @@ impl timeval_t {
     }
 }
 
+impl From<Duration> for timeval_t {
+    fn from(duration: Duration) -> timeval_t {
+        let sec = duration.as_secs() as time_t;
+        let usec = duration.subsec_micros() as i64;
+        debug_assert!(sec >= 0); // nsec >= 0 always holds
+        timeval_t { sec, usec }
+    }
+}
+
 pub fn do_gettimeofday() -> timeval_t {
     extern "C" {
         fn occlum_ocall_gettimeofday(tv: *mut timeval_t) -> sgx_status_t;

@@ -1,93 +1,123 @@
-use super::super::time::timer_slack::TIMERSLACK;
-use super::*;
+use std::time::Duration;
 
-pub fn select(
-    nfds: c_int,
-    readfds: &mut libc::fd_set,
-    writefds: &mut libc::fd_set,
-    exceptfds: &mut libc::fd_set,
-    timeout: *mut timeval_t,
+use super::poll_new::{do_poll_new, PollFd};
+use crate::fs::IoEvents;
+use crate::prelude::*;
+
+pub fn do_select(
+    num_fds: FileDesc,
+    mut readfds: Option<&mut libc::fd_set>,
+    mut writefds: Option<&mut libc::fd_set>,
+    mut exceptfds: Option<&mut libc::fd_set>,
+    timeout: Option<&mut Duration>,
 ) -> Result<isize> {
     debug!(
-        "read: {} write: {} exception: {}",
+        "do_select: read: {}, write: {}, exception: {}, timeout: {:?}",
         readfds.format(),
         writefds.format(),
-        exceptfds.format()
+        exceptfds.format(),
+        timeout,
     );
 
-    let mut ready_num = 0;
-    let mut pollfds: Vec<PollEvent> = Vec::new();
-
-    for fd in 0..(nfds as FileDesc) {
-        let (r, w, e) = (
-            readfds.is_set(fd),
-            writefds.is_set(fd),
-            exceptfds.is_set(fd),
-        );
-        if !(r || w || e) {
-            continue;
-        }
-
-        if current!().file(fd).is_err() {
-            return_errno!(
-                EBADF,
-                "An invalid file descriptor was given in one of the sets"
-            );
-        }
-
-        let mut events = PollEventFlags::empty();
-        if r {
-            events |= PollEventFlags::POLLIN;
-        }
-        if w {
-            events |= PollEventFlags::POLLOUT;
-        }
-        if e {
-            events |= PollEventFlags::POLLPRI;
-        }
-
-        pollfds.push(PollEvent::new(fd, events));
+    if num_fds as usize > libc::FD_SETSIZE {
+        return_errno!(EINVAL, "the value is too large");
     }
 
-    let mut origin_timeout: timeval_t = if timeout.is_null() {
-        Default::default()
-    } else {
-        unsafe { *timeout }
+    // Convert the three fd_set's to an array of PollFd
+    let poll_fds = {
+        let mut poll_fds = Vec::new();
+        for fd in (0..num_fds).into_iter() {
+            let events = {
+                let (mut readable, mut writable, mut except) = (false, false, false);
+                if let Some(readfds) = readfds.as_ref() {
+                    if readfds.is_set(fd) {
+                        readable = true;
+                    }
+                }
+                if let Some(writefds) = writefds.as_ref() {
+                    if writefds.is_set(fd) {
+                        writable = true;
+                    }
+                }
+                if let Some(exceptfds) = exceptfds.as_ref() {
+                    if exceptfds.is_set(fd) {
+                        except = true;
+                    }
+                }
+                convert_rwe_to_events(readable, writable, except)
+            };
+
+            if events.is_empty() {
+                continue;
+            }
+
+            let poll_fd = PollFd::new(fd, events);
+            poll_fds.push(poll_fd);
+        }
+        poll_fds
     };
-
-    let ret = do_poll(&mut pollfds, timeout)?;
-
-    readfds.clear();
-    writefds.clear();
-    exceptfds.clear();
-
-    if !timeout.is_null() {
-        let time_left = unsafe { *(timeout) };
-        time_left.validate()?;
-        assert!(
-            // Note: TIMERSLACK is a single value use maintained by the libOS and will not vary for different threads.
-            time_left.as_duration() <= origin_timeout.as_duration() + (*TIMERSLACK).to_duration()
-        );
+    // Clear up the three input fd_set's, which will be used for output as well
+    if let Some(readfds) = readfds.as_mut() {
+        readfds.clear();
+    }
+    if let Some(writefds) = writefds.as_mut() {
+        writefds.clear();
+    }
+    if let Some(exceptfds) = exceptfds.as_mut() {
+        exceptfds.clear();
     }
 
-    debug!("returned pollfds are {:?}", pollfds);
-    for pollfd in &pollfds {
-        let (r_poll, w_poll, e_poll) = convert_to_readable_writable_exceptional(pollfd.revents());
-        if r_poll {
-            readfds.set(pollfd.fd())?;
-            ready_num += 1;
-        }
-        if w_poll {
-            writefds.set(pollfd.fd())?;
-            ready_num += 1;
-        }
-        if e_poll {
-            exceptfds.set(pollfd.fd())?;
-            ready_num += 1;
-        }
+    // Do the poll syscall that is equivalent to the select syscall
+    let num_ready_fds = do_poll_new(&poll_fds, timeout)?;
+    if num_ready_fds == 0 {
+        return Ok(0);
     }
 
-    Ok(ready_num)
+    // Convert poll's pollfd results to select's fd_set results
+    let mut num_events = 0;
+    for poll_fd in &poll_fds {
+        let fd = poll_fd.fd();
+        let revents = poll_fd.revents().get();
+        let (readable, writable, exception) = convert_events_to_rwe(&revents);
+        if readable {
+            readfds.set(fd);
+            num_events += 1;
+        }
+        if writable {
+            writefds.set(fd);
+            num_events += 1;
+        }
+        if exception {
+            exceptfds.set(fd);
+            num_events += 1;
+        }
+    }
+    Ok(num_events)
+}
+
+// Convert select's rwe input to poll's IoEvents input accordingg to Linux's
+// behavior.
+fn convert_rwe_to_events(readable: bool, writable: bool, except: bool) -> IoEvents {
+    let mut events = IoEvents::empty();
+    if readable {
+        events |= IoEvents::IN;
+    }
+    if writable {
+        events |= IoEvents::OUT;
+    }
+    if except {
+        events |= IoEvents::PRI;
+    }
+    events
+}
+
+// Convert poll's IoEvents results to select's rwe results according to Linux's
+// behavior.
+fn convert_events_to_rwe(events: &IoEvents) -> (bool, bool, bool) {
+    let readable = events.intersects(IoEvents::IN | IoEvents::HUP | IoEvents::ERR);
+    let writable = events.intersects(IoEvents::OUT | IoEvents::ERR);
+    let exception = events.contains(IoEvents::PRI);
+    (readable, writable, exception)
 }
 
 /// Safe methods for `libc::fd_set`
@@ -163,20 +193,25 @@ impl FdSetExt for libc::fd_set {
     }
 }
 
-// The correspondence is from man2/select.2.html
-fn convert_to_readable_writable_exceptional(events: PollEventFlags) -> (bool, bool, bool) {
-    (
-        (PollEventFlags::POLLRDNORM
-            | PollEventFlags::POLLRDBAND
-            | PollEventFlags::POLLIN
-            | PollEventFlags::POLLHUP
-            | PollEventFlags::POLLERR)
-            .intersects(events),
-        (PollEventFlags::POLLWRBAND
-            | PollEventFlags::POLLWRNORM
-            | PollEventFlags::POLLOUT
-            | PollEventFlags::POLLERR)
-            .intersects(events),
-        PollEventFlags::POLLPRI.intersects(events),
-    )
+trait FdSetOptionExt {
+    fn format(&self) -> String;
+    fn set(&mut self, fd: FileDesc) -> Result<()>;
+}
+
+impl FdSetOptionExt for Option<&mut libc::fd_set> {
+    fn format(&self) -> String {
+        if let Some(self_) = self.as_ref() {
+            self_.format()
+        } else {
+            "(empty)".to_string()
+        }
+    }
+
+    fn set(&mut self, fd: FileDesc) -> Result<()> {
+        if let Some(inner) = self.as_mut() {
+            inner.set(fd)
+        } else {
+            Ok(())
+        }
+    }
 }
