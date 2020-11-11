@@ -81,7 +81,7 @@ impl CpuIdCache {
                         // EDX Bit 00: Reserved.
                         //     Bit 01: Supports L3 Cache Intel RDT Monitoring if 1.
                         //     Bits 31 - 02: Reserved.
-                        0xF => cpuid_result.edx & 0x0000_0002 >> 1,
+                        0xF => (cpuid_result.edx & 0x0000_0002) >> 1,
                         // Reports valid ResID starting at bit position 1 of EBX.
                         // EBX Bit 00: Reserved.
                         //     Bit 01: Supports L3 Cache Allocation Technology if 1.
