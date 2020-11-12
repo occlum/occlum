@@ -1,6 +1,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <dirent.h>
+#include <stdbool.h>
 #include <errno.h>
 #include <fcntl.h>
 #include "test_fs.h"
@@ -32,7 +34,7 @@ static int test_readdir() {
     return 0;
 }
 
-static int test_getdents_with_big_enough_buffer() {
+static int getdents_with_big_enough_buffer(bool use_explicit_syscall) {
     int fd, len;
     char buf[64];
 
@@ -41,7 +43,11 @@ static int test_getdents_with_big_enough_buffer() {
         THROW_ERROR("failed to open directory");
     }
     while (1) {
-        len = getdents(fd, (struct dirent *)buf, sizeof(buf));
+        if (use_explicit_syscall) {
+            len = syscall(__NR_getdents, fd, buf, sizeof(buf));
+        } else {
+            len = getdents(fd, (struct dirent *)buf, sizeof(buf));
+        }
         if (len < 0) {
             close(fd);
             THROW_ERROR("failed to call getdents");
@@ -54,7 +60,17 @@ static int test_getdents_with_big_enough_buffer() {
     return 0;
 }
 
-static int test_getdents_with_too_small_buffer() {
+static int test_getdents_with_big_enough_buffer() {
+    bool use_explicit_syscall = false;
+    return getdents_with_big_enough_buffer(use_explicit_syscall);
+}
+
+static int test_getdents_via_explicit_syscall_with_big_enough_buffer() {
+    bool use_explicit_syscall = true;
+    return getdents_with_big_enough_buffer(use_explicit_syscall);
+}
+
+static int getdents_with_too_small_buffer(bool use_explicit_syscall) {
     int fd, len;
     char buf[4];
 
@@ -62,13 +78,27 @@ static int test_getdents_with_too_small_buffer() {
     if (fd < 0) {
         THROW_ERROR("failed to open directory");
     }
-    len = getdents(fd, (struct dirent *)buf, sizeof(buf));
+    if (use_explicit_syscall) {
+        len = syscall(__NR_getdents, fd, buf, sizeof(buf));
+    } else {
+        len = getdents(fd, (struct dirent *)buf, sizeof(buf));
+    }
     if (len >= 0 || errno != EINVAL) {
         close(fd);
         THROW_ERROR("failed to call getdents with small buffer");
     }
     close(fd);
     return 0;
+}
+
+static int test_getdents_with_too_small_buffer() {
+    bool use_explicit_syscall = false;
+    return getdents_with_too_small_buffer(use_explicit_syscall);
+}
+
+static int test_getdents_via_explicit_syscall_with_too_small_buffer() {
+    bool use_explicit_syscall = true;
+    return getdents_with_too_small_buffer(use_explicit_syscall);
 }
 
 // ============================================================================
@@ -78,7 +108,9 @@ static int test_getdents_with_too_small_buffer() {
 static test_case_t test_cases[] = {
     TEST_CASE(test_readdir),
     TEST_CASE(test_getdents_with_big_enough_buffer),
+    TEST_CASE(test_getdents_via_explicit_syscall_with_big_enough_buffer),
     TEST_CASE(test_getdents_with_too_small_buffer),
+    TEST_CASE(test_getdents_via_explicit_syscall_with_too_small_buffer),
 };
 
 int main() {
