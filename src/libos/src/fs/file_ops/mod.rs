@@ -6,7 +6,7 @@ pub use self::access::{do_faccessat, AccessibilityCheckFlags, AccessibilityCheck
 pub use self::chmod::{do_fchmod, do_fchmodat, ChmodFlags, FileMode};
 pub use self::chown::{do_fchown, do_fchownat, ChownFlags};
 pub use self::close::do_close;
-pub use self::dirent::do_getdents64;
+pub use self::dirent::{do_getdents, do_getdents64};
 pub use self::dup::{do_dup, do_dup2, do_dup3};
 pub use self::fcntl::{do_fcntl, FcntlCmd};
 pub use self::file_flags::{AccessMode, CreationFlags, StatusFlags};
