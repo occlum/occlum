@@ -280,6 +280,10 @@ impl<I> Producer<I> {
 
 impl<I: Copy> Producer<I> {
     pub fn push_slice(&self, items: &[I]) -> Result<usize> {
+        if items.len() == 0 {
+            return Ok(0);
+        }
+
         waiter_loop!(
             {
                 let mut rb_producer = self.inner.lock().unwrap();
@@ -377,6 +381,10 @@ impl<I> Consumer<I> {
 
 impl<I: Copy> Consumer<I> {
     pub fn pop_slice(&self, items: &mut [I]) -> Result<usize> {
+        if items.len() == 0 {
+            return Ok(0);
+        }
+
         waiter_loop!(
             {
                 let mut rb_consumer = self.inner.lock().unwrap();
