@@ -16,7 +16,7 @@ jobs:
         submodules: true
 
     - name: Get occlum version
-      run: echo ::set-env name=OCCLUM_VERSION::$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
 
     - name: Create container
       run: docker run -itd --name=language_support_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
@@ -92,7 +92,7 @@ jobs:
         submodules: true
 
     - name: Get occlum version
-      run: echo ::set-env name=OCCLUM_VERSION::$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
 
     - name: Create container
       run: docker run -itd --name=java_support_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
@@ -124,7 +124,7 @@ jobs:
         submodules: true
 
     - name: Get occlum version
-      run: echo ::set-env name=OCCLUM_VERSION::$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
 
     - name: Create container
       run: docker run -itd --name=fish_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
@@ -159,7 +159,7 @@ jobs:
         submodules: true
 
     - name: Get occlum version
-      run: echo ::set-env name=OCCLUM_VERSION::$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
 
     - name: Create container
       run: docker run -itd --name=hello_bazel_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
@@ -193,7 +193,7 @@ jobs:
         submodules: true
 
     - name: Get occlum version
-      run: echo ::set-env name=OCCLUM_VERSION::$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
 
     - name: Create container
       run: docker run -itd --name=https_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
@@ -224,7 +224,7 @@ jobs:
         submodules: true
 
     - name: Get occlum version
-      run: echo ::set-env name=OCCLUM_VERSION::$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
 
     - name: Create container
       run: docker run -itd --name=la_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
@@ -251,7 +251,7 @@ jobs:
         submodules: true
 
     - name: Get occlum version
-      run: echo ::set-env name=OCCLUM_VERSION::$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
 
     - name: Create container
       run: docker run -itd --name=sqlite_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
@@ -277,7 +277,7 @@ jobs:
         submodules: true
 
     - name: Get occlum version
-      run: echo ::set-env name=OCCLUM_VERSION::$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
 
     - name: Create container
       run: docker run -itd --name=xgboost_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
@@ -308,7 +308,7 @@ jobs:
         submodules: true
 
     - name: Get occlum version
-      run: echo ::set-env name=OCCLUM_VERSION::$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
 
     - name: Create container
       run: docker run -itd --name=tflite_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
