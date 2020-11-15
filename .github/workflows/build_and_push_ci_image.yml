@@ -29,7 +29,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Get occlum version
-      run: echo ::set-env name=OCCLUM_VERSION::$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
 
     # Because "Build and push" step `context` field can't be subdir,
     # we need to copy files needed by dockerfile to root dir of the project
@@ -68,7 +68,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Get occlum version
-      run: echo ::set-env name=OCCLUM_VERSION::$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
 
     # Because "Build and push" step `context` field can't be subdir,
     # we need to copy files needed by dockerfile to root dir of the project
@@ -107,7 +107,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Get occlum version
-      run: echo ::set-env name=OCCLUM_VERSION::$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
 
     # Because "Build and push" step `context` field can't be subdir,
     # we need to copy files needed by dockerfile to root dir of the project
