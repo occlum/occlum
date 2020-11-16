@@ -286,7 +286,7 @@ macro_rules! process_syscall_table_with_callback {
             (Fremovexattr = 199) => handle_unsupported(),
             (Tkill = 200) => do_tkill(tid: pid_t, sig: c_int),
             (Time = 201) => handle_unsupported(),
-            (Futex = 202) => do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32, timeout: u64, futex_new_addr: *const i32),
+            (Futex = 202) => do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32, timeout: u64, futex_new_addr: *const i32, bitset: u32),
             (SchedSetaffinity = 203) => do_sched_setaffinity(pid: pid_t, cpusize: size_t, buf: *const c_uchar),
             (SchedGetaffinity = 204) => do_sched_getaffinity(pid: pid_t, cpusize: size_t, buf: *mut c_uchar),
             (SetThreadArea = 205) => handle_unsupported(),

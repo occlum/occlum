@@ -1,11 +1,11 @@
 use super::do_arch_prctl::ArchPrctlCode;
 use super::do_clone::CloneFlags;
-use super::do_futex::{FutexFlags, FutexOp};
+use super::do_futex::{FutexFlags, FutexOp, FutexTimeout};
 use super::do_spawn::FileAction;
 use super::prctl::PrctlCmd;
 use super::process::ProcessFilter;
 use crate::prelude::*;
-use crate::time::timespec_t;
+use crate::time::{timespec_t, ClockID};
 use crate::util::mem_util::from_user::*;
 use std::ptr::NonNull;
 
@@ -130,6 +130,7 @@ pub fn do_futex(
     futex_val: i32,
     timeout: u64,
     futex_new_addr: *const i32,
+    bitset: u32,
 ) -> Result<isize> {
     check_ptr(futex_addr)?;
     let (futex_op, futex_flags) = super::do_futex::futex_op_and_flags_from_u32(futex_op)?;
@@ -141,26 +142,39 @@ pub fn do_futex(
         Ok(val as usize)
     };
 
+    let get_futex_timeout = |timeout| -> Result<Option<FutexTimeout>> {
+        let timeout = timeout as *const timespec_t;
+        if timeout.is_null() {
+            return Ok(None);
+        }
+        let ts = timespec_t::from_raw_ptr(timeout)?;
+        ts.validate()?;
+        // TODO: use a secure clock to transfer the real time to monotonic time
+        let clock_id = if futex_flags.contains(FutexFlags::FUTEX_CLOCK_REALTIME) {
+            ClockID::CLOCK_REALTIME
+        } else {
+            ClockID::CLOCK_MONOTONIC
+        };
+        Ok(Some(FutexTimeout::new(clock_id, ts)))
+    };
+
     match futex_op {
         FutexOp::FUTEX_WAIT => {
-            let timeout = {
-                let timeout = timeout as *const timespec_t;
-                if timeout.is_null() {
-                    None
-                } else {
-                    let ts = timespec_t::from_raw_ptr(timeout)?;
-                    ts.validate()?;
-                    if futex_flags.contains(FutexFlags::FUTEX_CLOCK_REALTIME) {
-                        warn!("CLOCK_REALTIME is not supported yet, use monotonic clock");
-                    }
-                    Some(ts)
-                }
-            };
+            let timeout = get_futex_timeout(timeout)?;
             super::do_futex::futex_wait(futex_addr, futex_val, &timeout).map(|_| 0)
+        }
+        FutexOp::FUTEX_WAIT_BITSET => {
+            let timeout = get_futex_timeout(timeout)?;
+            super::do_futex::futex_wait_bitset(futex_addr, futex_val, &timeout, bitset).map(|_| 0)
         }
         FutexOp::FUTEX_WAKE => {
             let max_count = get_futex_val(futex_val)?;
             super::do_futex::futex_wake(futex_addr, max_count).map(|count| count as isize)
+        }
+        FutexOp::FUTEX_WAKE_BITSET => {
+            let max_count = get_futex_val(futex_val)?;
+            super::do_futex::futex_wake_bitset(futex_addr, max_count, bitset)
+                .map(|count| count as isize)
         }
         FutexOp::FUTEX_REQUEUE => {
             check_ptr(futex_new_addr)?;

@@ -4,7 +4,7 @@ use std::intrinsics::atomic_load;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::prelude::*;
-use crate::time::timespec_t;
+use crate::time::{timespec_t, ClockID};
 
 /// `FutexOp`, `FutexFlags`, and `futex_op_and_flags_from_u32` are helper types and
 /// functions for handling the versatile commands and arguments of futex system
@@ -22,6 +22,7 @@ pub enum FutexOp {
     FUTEX_UNLOCK_PI = 7,
     FUTEX_TRYLOCK_PI = 8,
     FUTEX_WAIT_BITSET = 9,
+    FUTEX_WAKE_BITSET = 10,
 }
 const FUTEX_OP_MASK: u32 = 0x0000_000F;
 
@@ -38,6 +39,7 @@ impl FutexOp {
             7 => Ok(FutexOp::FUTEX_UNLOCK_PI),
             8 => Ok(FutexOp::FUTEX_TRYLOCK_PI),
             9 => Ok(FutexOp::FUTEX_WAIT_BITSET),
+            10 => Ok(FutexOp::FUTEX_WAKE_BITSET),
             _ => return_errno!(EINVAL, "Unknown futex op"),
         }
     }
@@ -69,15 +71,47 @@ pub fn futex_op_and_flags_from_u32(bits: u32) -> Result<(FutexOp, FutexFlags)> {
     Ok((op, flags))
 }
 
+const FUTEX_BITSET_MATCH_ANY: u32 = 0xFFFF_FFFF;
+
+#[derive(Debug, Copy, Clone)]
+pub struct FutexTimeout {
+    clock_id: ClockID,
+    ts: timespec_t,
+}
+
+impl FutexTimeout {
+    pub fn new(clock_id: ClockID, ts: timespec_t) -> Self {
+        Self { clock_id, ts }
+    }
+
+    pub fn clock_id(&self) -> &ClockID {
+        &self.clock_id
+    }
+
+    pub fn ts(&self) -> &timespec_t {
+        &self.ts
+    }
+}
+
 /// Do futex wait
 pub fn futex_wait(
     futex_addr: *const i32,
     futex_val: i32,
-    timeout: &Option<timespec_t>,
+    timeout: &Option<FutexTimeout>,
+) -> Result<()> {
+    futex_wait_bitset(futex_addr, futex_val, timeout, FUTEX_BITSET_MATCH_ANY)
+}
+
+/// Do futex wait with bitset
+pub fn futex_wait_bitset(
+    futex_addr: *const i32,
+    futex_val: i32,
+    timeout: &Option<FutexTimeout>,
+    bitset: u32,
 ) -> Result<()> {
     debug!(
-        "futex_wait addr: {:#x}, val: {}, timeout: {:?}",
-        futex_addr as usize, futex_val, timeout
+        "futex_wait_bitset addr: {:#x}, val: {}, timeout: {:?}, bitset: {:#x}",
+        futex_addr as usize, futex_val, timeout, bitset
     );
     // Get and lock the futex bucket
     let futex_key = FutexKey::new(futex_addr);
@@ -120,7 +154,7 @@ pub fn futex_wait(
     // it cannot find the transition of futex value from val to new_val and enqueue
     // to the bucket, which will cause the waiter to wait forever.
 
-    let futex_item = FutexItem::new(futex_key);
+    let futex_item = FutexItem::new(futex_key, bitset);
     futex_bucket.enqueue_item(futex_item.clone());
 
     // Must make sure that no locks are holded by this thread before wait
@@ -130,9 +164,14 @@ pub fn futex_wait(
 
 /// Do futex wake
 pub fn futex_wake(futex_addr: *const i32, max_count: usize) -> Result<usize> {
+    futex_wake_bitset(futex_addr, max_count, FUTEX_BITSET_MATCH_ANY)
+}
+
+/// Do futex wake with bitset
+pub fn futex_wake_bitset(futex_addr: *const i32, max_count: usize, bitset: u32) -> Result<usize> {
     debug!(
-        "futex_wake addr: {:#x}, max_count: {}",
-        futex_addr as usize, max_count
+        "futex_wake_bitset addr: {:#x}, max_count: {}, bitset: {:#x}",
+        futex_addr as usize, max_count, bitset
     );
 
     // Get and lock the futex bucket
@@ -141,7 +180,7 @@ pub fn futex_wake(futex_addr: *const i32, max_count: usize) -> Result<usize> {
     let mut futex_bucket = futex_bucket_ref.lock().unwrap();
 
     // Dequeue and wake up the items in the bucket
-    let count = futex_bucket.dequeue_and_wake_items(futex_key, max_count);
+    let count = futex_bucket.dequeue_and_wake_items(futex_key, max_count, bitset);
     Ok(count)
 }
 
@@ -173,7 +212,8 @@ pub fn futex_requeue(
                     (futex_bucket, futex_new_bucket)
                 }
             };
-            let nwakes = futex_bucket.dequeue_and_wake_items(futex_key, max_nwakes);
+            let nwakes =
+                futex_bucket.dequeue_and_wake_items(futex_key, max_nwakes, FUTEX_BITSET_MATCH_ANY);
             futex_bucket.requeue_items_to_another_bucket(
                 futex_key,
                 &mut futex_new_bucket,
@@ -184,7 +224,8 @@ pub fn futex_requeue(
         } else {
             // bucket_idx == new_bucket_idx
             let mut futex_bucket = futex_bucket_ref.lock().unwrap();
-            let nwakes = futex_bucket.dequeue_and_wake_items(futex_key, max_nwakes);
+            let nwakes =
+                futex_bucket.dequeue_and_wake_items(futex_key, max_nwakes, FUTEX_BITSET_MATCH_ANY);
             futex_bucket.update_item_keys(futex_key, futex_new_key, max_nrequeues);
             nwakes
         }
@@ -219,13 +260,15 @@ impl FutexKey {
 #[derive(Clone, PartialEq)]
 struct FutexItem {
     key: FutexKey,
+    bitset: u32,
     waiter: WaiterRef,
 }
 
 impl FutexItem {
-    pub fn new(key: FutexKey) -> FutexItem {
+    pub fn new(key: FutexKey, bitset: u32) -> FutexItem {
         FutexItem {
-            key: key,
+            key,
+            bitset,
             waiter: Arc::new(Waiter::new()),
         }
     }
@@ -234,7 +277,7 @@ impl FutexItem {
         self.waiter().wake()
     }
 
-    pub fn wait(&self, timeout: &Option<timespec_t>) -> Result<()> {
+    pub fn wait(&self, timeout: &Option<FutexTimeout>) -> Result<()> {
         if let Err(e) = self.waiter.wait_timeout(&timeout) {
             let (_, futex_bucket_ref) = FUTEX_BUCKETS.get_bucket(self.key);
             let mut futex_bucket = futex_bucket_ref.lock().unwrap();
@@ -281,12 +324,17 @@ impl FutexBucket {
     }
 
     // TODO: consider using std::future to improve the readability
-    pub fn dequeue_and_wake_items(&mut self, key: FutexKey, max_count: usize) -> usize {
+    pub fn dequeue_and_wake_items(
+        &mut self,
+        key: FutexKey,
+        max_count: usize,
+        bitset: u32,
+    ) -> usize {
         let mut count = 0;
         let mut items_to_wake = Vec::new();
 
         self.queue.retain(|item| {
-            if count >= max_count || key != item.key {
+            if count >= max_count || key != item.key || (bitset & item.bitset) == 0 {
                 true
             } else {
                 items_to_wake.push(item.clone());
@@ -379,7 +427,7 @@ impl Waiter {
         }
     }
 
-    pub fn wait_timeout(&self, timeout: &Option<timespec_t>) -> Result<()> {
+    pub fn wait_timeout(&self, timeout: &Option<FutexTimeout>) -> Result<()> {
         let current = unsafe { sgx_thread_get_self() };
         if current != self.thread {
             return Ok(());
@@ -434,19 +482,26 @@ impl PartialEq for Waiter {
 unsafe impl Send for Waiter {}
 unsafe impl Sync for Waiter {}
 
-fn wait_event_timeout(thread: *const c_void, timeout: &Option<timespec_t>) -> Result<()> {
+fn wait_event_timeout(thread: *const c_void, timeout: &Option<FutexTimeout>) -> Result<()> {
     let mut ret: c_int = 0;
     let mut sgx_ret: c_int = 0;
-    let timeout_ptr = timeout
+    let (clockbit, ts_ptr) = timeout
         .as_ref()
-        .map(|timeout_ref| timeout_ref as *const _)
-        .unwrap_or(0 as *const _);
+        .map(|timeout| {
+            let clockbit = match timeout.clock_id() {
+                ClockID::CLOCK_REALTIME => FutexFlags::FUTEX_CLOCK_REALTIME.bits() as i32,
+                _ => 0,
+            };
+            (clockbit, timeout.ts() as *const timespec_t)
+        })
+        .unwrap_or((0, 0 as *const _));
     let mut errno: c_int = 0;
     unsafe {
         sgx_ret = sgx_thread_wait_untrusted_event_timeout_ocall(
             &mut ret as *mut c_int,
             thread,
-            timeout_ptr,
+            clockbit,
+            ts_ptr,
             &mut errno as *mut c_int,
         );
         assert!(sgx_ret == 0);
@@ -493,6 +548,7 @@ extern "C" {
     fn sgx_thread_wait_untrusted_event_timeout_ocall(
         ret: *mut c_int,
         self_thread: *const c_void,
+        clockbit: i32,
         ts: *const timespec_t,
         errno: *mut c_int,
     ) -> c_int;
