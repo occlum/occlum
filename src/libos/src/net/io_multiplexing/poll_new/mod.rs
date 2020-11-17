@@ -13,6 +13,12 @@ mod event_monitor;
 pub fn do_poll_new(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) -> Result<usize> {
     debug!("poll: poll_fds: {:?}, timeout: {:?}", poll_fds, timeout);
 
+    // Always clear the revents fields first
+    for poll_fd in poll_fds {
+        poll_fd.revents.set(IoEvents::empty());
+    }
+
+    // Map poll_fds to FileRef's
     let thread = current!();
     let files: Vec<FileRef> = poll_fds
         .iter()
