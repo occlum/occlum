@@ -200,17 +200,12 @@ impl EventMonitorBuilder {
     }
 
     pub fn add_file(&mut self, file: FileRef, events: IoEvents) {
-        let host_file_idx = if file.host_fd().is_some() {
-            Some(self.files_and_events.len())
-        } else {
-            None
-        };
-
-        self.files_and_events.push((file, events));
-
-        if let Some(host_file_idx) = host_file_idx {
+        if file.host_fd().is_some() {
+            let host_file_idx = self.files_and_events.len();
             self.host_file_idxes.push(host_file_idx);
         }
+
+        self.files_and_events.push((file, events));
     }
 
     fn init_ocall_pollfds(&mut self) {
