@@ -1,3 +1,5 @@
+use atomic::{Atomic, Ordering};
+
 use crate::events::{Event, EventFilter, Notifier, Observer};
 use crate::prelude::*;
 
@@ -37,6 +39,32 @@ impl IoEvents {
 }
 
 impl Event for IoEvents {}
+
+pub trait AtomicIoEvents {
+    /// Update the IoEvents atomically.
+    ///
+    /// The update is equivalent to the following assignment
+    /// ```
+    /// self.store(self.load(Ordering::Relaxed) & !*mask | *ready, ordering)
+    /// ```
+    fn update(&self, ready: &IoEvents, mask: &IoEvents, ordering: Ordering);
+}
+
+impl AtomicIoEvents for Atomic<IoEvents> {
+    fn update(&self, ready: &IoEvents, mask: &IoEvents, ordering: Ordering) {
+        loop {
+            let old_val = self.load(Ordering::Relaxed);
+            let new_val = old_val & !*mask | *ready;
+            let success_ordering = ordering;
+            let failure_ordering = Ordering::Relaxed;
+            if let Ok(_) =
+                self.compare_exchange(old_val, new_val, success_ordering, failure_ordering)
+            {
+                return;
+            }
+        }
+    }
+}
 
 impl EventFilter<IoEvents> for IoEvents {
     fn filter(&self, events: &IoEvents) -> bool {

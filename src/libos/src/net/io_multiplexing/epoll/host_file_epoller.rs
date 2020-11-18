@@ -10,14 +10,12 @@ use crate::prelude::*;
 #[derive(Debug)]
 pub struct HostFileEpoller {
     /// A map from host fd to HostFile, which maintains the set of the interesting
-    /// host files.
-    host_files: SgxMutex<HashMap<FileDesc, FileRef>>,
+    /// host files and their interesting events.
+    host_files_and_events: SgxMutex<HashMap<FileDesc, (FileRef, IoEvents)>>,
     /// The number of the interesting host files.
     count: AtomicUsize,
     /// The host fd of the underlying host epoll file.
     host_epoll_fd: HostFd,
-    /// Whether the host epoll file has any events.
-    is_ready: AtomicBool,
 }
 
 // TODO: the `add/mod/del_file` operation can be postponed until a `poll_files` operation,
@@ -25,7 +23,7 @@ pub struct HostFileEpoller {
 
 impl HostFileEpoller {
     pub fn new() -> Self {
-        let host_files = Default::default();
+        let host_files_and_events = Default::default();
         let count = Default::default();
         let host_epoll_fd = {
             let raw_host_fd = (|| -> Result<u32> {
@@ -36,19 +34,19 @@ impl HostFileEpoller {
 
             HostFd::new(raw_host_fd)
         };
-        let is_ready = Default::default();
         Self {
-            host_files,
+            host_files_and_events,
             count,
             host_epoll_fd,
-            is_ready,
         }
     }
 
     pub fn add_file(&self, host_file: FileRef, event: EpollEvent, flags: EpollFlags) -> Result<()> {
-        let mut host_files = self.host_files.lock().unwrap();
+        let mut host_files_and_events = self.host_files_and_events.lock().unwrap();
         let host_fd = host_file.host_fd().unwrap().to_raw();
-        let already_added = host_files.insert(host_fd, host_file.clone()).is_some();
+        let already_added = host_files_and_events
+            .insert(host_fd, (host_file.clone(), event.mask))
+            .is_some();
         if already_added {
             // TODO: handle the case where one host file is somehow to be added more than once.
             warn!(
@@ -62,7 +60,7 @@ impl HostFileEpoller {
         self.do_epoll_ctl(libc::EPOLL_CTL_ADD, &host_file, Some((event, flags)))
 
         // Concurrency note:
-        // The lock on self.host_files must be hold while invoking
+        // The lock on self.host_files_and_events must be hold while invoking
         // do_epoll_ctl to prevent race conditions that cause the OCall to fail.
         // This same argument applies to mod_file and del_file methods.
     }
@@ -70,23 +68,28 @@ impl HostFileEpoller {
     pub fn mod_file(
         &self,
         host_file: &FileRef,
-        event: EpollEvent,
-        flags: EpollFlags,
+        new_event: EpollEvent,
+        new_flags: EpollFlags,
     ) -> Result<()> {
-        let host_files = self.host_files.lock().unwrap();
+        let mut host_files_and_events = self.host_files_and_events.lock().unwrap();
         let host_fd = host_file.host_fd().unwrap().to_raw();
-        let not_added = !host_files.contains_key(&host_fd);
-        if not_added {
-            return_errno!(ENOENT, "the host file must be added before modifying");
-        }
+        let event = match host_files_and_events.get_mut(&host_fd) {
+            None => return_errno!(ENOENT, "the host file must be added before modifying"),
+            Some((_, event)) => event,
+        };
+        *event = new_event.mask;
 
-        self.do_epoll_ctl(libc::EPOLL_CTL_MOD, &host_file, Some((event, flags)))
+        self.do_epoll_ctl(
+            libc::EPOLL_CTL_MOD,
+            &host_file,
+            Some((new_event, new_flags)),
+        )
     }
 
     pub fn del_file(&self, host_file: &FileRef) -> Result<()> {
-        let mut host_files = self.host_files.lock().unwrap();
+        let mut host_files_and_events = self.host_files_and_events.lock().unwrap();
         let host_fd = host_file.host_fd().unwrap().to_raw();
-        let not_added = !host_files.remove(&host_fd).is_some();
+        let not_added = !host_files_and_events.remove(&host_fd).is_some();
         if not_added {
             return_errno!(ENOENT, "the host file must be added before deleting");
         }
@@ -153,13 +156,13 @@ impl HostFileEpoller {
 
         // Use the polled events from the host to update the states of the
         // corresponding host files
-        let mut host_files = self.host_files.lock().unwrap();
+        let mut host_files_and_events = self.host_files_and_events.lock().unwrap();
         for raw_event in &raw_events[..count] {
             let raw_event = unsafe { raw_event.assume_init() };
             let io_events = IoEvents::from_raw(raw_event.events as u32);
             let host_fd = raw_event.u64 as u32;
 
-            let host_file = match host_files.get(&host_fd) {
+            let (host_file, mask) = match host_files_and_events.get(&host_fd) {
                 None => {
                     count -= 1;
                     // The corresponding host file may be deleted
@@ -168,26 +171,13 @@ impl HostFileEpoller {
                 Some(host_file) => host_file,
             };
 
-            host_file.recv_host_events(&io_events, true);
+            host_file.update_host_events(&io_events, mask, true);
         }
         count
     }
 
     pub fn host_fd(&self) -> &HostFd {
         &self.host_epoll_fd
-    }
-
-    pub fn poll(&self) -> IoEvents {
-        if self.is_ready.load(Ordering::Acquire) {
-            IoEvents::IN
-        } else {
-            IoEvents::empty()
-        }
-    }
-
-    pub fn recv_host_events(&self, events: &IoEvents) {
-        let is_ready = events.contains(IoEvents::IN);
-        self.is_ready.store(is_ready, Ordering::Release);
     }
 }
 

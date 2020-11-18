@@ -116,11 +116,11 @@ impl File for EventFile {
         Some(&self.host_fd)
     }
 
-    fn recv_host_events(&self, events: &IoEvents, trigger_notifier: bool) {
-        self.host_events.store(*events, Ordering::Release);
+    fn update_host_events(&self, ready: &IoEvents, mask: &IoEvents, trigger_notifier: bool) {
+        self.host_events.update(ready, mask, Ordering::Release);
 
         if trigger_notifier {
-            self.notifier.broadcast(events);
+            self.notifier.broadcast(ready);
         }
     }
 

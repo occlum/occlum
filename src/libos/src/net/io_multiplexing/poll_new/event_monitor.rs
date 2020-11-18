@@ -4,7 +4,7 @@ use std::sync::Weak;
 use std::time::Duration;
 
 use crate::events::{Observer, Waiter, WaiterQueueObserver};
-use crate::fs::IoEvents;
+use crate::fs::{AtomicIoEvents, IoEvents};
 use crate::prelude::*;
 use crate::time::{timespec_t, TIMERSLACK};
 
@@ -41,10 +41,10 @@ impl EventMonitor {
     }
 
     /// Returns an iterator for the host files in the set of the interesting files.
-    pub fn host_files(&self) -> impl Iterator<Item = &FileRef> {
+    pub fn host_files_and_events(&self) -> impl Iterator<Item = &(FileRef, IoEvents)> {
         self.host_file_idxes
             .iter()
-            .map(move |idx| &self.files_and_events[*idx].0)
+            .map(move |idx| &self.files_and_events[*idx])
     }
 
     /// Reset the monitor so that it can wait for new events.
@@ -80,7 +80,7 @@ impl EventMonitor {
         // 4. the time is up.
         let num_events = self.do_poll_ocall(&mut timeout)?;
 
-        self.recv_host_file_events(num_events);
+        self.update_host_file_events(num_events);
 
         // Poll syscall does not treat timeout as error. So we need
         // to distinguish the case by ourselves.
@@ -104,7 +104,7 @@ impl EventMonitor {
             Err(_) => return,
         };
 
-        self.recv_host_file_events(num_events);
+        self.update_host_file_events(num_events);
     }
 
     fn do_poll_ocall(&mut self, timeout: &mut Option<&mut Duration>) -> Result<usize> {
@@ -148,22 +148,19 @@ impl EventMonitor {
         Ok(num_events)
     }
 
-    fn recv_host_file_events(&self, num_events: usize) {
+    fn update_host_file_events(&self, num_events: usize) {
         if num_events == 0 {
             return;
         }
 
         // According to the output pollfds, update the states of the corresponding host files
         let output_pollfds = self.ocall_pollfds[..self.ocall_pollfds.len() - 1].iter();
-        for (pollfd, host_file) in output_pollfds.zip(self.host_files()) {
+        for (pollfd, (host_file, mask)) in output_pollfds.zip(self.host_files_and_events()) {
             let revents = {
-                if pollfd.revents == 0 {
-                    continue;
-                }
                 assert!((pollfd.revents & libc::POLLNVAL) == 0);
                 IoEvents::from_raw(pollfd.revents as u32)
             };
-            host_file.recv_host_events(&revents, false);
+            host_file.update_host_events(&revents, mask, false);
         }
     }
 }

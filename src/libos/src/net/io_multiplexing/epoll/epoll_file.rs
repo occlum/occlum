@@ -6,11 +6,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Weak;
 use std::time::Duration;
 
+use atomic::Atomic;
+
 use super::epoll_waiter::EpollWaiter;
 use super::host_file_epoller::HostFileEpoller;
 use super::{EpollCtl, EpollEvent, EpollFlags};
 use crate::events::{Observer, Waiter, WaiterQueue};
-use crate::fs::{File, HostFd, IoEvents, IoNotifier};
+use crate::fs::{AtomicIoEvents, File, HostFd, IoEvents, IoNotifier};
 use crate::prelude::*;
 
 // TODO: Prevent two epoll files from monitoring each other, which may cause
@@ -54,6 +56,8 @@ pub struct EpollFile {
     host_file_epoller: HostFileEpoller,
     // Any EpollFile is wrapped with Arc when created.
     weak_self: Weak<Self>,
+    // Host events
+    host_events: Atomic<IoEvents>,
 }
 
 impl EpollFile {
@@ -64,6 +68,7 @@ impl EpollFile {
         let notifier = IoNotifier::new();
         let host_file_epoller = HostFileEpoller::new();
         let weak_self = Default::default();
+        let host_events = Atomic::new(IoEvents::empty());
 
         Self {
             interest,
@@ -72,6 +77,7 @@ impl EpollFile {
             notifier,
             host_file_epoller,
             weak_self,
+            host_events,
         }
         .wrap_self()
     }
@@ -119,7 +125,12 @@ impl EpollFile {
         let waiter = EpollWaiter::new(&self.host_file_epoller);
 
         loop {
-            // Poll the latest states of the interested host files
+            // Poll the latest states of the interested host files. If a host
+            // file is ready, then it will be pushed into the ready list. Note
+            // that this is the only way through which a host file can appear in
+            // the ready list. This ensures that only the host files whose
+            // events are update-to-date will be returned, reducing the chances
+            // of false positive results to the minimum.
             self.host_file_epoller.poll_events(max_count);
 
             // Prepare for the waiter.wait_mut() at the end of the loop
@@ -167,7 +178,11 @@ impl EpollFile {
                         .intersects(EpollFlags::EDGE_TRIGGER | EpollFlags::ONE_SHOT)
                     {
                         drop(inner);
-                        reinsert.push_back(ep_entry);
+
+                        // Host files should not be reinserted into the ready list
+                        if ep_entry.file.host_fd().is_none() {
+                            reinsert.push_back(ep_entry);
+                        }
                     }
                 }
             }
@@ -230,6 +245,7 @@ impl EpollFile {
             if ep_entry.file.host_fd().is_some() {
                 self.host_file_epoller
                     .add_file(ep_entry.file.clone(), event, flags);
+                return Ok(());
             }
         }
 
@@ -281,6 +297,7 @@ impl EpollFile {
             if ep_entry.file.host_fd().is_some() {
                 self.host_file_epoller
                     .mod_file(&ep_entry.file, event, flags);
+                return Ok(());
             }
 
             ep_entry
@@ -365,7 +382,11 @@ impl EpollFile {
 
 impl File for EpollFile {
     fn poll_new(&self) -> IoEvents {
-        if !self.host_file_epoller.poll().is_empty() {
+        if self
+            .host_events
+            .load(Ordering::Acquire)
+            .contains(IoEvents::IN)
+        {
             return IoEvents::IN;
         }
 
@@ -385,11 +406,11 @@ impl File for EpollFile {
         Some(self.host_file_epoller.host_fd())
     }
 
-    fn recv_host_events(&self, events: &IoEvents, trigger_notifier: bool) {
-        self.host_file_epoller.recv_host_events(events);
+    fn update_host_events(&self, ready: &IoEvents, mask: &IoEvents, trigger_notifier: bool) {
+        self.host_events.update(ready, mask, Ordering::Release);
 
         if trigger_notifier {
-            self.notifier.broadcast(events);
+            self.notifier.broadcast(ready);
         }
     }
 
