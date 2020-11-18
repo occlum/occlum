@@ -12,11 +12,18 @@ use super::epoll_waiter::EpollWaiter;
 use super::host_file_epoller::HostFileEpoller;
 use super::{EpollCtl, EpollEvent, EpollFlags};
 use crate::events::{Observer, Waiter, WaiterQueue};
-use crate::fs::{AtomicIoEvents, File, HostFd, IoEvents, IoNotifier};
+use crate::fs::{
+    AtomicIoEvents, File, FileTableEvent, FileTableNotifier, HostFd, IoEvents, IoNotifier,
+};
 use crate::prelude::*;
 
 // TODO: Prevent two epoll files from monitoring each other, which may cause
 // deadlock in the current implementation.
+// TODO: Fix unreliable EpollFiles after process spawning. EpollFile is connected
+// with the current process's file table by regitering itself as an observer
+// to the file table. But if an EpollFile is cloned or inherited by a child
+// process, then this EpollFile still has connection with the parent process's
+// file table, which is problematic.
 
 /// A file that provides epoll API.
 ///
@@ -70,7 +77,7 @@ impl EpollFile {
         let weak_self = Default::default();
         let host_events = Atomic::new(IoEvents::empty());
 
-        Self {
+        let arc_self = Self {
             interest,
             ready,
             waiters,
@@ -79,7 +86,10 @@ impl EpollFile {
             weak_self,
             host_events,
         }
-        .wrap_self()
+        .wrap_self();
+
+        arc_self.register_to_file_table();
+        arc_self
     }
 
     fn wrap_self(self) -> Arc<Self> {
@@ -93,6 +103,20 @@ impl EpollFile {
         }
 
         strong_self
+    }
+
+    fn register_to_file_table(&self) {
+        let weak_observer = self.weak_self.clone() as Weak<dyn Observer<_>>;
+        let thread = current!();
+        let file_table = thread.files().lock().unwrap();
+        file_table.notifier().register(weak_observer, None, None);
+    }
+
+    fn unregister_from_file_table(&self) {
+        let weak_observer = self.weak_self.clone() as Weak<dyn Observer<_>>;
+        let thread = current!();
+        let file_table = thread.files().lock().unwrap();
+        file_table.notifier().unregister(&weak_observer);
     }
 
     pub fn control(&self, cmd: &EpollCtl) -> Result<()> {
@@ -432,6 +456,8 @@ impl Drop for EpollFile {
                 notifier.unregister(&self_observer);
             }
         });
+
+        self.unregister_from_file_table();
     }
 }
 
@@ -447,6 +473,13 @@ impl Observer<IoEvents> for EpollFile {
         };
 
         self.push_ready(ep_entry);
+    }
+}
+
+impl Observer<FileTableEvent> for EpollFile {
+    fn on_event(&self, event: &FileTableEvent, _metadata: &Option<Weak<dyn Any + Send + Sync>>) {
+        let FileTableEvent::Del(fd) = event;
+        let _ = self.del_interest(*fd);
     }
 }
 

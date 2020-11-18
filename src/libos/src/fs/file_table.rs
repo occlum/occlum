@@ -1,12 +1,15 @@
 use super::*;
 
+use crate::events::{Event, Notifier};
+
 pub type FileDesc = u32;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug)]
 #[repr(C)]
 pub struct FileTable {
     table: Vec<Option<FileTableEntry>>,
     num_fds: usize,
+    notifier: FileTableNotifier,
 }
 
 impl FileTable {
@@ -14,6 +17,7 @@ impl FileTable {
         FileTable {
             table: Vec::with_capacity(4),
             num_fds: 0,
+            notifier: FileTableNotifier::new(),
         }
     }
 
@@ -130,6 +134,7 @@ impl FileTable {
         match del_table_entry {
             Some(del_table_entry) => {
                 self.num_fds -= 1;
+                self.broadcast_del(fd);
                 Ok(del_table_entry.file)
             }
             None => return_errno!(EBADF, "Invalid file descriptor"),
@@ -138,7 +143,8 @@ impl FileTable {
 
     /// Remove file descriptors that are close-on-spawn
     pub fn close_on_spawn(&mut self) {
-        for entry in self.table.iter_mut() {
+        let mut deleted_fds = Vec::new();
+        for (fd, entry) in self.table.iter_mut().enumerate() {
             let need_close = if let Some(entry) = entry {
                 entry.close_on_spawn
             } else {
@@ -146,11 +152,50 @@ impl FileTable {
             };
             if need_close {
                 *entry = None;
+                deleted_fds.push(fd as FileDesc);
                 self.num_fds -= 1;
             }
         }
+
+        for fd in deleted_fds {
+            self.broadcast_del(fd);
+        }
+    }
+
+    pub fn notifier(&self) -> &FileTableNotifier {
+        &self.notifier
+    }
+
+    fn broadcast_del(&self, fd: FileDesc) {
+        let del_event = FileTableEvent::Del(fd);
+        self.notifier.broadcast(&del_event);
     }
 }
+
+impl Clone for FileTable {
+    fn clone(&self) -> Self {
+        FileTable {
+            table: self.table.clone(),
+            num_fds: self.num_fds,
+            notifier: FileTableNotifier::new(),
+        }
+    }
+}
+
+impl Default for FileTable {
+    fn default() -> Self {
+        FileTable::new()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum FileTableEvent {
+    Del(FileDesc),
+}
+
+impl Event for FileTableEvent {}
+
+pub type FileTableNotifier = Notifier<FileTableEvent>;
 
 #[derive(Debug, Clone)]
 pub struct FileTableEntry {
