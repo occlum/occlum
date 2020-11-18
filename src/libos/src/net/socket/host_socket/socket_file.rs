@@ -5,8 +5,8 @@ use atomic::{Atomic, Ordering};
 
 use super::*;
 use crate::fs::{
-    occlum_ocall_ioctl, AccessMode, CreationFlags, File, FileRef, HostFd, IoEvents, IoctlCmd,
-    StatusFlags,
+    occlum_ocall_ioctl, AccessMode, AtomicIoEvents, CreationFlags, File, FileRef, HostFd, IoEvents,
+    IoctlCmd, StatusFlags,
 };
 
 //TODO: refactor write syscall to allow zero length with non-zero buffer
@@ -89,11 +89,11 @@ impl File for HostSocket {
         Some(&self.notifier)
     }
 
-    fn recv_host_events(&self, events: &IoEvents, trigger_notifier: bool) {
-        self.host_events.store(*events, Ordering::Release);
+    fn update_host_events(&self, ready: &IoEvents, mask: &IoEvents, trigger_notifier: bool) {
+        self.host_events.update(ready, mask, Ordering::Release);
 
         if trigger_notifier {
-            self.notifier.broadcast(events);
+            self.notifier.broadcast(ready);
         }
     }
 

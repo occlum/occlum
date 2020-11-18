@@ -123,13 +123,13 @@ pub trait File: Debug + Sync + Send + Any {
         return None;
     }
 
-    /// Receive events from the host.
+    /// Update the ready events of a host file.
     ///
     /// After calling this method, the `poll` method of the `File` trait will
-    /// return the latest events on the `HostFile`.
+    /// return the latest event state on the `HostFile`.
     ///
     /// This method has no effect if the `host_fd` method returns `None`.
-    fn recv_host_events(&self, events: &IoEvents, trigger_notifier: bool) {}
+    fn update_host_events(&self, ready: &IoEvents, mask: &IoEvents, trigger_notifier: bool) {}
 
     fn as_any(&self) -> &dyn Any;
 }

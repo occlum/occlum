@@ -12,7 +12,7 @@ use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
 
 pub use self::dev_fs::AsDevRandom;
 pub use self::event_file::{AsEvent, EventCreationFlags, EventFile};
-pub use self::events::{IoEvents, IoNotifier};
+pub use self::events::{AtomicIoEvents, IoEvents, IoNotifier};
 pub use self::file::{File, FileRef};
 pub use self::file_ops::{
     occlum_ocall_ioctl, AccessMode, BuiltinIoctlNum, CreationFlags, FileMode, Flock, FlockType,
