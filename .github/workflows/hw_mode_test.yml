@@ -297,6 +297,9 @@ jobs:
     - name: Run python support test
       run: docker exec python_support_test bash -c "cd /root/occlum/demos/python; ./run_python_on_occlum.sh"
 
+    - name: Check result
+      run: docker exec python_support_test bash -c "cd /root/occlum/demos/python/occlum_instance; cat smvlight.dat"
+
     - name: Clean the environment
       run: docker stop python_support_test
 

@@ -35,7 +35,7 @@ if [ ! -d "image/lib/python3.7" ];then
     cp -rf ../dataset image
     cp -f ../demo.py image
     new_json="$(jq '.resource_limits.user_space_size = "320MB" |
-                    .resource_limits.kernel_space_heap_size = "192MB" |
+                    .resource_limits.kernel_space_heap_size = "256MB" |
                     .process.default_mmap_size = "256MB"' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
     occlum build
