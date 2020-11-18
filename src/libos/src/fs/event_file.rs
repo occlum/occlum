@@ -49,13 +49,6 @@ extern "C" {
     fn occlum_ocall_eventfd(ret: *mut i32, init_val: u32, flags: i32) -> sgx_status_t;
 }
 
-impl Drop for EventFile {
-    fn drop(&mut self) {
-        let ret = unsafe { libc::ocall::close(self.host_fd.to_raw() as i32) };
-        assert!(ret == 0);
-    }
-}
-
 impl File for EventFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let (buf_ptr, buf_len) = buf.as_mut().as_mut_ptr_and_len();

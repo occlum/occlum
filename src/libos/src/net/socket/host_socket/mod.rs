@@ -134,13 +134,6 @@ impl HostSocket {
     }
 }
 
-impl Drop for HostSocket {
-    fn drop(&mut self) {
-        let ret = unsafe { libc::ocall::close(self.host_fd.to_raw() as i32) };
-        assert!(ret == 0);
-    }
-}
-
 pub trait HostSocketType {
     fn as_host_socket(&self) -> Result<&HostSocket>;
 }
