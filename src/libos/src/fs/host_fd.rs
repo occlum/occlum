@@ -5,7 +5,16 @@ use super::*;
 
 /// A unique fd from the host OS.
 ///
-/// The uniqueness property is important both
+/// There are two benefits of using `HostFd` instead of `FileDesc`.
+///
+/// 1. Uniqueness. Each instance of `HostFd` is guaranteed to have a different
+/// value. The uniqueness property makes it possible to use `HostFd` as keys of
+/// a hash table.
+///
+/// 2. Resource Acquisition Is Initialization (RAII). The acquisition and release
+/// of the host resource represented by a host fd is bound to the lifetime
+/// of the corresponding instance of `HostFd`. This makes resource management
+/// simpler and more robust.
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct HostFd(FileDesc);
 
@@ -22,11 +31,12 @@ impl HostFd {
 
 impl Drop for HostFd {
     fn drop(&mut self) {
-        HOST_FD_REGISTRY
-            .lock()
-            .unwrap()
-            .unregister(self.to_raw())
-            .unwrap();
+        let raw_fd = self.to_raw();
+        HOST_FD_REGISTRY.lock().unwrap().unregister(raw_fd).unwrap();
+        // Note that close MUST be done after unregistering
+        unsafe {
+            libc::ocall::close(raw_fd as i32);
+        }
     }
 }
 

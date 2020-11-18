@@ -180,11 +180,3 @@ impl HostFileEpoller {
         &self.host_epoll_fd
     }
 }
-
-impl Drop for HostFileEpoller {
-    fn drop(&mut self) {
-        unsafe {
-            libc::ocall::close(self.host_epoll_fd.to_raw() as i32);
-        }
-    }
-}
