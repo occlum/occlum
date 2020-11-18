@@ -1,38 +1,72 @@
-name: OCCLUM CI
+name: Essential Test
 
-# Controls when the action will run. Triggers the workflow on push or pull request
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  schedule:
+    # Schedule to run everyday at 9PM UTC (5AM CST)
+    - cron:  '0 9 * * *'
 
 jobs:
-  make-test-on-ubuntu:
-    # The type of runner that the job will run on
+  Make_test_on_ubuntu:
     runs-on: ubuntu-18.04
-    container: occlum/occlum:0.17.0-ubuntu18.04
 
-    # Below steps are running directly in docker container
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: true
 
-    - name: Set Toolchains
-      run: rustup default $OCCLUM_RUST_VERSION
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
 
-    - name: Check Format
-      run: |
-        info=$(make format-check)
-        if [ -n "$info" ]; then
+    - name: Create container with ubuntu image
+      run: docker run -itd --name=ubuntu-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+
+    - name: Check format
+      run:  docker exec ubuntu-test bash -c 'cd /root/occlum; info=$(make format-check);
+        if [[ -n $info ]]; then
           echo "Format error detected.";
+          echo "$info";
           exit 1;
-        fi
+        fi'
 
-    - name: Build Dependencies
-      run:  make submodule
+    - name: Build dependencies
+      run:  docker exec ubuntu-test bash -c "cd /root/occlum; make submodule"
 
-    - name: Build Source
-      run: |
-        OCCLUM_RELEASE_BUILD=y SGX_MODE=SIM make
+    - name: Build source
+      run:  docker exec ubuntu-test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y SGX_MODE=SIM make"
 
-    - name: Integration Test
-      run: |
-        SGX_MODE=SIM make test
+    - name: Integration test
+      run:  docker exec ubuntu-test bash -c "cd /root/occlum; SGX_MODE=SIM make test"
+
+
+  Make_test_on_centos:
+    runs-on: ubuntu-18.04
+
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+
+    - name: Create container with centos image
+      run: docker run -itd --name=centos-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-centos8.1
+
+    - name: Check format
+      run:  docker exec centos-test bash -c 'cd /root/occlum; info=$(make format-check);
+        if [[ -n $info ]]; then
+          echo "Format error detected.";
+          echo "$info";
+          exit 1;
+        fi'
+
+    - name: Build dependencies
+      run:  docker exec centos-test bash -c "cd /root/occlum; make submodule"
+
+    - name: Build source
+      run:  docker exec centos-test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y SGX_MODE=SIM make"
+
+    - name: Integration test
+      run:  docker exec centos-test bash -c "cd /root/occlum; SGX_MODE=SIM make test"
