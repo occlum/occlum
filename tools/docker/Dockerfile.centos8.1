@@ -96,8 +96,9 @@ RUN cd java && ./install_dragonwell.sh && rm -rf /tmp/java
 ENV PATH="/opt/occlum/toolchains/jvm/bin:$PATH"
 
 # Install the latest version of Occlum
+ARG OCCLUM_BRANCH
 WORKDIR /root
-RUN git clone https://github.com/occlum/occlum.git && \
+RUN git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum && \
     cd occlum && \
     source /root/.bashrc && \
     make submodule && \
