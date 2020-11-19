@@ -47,6 +47,9 @@ jobs:
           context: .
           file: ./tools/docker/Dockerfile.centos8.1
           platforms: linux/amd64
+          # GITHUB_REF=refs/heads/branch-name
+          # ${GITHUB_REF##*/} == branch-name
+          build-args: OCCLUM_BRANCH=${GITHUB_REF##*/}
           push: true
           tags: occlum/occlum:${{ env.RELEASE_VERSION }}-centos8.1
 
@@ -87,5 +90,8 @@ jobs:
           context: .
           file: ./tools/docker/Dockerfile.ubuntu18.04
           platforms: linux/amd64
+          # GITHUB_REF=refs/heads/branch-name
+          # ${GITHUB_REF##*/} == branch-name
+          build-args: OCCLUM_BRANCH=${GITHUB_REF##*/}
           push: true
           tags: occlum/occlum:${{ env.RELEASE_VERSION }}-ubuntu18.04
