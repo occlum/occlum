@@ -34,6 +34,7 @@ if [[ ( "$#" < 2 ) ]] ; then
     report_error
 fi
 
+occlum_branch=master
 occlum_label=$1
 os_name=$2
 
@@ -46,4 +47,4 @@ function check_item_in_list() {
 check_item_in_list "$os_name" "ubuntu18.04 centos7.5 centos8.1" || report_error
 
 cd "$script_dir/.."
-docker build -f "$script_dir/Dockerfile.$os_name" -t "occlum/occlum:$occlum_label-$os_name" .
+docker build -f "$script_dir/Dockerfile.$os_name" -t "occlum/occlum:$occlum_label-$os_name" --build-arg OCCLUM_BRANCH=$occlum_branch .
