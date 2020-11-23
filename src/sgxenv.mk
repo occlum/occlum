@@ -132,10 +132,10 @@ SGX_CXXFLAGS_T := $(SGX_CFLAGS_T) -std=c++11 -nostdinc++ -I$(SGX_SDK)/include/li
 #  linked.
 SGX_LFLAGS_T = $(SGX_COMMON_CFLAGS) -nostdlib -L$(SGX_LIBRARY_PATH) $(_Other_Link_Flags) \
 	-Wl,--whole-archive -l$(Trts_Library_Name) -Wl,--no-whole-archive
-ifeq ($(SGX_MODE), HW)
-SGX_LFLAGS_T += -Wl,--whole-archive -lsgx_tcmalloc -Wl,--no-whole-archive
-endif
-
+#TODO:enable tcmalloc when the tcmalloc memory leak issue fixed
+#ifeq ($(SGX_MODE), HW)
+#SGX_LFLAGS_T += -Wl,--whole-archive -lsgx_tcmalloc -Wl,--no-whole-archive
+#endif
 SGX_LFLAGS_T += -Wl,--start-group -lsgx_tcxx -lsgx_tstdc -l$(Crypto_Library_Name) -l$(Service_Library_Name) $(_Other_Enclave_Libs) -Wl,--end-group \
 	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined \
 	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic  \
