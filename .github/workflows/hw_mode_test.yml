@@ -13,7 +13,8 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
-    - uses: actions/checkout@v1
+    - name: Checkout code
+      uses: actions/checkout@v1
       with:
         submodules: true
 
@@ -22,7 +23,7 @@ jobs:
 
     - name: Create container
       run: |
-        occlum_test=$(docker run -itd --privileged --rm --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
         echo "occlum_test=$occlum_test" >> $GITHUB_ENV
 
     - name: Change download source of crates.io
@@ -35,10 +36,10 @@ jobs:
         registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
         EOF"
 
-    - name: Build Dependencies
-      run: docker exec $occlum_test bash -c "cd /root/occlum; make submodule"
+    - name: Build dependencies
+      run: docker exec $occlum_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
-    - name: Build Source
+    - name: Build source
       run: docker exec $occlum_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Integration test
@@ -56,7 +57,8 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
-    - uses: actions/checkout@v1
+    - name: Checkout code
+      uses: actions/checkout@v1
       with:
         submodules: true
 
@@ -65,7 +67,7 @@ jobs:
 
     - name: Create container
       run: |
-        language_support_test=$(docker run -itd --privileged --rm --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        language_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
         echo "language_support_test=$language_support_test" >> $GITHUB_ENV
 
     - name: Configure dependency source
@@ -78,8 +80,8 @@ jobs:
         registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
         EOF"
 
-    - name: Build Dependencies
-      run: docker exec $language_support_test bash -c "cd /root/occlum; make submodule"
+    - name: Build dependencies
+      run: docker exec $language_support_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
       run: docker exec $language_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
@@ -105,7 +107,7 @@ jobs:
       run: docker exec $language_support_test bash -c "cd /root/occlum/demos/embedded_mode && make;
             make test"
 
-    - name: Go Server set up and run
+    - name: Go server set up and run
       run: docker exec $language_support_test bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
             cd /root/occlum/demos/golang/web_server && occlum-go get -u -v github.com/gin-gonic/gin;
             occlum-go build -o web_server ./web_server.go;
@@ -144,7 +146,8 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
-    - uses: actions/checkout@v1
+    - name: Checkout code
+      uses: actions/checkout@v1
       with:
         submodules: true
 
@@ -153,7 +156,7 @@ jobs:
 
     - name: Create container
       run: |
-        java_support_test=$(docker run -itd --privileged --rm --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        java_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
         echo "java_support_test=$java_support_test" >> $GITHUB_ENV
 
     - name: Configure dependency source
@@ -166,8 +169,8 @@ jobs:
         registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
         EOF"
 
-    - name: Build Dependencies
-      run: docker exec $java_support_test bash -c "cd /root/occlum; make submodule"
+    - name: Build dependencies
+      run: docker exec $java_support_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
       run: docker exec $java_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
@@ -190,7 +193,8 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
-    - uses: actions/checkout@v1
+    - name: Checkout code
+      uses: actions/checkout@v1
       with:
         submodules: true
 
@@ -199,7 +203,7 @@ jobs:
 
     - name: Create container
       run: |
-        hello_bazel_test=$(docker run -itd --privileged --rm --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        hello_bazel_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
         echo "hello_bazel_test=$hello_bazel_test" >> $GITHUB_ENV
 
     - name: Configure dependency source
@@ -212,11 +216,16 @@ jobs:
         registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
         EOF"
 
-    - name: Build Dependencies
-      run: docker exec $hello_bazel_test bash -c "cd /root/occlum; make submodule"
+    - name: Build dependencies
+      run: docker exec $hello_bazel_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
       run: docker exec $hello_bazel_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+
+    - name: Config git proxy
+      run: |
+        docker exec $hello_bazel_test bash -c "git config --global http.proxy socks5://localhost:5432"
+        docker exec $hello_bazel_test bash -c "git config --global https.proxy socks5://localhost:5432"
 
     - name: Install bazel
       run: docker exec $hello_bazel_test bash -c "cd /root/occlum/demos/hello_bazel && wget https://github.com/bazelbuild/bazel/releases/download/3.2.0/bazel-3.2.0-installer-linux-x86_64.sh;
@@ -236,14 +245,15 @@ jobs:
       run: docker stop $hello_bazel_test
 
 
-  Sqlite_test:
+  Fish_test:
     runs-on: [self-hosted, SGX1-HW]
     steps:
     - name: Clean before running
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
-    - uses: actions/checkout@v1
+    - name: Checkout code
+      uses: actions/checkout@v1
       with:
         submodules: true
 
@@ -252,7 +262,119 @@ jobs:
 
     - name: Create container
       run: |
-        sqlite_test=$(docker run -itd --privileged --rm --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        fish_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        echo "fish_test=$fish_test" >> $GITHUB_ENV
+        cat $GITHUB_ENV
+
+    - name: Configure dependency source
+      run: |
+        docker exec $fish_test bash -c "cat <<- EOF >/root/.cargo/config
+        [source.crates-io]
+        registry = \"https://github.com/rust-lang/crates.io-index\"
+        replace-with = 'ustc'
+        [source.ustc]
+        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+        EOF"
+
+    - name: Build dependencies
+      run: docker exec $fish_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec $fish_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+
+    - name: Config git proxy
+      run: |
+        docker exec $fish_test bash -c "git config --global http.proxy socks5://localhost:5432"
+        docker exec $fish_test bash -c "git config --global https.proxy socks5://localhost:5432"
+
+    - name: Build Fish dependencies
+      run: docker exec $fish_test bash -c "cd /root/occlum/demos/fish && ./download_and_build.sh"
+
+    - name: Run Fish test
+      run: docker exec $fish_test bash -c "cd /root/occlum/demos/fish && ./run_fish_test.sh"
+
+    - name: Run Fish process rlimit test
+      run: docker exec $fish_test bash -c "cd /root/occlum/demos/fish && ./run_per_process_config_test.sh"
+
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop $fish_test
+
+
+  Xgboost_test:
+    runs-on: [self-hosted, SGX1-HW]
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - name: Checkout code
+      uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get Occlum version
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+
+    - name: Create container
+      run: |
+        xgboost_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        echo "xgboost_test=$xgboost_test" >> $GITHUB_ENV
+        cat $GITHUB_ENV
+
+    - name: Configure dependency source
+      run: |
+        docker exec $xgboost_test bash -c "cat <<- EOF >/root/.cargo/config
+        [source.crates-io]
+        registry = \"https://github.com/rust-lang/crates.io-index\"
+        replace-with = 'ustc'
+        [source.ustc]
+        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+        EOF"
+
+    - name: Build dependencies
+      run: docker exec $xgboost_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec $xgboost_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+
+    - name: Config git proxy
+      run: |
+        docker exec $xgboost_test bash -c "git config --global http.proxy socks5://localhost:5432"
+        docker exec $xgboost_test bash -c "git config --global https.proxy socks5://localhost:5432"
+
+    - name: Build xgboost dependencies
+      run: docker exec $xgboost_test bash -c "cd /root/occlum/demos/xgboost && ./download_and_build_xgboost.sh"
+
+    - name: Run xgboost test
+      run: docker exec $xgboost_test bash -c "cd /root/occlum/demos/xgboost && make test"
+
+    - name: Run xgboost cluster test
+      run: docker exec $xgboost_test bash -c "cd /root/occlum/demos/xgboost && make test-local-cluster"
+
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop $xgboost_test
+
+
+  Sqlite_test:
+    runs-on: [self-hosted, SGX1-HW]
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - name: Checkout code
+      uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get Occlum version
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+
+    - name: Create container
+      run: |
+        sqlite_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
         echo "sqlite_test=$sqlite_test" >> $GITHUB_ENV
 
     - name: Configure dependency source
@@ -265,11 +387,16 @@ jobs:
         registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
         EOF"
 
-    - name: Build Dependencies
-      run: docker exec $sqlite_test bash -c "cd /root/occlum; make submodule"
+    - name: Build dependencies
+      run: docker exec $sqlite_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
       run: docker exec $sqlite_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+
+    - name: Config git proxy
+      run: |
+        docker exec $sqlite_test bash -c "git config --global http.proxy socks5://localhost:5432"
+        docker exec $sqlite_test bash -c "git config --global https.proxy socks5://localhost:5432"
 
     - name: Build sqlite dependencies
       run: docker exec $sqlite_test bash -c "cd /root/occlum/demos/sqlite && ./download_and_build_sqlite.sh"
@@ -289,14 +416,15 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
-    - uses: actions/checkout@v1
+    - name: Checkout code
+      uses: actions/checkout@v1
       with:
         submodules: true
 
     - name: Create container
       run: |
         docker pull occlumbackup/occlum:latest-ubuntu18.04-python
-        python_support_test=$(docker run -itd --privileged --rm --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-python)
+        python_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-python)
         echo "python_support_test=$python_support_test" >> $GITHUB_ENV
 
     - name: Configure dependency source
@@ -304,13 +432,13 @@ jobs:
         docker exec $python_support_test bash -c "cat <<- EOF >/root/.cargo/config
         [source.crates-io]
         registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+        replace-with = 'tuna'
+        [source.tuna]
+        registry = \"https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git\"
         EOF"
 
-    - name: Build Dependencies
-      run: docker exec $python_support_test bash -c "cd /root/occlum; make submodule"
+    - name: Build dependencies
+      run: docker exec $python_support_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
       run: docker exec $python_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
@@ -333,14 +461,15 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
-    - uses: actions/checkout@v1
+    - name: Checkout code
+      uses: actions/checkout@v1
       with:
         submodules: true
 
     - name: Create container
       run: |
         docker pull occlumbackup/occlum:latest-ubuntu18.04-openvino
-        openvino_test=$(docker run -itd --privileged --rm --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-openvino)
+        openvino_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-openvino)
         echo "openvino_test=$openvino_test" >> $GITHUB_ENV
 
     - name: Configure dependency source
@@ -353,8 +482,8 @@ jobs:
         registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
         EOF"
 
-    - name: Build Dependencies
-      run: docker exec $openvino_test bash -c "cd /root/occlum; make submodule"
+    - name: Build dependencies
+      run: docker exec $openvino_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
       run: docker exec $openvino_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
@@ -374,14 +503,15 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
-    - uses: actions/checkout@v1
+    - name: Checkout code
+      uses: actions/checkout@v1
       with:
         submodules: true
 
     - name: Create container
       run: |
         docker pull occlumbackup/occlum:latest-ubuntu18.04-grpc
-        grpc_test=$(docker run -itd --privileged --rm --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-grpc)
+        grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-grpc)
         echo "grpc_test=$grpc_test" >> $GITHUB_ENV
 
     - name: Change download source of crates.io
@@ -395,7 +525,7 @@ jobs:
         EOF"
 
     - name: Build dependencies
-      run: docker exec $grpc_test bash -c "cd /root/occlum; make submodule"
+      run: docker exec $grpc_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
       run: docker exec $grpc_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
