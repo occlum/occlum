@@ -96,10 +96,6 @@ fn mount_nonroot_fs_according_to(mount_config: &Vec<ConfigMount>, root: &MNode) 
         if !mc.target.is_absolute() {
             return_errno!(EINVAL, "The target path must be absolute");
         }
-        if mc.target.parent().unwrap() != Path::new("/") {
-            return_errno!(EINVAL, "The target mount point must be under /");
-        }
-        let target_dirname = mc.target.file_name().unwrap().to_str().unwrap();
 
         use self::ConfigMountFsType::*;
         match mc.type_ {
@@ -133,7 +129,7 @@ fn mount_nonroot_fs_according_to(mount_config: &Vec<ConfigMount>, root: &MNode) 
                         &SgxUuidProvider,
                     )?
                 };
-                mount_fs_at(sefs, &root, target_dirname)?;
+                mount_fs_at(sefs, root, &mc.target)?;
             }
             TYPE_HOSTFS => {
                 if mc.source.is_none() {
@@ -142,11 +138,11 @@ fn mount_nonroot_fs_according_to(mount_config: &Vec<ConfigMount>, root: &MNode) 
                 let source_path = mc.source.as_ref().unwrap();
 
                 let hostfs = HostFS::new(source_path);
-                mount_fs_at(hostfs, &root, target_dirname)?;
+                mount_fs_at(hostfs, root, &mc.target)?;
             }
             TYPE_RAMFS => {
                 let ramfs = RamFS::new();
-                mount_fs_at(ramfs, &root, target_dirname)?;
+                mount_fs_at(ramfs, root, &mc.target)?;
             }
             TYPE_UNIONFS => {
                 return_errno!(EINVAL, "Cannot mount UnionFS at non-root path");
@@ -156,16 +152,20 @@ fn mount_nonroot_fs_according_to(mount_config: &Vec<ConfigMount>, root: &MNode) 
     Ok(())
 }
 
-fn mount_fs_at(fs: Arc<dyn FileSystem>, parent_inode: &MNode, dirname: &str) -> Result<()> {
-    let mount_dir = match parent_inode.find(false, dirname) {
-        Ok(existing_dir) => {
-            if existing_dir.metadata()?.type_ != FileType::Dir {
-                return_errno!(EIO, "not a directory");
+fn mount_fs_at(fs: Arc<dyn FileSystem>, parent_inode: &MNode, abs_path: &Path) -> Result<()> {
+    let mut mount_dir = parent_inode.find(false, ".")?;
+    // The first component of abs_path is the RootDir, skip it.
+    for dirname in abs_path.iter().skip(1) {
+        mount_dir = match mount_dir.find(false, dirname.to_str().unwrap()) {
+            Ok(existing_dir) => {
+                if existing_dir.metadata()?.type_ != FileType::Dir {
+                    return_errno!(EIO, "not a directory");
+                }
+                existing_dir
             }
-            existing_dir
-        }
-        Err(_) => return_errno!(ENOENT, "Mount point does not exist"),
-    };
+            Err(_) => return_errno!(ENOENT, "Mount point does not exist"),
+        };
+    }
     mount_dir.mount(fs);
     Ok(())
 }
