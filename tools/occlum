@@ -225,7 +225,7 @@ cmd_run() {
 
     echo "running" > $status_file
 
-    if [ "`get_enclave_debuggable_flag`" == "False" ]; then
+    if [ "`get_enclave_debuggable_flag`" == "false" ]; then
         export OCCLUM_RELEASE_ENCLAVE=1
     fi
     RUST_BACKTRACE=1 "$instance_dir/build/bin/occlum-run" "$@"
@@ -245,7 +245,7 @@ cmd_start() {
 
     echo "running" > $status_file
 
-    if [ "`get_enclave_debuggable_flag`" == "False" ]; then
+    if [ "`get_enclave_debuggable_flag`" == "false" ]; then
         export OCCLUM_RELEASE_ENCLAVE=1
     fi
     RUST_BACKTRACE=1 "$instance_dir/build/bin/occlum_exec_client" start
@@ -315,7 +315,7 @@ cmd_package() {
         $instance_base_name/build/mount $instance_base_name/build/Occlum.json.protected $instance_base_name/run \
         $instance_base_name/.__occlum_status $instance_base_name/.sgx_mode
 
-    if [ "`get_enclave_debuggable_flag`" == "True" ]; then
+    if [ "`get_enclave_debuggable_flag`" == "true" ]; then
         echo 'Warning: current Occlum instance is configured as "debuggable".'
         echo '(If it is not expected, you can modify the Occlum.json "metadata" - "debuggable" field to "false" and build again. And then use "occlum package")'
     fi
