@@ -106,7 +106,7 @@ int pal_init_enclave(const char *instance_dir) {
                              NULL);
     if (ret != SGX_SUCCESS) {
         const char *sgx_err_msg = pal_get_sgx_error_msg(ret);
-        PAL_ERROR("Failed to create enclave: %s", sgx_err_msg);
+        PAL_ERROR("Failed to create enclave with error code 0x%x: %s", ret, sgx_err_msg);
         if (fp != NULL) { fclose(fp); }
         return -1;
     }

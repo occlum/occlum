@@ -18,8 +18,8 @@ void *exec_libos_thread(void *_thread_data) {
                           host_tid);
     if (status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(status);
-        PAL_ERROR("Failed to enter the enclave to execute a LibOS thread (host tid = %d): %s",
-                  host_tid, sgx_err);
+        PAL_ERROR("Failed to enter the enclave to execute a LibOS thread (host tid = %d) with error code 0x%x: %s",
+                  host_tid, status, sgx_err);
         exit(EXIT_FAILURE);
     }
 

@@ -51,7 +51,7 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
                                 resolved_path);
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
-        PAL_ERROR("Failed to do ECall: %s", sgx_err);
+        PAL_ERROR("Failed to do ECall with error code 0x%x: %s", ecall_status, sgx_err);
         goto on_destroy_enclave;
     }
     if (ecall_ret < 0) {
@@ -95,7 +95,7 @@ int occlum_pal_create_process(struct occlum_pal_create_process_args *args) {
                                 args->argv, args->env, args->stdio);
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
-        PAL_ERROR("Failed to do ECall: %s", sgx_err);
+        PAL_ERROR("Failed to do ECall with error code 0x%x: %s", ecall_status, sgx_err);
         return -1;
     }
     if (ecall_ret < 0) {
@@ -156,7 +156,7 @@ int occlum_pal_kill(int pid, int sig) {
     sgx_status_t ecall_status = occlum_ecall_kill(eid, &ecall_ret, pid, sig);
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
-        PAL_ERROR("Failed to do ECall: %s", sgx_err);
+        PAL_ERROR("Failed to do ECall with error code 0x%x: %s", ecall_status, sgx_err);
         return -1;
     }
     if (ecall_ret < 0) {
