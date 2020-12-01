@@ -4,7 +4,7 @@ use xmas_elf::{header, program, sections};
 use crate::prelude::*;
 
 pub use xmas_elf::header::HeaderPt2 as ElfHeader;
-pub use xmas_elf::program::{ProgramHeader, ProgramIter};
+pub use xmas_elf::program::{ProgramHeader, ProgramIter, SegmentData};
 
 #[derive(Debug)]
 pub struct ElfFile<'a> {
@@ -37,6 +37,10 @@ impl<'a> ElfFile<'a> {
         // Validate the ELF header
         xmas_elf::header::sanity_check(elf_inner)
             .map_err(|e| errno!(ENOEXEC, "invalid ELF header"))?;
+        // Validate ELF type
+        if elf_inner.header.pt2.type_().as_type() != xmas_elf::header::Type::SharedObject {
+            return_errno!(ENOEXEC, "ELF is not position-independent");
+        }
         // Validate the segments
         for segment in elf_inner.program_iter() {
             segment.validate()?;
@@ -45,16 +49,27 @@ impl<'a> ElfFile<'a> {
     }
 }
 
-pub trait ProgramHeaderExt {
+pub trait ProgramHeaderExt<'a> {
     fn loadable(&self) -> bool;
+    fn is_interpreter(&self) -> bool;
     fn validate(&self) -> Result<()>;
+    fn get_content(&self, elf_file: &ElfFile<'a>) -> SegmentData<'a>;
 }
 
-impl<'a> ProgramHeaderExt for ProgramHeader<'a> {
+impl<'a> ProgramHeaderExt<'a> for ProgramHeader<'a> {
     /// Is the segment loadable?
     fn loadable(&self) -> bool {
         let type_ = self.get_type().unwrap();
         type_ == xmas_elf::program::Type::Load
+    }
+
+    fn is_interpreter(&self) -> bool {
+        let type_ = self.get_type().unwrap();
+        type_ == xmas_elf::program::Type::Interp
+    }
+
+    fn get_content(&self, elf_file: &ElfFile<'a>) -> SegmentData<'a> {
+        self.get_data(&elf_file.elf_inner).unwrap()
     }
 
     /// Do some basic sanity checks in case the ELF is corrupted somehow
