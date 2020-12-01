@@ -3,7 +3,7 @@ use std::path::Path;
 
 use self::aux_vec::{AuxKey, AuxVec};
 use self::exec_loader::{load_exec_file_to_vec, load_file_to_vec};
-use super::elf_file::{ElfFile, ElfHeader, ProgramHeader, ProgramHeaderExt};
+use super::elf_file::{ElfFile, ElfHeader, ProgramHeader, ProgramHeaderExt, SegmentData};
 use super::process::ProcessBuilder;
 use super::task::Task;
 use super::thread::ThreadName;
@@ -117,12 +117,22 @@ fn new_process(
         file_path.to_string()
     };
 
-    let ldso_path = "/lib/ld-musl-x86_64.so.1";
-    let ldso_elf_buf = load_file_to_vec(ldso_path, current_ref)
-        .cause_err(|e| errno!(e.errno(), "cannot load ld.so"))?;
-
     let exec_elf_file =
         ElfFile::new(&elf_buf).cause_err(|e| errno!(e.errno(), "invalid executable"))?;
+    // Get the ldso_path of the executable
+    let exec_interp_segment = exec_elf_file
+        .program_headers()
+        .find(|segment| segment.is_interpreter())
+        .ok_or_else(|| errno!(EINVAL, "cannot find the interpreter segment"))?;
+    let ldso_path = match exec_interp_segment.get_content(&exec_elf_file) {
+        SegmentData::Undefined(bytes) => std::ffi::CStr::from_bytes_with_nul(bytes)
+            .unwrap()
+            .to_str()
+            .unwrap(),
+        _ => return_errno!(EINVAL, "cannot get ldso_path from executable"),
+    };
+    let ldso_elf_buf = load_file_to_vec(ldso_path, current_ref)
+        .cause_err(|e| errno!(e.errno(), "cannot load ld.so"))?;
     let ldso_elf_file =
         ElfFile::new(&ldso_elf_buf).cause_err(|e| errno!(e.errno(), "invalid ld.so"))?;
 
