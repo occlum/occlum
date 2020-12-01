@@ -23,7 +23,8 @@ static void *thread_func(void *_data) {
                                     &num_broadcast_threads);
         if (ecall_status != SGX_SUCCESS) {
             const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
-            PAL_ERROR("Failed to do ECall: occlum_ecall_broadcast_interrupts: %s", sgx_err);
+            PAL_ERROR("Failed to do ECall: occlum_ecall_broadcast_interrupts with error code 0x%x: %s",
+                      ecall_status, sgx_err);
             exit(EXIT_FAILURE);
         }
         if (ecall_status == SGX_SUCCESS && num_broadcast_threads < 0) {
