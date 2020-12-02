@@ -80,6 +80,9 @@ pub extern "C" fn occlum_ecall_init(log_level: *const c_char, instance_dir: *con
 
         // Init boot up time stamp here.
         time::up_time::init();
+
+        // Enable global backtrace
+        unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
     });
 
     0
@@ -105,7 +108,6 @@ pub extern "C" fn occlum_ecall_new_process(
             }
         };
 
-    let _ = unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
     panic::catch_unwind(|| {
         backtrace::__rust_begin_short_backtrace(|| {
             match do_new_process(&path, &args, env, &host_stdio_fds) {
@@ -126,7 +128,6 @@ pub extern "C" fn occlum_ecall_exec_thread(libos_pid: i32, host_tid: i32) -> i32
         return ecall_errno!(EAGAIN);
     }
 
-    let _ = unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
     panic::catch_unwind(|| {
         backtrace::__rust_begin_short_backtrace(|| {
             match do_exec_thread(libos_pid as pid_t, host_tid as pid_t) {
@@ -147,7 +148,6 @@ pub extern "C" fn occlum_ecall_kill(pid: i32, sig: i32) -> i32 {
         return ecall_errno!(EAGAIN);
     }
 
-    let _ = unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
     panic::catch_unwind(|| {
         backtrace::__rust_begin_short_backtrace(|| match do_kill(pid, sig) {
             Ok(()) => 0,
@@ -166,7 +166,6 @@ pub extern "C" fn occlum_ecall_broadcast_interrupts() -> i32 {
         return ecall_errno!(EAGAIN);
     }
 
-    let _ = unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
     panic::catch_unwind(|| {
         backtrace::__rust_begin_short_backtrace(|| match interrupt::broadcast_interrupts() {
             Ok(count) => count as i32,
