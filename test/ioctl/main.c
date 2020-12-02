@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
@@ -222,7 +223,10 @@ int test_sgx_ioctl_SGXIOC_CREATE_AND_VERIFY_REPORT(void) {
 int test_ioctl_SIOCGIFCONF(void) {
     struct ifreq *req;
     struct ifconf conf;
-    char buf[CONFIG_SIZE];
+    char *buf = (char *)malloc(CONFIG_SIZE);
+    if (buf == NULL) {
+        THROW_ERROR("malloc failed");
+    }
     memset(buf, 0, CONFIG_SIZE);
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -248,7 +252,21 @@ int test_ioctl_SIOCGIFCONF(void) {
 
     int ret_len = conf.ifc_len;
 
-    conf.ifc_len = CONFIG_SIZE;
+    // use a larger buffer when the original one is insufficient
+    if (ret_len > CONFIG_SIZE) {
+        free(buf);
+
+        char *new_buf = (char *)malloc(ret_len);
+        if (new_buf == NULL) {
+            close(sock);
+            THROW_ERROR("malloc failed");
+        }
+        buf = new_buf;
+        memset(buf, 0, ret_len);
+    } else {
+        conf.ifc_len = CONFIG_SIZE;
+    }
+
     conf.ifc_buf = buf;
     if (ioctl(sock, SIOCGIFCONF, &conf) < 0) {
         close(sock);
