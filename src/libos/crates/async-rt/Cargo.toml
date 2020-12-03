@@ -1,0 +1,15 @@
+[package]
+name = "async_rt"
+version = "0.1.0"
+authors = ["Tate, Hongliang Tian <tate.thl@antfin.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bit-vec = { version = "0.6", default-features = false  }
+crossbeam-queue = { version = "0.3", default-features = false, features = ["alloc"] }
+futures = { version = "0.3", default-features = false, features = ["alloc"]  }
+lazy_static = "1.4"
+log = { version = "0.4", default-features= false }
+spin = "0.7"
