@@ -42,7 +42,10 @@ enclave {
          *      EEXIST - The LibOS has already been initialized.
          *      EINVAL - The value of an argument are invalid.
          */
-        public int occlum_ecall_init([in, string] const char* log_level, [in, string] const char* instance_dir);
+        public int occlum_ecall_init(
+            [in, string] const char* log_level,
+            [in, string] const char* instance_dir,
+            uint32_t num_vcpus);
 
         /*
          * Create a new LibOS process to do the task specified by the given 
@@ -62,29 +65,18 @@ enclave {
             [in, string] const char* executable_path,
             [user_check] const char** argv,
             [user_check] const char** env,
-            [in] const struct occlum_stdio_fds* io_fds);
+            [in] const struct occlum_stdio_fds* io_fds,
+            [out] int* exit_status);
 
         /*
-         * Execute the LibOS thread specified by the TID.
-         *
-         * This API is synchronous: it returns until the LibOS thread 
-         * terminates.
-         *
-         * @retval On success, return the exit status of the thread, whose 
-         * value is always greater than or equal to zero. To unify the two 
-         * cases of terminating normally and being killed by a signal, the
-         * exit status is encoded in the way described in wait(2) man page.
-         * This means if the thread exits normally (e.g., returning from the
-         * main page or call exit(2) explictly), then the exit status is 
-         * can be gained by WEXITSTATUS(status). If the thread is killed by a
-         * signal, then the signal number is WTERMSIG(status).
-         *
-         * The possible values of errno are
-         *      EAGAIN - The LibOS is not initialized.
-         *      EINVAL - The value of an argument are invalid.
-         *      ESRCH - Cannot find the LibOS thread.
+         * Run a vCPU.
          */
-        public int occlum_ecall_exec_thread(int libos_tid, int host_tid);
+        public int occlum_ecall_run_vcpu(void);
+
+        /*
+         * Shut down all vCPUs.
+         */
+        public int occlum_ecall_shutdown_vcpus(void);
 
         /*
          * Send a signal to one or multiple LibOS processes.

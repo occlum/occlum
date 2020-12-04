@@ -29,7 +29,8 @@ static void *thread_func(void *_data) {
         }
         if (ecall_status == SGX_SUCCESS && num_broadcast_threads < 0) {
             int errno_ = -num_broadcast_threads;
-            PAL_ERROR("Unexpcted error from cclum_ecall_broadcast_interrupts: %s", errno2str(errno_));
+            PAL_ERROR("Unexpcted error from occlum_ecall_broadcast_interrupts: %s",
+                      errno2str(errno_));
             exit(EXIT_FAILURE);
         }
 
@@ -41,6 +42,8 @@ static void *thread_func(void *_data) {
 }
 
 int pal_interrupt_thread_start(void) {
+    return 0;
+
     if (is_running) {
         errno = EEXIST;
         PAL_ERROR("The interrupt thread is already running: %s", errno2str(errno));
@@ -63,6 +66,8 @@ int pal_interrupt_thread_start(void) {
 }
 
 int pal_interrupt_thread_stop(void) {
+    return 0;
+
     if (!is_running) {
         errno = ENOENT;
         return -1;

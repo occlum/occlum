@@ -34,11 +34,15 @@ typedef struct occlum_pal_attr {
     //
     // Optional field. If NULL, the LibOS will treat it as "off".
     const char     *log_level;
+    // The number of vCPUs. A value of zero means using as many as CPU cores
+    // on the platform.
+    unsigned int    num_vcpus;
 } occlum_pal_attr_t;
 
 #define OCCLUM_PAL_ATTR_INITVAL         { \
-    .instance_dir = ".",                 \
-    .log_level = NULL                     \
+    .instance_dir = ".",                  \
+    .log_level = NULL,                    \
+    .num_vcpus = 0                        \
 }
 
 /*
@@ -91,25 +95,11 @@ struct occlum_pal_create_process_args {
     //
     // Mandatory field. Must not be NULL.
     int *pid;
-};
 
-/*
- * The struct which consists of arguments needed by occlum_pal_exec
- */
-struct occlum_pal_exec_args {
-    // Pid of new process created with occlum_pal_create_process.
-    //
-    // Mandatory field.
-    int pid;
-
-    // Output. The exit status of the command. The semantic of
-    // this value follows the one described in wait(2) man
-    // page. For example, if the program terminated normally,
-    // then WEXITSTATUS(exit_status) gives the value returned
-    // from a main function.
-    //
-    // Mandatory field. Must not be NULL.
-    int *exit_value;
+    // Output. Will be set when the process terminates. Also a call of futex
+    // wake will be made on the address so that a user can futex wait on the
+    // address.
+    int *exit_status;
 };
 
 /*
@@ -130,14 +120,9 @@ int occlum_pal_init(const struct occlum_pal_attr *attr);
  */
 int occlum_pal_create_process(struct occlum_pal_create_process_args *args);
 
-/*
- * @brief Execute the process inside the Occlum enclave
- *
- * @param args  Mandatory input. Arguments for occlum_pal_exec.
- *
- * @retval If 0, then success; otherwise, check errno for the exact error type.
- */
-int occlum_pal_exec(struct occlum_pal_exec_args *args);
+
+int occlum_pal_run_vcpu(void);
+
 
 /*
  * @brief Send a signal to one or multiple LibOS processes

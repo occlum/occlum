@@ -3,6 +3,7 @@
 #include "ocalls.h"
 #include "../pal_thread_counter.h"
 
+/*
 typedef struct {
     sgx_enclave_id_t    enclave_id;
     int                 libos_tid;
@@ -27,9 +28,11 @@ void *exec_libos_thread(void *_thread_data) {
     pal_thread_counter_dec();
     return NULL;
 }
+*/
 
 // Start a new host OS thread and enter the enclave to execute the LibOS thread
 int occlum_ocall_exec_thread_async(int libos_tid) {
+    /*
     int ret = 0;
     pthread_t thread;
 
@@ -46,6 +49,6 @@ int occlum_ocall_exec_thread_async(int libos_tid) {
     pthread_detach(thread);
 
     // Note: thread_data is freed and thread counter is decreased just before the thread exits
-
+    */
     return 0;
 }

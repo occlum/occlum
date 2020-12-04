@@ -7,6 +7,7 @@
 #include "pal_sig_handler.h"
 #include "pal_syscall.h"
 #include "pal_thread_counter.h"
+#include "pal_vcpu_thread.h"
 #include "errno2str.h"
 #include <linux/limits.h>
 
@@ -30,6 +31,11 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
         return -1;
     }
 
+    if (attr->num_vcpus == 0) {
+        // TODO: retrive the number of CPUs on the platform
+        *(int *)(&attr->num_vcpus) = 2;
+    }
+
     sgx_enclave_id_t eid = pal_get_enclave_id();
     if (eid != SGX_INVALID_ENCLAVE_ID) {
         PAL_ERROR("Enclave has been initialized.");
@@ -48,7 +54,7 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
 
     int ecall_ret = 0;
     sgx_status_t ecall_status = occlum_ecall_init(eid, &ecall_ret, attr->log_level,
-                                resolved_path);
+                                resolved_path, attr->num_vcpus);
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
         PAL_ERROR("Failed to do ECall with error code 0x%x: %s", ecall_status, sgx_err);
@@ -67,6 +73,11 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
         goto on_destroy_enclave;
     }
 #endif
+
+    if (pal_vcpu_threads_start(attr->num_vcpus) < 0) {
+        PAL_ERROR("Failed to start the vCPU threads: %s", errno2str(errno));
+        goto on_destroy_enclave;
+    }
 
     return 0;
 on_destroy_enclave:
@@ -92,7 +103,7 @@ int occlum_pal_create_process(struct occlum_pal_create_process_args *args) {
     }
 
     sgx_status_t ecall_status = occlum_ecall_new_process(eid, &ecall_ret, args->path,
-                                args->argv, args->env, args->stdio);
+                                args->argv, args->env, args->stdio, args->exit_status);
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
         PAL_ERROR("Failed to do ECall with error code 0x%x: %s", ecall_status, sgx_err);
@@ -108,15 +119,7 @@ int occlum_pal_create_process(struct occlum_pal_create_process_args *args) {
     return 0;
 }
 
-int occlum_pal_exec(struct occlum_pal_exec_args *args) {
-    int host_tid = GETTID();
-    int ecall_ret = 0;
-
-    if (args->exit_value == NULL) {
-        errno = EINVAL;
-        return -1;
-    }
-
+int occlum_pal_run_vcpu(void) {
     sgx_enclave_id_t eid = pal_get_enclave_id();
     if (eid == SGX_INVALID_ENCLAVE_ID) {
         PAL_ERROR("Enclave is not initialized yet.");
@@ -124,10 +127,8 @@ int occlum_pal_exec(struct occlum_pal_exec_args *args) {
         return -1;
     }
 
-    pal_thread_counter_inc();
-    sgx_status_t ecall_status = occlum_ecall_exec_thread(eid, &ecall_ret, args->pid,
-                                host_tid);
-    pal_thread_counter_dec();
+    int ecall_ret = 0;
+    sgx_status_t ecall_status = occlum_ecall_run_vcpu(eid, &ecall_ret);
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
         PAL_ERROR("Failed to do ECall: %s", sgx_err);
@@ -135,11 +136,9 @@ int occlum_pal_exec(struct occlum_pal_exec_args *args) {
     }
     if (ecall_ret < 0) {
         errno = -ecall_ret;
-        PAL_ERROR("occlum_ecall_exec_thread returns %s", errno2str(errno));
+        PAL_ERROR("occlum_ecall_run_vcpu returns %s", errno2str(errno));
         return -1;
     }
-
-    *args->exit_value = ecall_ret;
 
     return 0;
 }
@@ -186,6 +185,15 @@ int occlum_pal_destroy(void) {
     }
 #endif
 
+    if (pal_vcpu_threads_stop() < 0) {
+        ret = -1;
+        PAL_WARN("Cannot stop the vCPU threads: %s", errno2str(errno));
+    }
+
+    // Make sure all helper threads exit
+    int thread_counter;
+    while ((thread_counter = pal_thread_counter_wait_zero(NULL)) > 0) ;
+
     if (pal_destroy_enclave() < 0) {
         ret = -1;
         PAL_WARN("Cannot destroy the enclave");
@@ -200,9 +208,6 @@ __attribute__ ((weak, alias ("occlum_pal_init")));
 
 int pal_create_process(struct occlum_pal_create_process_args *args)\
 __attribute__ ((weak, alias ("occlum_pal_create_process")));
-
-int pal_exec(struct occlum_pal_exec_args *args)\
-__attribute__ ((weak, alias ("occlum_pal_exec")));
 
 int pal_kill(int pid, int sig) __attribute__ ((weak, alias ("occlum_pal_kill")));
 

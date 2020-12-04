@@ -8,6 +8,10 @@
 #include <sys/wait.h>
 #include <occlum_pal_api.h>
 #include <sys/prctl.h>
+#include <sys/syscall.h>
+#include <linux/futex.h>
+
+#define FUTEX_WAIT_TIMEOUT(addr, val, timeout)  ((int)syscall(__NR_futex, (addr), FUTEX_WAIT, (val), (timeout)))
 
 int main(int argc, char *argv[]) {
     // Parse arguments
@@ -46,27 +50,24 @@ int main(int argc, char *argv[]) {
         .stdout_fd = STDOUT_FILENO,
         .stderr_fd = STDERR_FILENO,
     };
-    int exit_status = 0;
     int libos_tid = 0;
+    volatile int exit_status = -1;
     struct occlum_pal_create_process_args create_process_args = {
         .path = (const char *) cmd_path,
         .argv = (const char **) cmd_args,
         .env = environ,
         .stdio = (const struct occlum_stdio_fds *) &io_fds,
         .pid = &libos_tid,
+        .exit_status = (int *) &exit_status,
     };
     if (occlum_pal_create_process(&create_process_args) < 0) {
         // Command not found or other internal errors
         return 127;
     }
 
-    struct occlum_pal_exec_args exec_args = {
-        .pid = libos_tid,
-        .exit_value = &exit_status,
-    };
-    if (occlum_pal_exec(&exec_args) < 0) {
-        // Command not found or other internal errors
-        return 127;
+    int futex_val;
+    while ((futex_val = exit_status) < 0) {
+        (void)FUTEX_WAIT_TIMEOUT(&exit_status, futex_val, NULL);
     }
 
     // Convert the exit status to a value in a shell-like encoding

@@ -31,7 +31,11 @@ macro_rules! ecall_errno {
 }
 
 #[no_mangle]
-pub extern "C" fn occlum_ecall_init(log_level: *const c_char, instance_dir: *const c_char) -> i32 {
+pub extern "C" fn occlum_ecall_init(
+    log_level: *const c_char,
+    instance_dir: *const c_char,
+    num_vcpus: u32,
+) -> i32 {
     if HAS_INIT.load(Ordering::SeqCst) == true {
         return ecall_errno!(EEXIST);
     }
@@ -64,6 +68,9 @@ pub extern "C" fn occlum_ecall_init(log_level: *const c_char, instance_dir: *con
             util::mpx_util::mpx_enable();
         }
 
+        // Enable backtrace
+        let _ = unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
+
         // Register exception handlers (support cpuid & rdtsc for now)
         register_exception_handlers();
 
@@ -75,6 +82,18 @@ pub extern "C" fn occlum_ecall_init(log_level: *const c_char, instance_dir: *con
         }
 
         interrupt::init();
+
+        debug!("num_vcpus = {:?}", num_vcpus);
+        async_rt::executor::set_parallelism(num_vcpus);
+
+        async_rt::task::spawn(async {
+            let tid = async_rt::task::current().tid();
+            println!("Hello World from task {:?}!", tid);
+        });
+        async_rt::task::spawn(async {
+            let tid = async_rt::task::current().tid();
+            println!("Hello World from task {:?}!", tid);
+        });
 
         HAS_INIT.store(true, Ordering::SeqCst);
 
@@ -94,6 +113,7 @@ pub extern "C" fn occlum_ecall_new_process(
     argv: *const *const c_char,
     env: *const *const c_char,
     host_stdio_fds: *const HostStdioFds,
+    u_status: *mut i32,
 ) -> i32 {
     if HAS_INIT.load(Ordering::SeqCst) == false {
         return ecall_errno!(EAGAIN);
@@ -120,6 +140,27 @@ pub extern "C" fn occlum_ecall_new_process(
         })
     })
     .unwrap_or(ecall_errno!(EFAULT))
+}
+
+#[no_mangle]
+pub extern "C" fn occlum_ecall_run_vcpu() -> i32 {
+    if HAS_INIT.load(Ordering::SeqCst) == false {
+        return ecall_errno!(EAGAIN);
+    }
+
+    debug!("occlum_ecall_run_vcpu");
+    async_rt::executor::run_tasks();
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn occlum_ecall_shutdown_vcpus() -> i32 {
+    if HAS_INIT.load(Ordering::SeqCst) == false {
+        return ecall_errno!(EAGAIN);
+    }
+
+    async_rt::executor::shutdown();
+    0
 }
 
 #[no_mangle]
@@ -162,6 +203,8 @@ pub extern "C" fn occlum_ecall_kill(pid: i32, sig: i32) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn occlum_ecall_broadcast_interrupts() -> i32 {
+    return 0;
+    /*
     if HAS_INIT.load(Ordering::SeqCst) == false {
         return ecall_errno!(EAGAIN);
     }
@@ -176,6 +219,7 @@ pub extern "C" fn occlum_ecall_broadcast_interrupts() -> i32 {
         })
     })
     .unwrap_or(ecall_errno!(EFAULT))
+    */
 }
 
 fn parse_log_level(level_chars: *const c_char) -> Result<LevelFilter> {
