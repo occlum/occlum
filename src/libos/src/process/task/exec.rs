@@ -38,7 +38,7 @@ pub fn exec(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
     this_thread.start(host_tid);
 
     // Enable current::get() from now on
-    current::set(this_thread.clone());
+    //unsafe { current::set(this_thread.clone()); }
 
     interrupt::enable_current_thread();
 
@@ -60,7 +60,7 @@ pub fn exec(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
     }
 
     // Disable current::get()
-    current::reset();
+    //current::reset();
 
     Ok(term_status.as_u32() as i32)
 }
