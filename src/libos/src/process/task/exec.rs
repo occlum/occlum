@@ -3,6 +3,7 @@ use super::Task;
 use crate::interrupt;
 use crate::prelude::*;
 
+/*
 /// Enqueue a new thread so that it can be executed later.
 pub fn enqueue(new_thread: ThreadRef) {
     let existing_thread = NEW_THREAD_TABLE
@@ -74,3 +75,5 @@ extern "C" {
     fn occlum_ocall_exec_thread_async(ret: *mut i32, libos_tid: pid_t) -> sgx_status_t;
     fn do_exec_task(task: *mut Task) -> i32;
 }
+
+*/

@@ -588,6 +588,24 @@ macro_rules! impl_dispatch_syscall {
 }
 process_syscall_table_with_callback!(impl_dispatch_syscall);
 
+pub async fn thread_main_loop(current: ThreadRef) {
+    unsafe {
+        crate::process::current::set(current);
+    }
+
+    let current = current!();
+    println!(
+        "thread ({:?}) executed as task ({:?})",
+        current.tid(),
+        async_rt::task::current().tid()
+    );
+    //current.start();
+    /*
+    use rcore_fs::vfs::FileSystem;
+    crate::fs::ROOT_INODE.fs().sync()?;
+    */
+}
+
 #[no_mangle]
 pub extern "C" fn occlum_syscall(user_context: *mut CpuContext) -> ! {
     // Start a new round of log messages for this system call. But we do not

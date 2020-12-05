@@ -3,10 +3,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::prelude::*;
 
-pub use self::exec::{enqueue, enqueue_and_exec, exec};
-
-mod exec;
-
 /// Note: this definition must be in sync with task.h
 #[derive(Debug, Default)]
 #[repr(C)]

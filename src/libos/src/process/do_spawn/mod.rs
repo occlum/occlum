@@ -41,7 +41,7 @@ pub fn do_spawn(
 }
 
 /// Spawn a new process but execute it later.
-pub fn do_spawn_without_exec(
+pub fn do_spawn_root(
     elf_path: &str,
     argv: &[CString],
     envp: &[CString],
@@ -82,11 +82,7 @@ fn do_spawn_common(
     let new_main_thread = new_process_ref
         .main_thread()
         .expect("the main thread is just created; it must exist");
-    if exec_now {
-        task::enqueue_and_exec(new_main_thread);
-    } else {
-        task::enqueue(new_main_thread);
-    };
+    async_rt::task::spawn(crate::syscall::thread_main_loop(new_main_thread));
 
     let new_pid = new_process_ref.pid();
     Ok(new_pid)

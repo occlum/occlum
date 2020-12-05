@@ -83,17 +83,8 @@ pub extern "C" fn occlum_ecall_init(
 
         interrupt::init();
 
-        debug!("num_vcpus = {:?}", num_vcpus);
+        println!("num_vcpus = {:?}", num_vcpus);
         async_rt::executor::set_parallelism(num_vcpus);
-
-        async_rt::task::spawn(async {
-            let tid = async_rt::task::current().tid();
-            println!("Hello World from task {:?}!", tid);
-        });
-        async_rt::task::spawn(async {
-            let tid = async_rt::task::current().tid();
-            println!("Hello World from task {:?}!", tid);
-        });
 
         HAS_INIT.store(true, Ordering::SeqCst);
 
@@ -161,26 +152,6 @@ pub extern "C" fn occlum_ecall_shutdown_vcpus() -> i32 {
 
     async_rt::executor::shutdown();
     0
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_ecall_exec_thread(libos_pid: i32, host_tid: i32) -> i32 {
-    if HAS_INIT.load(Ordering::SeqCst) == false {
-        return ecall_errno!(EAGAIN);
-    }
-
-    panic::catch_unwind(|| {
-        backtrace::__rust_begin_short_backtrace(|| {
-            match do_exec_thread(libos_pid as pid_t, host_tid as pid_t) {
-                Ok(exit_status) => exit_status,
-                Err(e) => {
-                    eprintln!("failed to execute a process: {}", e.backtrace());
-                    ecall_errno!(e.errno())
-                }
-            }
-        })
-    })
-    .unwrap_or(ecall_errno!(EFAULT))
 }
 
 #[no_mangle]
@@ -293,7 +264,7 @@ fn do_new_process(
     let file_actions = Vec::new();
     let current = &process::IDLE;
     let program_path_str = program_path.to_str().unwrap();
-    let new_tid = process::do_spawn_without_exec(
+    let new_tid = process::do_spawn_root(
         &program_path_str,
         argv,
         &env_concat,
@@ -302,19 +273,6 @@ fn do_new_process(
         current,
     )?;
     Ok(new_tid)
-}
-
-fn do_exec_thread(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
-    let status = process::task::exec(libos_tid, host_tid)?;
-
-    // sync file system
-    // TODO: only sync when all processes exit
-    use rcore_fs::vfs::FileSystem;
-    crate::fs::ROOT_INODE.fs().sync()?;
-
-    // Not to be confused with the return value of a main function.
-    // The exact meaning of status is described in wait(2) man page.
-    Ok(status)
 }
 
 fn validate_program_path(target_path: &PathBuf) -> Result<()> {

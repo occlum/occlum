@@ -4,7 +4,7 @@ use core::future::Future;
 use crate::executor::EXECUTOR;
 use crate::prelude::*;
 
-pub use self::current::current;
+pub use self::current::{current, try_current};
 pub use self::id::TaskId;
 pub use self::join::JoinHandle;
 pub use self::locals::LocalKey;

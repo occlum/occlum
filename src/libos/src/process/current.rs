@@ -6,19 +6,25 @@ use super::{Thread, ThreadRef};
 use crate::prelude::*;
 use crate::*;
 
-/// Ge the thread associated with the current task.
+/// Get the current thread.
 pub fn get() -> ThreadRef {
-    let current = CURRENT.with(|current| unsafe { &*current.get() });
-    current.as_ref().unwrap().clone()
+    try_get().unwrap_or_else(|| IDLE.clone())
+}
+
+/// Attempt to get the thread associated with the current task.
+fn try_get() -> Option<ThreadRef> {
+    let current_opt = CURRENT.try_with(|current| unsafe { &*current.get() });
+    current_opt.map(|current| current.as_ref().unwrap().clone())
 }
 
 /// Set the thread associated with the current task.
 ///
 /// This method should be only called once at the very beginning of a task
 /// that represents an OS thread.
-pub(super) unsafe fn set(new_current: ThreadRef) {
+pub unsafe fn set(new_current: ThreadRef) {
     assert!(new_current.tid() > 0);
     let current = CURRENT.with(|current| unsafe { &mut *current.get() });
+    debug_assert!(current.is_none());
     *current = Some(new_current);
 }
 

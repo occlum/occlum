@@ -151,22 +151,22 @@ impl Thread {
         &self.host_eventfd
     }
 
-    pub(super) fn start(&self, host_tid: pid_t) {
-        self.sched().lock().unwrap().attach(host_tid);
+    pub(super) fn start(&self) {
+        //self.sched().lock().unwrap().attach(host_tid);
         self.inner().start();
+        /*
+                let eventfd = EventFile::new(
+                    0,
+                    EventCreationFlags::EFD_CLOEXEC | EventCreationFlags::EFD_NONBLOCK,
+                )
+                .unwrap();
 
-        let eventfd = EventFile::new(
-            0,
-            EventCreationFlags::EFD_CLOEXEC | EventCreationFlags::EFD_NONBLOCK,
-        )
-        .unwrap();
-
-        THREAD_NOTIFIERS
-            .lock()
-            .unwrap()
-            .insert(self.tid(), eventfd)
-            .expect_none("this thread should not have an eventfd before start");
-
+                THREAD_NOTIFIERS
+                    .lock()
+                    .unwrap()
+                    .insert(self.tid(), eventfd)
+                    .expect_none("this thread should not have an eventfd before start");
+        */
         #[cfg(feature = "syscall_timing")]
         self.profiler()
             .lock()
@@ -178,6 +178,7 @@ impl Thread {
     }
 
     pub(super) fn exit(&self, term_status: TermStatus) -> usize {
+        /*
         #[cfg(feature = "syscall_timing")]
         self.profiler()
             .lock()
@@ -194,6 +195,7 @@ impl Thread {
             .unwrap();
 
         self.sched().lock().unwrap().detach();
+        */
 
         // Remove this thread from its owner process
         let mut process_inner = self.process.inner();

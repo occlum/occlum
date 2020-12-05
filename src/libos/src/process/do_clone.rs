@@ -82,7 +82,7 @@ pub fn do_clone(
         }
     }
 
-    task::enqueue_and_exec(new_thread_ref.clone());
+    async_rt::task::spawn(crate::syscall::thread_main_loop(new_thread_ref));
     Ok(new_tid)
 }
 

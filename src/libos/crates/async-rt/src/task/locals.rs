@@ -18,12 +18,23 @@ impl<T: Send + 'static> LocalKey<T> {
 }
 
 impl<T: Send + 'static> LocalKey<T> {
-    /// Attempts to get a reference to the task-local value with this key.
+    /// Get a reference to the task-local value with this key.
     pub fn with<F, R>(&'static self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
     {
-        let current = crate::task::current();
+        self.try_with(f).unwrap()
+    }
+
+    /// Attempts to get a reference to the task-local value with this key.
+    pub fn try_with<F, R>(&'static self, f: F) -> Option<R>
+    where
+        F: FnOnce(&T) -> R,
+    {
+        let current = match crate::task::try_current() {
+            None => return None,
+            Some(current) => current,
+        };
 
         // Prepare the numeric key, initialization function, and the map of task-locals.
         let key = self.key();
@@ -33,7 +44,8 @@ impl<T: Send + 'static> LocalKey<T> {
         let value: *const dyn Send = current.locals().get_or_insert(key, init);
 
         // Call the closure with the value passed as an argument.
-        unsafe { f(&*(value as *const T)) }
+        let val = unsafe { f(&*(value as *const T)) };
+        Some(val)
     }
 
     /// Returns the numeric key associated with this task-local.

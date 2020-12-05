@@ -534,7 +534,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "rcore-fs",
- "spin",
+ "spin 0.5.2",
 ]
 
 [[package]]
