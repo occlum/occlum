@@ -175,15 +175,7 @@ fn new_process(
             let user_stack_base = vm.get_stack_base();
             let user_stack_limit = vm.get_stack_limit();
             let user_rsp = init_stack::do_init(user_stack_base, 4096, &argv, envp, &mut auxvec)?;
-            unsafe {
-                Task::new(
-                    ldso_entry,
-                    user_rsp,
-                    user_stack_base,
-                    user_stack_limit,
-                    None,
-                )?
-            }
+            unsafe { Task::new(user_rsp, ldso_entry, None)? }
         };
         let vm_ref = Arc::new(vm);
         let files_ref = {
@@ -328,7 +320,7 @@ fn init_auxvec(process_vm: &ProcessVM, exec_elf_file: &ElfFile) -> Result<AuxVec
     let ldso_elf_base = process_vm.get_elf_ranges()[1].start() as u64;
     auxvec.set(AuxKey::AT_BASE, ldso_elf_base)?;
 
-    let syscall_addr = __occlum_syscall_linux_abi as *const () as u64;
+    let syscall_addr = __syscall_entry_linux_abi as *const () as u64;
     auxvec.set(AuxKey::AT_OCCLUM_ENTRY, syscall_addr)?;
     // TODO: init AT_EXECFN
     // auxvec.set_val(AuxKey::AT_EXECFN, "program_name")?;
@@ -337,6 +329,6 @@ fn init_auxvec(process_vm: &ProcessVM, exec_elf_file: &ElfFile) -> Result<AuxVec
 }
 
 extern "C" {
-    fn __occlum_syscall_linux_abi() -> i64;
+    fn __syscall_entry_linux_abi() -> i64;
     fn occlum_gdb_hook_load_elf(elf_base: u64, elf_path: *const u8, elf_path_len: u64);
 }

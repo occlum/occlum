@@ -33,20 +33,7 @@ pub fn do_clone(
     let new_thread_ref = {
         let current = current!();
         let vm = current.vm().clone();
-        let task = {
-            let user_stack_range = guess_user_stack_bound(&vm, user_rsp)?;
-            let user_stack_base = user_stack_range.end();
-            let user_stack_limit = user_stack_range.start();
-            unsafe {
-                Task::new(
-                    thread_entry,
-                    user_rsp,
-                    user_stack_base,
-                    user_stack_limit,
-                    new_tls,
-                )?
-            }
-        };
+        let task = unsafe { Task::new(user_rsp, thread_entry, new_tls)? };
         let files = current.files().clone();
         let rlimits = current.rlimits().clone();
         let fs = current.fs().clone();

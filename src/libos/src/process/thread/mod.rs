@@ -151,7 +151,7 @@ impl Thread {
         &self.host_eventfd
     }
 
-    pub(super) fn start(&self) {
+    pub fn start(&self) {
         //self.sched().lock().unwrap().attach(host_tid);
         self.inner().start();
         /*

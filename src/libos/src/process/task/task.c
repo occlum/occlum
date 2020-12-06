@@ -24,6 +24,7 @@ void sgx_disable_user_stack(void);
 
 #define OCCLUM_PAGE_SIZE 4096
 
+/*
 static uint64_t get_syscall_stack(struct Task *this_task) {
 #define LARGE_ENOUGH_GAP        (8192)
     char libos_stack_var = 0;
@@ -31,6 +32,7 @@ static uint64_t get_syscall_stack(struct Task *this_task) {
     libos_stack &= ~0x0FUL; // stack must be 16-byte aligned
     return libos_stack;
 }
+*/
 
 #define SET_CURRENT_TASK(task)                  \
     long stack_guard = __get_stack_guard();     \
@@ -40,6 +42,7 @@ static uint64_t get_syscall_stack(struct Task *this_task) {
     __set_stack_guard(stack_guard);
 
 int do_exec_task(struct Task *task) {
+    /*
     jmp_buf libos_state = {0};
     thread_data_t *td = get_thread_data();
     task->saved_state = &libos_state;
@@ -61,11 +64,14 @@ int do_exec_task(struct Task *task) {
 
     // Jump from do_exit_task
     RESET_CURRENT_TASK();
+    */
     return 0;
 }
 
 void do_exit_task(void) {
+    /*
     struct Task *task = __get_current_task();
     jmp_buf *jb = task->saved_state;
     longjmp(*jb, 1);
+    */
 }

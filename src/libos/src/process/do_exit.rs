@@ -3,7 +3,7 @@ use std::sync::Weak;
 
 use super::do_futex::futex_wake;
 use super::process::{Process, ProcessFilter};
-use super::{table, StatusChange, TermStatus, ThreadRef, ThreadStatus};
+use super::{table, StatuChange, ProcessRef, TermStatus, ThreadRef, ThreadStatus};
 use crate::prelude::*;
 use crate::signal::constants::*;
 use crate::signal::{KernelSignal, SigNum};
@@ -99,6 +99,7 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
 
         process_inner.exit(term_status, &idle_ref, &mut idle_inner, &parent);
         idle_inner.remove_zombie_child(pid);
+        wake_host(&process, term_status);
         return;
     }
     // Otherwise, we need to notify the parent process
@@ -116,6 +117,9 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
     process
         .notifier()
         .broadcast(&StatusChange::Terminated(term_status));
+
+    // Notify the host threads that wait the status change of this process
+    wake_host(&process, term_status);
 }
 
 fn send_sigchld_to(parent: &Arc<Process>) {
@@ -123,3 +127,10 @@ fn send_sigchld_to(parent: &Arc<Process>) {
     let mut sig_queues = parent.sig_queues().write().unwrap();
     sig_queues.enqueue(signal);
 }
+
+fn wake_host(process: &ProcessRef, term_status: TermStatus) {
+    if let Some(host_waker) = process.host_waker() {
+        host_waker.wake(term_status);
+    }
+}
+

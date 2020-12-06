@@ -7,50 +7,38 @@ use crate::prelude::*;
 #[derive(Debug, Default)]
 #[repr(C)]
 pub struct Task {
-    kernel_rsp: usize,
-    kernel_stack_base: usize,
-    kernel_stack_limit: usize,
-    kernel_fs: usize,
     user_rsp: usize,
-    user_stack_base: usize,
-    user_stack_limit: usize,
+    user_rip: usize,
     user_fs: AtomicUsize,
-    user_entry_addr: usize,
-    saved_state: usize, // struct jmpbuf*
 }
 
 impl Task {
-    pub unsafe fn new(
-        user_entry_addr: usize,
-        user_rsp: usize,
-        user_stack_base: usize,
-        user_stack_limit: usize,
-        user_fs: Option<usize>,
-    ) -> Result<Task> {
-        if !(user_stack_base >= user_rsp && user_rsp > user_stack_limit) {
-            return_errno!(EINVAL, "Invalid user stack");
-        }
-
+    pub unsafe fn new(user_rsp: usize, user_rip: usize, user_fs: Option<usize>) -> Result<Task> {
         // Set the default user fsbase to an address on user stack, which is
         // a relatively safe address in case the user program uses %fs before
         // initializing fs base address.
-        let user_fs = AtomicUsize::new(user_fs.unwrap_or(user_stack_limit));
+        let user_fs = AtomicUsize::new(user_fs.unwrap_or(user_rsp));
 
         Ok(Task {
-            user_entry_addr,
             user_rsp,
-            user_stack_base,
-            user_stack_limit,
+            user_rip,
             user_fs,
-            ..Default::default()
         })
     }
 
     pub(super) fn set_user_fs(&self, user_fs: usize) {
-        self.user_fs.store(user_fs, Ordering::SeqCst);
+        self.user_fs.store(user_fs, Ordering::Relaxed);
     }
 
     pub fn user_fs(&self) -> usize {
-        self.user_fs.load(Ordering::SeqCst)
+        self.user_fs.load(Ordering::Relaxed)
+    }
+
+    pub fn user_rsp(&self) -> usize {
+        self.user_rsp
+    }
+
+    pub fn user_rip(&self) -> usize {
+        self.user_rip
     }
 }

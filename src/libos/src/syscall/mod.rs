@@ -592,18 +592,25 @@ pub async fn thread_main_loop(current: ThreadRef) {
     unsafe {
         crate::process::current::set(current.clone());
     }
-    debug!(
-        "Thread #{} is executed as task #{}",
-        current.tid(),
-        async_rt::task::current::get().tid().0
-    );
+
+    let thread_id = current.tid();
+    let task_id = async_rt::task::current::get().tid().0;
+    debug!("Thread #{} is executed as task #{}", thread_id, task_id);
+
+    current.start();
 
     let mut user_context = thread_init_cpu_context(&current);
-
     while current.status() != ThreadStatus::Exited {
-        break;
-
-        switch_to_user(&mut user_context);
+        // Continue the execution in the user space
+        {
+            extern "C" {
+                fn switch_to_user(user_context: *mut CpuContext, user_fs: usize);
+            }
+            let user_fs = current.task().user_fs();
+            unsafe {
+                switch_to_user(&mut user_context, user_fs);
+            }
+        }
 
         // Start a new round of log messages for this system call. But we do not
         // set the description of this round, yet. We will do so after checking the
@@ -625,7 +632,12 @@ pub async fn thread_main_loop(current: ThreadRef) {
 }
 
 fn thread_init_cpu_context(current: &ThreadRef) -> CpuContext {
-    CpuContext::new()
+    let task = current.task();
+    CpuContext {
+        rip: task.user_rip() as u64,
+        rsp: task.user_rsp() as u64,
+        ..Default::default()
+    }
 }
 
 fn switch_to_user(user_context: &mut CpuContext) {}
