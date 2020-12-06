@@ -31,7 +31,7 @@ impl<T: Send + 'static> LocalKey<T> {
     where
         F: FnOnce(&T) -> R,
     {
-        let current = match crate::task::try_current() {
+        let current = match crate::task::current::try_get() {
             None => return None,
             Some(current) => current,
         };

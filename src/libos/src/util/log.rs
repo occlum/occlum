@@ -51,7 +51,7 @@ pub fn init(level: LevelFilter) {
 
 /// Notify the logger that a new round starts.
 ///
-/// Log messages generated in a thread are organized in _rounds_. Each round
+/// Log messages generated in a task are organized in _rounds_. Each round
 /// is a group of related log messages. For examples, all log messages generated
 /// during the execution of a single system call may belong to the same round.
 pub fn next_round(desc: Option<&'static str>) {
@@ -65,22 +65,36 @@ pub fn next_round(desc: Option<&'static str>) {
 
 /// Set the description of the current round
 pub fn set_round_desc(desc: Option<&'static str>) {
-    ROUND_DESC.with(|cell| {
+    ROUND_DESC.try_with(|cell| {
         cell.set(desc);
     });
 }
 
-fn round_count() -> u64 {
-    ROUND_COUNT.with(|cell| cell.get())
+fn round_count() -> Option<u64> {
+    ROUND_COUNT.try_with(|cell| cell.get())
 }
 
 fn round_desc() -> Option<&'static str> {
-    ROUND_DESC.with(|cell| cell.get())
+    ROUND_DESC.try_with(|cell| cell.get()).flatten()
 }
 
-thread_local! {
+fn tid() -> Option<u64> {
+    async_rt::task::current::try_get().map(|current| current.tid().0)
+}
+
+async_rt::task_local! {
     static ROUND_COUNT : Cell<u64> = Default::default();
     static ROUND_DESC : Cell<Option<&'static str>> = Default::default();
+}
+
+macro_rules! format_option {
+    ($fmt:expr, $opt_val:expr) => {{
+        if let Some(val) = $opt_val {
+            format!($fmt, val)
+        } else {
+            std::string::String::from("")
+        }
+    }};
 }
 
 /// A simple logger that adds thread and round info to log messages.
@@ -92,25 +106,20 @@ impl Log for SimpleLogger {
     }
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
-            // Parts of message
+            // parts of message
             let level = record.level();
-            let tid = current!().tid();
+            let tid = tid();
             let rounds = round_count();
             let desc = round_desc();
-            // Message (null-terminated)
-            let message = if let Some(desc) = desc {
-                format!(
-                    "[{:>5}][T{}][#{}][{:·>8}] {}\0",
-                    level,
-                    tid,
-                    rounds,
-                    desc,
-                    record.args()
-                )
-            } else {
-                format!("[{:>5}][T{}][#{}] {}\0", level, tid, rounds, record.args())
-            };
-            // Print the message
+            let message = format!(
+                "[{:>5}]{}{}{} {}\0",
+                level,
+                format_option!("[T{}]", tid),
+                format_option!("[#{}]", rounds),
+                format_option!("[{:·>8}]", desc),
+                record.args()
+            );
+            // print the message
             unsafe {
                 occlum_ocall_print_log(level as u32, message.as_ptr());
             }

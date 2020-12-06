@@ -25,7 +25,7 @@ mod tests {
     #[test]
     fn test_hello() {
         crate::test_rt::run_blocking(async {
-            let tid = crate::task::current().tid();
+            let tid = crate::task::current::get().tid();
             println!("Hello from task {:?}", tid);
         });
     }
@@ -81,7 +81,7 @@ mod tests {
         crate::test_rt::run_blocking(async {
             use crate::sched::Affinity;
 
-            let current = crate::task::current();
+            let current = crate::task::current::get();
 
             let mut affinity = current.sched_info().affinity().write();
             assert!(affinity.is_full());

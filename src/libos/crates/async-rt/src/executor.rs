@@ -101,7 +101,7 @@ impl Executor {
                 Some(future) => future,
             };
 
-            crate::task::set_current(task.clone());
+            crate::task::current::set(task.clone());
 
             let waker = waker_ref(&task);
             let context = &mut Context::from_waker(&*waker);
@@ -109,7 +109,7 @@ impl Executor {
                 *future_slot = Some(future);
             }
 
-            crate::task::reset_current();
+            crate::task::current::reset();
         }
     }
 

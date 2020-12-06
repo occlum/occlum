@@ -590,27 +590,45 @@ process_syscall_table_with_callback!(impl_dispatch_syscall);
 
 pub async fn thread_main_loop(current: ThreadRef) {
     unsafe {
-        crate::process::current::set(current);
+        crate::process::current::set(current.clone());
     }
-
-    let current = current!();
-    println!(
-        "thread ({:?}) executed as task ({:?})",
+    debug!(
+        "Thread #{} is executed as task #{}",
         current.tid(),
-        async_rt::task::current().tid()
+        async_rt::task::current::get().tid().0
     );
 
-    let process = current.process();
-    let host_waker = process.host_waker().as_ref().unwrap();
-    use crate::process::TermStatus;
-    host_waker.wake(TermStatus::Exited(0));
+    let mut user_context = thread_init_cpu_context(&current);
 
-    //current.start();
-    /*
-    use rcore_fs::vfs::FileSystem;
-    crate::fs::ROOT_INODE.fs().sync()?;
-    */
+    while current.status() != ThreadStatus::Exited {
+        break;
+
+        switch_to_user(&mut user_context);
+
+        // Start a new round of log messages for this system call. But we do not
+        // set the description of this round, yet. We will do so after checking the
+        // given system call number is a valid.
+        log::next_round(None);
+
+        do_syscall(&mut user_context);
+    }
+
+    {
+        use crate::process::TermStatus;
+        let process = current.process();
+        process
+            .host_waker()
+            .as_ref()
+            .unwrap()
+            .wake(TermStatus::Exited(0));
+    }
 }
+
+fn thread_init_cpu_context(current: &ThreadRef) -> CpuContext {
+    CpuContext::new()
+}
+
+fn switch_to_user(user_context: &mut CpuContext) {}
 
 #[no_mangle]
 pub extern "C" fn occlum_syscall(user_context: *mut CpuContext) -> ! {
@@ -994,6 +1012,10 @@ pub struct CpuContext {
 }
 
 impl CpuContext {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
     pub fn from_sgx(src: &sgx_cpu_context_t) -> CpuContext {
         Self {
             r8: src.r8,
@@ -1016,6 +1038,33 @@ impl CpuContext {
             rflags: src.rflags,
             fpregs_on_heap: 0,
             fpregs: ptr::null_mut(),
+        }
+    }
+}
+
+impl Default for CpuContext {
+    fn default() -> Self {
+        Self {
+            r8: 0,
+            r9: 0,
+            r10: 0,
+            r11: 0,
+            r12: 0,
+            r13: 0,
+            r14: 0,
+            r15: 0,
+            rdi: 0,
+            rsi: 0,
+            rbp: 0,
+            rbx: 0,
+            rdx: 0,
+            rax: 0,
+            rcx: 0,
+            rsp: 0,
+            rip: 0,
+            rflags: 0,
+            fpregs_on_heap: 0,
+            fpregs: std::ptr::null_mut(),
         }
     }
 }

@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct TaskId(pub(crate) u64);
+pub struct TaskId(pub u64);
 
 impl TaskId {
     pub fn new() -> Self {

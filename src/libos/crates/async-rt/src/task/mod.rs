@@ -4,16 +4,14 @@ use core::future::Future;
 use crate::executor::EXECUTOR;
 use crate::prelude::*;
 
-pub use self::current::{current, try_current};
 pub use self::id::TaskId;
 pub use self::join::JoinHandle;
 pub use self::locals::LocalKey;
 pub use self::task::Task;
 
-pub(crate) use self::current::{reset_current, set_current};
 pub(crate) use self::locals::LocalsMap;
 
-mod current;
+pub mod current;
 mod id;
 mod join;
 mod locals;

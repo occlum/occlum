@@ -3,11 +3,11 @@ use core::cell::Cell;
 use crate::prelude::*;
 use crate::task::Task;
 
-pub fn current() -> Arc<Task> {
-    try_current().unwrap()
+pub fn get() -> Arc<Task> {
+    try_get().unwrap()
 }
 
-pub fn try_current() -> Option<Arc<Task>> {
+pub fn try_get() -> Option<Arc<Task>> {
     let ptr = CURRENT.get();
     if ptr == core::ptr::null() {
         return None;
@@ -17,12 +17,12 @@ pub fn try_current() -> Option<Arc<Task>> {
     Some(current_task)
 }
 
-pub(crate) fn set_current(task: Arc<Task>) {
+pub(crate) fn set(task: Arc<Task>) {
     let last_ptr = CURRENT.replace(Arc::into_raw(task));
     free_task_ptr(last_ptr);
 }
 
-pub(crate) fn reset_current() {
+pub(crate) fn reset() {
     let last_ptr = CURRENT.replace(core::ptr::null());
     free_task_ptr(last_ptr);
 }

@@ -68,9 +68,6 @@ pub extern "C" fn occlum_ecall_init(
             util::mpx_util::mpx_enable();
         }
 
-        // Enable backtrace
-        let _ = unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
-
         // Register exception handlers (support cpuid & rdtsc for now)
         register_exception_handlers();
 
@@ -142,8 +139,11 @@ pub extern "C" fn occlum_ecall_run_vcpu() -> i32 {
         return ecall_errno!(EAGAIN);
     }
 
-    debug!("occlum_ecall_run_vcpu");
     async_rt::executor::run_tasks();
+
+    use rcore_fs::vfs::FileSystem;
+    crate::fs::ROOT_INODE.fs().sync().unwrap();
+
     0
 }
 
