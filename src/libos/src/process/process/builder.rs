@@ -3,8 +3,8 @@ use std::sync::Weak;
 use super::super::task::Task;
 use super::super::thread::{ThreadBuilder, ThreadId, ThreadName};
 use super::super::{
-    FileTableRef, ForcedExitStatus, FsViewRef, ProcessRef, ProcessVMRef, ResourceLimitsRef,
-    SchedAgentRef,
+    FileTableRef, ForcedExitStatus, FsViewRef, HostWaker, ProcessRef, ProcessVMRef,
+    ResourceLimitsRef, SchedAgentRef,
 };
 use super::{Process, ProcessInner};
 use crate::events::{Notifier, Observer, WaiterQueueObserver};
@@ -21,6 +21,7 @@ pub struct ProcessBuilder {
     exec_path: Option<String>,
     parent: Option<ProcessRef>,
     no_parent: bool,
+    host_waker: Option<HostWaker>,
 }
 
 impl ProcessBuilder {
@@ -33,6 +34,7 @@ impl ProcessBuilder {
             exec_path: None,
             parent: None,
             no_parent: false,
+            host_waker: None,
         }
     }
 
@@ -53,6 +55,11 @@ impl ProcessBuilder {
 
     pub fn no_parent(mut self, no_parent: bool) -> Self {
         self.no_parent = no_parent;
+        self
+    }
+
+    pub fn host_waker(mut self, host_waker: HostWaker) -> Self {
+        self.host_waker = Some(host_waker);
         self
     }
 
@@ -101,6 +108,7 @@ impl ProcessBuilder {
         let new_process = {
             let exec_path = self.exec_path.take().unwrap_or_default();
             let parent = self.parent.take().map(|parent| RwLock::new(parent));
+            let host_waker = self.host_waker.take();
             let inner = SgxMutex::new(ProcessInner::new());
             let sig_dispositions = RwLock::new(SigDispositions::new());
             let sig_queues = RwLock::new(SigQueues::new());
@@ -110,6 +118,7 @@ impl ProcessBuilder {
             Arc::new(Process {
                 pid,
                 exec_path,
+                host_waker,
                 parent,
                 inner,
                 sig_dispositions,

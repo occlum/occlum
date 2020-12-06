@@ -7,7 +7,7 @@ use super::elf_file::{ElfFile, ElfHeader, ProgramHeader, ProgramHeaderExt, Segme
 use super::process::ProcessBuilder;
 use super::task::Task;
 use super::thread::ThreadName;
-use super::{table, task, ProcessRef, ThreadRef};
+use super::{table, task, HostWaker, ProcessRef, ThreadRef};
 use crate::fs::{
     CreationFlags, File, FileDesc, FileTable, FsView, HostStdioFds, StdinFile, StdoutFile,
     ROOT_INODE,
@@ -35,6 +35,7 @@ pub fn do_spawn(
         envp,
         file_actions,
         None,
+        None,
         current_ref,
         exec_now,
     )
@@ -47,6 +48,7 @@ pub fn do_spawn_root(
     envp: &[CString],
     file_actions: &[FileAction],
     host_stdio_fds: &HostStdioFds,
+    wake_host: *mut i32,
     current_ref: &ThreadRef,
 ) -> Result<pid_t> {
     let exec_now = false;
@@ -56,6 +58,7 @@ pub fn do_spawn_root(
         envp,
         file_actions,
         Some(host_stdio_fds),
+        Some(wake_host),
         current_ref,
         exec_now,
     )
@@ -67,6 +70,7 @@ fn do_spawn_common(
     envp: &[CString],
     file_actions: &[FileAction],
     host_stdio_fds: Option<&HostStdioFds>,
+    wake_host: Option<*mut i32>,
     current_ref: &ThreadRef,
     exec_now: bool,
 ) -> Result<pid_t> {
@@ -76,6 +80,7 @@ fn do_spawn_common(
         envp,
         file_actions,
         host_stdio_fds,
+        wake_host,
         current_ref,
     )?;
 
@@ -95,6 +100,7 @@ fn new_process(
     envp: &[CString],
     file_actions: &[FileAction],
     host_stdio_fds: Option<&HostStdioFds>,
+    wake_host_ptr: Option<*mut i32>,
     current_ref: &ThreadRef,
 ) -> Result<ProcessRef> {
     let mut argv = argv.clone().to_vec();
@@ -192,7 +198,7 @@ fn new_process(
         let elf_name = elf_path.rsplit('/').collect::<Vec<&str>>()[0];
         let thread_name = ThreadName::new(elf_name);
 
-        ProcessBuilder::new()
+        let mut builder = ProcessBuilder::new()
             .vm(vm_ref)
             .exec_path(&elf_path)
             .parent(process_ref)
@@ -201,8 +207,14 @@ fn new_process(
             .rlimits(rlimit_ref)
             .fs(fs_ref)
             .files(files_ref)
-            .name(thread_name)
-            .build()?
+            .name(thread_name);
+
+        if let Some(wake_host_ptr) = wake_host_ptr {
+            let host_waker = HostWaker::new(wake_host_ptr)?;
+            builder = builder.host_waker(host_waker);
+        }
+
+        builder.build()?
     };
 
     table::add_process(new_process_ref.clone());

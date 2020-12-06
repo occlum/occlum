@@ -104,7 +104,7 @@ pub extern "C" fn occlum_ecall_new_process(
     argv: *const *const c_char,
     env: *const *const c_char,
     host_stdio_fds: *const HostStdioFds,
-    u_status: *mut i32,
+    wake_host: *mut i32,
 ) -> i32 {
     if HAS_INIT.load(Ordering::SeqCst) == false {
         return ecall_errno!(EAGAIN);
@@ -119,9 +119,12 @@ pub extern "C" fn occlum_ecall_new_process(
             }
         };
 
+    // Convert *mut i32 to usize to satisfy the requirement of Send/Sync
+    let wake_host_addr = wake_host as usize;
     panic::catch_unwind(|| {
         backtrace::__rust_begin_short_backtrace(|| {
-            match do_new_process(&path, &args, env, &host_stdio_fds) {
+            let wake_host = wake_host_addr as *mut i32;
+            match do_new_process(&path, &args, env, &host_stdio_fds, wake_host) {
                 Ok(pid_t) => pid_t as i32,
                 Err(e) => {
                     eprintln!("failed to boot up LibOS: {}", e.backtrace());
@@ -258,6 +261,7 @@ fn do_new_process(
     argv: &Vec<CString>,
     env_concat: Vec<CString>,
     host_stdio_fds: &HostStdioFds,
+    wake_host: *mut i32,
 ) -> Result<pid_t> {
     validate_program_path(program_path)?;
 
@@ -270,6 +274,7 @@ fn do_new_process(
         &env_concat,
         &file_actions,
         host_stdio_fds,
+        wake_host,
         current,
     )?;
     Ok(new_tid)

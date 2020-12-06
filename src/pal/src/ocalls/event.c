@@ -69,3 +69,8 @@ int occlum_ocall_poll_with_eventfd(
 
     return ret;
 }
+
+void occlum_ocall_futex_wake(int *addr, int count) {
+    futex_wake((volatile int *)addr, count);
+    return;
+}

@@ -66,7 +66,7 @@ enclave {
             [user_check] const char** argv,
             [user_check] const char** env,
             [in] const struct occlum_stdio_fds* io_fds,
-            [out] int* exit_status);
+            [user_check] int* exit_status);
 
         /*
          * Run a vCPU.
@@ -238,6 +238,8 @@ enclave {
             size_t num_fds,
             uint64_t val
         );
+
+        void occlum_ocall_futex_wake([user_check] int* addr, int count);
 
         // TODO: the usage of this OCall should be replaced with 
         // occlum_ocall_poll_with_eventfd, which is a more general form.

@@ -599,6 +599,12 @@ pub async fn thread_main_loop(current: ThreadRef) {
         current.tid(),
         async_rt::task::current().tid()
     );
+
+    let process = current.process();
+    let host_waker = process.host_waker().as_ref().unwrap();
+    use crate::process::TermStatus;
+    host_waker.wake(TermStatus::Exited(0));
+
     //current.start();
     /*
     use rcore_fs::vfs::FileSystem;

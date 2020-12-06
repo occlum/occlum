@@ -16,6 +16,7 @@ use crate::sched::SchedAgent;
 use crate::signal::{SigDispositions, SigQueues};
 use crate::vm::ProcessVM;
 
+use self::host_waker::HostWaker;
 use self::process::{ProcessBuilder, ProcessInner};
 use self::thread::{ThreadBuilder, ThreadId, ThreadInner};
 
@@ -36,6 +37,7 @@ mod do_getpid;
 mod do_set_tid_address;
 mod do_spawn;
 mod do_wait4;
+mod host_waker;
 mod prctl;
 mod process;
 mod syscalls;

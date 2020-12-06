@@ -1,8 +1,8 @@
 use std::fmt;
 use std::sync::Weak;
 
-use super::{ForcedExitStatus, ProcessRef, TermStatus, ThreadRef};
 use crate::events::{Notifier, Observer, WaiterQueueObserver};
+use super::{ForcedExitStatus, HostWaker, ProcessRef, TermStatus, ThreadRef};
 use crate::prelude::*;
 use crate::signal::{SigDispositions, SigNum, SigQueues};
 
@@ -18,6 +18,7 @@ pub struct Process {
     // Immutable info
     pid: pid_t,
     exec_path: String,
+    host_waker: Option<HostWaker>,
     // Mutable info
     parent: Option<RwLock<ProcessRef>>,
     inner: SgxMutex<ProcessInner>,
@@ -103,6 +104,11 @@ impl Process {
     /// Get the path of the executable
     pub fn exec_path(&self) -> &str {
         &self.exec_path
+    }
+
+    /// Get the host wake pointer.
+    pub fn host_waker(&self) -> &Option<HostWaker> {
+        &self.host_waker
     }
 
     /// Get the signal queues for process-directed signals.
