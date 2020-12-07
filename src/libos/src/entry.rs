@@ -9,9 +9,11 @@ use crate::fs::HostStdioFds;
 use crate::interrupt;
 use crate::process::ProcessFilter;
 use crate::signal::SigNum;
+use crate::signal::SIGKILL;
 use crate::time::up_time::init;
 use crate::util::log::LevelFilter;
 use crate::util::mem_util::from_untrusted::*;
+use crate::util::resource_checker::StaticResourceChecker;
 use crate::util::sgx::allow_debug as sgx_allow_debug;
 use sgx_tse::*;
 
@@ -150,7 +152,17 @@ pub extern "C" fn occlum_ecall_kill(pid: i32, sig: i32) -> i32 {
 
     panic::catch_unwind(|| {
         backtrace::__rust_begin_short_backtrace(|| match do_kill(pid, sig) {
-            Ok(()) => 0,
+            Ok(()) => {
+                // If all the processes are killed with SIGKILL, all resources should be released.
+                if pid == -1 && SigNum::from_u8(sig as u8).unwrap() == SIGKILL {
+                    for checker in inventory::iter::<StaticResourceChecker> {
+                        if checker.is_leak()() {
+                            return ecall_errno!(EFAULT);
+                        }
+                    }
+                }
+                0
+            }
             Err(e) => {
                 eprintln!("failed to kill: {}", e.backtrace());
                 ecall_errno!(e.errno())

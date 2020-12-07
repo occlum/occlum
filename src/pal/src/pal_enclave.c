@@ -129,7 +129,11 @@ int pal_init_enclave(const char *instance_dir) {
     return 0;
 }
 
+#define SIGKILL 9
 int pal_destroy_enclave(void) {
+    /* force kill all the process, if any is running. */
+    int ret = occlum_pal_kill(-1, SIGKILL);
+
 // FIXME: Due to lack of support for enclave interrupt in simulation mode, some programs
 // come across the problem that it can't exit when running in simulation mode. We have to
 // fallback to the old way to exit brutely in simulation mode.
@@ -138,7 +142,7 @@ int pal_destroy_enclave(void) {
     global_eid = SGX_INVALID_ENCLAVE_ID;
 #endif
 
-    return 0;
+    return ret;
 }
 
 sgx_enclave_id_t pal_get_enclave_id(void) {

@@ -2,6 +2,7 @@ use super::super::{current, TermStatus, ThreadRef};
 use super::Task;
 use crate::interrupt;
 use crate::prelude::*;
+use crate::util::resource_checker::StaticResourceChecker;
 
 /// Enqueue a new thread so that it can be executed later.
 pub fn enqueue(new_thread: ThreadRef) {
@@ -68,6 +69,16 @@ pub fn exec(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
 lazy_static! {
     static ref NEW_THREAD_TABLE: SgxMutex<HashMap<pid_t, ThreadRef>> =
         { SgxMutex::new(HashMap::new()) };
+}
+
+inventory::submit! {
+    StaticResourceChecker::new(||
+        if NEW_THREAD_TABLE.lock().unwrap().is_empty(){
+            false
+        } else {
+            error!("NEW_THREAD_TABLE is not empty.");
+            true
+        })
 }
 
 extern "C" {

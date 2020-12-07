@@ -1,9 +1,20 @@
 use super::*;
 use crate::fs::EventFile;
+use crate::util::resource_checker::StaticResourceChecker;
 
 lazy_static! {
     pub static ref THREAD_NOTIFIERS: SgxMutex<HashMap<pid_t, EventFile>> =
         SgxMutex::new(HashMap::new());
+}
+
+inventory::submit! {
+    StaticResourceChecker::new(||
+        if THREAD_NOTIFIERS.lock().unwrap().is_empty(){
+            false
+        } else {
+            error!("THREAD_NOTIFIERS is not empty.");
+            true
+        })
 }
 
 #[derive(Debug)]
