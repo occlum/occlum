@@ -333,26 +333,26 @@ pub fn do_prctl(option: i32, arg2: u64, arg3: u64, arg4: u64, arg5: u64) -> Resu
     super::prctl::do_prctl(prctl_cmd)
 }
 
-pub fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize> {
+pub async fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize> {
     let code = ArchPrctlCode::from_u32(code)?;
     check_mut_ptr(addr)?;
     super::do_arch_prctl::do_arch_prctl(code, addr).map(|_| 0)
 }
 
-pub fn do_set_tid_address(tidptr: *mut pid_t) -> Result<isize> {
+pub async fn do_set_tid_address(tidptr: *mut pid_t) -> Result<isize> {
     if !tidptr.is_null() {
         check_mut_ptr(tidptr)?;
     }
     super::do_set_tid_address::do_set_tid_address(tidptr).map(|tid| tid as isize)
 }
 
-pub fn do_exit(status: i32) -> Result<isize> {
+pub async fn do_exit(status: i32) -> Result<isize> {
     debug!("exit: {}", status);
     super::do_exit::do_exit(status);
     Ok(0)
 }
 
-pub fn do_exit_group(status: i32) -> Result<isize> {
+pub async fn do_exit_group(status: i32) -> Result<isize> {
     debug!("exit_group: {}", status);
     super::do_exit::do_exit_group(status);
     Ok(0)

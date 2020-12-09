@@ -39,7 +39,7 @@ extern "C" fn handle_exception(info: *mut sgx_exception_info_t) -> i32 {
 }
 
 /// Exceptions are handled as a special kind of system calls.
-pub fn do_handle_exception(
+pub async fn do_handle_exception(
     info: *mut sgx_exception_info_t,
     fpregs: *mut FpRegs,
     user_context: *mut CpuContext,

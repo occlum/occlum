@@ -84,6 +84,21 @@ macro_rules! process_syscall_table_with_callback {
             // <SyscallFunc> must be an identifier, not a path.
             //
             // TODO: Unify the use of C types. For example, u8 or i8 or char_c for C string?
+
+            (Mprotect = 10) => do_mprotect(addr: usize, len: usize, prot: u32),
+            (RtSigreturn = 15) => do_rt_sigreturn(context: *mut CpuContext),
+            (Ioctl = 16) => do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8),
+            (Writev = 20) => do_writev(fd: FileDesc, iov: *const iovec_t, count: i32),
+            (Exit = 60) => do_exit(exit_status: i32),
+            (Sigaltstack = 131) => do_sigaltstack(ss: *const stack_t, old_ss: *mut stack_t, context: *const CpuContext),
+            (ArchPrctl = 158) => do_arch_prctl(code: u32, addr: *mut usize),
+            (SetTidAddress = 218) => do_set_tid_address(tidptr: *mut pid_t),
+            (ExitGroup = 231) => do_exit_group(exit_status: i32),
+
+            (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
+            (HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
+
+            /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),
             (Write = 1) => do_write(fd: FileDesc, buf: *const u8, size: usize),
             (Open = 2) => do_open(path: *const i8, flags: u32, mode: u32),
@@ -416,6 +431,7 @@ macro_rules! process_syscall_table_with_callback {
             (SpawnMusl = 360) => do_spawn_for_musl(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp),
             (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
             (HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
+            */
         }
     };
 }
@@ -563,10 +579,10 @@ macro_rules! impl_dispatch_syscall {
     (@do_syscall $fn:ident, $syscall:ident, $arg_i:expr, ($_arg_name:ident : $arg_type:ty, $($more_args:tt)*) -> ($($output:tt)*)) => {
         impl_dispatch_syscall!(@do_syscall $fn, $syscall, ($arg_i + 1), ($($more_args)*) -> ($($output)* ($syscall.args[$arg_i] as $arg_type),));
     };
-    (@as_expr $e:expr) => { $e };
+    (@as_expr $e:expr) => { $e.await };
 
     ($( ( $name:ident = $num:expr ) => $fn:ident ( $($args:tt)* ) ),+,) => {
-        fn dispatch_syscall(syscall: Syscall) -> Result<isize> {
+        async fn dispatch_syscall(syscall: Syscall) -> Result<isize> {
             match syscall.num {
                 #![deny(unreachable_patterns)]
                 $(
@@ -588,7 +604,12 @@ macro_rules! impl_dispatch_syscall {
 }
 process_syscall_table_with_callback!(impl_dispatch_syscall);
 
-pub async fn thread_main_loop(current: ThreadRef) {
+pub fn thread_main_loop(current: ThreadRef) -> impl std::future::Future<Output = ()> + Send {
+    // FIXME: this is only a temp solution; we should not mark the entire task Send.
+    unsafe { future_util::mark_send(__thread_main_loop(current)) }
+}
+
+pub async fn __thread_main_loop(current: ThreadRef) {
     unsafe {
         crate::process::current::set(current.clone());
     }
@@ -617,7 +638,7 @@ pub async fn thread_main_loop(current: ThreadRef) {
         // given system call number is a valid.
         log::next_round(None);
 
-        do_syscall(&mut user_context);
+        do_syscall(&mut user_context).await;
     }
 
     {
@@ -661,7 +682,7 @@ pub extern "C" fn occlum_syscall(user_context: *mut CpuContext) -> ! {
     do_sysret(user_context)
 }
 
-fn do_syscall(user_context: &mut CpuContext) {
+async fn do_syscall(user_context: &mut CpuContext) {
     // Extract arguments from the CPU context. The arguments follows Linux's syscall ABI.
     let num = user_context.rax as u32;
     let arg0 = user_context.rdi as isize;
@@ -671,53 +692,51 @@ fn do_syscall(user_context: &mut CpuContext) {
     let arg4 = user_context.r8 as isize;
     let arg5 = user_context.r9 as isize;
 
-    let ret = Syscall::new(num, arg0, arg1, arg2, arg3, arg4, arg5).and_then(|mut syscall| {
-        log::set_round_desc(Some(syscall.num.as_str()));
-        trace!("{:?}", &syscall);
-        let syscall_num = syscall.num;
+    let mut syscall = Syscall::new(num, arg0, arg1, arg2, arg3, arg4, arg5).unwrap();
 
-        // Pass user_context as an extra argument to two special syscalls that
-        // need to modify it
-        if syscall_num == SyscallNum::RtSigreturn {
-            syscall.args[0] = user_context as *mut _ as isize;
-        } else if syscall_num == SyscallNum::HandleException {
-            // syscall.args[0] == info
-            // syscall.args[1] == fpregs
-            syscall.args[2] = user_context as *mut _ as isize;
-        } else if syscall.num == SyscallNum::HandleInterrupt {
-            // syscall.args[0] == info
-            // syscall.args[1] == fpregs
-            syscall.args[2] = user_context as *mut _ as isize;
-        } else if syscall.num == SyscallNum::Sigaltstack {
-            // syscall.args[0] == new_ss
-            // syscall.args[1] == old_ss
-            syscall.args[2] = user_context as *const _ as isize;
-        }
+    log::set_round_desc(Some(syscall.num.as_str()));
+    trace!("{:?}", &syscall);
+    let syscall_num = syscall.num;
 
-        #[cfg(feature = "syscall_timing")]
-        current!()
-            .profiler()
-            .lock()
-            .unwrap()
-            .as_mut()
-            .unwrap()
-            .syscall_enter(syscall_num)
-            .expect("unexpected error from profiler to enter syscall");
+    // Pass user_context as an extra argument to two special syscalls that
+    // need to modify it
+    if syscall_num == SyscallNum::RtSigreturn {
+        syscall.args[0] = user_context as *mut _ as isize;
+    } else if syscall_num == SyscallNum::HandleException {
+        // syscall.args[0] == info
+        // syscall.args[1] == fpregs
+        syscall.args[2] = user_context as *mut _ as isize;
+    } else if syscall.num == SyscallNum::HandleInterrupt {
+        // syscall.args[0] == info
+        // syscall.args[1] == fpregs
+        syscall.args[2] = user_context as *mut _ as isize;
+    } else if syscall.num == SyscallNum::Sigaltstack {
+        // syscall.args[0] == new_ss
+        // syscall.args[1] == old_ss
+        syscall.args[2] = user_context as *const _ as isize;
+    }
 
-        let ret = dispatch_syscall(syscall);
+    #[cfg(feature = "syscall_timing")]
+    current!()
+        .profiler()
+        .lock()
+        .unwrap()
+        .as_mut()
+        .unwrap()
+        .syscall_enter(syscall_num)
+        .expect("unexpected error from profiler to enter syscall");
 
-        #[cfg(feature = "syscall_timing")]
-        current!()
-            .profiler()
-            .lock()
-            .unwrap()
-            .as_mut()
-            .unwrap()
-            .syscall_exit(syscall_num, ret.is_err())
-            .expect("unexpected error from profiler to exit syscall");
+    let ret = dispatch_syscall(syscall).await;
 
-        ret
-    });
+    #[cfg(feature = "syscall_timing")]
+    current!()
+        .profiler()
+        .lock()
+        .unwrap()
+        .as_mut()
+        .unwrap()
+        .syscall_exit(syscall_num, ret.is_err())
+        .expect("unexpected error from profiler to exit syscall");
 
     let retval = match ret {
         Ok(retval) => retval as isize,
@@ -842,7 +861,7 @@ fn do_mremap(
     Ok(addr as isize)
 }
 
-fn do_mprotect(addr: usize, len: usize, perms: u32) -> Result<isize> {
+async fn do_mprotect(addr: usize, len: usize, perms: u32) -> Result<isize> {
     let perms = VMPerms::from_u32(perms as u32)?;
     vm::do_mprotect(addr, len, perms)?;
     Ok(0)
@@ -1081,6 +1100,8 @@ impl Default for CpuContext {
     }
 }
 
+unsafe impl Send for CpuContext {}
+
 // exception and interrupt syscalls share the same c abi
 //
 // num: occlum syscall number
@@ -1100,4 +1121,40 @@ pub unsafe fn exception_interrupt_syscall_c_abi(
         pub fn __occlum_syscall_c_abi(num: u32, info: *mut c_void, fpregs: *mut FpRegs) -> u32;
     }
     __occlum_syscall_c_abi(num, info, fpregs)
+}
+
+mod future_util {
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+
+    /// Wrap a future with a new future that implements Send.
+    ///
+    /// Sometimes, a future that is automatically generated by the Rust compiler
+    /// does not implement Send. But we know that the future is safe to implement
+    /// Send. For situation like this, it is convenient to use this function to
+    /// convert a future to a new Send-version.
+    pub unsafe fn mark_send<F: Future>(f: F) -> SendFuture<F> {
+        SendFuture::wrap(f)
+    }
+
+    pub struct SendFuture<F: Future> {
+        inner: F,
+    }
+
+    impl<F: Future> SendFuture<F> {
+        pub unsafe fn wrap(inner: F) -> Self {
+            Self { inner }
+        }
+    }
+
+    impl<F: Future> Future for SendFuture<F> {
+        type Output = F::Output;
+
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            unsafe { self.map_unchecked_mut(|self_| &mut self_.inner).poll(cx) }
+        }
+    }
+
+    unsafe impl<F: Future> Send for SendFuture<F> {}
 }

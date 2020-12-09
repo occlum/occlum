@@ -27,7 +27,7 @@ extern "C" fn handle_interrupt(info: *mut sgx_interrupt_info_t) -> i32 {
     unreachable!();
 }
 
-pub fn do_handle_interrupt(
+pub async fn do_handle_interrupt(
     info: *mut sgx_interrupt_info_t,
     fpregs: *mut FpRegs,
     cpu_context: *mut CpuContext,

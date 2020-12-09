@@ -71,7 +71,7 @@ pub fn do_write(fd: FileDesc, buf: *const u8, size: usize) -> Result<isize> {
     Ok(len as isize)
 }
 
-pub fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<isize> {
+pub async fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<isize> {
     let count = {
         if count < 0 {
             return_errno!(EINVAL, "Invalid count of iovec");
@@ -508,7 +508,7 @@ pub fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize> {
     file_ops::do_fcntl(fd, &mut cmd)
 }
 
-pub fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
+pub async fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
     let mut ioctl_cmd = unsafe {
         if argp.is_null() == false {
             from_user::check_mut_ptr(argp)?;

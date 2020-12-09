@@ -10,7 +10,7 @@ use crate::syscall::CpuContext;
 use crate::time::timespec_t;
 use crate::util::mem_util::from_user;
 
-pub fn do_rt_sigaction(
+pub async fn do_rt_sigaction(
     signum_c: c_int,
     new_sa_c: *const sigaction_t,
     old_sa_c: *mut sigaction_t,
@@ -45,7 +45,7 @@ pub fn do_rt_sigaction(
     Ok(0)
 }
 
-pub fn do_rt_sigreturn(user_context: *mut CpuContext) -> Result<isize> {
+pub async fn do_rt_sigreturn(user_context: *mut CpuContext) -> Result<isize> {
     let user_context = unsafe { &mut *user_context };
     super::do_sigreturn::do_rt_sigreturn(user_context)?;
     Ok(0)
@@ -124,7 +124,7 @@ pub fn do_rt_sigpending(buf_ptr: *mut sigset_t, buf_size: usize) -> Result<isize
     Ok(0)
 }
 
-pub fn do_sigaltstack(
+pub async fn do_sigaltstack(
     new_ss_c: *const stack_t,
     old_ss_c: *mut stack_t,
     user_context: *const CpuContext,
