@@ -2,8 +2,9 @@ use super::cpu_set::{CpuSet, AVAIL_CPUSET};
 use crate::prelude::*;
 use crate::util::mem_util::from_user::*;
 
-pub fn do_sched_yield() -> Result<isize> {
-    super::do_sched_yield::do_sched_yield();
+pub async fn do_sched_yield() -> Result<isize> {
+    //super::do_sched_yield::do_sched_yield();
+    async_rt::sched::yield_().await;
     Ok(0)
 }
 

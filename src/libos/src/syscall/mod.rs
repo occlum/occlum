@@ -89,6 +89,7 @@ macro_rules! process_syscall_table_with_callback {
             (RtSigreturn = 15) => do_rt_sigreturn(context: *mut CpuContext),
             (Ioctl = 16) => do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8),
             (Writev = 20) => do_writev(fd: FileDesc, iov: *const iovec_t, count: i32),
+            (SchedYield = 24) => do_sched_yield(),
             (Exit = 60) => do_exit(exit_status: i32),
             (Sigaltstack = 131) => do_sigaltstack(ss: *const stack_t, old_ss: *mut stack_t, context: *const CpuContext),
             (ArchPrctl = 158) => do_arch_prctl(code: u32, addr: *mut usize),
