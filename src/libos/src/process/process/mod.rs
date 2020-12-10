@@ -1,8 +1,8 @@
 use std::fmt;
 use std::sync::Weak;
 
-use crate::events::{Notifier, Observer, WaiterQueueObserver};
 use super::{ForcedExitStatus, HostWaker, ProcessRef, TermStatus, ThreadRef};
+use crate::events::{Notifier, Observer, WaiterQueueObserver};
 use crate::prelude::*;
 use crate::signal::{SigDispositions, SigNum, SigQueues};
 
