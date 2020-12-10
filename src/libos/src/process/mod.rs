@@ -18,12 +18,11 @@ use crate::vm::ProcessVM;
 
 use self::process::{ProcessBuilder, ProcessInner};
 use self::thread::{ThreadBuilder, ThreadId, ThreadInner};
-use self::wait::{WaitQueue, Waiter};
 
 pub use self::do_exit::handle_force_exit;
 pub use self::do_futex::{futex_wait, futex_wake};
 pub use self::do_spawn::do_spawn_without_exec;
-pub use self::process::{Process, ProcessFilter, ProcessStatus, IDLE};
+pub use self::process::{Process, ProcessFilter, ProcessStatus, StatusChange, IDLE};
 pub use self::syscalls::*;
 pub use self::task::Task;
 pub use self::term_status::{ForcedExitStatus, TermStatus};
@@ -42,7 +41,6 @@ mod process;
 mod syscalls;
 mod term_status;
 mod thread;
-mod wait;
 
 pub mod current;
 pub mod elf_file;
