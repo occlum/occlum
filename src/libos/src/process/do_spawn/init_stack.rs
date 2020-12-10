@@ -4,6 +4,7 @@ use std::{mem, ptr};
 
 use super::aux_vec::{AuxKey, AuxVec};
 use crate::prelude::*;
+use crate::util::random;
 
 /*
  * The initial stack of a process looks like below:
@@ -53,11 +54,13 @@ pub fn do_init(
     init_area_size: usize,
     argv: &[CString],
     envp: &[CString],
-    auxtbl: &AuxVec,
+    auxtbl: &mut AuxVec,
 ) -> Result<usize> {
     let stack_buf = unsafe { StackBuf::new(stack_top, init_area_size)? };
     let envp_cloned = clone_cstrings_on_stack(&stack_buf, envp)?;
     let argv_cloned = clone_cstrings_on_stack(&stack_buf, argv)?;
+    let rand_val_ptr = generate_random_on_stack(&stack_buf)?;
+    auxtbl.set(AuxKey::AT_RANDOM, rand_val_ptr as *const () as u64);
     adjust_alignment(&stack_buf, auxtbl, &envp_cloned, &argv_cloned)?;
     dump_auxtbl_on_stack(&stack_buf, auxtbl)?;
     dump_cstrptrs_on_stack(&stack_buf, &envp_cloned)?;
@@ -144,6 +147,15 @@ impl StackBuf {
 
         Ok(new_pos as *mut u8)
     }
+}
+
+fn generate_random_on_stack(stack: &StackBuf) -> Result<*const u8> {
+    let rand_val = {
+        let mut rand: [u8; 16] = [0; 16];
+        random::get_random(&mut rand)?;
+        rand
+    };
+    stack.put_slice(&rand_val)
 }
 
 fn clone_cstrings_on_stack<'a, 'b>(
