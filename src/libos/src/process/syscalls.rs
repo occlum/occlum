@@ -11,7 +11,7 @@ use crate::prelude::*;
 use crate::time::{timespec_t, ClockID};
 use crate::util::mem_util::from_user::*;
 
-pub fn do_spawn_for_musl(
+pub async fn do_spawn_for_musl(
     child_pid_ptr: *mut u32,
     path: *const i8,
     argv: *const *const i8,
@@ -87,7 +87,7 @@ fn clone_file_actions_safely(fdop_ptr: *const FdOp) -> Result<Vec<FileAction>> {
     Ok(file_actions)
 }
 
-pub fn do_spawn_for_glibc(
+pub async fn do_spawn_for_glibc(
     child_pid_ptr: *mut u32,
     path: *const i8,
     argv: *const *const i8,
@@ -358,7 +358,7 @@ pub async fn do_exit_group(status: i32) -> Result<isize> {
     Ok(0)
 }
 
-pub fn do_wait4(pid: i32, exit_status_ptr: *mut i32) -> Result<isize> {
+pub async fn do_wait4(pid: i32, exit_status_ptr: *mut i32) -> Result<isize> {
     if !exit_status_ptr.is_null() {
         check_mut_ptr(exit_status_ptr)?;
     }
@@ -387,22 +387,22 @@ pub fn do_wait4(pid: i32, exit_status_ptr: *mut i32) -> Result<isize> {
     }
 }
 
-pub fn do_getpid() -> Result<isize> {
+pub async fn do_getpid() -> Result<isize> {
     let pid = super::do_getpid::do_getpid();
     Ok(pid as isize)
 }
 
-pub fn do_gettid() -> Result<isize> {
+pub async fn do_gettid() -> Result<isize> {
     let tid = super::do_getpid::do_gettid();
     Ok(tid as isize)
 }
 
-pub fn do_getppid() -> Result<isize> {
+pub async fn do_getppid() -> Result<isize> {
     let ppid = super::do_getpid::do_getppid();
     Ok(ppid as isize)
 }
 
-pub fn do_getpgid() -> Result<isize> {
+pub async fn do_getpgid() -> Result<isize> {
     let pgid = super::do_getpid::do_getpgid();
     Ok(pgid as isize)
 }

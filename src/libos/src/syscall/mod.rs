@@ -90,12 +90,16 @@ macro_rules! process_syscall_table_with_callback {
             (Ioctl = 16) => do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8),
             (Writev = 20) => do_writev(fd: FileDesc, iov: *const iovec_t, count: i32),
             (SchedYield = 24) => do_sched_yield(),
+            (Getpid = 39) => do_getpid(),
             (Exit = 60) => do_exit(exit_status: i32),
+            (Wait4 = 61) => do_wait4(pid: i32, _exit_status: *mut i32),
+            (Getppid = 110) => do_getppid(),
             (Sigaltstack = 131) => do_sigaltstack(ss: *const stack_t, old_ss: *mut stack_t, context: *const CpuContext),
             (ArchPrctl = 158) => do_arch_prctl(code: u32, addr: *mut usize),
             (SetTidAddress = 218) => do_set_tid_address(tidptr: *mut pid_t),
             (ExitGroup = 231) => do_exit_group(exit_status: i32),
 
+            (Spawn = 360) => do_spawn(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp),
             (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
             (HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
 
@@ -639,17 +643,7 @@ pub async fn __thread_main_loop(current: ThreadRef) {
         // given system call number is a valid.
         log::next_round(None);
 
-        do_syscall(&mut user_context).await;
-    }
-
-    {
-        use crate::process::TermStatus;
-        let process = current.process();
-        process
-            .host_waker()
-            .as_ref()
-            .unwrap()
-            .wake(TermStatus::Exited(0));
+        handle_syscall(&mut user_context).await;
     }
 }
 
@@ -683,7 +677,61 @@ pub extern "C" fn occlum_syscall(user_context: *mut CpuContext) -> ! {
     do_sysret(user_context)
 }
 
-async fn do_syscall(user_context: &mut CpuContext) {
+async fn handle_syscall(user_context: &mut CpuContext) {
+    let syscall_num = user_context.rax as u32;
+
+    let retval = match do_syscall(user_context).await {
+        Ok(retval) => retval as isize,
+        Err(e) => {
+            let should_log_err = |errno| {
+                // If the log level requires every detail, don't ignore any error
+                if log::max_level() == LevelFilter::Trace {
+                    return true;
+                }
+
+                // All other log levels require errors to be outputed. But
+                // some errnos are usually benign and may occur in a very high
+                // frequency. So we want to ignore them to keep noises at a
+                // minimum level in the log.
+                //
+                // TODO: use a smarter, frequency-based strategy to decide whether
+                // to suppress error messages.
+                match errno {
+                    EAGAIN | ETIMEDOUT => false,
+                    _ => true,
+                }
+            };
+            if should_log_err(e.errno()) {
+                error!("Error = {}", e.backtrace());
+            }
+
+            let retval = -(e.errno() as isize);
+            debug_assert!(retval != 0);
+            retval
+        }
+    };
+    trace!("Retval = {:?}", retval);
+
+    // Put the return value into user_context.rax, except for syscalls that may
+    // modify user_context directly. Currently, there are three such syscalls:
+    // SigReturn, HandleException, and HandleInterrupt.
+    //
+    // Sigreturn restores `user_context` to the state when the last signal
+    // handler is executed. So in the case of sigreturn, `user_context` should
+    // be kept intact.
+    if syscall_num != SyscallNum::RtSigreturn as u32
+        && syscall_num != SyscallNum::HandleException as u32
+        && syscall_num != SyscallNum::HandleInterrupt as u32
+    {
+        user_context.rax = retval as u64;
+    }
+
+    crate::signal::deliver_signal(user_context);
+
+    crate::process::handle_force_exit();
+}
+
+async fn do_syscall(user_context: &mut CpuContext) -> Result<isize> {
     // Extract arguments from the CPU context. The arguments follows Linux's syscall ABI.
     let num = user_context.rax as u32;
     let arg0 = user_context.rdi as isize;
@@ -693,7 +741,7 @@ async fn do_syscall(user_context: &mut CpuContext) {
     let arg4 = user_context.r8 as isize;
     let arg5 = user_context.r9 as isize;
 
-    let mut syscall = Syscall::new(num, arg0, arg1, arg2, arg3, arg4, arg5).unwrap();
+    let mut syscall = Syscall::new(num, arg0, arg1, arg2, arg3, arg4, arg5)?;
 
     log::set_round_desc(Some(syscall.num.as_str()));
     trace!("{:?}", &syscall);
@@ -739,55 +787,7 @@ async fn do_syscall(user_context: &mut CpuContext) {
         .syscall_exit(syscall_num, ret.is_err())
         .expect("unexpected error from profiler to exit syscall");
 
-    let retval = match ret {
-        Ok(retval) => retval as isize,
-        Err(e) => {
-            let should_log_err = |errno| {
-                // If the log level requires every detail, don't ignore any error
-                if log::max_level() == LevelFilter::Trace {
-                    return true;
-                }
-
-                // All other log levels require errors to be outputed. But
-                // some errnos are usually benign and may occur in a very high
-                // frequency. So we want to ignore them to keep noises at a
-                // minimum level in the log.
-                //
-                // TODO: use a smarter, frequency-based strategy to decide whether
-                // to suppress error messages.
-                match errno {
-                    EAGAIN | ETIMEDOUT => false,
-                    _ => true,
-                }
-            };
-            if should_log_err(e.errno()) {
-                error!("Error = {}", e.backtrace());
-            }
-
-            let retval = -(e.errno() as isize);
-            debug_assert!(retval != 0);
-            retval
-        }
-    };
-    trace!("Retval = {:?}", retval);
-
-    // Put the return value into user_context.rax, except for syscalls that may
-    // modify user_context directly. Currently, there are three such syscalls:
-    // SigReturn, HandleException, and HandleInterrupt.
-    //
-    // Sigreturn restores `user_context` to the state when the last signal
-    // handler is executed. So in the case of sigreturn, `user_context` should
-    // be kept intact.
-    if num != SyscallNum::RtSigreturn as u32
-        && num != SyscallNum::HandleException as u32
-        && num != SyscallNum::HandleInterrupt as u32
-    {
-        user_context.rax = retval as u64;
-    }
-
-    crate::signal::deliver_signal(user_context);
-
-    crate::process::handle_force_exit();
+    ret
 }
 
 /// Return to the user space according to the given CPU context
