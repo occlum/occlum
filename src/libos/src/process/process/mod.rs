@@ -1,14 +1,17 @@
 use std::fmt;
+use std::sync::Weak;
 
-use super::wait::WaitQueue;
 use super::{ForcedExitStatus, ProcessRef, TermStatus, ThreadRef};
+use crate::events::{Notifier, Observer, WaiterQueueObserver};
 use crate::prelude::*;
 use crate::signal::{SigDispositions, SigNum, SigQueues};
 
 pub use self::builder::ProcessBuilder;
+pub use self::event::StatusChange;
 pub use self::idle::IDLE;
 
 mod builder;
+mod event;
 mod idle;
 
 pub struct Process {
@@ -22,6 +25,9 @@ pub struct Process {
     sig_dispositions: RwLock<SigDispositions>,
     sig_queues: RwLock<SigQueues>,
     forced_exit_status: ForcedExitStatus,
+    // Process-related Events
+    observer: Arc<WaiterQueueObserver<StatusChange>>,
+    notifier: Notifier<StatusChange>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -135,13 +141,20 @@ impl Process {
     pub(super) fn inner(&self) -> SgxMutexGuard<ProcessInner> {
         self.inner.lock().unwrap()
     }
+
+    pub(super) fn observer(&self) -> &Arc<WaiterQueueObserver<StatusChange>> {
+        &self.observer
+    }
+
+    pub(super) fn notifier(&self) -> &Notifier<StatusChange> {
+        &self.notifier
+    }
 }
 
 pub enum ProcessInner {
     Live {
         status: LiveStatus,
         children: Vec<ProcessRef>,
-        waiting_children: WaitQueue<ProcessFilter, pid_t>,
         threads: Vec<ThreadRef>,
     },
     Zombie {
@@ -154,7 +167,6 @@ impl ProcessInner {
         Self::Live {
             status: LiveStatus::Running,
             children: Vec::new(),
-            waiting_children: WaitQueue::new(),
             threads: Vec::new(),
         }
     }
@@ -215,15 +227,6 @@ impl ProcessInner {
         }
     }
 
-    pub fn waiting_children_mut(&mut self) -> Option<&mut WaitQueue<ProcessFilter, pid_t>> {
-        match self {
-            Self::Live {
-                waiting_children, ..
-            } => Some(waiting_children),
-            _ => None,
-        }
-    }
-
     pub fn remove_zombie_child(&mut self, zombie_pid: pid_t) -> ProcessRef {
         let mut children = self.children_mut().unwrap();
         let zombie_i = children
@@ -233,7 +236,8 @@ impl ProcessInner {
         children.swap_remove(zombie_i)
     }
 
-    /// Exit means two things: 1) transfer all children to a new parent; 2) update the status.
+    /// Exit means two things: 1) transfer all children to a new parent; 2) update the status to
+    /// zombie; 3) stop observing the status changes of all (previous) children.
     ///
     /// A lock guard for the new parent process is passed so that the transfer can be done
     /// atomically.
@@ -242,21 +246,34 @@ impl ProcessInner {
         term_status: TermStatus,
         new_parent_ref: &ProcessRef,
         new_parent_inner: &mut SgxMutexGuard<ProcessInner>,
+        old_parent_ref: &ProcessRef,
     ) {
         // Check preconditions
         debug_assert!(self.status() == ProcessStatus::Running);
         debug_assert!(self.num_threads() == 0);
 
+        self.stop_observing_children(old_parent_ref);
+
         // When this process exits, its children are adopted by the init process
         for child in self.children().unwrap() {
+            // Establish the new parent-child relationship
             let child_inner = child.inner();
             let mut parent = child.parent.as_ref().unwrap().write().unwrap();
             *parent = new_parent_ref.clone();
-
             new_parent_inner.children_mut().unwrap().push(child.clone());
+
+            // The new parent, which is the IDLE process, does not need to observe
+            // the status change of its children.
         }
 
         *self = Self::Zombie { term_status };
+    }
+
+    fn stop_observing_children(&mut self, old_parent_ref: &ProcessRef) {
+        let old_observer = Arc::downgrade(old_parent_ref.observer()) as Weak<dyn Observer<_>>;
+        for child in self.children().unwrap() {
+            child.notifier().unregister(&old_observer);
+        }
     }
 
     pub fn term_status(&self) -> Option<TermStatus> {
