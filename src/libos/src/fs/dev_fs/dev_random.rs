@@ -1,21 +1,14 @@
 use super::*;
 use crate::net::PollEventFlags;
+use crate::util::random;
 
 #[derive(Debug)]
 pub struct DevRandom;
 
-extern "C" {
-    fn sgx_read_rand(rand_buf: *mut u8, buf_size: usize) -> sgx_status_t;
-}
-
 impl File for DevRandom {
     fn read(&self, _buf: &mut [u8]) -> Result<usize> {
-        let (buf, size) = _buf.as_mut().as_mut_ptr_and_len();
-        let status = unsafe { sgx_read_rand(buf, size) };
-        if status != sgx_status_t::SGX_SUCCESS {
-            return_errno!(EAGAIN, "failed to get random number from sgx");
-        }
-        Ok(size)
+        random::get_random(_buf)?;
+        Ok(_buf.len())
     }
 
     fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize> {

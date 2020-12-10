@@ -130,7 +130,7 @@ fn new_process(
         let process_ref = current_ref.process().clone();
 
         let vm = init_vm::do_init(&exec_elf_file, &ldso_elf_file)?;
-        let auxvec = init_auxvec(&vm, &exec_elf_file)?;
+        let mut auxvec = init_auxvec(&vm, &exec_elf_file)?;
 
         // Notify debugger to load the symbols from elf file
         let ldso_elf_base = vm.get_elf_ranges()[1].start() as u64;
@@ -162,7 +162,7 @@ fn new_process(
             };
             let user_stack_base = vm.get_stack_base();
             let user_stack_limit = vm.get_stack_limit();
-            let user_rsp = init_stack::do_init(user_stack_base, 4096, &argv, envp, &auxvec)?;
+            let user_rsp = init_stack::do_init(user_stack_base, 4096, &argv, envp, &mut auxvec)?;
             unsafe {
                 Task::new(
                     ldso_entry,
