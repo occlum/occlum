@@ -79,8 +79,10 @@ impl WaiterQueue {
             count += 1;
         }
 
-        // Wake in batch
-        Waker::batch_wake(to_wake.iter());
+        // Do wake
+        for waker in &to_wake {
+            waker.wake();
+        }
         to_wake.len()
     }
 }

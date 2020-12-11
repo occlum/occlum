@@ -1,6 +1,9 @@
 use std::cmp::PartialEq;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Weak;
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 use super::host_event_fd::HostEventFd;
@@ -8,7 +11,7 @@ use crate::prelude::*;
 
 /// A waiter enables a thread to sleep.
 pub struct Waiter {
-    inner: Arc<Inner>,
+    inner: Arc<SgxMutex<Inner>>,
 }
 
 impl Waiter {
@@ -19,7 +22,7 @@ impl Waiter {
     /// `!Sync` traits. Thus, a `Waiter` can only put the current thread to sleep.
     pub fn new() -> Self {
         Self {
-            inner: Arc::new(Inner::new()),
+            inner: Arc::new(SgxMutex::new(Inner::new())),
         }
     }
 
@@ -28,7 +31,8 @@ impl Waiter {
     /// Once a waiter is waken up, the `wait` or `wait_mut` method becomes
     /// non-blocking.
     pub fn is_woken(&self) -> bool {
-        self.inner.is_woken()
+        let inner = self.inner.lock().unwrap();
+        inner.is_woken
     }
 
     /// Reset a waiter.
@@ -37,7 +41,8 @@ impl Waiter {
     /// that the `Waiter` can use the `wait` or `wait_mut` methods to sleep the
     /// current thread again.
     pub fn reset(&self) {
-        self.inner.reset();
+        let mut inner = self.inner.lock().unwrap();
+        inner.is_woken = false;
     }
 
     /// Put the current thread to sleep until being waken up by a waker.
@@ -49,16 +54,16 @@ impl Waiter {
     ///
     /// If the `timeout` argument is `None`, then the second case won't happen,
     /// i.e., the method will block indefinitely.
-    pub fn wait(&self, timeout: Option<&Duration>) -> Result<()> {
-        self.inner.wait(timeout)
+    pub fn wait(&self, timeout: Option<&Duration>) -> WaiterFuture {
+        WaiterFuture::new(&self.inner)
     }
 
     /// Put the current thread to sleep until being waken up by a waker.
     ///
     /// This method is similar to the `wait` method except that the `timeout`
     /// argument will be updated to reflect the remaining timeout.
-    pub fn wait_mut(&self, timeout: Option<&mut Duration>) -> Result<()> {
-        self.inner.wait_mut(timeout)
+    pub fn wait_mut(&self, timeout: Option<&mut Duration>) -> WaiterFuture {
+        WaiterFuture::new(&self.inner)
     }
 
     /// Create a waker that can wake up this waiter.
@@ -68,38 +73,39 @@ impl Waiter {
     /// does not need to be called manually.
     pub fn waker(&self) -> Waker {
         Waker {
-            inner: Arc::downgrade(&self.inner),
+            weak_inner: Arc::downgrade(&self.inner),
         }
     }
-
-    /// Expose the internal host eventfd.
-    ///
-    /// This host eventfd should be used by an external user carefully.
-    pub fn host_eventfd(&self) -> &HostEventFd {
-        self.inner.host_eventfd()
-    }
 }
-
-impl !Send for Waiter {}
-impl !Sync for Waiter {}
 
 /// A waker can wake up the thread that its waiter has put to sleep.
 #[derive(Clone)]
 pub struct Waker {
-    inner: Weak<Inner>,
+    weak_inner: Weak<SgxMutex<Inner>>,
 }
 
 impl Waker {
     /// Wake up the waiter that creates this waker.
     pub fn wake(&self) {
-        if let Some(inner) = self.inner.upgrade() {
-            inner.wake()
-        }
-    }
+        let arc_inner = match self.weak_inner.upgrade() {
+            None => return,
+            Some(inner) => inner,
+        };
+        let mut inner = arc_inner.lock().unwrap();
 
-    /// Wake up waiters in batch, more efficient than waking up one-by-one.
-    pub fn batch_wake<'a, I: Iterator<Item = &'a Waker>>(iter: I) {
-        Inner::batch_wake(iter);
+        if inner.is_woken {
+            return;
+        }
+        inner.is_woken = true;
+
+        let waker = match inner.core_waker.take() {
+            None => return,
+            Some(waker) => waker,
+        };
+
+        drop(inner);
+
+        waker.wake();
     }
 }
 
@@ -112,82 +118,42 @@ impl PartialEq for Waker {
 impl Eq for Waker {}
 
 struct Inner {
-    is_woken: AtomicBool,
-    host_eventfd: Arc<HostEventFd>,
+    is_woken: bool,
+    core_waker: Option<core::task::Waker>,
 }
 
 impl Inner {
     pub fn new() -> Self {
-        let is_woken = AtomicBool::new(false);
-        let host_eventfd = current!().host_eventfd().clone();
+        let is_woken = false;
+        let core_waker = None;
         Self {
             is_woken,
-            host_eventfd,
+            core_waker,
         }
     }
+}
 
-    pub fn is_woken(&self) -> bool {
-        self.is_woken.load(Ordering::SeqCst)
+pub struct WaiterFuture<'a> {
+    inner: &'a Arc<SgxMutex<Inner>>,
+}
+
+impl<'a> WaiterFuture<'a> {
+    fn new(inner: &'a Arc<SgxMutex<Inner>>) -> Self {
+        Self { inner }
     }
+}
 
-    pub fn reset(&self) {
-        self.is_woken.store(false, Ordering::SeqCst);
-    }
+impl<'a> Future for WaiterFuture<'a> {
+    type Output = ();
 
-    pub fn wait(&self, timeout: Option<&Duration>) -> Result<()> {
-        while !self.is_woken() {
-            self.host_eventfd.poll(timeout)?;
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut inner = self.inner.lock().unwrap();
+
+        if inner.is_woken {
+            return Poll::Ready(());
         }
-        Ok(())
-    }
 
-    pub fn wait_mut(&self, timeout: Option<&mut Duration>) -> Result<()> {
-        let mut remain = timeout.as_ref().map(|d| **d);
-
-        // Need to change timeout from `Option<&mut Duration>` to `&mut Option<Duration>`
-        // so that the Rust compiler is happy about using the variable in a loop.
-        let ret = self.do_wait_mut(&mut remain);
-
-        if let Some(timeout) = timeout {
-            *timeout = remain.unwrap();
-        }
-        ret
-    }
-
-    fn do_wait_mut(&self, remain: &mut Option<Duration>) -> Result<()> {
-        while !self.is_woken() {
-            self.host_eventfd.poll_mut(remain.as_mut())?;
-        }
-        Ok(())
-    }
-
-    pub fn wake(&self) {
-        if self
-            .is_woken
-            .compare_and_swap(false, true, Ordering::SeqCst)
-            == false
-        {
-            self.host_eventfd.write_u64(1);
-        }
-    }
-
-    pub fn batch_wake<'a, I: Iterator<Item = &'a Waker>>(iter: I) {
-        let host_eventfds = iter
-            .filter_map(|waker| waker.inner.upgrade())
-            .filter(|inner| {
-                inner
-                    .is_woken
-                    .compare_and_swap(false, true, Ordering::SeqCst)
-                    == false
-            })
-            .map(|inner| inner.host_eventfd.host_fd())
-            .collect::<Vec<FileDesc>>();
-        unsafe {
-            HostEventFd::write_u64_raw_and_batch(&host_eventfds, 1);
-        }
-    }
-
-    pub fn host_eventfd(&self) -> &HostEventFd {
-        &self.host_eventfd
+        inner.core_waker = Some(cx.waker().clone());
+        Poll::Pending
     }
 }

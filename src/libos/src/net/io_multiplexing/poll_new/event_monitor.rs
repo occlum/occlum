@@ -8,6 +8,8 @@ use crate::fs::{AtomicIoEvents, IoEvents};
 use crate::prelude::*;
 use crate::time::{timespec_t, TIMERSLACK};
 
+// FIXME: this event monitor is not working
+
 /// Monitor events that happen on a set of interesting files.
 ///
 /// The event monitor can wait for events on both LibOS files and host files.
@@ -223,12 +225,15 @@ impl EventMonitorBuilder {
             });
         }
 
-        // Add one more for waiter's underlying host eventfd
-        ocall_pollfds.push(libc::pollfd {
-            fd: self.waiter.host_eventfd().host_fd() as i32,
-            events: libc::POLLIN,
-            revents: 0,
-        });
+        todo!();
+        /*
+                // Add one more for waiter's underlying host eventfd
+                ocall_pollfds.push(libc::pollfd {
+                    fd: self.waiter.host_eventfd().host_fd() as i32,
+                    events: libc::POLLIN,
+                    revents: 0,
+                });
+        */
     }
 
     fn init_observer(&self) {
