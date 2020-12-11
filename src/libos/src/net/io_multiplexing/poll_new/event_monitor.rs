@@ -49,7 +49,8 @@ impl EventMonitor {
 
     /// Reset the monitor so that it can wait for new events.
     pub fn reset_events(&mut self) {
-        self.observer.waiter_queue().reset_and_enqueue(&self.waiter);
+        self.waiter.reset();
+        self.observer.waiter_queue().enqueue(&self.waiter);
     }
 
     /// Wait for some interesting events that happen on the set of files.

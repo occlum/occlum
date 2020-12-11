@@ -6,6 +6,7 @@ use ringbuf::{Consumer as RbConsumer, Producer as RbProducer, RingBuffer};
 use super::{IoEvents, IoNotifier};
 use crate::events::{Event, EventFilter, Notifier, Observer, Waiter, WaiterQueueObserver};
 use crate::prelude::*;
+use crate::waiter_loop;
 
 /// A unidirectional communication channel, intended to implement IPC, e.g., pipe,
 /// unix domain sockets, etc.
@@ -183,32 +184,6 @@ macro_rules! impl_end_point_type {
     )
 }
 
-// Just like a normal loop, except that a waiter queue (as well as a waiter)
-// is used to avoid busy loop. This macro is used in the push/pop implementation
-// below.
-macro_rules! waiter_loop {
-    ($loop_body: block, $waiter_queue: expr) => {
-        // Try without creating a waiter. This saves some CPU cycles if the
-        // first attempt succeeds.
-        {
-            $loop_body
-        }
-
-        // The main loop
-        let waiter = Waiter::new();
-        let waiter_queue = $waiter_queue;
-        loop {
-            waiter_queue.reset_and_enqueue(&waiter);
-
-            {
-                $loop_body
-            }
-
-            waiter.wait(None)?;
-        }
-    };
-}
-
 impl_end_point_type! {
     /// Producer is the writable endpoint of a channel.
     pub struct Producer<I> {
@@ -239,7 +214,7 @@ impl<I> Producer<I> {
                 }
             },
             self.observer.waiter_queue()
-        );
+        )
     }
 
     pub fn poll(&self) -> IoEvents {
@@ -325,7 +300,7 @@ impl<I: Copy> Producer<I> {
                 }
             },
             self.observer.waiter_queue()
-        );
+        )
     }
 }
 
@@ -365,7 +340,7 @@ impl<I> Consumer<I> {
                 }
             },
             self.observer.waiter_queue()
-        );
+        )
     }
 
     pub fn poll(&self) -> IoEvents {
@@ -467,7 +442,7 @@ impl<I: Copy> Consumer<I> {
                 }
             },
             self.observer.waiter_queue()
-        );
+        )
     }
 }
 

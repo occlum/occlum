@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::LinkedList;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
@@ -13,7 +13,7 @@ use crate::prelude::*;
 /// of `Waker`s.
 pub struct WaiterQueue {
     count: AtomicUsize,
-    wakers: SgxMutex<VecDeque<Waker>>,
+    wakers: SgxMutex<LinkedList<Waker>>,
 }
 
 impl WaiterQueue {
@@ -21,7 +21,7 @@ impl WaiterQueue {
     pub fn new() -> Self {
         Self {
             count: AtomicUsize::new(0),
-            wakers: SgxMutex::new(VecDeque::new()),
+            wakers: SgxMutex::new(LinkedList::new()),
         }
     }
 
@@ -30,17 +30,23 @@ impl WaiterQueue {
         self.count.load(Ordering::SeqCst) == 0
     }
 
-    /// Reset a waiter and enqueue it.
+    /// Enqueue a waiter.
     ///
     /// It is allowed to enqueue a waiter more than once before it is dequeued.
     /// But this is usually not a good idea. It is the callers' responsibility
     /// to use the API properly.
-    pub fn reset_and_enqueue(&self, waiter: &Waiter) {
-        waiter.reset();
-
+    pub fn enqueue(&self, waiter: &Waiter) {
         let mut wakers = self.wakers.lock().unwrap();
         self.count.fetch_add(1, Ordering::SeqCst);
         wakers.push_back(waiter.waker());
+    }
+
+    /// Dequeue a waiter.
+    pub fn dequeue(&self, waiter: &Waiter) {
+        let target_waker = waiter.waker();
+        let mut wakers = self.wakers.lock().unwrap();
+        let dequeued_count = wakers.drain_filter(|waker| waker == &target_waker).count();
+        self.count.fetch_sub(dequeued_count, Ordering::SeqCst);
     }
 
     /// Dequeue a waiter and wake up its thread.
@@ -61,13 +67,17 @@ impl WaiterQueue {
         }
 
         // Dequeue wakers
-        let to_wake = {
-            let mut wakers = self.wakers.lock().unwrap();
-            let max_count = max_count.min(wakers.len());
-            let to_wake: Vec<Waker> = wakers.drain(..max_count).collect();
-            self.count.fetch_sub(to_wake.len(), Ordering::SeqCst);
-            to_wake
-        };
+        let mut to_wake = Vec::new();
+        let mut wakers = self.wakers.lock().unwrap();
+        let mut count = 0;
+        while count < max_count {
+            let waker = match wakers.pop_front() {
+                None => break,
+                Some(waker) => waker,
+            };
+            to_wake.push(waker);
+            count += 1;
+        }
 
         // Wake in batch
         Waker::batch_wake(to_wake.iter());

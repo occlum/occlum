@@ -16,6 +16,7 @@ use crate::fs::{
     AtomicIoEvents, File, FileTableEvent, FileTableNotifier, HostFd, IoEvents, IoNotifier,
 };
 use crate::prelude::*;
+use crate::waiter_loop;
 
 // TODO: Prevent two epoll files from monitoring each other, which may cause
 // deadlock in the current implementation.
@@ -146,7 +147,8 @@ impl EpollFile {
         let mut timeout = timeout.cloned();
         let max_count = revents.len();
         let mut reinsert = VecDeque::with_capacity(max_count);
-        let waiter = EpollWaiter::new(&self.host_file_epoller);
+        let epoll_waiter = EpollWaiter::new(&self.host_file_epoller);
+        let waiter = epoll_waiter.as_ref();
 
         loop {
             // Poll the latest states of the interested host files. If a host
@@ -158,7 +160,7 @@ impl EpollFile {
             self.host_file_epoller.poll_events(max_count);
 
             // Prepare for the waiter.wait_mut() at the end of the loop
-            self.waiters.reset_and_enqueue(waiter.as_ref());
+            self.waiters.enqueue(waiter);
 
             // Pop from the ready list to find as many results as possible
             let mut count = 0;
@@ -231,6 +233,7 @@ impl EpollFile {
                 }
             }
             // This means we have been waken up successfully. Let's try again.
+            waiter.reset();
         }
     }
 
