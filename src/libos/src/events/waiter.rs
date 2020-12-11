@@ -1,3 +1,4 @@
+use std::cmp::PartialEq;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Weak;
 use std::time::Duration;
@@ -83,6 +84,7 @@ impl !Send for Waiter {}
 impl !Sync for Waiter {}
 
 /// A waker can wake up the thread that its waiter has put to sleep.
+#[derive(Clone)]
 pub struct Waker {
     inner: Weak<Inner>,
 }
@@ -100,6 +102,14 @@ impl Waker {
         Inner::batch_wake(iter);
     }
 }
+
+impl PartialEq for Waker {
+    fn eq(&self, other: &Self) -> bool {
+        Weak::ptr_eq(&self.inner, &other.inner)
+    }
+}
+
+impl Eq for Waker {}
 
 struct Inner {
     is_woken: AtomicBool,

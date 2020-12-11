@@ -49,7 +49,7 @@ impl EventMonitor {
 
     /// Reset the monitor so that it can wait for new events.
     pub fn reset_events(&mut self) {
-        self.observer.waiter_queue().reset_and_enqueue(&self.waiter);
+        self.waiter.reset();
     }
 
     /// Wait for some interesting events that happen on the set of files.
@@ -238,6 +238,8 @@ impl EventMonitorBuilder {
     pub fn build(mut self) -> EventMonitor {
         self.init_ocall_pollfds();
         self.init_observer();
+
+        self.observer.waiter_queue().enqueue(&self.waiter);
 
         let mut new_event_monitor = {
             let Self {
