@@ -3,7 +3,7 @@ use std::sync::Weak;
 
 use super::do_futex::futex_wake;
 use super::process::{Process, ProcessFilter};
-use super::{table, ProcessRef, StatuChange, TermStatus, ThreadRef, ThreadStatus};
+use super::{table, ProcessRef, StatusChange, TermStatus, ThreadRef, ThreadStatus};
 use crate::prelude::*;
 use crate::signal::constants::*;
 use crate::signal::{KernelSignal, SigNum};
