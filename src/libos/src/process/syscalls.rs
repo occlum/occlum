@@ -203,7 +203,7 @@ fn clone_file_actions_from_fa_safely(fa_ptr: *const SpawnFileActions) -> Result<
     Ok(file_actions)
 }
 
-pub fn do_clone(
+pub async fn do_clone(
     flags: u32,
     stack_addr: usize,
     ptid: *mut pid_t,
@@ -237,12 +237,12 @@ pub fn do_clone(
         }
     };
 
-    let child_pid = super::do_clone::do_clone(flags, stack_addr, ptid, ctid, new_tls)?;
+    let child_pid = super::do_clone::do_clone(flags, stack_addr, ptid, ctid, new_tls).await?;
 
     Ok(child_pid as isize)
 }
 
-pub fn do_futex(
+pub async fn do_futex(
     futex_addr: *const i32,
     futex_op: u32,
     futex_val: i32,

@@ -80,7 +80,7 @@ pub fn do_tgkill(pid: i32, tid: pid_t, sig: c_int) -> Result<isize> {
     Ok(0)
 }
 
-pub fn do_rt_sigprocmask(
+pub async fn do_rt_sigprocmask(
     how: c_int,
     set_ptr: *const sigset_t,
     oldset_ptr: *mut sigset_t,

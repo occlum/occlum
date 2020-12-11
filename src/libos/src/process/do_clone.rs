@@ -7,7 +7,7 @@ use crate::prelude::*;
 use crate::vm::{ProcessVM, VMRange};
 
 /// Create and execute a new thread.
-pub fn do_clone(
+pub async fn do_clone(
     flags: CloneFlags,
     user_rsp: usize,
     ptid: Option<NonNull<pid_t>>,

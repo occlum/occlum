@@ -103,6 +103,16 @@ macro_rules! process_syscall_table_with_callback {
             (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
             (HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
 
+            (RtSigprocmask = 14) => do_rt_sigprocmask(how: c_int, set: *const sigset_t, oldset: *mut sigset_t, sigset_size: size_t),
+            (Membarrier = 324) => handle_unsupported(),
+            (Mmap = 9) => do_mmap(addr: usize, size: usize, perms: i32, flags: i32, fd: FileDesc, offset: off_t),
+            (Munmap = 11) => do_munmap(addr: usize, size: usize),
+            (Mremap = 25) => do_mremap(old_addr: usize, old_size: usize, new_size: usize, flags: i32, new_addr: usize),
+            (Msync = 26) => do_msync(addr: usize, size: usize, flags: u32),
+            (Brk = 12) => do_brk(new_brk_addr: usize),
+            (Clone = 56) => do_clone(flags: u32, stack_addr: usize, ptid: *mut pid_t, ctid: *mut pid_t, new_tls: usize),
+            (Futex = 202) => do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32, timeout: u64, futex_new_addr: *const i32, bitset: u32),
+
             /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),
             (Write = 1) => do_write(fd: FileDesc, buf: *const u8, size: usize),
@@ -831,7 +841,7 @@ const FDOP_CLOSE: u32 = 1;
 const FDOP_DUP2: u32 = 2;
 const FDOP_OPEN: u32 = 3;
 
-fn do_mmap(
+async fn do_mmap(
     addr: usize,
     size: usize,
     perms: i32,
@@ -845,12 +855,12 @@ fn do_mmap(
     Ok(addr as isize)
 }
 
-fn do_munmap(addr: usize, size: usize) -> Result<isize> {
+async fn do_munmap(addr: usize, size: usize) -> Result<isize> {
     vm::do_munmap(addr, size)?;
     Ok(0)
 }
 
-fn do_mremap(
+async fn do_mremap(
     old_addr: usize,
     old_size: usize,
     new_size: usize,
@@ -868,12 +878,12 @@ async fn do_mprotect(addr: usize, len: usize, perms: u32) -> Result<isize> {
     Ok(0)
 }
 
-fn do_brk(new_brk_addr: usize) -> Result<isize> {
+async fn do_brk(new_brk_addr: usize) -> Result<isize> {
     let ret_brk_addr = vm::do_brk(new_brk_addr)?;
     Ok(ret_brk_addr as isize)
 }
 
-fn do_msync(addr: usize, size: usize, flags: u32) -> Result<isize> {
+async fn do_msync(addr: usize, size: usize, flags: u32) -> Result<isize> {
     let flags = MSyncFlags::from_u32(flags)?;
     vm::do_msync(addr, size, flags)?;
     Ok(0)
@@ -967,7 +977,7 @@ fn do_prlimit(
     misc::do_prlimit(pid, resource, new_limit, old_limit).map(|_| 0)
 }
 
-fn handle_unsupported() -> Result<isize> {
+async fn handle_unsupported() -> Result<isize> {
     return_errno!(ENOSYS, "Unimplemented or unknown syscall")
 }
 
