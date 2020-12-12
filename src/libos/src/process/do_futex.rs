@@ -2,6 +2,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::intrinsics::atomic_load;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use crate::prelude::*;
 use crate::time::{timespec_t, ClockID};
@@ -11,6 +12,7 @@ use crate::time::{timespec_t, ClockID};
 /// call in a memory-safe way.
 
 #[allow(non_camel_case_types)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum FutexOp {
     FUTEX_WAIT = 0,
     FUTEX_WAKE = 1,
@@ -73,31 +75,11 @@ pub fn futex_op_and_flags_from_u32(bits: u32) -> Result<(FutexOp, FutexFlags)> {
 
 const FUTEX_BITSET_MATCH_ANY: u32 = 0xFFFF_FFFF;
 
-#[derive(Debug, Copy, Clone)]
-pub struct FutexTimeout {
-    clock_id: ClockID,
-    ts: timespec_t,
-}
-
-impl FutexTimeout {
-    pub fn new(clock_id: ClockID, ts: timespec_t) -> Self {
-        Self { clock_id, ts }
-    }
-
-    pub fn clock_id(&self) -> &ClockID {
-        &self.clock_id
-    }
-
-    pub fn ts(&self) -> &timespec_t {
-        &self.ts
-    }
-}
-
 /// Do futex wait
 pub fn futex_wait(
     futex_addr: *const i32,
     futex_val: i32,
-    timeout: &Option<FutexTimeout>,
+    timeout: &Option<Duration>,
 ) -> Result<()> {
     futex_wait_bitset(futex_addr, futex_val, timeout, FUTEX_BITSET_MATCH_ANY)
 }
@@ -106,7 +88,7 @@ pub fn futex_wait(
 pub fn futex_wait_bitset(
     futex_addr: *const i32,
     futex_val: i32,
-    timeout: &Option<FutexTimeout>,
+    timeout: &Option<Duration>,
     bitset: u32,
 ) -> Result<()> {
     debug!(
@@ -277,7 +259,7 @@ impl FutexItem {
         self.waiter().wake()
     }
 
-    pub fn wait(&self, timeout: &Option<FutexTimeout>) -> Result<()> {
+    pub fn wait(&self, timeout: &Option<Duration>) -> Result<()> {
         if let Err(e) = self.waiter.wait_timeout(&timeout) {
             let (_, futex_bucket_ref) = FUTEX_BUCKETS.get_bucket(self.key);
             let mut futex_bucket = futex_bucket_ref.lock().unwrap();
@@ -427,7 +409,7 @@ impl Waiter {
         }
     }
 
-    pub fn wait_timeout(&self, timeout: &Option<FutexTimeout>) -> Result<()> {
+    pub fn wait_timeout(&self, timeout: &Option<Duration>) -> Result<()> {
         let current = unsafe { sgx_thread_get_self() };
         if current != self.thread {
             return Ok(());
@@ -482,19 +464,16 @@ impl PartialEq for Waiter {
 unsafe impl Send for Waiter {}
 unsafe impl Sync for Waiter {}
 
-fn wait_event_timeout(thread: *const c_void, timeout: &Option<FutexTimeout>) -> Result<()> {
+fn wait_event_timeout(thread: *const c_void, timeout: &Option<Duration>) -> Result<()> {
     let mut ret: c_int = 0;
     let mut sgx_ret: c_int = 0;
-    let (clockbit, ts_ptr) = timeout
+    // TODO: remove the clockbit argument from sgx_thread_wait_untrusted_event_timeout_ocall
+    let clockbit = 0;
+    let ts: Option<timespec_t> = timeout.map(|timeout| timespec_t::from(timeout));
+    let ts_ptr: *const timespec_t = ts
         .as_ref()
-        .map(|timeout| {
-            let clockbit = match timeout.clock_id() {
-                ClockID::CLOCK_REALTIME => FutexFlags::FUTEX_CLOCK_REALTIME.bits() as i32,
-                _ => 0,
-            };
-            (clockbit, timeout.ts() as *const timespec_t)
-        })
-        .unwrap_or((0, 0 as *const _));
+        .map(|ts| ts as *const _)
+        .unwrap_or(std::ptr::null());
     let mut errno: c_int = 0;
     unsafe {
         sgx_ret = sgx_thread_wait_untrusted_event_timeout_ocall(

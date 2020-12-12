@@ -1,13 +1,15 @@
+use std::ptr::NonNull;
+use std::time::Duration;
+
 use super::do_arch_prctl::ArchPrctlCode;
 use super::do_clone::CloneFlags;
-use super::do_futex::{FutexFlags, FutexOp, FutexTimeout};
+use super::do_futex::{FutexFlags, FutexOp};
 use super::do_spawn::FileAction;
 use super::prctl::PrctlCmd;
 use super::process::ProcessFilter;
 use crate::prelude::*;
 use crate::time::{timespec_t, ClockID};
 use crate::util::mem_util::from_user::*;
-use std::ptr::NonNull;
 
 pub fn do_spawn_for_musl(
     child_pid_ptr: *mut u32,
@@ -258,20 +260,43 @@ pub fn do_futex(
         Ok(val as usize)
     };
 
-    let get_futex_timeout = |timeout| -> Result<Option<FutexTimeout>> {
-        let timeout = timeout as *const timespec_t;
-        if timeout.is_null() {
-            return Ok(None);
-        }
-        let ts = timespec_t::from_raw_ptr(timeout)?;
-        ts.validate()?;
-        // TODO: use a secure clock to transfer the real time to monotonic time
-        let clock_id = if futex_flags.contains(FutexFlags::FUTEX_CLOCK_REALTIME) {
-            ClockID::CLOCK_REALTIME
-        } else {
-            ClockID::CLOCK_MONOTONIC
+    let get_futex_timeout = |timeout| -> Result<Option<Duration>> {
+        // Sanity checks
+        let mut timeout: Duration = {
+            let timeout = timeout as *const timespec_t;
+            if timeout.is_null() {
+                return Ok(None);
+            }
+            let ts = timespec_t::from_raw_ptr(timeout)?;
+            ts.validate()?;
+            ts.as_duration()
         };
-        Ok(Some(FutexTimeout::new(clock_id, ts)))
+
+        // Only FUTEX_WAIT takes the timeout input as relative
+        let is_absolute = if futex_op != FutexOp::FUTEX_WAIT {
+            true
+        } else {
+            false
+        };
+        if is_absolute {
+            // TODO: use a secure clock to transfer the real time to monotonic time
+            let clock_id = if futex_flags.contains(FutexFlags::FUTEX_CLOCK_REALTIME) {
+                ClockID::CLOCK_REALTIME
+            } else {
+                ClockID::CLOCK_MONOTONIC
+            };
+            let now = crate::time::do_clock_gettime(clock_id)
+                .unwrap()
+                .as_duration();
+            timeout = timeout
+                .checked_sub(now)
+                .ok_or_else(|| errno!(EINVAL, "timeout is invalid"))?;
+        }
+
+        // By now, the timeout argument has been converted to a Duration,
+        // interpreted as being relative. This form is expected by the
+        // subsequent, internal futex APIs.
+        Ok(Some(timeout))
     };
 
     match futex_op {
