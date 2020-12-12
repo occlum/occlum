@@ -4,6 +4,7 @@ use std::intrinsics::atomic_load;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
+use crate::events::{Waiter, Waker};
 use crate::prelude::*;
 use crate::time::{timespec_t, ClockID};
 
@@ -136,12 +137,22 @@ pub fn futex_wait_bitset(
     // it cannot find the transition of futex value from val to new_val and enqueue
     // to the bucket, which will cause the waiter to wait forever.
 
-    let futex_item = FutexItem::new(futex_key, bitset);
-    futex_bucket.enqueue_item(futex_item.clone());
+    let waiter = Waiter::new();
 
+    let futex_item = FutexItem::new(futex_key, bitset, waiter.waker());
+    futex_bucket.enqueue_item(futex_item.clone());
     // Must make sure that no locks are holded by this thread before wait
     drop(futex_bucket);
-    futex_item.wait(timeout)
+
+    let res = waiter.wait(timeout.as_ref());
+
+    if let Err(e) = res {
+        let (_, futex_bucket_ref) = FUTEX_BUCKETS.get_bucket(futex_item.key);
+        let mut futex_bucket = futex_bucket_ref.lock().unwrap();
+        futex_bucket.dequeue_item(&futex_item);
+        return_errno!(e.errno(), "futex wait timeout or interrupted");
+    }
+    Ok(())
 }
 
 /// Do futex wake
@@ -243,39 +254,21 @@ impl FutexKey {
 struct FutexItem {
     key: FutexKey,
     bitset: u32,
-    waiter: WaiterRef,
+    waker: Waker,
 }
 
 impl FutexItem {
-    pub fn new(key: FutexKey, bitset: u32) -> FutexItem {
-        FutexItem {
-            key,
-            bitset,
-            waiter: Arc::new(Waiter::new()),
-        }
+    pub fn new(key: FutexKey, bitset: u32, waker: Waker) -> FutexItem {
+        FutexItem { key, bitset, waker }
     }
 
     pub fn wake(&self) {
-        self.waiter().wake()
-    }
-
-    pub fn wait(&self, timeout: &Option<Duration>) -> Result<()> {
-        if let Err(e) = self.waiter.wait_timeout(&timeout) {
-            let (_, futex_bucket_ref) = FUTEX_BUCKETS.get_bucket(self.key);
-            let mut futex_bucket = futex_bucket_ref.lock().unwrap();
-            futex_bucket.dequeue_item(self);
-            return_errno!(e.errno(), "futex wait timeout or interrupted");
-        }
-        Ok(())
-    }
-
-    pub fn waiter(&self) -> &WaiterRef {
-        &self.waiter
+        self.waker.wake()
     }
 
     pub fn batch_wake(items: &[FutexItem]) {
-        let waiters: Vec<&WaiterRef> = items.iter().map(|item| item.waiter()).collect();
-        Waiter::batch_wake(&waiters);
+        let wakers = items.iter().map(|item| &item.waker);
+        Waker::batch_wake(wakers);
     }
 }
 
@@ -391,150 +384,4 @@ impl FutexBucketVec {
         };
         (idx, self.vec[idx].clone())
     }
-}
-
-#[derive(Debug)]
-struct Waiter {
-    thread: *const c_void,
-    is_woken: AtomicBool,
-}
-
-type WaiterRef = Arc<Waiter>;
-
-impl Waiter {
-    pub fn new() -> Waiter {
-        Waiter {
-            thread: unsafe { sgx_thread_get_self() },
-            is_woken: AtomicBool::new(false),
-        }
-    }
-
-    pub fn wait_timeout(&self, timeout: &Option<Duration>) -> Result<()> {
-        let current = unsafe { sgx_thread_get_self() };
-        if current != self.thread {
-            return Ok(());
-        }
-        while self.is_woken.load(Ordering::SeqCst) == false {
-            if let Err(e) = wait_event_timeout(self.thread, timeout) {
-                self.is_woken.store(true, Ordering::SeqCst);
-                return_errno!(e.errno(), "wait_timeout error");
-            }
-        }
-        Ok(())
-    }
-
-    pub fn wake(&self) {
-        if self.is_woken().fetch_or(true, Ordering::SeqCst) == false {
-            set_events(&[self.thread])
-        }
-    }
-
-    pub fn thread(&self) -> *const c_void {
-        self.thread
-    }
-
-    pub fn is_woken(&self) -> &AtomicBool {
-        &self.is_woken
-    }
-
-    pub fn batch_wake(waiters: &[&WaiterRef]) {
-        let threads: Vec<*const c_void> = waiters
-            .iter()
-            .filter_map(|waiter| {
-                // Only wake up items that are not woken.
-                // Set the item to be woken if it is not woken.
-                if waiter.is_woken().fetch_or(true, Ordering::SeqCst) == false {
-                    Some(waiter.thread())
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        set_events(&threads);
-    }
-}
-
-impl PartialEq for Waiter {
-    fn eq(&self, other: &Self) -> bool {
-        self.thread == other.thread
-    }
-}
-
-unsafe impl Send for Waiter {}
-unsafe impl Sync for Waiter {}
-
-fn wait_event_timeout(thread: *const c_void, timeout: &Option<Duration>) -> Result<()> {
-    let mut ret: c_int = 0;
-    let mut sgx_ret: c_int = 0;
-    // TODO: remove the clockbit argument from sgx_thread_wait_untrusted_event_timeout_ocall
-    let clockbit = 0;
-    let ts: Option<timespec_t> = timeout.map(|timeout| timespec_t::from(timeout));
-    let ts_ptr: *const timespec_t = ts
-        .as_ref()
-        .map(|ts| ts as *const _)
-        .unwrap_or(std::ptr::null());
-    let mut errno: c_int = 0;
-    unsafe {
-        sgx_ret = sgx_thread_wait_untrusted_event_timeout_ocall(
-            &mut ret as *mut c_int,
-            thread,
-            clockbit,
-            ts_ptr,
-            &mut errno as *mut c_int,
-        );
-        assert!(sgx_ret == 0);
-        assert!(ret == 0);
-    }
-    if errno != 0 {
-        // Do sanity check here, only possible errnos here are ETIMEDOUT, EAGAIN and EINTR
-        assert!(
-            (timeout.is_some() && errno == Errno::ETIMEDOUT as i32)
-                || errno == Errno::EINTR as i32
-                || errno == Errno::EAGAIN as i32
-        );
-        return_errno!(
-            Errno::from(errno as u32),
-            "sgx_thread_wait_untrusted_event_timeout_ocall error"
-        );
-    }
-    Ok(())
-}
-
-fn set_events(threads: &[*const c_void]) {
-    if threads.is_empty() {
-        return;
-    }
-
-    let mut ret: c_int = 0;
-    let sgx_ret = unsafe {
-        sgx_thread_set_multiple_untrusted_events_ocall(
-            &mut ret as *mut c_int,
-            threads.as_ptr(),
-            threads.len(),
-        )
-    };
-
-    assert!(
-        ret == 0 && sgx_ret == 0,
-        "ERROR: sgx_thread_set_multiple_untrusted_events_ocall failed"
-    );
-}
-
-extern "C" {
-    fn sgx_thread_get_self() -> *const c_void;
-
-    fn sgx_thread_wait_untrusted_event_timeout_ocall(
-        ret: *mut c_int,
-        self_thread: *const c_void,
-        clockbit: i32,
-        ts: *const timespec_t,
-        errno: *mut c_int,
-    ) -> c_int;
-
-    fn sgx_thread_set_multiple_untrusted_events_ocall(
-        ret: *mut c_int,
-        waiters: *const *const c_void,
-        total: usize,
-    ) -> c_int;
 }
