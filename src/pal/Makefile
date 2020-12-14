@@ -28,10 +28,21 @@ endif
 HEADER_FILES := $(sort $(wildcard src/*.h include/*.h include/*/*.h))
 
 C_COMMON_FLAGS := -I$(OBJ_DIR)/pal/$(SRC_OBJ) -Iinclude -Iinclude/edl
+ifdef OCCLUM_DISABLE_DCAP
+C_COMMON_FLAGS += -DOCCLUM_DISABLE_DCAP
+endif
 C_FLAGS := $(C_COMMON_FLAGS) $(SGX_CFLAGS_U)
 CXX_FLAGS := $(C_COMMON_FLAGS) $(SGX_CXXFLAGS_U)
 LINK_FLAGS := $(SGX_LFLAGS_U) -shared -L$(RUST_SGX_SDK_DIR)/sgx_ustdc/ -lsgx_ustdc -lsgx_uprotected_fs -ldl
 LINK_FLAGS += -Wl,--version-script=pal.lds
+ifndef OCCLUM_DISABLE_DCAP
+LINK_FLAGS += -lsgx_dcap_ql -lsgx_dcap_quoteverify
+ifneq ($(SGX_MODE), HW)
+LINK_FLAGS += -lsgx_quote_ex_sim
+else
+LINK_FLAGS += -lsgx_quote_ex
+endif
+endif
 
 ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(LIBOCCLUM_PAL_SO_REAL) $(EDL_C_OBJS) $(C_OBJS) $(CXX_OBJS))))
 
