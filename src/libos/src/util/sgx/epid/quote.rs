@@ -1,21 +1,21 @@
-//! SGX Quote in a memory safe representation and with hash validation.
+//! SGX EPID Quote in a memory safe representation and with hash validation.
 
 use super::*;
 
 #[derive(Debug, Default)]
-pub struct SgxQuote {
+pub struct Quote {
     quote_buf: Vec<u8>,
 }
 
-impl SgxQuote {
+impl Quote {
     pub fn new(
         quote_raw_buf: &[u8],
         quote_nonce: &sgx_quote_nonce_t,
         qe_report: &sgx_report_t,
-    ) -> Result<SgxQuote> {
+    ) -> Result<Self> {
         let quote_buf = Self::new_buf(quote_raw_buf)?;
         Self::validate_quote_buf(&quote_buf, quote_nonce, qe_report)?;
-        Ok(SgxQuote { quote_buf })
+        Ok(Self { quote_buf })
     }
 
     fn new_buf(quote_raw_buf: &[u8]) -> Result<Vec<u8>> {

@@ -12,6 +12,10 @@
 #include <unistd.h>
 #include <sgx_report.h>
 #include <sgx_quote.h>
+#ifndef OCCLUM_DISABLE_DCAP
+#include <sgx_ql_quote.h>
+#include <sgx_qve_header.h>
+#endif
 #include "test.h"
 
 // ============================================================================
@@ -48,7 +52,7 @@ typedef struct {
         uint8_t                *as_buf;
         sgx_quote_t            *as_quote;
     } quote;                                        // output
-} sgxioc_gen_quote_arg_t;
+} sgxioc_gen_epid_quote_arg_t;
 
 typedef struct {
     const sgx_target_info_t    *target_info;        // input (optinal)
@@ -56,12 +60,37 @@ typedef struct {
     sgx_report_t               *report;             // output
 } sgxioc_create_report_arg_t;
 
-#define SGXIOC_IS_EDMM_SUPPORTED _IOR('s', 0, int)
-#define SGXIOC_GET_EPID_GROUP_ID _IOR('s', 1, sgx_epid_group_id_t)
-#define SGXIOC_GEN_QUOTE         _IOWR('s', 2, sgxioc_gen_quote_arg_t)
-#define SGXIOC_SELF_TARGET       _IOR('s', 3, sgx_target_info_t)
-#define SGXIOC_CREATE_REPORT     _IOWR('s', 4, sgxioc_create_report_arg_t)
-#define SGXIOC_VERIFY_REPORT     _IOW('s', 5, sgx_report_t)
+#ifndef OCCLUM_DISABLE_DCAP
+typedef struct {
+    sgx_report_data_t      *report_data; // input
+    uint32_t               *quote_len;   // input/output
+    uint8_t                *quote_buf;   // output
+} sgxioc_gen_dcap_quote_arg_t;
+
+typedef struct {
+    const uint8_t                 *quote_buf;                    // input
+    uint32_t                      quote_size;                    // input
+    uint32_t                      *collateral_expiration_status; // output
+    sgx_ql_qv_result_t            *quote_verification_result;    // output
+    uint32_t                      supplemental_data_size;        // input
+    uint8_t                       *supplemental_data;            // output
+} sgxioc_ver_dcap_quote_arg_t;
+#endif
+
+#define SGXIOC_IS_EDMM_SUPPORTED          _IOR('s', 0, int)
+#define SGXIOC_GET_EPID_GROUP_ID          _IOR('s', 1, sgx_epid_group_id_t)
+#define SGXIOC_GEN_EPID_QUOTE             _IOWR('s', 2, sgxioc_gen_epid_quote_arg_t)
+#define SGXIOC_SELF_TARGET                _IOR('s', 3, sgx_target_info_t)
+#define SGXIOC_CREATE_REPORT              _IOWR('s', 4, sgxioc_create_report_arg_t)
+#define SGXIOC_VERIFY_REPORT              _IOW('s', 5, sgx_report_t)
+#define SGXIOC_DETECT_DCAP_DRIVER         _IOR('s', 6, int)
+
+#ifndef OCCLUM_DISABLE_DCAP
+#define SGXIOC_GET_DCAP_QUOTE_SIZE        _IOR('s', 7, uint32_t)
+#define SGXIOC_GEN_DCAP_QUOTE             _IOWR('s', 8, sgxioc_gen_dcap_quote_arg_t)
+#define SGXIOC_GET_DCAP_SUPPLEMENTAL_SIZE _IOR('s', 9, uint32_t)
+#define SGXIOC_VER_DCAP_QUOTE             _IOWR('s', 10, sgxioc_ver_dcap_quote_arg_t)
+#endif
 
 // The max number of retries if ioctl returns EBUSY
 #define IOCTL_MAX_RETRIES       20
@@ -73,9 +102,8 @@ static int do_SGXIOC_IS_EDMM_SUPPORTED(int sgx_fd) {
     if (ioctl(sgx_fd, SGXIOC_IS_EDMM_SUPPORTED, &is_edmm_supported) < 0) {
         THROW_ERROR("failed to ioctl /dev/sgx");
     }
-    if (is_edmm_supported != 0) {
-        THROW_ERROR("SGX EDMM supported are not expected to be enabled");
-    }
+
+    printf("    SGX EDMM support: %d\n", is_edmm_supported);
     return 0;
 }
 
@@ -102,7 +130,7 @@ static int do_SGXIOC_GET_EPID_GROUP_ID(int sgx_fd) {
 
 static int do_SGXIOC_GEN_QUOTE(int sgx_fd) {
     uint8_t quote_buf[2048] = { 0 };
-    sgxioc_gen_quote_arg_t gen_quote_arg = {
+    sgxioc_gen_epid_quote_arg_t gen_quote_arg = {
         .report_data = { { 0 } },                       // input (empty is ok)
         .quote_type = SGX_LINKABLE_SIGNATURE,           // input
         .spid = { { 0 } },                              // input (empty is ok)
@@ -114,7 +142,7 @@ static int do_SGXIOC_GEN_QUOTE(int sgx_fd) {
     };
     int nretries = 0;
     while (nretries < IOCTL_MAX_RETRIES) {
-        int ret = ioctl(sgx_fd, SGXIOC_GEN_QUOTE, &gen_quote_arg);
+        int ret = ioctl(sgx_fd, SGXIOC_GEN_EPID_QUOTE, &gen_quote_arg);
         if (ret == 0) {
             break;
         } else if (errno != EBUSY) {
@@ -199,6 +227,124 @@ static int do_SGXIOC_CREATE_AND_VERIFY_REPORT(int sgx_fd) {
     return 0;
 }
 
+#ifndef OCCLUM_DISABLE_DCAP
+#define REPORT_BODY_OFFSET 48
+static int generate_and_verify_dcap_quote(int sgx_fd) {
+    // get quote size
+    uint32_t quote_size = 0;
+    if (ioctl(sgx_fd, SGXIOC_GET_DCAP_QUOTE_SIZE, &quote_size) < 0) {
+        THROW_ERROR("failed to get quote size");
+    }
+
+    // get quote
+    uint8_t *quote_buffer = (uint8_t *)malloc(quote_size);
+    if (NULL == quote_buffer) {
+        THROW_ERROR("Couldn't allocate quote_buffer");
+    }
+    memset(quote_buffer, 0, quote_size);
+
+    sgx_report_data_t report_data = { 0 };
+    char *data = "ioctl DCAP report data example";
+    memcpy(report_data.d, data, strlen(data));
+
+    sgxioc_gen_dcap_quote_arg_t gen_quote_arg = {
+        .report_data = &report_data,
+        .quote_len = &quote_size,
+        .quote_buf = quote_buffer
+    };
+
+    if (ioctl(sgx_fd, SGXIOC_GEN_DCAP_QUOTE, &gen_quote_arg) < 0) {
+        THROW_ERROR("failed to get quote");
+    }
+
+    if (memcmp((void *) & ((sgx_report_body_t *)(quote_buffer +
+                           REPORT_BODY_OFFSET))->report_data,
+               (void *)&report_data, sizeof(sgx_report_data_t)) != 0) {
+        THROW_ERROR("mismathced report data");
+    }
+
+    uint32_t collateral_expiration_status = 1;
+    sgx_ql_qv_result_t quote_verification_result = SGX_QL_QV_RESULT_UNSPECIFIED;
+
+    uint32_t supplemental_size = 0;
+    if (ioctl(sgx_fd, SGXIOC_GET_DCAP_SUPPLEMENTAL_SIZE, &supplemental_size) < 0) {
+        THROW_ERROR("failed to get supplemental data size");
+    }
+    uint8_t *supplemental_buffer = (uint8_t *)malloc(supplemental_size);
+    if (NULL == supplemental_buffer) {
+        THROW_ERROR("Couldn't allocate quote_buffer");
+    }
+    memset(supplemental_buffer, 0, supplemental_size);
+
+    sgxioc_ver_dcap_quote_arg_t ver_quote_arg = {
+        .quote_buf = quote_buffer,
+        .quote_size = quote_size,
+        .collateral_expiration_status = &collateral_expiration_status,
+        .quote_verification_result = &quote_verification_result,
+        .supplemental_data_size = supplemental_size,
+        .supplemental_data = supplemental_buffer
+    };
+
+    if (ioctl(sgx_fd, SGXIOC_VER_DCAP_QUOTE, &ver_quote_arg) < 0) {
+        THROW_ERROR("failed to verify quote");
+    }
+
+    switch (quote_verification_result) {
+        case SGX_QL_QV_RESULT_OK:
+            return 0;
+        case SGX_QL_QV_RESULT_CONFIG_NEEDED:
+        case SGX_QL_QV_RESULT_OUT_OF_DATE:
+        case SGX_QL_QV_RESULT_OUT_OF_DATE_CONFIG_NEEDED:
+        case SGX_QL_QV_RESULT_SW_HARDENING_NEEDED:
+        case SGX_QL_QV_RESULT_CONFIG_AND_SW_HARDENING_NEEDED:
+            printf("WARN: App: Verification completed with Non-terminal result: %x\n",
+                   quote_verification_result);
+            return 0;
+        case SGX_QL_QV_RESULT_INVALID_SIGNATURE:
+        case SGX_QL_QV_RESULT_REVOKED:
+        case SGX_QL_QV_RESULT_UNSPECIFIED:
+        default:
+            THROW_ERROR("\tError: App: Verification completed with Terminal result: %x\n",
+                        quote_verification_result);
+    }
+}
+
+static int do_SGXIOC_GENERATE_AND_VERIFY_DCAP_QUOTE(int sgx_fd) {
+    int is_dcap_driver_installed = 0;
+    if (ioctl(sgx_fd, SGXIOC_DETECT_DCAP_DRIVER, &is_dcap_driver_installed) < 0) {
+        THROW_ERROR("failed to detect DCAP driver");
+    }
+
+    if (is_dcap_driver_installed == 0) {
+        printf("Warning: test_sgx_ioctl_SGXIOC_GENERATE_AND_VERIFY_DCAP_QUOTE is skipped\n");
+        return 0;
+    }
+
+    int nretries = 0;
+    while (nretries < IOCTL_MAX_RETRIES) {
+        int ret = generate_and_verify_dcap_quote(sgx_fd);
+        if (ret == 0) {
+            break;
+        } else if (errno != EBUSY) {
+            THROW_ERROR("failed to ioctl /dev/sgx");
+        }
+
+        printf("WARN: /dev/sgx is temporarily busy. Try again after 1 second.");
+        sleep(1);
+        nretries++;
+    }
+    if (nretries == IOCTL_MAX_RETRIES) {
+        THROW_ERROR("failed to ioctl /dev/sgx due to timeout");
+    }
+
+    return 0;
+}
+
+int test_sgx_ioctl_SGXIOC_GENERATE_AND_VERIFY_DCAP_QUOTE(void) {
+    return do_sgx_ioctl_test(do_SGXIOC_GENERATE_AND_VERIFY_DCAP_QUOTE);
+}
+#endif
+
 int test_sgx_ioctl_SGXIOC_IS_EDMM_SUPPORTED(void) {
     return do_sgx_ioctl_test(do_SGXIOC_IS_EDMM_SUPPORTED);
 }
@@ -207,7 +353,7 @@ int test_sgx_ioctl_SGXIOC_GET_EPID_GROUP_ID(void) {
     return do_sgx_ioctl_test(do_SGXIOC_GET_EPID_GROUP_ID);
 }
 
-int test_sgx_ioctl_SGXIOC_GEN_QUOTE(void) {
+int test_sgx_ioctl_SGXIOC_GEN_EPID_QUOTE(void) {
     return do_sgx_ioctl_test(do_SGXIOC_GEN_QUOTE);
 }
 
@@ -319,9 +465,12 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_tty_ioctl_TIOCGWINSZ),
     TEST_CASE(test_sgx_ioctl_SGXIOC_IS_EDMM_SUPPORTED),
     TEST_CASE(test_sgx_ioctl_SGXIOC_GET_EPID_GROUP_ID),
-    TEST_CASE(test_sgx_ioctl_SGXIOC_GEN_QUOTE),
+    TEST_CASE(test_sgx_ioctl_SGXIOC_GEN_EPID_QUOTE),
     TEST_CASE(test_sgx_ioctl_SGXIOC_SELF_TARGET),
     TEST_CASE(test_sgx_ioctl_SGXIOC_CREATE_AND_VERIFY_REPORT),
+#ifndef OCCLUM_DISABLE_DCAP
+    TEST_CASE(test_sgx_ioctl_SGXIOC_GENERATE_AND_VERIFY_DCAP_QUOTE),
+#endif
     TEST_CASE(test_ioctl_SIOCGIFCONF),
     TEST_CASE(test_ioctl_FIONBIO),
 };

@@ -60,7 +60,7 @@ test-glibc:
 	@$(MAKE) --no-print-directory -C test test-glibc
 
 OCCLUM_PREFIX ?= /opt/occlum
-install: $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/libsgx_uae_service_sim.so
+install: minimal_sgx_libs
 	@# Install both libraries for HW mode and SIM mode
 	@$(MAKE) SGX_MODE=HW --no-print-directory -C src
 	@$(MAKE) SGX_MODE=SIM --no-print-directory -C src
@@ -88,16 +88,18 @@ install: $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/libsgx_uae_service_sim.so
 
 	@echo "Installation is done."
 
+SGX_SDK=/opt/intel/sgxsdk
 # Install minimum sgx-sdk set to support Occlum cmd execution in non-customized sgx-sdk environment
-$(OCCLUM_PREFIX)/sgxsdk-tools/lib64/libsgx_uae_service_sim.so: /opt/intel/sgxsdk/lib64/libsgx_uae_service_sim.so
+minimal_sgx_libs: $(SGX_SDK)/lib64/libsgx_uae_service_sim.so $(SGX_SDK)/lib64/libsgx_quote_ex_sim.so
 	@echo "Install needed sgx-sdk tools ..."
 	@mkdir -p $(OCCLUM_PREFIX)/sgxsdk-tools/lib64
-	@cp /opt/intel/sgxsdk/lib64/{libsgx_ptrace.so,libsgx_uae_service_sim.so} $(OCCLUM_PREFIX)/sgxsdk-tools/lib64
+	@cp $(SGX_SDK)/lib64/{libsgx_ptrace.so,libsgx_uae_service_sim.so,libsgx_quote_ex_sim.so} $(OCCLUM_PREFIX)/sgxsdk-tools/lib64
 	@mkdir -p $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/gdb-sgx-plugin
-	@cd /opt/intel/sgxsdk/lib64/gdb-sgx-plugin/ && cp $$(ls -A | grep -v __pycache__) $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/gdb-sgx-plugin
-	@cd /opt/intel/sgxsdk && cp -a --parents {bin/sgx-gdb,bin/x64/sgx_sign} $(OCCLUM_PREFIX)/sgxsdk-tools/
+	@cd $(SGX_SDK)/lib64/gdb-sgx-plugin/ && cp $$(ls -A | grep -v __pycache__) $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/gdb-sgx-plugin
+	@cd $(SGX_SDK) && cp -a --parents {bin/sgx-gdb,bin/x64/sgx_sign} $(OCCLUM_PREFIX)/sgxsdk-tools/
 	@mkdir -p $(OCCLUM_PREFIX)/sgxsdk-tools/sdk_libs && cd $(OCCLUM_PREFIX)/sgxsdk-tools/sdk_libs && \
-		ln -sf ../lib64/libsgx_uae_service_sim.so libsgx_uae_service_sim.so
+		ln -sf ../lib64/libsgx_uae_service_sim.so libsgx_uae_service_sim.so && \
+		ln -sf ../lib64/libsgx_quote_ex_sim.so libsgx_quote_ex_sim.so
 	@# Delete SGX_LIBRARY_PATH env in sgx-gdb which are defined in etc/environment
 	@sed -i '/^SGX_LIBRARY_PATH=/d' $(OCCLUM_PREFIX)/sgxsdk-tools/bin/sgx-gdb
 	@cp etc/environment $(OCCLUM_PREFIX)/sgxsdk-tools/

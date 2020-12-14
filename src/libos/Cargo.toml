@@ -34,6 +34,7 @@ syscall_timing = []     # Timing for each syscall. But it has cost from more oca
 integrity_only_opt = [] # Clear bss only. It should be disabled if checking memory reads.
 sgx_file_cache = []     # Cache SgxFile objects. Invalidation is unimplemented.
 sgx1_exception_sim = [] # Simulate #PF and #GP exceptions on SGX 1
+dcap = []               # DCAP support. The compilation relies on DCAP package.
 
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
 xmas-elf = { path = "../../deps/xmas-elf" }
