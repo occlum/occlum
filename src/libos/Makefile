@@ -86,6 +86,9 @@ CXX_FLAGS := $(SGX_CXXFLAGS_T) $(C_COMMON_FLAGS)
 
 _Other_Link_Flags := -L$(RUST_SGX_SDK_DIR)/compiler-rt/ -L$(BUILD_DIR)/lib -L$(RUST_OUT_DIR)
 _Other_Enclave_Libs := -l$(LIBOS_CORE_LIB_NAME) -lsgx_tprotected_fs
+ifndef OCCLUM_DISABLE_DCAP
+_Other_Enclave_Libs += -lsgx_dcap_tvl
+endif
 LINK_FLAGS := $(SGX_LFLAGS_T)
 
 .PHONY: all clean format format-c format-rust format-check format-check-c format-check-rust
@@ -112,13 +115,19 @@ else
     RUSTC_WRAPPER :=
 endif
 
+LIBOS_FEATURES :=
+
+ifndef OCCLUM_DISABLE_DCAP
+    LIBOS_FEATURES += dcap
+endif
+
 ifeq ($(OCCLUM_RELEASE_BUILD), 1)
 $(LIBOS_CORE_RS_A): $(RUST_SRCS)
-	@RUSTC_BOOTSTRAP=1 RUSTC_WRAPPER=$(RUSTC_WRAPPER) cargo build --release --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR)
+	@RUSTC_BOOTSTRAP=1 RUSTC_WRAPPER=$(RUSTC_WRAPPER) cargo build --release --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR) --features "$(LIBOS_FEATURES)"
 	@echo "CARGO (release) => $@"
 else
 $(LIBOS_CORE_RS_A): $(RUST_SRCS)
-	@RUSTC_BOOTSTRAP=1 RUSTC_WRAPPER=$(RUSTC_WRAPPER) cargo build --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR)
+	@RUSTC_BOOTSTRAP=1 RUSTC_WRAPPER=$(RUSTC_WRAPPER) cargo build --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR) --features "$(LIBOS_FEATURES)"
 	@echo "CARGO (debug) => $@"
 endif
 
