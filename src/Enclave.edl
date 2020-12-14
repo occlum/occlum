@@ -10,6 +10,28 @@ enclave {
     include "sgx_quote.h"
     include "occlum_edl_types.h"
 
+    include "sgx_ql_quote.h"
+    include "sgx_qve_header.h"
+
+    // for deep copy of the inside contents
+    struct sgx_ql_qve_collateral {
+        uint32_t version;
+        [size=pck_crl_issuer_chain_size] char *pck_crl_issuer_chain;
+        uint32_t pck_crl_issuer_chain_size;
+        [size=root_ca_crl_size] char *root_ca_crl;
+        uint32_t root_ca_crl_size;
+        [size=pck_crl_size] char *pck_crl;
+        uint32_t pck_crl_size;
+        [size=tcb_info_issuer_chain_size] char *tcb_info_issuer_chain;
+        uint32_t tcb_info_issuer_chain_size;
+        [size=tcb_info_size] char *tcb_info;
+        uint32_t tcb_info_size;
+        [size=qe_identity_issuer_chain_size] char *qe_identity_issuer_chain;
+        uint32_t qe_identity_issuer_chain_size;
+        [size=qe_identity_size] char *qe_identity;
+        uint32_t qe_identity_size;
+    };
+
     trusted {
         /*
          * Initialize the LibOS according to the specified attributes.
@@ -151,7 +173,7 @@ enclave {
         sgx_status_t occlum_ocall_sgx_init_quote(
             [out] sgx_target_info_t* target_info,
             [out] sgx_epid_group_id_t* epid_group_id);
-        sgx_status_t occlum_ocall_sgx_get_quote(
+        sgx_status_t occlum_ocall_sgx_get_epid_quote(
             [in, size=sigrl_len] uint8_t* sigrl,
             uint32_t sigrl_len,
             [in] sgx_report_t* report,
@@ -161,6 +183,29 @@ enclave {
             [out] sgx_report_t* qe_report,
             [out, size=quote_buf_len] sgx_quote_t* quote_buf,
             uint32_t quote_buf_len);
+
+        int occlum_ocall_detect_dcap_driver() propagate_errno;
+        quote3_error_t occlum_ocall_init_dcap_quote_generator(
+            [out] sgx_target_info_t* qe_target_info,
+            [out] uint32_t* quote_size
+        ) propagate_errno;
+        quote3_error_t occlum_ocall_generate_dcap_quote(
+            [in] sgx_report_t* app_report,
+            uint32_t quote_size,
+            [out, size=quote_size] uint8_t* quote_buf
+        ) propagate_errno;
+        uint32_t occlum_ocall_get_supplement_size() propagate_errno;
+        quote3_error_t occlum_ocall_verify_dcap_quote(
+            [in, size=quote_size] uint8_t* quote_buf,
+            uint32_t quote_size,
+            [in] struct sgx_ql_qve_collateral* quote_collateral,
+            time_t expiration_check_date,
+            [out] uint32_t* collateral_expiration_status,
+            [out] sgx_ql_qv_result_t* quote_verification_result,
+            [in, out] sgx_ql_qe_report_info_t* qve_report_info,
+            uint32_t supplemental_data_size,
+            [out, size=supplemental_data_size] uint8_t* supplemental_data
+        ) propagate_errno;
 
         int64_t occlum_ocall_sendmsg(
             int sockfd,

@@ -2,12 +2,12 @@
 
 use super::*;
 
-pub struct SgxAttestationAgent {
+pub struct AttestationAgent {
     inner: Option<InnerAgent>,
 }
 
-impl SgxAttestationAgent {
-    pub fn new() -> SgxAttestationAgent {
+impl AttestationAgent {
+    pub fn new() -> Self {
         Self { inner: None }
     }
 
@@ -23,7 +23,7 @@ impl SgxAttestationAgent {
         quote_type: sgx_quote_sign_type_t,
         spid: &sgx_spid_t,
         nonce: &sgx_quote_nonce_t,
-    ) -> Result<SgxQuote> {
+    ) -> Result<Quote> {
         self.init_inner()?;
         self.inner
             .as_mut()
@@ -98,9 +98,9 @@ impl InnerAgent {
         quote_type: sgx_quote_sign_type_t,
         spid: &sgx_spid_t,
         nonce: &sgx_quote_nonce_t,
-    ) -> Result<SgxQuote> {
+    ) -> Result<Quote> {
         extern "C" {
-            pub fn occlum_ocall_sgx_get_quote(
+            pub fn occlum_ocall_sgx_get_epid_quote(
                 retval: *mut sgx_status_t,         // Output
                 sigrl: *const u8,                  // Input (optional)
                 sigrl_len: u32,                    // Input (optional)
@@ -158,7 +158,7 @@ impl InnerAgent {
         // Do OCall
         unsafe {
             let mut retval = Default::default();
-            let status = occlum_ocall_sgx_get_quote(
+            let status = occlum_ocall_sgx_get_epid_quote(
                 &mut retval as *mut sgx_status_t,
                 sigrl_ptr,
                 sigrl_size,
@@ -175,9 +175,9 @@ impl InnerAgent {
             if retval != sgx_status_t::SGX_SUCCESS {
                 match retval {
                     sgx_status_t::SGX_ERROR_BUSY => {
-                        return_errno!(EBUSY, "occlum_ocall_sgx_get_quote is temporarily busy")
+                        return_errno!(EBUSY, "occlum_ocall_sgx_get_epid_quote is temporarily busy")
                     }
-                    _ => return_errno!(EINVAL, "occlum_ocall_sgx_get_quote failed"),
+                    _ => return_errno!(EINVAL, "occlum_ocall_sgx_get_epid_quote failed"),
                 }
             }
         }
@@ -186,7 +186,7 @@ impl InnerAgent {
         SgxQeReportValidator::new(&self.target_info, nonce).validate(&qe_report)?;
 
         // Construct the resulting quote
-        let quote = SgxQuote::new(&quote_buf, &nonce, &qe_report)?;
+        let quote = Quote::new(&quote_buf, &nonce, &qe_report)?;
 
         Ok(quote)
     }
