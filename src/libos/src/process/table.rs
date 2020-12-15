@@ -1,5 +1,6 @@
 use super::{ProcessRef, ThreadRef};
 use crate::prelude::*;
+use crate::util::resource_checker::StaticResourceChecker;
 
 pub fn get_process(pid: pid_t) -> Result<ProcessRef> {
     PROCESS_TABLE.lock().unwrap().get(pid)
@@ -56,6 +57,26 @@ lazy_static! {
         { SgxMutex::new(Table::<ThreadRef>::with_capacity(8)) };
 }
 
+inventory::submit! {
+    StaticResourceChecker::new(||
+        if PROCESS_TABLE.lock().unwrap().is_empty(){
+            false
+        } else {
+            error!("PROCESS_TABLE is not empty.");
+            true
+        })
+}
+
+inventory::submit! {
+    StaticResourceChecker::new(||
+        if THREAD_TABLE.lock().unwrap().is_empty(){
+            false
+        } else {
+            error!("THREAD_TABLE is not empty.");
+            true
+        })
+}
+
 #[derive(Debug, Clone)]
 struct Table<I: Debug + Clone + Send + Sync> {
     map: HashMap<pid_t, I>,
@@ -92,5 +113,9 @@ impl<I: Debug + Clone + Send + Sync> Table<I> {
             return_errno!(ENOENT, "id does not exist");
         }
         Ok(self.map.remove(&id).unwrap())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
     }
 }
