@@ -18,9 +18,7 @@ use occlum_exec::occlum_exec::{
     KillProcessRequest, StopRequest,
 };
 use occlum_exec::occlum_exec_grpc::OcclumExecClient;
-use occlum_exec::{
-    DEFAULT_CLIENT_FILE, DEFAULT_SERVER_FILE, DEFAULT_SERVER_TIMER, DEFAULT_SOCK_FILE,
-};
+use occlum_exec::{DEFAULT_SERVER_FILE, DEFAULT_SERVER_TIMER, DEFAULT_SOCK_FILE};
 use protobuf::RepeatedField;
 use sendfd::SendWithFd;
 use signal_hook::iterator::Signals;
@@ -142,7 +140,12 @@ fn start_server(client: &OcclumExecClient, server_name: &str) -> Result<u32, Str
             Err(_resp) => {
                 if !server_launched {
                     debug!("server is not running, try to launch the server.");
-                    match Command::new(server_name).stdout(Stdio::null()).spawn() {
+                    match Command::new(server_name)
+                        .arg("-d")
+                        .arg(env::current_dir().unwrap())
+                        .stdout(Stdio::null())
+                        .spawn()
+                    {
                         Err(_r) => {
                             return Err("Failed to launch server".to_string());
                         }
@@ -233,6 +236,14 @@ fn main() -> Result<(), i32> {
 
     let matches = App::new("Occlum")
         .version("0.1.0")
+        .arg(
+            Arg::with_name("instance_dir")
+                .short("d")
+                .long("instance_dir")
+                .takes_value(true)
+                .default_value("./")
+                .help("The Occlum instance dir."),
+        )
         .subcommand(
             App::new("start").about(
                 "Start the Occlum server. If the server already running, immediately return.",
@@ -263,32 +274,20 @@ fn main() -> Result<(), i32> {
         )
         .get_matches();
 
-    let args: Vec<String> = env::args().collect();
     let env: Vec<String> = env::vars()
         .into_iter()
         .map(|(key, val)| format!("{}={}", key, val))
         .collect();
 
-    let mut sock_file = String::from(args[0].as_str());
-    let sock_file = str::replace(
-        sock_file.as_mut_str(),
-        DEFAULT_CLIENT_FILE,
-        DEFAULT_SOCK_FILE,
-    );
+    // Set the instance_dir as the current dir
+    let instance_dir = Path::new(matches.value_of("instance_dir").unwrap());
+    assert!(env::set_current_dir(&instance_dir).is_ok());
 
-    let client = OcclumExecClient::new_plain_unix(&sock_file, ClientConf::new())
+    let client = OcclumExecClient::new_plain_unix(DEFAULT_SOCK_FILE, ClientConf::new())
         .expect("failed to create UDS client");
 
     if let Some(ref _matches) = matches.subcommand_matches("start") {
-        //get the server name with the first args
-        let mut server_name = String::from(args[0].as_str());
-        let server_name = str::replace(
-            server_name.as_mut_str(),
-            DEFAULT_CLIENT_FILE,
-            DEFAULT_SERVER_FILE,
-        );
-
-        if let Err(s) = start_server(&client, &server_name) {
+        if let Err(s) = start_server(&client, DEFAULT_SERVER_FILE) {
             println!("start_server failed {}", s);
             return Err(-1);
         }
