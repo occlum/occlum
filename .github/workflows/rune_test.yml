@@ -25,7 +25,7 @@ jobs:
 
     - name: Create container
       run: |
-        rune_ubuntu_test=$(docker run -itd --privileged --rm --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        rune_ubuntu_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
         echo "rune_ubuntu_test=$rune_ubuntu_test" >> $GITHUB_ENV
 
     - name: Change download source of crates.io
@@ -39,7 +39,7 @@ jobs:
         EOF"
 
     - name: Build Occlum dependencies
-      run: docker exec $rune_ubuntu_test bash -c "cd /root/occlum; make submodule"
+      run: docker exec $rune_ubuntu_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Install Occlum
       run: docker exec $rune_ubuntu_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make && make install"
@@ -118,7 +118,7 @@ jobs:
 
     - name: Create container
       run: |
-        rune_crictl_centos=$(docker run -itd --privileged --rm --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum crictl-occlum:centos8.1)
+        rune_crictl_centos=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum crictl-occlum:centos8.1)
         echo "rune_crictl_centos=$rune_crictl_centos" >> $GITHUB_ENV
 
     - name: Change download source of crates.io
@@ -132,7 +132,7 @@ jobs:
         EOF"
 
     - name: Build Occlum dependencies
-      run: docker exec $rune_crictl_centos bash -c "cd /root/occlum; make submodule"
+      run: docker exec $rune_crictl_centos bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Install Occlum
       run: docker exec $rune_crictl_centos bash -c "cd /root/occlum;
