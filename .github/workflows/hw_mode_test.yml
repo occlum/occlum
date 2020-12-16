@@ -1,12 +1,17 @@
 name: SGX Hardware Mode Test
 
-on: [push]
+# Triggers the workflow on push and pull request labeled "SGX-hardware-test-required".
+on:
+  push:
+  pull_request_target:
+    types: labeled
 
 env:
   nap_time: 60
 
 jobs:
   Make-test-on-ubuntu:
+    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: [self-hosted, SGX1-HW]
     steps:
     - name: Clean before running
@@ -14,8 +19,18 @@ jobs:
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
     - name: Checkout code
-      uses: actions/checkout@v1
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2
       with:
+        submodules: true
+
+    - name: Checkout code from fork
+      # This step is only needed when the pull request is labeled.
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        # For pull request, we need to merge the commit from fork to the base
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
     - name: Get Occlum version
@@ -51,6 +66,7 @@ jobs:
 
 
   C_cpp_rust_golang_embedded_mode_support_test:
+    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: [self-hosted, SGX1-HW]
     steps:
     - name: Clean before running
@@ -58,8 +74,16 @@ jobs:
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
     - name: Checkout code
-      uses: actions/checkout@v1
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2
       with:
+        submodules: true
+
+    - name: Checkout code from fork
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
     - name: Get Occlum version
@@ -113,8 +137,10 @@ jobs:
             occlum-go build -o web_server ./web_server.go;
             ./run_golang_on_occlum.sh" &
 
+    # Sleeps longer to make sure the server is up.
     - name: Curl test
       run: |
+        sleep ${{ env.nap_time }};
         sleep ${{ env.nap_time }};
         docker exec $language_support_test bash -c "curl http://127.0.0.1:8090/ping"
 
@@ -140,6 +166,7 @@ jobs:
 
 
   Java_support_test:
+    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: [self-hosted, SGX1-HW]
     steps:
     - name: Clean before running
@@ -147,8 +174,16 @@ jobs:
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
     - name: Checkout code
-      uses: actions/checkout@v1
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2
       with:
+        submodules: true
+
+    - name: Checkout code from fork
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
     - name: Get Occlum version
@@ -187,6 +222,7 @@ jobs:
 
 
   Bazel_test:
+    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: [self-hosted, SGX1-HW]
     steps:
     - name: Clean before running
@@ -194,8 +230,16 @@ jobs:
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
     - name: Checkout code
-      uses: actions/checkout@v1
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2
       with:
+        submodules: true
+
+    - name: Checkout code from fork
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
     - name: Get Occlum version
@@ -246,6 +290,7 @@ jobs:
 
 
   Fish_test:
+    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: [self-hosted, SGX1-HW]
     steps:
     - name: Clean before running
@@ -253,8 +298,16 @@ jobs:
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
     - name: Checkout code
-      uses: actions/checkout@v1
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2
       with:
+        submodules: true
+
+    - name: Checkout code from fork
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
     - name: Get Occlum version
@@ -302,6 +355,7 @@ jobs:
 
 
   Xgboost_test:
+    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: [self-hosted, SGX1-HW]
     steps:
     - name: Clean before running
@@ -309,8 +363,16 @@ jobs:
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
     - name: Checkout code
-      uses: actions/checkout@v1
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2
       with:
+        submodules: true
+
+    - name: Checkout code from fork
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
     - name: Get Occlum version
@@ -358,6 +420,7 @@ jobs:
 
 
   Sqlite_test:
+    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: [self-hosted, SGX1-HW]
     steps:
     - name: Clean before running
@@ -365,8 +428,16 @@ jobs:
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
     - name: Checkout code
-      uses: actions/checkout@v1
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2
       with:
+        submodules: true
+
+    - name: Checkout code from fork
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
     - name: Get Occlum version
@@ -410,6 +481,7 @@ jobs:
 
 
   Python_support_test:
+    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: [self-hosted, SGX1-HW]
     steps:
     - name: Clean before running
@@ -417,8 +489,16 @@ jobs:
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
     - name: Checkout code
-      uses: actions/checkout@v1
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2
       with:
+        submodules: true
+
+    - name: Checkout code from fork
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
     - name: Create container
@@ -455,6 +535,7 @@ jobs:
 
 
   Openvino_test:
+    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: [self-hosted, SGX1-HW]
     steps:
     - name: Clean before running
@@ -462,8 +543,16 @@ jobs:
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
     - name: Checkout code
-      uses: actions/checkout@v1
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2
       with:
+        submodules: true
+
+    - name: Checkout code from fork
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
     - name: Create container
@@ -497,6 +586,7 @@ jobs:
 
 
   Grpc_test:
+    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: [self-hosted, SGX1-HW]
     steps:
     - name: Clean before running
@@ -504,8 +594,16 @@ jobs:
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
     - name: Checkout code
-      uses: actions/checkout@v1
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2
       with:
+        submodules: true
+
+    - name: Checkout code from fork
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
     - name: Create container
