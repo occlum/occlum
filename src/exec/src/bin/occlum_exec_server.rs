@@ -5,16 +5,18 @@ extern crate occlum_exec;
 extern crate protobuf;
 #[macro_use]
 extern crate log;
+use clap::{App, Arg};
 use futures::executor;
 use grpc::prelude::*;
 use grpc::ClientConf;
 use occlum_exec::occlum_exec::HealthCheckRequest;
 use occlum_exec::occlum_exec_grpc::{OcclumExecClient, OcclumExecServer};
 use occlum_exec::server::OcclumExecImpl;
-use occlum_exec::{DEFAULT_SERVER_FILE, DEFAULT_SOCK_FILE};
+use occlum_exec::DEFAULT_SOCK_FILE;
 use std::env;
 use std::ffi::{CStr, OsString};
 use std::os::unix::ffi::OsStrExt;
+use std::path::Path;
 use std::sync::{Arc, Condvar, Mutex};
 
 //Checks the server status, if the server is running return true, else recover the socket file and return false.
@@ -52,17 +54,24 @@ fn check_server_status(sock_file: &str) -> bool {
 }
 
 fn main() {
-    //get the UDS file name
-    let args: Vec<String> = env::args().collect();
-    let mut sockfile = String::from(args[0].as_str());
-    let sockfile = str::replace(
-        sockfile.as_mut_str(),
-        DEFAULT_SERVER_FILE,
-        DEFAULT_SOCK_FILE,
-    );
+    let matches = App::new("Occlum_server")
+        .version("0.1.0")
+        .arg(
+            Arg::with_name("instance_dir")
+                .short("d")
+                .long("instance_dir")
+                .takes_value(true)
+                .default_value("./")
+                .help("The Occlum instance dir."),
+        )
+        .get_matches();
+
+    // Set the instance_dir as the current dir
+    let instance_dir = Path::new(matches.value_of("instance_dir").unwrap());
+    assert!(env::set_current_dir(&instance_dir).is_ok());
 
     //If the server already startted, then return
-    if check_server_status(sockfile.as_str()) {
+    if check_server_status(DEFAULT_SOCK_FILE) {
         println!("server stared");
         return;
     }
@@ -74,7 +83,7 @@ fn main() {
     );
     let mut server_builder = grpc::ServerBuilder::new_plain();
     server_builder.add_service(service_def);
-    match server_builder.http.set_unix_addr(sockfile) {
+    match server_builder.http.set_unix_addr(DEFAULT_SOCK_FILE) {
         Ok(_) => {}
         Err(e) => {
             debug!("{:?}", e);
