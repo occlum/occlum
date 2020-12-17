@@ -24,7 +24,6 @@ RUN yum install epel-release -y && \
     gmp-devel \
     golang \
     jq \
-    lcov \
     libcurl-devel \
     libmpc-devel \
     libxml2-devel \
@@ -42,7 +41,8 @@ RUN yum install epel-release -y && \
     wget \
     uuid-devel \
     vim \
-    yum-utils &&\
+    yum-utils \
+    http://downloads.sourceforge.net/ltp/lcov-1.14-1.noarch.rpm &&\
     alternatives --set python /usr/bin/python2
 
 # Install cpuid tool for tests
