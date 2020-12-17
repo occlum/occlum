@@ -28,6 +28,7 @@ RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-i
         golang-go \
         jq \
         kmod \
+        lcov \
         libboost-system-dev \
         libboost-thread-dev \
         libcurl4-openssl-dev \
