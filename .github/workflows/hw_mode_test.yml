@@ -60,6 +60,9 @@ jobs:
     - name: Integration test
       run:  docker exec $occlum_test bash -c "cd /root/occlum; make test"
 
+    - name: Integration test with Glibc
+      run:  docker exec $occlum_test bash -c "cd /root/occlum; make test-glibc"
+
     - name: Clean the environment
       if: ${{ always() }}
       run: docker stop $occlum_test
