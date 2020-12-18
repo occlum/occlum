@@ -317,6 +317,7 @@ static int do_SGXIOC_GENERATE_AND_VERIFY_DCAP_QUOTE(int sgx_fd) {
 
     if (is_dcap_driver_installed == 0) {
         printf("Warning: test_sgx_ioctl_SGXIOC_GENERATE_AND_VERIFY_DCAP_QUOTE is skipped\n");
+        return 0;
     }
 
     int nretries = 0;
