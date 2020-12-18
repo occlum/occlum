@@ -55,27 +55,14 @@ impl FileMode {
     }
 }
 
-bitflags! {
-    pub struct ChmodFlags: i32 {
-        const AT_SYMLINK_NOFOLLOW = 0x100;
-    }
-}
-
-pub fn do_fchmodat(fs_path: &FsPath, mode: FileMode, flags: ChmodFlags) -> Result<()> {
-    debug!(
-        "fchmodat: fs_path: {:?}, mode: {:#o}, flags: {:?}",
-        fs_path, mode, flags
-    );
+pub fn do_fchmodat(fs_path: &FsPath, mode: FileMode) -> Result<()> {
+    debug!("fchmodat: fs_path: {:?}, mode: {:#o}", fs_path, mode);
 
     let inode = {
         let path = fs_path.to_abs_path()?;
         let current = current!();
         let fs = current.fs().lock().unwrap();
-        if flags.contains(ChmodFlags::AT_SYMLINK_NOFOLLOW) {
-            fs.lookup_inode_no_follow(&path)?
-        } else {
-            fs.lookup_inode(&path)?
-        }
+        fs.lookup_inode(&path)?
     };
     let mut info = inode.metadata()?;
     info.mode = mode.bits();
