@@ -160,9 +160,17 @@ cmd_init() {
         cp -t "image/$occlum_glibc_lib" \
             "$occlum_glibc_lib/libc.so.6" \
             "$occlum_glibc_lib/libpthread.so.0" \
-            "$occlum_glibc_lib/libm.so.6" \
-            "/usr/lib/x86_64-linux-gnu/libstdc++.so.6" \
-            "/usr/lib/gcc/x86_64-linux-gnu/7/libgcc_s.so.1"
+            "$occlum_glibc_lib/libm.so.6"
+        local os_release=`awk -F= '/^NAME/{print $2}' /etc/os-release`
+        if [ "$os_release" == "\"Ubuntu\"" ]; then
+            cp -t "image/$occlum_glibc_lib" \
+                "/usr/lib/x86_64-linux-gnu/libstdc++.so.6" \
+                "/lib/x86_64-linux-gnu/libgcc_s.so.1"
+        else
+            cp -t "image/$occlum_glibc_lib" \
+                "/usr/lib64/libstdc++.so.6" \
+                "/usr/lib64/libgcc_s.so.1"
+        fi
         cp -t "image/$cpu_lib" \
             "$cpu_lib/online"
     fi
