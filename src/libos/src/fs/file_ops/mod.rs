@@ -3,7 +3,7 @@ use super::*;
 use process::Process;
 
 pub use self::access::{do_faccessat, AccessibilityCheckFlags, AccessibilityCheckMode};
-pub use self::chmod::{do_fchmod, do_fchmodat, ChmodFlags, FileMode};
+pub use self::chmod::{do_fchmod, do_fchmodat, FileMode};
 pub use self::chown::{do_fchown, do_fchownat, ChownFlags};
 pub use self::close::do_close;
 pub use self::dirent::{do_getdents, do_getdents64};

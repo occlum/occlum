@@ -352,7 +352,7 @@ macro_rules! process_syscall_table_with_callback {
             (Linkat = 265) => do_linkat(olddirfd: i32, oldpath: *const i8, newdirfd: i32, newpath: *const i8, flags: i32),
             (Symlinkat = 266) => do_symlinkat(target: *const i8, new_dirfd: i32, link_path: *const i8),
             (Readlinkat = 267) => do_readlinkat(dirfd: i32, path: *const i8, buf: *mut u8, size: usize),
-            (Fchmodat = 268) => do_fchmodat(dirfd: i32, path: *const i8, mode: u16, flags: i32),
+            (Fchmodat = 268) => do_fchmodat(dirfd: i32, path: *const i8, mode: u16),
             (Faccessat = 269) => do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32),
             (Pselect6 = 270) => handle_unsupported(),
             (Ppoll = 271) => handle_unsupported(),
