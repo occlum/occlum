@@ -54,8 +54,8 @@ static int test_sched_getaffinity_with_self_pid() {
     if (CPU_COUNT(&mask) <= 0) {
         THROW_ERROR("failed to get cpuset mask");
     }
-    if (sysconf(_SC_NPROCESSORS_ONLN) != CPU_COUNT(&mask)) {
-        THROW_ERROR("cpuset num wrong");
+    if (sysconf(_SC_NPROCESSORS_ONLN) < CPU_COUNT(&mask)) {
+        THROW_ERROR("cpuset num must be less or equal to _SC_NPROCESSORS_ONLN");
     }
     return 0;
 }
@@ -166,7 +166,7 @@ static int test_sched_xetaffinity_children_inheritance() {
     return 0;
 }
 
-#define CPU_SET_SIZE_LIMIT (1024)
+#define CPU_SET_SIZE_LIMIT (128)
 
 static int test_sched_getaffinity_via_explicit_syscall() {
     unsigned char buf[CPU_SET_SIZE_LIMIT] = { 0 };
