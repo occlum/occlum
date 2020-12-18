@@ -1,8 +1,8 @@
 use super::event_file::EventCreationFlags;
 use super::file_ops;
 use super::file_ops::{
-    AccessibilityCheckFlags, AccessibilityCheckMode, ChmodFlags, ChownFlags, FcntlCmd, FsPath,
-    LinkFlags, StatFlags, UnlinkFlags, AT_FDCWD,
+    AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath, LinkFlags,
+    StatFlags, UnlinkFlags, AT_FDCWD,
 };
 use super::fs_ops;
 use super::*;
@@ -433,7 +433,7 @@ pub fn do_symlinkat(target: *const i8, new_dirfd: i32, link_path: *const i8) -> 
 }
 
 pub fn do_chmod(path: *const i8, mode: u16) -> Result<isize> {
-    self::do_fchmodat(AT_FDCWD, path, mode, 0)
+    self::do_fchmodat(AT_FDCWD, path, mode)
 }
 
 pub fn do_fchmod(fd: FileDesc, mode: u16) -> Result<isize> {
@@ -442,14 +442,13 @@ pub fn do_fchmod(fd: FileDesc, mode: u16) -> Result<isize> {
     Ok(0)
 }
 
-pub fn do_fchmodat(dirfd: i32, path: *const i8, mode: u16, flags: i32) -> Result<isize> {
+pub fn do_fchmodat(dirfd: i32, path: *const i8, mode: u16) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
     let mode = FileMode::from_bits_truncate(mode);
     let fs_path = FsPath::new(&path, dirfd, false)?;
-    let flags = ChmodFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
-    file_ops::do_fchmodat(&fs_path, mode, flags)?;
+    file_ops::do_fchmodat(&fs_path, mode)?;
     Ok(0)
 }
 
