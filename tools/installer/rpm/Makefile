@@ -9,19 +9,21 @@ VERSION_NUM := $(MAJOR_VER_NUM).$(MINOR_VER_NUM).$(PATCH_VER_NUM)
 
 # Occlum specific version
 MUSL_VERSION = 0.15.0
+GOLANG_VERSION = 0.16.0
 
 RPM_FILELIST = occlum-filelist occlum-pal-filelist occlum-runtime-filelist
 EXPORT_SCRIPT = occlum-pal.sh occlum-runtime.sh
 
-GCC_PATCH = toolchains/gcc/musl-cross-make-disable-download.patch
-GCC_SCRIPT = toolchains/gcc/occlum-gcc.sh
+GCC_PATCH = toolchains/musl-gcc/musl-cross-make-disable-download.patch
+GCC_SCRIPT = toolchains/musl-gcc/occlum-gcc.sh
+OCCLUM_MUSL_PATCH := $(PROJECT_DIR)/tools/toolchains/musl-gcc/0014-libgomp-futex-occlum.diff
 
 GO_PATCH = $(PROJECT_DIR)/tools/toolchains/golang/adapt-golang-to-occlum.patch
 GO_SCRIPT = toolchains/golang/occlum-go.sh
 
 PACKAGE_DIR = /tmp
 
-.PHONY: all main main_deps c/c++ deps_c clean golang
+.PHONY: all main main_deps musl-gcc deps_c clean golang
 
 all: main
 
@@ -47,8 +49,8 @@ $(PACKAGE_DIR)/$(VERSION_NUM).tar.gz:
 		rm -rf $(PACKAGE_DIR)/occlum-$(VERSION_NUM)/build
 	@cd $(PACKAGE_DIR) && tar -cvzf "$$HOME/rpmbuild/SOURCES/$(VERSION_NUM).tar.gz" occlum-$(VERSION_NUM)
 
-c/c++: deps_c
-	@rpmbuild -ba --define '_musl_version $(MUSL_VERSION)' toolchains/gcc/occlum-toolchains-gcc.spec
+musl-gcc: deps_c
+	@rpmbuild -ba --define '_musl_version $(MUSL_VERSION)' toolchains/musl-gcc/occlum-toolchains-gcc.spec
 	@mv $$HOME/rpmbuild $$HOME/rpmbuild-occlum-toolchains-gcc
 	@cp $$HOME/rpmbuild-occlum-toolchains-gcc/RPMS/x86_64/*.rpm $(TARGET_DIR)
 	@echo "$$(ls $$HOME/rpmbuild-occlum-toolchains-gcc/RPMS/x86_64) can be found at $(TARGET_DIR)"
@@ -60,12 +62,12 @@ $$HOME/rpmbuild/SOURCES/$(GCC_PATCH):
 	@if [ -d $$HOME/rpmbuild ]; then \
 		mv $$HOME/rpmbuild $$HOME/rpmbuild-old-$$(date +%Y%m%d-%T); fi
 	@mkdir -p $$HOME/rpmbuild/{BUILD,RPMS,SPECS,SOURCES,SRPMS}
-	@MUSL_VERSION=$(MUSL_VERSION) toolchains/gcc/download_sources.sh
-	@spectool -g -R --define '_musl_version $(MUSL_VERSION)' toolchains/gcc/occlum-toolchains-gcc.spec
-	@cp -t $$HOME/rpmbuild/SOURCES $(GCC_PATCH) $(GCC_SCRIPT)
+	@MUSL_VERSION=$(MUSL_VERSION) toolchains/musl-gcc/download_sources.sh
+	@spectool -g -R --define '_musl_version $(MUSL_VERSION)' toolchains/musl-gcc/occlum-toolchains-gcc.spec
+	@cp -t $$HOME/rpmbuild/SOURCES $(GCC_PATCH) $(GCC_SCRIPT) $(OCCLUM_MUSL_PATCH)
 
 golang: $$HOME/rpmbuild/SOURCES/$(GO_PATCH)
-	@rpmbuild -ba toolchains/golang/occlum-toolchains-golang.spec
+	@rpmbuild -ba --define '_golang_version $(GOLANG_VERSION)' toolchains/golang/occlum-toolchains-golang.spec
 	@mv $$HOME/rpmbuild $$HOME/rpmbuild-occlum-toolchains-golang
 	@cp $$HOME/rpmbuild-occlum-toolchains-golang/RPMS/x86_64/*.rpm $(TARGET_DIR)
 	@echo "$$(ls $$HOME/rpmbuild-occlum-toolchains-golang/RPMS/x86_64) can be found at $(TARGET_DIR)"
@@ -77,7 +79,7 @@ $$HOME/rpmbuild/SOURCES/$(GO_PATCH):
 		mv $$HOME/rpmbuild $$HOME/rpmbuild-old-$$(date +%Y%m%d-%T); fi
 	@rm -rf $$HOME/rpmbuild/{BUILD,RPMS,SPECS,SRPMS} # tmp
 	@mkdir -p $$HOME/rpmbuild/{BUILD,RPMS,SPECS,SOURCES,SRPMS}
-	@spectool -g -R toolchains/golang/occlum-toolchains-golang.spec
+	@spectool -g -R --define '_golang_version $(GOLANG_VERSION)' toolchains/golang/occlum-toolchains-golang.spec
 	@cp -t $$HOME/rpmbuild/SOURCES $(GO_PATCH) $(GO_SCRIPT)
 
 clean:
