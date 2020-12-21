@@ -29,6 +29,7 @@ Source9: musl-%{_musl_version}.tar.gz
 Source10: occlum-gcc.sh
 
 Patch0: musl-cross-make-disable-download.patch
+Patch1: 0014-libgomp-futex-occlum.diff
 
 ExclusiveArch: x86_64
 
@@ -42,7 +43,7 @@ Occlum toolchains gcc
 %setup -q -T -D -a 1
 
 # This patch replaces syscall instruction with libc's syscall wrapper
-cp occlum-%{version}/tools/toolchains/gcc/0014-libgomp-*.diff musl-cross-make-0.9.9.hotfix/patches/gcc-%{GCC_VER}/
+cp %{PATCH1} musl-cross-make-0.9.9.hotfix/patches/gcc-%{GCC_VER}/
 
 pushd musl-cross-make-0.9.9.hotfix
 mkdir -p sources/gcc-%{GCC_VER}.tar.xz.tmp && cp %{SOURCE2} sources/gcc-%{GCC_VER}.tar.xz.tmp

@@ -12,7 +12,7 @@
 %define _unpackaged_files_terminate_build 0
 
 Name: occlum-toolchains-golang
-Version: 0.16.0
+Version: %{_golang_version}
 Release: %{centos_base_release}%{?dist}
 Summary: occlum toolchains golang
 

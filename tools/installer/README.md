@@ -26,7 +26,7 @@ If a user wants to build his application on a platform installed with Occlum ins
 cd tools/installer/rpm
 make <language option>
 ```
-Now, only `c/c++` and `golang` options are supported. And the installer can be found under `build/rpms`.
+Now, only `musl-gcc` and `golang` options are supported. And the installer can be found under `build/rpms`.
 
 ### How to Use
 
@@ -107,7 +107,7 @@ If a user wants to build his application on a platform installed with Occlum ins
 cd tools/installer/deb
 make <language option>
 ```
-Now, only `c/c++` and `golang` options are supported. And the installer can be found under `build/debs`.
+Now, only `musl-gcc` and `golang` options are supported. And the installer can be found under `build/debs`.
 
 ### How to Use
 

@@ -10,9 +10,18 @@ VERSION_NUM = $(MAJOR_VER_NUM).$(MINOR_VER_NUM).$(PATCH_VER_NUM)
 DEB_BUILD_DIR := /tmp/deb_build
 PACKAGE_DIR := /tmp
 
+C_TOOLCHAIN_PACKAGE_NAME := occlum-toolchains-gcc
+
+# Version number for toolchain packages
+# The version numbers are only needed to update when the toolchains are updated.
+# When updating the toolchain packages for Deb, please first update RPM configuration. And then
+# update the "changelog" file accordingly.
+MUSL_VERSION := 0.15.0
+GOLAN_VERSION := 0.16.0
+
 GO_PATCH = $(PROJECT_DIR)/tools/toolchains/golang/adapt-golang-to-occlum.patch
 
-.PHONY: all main config_files main_deps c/c++ deps_c clean clean-build
+.PHONY: all main config_files main_deps musl-gcc deps_c clean clean-build
 
 all: main
 
@@ -42,18 +51,18 @@ main_deps:
 		git submodule deinit -f . ; \
 		rm -rf $(DEB_BUILD_DIR)/occlum-$(VERSION_NUM)/occlum-src/{build,demos}
 
-c/c++: deps_c
-	cd $(DEB_BUILD_DIR)/occlum-toolchains-gcc ; \
+musl-gcc: deps_c
+	cd $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME) ; \
 		dpkg-buildpackage -us -uc
-	cp -t $(TARGET_DIR) $(DEB_BUILD_DIR)/occlum-toolchains-gcc*.deb $(DEB_BUILD_DIR)/occlum-toolchains-gcc-dbgsym*.ddeb
+	cp -t $(TARGET_DIR) $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME)*.deb $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME)-dbgsym*.ddeb
 
 deps_c:
 	mkdir -p $(TARGET_DIR)
-	mkdir -p $(DEB_BUILD_DIR)/occlum-toolchains-gcc
-	cp -r toolchains/gcc $(DEB_BUILD_DIR)/occlum-toolchains-gcc/debian
-	cp $(PROJECT_DIR)/tools/toolchains/gcc/0014-libgomp-futex-occlum.diff $(DEB_BUILD_DIR)/occlum-toolchains-gcc/debian
-	cp $(PROJECT_DIR)/tools/installer/rpm/toolchains/gcc/occlum-gcc.sh $(DEB_BUILD_DIR)/occlum-toolchains-gcc/debian
-	echo " echo 'Please execute command \"source /etc/profile\" to validate envs immediately' " > $(DEB_BUILD_DIR)/occlum-toolchains-gcc/debian/occlum-gcc.postinst
+	mkdir -p $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME)
+	cp -r toolchains/musl-gcc $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME)/debian
+	cp $(PROJECT_DIR)/tools/toolchains/musl-gcc/0014-libgomp-futex-occlum.diff $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME)/debian
+	cp $(PROJECT_DIR)/tools/installer/rpm/toolchains/musl-gcc/occlum-gcc.sh $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME)/debian
+	echo " echo 'Please execute command \"source /etc/profile\" to validate envs immediately' " > $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME)/debian/occlum-gcc.postinst
 
 golang: deps_golang
 	cd $(DEB_BUILD_DIR)/occlum-toolchains-golang ; \
