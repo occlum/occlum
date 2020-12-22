@@ -100,7 +100,7 @@ jobs:
             wget -qO - https://occlum.io/occlum-package-repos/debian/public.key | apt-key add -;"
 
     - name: Install sgx dependencies and occlum
-      run: docker exec ubuntu bash -c "apt-get update; apt-cache policy occlum; apt-get install -y occlum libsgx-uae-service"
+      run: docker exec ubuntu bash -c "apt-get update; apt-cache policy occlum; apt-get install -y occlum libsgx-uae-service libsgx-dcap-ql"
 
     - name: Hello world test
       run: docker exec ubuntu bash -c "source /etc/profile; cd /root; wget https://raw.githubusercontent.com/occlum/occlum/master/demos/hello_c/hello_world.c; occlum-gcc -o hello_world hello_world.c;
@@ -116,7 +116,7 @@ jobs:
 
     - name: Install sgx dependencies
       run: docker exec centos bash -c "yum install -y wget yum-utils make jq gdb; cd /root && wget https://download.01.org/intel-sgx/sgx-linux/2.11/distro/centos8.1-server/sgx_rpm_local_repo.tgz;
-        tar -xvzf sgx_rpm_local_repo.tgz; yum-config-manager --add-repo file:///root/sgx_rpm_local_repo; yum --nogpgcheck install -y libsgx-epid libsgx-urts;
+        tar -xvzf sgx_rpm_local_repo.tgz; yum-config-manager --add-repo file:///root/sgx_rpm_local_repo; yum --nogpgcheck install -y libsgx-dcap-ql libsgx-epid libsgx-urts;
         yum --nogpgcheck install -y libsgx-quote-ex; rpm -i /root/sgx_rpm_local_repo/libsgx-uae-service-2.11.100.2-1.el8.x86_64.rpm || true"
 
     - name: Install occlum
