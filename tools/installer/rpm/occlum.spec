@@ -35,7 +35,7 @@ BuildRequires: git
 BuildRequires: fuse-devel
 BuildRequires: fuse-libs
 
-Requires: occlum-pal, occlum-runtime, occlum-toolchains-gcc, occlum-sgx-tools
+Requires: occlum-pal = %{_version}, occlum-runtime = %{_version}, occlum-sgx-tools = %{_version}, occlum-toolchains-gcc = %{_musl_version}
 
 %description
 Occlum is a memory-safe, multi-process library OS (LibOS) for Intel SGX.

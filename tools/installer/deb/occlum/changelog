@@ -1,4 +1,4 @@
-occlum ($VERSION-1) unstable; urgency=medium
+occlum ($OCCLUM_VERSION-1) unstable; urgency=medium
 
   * Initial release
 

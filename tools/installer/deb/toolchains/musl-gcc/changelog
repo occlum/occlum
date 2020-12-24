@@ -1,4 +1,4 @@
-occlum-toolchains-gcc (0.15.0-1) unstable; urgency=medium
+occlum-toolchains-gcc ($MUSL_VERSION-1) unstable; urgency=medium
 
   * Initial release
 

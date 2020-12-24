@@ -29,7 +29,7 @@ all: main
 
 main: main_deps
 	@mkdir -p $(TARGET_DIR)
-	@rpmbuild -ba --define '_version $(VERSION_NUM)' occlum.spec
+	@rpmbuild -ba --define '_version $(VERSION_NUM)' --define '_musl_version $(MUSL_VERSION)' occlum.spec
 	@mv $$HOME/rpmbuild $$HOME/rpmbuild-occlum
 	@cp $$HOME/rpmbuild-occlum/RPMS/x86_64/*.rpm $(TARGET_DIR)
 	@echo "$$(ls $$HOME/rpmbuild-occlum/RPMS/x86_64) can be found at $(TARGET_DIR)"

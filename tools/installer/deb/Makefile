@@ -40,7 +40,9 @@ config_files: main_deps
 	sed -e 's/^\///g' -i $(DEB_BUILD_DIR)/occlum-$(VERSION_NUM)/debian/occlum*filelist
 	sed -i -e '$$aetc/profile.d/occlum-pal.sh' $(DEB_BUILD_DIR)/occlum-$(VERSION_NUM)/debian/occlum-pal-filelist
 	sed -i -e '$$aetc/profile.d/occlum-runtime.sh' $(DEB_BUILD_DIR)/occlum-$(VERSION_NUM)/debian/occlum-runtime-filelist
-	sed -i -e 's/$$VERSION/$(VERSION_NUM)/g' $(DEB_BUILD_DIR)/occlum-$(VERSION_NUM)/debian/changelog
+	sed -i -e 's/$$OCCLUM_VERSION/$(VERSION_NUM)/g' $(DEB_BUILD_DIR)/occlum-$(VERSION_NUM)/debian/changelog
+	sed -i -e 's/$$OCCLUM_VERSION/$(VERSION_NUM)/g' $(DEB_BUILD_DIR)/occlum-$(VERSION_NUM)/debian/control
+	sed -i -e 's/$$MUSL_VERSION/$(MUSL_VERSION)/g' $(DEB_BUILD_DIR)/occlum-$(VERSION_NUM)/debian/control
 
 main_deps:
 	mkdir -p $(TARGET_DIR)
@@ -63,6 +65,7 @@ deps_c:
 	cp $(PROJECT_DIR)/tools/toolchains/musl-gcc/0014-libgomp-futex-occlum.diff $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME)/debian
 	cp $(PROJECT_DIR)/tools/installer/rpm/toolchains/musl-gcc/occlum-gcc.sh $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME)/debian
 	echo " echo 'Please execute command \"source /etc/profile\" to validate envs immediately' " > $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME)/debian/occlum-gcc.postinst
+	sed -i -e 's/$$MUSL_VERSION/$(MUSL_VERSION)/g' $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME)/debian/changelog
 
 golang: deps_golang
 	cd $(DEB_BUILD_DIR)/occlum-toolchains-golang ; \
