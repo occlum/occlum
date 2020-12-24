@@ -8,7 +8,7 @@ Homepage: https://github.com/occlum/occlum
 
 Package: occlum
 Architecture: amd64
-Depends: ${misc:Depends}, occlum-sgx-tools, occlum-pal, occlum-runtime, occlum-toolchains-gcc
+Depends: ${misc:Depends}, occlum-sgx-tools (=$OCCLUM_VERSION-1), occlum-pal (=$OCCLUM_VERSION-1), occlum-runtime (=$OCCLUM_VERSION-1), occlum-toolchains-gcc (=$MUSL_VERSION-1)
 Description: Occlum is a memory-safe, multi-process library OS (LibOS) for Intel SGX.
  As a LibOS, it enables legacy applications to run on SGX with little or even no modifications of source code,
  thus protecting the confidentiality and integrity of user workloads transparently.
