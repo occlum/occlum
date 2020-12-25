@@ -862,7 +862,8 @@ fn do_nanosleep(req_u: *const timespec_t, rem_u: *mut timespec_t) -> Result<isiz
 }
 
 fn do_uname(name: *mut utsname_t) -> Result<isize> {
-    check_mut_ptr(name)?;
+    // [static link mode] skip checking
+    // check_mut_ptr(name)?;
     let name = unsafe { &mut *name };
     misc::do_uname(name).map(|_| 0)
 }

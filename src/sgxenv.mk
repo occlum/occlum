@@ -135,7 +135,7 @@ SGX_LFLAGS_T = $(SGX_COMMON_CFLAGS) -nostdlib -L$(SGX_LIBRARY_PATH) $(_Other_Lin
 ifeq ($(TCMALLOC), Y)
 SGX_LFLAGS_T += -Wl,--whole-archive -lsgx_tcmalloc -Wl,--no-whole-archive
 endif
-SGX_LFLAGS_T += -Wl,--start-group -lsgx_tcxx -lsgx_tstdc -l$(Crypto_Library_Name) -l$(Service_Library_Name) $(_Other_Enclave_Libs) -Wl,--end-group \
+SGX_LFLAGS_T += -Wl,--start-group -lsgx_tcxx -lsgx_tstdc -lmusl_c -locclum-app -l$(Crypto_Library_Name) -l$(Service_Library_Name) $(_Other_Enclave_Libs) -Wl,--end-group \
 	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined \
 	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic  \
 	-Wl,--defsym,__ImageBase=0 \

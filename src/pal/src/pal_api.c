@@ -10,6 +10,8 @@
 #include "errno2str.h"
 #include <linux/limits.h>
 
+extern void init_occlum_syscall();
+
 int occlum_pal_get_version(void) {
     return OCCLUM_PAL_VERSION;
 }
@@ -59,6 +61,20 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
         PAL_ERROR("occlum_ecall_init returns %s", errno2str(errno));
         goto on_destroy_enclave;
     }
+
+    // For not creating a new PAL api, simply leverage occlum_pal_init for invoking now
+    ecall_status = occlum_ecall_invoke_main(eid, &ecall_ret);
+    if (ecall_status != SGX_SUCCESS) {
+        const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
+        PAL_ERROR("Failed to do ECall with error code 0x%x: %s", ecall_status, sgx_err);
+        return -1;
+    }
+    if (ecall_ret < 0) {
+        errno = -ecall_ret;
+        PAL_ERROR("occlum_ecall_invoke_main returns %s", errno2str(errno));
+        return -1;
+    }
+    printf("app run return: %d\n", ecall_ret);
 
 // FIXME
 #ifndef SGX_MODE_SIM

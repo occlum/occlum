@@ -79,7 +79,8 @@ pub fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<isize>
         count as usize
     };
 
-    from_user::check_array(iov, count)?;
+    // [static link mode] skip checking
+    // from_user::check_array(iov, count)?;
     let bufs_vec = {
         let mut bufs_vec = Vec::with_capacity(count);
         for iov_i in 0..count {
@@ -511,7 +512,8 @@ pub fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize> {
 pub fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
     let mut ioctl_cmd = unsafe {
         if argp.is_null() == false {
-            from_user::check_mut_ptr(argp)?;
+            // [static link mode] skip checking
+            // from_user::check_mut_ptr(argp)?;
         }
         IoctlCmd::new(cmd, argp)?
     };

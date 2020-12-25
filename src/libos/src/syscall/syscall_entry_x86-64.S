@@ -67,7 +67,7 @@ __occlum_syscall_linux_abi:
     popq %rdi
 #else // SGX_MODE_HW
     movq TASK_KERNEL_FS(%r12), %r11
-    wrfsbase %r11
+    // wrfsbase %r11
 #endif
     
     // Keep the stack 16 bytes alignment
@@ -99,7 +99,7 @@ __occlum_sysret:
     popq %rdi
 #else // SGX_MODE_HW
     movq TASK_USER_FS(%r12), %r11
-    wrfsbase %r11
+    // wrfsbase %r11
 #endif
     // Restore flags first
     leaq (17*8)(%rdi), %rsp

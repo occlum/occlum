@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
 
     char **cmd_args = &argv[1];
     char *cmd_path = strdup(argv[1]);
-    extern const char **environ;
+    // extern const char **environ;
 
     // Change cmd_args[0] from program path to program name in place (e.g., "/bin/abc" to "abc")
     char *cmd_path_tmp = strdup(cmd_path);
@@ -40,13 +40,14 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    int exit_status = 0;
+    /*
     // Use Occlum PAL to execute the cmd
     struct occlum_stdio_fds io_fds = {
         .stdin_fd = STDIN_FILENO,
         .stdout_fd = STDOUT_FILENO,
         .stderr_fd = STDERR_FILENO,
     };
-    int exit_status = 0;
     int libos_tid = 0;
     struct occlum_pal_create_process_args create_process_args = {
         .path = (const char *) cmd_path,
@@ -75,6 +76,7 @@ int main(int argc, char *argv[]) {
     } else { // killed by signal
         exit_status = 128 + WTERMSIG(exit_status); // [128 + 1, 128 + 64]
     }
+    */
 
     // Destroy Occlum PAL
     occlum_pal_destroy();

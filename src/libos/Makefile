@@ -55,6 +55,7 @@ endif
 
 LIBOS_CORE_A := $(OBJ_DIR)/libos/lib/lib$(LIBOS_CORE_LIB_NAME).a
 LIBOS_CORE_RS_A := $(OBJ_DIR)/libos/lib/libocclum_libos_core_rs.a
+APP_A := $(OBJ_DIR)/libos/lib/libocclum-app.a
 
 # All source code
 RUST_SRCS := $(wildcard src/*.rs src/*/*.rs src/*/*/*.rs src/*/*/*/*.rs src/*/*/*/*/*.rs)
@@ -98,9 +99,9 @@ all: $(ALL_BUILD_SUBDIRS) $(LIBOS_SO_REAL)
 $(ALL_BUILD_SUBDIRS):
 	@mkdir -p $@
 
-LIBOS_SO_DEPS := $(LIBOS_CORE_A) $(LIBCOMPILER_RT_PATCH_A)
+LIBOS_SO_DEPS := $(LIBOS_CORE_A) $(APP_A)
 
-$(LIBOS_SO_REAL): $(LIBOS_CORE_A) $(LIBCOMPILER_RT_PATCH_A)
+$(LIBOS_SO_REAL): $(LIBOS_CORE_A)
 	@$(CC) $(LIBOS_SO_DEPS) -o $@ $(LINK_FLAGS) -Wl,-soname=$(LIBOS_SONAME)
 	@echo "LINK => $@"
 

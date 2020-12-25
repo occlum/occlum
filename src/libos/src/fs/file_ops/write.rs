@@ -8,8 +8,9 @@ pub fn do_write(fd: FileDesc, buf: &[u8]) -> Result<usize> {
 
 pub fn do_writev(fd: FileDesc, bufs: &[&[u8]]) -> Result<usize> {
     debug!("writev: fd: {}", fd);
-    let file_ref = current!().file(fd)?;
-    file_ref.writev(bufs)
+    // let file_ref = current!().file(fd)?;
+    // file_ref.writev(bufs)
+    StdoutFile::new(fd).writev(bufs)
 }
 
 pub fn do_pwrite(fd: FileDesc, buf: &[u8], offset: off_t) -> Result<usize> {

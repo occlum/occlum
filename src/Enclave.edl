@@ -45,6 +45,13 @@ enclave {
         public int occlum_ecall_init([in, string] const char* log_level, [in, string] const char* instance_dir);
 
         /*
+         * Invoke the main function of the statically-linked application.
+         *
+         * @retval On success, return 0; otherwise, return -errno.
+         */
+        public int occlum_ecall_invoke_main();
+
+        /*
          * Create a new LibOS process to do the task specified by the given 
          * arguments.
          *
