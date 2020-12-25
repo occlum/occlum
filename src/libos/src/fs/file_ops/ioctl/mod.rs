@@ -91,8 +91,9 @@ impl<'a> IoctlCmd<'a> {
 
 pub fn do_ioctl(fd: FileDesc, cmd: &mut IoctlCmd) -> Result<i32> {
     debug!("ioctl: fd: {}, cmd: {:?}", fd, cmd);
-    let file_ref = current!().file(fd)?;
-    file_ref.ioctl(cmd)
+    // let file_ref = current!().file(fd)?;
+    // file_ref.ioctl(cmd)
+    StdoutFile::new(fd).ioctl(cmd)
 }
 
 extern "C" {

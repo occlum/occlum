@@ -63,11 +63,11 @@ __exec_task:
     movq %r10, TASK_KERNEL_FS(%rdi)
     // Use user fsbase
     movq TASK_USER_FS(%rdi), %r10
-    wrfsbase %r10
+    # wrfsbase %r10
 #endif
 
     // Use user stack
-    movq TASK_USER_RSP(%rdi), %rsp
+    // movq TASK_USER_RSP(%rdi), %rsp
     // Run user code
     movq TASK_USER_ENTRY_ADDR(%rdi), %r11
-    jmp *%r11
+    // jmp *%r11
