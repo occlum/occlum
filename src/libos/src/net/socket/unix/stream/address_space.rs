@@ -31,19 +31,31 @@ impl AddressSpace {
         }
     }
 
-    pub fn add_listener(&self, addr: &Addr, capacity: usize) -> Result<()> {
+    pub fn add_listener(&self, addr: &Addr, capacity: usize, nonblocking: bool) -> Result<()> {
+        let key = Self::get_key(addr);
+        let mut space = self.get_space(addr);
+
+        if let Some(option) = space.get(&key) {
+            if option.is_none() {
+                space.insert(key, Some(Arc::new(Listener::new(capacity, nonblocking)?)));
+                Ok(())
+            } else {
+                return_errno!(EINVAL, "the socket is already listened");
+            }
+        } else {
+            return_errno!(EINVAL, "the socket is not bound");
+        }
+    }
+
+    pub fn resize_listener(&self, addr: &Addr, capacity: usize) -> Result<()> {
         let key = Self::get_key(addr);
         let mut space = self.get_space(addr);
 
         if let Some(option) = space.get(&key) {
             if let Some(listener) = option {
-                let new_listener = Listener::new(capacity)?;
-                for i in 0..std::cmp::min(listener.remaining(), capacity) {
-                    new_listener.push_incoming(listener.pop_incoming().unwrap());
-                }
-                space.insert(key, Some(Arc::new(new_listener)));
+                listener.resize(capacity);
             } else {
-                space.insert(key, Some(Arc::new(Listener::new(capacity)?)));
+                return_errno!(EINVAL, "the socket is not listening");
             }
             Ok(())
         } else {
@@ -54,8 +66,7 @@ impl AddressSpace {
     pub fn push_incoming(&self, addr: &Addr, sock: Endpoint) -> Result<()> {
         self.get_listener_ref(addr)
             .ok_or_else(|| errno!(ECONNREFUSED, "no one's listening on the remote address"))?
-            .push_incoming(sock);
-        Ok(())
+            .push_incoming(sock)
     }
 
     pub fn pop_incoming(&self, addr: &Addr) -> Result<Endpoint> {

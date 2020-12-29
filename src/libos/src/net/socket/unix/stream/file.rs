@@ -5,14 +5,19 @@ use std::any::Any;
 
 impl File for Stream {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
-        match &*self.inner() {
+        // The connected status will not be changed any more
+        // in the current implementation. Use clone to release
+        // the mutex lock early.
+        let status = (*self.inner()).clone();
+        match status {
             Status::Connected(endpoint) => endpoint.read(buf),
             _ => return_errno!(ENOTCONN, "unconnected socket"),
         }
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize> {
-        match &*self.inner() {
+        let status = (*self.inner()).clone();
+        match status {
             Status::Connected(endpoint) => endpoint.write(buf),
             _ => return_errno!(ENOTCONN, "unconnected socket"),
         }
@@ -33,14 +38,16 @@ impl File for Stream {
     }
 
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-        match &*self.inner() {
+        let status = (*self.inner()).clone();
+        match status {
             Status::Connected(endpoint) => endpoint.readv(bufs),
             _ => return_errno!(ENOTCONN, "unconnected socket"),
         }
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
-        match &*self.inner() {
+        let status = (*self.inner()).clone();
+        match status {
             Status::Connected(endpoint) => endpoint.writev(bufs),
             _ => return_errno!(ENOTCONN, "unconnected socket"),
         }
