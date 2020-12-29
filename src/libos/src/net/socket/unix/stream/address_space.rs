@@ -37,11 +37,15 @@ impl AddressSpace {
 
         if let Some(option) = space.get(&key) {
             if let Some(listener) = option {
+                let listener = listener.clone();
                 let new_listener = Listener::new(capacity)?;
                 for i in 0..std::cmp::min(listener.remaining(), capacity) {
                     new_listener.push_incoming(listener.pop_incoming().unwrap());
                 }
                 space.insert(key, Some(Arc::new(new_listener)));
+                /// shutdown the old listener in case it is still being used
+                /// by especially blocking accept
+                listener.shutdown();
             } else {
                 space.insert(key, Some(Arc::new(Listener::new(capacity)?)));
             }

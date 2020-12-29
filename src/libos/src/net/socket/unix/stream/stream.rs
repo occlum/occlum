@@ -107,6 +107,8 @@ impl Stream {
         Ok(())
     }
 
+    /// The establishment of the connection is very fast and can be done immediately.
+    /// Therefore, the connect function in our implementation will never block.
     pub fn connect(&self, addr: &Addr) -> Result<()> {
         debug!("connect to {:?}", addr);
 
@@ -126,7 +128,12 @@ impl Stream {
                     end_self.set_addr(self_addr);
                 }
 
-                ADDRESS_SPACE.push_incoming(addr, end_incoming)?;
+                ADDRESS_SPACE
+                    .push_incoming(addr, end_incoming)
+                    .map_err(|e| match e.errno() {
+                        Errno::EAGAIN => errno!(ECONNREFUSED, "the backlog is full"),
+                        _ => e,
+                    })?;
 
                 *inner = Status::Connected(end_self);
                 Ok(())
@@ -137,7 +144,8 @@ impl Stream {
     }
 
     pub fn accept(&self, flags: FileFlags) -> Result<(Self, Option<Addr>)> {
-        match &*self.inner() {
+        let status = (*self.inner()).clone();
+        match status {
             Status::Listening(addr) => {
                 let endpoint = ADDRESS_SPACE.pop_incoming(&addr)?;
                 endpoint.set_nonblocking(flags.contains(FileFlags::SOCK_NONBLOCK));
@@ -234,6 +242,7 @@ impl Drop for Stream {
     }
 }
 
+#[derive(Clone)]
 pub enum Status {
     Unconnected(Info),
     /// The listeners are stored in a global data structure indexed by the address.
@@ -273,26 +282,21 @@ impl Info {
     }
 }
 
+/// The listener status of a stream unix socket.
+/// It contains a channel holding incoming connections.
+/// The nonblocking status of the reader end keeps the same with the socket.
+/// The writer end is always non-blocking. The connect function returns
+/// ECONNREFUSED rather than block when the channel is full.
 pub struct Listener {
     channel: Channel<Endpoint>,
-    nonblocking: AtomicBool,
 }
 
 impl Listener {
     pub fn new(capacity: usize) -> Result<Self> {
         let channel = Channel::new(capacity)?;
-        // It may incur blocking inside a blocking if the channel is blocking. Set the channel to
-        // nonblocking permanently to avoid the nested blocking. This also results in nonblocking
-        // accept and connect. Future work is needed to resolve this blocking issue to support
-        // blocking accept and connect.
-        channel.set_nonblocking(true);
-        /// The listener is blocking by default
-        let nonblocking = AtomicBool::new(true);
+        channel.set_producer_nonblocking(true);
 
-        Ok(Self {
-            channel,
-            nonblocking,
-        })
+        Ok(Self { channel })
     }
 
     pub fn push_incoming(&self, stream_socket: Endpoint) {
@@ -308,15 +312,11 @@ impl Listener {
     }
 
     pub fn nonblocking(&self) -> bool {
-        warn!("the channel works in a nonblocking way regardless of the nonblocking status");
-
-        self.nonblocking.load(Ordering::Acquire)
+        self.channel.consumer_nonblocking()
     }
 
     pub fn set_nonblocking(&self, nonblocking: bool) {
-        warn!("the channel works in a nonblocking way regardless of the nonblocking status");
-
-        self.nonblocking.store(nonblocking, Ordering::Release);
+        self.channel.set_consumer_nonblocking(nonblocking);
     }
 
     pub fn shutdown(&self) {
