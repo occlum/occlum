@@ -81,8 +81,24 @@ impl<I> Channel<I> {
         self.consumer.items_to_consume()
     }
 
+    pub fn consumer_nonblocking(&self) -> bool {
+        self.consumer.is_nonblocking.load(Ordering::Acquire)
+    }
+
+    pub fn producer_nonblocking(&self) -> bool {
+        self.producer.is_nonblocking.load(Ordering::Acquire)
+    }
+
     pub fn set_nonblocking(&self, nonblocking: bool) {
+        self.set_consumer_nonblocking(nonblocking);
+        self.set_producer_nonblocking(nonblocking);
+    }
+
+    pub fn set_consumer_nonblocking(&self, nonblocking: bool) {
         self.consumer.set_nonblocking(nonblocking);
+    }
+
+    pub fn set_producer_nonblocking(&self, nonblocking: bool) {
         self.producer.set_nonblocking(nonblocking);
     }
 
