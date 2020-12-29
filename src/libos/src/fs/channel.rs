@@ -77,6 +77,18 @@ impl<I> Channel<I> {
         (producer, consumer)
     }
 
+    pub fn consumer(&self) -> &Consumer<I> {
+        &self.consumer
+    }
+
+    pub fn producer(&self) -> &Producer<I> {
+        &self.producer
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.consumer.capacity()
+    }
+
     pub fn items_to_consume(&self) -> usize {
         self.consumer.items_to_consume()
     }
@@ -406,6 +418,11 @@ impl<I> Consumer<I> {
 
     pub fn items_to_consume(&self) -> usize {
         self.inner.lock().unwrap().len()
+    }
+
+    pub fn capacity(&self) -> usize {
+        let rb_consumer = self.inner.lock().unwrap();
+        rb_consumer.capacity()
     }
 }
 
