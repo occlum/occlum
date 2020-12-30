@@ -26,7 +26,10 @@ pub mod from_user {
 
     /// Check the readonly array is within the readable memory of the user process
     pub fn check_array<T>(user_buf: *const T, count: usize) -> Result<()> {
-        if !is_inside_user_space(user_buf as *const u8, count * size_of::<T>()) {
+        let checked_len = count
+            .checked_mul(size_of::<T>())
+            .ok_or_else(|| errno!(EINVAL, "the array is too long"))?;
+        if !is_inside_user_space(user_buf as *const u8, checked_len) {
             return_errno!(EFAULT, "the whole buffer is not in the user space");
         }
         Ok(())
@@ -109,10 +112,10 @@ pub mod from_untrusted {
 
     /// Check the untrusted array is outside the enclave
     pub fn check_array<T>(out_ptr: *const T, count: usize) -> Result<()> {
-        if !sgx_trts::trts::rsgx_raw_is_outside_enclave(
-            out_ptr as *const u8,
-            count * size_of::<T>(),
-        ) {
+        let checked_len = count
+            .checked_mul(size_of::<T>())
+            .ok_or_else(|| errno!(EINVAL, "the array is too long"))?;
+        if !sgx_trts::trts::rsgx_raw_is_outside_enclave(out_ptr as *const u8, checked_len) {
             return_errno!(EFAULT, "the whole buffer is not outside enclave");
         }
         Ok(())
