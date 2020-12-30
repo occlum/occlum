@@ -1,6 +1,6 @@
 use super::stream::Status;
 use super::*;
-use fs::{AccessMode, File, FileRef, IoctlCmd, StatusFlags};
+use fs::{AccessMode, File, FileRef, IoEvents, IoNotifier, IoctlCmd, StatusFlags};
 use std::any::Any;
 
 impl File for Stream {
@@ -90,10 +90,20 @@ impl File for Stream {
         Ok(())
     }
 
-    fn poll(&self) -> Result<PollEventFlags> {
-        warn!("poll is not supported for unix_socket");
-        let events = PollEventFlags::empty();
-        Ok(events)
+    fn poll_new(&self) -> IoEvents {
+        match &*self.inner() {
+            // linux return value
+            Status::Idle(info) => IoEvents::OUT | IoEvents::HUP,
+            Status::Connected(endpoint) => endpoint.poll(),
+            Status::Listening(_) => {
+                warn!("poll is not fully implemented for the listener socket");
+                IoEvents::empty()
+            }
+        }
+    }
+
+    fn notifier(&self) -> Option<&IoNotifier> {
+        Some(&self.notifier.notifier())
     }
 
     fn as_any(&self) -> &dyn Any {
