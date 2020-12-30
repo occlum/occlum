@@ -35,10 +35,11 @@ extern crate sgx_types;
 #[cfg(not(target_env = "sgx"))]
 #[macro_use]
 extern crate sgx_tstd as std;
+extern crate goblin;
+extern crate scroll;
 extern crate sgx_tcrypto;
 extern crate sgx_trts;
 extern crate sgx_tse;
-extern crate xmas_elf;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]

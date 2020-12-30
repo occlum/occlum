@@ -16,7 +16,8 @@ impl UserSpaceVMManager {
         }
     }
 
-    pub fn alloc(&self, size: usize) -> Result<UserSpaceVMRange> {
+    pub fn alloc(&self, vm_layout: VMLayout) -> Result<UserSpaceVMRange> {
+        let size = align_up(vm_layout.size(), vm_layout.align());
         let vm_range = unsafe {
             let ptr = sgx_alloc_rsrv_mem(size);
             let perm = MemPerm::READ | MemPerm::WRITE | MemPerm::EXEC;
