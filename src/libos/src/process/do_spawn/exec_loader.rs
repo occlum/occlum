@@ -1,21 +1,27 @@
+use super::super::elf_file::*;
 use super::ThreadRef;
 use crate::fs::{FileMode, INodeExt};
 use crate::prelude::*;
 use rcore_fs::vfs::INode;
 use std::ffi::CString;
 
-/// Load an ELF file itself or a script's interpreter into a vector.
+/// Load an ELF file header or a script's interpreter header into a vector.
 ///
-/// If the file is an executable binary, then just load this file.
+/// If the file is an executable binary, then just load this file's header.
 /// If the file is an script text, then parse the shebang and load
-/// the interpreter.
-pub fn load_exec_file_to_vec(
+/// the interpreter header.
+pub fn load_exec_file_hdr_to_vec(
     file_path: &str,
     current_ref: &ThreadRef,
-) -> Result<(Option<String>, Vec<u8>)> {
-    let file_buf = load_file_to_vec(&file_path, current_ref)?;
-    let is_script = is_script_file(&file_buf);
-    if is_script {
+) -> Result<(Option<String>, Arc<dyn INode>, Vec<u8>, ElfHeader)> {
+    let (inode, file_buf, elf_hdr) = load_file_hdr_to_vec(&file_path, current_ref)?;
+    if elf_hdr.is_some() {
+        Ok((None, inode, file_buf, elf_hdr.unwrap()))
+    } else {
+        // loaded file is not Elf format, try script file
+        if !is_script_file(&file_buf) {
+            return_errno!(ENOEXEC, "unknown executable file format");
+        }
         // load interpreter
         let interpreter_path = parse_script_interpreter(&file_buf)?;
         if interpreter_path.starts_with("/host/") {
@@ -24,10 +30,14 @@ pub fn load_exec_file_to_vec(
                 "libos doesn't support executing binaries from \"/host\" directory"
             );
         }
-        let elf_buf = load_file_to_vec(&interpreter_path, current_ref)?;
-        Ok((Some(interpreter_path), elf_buf))
-    } else {
-        Ok((None, file_buf))
+        let (interp_inode, interp_buf, interp_hdr) =
+            load_file_hdr_to_vec(&interpreter_path, current_ref)?;
+        let interp_hdr = if interp_hdr.is_none() {
+            return_errno!(ENOEXEC, "scrip interpreter is not ELF format");
+        } else {
+            interp_hdr.unwrap()
+        };
+        Ok((Some(interpreter_path), interp_inode, interp_buf, interp_hdr))
     }
 }
 
@@ -59,7 +69,10 @@ fn parse_script_interpreter(file_buf: &Vec<u8>) -> Result<String> {
     Ok(interpreter.to_owned())
 }
 
-pub fn load_file_to_vec(file_path: &str, current_ref: &ThreadRef) -> Result<Vec<u8>> {
+pub fn load_file_hdr_to_vec(
+    file_path: &str,
+    current_ref: &ThreadRef,
+) -> Result<(Arc<dyn INode>, Vec<u8>, Option<ElfHeader>)> {
     let inode = current_ref
         .fs()
         .lock()
@@ -79,7 +92,16 @@ pub fn load_file_to_vec(file_path: &str, current_ref: &ThreadRef) -> Result<Vec<
             file_mode
         );
     }
-    inode
-        .read_as_vec()
-        .map_err(|e| errno!(e.errno(), "failed to read the file"))
+
+    // Try to read the file as ELF64
+    let mut file_buf = inode
+        .read_elf64_lazy_as_vec()
+        .map_err(|e| errno!(e.errno(), "failed to read the file"))?;
+
+    if let Ok(elf_header) = ElfFile::parse_elf_hdr(&inode, &mut file_buf) {
+        Ok((inode, file_buf, Some(elf_header)))
+    } else {
+        // this file is not ELF format
+        Ok((inode, file_buf, None))
+    }
 }

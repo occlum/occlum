@@ -65,8 +65,8 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
                 elf.program_headers()
                     .filter(|segment| segment.loadable())
                     .fold(VMLayout::new_empty(), |mut elf_layout, segment| {
-                        let segment_size = (segment.virtual_addr() + segment.mem_size()) as usize;
-                        let segment_align = segment.align() as usize;
+                        let segment_size = (segment.p_vaddr + segment.p_memsz) as usize;
+                        let segment_align = segment.p_align as usize;
                         let segment_layout = VMLayout::new(segment_size, segment_align).unwrap();
                         elf_layout.extend(&segment_layout);
                         elf_layout
@@ -172,10 +172,10 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
     fn init_elf_memory(elf_range: &VMRange, elf_file: &ElfFile) -> Result<()> {
         // Destination buffer: ELF appeared in the process
         let elf_proc_buf = unsafe { elf_range.as_slice_mut() };
-        // Set zero for the buffer
-        for b in &mut elf_proc_buf[..] {
-            *b = 0;
-        }
+        let mut empty_offset_vec: Vec<(usize, usize)> = Vec::with_capacity(3); // usally two loadable segments
+        let mut empty_start_offset = 0;
+        let mut empty_end_offset = 0;
+
         // Source buffer: ELF stored in the ELF file
         let elf_file_buf = elf_file.as_slice();
         // Init all loadable segements
@@ -183,17 +183,35 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
             .program_headers()
             .filter(|segment| segment.loadable())
             .for_each(|segment| {
-                let file_size = segment.file_size() as usize;
-                let file_offset = segment.offset() as usize;
-                let mem_addr = segment.virtual_addr() as usize;
-                let mem_size = segment.mem_size() as usize;
+                let file_size = segment.p_filesz as usize;
+                let file_offset = segment.p_offset as usize;
+                let mem_addr = segment.p_vaddr as usize;
+                let mem_size = segment.p_memsz as usize;
                 debug_assert!(file_size <= mem_size);
 
                 // The first file_size bytes are loaded from the ELF file,
                 // the remaining (mem_size - file_size) bytes are zeros.
-                elf_proc_buf[mem_addr..mem_addr + file_size]
-                    .copy_from_slice(&elf_file_buf[file_offset..file_offset + file_size]);
+                elf_file.file_inode().read_at(
+                    file_offset,
+                    &mut elf_proc_buf[mem_addr..mem_addr + file_size],
+                );
+
+                empty_end_offset = mem_addr;
+                empty_offset_vec.push((empty_start_offset, empty_end_offset));
+                empty_start_offset = empty_end_offset + file_size;
             });
+
+        empty_offset_vec.push((empty_start_offset, elf_proc_buf.len() - 1));
+
+        // Set zero for the remain part of the buffer
+        empty_offset_vec
+            .iter()
+            .for_each(|(start_offset, end_offset)| {
+                for b in &mut elf_proc_buf[*start_offset..*end_offset] {
+                    *b = 0;
+                }
+            });
+
         Ok(())
     }
 }
