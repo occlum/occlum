@@ -1,6 +1,9 @@
 use super::*;
-use alloc::sync::{Arc, Weak};
+use events::{Event, EventFilter, Notifier, Observer};
 use fs::channel::{Channel, Consumer, Producer};
+use fs::{IoEvents, IoNotifier};
+use std::any::Any;
+use std::sync::{Arc, Weak};
 
 pub type Endpoint = Arc<Inner>;
 
@@ -100,6 +103,36 @@ impl Inner {
         Ok(())
     }
 
+    pub fn poll(&self) -> IoEvents {
+        let mut events = IoEvents::empty();
+        let reader_events = self.reader.poll();
+        let writer_events = self.writer.poll();
+
+        if reader_events.contains(IoEvents::HUP) || self.reader.is_self_shutdown() {
+            events |= IoEvents::RDHUP;
+            if writer_events.contains(IoEvents::ERR) || self.writer.is_self_shutdown() {
+                events |= IoEvents::HUP;
+            }
+        }
+
+        events |= (reader_events & IoEvents::IN) | (writer_events & IoEvents::OUT);
+        events
+    }
+
+    pub(self) fn register_relay_notifier(&self, observer: &Arc<RelayNotifier>) {
+        self.reader.notifier().register(
+            Arc::downgrade(observer) as Weak<dyn Observer<_>>,
+            None,
+            None,
+        );
+
+        self.writer.notifier().register(
+            Arc::downgrade(observer) as Weak<dyn Observer<_>>,
+            None,
+            None,
+        );
+    }
+
     fn is_connected(&self) -> bool {
         self.peer.upgrade().is_some()
     }
@@ -108,3 +141,51 @@ impl Inner {
 // TODO: Add SO_SNDBUF and SO_RCVBUF to set/getsockopt to dynamcally change the size.
 // This value is got from /proc/sys/net/core/rmem_max and wmem_max that are same on linux.
 pub const DEFAULT_BUF_SIZE: usize = 208 * 1024;
+
+/// An observer used to observe both reader and writer of the endpoint. It also contains a
+/// notifier that relays the notification of the endpoint.
+pub(super) struct RelayNotifier {
+    notifier: IoNotifier,
+    endpoint: SgxMutex<Option<Endpoint>>,
+}
+
+impl RelayNotifier {
+    pub fn new() -> Self {
+        let notifier = IoNotifier::new();
+        let endpoint = SgxMutex::new(None);
+        Self { notifier, endpoint }
+    }
+
+    pub fn notifier(&self) -> &IoNotifier {
+        &self.notifier
+    }
+
+    pub fn observe_endpoint(self: &Arc<Self>, endpoint: &Endpoint) {
+        endpoint.register_relay_notifier(self);
+        *self.endpoint.lock().unwrap() = Some(endpoint.clone());
+    }
+}
+
+impl Observer<IoEvents> for RelayNotifier {
+    fn on_event(&self, event: &IoEvents, _metadata: &Option<Weak<dyn Any + Send + Sync>>) {
+        let endpoint = self.endpoint.lock().unwrap();
+        // Only endpoint can broadcast events
+
+        let mut event = event.clone();
+        // The event of the channel should not be broadcasted directly to socket.
+        // The event transformation should be consistant with poll.
+        if event.contains(IoEvents::HUP) {
+            event -= IoEvents::HUP;
+            event |= IoEvents::RDHUP;
+        }
+
+        if event.contains(IoEvents::ERR) {
+            event -= IoEvents::ERR;
+            event |= IoEvents::HUP;
+        }
+
+        // A notifier can only have events after observe_endpoint
+        self.notifier()
+            .broadcast(&(endpoint.as_ref().unwrap().poll() & event));
+    }
+}
