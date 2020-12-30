@@ -247,17 +247,14 @@ impl<I> Producer<I> {
 
         let writable = {
             let mut rb_producer = self.inner.lock().unwrap();
-            !rb_producer.is_full()
+            !rb_producer.is_full() || self.is_self_shutdown() || self.is_peer_shutdown()
         };
         if writable {
             events |= IoEvents::OUT;
         }
 
-        if self.is_self_shutdown() {
-            events |= IoEvents::HUP;
-        }
         if self.is_peer_shutdown() {
-            events |= IoEvents::RDHUP;
+            events |= IoEvents::ERR;
         }
 
         events
@@ -376,15 +373,12 @@ impl<I> Consumer<I> {
 
         let readable = {
             let mut rb_consumer = self.inner.lock().unwrap();
-            !rb_consumer.is_empty()
+            !rb_consumer.is_empty() || self.is_self_shutdown() || self.is_peer_shutdown()
         };
         if readable {
             events |= IoEvents::IN;
         }
 
-        if self.is_self_shutdown() {
-            events |= IoEvents::RDHUP;
-        }
         if self.is_peer_shutdown() {
             events |= IoEvents::HUP;
         }
@@ -417,7 +411,11 @@ impl<I> Consumer<I> {
     }
 
     pub fn items_to_consume(&self) -> usize {
-        self.inner.lock().unwrap().len()
+        if self.is_self_shutdown() {
+            0
+        } else {
+            self.inner.lock().unwrap().len()
+        }
     }
 
     pub fn capacity(&self) -> usize {
