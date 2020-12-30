@@ -1,6 +1,9 @@
 use super::*;
+use crate::events::{Event, EventFilter, Notifier, Observer};
 use alloc::sync::{Arc, Weak};
 use fs::channel::{Channel, Consumer, Producer};
+use fs::{IoEvents, IoNotifier};
+use std::any::Any;
 
 pub type Endpoint = Arc<Inner>;
 
@@ -100,6 +103,38 @@ impl Inner {
         Ok(())
     }
 
+    pub fn poll(&self) -> IoEvents {
+        let mut events = IoEvents::empty();
+
+        /// get the status of peer
+        if self.reader.is_peer_shutdown() {
+            events |= IoEvents::RDHUP;
+            if self.writer.is_peer_shutdown() {
+                events |= IoEvents::HUP;
+            }
+        }
+
+        let reader_events = self.reader.poll();
+        let writer_events = self.writer.poll();
+        events |= (reader_events & IoEvents::IN) | (writer_events & IoEvents::OUT);
+
+        events
+    }
+
+    pub(super) fn register_endpoint_observer(&self, observer: &Arc<EndpointObserver>) {
+        self.reader.notifier().register(
+            Arc::downgrade(observer) as Weak<dyn Observer<_>>,
+            None,
+            None,
+        );
+
+        self.writer.notifier().register(
+            Arc::downgrade(observer) as Weak<dyn Observer<_>>,
+            None,
+            None,
+        );
+    }
+
     fn is_connected(&self) -> bool {
         self.peer.upgrade().is_some()
     }
@@ -108,3 +143,26 @@ impl Inner {
 // TODO: Add SO_SNDBUF and SO_RCVBUF to set/getsockopt to dynamcally change the size.
 // This value is got from /proc/sys/net/core/rmem_max and wmem_max that are same on linux.
 pub const DEFAULT_BUF_SIZE: usize = 208 * 1024;
+
+/// An observer used to observe both reader and writer of the endpoint.  It also contains a
+/// notifier that relays the notification of the endpoint.
+pub(super) struct EndpointObserver {
+    notifier: IoNotifier,
+}
+
+impl EndpointObserver {
+    pub fn new() -> Self {
+        let notifier = IoNotifier::new();
+        Self { notifier }
+    }
+
+    pub fn notifier(&self) -> &IoNotifier {
+        &self.notifier
+    }
+}
+
+impl Observer<IoEvents> for EndpointObserver {
+    fn on_event(&self, event: &IoEvents, _metadata: &Option<Weak<dyn Any + Send + Sync>>) {
+        self.notifier().broadcast(event);
+    }
+}

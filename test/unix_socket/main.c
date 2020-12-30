@@ -79,12 +79,19 @@ int verify_child_echo(int *connected_sockets) {
         THROW_ERROR("failed to spawn a child process");
     }
 
+    struct pollfd polls[] = {
+        { .fd = connected_sockets[1], .events = POLLIN },
+    };
+
+    // Test for blocking poll, poll will be only interrupted by sigchld
+    // if socket does not support waking up a sleeping poller
+    int ret = poll(polls, 1, -1);
+    if (ret < 0) {
+        THROW_ERROR("failed to poll");
+    }
+
     char actual_str[32] = {0};
-    ssize_t actual_len;
-    //TODO: implement blocking read
-    do {
-        actual_len = read(connected_sockets[1], actual_str, 32);
-    } while (actual_len == 0);
+    read(connected_sockets[1], actual_str, 32);
     if (strncmp(actual_str, ECHO_MSG, sizeof(ECHO_MSG) - 1) != 0) {
         printf("data read is :%s\n", actual_str);
         THROW_ERROR("received string is not as expected");
@@ -191,13 +198,14 @@ int test_poll() {
     write(socks[0], "not today\n", 10);
 
     struct pollfd polls[] = {
-        { .fd = socks[1], .events = POLLIN },
         { .fd = socks[0], .events = POLLOUT },
+        { .fd = socks[1], .events = POLLIN },
     };
 
     int ret = poll(polls, 2, 5000);
     if (ret <= 0) { THROW_ERROR("poll error"); }
-    if ((polls[0].revents & POLLOUT) && (polls[1].revents && POLLIN) == 0) {
+    if (((polls[0].revents & POLLOUT) && (polls[1].revents & POLLIN)) == 0) {
+        printf("%d %d\n", polls[0].revents, polls[1].revents);
         THROW_ERROR("wrong return events");
     }
     return 0;
@@ -241,9 +249,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_unix_socket_inter_process),
     TEST_CASE(test_socketpair_inter_process),
     TEST_CASE(test_multiple_socketpairs),
-    // TODO: recover the test after the unix sockets are rewritten by using
-    // the new event subsystem
-    //TEST_CASE(test_poll),
+    TEST_CASE(test_poll),
     TEST_CASE(test_getname),
 };
 

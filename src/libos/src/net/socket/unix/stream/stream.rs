@@ -1,8 +1,10 @@
 use super::address_space::ADDRESS_SPACE;
-use super::endpoint::{end_pair, Endpoint};
+use super::endpoint::{end_pair, Endpoint, EndpointObserver};
 use super::*;
+use crate::events::{Event, EventFilter, Notifier, Observer};
 use alloc::sync::Arc;
 use fs::channel::Channel;
+use fs::IoEvents;
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -13,6 +15,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// will not transfer to other statuses.
 pub struct Stream {
     inner: SgxMutex<Status>,
+    /// Use the internal notifier of EndpointObserver as the notifier of stream socket. It relays the events of the
+    /// endpoint, too.
+    pub(super) notifier: Arc<EndpointObserver>,
 }
 
 impl Stream {
@@ -21,19 +26,26 @@ impl Stream {
             inner: SgxMutex::new(Status::Unconnected(Info::new(
                 flags.contains(FileFlags::SOCK_NONBLOCK),
             ))),
+            notifier: Arc::new(EndpointObserver::new()),
         }
     }
 
     pub fn socketpair(flags: FileFlags) -> Result<(Self, Self)> {
         let nonblocking = flags.contains(FileFlags::SOCK_NONBLOCK);
         let (end_a, end_b) = end_pair(nonblocking)?;
+        let observer_a = Arc::new(EndpointObserver::new());
+        let observer_b = Arc::new(EndpointObserver::new());
+        end_a.register_endpoint_observer(&observer_a);
+        end_b.register_endpoint_observer(&observer_b);
 
         let socket_a = Self {
             inner: SgxMutex::new(Status::Connected(end_a)),
+            notifier: observer_a,
         };
 
         let socket_b = Self {
             inner: SgxMutex::new(Status::Connected(end_b)),
+            notifier: observer_b,
         };
 
         Ok((socket_a, socket_b))
@@ -135,6 +147,8 @@ impl Stream {
                         _ => e,
                     })?;
 
+                end_self.register_endpoint_observer(self.observer());
+
                 *inner = Status::Connected(end_self);
                 Ok(())
             }
@@ -149,6 +163,8 @@ impl Stream {
             Status::Listening(addr) => {
                 let endpoint = ADDRESS_SPACE.pop_incoming(&addr)?;
                 endpoint.set_nonblocking(flags.contains(FileFlags::SOCK_NONBLOCK));
+                let observer = Arc::new(EndpointObserver::new());
+                endpoint.register_endpoint_observer(&observer);
 
                 let peer_addr = endpoint.peer_addr();
 
@@ -157,6 +173,7 @@ impl Stream {
                 Ok((
                     Self {
                         inner: SgxMutex::new(Status::Connected(endpoint)),
+                        notifier: observer,
                     },
                     peer_addr,
                 ))
@@ -210,6 +227,10 @@ impl Stream {
 
     pub(super) fn inner(&self) -> SgxMutexGuard<'_, Status> {
         self.inner.lock().unwrap()
+    }
+
+    pub(super) fn observer(&self) -> &Arc<EndpointObserver> {
+        &self.notifier
     }
 }
 
