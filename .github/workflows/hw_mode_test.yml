@@ -645,3 +645,53 @@ jobs:
     - name: Clean the environment
       if: ${{ always() }}
       run: docker stop $grpc_test
+
+  Gvisor_test:
+    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    runs-on: [self-hosted, SGX1-HW]
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - name: Checkout code
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+
+    - name: Checkout code from fork
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
+        submodules: true
+
+    - name: Create container
+      run: |
+        docker pull occlumbackup/occlum:latest-ubuntu18.04-gvisor
+        gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-gvisor)
+        echo "gvisor_test=$gvisor_test" >> $GITHUB_ENV
+
+    - name: Change download source of crates.io
+      run: |
+        docker exec $gvisor_test bash -c "cat <<- EOF >/root/.cargo/config
+        [source.crates-io]
+        registry = \"https://github.com/rust-lang/crates.io-index\"
+        replace-with = 'ustc'
+        [source.ustc]
+        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+        EOF"
+
+    - name: Build dependencies
+      run: docker exec $gvisor_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec $gvisor_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+
+    - name: Run gvisor syscall test
+      run: docker exec $gvisor_test bash -c "cd /root/gvisor_occlum; ./run_occlum_passed_tests.sh"
+
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop $gvisor_test
