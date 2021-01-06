@@ -95,6 +95,13 @@ check_has_built() {
     fi
 }
 
+check_has_run() {
+    if pgrep --full "$instance_dir/build/bin/occlum-run" > /dev/null ; then
+        echo "Error: the process of current Occlum instance is running. Need to wait for the process to finish or kill it first."
+        exit 1
+    fi
+}
+
 cmd_new() {
     if [ -z $@ ]; then
         echo "Error: target directory is not set"
@@ -246,6 +253,7 @@ cmd_build() {
 
 cmd_run() {
     check_has_built
+    check_has_run
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
