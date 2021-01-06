@@ -102,6 +102,14 @@ check_has_run() {
     fi
 }
 
+check_aesm_service() {
+    for i in $(seq 1 3); do
+        pgrep "aesm_service" > /dev/null && return || sleep 5
+    done
+    echo "Error: AESM service is not started yet. Need to start it first"
+    exit 1
+}
+
 cmd_new() {
     if [ -z $@ ]; then
         echo "Error: target directory is not set"
@@ -254,6 +262,7 @@ cmd_build() {
 cmd_run() {
     check_has_built
     check_has_run
+    check_aesm_service
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
@@ -274,6 +283,7 @@ cmd_run() {
 
 cmd_start() {
     check_has_built
+    check_aesm_service
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
