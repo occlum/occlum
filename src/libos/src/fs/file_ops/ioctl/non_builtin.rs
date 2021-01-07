@@ -106,13 +106,7 @@ impl StructuredIoctlNum {
         // bits: [30, 32)
         let arg_type = {
             let type_bits = ((raw_cmd_num) >> 30) as u8;
-            match type_bits {
-                0 => StructuredIoctlArgType::Void,
-                1 => StructuredIoctlArgType::Input,
-                2 => StructuredIoctlArgType::Output,
-                3 => StructuredIoctlArgType::InputOutput,
-                _ => unreachable!(),
-            }
+            StructuredIoctlArgType::from_u8(type_bits)
         };
 
         if arg_type == StructuredIoctlArgType::Void {
@@ -162,14 +156,22 @@ impl StructuredIoctlNum {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+#[repr(u8)]
 pub enum StructuredIoctlArgType {
     Void = 0,
-    Output = 1,
-    Input = 2,
+    Input = 1,
+    Output = 2,
     InputOutput = 3,
 }
 
 impl StructuredIoctlArgType {
+    pub fn from_u8(type_bits: u8) -> StructuredIoctlArgType {
+        if type_bits > StructuredIoctlArgType::InputOutput as u8 {
+            panic!("invalid bits for StructuredIoctlArgType");
+        }
+        unsafe { core::mem::transmute(type_bits) }
+    }
+
     pub fn can_be_input(&self) -> bool {
         *self == StructuredIoctlArgType::Input || *self == StructuredIoctlArgType::InputOutput
     }
