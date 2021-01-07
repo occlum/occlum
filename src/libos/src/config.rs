@@ -125,6 +125,7 @@ pub enum ConfigMountFsType {
     TYPE_HOSTFS,
     TYPE_RAMFS,
     TYPE_UNIONFS,
+    TYPE_DEVFS,
 }
 
 #[derive(Debug)]
@@ -199,13 +200,14 @@ impl ConfigEnv {
 
 impl ConfigMount {
     fn from_input(input: &InputConfigMount) -> Result<ConfigMount> {
-        const ALL_FS_TYPES: [&str; 4] = ["sefs", "hostfs", "ramfs", "unionfs"];
+        const ALL_FS_TYPES: [&str; 5] = ["sefs", "hostfs", "ramfs", "unionfs", "devfs"];
 
         let type_ = match input.type_.as_str() {
             "sefs" => ConfigMountFsType::TYPE_SEFS,
             "hostfs" => ConfigMountFsType::TYPE_HOSTFS,
             "ramfs" => ConfigMountFsType::TYPE_RAMFS,
             "unionfs" => ConfigMountFsType::TYPE_UNIONFS,
+            "devfs" => ConfigMountFsType::TYPE_DEVFS,
             _ => {
                 return_errno!(EINVAL, "Unsupported file system type");
             }

@@ -13,6 +13,7 @@ dependencies = [
  "log",
  "memoffset",
  "rcore-fs",
+ "rcore-fs-devfs",
  "rcore-fs-mountfs",
  "rcore-fs-ramfs",
  "rcore-fs-sefs",
@@ -386,6 +387,15 @@ dependencies = [
 name = "rcore-fs"
 version = "0.1.0"
 dependencies = [
+ "spin",
+]
+
+[[package]]
+name = "rcore-fs-devfs"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "rcore-fs",
  "spin",
 ]
 

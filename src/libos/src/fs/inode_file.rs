@@ -1,4 +1,5 @@
 use super::*;
+use crate::net::PollEventFlags;
 use rcore_fs_sefs::dev::SefsMac;
 
 pub struct INodeFile {
@@ -194,6 +195,20 @@ impl File for INodeFile {
         // Let the advisory lock could be acquired or released
         // TODO: Implement the real advisory lock
         Ok(())
+    }
+
+    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
+        let cmd_num = cmd.cmd_num();
+        let cmd_argp = cmd.arg_ptr() as usize;
+        self.inode.io_control(cmd_num, cmd_argp)?;
+        Ok(0)
+    }
+
+    fn poll_new(&self) -> IoEvents {
+        match self.inode.poll() {
+            Ok(poll_status) => IoEvents::from_poll_status(&poll_status),
+            Err(_) => IoEvents::empty(),
+        }
     }
 
     fn as_any(&self) -> &dyn Any {

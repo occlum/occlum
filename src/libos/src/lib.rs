@@ -38,6 +38,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate rcore_fs;
+extern crate rcore_fs_devfs;
 extern crate rcore_fs_mountfs;
 extern crate rcore_fs_ramfs;
 extern crate rcore_fs_sefs;

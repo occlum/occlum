@@ -15,7 +15,7 @@ pub use self::poll::{do_poll, PollEvent, PollEventFlags};
 pub use self::poll_new::{do_poll_new, PollFd};
 pub use self::select::{do_select, FdSetExt};
 
-use fs::{AsDevRandom, AsEvent, CreationFlags, File, FileDesc, FileRef, HostFd, PipeType};
+use fs::{AsEvent, AsINodeFile, CreationFlags, File, FileDesc, FileRef, HostFd, PipeType};
 use std::any::Any;
 use std::convert::TryFrom;
 use std::fmt;

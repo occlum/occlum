@@ -3,31 +3,46 @@ use super::*;
 #[derive(Debug)]
 pub struct DevZero;
 
-impl File for DevZero {
-    fn read(&self, _buf: &mut [u8]) -> Result<usize> {
-        for b in _buf.iter_mut() {
+impl INode for DevZero {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> vfs::Result<usize> {
+        for b in buf.iter_mut() {
             *b = 0;
         }
-        Ok(_buf.len())
+        Ok(buf.len())
     }
 
-    fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize> {
-        self.read(_buf)
+    fn write_at(&self, offset: usize, buf: &[u8]) -> vfs::Result<usize> {
+        Ok(buf.len())
     }
 
-    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-        let mut total_nbytes = 0;
-        for buf in bufs {
-            total_nbytes += self.read(buf)?;
-        }
-        Ok(total_nbytes)
+    fn poll(&self) -> vfs::Result<vfs::PollStatus> {
+        Ok(vfs::PollStatus {
+            read: true,
+            write: true,
+            error: false,
+        })
     }
 
-    fn poll_new(&self) -> IoEvents {
-        IoEvents::IN
+    fn metadata(&self) -> vfs::Result<Metadata> {
+        Ok(Metadata {
+            dev: 1,
+            inode: 0,
+            size: 0,
+            blk_size: 0,
+            blocks: 0,
+            atime: Timespec { sec: 0, nsec: 0 },
+            mtime: Timespec { sec: 0, nsec: 0 },
+            ctime: Timespec { sec: 0, nsec: 0 },
+            type_: vfs::FileType::CharDevice,
+            mode: 0o666,
+            nlinks: 1,
+            uid: 0,
+            gid: 0,
+            rdev: 0,
+        })
     }
 
-    fn as_any(&self) -> &dyn Any {
+    fn as_any_ref(&self) -> &dyn Any {
         self
     }
 }

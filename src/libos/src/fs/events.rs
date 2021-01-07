@@ -25,6 +25,20 @@ impl IoEvents {
         Self::from_bits_truncate(raw)
     }
 
+    pub fn from_poll_status(poll_status: &crate::rcore_fs::vfs::PollStatus) -> Self {
+        if poll_status.error {
+            return Self::ERR;
+        }
+        let mut events = Self::empty();
+        if poll_status.read {
+            events |= Self::IN
+        }
+        if poll_status.write {
+            events |= Self::OUT
+        }
+        events
+    }
+
     fn contains_unrecognizable_bits(raw: u32) -> bool {
         // Help to detect four valid but mostly useless flags that we do not
         // handle, yet: POLLRDNORM, POLLRDBAND, POLLWRNORM, annd POLLWRBAND.

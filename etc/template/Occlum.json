@@ -58,6 +58,10 @@
             "options": {
                 "temporary": true
             }
+        },
+        {
+            "target": "/dev",
+            "type": "devfs"
         }
     ]
 }

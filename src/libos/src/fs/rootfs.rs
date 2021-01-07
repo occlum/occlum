@@ -1,3 +1,4 @@
+use super::dev_fs;
 use super::hostfs::HostFS;
 use super::sefs::{SgxStorage, SgxUuidProvider};
 use super::*;
@@ -143,6 +144,10 @@ fn mount_nonroot_fs_according_to(mount_config: &Vec<ConfigMount>, root: &MNode) 
             TYPE_RAMFS => {
                 let ramfs = RamFS::new();
                 mount_fs_at(ramfs, root, &mc.target)?;
+            }
+            TYPE_DEVFS => {
+                let devfs = dev_fs::init_devfs()?;
+                mount_fs_at(devfs, root, &mc.target)?;
             }
             TYPE_UNIONFS => {
                 return_errno!(EINVAL, "Cannot mount UnionFS at non-root path");
