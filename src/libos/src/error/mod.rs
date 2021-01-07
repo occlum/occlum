@@ -60,8 +60,7 @@ macro_rules! try_libc_may_epipe {
         if ret < 0 {
             let errno = unsafe { libc::errno() };
             if errno == Errno::EPIPE as i32 {
-                // SIGPIPE = 12
-                crate::signal::do_tkill(current!().tid(), 12);
+                crate::signal::do_tkill(current!().tid(), crate::signal::SIGPIPE.as_u8() as i32);
             }
             return_errno!(Errno::from(errno as u32), "libc error");
         }
