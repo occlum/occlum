@@ -93,7 +93,6 @@ pub fn do_poll(pollfds: &mut [PollEvent], timeout: *mut timeval_t) -> Result<usi
         if file_ref.as_unix_socket().is_ok()
             || file_ref.as_pipe_reader().is_ok()
             || file_ref.as_pipe_writer().is_ok()
-            || file_ref.as_dev_random().is_ok()
         {
             let events = file_ref.poll()?;
             debug!("polled events are {:?}", events);

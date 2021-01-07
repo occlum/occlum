@@ -1,4 +1,3 @@
-use super::dev_fs::{DevNull, DevRandom, DevSgx, DevZero};
 /// Present a per-process view of FS.
 use super::*;
 
@@ -40,18 +39,6 @@ impl FsView {
 
     /// Open a file on the process. But DO NOT add it to file table.
     pub fn open_file(&self, path: &str, flags: u32, mode: u32) -> Result<Arc<dyn File>> {
-        if path == "/dev/null" {
-            return Ok(Arc::new(DevNull));
-        }
-        if path == "/dev/zero" {
-            return Ok(Arc::new(DevZero));
-        }
-        if path == "/dev/random" || path == "/dev/urandom" || path == "/dev/arandom" {
-            return Ok(Arc::new(DevRandom));
-        }
-        if path == "/dev/sgx" {
-            return Ok(Arc::new(DevSgx));
-        }
         let creation_flags = CreationFlags::from_bits_truncate(flags);
         let inode = if creation_flags.no_follow_symlink() {
             match self.lookup_inode_no_follow(path) {

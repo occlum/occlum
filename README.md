@@ -162,6 +162,10 @@ Occlum can be configured easily via a configuration file named `Occlum.json`, wh
             "options": {
                 "temporary": true
             }
+        },
+        {
+            "target": "/dev",
+            "type": "devfs"
         }
     ]
 }

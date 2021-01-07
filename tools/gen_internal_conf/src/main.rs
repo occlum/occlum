@@ -258,6 +258,10 @@ fn gen_mount_config(occlum_conf_root_fs_mac: String) -> serde_json::Value {
                 "options": {
                     "temporary": true
                 }
+            },
+            {
+                "target": "/dev",
+                "type": "devfs"
             }
         ]
     });
