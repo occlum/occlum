@@ -39,7 +39,7 @@ int fs_split_path(const char *path, char *dir_buf, char **dir_name, char *base_b
 }
 
 int fs_check_file_content(const char *path, const char *msg) {
-    char read_buf[128] = { 0 };
+    char read_buf[PATH_MAX] = { 0 };
 
     int fd = open(path, O_RDONLY);
     if (fd < 0) {

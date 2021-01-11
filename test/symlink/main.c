@@ -9,7 +9,6 @@
 // ============================================================================
 // Helper variable and function
 // ============================================================================
-const char **g_argv;
 
 static ssize_t get_path_by_fd(int fd, char *buf, ssize_t buf_len) {
     char proc_fd[64] = { 0 };
@@ -164,29 +163,6 @@ static int test_realpath() {
 
 static int test_readlinkat() {
     return test_readlink_framework(__test_readlinkat);
-}
-
-static int test_readlink_from_proc_self_exe() {
-    char exe_buf[128] = { 0 };
-    char absolute_path[128] = { 0 };
-    const char *proc_exe = "/proc/self/exe";
-    ssize_t n;
-
-    n = snprintf(absolute_path, sizeof(absolute_path), "/bin/%s", *g_argv);
-    if (n < 0) {
-        THROW_ERROR("failed to call snprintf");
-    }
-    n = readlink(proc_exe, exe_buf, sizeof(exe_buf));
-    if (n < 0) {
-        THROW_ERROR("failed to readlink from %s", proc_exe);
-    } else if (n != strlen(absolute_path)) {
-        THROW_ERROR("readlink from %s length is wrong", proc_exe);
-    }
-    if (strncmp(exe_buf, absolute_path, n) != 0) {
-        THROW_ERROR("check the absolute path from %s failed", proc_exe);
-    }
-
-    return 0;
 }
 
 // ============================================================================
@@ -441,7 +417,6 @@ static int test_create_file_from_symlink_to_relative_target() {
 static test_case_t test_cases[] = {
     TEST_CASE(test_readlink_from_proc_self_fd),
     TEST_CASE(test_realpath),
-    TEST_CASE(test_readlink_from_proc_self_exe),
     TEST_CASE(test_readlinkat),
     TEST_CASE(test_symlinkat),
     TEST_CASE(test_symlink_to_absolute_target),
@@ -454,6 +429,5 @@ static test_case_t test_cases[] = {
 };
 
 int main(int argc, const char *argv[]) {
-    g_argv = argv;
     return test_suite_run(test_cases, ARRAY_SIZE(test_cases));
 }
