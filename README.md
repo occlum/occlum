@@ -4,6 +4,7 @@
 [![Essential Test](https://github.com/occlum/occlum/workflows/Essential%20Test/badge.svg?branch=master)](https://github.com/occlum/occlum/actions?query=workflow%3A%22Essential+Test%22)
 [![SGX Hardware Mode Test](https://github.com/occlum/occlum/workflows/SGX%20Hardware%20Mode%20Test/badge.svg?branch=master)](https://github.com/occlum/occlum/actions?query=workflow%3A%22SGX+Hardware+Mode+Test%22)
 [![Demo Test](https://github.com/occlum/occlum/workflows/Demo%20Test/badge.svg?branch=master)](https://github.com/occlum/occlum/actions?query=workflow%3A%22Demo+Test%22)
+[![codecov](https://codecov.io/gh/occlum/occlum/branch/master/graph/badge.svg?token=FS22ULGGRC)](https://codecov.io/gh/occlum/occlum)
 
 **NEWS:** Our paper _Occlum: Secure and Efficient Multitasking Inside a Single Enclave of Intel SGX_ has been accepted by [ASPLOS'20](https://asplos-conference.org/programs/). This research paper highlights the advantages of the single-address-space architecture adopted by Occlum and describes a novel in-enclave isolation mechanism that complements this approach. The paper can be found on [ACM Digital Library](https://dl.acm.org/doi/abs/10.1145/3373376.3378469) and [Arxiv](https://arxiv.org/abs/2001.07450).
 
