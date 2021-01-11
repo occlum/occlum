@@ -10,6 +10,67 @@ env:
   nap_time: 60
 
 jobs:
+  Collect-code-coverage:
+    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    runs-on: [self-hosted, SGX1-HW]
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - name: Checkout code
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+
+    - name: Checkout code from fork
+      # This step is only needed when the pull request is labeled.
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        # For pull request, we need to merge the commit from fork to the base
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
+        submodules: true
+
+    - name: Get Occlum version
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+
+    - name: Create container
+      run: |
+        occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        echo "occlum_test=$occlum_test" >> $GITHUB_ENV
+
+    - name: Change download source of crates.io
+      run: |
+        docker exec $occlum_test bash -c "cat <<- EOF >/root/.cargo/config
+        [source.crates-io]
+        registry = \"https://github.com/rust-lang/crates.io-index\"
+        replace-with = 'ustc'
+        [source.ustc]
+        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+        EOF"
+
+    - name: Build dependencies
+      run: docker exec $occlum_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
+
+    - name: Build source
+      run: docker exec $occlum_test bash -c "cd /root/occlum; OCCLUM_COV=1 make install"
+
+    - name: Integration test
+      run:  docker exec $occlum_test bash -c "cd /root/occlum; make test"
+
+    - name: Integration test with Glibc
+      run:  docker exec $occlum_test bash -c "cd /root/occlum; make test-glibc"
+
+    - name: Upload coverage report
+      run: docker exec $occlum_test bash -c "cd /root/occlum/build/internal/src/libos/cargo-target/debug/deps; export CODECOV_TOKEN="${{ secrets.COV_TOKEN }}"; bash <(curl -s https://codecov.io/bash)"
+
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop $occlum_test
+
+
   Make-test-on-ubuntu:
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: [self-hosted, SGX1-HW]
