@@ -116,7 +116,7 @@ pub fn do_poll(pollfds: &mut [PollEvent], timeout: *mut timeval_t) -> Result<usi
             index_host_pollfds.push(i);
             host_pollfds.push(PollEvent::new(fd, pollfd.events()));
         } else if let Ok(eventfd) = file_ref.as_event() {
-            let fd = eventfd.get_host_fd() as FileDesc;
+            let fd = eventfd.host_fd() as FileDesc;
             index_host_pollfds.push(i);
             host_pollfds.push(PollEvent::new(fd, pollfd.events()));
         } else {
@@ -129,7 +129,7 @@ pub fn do_poll(pollfds: &mut [PollEvent], timeout: *mut timeval_t) -> Result<usi
         .unwrap()
         .get(&current.tid())
         .unwrap()
-        .get_host_fd();
+        .host_fd();
 
     debug!(
         "number of ready libos fd is {}; notifier_host_fd is {}",

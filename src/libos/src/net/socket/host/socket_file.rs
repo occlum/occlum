@@ -50,11 +50,11 @@ impl File for HostSocket {
         self.ioctl_impl(cmd)
     }
 
-    fn get_access_mode(&self) -> Result<AccessMode> {
+    fn access_mode(&self) -> Result<AccessMode> {
         Ok(AccessMode::O_RDWR)
     }
 
-    fn get_status_flags(&self) -> Result<StatusFlags> {
+    fn status_flags(&self) -> Result<StatusFlags> {
         let ret = try_libc!(libc::ocall::fcntl_arg0(
             self.raw_host_fd() as i32,
             libc::F_GETFL

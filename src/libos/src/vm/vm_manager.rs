@@ -603,7 +603,7 @@ impl VMManager {
             Some((file_and_offset)) => file_and_offset,
         };
         let file_writable = file
-            .get_access_mode()
+            .access_mode()
             .map(|ac| ac.writable())
             .unwrap_or_default();
         if !file_writable {

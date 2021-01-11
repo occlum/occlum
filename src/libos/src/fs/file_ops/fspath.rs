@@ -98,7 +98,7 @@ fn get_abs_path_by_fd(fd: FileDesc) -> Result<String> {
     let path = {
         let file_ref = current!().file(fd)?;
         if let Ok(inode_file) = file_ref.as_inode_file() {
-            inode_file.get_abs_path().to_owned()
+            inode_file.abs_path().to_owned()
         } else {
             return_errno!(EBADF, "not an inode file");
         }

@@ -29,7 +29,7 @@ impl EventFile {
         })
     }
 
-    pub fn get_host_fd(&self) -> c_int {
+    pub fn host_fd(&self) -> c_int {
         self.host_fd.to_raw() as c_int
     }
 }
@@ -73,12 +73,12 @@ impl File for EventFile {
         Ok(ret)
     }
 
-    fn get_access_mode(&self) -> Result<AccessMode> {
+    fn access_mode(&self) -> Result<AccessMode> {
         Ok(AccessMode::O_RDWR)
     }
 
-    fn get_status_flags(&self) -> Result<StatusFlags> {
-        let ret = try_libc!(libc::ocall::fcntl_arg0(self.get_host_fd(), libc::F_GETFL));
+    fn status_flags(&self) -> Result<StatusFlags> {
+        let ret = try_libc!(libc::ocall::fcntl_arg0(self.host_fd(), libc::F_GETFL));
         Ok(StatusFlags::from_bits_truncate(ret as u32))
     }
 
@@ -90,7 +90,7 @@ impl File for EventFile {
             | StatusFlags::O_NONBLOCK;
         let raw_status_flags = (new_status_flags & valid_flags_mask).bits();
         try_libc!(libc::ocall::fcntl_arg1(
-            self.get_host_fd(),
+            self.host_fd(),
             libc::F_SETFL,
             raw_status_flags as c_int
         ));
