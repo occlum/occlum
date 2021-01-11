@@ -149,6 +149,7 @@ cmd_init() {
     mkdir -p image/host
     mkdir -p image/tmp
     mkdir -p image/dev
+    mkdir -p image/proc
     local occlum_glibc_lib=/opt/occlum/glibc/lib
     local cpu_lib=/sys/devices/system/cpu
     if [ -d "$occlum_glibc_lib" ]; then

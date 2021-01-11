@@ -252,6 +252,10 @@ fn gen_mount_config(occlum_conf_root_fs_mac: String) -> serde_json::Value {
                 "source": "."
             },
             {
+                "target": "/proc",
+                "type": "procfs"
+            },
+            {
                 "target": "/tmp",
                 "type": "sefs",
                 "source": "",
@@ -280,7 +284,7 @@ fn gen_mount_config(occlum_conf_root_fs_mac: String) -> serde_json::Value {
         .pointer_mut("/mount/0/options/layers/1/source")
         .unwrap() = serde_json::Value::String(unionfs_run_source_path);
     *internal_mount_config
-        .pointer_mut("/mount/2/source")
+        .pointer_mut("/mount/3/source")
         .unwrap() = serde_json::Value::String(tmp_run_source_path);
 
     debug!("internal Occlum.json mount config:\n{:?}", internal_mount_config);

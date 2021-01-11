@@ -157,6 +157,10 @@ Occlum can be configured easily via a configuration file named `Occlum.json`, wh
             "source": "."
         },
         {
+            "target": "/proc",
+            "type": "procfs"
+        },
+        {
             "target": "/tmp",
             "type": "sefs",
             "options": {

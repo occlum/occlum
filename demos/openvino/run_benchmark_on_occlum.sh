@@ -28,8 +28,6 @@ cp $occlum_lib/libopencv_videoio.so.4.1 image/lib
 cp $occlum_lib/libz.so.1 image/lib
 [ -e $occlum_lib/libtbb.so ] && cp $occlum_lib/libtbb.so image/lib
 [ -e $occlum_lib/libtbbmalloc.so ] && cp $occlum_lib/libtbbmalloc.so image/lib
-mkdir image/proc
-cp /proc/cpuinfo image/proc
 mkdir image/model
 cp -r ../model/* image/model
 occlum build
