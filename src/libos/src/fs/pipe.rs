@@ -44,11 +44,11 @@ impl File for PipeReader {
         self.consumer.pop_slices(bufs)
     }
 
-    fn get_access_mode(&self) -> Result<AccessMode> {
+    fn access_mode(&self) -> Result<AccessMode> {
         Ok(AccessMode::O_RDONLY)
     }
 
-    fn get_status_flags(&self) -> Result<StatusFlags> {
+    fn status_flags(&self) -> Result<StatusFlags> {
         let status_flags = self.status_flags.load(Ordering::Acquire);
         Ok(status_flags.clone())
     }
@@ -107,11 +107,11 @@ impl File for PipeWriter {
         return_errno!(ESPIPE, "Pipe does not support seek")
     }
 
-    fn get_access_mode(&self) -> Result<AccessMode> {
+    fn access_mode(&self) -> Result<AccessMode> {
         Ok(AccessMode::O_WRONLY)
     }
 
-    fn get_status_flags(&self) -> Result<StatusFlags> {
+    fn status_flags(&self) -> Result<StatusFlags> {
         let status_flags = self.status_flags.load(Ordering::Acquire);
         Ok(status_flags.clone())
     }

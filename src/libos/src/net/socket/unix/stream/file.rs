@@ -60,11 +60,11 @@ impl File for Stream {
         }
     }
 
-    fn get_access_mode(&self) -> Result<AccessMode> {
+    fn access_mode(&self) -> Result<AccessMode> {
         Ok(AccessMode::O_RDWR)
     }
 
-    fn get_status_flags(&self) -> Result<StatusFlags> {
+    fn status_flags(&self) -> Result<StatusFlags> {
         if self.nonblocking() {
             Ok(StatusFlags::O_NONBLOCK)
         } else {

@@ -149,11 +149,11 @@ impl File for INodeFile {
         Ok(name)
     }
 
-    fn get_access_mode(&self) -> Result<AccessMode> {
+    fn access_mode(&self) -> Result<AccessMode> {
         Ok(self.access_mode.clone())
     }
 
-    fn get_status_flags(&self) -> Result<StatusFlags> {
+    fn status_flags(&self) -> Result<StatusFlags> {
         let status_flags = self.status_flags.read().unwrap();
         Ok(status_flags.clone())
     }
@@ -238,7 +238,7 @@ impl INodeFile {
         })
     }
 
-    pub fn get_abs_path(&self) -> &str {
+    pub fn abs_path(&self) -> &str {
         &self.abs_path
     }
 }
