@@ -58,10 +58,10 @@ jobs:
       run: docker exec $occlum_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Integration test
-      run:  docker exec $occlum_test bash -c "cd /root/occlum; make test"
+      run:  docker exec $occlum_test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace make test"
 
     - name: Integration test with Glibc
-      run:  docker exec $occlum_test bash -c "cd /root/occlum; make test-glibc"
+      run:  docker exec $occlum_test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace make test-glibc"
 
     - name: Clean the environment
       if: ${{ always() }}
