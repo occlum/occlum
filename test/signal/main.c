@@ -456,7 +456,7 @@ static void *send_signal_with_delay(void *_data) {
 // thread to send the signal to the parent thread after some specified delay.
 // The delay is meant to ensure some operation in the parent thread is
 // completed by the time the signal is sent.
-static void raise_async(int signum, const struct timespec *delay) {
+static pthread_t raise_async(int signum, const struct timespec *delay) {
     pthread_t thread;
     int ret;
     struct send_signal_data *data = malloc(sizeof(*data));
@@ -467,7 +467,8 @@ static void raise_async(int signum, const struct timespec *delay) {
         printf("ERROR: pthread_create failed unexpectedly\n");
         abort();
     }
-    pthread_detach(thread);
+
+    return thread;
 }
 
 int test_sigtimedwait() {
@@ -502,7 +503,7 @@ int test_sigtimedwait() {
     // pending.
     delay.tv_sec = 0;
     delay.tv_nsec = 10 * 1000 * 1000; // 10ms
-    raise_async(SIGIO, &delay);
+    pthread_t thread = raise_async(SIGIO, &delay);
 
     timeout.tv_sec = 0;
     timeout.tv_nsec = 2 * delay.tv_nsec;
@@ -514,6 +515,10 @@ int test_sigtimedwait() {
     // Restore the signal mask
     if ((ret = sigprocmask(SIG_SETMASK, &old_mask, NULL)) < 0) {
         THROW_ERROR("sigprocmask failed unexpectedly");
+    }
+
+    if (pthread_join(thread, NULL) != 0) {
+        THROW_ERROR("failed to join the thread");
     }
     return 0;
 }
