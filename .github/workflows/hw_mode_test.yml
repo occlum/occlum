@@ -4,7 +4,6 @@ name: SGX Hardware Mode Test
 on:
   push:
   pull_request_target:
-    types: labeled
 
 env:
   nap_time: 60
