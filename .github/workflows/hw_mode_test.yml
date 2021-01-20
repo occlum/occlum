@@ -642,7 +642,7 @@ jobs:
       run: docker exec $openvino_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Run openVINO benchmark
-      run: docker exec $openvino_test bash -c "cd /root/demos/openvino && ./run_benchmark_on_occlum.sh"
+      run: docker exec $openvino_test bash -c "cd /root/occlum/demos/openvino && ./run_benchmark_on_occlum.sh"
 
     - name: Clean the environment
       if: ${{ always() }}
@@ -693,15 +693,15 @@ jobs:
       run: docker exec $grpc_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Prepare grpc sample project
-      run: docker exec $grpc_test bash -c "cd /root/demos/grpc && ./prepare_client_server.sh"
+      run: docker exec $grpc_test bash -c "cd /root/occlum/demos/grpc && ./prepare_client_server.sh"
 
     - name: Run grpc server
-      run: docker exec $grpc_test bash -c "cd /root/demos/grpc && ./run_server_on_occlum.sh" &
+      run: docker exec $grpc_test bash -c "cd /root/occlum/demos/grpc && ./run_server_on_occlum.sh" &
 
     - name: Run grpc client
       run: |
         sleep ${{ env.nap_time }};
-        docker exec $grpc_test bash -c "cd /root/demos/grpc && ./run_client_on_occlum.sh"
+        docker exec $grpc_test bash -c "cd /root/occlum/demos/grpc && ./run_client_on_occlum.sh"
 
     - name: Clean the environment
       if: ${{ always() }}
