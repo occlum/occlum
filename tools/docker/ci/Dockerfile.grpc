@@ -3,7 +3,8 @@ FROM occlum/occlum:$OCCLUM_VERSION-ubuntu18.04 as base
 LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
 
 WORKDIR /root
-RUN git clone https://github.com/occlum/occlum.git && \
+RUN rm -rf /root/demos && \
+    git clone https://github.com/occlum/occlum.git && \
     cp -r occlum/demos /root/demos && \
     rm -rf /root/occlum
 
