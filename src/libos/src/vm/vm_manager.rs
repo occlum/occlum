@@ -217,7 +217,8 @@ impl VMRemapOptions {
 
 /// Memory manager.
 ///
-/// VMManager provides useful memory management APIs such as mmap, munmap, mremap, etc.
+/// VMManager provides useful memory management APIs such as mmap, munmap, mremap, etc. It also manages the whole
+/// process VM including mmap, stack, heap, elf ranges.
 ///
 /// # Invariants
 ///
@@ -255,6 +256,7 @@ impl VMRemapOptions {
 pub struct VMManager {
     range: VMRange,
     vmas: Vec<VMArea>,
+    mmap_prefered_start_addr: usize, // Prefer to alloc mmap range starting this address
 }
 
 impl VMManager {
@@ -275,11 +277,24 @@ impl VMManager {
             };
             vec![start_sentry, end_sentry]
         };
-        Ok(VMManager { range, vmas })
+        Ok(VMManager {
+            range,
+            vmas,
+            mmap_prefered_start_addr: addr, // make it the start of VMManger range by default
+        })
     }
 
     pub fn range(&self) -> &VMRange {
         &self.range
+    }
+
+    pub fn vmas(&self) -> &Vec<VMArea> {
+        &self.vmas
+    }
+
+    // This is used to set the mmap prefered start address for VMManager
+    pub fn set_mmap_prefered_start_addr(&mut self, addr: usize) {
+        self.mmap_prefered_start_addr = addr
     }
 
     pub fn mmap(&mut self, mut options: VMMapOptions) -> Result<usize> {
@@ -623,6 +638,14 @@ impl VMManager {
             .ok_or_else(|| errno!(ESRCH, "no mmap regions that contains the address"))
     }
 
+    pub fn usage_percentage(&self) -> f32 {
+        let totol_size = self.range.size();
+        let mut used_size = 0;
+        self.vmas.iter().for_each(|vma| used_size += vma.size());
+
+        return used_size as f32 / totol_size as f32;
+    }
+
     // Find a VMA that contains the given range, returning the VMA's index
     fn find_containing_vma_idx(&self, target_range: &VMRange) -> Option<usize> {
         self.vmas
@@ -644,7 +667,8 @@ impl VMManager {
         // TODO: reduce the complexity from O(N) to O(log(N)), where N is
         // the number of existing VMAs.
 
-        // Record the minimal free range that satisfies the contraints
+        let mmap_prefered_start_addr = self.mmap_prefered_start_addr;
+        // Record the minimal free range that satisfies the contraints8
         let mut result_free_range: Option<VMRange> = None;
         let mut result_idx: Option<usize> = None;
 
@@ -698,6 +722,9 @@ impl VMManager {
 
             if result_free_range == None
                 || result_free_range.as_ref().unwrap().size() > free_range.size()
+                // Preferentially alloc range above mmap_prefered_start_addr
+                || (result_free_range.as_ref().unwrap().end() < mmap_prefered_start_addr
+                    && mmap_prefered_start_addr <= free_range.start())
             {
                 result_free_range = Some(free_range);
                 result_idx = Some(idx);
@@ -705,6 +732,12 @@ impl VMManager {
         }
 
         if result_free_range.is_none() {
+            let usage = self.usage_percentage();
+            debug!(
+                "Not enough memory to allocate {} bytes. Current memory usage is {}%",
+                size,
+                usage * 100 as f32
+            );
             return_errno!(ENOMEM, "not enough memory");
         }
 
