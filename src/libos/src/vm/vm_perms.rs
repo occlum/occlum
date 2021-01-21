@@ -2,6 +2,7 @@ use super::*;
 
 bitflags! {
     pub struct VMPerms : u32 {
+        const NONE        = 0x0;
         const READ        = 0x1;
         const WRITE       = 0x2;
         const EXEC        = 0x4;
