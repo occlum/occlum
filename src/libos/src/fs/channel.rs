@@ -247,7 +247,7 @@ impl<I> Producer<I> {
 
         let writable = {
             let mut rb_producer = self.inner.lock().unwrap();
-            !rb_producer.is_full() || self.is_self_shutdown() || self.is_peer_shutdown()
+            !rb_producer.is_full() || self.is_self_shutdown()
         };
         if writable {
             events |= IoEvents::OUT;
@@ -373,7 +373,7 @@ impl<I> Consumer<I> {
 
         let readable = {
             let mut rb_consumer = self.inner.lock().unwrap();
-            !rb_consumer.is_empty() || self.is_self_shutdown() || self.is_peer_shutdown()
+            !rb_consumer.is_empty() || self.is_self_shutdown()
         };
         if readable {
             events |= IoEvents::IN;

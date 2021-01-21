@@ -109,9 +109,9 @@ impl Inner {
         let writer_events = self.writer.poll();
 
         if reader_events.contains(IoEvents::HUP) || self.reader.is_self_shutdown() {
-            events |= IoEvents::RDHUP;
+            events |= IoEvents::RDHUP | IoEvents::IN;
             if writer_events.contains(IoEvents::ERR) || self.writer.is_self_shutdown() {
-                events |= IoEvents::HUP;
+                events |= IoEvents::HUP | IoEvents::OUT;
             }
         }
 
