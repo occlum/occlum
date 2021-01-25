@@ -26,10 +26,10 @@ use crate::fs::{
     do_eventfd2, do_faccessat, do_fchmod, do_fchmodat, do_fchown, do_fchownat, do_fcntl,
     do_fdatasync, do_fstat, do_fstatat, do_fsync, do_ftruncate, do_getcwd, do_getdents,
     do_getdents64, do_ioctl, do_lchown, do_link, do_linkat, do_lseek, do_lstat, do_mkdir,
-    do_mkdirat, do_open, do_openat, do_pipe, do_pipe2, do_pread, do_pwrite, do_read, do_readlink,
-    do_readlinkat, do_readv, do_rename, do_renameat, do_rmdir, do_sendfile, do_stat, do_symlink,
-    do_symlinkat, do_sync, do_truncate, do_unlink, do_unlinkat, do_write, do_writev, iovec_t, File,
-    FileDesc, FileRef, HostStdioFds, Stat,
+    do_mkdirat, do_mount_rootfs, do_open, do_openat, do_pipe, do_pipe2, do_pread, do_pwrite,
+    do_read, do_readlink, do_readlinkat, do_readv, do_rename, do_renameat, do_rmdir, do_sendfile,
+    do_stat, do_symlink, do_symlinkat, do_sync, do_truncate, do_unlink, do_unlinkat, do_write,
+    do_writev, iovec_t, File, FileDesc, FileRef, HostStdioFds, Stat,
 };
 use crate::interrupt::{do_handle_interrupt, sgx_interrupt_info_t};
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t};
@@ -416,6 +416,7 @@ macro_rules! process_syscall_table_with_callback {
             (SpawnMusl = 360) => do_spawn_for_musl(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp),
             (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
             (HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
+            (MountRootFS = 363) => do_mount_rootfs(key_ptr: *const sgx_key_128bit_t, occlum_json_mac_ptr: *const sgx_aes_gcm_128bit_tag_t),
         }
     };
 }

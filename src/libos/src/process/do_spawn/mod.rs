@@ -10,7 +10,6 @@ use super::thread::ThreadName;
 use super::{table, task, ProcessRef, ThreadRef};
 use crate::fs::{
     CreationFlags, File, FileDesc, FileTable, FsView, HostStdioFds, StdinFile, StdoutFile,
-    ROOT_INODE,
 };
 use crate::prelude::*;
 use crate::vm::ProcessVM;

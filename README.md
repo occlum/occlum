@@ -128,8 +128,7 @@ Occlum can be configured easily via a configuration file named `Occlum.json`, wh
     },
     // Mount points and their file systems
     //
-    // Limitation: configuring mount points by modifying this config file is not
-    // supported at the moment. The default configuration is shown below.
+    // The default configuration is shown below.
     "mount": [
         {
             "target": "/",
@@ -139,14 +138,15 @@ Occlum can be configured easily via a configuration file named `Occlum.json`, wh
                     {
                         "target": "/",
                         "type": "sefs",
-                        "source": "./image",
+                        "source": "./build/mount/__ROOT",
                         "options": {
-                            "integrity_only": true
+                            "MAC": ""
                         }
                     },
                     {
                         "target": "/",
-                        "type": "sefs"
+                        "type": "sefs",
+                        "source": "./run/mount/__ROOT"
                     }
                 ]
             }
@@ -157,15 +157,16 @@ Occlum can be configured easily via a configuration file named `Occlum.json`, wh
             "source": "."
         },
         {
-            "target": "/proc",
-            "type": "procfs"
-        },
-        {
             "target": "/tmp",
             "type": "sefs",
+            "source": "./run/mount/tmp",
             "options": {
                 "temporary": true
             }
+        },
+        {
+            "target": "/proc",
+            "type": "procfs"
         },
         {
             "target": "/dev",

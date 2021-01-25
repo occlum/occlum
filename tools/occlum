@@ -52,11 +52,16 @@ Usage:
     occlum init
         Initialize a directory as the Occlum instance.
 
-    occlum build [--sign-key <key_path>] [--sign-tool <tool_path>] [-f/--force]
+    occlum build [--sign-key <key_path>] [--sign-tool <tool_path>] [--image-key <key_path>] [--no-buildin-image-config] [-f/--force]
         Build and sign an Occlum SGX enclave (.so) and generate its associated secure
         FS image according to the user-provided image directory and Occlum.json config file.
         The whole building process is incremental: the building artifacts are built only
         when needed.
+        A Configuration file (i.e., image_config.json) consists of the MAC of Occlum.json and
+        the key (if provided) of the secure FS image will be built into the initfs by default,
+        the init program can use it to mount the secure FS image as the rootfs.
+        To protect the security of FS image, give the [--no-buildin-image-config] flag,
+        and modifies the init program to acquire the MAC and key with LA or RA.
         To force rebuilding all artifacts, give the [-f/--force] flag.
 
     occlum run <program_name> <program_args>
@@ -73,7 +78,7 @@ Usage:
     occlum gdb <program_name> <program_args>
         Debug the program running inside an SGX enclave with GDB.
 
-    occlum mount [--sign-key <key_path>] [--sign-tool <tool_path>] <path>
+    occlum mount [--sign-key <key_path>] [--sign-tool <tool_path>] [--image-key <key_path>] <path>
         Mount the secure FS image of the Occlum instance as a Linux FS at an existing <path>.
         This makes it easy to access and manipulate Occlum's secure FS for debug purpose.
 EOF
@@ -192,6 +197,25 @@ cmd_init() {
             "$cpu_lib/online"
     fi
 
+    mkdir -p initfs
+    mkdir -p initfs/bin
+    mkdir -p initfs/lib
+    mkdir -p initfs/dev
+    mkdir -p initfs/proc
+    mkdir -p initfs/etc
+    # add default /etc/hosts
+    echo "127.0.0.1   localhost" > initfs/etc/hosts
+    # add musl
+    local occlum_musl_lib=/usr/local/occlum/x86_64-linux-musl/lib
+    cp -t initfs/lib \
+        /lib/ld-musl-x86_64.so.1 \
+        "$occlum_musl_lib/libc.so" \
+        "$occlum_musl_lib/libstdc++.so.6" \
+        "$occlum_musl_lib/libgcc_s.so.1" \
+        "$occlum_musl_lib/libgomp.so.1"
+
+    cp "$occlum_dir"/build/bin/init initfs/bin/
+
     cp "$occlum_dir"/etc/template/Occlum.json "$instance_dir"/
     chmod 644 "$instance_dir"/Occlum.json
 
@@ -203,20 +227,27 @@ cmd_build() {
 
     pal_lib=libocclum-pal.so
     libos_lib=libocclum-libos.so
+    BUILDIN_IMAGE_CONF=true
 
     while [ -n "$1" ]; do
         case "$1" in
         --sign-key)     [ -n "$2" ] && ENCLAVE_SIGN_KEY=$2 ; shift 2 || exit_error "empty signing key path"     ;;
         --sign-tool)    [ -n "$2" ] && ENCLAVE_SIGN_TOOL=$2 ; shift 2 || exit_error "empty signing tool path"   ;;
         --sgx-mode)     [[ -n "$2" && "$2" != "HW" ]] && export SGX_MODE=SIM ; shift 2 || exit_error "empty sgx mode";;
+        --image-key)    [ -n "$2" ] && SECURE_IMAGE_KEY=$2 ; shift 2 || exit_error "empty secure image key path"   ;;
+        --no-buildin-image-config)  BUILDIN_IMAGE_CONF=false ; shift ;;
         --force | -f)   MAKE_OPTION="--always-make" ; shift ;;
         *) exit_error "Unknown option: $1"                                                                      ;;
         esac
     done
     [ -e "$ENCLAVE_SIGN_KEY" ] || exit_error "invalid signing key path: $ENCLAVE_SIGN_KEY"
     [ -e "$ENCLAVE_SIGN_TOOL" ] || exit_error "invalid signing tool path: $ENCLAVE_SIGN_TOOL"
+    if [ -n "$SECURE_IMAGE_KEY" ]; then
+        [ -e "$SECURE_IMAGE_KEY" ] || exit_error "invalid secure image key path: $SECURE_IMAGE_KEY"
+    fi
     echo "Enclave sign-tool: $ENCLAVE_SIGN_TOOL"
     echo "Enclave sign-key: $ENCLAVE_SIGN_KEY"
+    [ -n "$SECURE_IMAGE_KEY" ] && echo "Image encryption key: $SECURE_IMAGE_KEY"
 
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SGX_SDK/sdk_libs
@@ -244,6 +275,7 @@ cmd_build() {
     occlum_dir=$occlum_dir instance_dir=$instance_dir pal_lib=$pal_lib major_ver=$major_ver \
     occlum_version=$occlum_version libos_lib=$libos_lib \
     ENCLAVE_SIGN_KEY=$ENCLAVE_SIGN_KEY ENCLAVE_SIGN_TOOL=$ENCLAVE_SIGN_TOOL \
+    SECURE_IMAGE_KEY=$SECURE_IMAGE_KEY BUILDIN_IMAGE_CONF=$BUILDIN_IMAGE_CONF \
     make -f $build_makefile $MAKE_OPTION
 
     cd "$instance_dir"
@@ -257,6 +289,8 @@ cmd_build() {
 
     mkdir -p "$instance_dir/run/mount/__ROOT"
     mkdir -p "$instance_dir/run/mount/tmp"
+
+    mkdir -p "$instance_dir/run/initfs/__ROOT"
 
     echo "Built the Occlum image and enclave successfully"
 }
@@ -363,7 +397,9 @@ cmd_package() {
 
     cd .. && tar -cvzf $instance_dir/$package_name $instance_base_name/Occlum.json $instance_base_name/build/bin \
         $instance_base_name/build/lib/libocclum-libos.signed.so $instance_base_name/build/lib/libocclum-pal.so* \
-        $instance_base_name/build/mount $instance_base_name/build/Occlum.json.protected $instance_base_name/run \
+        $instance_base_name/build/mount $instance_base_name/build/Occlum.json.protected \
+        $instance_base_name/build/initfs $instance_base_name/build/.Occlum_sys.json.protected \
+        $instance_base_name/initfs $instance_base_name/run \
         $instance_base_name/.__occlum_status $instance_base_name/.sgx_mode
 
     if [ "`get_enclave_debuggable_flag`" == "true" ]; then
@@ -398,14 +434,19 @@ cmd_mount() {
         case "$1" in
         --sign-key)     [ -n "$2" ] && ENCLAVE_SIGN_KEY=$2 ; shift 2 || exit_error "empty signing key path"     ;;
         --sign-tool)    [ -n "$2" ] && ENCLAVE_SIGN_TOOL=$2 ; shift 2 || exit_error "empty signing tool path"   ;;
+        --image-key)    [ -n "$2" ] && SECURE_IMAGE_KEY=$2 ; shift 2 || exit_error "empty secure image key path"   ;;
         *) MNT_POINT=$1 ; shift ;;
         esac
     done
     [ -e "$ENCLAVE_SIGN_KEY" ] || exit_error "invalid signing key path: $ENCLAVE_SIGN_KEY"
     [ -e "$ENCLAVE_SIGN_TOOL" ] || exit_error "invalid signing tool path: $ENCLAVE_SIGN_TOOL"
+    if [ -n "$SECURE_IMAGE_KEY" ]; then
+        [ -e "$SECURE_IMAGE_KEY" ] || exit_error "invalid secure image key path: $SECURE_IMAGE_KEY"
+    fi
     [ -d "$MNT_POINT" ] || exit_error "invalid mount point: $MNT_POINT"
     echo "Mount tool sign-tool: $ENCLAVE_SIGN_TOOL"
     echo "Mount tool sign-key: $ENCLAVE_SIGN_KEY"
+    [ -n "$SECURE_IMAGE_KEY" ] && echo "Image decryption key: $SECURE_IMAGE_KEY"
     echo "Mount point: $MNT_POINT"
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
@@ -434,10 +475,12 @@ cmd_mount() {
         container_fs=""
     fi
 
+    [ -n "$SECURE_IMAGE_KEY" ] && SECURE_IMAGE_KEY_OPTION="--key $SECURE_IMAGE_KEY"
     echo "Start to mount the FS..."
     LD_LIBRARY_PATH="$SGX_SDK/sdk_libs" "$sefs_cli" \
         --enclave "$signed_sefs_cli_lib" \
         mount \
+        $SECURE_IMAGE_KEY_OPTION \
         "$image_fs" \
         "$container_fs" \
         "$MNT_POINT"

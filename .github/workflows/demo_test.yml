@@ -29,12 +29,20 @@ jobs:
 
     - name: Make test
       run: docker exec language_support_test bash -c "cd /root/occlum; SGX_MODE=SIM make test"
-    
+
     - name: C test
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/hello_c && make;
             occlum new occlum_instance;
             cp hello_world occlum_instance/image/bin;
             cd occlum_instance && SGX_MODE=SIM occlum build;
+            occlum run /bin/hello_world"
+
+    - name: C with encrypted image test
+      run: docker exec language_support_test bash -c "cd /root/occlum/demos/hello_c && make;
+            rm -rf occlum_instance && occlum new occlum_instance;
+            echo \"ff-2a-f9-29-ce-6d-95-04-93-70-6e-83-64-1b-d6-0c\" > occlum_instance/image_key;
+            cp hello_world occlum_instance/image/bin;
+            cd occlum_instance && SGX_MODE=SIM occlum build --image-key ./image_key;
             occlum run /bin/hello_world"
 
     - name: C++ test
@@ -43,7 +51,7 @@ jobs:
             cp hello_world occlum_instance/image/bin;
             cd occlum_instance && SGX_MODE=SIM occlum build;
             occlum run /bin/hello_world"
-  
+
     - name: Rust test
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/rust && SGX_MODE=SIM ./run_rust_demo_on_occlum.sh"
 

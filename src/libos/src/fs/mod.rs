@@ -10,6 +10,8 @@ use std::mem::MaybeUninit;
 use std::path::Path;
 use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
 
+use crate::config::ConfigMount;
+
 pub use self::event_file::{AsEvent, EventCreationFlags, EventFile};
 pub use self::events::{AtomicIoEvents, IoEvents, IoNotifier};
 pub use self::file::{File, FileRef};
