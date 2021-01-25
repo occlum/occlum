@@ -518,3 +518,23 @@ pub fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
     file_ops::do_ioctl(fd, &mut ioctl_cmd)?;
     Ok(0)
 }
+
+pub fn do_mount_rootfs(
+    key_ptr: *const sgx_key_128bit_t,
+    occlum_json_mac_ptr: *const sgx_aes_gcm_128bit_tag_t,
+) -> Result<isize> {
+    let key = if key_ptr.is_null() {
+        None
+    } else {
+        Some(unsafe { key_ptr.read() })
+    };
+    if occlum_json_mac_ptr.is_null() {
+        return_errno!(EINVAL, "occlum_json_mac_ptr cannot be null");
+    }
+    let expected_occlum_json_mac = unsafe { occlum_json_mac_ptr.read() };
+    let user_config_path = unsafe { format!("{}{}", INSTANCE_DIR, "/build/Occlum.json.protected") };
+    let user_mount_config =
+        config::load_config(&user_config_path, &expected_occlum_json_mac)?.mount;
+    fs_ops::do_mount_rootfs(&user_mount_config, &key)?;
+    Ok(0)
+}

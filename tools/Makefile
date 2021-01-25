@@ -9,6 +9,7 @@ all:
 	@ln -s -f ../../tools/occlum ../$(BUILD_DIR)/bin/occlum
 	@$(MAKE) --no-print-directory -C protect-integrity
 	@$(MAKE) --no-print-directory -C gen_internal_conf
+	@$(MAKE) --no-print-directory -C init
 
 format:
 	@$(MAKE) --no-print-directory -C protect-integrity format
@@ -19,3 +20,4 @@ format-check:
 clean:
 	@$(MAKE) --no-print-directory -C protect-integrity clean
 	@$(MAKE) --no-print-directory -C gen_internal_conf clean
+	@$(MAKE) --no-print-directory -C init clean

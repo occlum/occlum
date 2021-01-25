@@ -14,6 +14,53 @@ int occlum_pal_get_version(void) {
     return OCCLUM_PAL_VERSION;
 }
 
+int pal_run_init_process() {
+    const char *init_path = "/bin/init";
+    const char *init_argv[2] = {
+        "init",
+        NULL,
+    };
+    struct occlum_stdio_fds init_io_fds = {
+        .stdin_fd = STDIN_FILENO,
+        .stdout_fd = STDOUT_FILENO,
+        .stderr_fd = STDERR_FILENO,
+    };
+    int libos_tid = 0;
+    struct occlum_pal_create_process_args init_process_args = {
+        .path = init_path,
+        .argv = init_argv,
+        .env = NULL,
+        .stdio = &init_io_fds,
+        .pid = &libos_tid,
+    };
+    if (occlum_pal_create_process(&init_process_args) < 0) {
+        return -1;
+    }
+
+    int exit_status = 0;
+    struct occlum_pal_exec_args init_exec_args = {
+        .pid = libos_tid,
+        .exit_value = &exit_status,
+    };
+    if (occlum_pal_exec(&init_exec_args) < 0) {
+        return -1;
+    }
+
+    // Convert the exit status to a value in a shell-like encoding
+    if (WIFEXITED(exit_status)) { // terminated normally
+        exit_status = WEXITSTATUS(exit_status) & 0x7F; // [0, 127]
+    } else { // killed by signal
+        exit_status = 128 + WTERMSIG(exit_status); // [128 + 1, 128 + 64]
+    }
+    if (exit_status != 0) {
+        errno = EINVAL;
+        PAL_ERROR("The init process exit with code: %d", exit_status);
+        return -1;
+    }
+
+    return 0;
+}
+
 int occlum_pal_init(const struct occlum_pal_attr *attr) {
     if (attr == NULL) {
         errno = EINVAL;
@@ -67,6 +114,11 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
         goto on_destroy_enclave;
     }
 #endif
+
+    if (pal_run_init_process() < 0) {
+        PAL_ERROR("Failed to run the init process: %s", errno2str(errno));
+        goto on_destroy_enclave;
+    }
 
     return 0;
 on_destroy_enclave:
