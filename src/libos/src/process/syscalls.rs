@@ -302,11 +302,15 @@ pub async fn do_futex(
     match futex_op {
         FutexOp::FUTEX_WAIT => {
             let timeout = get_futex_timeout(timeout)?;
-            super::do_futex::futex_wait(futex_addr, futex_val, &timeout).map(|_| 0)
+            super::do_futex::futex_wait(futex_addr, futex_val, &timeout)
+                .await
+                .map(|_| 0)
         }
         FutexOp::FUTEX_WAIT_BITSET => {
             let timeout = get_futex_timeout(timeout)?;
-            super::do_futex::futex_wait_bitset(futex_addr, futex_val, &timeout, bitset).map(|_| 0)
+            super::do_futex::futex_wait_bitset(futex_addr, futex_val, &timeout, bitset)
+                .await
+                .map(|_| 0)
         }
         FutexOp::FUTEX_WAKE => {
             let max_count = get_futex_val(futex_val)?;
@@ -374,7 +378,7 @@ pub async fn do_wait4(pid: i32, exit_status_ptr: *mut i32) -> Result<isize> {
         _ => unreachable!(),
     };
     let mut exit_status = 0;
-    match super::do_wait4::do_wait4(&child_process_filter) {
+    match super::do_wait4::do_wait4(&child_process_filter).await {
         Ok((pid, exit_status)) => {
             if !exit_status_ptr.is_null() {
                 unsafe {

@@ -111,7 +111,7 @@ impl Waker {
 
 impl PartialEq for Waker {
     fn eq(&self, other: &Self) -> bool {
-        Weak::ptr_eq(&self.inner, &other.inner)
+        Weak::ptr_eq(&self.weak_inner, &other.weak_inner)
     }
 }
 
@@ -144,13 +144,13 @@ impl<'a> WaiterFuture<'a> {
 }
 
 impl<'a> Future for WaiterFuture<'a> {
-    type Output = ();
+    type Output = Result<()>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut inner = self.inner.lock().unwrap();
 
         if inner.is_woken {
-            return Poll::Ready(());
+            return Poll::Ready(Ok(()));
         }
 
         inner.core_waker = Some(cx.waker().clone());

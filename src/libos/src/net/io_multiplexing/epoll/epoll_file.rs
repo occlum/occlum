@@ -137,7 +137,7 @@ impl EpollFile {
         Ok(())
     }
 
-    pub fn wait(
+    pub async fn wait(
         &self,
         revents: &mut [MaybeUninit<EpollEvent>],
         timeout: Option<&Duration>,
@@ -224,7 +224,7 @@ impl EpollFile {
             }
 
             // Wait for a while to try again later.
-            let ret = waiter.wait_mut(timeout.as_mut());
+            let ret = waiter.wait_mut(timeout.as_mut()).await;
             if let Err(e) = ret {
                 if e.errno() == ETIMEDOUT {
                     return Ok(0);

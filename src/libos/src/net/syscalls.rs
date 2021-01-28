@@ -748,7 +748,7 @@ pub fn do_epoll_ctl(
     Ok(0)
 }
 
-pub fn do_epoll_wait(
+pub async fn do_epoll_wait(
     epfd: c_int,
     events: *mut libc::epoll_event,
     max_events: c_int,
@@ -787,7 +787,7 @@ pub fn do_epoll_wait(
     } else {
         None
     };
-    let count = epoll_file.wait(&mut inner_events, timeout.as_ref())?;
+    let count = epoll_file.wait(&mut inner_events, timeout.as_ref()).await?;
 
     for i in 0..count {
         raw_events[i] = unsafe { inner_events[i].assume_init() }.to_c();
@@ -796,7 +796,7 @@ pub fn do_epoll_wait(
     Ok(count as isize)
 }
 
-pub fn do_epoll_pwait(
+pub async fn do_epoll_pwait(
     epfd: c_int,
     events: *mut libc::epoll_event,
     maxevents: c_int,
@@ -808,5 +808,5 @@ pub fn do_epoll_pwait(
     } else {
         debug!("epoll_wait");
     }
-    do_epoll_wait(epfd, events, maxevents, timeout)
+    do_epoll_wait(epfd, events, maxevents, timeout).await
 }

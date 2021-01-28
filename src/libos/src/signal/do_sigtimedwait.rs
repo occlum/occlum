@@ -7,7 +7,7 @@ use crate::prelude::*;
 use crate::process::{ProcessRef, TermStatus, ThreadRef};
 use crate::waiter_loop;
 
-pub fn do_sigtimedwait(interest: SigSet, timeout: Option<&Duration>) -> Result<siginfo_t> {
+pub async fn do_sigtimedwait(interest: SigSet, timeout: Option<&Duration>) -> Result<siginfo_t> {
     debug!(
         "do_rt_sigtimedwait: interest: {:?}, timeout: {:?}",
         interest, timeout,
@@ -27,7 +27,7 @@ pub fn do_sigtimedwait(interest: SigSet, timeout: Option<&Duration>) -> Result<s
             .ok_or_else(|| errno!(EAGAIN, "no interesting, pending signal"))?,
         Some(timeout) => {
             let pending_sig_waiter = PendingSigWaiter::new(thread, process, interest);
-            pending_sig_waiter.wait(timeout).map_err(|e| {
+            pending_sig_waiter.wait(timeout).await.map_err(|e| {
                 if e.errno() == Errno::EINTR {
                     return e;
                 }
@@ -71,7 +71,7 @@ impl PendingSigWaiter {
         })
     }
 
-    pub fn wait(&self, timeout: &Duration) -> Result<Box<dyn Signal>> {
+    pub async fn wait(&self, timeout: &Duration) -> Result<Box<dyn Signal>> {
         // Repeat trying to dequeue a pending signal from the current process or thread
         let err_res = waiter_loop!(
             {

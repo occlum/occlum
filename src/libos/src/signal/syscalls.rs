@@ -161,7 +161,7 @@ pub async fn do_sigaltstack(
     Ok(0)
 }
 
-pub fn do_rt_sigtimedwait(
+pub async fn do_rt_sigtimedwait(
     mask_ptr: *const sigset_t,
     info_ptr: *mut siginfo_t,
     timeout_ptr: *const timespec_t,
@@ -191,6 +191,6 @@ pub fn do_rt_sigtimedwait(
         }
     };
 
-    *info = super::do_sigtimedwait::do_sigtimedwait(mask, timeout.as_ref())?;
+    *info = super::do_sigtimedwait::do_sigtimedwait(mask, timeout.as_ref()).await?;
     Ok(0)
 }

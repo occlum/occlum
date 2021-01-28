@@ -193,6 +193,8 @@ impl_end_point_type! {
 
 impl<I> Producer<I> {
     pub fn push(&self, mut item: I) -> Result<()> {
+        todo!("make this async");
+        /*
         waiter_loop!(
             {
                 let mut rb_producer = self.inner.lock().unwrap();
@@ -215,6 +217,7 @@ impl<I> Producer<I> {
             },
             self.observer.waiter_queue()
         )
+        */
     }
 
     pub fn poll(&self) -> IoEvents {
@@ -271,6 +274,7 @@ impl<I: Copy> Producer<I> {
             return Ok(0);
         }
 
+        /*
         waiter_loop!(
             {
                 let mut rb_producer = self.inner.lock().unwrap();
@@ -301,6 +305,8 @@ impl<I: Copy> Producer<I> {
             },
             self.observer.waiter_queue()
         )
+        */
+        todo!("make function async")
     }
 }
 
@@ -319,28 +325,32 @@ impl_end_point_type! {
 
 impl<I> Consumer<I> {
     pub fn pop(&self) -> Result<Option<I>> {
-        waiter_loop!(
-            {
-                let mut rb_consumer = self.inner.lock().unwrap();
-                if self.is_self_shutdown() {
-                    return_errno!(EPIPE, "this endpoint has been shutdown");
-                }
+        todo!("make function async");
 
-                if let Some(item) = rb_consumer.pop() {
-                    drop(rb_consumer);
-                    self.trigger_peer_events(&IoEvents::OUT);
-                    return Ok(Some(item));
-                }
+        /*
+                waiter_loop!(
+                    {
+                        let mut rb_consumer = self.inner.lock().unwrap();
+                        if self.is_self_shutdown() {
+                            return_errno!(EPIPE, "this endpoint has been shutdown");
+                        }
 
-                if self.is_peer_shutdown() {
-                    return Ok(None);
-                }
-                if self.is_nonblocking() {
-                    return_errno!(EAGAIN, "try again later");
-                }
-            },
-            self.observer.waiter_queue()
-        )
+                        if let Some(item) = rb_consumer.pop() {
+                            drop(rb_consumer);
+                            self.trigger_peer_events(&IoEvents::OUT);
+                            return Ok(Some(item));
+                        }
+
+                        if self.is_peer_shutdown() {
+                            return Ok(None);
+                        }
+                        if self.is_nonblocking() {
+                            return_errno!(EAGAIN, "try again later");
+                        }
+                    },
+                    self.observer.waiter_queue()
+                )
+        */
     }
 
     pub fn poll(&self) -> IoEvents {
@@ -410,39 +420,42 @@ impl<I: Copy> Consumer<I> {
             return Ok(0);
         }
 
-        waiter_loop!(
-            {
-                let mut rb_consumer = self.inner.lock().unwrap();
-                if self.is_self_shutdown() {
-                    return_errno!(EPIPE, "this endpoint has been shutdown");
-                }
-
-                let mut total_count = 0;
-                for items in item_slices.iter_mut() {
-                    let count = rb_consumer.pop_slice(items);
-                    total_count += count;
-                    if count < items.len() {
-                        break;
-                    } else {
-                        continue;
+        todo!("make function async")
+        /*
+            waiter_loop!(
+                {
+                    let mut rb_consumer = self.inner.lock().unwrap();
+                    if self.is_self_shutdown() {
+                        return_errno!(EPIPE, "this endpoint has been shutdown");
                     }
-                }
 
-                if total_count > 0 {
-                    drop(rb_consumer);
-                    self.trigger_peer_events(&IoEvents::OUT);
-                    return Ok(total_count);
-                };
+                    let mut total_count = 0;
+                    for items in item_slices.iter_mut() {
+                        let count = rb_consumer.pop_slice(items);
+                        total_count += count;
+                        if count < items.len() {
+                            break;
+                        } else {
+                            continue;
+                        }
+                    }
 
-                if self.is_peer_shutdown() {
-                    return Ok(0);
-                }
-                if self.is_nonblocking() {
-                    return_errno!(EAGAIN, "try again later");
-                }
-            },
-            self.observer.waiter_queue()
-        )
+                    if total_count > 0 {
+                        drop(rb_consumer);
+                        self.trigger_peer_events(&IoEvents::OUT);
+                        return Ok(total_count);
+                    };
+
+                    if self.is_peer_shutdown() {
+                        return Ok(0);
+                    }
+                    if self.is_nonblocking() {
+                        return_errno!(EAGAIN, "try again later");
+                    }
+                },
+                self.observer.waiter_queue()
+            )
+        */
     }
 }
 

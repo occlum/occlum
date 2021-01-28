@@ -77,16 +77,16 @@ pub fn futex_op_and_flags_from_u32(bits: u32) -> Result<(FutexOp, FutexFlags)> {
 const FUTEX_BITSET_MATCH_ANY: u32 = 0xFFFF_FFFF;
 
 /// Do futex wait
-pub fn futex_wait(
+pub async fn futex_wait(
     futex_addr: *const i32,
     futex_val: i32,
     timeout: &Option<Duration>,
 ) -> Result<()> {
-    futex_wait_bitset(futex_addr, futex_val, timeout, FUTEX_BITSET_MATCH_ANY)
+    futex_wait_bitset(futex_addr, futex_val, timeout, FUTEX_BITSET_MATCH_ANY).await
 }
 
 /// Do futex wait with bitset
-pub fn futex_wait_bitset(
+pub async fn futex_wait_bitset(
     futex_addr: *const i32,
     futex_val: i32,
     timeout: &Option<Duration>,
@@ -144,7 +144,7 @@ pub fn futex_wait_bitset(
     // Must make sure that no locks are holded by this thread before wait
     drop(futex_bucket);
 
-    let res = waiter.wait(timeout.as_ref());
+    let res = waiter.wait(timeout.as_ref()).await;
 
     if let Err(e) = res {
         let (_, futex_bucket_ref) = FUTEX_BUCKETS.get_bucket(futex_item.key);
@@ -267,8 +267,9 @@ impl FutexItem {
     }
 
     pub fn batch_wake(items: &[FutexItem]) {
-        let wakers = items.iter().map(|item| &item.waker);
-        Waker::batch_wake(wakers);
+        for item in items {
+            item.waker.wake();
+        }
     }
 }
 

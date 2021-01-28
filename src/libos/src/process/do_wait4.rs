@@ -6,11 +6,11 @@ use crate::events::{Observer, Waiter};
 use crate::prelude::*;
 use crate::waiter_loop;
 
-pub fn do_wait4(child_filter: &ProcessFilter) -> Result<(pid_t, i32)> {
+pub async fn do_wait4(child_filter: &ProcessFilter) -> Result<(pid_t, i32)> {
     let thread = current!();
     let process = thread.process();
 
-    waiter_loop!(
+    let err_res = waiter_loop!(
         {
             // Lock order: always lock parent then child to avoid deadlock
             let mut process_inner = process.inner();
@@ -41,7 +41,8 @@ pub fn do_wait4(child_filter: &ProcessFilter) -> Result<(pid_t, i32)> {
             }
         },
         process.observer().waiter_queue()
-    )
+    );
+    err_res
 }
 
 fn free_zombie_child(

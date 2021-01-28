@@ -71,7 +71,7 @@ macro_rules! waiter_loop {
                 $loop_body
             }
 
-            let ret = waiter.wait_mut(timeout.as_mut());
+            let ret = waiter.wait_mut(timeout.as_mut()).await;
             if let Err(e) = ret {
                 break Err(e);
             }
