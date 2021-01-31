@@ -55,7 +55,6 @@ jobs:
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/web_server && occlum-go get -u -v github.com/gin-gonic/gin;
             occlum-go build -o web_server ./web_server.go;
             SGX_MODE=SIM ./run_golang_on_occlum.sh" &
-
     - name: Curl test
       run: |
         sleep ${{ env.nap_time }};
@@ -400,3 +399,40 @@ jobs:
 
     - name: Check result
       run: docker exec python_support_test bash -c "cd /root/occlum/demos/python/occlum_instance; cat smvlight.dat"
+
+  # Redis test
+  Redis_support_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
+
+    - name: Create container
+      run: docker run -itd --name=redis_support_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+
+    - name: Build dependencies
+      run: docker exec redis_support_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec redis_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+
+    - name: download and build redis
+      run: docker exec redis_support_test bash -c "cd /root/occlum/demos/redis; ./download_and_build_redis.sh"
+
+    - name: Run redis benchmark
+      run: docker exec redis_support_test bash -c "cd /root/occlum/demos/redis; SGX_MODE=SIM ./benchmark.sh"
+
+    - name: Restart the container
+      run: |
+        sleep ${{ env.nap_time }};
+        docker restart redis_support_test
+
+    - name: download and build redis with glibc
+      run: docker exec redis_support_test bash -c "cd /root/occlum/demos/redis; ./download_and_build_redis_glibc.sh"
+
+    - name: Run redis benchmark
+      run: docker exec redis_support_test bash -c "cd /root/occlum/demos/redis; SGX_MODE=SIM ./benchmark_glibc.sh"
