@@ -9,6 +9,7 @@ use crate::occlum_exec::{
 };
 use crate::occlum_exec_grpc::OcclumExec;
 use grpc::{ServerHandlerContext, ServerRequestSingle, ServerResponseUnarySink};
+use linux_futex::{Futex, Shared};
 use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
 use sendfd::RecvWithFd;
@@ -17,6 +18,7 @@ use std::collections::HashMap;
 use std::ffi::CString;
 use std::os::unix::io::RawFd;
 use std::os::unix::net::UnixStream;
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use timer::{Guard, Timer};
@@ -193,21 +195,37 @@ impl OcclumExec for OcclumExecImpl {
         let args = req.parameters.into_vec().clone();
         let envs = req.enviroments.into_vec().clone();
         let client_process_id = req.process_id;
+        let exit_status = Box::new(Futex::<Shared>::new(-1));
 
-        if let Ok(process_id) = rust_occlum_pal_create_process(&cmd, &args, &envs, &stdio_fds) {
+        if let Ok(process_id) =
+            rust_occlum_pal_create_process(&cmd, &args, &envs, &stdio_fds, &exit_status.value)
+        {
+            //Notifies the client to application stopped
+            debug!("process:{} started.", process_id);
+
             let mut commands = _commands.lock().unwrap();
             commands.entry(process_id).or_insert((None, true));
             drop(commands);
 
             //Run the command in a thread
             thread::spawn(move || {
-                let mut exit_status = Box::new(0);
-
-                rust_occlum_pal_exec(process_id, &mut exit_status)
-                    .expect("failed to execute the command");
+                loop {
+                    debug!("waiting:");
+                    match exit_status.wait(0) {
+                        Ok(()) => break,
+                        Err(err) => {
+                            debug!("error:{:?} {:?} ", err, exit_status);
+                            if exit_status.value.load(Ordering::Relaxed) >= 0 {
+                                break;
+                            }
+                            continue;
+                        }
+                    }
+                }
 
                 let mut commands = _commands.lock().unwrap();
-                *commands.get_mut(&process_id).expect("get process") = (Some(*exit_status), false);
+                *commands.get_mut(&process_id).expect("get process") =
+                    (Some(exit_status.value.load(Ordering::Relaxed)), false);
 
                 //Notifies the client to application stopped
                 debug!(
@@ -218,12 +236,14 @@ impl OcclumExec for OcclumExecImpl {
                     .unwrap_or_default();
             });
 
+            debug!("response");
             resp.finish(ExecCommResponse {
                 status: ExecCommResponse_ExecutionStatus::RUNNING,
                 process_id: process_id,
                 ..Default::default()
             })
         } else {
+            debug!("Creating process failed");
             resp.finish(ExecCommResponse {
                 status: ExecCommResponse_ExecutionStatus::LAUNCH_FAILED,
                 process_id: 0,
@@ -253,15 +273,7 @@ pub struct occlum_pal_create_process_args {
     pub env: *const *const libc::c_char,
     pub stdio: *const occlum_stdio_fds,
     pub pid: *mut i32,
-}
-
-/*
- * The struct which consists of arguments needed by occlum_pal_exec
- */
-#[repr(C)]
-pub struct occlum_pal_exec_args {
-    pub pid: i32,
-    pub exit_value: *mut i32,
+    pub exit_status: *mut i32,
 }
 
 extern "C" {
@@ -273,15 +285,6 @@ extern "C" {
      * @retval If 0, then success; otherwise, check errno for the exact error type.
      */
     fn occlum_pal_create_process(args: *mut occlum_pal_create_process_args) -> i32;
-
-    /*
-     * @brief Execute the process inside the Occlum enclave
-     *
-     * @param args  Mandatory input. Arguments for occlum_pal_exec.
-     *
-     * @retval If 0, then success; otherwise, check errno for the exact error type.
-     */
-    fn occlum_pal_exec(args: *mut occlum_pal_exec_args) -> i32;
 
     /*
      * @brief Send a signal to one or multiple LibOS processes
@@ -317,6 +320,7 @@ fn rust_occlum_pal_create_process(
     args: &Vec<String>,
     envs: &Vec<String>,
     stdio: &occlum_stdio_fds,
+    exit_status: &AtomicI32,
 ) -> Result<i32, i32> {
     let cmd_path = CString::new(cmd).expect("cmd_path: new failed");
     let (cmd_args_array, _cmd_args) = vec_strings_to_cchars(args)?;
@@ -330,25 +334,12 @@ fn rust_occlum_pal_create_process(
         env: Box::into_raw(cmd_envs_array.into_boxed_slice()) as *const *const libc::c_char,
         stdio: *stdio_raw,
         pid: &mut libos_tid as *mut i32,
+        exit_status: exit_status.as_mut_ptr(),
     });
 
     let ret = unsafe { occlum_pal_create_process(Box::into_raw(create_process_args)) };
     match ret {
         0 => Ok(libos_tid),
-        _ => Err(ret),
-    }
-}
-
-fn rust_occlum_pal_exec(occlum_process_id: i32, exit_status: &mut i32) -> Result<(), i32> {
-    let exec_args = Box::new(occlum_pal_exec_args {
-        pid: occlum_process_id,
-        exit_value: exit_status as *mut i32,
-    });
-
-    let ret = unsafe { occlum_pal_exec(Box::into_raw(exec_args)) };
-
-    match ret {
-        0 => Ok(()),
         _ => Err(ret),
     }
 }

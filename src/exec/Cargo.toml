@@ -25,6 +25,7 @@ sendfd          = "0.3"
 signal-hook     = "0.1"
 nix             = "0.17"
 log             = "0.4.8"
+linux-futex     = "0.1.1"
 
 [build-dependencies]
 protoc-rust-grpc = { path = "../../deps/grpc-rust/protoc-rust-grpc" }
