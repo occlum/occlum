@@ -5,7 +5,7 @@ use aligned::{Aligned, A16};
 
 use crate::prelude::*;
 
-/// The floating point state of CPU.
+/// The floating-point state of CPU.
 #[derive(Clone)]
 #[repr(C)]
 pub struct FpRegs {

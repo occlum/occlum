@@ -11,7 +11,6 @@ use crate::net::THREAD_NOTIFIERS;
 use crate::prelude::*;
 use crate::signal::{SigQueues, SigSet, SigStack};
 use crate::syscall::CpuContext;
-use crate::time::ThreadProfiler;
 
 pub use self::builder::ThreadBuilder;
 pub use self::id::ThreadId;
@@ -41,8 +40,6 @@ pub struct Thread {
     sig_mask: RwLock<SigSet>,
     sig_tmp_mask: RwLock<SigSet>,
     sig_stack: SgxMutex<Option<SigStack>>,
-    // System call timing
-    profiler: SgxMutex<Option<ThreadProfiler>>,
     // Misc
     host_eventfd: Arc<HostEventFd>,
 }
@@ -102,11 +99,6 @@ impl Thread {
         &self.sig_stack
     }
 
-    /// Get the alternate thread performance profiler
-    pub fn profiler(&self) -> &SgxMutex<Option<ThreadProfiler>> {
-        &self.profiler
-    }
-
     /// Get a file from the file table.
     pub fn file(&self, fd: FileDesc) -> Result<FileRef> {
         self.files().lock().unwrap().get(fd)
@@ -161,27 +153,10 @@ impl Thread {
                     .insert(self.tid(), eventfd)
                     .expect_none("this thread should not have an eventfd before start");
         */
-        #[cfg(feature = "syscall_timing")]
-        self.profiler()
-            .lock()
-            .unwrap()
-            .as_mut()
-            .unwrap()
-            .start()
-            .unwrap();
     }
 
     pub(super) fn exit(&self, term_status: TermStatus) -> usize {
         /*
-        #[cfg(feature = "syscall_timing")]
-        self.profiler()
-            .lock()
-            .unwrap()
-            .as_mut()
-            .unwrap()
-            .stop()
-            .unwrap();
-
         THREAD_NOTIFIERS
             .lock()
             .unwrap()
@@ -231,7 +206,6 @@ impl fmt::Debug for Thread {
             .field("vm", self.vm())
             .field("fs", self.fs())
             .field("files", self.files())
-            .field("profiler", self.profiler())
             .finish()
     }
 }

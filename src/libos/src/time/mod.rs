@@ -8,11 +8,9 @@ use std::time::Duration;
 use std::{fmt, u64};
 use syscall::SyscallNum;
 
-mod profiler;
 pub mod timer_slack;
 pub mod up_time;
 
-pub use profiler::ThreadProfiler;
 pub use timer_slack::TIMERSLACK;
 
 #[allow(non_camel_case_types)]

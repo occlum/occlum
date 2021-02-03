@@ -764,27 +764,7 @@ async fn do_syscall() -> Result<isize> {
     }
     */
 
-    #[cfg(feature = "syscall_timing")]
-    current!()
-        .profiler()
-        .lock()
-        .unwrap()
-        .as_mut()
-        .unwrap()
-        .syscall_enter(syscall_num)
-        .expect("unexpected error from profiler to enter syscall");
-
     let ret = dispatch_syscall(syscall).await;
-
-    #[cfg(feature = "syscall_timing")]
-    current!()
-        .profiler()
-        .lock()
-        .unwrap()
-        .as_mut()
-        .unwrap()
-        .syscall_exit(syscall_num, ret.is_err())
-        .expect("unexpected error from profiler to exit syscall");
 
     ret
 }

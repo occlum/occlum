@@ -32,7 +32,6 @@ sgx_tstd = { path = "../../deps/rust-sgx-sdk/sgx_tstd" }
 
 [features]
 default = ["integrity_only_opt", "sgx_file_cache", "sgx1_exception_sim"]
-syscall_timing = []     # Timing for each syscall. But it has cost from more ocall.
 integrity_only_opt = [] # Clear bss only. It should be disabled if checking memory reads.
 sgx_file_cache = []     # Cache SgxFile objects. Invalidation is unimplemented.
 sgx1_exception_sim = [] # Simulate #PF and #GP exceptions on SGX 1
