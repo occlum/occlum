@@ -5,14 +5,14 @@ use self::aux_vec::{AuxKey, AuxVec};
 use self::exec_loader::{load_exec_file_to_vec, load_file_to_vec};
 use super::elf_file::{ElfFile, ElfHeader, ProgramHeader, ProgramHeaderExt, SegmentData};
 use super::process::ProcessBuilder;
-use super::task::Task;
 use super::thread::ThreadName;
-use super::{table, task, HostWaker, ProcessRef, ThreadRef};
+use super::{table, HostWaker, ProcessRef, ThreadRef};
 use crate::fs::{
     CreationFlags, File, FileDesc, FileTable, FsView, HostStdioFds, StdinFile, StdoutFile,
     ROOT_INODE,
 };
 use crate::prelude::*;
+use crate::syscall::CpuContext;
 use crate::vm::ProcessVM;
 
 mod aux_vec;
@@ -74,7 +74,7 @@ fn do_spawn_common(
     current_ref: &ThreadRef,
     exec_now: bool,
 ) -> Result<pid_t> {
-    let new_process_ref = new_process(
+    let (new_process_ref, init_cpu_state) = new_process(
         elf_path,
         argv,
         envp,
@@ -87,7 +87,10 @@ fn do_spawn_common(
     let new_main_thread = new_process_ref
         .main_thread()
         .expect("the main thread is just created; it must exist");
-    async_rt::task::spawn(crate::syscall::thread_main_loop(new_main_thread));
+    async_rt::task::spawn(crate::syscall::thread_main_loop(
+        new_main_thread,
+        init_cpu_state,
+    ));
 
     let new_pid = new_process_ref.pid();
     Ok(new_pid)
@@ -102,7 +105,7 @@ fn new_process(
     host_stdio_fds: Option<&HostStdioFds>,
     wake_host_ptr: Option<*mut i32>,
     current_ref: &ThreadRef,
-) -> Result<ProcessRef> {
+) -> Result<(ProcessRef, CpuContext)> {
     let mut argv = argv.clone().to_vec();
     let (is_script, elf_buf) = load_exec_file_to_vec(file_path, current_ref)?;
 
@@ -138,7 +141,7 @@ fn new_process(
     let ldso_elf_file =
         ElfFile::new(&ldso_elf_buf).cause_err(|e| errno!(e.errno(), "invalid ld.so"))?;
 
-    let new_process_ref = {
+    let (new_process_ref, init_cpu_state) = {
         let process_ref = current_ref.process().clone();
 
         let vm = init_vm::do_init(&exec_elf_file, &ldso_elf_file)?;
@@ -162,7 +165,7 @@ fn new_process(
             );
         }
 
-        let task = {
+        let init_cpu_state = {
             let ldso_entry = {
                 let ldso_range = vm.get_elf_ranges()[1];
                 let ldso_entry =
@@ -175,7 +178,11 @@ fn new_process(
             let user_stack_base = vm.get_stack_base();
             let user_stack_limit = vm.get_stack_limit();
             let user_rsp = init_stack::do_init(user_stack_base, 4096, &argv, envp, &mut auxvec)?;
-            unsafe { Task::new(user_rsp, ldso_entry, None)? }
+            CpuContext {
+                rsp: user_rsp as _,
+                rip: ldso_entry as _,
+                ..Default::default()
+            }
         };
         let vm_ref = Arc::new(vm);
         let files_ref = {
@@ -194,7 +201,6 @@ fn new_process(
             .vm(vm_ref)
             .exec_path(&elf_path)
             .parent(process_ref)
-            .task(task)
             .sched(sched_ref)
             .rlimits(rlimit_ref)
             .fs(fs_ref)
@@ -206,7 +212,8 @@ fn new_process(
             builder = builder.host_waker(host_waker);
         }
 
-        builder.build()?
+        let new_process = builder.build()?;
+        (new_process, init_cpu_state)
     };
 
     table::add_process(new_process_ref.clone());
@@ -218,7 +225,7 @@ fn new_process(
         new_process_ref.pid()
     );
 
-    Ok(new_process_ref)
+    Ok((new_process_ref, init_cpu_state))
 }
 
 #[derive(Debug)]

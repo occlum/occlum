@@ -30,6 +30,7 @@ less than 4096 is unused by anyone. We can use it.*/
 #define CPU_CONTEXT_RSP     (15*8)
 #define CPU_CONTEXT_RIP     (16*8)
 #define CPU_CONTEXT_RFLAGS  (17*8)
+#define CPU_CONTEXT_FSBASE  (18*8)
 
 #else /* ! __ASSEMBLY_ */
 
@@ -60,11 +61,11 @@ typedef struct {
     uint64_t rsp;
     uint64_t rip;
     uint64_t rflags;
-    uint64_t fpregs_on_heap;
+    uint64_t fsbase;
     void* fpregs;
 } CpuContext;
 
-void switch_to_user(CpuContext* user_context, uint64_t user_fs);
+void switch_to_user(CpuContext* user_context);
 
 #ifdef __cplusplus
 }

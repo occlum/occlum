@@ -2,7 +2,7 @@ use std::ptr::NonNull;
 
 use super::{
     FileTableRef, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef, ResourceLimitsRef, SchedAgentRef,
-    SigQueues, SigSet, Task, Thread, ThreadId, ThreadInner, ThreadName, ThreadRef,
+    SigQueues, SigSet, Thread, ThreadId, ThreadInner, ThreadName, ThreadRef,
 };
 use crate::events::HostEventFd;
 use crate::prelude::*;
@@ -12,7 +12,6 @@ use crate::time::ThreadProfiler;
 pub struct ThreadBuilder {
     // Mandatory field
     tid: Option<ThreadId>,
-    task: Option<Task>,
     process: Option<ProcessRef>,
     vm: Option<ProcessVMRef>,
     // Optional fields
@@ -28,7 +27,6 @@ impl ThreadBuilder {
     pub fn new() -> Self {
         Self {
             tid: None,
-            task: None,
             process: None,
             vm: None,
             fs: None,
@@ -42,11 +40,6 @@ impl ThreadBuilder {
 
     pub fn tid(mut self, tid: ThreadId) -> Self {
         self.tid = Some(tid);
-        self
-    }
-
-    pub fn task(mut self, task: Task) -> Self {
-        self.task = Some(task);
         self
     }
 
@@ -91,9 +84,6 @@ impl ThreadBuilder {
     }
 
     pub fn build(self) -> Result<ThreadRef> {
-        let task = self
-            .task
-            .ok_or_else(|| errno!(EINVAL, "task is mandatory"))?;
         let tid = self.tid.unwrap_or_else(|| ThreadId::new());
         let clear_ctid = RwLock::new(self.clear_ctid);
         let inner = SgxMutex::new(ThreadInner::new());
@@ -120,7 +110,6 @@ impl ThreadBuilder {
         let host_eventfd = Arc::new(HostEventFd::new()?);
 
         let new_thread = Arc::new(Thread {
-            task,
             tid,
             clear_ctid,
             inner,

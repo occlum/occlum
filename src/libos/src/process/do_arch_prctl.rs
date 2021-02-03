@@ -1,13 +1,18 @@
 use crate::prelude::*;
+use crate::syscall::CURRENT_CONTEXT;
 
 pub fn do_arch_prctl(code: ArchPrctlCode, addr: *mut usize) -> Result<()> {
     debug!("do_arch_prctl: code: {:?}, addr: {:?}", code, addr);
     match code {
         ArchPrctlCode::ARCH_SET_FS => {
-            current!().task().set_user_fs(addr as usize);
+            CURRENT_CONTEXT.with(|context| {
+                context.borrow_mut().fsbase = addr as _;
+            });
         }
         ArchPrctlCode::ARCH_GET_FS => unsafe {
-            *addr = current!().task().user_fs();
+            CURRENT_CONTEXT.with(|context| {
+                *addr = context.borrow_mut().fsbase as _;
+            });
         },
         ArchPrctlCode::ARCH_SET_GS | ArchPrctlCode::ARCH_GET_GS => {
             return_errno!(EINVAL, "GS cannot be accessed from the user space");

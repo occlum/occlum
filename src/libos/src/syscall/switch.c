@@ -5,15 +5,14 @@
 
 void __switch_to_user(
     CpuContext *user_context,
-    uint64_t user_fs,
     jmp_buf jb
 ) __attribute__((noreturn));
 
-void switch_to_user(CpuContext *user_context, uint64_t user_fs) {
+void switch_to_user(CpuContext *user_context) {
     jmp_buf jb;
     int second = setjmp(jb);
     if (!second) {
-        __switch_to_user(user_context, user_fs, jb);
+        __switch_to_user(user_context, jb);
         THIS_SHOULD_NEVER_HAPPEN;
     }
     // Back from the user space with user_context updated
@@ -24,8 +23,7 @@ void switch_to_user(CpuContext *user_context, uint64_t user_fs) {
 void switch_to_kernel(jmp_buf jb, CpuContext *user_context) __attribute__((noreturn));
 
 void switch_to_kernel(jmp_buf jb, CpuContext *user_context) {
-    // Init the two fields that haven't been initialized by the assembly code
-    user_context->fpregs_on_heap = 0;
+    // Init the fields that haven't been initialized by the assembly code
     user_context->fpregs = NULL;
 
     longjmp(jb, 1);

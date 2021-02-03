@@ -7,8 +7,6 @@
 /// can own multiple threads.
 /// * [`Thread`]. A thread belongs to one and only one process and owns a set
 /// of OS resources, e.g., virtual memory, file tables, etc.
-/// * [`Task`]. A task belongs to one and only one thread, for which it deals with
-/// the low-level details about thread execution.
 use crate::fs::{FileRef, FileTable, FsView};
 use crate::misc::ResourceLimits;
 use crate::prelude::*;
@@ -25,7 +23,6 @@ pub use self::do_futex::{futex_wait, futex_wake};
 pub use self::do_spawn::do_spawn_root;
 pub use self::process::{Process, ProcessFilter, ProcessStatus, StatusChange, IDLE};
 pub use self::syscalls::*;
-pub use self::task::Task;
 pub use self::term_status::{ForcedExitStatus, TermStatus};
 pub use self::thread::{Thread, ThreadStatus};
 
@@ -47,7 +44,6 @@ mod thread;
 pub mod current;
 pub mod elf_file;
 pub mod table;
-pub mod task;
 
 // TODO: need to separate C's version pid_t with Rust version Pid.
 // pid_t must be signed as negative values may have special meaning

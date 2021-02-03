@@ -10,6 +10,7 @@
 use aligned::{Aligned, A16};
 use core::arch::x86_64::{_fxrstor, _fxsave};
 use std::any::Any;
+use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::default::Default;
 use std::ffi::{CStr, CString};
@@ -621,15 +622,26 @@ macro_rules! impl_dispatch_syscall {
 }
 process_syscall_table_with_callback!(impl_dispatch_syscall);
 
-pub fn thread_main_loop(current: ThreadRef) -> impl std::future::Future<Output = ()> + Send {
-    // FIXME: this is only a temp solution; we should not mark the entire task Send.
-    unsafe { future_util::mark_send(__thread_main_loop(current)) }
+async_rt::task_local! {
+    pub static CURRENT_CONTEXT: RefCell<CpuContext> = RefCell::new(CpuContext::default());
 }
 
-pub async fn __thread_main_loop(current: ThreadRef) {
+pub fn thread_main_loop(
+    current: ThreadRef,
+    init_cpu_state: CpuContext,
+) -> impl std::future::Future<Output = ()> + Send {
+    // FIXME: this is only a temp solution; we should not mark the entire task Send.
+    unsafe { future_util::mark_send(__thread_main_loop(current, init_cpu_state)) }
+}
+
+async fn __thread_main_loop(current: ThreadRef, init_cpu_state: CpuContext) {
     unsafe {
         crate::process::current::set(current.clone());
     }
+    let current_context_ptr = CURRENT_CONTEXT.with(|context| {
+        *context.borrow_mut() = init_cpu_state;
+        context.as_ptr()
+    });
 
     let thread_id = current.tid();
     let task_id = async_rt::task::current::get().tid().0;
@@ -637,16 +649,14 @@ pub async fn __thread_main_loop(current: ThreadRef) {
 
     current.start();
 
-    let mut user_context = thread_init_cpu_context(&current);
     while current.status() != ThreadStatus::Exited {
         // Continue the execution in the user space
         {
             extern "C" {
-                fn switch_to_user(user_context: *mut CpuContext, user_fs: usize);
+                fn switch_to_user(user_context: *mut CpuContext);
             }
-            let user_fs = current.task().user_fs();
             unsafe {
-                switch_to_user(&mut user_context, user_fs);
+                switch_to_user(current_context_ptr);
             }
         }
 
@@ -655,44 +665,19 @@ pub async fn __thread_main_loop(current: ThreadRef) {
         // given system call number is a valid.
         log::next_round(None);
 
-        handle_syscall(&mut user_context).await;
+        handle_syscall().await;
     }
 }
-
-fn thread_init_cpu_context(current: &ThreadRef) -> CpuContext {
-    let task = current.task();
-    CpuContext {
-        rip: task.user_rip() as u64,
-        rsp: task.user_rsp() as u64,
-        ..Default::default()
-    }
-}
-
-fn switch_to_user(user_context: &mut CpuContext) {}
 
 #[no_mangle]
 pub extern "C" fn occlum_syscall(user_context: *mut CpuContext) -> ! {
-    // Start a new round of log messages for this system call. But we do not
-    // set the description of this round, yet. We will do so after checking the
-    // given system call number is a valid.
-    log::next_round(None);
-
-    let user_context = unsafe {
-        // TODO: validate pointer
-        &mut *user_context
-    };
-
-    // Do system call
-    do_syscall(user_context);
-
-    // Back to the user space
-    do_sysret(user_context)
+    todo!("this function will be removed")
 }
 
-async fn handle_syscall(user_context: &mut CpuContext) {
-    let syscall_num = user_context.rax as u32;
+async fn handle_syscall() {
+    let syscall_num = CURRENT_CONTEXT.with(|context| context.borrow().rax as u32);
 
-    let retval = match do_syscall(user_context).await {
+    let retval = match do_syscall().await {
         Ok(retval) => retval as isize,
         Err(e) => {
             let should_log_err = |errno| {
@@ -735,25 +720,31 @@ async fn handle_syscall(user_context: &mut CpuContext) {
         && syscall_num != SyscallNum::HandleException as u32
         && syscall_num != SyscallNum::HandleInterrupt as u32
     {
-        user_context.rax = retval as u64;
+        CURRENT_CONTEXT.with(|context| {
+            context.borrow_mut().rax = retval as u64;
+        });
     }
 
-    crate::signal::deliver_signal(user_context);
+    CURRENT_CONTEXT.with(|context| {
+        crate::signal::deliver_signal(&mut context.borrow_mut());
+    });
 
     crate::process::handle_force_exit();
 }
 
-async fn do_syscall(user_context: &mut CpuContext) -> Result<isize> {
+async fn do_syscall() -> Result<isize> {
     // Extract arguments from the CPU context. The arguments follows Linux's syscall ABI.
-    let num = user_context.rax as u32;
-    let arg0 = user_context.rdi as isize;
-    let arg1 = user_context.rsi as isize;
-    let arg2 = user_context.rdx as isize;
-    let arg3 = user_context.r10 as isize;
-    let arg4 = user_context.r8 as isize;
-    let arg5 = user_context.r9 as isize;
-
-    let mut syscall = Syscall::new(num, arg0, arg1, arg2, arg3, arg4, arg5)?;
+    let mut syscall = CURRENT_CONTEXT.with(|_context| {
+        let context = _context.borrow();
+        let num = context.rax as u32;
+        let arg0 = context.rdi as isize;
+        let arg1 = context.rsi as isize;
+        let arg2 = context.rdx as isize;
+        let arg3 = context.r10 as isize;
+        let arg4 = context.r8 as isize;
+        let arg5 = context.r9 as isize;
+        Syscall::new(num, arg0, arg1, arg2, arg3, arg4, arg5)
+    })?;
 
     log::set_round_desc(Some(syscall.num.as_str()));
     trace!("{:?}", &syscall);
@@ -761,6 +752,8 @@ async fn do_syscall(user_context: &mut CpuContext) -> Result<isize> {
 
     // Pass user_context as an extra argument to two special syscalls that
     // need to modify it
+    // TODO: modify the four syscalls to use CURRENT_CONTEXT
+    /*
     if syscall_num == SyscallNum::RtSigreturn {
         syscall.args[0] = user_context as *mut _ as isize;
     } else if syscall_num == SyscallNum::HandleException {
@@ -776,6 +769,7 @@ async fn do_syscall(user_context: &mut CpuContext) -> Result<isize> {
         // syscall.args[1] == old_ss
         syscall.args[2] = user_context as *const _ as isize;
     }
+    */
 
     #[cfg(feature = "syscall_timing")]
     current!()
@@ -818,16 +812,12 @@ fn do_sysret(user_context: &mut CpuContext) -> ! {
         // Todo: Is it correct to do fxstor in kernel?
         let fpregs = user_context.fpregs;
         if (fpregs != ptr::null_mut()) {
-            if user_context.fpregs_on_heap == 1 {
-                let fpregs = unsafe { Box::from_raw(user_context.fpregs as *mut FpRegs) };
-                fpregs.restore();
-            } else {
-                unsafe { fpregs.as_ref().unwrap().restore() };
-            }
+            let fpregs = unsafe { Box::from_raw(user_context.fpregs as *mut FpRegs) };
+            fpregs.restore();
         }
         unsafe { __occlum_sysret(user_context) } // jump to user space
     } else {
-        if user_context.fpregs != ptr::null_mut() && user_context.fpregs_on_heap == 1 {
+        if user_context.fpregs != ptr::null_mut() {
             drop(unsafe { Box::from_raw(user_context.fpregs as *mut FpRegs) });
         }
         unsafe { do_exit_task() } // exit enclave
@@ -1051,7 +1041,7 @@ pub struct CpuContext {
     pub rsp: u64,
     pub rip: u64,
     pub rflags: u64,
-    pub fpregs_on_heap: u64,
+    pub fsbase: u64,
     pub fpregs: *mut FpRegs,
 }
 
@@ -1080,7 +1070,7 @@ impl CpuContext {
             rsp: src.rsp,
             rip: src.rip,
             rflags: src.rflags,
-            fpregs_on_heap: 0,
+            fsbase: 0,
             fpregs: ptr::null_mut(),
         }
     }
@@ -1107,7 +1097,7 @@ impl Default for CpuContext {
             rsp: 0,
             rip: 0,
             rflags: 0,
-            fpregs_on_heap: 0,
+            fsbase: 0,
             fpregs: std::ptr::null_mut(),
         }
     }

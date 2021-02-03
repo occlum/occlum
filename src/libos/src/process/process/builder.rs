@@ -1,6 +1,5 @@
 use std::sync::Weak;
 
-use super::super::task::Task;
 use super::super::thread::{ThreadBuilder, ThreadId, ThreadName};
 use super::super::{
     FileTableRef, ForcedExitStatus, FsViewRef, HostWaker, ProcessRef, ProcessVMRef,
@@ -61,10 +60,6 @@ impl ProcessBuilder {
     pub fn host_waker(mut self, host_waker: HostWaker) -> Self {
         self.host_waker = Some(host_waker);
         self
-    }
-
-    pub fn task(mut self, task: Task) -> Self {
-        self.thread_builder(|tb| tb.task(task))
     }
 
     pub fn sched(mut self, sched: SchedAgentRef) -> Self {

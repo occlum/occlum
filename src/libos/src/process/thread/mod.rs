@@ -1,7 +1,6 @@
 use std::fmt;
 use std::ptr::NonNull;
 
-use super::task::Task;
 use super::{
     FileTableRef, ForcedExitStatus, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef,
     ResourceLimitsRef, SchedAgentRef, TermStatus, ThreadRef,
@@ -11,6 +10,7 @@ use crate::fs::{EventCreationFlags, EventFile};
 use crate::net::THREAD_NOTIFIERS;
 use crate::prelude::*;
 use crate::signal::{SigQueues, SigSet, SigStack};
+use crate::syscall::CpuContext;
 use crate::time::ThreadProfiler;
 
 pub use self::builder::ThreadBuilder;
@@ -22,8 +22,6 @@ mod id;
 mod name;
 
 pub struct Thread {
-    // Low-level info
-    task: Task,
     // Immutable info
     tid: ThreadId,
     // Mutable info
@@ -59,10 +57,6 @@ pub enum ThreadStatus {
 impl Thread {
     pub fn process(&self) -> &ProcessRef {
         &self.process
-    }
-
-    pub fn task(&self) -> &Task {
-        &self.task
     }
 
     pub fn tid(&self) -> pid_t {

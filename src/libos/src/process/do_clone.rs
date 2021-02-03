@@ -1,9 +1,9 @@
 use std::ptr::NonNull;
 
 use super::table::{self};
-use super::task::{self, Task};
 use super::thread::{Thread, ThreadBuilder};
 use crate::prelude::*;
+use crate::syscall::CpuContext;
 use crate::vm::{ProcessVM, VMRange};
 
 /// Create and execute a new thread.
@@ -30,10 +30,16 @@ pub async fn do_clone(
     // TODO: add pointer checking
     let thread_entry = unsafe { *(user_rsp as *mut usize) };
 
+    let init_cpu_state = CpuContext {
+        rsp: user_rsp as _,
+        rip: thread_entry as _,
+        fsbase: new_tls.unwrap_or(0) as _,
+        ..Default::default()
+    };
+
     let new_thread_ref = {
         let current = current!();
         let vm = current.vm().clone();
-        let task = unsafe { Task::new(user_rsp, thread_entry, new_tls)? };
         let files = current.files().clone();
         let rlimits = current.rlimits().clone();
         let fs = current.fs().clone();
@@ -42,7 +48,6 @@ pub async fn do_clone(
         let mut builder = ThreadBuilder::new()
             .process(current.process().clone())
             .vm(vm)
-            .task(task)
             .fs(fs)
             .files(files)
             .name(name)
@@ -69,7 +74,10 @@ pub async fn do_clone(
         }
     }
 
-    async_rt::task::spawn(crate::syscall::thread_main_loop(new_thread_ref));
+    async_rt::task::spawn(crate::syscall::thread_main_loop(
+        new_thread_ref,
+        init_cpu_state,
+    ));
     Ok(new_tid)
 }
 

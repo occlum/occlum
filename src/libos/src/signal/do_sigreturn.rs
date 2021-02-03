@@ -38,7 +38,6 @@ pub fn do_rt_sigreturn(curr_user_ctxt: &mut CpuContext) -> Result<()> {
     // before return to user's code
     let mut fpregs = Box::new(unsafe { FpRegs::from_slice(&last_ucontext.fpregs) });
     curr_user_ctxt.fpregs = Box::into_raw(fpregs);
-    curr_user_ctxt.fpregs_on_heap = 1; // indicates the fpregs is on heap
     Ok(())
 }
 

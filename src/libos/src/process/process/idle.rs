@@ -1,4 +1,3 @@
-use super::super::task::Task;
 use super::super::thread::ThreadId;
 use super::{ProcessBuilder, ThreadRef};
 use crate::misc::ResourceLimits;
@@ -18,7 +17,6 @@ fn create_idle_thread() -> Result<ThreadRef> {
     // Create dummy values for the mandatory fields
     let dummy_tid = ThreadId::zero();
     let dummy_vm = Arc::new(ProcessVM::default());
-    let dummy_task = Task::default();
 
     // rlimit get from Occlum.json
     let rlimits = Arc::new(SgxMutex::new(ResourceLimits::default()));
@@ -27,7 +25,6 @@ fn create_idle_thread() -> Result<ThreadRef> {
     let idle_process = ProcessBuilder::new()
         .tid(dummy_tid)
         .vm(dummy_vm)
-        .task(dummy_task)
         .rlimits(rlimits)
         .no_parent(true)
         .build()?;

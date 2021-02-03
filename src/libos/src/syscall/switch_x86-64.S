@@ -76,17 +76,17 @@ __syscall_return:
     .type __switch_to_user, @function
 __switch_to_user:
     // %rdi - CpuContext* user_context
-    // %rsi - uint64_t user_fs
-    // %rdx - jmp_buf jb
+    // %rsi - jmp_buf jb
 
     // Save the states of the kernel space
     movq %rdi, %gs:(TD_USER_CONTEXT)
-    movq %rdx, %gs:(TD_KERNEL_JMPBUF)
+    movq %rsi, %gs:(TD_KERNEL_JMPBUF)
     movq %rsp, %gs:(TD_KERNEL_RSP)
     rdfsbase %rcx
     movq %rcx, %gs:(TD_KERNEL_FS)
 
     // Use user FS
+    movq CPU_CONTEXT_FSBASE(%rdi), %rsi
     wrfsbase %rsi
 
     // Get the user's RIP
