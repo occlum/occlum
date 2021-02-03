@@ -90,7 +90,15 @@ impl INode for HNode {
     }
 
     fn poll(&self) -> Result<PollStatus> {
-        unimplemented!()
+        let metadata = try_std!(self.path.metadata());
+        if !metadata.is_file() {
+            return Err(FsError::NotFile);
+        }
+        Ok(PollStatus {
+            read: true,
+            write: !metadata.permissions().readonly(),
+            error: false,
+        })
     }
 
     fn metadata(&self) -> Result<Metadata> {
@@ -104,12 +112,16 @@ impl INode for HNode {
     }
 
     fn sync_all(&self) -> Result<()> {
-        warn!("HostFS: sync_all() is unimplemented");
+        let mut guard = self.open_file()?;
+        let file = guard.as_mut().unwrap();
+        try_std!(file.sync_all());
         Ok(())
     }
 
     fn sync_data(&self) -> Result<()> {
-        warn!("HostFS: sync_data() is unimplemented");
+        let mut guard = self.open_file()?;
+        let file = guard.as_mut().unwrap();
+        try_std!(file.sync_data());
         Ok(())
     }
 
