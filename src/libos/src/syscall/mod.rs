@@ -17,7 +17,6 @@ use time::{clockid_t, timespec_t, timeval_t};
 use util::log::{self, LevelFilter};
 use util::mem_util::from_user::*;
 
-use crate::exception::do_handle_exception;
 use crate::fs::{
     do_access, do_chdir, do_chmod, do_chown, do_close, do_dup, do_dup2, do_dup3, do_eventfd,
     do_eventfd2, do_faccessat, do_fchmod, do_fchmodat, do_fchown, do_fchownat, do_fcntl,
@@ -56,7 +55,7 @@ use super::*;
 mod context_switch;
 
 pub use self::context_switch::{
-    current_context_ptr, switch_to_user, CpuContext, FpRegs, CURRENT_CONTEXT,
+    current_context_ptr, switch_to_user, CpuContext, FpRegs, GpRegs, CURRENT_CONTEXT,
 };
 
 /// System call table defined in a macro.
@@ -105,8 +104,8 @@ macro_rules! process_syscall_table_with_callback {
 
             (SpawnGlibc = 359) => do_spawn_for_glibc(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fa: *const SpawnFileActions),
             (SpawnMusl = 360) => do_spawn_for_musl(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp),
-            (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
-            (HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
+            //(HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
+            //(HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
 
             (RtSigprocmask = 14) => do_rt_sigprocmask(how: c_int, set: *const sigset_t, oldset: *mut sigset_t, sigset_size: size_t),
             (Membarrier = 324) => handle_unsupported(),
@@ -668,7 +667,7 @@ pub extern "C" fn occlum_syscall(user_context: *mut CpuContext) -> ! {
 }
 
 async fn handle_syscall() {
-    let syscall_num = CURRENT_CONTEXT.with(|context| context.borrow().rax as u32);
+    let syscall_num = CURRENT_CONTEXT.with(|context| context.borrow().gp_regs.rax as u32);
 
     let retval = match do_syscall().await {
         Ok(retval) => retval as isize,
@@ -710,11 +709,11 @@ async fn handle_syscall() {
     // handler is executed. So in the case of sigreturn, `user_context` should
     // be kept intact.
     if syscall_num != SyscallNum::RtSigreturn as u32
-        && syscall_num != SyscallNum::HandleException as u32
-        && syscall_num != SyscallNum::HandleInterrupt as u32
+    //&& syscall_num != SyscallNum::HandleException as u32
+    //&& syscall_num != SyscallNum::HandleInterrupt as u32
     {
         CURRENT_CONTEXT.with(|context| {
-            context.borrow_mut().rax = retval as u64;
+            context.borrow_mut().gp_regs.rax = retval as u64;
         });
     }
 
@@ -729,13 +728,14 @@ async fn do_syscall() -> Result<isize> {
     // Extract arguments from the CPU context. The arguments follows Linux's syscall ABI.
     let mut syscall = CURRENT_CONTEXT.with(|_context| {
         let context = _context.borrow();
-        let num = context.rax as u32;
-        let arg0 = context.rdi as isize;
-        let arg1 = context.rsi as isize;
-        let arg2 = context.rdx as isize;
-        let arg3 = context.r10 as isize;
-        let arg4 = context.r8 as isize;
-        let arg5 = context.r9 as isize;
+        let gp_regs = &context.gp_regs;
+        let num = gp_regs.rax as u32;
+        let arg0 = gp_regs.rdi as isize;
+        let arg1 = gp_regs.rsi as isize;
+        let arg2 = gp_regs.rdx as isize;
+        let arg3 = gp_regs.r10 as isize;
+        let arg4 = gp_regs.r8 as isize;
+        let arg5 = gp_regs.r9 as isize;
         Syscall::new(num, arg0, arg1, arg2, arg3, arg4, arg5)
     })?;
 
@@ -787,35 +787,6 @@ async fn do_syscall() -> Result<isize> {
         .expect("unexpected error from profiler to exit syscall");
 
     ret
-}
-
-/// Return to the user space according to the given CPU context
-fn do_sysret(user_context: &mut CpuContext) -> ! {
-    // Rust compiler would complain about passing to external C functions a CpuContext
-    // pointer, which includes a FpRegs pointer that is not safe to use by external
-    // modules. In our case, the FpRegs pointer will not be used actually. So the
-    // Rust warning is a false alarm. We suppress it here.
-    #[allow(improper_ctypes)]
-    extern "C" {
-        fn __occlum_sysret(user_context: *mut CpuContext) -> !;
-        fn do_exit_task() -> !;
-    }
-    if current!().status() != ThreadStatus::Exited {
-        // Restore the floating point registers
-        // Todo: Is it correct to do fxstor in kernel?
-        let fpregs = user_context.fpregs;
-        if (fpregs != ptr::null_mut()) {
-            let fpregs = unsafe { Box::from_raw(user_context.fpregs as *mut FpRegs) };
-            fpregs.restore();
-        }
-        unsafe { __occlum_sysret(user_context) } // jump to user space
-    } else {
-        if user_context.fpregs != ptr::null_mut() {
-            drop(unsafe { Box::from_raw(user_context.fpregs as *mut FpRegs) });
-        }
-        unsafe { do_exit_task() } // exit enclave
-    }
-    unreachable!("__occlum_sysret never returns!");
 }
 
 /*

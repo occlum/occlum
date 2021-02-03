@@ -8,12 +8,12 @@ pub fn do_sigaltstack(new_ss: &Option<SigStack>, curr_user_ctxt: &CpuContext) ->
     let mut sig_stack = thread.sig_stack().lock().unwrap();
     let old_ss = if let Some(sig_stack) = *sig_stack {
         // Deny to update the stack when we are on the stack
-        if new_ss.is_some() && sig_stack.contains(curr_user_ctxt.rsp as usize) {
+        if new_ss.is_some() && sig_stack.contains(curr_user_ctxt.gp_regs.rsp as usize) {
             return_errno!(EPERM, "thread is on signal stack currently");
         }
 
         // Retrieve the old signal stack information
-        let flags = if sig_stack.contains(curr_user_ctxt.rsp as usize) {
+        let flags = if sig_stack.contains(curr_user_ctxt.gp_regs.rsp as usize) {
             SigStackFlags::SS_ONSTACK
         } else {
             SigStackFlags::EMPTY

@@ -12,7 +12,7 @@ use crate::fs::{
     ROOT_INODE,
 };
 use crate::prelude::*;
-use crate::syscall::CpuContext;
+use crate::syscall::{CpuContext, GpRegs};
 use crate::vm::ProcessVM;
 
 mod aux_vec;
@@ -178,9 +178,13 @@ fn new_process(
             let user_stack_base = vm.get_stack_base();
             let user_stack_limit = vm.get_stack_limit();
             let user_rsp = init_stack::do_init(user_stack_base, 4096, &argv, envp, &mut auxvec)?;
+
             CpuContext {
-                rsp: user_rsp as _,
-                rip: ldso_entry as _,
+                gp_regs: GpRegs {
+                    rsp: user_rsp as _,
+                    rip: ldso_entry as _,
+                    ..Default::default()
+                },
                 ..Default::default()
             }
         };

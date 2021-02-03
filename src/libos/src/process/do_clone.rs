@@ -3,7 +3,7 @@ use std::ptr::NonNull;
 use super::table::{self};
 use super::thread::{Thread, ThreadBuilder};
 use crate::prelude::*;
-use crate::syscall::CpuContext;
+use crate::syscall::{CpuContext, GpRegs};
 use crate::vm::{ProcessVM, VMRange};
 
 /// Create and execute a new thread.
@@ -31,9 +31,12 @@ pub async fn do_clone(
     let thread_entry = unsafe { *(user_rsp as *mut usize) };
 
     let init_cpu_state = CpuContext {
-        rsp: user_rsp as _,
-        rip: thread_entry as _,
-        fsbase: new_tls.unwrap_or(0) as _,
+        gp_regs: GpRegs {
+            rsp: user_rsp as _,
+            rip: thread_entry as _,
+            ..Default::default()
+        },
+        fs_base: new_tls.unwrap_or(0) as _,
         ..Default::default()
     };
 

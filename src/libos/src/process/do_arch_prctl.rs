@@ -6,12 +6,12 @@ pub fn do_arch_prctl(code: ArchPrctlCode, addr: *mut usize) -> Result<()> {
     match code {
         ArchPrctlCode::ARCH_SET_FS => {
             CURRENT_CONTEXT.with(|context| {
-                context.borrow_mut().fsbase = addr as _;
+                context.borrow_mut().fs_base = addr as _;
             });
         }
         ArchPrctlCode::ARCH_GET_FS => unsafe {
             CURRENT_CONTEXT.with(|context| {
-                *addr = context.borrow_mut().fsbase as _;
+                *addr = context.borrow_mut().fs_base as _;
             });
         },
         ArchPrctlCode::ARCH_SET_GS | ArchPrctlCode::ARCH_GET_GS => {

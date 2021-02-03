@@ -31,13 +31,12 @@ pub fn do_rt_sigreturn(curr_user_ctxt: &mut CpuContext) -> Result<()> {
     // Restore sigmask
     *current!().sig_mask().write().unwrap() = SigSet::from_c(last_ucontext.uc_sigmask);
     // Restore user context
-    *curr_user_ctxt = last_ucontext.uc_mcontext.inner;
-
-    // Restore the floating point registers to a temp area
-    // The floating point registers would be recoved just
-    // before return to user's code
-    let mut fpregs = Box::new(unsafe { FpRegs::from_slice(&last_ucontext.fpregs) });
-    curr_user_ctxt.fpregs = Box::into_raw(fpregs);
+    curr_user_ctxt.gp_regs = last_ucontext.uc_mcontext.gp_regs;
+    unsafe {
+        curr_user_ctxt
+            .fp_regs
+            .save_from_slice(&last_ucontext.fpregs);
+    }
     Ok(())
 }
 
@@ -220,14 +219,14 @@ fn handle_signals_by_user(
                 let thread = current!();
                 let sig_stack = thread.sig_stack().lock().unwrap();
                 if let Some(stack) = *sig_stack {
-                    if !stack.contains(curr_user_ctxt.rsp as usize) {
+                    if !stack.contains(curr_user_ctxt.gp_regs.rsp as usize) {
                         let stack_top = stack.sp() + stack.size();
                         return stack_top;
                     }
                 }
             }
             const BIG_ENOUGH_GAP: u64 = 1024;
-            let stack_top = (curr_user_ctxt.rsp - BIG_ENOUGH_GAP) as usize;
+            let stack_top = (curr_user_ctxt.gp_regs.rsp - BIG_ENOUGH_GAP) as usize;
             stack_top
         };
         let stack_top = get_stack_top();
@@ -260,22 +259,16 @@ fn handle_signals_by_user(
         // Save the old sigmask
         ucontext.uc_sigmask = old_sigmask.to_c();
         // Save the user context
-        ucontext.uc_mcontext.inner = *curr_user_ctxt;
-
+        ucontext.uc_mcontext.gp_regs = curr_user_ctxt.gp_regs;
         // Save the floating point registers
-        if curr_user_ctxt.fpregs != ptr::null_mut() {
-            ucontext
-                .fpregs
-                .copy_from_slice(unsafe { curr_user_ctxt.fpregs.as_ref().unwrap().as_slice() });
-            // Clear the floating point registers, since we do not need to recover is when this syscall return
-            curr_user_ctxt.fpregs = ptr::null_mut();
-        } else {
-            // We need a correct fxsave structure in the buffer,
+        let fp_regs = &mut curr_user_ctxt.fp_regs;
+        if !fp_regs.is_valid() {
+            // We need a valid fxsave structure in the buffer,
             // because the app may modify part of it to update the
             // floating point after the signal handler finished.
-            let fpregs = FpRegs::save();
-            ucontext.fpregs.copy_from_slice(fpregs.as_slice());
+            fp_regs.save();
         }
+        ucontext.fpregs.copy_from_slice(fp_regs.as_slice());
 
         ucontext as *mut ucontext_t
     };
@@ -289,12 +282,18 @@ fn handle_signals_by_user(
     // Modify the current user CPU context so that the signal handler will
     // be "called" upon returning back to the user space and when the signal
     // handler finishes, the CPU will jump to the restorer.
-    curr_user_ctxt.rsp = handler_stack_top as u64;
-    curr_user_ctxt.rip = handler_addr as u64;
-    // Prepare the three arguments for the signal handler
-    curr_user_ctxt.rdi = signal.num().as_u8() as u64;
-    curr_user_ctxt.rsi = info as u64;
-    curr_user_ctxt.rdx = ucontext as u64;
+    {
+        let gp_regs = &mut curr_user_ctxt.gp_regs;
+        gp_regs.rsp = handler_stack_top as u64;
+        gp_regs.rip = handler_addr as u64;
+        // Prepare the three arguments for the signal handler
+        gp_regs.rdi = signal.num().as_u8() as u64;
+        gp_regs.rsi = info as u64;
+        gp_regs.rdx = ucontext as u64;
+
+        let fp_regs = &mut curr_user_ctxt.fp_regs;
+        fp_regs.clear();
+    }
 
     PRE_UCONTEXTS.with(|ref_cell| {
         let mut stack = ref_cell.borrow_mut();

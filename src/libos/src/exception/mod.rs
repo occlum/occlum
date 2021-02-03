@@ -1,20 +1,23 @@
 //! Exception handling subsystem.
 
-use self::cpuid::{handle_cpuid_exception, setup_cpuid_info, CPUID_OPCODE};
-use self::rdtsc::{handle_rdtsc_exception, RDTSC_OPCODE};
-use self::syscall::{handle_syscall_exception, SYSCALL_OPCODE};
+//use self::cpuid::{handle_cpuid_exception, setup_cpuid_info, CPUID_OPCODE};
+//use self::rdtsc::{handle_rdtsc_exception, RDTSC_OPCODE};
+//use self::syscall::{handle_syscall_exception, SYSCALL_OPCODE};
 use super::*;
 use crate::signal::{FaultSignal, SigSet};
 use crate::syscall::exception_interrupt_syscall_c_abi;
-use crate::syscall::{CpuContext, FpRegs, SyscallNum};
+use crate::syscall::{CpuContext, FpRegs, GpRegs, SyscallNum};
 use aligned::{Aligned, A16};
 use core::arch::x86_64::_fxsave;
 use sgx_types::*;
 
 // Modules for instruction simulation
-mod cpuid;
-mod rdtsc;
-mod syscall;
+//mod cpuid;
+//mod rdtsc;
+//mod syscall;
+
+// TODO: remove this dummy implementation
+fn setup_cpuid_info() {}
 
 pub fn register_exception_handlers() {
     setup_cpuid_info();
@@ -26,19 +29,24 @@ pub fn register_exception_handlers() {
 }
 
 #[no_mangle]
-extern "C" fn handle_exception(info: *mut sgx_exception_info_t) -> i32 {
-    let mut fpregs = FpRegs::save();
-    unsafe {
-        exception_interrupt_syscall_c_abi(
-            SyscallNum::HandleException as u32,
-            info as *mut _,
-            &mut fpregs as *mut FpRegs,
-        )
-    };
-    unreachable!();
+extern "C" fn handle_exception(sgx_except_info: *mut sgx_exception_info_t) -> i32 {
+    let sgx_except_info = unsafe { &mut *sgx_except_info };
+
+    // Update the current CPU context
+    let curr_user_context = unsafe { &mut *syscall::current_context_ptr() };
+    // Save CPU's floating-point registers at the time when the exception occurs.
+    // Note that we do this at the earliest possible time in hope that
+    // the floating-point registers have not been tainted by the LibOS code.
+    curr_user_context.fp_regs.save();
+    // Save CPU's general-purpose registers
+    curr_user_context.gp_regs = GpRegs::from(&sgx_except_info.cpu_context);
+
+    //let exception_info = ExceptionInfo::from(sgx_info);
+    todo!("switch to kernel")
 }
 
 /// Exceptions are handled as a special kind of system calls.
+/*
 pub async fn do_handle_exception(
     info: *mut sgx_exception_info_t,
     fpregs: *mut FpRegs,
@@ -79,7 +87,7 @@ pub async fn do_handle_exception(
 
     Ok(0)
 }
-
+*/
 // Notes about #PF and #GP exception simulation for SGX 1.
 //
 // SGX 1 cannot capture #PF and #GP exceptions inside enclaves. This leaves us

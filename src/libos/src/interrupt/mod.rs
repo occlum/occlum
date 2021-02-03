@@ -16,6 +16,8 @@ pub fn init() {
 }
 
 extern "C" fn handle_interrupt(info: *mut sgx_interrupt_info_t) -> i32 {
+    todo!("enable interrupt");
+    /*
     let mut fpregs = FpRegs::save();
     unsafe {
         exception_interrupt_syscall_c_abi(
@@ -24,6 +26,7 @@ extern "C" fn handle_interrupt(info: *mut sgx_interrupt_info_t) -> i32 {
             &mut fpregs as *mut FpRegs,
         )
     };
+    */
     unreachable!();
 }
 
@@ -32,12 +35,15 @@ pub async fn do_handle_interrupt(
     fpregs: *mut FpRegs,
     cpu_context: *mut CpuContext,
 ) -> Result<isize> {
+    todo!("enable interrupt");
+    /*
     let info = unsafe { &*info };
     let context = unsafe { &mut *cpu_context };
     // The cpu context is overriden so that it is as if the syscall is called from where the
     // interrupt happened
     *context = CpuContext::from_sgx(&info.cpu_context);
     context.fpregs = fpregs;
+    */
     Ok(0)
 }
 

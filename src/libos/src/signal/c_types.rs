@@ -4,7 +4,7 @@ use std::fmt;
 
 use super::SigNum;
 use crate::prelude::*;
-use crate::syscall::CpuContext;
+use crate::syscall::GpRegs;
 use crate::time::clock_t;
 
 #[derive(Clone, Copy, Debug)]
@@ -223,7 +223,7 @@ pub type stack_t = sigaltstack_t;
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct mcontext_t {
-    pub inner: CpuContext,
+    pub gp_regs: GpRegs,
     // TODO: the fields should be csgsfs, err, trapno, oldmask, and cr2
     _unused0: [u64; 5],
     // TODO: this field should be `fpregs: fpregset_t,`
