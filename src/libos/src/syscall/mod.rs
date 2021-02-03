@@ -55,7 +55,9 @@ use super::*;
 
 mod context_switch;
 
-pub use self::context_switch::{CpuContext, FpRegs, CURRENT_CONTEXT};
+pub use self::context_switch::{
+    current_context_ptr, switch_to_user, CpuContext, FpRegs, CURRENT_CONTEXT,
+};
 
 /// System call table defined in a macro.
 ///
@@ -647,13 +649,8 @@ async fn __thread_main_loop(current: ThreadRef, init_cpu_state: CpuContext) {
 
     while current.status() != ThreadStatus::Exited {
         // Continue the execution in the user space
-        {
-            extern "C" {
-                fn switch_to_user(user_context: *mut CpuContext);
-            }
-            unsafe {
-                switch_to_user(current_context_ptr);
-            }
+        unsafe {
+            switch_to_user(current_context_ptr);
         }
 
         // Start a new round of log messages for this system call. But we do not
