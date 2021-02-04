@@ -6,7 +6,6 @@ use std::sync::Once;
 use super::*;
 use crate::exception::*;
 use crate::fs::HostStdioFds;
-use crate::interrupt;
 use crate::process::ProcessFilter;
 use crate::signal::SigNum;
 use crate::time::up_time::init;
@@ -173,27 +172,6 @@ pub extern "C" fn occlum_ecall_kill(pid: i32, sig: i32) -> i32 {
         })
     })
     .unwrap_or(ecall_errno!(EFAULT))
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_ecall_broadcast_interrupts() -> i32 {
-    return 0;
-    /*
-    if HAS_INIT.load(Ordering::SeqCst) == false {
-        return ecall_errno!(EAGAIN);
-    }
-
-    panic::catch_unwind(|| {
-        backtrace::__rust_begin_short_backtrace(|| match interrupt::broadcast_interrupts() {
-            Ok(count) => count as i32,
-            Err(e) => {
-                eprintln!("failed to broadcast interrupts: {}", e.backtrace());
-                ecall_errno!(e.errno())
-            }
-        })
-    })
-    .unwrap_or(ecall_errno!(EFAULT))
-    */
 }
 
 fn parse_log_level(level_chars: *const c_char) -> Result<LevelFilter> {

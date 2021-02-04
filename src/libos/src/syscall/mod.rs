@@ -448,8 +448,6 @@ macro_rules! process_syscall_table_with_callback {
             // Occlum-specific system calls
             (SpawnGlibc = 359) => do_spawn_for_glibc(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fa: *const SpawnFileActions),
             (SpawnMusl = 360) => do_spawn_for_musl(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp),
-            (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
-            (HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
             */
         }
     };
@@ -884,27 +882,6 @@ fn do_prlimit(
 
 async fn handle_unsupported() -> Result<isize> {
     return_errno!(ENOSYS, "Unimplemented or unknown syscall")
-}
-
-// exception and interrupt syscalls share the same c abi
-//
-// num: occlum syscall number
-// info: pointer to sgx_exception_info_t or sgx_interrupt_info_t
-// fpregs: pointer to FpRegs. Rust compiler would complain about passing
-//  to external C functions a CpuContext pointer, which includes a FpRegs
-//  pointer that is not safe to use by external modules. In our case, the
-//  FpRegs pointer will not be used actually. So the Rust warning is a
-//  false alarm. We suppress it here.
-pub unsafe fn exception_interrupt_syscall_c_abi(
-    num: u32,
-    info: *mut c_void,
-    fpregs: *mut FpRegs,
-) -> u32 {
-    #[allow(improper_ctypes)]
-    extern "C" {
-        pub fn __occlum_syscall_c_abi(num: u32, info: *mut c_void, fpregs: *mut FpRegs) -> u32;
-    }
-    __occlum_syscall_c_abi(num, info, fpregs)
 }
 
 mod future_util {
