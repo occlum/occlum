@@ -1072,6 +1072,8 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_anonymous_mmap_with_bad_hints),
     TEST_CASE(test_anonymous_mmap_with_zero_len),
     TEST_CASE(test_anonymous_mmap_with_non_page_aligned_len),
+#if 0
+    // TODO: recover these tests
     TEST_CASE(test_private_file_mmap),
     TEST_CASE(test_private_file_mmap_with_offset),
     TEST_CASE(test_private_file_mmap_with_invalid_fd),
@@ -1080,6 +1082,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_shared_file_mmap_flushing_with_munmap),
     TEST_CASE(test_shared_file_mmap_flushing_with_fdatasync),
     TEST_CASE(test_shared_file_mmap_flushing_with_fsync),
+#endif
     TEST_CASE(test_fixed_mmap_that_does_not_override_any_mmaping),
     TEST_CASE(test_fixed_mmap_that_overrides_existing_mmaping),
     TEST_CASE(test_fixed_mmap_with_non_page_aligned_addr),
