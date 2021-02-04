@@ -1,25 +1,26 @@
 use super::*;
-use crate::syscall::{occlum_syscall, CpuContext, SyscallNum};
+use crate::syscall::{handle_syscall, CURRENT_CONTEXT};
 use sgx_types::*;
 
 pub const SYSCALL_OPCODE: u16 = 0x050F;
 
-pub fn handle_syscall_exception(user_context: &mut CpuContext) -> ! {
+pub async fn handle_syscall_exception() -> Result<()> {
     debug!("handle SYSCALL exception");
 
-    // SYSCALL instruction saves RIP into RCX and RFLAGS into R11. This is to
-    // comply with hardware's behavoir. Not useful for us.
-    user_context.rcx = user_context.rip;
-    user_context.r11 = user_context.rflags;
+    CURRENT_CONTEXT.with(|_context| {
+        let mut context = _context.borrow_mut();
+        let gp_regs = &mut context.gp_regs;
 
-    // The target RIP should be the next instruction
-    user_context.rip += 2;
-    // Set target RFLAGS: clear RF, VM, reserved bits; set bit 1
-    user_context.rflags = (user_context.rflags & 0x3C7FD7) | 2;
+        // SYSCALL instruction saves RIP into RCX and RFLAGS into R11. This is to
+        // comply with hardware's behavoir. Not useful for us.
+        gp_regs.rcx = gp_regs.rip;
+        gp_regs.r11 = gp_regs.rflags;
 
-    let num = user_context.rax as u32;
-    assert!(num != SyscallNum::HandleException as u32);
+        // The target RIP should be the next instruction
+        gp_regs.rip += 2;
+        // Set target RFLAGS: clear RF, VM, reserved bits; set bit 1
+        gp_regs.rflags = (gp_regs.rflags & 0x3C7FD7) | 2;
+    });
 
-    // FIXME: occlum syscall must use Linux ABI
-    occlum_syscall(user_context);
+    handle_syscall().await
 }

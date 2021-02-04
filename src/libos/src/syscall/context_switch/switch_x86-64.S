@@ -1,6 +1,52 @@
 #define __ASSEMBLY__
 #include "switch.h"
 
+    .global __switch_to_user
+    .type __switch_to_user, @function
+__switch_to_user:
+    // %rdi - CpuContext* user_context
+    // %rsi - jmp_buf jb
+    // %rdx - void* fault
+
+    // Save the states of the kernel space
+    movq %rdi, %gs:(TD_USER_CONTEXT)
+    movq %rsi, %gs:(TD_KERNEL_JMPBUF)
+    movq %rdx, %gs:(TD_USER_FAULT)
+    movq %rsp, %gs:(TD_KERNEL_RSP)
+    rdfsbase %rcx
+    movq %rcx, %gs:(TD_KERNEL_FS)
+
+    // Use user FS
+    movq CPU_CONTEXT_FSBASE(%rdi), %rsi
+    wrfsbase %rsi
+
+    // Get the user's RIP
+    movq (16*8)(%rdi), %rcx
+    movq %rcx, %gs:(TD_USER_RIP)
+
+    // Restore the CPU context of the user space
+    movq %rdi, %rsp
+    pop %r8
+    pop %r9
+    pop %r10
+    pop %r11
+    pop %r12
+    pop %r13
+    pop %r14
+    pop %r15
+    pop %rdi
+    pop %rsi
+    pop %rbp
+    pop %rbx
+    pop %rdx
+    pop %rax
+    pop %rcx
+    pop %rsp
+    jmp *%gs:(TD_USER_RIP)
+
+    // This should never happen
+    ud2
+
     .global __syscall_entry_linux_abi
     .type __syscall_entry_linux_abi, @function
 __syscall_entry_linux_abi:
@@ -48,71 +94,50 @@ __syscall_entry_linux_abi:
     movq %gs:(TD_KERNEL_FS), %rcx
     wrfsbase %rcx
 
+    // Set the two pointers to NULL so that we can detect misuse
+    xor %rax, %rax
+    movq %rax, %gs:(TD_USER_CONTEXT)
+    movq %rax, %gs:(TD_USER_FAULT)
+
     movq %gs:(TD_KERNEL_JMPBUF), %rdi
-    movq %gs:(TD_USER_CONTEXT), %rsi
     // Keep the stack 16-byte alignment
     and $-16, %rsp
-    call switch_to_kernel
+    call _restore_kernel_state
 
     // This should never happen
     ud2
 
-    .global __syscall_entry_c_abi
-    .type __syscall_entry_c_abi, @function
-__syscall_entry_c_abi:
-    movq %rdi, %rax
-    movq %rsi, %rdi
-    movq %rdx, %rsi
-    movq %rcx, %rdx
-    movq %r8, %r10
-    movq %r9, %r8
-    movq 8(%rsp), %r9
-    lea __syscall_return(%rip), %rcx
-    jmp __syscall_entry_linux_abi
-__syscall_return:
+    .global __switch_to_kernel
+    .type __switch_to_kernel, @function
+__switch_to_kernel:
+    // Switch to the kernel stack
+    movq %gs:(TD_KERNEL_RSP), %rsp
+
+    // Switch to the kernel FS
+    movq %gs:(TD_KERNEL_FS), %rcx
+    wrfsbase %rcx
+
+    // Set the two pointers to NULL so that we can detect misuse
+    xor %rax, %rax
+    movq %rax, %gs:(TD_USER_CONTEXT)
+    movq %rax, %gs:(TD_USER_FAULT)
+
+    movq %gs:(TD_KERNEL_JMPBUF), %rdi
+    // Keep the stack 16-byte alignment
+    and $-16, %rsp
+    call _restore_kernel_state
+
+    // This should never happen
+    ud2
+
+    .global __current_context_ptr
+    .type __current_context_ptr, @function
+__current_context_ptr:
+    movq %gs:(TD_USER_CONTEXT), %rax
     ret
 
-    .global __switch_to_user
-    .type __switch_to_user, @function
-__switch_to_user:
-    // %rdi - CpuContext* user_context
-    // %rsi - jmp_buf jb
-
-    // Save the states of the kernel space
-    movq %rdi, %gs:(TD_USER_CONTEXT)
-    movq %rsi, %gs:(TD_KERNEL_JMPBUF)
-    movq %rsp, %gs:(TD_KERNEL_RSP)
-    rdfsbase %rcx
-    movq %rcx, %gs:(TD_KERNEL_FS)
-
-    // Use user FS
-    movq CPU_CONTEXT_FSBASE(%rdi), %rsi
-    wrfsbase %rsi
-
-    // Get the user's RIP
-    movq (16*8)(%rdi), %rcx
-    movq %rcx, %gs:(TD_USER_RIP)
-
-    // Restore the CPU context of the user space
-    movq %rdi, %rsp
-    pop %r8
-    pop %r9
-    pop %r10
-    pop %r11
-    pop %r12
-    pop %r13
-    pop %r14
-    pop %r15
-    pop %rdi
-    pop %rsi
-    pop %rbp
-    pop %rbx
-    pop %rdx
-    pop %rax
-    pop %rcx
-    pop %rsp
-    jmp *%gs:(TD_USER_RIP)
-
-    // This should never happen
-    ud2
-
+    .global __current_fault_ptr
+    .type __current_fault_ptr, @function
+__current_fault_ptr:
+    movq %gs:(TD_USER_FAULT), %rax
+    ret

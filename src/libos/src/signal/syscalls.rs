@@ -6,7 +6,6 @@ use super::signals::FaultSignal;
 use super::{sigaction_t, siginfo_t, sigset_t, stack_t, SigAction, SigNum, SigSet, SigStack};
 use crate::prelude::*;
 use crate::process::ProcessFilter;
-use crate::syscall::CpuContext;
 use crate::time::timespec_t;
 use crate::util::mem_util::from_user;
 
@@ -45,9 +44,8 @@ pub async fn do_rt_sigaction(
     Ok(0)
 }
 
-pub async fn do_rt_sigreturn(user_context: *mut CpuContext) -> Result<isize> {
-    let user_context = unsafe { &mut *user_context };
-    super::do_sigreturn::do_rt_sigreturn(user_context)?;
+pub async fn do_rt_sigreturn() -> Result<isize> {
+    super::do_sigreturn::do_rt_sigreturn()?;
     Ok(0)
 }
 
@@ -124,11 +122,7 @@ pub fn do_rt_sigpending(buf_ptr: *mut sigset_t, buf_size: usize) -> Result<isize
     Ok(0)
 }
 
-pub async fn do_sigaltstack(
-    new_ss_c: *const stack_t,
-    old_ss_c: *mut stack_t,
-    user_context: *const CpuContext,
-) -> Result<isize> {
+pub async fn do_sigaltstack(new_ss_c: *const stack_t, old_ss_c: *mut stack_t) -> Result<isize> {
     // C types -> Rust types
     let new_ss = {
         if !new_ss_c.is_null() {
@@ -149,10 +143,9 @@ pub async fn do_sigaltstack(
             None
         }
     };
-    let user_context = unsafe { &*user_context };
 
     // Do sigaltstack
-    let old_ss = super::do_sigaltstack::do_sigaltstack(&new_ss, user_context)?;
+    let old_ss = super::do_sigaltstack::do_sigaltstack(&new_ss)?;
 
     // Retrieve old signal stack, if needed
     if let Some(old_ss_c) = old_ss_c {

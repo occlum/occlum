@@ -5,27 +5,23 @@
 
 void __switch_to_user(
     CpuContext *user_context,
-    jmp_buf jb
+    jmp_buf jb,
+    void *fault
 ) __attribute__((noreturn));
 
-void switch_to_user(CpuContext *user_context) {
+void _switch_to_user(CpuContext *user_context, void *fault) {
     jmp_buf jb;
     int second = setjmp(jb);
     if (!second) {
-        __switch_to_user(user_context, jb);
+        __switch_to_user(user_context, jb, fault);
         THIS_SHOULD_NEVER_HAPPEN;
     }
     // Back from the user space with user_context updated
     return;
 }
 
-
-void switch_to_kernel(jmp_buf jb, CpuContext *user_context) __attribute__((noreturn));
-
-void switch_to_kernel(jmp_buf jb, CpuContext *user_context) {
-    // Init the fields that haven't been initialized by the assembly code
-    user_context->fpregs = NULL;
-
+void _restore_kernel_state(jmp_buf jb) __attribute__((noreturn));
+void _restore_kernel_state(jmp_buf jb) {
     longjmp(jb, 1);
     THIS_SHOULD_NEVER_HAPPEN;
 }

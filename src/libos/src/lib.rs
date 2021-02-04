@@ -19,6 +19,7 @@
 #![feature(maybe_uninit_extra)]
 #![feature(get_mut_unchecked)]
 #![feature(drain_filter)]
+#![feature(test)]
 
 #[macro_use]
 extern crate async_rt;

@@ -2,6 +2,7 @@ use super::super::c_types::*;
 use super::super::constants::*;
 use super::super::{SigNum, Signal};
 use crate::prelude::*;
+use crate::syscall::Exception;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct FaultSignal {
@@ -11,12 +12,12 @@ pub struct FaultSignal {
 }
 
 impl FaultSignal {
-    pub fn new(info: &sgx_exception_info_t) -> Self {
-        // TODO: the current mapping from exceptinon to signal is only a first
+    pub fn new(exception: &Exception) -> Self {
+        // TODO: the current mapping from exception to signal is only a first
         // order approximation. The resulting signum or siginfo may not be
         // idential to Linux's behavior.
         use sgx_exception_vector_t::*;
-        let (num, code, addr) = match info.exception_vector {
+        let (num, code, addr) = match exception.vector {
             // Divider exception
             SGX_EXCEPTION_VECTOR_DE => (SIGFPE, FPE_INTDIV, None),
             // Floating-point exception
@@ -36,12 +37,12 @@ impl FaultSignal {
             // Page fault exception
             SGX_EXCEPTION_VECTOR_PF => {
                 const PF_ERR_FLAG_PRESENT : u32 = 1u32 << 0;
-                let code = if info.exinfo.errcd & PF_ERR_FLAG_PRESENT != 0 {
+                let code = if exception.exinfo.errcd & PF_ERR_FLAG_PRESENT != 0 {
                     SEGV_ACCERR
                 } else {
                     SEGV_MAPERR
                 };
-                let addr = Some(info.exinfo.maddr);
+                let addr = Some(exception.exinfo.maddr);
                 (SIGSEGV, code, addr)
             },
             // General protection exception

@@ -1,5 +1,5 @@
 #!/bin/bash
-TEST=pthread
+TEST=emulate_syscall
 make clean
 make TESTS="$TEST" TEST_DEPS="" BENCHES=""
 export OCCLUM_LOG_LEVEL=debug

@@ -59,10 +59,7 @@ impl FpRegs {
     ///
     /// Panic. If the current state is invalid, the method will panic.
     pub fn restore(&self) {
-        assert!(
-            !self.is_valid,
-            "the current floating-point state is invalid"
-        );
+        assert!(self.is_valid);
         unsafe { _fxrstor(self.buf.as_ptr()) };
     }
 

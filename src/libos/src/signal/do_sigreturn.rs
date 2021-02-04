@@ -5,12 +5,12 @@ use super::{SigAction, SigActionFlags, SigDefaultAction, SigSet, Signal};
 use crate::lazy_static::__Deref;
 use crate::prelude::*;
 use crate::process::{ProcessRef, TermStatus, ThreadRef};
-use crate::syscall::{CpuContext, FpRegs};
+use crate::syscall::{CpuContext, FpRegs, CURRENT_CONTEXT};
 use aligned::{Aligned, A16};
 use core::arch::x86_64::{_fxrstor, _fxsave};
 use std::{ptr, slice};
 
-pub fn do_rt_sigreturn(curr_user_ctxt: &mut CpuContext) -> Result<()> {
+pub fn do_rt_sigreturn() -> Result<()> {
     debug!("do_rt_sigreturn");
     let last_ucontext = {
         let last_ucontext = PRE_UCONTEXTS.with(|ref_cell| {
@@ -31,12 +31,13 @@ pub fn do_rt_sigreturn(curr_user_ctxt: &mut CpuContext) -> Result<()> {
     // Restore sigmask
     *current!().sig_mask().write().unwrap() = SigSet::from_c(last_ucontext.uc_sigmask);
     // Restore user context
-    curr_user_ctxt.gp_regs = last_ucontext.uc_mcontext.gp_regs;
-    unsafe {
-        curr_user_ctxt
-            .fp_regs
-            .save_from_slice(&last_ucontext.fpregs);
-    }
+    CURRENT_CONTEXT.with(|_context| {
+        let mut context = _context.borrow_mut();
+        context.gp_regs = last_ucontext.uc_mcontext.gp_regs;
+        unsafe {
+            context.fp_regs.save_from_slice(&last_ucontext.fpregs);
+        }
+    });
     Ok(())
 }
 
@@ -61,12 +62,12 @@ pub fn do_rt_sigreturn(curr_user_ctxt: &mut CpuContext) -> Result<()> {
 /// syscall and at a very late stage.
 ///
 /// **Post-condition.** The temporary signal mask of the current thread is cleared.
-pub fn deliver_signal(cpu_context: &mut CpuContext) {
+pub fn deliver_signal() {
     let thread = current!();
     let process = thread.process();
 
     if !process.is_forced_to_exit() {
-        do_deliver_signal(&thread, &process, cpu_context);
+        do_deliver_signal(&thread, &process);
     }
 
     // Ensure the tmp signal mask is cleared before sysret
@@ -74,7 +75,7 @@ pub fn deliver_signal(cpu_context: &mut CpuContext) {
     *tmp_sig_mask = SigSet::new_empty();
 }
 
-fn do_deliver_signal(thread: &ThreadRef, process: &ProcessRef, cpu_context: &mut CpuContext) {
+fn do_deliver_signal(thread: &ThreadRef, process: &ProcessRef) {
     loop {
         if process.sig_queues().read().unwrap().empty()
             && thread.sig_queues().read().unwrap().empty()
@@ -99,7 +100,7 @@ fn do_deliver_signal(thread: &ThreadRef, process: &ProcessRef, cpu_context: &mut
             signal_opt.unwrap()
         };
 
-        let continue_handling = handle_signal(signal, thread, process, cpu_context);
+        let continue_handling = handle_signal(signal, thread, process);
         if !continue_handling {
             break;
         }
@@ -114,11 +115,11 @@ fn do_deliver_signal(thread: &ThreadRef, process: &ProcessRef, cpu_context: &mut
 ///
 /// **Requirement.** This function can only be called at most once during the execution of
 /// a syscall.
-pub fn force_signal(signal: Box<dyn Signal>, cpu_context: &mut CpuContext) {
+pub fn force_signal(signal: Box<dyn Signal>) {
     let thread = current!();
     let process = thread.process();
 
-    handle_signal(signal, &thread, &process, cpu_context);
+    handle_signal(signal, &thread, &process);
 
     // Temporarily block all signals from being delivered until this syscall is
     // over. This ensures that the updated curr_cpu_ctxt will not be overriden
@@ -127,12 +128,7 @@ pub fn force_signal(signal: Box<dyn Signal>, cpu_context: &mut CpuContext) {
     *tmp_sig_mask = SigSet::new_full();
 }
 
-fn handle_signal(
-    signal: Box<dyn Signal>,
-    thread: &ThreadRef,
-    process: &ProcessRef,
-    cpu_context: &mut CpuContext,
-) -> bool {
+fn handle_signal(signal: Box<dyn Signal>, thread: &ThreadRef, process: &ProcessRef) -> bool {
     let is_sig_stack_full = PRE_UCONTEXTS.with(|ref_cell| {
         let stack = ref_cell.borrow();
         stack.full()
@@ -174,15 +170,18 @@ fn handle_signal(
             restorer_addr,
             mask,
         } => {
-            let ret = handle_signals_by_user(
-                signal,
-                thread,
-                handler_addr,
-                flags,
-                restorer_addr,
-                mask,
-                cpu_context,
-            );
+            let ret = CURRENT_CONTEXT.with(|_context| {
+                let mut context = _context.borrow_mut();
+                handle_signals_by_user(
+                    signal,
+                    thread,
+                    handler_addr,
+                    flags,
+                    restorer_addr,
+                    mask,
+                    context.deref_mut(),
+                )
+            });
             if let Err(_) = ret {
                 todo!("kill the process if any error");
             }

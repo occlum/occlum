@@ -1,5 +1,5 @@
 use super::*;
-use crate::syscall::CpuContext;
+use crate::syscall::CURRENT_CONTEXT;
 use sgx_types::*;
 use std::collections::HashMap;
 use std::rsgx_cpuidex;
@@ -262,17 +262,21 @@ pub fn setup_cpuid_info() {
     let max_basic_leaf = CPUID.get_max_basic_leaf();
 }
 
-pub fn handle_cpuid_exception(user_context: &mut CpuContext) -> Result<isize> {
+pub fn handle_cpuid_exception() -> Result<()> {
     debug!("handle CPUID exception");
-    let leaf = user_context.rax as u32;
-    let subleaf = user_context.rcx as u32;
-    let cpuid_result = CPUID.get_cpuid_info(leaf, subleaf);
-    trace!("cpuid result: {:?}", cpuid_result);
-    user_context.rax = cpuid_result.eax as u64;
-    user_context.rbx = cpuid_result.ebx as u64;
-    user_context.rcx = cpuid_result.ecx as u64;
-    user_context.rdx = cpuid_result.edx as u64;
-    user_context.rip += 2;
+    CURRENT_CONTEXT.with(|_context| {
+        let mut context = _context.borrow_mut();
+        let gp_regs = &mut context.gp_regs;
 
-    Ok(0)
+        let leaf = gp_regs.rax as u32;
+        let subleaf = gp_regs.rcx as u32;
+        let cpuid_result = CPUID.get_cpuid_info(leaf, subleaf);
+        trace!("cpuid result: {:?}", cpuid_result);
+        gp_regs.rax = cpuid_result.eax as u64;
+        gp_regs.rbx = cpuid_result.ebx as u64;
+        gp_regs.rcx = cpuid_result.ecx as u64;
+        gp_regs.rdx = cpuid_result.edx as u64;
+        gp_regs.rip += 2;
+    });
+    Ok(())
 }

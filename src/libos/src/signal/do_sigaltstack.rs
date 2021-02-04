@@ -1,19 +1,21 @@
 use super::sig_stack::{SigStack, SigStackFlags, MINSIGSTKSZ};
 use crate::prelude::*;
-use crate::syscall::CpuContext;
+use crate::syscall::CURRENT_CONTEXT;
 
-pub fn do_sigaltstack(new_ss: &Option<SigStack>, curr_user_ctxt: &CpuContext) -> Result<SigStack> {
+pub fn do_sigaltstack(new_ss: &Option<SigStack>) -> Result<SigStack> {
     debug!("do_sigaltstack: new_ss:{:?}", new_ss);
     let thread = current!();
     let mut sig_stack = thread.sig_stack().lock().unwrap();
     let old_ss = if let Some(sig_stack) = *sig_stack {
+        let rsp = CURRENT_CONTEXT.with(|context| context.borrow().gp_regs.rsp);
+
         // Deny to update the stack when we are on the stack
-        if new_ss.is_some() && sig_stack.contains(curr_user_ctxt.gp_regs.rsp as usize) {
+        if new_ss.is_some() && sig_stack.contains(rsp as usize) {
             return_errno!(EPERM, "thread is on signal stack currently");
         }
 
         // Retrieve the old signal stack information
-        let flags = if sig_stack.contains(curr_user_ctxt.gp_regs.rsp as usize) {
+        let flags = if sig_stack.contains(rsp as usize) {
             SigStackFlags::SS_ONSTACK
         } else {
             SigStackFlags::EMPTY

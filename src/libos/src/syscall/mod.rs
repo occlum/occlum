@@ -17,6 +17,7 @@ use time::{clockid_t, timespec_t, timeval_t};
 use util::log::{self, LevelFilter};
 use util::mem_util::from_user::*;
 
+use crate::exception::handle_exception;
 use crate::fs::{
     do_access, do_chdir, do_chmod, do_chown, do_close, do_dup, do_dup2, do_dup3, do_eventfd,
     do_eventfd2, do_faccessat, do_fchmod, do_fchmodat, do_fchown, do_fchownat, do_fcntl,
@@ -55,7 +56,8 @@ use super::*;
 mod context_switch;
 
 pub use self::context_switch::{
-    current_context_ptr, switch_to_user, CpuContext, FpRegs, GpRegs, CURRENT_CONTEXT,
+    current_context_ptr, switch_to_kernel_for_exception, switch_to_user, CpuContext, Exception,
+    Fault, FpRegs, GpRegs, CURRENT_CONTEXT,
 };
 
 /// System call table defined in a macro.
@@ -89,7 +91,7 @@ macro_rules! process_syscall_table_with_callback {
             // TODO: Unify the use of C types. For example, u8 or i8 or char_c for C string?
 
             (Mprotect = 10) => do_mprotect(addr: usize, len: usize, prot: u32),
-            (RtSigreturn = 15) => do_rt_sigreturn(context: *mut CpuContext),
+            (RtSigreturn = 15) => do_rt_sigreturn(),
             (Ioctl = 16) => do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8),
             (Writev = 20) => do_writev(fd: FileDesc, iov: *const iovec_t, count: i32),
             (SchedYield = 24) => do_sched_yield(),
@@ -97,15 +99,13 @@ macro_rules! process_syscall_table_with_callback {
             (Exit = 60) => do_exit(exit_status: i32),
             (Wait4 = 61) => do_wait4(pid: i32, _exit_status: *mut i32),
             (Getppid = 110) => do_getppid(),
-            (Sigaltstack = 131) => do_sigaltstack(ss: *const stack_t, old_ss: *mut stack_t, context: *const CpuContext),
+            (Sigaltstack = 131) => do_sigaltstack(ss: *const stack_t, old_ss: *mut stack_t),
             (ArchPrctl = 158) => do_arch_prctl(code: u32, addr: *mut usize),
             (SetTidAddress = 218) => do_set_tid_address(tidptr: *mut pid_t),
             (ExitGroup = 231) => do_exit_group(exit_status: i32),
 
             (SpawnGlibc = 359) => do_spawn_for_glibc(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fa: *const SpawnFileActions),
             (SpawnMusl = 360) => do_spawn_for_musl(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp),
-            //(HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
-            //(HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
 
             (RtSigprocmask = 14) => do_rt_sigprocmask(how: c_int, set: *const sigset_t, oldset: *mut sigset_t, sigset_size: size_t),
             (Membarrier = 324) => handle_unsupported(),
@@ -635,9 +635,8 @@ async fn __thread_main_loop(current: ThreadRef, init_cpu_state: CpuContext) {
     unsafe {
         crate::process::current::set(current.clone());
     }
-    let current_context_ptr = CURRENT_CONTEXT.with(|context| {
+    CURRENT_CONTEXT.with(|context| {
         *context.borrow_mut() = init_cpu_state;
-        context.as_ptr()
     });
 
     let thread_id = current.tid();
@@ -648,83 +647,53 @@ async fn __thread_main_loop(current: ThreadRef, init_cpu_state: CpuContext) {
 
     while current.status() != ThreadStatus::Exited {
         // Continue the execution in the user space
-        unsafe {
-            switch_to_user(current_context_ptr);
-        }
+        let fault = unsafe { switch_to_user() };
 
-        // Start a new round of log messages for this system call. But we do not
-        // set the description of this round, yet. We will do so after checking the
-        // given system call number is a valid.
+        // Start a new round of log messages. We will set the description for
+        // this round later when we have extracted more info from the fault.
         log::next_round(None);
 
-        handle_syscall().await;
+        handle_fault(fault).await;
     }
 }
 
-#[no_mangle]
-pub extern "C" fn occlum_syscall(user_context: *mut CpuContext) -> ! {
-    todo!("this function will be removed")
-}
+async fn handle_fault(fault: Fault) {
+    let res = match &fault {
+        Fault::Syscall => handle_syscall().await,
+        Fault::Exception(exception) => handle_exception(exception).await,
+        Fault::Interrupt => todo!("handle interrupt"),
+    };
 
-async fn handle_syscall() {
-    let syscall_num = CURRENT_CONTEXT.with(|context| context.borrow().gp_regs.rax as u32);
-
-    let retval = match do_syscall().await {
-        Ok(retval) => retval as isize,
-        Err(e) => {
-            let should_log_err = |errno| {
-                // If the log level requires every detail, don't ignore any error
-                if log::max_level() == LevelFilter::Trace {
-                    return true;
-                }
-
-                // All other log levels require errors to be outputed. But
-                // some errnos are usually benign and may occur in a very high
-                // frequency. So we want to ignore them to keep noises at a
-                // minimum level in the log.
-                //
-                // TODO: use a smarter, frequency-based strategy to decide whether
-                // to suppress error messages.
-                match errno {
-                    EAGAIN | ETIMEDOUT => false,
-                    _ => true,
-                }
-            };
-            if should_log_err(e.errno()) {
-                error!("Error = {}", e.backtrace());
+    if let Err(e) = res {
+        let should_log_err = |errno| {
+            // If the log level requires every detail, don't ignore any error
+            if log::max_level() == LevelFilter::Trace {
+                return true;
             }
 
-            let retval = -(e.errno() as isize);
-            debug_assert!(retval != 0);
-            retval
+            // All other log levels require errors to be outputed. But
+            // some errnos are usually benign and may occur in a very high
+            // frequency. So we want to ignore them to keep noises at a
+            // minimum level in the log.
+            //
+            // TODO: use a smarter, frequency-based strategy to decide whether
+            // to suppress error messages.
+            match errno {
+                EAGAIN | ETIMEDOUT => false,
+                _ => true,
+            }
+        };
+        if should_log_err(e.errno()) {
+            error!("Error = {}", e.backtrace());
         }
-    };
-    trace!("Retval = {:?}", retval);
-
-    // Put the return value into user_context.rax, except for syscalls that may
-    // modify user_context directly. Currently, there are three such syscalls:
-    // SigReturn, HandleException, and HandleInterrupt.
-    //
-    // Sigreturn restores `user_context` to the state when the last signal
-    // handler is executed. So in the case of sigreturn, `user_context` should
-    // be kept intact.
-    if syscall_num != SyscallNum::RtSigreturn as u32
-    //&& syscall_num != SyscallNum::HandleException as u32
-    //&& syscall_num != SyscallNum::HandleInterrupt as u32
-    {
-        CURRENT_CONTEXT.with(|context| {
-            context.borrow_mut().gp_regs.rax = retval as u64;
-        });
     }
 
-    CURRENT_CONTEXT.with(|context| {
-        crate::signal::deliver_signal(&mut context.borrow_mut());
-    });
+    crate::signal::deliver_signal();
 
     crate::process::handle_force_exit();
 }
 
-async fn do_syscall() -> Result<isize> {
+pub async fn handle_syscall() -> Result<()> {
     // Extract arguments from the CPU context. The arguments follows Linux's syscall ABI.
     let mut syscall = CURRENT_CONTEXT.with(|_context| {
         let context = _context.borrow();
@@ -738,35 +707,35 @@ async fn do_syscall() -> Result<isize> {
         let arg5 = gp_regs.r9 as isize;
         Syscall::new(num, arg0, arg1, arg2, arg3, arg4, arg5)
     })?;
-
-    log::set_round_desc(Some(syscall.num.as_str()));
-    trace!("{:?}", &syscall);
     let syscall_num = syscall.num;
 
-    // Pass user_context as an extra argument to two special syscalls that
-    // need to modify it
-    // TODO: modify the four syscalls to use CURRENT_CONTEXT
-    /*
-    if syscall_num == SyscallNum::RtSigreturn {
-        syscall.args[0] = user_context as *mut _ as isize;
-    } else if syscall_num == SyscallNum::HandleException {
-        // syscall.args[0] == info
-        // syscall.args[1] == fpregs
-        syscall.args[2] = user_context as *mut _ as isize;
-    } else if syscall.num == SyscallNum::HandleInterrupt {
-        // syscall.args[0] == info
-        // syscall.args[1] == fpregs
-        syscall.args[2] = user_context as *mut _ as isize;
-    } else if syscall.num == SyscallNum::Sigaltstack {
-        // syscall.args[0] == new_ss
-        // syscall.args[1] == old_ss
-        syscall.args[2] = user_context as *const _ as isize;
+    log::set_round_desc(Some(syscall_num.as_str()));
+    trace!("{:?}", &syscall);
+
+    let syscall_res = dispatch_syscall(syscall).await;
+
+    // Put the return value into rax, except for syscalls that may modify CPU
+    // Context directly. Currently, there is only one succh syscall: SigReturn.
+    //
+    // Sigreturn restores user's CPU state to the state when the last signal
+    // handler is executed. So in the case of sigreturn, the user CPU context's
+    // rax should not be updated with the return value of the syscall.
+    if syscall_num != SyscallNum::RtSigreturn {
+        let retval = match &syscall_res {
+            Ok(retval) => *retval as i64,
+            Err(e) => -(e.errno() as i64),
+        };
+        CURRENT_CONTEXT.with(|context| {
+            context.borrow_mut().gp_regs.rax = retval as u64;
+        });
     }
-    */
 
-    let ret = dispatch_syscall(syscall).await;
+    syscall_res.map(|_| ())
+}
 
-    ret
+#[no_mangle]
+pub extern "C" fn occlum_syscall(user_context: *mut CpuContext) -> ! {
+    todo!("this function will be removed")
 }
 
 /*

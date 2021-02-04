@@ -11,6 +11,7 @@ less than 4096 is unused by anyone. We can use it.*/
 #define TD_KERNEL_RSP       (0x110)
 #define TD_KERNEL_FS        (0x118)
 #define TD_KERNEL_JMPBUF    (0x120)
+#define TD_USER_FAULT       (0x128)
 
 #define CPU_CONTEXT_R8      (0*8)
 #define CPU_CONTEXT_R9      (1*8)
