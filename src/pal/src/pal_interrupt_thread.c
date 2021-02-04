@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <pthread.h>
 #include "Enclave_u.h"
 #include "pal_enclave.h"
@@ -6,44 +7,32 @@
 #include "pal_log.h"
 #include "pal_syscall.h"
 #include "pal_thread_counter.h"
+#include "pal_vcpu_thread.h"
 #include "errno2str.h"
 
-#define MS  (1000*1000L) // 1ms = 1,000,000ns
+#define MS                      (1000*1000L) // 1ms = 1,000,000ns
+// real-time signal 64 is used to notify interrupts
+#define INTERRUPT_SIGNAL        (64)
 
 static pthread_t thread;
 static int is_running = 0;
 
 static void *thread_func(void *_data) {
-    sgx_enclave_id_t eid = pal_get_enclave_id();
-
-    int counter = 0;
-    do {
-        int num_broadcast_threads = 0;
-        sgx_status_t ecall_status = occlum_ecall_broadcast_interrupts(eid,
-                                    &num_broadcast_threads);
-        if (ecall_status != SGX_SUCCESS) {
-            const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
-            PAL_ERROR("Failed to do ECall: occlum_ecall_broadcast_interrupts with error code 0x%x: %s",
-                      ecall_status, sgx_err);
-            exit(EXIT_FAILURE);
-        }
-        if (ecall_status == SGX_SUCCESS && num_broadcast_threads < 0) {
-            int errno_ = -num_broadcast_threads;
-            PAL_ERROR("Unexpcted error from occlum_ecall_broadcast_interrupts: %s",
-                      errno2str(errno_));
-            exit(EXIT_FAILURE);
+    while (1) {
+        struct timespec timeout = { .tv_sec = 0, .tv_nsec = 250 * MS };
+        int counter = pal_thread_counter_wait_zero(&timeout);
+        if (counter == 0) {
+            return NULL;
         }
 
-        struct timespec timeout = { .tv_sec = 0, .tv_nsec = 25 * MS };
-        counter = pal_thread_counter_wait_zero(&timeout);
-    } while (counter > 0);
-
-    return NULL;
+        for (int vcpu_i = 0; vcpu_i < pal_num_vcpus; vcpu_i++) {
+            pthread_t vcpu_thread = pal_vcpu_threads[vcpu_i];
+            pthread_kill(vcpu_thread, INTERRUPT_SIGNAL);
+        }
+    }
 }
 
 int pal_interrupt_thread_start(void) {
-    return 0;
-
     if (is_running) {
         errno = EEXIST;
         PAL_ERROR("The interrupt thread is already running: %s", errno2str(errno));
@@ -66,8 +55,6 @@ int pal_interrupt_thread_start(void) {
 }
 
 int pal_interrupt_thread_stop(void) {
-    return 0;
-
     if (!is_running) {
         errno = ENOENT;
         return -1;

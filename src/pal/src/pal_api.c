@@ -66,6 +66,11 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
         goto on_destroy_enclave;
     }
 
+    if (pal_vcpu_threads_start(attr->num_vcpus) < 0) {
+        PAL_ERROR("Failed to start the vCPU threads: %s", errno2str(errno));
+        goto on_destroy_enclave;
+    }
+
 // FIXME
 #ifndef SGX_MODE_SIM
     if (pal_interrupt_thread_start() < 0) {
@@ -73,11 +78,6 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
         goto on_destroy_enclave;
     }
 #endif
-
-    if (pal_vcpu_threads_start(attr->num_vcpus) < 0) {
-        PAL_ERROR("Failed to start the vCPU threads: %s", errno2str(errno));
-        goto on_destroy_enclave;
-    }
 
     return 0;
 on_destroy_enclave:
@@ -177,6 +177,11 @@ int occlum_pal_destroy(void) {
 
     int ret = 0;
 
+    if (pal_vcpu_threads_stop() < 0) {
+        ret = -1;
+        PAL_WARN("Cannot stop the vCPU threads: %s", errno2str(errno));
+    }
+
 // FIXME
 #ifndef SGX_MODE_SIM
     if (pal_interrupt_thread_stop() < 0) {
@@ -185,15 +190,11 @@ int occlum_pal_destroy(void) {
     }
 #endif
 
-    if (pal_vcpu_threads_stop() < 0) {
-        ret = -1;
-        PAL_WARN("Cannot stop the vCPU threads: %s", errno2str(errno));
-    }
-
     // Make sure all helper threads exit
     int thread_counter;
     while ((thread_counter = pal_thread_counter_wait_zero(NULL)) > 0) ;
 
+    // Make sure all helper threads exit
     if (pal_destroy_enclave() < 0) {
         ret = -1;
         PAL_WARN("Cannot destroy the enclave");

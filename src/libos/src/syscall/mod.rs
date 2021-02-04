@@ -28,7 +28,7 @@ use crate::fs::{
     do_symlinkat, do_sync, do_truncate, do_unlink, do_unlinkat, do_write, do_writev, iovec_t, File,
     FileDesc, FileRef, HostStdioFds, Stat,
 };
-use crate::interrupt::{do_handle_interrupt, sgx_interrupt_info_t};
+use crate::interrupt::handle_interrupt;
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t};
 use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
@@ -56,8 +56,8 @@ use super::*;
 mod context_switch;
 
 pub use self::context_switch::{
-    current_context_ptr, switch_to_kernel_for_exception, switch_to_user, CpuContext, Exception,
-    Fault, FpRegs, GpRegs, CURRENT_CONTEXT,
+    current_context_ptr, switch_to_kernel_for_exception, switch_to_kernel_for_interrupt,
+    switch_to_user, CpuContext, Exception, Fault, FpRegs, GpRegs, CURRENT_CONTEXT,
 };
 
 /// System call table defined in a macro.
@@ -661,7 +661,7 @@ async fn handle_fault(fault: Fault) {
     let res = match &fault {
         Fault::Syscall => handle_syscall().await,
         Fault::Exception(exception) => handle_exception(exception).await,
-        Fault::Interrupt => todo!("handle interrupt"),
+        Fault::Interrupt => handle_interrupt().await,
     };
 
     if let Err(e) = res {

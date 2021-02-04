@@ -23,6 +23,8 @@ async_rt::task_local! {
 ///
 /// Safety. The content of `CURRENT_CONTEXT` must be valid.
 pub unsafe fn switch_to_user() -> Fault {
+    crate::interrupt::enable_current_thread();
+
     let context_ptr = CURRENT_CONTEXT.with(|_context| {
         // Restore user's floating-point state first. Note that there is an implicit
         // assumption that the subsequent LibOS code would not modify floating-
@@ -45,6 +47,8 @@ pub unsafe fn switch_to_user() -> Fault {
         _switch_to_user(context_ptr, fault_ptr);
     }
 
+    crate::interrupt::disable_current_thread();
+
     // Give the compiler a (maybe-useless-but-absolutely-harmless) hint that
     // fault may be updated somewhere else.
     //
@@ -53,6 +57,7 @@ pub unsafe fn switch_to_user() -> Fault {
     // switch_to_kernel_for_interrupt, then the resulting fault will be
     // Fault::Exception(_) or Fault::Interrupt.
     let fault = std::hint::black_box(fault);
+
     fault
 }
 
@@ -74,6 +79,20 @@ pub unsafe fn switch_to_kernel_for_exception(exception: Exception) -> ! {
     };
     let fault = fault_ptr.as_mut();
     *fault = Fault::Exception(exception);
+
+    __switch_to_kernel();
+}
+
+/// Switch to kernel space from SGX interrupt handler.
+///
+/// Similar to the exception version.
+pub unsafe fn switch_to_kernel_for_interrupt() -> ! {
+    let mut fault_ptr = {
+        let fault_ptr = __current_fault_ptr();
+        NonNull::new(fault_ptr).unwrap()
+    };
+    let fault = fault_ptr.as_mut();
+    *fault = Fault::Interrupt;
 
     __switch_to_kernel();
 }

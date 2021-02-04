@@ -1,8 +1,7 @@
 pub use self::sgx::sgx_interrupt_info_t;
 use crate::prelude::*;
 use crate::process::ThreadRef;
-use crate::syscall::exception_interrupt_syscall_c_abi;
-use crate::syscall::{CpuContext, FpRegs, SyscallNum};
+use crate::syscall::{current_context_ptr, switch_to_kernel_for_interrupt, GpRegs};
 use aligned::{Aligned, A16};
 use core::arch::x86_64::_fxsave;
 
@@ -10,83 +9,36 @@ mod sgx;
 
 pub fn init() {
     unsafe {
-        let status = sgx::sgx_interrupt_init(handle_interrupt);
+        let status = sgx::sgx_interrupt_init(interrupt_entrypoint);
         assert!(status == sgx_status_t::SGX_SUCCESS);
     }
 }
 
-extern "C" fn handle_interrupt(info: *mut sgx_interrupt_info_t) -> i32 {
-    todo!("enable interrupt");
-    /*
-    let mut fpregs = FpRegs::save();
+extern "C" fn interrupt_entrypoint(sgx_interrupt_info: *mut sgx_interrupt_info_t) -> i32 {
+    let sgx_interrupt_info = unsafe { &mut *sgx_interrupt_info };
+
+    // Update the current CPU context
+    let mut curr_context_ptr = current_context_ptr();
+    let curr_context = unsafe { curr_context_ptr.as_mut() };
+    // Save CPU's floating-point registers at the time when the exception occurs.
+    // Note that we do this at the earliest possible time in hope that
+    // the floating-point registers have not been tainted by the LibOS.
+    curr_context.fp_regs.save();
+    // Save CPU's general-purpose registers
+    curr_context.gp_regs = GpRegs::from(&sgx_interrupt_info.cpu_context);
+
     unsafe {
-        exception_interrupt_syscall_c_abi(
-            SyscallNum::HandleInterrupt as u32,
-            info as *mut _,
-            &mut fpregs as *mut FpRegs,
-        )
-    };
-    */
-    unreachable!();
+        switch_to_kernel_for_interrupt();
+    }
+
+    unreachable!("enter_kernel_for_interrupt never returns!");
 }
 
-pub async fn do_handle_interrupt(
-    info: *mut sgx_interrupt_info_t,
-    fpregs: *mut FpRegs,
-    cpu_context: *mut CpuContext,
-) -> Result<isize> {
-    todo!("enable interrupt");
-    /*
-    let info = unsafe { &*info };
-    let context = unsafe { &mut *cpu_context };
-    // The cpu context is overriden so that it is as if the syscall is called from where the
-    // interrupt happened
-    *context = CpuContext::from_sgx(&info.cpu_context);
-    context.fpregs = fpregs;
-    */
-    Ok(0)
-}
-
-/// Broadcast interrupts to threads by sending POSIX signals.
-pub fn broadcast_interrupts() -> Result<usize> {
-    let should_interrupt_thread = |thread: &&ThreadRef| -> bool {
-        // TODO: check Thread::sig_mask to reduce false positives
-        thread.process().is_forced_to_exit()
-            || !thread.sig_queues().read().unwrap().empty()
-            || !thread.process().sig_queues().read().unwrap().empty()
-    };
-
-    let num_signaled_threads = crate::process::table::get_all_threads()
-        .iter()
-        .filter(should_interrupt_thread)
-        .map(|thread| {
-            let host_tid = {
-                let sched = thread.sched().lock().unwrap();
-                match sched.host_tid() {
-                    None => return false,
-                    Some(host_tid) => host_tid,
-                }
-            };
-            let signum = 64; // real-time signal 64 is used to notify interrupts
-            let is_signaled = unsafe {
-                let mut retval = 0;
-                let status = occlum_ocall_tkill(&mut retval, host_tid, signum);
-                assert!(status == sgx_status_t::SGX_SUCCESS);
-                if retval == 0 {
-                    true
-                } else {
-                    false
-                }
-            };
-            is_signaled
-        })
-        .filter(|&is_signaled| is_signaled)
-        .count();
-    Ok(num_signaled_threads)
-}
-
-extern "C" {
-    fn occlum_ocall_tkill(retval: &mut i32, host_tid: pid_t, signum: i32) -> sgx_status_t;
+pub async fn handle_interrupt() -> Result<()> {
+    debug!("handle interrupt");
+    // We use the interrupt as a chance to do preemptivee sceduling
+    async_rt::sched::yield_().await;
+    Ok(())
 }
 
 pub fn enable_current_thread() {
