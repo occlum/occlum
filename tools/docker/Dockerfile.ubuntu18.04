@@ -78,8 +78,7 @@ ENV OCCLUM_RUST_VERSION=nightly-2020-09-08
 RUN curl https://sh.rustup.rs -sSf | \
         sh -s -- --default-toolchain ${OCCLUM_RUST_VERSION} -y && \
     rm -rf /root/.cargo/registry && rm -rf /root/.cargo/git && \
-    cargo -V && \
-    cargo install sccache
+    cargo -V 
 
 # Install Occlum toolchain
 COPY toolchains/musl-gcc /tmp/musl-gcc
