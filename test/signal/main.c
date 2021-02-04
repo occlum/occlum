@@ -236,11 +236,6 @@ int div_maybe_zero(int x, int y) {
 #define fxsave(addr) __asm __volatile("fxsave %0" : "=m" (*(addr)))
 
 int test_handle_sigfpe() {
-#ifdef SGX_MODE_SIM
-    printf("WARNING: Skip this test case as we do not support "
-           "capturing hardware exception in SGX simulation mode\n");
-    return 0;
-#else
     // Set up a signal handler that handles divide-by-zero exception
     struct sigaction new_action, old_action;
     memset(&new_action, 0, sizeof(struct sigaction));
@@ -276,7 +271,6 @@ int test_handle_sigfpe() {
         THROW_ERROR("restoring old signal handler failed");
     }
     return 0;
-#endif /* SGX_MODE_SIM */
 }
 
 
@@ -301,11 +295,6 @@ static void handle_sigsegv(int num, siginfo_t *info, void *_context) {
 
 
 int test_handle_sigsegv() {
-#ifdef SGX_MODE_SIM
-    printf("WARNING: Skip this test case as we do not support "
-           "capturing hardware exception in SGX simulation mode\n");
-    return 0;
-#else
     // Set up a signal handler that handles divide-by-zero exception
     struct sigaction new_action, old_action;
     memset(&new_action, 0, sizeof(struct sigaction));
@@ -329,7 +318,6 @@ int test_handle_sigsegv() {
         THROW_ERROR("restoring old signal handler failed");
     }
     return 0;
-#endif /* SGX_MODE_SIM */
 }
 
 // ============================================================================

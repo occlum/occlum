@@ -107,13 +107,10 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
         goto on_destroy_enclave;
     }
 
-// FIXME
-#ifndef SGX_MODE_SIM
     if (pal_interrupt_thread_start() < 0) {
         PAL_ERROR("Failed to start the interrupt thread: %s", errno2str(errno));
         goto on_destroy_enclave;
     }
-#endif
 
     if (pal_run_init_process() < 0) {
         PAL_ERROR("Failed to run the init process: %s", errno2str(errno));
@@ -230,13 +227,10 @@ int occlum_pal_destroy(void) {
 
     int ret = 0;
 
-// FIXME
-#ifndef SGX_MODE_SIM
     if (pal_interrupt_thread_stop() < 0) {
         ret = -1;
         PAL_WARN("Cannot stop the interrupt thread: %s", errno2str(errno));
     }
-#endif
 
     if (pal_destroy_enclave() < 0) {
         ret = -1;
