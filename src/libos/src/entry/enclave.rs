@@ -1,18 +1,20 @@
+use std::backtrace::{self, PrintFormat};
 use std::ffi::{CStr, CString, OsString};
+use std::panic::{self};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 
-use super::*;
-use crate::exception::*;
+use sgx_tse::*;
+
 use crate::fs::HostStdioFds;
-use crate::process::ProcessFilter;
+use crate::prelude::*;
+use crate::process::{self, ProcessFilter};
 use crate::signal::SigNum;
 use crate::time::up_time::init;
 use crate::util::log::LevelFilter;
 use crate::util::mem_util::from_untrusted::*;
 use crate::util::sgx::allow_debug as sgx_allow_debug;
-use sgx_tse::*;
 
 pub static mut INSTANCE_DIR: String = String::new();
 static mut ENCLAVE_PATH: String = String::new();
@@ -59,16 +61,16 @@ pub extern "C" fn occlum_ecall_init(
 
     INIT_ONCE.call_once(|| {
         // Init the log infrastructure first so that log messages will be printed afterwards
-        util::log::init(log_level);
+        crate::util::log::init(log_level);
 
         // Init MPX for SFI if MPX is available
         let report = rsgx_self_report();
         if (report.body.attributes.xfrm & SGX_XFRM_MPX != 0) {
-            util::mpx_util::mpx_enable();
+            crate::util::mpx_util::mpx_enable();
         }
 
         // Register exception handlers (support cpuid & rdtsc for now)
-        register_exception_handlers();
+        super::exception::register_exception_handlers();
 
         unsafe {
             let dir_str: &str = CStr::from_ptr(instance_dir).to_str().unwrap();
@@ -77,7 +79,7 @@ pub extern "C" fn occlum_ecall_init(
             ENCLAVE_PATH.push_str("/build/lib/libocclum-libos.signed.so");
         }
 
-        interrupt::init();
+        super::interrupt::init();
 
         println!("num_vcpus = {:?}", num_vcpus);
         async_rt::executor::set_parallelism(num_vcpus);
@@ -85,10 +87,10 @@ pub extern "C" fn occlum_ecall_init(
         HAS_INIT.store(true, Ordering::SeqCst);
 
         // Init boot up time stamp here.
-        time::up_time::init();
+        crate::time::up_time::init();
 
         // Enable global backtrace
-        unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
+        unsafe { std::backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
     });
 
     0
@@ -277,7 +279,7 @@ fn validate_program_path(target_path: &PathBuf) -> Result<()> {
     }
 
     // Check whether the prefix of the program path matches one of the entry points
-    let is_valid_entry_point = &config::LIBOS_CONFIG
+    let is_valid_entry_point = &crate::config::LIBOS_CONFIG
         .entry_points
         .iter()
         .any(|valid_path_prefix| target_path.starts_with(valid_path_prefix));
@@ -314,7 +316,7 @@ fn merge_env(env: *const *const c_char) -> Result<Vec<CString>> {
         helper: HashMap<String, usize>, // Env key: index of content
     }
 
-    let env_listed = &config::LIBOS_CONFIG.env.untrusted;
+    let env_listed = &crate::config::LIBOS_CONFIG.env.untrusted;
     let mut env_checked: Vec<CString> = Vec::new();
     let mut env_default = EnvDefaultInner {
         content: Vec::new(),
@@ -322,7 +324,7 @@ fn merge_env(env: *const *const c_char) -> Result<Vec<CString>> {
     };
 
     // Use inner struct to parse env default
-    for (idx, val) in config::LIBOS_CONFIG.env.default.iter().enumerate() {
+    for (idx, val) in crate::config::LIBOS_CONFIG.env.default.iter().enumerate() {
         env_default.content.push(CString::new(val.clone())?);
         let kv: Vec<&str> = val.to_str().unwrap().splitn(2, '=').collect(); // only split the first "="
         env_default.helper.insert(kv[0].to_string(), idx);

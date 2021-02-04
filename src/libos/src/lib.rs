@@ -72,19 +72,16 @@ mod error;
 mod config;
 mod entry;
 mod events;
-mod exception;
 mod fs;
-mod interrupt;
 mod misc;
 mod net;
 mod process;
 mod sched;
 mod signal;
-mod syscall;
 mod time;
 mod untrusted;
 mod util;
 mod vm;
 
 // Export ECalls
-pub use entry::*;
+pub use entry::enclave::*;

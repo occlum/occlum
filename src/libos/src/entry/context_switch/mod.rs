@@ -1,16 +1,15 @@
 use std::cell::RefCell;
 use std::ptr::NonNull;
 
+use crate::entry::exception::Exception;
 use crate::prelude::*;
 
 mod cpu_context;
-mod exception;
 mod fault;
 mod fp_regs;
 mod gp_regs;
 
 pub use self::cpu_context::CpuContext;
-pub use self::exception::Exception;
 pub use self::fault::Fault;
 pub use self::fp_regs::FpRegs;
 pub use self::gp_regs::GpRegs;
@@ -23,7 +22,7 @@ async_rt::task_local! {
 ///
 /// Safety. The content of `CURRENT_CONTEXT` must be valid.
 pub unsafe fn switch_to_user() -> Fault {
-    crate::interrupt::enable_current_thread();
+    crate::entry::interrupt::enable_current_thread();
 
     let context_ptr = CURRENT_CONTEXT.with(|_context| {
         // Restore user's floating-point state first. Note that there is an implicit
@@ -47,7 +46,7 @@ pub unsafe fn switch_to_user() -> Fault {
         _switch_to_user(context_ptr, fault_ptr);
     }
 
-    crate::interrupt::disable_current_thread();
+    crate::entry::interrupt::disable_current_thread();
 
     // Give the compiler a (maybe-useless-but-absolutely-harmless) hint that
     // fault may be updated somewhere else.

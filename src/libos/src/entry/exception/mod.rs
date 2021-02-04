@@ -1,20 +1,22 @@
 //! Exception handling subsystem.
+use core::arch::x86_64::_fxsave;
+
+use aligned::{Aligned, A16};
 
 use self::cpuid::{handle_cpuid_exception, setup_cpuid_info, CPUID_OPCODE};
 use self::rdtsc::{handle_rdtsc_exception, RDTSC_OPCODE};
 use self::syscall::{handle_syscall_exception, SYSCALL_OPCODE};
-use super::*;
+use super::context_switch::{self, CpuContext, FpRegs, GpRegs, CURRENT_CONTEXT};
+use crate::prelude::*;
 use crate::signal::{FaultSignal, SigSet};
-use crate::syscall::{current_context_ptr, switch_to_kernel_for_exception};
-use crate::syscall::{CpuContext, Exception, FpRegs, GpRegs, SyscallNum, CURRENT_CONTEXT};
-use aligned::{Aligned, A16};
-use core::arch::x86_64::_fxsave;
-use sgx_types::*;
 
 // Modules for instruction simulation
 mod cpuid;
+mod exception;
 mod rdtsc;
 mod syscall;
+
+pub use self::exception::Exception;
 
 pub fn register_exception_handlers() {
     setup_cpuid_info();
@@ -30,7 +32,7 @@ extern "C" fn exception_entrypoint(sgx_except_info: *mut sgx_exception_info_t) -
     let sgx_except_info = unsafe { &mut *sgx_except_info };
 
     // Update the current CPU context
-    let mut curr_context_ptr = current_context_ptr();
+    let mut curr_context_ptr = context_switch::current_context_ptr();
     let curr_context = unsafe { curr_context_ptr.as_mut() };
     // Save CPU's floating-point registers at the time when the exception occurs.
     // Note that we do this at the earliest possible time in hope that
@@ -41,7 +43,7 @@ extern "C" fn exception_entrypoint(sgx_except_info: *mut sgx_exception_info_t) -
 
     let exception = Exception::from(sgx_except_info);
     unsafe {
-        switch_to_kernel_for_exception(exception);
+        context_switch::switch_to_kernel_for_exception(exception);
     }
 
     unreachable!("enter_kernel_for_exception never returns!");

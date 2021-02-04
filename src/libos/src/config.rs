@@ -1,11 +1,14 @@
-use super::*;
-use crate::std::untrusted::path::PathEx;
-use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sgxfs::SgxFile;
+use std::untrusted::path::PathEx;
+
+use serde::{Deserialize, Serialize};
+
+use crate::entry::enclave::INSTANCE_DIR;
+use crate::prelude::*;
 
 lazy_static! {
     pub static ref LIBOS_CONFIG: Config = {

@@ -1,5 +1,5 @@
 use super::*;
-use crate::syscall::{handle_syscall, CURRENT_CONTEXT};
+use crate::entry::context_switch::CURRENT_CONTEXT;
 use sgx_types::*;
 
 pub const SYSCALL_OPCODE: u16 = 0x050F;
@@ -22,5 +22,5 @@ pub async fn handle_syscall_exception() -> Result<()> {
         gp_regs.rflags = (gp_regs.rflags & 0x3C7FD7) | 2;
     });
 
-    handle_syscall().await
+    crate::entry::syscall::handle_syscall().await
 }

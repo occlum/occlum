@@ -2,8 +2,8 @@ use std::ptr::NonNull;
 
 use super::table::{self};
 use super::thread::{Thread, ThreadBuilder};
+use crate::entry::context_switch::{CpuContext, GpRegs};
 use crate::prelude::*;
-use crate::syscall::{CpuContext, GpRegs};
 use crate::vm::{ProcessVM, VMRange};
 
 /// Create and execute a new thread.
@@ -77,7 +77,7 @@ pub async fn do_clone(
         }
     }
 
-    async_rt::task::spawn(crate::syscall::thread_main_loop(
+    async_rt::task::spawn(crate::entry::thread::main_loop(
         new_thread_ref,
         init_cpu_state,
     ));

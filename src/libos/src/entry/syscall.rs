@@ -1,11 +1,4 @@
 //! System call handler
-//!
-//! # Syscall processing flow
-//!
-//! 1. Libc calls `__occlum_syscall` (in `syscall_entry_x86_64.S`)
-//! 2. Do user/LibOS switch and then call `occlum_syscall` (in this file)
-//! 3. Preprocess the system call and then call `dispatch_syscall` (in this file)
-//! 4. Call `do_*` to process the system call (in other modules)
 
 use std::any::Any;
 use std::convert::TryFrom;
@@ -13,11 +6,7 @@ use std::default::Default;
 use std::ffi::{CStr, CString};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::ptr;
-use time::{clockid_t, timespec_t, timeval_t};
-use util::log::{self, LevelFilter};
-use util::mem_util::from_user::*;
 
-use crate::exception::handle_exception;
 use crate::fs::{
     do_access, do_chdir, do_chmod, do_chown, do_close, do_dup, do_dup2, do_dup3, do_eventfd,
     do_eventfd2, do_faccessat, do_fchmod, do_fchmodat, do_fchown, do_fchownat, do_fcntl,
@@ -28,7 +17,6 @@ use crate::fs::{
     do_symlinkat, do_sync, do_truncate, do_unlink, do_unlinkat, do_write, do_writev, iovec_t, File,
     FileDesc, FileRef, HostStdioFds, Stat,
 };
-use crate::interrupt::handle_interrupt;
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t};
 use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
@@ -36,6 +24,7 @@ use crate::net::{
     do_poll, do_recvfrom, do_recvmsg, do_select, do_sendmsg, do_sendto, do_setsockopt, do_shutdown,
     do_socket, do_socketpair, msghdr, msghdr_mut,
 };
+use crate::prelude::*;
 use crate::process::{
     do_arch_prctl, do_clone, do_exit, do_exit_group, do_futex, do_getegid, do_geteuid, do_getgid,
     do_getpgid, do_getpid, do_getppid, do_gettid, do_getuid, do_prctl, do_set_tid_address,
@@ -48,17 +37,53 @@ use crate::signal::{
     do_rt_sigtimedwait, do_sigaltstack, do_tgkill, do_tkill, sigaction_t, siginfo_t, sigset_t,
     stack_t,
 };
+use crate::time::{clockid_t, timespec_t, timeval_t};
+use crate::util::log::{self, LevelFilter};
+use crate::util::mem_util::from_user::*;
 use crate::vm::{MMapFlags, MRemapFlags, MSyncFlags, VMPerms};
 use crate::{fs, process, std, vm};
 
-use super::*;
+use super::context_switch::{self, CpuContext, Fault, FpRegs, GpRegs, CURRENT_CONTEXT};
 
-mod context_switch;
+pub async fn handle_syscall() -> Result<()> {
+    // Extract arguments from the CPU context. The arguments follows Linux's syscall ABI.
+    let mut syscall = CURRENT_CONTEXT.with(|_context| {
+        let context = _context.borrow();
+        let gp_regs = &context.gp_regs;
+        let num = gp_regs.rax as u32;
+        let arg0 = gp_regs.rdi as isize;
+        let arg1 = gp_regs.rsi as isize;
+        let arg2 = gp_regs.rdx as isize;
+        let arg3 = gp_regs.r10 as isize;
+        let arg4 = gp_regs.r8 as isize;
+        let arg5 = gp_regs.r9 as isize;
+        Syscall::new(num, arg0, arg1, arg2, arg3, arg4, arg5)
+    })?;
+    let syscall_num = syscall.num;
 
-pub use self::context_switch::{
-    current_context_ptr, switch_to_kernel_for_exception, switch_to_kernel_for_interrupt,
-    switch_to_user, CpuContext, Exception, Fault, FpRegs, GpRegs, CURRENT_CONTEXT,
-};
+    log::set_round_desc(Some(syscall_num.as_str()));
+    trace!("{:?}", &syscall);
+
+    let syscall_res = dispatch_syscall(syscall).await;
+
+    // Put the return value into rax, except for syscalls that may modify CPU
+    // Context directly. Currently, there is only one succh syscall: SigReturn.
+    //
+    // Sigreturn restores user's CPU state to the state when the last signal
+    // handler is executed. So in the case of sigreturn, the user CPU context's
+    // rax should not be updated with the return value of the syscall.
+    if syscall_num != SyscallNum::RtSigreturn {
+        let retval = match &syscall_res {
+            Ok(retval) => *retval as i64,
+            Err(e) => -(e.errno() as i64),
+        };
+        CURRENT_CONTEXT.with(|context| {
+            context.borrow_mut().gp_regs.rax = retval as u64;
+        });
+    }
+
+    syscall_res.map(|_| ())
+}
 
 /// System call table defined in a macro.
 ///
@@ -487,7 +512,7 @@ macro_rules! impl_syscall_nums {
         }
 
         impl TryFrom<u32> for SyscallNum {
-            type Error = error::Error;
+            type Error = crate::error::Error;
 
             fn try_from(raw_num: u32) -> Result<Self> {
                 match raw_num {
@@ -621,120 +646,7 @@ macro_rules! impl_dispatch_syscall {
 }
 process_syscall_table_with_callback!(impl_dispatch_syscall);
 
-pub fn thread_main_loop(
-    current: ThreadRef,
-    init_cpu_state: CpuContext,
-) -> impl std::future::Future<Output = ()> + Send {
-    // FIXME: this is only a temp solution; we should not mark the entire task Send.
-    unsafe { future_util::mark_send(__thread_main_loop(current, init_cpu_state)) }
-}
-
-async fn __thread_main_loop(current: ThreadRef, init_cpu_state: CpuContext) {
-    unsafe {
-        crate::process::current::set(current.clone());
-    }
-    CURRENT_CONTEXT.with(|context| {
-        *context.borrow_mut() = init_cpu_state;
-    });
-
-    let thread_id = current.tid();
-    let task_id = async_rt::task::current::get().tid().0;
-    debug!("Thread #{} is executed as task #{}", thread_id, task_id);
-
-    current.start();
-
-    while current.status() != ThreadStatus::Exited {
-        // Continue the execution in the user space
-        let fault = unsafe { switch_to_user() };
-
-        // Start a new round of log messages. We will set the description for
-        // this round later when we have extracted more info from the fault.
-        log::next_round(None);
-
-        handle_fault(fault).await;
-    }
-}
-
-async fn handle_fault(fault: Fault) {
-    let res = match &fault {
-        Fault::Syscall => handle_syscall().await,
-        Fault::Exception(exception) => handle_exception(exception).await,
-        Fault::Interrupt => handle_interrupt().await,
-    };
-
-    if let Err(e) = res {
-        let should_log_err = |errno| {
-            // If the log level requires every detail, don't ignore any error
-            if log::max_level() == LevelFilter::Trace {
-                return true;
-            }
-
-            // All other log levels require errors to be outputed. But
-            // some errnos are usually benign and may occur in a very high
-            // frequency. So we want to ignore them to keep noises at a
-            // minimum level in the log.
-            //
-            // TODO: use a smarter, frequency-based strategy to decide whether
-            // to suppress error messages.
-            match errno {
-                EAGAIN | ETIMEDOUT => false,
-                _ => true,
-            }
-        };
-        if should_log_err(e.errno()) {
-            error!("Error = {}", e.backtrace());
-        }
-    }
-
-    crate::signal::deliver_signal();
-
-    crate::process::handle_force_exit();
-}
-
-pub async fn handle_syscall() -> Result<()> {
-    // Extract arguments from the CPU context. The arguments follows Linux's syscall ABI.
-    let mut syscall = CURRENT_CONTEXT.with(|_context| {
-        let context = _context.borrow();
-        let gp_regs = &context.gp_regs;
-        let num = gp_regs.rax as u32;
-        let arg0 = gp_regs.rdi as isize;
-        let arg1 = gp_regs.rsi as isize;
-        let arg2 = gp_regs.rdx as isize;
-        let arg3 = gp_regs.r10 as isize;
-        let arg4 = gp_regs.r8 as isize;
-        let arg5 = gp_regs.r9 as isize;
-        Syscall::new(num, arg0, arg1, arg2, arg3, arg4, arg5)
-    })?;
-    let syscall_num = syscall.num;
-
-    log::set_round_desc(Some(syscall_num.as_str()));
-    trace!("{:?}", &syscall);
-
-    let syscall_res = dispatch_syscall(syscall).await;
-
-    // Put the return value into rax, except for syscalls that may modify CPU
-    // Context directly. Currently, there is only one succh syscall: SigReturn.
-    //
-    // Sigreturn restores user's CPU state to the state when the last signal
-    // handler is executed. So in the case of sigreturn, the user CPU context's
-    // rax should not be updated with the return value of the syscall.
-    if syscall_num != SyscallNum::RtSigreturn {
-        let retval = match &syscall_res {
-            Ok(retval) => *retval as i64,
-            Err(e) => -(e.errno() as i64),
-        };
-        CURRENT_CONTEXT.with(|context| {
-            context.borrow_mut().gp_regs.rax = retval as u64;
-        });
-    }
-
-    syscall_res.map(|_| ())
-}
-
-#[no_mangle]
-pub extern "C" fn occlum_syscall(user_context: *mut CpuContext) -> ! {
-    todo!("this function will be removed")
-}
+// TODO: move the following syscall redirction code to proper subsystems.
 
 /*
  * This Rust-version of fdop correspond to the C-version one in Occlum.
@@ -795,14 +707,14 @@ async fn do_msync(addr: usize, size: usize, flags: u32) -> Result<isize> {
 fn do_sysinfo(info: *mut sysinfo_t) -> Result<isize> {
     check_mut_ptr(info)?;
     let info = unsafe { &mut *info };
-    *info = misc::do_sysinfo()?;
+    *info = crate::misc::do_sysinfo()?;
     Ok(0)
 }
 
 // TODO: handle tz: timezone_t
 fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<isize> {
     check_mut_ptr(tv_u)?;
-    let tv = time::do_gettimeofday();
+    let tv = crate::time::do_gettimeofday();
     unsafe {
         *tv_u = tv;
     }
@@ -811,8 +723,8 @@ fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<isize> {
 
 fn do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t) -> Result<isize> {
     check_mut_ptr(ts_u)?;
-    let clockid = time::ClockID::from_raw(clockid)?;
-    let ts = time::do_clock_gettime(clockid)?;
+    let clockid = crate::time::ClockID::from_raw(clockid)?;
+    let ts = crate::time::do_clock_gettime(clockid)?;
     unsafe {
         *ts_u = ts;
     }
@@ -824,8 +736,8 @@ fn do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t) -> Result<isize> 
         return Ok(0);
     }
     check_mut_ptr(res_u)?;
-    let clockid = time::ClockID::from_raw(clockid)?;
-    let res = time::do_clock_getres(clockid)?;
+    let clockid = crate::time::ClockID::from_raw(clockid)?;
+    let res = crate::time::do_clock_getres(clockid)?;
     unsafe {
         *res_u = res;
     }
@@ -844,14 +756,14 @@ fn do_nanosleep(req_u: *const timespec_t, rem_u: *mut timespec_t) -> Result<isiz
     } else {
         None
     };
-    time::do_nanosleep(&req, rem)?;
+    crate::time::do_nanosleep(&req, rem)?;
     Ok(0)
 }
 
 fn do_uname(name: *mut utsname_t) -> Result<isize> {
     check_mut_ptr(name)?;
     let name = unsafe { &mut *name };
-    misc::do_uname(name).map(|_| 0)
+    crate::misc::do_uname(name).map(|_| 0)
 }
 
 fn do_prlimit(
@@ -877,45 +789,9 @@ fn do_prlimit(
             None
         }
     };
-    misc::do_prlimit(pid, resource, new_limit, old_limit).map(|_| 0)
+    crate::misc::do_prlimit(pid, resource, new_limit, old_limit).map(|_| 0)
 }
 
 async fn handle_unsupported() -> Result<isize> {
     return_errno!(ENOSYS, "Unimplemented or unknown syscall")
-}
-
-mod future_util {
-    use std::future::Future;
-    use std::pin::Pin;
-    use std::task::{Context, Poll};
-
-    /// Wrap a future with a new future that implements Send.
-    ///
-    /// Sometimes, a future that is automatically generated by the Rust compiler
-    /// does not implement Send. But we know that the future is safe to implement
-    /// Send. For situation like this, it is convenient to use this function to
-    /// convert a future to a new Send-version.
-    pub unsafe fn mark_send<F: Future>(f: F) -> SendFuture<F> {
-        SendFuture::wrap(f)
-    }
-
-    pub struct SendFuture<F: Future> {
-        inner: F,
-    }
-
-    impl<F: Future> SendFuture<F> {
-        pub unsafe fn wrap(inner: F) -> Self {
-            Self { inner }
-        }
-    }
-
-    impl<F: Future> Future for SendFuture<F> {
-        type Output = F::Output;
-
-        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            unsafe { self.map_unchecked_mut(|self_| &mut self_.inner).poll(cx) }
-        }
-    }
-
-    unsafe impl<F: Future> Send for SendFuture<F> {}
 }

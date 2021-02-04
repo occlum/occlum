@@ -1,8 +1,8 @@
-use super::*;
-use crate::syscall::CURRENT_CONTEXT;
-use sgx_types::*;
 use std::collections::HashMap;
 use std::rsgx_cpuidex;
+
+use super::CURRENT_CONTEXT;
+use crate::prelude::*;
 
 pub const CPUID_OPCODE: u16 = 0xA20F;
 const CPUID_MIN_BASIC_LEAF: u32 = 0;

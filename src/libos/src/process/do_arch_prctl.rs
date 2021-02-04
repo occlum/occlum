@@ -1,5 +1,5 @@
+use crate::entry::context_switch::CURRENT_CONTEXT;
 use crate::prelude::*;
-use crate::syscall::CURRENT_CONTEXT;
 
 pub fn do_arch_prctl(code: ArchPrctlCode, addr: *mut usize) -> Result<()> {
     debug!("do_arch_prctl: code: {:?}, addr: {:?}", code, addr);

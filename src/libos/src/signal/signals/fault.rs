@@ -1,8 +1,8 @@
 use super::super::c_types::*;
 use super::super::constants::*;
 use super::super::{SigNum, Signal};
+use crate::entry::exception::Exception;
 use crate::prelude::*;
-use crate::syscall::Exception;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct FaultSignal {

@@ -3,8 +3,8 @@
 use std::fmt;
 
 use super::SigNum;
+use crate::entry::context_switch::GpRegs;
 use crate::prelude::*;
-use crate::syscall::GpRegs;
 use crate::time::clock_t;
 
 #[derive(Clone, Copy, Debug)]

@@ -7,12 +7,12 @@ use super::elf_file::{ElfFile, ElfHeader, ProgramHeader, ProgramHeaderExt, Segme
 use super::process::ProcessBuilder;
 use super::thread::ThreadName;
 use super::{table, HostWaker, ProcessRef, ThreadRef};
+use crate::entry::context_switch::{CpuContext, GpRegs};
 use crate::fs::{
     CreationFlags, File, FileDesc, FileTable, FsView, HostStdioFds, StdinFile, StdoutFile,
     ROOT_INODE,
 };
 use crate::prelude::*;
-use crate::syscall::{CpuContext, GpRegs};
 use crate::vm::ProcessVM;
 
 mod aux_vec;
@@ -87,7 +87,7 @@ fn do_spawn_common(
     let new_main_thread = new_process_ref
         .main_thread()
         .expect("the main thread is just created; it must exist");
-    async_rt::task::spawn(crate::syscall::thread_main_loop(
+    async_rt::task::spawn(crate::entry::thread::main_loop(
         new_main_thread,
         init_cpu_state,
     ));

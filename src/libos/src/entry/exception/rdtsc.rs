@@ -1,5 +1,5 @@
+use super::CURRENT_CONTEXT;
 use crate::prelude::*;
-use crate::syscall::CURRENT_CONTEXT;
 
 pub const RDTSC_OPCODE: u16 = 0x310F;
 

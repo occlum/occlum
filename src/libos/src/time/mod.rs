@@ -6,7 +6,6 @@ use rcore_fs::dev::TimeProvider;
 use rcore_fs::vfs::Timespec;
 use std::time::Duration;
 use std::{fmt, u64};
-use syscall::SyscallNum;
 
 pub mod timer_slack;
 pub mod up_time;

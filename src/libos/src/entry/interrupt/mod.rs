@@ -1,9 +1,11 @@
-pub use self::sgx::sgx_interrupt_info_t;
+use core::arch::x86_64::_fxsave;
+
+use aligned::{Aligned, A16};
+
+use self::sgx::sgx_interrupt_info_t;
+use super::context_switch::{self, GpRegs};
 use crate::prelude::*;
 use crate::process::ThreadRef;
-use crate::syscall::{current_context_ptr, switch_to_kernel_for_interrupt, GpRegs};
-use aligned::{Aligned, A16};
-use core::arch::x86_64::_fxsave;
 
 mod sgx;
 
@@ -18,7 +20,7 @@ extern "C" fn interrupt_entrypoint(sgx_interrupt_info: *mut sgx_interrupt_info_t
     let sgx_interrupt_info = unsafe { &mut *sgx_interrupt_info };
 
     // Update the current CPU context
-    let mut curr_context_ptr = current_context_ptr();
+    let mut curr_context_ptr = context_switch::current_context_ptr();
     let curr_context = unsafe { curr_context_ptr.as_mut() };
     // Save CPU's floating-point registers at the time when the exception occurs.
     // Note that we do this at the earliest possible time in hope that
@@ -28,7 +30,7 @@ extern "C" fn interrupt_entrypoint(sgx_interrupt_info: *mut sgx_interrupt_info_t
     curr_context.gp_regs = GpRegs::from(&sgx_interrupt_info.cpu_context);
 
     unsafe {
-        switch_to_kernel_for_interrupt();
+        context_switch::switch_to_kernel_for_interrupt();
     }
 
     unreachable!("enter_kernel_for_interrupt never returns!");

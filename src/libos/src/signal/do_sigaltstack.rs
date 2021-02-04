@@ -1,6 +1,6 @@
 use super::sig_stack::{SigStack, SigStackFlags, MINSIGSTKSZ};
+use crate::entry::context_switch::CURRENT_CONTEXT;
 use crate::prelude::*;
-use crate::syscall::CURRENT_CONTEXT;
 
 pub fn do_sigaltstack(new_ss: &Option<SigStack>) -> Result<SigStack> {
     debug!("do_sigaltstack: new_ss:{:?}", new_ss);
