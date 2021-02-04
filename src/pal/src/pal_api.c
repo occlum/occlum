@@ -90,13 +90,10 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
         goto on_destroy_enclave;
     }
 
-// FIXME
-#ifndef SGX_MODE_SIM
     if (pal_interrupt_thread_start() < 0) {
         PAL_ERROR("Failed to start the interrupt thread: %s", errno2str(errno));
         goto on_destroy_enclave;
     }
-#endif
 
     return 0;
 on_destroy_enclave:
@@ -201,13 +198,10 @@ int occlum_pal_destroy(void) {
         PAL_WARN("Cannot stop the vCPU threads: %s", errno2str(errno));
     }
 
-// FIXME
-#ifndef SGX_MODE_SIM
     if (pal_interrupt_thread_stop() < 0) {
         ret = -1;
         PAL_WARN("Cannot stop the interrupt thread: %s", errno2str(errno));
     }
-#endif
 
     // Make sure all helper threads exit
     int thread_counter;
