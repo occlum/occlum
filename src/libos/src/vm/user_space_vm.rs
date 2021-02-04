@@ -20,11 +20,11 @@ impl UserSpaceVMManager {
         let size = align_up(vm_layout.size(), vm_layout.align());
         let vm_range = unsafe {
             let ptr = sgx_alloc_rsrv_mem(size);
-            let perm = MemPerm::READ | MemPerm::WRITE | MemPerm::EXEC;
+            let perm = MemPerm::READ | MemPerm::WRITE;
             if ptr.is_null() {
                 return_errno!(ENOMEM, "run out of reserved memory");
             }
-            // Change the page permission to RWX
+            // Change the page permission to RW (default)
             assert!(sgx_tprotect_rsrv_mem(ptr, size, perm.bits()) == sgx_status_t::SGX_SUCCESS);
 
             let addr = ptr as usize;
