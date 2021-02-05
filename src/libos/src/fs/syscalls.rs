@@ -537,3 +537,19 @@ pub fn do_mount_rootfs(
     fs_ops::do_mount_rootfs(&user_config, &key)?;
     Ok(0)
 }
+
+pub fn do_fallocate(fd: FileDesc, mode: u32, offset: off_t, len: off_t) -> Result<isize> {
+    if offset < 0 || len <= 0 {
+        return_errno!(
+            EINVAL,
+            "offset was less than 0, or len was less than or equal to 0"
+        );
+    }
+    // Current implementation is just the posix_fallocate
+    // TODO: Support more modes in fallocate
+    if mode != 0 {
+        return_errno!(ENOSYS, "unsupported mode");
+    }
+    file_ops::do_fallocate(fd, mode, offset as u64, len as u64)?;
+    Ok(0)
+}

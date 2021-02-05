@@ -121,6 +121,11 @@ impl File for INodeFile {
         Ok(())
     }
 
+    fn fallocate(&self, mode: u32, offset: u64, len: u64) -> Result<()> {
+        self.inode.fallocate(mode, offset, len)?;
+        Ok(())
+    }
+
     fn set_len(&self, len: u64) -> Result<()> {
         if !self.access_mode.writable() {
             return_errno!(EACCES, "File not writable. Can't set len.");
