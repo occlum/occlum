@@ -132,6 +132,9 @@ macro_rules! process_syscall_table_with_callback {
             (SpawnGlibc = 359) => do_spawn_for_glibc(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fa: *const SpawnFileActions),
             (SpawnMusl = 360) => do_spawn_for_musl(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp),
 
+            (ClockGettime = 228) => do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t),
+            (ClockGetres = 229) => do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t),
+
             (RtSigprocmask = 14) => do_rt_sigprocmask(how: c_int, set: *const sigset_t, oldset: *mut sigset_t, sigset_size: size_t),
             (Membarrier = 324) => handle_unsupported(),
             (Mmap = 9) => do_mmap(addr: usize, size: usize, perms: i32, flags: i32, fd: FileDesc, offset: off_t),
@@ -139,8 +142,11 @@ macro_rules! process_syscall_table_with_callback {
             (Mremap = 25) => do_mremap(old_addr: usize, old_size: usize, new_size: usize, flags: i32, new_addr: usize),
             (Msync = 26) => do_msync(addr: usize, size: usize, flags: u32),
             (Brk = 12) => do_brk(new_brk_addr: usize),
+
             (Clone = 56) => do_clone(flags: u32, stack_addr: usize, ptid: *mut pid_t, ctid: *mut pid_t, new_tls: usize),
             (Futex = 202) => do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32, timeout: u64, futex_new_addr: *const i32, bitset: u32),
+
+            (Prlimit64 = 302) => do_prlimit(pid: pid_t, resource: u32, new_limit: *const rlimit_t, old_limit: *mut rlimit_t),
 
             /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),
@@ -721,7 +727,7 @@ fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<isize> {
     Ok(0)
 }
 
-fn do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t) -> Result<isize> {
+async fn do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t) -> Result<isize> {
     check_mut_ptr(ts_u)?;
     let clockid = crate::time::ClockID::from_raw(clockid)?;
     let ts = crate::time::do_clock_gettime(clockid)?;
@@ -731,7 +737,7 @@ fn do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t) -> Result<isize> 
     Ok(0)
 }
 
-fn do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t) -> Result<isize> {
+async fn do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t) -> Result<isize> {
     if res_u.is_null() {
         return Ok(0);
     }
@@ -766,7 +772,7 @@ fn do_uname(name: *mut utsname_t) -> Result<isize> {
     crate::misc::do_uname(name).map(|_| 0)
 }
 
-fn do_prlimit(
+async fn do_prlimit(
     pid: pid_t,
     resource: u32,
     new_limit: *const rlimit_t,
