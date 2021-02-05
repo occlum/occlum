@@ -91,6 +91,10 @@ pub trait File: Debug + Sync + Send + Any {
         return_op_unsupported_error!("set_advisory_lock")
     }
 
+    fn fallocate(&self, _mode: u32, _offset: u64, _len: u64) -> Result<()> {
+        return_op_unsupported_error!("fallocate")
+    }
+
     // TODO: remove this function after all users of this code are removed
     fn poll(&self) -> Result<(crate::net::PollEventFlags)> {
         return_op_unsupported_error!("poll")
