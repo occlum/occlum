@@ -18,6 +18,9 @@ mod locals;
 mod task;
 
 pub fn spawn<T: Send + 'static>(future: impl Future<Output = T> + 'static + Send) -> JoinHandle<T> {
+    #[cfg(any(test, feature = "auto_run"))]
+    init_runner_threads();
+
     let (join_handle, output_handle) = join::new();
     let future = async move {
         let output = future.await;
@@ -29,6 +32,9 @@ pub fn spawn<T: Send + 'static>(future: impl Future<Output = T> + 'static + Send
 }
 
 pub fn block_on<T: Send + 'static>(future: impl Future<Output = T> + 'static + Send) -> T {
+    #[cfg(any(test, feature = "auto_run"))]
+    init_runner_threads();
+
     let output_slot: Arc<Mutex<Option<T>>> = Arc::new(Mutex::new(None));
     let completed = Arc::new(AtomicBool::new(false));
 
@@ -51,4 +57,17 @@ pub fn block_on<T: Send + 'static>(future: impl Future<Output = T> + 'static + S
 
     let mut output_slot = output_slot.lock();
     output_slot.take().unwrap()
+}
+
+#[cfg(any(test, feature = "auto_run"))]
+fn init_runner_threads() {
+    use std::sync::Once;
+    static INIT: Once = Once::new();
+    INIT.call_once(|| {
+        for _ in 0..crate::executor::parallelism() {
+            std::thread::spawn(|| {
+                crate::executor::run_tasks();
+            });
+        }
+    });
 }

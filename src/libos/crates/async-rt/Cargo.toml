@@ -1,15 +1,24 @@
 [package]
-name = "async_rt"
+name = "async-rt"
 version = "0.1.0"
 authors = ["Tate, Hongliang Tian <tate.thl@antfin.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = []
+auto_run = []
+sgx = ["flume/sgx", "sgx_tstd"]
+
 [dependencies]
 bit-vec = { version = "0.6", default-features = false  }
-crossbeam-queue = { version = "0.3", default-features = false, features = ["alloc"] }
+flume = { path = "../../../../deps/flume", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["alloc"]  }
-lazy_static = "1.4"
-log = { version = "0.4", default-features= false }
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 spin = "0.7"
+sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", features = ["backtrace", "thread"], optional = true }
+
+[dev-dependencies]
+log = { version = "0.4", default-features= false }
+ctor = "0.1"

@@ -1,4 +1,5 @@
 use core::cell::Cell;
+use core::ptr::{self};
 
 use crate::prelude::*;
 use crate::task::Task;
@@ -9,7 +10,7 @@ pub fn get() -> Arc<Task> {
 
 pub fn try_get() -> Option<Arc<Task>> {
     let ptr = CURRENT.get();
-    if ptr == core::ptr::null() {
+    if ptr == ptr::null() {
         return None;
     }
     let current_task = unsafe { Arc::from_raw(ptr) };
@@ -23,16 +24,16 @@ pub(crate) fn set(task: Arc<Task>) {
 }
 
 pub(crate) fn reset() {
-    let last_ptr = CURRENT.replace(core::ptr::null());
+    let last_ptr = CURRENT.replace(ptr::null());
     free_task_ptr(last_ptr);
 }
 
 fn free_task_ptr(ptr: *const Task) {
-    if ptr != core::ptr::null() {
+    if ptr != ptr::null() {
         let task = unsafe { Arc::from_raw(ptr) };
         drop(task);
     }
 }
 
 #[thread_local]
-static CURRENT: Cell<*const Task> = Cell::new(core::ptr::null_mut());
+static CURRENT: Cell<*const Task> = Cell::new(ptr::null_mut());

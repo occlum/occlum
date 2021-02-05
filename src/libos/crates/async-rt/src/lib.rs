@@ -1,14 +1,17 @@
-#![cfg_attr(not(test), no_std)]
+#![cfg_attr(any(not(any(test, feature = "auto_run")), feature = "sgx"), no_std)]
 #![feature(const_fn)]
 #![feature(thread_local)]
 
+#[cfg(all(feature = "sgx", feature = "auto_run"))]
+#[macro_use]
+extern crate sgx_tstd as std;
 extern crate alloc;
 extern crate bit_vec;
 #[macro_use]
 extern crate lazy_static;
 //#[macro_use]
 //extern crate log;
-extern crate crossbeam_queue;
+extern crate flume;
 extern crate spin;
 
 pub mod executor;
@@ -24,7 +27,7 @@ mod tests {
 
     #[test]
     fn test_hello() {
-        crate::test_rt::run_blocking(async {
+        crate::task::block_on(async {
             let tid = crate::task::current::get().tid();
             println!("Hello from task {:?}", tid);
         });
@@ -32,7 +35,7 @@ mod tests {
 
     #[test]
     fn test_yield() {
-        crate::test_rt::run_blocking(async {
+        crate::task::block_on(async {
             for _ in 0..100 {
                 crate::sched::yield_().await;
             }
@@ -47,7 +50,7 @@ mod tests {
             static COUNT: Cell<u32> = Cell::new(0);
         }
 
-        crate::test_rt::run_blocking(async {
+        crate::task::block_on(async {
             for _ in 0..100 {
                 COUNT.with(|count| {
                     count.set(count.get() + 1);
@@ -59,7 +62,7 @@ mod tests {
 
     #[test]
     fn test_spawn_and_join() {
-        crate::test_rt::run_blocking(async {
+        crate::task::block_on(async {
             use crate::task::JoinHandle;
             let mut join_handles: Vec<JoinHandle<i32>> = (0..10)
                 .map(|i| {
@@ -78,7 +81,7 @@ mod tests {
 
     #[test]
     fn test_affinity() {
-        crate::test_rt::run_blocking(async {
+        crate::task::block_on(async {
             use crate::sched::Affinity;
 
             let current = crate::task::current::get();
@@ -100,84 +103,39 @@ mod tests {
             assert!(*current.sched_info().affinity().read() == new_affinity);
         });
     }
-}
 
-// Test runtime
-#[cfg(test)]
-mod test_rt {
-    use crate::prelude::*;
-
-    pub(crate) fn run_blocking<T: Send + 'static>(
-        future: impl Future<Output = T> + 'static + Send,
-    ) -> T {
-        TEST_RT.run_blocking(future)
+    #[ctor::ctor]
+    fn auto_init_executor() {
+        crate::executor::set_parallelism(3);
     }
 
-    const TEST_PARALLELISM: u32 = 3;
+    mod logger {
+        use log::{Level, LevelFilter, Metadata, Record, SetLoggerError};
 
-    lazy_static! {
-        static ref TEST_RT: TestRt = TestRt::new(TEST_PARALLELISM);
-    }
-
-    struct TestRt {
-        threads: Vec<std::thread::JoinHandle<()>>,
-    }
-
-    impl TestRt {
-        pub fn new(parallelism: u32) -> Self {
-            crate::executor::set_parallelism(parallelism).unwrap();
-            crate::test_logger::init().unwrap();
-
-            let threads = (0..parallelism)
-                .map(|_| std::thread::spawn(|| crate::executor::run_tasks()))
-                .collect::<Vec<_>>();
-            Self { threads }
+        #[ctor::ctor]
+        fn auto_init() {
+            log::set_logger(&LOGGER)
+                .map(|()| log::set_max_level(LevelFilter::Info))
+                .expect("failed to init the");
         }
 
-        pub fn run_blocking<T: Send + 'static>(
-            &self,
-            future: impl Future<Output = T> + 'static + Send,
-        ) -> T {
-            crate::task::block_on(future)
-        }
-    }
+        static LOGGER: SimpleLogger = SimpleLogger;
 
-    impl Drop for TestRt {
-        fn drop(&mut self) {
-            // Shutdown the executor and free the threads
-            crate::executor::shutdown();
+        struct SimpleLogger;
 
-            for th in self.threads.drain(0..self.threads.len()) {
-                th.join().unwrap();
+        impl log::Log for SimpleLogger {
+            fn enabled(&self, metadata: &Metadata) -> bool {
+                metadata.level() <= Level::Info
             }
-        }
-    }
-}
 
-#[cfg(test)]
-mod test_logger {
-    use log::{Level, LevelFilter, Metadata, Record, SetLoggerError};
-
-    static LOGGER: SimpleLogger = SimpleLogger;
-
-    pub fn init() -> std::result::Result<(), SetLoggerError> {
-        log::set_logger(&LOGGER).map(|()| log::set_max_level(LevelFilter::Info))
-    }
-
-    struct SimpleLogger;
-
-    impl log::Log for SimpleLogger {
-        fn enabled(&self, metadata: &Metadata) -> bool {
-            metadata.level() <= Level::Info
-        }
-
-        fn log(&self, record: &Record) {
-            if self.enabled(record.metadata()) {
-                println!("[{}] {}", record.level(), record.args());
+            fn log(&self, record: &Record) {
+                if self.enabled(record.metadata()) {
+                    println!("[{}] {}", record.level(), record.args());
+                }
             }
-        }
 
-        fn flush(&self) {}
+            fn flush(&self) {}
+        }
     }
 }
 
