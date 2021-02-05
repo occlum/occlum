@@ -1,6 +1,6 @@
 #!/bin/bash
 TESTS="empty hello_world getpid malloc mmap spawn exit_group pthread tls \
-    cpuid rdtsc emulate_syscall rlimit time"
+    signal cpuid rdtsc emulate_syscall rlimit time"
 
 GREEN='\033[1;32m'
 NO_COLOR='\033[0m'

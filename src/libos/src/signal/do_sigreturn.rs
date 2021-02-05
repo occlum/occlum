@@ -17,6 +17,8 @@ pub fn do_rt_sigreturn() -> Result<()> {
             let mut stack = ref_cell.borrow_mut();
             stack.pop()
         });
+
+        // Handle a (very unlikely) error condition
         if last_ucontext.is_none() {
             let term_status = TermStatus::Killed(SIGKILL);
             current!().process().force_exit(term_status);
@@ -25,6 +27,7 @@ pub fn do_rt_sigreturn() -> Result<()> {
                 "sigreturn should not have been called; kill this process"
             );
         }
+
         unsafe { &*last_ucontext.unwrap() }
     };
 

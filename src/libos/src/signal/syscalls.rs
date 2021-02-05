@@ -49,7 +49,7 @@ pub async fn do_rt_sigreturn() -> Result<isize> {
     Ok(0)
 }
 
-pub fn do_kill(pid: i32, sig: c_int) -> Result<isize> {
+pub async fn do_kill(pid: i32, sig: c_int) -> Result<isize> {
     let process_filter = match pid {
         pid if pid < -1 => ProcessFilter::WithPgid((-pid) as pid_t),
         -1 => ProcessFilter::WithAnyPid,
@@ -65,13 +65,13 @@ pub fn do_kill(pid: i32, sig: c_int) -> Result<isize> {
     Ok(0)
 }
 
-pub fn do_tkill(tid: pid_t, sig: c_int) -> Result<isize> {
+pub async fn do_tkill(tid: pid_t, sig: c_int) -> Result<isize> {
     let signum = SigNum::from_u8(sig as u8)?;
     super::do_kill::do_tgkill(None, tid, signum)?;
     Ok(0)
 }
 
-pub fn do_tgkill(pid: i32, tid: pid_t, sig: c_int) -> Result<isize> {
+pub async fn do_tgkill(pid: i32, tid: pid_t, sig: c_int) -> Result<isize> {
     let pid = if pid >= 0 { Some(pid as pid_t) } else { None };
     let signum = SigNum::from_u8(sig as u8)?;
     super::do_kill::do_tgkill(pid, tid, signum)?;
@@ -107,7 +107,7 @@ pub async fn do_rt_sigprocmask(
     Ok(0)
 }
 
-pub fn do_rt_sigpending(buf_ptr: *mut sigset_t, buf_size: usize) -> Result<isize> {
+pub async fn do_rt_sigpending(buf_ptr: *mut sigset_t, buf_size: usize) -> Result<isize> {
     let buf: &mut sigset_t = {
         if buf_size < std::mem::size_of::<sigset_t>() {
             return_errno!(EINVAL, "buf is not big enough");

@@ -40,6 +40,7 @@ impl FpRegs {
     /// After calling this method, the state of the instance will be considered valid.
     pub unsafe fn save_from_slice(&mut self, src: &[u8]) {
         (&mut self.buf).copy_from_slice(src);
+        self.is_valid = true;
     }
 
     /// Returns whether the instance can contains data in valid xsave/xrstor format.

@@ -22,8 +22,6 @@ async_rt::task_local! {
 ///
 /// Safety. The content of `CURRENT_CONTEXT` must be valid.
 pub unsafe fn switch_to_user() -> Fault {
-    crate::entry::interrupt::enable_current_thread();
-
     let context_ptr = CURRENT_CONTEXT.with(|_context| {
         // Restore user's floating-point state first. Note that there is an implicit
         // assumption that the subsequent LibOS code would not modify floating-
@@ -42,10 +40,10 @@ pub unsafe fn switch_to_user() -> Fault {
     let mut fault = Fault::Syscall;
     let fault_ptr = &mut fault;
 
+    crate::entry::interrupt::enable_current_thread();
     unsafe {
         _switch_to_user(context_ptr, fault_ptr);
     }
-
     crate::entry::interrupt::disable_current_thread();
 
     // Give the compiler a (maybe-useless-but-absolutely-harmless) hint that

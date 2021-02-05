@@ -115,38 +115,44 @@ macro_rules! process_syscall_table_with_callback {
             //
             // TODO: Unify the use of C types. For example, u8 or i8 or char_c for C string?
 
-            (Mprotect = 10) => do_mprotect(addr: usize, len: usize, prot: u32),
-            (RtSigreturn = 15) => do_rt_sigreturn(),
-            (Ioctl = 16) => do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8),
-            (Writev = 20) => do_writev(fd: FileDesc, iov: *const iovec_t, count: i32),
-            (SchedYield = 24) => do_sched_yield(),
-            (Getpid = 39) => do_getpid(),
-            (Exit = 60) => do_exit(exit_status: i32),
-            (Wait4 = 61) => do_wait4(pid: i32, _exit_status: *mut i32),
-            (Getppid = 110) => do_getppid(),
-            (Sigaltstack = 131) => do_sigaltstack(ss: *const stack_t, old_ss: *mut stack_t),
-            (ArchPrctl = 158) => do_arch_prctl(code: u32, addr: *mut usize),
-            (SetTidAddress = 218) => do_set_tid_address(tidptr: *mut pid_t),
-            (ExitGroup = 231) => do_exit_group(exit_status: i32),
-
             (SpawnGlibc = 359) => do_spawn_for_glibc(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fa: *const SpawnFileActions),
             (SpawnMusl = 360) => do_spawn_for_musl(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp),
+            (Clone = 56) => do_clone(flags: u32, stack_addr: usize, ptid: *mut pid_t, ctid: *mut pid_t, new_tls: usize),
+            (Wait4 = 61) => do_wait4(pid: i32, _exit_status: *mut i32),
+            (Exit = 60) => do_exit(exit_status: i32),
+            (ExitGroup = 231) => do_exit_group(exit_status: i32),
+
+            (ArchPrctl = 158) => do_arch_prctl(code: u32, addr: *mut usize),
+            (Getpid = 39) => do_getpid(),
+            (Getppid = 110) => do_getppid(),
+            (SetTidAddress = 218) => do_set_tid_address(tidptr: *mut pid_t),
+            (Prlimit64 = 302) => do_prlimit(pid: pid_t, resource: u32, new_limit: *const rlimit_t, old_limit: *mut rlimit_t),
+
+            (Futex = 202) => do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32, timeout: u64, futex_new_addr: *const i32, bitset: u32),
+            (SchedYield = 24) => do_sched_yield(),
 
             (ClockGettime = 228) => do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t),
             (ClockGetres = 229) => do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t),
 
-            (RtSigprocmask = 14) => do_rt_sigprocmask(how: c_int, set: *const sigset_t, oldset: *mut sigset_t, sigset_size: size_t),
-            (Membarrier = 324) => handle_unsupported(),
+            (Mprotect = 10) => do_mprotect(addr: usize, len: usize, prot: u32),
             (Mmap = 9) => do_mmap(addr: usize, size: usize, perms: i32, flags: i32, fd: FileDesc, offset: off_t),
             (Munmap = 11) => do_munmap(addr: usize, size: usize),
             (Mremap = 25) => do_mremap(old_addr: usize, old_size: usize, new_size: usize, flags: i32, new_addr: usize),
             (Msync = 26) => do_msync(addr: usize, size: usize, flags: u32),
             (Brk = 12) => do_brk(new_brk_addr: usize),
 
-            (Clone = 56) => do_clone(flags: u32, stack_addr: usize, ptid: *mut pid_t, ctid: *mut pid_t, new_tls: usize),
-            (Futex = 202) => do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32, timeout: u64, futex_new_addr: *const i32, bitset: u32),
+            (RtSigaction = 13) => do_rt_sigaction(signum_c: c_int, new_sa_c: *const sigaction_t, old_sa_c: *mut sigaction_t),
+            (RtSigpending = 127) => do_rt_sigpending(buf_ptr: *mut sigset_t, buf_size: usize),
+            (RtSigreturn = 15) => do_rt_sigreturn(),
+            (RtSigtimedwait = 128) => do_rt_sigtimedwait(mask_ptr: *const sigset_t, info_ptr: *mut siginfo_t, timeout_ptr: *const timespec_t, mask_size: usize),
+            (Sigaltstack = 131) => do_sigaltstack(ss: *const stack_t, old_ss: *mut stack_t),
+            (RtSigprocmask = 14) => do_rt_sigprocmask(how: c_int, set: *const sigset_t, oldset: *mut sigset_t, sigset_size: size_t),
+            (Kill = 62) => do_kill(pid: i32, sig: c_int),
+            (Tgkill = 234) => do_tgkill(pid: i32, tid: pid_t, sig: c_int),
+            (Tkill = 200) => do_tkill(tid: pid_t, sig: c_int),
 
-            (Prlimit64 = 302) => do_prlimit(pid: pid_t, resource: u32, new_limit: *const rlimit_t, old_limit: *mut rlimit_t),
+            (Ioctl = 16) => do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8),
+            (Writev = 20) => do_writev(fd: FileDesc, iov: *const iovec_t, count: i32),
 
             /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),
