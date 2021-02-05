@@ -29,3 +29,6 @@
 [submodule "deps/flume"]
 	path = deps/flume
 	url = https://github.com/occlum/flume
+[submodule "deps/io-uring"]
+	path = deps/io-uring
+	url = https://github.com/occlum/io-uring

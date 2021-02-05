@@ -1,0 +1,28 @@
+[package]
+name = "async-socket"
+version = "0.1.0"
+authors = ["Tate, Hongliang Tian <tate.thl@antfin.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["libc"]
+sgx = ["sgx_types", "sgx_tstd", "sgx_trts", "sgx_libc", "io-uring-callback/sgx", "sgx-untrusted-alloc"]
+
+[dependencies]
+atomic = "0.5.0"
+bitflags = "1.2"
+slab = { git = "https://github.com/tokio-rs/slab.git", default-features = false }
+libc = { version = "0.2", optional = true }
+io-uring-callback = { path = "../io-uring-callback" }
+sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }
+sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", optional = true, features = ["backtrace"] }
+sgx_trts = { path = "../../../../deps/rust-sgx-sdk/sgx_trts", optional = true }
+sgx_libc = { path = "../../../../deps/rust-sgx-sdk/sgx_libc", optional = true }
+sgx-untrusted-alloc = { path = "../sgx-untrusted-alloc", optional = true }
+
+[dev-dependencies]
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+futures = { version = "0.3", default-features = false }
+async-rt = { path = "../async-rt", features = ["auto_run"] } 

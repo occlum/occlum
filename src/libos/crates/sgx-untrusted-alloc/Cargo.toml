@@ -1,0 +1,10 @@
+[package]
+name = "sgx-untrusted-alloc"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+buddy_system_allocator = { git = "https://github.com/rcore-os/buddy_system_allocator.git" }
+sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types" }
+sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", features = ["backtrace"] }
+sgx_trts = { path = "../../../../deps/rust-sgx-sdk/sgx_trts" }

@@ -2,9 +2,12 @@
 
 members = [
     "async-rt",
+    "async-file",
+    "async-socket",
+    "io-uring-callback",
+    "sgx-untrusted-alloc",
 ]
 
 exclude = [ 
-    "third_parties", 
     "test",
 ]
