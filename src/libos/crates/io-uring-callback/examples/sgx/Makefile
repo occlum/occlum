@@ -21,10 +21,11 @@ SGX_SDK ?= /opt/sgxsdk
 SGX_MODE ?= HW
 SGX_ARCH ?= x64
 
-TOP_DIR := ../../../third_parties/incubator-teaclave-sgx-sdk
-include $(TOP_DIR)/buildenv.mk
+include ../../../common.mk
 
-OCALLS_DIR := ../../../third_parties/io-uring/ocalls
+include $(RUST_SGX_SDK_DIR)/buildenv.mk
+
+OCALLS_DIR := $(ROOT_DIR)/deps/io-uring/ocalls
 
 ifeq ($(shell getconf LONG_BIT), 32)
 	SGX_ARCH := x86
@@ -62,8 +63,8 @@ SGX_COMMON_CFLAGS += -fstack-protector
 
 CUSTOM_LIBRARY_PATH := ./lib
 CUSTOM_BIN_PATH := ./bin
-CUSTOM_EDL_PATH := $(TOP_DIR)/edl
-CUSTOM_COMMON_PATH := $(TOP_DIR)/common
+CUSTOM_EDL_PATH := $(RUST_SGX_SDK_DIR)/edl
+CUSTOM_COMMON_PATH := $(RUST_SGX_SDK_DIR)/common
 
 ######## EDL Settings ########
 

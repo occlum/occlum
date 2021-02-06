@@ -11,13 +11,13 @@ default = []
 
 [dependencies]
 io-uring-callback = { path = "../../../../io-uring-callback", features = ["sgx"] }
-io-uring = { path = "../../../../third_parties/io-uring", features = ["sgx"] }
+io-uring = { path = "../../../../../../../deps/io-uring", features = ["sgx"] }
 slab = { git = "https://github.com/tokio-rs/slab.git", default-features = false }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
-sgx_types = { path = "../../../../third_parties/incubator-teaclave-sgx-sdk/sgx_types" }
-sgx_tstd = { path = "../../../../third_parties/incubator-teaclave-sgx-sdk/sgx_tstd", features = ["backtrace", "thread"] }
-sgx_trts = { path = "../../../../third_parties/incubator-teaclave-sgx-sdk/sgx_trts" }
+sgx_types = { path = "../../../../../../../deps/rust-sgx-sdk/sgx_types" }
+sgx_tstd = { path = "../../../../../../../deps/rust-sgx-sdk/sgx_tstd", features = ["backtrace", "thread"] }
+sgx_trts = { path = "../../../../../../../deps/rust-sgx-sdk/sgx_trts" }
 
 [workspace]

@@ -4,8 +4,8 @@ version = "1.0.0"
 build = "build.rs"
 
 [dependencies]
-sgx-io-uring-ocalls = { path = "../../../../third_parties/io-uring/ocalls" }
-sgx_types = { path = "../../../../third_parties/incubator-teaclave-sgx-sdk/sgx_types" }
-sgx_urts = { path = "../../../../third_parties/incubator-teaclave-sgx-sdk/sgx_urts" }
+sgx-io-uring-ocalls = { path = "../deps/io-uring/ocalls" }
+sgx_types = { path = "../deps/rust-sgx-sdk/sgx_types" }
+sgx_urts = { path = "../deps/rust-sgx-sdk/sgx_urts" }
 
 [workspace]
