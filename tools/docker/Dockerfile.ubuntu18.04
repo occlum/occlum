@@ -52,9 +52,15 @@ RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-i
         vim \
         wget \
         zip \
+        gnupg \
+        aptitude \
         && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+RUN echo "ca_directory=/etc/ssl/certs" >> /etc/wgetrc && \
+    echo 'deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu bionic main' | tee /etc/apt/sources.list.d/intel-sgx.list &&\
+    wget -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key --no-check-certificate | apt-key add -
 
 # Install cpuid tool for tests
 WORKDIR /tmp
@@ -62,15 +68,6 @@ RUN wget http://www.etallen.com/cpuid/cpuid-20200211.x86_64.tar.gz && \
     tar -xf ./cpuid-20200211.x86_64.tar.gz && \
     cp ./cpuid-20200211/cpuid /usr/bin/ && \
     rm -rf /tmp/cpuid-20200211*
-
-# Install SGX SDK
-WORKDIR /tmp
-RUN git clone -b sgx_2.11_for_occlum https://github.com/occlum/linux-sgx && \
-    mkdir /etc/init && \
-    cd linux-sgx && \
-    ./compile_and_install.sh no_mitigation USE_OPT_LIBS=2 && \
-    echo 'source /opt/intel/sgxsdk/environment' >> /root/.bashrc && \
-    rm -rf /tmp/linux-sgx
 
 # Install Rust
 ENV PATH="/root/.cargo/bin:$PATH"
@@ -114,6 +111,49 @@ WORKDIR /tmp
 RUN cd java && ./install_dragonwell.sh && rm -rf /tmp/java
 ENV PATH="/opt/occlum/toolchains/jvm/bin:$PATH"
 
+# Install SGX PSW
+RUN apt-get update && aptitude install -y \
+        libsgx-launch-dev=2.13.100.4-bionic1 \
+        libsgx-epid-dev=2.13.100.4-bionic1 \
+        libsgx-quote-ex-dev=2.13.100.4-bionic1 \
+        libsgx-urts=2.13.100.4-bionic1 \
+        libsgx-enclave-common=2.13.100.4-bionic1 \
+        libsgx-uae-service=2.13.100.4-bionic1 \
+        libsgx-ae-epid=2.13.100.4-bionic1 \
+        libsgx-ae-le=2.13.100.4-bionic1 \
+        libsgx-ae-pce=2.13.100.4-bionic1 \
+        libsgx-aesm-launch-plugin=2.13.100.4-bionic1 \
+        sgx-aesm-service=2.13.100.4-bionic1 \
+        libsgx-aesm-launch-plugin=2.13.100.4-bionic1 \
+        libsgx-aesm-pce-plugin=2.13.100.4-bionic1 \
+        libsgx-aesm-ecdsa-plugin=2.13.100.4-bionic1 \
+        libsgx-aesm-epid-plugin=2.13.100.4-bionic1 \
+        libsgx-aesm-quote-ex-plugin=2.13.100.4-bionic1 \
+        libsgx-dcap-quote-verify=1.10.100.4-bionic1 \
+        libsgx-dcap-quote-verify-dev=1.10.100.4-bionic1 \
+        libsgx-dcap-ql=1.10.100.4-bionic1 \
+        libsgx-dcap-ql-dev=1.10.100.4-bionic1 \
+        libsgx-epid=2.13.100.4-bionic1 \
+        libsgx-quote-ex=2.13.100.4-bionic1 \
+        libsgx-pce-logic=1.10.100.4-bionic1 \
+        libsgx-qe3-logic=1.10.100.4-bionic1 \
+        libsgx-launch=2.13.100.4-bionic1 \
+        libsgx-dcap-default-qpl=1.10.100.4-bionic1 \
+        && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    ln -s /usr/lib/x86_64-linux-gnu/libsgx_enclave_common.so.1 /usr/lib/x86_64-linux-gnu/libsgx_enclave_common.so
+
+# Install SGX SDK
+WORKDIR /tmp
+RUN git clone -b sgx_2.13_for_occlum https://github.com/occlum/linux-sgx && \
+    mkdir /etc/init && \
+    cd linux-sgx && \
+    make preparation && \
+    ./compile_and_install.sh no_mitigation USE_OPT_LIBS=2 && \
+    echo 'source /opt/intel/sgxsdk/environment' >> /root/.bashrc && \
+    rm -rf /tmp/linux-sgx
+
 # Install the latest version of Occlum
 ARG OCCLUM_BRANCH
 WORKDIR /root
@@ -130,7 +170,7 @@ RUN git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum && \
 # To do so, we add the script to ~/.bashrc. We cannot use systemd to run AESM
 # as a "real" service since the pid 1 is not systemd in Docker. So we start
 # up AESM service when an user login with an interative shell.
-COPY docker/start_aesm.sh /opt/occlum/
-RUN echo '/opt/occlum/start_aesm.sh' >> /root/.bashrc
+COPY docker/start_aesm.sh /opt/occlum/ 
+RUN mkdir -p /var/run/aesmd && echo '/opt/occlum/start_aesm.sh' >> /root/.bashrc
 
 WORKDIR /root
