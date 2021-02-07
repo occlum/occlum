@@ -4,6 +4,7 @@ use std::prelude::v1::*;
 use std::sync::{Arc, Mutex};
 #[cfg(feature = "sgx")]
 use std::sync::{Arc, SgxMutex as Mutex};
+use std::sync::atomic::AtomicUsize;
 
 use atomic::{Atomic, Ordering};
 use intrusive_collections::intrusive_adapter;

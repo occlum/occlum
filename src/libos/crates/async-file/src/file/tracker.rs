@@ -6,6 +6,8 @@ use std::sync::{Mutex, MutexGuard};
 #[cfg(feature = "sgx")]
 use std::sync::{SgxMutex as Mutex, SgxMutexGuard as MutexGuard};
 
+use itertools::Itertools;
+
 use crate::page_cache::Page;
 
 /// A few tuning knobs for the sequential read tracker.

@@ -25,8 +25,10 @@ impl<T> RawSlab<T> {
     /// Allocate an object.
     ///
     /// This method is semantically equivalent to
-    /// ```
+    /// ```no_run
+    /// # unsafe fn call_malloc<T>() -> *mut libc::c_void {
     /// libc::malloc(std::mem::size_of::<T>())
+    /// # }
     /// ```
     pub fn alloc(&mut self) -> Option<*mut T> {
         let free_index = match self.free_indexes.pop() {
@@ -41,8 +43,11 @@ impl<T> RawSlab<T> {
     /// Deallocate an object.
     ///
     /// This method is semantically equivalent to
-    /// ```
-    /// libc::free(ptr)
+    /// ```no_run
+    /// # let ptr = std::ptr::null_mut();
+    /// # unsafe {
+    /// libc::free(ptr);
+    /// # }
     /// ```
     /// where ptr is a pointer to an object of `T` that
     /// is previously allocated by this allocator.
@@ -86,9 +91,11 @@ mod tests {
             assert_eq!(entry.is_some(), true);
             ptr_vec.push(entry.unwrap());
         }
+
         let entry = slab.alloc();
         assert_eq!(entry.is_none(), true);
         assert_eq!(slab.allocated(), capacity);
+
         for i in 0..capacity {
             unsafe {
                 slab.dealloc(ptr_vec[i]);

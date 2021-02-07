@@ -8,6 +8,14 @@ members = [
     "sgx-untrusted-alloc",
 ]
 
+# Default members can run on Linux; non-default members can only run inside SGX.
+default-members = [
+    "async-rt",
+    "async-file",
+    "async-socket",
+    "io-uring-callback",
+]
+
 exclude = [ 
     "test",
 ]
