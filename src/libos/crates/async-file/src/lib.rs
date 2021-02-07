@@ -237,13 +237,13 @@ mod tests {
 
     #[ctor::ctor]
     fn auto_init_async_rt() {
-        async_rt::executor::set_parallelism(1).unwrap();
+        async_rt::config::set_parallelism(1);
 
         let ring = &runtime::RING;
         unsafe { ring.start_enter_syscall_thread(); }
-        let actor = move || {
+        let callback = move || {
             ring.trigger_callbacks();
         };
-        async_rt::executor::register_actor(actor);
+        async_rt::config::set_sched_callback(callback);
     }
 }

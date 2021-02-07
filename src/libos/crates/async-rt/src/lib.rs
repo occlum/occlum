@@ -19,6 +19,7 @@ mod macros;
 pub mod prelude;
 pub mod sched;
 pub mod task;
+pub mod config;
 
 // All unit tests
 #[cfg(test)]
@@ -106,7 +107,7 @@ mod tests {
 
     #[ctor::ctor]
     fn auto_init_executor() {
-        crate::executor::set_parallelism(3);
+        crate::config::set_parallelism(3);
     }
 
     mod logger {

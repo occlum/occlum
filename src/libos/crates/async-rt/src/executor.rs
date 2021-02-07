@@ -4,19 +4,7 @@ use futures::task::waker_ref;
 use crate::prelude::*;
 use crate::sched::Affinity;
 use crate::task::Task;
-
-pub const DEFAULT_PARALLELISM: u32 = 1;
-
-static PARALLELISM: AtomicU32 = AtomicU32::new(DEFAULT_PARALLELISM);
-
-pub fn set_parallelism(parallelism: u32) -> Result<()> {
-    if parallelism == 0 {
-        return Err("invalid argument");
-    }
-
-    PARALLELISM.store(parallelism, Ordering::Relaxed);
-    Ok(())
-}
+use crate::config::CONFIG;
 
 pub fn parallelism() -> u32 {
     EXECUTOR.parallelism()
@@ -26,32 +14,32 @@ pub fn run_tasks() {
     EXECUTOR.run_tasks()
 }
 
-pub fn register_actor(actor: impl Fn() + Send + 'static) {
-    EXECUTOR.register_actor(actor)
-}
-
 pub fn shutdown() {
     EXECUTOR.shutdown()
 }
 
 lazy_static! {
     pub(crate) static ref EXECUTOR: Executor = {
-        let parallelism = PARALLELISM.load(Ordering::Relaxed);
-        Executor::new(parallelism).unwrap()
+        let parallelism = CONFIG.parallelism();
+        let sched_callback = CONFIG.take_sched_callback();
+        Executor::new(parallelism, sched_callback).unwrap()
     };
 }
 
 pub(crate) struct Executor {
     parallelism: u32,
+    sched_callback: Box<dyn Fn() + Send + Sync + 'static>,
     run_queues: Vec<Receiver<Arc<Task>>>,
     task_senders: Vec<Sender<Arc<Task>>>,
     next_run_queue_id: AtomicU32,
     is_shutdown: AtomicBool,
-    actors: Mutex<Vec<Box<dyn Fn() + Send + 'static>>>,
 }
 
 impl Executor {
-    pub fn new(parallelism: u32) -> Result<Self> {
+    pub fn new(
+        parallelism: u32,
+        sched_callback: Box<dyn Fn() + Send + Sync + 'static>,
+    ) -> Result<Self> {
         if parallelism == 0 {
             return Err("invalid argument");
         }
@@ -67,15 +55,14 @@ impl Executor {
 
         let is_shutdown = AtomicBool::new(false);
         let next_run_queue_id = AtomicU32::new(0);
-        let actors = Mutex::new(Vec::new());
 
         let new_self = Self {
             parallelism,
+            sched_callback,
             run_queues,
             task_senders,
             next_run_queue_id,
             is_shutdown,
-            actors,
         };
         Ok(new_self)
     }
@@ -89,7 +76,7 @@ impl Executor {
         assert!(run_queue_id < self.parallelism);
         let run_queue = &self.run_queues[run_queue_id as usize];
         loop {
-            self.run_actors();
+            (self.sched_callback)();
 
             let task = {
                 let task_res = run_queue.try_recv();
@@ -156,15 +143,5 @@ impl Executor {
 
     pub fn is_shutdown(&self) -> bool {
         self.is_shutdown.load(Ordering::Relaxed)
-    }
-
-    pub fn register_actor(&self, actor: impl Fn() + Send + 'static) {
-        let mut actors = self.actors.lock();
-        actors.push(Box::new(actor));
-    }
-
-    fn run_actors(&self) {
-        let actors = self.actors.lock();
-        actors.iter().for_each(|actor| actor());
     }
 }
