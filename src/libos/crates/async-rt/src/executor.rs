@@ -1,10 +1,10 @@
 use flume::{Receiver, Sender};
 use futures::task::waker_ref;
 
+use crate::config::CONFIG;
 use crate::prelude::*;
 use crate::sched::Affinity;
 use crate::task::Task;
-use crate::config::CONFIG;
 
 pub fn parallelism() -> u32 {
     EXECUTOR.parallelism()

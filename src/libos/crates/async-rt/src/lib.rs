@@ -14,12 +14,12 @@ extern crate lazy_static;
 extern crate flume;
 extern crate spin;
 
+pub mod config;
 pub mod executor;
 mod macros;
 pub mod prelude;
 pub mod sched;
 pub mod task;
-pub mod config;
 
 // All unit tests
 #[cfg(test)]

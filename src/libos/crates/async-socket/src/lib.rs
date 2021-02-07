@@ -4,7 +4,7 @@
 #![allow(dead_code)]
 // When using Rust SGX SDK, feature(hash_set_entry) cannot be recoganized. So
 // we disable it.
-#![cfg_attr(not(feature="sgx"), feature(hash_set_entry))]
+#![cfg_attr(not(feature = "sgx"), feature(hash_set_entry))]
 
 #[cfg(feature = "sgx")]
 extern crate sgx_types;

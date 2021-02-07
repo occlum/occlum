@@ -34,7 +34,7 @@ impl Config {
             sched_callback: None,
         };
         Self {
-            inner: Mutex::new(inner)
+            inner: Mutex::new(inner),
         }
     }
 
@@ -62,7 +62,6 @@ impl Config {
         })
     }
 }
-
 
 lazy_static! {
     pub(crate) static ref CONFIG: Config = Config::new();
