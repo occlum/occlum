@@ -1,0 +1,10 @@
+enclave {
+    untrusted {
+        int ocall_get_vdso_info(
+            [out] unsigned long* vdso_addr, 
+            [out] long* coarse_resolution, 
+            [out, size = release_len] char* release,
+            int release_len
+        );
+    };
+};

@@ -1,0 +1,17 @@
+[package]
+name = "vdso-time"
+version = "0.1.0"
+authors = ["Shuocheng Wang <shuocheng.wsc@antgroup.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["libc"]
+sgx = ["sgx_types", "sgx_tstd", "sgx_libc"]
+
+[dependencies]
+libc = { version = "0.2", optional = true }
+sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }
+sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", optional = true, features = ["backtrace"] }
+sgx_libc = { path = "../../../../deps/rust-sgx-sdk/sgx_libc", optional = true }

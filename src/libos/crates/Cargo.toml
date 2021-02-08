@@ -6,6 +6,7 @@ members = [
     "async-socket",
     "io-uring-callback",
     "sgx-untrusted-alloc",
+    "vdso-time",
 ]
 
 # Default members can run on Linux; non-default members can only run inside SGX.
@@ -14,6 +15,7 @@ default-members = [
     "async-file",
     "async-socket",
     "io-uring-callback",
+    "vdso-time",
 ]
 
 exclude = [ 
