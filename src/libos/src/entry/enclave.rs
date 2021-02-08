@@ -82,7 +82,7 @@ pub extern "C" fn occlum_ecall_init(
         super::interrupt::init();
 
         println!("num_vcpus = {:?}", num_vcpus);
-        async_rt::executor::set_parallelism(num_vcpus);
+        async_rt::config::set_parallelism(num_vcpus);
 
         HAS_INIT.store(true, Ordering::SeqCst);
 
