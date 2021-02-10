@@ -279,6 +279,9 @@ impl Vdso {
     }
 }
 
+unsafe impl Sync for Vdso {}
+unsafe impl Send for Vdso {}
+
 // All unit tests
 #[cfg(test)]
 mod tests {
