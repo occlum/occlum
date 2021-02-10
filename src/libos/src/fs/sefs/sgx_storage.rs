@@ -1,7 +1,3 @@
-use super::*;
-use crate::error::*;
-use rcore_fs::dev::{DevError, DevResult};
-use rcore_fs_sefs::dev::{File, SefsMac, Storage};
 use std::boxed::Box;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeMap;
@@ -11,6 +7,12 @@ use std::path::{Path, PathBuf};
 use std::sgxfs::{remove, OpenOptions, SgxFile};
 use std::sync::{Arc, SgxMutex as Mutex};
 use std::untrusted::fs;
+
+use rcore_fs::dev::{DevError, DevResult};
+use rcore_fs_sefs::dev::{File, SefsMac, Storage};
+
+use super::*;
+use crate::prelude::*;
 
 /// A helper macro to automatically convert a block of code that returns `std::result::Result<T, E1>`
 /// to one that returns `std::result::Result<T, E2>`, where `E1` satisfies `impl From<E1> for Error`
@@ -251,12 +253,5 @@ impl File for LockedFile {
     fn get_file_mac(&self) -> DevResult<SefsMac> {
         let file = self.0.lock().unwrap();
         Ok(SefsMac(file.get_mac().unwrap()))
-    }
-}
-
-impl From<Error> for DevError {
-    fn from(e: Error) -> Self {
-        error!("SGX protected file I/O error: {}", e.backtrace());
-        DevError(e.errno() as i32)
     }
 }

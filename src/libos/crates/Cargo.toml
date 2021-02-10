@@ -4,6 +4,7 @@ members = [
     "async-rt",
     "async-file",
     "async-socket",
+    "errno",
     "io-uring-callback",
     "sgx-untrusted-alloc",
     "vdso-time",

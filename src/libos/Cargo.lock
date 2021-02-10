@@ -10,6 +10,7 @@ dependencies = [
  "bitflags",
  "bitvec",
  "derive_builder",
+ "errno",
  "lazy_static",
  "log",
  "memoffset",
@@ -28,6 +29,7 @@ dependencies = [
  "sgx_tse",
  "sgx_tstd",
  "sgx_types",
+ "vdso-time",
  "xmas-elf",
 ]
 
@@ -192,6 +194,15 @@ name = "either"
 version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
+
+[[package]]
+name = "errno"
+version = "0.1.0"
+dependencies = [
+ "rcore-fs",
+ "serde_json",
+ "sgx_tstd",
+]
 
 [[package]]
 name = "flume"
@@ -796,6 +807,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90dbc611eb48397705a6b0f6e917da23ae517e4d127123d2cf7674206627d32a"
 dependencies = [
  "rand",
+]
+
+[[package]]
+name = "vdso-time"
+version = "0.1.0"
+dependencies = [
+ "sgx_libc",
+ "sgx_tstd",
+ "sgx_types",
 ]
 
 [[package]]

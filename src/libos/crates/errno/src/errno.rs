@@ -1,4 +1,4 @@
-use super::*;
+use core::fmt;
 
 /// POSIX errno
 #[derive(Clone, Copy, Debug, PartialEq)]

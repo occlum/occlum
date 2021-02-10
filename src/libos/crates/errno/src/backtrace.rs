@@ -1,4 +1,9 @@
-use super::*;
+use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::vec::Vec;
+use core::fmt;
+
+use super::{Error, Result};
 
 #[derive(Debug, Clone)]
 pub struct ErrorBacktrace<'a> {
@@ -15,7 +20,7 @@ impl<'a> ErrorBacktrace<'a> {
 
 impl<'a> fmt::Display for ErrorBacktrace<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let error_strings: Vec<String> = self.clone().map(|e| e.to_string()).collect();
+        let error_strings: Vec<String> = self.clone().map(|e| alloc::format!("{}", e)).collect();
         let error_backtrace = error_strings.join("\n    Caused by ");
         write!(f, "{}", error_backtrace)
     }

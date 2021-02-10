@@ -524,7 +524,7 @@ macro_rules! impl_syscall_nums {
         }
 
         impl TryFrom<u32> for SyscallNum {
-            type Error = crate::error::Error;
+            type Error = errno::Error;
 
             fn try_from(raw_num: u32) -> Result<Self> {
                 match raw_num {
