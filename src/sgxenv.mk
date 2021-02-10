@@ -2,6 +2,7 @@ MAIN_MAKEFILE := $(firstword $(MAKEFILE_LIST))
 INCLUDE_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 CUR_DIR := $(shell dirname $(realpath $(MAIN_MAKEFILE)))
 PROJECT_DIR := $(realpath $(CUR_DIR)/../../)
+CRATES_DIR := $(realpath $(CUR_DIR)/../libos/crates)
 
 SHELL := /bin/bash
 

@@ -26,6 +26,7 @@ rcore-fs-devfs = { path = "../../deps/sefs/rcore-fs-devfs" }
 serde = { path = "../../deps/serde-sgx/serde", features = ["derive"] }
 serde_json = { path = "../../deps/serde-json-sgx" }
 memoffset = "0.6.1"
+vdso-time  = { path = "crates/vdso-time", default-features = false, features = ["sgx"] }
 
 [patch.'https://github.com/apache/teaclave-sgx-sdk.git']
 sgx_tstd = { path = "../../deps/rust-sgx-sdk/sgx_tstd" }

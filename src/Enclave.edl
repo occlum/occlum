@@ -7,6 +7,7 @@ enclave {
     from "sgx_net.edl" import *;
     from "sgx_thread.edl" import *;
     from "sgx_occlum_utils.edl" import *;
+    from "sgx_vdso_time_ocalls.edl" import *;
 
     include "sgx_quote.h"
     include "occlum_edl_types.h"

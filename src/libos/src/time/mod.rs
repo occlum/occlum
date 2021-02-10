@@ -6,11 +6,16 @@ use rcore_fs::dev::TimeProvider;
 use rcore_fs::vfs::Timespec;
 use std::time::Duration;
 use std::{fmt, u64};
+use vdso_time::Vdso;
 
 pub mod timer_slack;
 pub mod up_time;
 
 pub use timer_slack::TIMERSLACK;
+
+lazy_static! {
+    static ref VDSO: Vdso = Vdso::new().unwrap();
+}
 
 #[allow(non_camel_case_types)]
 pub type time_t = i64;
@@ -65,10 +70,17 @@ pub fn do_gettimeofday() -> timeval_t {
     }
 
     let mut tv: timeval_t = Default::default();
-    unsafe {
-        occlum_ocall_gettimeofday(&mut tv as *mut timeval_t);
+    if VDSO
+        .gettimeofday(&mut tv as *mut timeval_t as *mut _, std::ptr::null_mut())
+        .is_err()
+    {
+        debug!("fallback to occlum_ocall_gettimeofday");
+        unsafe {
+            occlum_ocall_gettimeofday(&mut tv as *mut timeval_t);
+        }
     }
-    tv.validate().expect("ocall returned invalid timeval_t");
+    tv.validate()
+        .expect("gettimeofday returned invalid timeval_t");
     tv
 }
 
@@ -156,10 +168,17 @@ pub fn do_clock_gettime(clockid: ClockID) -> Result<timespec_t> {
     }
 
     let mut tv: timespec_t = Default::default();
-    unsafe {
-        occlum_ocall_clock_gettime(clockid as clockid_t, &mut tv as *mut timespec_t);
+    if VDSO
+        .clock_gettime(clockid as clockid_t, &mut tv as *mut timespec_t as *mut _)
+        .is_err()
+    {
+        debug!("fallback to occlum_ocall_clock_gettime");
+        unsafe {
+            occlum_ocall_clock_gettime(clockid as clockid_t, &mut tv as *mut timespec_t);
+        }
     }
-    tv.validate().expect("ocall returned invalid timespec");
+    tv.validate()
+        .expect("clock_gettime returned invalid timespec");
     Ok(tv)
 }
 
@@ -169,8 +188,14 @@ pub fn do_clock_getres(clockid: ClockID) -> Result<timespec_t> {
     }
 
     let mut res: timespec_t = Default::default();
-    unsafe {
-        occlum_ocall_clock_getres(clockid as clockid_t, &mut res as *mut timespec_t);
+    if VDSO
+        .clock_getres(clockid as clockid_t, &mut res as *mut timespec_t as *mut _)
+        .is_err()
+    {
+        debug!("fallback to occlum_ocall_clock_getres");
+        unsafe {
+            occlum_ocall_clock_getres(clockid as clockid_t, &mut res as *mut timespec_t);
+        }
     }
     let validate_resolution = |res: &timespec_t| -> Result<()> {
         // The resolution can be ranged from 1 nanosecond to a few milliseconds
@@ -181,7 +206,7 @@ pub fn do_clock_getres(clockid: ClockID) -> Result<timespec_t> {
         }
     };
     // do sanity check
-    validate_resolution(&res).expect("ocall returned invalid resolution");
+    validate_resolution(&res).expect("clock_getres returned invalid resolution");
     Ok(res)
 }
 

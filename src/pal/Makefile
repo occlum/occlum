@@ -12,8 +12,8 @@ endif
 # A dependency on Rust SGX SDK
 LIBSGX_USTDC_A := $(BUILD_DIR)/lib/libsgx_ustdc.a
 
-EDL_C_SRCS := $(addprefix $(OBJ_DIR)/pal/$(SRC_OBJ)/,Enclave_u.c Enclave_u.h)
-EDL_C_OBJS := $(addprefix $(OBJ_DIR)/pal/$(SRC_OBJ)/,Enclave_u.o)
+EDL_C_SRCS := $(addprefix $(OBJ_DIR)/pal/$(SRC_OBJ)/,Enclave_u.c Enclave_u.h) $(CRATES_DIR)/vdso-time/ocalls/vdso-time-ocalls.c
+EDL_C_OBJS := $(addprefix $(OBJ_DIR)/pal/$(SRC_OBJ)/,Enclave_u.o) $(CRATES_DIR)/vdso-time/ocalls/vdso-time-ocalls.o
 C_SRCS := $(sort $(wildcard src/*.c src/*/*.c))
 CXX_SRCS := $(sort $(wildcard src/*.cpp src/*/*.cpp))
 C_OBJS := $(addprefix $(OBJ_DIR)/pal/,$(C_SRCS:.c=.o))
@@ -68,7 +68,8 @@ $(OBJ_DIR)/pal/$(SRC_OBJ)/Enclave_u.c: $(SGX_EDGER8R) ../Enclave.edl
 	@cd $(OBJ_DIR)/pal/$(SRC_OBJ) && \
 		$(SGX_EDGER8R) --untrusted $(CUR_DIR)/../Enclave.edl \
 		--search-path $(SGX_SDK)/include \
-		--search-path $(RUST_SGX_SDK_DIR)/edl/
+		--search-path $(RUST_SGX_SDK_DIR)/edl/ \
+		--search-path $(CRATES_DIR)/vdso-time/ocalls
 	@echo "GEN <= $@"
 
 $(OBJ_DIR)/pal/$(SRC_OBJ)/%.o: src/%.c
