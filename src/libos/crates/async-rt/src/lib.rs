@@ -20,6 +20,7 @@ mod macros;
 pub mod prelude;
 pub mod sched;
 pub mod task;
+pub mod wait;
 
 // All unit tests
 #[cfg(test)]
