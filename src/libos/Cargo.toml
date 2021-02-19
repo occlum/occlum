@@ -17,7 +17,7 @@ log = "0.4"
 aligned = "0.3.4"
 lazy_static = { version = "1.1.0", features = ["spin_no_std"] } # Implies nightly
 derive_builder = "0.9"
-ringbuf = { path = "../../deps/ringbuf" }
+ringbuf = { version = "0.2.3", default-features = false }
 rcore-fs = { path = "../../deps/sefs/rcore-fs" }
 rcore-fs-sefs = { path = "../../deps/sefs/rcore-fs-sefs" }
 rcore-fs-ramfs = { path = "../../deps/sefs/rcore-fs-ramfs" }

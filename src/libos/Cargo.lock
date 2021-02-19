@@ -13,7 +13,7 @@ dependencies = [
  "errno",
  "lazy_static",
  "log",
- "memoffset",
+ "memoffset 0.6.1",
  "rcore-fs",
  "rcore-fs-devfs",
  "rcore-fs-mountfs",
@@ -57,10 +57,13 @@ dependencies = [
 name = "async-rt"
 version = "0.1.0"
 dependencies = [
+ "atomic",
  "bit-vec",
  "flume",
  "futures",
+ "intrusive-collections",
  "lazy_static",
+ "object-id",
  "sgx_tstd",
  "spin 0.7.0",
 ]
@@ -314,6 +317,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
+name = "intrusive-collections"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4bca8c0bb831cd60d4dda79a58e3705ca6eb47efb65d665651a8d672213ec3db"
+dependencies = [
+ "memoffset 0.5.6",
+]
+
+[[package]]
 name = "itoa"
 version = "0.4.5"
 dependencies = [
@@ -355,12 +367,25 @@ dependencies = [
 
 [[package]]
 name = "memoffset"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "043175f069eda7b85febe4a74abbaeff828d9f8b448515d3151a14a3542811aa"
+dependencies = [
+ "autocfg 1.0.1",
+]
+
+[[package]]
+name = "memoffset"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "157b4208e3059a8f9e78d559edc658e13df41410cb3ae03979c83130067fdd87"
 dependencies = [
  "autocfg 1.0.1",
 ]
+
+[[package]]
+name = "object-id"
+version = "0.1.0"
 
 [[package]]
 name = "pin-project"
@@ -589,10 +614,9 @@ dependencies = [
 
 [[package]]
 name = "ringbuf"
-version = "0.2.1"
-dependencies = [
- "sgx_tstd",
-]
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "930c1d8c4c3341099e662d45a884aa8047ab659bfb579747a48598bb86aae062"
 
 [[package]]
 name = "ryu"
