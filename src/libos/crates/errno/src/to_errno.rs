@@ -8,7 +8,7 @@ pub trait ToErrno: fmt::Display + fmt::Debug {
 
 impl<T> From<T> for Error
 where
-    T: ToErrno + 'static,
+    T: ToErrno + Send + 'static,
 {
     fn from(t: T) -> Error {
         Error::boxed(t, None)

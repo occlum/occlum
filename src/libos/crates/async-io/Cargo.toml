@@ -1,0 +1,30 @@
+[package]
+name = "async-io"
+version = "0.1.0"
+authors = ["Tate, Hongliang Tian <tate.thl@antfin.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = []
+sgx = ["sgx_types", "sgx_tstd", "sgx_trts", "sgx_libc", "io-uring-callback/sgx", "async-rt/sgx"]
+
+[dependencies]
+async-rt = { path = "../async-rt" }
+atomic = "0.5"
+bitflags = "1.2"
+errno = { path = "../errno" }
+io-uring-callback = { path = "../io-uring-callback" }
+object-id = { path = "../object-id" }
+ringbuf = { version = "0.2.3", default-features = false }
+
+sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }
+sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", optional = true, features = ["backtrace"] }
+sgx_trts = { path = "../../../../deps/rust-sgx-sdk/sgx_trts", optional = true }
+sgx_libc = { path = "../../../../deps/rust-sgx-sdk/sgx_libc", optional = true }
+
+[dev-dependencies]
+async-rt = { path = "../async-rt", features = ["auto_run"] }
+ctor = "0.1"
+lazy_static = "1.4"

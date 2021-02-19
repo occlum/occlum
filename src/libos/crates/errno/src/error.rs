@@ -13,7 +13,7 @@ pub struct Error {
 #[derive(Debug)]
 enum Error__ {
     Embedded((Errno, &'static str)),
-    Boxed(Box<dyn ToErrno + 'static>),
+    Boxed(Box<dyn ToErrno + Send + 'static>),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -33,7 +33,7 @@ impl Error {
 
     pub fn boxed<T>(inner: T, location: Option<ErrorLocation>) -> Error
     where
-        T: ToErrno + 'static,
+        T: ToErrno + Send + 'static,
     {
         Error {
             inner: Error__::Boxed(Box::new(inner)),

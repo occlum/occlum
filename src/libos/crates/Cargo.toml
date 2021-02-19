@@ -3,6 +3,7 @@
 members = [
     "async-rt",
     "async-file",
+    "async-io",
     "async-socket",
     "errno",
     "io-uring-callback",
