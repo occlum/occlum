@@ -36,6 +36,54 @@ impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
         }
     }
 
+    pub async fn read_exact(&self, buf: &mut [u8]) -> Result<()> {
+        let mut count = 0;
+        while count < buf.len() {
+            // TODO: handle EINTR
+            let nbytes = self.read(&mut buf[count..]).await?;
+            if nbytes == 0 {
+                return_errno!(EINVAL, "unexpected EOF");
+            }
+            count += nbytes;
+        }
+        Ok(())
+    }
+
+    pub async fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+        // Fast path
+        let res = self.file.read_at(offset, buf);
+        if is_ok_or_not_egain(&res) {
+            return res;
+        }
+
+        // Slow path
+        let mask = Events::IN;
+        let mut poller = Poller::new();
+        loop {
+            let events = self.poll_by(mask, Some(&mut poller));
+            if events.contains(Events::IN) {
+                let res = self.file.read_at(offset, buf);
+                if is_ok_or_not_egain(&res) {
+                    return res;
+                }
+            }
+            poller.wait().await;
+        }
+    }
+
+    pub async fn read_exact_at(&self, offset: usize, buf: &mut [u8]) -> Result<()> {
+        let mut count = 0;
+        while count < buf.len() {
+            // TODO: handle EINTR
+            let nbytes = self.read_at(offset + count, &mut buf[count..]).await?;
+            if nbytes == 0 {
+                return_errno!(EINVAL, "unexpected EOF");
+            }
+            count += nbytes;
+        }
+        Ok(())
+    }
+
     pub async fn write(&self, buf: &[u8]) -> Result<usize> {
         // Fast path
         let res = self.file.write(buf);
@@ -58,12 +106,52 @@ impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
         }
     }
 
-    pub fn seek(&self, pos: SeekFrom) -> Result<usize> {
-        self.file.seek(pos)
+    pub async fn write_exact(&self, buf: &[u8]) -> Result<()> {
+        let mut count = 0;
+        while count < buf.len() {
+            // TODO: Handle EINTR
+            count += self.write(&buf[count..]).await?;
+        }
+        Ok(())
     }
 
-    pub fn flush(&self) -> Result<()> {
-        self.file.flush()
+    pub async fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+        // Fast path
+        let res = self.file.write_at(offset, buf);
+        if is_ok_or_not_egain(&res) {
+            return res;
+        }
+
+        // Slow path
+        let mask = Events::OUT;
+        let mut poller = Poller::new();
+        loop {
+            let events = self.poll_by(mask, Some(&mut poller));
+            if events.contains(Events::OUT) {
+                let res = self.file.write_at(offset, buf);
+                if is_ok_or_not_egain(&res) {
+                    return res;
+                }
+            }
+            poller.wait().await;
+        }
+    }
+
+    pub async fn write_exact_at(&self, offset: usize, buf: &[u8]) -> Result<()> {
+        let mut count = 0;
+        while count < buf.len() {
+            // TODO: Handle EINTR
+            count += self.write_at(offset + count, &buf[count..]).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn flush(&self) -> Result<()> {
+        self.file.flush().await
+    }
+
+    pub fn seek(&self, pos: SeekFrom) -> Result<usize> {
+        self.file.seek(pos)
     }
 
     pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
@@ -123,7 +211,7 @@ mod tests {
         impl FooFile {
             pub fn new() -> Self {
                 Self {
-                    pollee: Pollee::new(),
+                    pollee: Pollee::new(Events::empty()),
                 }
             }
         }
@@ -146,7 +234,7 @@ mod tests {
         impl BarFile {
             pub fn new() -> Self {
                 Self {
-                    pollee: Pollee::new(),
+                    pollee: Pollee::new(Events::empty()),
                 }
             }
         }

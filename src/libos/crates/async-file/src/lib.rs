@@ -17,25 +17,27 @@ extern crate sgx_trts;
 #[cfg(feature = "sgx")]
 extern crate sgx_untrusted_alloc;
 
-mod event;
 mod file;
 mod page_cache;
 mod util;
 
-pub use crate::event::waiter::{Waiter, WaiterQueue};
 pub use crate::file::{AsyncFile, AsyncFileRt, Flusher};
 pub use crate::page_cache::{AsFd, Page, PageCache, PageHandle, PageState};
 
+// TODO
+// - [ ] Use inode number instead of fd to differentiate AsyncFile
+
 #[cfg(test)]
 mod tests {
-    use self::runtime::Runtime;
-    use super::*;
-    use crate::event::waiter::{Waiter, WaiterQueue};
+    use async_io::file::{Async, File};
     use io_uring_callback::{Builder, IoUring};
     use lazy_static::lazy_static;
 
+    use self::runtime::Runtime;
+    use super::*;
+
     #[test]
-    fn hello_world() {
+    fn write_read_small_file() {
         async_rt::task::block_on(async {
             let path = "tmp.data.hello_world";
             let file = {
@@ -44,10 +46,11 @@ mod tests {
                 let mode = libc::S_IRUSR | libc::S_IWUSR;
                 AsyncFile::<Runtime>::open(path.clone(), flags, mode).unwrap()
             };
+            // The size of this file is considered _small_ given the size of
+            // the page cache.
             let input_buf = "hello world\n".to_string().into_bytes().into_boxed_slice();
-            let retval = file.write_at(0, &input_buf).await;
-            assert!(retval as usize == input_buf.len());
-            file.flush().await;
+            file.write_exact_at(0, &input_buf).await.unwrap();
+            file.flush().await.unwrap();
             drop(file);
 
             let file = {
@@ -59,15 +62,15 @@ mod tests {
             let mut output_vec = Vec::with_capacity(input_buf.len());
             output_vec.resize(input_buf.len(), 0);
             let mut output_buf = output_vec.into_boxed_slice();
-            let retval = file.read_at(0, &mut output_buf[..]).await;
-            assert!(retval as usize == input_buf.len());
+            file.read_exact_at(0, &mut output_buf[..]).await.unwrap();
+
             assert!(output_buf.len() == input_buf.len());
             assert!(output_buf == input_buf);
         });
     }
 
     #[test]
-    fn test_seq_write_read() {
+    fn write_read_large_file() {
         async_rt::task::block_on(async {
             let path = "tmp.data.test_seq_write_read";
             let file = {
@@ -77,7 +80,9 @@ mod tests {
                 AsyncFile::<Runtime>::open(path.clone(), flags, mode).unwrap()
             };
 
-            let data_len = 4096 * 1024;
+            // The size of this file is considered _large_ given the size of
+            // the page cache.
+            let data_len = 16 * 1024 * 1024;
             let mut data: Vec<u8> = Vec::with_capacity(data_len);
             for i in 0..data_len {
                 let ch = (i % 128) as u8;
@@ -85,9 +90,8 @@ mod tests {
             }
 
             let input_buf = data.into_boxed_slice();
-            let retval = file.write_at(0, &input_buf).await;
-            assert!(retval as usize == input_buf.len());
-            file.flush().await;
+            file.write_exact_at(0, &input_buf).await.unwrap();
+            file.flush().await.unwrap();
             drop(file);
 
             let file = {
@@ -99,8 +103,8 @@ mod tests {
             let mut output_vec = Vec::with_capacity(input_buf.len());
             output_vec.resize(input_buf.len(), 0);
             let mut output_buf = output_vec.into_boxed_slice();
-            let retval = file.read_at(0, &mut output_buf[..]).await;
-            assert!(retval as usize == input_buf.len());
+            file.read_exact_at(0, &mut output_buf[..]).await.unwrap();
+
             assert!(output_buf.len() == input_buf.len());
             assert!(output_buf == input_buf);
         });
@@ -176,15 +180,17 @@ mod tests {
     // }
 
     mod runtime {
+        use async_rt::{waiter_loop, wait::WaiterQueue};
+
         use super::*;
         use std::sync::Once;
 
         pub struct Runtime;
 
-        pub const PAGE_CACHE_SIZE: usize = 102400; // 400 MB
-        pub const DIRTY_LOW_MARK: usize = PAGE_CACHE_SIZE / 10 * 3;
-        pub const DIRTY_HIGH_MARK: usize = PAGE_CACHE_SIZE / 10 * 7;
-        pub const MAX_DIRTY_PAGES_PER_FLUSH: usize = PAGE_CACHE_SIZE / 10;
+        pub const PAGE_CACHE_SIZE: usize = 10; // 10 * 4KB
+        pub const DIRTY_LOW_MARK: usize = 3;
+        pub const DIRTY_HIGH_MARK: usize = 6;
+        pub const MAX_DIRTY_PAGES_PER_FLUSH: usize = 10;
 
         lazy_static! {
             static ref PAGE_CACHE: PageCache = PageCache::with_capacity(PAGE_CACHE_SIZE);
@@ -212,19 +218,17 @@ mod tests {
                         let page_cache = &PAGE_CACHE;
                         let flusher = &FLUSHER;
                         let waiter_queue = &WAITER_QUEUE;
-                        let waiter = Waiter::new();
-                        waiter_queue.enqueue(&waiter);
-                        loop {
+                        waiter_loop!(waiter_queue, {
                             // Start flushing when the # of dirty pages rises above the high watermark
-                            while page_cache.num_dirty_pages() < DIRTY_HIGH_MARK {
-                                waiter.wait().await;
+                            if page_cache.num_dirty_pages() < DIRTY_HIGH_MARK {
+                                continue;
                             }
 
                             // Stop flushing until the # of dirty pages falls below the low watermark
                             while page_cache.num_dirty_pages() > DIRTY_LOW_MARK {
                                 flusher.flush(MAX_DIRTY_PAGES_PER_FLUSH).await;
                             }
-                        }
+                        });
                     });
                 });
 
@@ -243,6 +247,7 @@ mod tests {
         unsafe {
             ring.start_enter_syscall_thread();
         }
+
         let callback = move || {
             ring.trigger_callbacks();
         };

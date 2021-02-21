@@ -15,6 +15,7 @@ async-rt = { path = "../async-rt" }
 atomic = "0.5"
 bitflags = "1.2"
 errno = { path = "../errno" }
+futures = { version = "0.3", default-features = false, features = ["alloc"]  }
 io-uring-callback = { path = "../io-uring-callback" }
 object-id = { path = "../object-id" }
 ringbuf = { version = "0.2.3", default-features = false }

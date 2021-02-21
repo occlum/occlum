@@ -373,6 +373,7 @@ impl Unpin for Handle {}
 impl Future for Handle {
     type Output = i32;
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // FIXME: concurrency issues
         if self.is_completed() {
             Poll::Ready(self.retval().unwrap())
         } else {

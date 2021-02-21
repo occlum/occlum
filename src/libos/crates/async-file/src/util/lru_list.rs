@@ -119,6 +119,7 @@ impl<T> LruList<T> {
             }
             cursor.move_prev();
         }
+        self.len -= res.len();
         res
     }
 

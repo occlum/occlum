@@ -3,7 +3,7 @@ use async_rt::task::JoinHandle;
 use async_file::*;
 use self::runtime::Runtime;
 
-const FILE_LEN: usize = 4096 * 10240; // 40 MB
+const FILE_LEN: usize = 160 * 1024 * 1024; // 160 MB
 const FILE_NUM: usize = 1;
 const BLOCK_SIZE: usize = 4096 * 1;
 
@@ -15,10 +15,10 @@ async fn prepare_file(file_num: usize) {
             let mode = libc::S_IRUSR | libc::S_IWUSR;
             AsyncFile::<Runtime>::open(path.clone(), flags, mode).unwrap()
         };
-        let data : Vec<u8> = vec![0; FILE_LEN];
-        let input_buf = data.into_boxed_slice();
-        let retval = file.write_at(0, &input_buf).await;
-        assert!(retval as usize == input_buf.len());
+        let buf : Vec<u8> = vec![0; FILE_LEN];
+        let mut count = 0;
+        let input_buf = buf.into_boxed_slice();
+        file.write_exact_at(0, &input_buf).await.unwrap();
         file.flush().await;
     }
 }
@@ -45,9 +45,9 @@ fn seq_read_write() {
                     let mut buf = vec.into_boxed_slice();
                     let mut offset = 0;
                     while offset < FILE_LEN {
-                        let retval = file.read_at(offset, &mut buf[..]).await;
-                        assert!(retval >= 0);
-                        offset += retval as usize;
+                        let nbytes = file.read_at(offset, &mut buf[..]).await.unwrap();
+                        assert!(nbytes > 0);
+                        offset += nbytes as usize;
                     }
                     
                     i as i32
@@ -83,9 +83,9 @@ fn seq_read_write() {
                     let mut offset = 0;
                     while offset < FILE_LEN {
                         buf[0] = buf[0] % 128 + 1;
-                        let retval = file.write_at(offset, &buf[..]).await;
+                        let retval = file.write_at(offset, &buf[..]).await.unwrap();
                         assert!(retval >= 0);
-                        offset += retval as usize;
+                        offset += retval;
                     }
 
                     file.flush().await;
@@ -131,9 +131,9 @@ fn libc_seq_read_write() {
                     let mut vec = vec![0; BLOCK_SIZE];
                     let mut bytes = 0;
                     while bytes < FILE_LEN {
-                        let retval = unsafe{ libc::read(file, vec.as_mut_ptr() as *mut libc::c_void, BLOCK_SIZE)};
-                        assert!(retval >= 0);
-                        bytes += retval as usize;
+                        let nbytes = unsafe{ libc::read(file, vec.as_mut_ptr() as *mut libc::c_void, BLOCK_SIZE)};
+                        assert!(nbytes >= 0);
+                        bytes += nbytes as usize;
                     }
                     
                     unsafe{ libc::close(file); }
@@ -171,9 +171,9 @@ fn libc_seq_read_write() {
                     let vec = vec![1; BLOCK_SIZE];
                     let mut bytes = 0;
                     while bytes < FILE_LEN {
-                        let retval = unsafe{ libc::write(file, vec.as_ptr() as *const libc::c_void, BLOCK_SIZE) };
-                        assert!(retval >= 0);
-                        bytes += retval as usize;
+                        let nbytes = unsafe{ libc::write(file, vec.as_ptr() as *const libc::c_void, BLOCK_SIZE) };
+                        assert!(nbytes >= 0);
+                        bytes += nbytes as usize;
                     }
                     
                     unsafe{ 
@@ -198,8 +198,10 @@ fn libc_seq_read_write() {
 */
 
 mod runtime {
-    use async_file::*;
     use std::sync::Once;
+
+    use async_file::*;
+    use async_rt::{waiter_loop, wait::WaiterQueue};
     use io_uring_callback::{IoUring, Builder};
     use lazy_static::lazy_static;
 
@@ -236,19 +238,17 @@ mod runtime {
                     let page_cache = &PAGE_CACHE;
                     let flusher = &FLUSHER;
                     let waiter_queue = &WAITER_QUEUE;
-                    let waiter = Waiter::new();
-                    waiter_queue.enqueue(&waiter);
-                    loop {
+                    waiter_loop!(waiter_queue, {
                         // Start flushing when the # of dirty pages rises above the high watermark
-                        while page_cache.num_dirty_pages() < DIRTY_HIGH_MARK {
-                            waiter.wait().await;
+                        if page_cache.num_dirty_pages() < DIRTY_HIGH_MARK {
+                            continue;
                         }
 
                         // Stop flushing until the # of dirty pages falls below the low watermark
                         while page_cache.num_dirty_pages() > DIRTY_LOW_MARK {
                             flusher.flush(MAX_DIRTY_PAGES_PER_FLUSH).await;
                         }
-                    }
+                    });
                 });
             });
 

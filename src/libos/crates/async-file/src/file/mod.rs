@@ -2,11 +2,17 @@ use std::marker::PhantomData;
 #[cfg(feature = "sgx")]
 use std::prelude::v1::*;
 #[cfg(not(feature = "sgx"))]
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Weak, Mutex, RwLock};
 #[cfg(feature = "sgx")]
-use std::sync::{Arc, SgxMutex as Mutex, SgxRwLock as RwLock};
+use std::sync::{Arc, Weak, SgxMutex as Mutex, SgxRwLock as RwLock};
+use std::any::Any;
 
-use crate::event::waiter::{Waiter, WaiterQueue};
+use async_io::prelude::{Result, *};
+use async_io::poll::{Poller, Pollee, Events};
+use async_io::file::{Async, File};
+use futures::future::{BoxFuture};
+use futures::prelude::*;
+
 use crate::file::tracker::SeqRdTracker;
 use crate::page_cache::{AsFd, Page, PageCache, PageHandle, PageState};
 use crate::util::{align_down, align_up};
@@ -27,8 +33,10 @@ pub struct AsyncFile<Rt: AsyncFileRt + ?Sized> {
     can_read: bool,
     can_write: bool,
     seq_rd_tracker: SeqRdTracker,
-    waiter_queue: WaiterQueue,
+    pollee: Pollee,
+    fixed_events: Events,
     phantom_data: PhantomData<Rt>,
+    weak_self: Weak<Self>,
 }
 
 /// The runtime support for AsyncFile.
@@ -45,11 +53,82 @@ pub trait AsyncFileRt: Send + Sync + 'static {
     fn auto_flush();
 }
 
+impl<Rt: AsyncFileRt + ?Sized> File for AsyncFile<Rt> {
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+        if !self.can_read {
+            return_errno!(EBADF, "not open for read");
+        }
+        if buf.len() == 0 {
+            return Ok(0);
+        }
+
+        // Prevent offset calculation from overflow
+        if offset >= usize::max_value() / 2 {
+            return_errno!(EINVAL, "offset is too large");
+        }
+        // Prevent the return length (i32) from overflow
+        if buf.len() > i32::max_value() as usize {
+            return_errno!(EINVAL, "buffer is tool large");
+        }
+
+        self.do_read_at(offset, buf)
+    }
+
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+        if !self.can_write {
+            return_errno!(EBADF, "not open for write");
+        }
+        if buf.len() == 0 {
+            return Ok(0);
+        }
+
+        // Prevent offset calculation from overflow
+        if offset >= usize::max_value() / 2 {
+            return_errno!(EINVAL, "offset is too large");
+        }
+        // Prevent the return length (i32) from overflow
+        if buf.len() > i32::max_value() as usize {
+            return_errno!(EINVAL, "buffer is tool large");
+        }
+
+        self.do_write_at(offset, buf)
+    }
+
+    fn flush(&self) -> BoxFuture<'_, Result<()>> {
+        let fd = self.fd;
+        (async move {
+            loop {
+                const FLUSH_BATCH_SIZE: usize = 64;
+                let num_flushed = Rt::flusher().flush_by_fd(fd, FLUSH_BATCH_SIZE).await;
+                if num_flushed == 0 {
+                    return Ok(());
+                }
+            }
+        }).boxed()
+    }
+
+    fn poll_by(&self, mask: Events, mut poller: Option<&mut Poller>) -> Events {
+        // Both the file's and flusher's pollee affects the readiness of
+        // reads and writes on this file.
+        let reborrowed_poller = poller.as_mut().map(|p| &mut **p);
+        self.pollee.poll_by(mask, reborrowed_poller);
+
+        let flusher = Rt::flusher();
+        flusher.pollee().poll_by(mask, poller);
+
+        self.fixed_events
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self as &dyn Any
+    }
+}
+
 impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
     /// Open a file at a given path.
     ///
     /// The three arguments have the same meaning as the open syscall.
-    pub fn open(mut path: String, flags: i32, mode: u32) -> Result<Arc<Self>, i32> {
+    pub fn open(mut path: String, flags: i32, mode: u32) -> Result<Async<Arc<Self>>> {
         let (can_read, can_write) = if flags & libc::O_WRONLY != 0 {
             (false, true)
         } else if flags & libc::O_RDWR != 0 {
@@ -74,7 +153,7 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
             fd
         };
         if fd < 0 {
-            return Err(errno());
+            return_errno!(Errno::from(libc_errno() as u32), "libc::open error");
         }
 
         #[cfg(not(feature = "sgx"))]
@@ -82,65 +161,55 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
         #[cfg(feature = "sgx")]
         let len = unsafe { libc::ocall::lseek(fd, 0, libc::SEEK_END) };
         if len < 0 {
-            return Err(errno());
+            return_errno!(Errno::from(libc_errno() as u32), "libc::lseek error");
         }
 
-        Ok(Arc::new(Self {
+        // A regular file is always readable (or writable) if it is open for
+        // read or write.
+        let fixed_events = {
+            let mut events = Events::empty();
+            if can_read {
+                events |= Events::IN;
+            }
+            if can_write {
+                events |= Events::OUT;
+            }
+            events
+        };
+
+        let new_self = (Self {
             fd,
             len: RwLock::new(len as usize),
             can_read,
             can_write,
             seq_rd_tracker: SeqRdTracker::new(),
-            waiter_queue: WaiterQueue::new(),
+            pollee: Pollee::new(fixed_events),
+            fixed_events,
             phantom_data: PhantomData,
-        }))
+            weak_self: Weak::default(),
+        }).wrap();
+        Ok(new_self)
     }
 
-    pub async fn read_at(self: &Arc<Self>, offset: usize, buf: &mut [u8]) -> i32 {
-        if !self.can_read {
-            return -libc::EBADF;
+    fn wrap(self) -> Async<Arc<Self>> {
+        // Create an Arc, make a Weak from it, then put it into the struct.
+        // It's a little tricky.
+        let arc = Arc::new(self);
+        let weak = Arc::downgrade(&arc);
+        let ptr = Arc::into_raw(arc) as *mut Self;
+        unsafe {
+            (*ptr).weak_self = weak;
+            Async::new(Arc::from_raw(ptr))
         }
-        if buf.len() == 0 {
-            return 0;
-        }
-
-        // Prevent offset calculation from overflow
-        if offset >= usize::max_value() / 2 {
-            return -libc::EINVAL;
-        }
-        // Prevent the return length (i32) from overflow
-        if buf.len() > i32::max_value() as usize {
-            return -libc::EINVAL;
-        }
-
-        // Fast path
-        let retval = self.try_read_at(offset, buf);
-        if retval != -libc::EAGAIN {
-            return retval;
-        }
-
-        // Slow path
-        let waiter = Waiter::new();
-        self.waiter_queue.enqueue(&waiter);
-        let retval = loop {
-            let retval = self.try_read_at(offset, buf);
-            if retval != -libc::EAGAIN {
-                break retval;
-            }
-
-            waiter.wait().await;
-        };
-        self.waiter_queue.dequeue(&waiter);
-        retval
     }
 
-    fn try_read_at(self: &Arc<Self>, offset: usize, buf: &mut [u8]) -> i32 {
+    fn do_read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         let file_len = *self.len.read().unwrap();
 
         // For reads beyond the end of the file
         if offset >= file_len {
             // EOF
-            return 0;
+            return Ok(0);
         }
 
         // For reads within the bound of the file
@@ -175,9 +244,9 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
 
         if read_nbytes > 0 {
             seq_rd.map(|seq_rd| seq_rd.complete(read_nbytes));
-            read_nbytes as i32
+            Ok(read_nbytes)
         } else {
-            -libc::EAGAIN
+            return_errno!(EAGAIN, "try again later");
         }
     }
 
@@ -197,7 +266,7 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
     // phase, we will try out our best to bring the pages into the page cache,
     // issueing async reads if needed.
     fn fetch_pages(
-        self: &Arc<Self>,
+        &self,
         offset: usize,
         len: usize,
         prefetch_len: usize,
@@ -209,6 +278,7 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
         let mut consecutive_pages = Vec::new();
 
         // Enter the loop that fetches and prefetches pages.
+        let arc_self = self.clone_arc();
         let page_cache = Rt::page_cache();
         let page_begin = align_down(offset, Page::size());
         let page_end = align_up(offset + len + prefetch_len, Page::size());
@@ -218,7 +288,10 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
                 should_call_access_fn = false;
             }
 
-            let page = page_cache.acquire(self, page_offset).unwrap();
+            let page = match page_cache.acquire(&arc_self, page_offset) {
+                Some(page) => page,
+                None => break,
+            };
             let mut state = page.state();
             if should_call_access_fn {
                 // The fetching phase
@@ -279,7 +352,7 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
         }
     }
 
-    fn fetch_consecutive_pages(self: &Arc<Self>, consecutive_pages: Vec<PageHandle>) {
+    fn fetch_consecutive_pages(&self, consecutive_pages: Vec<PageHandle>) {
         debug_assert!(!consecutive_pages.is_empty());
         debug_assert!(consecutive_pages.windows(2).all(|two_pages| {
             let (p0, p1) = (&two_pages[0], &two_pages[1]);
@@ -290,7 +363,7 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
             .all(|page| { *page.state() == PageState::Fetching }));
 
         let first_offset = consecutive_pages[0].offset();
-        let self_ = self.clone();
+        let self_ = self.clone_arc();
         let iovecs = Box::new(
             consecutive_pages
                 .iter()
@@ -362,7 +435,7 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
                 }
                 page_cache.release(page);
             }
-            self_.waiter_queue.wake_all();
+            self_.pollee.add_events(Events::IN | Events::OUT);
 
             #[cfg(feature = "sgx")]
             {
@@ -398,52 +471,18 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
         guard.replace(handle);
     }
 
-    pub async fn write_at(self: &Arc<Self>, offset: usize, buf: &[u8]) -> i32 {
-        if !self.can_write {
-            return -libc::EBADF;
-        }
-        if buf.len() == 0 {
-            return 0;
-        }
-
-        // Fast path
-        let retval = self.try_write(offset, buf);
-        if retval != -libc::EAGAIN {
-            return retval;
-        }
-
-        // Slow path
-        let waiter = Waiter::new();
-        self.waiter_queue.enqueue(&waiter);
-        let retval = loop {
-            let retval = self.try_write(offset, buf);
-            if retval != -libc::EAGAIN {
-                break retval;
-            }
-
-            waiter.wait().await;
-        };
-        self.waiter_queue.dequeue(&waiter);
-        retval
-    }
-
-    fn try_write(self: &Arc<Self>, offset: usize, buf: &[u8]) -> i32 {
-        // Prevent offset calculation from overflow
-        if offset >= usize::max_value() / 2 {
-            return -libc::EINVAL;
-        }
-        // Prevent the return length (i32) from overflow
-        if buf.len() > i32::max_value() as usize {
-            return -libc::EINVAL;
-        }
-
+    fn do_write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
         let mut new_dirty_pages = false;
         let mut write_nbytes = 0;
+        let arc_self = self.clone_arc();
         let page_cache = Rt::page_cache();
         let page_begin = align_down(offset, Page::size());
         let page_end = align_up(offset + buf.len(), Page::size());
         for page_offset in (page_begin..page_end).step_by(Page::size()) {
-            let page_handle = page_cache.acquire(self, page_offset).unwrap();
+            let page_handle = match page_cache.acquire(&arc_self, page_offset) {
+                Some(page_handle) => page_handle,
+                None => break,
+            };
             let inner_offset = offset + write_nbytes - page_offset;
 
             let copy_size = {
@@ -517,24 +556,18 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
                 *file_len = offset + write_nbytes;
             }
 
-            write_nbytes as i32
+            Ok(write_nbytes)
         } else {
-            -libc::EAGAIN
+            return_errno!(EAGAIN, "try again later");
         }
     }
 
-    pub async fn flush(&self) {
-        loop {
-            const FLUSH_BATCH_SIZE: usize = 64;
-            let num_flushed = Rt::flusher().flush_by_fd(self.fd, FLUSH_BATCH_SIZE).await;
-            if num_flushed == 0 {
-                return;
-            }
-        }
+    pub fn clone_arc(&self) -> Arc<Self> {
+        self.weak_self.upgrade().unwrap()
     }
 
-    pub(crate) fn waiter_queue(&self) -> &WaiterQueue {
-        &self.waiter_queue
+    pub(crate) fn pollee(&self) -> &Pollee {
+        &self.pollee
     }
 }
 
@@ -555,8 +588,17 @@ impl<Rt: AsyncFileRt + ?Sized> Drop for AsyncFile<Rt> {
     }
 }
 
+impl<Rt: AsyncFileRt + ?Sized> std::fmt::Debug for AsyncFile<Rt> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AsyncFile")
+            .field("fd", &self.fd)
+            .field("pollee", self.pollee())
+            .finish()
+    }
+}
+
 #[cfg(not(feature = "sgx"))]
-fn errno() -> i32 {
+fn libc_errno() -> i32 {
     unsafe {
         *(libc::__errno_location())
         // *(libc::__error())
@@ -564,6 +606,6 @@ fn errno() -> i32 {
 }
 
 #[cfg(feature = "sgx")]
-fn errno() -> i32 {
+fn libc_errno() -> i32 {
     libc::errno()
 }

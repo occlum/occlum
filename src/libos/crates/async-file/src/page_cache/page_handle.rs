@@ -14,6 +14,7 @@ use crate::page_cache::{Page, PageEntry, PageState};
 /// We rely on this property for zero-overhead type conversion between PageHandle
 /// and PageEntry.
 #[repr(transparent)]
+#[derive(Debug)]
 pub struct PageHandle(PageEntry);
 
 impl PageHandle {

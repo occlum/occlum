@@ -22,10 +22,10 @@ struct PolleeInner {
 }
 
 impl Pollee {
-    pub fn new() -> Self {
+    pub fn new(init_events: Events) -> Self {
         let inner = PolleeInner {
             pollers: Mutex::new(HashMap::new()),
-            events: AtomicU32::new(0),
+            events: AtomicU32::new(init_events.bits()),
             num_pollers: AtomicUsize::new(0),
         };
         Self {
@@ -35,17 +35,15 @@ impl Pollee {
 
     /// Returns the current events of the pollee given an event mask.
     ///
-    /// If no interesting events for now and a poller is provided, then the poller will start
-    /// monitoring the pollee and receive event notification once the pollee gets any
+    /// If a poller is provided, then the poller will start monitoring the
+    /// pollee and receive event notification once the pollee gets any
     /// interesting events.
     pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
         let mask = mask | Events::ALWAYS_POLL;
 
-        // Attempt to get interesting events without locking. It is ok to return false positives.
-        let revents = self.events() & mask;
-
-        // Fast path: return non-empty events immediately
-        if !revents.is_empty() || poller.is_none() {
+        // Fast path: return events immediately
+        if poller.is_none() {
+            let revents = self.events() & mask;
             return revents;
         }
 

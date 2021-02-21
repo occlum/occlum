@@ -1,24 +1,28 @@
 use std::marker::PhantomData;
 #[cfg(feature = "sgx")]
 use std::prelude::v1::*;
+use std::sync::Arc;
 
+use async_io::poll::{Pollee, Events};
 use futures::future::BoxFuture;
 use io_uring_callback::Fd;
 use itertools::Itertools;
 #[cfg(feature = "sgx")]
 use sgx_untrusted_alloc::UntrustedAllocator;
 
-use crate::file::{AsyncFile, AsyncFileRt};
+use crate::file::{AsyncFileRt};
 use crate::page_cache::{Page, PageHandle, PageState};
 
 /// Flush dirty pages in a page cache.
 pub struct Flusher<Rt: AsyncFileRt + ?Sized> {
+    pollee: Arc<Pollee>,
     phantom_data: PhantomData<Rt>,
 }
 
 impl<Rt: AsyncFileRt + ?Sized> Flusher<Rt> {
     pub fn new() -> Self {
         Self {
+            pollee: Arc::new(Pollee::new(Events::IN | Events::OUT)),
             phantom_data: PhantomData,
         }
     }
@@ -126,6 +130,7 @@ impl<Rt: AsyncFileRt + ?Sized> Flusher<Rt> {
         offset: usize,
         mut consecutive_pages: Vec<PageHandle>,
     ) -> BoxFuture<'static, i32> {
+        // TODO: I don't think this Box is necessary (at least for non-SGX build)
         let iovecs: Box<Vec<libc::iovec>> = Box::new(
             consecutive_pages
                 .iter()
@@ -169,14 +174,7 @@ impl<Rt: AsyncFileRt + ?Sized> Flusher<Rt> {
 
         let complete_fn = {
             let page_cache = Rt::page_cache();
-            let file = {
-                let first_page = &consecutive_pages[0];
-                first_page
-                    .file()
-                    .clone()
-                    .downcast::<AsyncFile<Rt>>()
-                    .unwrap()
-            };
+            let flusher_pollee = self.pollee.clone();
             move |retval: i32| {
                 // TODO: handle partial writes or error
                 assert!(retval as usize == consecutive_pages.len() * Page::size());
@@ -192,7 +190,8 @@ impl<Rt: AsyncFileRt + ?Sized> Flusher<Rt> {
                     drop(state);
                     page_cache.release(page);
                 }
-                file.waiter_queue().wake_all();
+                flusher_pollee.add_events(Events::IN | Events::OUT);
+
                 #[cfg(feature = "sgx")]
                 drop(allocator);
                 drop(iovecs_box);
@@ -209,6 +208,11 @@ impl<Rt: AsyncFileRt + ?Sized> Flusher<Rt> {
                 complete_fn,
             )
         };
+        // TODO: I don't think this Box is necessary
         Box::pin(handle)
+    }
+
+    pub(crate) fn pollee(&self) -> &Pollee {
+        &self.pollee
     }
 }

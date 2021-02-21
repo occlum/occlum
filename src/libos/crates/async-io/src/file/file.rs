@@ -1,12 +1,16 @@
 use std::any::Any;
 use std::fmt::Debug;
 
+use futures::future::{self, BoxFuture};
+use futures::prelude::*;
+
 use crate::poll::{Events, Poller};
 use crate::prelude::*;
 
-/// An abstract for non-blocking file APIs.
+/// An abstract for file APIs.
 ///
-/// An implementation for this trait should make sure all APIs are non-blocking.
+/// An implementation for this trait should make sure all read and write APIs
+/// are non-blocking.
 pub trait File: Debug {
     fn read(&self, _buf: &mut [u8]) -> Result<usize> {
         return_errno!(EBADF, "the file cannot read");
@@ -21,7 +25,7 @@ pub trait File: Debug {
         Ok(0)
     }
 
-    fn read_at(&self, buf: &mut [u8], _offset: usize) -> Result<usize> {
+    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
         self.read(buf)
     }
 
@@ -38,16 +42,16 @@ pub trait File: Debug {
         Ok(0)
     }
 
-    fn write_at(&self, buf: &[u8], _offset: usize) -> Result<usize> {
+    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         self.write(buf)
+    }
+
+    fn flush(&self) -> BoxFuture<'_, Result<()>> {
+        future::ready(Ok(())).boxed()
     }
 
     fn seek(&self, _pos: SeekFrom) -> Result<usize> {
         return_errno!(ESPIPE, "the file cannot seek");
-    }
-
-    fn flush(&self) -> Result<()> {
-        Ok(())
     }
 
     fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events;

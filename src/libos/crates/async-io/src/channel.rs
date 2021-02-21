@@ -71,9 +71,8 @@ impl Common {
         let rb: RingBuffer<u8> = RingBuffer::new(capacity);
         let (rb_producer, rb_consumer) = rb.split();
 
-        let producer = EndPoint::new(rb_producer);
-        let consumer = EndPoint::new(rb_consumer);
-        producer.pollee.add_events(Events::OUT);
+        let producer = EndPoint::new(rb_producer, Events::OUT);
+        let consumer = EndPoint::new(rb_consumer, Events::empty());
 
         let event_lock = Mutex::new(());
 
@@ -90,10 +89,10 @@ impl Common {
 }
 
 impl<T> EndPoint<T> {
-    pub fn new(ringbuf: T) -> Self {
+    pub fn new(ringbuf: T, init_events: Events) -> Self {
         Self {
             ringbuf: Mutex::new(ringbuf),
-            pollee: Pollee::new(),
+            pollee: Pollee::new(init_events),
             is_shutdown: AtomicBool::new(false),
         }
     }

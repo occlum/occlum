@@ -94,18 +94,19 @@ impl Executor {
                 }
             };
 
-            let future = task.future();
-            let mut future_slot = future.lock();
+            let mut future_slot = task.future().lock();
             let mut future = match future_slot.take() {
                 None => continue,
                 Some(future) => future,
             };
+            drop(future_slot);
 
             crate::task::current::set(task.clone());
 
             let waker = waker_ref(&task);
             let context = &mut Context::from_waker(&*waker);
             if let Poll::Pending = future.as_mut().poll(context) {
+                let mut future_slot = task.future().lock();
                 *future_slot = Some(future);
             }
 

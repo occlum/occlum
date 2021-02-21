@@ -8,7 +8,16 @@ edition = "2018"
 
 [features]
 default = ["libc"]
-sgx = ["sgx_types", "sgx_tstd", "sgx_trts", "sgx_libc", "io-uring-callback/sgx", "async-rt/sgx", "sgx-untrusted-alloc"]
+sgx = [
+    "sgx_types",
+    "sgx_tstd",
+    "sgx_trts",
+    "sgx_libc",
+    "io-uring-callback/sgx",
+    "async-rt/sgx",
+    "async-io/sgx",
+    "sgx-untrusted-alloc"
+]
 
 [dependencies]
 array-init = "1.0"
@@ -18,6 +27,7 @@ intrusive-collections = "0.9"
 itertools = { version = "0.10", default-features = false, features = ["use_alloc"] }
 io-uring-callback = { path = "../io-uring-callback" }
 async-rt = { path = "../async-rt", features = ["auto_run"] }
+async-io = { path = "../async-io" }
 libc = { version = "0.2", optional = true }
 sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }
 sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", optional = true, features = ["backtrace"] }
