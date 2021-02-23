@@ -373,6 +373,12 @@ impl ProcessVM {
     }
 
     pub fn mprotect(&self, addr: usize, size: usize, perms: VMPerms) -> Result<()> {
+        let size = {
+            if size == 0 {
+                return Ok(());
+            }
+            align_up(size, PAGE_SIZE)
+        };
         let protect_range = VMRange::new_with_size(addr, size)?;
         if !self.process_range.range().is_superset_of(&protect_range) {
             return_errno!(ENOMEM, "invalid range");
