@@ -136,6 +136,12 @@ int server_recvmsg(int client_fd) {
     return ret;
 }
 
+int sigchld = 0;
+
+void proc_exit() {
+    sigchld = 1;
+}
+
 int server_connectionless_recvmsg() {
     int ret = 0;
     const int buf_size = 1000;
@@ -171,6 +177,10 @@ int server_connectionless_recvmsg() {
     msg.msg_control = 0;
     msg.msg_controllen = 0;
     msg.msg_flags = 0;
+
+    if (sigchld != 0) {
+        return 0;
+    }
 
     ret = recvmsg(sock, &msg, 0);
     if (ret <= 0) {
@@ -261,6 +271,8 @@ int test_sendmsg_recvmsg() {
 int test_sendmsg_recvmsg_connectionless() {
     int ret = 0;
     int child_pid = 0;
+
+    signal(SIGCHLD, proc_exit);
 
     char *client_argv[] = {"client", "NULL", "8803", NULL};
     ret = posix_spawn(&child_pid, "/bin/client", NULL, NULL, client_argv, NULL);
