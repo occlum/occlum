@@ -15,6 +15,7 @@
 #include "test.h"
 
 #define MAXEVENTS 64
+#define MAXRETRY_TIMES 3
 #define DEFAULT_PROC_NUM 3
 #define DEFAULT_MSG "Hello World!\n"
 // The recv buf length should be longer than that of DEFAULT_MSG
@@ -89,10 +90,19 @@ int test_ip_socket() {
     int count = 0;
     while (count < proc_num) {
         struct epoll_event events[MAXEVENTS] = {0};
-        int nfds = epoll_pwait(epfd, events, MAXEVENTS, -1, NULL);
-        if (nfds == -1) {
-            close_files(2, server_fd, epfd);
-            THROW_ERROR("epoll_wait failed");
+        int retry_times = 0;
+        int nfds = -1;
+        while (1) {
+            nfds = epoll_pwait(epfd, events, MAXEVENTS, -1, NULL);
+
+            if (nfds >= 0) {
+                break;
+            } else if ( retry_times == MAXRETRY_TIMES ) {
+                close_files(2, server_fd, epfd);
+                THROW_ERROR("epoll_wait failed");
+            }
+
+            retry_times++;
         }
 
         for (int i = 0; i < nfds; i++) {
