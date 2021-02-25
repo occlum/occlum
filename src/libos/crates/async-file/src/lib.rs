@@ -180,7 +180,7 @@ mod tests {
     // }
 
     mod runtime {
-        use async_rt::{waiter_loop, wait::WaiterQueue};
+        use async_rt::{wait::WaiterQueue, waiter_loop};
 
         use super::*;
         use std::sync::Once;

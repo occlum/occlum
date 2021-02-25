@@ -1,16 +1,16 @@
+use std::any::Any;
 use std::marker::PhantomData;
 #[cfg(feature = "sgx")]
 use std::prelude::v1::*;
 #[cfg(not(feature = "sgx"))]
-use std::sync::{Arc, Weak, Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock, Weak};
 #[cfg(feature = "sgx")]
-use std::sync::{Arc, Weak, SgxMutex as Mutex, SgxRwLock as RwLock};
-use std::any::Any;
+use std::sync::{Arc, SgxMutex as Mutex, SgxRwLock as RwLock, Weak};
 
-use async_io::prelude::{Result, *};
-use async_io::poll::{Poller, Pollee, Events};
 use async_io::file::{Async, File};
-use futures::future::{BoxFuture};
+use async_io::poll::{Events, Pollee, Poller};
+use async_io::prelude::{Result, *};
+use futures::future::BoxFuture;
 use futures::prelude::*;
 
 use crate::file::tracker::SeqRdTracker;
@@ -104,7 +104,8 @@ impl<Rt: AsyncFileRt + ?Sized> File for AsyncFile<Rt> {
                     return Ok(());
                 }
             }
-        }).boxed()
+        })
+        .boxed()
     }
 
     fn poll_by(&self, mask: Events, mut poller: Option<&mut Poller>) -> Events {
@@ -187,7 +188,8 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
             fixed_events,
             phantom_data: PhantomData,
             weak_self: Weak::default(),
-        }).wrap();
+        })
+        .wrap();
         Ok(new_self)
     }
 
