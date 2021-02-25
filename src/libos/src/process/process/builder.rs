@@ -1,12 +1,13 @@
 use std::sync::Weak;
 
+use async_rt::wait::WaiterQueue;
+
 use super::super::thread::{ThreadBuilder, ThreadId, ThreadName};
 use super::super::{
     FileTableRef, ForcedExitStatus, FsViewRef, HostWaker, ProcessRef, ProcessVMRef,
     ResourceLimitsRef, SchedAgentRef,
 };
 use super::{Process, ProcessInner};
-use crate::events::{Notifier, Observer, WaiterQueueObserver};
 use crate::prelude::*;
 use crate::signal::{SigDispositions, SigQueues};
 
@@ -108,8 +109,7 @@ impl ProcessBuilder {
             let sig_dispositions = RwLock::new(SigDispositions::new());
             let sig_queues = RwLock::new(SigQueues::new());
             let forced_exit_status = ForcedExitStatus::new();
-            let observer = WaiterQueueObserver::new();
-            let notifier = Notifier::new();
+            let waiter_queue = WaiterQueue::new();
             Arc::new(Process {
                 pid,
                 exec_path,
@@ -119,8 +119,7 @@ impl ProcessBuilder {
                 sig_dispositions,
                 sig_queues,
                 forced_exit_status,
-                observer,
-                notifier,
+                waiter_queue,
             })
         };
 
@@ -136,13 +135,6 @@ impl ProcessBuilder {
                 .children_mut()
                 .unwrap()
                 .push(new_process.clone());
-
-            // If the parent is not the idle process, then we let the parent process
-            // to monitor events on the new process
-            if parent.pid() != 0 {
-                let weak_observer = Arc::downgrade(parent.observer()) as Weak<dyn Observer<_>>;
-                new_process.notifier().register(weak_observer, None, None);
-            }
         }
 
         Ok(new_process)

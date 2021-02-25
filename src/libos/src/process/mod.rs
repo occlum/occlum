@@ -21,7 +21,7 @@ use self::thread::{ThreadBuilder, ThreadId, ThreadInner};
 pub use self::do_exit::handle_force_exit;
 pub use self::do_futex::{futex_wait, futex_wake};
 pub use self::do_spawn::do_spawn_root;
-pub use self::process::{Process, ProcessFilter, ProcessStatus, StatusChange, IDLE};
+pub use self::process::{Process, ProcessFilter, ProcessStatus, IDLE};
 pub use self::syscalls::*;
 pub use self::term_status::{ForcedExitStatus, TermStatus};
 pub use self::thread::{Thread, ThreadStatus};

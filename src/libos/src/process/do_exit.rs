@@ -3,7 +3,7 @@ use std::sync::Weak;
 
 use super::do_futex::futex_wake;
 use super::process::{Process, ProcessFilter};
-use super::{table, ProcessRef, StatusChange, TermStatus, ThreadRef, ThreadStatus};
+use super::{table, ProcessRef, TermStatus, ThreadRef, ThreadStatus};
 use crate::prelude::*;
 use crate::signal::constants::*;
 use crate::signal::{KernelSignal, SigNum};
@@ -114,9 +114,7 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
     drop(process_inner);
 
     // Notify the parent that this child process's status has changed
-    process
-        .notifier()
-        .broadcast(&StatusChange::Terminated(term_status));
+    parent.waiter_queue().wake_all();
 
     // Notify the host threads that wait the status change of this process
     wake_host(&process, term_status);

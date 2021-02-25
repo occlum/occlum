@@ -1,17 +1,16 @@
 use std::fmt;
 use std::sync::Weak;
 
+use async_rt::wait::WaiterQueue;
+
 use super::{ForcedExitStatus, HostWaker, ProcessRef, TermStatus, ThreadRef};
-use crate::events::{Notifier, Observer, WaiterQueueObserver};
 use crate::prelude::*;
 use crate::signal::{SigDispositions, SigNum, SigQueues};
 
 pub use self::builder::ProcessBuilder;
-pub use self::event::StatusChange;
 pub use self::idle::IDLE;
 
 mod builder;
-mod event;
 mod idle;
 
 pub struct Process {
@@ -26,9 +25,8 @@ pub struct Process {
     sig_dispositions: RwLock<SigDispositions>,
     sig_queues: RwLock<SigQueues>,
     forced_exit_status: ForcedExitStatus,
-    // Process-related Events
-    observer: Arc<WaiterQueueObserver<StatusChange>>,
-    notifier: Notifier<StatusChange>,
+    // Wait4
+    waiter_queue: WaiterQueue,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -148,12 +146,8 @@ impl Process {
         self.inner.lock().unwrap()
     }
 
-    pub(super) fn observer(&self) -> &Arc<WaiterQueueObserver<StatusChange>> {
-        &self.observer
-    }
-
-    pub(super) fn notifier(&self) -> &Notifier<StatusChange> {
-        &self.notifier
+    pub(super) fn waiter_queue(&self) -> &WaiterQueue {
+        &self.waiter_queue
     }
 }
 
@@ -258,8 +252,6 @@ impl ProcessInner {
         debug_assert!(self.status() == ProcessStatus::Running);
         debug_assert!(self.num_threads() == 0);
 
-        self.stop_observing_children(old_parent_ref);
-
         // When this process exits, its children are adopted by the init process
         for child in self.children().unwrap() {
             // Establish the new parent-child relationship
@@ -273,13 +265,6 @@ impl ProcessInner {
         }
 
         *self = Self::Zombie { term_status };
-    }
-
-    fn stop_observing_children(&mut self, old_parent_ref: &ProcessRef) {
-        let old_observer = Arc::downgrade(old_parent_ref.observer()) as Weak<dyn Observer<_>>;
-        for child in self.children().unwrap() {
-            child.notifier().unregister(&old_observer);
-        }
     }
 
     pub fn term_status(&self) -> Option<TermStatus> {

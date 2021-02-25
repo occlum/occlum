@@ -1,48 +1,44 @@
 use std::sync::Weak;
 
+use async_rt::waiter_loop;
+
 use super::process::{ProcessFilter, ProcessInner};
 use super::{table, ProcessRef, ProcessStatus};
-use crate::events::{Observer, Waiter};
 use crate::prelude::*;
-use crate::waiter_loop;
 
 pub async fn do_wait4(child_filter: &ProcessFilter) -> Result<(pid_t, i32)> {
     let thread = current!();
     let process = thread.process();
 
-    let err_res = waiter_loop!(
-        {
-            // Lock order: always lock parent then child to avoid deadlock
-            let mut process_inner = process.inner();
+    waiter_loop!(process.waiter_queue(), {
+        // Lock order: always lock parent then child to avoid deadlock
+        let mut process_inner = process.inner();
 
-            let unwaited_children = process_inner
-                .children()
-                .unwrap()
-                .iter()
-                .filter(|child| match child_filter {
-                    ProcessFilter::WithAnyPid => true,
-                    ProcessFilter::WithPid(required_pid) => child.pid() == *required_pid,
-                    ProcessFilter::WithPgid(required_pgid) => child.pgid() == *required_pgid,
-                })
-                .collect::<Vec<&ProcessRef>>();
+        let unwaited_children = process_inner
+            .children()
+            .unwrap()
+            .iter()
+            .filter(|child| match child_filter {
+                ProcessFilter::WithAnyPid => true,
+                ProcessFilter::WithPid(required_pid) => child.pid() == *required_pid,
+                ProcessFilter::WithPgid(required_pgid) => child.pgid() == *required_pgid,
+            })
+            .collect::<Vec<&ProcessRef>>();
 
-            if unwaited_children.len() == 0 {
-                return_errno!(ECHILD, "Cannot find any unwaited children");
-            }
+        if unwaited_children.len() == 0 {
+            return_errno!(ECHILD, "Cannot find any unwaited children");
+        }
 
-            // Return immediately if a child that we wait for has already exited
-            let zombie_child = unwaited_children
-                .iter()
-                .find(|child| child.status() == ProcessStatus::Zombie);
-            if let Some(zombie_child) = zombie_child {
-                let zombie_pid = zombie_child.pid();
-                let exit_status = free_zombie_child(&process, process_inner, zombie_pid);
-                return Ok((zombie_pid, exit_status));
-            }
-        },
-        process.observer().waiter_queue()
-    );
-    err_res
+        // Return immediately if a child that we wait for has already exited
+        let zombie_child = unwaited_children
+            .iter()
+            .find(|child| child.status() == ProcessStatus::Zombie);
+        if let Some(zombie_child) = zombie_child {
+            let zombie_pid = zombie_child.pid();
+            let exit_status = free_zombie_child(&process, process_inner, zombie_pid);
+            return Ok((zombie_pid, exit_status));
+        }
+    });
 }
 
 fn free_zombie_child(
@@ -56,9 +52,6 @@ fn free_zombie_child(
 
     let zombie = parent_inner.remove_zombie_child(zombie_pid);
     debug_assert!(zombie.status() == ProcessStatus::Zombie);
-
-    let observer = Arc::downgrade(parent.observer()) as Weak<dyn Observer<_>>;
-    zombie.notifier().unregister(&observer);
 
     let zombie_inner = zombie.inner();
     zombie_inner.term_status().unwrap().as_u32() as i32
