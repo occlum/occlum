@@ -1,3 +1,5 @@
+pub use core::task::Waker as RawWaker;
+
 use atomic::{Atomic, Ordering};
 use intrusive_collections::{LinkedList, LinkedListLink};
 use object_id::ObjectId;
@@ -5,6 +7,9 @@ use object_id::ObjectId;
 use crate::prelude::*;
 
 /// A waiter.
+///
+/// `Waiter`s are mostly used with `WaiterQueue`s. Yet, it is also possible to
+/// use `Waiter` with `Waker`.
 pub struct Waiter {
     inner: Arc<WaiterInner>,
 }
@@ -35,15 +40,36 @@ impl Waiter {
         self.inner.wait()
     }
 
+    pub fn waker(&self) -> Waker {
+        Waker {
+            inner: self.inner.clone(),
+        }
+    }
+
     pub(super) fn inner(&self) -> &Arc<WaiterInner> {
         &self.inner
+    }
+}
+
+#[derive(Clone)]
+pub struct Waker {
+    inner: Arc<WaiterInner>,
+}
+
+impl Waker {
+    pub fn state(&self) -> WaiterState {
+        self.inner.state()
+    }
+
+    pub fn wake(&self) -> Option<()> {
+        self.inner.wake()
     }
 }
 
 // Accesible by WaiterQueue.
 pub(super) struct WaiterInner {
     state: Atomic<WaiterState>,
-    waker: Mutex<Option<Waker>>,
+    raw_waker: Mutex<Option<RawWaker>>,
     queue_id: Atomic<ObjectId>,
     pub(super) link: LinkedListLink,
 }
@@ -53,7 +79,7 @@ impl WaiterInner {
         Self {
             state: Atomic::new(WaiterState::Idle),
             link: LinkedListLink::new(),
-            waker: Mutex::new(None),
+            raw_waker: Mutex::new(None),
             queue_id: Atomic::new(ObjectId::null()),
         }
     }
@@ -75,7 +101,7 @@ impl WaiterInner {
     }
 
     pub fn wake(&self) -> Option<()> {
-        let mut waker = self.waker.lock();
+        let mut raw_waker = self.raw_waker.lock();
         match self.state() {
             WaiterState::Idle => {
                 self.set_state(WaiterState::Woken);
@@ -84,8 +110,8 @@ impl WaiterInner {
             WaiterState::Waiting => {
                 self.set_state(WaiterState::Woken);
 
-                let waker = waker.take().unwrap();
-                waker.wake();
+                let raw_waker = raw_waker.take().unwrap();
+                raw_waker.wake();
                 Some(())
             }
             WaiterState::Woken => None,
@@ -110,20 +136,20 @@ impl<'a> Future for WaitFuture<'a> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut waker = self.waiter.waker.lock();
+        let mut raw_waker = self.waiter.raw_waker.lock();
         match self.waiter.state() {
             WaiterState::Idle => {
                 self.waiter.set_state(WaiterState::Waiting);
 
-                *waker = Some(cx.waker().clone());
+                *raw_waker = Some(cx.waker().clone());
                 Poll::Pending
             }
             WaiterState::Waiting => {
-                *waker = Some(cx.waker().clone());
+                *raw_waker = Some(cx.waker().clone());
                 Poll::Pending
             }
             WaiterState::Woken => {
-                debug_assert!(waker.is_none());
+                debug_assert!(raw_waker.is_none());
                 Poll::Ready(())
             }
         }

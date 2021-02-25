@@ -4,7 +4,8 @@ use std::intrinsics::atomic_load;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use crate::events::{Waiter, Waker};
+use async_rt::wait::{Waiter, Waker};
+
 use crate::prelude::*;
 use crate::time::{timespec_t, ClockID};
 
@@ -144,14 +145,16 @@ pub async fn futex_wait_bitset(
     // Must make sure that no locks are holded by this thread before wait
     drop(futex_bucket);
 
-    let res = waiter.wait(timeout.as_ref()).await;
+    waiter.wait(/*timeout.as_ref()*/).await;
 
+    /* TODO: handle errror
     if let Err(e) = res {
         let (_, futex_bucket_ref) = FUTEX_BUCKETS.get_bucket(futex_item.key);
         let mut futex_bucket = futex_bucket_ref.lock().unwrap();
         futex_bucket.dequeue_item(&futex_item);
         return_errno!(e.errno(), "futex wait timeout or interrupted");
     }
+    */
     Ok(())
 }
 
@@ -250,7 +253,7 @@ impl FutexKey {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 struct FutexItem {
     key: FutexKey,
     bitset: u32,
@@ -263,7 +266,7 @@ impl FutexItem {
     }
 
     pub fn wake(&self) {
-        self.waker.wake()
+        self.waker.wake();
     }
 
     pub fn batch_wake(items: &[FutexItem]) {
@@ -291,13 +294,13 @@ impl FutexBucket {
     }
 
     // TODO: this is an O(N) operation. Try to make it more efficient
-    pub fn dequeue_item(&mut self, futex_item: &FutexItem) -> Option<FutexItem> {
+    /*pub fn dequeue_item(&mut self, futex_item: &FutexItem) -> Option<FutexItem> {
         let item_i = self.queue.iter().position(|item| *item == *futex_item);
         if item_i.is_none() {
             return None;
         }
         self.queue.remove(item_i.unwrap())
-    }
+    }*/
 
     // TODO: consider using std::future to improve the readability
     pub fn dequeue_and_wake_items(

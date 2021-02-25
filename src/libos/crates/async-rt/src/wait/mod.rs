@@ -3,7 +3,7 @@ mod waiter;
 mod waiter_queue;
 
 pub use self::macros::AutoWaiter;
-pub use self::waiter::Waiter;
+pub use self::waiter::{Waiter, Waker};
 pub use self::waiter_queue::WaiterQueue;
 
 #[cfg(test)]

@@ -20,7 +20,7 @@ macro_rules! waiter_loop {
 
         let waiter_queue: &WaiterQueue = $waiter_queue;
         let mut auto_waiter = AutoWaiter::new(waiter_queue);
-        let mut loop_count : u32 = 0;
+        let mut loop_count: u32 = 0;
 
         // The loop below may seem a bit of complicated since we want
         // achieve the following three goals simultaneously:
@@ -38,12 +38,12 @@ macro_rules! waiter_loop {
                 0 => {
                     // For the first attempt, we jump directly to the loop body
                     loop_count += 1;
-                },
+                }
                 1 => {
                     // For the second attempt, we init the waiter
                     auto_waiter.waiter();
                     loop_count += 1;
-                },
+                }
                 2 => {
                     // For the third attempt and beyond, we will wait
                     let waiter = auto_waiter.waiter();
@@ -51,7 +51,7 @@ macro_rules! waiter_loop {
                     waiter.wait().await;
                     // Prepare the waiter so that we can try the loop body again
                     waiter.reset();
-                },
+                }
                 _ => unreachable!(),
             };
 
