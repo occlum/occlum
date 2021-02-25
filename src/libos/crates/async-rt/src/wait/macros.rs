@@ -20,27 +20,40 @@ macro_rules! waiter_loop {
 
         let waiter_queue: &WaiterQueue = $waiter_queue;
         let mut auto_waiter = AutoWaiter::new(waiter_queue);
-        let mut is_first = true;
+        let mut loop_count : u32 = 0;
 
-        // The main loop cannot be written in the most natural way since we want
-        // achieve the following two goals simultaneously:
+        // The loop below may seem a bit of complicated since we want
+        // achieve the following three goals simultaneously:
         //
         // 1. The loop_body can only appear once after the expansion of the macro.
         //
         // 2. We do not create the waiter on the first attempt of the loop. This
         // saves a heap allocation and other initialization if we are lucky with
         // the first attempt.
+        //
+        // 3. Use the combo of waiter and waiter queue properly so that we do
+        // not miss any interesting events.
         loop {
-            if is_first {
-                is_first = false;
-            } else {
-                let waiter = auto_waiter.waiter();
-                // Wait until being woken by the waiter queue
-                waiter.wait().await;
-
-                // Prepare the waiter so that we can try the loop body again
-                waiter.reset();
-            }
+            match loop_count {
+                0 => {
+                    // For the first attempt, we jump directly to the loop body
+                    loop_count += 1;
+                },
+                1 => {
+                    // For the second attempt, we init the waiter
+                    auto_waiter.waiter();
+                    loop_count += 1;
+                },
+                2 => {
+                    // For the third attempt and beyond, we will wait
+                    let waiter = auto_waiter.waiter();
+                    // Wait until being woken by the waiter queue
+                    waiter.wait().await;
+                    // Prepare the waiter so that we can try the loop body again
+                    waiter.reset();
+                },
+                _ => unreachable!(),
+            };
 
             {
                 $loop_body
