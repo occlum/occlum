@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex, RwLock, Weak};
 #[cfg(feature = "sgx")]
 use std::sync::{Arc, SgxMutex as Mutex, SgxRwLock as RwLock, Weak};
 
-use async_io::file::{Async, File};
+use async_io::file::{Async, File, SeekFrom};
 use async_io::poll::{Events, Pollee, Poller};
 use async_io::prelude::{Result, *};
 use futures::future::BoxFuture;
@@ -29,6 +29,7 @@ mod tracker;
 /// An instance of file with async APIs.
 pub struct AsyncFile<Rt: AsyncFileRt + ?Sized> {
     fd: i32,
+    pos: Mutex<usize>,
     len: RwLock<usize>,
     can_read: bool,
     can_write: bool,
@@ -54,43 +55,55 @@ pub trait AsyncFileRt: Send + Sync + 'static {
 }
 
 impl<Rt: AsyncFileRt + ?Sized> File for AsyncFile<Rt> {
+    fn read(&self, buf: &mut [u8]) -> Result<usize> {
+        let mut pos = self.pos.lock().unwrap();
+        let res = self.do_read_at(*pos, buf);
+        if let Ok(nbytes) = &res {
+            *pos += *nbytes;
+        }
+        res
+    }
+
+    fn write(&self, buf: &[u8]) -> Result<usize> {
+        let mut pos = self.pos.lock().unwrap();
+        let res = self.do_write_at(*pos, buf);
+        if let Ok(nbytes) = &res {
+            *pos += *nbytes;
+        }
+        res
+    }
+
+    fn seek(&self, seek_pos: SeekFrom) -> Result<usize> {
+        let mut pos = self.pos.lock().unwrap();
+        match seek_pos {
+            SeekFrom::Start(offset) => {
+                *pos = offset;
+            }
+            SeekFrom::End(offset) => {
+                let len = self.len.read().unwrap();
+                *pos = len
+                    .checked_add(offset)
+                    .ok_or_else(|| errno!(EOVERFLOW, "offset overflow"))?;
+            }
+            SeekFrom::Current(offset) => {
+                let new_pos = if offset >= 0 {
+                    pos.checked_add(offset as usize)
+                        .ok_or_else(|| errno!(EOVERFLOW, "offset overflow"))?
+                } else {
+                    pos.checked_sub(-offset as usize)
+                        .ok_or_else(|| errno!(EINVAL, "offset underflow"))?
+                };
+                *pos = new_pos;
+            }
+        }
+        Ok(*pos)
+    }
+
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        if !self.can_read {
-            return_errno!(EBADF, "not open for read");
-        }
-        if buf.len() == 0 {
-            return Ok(0);
-        }
-
-        // Prevent offset calculation from overflow
-        if offset >= usize::max_value() / 2 {
-            return_errno!(EINVAL, "offset is too large");
-        }
-        // Prevent the return length (i32) from overflow
-        if buf.len() > i32::max_value() as usize {
-            return_errno!(EINVAL, "buffer is tool large");
-        }
-
         self.do_read_at(offset, buf)
     }
 
     fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
-        if !self.can_write {
-            return_errno!(EBADF, "not open for write");
-        }
-        if buf.len() == 0 {
-            return Ok(0);
-        }
-
-        // Prevent offset calculation from overflow
-        if offset >= usize::max_value() / 2 {
-            return_errno!(EINVAL, "offset is too large");
-        }
-        // Prevent the return length (i32) from overflow
-        if buf.len() > i32::max_value() as usize {
-            return_errno!(EINVAL, "buffer is tool large");
-        }
-
         self.do_write_at(offset, buf)
     }
 
@@ -180,6 +193,7 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
 
         let new_self = (Self {
             fd,
+            pos: Mutex::new(0),
             len: RwLock::new(len as usize),
             can_read,
             can_write,
@@ -206,6 +220,14 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
     }
 
     fn do_read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+        if !self.can_read {
+            return_errno!(EBADF, "not open for read");
+        }
+        if buf.len() == 0 {
+            return Ok(0);
+        }
+        self.check_args(offset, buf.len())?;
+
         let file_len = *self.len.read().unwrap();
 
         // For reads beyond the end of the file
@@ -474,6 +496,14 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
     }
 
     fn do_write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+        if !self.can_write {
+            return_errno!(EBADF, "not open for write");
+        }
+        if buf.len() == 0 {
+            return Ok(0);
+        }
+        self.check_args(offset, buf.len())?;
+
         let mut new_dirty_pages = false;
         let mut write_nbytes = 0;
         let arc_self = self.clone_arc();
@@ -562,6 +592,18 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
         } else {
             return_errno!(EAGAIN, "try again later");
         }
+    }
+
+    fn check_args(&self, offset: usize, buf_len: usize) -> Result<()> {
+        // Prevent the return length (i32) from overflow
+        if buf_len > i32::max_value() as usize {
+            return_errno!(EINVAL, "buffer is tool large");
+        }
+        // Prevent the offset calculation from overflow
+        if offset.checked_add(buf_len).is_none() {
+            return_errno!(EFBIG, "offset or buffer is too large");
+        }
+        Ok(())
     }
 
     pub fn clone_arc(&self) -> Arc<Self> {
