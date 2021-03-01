@@ -237,7 +237,7 @@ fn main() {
                 default_heap_size: occlum_config.process.default_heap_size,
                 default_mmap_size: occlum_config.process.default_mmap_size,
             },
-            entry_points: occlum_config.entry_points,
+            entry_points: json!(["/bin"]),
             env: occlum_config.env,
             mount: gen_sys_mount_config(occlum_conf_init_fs_mac.to_string()),
         };
