@@ -27,7 +27,7 @@ If applicable, add logs to help explain your problem.
 # Environment
 <!--- Please complete the following information -->
 - HW: [e.g. SGX1, SGX2] 
-- OS: [e.g. Ubuntu18.04, CentOS8.1]
+- OS: [e.g. Ubuntu18.04, CentOS8.2]
 - Occlum version: [e.g. 0.17.0]
 
 # Additional context
