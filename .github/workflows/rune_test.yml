@@ -12,7 +12,7 @@ jobs:
     runs-on: [self-hosted, SGX1-HW]
     strategy:
       matrix:
-        tag: [ubuntu18.04, centos8.1]
+        tag: [ubuntu18.04, centos8.2]
     steps:
     - name: Clean before running
       run: |
@@ -74,14 +74,14 @@ jobs:
       run: docker exec $rune_test bash -c "docker run -i --rm --runtime=rune -e ENCLAVE_TYPE=intelSgx -e ENCLAVE_RUNTIME_PATH=/opt/occlum/build/lib/libocclum-pal.so -e ENCLAVE_RUNTIME_ARGS=occlum_instance occlum-app"
 
     - name: Run occlum-hello pod
-      if: ${{ contains(matrix.tag, 'centos8.1') }}
+      if: ${{ contains(matrix.tag, 'centos8.2') }}
       run: docker exec $rune_test bash -c "containerd" &
 
         docker exec $rune_test bash -c "cd /root/samples && ./clean.sh;
         crictl run --timeout 3s hello.yaml pod.yaml && ./show.sh"
 
     - name: Run golang-web pod
-      if: ${{ contains(matrix.tag, 'centos8.1') }}
+      if: ${{ contains(matrix.tag, 'centos8.2') }}
       run: docker exec $rune_test bash -c "cd /root/samples && ./clean.sh;
         crictl run --timeout 3s golang.yaml pod.yaml && ./show.sh"
 

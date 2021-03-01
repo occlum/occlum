@@ -17,6 +17,6 @@ describe the version of Occlum preinstalled in the Docker image
 (e.g., "latest", "0.15.0", and "prerelease") and `<OS_NAME>` is the
 name of the OS distribution that the Docker image is based on.
 Currently, `<OS_NAME>` must be one of the following values:
-`ubuntu18.04`, `centos7.5` and `centos8.1`.
+`ubuntu18.04` and `centos8.2`.
 
 The resulting Docker image will have `occlum/occlum:<OCCLUM_LABEL>-<OS_NAME>` as its label.
