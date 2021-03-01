@@ -21,6 +21,8 @@ static mut ENCLAVE_PATH: String = String::new();
 lazy_static! {
     static ref INIT_ONCE: Once = Once::new();
     static ref HAS_INIT: AtomicBool = AtomicBool::new(false);
+    pub static ref ENTRY_POINTS: RwLock<Vec<PathBuf>> =
+        RwLock::new(config::LIBOS_CONFIG.entry_points.clone());
 }
 
 macro_rules! ecall_errno {
@@ -292,8 +294,9 @@ fn validate_program_path(target_path: &PathBuf) -> Result<()> {
     }
 
     // Check whether the prefix of the program path matches one of the entry points
-    let is_valid_entry_point = &config::LIBOS_CONFIG
-        .entry_points
+    let is_valid_entry_point = &ENTRY_POINTS
+        .read()
+        .unwrap()
         .iter()
         .any(|valid_path_prefix| target_path.starts_with(valid_path_prefix));
     if !is_valid_entry_point {

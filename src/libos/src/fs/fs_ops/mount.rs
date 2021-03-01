@@ -8,7 +8,7 @@ lazy_static! {
 }
 
 pub fn do_mount_rootfs(
-    mount_configs: &Vec<ConfigMount>,
+    user_config: &config::Config,
     user_key: &Option<sgx_key_128bit_t>,
 ) -> Result<()> {
     debug!("mount rootfs");
@@ -17,14 +17,15 @@ pub fn do_mount_rootfs(
         return_errno!(EPERM, "rootfs cannot be mounted more than once");
     }
     let new_root_inode = {
-        let rootfs = open_root_fs_according_to(mount_configs, user_key)?;
+        let rootfs = open_root_fs_according_to(&user_config.mount, user_key)?;
         rootfs.root_inode()
     };
-    mount_nonroot_fs_according_to(&new_root_inode, mount_configs, user_key)?;
+    mount_nonroot_fs_according_to(&new_root_inode, &user_config.mount, user_key)?;
     MOUNT_ONCE.call_once(|| {
         let mut root_inode = ROOT_INODE.write().unwrap();
         root_inode.fs().sync().expect("failed to sync old rootfs");
         *root_inode = new_root_inode;
+        *ENTRY_POINTS.write().unwrap() = user_config.entry_points.to_owned();
     });
     Ok(())
 }
