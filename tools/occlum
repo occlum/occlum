@@ -108,6 +108,10 @@ check_has_run() {
 }
 
 check_aesm_service() {
+    # Ignore AESM service status for simulation mode
+    if [ "$(cat $instance_dir/.sgx_mode 2>/dev/null)" != "HW" ]; then
+        return
+    fi
     for i in $(seq 1 3); do
         pgrep "aesm_service" > /dev/null && return || sleep 5
     done
