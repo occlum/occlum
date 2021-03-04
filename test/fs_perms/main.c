@@ -66,7 +66,7 @@ static int do_perm_tests(
     size_t num_files,
     int flags, int do_write,
     int *expected_results) {
-    flags |= O_CREAT | O_TRUNC;
+    flags |= O_CREAT;
     for (size_t i = 0; i < num_files; i++) {
         const char *filename = files[i];
         int expected_result = expected_results[i];

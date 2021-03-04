@@ -56,4 +56,43 @@ int fs_check_file_content(const char *path, const char *msg) {
     return 0;
 }
 
+int fill_file_with_repeated_bytes(int fd, size_t len, int byte_val) {
+    char buf[1024 * 4];
+    memset(buf, byte_val, sizeof(buf));
+
+    size_t remain_bytes = len;
+    while (remain_bytes > 0) {
+        int to_write_bytes = MIN(sizeof(buf), remain_bytes);
+        int written_bytes = write(fd, buf, to_write_bytes);
+        if (written_bytes != to_write_bytes) {
+            THROW_ERROR("file write failed");
+        }
+        remain_bytes -= written_bytes;
+    }
+
+    return 0;
+}
+
+int check_file_with_repeated_bytes(int fd, size_t len, int expected_byte_val) {
+    size_t remain = len;
+    char read_buf[512];
+    while (remain > 0) {
+        int read_nbytes = read(fd, read_buf, sizeof(read_buf));
+        if (read_nbytes < 0) {
+            // I/O error
+            return -1;
+        }
+        remain -= read_nbytes;
+        if (read_nbytes == 0 && remain > 0) {
+            // Not enough data in the file
+            return -1;
+        }
+        if (check_bytes_in_buf(read_buf, read_nbytes, expected_byte_val) < 0) {
+            // Incorrect data
+            return -1;
+        }
+    }
+    return 0;
+}
+
 #endif /* __TEST_FS_H */
