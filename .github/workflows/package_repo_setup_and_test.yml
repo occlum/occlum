@@ -9,6 +9,14 @@ jobs:
     env:
      TOKEN: ${{ secrets.PAT_TOKEN }}
     steps:
+    # This step is added to get more free space
+    - name: Clean virtual environment
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
     - name: Checkout occlum src code
       uses: actions/checkout@v2
       with:
@@ -44,6 +52,11 @@ jobs:
             aptly publish repo occlum-deb-repo; tree /root/.aptly/public;
             cd /root/workspace/occlum-package-repos; rm -rf debian; cp -r /root/.aptly/public /root/workspace/occlum-package-repos/debian;
             cp /root/public.key /root/workspace/occlum-package-repos/debian'
+
+    - name: Clean ubuntu container and image
+      run: |
+          docker rm -f ubuntu
+          docker rmi -f occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
 
     - name: Create centos container
       run: docker run -itd --name=centos -v $GITHUB_WORKSPACE:/root/workspace occlum/occlum:${{ env.OCCLUM_VERSION }}-centos8.2
