@@ -52,16 +52,11 @@ Usage:
     occlum init
         Initialize a directory as the Occlum instance.
 
-    occlum build [--sign-key <key_path>] [--sign-tool <tool_path>] [--image-key <key_path>] [--no-buildin-image-config] [-f/--force]
+    occlum build [--sign-key <key_path>] [--sign-tool <tool_path>] [--image-key <key_path>] [--buildin-image-key] [-f/--force]
         Build and sign an Occlum SGX enclave (.so) and generate its associated secure
         FS image according to the user-provided image directory and Occlum.json config file.
         The whole building process is incremental: the building artifacts are built only
         when needed.
-        A Configuration file (i.e., image_config.json) consists of the MAC of Occlum.json and
-        the key (if provided) of the secure FS image will be built into the initfs by default,
-        the init program can use it to mount the secure FS image as the rootfs.
-        To protect the security of FS image, give the [--no-buildin-image-config] flag,
-        and modifies the init program to acquire the MAC and key with LA or RA.
         To force rebuilding all artifacts, give the [-f/--force] flag.
 
     occlum run <program_name> <program_args>
@@ -81,6 +76,9 @@ Usage:
     occlum mount [--sign-key <key_path>] [--sign-tool <tool_path>] [--image-key <key_path>] <path>
         Mount the secure FS image of the Occlum instance as a Linux FS at an existing <path>.
         This makes it easy to access and manipulate Occlum's secure FS for debug purpose.
+
+    occlum gen-image-key <key_path>
+        Generate a file consists of a randomly generated 128-bit key for encryption of the FS image.
 EOF
 }
 
@@ -231,7 +229,7 @@ cmd_build() {
 
     pal_lib=libocclum-pal.so
     libos_lib=libocclum-libos.so
-    BUILDIN_IMAGE_CONF=true
+    BUILDIN_IMAGE_KEY=false
 
     while [ -n "$1" ]; do
         case "$1" in
@@ -239,7 +237,7 @@ cmd_build() {
         --sign-tool)    [ -n "$2" ] && ENCLAVE_SIGN_TOOL=$2 ; shift 2 || exit_error "empty signing tool path"   ;;
         --sgx-mode)     [[ -n "$2" && "$2" != "HW" ]] && export SGX_MODE=SIM ; shift 2 || exit_error "empty sgx mode";;
         --image-key)    [ -n "$2" ] && SECURE_IMAGE_KEY=$2 ; shift 2 || exit_error "empty secure image key path"   ;;
-        --no-buildin-image-config)  BUILDIN_IMAGE_CONF=false ; shift ;;
+        --buildin-image-key)  BUILDIN_IMAGE_KEY=true ; shift ;;
         --force | -f)   MAKE_OPTION="--always-make" ; shift ;;
         *) exit_error "Unknown option: $1"                                                                      ;;
         esac
@@ -279,7 +277,7 @@ cmd_build() {
     occlum_dir=$occlum_dir instance_dir=$instance_dir pal_lib=$pal_lib major_ver=$major_ver \
     occlum_version=$occlum_version libos_lib=$libos_lib \
     ENCLAVE_SIGN_KEY=$ENCLAVE_SIGN_KEY ENCLAVE_SIGN_TOOL=$ENCLAVE_SIGN_TOOL \
-    SECURE_IMAGE_KEY=$SECURE_IMAGE_KEY BUILDIN_IMAGE_CONF=$BUILDIN_IMAGE_CONF \
+    SECURE_IMAGE_KEY=$SECURE_IMAGE_KEY BUILDIN_IMAGE_KEY=$BUILDIN_IMAGE_KEY \
     make -f $build_makefile $MAKE_OPTION
 
     cd "$instance_dir"
@@ -497,6 +495,19 @@ cmd_status() {
     cat "$status_file"
 }
 
+cmd_gen_image_key() {
+    if [ -z $@ ]; then
+        echo "Error: target file is not set"
+        exit 1
+    fi
+
+    key_path="$@"
+    if [[ "$key_path" != "/"* ]]; then
+        key_path="$instance_dir/$@"
+    fi
+    cat /dev/urandom | tr -dc 'a-f0-9' | fold -w 32 | head -n 1 | sed -r 's/.{2}/&-/g; s/.$//' > $key_path
+}
+
 set -e
 
 if [[ ( "$#" < 1 ) ]] ; then
@@ -538,6 +549,9 @@ case "$cmd" in
         ;;
     status)
         cmd_status
+        ;;
+    gen-image-key)
+        cmd_gen_image_key "${@:2:1}"
         ;;
     *)
         report_arg_error "Error: unknown sub-command $cmd"

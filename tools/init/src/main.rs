@@ -22,14 +22,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let occlum_json_mac_ptr = &occlum_json_mac as *const sgx_aes_gcm_128bit_tag_t;
 
-    // Get the key of encrypted SEFS image if exists
-    let key = match image_config.key {
-        Some(key_str) => {
+    // Get the key of FS image if needed
+    let key = match &image_config.image_type[..] {
+        "encrypted" => {
+            // TODO: Get the key through RA or LA
+            const IMAGE_KEY_FILE: &str = "/etc/image_key";
+            let key_str = load_key(IMAGE_KEY_FILE)?;
             let mut key: sgx_key_128bit_t = Default::default();
             parse_str_to_bytes(&key_str, &mut key)?;
             Some(key)
         }
-        None => None,
+        "integrity-only" => None,
+        _ => unreachable!(),
     };
     let key_ptr = key
         .as_ref()
@@ -55,8 +59,7 @@ type sgx_aes_gcm_128bit_tag_t = [u8; 16];
 #[serde(deny_unknown_fields)]
 struct ImageConfig {
     occlum_json_mac: String,
-    #[serde(default)]
-    key: Option<String>,
+    image_type: String,
 }
 
 fn load_config(config_path: &str) -> Result<ImageConfig, Box<dyn Error>> {
@@ -68,6 +71,13 @@ fn load_config(config_path: &str) -> Result<ImageConfig, Box<dyn Error>> {
     };
     let config: ImageConfig = serde_json::from_str(&config_json)?;
     Ok(config)
+}
+
+fn load_key(key_path: &str) -> Result<String, Box<dyn Error>> {
+    let mut key_file = File::open(key_path)?;
+    let mut key = String::new();
+    key_file.read_to_string(&mut key)?;
+    Ok(key.trim_end_matches(|c| c == '\r' || c == '\n').to_string())
 }
 
 fn parse_str_to_bytes(arg_str: &str, bytes: &mut [u8]) -> Result<(), Box<dyn Error>> {

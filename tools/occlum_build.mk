@@ -96,9 +96,10 @@ $(INITFS_IMAGE): $(INITFS) $(INITFS_DIRS) $(INITFS_FILES) $(IMAGE_CONFIG_JSON) $
 	@echo "Building the initfs..."
 	@rm -rf build/initfs
 	@mkdir -p build/initfs
-	@[ "$(BUILDIN_IMAGE_CONF)" == "true" ] && \
-		cp "$(IMAGE_CONFIG_JSON)" "$(INITFS)/etc/" || \
-		rm -f "$(INITFS)/etc/`basename $(IMAGE_CONFIG_JSON)`"
+	@[ "$(BUILDIN_IMAGE_KEY)" == "true" ] && \
+		cp "$(SECURE_IMAGE_KEY)" "$(INITFS)/etc/image_key" || \
+		rm -f "$(INITFS)/etc/image_key"
+	@cp "$(IMAGE_CONFIG_JSON)" "$(INITFS)/etc/"
 	@LD_LIBRARY_PATH="$(SGX_SDK)/sdk_libs" $(SEFS_CLI_SIM) \
 		--enclave "$(SIGNED_SEFS_CLI_LIB)" \
 		zip \
@@ -110,10 +111,10 @@ $(IMAGE_CONFIG_JSON): $(instance_dir)/build/Occlum.json.protected
 	@export OCCLUM_CONF_FILE_MAC=`$(get_occlum_user_conf_file_mac)` ; \
 		echo "EXPORT => OCCLUM_CONF_FILE_MAC = $$OCCLUM_CONF_FILE_MAC" ; \
 		[ -n "$(SECURE_IMAGE_KEY)" ] && \
-		jq -n --arg mac_val "$$OCCLUM_CONF_FILE_MAC" --arg key_val "`cat $(SECURE_IMAGE_KEY)`" \
-		'{occlum_json_mac: $$mac_val, key: $$key_val}' > $(IMAGE_CONFIG_JSON) || \
 		jq -n --arg mac_val "$$OCCLUM_CONF_FILE_MAC" \
-		'{occlum_json_mac: $$mac_val}' > $(IMAGE_CONFIG_JSON)
+		'{image_type: "encrypted", occlum_json_mac: $$mac_val}' > $(IMAGE_CONFIG_JSON) || \
+		jq -n --arg mac_val "$$OCCLUM_CONF_FILE_MAC" \
+		'{image_type: "integrity-only", occlum_json_mac: $$mac_val}' > $(IMAGE_CONFIG_JSON)
 
 $(instance_dir)/build/Occlum.json.protected: $(instance_dir)/build/Occlum.json
 	@cd "$(instance_dir)/build" ; \
