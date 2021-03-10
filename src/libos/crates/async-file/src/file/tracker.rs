@@ -1,146 +1,104 @@
-use std::ops::RangeInclusive;
 #[cfg(feature = "sgx")]
 use std::prelude::v1::*;
-#[cfg(not(feature = "sgx"))]
-use std::sync::{Mutex, MutexGuard};
-#[cfg(feature = "sgx")]
-use std::sync::{SgxMutex as Mutex, SgxMutexGuard as MutexGuard};
-
-use itertools::Itertools;
 
 use crate::page_cache::Page;
 
 /// A few tuning knobs for the sequential read tracker.
 pub const MIN_PREFETCH_SIZE: usize = Page::size();
 pub const MAX_PREFETCH_SIZE: usize = 64 * Page::size();
-pub const MAX_CONCURRENCY: usize = 3;
 
-/// A tracker for multiple concurrent sequential reads on a file.
-///
-/// If the tracker decides that a read is sequential, then it can help further decide
-/// how much data to prefetch.
+/// A read tracker that can determine whether a new read is sequential or not.
 pub struct SeqRdTracker {
-    trackers: [Mutex<Tracker>; MAX_CONCURRENCY],
-}
-
-// An internal tracker for a single thread of sequential reads.
-struct Tracker {
-    seq_window: RangeInclusive<usize>,
+    // A new read is considered sequential if and only if the new read starts at
+    // this position.
+    last_rd_end: usize,
+    // The end of the region that we have issued prefetch
+    prefetch_end: usize,
+    // The size of the next prefetch, increasing with the number of consecutive
+    // sequential reads. If the size is 0, then the last read received by the
+    // tracker is not sequential.
     prefetch_size: usize,
 }
 
-/// A sequential read.
-pub struct SeqRd<'a> {
-    tracker: MutexGuard<'a, Tracker>,
-    offset: usize,
-    len: usize,
-}
-
-// Implementation for SeqRdTracker
-
 impl SeqRdTracker {
     pub fn new() -> Self {
-        let trackers = array_init::array_init(|_| Mutex::new(Tracker::new()));
-        Self { trackers }
+        Self {
+            last_rd_end: 0,
+            prefetch_end: 0,
+            prefetch_size: 0,
+        }
     }
 
-    /// Accept a new read.
-    ///
-    /// By accepting a new read, we track the read and guess---according to the
-    /// previously accepted reads---whether the new read is sequential. If so,
-    /// we return an object that represents the sequential read, which can in turn
-    /// give a "good" suggestion for the amount of data to prefetch.
-    pub fn accept(&self, offset: usize, len: usize) -> Option<SeqRd<'_>> {
-        // Try to find a tracker of sequential reads that matches the new read.
-        //
-        // If not found, we pick a "victim" tracker to track the potentially new
-        // thread of sequential reads starting from this read.
-        let mut victim_tracker_opt: Option<MutexGuard<'_, Tracker>> = None;
-        for (tracker_i, tracker_lock) in self.trackers.iter().enumerate() {
-            let tracker = match tracker_lock.try_lock().ok() {
-                Some(tracker) => tracker,
-                None => continue,
+    pub fn track<'a>(&'a mut self, offset: usize, len: usize) -> NewRead<'a> {
+        // Handle the cases when the new read is NOT considered sequential
+        if offset != self.last_rd_end {
+            self.prefetch_size = 0;
+            return NewRead::Random {
+                tracker: self,
+                offset,
             };
-
-            if tracker.check_sequential(offset) {
-                return Some(SeqRd::new(tracker, offset, len));
-            } else {
-                // Victim selection: we prefer the tracker with greater prefetch size.
-                if let Some(victim_tracker) = victim_tracker_opt.as_mut() {
-                    if victim_tracker.prefetch_size < tracker.prefetch_size {
-                        victim_tracker_opt = Some(tracker);
-                    }
-                } else {
-                    victim_tracker_opt = Some(tracker);
-                }
-            }
         }
 
-        let mut victim_tracker = victim_tracker_opt?;
-        victim_tracker.restart_from(offset, len);
-        None
-    }
-}
-
-// Implementation for Tracker
-
-// The value of the prefetch size of a tracker that has not been able to track any
-// sequential reads. This value is chosen so that our criterion of replacing a tracker
-// can be simplified to "always choose the one with the greatest prefetch size".
-const INVALID_PREFETCH_SIZE: usize = usize::max_value();
-
-impl Tracker {
-    pub fn new() -> Self {
-        Self {
-            seq_window: (0..=0),
-            prefetch_size: INVALID_PREFETCH_SIZE,
+        // If this new read is the first sequential read
+        if self.prefetch_size == 0 {
+            self.prefetch_end = offset;
+            self.prefetch_size = MIN_PREFETCH_SIZE;
         }
-    }
-
-    pub fn check_sequential(&self, offset: usize) -> bool {
-        self.seq_window.contains(&offset)
-    }
-
-    pub fn restart_from(&mut self, offset: usize, len: usize) {
-        self.seq_window = (offset + len / 2)..=(offset + len);
-        self.prefetch_size = INVALID_PREFETCH_SIZE;
-    }
-}
-
-// Implementation for SeqRd
-
-impl<'a> SeqRd<'a> {
-    fn new(mut tracker: MutexGuard<'a, Tracker>, offset: usize, len: usize) -> Self {
-        if tracker.prefetch_size == INVALID_PREFETCH_SIZE {
-            tracker.prefetch_size = MIN_PREFETCH_SIZE;
-        }
-        Self {
-            tracker,
+        NewRead::Sequential {
+            tracker: self,
             offset,
             len,
         }
     }
+}
 
+pub enum NewRead<'a> {
+    Sequential {
+        tracker: &'a mut SeqRdTracker,
+        offset: usize,
+        len: usize,
+    },
+    Random {
+        tracker: &'a mut SeqRdTracker,
+        offset: usize,
+    },
+}
+
+impl<'a> NewRead<'a> {
     pub fn prefetch_size(&self) -> usize {
-        self.tracker.prefetch_size
+        match self {
+            Self::Sequential {
+                tracker,
+                offset,
+                len,
+            } => {
+                // If the new read attempts to read the range beyond the end of the
+                // prefetched region, we need to issue new prefetch
+                if *offset + *len >= tracker.prefetch_end {
+                    tracker.prefetch_size
+                } else {
+                    0
+                }
+            }
+            Self::Random { .. } => 0,
+        }
     }
 
-    pub fn complete(mut self, read_bytes: usize) {
-        debug_assert!(read_bytes > 0);
-        self.tracker.seq_window = {
-            let low = self.offset + read_bytes / 2;
-            let upper = self.offset + read_bytes;
-            low..=upper
-        };
-
-        self.tracker.prefetch_size *= 2;
-        let max_prefetch_size = MAX_PREFETCH_SIZE.min(self.len * 4);
-        if self.tracker.prefetch_size > max_prefetch_size {
-            self.tracker.prefetch_size = max_prefetch_size;
+    pub fn complete(self, read_nbytes: usize) {
+        match self {
+            Self::Sequential { tracker, len, .. } => {
+                tracker.last_rd_end += read_nbytes;
+                tracker.prefetch_end += len + tracker.prefetch_size;
+                tracker.prefetch_size = MAX_PREFETCH_SIZE.min(tracker.prefetch_size * 2);
+            }
+            Self::Random { tracker, offset } => {
+                tracker.last_rd_end = offset + read_nbytes;
+            }
         }
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
     use self::helper::SeqRds;
@@ -228,3 +186,4 @@ mod test {
         }
     }
 }
+*/

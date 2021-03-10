@@ -33,7 +33,7 @@ pub struct AsyncFile<Rt: AsyncFileRt + ?Sized> {
     len: RwLock<usize>,
     can_read: bool,
     can_write: bool,
-    seq_rd_tracker: SeqRdTracker,
+    seq_rd_tracker: Mutex<SeqRdTracker>,
     pollee: Pollee,
     fixed_events: Events,
     phantom_data: PhantomData<Rt>,
@@ -197,7 +197,7 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
             len: RwLock::new(len as usize),
             can_read,
             can_write,
-            seq_rd_tracker: SeqRdTracker::new(),
+            seq_rd_tracker: Mutex::new(SeqRdTracker::new()),
             pollee: Pollee::new(fixed_events),
             fixed_events,
             phantom_data: PhantomData,
@@ -241,10 +241,13 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
         let buf_len = buf.len().min(file_remaining);
         let buf = &mut buf[..buf_len];
 
-        // Determine if it is a sequential read and how much data to prefetch
-        let seq_rd = self.seq_rd_tracker.accept(offset, buf.len());
+        // Use tracker to determine if the new read is sequential and how much data to prefetch.
+        let mut tracker = self.seq_rd_tracker.try_lock().ok();
+        let new_read = tracker
+            .as_mut()
+            .map(|tracker| tracker.track(offset, buf.len()));
         let prefetch_len = {
-            let prefetch_len = seq_rd.as_ref().map_or(0, |seq_rd| seq_rd.prefetch_size());
+            let prefetch_len = new_read.as_ref().map_or(0, |seq_rd| seq_rd.prefetch_size());
             let max_prefetch_len = file_remaining - buf.len();
             prefetch_len.min(max_prefetch_len)
         };
@@ -267,7 +270,7 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
         });
 
         if read_nbytes > 0 {
-            seq_rd.map(|seq_rd| seq_rd.complete(read_nbytes));
+            new_read.map(|new_read| new_read.complete(read_nbytes));
             Ok(read_nbytes)
         } else {
             return_errno!(EAGAIN, "try again later");
