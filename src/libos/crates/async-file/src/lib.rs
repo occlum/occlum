@@ -16,6 +16,8 @@ extern crate sgx_libc as libc;
 extern crate sgx_trts;
 #[cfg(feature = "sgx")]
 extern crate sgx_untrusted_alloc;
+#[cfg(test)]
+extern crate test;
 
 mod file;
 mod page_cache;
@@ -33,7 +35,7 @@ mod tests {
     use io_uring_callback::{Builder, IoUring};
     use lazy_static::lazy_static;
 
-    use self::runtime::Runtime;
+    pub use self::runtime::Runtime;
     use super::*;
 
     #[test]

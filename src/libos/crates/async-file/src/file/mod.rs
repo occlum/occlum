@@ -653,3 +653,96 @@ fn libc_errno() -> i32 {
 fn libc_errno() -> i32 {
     libc::errno()
 }
+
+#[cfg(test)]
+mod tests {
+    use test::Bencher;
+
+    use super::*;
+    use crate::tests::Runtime;
+
+    #[bench]
+    fn write_first_page(b: &mut Bencher) {
+        let path = "write_first_page.data";
+        let file = {
+            let path = path.to_string();
+            let flags = libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC;
+            let mode = libc::S_IRUSR | libc::S_IWUSR;
+            AsyncFile::<Runtime>::open(path.clone(), flags, mode).unwrap()
+        };
+        let mut input_buf = Vec::with_capacity(4096);
+        input_buf.resize(input_buf.capacity(), 0);
+
+        b.iter(|| {
+            let nbytes = file.file().write_at(0, &input_buf).unwrap();
+            assert!(nbytes == input_buf.len());
+        })
+    }
+
+    #[bench]
+    fn write_first_page_linux(b: &mut Bencher) {
+        // It is important that the path is NULL-terminated
+        let path = "write_first_page_linux.data\0";
+        let fd = {
+            let path = path.as_ptr() as _;
+            let flags = libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC;
+            let mode = libc::S_IRUSR | libc::S_IWUSR;
+            let ret = unsafe { libc::open(path, flags, mode) };
+            assert!(ret >= 0);
+            ret
+        };
+
+        let mut buf = Vec::with_capacity(4096);
+        buf.resize(buf.capacity(), 0);
+        let buf_ptr = buf.as_ptr() as _;
+        let buf_len = buf.len();
+        b.iter(|| {
+            let ret = unsafe { libc::pwrite(fd, buf_ptr, buf_len, 0) };
+            assert!(ret as usize == buf.len());
+        })
+    }
+
+    #[bench]
+    fn read_first_page(b: &mut Bencher) {
+        let path = "read_first_page.data";
+        let file = {
+            let path = path.to_string();
+            let flags = libc::O_RDWR | libc::O_CREAT | libc::O_TRUNC;
+            let mode = libc::S_IRUSR | libc::S_IWUSR;
+            AsyncFile::<Runtime>::open(path.clone(), flags, mode).unwrap()
+        };
+        let mut buf = Vec::with_capacity(4096);
+        buf.resize(buf.capacity(), 0);
+        file.file().write_at(0, &buf).unwrap();
+
+        b.iter(|| {
+            let nbytes = file.file().read_at(0, &mut buf).unwrap();
+            assert!(nbytes == buf.len());
+        })
+    }
+
+    #[bench]
+    fn read_first_page_linux(b: &mut Bencher) {
+        // It is important that the path is NULL-terminated
+        let path = "read_first_page_linux.data\0";
+        let fd = {
+            let path = path.as_ptr() as _;
+            let flags = libc::O_RDWR | libc::O_CREAT | libc::O_TRUNC;
+            let mode = libc::S_IRUSR | libc::S_IWUSR;
+            let ret = unsafe { libc::open(path, flags, mode) };
+            assert!(ret >= 0);
+            ret
+        };
+
+        let mut buf = Vec::with_capacity(4096);
+        buf.resize(buf.capacity(), 0);
+        let buf_ptr = buf.as_mut_ptr() as _;
+        let buf_len = buf.len();
+
+        assert!(unsafe { libc::pwrite(fd, buf_ptr, buf_len, 0) } as usize == buf_len);
+        b.iter(|| {
+            let ret = unsafe { libc::pread(fd, buf_ptr as _, buf_len, 0) };
+            assert!(ret as usize == buf_len);
+        })
+    }
+}
