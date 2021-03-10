@@ -310,7 +310,9 @@ impl std::fmt::Debug for PageCache {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
+    use test::Bencher;
+
     use self::helper::{release_pages, visit_page, File};
     use super::*;
 
@@ -494,6 +496,17 @@ mod test {
         let result_file = page_handle.file().clone().downcast::<File>().unwrap();
         assert!(input_file == result_file);
         page_cache.release(page_handle);
+    }
+
+    #[bench]
+    fn acquire_release_page(b: &mut Bencher) {
+        let page_cache = PageCache::with_capacity(10);
+        let input_file = file!(1234);
+        let offset = 0;
+        b.iter(|| {
+            let page_handle = page_cache.acquire(&input_file, offset).unwrap();
+            page_cache.release(page_handle);
+        })
     }
 
     mod helper {
