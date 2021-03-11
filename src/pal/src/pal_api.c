@@ -8,6 +8,7 @@
 #include "pal_syscall.h"
 #include "pal_thread_counter.h"
 #include "pal_vcpu_thread.h"
+#include "pal_check_fsgsbase.h"
 #include "errno2str.h"
 #include <linux/limits.h>
 #include <unistd.h>
@@ -31,6 +32,14 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
         PAL_ERROR("realpath returns %s", errno2str(errno));
         return -1;
     }
+
+    // Check only for SGX hardware mode
+#ifdef SGX_MODE_HW
+    if (check_fsgsbase_enablement() != 0) {
+        PAL_ERROR("FSGSBASE enablement check failed.");
+        return -1;
+    }
+#endif
 
     const int MAX_NUM_VCPUS = 1024;
     if (attr->num_vcpus == 0 || attr->num_vcpus > MAX_NUM_VCPUS) {
