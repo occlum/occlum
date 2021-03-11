@@ -7,6 +7,7 @@
 #include "pal_sig_handler.h"
 #include "pal_syscall.h"
 #include "pal_thread_counter.h"
+#include "pal_check_fsgsbase.h"
 #include "errno2str.h"
 #include <linux/limits.h>
 
@@ -76,6 +77,14 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
         PAL_ERROR("realpath returns %s", errno2str(errno));
         return -1;
     }
+
+// Check only for SGX hardware mode
+#ifdef SGX_MODE_HW
+    if (check_fsgsbase_enablement() != 0) {
+        PAL_ERROR("FSGSBASE enablement check failed.");
+        return -1;
+    }
+#endif
 
     sgx_enclave_id_t eid = pal_get_enclave_id();
     if (eid != SGX_INVALID_ENCLAVE_ID) {
