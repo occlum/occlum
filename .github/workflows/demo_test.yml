@@ -27,9 +27,6 @@ jobs:
     - name: Make install
       run: docker exec language_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
-    - name: Make test
-      run: docker exec language_support_test bash -c "cd /root/occlum; SGX_MODE=SIM make test"
-
     - name: C test
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/hello_c && make;
             occlum new occlum_instance;
@@ -80,16 +77,8 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec language_support_test bash -c "cd /root/occlum/demos/golang/grpc_pingpong && SGX_MODE=SIM ./run_ping_on_occlum.sh" &
 
-    # TODO: Remove " || true " because in simulation mode, process exits brutely and can cause segmentation fault in some cases.
     - name: Run Golang sqlite test
-      run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh" || true
-
-    # TODO: When sgx simulation mode can handle interrupt signal, remove this.
-    - name: Kill the container
-      run: |
-        sleep ${{ env.nap_time }};
-        docker stop language_support_test
-
+      run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh"
 
   # TODO: Add Java web server test
   Java_support_test:
@@ -116,13 +105,6 @@ jobs:
 
     - name: Run hello world
       run: docker exec java_support_test bash -c "cd /root/occlum/demos/java && SGX_MODE=SIM ./run_java_on_occlum.sh hello" &
-
-    # TODO: When sgx simulation mode can handle page fault exception, remove this.
-    - name: Kill the container
-      run: |
-        sleep ${{ env.nap_time }};
-        docker stop java_support_test
-
 
   Fish_test:
     runs-on: ubuntu-18.04
@@ -151,13 +133,6 @@ jobs:
 
     - name: Run Fish process rlimit test
       run: docker exec fish_test bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_per_process_config_test.sh" &
-
-    # TODO: When sgx simulation mode supports interrupt signal, remove this.
-    - name: Kill the container
-      run: |
-        sleep ${{ env.nap_time }};
-        docker stop fish_test
-
 
   Bazel_test:
     runs-on: ubuntu-18.04
@@ -299,13 +274,11 @@ jobs:
     - name: Build xgboost dependencies
       run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && ./download_and_build_xgboost.sh"
 
-    # TODO: Remove " || true " because in simulation mode, process exits brutely and can cause segmentation fault in some cases.
     - name: Run xgboost test
-      run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test" || true
+      run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test"
 
-    # TODO: Remove " || true " because in simulation mode, process exits brutely and can cause segmentation fault in some cases.
     - name: Run xgboost cluster test
-      run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test-local-cluster" || true
+      run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test-local-cluster"
 
 
   Tensorflow_lite_test:
@@ -360,11 +333,10 @@ jobs:
     - name: Run grpc server
       run: docker exec grpc_test bash -c "cd /root/demos/grpc && SGX_MODE=SIM ./run_server_on_occlum.sh" &
 
-    # TODO: Remove " || true " because in simulation mode, process exits brutely and can cause segmentation fault in some cases.
     - name: Run grpc client
       run: |
         sleep ${{ env.nap_time }};
-        docker exec grpc_test bash -c "cd /root/demos/grpc && SGX_MODE=SIM ./run_client_on_occlum.sh" || true
+        docker exec grpc_test bash -c "cd /root/demos/grpc && SGX_MODE=SIM ./run_client_on_occlum.sh"
 
 
   Openvino_test:
