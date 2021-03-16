@@ -1,8 +1,9 @@
 %define centos_base_release 1
-
 %define _unpackaged_files_terminate_build 0
 %define sgxsdk_install_dir /opt/intel
 
+# Ignore missing build id error (generated when packaging "init" binary)
+%global _missing_build_ids_terminate_build 0
 # Remove checking for python shebang error in sgx-gdb
 %undefine __brp_mangle_shebangs
 

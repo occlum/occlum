@@ -17,6 +17,7 @@ use std::collections::HashMap;
 use std::ffi::CString;
 use std::os::unix::io::RawFd;
 use std::os::unix::net::UnixStream;
+use std::panic;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use timer::{Guard, Timer};
@@ -203,13 +204,18 @@ impl OcclumExec for OcclumExecImpl {
             thread::spawn(move || {
                 let mut exit_status = Box::new(0);
 
-                rust_occlum_pal_exec(process_id, &mut exit_status)
-                    .expect("failed to execute the command");
-
+                let result = rust_occlum_pal_exec(process_id, &mut exit_status);
                 let mut commands = _commands.lock().unwrap();
-                *commands.get_mut(&process_id).expect("get process") = (Some(*exit_status), false);
 
-                //Notifies the client to application stopped
+                if result == Ok(()) {
+                    *commands.get_mut(&process_id).expect("get process") =
+                        (Some(*exit_status), false);
+                } else {
+                    // Return -1 if the process crashed or get any unexpected error
+                    *commands.get_mut(&process_id).expect("get process") = (Some(-1), false);
+                }
+
+                //Notifies the client that the application stopped
                 debug!(
                     "process:{} finished, send signal to {}",
                     process_id, client_process_id
@@ -345,11 +351,17 @@ fn rust_occlum_pal_exec(occlum_process_id: i32, exit_status: &mut i32) -> Result
         exit_value: exit_status as *mut i32,
     });
 
-    let ret = unsafe { occlum_pal_exec(Box::into_raw(exec_args)) };
+    let result = panic::catch_unwind(|| unsafe { occlum_pal_exec(Box::into_raw(exec_args)) });
 
-    match ret {
-        0 => Ok(()),
-        _ => Err(ret),
+    match result {
+        Ok(ret) => {
+            if ret == 0 {
+                Ok(())
+            } else {
+                Err(ret)
+            }
+        }
+        Err(_) => Err(-1),
     }
 }
 

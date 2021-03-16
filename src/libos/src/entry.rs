@@ -21,6 +21,8 @@ static mut ENCLAVE_PATH: String = String::new();
 lazy_static! {
     static ref INIT_ONCE: Once = Once::new();
     static ref HAS_INIT: AtomicBool = AtomicBool::new(false);
+    pub static ref ENTRY_POINTS: RwLock<Vec<PathBuf>> =
+        RwLock::new(config::LIBOS_CONFIG.entry_points.clone());
 }
 
 macro_rules! ecall_errno {
@@ -266,7 +268,7 @@ fn do_exec_thread(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
     // sync file system
     // TODO: only sync when all processes exit
     use rcore_fs::vfs::FileSystem;
-    crate::fs::ROOT_INODE.fs().sync()?;
+    crate::fs::ROOT_INODE.read().unwrap().fs().sync()?;
 
     // Not to be confused with the return value of a main function.
     // The exact meaning of status is described in wait(2) man page.
@@ -292,8 +294,9 @@ fn validate_program_path(target_path: &PathBuf) -> Result<()> {
     }
 
     // Check whether the prefix of the program path matches one of the entry points
-    let is_valid_entry_point = &config::LIBOS_CONFIG
-        .entry_points
+    let is_valid_entry_point = &ENTRY_POINTS
+        .read()
+        .unwrap()
         .iter()
         .any(|valid_path_prefix| target_path.starts_with(valid_path_prefix));
     if !is_valid_entry_point {

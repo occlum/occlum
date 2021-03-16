@@ -2,6 +2,7 @@
 /opt/occlum/build/bin/occlum-protect-integrity
 /opt/occlum/build/bin/sefs-cli
 /opt/occlum/build/bin/sefs-cli_sim
+/opt/occlum/build/bin/init
 /opt/occlum/build/lib/libocclum-pal_sim.so*
 /opt/occlum/build/lib/libocclum-libos.so*
 /opt/occlum/build/lib/libocclum-libos_sim.so*

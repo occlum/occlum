@@ -2,13 +2,13 @@
     "resource_limits": {
         "kernel_space_heap_size": "40MB",
         "kernel_space_stack_size": "1MB",
-        "user_space_size": "320MB",
+        "user_space_size": "420MB",
         "max_num_of_threads": 32
     },
     "process": {
         "default_stack_size": "4MB",
         "default_heap_size": "8MB",
-        "default_mmap_size": "80MB"
+        "default_mmap_size": "100MB"
     },
     "entry_points": [
         "/bin"
@@ -38,14 +38,15 @@
                     {
                         "target": "/",
                         "type": "sefs",
-                        "source": "./image",
+                        "source": "./build/mount/__ROOT",
                         "options": {
-                            "integrity_only": true
+                            "MAC": ""
                         }
                     },
                     {
                         "target": "/",
-                        "type": "sefs"
+                        "type": "sefs",
+                        "source": "./run/mount/__ROOT"
                     }
                 ]
             }
@@ -56,15 +57,16 @@
             "source": "."
         },
         {
-            "target": "/proc",
-            "type": "procfs"
-        },
-        {
             "target": "/tmp",
             "type": "sefs",
+            "source": "./run/mount/tmp",
             "options": {
                 "temporary": true
             }
+        },
+        {
+            "target": "/proc",
+            "type": "procfs"
         },
         {
             "target": "/dev",

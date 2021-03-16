@@ -9,6 +9,14 @@ jobs:
     env:
      TOKEN: ${{ secrets.PAT_TOKEN }}
     steps:
+    # This step is added to get more free space
+    - name: Clean virtual environment
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
     - name: Checkout occlum src code
       uses: actions/checkout@v2
       with:
@@ -45,8 +53,13 @@ jobs:
             cd /root/workspace/occlum-package-repos; rm -rf debian; cp -r /root/.aptly/public /root/workspace/occlum-package-repos/debian;
             cp /root/public.key /root/workspace/occlum-package-repos/debian'
 
+    - name: Clean ubuntu container and image
+      run: |
+          docker rm -f ubuntu
+          docker rmi -f occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+
     - name: Create centos container
-      run: docker run -itd --name=centos -v $GITHUB_WORKSPACE:/root/workspace occlum/occlum:${{ env.OCCLUM_VERSION }}-centos8.1
+      run: docker run -itd --name=centos -v $GITHUB_WORKSPACE:/root/workspace occlum/occlum:${{ env.OCCLUM_VERSION }}-centos8.2
 
     - name: Build rpm packages
       run: docker exec centos bash -c "cd /root/workspace/occlum/tools/installer/rpm; make; make musl-gcc"
@@ -112,12 +125,12 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
     - name: Create clean centos container
-      run: docker run -itd --name=centos centos:centos8.1.1911
+      run: docker run -itd --name=centos centos:centos8.2.2004
 
     - name: Install sgx dependencies
-      run: docker exec centos bash -c "yum install -y wget yum-utils make jq gdb; cd /root && wget https://download.01.org/intel-sgx/sgx-linux/2.11/distro/centos8.1-server/sgx_rpm_local_repo.tgz;
+      run: docker exec centos bash -c "yum install -y wget yum-utils make jq gdb; cd /root && wget https://download.01.org/intel-sgx/sgx-linux/2.13/distro/centos8.2-server/sgx_rpm_local_repo.tgz;
         tar -xvzf sgx_rpm_local_repo.tgz; yum-config-manager --add-repo file:///root/sgx_rpm_local_repo; yum --nogpgcheck install -y libsgx-dcap-ql libsgx-epid libsgx-urts;
-        yum --nogpgcheck install -y libsgx-quote-ex; rpm -i /root/sgx_rpm_local_repo/libsgx-uae-service-2.11.100.2-1.el8.x86_64.rpm || true"
+        yum --nogpgcheck install -y libsgx-quote-ex; rpm -i /root/sgx_rpm_local_repo/libsgx-uae-service-*.rpm || true"
 
     - name: Install occlum
       run: |

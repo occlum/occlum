@@ -2,6 +2,7 @@
 #include <sys/uio.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include "test_fs.h"
 
 // ============================================================================
@@ -162,6 +163,46 @@ static int __test_lseek(const char *file_path) {
     return 0;
 }
 
+static int __test_posix_fallocate(const char *file_path) {
+    int fd = open(file_path, O_RDWR);
+    if (fd < 0) {
+        THROW_ERROR("failed to open a file to read/write");
+    }
+    off_t offset = -1;
+    off_t len = 100;
+    if (posix_fallocate(fd, offset, len) != EINVAL) {
+        THROW_ERROR("failed to call posix_fallocate with invalid offset");
+    }
+    offset = 16;
+    len = 0;
+    if (posix_fallocate(fd, offset, len) != EINVAL) {
+        THROW_ERROR("failed to call posix_fallocate with invalid len");
+    }
+    len = 48;
+    if (posix_fallocate(fd, offset, len) != 0) {
+        THROW_ERROR("failed to call posix_fallocate");
+    }
+    struct stat stat_buf;
+    if (fstat(fd, &stat_buf) < 0) {
+        THROW_ERROR("failed to stat file");
+    }
+    if (stat_buf.st_size < offset + len) {
+        THROW_ERROR("failed to check the len after posix_fallocate");
+    }
+
+    char *read_buf = malloc(stat_buf.st_size);
+    if (read_buf == NULL) {
+        THROW_ERROR("failed to malloc buf to read");
+    }
+    if (read(fd, read_buf, stat_buf.st_size) != stat_buf.st_size) {
+        THROW_ERROR("failed to read correct size of fallocated file");
+    }
+
+    free(read_buf);
+    close(fd);
+    return 0;
+}
+
 typedef int(*test_file_func_t)(const char *);
 
 static int test_file_framework(test_file_func_t fn) {
@@ -195,6 +236,10 @@ static int test_lseek() {
     return test_file_framework(__test_lseek);
 }
 
+static int test_posix_fallocate() {
+    return test_file_framework(__test_posix_fallocate);
+}
+
 // ============================================================================
 // Test suite main
 // ============================================================================
@@ -204,6 +249,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_pwrite_pread),
     TEST_CASE(test_writev_readv),
     TEST_CASE(test_lseek),
+    TEST_CASE(test_posix_fallocate),
 };
 
 int main(int argc, const char *argv[]) {
