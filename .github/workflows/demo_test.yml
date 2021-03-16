@@ -410,9 +410,41 @@ jobs:
       run: |
         sleep ${{ env.nap_time }};
         docker restart redis_support_test
-
     - name: download and build redis with glibc
       run: docker exec redis_support_test bash -c "cd /root/occlum/demos/redis; ./download_and_build_redis_glibc.sh"
 
     - name: Run redis benchmark
       run: docker exec redis_support_test bash -c "cd /root/occlum/demos/redis; SGX_MODE=SIM ./benchmark_glibc.sh"
+
+  flink_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
+
+    - name: Create container
+      run: docker run -itd --name=flink_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+
+    - name: Build dependencies
+      run: docker exec flink_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec flink_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+
+    - name: Download flink
+      run: docker exec flink_test bash -c "cd /root/occlum/demos/flink && ./download_flink.sh"
+
+    - name: Run jobmanager on host
+      run: docker exec flink_test bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_webserver_on_host.sh"
+
+    - name: Run flink taskmanager
+      sleep ${{ env.nap_time }};
+      run: docker exec flink_test bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_on_occlum_glibc.sh tm"
+
+    - name: Run flink task
+      run: docker exec flink_test bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_on_occlum_glibc.sh task"
+
