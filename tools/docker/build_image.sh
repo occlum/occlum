@@ -20,8 +20,7 @@ USAGE:
 <OS_NAME>:
     The name of the OS distribution that the Docker image is based on. Currently, <OS_NAME> must be one of the following values:
         ubuntu18.04         Use Ubuntu 18.04 as the base image
-        centos7.5           Use CentOS 7.5 as the base image
-        centos8.1           Use CentOS 8.1 as the base image
+        centos8.2           Use CentOS 8.2 as the base image
 
 The resulting Docker image will have "occlum/occlum:<OCCLUM_LABEL>-<OS_NAME>" as its label.
 EOF
@@ -44,7 +43,7 @@ function check_item_in_list() {
     [[ $list =~ (^|[[:space:]])$item($|[[:space:]]) ]]
 }
 
-check_item_in_list "$os_name" "ubuntu18.04 centos7.5 centos8.1" || report_error
+check_item_in_list "$os_name" "ubuntu18.04 centos8.2" || report_error
 
 cd "$script_dir/.."
 docker build -f "$script_dir/Dockerfile.$os_name" -t "occlum/occlum:$occlum_label-$os_name" --build-arg OCCLUM_BRANCH=$occlum_branch .

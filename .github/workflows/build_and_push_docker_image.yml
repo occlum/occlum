@@ -52,11 +52,11 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          file: ./tools/docker/Dockerfile.centos8.1
+          file: ./tools/docker/Dockerfile.centos8.2
           platforms: linux/amd64
           build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
           push: true
-          tags: occlum/occlum:${{ env.RELEASE_VERSION }}-centos8.1
+          tags: occlum/occlum:${{ env.RELEASE_VERSION }}-centos8.2
 
 
   generate-ubuntu-image:

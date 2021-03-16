@@ -2,13 +2,14 @@
 # It is not intended for manual editing.
 [[package]]
 name = "Occlum"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "aligned",
  "atomic",
  "bitflags",
  "bitvec",
  "derive_builder",
+ "goblin",
  "lazy_static",
  "log",
  "memoffset",
@@ -19,6 +20,7 @@ dependencies = [
  "rcore-fs-sefs",
  "rcore-fs-unionfs",
  "ringbuf",
+ "scroll",
  "serde",
  "serde_json",
  "sgx_cov",
@@ -27,7 +29,6 @@ dependencies = [
  "sgx_tse",
  "sgx_tstd",
  "sgx_types",
- "xmas-elf",
 ]
 
 [[package]]
@@ -205,6 +206,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "goblin"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "669cdc3826f69a51d3f8fc3f86de81c2378110254f678b8407977736122057a4"
+dependencies = [
+ "log",
+ "plain",
+ "scroll",
+]
+
+[[package]]
 name = "hashbrown_tstd"
 version = "0.9.0"
 
@@ -253,6 +265,12 @@ checksum = "157b4208e3059a8f9e78d559edc658e13df41410cb3ae03979c83130067fdd87"
 dependencies = [
  "autocfg 1.0.1",
 ]
+
+[[package]]
+name = "plain"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 
 [[package]]
 name = "proc-macro2"
@@ -467,6 +485,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
+name = "scroll"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fda28d4b4830b807a8b43f7b0e6b5df875311b3e7621d84577188c175b6ec1ec"
+dependencies = [
+ "scroll_derive",
+]
+
+[[package]]
+name = "scroll_derive"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b12bd20b94c7cdfda8c7ba9b92ad0d9a56e3fa018c25fca83b51aa664c9b4c0d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "serde"
 version = "1.0.104"
 dependencies = [
@@ -675,16 +713,3 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
-
-[[package]]
-name = "xmas-elf"
-version = "0.6.2"
-dependencies = [
- "zero",
-]
-
-[[package]]
-name = "zero"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f1bc8a6b2005884962297587045002d8cfb8dcec9db332f4ca216ddc5de82c5"

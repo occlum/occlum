@@ -2,15 +2,14 @@ use std::ffi::{CStr, CString};
 use std::path::Path;
 
 use self::aux_vec::{AuxKey, AuxVec};
-use self::exec_loader::{load_exec_file_to_vec, load_file_to_vec};
-use super::elf_file::{ElfFile, ElfHeader, ProgramHeader, ProgramHeaderExt, SegmentData};
+use self::exec_loader::{load_exec_file_hdr_to_vec, load_file_hdr_to_vec};
+use super::elf_file::{ElfFile, ElfHeader, ProgramHeaderExt};
 use super::process::ProcessBuilder;
 use super::task::Task;
 use super::thread::ThreadName;
 use super::{table, task, ProcessRef, ThreadRef};
 use crate::fs::{
     CreationFlags, File, FileDesc, FileTable, FsView, HostStdioFds, StdinFile, StdoutFile,
-    ROOT_INODE,
 };
 use crate::prelude::*;
 use crate::vm::ProcessVM;
@@ -102,7 +101,8 @@ fn new_process(
     current_ref: &ThreadRef,
 ) -> Result<ProcessRef> {
     let mut argv = argv.clone().to_vec();
-    let (is_script, elf_buf) = load_exec_file_to_vec(file_path, current_ref)?;
+    let (is_script, elf_inode, mut elf_buf, elf_header) =
+        load_exec_file_hdr_to_vec(file_path, current_ref)?;
 
     // elf_path might be different from file_path because file_path could lead to a script text file.
     // And intepreter will be the loaded ELF.
@@ -117,30 +117,28 @@ fn new_process(
         file_path.to_string()
     };
 
-    let exec_elf_file =
-        ElfFile::new(&elf_buf).cause_err(|e| errno!(e.errno(), "invalid executable"))?;
-    // Get the ldso_path of the executable
-    let exec_interp_segment = exec_elf_file
-        .program_headers()
-        .find(|segment| segment.is_interpreter())
+    let exec_elf_hdr = ElfFile::new(&elf_inode, &mut elf_buf, elf_header)
+        .cause_err(|e| errno!(e.errno(), "invalid executable"))?;
+    let ldso_path = exec_elf_hdr
+        .elf_interpreter()
         .ok_or_else(|| errno!(EINVAL, "cannot find the interpreter segment"))?;
-    let ldso_path = match exec_interp_segment.get_content(&exec_elf_file) {
-        SegmentData::Undefined(bytes) => std::ffi::CStr::from_bytes_with_nul(bytes)
-            .unwrap()
-            .to_str()
-            .unwrap(),
-        _ => return_errno!(EINVAL, "cannot get ldso_path from executable"),
+    trace!("ldso_path = {:?}", ldso_path);
+    let (ldso_inode, mut ldso_elf_hdr_buf, ldso_elf_header) =
+        load_file_hdr_to_vec(ldso_path, current_ref)
+            .cause_err(|e| errno!(e.errno(), "cannot load ld.so"))?;
+    let ldso_elf_header = if ldso_elf_header.is_none() {
+        return_errno!(ENOEXEC, "ldso header is not ELF format");
+    } else {
+        ldso_elf_header.unwrap()
     };
-    let ldso_elf_buf = load_file_to_vec(ldso_path, current_ref)
-        .cause_err(|e| errno!(e.errno(), "cannot load ld.so"))?;
-    let ldso_elf_file =
-        ElfFile::new(&ldso_elf_buf).cause_err(|e| errno!(e.errno(), "invalid ld.so"))?;
+    let ldso_elf_hdr = ElfFile::new(&ldso_inode, &mut ldso_elf_hdr_buf, ldso_elf_header)
+        .cause_err(|e| errno!(e.errno(), "invalid ld.so"))?;
 
     let new_process_ref = {
         let process_ref = current_ref.process().clone();
 
-        let vm = init_vm::do_init(&exec_elf_file, &ldso_elf_file)?;
-        let mut auxvec = init_auxvec(&vm, &exec_elf_file)?;
+        let vm = init_vm::do_init(&exec_elf_hdr, &ldso_elf_hdr)?;
+        let mut auxvec = init_auxvec(&vm, &exec_elf_hdr)?;
 
         // Notify debugger to load the symbols from elf file
         let ldso_elf_base = vm.get_elf_ranges()[1].start() as u64;
@@ -163,8 +161,7 @@ fn new_process(
         let task = {
             let ldso_entry = {
                 let ldso_range = vm.get_elf_ranges()[1];
-                let ldso_entry =
-                    ldso_range.start() + ldso_elf_file.elf_header().entry_point() as usize;
+                let ldso_entry = ldso_range.start() + ldso_elf_hdr.elf_header().e_entry as usize;
                 if !ldso_range.contains(ldso_entry) {
                     return_errno!(EINVAL, "Invalid program entry");
                 }
@@ -309,13 +306,10 @@ fn init_auxvec(process_vm: &ProcessVM, exec_elf_file: &ElfFile) -> Result<AuxVec
 
     let exec_elf_base = process_vm.get_elf_ranges()[0].start() as u64;
     let exec_elf_header = exec_elf_file.elf_header();
-    auxvec.set(AuxKey::AT_PHENT, exec_elf_header.ph_entry_size() as u64)?;
-    auxvec.set(AuxKey::AT_PHNUM, exec_elf_header.ph_count() as u64)?;
-    auxvec.set(AuxKey::AT_PHDR, exec_elf_base + exec_elf_header.ph_offset())?;
-    auxvec.set(
-        AuxKey::AT_ENTRY,
-        exec_elf_base + exec_elf_header.entry_point(),
-    )?;
+    auxvec.set(AuxKey::AT_PHENT, exec_elf_header.e_phentsize as u64)?;
+    auxvec.set(AuxKey::AT_PHNUM, exec_elf_header.e_phnum as u64)?;
+    auxvec.set(AuxKey::AT_PHDR, exec_elf_base + exec_elf_header.e_phoff)?;
+    auxvec.set(AuxKey::AT_ENTRY, exec_elf_base + exec_elf_header.e_entry)?;
 
     let ldso_elf_base = process_vm.get_elf_ranges()[1].start() as u64;
     auxvec.set(AuxKey::AT_BASE, ldso_elf_base)?;

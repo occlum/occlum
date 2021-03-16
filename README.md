@@ -2,8 +2,8 @@
 ## <!-- render a nicely looking grey line to separate the logo from the content  -->
 [![All Contributors](https://img.shields.io/badge/all_contributors-7-orange.svg?style=flat-square)](CONTRIBUTORS.md)
 [![Essential Test](https://github.com/occlum/occlum/workflows/Essential%20Test/badge.svg?branch=master)](https://github.com/occlum/occlum/actions?query=workflow%3A%22Essential+Test%22)
-[![SGX Hardware Mode Test](https://github.com/occlum/occlum/workflows/SGX%20Hardware%20Mode%20Test/badge.svg?branch=master)](https://github.com/occlum/occlum/actions?query=workflow%3A%22SGX+Hardware+Mode+Test%22)
 [![Demo Test](https://github.com/occlum/occlum/workflows/Demo%20Test/badge.svg?branch=master)](https://github.com/occlum/occlum/actions?query=workflow%3A%22Demo+Test%22)
+<!--[![SGX Hardware Mode Test](https://github.com/occlum/occlum/workflows/SGX%20Hardware%20Mode%20Test/badge.svg?branch=master)](https://github.com/occlum/occlum/actions?query=workflow%3A%22SGX+Hardware+Mode+Test%22)-->
 
 **NEWS:** Our paper _Occlum: Secure and Efficient Multitasking Inside a Single Enclave of Intel SGX_ has been accepted by [ASPLOS'20](https://asplos-conference.org/programs/). This research paper highlights the advantages of the single-address-space architecture adopted by Occlum and describes a novel in-enclave isolation mechanism that complements this approach. The paper can be found on [ACM Digital Library](https://dl.acm.org/doi/abs/10.1145/3373376.3378469) and [Arxiv](https://arxiv.org/abs/2001.07450).
 
@@ -48,7 +48,7 @@ The `occlum init` command creates the compile-time and run-time state of Occlum 
 $ cp ../hello_world image/bin/
 $ occlum build
 ```
-The content of the `image` directory is initialized by the `occlum init` command. The structure of the `image` directory mimics that of an ordinary UNIX FS, containing directories like `/bin`, `/lib`, `/root`, `/tmp`, etc. After copying the user program `hello_world` into `image/bin/`, the `image` directory is packaged by the `occlum build` command to generate a secure Occlum FS image as well as the Occlum SGX enclave.
+The content of the `image` directory is initialized by the `occlum init` command. The structure of the `image` directory mimics that of an ordinary UNIX FS, containing directories like `/bin`, `/lib`, `/root`, `/tmp`, etc. After copying the user program `hello_world` into `image/bin/`, the `image` directory is packaged by the `occlum build` command to generate a secure Occlum FS image as well as the Occlum SGX enclave. The FS image is integrity protected by default, if you want to protect the confidentiality and integrity with your own key, please check out [here](docs/encrypted_image.md).
 
 For platforms that don't support SGX, it is also possible to run Occlum in SGX simulation mode. To switch to the simulation mode, `occlum build` command must be given an extra argument or an environment variable as shown below:
 ```
@@ -128,8 +128,7 @@ Occlum can be configured easily via a configuration file named `Occlum.json`, wh
     },
     // Mount points and their file systems
     //
-    // Limitation: configuring mount points by modifying this config file is not
-    // supported at the moment. The default configuration is shown below.
+    // The default configuration is shown below.
     "mount": [
         {
             "target": "/",
@@ -139,14 +138,15 @@ Occlum can be configured easily via a configuration file named `Occlum.json`, wh
                     {
                         "target": "/",
                         "type": "sefs",
-                        "source": "./image",
+                        "source": "./build/mount/__ROOT",
                         "options": {
-                            "integrity_only": true
+                            "MAC": ""
                         }
                     },
                     {
                         "target": "/",
-                        "type": "sefs"
+                        "type": "sefs",
+                        "source": "./run/mount/__ROOT"
                     }
                 ]
             }
@@ -157,15 +157,16 @@ Occlum can be configured easily via a configuration file named `Occlum.json`, wh
             "source": "."
         },
         {
-            "target": "/proc",
-            "type": "procfs"
-        },
-        {
             "target": "/tmp",
             "type": "sefs",
+            "source": "./run/mount/tmp",
             "options": {
                 "temporary": true
             }
+        },
+        {
+            "target": "/proc",
+            "type": "procfs"
         },
         {
             "target": "/dev",
@@ -202,7 +203,7 @@ Step 1-3 are to be done on the host OS (Linux):
 
 3. Run the Occlum Docker container, which has Occlum and its demos preinstalled:
     ```
-    docker run -it --device /dev/isgx occlum/occlum:0.20.0-ubuntu18.04
+    docker run -it --device /dev/isgx occlum/occlum:[version]-ubuntu18.04
     ```
 
 Step 4-5 are to be done on the guest OS running inside the Docker container:
@@ -213,7 +214,7 @@ Step 4-5 are to be done on the guest OS running inside the Docker container:
     ```
 5. Check out Occlum's demos preinstalled at `/root/demos`, whose README can be found [here](demos/README.md). Or you can try to build and run your own SGX-protected applications using Occlum as shown in the demos.
 
-Alternatively, to use Occlum without Docker, one can install Occlum on popular Linux distributions like Ubuntu and CentOS with the Occlum DEB and RPM packages, respectively. These packages are provided for every release of Occlum. For more info about the installation packages, see [here](tools/installer/README.md).
+Alternatively, to use Occlum without Docker, one can install Occlum on popular Linux distributions like Ubuntu and CentOS with the Occlum DEB and RPM packages, respectively. These packages are provided for every release of Occlum since `0.16.0`. For more info about the packages, see [here](docs/install_occlum_packages.md).
 
 ## How to Build?
 

@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <unistd.h>
+#include <errno.h>
+#include <string.h>
 
 #define _STR(x)             #x
 #define STR(x)              _STR(x)
@@ -21,8 +23,8 @@ typedef struct {
 #define TEST_CASE(name)     { STR(name), name }
 
 #define THROW_ERROR(fmt, ...)   do { \
-    printf("\t\tERROR:" fmt " in func %s at line %d of file %s\n", \
-    ##__VA_ARGS__, __func__, __LINE__, __FILE__); \
+    printf("\t\tERROR:" fmt " in func %s at line %d of file %s with errno %d: %s\n", \
+    ##__VA_ARGS__, __func__, __LINE__, __FILE__, errno, strerror(errno)); \
     return -1; \
 } while (0)
 

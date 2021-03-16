@@ -27,14 +27,19 @@ jobs:
     - name: Make install
       run: docker exec language_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
-    - name: Make test
-      run: docker exec language_support_test bash -c "cd /root/occlum; SGX_MODE=SIM make test"
-    
     - name: C test
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/hello_c && make;
             occlum new occlum_instance;
             cp hello_world occlum_instance/image/bin;
             cd occlum_instance && SGX_MODE=SIM occlum build;
+            occlum run /bin/hello_world"
+
+    - name: C with encrypted image test
+      run: docker exec language_support_test bash -c "cd /root/occlum/demos/hello_c && make;
+            rm -rf occlum_instance && occlum new occlum_instance;
+            occlum gen-image-key occlum_instance/image_key;
+            cp hello_world occlum_instance/image/bin;
+            cd occlum_instance && SGX_MODE=SIM occlum build --image-key ./image_key --buildin-image-key;
             occlum run /bin/hello_world"
 
     - name: C++ test
@@ -43,7 +48,7 @@ jobs:
             cp hello_world occlum_instance/image/bin;
             cd occlum_instance && SGX_MODE=SIM occlum build;
             occlum run /bin/hello_world"
-  
+
     - name: Rust test
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/rust && SGX_MODE=SIM ./run_rust_demo_on_occlum.sh"
 
@@ -55,7 +60,6 @@ jobs:
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/web_server && occlum-go get -u -v github.com/gin-gonic/gin;
             occlum-go build -o web_server ./web_server.go;
             SGX_MODE=SIM ./run_golang_on_occlum.sh" &
-
     - name: Curl test
       run: |
         sleep ${{ env.nap_time }};
@@ -72,16 +76,8 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec language_support_test bash -c "cd /root/occlum/demos/golang/grpc_pingpong && SGX_MODE=SIM ./run_ping_on_occlum.sh" &
 
-    # TODO: Remove " || true " because in simulation mode, process exits brutely and can cause segmentation fault in some cases.
     - name: Run Golang sqlite test
-      run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh" || true
-
-    # TODO: When sgx simulation mode can handle interrupt signal, remove this.
-    - name: Kill the container
-      run: |
-        sleep ${{ env.nap_time }};
-        docker stop language_support_test
-
+      run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh"
 
   # TODO: Add Java web server test
   Java_support_test:
@@ -108,13 +104,6 @@ jobs:
 
     - name: Run hello world
       run: docker exec java_support_test bash -c "cd /root/occlum/demos/java && SGX_MODE=SIM ./run_java_on_occlum.sh hello" &
-
-    # TODO: When sgx simulation mode can handle page fault exception, remove this.
-    - name: Kill the container
-      run: |
-        sleep ${{ env.nap_time }};
-        docker stop java_support_test
-
 
   Fish_test:
     runs-on: ubuntu-18.04
@@ -143,13 +132,6 @@ jobs:
 
     - name: Run Fish process rlimit test
       run: docker exec fish_test bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_per_process_config_test.sh" &
-
-    # TODO: When sgx simulation mode supports interrupt signal, remove this.
-    - name: Kill the container
-      run: |
-        sleep ${{ env.nap_time }};
-        docker stop fish_test
-
 
   Bazel_test:
     runs-on: ubuntu-18.04
@@ -291,13 +273,11 @@ jobs:
     - name: Build xgboost dependencies
       run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && ./download_and_build_xgboost.sh"
 
-    # TODO: Remove " || true " because in simulation mode, process exits brutely and can cause segmentation fault in some cases.
     - name: Run xgboost test
-      run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test" || true
+      run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test"
 
-    # TODO: Remove " || true " because in simulation mode, process exits brutely and can cause segmentation fault in some cases.
     - name: Run xgboost cluster test
-      run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test-local-cluster" || true
+      run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test-local-cluster"
 
 
   Tensorflow_lite_test:
@@ -352,11 +332,10 @@ jobs:
     - name: Run grpc server
       run: docker exec grpc_test bash -c "cd /root/demos/grpc && SGX_MODE=SIM ./run_server_on_occlum.sh" &
 
-    # TODO: Remove " || true " because in simulation mode, process exits brutely and can cause segmentation fault in some cases.
     - name: Run grpc client
       run: |
         sleep ${{ env.nap_time }};
-        docker exec grpc_test bash -c "cd /root/demos/grpc && SGX_MODE=SIM ./run_client_on_occlum.sh" || true
+        docker exec grpc_test bash -c "cd /root/demos/grpc && SGX_MODE=SIM ./run_client_on_occlum.sh"
 
 
   Openvino_test:
@@ -400,3 +379,40 @@ jobs:
 
     - name: Check result
       run: docker exec python_support_test bash -c "cd /root/occlum/demos/python/occlum_instance; cat smvlight.dat"
+
+  # Redis test
+  Redis_support_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
+
+    - name: Create container
+      run: docker run -itd --name=redis_support_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+
+    - name: Build dependencies
+      run: docker exec redis_support_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec redis_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+
+    - name: download and build redis
+      run: docker exec redis_support_test bash -c "cd /root/occlum/demos/redis; ./download_and_build_redis.sh"
+
+    - name: Run redis benchmark
+      run: docker exec redis_support_test bash -c "cd /root/occlum/demos/redis; SGX_MODE=SIM ./benchmark.sh"
+
+    - name: Restart the container
+      run: |
+        sleep ${{ env.nap_time }};
+        docker restart redis_support_test
+
+    - name: download and build redis with glibc
+      run: docker exec redis_support_test bash -c "cd /root/occlum/demos/redis; ./download_and_build_redis_glibc.sh"
+
+    - name: Run redis benchmark
+      run: docker exec redis_support_test bash -c "cd /root/occlum/demos/redis; SGX_MODE=SIM ./benchmark_glibc.sh"

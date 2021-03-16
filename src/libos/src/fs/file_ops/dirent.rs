@@ -8,7 +8,7 @@ pub fn do_getdents(fd: FileDesc, buf: &mut [u8]) -> Result<usize> {
     getdents_common::<()>(fd, buf)
 }
 
-fn getdents_common<T: DirentType + Copy + Default>(fd: FileDesc, buf: &mut [u8]) -> Result<usize> {
+fn getdents_common<T: DirentType + Copy>(fd: FileDesc, buf: &mut [u8]) -> Result<usize> {
     debug!(
         "getdents: fd: {}, buf: {:?}, buf_size: {}",
         fd,
@@ -33,8 +33,8 @@ fn getdents_common<T: DirentType + Copy + Default>(fd: FileDesc, buf: &mut [u8])
             }
             Ok(name) => name,
         };
-        // TODO: get ino from dirent
-        let dirent = LinuxDirent::<T>::new(1, &name);
+        // TODO: get ino and type from dirent
+        let dirent = LinuxDirent::<T>::new(1, &name, DT_UNKNOWN);
         if let Err(e) = writer.try_write(&dirent, &name) {
             file_ref.seek(SeekFrom::Current(-1))?;
             if writer.written_size == 0 {
@@ -47,8 +47,10 @@ fn getdents_common<T: DirentType + Copy + Default>(fd: FileDesc, buf: &mut [u8])
     Ok(writer.written_size)
 }
 
+const DT_UNKNOWN: u8 = 0;
+
 #[repr(packed)] // Don't use 'C'. Or its size will align up to 8 bytes.
-struct LinuxDirent<T: DirentType + Copy + Default> {
+struct LinuxDirent<T: DirentType + Copy> {
     /// Inode number
     ino: u64,
     /// Offset to next structure
@@ -61,15 +63,20 @@ struct LinuxDirent<T: DirentType + Copy + Default> {
     name: [u8; 0],
 }
 
-impl<T: DirentType + Copy + Default> LinuxDirent<T> {
-    fn new(ino: u64, name: &str) -> Self {
-        let ori_len = ::core::mem::size_of::<LinuxDirent<T>>() + name.len() + 1;
+impl<T: DirentType + Copy> LinuxDirent<T> {
+    fn new(ino: u64, name: &str, d_type: u8) -> Self {
+        let ori_len = if !T::at_the_end_of_linux_dirent() {
+            core::mem::size_of::<LinuxDirent<T>>() + name.len() + 1
+        } else {
+            // pad the file type at the end
+            core::mem::size_of::<LinuxDirent<T>>() + name.len() + 1 + core::mem::size_of::<u8>()
+        };
         let len = align_up(ori_len, 8); // align up to 8 bytes
         Self {
             ino,
             offset: 0,
             reclen: len as u16,
-            type_: Default::default(),
+            type_: T::set_type(d_type),
             name: [],
         }
     }
@@ -79,9 +86,9 @@ impl<T: DirentType + Copy + Default> LinuxDirent<T> {
     }
 }
 
-impl<T: DirentType + Copy + Default> Copy for LinuxDirent<T> {}
+impl<T: DirentType + Copy> Copy for LinuxDirent<T> {}
 
-impl<T: DirentType + Copy + Default> Clone for LinuxDirent<T> {
+impl<T: DirentType + Copy> Clone for LinuxDirent<T> {
     fn clone(&self) -> Self {
         Self {
             ino: self.ino,
@@ -93,10 +100,27 @@ impl<T: DirentType + Copy + Default> Clone for LinuxDirent<T> {
     }
 }
 
-trait DirentType {}
+trait DirentType {
+    fn set_type(d_type: u8) -> Self;
+    fn at_the_end_of_linux_dirent() -> bool;
+}
 
-impl DirentType for u8 {}
-impl DirentType for () {}
+impl DirentType for u8 {
+    fn set_type(d_type: u8) -> Self {
+        d_type
+    }
+    fn at_the_end_of_linux_dirent() -> bool {
+        false
+    }
+}
+impl DirentType for () {
+    fn set_type(d_type: u8) -> Self {
+        Default::default()
+    }
+    fn at_the_end_of_linux_dirent() -> bool {
+        true
+    }
+}
 
 struct DirentBufWriter<'a> {
     buf: &'a mut [u8],
@@ -114,7 +138,7 @@ impl<'a> DirentBufWriter<'a> {
         }
     }
 
-    fn try_write<T: DirentType + Copy + Default>(
+    fn try_write<T: DirentType + Copy>(
         &mut self,
         dirent: &LinuxDirent<T>,
         name: &str,
@@ -127,6 +151,21 @@ impl<'a> DirentBufWriter<'a> {
             ptr.write(*dirent);
             let name_ptr = ptr.add(1) as _;
             write_cstr(name_ptr, name);
+            if T::at_the_end_of_linux_dirent() {
+                // pad zero bytes and file type at the end
+                let mut ptr = name_ptr.add(name.len() + 1);
+                let mut rest_len = {
+                    let written_len = core::mem::size_of::<LinuxDirent<T>>() + name.len() + 1;
+                    dirent.len() - written_len
+                };
+                while rest_len > 1 {
+                    ptr.write(0);
+                    ptr = ptr.add(1);
+                    rest_len -= 1;
+                }
+                // the last one is file type
+                ptr.write(DT_UNKNOWN);
+            }
         }
         self.rest_size -= dirent.len();
         self.written_size += dirent.len();
