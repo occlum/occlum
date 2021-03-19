@@ -1,6 +1,6 @@
 /target
 Cargo.lock
-tmp.data*
+*.data*
 file-io-bench/file-io-bench
 file-io-bench/test_file*
 file-io-bench/benchmark_result.txt

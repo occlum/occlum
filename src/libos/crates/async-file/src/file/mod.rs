@@ -1,11 +1,9 @@
+use spin::{Mutex, RwLock};
 use std::any::Any;
 use std::marker::PhantomData;
 #[cfg(feature = "sgx")]
 use std::prelude::v1::*;
-#[cfg(not(feature = "sgx"))]
-use std::sync::{Arc, Mutex, RwLock, Weak};
-#[cfg(feature = "sgx")]
-use std::sync::{Arc, SgxMutex as Mutex, SgxRwLock as RwLock, Weak};
+use std::sync::{Arc, Weak};
 
 use async_io::file::{Async, File, SeekFrom};
 use async_io::poll::{Events, Pollee, Poller};
@@ -56,7 +54,7 @@ pub trait AsyncFileRt: Send + Sync + 'static {
 
 impl<Rt: AsyncFileRt + ?Sized> File for AsyncFile<Rt> {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
-        let mut pos = self.pos.lock().unwrap();
+        let mut pos = self.pos.lock();
         let res = self.do_read_at(*pos, buf);
         if let Ok(nbytes) = &res {
             *pos += *nbytes;
@@ -65,7 +63,7 @@ impl<Rt: AsyncFileRt + ?Sized> File for AsyncFile<Rt> {
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize> {
-        let mut pos = self.pos.lock().unwrap();
+        let mut pos = self.pos.lock();
         let res = self.do_write_at(*pos, buf);
         if let Ok(nbytes) = &res {
             *pos += *nbytes;
@@ -74,13 +72,13 @@ impl<Rt: AsyncFileRt + ?Sized> File for AsyncFile<Rt> {
     }
 
     fn seek(&self, seek_pos: SeekFrom) -> Result<usize> {
-        let mut pos = self.pos.lock().unwrap();
+        let mut pos = self.pos.lock();
         match seek_pos {
             SeekFrom::Start(offset) => {
                 *pos = offset;
             }
             SeekFrom::End(offset) => {
-                let len = self.len.read().unwrap();
+                let len = self.len.read();
                 *pos = len
                     .checked_add(offset)
                     .ok_or_else(|| errno!(EOVERFLOW, "offset overflow"))?;
@@ -235,7 +233,7 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
         }
         self.check_args(offset, buf.len())?;
 
-        let file_len = *self.len.read().unwrap();
+        let file_len = *self.len.read();
 
         // For reads beyond the end of the file
         if offset >= file_len {
@@ -249,7 +247,7 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
         let buf = &mut buf[..buf_len];
 
         // Use tracker to determine if the new read is sequential and how much data to prefetch.
-        let mut tracker = self.seq_rd_tracker.try_lock().ok();
+        let mut tracker = self.seq_rd_tracker.try_lock();
         let new_read = tracker
             .as_mut()
             .map(|tracker| tracker.track(offset, buf.len()));
@@ -480,7 +478,7 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
                 callback,
             )
         };
-        let mut guard = handle_store2.lock().unwrap();
+        let mut guard = handle_store2.lock();
         guard.replace(handle);
     }
 
@@ -572,7 +570,7 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
 
         if write_nbytes > 0 {
             // Update file length if necessary
-            let mut file_len = self.len.write().unwrap();
+            let mut file_len = self.len.write();
             if offset + write_nbytes > *file_len {
                 *file_len = offset + write_nbytes;
             }

@@ -50,10 +50,10 @@ impl Pollee {
         // Slow path: connect the pollee with the poller
         let poller = poller.unwrap();
 
-        let mut pollers = self.inner.pollers.lock().unwrap();
+        let mut pollers = self.inner.pollers.lock();
         let is_new = pollers.insert(poller.inner.clone(), mask).is_none();
         if is_new {
-            let mut pollees = poller.inner.pollees.lock().unwrap();
+            let mut pollees = poller.inner.pollees.lock();
             pollees.push(Arc::downgrade(&self.inner));
 
             self.inner.num_pollers.fetch_add(1, Ordering::Release);
@@ -74,7 +74,7 @@ impl Pollee {
         }
 
         // Slow path: broadcast the new events to all pollers
-        let pollers = self.inner.pollers.lock().unwrap();
+        let pollers = self.inner.pollers.lock();
         pollers
             .iter()
             .filter(|(_, mask)| mask.intersects(events))
@@ -154,10 +154,10 @@ impl Hash for PollerInner {
 
 impl Drop for Poller {
     fn drop(&mut self) {
-        let mut pollees = self.inner.pollees.lock().unwrap();
+        let mut pollees = self.inner.pollees.lock();
         for weak_pollee in pollees.drain(..) {
             if let Some(pollee) = weak_pollee.upgrade() {
-                let mut pollers = pollee.pollers.lock().unwrap();
+                let mut pollers = pollee.pollers.lock();
                 pollers.remove(&self.inner);
                 drop(pollers);
 

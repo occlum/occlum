@@ -1,10 +1,8 @@
+use spin::MutexGuard;
 use std::any::Any;
 #[cfg(feature = "sgx")]
 use std::prelude::v1::*;
-#[cfg(not(feature = "sgx"))]
-use std::sync::{Arc, MutexGuard};
-#[cfg(feature = "sgx")]
-use std::sync::{Arc, SgxMutexGuard as MutexGuard};
+use std::sync::Arc;
 
 use crate::page_cache::{Page, PageEntry, PageState};
 

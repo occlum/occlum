@@ -1,12 +1,9 @@
+use atomic::{Atomic, Ordering};
+use spin::{Mutex, MutexGuard};
 use std::any::Any;
 #[cfg(feature = "sgx")]
 use std::prelude::v1::*;
-#[cfg(not(feature = "sgx"))]
-use std::sync::{Arc, Mutex, MutexGuard};
-#[cfg(feature = "sgx")]
-use std::sync::{Arc, SgxMutex as Mutex, SgxMutexGuard as MutexGuard};
-
-use atomic::{Atomic, Ordering};
+use std::sync::Arc;
 
 use super::LruListName;
 use crate::page_cache::{AsFd, Page, PageState};
@@ -79,7 +76,7 @@ impl PageEntry {
     }
 
     pub fn state(&self) -> MutexGuard<PageState> {
-        self.0.inner().state.lock().unwrap()
+        self.0.inner().state.lock()
     }
 
     pub fn page(&self) -> &Page {
@@ -153,7 +150,7 @@ impl std::fmt::Debug for PageEntryInner {
         f.debug_struct("PageEntryInner")
             .field("fd", &self.fd)
             .field("offset", &self.offset)
-            .field("state", &*self.state.lock().unwrap())
+            .field("state", &*self.state.lock())
             .field("list_name", &self.list_name.load(Ordering::Relaxed))
             .finish()
     }

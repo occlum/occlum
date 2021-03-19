@@ -84,7 +84,7 @@ impl Common {
     }
 
     pub fn lock_event(&self) -> MutexGuard<()> {
-        self.event_lock.lock().unwrap()
+        self.event_lock.lock()
     }
 }
 
@@ -98,7 +98,7 @@ impl<T> EndPoint<T> {
     }
 
     pub fn ringbuf(&self) -> MutexGuard<T> {
-        self.ringbuf.lock().unwrap()
+        self.ringbuf.lock()
     }
 
     pub fn pollee(&self) -> &Pollee {

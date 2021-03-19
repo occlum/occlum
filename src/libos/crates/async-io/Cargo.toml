@@ -19,6 +19,7 @@ futures = { version = "0.3", default-features = false, features = ["alloc"]  }
 io-uring-callback = { path = "../io-uring-callback" }
 object-id = { path = "../object-id" }
 ringbuf = { version = "0.2.3", default-features = false }
+spin = "0.7"
 
 sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }
 sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", optional = true, features = ["backtrace"] }

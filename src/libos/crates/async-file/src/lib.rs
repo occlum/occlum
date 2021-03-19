@@ -18,6 +18,7 @@ extern crate sgx_libc as libc;
 extern crate sgx_trts;
 #[cfg(feature = "sgx")]
 extern crate sgx_untrusted_alloc;
+extern crate spin;
 #[cfg(test)]
 extern crate test;
 

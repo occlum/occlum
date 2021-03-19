@@ -1,11 +1,9 @@
+use spin::{Mutex, MutexGuard};
 use std::collections::HashMap;
 #[cfg(feature = "sgx")]
 use std::prelude::v1::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
-#[cfg(not(feature = "sgx"))]
-use std::sync::{Arc, Mutex, MutexGuard};
-#[cfg(feature = "sgx")]
-use std::sync::{Arc, SgxMutex as Mutex, SgxMutexGuard as MutexGuard};
+use std::sync::Arc;
 
 mod page;
 mod page_entry;
@@ -72,7 +70,7 @@ impl PageCache {
         debug_assert!(offset % Page::size() == 0);
 
         let key = (file.as_fd(), offset);
-        let mut map = self.map.lock().unwrap();
+        let mut map = self.map.lock();
 
         // Try to get an existing entry in the map.
         if let Some(existing_entry) = map.get(&key) {
@@ -120,7 +118,7 @@ impl PageCache {
 
     /// Release a page handle.
     pub fn release(&self, handle: PageHandle) {
-        self.do_release(handle, false)
+        self.do_release(handle, false);
     }
 
     pub fn discard(&self, handle: PageHandle) {
@@ -175,7 +173,7 @@ impl PageCache {
 
     fn do_release(&self, handle: PageHandle, is_discard: bool) {
         let entry = handle.unwrap();
-        let mut map = self.map.lock().unwrap();
+        let mut map = self.map.lock();
 
         let are_users_still_holding_handles = |entry: &PageEntry| {
             let internal_refcnt = if entry.list_name().is_some() {
@@ -287,7 +285,7 @@ impl PageCache {
     }
 
     fn acquire_lru_list(&self, name: LruListName) -> MutexGuard<PageLruList> {
-        self.lru_lists[name as usize].lock().unwrap()
+        self.lru_lists[name as usize].lock()
     }
 }
 
@@ -296,13 +294,13 @@ impl std::fmt::Debug for PageCache {
         f.debug_struct("PageCache")
             .field("capacity", &self.capacity)
             .field("num_allocated", &self.num_allocated.load(Ordering::Relaxed))
-            .field("map", &self.map.lock().unwrap())
+            .field("map", &self.map.lock())
             .field(
                 "lru_lists",
                 &self
                     .lru_lists
                     .iter()
-                    .map(|ll| ll.lock().unwrap())
+                    .map(|ll| ll.lock())
                     .collect::<Vec<MutexGuard<PageLruList>>>(),
             )
             .finish()
@@ -511,7 +509,7 @@ mod tests {
 
     mod helper {
         use super::*;
-        use std::sync::{Mutex, MutexGuard};
+        use spin::{Mutex, MutexGuard};
 
         #[derive(Debug, PartialEq, Eq)]
         pub struct File(pub i32);
