@@ -114,9 +114,16 @@ impl<Rt: AsyncFileRt + ?Sized> File for AsyncFile<Rt> {
                 const FLUSH_BATCH_SIZE: usize = 64;
                 let num_flushed = Rt::flusher().flush_by_fd(fd, FLUSH_BATCH_SIZE).await;
                 if num_flushed == 0 {
-                    return Ok(());
+                    break;
                 }
             }
+
+            let complete_fn = move |retval: i32| assert!(retval == 0);
+            let io_uring = Rt::io_uring();
+            let handle = unsafe { io_uring.fsync(Fd(fd), false, complete_fn) };
+            handle.await;
+
+            return Ok(());
         })
         .boxed()
     }

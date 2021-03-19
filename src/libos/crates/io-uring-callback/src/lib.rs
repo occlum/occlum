@@ -279,6 +279,31 @@ impl IoUring {
         handle
     }
 
+    pub unsafe fn fsync(
+        &self,
+        fd: Fd,
+        datasync: bool,
+        callback: impl FnOnce(i32) + Send + 'static,
+    ) -> Handle {
+        let token_idx = self.gen_token(callback);
+
+        let entry = if datasync {
+            opcode::Fsync::new(fd)
+                .flags(types::FsyncFlags::DATASYNC)
+                .build()
+                .user_data(token_idx as _)
+        } else {
+            opcode::Fsync::new(fd).build().user_data(token_idx as _)
+        };
+
+        if let Err(entry) = self.inner.submission().push(entry) {
+            panic!("sq must be large enough");
+        }
+
+        let handle = self.gen_handle(token_idx);
+        handle
+    }
+
     /// Scan for completed async I/O and trigger their registered callbacks.
     pub fn trigger_callbacks(&self) {
         let cq = self.inner.completion();
