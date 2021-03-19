@@ -77,5 +77,6 @@ fn main() {
         }
     }
     println!("[+] run_sgx_example success...");
-    enclave.destroy();
+    // enclave.destroy();
+    std::process::exit(1);
 }

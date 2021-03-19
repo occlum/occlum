@@ -21,7 +21,7 @@ SGX_SDK ?= /opt/sgxsdk
 SGX_MODE ?= HW
 SGX_ARCH ?= x64
 
-include ../../../common.mk
+include ../../../../common.mk
 
 include $(RUST_SGX_SDK_DIR)/buildenv.mk
 
