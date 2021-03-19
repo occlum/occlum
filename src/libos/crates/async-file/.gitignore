@@ -3,3 +3,4 @@ Cargo.lock
 tmp.data*
 file-io-bench/file-io-bench
 file-io-bench/test_file*
+file-io-bench/benchmark_result.txt

@@ -3,13 +3,13 @@ bench_dir=$PWD
 
 run_async_file_in_host(){
    cd $bench_dir/../../target/release/examples/
-   ./read_write_bench $file_num $block_size $file_total_size $is_read $is_seq $use_fsync $use_direct $loops
+   ./read_write_bench $file_num $block_size $file_total_size $is_read $is_seq $use_fsync $use_direct $loops | tee -a "$bench_dir/$file_name"
    sleep 2
 }
 
 run_async_file_in_sgx(){
    cd $bench_dir/../examples/sgx/read_write_bench/bin
-   ./app
+   ./app $file_num $block_size $file_total_size $is_read $is_seq $use_fsync $use_direct $loops | tee -a "$bench_dir/$file_name"
    sleep 2
 }
 
@@ -27,6 +27,8 @@ cargo b --release --examples
 
 cd $bench_dir/../examples/sgx/read_write_bench
 make
+
+file_name="benchmark_result.txt"
 
 file_num=1
 file_total_size=100

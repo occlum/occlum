@@ -179,8 +179,6 @@ void *pthread_routine(void *arg) {
     long file_size = file_total_size / file_num;
     int fd = fds[0];
     for (int i = 0; i < loops; ++i) {
-        for (int j = 0; j < file_block_size; ++j) buf[j] = i;
-
         if (is_read) {
             if (is_seq) {
                 for (long offset = 0; offset < file_size; offset += file_block_size) {

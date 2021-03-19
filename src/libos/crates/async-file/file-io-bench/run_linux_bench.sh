@@ -1,10 +1,12 @@
 #!/bin/bash
 run_file_io(){
-    ./file-io-bench $thread_num $file_num $block_size $req_merge_num $file_total_size $is_read $is_seq $use_fsync $use_direct $loops
+    ./file-io-bench $thread_num $file_num $block_size $req_merge_num $file_total_size $is_read $is_seq $use_fsync $use_direct $loops | tee -a "$file_name"
     sleep 2
 }
 
 gcc -O2 -pthread file-io-bench.c -o file-io-bench
+
+file_name="benchmark_result.txt"
 
 thread_num=1
 file_num=1
