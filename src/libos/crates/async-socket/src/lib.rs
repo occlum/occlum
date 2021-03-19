@@ -64,8 +64,8 @@ enum State<P: IoUringProvider> {
 
 // Implementation for Socket
 
-pub const DEFAULT_SEND_BUF_SIZE: usize = 16 * 1024;
-pub const DEFAULT_RECV_BUF_SIZE: usize = 16 * 1024;
+pub const DEFAULT_SEND_BUF_SIZE: usize = 65 * 1024;
+pub const DEFAULT_RECV_BUF_SIZE: usize = 65 * 1024;
 
 impl<P: IoUringProvider> Socket<P> {
     /// Create a new instance.

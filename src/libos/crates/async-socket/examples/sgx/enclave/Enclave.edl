@@ -27,7 +27,7 @@ enclave {
     
     trusted {
         /* define ECALLs here. */
-        public sgx_status_t run_sgx_example();
+        public sgx_status_t run_sgx_example(unsigned short port);
     };
 
     untrusted {

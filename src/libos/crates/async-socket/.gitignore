@@ -1,2 +1,5 @@
 /target
 Cargo.lock
+network-bench/client
+network-bench/server
+network-bench/benchmark_result.txt

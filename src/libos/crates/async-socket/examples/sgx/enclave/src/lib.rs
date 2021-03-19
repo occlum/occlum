@@ -35,16 +35,18 @@ use sgx_trts::libc;
 use sgx_types::*;
 use std::prelude::v1::*;
 
-include!("../../../common.in");
+include!("../../../common/tcp_echo.rs");
 
 #[no_mangle]
-pub extern "C" fn run_sgx_example() -> sgx_status_t {
+pub extern "C" fn run_sgx_example(port: u16) -> sgx_status_t {
     // std::backtrace::enable_backtrace("enclave.signed.so", std::backtrace::PrintFormat::Full);
     println!("[ECALL] run_sgx_example");
 
-    init_async_rt();
+    let parallelism: u32 = 1;
 
-    async_rt::task::block_on(tcp_echo());
+    init_async_rt(parallelism);
+
+    async_rt::task::block_on(tcp_echo(port));
 
     sgx_status_t::SGX_SUCCESS
 }

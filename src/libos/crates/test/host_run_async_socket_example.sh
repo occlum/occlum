@@ -3,7 +3,8 @@ source_dir=${PWD}
 
 cd ${source_dir}/../async-socket/
 cargo b --examples --release
-cargo run --example tcp_echo --release &
+cd ${source_dir}/../target/release/examples/
+./tcp_echo &
 
 sleep 2
 

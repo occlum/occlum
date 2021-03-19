@@ -26,7 +26,8 @@ pub use sgx_io_uring_ocalls::*;
 static ENCLAVE_FILE: &'static str = "enclave.signed.so";
 
 extern "C" {
-    fn run_sgx_example(eid: sgx_enclave_id_t, retval: *mut sgx_status_t) -> sgx_status_t;
+    fn run_sgx_example(eid: sgx_enclave_id_t, retval: *mut sgx_status_t, port: u16)
+        -> sgx_status_t;
 }
 
 fn init_enclave() -> SgxResult<SgxEnclave> {
@@ -49,6 +50,14 @@ fn init_enclave() -> SgxResult<SgxEnclave> {
 }
 
 fn main() {
+    use std::env;
+    let args: Vec<String> = env::args().collect();
+    let port: u16 = if args.len() > 1 {
+        args[1].parse().unwrap()
+    } else {
+        3456
+    };
+
     let enclave = match init_enclave() {
         Ok(r) => {
             println!("[+] Init Enclave Successful {}!", r.geteid());
@@ -61,7 +70,7 @@ fn main() {
     };
 
     let mut retval = sgx_status_t::SGX_SUCCESS;
-    let result = unsafe { run_sgx_example(enclave.geteid(), &mut retval) };
+    let result = unsafe { run_sgx_example(enclave.geteid(), &mut retval, port) };
     match result {
         sgx_status_t::SGX_SUCCESS => {}
         _ => {
