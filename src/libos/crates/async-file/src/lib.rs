@@ -11,6 +11,8 @@ extern crate sgx_types;
 #[macro_use]
 extern crate sgx_tstd as std;
 #[cfg(feature = "sgx")]
+extern crate lazy_static;
+#[cfg(feature = "sgx")]
 extern crate sgx_libc as libc;
 #[cfg(feature = "sgx")]
 extern crate sgx_trts;

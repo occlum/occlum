@@ -407,17 +407,10 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
             let iovecs_len = (*iovecs).len();
             let t_iovecs_ptr = (*iovecs).as_ptr();
             let iovecs_size = iovecs_len * core::mem::size_of::<libc::iovec>();
-            let size = iovecs_size + iovecs_len * Page::size();
-            let allocator = UntrustedAllocator::new(size, 8).unwrap();
+            let allocator = UntrustedAllocator::new(iovecs_size, 8).unwrap();
             let iovecs_ptr = allocator.as_mut_ptr() as *mut libc::iovec;
-            let data_ptr = unsafe { iovecs_ptr.add(iovecs_size) as *mut u8 };
-            for idx in 0..iovecs_len {
-                unsafe {
-                    *iovecs_ptr.add(idx) = libc::iovec {
-                        iov_base: data_ptr.add(idx * Page::size()) as _,
-                        iov_len: Page::size(),
-                    };
-                }
+            unsafe {
+                std::ptr::copy_nonoverlapping(t_iovecs_ptr, iovecs_ptr, iovecs_len);
             }
             (
                 iovecs_ptr,
@@ -465,21 +458,7 @@ impl<Rt: AsyncFileRt + ?Sized> AsyncFile<Rt> {
             self_.pollee.add_events(Events::IN | Events::OUT);
 
             #[cfg(feature = "sgx")]
-            {
-                let iovecs_ptr = iovecs_ptr_u64 as *const libc::iovec;
-                let t_iovecs_ptr = t_iovecs_ptr_u64 as *mut libc::iovec;
-                for idx in 0..iovecs_len {
-                    unsafe {
-                        assert!((*t_iovecs_ptr.add(idx)).iov_len == Page::size());
-                        std::ptr::copy_nonoverlapping(
-                            (*iovecs_ptr.add(idx)).iov_base,
-                            (*t_iovecs_ptr.add(idx)).iov_base,
-                            (*t_iovecs_ptr.add(idx)).iov_len,
-                        );
-                    }
-                }
-                drop(allocator);
-            }
+            drop(allocator);
             drop(iovecs_box);
             drop(handle_store);
         };

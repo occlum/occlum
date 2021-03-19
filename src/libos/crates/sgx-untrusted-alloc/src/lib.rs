@@ -48,7 +48,7 @@ impl UntrustedAllocator {
 
         static INIT: Once = Once::new();
         INIT.call_once(|| {
-            let size = 1024 * 1024 * 512;
+            let size = 1024 * 1024 * 1024;
             let heap_ptr = unsafe { libc::ocall::malloc(size) };
             assert!(!heap_ptr.is_null());
             unsafe {
@@ -105,6 +105,35 @@ impl UntrustedAllocator {
         let new_slice = unsafe { std::slice::from_raw_parts_mut(new_slice_ptr, new_slice_len) };
         Ok(new_slice)
     }
+
+    pub fn new_slice_mut_align(&self, new_slice_len: usize, align: usize) -> Result<&mut [u8], ()> {
+        let new_slice_ptr = {
+            // Move self.buf_pos forward if enough space _atomically_.
+            let old_pos = self
+                .buf_pos
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |old_pos| {
+                    let mut new_pos = old_pos + new_slice_len;
+                    if new_pos % align != 0 {
+                        new_pos += align - new_pos % align;
+                    }
+                    if new_pos <= self.buf_size {
+                        Some(new_pos)
+                    } else {
+                        None
+                    }
+                })
+                .map_err(|_| {
+                    println!(
+                        "No enough space in UntrustedAllocator, buf_size: {}",
+                        self.buf_size
+                    );
+                    ()
+                })?;
+            unsafe { self.buf_ptr.add(old_pos) }
+        };
+        let new_slice = unsafe { std::slice::from_raw_parts_mut(new_slice_ptr, new_slice_len) };
+        Ok(new_slice)
+    }
 }
 
 impl Drop for UntrustedAllocator {
@@ -122,3 +151,5 @@ impl Drop for UntrustedAllocator {
 }
 
 unsafe impl Send for UntrustedAllocator {}
+
+unsafe impl Sync for UntrustedAllocator {}
