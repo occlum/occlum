@@ -98,10 +98,12 @@ pub fn load_file_hdr_to_vec(
         .read_elf64_lazy_as_vec()
         .map_err(|e| errno!(e.errno(), "failed to read the file"))?;
 
-    if let Ok(elf_header) = ElfFile::parse_elf_hdr(&inode, &mut file_buf) {
+    let elf_header = ElfFile::parse_elf_hdr(&inode, &mut file_buf);
+    if let Ok(elf_header) = elf_header {
         Ok((inode, file_buf, Some(elf_header)))
     } else {
-        // this file is not ELF format
+        // this file is not ELF format or there is something wrong when parsing
+        warn!("parse elf header error = {}", elf_header.err().unwrap());
         Ok((inode, file_buf, None))
     }
 }
