@@ -6,7 +6,7 @@ extern crate sgx_types;
 #[macro_use]
 extern crate sgx_tstd as std;
 
-pub mod channel;
 pub mod file;
 pub mod poll;
 pub mod prelude;
+pub mod util;

@@ -25,6 +25,7 @@ sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true 
 sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", optional = true, features = ["backtrace"] }
 sgx_trts = { path = "../../../../deps/rust-sgx-sdk/sgx_trts", optional = true }
 sgx_libc = { path = "../../../../deps/rust-sgx-sdk/sgx_libc", optional = true }
+rcore-fs = { path = "../../../../deps/sefs/rcore-fs" }
 
 [dev-dependencies]
 async-rt = { path = "../async-rt", features = ["auto_run"] }

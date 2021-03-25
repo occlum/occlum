@@ -1,9 +1,8 @@
-use std::any::Any;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use ringbuf::{Consumer as RbConsumer, Producer as RbProducer, RingBuffer};
 
-use crate::file::File;
+use crate::file::PollableFile;
 use crate::poll::{Events, Pollee, Poller};
 use crate::prelude::*;
 
@@ -152,7 +151,7 @@ impl Producer {
     }
 }
 
-impl File for Producer {
+impl PollableFile for Producer {
     fn write(&self, buf: &[u8]) -> Result<usize> {
         let this_end = self.this_end();
         let peer_end = self.peer_end();
@@ -184,10 +183,6 @@ impl File for Producer {
 
     fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
         self.this_end().pollee().poll_by(mask, poller)
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self as &dyn Any
     }
 }
 
@@ -227,7 +222,7 @@ impl Consumer {
     }
 }
 
-impl File for Consumer {
+impl PollableFile for Consumer {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let this_end = self.this_end();
         let peer_end = self.peer_end();
@@ -260,10 +255,6 @@ impl File for Consumer {
     fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
         self.this_end().pollee().poll_by(mask, poller)
     }
-
-    fn as_any(&self) -> &dyn Any {
-        self as &dyn Any
-    }
 }
 
 impl Drop for Consumer {
@@ -280,7 +271,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::file::{Async, File};
+    use crate::file::{Async, PollableFile};
 
     #[test]
     fn transfer_data_with_small_buf() {

@@ -1,15 +1,91 @@
+use std::fmt::Debug;
 use std::ops::Deref;
 
-use super::{File, SeekFrom};
+use futures::future::{self, BoxFuture};
+use futures::prelude::*;
+
+use crate::file::{AccessMode, SeekFrom, StatusFlags};
 use crate::poll::{Events, Poller};
 use crate::prelude::*;
 
-/// A wrapper type that extends a `File` object with async APIs.
+/// An abstract for file APIs.
+///
+/// An implementation for this trait should make sure all read and write APIs
+/// are non-blocking.
+pub trait PollableFile: Debug + Sync + Send {
+    fn read(&self, _buf: &mut [u8]) -> Result<usize> {
+        return_errno!(EBADF, "not support read");
+    }
+
+    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
+        for buf in bufs {
+            if buf.len() > 0 {
+                return self.read(buf);
+            }
+        }
+        Ok(0)
+    }
+
+    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
+        return_errno!(ESPIPE, "not support seek or read");
+    }
+
+    fn write(&self, _buf: &[u8]) -> Result<usize> {
+        return_errno!(EBADF, "not support write");
+    }
+
+    fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
+        for buf in bufs {
+            if buf.len() > 0 {
+                return self.write(buf);
+            }
+        }
+        Ok(0)
+    }
+
+    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
+        return_errno!(ESPIPE, "not support seek or write");
+    }
+
+    fn flush(&self) -> BoxFuture<'_, Result<()>> {
+        future::ready(Ok(())).boxed()
+    }
+
+    fn seek(&self, _pos: SeekFrom) -> Result<usize> {
+        return_errno!(ESPIPE, "not support seek");
+    }
+
+    fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events;
+
+    /*
+        fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
+            return_op_unsupported_error!("ioctl")
+        }
+    */
+
+    fn access_mode(&self) -> Result<AccessMode> {
+        return_errno!(ENOSYS, "not support getting access mode");
+    }
+
+    fn set_access_mode(&self, new_mode: AccessMode) -> Result<()> {
+        return_errno!(ENOSYS, "not support setting access mode");
+    }
+
+    fn status_flags(&self) -> Result<StatusFlags> {
+        return_errno!(ENOSYS, "not support getting status flags");
+    }
+
+    fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
+        return_errno!(ENOSYS, "not support setting status flags");
+    }
+}
+
+/// A wrapper type that extends a `PollableFile` object with async APIs.
 pub struct Async<T> {
     file: T,
 }
 
-impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
+impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
     pub fn new(file: T) -> Self {
         Self { file }
     }
@@ -36,17 +112,26 @@ impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
         }
     }
 
-    pub async fn read_exact(&self, buf: &mut [u8]) -> Result<()> {
-        let mut count = 0;
-        while count < buf.len() {
-            // TODO: handle EINTR
-            let nbytes = self.read(&mut buf[count..]).await?;
-            if nbytes == 0 {
-                return_errno!(EINVAL, "unexpected EOF");
-            }
-            count += nbytes;
+    pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
+        // Fast path
+        let res = self.file.readv(bufs);
+        if is_ok_or_not_egain(&res) {
+            return res;
         }
-        Ok(())
+
+        // Slow path
+        let mask = Events::IN;
+        let mut poller = Poller::new();
+        loop {
+            let events = self.poll_by(mask, Some(&mut poller));
+            if events.contains(Events::IN) {
+                let res = self.file.readv(bufs);
+                if is_ok_or_not_egain(&res) {
+                    return res;
+                }
+            }
+            poller.wait().await;
+        }
     }
 
     pub async fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
@@ -71,19 +156,6 @@ impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
         }
     }
 
-    pub async fn read_exact_at(&self, offset: usize, buf: &mut [u8]) -> Result<()> {
-        let mut count = 0;
-        while count < buf.len() {
-            // TODO: handle EINTR
-            let nbytes = self.read_at(offset + count, &mut buf[count..]).await?;
-            if nbytes == 0 {
-                return_errno!(EINVAL, "unexpected EOF");
-            }
-            count += nbytes;
-        }
-        Ok(())
-    }
-
     pub async fn write(&self, buf: &[u8]) -> Result<usize> {
         // Fast path
         let res = self.file.write(buf);
@@ -106,13 +178,26 @@ impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
         }
     }
 
-    pub async fn write_exact(&self, buf: &[u8]) -> Result<()> {
-        let mut count = 0;
-        while count < buf.len() {
-            // TODO: Handle EINTR
-            count += self.write(&buf[count..]).await?;
+    pub async fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
+        // Fast path
+        let res = self.file.writev(bufs);
+        if is_ok_or_not_egain(&res) {
+            return res;
         }
-        Ok(())
+
+        // Slow path
+        let mask = Events::OUT;
+        let mut poller = Poller::new();
+        loop {
+            let events = self.poll_by(mask, Some(&mut poller));
+            if events.contains(Events::OUT) {
+                let res = self.file.writev(bufs);
+                if is_ok_or_not_egain(&res) {
+                    return res;
+                }
+            }
+            poller.wait().await;
+        }
     }
 
     pub async fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
@@ -137,15 +222,6 @@ impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
         }
     }
 
-    pub async fn write_exact_at(&self, offset: usize, buf: &[u8]) -> Result<()> {
-        let mut count = 0;
-        while count < buf.len() {
-            // TODO: Handle EINTR
-            count += self.write_at(offset + count, &buf[count..]).await?;
-        }
-        Ok(())
-    }
-
     pub async fn flush(&self) -> Result<()> {
         self.file.flush().await
     }
@@ -162,8 +238,28 @@ impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
     // * readv, read_at
     // * writev, write_at
 
+    pub fn access_mode(&self) -> Result<AccessMode> {
+        self.file.access_mode()
+    }
+
+    pub fn set_access_mode(&self, new_mode: AccessMode) -> Result<()> {
+        self.file.set_access_mode(new_mode)
+    }
+
+    pub fn status_flags(&self) -> Result<StatusFlags> {
+        self.file.status_flags()
+    }
+
+    pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
+        self.file.set_status_flags(new_status)
+    }
+
     pub fn file(&self) -> &T {
         &self.file
+    }
+
+    pub fn unwrap(self) -> T {
+        self.file
     }
 }
 
@@ -180,6 +276,12 @@ impl<T: std::fmt::Debug> std::fmt::Debug for Async<T> {
     }
 }
 
+impl<F: PollableFile + ?Sized, T: Deref<Target = F> + Clone> Clone for Async<T> {
+    fn clone(&self) -> Self {
+        Self::new(self.file.clone())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::any::Any;
@@ -191,8 +293,8 @@ mod tests {
 
     #[test]
     fn with_arc_dyn() {
-        let foo = Arc::new(FooFile::new()) as Arc<dyn File>;
-        let bar = Arc::new(BarFile::new()) as Arc<dyn File>;
+        let foo = Arc::new(FooFile::new()) as Arc<dyn PollableFile>;
+        let bar = Arc::new(BarFile::new()) as Arc<dyn PollableFile>;
         let async_foo = Async::new(foo);
         let async_bar = Async::new(bar);
         println!("foo file = {:?}", &async_foo);
@@ -216,13 +318,9 @@ mod tests {
             }
         }
 
-        impl File for FooFile {
+        impl PollableFile for FooFile {
             fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
                 self.pollee.poll_by(mask, poller)
-            }
-
-            fn as_any(&self) -> &dyn Any {
-                self as &dyn Any
             }
         }
 
@@ -239,13 +337,9 @@ mod tests {
             }
         }
 
-        impl File for BarFile {
+        impl PollableFile for BarFile {
             fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
                 self.pollee.poll_by(mask, poller)
-            }
-
-            fn as_any(&self) -> &dyn Any {
-                self as &dyn Any
             }
         }
     }
