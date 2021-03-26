@@ -285,7 +285,7 @@ macro_rules! process_syscall_table_with_callback {
             (Lremovexattr = 198) => handle_unsupported(),
             (Fremovexattr = 199) => handle_unsupported(),
             (Tkill = 200) => do_tkill(tid: pid_t, sig: c_int),
-            (Time = 201) => handle_unsupported(),
+            (Time = 201) => do_time(tloc_u: *mut time_t),
             (Futex = 202) => do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32, timeout: u64, futex_new_addr: *const i32, bitset: u32),
             (SchedSetaffinity = 203) => do_sched_setaffinity(pid: pid_t, cpusize: size_t, buf: *const c_uchar),
             (SchedGetaffinity = 204) => do_sched_getaffinity(pid: pid_t, cpusize: size_t, buf: *mut c_uchar),
@@ -831,6 +831,17 @@ fn do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t) -> Result<isize> 
         *ts_u = ts;
     }
     Ok(0)
+}
+
+fn do_time(tloc_u: *mut time_t) -> Result<isize> {
+    let ts = time::do_clock_gettime(time::ClockID::CLOCK_REALTIME)?;
+    if !tloc_u.is_null() {
+        check_mut_ptr(tloc_u)?;
+        unsafe {
+            *tloc_u = ts.sec();
+        }
+    }
+    Ok(ts.sec() as isize)
 }
 
 fn do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t) -> Result<isize> {
