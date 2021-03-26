@@ -157,15 +157,19 @@ cmd_init() {
     mkdir -p image/tmp
     mkdir -p image/dev
     mkdir -p image/proc
+    mkdir -p image/etc
     local occlum_glibc_lib=/opt/occlum/glibc/lib
+    local occlum_glibc_etc=/opt/occlum/glibc/etc
     local cpu_lib=/sys/devices/system/cpu
     if [ -d "$occlum_glibc_lib" ]; then
         mkdir -p "image/$occlum_glibc_lib"
         mkdir -p "image/$cpu_lib"
+        mkdir -p "image/$occlum_glibc_etc"
     fi
     # add default /etc/hosts
-    mkdir -p image/etc
     echo "127.0.0.1   localhost" > image/etc/hosts
+    # add default timezone file
+    cp /etc/localtime image/etc/
 
     # add musl
     local occlum_musl_lib=/usr/local/occlum/x86_64-linux-musl/lib
@@ -195,6 +199,8 @@ cmd_init() {
                 "/usr/lib64/libstdc++.so.6" \
                 "/usr/lib64/libgcc_s.so.1"
         fi
+        cp -t "image/$occlum_glibc_etc" \
+            /etc/localtime
         cp -t "image/$cpu_lib" \
             "$cpu_lib/online"
     fi
@@ -207,6 +213,9 @@ cmd_init() {
     mkdir -p initfs/etc
     # add default /etc/hosts
     echo "127.0.0.1   localhost" > initfs/etc/hosts
+    # add default timezone file
+    cp /etc/localtime initfs/etc/
+
     # add musl
     local occlum_musl_lib=/usr/local/occlum/x86_64-linux-musl/lib
     cp -t initfs/lib \
