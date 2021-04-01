@@ -37,6 +37,6 @@ mkdir <path>
 
 Step 2: Mount the secure FS at the newly created mount point
 ```
-occlum mount [--sign-key <key_path>] [--sign-tool <tool_path>] <path>
+occlum mount [--sign-key <key_path>] [--sign-tool <tool_path>] [--image-key <key_path>] <path>
 ```
 After mounting the secure FS successfully, you can access and manipulate the FS from the mount point as easy as regular Linux FS.
