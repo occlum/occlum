@@ -1,4 +1,4 @@
-# Make Occlum support font
+# Support font with Java
 
 This project demonstrates how Occlum support font with a Java demo in SGX enclaves.
 
@@ -10,26 +10,26 @@ Our demos use Dragonwell as the default JDK, you are free to change to OpenJDK b
 
 ## Demo: Java excel file writting with Poi
 
-We provide a excel file writting demo to show how to make occlum support font inside SGX enclaves.
+We provide an excel file writting demo to show how to make occlum support font inside SGX enclaves.
 
 ### Create demo and build it
 
-Excel writting demo is created in create_java_font_app.sh, and the script also creates a build.gradle to build demo. Then a docker container is created to
-build the demo and we will get a fat jar file. The docker container is based on Alpine, we will collect all dependency libs and font in document font-lib
-from the container.
+The excel writting demo is created in `create_java_font_app.sh`, and the script also creates a `build.gradle` to build demo. Then a docker container is created to build the demo and we will get a fat jar file. The docker container is based on Alpine, we will collect all dependent libs and font in document font-lib from the container.
 
 ### Run demo in Occlum container
 
-Create occlum instance and copy all libs into occlum image which font dependence in occlum container, then build the occlum image and run the demo.
+Create occlum instance and copy all libs into occlum image which font depends in occlum container, then build the occlum image and run the demo.
 
 ### How to Run
 
-Step 1: Create and build demo, also collect font dependency occlum needs
-
+Step 1: Create and build demo, it also collects the font dependencies
+```
 ./create_java_font_app.sh
+```
 
-Step 2: Create occlum instance and run the demo in occlum's latest docker image release
-
+Step 2: Create occlum instance and run the demo in occlum's latest docker image
+```
 docker run -it --device /dev/isgx --rm -v `pwd`:`pwd` -w `pwd` occlum/occlum:[latest version]-ubuntu18.04 `pwd`/run_java_font_app_internal.sh
+```
 
-Step 3: To check whether it works, a Demo.xlsx file should be created in occlum image host path.
+Step 3: To check whether it works, a `Demo.xlsx` file should be created in the host path of occlum instance.
