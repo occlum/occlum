@@ -1,5 +1,4 @@
 use super::*;
-use crate::net::PollEventFlags;
 use rcore_fs_sefs::dev::SefsMac;
 
 pub struct INodeFile {

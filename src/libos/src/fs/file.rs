@@ -91,21 +91,6 @@ pub trait File: Debug + Sync + Send + Any {
         return_op_unsupported_error!("set_advisory_lock")
     }
 
-    // TODO: remove this function after all users of this code are removed
-    fn poll(&self) -> Result<(crate::net::PollEventFlags)> {
-        return_op_unsupported_error!("poll")
-    }
-
-    // TODO: remove this function after all users of this code are removed
-    fn enqueue_event(&self, _: crate::net::IoEvent) -> Result<()> {
-        return_op_unsupported_error!("enqueue_event");
-    }
-
-    // TODO: remove this function after all users of this code are removed
-    fn dequeue_event(&self) -> Result<()> {
-        return_op_unsupported_error!("dequeue_event");
-    }
-
     // TODO: rename poll_new to poll
     fn poll_new(&self) -> IoEvents {
         IoEvents::empty()

@@ -73,7 +73,7 @@ mod entry;
 mod events;
 mod fs;
 mod misc;
-mod net;
+//mod net;
 mod process;
 mod sched;
 mod signal;

@@ -7,7 +7,6 @@ use super::{
 };
 use crate::events::HostEventFd;
 use crate::fs::{EventCreationFlags, EventFile};
-use crate::net::THREAD_NOTIFIERS;
 use crate::prelude::*;
 use crate::signal::{SigQueues, SigSet, SigStack};
 

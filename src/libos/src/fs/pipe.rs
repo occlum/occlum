@@ -2,7 +2,6 @@ use atomic::{Atomic, Ordering};
 
 use super::channel::{Channel, Consumer, Producer};
 use super::*;
-use net::PollEventFlags;
 
 // TODO: Add F_SETPIPE_SZ in fcntl to dynamically change the size of pipe
 // to improve memory efficiency. This value is got from /proc/sys/fs/pipe-max-size on linux.
@@ -70,12 +69,6 @@ impl File for PipeReader {
         Ok(())
     }
 
-    fn poll(&self) -> Result<PollEventFlags> {
-        warn!("poll is not supported for pipe");
-        let events = PollEventFlags::empty();
-        Ok(events)
-    }
-
     fn poll_new(&self) -> IoEvents {
         self.consumer.poll()
     }
@@ -131,12 +124,6 @@ impl File for PipeWriter {
 
         self.status_flags.store(new_status_flags, Ordering::Release);
         Ok(())
-    }
-
-    fn poll(&self) -> Result<PollEventFlags> {
-        warn!("poll is not supported for pipe");
-        let events = PollEventFlags::empty();
-        Ok(events)
     }
 
     fn poll_new(&self) -> IoEvents {
