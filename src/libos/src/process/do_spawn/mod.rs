@@ -309,7 +309,12 @@ fn init_auxvec(process_vm: &ProcessVM, exec_elf_file: &ElfFile) -> Result<AuxVec
     auxvec.set(AuxKey::AT_PHENT, exec_elf_header.e_phentsize as u64)?;
     auxvec.set(AuxKey::AT_PHNUM, exec_elf_header.e_phnum as u64)?;
     auxvec.set(AuxKey::AT_PHDR, exec_elf_base + exec_elf_header.e_phoff)?;
-    auxvec.set(AuxKey::AT_ENTRY, exec_elf_base + exec_elf_header.e_entry)?;
+
+    let base_load_address_offset = exec_elf_file.base_load_address_offset();
+    auxvec.set(
+        AuxKey::AT_ENTRY,
+        exec_elf_base + exec_elf_header.e_entry - base_load_address_offset,
+    )?;
 
     let ldso_elf_base = process_vm.get_elf_ranges()[1].start() as u64;
     auxvec.set(AuxKey::AT_BASE, ldso_elf_base)?;

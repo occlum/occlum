@@ -136,6 +136,12 @@ impl<'a> ElfFile<'a> {
         )?;
         Ok(elf_hdr)
     }
+
+    // An offset to be subtracted from ELF vaddr for PIE
+    pub fn base_load_address_offset(&self) -> u64 {
+        let phdr = self.program_headers().nth(0).unwrap();
+        phdr.p_vaddr - phdr.p_offset
+    }
 }
 
 pub trait ProgramHeaderExt<'a> {

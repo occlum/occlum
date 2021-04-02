@@ -212,14 +212,17 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
     fn init_elf_memory(elf_range: &VMRange, elf_file: &ElfFile) -> Result<()> {
         // Destination buffer: ELF appeared in the process
         let elf_proc_buf = unsafe { elf_range.as_slice_mut() };
-        let mut empty_offset_vec: Vec<(usize, usize)> = Vec::with_capacity(3); // usally two loadable segments
+        // Source buffer: ELF stored in the ELF file
+        let elf_file_buf = elf_file.as_slice();
+
+        let base_load_address_offset = elf_file.base_load_address_offset() as usize;
+
+        // Offsets to track zerolized range
         let mut empty_start_offset = 0;
         let mut empty_end_offset = 0;
 
-        // Source buffer: ELF stored in the ELF file
-        let elf_file_buf = elf_file.as_slice();
         // Init all loadable segements
-        let loadable_segments = elf_file
+        elf_file
             .program_headers()
             .filter(|segment| segment.loadable())
             .for_each(|segment| {
@@ -227,27 +230,26 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
                 let file_offset = segment.p_offset as usize;
                 let mem_addr = segment.p_vaddr as usize;
                 let mem_size = segment.p_memsz as usize;
+                let alignment = segment.p_align as usize;
                 debug_assert!(file_size <= mem_size);
 
-                // The first file_size bytes are loaded from the ELF file,
-                // the remaining (mem_size - file_size) bytes are zeros.
+                let mem_start_offset = mem_addr - base_load_address_offset;
+
+                // Initialize empty part to zero based on alignment
+                empty_start_offset = align_down(mem_start_offset, alignment);
+                for b in &mut elf_proc_buf[empty_start_offset..mem_start_offset] {
+                    *b = 0;
+                }
+
+                // Bytes of file_size length are loaded from the ELF file
                 elf_file.file_inode().read_at(
                     file_offset,
-                    &mut elf_proc_buf[mem_addr..mem_addr + file_size],
+                    &mut elf_proc_buf[mem_start_offset..mem_start_offset + file_size],
                 );
 
-                empty_end_offset = mem_addr;
-                empty_offset_vec.push((empty_start_offset, empty_end_offset));
-                empty_start_offset = empty_end_offset + file_size;
-            });
-
-        empty_offset_vec.push((empty_start_offset, elf_proc_buf.len()));
-
-        // Set zero for the remain part of the buffer
-        empty_offset_vec
-            .iter()
-            .for_each(|(start_offset, end_offset)| {
-                for b in &mut elf_proc_buf[*start_offset..*end_offset] {
+                // Set the remaining part to zero based on alignment
+                empty_end_offset = align_up(mem_start_offset + file_size, alignment);
+                for b in &mut elf_proc_buf[mem_start_offset + file_size..empty_end_offset] {
                     *b = 0;
                 }
             });
