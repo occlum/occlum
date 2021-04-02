@@ -1,7 +1,6 @@
 use std::fmt;
 
 use super::constants::*;
-use crate::events::Event;
 use crate::prelude::*;
 
 #[repr(C)]
@@ -89,5 +88,3 @@ impl fmt::Debug for SigNum {
         }
     }
 }
-
-impl Event for SigNum {}

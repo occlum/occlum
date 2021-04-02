@@ -4,7 +4,6 @@ use super::{
     FileTableRef, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef, ResourceLimitsRef, SchedAgentRef,
     SigQueues, SigSet, Thread, ThreadId, ThreadInner, ThreadName, ThreadRef,
 };
-use crate::events::HostEventFd;
 use crate::prelude::*;
 
 #[derive(Debug)]
@@ -101,7 +100,6 @@ impl ThreadBuilder {
         let sig_mask = RwLock::new(SigSet::new_empty());
         let sig_tmp_mask = RwLock::new(SigSet::new_empty());
         let sig_stack = SgxMutex::new(None);
-        let host_eventfd = Arc::new(HostEventFd::new()?);
 
         let new_thread = Arc::new(Thread {
             tid,
@@ -118,7 +116,6 @@ impl ThreadBuilder {
             sig_mask,
             sig_tmp_mask,
             sig_stack,
-            host_eventfd,
         });
 
         let mut inner = new_thread.process().inner();

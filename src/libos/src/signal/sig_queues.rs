@@ -3,7 +3,6 @@ use std::fmt;
 
 use super::constants::*;
 use super::{SigNum, SigSet, Signal};
-use crate::events::Notifier;
 use crate::prelude::*;
 
 pub struct SigQueues {

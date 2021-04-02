@@ -2,10 +2,8 @@ use std::sync::Weak;
 use std::time::Duration;
 
 use super::{siginfo_t, SigNum, SigSet, Signal};
-use crate::events::{Observer, Waiter, WaiterQueueObserver};
 use crate::prelude::*;
 use crate::process::{ProcessRef, TermStatus, ThreadRef};
-use crate::waiter_loop;
 
 pub async fn do_sigtimedwait(interest: SigSet, timeout: Option<&Duration>) -> Result<siginfo_t> {
     debug!(

@@ -1,4 +1,3 @@
-use super::event_file::EventCreationFlags;
 use super::file_ops;
 use super::file_ops::{
     AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath, LinkFlags,
@@ -15,24 +14,11 @@ pub struct iovec_t {
 }
 
 pub fn do_eventfd(init_val: u32) -> Result<isize> {
-    do_eventfd2(init_val, 0)
+    todo!()
 }
 
 pub fn do_eventfd2(init_val: u32, flags: i32) -> Result<isize> {
-    info!("eventfd: initval {}, flags {} ", init_val, flags);
-
-    let inner_flags =
-        EventCreationFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
-    let file_ref: Arc<dyn File> = {
-        let event = EventFile::new(init_val, inner_flags)?;
-        Arc::new(event)
-    };
-
-    let fd = current!().add_file(
-        file_ref,
-        inner_flags.contains(EventCreationFlags::EFD_CLOEXEC),
-    );
-    Ok(fd as isize)
+    todo!()
 }
 
 pub fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize> {
@@ -263,18 +249,11 @@ pub fn do_sync() -> Result<isize> {
 }
 
 pub fn do_pipe(fds_u: *mut i32) -> Result<isize> {
-    do_pipe2(fds_u, 0)
+    todo!()
 }
 
 pub fn do_pipe2(fds_u: *mut i32, flags: u32) -> Result<isize> {
-    from_user::check_mut_array(fds_u, 2)?;
-    // TODO: how to deal with open flags???
-    let fds = pipe::do_pipe2(flags as u32)?;
-    unsafe {
-        *fds_u.offset(0) = fds[0] as c_int;
-        *fds_u.offset(1) = fds[1] as c_int;
-    }
-    Ok(0)
+    todo!()
 }
 
 pub fn do_dup(old_fd: FileDesc) -> Result<isize> {

@@ -5,8 +5,6 @@ use super::{
     FileTableRef, ForcedExitStatus, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef,
     ResourceLimitsRef, SchedAgentRef, TermStatus, ThreadRef,
 };
-use crate::events::HostEventFd;
-use crate::fs::{EventCreationFlags, EventFile};
 use crate::prelude::*;
 use crate::signal::{SigQueues, SigSet, SigStack};
 
@@ -38,8 +36,6 @@ pub struct Thread {
     sig_mask: RwLock<SigSet>,
     sig_tmp_mask: RwLock<SigSet>,
     sig_stack: SgxMutex<Option<SigStack>>,
-    // Misc
-    host_eventfd: Arc<HostEventFd>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -129,10 +125,6 @@ impl Thread {
 
     pub fn set_name(&self, new_name: ThreadName) {
         *self.name.write().unwrap() = new_name;
-    }
-
-    pub fn host_eventfd(&self) -> &Arc<HostEventFd> {
-        &self.host_eventfd
     }
 
     pub fn start(&self) {

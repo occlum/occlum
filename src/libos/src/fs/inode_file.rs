@@ -203,13 +203,6 @@ impl File for INodeFile {
         Ok(0)
     }
 
-    fn poll_new(&self) -> IoEvents {
-        match self.inode.poll() {
-            Ok(poll_status) => IoEvents::from_poll_status(&poll_status),
-            Err(_) => IoEvents::empty(),
-        }
-    }
-
     fn as_any(&self) -> &dyn Any {
         self
     }

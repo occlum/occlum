@@ -70,7 +70,6 @@ mod prelude;
 
 mod config;
 mod entry;
-mod events;
 mod fs;
 mod misc;
 //mod net;
