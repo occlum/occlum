@@ -5,6 +5,7 @@ name = "Occlum"
 version = "0.20.0"
 dependencies = [
  "aligned",
+ "async-io",
  "async-rt",
  "atomic",
  "bitflags",
@@ -51,6 +52,25 @@ dependencies = [
  "generic-array 0.12.3",
  "generic-array 0.13.2",
  "stable_deref_trait",
+]
+
+[[package]]
+name = "async-io"
+version = "0.1.0"
+dependencies = [
+ "async-rt",
+ "atomic",
+ "bitflags",
+ "errno",
+ "futures",
+ "io-uring-callback",
+ "object-id",
+ "rcore-fs",
+ "ringbuf",
+ "sgx_libc",
+ "sgx_trts",
+ "sgx_tstd",
+ "sgx_types",
 ]
 
 [[package]]
@@ -122,6 +142,12 @@ name = "cfg-if"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
+
+[[package]]
+name = "cfg-if"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cloudabi"
@@ -317,12 +343,50 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
+name = "instant"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61124eeebbd69b8190558df225adf7e4caafce0d743919e5d6b19652314ec5ec"
+dependencies = [
+ "cfg-if 1.0.0",
+]
+
+[[package]]
 name = "intrusive-collections"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4bca8c0bb831cd60d4dda79a58e3705ca6eb47efb65d665651a8d672213ec3db"
 dependencies = [
  "memoffset 0.5.6",
+]
+
+[[package]]
+name = "io-uring"
+version = "0.5.0-alpha"
+dependencies = [
+ "bitflags",
+ "libc",
+ "parking_lot",
+ "sgx_libc",
+ "sgx_trts",
+ "sgx_tstd",
+ "sgx_types",
+]
+
+[[package]]
+name = "io-uring-callback"
+version = "0.1.0"
+dependencies = [
+ "atomic",
+ "futures",
+ "io-uring",
+ "lazy_static",
+ "libc",
+ "sgx_libc",
+ "sgx_trts",
+ "sgx_tstd",
+ "sgx_types",
+ "slab",
 ]
 
 [[package]]
@@ -362,7 +426,7 @@ version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fabed175da42fed1fa0746b0ea71f412aa9d35e76e95e59b192c64b9dc2bf8b"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
 ]
 
 [[package]]
@@ -386,6 +450,31 @@ dependencies = [
 [[package]]
 name = "object-id"
 version = "0.1.0"
+
+[[package]]
+name = "parking_lot"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d7744ac029df22dca6284efe4e898991d28e3085c706c972bcd7da4a27a15eb"
+dependencies = [
+ "instant",
+ "lock_api",
+ "parking_lot_core",
+]
+
+[[package]]
+name = "parking_lot_core"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa7a782938e745763fe6907fc6ba86946d72f49fe7e21de074e08128a99fb018"
+dependencies = [
+ "cfg-if 1.0.0",
+ "instant",
+ "libc",
+ "redox_syscall",
+ "smallvec",
+ "winapi",
+]
 
 [[package]]
 name = "pin-project"
@@ -613,6 +702,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "redox_syscall"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94341e4e44e24f6b591b59e47a8a027df12e008d73fd5672dbea9cc22f4507d9"
+dependencies = [
+ "bitflags",
+]
+
+[[package]]
 name = "ringbuf"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -761,6 +859,17 @@ version = "0.1.1"
 dependencies = [
  "sgx_build_helper",
 ]
+
+[[package]]
+name = "slab"
+version = "0.4.2"
+source = "git+https://github.com/tokio-rs/slab.git#d5449b3b1dc2dfe640613fb64589639048f5046d"
+
+[[package]]
+name = "smallvec"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
 
 [[package]]
 name = "spin"
