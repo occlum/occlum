@@ -4,7 +4,6 @@ use std::ops::{Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, Not, Su
 
 use super::constants::MIN_STD_SIG_NUM;
 use super::{sigset_t, SigNum};
-use crate::events::EventFilter;
 use crate::prelude::*;
 
 #[derive(Copy, Clone, Default, PartialEq, Eq)]
@@ -190,11 +189,5 @@ impl fmt::Debug for SigSet {
             _ => unreachable!(),
         }
         write!(f, " }}")
-    }
-}
-
-impl EventFilter<SigNum> for SigSet {
-    fn filter(&self, event: &SigNum) -> bool {
-        self.contains(*event)
     }
 }

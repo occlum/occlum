@@ -25,8 +25,9 @@ pub struct Process {
     sig_dispositions: RwLock<SigDispositions>,
     sig_queues: RwLock<SigQueues>,
     forced_exit_status: ForcedExitStatus,
-    // Wait4
-    waiter_queue: WaiterQueue,
+    // Waiters
+    exit_waiters: WaiterQueue,
+    sig_waiters: WaiterQueue,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -146,8 +147,14 @@ impl Process {
         self.inner.lock().unwrap()
     }
 
-    pub(super) fn waiter_queue(&self) -> &WaiterQueue {
-        &self.waiter_queue
+    /// Get the waiter queue to wait for the process to exit.
+    pub(super) fn exit_waiters(&self) -> &WaiterQueue {
+        &self.exit_waiters
+    }
+
+    /// Get the waiter queue to wait for any signals to the process or its threads.
+    pub fn sig_waiters(&self) -> &WaiterQueue {
+        &self.sig_waiters
     }
 }
 

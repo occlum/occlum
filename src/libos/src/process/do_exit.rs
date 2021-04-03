@@ -114,7 +114,7 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
     drop(process_inner);
 
     // Notify the parent that this child process's status has changed
-    parent.waiter_queue().wake_all();
+    parent.exit_waiters().wake_all();
 
     // Notify the host threads that wait the status change of this process
     wake_host(&process, term_status);

@@ -1,6 +1,8 @@
 use std::sync::Weak;
 use std::time::Duration;
 
+use async_rt::waiter_loop;
+
 use super::{siginfo_t, SigNum, SigSet, Signal};
 use crate::prelude::*;
 use crate::process::{ProcessRef, TermStatus, ThreadRef};
@@ -10,6 +12,10 @@ pub async fn do_sigtimedwait(interest: SigSet, timeout: Option<&Duration>) -> Re
         "do_rt_sigtimedwait: interest: {:?}, timeout: {:?}",
         interest, timeout,
     );
+    // TODO: support timeout
+    if let Some(timeout) = timeout {
+        warn!("do not support timeout yet");
+    }
 
     let thread = current!();
     let process = thread.process().clone();
@@ -20,101 +26,13 @@ pub async fn do_sigtimedwait(interest: SigSet, timeout: Option<&Duration>) -> Re
         *blocked & interest
     };
 
-    let signal = match timeout {
-        None => dequeue_pending_signal(&interest, &thread, &process)
-            .ok_or_else(|| errno!(EAGAIN, "no interesting, pending signal"))?,
-        Some(timeout) => {
-            let pending_sig_waiter = PendingSigWaiter::new(thread, process, interest);
-            pending_sig_waiter.wait(timeout).await.map_err(|e| {
-                if e.errno() == Errno::EINTR {
-                    return e;
-                }
-                errno!(EAGAIN, "no interesting, pending signal")
-            })?
+    // Loop until we find a pending signal or reach timeout
+    waiter_loop!(process.sig_waiters(), {
+        if let Some(signal) = dequeue_pending_signal(&interest, &thread, &process) {
+            let siginfo = signal.to_info();
+            return Ok(siginfo);
         }
-    };
-
-    let siginfo = signal.to_info();
-    Ok(siginfo)
-}
-
-struct PendingSigWaiter {
-    thread: ThreadRef,
-    process: ProcessRef,
-    interest: SigSet,
-    observer: Arc<WaiterQueueObserver<SigNum>>,
-}
-
-impl PendingSigWaiter {
-    pub fn new(thread: ThreadRef, process: ProcessRef, interest: SigSet) -> Arc<Self> {
-        let observer = WaiterQueueObserver::new();
-
-        let weak_observer = Arc::downgrade(&observer) as Weak<dyn Observer<_>>;
-        thread.sig_queues().read().unwrap().notifier().register(
-            weak_observer.clone(),
-            Some(interest),
-            None,
-        );
-        process.sig_queues().read().unwrap().notifier().register(
-            weak_observer,
-            Some(interest),
-            None,
-        );
-
-        Arc::new(Self {
-            thread,
-            process,
-            interest,
-            observer,
-        })
-    }
-
-    pub async fn wait(&self, timeout: &Duration) -> Result<Box<dyn Signal>> {
-        // Repeat trying to dequeue a pending signal from the current process or thread
-        let err_res = waiter_loop!(
-            {
-                if let Some(signal) =
-                    dequeue_pending_signal(&self.interest, &self.thread, &self.process)
-                {
-                    return Ok(signal);
-                }
-            },
-            self.observer.waiter_queue(),
-            Some(timeout)
-        );
-
-        // Do not try again if some error is encountered. There are only
-        // two possible errors: ETIMEDOUT or EINTR.
-        let err = err_res.as_ref().unwrap_err();
-        // When interrupted, it is possible that the interrupting signal happens
-        // to be an interesting and pending signal. So we attempt to dequeue again.
-        if err.errno() == Errno::EINTR {
-            if let Some(signal) =
-                dequeue_pending_signal(&self.interest, &self.thread, &self.process)
-            {
-                return Ok(signal);
-            }
-        }
-        err_res
-    }
-}
-
-impl Drop for PendingSigWaiter {
-    fn drop(&mut self) {
-        let weak_observer = Arc::downgrade(&self.observer) as Weak<dyn Observer<_>>;
-        self.thread
-            .sig_queues()
-            .read()
-            .unwrap()
-            .notifier()
-            .unregister(&weak_observer);
-        self.process
-            .sig_queues()
-            .read()
-            .unwrap()
-            .notifier()
-            .unregister(&weak_observer);
-    }
+    });
 }
 
 fn dequeue_pending_signal(

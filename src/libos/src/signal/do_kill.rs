@@ -18,6 +18,7 @@ pub fn do_kill(filter: ProcessFilter, signum: SigNum) -> Result<()> {
         let signal = Box::new(UserSignal::new(signum, UserSignalKind::Kill, pid, uid));
         let mut sig_queues = process.sig_queues().write().unwrap();
         sig_queues.enqueue(signal);
+        process.sig_waiters().wake_all();
     }
     Ok(())
 }
@@ -44,6 +45,7 @@ pub fn do_kill_from_outside_enclave(filter: ProcessFilter, signum: SigNum) -> Re
 
         let mut sig_queues = process.sig_queues().write().unwrap();
         sig_queues.enqueue(signal.clone());
+        process.sig_waiters().wake_all();
     }
     Ok(())
 }
@@ -77,8 +79,9 @@ pub fn do_tgkill(pid: Option<pid_t>, tid: pid_t, signum: SigNum) -> Result<()> {
     );
 
     let thread = table::get_thread(tid)?;
+    let process = thread.process();
     if let Some(pid) = pid {
-        if pid != thread.process().pid() {
+        if pid != process.pid() {
             return_errno!(EINVAL, "the combination of pid and tid is not valid");
         }
     }
@@ -99,5 +102,6 @@ pub fn do_tgkill(pid: Option<pid_t>, tid: pid_t, signum: SigNum) -> Result<()> {
     };
     let mut sig_queues = thread.sig_queues().write().unwrap();
     sig_queues.enqueue(signal);
+    process.sig_waiters().wake_all();
     Ok(())
 }

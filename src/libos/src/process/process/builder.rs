@@ -109,7 +109,8 @@ impl ProcessBuilder {
             let sig_dispositions = RwLock::new(SigDispositions::new());
             let sig_queues = RwLock::new(SigQueues::new());
             let forced_exit_status = ForcedExitStatus::new();
-            let waiter_queue = WaiterQueue::new();
+            let exit_waiters = WaiterQueue::new();
+            let sig_waiters = WaiterQueue::new();
             Arc::new(Process {
                 pid,
                 exec_path,
@@ -119,7 +120,8 @@ impl ProcessBuilder {
                 sig_dispositions,
                 sig_queues,
                 forced_exit_status,
-                waiter_queue,
+                exit_waiters,
+                sig_waiters,
             })
         };
 

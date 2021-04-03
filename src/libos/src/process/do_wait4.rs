@@ -10,7 +10,7 @@ pub async fn do_wait4(child_filter: &ProcessFilter) -> Result<(pid_t, i32)> {
     let thread = current!();
     let process = thread.process();
 
-    waiter_loop!(process.waiter_queue(), {
+    waiter_loop!(process.exit_waiters(), {
         // Lock order: always lock parent then child to avoid deadlock
         let mut process_inner = process.inner();
 
