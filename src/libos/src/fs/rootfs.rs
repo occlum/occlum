@@ -1,6 +1,6 @@
-use super::dev_fs;
+//use super::dev_fs;
 use super::hostfs::HostFS;
-use super::procfs::ProcFS;
+//use super::procfs::ProcFS;
 use super::sefs::{SgxStorage, SgxUuidProvider};
 use super::*;
 use config::{ConfigMount, ConfigMountFsType};
@@ -147,12 +147,14 @@ fn mount_nonroot_fs_according_to(mount_config: &Vec<ConfigMount>, root: &MNode) 
                 mount_fs_at(ramfs, root, &mc.target)?;
             }
             TYPE_DEVFS => {
-                let devfs = dev_fs::init_devfs()?;
-                mount_fs_at(devfs, root, &mc.target)?;
+                //let devfs = dev_fs::init_devfs()?;
+                //mount_fs_at(devfs, root, &mc.target)?;
+                warn!("devfs is not supported");
             }
             TYPE_PROCFS => {
-                let procfs = ProcFS::new();
-                mount_fs_at(procfs, root, &mc.target)?;
+                //let procfs = ProcFS::new();
+                //mount_fs_at(procfs, root, &mc.target)?;
+                warn!("procfs is not supported");
             }
             TYPE_UNIONFS => {
                 return_errno!(EINVAL, "Cannot mount UnionFS at non-root path");

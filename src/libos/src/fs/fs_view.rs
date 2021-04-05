@@ -38,7 +38,7 @@ impl FsView {
     }
 
     /// Open a file on the process. But DO NOT add it to file table.
-    pub fn open_file(&self, path: &str, flags: u32, mode: u32) -> Result<Arc<dyn File>> {
+    pub fn open_file(&self, path: &str, flags: u32, mode: u32) -> Result<Arc<dyn SyncFile>> {
         let creation_flags = CreationFlags::from_bits_truncate(flags);
         let inode = if creation_flags.no_follow_symlink() {
             match self.lookup_inode_no_follow(path) {

@@ -7,6 +7,7 @@ extern crate sgx_types;
 extern crate sgx_tstd as std;
 
 pub mod file;
+pub mod fs;
 pub mod poll;
 pub mod prelude;
 pub mod util;

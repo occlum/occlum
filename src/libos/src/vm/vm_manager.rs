@@ -37,10 +37,11 @@ impl VMInitializer {
                 }
             }
             VMInitializer::LoadFromFile { file, offset } => {
-                // TODO: make sure that read_at does not move file cursor
                 let len = file
+                    .as_inode()
+                    .unwrap()
                     .read_at(*offset, buf)
-                    .cause_err(|_| errno!(EIO, "failed to init memory from file"))?;
+                    .map_err(|_| errno!(EIO, "failed to init memory from file"))?;
                 for b in &mut buf[len..] {
                     *b = 0;
                 }
@@ -79,6 +80,9 @@ pub struct VMMapOptions {
 // VMMapOptionsBuilder is generated automatically, except the build function
 impl VMMapOptionsBuilder {
     pub fn build(mut self) -> Result<VMMapOptions> {
+        // TODO: support async I/O in vm code
+        self.check_files_are_inodes()?;
+
         let size = {
             let size = self
                 .size
@@ -120,6 +124,7 @@ impl VMMapOptionsBuilder {
             None => VMInitializer::default(),
         };
         let writeback_file = self.writeback_file.take().unwrap_or_default();
+
         Ok(VMMapOptions {
             size,
             align,
@@ -128,6 +133,20 @@ impl VMMapOptionsBuilder {
             initializer,
             writeback_file,
         })
+    }
+
+    fn check_files_are_inodes(&self) -> Result<()> {
+        if let Some(VMInitializer::LoadFromFile { file, .. }) = self.initializer.as_ref() {
+            if file.as_inode().is_none() {
+                return_errno!(ENODEV, "VMA must be backed by inode files");
+            }
+        }
+        if let Some(Some((file, _))) = self.writeback_file.as_ref() {
+            if file.as_inode().is_none() {
+                return_errno!(ENODEV, "VMA must be backed by inode files");
+            }
+        }
+        Ok(())
     }
 }
 
@@ -586,7 +605,7 @@ impl VMManager {
     /// the memory content to the file.
     pub fn msync_by_file(&mut self, sync_file: &FileRef) {
         for vma in &self.vmas {
-            let is_same_file = |file: &FileRef| -> bool { Arc::ptr_eq(&file, &sync_file) };
+            let is_same_file = |file: &FileRef| -> bool { file == sync_file };
             Self::flush_file_vma_with_cond(vma, is_same_file);
         }
     }
@@ -793,7 +812,7 @@ impl VMManager {
             (Some(_), None) => false,
             (None, Some(_)) => false,
             (Some((left_file, left_offset)), Some((right_file, right_offset))) => {
-                Arc::ptr_eq(&left_file, &right_file)
+                left_file == right_file
                     && right_offset > left_offset
                     && right_offset - left_offset == left.size()
             }

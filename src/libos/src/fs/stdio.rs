@@ -101,7 +101,7 @@ impl StdoutFile {
     }
 }
 
-impl File for StdoutFile {
+impl SyncFile for StdoutFile {
     fn write(&self, buf: &[u8]) -> Result<usize> {
         let write_len = {
             self.inner
@@ -141,68 +141,46 @@ impl File for StdoutFile {
         Ok(total_bytes)
     }
 
-    fn metadata(&self) -> Result<Metadata> {
-        Ok(Metadata {
-            dev: 0,
-            inode: 0,
-            size: 0,
-            blk_size: 0,
-            blocks: 0,
-            atime: Timespec { sec: 0, nsec: 0 },
-            mtime: Timespec { sec: 0, nsec: 0 },
-            ctime: Timespec { sec: 0, nsec: 0 },
-            type_: FileType::CharDevice,
-            mode: 0,
-            nlinks: 0,
-            uid: 0,
-            gid: 0,
-            rdev: 0,
-        })
-    }
-
-    fn sync_all(&self) -> Result<()> {
-        self.sync_data()
-    }
-
-    fn sync_data(&self) -> Result<()> {
+    fn flush(&self) -> Result<()> {
         self.inner.lock().unwrap().flush()?;
         Ok(())
     }
 
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-        let can_delegate_to_host = match cmd {
-            IoctlCmd::TIOCGWINSZ(_) => true,
-            IoctlCmd::TIOCSWINSZ(_) => true,
-            _ => false,
-        };
-        if !can_delegate_to_host {
-            return_errno!(EINVAL, "unknown ioctl cmd for stdout");
+    fn poll(&self, mask: Events) -> Events {
+        Events::OUT
+    }
+    /*
+        fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
+            let can_delegate_to_host = match cmd {
+                IoctlCmd::TIOCGWINSZ(_) => true,
+                IoctlCmd::TIOCSWINSZ(_) => true,
+                _ => false,
+            };
+            if !can_delegate_to_host {
+                return_errno!(EINVAL, "unknown ioctl cmd for stdout");
+            }
+
+            let cmd_bits = cmd.cmd_num() as c_int;
+            let cmd_arg_ptr = cmd.arg_ptr() as *mut c_void;
+            let host_stdout_fd = self.host_fd() as i32;
+            let cmd_arg_len = cmd.arg_len();
+            let ret = try_libc!({
+                let mut retval: i32 = 0;
+                let status = occlum_ocall_ioctl(
+                    &mut retval as *mut i32,
+                    host_stdout_fd,
+                    cmd_bits,
+                    cmd_arg_ptr,
+                    cmd_arg_len,
+                );
+                assert!(status == sgx_status_t::SGX_SUCCESS);
+                retval
+            });
+            cmd.validate_arg_and_ret_vals(ret)?;
+
+            Ok(ret)
         }
-
-        let cmd_bits = cmd.cmd_num() as c_int;
-        let cmd_arg_ptr = cmd.arg_ptr() as *mut c_void;
-        let host_stdout_fd = self.host_fd() as i32;
-        let cmd_arg_len = cmd.arg_len();
-        let ret = try_libc!({
-            let mut retval: i32 = 0;
-            let status = occlum_ocall_ioctl(
-                &mut retval as *mut i32,
-                host_stdout_fd,
-                cmd_bits,
-                cmd_arg_ptr,
-                cmd_arg_len,
-            );
-            assert!(status == sgx_status_t::SGX_SUCCESS);
-            retval
-        });
-        cmd.validate_arg_and_ret_vals(ret)?;
-
-        Ok(ret)
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
+    */
 }
 
 impl Debug for StdoutFile {
@@ -263,7 +241,7 @@ impl StdinFile {
     }
 }
 
-impl File for StdinFile {
+impl SyncFile for StdinFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let read_len = {
             self.inner
@@ -299,59 +277,41 @@ impl File for StdinFile {
         Ok(total_bytes)
     }
 
-    fn metadata(&self) -> Result<Metadata> {
-        Ok(Metadata {
-            dev: 0,
-            inode: 0,
-            size: 0,
-            blk_size: 0,
-            blocks: 0,
-            atime: Timespec { sec: 0, nsec: 0 },
-            mtime: Timespec { sec: 0, nsec: 0 },
-            ctime: Timespec { sec: 0, nsec: 0 },
-            type_: FileType::CharDevice,
-            mode: 0,
-            nlinks: 0,
-            uid: 0,
-            gid: 0,
-            rdev: 0,
-        })
+    fn poll(&self, mask: Events) -> Events {
+        Events::IN
     }
+    /*
+        fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
+            let can_delegate_to_host = match cmd {
+                IoctlCmd::TIOCGWINSZ(_) => true,
+                IoctlCmd::TIOCSWINSZ(_) => true,
+                _ => false,
+            };
+            if !can_delegate_to_host {
+                return_errno!(EINVAL, "unknown ioctl cmd for stdin");
+            }
 
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-        let can_delegate_to_host = match cmd {
-            IoctlCmd::TIOCGWINSZ(_) => true,
-            IoctlCmd::TIOCSWINSZ(_) => true,
-            _ => false,
-        };
-        if !can_delegate_to_host {
-            return_errno!(EINVAL, "unknown ioctl cmd for stdin");
+            let cmd_bits = cmd.cmd_num() as c_int;
+            let cmd_arg_ptr = cmd.arg_ptr() as *mut c_void;
+            let host_stdin_fd = self.host_fd() as i32;
+            let cmd_arg_len = cmd.arg_len();
+            let ret = try_libc!({
+                let mut retval: i32 = 0;
+                let status = occlum_ocall_ioctl(
+                    &mut retval as *mut i32,
+                    host_stdin_fd,
+                    cmd_bits,
+                    cmd_arg_ptr,
+                    cmd_arg_len,
+                );
+                assert!(status == sgx_status_t::SGX_SUCCESS);
+                retval
+            });
+            cmd.validate_arg_and_ret_vals(ret)?;
+
+            Ok(ret)
         }
-
-        let cmd_bits = cmd.cmd_num() as c_int;
-        let cmd_arg_ptr = cmd.arg_ptr() as *mut c_void;
-        let host_stdin_fd = self.host_fd() as i32;
-        let cmd_arg_len = cmd.arg_len();
-        let ret = try_libc!({
-            let mut retval: i32 = 0;
-            let status = occlum_ocall_ioctl(
-                &mut retval as *mut i32,
-                host_stdin_fd,
-                cmd_bits,
-                cmd_arg_ptr,
-                cmd_arg_len,
-            );
-            assert!(status == sgx_status_t::SGX_SUCCESS);
-            retval
-        });
-        cmd.validate_arg_and_ret_vals(ret)?;
-
-        Ok(ret)
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
+    */
 }
 
 impl Debug for StdinFile {

@@ -3,7 +3,7 @@ use bitflags::bitflags;
 use crate::prelude::*;
 
 #[allow(non_camel_case_types)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 #[repr(u8)]
 pub enum AccessMode {
     /// read only

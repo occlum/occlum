@@ -1,5 +1,5 @@
 use super::*;
-use fs::{File, FileDesc, FileRef};
+use fs::{FileDesc, FileRef};
 use process::{Process, ProcessRef};
 use std::fmt;
 

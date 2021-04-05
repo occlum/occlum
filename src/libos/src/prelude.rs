@@ -13,7 +13,9 @@ pub use std::sync::{
     Arc, SgxMutex, SgxMutexGuard, SgxRwLock, SgxRwLockReadGuard, SgxRwLockWriteGuard,
 };
 
-pub use crate::fs::{File, FileDesc, FileRef};
+pub use async_io::file::{FileHandle as FileRef, PollableFile, SyncFile};
+
+pub use crate::fs::FileDesc;
 pub use crate::process::{pid_t, uid_t};
 pub use crate::util::sync::RwLock;
 pub use errno::prelude::*;

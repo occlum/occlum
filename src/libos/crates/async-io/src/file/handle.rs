@@ -1,3 +1,4 @@
+use std::fmt;
 use std::sync::Arc;
 
 use rcore_fs::vfs::INode;
@@ -19,21 +20,12 @@ pub enum FileHandle {
     //Async(Arc<dyn AsyncFile>),
 }
 
-impl Clone for FileHandle {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Pollable(f) => Self::Pollable(f.clone()),
-            Self::Sync(f) => Self::Sync(f.clone()),
-        }
-    }
-}
-
 impl FileHandle {
-    pub fn from_pollable(file: Arc<PollableFile>) -> Self {
+    pub fn from_pollable(file: Arc<dyn PollableFile>) -> Self {
         FileHandle::Pollable(Async::new(file))
     }
 
-    pub fn from_sync(file: Arc<SyncFile>) -> Self {
+    pub fn from_sync(file: Arc<dyn SyncFile>) -> Self {
         FileHandle::Sync(file)
     }
 
@@ -157,13 +149,6 @@ impl FileHandle {
         }
     }
 
-    pub fn set_access_mode(&self, new_mode: AccessMode) -> Result<()> {
-        match self {
-            Self::Pollable(f) => f.set_access_mode(new_mode),
-            Self::Sync(f) => f.set_access_mode(new_mode),
-        }
-    }
-
     pub fn status_flags(&self) -> Result<StatusFlags> {
         match self {
             Self::Pollable(f) => f.status_flags(),
@@ -182,6 +167,46 @@ impl FileHandle {
         match self {
             Self::Pollable(f) => None,
             Self::Sync(f) => f.as_inode(),
+        }
+    }
+}
+
+impl Clone for FileHandle {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Pollable(f) => Self::Pollable(f.clone()),
+            Self::Sync(f) => Self::Sync(f.clone()),
+        }
+    }
+}
+
+impl PartialEq for FileHandle {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Pollable(self_f), Self::Pollable(other_f)) => {
+                let self_file_arc = self_f.file();
+                let other_file_arc = other_f.file();
+                Arc::ptr_eq(self_file_arc, other_file_arc)
+            }
+            (Self::Sync(self_f), Self::Sync(other_f)) => Arc::ptr_eq(self_f, other_f),
+            _ => false,
+        }
+    }
+}
+
+impl Eq for FileHandle {}
+
+impl fmt::Debug for FileHandle {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Pollable(file) => formatter
+                .debug_struct("FileHandle::Pollable")
+                .field("inner", file)
+                .finish(),
+            Self::Sync(file) => formatter
+                .debug_struct("FileHandle::Sync")
+                .field("inner", file)
+                .finish(),
         }
     }
 }

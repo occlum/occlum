@@ -1,9 +1,9 @@
-use super::file_ops;
 use super::file_ops::{
-    AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath, LinkFlags,
-    StatFlags, UnlinkFlags, AT_FDCWD,
+    /* AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath, LinkFlags,
+    StatFlags, UnlinkFlags, AT_FDCWD, */
+    self, FsPath, AT_FDCWD,
 };
-use super::fs_ops;
+//use super::fs_ops;
 use super::*;
 use util::mem_util::from_user;
 
@@ -12,20 +12,20 @@ pub struct iovec_t {
     base: *const c_void,
     len: size_t,
 }
-
-pub fn do_eventfd(init_val: u32) -> Result<isize> {
+/*
+pub async fn do_eventfd(init_val: u32) -> Result<isize> {
     todo!()
 }
 
-pub fn do_eventfd2(init_val: u32, flags: i32) -> Result<isize> {
+pub async fn do_eventfd2(init_val: u32, flags: i32) -> Result<isize> {
     todo!()
 }
-
-pub fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize> {
-    self::do_openat(AT_FDCWD, path, flags, mode)
+*/
+pub async fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize> {
+    self::do_openat(AT_FDCWD, path, flags, mode).await
 }
 
-pub fn do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u32) -> Result<isize> {
+pub async fn do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u32) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
@@ -34,26 +34,26 @@ pub fn do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u32) -> Result<i
     Ok(fd as isize)
 }
 
-pub fn do_close(fd: FileDesc) -> Result<isize> {
+pub async fn do_close(fd: FileDesc) -> Result<isize> {
     file_ops::do_close(fd)?;
     Ok(0)
 }
 
-pub fn do_read(fd: FileDesc, buf: *mut u8, size: usize) -> Result<isize> {
+pub async fn do_read(fd: FileDesc, buf: *mut u8, size: usize) -> Result<isize> {
     let safe_buf = {
         from_user::check_mut_array(buf, size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, size) }
     };
-    let len = file_ops::do_read(fd, safe_buf)?;
+    let len = file_ops::do_read(fd, safe_buf).await?;
     Ok(len as isize)
 }
 
-pub fn do_write(fd: FileDesc, buf: *const u8, size: usize) -> Result<isize> {
+pub async fn do_write(fd: FileDesc, buf: *const u8, size: usize) -> Result<isize> {
     let safe_buf = {
         from_user::check_array(buf, size)?;
         unsafe { std::slice::from_raw_parts(buf, size) }
     };
-    let len = file_ops::do_write(fd, safe_buf)?;
+    let len = file_ops::do_write(fd, safe_buf).await?;
     Ok(len as isize)
 }
 
@@ -78,11 +78,11 @@ pub async fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<
     };
     let bufs = &bufs_vec[..];
 
-    let len = file_ops::do_writev(fd, bufs)?;
+    let len = file_ops::do_writev(fd, bufs).await?;
     Ok(len as isize)
 }
 
-pub fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize> {
+pub async fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize> {
     let count = {
         if count < 0 {
             return_errno!(EINVAL, "Invalid count of iovec");
@@ -103,28 +103,28 @@ pub fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize> {
     };
     let bufs = &mut bufs_vec[..];
 
-    let len = file_ops::do_readv(fd, bufs)?;
+    let len = file_ops::do_readv(fd, bufs).await?;
     Ok(len as isize)
 }
 
-pub fn do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: off_t) -> Result<isize> {
+pub async fn do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: off_t) -> Result<isize> {
     let safe_buf = {
         from_user::check_mut_array(buf, size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, size) }
     };
-    let len = file_ops::do_pread(fd, safe_buf, offset)?;
+    let len = file_ops::do_pread(fd, safe_buf, offset).await?;
     Ok(len as isize)
 }
 
-pub fn do_pwrite(fd: FileDesc, buf: *const u8, size: usize, offset: off_t) -> Result<isize> {
+pub async fn do_pwrite(fd: FileDesc, buf: *const u8, size: usize, offset: off_t) -> Result<isize> {
     let safe_buf = {
         from_user::check_array(buf, size)?;
         unsafe { std::slice::from_raw_parts(buf, size) }
     };
-    let len = file_ops::do_pwrite(fd, safe_buf, offset)?;
+    let len = file_ops::do_pwrite(fd, safe_buf, offset).await?;
     Ok(len as isize)
 }
-
+/*
 pub fn do_fstat(fd: FileDesc, stat_buf: *mut Stat) -> Result<isize> {
     from_user::check_mut_ptr(stat_buf)?;
 
@@ -175,7 +175,7 @@ pub fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) -> Resul
     let flags = AccessibilityCheckFlags::from_u32(flags)?;
     file_ops::do_faccessat(&fs_path, mode, flags).map(|_| 0)
 }
-
+*/
 pub fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize> {
     let seek_from = match whence {
         0 => {
@@ -201,7 +201,7 @@ pub fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize> {
     let offset = file_ops::do_lseek(fd, seek_from)?;
     Ok(offset as isize)
 }
-
+/*
 pub fn do_fsync(fd: FileDesc) -> Result<isize> {
     file_ops::do_fsync(fd)?;
     Ok(0)
@@ -497,3 +497,4 @@ pub async fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
     file_ops::do_ioctl(fd, &mut ioctl_cmd)?;
     Ok(0)
 }
+*/

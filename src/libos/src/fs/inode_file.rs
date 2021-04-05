@@ -9,7 +9,7 @@ pub struct INodeFile {
     status_flags: RwLock<StatusFlags>,
 }
 
-impl File for INodeFile {
+impl SyncFile for INodeFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
         if !self.access_mode.readable() {
             return_errno!(EACCES, "File not readable");
@@ -92,69 +92,51 @@ impl File for INodeFile {
         Ok(total_len)
     }
 
-    fn seek(&self, pos: SeekFrom) -> Result<off_t> {
+    fn seek(&self, pos: SeekFrom) -> Result<usize> {
         let mut offset = self.offset.lock().unwrap();
-        let new_offset = match pos {
-            SeekFrom::Start(off) => off as i64,
-            SeekFrom::End(off) => (self.inode.metadata()?.size as i64)
-                .checked_add(off)
-                .ok_or_else(|| errno!(EOVERFLOW, "file offset overflow"))?,
-            SeekFrom::Current(off) => (*offset as i64)
+        let new_offset: i64 = match pos {
+            SeekFrom::Start(off /* as u64 */) => {
+                if off > i64::max_value() as u64 {
+                    return_errno!(EINVAL, "file offset is too large");
+                }
+                off as i64
+            }
+            SeekFrom::End(off /* as i64 */) => {
+                let file_size = self.inode.metadata()?.size as i64;
+                assert!(file_size >= 0);
+                file_size
+                    .checked_add(off)
+                    .ok_or_else(|| errno!(EOVERFLOW, "file offset overflow"))?
+            }
+            SeekFrom::Current(off /* as i64 */) => (*offset as i64)
                 .checked_add(off)
                 .ok_or_else(|| errno!(EOVERFLOW, "file offset overflow"))?,
         };
         if new_offset < 0 {
-            return_errno!(EINVAL, "file offset is negative");
+            return_errno!(EINVAL, "file offset must not be negative");
         }
-        *offset = new_offset as usize;
-        Ok(*offset as i64)
-    }
-
-    fn metadata(&self) -> Result<Metadata> {
-        let metadata = self.inode.metadata()?;
-        Ok(metadata)
-    }
-
-    fn set_metadata(&self, metadata: &Metadata) -> Result<()> {
-        self.inode.set_metadata(metadata)?;
-        Ok(())
-    }
-
-    fn set_len(&self, len: u64) -> Result<()> {
-        if !self.access_mode.writable() {
-            return_errno!(EACCES, "File not writable. Can't set len.");
-        }
-        self.inode.resize(len as usize)?;
-        Ok(())
-    }
-
-    fn sync_all(&self) -> Result<()> {
-        self.inode.sync_all()?;
-        Ok(())
-    }
-
-    fn sync_data(&self) -> Result<()> {
-        self.inode.sync_data()?;
-        Ok(())
-    }
-
-    fn read_entry(&self) -> Result<String> {
-        if !self.access_mode.readable() {
-            return_errno!(EACCES, "File not readable. Can't read entry.");
-        }
-        let mut offset = self.offset.lock().unwrap();
-        let name = self.inode.get_entry(*offset)?;
-        *offset += 1;
-        Ok(name)
+        // Invariant: 0 <= new_offset <= i64::max_value()
+        let new_offset = new_offset as usize;
+        *offset = new_offset;
+        Ok(new_offset)
     }
 
     fn access_mode(&self) -> Result<AccessMode> {
-        Ok(self.access_mode.clone())
+        Ok(self.access_mode)
     }
 
     fn status_flags(&self) -> Result<StatusFlags> {
         let status_flags = self.status_flags.read().unwrap();
-        Ok(status_flags.clone())
+        Ok(*status_flags)
+    }
+
+    fn poll(&self, mask: Events) -> Events {
+        let events = match self.access_mode {
+            AccessMode::O_RDONLY => Events::IN,
+            AccessMode::O_WRONLY => Events::OUT,
+            AccessMode::O_RDWR => Events::IN | Events::OUT,
+        };
+        events | mask
     }
 
     fn set_status_flags(&self, new_status_flags: StatusFlags) -> Result<()> {
@@ -170,41 +152,8 @@ impl File for INodeFile {
         Ok(())
     }
 
-    fn test_advisory_lock(&self, lock: &mut Flock) -> Result<()> {
-        // Let the advisory lock could be placed
-        // TODO: Implement the real advisory lock
-        lock.l_type = FlockType::F_UNLCK;
-        Ok(())
-    }
-
-    fn set_advisory_lock(&self, lock: &Flock) -> Result<()> {
-        match lock.l_type {
-            FlockType::F_RDLCK => {
-                if !self.access_mode.readable() {
-                    return_errno!(EACCES, "File not readable");
-                }
-            }
-            FlockType::F_WRLCK => {
-                if !self.access_mode.writable() {
-                    return_errno!(EACCES, "File not writable");
-                }
-            }
-            _ => (),
-        }
-        // Let the advisory lock could be acquired or released
-        // TODO: Implement the real advisory lock
-        Ok(())
-    }
-
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-        let cmd_num = cmd.cmd_num();
-        let cmd_argp = cmd.arg_ptr() as usize;
-        self.inode.io_control(cmd_num, cmd_argp)?;
-        Ok(0)
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
+    fn as_inode(&self) -> Option<&dyn INode> {
+        Some(&*self.inode as &dyn INode)
     }
 }
 
@@ -275,17 +224,5 @@ impl INodeExt for dyn INode {
         let info = self.metadata()?;
         let file_mode = FileMode::from_bits_truncate(info.mode);
         Ok(file_mode.is_readable())
-    }
-}
-
-pub trait AsINodeFile {
-    fn as_inode_file(&self) -> Result<&INodeFile>;
-}
-
-impl AsINodeFile for FileRef {
-    fn as_inode_file(&self) -> Result<&INodeFile> {
-        self.as_any()
-            .downcast_ref::<INodeFile>()
-            .ok_or_else(|| errno!(EBADF, "not an inode file"))
     }
 }

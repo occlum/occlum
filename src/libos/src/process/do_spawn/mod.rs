@@ -9,8 +9,7 @@ use super::thread::ThreadName;
 use super::{table, HostWaker, ProcessRef, ThreadRef};
 use crate::entry::context_switch::{CpuContext, GpRegs};
 use crate::fs::{
-    CreationFlags, File, FileDesc, FileTable, FsView, HostStdioFds, StdinFile, StdoutFile,
-    ROOT_INODE,
+    CreationFlags, FileDesc, FileTable, FsView, HostStdioFds, StdinFile, StdoutFile, ROOT_INODE,
 };
 use crate::prelude::*;
 use crate::vm::ProcessVM;
@@ -265,12 +264,13 @@ fn init_files(
                     oflag,
                     fd,
                 } => {
-                    let file_ref =
+                    let sync_file =
                         current_ref
                             .fs()
                             .lock()
                             .unwrap()
                             .open_file(path.as_str(), oflag, mode)?;
+                    let file_ref = FileRef::from_sync(sync_file);
                     let creation_flags = CreationFlags::from_bits_truncate(oflag);
                     cloned_file_table.put_at(fd, file_ref, creation_flags.must_close_on_spawn());
                 }
@@ -293,14 +293,15 @@ fn init_files(
 
     // But, for init process, we initialize file table for it
     let mut file_table = FileTable::new();
-    let stdin: Arc<dyn File> =
-        Arc::new(StdinFile::new(host_stdio_fds.unwrap().stdin_fd as FileDesc));
-    let stdout: Arc<dyn File> = Arc::new(StdoutFile::new(
+    let stdin = FileRef::from_sync(Arc::new(StdinFile::new(
+        host_stdio_fds.unwrap().stdin_fd as FileDesc,
+    )));
+    let stdout = FileRef::from_sync(Arc::new(StdoutFile::new(
         host_stdio_fds.unwrap().stdout_fd as FileDesc,
-    ));
-    let stderr: Arc<dyn File> = Arc::new(StdoutFile::new(
+    )));
+    let stderr = FileRef::from_sync(Arc::new(StdoutFile::new(
         host_stdio_fds.unwrap().stderr_fd as FileDesc,
-    ));
+    )));
 
     file_table.put(stdin, false);
     file_table.put(stdout, false);

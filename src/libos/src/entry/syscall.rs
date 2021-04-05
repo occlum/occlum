@@ -8,6 +8,11 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::ptr;
 
 use crate::fs::{
+    do_close, do_lseek, do_open, do_openat, do_pread, do_pwrite, do_read, do_readv, do_write,
+    do_writev, iovec_t, FileDesc, FileRef,
+};
+/*
+use crate::fs::{
     do_access, do_chdir, do_chmod, do_chown, do_close, do_dup, do_dup2, do_dup3, do_eventfd,
     do_eventfd2, do_faccessat, do_fchmod, do_fchmodat, do_fchown, do_fchownat, do_fcntl,
     do_fdatasync, do_fstat, do_fstatat, do_fsync, do_ftruncate, do_getcwd, do_getdents,
@@ -17,6 +22,7 @@ use crate::fs::{
     do_symlinkat, do_sync, do_truncate, do_unlink, do_unlinkat, do_write, do_writev, iovec_t, File,
     FileDesc, FileRef, HostStdioFds, Stat,
 };
+*/
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t};
 /*
 use crate::net::{
@@ -153,7 +159,7 @@ macro_rules! process_syscall_table_with_callback {
             (Tgkill = 234) => do_tgkill(pid: i32, tid: pid_t, sig: c_int),
             (Tkill = 200) => do_tkill(tid: pid_t, sig: c_int),
 
-            (Ioctl = 16) => do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8),
+            //(Ioctl = 16) => do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8),
             (Writev = 20) => do_writev(fd: FileDesc, iov: *const iovec_t, count: i32),
 
             /*

@@ -10,7 +10,8 @@ pub fn do_openat(fs_path: &FsPath, flags: u32, mode: u32) -> Result<FileDesc> {
     let current = current!();
     let fs = current.fs().lock().unwrap();
 
-    let file_ref: Arc<dyn File> = fs.open_file(&path, flags, mode)?;
+    let sync_file: Arc<dyn SyncFile> = fs.open_file(&path, flags, mode)?;
+    let file_ref = FileRef::from_sync(sync_file);
 
     let fd = {
         let creation_flags = CreationFlags::from_bits_truncate(flags);

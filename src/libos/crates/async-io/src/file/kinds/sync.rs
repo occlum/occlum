@@ -61,10 +61,6 @@ pub trait SyncFile: Debug + Sync + Send {
         return_errno!(ENOSYS, "not support getting access mode");
     }
 
-    fn set_access_mode(&self, new_mode: AccessMode) -> Result<()> {
-        return_errno!(ENOSYS, "not support setting access mode");
-    }
-
     fn status_flags(&self) -> Result<StatusFlags> {
         return_errno!(ENOSYS, "not support getting status flags");
     }

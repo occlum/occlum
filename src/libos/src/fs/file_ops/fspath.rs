@@ -32,6 +32,8 @@ impl<'a> FsPath<'a> {
                 }
                 FsPathInner::Fd(fd as FileDesc)
             } else {
+                /*
+                TODO: replace as_inode_file API
                 let file_ref = current!().file(fd as FileDesc)?;
                 let inode_file = file_ref
                     .as_inode_file()
@@ -39,6 +41,7 @@ impl<'a> FsPath<'a> {
                 if inode_file.metadata()?.type_ != FileType::Dir {
                     return_errno!(ENOTDIR, "dirfd is not a directory");
                 }
+                */
                 FsPathInner::FdRelative(path, fd as FileDesc)
             }
         } else if fd == AT_FDCWD {
@@ -95,6 +98,8 @@ impl<'a> Debug for FsPath<'a> {
 
 /// Get the absolute path by file descriptor
 fn get_abs_path_by_fd(fd: FileDesc) -> Result<String> {
+    todo!("as_inode_file is not a good API and should be replaced with a new approach");
+    /*
     let path = {
         let file_ref = current!().file(fd)?;
         if let Ok(inode_file) = file_ref.as_inode_file() {
@@ -104,4 +109,5 @@ fn get_abs_path_by_fd(fd: FileDesc) -> Result<String> {
         }
     };
     Ok(path)
+    */
 }

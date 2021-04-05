@@ -5,36 +5,40 @@ use rcore_fs::vfs::{FileSystem, FileType, FsError, INode, Metadata, Timespec, PA
 use std;
 use std::any::Any;
 use std::fmt;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{Read, Seek, Write};
 use std::mem::MaybeUninit;
 use std::path::Path;
 use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
 
-pub use async_io::file::{FileHandle, PollableFile, SyncFile};
+pub use async_io::file::{
+    AccessMode, CreationFlags, FileHandle as FileRef, PollableFile, SeekFrom, StatusFlags, SyncFile,
+};
+pub use async_io::fs::FileMode;
+pub use async_io::poll::Events;
 
-pub use self::file::{File, FileRef};
-pub use self::file_ops::{
+/*pub use self::file_ops::{
     occlum_ocall_ioctl, AccessMode, BuiltinIoctlNum, CreationFlags, FileMode, Flock, FlockType,
     IfConf, IoctlCmd, Stat, StatusFlags, StructuredIoctlArgType, StructuredIoctlNum,
-};
+};*/
 pub use self::file_table::{FileDesc, FileTable};
 pub use self::fs_view::FsView;
 pub use self::host_fd::HostFd;
-pub use self::inode_file::{AsINodeFile, INodeExt, INodeFile};
+pub use self::inode_file::{INodeExt, INodeFile};
 pub use self::rootfs::ROOT_INODE;
 pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
 pub use self::syscalls::*;
 
-mod dev_fs;
-mod file;
+//mod dev_fs;
+// TODO: remove the file
+//mod file;
 mod file_ops;
 mod file_table;
-mod fs_ops;
+//mod fs_ops;
 mod fs_view;
 mod host_fd;
 mod hostfs;
 mod inode_file;
-mod procfs;
+//mod procfs;
 mod rootfs;
 mod sefs;
 mod stdio;
