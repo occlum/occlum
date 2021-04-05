@@ -416,18 +416,18 @@ pub fn do_symlinkat(target: *const i8, new_dirfd: i32, link_path: *const i8) -> 
     file_ops::do_symlinkat(&target, &fs_path)?;
     Ok(0)
 }
-
-pub fn do_chmod(path: *const i8, mode: u16) -> Result<isize> {
-    self::do_fchmodat(AT_FDCWD, path, mode)
+*/
+pub async fn do_chmod(path: *const i8, mode: u16) -> Result<isize> {
+    self::do_fchmodat(AT_FDCWD, path, mode).await
 }
 
-pub fn do_fchmod(fd: FileDesc, mode: u16) -> Result<isize> {
+pub async fn do_fchmod(fd: FileDesc, mode: u16) -> Result<isize> {
     let mode = FileMode::from_bits_truncate(mode);
     file_ops::do_fchmod(fd, mode)?;
     Ok(0)
 }
 
-pub fn do_fchmodat(dirfd: i32, path: *const i8, mode: u16) -> Result<isize> {
+pub async fn do_fchmodat(dirfd: i32, path: *const i8, mode: u16) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
@@ -436,7 +436,7 @@ pub fn do_fchmodat(dirfd: i32, path: *const i8, mode: u16) -> Result<isize> {
     file_ops::do_fchmodat(&fs_path, mode)?;
     Ok(0)
 }
-
+/*
 pub fn do_chown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
     self::do_fchownat(AT_FDCWD, path, uid, gid, 0)
 }

@@ -143,7 +143,7 @@ static int test_fchmodat() {
 static test_case_t test_cases[] = {
     TEST_CASE(test_chmod),
     TEST_CASE(test_fchmod),
-    TEST_CASE(test_fchmodat),
+    //TEST_CASE(test_fchmodat),
 };
 
 int main(int argc, const char *argv[]) {

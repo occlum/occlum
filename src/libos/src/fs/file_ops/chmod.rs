@@ -1,4 +1,3 @@
-use crate::fs::FileMode;
 use super::*;
 
 pub fn do_fchmodat(fs_path: &FsPath, mode: FileMode) -> Result<()> {
@@ -20,8 +19,13 @@ pub fn do_fchmod(fd: FileDesc, mode: FileMode) -> Result<()> {
     debug!("fchmod: fd: {}, mode: {:#o}", fd, mode);
 
     let file_ref = current!().file(fd)?;
-    let mut info = file_ref.metadata()?;
+    let inode = if let Some(inode) = file_ref.as_inode() {
+        inode
+    } else {
+        return_errno!(ENODEV, "file is not an inode");
+    };
+    let mut info = inode.metadata()?;
     info.mode = mode.bits();
-    file_ref.set_metadata(&info)?;
+    inode.set_metadata(&info)?;
     Ok(())
 }
