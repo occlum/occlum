@@ -124,8 +124,8 @@ pub async fn do_pwrite(fd: FileDesc, buf: *const u8, size: usize, offset: off_t)
     let len = file_ops::do_pwrite(fd, safe_buf, offset).await?;
     Ok(len as isize)
 }
-/*
-pub fn do_fstat(fd: FileDesc, stat_buf: *mut Stat) -> Result<isize> {
+
+pub async fn do_fstat(fd: FileDesc, stat_buf: *mut StatBuf) -> Result<isize> {
     from_user::check_mut_ptr(stat_buf)?;
 
     let stat = file_ops::do_fstat(fd)?;
@@ -135,20 +135,26 @@ pub fn do_fstat(fd: FileDesc, stat_buf: *mut Stat) -> Result<isize> {
     Ok(0)
 }
 
-pub fn do_stat(path: *const i8, stat_buf: *mut Stat) -> Result<isize> {
-    self::do_fstatat(AT_FDCWD, path, stat_buf, 0)
+pub async fn do_stat(path: *const i8, stat_buf: *mut StatBuf) -> Result<isize> {
+    self::do_fstatat(AT_FDCWD, path, stat_buf, 0).await
 }
 
-pub fn do_lstat(path: *const i8, stat_buf: *mut Stat) -> Result<isize> {
+pub async fn do_lstat(path: *const i8, stat_buf: *mut StatBuf) -> Result<isize> {
     self::do_fstatat(
         AT_FDCWD,
         path,
         stat_buf,
         StatFlags::AT_SYMLINK_NOFOLLOW.bits(),
     )
+    .await
 }
 
-pub fn do_fstatat(dirfd: i32, path: *const i8, stat_buf: *mut Stat, flags: u32) -> Result<isize> {
+pub async fn do_fstatat(
+    dirfd: i32,
+    path: *const i8,
+    stat_buf: *mut StatBuf,
+    flags: u32,
+) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
@@ -161,7 +167,7 @@ pub fn do_fstatat(dirfd: i32, path: *const i8, stat_buf: *mut Stat, flags: u32) 
     }
     Ok(0)
 }
-
+/*
 pub fn do_access(path: *const i8, mode: u32) -> Result<isize> {
     self::do_faccessat(AT_FDCWD, path, mode, 0)
 }
@@ -330,8 +336,8 @@ pub fn do_mkdirat(dirfd: i32, path: *const i8, mode: usize) -> Result<isize> {
     file_ops::do_mkdirat(&fs_path, mode)?;
     Ok(0)
 }
-
-pub fn do_rmdir(path: *const i8) -> Result<isize> {
+*/
+pub async fn do_rmdir(path: *const i8) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
@@ -339,11 +345,11 @@ pub fn do_rmdir(path: *const i8) -> Result<isize> {
     Ok(0)
 }
 
-pub fn do_link(oldpath: *const i8, newpath: *const i8) -> Result<isize> {
-    self::do_linkat(AT_FDCWD, oldpath, AT_FDCWD, newpath, 0)
+pub async fn do_link(oldpath: *const i8, newpath: *const i8) -> Result<isize> {
+    self::do_linkat(AT_FDCWD, oldpath, AT_FDCWD, newpath, 0).await
 }
 
-pub fn do_linkat(
+pub async fn do_linkat(
     olddirfd: i32,
     oldpath: *const i8,
     newdirfd: i32,
@@ -363,11 +369,11 @@ pub fn do_linkat(
     Ok(0)
 }
 
-pub fn do_unlink(path: *const i8) -> Result<isize> {
-    self::do_unlinkat(AT_FDCWD, path, 0)
+pub async fn do_unlink(path: *const i8) -> Result<isize> {
+    self::do_unlinkat(AT_FDCWD, path, 0).await
 }
 
-pub fn do_unlinkat(dirfd: i32, path: *const i8, flags: i32) -> Result<isize> {
+pub async fn do_unlinkat(dirfd: i32, path: *const i8, flags: i32) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
@@ -377,7 +383,7 @@ pub fn do_unlinkat(dirfd: i32, path: *const i8, flags: i32) -> Result<isize> {
     file_ops::do_unlinkat(&fs_path, flags)?;
     Ok(0)
 }
-
+/*
 pub fn do_readlink(path: *const i8, buf: *mut u8, size: usize) -> Result<isize> {
     self::do_readlinkat(AT_FDCWD, path, buf, size)
 }

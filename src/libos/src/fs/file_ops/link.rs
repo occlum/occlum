@@ -1,12 +1,5 @@
 use super::*;
 
-bitflags! {
-    pub struct LinkFlags: i32 {
-        const AT_EMPTY_PATH = 0x1000;
-        const AT_SYMLINK_FOLLOW = 0x400;
-    }
-}
-
 pub fn do_linkat(old_fs_path: &FsPath, new_fs_path: &FsPath, flags: LinkFlags) -> Result<()> {
     debug!(
         "linkat: old_fs_path: {:?}, new_fs_path: {:?}, flags:{:?}",

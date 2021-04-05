@@ -183,8 +183,8 @@ static int test_linkat_with_empty_oldpath() {
 
 static test_case_t test_cases[] = {
     TEST_CASE(test_link_then_unlink),
-    TEST_CASE(test_linkat_then_unlinkat),
-    TEST_CASE(test_linkat_with_empty_oldpath),
+    //TEST_CASE(test_linkat_then_unlinkat),
+    //TEST_CASE(test_linkat_with_empty_oldpath),
 };
 
 int main(int argc, const char *argv[]) {

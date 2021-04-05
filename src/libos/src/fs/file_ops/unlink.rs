@@ -1,8 +1,13 @@
 use super::*;
 
-bitflags! {
-    pub struct UnlinkFlags: i32 {
-        const AT_REMOVEDIR = 0x200;
+pub fn do_unlinkat(fs_path: &FsPath, flags: UnlinkFlags) -> Result<()> {
+    debug!("unlinkat: fs_path: {:?}, flags: {:?}", fs_path, flags);
+
+    let abs_path = fs_path.to_abs_path()?;
+    if flags.contains(UnlinkFlags::AT_REMOVEDIR) {
+        super::do_rmdir(&abs_path)
+    } else {
+        do_unlink(&abs_path)
     }
 }
 
@@ -24,15 +29,4 @@ fn do_unlink(path: &str) -> Result<()> {
     }
     dir_inode.unlink(file_name)?;
     Ok(())
-}
-
-pub fn do_unlinkat(fs_path: &FsPath, flags: UnlinkFlags) -> Result<()> {
-    debug!("unlinkat: fs_path: {:?}, flags: {:?}", fs_path, flags);
-
-    let abs_path = fs_path.to_abs_path()?;
-    if flags.contains(UnlinkFlags::AT_REMOVEDIR) {
-        super::do_rmdir(&abs_path)
-    } else {
-        do_unlink(&abs_path)
-    }
 }

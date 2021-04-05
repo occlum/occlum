@@ -8,8 +8,9 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::ptr;
 
 use crate::fs::{
-    do_close, do_lseek, do_open, do_openat, do_pread, do_pwrite, do_read, do_readv, do_write,
-    do_writev, iovec_t, FileDesc, FileRef,
+    do_close, do_fstat, do_fstatat, do_link, do_linkat, do_lseek, do_lstat, do_open, do_openat,
+    do_pread, do_pwrite, do_read, do_readv, do_rmdir, do_stat, do_unlink, do_unlinkat, do_write,
+    do_writev, iovec_t, FileDesc, FileRef, StatBuf,
 };
 /*
 use crate::fs::{
@@ -170,6 +171,15 @@ macro_rules! process_syscall_table_with_callback {
             (Pread64 = 17) => do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: off_t),
             (Lseek = 8) => do_lseek(fd: FileDesc, offset: off_t, whence: i32),
             //(Ioctl = 16) => do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8),
+
+            (Rmdir = 84) => do_rmdir(path: *const i8),
+            (Link = 86) => do_link(oldpath: *const i8, newpath: *const i8),
+            (Linkat = 265) => do_linkat(olddirfd: i32, oldpath: *const i8, newdirfd: i32, newpath: *const i8, flags: i32),
+            (Unlink = 87) => do_unlink(path: *const i8),
+            (Stat = 4) => do_stat(path: *const i8, stat_buf: *mut StatBuf),
+            (Fstat = 5) => do_fstat(fd: FileDesc, stat_buf: *mut StatBuf),
+            (Lstat = 6) => do_lstat(path: *const i8, stat_buf: *mut StatBuf),
+            (Fstatat = 262) => do_fstatat(dirfd: i32, path: *const i8, stat_buf: *mut StatBuf, flags: u32),
 
             /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),

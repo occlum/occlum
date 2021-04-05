@@ -1,7 +1,6 @@
 use super::*;
 
 use process;
-use rcore_fs::vfs::{FileSystem, FileType, FsError, INode, Metadata, Timespec, PATH_MAX};
 use std;
 use std::any::Any;
 use std::fmt;
@@ -13,7 +12,10 @@ use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
 pub use async_io::file::{
     AccessMode, CreationFlags, FileHandle as FileRef, PollableFile, SeekFrom, StatusFlags, SyncFile,
 };
-pub use async_io::fs::FileMode;
+pub use async_io::fs::{
+    FileMode, FileSystem, FileType, FsError, INode, LinkFlags, Metadata, StatBuf, StatFlags,
+    StatMode, Timespec, UnlinkFlags, PATH_MAX,
+};
 pub use async_io::poll::Events;
 
 /*pub use self::file_ops::{
