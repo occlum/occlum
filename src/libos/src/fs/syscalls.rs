@@ -176,7 +176,7 @@ pub fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) -> Resul
     file_ops::do_faccessat(&fs_path, mode, flags).map(|_| 0)
 }
 */
-pub fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize> {
+pub async fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize> {
     let seek_from = match whence {
         0 => {
             // SEEK_SET

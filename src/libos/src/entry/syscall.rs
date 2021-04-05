@@ -159,8 +159,17 @@ macro_rules! process_syscall_table_with_callback {
             (Tgkill = 234) => do_tgkill(pid: i32, tid: pid_t, sig: c_int),
             (Tkill = 200) => do_tkill(tid: pid_t, sig: c_int),
 
-            //(Ioctl = 16) => do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8),
+            (Open = 2) => do_open(path: *const i8, flags: u32, mode: u32),
+            (Openat = 257) => do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u32),
+            (Close = 3) => do_close(fd: FileDesc),
+            (Write = 1) => do_write(fd: FileDesc, buf: *const u8, size: usize),
             (Writev = 20) => do_writev(fd: FileDesc, iov: *const iovec_t, count: i32),
+            (Pwrite64 = 18) => do_pwrite(fd: FileDesc, buf: *const u8, size: usize, offset: off_t),
+            (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),
+            (Readv = 19) => do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32),
+            (Pread64 = 17) => do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: off_t),
+            (Lseek = 8) => do_lseek(fd: FileDesc, offset: off_t, whence: i32),
+            //(Ioctl = 16) => do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8),
 
             /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),
