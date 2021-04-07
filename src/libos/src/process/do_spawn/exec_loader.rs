@@ -2,7 +2,7 @@ use super::super::elf_file::*;
 use super::ThreadRef;
 use crate::fs::{FileMode, INodeExt};
 use crate::prelude::*;
-use rcore_fs::vfs::INode;
+use rcore_fs::vfs::{FileType, INode, Metadata};
 use std::ffi::CString;
 
 /// Load an ELF file header or a script's interpreter header into a vector.
@@ -79,6 +79,13 @@ pub fn load_file_hdr_to_vec(
         .unwrap()
         .lookup_inode(file_path)
         .map_err(|e| errno!(e.errno(), "cannot find the file"))?;
+
+    // Make sure the final file to exec is not a directory
+    let metadata = inode.metadata()?;
+    if metadata.type_ != FileType::File {
+        return_errno!(EACCES, "it is not a regular file");
+    }
+
     let file_mode = {
         let info = inode.metadata()?;
         FileMode::from_bits_truncate(info.mode)
