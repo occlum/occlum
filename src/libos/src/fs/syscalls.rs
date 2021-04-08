@@ -279,8 +279,7 @@ pub async fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<i
     Ok(new_fd as isize)
 }
 
-/*
-pub fn do_chdir(path: *const i8) -> Result<isize> {
+pub async fn do_chdir(path: *const i8) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
@@ -288,7 +287,7 @@ pub fn do_chdir(path: *const i8) -> Result<isize> {
     Ok(0)
 }
 
-pub fn do_getcwd(buf_ptr: *mut u8, size: usize) -> Result<isize> {
+pub async fn do_getcwd(buf_ptr: *mut u8, size: usize) -> Result<isize> {
     let buf = {
         from_user::check_mut_array(buf_ptr, size)?;
         unsafe { std::slice::from_raw_parts_mut(buf_ptr, size) }
@@ -305,6 +304,7 @@ pub fn do_getcwd(buf_ptr: *mut u8, size: usize) -> Result<isize> {
     Ok(buf.len() as isize)
 }
 
+/*
 pub fn do_rename(oldpath: *const i8, newpath: *const i8) -> Result<isize> {
     self::do_renameat(AT_FDCWD, oldpath, AT_FDCWD, newpath)
 }
@@ -326,12 +326,13 @@ pub fn do_renameat(
     file_ops::do_renameat(&old_fs_path, &new_fs_path)?;
     Ok(0)
 }
+*/
 
-pub fn do_mkdir(path: *const i8, mode: usize) -> Result<isize> {
-    self::do_mkdirat(AT_FDCWD, path, mode)
+pub async fn do_mkdir(path: *const i8, mode: usize) -> Result<isize> {
+    self::do_mkdirat(AT_FDCWD, path, mode).await
 }
 
-pub fn do_mkdirat(dirfd: i32, path: *const i8, mode: usize) -> Result<isize> {
+pub async fn do_mkdirat(dirfd: i32, path: *const i8, mode: usize) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
@@ -339,7 +340,7 @@ pub fn do_mkdirat(dirfd: i32, path: *const i8, mode: usize) -> Result<isize> {
     file_ops::do_mkdirat(&fs_path, mode)?;
     Ok(0)
 }
-*/
+
 pub async fn do_rmdir(path: *const i8) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()

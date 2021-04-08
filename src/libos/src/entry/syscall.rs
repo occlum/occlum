@@ -8,10 +8,11 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::ptr;
 
 use crate::fs::{
-    do_access, do_chmod, do_close, do_dup, do_dup2, do_dup3, do_faccessat, do_fchmod, do_fchmodat,
-    do_fdatasync, do_fstat, do_fstatat, do_fsync, do_link, do_linkat, do_lseek, do_lstat, do_open,
-    do_openat, do_pread, do_pwrite, do_read, do_readv, do_rmdir, do_stat, do_unlink, do_unlinkat,
-    do_write, do_writev, iovec_t, FileDesc, FileRef, StatBuf,
+    do_access, do_chdir, do_chmod, do_close, do_dup, do_dup2, do_dup3, do_faccessat, do_fchmod,
+    do_fchmodat, do_fdatasync, do_fstat, do_fstatat, do_fsync, do_getcwd, do_link, do_linkat,
+    do_lseek, do_lstat, do_mkdir, do_mkdirat, do_open, do_openat, do_pread, do_pwrite, do_read,
+    do_readv, do_rmdir, do_stat, do_unlink, do_unlinkat, do_write, do_writev, iovec_t, FileDesc,
+    FileRef, StatBuf,
 };
 /*
 use crate::fs::{
@@ -177,6 +178,7 @@ macro_rules! process_syscall_table_with_callback {
             (Link = 86) => do_link(oldpath: *const i8, newpath: *const i8),
             (Linkat = 265) => do_linkat(olddirfd: i32, oldpath: *const i8, newdirfd: i32, newpath: *const i8, flags: i32),
             (Unlink = 87) => do_unlink(path: *const i8),
+            (Unlinkat = 263) => do_unlinkat(dirfd: i32, path: *const i8, flags: i32),
             (Stat = 4) => do_stat(path: *const i8, stat_buf: *mut StatBuf),
             (Fstat = 5) => do_fstat(fd: FileDesc, stat_buf: *mut StatBuf),
             (Lstat = 6) => do_lstat(path: *const i8, stat_buf: *mut StatBuf),
@@ -191,6 +193,10 @@ macro_rules! process_syscall_table_with_callback {
             (Fdatasync = 75) => do_fdatasync(fd: FileDesc),
             (Access = 21) => do_access(path: *const i8, mode: u32),
             (Faccessat = 269) => do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32),
+            (Mkdir = 83) => do_mkdir(path: *const i8, mode: usize),
+            (Mkdirat = 258) => do_mkdirat(dirfd: i32, path: *const i8, mode: usize),
+            (Getcwd = 79) => do_getcwd(buf: *mut u8, size: usize),
+            (Chdir = 80) => do_chdir(path: *const i8),
 
             /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),

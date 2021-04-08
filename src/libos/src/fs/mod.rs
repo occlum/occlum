@@ -35,7 +35,7 @@ pub use self::syscalls::*;
 //mod file;
 mod file_ops;
 mod file_table;
-//mod fs_ops;
+mod fs_ops;
 mod fs_view;
 mod host_fd;
 mod hostfs;
