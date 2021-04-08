@@ -1,7 +1,7 @@
 use super::file_ops::{
     /* AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath, LinkFlags,
     StatFlags, UnlinkFlags, AT_FDCWD, */
-    self, FsPath, AT_FDCWD,
+    self, FsPath, LinkFlags, UnlinkFlags, AT_FDCWD,
 };
 //use super::fs_ops;
 use super::*;

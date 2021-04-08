@@ -16,7 +16,7 @@ pub use self::fsync::{do_fdatasync, do_fsync};
 //     do_ioctl, occlum_ocall_ioctl, BuiltinIoctlNum, IfConf, IoctlCmd, StructuredIoctlArgType,
 //     StructuredIoctlNum,
 // };
-pub use self::link::do_linkat;
+pub use self::link::{do_linkat, LinkFlags};
 pub use self::lseek::do_lseek;
 // pub use self::mkdir::do_mkdirat;
 pub use self::open::do_openat;
@@ -27,7 +27,7 @@ pub use self::rmdir::do_rmdir;
 pub use self::stat::{do_fstat, do_fstatat};
 // pub use self::symlink::{do_readlinkat, do_symlinkat};
 // pub use self::truncate::{do_ftruncate, do_truncate};
-pub use self::unlink::do_unlinkat;
+pub use self::unlink::{do_unlinkat, UnlinkFlags};
 pub use self::write::{do_pwrite, do_write, do_writev};
 
 // mod access;

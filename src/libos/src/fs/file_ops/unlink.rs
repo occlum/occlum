@@ -11,6 +11,12 @@ pub fn do_unlinkat(fs_path: &FsPath, flags: UnlinkFlags) -> Result<()> {
     }
 }
 
+bitflags::bitflags! {
+    pub struct UnlinkFlags: i32 {
+        const AT_REMOVEDIR = 0x200;
+    }
+}
+
 fn do_unlink(path: &str) -> Result<()> {
     let (dir_path, file_name) = split_path(&path);
     let dir_inode = {

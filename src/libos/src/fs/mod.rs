@@ -13,8 +13,8 @@ pub use async_io::file::{
     AccessMode, CreationFlags, FileHandle as FileRef, PollableFile, SeekFrom, StatusFlags, SyncFile,
 };
 pub use async_io::fs::{
-    FileMode, FileSystem, FileType, FsError, INode, LinkFlags, Metadata, StatBuf, StatFlags,
-    StatMode, Timespec, UnlinkFlags, PATH_MAX,
+    FileMode, FileSystem, FileType, FsError, INode, Metadata, StatBuf, StatFlags, StatMode,
+    Timespec, PATH_MAX,
 };
 pub use async_io::poll::Events;
 
