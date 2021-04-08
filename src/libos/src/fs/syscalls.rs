@@ -218,8 +218,7 @@ pub async fn do_fdatasync(fd: FileDesc) -> Result<isize> {
     Ok(0)
 }
 
-/*
-pub fn do_truncate(path: *const i8, len: usize) -> Result<isize> {
+pub async fn do_truncate(path: *const i8, len: usize) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
@@ -227,11 +226,12 @@ pub fn do_truncate(path: *const i8, len: usize) -> Result<isize> {
     Ok(0)
 }
 
-pub fn do_ftruncate(fd: FileDesc, len: usize) -> Result<isize> {
+pub async fn do_ftruncate(fd: FileDesc, len: usize) -> Result<isize> {
     file_ops::do_ftruncate(fd, len)?;
     Ok(0)
 }
 
+/*
 pub fn do_getdents64(fd: FileDesc, buf: *mut u8, buf_size: usize) -> Result<isize> {
     let safe_buf = {
         from_user::check_mut_array(buf, buf_size)?;

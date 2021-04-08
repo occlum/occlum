@@ -26,7 +26,7 @@ pub use self::rmdir::do_rmdir;
 // pub use self::sendfile::do_sendfile;
 pub use self::stat::{do_fstat, do_fstatat};
 // pub use self::symlink::{do_readlinkat, do_symlinkat};
-// pub use self::truncate::{do_ftruncate, do_truncate};
+pub use self::truncate::{do_ftruncate, do_truncate};
 pub use self::unlink::{do_unlinkat, UnlinkFlags};
 pub use self::write::{do_pwrite, do_write, do_writev};
 
@@ -52,6 +52,6 @@ mod rmdir;
 // mod sendfile;
 mod stat;
 // mod symlink;
-// mod truncate;
+mod truncate;
 mod unlink;
 mod write;
