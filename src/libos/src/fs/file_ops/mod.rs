@@ -11,7 +11,7 @@ pub use self::dup::{do_dup, do_dup2, do_dup3};
 // pub use self::file_flags::{AccessMode, CreationFlags, StatusFlags};
 // pub use self::flock::{Flock, FlockType};
 pub use self::fspath::{FsPath, AT_FDCWD};
-// pub use self::fsync::{do_fdatasync, do_fsync};
+pub use self::fsync::{do_fdatasync, do_fsync};
 // pub use self::ioctl::{
 //     do_ioctl, occlum_ocall_ioctl, BuiltinIoctlNum, IfConf, IoctlCmd, StructuredIoctlArgType,
 //     StructuredIoctlNum,
@@ -40,7 +40,7 @@ mod dup;
 // mod file_flags;
 // mod flock;
 mod fspath;
-// mod fsync;
+mod fsync;
 // mod ioctl;
 mod link;
 mod lseek;

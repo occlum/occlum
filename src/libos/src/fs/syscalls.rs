@@ -207,17 +207,18 @@ pub async fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize>
     let offset = file_ops::do_lseek(fd, seek_from)?;
     Ok(offset as isize)
 }
+
+pub async fn do_fsync(fd: FileDesc) -> Result<isize> {
+    file_ops::do_fsync(fd).await?;
+    Ok(0)
+}
+
+pub async fn do_fdatasync(fd: FileDesc) -> Result<isize> {
+    file_ops::do_fdatasync(fd).await?;
+    Ok(0)
+}
+
 /*
-pub fn do_fsync(fd: FileDesc) -> Result<isize> {
-    file_ops::do_fsync(fd)?;
-    Ok(0)
-}
-
-pub fn do_fdatasync(fd: FileDesc) -> Result<isize> {
-    file_ops::do_fdatasync(fd)?;
-    Ok(0)
-}
-
 pub fn do_truncate(path: *const i8, len: usize) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()

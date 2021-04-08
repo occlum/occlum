@@ -121,6 +121,11 @@ impl SyncFile for INodeFile {
         Ok(new_offset)
     }
 
+    fn flush(&self) -> Result<()> {
+        self.inode.sync_data()?;
+        Ok(())
+    }
+
     fn access_mode(&self) -> Result<AccessMode> {
         Ok(self.access_mode)
     }
