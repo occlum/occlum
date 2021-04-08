@@ -304,12 +304,11 @@ pub async fn do_getcwd(buf_ptr: *mut u8, size: usize) -> Result<isize> {
     Ok(buf.len() as isize)
 }
 
-/*
-pub fn do_rename(oldpath: *const i8, newpath: *const i8) -> Result<isize> {
-    self::do_renameat(AT_FDCWD, oldpath, AT_FDCWD, newpath)
+pub async fn do_rename(oldpath: *const i8, newpath: *const i8) -> Result<isize> {
+    self::do_renameat(AT_FDCWD, oldpath, AT_FDCWD, newpath).await
 }
 
-pub fn do_renameat(
+pub async fn do_renameat(
     olddirfd: i32,
     oldpath: *const i8,
     newdirfd: i32,
@@ -326,7 +325,6 @@ pub fn do_renameat(
     file_ops::do_renameat(&old_fs_path, &new_fs_path)?;
     Ok(0)
 }
-*/
 
 pub async fn do_mkdir(path: *const i8, mode: usize) -> Result<isize> {
     self::do_mkdirat(AT_FDCWD, path, mode).await
