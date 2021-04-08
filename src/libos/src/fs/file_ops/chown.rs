@@ -34,9 +34,12 @@ pub fn do_fchown(fd: FileDesc, uid: u32, gid: u32) -> Result<()> {
     debug!("fchown: fd: {}, uid: {}, gid: {}", fd, uid, gid);
 
     let file_ref = current!().file(fd)?;
-    let mut info = file_ref.metadata()?;
+    let inode = file_ref
+        .as_inode()
+        .ok_or_else(|| errno!(EINVAL, "not an inode"))?;
+    let mut info = inode.metadata()?;
     info.uid = uid as usize;
     info.gid = gid as usize;
-    file_ref.set_metadata(&info)?;
+    inode.set_metadata(&info)?;
     Ok(())
 }

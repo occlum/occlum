@@ -1,7 +1,8 @@
 use super::file_ops::{
     /* AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath, LinkFlags,
     StatFlags, UnlinkFlags, AT_FDCWD, */
-    self, AccessibilityCheckFlags, AccessibilityCheckMode, FsPath, LinkFlags, UnlinkFlags, AT_FDCWD,
+    self, AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FsPath, LinkFlags,
+    UnlinkFlags, AT_FDCWD,
 };
 //use super::fs_ops;
 use super::*;
@@ -438,17 +439,23 @@ pub async fn do_fchmodat(dirfd: i32, path: *const i8, mode: u16) -> Result<isize
     file_ops::do_fchmodat(&fs_path, mode)?;
     Ok(0)
 }
-/*
-pub fn do_chown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
-    self::do_fchownat(AT_FDCWD, path, uid, gid, 0)
+
+pub async fn do_chown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
+    self::do_fchownat(AT_FDCWD, path, uid, gid, 0).await
 }
 
-pub fn do_fchown(fd: FileDesc, uid: u32, gid: u32) -> Result<isize> {
+pub async fn do_fchown(fd: FileDesc, uid: u32, gid: u32) -> Result<isize> {
     file_ops::do_fchown(fd, uid, gid)?;
     Ok(0)
 }
 
-pub fn do_fchownat(dirfd: i32, path: *const i8, uid: u32, gid: u32, flags: i32) -> Result<isize> {
+pub async fn do_fchownat(
+    dirfd: i32,
+    path: *const i8,
+    uid: u32,
+    gid: u32,
+    flags: i32,
+) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
@@ -458,7 +465,7 @@ pub fn do_fchownat(dirfd: i32, path: *const i8, uid: u32, gid: u32, flags: i32) 
     Ok(0)
 }
 
-pub fn do_lchown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
+pub async fn do_lchown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
     self::do_fchownat(
         AT_FDCWD,
         path,
@@ -466,8 +473,9 @@ pub fn do_lchown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
         gid,
         ChownFlags::AT_SYMLINK_NOFOLLOW.bits(),
     )
+    .await
 }
-
+/*
 pub fn do_sendfile(
     out_fd: FileDesc,
     in_fd: FileDesc,

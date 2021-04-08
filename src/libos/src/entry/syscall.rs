@@ -8,11 +8,12 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::ptr;
 
 use crate::fs::{
-    do_access, do_chdir, do_chmod, do_close, do_dup, do_dup2, do_dup3, do_faccessat, do_fchmod,
-    do_fchmodat, do_fdatasync, do_fstat, do_fstatat, do_fsync, do_ftruncate, do_getcwd, do_link,
-    do_linkat, do_lseek, do_lstat, do_mkdir, do_mkdirat, do_open, do_openat, do_pread, do_pwrite,
-    do_read, do_readv, do_rename, do_renameat, do_rmdir, do_stat, do_truncate, do_unlink,
-    do_unlinkat, do_write, do_writev, iovec_t, FileDesc, FileRef, StatBuf,
+    do_access, do_chdir, do_chmod, do_chown, do_close, do_dup, do_dup2, do_dup3, do_faccessat,
+    do_fchmod, do_fchmodat, do_fchown, do_fchownat, do_fdatasync, do_fstat, do_fstatat, do_fsync,
+    do_ftruncate, do_getcwd, do_lchown, do_link, do_linkat, do_lseek, do_lstat, do_mkdir,
+    do_mkdirat, do_open, do_openat, do_pread, do_pwrite, do_read, do_readv, do_rename, do_renameat,
+    do_rmdir, do_stat, do_truncate, do_unlink, do_unlinkat, do_write, do_writev, iovec_t, FileDesc,
+    FileRef, StatBuf,
 };
 /*
 use crate::fs::{
@@ -201,6 +202,10 @@ macro_rules! process_syscall_table_with_callback {
             (Renameat = 264) => do_renameat(olddirfd: i32, oldpath: *const i8, newdirfd: i32, newpath: *const i8),
             (Truncate = 76) => do_truncate(path: *const i8, len: usize),
             (Ftruncate = 77) => do_ftruncate(fd: FileDesc, len: usize),
+            (Chown = 92) => do_chown(path: *const i8, uid: u32, gid: u32),
+            (Fchown = 93) => do_fchown(fd: FileDesc, uid: u32, gid: u32),
+            (Lchown = 94) => do_lchown(path: *const i8, uid: u32, gid: u32),
+            (Fchownat = 260) => do_fchownat(dirfd: i32, path: *const i8, uid: u32, gid: u32, flags: i32),
 
             /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),
