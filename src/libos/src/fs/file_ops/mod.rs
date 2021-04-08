@@ -1,7 +1,7 @@
 use super::*;
 use process::Process;
 
-// pub use self::access::{do_faccessat, AccessibilityCheckFlags, AccessibilityCheckMode};
+pub use self::access::{do_faccessat, AccessibilityCheckFlags, AccessibilityCheckMode};
 pub use self::chmod::{do_fchmod, do_fchmodat};
 // pub use self::chown::{do_fchown, do_fchownat, ChownFlags};
 pub use self::close::do_close;
@@ -30,7 +30,7 @@ pub use self::stat::{do_fstat, do_fstatat};
 pub use self::unlink::{do_unlinkat, UnlinkFlags};
 pub use self::write::{do_pwrite, do_write, do_writev};
 
-// mod access;
+mod access;
 mod chmod;
 // mod chown;
 mod close;

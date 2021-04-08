@@ -8,10 +8,10 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::ptr;
 
 use crate::fs::{
-    do_chmod, do_close, do_dup, do_dup2, do_dup3, do_fchmod, do_fchmodat, do_fdatasync, do_fstat,
-    do_fstatat, do_fsync, do_link, do_linkat, do_lseek, do_lstat, do_open, do_openat, do_pread,
-    do_pwrite, do_read, do_readv, do_rmdir, do_stat, do_unlink, do_unlinkat, do_write, do_writev,
-    iovec_t, FileDesc, FileRef, StatBuf,
+    do_access, do_chmod, do_close, do_dup, do_dup2, do_dup3, do_faccessat, do_fchmod, do_fchmodat,
+    do_fdatasync, do_fstat, do_fstatat, do_fsync, do_link, do_linkat, do_lseek, do_lstat, do_open,
+    do_openat, do_pread, do_pwrite, do_read, do_readv, do_rmdir, do_stat, do_unlink, do_unlinkat,
+    do_write, do_writev, iovec_t, FileDesc, FileRef, StatBuf,
 };
 /*
 use crate::fs::{
@@ -189,6 +189,8 @@ macro_rules! process_syscall_table_with_callback {
             (Dup3 = 292) => do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32),
             (Fsync = 74) => do_fsync(fd: FileDesc),
             (Fdatasync = 75) => do_fdatasync(fd: FileDesc),
+            (Access = 21) => do_access(path: *const i8, mode: u32),
+            (Faccessat = 269) => do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32),
 
             /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),

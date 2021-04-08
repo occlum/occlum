@@ -1,7 +1,7 @@
 use super::file_ops::{
     /* AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath, LinkFlags,
     StatFlags, UnlinkFlags, AT_FDCWD, */
-    self, FsPath, LinkFlags, UnlinkFlags, AT_FDCWD,
+    self, AccessibilityCheckFlags, AccessibilityCheckMode, FsPath, LinkFlags, UnlinkFlags, AT_FDCWD,
 };
 //use super::fs_ops;
 use super::*;
@@ -167,12 +167,12 @@ pub async fn do_fstatat(
     }
     Ok(0)
 }
-/*
-pub fn do_access(path: *const i8, mode: u32) -> Result<isize> {
-    self::do_faccessat(AT_FDCWD, path, mode, 0)
+
+pub async fn do_access(path: *const i8, mode: u32) -> Result<isize> {
+    self::do_faccessat(AT_FDCWD, path, mode, 0).await
 }
 
-pub fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) -> Result<isize> {
+pub async fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
@@ -181,7 +181,7 @@ pub fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) -> Resul
     let flags = AccessibilityCheckFlags::from_u32(flags)?;
     file_ops::do_faccessat(&fs_path, mode, flags).map(|_| 0)
 }
-*/
+
 pub async fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize> {
     let seek_from = match whence {
         0 => {
