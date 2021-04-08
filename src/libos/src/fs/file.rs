@@ -55,8 +55,8 @@ pub trait File: Debug + Sync + Send + Any {
         return_op_unsupported_error!("set_len")
     }
 
-    fn read_entry(&self) -> Result<String> {
-        return_op_unsupported_error!("read_entry", ENOTDIR)
+    fn iterate_entries(&self, writer: &mut dyn DirentWriter) -> Result<usize> {
+        return_op_unsupported_error!("iterate_entries")
     }
 
     fn sync_all(&self) -> Result<()> {

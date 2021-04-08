@@ -144,14 +144,15 @@ impl File for INodeFile {
         Ok(())
     }
 
-    fn read_entry(&self) -> Result<String> {
+    fn iterate_entries(&self, writer: &mut dyn DirentWriter) -> Result<usize> {
         if !self.access_mode.readable() {
             return_errno!(EACCES, "File not readable. Can't read entry.");
         }
         let mut offset = self.offset.lock().unwrap();
-        let name = self.inode.get_entry(*offset)?;
-        *offset += 1;
-        Ok(name)
+        let mut dir_ctx = DirentWriterContext::new(*offset, writer);
+        let written_size = self.inode.iterate_entries(&mut dir_ctx)?;
+        *offset = dir_ctx.pos();
+        Ok(written_size)
     }
 
     fn access_mode(&self) -> Result<AccessMode> {
