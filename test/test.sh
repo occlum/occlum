@@ -1,7 +1,7 @@
 #!/bin/bash
 TESTS="empty hello_world getpid malloc mmap spawn exit_group pthread tls \
     signal cpuid rdtsc emulate_syscall rlimit time file link stat chmod \
-    access mkdir rename truncate chown"
+    access mkdir rename truncate chown symlink"
 
 GREEN='\033[1;32m'
 NO_COLOR='\033[0m'

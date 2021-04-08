@@ -386,12 +386,17 @@ pub async fn do_unlinkat(dirfd: i32, path: *const i8, flags: i32) -> Result<isiz
     file_ops::do_unlinkat(&fs_path, flags)?;
     Ok(0)
 }
-/*
-pub fn do_readlink(path: *const i8, buf: *mut u8, size: usize) -> Result<isize> {
-    self::do_readlinkat(AT_FDCWD, path, buf, size)
+
+pub async fn do_readlink(path: *const i8, buf: *mut u8, size: usize) -> Result<isize> {
+    self::do_readlinkat(AT_FDCWD, path, buf, size).await
 }
 
-pub fn do_readlinkat(dirfd: i32, path: *const i8, buf: *mut u8, size: usize) -> Result<isize> {
+pub async fn do_readlinkat(
+    dirfd: i32,
+    path: *const i8,
+    buf: *mut u8,
+    size: usize,
+) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
@@ -404,11 +409,15 @@ pub fn do_readlinkat(dirfd: i32, path: *const i8, buf: *mut u8, size: usize) -> 
     Ok(len as isize)
 }
 
-pub fn do_symlink(target: *const i8, link_path: *const i8) -> Result<isize> {
-    self::do_symlinkat(target, AT_FDCWD, link_path)
+pub async fn do_symlink(target: *const i8, link_path: *const i8) -> Result<isize> {
+    self::do_symlinkat(target, AT_FDCWD, link_path).await
 }
 
-pub fn do_symlinkat(target: *const i8, new_dirfd: i32, link_path: *const i8) -> Result<isize> {
+pub async fn do_symlinkat(
+    target: *const i8,
+    new_dirfd: i32,
+    link_path: *const i8,
+) -> Result<isize> {
     let target = from_user::clone_cstring_safely(target)?
         .to_string_lossy()
         .into_owned();
@@ -419,7 +428,7 @@ pub fn do_symlinkat(target: *const i8, new_dirfd: i32, link_path: *const i8) -> 
     file_ops::do_symlinkat(&target, &fs_path)?;
     Ok(0)
 }
-*/
+
 pub async fn do_chmod(path: *const i8, mode: u16) -> Result<isize> {
     self::do_fchmodat(AT_FDCWD, path, mode).await
 }
