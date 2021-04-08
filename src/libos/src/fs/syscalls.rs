@@ -261,22 +261,24 @@ pub fn do_pipe(fds_u: *mut i32) -> Result<isize> {
 pub fn do_pipe2(fds_u: *mut i32, flags: u32) -> Result<isize> {
     todo!()
 }
+*/
 
-pub fn do_dup(old_fd: FileDesc) -> Result<isize> {
+pub async fn do_dup(old_fd: FileDesc) -> Result<isize> {
     let new_fd = file_ops::do_dup(old_fd)?;
     Ok(new_fd as isize)
 }
 
-pub fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<isize> {
+pub async fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<isize> {
     let new_fd = file_ops::do_dup2(old_fd, new_fd)?;
     Ok(new_fd as isize)
 }
 
-pub fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<isize> {
+pub async fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<isize> {
     let new_fd = file_ops::do_dup3(old_fd, new_fd, flags)?;
     Ok(new_fd as isize)
 }
 
+/*
 pub fn do_chdir(path: *const i8) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
