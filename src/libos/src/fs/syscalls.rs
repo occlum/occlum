@@ -250,12 +250,14 @@ pub fn do_getdents(fd: FileDesc, buf: *mut u8, buf_size: usize) -> Result<isize>
     let len = file_ops::do_getdents(fd, safe_buf)?;
     Ok(len as isize)
 }
+*/
 
-pub fn do_sync() -> Result<isize> {
+pub async fn do_sync() -> Result<isize> {
     fs_ops::do_sync()?;
     Ok(0)
 }
 
+/*
 pub fn do_pipe(fds_u: *mut i32) -> Result<isize> {
     todo!()
 }

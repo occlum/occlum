@@ -12,8 +12,8 @@ use crate::fs::{
     do_fchmod, do_fchmodat, do_fchown, do_fchownat, do_fdatasync, do_fstat, do_fstatat, do_fsync,
     do_ftruncate, do_getcwd, do_lchown, do_link, do_linkat, do_lseek, do_lstat, do_mkdir,
     do_mkdirat, do_open, do_openat, do_pread, do_pwrite, do_read, do_readlink, do_readlinkat,
-    do_readv, do_rename, do_renameat, do_rmdir, do_stat, do_symlink, do_symlinkat, do_truncate,
-    do_unlink, do_unlinkat, do_write, do_writev, iovec_t, FileDesc, FileRef, StatBuf,
+    do_readv, do_rename, do_renameat, do_rmdir, do_stat, do_symlink, do_symlinkat, do_sync,
+    do_truncate, do_unlink, do_unlinkat, do_write, do_writev, iovec_t, FileDesc, FileRef, StatBuf,
 };
 /*
 use crate::fs::{
@@ -210,6 +210,7 @@ macro_rules! process_syscall_table_with_callback {
             (Readlinkat = 267) => do_readlinkat(dirfd: i32, path: *const i8, buf: *mut u8, size: usize),
             (Symlink = 88) => do_symlink(target: *const i8, link_path: *const i8),
             (Symlinkat = 266) => do_symlinkat(target: *const i8, new_dirfd: i32, link_path: *const i8),
+            (Sync = 162) => do_sync(),
 
             /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),
