@@ -40,6 +40,7 @@ RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-i
         libssl-dev \
         libtool \
         libxml2-dev \
+        nano \
         ocaml \
         ocamlbuild \
         pkg-config \
