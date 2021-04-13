@@ -4,6 +4,7 @@ This project demonstrates how Occlum enables [Golang](https://golang.org) progra
 
 Step 1: Install Gin with `occlum-go`, it may take a few minutes
 ```
+occlum-go mod init web_server && \
 occlum-go get -u -v github.com/gin-gonic/gin
 ```
 
