@@ -57,13 +57,9 @@ jobs:
             SGX_MODE=SIM make test"
 
     - name: Go Server set up and run
-      run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/web_server && occlum-go get -u -v github.com/gin-gonic/gin;
+      run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/web_server && occlum-go mod init web_server && occlum-go get -u -v github.com/gin-gonic/gin;
             occlum-go build -o web_server ./web_server.go;
             SGX_MODE=SIM ./run_golang_on_occlum.sh" &
-    - name: Curl test
-      run: |
-        sleep ${{ env.nap_time }};
-        docker exec language_support_test bash -c "curl http://127.0.0.1:8090/ping"
 
     - name: Set up Golang grpc pingpong test
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/grpc_pingpong && ./prepare_ping_pong.sh"
@@ -79,7 +75,11 @@ jobs:
     - name: Run Golang sqlite test
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh"
 
-  # TODO: Add Java web server test
+    - name: Curl test
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec language_support_test bash -c "curl http://127.0.0.1:8090/ping"
+
   Java_support_test:
     runs-on: ubuntu-18.04
     steps:
