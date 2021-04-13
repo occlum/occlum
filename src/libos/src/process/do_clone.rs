@@ -157,7 +157,6 @@ fn check_clone_args(
 /// CLONE_SETTLS
 /// CLONE_SIGHAND
 /// CLONE_SYSVSEM
-/// CLONE_PARENT_SETTID
 /// ```
 ///
 /// # Optional flags
@@ -166,6 +165,7 @@ fn check_clone_args(
 /// ```
 /// CLONE_CHILD_CLEARTID
 /// CLONE_CHILD_SETTID
+/// CLONE_PARENT_SETTID
 /// ```
 ///
 /// # Ignored flags
@@ -204,7 +204,6 @@ fn check_clone_flags(flags: CloneFlags) -> Result<()> {
                 | CloneFlags::CLONE_SETTLS
                 | CloneFlags::CLONE_SIGHAND
                 | CloneFlags::CLONE_SYSVSEM
-                | CloneFlags::CLONE_PARENT_SETTID
         };
         static ref UNSUPPORTED_FLAGS: CloneFlags = {
             CloneFlags::CLONE_VFORK
