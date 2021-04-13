@@ -17,9 +17,9 @@ cd ${BUILD_DIR}
 # Download Golang
 git clone https://github.com/golang/go .
 # Swtich to Golang 1.13.7
-git checkout -b go1.13.7 tags/go1.13.7
+git checkout -b go1.16.3 tags/go1.16.3
 # Apply the patch to adapt Golang to Occlum
-git apply ${THIS_DIR}/adapt-golang-to-occlum.patch
+git apply ${THIS_DIR}/adapt-golang1.16.3-to-occlum.patch
 
 # Build Golang
 cd src
