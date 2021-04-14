@@ -1,8 +1,9 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use atomic::{Atomic};
 use ringbuf::{Consumer as RbConsumer, Producer as RbProducer, RingBuffer};
 
-use crate::file::PollableFile;
+use crate::file::{AccessMode, PollableFile, StatusFlags};
 use crate::poll::{Events, Pollee, Poller};
 use crate::prelude::*;
 
@@ -35,11 +36,16 @@ struct EndPoint<T> {
     ringbuf: Mutex<T>,
     pollee: Pollee,
     is_shutdown: AtomicBool,
+    flags: Atomic<StatusFlags>,
 }
 
 impl Channel {
     pub fn with_capacity(capacity: usize) -> Result<Self> {
-        let common = Arc::new(Common::with_capacity(capacity)?);
+        Self::with_capacity_and_flags(capacity, StatusFlags::empty())
+    }
+
+    pub fn with_capacity_and_flags(capacity: usize, flags: StatusFlags) -> Result<Self> {
+        let common = Arc::new(Common::with_capacity_and_flags(capacity, flags)?);
         let producer = Producer {
             common: common.clone(),
         };
@@ -62,7 +68,9 @@ impl Channel {
 }
 
 impl Common {
-    pub fn with_capacity(capacity: usize) -> Result<Self> {
+    pub fn with_capacity_and_flags(capacity: usize, flags: StatusFlags) -> Result<Self> {
+        check_status_flags(flags)?;
+        
         if capacity == 0 {
             return_errno!(EINVAL, "capacity cannot be zero");
         }
@@ -70,8 +78,8 @@ impl Common {
         let rb: RingBuffer<u8> = RingBuffer::new(capacity);
         let (rb_producer, rb_consumer) = rb.split();
 
-        let producer = EndPoint::new(rb_producer, Events::OUT);
-        let consumer = EndPoint::new(rb_consumer, Events::empty());
+        let producer = EndPoint::new(rb_producer, Events::OUT, flags);
+        let consumer = EndPoint::new(rb_consumer, Events::empty(), flags);
 
         let event_lock = Mutex::new(());
 
@@ -88,11 +96,12 @@ impl Common {
 }
 
 impl<T> EndPoint<T> {
-    pub fn new(ringbuf: T, init_events: Events) -> Self {
+    pub fn new(ringbuf: T, init_events: Events, flags: StatusFlags) -> Self {
         Self {
             ringbuf: Mutex::new(ringbuf),
             pollee: Pollee::new(init_events),
             is_shutdown: AtomicBool::new(false),
+            flags: Atomic::new(flags),
         }
     }
 
@@ -184,6 +193,20 @@ impl PollableFile for Producer {
     fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
         self.this_end().pollee().poll_by(mask, poller)
     }
+
+    fn access_mode(&self) -> Result<AccessMode> {
+        Ok(AccessMode::O_WRONLY)
+    }
+
+    fn status_flags(&self) -> Result<StatusFlags> {
+        Ok(self.this_end().flags.load(Ordering::Relaxed))
+    }
+
+    fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
+        check_status_flags(new_status)?;
+        self.this_end().flags.store(new_status, Ordering::Relaxed);
+        Ok(())
+    }
 }
 
 impl Drop for Producer {
@@ -254,6 +277,20 @@ impl PollableFile for Consumer {
 
     fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
         self.this_end().pollee().poll_by(mask, poller)
+    }
+
+    fn access_mode(&self) -> Result<AccessMode> {
+        Ok(AccessMode::O_RDONLY)
+    }
+
+    fn status_flags(&self) -> Result<StatusFlags> {
+        Ok(self.this_end().flags.load(Ordering::Relaxed))
+    }
+
+    fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
+        check_status_flags(new_status)?;
+        self.this_end().flags.store(new_status, Ordering::Relaxed);
+        Ok(())
     }
 }
 
@@ -369,4 +406,15 @@ mod tests {
         assert!(producer.poll_by(mask, None) == Events::empty());
         assert!(consumer.poll_by(mask, None) == Events::IN);
     }
+}
+
+fn check_status_flags(flags: StatusFlags) -> Result<()> {
+    let VALID_FLAGS : StatusFlags = StatusFlags::O_NONBLOCK | StatusFlags::O_DIRECT;
+    if !VALID_FLAGS.contains(flags) {
+        return_errno!(EINVAL, "invalid flags");
+    }
+    if flags.contains(StatusFlags::O_DIRECT) {
+        return_errno!(EINVAL, "O_DIRECT is not supported");
+    }
+    Ok(())
 }

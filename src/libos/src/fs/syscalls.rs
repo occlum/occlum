@@ -257,15 +257,20 @@ pub async fn do_sync() -> Result<isize> {
     Ok(0)
 }
 
-/*
-pub fn do_pipe(fds_u: *mut i32) -> Result<isize> {
-    todo!()
+pub async fn do_pipe(fds_u: *mut i32) -> Result<isize> {
+    do_pipe2(fds_u, 0).await
 }
 
-pub fn do_pipe2(fds_u: *mut i32, flags: u32) -> Result<isize> {
-    todo!()
+pub async fn do_pipe2(fds_u: *mut i32, flags: u32) -> Result<isize> {
+    from_user::check_mut_array(fds_u, 2)?;
+    // TODO: how to deal with open flags???
+    let fds = super::pipe::do_pipe2(flags as u32)?;
+    unsafe {
+        *fds_u.offset(0) = fds[0] as c_int;
+        *fds_u.offset(1) = fds[1] as c_int;
+    }
+    Ok(0)
 }
-*/
 
 pub async fn do_dup(old_fd: FileDesc) -> Result<isize> {
     let new_fd = file_ops::do_dup(old_fd)?;

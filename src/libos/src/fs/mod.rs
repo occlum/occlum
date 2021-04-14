@@ -40,6 +40,7 @@ mod fs_view;
 mod host_fd;
 mod hostfs;
 mod inode_file;
+mod pipe;
 //mod procfs;
 mod rootfs;
 mod sefs;
