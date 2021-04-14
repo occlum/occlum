@@ -479,3 +479,33 @@ jobs:
       run: |
         sleep ${{ env.nap_time }};
         docker exec enclave_ra_tls_test bash -c "/opt/enclave-tls/bin/enclave-tls-client"
+
+  vault_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
+
+    - name: Create container
+      run: docker run -itd --name=vault_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+
+    - name: Build dependencies
+      run: docker exec vault_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec vault_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+
+    - name: Download and build HashiCorp Vault
+      run: docker exec vault_test bash -c "cd /root/occlum/demos/golang/vault && ./prepare_vault.sh"
+
+    - name: Run the Vault server on Occlum
+      run: docker exec vault_test bash -c "cd /root/occlum/demos/golang/vault && SGX_MODE=SIM ./run_occlum_vault_server.sh"
+
+    - name: Run the Vault client
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec vault_test bash -c "cd /root/occlum/demos/golang/vault && ./run_occlum_vault_test.sh"
