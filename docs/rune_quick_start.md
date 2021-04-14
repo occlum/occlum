@@ -9,19 +9,19 @@ This user guide provides the steps to run Occlum with OCI Runtime `rune`.
 # Requirements
 
 - Ensure that you have one of the following required operating systems to build an Occlum container image:
-  - CentOS 8.1
+  - CentOS 8.2
   - Ubuntu 18.04-server
 
-- Please follow [Intel SGX Installation Guide](https://download.01.org/intel-sgx/sgx-linux/2.11/docs/Intel_SGX_Installation_Guide_Linux_2.11_Open_Source.pdf) to install Intel SGX driver, Intel SGX SDK & PSW for Linux.
-  - For CentOS 8.1, UAE service libraries are needed but may not be installed if SGX PSW installer is used. Please manually install it:
+- Please follow [Intel SGX Installation Guide](https://download.01.org/intel-sgx/sgx-linux/2.13/docs/Intel_SGX_Installation_Guide_Linux_2.13_Open_Source.pdf) to install Intel SGX driver, Intel SGX SDK & PSW for Linux.
+  - For CentOS 8.2, UAE service libraries are needed but may not be installed if SGX PSW installer is used. Please manually install it:
     ```shell
-    rpm -i libsgx-uae-service-2.11.100.2-1.el8.x86_64.rpm
+    yum install libsgx-uae-service
     ```
 
 - Install [enable_rdfsbase kernel module](https://github.com/occlum/enable_rdfsbase#how-to-build), allowing to use FSGSBASE instructions in Occlum. Please skip this step when using kernel 5.9. Note that you are not able to run Occlum with kernel disabled FSGSBASE feature even you have installed this module.
 
 - Install rune and occlum.
-  - For CentOS 8.1:
+  - For CentOS 8.2:
     1. Add the repository to your sources.
     ```shell
     cat >/etc/yum.repos.d/inclavare-containers.repo <<EOF
@@ -83,7 +83,7 @@ Type the following commands to create a `Dockerfile`:
 
 ```Dockerfile
 cat >Dockerfile <<EOF
-FROM centos:8.1.1911
+FROM centos:8.2.2004
 
 RUN mkdir -p /run/rune
 WORKDIR /run/rune
