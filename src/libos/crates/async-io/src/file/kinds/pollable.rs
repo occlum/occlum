@@ -91,9 +91,11 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
     }
 
     pub async fn read(&self, buf: &mut [u8]) -> Result<usize> {
+        let is_nonblocking = self.is_nonblocking();
+
         // Fast path
         let res = self.file.read(buf);
-        if is_ok_or_not_egain(&res) {
+        if Self::should_io_return(&res, is_nonblocking) {
             return res;
         }
 
@@ -104,7 +106,7 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
             let events = self.poll_by(mask, Some(&mut poller));
             if events.contains(Events::IN) {
                 let res = self.file.read(buf);
-                if is_ok_or_not_egain(&res) {
+                if Self::should_io_return(&res, is_nonblocking) {
                     return res;
                 }
             }
@@ -113,9 +115,11 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
     }
 
     pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
+        let is_nonblocking = self.is_nonblocking();
+
         // Fast path
         let res = self.file.readv(bufs);
-        if is_ok_or_not_egain(&res) {
+        if Self::should_io_return(&res, is_nonblocking) {
             return res;
         }
 
@@ -126,7 +130,7 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
             let events = self.poll_by(mask, Some(&mut poller));
             if events.contains(Events::IN) {
                 let res = self.file.readv(bufs);
-                if is_ok_or_not_egain(&res) {
+                if Self::should_io_return(&res, is_nonblocking) {
                     return res;
                 }
             }
@@ -135,9 +139,11 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
     }
 
     pub async fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+        let is_nonblocking = self.is_nonblocking();
+
         // Fast path
         let res = self.file.read_at(offset, buf);
-        if is_ok_or_not_egain(&res) {
+        if Self::should_io_return(&res, is_nonblocking) {
             return res;
         }
 
@@ -148,7 +154,7 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
             let events = self.poll_by(mask, Some(&mut poller));
             if events.contains(Events::IN) {
                 let res = self.file.read_at(offset, buf);
-                if is_ok_or_not_egain(&res) {
+                if Self::should_io_return(&res, is_nonblocking) {
                     return res;
                 }
             }
@@ -157,9 +163,11 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
     }
 
     pub async fn write(&self, buf: &[u8]) -> Result<usize> {
+        let is_nonblocking = self.is_nonblocking();
+
         // Fast path
         let res = self.file.write(buf);
-        if is_ok_or_not_egain(&res) {
+        if Self::should_io_return(&res, is_nonblocking) {
             return res;
         }
 
@@ -170,7 +178,7 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
             let events = self.poll_by(mask, Some(&mut poller));
             if events.contains(Events::OUT) {
                 let res = self.file.write(buf);
-                if is_ok_or_not_egain(&res) {
+                if Self::should_io_return(&res, is_nonblocking) {
                     return res;
                 }
             }
@@ -179,9 +187,11 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
     }
 
     pub async fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
+        let is_nonblocking = self.is_nonblocking();
+
         // Fast path
         let res = self.file.writev(bufs);
-        if is_ok_or_not_egain(&res) {
+        if Self::should_io_return(&res, is_nonblocking) {
             return res;
         }
 
@@ -192,7 +202,7 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
             let events = self.poll_by(mask, Some(&mut poller));
             if events.contains(Events::OUT) {
                 let res = self.file.writev(bufs);
-                if is_ok_or_not_egain(&res) {
+                if Self::should_io_return(&res, is_nonblocking) {
                     return res;
                 }
             }
@@ -201,9 +211,11 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
     }
 
     pub async fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+        let is_nonblocking = self.is_nonblocking();
+
         // Fast path
         let res = self.file.write_at(offset, buf);
-        if is_ok_or_not_egain(&res) {
+        if Self::should_io_return(&res, is_nonblocking) {
             return res;
         }
 
@@ -214,7 +226,7 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
             let events = self.poll_by(mask, Some(&mut poller));
             if events.contains(Events::OUT) {
                 let res = self.file.write_at(offset, buf);
-                if is_ok_or_not_egain(&res) {
+                if Self::should_io_return(&res, is_nonblocking) {
                     return res;
                 }
             }
@@ -233,10 +245,6 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
     pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
         self.file.poll_by(mask, poller)
     }
-
-    // TODO: add more APIs
-    // * readv, read_at
-    // * writev, write_at
 
     pub fn access_mode(&self) -> Result<AccessMode> {
         self.file.access_mode()
@@ -261,12 +269,24 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
     pub fn unwrap(self) -> T {
         self.file
     }
-}
 
-fn is_ok_or_not_egain<T>(res: &Result<T>) -> bool {
-    match res {
-        Ok(_) => true,
-        Err(e) => e.errno() != EAGAIN,
+    fn is_nonblocking(&self) -> bool {
+        if let Ok(flags) = self.status_flags() {
+            flags.contains(StatusFlags::O_NONBLOCK)
+        } else {
+            false
+        }
+    }
+
+    fn should_io_return(res: &Result<usize>, is_nonblocking: bool) -> bool {
+        is_nonblocking || Self::is_ok_or_not_egain(res)
+    }
+
+    fn is_ok_or_not_egain(res: &Result<usize>) -> bool {
+        match res {
+            Ok(_) => true,
+            Err(e) => e.errno() != EAGAIN,
+        }
     }
 }
 
