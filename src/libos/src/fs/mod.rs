@@ -20,6 +20,7 @@ pub use self::file_ops::{
     IfConf, IoctlCmd, Stat, StatusFlags, StructuredIoctlArgType, StructuredIoctlNum,
 };
 pub use self::file_table::{FileDesc, FileTable, FileTableEvent, FileTableNotifier};
+pub use self::fs_ops::Statfs;
 pub use self::fs_view::FsView;
 pub use self::host_fd::HostFd;
 pub use self::inode_file::{AsINodeFile, INodeExt, INodeFile};

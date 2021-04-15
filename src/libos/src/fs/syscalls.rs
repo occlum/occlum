@@ -553,3 +553,24 @@ pub fn do_fallocate(fd: FileDesc, mode: u32, offset: off_t, len: off_t) -> Resul
     file_ops::do_fallocate(fd, mode, offset as u64, len as u64)?;
     Ok(0)
 }
+
+pub fn do_fstatfs(fd: FileDesc, statfs_buf: *mut Statfs) -> Result<isize> {
+    from_user::check_mut_ptr(statfs_buf)?;
+
+    let statfs = fs_ops::do_fstatfs(fd)?;
+    unsafe {
+        statfs_buf.write(statfs);
+    }
+    Ok(0)
+}
+
+pub fn do_statfs(path: *const i8, statfs_buf: *mut Statfs) -> Result<isize> {
+    let path = from_user::clone_cstring_safely(path)?
+        .to_string_lossy()
+        .into_owned();
+    let statfs = fs_ops::do_statfs(&path)?;
+    unsafe {
+        statfs_buf.write(statfs);
+    }
+    Ok(0)
+}

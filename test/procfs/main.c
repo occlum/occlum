@@ -1,4 +1,5 @@
 #include <sys/types.h>
+#include <sys/vfs.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -142,6 +143,22 @@ static int test_read_from_proc_cpuinfo() {
     return 0;
 }
 
+#define PROC_SUPER_MAGIC 0x9fa0
+static int test_statfs() {
+    const char *file_path = "/proc/cpuinfo";
+    struct statfs statfs_buf;
+    int ret;
+
+    ret = statfs(file_path, &statfs_buf);
+    if (ret < 0) {
+        THROW_ERROR("failed to statfs the file");
+    }
+    if (statfs_buf.f_type != PROC_SUPER_MAGIC) {
+        THROW_ERROR("failed to check the f_type");
+    }
+    return 0;
+}
+
 // ============================================================================
 // Test suite main
 // ============================================================================
@@ -154,6 +171,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_read_from_proc_self_cmdline),
     TEST_CASE(test_read_from_proc_meminfo),
     TEST_CASE(test_read_from_proc_cpuinfo),
+    TEST_CASE(test_statfs),
 };
 
 int main(int argc, const char *argv[]) {

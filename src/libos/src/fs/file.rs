@@ -95,6 +95,10 @@ pub trait File: Debug + Sync + Send + Any {
         return_op_unsupported_error!("fallocate")
     }
 
+    fn fs(&self) -> Result<Arc<dyn FileSystem>> {
+        return_op_unsupported_error!("fs")
+    }
+
     // TODO: remove this function after all users of this code are removed
     fn poll(&self) -> Result<(crate::net::PollEventFlags)> {
         return_op_unsupported_error!("poll")
