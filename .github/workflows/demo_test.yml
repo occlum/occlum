@@ -450,3 +450,32 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec flink_test bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_on_occlum_glibc.sh task"
 
+  enclave_ra_tls_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
+
+    - name: Create container
+      run: docker run -itd --name=enclave_ra_tls_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+
+    - name: Build dependencies
+      run: docker exec enclave_ra_tls_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec enclave_ra_tls_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+
+    - name: Download and build Enclave TLS
+      run: docker exec enclave_ra_tls_test bash -c "cd /root/occlum/demos/enclave_tls && ./download_and_build_enclave_tls.sh"
+
+    - name: Run the encalve tls server on Occlum
+      run: docker exec enclave_ra_tls_test bash -c "cd /root/occlum/demos/enclave_tls && SGX_MODE=SIM ./run_enclave_tls_server_in_occlum.sh"
+
+    - name: Run the encalve tls client
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec enclave_ra_tls_test bash -c "/opt/enclave-tls/bin/enclave-tls-client"

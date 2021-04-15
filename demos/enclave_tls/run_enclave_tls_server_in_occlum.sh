@@ -17,4 +17,4 @@ cp /usr/lib/x86_64-linux-gnu/libsgx_dcap_quoteverify.so.1 image/opt/occlum/glibc
 occlum build
 
 # 3. Run enclave_tls_server
-occlum run /bin/enclave-tls-server
+occlum run /bin/enclave-tls-server &
