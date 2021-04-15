@@ -36,7 +36,8 @@ impl FileSystem for HostFS {
     }
 
     fn info(&self) -> FsInfo {
-        unimplemented!()
+        warn!("HostFS: FsInfo is unimplemented");
+        Default::default()
     }
 }
 

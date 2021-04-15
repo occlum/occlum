@@ -16,6 +16,9 @@ mod pid_inode;
 mod proc_inode;
 mod self_inode;
 
+// Same with the procfs on Linux
+const PROC_SUPER_MAGIC: usize = 0x9fa0;
+
 /// Proc file system
 pub struct ProcFS {
     root: Arc<Dir<LockedProcRootINode>>,
@@ -33,14 +36,15 @@ impl FileSystem for ProcFS {
 
     fn info(&self) -> vfs::FsInfo {
         vfs::FsInfo {
-            bsize: 0,
-            frsize: 0,
+            magic: PROC_SUPER_MAGIC,
+            bsize: 4096,
+            frsize: 4096,
             blocks: 0,
             bfree: 0,
             bavail: 0,
             files: 0,
             ffree: 0,
-            namemax: 0,
+            namemax: 255,
         }
     }
 }

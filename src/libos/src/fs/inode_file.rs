@@ -221,6 +221,10 @@ impl File for INodeFile {
         }
     }
 
+    fn fs(&self) -> Result<Arc<dyn FileSystem>> {
+        Ok(self.inode.fs())
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
