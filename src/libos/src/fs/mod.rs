@@ -22,6 +22,7 @@ pub use async_io::poll::Events;
     occlum_ocall_ioctl, AccessMode, BuiltinIoctlNum, CreationFlags, FileMode, Flock, FlockType,
     IfConf, IoctlCmd, Stat, StatusFlags, StructuredIoctlArgType, StructuredIoctlNum,
 };*/
+pub use self::event_file::{EventFile, EventFileFlags};
 pub use self::file_table::{FileDesc, FileTable};
 pub use self::fs_view::FsView;
 pub use self::host_fd::HostFd;
@@ -30,6 +31,7 @@ pub use self::rootfs::ROOT_INODE;
 pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
 pub use self::syscalls::*;
 
+mod event_file;
 //mod dev_fs;
 // TODO: remove the file
 //mod file;

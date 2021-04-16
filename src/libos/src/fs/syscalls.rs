@@ -13,15 +13,17 @@ pub struct iovec_t {
     base: *const c_void,
     len: size_t,
 }
-/*
+
 pub async fn do_eventfd(init_val: u32) -> Result<isize> {
-    todo!()
+    do_eventfd2(init_val, 0).await
 }
 
 pub async fn do_eventfd2(init_val: u32, flags: i32) -> Result<isize> {
-    todo!()
+    let flags = EventFileFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
+    let fd = super::event_file::do_eventfd(init_val, flags)?;
+    Ok(fd as isize)
 }
-*/
+
 pub async fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize> {
     self::do_openat(AT_FDCWD, path, flags, mode).await
 }

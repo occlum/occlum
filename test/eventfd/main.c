@@ -247,13 +247,15 @@ int test_epoll_with_socket() {
 // ============================================================================
 
 static test_case_t test_cases[] = {
-    TEST_CASE(test_fcntl_get_flags),
-    TEST_CASE(test_fcntl_set_flags),
-    TEST_CASE(test_create_with_flags),
+    // TODO: enable the tests after adding fcntl
+    //TEST_CASE(test_fcntl_get_flags),
+    //TEST_CASE(test_fcntl_set_flags),
+    //TEST_CASE(test_create_with_flags),
     TEST_CASE(test_read_write),
-    TEST_CASE(test_epoll_with_socket),
-    TEST_CASE(test_poll_with_socket),
-    TEST_CASE(test_select_with_socket),
+    // TODO: enable the tests after adding select/poll/epoll
+    //TEST_CASE(test_epoll_with_socket),
+    //TEST_CASE(test_poll_with_socket),
+    //TEST_CASE(test_select_with_socket),
 };
 
 int main(int argc, const char *argv[]) {

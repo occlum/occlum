@@ -8,13 +8,13 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::ptr;
 
 use crate::fs::{
-    do_access, do_chdir, do_chmod, do_chown, do_close, do_dup, do_dup2, do_dup3, do_faccessat,
-    do_fchmod, do_fchmodat, do_fchown, do_fchownat, do_fdatasync, do_fstat, do_fstatat, do_fsync,
-    do_ftruncate, do_getcwd, do_lchown, do_link, do_linkat, do_lseek, do_lstat, do_mkdir,
-    do_mkdirat, do_open, do_openat, do_pipe, do_pipe2, do_pread, do_pwrite, do_read, do_readlink,
-    do_readlinkat, do_readv, do_rename, do_renameat, do_rmdir, do_stat, do_symlink, do_symlinkat,
-    do_sync, do_truncate, do_unlink, do_unlinkat, do_write, do_writev, iovec_t, FileDesc, FileRef,
-    StatBuf,
+    do_access, do_chdir, do_chmod, do_chown, do_close, do_dup, do_dup2, do_dup3, do_eventfd,
+    do_eventfd2, do_faccessat, do_fchmod, do_fchmodat, do_fchown, do_fchownat, do_fdatasync,
+    do_fstat, do_fstatat, do_fsync, do_ftruncate, do_getcwd, do_lchown, do_link, do_linkat,
+    do_lseek, do_lstat, do_mkdir, do_mkdirat, do_open, do_openat, do_pipe, do_pipe2, do_pread,
+    do_pwrite, do_read, do_readlink, do_readlinkat, do_readv, do_rename, do_renameat, do_rmdir,
+    do_stat, do_symlink, do_symlinkat, do_sync, do_truncate, do_unlink, do_unlinkat, do_write,
+    do_writev, iovec_t, FileDesc, FileRef, StatBuf,
 };
 /*
 use crate::fs::{
@@ -215,6 +215,9 @@ macro_rules! process_syscall_table_with_callback {
 
             (Pipe = 22) => do_pipe(fds_u: *mut i32),
             (Pipe2 = 293) => do_pipe2(fds_u: *mut i32, flags: u32),
+
+            (Eventfd = 284) => do_eventfd(init_val: u32),
+            (Eventfd2 = 290) => do_eventfd2(init_val: u32, flags: i32),
 
             /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),
