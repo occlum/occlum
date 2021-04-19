@@ -509,3 +509,36 @@ jobs:
       run: |
         sleep ${{ env.nap_time }};
         docker exec vault_test bash -c "cd /root/occlum/demos/golang/vault && ./run_occlum_vault_test.sh"
+  
+  sofaboot_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
+
+    - name: Create container
+      run: docker run -itd --name=sofaboot_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+
+    - name: Install Maven
+      run: docker exec sofaboot_test bash -c "apt update && apt install -y maven"
+
+    - name: Build dependencies
+      run: docker exec sofaboot_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec sofaboot_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+
+    - name: Download and compile sofaboot web demos
+      run: docker exec sofaboot_test bash -c "cd /root/occlum/demos/sofaboot && ./download_compile_sofaboot.sh"
+
+    - name: Run SOFABoot web demo
+      run: docker exec sofaboot_test bash -c "cd /root/occlum/demos/sofaboot && SGX_MODE=SIM ./run_sofaboot_on_occlum.sh"
+
+    - name: Check SOFABoot result
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec sofaboot_test bash -c "curl http://localhost:8080/actuator/versions"
