@@ -15,3 +15,11 @@ libc = { version = "0.2", optional = true }
 sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }
 sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", optional = true, features = ["backtrace"] }
 sgx_libc = { path = "../../../../deps/rust-sgx-sdk/sgx_libc", optional = true }
+
+[dev-dependencies]
+criterion = "0.3"
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+
+[[bench]]
+name = "bench"
+harness = false

@@ -1,4 +1,4 @@
-include!("common.in");
+include!("common/example.rs");
 
 fn main() {
     example();

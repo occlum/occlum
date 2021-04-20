@@ -28,11 +28,13 @@ extern crate sgx_tstd as std;
 extern crate sgx_libc as libc;
 
 extern crate vdso_time;
+extern crate lazy_static;
 
 use sgx_types::*;
 use std::prelude::v1::*;
 
-include!("../../../common.in");
+include!("../../../common/example.rs");
+include!("../../../common/bench.rs");
 
 #[no_mangle]
 pub extern "C" fn run_sgx_example() -> sgx_status_t {
@@ -40,6 +42,8 @@ pub extern "C" fn run_sgx_example() -> sgx_status_t {
     println!("[ECALL] run_sgx_example");
 
     example();
+
+    vdso_benchmarks();
 
     sgx_status_t::SGX_SUCCESS
 }

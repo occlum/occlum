@@ -11,6 +11,7 @@ default = []
 
 [dependencies]
 vdso-time = { path = "../../../../vdso-time", default-features = false, features = ["sgx"] }
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
 sgx_types = { path = "../../../../../../../deps/rust-sgx-sdk/sgx_types" }
