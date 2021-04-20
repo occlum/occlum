@@ -17,13 +17,15 @@ This set of demos shows how real-world apps can be easily run inside SGX enclave
 * [fish](fish/): A demo of [FISH](https://fishshell.com) shell script.
 * [flink](flink/): A demo of [Apache Flink](https://flink.apache.org).
 * [font](font/font_support_for_java): A demo of supporting font with Java.
-* [https_server](https_server/): A HTTPS file server based on [Mongoose Embedded Web Server Library](https://github.com/cesanta/mongoose).
 * [grpc](grpc/): A client and server communicating through [gRPC](https://grpc.io).
+* [https_server](https_server/): A HTTPS file server based on [Mongoose Embedded Web Server Library](https://github.com/cesanta/mongoose).
 * [openvino](openvino/) A benchmark of [OpenVINO Inference Engine](https://docs.openvinotoolkit.org/2019_R3/_docs_IE_DG_inference_engine_intro.html).
 * [pytorch](pytorch/): A demo of [PyTorch](https://pytorch.org/).
-* [redis](redis/): A demo of [redis](https://redis.io).
+* [redis](redis/): A demo of [Redis](https://redis.io).
+* [sofaboot](sofaboot/): A demo of [SOFABoot](https://github.com/sofastack/sofa-boot), an open source Java development framework based on Spring Boot.
 * [sqlite](sqlite/) A demo of [SQLite](https://www.sqlite.org) SQL database engine.
 * [tensorflow_lite](tensorflow_lite/): A demo and benchmark of [Tensorflow Lite](https://www.tensorflow.org/lite) inference engine.
+* [vault](golang/vault/): A demo of [HashiCorp Vault](https://github.com/hashicorp/vault).
 * [xgboost](xgboost/): A demo of [XGBoost](https://xgboost.readthedocs.io/en/latest).
 
 ## Programming language demos
@@ -38,6 +40,7 @@ This set of demos shows how apps written with popular programming languages can 
 ## Other demos
 
 * [embedded_mode](embedded_mode/): A cross-enclave memory throughput benchmark enabled by the embedded mode of Occlum.
+* [enclave_tls](enclave_tls/): Running TLS server inside Occlum. Client connects with server associate with Enclave-RA information.  
 * [gdb_support](gdb_support/): This demo explains the technical detail of GDB support and demonstrates how to debug an app running upon Occlum with GDB.
 * [local_attestation](local_attestation/): This project demonstrates how an app running upon Occlum can perform SGX local attestation.
 * [remote_attestation](remote_attestation/): This project demonstrates how an app running upon Occlum can perform SGX remote attestation.
