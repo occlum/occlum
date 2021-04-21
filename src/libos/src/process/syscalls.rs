@@ -517,3 +517,21 @@ pub async fn do_execve(
 
     do_exec(&path, &argv, &envp, &current).await
 }
+// Occlum is a single user enviroment, so only group 0 is supported
+pub async fn do_getgroups(size: isize, buf_ptr: *mut u32) -> Result<isize> {
+    if size < 0 {
+        return_errno!(EINVAL, "buffer size is incorrect");
+    } else if size == 0 {
+        //Occlum only has 1 group
+        Ok(1)
+    } else {
+        let size = size as usize;
+        check_array(buf_ptr, size)?;
+
+        let group_list = unsafe { std::slice::from_raw_parts_mut(buf_ptr, size) };
+        group_list[0] = 0;
+
+        //Occlum only has 1 group
+        Ok(1)
+    }
+}

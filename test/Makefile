@@ -23,7 +23,7 @@ TEST_DEPS := client data_sink naughty_child
 # 	server server_epoll unix_socket cout hostfs cpuid rdtsc device sleep exit_group \
 # 	ioctl fcntl eventfd emulate_syscall access signal sysinfo prctl rename procfs
 TESTS ?= access chmod chown cpuid empty emulate_syscall pipe eventfd exit_group file \
-	getpid hello_world link malloc mkdir mmap pthread rdtsc rename rlimit server \
+	getpid hello_world link malloc mkdir mmap pthread system_info rdtsc rename rlimit server \
 	server_epoll signal sleep spawn stat symlink time tls truncate unix_socket wait \
 	fcntl spawn_attribute device ioctl readdir statfs random umask procfs flock resolv_conf \
 	exec pgrp vfork

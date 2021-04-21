@@ -51,10 +51,10 @@ use crate::poll::syscalls::{
 use crate::prelude::*;
 use crate::process::{
     do_arch_prctl, do_clone, do_execve, do_exit, do_exit_group, do_futex, do_get_robust_list,
-    do_getegid, do_geteuid, do_getgid, do_getpgid, do_getpgrp, do_getpid, do_getppid, do_gettid,
-    do_getuid, do_prctl, do_set_robust_list, do_set_tid_address, do_setpgid, do_spawn_for_glibc,
-    do_spawn_for_musl, do_vfork, do_wait4, pid_t, posix_spawnattr_t, FdOp, RobustListHead,
-    SpawnFileActions, ThreadRef, ThreadStatus,
+    do_getegid, do_geteuid, do_getgid, do_getgroups, do_getpgid, do_getpgrp, do_getpid, do_getppid,
+    do_gettid, do_getuid, do_prctl, do_set_robust_list, do_set_tid_address, do_setpgid,
+    do_spawn_for_glibc, do_spawn_for_musl, do_vfork, do_wait4, pid_t, posix_spawnattr_t, FdOp,
+    RobustListHead, SpawnFileActions, ThreadRef, ThreadStatus,
 };
 use crate::sched::{do_getcpu, do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
 use crate::signal::{
@@ -291,7 +291,7 @@ macro_rules! process_syscall_table_with_callback {
             (EpollCtl = 233) => do_epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *const libc::epoll_event),
             (EpollPwait = 281) => do_epoll_pwait(epfd: c_int, events: *mut libc::epoll_event, maxevents: c_int, timeout: c_int, sigmask: *const usize),
             (Sendmmsg = 307) => do_sendmmsg(fd: c_int, msg_ptr: *mut mmsghdr, vlen: c_uint, flags_c: c_int),
-
+            (Getgroups = 115) => do_getgroups(size: isize, buf_ptr: *mut u32),
             /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),
             (Write = 1) => do_write(fd: FileDesc, buf: *const u8, size: usize),
@@ -408,7 +408,7 @@ macro_rules! process_syscall_table_with_callback {
             (Setsid = 112) => handle_unsupported(),
             (Setreuid = 113) => handle_unsupported(),
             (Setregid = 114) => handle_unsupported(),
-            (Getgroups = 115) => handle_unsupported(),
+            (Getgroups = 115) => do_getgroups(size: isize, buf_ptr: *mut u32),
             (Setgroups = 116) => handle_unsupported(),
             (Setresuid = 117) => handle_unsupported(),
             (Getresuid = 118) => handle_unsupported(),
