@@ -1,10 +1,15 @@
 enclave {
+    include "time.h"
+
     untrusted {
-        int ocall_get_vdso_info(
+        int vdso_ocall_get_vdso_info(
             [out] unsigned long* vdso_addr, 
+            [out] long* hres_resolution, 
             [out] long* coarse_resolution, 
             [out, size = release_len] char* release,
-            int release_len
+            int release_len,
+            [out, count = tss_len] struct timespec* tss,
+            int tss_len
         );
     };
 };

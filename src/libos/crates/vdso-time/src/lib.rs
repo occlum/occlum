@@ -16,19 +16,35 @@ pub use libc::{
     clockid_t, time_t, timespec, timeval, CLOCK_BOOTTIME, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE,
     CLOCK_MONOTONIC_RAW, CLOCK_REALTIME, CLOCK_REALTIME_COARSE,
 };
+use std::str;
 use std::sync::atomic::{self, Ordering};
 pub use sys::timezone;
 use sys::*;
 
 pub struct Vdso {
     vdso_data_ptr: VdsoDataPtr,
+    // hres resolution for clock_getres
+    hres_resolution: Option<i64>,
+    // coarse resolution for clock_getres
     coarse_resolution: Option<i64>,
+    // If support_clocks[clockid] is true, indicate that the corresponding clockid is supported
+    support_clocks: [bool; VDSO_BASES],
 }
 
 impl Vdso {
     pub fn new() -> Result<Self, ()> {
+        let mut support_clocks = [false; VDSO_BASES];
+        let clockids = [
+            CLOCK_REALTIME,
+            CLOCK_MONOTONIC,
+            CLOCK_MONOTONIC_RAW,
+            CLOCK_REALTIME_COARSE,
+            CLOCK_MONOTONIC_COARSE,
+            CLOCK_BOOTTIME,
+        ];
+
         #[cfg(not(feature = "sgx"))]
-        let (vdso_addr, coarse_resolution, release) = {
+        let (vdso_addr, hres_resolution, coarse_resolution, tss, release) = {
             const AT_SYSINFO_EHDR: u64 = 33;
             let vdso_addr = unsafe { libc::getauxval(AT_SYSINFO_EHDR) };
 
@@ -36,6 +52,8 @@ impl Vdso {
                 tv_sec: 0,
                 tv_nsec: 0,
             };
+            let ret = unsafe { libc::clock_getres(CLOCK_REALTIME, &mut tp as *mut _) };
+            let hres_resolution = if ret == 0 { Some(tp.tv_nsec) } else { None };
             let ret = unsafe { libc::clock_getres(CLOCK_REALTIME_COARSE, &mut tp as *mut _) };
             let coarse_resolution = if ret == 0 { Some(tp.tv_nsec) } else { None };
 
@@ -45,92 +63,152 @@ impl Vdso {
                 return Err(());
             }
 
-            (vdso_addr, coarse_resolution, utsname.release)
+            let mut tss = [timespec {
+                tv_sec: 0,
+                tv_nsec: 0,
+            }; VDSO_BASES as usize];
+            for &clockid in &clockids {
+                unsafe {
+                    if libc::clock_gettime(clockid, &mut tss[clockid as usize] as *mut _) != 0 {
+                        tss[clockid as usize].tv_sec = 0;
+                        tss[clockid as usize].tv_nsec = 0;
+                    }
+                }
+            }
+
+            (
+                vdso_addr,
+                hres_resolution,
+                coarse_resolution,
+                tss,
+                utsname.release,
+            )
         };
 
         #[cfg(feature = "sgx")]
-        let (vdso_addr, coarse_resolution, release) = {
+        let (vdso_addr, hres_resolution, coarse_resolution, tss, release) = {
             extern "C" {
-                fn ocall_get_vdso_info(
+                fn vdso_ocall_get_vdso_info(
                     ret: *mut libc::c_int,
                     vdso_addr: *mut libc::c_ulong,
+                    hres_resolution: *mut libc::c_long,
                     coarse_resolution: *mut libc::c_long,
                     release: *mut libc::c_char,
                     release_len: libc::c_int,
+                    tss: *mut timespec,
+                    tss_len: libc::c_int,
                 ) -> sgx_types::sgx_status_t;
             }
 
             let mut vdso_addr: libc::c_ulong = 0;
+            let mut hres_resolution: libc::c_long = 0;
             let mut coarse_resolution: libc::c_long = 0;
-            let mut release: [libc::c_char; 65] = [0; 65];
+            let mut release = [0 as libc::c_char; 65];
+            let mut tss = [timespec {
+                tv_sec: 0,
+                tv_nsec: 0,
+            }; VDSO_BASES as usize];
             let mut ret: libc::c_int = 0;
             unsafe {
-                ocall_get_vdso_info(
+                vdso_ocall_get_vdso_info(
                     &mut ret as *mut _,
                     &mut vdso_addr as *mut _,
+                    &mut hres_resolution as *mut _,
                     &mut coarse_resolution as *mut _,
                     release.as_mut_ptr(),
                     release.len() as _,
+                    tss.as_mut_ptr(),
+                    tss.len() as _,
                 );
             }
             if ret != 0 {
                 return Err(());
             }
 
+            let hres_resolution = if hres_resolution != 0 {
+                Some(hres_resolution)
+            } else {
+                None
+            };
             let coarse_resolution = if coarse_resolution != 0 {
                 Some(coarse_resolution)
             } else {
                 None
             };
 
-            (vdso_addr, coarse_resolution, release)
-        };
-
-        // release, e.g., "5.9.6-050906-generic"
-        // Then, kernel_version should be (5, 9)
-        // if release is "5.10.1-...", kernel_version should be (5, 10)
-        let kernel_version = if release[0] as u8 >= ('0' as u8)
-            && release[0] as u8 <= ('9' as u8)
-            && release[1] as u8 == ('.' as u8)
-            && release[2] as u8 >= ('0' as u8)
-            && release[2] as u8 <= ('9' as u8)
-        {
-            let big = release[0] as u8 - ('0' as u8);
-            let little = release[2] as u8 - ('0' as u8);
-            if release[3] as u8 == ('.' as u8) {
-                (big, little)
-            } else if release[3] as u8 >= ('0' as u8) && release[3] as u8 <= ('9' as u8) {
-                let little = little * 10 + release[3] as u8 - ('0' as u8);
-                (big, little)
-            } else {
-                return Err(());
-            }
-        } else {
-            return Err(());
+            (vdso_addr, hres_resolution, coarse_resolution, tss, release)
         };
 
         if vdso_addr == 0 {
             return Err(());
         }
-        let vdso_data_ptr = match kernel_version {
-            (5, 9) => {
-                let vdso_data_addr = vdso_addr - 4 * PAGE_SIZE + 128;
-                VdsoDataPtr::V5_9(vdso_data_addr as *const vdso_data_v5_9)
-            }
+
+        // release, e.g., "5.9.6-050906-generic"
+        let release = unsafe { &*(&release as *const [i8] as *const [u8]) };
+        let release = str::from_utf8(release);
+        if release.is_err() {
+            return Err(());
+        }
+        let mut release = release.unwrap().split(&['-', '.', ' '][..]);
+        let version_big: u8 = release.next().unwrap_or("0").parse().unwrap_or(0);
+        let version_little: u8 = release.next().unwrap_or("0").parse().unwrap_or(0);
+
+        let vdso_data_ptr = match (version_big, version_little) {
+            (4, 0..=4) | (4, 7..=11) => VdsoDataPtr::V4_0(vdso_data_v4_0::vdsodata_ptr(vdso_addr)),
+            (4, 5..=6) | (4, 12..=19) => VdsoDataPtr::V4_5(vdso_data_v4_5::vdsodata_ptr(vdso_addr)),
+            (5, 0..=2) => VdsoDataPtr::V5_0(vdso_data_v5_0::vdsodata_ptr(vdso_addr)),
+            (5, 3..=5) => VdsoDataPtr::V5_3(vdso_data_v5_3::vdsodata_ptr(vdso_addr)),
+            (5, 6..=8) => VdsoDataPtr::V5_6(vdso_data_v5_6::vdsodata_ptr(vdso_addr)),
+            (5, _) => VdsoDataPtr::V5_9(vdso_data_v5_9::vdsodata_ptr(vdso_addr)),
             (_, _) => return Err(()),
         };
 
-        Ok(Self {
+        // If linux support a clockid, then we think vdso support it too temporaryly.
+        // We will verify whether vdso can support this clockid correctly later.
+        for &clockid in &clockids {
+            if !(tss[clockid as usize].tv_sec == 0 && tss[clockid as usize].tv_nsec == 0) {
+                support_clocks[clockid as usize] = true;
+            }
+        }
+
+        let mut vdso = Self {
             vdso_data_ptr,
+            hres_resolution,
             coarse_resolution,
-        })
+            support_clocks,
+        };
+
+        // Compare the results of Linux and vdso
+        // to check whether vdso can support the clockid correctly.
+        for &clockid in &clockids {
+            if vdso.support_clocks[clockid as usize] {
+                let mut tp = timespec {
+                    tv_sec: 0,
+                    tv_nsec: 0,
+                };
+                if vdso.clock_gettime(clockid, &mut tp as *mut _).is_err() {
+                    vdso.support_clocks[clockid as usize] = false;
+                }
+                let diff = (tp.tv_sec - tss[clockid as usize].tv_sec) * NSEC_PER_SEC as i64
+                    + (tp.tv_nsec - tss[clockid as usize].tv_nsec);
+                if diff < 0 || diff > 10000 * NSEC_PER_USEC as i64 {
+                    vdso.support_clocks[clockid as usize] = false;
+                }
+            }
+        }
+
+        Ok(vdso)
     }
 
     // Linux time(): time_t time(time_t *tloc);
     pub fn time(&self, tloc: *mut time_t) -> Result<time_t, ()> {
+        let clockid = CLOCK_REALTIME;
+        if !self.support_clocks[clockid as usize] {
+            return Err(());
+        }
+
         let vdso_data = self.vdso_data(ClockSource::CS_HRES_COARSE);
-        let timestamp = vdso_data.vdso_timestamp(CLOCK_REALTIME);
-        let t: time_t = timestamp.sec as _;
+        let t: time_t = vdso_data.sec(clockid)? as _;
         if !tloc.is_null() {
             unsafe {
                 *tloc = t;
@@ -141,12 +219,17 @@ impl Vdso {
 
     // Linux gettimeofday(): int gettimeofday(struct timeval *tv, struct timezone *tz);
     pub fn gettimeofday(&self, tv: *mut timeval, tz: *mut timezone) -> Result<i32, ()> {
+        let clockid = CLOCK_REALTIME;
+        if !self.support_clocks[clockid as usize] {
+            return Err(());
+        }
+
         if !tv.is_null() {
             let mut tp = timespec {
                 tv_sec: 0,
                 tv_nsec: 0,
             };
-            self.do_hres(ClockSource::CS_HRES_COARSE, CLOCK_REALTIME, &mut tp)?;
+            self.do_hres(ClockSource::CS_HRES_COARSE, clockid, &mut tp)?;
             unsafe {
                 (*tv).tv_sec = tp.tv_sec;
                 (*tv).tv_usec = tp.tv_nsec / NSEC_PER_USEC as i64;
@@ -166,6 +249,10 @@ impl Vdso {
 
     // Linux clock_gettime(): int clock_gettime(clockid_t clockid, struct timespec *tp);
     pub fn clock_gettime(&self, clockid: clockid_t, tp: *mut timespec) -> Result<i32, ()> {
+        if !self.support_clocks[clockid as usize] {
+            return Err(());
+        }
+
         match clockid {
             CLOCK_REALTIME | CLOCK_MONOTONIC | CLOCK_BOOTTIME => {
                 self.do_hres(ClockSource::CS_HRES_COARSE, clockid, tp)
@@ -182,8 +269,10 @@ impl Vdso {
     pub fn clock_getres(&self, clockid: clockid_t, res: *mut timespec) -> Result<i32, ()> {
         let ns = match clockid {
             CLOCK_REALTIME | CLOCK_MONOTONIC | CLOCK_BOOTTIME | CLOCK_MONOTONIC_RAW => {
-                let vdso_data = self.vdso_data(ClockSource::CS_HRES_COARSE);
-                vdso_data.hrtimer_res() as i64
+                if self.hres_resolution.is_none() {
+                    return Err(());
+                }
+                self.hres_resolution.unwrap()
             }
             CLOCK_REALTIME_COARSE | CLOCK_MONOTONIC_COARSE => {
                 if self.coarse_resolution.is_none() {
@@ -203,15 +292,19 @@ impl Vdso {
     }
 
     #[inline]
-    fn vdso_data(&self, cs: ClockSource) -> &'static impl VdsoData {
+    fn vdso_data(&self, cs: ClockSource) -> &'static dyn VdsoData {
         match self.vdso_data_ptr {
+            VdsoDataPtr::V4_0(ptr) => unsafe { &*(ptr) },
+            VdsoDataPtr::V4_5(ptr) => unsafe { &*(ptr) },
+            VdsoDataPtr::V5_0(ptr) => unsafe { &*(ptr) },
+            VdsoDataPtr::V5_3(ptr) => unsafe { &*(ptr.add(cs as _)) },
+            VdsoDataPtr::V5_6(ptr) => unsafe { &*(ptr.add(cs as _)) },
             VdsoDataPtr::V5_9(ptr) => unsafe { &*(ptr.add(cs as _)) },
         }
     }
 
     fn do_hres(&self, cs: ClockSource, clockid: clockid_t, tp: *mut timespec) -> Result<i32, ()> {
         let vdso_data = self.vdso_data(cs);
-        let timestamp = vdso_data.vdso_timestamp(clockid);
         loop {
             let seq = vdso_data.seq();
 
@@ -236,8 +329,8 @@ impl Vdso {
                 upper << 32 | lower
             };
 
-            let sec = timestamp.sec;
-            let mut ns = timestamp.nsec;
+            let sec = vdso_data.sec(clockid)?;
+            let mut ns = vdso_data.nsec(clockid)?;
             ns += ((cycles - vdso_data.cycle_last()) & vdso_data.mask()) * vdso_data.mult() as u64;
             ns = ns >> vdso_data.shift();
 
@@ -254,15 +347,14 @@ impl Vdso {
 
     fn do_coarse(&self, cs: ClockSource, clockid: clockid_t, tp: *mut timespec) -> Result<i32, ()> {
         let vdso_data = self.vdso_data(cs);
-        let timestamp = vdso_data.vdso_timestamp(clockid);
         loop {
             let seq = vdso_data.seq();
 
             atomic::fence(Ordering::Acquire);
 
             unsafe {
-                (*tp).tv_sec = timestamp.sec as i64;
-                (*tp).tv_nsec = timestamp.nsec as i64;
+                (*tp).tv_sec = vdso_data.sec(clockid)? as i64;
+                (*tp).tv_nsec = vdso_data.nsec(clockid)? as i64;
             }
 
             if !Self::vdso_read_retry(vdso_data, seq) {
@@ -273,7 +365,7 @@ impl Vdso {
     }
 
     #[inline]
-    fn vdso_read_retry(vdso_data: &impl VdsoData, old_seq: u32) -> bool {
+    fn vdso_read_retry(vdso_data: &dyn VdsoData, old_seq: u32) -> bool {
         atomic::fence(Ordering::Acquire);
         old_seq != vdso_data.seq()
     }
@@ -290,7 +382,7 @@ mod tests {
 
     const LOOPS: usize = 3;
     const SLEEP_DURATION: u64 = 10;
-    const MAX_DIFF_NSEC: u64 = 2000;
+    const MAX_DIFF_NSEC: u64 = 10000;
     const USEC_PER_SEC: u64 = 1000000;
 
     #[test]
@@ -316,13 +408,33 @@ mod tests {
     }
 
     #[test]
-    fn test_clock_gettime() {
-        test_single_clock_gettime(CLOCK_REALTIME_COARSE);
-        test_single_clock_gettime(CLOCK_MONOTONIC_COARSE);
+    fn test_clock_gettime_realtime() {
         test_single_clock_gettime(CLOCK_REALTIME);
+    }
+
+    #[test]
+    fn test_clock_gettime_realtime_coarse() {
+        test_single_clock_gettime(CLOCK_REALTIME_COARSE);
+    }
+
+    #[test]
+    fn test_clock_gettime_monotonic() {
         test_single_clock_gettime(CLOCK_MONOTONIC);
-        test_single_clock_gettime(CLOCK_BOOTTIME);
+    }
+
+    #[test]
+    fn test_clock_gettime_monotonic_coarse() {
+        test_single_clock_gettime(CLOCK_MONOTONIC_COARSE);
+    }
+
+    #[test]
+    fn test_clock_gettime_monotonic_raw() {
         test_single_clock_gettime(CLOCK_MONOTONIC_RAW);
+    }
+
+    #[test]
+    fn test_clock_gettime_boottime() {
+        test_single_clock_gettime(CLOCK_BOOTTIME);
     }
 
     fn test_single_clock_gettime(clockid: clockid_t) {
