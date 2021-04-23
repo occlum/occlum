@@ -31,7 +31,7 @@ int vdso_ocall_get_vdso_info(
     memcpy(release, buf.release, len);
 
     clockid_t clockids[] = { CLOCK_REALTIME, CLOCK_MONOTONIC, CLOCK_MONOTONIC_RAW, 
-        CLOCK_REALTIME_COARSE, CLOCK_MONOTONIC_COARSE, CLOCK_MONOTONIC_COARSE };
+        CLOCK_REALTIME_COARSE, CLOCK_MONOTONIC_COARSE, CLOCK_BOOTTIME };
     for (int i = 0; i < sizeof(clockids) / sizeof(clockid_t); ++i) {
         if (tss_len > clockids[i] && clock_gettime(clockids[i], &tss[clockids[i]]) != 0) {
             tss[clockids[i]].tv_sec = 0;
