@@ -3,6 +3,18 @@
 #include "test.h"
 
 // ============================================================================
+// Test cases for time
+// ============================================================================
+int test_time() {
+    time_t tloc;
+    time_t ret = time(&tloc);
+    if (ret < 0 || ret != tloc) {
+        THROW_ERROR("time(...) failed");
+    }
+    return 0;
+}
+
+// ============================================================================
 // Test cases for gettimeofday
 // ============================================================================
 
@@ -26,6 +38,18 @@ int test_clock_gettime() {
     if (clock_gettime(CLOCK_MONOTONIC, &ts)) {
         THROW_ERROR("clock_gettime(CLOCK_MONOTONIC, ...) failed");
     }
+    if (clock_gettime(CLOCK_MONOTONIC_RAW, &ts)) {
+        THROW_ERROR("clock_gettime(CLOCK_MONOTONIC_RAW, ...) failed");
+    }
+    if (clock_gettime(CLOCK_REALTIME_COARSE, &ts)) {
+        THROW_ERROR("clock_gettime(CLOCK_REALTIME_COARSE, ...) failed");
+    }
+    if (clock_gettime(CLOCK_MONOTONIC_COARSE, &ts)) {
+        THROW_ERROR("clock_gettime(CLOCK_MONOTONIC_COARSE, ...) failed");
+    }
+    if (clock_gettime(CLOCK_BOOTTIME, &ts)) {
+        THROW_ERROR("clock_gettime(CLOCK_BOOTTIME, ...) failed");
+    }
     return 0;
 }
 
@@ -41,9 +65,19 @@ int test_clock_getres() {
     if (clock_getres(CLOCK_MONOTONIC, &res)) {
         THROW_ERROR("clock_getres(CLOCK_MONOTONIC, ...) failed");
     }
+    if (clock_getres(CLOCK_MONOTONIC_RAW, &res)) {
+        THROW_ERROR("clock_getres(CLOCK_MONOTONIC_RAW, ...) failed");
+    }
+    if (clock_getres(CLOCK_REALTIME_COARSE, &res)) {
+        THROW_ERROR("clock_getres(CLOCK_REALTIME_COARSE, ...) failed");
+    }
     if (clock_getres(CLOCK_MONOTONIC_COARSE, &res)) {
         THROW_ERROR("clock_getres(CLOCK_MONOTONIC_COARSE, ...) failed");
     }
+    if (clock_getres(CLOCK_BOOTTIME, &res)) {
+        THROW_ERROR("clock_getres(CLOCK_BOOTTIME, ...) failed");
+    }
+
     if (clock_getres(CLOCK_REALTIME, NULL)) {
         THROW_ERROR("clock_getres(CLOCK_REALTIME, NULL) failed");
     }
@@ -55,6 +89,7 @@ int test_clock_getres() {
 // ============================================================================
 
 static test_case_t test_cases[] = {
+    TEST_CASE(test_time),
     TEST_CASE(test_gettimeofday),
     TEST_CASE(test_clock_gettime),
     TEST_CASE(test_clock_getres),
