@@ -14,7 +14,7 @@ pub mod up_time;
 pub use timer_slack::TIMERSLACK;
 
 lazy_static! {
-    static ref VDSO: Vdso = Vdso::new().unwrap();
+    static ref VDSO: Option<Vdso> = Vdso::new().ok();
 }
 
 #[allow(non_camel_case_types)]
@@ -70,9 +70,12 @@ pub fn do_gettimeofday() -> timeval_t {
     }
 
     let mut tv: timeval_t = Default::default();
-    if VDSO
-        .gettimeofday(&mut tv as *mut timeval_t as *mut _, std::ptr::null_mut())
-        .is_err()
+    if VDSO.is_none()
+        || VDSO
+            .as_ref()
+            .unwrap()
+            .gettimeofday(&mut tv as *mut timeval_t as *mut _, std::ptr::null_mut())
+            .is_err()
     {
         debug!("fallback to occlum_ocall_gettimeofday");
         unsafe {
@@ -168,9 +171,12 @@ pub fn do_clock_gettime(clockid: ClockID) -> Result<timespec_t> {
     }
 
     let mut tv: timespec_t = Default::default();
-    if VDSO
-        .clock_gettime(clockid as clockid_t, &mut tv as *mut timespec_t as *mut _)
-        .is_err()
+    if VDSO.is_none()
+        || VDSO
+            .as_ref()
+            .unwrap()
+            .clock_gettime(clockid as clockid_t, &mut tv as *mut timespec_t as *mut _)
+            .is_err()
     {
         debug!("fallback to occlum_ocall_clock_gettime");
         unsafe {
@@ -188,9 +194,12 @@ pub fn do_clock_getres(clockid: ClockID) -> Result<timespec_t> {
     }
 
     let mut res: timespec_t = Default::default();
-    if VDSO
-        .clock_getres(clockid as clockid_t, &mut res as *mut timespec_t as *mut _)
-        .is_err()
+    if VDSO.is_none()
+        || VDSO
+            .as_ref()
+            .unwrap()
+            .clock_getres(clockid as clockid_t, &mut res as *mut timespec_t as *mut _)
+            .is_err()
     {
         debug!("fallback to occlum_ocall_clock_getres");
         unsafe {
