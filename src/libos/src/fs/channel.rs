@@ -6,6 +6,7 @@ use ringbuf::{Consumer as RbConsumer, Producer as RbProducer, RingBuffer};
 use super::{IoEvents, IoNotifier};
 use crate::events::{Event, EventFilter, Notifier, Observer, Waiter, WaiterQueueObserver};
 use crate::prelude::*;
+use crate::waiter_loop;
 
 /// A unidirectional communication channel, intended to implement IPC, e.g., pipe,
 /// unix domain sockets, etc.
@@ -170,7 +171,7 @@ macro_rules! impl_end_point_type {
 
                 if nonblocking {
                     // Wake all threads that are blocked on pushing/popping this endpoint
-                    self.observer.waiter_queue().dequeue_and_wake_all();
+                    self.observer.waiter_queue().wake_all();
                 }
             }
 
@@ -181,32 +182,6 @@ macro_rules! impl_end_point_type {
             }
         }
     )
-}
-
-// Just like a normal loop, except that a waiter queue (as well as a waiter)
-// is used to avoid busy loop. This macro is used in the push/pop implementation
-// below.
-macro_rules! waiter_loop {
-    ($loop_body: block, $waiter_queue: expr) => {
-        // Try without creating a waiter. This saves some CPU cycles if the
-        // first attempt succeeds.
-        {
-            $loop_body
-        }
-
-        // The main loop
-        let waiter = Waiter::new();
-        let waiter_queue = $waiter_queue;
-        loop {
-            waiter_queue.reset_and_enqueue(&waiter);
-
-            {
-                $loop_body
-            }
-
-            waiter.wait(None)?;
-        }
-    };
 }
 
 impl_end_point_type! {
@@ -239,7 +214,7 @@ impl<I> Producer<I> {
                 }
             },
             self.observer.waiter_queue()
-        );
+        )
     }
 
     pub fn poll(&self) -> IoEvents {
@@ -273,7 +248,7 @@ impl<I> Producer<I> {
         // The shutdown of the producer triggers hangup events on the consumer
         self.trigger_peer_events(&IoEvents::HUP);
         // Wake all threads that are blocked on pushing to this producer
-        self.observer.waiter_queue().dequeue_and_wake_all();
+        self.observer.waiter_queue().wake_all();
     }
 
     pub fn is_self_shutdown(&self) -> bool {
@@ -325,7 +300,7 @@ impl<I: Copy> Producer<I> {
                 }
             },
             self.observer.waiter_queue()
-        );
+        )
     }
 }
 
@@ -365,7 +340,7 @@ impl<I> Consumer<I> {
                 }
             },
             self.observer.waiter_queue()
-        );
+        )
     }
 
     pub fn poll(&self) -> IoEvents {
@@ -399,7 +374,7 @@ impl<I> Consumer<I> {
         // The consumer being shutdown triggers error on the producer
         self.trigger_peer_events(&IoEvents::ERR);
         // Wake all threads that are blocked on popping from this consumer
-        self.observer.waiter_queue().dequeue_and_wake_all();
+        self.observer.waiter_queue().wake_all();
     }
 
     pub fn is_self_shutdown(&self) -> bool {
@@ -467,7 +442,7 @@ impl<I: Copy> Consumer<I> {
                 }
             },
             self.observer.waiter_queue()
-        );
+        )
     }
 }
 

@@ -27,46 +27,46 @@ impl WaiterQueue {
 
     /// Returns whether the queue is empty.
     pub fn is_empty(&self) -> bool {
-        self.count.load(Ordering::SeqCst) == 0
+        self.count.load(Ordering::Acquire) == 0
     }
 
-    /// Reset a waiter and enqueue it.
+    /// Enqueue a waiter.
     ///
     /// It is allowed to enqueue a waiter more than once before it is dequeued.
     /// But this is usually not a good idea. It is the callers' responsibility
     /// to use the API properly.
-    pub fn reset_and_enqueue(&self, waiter: &Waiter) {
-        waiter.reset();
-
+    pub fn enqueue(&self, waiter: &Waiter) {
         let mut wakers = self.wakers.lock().unwrap();
-        self.count.fetch_add(1, Ordering::SeqCst);
         wakers.push_back(waiter.waker());
+        self.count.fetch_add(1, Ordering::Release);
     }
 
-    /// Dequeue a waiter and wake up its thread.
-    pub fn dequeue_and_wake_one(&self) -> usize {
-        self.dequeue_and_wake_nr(1)
+    /// Dequeue a waiter.
+    pub fn dequeue(&self, waiter: &Waiter) {
+        let target_waker = waiter.waker();
+        let mut wakers = self.wakers.lock().unwrap();
+        let mut dequeued_count = 0;
+        wakers.retain(|waker| {
+            let retain = waker != &target_waker;
+            if !retain {
+                dequeued_count += 1;
+            }
+            retain
+        });
+        self.count.fetch_sub(dequeued_count, Ordering::Release);
     }
 
     /// Dequeue all waiters and wake up their threads.
-    pub fn dequeue_and_wake_all(&self) -> usize {
-        self.dequeue_and_wake_nr(usize::MAX)
-    }
-
-    /// Deuque a maximum numer of waiters and wake up their threads.
-    pub fn dequeue_and_wake_nr(&self, max_count: usize) -> usize {
+    pub fn wake_all(&self) -> usize {
         // The quick path for a common case
         if self.is_empty() {
             return 0;
         }
 
-        // Dequeue wakers
-        let to_wake = {
+        // Collect wakers
+        let to_wake: Vec<Waker> = {
             let mut wakers = self.wakers.lock().unwrap();
-            let max_count = max_count.min(wakers.len());
-            let to_wake: Vec<Waker> = wakers.drain(..max_count).collect();
-            self.count.fetch_sub(to_wake.len(), Ordering::SeqCst);
-            to_wake
+            wakers.iter().map(|waker| waker.clone()).collect()
         };
 
         // Wake in batch

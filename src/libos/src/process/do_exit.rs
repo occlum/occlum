@@ -1,10 +1,11 @@
-use crate::signal::constants::*;
 use std::intrinsics::atomic_store;
+use std::sync::Weak;
 
 use super::do_futex::futex_wake;
 use super::process::{Process, ProcessFilter};
-use super::{table, TermStatus, ThreadRef, ThreadStatus};
+use super::{table, StatusChange, TermStatus, ThreadRef, ThreadStatus};
 use crate::prelude::*;
+use crate::signal::constants::*;
 use crate::signal::{KernelSignal, SigNum};
 
 pub fn do_exit_group(status: i32) {
@@ -67,7 +68,7 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
     let idle_ref = super::IDLE.process().clone();
     let mut idle_inner = idle_ref.inner();
     // Lock the parent process as we want to prevent race conditions between
-    // current's exit() and parent's wait5().
+    // current's exit() and parent's wait4().
     let mut parent;
     let mut parent_inner = loop {
         parent = process.parent();
@@ -96,36 +97,25 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
         table::del_thread(main_tid).expect("tid must be in the table");
         table::del_process(pid).expect("pid must be in the table");
 
-        process_inner.exit(term_status, &idle_ref, &mut idle_inner);
+        process_inner.exit(term_status, &idle_ref, &mut idle_inner, &parent);
         idle_inner.remove_zombie_child(pid);
         return;
     }
     // Otherwise, we need to notify the parent process
     let mut parent_inner = parent_inner.unwrap();
-
-    process_inner.exit(term_status, &idle_ref, &mut idle_inner);
+    process_inner.exit(term_status, &idle_ref, &mut idle_inner, &parent);
 
     //Send SIGCHLD to parent
     send_sigchld_to(&parent);
 
-    // Wake up the parent if it is waiting on this child
-    let waiting_children = parent_inner.waiting_children_mut().unwrap();
-    waiting_children.del_and_wake_one_waiter(|waiter_data| -> Option<pid_t> {
-        match waiter_data {
-            ProcessFilter::WithAnyPid => {}
-            ProcessFilter::WithPid(required_pid) => {
-                if process.pid() != *required_pid {
-                    return None;
-                }
-            }
-            ProcessFilter::WithPgid(required_pgid) => {
-                if process.pgid() != *required_pgid {
-                    return None;
-                }
-            }
-        }
-        Some(process.pid())
-    });
+    drop(idle_inner);
+    drop(parent_inner);
+    drop(process_inner);
+
+    // Notify the parent that this child process's status has changed
+    process
+        .notifier()
+        .broadcast(&StatusChange::Terminated(term_status));
 }
 
 fn send_sigchld_to(parent: &Arc<Process>) {
