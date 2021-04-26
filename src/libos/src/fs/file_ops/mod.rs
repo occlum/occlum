@@ -11,13 +11,14 @@ pub use self::fallocate::do_fallocate;
 pub use self::fcntl::{do_fcntl, FcntlCmd};
 pub use self::file_flags::{AccessMode, CreationFlags, StatusFlags};
 pub use self::flock::{Flock, FlockType};
-pub use self::fspath::{FsPath, AT_FDCWD};
+pub use self::fspath::{get_abs_path_by_fd, FsPath, AT_FDCWD};
 pub use self::fsync::{do_fdatasync, do_fsync};
 pub use self::ioctl::{
     do_ioctl, occlum_ocall_ioctl, BuiltinIoctlNum, IfConf, IoctlCmd, StructuredIoctlArgType,
     StructuredIoctlNum,
 };
 pub use self::link::{do_linkat, LinkFlags};
+pub use self::log_util::detail_debug_print;
 pub use self::lseek::do_lseek;
 pub use self::mkdir::do_mkdirat;
 pub use self::open::do_openat;
@@ -45,6 +46,7 @@ mod fspath;
 mod fsync;
 mod ioctl;
 mod link;
+mod log_util;
 mod lseek;
 mod mkdir;
 mod open;
