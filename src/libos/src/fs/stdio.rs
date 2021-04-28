@@ -171,6 +171,8 @@ impl File for StdoutFile {
 
     fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
         let can_delegate_to_host = match cmd {
+            IoctlCmd::TCGETS(_) => true,
+            IoctlCmd::TCSETS(_) => true,
             IoctlCmd::TIOCGWINSZ(_) => true,
             IoctlCmd::TIOCSWINSZ(_) => true,
             _ => false,
@@ -320,6 +322,8 @@ impl File for StdinFile {
 
     fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
         let can_delegate_to_host = match cmd {
+            IoctlCmd::TCGETS(_) => true,
+            IoctlCmd::TCSETS(_) => true,
             IoctlCmd::TIOCGWINSZ(_) => true,
             IoctlCmd::TIOCSWINSZ(_) => true,
             _ => false,

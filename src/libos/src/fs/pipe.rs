@@ -87,6 +87,10 @@ impl File for PipeReader {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
+        ioctl_inner(cmd)
+    }
 }
 
 pub struct PipeWriter {
@@ -150,6 +154,10 @@ impl File for PipeWriter {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
+        ioctl_inner(cmd)
+    }
 }
 
 impl fmt::Debug for PipeReader {
@@ -201,4 +209,13 @@ impl PipeType for FileRef {
             .downcast_ref::<PipeWriter>()
             .ok_or_else(|| errno!(EBADF, "not a pipe writer"))
     }
+}
+
+fn ioctl_inner(cmd: &mut IoctlCmd) -> Result<i32> {
+    match cmd {
+        IoctlCmd::TCGETS(_) => return_errno!(ENOTTY, "not tty device"),
+        IoctlCmd::TCSETS(_) => return_errno!(ENOTTY, "not tty device"),
+        _ => return_errno!(ENOSYS, "not supported"),
+    };
+    unreachable!();
 }
