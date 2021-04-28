@@ -2,6 +2,7 @@ use super::do_arch_prctl::ArchPrctlCode;
 use super::do_clone::CloneFlags;
 use super::do_futex::{FutexFlags, FutexOp, FutexTimeout};
 use super::do_spawn::FileAction;
+use super::do_wait4::WaitOptions;
 use super::prctl::PrctlCmd;
 use super::process::ProcessFilter;
 use crate::prelude::*;
@@ -333,7 +334,7 @@ pub fn do_exit_group(status: i32) -> Result<isize> {
     Ok(0)
 }
 
-pub fn do_wait4(pid: i32, exit_status_ptr: *mut i32) -> Result<isize> {
+pub fn do_wait4(pid: i32, exit_status_ptr: *mut i32, options: u32) -> Result<isize> {
     if !exit_status_ptr.is_null() {
         check_mut_ptr(exit_status_ptr)?;
     }
@@ -348,8 +349,11 @@ pub fn do_wait4(pid: i32, exit_status_ptr: *mut i32) -> Result<isize> {
         pid if pid > 0 => ProcessFilter::WithPid(pid as pid_t),
         _ => unreachable!(),
     };
+
+    let wait_options =
+        WaitOptions::from_bits(options).ok_or_else(|| errno!(EINVAL, "options not recognized"))?;
     let mut exit_status = 0;
-    match super::do_wait4::do_wait4(&child_process_filter) {
+    match super::do_wait4::do_wait4(&child_process_filter, wait_options) {
         Ok((pid, exit_status)) => {
             if !exit_status_ptr.is_null() {
                 unsafe {

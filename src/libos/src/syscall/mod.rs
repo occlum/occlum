@@ -145,7 +145,7 @@ macro_rules! process_syscall_table_with_callback {
             (Vfork = 58) => handle_unsupported(),
             (Execve = 59) => handle_unsupported(),
             (Exit = 60) => do_exit(exit_status: i32),
-            (Wait4 = 61) => do_wait4(pid: i32, _exit_status: *mut i32),
+            (Wait4 = 61) => do_wait4(pid: i32, _exit_status: *mut i32, options: u32),
             (Kill = 62) => do_kill(pid: i32, sig: c_int),
             (Uname = 63) => do_uname(name: *mut utsname_t),
             (Semget = 64) => handle_unsupported(),
