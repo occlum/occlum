@@ -36,8 +36,8 @@ use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t};
 use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
     do_epoll_pwait, do_epoll_wait, do_getpeername, do_getsockname, do_getsockopt, do_listen,
-    do_poll, do_recvfrom, do_recvmsg, do_select, do_sendmsg, do_sendto, do_setsockopt, do_shutdown,
-    do_socket, do_socketpair, msghdr, msghdr_mut,
+    do_poll, do_recvfrom, do_recvmsg, do_select, do_sendmmsg, do_sendmsg, do_sendto, do_setsockopt,
+    do_shutdown, do_socket, do_socketpair, mmsghdr, msghdr, msghdr_mut,
 };
 use crate::process::{
     do_arch_prctl, do_clone, do_exit, do_exit_group, do_futex, do_getegid, do_geteuid, do_getgid,
@@ -391,7 +391,7 @@ macro_rules! process_syscall_table_with_callback {
             (OpenByHandleAt = 304) => handle_unsupported(),
             (ClockAdjtime = 305) => handle_unsupported(),
             (Syncfs = 306) => handle_unsupported(),
-            (Sendmmsg = 307) => handle_unsupported(),
+            (Sendmmsg = 307) => do_sendmmsg(fd: c_int, msg_ptr: *mut mmsghdr, vlen: c_uint, flags_c: c_int),
             (Setns = 308) => handle_unsupported(),
             (Getcpu = 309) => do_getcpu(cpu_ptr: *mut u32, node_ptr: *mut u32),
             (ProcessVmReadv = 310) => handle_unsupported(),
