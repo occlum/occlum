@@ -2,7 +2,7 @@
 name: RFC template
 about: request for comments
 title: "[RFC]"
-labels: ''
+labels: 'RFC'
 assignees: ''
 
 ---
