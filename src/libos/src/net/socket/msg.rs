@@ -14,6 +14,13 @@ pub struct msghdr {
     pub msg_flags: c_int,
 }
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct mmsghdr {
+    pub msg_hdr: msghdr,
+    pub msg_len: c_uint,
+}
+
 /// C struct for a socket message with mutable pointers
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]

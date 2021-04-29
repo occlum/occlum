@@ -48,7 +48,7 @@ pub fn do_bind(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t
         trace!("bind to addr: {:?}", unix_addr);
         unix_socket.bind(&unix_addr)?;
     } else {
-        return_errno!(EBADF, "not a socket");
+        return_errno!(ENOTSOCK, "not a socket");
     }
 
     Ok(0)
@@ -61,7 +61,7 @@ pub fn do_listen(fd: c_int, backlog: c_int) -> Result<isize> {
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
         unix_socket.listen(backlog)?;
     } else {
-        return_errno!(EBADF, "not a socket");
+        return_errno!(ENOTSOCK, "not a socket");
     }
 
     Ok(0)
@@ -99,7 +99,7 @@ pub fn do_connect(
 
         unix_socket.connect(&addr)?;
     } else {
-        return_errno!(EBADF, "not a socket");
+        return_errno!(ENOTSOCK, "not a socket");
     }
 
     Ok(0)
@@ -170,7 +170,7 @@ pub fn do_accept4(
         }
         Ok(new_fd as isize)
     } else {
-        return_errno!(EBADF, "not a socket");
+        return_errno!(ENOTSOCK, "not a socket");
     }
 }
 
@@ -215,7 +215,7 @@ pub fn do_setsockopt(
         warn!("setsockopt for unix socket is unimplemented");
         Ok(0)
     } else {
-        return_errno!(EBADF, "not a socket")
+        return_errno!(ENOTSOCK, "not a socket")
     }
 }
 
@@ -275,7 +275,7 @@ pub fn do_getpeername(
         }
         Ok(0)
     } else {
-        return_errno!(EBADF, "not a socket")
+        return_errno!(ENOTSOCK, "not a socket")
     }
 }
 
@@ -322,7 +322,7 @@ pub fn do_getsockname(
         }
         Ok(0)
     } else {
-        return_errno!(EBADF, "not a socket");
+        return_errno!(ENOTSOCK, "not a socket");
     }
 }
 
@@ -440,7 +440,7 @@ pub fn do_recvfrom(
         }
         Ok(data_len as isize)
     } else {
-        return_errno!(EBADF, "not a socket");
+        return_errno!(ENOTSOCK, "not a socket");
     }
 }
 
@@ -497,9 +497,9 @@ pub fn do_sendmsg(fd: c_int, msg_ptr: *const msghdr, flags_c: c_int) -> Result<i
             .sendmsg(&msg, flags)
             .map(|bytes_sent| bytes_sent as isize)
     } else if let Ok(socket) = file_ref.as_unix_socket() {
-        return_errno!(EBADF, "does not support unix socket")
+        return_errno!(EOPNOTSUPP, "does not support unix socket")
     } else {
-        return_errno!(EBADF, "not a socket")
+        return_errno!(ENOTSOCK, "not a socket")
     }
 }
 
@@ -525,9 +525,63 @@ pub fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut msghdr_mut, flags_c: c_int) -> Re
             .recvmsg(&mut msg_mut, flags)
             .map(|bytes_recvd| bytes_recvd as isize)
     } else if let Ok(socket) = file_ref.as_unix_socket() {
-        return_errno!(EBADF, "does not support unix socket")
+        return_errno!(EOPNOTSUPP, "does not support unix socket")
     } else {
-        return_errno!(EBADF, "not a socket")
+        return_errno!(ENOTSOCK, "not a socket")
+    }
+}
+
+pub fn do_sendmmsg(
+    fd: c_int,
+    msgvec_ptr: *mut mmsghdr,
+    vlen: c_uint,
+    flags_c: c_int,
+) -> Result<isize> {
+    debug!(
+        "sendmmsg: fd: {}, msg: {:?}, flags: 0x{:x}",
+        fd, msgvec_ptr, flags_c
+    );
+
+    from_user::check_ptr(msgvec_ptr)?;
+
+    let mut msgvec = unsafe { std::slice::from_raw_parts_mut(msgvec_ptr, vlen as usize) };
+    let flags = SendFlags::from_bits_truncate(flags_c);
+    let file_ref = current!().file(fd as FileDesc)?;
+
+    if let Ok(socket) = file_ref.as_host_socket() {
+        let mut send_count = 0;
+        for mmsg in (msgvec) {
+            if !mmsg.msg_hdr.check_member_ptrs().is_ok() {
+                break;
+            }
+
+            let msg = unsafe {
+                if let Ok(msg) = MsgHdr::from_c({ &mmsg.msg_hdr }) {
+                    msg
+                } else {
+                    break;
+                }
+            };
+
+            if socket
+                .sendmsg(&msg, flags)
+                .map(|bytes_sent| {
+                    mmsg.msg_len = bytes_sent as u32;
+                    mmsg.msg_len
+                })
+                .is_ok()
+            {
+                send_count += 1;
+            } else {
+                break;
+            }
+        }
+
+        Ok(send_count as isize)
+    } else if let Ok(socket) = file_ref.as_unix_socket() {
+        return_errno!(EOPNOTSUPP, "does not support unix socket")
+    } else {
+        return_errno!(ENOTSOCK, "not a socket")
     }
 }
 

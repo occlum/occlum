@@ -268,13 +268,33 @@ int test_sendmsg_recvmsg() {
     return ret;
 }
 
+int test_sendmmsg_recvmsg() {
+    int ret = 0;
+    int child_pid = 0;
+    int client_fd = connect_with_child(8803, &child_pid);
+    if (client_fd < 0) {
+        THROW_ERROR("connect failed");
+    }
+
+    if (neogotiate_msg(client_fd) < 0) {
+        THROW_ERROR("neogotiate failed");
+    }
+
+    ret = server_recvmsg(client_fd);
+    if (ret < 0) { return -1; }
+
+    ret = wait_for_child_exit(child_pid);
+
+    return ret;
+}
+
 int test_sendmsg_recvmsg_connectionless() {
     int ret = 0;
     int child_pid = 0;
 
     signal(SIGCHLD, proc_exit);
 
-    char *client_argv[] = {"client", "NULL", "8803", NULL};
+    char *client_argv[] = {"client", "NULL", "8804", NULL};
     ret = posix_spawn(&child_pid, "/bin/client", NULL, NULL, client_argv, NULL);
     if (ret < 0) {
         THROW_ERROR("spawn client process error");
@@ -383,6 +403,9 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_read_write),
     TEST_CASE(test_send_recv),
     TEST_CASE(test_sendmsg_recvmsg),
+#ifdef __GLIBC__
+    TEST_CASE(test_sendmmsg_recvmsg),
+#endif
     TEST_CASE(test_sendmsg_recvmsg_connectionless),
     TEST_CASE(test_fcntl_setfl_and_getfl),
     TEST_CASE(test_poll),
