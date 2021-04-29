@@ -475,10 +475,11 @@ jobs:
     - name: Run the encalve tls server on Occlum
       run: docker exec enclave_ra_tls_test bash -c "cd /root/occlum/demos/enclave_tls && SGX_MODE=SIM ./run_enclave_tls_server_in_occlum.sh"
 
+    # Ignore the result here as simulation mode doesn't have RA capabilities
     - name: Run the encalve tls client
       run: |
         sleep ${{ env.nap_time }};
-        docker exec enclave_ra_tls_test bash -c "/opt/enclave-tls/bin/enclave-tls-client"
+        docker exec enclave_ra_tls_test bash -c "/opt/enclave-tls/bin/enclave-tls-client" || true
 
   vault_test:
     runs-on: ubuntu-18.04
