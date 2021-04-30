@@ -20,6 +20,7 @@ pub struct ThreadBuilder {
     files: Option<FileTableRef>,
     sched: Option<SchedAgentRef>,
     rlimits: Option<ResourceLimitsRef>,
+    sig_mask: Option<SigSet>,
     clear_ctid: Option<NonNull<pid_t>>,
     name: Option<ThreadName>,
 }
@@ -35,6 +36,7 @@ impl ThreadBuilder {
             files: None,
             sched: None,
             rlimits: None,
+            sig_mask: None,
             clear_ctid: None,
             name: None,
         }
@@ -67,6 +69,11 @@ impl ThreadBuilder {
 
     pub fn files(mut self, files: FileTableRef) -> Self {
         self.files = Some(files);
+        self
+    }
+
+    pub fn sig_mask(mut self, sig_mask: SigSet) -> Self {
+        self.sig_mask = Some(sig_mask);
         self
     }
 
@@ -108,8 +115,8 @@ impl ThreadBuilder {
         let sched = self.sched.unwrap_or_default();
         let rlimits = self.rlimits.unwrap_or_default();
         let name = RwLock::new(self.name.unwrap_or_default());
+        let sig_mask = RwLock::new(self.sig_mask.unwrap_or_default());
         let sig_queues = RwLock::new(SigQueues::new());
-        let sig_mask = RwLock::new(SigSet::new_empty());
         let sig_tmp_mask = RwLock::new(SigSet::new_empty());
         let sig_stack = SgxMutex::new(None);
         let profiler = if cfg!(feature = "syscall_timing") {

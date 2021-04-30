@@ -51,6 +51,7 @@ pub fn do_clone(
         let rlimits = current.rlimits().clone();
         let fs = current.fs().clone();
         let name = current.name().clone();
+        let sig_mask = current.sig_mask().read().unwrap().clone();
 
         let mut builder = ThreadBuilder::new()
             .process(current.process().clone())
@@ -59,12 +60,14 @@ pub fn do_clone(
             .fs(fs)
             .files(files)
             .name(name)
-            .rlimits(rlimits);
+            .rlimits(rlimits)
+            .sig_mask(sig_mask);
         if let Some(ctid) = ctid {
             builder = builder.clear_ctid(ctid);
         }
         builder.build()?
     };
+    trace!("new thread sigmask = {:?}", new_thread_ref.sig_mask());
     let new_tid = new_thread_ref.tid();
     table::add_thread(new_thread_ref.clone());
     info!("Thread created: tid = {}", new_tid);

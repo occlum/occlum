@@ -27,8 +27,30 @@ impl SigDispositions {
         self.map[idx] = sa;
     }
 
+    pub fn set_default(&mut self, num: SigNum) {
+        let idx = Self::num_to_idx(num);
+        self.map[idx] = SigAction::Dfl;
+    }
+
     pub fn iter<'a>(&'a self) -> SigDispositionsIter<'a> {
         SigDispositionsIter::new(self)
+    }
+
+    // inherit sigdispositions for child process, user defined sigaction should be set to default
+    pub fn inherit(&mut self) {
+        for mut sigaction in &mut self.map {
+            match sigaction {
+                SigAction::User {
+                    handler_addr,
+                    flags,
+                    restorer_addr,
+                    mask,
+                } => {
+                    *sigaction = SigAction::Dfl;
+                }
+                _ => {}
+            }
+        }
     }
 
     fn num_to_idx(num: SigNum) -> usize {
@@ -81,7 +103,7 @@ impl Default for SigDispositions {
 
 impl fmt::Debug for SigDispositions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "SigDispositions ");
+        write!(f, "SigDispositions (only none-default is shown) ");
         let non_default_dispositions = self.iter().filter(|(_, action)| **action != SigAction::Dfl);
         f.debug_map().entries(non_default_dispositions).finish()
     }

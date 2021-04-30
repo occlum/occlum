@@ -5,6 +5,7 @@ use self::aux_vec::{AuxKey, AuxVec};
 use self::exec_loader::{load_exec_file_hdr_to_vec, load_file_hdr_to_vec};
 use super::elf_file::{ElfFile, ElfHeader, ProgramHeaderExt};
 use super::process::ProcessBuilder;
+use super::spawn_attribute::SpawnAttr;
 use super::task::Task;
 use super::thread::ThreadName;
 use super::{table, task, ProcessRef, ThreadRef};
@@ -25,6 +26,7 @@ pub fn do_spawn(
     argv: &[CString],
     envp: &[CString],
     file_actions: &[FileAction],
+    spawn_attributes: Option<SpawnAttr>,
     current_ref: &ThreadRef,
 ) -> Result<pid_t> {
     let exec_now = true;
@@ -33,6 +35,7 @@ pub fn do_spawn(
         argv,
         envp,
         file_actions,
+        spawn_attributes,
         None,
         current_ref,
         exec_now,
@@ -45,6 +48,7 @@ pub fn do_spawn_without_exec(
     argv: &[CString],
     envp: &[CString],
     file_actions: &[FileAction],
+    spawn_attributes: Option<SpawnAttr>,
     host_stdio_fds: &HostStdioFds,
     current_ref: &ThreadRef,
 ) -> Result<pid_t> {
@@ -54,6 +58,7 @@ pub fn do_spawn_without_exec(
         argv,
         envp,
         file_actions,
+        spawn_attributes,
         Some(host_stdio_fds),
         current_ref,
         exec_now,
@@ -65,6 +70,7 @@ fn do_spawn_common(
     argv: &[CString],
     envp: &[CString],
     file_actions: &[FileAction],
+    spawn_attributes: Option<SpawnAttr>,
     host_stdio_fds: Option<&HostStdioFds>,
     current_ref: &ThreadRef,
     exec_now: bool,
@@ -74,6 +80,7 @@ fn do_spawn_common(
         argv,
         envp,
         file_actions,
+        spawn_attributes,
         host_stdio_fds,
         current_ref,
     )?;
@@ -97,6 +104,7 @@ fn new_process(
     argv: &[CString],
     envp: &[CString],
     file_actions: &[FileAction],
+    spawn_attributes: Option<SpawnAttr>,
     host_stdio_fds: Option<&HostStdioFds>,
     current_ref: &ThreadRef,
 ) -> Result<ProcessRef> {
@@ -188,6 +196,28 @@ fn new_process(
         let fs_ref = Arc::new(SgxMutex::new(current_ref.fs().lock().unwrap().clone()));
         let sched_ref = Arc::new(SgxMutex::new(current_ref.sched().lock().unwrap().clone()));
         let rlimit_ref = Arc::new(SgxMutex::new(current_ref.rlimits().lock().unwrap().clone()));
+        let sig_mask = if spawn_attributes.is_some() && spawn_attributes.unwrap().sig_mask.is_some()
+        {
+            spawn_attributes.unwrap().sig_mask.unwrap()
+        } else {
+            current_ref.sig_mask().read().unwrap().clone()
+        };
+        trace!("new process sigmask = {:?}", sig_mask);
+
+        let mut sig_dispositions = current_ref
+            .process()
+            .sig_dispositions()
+            .read()
+            .unwrap()
+            .clone();
+        sig_dispositions.inherit();
+        if spawn_attributes.is_some() && spawn_attributes.unwrap().sig_default.is_some() {
+            let sig_default_set = spawn_attributes.unwrap().sig_default.unwrap();
+            sig_default_set.iter().for_each(|b| {
+                sig_dispositions.set_default(b);
+            })
+        }
+        trace!("new process sig_dispositions = {:?}", sig_dispositions);
 
         // Make the default thread name to be the process's corresponding elf file name
         let elf_name = elf_path.rsplit('/').collect::<Vec<&str>>()[0];
@@ -202,7 +232,9 @@ fn new_process(
             .rlimits(rlimit_ref)
             .fs(fs_ref)
             .files(files_ref)
+            .sig_mask(sig_mask)
             .name(thread_name)
+            .sig_dispositions(sig_dispositions)
             .build()?
     };
 
