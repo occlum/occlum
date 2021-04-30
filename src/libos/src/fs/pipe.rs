@@ -44,6 +44,25 @@ impl File for PipeReader {
         self.consumer.pop_slices(bufs)
     }
 
+    fn metadata(&self) -> Result<Metadata> {
+        Ok(Metadata {
+            dev: 0,
+            inode: 0,
+            size: 0,
+            blk_size: 0,
+            blocks: 0,
+            atime: Timespec { sec: 0, nsec: 0 },
+            mtime: Timespec { sec: 0, nsec: 0 },
+            ctime: Timespec { sec: 0, nsec: 0 },
+            type_: FileType::NamedPipe,
+            mode: 0o600,
+            nlinks: 1,
+            uid: 0,
+            gid: 0,
+            rdev: 0,
+        })
+    }
+
     fn access_mode(&self) -> Result<AccessMode> {
         Ok(AccessMode::O_RDONLY)
     }
@@ -109,6 +128,25 @@ impl File for PipeWriter {
 
     fn seek(&self, pos: SeekFrom) -> Result<off_t> {
         return_errno!(ESPIPE, "Pipe does not support seek")
+    }
+
+    fn metadata(&self) -> Result<Metadata> {
+        Ok(Metadata {
+            dev: 0,
+            inode: 0,
+            size: 0,
+            blk_size: 0,
+            blocks: 0,
+            atime: Timespec { sec: 0, nsec: 0 },
+            mtime: Timespec { sec: 0, nsec: 0 },
+            ctime: Timespec { sec: 0, nsec: 0 },
+            type_: FileType::NamedPipe,
+            mode: 0o600,
+            nlinks: 1,
+            uid: 0,
+            gid: 0,
+            rdev: 0,
+        })
     }
 
     fn access_mode(&self) -> Result<AccessMode> {
