@@ -13,12 +13,12 @@ PASS_LOG = $(BUILD_DIR)/test/.pass
 FAIL_LOG = $(BUILD_DIR)/test/.fail
 
 # Dependencies: need to be compiled but not to run by any Makefile target
-TEST_DEPS := client data_sink
+TEST_DEPS := client data_sink naughty_child
 # Tests: need to be compiled and run by test-% target
 TESTS ?= env empty hello_world malloc mmap file fs_perms getpid spawn sched pipe time \
 	truncate readdir mkdir open stat link symlink chmod chown tls pthread uname rlimit \
 	server server_epoll unix_socket cout hostfs cpuid rdtsc device sleep exit_group \
-	ioctl fcntl eventfd emulate_syscall access signal sysinfo prctl rename procfs wait
+	ioctl fcntl eventfd emulate_syscall access signal sysinfo prctl rename procfs wait spawn_attribute
 # Benchmarks: need to be compiled and run by bench-% target
 BENCHES := spawn_and_exit_latency pipe_throughput unix_socket_throughput
 
