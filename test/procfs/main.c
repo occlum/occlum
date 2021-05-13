@@ -66,6 +66,16 @@ static int test_readlink_from_proc_self_cwd() {
     return 0;
 }
 
+static int test_readlink_from_proc_self_root() {
+    char root_buf[PATH_MAX] = { 0 };
+    const char *proc_root = "/proc/self/root";
+
+    if (test_readlink_from_procfs(proc_root, root_buf, PATH_MAX, "/") < 0) {
+        THROW_ERROR("failed to call test_readlink_from_procfs");
+    }
+    return 0;
+}
+
 static int test_read_from_proc_self_cmdline() {
     char absolute_path[PATH_MAX] = { 0 };
     const char *proc_cmdline = "/proc/self/cmdline";
@@ -126,6 +136,7 @@ static int test_read_from_proc_cpuinfo() {
 static test_case_t test_cases[] = {
     TEST_CASE(test_readlink_from_proc_self_exe),
     TEST_CASE(test_readlink_from_proc_self_cwd),
+    TEST_CASE(test_readlink_from_proc_self_root),
     TEST_CASE(test_read_from_proc_self_cmdline),
     TEST_CASE(test_read_from_proc_meminfo),
     TEST_CASE(test_read_from_proc_cpuinfo),

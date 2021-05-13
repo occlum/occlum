@@ -38,6 +38,10 @@ impl LockedPidDirINode {
         // fd
         let fd_inode = LockedProcFdDirINode::new(&file.process_ref, file.this.upgrade().unwrap());
         file.entries.insert(String::from("fd"), fd_inode);
+        // root
+        let root_inode = ProcRootSymINode::new(&file.process_ref);
+        file.entries.insert(String::from("root"), root_inode);
+
         Ok(())
     }
 }
@@ -163,6 +167,22 @@ impl ProcINode for ProcCwdSymINode {
         let main_thread = self.0.main_thread().ok_or(FsError::EntryNotFound)?;
         let fs = main_thread.fs().lock().unwrap();
         Ok(fs.cwd().to_owned().into_bytes())
+    }
+}
+
+pub struct ProcRootSymINode(ProcessRef);
+
+impl ProcRootSymINode {
+    pub fn new(process_ref: &ProcessRef) -> Arc<dyn INode> {
+        Arc::new(SymLink::new(Self(Arc::clone(process_ref))))
+    }
+}
+
+impl ProcINode for ProcRootSymINode {
+    fn generate_data_in_bytes(&self) -> vfs::Result<Vec<u8>> {
+        let main_thread = self.0.main_thread().ok_or(FsError::EntryNotFound)?;
+        let fs = main_thread.fs().lock().unwrap();
+        Ok(fs.root().to_owned().into_bytes())
     }
 }
 
