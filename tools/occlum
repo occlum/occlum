@@ -213,7 +213,7 @@ cmd_build() {
         --sign-key)     [ -n "$2" ] && ENCLAVE_SIGN_KEY=$2 ; shift 2 || exit_error "empty signing key path"     ;;
         --sign-tool)    [ -n "$2" ] && ENCLAVE_SIGN_TOOL=$2 ; shift 2 || exit_error "empty signing tool path"   ;;
         --sgx-mode)     [[ -n "$2" && "$2" != "HW" ]] && export SGX_MODE=SIM ; shift 2 || exit_error "empty sgx mode";;
-        --force | -f)   MAKE_OPTION="--always-make" ; shift ;;
+        --force | -f)   MAKE_OPTION="clean" ; shift ;;
         *) exit_error "Unknown option: $1"                                                                      ;;
         esac
     done
@@ -234,21 +234,24 @@ cmd_build() {
     # If sgx mode is changed, build thoroughly again
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
         if [ "$(cat $instance_dir/.sgx_mode 2>/dev/null)" != "SIM" ]; then
-            MAKE_OPTION="--always-make"
+            MAKE_OPTION="clean"
         fi
     else
         #HW mode
         if [ "$(cat $instance_dir/.sgx_mode 2>/dev/null)" != "HW" ]; then
-            MAKE_OPTION="--always-make"
+            MAKE_OPTION="clean"
         fi
     fi
 
     rm -rf "$instance_dir/run"
-
+    if [[ -n $MAKE_OPTION ]]; then
+        occlum_dir=$occlum_dir instance_dir=$instance_dir \
+        make -f $build_makefile $MAKE_OPTION
+    fi
     occlum_dir=$occlum_dir instance_dir=$instance_dir pal_lib=$pal_lib major_ver=$major_ver \
     occlum_version=$occlum_version libos_lib=$libos_lib \
     ENCLAVE_SIGN_KEY=$ENCLAVE_SIGN_KEY ENCLAVE_SIGN_TOOL=$ENCLAVE_SIGN_TOOL \
-    make -f $build_makefile $MAKE_OPTION
+    make -f $build_makefile --no-builtin-rules
 
     cd "$instance_dir"
     echo "built" > $status_file

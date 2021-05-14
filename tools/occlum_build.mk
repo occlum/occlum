@@ -33,8 +33,7 @@ define get_occlum_conf_file_mac
 		"$(occlum_dir)/build/bin/occlum-protect-integrity" show-mac "$(instance_dir)/build/Occlum.json.protected"
 endef
 
-
-.PHONY : all
+.PHONY : all clean
 
 ALL_TARGETS := $(SIGNED_ENCLAVE) $(BIN_LINKS) $(LIB_LINKS)
 
@@ -99,3 +98,6 @@ $(SECURE_IMAGE): $(IMAGE) $(IMAGE_DIRS) $(IMAGE_FILES) $(SEFS_CLI_SIM) $(SIGNED_
 		"$(instance_dir)/build/mount/__ROOT" \
 		--integrity-only
 endif
+
+clean:
+	rm -rf $(instance_dir)/build
