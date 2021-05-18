@@ -479,7 +479,7 @@ jobs:
     - name: Run the encalve tls client
       run: |
         sleep ${{ env.nap_time }};
-        docker exec enclave_ra_tls_test bash -c "/opt/enclave-tls/bin/enclave-tls-client" || true
+        docker exec enclave_ra_tls_test bash -c "/usr/share/enclave-tls/samples/enclave-tls-client" || true
 
   vault_test:
     runs-on: ubuntu-18.04
