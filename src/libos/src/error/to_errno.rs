@@ -101,7 +101,7 @@ impl ToErrno for rcore_fs::vfs::FsError {
     }
 }
 
-impl ToErrno for std::alloc::AllocErr {
+impl ToErrno for std::alloc::AllocError {
     fn errno(&self) -> Errno {
         ENOMEM
     }

@@ -1,5 +1,5 @@
 use super::*;
-use std::alloc::{AllocErr, AllocRef, Layout};
+use std::alloc::{AllocError, AllocRef, Layout};
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
 

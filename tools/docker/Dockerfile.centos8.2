@@ -55,7 +55,7 @@ RUN wget http://www.etallen.com/cpuid/cpuid-20200211.x86_64.tar.gz && \
 
 # Install Rust
 ENV PATH="/root/.cargo/bin:$PATH"
-ENV OCCLUM_RUST_VERSION=nightly-2020-09-08
+ENV OCCLUM_RUST_VERSION=nightly-2020-10-25
 RUN curl https://sh.rustup.rs -sSf | \
         sh -s -- --default-toolchain ${OCCLUM_RUST_VERSION} -y && \
     rm -rf /root/.cargo/registry && rm -rf /root/.cargo/git && \
