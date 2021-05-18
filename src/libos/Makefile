@@ -149,7 +149,7 @@ $(OBJ_DIR)/libos/$(SRC_OBJ)/Enclave_t.o: $(OBJ_DIR)/libos/$(SRC_OBJ)/Enclave_t.c
 	@echo "CC <= $@"
 
 $(OBJ_DIR)/libos/$(SRC_OBJ)/Enclave_t.c: $(SGX_EDGER8R) ../Enclave.edl
-	@cd $(OBJ_DIR)/libos/$(SRC_OBJ) && $(SGX_EDGER8R) --trusted $(CUR_DIR)/../Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_DIR)/edl --search-path $(CRATES_DIR)/vdso-time/ocalls
+	@cd $(OBJ_DIR)/libos/$(SRC_OBJ) && $(SGX_EDGER8R) --trusted $(CUR_DIR)/../Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_DIR)/edl --search-path $(CRATES_DIR)/vdso-time/ocalls --search-path $(PROJECT_DIR)/deps/io-uring/ocalls
 	@echo "GEN <= $@"
 
 $(C_OBJS):$(OBJ_DIR)/libos/$(SRC_OBJ)/%.o: src/%.c
