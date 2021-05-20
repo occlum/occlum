@@ -25,7 +25,7 @@ jobs:
       run: docker exec language_support_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec language_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec language_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: C test
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/hello_c && make;
@@ -97,7 +97,7 @@ jobs:
       run: docker exec java_support_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec java_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec java_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Compile Java
       run: docker exec java_support_test bash -c "cd /root/occlum/demos/java && occlum-javac ./hello_world/Main.java"
@@ -122,7 +122,7 @@ jobs:
       run: docker exec fish_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec fish_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec fish_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Build Fish dependencies
       run: docker exec fish_test bash -c "cd /root/occlum/demos/fish && ./download_and_build.sh"
@@ -150,7 +150,7 @@ jobs:
       run: docker exec hello_bazel_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec hello_bazel_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec hello_bazel_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Install bazel
       run: docker exec hello_bazel_test bash -c "cd /root/occlum/demos/hello_bazel && wget https://github.com/bazelbuild/bazel/releases/download/3.2.0/bazel-3.2.0-installer-linux-x86_64.sh;
@@ -184,7 +184,7 @@ jobs:
       run: docker exec https_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec https_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+      run: docker exec https_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Build https server dependencies
       run: docker exec https_test bash -c "cd /root/occlum/demos/https_server && ./download_and_build_mongoose.sh"
@@ -215,7 +215,7 @@ jobs:
       run: docker exec la_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec la_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec la_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Build LA dependencies
       run: docker exec la_test bash -c "cd /root/occlum/demos/local_attestation && ./download_src_and_build_deps.sh"
@@ -242,7 +242,7 @@ jobs:
       run: docker exec sqlite_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec sqlite_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec sqlite_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Build sqlite dependencies
       run: docker exec sqlite_test bash -c "cd /root/occlum/demos/sqlite && ./download_and_build_sqlite.sh"
@@ -268,7 +268,7 @@ jobs:
       run: docker exec xgboost_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec xgboost_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec xgboost_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Build xgboost dependencies
       run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && ./download_and_build_xgboost.sh"
@@ -297,7 +297,7 @@ jobs:
       run: docker exec tflite_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec tflite_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+      run: docker exec tflite_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Build Tensorflow-lite dependencies
       run: docker exec tflite_test bash -c "cd /root/occlum/demos/tensorflow_lite && ./download_and_build_tflite.sh"
@@ -324,7 +324,7 @@ jobs:
       run: docker exec grpc_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec grpc_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+      run: docker exec grpc_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Prepare grpc sample project
       run: docker exec grpc_test bash -c "cd /root/demos/grpc && ./prepare_client_server.sh"
@@ -352,7 +352,7 @@ jobs:
       run: docker exec openvino_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec openvino_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+      run: docker exec openvino_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Run openVINO benchmark
       run: docker exec openvino_test bash -c "cd /root/demos/openvino && SGX_MODE=SIM ./run_benchmark_on_occlum.sh"
@@ -372,7 +372,7 @@ jobs:
       run: docker exec python_support_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec python_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec python_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Run python support test
       run: docker exec python_support_test bash -c "cd /root/occlum/demos/python; SGX_MODE=SIM ./run_python_on_occlum.sh"
@@ -398,7 +398,7 @@ jobs:
       run: docker exec redis_support_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec redis_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec redis_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: download and build redis
       run: docker exec redis_support_test bash -c "cd /root/occlum/demos/redis; ./download_and_build_redis.sh"
@@ -434,7 +434,7 @@ jobs:
       run: docker exec flink_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec flink_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+      run: docker exec flink_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Download flink
       run: docker exec flink_test bash -c "cd /root/occlum/demos/flink && ./download_flink.sh"
@@ -467,7 +467,7 @@ jobs:
       run: docker exec enclave_ra_tls_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec enclave_ra_tls_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+      run: docker exec enclave_ra_tls_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Download and build Enclave TLS
       run: docker exec enclave_ra_tls_test bash -c "cd /root/occlum/demos/enclave_tls && ./download_and_build_enclave_tls.sh"
@@ -498,7 +498,7 @@ jobs:
       run: docker exec vault_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec vault_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+      run: docker exec vault_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Download and build HashiCorp Vault
       run: docker exec vault_test bash -c "cd /root/occlum/demos/golang/vault && ./prepare_vault.sh"
@@ -531,7 +531,7 @@ jobs:
       run: docker exec sofaboot_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec sofaboot_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+      run: docker exec sofaboot_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Download and compile sofaboot web demos
       run: docker exec sofaboot_test bash -c "cd /root/occlum/demos/sofaboot && ./download_compile_sofaboot.sh"
