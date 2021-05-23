@@ -202,8 +202,15 @@ Step 1-3 are to be done on the host OS (Linux):
 2. Install [enable_rdfsbase kernel module](https://github.com/occlum/enable_rdfsbase), which enables Occlum to use `rdfsbase`-family instructions in enclaves.
 
 3. Run the Occlum Docker container, which has Occlum and its demos preinstalled:
-    ```
+
+    For old IAS driver (not DCAP aware):
+    ```bash
     docker run -it --device /dev/isgx occlum/occlum:[version]-ubuntu18.04
+    ```
+    
+    For new DCAP driver:
+    ```bash
+    docker run -it --device /dev/sgx/enclave occlum/occlum:[version]-ubuntu18.04
     ```
 
 Step 4-5 are to be done on the guest OS running inside the Docker container:
