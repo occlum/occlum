@@ -422,6 +422,12 @@ impl<I> Consumer<I> {
         let rb_consumer = self.inner.lock().unwrap();
         rb_consumer.capacity()
     }
+
+    // Get the length of data stored in the buffer
+    pub fn ready_len(&self) -> usize {
+        let rb_consumer = self.inner.lock().unwrap();
+        rb_consumer.len()
+    }
 }
 
 impl<I: Copy> Consumer<I> {
