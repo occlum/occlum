@@ -24,6 +24,9 @@ pub type suseconds_t = i64;
 #[allow(non_camel_case_types)]
 pub type clock_t = i64;
 
+/// Clock ticks per second
+pub const SC_CLK_TCK: u64 = 100;
+
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 #[allow(non_camel_case_types)]

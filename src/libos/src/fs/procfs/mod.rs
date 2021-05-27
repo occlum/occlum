@@ -10,12 +10,14 @@ use self::meminfo::MemInfoINode;
 use self::pid::LockedPidDirINode;
 use self::proc_inode::{Dir, DirProcINode, File, ProcINode, SymLink};
 use self::self_::SelfSymINode;
+use self::stat::StatINode;
 
 mod cpuinfo;
 mod meminfo;
 mod pid;
 mod proc_inode;
 mod self_;
+mod stat;
 
 // Same with the procfs on Linux
 const PROC_SUPER_MAGIC: usize = 0x9fa0;
@@ -97,7 +99,6 @@ impl LockedProcRootINode {
     fn init(&self, fs: &Arc<ProcFS>) {
         let mut file = self.0.write().unwrap();
         file.this = Arc::downgrade(&fs.root);
-        // Currently, we only init the 'cpuinfo', 'meminfo' and 'self' entry.
         // TODO: Add more entries for root.
         // All [pid] entries are lazy-initialized at the find() step.
         let cpuinfo_inode = CpuInfoINode::new();
@@ -109,6 +110,9 @@ impl LockedProcRootINode {
         let self_inode = SelfSymINode::new();
         file.non_volatile_entries
             .insert(String::from("self"), self_inode);
+        let stat_inode = StatINode::new();
+        file.non_volatile_entries
+            .insert(String::from("stat"), stat_inode);
     }
 }
 
