@@ -48,7 +48,6 @@ static int test_read_from_procfs(const char *proc_inode) {
     return 0;
 }
 
-
 // ============================================================================
 // Test cases for procfs
 // ============================================================================
@@ -207,6 +206,15 @@ static int test_read_from_proc_cpuinfo() {
     return 0;
 }
 
+static int test_read_from_proc_stat() {
+    const char *proc_stat = "/proc/stat";
+
+    if (test_read_from_procfs(proc_stat) < 0) {
+        THROW_ERROR("failed to read the stat");
+    }
+    return 0;
+}
+
 #define PROC_SUPER_MAGIC 0x9fa0
 static int test_statfs() {
     const char *file_path = "/proc/cpuinfo";
@@ -288,6 +296,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_read_from_proc_self_stat),
     TEST_CASE(test_read_from_proc_meminfo),
     TEST_CASE(test_read_from_proc_cpuinfo),
+    TEST_CASE(test_read_from_proc_stat),
     TEST_CASE(test_statfs),
     TEST_CASE(test_readdir_root),
     TEST_CASE(test_readdir_self),

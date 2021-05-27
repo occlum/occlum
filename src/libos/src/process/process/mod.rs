@@ -1,4 +1,5 @@
 use std::fmt;
+use std::time::Duration;
 
 use super::wait::WaitQueue;
 use super::{ForcedExitStatus, ProcessGrpRef, ProcessRef, TermStatus, ThreadRef};
@@ -16,6 +17,7 @@ pub struct Process {
     // Immutable info
     pid: pid_t,
     exec_path: String,
+    start_time: Duration,
     // Mutable info
     parent: Option<RwLock<ProcessRef>>,
     pgrp: RwLock<Option<ProcessGrpRef>>,
@@ -122,6 +124,13 @@ impl Process {
     /// Get the path of the executable
     pub fn exec_path(&self) -> &str {
         &self.exec_path
+    }
+
+    /// Get the time the process started after system boot
+    ///
+    /// The value is expressed in clock ticks
+    pub fn start_time(&self) -> u64 {
+        self.start_time.as_millis() as u64 * crate::time::SC_CLK_TCK / 1000
     }
 
     /// Get the file mode creation mask

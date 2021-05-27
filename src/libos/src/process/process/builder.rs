@@ -135,9 +135,11 @@ impl ProcessBuilder {
             let sig_dispositions = RwLock::new(self.sig_dispositions.unwrap_or_default());
             let sig_queues = RwLock::new(SigQueues::new());
             let forced_exit_status = ForcedExitStatus::new();
+            let start_time = crate::time::up_time::get().unwrap();
             Arc::new(Process {
                 pid,
                 exec_path,
+                start_time,
                 umask,
                 parent,
                 pgrp,
