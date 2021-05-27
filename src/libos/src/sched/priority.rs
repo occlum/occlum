@@ -46,6 +46,15 @@ impl NiceValue {
         }
     }
 
+    pub fn raw_val(&self) -> i32 {
+        self.value
+    }
+
+    /// Convert [19,-20] to priority value [39,0].
+    pub fn to_priority_val(&self) -> i32 {
+        self.value - Self::MIN_PRIO
+    }
+
     /// Convert [19,-20] to rlimit style value [1,40].
     pub fn to_rlimit_val(&self) -> i32 {
         Self::MAX_PRIO - self.value + 1

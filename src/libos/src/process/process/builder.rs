@@ -144,10 +144,12 @@ impl ProcessBuilder {
             let forced_exit_status = ForcedExitStatus::new();
             let exit_waiters = WaiterQueue::new();
             let sig_waiters = WaiterQueue::new();
+            let start_time = crate::time::up_time::get().unwrap();
             Arc::new(Process {
                 pid,
                 exec_path,
                 host_waker,
+                start_time,
                 umask,
                 parent,
                 pgrp,

@@ -1,5 +1,6 @@
 use std::fmt;
 use std::sync::Weak;
+use std::time::Duration;
 
 use async_rt::wait::WaiterQueue;
 
@@ -19,6 +20,7 @@ pub struct Process {
     pid: pid_t,
     exec_path: String,
     host_waker: Option<HostWaker>,
+    start_time: Duration,
     // Mutable info
     parent: Option<RwLock<ProcessRef>>,
     pgrp: RwLock<Option<ProcessGrpRef>>,
@@ -146,6 +148,13 @@ impl Process {
     /// Get the host wake pointer.
     pub fn host_waker(&self) -> &Option<HostWaker> {
         &self.host_waker
+    }
+
+    /// Get the time the process started after system boot
+    ///
+    /// The value is expressed in clock ticks
+    pub fn start_time(&self) -> u64 {
+        self.start_time.as_millis() as u64 * crate::time::SC_CLK_TCK / 1000
     }
 
     /// Get the file mode creation mask
