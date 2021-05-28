@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use atomic::{Atomic};
+use atomic::Atomic;
 use ringbuf::{Consumer as RbConsumer, Producer as RbProducer, RingBuffer};
 
 use crate::file::{AccessMode, PollableFile, StatusFlags};
@@ -70,7 +70,7 @@ impl Channel {
 impl Common {
     pub fn with_capacity_and_flags(capacity: usize, flags: StatusFlags) -> Result<Self> {
         check_status_flags(flags)?;
-        
+
         if capacity == 0 {
             return_errno!(EINVAL, "capacity cannot be zero");
         }
@@ -409,7 +409,7 @@ mod tests {
 }
 
 fn check_status_flags(flags: StatusFlags) -> Result<()> {
-    let VALID_FLAGS : StatusFlags = StatusFlags::O_NONBLOCK | StatusFlags::O_DIRECT;
+    let VALID_FLAGS: StatusFlags = StatusFlags::O_NONBLOCK | StatusFlags::O_DIRECT;
     if !VALID_FLAGS.contains(flags) {
         return_errno!(EINVAL, "invalid flags");
     }
