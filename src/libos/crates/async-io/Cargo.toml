@@ -14,6 +14,7 @@ sgx = ["sgx_types", "sgx_tstd", "sgx_trts", "sgx_libc", "io-uring-callback/sgx",
 async-rt = { path = "../async-rt" }
 atomic = "0.5"
 bitflags = "1.2"
+downcast-rs = { version = "1.2.0", default-features = false }
 errno = { path = "../errno" }
 futures = { version = "0.3", default-features = false, features = ["alloc"]  }
 io-uring-callback = { path = "../io-uring-callback" }
