@@ -7,9 +7,27 @@ lazy_static! {
     pub(super) static ref ADDRESS_SPACE: AddressSpace = AddressSpace::new();
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+pub enum AddressSpaceKey {
+    FileKey(usize),
+    AbstrKey(String),
+}
+
+impl AddressSpaceKey {
+    pub fn from_inode(inode: usize) -> Self {
+        AddressSpaceKey::FileKey(inode)
+    }
+
+    pub fn from_path(path: String) -> Self {
+        AddressSpaceKey::AbstrKey(path)
+    }
+}
+
 pub struct AddressSpace {
-    file: SgxMutex<BTreeMap<String, Option<Arc<Listener>>>>,
-    abstr: SgxMutex<BTreeMap<String, Option<Arc<Listener>>>>,
+    // For "file", use inode number as "key" instead of path string so that listeners can still
+    // be reached even if the socket file is moved or renamed.
+    file: SgxMutex<BTreeMap<AddressSpaceKey, Option<Arc<Listener>>>>,
+    abstr: SgxMutex<BTreeMap<AddressSpaceKey, Option<Arc<Listener>>>>,
 }
 
 impl AddressSpace {
@@ -21,7 +39,7 @@ impl AddressSpace {
     }
 
     pub fn add_binder(&self, addr: &Addr) -> Result<()> {
-        let key = Self::get_key(addr);
+        let key = Self::get_key(addr).ok_or_else(|| errno!(EINVAL, "can't find socket file"))?;
         let mut space = self.get_space(addr);
         if space.contains_key(&key) {
             return_errno!(EADDRINUSE, "the addr is already bound");
@@ -32,7 +50,7 @@ impl AddressSpace {
     }
 
     pub fn add_listener(&self, addr: &Addr, capacity: usize, nonblocking: bool) -> Result<()> {
-        let key = Self::get_key(addr);
+        let key = Self::get_key(addr).ok_or_else(|| errno!(EINVAL, "the socket is not bound"))?;
         let mut space = self.get_space(addr);
 
         if let Some(option) = space.get(&key) {
@@ -48,7 +66,7 @@ impl AddressSpace {
     }
 
     pub fn resize_listener(&self, addr: &Addr, capacity: usize) -> Result<()> {
-        let key = Self::get_key(addr);
+        let key = Self::get_key(addr).ok_or_else(|| errno!(EINVAL, "the socket is not bound"))?;
         let mut space = self.get_space(addr);
 
         if let Some(option) = space.get(&key) {
@@ -78,27 +96,54 @@ impl AddressSpace {
 
     pub fn get_listener_ref(&self, addr: &Addr) -> Option<Arc<Listener>> {
         let key = Self::get_key(addr);
-        let space = self.get_space(addr);
-        space.get(&key).map(|x| x.clone()).flatten()
+        if let Some(key) = key {
+            let space = self.get_space(addr);
+            space.get(&key).map(|x| x.clone()).flatten()
+        } else {
+            None
+        }
     }
 
     pub fn remove_addr(&self, addr: &Addr) {
         let key = Self::get_key(addr);
-        let mut space = self.get_space(addr);
-        space.remove(&key);
-    }
-
-    fn get_space(&self, addr: &Addr) -> SgxMutexGuard<'_, BTreeMap<String, Option<Arc<Listener>>>> {
-        match addr {
-            Addr::File(unix_path) => self.file.lock().unwrap(),
-            Addr::Abstract(path) => self.abstr.lock().unwrap(),
+        if let Some(key) = key {
+            let mut space = self.get_space(addr);
+            space.remove(&key);
+        } else {
+            warn!("address space key not exit: {:?}", addr);
         }
     }
 
-    fn get_key(addr: &Addr) -> String {
+    fn get_space(
+        &self,
+        addr: &Addr,
+    ) -> SgxMutexGuard<'_, BTreeMap<AddressSpaceKey, Option<Arc<Listener>>>> {
         match addr {
-            Addr::File(unix_path) => unix_path.absolute(),
-            Addr::Abstract(path) => addr.path_str().to_string(),
+            Addr::File(_, _) => self.file.lock().unwrap(),
+            Addr::Abstract(_) => self.abstr.lock().unwrap(),
+        }
+    }
+
+    fn get_key(addr: &Addr) -> Option<AddressSpaceKey> {
+        trace!("addr = {:?}", addr);
+        match addr {
+            Addr::File(inode_num, unix_path) if inode_num.is_some() => {
+                Some(AddressSpaceKey::from_inode(inode_num.unwrap()))
+            }
+            Addr::File(_, unix_path) => {
+                let inode = {
+                    let file_path = unix_path.absolute();
+                    let current = current!();
+                    let fs = current.fs().read().unwrap();
+                    fs.lookup_inode(&file_path)
+                };
+                if let Ok(inode) = inode {
+                    Some(AddressSpaceKey::from_inode(inode.metadata().unwrap().inode))
+                } else {
+                    None
+                }
+            }
+            Addr::Abstract(path) => Some(AddressSpaceKey::from_path(addr.path_str().to_string())),
         }
     }
 }

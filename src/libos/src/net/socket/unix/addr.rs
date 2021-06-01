@@ -10,7 +10,7 @@ lazy_static! {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Addr {
-    File(UnixPath),
+    File(Option<usize>, UnixPath), // An optional inode number and path. Use inode if there is one.
     Abstract(String),
 }
 
@@ -54,7 +54,7 @@ impl Addr {
                 return_errno!(EINVAL, "no null in the address");
             }
 
-            Ok(Self::File(UnixPath::new(path_cstr.to_str().unwrap())))
+            Ok(Self::File(None, UnixPath::new(path_cstr.to_str().unwrap())))
         }
     }
 
@@ -76,7 +76,7 @@ impl Addr {
 
     pub fn path_str(&self) -> &str {
         match self {
-            Self::File(unix_path) => &unix_path.path_str(),
+            Self::File(_, unix_path) => &unix_path.path_str(),
             Self::Abstract(path) => &path,
         }
     }
@@ -86,7 +86,7 @@ impl Addr {
         addr.sun_family = AddressFamily::LOCAL as libc::sa_family_t;
 
         let addr_len = match self {
-            Self::File(unix_path) => {
+            Self::File(_, unix_path) => {
                 let path_str = unix_path.path_str();
                 let buf_len = path_str.len();
                 /// addr is initialized to all zeros and try_from_raw guarentees
