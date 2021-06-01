@@ -23,7 +23,7 @@ pub fn do_statfs(path: &FsPath) -> Result<Statfs> {
 
     let inode = {
         let current = current!();
-        let fs = current.fs().lock().unwrap();
+        let fs = current.fs().read().unwrap();
         fs.lookup_inode(path)?
     };
     let statfs = {

@@ -7,7 +7,7 @@ pub fn do_openat(fs_path: &FsPath, flags: u32, mode: FileMode) -> Result<FileDes
     );
 
     let current = current!();
-    let fs = current.fs().lock().unwrap();
+    let fs = current.fs().read().unwrap();
     let masked_mode = mode & !current.process().umask();
 
     let inode_file = fs.open_file(&fs_path, flags, masked_mode)?;

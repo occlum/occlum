@@ -7,7 +7,7 @@ pub fn do_renameat(old_fs_path: &FsPath, new_fs_path: &FsPath) -> Result<()> {
     );
 
     let current = current!();
-    let fs = current.fs().lock().unwrap();
+    let fs = current.fs().read().unwrap();
 
     let (old_dir_inode, old_file_name) = fs.lookup_dirinode_and_basename(old_fs_path)?;
     let (new_dir_inode, new_file_name) = fs.lookup_dirinode_and_basename(new_fs_path)?;

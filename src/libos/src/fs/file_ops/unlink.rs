@@ -19,7 +19,7 @@ bitflags::bitflags! {
 fn do_unlink(fs_path: &FsPath) -> Result<()> {
     let (dir_inode, file_name) = {
         let current = current!();
-        let fs = current.fs().lock().unwrap();
+        let fs = current.fs().read().unwrap();
         fs.lookup_dirinode_and_basename(fs_path)?
     };
     let file_inode = dir_inode.find(&file_name)?;

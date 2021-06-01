@@ -204,7 +204,7 @@ fn new_process(
             let files = init_files(current_ref, file_actions, host_stdio_fds)?;
             Arc::new(SgxMutex::new(files))
         };
-        let fs_ref = Arc::new(SgxMutex::new(current_ref.fs().lock().unwrap().clone()));
+        let fs_ref = Arc::new(RwLock::new(current_ref.fs().read().unwrap().clone()));
         let sched_ref = Arc::new(SgxMutex::new(current_ref.sched().lock().unwrap().clone()));
         let rlimit_ref = Arc::new(SgxMutex::new(current_ref.rlimits().lock().unwrap().clone()));
         let sig_mask = if spawn_attributes.is_some() && spawn_attributes.unwrap().sig_mask.is_some()
@@ -301,7 +301,7 @@ fn init_files(
                     oflag,
                     fd,
                 } => {
-                    let inode_file = current_ref.fs().lock().unwrap().open_file(
+                    let inode_file = current_ref.fs().read().unwrap().open_file(
                         &FsPath::try_from(path.as_str())?,
                         oflag,
                         FileMode::from_bits_truncate(mode as u16),

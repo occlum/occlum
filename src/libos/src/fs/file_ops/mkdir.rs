@@ -5,7 +5,7 @@ pub fn do_mkdirat(fs_path: &FsPath, mode: FileMode) -> Result<()> {
 
     let (dir_inode, file_name) = {
         let current = current!();
-        let fs = current.fs().lock().unwrap();
+        let fs = current.fs().read().unwrap();
         fs.lookup_dirinode_and_basename(fs_path)?
     };
     if dir_inode.find(&file_name).is_ok() {

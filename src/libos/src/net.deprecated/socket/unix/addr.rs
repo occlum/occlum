@@ -126,7 +126,7 @@ impl UnixPath {
                 None
             } else {
                 let thread = current!();
-                let fs = thread.fs().lock().unwrap();
+                let fs = thread.fs().read().unwrap();
                 let cwd = fs.cwd().to_owned();
 
                 Some(cwd)
