@@ -18,7 +18,7 @@ pub fn do_linkat(old_fs_path: &FsPath, new_fs_path: &FsPath, flags: LinkFlags) -
     let (inode, new_dir_inode) = {
         let oldpath = old_fs_path.to_abs_path()?;
         let current = current!();
-        let fs = current.fs().lock().unwrap();
+        let fs = current.fs().read().unwrap();
         let inode = if flags.contains(LinkFlags::AT_SYMLINK_FOLLOW) {
             fs.lookup_inode(&oldpath)?
         } else {

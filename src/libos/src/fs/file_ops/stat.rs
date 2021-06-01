@@ -147,7 +147,7 @@ pub fn do_fstatat(fs_path: &FsPath, flags: StatFlags) -> Result<Stat> {
     let inode = {
         let path = fs_path.to_abs_path()?;
         let current = current!();
-        let fs = current.fs().lock().unwrap();
+        let fs = current.fs().read().unwrap();
         if flags.contains(StatFlags::AT_SYMLINK_NOFOLLOW) {
             fs.lookup_inode_no_follow(&path)?
         } else {

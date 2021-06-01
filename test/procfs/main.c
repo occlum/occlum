@@ -76,6 +76,19 @@ static int test_readlink_from_proc_self_root() {
     return 0;
 }
 
+static int test_create_and_unlink_file_from_proc_self_root() {
+    const char *proc_root_file = "/proc/self/root/test_file";
+    int fd = open(proc_root_file, O_RDONLY | O_CREAT | O_TRUNC, 00666);
+    if (fd < 0) {
+        THROW_ERROR("failed to create a file");
+    }
+    close(fd);
+    if (unlink(proc_root_file) < 0) {
+        THROW_ERROR("failed to unlink the created file");
+    }
+    return 0;
+}
+
 static int test_read_from_proc_self_cmdline() {
     char absolute_path[PATH_MAX] = { 0 };
     const char *proc_cmdline = "/proc/self/cmdline";
@@ -137,6 +150,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_readlink_from_proc_self_exe),
     TEST_CASE(test_readlink_from_proc_self_cwd),
     TEST_CASE(test_readlink_from_proc_self_root),
+    TEST_CASE(test_create_and_unlink_file_from_proc_self_root),
     TEST_CASE(test_read_from_proc_self_cmdline),
     TEST_CASE(test_read_from_proc_meminfo),
     TEST_CASE(test_read_from_proc_cpuinfo),

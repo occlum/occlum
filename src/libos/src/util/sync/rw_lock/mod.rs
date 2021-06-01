@@ -106,6 +106,12 @@ unsafe impl<#[may_dangle] T: ?Sized> Drop for RwLock<T> {
     }
 }
 
+impl<T: ?Sized + Default> Default for RwLock<T> {
+    fn default() -> RwLock<T> {
+        RwLock::new(Default::default())
+    }
+}
+
 impl<T: core::fmt::Debug> fmt::Debug for RwLock<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RwLock")

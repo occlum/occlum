@@ -16,7 +16,7 @@ pub fn do_fchownat(fs_path: &FsPath, uid: u32, gid: u32, flags: ChownFlags) -> R
     let inode = {
         let path = fs_path.to_abs_path()?;
         let current = current!();
-        let fs = current.fs().lock().unwrap();
+        let fs = current.fs().read().unwrap();
         if flags.contains(ChownFlags::AT_SYMLINK_NOFOLLOW) {
             fs.lookup_inode_no_follow(&path)?
         } else {

@@ -7,7 +7,7 @@ pub fn do_mkdirat(fs_path: &FsPath, mode: usize) -> Result<()> {
     let (dir_path, file_name) = split_path(&path);
     let inode = {
         let current = current!();
-        let fs = current.fs().lock().unwrap();
+        let fs = current.fs().read().unwrap();
         fs.lookup_inode(dir_path)?
     };
     if inode.find(file_name).is_ok() {

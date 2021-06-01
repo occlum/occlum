@@ -4,7 +4,7 @@ pub fn do_truncate(path: &str, len: usize) -> Result<()> {
     debug!("truncate: path: {:?}, len: {}", path, len);
     let inode = {
         let current = current!();
-        let fs = current.fs().lock().unwrap();
+        let fs = current.fs().read().unwrap();
         fs.lookup_inode(&path)?
     };
     inode.resize(len)?;

@@ -165,7 +165,7 @@ impl ProcCwdSymINode {
 impl ProcINode for ProcCwdSymINode {
     fn generate_data_in_bytes(&self) -> vfs::Result<Vec<u8>> {
         let main_thread = self.0.main_thread().ok_or(FsError::EntryNotFound)?;
-        let fs = main_thread.fs().lock().unwrap();
+        let fs = main_thread.fs().read().unwrap();
         Ok(fs.cwd().to_owned().into_bytes())
     }
 }
@@ -181,7 +181,7 @@ impl ProcRootSymINode {
 impl ProcINode for ProcRootSymINode {
     fn generate_data_in_bytes(&self) -> vfs::Result<Vec<u8>> {
         let main_thread = self.0.main_thread().ok_or(FsError::EntryNotFound)?;
-        let fs = main_thread.fs().lock().unwrap();
+        let fs = main_thread.fs().read().unwrap();
         Ok(fs.root().to_owned().into_bytes())
     }
 }
