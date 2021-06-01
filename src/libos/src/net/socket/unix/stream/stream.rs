@@ -3,6 +3,7 @@ use super::endpoint::{end_pair, Endpoint, RelayNotifier};
 use super::*;
 use events::{Event, EventFilter, Notifier, Observer};
 use fs::channel::Channel;
+use fs::CreationFlags;
 use fs::IoEvents;
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -68,8 +69,19 @@ impl Stream {
         return_errno!(ENOTCONN, "the socket is not connected");
     }
 
-    // TODO: create the corresponding file in the fs
-    pub fn bind(&self, addr: &Addr) -> Result<()> {
+    pub fn bind(&self, addr: &mut Addr) -> Result<()> {
+        if let Addr::File(inode_num, path) = addr {
+            // create the corresponding file in the fs and fill Addr with its inode
+            let corresponding_inode_num = {
+                let current = current!();
+                let fs = current.fs().read().unwrap();
+                let file_ref =
+                    fs.open_file(path.path_str(), CreationFlags::O_CREAT.bits(), 0o777)?;
+                file_ref.metadata()?.inode
+            };
+            *inode_num = Some(corresponding_inode_num);
+        }
+
         match &mut *self.inner() {
             Status::Idle(ref mut info) => {
                 if info.addr().is_some() {
@@ -105,6 +117,7 @@ impl Stream {
         match &*inner {
             Status::Idle(info) => {
                 if let Some(addr) = info.addr() {
+                    warn!("addr = {:?}", addr);
                     ADDRESS_SPACE.add_listener(addr, capacity, info.nonblocking())?;
                     *inner = Status::Listening(addr.clone());
                 } else {

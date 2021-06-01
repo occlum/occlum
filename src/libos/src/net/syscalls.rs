@@ -44,9 +44,9 @@ pub fn do_bind(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t
         trace!("bind to addr: {:?}", sock_addr);
         socket.bind(&sock_addr)?;
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
-        let unix_addr = unsafe { UnixAddr::try_from_raw(addr, addr_len)? };
+        let mut unix_addr = unsafe { UnixAddr::try_from_raw(addr, addr_len)? };
         trace!("bind to addr: {:?}", unix_addr);
-        unix_socket.bind(&unix_addr)?;
+        unix_socket.bind(&mut unix_addr)?;
     } else {
         return_errno!(ENOTSOCK, "not a socket");
     }
@@ -231,16 +231,19 @@ pub fn do_getsockopt(
         fd, level, optname, optval, optlen
     );
     let file_ref = current!().file(fd as FileDesc)?;
-    let socket = file_ref.as_host_socket()?;
-
-    let ret = try_libc!(libc::ocall::getsockopt(
-        socket.raw_host_fd() as i32,
-        level,
-        optname,
-        optval,
-        optlen
-    ));
-    Ok(ret as isize)
+    if let Ok(socket) = file_ref.as_host_socket() {
+        let ret = try_libc!(libc::ocall::getsockopt(
+            socket.raw_host_fd() as i32,
+            level,
+            optname,
+            optval,
+            optlen
+        ));
+        Ok(ret as isize)
+    } else {
+        warn!("getsockeopt is not implemented for non-host socket.");
+        Ok(0 as isize)
+    }
 }
 
 pub fn do_getpeername(
