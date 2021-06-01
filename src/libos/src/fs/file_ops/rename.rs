@@ -9,7 +9,7 @@ pub fn do_renameat(old_fs_path: &FsPath, new_fs_path: &FsPath) -> Result<()> {
     let oldpath = old_fs_path.to_abs_path()?;
     let newpath = new_fs_path.to_abs_path()?;
     let current = current!();
-    let fs = current.fs().lock().unwrap();
+    let fs = current.fs().read().unwrap();
 
     let (old_dir_path, old_file_name) = split_path(&oldpath);
     let (new_dir_path, new_file_name) = split_path(&newpath);

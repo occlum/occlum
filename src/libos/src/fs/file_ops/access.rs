@@ -50,7 +50,7 @@ pub fn do_faccessat(
     let inode = {
         let path = fs_path.to_abs_path()?;
         let current = current!();
-        let fs = current.fs().lock().unwrap();
+        let fs = current.fs().read().unwrap();
         if flags.contains(AccessibilityCheckFlags::AT_SYMLINK_NOFOLLOW) {
             fs.lookup_inode_no_follow(&path)?
         } else {

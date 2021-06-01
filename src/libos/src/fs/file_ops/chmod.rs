@@ -61,7 +61,7 @@ pub fn do_fchmodat(fs_path: &FsPath, mode: FileMode) -> Result<()> {
     let inode = {
         let path = fs_path.to_abs_path()?;
         let current = current!();
-        let fs = current.fs().lock().unwrap();
+        let fs = current.fs().read().unwrap();
         fs.lookup_inode(&path)?
     };
     let mut info = inode.metadata()?;

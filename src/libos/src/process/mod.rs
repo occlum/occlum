@@ -62,6 +62,6 @@ pub type ProcessRef = Arc<Process>;
 pub type ThreadRef = Arc<Thread>;
 pub type FileTableRef = Arc<SgxMutex<FileTable>>;
 pub type ProcessVMRef = Arc<ProcessVM>;
-pub type FsViewRef = Arc<SgxMutex<FsView>>;
+pub type FsViewRef = Arc<RwLock<FsView>>;
 pub type SchedAgentRef = Arc<SgxMutex<SchedAgent>>;
 pub type ResourceLimitsRef = Arc<SgxMutex<ResourceLimits>>;

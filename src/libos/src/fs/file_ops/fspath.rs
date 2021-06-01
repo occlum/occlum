@@ -74,12 +74,12 @@ impl<'a> FsPath<'a> {
             FsPathInner::Fd(fd) => get_abs_path_by_fd(*fd)?,
             FsPathInner::CwdRelative(path) => {
                 let current = current!();
-                let fs = current.fs().lock().unwrap();
+                let fs = current.fs().read().unwrap();
                 fs.convert_to_abs_path(path)
             }
             FsPathInner::Cwd => {
                 let current = current!();
-                let fs = current.fs().lock().unwrap();
+                let fs = current.fs().read().unwrap();
                 fs.cwd().to_owned()
             }
         };

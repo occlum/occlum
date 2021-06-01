@@ -185,7 +185,7 @@ fn new_process(
             let files = init_files(current_ref, file_actions, host_stdio_fds)?;
             Arc::new(SgxMutex::new(files))
         };
-        let fs_ref = Arc::new(SgxMutex::new(current_ref.fs().lock().unwrap().clone()));
+        let fs_ref = Arc::new(RwLock::new(current_ref.fs().read().unwrap().clone()));
         let sched_ref = Arc::new(SgxMutex::new(current_ref.sched().lock().unwrap().clone()));
         let rlimit_ref = Arc::new(SgxMutex::new(current_ref.rlimits().lock().unwrap().clone()));
 
@@ -254,7 +254,7 @@ fn init_files(
                     let file_ref =
                         current_ref
                             .fs()
-                            .lock()
+                            .read()
                             .unwrap()
                             .open_file(path.as_str(), oflag, mode)?;
                     let creation_flags = CreationFlags::from_bits_truncate(oflag);

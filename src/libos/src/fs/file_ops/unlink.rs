@@ -10,7 +10,7 @@ fn do_unlink(path: &str) -> Result<()> {
     let (dir_path, file_name) = split_path(&path);
     let dir_inode = {
         let current = current!();
-        let fs = current.fs().lock().unwrap();
+        let fs = current.fs().read().unwrap();
         fs.lookup_inode(dir_path)?
     };
     let file_inode = dir_inode.find(file_name)?;
