@@ -6,7 +6,7 @@ NC='\033[0m'
 
 show_usage() {
     echo "Error: invalid arguments"
-    echo "Usage: $0 web_app/hello"
+    echo "Usage: $0 web_app/hello/processBuilder"
     exit 1
 }
 
@@ -72,6 +72,29 @@ run_hello() {
     occlum run /usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin/java -Xmx512m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=64m -Dos.name=Linux Main
 }
 
+build_processBuilder() {
+    # Copy JVM and class file into Occlum instance and build
+    mkdir -p image/usr/lib/jvm
+    cp -r /opt/occlum/toolchains/jvm/java-11-alibaba-dragonwell image/usr/lib/jvm
+    cp /usr/local/occlum/x86_64-linux-musl/lib/libz.so.1 image/lib
+    cp ../${app} image
+    cp /bin/date image/bin/
+    # Need bigger user space size for multiprocess
+    new_json="$(jq '.resource_limits.user_space_size = "6000MB"' Occlum.json)" && \
+    echo "${new_json}" > Occlum.json
+    occlum build
+}
+
+run_processBuilder() {
+    app=./processBuilder/processBuilder.class
+    check_file_exist ${app}
+    init_instance
+    build_processBuilder
+    echo -e "${BLUE}occlum run JVM processBuilder${NC}"
+    occlum run /usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin/java -Xmx512m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=64m -Dos.name=Linux \
+        -Djdk.lang.Process.launchMechanism=posix_spawn processBuilder
+}
+
 arg=$1
 case "$arg" in
     web_app)
@@ -79,6 +102,9 @@ case "$arg" in
         ;;
     hello)
         run_hello
+        ;;
+    processBuilder)
+        run_processBuilder
         ;;
     *)
         show_usage
