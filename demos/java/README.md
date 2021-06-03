@@ -50,3 +50,23 @@ curl http://localhost:8080
 in another terminal.
 
 It is recommended to access the web application in a Web browser. You have to manually map port 8080 of the Docker container to a port on the host OS. Check out how to use [the `-p` argument of `docker run` command](https://docs.docker.com/engine/reference/commandline/run/).
+
+# Demo: ProcessBuilder application
+This demo shows that Occlum has enabled support for `ProcessBuilder` class and multiprocess in Java.
+
+# How to Run
+Step 1: Compile the source code with `occlum-javac`
+```
+occlum-javac ./processBuilder/processBuilder.java
+```
+When completed, the resulting file can be found at `./processBuilder/processBuilder.java`.
+
+Try to run it on native Linux with:
+```
+cd processBuilder && occlum-java processBuilder
+```
+
+Step 2: Start JVM to run the processBuilder demo
+```
+./run_java_on_occlum.sh processBuilder
+```
