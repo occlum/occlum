@@ -218,19 +218,31 @@ static int initialize_enclave(void) {
     return 0;
 }
 
+
+// File stream for output buffer
+static FILE *fp_output = NULL;
+
 // ==========================================================================
 //  OCalls
 // ==========================================================================
 
 void ocall_print(const char *str) {
-    printf("%s", str);
+    if (fp_output) {
+        fprintf(fp_output, "%s", str);
+    } else {
+        fprintf(stdout, "%s", str);
+    }
 }
 
 void ocall_eprint(const char *str) {
     fprintf(stderr, "%s", str);
 }
 
-int ocall_open(const char *path) {
+int ocall_open_for_write(const char *path) {
+    return open(path, O_WRONLY | O_CREAT | O_TRUNC, 00644);
+}
+
+int ocall_open_for_read(const char *path) {
     return open(path, O_RDONLY);
 }
 
@@ -256,8 +268,8 @@ static void print_help(void) {
             "\n"
             "Usage:\n"
             "\tprotect-integrity protect <ordinary_file>\n"
-            "\tprotect-integrity show <protected_file>\n"
-            "\tprotect-integrity show-mac <protected_file>\n");
+            "\tprotect-integrity show <protected_file> [<output_file>]\n"
+            "\tprotect-integrity show-mac <protected_file> [<output_file>]\n");
 }
 
 #define CMD_ERROR       (-1)
@@ -271,15 +283,23 @@ static int parse_args(
     char *argv[],
     /* outputs */
     int *arg_command,
-    char **arg_file_path) {
-    if (argc != 3) { return -1; }
+    char **arg_file_path,
+    char **arg_output_path) {
+    if (argc < 3 || argc > 4) { return -1; }
 
     if (strcmp(argv[1], "protect") == 0) {
+        if (argc != 3) { return -1; }
         *arg_command = CMD_PROTECT;
     } else if (strcmp(argv[1], "show") == 0) {
         *arg_command = CMD_SHOW;
+        if (argc == 4) {
+            *arg_output_path = argv[3];
+        }
     } else if (strcmp(argv[1], "show-mac") == 0) {
         *arg_command = CMD_SHOW_MAC;
+        if (argc == 4) {
+            *arg_output_path = argv[3];
+        }
     } else {
         return -1;
     }
@@ -296,7 +316,8 @@ int SGX_CDECL main(int argc, char *argv[]) {
     /* Parse arguments */
     int arg_command = CMD_ERROR;
     char *arg_file_path = NULL;
-    if (parse_args(argc, argv, &arg_command, &arg_file_path) < 0) {
+    char *arg_output_path = NULL;
+    if (parse_args(argc, argv, &arg_command, &arg_file_path, &arg_output_path) < 0) {
         print_help();
         return -1;
     }
@@ -328,7 +349,8 @@ int SGX_CDECL main(int argc, char *argv[]) {
         }
         case CMD_SHOW: {
             const char *input_path = arg_file_path;
-            if (ecall_show(global_eid, &ret, input_path)) {
+            const char *output_path = arg_output_path;
+            if (ecall_show(global_eid, &ret, input_path, output_path)) {
                 fprintf(stderr, "Error: ecall failed\n");
                 ret = -1;
             }
@@ -336,9 +358,21 @@ int SGX_CDECL main(int argc, char *argv[]) {
         }
         case CMD_SHOW_MAC: {
             const char *input_path = arg_file_path;
+            const char *output_path = arg_output_path;
+            if (output_path) {
+                fp_output = fopen(output_path, "w");
+                if (!fp_output) {
+                    fprintf(stderr, "Error: failed to open %s for output \n", output_path);
+                    ret = -1;
+                    break;
+                }
+            }
             if (ecall_show_mac(global_eid, &ret, input_path)) {
                 fprintf(stderr, "Error: ecall failed\n");
                 ret = -1;
+            }
+            if (fp_output) {
+                fclose(fp_output);
             }
             break;
         }

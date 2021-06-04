@@ -39,10 +39,15 @@ static void print_mac(sgx_aes_gcm_128bit_tag_t *mac) {
     printf("\n");
 }
 
-
-static int open(const char *path) {
+static int open_for_write(const char *path) {
     int fd = 0;
-    ocall_open(&fd, path);
+    ocall_open_for_write(&fd, path);
+    return fd;
+}
+
+static int open_for_read(const char *path) {
+    int fd = 0;
+    ocall_open_for_read(&fd, path);
     return fd;
 }
 
@@ -74,7 +79,7 @@ int ecall_protect(const char *input_path, const char *output_path) {
     size_t len;
     char buf[4 * 1024];
 
-    input_file = open(input_path);
+    input_file = open_for_read(input_path);
     if (input_file < 0) {
         eprintf("Error: cannot open the input file at %s\n", input_path);
         goto on_error;
@@ -107,9 +112,10 @@ on_error:
     return -1;
 }
 
-int ecall_show(const char *protected_file_path) {
+int ecall_show(const char *protected_file_path, const char *show_path) {
     SGX_FILE *protected_file = NULL;
     ssize_t len;
+    int output_fd = 1; /* stdout */
     char buf[4 * 1024];
 
     protected_file = sgx_fopen_integrity_only(protected_file_path, "r");
@@ -117,9 +123,16 @@ int ecall_show(const char *protected_file_path) {
         eprintf("Error: failed to open the given protected file %s\n", protected_file_path);
         goto on_error;
     }
+    if (show_path) {
+        output_fd = open_for_write(show_path);
+        if (output_fd < 0) {
+            eprintf("Error: failed to open the given show_path %s\n", show_path);
+            goto on_error;
+        }
+    }
 
     while ((len = sgx_fread(buf, 1, sizeof(buf), protected_file)) > 0) {
-        write(1/* stdout */, buf, len);
+        write(output_fd, buf, len);
     }
 
     if (sgx_ferror(protected_file)) {
@@ -128,10 +141,16 @@ int ecall_show(const char *protected_file_path) {
     }
 
     sgx_fclose(protected_file);
+    if (output_fd > 1) {
+        close(output_fd);
+    }
     return 0;
 on_error:
     if (protected_file != NULL) {
         sgx_fclose(protected_file);
+    }
+    if (output_fd > 1) {
+        close(output_fd);
     }
     return -1;
 }

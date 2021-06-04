@@ -8,6 +8,7 @@ INITFS := $(instance_dir)/initfs
 INITFS_IMAGE := $(instance_dir)/build/initfs/__ROOT/metadata
 INITFS_IMAGE_MAC := $(instance_dir)/build/initfs/.ROOT_MAC
 JSON_CONF := $(instance_dir)/Occlum.json
+CONF_TMP_MAC := $(instance_dir)/build/tmp_mac
 
 LIBOS := $(instance_dir)/build/lib/$(libos_lib).$(occlum_version)
 SIGNED_ENCLAVE := $(instance_dir)/build/lib/libocclum-libos.signed.so
@@ -33,14 +34,9 @@ endif
 
 SHELL:=/bin/bash
 
-define get_occlum_sys_conf_file_mac
+define get_occlum_file_mac
 	LD_LIBRARY_PATH="$(SGX_SDK)/sdk_libs" \
-		"$(occlum_dir)/build/bin/occlum-protect-integrity" show-mac "$(instance_dir)/build/.Occlum_sys.json.protected"
-endef
-
-define get_occlum_user_conf_file_mac
-	LD_LIBRARY_PATH="$(SGX_SDK)/sdk_libs" \
-		"$(occlum_dir)/build/bin/occlum-protect-integrity" show-mac "$(instance_dir)/build/Occlum.json.protected"
+		"$(occlum_dir)/build/bin/occlum-protect-integrity" show-mac $(1) $(2)
 endef
 
 .PHONY : all clean
@@ -60,13 +56,13 @@ $(SIGNED_ENCLAVE): $(LIBOS)
 
 $(LIBOS): $(instance_dir)/build/.Occlum_sys.json.protected
 	@echo "Building libOS..."
-	@export OCCLUM_BUILTIN_SYS_CONF_FILE_MAC=`$(get_occlum_sys_conf_file_mac)` ; \
-		cd $(instance_dir)/build/lib && \
-		cp "$(occlum_dir)/build/lib/$(libos_lib).$(occlum_version)" . && ln -sf "$(libos_lib).$(occlum_version)" "libocclum-libos.so.$(major_ver)" && \
+	@cd $(instance_dir)/build/lib && \
+		cp "$(occlum_dir)/build/lib/$(libos_lib).$(occlum_version)" . && \
+		ln -sf "$(libos_lib).$(occlum_version)" "libocclum-libos.so.$(major_ver)" && \
 		ln -sf "libocclum-libos.so.$(major_ver)" libocclum-libos.so ; \
-		echo -e "$$OCCLUM_BUILTIN_SYS_CONF_FILE_MAC\c" > temp_mac_file && \
-		objcopy --update-section .builtin_config=temp_mac_file libocclum-libos.so && \
-		rm temp_mac_file
+		$(call get_occlum_file_mac, "$(instance_dir)/build/.Occlum_sys.json.protected", "$(CONF_TMP_MAC)") && \
+		objcopy --update-section .builtin_config="$(CONF_TMP_MAC)" libocclum-libos.so && \
+		rm -f "$(CONF_TMP_MAC)"
 
 $(instance_dir)/build/.Occlum_sys.json.protected: $(instance_dir)/build/.Occlum_sys.json
 	@cd "$(instance_dir)/build" ; \
@@ -108,13 +104,13 @@ $(INITFS_IMAGE): $(INITFS) $(INITFS_DIRS) $(INITFS_FILES) $(IMAGE_CONFIG_JSON) $
 		"$(INITFS_IMAGE_MAC)"
 
 $(IMAGE_CONFIG_JSON): $(instance_dir)/build/Occlum.json.protected
-	@export OCCLUM_CONF_FILE_MAC=`$(get_occlum_user_conf_file_mac)` ; \
-		echo "EXPORT => OCCLUM_CONF_FILE_MAC = $$OCCLUM_CONF_FILE_MAC" ; \
+	@$(call get_occlum_file_mac, "$(instance_dir)/build/Occlum.json.protected", "$(CONF_TMP_MAC)") && \
 		[ -n "$(SECURE_IMAGE_KEY)" ] && \
-		jq -n --arg mac_val "$$OCCLUM_CONF_FILE_MAC" \
+		jq -n --arg mac_val "`cat $(CONF_TMP_MAC)`" \
 		'{image_type: "encrypted", occlum_json_mac: $$mac_val}' > $(IMAGE_CONFIG_JSON) || \
-		jq -n --arg mac_val "$$OCCLUM_CONF_FILE_MAC" \
+		jq -n --arg mac_val "`cat $(CONF_TMP_MAC)`" \
 		'{image_type: "integrity-only", occlum_json_mac: $$mac_val}' > $(IMAGE_CONFIG_JSON)
+	@rm -f "$(CONF_TMP_MAC)"
 
 $(instance_dir)/build/Occlum.json.protected: $(instance_dir)/build/Occlum.json
 	@cd "$(instance_dir)/build" ; \

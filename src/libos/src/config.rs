@@ -45,23 +45,15 @@ pub fn load_config(config_path: &str, expected_mac: &sgx_aes_gcm_128bit_tag_t) -
 }
 
 // This value will be modified during occlum build
-#[no_mangle]
+#[used]
 #[link_section = ".builtin_config"]
-static OCCLUM_JSON_MAC: [i8; 48] = [0; 48];
+static OCCLUM_JSON_MAC: [u8; 47] = [0; 47];
 
 fn conf_get_hardcoded_file_mac() -> sgx_aes_gcm_128bit_tag_t {
-    assert!(
-        *OCCLUM_JSON_MAC.last().unwrap() == 0,
-        "must be a null-terminated C string"
-    );
-
-    let mac_str = unsafe {
-        CStr::from_ptr(&OCCLUM_JSON_MAC as *const i8)
-            .to_str()
-            .expect("MAC contains non UTF-8 characters")
-    };
-
-    let mac = parse_mac(mac_str).expect("MAC string cannot be converted to numbers");
+    // Use black_box to avoid the compiler's optimization for OCCLUM_JSON_MAC
+    let json_mac = std::hint::black_box(&OCCLUM_JSON_MAC);
+    let mac_str = String::from_utf8(json_mac.to_vec()).expect("MAC contains non UTF-8 characters");
+    let mac = parse_mac(&mac_str).expect("MAC string cannot be converted to numbers");
     mac
 }
 
