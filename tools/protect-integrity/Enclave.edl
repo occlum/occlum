@@ -8,13 +8,15 @@ enclave {
     trusted {
         public int ecall_protect([in, string] const char* input_path,
                                  [in, string] const char* ouput_path);
-        public int ecall_show([in, string] const char* input_path);
+        public int ecall_show([in, string] const char* input_path,
+                              [in, string] const char* output_path);
         public int ecall_show_mac([in, string] const char* input_path);
     };
 
     untrusted {
         // File operations
-        int ocall_open([in, string] const char* path);
+        int ocall_open_for_write([in, string] const char* path);
+        int ocall_open_for_read([in, string] const char* path);
         ssize_t ocall_read(int fd, [out, size=size] void* buf, size_t size);
         ssize_t ocall_write(int fd, [in, size=size] const void* buf, size_t size);
         int ocall_close(int fd);
