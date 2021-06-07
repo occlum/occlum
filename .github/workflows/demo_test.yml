@@ -380,6 +380,7 @@ jobs:
     - name: Check result
       run: docker exec python_support_test bash -c "cd /root/occlum/demos/python/python_musl/occlum_instance; cat smvlight.dat"
 
+  # Python glibc support test
   Python_glibc_support_test:
     runs-on: ubuntu-18.04
     steps:
@@ -394,10 +395,10 @@ jobs:
       run: docker run -itd --name=python_glibc_support_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
 
     - name: Build dependencies
-      run: docker exec python_glibc_support_test -c "cd /root/occlum; make submodule"
+      run: docker exec python_glibc_support_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec python_glibc_support_test -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec python_glibc_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: download conda and build python
       run: docker exec python_glibc_support_test bash -c "cd /root/occlum/demos/python/python_glibc; ./install_python_using_conda.sh"
