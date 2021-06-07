@@ -401,7 +401,7 @@ jobs:
       run: docker exec python_glibc_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: download conda and build python
-      run: docker exec python_glibc_support_test bash -c "cd /root/occlum/demos/python/python_glibc; ./install_python_using_conda.sh"
+      run: docker exec python_glibc_support_test bash -c "cd /root/occlum/demos/python/python_glibc; chmod +x install_python_using_conda.sh; ./install_python_using_conda.sh"
 
     - name: Run python glibc support test
       run: docker exec python_glibc_support_test bash -c "cd /root/occlum/demos/python/python_glibc; SGX_MODE=SIM ./run_python_on_occlum.sh"
