@@ -31,7 +31,7 @@ This set of demos shows how apps written with popular programming languages can 
 
 * [golang](golang/): A collection of [Golang](https://golang.org) program demos.
 * [java](java/): A demo of [Java](https://openjdk.java.net) program.
-* [python](python/) A demo of [Python](https://www.python.org) program.
+* [python](python/) A collection of [Python](https://www.python.org) program demos, contain [glibc-supported python](python/python_glibc) demo and [musl-supported python](python/python_musl) demo.
 * [rust](rust/) A demo of [Rust](https://www.rust-lang.org) program.
 
 ## Other demos

@@ -359,26 +359,55 @@ jobs:
 
 
   # Python test also needs its own image because in Alpine environment, modules are built locally and consumes a lot of time.
-  Python_support_test:
+  Python_musl_support_test:
     runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: true
     - name: Create container
-      run: docker run -itd --name=python_support_test -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-python
+      run: docker run -itd --name=python_musl_support_test -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-python
 
     - name: Build dependencies
-      run: docker exec python_support_test bash -c "cd /root/occlum; make submodule"
+      run: docker exec python_musl_support_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec python_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec python_musl_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Run python support test
-      run: docker exec python_support_test bash -c "cd /root/occlum/demos/python; SGX_MODE=SIM ./run_python_on_occlum.sh"
+      run: docker exec python_musl_support_test bash -c "cd /root/occlum/demos/python/python_musl; SGX_MODE=SIM ./run_python_on_occlum.sh"
 
     - name: Check result
-      run: docker exec python_support_test bash -c "cd /root/occlum/demos/python/occlum_instance; cat smvlight.dat"
+      run: docker exec python_musl_support_test bash -c "cd /root/occlum/demos/python/python_musl/occlum_instance; cat smvlight.dat"
+
+  # Python glibc support test
+  Python_glibc_support_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
+
+    - name: Create container
+      run: docker run -itd --name=python_glibc_support_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+
+    - name: Build dependencies
+      run: docker exec python_glibc_support_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec python_glibc_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+
+    - name: download conda and build python
+      run: docker exec python_glibc_support_test bash -c "cd /root/occlum/demos/python/python_glibc; ./install_python_with_conda.sh"
+
+    - name: Run python glibc support test
+      run: docker exec python_glibc_support_test bash -c "cd /root/occlum/demos/python/python_glibc; SGX_MODE=SIM ./run_python_on_occlum.sh"
+
+    - name: Check result
+      run: docker exec python_glibc_support_test bash -c "cd /root/occlum/demos/python/python_glibc/occlum_instance; cat smvlight.dat"
 
   # Redis test
   Redis_support_test:
