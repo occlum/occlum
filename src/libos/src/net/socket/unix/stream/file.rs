@@ -55,16 +55,21 @@ impl File for Stream {
 
     fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
         match cmd {
+            IoctlCmd::TCGETS(_) => return_errno!(ENOTTY, "not tty device"),
+            IoctlCmd::TCSETS(_) => return_errno!(ENOTTY, "not tty device"),
+            IoctlCmd::FIONBIO(nonblocking) => {
+                self.set_nonblocking(**nonblocking != 0);
+            }
             IoctlCmd::FIONREAD(arg) => match &*self.inner() {
                 Status::Connected(endpoint) => {
                     let bytes_to_read = endpoint.bytes_to_read().min(std::i32::MAX as usize) as i32;
                     **arg = bytes_to_read;
-                    Ok(0)
                 }
                 _ => return_errno!(ENOTCONN, "unconnected socket"),
             },
             _ => return_errno!(EINVAL, "unknown ioctl cmd for unix socket"),
         }
+        Ok(0)
     }
 
     fn access_mode(&self) -> Result<AccessMode> {

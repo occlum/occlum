@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <unistd.h>
@@ -329,6 +330,61 @@ int test_select_read_write() {
     return 0;
 }
 
+int test_ioctl_fionread() {
+    int pipe_fds[2];
+    if (pipe(pipe_fds) < 0) {
+        THROW_ERROR("failed to create a pipe");
+    }
+
+    int pipe_rd_fd = pipe_fds[0];
+    int pipe_wr_fd = pipe_fds[1];
+
+    posix_spawn_file_actions_t file_actions;
+    posix_spawn_file_actions_init(&file_actions);
+    posix_spawn_file_actions_adddup2(&file_actions, pipe_wr_fd, STDOUT_FILENO);
+    posix_spawn_file_actions_addclose(&file_actions, pipe_rd_fd);
+
+    const char *msg = "Echo!\n";
+    const char *child_prog = "/bin/hello_world";
+    const char *child_argv[3] = { child_prog, msg, NULL };
+    int child_pid;
+    if (posix_spawn(&child_pid, child_prog, &file_actions,
+                    NULL, (char *const *)child_argv, NULL) < 0) {
+        THROW_ERROR("failed to spawn a child process");
+    }
+    int status = 0;
+    if (wait4(child_pid, &status, 0, NULL) < 0) {
+        THROW_ERROR("failed to wait4 the child process");
+    }
+
+    close(pipe_wr_fd);
+
+    const char *expected_str = msg;
+    size_t expected_len = strlen(expected_str);
+    char actual_str[32] = {0};
+
+    int data_len_ready = 0;
+    if ( ioctl(pipe_rd_fd, FIONREAD, &data_len_ready) < 0 ) {
+        THROW_ERROR("ioctl FIONREAD failed");
+    }
+
+    // data_len_ready will include '\0'
+    if (data_len_ready - 1 != expected_len) {
+        THROW_ERROR("ioctl FIONREAD value not match");
+    }
+
+    if (read(pipe_rd_fd, actual_str, sizeof(actual_str) - 1) < 0) {
+        THROW_ERROR("reading pipe failed");
+    };
+
+    if (strncmp(expected_str, actual_str, expected_len) != 0) {
+        THROW_ERROR("received string is not as expected");
+    }
+
+    close(pipe_rd_fd);
+    return 0;
+}
+
 // ============================================================================
 // Test suite
 // ============================================================================
@@ -344,6 +400,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_poll_no_timeout),
     TEST_CASE(test_epoll_no_timeout),
     TEST_CASE(test_select_read_write),
+    TEST_CASE(test_ioctl_fionread),
 };
 
 int main(int argc, const char *argv[]) {

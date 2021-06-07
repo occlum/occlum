@@ -4,7 +4,10 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <features.h>
+#include <sys/stat.h>
 #include "test.h"
+
+char **g_argv;
 
 void sigio_handler(int sig) {
     printf("[child] SIGIO is caught in child!\n");
@@ -70,6 +73,33 @@ int test_spawn_attribute_sigdef() {
     return 0;
 }
 
+int test_ioctl_fioclex() {
+    int regular_file_fd = atoi(g_argv[3]);
+    int pipe_reader_fd = atoi(g_argv[4]);
+    int pipe_writer_fd = atoi(g_argv[5]);
+
+    // regular file is set with ioctl FIONCLEX
+    struct stat stat_buf;
+    int ret = fstat(regular_file_fd, &stat_buf);
+    if (ret != 0 || !S_ISREG(stat_buf.st_mode)) {
+        THROW_ERROR("fstat regular file fd error");
+    }
+
+    // pipe reader is set with ioctl FIOCLEX
+    ret = fstat(pipe_reader_fd, &stat_buf);
+    if (ret != -1 || errno != EBADF) {
+        THROW_ERROR("fstat pipe reader fd error");
+    }
+
+    // pipe writer is set with default and should inherit by child
+    ret = fstat(pipe_writer_fd, &stat_buf);
+    if (ret != 0 || !S_ISFIFO(stat_buf.st_mode)) {
+        THROW_ERROR("fstat pipe writer fd error");
+    }
+
+    return 0;
+}
+
 // ============================================================================
 // Test suite
 // ============================================================================
@@ -81,6 +111,8 @@ int start_test(const char *test_name) {
         return test_spawn_attribute_sigmask();
     } else if (strcmp(test_name, "sigdef") == 0) {
         return test_spawn_attribute_sigdef();
+    } else if (strcmp(test_name, "fioclex") == 0) {
+        return test_ioctl_fioclex();
     } else {
         fprintf(stderr, "[child] test case not found\n");
         return -1;
@@ -89,7 +121,7 @@ int start_test(const char *test_name) {
 
 void print_usage() {
     fprintf(stderr, "Usage:\n nauty_child [-t testcase1] [-t testcase2] ...\n\n");
-    fprintf(stderr, " Now support testcase: <sigmask, sigdef>\n");
+    fprintf(stderr, " Now support testcase: <sigmask, sigdef, fioclex>\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -98,6 +130,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+    g_argv = argv;
     int opt;
     char *testcase_name = calloc(1, TEST_NAME_MAX);
     while ((opt = getopt(argc, argv, "t:")) != -1) {

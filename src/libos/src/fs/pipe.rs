@@ -108,7 +108,23 @@ impl File for PipeReader {
     }
 
     fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-        ioctl_inner(cmd)
+        match cmd {
+            IoctlCmd::TCGETS(_) => return_errno!(ENOTTY, "not tty device"),
+            IoctlCmd::TCSETS(_) => return_errno!(ENOTTY, "not tty device"),
+            IoctlCmd::FIONREAD(arg) => {
+                let ready_len = self.get_ready_len().min(std::i32::MAX as usize) as i32;
+                **arg = ready_len;
+                return Ok(0);
+            }
+            _ => return_errno!(ENOSYS, "not supported"),
+        };
+        unreachable!();
+    }
+}
+
+impl PipeReader {
+    fn get_ready_len(&self) -> usize {
+        self.consumer.ready_len()
     }
 }
 
@@ -194,7 +210,12 @@ impl File for PipeWriter {
     }
 
     fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-        ioctl_inner(cmd)
+        match cmd {
+            IoctlCmd::TCGETS(_) => return_errno!(ENOTTY, "not tty device"),
+            IoctlCmd::TCSETS(_) => return_errno!(ENOTTY, "not tty device"),
+            _ => return_errno!(ENOSYS, "not supported"),
+        };
+        unreachable!();
     }
 }
 
@@ -247,13 +268,4 @@ impl PipeType for FileRef {
             .downcast_ref::<PipeWriter>()
             .ok_or_else(|| errno!(EBADF, "not a pipe writer"))
     }
-}
-
-fn ioctl_inner(cmd: &mut IoctlCmd) -> Result<i32> {
-    match cmd {
-        IoctlCmd::TCGETS(_) => return_errno!(ENOTTY, "not tty device"),
-        IoctlCmd::TCSETS(_) => return_errno!(ENOTTY, "not tty device"),
-        _ => return_errno!(ENOSYS, "not supported"),
-    };
-    unreachable!();
 }

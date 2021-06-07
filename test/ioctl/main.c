@@ -5,11 +5,14 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <fcntl.h>
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <spawn.h>
+#include <sys/wait.h>
 #include <sgx_report.h>
 #include <sgx_quote.h>
 #ifndef OCCLUM_DISABLE_DCAP
@@ -487,21 +490,78 @@ int test_ioctl_SIOCGIFCONF(void) {
 }
 
 int test_ioctl_FIONBIO(void) {
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    int test_sock[2], sock;
+    test_sock[0] = socket(AF_INET, SOCK_STREAM, 0);
+    test_sock[1] = socket(AF_UNIX, SOCK_STREAM, 0);
 
-    int on = 1;
-    if (ioctl(sock, FIONBIO, &on) < 0) {
+    for (int i = 0; i < 2; i++) {
+        sock = test_sock[i];
+        int on = 1;
+        if (ioctl(sock, FIONBIO, &on) < 0) {
+            close(sock);
+            THROW_ERROR("ioctl FIONBIO failed");
+        }
+
+        int actual_flags = fcntl(sock, F_GETFL);
+        if ((actual_flags & O_NONBLOCK) == 0) {
+            close(sock);
+            THROW_ERROR("failed to check the O_NONBLOCK flag after FIONBIO");
+        }
+
         close(sock);
-        THROW_ERROR("ioctl FIONBIO failed");
+    }
+    return 0;
+}
+
+int test_ioctl_FIOCLEX(void) {
+    // Open a file with O_CLOEXEC (close-on-exec)
+    char *tmp_file = "/tmp/test_fioclex";
+    int fd = open(tmp_file, O_CREAT | O_CLOEXEC, 0666);
+    if (fd < 0) {
+        THROW_ERROR("failed to open the tmp file");
     }
 
-    int actual_flags = fcntl(sock, F_GETFL);
-    if ((actual_flags & O_NONBLOCK) == 0) {
-        close(sock);
-        THROW_ERROR("failed to check the O_NONBLOCK flag after FIONBIO");
+    // change this fd to "no close-on-exec"
+    int ret = ioctl(fd, FIONCLEX, NULL);
+    if (ret != 0) {
+        THROW_ERROR("ioctl FIONCLEX failed");
     }
 
-    close(sock);
+    int pipefds[2];
+    ret = pipe(pipefds);
+    if (ret != 0) {
+        THROW_ERROR("failed to create pipe");
+    }
+
+    // set close on exec on reader end
+    ret = ioctl(pipefds[0], FIOCLEX, NULL);
+    if (ret != 0) {
+        THROW_ERROR("ioctl FIOCLEX failed");
+    }
+
+    // construct child process args
+    int child_pid, status;
+    int child_argc =
+        6; // ./nauty_child -t fioclex regular_file_fd pipe_reader_fd pipe_writer_fd
+    char **child_argv = calloc(1, sizeof(char *) * (child_argc + 1));
+    child_argv[0] = strdup("naughty_child");
+    child_argv[1] = strdup("-t");
+    child_argv[2] = strdup("fioclex");
+    asprintf(&child_argv[3], "%d", fd);
+    asprintf(&child_argv[4], "%d", pipefds[0]);
+    asprintf(&child_argv[5], "%d", pipefds[1]);
+
+    ret = posix_spawn(&child_pid, "/bin/naughty_child", NULL, NULL, child_argv, NULL);
+    if (ret != 0) {
+        THROW_ERROR("failed to spawn a child process\n");
+    }
+
+    ret = waitpid(child_pid, &status, 0);
+    if (ret < 0) {
+        THROW_ERROR("failed to wait4 the child process");
+    }
+    printf("child process %d exit status = %d\n", child_pid, status);
+
     return 0;
 }
 
@@ -522,6 +582,7 @@ static test_case_t test_cases[] = {
 #endif
     TEST_CASE(test_ioctl_SIOCGIFCONF),
     TEST_CASE(test_ioctl_FIONBIO),
+    TEST_CASE(test_ioctl_FIOCLEX),
 };
 
 int main() {
