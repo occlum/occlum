@@ -407,7 +407,7 @@ jobs:
       run: docker exec python_glibc_support_test bash -c "cd /root/occlum/demos/python/python_glibc; SGX_MODE=SIM ./run_python_on_occlum.sh"
 
     - name: Check result
-      run: docker exec python_support_test bash -c "cd /root/occlum/demos/python/python_glibc/occlum_instance; cat smvlight.dat"
+      run: docker exec python_glibc_support_test bash -c "cd /root/occlum/demos/python/python_glibc/occlum_instance; cat smvlight.dat"
 
   # Redis test
   Redis_support_test:
