@@ -29,6 +29,6 @@ if [ ! -d "image/lib/python3" ];then
     occlum build
 fi
 
-# Run the hello world sample
+# Run the python demo
 echo -e "${BLUE}occlum run /bin/python3 demo.py${NC}"
 occlum run /bin/python3 demo.py

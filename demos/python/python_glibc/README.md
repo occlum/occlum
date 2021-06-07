@@ -15,18 +15,18 @@ Occlum is compatible with glibc-supported Python, we employ miniconda as python 
 Step 1 (on the host): Start an Occlum container
 ```
 docker pull occlum/occlum:0.22.0-ubuntu18.04
-docker run -it  --privileged --name=pythonDemo --device /dev/sgx/enclave occlum/occlum:0.22.0-ubuntu18.04 bash
+docker run -it --privileged --name=pythonDemo --device /dev/sgx/enclave occlum/occlum:0.22.0-ubuntu18.04 bash
 ```
 
 Step 2 (on the host): Download miniconda and install python to prefix position.
 ```
 cd /root/occlum/demos/python/python_glibc
-./install_python_using_conda.sh
+bash ./install_python_using_conda.sh
 ```
 
 Step 3 (on the host): Run the sample code on Occlum
 ```
 cd /root/occlum/demos/python/python_glibc
-./run_python_on_occlum.sh
+bash ./run_python_on_occlum.sh
 ```
 It will process CSV data files and generate a file (`smvlight.dat`) in `./occlum_instance`.
