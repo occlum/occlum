@@ -49,7 +49,7 @@ lazy_static! {
 ///
 /// # Safety
 ///
-/// All I/O methods are based on the assumption that the resources (e.g., file descriptors, pointers, etc.) 
+/// All I/O methods are based on the assumption that the resources (e.g., file descriptors, pointers, etc.)
 /// given in their arguments are valid before the completion of the async I/O.
 pub struct IoUring {
     inner: Arc<io_uring::concurrent::IoUring>,
@@ -89,7 +89,7 @@ impl IoUring {
     /// Push a connect request into the submission queue of the io_uring.
     ///
     /// # Safety
-    /// 
+    ///
     /// See the safety section of the `IoUring`.
     pub unsafe fn connect(
         &self,
@@ -112,7 +112,7 @@ impl IoUring {
     /// Push a poll_add request into the submission queue of the io_uring.
     ///
     /// # Safety
-    /// 
+    ///
     /// See the safety section of the `IoUring`.
     pub unsafe fn poll_add(
         &self,
@@ -134,7 +134,7 @@ impl IoUring {
     /// Push a poll_remove request into the submission queue of the io_uring.
     ///
     /// # Safety
-    /// 
+    ///
     /// See the safety section of the `IoUring`.
     pub unsafe fn poll_remove(
         &self,
@@ -154,7 +154,7 @@ impl IoUring {
     /// Push a read request into the submission queue of the io_uring.
     ///
     /// # Safety
-    /// 
+    ///
     /// See the safety section of the `IoUring`.
     pub unsafe fn read(
         &self,
@@ -235,7 +235,7 @@ impl IoUring {
     /// Push a writev request into the submission queue of the io_uring.
     ///
     /// # Safety
-    /// 
+    ///
     /// See the safety section of the `IoUring`.
     pub unsafe fn writev(
         &self,
@@ -286,7 +286,7 @@ impl IoUring {
     /// Push a sendmsg request into the submission queue of the io_uring.
     ///
     /// # Safety
-    /// 
+    ///
     /// See the safety section of the `IoUring`.
     pub unsafe fn sendmsg(
         &self,
@@ -310,7 +310,7 @@ impl IoUring {
     /// Push a fsync request into the submission queue of the io_uring.
     ///
     /// # Safety
-    /// 
+    ///
     /// See the safety section of the `IoUring`.
     pub unsafe fn fsync(
         &self,
@@ -355,6 +355,22 @@ impl IoUring {
         }
     }
 
+    /// Start a helper thread that is busy doing `io_uring_enter` on this io_uring instance.
+    ///
+    /// # Why a helper thread?
+    ///
+    /// The io_uring implementation on the latest Linux kernel only has a limited (even buggy)
+    /// support for kernel-polling mode. To address this limitation, we can start a helper thread
+    /// that keeps entering into the kernel and polling I/O requests from the submission queue of
+    /// the io_uring instance.
+    ///
+    /// # Safety
+    ///
+    /// This API is unsafe due to the fact that the thread has no idea when the io_uring instance
+    /// is destroyed, thus invalidating the file descriptor of io_uring that is still in use by the thread.
+    /// This unexpected invalidation is---in most cases---harmless. This is because an io_uring
+    /// instance is most likely used as a singleton in a process and will not get destroyed until
+    /// the end of the process.
     pub unsafe fn start_enter_syscall_thread(&self) {
         self.inner.start_enter_syscall_thread();
     }

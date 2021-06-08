@@ -49,7 +49,7 @@ impl Token {
     pub fn cancel(&self) {
         todo!();
     }
-    
+
     #[allow(dead_code)]
     pub fn is_cancalling(&self) -> bool {
         self.state.load(Ordering::Acquire) == State::Cancelling
