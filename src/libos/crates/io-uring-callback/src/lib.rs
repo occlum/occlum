@@ -1,4 +1,22 @@
-//! An IoUring with callback-based async I/O APIs.
+//! Rust io_uring APIs with callback-based completion notifications.
+//!
+//! # Overview
+//!
+//! While the original [io_uring crate](https://github.com/tokio-rs/io-uring) exposes io_uring's API in Rust, it has
+//! one big shortcoming: users have to manually pop entries out of the completion queue and map those entries to
+//! user requests.
+//!
+//! This crate provides a more convenient callback-based APIs, which trigger user-provided callback on the completion
+//! of requests.
+//!
+//! # Example
+//!
+//! Here is an example.
+//!
+//!
+
+#![feature(get_mut_unchecked)]
+
 #![cfg_attr(feature = "sgx", no_std)]
 
 #[cfg(feature = "sgx")]
@@ -13,8 +31,6 @@ extern crate sgx_trts;
 
 extern crate atomic;
 extern crate io_uring;
-#[macro_use]
-extern crate lazy_static;
 extern crate slab;
 
 #[cfg(feature = "sgx")]
@@ -24,7 +40,7 @@ use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll, Waker};
 use std::io;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 #[cfg(not(feature = "sgx"))]
 use std::sync::Mutex;
 #[cfg(feature = "sgx")]
@@ -40,11 +56,6 @@ mod operation;
 pub use io_uring::opcode::types::{Fd, Fixed};
 use io_uring::squeue::Entry as SqEntry;
 
-// TODO: move it into IoUring.
-lazy_static! {
-    static ref TOKEN_SLAB: Mutex<Slab<Token>> = Mutex::new(Slab::new());
-}
-
 /// An io_uring instance augmented with callback-based I/O interfaces.
 ///
 /// # Safety
@@ -52,13 +63,26 @@ lazy_static! {
 /// All I/O methods are based on the assumption that the resources (e.g., file descriptors, pointers, etc.)
 /// given in their arguments are valid before the completion of the async I/O.
 pub struct IoUring {
-    inner: Arc<io_uring::concurrent::IoUring>,
+    ring: io_uring::concurrent::IoUring,
+    token_slab: Mutex<Slab<Token>>,
+    weak_self: Weak<Self>,
 }
 
 impl IoUring {
-    pub(crate) fn new(inner: io_uring::IoUring) -> Self {
-        let inner = Arc::new(inner.concurrent());
-        Self { inner }
+    pub(crate) fn new(ring: io_uring::IoUring) -> Arc<Self> {
+        let new_self = {
+            let ring = ring.concurrent();
+            let token_slab = Mutex::new(Slab::new());
+            let weak_self = Weak::default();
+            Self { ring, token_slab, weak_self, }
+        };
+        let mut arc_self = Arc::new(new_self);
+        let weak_self = Arc::downgrade(&arc_self);
+        // Safety. No Arc or Weak pointers to this Arc are destroyed for the duration of this unsafey block.
+        unsafe {
+            Arc::get_mut_unchecked(&mut arc_self).weak_self = weak_self;
+        }
+        arc_self
     }
 
     /// Push an accept request into the submission queue of the io_uring.
@@ -336,11 +360,11 @@ impl IoUring {
 
     /// Scan for completed async I/O and trigger their registered callbacks.
     pub fn trigger_callbacks(&self) {
-        let cq = self.inner.completion();
+        let cq = self.ring.completion();
         while let Some(cqe) = cq.pop() {
             let retval = cqe.result();
             let token_idx = cqe.user_data() as usize;
-            let token_slab = TOKEN_SLAB.lock().unwrap();
+            let token_slab = self.token_slab.lock().unwrap();
             let token = token_slab.get(token_idx).unwrap();
             let callback = token.complete(retval);
             drop(token_slab);
@@ -350,7 +374,7 @@ impl IoUring {
 
     /// Submit all I/O requests in the submission queue to Linux kernel.
     pub fn submit(&self) {
-        if let Err(e) = self.inner.submit() {
+        if let Err(e) = self.ring.submit() {
             panic!("submit failed, error: {}", e);
         }
     }
@@ -372,14 +396,14 @@ impl IoUring {
     /// instance is most likely used as a singleton in a process and will not get destroyed until
     /// the end of the process.
     pub unsafe fn start_enter_syscall_thread(&self) {
-        self.inner.start_enter_syscall_thread();
+        self.ring.start_enter_syscall_thread();
     }
 
     // Push an entry to the submission queue of the io_uring instance.
     //
     // Safety. All resources referenced by the entry must be valid before its completion.
     unsafe fn push_entry(&self, entry: SqEntry) {
-        if self.inner.submission().push(entry).is_err() {
+        if self.ring.submission().push(entry).is_err() {
             panic!("sq must be large enough");
         }
     }
@@ -391,26 +415,27 @@ impl IoUring {
 
     fn gen_token(&self, callback: impl FnOnce(i32) + Send + 'static) -> usize {
         let token = Token::new(callback);
-        let token_idx = TOKEN_SLAB.lock().unwrap().insert(token);
+        let token_idx = self.token_slab.lock().unwrap().insert(token);
         token_idx
     }
 
     fn gen_handle(&self, token_idx: usize) -> Handle {
         Handle {
-            io_uring: self.inner.clone(),
+            io_uring: self.weak_self.upgrade().unwrap(),
             token_idx,
         }
     }
 }
 
 pub struct Handle {
-    io_uring: Arc<io_uring::concurrent::IoUring>,
+    io_uring: Arc<IoUring>,
     token_idx: usize,
 }
 
 impl Handle {
     pub fn retval(&self) -> Option<i32> {
-        TOKEN_SLAB
+        self.io_uring
+            .token_slab
             .lock()
             .unwrap()
             .get(self.token_idx)
@@ -419,7 +444,8 @@ impl Handle {
     }
 
     pub fn is_completed(&self) -> bool {
-        TOKEN_SLAB
+        self.io_uring
+            .token_slab
             .lock()
             .unwrap()
             .get(self.token_idx)
@@ -440,7 +466,8 @@ impl Handle {
     }
 
     pub fn set_waker(&self, waker: Waker) {
-        TOKEN_SLAB
+        self.io_uring
+            .token_slab
             .lock()
             .unwrap()
             .get(self.token_idx)
@@ -466,7 +493,7 @@ impl Future for Handle {
 
 impl Drop for Handle {
     fn drop(&mut self) {
-        let mut token_slab = TOKEN_SLAB.lock().unwrap();
+        let mut token_slab = self.io_uring.token_slab.lock().unwrap();
         debug_assert!(token_slab.contains(self.token_idx));
         token_slab.remove(self.token_idx);
     }
@@ -509,7 +536,7 @@ impl Builder {
 
     /// Build a [IoUring].
     #[inline]
-    pub fn build(&self, entries: u32) -> io::Result<IoUring> {
+    pub fn build(&self, entries: u32) -> io::Result<Arc<IoUring>> {
         let io_uring_inner = self.inner.build(entries)?;
         let io_uring = IoUring::new(io_uring_inner);
         Ok(io_uring)
@@ -560,7 +587,7 @@ mod tests {
             let mut inner = clone.lock().unwrap();
             inner.replace(retval);
         };
-        let handle = unsafe {
+        let _handle = unsafe {
             io_uring.writev(
                 fd,
                 w_iovecs.as_ptr().cast(),
@@ -588,7 +615,7 @@ mod tests {
             let mut inner = clone.lock().unwrap();
             inner.replace(retval);
         };
-        let handle = unsafe {
+        let _handle = unsafe {
             io_uring.readv(
                 fd,
                 r_iovecs.as_ptr().cast(),
