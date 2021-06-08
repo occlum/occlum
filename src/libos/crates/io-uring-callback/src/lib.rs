@@ -38,11 +38,19 @@ use crate::operation::Token;
 mod operation;
 
 pub use io_uring::opcode::types::{Fd, Fixed};
+use io_uring::squeue::Entry as SqEntry;
 
+// TODO: move it into IoUring.
 lazy_static! {
     static ref TOKEN_SLAB: Mutex<Slab<Token>> = Mutex::new(Slab::new());
 }
 
+/// An io_uring instance augmented with callback-based I/O interfaces.
+///
+/// # Safety
+///
+/// All I/O methods are based on the assumption that the resources (e.g., file descriptors, pointers, etc.) 
+/// given in their arguments are valid before the completion of the async I/O.
 pub struct IoUring {
     inner: Arc<io_uring::concurrent::IoUring>,
 }
@@ -53,6 +61,11 @@ impl IoUring {
         Self { inner }
     }
 
+    /// Push an accept request into the submission queue of the io_uring.
+    ///
+    /// # Safety
+    ///
+    /// See the safety section of the `IoUring`.
     pub unsafe fn accept(
         &self,
         fd: Fd,
@@ -68,14 +81,16 @@ impl IoUring {
             .flags(flags)
             .build()
             .user_data(token_idx as _);
-        if let Err(entry) = self.inner.submission().push(entry) {
-            panic!("sq must be large enough");
-        }
+        self.push_entry(entry);
 
-        let handle = self.gen_handle(token_idx);
-        handle
+        self.gen_handle(token_idx)
     }
 
+    /// Push a connect request into the submission queue of the io_uring.
+    ///
+    /// # Safety
+    /// 
+    /// See the safety section of the `IoUring`.
     pub unsafe fn connect(
         &self,
         fd: Fd,
@@ -89,14 +104,16 @@ impl IoUring {
         let entry = opcode::Connect::new(fd, addr, addrlen)
             .build()
             .user_data(token_idx as _);
-        if let Err(entry) = self.inner.submission().push(entry) {
-            panic!("sq must be large enough");
-        }
+        self.push_entry(entry);
 
-        let handle = self.gen_handle(token_idx);
-        handle
+        self.gen_handle(token_idx)
     }
 
+    /// Push a poll_add request into the submission queue of the io_uring.
+    ///
+    /// # Safety
+    /// 
+    /// See the safety section of the `IoUring`.
     pub unsafe fn poll_add(
         &self,
         fd: Fd,
@@ -109,14 +126,16 @@ impl IoUring {
         let entry = opcode::PollAdd::new(fd, flags)
             .build()
             .user_data(token_idx as _);
-        if let Err(entry) = self.inner.submission().push(entry) {
-            panic!("sq must be large enough");
-        }
+        self.push_entry(entry);
 
-        let handle = self.gen_handle(token_idx);
-        handle
+        self.gen_handle(token_idx)
     }
 
+    /// Push a poll_remove request into the submission queue of the io_uring.
+    ///
+    /// # Safety
+    /// 
+    /// See the safety section of the `IoUring`.
     pub unsafe fn poll_remove(
         &self,
         user_data: u64,
@@ -127,14 +146,16 @@ impl IoUring {
         let entry = opcode::PollRemove::new(user_data)
             .build()
             .user_data(token_idx as _);
-        if let Err(entry) = self.inner.submission().push(entry) {
-            panic!("sq must be large enough");
-        }
+        self.push_entry(entry);
 
-        let handle = self.gen_handle(token_idx);
-        handle
+        self.gen_handle(token_idx)
     }
 
+    /// Push a read request into the submission queue of the io_uring.
+    ///
+    /// # Safety
+    /// 
+    /// See the safety section of the `IoUring`.
     pub unsafe fn read(
         &self,
         fd: Fd,
@@ -152,14 +173,16 @@ impl IoUring {
             .rw_flags(flags)
             .build()
             .user_data(token_idx as _);
-        if let Err(entry) = self.inner.submission().push(entry) {
-            panic!("sq must be large enough");
-        }
+        self.push_entry(entry);
 
-        let handle = self.gen_handle(token_idx);
-        handle
+        self.gen_handle(token_idx)
     }
 
+    /// Push a write request into the submission queue of the io_uring.
+    ///
+    /// # Safety
+    ///
+    /// See the safety section of the `IoUring`.
     pub unsafe fn write(
         &self,
         fd: Fd,
@@ -177,14 +200,16 @@ impl IoUring {
             .rw_flags(flags)
             .build()
             .user_data(token_idx as _);
-        if let Err(entry) = self.inner.submission().push(entry) {
-            panic!("sq must be large enough");
-        }
+        self.push_entry(entry);
 
-        let handle = self.gen_handle(token_idx);
-        handle
+        self.gen_handle(token_idx)
     }
 
+    /// Push a readv request into the submission queue of the io_uring.
+    ///
+    /// # Safety
+    ///
+    /// See the safety section of the `IoUring`.
     pub unsafe fn readv(
         &self,
         fd: Fd,
@@ -202,14 +227,16 @@ impl IoUring {
             .rw_flags(flags)
             .build()
             .user_data(token_idx as _);
-        if let Err(entry) = self.inner.submission().push(entry) {
-            panic!("sq must be large enough");
-        }
+        self.push_entry(entry);
 
-        let handle = self.gen_handle(token_idx);
-        handle
+        self.gen_handle(token_idx)
     }
 
+    /// Push a writev request into the submission queue of the io_uring.
+    ///
+    /// # Safety
+    /// 
+    /// See the safety section of the `IoUring`.
     pub unsafe fn writev(
         &self,
         fd: Fd,
@@ -227,14 +254,16 @@ impl IoUring {
             .rw_flags(flags)
             .build()
             .user_data(token_idx as _);
-        if let Err(entry) = self.inner.submission().push(entry) {
-            panic!("sq must be large enough");
-        }
+        self.push_entry(entry);
 
-        let handle = self.gen_handle(token_idx);
-        handle
+        self.gen_handle(token_idx)
     }
 
+    /// Push a recvmsg request into the submission queue of the io_uring.
+    ///
+    /// # Safety
+    ///
+    /// See the safety section of the `IoUring`.
     pub unsafe fn recvmsg(
         &self,
         fd: Fd,
@@ -249,14 +278,16 @@ impl IoUring {
             .flags(flags)
             .build()
             .user_data(token_idx as _);
-        if let Err(entry) = self.inner.submission().push(entry) {
-            panic!("sq must be large enough");
-        }
+        self.push_entry(entry);
 
-        let handle = self.gen_handle(token_idx);
-        handle
+        self.gen_handle(token_idx)
     }
 
+    /// Push a sendmsg request into the submission queue of the io_uring.
+    ///
+    /// # Safety
+    /// 
+    /// See the safety section of the `IoUring`.
     pub unsafe fn sendmsg(
         &self,
         fd: Fd,
@@ -271,14 +302,16 @@ impl IoUring {
             .flags(flags)
             .build()
             .user_data(token_idx as _);
-        if let Err(entry) = self.inner.submission().push(entry) {
-            panic!("sq must be large enough");
-        }
+        self.push_entry(entry);
 
-        let handle = self.gen_handle(token_idx);
-        handle
+        self.gen_handle(token_idx)
     }
 
+    /// Push a fsync request into the submission queue of the io_uring.
+    ///
+    /// # Safety
+    /// 
+    /// See the safety section of the `IoUring`.
     pub unsafe fn fsync(
         &self,
         fd: Fd,
@@ -296,12 +329,9 @@ impl IoUring {
             opcode::Fsync::new(fd).build().user_data(token_idx as _)
         };
 
-        if let Err(entry) = self.inner.submission().push(entry) {
-            panic!("sq must be large enough");
-        }
+        self.push_entry(entry);
 
-        let handle = self.gen_handle(token_idx);
-        handle
+        self.gen_handle(token_idx)
     }
 
     /// Scan for completed async I/O and trigger their registered callbacks.
@@ -318,13 +348,23 @@ impl IoUring {
         }
     }
 
+    /// Submit all I/O requests in the submission queue to Linux kernel.
+    pub fn submit(&self) {
+        if let Err(e) = self.inner.submit() {
+            panic!("submit failed, error: {}", e);
+        }
+    }
+
     pub unsafe fn start_enter_syscall_thread(&self) {
         self.inner.start_enter_syscall_thread();
     }
 
-    pub fn submit(&self) {
-        if let Err(e) = self.inner.submit() {
-            panic!("submit failed, error: {}", e);
+    // Push an entry to the submission queue of the io_uring instance.
+    //
+    // Safety. All resources referenced by the entry must be valid before its completion.
+    unsafe fn push_entry(&self, entry: SqEntry) {
+        if self.inner.submission().push(entry).is_err() {
+            panic!("sq must be large enough");
         }
     }
 
@@ -416,12 +456,14 @@ impl Drop for Handle {
     }
 }
 
+/// A builder for `IoUring`.
 #[derive(Default)]
 pub struct Builder {
     inner: io_uring::Builder,
 }
 
 impl Builder {
+    /// Creates a `IoUring` builder.
     pub fn new() -> Self {
         Default::default()
     }

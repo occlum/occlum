@@ -9,9 +9,11 @@ use std::task::Waker;
 
 use atomic::{Atomic, Ordering};
 
+pub type Callback = Box<dyn FnOnce(i32) + Send + 'static>;
+
 pub struct Token {
     state: Atomic<State>,
-    callback: Mutex<Option<Box<dyn FnOnce(i32) + Send + 'static>>>,
+    callback: Mutex<Option<Callback>>,
     waker: Mutex<Option<Waker>>,
 }
 
@@ -43,16 +45,18 @@ impl Token {
         }
     }
 
+    #[allow(dead_code)]
     pub fn cancel(&self) {
         todo!();
+    }
+    
+    #[allow(dead_code)]
+    pub fn is_cancalling(&self) -> bool {
+        self.state.load(Ordering::Acquire) == State::Cancelling
     }
 
     pub fn is_cancelled(&self) -> bool {
         self.state.load(Ordering::Acquire) == State::Cancelled
-    }
-
-    pub fn is_cancalling(&self) -> bool {
-        self.state.load(Ordering::Acquire) == State::Cancelling
     }
 
     pub fn is_completed(&self) -> bool {
