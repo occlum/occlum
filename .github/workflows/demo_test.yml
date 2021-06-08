@@ -308,6 +308,30 @@ jobs:
     - name: Run Tensorflow-lite benchmark
       run: docker exec tflite_test bash -c "cd /root/occlum/demos/tensorflow_lite && SGX_MODE=SIM ./run_tflite_in_occlum.sh benchmark"
 
+  Pytorch_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
+
+    - name: Create container
+      run: docker run -itd --name=pytorch_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+
+    - name: Build dependencies
+      run: docker exec pytorch_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec pytorch_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+
+    - name: Build python and pytorch
+      run: docker exec pytorch_test bash -c "cd /root/occlum/demos/pytorch; ./install_python_with_conda.sh"
+
+    - name: Run pytorch test
+      run: docker exec pytorch_test bash -c "cd /root/occlum/demos/pytorch; SGX_MODE=SIM ./run_pytorch_on_occlum.sh"
 
 # Below tests needs test image to run faster
   Grpc_test:

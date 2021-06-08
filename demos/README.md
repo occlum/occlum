@@ -20,6 +20,7 @@ This set of demos shows how real-world apps can be easily run inside SGX enclave
 * [https_server](https_server/): A HTTPS file server based on [Mongoose Embedded Web Server Library](https://github.com/cesanta/mongoose).
 * [grpc](grpc/): A client and server communicating through [gRPC](https://grpc.io).
 * [openvino](openvino/) A benchmark of [OpenVINO Inference Engine](https://docs.openvinotoolkit.org/2019_R3/_docs_IE_DG_inference_engine_intro.html).
+* [pytorch](pytorch/): A demo of [PyTorch](https://pytorch.org/).
 * [redis](redis/): A demo of [redis](https://redis.io).
 * [sqlite](sqlite/) A demo of [SQLite](https://www.sqlite.org) SQL database engine.
 * [tensorflow_lite](tensorflow_lite/): A demo and benchmark of [Tensorflow Lite](https://www.tensorflow.org/lite) inference engine.
