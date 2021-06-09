@@ -1,5 +1,6 @@
 use super::do_arch_prctl::ArchPrctlCode;
 use super::do_clone::CloneFlags;
+use super::do_exec::do_exec;
 use super::do_futex::{FutexFlags, FutexOp, FutexTimeout};
 use super::do_spawn::FileAction;
 use super::do_wait4::WaitOptions;
@@ -428,4 +429,17 @@ pub fn do_getgroups(size: isize, buf_ptr: *mut u32) -> Result<isize> {
         //Occlum only has 1 group
         Ok(1)
     }
+}
+
+pub fn do_execve(path: *const i8, argv: *const *const i8, envp: *const *const i8) -> Result<isize> {
+    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
+    let argv = clone_cstrings_safely(argv)?;
+    let envp = clone_cstrings_safely(envp)?;
+    let current = current!();
+    debug!(
+        "execve: path: {:?}, argv: {:?}, envp: {:?}",
+        path, argv, envp
+    );
+
+    do_exec(&path, &argv, &envp, &current)
 }

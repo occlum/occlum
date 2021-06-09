@@ -8,7 +8,7 @@ use crate::prelude::*;
 /// And when a ThreadID instance is freed, its ID is automatically freed too.
 #[derive(Debug, PartialEq)]
 pub struct ThreadId {
-    tid: u32,
+    pub tid: u32,
 }
 
 impl ThreadId {
@@ -41,7 +41,7 @@ impl Drop for ThreadId {
         }
 
         let mut alloc = THREAD_ID_ALLOC.lock().unwrap();
-        alloc.free(self.tid).expect("tid must has been allocated");
+        alloc.free(self.tid);
     }
 }
 
@@ -90,7 +90,9 @@ impl IdAlloc {
     }
 
     pub fn free(&mut self, id: u32) -> Option<u32> {
-        debug_assert!(self.used_ids.contains(&id));
+        // Note: When enableing "execve", there is situation that the ThreadId is reused.
+        // And thus when exit, it may free twice.
+        // debug_assert!(self.used_ids.contains(&id));
         if self.used_ids.remove(&id) {
             Some(id)
         } else {
