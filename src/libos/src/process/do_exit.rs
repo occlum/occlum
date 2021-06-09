@@ -3,7 +3,7 @@ use std::intrinsics::atomic_store;
 
 use super::do_futex::futex_wake;
 use super::process::{Process, ProcessFilter};
-use super::{table, TermStatus, ThreadRef, ThreadStatus};
+use super::{table, ProcessRef, TermStatus, ThreadRef, ThreadStatus};
 use crate::prelude::*;
 use crate::signal::{KernelSignal, SigNum};
 
@@ -56,6 +56,10 @@ fn exit_thread(term_status: TermStatus) {
     if num_remaining_threads == 0 {
         exit_process(&thread, term_status);
     }
+
+    // Notify a thread, if any, that wait on this thread to exit.
+    // E.g. In execve, the new thread should wait for old process's all thread to exit
+    futex_wake(Arc::as_ptr(&thread.process()) as *const i32, 1);
 }
 
 fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
@@ -132,4 +136,69 @@ fn send_sigchld_to(parent: &Arc<Process>) {
     let signal = Box::new(KernelSignal::new(SigNum::from(SIGCHLD)));
     let mut sig_queues = parent.sig_queues().write().unwrap();
     sig_queues.enqueue(signal);
+}
+
+pub fn exit_old_process_for_execve(term_status: TermStatus, new_parent_ref: ProcessRef) {
+    let thread = current!();
+
+    // Exit current thread
+    let num_remaining_threads = thread.exit(term_status);
+    if thread.tid() != thread.process().pid() {
+        // Keep the main thread's tid available as long as the process is not destroyed.
+        // Main thread doesn't need to delete here. It will be repalced later.
+        table::del_thread(thread.tid()).expect("tid must be in the table");
+    }
+
+    debug_assert!(num_remaining_threads == 0);
+    exit_process_for_execve(&thread, new_parent_ref, term_status);
+}
+
+// Let new parent process to adopt current process' children
+fn exit_process_for_execve(
+    thread: &ThreadRef,
+    new_parent_ref: ProcessRef,
+    term_status: TermStatus,
+) {
+    let process = thread.process();
+
+    // Deadlock note: always lock parent first, then child.
+    // Lock the idle process since it may adopt new children.
+    let idle_ref = super::IDLE.process().clone();
+    let mut idle_inner = idle_ref.inner();
+
+    // Lock the parent process as we want to prevent race conditions between
+    // current's exit() and parent's wait5().
+    let mut parent;
+    let mut parent_inner = loop {
+        parent = process.parent();
+        if parent.pid() == 0 {
+            // If the parent is the idle process, don't need to lock again
+            break None;
+        }
+
+        let parent_inner = parent.inner();
+        // To prevent the race condition that parent is changed after `parent()`,
+        // but before `parent().innner()`, we need to check again here.
+        if parent.pid() != process.parent().pid() {
+            continue;
+        }
+        break Some(parent_inner);
+    };
+
+    // Lock the current process
+    let mut process_inner = process.inner();
+    let mut new_parent_inner = new_parent_ref.inner();
+    let pid = process.pid();
+
+    // Let new_process to adopt the children of current process
+    process_inner.exit(term_status, &new_parent_ref, &mut new_parent_inner);
+
+    // Remove current process from parent process' zombie list.
+    if parent_inner.is_none() {
+        debug_assert!(parent.pid() == 0);
+        idle_inner.remove_zombie_child(pid);
+        return;
+    }
+
+    parent_inner.unwrap().remove_zombie_child(pid);
 }

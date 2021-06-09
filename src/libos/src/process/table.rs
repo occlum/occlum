@@ -31,6 +31,11 @@ pub(super) fn del_process(pid: pid_t) -> Result<ProcessRef> {
     PROCESS_TABLE.lock().unwrap().del(pid)
 }
 
+pub fn replace_process(pid: pid_t, new_process: ProcessRef) -> Result<()> {
+    del_process(pid);
+    add_process(new_process)
+}
+
 pub fn get_thread(tid: pid_t) -> Result<ThreadRef> {
     THREAD_TABLE.lock().unwrap().get(tid)
 }
@@ -41,6 +46,11 @@ pub(super) fn add_thread(thread: ThreadRef) -> Result<()> {
 
 pub(super) fn del_thread(tid: pid_t) -> Result<ThreadRef> {
     THREAD_TABLE.lock().unwrap().del(tid)
+}
+
+pub(super) fn replace_thread(tid: pid_t, new_thread: ThreadRef) -> Result<()> {
+    del_thread(tid);
+    add_thread(new_thread)
 }
 
 pub fn debug() {

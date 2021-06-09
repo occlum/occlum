@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <features.h>
 #include <sys/stat.h>
+#include <pthread.h>
+#include <unistd.h>
 #include "test.h"
 
 char **g_argv;
@@ -100,6 +102,94 @@ int test_ioctl_fioclex() {
     return 0;
 }
 
+// This child process will first create multiple threads which are waiting on a condition
+// and then a child thread will call execve and all threads should be destroyed except the
+// main thread. Use "pthread" test case as reference.
+#define NTHREADS                (5)
+#define WAIT_ROUND          (100000)
+
+struct thread_cond_arg {
+    int                         ti;
+    volatile unsigned int      *val;
+    volatile int               *exit_thread_count;
+    pthread_cond_t             *cond_val;
+    pthread_mutex_t            *mutex;
+};
+
+static void *thread_cond_wait(void *_arg) {
+    struct thread_cond_arg *arg = _arg;
+    printf("Thread #%d: start to wait on condition variable.\n", arg->ti);
+    for (unsigned int i = 0; i < WAIT_ROUND; ++i) {
+        pthread_mutex_lock(arg->mutex);
+        // execve on a child thread with mutex
+        if (arg->ti == NTHREADS - 4) {
+            char *args[] = {"/bin/getpid", NULL};
+            if (execve("/bin/getpid", args, NULL) < 0) {
+                printf("execve failed with errno: %d", errno);
+                exit(errno);
+            }
+        }
+        while (*(arg->val) == 0) {
+            pthread_cond_wait(arg->cond_val, arg->mutex);
+        }
+        pthread_mutex_unlock(arg->mutex);
+    }
+    (*arg->exit_thread_count)++;
+    printf("Thread #%d: exited.\n", arg->ti);
+    return NULL;
+}
+
+int test_execve_child_thread() {
+    volatile unsigned int val = 0;
+    volatile int exit_thread_count = 0;
+    pthread_t threads[NTHREADS];
+    struct thread_cond_arg thread_args[NTHREADS];
+    pthread_cond_t cond_val = PTHREAD_COND_INITIALIZER;
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+    /*
+     * Start the threads waiting on the condition variable
+     */
+    for (int ti = 0; ti < NTHREADS; ti++) {
+        struct thread_cond_arg *thread_arg = &thread_args[ti];
+        thread_arg->ti = ti;
+        thread_arg->val = &val;
+        thread_arg->exit_thread_count = &exit_thread_count;
+        thread_arg->cond_val = &cond_val;
+        thread_arg->mutex = &mutex;
+
+        if (pthread_create(&threads[ti], NULL, thread_cond_wait, thread_arg) < 0) {
+            printf("ERROR: pthread_create failed (ti = %d)\n", ti);
+            return -1;
+        }
+    }
+
+    /*
+    * Unblock all threads currently waiting on the condition variable
+    */
+    while (exit_thread_count < NTHREADS) {
+        pthread_mutex_lock(&mutex);
+        val = 1;
+        pthread_cond_broadcast(&cond_val);
+        pthread_mutex_unlock(&mutex);
+
+        pthread_mutex_lock(&mutex);
+        val = 0;
+        pthread_mutex_unlock(&mutex);
+    }
+
+    // wait for all threads to finish
+    for (int ti = 0; ti < NTHREADS; ti++) {
+        if (pthread_join(threads[ti], NULL) < 0) {
+            printf("ERROR: pthread_join failed (ti = %d)\n", ti);
+            return -1;
+        }
+    }
+
+    THROW_ERROR("This should never be reached!");
+    return -1;
+}
+
 // ============================================================================
 // Test suite
 // ============================================================================
@@ -113,6 +203,8 @@ int start_test(const char *test_name) {
         return test_spawn_attribute_sigdef();
     } else if (strcmp(test_name, "fioclex") == 0) {
         return test_ioctl_fioclex();
+    } else if (strcmp(test_name, "execve_thread") == 0) {
+        return test_execve_child_thread();
     } else {
         fprintf(stderr, "[child] test case not found\n");
         return -1;
@@ -120,8 +212,8 @@ int start_test(const char *test_name) {
 }
 
 void print_usage() {
-    fprintf(stderr, "Usage:\n nauty_child [-t testcase1] [-t testcase2] ...\n\n");
-    fprintf(stderr, " Now support testcase: <sigmask, sigdef, fioclex>\n");
+    fprintf(stderr, "Usage:\n naughty_child [-t testcase1] [-t testcase2] ...\n\n");
+    fprintf(stderr, " Now support testcase: <sigmask, sigdef, fioclex, execve_thread>\n");
 }
 
 int main(int argc, char *argv[]) {

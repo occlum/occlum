@@ -32,6 +32,7 @@ pub use self::thread::{Thread, ThreadStatus};
 
 mod do_arch_prctl;
 mod do_clone;
+mod do_exec;
 mod do_exit;
 mod do_futex;
 mod do_getpid;

@@ -40,8 +40,8 @@ use crate::net::{
     do_shutdown, do_socket, do_socketpair, mmsghdr, msghdr, msghdr_mut,
 };
 use crate::process::{
-    do_arch_prctl, do_clone, do_exit, do_exit_group, do_futex, do_getegid, do_geteuid, do_getgid,
-    do_getgroups, do_getpgid, do_getpid, do_getppid, do_gettid, do_getuid, do_prctl,
+    do_arch_prctl, do_clone, do_execve, do_exit, do_exit_group, do_futex, do_getegid, do_geteuid,
+    do_getgid, do_getgroups, do_getpgid, do_getpid, do_getppid, do_gettid, do_getuid, do_prctl,
     do_set_tid_address, do_spawn_for_glibc, do_spawn_for_musl, do_wait4, pid_t, posix_spawnattr_t,
     FdOp, SpawnFileActions, ThreadStatus,
 };
@@ -144,7 +144,7 @@ macro_rules! process_syscall_table_with_callback {
             (Clone = 56) => do_clone(flags: u32, stack_addr: usize, ptid: *mut pid_t, ctid: *mut pid_t, new_tls: usize),
             (Fork = 57) => handle_unsupported(),
             (Vfork = 58) => handle_unsupported(),
-            (Execve = 59) => handle_unsupported(),
+            (Execve = 59) => do_execve(path: *const i8, argv: *const *const i8, envp: *const *const i8),
             (Exit = 60) => do_exit(exit_status: i32),
             (Wait4 = 61) => do_wait4(pid: i32, _exit_status: *mut i32, options: u32),
             (Kill = 62) => do_kill(pid: i32, sig: c_int),
