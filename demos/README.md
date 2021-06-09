@@ -14,6 +14,7 @@ This set of demos shows how the Occlum toolchain can be used with different buil
 
 This set of demos shows how real-world apps can be easily run inside SGX enclaves with Occlum.
 
+* [cluster_serving](cluster_serving/): A demo of [Analytics Zoo Cluster Serving](https://analytics-zoo.github.io/master/#ClusterServingGuide/ProgrammingGuide/) inference solution.
 * [fish](fish/): A demo of [FISH](https://fishshell.com) shell script.
 * [flink](flink/): A demo of [Apache Flink](https://flink.apache.org).
 * [font](font/font_support_for_java): A demo of supporting font with Java.
