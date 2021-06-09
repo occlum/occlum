@@ -509,6 +509,31 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec flink_test bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_on_occlum_glibc.sh task"
 
+  Cluster_serving_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
+
+    - name: Create container
+      run: docker run -itd --name=cluster_serving_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+
+    - name: Build dependencies
+      run: docker exec cluster_serving_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec cluster_serving_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+
+    - name: Set up environment
+      run: docker exec cluster_serving_test bash -c "cd /root/occlum/demos/cluster_serving; source ./environment.sh; ./install-dependencies.sh"
+
+    - name: Run cluster serving test
+      run: docker exec cluster_serving_test bash -c "cd /root/occlum/demos/cluster_serving; source ./environment.sh; SGX_MODE=SIM ./start-all.sh; ./push-image.sh"
+
   enclave_ra_tls_test:
     runs-on: ubuntu-18.04
     steps:
