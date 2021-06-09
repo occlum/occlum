@@ -231,7 +231,9 @@ pub fn do_getsockopt(
         fd, level, optname, optval, optlen
     );
     let file_ref = current!().file(fd as FileDesc)?;
-    if let Ok(socket) = file_ref.as_host_socket() {
+    let socket = file_ref.as_host_socket();
+
+    if let Ok(socket) = socket {
         let ret = try_libc!(libc::ocall::getsockopt(
             socket.raw_host_fd() as i32,
             level,
@@ -240,9 +242,11 @@ pub fn do_getsockopt(
             optlen
         ));
         Ok(ret as isize)
+    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        warn!("getsockopt for unix socket is unimplemented");
+        Ok(0)
     } else {
-        warn!("getsockeopt is not implemented for non-host socket.");
-        Ok(0 as isize)
+        return_errno!(ENOTSOCK, "not a socket")
     }
 }
 
