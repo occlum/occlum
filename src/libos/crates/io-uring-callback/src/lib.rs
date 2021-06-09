@@ -1,22 +1,39 @@
-//! Rust io_uring APIs with callback-based completion notifications.
+//! A more user-friendly io_uring crate.
 //!
 //! # Overview
 //!
 //! While the original [io_uring crate](https://github.com/tokio-rs/io-uring) exposes io_uring's API in Rust, it has
 //! one big shortcoming: users have to manually pop entries out of the completion queue and map those entries to
-//! user requests.
+//! user requests. It makes the APIs cumbersome to use.
 //!
-//! This crate provides a more convenient callback-based APIs, which trigger user-provided callback on the completion
-//! of requests.
+//! This crate provides more user-friend APIs with the following features:
 //!
-//! # Example
+//! * Callback-based. On the completion of an I/O request, the corresponding user-registered
+//! callback will get invoked. No manual dispatching of I/O completions.
 //!
-//! Here is an example.
+//! * Async/await-ready. After submitting an I/O request, the user will get a handle that
+//! represents the on-going I/O request. The user can await the handle (as it is a `Future`).
+//!
+//! * Polling-based I/O. Both I/O submissions and completions can be easily done in polling mode.
+//!
+//! # Usage
+//!
+//! ## Construct an io_uring instance
 //!
 //!
+//! ## Submit I/O requests
+//!
+//!
+//! ## Poll I/O completions
+//!
+//!
+//! # Handles
+//!
+//! ## The contract
+//!
+//! ## I/O cancelling
 
 #![feature(get_mut_unchecked)]
-
 #![cfg_attr(feature = "sgx", no_std)]
 
 #[cfg(feature = "sgx")]
@@ -36,25 +53,23 @@ extern crate slab;
 #[cfg(feature = "sgx")]
 use std::prelude::v1::*;
 
-use core::future::Future;
-use core::pin::Pin;
-use core::task::{Context, Poll, Waker};
 use std::io;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 #[cfg(not(feature = "sgx"))]
 use std::sync::Mutex;
 #[cfg(feature = "sgx")]
 use std::sync::SgxMutex as Mutex;
 
 use io_uring::opcode::{self, types};
+use io_uring::squeue::Entry as SqEntry;
 use slab::Slab;
 
-use crate::operation::Token;
+use crate::io_handle::IoToken;
 
-mod operation;
+mod io_handle;
 
+pub use crate::io_handle::{IoHandle, IoState};
 pub use io_uring::opcode::types::{Fd, Fixed};
-use io_uring::squeue::Entry as SqEntry;
 
 /// An io_uring instance augmented with callback-based I/O interfaces.
 ///
@@ -64,25 +79,28 @@ use io_uring::squeue::Entry as SqEntry;
 /// given in their arguments are valid before the completion of the async I/O.
 pub struct IoUring {
     ring: io_uring::concurrent::IoUring,
-    token_slab: Mutex<Slab<Token>>,
-    weak_self: Weak<Self>,
+    token_table: Mutex<Slab<Arc<IoToken>>>,
+}
+
+impl Drop for IoUring {
+    fn drop(&mut self) {
+        // By the end of the life of the io_uring instance, its token table should have been emptied.
+        // This emptyness check prevents handles created by this io_uring become "dangling".
+        // That is, no user will ever hold a handle whose associated io_uring instance has
+        // been destroyed.
+        let token_table = self.token_table.lock().unwrap();
+        assert!(token_table.len() == 0);
+    }
 }
 
 impl IoUring {
-    pub(crate) fn new(ring: io_uring::IoUring) -> Arc<Self> {
-        let new_self = {
-            let ring = ring.concurrent();
-            let token_slab = Mutex::new(Slab::new());
-            let weak_self = Weak::default();
-            Self { ring, token_slab, weak_self, }
-        };
-        let mut arc_self = Arc::new(new_self);
-        let weak_self = Arc::downgrade(&arc_self);
-        // Safety. No Arc or Weak pointers to this Arc are destroyed for the duration of this unsafey block.
-        unsafe {
-            Arc::get_mut_unchecked(&mut arc_self).weak_self = weak_self;
-        }
-        arc_self
+    /// Internal constructor.
+    ///
+    /// Users should use `Builder` instead.
+    pub(crate) fn new(ring: io_uring::IoUring) -> Self {
+        let ring = ring.concurrent();
+        let token_table = Mutex::new(Slab::new());
+        Self { ring, token_table }
     }
 
     /// Push an accept request into the submission queue of the io_uring.
@@ -98,16 +116,9 @@ impl IoUring {
         addrlen: *mut libc::socklen_t,
         flags: u32,
         callback: impl FnOnce(i32) + Send + 'static,
-    ) -> Handle {
-        let token_idx = self.gen_token(callback);
-
-        let entry = opcode::Accept::new(fd, addr, addrlen)
-            .flags(flags)
-            .build()
-            .user_data(token_idx as _);
-        self.push_entry(entry);
-
-        self.gen_handle(token_idx)
+    ) -> IoHandle {
+        let entry = opcode::Accept::new(fd, addr, addrlen).flags(flags).build();
+        self.push_entry(entry, callback)
     }
 
     /// Push a connect request into the submission queue of the io_uring.
@@ -122,15 +133,9 @@ impl IoUring {
         addr: *const libc::sockaddr,
         addrlen: libc::socklen_t,
         callback: impl FnOnce(i32) + Send + 'static,
-    ) -> Handle {
-        let token_idx = self.gen_token(callback);
-
-        let entry = opcode::Connect::new(fd, addr, addrlen)
-            .build()
-            .user_data(token_idx as _);
-        self.push_entry(entry);
-
-        self.gen_handle(token_idx)
+    ) -> IoHandle {
+        let entry = opcode::Connect::new(fd, addr, addrlen).build();
+        self.push_entry(entry, callback)
     }
 
     /// Push a poll_add request into the submission queue of the io_uring.
@@ -144,15 +149,9 @@ impl IoUring {
         // fixed_fd: Fixed,
         flags: u32,
         callback: impl FnOnce(i32) + Send + 'static,
-    ) -> Handle {
-        let token_idx = self.gen_token(callback);
-
-        let entry = opcode::PollAdd::new(fd, flags)
-            .build()
-            .user_data(token_idx as _);
-        self.push_entry(entry);
-
-        self.gen_handle(token_idx)
+    ) -> IoHandle {
+        let entry = opcode::PollAdd::new(fd, flags).build();
+        self.push_entry(entry, callback)
     }
 
     /// Push a poll_remove request into the submission queue of the io_uring.
@@ -164,15 +163,9 @@ impl IoUring {
         &self,
         user_data: u64,
         callback: impl FnOnce(i32) + Send + 'static,
-    ) -> Handle {
-        let token_idx = self.gen_token(callback);
-
-        let entry = opcode::PollRemove::new(user_data)
-            .build()
-            .user_data(token_idx as _);
-        self.push_entry(entry);
-
-        self.gen_handle(token_idx)
+    ) -> IoHandle {
+        let entry = opcode::PollRemove::new(user_data).build();
+        self.push_entry(entry, callback)
     }
 
     /// Push a read request into the submission queue of the io_uring.
@@ -189,17 +182,12 @@ impl IoUring {
         offset: libc::off_t,
         flags: types::RwFlags,
         callback: impl FnOnce(i32) + Send + 'static,
-    ) -> Handle {
-        let token_idx = self.gen_token(callback);
-
+    ) -> IoHandle {
         let entry = opcode::Read::new(fd, buf, len)
             .offset(offset)
             .rw_flags(flags)
-            .build()
-            .user_data(token_idx as _);
-        self.push_entry(entry);
-
-        self.gen_handle(token_idx)
+            .build();
+        self.push_entry(entry, callback)
     }
 
     /// Push a write request into the submission queue of the io_uring.
@@ -216,17 +204,12 @@ impl IoUring {
         offset: libc::off_t,
         flags: types::RwFlags,
         callback: impl FnOnce(i32) + Send + 'static,
-    ) -> Handle {
-        let token_idx = self.gen_token(callback);
-
+    ) -> IoHandle {
         let entry = opcode::Write::new(fd, buf, len)
             .offset(offset)
             .rw_flags(flags)
-            .build()
-            .user_data(token_idx as _);
-        self.push_entry(entry);
-
-        self.gen_handle(token_idx)
+            .build();
+        self.push_entry(entry, callback)
     }
 
     /// Push a readv request into the submission queue of the io_uring.
@@ -243,17 +226,12 @@ impl IoUring {
         offset: libc::off_t,
         flags: types::RwFlags,
         callback: impl FnOnce(i32) + Send + 'static,
-    ) -> Handle {
-        let token_idx = self.gen_token(callback);
-
+    ) -> IoHandle {
         let entry = opcode::Readv::new(fd, iovec, len)
             .offset(offset)
             .rw_flags(flags)
-            .build()
-            .user_data(token_idx as _);
-        self.push_entry(entry);
-
-        self.gen_handle(token_idx)
+            .build();
+        self.push_entry(entry, callback)
     }
 
     /// Push a writev request into the submission queue of the io_uring.
@@ -270,17 +248,12 @@ impl IoUring {
         offset: libc::off_t,
         flags: types::RwFlags,
         callback: impl FnOnce(i32) + Send + 'static,
-    ) -> Handle {
-        let token_idx = self.gen_token(callback);
-
+    ) -> IoHandle {
         let entry = opcode::Writev::new(fd, iovec, len)
             .offset(offset)
             .rw_flags(flags)
-            .build()
-            .user_data(token_idx as _);
-        self.push_entry(entry);
-
-        self.gen_handle(token_idx)
+            .build();
+        self.push_entry(entry, callback)
     }
 
     /// Push a recvmsg request into the submission queue of the io_uring.
@@ -295,16 +268,9 @@ impl IoUring {
         msg: *mut libc::msghdr,
         flags: u32,
         callback: impl FnOnce(i32) + Send + 'static,
-    ) -> Handle {
-        let token_idx = self.gen_token(callback);
-
-        let entry = opcode::RecvMsg::new(fd, msg)
-            .flags(flags)
-            .build()
-            .user_data(token_idx as _);
-        self.push_entry(entry);
-
-        self.gen_handle(token_idx)
+    ) -> IoHandle {
+        let entry = opcode::RecvMsg::new(fd, msg).flags(flags).build();
+        self.push_entry(entry, callback)
     }
 
     /// Push a sendmsg request into the submission queue of the io_uring.
@@ -319,16 +285,9 @@ impl IoUring {
         msg: *const libc::msghdr,
         flags: u32,
         callback: impl FnOnce(i32) + Send + 'static,
-    ) -> Handle {
-        let token_idx = self.gen_token(callback);
-
-        let entry = opcode::SendMsg::new(fd, msg)
-            .flags(flags)
-            .build()
-            .user_data(token_idx as _);
-        self.push_entry(entry);
-
-        self.gen_handle(token_idx)
+    ) -> IoHandle {
+        let entry = opcode::SendMsg::new(fd, msg).flags(flags).build();
+        self.push_entry(entry, callback)
     }
 
     /// Push a fsync request into the submission queue of the io_uring.
@@ -341,41 +300,41 @@ impl IoUring {
         fd: Fd,
         datasync: bool,
         callback: impl FnOnce(i32) + Send + 'static,
-    ) -> Handle {
-        let token_idx = self.gen_token(callback);
-
+    ) -> IoHandle {
         let entry = if datasync {
             opcode::Fsync::new(fd)
                 .flags(types::FsyncFlags::DATASYNC)
                 .build()
-                .user_data(token_idx as _)
         } else {
-            opcode::Fsync::new(fd).build().user_data(token_idx as _)
+            opcode::Fsync::new(fd).build()
         };
-
-        self.push_entry(entry);
-
-        self.gen_handle(token_idx)
+        self.push_entry(entry, callback)
     }
 
-    /// Scan for completed async I/O and trigger their registered callbacks.
-    pub fn trigger_callbacks(&self) {
-        let cq = self.ring.completion();
-        while let Some(cqe) = cq.pop() {
-            let retval = cqe.result();
-            let token_idx = cqe.user_data() as usize;
-            let token_slab = self.token_slab.lock().unwrap();
-            let token = token_slab.get(token_idx).unwrap();
-            let callback = token.complete(retval);
-            drop(token_slab);
-            (callback)(retval);
+    /// Submit all I/O requests in the submission queue of io_uring.
+    ///
+    /// Without calling this method, new I/O requests pushed into the submission queue will
+    /// not get popped by Linux kernel.
+    pub fn submit_requests(&self) {
+        if let Err(e) = self.ring.submit() {
+            panic!("submit failed, error: {}", e);
         }
     }
 
-    /// Submit all I/O requests in the submission queue to Linux kernel.
-    pub fn submit(&self) {
-        if let Err(e) = self.ring.submit() {
-            panic!("submit failed, error: {}", e);
+    /// Poll new I/O completions in the completions queue of io_uring.
+    ///
+    /// Upon receiving completed I/O, the corresponding user-registered callback functions
+    /// will get invoked and the `IoHandle` (as a `Future`) will become ready.
+    pub fn poll_completions(&self) {
+        let cq = self.ring.completion();
+        while let Some(cqe) = cq.pop() {
+            let retval = cqe.result();
+            let io_token = {
+                let token_idx = cqe.user_data() as usize;
+                let mut token_table = self.token_table.lock().unwrap();
+                token_table.remove(token_idx)
+            };
+            io_token.complete(retval);
         }
     }
 
@@ -384,13 +343,17 @@ impl IoUring {
     /// # Why a helper thread?
     ///
     /// The io_uring implementation on the latest Linux kernel only has a limited (even buggy)
-    /// support for kernel-polling mode. To address this limitation, we can start a helper thread
-    /// that keeps entering into the kernel and polling I/O requests from the submission queue of
-    /// the io_uring instance.
+    /// support for kernel-polling mode. To address this limitation, we simulate the kernel-polling
+    /// mode in the user space by starting a helper thread that keeps entering into the kernel
+    /// and polling I/O requests from the submission queue of the io_uring instance.
+    ///
+    /// While the helper thread comes with a performance cost, we believe it is acceptable as a
+    /// short-term workaround. We expect the io_uring implementation in Linux kernel to become mature
+    /// in the near future.
     ///
     /// # Safety
     ///
-    /// This API is unsafe due to the fact that the thread has no idea when the io_uring instance
+    /// This API is _unsafe_ due to the fact that the thread has no idea when the io_uring instance
     /// is destroyed, thus invalidating the file descriptor of io_uring that is still in use by the thread.
     /// This unexpected invalidation is---in most cases---harmless. This is because an io_uring
     /// instance is most likely used as a singleton in a process and will not get destroyed until
@@ -399,103 +362,39 @@ impl IoUring {
         self.ring.start_enter_syscall_thread();
     }
 
-    // Push an entry to the submission queue of the io_uring instance.
+    // Push a submission entry to io_uring and return a corresponding handle.
     //
     // Safety. All resources referenced by the entry must be valid before its completion.
-    unsafe fn push_entry(&self, entry: SqEntry) {
+    unsafe fn push_entry(
+        &self,
+        mut entry: SqEntry,
+        callback: impl FnOnce(i32) + Send + 'static,
+    ) -> IoHandle {
+        // Create the user-visible handle that is associated with the submission entry
+        let io_handle = {
+            let mut token_table = self.token_table.lock().unwrap();
+            let token_slot = token_table.vacant_entry();
+            let token_key = token_slot.key() as u64;
+            let token = Arc::new(IoToken::new(callback));
+            token_slot.insert(token.clone());
+            let handle = IoHandle::new(token);
+
+            // Associated entry with token, the latter of which is pointed to by handle.
+            entry = entry.user_data(token_key);
+
+            handle
+        };
+
         if self.ring.submission().push(entry).is_err() {
             panic!("sq must be large enough");
         }
+
+        io_handle
     }
 
     /// Cancel all ongoing async I/O.
     pub fn cancel_all(&self) {
-        todo!();
-    }
-
-    fn gen_token(&self, callback: impl FnOnce(i32) + Send + 'static) -> usize {
-        let token = Token::new(callback);
-        let token_idx = self.token_slab.lock().unwrap().insert(token);
-        token_idx
-    }
-
-    fn gen_handle(&self, token_idx: usize) -> Handle {
-        Handle {
-            io_uring: self.weak_self.upgrade().unwrap(),
-            token_idx,
-        }
-    }
-}
-
-pub struct Handle {
-    io_uring: Arc<IoUring>,
-    token_idx: usize,
-}
-
-impl Handle {
-    pub fn retval(&self) -> Option<i32> {
-        self.io_uring
-            .token_slab
-            .lock()
-            .unwrap()
-            .get(self.token_idx)
-            .unwrap()
-            .retval()
-    }
-
-    pub fn is_completed(&self) -> bool {
-        self.io_uring
-            .token_slab
-            .lock()
-            .unwrap()
-            .get(self.token_idx)
-            .unwrap()
-            .is_completed()
-    }
-
-    pub fn cancel(&self) {
-        todo!();
-    }
-
-    pub fn is_cancelled(&self) -> bool {
-        false
-    }
-
-    pub fn user_data(&self) -> u64 {
-        self.token_idx as _
-    }
-
-    pub fn set_waker(&self, waker: Waker) {
-        self.io_uring
-            .token_slab
-            .lock()
-            .unwrap()
-            .get(self.token_idx)
-            .unwrap()
-            .set_waker(waker);
-    }
-}
-
-impl Unpin for Handle {}
-
-impl Future for Handle {
-    type Output = i32;
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // FIXME: concurrency issues
-        if self.is_completed() {
-            Poll::Ready(self.retval().unwrap())
-        } else {
-            self.set_waker(cx.waker().clone());
-            Poll::Pending
-        }
-    }
-}
-
-impl Drop for Handle {
-    fn drop(&mut self) {
-        let mut token_slab = self.io_uring.token_slab.lock().unwrap();
-        debug_assert!(token_slab.contains(self.token_idx));
-        token_slab.remove(self.token_idx);
+        todo!("implement cancel in the future");
     }
 }
 
@@ -536,7 +435,7 @@ impl Builder {
 
     /// Build a [IoUring].
     #[inline]
-    pub fn build(&self, entries: u32) -> io::Result<Arc<IoUring>> {
+    pub fn build(&self, entries: u32) -> io::Result<IoUring> {
         let io_uring_inner = self.inner.build(entries)?;
         let io_uring = IoUring::new(io_uring_inner);
         Ok(io_uring)
@@ -597,9 +496,9 @@ mod tests {
                 complete_fn,
             )
         };
-        io_uring.submit();
+        io_uring.submit_requests();
         loop {
-            io_uring.trigger_callbacks();
+            io_uring.poll_completions();
 
             let clone = complete_io.clone();
             let mut inner = clone.lock().unwrap();
@@ -625,9 +524,9 @@ mod tests {
                 complete_fn,
             )
         };
-        io_uring.submit();
+        io_uring.submit_requests();
         loop {
-            io_uring.trigger_callbacks();
+            io_uring.poll_completions();
 
             let clone = complete_io.clone();
             let mut inner = clone.lock().unwrap();

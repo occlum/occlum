@@ -5,12 +5,12 @@ use std::ptr;
 use std::sync::Mutex;
 
 use io_uring::opcode::types;
-use io_uring_callback::{Builder, Handle, IoUring};
+use io_uring_callback::{Builder, IoHandle, IoUring};
 use lazy_static::lazy_static;
 
 lazy_static! {
     static ref TOKEN_QUEUE: Mutex<VecDeque<(Token, i32)>> = Mutex::new(VecDeque::new());
-    static ref HANDLE_SLAB: Mutex<slab::Slab<Handle>> = Mutex::new(slab::Slab::new());
+    static ref HANDLE_SLAB: Mutex<slab::Slab<IoHandle>> = Mutex::new(slab::Slab::new());
 }
 
 #[derive(Clone, Debug)]
@@ -85,7 +85,7 @@ fn main() {
     loop {
         accept.try_push_accept(&ring);
 
-        ring.trigger_callbacks();
+        ring.poll_completions();
 
         let mut queue = TOKEN_QUEUE.lock().unwrap();
         while !queue.is_empty() {
