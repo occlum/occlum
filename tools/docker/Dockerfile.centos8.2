@@ -7,6 +7,10 @@ FROM centos:8.2.2004
 
 LABEL maintainer="He Sun <bochang.sh@antgroup.com>"
 
+#The default shell for the RUN instruction is ["/bin/sh", "-c"], which sometimes cause unexpected error
+#for example "source a_file". Use bash as default shell instead.
+SHELL ["/bin/bash", "-c"]
+
 RUN yum install epel-release -y && \
     dnf clean all && rm -r /var/cache/dnf && \
     dnf group install 'Development Tools' -y && \
