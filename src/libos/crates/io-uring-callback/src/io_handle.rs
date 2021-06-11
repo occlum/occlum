@@ -1,14 +1,15 @@
-#[cfg(feature = "sgx")]
-use std::prelude::v1::*;
-#[cfg(not(feature = "sgx"))]
-use std::sync::Mutex;
-#[cfg(feature = "sgx")]
-use std::sync::SgxMutex as Mutex;
-
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
+cfg_if::cfg_if! {
+    if #[cfg(feature = "sgx")] {
+        use std::prelude::v1::*;
+        use std::sync::SgxMutex as Mutex;
+    } else {
+        use std::sync::Mutex;
+    }
+}
 
 /// The handle to an I/O request pushed to the submission queue of an io_uring instance.
 pub struct IoHandle(Arc<IoToken>);

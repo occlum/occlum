@@ -12,6 +12,7 @@ sgx = ["sgx_types", "sgx_tstd", "sgx_trts", "sgx_libc", "io-uring/sgx"]
 
 [dependencies]
 atomic = "0.5.0"
+cfg-if = "1.0.0"
 futures = { version = "0.3", default-features = false, features = ["alloc"]  }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 slab = { git = "https://github.com/tokio-rs/slab.git", default-features = false }

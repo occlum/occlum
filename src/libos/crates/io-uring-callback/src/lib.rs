@@ -76,29 +76,24 @@
 #![feature(get_mut_unchecked)]
 #![cfg_attr(feature = "sgx", no_std)]
 
-#[cfg(feature = "sgx")]
-extern crate sgx_types;
-#[cfg(feature = "sgx")]
-#[macro_use]
-extern crate sgx_tstd as std;
-#[cfg(feature = "sgx")]
-extern crate sgx_libc as libc;
-#[cfg(feature = "sgx")]
-extern crate sgx_trts;
-
-extern crate atomic;
-extern crate io_uring;
-extern crate slab;
-
-#[cfg(feature = "sgx")]
-use std::prelude::v1::*;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "sgx")] {
+        #[macro_use]
+        extern crate sgx_tstd as std;
+        extern crate sgx_libc as libc;
+    }
+}
 
 use std::io;
 use std::sync::Arc;
-#[cfg(not(feature = "sgx"))]
-use std::sync::Mutex;
-#[cfg(feature = "sgx")]
-use std::sync::SgxMutex as Mutex;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "sgx")] {
+        use std::prelude::v1::*;
+        use std::sync::SgxMutex as Mutex;
+    } else {
+        use std::sync::Mutex;
+    }
+}
 
 use io_uring::opcode::{self, types};
 use io_uring::squeue::Entry as SqEntry;
