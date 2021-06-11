@@ -178,7 +178,7 @@ ENV LD_LIBRARY_PATH="/opt/intel/sgxpsw/aesm:/usr/lib64/:/usr/local/lib:/opt/inte
 WORKDIR /root/occlum
 RUN rm -rf occlum && \
     source scl_source enable devtoolset-8 && \
-    git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum && \
+    git clone -b $OCCLUM_BRANCH https://github.com/jessehui/occlum && \
     cd occlum && \
     make submodule && \
     OCCLUM_RELEASE_BUILD=1 make install && \

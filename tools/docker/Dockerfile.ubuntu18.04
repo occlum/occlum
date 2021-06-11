@@ -162,7 +162,7 @@ RUN git clone -b sgx_2.13_for_occlum https://github.com/occlum/linux-sgx && \
 # Install the latest version of Occlum
 ARG OCCLUM_BRANCH
 WORKDIR /root
-RUN git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum && \
+RUN git clone -b $OCCLUM_BRANCH https://github.com/jessehui/occlum && \
     cd occlum && \
     source /opt/intel/sgxsdk/environment && \
     make submodule && \

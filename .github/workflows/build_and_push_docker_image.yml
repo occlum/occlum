@@ -60,7 +60,7 @@ jobs:
           platforms: linux/amd64
           build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
           push: true
-          tags: occlum/occlum:${{ env.RELEASE_VERSION }}-centos8.2
+          tags: jessehui/occlum:${{ env.RELEASE_VERSION }}-centos8.2
 
 
   generate-ubuntu-image:
@@ -108,4 +108,4 @@ jobs:
           platforms: linux/amd64
           build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
           push: true
-          tags: occlum/occlum:${{ env.RELEASE_VERSION }}-ubuntu18.04
+          tags: jessehui/occlum:${{ env.RELEASE_VERSION }}-ubuntu18.04
