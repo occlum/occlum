@@ -1,0 +1,273 @@
+use std::collections::VecDeque;
+use std::marker::PhantomData;
+
+use async_io::poll::{Events, Pollee, Poller};
+use async_io::socket::Addr;
+use io_uring_callback::{Fd, IoHandle, IoUringArray};
+use memoffset::offset_of;
+
+use super::{Common, ConnectedStream};
+use crate::prelude::*;
+use crate::runtime::Runtime;
+
+/// A listener stream, ready to accept incoming connections.
+pub struct ListenerStream<A: Addr + 'static, R: Runtime> {
+    common: Arc<Common<A, R>>,
+    inner: Mutex<Inner<A>>,
+}
+
+impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
+    /// Creates a new listener stream.
+    pub fn new(backlog: u32, common: Arc<Common<A, R>>) -> Result<Arc<Self>> {
+        let inner = Inner::new(backlog)?;
+
+        Self::do_listen(common.host_fd(), backlog)?;
+
+        let new_self = Arc::new(Self {
+            common,
+            inner: Mutex::new(inner),
+        });
+
+        // Start async accept requests right as early as possible to improve performance
+        {
+            let mut inner = new_self.inner.lock().unwrap();
+            new_self.initiate_async_accepts(inner);
+        }
+
+        Ok(new_self)
+    }
+
+    fn do_listen(host_fd: HostFd, backlog: u32) -> Result<()> {
+        let host_fd = host_fd as i32;
+        #[cfg(not(feature = "sgx"))]
+        let retval = unsafe { libc::listen(host_fd, backlog as _) };
+        #[cfg(feature = "sgx")]
+        let retval = unsafe { libc::ocall::listen(host_fd, backlog as _) };
+        if retval < 0 {
+            let errno = Errno::from(-retval as u32);
+            return_errno!(errno, "listen failed");
+        }
+        Ok(())
+    }
+
+    pub async fn accept(self: &Arc<Self>) -> Result<Arc<ConnectedStream<A, R>>> {
+        // Init the poller only when needed
+        let mut poller = None;
+        loop {
+            // Attempt to accept
+            let res = self.try_accept();
+            if !res.has_errno(EAGAIN) {
+                return res;
+            }
+
+            // Ensure the poller is initialized
+            if poller.is_none() {
+                poller = Some(Poller::new());
+            }
+            // Wait for interesting events by polling
+            let mask = Events::IN;
+            let events = self.common.pollee().poll_by(mask, poller.as_mut());
+            if events.is_empty() {
+                poller.as_ref().unwrap().wait().await;
+            }
+        }
+    }
+
+    pub fn try_accept(self: &Arc<Self>) -> Result<Arc<ConnectedStream<A, R>>> {
+        let mut inner = self.inner.lock().unwrap();
+
+        if let Some(errno) = inner.fatal {
+            return_errno!(errno, "accept failed");
+        }
+
+        let (accepted_fd, accepted_addr) = inner
+            .backlog
+            .pop_completed_req()
+            .ok_or_else(|| errno!(EAGAIN, "try accept again"))?;
+
+        if !inner.backlog.has_completed_reqs() {
+            self.common.pollee().del_events(Events::IN);
+        }
+
+        self.initiate_async_accepts(inner);
+
+        let common = {
+            let mut common = Arc::new(Common::with_host_fd(accepted_fd));
+            common.pollee().add_events(Events::OUT);
+            common
+        };
+        let accepted_stream = ConnectedStream::new(common);
+        Ok(accepted_stream)
+    }
+
+    fn initiate_async_accepts(self: &Arc<Self>, mut inner: MutexGuard<Inner<A>>) {
+        let backlog = &mut inner.backlog;
+        while backlog.has_free_entries() {
+            backlog.start_new_req(self);
+        }
+    }
+}
+
+/// The mutable, internal state of a listener stream.
+struct Inner<A: Addr> {
+    backlog: Backlog<A>,
+    fatal: Option<Errno>,
+}
+
+impl<A: Addr> Inner<A> {
+    pub fn new(backlog: u32) -> Result<Self> {
+        Ok(Inner {
+            backlog: Backlog::with_capacity(backlog as usize)?,
+            fatal: None,
+        })
+    }
+}
+
+/// An entry in the backlog.
+enum Entry {
+    /// The entry is free to use.
+    Free,
+    /// The entry is a pending accept request.
+    Pending { io_handle: IoHandle },
+    /// The entry is a completed accept request.
+    Completed { host_fd: HostFd },
+}
+
+impl Default for Entry {
+    fn default() -> Self {
+        Self::Free
+    }
+}
+
+/// An async io_uring accept request.
+#[derive(Copy, Clone)]
+#[repr(C)]
+struct AcceptReq {
+    c_addr: libc::sockaddr_storage,
+    c_addr_len: libc::socklen_t,
+}
+
+/// A backlog of incoming connections of a listener stream.
+///
+/// With backlog, we can start async accept requests, keep track of the pending requests,
+/// and maintain the ones that have completed.
+struct Backlog<A: Addr> {
+    // The entries in the backlog.
+    entries: Box<[Entry]>,
+    // Arguments of the io_uring requests submitted for the entries in the backlog.
+    reqs: IoUringArray<AcceptReq>,
+    // The indexes of completed entries.
+    completed: VecDeque<usize>,
+    // The number of free entries.
+    num_free: usize,
+    phantom_data: PhantomData<A>,
+}
+
+impl<A: Addr> Backlog<A> {
+    pub fn with_capacity(capacity: usize) -> Result<Self> {
+        if capacity == 0 {
+            return_errno!(EINVAL, "capacity cannot be zero");
+        }
+
+        let entries = (0..capacity)
+            .map(|_| Entry::Free)
+            .collect::<Vec<Entry>>()
+            .into_boxed_slice();
+        let reqs = IoUringArray::with_capacity(capacity);
+        let completed = VecDeque::new();
+        let num_free = capacity;
+        let new_self = Self {
+            entries,
+            reqs,
+            completed,
+            num_free,
+            phantom_data: PhantomData,
+        };
+        Ok(new_self)
+    }
+
+    pub fn has_free_entries(&self) -> bool {
+        self.num_free > 0
+    }
+
+    /// Start a new async accept request, turning a free entry into a pending one.
+    pub fn start_new_req<R: Runtime>(&mut self, stream: &Arc<ListenerStream<A, R>>) {
+        debug_assert!(self.has_free_entries());
+
+        let entry_idx = self
+            .entries
+            .iter()
+            .position(|entry| matches!(entry, Entry::Free))
+            .unwrap();
+
+        let (c_addr_ptr, c_addr_len_ptr) = unsafe {
+            let accept_req_ptr = self.reqs.as_ptr().add(entry_idx);
+            let c_addr_ptr = (accept_req_ptr as *mut u8).add(offset_of!(AcceptReq, c_addr)) as _;
+            let c_addr_len_ptr: *mut libc::socklen_t =
+                (accept_req_ptr as *mut u8).add(offset_of!(AcceptReq, c_addr_len)) as _;
+            c_addr_len_ptr.write(std::mem::size_of::<libc::sockaddr_storage> as _);
+            (c_addr_ptr, c_addr_len_ptr)
+        };
+
+        let callback = {
+            let stream = stream.clone();
+            move |retval: i32| {
+                let mut inner = stream.inner.lock().unwrap();
+
+                if retval < 0 {
+                    let errno = Errno::from(-retval as u32);
+                    inner.fatal = Some(errno);
+                    stream.common.pollee().add_events(Events::ERR);
+
+                    inner.backlog.entries[entry_idx] = Entry::Free;
+                    inner.backlog.num_free += 1;
+                    return;
+                }
+
+                let host_fd = retval as HostFd;
+                inner.backlog.entries[entry_idx] = Entry::Completed { host_fd };
+                inner.backlog.completed.push_back(entry_idx);
+
+                stream.common.pollee().add_events(Events::IN);
+            }
+        };
+        let io_uring = stream.common.io_uring();
+        let fd = stream.common.host_fd() as i32;
+        let flags = 0;
+        let io_handle =
+            unsafe { io_uring.accept(Fd(fd), c_addr_ptr, c_addr_len_ptr, flags, callback) };
+
+        self.entries[entry_idx] = Entry::Pending { io_handle };
+        self.num_free -= 1;
+    }
+
+    pub fn has_completed_reqs(&self) -> bool {
+        self.completed.len() > 0
+    }
+
+    /// Pop a completed async accept request, turing a completed entry into a free one.
+    pub fn pop_completed_req(&mut self) -> Option<(HostFd, A)> {
+        let completed_idx = self.completed.pop_front()?;
+        let accepted_fd = {
+            let entry = &mut self.entries[completed_idx];
+            let accepted_fd = match entry {
+                Entry::Completed { host_fd } => *host_fd,
+                _ => unreachable!("the entry should have been completed"),
+            };
+            self.num_free += 1;
+            *entry = Entry::Free;
+            accepted_fd
+        };
+        let accepted_addr = {
+            let AcceptReq { c_addr, c_addr_len } = unsafe { self.reqs.get(completed_idx) };
+            A::from_c_storage(&c_addr, c_addr_len as _).unwrap()
+        };
+        Some((accepted_fd, accepted_addr))
+    }
+}
+
+impl<A: Addr> Drop for Backlog<A> {
+    fn drop(&mut self) {
+        // TODO: close the accepted fds
+    }
+}

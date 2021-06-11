@@ -104,7 +104,7 @@ use crate::io_handle::IoToken;
 mod io_args;
 mod io_handle;
 
-pub use crate::io_args::{IoUringCell, IoUringArray};
+pub use crate::io_args::{IoUringArray, IoUringCell};
 pub use crate::io_handle::{IoHandle, IoState};
 pub use io_uring::opcode::types::{Fd, RwFlags};
 

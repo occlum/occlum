@@ -12,13 +12,19 @@ cfg_if::cfg_if! {
 }
 
 /// The handle to an I/O request pushed to the submission queue of an io_uring instance.
+#[derive(Debug)]
 pub struct IoHandle(Arc<IoToken>);
 
+/// The state of an I/O request represented by an [`IoHandle`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum IoState {
+    /// Submitted.
     Submitted,
+    /// Completed with a return value.
     Completed(i32),
+    /// Cancelling (not used yet).
     Cancelling,
+    /// Cancelled (not used yet).
     Cancelled,
 }
 
@@ -98,12 +104,26 @@ impl IoToken {
 
     pub fn complete(&self, retval: i32) {
         let mut inner = self.inner.lock().unwrap();
-        inner.complete(retval)
+        let callback = inner.complete(retval);
+        // Must release the lock before invoking the callback function.
+        // This avoids any deadlock if the IoHandle is accessed inside the callback by
+        // user.
+        drop(inner);
+
+        (callback)(retval);
     }
 
     pub fn cancel(&self) {
         let mut inner = self.inner.lock().unwrap();
         inner.cancel()
+    }
+}
+
+impl std::fmt::Debug for IoToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IoToken")
+            .field("state", &self.state())
+            .finish()
     }
 }
 
@@ -127,7 +147,7 @@ impl Inner {
         }
     }
 
-    pub fn complete(&mut self, retval: i32) {
+    pub fn complete(&mut self, retval: i32) -> Callback {
         match self.state {
             IoState::Submitted | IoState::Cancelling => {
                 self.state = IoState::Completed(retval);
@@ -137,8 +157,7 @@ impl Inner {
             }
         }
 
-        let callback = self.callback.take().unwrap();
-        (callback)(retval);
+        self.callback.take().unwrap()
     }
 
     pub fn cancel(&mut self) {

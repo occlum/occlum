@@ -6,6 +6,7 @@ members = [
     "async-io",
     "async-socket",
     "errno",
+    "host-socket",
     "io-uring-callback",
     "object-id",
     "sgx-untrusted-alloc",

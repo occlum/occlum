@@ -24,7 +24,7 @@ impl<T: Copy> IoUringArray<T> {
     /// Get the value of an element.
     ///
     /// # Safety
-    /// 
+    ///
     /// The caller must ensure that the element at the given position has been initialized.
     pub unsafe fn get(&self, index: usize) -> T {
         *self.pos_ptr(index)

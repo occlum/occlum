@@ -87,6 +87,12 @@ impl Pollee {
             .fetch_and(!events.bits(), Ordering::Release);
     }
 
+    pub fn reset_events(&self) {
+        self.inner
+            .events
+            .fetch_and(!Events::all().bits(), Ordering::Release);
+    }
+
     fn events(&self) -> Events {
         let event_bits = self.inner.events.load(Ordering::Relaxed);
         unsafe { Events::from_bits_unchecked(event_bits) }

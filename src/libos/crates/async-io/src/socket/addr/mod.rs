@@ -7,7 +7,7 @@ mod ipv4;
 mod unix;
 
 /// A trait for network addresses.
-pub trait Addr: Clone + Debug {
+pub trait Addr: Clone + Debug + Send + Sync {
     /// Return the domain that the address belongs to.
     fn domain() -> Domain;
 
