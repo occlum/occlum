@@ -111,14 +111,14 @@ mod errno;
 mod error;
 mod macros;
 pub mod prelude;
+mod result;
 mod to_errno;
 
-pub use self::backtrace::{ErrorBacktrace, ResultExt};
+pub use self::backtrace::ErrorBacktrace;
 pub use self::errno::Errno;
 pub use self::error::{Error, ErrorLocation};
+pub use self::result::{Result, ResultExt};
 pub use self::to_errno::ToErrno;
-
-pub type Result<T> = core::result::Result<T, Error>;
 
 #[cfg(test)]
 mod tests {

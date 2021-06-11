@@ -3,7 +3,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
-use super::{Error, Result};
+use super::Error;
 
 #[derive(Debug, Clone)]
 pub struct ErrorBacktrace<'a> {
@@ -51,20 +51,5 @@ impl Error {
 
     pub fn backtrace(&self) -> ErrorBacktrace {
         ErrorBacktrace::new(self)
-    }
-}
-
-pub trait ResultExt<T> {
-    fn cause_err<F>(self, f: F) -> Result<T>
-    where
-        F: FnOnce(&Error) -> Error;
-}
-
-impl<T> ResultExt<T> for Result<T> {
-    fn cause_err<F>(self, f: F) -> Result<T>
-    where
-        F: FnOnce(&Error) -> Error,
-    {
-        self.map_err(|old_e| old_e.cause_err(f))
     }
 }
