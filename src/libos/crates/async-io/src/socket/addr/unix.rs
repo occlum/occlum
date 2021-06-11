@@ -1,10 +1,11 @@
 use libc::c_char;
+use std::mem::MaybeUninit;
 
 use super::{Addr, Domain};
 use crate::prelude::*;
 
 /// A UNIX address.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UnixAddr {
     Unnamed,
     Pathname(PathUnixAddr),
@@ -97,8 +98,29 @@ impl UnixAddr {
 }
 
 impl Addr for UnixAddr {
-    fn domain(&self) -> Domain {
+    fn domain() -> Domain {
         Domain::Unix
+    }
+
+    fn from_c_storage(c_addr: &libc::sockaddr_storage, c_addr_len: usize) -> Result<Self> {
+        if c_addr_len > std::mem::size_of::<libc::sockaddr_storage>() {
+            return_errno!(EINVAL, "address length is too large");
+        }
+        // Safe to convert from sockaddr_storage to sockaddr_un
+        let c_addr = unsafe { std::mem::transmute(c_addr) };
+        Self::from_c(c_addr, c_addr_len)
+    }
+
+    fn to_c_storage(&self) -> (libc::sockaddr_storage, usize) {
+        let (c_addr, c_addr_len) = self.to_c();
+        // Safety to use sockaddr_storage as sockaddr_un
+        let c_addr_storage = unsafe {
+            let mut storage: MaybeUninit<libc::sockaddr_storage> = MaybeUninit::uninit();
+            let dst: &mut libc::sockaddr_un = std::mem::transmute(&mut storage);
+            *dst = c_addr;
+            storage.assume_init()
+        };
+        (c_addr_storage, c_addr_len)
     }
 }
 

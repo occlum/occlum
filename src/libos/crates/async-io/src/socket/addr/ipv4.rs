@@ -1,4 +1,5 @@
 use std::fmt::{self, Debug};
+use std::mem::MaybeUninit;
 
 use super::{Addr, Domain};
 use crate::prelude::*;
@@ -11,8 +12,30 @@ pub struct Ipv4SocketAddr {
 }
 
 impl Addr for Ipv4SocketAddr {
-    fn domain(&self) -> Domain {
+    fn domain() -> Domain {
         Domain::Ipv4
+    }
+
+    fn from_c_storage(c_addr: &libc::sockaddr_storage, c_addr_len: usize) -> Result<Self> {
+        if c_addr_len > std::mem::size_of::<libc::sockaddr_storage>() {
+            return_errno!(EINVAL, "address length is too large");
+        }
+        // Safe to convert from sockaddr_storage to sockaddr_in
+        let c_addr = unsafe { std::mem::transmute(c_addr) };
+        Self::from_c(c_addr)
+    }
+
+    fn to_c_storage(&self) -> (libc::sockaddr_storage, usize) {
+        let c_addr: libc::sockaddr_in = self.to_c();
+        let c_addr_len = std::mem::size_of::<libc::sockaddr_in>();
+        // Safety to use sockaddr_storage as sockaddr_in
+        let c_addr_storage = unsafe {
+            let mut storage: MaybeUninit<libc::sockaddr_storage> = MaybeUninit::uninit();
+            let dst: &mut libc::sockaddr_in = std::mem::transmute(&mut storage);
+            *dst = c_addr;
+            storage.assume_init()
+        };
+        (c_addr_storage, c_addr_len)
     }
 }
 
