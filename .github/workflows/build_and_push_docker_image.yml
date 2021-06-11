@@ -1,9 +1,13 @@
 name: Occlum Docker Build and Push
 
-# Triggers the workflow on pre-release events
+# This is a manual trigger.
 on:
-  release:
-    types: [prereleased]
+  workflow_dispatch:
+    inputs:
+      OS:
+        description: 'OS name (must choose from <CentOS, Ubuntu>)'
+        required: true
+        default: 'Ubuntu'
 
 jobs:
   generate-centos-image:
