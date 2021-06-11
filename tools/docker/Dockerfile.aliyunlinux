@@ -180,6 +180,7 @@ RUN rm -rf occlum && \
     source scl_source enable devtoolset-8 && \
     git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum && \
     cd occlum && \
+    source /opt/intel/sgxsdk/environment && \
     make submodule && \
     OCCLUM_RELEASE_BUILD=1 make install && \
     cp -r demos /root/demos && \
