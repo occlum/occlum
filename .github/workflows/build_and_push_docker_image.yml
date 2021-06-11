@@ -1,14 +1,19 @@
 name: Occlum Docker Build and Push
 
-# Triggers the workflow on pre-release events
+# This is a manual trigger.
 on:
-  release:
-    types: [prereleased]
+  workflow_dispatch:
+    inputs:
+      OS:
+        description: 'OS name (must choose from <centos, ubuntu>)'
+        required: true
+        default: 'ubuntu'
 
 jobs:
   generate-centos-image:
       # GitHub Actions doesn't have CentOS VM provided
       runs-on: ubuntu-18.04
+      if: github.event.inputs.OS == 'centos'
 
       steps:
       - name: Prepare tools
@@ -25,9 +30,8 @@ jobs:
           cp -r tools/toolchains .
           cp -r tools/docker .
 
-      - name: Get release version
-        id: get_version
-        run: echo "RELEASE_VERSION=$(echo ${GITHUB_REF:10})" >> $GITHUB_ENV;
+      - name: Get Occlum release version
+        run: echo "RELEASE_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
 
       - name: Get branch name
         # GITHUB_REF=refs/heads/branch-name
@@ -61,6 +65,7 @@ jobs:
 
   generate-ubuntu-image:
       runs-on: ubuntu-18.04
+      if: github.event.inputs.OS == 'ubuntu'
 
       steps:
       - name: Checkout code
@@ -73,9 +78,8 @@ jobs:
           cp -r tools/toolchains .
           cp -r tools/docker .
 
-      - name: Get release version
-        id: get_version
-        run: echo "RELEASE_VERSION=$(echo ${GITHUB_REF:10})" >> $GITHUB_ENV;
+      - name: Get Occlum release version
+        run: echo "RELEASE_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
 
       - name: Get branch name
         # GITHUB_REF=refs/heads/branch-name
