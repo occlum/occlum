@@ -18,20 +18,60 @@
 //!
 //! # Usage
 //!
-//! ## Construct an io_uring instance
+//! Use [`Builder`] to create a new instance of [`IoUring`].
 //!
+//! ```
+//! use io_uring_callback::{Builder, IoUring};
 //!
-//! ## Submit I/O requests
+//! let io_uring: IoUring = Builder::new().build(256).unwrap();
+//! ```
 //!
+//! A number of I/O operations are supported, e.g., `read`, `write`, `fsync`, `sendmsg`,
+//! `recvmsg`, etc. Requests for such I/O operations can be pushed into the submission
+//! queue of the io_uring with the corresponding methods.
 //!
-//! ## Poll I/O completions
+//! ```
+//! # use io_uring_callback::{Builder};
+//! use io_uring_callback::{Fd, RwFlags};
 //!
+//! # let io_uring = Builder::new().build(256).unwrap();
+//! let fd = Fd(1); // use the stdout
+//! let msg = "hello world\0";
+//! let callback = move |retval: i32| {
+//!     assert!(retval > 0);
+//! };
+//! let handle = unsafe {
+//!     io_uring.write(fd, msg.as_ptr(), msg.len() as u32, 0, RwFlags::default(), callback)
+//! };
+//! # io_uring.submit_requests();
+//! # while handle.retval().is_none() {
+//! #    io_uring.poll_completions();
+//! # }
+//! ```
 //!
-//! # Handles
+//! You have to two ways to get notified about the completion of I/O requests. The first
+//! is through the registered callback function and the second is by `await`ing the handle
+//! (which is a `Future`) obtained as a result of pushing I/O requests.
 //!
-//! ## The contract
+//! After pushing a batch of I/O requests into the submission queue, you can now _submit_ them
+//! to the Linux kernel. Without an explict submit, Linux will not be aware of the new I/O requests.
+//! ```
+//! # use io_uring_callback::{Builder};
+//! # let io_uring = Builder::new().build(256).unwrap();
+//! io_uring.submit_requests();
+//! ```
 //!
-//! ## I/O cancelling
+//! After completing the I/O requests, Linux will push I/O responses into the completion queue of
+//! the io_uring instance. You need _periodically_ poll completions from the queue.
+//! ```
+//! # use io_uring_callback::{Builder};
+//! # let io_uring = Builder::new().build(256).unwrap();
+//! io_uring.poll_completions();
+//! ```
+//! which will trigger registered callbacks and wake up handles.
+//!
+
+// TODO: write more about handles and their contracts
 
 #![feature(get_mut_unchecked)]
 #![cfg_attr(feature = "sgx", no_std)]
@@ -69,9 +109,9 @@ use crate::io_handle::IoToken;
 mod io_handle;
 
 pub use crate::io_handle::{IoHandle, IoState};
-pub use io_uring::opcode::types::{Fd, Fixed};
+pub use io_uring::opcode::types::{Fd, RwFlags};
 
-/// An io_uring instance augmented with callback-based I/O interfaces.
+/// An io_uring instance.
 ///
 /// # Safety
 ///
@@ -94,7 +134,7 @@ impl Drop for IoUring {
 }
 
 impl IoUring {
-    /// Internal constructor.
+    /// Constructor for internal uses.
     ///
     /// Users should use `Builder` instead.
     pub(crate) fn new(ring: io_uring::IoUring) -> Self {

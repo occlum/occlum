@@ -26,14 +26,19 @@ impl IoHandle {
         Self(token)
     }
 
+    /// Returns the state of the I/O request.
     pub fn state(&self) -> IoState {
         self.0.state()
     }
 
+    /// Returns the return value of the I/O request if it is completed.
     pub fn retval(&self) -> Option<i32> {
         self.0.retval()
     }
 
+    /// Cancel the I/O request.
+    ///
+    /// This is NOT implemented, yet.
     pub fn cancel(&self) {
         self.0.cancel()
     }
