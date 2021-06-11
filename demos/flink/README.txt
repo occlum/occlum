@@ -5,6 +5,6 @@
     ./run_flink_on_occlum_glibc.sh tm
 
 3. Run flink jobs example
-    ./run_flink_on_occlum.sh task
+    ./run_flink_on_occlum_glibc.sh task
 
 Note: If running the jobmanager in docker, please export the port 8081 and 6123
