@@ -9,6 +9,10 @@ FROM ubuntu:18.04
 
 LABEL maintainer="Qing Li <geding.lq@antgroup.com>"
 
+#The default shell for the RUN instruction is ["/bin/sh", "-c"], which sometimes cause unexpected error
+#for example "source a_file". Use bash as default shell instead.
+SHELL ["/bin/bash", "-c"]
+
 RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-install-recommends \
         alien \
         astyle \
@@ -160,6 +164,7 @@ ARG OCCLUM_BRANCH
 WORKDIR /root
 RUN git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum && \
     cd occlum && \
+    source /opt/intel/sgxsdk/environment && \
     make submodule && \
     OCCLUM_RELEASE_BUILD=1 make && \
     make install && \
