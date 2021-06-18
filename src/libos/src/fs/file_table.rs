@@ -10,6 +10,7 @@ pub struct FileTable {
     table: Vec<Option<FileTableEntry>>,
     num_fds: usize,
     notifier: FileTableNotifier,
+    id: ObjectId,
 }
 
 impl FileTable {
@@ -18,7 +19,12 @@ impl FileTable {
             table: Vec::with_capacity(4),
             num_fds: 0,
             notifier: FileTableNotifier::new(),
+            id: ObjectId::new(),
         }
+    }
+
+    pub fn id(&self) -> ObjectId {
+        self.id
     }
 
     pub fn dup(
@@ -76,7 +82,7 @@ impl FileTable {
             table.len() - 1
         };
 
-        table[min_free_fd as usize] = Some(FileTableEntry::new(file, close_on_spawn));
+        table[min_free_fd as usize] = Some(FileTableEntry::new(self.id, file, close_on_spawn));
         self.num_fds += 1;
 
         min_free_fd as FileDesc
@@ -84,7 +90,7 @@ impl FileTable {
 
     pub fn put_at(&mut self, fd: FileDesc, file: FileRef, close_on_spawn: bool) {
         let mut table = &mut self.table;
-        let mut table_entry = Some(FileTableEntry::new(file, close_on_spawn));
+        let mut table_entry = Some(FileTableEntry::new(self.id, file, close_on_spawn));
         if fd as usize >= table.len() {
             table.resize(fd as usize + 1, None);
         }
@@ -135,9 +141,27 @@ impl FileTable {
             Some(del_table_entry) => {
                 self.num_fds -= 1;
                 self.broadcast_del(fd);
-                Ok(del_table_entry.file)
+                Ok(del_table_entry.file.clone())
             }
             None => return_errno!(EBADF, "Invalid file descriptor"),
+        }
+    }
+
+    /// Remove all the file descriptors
+    pub fn del_all(&mut self) {
+        let mut deleted_fds = Vec::new();
+        for (fd, entry) in self
+            .table
+            .iter_mut()
+            .filter(|entry| entry.is_some())
+            .enumerate()
+        {
+            *entry = None;
+            deleted_fds.push(fd as FileDesc);
+        }
+        self.num_fds = 0;
+        for fd in deleted_fds {
+            self.broadcast_del(fd);
         }
     }
 
@@ -178,6 +202,7 @@ impl Clone for FileTable {
             table: self.table.clone(),
             num_fds: self.num_fds,
             notifier: FileTableNotifier::new(),
+            id: ObjectId::new(),
         }
     }
 }
@@ -201,13 +226,15 @@ pub type FileTableNotifier = Notifier<FileTableEvent>;
 pub struct FileTableEntry {
     file: FileRef,
     close_on_spawn: bool,
+    table_id: ObjectId,
 }
 
 impl FileTableEntry {
-    pub fn new(file: FileRef, close_on_spawn: bool) -> FileTableEntry {
+    pub fn new(table_id: ObjectId, file: FileRef, close_on_spawn: bool) -> FileTableEntry {
         FileTableEntry {
             file,
             close_on_spawn,
+            table_id,
         }
     }
 
@@ -225,5 +252,14 @@ impl FileTableEntry {
 
     pub fn set_close_on_spawn(&mut self, close_on_spawn: bool) {
         self.close_on_spawn = close_on_spawn;
+    }
+}
+
+impl Drop for FileTableEntry {
+    fn drop(&mut self) {
+        // Remove the advisory locks if necessary
+        if let Ok(inode_file) = self.file.as_inode_file() {
+            inode_file.remove_advisory_locks(self.table_id).unwrap();
+        }
     }
 }

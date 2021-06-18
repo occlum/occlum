@@ -123,6 +123,16 @@ impl Thread {
         self.files().lock().unwrap().put(new_file, close_on_spawn)
     }
 
+    /// Delete a file from the file table.
+    pub fn del_file(&self, fd: FileDesc) -> Result<FileRef> {
+        self.files().lock().unwrap().del(fd)
+    }
+
+    /// Delete all files in the file table.
+    pub fn del_files(&self) {
+        self.files().lock().unwrap().del_all()
+    }
+
     pub fn fs(&self) -> &FsViewRef {
         &self.fs
     }
