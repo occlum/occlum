@@ -8,7 +8,7 @@ use self::states::{ConnectedStream, ConnectingStream, InitStream, ListenerStream
 use crate::prelude::*;
 use crate::runtime::Runtime;
 
-pub struct Stream<A: Addr + 'static, R: Runtime> {
+pub struct StreamSocket<A: Addr + 'static, R: Runtime> {
     state: RwLock<State<A, R>>,
 }
 
@@ -23,7 +23,7 @@ enum State<A: Addr + 'static, R: Runtime> {
     Listen(Arc<ListenerStream<A, R>>),
 }
 
-impl<A: Addr, R: Runtime> Stream<A, R> {
+impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     pub fn new() -> Result<Self> {
         let init_stream = InitStream::new()?;
         let init_state = State::Init(init_stream);

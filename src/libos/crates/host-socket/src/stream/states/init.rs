@@ -30,10 +30,26 @@ impl<A: Addr + 'static, R: Runtime> InitStream<A, R> {
             return_errno!(EINVAL, "the socket is already bound to an address");
         }
 
-        // TODO: do bind syscall
+        Self::do_bind(self.common.host_fd(), addr)?;
 
         inner.has_bound = true;
         self.common.set_addr(addr);
+        Ok(())
+    }
+
+    fn do_bind(host_fd: HostFd, addr: &A) -> Result<()> {
+        let fd = host_fd as i32;
+        let (c_addr_storage, c_addr_len) = addr.to_c_storage();
+        let c_addr_ptr = &c_addr_storage as *const _ as _;
+        let c_addr_len = c_addr_len as u32;
+        #[cfg(not(feature = "sgx"))]
+        let retval = unsafe { libc::bind(fd, c_addr_ptr, c_addr_len) };
+        #[cfg(feature = "sgx")]
+        let retval = unsafe { libc::ocall::bind(fd, c_addr_ptr, c_addr_len) };
+        if retval < 0 {
+            let errno = Errno::from(-retval as u32);
+            return_errno!(errno, "listen failed");
+        }
         Ok(())
     }
 

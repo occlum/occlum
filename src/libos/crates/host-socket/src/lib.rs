@@ -16,12 +16,4 @@ mod stream;
 mod util;
 
 pub use self::runtime::Runtime;
-pub use self::stream::Stream;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+pub use self::stream::StreamSocket;

@@ -24,4 +24,4 @@ pub trait Addr: Clone + Debug + Send + Sync {
 }
 
 pub use self::ipv4::{Ipv4Addr, Ipv4SocketAddr};
-pub use self::unix::UnixAddr;
+pub use self::unix::{UnixAddr, UnnamedUnixAddr, PathUnixAddr, AbstractUnixAddr};

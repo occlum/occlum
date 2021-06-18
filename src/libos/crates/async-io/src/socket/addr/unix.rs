@@ -124,9 +124,30 @@ impl Addr for UnixAddr {
     }
 }
 
-// TODO: should be backed by an inode, instead of a string of path.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PathUnixAddr(String);
+impl From<UnnamedUnixAddr> for UnixAddr {
+    fn from(_unnamed: UnnamedUnixAddr) -> Self {
+        Self::Unnamed
+    }
+}
+
+impl From<PathUnixAddr> for UnixAddr {
+    fn from(path: PathUnixAddr) -> Self {
+        Self::Pathname(path)
+    }
+}
+
+impl From<AbstractUnixAddr> for UnixAddr {
+    fn from(abstract_: AbstractUnixAddr) -> Self {
+        Self::Abstract(abstract_)
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AbstractUnixAddr(Vec<u8>);
+pub struct UnnamedUnixAddr;
+
+// TODO: should be backed by an inode, instead of a string of path.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PathUnixAddr(pub String);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AbstractUnixAddr(pub Vec<u8>);
