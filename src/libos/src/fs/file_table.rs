@@ -151,9 +151,31 @@ impl FileTable {
         }
     }
 
-    /// Remove file descriptors that are close-on-spawn
-    pub fn close_on_spawn(&mut self) {
+    /// Remove all the file descriptors
+    pub fn del_all(&mut self) -> Vec<FileRef> {
         let mut deleted_fds = Vec::new();
+        let mut deleted_files = Vec::new();
+        for (fd, entry) in self
+            .table
+            .iter_mut()
+            .filter(|entry| entry.is_some())
+            .enumerate()
+        {
+            deleted_files.push(entry.as_ref().unwrap().file.clone());
+            *entry = None;
+            deleted_fds.push(fd as FileDesc);
+        }
+        self.num_fds = 0;
+        for fd in deleted_fds {
+            self.broadcast_del(fd);
+        }
+        deleted_files
+    }
+
+    /// Remove file descriptors that are close-on-spawn
+    pub fn close_on_spawn(&mut self) -> Vec<FileRef> {
+        let mut deleted_fds = Vec::new();
+        let mut deleted_files = Vec::new();
         for (fd, entry) in self.table.iter_mut().enumerate() {
             let need_close = if let Some(entry) = entry {
                 entry.close_on_spawn
@@ -161,6 +183,7 @@ impl FileTable {
                 false
             };
             if need_close {
+                deleted_files.push(entry.as_ref().unwrap().file.clone());
                 *entry = None;
                 deleted_fds.push(fd as FileDesc);
                 self.num_fds -= 1;
@@ -170,6 +193,7 @@ impl FileTable {
         for fd in deleted_fds {
             self.broadcast_del(fd);
         }
+        deleted_files
     }
 
     pub fn notifier(&self) -> &FileTableNotifier {

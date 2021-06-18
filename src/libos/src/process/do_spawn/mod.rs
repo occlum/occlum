@@ -246,7 +246,7 @@ fn new_process_common(
         };
         let vm_ref = Arc::new(vm);
         let files_ref = {
-            let files = init_files(current_ref, file_actions, host_stdio_fds)?;
+            let files = init_files(current_ref, file_actions, host_stdio_fds, &reuse_tid)?;
             Arc::new(SgxMutex::new(files))
         };
         let fs_ref = Arc::new(RwLock::new(current_ref.fs().read().unwrap().clone()));
@@ -347,12 +347,25 @@ fn init_files(
     current_ref: &ThreadRef,
     file_actions: &[FileAction],
     host_stdio_fds: Option<&HostStdioFds>,
+    reuse_tid: &Option<ThreadId>,
 ) -> Result<FileTable> {
     // Usually, we just inherit the file table from the current process
     let should_inherit_file_table = current_ref.process().pid() > 0;
     if should_inherit_file_table {
         // Fork: clone file table
         let mut cloned_file_table = current_ref.files().lock().unwrap().clone();
+
+        // By default, file descriptors remain open across an execve().
+        // File descriptors that are marked close-on-exec are closed, which will cause
+        // the release of advisory locks owned by current process.
+        if reuse_tid.is_some() {
+            let closed_files = cloned_file_table.close_on_spawn();
+            for file in closed_files {
+                file.release_advisory_locks();
+            }
+            return Ok(cloned_file_table);
+        }
+
         // Perform file actions to modify the cloned file table
         for file_action in file_actions {
             match file_action {

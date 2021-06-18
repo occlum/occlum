@@ -239,6 +239,10 @@ jobs:
       run: docker exec $language_support_test bash -c "cd /root/occlum/demos/embedded_mode && make;
             make test"
 
+    - name: Run Golang sqlite test
+      run: docker exec $language_support_test bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
+            cd /root/occlum/demos/golang/go_sqlite/ && ./run_go_sqlite_demo.sh"
+
     - name: Go server set up and run
       run: docker exec $language_support_test bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
             cd /root/occlum/demos/golang/web_server && occlum-go mod init web_server && occlum-go get -u -v github.com/gin-gonic/gin;
@@ -256,10 +260,6 @@ jobs:
       run: |
         sleep ${{ env.nap_time }};
         docker exec $language_support_test bash -c "cd /root/occlum/demos/golang/grpc_pingpong && ./run_ping_on_occlum.sh"
-
-    - name: Run Golang sqlite test
-      run: docker exec $language_support_test bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
-            cd /root/occlum/demos/golang/go_sqlite/ && ./run_go_sqlite_demo.sh"
 
     # Sleeps longer to make sure the server is up.
     - name: Curl test

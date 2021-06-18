@@ -64,8 +64,9 @@ fn exit_thread(term_status: TermStatus) {
         table::del_thread(thread.tid()).expect("tid must be in the table");
     }
 
-    // If this thread is the last thread, then exit the process
+    // If this thread is the last thread, close all files then exit the process
     if num_remaining_threads == 0 {
+        thread.close_all_files();
         exit_process(&thread, term_status);
     }
 

@@ -43,6 +43,10 @@ pub trait File: Debug + Sync + Send + Any {
         return_op_unsupported_error!("seek")
     }
 
+    fn position(&self) -> Result<off_t> {
+        return_op_unsupported_error!("position")
+    }
+
     fn metadata(&self) -> Result<Metadata> {
         return_op_unsupported_error!("metadata")
     }
@@ -83,13 +87,15 @@ pub trait File: Debug + Sync + Send + Any {
         return_op_unsupported_error!("set_status_flags")
     }
 
-    fn test_advisory_lock(&self, lock: &mut Flock) -> Result<()> {
+    fn test_advisory_lock(&self, lock: &mut RangeLock) -> Result<()> {
         return_op_unsupported_error!("test_advisory_lock")
     }
 
-    fn set_advisory_lock(&self, lock: &Flock) -> Result<()> {
+    fn set_advisory_lock(&self, lock: &RangeLock, is_nonblocking: bool) -> Result<()> {
         return_op_unsupported_error!("set_advisory_lock")
     }
+
+    fn release_advisory_locks(&self) {}
 
     fn fallocate(&self, _flags: FallocateFlags, _offset: usize, _len: usize) -> Result<()> {
         return_op_unsupported_error!("fallocate")

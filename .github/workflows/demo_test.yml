@@ -56,6 +56,9 @@ jobs:
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/embedded_mode && SGX_MODE=SIM make;
             SGX_MODE=SIM make test"
 
+    - name: Run Golang sqlite test
+      run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh"
+
     - name: Go Server set up and run
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/web_server && occlum-go mod init web_server && occlum-go get -u -v github.com/gin-gonic/gin;
             occlum-go build -o web_server ./web_server.go;
@@ -71,9 +74,6 @@ jobs:
       run: |
         sleep ${{ env.nap_time }};
         docker exec language_support_test bash -c "cd /root/occlum/demos/golang/grpc_pingpong && SGX_MODE=SIM ./run_ping_on_occlum.sh" &
-
-    - name: Run Golang sqlite test
-      run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh"
 
     - name: Curl test
       run: |

@@ -1,4 +1,4 @@
-use super::flock::flock;
+use super::flock::c_flock;
 use super::*;
 use util::mem_util::from_user;
 
@@ -19,9 +19,11 @@ pub enum FcntlCmd<'a> {
     /// Set the file status flags
     SetFl(u32),
     /// Test a file lock
-    GetLk(&'a mut flock),
+    GetLk(&'a mut c_flock),
     /// Acquire or release a file lock
-    SetLk(&'a flock),
+    SetLk(&'a c_flock),
+    /// The blocking version of SetLK
+    SetLkWait(&'a c_flock),
 }
 
 impl<'a> FcntlCmd<'a> {
@@ -35,16 +37,22 @@ impl<'a> FcntlCmd<'a> {
             libc::F_GETFL => FcntlCmd::GetFl(),
             libc::F_SETFL => FcntlCmd::SetFl(arg as u32),
             libc::F_GETLK => {
-                let flock_mut_ptr = arg as *mut flock;
-                from_user::check_mut_ptr(flock_mut_ptr)?;
-                let flock_mut_c = unsafe { &mut *flock_mut_ptr };
-                FcntlCmd::GetLk(flock_mut_c)
+                let lock_mut_ptr = arg as *mut c_flock;
+                from_user::check_mut_ptr(lock_mut_ptr)?;
+                let lock_mut_c = unsafe { &mut *lock_mut_ptr };
+                FcntlCmd::GetLk(lock_mut_c)
             }
             libc::F_SETLK => {
-                let flock_ptr = arg as *const flock;
-                from_user::check_ptr(flock_ptr)?;
-                let flock_c = unsafe { &*flock_ptr };
-                FcntlCmd::SetLk(flock_c)
+                let lock_ptr = arg as *const c_flock;
+                from_user::check_ptr(lock_ptr)?;
+                let lock_c = unsafe { &*lock_ptr };
+                FcntlCmd::SetLk(lock_c)
+            }
+            libc::F_SETLKW => {
+                let lock_ptr = arg as *const c_flock;
+                from_user::check_ptr(lock_ptr)?;
+                let lock_c = unsafe { &*lock_ptr };
+                FcntlCmd::SetLkWait(lock_c)
             }
             _ => return_errno!(EINVAL, "unsupported command"),
         })
@@ -92,20 +100,39 @@ pub fn do_fcntl(fd: FileDesc, cmd: &mut FcntlCmd) -> Result<isize> {
             file.set_status_flags(status_flags)?;
             0
         }
-        FcntlCmd::GetLk(flock_mut_c) => {
+        FcntlCmd::GetLk(lock_mut_c) => {
             let file = file_table.get(fd)?;
-            let mut lock = Flock::from_c(*flock_mut_c)?;
-            if let FlockType::F_UNLCK = lock.l_type {
+            let lock_type = RangeLockType::from_u16(lock_mut_c.l_type)?;
+            if RangeLockType::F_UNLCK == lock_type {
                 return_errno!(EINVAL, "invalid flock type for getlk");
             }
+            let mut lock = RangeLockBuilder::new()
+                .type_(lock_type)
+                .range(FileRange::from_c_flock_and_file(&lock_mut_c, &file)?)
+                .build()?;
             file.test_advisory_lock(&mut lock)?;
-            (*flock_mut_c).copy_from_safe(&lock);
+            trace!("getlk returns: {:?}", lock);
+            (*lock_mut_c).copy_from_range_lock(&lock);
             0
         }
-        FcntlCmd::SetLk(flock_c) => {
+        FcntlCmd::SetLk(lock_c) => {
             let file = file_table.get(fd)?;
-            let lock = Flock::from_c(*flock_c)?;
-            file.set_advisory_lock(&lock)?;
+            let lock = RangeLockBuilder::new()
+                .type_(RangeLockType::from_u16(lock_c.l_type)?)
+                .range(FileRange::from_c_flock_and_file(&lock_c, &file)?)
+                .build()?;
+            let is_nonblocking = true;
+            file.set_advisory_lock(&lock, is_nonblocking)?;
+            0
+        }
+        FcntlCmd::SetLkWait(lock_c) => {
+            let file = file_table.get(fd)?;
+            let lock = RangeLockBuilder::new()
+                .type_(RangeLockType::from_u16(lock_c.l_type)?)
+                .range(FileRange::from_c_flock_and_file(&lock_c, &file)?)
+                .build()?;
+            let is_nonblocking = false;
+            file.set_advisory_lock(&lock, is_nonblocking)?;
             0
         }
     };
