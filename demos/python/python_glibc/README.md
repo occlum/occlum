@@ -10,12 +10,12 @@ To make the sample code more realistic, we choose to write a Python program that
 
 This tutorial is written under the assumption that you have Docker installed and use Occlum in a Docker container.
 
-Occlum is compatible with glibc-supported Python, we employ miniconda as python installation tool. You can import any python dependencies using conda. Here, miniconda is automatically installed by install_python_with_conda.sh script, the required python and related dependencies for this project are also loaded by this script. Here, we take occlum/occlum:0.22.0-ubuntu18.04 as example.
+Occlum is compatible with glibc-supported Python, we employ miniconda as python installation tool. You can import any python dependencies using conda. Here, miniconda is automatically installed by install_python_with_conda.sh script, the required python and related dependencies for this project are also loaded by this script. Here, we take occlum/occlum:0.23.0-ubuntu18.04 as example.
 
 Step 1 (on the host): Start an Occlum container
 ```
-docker pull occlum/occlum:0.22.0-ubuntu18.04
-docker run -it --name=pythonDemo --device /dev/sgx/enclave occlum/occlum:0.22.0-ubuntu18.04 bash
+docker pull occlum/occlum:0.23.0-ubuntu18.04
+docker run -it --name=pythonDemo --device /dev/sgx/enclave occlum/occlum:0.23.0-ubuntu18.04 bash
 ```
 
 Step 2 (on the host): Download miniconda and install python to prefix position.
