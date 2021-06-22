@@ -1,15 +1,15 @@
 use libc::c_char;
 use std::mem::MaybeUninit;
 
-use super::{Addr, Domain};
+use super::{Addr, CSockAddr, Domain};
 use crate::prelude::*;
 
 /// A UNIX address.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UnixAddr {
     Unnamed,
-    Pathname(PathUnixAddr),
-    Abstract(AbstractUnixAddr),
+    Pathname(String),
+    Abstract(Vec<u8>),
 }
 
 impl UnixAddr {
@@ -33,11 +33,11 @@ impl UnixAddr {
         }
 
         let path_len = c_len - std::mem::size_of::<libc::sa_family_t>();
+        debug_assert!(path_len > 1);
         if path_len == 1 {
             // Both pathname and abstract addresses require a path_len greater than 1.
             return_errno!(EINVAL, "the pathname must not be empty");
         }
-        debug_assert!(path_len > 1);
 
         // A pathname address
         if c_addr.sun_path[0] != 0 {
@@ -48,45 +48,48 @@ impl UnixAddr {
             }
 
             let pathname = {
-                // Safe to convert from &[c_char] to &[u8]
+                // Safety. Converting from &[c_char] to &[u8] is harmless.
                 let path_slice: &[u8] = unsafe {
-                    let char_slice: &[c_char] = &c_addr.sun_path[..(path_len - 1)];
+                    let char_slice = &c_addr.sun_path[..(path_len - 1)];
                     std::mem::transmute(char_slice)
                 };
                 let path_str = std::str::from_utf8(path_slice)
                     .map_err(|_| errno!(EINVAL, "path is not UTF8"))?;
                 path_str.to_string()
             };
-            Ok(UnixAddr::Pathname(PathUnixAddr(pathname)))
+            Ok(UnixAddr::Pathname(pathname))
         }
         // An abstract address
         else {
-            // Safe to convert from &[c_char] to &[u8]
+            // Safety. Converting from &[c_char] to &[u8] is harmless.
             let u8_slice: &[u8] = unsafe {
-                let char_slice: &[c_char] = &c_addr.sun_path[..];
+                let char_slice = &c_addr.sun_path[1..(path_len)];
                 std::mem::transmute(char_slice)
             };
-            Ok(UnixAddr::Abstract(AbstractUnixAddr(Vec::from(u8_slice))))
+            Ok(UnixAddr::Abstract(Vec::from(u8_slice)))
         }
     }
 
     pub fn to_c(&self) -> (libc::sockaddr_un, usize) {
+        const FAMILY_LEN: usize = std::mem::size_of::<libc::sa_family_t>();
+
         let sun_family = libc::AF_UNIX as _;
         let mut sun_path: [u8; 108] = [0; 108];
         let c_len = match self {
-            Self::Unnamed => std::mem::size_of::<libc::sa_family_t>(),
-            Self::Pathname(PathUnixAddr(path)) => {
+            Self::Unnamed => FAMILY_LEN,
+            Self::Pathname(path) => {
                 let path = path.as_bytes();
                 sun_path[..path.len()].copy_from_slice(&path[..]);
                 sun_path[path.len()] = 0;
-                path.len() + 1
+                FAMILY_LEN + path.len() + 1
             }
-            Self::Abstract(AbstractUnixAddr(name)) => {
-                sun_path[..name.len()].copy_from_slice(&name[..]);
-                name.len()
+            Self::Abstract(name) => {
+                sun_path[0] = 0;
+                sun_path[1..name.len() + 1].copy_from_slice(&name[..]);
+                FAMILY_LEN + name.len() + 1
             }
         };
-        // Safe to convert from [u8; N] to [i8; N]
+        // Safety. Convert from [u8; N] to [i8; N] is harmless.
         let sun_path = unsafe { std::mem::transmute(sun_path) };
 
         let c_addr = libc::sockaddr_un {
@@ -106,48 +109,13 @@ impl Addr for UnixAddr {
         if c_addr_len > std::mem::size_of::<libc::sockaddr_storage>() {
             return_errno!(EINVAL, "address length is too large");
         }
-        // Safe to convert from sockaddr_storage to sockaddr_un
+        // Safety. Convert from sockaddr_storage to sockaddr_un is harmless.
         let c_addr = unsafe { std::mem::transmute(c_addr) };
         Self::from_c(c_addr, c_addr_len)
     }
 
     fn to_c_storage(&self) -> (libc::sockaddr_storage, usize) {
-        let (c_addr, c_addr_len) = self.to_c();
-        // Safety to use sockaddr_storage as sockaddr_un
-        let c_addr_storage = unsafe {
-            let mut storage: MaybeUninit<libc::sockaddr_storage> = MaybeUninit::uninit();
-            let dst: &mut libc::sockaddr_un = std::mem::transmute(&mut storage);
-            *dst = c_addr;
-            storage.assume_init()
-        };
-        (c_addr_storage, c_addr_len)
+        let c_un_addr = self.to_c();
+        c_un_addr.to_c_storage()
     }
 }
-
-impl From<UnnamedUnixAddr> for UnixAddr {
-    fn from(_unnamed: UnnamedUnixAddr) -> Self {
-        Self::Unnamed
-    }
-}
-
-impl From<PathUnixAddr> for UnixAddr {
-    fn from(path: PathUnixAddr) -> Self {
-        Self::Pathname(path)
-    }
-}
-
-impl From<AbstractUnixAddr> for UnixAddr {
-    fn from(abstract_: AbstractUnixAddr) -> Self {
-        Self::Abstract(abstract_)
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct UnnamedUnixAddr;
-
-// TODO: should be backed by an inode, instead of a string of path.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PathUnixAddr(pub String);
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AbstractUnixAddr(pub Vec<u8>);
