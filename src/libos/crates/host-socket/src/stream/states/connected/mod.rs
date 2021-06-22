@@ -34,3 +34,13 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
 
     // Other methods are implemented in the send and receive modules
 }
+
+impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for ConnectedStream<A, R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConnectedStream")
+            .field("common", &self.common)
+            .field("sender", &self.sender)
+            .field("receiver", &self.receiver)
+            .finish()
+    }
+}

@@ -146,6 +146,14 @@ impl Receiver {
     }
 }
 
+impl std::fmt::Debug for Receiver {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Receiver")
+            .field("inner", &self.inner.lock().unwrap())
+            .finish()
+    }
+}
+
 struct Inner {
     recv_buf: CircularBuf<IoUringArray<u8>>,
     recv_req: IoUringCell<RecvReq>,
@@ -239,6 +247,18 @@ impl Inner {
         });
         debug_assert!(iovecs_len > 0);
         (iovecs, iovecs_len)
+    }
+}
+
+impl std::fmt::Debug for Inner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Inner")
+            .field("recv_buf", &self.recv_buf)
+            .field("io_handle", &self.io_handle)
+            .field("is_shutdown", &self.is_shutdown)
+            .field("end_of_file", &self.end_of_file)
+            .field("fatal", &self.fatal)
+            .finish()
     }
 }
 

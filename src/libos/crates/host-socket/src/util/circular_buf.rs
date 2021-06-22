@@ -241,6 +241,16 @@ impl<B: BufLike> CircularBuf<B> {
     }
 }
 
+impl<B: BufLike> std::fmt::Debug for CircularBuf<B> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CircularBuf")
+            .field("capacity", &self.capacity())
+            .field("producible", &self.producible())
+            .field("consumable", &self.consumable())
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

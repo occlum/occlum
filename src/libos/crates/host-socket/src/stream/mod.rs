@@ -206,3 +206,23 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         }
     */
 }
+
+impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for State<A, R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let inner: &dyn std::fmt::Debug = match self {
+            State::Init(inner) => inner as _,
+            State::Connect(inner) => inner as _,
+            State::Connected(inner) => inner as _,
+            State::Listen(inner) => inner as _,
+        };
+        f.debug_tuple("State").field(inner).finish()
+    }
+}
+
+impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for StreamSocket<A, R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StreamSocket")
+            .field("state", &self.state.read().unwrap())
+            .finish()
+    }
+}

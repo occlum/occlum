@@ -48,7 +48,7 @@ impl<A: Addr + 'static, R: Runtime> InitStream<A, R> {
         let retval = unsafe { libc::ocall::bind(fd, c_addr_ptr, c_addr_len) };
         if retval < 0 {
             let errno = Errno::from(-retval as u32);
-            return_errno!(errno, "listen failed");
+            return_errno!(errno, "bind failed");
         }
         Ok(())
     }

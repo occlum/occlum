@@ -138,6 +138,14 @@ impl Sender {
     }
 }
 
+impl std::fmt::Debug for Sender {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Sender")
+            .field("inner", &self.inner.lock().unwrap())
+            .finish()
+    }
+}
+
 struct Inner {
     send_buf: CircularBuf<IoUringArray<u8>>,
     send_req: IoUringCell<SendReq>,
@@ -229,6 +237,17 @@ impl Inner {
         });
         debug_assert!(iovecs_len > 0);
         (iovecs, iovecs_len)
+    }
+}
+
+impl std::fmt::Debug for Inner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Inner")
+            .field("send_buf", &self.send_buf)
+            .field("io_handle", &self.io_handle)
+            .field("is_shutdown", &self.is_shutdown)
+            .field("fatal", &self.fatal)
+            .finish()
     }
 }
 

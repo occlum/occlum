@@ -1,4 +1,4 @@
-use async_io::socket::{Addr, Ipv4Addr, Ipv4SocketAddr, PathUnixAddr, UnixAddr};
+use async_io::socket::{Addr, Ipv4Addr, Ipv4SocketAddr, UnixAddr};
 
 mod runtime {
     use std::sync::Once;
@@ -134,6 +134,7 @@ mod server {
     }
 }
 
+#[test]
 fn ipv4() {
     runtime::SocketRuntime::init(2);
 
@@ -163,7 +164,9 @@ fn ipv4() {
 fn unix() {
     runtime::SocketRuntime::init(2);
 
-    let server_addr: UnixAddr = PathUnixAddr("test.sock".to_string()).into();
+    let path = "test.sock";
+    std::fs::remove_file(&path).unwrap();
+    let server_addr = UnixAddr::Pathname(path.to_string());
 
     // Spawn a task to run the server
     async_rt::task::block_on({

@@ -82,6 +82,7 @@ impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for Common<A, R> {
         f.debug_struct("Common")
             .field("host_fd", &self.host_fd)
             .field("pollee", &self.pollee)
+            .field("inner", &self.inner.lock().unwrap())
             .finish()
     }
 }

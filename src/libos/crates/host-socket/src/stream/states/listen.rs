@@ -108,6 +108,15 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
     }
 }
 
+impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for ListenerStream<A, R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ListenerStream")
+            .field("common", &self.common)
+            .field("inner", &self.inner.lock().unwrap())
+            .finish()
+    }
+}
+
 /// The mutable, internal state of a listener stream.
 struct Inner<A: Addr> {
     backlog: Backlog<A>,
@@ -123,7 +132,17 @@ impl<A: Addr> Inner<A> {
     }
 }
 
+impl<A: Addr + 'static> std::fmt::Debug for Inner<A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Inner")
+            .field("backlog", &self.backlog)
+            .field("fatal", &self.fatal)
+            .finish()
+    }
+}
+
 /// An entry in the backlog.
+#[derive(Debug)]
 enum Entry {
     /// The entry is free to use.
     Free,
@@ -263,6 +282,16 @@ impl<A: Addr> Backlog<A> {
             A::from_c_storage(&c_addr, c_addr_len as _).unwrap()
         };
         Some((accepted_fd, accepted_addr))
+    }
+}
+
+impl<A: Addr + 'static> std::fmt::Debug for Backlog<A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Backlog")
+            .field("entries", &self.entries)
+            .field("completed", &self.completed)
+            .field("num_free", &self.num_free)
+            .finish()
     }
 }
 
