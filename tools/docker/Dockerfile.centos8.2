@@ -104,7 +104,7 @@ ENV PATH="/opt/occlum/toolchains/jvm/bin:$PATH"
 # Install SGX PSW
 WORKDIR /tmp
 RUN echo "ca_directory=/etc/ssl/certs" >> /etc/wgetrc && \
-    wget https://download.01.org/intel-sgx/sgx-linux/2.13/distro/centos8.2-server/sgx_rpm_local_repo.tgz && \
+    wget https://download.01.org/intel-sgx/sgx-linux/2.13.3/distro/centos8.2-server/sgx_rpm_local_repo.tgz && \
     tar -xvf sgx_rpm_local_repo.tgz && \
     rm sgx_rpm_local_repo.tgz && \
     wget https://download.01.org/intel-sgx/sgx-dcap/1.10/linux/distro/centos8.2-server/sgx_rpm_local_repo.tgz && \
@@ -137,7 +137,7 @@ RUN echo "ca_directory=/etc/ssl/certs" >> /etc/wgetrc && \
 
 # Install SGX SDK
 WORKDIR /tmp
-RUN git clone -b sgx_2.13_for_occlum https://github.com/occlum/linux-sgx && \
+RUN git clone -b sgx_2.13.3_for_occlum https://github.com/occlum/linux-sgx && \
     cd linux-sgx && \
     make preparation && \
     ./compile_and_install.sh no_mitigation USE_OPT_LIBS=2 && \
