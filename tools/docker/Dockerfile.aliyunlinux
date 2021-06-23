@@ -117,7 +117,7 @@ RUN wget https://mirrors.openanolis.org/inclavare-containers/alinux2/sgx_rpm_loc
 
 # Install SGX SDK
 WORKDIR /tmp
-RUN git clone -b sgx_2.13_for_occlum https://github.com/occlum/linux-sgx && \
+RUN git clone -b sgx_2.13.3_for_occlum https://github.com/occlum/linux-sgx && \
     cd linux-sgx && \
     make preparation && \
     ./compile_and_install.sh no_mitigation USE_OPT_LIBS=2 && \
