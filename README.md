@@ -207,10 +207,23 @@ Step 1-3 are to be done on the host OS (Linux):
     ```bash
     docker run -it --device /dev/isgx occlum/occlum:[version]-ubuntu18.04
     ```
-    
-    For new DCAP driver:
+
+    For DCAP driver before v1.41:
     ```bash
-    docker run -it --device /dev/sgx/enclave occlum/occlum:[version]-ubuntu18.04
+    docker run -it --device /dev/sgx/enclave --device /dev/sgx/provision occlum/occlum:[version]-ubuntu18.04
+    ```
+
+    For DCAP driver since v1.41 or in-tree kernel driver:
+    ```bash
+    # Two methods:
+    # (1) Create softlinks on host
+    mkdir -p /dev/sgx
+    ln -sf ../sgx_enclave /dev/sgx/enclave
+    ln -sf ../sgx_provision /dev/sgx/provision
+    docker run -it --device /dev/sgx/enclave --device /dev/sgx/provision occlum/occlum:[version]-ubuntu18.04
+
+    # (2) Create the docker with privileged mode
+    docker run -it --privileged -v /dev/sgx_enclave:/dev/sgx/enclave -v /dev/sgx_provision:/dev/sgx/provision occlum/occlum:[version]-ubuntu18.04
     ```
 
 Step 4-5 are to be done on the guest OS running inside the Docker container:
