@@ -10,7 +10,7 @@ cfg_if::cfg_if! {
         use std::mem::MaybeUninit;
         use std::cell::Cell;
 
-        type Array<T> = std::vec::Vec<Cell<MaybeUninit<T>>>;
+        type Array<T> = std::vec::Vec<Cell<T>>;
     }
 }
 
@@ -27,13 +27,13 @@ impl<T: Copy> IoUringArray<T> {
     ///
     /// The caller must ensure that the element at the given position has been initialized.
     pub unsafe fn get(&self, index: usize) -> T {
-        *self.pos_ptr(index)
+        self.pos_ptr(index).read()
     }
 
     /// Set the value of an element.
-    pub fn set(&self, index: usize, val: T) {
+    pub fn set(&mut self, index: usize, val: T) {
         unsafe {
-            *self.pos_ptr(index) = val;
+            self.pos_ptr(index).write(val);
         }
     }
 
@@ -42,7 +42,7 @@ impl<T: Copy> IoUringArray<T> {
         self.0.capacity()
     }
 
-    /// Returns the base pointer of the array.
+    /// Returns the mutable base pointer of the array.
     pub fn as_ptr(&self) -> *mut T {
         cfg_if::cfg_if! {
             if #[cfg(feature = "sgx")] {
@@ -65,7 +65,7 @@ mod tests {
 
     #[test]
     fn get_and_set() {
-        let array = IoUringArray::with_capacity(4);
+        let mut array = IoUringArray::with_capacity(4);
         (0..4).for_each(|idx| {
             let val = idx * idx;
             array.set(idx, val);

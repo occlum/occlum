@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use std::marker::PhantomData;
+use std::mem::{size_of, MaybeUninit};
 
 use async_io::poll::{Events, Pollee, Poller};
 use async_io::socket::Addr;
@@ -221,10 +222,12 @@ impl<A: Addr> Backlog<A> {
 
         let (c_addr_ptr, c_addr_len_ptr) = unsafe {
             let accept_req_ptr = self.reqs.as_ptr().add(entry_idx);
-            let c_addr_ptr = (accept_req_ptr as *mut u8).add(offset_of!(AcceptReq, c_addr)) as _;
+            let c_addr_ptr: *mut libc::sockaddr =
+                (accept_req_ptr as *mut u8).add(offset_of!(AcceptReq, c_addr)) as _;
             let c_addr_len_ptr: *mut libc::socklen_t =
                 (accept_req_ptr as *mut u8).add(offset_of!(AcceptReq, c_addr_len)) as _;
-            c_addr_len_ptr.write(std::mem::size_of::<libc::sockaddr_storage> as _);
+            let c_addr_max_len = size_of::<libc::sockaddr_storage>();
+            c_addr_len_ptr.write(c_addr_max_len as _);
             (c_addr_ptr, c_addr_len_ptr)
         };
 
@@ -234,20 +237,31 @@ impl<A: Addr> Backlog<A> {
                 let mut inner = stream.inner.lock().unwrap();
 
                 if retval < 0 {
+                    // Since most errors that may result from the accept syscall are _not fatal_,
+                    // we simply ignore the errno code and try again.
+                    //
+                    // According to the man page, Linux may report the network errors on an
+                    // newly-accepted socket through the accept system call. Thus, we should not
+                    // treat the listener socket as "broken" simply because an error is returned
+                    // from the accept syscall.
+                    //
+                    // TODO: throw fatal errors to the upper layer.
                     let errno = Errno::from(-retval as u32);
-                    inner.fatal = Some(errno);
-                    stream.common.pollee().add_events(Events::ERR);
+                    println!("Accept error: errno = {}", errno);
+                    //inner.fatal = Some(errno);
+                    //stream.common.pollee().add_events(Events::ERR);
 
                     inner.backlog.entries[entry_idx] = Entry::Free;
                     inner.backlog.num_free += 1;
-                    return;
+                } else {
+                    let host_fd = retval as HostFd;
+                    inner.backlog.entries[entry_idx] = Entry::Completed { host_fd };
+                    inner.backlog.completed.push_back(entry_idx);
+
+                    stream.common.pollee().add_events(Events::IN);
                 }
 
-                let host_fd = retval as HostFd;
-                inner.backlog.entries[entry_idx] = Entry::Completed { host_fd };
-                inner.backlog.completed.push_back(entry_idx);
-
-                stream.common.pollee().add_events(Events::IN);
+                stream.initiate_async_accepts(inner);
             }
         };
         let io_uring = stream.common.io_uring();
@@ -255,7 +269,6 @@ impl<A: Addr> Backlog<A> {
         let flags = 0;
         let io_handle =
             unsafe { io_uring.accept(Fd(fd), c_addr_ptr, c_addr_len_ptr, flags, callback) };
-
         self.entries[entry_idx] = Entry::Pending { io_handle };
         self.num_free -= 1;
     }
@@ -267,6 +280,10 @@ impl<A: Addr> Backlog<A> {
     /// Pop a completed async accept request, turing a completed entry into a free one.
     pub fn pop_completed_req(&mut self) -> Option<(HostFd, A)> {
         let completed_idx = self.completed.pop_front()?;
+        let accepted_addr = {
+            let AcceptReq { c_addr, c_addr_len } = unsafe { self.reqs.get(completed_idx) };
+            A::from_c_storage(&c_addr, c_addr_len as _).unwrap()
+        };
         let accepted_fd = {
             let entry = &mut self.entries[completed_idx];
             let accepted_fd = match entry {
@@ -276,10 +293,6 @@ impl<A: Addr> Backlog<A> {
             self.num_free += 1;
             *entry = Entry::Free;
             accepted_fd
-        };
-        let accepted_addr = {
-            let AcceptReq { c_addr, c_addr_len } = unsafe { self.reqs.get(completed_idx) };
-            A::from_c_storage(&c_addr, c_addr_len as _).unwrap()
         };
         Some((accepted_fd, accepted_addr))
     }

@@ -13,3 +13,29 @@ cfg_if::cfg_if! {
 
 // Convenient type alises for internal uses.
 pub(crate) type HostFd = u32;
+
+macro_rules! function {
+    () => {{
+        fn f() {}
+        fn type_name_of<T>(_: T) -> &'static str {
+            std::any::type_name::<T>()
+        }
+        let name = type_name_of(f);
+
+        match &name[..name.len() - 3].rfind(':') {
+            Some(pos) => &name[pos + 1..name.len() - 3],
+            None => &name[..name.len() - 3],
+        }
+    }};
+}
+
+macro_rules! debug_trace {
+    () => {
+        println!(
+            "> Function = {}, Line = {}, File = {}",
+            function!(),
+            line!(),
+            file!()
+        )
+    };
+}

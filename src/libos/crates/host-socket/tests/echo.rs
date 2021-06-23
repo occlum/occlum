@@ -81,7 +81,7 @@ mod server {
                     .ok_or_else(|| errno!(EINVAL, "an address must be given"))?;
                 let socket = StreamSocket::new()?;
                 socket.bind(&addr)?;
-                socket.listen(32)?;
+                socket.listen(2)?;
                 socket
             };
             let server = EchoServer {
@@ -136,11 +136,11 @@ mod server {
 
 #[test]
 fn ipv4() {
-    runtime::SocketRuntime::init(2);
+    runtime::SocketRuntime::init(1);
 
     let server_addr = {
         let ipv4_addr = Ipv4Addr::new(127, 0, 0, 1);
-        let port = 8899;
+        let port = 9999;
         Ipv4SocketAddr::new(ipv4_addr, port)
     };
 
@@ -160,7 +160,7 @@ fn ipv4() {
     });
 }
 
-#[test]
+//#[test]
 fn unix() {
     runtime::SocketRuntime::init(2);
 

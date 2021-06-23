@@ -10,6 +10,7 @@ cfg_if::cfg_if! {
     }
 }
 
+#[macro_use]
 mod prelude;
 mod runtime;
 mod stream;
