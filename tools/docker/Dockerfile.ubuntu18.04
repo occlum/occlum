@@ -117,33 +117,35 @@ RUN cd java && ./install_dragonwell.sh && rm -rf /tmp/java
 ENV PATH="/opt/occlum/toolchains/jvm/bin:$PATH"
 
 # Install SGX PSW
+ARG PSW_VERSION=2.13.103.1
+ARG DCAP_VERSION=1.10.103.1
 RUN apt-get update && aptitude install -y \
-        libsgx-launch-dev=2.13.100.4-bionic1 \
-        libsgx-epid-dev=2.13.100.4-bionic1 \
-        libsgx-quote-ex-dev=2.13.100.4-bionic1 \
-        libsgx-urts=2.13.100.4-bionic1 \
-        libsgx-enclave-common=2.13.100.4-bionic1 \
-        libsgx-uae-service=2.13.100.4-bionic1 \
-        libsgx-ae-epid=2.13.100.4-bionic1 \
-        libsgx-ae-le=2.13.100.4-bionic1 \
-        libsgx-ae-pce=2.13.100.4-bionic1 \
-        libsgx-aesm-launch-plugin=2.13.100.4-bionic1 \
-        sgx-aesm-service=2.13.100.4-bionic1 \
-        libsgx-aesm-launch-plugin=2.13.100.4-bionic1 \
-        libsgx-aesm-pce-plugin=2.13.100.4-bionic1 \
-        libsgx-aesm-ecdsa-plugin=2.13.100.4-bionic1 \
-        libsgx-aesm-epid-plugin=2.13.100.4-bionic1 \
-        libsgx-aesm-quote-ex-plugin=2.13.100.4-bionic1 \
-        libsgx-dcap-quote-verify=1.10.100.4-bionic1 \
-        libsgx-dcap-quote-verify-dev=1.10.100.4-bionic1 \
-        libsgx-dcap-ql=1.10.100.4-bionic1 \
-        libsgx-dcap-ql-dev=1.10.100.4-bionic1 \
-        libsgx-epid=2.13.100.4-bionic1 \
-        libsgx-quote-ex=2.13.100.4-bionic1 \
-        libsgx-pce-logic=1.10.100.4-bionic1 \
-        libsgx-qe3-logic=1.10.100.4-bionic1 \
-        libsgx-launch=2.13.100.4-bionic1 \
-        libsgx-dcap-default-qpl=1.10.100.4-bionic1 \
+        libsgx-launch-dev=$PSW_VERSION-bionic1 \
+        libsgx-epid-dev=$PSW_VERSION-bionic1 \
+        libsgx-quote-ex-dev=$PSW_VERSION-bionic1 \
+        libsgx-urts=$PSW_VERSION-bionic1 \
+        libsgx-enclave-common=$PSW_VERSION-bionic1 \
+        libsgx-uae-service=$PSW_VERSION-bionic1 \
+        libsgx-ae-epid=$PSW_VERSION-bionic1 \
+        libsgx-ae-le=$PSW_VERSION-bionic1 \
+        libsgx-ae-pce=$PSW_VERSION-bionic1 \
+        libsgx-aesm-launch-plugin=$PSW_VERSION-bionic1 \
+        sgx-aesm-service=$PSW_VERSION-bionic1 \
+        libsgx-aesm-launch-plugin=$PSW_VERSION-bionic1 \
+        libsgx-aesm-pce-plugin=$PSW_VERSION-bionic1 \
+        libsgx-aesm-ecdsa-plugin=$PSW_VERSION-bionic1 \
+        libsgx-aesm-epid-plugin=$PSW_VERSION-bionic1 \
+        libsgx-aesm-quote-ex-plugin=$PSW_VERSION-bionic1 \
+        libsgx-dcap-quote-verify=$DCAP_VERSION-bionic1 \
+        libsgx-dcap-quote-verify-dev=$DCAP_VERSION-bionic1 \
+        libsgx-dcap-ql=$DCAP_VERSION-bionic1 \
+        libsgx-dcap-ql-dev=$DCAP_VERSION-bionic1 \
+        libsgx-epid=$PSW_VERSION-bionic1 \
+        libsgx-quote-ex=$PSW_VERSION-bionic1 \
+        libsgx-pce-logic=$DCAP_VERSION-bionic1 \
+        libsgx-qe3-logic=$DCAP_VERSION-bionic1 \
+        libsgx-launch=$PSW_VERSION-bionic1 \
+        libsgx-dcap-default-qpl=$DCAP_VERSION-bionic1 \
         && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
@@ -151,7 +153,7 @@ RUN apt-get update && aptitude install -y \
 
 # Install SGX SDK
 WORKDIR /tmp
-RUN git clone -b sgx_2.13_for_occlum https://github.com/occlum/linux-sgx && \
+RUN git clone -b sgx_2.13.3_for_occlum https://github.com/occlum/linux-sgx && \
     mkdir /etc/init && \
     cd linux-sgx && \
     make preparation && \
