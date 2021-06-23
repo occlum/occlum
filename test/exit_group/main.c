@@ -18,7 +18,14 @@
 
 // Type 1: a busy loop thread
 static void *busyloop_thread_func(void *_) {
+// FIXME: Disable support for interrupting user code in simulation mode becase
+// the interrupt signal is not handled well.
+#ifdef SGX_MODE_SIM
+    printf("WARNING: Skip busyloop_thread_func case as we do not support "
+           "interrupting user code in SGX simulation mode\n");
+#else
     while (1) {  }
+#endif
     return NULL;
 }
 
