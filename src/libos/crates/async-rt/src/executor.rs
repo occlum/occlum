@@ -2,6 +2,8 @@ use flume::{Receiver, Sender};
 use futures::task::waker_ref;
 
 use crate::config::CONFIG;
+#[cfg(feature = "thread_sleep")]
+use crate::parks::Parks;
 use crate::prelude::*;
 use crate::sched::Affinity;
 use crate::task::Task;
@@ -33,6 +35,8 @@ pub(crate) struct Executor {
     task_senders: Vec<Sender<Arc<Task>>>,
     next_run_queue_id: AtomicU32,
     is_shutdown: AtomicBool,
+    #[cfg(feature = "thread_sleep")]
+    parks: Parks,
 }
 
 impl Executor {
@@ -56,6 +60,9 @@ impl Executor {
         let is_shutdown = AtomicBool::new(false);
         let next_run_queue_id = AtomicU32::new(0);
 
+        #[cfg(feature = "thread_sleep")]
+        let parks = Parks::new(parallelism);
+
         let new_self = Self {
             parallelism,
             sched_callback,
@@ -63,6 +70,8 @@ impl Executor {
             task_senders,
             next_run_queue_id,
             is_shutdown,
+            #[cfg(feature = "thread_sleep")]
+            parks,
         };
         Ok(new_self)
     }
@@ -87,6 +96,12 @@ impl Executor {
 
                 match task_res {
                     Err(_) => {
+                        #[cfg(feature = "thread_sleep")]
+                        self.parks.park_timeout(
+                            run_queue_id as usize,
+                            core::time::Duration::from_millis(10),
+                        );
+                        #[cfg(not(feature = "thread_sleep"))]
                         core::sync::atomic::spin_loop_hint();
                         continue;
                     }
@@ -123,6 +138,9 @@ impl Executor {
         self.task_senders[thread_id]
             .send(task)
             .expect("too many tasks enqueued");
+
+        #[cfg(feature = "thread_sleep")]
+        self.parks.unpark(thread_id);
     }
 
     fn pick_thread_for(&self, task: &Arc<Task>) -> usize {
@@ -140,6 +158,9 @@ impl Executor {
 
     pub fn shutdown(&self) {
         self.is_shutdown.store(true, Ordering::Relaxed);
+
+        #[cfg(feature = "thread_sleep")]
+        self.parks.unpark_all();
     }
 
     pub fn is_shutdown(&self) -> bool {

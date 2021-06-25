@@ -142,7 +142,7 @@ fn main() {
         HeapMaxSize: heap_max_size.unwrap() as u64,
         HeapMinSize: heap_max_size.unwrap() as u64, // just use the same size as max size
         TCSNum: occlum_config.resource_limits.max_num_of_threads,
-        TCSPolicy: 1,
+        TCSPolicy: 0, // TCS is bound to the untrusted thread
         DisableDebug: match occlum_config.metadata.debuggable {
             true => 0,
             false => 1,

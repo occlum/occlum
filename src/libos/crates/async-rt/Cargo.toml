@@ -9,6 +9,7 @@ edition = "2018"
 [features]
 default = []
 auto_run = []
+thread_sleep = [] # need std or sgx_tstd
 sgx = ["flume/sgx", "sgx_tstd"]
 
 [dependencies]

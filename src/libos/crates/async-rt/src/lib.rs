@@ -1,8 +1,14 @@
-#![cfg_attr(any(not(any(test, feature = "auto_run")), feature = "sgx"), no_std)]
+#![cfg_attr(
+    any(
+        not(any(test, feature = "auto_run", feature = "thread_sleep")),
+        feature = "sgx"
+    ),
+    no_std
+)]
 #![feature(const_fn)]
 #![feature(thread_local)]
 
-#[cfg(all(feature = "sgx", feature = "auto_run"))]
+#[cfg(feature = "sgx")]
 #[macro_use]
 extern crate sgx_tstd as std;
 extern crate alloc;
@@ -17,6 +23,8 @@ extern crate spin;
 pub mod config;
 pub mod executor;
 mod macros;
+#[cfg(feature = "thread_sleep")]
+mod parks;
 pub mod prelude;
 pub mod sched;
 pub mod task;
