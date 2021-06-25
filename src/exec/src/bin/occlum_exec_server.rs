@@ -64,11 +64,24 @@ fn main() {
                 .default_value("./")
                 .help("The Occlum instance dir."),
         )
+        .arg(
+            Arg::with_name("cpus")
+                .long("cpus")
+                .takes_value(true)
+                .help("The number of vcpus")
+                .default_value("0")
+                .validator(|t| match t.parse::<u32>() {
+                    Ok(_) => Ok(()),
+                    Err(e) => Err(e.to_string()),
+                }),
+        )
         .get_matches();
 
     // Set the instance_dir as the current dir
     let instance_dir = Path::new(matches.value_of("instance_dir").unwrap());
     assert!(env::set_current_dir(&instance_dir).is_ok());
+
+    let num_vcpus = matches.value_of("cpus").unwrap().parse::<u32>().unwrap();
 
     //If the server already startted, then return
     if check_server_status(DEFAULT_SOCK_FILE) {
@@ -92,7 +105,7 @@ fn main() {
     };
 
     if let Ok(server) = server_builder.build() {
-        rust_occlum_pal_init().expect("Occlum image initialization failed");
+        rust_occlum_pal_init(num_vcpus).expect("Occlum image initialization failed");
         //server is running
         println!("server stared on addr {}", server.local_addr());
         let (lock, cvar) = &*server_stopped;
@@ -140,10 +153,13 @@ pub struct occlum_pal_attr_t {
     ///
     /// Optional field. If NULL, the LibOS will treat it as "off".
     pub log_level: *const libc::c_char,
+    /// The number of vCPUs. A value of zero means using as many as CPU cores
+    /// on the platform.
+    pub num_vcpus: u32,
 }
 
 /// Loads and initializes the Occlum enclave image
-fn rust_occlum_pal_init() -> Result<(), i32> {
+fn rust_occlum_pal_init(num_vcpus: u32) -> Result<(), i32> {
     let instance_dir = OsString::from(".\0");
     let mut log_level = OsString::from("off\0");
     if let Some(val) = env::var_os("OCCLUM_LOG_LEVEL") {
@@ -159,6 +175,7 @@ fn rust_occlum_pal_init() -> Result<(), i32> {
         log_level: CStr::from_bytes_with_nul(log_level.as_bytes())
             .unwrap()
             .as_ptr(),
+        num_vcpus,
     };
     let rust_object = Box::new(&occlum_pal_attribute);
 

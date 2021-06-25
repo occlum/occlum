@@ -59,7 +59,7 @@ Usage:
         when needed.
         To force rebuilding all artifacts, give the [-f/--force] flag.
 
-    occlum run <program_name> <program_args>
+    occlum run [--cpus <num_of_cpus>] <program_name> <program_args>
         Run the user program inside an SGX enclave.
 
     occlum package [<package_name>.tar.gz]
@@ -299,7 +299,7 @@ cmd_start() {
     if [ "`get_enclave_debuggable_flag`" == "false" ]; then
         export OCCLUM_RELEASE_ENCLAVE=1
     fi
-    RUST_BACKTRACE=1 "$instance_dir/build/bin/occlum_exec_client" start
+    RUST_BACKTRACE=1 "$instance_dir/build/bin/occlum_exec_client" start "$@"
 
     echo "built" > $status_file
 }
@@ -472,7 +472,7 @@ case "$cmd" in
         cmd_run "${@:2}"
         ;;
     start)
-        cmd_start
+        cmd_start "${@:2}"
         ;;
     exec)
         cmd_exec "${@:2}"

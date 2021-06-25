@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
+#include <limits.h>
 #include <libgen.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -17,12 +19,25 @@ int main(int argc, char *argv[]) {
     // Parse arguments
     if (argc < 2) {
         fprintf(stderr, "[ERROR] occlum-run: at least one argument must be provided\n\n");
-        fprintf(stderr, "Usage: occlum-run <executable> [<args>]\n");
+        fprintf(stderr, "Usage: occlum-run [--cpus <num_of_cpus>] <executable> [<args>]\n");
         return EXIT_FAILURE;
     }
 
-    char **cmd_args = &argv[1];
-    char *cmd_path = strdup(argv[1]);
+    unsigned int num_vcpus = 0;
+    unsigned int cmd_idx = 1;
+    if (argc >= 4 && strcmp(argv[1], "--cpus") == 0) {
+        unsigned long cpus = strtoul(argv[2], NULL, 10);
+        if (errno == ERANGE || cpus > UINT_MAX) {
+            fprintf(stderr, "[ERROR] occlum-run: --cpu should specified a valid number\n\n");
+            if (errno == ERANGE) { errno = 0; }
+            return EXIT_FAILURE;
+        }
+        num_vcpus = cpus;
+        cmd_idx += 2;
+    }
+
+    char **cmd_args = &argv[cmd_idx];
+    char *cmd_path = strdup(argv[cmd_idx]);
     extern const char **environ;
 
     // Change cmd_args[0] from program path to program name in place (e.g., "/bin/abc" to "abc")
@@ -40,6 +55,7 @@ int main(int argc, char *argv[]) {
     // Init Occlum PAL
     struct occlum_pal_attr attr = OCCLUM_PAL_ATTR_INITVAL;
     attr.log_level = getenv("OCCLUM_LOG_LEVEL");
+    attr.num_vcpus = num_vcpus;
     if (occlum_pal_init(&attr) < 0) {
         return EXIT_FAILURE;
     }

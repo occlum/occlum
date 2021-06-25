@@ -10,6 +10,7 @@
 #include "pal_vcpu_thread.h"
 #include "errno2str.h"
 #include <linux/limits.h>
+#include <unistd.h>
 
 int occlum_pal_get_version(void) {
     return OCCLUM_PAL_VERSION;
@@ -31,9 +32,18 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
         return -1;
     }
 
-    if (attr->num_vcpus == 0) {
-        // TODO: retrive the number of CPUs on the platform
-        *(int *)(&attr->num_vcpus) = 2;
+    const int MAX_NUM_VCPUS = 1024;
+    if (attr->num_vcpus == 0 || attr->num_vcpus > MAX_NUM_VCPUS) {
+        long number_of_processors = sysconf(_SC_NPROCESSORS_ONLN);
+        if (number_of_processors < 0) {
+            PAL_ERROR("sysconf returns %s", errno2str(errno));
+            number_of_processors = 1;
+        } else if (number_of_processors > MAX_NUM_VCPUS) {
+            PAL_ERROR("sysconf returns an excessively large number: %ld", number_of_processors);
+            number_of_processors = 1;
+        }
+
+        *(int *)(&attr->num_vcpus) = number_of_processors;
     }
 
     sgx_enclave_id_t eid = pal_get_enclave_id();

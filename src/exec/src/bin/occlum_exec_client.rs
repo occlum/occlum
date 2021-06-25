@@ -114,7 +114,11 @@ fn exec_command(
 }
 
 /// Starts the server if the server is not running
-fn start_server(client: &OcclumExecClient, server_name: &str) -> Result<u32, String> {
+fn start_server(
+    client: &OcclumExecClient,
+    server_name: &str,
+    num_vcpus: u32,
+) -> Result<u32, String> {
     let mut server_launched = false;
 
     loop {
@@ -143,6 +147,8 @@ fn start_server(client: &OcclumExecClient, server_name: &str) -> Result<u32, Str
                     match Command::new(server_name)
                         .arg("-d")
                         .arg(env::current_dir().unwrap())
+                        .arg("--cpus")
+                        .arg(num_vcpus.to_string())
                         .stdout(Stdio::null())
                         .spawn()
                     {
@@ -247,7 +253,17 @@ fn main() -> Result<(), i32> {
         .subcommand(
             App::new("start").about(
                 "Start the Occlum server. If the server already running, immediately return.",
-            ),
+            ).arg(
+                Arg::with_name("cpus")
+                    .long("cpus")
+                    .takes_value(true)
+                    .help("The number of vcpus")
+                    .default_value("0")
+                    .validator(|t| match t.parse::<u32>() {
+                        Ok(_) => Ok(()),
+                        Err(e) => Err(e.to_string()),
+                        }),
+                ),
         )
         .subcommand(
             App::new("stop")
@@ -286,8 +302,9 @@ fn main() -> Result<(), i32> {
     let client = OcclumExecClient::new_plain_unix(DEFAULT_SOCK_FILE, ClientConf::new())
         .expect("failed to create UDS client");
 
-    if let Some(ref _matches) = matches.subcommand_matches("start") {
-        if let Err(s) = start_server(&client, DEFAULT_SERVER_FILE) {
+    if let Some(ref matches) = matches.subcommand_matches("start") {
+        let num_vcpus = matches.value_of("cpus").unwrap().parse::<u32>().unwrap();
+        if let Err(s) = start_server(&client, DEFAULT_SERVER_FILE, num_vcpus) {
             println!("start_server failed {}", s);
             return Err(-1);
         }

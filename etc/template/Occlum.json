@@ -3,7 +3,8 @@
         "user_space_size": "256MB",
         "kernel_space_heap_size": "32MB",
         "kernel_space_stack_size": "1MB",
-        "max_num_of_threads": 32
+        "min_num_of_cpus": 1,
+        "max_num_of_cpus": 128
     },
     "process": {
         "default_stack_size": "4MB",

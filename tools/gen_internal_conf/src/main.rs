@@ -141,7 +141,9 @@ fn main() {
         StackMinSize: stack_max_size.unwrap() as u64, // just use the same size as max size
         HeapMaxSize: heap_max_size.unwrap() as u64,
         HeapMinSize: heap_max_size.unwrap() as u64, // just use the same size as max size
-        TCSNum: occlum_config.resource_limits.max_num_of_threads,
+        TCSNum: occlum_config.resource_limits.max_num_of_cpus * 2,
+        TCSMinPool: occlum_config.resource_limits.min_num_of_cpus + 1,
+        TCSMaxNum: occlum_config.resource_limits.max_num_of_cpus * 2,
         TCSPolicy: 0, // TCS is bound to the untrusted thread
         DisableDebug: match occlum_config.metadata.debuggable {
             true => 0,
@@ -304,7 +306,8 @@ struct OcclumConfiguration {
 
 #[derive(Debug, PartialEq, Deserialize)]
 struct OcclumResourceLimits {
-    max_num_of_threads: u32,
+    min_num_of_cpus: u32,
+    max_num_of_cpus: u32,
     kernel_space_heap_size: String,
     kernel_space_stack_size: String,
     user_space_size: String,
@@ -334,6 +337,8 @@ struct EnclaveConfiguration {
     HeapMaxSize: u64,
     HeapMinSize: u64,
     TCSNum: u32,
+    TCSMaxNum: u32,
+    TCSMinPool: u32,
     TCSPolicy: u32,
     DisableDebug: u32,
     MiscSelect: String,
