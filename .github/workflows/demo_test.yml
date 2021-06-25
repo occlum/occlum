@@ -314,6 +314,7 @@ jobs:
     - name: Run Tensorflow-lite benchmark
       run: docker exec tflite_test bash -c "cd /root/occlum/demos/tensorflow_lite && SGX_MODE=SIM ./run_tflite_in_occlum.sh benchmark"
 
+
   Pytorch_test:
     runs-on: ubuntu-18.04
     steps:
@@ -337,7 +338,19 @@ jobs:
       run: docker exec pytorch_test bash -c "cd /root/occlum/demos/pytorch; ./install_python_with_conda.sh"
 
     - name: Run pytorch test
-      run: docker exec pytorch_test bash -c "cd /root/occlum/demos/pytorch; SGX_MODE=SIM ./run_pytorch_on_occlum.sh"
+      run: docker exec -d pytorch_test bash -c "cd /root/occlum/demos/pytorch; SGX_MODE=SIM ./run_pytorch_on_occlum.sh 2>&1 | tee /root/occlum/log"
+
+    # FIXME: PyTorch can't exit normally in SIM mode
+    - name: Kill the container
+      run: |
+        sleep 180;
+        cat "$GITHUB_WORKSPACE/log";
+        if grep -q Done "$GITHUB_WORKSPACE/log"; then
+          docker stop pytorch_test
+        else
+          exit 1
+        fi
+
 
 # Below tests needs test image to run faster
   Grpc_test:
