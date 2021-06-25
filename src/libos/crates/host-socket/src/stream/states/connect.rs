@@ -2,7 +2,8 @@ use std::marker::PhantomData;
 
 use async_io::poll::{Events, Poller};
 use async_io::socket::Addr;
-use io_uring_callback::{Fd, IoHandle, IoUringCell};
+use io_uring_callback::{Fd, IoHandle};
+use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
 use super::Common;
 use crate::prelude::*;
@@ -17,7 +18,7 @@ pub struct ConnectingStream<A: Addr + 'static, R: Runtime> {
 
 struct ConnectReq<A: Addr> {
     io_handle: Option<IoHandle>,
-    c_addr: IoUringCell<libc::sockaddr_storage>,
+    c_addr: UntrustedBox<libc::sockaddr_storage>,
     c_addr_len: usize,
     errno: Option<Errno>,
     phantom_data: PhantomData<A>,
@@ -104,7 +105,7 @@ impl<A: Addr> ConnectReq<A> {
         let (c_addr_storage, c_addr_len) = peer_addr.to_c_storage();
         Self {
             io_handle: None,
-            c_addr: IoUringCell::new(c_addr_storage),
+            c_addr: UntrustedBox::new(c_addr_storage),
             c_addr_len,
             errno: None,
             phantom_data: PhantomData,

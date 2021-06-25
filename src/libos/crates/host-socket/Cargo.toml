@@ -7,8 +7,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["libc"]
-sgx = ["sgx_types", "sgx_tstd", "sgx_trts", "sgx_libc", "io-uring-callback/sgx", "sgx-untrusted-alloc"]
+default = ["libc", "sgx-untrusted-alloc/default"]
+sgx = ["sgx_types", "sgx_tstd", "sgx_trts", "sgx_libc", "io-uring-callback/sgx", "sgx-untrusted-alloc/sgx"]
 
 [dependencies]
 async-io = { path = "../async-io" }
@@ -24,7 +24,7 @@ sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true 
 sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", optional = true, features = ["backtrace"] }
 sgx_trts = { path = "../../../../deps/rust-sgx-sdk/sgx_trts", optional = true }
 sgx_libc = { path = "../../../../deps/rust-sgx-sdk/sgx_libc", optional = true }
-sgx-untrusted-alloc = { path = "../sgx-untrusted-alloc", optional = true }
+sgx-untrusted-alloc = { path = "../sgx-untrusted-alloc", default-features = false  }
 
 [dev-dependencies]
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }

@@ -4,13 +4,14 @@ use std::ptr::{self};
 
 use async_io::poll::{Events, Poller};
 use async_io::socket::Addr;
-use io_uring_callback::{Fd, IoHandle, IoUringArray, IoUringCell};
+use io_uring_callback::{Fd, IoHandle};
 use memoffset::offset_of;
+use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
 use super::ConnectedStream;
 use crate::prelude::*;
 use crate::runtime::Runtime;
-use crate::util::CircularBuf;
+use crate::util::UntrustedCircularBuf;
 
 impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
     pub async fn write(self: &Arc<Self>, buf: &[u8]) -> Result<usize> {
@@ -147,8 +148,8 @@ impl std::fmt::Debug for Sender {
 }
 
 struct Inner {
-    send_buf: CircularBuf<IoUringArray<u8>>,
-    send_req: IoUringCell<SendReq>,
+    send_buf: UntrustedCircularBuf,
+    send_req: UntrustedBox<SendReq>,
     io_handle: Option<IoHandle>,
     is_shutdown: bool,
     fatal: Option<Errno>,
@@ -163,8 +164,8 @@ unsafe impl Send for Inner {}
 impl Inner {
     pub fn new() -> Self {
         Self {
-            send_buf: CircularBuf::new(IoUringArray::with_capacity(super::SEND_BUF_SIZE)),
-            send_req: IoUringCell::new(unsafe { MaybeUninit::<SendReq>::uninit().assume_init() }),
+            send_buf: UntrustedCircularBuf::with_capacity(super::SEND_BUF_SIZE),
+            send_req: UntrustedBox::new_uninit(),
             io_handle: None,
             is_shutdown: false,
             fatal: None,
@@ -181,15 +182,8 @@ impl Inner {
     pub fn new_send_req(&mut self) -> *mut libc::msghdr {
         let (iovecs, iovecs_len) = self.gen_iovecs_from_send_buf();
 
-        let (msghdr_ptr, iovecs_ptr) = {
-            let send_req_ptr = self.send_req.as_ptr() as *mut u8;
-            let msghdr_ptr = unsafe { send_req_ptr.add(offset_of!(SendReq, msg)) };
-            let iovecs_ptr = unsafe { send_req_ptr.add(offset_of!(SendReq, iovecs)) };
-            (
-                msghdr_ptr as *mut libc::msghdr,
-                iovecs_ptr as *mut libc::iovec,
-            )
-        };
+        let msghdr_ptr: *mut libc::msghdr = &mut self.send_req.msg;
+        let iovecs_ptr: *mut libc::iovec = &mut self.send_req.iovecs as *mut _ as _;
 
         let msg = libc::msghdr {
             msg_name: ptr::null_mut() as _,
@@ -201,8 +195,8 @@ impl Inner {
             msg_flags: 0,
         };
 
-        let new_send_req = SendReq { msg, iovecs };
-        self.send_req.set(new_send_req);
+        self.send_req.msg = msg;
+        self.send_req.iovecs = iovecs;
 
         msghdr_ptr
     }
@@ -256,6 +250,9 @@ struct SendReq {
     msg: libc::msghdr,
     iovecs: [libc::iovec; 2],
 }
+
+// Safety. SendReq is a C-style struct.
+unsafe impl MaybeUntrusted for SendReq {}
 
 // Acquired by `IoUringCell<T: Copy>`.
 impl Copy for SendReq {}

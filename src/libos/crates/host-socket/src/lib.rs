@@ -1,5 +1,7 @@
 //! Socket APIs backed by the host Linux OS.
 
+#![feature(stmt_expr_attributes)]
+
 // TODO: how to async I/O request to return?
 // When we want to force exit a process,
 

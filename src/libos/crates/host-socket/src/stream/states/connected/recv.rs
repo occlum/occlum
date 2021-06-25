@@ -4,13 +4,14 @@ use std::ptr::{self};
 
 use async_io::poll::{Events, Poller};
 use async_io::socket::Addr;
-use io_uring_callback::{Fd, IoHandle, IoUringArray, IoUringCell};
+use io_uring_callback::{Fd, IoHandle};
 use memoffset::offset_of;
+use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
 use super::ConnectedStream;
 use crate::prelude::*;
 use crate::runtime::Runtime;
-use crate::util::CircularBuf;
+use crate::util::UntrustedCircularBuf;
 
 impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
     pub async fn read(self: &Arc<Self>, buf: &mut [u8]) -> Result<usize> {
@@ -155,8 +156,8 @@ impl std::fmt::Debug for Receiver {
 }
 
 struct Inner {
-    recv_buf: CircularBuf<IoUringArray<u8>>,
-    recv_req: IoUringCell<RecvReq>,
+    recv_buf: UntrustedCircularBuf,
+    recv_req: UntrustedBox<RecvReq>,
     io_handle: Option<IoHandle>,
     is_shutdown: bool,
     end_of_file: bool,
@@ -172,8 +173,8 @@ unsafe impl Send for Inner {}
 impl Inner {
     pub fn new() -> Self {
         Self {
-            recv_buf: CircularBuf::new(IoUringArray::with_capacity(super::RECV_BUF_SIZE)),
-            recv_req: IoUringCell::new(unsafe { MaybeUninit::<RecvReq>::uninit().assume_init() }),
+            recv_buf: UntrustedCircularBuf::with_capacity(super::RECV_BUF_SIZE),
+            recv_req: UntrustedBox::new_uninit(),
             io_handle: None,
             is_shutdown: false,
             end_of_file: false,
@@ -191,15 +192,8 @@ impl Inner {
     pub fn new_recv_req(&mut self) -> *mut libc::msghdr {
         let (iovecs, iovecs_len) = self.gen_iovecs_from_recv_buf();
 
-        let (msghdr_ptr, iovecs_ptr) = {
-            let recv_req_ptr = self.recv_req.as_ptr() as *mut u8;
-            let msghdr_ptr = unsafe { recv_req_ptr.add(offset_of!(RecvReq, msg)) };
-            let iovecs_ptr = unsafe { recv_req_ptr.add(offset_of!(RecvReq, iovecs)) };
-            (
-                msghdr_ptr as *mut libc::msghdr,
-                iovecs_ptr as *mut libc::iovec,
-            )
-        };
+        let msghdr_ptr: *mut libc::msghdr = &mut self.recv_req.msg;
+        let iovecs_ptr: *mut libc::iovec = &mut self.recv_req.iovecs as *mut _ as _;
 
         let msg = libc::msghdr {
             msg_name: ptr::null_mut() as _,
@@ -211,8 +205,8 @@ impl Inner {
             msg_flags: 0,
         };
 
-        let new_recv_req = RecvReq { msg, iovecs };
-        self.recv_req.set(new_recv_req);
+        self.recv_req.msg = msg;
+        self.recv_req.iovecs = iovecs;
 
         msghdr_ptr
     }
@@ -267,6 +261,9 @@ struct RecvReq {
     msg: libc::msghdr,
     iovecs: [libc::iovec; 2],
 }
+
+// Safety. RecvReq is a C-style struct.
+unsafe impl MaybeUntrusted for RecvReq {}
 
 // Acquired by `IoUringCell<T: Copy>`.
 impl Copy for RecvReq {}

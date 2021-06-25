@@ -1,55 +1,18 @@
+use std::mem::{self};
 use std::ptr::NonNull;
-use std::slice;
+use std::slice::{self};
 
-use io_uring_callback::IoUringArray;
+use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
 use crate::prelude::*;
 
-/// A trait for any type that can be used as a buffer of bytes.
-///
-/// `Vec<u8>` and `IoUringArray<u8>` implement `BufLike`.
-pub trait BufLike {
-    /// Returns the pointer and length of the buffer.
-    fn as_ptr_and_len(&self) -> (NonNull<u8>, usize);
-}
-
-impl BufLike for Vec<u8> {
-    fn as_ptr_and_len(&self) -> (NonNull<u8>, usize) {
-        let len = self.capacity();
-        assert!(len > 0);
-        let ptr = {
-            let ptr = self.as_ptr() as *mut u8;
-            NonNull::new(ptr).unwrap()
-        };
-        (ptr, len)
-    }
-}
-
-impl BufLike for IoUringArray<u8> {
-    fn as_ptr_and_len(&self) -> (NonNull<u8>, usize) {
-        let len = self.capacity();
-        assert!(len > 0);
-        let ptr = {
-            let ptr = self.as_ptr();
-            NonNull::new(ptr).unwrap()
-        };
-        (ptr, len)
-    }
-}
-
-/// A circular buffer.
-pub struct CircularBuf<B: BufLike> {
+/// A circular buffer in untrusted memory.
+pub struct UntrustedCircularBuf {
     // The underlying storage of the buffer.
-    buf: B,
-    // The base pointere of the buffer.
-    ptr: NonNull<u8>,
-    // The length of the buffer.
     //
-    // To deferentiate between an empty buffer and a full buffer, the
-    // actual capacity of the buffer is the length minus one.
-    //
-    // Property: len > 0.
-    len: usize,
+    // Note that to differentiate between the state of being full and empty,
+    // the actual capacity has to be `buf.len() - 1`
+    buf: UntrustedBox<[u8]>,
     // The head of the buf, manipulated by consumer methods.
     //
     // Invariant: 0 <= head < len.
@@ -60,18 +23,12 @@ pub struct CircularBuf<B: BufLike> {
     tail: usize, // producer
 }
 
-// Safety. This is safe as any type `B: BufLike` implements `Send` and `Sync`.
-unsafe impl<B: BufLike> Send for CircularBuf<B> {}
-unsafe impl<B: BufLike> Sync for CircularBuf<B> {}
-
-impl<B: BufLike> CircularBuf<B> {
+impl UntrustedCircularBuf {
     /// Construct a circular buffer.
-    pub fn new(buf: B) -> Self {
-        let (ptr, len) = buf.as_ptr_and_len();
+    pub fn with_capacity(capacity: usize) -> Self {
+        debug_assert!(capacity > 0);
         Self {
-            buf,
-            ptr,
-            len,
+            buf: UntrustedBox::new_uninit_slice(capacity),
             head: 0,
             tail: 0,
         }
@@ -79,25 +36,23 @@ impl<B: BufLike> CircularBuf<B> {
 
     /// Produce some bytes.
     pub fn produce(&mut self, buf: &[u8]) -> usize {
-        unsafe {
-            self.with_producer_view(|part0, part1| {
-                if buf.len() <= part0.len() {
-                    part0[..buf.len()].copy_from_slice(buf);
-                    return buf.len();
-                }
+        self.with_producer_view(|part0, part1| {
+            if buf.len() <= part0.len() {
+                part0[..buf.len()].copy_from_slice(buf);
+                return buf.len();
+            }
 
-                part0.copy_from_slice(&buf[..part0.len()]);
+            part0.copy_from_slice(&buf[..part0.len()]);
 
-                let buf = &buf[part0.len()..];
-                if buf.len() <= part1.len() {
-                    part1[..buf.len()].copy_from_slice(buf);
-                    return part0.len() + buf.len();
-                } else {
-                    part1.copy_from_slice(&buf[..part1.len()]);
-                    return part0.len() + part1.len();
-                }
-            })
-        }
+            let buf = &buf[part0.len()..];
+            if buf.len() <= part1.len() {
+                part1[..buf.len()].copy_from_slice(buf);
+                return part0.len() + buf.len();
+            } else {
+                part1.copy_from_slice(&buf[..part1.len()]);
+                return part0.len() + part1.len();
+            }
+        })
     }
 
     pub fn produce_without_copy(&mut self, len: usize) -> usize {
@@ -111,7 +66,7 @@ impl<B: BufLike> CircularBuf<B> {
     pub fn with_producer_view(&mut self, f: impl FnOnce(&mut [u8], &mut [u8]) -> usize) -> usize {
         let head = self.head;
         let tail = self.tail;
-        let len = self.len;
+        let len = self.buf.len();
 
         let (range0, range1) = if tail >= head {
             if head > 0 {
@@ -145,11 +100,14 @@ impl<B: BufLike> CircularBuf<B> {
         //
         // where L = self.len and "*" indicates a stored byte.
 
-        let make_mut_slice_from_range = |range: &std::ops::Range<usize>| unsafe {
-            slice::from_raw_parts_mut(self.ptr.as_ptr().add(range.start), range.end - range.start)
+        // Safety. It is ok to acquire two mutable subslices from the buf since the two
+        // subslices are guaranteed to be exclusive to each other.
+        let (part0, part1) = unsafe {
+            #![allow(mutable_transmutes)]
+            let part0 = mem::transmute::<&[u8], &mut [u8]>(&self.buf[range0]);
+            let part1 = mem::transmute::<&[u8], &mut [u8]>(&self.buf[range1]);
+            (part0, part1)
         };
-        let part0 = make_mut_slice_from_range(&range0);
-        let part1 = make_mut_slice_from_range(&range1);
 
         let bytes_produced = f(part0, part1);
         assert!(bytes_produced <= self.producible());
@@ -185,7 +143,7 @@ impl<B: BufLike> CircularBuf<B> {
     pub fn with_consumer_view(&mut self, f: impl FnOnce(&[u8], &[u8]) -> usize) -> usize {
         let head = self.head;
         let tail = self.tail;
-        let len = self.len;
+        let len = self.buf.len();
 
         let (range0, range1) = if head <= tail {
             (head..tail, 0..0)
@@ -193,11 +151,8 @@ impl<B: BufLike> CircularBuf<B> {
             (head..len, 0..tail)
         };
 
-        let make_slice_from_range = |range: &std::ops::Range<usize>| unsafe {
-            slice::from_raw_parts(self.ptr.as_ptr().add(range.start), range.end - range.start)
-        };
-        let part0 = make_slice_from_range(&range0);
-        let part1 = make_slice_from_range(&range1);
+        let part0 = &self.buf[range0];
+        let part1 = &self.buf[range1];
 
         let bytes_consumed = f(part0, part1);
         assert!(bytes_consumed <= self.consumable());
@@ -209,7 +164,7 @@ impl<B: BufLike> CircularBuf<B> {
     pub fn consumable(&self) -> usize {
         let head = self.head;
         let tail = self.tail;
-        let len = self.len;
+        let len = self.buf.len();
 
         if head <= tail {
             tail - head
@@ -219,7 +174,7 @@ impl<B: BufLike> CircularBuf<B> {
     }
 
     pub fn capacity(&self) -> usize {
-        self.len - 1
+        self.buf.len() - 1
     }
 
     pub fn is_full(&self) -> bool {
@@ -232,18 +187,18 @@ impl<B: BufLike> CircularBuf<B> {
 
     /// Returns a slice that contains the entire buffer.
     pub fn as_slice(&self) -> &[u8] {
-        unsafe { std::slice::from_raw_parts(self.ptr.as_ptr() as _, self.len) }
+        &*self.buf
     }
 
     /// Returns a mutable slice that contains the entire buffer.
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
-        unsafe { std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len) }
+        &mut *self.buf
     }
 }
 
-impl<B: BufLike> std::fmt::Debug for CircularBuf<B> {
+impl std::fmt::Debug for UntrustedCircularBuf {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CircularBuf")
+        f.debug_struct("UntrustedCircularBuf")
             .field("capacity", &self.capacity())
             .field("producible", &self.producible())
             .field("consumable", &self.consumable())
@@ -258,10 +213,7 @@ mod tests {
     #[test]
     fn test() {
         let capacity = 1001;
-        let mut vec: Vec<u8> = Vec::with_capacity(capacity);
-        assert_eq!(capacity, vec.capacity());
-
-        let mut cbuf = CircularBuf::new(vec);
+        let mut cbuf = UntrustedCircularBuf::with_capacity(capacity);
         assert_eq!(cbuf.capacity(), capacity - 1);
         assert_eq!(cbuf.is_empty(), true);
         assert_eq!(cbuf.is_full(), false);
@@ -341,10 +293,7 @@ mod tests {
     #[test]
     fn test_buf_full() {
         let capacity = 1024;
-        let mut vec: Vec<u8> = Vec::with_capacity(capacity);
-        assert_eq!(capacity, vec.capacity());
-
-        let mut cbuf = CircularBuf::new(vec);
+        let mut cbuf = UntrustedCircularBuf::with_capacity(capacity);
         assert_eq!(cbuf.capacity(), capacity - 1);
         assert_eq!(cbuf.is_empty(), true);
         assert_eq!(cbuf.is_full(), false);

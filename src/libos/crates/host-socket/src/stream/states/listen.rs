@@ -4,8 +4,9 @@ use std::mem::{size_of, MaybeUninit};
 
 use async_io::poll::{Events, Pollee, Poller};
 use async_io::socket::Addr;
-use io_uring_callback::{Fd, IoHandle, IoUringArray};
+use io_uring_callback::{Fd, IoHandle};
 use memoffset::offset_of;
+use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
 use super::{Common, ConnectedStream};
 use crate::prelude::*;
@@ -167,6 +168,9 @@ struct AcceptReq {
     c_addr_len: libc::socklen_t,
 }
 
+// Safety. AcceptReq is a C-style struct with C-style fields.
+unsafe impl MaybeUntrusted for AcceptReq {}
+
 /// A backlog of incoming connections of a listener stream.
 ///
 /// With backlog, we can start async accept requests, keep track of the pending requests,
@@ -175,7 +179,7 @@ struct Backlog<A: Addr> {
     // The entries in the backlog.
     entries: Box<[Entry]>,
     // Arguments of the io_uring requests submitted for the entries in the backlog.
-    reqs: IoUringArray<AcceptReq>,
+    reqs: UntrustedBox<[AcceptReq]>,
     // The indexes of completed entries.
     completed: VecDeque<usize>,
     // The number of free entries.
@@ -193,7 +197,7 @@ impl<A: Addr> Backlog<A> {
             .map(|_| Entry::Free)
             .collect::<Vec<Entry>>()
             .into_boxed_slice();
-        let reqs = IoUringArray::with_capacity(capacity);
+        let reqs = UntrustedBox::new_uninit_slice(capacity);
         let completed = VecDeque::new();
         let num_free = capacity;
         let new_self = Self {
@@ -220,14 +224,12 @@ impl<A: Addr> Backlog<A> {
             .position(|entry| matches!(entry, Entry::Free))
             .unwrap();
 
-        let (c_addr_ptr, c_addr_len_ptr) = unsafe {
-            let accept_req_ptr = self.reqs.as_ptr().add(entry_idx);
-            let c_addr_ptr: *mut libc::sockaddr =
-                (accept_req_ptr as *mut u8).add(offset_of!(AcceptReq, c_addr)) as _;
-            let c_addr_len_ptr: *mut libc::socklen_t =
-                (accept_req_ptr as *mut u8).add(offset_of!(AcceptReq, c_addr_len)) as _;
-            let c_addr_max_len = size_of::<libc::sockaddr_storage>();
-            c_addr_len_ptr.write(c_addr_max_len as _);
+        let (c_addr_ptr, c_addr_len_ptr) = {
+            let accept_req = &mut self.reqs[entry_idx];
+            accept_req.c_addr_len = size_of::<libc::sockaddr_storage>() as _;
+
+            let c_addr_ptr = &mut accept_req.c_addr as *mut _ as _;
+            let c_addr_len_ptr = &mut accept_req.c_addr_len as _;
             (c_addr_ptr, c_addr_len_ptr)
         };
 
@@ -281,7 +283,7 @@ impl<A: Addr> Backlog<A> {
     pub fn pop_completed_req(&mut self) -> Option<(HostFd, A)> {
         let completed_idx = self.completed.pop_front()?;
         let accepted_addr = {
-            let AcceptReq { c_addr, c_addr_len } = unsafe { self.reqs.get(completed_idx) };
+            let AcceptReq { c_addr, c_addr_len } = self.reqs[completed_idx].clone();
             A::from_c_storage(&c_addr, c_addr_len as _).unwrap()
         };
         let accepted_fd = {

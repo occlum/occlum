@@ -65,6 +65,7 @@ dependencies = [
  "errno",
  "futures",
  "io-uring-callback",
+ "libc",
  "object-id",
  "rcore-fs",
  "ringbuf",
@@ -386,6 +387,7 @@ name = "io-uring-callback"
 version = "0.1.0"
 dependencies = [
  "atomic",
+ "cfg-if 1.0.0",
  "futures",
  "io-uring",
  "lazy_static",

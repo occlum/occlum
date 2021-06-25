@@ -1,3 +1,3 @@
-mod circular_buf;
+mod untrusted_circular_buf;
 
-pub use self::circular_buf::CircularBuf;
+pub use self::untrusted_circular_buf::UntrustedCircularBuf;
