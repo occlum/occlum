@@ -70,8 +70,26 @@
 //! ```
 //! which will trigger registered callbacks and wake up handles.
 //!
-
-// TODO: write more about handles and their contracts
+//! # I/O Handles
+//!
+//! After submitting an I/O request, the user will get as the return value
+//! an instance of [`IoHandle`], which represents the submitted I/O requests.
+//!
+//! So why bother keeping I/O handles? The reasons are three-fold.
+//!
+//! First, as a future, `IoHandle` allows you to await on it, which is quite
+//! convenient if you happen to use io_uring with Rust's async/await.
+//! Second, `IoHandle` makes it possible to _cancel_ on-going
+//! I/O requests (although the `cancel` method of `IoHandle` is not implemented, yet).
+//! Third, it makes the whole APIs less prone to memory safety issues. Recall that all I/O submitting
+//! methods (e.g., `write`, `accept`, etc.) are _unsafe_ as there are no guarantee that
+//! their arguments---like FDs or buffer pointers---are valid throughout the lifetime of
+//! an I/O request. What if an user accidentally releases the in-use resources associated with
+//! an on-going I/O request? I/O handles can detect such programming bugs as long as
+//! the handles are also released along with other in-use I/O resources (which is most likely).
+//! This is because when an `IoHandle` is dropped, we will panic if its state is neither
+//! completed (`IoState::Completed`) or canceled (`IoState::Canceled`). That is, dropping
+//! an `IoHandle` that is still in-use is forbidden.
 
 #![feature(get_mut_unchecked)]
 #![cfg_attr(feature = "sgx", no_std)]
