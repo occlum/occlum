@@ -1,3 +1,5 @@
+//! Test sockets with an echo server.
+
 use async_io::socket::{Addr, Ipv4Addr, Ipv4SocketAddr, UnixAddr};
 
 #[test]
