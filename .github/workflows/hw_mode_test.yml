@@ -55,7 +55,7 @@ jobs:
       run: docker exec $occlum_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Build source
-      run: docker exec $occlum_test bash -c "cd /root/occlum; OCCLUM_COV=1 make install"
+      run: docker exec $occlum_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_COV=1 make install"
 
     - name: Integration test
       run:  docker exec $occlum_test bash -c "cd /root/occlum; make test"
@@ -116,7 +116,7 @@ jobs:
       run: docker exec $occlum_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Build source
-      run: docker exec $occlum_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+      run: docker exec $occlum_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Integration test
       run:  docker exec $occlum_test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace make test"
@@ -172,7 +172,7 @@ jobs:
       run: docker exec $language_support_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec $language_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec $language_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: C test
       run: docker exec $language_support_test bash -c "cd /root/occlum/demos/hello_c && make;
@@ -280,7 +280,7 @@ jobs:
       run: docker exec $java_support_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec $java_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec $java_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Compile Java
       run: docker exec $java_support_test bash -c "cd /root/occlum/demos/java && occlum-javac ./hello_world/Main.java"
@@ -342,7 +342,7 @@ jobs:
       run: docker exec $hello_bazel_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec $hello_bazel_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec $hello_bazel_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Config git proxy
       run: |
@@ -411,7 +411,7 @@ jobs:
       run: docker exec $fish_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec $fish_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec $fish_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Config git proxy
       run: |
@@ -476,7 +476,7 @@ jobs:
       run: docker exec $xgboost_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec $xgboost_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec $xgboost_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Config git proxy
       run: |
@@ -540,7 +540,7 @@ jobs:
       run: docker exec $sqlite_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec $sqlite_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec $sqlite_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Config git proxy
       run: |
@@ -599,7 +599,7 @@ jobs:
       run: docker exec $python_support_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec $python_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec $python_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Run python support test
       run: docker exec $python_support_test bash -c "cd /root/occlum/demos/python; ./run_python_on_occlum.sh"
@@ -653,7 +653,7 @@ jobs:
       run: docker exec $openvino_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec $openvino_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec $openvino_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Run openVINO benchmark
       run: docker exec $openvino_test bash -c "cd /root/demos/openvino && ./run_benchmark_on_occlum.sh"
@@ -704,7 +704,7 @@ jobs:
       run: docker exec $grpc_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec $grpc_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+      run: docker exec $grpc_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Prepare grpc sample project
       run: docker exec $grpc_test bash -c "cd /root/demos/grpc && ./prepare_client_server.sh"
@@ -762,7 +762,7 @@ jobs:
       run: docker exec $gvisor_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec $gvisor_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+      run: docker exec $gvisor_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Run gvisor syscall test
       run: docker exec $gvisor_test bash -c "cd /root/gvisor_occlum; ./run_occlum_passed_tests.sh"
