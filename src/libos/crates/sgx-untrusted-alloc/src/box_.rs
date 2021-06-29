@@ -12,6 +12,10 @@ cfg_if::cfg_if! {
 use crate::MaybeUntrusted;
 
 /// A memory location on the heap in untrusted memory.
+///
+/// `UntrustedBox<T>` Behaves similar to the standard `Box<T>`, except that
+/// it requires that the type bound of `T: MaybeUntrusted`. This is a safety
+/// measure to avoid potential misuses.
 pub struct UntrustedBox<T: ?Sized> {
     ptr: NonNull<T>,
 }
