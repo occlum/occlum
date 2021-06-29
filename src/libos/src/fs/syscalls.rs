@@ -5,6 +5,8 @@ use super::file_ops::{
     StatFlags, UnlinkFlags, AT_FDCWD,
 };
 use super::fs_ops;
+use super::time::{clockid_t, itimerspec_t, ClockID};
+use super::timer_file::{TimerCreationFlags, TimerSetFlags};
 use super::*;
 use util::mem_util::from_user;
 
@@ -33,6 +35,66 @@ pub fn do_eventfd2(init_val: u32, flags: i32) -> Result<isize> {
         inner_flags.contains(EventCreationFlags::EFD_CLOEXEC),
     );
     Ok(fd as isize)
+}
+
+pub fn do_timerfd_create(clockid: clockid_t, flags: i32) -> Result<isize> {
+    debug!("timerfd: clockid {}, flags {} ", clockid, flags);
+
+    let clockid = ClockID::from_raw(clockid)?;
+    match clockid {
+        ClockID::CLOCK_REALTIME | ClockID::CLOCK_MONOTONIC => {}
+        _ => {
+            return_errno!(EINVAL, "invalid clockid");
+        }
+    }
+    let timer_create_flags =
+        TimerCreationFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
+    let file_ref: Arc<dyn File> = {
+        let timer = TimerFile::new(clockid, timer_create_flags)?;
+        Arc::new(timer)
+    };
+
+    let fd = current!().add_file(
+        file_ref,
+        timer_create_flags.contains(TimerCreationFlags::TFD_CLOEXEC),
+    );
+    Ok(fd as isize)
+}
+
+pub fn do_timerfd_settime(
+    fd: FileDesc,
+    flags: i32,
+    new_value_ptr: *const itimerspec_t,
+    old_value_ptr: *mut itimerspec_t,
+) -> Result<isize> {
+    from_user::check_ptr(new_value_ptr)?;
+    let new_value = itimerspec_t::from_raw_ptr(new_value_ptr)?;
+    let timer_set_flags =
+        TimerSetFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
+
+    let current = current!();
+    let file = current.file(fd)?;
+    let timerfile = file.as_timer()?;
+    let old_value = timerfile.set_time(timer_set_flags, &new_value)?;
+    if !old_value_ptr.is_null() {
+        from_user::check_mut_ptr(old_value_ptr)?;
+        unsafe {
+            old_value_ptr.write(old_value);
+        }
+    }
+    Ok(0)
+}
+
+pub fn do_timerfd_gettime(fd: FileDesc, curr_value_ptr: *mut itimerspec_t) -> Result<isize> {
+    from_user::check_mut_ptr(curr_value_ptr)?;
+    let current = current!();
+    let file = current.file(fd)?;
+    let timerfile = file.as_timer()?;
+    let curr_value = timerfile.time()?;
+    unsafe {
+        curr_value_ptr.write(curr_value);
+    }
+    Ok(0)
 }
 
 pub fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize> {
