@@ -205,7 +205,7 @@ jobs:
 
     - name: Go server set up and run
       run: docker exec $language_support_test bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
-            cd /root/occlum/demos/golang/web_server && occlum-go get -u -v github.com/gin-gonic/gin;
+            cd /root/occlum/demos/golang/web_server && occlum-go mod init web_server && occlum-go get -u -v github.com/gin-gonic/gin;
             occlum-go build -o web_server ./web_server.go;
             ./run_golang_on_occlum.sh" &
 
@@ -228,7 +228,6 @@ jobs:
     # Sleeps longer to make sure the server is up.
     - name: Curl test
       run: |
-        sleep ${{ env.nap_time }};
         sleep ${{ env.nap_time }};
         docker exec $language_support_test bash -c "curl http://127.0.0.1:8090/ping"
 
