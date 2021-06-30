@@ -94,13 +94,10 @@
 #![feature(get_mut_unchecked)]
 #![cfg_attr(feature = "sgx", no_std)]
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "sgx")] {
-        #[macro_use]
-        extern crate sgx_tstd as std;
-        extern crate sgx_libc as libc;
-    }
-}
+#[cfg(feature = "sgx")] 
+extern crate sgx_tstd as std;
+#[cfg(feature = "sgx")] 
+extern crate sgx_libc as libc;
 
 use std::io;
 use std::sync::Arc;

@@ -37,7 +37,7 @@ impl Ipv4SocketAddr {
     }
 
     pub fn from_c(c_addr: &libc::sockaddr_in) -> Result<Self> {
-        if c_addr.sin_family != libc::AF_INET as _ {
+        if c_addr.sin_family != libc::AF_INET as libc::sa_family_t {
             return_errno!(EINVAL, "an ipv4 address is expected");
         }
         Ok(Self {

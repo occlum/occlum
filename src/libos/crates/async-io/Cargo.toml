@@ -8,7 +8,7 @@ edition = "2018"
 
 [features]
 default = ["libc"]
-sgx = ["sgx_types", "sgx_tstd", "sgx_trts", "sgx_libc", "io-uring-callback/sgx", "async-rt/sgx"]
+sgx = ["sgx_types", "sgx_tstd", "sgx_trts", "sgx_libc", "async-rt/sgx"]
 
 [dependencies]
 async-rt = { path = "../async-rt" }
@@ -18,7 +18,6 @@ downcast-rs = { version = "1.2.0", default-features = false }
 errno = { path = "../errno" }
 futures = { version = "0.3", default-features = false, features = ["alloc"]  }
 libc = { version = "0.2", optional = true }
-io-uring-callback = { path = "../io-uring-callback" }
 object-id = { path = "../object-id" }
 ringbuf = { version = "0.2.3", default-features = false }
 spin = "0.7"

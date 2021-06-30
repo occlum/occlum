@@ -12,6 +12,7 @@ dependencies = [
  "bitvec",
  "derive_builder",
  "errno",
+ "io-uring-callback",
  "lazy_static",
  "log",
  "memoffset 0.6.1",
@@ -64,7 +65,6 @@ dependencies = [
  "downcast-rs",
  "errno",
  "futures",
- "io-uring-callback",
  "libc",
  "object-id",
  "rcore-fs",
@@ -713,9 +713,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.5"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94341e4e44e24f6b591b59e47a8a027df12e008d73fd5672dbea9cc22f4507d9"
+checksum = "5ab49abadf3f9e1c4bc499e8845e152ad87d2ad2d30371841171169e9d75feee"
 dependencies = [
  "bitflags",
 ]
@@ -872,8 +872,8 @@ dependencies = [
 
 [[package]]
 name = "slab"
-version = "0.4.2"
-source = "git+https://github.com/tokio-rs/slab.git#d5449b3b1dc2dfe640613fb64589639048f5046d"
+version = "0.4.3"
+source = "git+https://github.com/tokio-rs/slab.git#5bc6f62d8abd38d4cbab933deda0741d00fb77b2"
 
 [[package]]
 name = "smallvec"

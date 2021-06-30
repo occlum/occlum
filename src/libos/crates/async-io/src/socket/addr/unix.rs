@@ -19,7 +19,7 @@ impl UnixAddr {
     /// C address.
     pub fn from_c(c_addr: &libc::sockaddr_un, c_len: usize) -> Result<Self> {
         // Sanity checks
-        if c_addr.sun_family != libc::AF_UNIX as _ {
+        if c_addr.sun_family != libc::AF_UNIX as libc::sa_family_t {
             return_errno!(EINVAL, "an unix address is expected");
         }
         if c_len < std::mem::size_of::<libc::sa_family_t>() {
