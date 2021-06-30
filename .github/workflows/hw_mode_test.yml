@@ -558,7 +558,7 @@ jobs:
       run: docker stop $sqlite_test
 
 
-  Python_support_test:
+  Python_musl_support_test:
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: [self-hosted, SGX1-HW]
     steps:
@@ -582,12 +582,12 @@ jobs:
     - name: Create container
       run: |
         docker pull occlumbackup/occlum:latest-ubuntu18.04-python
-        python_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-python)
-        echo "python_support_test=$python_support_test" >> $GITHUB_ENV
+        python_musl_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-python)
+        echo "python_musl_support_test=$python_musl_support_test" >> $GITHUB_ENV
 
     - name: Configure dependency source
       run: |
-        docker exec $python_support_test bash -c "cat <<- EOF >/root/.cargo/config
+        docker exec $python_musl_support_test bash -c "cat <<- EOF >/root/.cargo/config
         [source.crates-io]
         registry = \"https://github.com/rust-lang/crates.io-index\"
         replace-with = 'tuna'
@@ -596,20 +596,20 @@ jobs:
         EOF"
 
     - name: Build dependencies
-      run: docker exec $python_support_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
+      run: docker exec $python_musl_support_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec $python_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec $python_musl_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
-    - name: Run python support test
-      run: docker exec $python_support_test bash -c "cd /root/occlum/demos/python; ./run_python_on_occlum.sh"
+    - name: Run python musl support test
+      run: docker exec $python_musl_support_test bash -c "cd /root/occlum/demos/python/python_musl; ./run_python_on_occlum.sh"
 
     - name: Check result
-      run: docker exec $python_support_test bash -c "cd /root/occlum/demos/python/occlum_instance; cat smvlight.dat"
+      run: docker exec $python_musl_support_test bash -c "cd /root/occlum/demos/python/python_musl/occlum_instance; cat smvlight.dat"
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop $python_support_test
+      run: docker stop $python_musl_support_test
 
 
   Openvino_test:
