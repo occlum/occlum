@@ -4,7 +4,7 @@ use std::sync::RwLock;
 
 use async_io::socket::Addr;
 
-use self::states::{ConnectedStream, ConnectingStream, InitStream, ListenerStream};
+use self::states::{Common, ConnectedStream, ConnectingStream, InitStream, ListenerStream};
 use crate::prelude::*;
 use crate::runtime::Runtime;
 
@@ -130,6 +130,10 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     pub async fn read(&self, buf: &mut [u8]) -> Result<usize> {
+        self.readv(&mut [buf]).await
+    }
+
+    pub async fn readv(&self, buf: &mut [&mut [u8]]) -> Result<usize> {
         let connected_stream = {
             let state = self.state.read().unwrap();
             match &*state {
@@ -140,10 +144,14 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             }
         };
 
-        connected_stream.read(buf).await
+        connected_stream.readv(buf).await
     }
 
     pub async fn write(&self, buf: &[u8]) -> Result<usize> {
+        self.writev(&[buf]).await
+    }
+
+    pub async fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
         let connected_stream = {
             let state = self.state.read().unwrap();
             match &*state {
@@ -154,8 +162,9 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             }
         };
 
-        connected_stream.write(buf).await
+        connected_stream.writev(bufs).await
     }
+
     /*
         pub async fn shutdown(&self, shutdown: Shutdown) -> Result<()> {
             let connected_stream = {

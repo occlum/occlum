@@ -14,8 +14,9 @@ use crate::runtime::Runtime;
 use crate::util::UntrustedCircularBuf;
 
 impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
-    pub async fn read(self: &Arc<Self>, buf: &mut [u8]) -> Result<usize> {
-        if buf.len() == 0 {
+    pub async fn readv(self: &Arc<Self>, bufs: &mut [&mut [u8]]) -> Result<usize> {
+        let total_len: usize = bufs.iter().map(|buf| buf.len()).sum();
+        if total_len == 0 {
             return Ok(0);
         }
 
@@ -23,7 +24,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         let mut poller = None;
         loop {
             // Attempt to reade
-            let res = self.try_read(buf);
+            let res = self.try_readv(bufs);
             if !res.has_errno(EAGAIN) {
                 return res;
             }
@@ -40,10 +41,21 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         }
     }
 
-    fn try_read(self: &Arc<Self>, buf: &mut [u8]) -> Result<usize> {
+    fn try_readv(self: &Arc<Self>, bufs: &mut [&mut [u8]]) -> Result<usize> {
         let mut inner = self.receiver.inner.lock().unwrap();
 
-        let nbytes = inner.recv_buf.consume(buf);
+        // Copy data from the recv buffer to the bufs
+        let nbytes = {
+            let mut total_consumed = 0;
+            for buf in bufs {
+                let this_consumed = inner.recv_buf.consume(buf);
+                if this_consumed == 0 {
+                    break;
+                }
+                total_consumed += this_consumed;
+            }
+            total_consumed
+        };
 
         if inner.end_of_file {
             return Ok(nbytes);

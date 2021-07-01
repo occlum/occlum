@@ -14,8 +14,9 @@ use crate::runtime::Runtime;
 use crate::util::UntrustedCircularBuf;
 
 impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
-    pub async fn write(self: &Arc<Self>, buf: &[u8]) -> Result<usize> {
-        if buf.len() == 0 {
+    pub async fn writev(self: &Arc<Self>, bufs: &[&[u8]]) -> Result<usize> {
+        let total_len: usize = bufs.iter().map(|buf| buf.len()).sum();
+        if total_len == 0 {
             return Ok(0);
         }
 
@@ -23,7 +24,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         let mut poller = None;
         loop {
             // Attempt to write
-            let res = self.try_write(buf);
+            let res = self.try_writev(bufs);
             if !res.has_errno(EAGAIN) {
                 return res;
             }
@@ -40,7 +41,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         }
     }
 
-    fn try_write(self: &Arc<Self>, buf: &[u8]) -> Result<usize> {
+    fn try_writev(self: &Arc<Self>, bufs: &[&[u8]]) -> Result<usize> {
         let mut inner = self.sender.inner.lock().unwrap();
 
         // Check for error condition before write.
@@ -54,7 +55,18 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             return_errno!(errno, "write failed");
         }
 
-        let nbytes = inner.send_buf.produce(buf);
+        // Copy data from the bufs to the send buffer
+        let nbytes = {
+            let mut total_produced = 0;
+            for buf in bufs {
+                let this_produced = inner.send_buf.produce(buf);
+                if this_produced == 0 {
+                    break;
+                }
+                total_produced += this_produced;
+            }
+            total_produced
+        };
 
         if inner.send_buf.is_full() {
             // Mark the socket as non-writable
