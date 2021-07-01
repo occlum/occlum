@@ -71,6 +71,7 @@ mod prelude;
 mod config;
 mod entry;
 mod fs;
+mod io_uring;
 mod misc;
 //mod net;
 mod process;
