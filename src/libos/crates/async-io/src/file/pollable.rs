@@ -197,7 +197,7 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
 
 impl<T: std::fmt::Debug> std::fmt::Debug for Async<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Async").field("file", &self.0).finish()
+        f.debug_struct("Async").field("0", &self.0).finish()
     }
 }
 

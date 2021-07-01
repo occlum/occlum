@@ -14,8 +14,8 @@ pub fn do_truncate(path: &str, len: usize) -> Result<()> {
 pub fn do_ftruncate(fd: FileDesc, len: usize) -> Result<()> {
     debug!("ftruncate: fd: {}, len: {}", fd, len);
     let file_ref = current!().file(fd)?;
-    if let Some(inode) = file_ref.as_inode() {
-        inode.resize(len)?;
+    if let Some(inode_file) = file_ref.as_inode_file() {
+        inode_file.inode().resize(len)?;
         Ok(())
     } else {
         return_errno!(EINVAL, "not an inode file");

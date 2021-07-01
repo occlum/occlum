@@ -264,13 +264,13 @@ fn init_files(
                     oflag,
                     fd,
                 } => {
-                    let sync_file =
+                    let inode_file =
                         current_ref
                             .fs()
                             .lock()
                             .unwrap()
                             .open_file(path.as_str(), oflag, mode)?;
-                    let file_ref = FileRef::from_sync(sync_file);
+                    let file_ref = FileRef::new_inode(inode_file);
                     let creation_flags = CreationFlags::from_bits_truncate(oflag);
                     cloned_file_table.put_at(fd, file_ref, creation_flags.must_close_on_spawn());
                 }
@@ -293,15 +293,13 @@ fn init_files(
 
     // But, for init process, we initialize file table for it
     let mut file_table = FileTable::new();
-    let stdin = FileRef::from_sync(Arc::new(StdinFile::new(
-        host_stdio_fds.unwrap().stdin_fd as FileDesc,
-    )));
-    let stdout = FileRef::from_sync(Arc::new(StdoutFile::new(
+    let stdin = FileRef::new_pollable(StdinFile::new(host_stdio_fds.unwrap().stdin_fd as FileDesc));
+    let stdout = FileRef::new_pollable(StdoutFile::new(
         host_stdio_fds.unwrap().stdout_fd as FileDesc,
-    )));
-    let stderr = FileRef::from_sync(Arc::new(StdoutFile::new(
+    ));
+    let stderr = FileRef::new_pollable(StdoutFile::new(
         host_stdio_fds.unwrap().stderr_fd as FileDesc,
-    )));
+    ));
 
     file_table.put(stdin, false);
     file_table.put(stdout, false);

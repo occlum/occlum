@@ -1,6 +1,9 @@
 use super::*;
 use rcore_fs_sefs::dev::SefsMac;
 
+// TODO: rename all INodeFile to InodeFile
+pub use self::INodeFile as InodeFile;
+
 pub struct INodeFile {
     inode: Arc<dyn INode>,
     abs_path: String,
@@ -9,8 +12,33 @@ pub struct INodeFile {
     status_flags: RwLock<StatusFlags>,
 }
 
-impl SyncFile for INodeFile {
-    fn read(&self, buf: &mut [u8]) -> Result<usize> {
+impl INodeFile {
+    pub fn open(inode: Arc<dyn INode>, abs_path: &str, flags: u32) -> Result<Self> {
+        let access_mode = AccessMode::from_u32(flags)?;
+        if (access_mode.readable() && !inode.allow_read()?) {
+            return_errno!(EACCES, "File not readable");
+        }
+        if (access_mode.writable() && !inode.allow_write()?) {
+            return_errno!(EACCES, "File not writable");
+        }
+        if access_mode.writable() && inode.metadata()?.type_ == FileType::Dir {
+            return_errno!(EISDIR, "Directory cannot be open to write");
+        }
+        let status_flags = StatusFlags::from_bits_truncate(flags);
+        Ok(INodeFile {
+            inode,
+            abs_path: abs_path.to_owned(),
+            offset: SgxMutex::new(0),
+            access_mode,
+            status_flags: RwLock::new(status_flags),
+        })
+    }
+
+    pub fn abs_path(&self) -> &str {
+        &self.abs_path
+    }
+
+    pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
         if !self.access_mode.readable() {
             return_errno!(EACCES, "File not readable");
         }
@@ -20,7 +48,7 @@ impl SyncFile for INodeFile {
         Ok(len)
     }
 
-    fn write(&self, buf: &[u8]) -> Result<usize> {
+    pub fn write(&self, buf: &[u8]) -> Result<usize> {
         if !self.access_mode.writable() {
             return_errno!(EACCES, "File not writable");
         }
@@ -34,7 +62,7 @@ impl SyncFile for INodeFile {
         Ok(len)
     }
 
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+    pub fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         if !self.access_mode.readable() {
             return_errno!(EACCES, "File not readable");
         }
@@ -42,7 +70,7 @@ impl SyncFile for INodeFile {
         Ok(len)
     }
 
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+    pub fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
         if !self.access_mode.writable() {
             return_errno!(EACCES, "File not writable");
         }
@@ -50,7 +78,7 @@ impl SyncFile for INodeFile {
         Ok(len)
     }
 
-    fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
+    pub fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
         if !self.access_mode.readable() {
             return_errno!(EACCES, "File not readable");
         }
@@ -69,7 +97,7 @@ impl SyncFile for INodeFile {
         Ok(total_len)
     }
 
-    fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
+    pub fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
         if !self.access_mode.writable() {
             return_errno!(EACCES, "File not writable");
         }
@@ -92,7 +120,7 @@ impl SyncFile for INodeFile {
         Ok(total_len)
     }
 
-    fn seek(&self, pos: SeekFrom) -> Result<usize> {
+    pub fn seek(&self, pos: SeekFrom) -> Result<usize> {
         let mut offset = self.offset.lock().unwrap();
         let new_offset: i64 = match pos {
             SeekFrom::Start(off /* as u64 */) => {
@@ -121,21 +149,21 @@ impl SyncFile for INodeFile {
         Ok(new_offset)
     }
 
-    fn flush(&self) -> Result<()> {
+    pub fn flush(&self) -> Result<()> {
         self.inode.sync_data()?;
         Ok(())
     }
 
-    fn access_mode(&self) -> Result<AccessMode> {
-        Ok(self.access_mode)
+    pub fn access_mode(&self) -> AccessMode {
+        self.access_mode
     }
 
-    fn status_flags(&self) -> Result<StatusFlags> {
+    pub fn status_flags(&self) -> StatusFlags {
         let status_flags = self.status_flags.read().unwrap();
-        Ok(*status_flags)
+        *status_flags
     }
 
-    fn poll(&self, mask: Events) -> Events {
+    pub fn poll_by(&self, mask: Events, _poller: Option<&mut Poller>) -> Events {
         let events = match self.access_mode {
             AccessMode::O_RDONLY => Events::IN,
             AccessMode::O_WRONLY => Events::OUT,
@@ -144,7 +172,7 @@ impl SyncFile for INodeFile {
         events | mask
     }
 
-    fn set_status_flags(&self, new_status_flags: StatusFlags) -> Result<()> {
+    pub fn set_status_flags(&self, new_status_flags: StatusFlags) -> Result<()> {
         let mut status_flags = self.status_flags.write().unwrap();
         // Currently, F_SETFL can change only the O_APPEND,
         // O_ASYNC, O_NOATIME, and O_NONBLOCK flags
@@ -157,35 +185,8 @@ impl SyncFile for INodeFile {
         Ok(())
     }
 
-    fn as_inode(&self) -> Option<&dyn INode> {
-        Some(&*self.inode as &dyn INode)
-    }
-}
-
-impl INodeFile {
-    pub fn open(inode: Arc<dyn INode>, abs_path: &str, flags: u32) -> Result<Self> {
-        let access_mode = AccessMode::from_u32(flags)?;
-        if (access_mode.readable() && !inode.allow_read()?) {
-            return_errno!(EACCES, "File not readable");
-        }
-        if (access_mode.writable() && !inode.allow_write()?) {
-            return_errno!(EACCES, "File not writable");
-        }
-        if access_mode.writable() && inode.metadata()?.type_ == FileType::Dir {
-            return_errno!(EISDIR, "Directory cannot be open to write");
-        }
-        let status_flags = StatusFlags::from_bits_truncate(flags);
-        Ok(INodeFile {
-            inode,
-            abs_path: abs_path.to_owned(),
-            offset: SgxMutex::new(0),
-            access_mode,
-            status_flags: RwLock::new(status_flags),
-        })
-    }
-
-    pub fn abs_path(&self) -> &str {
-        &self.abs_path
+    pub fn inode(&self) -> &dyn INode {
+        &*self.inode as _
     }
 }
 
@@ -229,5 +230,54 @@ impl INodeExt for dyn INode {
         let info = self.metadata()?;
         let file_mode = FileMode::from_bits_truncate(info.mode);
         Ok(file_mode.is_readable())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct AsyncInode(Arc<InodeFile>);
+
+impl AsyncInode {
+    pub fn new(inode: InodeFile) -> Self {
+        Self(Arc::new(inode))
+    }
+
+    #[inline]
+    pub async fn read(&self, buf: &mut [u8]) -> Result<usize> {
+        self.0.read(buf)
+    }
+
+    #[inline]
+    pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
+        self.0.readv(bufs)
+    }
+
+    #[inline]
+    pub async fn write(&self, buf: &[u8]) -> Result<usize> {
+        self.0.write(buf)
+    }
+
+    #[inline]
+    pub async fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
+        self.0.writev(bufs)
+    }
+
+    #[inline]
+    pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+        self.0.poll_by(mask, poller)
+    }
+
+    #[inline]
+    pub fn status_flags(&self) -> StatusFlags {
+        self.0.status_flags()
+    }
+
+    #[inline]
+    pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
+        self.0.set_status_flags(new_status)
+    }
+
+    #[inline]
+    pub fn inner(&self) -> &InodeFile {
+        &*self.0
     }
 }

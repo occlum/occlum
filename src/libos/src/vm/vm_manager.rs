@@ -38,7 +38,7 @@ impl VMInitializer {
             }
             VMInitializer::LoadFromFile { file, offset } => {
                 let len = file
-                    .as_inode()
+                    .as_inode_file()
                     .unwrap()
                     .read_at(*offset, buf)
                     .map_err(|_| errno!(EIO, "failed to init memory from file"))?;
@@ -137,12 +137,12 @@ impl VMMapOptionsBuilder {
 
     fn check_files_are_inodes(&self) -> Result<()> {
         if let Some(VMInitializer::LoadFromFile { file, .. }) = self.initializer.as_ref() {
-            if file.as_inode().is_none() {
+            if file.as_inode_file().is_none() {
                 return_errno!(ENODEV, "VMA must be backed by inode files");
             }
         }
         if let Some(Some((file, _))) = self.writeback_file.as_ref() {
-            if file.as_inode().is_none() {
+            if file.as_inode_file().is_none() {
                 return_errno!(ENODEV, "VMA must be backed by inode files");
             }
         }
@@ -621,17 +621,15 @@ impl VMManager {
             None => return,
             Some((file_and_offset)) => file_and_offset,
         };
-        let file_writable = file
-            .access_mode()
-            .map(|ac| ac.writable())
-            .unwrap_or_default();
+        let inode_file = file.as_inode_file().unwrap();
+        let file_writable = inode_file.access_mode().writable();
         if !file_writable {
             return;
         }
         if !cond_fn(file) {
             return;
         }
-        file.write_at(*file_offset, unsafe { vma.as_slice() });
+        inode_file.write_at(*file_offset, unsafe { vma.as_slice() });
     }
 
     pub fn find_mmap_region(&self, addr: usize) -> Result<&VMRange> {

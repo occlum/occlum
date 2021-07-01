@@ -19,7 +19,7 @@ pub fn do_eventfd(init_val: u32, flags: EventFileFlags) -> Result<FileDesc> {
     };
 
     let event_file = EventFile::new(init_val as u64, is_semaphore, status_flags)?;
-    let file_ref = FileRef::from_pollable(Arc::new(event_file));
+    let file_ref = FileRef::new_pollable(event_file);
     let event_fd = current!().add_file(file_ref, close_on_spawn);
     Ok(event_fd)
 }
@@ -114,12 +114,8 @@ impl PollableFile for EventFile {
         self.pollee.poll_by(mask, poller)
     }
 
-    fn access_mode(&self) -> Result<AccessMode> {
-        Ok(AccessMode::O_RDWR)
-    }
-
-    fn status_flags(&self) -> Result<StatusFlags> {
-        Ok(self.flags.load(Ordering::Relaxed))
+    fn status_flags(&self) -> StatusFlags {
+        self.flags.load(Ordering::Relaxed)
     }
 
     fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {

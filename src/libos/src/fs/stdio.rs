@@ -101,7 +101,7 @@ impl StdoutFile {
     }
 }
 
-impl SyncFile for StdoutFile {
+impl PollableFile for StdoutFile {
     fn write(&self, buf: &[u8]) -> Result<usize> {
         let write_len = {
             self.inner
@@ -111,10 +111,6 @@ impl SyncFile for StdoutFile {
                 .map_err(|e| errno!(e))?
         };
         Ok(write_len)
-    }
-
-    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
-        self.write(buf)
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
@@ -141,12 +137,7 @@ impl SyncFile for StdoutFile {
         Ok(total_bytes)
     }
 
-    fn flush(&self) -> Result<()> {
-        self.inner.lock().unwrap().flush()?;
-        Ok(())
-    }
-
-    fn poll(&self, mask: Events) -> Events {
+    fn poll_by(&self, mask: Events, _poller: Option<&mut Poller>) -> Events {
         Events::OUT
     }
     /*
@@ -241,7 +232,7 @@ impl StdinFile {
     }
 }
 
-impl SyncFile for StdinFile {
+impl PollableFile for StdinFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let read_len = {
             self.inner
@@ -277,7 +268,7 @@ impl SyncFile for StdinFile {
         Ok(total_bytes)
     }
 
-    fn poll(&self, mask: Events) -> Events {
+    fn poll_by(&self, mask: Events, _poller: Option<&mut Poller>) -> Events {
         Events::IN
     }
     /*

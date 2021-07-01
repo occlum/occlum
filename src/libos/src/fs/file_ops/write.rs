@@ -18,5 +18,10 @@ pub async fn do_pwrite(fd: FileDesc, buf: &[u8], offset: off_t) -> Result<usize>
         return_errno!(EINVAL, "the offset is negative");
     }
     let file_ref = current!().file(fd)?;
-    file_ref.write_at(offset as usize, buf).await
+    if let Some(inode_file) = file_ref.as_inode_file() {
+        inode_file.write_at(offset as usize, buf)
+    } else {
+        // For non-inode files, we simply ignore the offset
+        file_ref.write(buf).await
+    }
 }

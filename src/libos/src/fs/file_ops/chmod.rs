@@ -19,11 +19,10 @@ pub fn do_fchmod(fd: FileDesc, mode: FileMode) -> Result<()> {
     debug!("fchmod: fd: {}, mode: {:#o}", fd, mode);
 
     let file_ref = current!().file(fd)?;
-    let inode = if let Some(inode) = file_ref.as_inode() {
-        inode
-    } else {
-        return_errno!(ENODEV, "file is not an inode");
-    };
+    let inode_file = file_ref
+        .as_inode_file()
+        .ok_or_else(|| errno!(EINVAL, "not an inode"))?;
+    let inode = inode_file.inode();
     let mut info = inode.metadata()?;
     info.mode = mode.bits();
     inode.set_metadata(&info)?;
