@@ -98,6 +98,10 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
     pub fn peer_addr(&self) -> &A {
         &self.peer_addr
     }
+
+    pub fn common(&self) -> &Arc<Common<A, R>> {
+        &self.common
+    }
 }
 
 impl<A: Addr> ConnectReq<A> {

@@ -2,6 +2,7 @@ mod states;
 
 use std::sync::RwLock;
 
+use async_io::poll::{Events, Poller};
 use async_io::socket::Addr;
 
 use self::states::{Common, ConnectedStream, ConnectingStream, InitStream, ListenerStream};
@@ -165,6 +166,12 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         connected_stream.writev(bufs).await
     }
 
+    pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+        let state = self.state.read().unwrap();
+        let pollee = state.common().pollee();
+        pollee.poll_by(mask, poller)
+    }
+
     /*
         pub async fn shutdown(&self, shutdown: Shutdown) -> Result<()> {
             let connected_stream = {
@@ -233,5 +240,16 @@ impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for StreamSocket<A, R> {
         f.debug_struct("StreamSocket")
             .field("state", &self.state.read().unwrap())
             .finish()
+    }
+}
+
+impl<A: Addr + 'static, R: Runtime> State<A, R> {
+    fn common(&self) -> &Common<A, R> {
+        match self {
+            Self::Init(stream) => stream.common(),
+            Self::Connect(stream) => stream.common(),
+            Self::Connected(stream) => stream.common(),
+            Self::Listen(stream) => stream.common(),
+        }
     }
 }

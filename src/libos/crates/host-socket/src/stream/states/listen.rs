@@ -108,6 +108,10 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
             backlog.start_new_req(self);
         }
     }
+
+    pub fn common(&self) -> &Arc<Common<A, R>> {
+        &self.common
+    }
 }
 
 impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for ListenerStream<A, R> {

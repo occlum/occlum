@@ -30,6 +30,10 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         Arc::new(new_self)
     }
 
+    pub fn common(&self) -> &Arc<Common<A, R>> {
+        &self.common
+    }
+
     // TODO: implement other methods
 
     // Other methods are implemented in the send and receive modules
