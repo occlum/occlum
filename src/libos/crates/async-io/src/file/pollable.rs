@@ -26,10 +26,6 @@ pub trait PollableFile: Debug + Sync + Send {
         Ok(0)
     }
 
-    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
-        return_errno!(ESPIPE, "not support seek or read");
-    }
-
     fn write(&self, _buf: &[u8]) -> Result<usize> {
         return_errno!(EBADF, "not support write");
     }
@@ -43,18 +39,6 @@ pub trait PollableFile: Debug + Sync + Send {
         Ok(0)
     }
 
-    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
-        return_errno!(ESPIPE, "not support seek or write");
-    }
-
-    fn flush(&self) -> BoxFuture<'_, Result<()>> {
-        future::ready(Ok(())).boxed()
-    }
-
-    fn seek(&self, _pos: SeekFrom) -> Result<usize> {
-        return_errno!(ESPIPE, "not support seek");
-    }
-
     fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events;
 
     /*
@@ -63,16 +47,8 @@ pub trait PollableFile: Debug + Sync + Send {
         }
     */
 
-    fn access_mode(&self) -> Result<AccessMode> {
-        return_errno!(ENOSYS, "not support getting access mode");
-    }
-
-    fn set_access_mode(&self, new_mode: AccessMode) -> Result<()> {
-        return_errno!(ENOSYS, "not support setting access mode");
-    }
-
-    fn status_flags(&self) -> Result<StatusFlags> {
-        return_errno!(ENOSYS, "not support getting status flags");
+    fn status_flags(&self) -> StatusFlags {
+        StatusFlags::empty()
     }
 
     fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
@@ -81,20 +57,18 @@ pub trait PollableFile: Debug + Sync + Send {
 }
 
 /// A wrapper type that extends a `PollableFile` object with async APIs.
-pub struct Async<T> {
-    file: T,
-}
+pub struct Async<T>(T);
 
 impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
     pub fn new(file: T) -> Self {
-        Self { file }
+        Self(file)
     }
 
     pub async fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let is_nonblocking = self.is_nonblocking();
 
         // Fast path
-        let res = self.file.read(buf);
+        let res = self.0.read(buf);
         if Self::should_io_return(&res, is_nonblocking) {
             return res;
         }
@@ -105,7 +79,7 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
         loop {
             let events = self.poll_by(mask, Some(&mut poller));
             if events.contains(Events::IN) {
-                let res = self.file.read(buf);
+                let res = self.0.read(buf);
                 if Self::should_io_return(&res, is_nonblocking) {
                     return res;
                 }
@@ -118,7 +92,7 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
         let is_nonblocking = self.is_nonblocking();
 
         // Fast path
-        let res = self.file.readv(bufs);
+        let res = self.0.readv(bufs);
         if Self::should_io_return(&res, is_nonblocking) {
             return res;
         }
@@ -129,31 +103,7 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
         loop {
             let events = self.poll_by(mask, Some(&mut poller));
             if events.contains(Events::IN) {
-                let res = self.file.readv(bufs);
-                if Self::should_io_return(&res, is_nonblocking) {
-                    return res;
-                }
-            }
-            poller.wait().await;
-        }
-    }
-
-    pub async fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        let is_nonblocking = self.is_nonblocking();
-
-        // Fast path
-        let res = self.file.read_at(offset, buf);
-        if Self::should_io_return(&res, is_nonblocking) {
-            return res;
-        }
-
-        // Slow path
-        let mask = Events::IN;
-        let mut poller = Poller::new();
-        loop {
-            let events = self.poll_by(mask, Some(&mut poller));
-            if events.contains(Events::IN) {
-                let res = self.file.read_at(offset, buf);
+                let res = self.0.readv(bufs);
                 if Self::should_io_return(&res, is_nonblocking) {
                     return res;
                 }
@@ -166,7 +116,7 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
         let is_nonblocking = self.is_nonblocking();
 
         // Fast path
-        let res = self.file.write(buf);
+        let res = self.0.write(buf);
         if Self::should_io_return(&res, is_nonblocking) {
             return res;
         }
@@ -177,7 +127,7 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
         loop {
             let events = self.poll_by(mask, Some(&mut poller));
             if events.contains(Events::OUT) {
-                let res = self.file.write(buf);
+                let res = self.0.write(buf);
                 if Self::should_io_return(&res, is_nonblocking) {
                     return res;
                 }
@@ -190,7 +140,7 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
         let is_nonblocking = self.is_nonblocking();
 
         // Fast path
-        let res = self.file.writev(bufs);
+        let res = self.0.writev(bufs);
         if Self::should_io_return(&res, is_nonblocking) {
             return res;
         }
@@ -201,7 +151,7 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
         loop {
             let events = self.poll_by(mask, Some(&mut poller));
             if events.contains(Events::OUT) {
-                let res = self.file.writev(bufs);
+                let res = self.0.writev(bufs);
                 if Self::should_io_return(&res, is_nonblocking) {
                     return res;
                 }
@@ -210,95 +160,50 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
         }
     }
 
-    pub async fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
-        let is_nonblocking = self.is_nonblocking();
-
-        // Fast path
-        let res = self.file.write_at(offset, buf);
-        if Self::should_io_return(&res, is_nonblocking) {
-            return res;
-        }
-
-        // Slow path
-        let mask = Events::OUT;
-        let mut poller = Poller::new();
-        loop {
-            let events = self.poll_by(mask, Some(&mut poller));
-            if events.contains(Events::OUT) {
-                let res = self.file.write_at(offset, buf);
-                if Self::should_io_return(&res, is_nonblocking) {
-                    return res;
-                }
-            }
-            poller.wait().await;
-        }
-    }
-
-    pub async fn flush(&self) -> Result<()> {
-        self.file.flush().await
-    }
-
-    pub fn seek(&self, pos: SeekFrom) -> Result<usize> {
-        self.file.seek(pos)
-    }
-
+    #[inline]
     pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
-        self.file.poll_by(mask, poller)
+        self.0.poll_by(mask, poller)
     }
 
-    pub fn access_mode(&self) -> Result<AccessMode> {
-        self.file.access_mode()
+    #[inline]
+    pub fn status_flags(&self) -> StatusFlags {
+        self.0.status_flags()
     }
 
-    pub fn set_access_mode(&self, new_mode: AccessMode) -> Result<()> {
-        self.file.set_access_mode(new_mode)
-    }
-
-    pub fn status_flags(&self) -> Result<StatusFlags> {
-        self.file.status_flags()
-    }
-
+    #[inline]
     pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
-        self.file.set_status_flags(new_status)
+        self.0.set_status_flags(new_status)
     }
 
-    pub fn file(&self) -> &T {
-        &self.file
+    #[inline]
+    pub fn inner(&self) -> &T {
+        &self.0
     }
 
-    pub fn unwrap(self) -> T {
-        self.file
-    }
-
-    fn is_nonblocking(&self) -> bool {
-        if let Ok(flags) = self.status_flags() {
-            flags.contains(StatusFlags::O_NONBLOCK)
-        } else {
-            false
-        }
+    #[inline]
+    pub fn into_inner(self) -> T {
+        self.0
     }
 
     fn should_io_return(res: &Result<usize>, is_nonblocking: bool) -> bool {
-        is_nonblocking || Self::is_ok_or_not_egain(res)
+        is_nonblocking || !res.has_errno(EAGAIN)
     }
 
-    fn is_ok_or_not_egain(res: &Result<usize>) -> bool {
-        match res {
-            Ok(_) => true,
-            Err(e) => e.errno() != EAGAIN,
-        }
+    fn is_nonblocking(&self) -> bool {
+        let flags = self.status_flags();
+        flags.contains(StatusFlags::O_NONBLOCK)
     }
 }
 
 impl<T: std::fmt::Debug> std::fmt::Debug for Async<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Async").field("file", &self.file).finish()
+        f.debug_struct("Async").field("file", &self.0).finish()
     }
 }
 
 impl<F: PollableFile + ?Sized, T: Deref<Target = F> + Clone> Clone for Async<T> {
     fn clone(&self) -> Self {
-        Self::new(self.file.clone())
+        Self::new(self.0.clone())
     }
 }
 

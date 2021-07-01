@@ -1,13 +1,8 @@
 mod flags;
-mod handle;
-mod kinds;
+mod pollable;
 
 pub use self::flags::{AccessMode, CreationFlags, StatusFlags};
-pub use self::handle::FileHandle;
-pub use self::kinds::{
-    pollable::{Async, PollableFile},
-    sync::SyncFile,
-};
+pub use self::pollable::{Async, PollableFile};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SeekFrom {

@@ -194,12 +194,8 @@ impl PollableFile for Producer {
         self.this_end().pollee().poll_by(mask, poller)
     }
 
-    fn access_mode(&self) -> Result<AccessMode> {
-        Ok(AccessMode::O_WRONLY)
-    }
-
-    fn status_flags(&self) -> Result<StatusFlags> {
-        Ok(self.this_end().flags.load(Ordering::Relaxed))
+    fn status_flags(&self) -> StatusFlags {
+        self.this_end().flags.load(Ordering::Relaxed)
     }
 
     fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
@@ -279,12 +275,8 @@ impl PollableFile for Consumer {
         self.this_end().pollee().poll_by(mask, poller)
     }
 
-    fn access_mode(&self) -> Result<AccessMode> {
-        Ok(AccessMode::O_RDONLY)
-    }
-
-    fn status_flags(&self) -> Result<StatusFlags> {
-        Ok(self.this_end().flags.load(Ordering::Relaxed))
+    fn status_flags(&self) -> StatusFlags {
+        self.this_end().flags.load(Ordering::Relaxed)
     }
 
     fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
