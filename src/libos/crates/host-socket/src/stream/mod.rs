@@ -1,7 +1,7 @@
 mod states;
 
 use async_io::poll::{Events, Poller};
-use async_io::socket::Addr;
+use async_io::socket::{Addr, Domain};
 
 use self::states::{Common, ConnectedStream, ConnectingStream, InitStream, ListenerStream};
 use crate::prelude::*;
@@ -34,6 +34,10 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     fn new_connected(connected_stream: Arc<ConnectedStream<A, R>>) -> Self {
         let state = RwLock::new(State::Connected(connected_stream));
         Self { state }
+    }
+
+    pub fn domain(&self) -> Domain {
+        A::domain()
     }
 
     pub fn bind(&self, addr: &A) -> Result<()> {

@@ -73,7 +73,7 @@ mod entry;
 mod fs;
 mod io_uring;
 mod misc;
-//mod net;
+mod net;
 mod process;
 mod sched;
 mod signal;

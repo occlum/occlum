@@ -1,6 +1,7 @@
 use async_io::file::{Async as AsyncFile, File};
 
 use super::*;
+use crate::net::SocketFile;
 
 // TODO: add fd to FileHandle?
 
@@ -16,7 +17,7 @@ struct Inner {
 enum AnyFile {
     File(AsyncFile<Arc<dyn File>>),
     Inode(AsyncInode),
-    //Socket(Arc<SocketFile>),
+    Socket(Arc<SocketFile>),
 }
 
 // Apply a function all variants of AnyFile enum.
@@ -30,9 +31,9 @@ macro_rules! apply_fn_on_any_file {
             AnyFile::Inode($file) => {
                 $($fn_body)*
             }
-            /*AnyFile::Socket($file) => {
+            AnyFile::Socket($file) => {
                 $($fn_body)*
-            }*/
+            }
         }
     }}
 }
@@ -52,10 +53,10 @@ impl FileHandle {
         Self::new(any_file)
     }
 
-    /*pub fn new_socket(fd: FileDesc, file: SocketFile) -> Self {
+    pub fn new_socket(fd: FileDesc, file: SocketFile) -> Self {
         let any_file = AnyFile::Socket(Arc::new(file));
-        Self::new(fd, any_file)
-    }*/
+        Self::new(any_file)
+    }
 
     fn new(file: AnyFile) -> Self {
         let inner = Inner { file };
@@ -101,14 +102,12 @@ impl FileHandle {
         }
     }
 
-    /*
     pub fn as_socket_file(&self) -> Option<&SocketFile> {
         match &self.0.file {
-            AnyFile::Socket(socket_file) => Some(&*socket_file),
+            AnyFile::Socket(socket_file) => Some(socket_file),
             _ => None,
         }
     }
-    */
 }
 
 impl PartialEq for FileHandle {
