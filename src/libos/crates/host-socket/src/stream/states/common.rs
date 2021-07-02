@@ -3,6 +3,13 @@ use std::marker::PhantomData;
 use async_io::poll::{Events, Pollee};
 use async_io::socket::Addr;
 use io_uring_callback::IoUring;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "sgx")] {
+        use libc::ocall::socket as do_socket;
+    } else {
+        use libc::socket as do_socket;
+    }
+}
 
 use crate::prelude::*;
 use crate::runtime::Runtime;
@@ -19,7 +26,7 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
     pub fn new() -> Self {
         let domain_c = A::domain() as libc::c_int;
         let host_fd = {
-            let retval = unsafe { libc::socket(domain_c, libc::SOCK_STREAM, 0) };
+            let retval = unsafe { do_socket(domain_c, libc::SOCK_STREAM, 0) };
             assert!(retval >= 0);
             retval as HostFd
         };

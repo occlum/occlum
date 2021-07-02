@@ -1,16 +1,15 @@
 //! Socket APIs backed by the host Linux OS.
 
-#![feature(stmt_expr_attributes)]
-
-// TODO: how to async I/O request to return?
+// TODO: how to force an async I/O operation return?
 // When we want to force exit a process,
 
-cfg_if::cfg_if! {
-    if #[cfg(feature="sgx")] {
-        extern crate sgx_tstd as std;
-        extern crate sgx_libc as libc;
-    }
-}
+#![feature(stmt_expr_attributes)]
+#![cfg_attr(feature = "sgx", no_std)]
+
+#[cfg(feature = "sgx")]
+extern crate sgx_libc as libc;
+#[cfg(feature = "sgx")]
+extern crate sgx_tstd as std;
 
 #[macro_use]
 mod prelude;

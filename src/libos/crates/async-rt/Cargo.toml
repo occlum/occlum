@@ -17,6 +17,7 @@ atomic = "0.5"
 bit-vec = { version = "0.6", default-features = false  }
 flume = { path = "../../../../deps/flume", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["alloc"]  }
+log = { version = "0.4" }
 intrusive-collections = "0.9"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 object-id = { path = "../object-id" }
@@ -24,5 +25,4 @@ spin = "0.7"
 sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", features = ["backtrace", "thread"], optional = true }
 
 [dev-dependencies]
-log = { version = "0.4", default-features= false }
 ctor = "0.1"

@@ -48,3 +48,13 @@ impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for ConnectedStream<A, R> {
             .finish()
     }
 }
+
+fn new_msghdr(iovecs_ptr: *mut libc::iovec, iovecs_len: usize) -> libc::msghdr {
+    use std::mem::MaybeUninit;
+    // Safety. Setting all fields to zeros is a valid state for msghdr.
+    let mut msghdr: libc::msghdr = unsafe { MaybeUninit::zeroed().assume_init() };
+    msghdr.msg_iov = iovecs_ptr;
+    msghdr.msg_iovlen = iovecs_len as _;
+    // We do want to leave all other fields as zeros
+    msghdr
+}

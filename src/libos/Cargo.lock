@@ -12,6 +12,7 @@ dependencies = [
  "bitvec",
  "derive_builder",
  "errno",
+ "host-socket",
  "io-uring-callback",
  "lazy_static",
  "log",
@@ -86,6 +87,7 @@ dependencies = [
  "futures",
  "intrusive-collections",
  "lazy_static",
+ "log",
  "object-id",
  "sgx_tstd",
  "spin 0.7.0",
@@ -344,6 +346,26 @@ dependencies = [
 [[package]]
 name = "hashbrown_tstd"
 version = "0.9.0"
+
+[[package]]
+name = "host-socket"
+version = "0.1.0"
+dependencies = [
+ "async-io",
+ "atomic",
+ "bitflags",
+ "cfg-if 1.0.0",
+ "errno",
+ "io-uring-callback",
+ "log",
+ "memoffset 0.6.1",
+ "sgx-untrusted-alloc",
+ "sgx_libc",
+ "sgx_trts",
+ "sgx_tstd",
+ "sgx_types",
+ "slab",
+]
 
 [[package]]
 name = "ident_case"
@@ -763,6 +785,17 @@ dependencies = [
  "ryu",
  "serde",
  "sgx_tstd",
+]
+
+[[package]]
+name = "sgx-untrusted-alloc"
+version = "0.1.0"
+dependencies = [
+ "cfg-if 1.0.0",
+ "sgx_libc",
+ "sgx_trts",
+ "sgx_tstd",
+ "sgx_types",
 ]
 
 [[package]]

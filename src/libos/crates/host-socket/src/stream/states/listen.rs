@@ -253,7 +253,7 @@ impl<A: Addr> Backlog<A> {
                     //
                     // TODO: throw fatal errors to the upper layer.
                     let errno = Errno::from(-retval as u32);
-                    println!("Accept error: errno = {}", errno);
+                    log::error!("Accept error: errno = {}", errno);
                     //inner.fatal = Some(errno);
                     //stream.common.pollee().add_events(Events::ERR);
 

@@ -18,6 +18,7 @@ cfg-if = "1.0"
 errno = { path = "../errno" }
 slab = { git = "https://github.com/tokio-rs/slab.git", default-features = false }
 libc = { version = "0.2", optional = true }
+log = { version = "0.4" }
 io-uring-callback = { path = "../io-uring-callback" }
 memoffset = "0.6"
 sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }

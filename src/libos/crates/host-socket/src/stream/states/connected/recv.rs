@@ -207,15 +207,7 @@ impl Inner {
         let msghdr_ptr: *mut libc::msghdr = &mut self.recv_req.msg;
         let iovecs_ptr: *mut libc::iovec = &mut self.recv_req.iovecs as *mut _ as _;
 
-        let msg = libc::msghdr {
-            msg_name: ptr::null_mut() as _,
-            msg_namelen: 0,
-            msg_iov: iovecs_ptr,
-            msg_iovlen: iovecs_len,
-            msg_control: ptr::null_mut() as _,
-            msg_controllen: 0,
-            msg_flags: 0,
-        };
+        let msg = super::new_msghdr(iovecs_ptr, iovecs_len);
 
         self.recv_req.msg = msg;
         self.recv_req.iovecs = iovecs;

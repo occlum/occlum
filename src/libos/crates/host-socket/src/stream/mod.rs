@@ -1,7 +1,5 @@
 mod states;
 
-use std::sync::RwLock;
-
 use async_io::poll::{Events, Poller};
 use async_io::socket::Addr;
 

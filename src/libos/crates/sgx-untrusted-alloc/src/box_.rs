@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
 cfg_if::cfg_if! {
     if #[cfg(feature = "sgx")] {
-        use libc::ocalls::{malloc, free};
+        use libc::ocall::{malloc, free};
     } else {
         use libc::{malloc, free};
     }
