@@ -293,11 +293,11 @@ fn init_files(
 
     // But, for init process, we initialize file table for it
     let mut file_table = FileTable::new();
-    let stdin = FileRef::new_pollable(StdinFile::new(host_stdio_fds.unwrap().stdin_fd as FileDesc));
-    let stdout = FileRef::new_pollable(StdoutFile::new(
+    let stdin = FileRef::new_file(StdinFile::new(host_stdio_fds.unwrap().stdin_fd as FileDesc));
+    let stdout = FileRef::new_file(StdoutFile::new(
         host_stdio_fds.unwrap().stdout_fd as FileDesc,
     ));
-    let stderr = FileRef::new_pollable(StdoutFile::new(
+    let stderr = FileRef::new_file(StdoutFile::new(
         host_stdio_fds.unwrap().stderr_fd as FileDesc,
     ));
 

@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use async_io::file::{AccessMode, PollableFile, StatusFlags};
+use async_io::file::{AccessMode, File, StatusFlags};
 use async_io::poll::{Events, Pollee, Poller};
 use async_io::prelude::*;
 use atomic::{Atomic, Ordering};
@@ -19,7 +19,7 @@ pub fn do_eventfd(init_val: u32, flags: EventFileFlags) -> Result<FileDesc> {
     };
 
     let event_file = EventFile::new(init_val as u64, is_semaphore, status_flags)?;
-    let file_ref = FileRef::new_pollable(event_file);
+    let file_ref = FileRef::new_file(event_file);
     let event_fd = current!().add_file(file_ref, close_on_spawn);
     Ok(event_fd)
 }
@@ -63,7 +63,7 @@ impl EventFile {
     }
 }
 
-impl PollableFile for EventFile {
+impl File for EventFile {
     fn write(&self, buf: &[u8]) -> Result<usize> {
         let new_val = slice_to_u64(buf)?;
         if new_val == u64::max_value() {

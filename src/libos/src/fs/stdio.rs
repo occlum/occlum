@@ -101,7 +101,7 @@ impl StdoutFile {
     }
 }
 
-impl PollableFile for StdoutFile {
+impl File for StdoutFile {
     fn write(&self, buf: &[u8]) -> Result<usize> {
         let write_len = {
             self.inner
@@ -232,7 +232,7 @@ impl StdinFile {
     }
 }
 
-impl PollableFile for StdinFile {
+impl File for StdinFile {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let read_len = {
             self.inner

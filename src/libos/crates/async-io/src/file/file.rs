@@ -4,7 +4,7 @@ use std::ops::Deref;
 use futures::future::{self, BoxFuture};
 use futures::prelude::*;
 
-use crate::file::{AccessMode, SeekFrom, StatusFlags};
+use crate::file::{AccessMode, StatusFlags};
 use crate::poll::{Events, Poller};
 use crate::prelude::*;
 
@@ -12,7 +12,7 @@ use crate::prelude::*;
 ///
 /// An implementation for this trait should make sure all read and write APIs
 /// are non-blocking.
-pub trait PollableFile: Debug + Sync + Send {
+pub trait File: Debug + Sync + Send {
     fn read(&self, _buf: &mut [u8]) -> Result<usize> {
         return_errno!(EBADF, "not support read");
     }
@@ -47,6 +47,10 @@ pub trait PollableFile: Debug + Sync + Send {
         }
     */
 
+    fn access_mode(&self) -> AccessMode {
+        AccessMode::O_RDWR
+    }
+
     fn status_flags(&self) -> StatusFlags {
         StatusFlags::empty()
     }
@@ -56,10 +60,10 @@ pub trait PollableFile: Debug + Sync + Send {
     }
 }
 
-/// A wrapper type that extends a `PollableFile` object with async APIs.
+/// A wrapper type that extends a `File` object with async APIs.
 pub struct Async<T>(T);
 
-impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
+impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
     pub fn new(file: T) -> Self {
         Self(file)
     }
@@ -176,6 +180,11 @@ impl<F: PollableFile + ?Sized, T: Deref<Target = F>> Async<T> {
     }
 
     #[inline]
+    pub fn access_mode(&self) -> AccessMode {
+        self.0.access_mode()
+    }
+
+    #[inline]
     pub fn inner(&self) -> &T {
         &self.0
     }
@@ -201,7 +210,7 @@ impl<T: std::fmt::Debug> std::fmt::Debug for Async<T> {
     }
 }
 
-impl<F: PollableFile + ?Sized, T: Deref<Target = F> + Clone> Clone for Async<T> {
+impl<F: File + ?Sized, T: Deref<Target = F> + Clone> Clone for Async<T> {
     fn clone(&self) -> Self {
         Self::new(self.0.clone())
     }
@@ -218,8 +227,8 @@ mod tests {
 
     #[test]
     fn with_arc_dyn() {
-        let foo = Arc::new(FooFile::new()) as Arc<dyn PollableFile>;
-        let bar = Arc::new(BarFile::new()) as Arc<dyn PollableFile>;
+        let foo = Arc::new(FooFile::new()) as Arc<dyn File>;
+        let bar = Arc::new(BarFile::new()) as Arc<dyn File>;
         let async_foo = Async::new(foo);
         let async_bar = Async::new(bar);
         println!("foo file = {:?}", &async_foo);
@@ -243,7 +252,7 @@ mod tests {
             }
         }
 
-        impl PollableFile for FooFile {
+        impl File for FooFile {
             fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
                 self.pollee.poll_by(mask, poller)
             }
@@ -262,7 +271,7 @@ mod tests {
             }
         }
 
-        impl PollableFile for BarFile {
+        impl File for BarFile {
             fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
                 self.pollee.poll_by(mask, poller)
             }

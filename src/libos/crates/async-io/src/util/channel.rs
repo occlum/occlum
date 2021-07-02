@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use atomic::Atomic;
 use ringbuf::{Consumer as RbConsumer, Producer as RbProducer, RingBuffer};
 
-use crate::file::{AccessMode, PollableFile, StatusFlags};
+use crate::file::{AccessMode, File, StatusFlags};
 use crate::poll::{Events, Pollee, Poller};
 use crate::prelude::*;
 
@@ -160,7 +160,7 @@ impl Producer {
     }
 }
 
-impl PollableFile for Producer {
+impl File for Producer {
     fn write(&self, buf: &[u8]) -> Result<usize> {
         let this_end = self.this_end();
         let peer_end = self.peer_end();
@@ -241,7 +241,7 @@ impl Consumer {
     }
 }
 
-impl PollableFile for Consumer {
+impl File for Consumer {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let this_end = self.this_end();
         let peer_end = self.peer_end();
@@ -300,7 +300,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::file::{Async, PollableFile};
+    use crate::file::{Async, File};
 
     #[test]
     fn transfer_data_with_small_buf() {

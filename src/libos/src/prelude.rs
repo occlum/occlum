@@ -13,7 +13,7 @@ pub use std::sync::{
     Arc, SgxMutex, SgxMutexGuard, SgxRwLock, SgxRwLockReadGuard, SgxRwLockWriteGuard,
 };
 
-pub use async_io::file::PollableFile;
+pub use async_io::file::File;
 
 pub use crate::fs::{FileDesc, FileRef};
 pub use crate::process::{pid_t, uid_t};

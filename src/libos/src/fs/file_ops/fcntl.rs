@@ -82,8 +82,8 @@ pub fn do_fcntl(fd: FileDesc, cmd: &mut FcntlCmd) -> Result<isize> {
         }
         FcntlCmd::GetFl() => {
             let file = file_table.get(fd)?;
-            let status_flags = file.status_flags()?;
-            let access_mode = file.access_mode()?;
+            let status_flags = file.status_flags();
+            let access_mode = file.access_mode();
             (status_flags.bits() | access_mode as u32) as isize
         }
         FcntlCmd::SetFl(flags) => {

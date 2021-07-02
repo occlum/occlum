@@ -12,8 +12,8 @@ pub fn do_pipe2(flags: u32) -> Result<[FileDesc; 2]> {
     debug!("pipe2: flags: {:?} {:?}", creation_flags, status_flags);
 
     let (pipe_writer, pipe_reader) = pipe(status_flags)?;
-    let pipe_writer = FileRef::new_pollable(pipe_writer);
-    let pipe_reader = FileRef::new_pollable(pipe_reader);
+    let pipe_writer = FileRef::new_file(pipe_writer);
+    let pipe_reader = FileRef::new_file(pipe_reader);
 
     let close_on_spawn = creation_flags.must_close_on_spawn();
     let current = current!();

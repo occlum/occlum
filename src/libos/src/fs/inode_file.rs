@@ -267,6 +267,11 @@ impl AsyncInode {
     }
 
     #[inline]
+    pub fn access_mode(&self) -> AccessMode {
+        self.0.access_mode()
+    }
+
+    #[inline]
     pub fn status_flags(&self) -> StatusFlags {
         self.0.status_flags()
     }
