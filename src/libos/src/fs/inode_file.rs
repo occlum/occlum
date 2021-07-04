@@ -282,7 +282,7 @@ impl AsyncInode {
     }
 
     #[inline]
-    pub fn inner(&self) -> &InodeFile {
-        &*self.0
+    pub fn inner(&self) -> &Arc<InodeFile> {
+        &self.0
     }
 }

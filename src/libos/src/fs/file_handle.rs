@@ -3,15 +3,15 @@ use async_io::file::{Async as AsyncFile, File};
 use super::*;
 use crate::net::SocketFile;
 
-// TODO: fix the unncessary double-arc
 // TODO: add fd to FileHandle?
 
 #[derive(Clone, Debug)]
-pub struct FileHandle(Arc<Inner>);
+pub struct FileHandle(Inner);
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Inner {
     file: AnyFile,
+    // More fields (e.g., fd) are expected
 }
 
 #[derive(Clone, Debug)]
@@ -61,7 +61,7 @@ impl FileHandle {
 
     fn new(file: AnyFile) -> Self {
         let inner = Inner { file };
-        Self(Arc::new(inner))
+        Self(inner)
     }
 
     pub async fn read(&self, buf: &mut [u8]) -> Result<usize> {
@@ -113,6 +113,15 @@ impl FileHandle {
 
 impl PartialEq for FileHandle {
     fn eq(&self, other: &Self) -> bool {
-        Arc::as_ptr(&self.0) == Arc::as_ptr(&other.0)
+        let rhs = (&self.0.file, &other.0.file);
+        if let (AnyFile::File(self_file), AnyFile::File(other_file)) = rhs {
+            Arc::as_ptr(self_file.inner()) == Arc::as_ptr(other_file.inner())
+        } else if let (AnyFile::Inode(self_inode), AnyFile::Inode(other_inode)) = rhs {
+            Arc::as_ptr(self_inode.inner()) == Arc::as_ptr(other_inode.inner())
+        } else if let (AnyFile::Socket(self_socket), AnyFile::Socket(other_socket)) = rhs {
+            Arc::as_ptr(self_socket) == Arc::as_ptr(other_socket)
+        } else {
+            false
+        }
     }
 }
