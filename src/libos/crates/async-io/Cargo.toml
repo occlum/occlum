@@ -18,6 +18,7 @@ downcast-rs = { version = "1.2.0", default-features = false }
 errno = { path = "../errno" }
 futures = { version = "0.3", default-features = false, features = ["alloc"]  }
 libc = { version = "0.2", optional = true }
+num_enum = { version = "0.5", default-features = false }
 object-id = { path = "../object-id" }
 ringbuf = { version = "0.2.3", default-features = false }
 spin = "0.7"

@@ -3,6 +3,7 @@ use async_io::file::{Async as AsyncFile, File};
 use super::*;
 use crate::net::SocketFile;
 
+// TODO: fix the unncessary double-arc
 // TODO: add fd to FileHandle?
 
 #[derive(Clone, Debug)]
@@ -53,7 +54,7 @@ impl FileHandle {
         Self::new(any_file)
     }
 
-    pub fn new_socket(fd: FileDesc, file: SocketFile) -> Self {
+    pub fn new_socket(file: SocketFile) -> Self {
         let any_file = AnyFile::Socket(Arc::new(file));
         Self::new(any_file)
     }

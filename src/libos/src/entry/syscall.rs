@@ -29,6 +29,7 @@ use crate::fs::{
 };
 */
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t};
+use crate::net::{do_accept, do_accept4, do_bind, do_connect, do_listen, do_socket};
 /*
 use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
@@ -218,6 +219,13 @@ macro_rules! process_syscall_table_with_callback {
 
             (Eventfd = 284) => do_eventfd(init_val: u32),
             (Eventfd2 = 290) => do_eventfd2(init_val: u32, flags: i32),
+
+            (Accept = 43) => do_accept(fd: c_int, addr: *mut libc::sockaddr, addr_len: *mut libc::socklen_t),
+            (Accept4 = 288) => do_accept4(fd: c_int, addr: *mut libc::sockaddr, addr_len: *mut libc::socklen_t, flags: c_int),
+            (Bind = 49) => do_bind(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t),
+            (Connect = 42) => do_connect(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t),
+            (Listen = 50) => do_listen(fd: c_int, backlog: c_int),
+            (Socket = 41) => do_socket(domain: c_int, socket_type: c_int, protocol: c_int),
 
             /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),

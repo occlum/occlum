@@ -1,3 +1,4 @@
+use self::impls::{Ipv4Stream, UnixStream};
 use crate::fs::{AccessMode, Events, Poller, StatusFlags};
 use crate::net::{Addr, AnyAddr, Domain, Ipv4SocketAddr, UnixAddr};
 use crate::prelude::*;
@@ -188,4 +189,3 @@ mod impls {
         }
     }
 }
-use self::impls::{Ipv4Stream, UnixStream};
