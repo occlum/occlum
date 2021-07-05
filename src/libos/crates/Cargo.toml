@@ -5,6 +5,7 @@ members = [
     "async-file",
     "async-io",
     "async-socket",
+    "inherit-methods-macro",
     "errno",
     "host-socket",
     "io-uring-callback",
@@ -18,6 +19,7 @@ default-members = [
     "async-rt",
     "async-file",
     "async-socket",
+    "inherit-methods-macro",
     "io-uring-callback",
     "vdso-time",
 ]
