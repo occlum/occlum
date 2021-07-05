@@ -1,20 +1,40 @@
 extern crate proc_macro;
 
-use proc_macro2::{Punct, Spacing, TokenStream};
+use darling::FromMeta;
+use proc_macro2::{Punct, Spacing, Span, TokenStream};
 use quote::{quote, ToTokens, TokenStreamExt};
 use syn::parse::{Parse, ParseStream};
-use syn::{Block, FnArg, Ident, ImplItem, Item, ItemImpl, Pat, Stmt};
+use syn::{AttributeArgs, Block, Expr, FnArg, Ident, ImplItem, Item, ItemImpl, Pat, Stmt};
+
+#[derive(Debug, FromMeta)]
+struct MacroAttr {
+    #[darling(default = "default_from_val")]
+    from_field: String,
+}
+
+fn default_from_val() -> String {
+    "self.0".to_string()
+}
 
 #[proc_macro_attribute]
 pub fn inherit_methods(
     attr: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
+    let attr = {
+        let attr_tokens = syn::parse_macro_input!(attr as AttributeArgs);
+        match MacroAttr::from_list(&attr_tokens) {
+            Ok(attr) => attr,
+            Err(e) => {
+                return TokenStream::from(e.write_errors()).into();
+            }
+        }
+    };
     let item_impl = syn::parse_macro_input!(item as syn::ItemImpl);
-    do_inherit_methods(item_impl).into()
+    do_inherit_methods(attr, item_impl).into()
 }
 
-fn do_inherit_methods(mut item_impl: ItemImpl) -> TokenStream {
+fn do_inherit_methods(attr: MacroAttr, mut item_impl: ItemImpl) -> TokenStream {
     for impl_item in &mut item_impl.items {
         let impl_item_method = if let ImplItem::Method(method) = impl_item {
             method
@@ -43,9 +63,10 @@ fn do_inherit_methods(mut item_impl: ItemImpl) -> TokenStream {
             args_tokens.append(Punct::new(',', Spacing::Alone));
         }
 
+        let field: Expr = syn::parse_str(&attr.from_field).unwrap();
         let new_fn_tokens = quote! {
             {
-                self.0.#fn_name(#args_tokens)
+                #field.#fn_name(#args_tokens)
             }
         };
         let new_fn_block: Block = syn::parse(new_fn_tokens.into()).unwrap();

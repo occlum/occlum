@@ -1,12 +1,12 @@
-use inherit_methods_macro::inherit_methods;
+//! Implement the NewType pattern with inherit_methods macro.
 
+use inherit_methods_macro::inherit_methods;
 use std::vec::Vec;
 
 pub struct Stack<T>(Vec<T>);
 
 // The following methods are inherited from Vec automatically
-//#[inherit_methods(from="self.0", meta="#[inline]")]
-#[inherit_methods]
+#[inherit_methods(from_field = "self.0")]
 impl<T> Stack<T> {
     // Normal methods can be fixed with inherited methods in the same impl block.
     pub fn new() -> Self {
