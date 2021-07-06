@@ -4,6 +4,7 @@ use std::time::Duration;
 use super::do_arch_prctl::ArchPrctlCode;
 use super::do_clone::CloneFlags;
 use super::do_futex::{FutexFlags, FutexOp};
+use super::do_robust_list::RobustListHead;
 use super::do_spawn::FileAction;
 use super::do_wait4::WaitOptions;
 use super::prctl::PrctlCmd;
@@ -440,5 +441,28 @@ pub async fn do_geteuid() -> Result<isize> {
 }
 
 pub async fn do_getegid() -> Result<isize> {
+    Ok(0)
+}
+
+pub async fn do_set_robust_list(list_head_ptr: *mut RobustListHead, len: usize) -> Result<isize> {
+    if !list_head_ptr.is_null() {
+        check_mut_ptr(list_head_ptr)?;
+    }
+    super::do_robust_list::do_set_robust_list(list_head_ptr, len)?;
+    Ok(0)
+}
+
+pub async fn do_get_robust_list(
+    tid: pid_t,
+    list_head_ptr_ptr: *mut *mut RobustListHead,
+    len_ptr: *mut usize,
+) -> Result<isize> {
+    check_mut_ptr(list_head_ptr_ptr)?;
+    check_mut_ptr(len_ptr)?;
+    let list_head_ptr = super::do_robust_list::do_get_robust_list(tid)?;
+    unsafe {
+        list_head_ptr_ptr.write(list_head_ptr);
+        len_ptr.write(std::mem::size_of::<RobustListHead>());
+    }
     Ok(0)
 }

@@ -23,6 +23,7 @@
 #![feature(raw_ref_op)]
 // for std::hint::black_box
 #![feature(test)]
+#![feature(atomic_from_mut)]
 
 #[macro_use]
 extern crate async_rt;

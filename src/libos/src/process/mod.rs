@@ -20,6 +20,7 @@ use self::thread::{ThreadBuilder, ThreadId, ThreadInner};
 
 pub use self::do_exit::handle_force_exit;
 pub use self::do_futex::{futex_wait, futex_wake};
+pub use self::do_robust_list::RobustListHead;
 pub use self::do_spawn::do_spawn_root;
 pub use self::process::{Process, ProcessFilter, ProcessStatus, IDLE};
 pub use self::spawn_attribute::posix_spawnattr_t;
@@ -32,6 +33,7 @@ mod do_clone;
 mod do_exit;
 mod do_futex;
 mod do_getpid;
+mod do_robust_list;
 mod do_set_tid_address;
 mod do_spawn;
 mod do_wait4;

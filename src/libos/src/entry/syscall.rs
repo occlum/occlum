@@ -49,10 +49,10 @@ use crate::poll::syscalls::{
 };
 use crate::prelude::*;
 use crate::process::{
-    do_arch_prctl, do_clone, do_exit, do_exit_group, do_futex, do_getegid, do_geteuid, do_getgid,
-    do_getpgid, do_getpid, do_getppid, do_gettid, do_getuid, do_prctl, do_set_tid_address,
-    do_spawn_for_glibc, do_spawn_for_musl, do_wait4, pid_t, posix_spawnattr_t, FdOp,
-    SpawnFileActions, ThreadRef, ThreadStatus,
+    do_arch_prctl, do_clone, do_exit, do_exit_group, do_futex, do_get_robust_list, do_getegid,
+    do_geteuid, do_getgid, do_getpgid, do_getpid, do_getppid, do_gettid, do_getuid, do_prctl,
+    do_set_robust_list, do_set_tid_address, do_spawn_for_glibc, do_spawn_for_musl, do_wait4, pid_t,
+    posix_spawnattr_t, FdOp, RobustListHead, SpawnFileActions, ThreadRef, ThreadStatus,
 };
 use crate::sched::{do_getcpu, do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
 use crate::signal::{
@@ -168,6 +168,8 @@ macro_rules! process_syscall_table_with_callback {
             (SchedSetaffinity = 203) => do_sched_setaffinity(pid: pid_t, cpusize: size_t, buf: *const c_uchar),
             (SchedGetaffinity = 204) => do_sched_getaffinity(pid: pid_t, cpusize: size_t, buf: *mut c_uchar),
             (Getcpu = 309) => do_getcpu(cpu_ptr: *mut u32, node_ptr: *mut u32),
+            (SetRobustList = 273) => do_set_robust_list(list_head_ptr: *mut RobustListHead, len: usize),
+            (GetRobustList = 274) => do_get_robust_list(tid: pid_t, list_head_ptr_ptr: *mut *mut RobustListHead, len_ptr: *mut usize),
 
             (Gettimeofday = 96) => do_gettimeofday(tv_u: *mut timeval_t),
             (ClockGettime = 228) => do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t),

@@ -1,8 +1,9 @@
 use std::ptr::NonNull;
 
 use super::{
-    FileTableRef, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef, ResourceLimitsRef, SchedAgentRef,
-    SigQueues, SigSet, Thread, ThreadId, ThreadInner, ThreadName, ThreadRef,
+    FileTableRef, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef, ResourceLimitsRef,
+    RobustListHead, SchedAgentRef, SigQueues, SigSet, Thread, ThreadId, ThreadInner, ThreadName,
+    ThreadRef,
 };
 use crate::prelude::*;
 
@@ -19,6 +20,7 @@ pub struct ThreadBuilder {
     rlimits: Option<ResourceLimitsRef>,
     sig_mask: Option<SigSet>,
     clear_ctid: Option<NonNull<pid_t>>,
+    robust_list: Option<NonNull<RobustListHead>>,
     name: Option<ThreadName>,
 }
 
@@ -34,6 +36,7 @@ impl ThreadBuilder {
             rlimits: None,
             sig_mask: None,
             clear_ctid: None,
+            robust_list: None,
             name: None,
         }
     }
@@ -83,6 +86,11 @@ impl ThreadBuilder {
         self
     }
 
+    pub fn robust_list(mut self, robust_list_addr: NonNull<RobustListHead>) -> Self {
+        self.robust_list = Some(robust_list_addr);
+        self
+    }
+
     pub fn name(mut self, name: ThreadName) -> Self {
         self.name = Some(name);
         self
@@ -91,6 +99,7 @@ impl ThreadBuilder {
     pub fn build(self) -> Result<ThreadRef> {
         let tid = self.tid.unwrap_or_else(|| ThreadId::new());
         let clear_ctid = RwLock::new(self.clear_ctid);
+        let robust_list = RwLock::new(self.robust_list);
         let inner = SgxMutex::new(ThreadInner::new());
         let process = self
             .process
@@ -111,6 +120,7 @@ impl ThreadBuilder {
         let new_thread = Arc::new(Thread {
             tid,
             clear_ctid,
+            robust_list,
             inner,
             process,
             vm,
