@@ -10,6 +10,7 @@ use super::prctl::PrctlCmd;
 use super::process::ProcessFilter;
 use super::spawn_attribute::{clone_spawn_atrributes_safely, posix_spawnattr_t, SpawnAttr};
 use crate::prelude::*;
+use crate::syscall::CpuContext;
 use crate::time::{timespec_t, ClockID};
 use crate::util::mem_util::from_user::*;
 use std::ptr::NonNull;
@@ -341,10 +342,10 @@ pub fn do_exit(status: i32) -> Result<isize> {
     Ok(0)
 }
 
-pub fn do_exit_group(status: i32) -> Result<isize> {
+pub fn do_exit_group(status: i32, user_context: *mut CpuContext) -> Result<isize> {
     debug!("exit_group: {}", status);
-    super::do_exit::do_exit_group(status);
-    Ok(0)
+    let user_context = unsafe { &mut *user_context };
+    return super::do_exit::do_exit_group(status, user_context);
 }
 
 pub fn do_wait4(pid: i32, exit_status_ptr: *mut i32, options: u32) -> Result<isize> {
@@ -469,7 +470,12 @@ pub fn do_getgroups(size: isize, buf_ptr: *mut u32) -> Result<isize> {
     }
 }
 
-pub fn do_execve(path: *const i8, argv: *const *const i8, envp: *const *const i8) -> Result<isize> {
+pub fn do_execve(
+    path: *const i8,
+    argv: *const *const i8,
+    envp: *const *const i8,
+    context: *mut CpuContext,
+) -> Result<isize> {
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     let argv = clone_cstrings_safely(argv)?;
     let envp = clone_cstrings_safely(envp)?;
@@ -479,7 +485,7 @@ pub fn do_execve(path: *const i8, argv: *const *const i8, envp: *const *const i8
         path, argv, envp
     );
 
-    do_exec(&path, &argv, &envp, &current)
+    do_exec(&path, &argv, &envp, &current, context)
 }
 
 pub fn do_set_robust_list(list_head_ptr: *mut RobustListHead, len: usize) -> Result<isize> {
