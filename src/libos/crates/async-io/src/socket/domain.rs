@@ -17,7 +17,6 @@ mod tests {
     fn from_i32() {
         // Positive cases
         assert!(Domain::try_from(libc::AF_INET).unwrap() == Domain::Ipv4);
-        assert!(Domain::try_from(libc::AF_INET6).unwrap() == Domain::Ipv6);
         assert!(Domain::try_from(libc::AF_LOCAL).unwrap() == Domain::Unix);
 
         // Negative cases

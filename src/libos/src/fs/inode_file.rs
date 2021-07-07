@@ -1,4 +1,5 @@
 use super::*;
+use inherit_methods_macro::inherit_methods;
 use rcore_fs_sefs::dev::SefsMac;
 
 // TODO: rename all INodeFile to InodeFile
@@ -236,53 +237,25 @@ impl INodeExt for dyn INode {
 #[derive(Clone, Debug)]
 pub struct AsyncInode(Arc<InodeFile>);
 
+#[inherit_methods(from = "self.0")]
 impl AsyncInode {
     pub fn new(inode: InodeFile) -> Self {
         Self(Arc::new(inode))
     }
 
     #[inline]
-    pub async fn read(&self, buf: &mut [u8]) -> Result<usize> {
-        self.0.read(buf)
-    }
-
-    #[inline]
-    pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-        self.0.readv(bufs)
-    }
-
-    #[inline]
-    pub async fn write(&self, buf: &[u8]) -> Result<usize> {
-        self.0.write(buf)
-    }
-
-    #[inline]
-    pub async fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
-        self.0.writev(bufs)
-    }
-
-    #[inline]
-    pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
-        self.0.poll_by(mask, poller)
-    }
-
-    #[inline]
-    pub fn access_mode(&self) -> AccessMode {
-        self.0.access_mode()
-    }
-
-    #[inline]
-    pub fn status_flags(&self) -> StatusFlags {
-        self.0.status_flags()
-    }
-
-    #[inline]
-    pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
-        self.0.set_status_flags(new_status)
-    }
-
-    #[inline]
     pub fn inner(&self) -> &Arc<InodeFile> {
         &self.0
     }
+
+    // Inherit methods from the inner InodeFile. Note that all I/O methods are
+    // async wrappers of the original sync ones.
+    pub async fn read(&self, buf: &mut [u8]) -> Result<usize>;
+    pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize>;
+    pub async fn write(&self, buf: &[u8]) -> Result<usize>;
+    pub async fn writev(&self, bufs: &[&[u8]]) -> Result<usize>;
+    pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events;
+    pub fn access_mode(&self) -> AccessMode;
+    pub fn status_flags(&self) -> StatusFlags;
+    pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()>;
 }

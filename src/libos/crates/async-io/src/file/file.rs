@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 use std::ops::Deref;
 
+use inherit_methods_macro::inherit_methods;
 use futures::future::{self, BoxFuture};
 use futures::prelude::*;
 
@@ -165,26 +166,6 @@ impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
     }
 
     #[inline]
-    pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
-        self.0.poll_by(mask, poller)
-    }
-
-    #[inline]
-    pub fn status_flags(&self) -> StatusFlags {
-        self.0.status_flags()
-    }
-
-    #[inline]
-    pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
-        self.0.set_status_flags(new_status)
-    }
-
-    #[inline]
-    pub fn access_mode(&self) -> AccessMode {
-        self.0.access_mode()
-    }
-
-    #[inline]
     pub fn inner(&self) -> &T {
         &self.0
     }
@@ -202,6 +183,15 @@ impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
         let flags = self.status_flags();
         flags.contains(StatusFlags::O_NONBLOCK)
     }
+}
+
+// Implement methods inherited from File
+#[inherit_methods(from = "self.0")]
+impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
+    pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events;
+    pub fn status_flags(&self) -> StatusFlags;
+    pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()>;
+    pub fn access_mode(&self) -> AccessMode;
 }
 
 impl<T: std::fmt::Debug> std::fmt::Debug for Async<T> {

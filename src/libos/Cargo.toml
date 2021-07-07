@@ -30,6 +30,7 @@ serde_json = { path = "../../deps/serde-json-sgx" }
 memoffset = "0.6.1"
 num_enum = { version = "0.5", default-features = false }
 vdso-time  = { path = "crates/vdso-time", default-features = false, features = ["sgx"] }
+inherit-methods-macro= { path = "crates/inherit-methods-macro" }
 io-uring-callback = { path = "crates/io-uring-callback", features = ["sgx"] }
 host-socket  = { path = "crates/host-socket", default-features = false, features = ["sgx"] }
 
