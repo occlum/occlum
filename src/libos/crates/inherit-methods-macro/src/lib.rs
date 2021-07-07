@@ -21,7 +21,7 @@
 //!
 //! ## Implementing the new type idiom
 //!
-//! Suppose that you want to create new struct named `Stack<T>`, which can be implemented by
+//! Suppose that you want to create a new struct named `Stack<T>`, which can be implemented by
 //! simply wrapping around `Vec<T>` and exposing only a subset of the APIs of `Vec`. Here is
 //! how this crate can help you do it easily.
 //!
@@ -47,7 +47,7 @@
 //! }
 //! ```
 //!
-//! If you want to derive common traits (like `AsRef` and `Deref`) for a new type, check out
+//! If you want to derive common traits (like `AsRef` and `Deref`) for a wrapper type, check out
 //! the [shrinkwraprs](https://crates.io/crates/shrinkwraprs) crate.
 //!
 //! ## Emulating the classic OOP inheritance
@@ -111,6 +111,7 @@
 //!
 //! #[inherit_methods(from = "self.base")]
 //! impl Object for DummyObject {
+//!     // Give this method an implementation specific to this type
 //!     fn type_name(&self) -> &'static str {
 //!         "DummyObject"
 //!     }
@@ -125,9 +126,8 @@
 extern crate proc_macro;
 
 use darling::FromMeta;
-use proc_macro2::{Punct, Spacing, Span, TokenStream};
+use proc_macro2::{Punct, Spacing, TokenStream};
 use quote::{quote, ToTokens, TokenStreamExt};
-use syn::parse::{Parse, ParseStream};
 use syn::{AttributeArgs, Block, Expr, FnArg, Ident, ImplItem, Item, ItemImpl, Pat, Stmt};
 
 #[derive(Debug, FromMeta)]
@@ -150,7 +150,7 @@ pub fn inherit_methods(
         match MacroAttr::from_list(&attr_tokens) {
             Ok(attr) => attr,
             Err(e) => {
-                return TokenStream::from(e.write_errors()).into();
+                return e.write_errors().into();
             }
         }
     };
