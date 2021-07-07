@@ -11,6 +11,10 @@ Step 2: Download OpenVINO and build the Inference Engine, it will also download 
 ```
 ./download_and_build_openvino.sh
 ```
+or using OpenVINO version 2021.3
+```
+./download_and_build_openvino_2021.sh
+```
 When completed, the resulting OpenVINO can be found in `openvino_src` directory. Threading Building Blocks (TBB) is used by default. To use OpenMP, add option `--threading OMP` when invoking the script above.
 
 Step 3: Download the example of OpenVINO models from [01.org](https://download.01.org/opencv/)
@@ -21,6 +25,10 @@ Step 3: Download the example of OpenVINO models from [01.org](https://download.0
 Step 4: Run OpenVINO Inference Engine benchmark app inside SGX enclave with Occlum
 ```
 ./run_benchmark_on_occlum.sh
+```
+or run sciprt for OpenVINO 2021.3
+```
+./run_benchmark_on_occlum_2021.sh
 ```
 
 Step 5 (Optional): Run OpenVINO Inference Engine benchmark app in Linux

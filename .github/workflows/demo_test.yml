@@ -401,6 +401,26 @@ jobs:
       run: docker exec openvino_test bash -c "cd /root/demos/openvino && SGX_MODE=SIM ./run_benchmark_on_occlum.sh"
 
 
+  Openvino2021_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Create container
+      run: docker run -itd --name=openvino2021_test -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-openvino2021
+
+    - name: Build dependencies
+      run: docker exec openvino2021_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec openvino2021_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+
+    - name: Run openVINO benchmark
+      run: docker exec openvino2021_test bash -c "cd /root/demos/openvino && SGX_MODE=SIM ./run_benchmark_on_occlum_2021.sh"
+
+
   # Python test also needs its own image because in Alpine environment, modules are built locally and consumes a lot of time.
   Python_musl_support_test:
     runs-on: ubuntu-18.04
