@@ -238,12 +238,12 @@ impl INodeExt for dyn INode {
 pub struct AsyncInode(Arc<InodeFile>);
 
 #[inherit_methods(from = "self.0")]
+#[rustfmt::skip]
 impl AsyncInode {
     pub fn new(inode: InodeFile) -> Self {
         Self(Arc::new(inode))
     }
 
-    #[inline]
     pub fn inner(&self) -> &Arc<InodeFile> {
         &self.0
     }

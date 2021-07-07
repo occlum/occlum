@@ -7,6 +7,7 @@ pub struct Stack<T>(Vec<T>);
 
 // The following methods are inherited from Vec automatically
 #[inherit_methods(from = "self.0")]
+#[rustfmt::skip]
 impl<T> Stack<T> {
     // Normal methods can be implemented with inherited methods in the same impl block.
     pub fn new() -> Self {
@@ -16,11 +17,11 @@ impl<T> Stack<T> {
         Self(Vec::with_capacity(capacity))
     }
 
-    // Inherited methods with all kinds of fucntion signature.
-    fn push(&mut self, value: T);
-    fn pop(&mut self) -> Option<T>;
-    fn len(&self) -> usize;
-    fn retain<F>(&mut self, f: F)
+    // Inherited methods with all kinds of function signature.
+    pub fn push(&mut self, value: T);
+    pub fn pop(&mut self) -> Option<T>;
+    pub fn len(&self) -> usize;
+    pub fn retain<F>(&mut self, f: F)
     where
         F: FnMut(&T) -> bool;
 }
