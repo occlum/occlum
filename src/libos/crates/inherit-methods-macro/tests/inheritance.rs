@@ -1,8 +1,9 @@
-//! Emulate "inheritance" with the inherit_methods macro.
+//! Emulate the inheritance in OOP with the inherit_methods macro.
 
-use inherit_methods_macro::inherit_methods;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+
+use inherit_methods_macro::inherit_methods;
 
 pub trait Object {
     fn type_name(&self) -> &'static str;
@@ -50,7 +51,7 @@ impl DummyObject {
     }
 }
 
-#[inherit_methods(from_field = "self.base")]
+#[inherit_methods(from = "self.base")]
 impl Object for DummyObject {
     fn type_name(&self) -> &'static str {
         "DummyObject"
