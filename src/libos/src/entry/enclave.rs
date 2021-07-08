@@ -83,9 +83,14 @@ pub extern "C" fn occlum_ecall_init(
 
         info!("num_vcpus = {:?}", num_vcpus);
         async_rt::config::set_parallelism(num_vcpus);
-        async_rt::config::set_sched_callback(|| {
+        async_rt::task::spawn(async {
             let io_uring = &crate::io_uring::SINGLETON;
-            io_uring.poll_completions();
+            loop {
+                for _ in 0..100 {
+                    io_uring.poll_completions();
+                }
+                async_rt::sched::yield_().await;
+            }
         });
 
         HAS_INIT.store(true, Ordering::SeqCst);

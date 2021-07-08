@@ -23,14 +23,12 @@ pub fn shutdown() {
 lazy_static! {
     pub(crate) static ref EXECUTOR: Executor = {
         let parallelism = CONFIG.parallelism();
-        let sched_callback = CONFIG.take_sched_callback();
-        Executor::new(parallelism, sched_callback).unwrap()
+        Executor::new(parallelism).unwrap()
     };
 }
 
 pub(crate) struct Executor {
     parallelism: u32,
-    sched_callback: Box<dyn Fn() + Send + Sync + 'static>,
     run_queues: Vec<Receiver<Arc<Task>>>,
     task_senders: Vec<Sender<Arc<Task>>>,
     next_run_queue_id: AtomicU32,
@@ -42,7 +40,6 @@ pub(crate) struct Executor {
 impl Executor {
     pub fn new(
         parallelism: u32,
-        sched_callback: Box<dyn Fn() + Send + Sync + 'static>,
     ) -> Result<Self> {
         if parallelism == 0 {
             return Err("invalid argument");
@@ -65,7 +62,6 @@ impl Executor {
 
         let new_self = Self {
             parallelism,
-            sched_callback,
             run_queues,
             task_senders,
             next_run_queue_id,
@@ -85,8 +81,6 @@ impl Executor {
         assert!(run_queue_id < self.parallelism);
         let run_queue = &self.run_queues[run_queue_id as usize];
         loop {
-            (self.sched_callback)();
-
             let task = {
                 let task_res = run_queue.try_recv();
 
@@ -131,7 +125,16 @@ impl Executor {
 
     pub fn accept_task(&self, task: Arc<Task>) {
         if self.is_shutdown() {
-            panic!("a shut-down executor cannot spawn new tasks");
+            // Should not panic for now, return directly.
+            // LibOS task may be waked up after shutdown, e.g. io_uring task.
+            // To solve this problem actually, 
+            // we can add task_attribute and task_status to task struct,
+            // then we can prevent repeated wake-ups
+            // we also need store these tasks in executor,
+            // shutdown these tasks before shutdown executor.
+            
+            // panic!("a shut-down executor cannot spawn new tasks");
+            return;
         }
 
         let thread_id = self.pick_thread_for(&task);
