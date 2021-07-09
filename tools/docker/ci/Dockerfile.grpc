@@ -9,8 +9,12 @@ RUN rm -rf /root/demos && \
     cp -r occlum/demos /root/demos && \
     rm -rf /root/occlum
 
-WORKDIR /root/demos/grpc
+WORKDIR /root/demos/grpc/grpc_musl
 RUN bash -x download_and_install_openssl.sh && \
     bash -x download_and_install_grpc.sh
+
+WORKDIR /root/demos/grpc/grpc_glibc
+RUN bash -x download_and_install_grpc_glibc.sh && \
+    bash -x prepare_stress_test_tool.sh
 
 WORKDIR /root
