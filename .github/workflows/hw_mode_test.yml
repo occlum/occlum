@@ -571,16 +571,37 @@ jobs:
     - name: Make install
       run: docker exec $grpc_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
-    - name: Prepare grpc sample project
-      run: docker exec $grpc_test bash -c "cd /root/demos/grpc && ./prepare_client_server.sh"
+    - name: Prepare grpc musl sample project
+      run: docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_musl && ./prepare_client_server.sh"
 
-    - name: Run grpc server
-      run: docker exec $grpc_test bash -c "cd /root/demos/grpc && ./run_server_on_occlum.sh" &
+    - name: Run grpc musl server
+      run: docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_musl && ./run_server_on_occlum.sh" &
 
-    - name: Run grpc client
+    - name: Run grpc musl client
       run: |
         sleep ${{ env.nap_time }};
-        docker exec $grpc_test bash -c "cd /root/demos/grpc && ./run_client_on_occlum.sh"
+        docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_musl && ./run_client_on_occlum.sh"
+
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop $grpc_test
+
+    - name: Restart the docker
+      run: docker start $grpc_test
+
+    - name: Prepare grpc glibc sample project
+      run: docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_glibc && ./prepare_client_server_glibc.sh"
+
+    - name: Run grpc glibc server
+      run: docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_glibc && ./run_server_on_occlum_glibc.sh" &
+
+    - name: Run grpc glibc client
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_glibc && ./run_client_on_occlum_glibc.sh"
+
+    - name: Run grpc stress test
+      run: docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_glibc && ./run_stress_test.sh"
 
     - name: Clean the environment
       if: ${{ always() }}

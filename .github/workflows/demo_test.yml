@@ -305,7 +305,7 @@ jobs:
 
 
 # Below tests needs test image to run faster
-  Grpc_test:
+  Grpc_musl_test:
     runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@v1
@@ -322,16 +322,45 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Prepare grpc sample project
-      run: docker exec ${{ github.job }} bash -c "cd /root/demos/grpc && ./prepare_client_server.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_musl && ./prepare_client_server.sh"
 
     - name: Run grpc server
-      run: docker exec ${{ github.job }} bash -c "cd /root/demos/grpc && SGX_MODE=SIM ./run_server_on_occlum.sh" &
+      run: docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_musl && SGX_MODE=SIM ./run_server_on_occlum.sh" &
 
     - name: Run grpc client
       run: |
         sleep ${{ env.nap_time }};
-        docker exec ${{ github.job }} bash -c "cd /root/demos/grpc && SGX_MODE=SIM ./run_client_on_occlum.sh"
+        docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_musl && SGX_MODE=SIM ./run_client_on_occlum.sh"
 
+  Grpc_glibc_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Create container
+      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-grpc
+
+    - name: Build dependencies
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec ${{ github.job }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+
+    - name: Prepare grpc sample project
+      run: docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_glibc && ./prepare_client_server_glibc.sh"
+
+    - name: Run grpc server
+      run: docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_glibc && SGX_MODE=SIM ./run_server_on_occlum_glibc.sh" &
+
+    - name: Run grpc client
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_glibc && SGX_MODE=SIM ./run_client_on_occlum_glibc.sh"
+
+    - name: Run grpc stress client
+      run: docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_glibc && ./run_stress_test.sh"
 
   Openvino_test:
     runs-on: ubuntu-18.04
