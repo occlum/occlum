@@ -3,7 +3,7 @@ FROM alpine:3.11 AS alpine
 RUN apk update && \
     apk --no-cache add openjdk11 --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
 
-FROM registry.cn-hangzhou.aliyuncs.com/alinux/alinux3
+FROM registry.cn-hangzhou.aliyuncs.com/alinux/alinux3:3.210714.1
 
 LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
 
@@ -12,8 +12,6 @@ LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
 SHELL ["/bin/bash", "-c"]
 
 RUN yum install -y --nogpgcheck \
-        alinux-release-experimentals && \
-        yum install -y --nogpgcheck \
         astyle \
         autoconf \
         automake \
@@ -45,7 +43,7 @@ RUN yum install -y --nogpgcheck \
         libxml2-devel \
         libtool \
         pkgconfig \
-        python \
+        python2 \
         kmod \
         make \
         mod_ssl \
@@ -167,7 +165,6 @@ ENV LD_LIBRARY_PATH="/opt/intel/sgxpsw/aesm:/usr/lib64/:/usr/local/lib:/opt/inte
 # Install the latest version of Occlum
 WORKDIR /root/occlum
 RUN rm -rf occlum && \
-    source scl_source enable devtoolset-8 && \
     git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum && \
     cd occlum && \
     source /opt/intel/sgxsdk/environment && \
