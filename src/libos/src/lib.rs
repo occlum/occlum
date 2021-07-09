@@ -74,6 +74,7 @@ mod fs;
 mod io_uring;
 mod misc;
 mod net;
+mod poll;
 mod process;
 mod sched;
 mod signal;

@@ -38,6 +38,7 @@ use crate::net::{
     do_socket, do_socketpair, msghdr, msghdr_mut,
 };
 */
+use crate::poll::syscalls::*;
 use crate::prelude::*;
 use crate::process::{
     do_arch_prctl, do_clone, do_exit, do_exit_group, do_futex, do_getegid, do_geteuid, do_getgid,
@@ -226,6 +227,8 @@ macro_rules! process_syscall_table_with_callback {
             (Connect = 42) => do_connect(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t),
             (Listen = 50) => do_listen(fd: c_int, backlog: c_int),
             (Socket = 41) => do_socket(domain: c_int, socket_type: c_int, protocol: c_int),
+
+            (Poll = 7) => do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int),
 
             /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),
