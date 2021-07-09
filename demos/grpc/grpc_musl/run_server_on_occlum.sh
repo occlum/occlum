@@ -1,9 +1,8 @@
 #!/bin/bash
 INSTALL_DIR=/usr/local/occlum/x86_64-linux-musl
+export PATH=$INSTALL_DIR/bin:$PATH
 
-export PATH=$PATH:$INSTALL_DIR/bin
-
-cd client
+cd server
 
 make -j$(nproc)
 if [ $? -ne 0 ]
@@ -24,7 +23,7 @@ then
 fi
 
 rm -rf image && \
-copy_bom -f ../../grpc_client.yaml --root image --include-dir /opt/occlum/etc/template && \
+copy_bom -f ../../grpc_server.yaml --root image --include-dir /opt/occlum/etc/template && \
 occlum build
 
 if [ $? -ne 0 ]
@@ -33,4 +32,4 @@ then
   exit 1
 fi
 
-occlum run /bin/greeter_client
+occlum run /bin/greeter_server
