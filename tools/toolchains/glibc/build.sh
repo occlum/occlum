@@ -3,6 +3,12 @@ SRC_DIR=/tmp/glibc/glibc
 BUILD_DIR=/tmp/glibc/glibc_build
 INSTALL_DIR=/opt/occlum/glibc
 
+# GCC 10 introduces many new checkings and will cause the build to fail.
+if [ "$(gcc -dumpversion)" = "10" ]; then
+    EXTRA_CFLAGS=-fcommon
+    EXTRA_CONFIG_OPTION="--disable-werror"
+fi
+
 # Exit if any command fails
 set -e
 
@@ -20,8 +26,8 @@ mkdir -p ${BUILD_DIR}
 cd ${BUILD_DIR}
 # Build and install glibc
 unset LD_LIBRARY_PATH
-CFLAGS="-O2 -g" ${SRC_DIR}/configure \
+CFLAGS="-O2 -g ${EXTRA_CFLAGS}" ${SRC_DIR}/configure \
   --prefix=${INSTALL_DIR} --with-tls --without-selinux \
-  --enable-stack-protector=strong --disable-nscd
+  --enable-stack-protector=strong --disable-nscd ${EXTRA_CONFIG_OPTION}
 make
 make install
