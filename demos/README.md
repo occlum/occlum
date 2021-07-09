@@ -20,7 +20,7 @@ This set of demos shows how real-world apps can be easily run inside SGX enclave
 * [fish](fish/): A demo of [FISH](https://fishshell.com) shell script.
 * [flink](flink/): A demo of [Apache Flink](https://flink.apache.org).
 * [font](font/font_support_for_java): A demo of supporting font with Java.
-* [grpc](grpc/): A client and server communicating through [gRPC](https://grpc.io).
+* [grpc](grpc/): A client and server communicating through [gRPC](https://grpc.io), containing [glibc-supported demo](grpc/grpc_glibc) and [musl-supported demo](grpc/grpc_musl).
 * [https_server](https_server/): A HTTPS file server based on [Mongoose Embedded Web Server Library](https://github.com/cesanta/mongoose).
 * [openvino](openvino/) A benchmark of [OpenVINO Inference Engine](https://docs.openvinotoolkit.org/2019_R3/_docs_IE_DG_inference_engine_intro.html).
 * [pytorch](pytorch/): A demo of [PyTorch](https://pytorch.org/).
