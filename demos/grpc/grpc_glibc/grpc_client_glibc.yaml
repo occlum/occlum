@@ -1,0 +1,7 @@
+includes:
+  - base.yaml
+targets:
+  - target: /bin/
+    copy:
+      - files:
+        - ../grpc_src/examples/cpp/helloworld/cmake/build/greeter_client
