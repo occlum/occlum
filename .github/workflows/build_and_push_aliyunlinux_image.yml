@@ -51,11 +51,11 @@ jobs:
       uses: docker/build-push-action@v2
       with:
         context: .
-        file: ./tools/docker/Dockerfile.aliyunlinux2
+        file: ./tools/docker/Dockerfile.aliyunlinux3
         platforms: linux/amd64
         build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
         push: true
-        tags: occlum/occlum:${{ env.RELEASE_VERSION }}-aliyunlinux
+        tags: occlum/occlum:${{ env.RELEASE_VERSION }}-aliyunlinux3
 
 
   Make_test_on_aliyunlinux:
@@ -72,7 +72,7 @@ jobs:
       run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
 
     - name: Create container with Aliyun Linux image
-      run: docker run -itd --name=alinux-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-aliyunlinux
+      run: docker run -itd --name=alinux-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-aliyunlinux3
 
     - name: Build dependencies
       run:  docker exec alinux-test bash -c "cd /root/occlum; make submodule"
