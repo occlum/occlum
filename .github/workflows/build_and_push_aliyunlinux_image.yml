@@ -1,4 +1,4 @@
-name: Alinux2 Docker Build and Push
+name: Aliyunlinux Docker Build and Push
 
 # This is a manual trigger.
 on:
@@ -10,7 +10,7 @@ on:
         default: 'N'
 
 jobs:
-  generate-alinux2-image:
+  generate-aliyunlinux-image:
     runs-on: ubuntu-18.04
     if: github.event.inputs.only_test == 'N'
 
@@ -51,16 +51,16 @@ jobs:
       uses: docker/build-push-action@v2
       with:
         context: .
-        file: ./tools/docker/Dockerfile.aliyunlinux
+        file: ./tools/docker/Dockerfile.aliyunlinux3
         platforms: linux/amd64
         build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
         push: true
         tags: occlum/occlum:${{ env.RELEASE_VERSION }}-aliyunlinux
 
 
-  Make_test_on_alinux2:
+  Make_test_on_aliyunlinux:
     if: ${{ always() }}
-    needs: generate-alinux2-image
+    needs: generate-aliyunlinux-image
     runs-on: ubuntu-18.04
 
     steps:
@@ -72,16 +72,16 @@ jobs:
       run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
 
     - name: Create container with Aliyun Linux image
-      run: docker run -itd --name=alinux2-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-aliyunlinux
+      run: docker run -itd --name=alinux-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-aliyunlinux
 
     - name: Build dependencies
-      run:  docker exec alinux2-test bash -c "cd /root/occlum; make submodule"
+      run:  docker exec alinux-test bash -c "cd /root/occlum; make submodule"
 
     - name: Build source
-      run:  docker exec alinux2-test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y SGX_MODE=SIM make"
+      run:  docker exec alinux-test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y SGX_MODE=SIM make"
 
     - name: Integration test
-      run:  docker exec alinux2-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test"
+      run:  docker exec alinux-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test"
 
     - name: Integration test with Glibc
-      run:  docker exec alinux2-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test-glibc"
+      run:  docker exec alinux-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test-glibc"
