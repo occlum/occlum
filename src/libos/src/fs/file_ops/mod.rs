@@ -6,7 +6,7 @@ pub use self::chmod::{do_fchmod, do_fchmodat, FileMode};
 pub use self::chown::{do_fchown, do_fchownat, ChownFlags};
 pub use self::close::do_close;
 pub use self::dup::{do_dup, do_dup2, do_dup3};
-pub use self::fallocate::do_fallocate;
+pub use self::fallocate::{do_fallocate, FallocateFlags};
 pub use self::fcntl::{do_fcntl, FcntlCmd};
 pub use self::file_flags::{AccessMode, CreationFlags, StatusFlags};
 pub use self::flock::{Flock, FlockType};

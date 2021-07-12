@@ -1,5 +1,6 @@
 use super::*;
 use crate::net::PollEventFlags;
+use rcore_fs::vfs::FallocateMode;
 use rcore_fs_sefs::dev::SefsMac;
 
 pub struct INodeFile {
@@ -121,8 +122,12 @@ impl File for INodeFile {
         Ok(())
     }
 
-    fn fallocate(&self, mode: u32, offset: u64, len: u64) -> Result<()> {
-        self.inode.fallocate(mode, offset, len)?;
+    fn fallocate(&self, flags: FallocateFlags, offset: usize, len: usize) -> Result<()> {
+        if !self.access_mode.writable() {
+            return_errno!(EBADF, "File is not opened for writing");
+        }
+        let mode = FallocateMode::from(flags);
+        self.inode.fallocate(&mode, offset, len)?;
         Ok(())
     }
 
