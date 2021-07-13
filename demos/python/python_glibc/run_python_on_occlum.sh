@@ -14,7 +14,7 @@ fi
 
 cd occlum_instance
 # Copy files into Occlum Workspace and build
-if [ ! -d "image/lib/python3" ];then
+if [ ! -L "image/bin/python3" ];then
     ln -s /opt/python-occlum/bin/python3 image/bin/python3
     cp -f /opt/occlum/glibc/lib/libdl.so.2 image/opt/occlum/glibc/lib/
     cp -f /opt/occlum/glibc/lib/libutil.so.1 image/opt/occlum/glibc/lib/
