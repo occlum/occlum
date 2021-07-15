@@ -1,6 +1,0 @@
-*.o
-*.a
-*.so
-*.orig
-build/
-.DS_Store
