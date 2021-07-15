@@ -1,7 +1,0 @@
-tensorflow_src/
-deps/
-models/
-testdata/
-label_image
-benchmark_model
-minimal
