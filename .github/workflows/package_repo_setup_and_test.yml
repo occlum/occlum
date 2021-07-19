@@ -1,13 +1,26 @@
 name: Set up Package Repository and Test (Manual Trigger)
 
 # This is a manual trigger.
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
+    inputs:
+      only_test:
+        description: 'Only Test? <Y/N>'
+        required: true
+        default: 'N'
+      test_version:
+        description: 'Test Occlum version'
+        required: false
 
 jobs:
   Package_repository_setup_and_test:
     runs-on: ubuntu-18.04
+    if: github.event.inputs.only_test == 'N'
     env:
      TOKEN: ${{ secrets.PAT_TOKEN }}
+    # Map a step output to a job output
+    outputs:
+      occlum_version: ${{ steps.occlum_version.outputs.version }}
     steps:
     # This step is added to get more free space
     - name: Clean virtual environment
@@ -35,6 +48,10 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/occlum
         echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
+
+    - name: Set occlum version as output
+      id: occlum_version
+      run: echo "::set-output name=version::${{ env.OCCLUM_VERSION }}"
 
     - name: Create ubuntu container
       run: docker run -itd --name=ubuntu -v $GITHUB_WORKSPACE:/root/workspace occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
@@ -98,11 +115,20 @@ jobs:
 
 
   Test_deb_package:
+    if: ${{ always() }}
     needs: Package_repository_setup_and_test
     runs-on: ubuntu-18.04
+
     steps:
     - name: Create a clean ubuntu container
       run: docker run -itd --name=ubuntu ubuntu:18.04
+
+    - name: Get occlum version from user inputs
+      run: echo "OCCLUM_VERSION=${{github.event.inputs.test_version}}" >> $GITHUB_ENV
+
+    - name: Update occlum version from previous job
+      if: github.event.inputs.only_test == 'N'
+      run: echo "OCCLUM_VERSION=${{needs.Package_repository_setup_and_test.outputs.occlum_version}}" >> $GITHUB_ENV
 
     - name: Configure sgx and occlum deb repo
       run: |
@@ -115,19 +141,32 @@ jobs:
             wget -qO - https://occlum.io/occlum-package-repos/debian/public.key | apt-key add -;"
 
     - name: Install sgx dependencies and occlum
-      run: docker exec ubuntu bash -c "apt-get update; apt-cache policy occlum; apt-get install -y occlum libsgx-uae-service libsgx-dcap-ql"
+      run: docker exec ubuntu bash -c "apt-get update; apt-cache policy occlum | grep -n5 ${{ env.OCCLUM_VERSION }} && apt-get install -y occlum libsgx-uae-service libsgx-dcap-ql"
 
     - name: Hello world test
       run: docker exec ubuntu bash -c "source /etc/profile; cd /root; wget https://raw.githubusercontent.com/occlum/occlum/master/demos/hello_c/hello_world.c; occlum-gcc -o hello_world hello_world.c;
             occlum new occlum-instance; cp hello_world /root/occlum-instance/image/bin; cd /root/occlum-instance && SGX_MODE=SIM occlum build; occlum run /bin/hello_world"
 
+    # If there is no match, it will return 1.
+    - name: Check installed version
+      run: docker exec ubuntu bash -c "cat /opt/occlum/include/occlum_version.h | grep -n5 ${{ env.OCCLUM_VERSION }}"
+
 
   Test_rpm_package:
+    if: ${{ always() }}
     needs: Package_repository_setup_and_test
     runs-on: ubuntu-18.04
+
     steps:
     - name: Create clean centos container
       run: docker run -itd --name=centos centos:centos8.2.2004
+
+    - name: Get occlum version from user inputs
+      run: echo "OCCLUM_VERSION=${{github.event.inputs.test_version}}" >> $GITHUB_ENV
+
+    - name: Update occlum version from previous job
+      if: github.event.inputs.only_test == 'N'
+      run: echo "OCCLUM_VERSION=${{needs.Package_repository_setup_and_test.outputs.occlum_version}}" >> $GITHUB_ENV
 
     - name: Install sgx dependencies
       run: docker exec centos bash -c "yum install -y wget yum-utils make jq gdb; cd /root && wget https://download.01.org/intel-sgx/sgx-linux/2.13.3/distro/centos8.2-server/sgx_rpm_local_repo.tgz;
@@ -146,8 +185,12 @@ jobs:
         gpgkey=https://occlum.io/occlum-package-repos/rpm-repo/RPM-GPG-KEY-rpm-sign
         gpgcakey=https://occlum.io/occlum-package-repos/rpm-repo/RPM-GPG-KEY-rpm-sign-ca
         EOF"
-        docker exec centos bash -c "yum --showduplicate list -y occlum; yum install -y occlum"
+        docker exec centos bash -c "yum --showduplicate list -y occlum | grep -n5 ${{ env.OCCLUM_VERSION }} && yum install -y occlum"
 
     - name: Hello world test
       run: docker exec centos bash -c "source /etc/profile; cd /root; rm -rf hello_world*; wget https://raw.githubusercontent.com/occlum/occlum/master/demos/hello_c/hello_world.c; occlum-gcc -o hello_world hello_world.c;
             occlum new occlum-instance; cp hello_world /root/occlum-instance/image/bin; cd /root/occlum-instance && SGX_MODE=SIM occlum build; occlum run /bin/hello_world"
+
+    # If there is no match, it will return 1.
+    - name: Check installed version
+      run: docker exec centos bash -c "cat /opt/occlum/include/occlum_version.h | grep -n5 ${{ env.OCCLUM_VERSION }}"
