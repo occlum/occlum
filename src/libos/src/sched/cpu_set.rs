@@ -20,8 +20,10 @@ pub struct CpuSet {
 
 impl CpuSet {
     /// Returns the length of a CPU set in bytes.
+    ///
+    /// The length must be an integer multiple of sizeof(long) in Linux.
     pub fn len() -> usize {
-        align_up(Self::ncores(), 8) / 8
+        align_up(align_up(Self::ncores(), 8) / 8, 8)
     }
 
     /// Returns the number CPU of cores in a CPU set.

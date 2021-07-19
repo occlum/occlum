@@ -14,11 +14,6 @@ pub fn do_sched_getaffinity(pid: pid_t, buf_size: size_t, buf_ptr: *mut u8) -> R
             return_errno!(EINVAL, "buf size is not big enough");
         }
 
-        // Linux stores the cpumask in an array of "unsigned long" so the buffer needs to be
-        // multiple of unsigned long. However, Occlum doesn't have this restriction.
-        if (buf_size & (std::mem::size_of::<u64>() - 1) != 0) {
-            warn!("cpuset buf size is not a multiple of unsigned long");
-        }
         CpuSet::len()
     };
     let mut buf_slice = {
