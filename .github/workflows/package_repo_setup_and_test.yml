@@ -115,11 +115,15 @@ jobs:
             wget -qO - https://occlum.io/occlum-package-repos/debian/public.key | apt-key add -;"
 
     - name: Install sgx dependencies and occlum
-      run: docker exec ubuntu bash -c "apt-get update; apt-cache policy occlum; apt-get install -y occlum libsgx-uae-service libsgx-dcap-ql"
+      run: docker exec ubuntu bash -c "apt-get update; apt-cache policy occlum | grep -n5 ${{ env.OCCLUM_VERSION }} && apt-get install -y occlum libsgx-uae-service libsgx-dcap-ql"
 
     - name: Hello world test
       run: docker exec ubuntu bash -c "source /etc/profile; cd /root; wget https://raw.githubusercontent.com/occlum/occlum/master/demos/hello_c/hello_world.c; occlum-gcc -o hello_world hello_world.c;
             occlum new occlum-instance; cp hello_world /root/occlum-instance/image/bin; cd /root/occlum-instance && SGX_MODE=SIM occlum build; occlum run /bin/hello_world"
+
+    # If there is no match, it will return 1.
+    - name: Check installed version
+      run: docker exec ubuntu bash -c "cat /opt/occlum/include/occlum_version.h | grep -n5 ${{ env.OCCLUM_VERSION }}"
 
 
   Test_rpm_package:
@@ -146,8 +150,12 @@ jobs:
         gpgkey=https://occlum.io/occlum-package-repos/rpm-repo/RPM-GPG-KEY-rpm-sign
         gpgcakey=https://occlum.io/occlum-package-repos/rpm-repo/RPM-GPG-KEY-rpm-sign-ca
         EOF"
-        docker exec centos bash -c "yum --showduplicate list -y occlum; yum install -y occlum"
+        docker exec centos bash -c "yum --showduplicate list -y occlum | grep -n5 ${{ env.OCCLUM_VERSION }} && yum install -y occlum"
 
     - name: Hello world test
       run: docker exec centos bash -c "source /etc/profile; cd /root; rm -rf hello_world*; wget https://raw.githubusercontent.com/occlum/occlum/master/demos/hello_c/hello_world.c; occlum-gcc -o hello_world hello_world.c;
             occlum new occlum-instance; cp hello_world /root/occlum-instance/image/bin; cd /root/occlum-instance && SGX_MODE=SIM occlum build; occlum run /bin/hello_world"
+
+    # If there is no match, it will return 1.
+    - name: Check installed version
+      run: docker exec centos bash -c "cat /opt/occlum/include/occlum_version.h | grep -n5 ${{ env.OCCLUM_VERSION }}"
