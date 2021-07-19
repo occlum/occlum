@@ -53,6 +53,7 @@ extern crate serde;
 extern crate serde_json;
 #[macro_use]
 extern crate memoffset;
+extern crate resolv_conf;
 
 use sgx_trts::libc;
 use sgx_types::*;
