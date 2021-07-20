@@ -1,6 +1,6 @@
 use super::*;
 use crate::process::table::get_process;
-use crate::process::ProcessRef;
+use crate::process::{ProcessRef, ProcessStatus};
 
 pub struct LockedPidDirINode(RwLock<PidDirINode>);
 
@@ -41,7 +41,9 @@ impl LockedPidDirINode {
         // root
         let root_inode = ProcRootSymINode::new(&file.process_ref);
         file.entries.insert(String::from("root"), root_inode);
-
+        // comm
+        let comm_inode = ProcCommINode::new(&file.process_ref);
+        file.entries.insert(String::from("comm"), comm_inode);
         Ok(())
     }
 }
@@ -136,7 +138,15 @@ impl ProcCmdlineINode {
 
 impl ProcINode for ProcCmdlineINode {
     fn generate_data_in_bytes(&self) -> vfs::Result<Vec<u8>> {
-        Ok(self.0.exec_path().to_owned().into_bytes())
+        let cmdline = if let ProcessStatus::Zombie = self.0.status() {
+            Vec::new()
+        } else {
+            // Null-terminated bytes
+            std::ffi::CString::new(self.0.exec_path())
+                .expect("failed to new CString")
+                .into_bytes_with_nul()
+        };
+        Ok(cmdline)
     }
 }
 
@@ -183,6 +193,24 @@ impl ProcINode for ProcRootSymINode {
         let main_thread = self.0.main_thread().ok_or(FsError::EntryNotFound)?;
         let fs = main_thread.fs().read().unwrap();
         Ok(fs.root().to_owned().into_bytes())
+    }
+}
+
+pub struct ProcCommINode(ProcessRef);
+
+impl ProcCommINode {
+    pub fn new(process_ref: &ProcessRef) -> Arc<dyn INode> {
+        Arc::new(File::new(Self(Arc::clone(process_ref))))
+    }
+}
+
+impl ProcINode for ProcCommINode {
+    fn generate_data_in_bytes(&self) -> vfs::Result<Vec<u8>> {
+        let main_thread = self.0.main_thread().ok_or(FsError::EntryNotFound)?;
+        let mut comm = main_thread.name().as_c_str().to_bytes().to_vec();
+        // Add '\n' at the end to make the result same with Linux
+        comm.push(b'\n');
+        Ok(comm)
     }
 }
 

@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <sys/types.h>
 #include <sys/vfs.h>
 #include <fcntl.h>
@@ -10,7 +11,8 @@
 // Helper variable and function
 // ============================================================================
 
-const char **g_argv;
+// Contains the name that was used to invoke the calling program
+extern char *program_invocation_short_name;
 
 static int test_readlink_from_procfs(const char *proc_inode, char *buf, int buf_size,
                                      const char *expected_target) {
@@ -36,7 +38,8 @@ static int test_readlink_from_proc_self_exe() {
     char absolute_path[PATH_MAX] = { 0 };
     const char *proc_exe = "/proc/self/exe";
 
-    int n = snprintf(absolute_path, sizeof(absolute_path), "/bin/%s", *g_argv);
+    int n = snprintf(absolute_path, sizeof(absolute_path), "/bin/%s",
+                     program_invocation_short_name);
     if (n < 0) {
         THROW_ERROR("failed to call snprintf");
     }
@@ -94,12 +97,40 @@ static int test_read_from_proc_self_cmdline() {
     char absolute_path[PATH_MAX] = { 0 };
     const char *proc_cmdline = "/proc/self/cmdline";
 
-    int n = snprintf(absolute_path, sizeof(absolute_path), "/bin/%s", *g_argv);
+    int n = snprintf(absolute_path, sizeof(absolute_path), "/bin/%s",
+                     program_invocation_short_name);
     if (n < 0) {
         THROW_ERROR("failed to call snprintf");
     }
-    if (fs_check_file_content(proc_cmdline, absolute_path) < 0) {
+    char read_buf[PATH_MAX] = { 0 };
+    int fd = open(proc_cmdline, O_RDONLY);
+    size_t len = read(fd, read_buf, sizeof(read_buf));
+    if (len != strlen(absolute_path) + 1) {
+        THROW_ERROR("failed check the return value of reading from %s", proc_cmdline);
+    }
+    if (read_buf[strlen(absolute_path)] != '\0') {
+        THROW_ERROR("failed check the buffer of reading from %s", proc_cmdline);
+    }
+    if (strcmp(absolute_path, read_buf) != 0) {
         THROW_ERROR("failed to check result in %s", proc_cmdline);
+    }
+    close(fd);
+    return 0;
+}
+
+static int test_read_from_proc_self_comm() {
+    // The name can be up to 16 bytes long, including the terminating null byte.
+    char comm_name[16] = { 0 };
+    const char *proc_comm = "/proc/self/comm";
+
+    if (snprintf(comm_name, sizeof(comm_name), "%s", program_invocation_short_name) < 0) {
+        THROW_ERROR("failed to call snprintf");
+    }
+    // The last byte shoud be '\n'
+    int end_idx = strlen(comm_name);
+    comm_name[end_idx] = '\n';
+    if (fs_check_file_content(proc_comm, comm_name) < 0) {
+        THROW_ERROR("failed to check result in %s", proc_comm);
     }
 
     return 0;
@@ -169,12 +200,12 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_readlink_from_proc_self_root),
     TEST_CASE(test_create_and_unlink_file_from_proc_self_root),
     TEST_CASE(test_read_from_proc_self_cmdline),
+    TEST_CASE(test_read_from_proc_self_comm),
     TEST_CASE(test_read_from_proc_meminfo),
     TEST_CASE(test_read_from_proc_cpuinfo),
     TEST_CASE(test_statfs),
 };
 
 int main(int argc, const char *argv[]) {
-    g_argv = argv;
     return test_suite_run(test_cases, ARRAY_SIZE(test_cases));
 }
