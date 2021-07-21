@@ -21,13 +21,28 @@ impl VMLayout {
         }
     }
 
-    pub fn extend(&mut self, more_space: &VMLayout) -> &mut Self {
+    // This is used to add "more_space" to VM layout
+    pub fn add(&mut self, more_space: &VMLayout) -> &mut Self {
         if more_space.size == 0 {
             return self;
         }
 
         self.size = align_up(self.size, more_space.align) + more_space.size;
         self.align = max(self.align, more_space.align);
+        self
+    }
+
+    // This is used to get the bigger and aligned VM layout
+    pub fn extend(&mut self, new_space: &VMLayout) -> &mut Self {
+        if new_space.size == 0 {
+            return self;
+        }
+
+        self.align = max(self.align, new_space.align);
+        self.size = {
+            let size = max(self.size, new_space.size);
+            align_up(size, self.align)
+        };
         self
     }
 
