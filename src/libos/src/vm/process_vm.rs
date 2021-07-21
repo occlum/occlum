@@ -108,11 +108,7 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
 
         // Now that we end up with the memory layout required by the process,
         // let's allocate the memory for the process
-        let process_range = {
-            // TODO: ensure alignment through USER_SPACE_VM_MANAGER, not by
-            // preserving extra space for alignment
-            USER_SPACE_VM_MANAGER.alloc(process_layout.align() + process_layout.size())?
-        };
+        let process_range = { USER_SPACE_VM_MANAGER.alloc(process_layout)? };
         let process_base = process_range.range().start();
         // Use the vm_manager to manage the whole process VM (including mmap region)
         let mut vm_manager = VMManager::from(process_base, process_range.range().size())?;
