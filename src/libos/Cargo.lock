@@ -2,7 +2,7 @@
 # It is not intended for manual editing.
 [[package]]
 name = "Occlum"
-version = "0.23.3"
+version = "0.23.4"
 dependencies = [
  "aligned",
  "atomic",
@@ -411,6 +411,7 @@ dependencies = [
 name = "rcore-fs"
 version = "0.1.0"
 dependencies = [
+ "bitflags",
  "spin",
 ]
 
