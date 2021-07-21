@@ -248,7 +248,8 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
                 );
 
                 // Set the remaining part to zero based on alignment
-                empty_end_offset = align_up(mem_start_offset + file_size, alignment);
+                debug_assert!(file_size <= mem_size);
+                empty_end_offset = align_up(mem_start_offset + mem_size, alignment);
                 for b in &mut elf_proc_buf[mem_start_offset + file_size..empty_end_offset] {
                     *b = 0;
                 }
