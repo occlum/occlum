@@ -101,7 +101,7 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
         let process_layout = elf_layouts.iter().chain(other_layouts.iter()).fold(
             VMLayout::new_empty(),
             |mut process_layout, sub_layout| {
-                process_layout.extend(&sub_layout);
+                process_layout.add(&sub_layout);
                 process_layout
             },
         );
