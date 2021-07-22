@@ -101,18 +101,14 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
         let process_layout = elf_layouts.iter().chain(other_layouts.iter()).fold(
             VMLayout::new_empty(),
             |mut process_layout, sub_layout| {
-                process_layout.extend(&sub_layout);
+                process_layout.add(&sub_layout);
                 process_layout
             },
         );
 
         // Now that we end up with the memory layout required by the process,
         // let's allocate the memory for the process
-        let process_range = {
-            // TODO: ensure alignment through USER_SPACE_VM_MANAGER, not by
-            // preserving extra space for alignment
-            USER_SPACE_VM_MANAGER.alloc(process_layout.align() + process_layout.size())?
-        };
+        let process_range = { USER_SPACE_VM_MANAGER.alloc(process_layout)? };
         let process_base = process_range.range().start();
         // Use the vm_manager to manage the whole process VM (including mmap region)
         let mut vm_manager = VMManager::from(process_base, process_range.range().size())?;
@@ -248,7 +244,7 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
                 );
 
                 // Set the remaining part to zero based on alignment
-                empty_end_offset = align_up(mem_start_offset + file_size, alignment);
+                empty_end_offset = align_up(mem_start_offset + max(file_size, mem_size), alignment);
                 for b in &mut elf_proc_buf[mem_start_offset + file_size..empty_end_offset] {
                     *b = 0;
                 }
