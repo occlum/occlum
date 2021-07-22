@@ -75,6 +75,14 @@ impl PendingSigWaiter {
         let waiter = Waiter::new();
         loop {
             if *timeout == Duration::new(0, 0) {
+                // When timeout is reached, it is possible that there is actually an interesting
+                // signal in the queue, but timeout happens slightly before being interrupted.
+                // So here we attempt to dequeue again before returning with timeout.
+                if let Some(signal) =
+                    dequeue_pending_signal(&self.interest, &self.thread, &self.process)
+                {
+                    return Ok(signal);
+                }
                 return_errno!(ETIMEDOUT, "timeout");
             }
 
