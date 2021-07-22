@@ -1,0 +1,2 @@
+[workspace]
+members = ["generate_bom", "copy_bom", "update_bom", "bom_core"]
