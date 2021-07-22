@@ -199,6 +199,9 @@ fn clone_file_actions_from_fa_safely(fa_ptr: *const SpawnFileActions) -> Result<
         let fa = unsafe { &*fa_ptr };
         let sa_ptr = fa.actions;
         let sa_len = fa.used as usize;
+        if (sa_ptr == std::ptr::null() && sa_len == 0) {
+            return Ok(file_actions);
+        }
         check_array(sa_ptr, sa_len)?;
         unsafe { std::slice::from_raw_parts(sa_ptr, sa_len) }
     };
