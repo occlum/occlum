@@ -640,3 +640,29 @@ jobs:
       run: |
         sleep ${{ env.nap_time }};
         docker exec sofaboot_test bash -c "curl http://localhost:8080/actuator/versions"
+
+  spark_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
+
+    - name: Create container
+      run: docker run -itd --name=spark_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+
+    - name: Build dependencies
+      run: docker exec spark_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec spark_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+
+    - name: prepare the spark package
+      run: docker exec spark_test bash -c "cd /root/occlum/demos/spark/spark_local && ./prepare_spark_package.sh"
+
+
+    - name: Run spark test
+      run: docker exec spark_test bash -c "cd /root/occlum/demos/spark/spark_local && SGX_MODE=SIM ./run_spark_on_occlum_glibc.sh"
