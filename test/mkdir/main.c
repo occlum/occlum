@@ -1,4 +1,5 @@
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <errno.h>
 #include <fcntl.h>
 #include "test_fs.h"
@@ -115,6 +116,15 @@ static int __test_chdir(const char *dir_path) {
     }
     if (strcmp(buf, dir_path)) {
         THROW_ERROR("the cwd is incorrect after chdir");
+    }
+
+    // Check getcwd via explicit syscall
+    int ret = syscall(__NR_getcwd, buf, sizeof(buf));
+    if (ret < 0) {
+        THROW_ERROR("failed to call via explicit syscall");
+    }
+    if (ret != strlen(dir_path) + 1) {
+        THROW_ERROR("failed to check the return value from kernel");
     }
     return 0;
 }
