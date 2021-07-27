@@ -23,14 +23,14 @@ use util::mem_util::from_user::*;
 use crate::exception::do_handle_exception;
 use crate::fs::{
     do_access, do_chdir, do_chmod, do_chown, do_close, do_dup, do_dup2, do_dup3, do_eventfd,
-    do_eventfd2, do_faccessat, do_fallocate, do_fchmod, do_fchmodat, do_fchown, do_fchownat,
-    do_fcntl, do_fdatasync, do_fstat, do_fstatat, do_fstatfs, do_fsync, do_ftruncate, do_getcwd,
-    do_getdents, do_getdents64, do_ioctl, do_lchown, do_link, do_linkat, do_lseek, do_lstat,
-    do_mkdir, do_mkdirat, do_mount_rootfs, do_open, do_openat, do_pipe, do_pipe2, do_pread,
-    do_pwrite, do_read, do_readlink, do_readlinkat, do_readv, do_rename, do_renameat, do_rmdir,
-    do_sendfile, do_stat, do_statfs, do_symlink, do_symlinkat, do_sync, do_timerfd_create,
-    do_timerfd_gettime, do_timerfd_settime, do_truncate, do_unlink, do_unlinkat, do_write,
-    do_writev, iovec_t, AsTimer, File, FileDesc, FileRef, HostStdioFds, Stat, Statfs,
+    do_eventfd2, do_faccessat, do_fallocate, do_fchdir, do_fchmod, do_fchmodat, do_fchown,
+    do_fchownat, do_fcntl, do_fdatasync, do_fstat, do_fstatat, do_fstatfs, do_fsync, do_ftruncate,
+    do_getcwd, do_getdents, do_getdents64, do_ioctl, do_lchown, do_link, do_linkat, do_lseek,
+    do_lstat, do_mkdir, do_mkdirat, do_mount_rootfs, do_open, do_openat, do_pipe, do_pipe2,
+    do_pread, do_pwrite, do_read, do_readlink, do_readlinkat, do_readv, do_rename, do_renameat,
+    do_rmdir, do_sendfile, do_stat, do_statfs, do_symlink, do_symlinkat, do_sync,
+    do_timerfd_create, do_timerfd_gettime, do_timerfd_settime, do_truncate, do_unlink, do_unlinkat,
+    do_write, do_writev, iovec_t, AsTimer, File, FileDesc, FileRef, HostStdioFds, Stat, Statfs,
 };
 use crate::interrupt::{do_handle_interrupt, sgx_interrupt_info_t};
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t};
@@ -167,7 +167,7 @@ macro_rules! process_syscall_table_with_callback {
             (Getdents = 78) => do_getdents(fd: FileDesc, buf: *mut u8, buf_size: usize),
             (Getcwd = 79) => do_getcwd(buf: *mut u8, size: usize),
             (Chdir = 80) => do_chdir(path: *const i8),
-            (Fchdir = 81) => handle_unsupported(),
+            (Fchdir = 81) => do_fchdir(fd: FileDesc),
             (Rename = 82) => do_rename(oldpath: *const i8, newpath: *const i8),
             (Mkdir = 83) => do_mkdir(path: *const i8, mode: usize),
             (Rmdir = 84) => do_rmdir(path: *const i8),
