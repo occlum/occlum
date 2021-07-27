@@ -1,8 +1,8 @@
 use super::event_file::EventCreationFlags;
 use super::file_ops;
 use super::file_ops::{
-    AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath, LinkFlags,
-    StatFlags, UnlinkFlags, AT_FDCWD,
+    get_abs_path_by_fd, AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd,
+    FsPath, LinkFlags, StatFlags, UnlinkFlags, AT_FDCWD,
 };
 use super::fs_ops;
 use super::time::{clockid_t, itimerspec_t, ClockID};
@@ -358,6 +358,12 @@ pub fn do_chdir(path: *const i8) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
+    fs_ops::do_chdir(&path)?;
+    Ok(0)
+}
+
+pub fn do_fchdir(fd: FileDesc) -> Result<isize> {
+    let path = get_abs_path_by_fd(fd)?;
     fs_ops::do_chdir(&path)?;
     Ok(0)
 }

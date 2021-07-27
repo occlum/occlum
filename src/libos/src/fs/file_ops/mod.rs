@@ -10,7 +10,7 @@ pub use self::fallocate::do_fallocate;
 pub use self::fcntl::{do_fcntl, FcntlCmd};
 pub use self::file_flags::{AccessMode, CreationFlags, StatusFlags};
 pub use self::flock::{Flock, FlockType};
-pub use self::fspath::{FsPath, AT_FDCWD};
+pub use self::fspath::{get_abs_path_by_fd, FsPath, AT_FDCWD};
 pub use self::fsync::{do_fdatasync, do_fsync};
 pub use self::getdents::{do_getdents, do_getdents64};
 pub use self::ioctl::{
