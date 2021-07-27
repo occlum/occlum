@@ -1,12 +1,7 @@
-## Spark 2.4.3 local test:
+## Spark 3.0.0 local test:
 ```
-1. enter the 0.23 occlum container
-2.apt-get update &&/
-  apt-get install -y openjdk-11-jdk
-3. wget https://archive.apache.org/dist/spark/spark-2.4.3/spark-2.4.3-bin-hadoop2.7.tgz
-4. tar -xvzf spark-2.4.3-bin-hadoop2.7.tgz
-5. replace the spark-network-common_2.11-2.4.3.jar
-6. ./run_spark_on_occlum_glibc.sh test
+1. ./prepare_spark_package.sh
+2. ./run_spark_on_occlum_glibc.sh test
 ```
 
 ### Enable Spark 3.0.0 in occlum with K8S
