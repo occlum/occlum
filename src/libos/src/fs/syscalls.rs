@@ -369,14 +369,15 @@ pub fn do_getcwd(buf_ptr: *mut u8, size: usize) -> Result<isize> {
     };
 
     let cwd = fs_ops::do_getcwd()?;
-
     if cwd.len() + 1 > buf.len() {
         return_errno!(ERANGE, "buf is not long enough");
     }
     buf[..cwd.len()].copy_from_slice(cwd.as_bytes());
-    buf[cwd.len()] = 0;
+    buf[cwd.len()] = b'\0';
 
-    Ok(buf.len() as isize)
+    // The user-level library returns the pointer of buffer, the kernel just returns
+    // the length of the buffer filled (which includes the ending '\0' character).
+    Ok((cwd.len() + 1) as isize)
 }
 
 pub fn do_rename(oldpath: *const i8, newpath: *const i8) -> Result<isize> {
