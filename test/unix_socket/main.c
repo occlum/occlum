@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <spawn.h>
 #include <string.h>
-#include <spawn.h>
 
 #include "test.h"
 

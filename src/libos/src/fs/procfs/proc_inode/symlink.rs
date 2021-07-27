@@ -25,7 +25,7 @@ where
     fn metadata(&self) -> vfs::Result<Metadata> {
         Ok(Metadata {
             dev: 0,
-            inode: 0,
+            inode: PROC_INO,
             size: 0,
             blk_size: 0,
             blocks: 0,
