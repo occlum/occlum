@@ -3,6 +3,7 @@ use alloc::sync::{Arc, Weak};
 use rcore_fs::vfs;
 
 use crate::process::pid_t;
+use crate::process::table::get_all_processes;
 
 use self::cpuinfo_inode::CpuInfoINode;
 use self::meminfo_inode::MemInfoINode;
@@ -18,6 +19,11 @@ mod self_inode;
 
 // Same with the procfs on Linux
 const PROC_SUPER_MAGIC: usize = 0x9fa0;
+
+// Use the same inode number for all the inodes in procfs, the value is
+// arbitrarily chosen, and it should not be zero.
+// TODO: Assign different inode numbers for different inodes
+pub const PROC_INO: usize = 0x63fd_40e5;
 
 /// Proc file system
 pub struct ProcFS {
@@ -55,7 +61,6 @@ impl ProcFS {
         let fs = {
             let root = Arc::new(Dir::new(LockedProcRootINode(RwLock::new(ProcRootINode {
                 non_volatile_entries: HashMap::new(),
-                parent: Weak::default(),
                 this: Weak::default(),
             }))));
             ProcFS {
@@ -86,14 +91,12 @@ struct LockedProcRootINode(RwLock<ProcRootINode>);
 struct ProcRootINode {
     non_volatile_entries: HashMap<String, Arc<dyn INode>>,
     this: Weak<Dir<LockedProcRootINode>>,
-    parent: Weak<Dir<LockedProcRootINode>>,
 }
 
 impl LockedProcRootINode {
     fn init(&self, fs: &Arc<ProcFS>) {
         let mut file = self.0.write().unwrap();
         file.this = Arc::downgrade(&fs.root);
-        file.parent = Arc::downgrade(&fs.root);
         // Currently, we only init the 'cpuinfo', 'meminfo' and 'self' entry.
         // TODO: Add more entries for root.
         // All [pid] entries are lazy-initialized at the find() step.
@@ -116,7 +119,7 @@ impl DirProcINode for LockedProcRootINode {
             return Ok(file.this.upgrade().unwrap());
         }
         if name == ".." {
-            return Ok(file.parent.upgrade().unwrap());
+            return Ok(file.this.upgrade().unwrap());
         }
 
         if let Ok(pid) = name.parse::<pid_t>() {
@@ -135,13 +138,61 @@ impl DirProcINode for LockedProcRootINode {
             1 => Ok(String::from("..")),
             i => {
                 let file = self.0.read().unwrap();
-                if let Some(s) = file.non_volatile_entries.keys().nth(i - 2) {
-                    Ok(s.to_string())
+                if let Some(name) = file.non_volatile_entries.keys().nth(i - 2) {
+                    Ok(name.to_owned())
                 } else {
-                    // TODO: When to iterate the process table ?
-                    Err(FsError::EntryNotFound)
+                    let processes = get_all_processes();
+                    let prior_entries_len = 2 + file.non_volatile_entries.len();
+                    let process = processes
+                        .iter()
+                        .nth(i - prior_entries_len)
+                        .ok_or(FsError::EntryNotFound)?;
+                    Ok(process.pid().to_string())
                 }
             }
         }
+    }
+
+    fn iterate_entries(&self, mut ctx: &mut DirentWriterContext) -> vfs::Result<usize> {
+        let file = self.0.read().unwrap();
+        let mut total_written_len = 0;
+        let idx = ctx.pos();
+
+        // Write first two special entries
+        if idx == 0 {
+            let this_inode = file.this.upgrade().unwrap();
+            write_inode_entry!(&mut ctx, ".", &this_inode, &mut total_written_len);
+        }
+        if idx <= 1 {
+            let parent_inode = file.this.upgrade().unwrap();
+            write_inode_entry!(&mut ctx, "..", &parent_inode, &mut total_written_len);
+        }
+
+        // Write the non volatile entries
+        let skipped = if idx < 2 { 0 } else { idx - 2 };
+        for (name, inode) in file.non_volatile_entries.iter().skip(skipped) {
+            write_inode_entry!(&mut ctx, name, inode, &mut total_written_len);
+        }
+
+        // Write the pid entries
+        let skipped = {
+            let prior_entries_len = 2 + file.non_volatile_entries.len();
+            if idx < prior_entries_len {
+                0
+            } else {
+                idx - prior_entries_len
+            }
+        };
+        for process in get_all_processes().iter().skip(skipped) {
+            write_entry!(
+                &mut ctx,
+                &process.pid().to_string(),
+                PROC_INO,
+                vfs::FileType::Dir,
+                &mut total_written_len
+            );
+        }
+
+        Ok(total_written_len)
     }
 }

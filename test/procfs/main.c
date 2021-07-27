@@ -190,6 +190,57 @@ static int test_statfs() {
     return 0;
 }
 
+static int test_readdir_root() {
+    const char *root = "/proc";
+    char pid[NAME_MAX] = { 0 };
+    snprintf(pid, sizeof(pid), "%d", getpid());
+    char expected_entries[4][NAME_MAX] = {
+        "self",
+        "meminfo",
+        "cpuinfo",
+        { *pid },
+    };
+
+    if (check_readdir_with_expected_entries(root, expected_entries, 4) < 0) {
+        THROW_ERROR("failed to test readdir %s", root);
+    }
+
+    return 0;
+}
+
+static int test_readdir_self() {
+    const char *self = "/proc/self";
+    char expected_entries[6][NAME_MAX] = {
+        "exe",
+        "cwd",
+        "root",
+        "fd",
+        "comm",
+        "cmdline",
+    };
+
+    if (check_readdir_with_expected_entries(self, expected_entries, 6) < 0) {
+        THROW_ERROR("failed to test readdir %s", self);
+    }
+
+    return 0;
+}
+
+static int test_readdir_self_fd() {
+    const char *self_fd = "/proc/self/fd";
+    char expected_entries[3][NAME_MAX] = {
+        "0",
+        "1",
+        "2",
+    };
+
+    if (check_readdir_with_expected_entries(self_fd, expected_entries, 3) < 0) {
+        THROW_ERROR("failed to test readdir %s", self_fd);
+    }
+
+    return 0;
+}
+
 // ============================================================================
 // Test suite main
 // ============================================================================
@@ -204,6 +255,9 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_read_from_proc_meminfo),
     TEST_CASE(test_read_from_proc_cpuinfo),
     TEST_CASE(test_statfs),
+    TEST_CASE(test_readdir_root),
+    TEST_CASE(test_readdir_self),
+    TEST_CASE(test_readdir_self_fd),
 };
 
 int main(int argc, const char *argv[]) {

@@ -94,6 +94,16 @@ impl FileTable {
         }
     }
 
+    pub fn fds(&self) -> Vec<FileDesc> {
+        let table = &self.table;
+        table
+            .iter()
+            .enumerate()
+            .filter(|(_, opt)| opt.is_some())
+            .map(|(idx, _)| idx as FileDesc)
+            .collect()
+    }
+
     pub fn get(&self, fd: FileDesc) -> Result<FileRef> {
         let entry = self.get_entry(fd)?;
         Ok(entry.file.clone())
