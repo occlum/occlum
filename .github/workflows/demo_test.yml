@@ -352,6 +352,32 @@ jobs:
         fi
 
 
+  Tensorflow_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
+
+    - name: Create container
+      run: docker run -itd --cpuset-cpus="0" --name=tensorflow_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+
+    - name: Build dependencies
+      run: docker exec tensorflow_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec tensorflow_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+
+    - name: Build python and tensorflow
+      run: docker exec tensorflow_test bash -c "cd /root/occlum/demos/tensorflow/tensorflow_training; ./install_python_with_conda.sh"
+
+    - name: Run tensorflow test
+      run: docker exec tensorflow_test bash -c "cd /root/occlum/demos/tensorflow/tensorflow_training; SGX_MODE=SIM ./run_tensorflow_on_occlum.sh 2>&1 | tee /root/occlum/log"
+
+
 # Below tests needs test image to run faster
   Grpc_test:
     runs-on: ubuntu-18.04
