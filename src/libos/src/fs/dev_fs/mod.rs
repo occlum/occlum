@@ -6,12 +6,14 @@ use rcore_fs_devfs::DevFS;
 use rcore_fs_mountfs::MountFS;
 use rcore_fs_ramfs::RamFS;
 
+use self::dev_fd::DevFd;
 use self::dev_null::DevNull;
 use self::dev_random::DevRandom;
 use self::dev_sgx::DevSgx;
 use self::dev_shm::DevShm;
 use self::dev_zero::DevZero;
 
+mod dev_fd;
 mod dev_null;
 mod dev_random;
 mod dev_sgx;
@@ -33,6 +35,8 @@ pub fn init_devfs() -> Result<Arc<MountFS>> {
     devfs.add("sgx", dev_sgx)?;
     let dev_shm = Arc::new(DevShm) as _;
     devfs.add("shm", dev_shm)?;
+    let dev_fd = Arc::new(DevFd) as _;
+    devfs.add("fd", dev_fd);
     let mountable_devfs = MountFS::new(devfs);
     // Mount the ramfs at '/shm'
     let ramfs = RamFS::new();
