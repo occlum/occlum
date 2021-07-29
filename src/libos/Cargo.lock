@@ -19,6 +19,7 @@ dependencies = [
  "rcore-fs-ramfs",
  "rcore-fs-sefs",
  "rcore-fs-unionfs",
+ "resolv-conf",
  "ringbuf",
  "scroll",
  "serde",
@@ -287,6 +288,11 @@ version = "0.1.0"
 source = "git+https://github.com/mesalock-linux/sgx-fake-profiler-builtins#37b585ce50ce53a74d57b8aee7f6344765846ac1"
 
 [[package]]
+name = "quick-error"
+version = "1.2.2"
+source = "git+https://github.com/mesalock-linux/quick-error-sgx.git#468bf2cce746f34dd3df8c1c5b4a5a6494914d36"
+
+[[package]]
 name = "quote"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -469,6 +475,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "678054eb77286b51581ba43620cc911abf02758c91f93f479767aed0f90458b2"
 dependencies = [
  "rand_core 0.3.1",
+]
+
+[[package]]
+name = "resolv-conf"
+version = "0.7.0"
+dependencies = [
+ "quick-error",
+ "sgx_tstd",
 ]
 
 [[package]]
