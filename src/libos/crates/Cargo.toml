@@ -9,6 +9,7 @@ members = [
     "errno",
     "host-socket",
     "io-uring-callback",
+    "keyable-arc",
     "object-id",
     "sgx-untrusted-alloc",
     "vdso-time",
@@ -21,6 +22,7 @@ default-members = [
     "async-socket",
     "inherit-methods-macro",
     "io-uring-callback",
+    "keyable-arc",
     "vdso-time",
 ]
 
