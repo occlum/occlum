@@ -100,6 +100,8 @@
 // keyable counterparts.
 
 #![cfg_attr(not(test), no_std)]
+#![feature(coerce_unsized)]
+#![feature(unsize)]
 
 extern crate alloc;
 
@@ -108,7 +110,8 @@ use core::borrow::Borrow;
 use core::convert::AsRef;
 use core::fmt;
 use core::hash::{Hash, Hasher};
-use core::ops::Deref;
+use core::marker::Unsize;
+use core::ops::{CoerceUnsized, Deref};
 
 /// Same as the standard `Arc`, except that it can be used as the key type of a hash table.
 #[repr(transparent)]
@@ -284,6 +287,10 @@ impl<T: ?Sized + fmt::Debug> fmt::Debug for KeyableWeak<T> {
     }
 }
 
+// Enabling type coercing, e.g., converting from `KeyableArc<T>` to `KeyableArc<dyn S>`,
+// where `T` implements `S`.
+impl<T: ?Sized + Unsize<U>, U: ?Sized> CoerceUnsized<KeyableArc<U>> for KeyableArc<T> {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -300,5 +307,30 @@ mod tests {
     fn debug_format() {
         println!("{:?}", KeyableArc::new(1u32));
         println!("{:?}", KeyableWeak::<u32>::new());
+    }
+
+    #[test]
+    fn use_as_key() {
+        use std::collections::HashMap;
+
+        let mut map: HashMap<KeyableArc<u32>, u32> = HashMap::new();
+        let key = KeyableArc::new(1);
+        let val = 1;
+        map.insert(key.clone(), val);
+        assert!(map.get(&key) == Some(&val));
+        assert!(map.remove(&key) == Some(val));
+        assert!(map.keys().count() == 0);
+    }
+
+    #[test]
+    fn as_trait_object() {
+        trait DummyTrait {}
+        struct DummyStruct;
+        impl DummyTrait for DummyStruct {}
+
+        let arc_struct = KeyableArc::new(DummyStruct);
+        let arc_dyn0: KeyableArc<dyn DummyTrait> = arc_struct.clone();
+        let arc_dyn1: KeyableArc<dyn DummyTrait> = arc_struct.clone();
+        assert!(arc_dyn0 == arc_dyn1);
     }
 }
