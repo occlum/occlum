@@ -1,5 +1,5 @@
-mod flags;
 mod file;
+mod flags;
 
-pub use self::flags::{AccessMode, CreationFlags, StatusFlags};
 pub use self::file::{Async, File};
+pub use self::flags::{AccessMode, CreationFlags, StatusFlags};

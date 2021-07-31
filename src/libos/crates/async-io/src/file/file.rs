@@ -1,9 +1,9 @@
 use std::fmt::Debug;
 use std::ops::Deref;
 
-use inherit_methods_macro::inherit_methods;
 use futures::future::{self, BoxFuture};
 use futures::prelude::*;
+use inherit_methods_macro::inherit_methods;
 
 use crate::file::{AccessMode, StatusFlags};
 use crate::poll::{Events, Poller};
@@ -187,6 +187,7 @@ impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
 
 // Implement methods inherited from File
 #[inherit_methods(from = "self.0")]
+#[rustfmt::skip]
 impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
     pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events;
     pub fn status_flags(&self) -> StatusFlags;

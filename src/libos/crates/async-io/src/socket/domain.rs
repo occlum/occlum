@@ -10,8 +10,8 @@ pub enum Domain {
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryFrom;
     use super::*;
+    use std::convert::TryFrom;
 
     #[test]
     fn from_i32() {
