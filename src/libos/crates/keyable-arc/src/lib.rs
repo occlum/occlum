@@ -84,17 +84,32 @@
 //! let key_arc: KeyableArc<u32> = Arc::new(0).into();
 //! let arc: Arc<u32> = KeyableArc::new(0).into();
 //! ```
+//!
+//! # The weak version
+//!
+//! `KeyableWeak<T>` is the weak version of `KeyableArc<T>`, just like `Weak<T>` is
+//! that of `Arc<T>`. And of course, `KeyableWeak<T>` is also _keyable_ for any
+//! type `T`.
+
+// TODO: Add `KeyableBox<T>` or other keyable versions of smart pointers.
+// If this is needed in the future, this crate should be renamed to `keyable`.
+
+// TODO: Add the missing methods offered by `Arc` or `Weak` but not their
+// keyable counterparts.
+
 use std::borrow::Borrow;
 use std::convert::AsRef;
+use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 /// Same as the standard `Arc`, except that it can be used as the key type of a hash table.
 #[repr(transparent)]
 pub struct KeyableArc<T: ?Sized>(Arc<T>);
 
 impl<T> KeyableArc<T> {
+    /// Constructs a new instance of `KeyableArc<T>`.
     #[inline]
     pub fn new(data: T) -> Self {
         Self(Arc::new(data))
@@ -102,9 +117,15 @@ impl<T> KeyableArc<T> {
 }
 
 impl<T: ?Sized> KeyableArc<T> {
+    /// Returns a raw pointer to the object `T` pointed to by this `KeyableArc<T>`.
     #[inline]
     pub fn as_ptr(this: &Self) -> *const T {
         Arc::as_ptr(&this.0)
+    }
+
+    /// Creates a new `KeyableWeak` pointer to this allocation.
+    pub fn downgrade(this: &Self) -> KeyableWeak<T> {
+        Arc::downgrade(&this.0).into()
     }
 }
 
@@ -162,5 +183,116 @@ impl<T: ?Sized> Hash for KeyableArc<T> {
 impl<T: ?Sized> Clone for KeyableArc<T> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
+    }
+}
+
+impl<T: ?Sized + fmt::Debug> fmt::Debug for KeyableArc<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&**self, f)
+    }
+}
+
+//=========================================================
+// The weak version
+//=========================================================
+
+/// The weak counterpart of `KeyableArc<T>`, similar to `Weak<T>`.
+///
+/// `KeyableWeak<T>` is also _keyable_ for any type `T` just like
+/// `KeyableArc<T>`.
+#[repr(transparent)]
+pub struct KeyableWeak<T: ?Sized>(Weak<T>);
+
+impl<T> KeyableWeak<T> {
+    /// Constructs a new `KeyableWeak<T>`, without allocating any memory.
+    /// Calling `upgrade` on the return value always gives `None`.
+    #[inline]
+    pub fn new() -> Self {
+        Self(Weak::new())
+    }
+
+    /// Returns a raw pointer to the object `T` pointed to by this `KeyableWeak<T>`.
+    ///
+    /// The pointer is valid only if there are some strong references.
+    /// The pointer may be dangling, unaligned or even null otherwise.
+    #[inline]
+    pub fn as_ptr(&self) -> *const T {
+        self.0.as_ptr()
+    }
+}
+
+impl<T: ?Sized> KeyableWeak<T> {
+    /// Attempts to upgrade the Weak pointer to an Arc,
+    /// delaying dropping of the inner value if successful.
+    ///
+    /// Returns None if the inner value has since been dropped.
+    #[inline]
+    pub fn upgrade(&self) -> Option<KeyableArc<T>> {
+        self.0.upgrade().map(|arc| arc.into())
+    }
+
+    /// Gets the number of strong pointers pointing to this allocation.
+    #[inline]
+    pub fn strong_count(&self) -> usize {
+        self.0.strong_count()
+    }
+
+    /// Gets the number of weak pointers pointing to this allocation.
+    #[inline]
+    pub fn weak_count(&self) -> usize {
+        self.0.weak_count()
+    }
+}
+
+impl<T> PartialEq for KeyableWeak<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.as_ptr() == other.0.as_ptr()
+    }
+}
+
+impl<T> Eq for KeyableWeak<T> {}
+
+impl<T> Hash for KeyableWeak<T> {
+    fn hash<H: Hasher>(&self, s: &mut H) {
+        self.0.as_ptr().hash(s)
+    }
+}
+
+impl<T: ?Sized> From<Weak<T>> for KeyableWeak<T> {
+    #[inline]
+    fn from(weak: Weak<T>) -> Self {
+        Self(weak)
+    }
+}
+
+impl<T: ?Sized> Into<Weak<T>> for KeyableWeak<T> {
+    #[inline]
+    fn into(self) -> Weak<T> {
+        self.0
+    }
+}
+
+impl<T: ?Sized + fmt::Debug> fmt::Debug for KeyableWeak<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "(KeyableWeak)")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn downgrade_and_upgrade() {
+        let arc = KeyableArc::new(1);
+        let weak = KeyableArc::downgrade(&arc);
+        assert!(arc.clone() == weak.upgrade().unwrap());
+        assert!(weak == KeyableArc::downgrade(&arc));
+    }
+
+    #[test]
+    fn debug_format() {
+        println!("{:?}", KeyableArc::new(1u32));
+        println!("{:?}", KeyableWeak::<u32>::new());
     }
 }
