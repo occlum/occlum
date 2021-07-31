@@ -69,6 +69,7 @@ dependencies = [
  "errno",
  "futures",
  "inherit-methods-macro",
+ "keyable-arc",
  "libc",
  "num_enum",
  "object-id",
@@ -485,6 +486,10 @@ version = "0.4.5"
 dependencies = [
  "sgx_tstd",
 ]
+
+[[package]]
+name = "keyable-arc"
+version = "0.1.0"
 
 [[package]]
 name = "lazy_static"
