@@ -25,6 +25,8 @@
 //! equality and hash of the `KeyableArc<T>` object. As the address won't change for
 //! an immutable `KeyableArc<T>` object, the hash and equality also stay the same.
 //!
+//! This crate is `#[no_std]` compatible, but requires the `alloc` crate.
+//!
 //! # Usage
 //!
 //! Here is a basic example to how that `KeyableArc<T>` is keyable even when `T`
@@ -75,7 +77,7 @@
 //! ```
 //!
 //! `KeyableArc<T>` is simply a wrapper of `Arc<T>. So converting between them
-//! is zero cost.
+//! through the `From` and `Into` traits is zero cost.
 //!
 //! ```rust
 //! use std::sync::Arc;
@@ -97,12 +99,16 @@
 // TODO: Add the missing methods offered by `Arc` or `Weak` but not their
 // keyable counterparts.
 
-use std::borrow::Borrow;
-use std::convert::AsRef;
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::ops::Deref;
-use std::sync::{Arc, Weak};
+#![cfg_attr(not(test), no_std)]
+
+extern crate alloc;
+
+use alloc::sync::{Arc, Weak};
+use core::borrow::Borrow;
+use core::convert::AsRef;
+use core::fmt;
+use core::hash::{Hash, Hasher};
+use core::ops::Deref;
 
 /// Same as the standard `Arc`, except that it can be used as the key type of a hash table.
 #[repr(transparent)]
