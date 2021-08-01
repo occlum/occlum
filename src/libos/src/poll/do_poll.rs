@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::time::Duration;
 
-use async_io::poll::{Events, Pollee, Poller};
+use async_io::event::{Events, Pollee, Poller};
 
 use crate::prelude::*;
 

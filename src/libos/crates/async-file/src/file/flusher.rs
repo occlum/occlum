@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::prelude::v1::*;
 use std::sync::Arc;
 
-use async_io::poll::{Events, Pollee};
+use async_io::event::{Events, Pollee};
 use futures::future::BoxFuture;
 use io_uring_callback::Fd;
 use itertools::Itertools;

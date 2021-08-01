@@ -2,8 +2,6 @@ use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::mem::{size_of, MaybeUninit};
 
-use async_io::poll::{Events, Pollee, Poller};
-use async_io::socket::Addr;
 use io_uring_callback::{Fd, IoHandle};
 use memoffset::offset_of;
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};

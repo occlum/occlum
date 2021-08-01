@@ -1,5 +1,3 @@
-use async_io::socket::Addr;
-
 use self::recv::Receiver;
 use self::send::Sender;
 use super::Common;

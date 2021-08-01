@@ -1,6 +1,3 @@
-use async_io::poll::Pollee;
-use async_io::socket::Addr;
-
 use super::Common;
 use crate::prelude::*;
 use crate::runtime::Runtime;

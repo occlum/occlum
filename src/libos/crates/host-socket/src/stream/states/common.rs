@@ -1,7 +1,5 @@
 use std::marker::PhantomData;
 
-use async_io::poll::{Events, Pollee};
-use async_io::socket::Addr;
 use io_uring_callback::IoUring;
 cfg_if::cfg_if! {
     if #[cfg(feature = "sgx")] {

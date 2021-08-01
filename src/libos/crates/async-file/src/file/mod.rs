@@ -5,8 +5,8 @@ use std::marker::PhantomData;
 use std::prelude::v1::*;
 use std::sync::{Arc, Weak};
 
+use async_io::event::{Events, Pollee, Poller};
 use async_io::file::{Async, File, SeekFrom};
-use async_io::poll::{Events, Pollee, Poller};
 use async_io::prelude::{Result, *};
 use futures::future::BoxFuture;
 use futures::prelude::*;

@@ -5,8 +5,8 @@ use futures::future::{self, BoxFuture};
 use futures::prelude::*;
 use inherit_methods_macro::inherit_methods;
 
+use crate::event::{Events, Pollee, Poller};
 use crate::file::{AccessMode, StatusFlags};
-use crate::poll::{Events, Poller};
 use crate::prelude::*;
 
 /// An abstract for file APIs.
@@ -228,7 +228,6 @@ mod tests {
 
     mod dummy_files {
         use super::*;
-        use crate::poll::Pollee;
 
         #[derive(Debug)]
         pub struct FooFile {

@@ -2,8 +2,6 @@ use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::ptr::{self};
 
-use async_io::poll::{Events, Poller};
-use async_io::socket::Addr;
 use io_uring_callback::{Fd, IoHandle};
 use memoffset::offset_of;
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};

@@ -14,6 +14,9 @@ cfg_if::cfg_if! {
 // Convenient type alises for internal uses.
 pub(crate) type HostFd = u32;
 
+pub(crate) use async_io::event::{Events, Pollee, Poller};
+pub(crate) use async_io::socket::{Addr, Domain};
+
 macro_rules! function {
     () => {{
         fn f() {}

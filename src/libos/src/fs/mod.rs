@@ -9,12 +9,12 @@ use std::mem::MaybeUninit;
 use std::path::Path;
 use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
 
+pub use async_io::event::{Events, Pollee, Poller};
 pub use async_io::file::{AccessMode, CreationFlags, File, StatusFlags};
 pub use async_io::fs::{
     FileMode, FileSystem, FileType, FsError, INode, Metadata, SeekFrom, StatBuf, StatFlags,
     StatMode, Timespec, PATH_MAX,
 };
-pub use async_io::poll::{Events, Pollee, Poller};
 
 /*pub use self::file_ops::{
     occlum_ocall_ioctl, AccessMode, BuiltinIoctlNum, CreationFlags, FileMode, Flock, FlockType,

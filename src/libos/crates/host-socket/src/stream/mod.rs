@@ -1,8 +1,5 @@
 mod states;
 
-use async_io::poll::{Events, Poller};
-use async_io::socket::{Addr, Domain};
-
 use self::states::{Common, ConnectedStream, ConnectingStream, InitStream, ListenerStream};
 use crate::prelude::*;
 use crate::runtime::Runtime;

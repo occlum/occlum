@@ -3,8 +3,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use atomic::Atomic;
 use ringbuf::{Consumer as RbConsumer, Producer as RbProducer, RingBuffer};
 
+use crate::event::{Events, Pollee, Poller};
 use crate::file::{AccessMode, File, StatusFlags};
-use crate::poll::{Events, Pollee, Poller};
 use crate::prelude::*;
 
 /// A unidirectional communication channel, intended to implement IPC, e.g., pipe,

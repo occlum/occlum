@@ -1,7 +1,5 @@
 use std::marker::PhantomData;
 
-use async_io::poll::{Events, Poller};
-use async_io::socket::Addr;
 use io_uring_callback::{Fd, IoHandle};
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 

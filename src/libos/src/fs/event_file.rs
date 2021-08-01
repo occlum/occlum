@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 
+use async_io::event::{Events, Pollee, Poller};
 use async_io::file::{AccessMode, File, StatusFlags};
-use async_io::poll::{Events, Pollee, Poller};
 use async_io::prelude::*;
 use atomic::{Atomic, Ordering};
 
