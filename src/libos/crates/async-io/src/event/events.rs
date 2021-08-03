@@ -1,5 +1,5 @@
 bitflags::bitflags! {
-    /// I/O Events that can be polled.
+    /// Linux-compatible I/O events.
     #[rustfmt::skip]
     pub struct Events: u32 {
         /// = POLLIN
