@@ -302,7 +302,6 @@ cmd_build() {
     fi
 
     mkdir -p "$instance_dir/run/mount/__ROOT"
-    mkdir -p "$instance_dir/run/mount/tmp"
 
     mkdir -p "$instance_dir/run/initfs/__ROOT"
 
