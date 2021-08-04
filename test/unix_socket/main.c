@@ -160,8 +160,8 @@ int verify_child_echo(int *connected_sockets) {
     }
 
     char actual_str[32] = {0};
-    read(connected_sockets[1], actual_str, 32);
-    if (strncmp(actual_str, ECHO_MSG, sizeof(ECHO_MSG) - 1) != 0) {
+    ssize_t len = read(connected_sockets[1], actual_str, 32);
+    if (len != sizeof(ECHO_MSG) || strncmp(actual_str, ECHO_MSG, strlen(ECHO_MSG)) != 0) {
         printf("data read is :%s\n", actual_str);
         THROW_ERROR("received string is not as expected");
     }
@@ -269,7 +269,9 @@ int test_poll() {
         THROW_ERROR("socketpair failed");
     }
 
-    write(socks[0], "not today\n", 10);
+    if (write(socks[0], "not today\n", 10) < 0) {
+        THROW_ERROR("failed to write to socket");
+    }
 
     struct pollfd polls[] = {
         { .fd = socks[0], .events = POLLOUT },
@@ -358,8 +360,8 @@ int test_ioctl_fionread() {
     }
 
     char actual_str[32] = {0};
-    read(sockets[1], actual_str, 32);
-    if (strncmp(actual_str, ECHO_MSG, sizeof(ECHO_MSG) - 1) != 0) {
+    ssize_t len = read(sockets[1], actual_str, 32);
+    if (len != sizeof(ECHO_MSG) || strncmp(actual_str, ECHO_MSG, strlen(ECHO_MSG)) != 0) {
         printf("data read is :%s\n", actual_str);
         THROW_ERROR("received string is not as expected");
     }

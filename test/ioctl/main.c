@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <net/if.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -5,7 +6,6 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <fcntl.h>
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -547,9 +547,11 @@ int test_ioctl_FIOCLEX(void) {
     child_argv[0] = strdup("naughty_child");
     child_argv[1] = strdup("-t");
     child_argv[2] = strdup("fioclex");
-    asprintf(&child_argv[3], "%d", fd);
-    asprintf(&child_argv[4], "%d", pipefds[0]);
-    asprintf(&child_argv[5], "%d", pipefds[1]);
+    if (asprintf(&child_argv[3], "%d", fd) < 0 ||
+            asprintf(&child_argv[4], "%d", pipefds[0]) < 0 ||
+            asprintf(&child_argv[5], "%d", pipefds[1]) < 0) {
+        THROW_ERROR("failed to call asprintf");
+    }
 
     ret = posix_spawn(&child_pid, "/bin/naughty_child", NULL, NULL, child_argv, NULL);
     if (ret != 0) {
