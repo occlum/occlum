@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -94,16 +95,11 @@ int client_sendmsg(int server_fd, char *buf) {
 
 #ifdef __GLIBC__
 
-struct mmsghdr {
-    struct msghdr msg;
-    unsigned int len;
-};
-
 int client_sendmmsg(int server_fd, char *buf) {
     int ret = 0;
     struct mmsghdr msg_v[2] = {};
     struct iovec iov[1];
-    struct msghdr *msg_ptr = &msg_v[0].msg;
+    struct msghdr *msg_ptr = &msg_v[0].msg_hdr;
 
     // Set msg0
     msg_ptr->msg_name = NULL;
@@ -118,14 +114,15 @@ int client_sendmmsg(int server_fd, char *buf) {
 
     // Set msg1
     msg_v[1] = msg_v[0];
-    msg_ptr = &msg_v[1].msg;
+    msg_ptr = &msg_v[1].msg_hdr;
     msg_ptr->msg_iov = NULL;
     msg_ptr->msg_iovlen = 0;
 
     ret = sendmmsg(server_fd, msg_v,  2, 0);
-    if (ret != 2 || msg_v[0].len <= 0 || msg_v[1].len != 0) {
+    if (ret != 2 || msg_v[0].msg_len <= 0 || msg_v[1].msg_len != 0) {
         THROW_ERROR("sendmsg failed");
     }
+    return 0;
 }
 #endif
 

@@ -12,10 +12,15 @@ char *read_resolv_conf(void) {
     fseek(fp, 0, SEEK_SET);
     char *resolv_conf_buffer = malloc(fsize + 1);
     if (resolv_conf_buffer == NULL) {
-        printf("ERROR: Failed to malloc for /etc/resolv.conf buffer");
+        printf("ERROR: Failed to malloc for /etc/resolv.conf buffer\n");
         return NULL;
     }
-    fread(resolv_conf_buffer, 1, fsize, fp);
+    size_t len = fread(resolv_conf_buffer, 1, fsize, fp);
+    if (len != fsize) {
+        printf("ERROR: failed to fread correct len\n");
+        fclose(fp);
+        return NULL;
+    }
     fclose(fp);
     return resolv_conf_buffer;
 }

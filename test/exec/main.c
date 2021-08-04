@@ -45,7 +45,8 @@ int test_execve_error_return(void) {
     }
 
     // during the time, try execve a non-exit process
-    int ret = execve("/bin/joke", NULL, NULL);
+    char *args[] = {"joke", NULL};
+    int ret = execve("/bin/joke", args, NULL);
     if (ret != -1 || errno != ENOENT) {
         THROW_ERROR("execve error code wrong");
     }
