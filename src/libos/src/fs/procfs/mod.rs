@@ -5,17 +5,17 @@ use rcore_fs::vfs;
 use crate::process::pid_t;
 use crate::process::table::get_all_processes;
 
-use self::cpuinfo_inode::CpuInfoINode;
-use self::meminfo_inode::MemInfoINode;
-use self::pid_inode::LockedPidDirINode;
+use self::cpuinfo::CpuInfoINode;
+use self::meminfo::MemInfoINode;
+use self::pid::LockedPidDirINode;
 use self::proc_inode::{Dir, DirProcINode, File, ProcINode, SymLink};
-use self::self_inode::SelfSymINode;
+use self::self_::SelfSymINode;
 
-mod cpuinfo_inode;
-mod meminfo_inode;
-mod pid_inode;
+mod cpuinfo;
+mod meminfo;
+mod pid;
 mod proc_inode;
-mod self_inode;
+mod self_;
 
 // Same with the procfs on Linux
 const PROC_SUPER_MAGIC: usize = 0x9fa0;
