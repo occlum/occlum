@@ -7,6 +7,7 @@ use super::*;
 use crate::exception::*;
 use crate::fs::HostStdioFds;
 use crate::interrupt;
+use crate::process::idle_reap_zombie_children;
 use crate::process::ProcessFilter;
 use crate::signal::SigNum;
 use crate::time::up_time::init;
@@ -283,6 +284,9 @@ fn do_new_process(
 
 fn do_exec_thread(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
     let status = process::task::exec(libos_tid, host_tid)?;
+
+    // Idle process should reap all zombie children
+    idle_reap_zombie_children()?;
 
     // sync file system
     // TODO: only sync when all processes exit
