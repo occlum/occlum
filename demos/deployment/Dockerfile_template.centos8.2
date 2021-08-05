@@ -25,8 +25,10 @@ ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
 
 
 # packager stage:
-# Users can build their own applications and put to occlum instance. And then use "occlum package"
-# to get a minimum subset of files to run in deployment environment.
+# Users can build their own applications and put to occlum instance.
+# And then use "occlum package" to get a minimum subset of files to run in deployment environment.
+# In this demo, the occlum instance is built in debug mode.
+# So "--debug" flag is required for the "occlum package".
 FROM base as packager
 RUN yum install -y fuse-libs libtool make gdb git && \
     cd /root && \
@@ -41,7 +43,7 @@ RUN yum install -y fuse-libs libtool make gdb git && \
     cd /root/demos/hello_c && \
     make && cp hello_world /root/occlum-instance/image/bin && \
     cd /root/occlum-instance && occlum build && \
-    occlum package
+    occlum package --debug
 
 
 # deployer stage:

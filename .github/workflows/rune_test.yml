@@ -67,7 +67,7 @@ jobs:
       run: docker exec $rune_test bash -c "occlum-gcc -o hello_world hello_world.c;
         occlum new occlum_instance && cd occlum_instance;
         cp ../hello_world image/bin/ && occlum build;
-        occlum package occlum_instance.tar.gz;
+        occlum package --debug occlum_instance.tar.gz;
         docker build . -t occlum-app -f /root/Dockerfile-occlum"
 
     - name: Run Occlum image
