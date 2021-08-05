@@ -38,11 +38,8 @@ fn create_idle_thread() -> Result<ThreadRef> {
     let idle_thread = idle_process.main_thread().unwrap();
     debug_assert!(idle_thread.tid() == 0);
 
-    // We do not add the idle process/thread to the process/thread table.
+    // We do not add the idle process/thread/process group to the process/thread/process group table.
     // This ensures that the idle process is not accessible from the user space.
-
-    // Keep process groud 0 in the table
-    table::add_pgrp(idle_process.pgrp());
 
     Ok(idle_thread)
 }

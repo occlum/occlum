@@ -179,7 +179,18 @@ pub extern "C" fn occlum_ecall_run_vcpu(pal_data_ptr: *const occlum_pal_vcpu_dat
     assert!(!pal_data_ptr.is_null());
     set_pal_data_addr(pal_data_ptr);
 
-    async_rt::executor::run_tasks();
+    let running_vcpu_num = async_rt::executor::run_tasks();
+    if running_vcpu_num == 0 {
+        // It is the last vcpu for the executor. We can perform some check to make sure there is no resource leakage
+        use crate::process::table;
+        use crate::vm::USER_SPACE_VM_MANAGER;
+        assert!(
+            table::get_all_pgrp().len() == 0
+                && table::get_all_processes().len() == 0
+                && table::get_all_threads().len() == 0
+        );
+        assert!(USER_SPACE_VM_MANAGER.verified_clean_when_exit());
+    }
 
     use rcore_fs::vfs::FileSystem;
     crate::fs::ROOT_INODE.read().unwrap().fs().sync().unwrap();

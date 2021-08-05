@@ -3,6 +3,7 @@ use std::sync::Weak;
 
 use super::do_futex::futex_wake;
 use super::do_vfork::{is_vforked_child_process, vfork_return_to_parent};
+use super::do_wait4::idle_reap_zombie_children;
 use super::pgrp::clean_pgrp_when_exit;
 use super::process::{Process, ProcessFilter};
 use super::{table, ProcessRef, TermStatus, ThreadRef, ThreadStatus};
@@ -175,13 +176,17 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus, new_parent_ref: Opt
         // Notify the parent that this child process's status has changed
         parent.exit_waiters().wake_all();
 
-        drop(idle_inner);
         drop(parent_inner);
-        drop(process_inner);
     }
+    drop(idle_inner);
+    drop(process_inner);
 
     // Notify the host threads that wait the status change of this process
     wake_host(&process, term_status);
+
+    // For situations that the parent didn't wait4 child, the child process will become zombie child of idle process.
+    // And may never be freed. Call this function to let idle process reap the zombie children if any.
+    idle_reap_zombie_children();
 }
 
 fn wake_host(process: &ProcessRef, term_status: TermStatus) {

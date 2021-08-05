@@ -7,6 +7,35 @@ use super::process::{ProcessFilter, ProcessInner};
 use super::{table, ProcessRef, ProcessStatus};
 use crate::prelude::*;
 
+// Children process exits without parent calls wait4 should be reaped by Idle process in the end.
+// Without this, there might be memory leakage when exit.
+pub fn idle_reap_zombie_children() {
+    let idle_ref = super::IDLE.process().clone();
+    let mut zombie_pids = Vec::new();
+    loop {
+        // This needs to acquire lock every time.
+        let mut idle_inner = idle_ref.inner();
+        let children = idle_inner.children().unwrap();
+        match children
+            .iter()
+            .find(|child| child.status() == ProcessStatus::Zombie)
+        {
+            Some(zombie_child) => {
+                // Reap one zombie each time.
+                let zombie_pid = zombie_child.pid();
+                let exit_status = free_zombie_child(&idle_ref, idle_inner, zombie_pid);
+                zombie_pids.push(zombie_pid);
+            }
+            None => {
+                // None zombie child, just return
+                break;
+            }
+        }
+    }
+
+    info!("Idle process reaps zombie children pid = {:?}", zombie_pids);
+}
+
 pub async fn do_wait4(child_filter: &ProcessFilter, options: WaitOptions) -> Result<(pid_t, i32)> {
     let thread = current!();
     let process = thread.process();
