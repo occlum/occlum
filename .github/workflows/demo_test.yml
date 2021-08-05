@@ -692,29 +692,24 @@ jobs:
     - name: Run Bash test
       run: docker exec bash_test bash -c "cd /root/occlum/demos/bash && SGX_MODE=SIM ./run_bash_demo.sh"
 
-  Tensorflow_serving_test:
+  # Tensorflow_serving requires binary tensorflow_serving PIC, here we compile tensorflow_model_server before workflow
+  tensorflow_serving_test:
     runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: true
-
-    - name: Get occlum version
-      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
-
-    - name: Compile the tensorflow_serving with PIC
-      run: |
-        cd $GITHUB_WORKSPACE/demos/tensorflow/tensorflow_serving;
-        ./build_occlum_tf_serving.sh
-
     - name: Create container
-      run: docker run -itd --name=tf_serving_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+      run: docker run -itd --name=tf_serving_test -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-tf_serving
 
     - name: Build dependencies
       run: docker exec tf_serving_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
       run: docker exec tf_serving_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+    
+    - name: Move tensorflow_model_server
+      run: docker exec tf_serving_test bash -c "mv /root/tensorflow_model_server /root/occlum/demos/tensorflow/tensorflow_serving"
 
     - name: Set up environment
       run: docker exec tf_serving_test bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving; ./prepare_model_and_env.sh"
