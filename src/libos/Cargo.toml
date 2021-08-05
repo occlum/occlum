@@ -28,6 +28,7 @@ rcore-fs-devfs = { path = "../../deps/sefs/rcore-fs-devfs" }
 serde = { path = "../../deps/serde-sgx/serde", features = ["derive"] }
 serde_json = { path = "../../deps/serde-json-sgx" }
 memoffset = "0.6.1"
+new-self-ref-arc = { path = "crates/new-self-ref-arc", features = ["sgx"] }
 num_enum = { version = "0.5", default-features = false }
 vdso-time  = { path = "crates/vdso-time", default-features = false, features = ["sgx"] }
 inherit-methods-macro= { path = "crates/inherit-methods-macro" }
