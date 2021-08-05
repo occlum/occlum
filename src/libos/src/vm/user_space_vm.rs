@@ -121,7 +121,7 @@ impl Drop for UserSpaceVMRange {
         }
 
         USER_SPACE_VM_MANAGER.add_free_size(self);
-
+        info!("user space vm free: {:?}", self.vm_range);
         assert!(unsafe { sgx_free_rsrv_mem(addr, size) == 0 });
     }
 }
