@@ -1,0 +1,11 @@
+ARG OCCLUM_VERSION
+
+FROM tf_serving_pic:latest as build_binary
+
+FROM occlum/occlum:$OCCLUM_VERSION-ubuntu18.04 as base
+LABEL maintainer="Zehuan Li <lizehuan.lzh@antgroup.com>"
+
+WORKDIR /usr/local/bin
+COPY --from=build_binary /tensorflow_model_server /root/tensorflow_model_server
+
+WORKDIR /root
