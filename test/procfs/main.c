@@ -29,6 +29,25 @@ static int test_readlink_from_procfs(const char *proc_inode, char *buf, int buf_
     return 0;
 }
 
+static int test_read_from_procfs(const char *proc_inode) {
+    char buf[1024] = { 0 };
+    int len;
+
+    int fd = open(proc_inode, O_RDONLY);
+    if (fd < 0) {
+        THROW_ERROR("failed to open file: %s", proc_inode);
+    }
+    do {
+        len = read(fd, buf, sizeof(buf));
+        if (len < 0) {
+            THROW_ERROR("failed to read: %s", proc_inode);
+        }
+    } while (len == sizeof(buf));
+    close(fd);
+    return 0;
+}
+
+
 // ============================================================================
 // Test cases for procfs
 // ============================================================================
@@ -136,41 +155,45 @@ static int test_read_from_proc_self_comm() {
     return 0;
 }
 
+static int test_read_from_proc_self_stat() {
+    const char *proc_self_stat = "/proc/self/stat";
+    FILE *fp = fopen(proc_self_stat, "r");
+    if (fp == NULL) {
+        THROW_ERROR("failed to fopen: %s", proc_self_stat);
+    }
+
+    int pid, ppid, pgrp;
+    char comm[32] = { 0 };
+    char state[32] = { 0 };
+    int ret = fscanf(fp, "%d %s %s %d %d", &pid, comm, state, &ppid, &pgrp);
+    if (ret != 5) {
+        THROW_ERROR("failed to parse the first 5 items");
+    }
+    if (pid != getpid()) {
+        THROW_ERROR("failed to check the result in %s", proc_self_stat);
+    }
+    printf("cat %s with the first 5 items:\n%d %s %s %d %d\n", proc_self_stat, pid, comm,
+           state, ppid, pgrp);
+
+    fclose(fp);
+    return 0;
+}
+
 static int test_read_from_proc_meminfo() {
-    char meminfo[1024] = { 0 };
     const char *proc_meminfo = "/proc/meminfo";
 
-    int fd = open(proc_meminfo, O_RDONLY);
-    if (fd < 0) {
-        THROW_ERROR("failed to open file: %s", proc_meminfo);
-    }
-    if (read(fd, meminfo, sizeof(meminfo)) < 0) {
+    if (test_read_from_procfs(proc_meminfo) < 0) {
         THROW_ERROR("failed to read the meminfo");
     }
-    close(fd);
-
     return 0;
 }
 
 static int test_read_from_proc_cpuinfo() {
-    char cpuinfo[1024] = { 0 };
     const char *proc_cpuinfo = "/proc/cpuinfo";
-    int len;
 
-    int fd = open(proc_cpuinfo, O_RDONLY);
-    if (fd < 0) {
-        THROW_ERROR("failed to open file: %s", proc_cpuinfo);
+    if (test_read_from_procfs(proc_cpuinfo) < 0) {
+        THROW_ERROR("failed to read the cpuinfo");
     }
-    do {
-        len = read(fd, cpuinfo, sizeof(cpuinfo));
-        if (len < 0) {
-            THROW_ERROR("failed to read the cpuinfo");
-        } else if (len < sizeof(cpuinfo)) {
-            break;
-        }
-    } while (len == sizeof(cpuinfo));
-    close(fd);
-
     return 0;
 }
 
@@ -252,6 +275,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_create_and_unlink_file_from_proc_self_root),
     TEST_CASE(test_read_from_proc_self_cmdline),
     TEST_CASE(test_read_from_proc_self_comm),
+    TEST_CASE(test_read_from_proc_self_stat),
     TEST_CASE(test_read_from_proc_meminfo),
     TEST_CASE(test_read_from_proc_cpuinfo),
     TEST_CASE(test_statfs),

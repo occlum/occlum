@@ -8,6 +8,7 @@ use self::cwd::ProcCwdSymINode;
 use self::exe::ProcExeSymINode;
 use self::fd::LockedProcFdDirINode;
 use self::root::ProcRootSymINode;
+use self::stat::ProcStatINode;
 
 mod cmdline;
 mod comm;
@@ -15,6 +16,7 @@ mod cwd;
 mod exe;
 mod fd;
 mod root;
+mod stat;
 
 pub struct LockedPidDirINode(RwLock<PidDirINode>);
 
@@ -58,6 +60,9 @@ impl LockedPidDirINode {
         // comm
         let comm_inode = ProcCommINode::new(&file.process_ref);
         file.entries.insert(String::from("comm"), comm_inode);
+        // stat
+        let stat_inode = ProcStatINode::new(&file.process_ref);
+        file.entries.insert(String::from("stat"), stat_inode);
 
         Ok(())
     }
