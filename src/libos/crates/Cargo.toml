@@ -8,6 +8,7 @@ members = [
     "host-socket",
     "io-uring-callback",
     "keyable-arc",
+    "new-self-ref-arc",
     "object-id",
     "sgx-untrusted-alloc",
     "vdso-time",
@@ -19,6 +20,7 @@ default-members = [
     "inherit-methods-macro",
     "io-uring-callback",
     "keyable-arc",
+    "new-self-ref-arc",
     "vdso-time",
 ]
 
