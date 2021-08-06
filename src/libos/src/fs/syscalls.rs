@@ -25,6 +25,12 @@ pub async fn do_eventfd2(init_val: u32, flags: i32) -> Result<isize> {
     Ok(fd as isize)
 }
 
+pub async fn do_creat(path: *const i8, mode: u32) -> Result<isize> {
+    let flags =
+        AccessMode::O_WRONLY as u32 | (CreationFlags::O_CREAT | CreationFlags::O_TRUNC).bits();
+    self::do_open(path, flags, mode).await
+}
+
 pub async fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize> {
     self::do_openat(AT_FDCWD, path, flags, mode).await
 }
