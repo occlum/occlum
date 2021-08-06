@@ -53,6 +53,17 @@ impl FileMode {
     pub fn has_set_gid(&self) -> bool {
         self.contains(FileMode::S_ISGID)
     }
+
+    /// Umask is FileMode & 0o777, only the file permission bits are used
+    pub fn to_umask(mut self) -> Self {
+        self.remove(Self::S_ISUID | Self::S_ISGID | Self::S_ISVTX);
+        self
+    }
+
+    /// Default umask is 0o022
+    pub fn default_umask() -> Self {
+        Self::S_IWGRP | Self::S_IWOTH
+    }
 }
 
 pub fn do_fchmodat(fs_path: &FsPath, mode: FileMode) -> Result<()> {

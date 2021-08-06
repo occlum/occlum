@@ -10,7 +10,7 @@ use super::task::Task;
 use super::thread::{ThreadId, ThreadName};
 use super::{table, task, ProcessRef, ThreadRef};
 use crate::fs::{
-    CreationFlags, File, FileDesc, FileTable, FsView, HostStdioFds, StdinFile, StdoutFile,
+    CreationFlags, File, FileDesc, FileMode, FileTable, FsView, HostStdioFds, StdinFile, StdoutFile,
 };
 use crate::prelude::*;
 use crate::vm::ProcessVM;
@@ -285,6 +285,7 @@ fn new_process_common(
         process_builder
             .vm(vm_ref)
             .exec_path(&elf_path)
+            .umask(parent.umask())
             .parent(parent)
             .task(task)
             .sched(sched_ref)
@@ -339,12 +340,11 @@ fn init_files(
                     oflag,
                     fd,
                 } => {
-                    let file_ref =
-                        current_ref
-                            .fs()
-                            .read()
-                            .unwrap()
-                            .open_file(path.as_str(), oflag, mode)?;
+                    let file_ref = current_ref.fs().read().unwrap().open_file(
+                        path.as_str(),
+                        oflag,
+                        FileMode::from_bits_truncate(mode as u16),
+                    )?;
                     let creation_flags = CreationFlags::from_bits_truncate(oflag);
                     cloned_file_table.put_at(fd, file_ref, creation_flags.must_close_on_spawn());
                 }

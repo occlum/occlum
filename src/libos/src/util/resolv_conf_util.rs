@@ -1,5 +1,5 @@
 use super::*;
-use crate::fs::{AccessMode, CreationFlags, FsView};
+use crate::fs::{AccessMode, CreationFlags, FileMode, FsView};
 use resolv_conf::*;
 use std::ffi::CStr;
 use std::str;
@@ -11,7 +11,7 @@ pub fn write_resolv_conf() -> Result<()> {
     let resolv_conf_file = fs_view.open_file(
         RESOLV_CONF_PATH,
         AccessMode::O_RDWR as u32 | CreationFlags::O_CREAT.bits() | CreationFlags::O_TRUNC.bits(),
-        0o666,
+        FileMode::from_bits(0o666).unwrap(),
     )?;
     let resolv_conf_str = RESOLV_CONF_STR.read().unwrap();
     match &*resolv_conf_str {

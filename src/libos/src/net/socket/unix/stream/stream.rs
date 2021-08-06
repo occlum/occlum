@@ -3,8 +3,8 @@ use super::endpoint::{end_pair, Endpoint, RelayNotifier};
 use super::*;
 use events::{Event, EventFilter, Notifier, Observer};
 use fs::channel::Channel;
-use fs::CreationFlags;
 use fs::IoEvents;
+use fs::{CreationFlags, FileMode};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -75,8 +75,11 @@ impl Stream {
             let corresponding_inode_num = {
                 let current = current!();
                 let fs = current.fs().read().unwrap();
-                let file_ref =
-                    fs.open_file(path.path_str(), CreationFlags::O_CREAT.bits(), 0o777)?;
+                let file_ref = fs.open_file(
+                    path.path_str(),
+                    CreationFlags::O_CREAT.bits(),
+                    FileMode::from_bits(0o777).unwrap(),
+                )?;
                 file_ref.metadata()?.inode
             };
             *inode_num = Some(corresponding_inode_num);
