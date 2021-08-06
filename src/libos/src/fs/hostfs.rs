@@ -134,7 +134,7 @@ impl INode for HNode {
         Ok(())
     }
 
-    fn create(&self, name: &str, type_: FileType, mode: u32) -> Result<Arc<dyn INode>> {
+    fn create(&self, name: &str, type_: FileType, mode: u16) -> Result<Arc<dyn INode>> {
         let new_path = self.path.join(name);
         if new_path.exists() {
             return Err(FsError::EntryExist);

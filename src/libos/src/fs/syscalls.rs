@@ -97,23 +97,30 @@ pub fn do_timerfd_gettime(fd: FileDesc, curr_value_ptr: *mut itimerspec_t) -> Re
     Ok(0)
 }
 
-pub fn do_creat(path: *const i8, mode: u32) -> Result<isize> {
+pub fn do_creat(path: *const i8, mode: u16) -> Result<isize> {
     let flags =
         AccessMode::O_WRONLY as u32 | (CreationFlags::O_CREAT | CreationFlags::O_TRUNC).bits();
     self::do_open(path, flags, mode)
 }
 
-pub fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize> {
+pub fn do_open(path: *const i8, flags: u32, mode: u16) -> Result<isize> {
     self::do_openat(AT_FDCWD, path, flags, mode)
 }
 
-pub fn do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u32) -> Result<isize> {
+pub fn do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u16) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
     let fs_path = FsPath::new(&path, dirfd, false)?;
+    let mode = FileMode::from_bits_truncate(mode);
     let fd = file_ops::do_openat(&fs_path, flags, mode)?;
     Ok(fd as isize)
+}
+
+pub fn do_umask(mask: u16) -> Result<isize> {
+    let new_mask = FileMode::from_bits_truncate(mask).to_umask();
+    let old_mask = current!().process().set_umask(new_mask);
+    Ok(old_mask.bits() as isize)
 }
 
 pub fn do_close(fd: FileDesc) -> Result<isize> {
@@ -414,15 +421,16 @@ pub fn do_renameat(
     Ok(0)
 }
 
-pub fn do_mkdir(path: *const i8, mode: usize) -> Result<isize> {
+pub fn do_mkdir(path: *const i8, mode: u16) -> Result<isize> {
     self::do_mkdirat(AT_FDCWD, path, mode)
 }
 
-pub fn do_mkdirat(dirfd: i32, path: *const i8, mode: usize) -> Result<isize> {
+pub fn do_mkdirat(dirfd: i32, path: *const i8, mode: u16) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
     let fs_path = FsPath::new(&path, dirfd, false)?;
+    let mode = FileMode::from_bits_truncate(mode);
     file_ops::do_mkdirat(&fs_path, mode)?;
     Ok(0)
 }
