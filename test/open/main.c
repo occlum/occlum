@@ -1,3 +1,4 @@
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
 #include "test_fs.h"
@@ -102,6 +103,15 @@ static int __test_openat_with_dirfd(const char *file_path, int flags, int mode) 
     return 0;
 }
 
+static int __test_creat(const char *file_path, int flags, int mode) {
+    int fd = creat(file_path, mode);
+    if (fd < 0) {
+        THROW_ERROR("failed to creat a file");
+    }
+    close(fd);
+    return 0;
+}
+
 typedef int(*test_open_func_t)(const char *, int, int);
 
 static int test_open_framework(test_open_func_t fn) {
@@ -138,6 +148,10 @@ static int test_openat_with_dirfd() {
     return test_open_framework(__test_openat_with_dirfd);
 }
 
+static int test_creat() {
+    return test_open_framework(__test_creat);
+}
+
 // ============================================================================
 // Test suite main
 // ============================================================================
@@ -148,6 +162,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_open_dir_with_write_flags),
     TEST_CASE(test_openat_with_abs_path),
     TEST_CASE(test_openat_with_dirfd),
+    TEST_CASE(test_creat),
 };
 
 int main(int argc, const char *argv[]) {
