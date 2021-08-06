@@ -80,7 +80,7 @@ impl EventMonitor {
         // 4. the time is up.
         let num_events = self.do_poll_ocall(&mut timeout)?;
 
-        self.update_host_file_events(num_events);
+        self.update_host_file_events();
 
         // Poll syscall does not treat timeout as error. So we need
         // to distinguish the case by ourselves.
@@ -99,12 +99,11 @@ impl EventMonitor {
     /// their states accordingly.
     pub fn poll_host_files(&mut self) {
         let mut zero_timeout = Some(Duration::from_secs(0));
-        let num_events = match self.do_poll_ocall(&mut zero_timeout.as_mut()) {
-            Ok(num_events) => num_events,
-            Err(_) => return,
-        };
+        if let Err(_) = self.do_poll_ocall(&mut zero_timeout.as_mut()) {
+            return;
+        }
 
-        self.update_host_file_events(num_events);
+        self.update_host_file_events();
     }
 
     fn do_poll_ocall(&mut self, timeout: &mut Option<&mut Duration>) -> Result<usize> {
@@ -148,11 +147,7 @@ impl EventMonitor {
         Ok(num_events)
     }
 
-    fn update_host_file_events(&self, num_events: usize) {
-        if num_events == 0 {
-            return;
-        }
-
+    fn update_host_file_events(&self) {
         // According to the output pollfds, update the states of the corresponding host files
         let output_pollfds = self.ocall_pollfds[..self.ocall_pollfds.len() - 1].iter();
         for (pollfd, (host_file, mask)) in output_pollfds.zip(self.host_files_and_events()) {
