@@ -3,10 +3,10 @@
 #ifndef _OCCLUM_VERSION_H_
 #define _OCCLUM_VERSION_H_
 
-// Version = 0.23.5
+// Version = 0.23.6
 #define OCCLUM_MAJOR_VERSION    0
 #define OCCLUM_MINOR_VERSION    23
-#define OCCLUM_PATCH_VERSION    5
+#define OCCLUM_PATCH_VERSION    6
 
 #define STRINGIZE_PRE(X) #X
 #define STRINGIZE(X) STRINGIZE_PRE(X)
