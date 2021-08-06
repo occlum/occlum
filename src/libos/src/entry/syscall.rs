@@ -14,8 +14,8 @@ use crate::fs::{
     do_getcwd, do_getdents, do_getdents64, do_ioctl, do_lchown, do_link, do_linkat, do_lseek,
     do_lstat, do_mkdir, do_mkdirat, do_mount_rootfs, do_open, do_openat, do_pipe, do_pipe2,
     do_pread, do_pwrite, do_read, do_readlink, do_readlinkat, do_readv, do_rename, do_renameat,
-    do_rmdir, do_stat, do_statfs, do_symlink, do_symlinkat, do_sync, do_truncate, do_unlink,
-    do_unlinkat, do_write, do_writev, iovec_t, FileDesc, FileRef, StatBuf, Statfs,
+    do_rmdir, do_stat, do_statfs, do_symlink, do_symlinkat, do_sync, do_truncate, do_umask,
+    do_unlink, do_unlinkat, do_write, do_writev, iovec_t, FileDesc, FileRef, StatBuf, Statfs,
 };
 /*
 use crate::fs::{
@@ -195,9 +195,9 @@ macro_rules! process_syscall_table_with_callback {
             (Tkill = 200) => do_tkill(tid: pid_t, sig: c_int),
 
 
-            (Creat = 85) => do_creat(path: *const i8, mode: u32),
-            (Open = 2) => do_open(path: *const i8, flags: u32, mode: u32),
-            (Openat = 257) => do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u32),
+            (Creat = 85) => do_creat(path: *const i8, mode: u16),
+            (Open = 2) => do_open(path: *const i8, flags: u32, mode: u16),
+            (Openat = 257) => do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u16),
             (Close = 3) => do_close(fd: FileDesc),
             (Write = 1) => do_write(fd: FileDesc, buf: *const u8, size: usize),
             (Writev = 20) => do_writev(fd: FileDesc, iov: *const iovec_t, count: i32),
@@ -221,6 +221,7 @@ macro_rules! process_syscall_table_with_callback {
             (Chmod = 90) => do_chmod(path: *const i8, mode: u16),
             (Fchmod = 91) => do_fchmod(fd: FileDesc, mode: u16),
             (Fchmodat = 268) => do_fchmodat(dirfd: i32, path: *const i8, mode: u16),
+            (Umask = 95) => do_umask(mask: u16),
             (Dup = 32) => do_dup(old_fd: FileDesc),
             (Dup2 = 33) => do_dup2(old_fd: FileDesc, new_fd: FileDesc),
             (Dup3 = 292) => do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32),
@@ -229,8 +230,8 @@ macro_rules! process_syscall_table_with_callback {
             (Access = 21) => do_access(path: *const i8, mode: u32),
             (Faccessat = 269) => do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32),
             (Fallocate = 285) => do_fallocate(fd: FileDesc, mode: u32, offset: off_t, len: off_t),
-            (Mkdir = 83) => do_mkdir(path: *const i8, mode: usize),
-            (Mkdirat = 258) => do_mkdirat(dirfd: i32, path: *const i8, mode: usize),
+            (Mkdir = 83) => do_mkdir(path: *const i8, mode: u16),
+            (Mkdirat = 258) => do_mkdirat(dirfd: i32, path: *const i8, mode: u16),
             (Getcwd = 79) => do_getcwd(buf: *mut u8, size: usize),
             (Chdir = 80) => do_chdir(path: *const i8),
             (Rename = 82) => do_rename(oldpath: *const i8, newpath: *const i8),

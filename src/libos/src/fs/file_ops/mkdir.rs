@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn do_mkdirat(fs_path: &FsPath, mode: usize) -> Result<()> {
+pub fn do_mkdirat(fs_path: &FsPath, mode: FileMode) -> Result<()> {
     debug!("mkdirat: fs_path: {:?}, mode: {:#o}", fs_path, mode);
 
     let (dir_inode, file_name) = {
@@ -14,6 +14,7 @@ pub fn do_mkdirat(fs_path: &FsPath, mode: usize) -> Result<()> {
     if !dir_inode.allow_write()? {
         return_errno!(EPERM, "dir cannot be written");
     }
-    dir_inode.create(&file_name, FileType::Dir, mode as u32)?;
+    let masked_mode = mode & !current!().process().umask();
+    dir_inode.create(&file_name, FileType::Dir, masked_mode.bits())?;
     Ok(())
 }

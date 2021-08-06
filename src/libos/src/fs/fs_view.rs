@@ -40,7 +40,7 @@ impl FsView {
     }
 
     /// Open a file on the process. But DO NOT add it to file table.
-    pub fn open_file(&self, fs_path: &FsPath, flags: u32, mode: u32) -> Result<INodeFile> {
+    pub fn open_file(&self, fs_path: &FsPath, flags: u32, mode: FileMode) -> Result<INodeFile> {
         let creation_flags = CreationFlags::from_bits_truncate(flags);
         let inode = if creation_flags.no_follow_symlink() {
             match self.lookup_inode_no_follow(fs_path) {
@@ -68,7 +68,7 @@ impl FsView {
                     if !dir_inode.allow_write()? {
                         return_errno!(EPERM, "file cannot be created");
                     }
-                    dir_inode.create(&file_name, FileType::File, mode)?
+                    dir_inode.create(&file_name, FileType::File, mode.bits())?
                 }
                 Err(e) => return Err(e),
             }
@@ -93,7 +93,7 @@ impl FsView {
                     if !dir_inode.allow_write()? {
                         return_errno!(EPERM, "file cannot be created");
                     }
-                    dir_inode.create(&file_name, FileType::File, mode)?
+                    dir_inode.create(&file_name, FileType::File, mode.bits())?
                 }
                 Err(e) => return Err(e),
             }

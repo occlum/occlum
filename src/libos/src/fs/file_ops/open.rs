@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn do_openat(fs_path: &FsPath, flags: u32, mode: u32) -> Result<FileDesc> {
+pub fn do_openat(fs_path: &FsPath, flags: u32, mode: FileMode) -> Result<FileDesc> {
     debug!(
         "openat: fs_path: {:?}, flags: {:#o}, mode: {:#o}",
         fs_path, flags, mode
@@ -8,8 +8,9 @@ pub fn do_openat(fs_path: &FsPath, flags: u32, mode: u32) -> Result<FileDesc> {
 
     let current = current!();
     let fs = current.fs().lock().unwrap();
+    let masked_mode = mode & !current.process().umask();
 
-    let inode_file = fs.open_file(&fs_path, flags, mode)?;
+    let inode_file = fs.open_file(&fs_path, flags, masked_mode)?;
     let file_ref = FileRef::new_inode(inode_file);
 
     let fd = {

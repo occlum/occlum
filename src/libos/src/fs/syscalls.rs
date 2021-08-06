@@ -25,17 +25,17 @@ pub async fn do_eventfd2(init_val: u32, flags: i32) -> Result<isize> {
     Ok(fd as isize)
 }
 
-pub async fn do_creat(path: *const i8, mode: u32) -> Result<isize> {
+pub async fn do_creat(path: *const i8, mode: u16) -> Result<isize> {
     let flags =
         AccessMode::O_WRONLY as u32 | (CreationFlags::O_CREAT | CreationFlags::O_TRUNC).bits();
     self::do_open(path, flags, mode).await
 }
 
-pub async fn do_open(path: *const i8, flags: u32, mode: u32) -> Result<isize> {
+pub async fn do_open(path: *const i8, flags: u32, mode: u16) -> Result<isize> {
     self::do_openat(AT_FDCWD, path, flags, mode).await
 }
 
-pub async fn do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u32) -> Result<isize> {
+pub async fn do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u16) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
@@ -43,8 +43,15 @@ pub async fn do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u32) -> Re
         return_errno!(ENOENT, "path is an empty string");
     }
     let fs_path = FsPath::new(&path, dirfd)?;
+    let mode = FileMode::from_bits_truncate(mode);
     let fd = file_ops::do_openat(&fs_path, flags, mode)?;
     Ok(fd as isize)
+}
+
+pub async fn do_umask(mask: u16) -> Result<isize> {
+    let new_mask = FileMode::from_bits_truncate(mask).to_umask();
+    let old_mask = current!().process().set_umask(new_mask);
+    Ok(old_mask.bits() as isize)
 }
 
 pub async fn do_close(fd: FileDesc) -> Result<isize> {
@@ -354,11 +361,11 @@ pub async fn do_renameat(
     Ok(0)
 }
 
-pub async fn do_mkdir(path: *const i8, mode: usize) -> Result<isize> {
+pub async fn do_mkdir(path: *const i8, mode: u16) -> Result<isize> {
     self::do_mkdirat(AT_FDCWD, path, mode).await
 }
 
-pub async fn do_mkdirat(dirfd: i32, path: *const i8, mode: usize) -> Result<isize> {
+pub async fn do_mkdirat(dirfd: i32, path: *const i8, mode: u16) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
@@ -366,6 +373,7 @@ pub async fn do_mkdirat(dirfd: i32, path: *const i8, mode: usize) -> Result<isiz
         return_errno!(ENOENT, "path is an empty string");
     }
     let fs_path = FsPath::new(&path, dirfd)?;
+    let mode = FileMode::from_bits_truncate(mode);
     file_ops::do_mkdirat(&fs_path, mode)?;
     Ok(0)
 }

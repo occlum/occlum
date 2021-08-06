@@ -8,6 +8,7 @@ use super::super::{
     ResourceLimitsRef, SchedAgentRef,
 };
 use super::{Process, ProcessInner};
+use crate::fs::FileMode;
 use crate::prelude::*;
 use crate::signal::{SigDispositions, SigQueues, SigSet};
 
@@ -19,6 +20,7 @@ pub struct ProcessBuilder {
     vm: Option<ProcessVMRef>,
     // Optional fields, which have reasonable default values
     exec_path: Option<String>,
+    umask: Option<FileMode>,
     parent: Option<ProcessRef>,
     no_parent: bool,
     host_waker: Option<HostWaker>,
@@ -33,6 +35,7 @@ impl ProcessBuilder {
             thread_builder: Some(thread_builder),
             vm: None,
             exec_path: None,
+            umask: None,
             parent: None,
             no_parent: false,
             host_waker: None,
@@ -47,6 +50,11 @@ impl ProcessBuilder {
 
     pub fn exec_path(mut self, exec_path: &str) -> Self {
         self.exec_path = Some(exec_path.to_string());
+        self
+    }
+
+    pub fn umask(mut self, umask: FileMode) -> Self {
+        self.umask = Some(umask);
         self
     }
 
@@ -114,6 +122,7 @@ impl ProcessBuilder {
         // Build a new process
         let new_process = {
             let exec_path = self.exec_path.take().unwrap_or_default();
+            let umask = RwLock::new(self.umask.unwrap_or(FileMode::default_umask()));
             let parent = self.parent.take().map(|parent| RwLock::new(parent));
             let host_waker = self.host_waker.take();
             let inner = SgxMutex::new(ProcessInner::new());
@@ -126,6 +135,7 @@ impl ProcessBuilder {
                 pid,
                 exec_path,
                 host_waker,
+                umask,
                 parent,
                 inner,
                 sig_dispositions,

@@ -4,6 +4,7 @@ use std::sync::Weak;
 use async_rt::wait::WaiterQueue;
 
 use super::{ForcedExitStatus, HostWaker, ProcessRef, TermStatus, ThreadRef};
+use crate::fs::FileMode;
 use crate::prelude::*;
 use crate::signal::{SigDispositions, SigNum, SigQueues};
 
@@ -21,6 +22,7 @@ pub struct Process {
     // Mutable info
     parent: Option<RwLock<ProcessRef>>,
     inner: SgxMutex<ProcessInner>,
+    umask: RwLock<FileMode>,
     // Signal
     sig_dispositions: RwLock<SigDispositions>,
     sig_queues: RwLock<SigQueues>,
@@ -108,6 +110,19 @@ impl Process {
     /// Get the host wake pointer.
     pub fn host_waker(&self) -> &Option<HostWaker> {
         &self.host_waker
+    }
+
+    /// Get the file mode creation mask
+    pub fn umask(&self) -> FileMode {
+        self.umask.read().unwrap().clone()
+    }
+
+    /// Set the file mode creation mask, return the previous value
+    pub fn set_umask(&self, new_mask: FileMode) -> FileMode {
+        let mut mask = self.umask.write().unwrap();
+        let old_mask = mask.clone();
+        *mask = new_mask;
+        old_mask
     }
 
     /// Get the signal queues for process-directed signals.

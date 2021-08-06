@@ -11,7 +11,8 @@ use super::thread::ThreadName;
 use super::{table, HostWaker, ProcessRef, ThreadRef};
 use crate::entry::context_switch::{CpuContext, GpRegs};
 use crate::fs::{
-    CreationFlags, FileDesc, FileTable, FsPath, FsView, HostStdioFds, StdinFile, StdoutFile,
+    CreationFlags, FileDesc, FileMode, FileTable, FsPath, FsView, HostStdioFds, StdinFile,
+    StdoutFile,
 };
 use crate::prelude::*;
 use crate::vm::ProcessVM;
@@ -236,6 +237,7 @@ fn new_process(
         let mut builder = ProcessBuilder::new()
             .vm(vm_ref)
             .exec_path(&elf_path)
+            .umask(process_ref.umask())
             .parent(process_ref)
             .sched(sched_ref)
             .rlimits(rlimit_ref)
@@ -302,7 +304,7 @@ fn init_files(
                     let inode_file = current_ref.fs().lock().unwrap().open_file(
                         &FsPath::try_from(path.as_str())?,
                         oflag,
-                        mode,
+                        FileMode::from_bits_truncate(mode as u16),
                     )?;
                     let file_ref = FileRef::new_inode(inode_file);
                     let creation_flags = CreationFlags::from_bits_truncate(oflag);
