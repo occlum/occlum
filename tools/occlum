@@ -440,7 +440,9 @@ cmd_package() {
         "
     fi
 
-    cd .. && tar -cvzf $instance_dir/$package_name $pkg_files $sim_files
+    cd .. && tar -cvzf $instance_dir/$package_name \
+                --transform s/$instance_base_name/$(basename $package_name .tar.gz)/ \
+                $pkg_files $sim_files
 
     echo "The package $package_name is generated successfully"
 }
