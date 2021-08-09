@@ -211,7 +211,9 @@ impl OcclumExec for OcclumExecImpl {
             thread::spawn(move || {
                 loop {
                     debug!("waiting:");
-                    match exit_status.wait(0) {
+                    // The value we wait should be equal to init value,
+                    // and must be outside the 0 .. 0xff00 range.
+                    match exit_status.wait(-1) {
                         Ok(()) => break,
                         Err(err) => {
                             debug!("error:{:?} {:?} ", err, exit_status);
