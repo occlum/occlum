@@ -278,7 +278,7 @@ extern "C" {
      *
      * @retval If 0, then success; otherwise, check errno for the exact error type.
      */
-    fn occlum_pal_create_process(args: *mut occlum_pal_create_process_args) -> i32;
+    fn occlum_pal_create_process(args: *const occlum_pal_create_process_args) -> i32;
 
     /*
      * @brief Execute the process inside the Occlum enclave
@@ -287,7 +287,7 @@ extern "C" {
      *
      * @retval If 0, then success; otherwise, check errno for the exact error type.
      */
-    fn occlum_pal_exec(args: *mut occlum_pal_exec_args) -> i32;
+    fn occlum_pal_exec(args: *const occlum_pal_exec_args) -> i32;
 
     /*
      * @brief Send a signal to one or multiple LibOS processes
@@ -330,15 +330,19 @@ fn rust_occlum_pal_create_process(
 
     let stdio_raw = Box::new(stdio);
     let mut libos_tid = 0;
-    let create_process_args = Box::new(occlum_pal_create_process_args {
+    let argv = cmd_args_array.as_ptr();
+    let env = cmd_envs_array.as_ptr();
+
+    let args = occlum_pal_create_process_args {
         path: cmd_path.as_ptr() as *const libc::c_char,
-        argv: Box::into_raw(cmd_args_array.into_boxed_slice()) as *const *const libc::c_char,
-        env: Box::into_raw(cmd_envs_array.into_boxed_slice()) as *const *const libc::c_char,
+        argv: argv as *const *const libc::c_char,
+        env: env as *const *const libc::c_char,
         stdio: *stdio_raw,
         pid: &mut libos_tid as *mut i32,
-    });
+    };
 
-    let ret = unsafe { occlum_pal_create_process(Box::into_raw(create_process_args)) };
+    let ret = unsafe { occlum_pal_create_process(&args as *const occlum_pal_create_process_args) };
+
     match ret {
         0 => Ok(libos_tid),
         _ => Err(ret),
@@ -346,12 +350,13 @@ fn rust_occlum_pal_create_process(
 }
 
 fn rust_occlum_pal_exec(occlum_process_id: i32, exit_status: &mut i32) -> Result<(), i32> {
-    let exec_args = Box::new(occlum_pal_exec_args {
+    let args = occlum_pal_exec_args {
         pid: occlum_process_id,
         exit_value: exit_status as *mut i32,
-    });
+    };
 
-    let result = panic::catch_unwind(|| unsafe { occlum_pal_exec(Box::into_raw(exec_args)) });
+    let result =
+        panic::catch_unwind(|| unsafe { occlum_pal_exec(&args as *const occlum_pal_exec_args) });
 
     match result {
         Ok(ret) => {
