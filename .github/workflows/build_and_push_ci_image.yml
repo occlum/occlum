@@ -192,6 +192,7 @@ jobs:
     - name: Copy context for docker build
       run: |
         cp -r tools/docker .
+        
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v1
 
@@ -200,7 +201,7 @@ jobs:
 
     - name: build tf_serving image
       run: |
-        docker build -f ./demos/tensorflow/tensorflow_serving/docker/Dockerfile.devel . -t tf_serving_pic:latest
+        docker build -f ./demos/tensorflow/tensorflow_serving/docker/Dockerfile.devel . -t occlum/tf_serving_pic:latest
 
     - name: Login to DockerHub
       uses: docker/login-action@v1
