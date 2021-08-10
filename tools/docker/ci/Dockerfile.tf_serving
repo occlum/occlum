@@ -1,6 +1,6 @@
 ARG OCCLUM_VERSION
 
-FROM occlum/tf_serving_pic:latest as build_binary
+FROM occlumbackup/tf_serving_pic:latest as build_binary
 
 FROM occlum/occlum:$OCCLUM_VERSION-ubuntu18.04 as base
 LABEL maintainer="Zehuan Li <lizehuan.lzh@antgroup.com>"
