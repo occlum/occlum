@@ -224,6 +224,6 @@ jobs:
         load: true
         tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu18.04-tf_serving
 
-    - name: push service
-        run: |
-          docker push occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu18.04-tf_serving
+    - name: Push image
+      run: |
+        docker push occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu18.04-tf_serving
