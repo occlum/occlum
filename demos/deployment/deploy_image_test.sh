@@ -7,7 +7,9 @@ if [[ $1 != "ubuntu18.04" && $1 != "centos8.2" ]]; then
 fi
 
 OS=$1
-DEVICE_OPTION="--device /dev/isgx"
+if [ -z "$DEVICE_OPTION" ]; then
+    DEVICE_OPTION="--device /dev/isgx"
+fi
 
 docker build -f Dockerfile_template."$OS" -t test-package:"$OS" .
 name="$OS"_deploy_test
