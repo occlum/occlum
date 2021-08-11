@@ -12,7 +12,11 @@ env:
 jobs:
   Collect-code-coverage:
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
-    runs-on: [self-hosted, SGX1-HW]
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
+
     steps:
     - name: Clean before running
       run: |
@@ -38,7 +42,13 @@ jobs:
 
     - name: Create container
       run: |
-        occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        else
+          echo "Unsupported Hardware"
+        fi;
         echo "occlum_test=$occlum_test" >> $GITHUB_ENV
 
     - name: Change download source of crates.io
@@ -73,7 +83,11 @@ jobs:
 
   Make-test-on-ubuntu:
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
-    runs-on: [self-hosted, SGX1-HW]
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
+
     steps:
     - name: Clean before running
       run: |
@@ -99,8 +113,15 @@ jobs:
 
     - name: Create container
       run: |
-        occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        else
+          echo "Unsupported Hardware"
+        fi;
         echo "occlum_test=$occlum_test" >> $GITHUB_ENV
+
 
     - name: Change download source of crates.io
       run: |
@@ -131,7 +152,11 @@ jobs:
 
   C_cpp_rust_golang_embedded_mode_support_test:
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
-    runs-on: [self-hosted, SGX1-HW]
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
+
     steps:
     - name: Clean before running
       run: |
@@ -155,7 +180,13 @@ jobs:
 
     - name: Create container
       run: |
-        language_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          language_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          language_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        else
+          echo "Unsupported Hardware"
+        fi;
         echo "language_support_test=$language_support_test" >> $GITHUB_ENV
 
     - name: Configure dependency source
@@ -238,7 +269,11 @@ jobs:
 
   Java_support_test:
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
-    runs-on: [self-hosted, SGX1-HW]
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
+
     steps:
     - name: Clean before running
       run: |
@@ -262,7 +297,13 @@ jobs:
 
     - name: Create container
       run: |
-        java_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          java_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          java_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        else
+          echo "Unsupported Hardware"
+        fi;
         echo "java_support_test=$java_support_test" >> $GITHUB_ENV
 
     - name: Configure dependency source
@@ -300,7 +341,11 @@ jobs:
 
   Bazel_test:
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
-    runs-on: [self-hosted, SGX1-HW]
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
+
     steps:
     - name: Clean before running
       run: |
@@ -324,7 +369,13 @@ jobs:
 
     - name: Create container
       run: |
-        hello_bazel_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          hello_bazel_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          hello_bazel_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        else
+          echo "Unsupported Hardware"
+        fi;
         echo "hello_bazel_test=$hello_bazel_test" >> $GITHUB_ENV
 
     - name: Configure dependency source
@@ -368,7 +419,11 @@ jobs:
 
   Fish_test:
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
-    runs-on: [self-hosted, SGX1-HW]
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
+
     steps:
     - name: Clean before running
       run: |
@@ -392,9 +447,14 @@ jobs:
 
     - name: Create container
       run: |
-        fish_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          fish_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          fish_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        else
+          echo "Unsupported Hardware"
+        fi;
         echo "fish_test=$fish_test" >> $GITHUB_ENV
-        cat $GITHUB_ENV
 
     - name: Configure dependency source
       run: |
@@ -433,7 +493,11 @@ jobs:
 
   Xgboost_test:
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
-    runs-on: [self-hosted, SGX1-HW]
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
+
     steps:
     - name: Clean before running
       run: |
@@ -457,9 +521,14 @@ jobs:
 
     - name: Create container
       run: |
-        xgboost_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          xgboost_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          xgboost_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        else
+          echo "Unsupported Hardware"
+        fi;
         echo "xgboost_test=$xgboost_test" >> $GITHUB_ENV
-        cat $GITHUB_ENV
 
     - name: Configure dependency source
       run: |
@@ -498,7 +567,11 @@ jobs:
 
   Sqlite_test:
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
-    runs-on: [self-hosted, SGX1-HW]
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
+
     steps:
     - name: Clean before running
       run: |
@@ -522,7 +595,13 @@ jobs:
 
     - name: Create container
       run: |
-        sqlite_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04)
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          sqlite_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          sqlite_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        else
+          echo "Unsupported Hardware"
+        fi;
         echo "sqlite_test=$sqlite_test" >> $GITHUB_ENV
 
     - name: Configure dependency source
@@ -559,7 +638,11 @@ jobs:
 
   Python_musl_support_test:
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
-    runs-on: [self-hosted, SGX1-HW]
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
+
     steps:
     - name: Clean before running
       run: |
@@ -581,7 +664,13 @@ jobs:
     - name: Create container
       run: |
         docker pull occlumbackup/occlum:latest-ubuntu18.04-python
-        python_musl_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-python)
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          python_musl_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-python);
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          python_musl_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-python);
+        else
+          echo "Unsupported Hardware"
+        fi;
         echo "python_musl_support_test=$python_musl_support_test" >> $GITHUB_ENV
 
     - name: Configure dependency source
@@ -613,7 +702,11 @@ jobs:
 
   Openvino_test:
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
-    runs-on: [self-hosted, SGX1-HW]
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
+
     steps:
     - name: Clean before running
       run: |
@@ -635,7 +728,13 @@ jobs:
     - name: Create container
       run: |
         docker pull occlumbackup/occlum:latest-ubuntu18.04-openvino
-        openvino_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-openvino)
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          openvino_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-openvino);
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          openvino_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-openvino);
+        else
+          echo "Unsupported Hardware"
+        fi;
         echo "openvino_test=$openvino_test" >> $GITHUB_ENV
 
     - name: Configure dependency source
@@ -664,7 +763,11 @@ jobs:
 
   Grpc_test:
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
-    runs-on: [self-hosted, SGX1-HW]
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
+
     steps:
     - name: Clean before running
       run: |
@@ -686,7 +789,13 @@ jobs:
     - name: Create container
       run: |
         docker pull occlumbackup/occlum:latest-ubuntu18.04-grpc
-        grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-grpc)
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-grpc);
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-grpc);
+        else
+          echo "Unsupported Hardware"
+        fi;
         echo "grpc_test=$grpc_test" >> $GITHUB_ENV
 
     - name: Change download source of crates.io
@@ -720,9 +829,14 @@ jobs:
       if: ${{ always() }}
       run: docker stop $grpc_test
 
+
   Gvisor_test:
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
-    runs-on: [self-hosted, SGX1-HW]
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
+
     steps:
     - name: Clean before running
       run: |
@@ -744,7 +858,13 @@ jobs:
     - name: Create container
       run: |
         docker pull occlumbackup/occlum:latest-ubuntu18.04-gvisor_test
-        gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-gvisor_test)
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-gvisor_test);
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-gvisor_test);
+        else
+          echo "Unsupported Hardware"
+        fi;
         echo "gvisor_test=$gvisor_test" >> $GITHUB_ENV
 
     - name: Change download source of crates.io
@@ -773,7 +893,10 @@ jobs:
 
   Test_rpm_deploy:
     if: github.event_name == 'push'
-    runs-on: [self-hosted, SGX1-HW]
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
 
     steps:
     - name: Clean before running
@@ -789,16 +912,28 @@ jobs:
     - name: Test deployment
       run: |
         cd demos/deployment
-        ./deploy_image_test.sh centos8.2
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          ./deploy_image_test.sh centos8.2
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          DEVICE_OPTION="-v /dev/sgx:/dev/sgx" ./deploy_image_test.sh centos8.2
+        else
+          echo "Unsupported Hardware"
+          exit 1
+        fi;
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop centos8.2_deploy_test
+      run: |
+        docker stop centos8.2_deploy_test
+        docker rm -f centos8.2_deploy_test
 
 
   Test_deb_deploy:
     if: github.event_name == 'push'
-    runs-on: [self-hosted, SGX1-HW]
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
 
     steps:
     - name: Clean before running
@@ -814,8 +949,91 @@ jobs:
     - name: Test deployment
       run: |
         cd demos/deployment
-        ./deploy_image_test.sh ubuntu18.04
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          ./deploy_image_test.sh ubuntu18.04
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          DEVICE_OPTION="-v /dev/sgx:/dev/sgx" ./deploy_image_test.sh ubuntu18.04
+        else
+          echo "Unsupported Hardware"
+          exit 1
+        fi;
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop ubuntu18.04_deploy_test
+      run: |
+        docker stop ubuntu18.04_deploy_test
+        docker rm -f ubuntu18.04_deploy_test
+
+
+# Tensorflow_serving requires binary tensorflow_serving PIC, here we compile tensorflow_model_server before workflow
+  Tensorflow_serving_test:
+    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        # Tensorflow serving test requires AVX512 instruction support. Only the SGX2-HW machine has support for that.
+        self_runner: [[self-hosted, SGX2-HW]]
+
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - name: Checkout code
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+
+    - name: Checkout code from fork
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
+        submodules: true
+
+    - name: Create container
+      run: |
+        docker pull occlumbackup/occlum:latest-ubuntu18.04-tf_serving
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          tf_serving_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-tf_serving);
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          tf_serving_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-tf_serving);
+        else
+          echo "Unsupported Hardware"
+        fi;
+        echo "tf_serving_test=$tf_serving_test" >> $GITHUB_ENV
+
+    - name: Change download source of crates.io
+      run: |
+        docker exec $tf_serving_test bash -c "cat <<- EOF >/root/.cargo/config
+        [source.crates-io]
+        registry = \"https://github.com/rust-lang/crates.io-index\"
+        replace-with = 'ustc'
+        [source.ustc]
+        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+        EOF"
+
+    - name: Build dependencies
+      run: docker exec $tf_serving_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec $tf_serving_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+
+    - name: Move dependencies to current demo
+      run: docker exec $tf_serving_test bash -c "mv /root/tensorflow_model_server /root/occlum/demos/tensorflow/tensorflow_serving; mv /root/resnet50-v15-fp32 /root/occlum/demos/tensorflow/tensorflow_serving"
+
+    - name: Generate SSL
+      run: docker exec $tf_serving_test bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving; ./generate_ssl_config.sh localhost"
+
+    - name: Run tf_serving server
+      run: docker exec $tf_serving_test bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving; ./run_occlum_tf_serving.sh"
+
+    - name: Run tf_serving client
+      run: |
+        sleep 120;
+        docker exec $tf_serving_test bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving/client; ./benchmark.sh python3 localhost:8500 ../ssl_configure/server.crt"
+
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop $tf_serving_test
