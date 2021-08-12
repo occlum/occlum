@@ -8,7 +8,7 @@ edition = "2018"
 
 [features]
 default = ["libc"]
-sgx = ["sgx_types", "sgx_tstd", "sgx_trts", "sgx_libc", "io-uring/sgx"]
+sgx = ["sgx_tstd", "sgx_libc", "io-uring/sgx"]
 
 [dependencies]
 atomic = "0.5.0"
@@ -19,9 +19,7 @@ slab = { git = "https://github.com/tokio-rs/slab.git", default-features = false 
 libc = { version = "0.2.0", optional = true }
 
 io-uring = { path = "../../../../deps/io-uring", features = ["concurrent"]  }
-sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }
 sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", optional = true, features = ["backtrace"] }
-sgx_trts = { path = "../../../../deps/rust-sgx-sdk/sgx_trts", optional = true }
 sgx_libc = { path = "../../../../deps/rust-sgx-sdk/sgx_libc", optional = true }
 
 [dev-dependencies]

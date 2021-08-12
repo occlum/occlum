@@ -37,11 +37,11 @@
 //! # let io_uring = Builder::new().build(256).unwrap();
 //! let fd = Fd(1); // use the stdout
 //! let msg = "hello world\0";
-//! let callback = move |retval: i32| {
+//! let completion_callback = move |retval: i32| {
 //!     assert!(retval > 0);
 //! };
 //! let handle = unsafe {
-//!     io_uring.write(fd, msg.as_ptr(), msg.len() as u32, 0, RwFlags::default(), callback)
+//!     io_uring.write(fd, msg.as_ptr(), msg.len() as u32, 0, RwFlags::default(), completion_callback)
 //! };
 //! # io_uring.submit_requests();
 //! # while handle.retval().is_none() {
@@ -62,13 +62,30 @@
 //! ```
 //!
 //! After completing the I/O requests, Linux will push I/O responses into the completion queue of
-//! the io_uring instance. You need _periodically_ poll completions from the queue.
+//! the io_uring instance. You need _periodically_ poll completions from the queue:
 //! ```
 //! # use io_uring_callback::{Builder};
 //! # let io_uring = Builder::new().build(256).unwrap();
 //! io_uring.poll_completions();
 //! ```
 //! which will trigger registered callbacks and wake up handles.
+//!
+//! If you want to busywait _min_complete_ completions, which mainly used in the simple test:
+//! ```
+//! # use io_uring_callback::{Builder, Timespec, TimeoutFlags};
+//! # let io_uring = Builder::new().build(256).unwrap();
+//! # let tp = Timespec { tv_sec: 1, tv_nsec: 0, };
+//! # let completion_callback = move |_retval: i32| {};
+//! # let handle = unsafe {
+//! #     io_uring.timeout(&tp as *const _, 0, TimeoutFlags::empty(), completion_callback)
+//! # };
+//! # io_uring.submit_requests();
+//! let min_complete = 1;
+//! io_uring.busywait_completions(min_complete);
+//! ```
+//!
+//! When the I/O request is completed (the request is processed or cancelled by the kernel),
+//! `poll_completions` and `busywait_completions` will trigger the user-registered callback.
 //!
 //! # I/O Handles
 //!
@@ -77,27 +94,45 @@
 //!
 //! So why bother keeping I/O handles? The reasons are three-fold.
 //!
-//! First, as a future, `IoHandle` allows you to await on it, which is quite
+//! - First, as a future, `IoHandle` allows you to await on it, which is quite
 //! convenient if you happen to use io_uring with Rust's async/await.
-//! Second, `IoHandle` makes it possible to _cancel_ on-going
-//! I/O requests (although the `cancel` method of `IoHandle` is not implemented, yet).
-//! Third, it makes the whole APIs less prone to memory safety issues. Recall that all I/O submitting
+//! - Second, `IoHandle` makes it possible to _cancel_ on-going I/O requests.
+//! - Third, it makes the whole APIs less prone to memory safety issues. Recall that all I/O submitting
 //! methods (e.g., `write`, `accept`, etc.) are _unsafe_ as there are no guarantee that
 //! their arguments---like FDs or buffer pointers---are valid throughout the lifetime of
 //! an I/O request. What if an user accidentally releases the in-use resources associated with
 //! an on-going I/O request? I/O handles can detect such programming bugs as long as
 //! the handles are also released along with other in-use I/O resources (which is most likely).
 //! This is because when an `IoHandle` is dropped, we will panic if its state is neither
-//! completed (`IoState::Completed`) or canceled (`IoState::Canceled`). That is, dropping
+//! processed (`IoState::Processed`) or canceled (`IoState::Canceled`). That is, dropping
 //! an `IoHandle` that is still in-use is forbidden.
+//!
+//! After pushing an I/O request into the submission queue, you will get an `IoHandle`.
+//! With this handle, you can cancel the I/O request.
+//! ```
+//! # use io_uring_callback::Builder;
+//! use io_uring_callback::{Timespec, TimeoutFlags};
+//!
+//! # let io_uring = Builder::new().build(256).unwrap();
+//! let tp = Timespec { tv_sec: 1, tv_nsec: 0, };
+//! let completion_callback = move |_retval: i32| {};
+//! let handle = unsafe {
+//!     io_uring.timeout(&tp as *const _, 0, TimeoutFlags::empty(), completion_callback)
+//! };
+//! io_uring.submit_requests();
+//! unsafe { io_uring.cancel(&handle); }
+//! # while handle.retval().is_none() {
+//! #    io_uring.poll_completions();
+//! # }
+//! ```
 
 #![feature(get_mut_unchecked)]
 #![cfg_attr(feature = "sgx", no_std)]
 
-#[cfg(feature = "sgx")] 
-extern crate sgx_tstd as std;
-#[cfg(feature = "sgx")] 
+#[cfg(feature = "sgx")]
 extern crate sgx_libc as libc;
+#[cfg(feature = "sgx")]
+extern crate sgx_tstd as std;
 
 use std::io;
 use std::sync::Arc;
@@ -119,7 +154,7 @@ use crate::io_handle::IoToken;
 mod io_handle;
 
 pub use crate::io_handle::{IoHandle, IoState};
-pub use io_uring::opcode::types::{Fd, RwFlags};
+pub use io_uring::opcode::types::{Fd, RwFlags, TimeoutFlags, Timespec};
 
 /// An io_uring instance.
 ///
@@ -144,6 +179,10 @@ impl Drop for IoUring {
 }
 
 impl IoUring {
+    /// The magic token_key for Cancel I/O request.
+    /// The magic token_key should be different from the token_table's keys.
+    const CANCEL_TOKEN_KEY: u64 = u64::MAX;
+
     /// Constructor for internal uses.
     ///
     /// Users should use `Builder` instead.
@@ -161,7 +200,6 @@ impl IoUring {
     pub unsafe fn accept(
         &self,
         fd: Fd,
-        // fixed_fd: Fixed,
         addr: *mut libc::sockaddr,
         addrlen: *mut libc::socklen_t,
         flags: u32,
@@ -179,7 +217,6 @@ impl IoUring {
     pub unsafe fn connect(
         &self,
         fd: Fd,
-        // fixed_fd: Fixed,
         addr: *const libc::sockaddr,
         addrlen: libc::socklen_t,
         callback: impl FnOnce(i32) + Send + 'static,
@@ -188,33 +225,18 @@ impl IoUring {
         self.push_entry(entry, callback)
     }
 
-    /// Push a poll_add request into the submission queue of the io_uring.
+    /// Push a poll request into the submission queue of the io_uring.
     ///
     /// # Safety
     ///
     /// See the safety section of the `IoUring`.
-    pub unsafe fn poll_add(
+    pub unsafe fn poll(
         &self,
         fd: Fd,
-        // fixed_fd: Fixed,
         flags: u32,
         callback: impl FnOnce(i32) + Send + 'static,
     ) -> IoHandle {
         let entry = opcode::PollAdd::new(fd, flags).build();
-        self.push_entry(entry, callback)
-    }
-
-    /// Push a poll_remove request into the submission queue of the io_uring.
-    ///
-    /// # Safety
-    ///
-    /// See the safety section of the `IoUring`.
-    pub unsafe fn poll_remove(
-        &self,
-        user_data: u64,
-        callback: impl FnOnce(i32) + Send + 'static,
-    ) -> IoHandle {
-        let entry = opcode::PollRemove::new(user_data).build();
         self.push_entry(entry, callback)
     }
 
@@ -226,7 +248,6 @@ impl IoUring {
     pub unsafe fn read(
         &self,
         fd: Fd,
-        // fixed_fd: Fixed,
         buf: *mut u8,
         len: u32,
         offset: libc::off_t,
@@ -248,7 +269,6 @@ impl IoUring {
     pub unsafe fn write(
         &self,
         fd: Fd,
-        // fixed_fd: Fixed,
         buf: *const u8,
         len: u32,
         offset: libc::off_t,
@@ -270,7 +290,6 @@ impl IoUring {
     pub unsafe fn readv(
         &self,
         fd: Fd,
-        // fixed_fd: Fixed,
         iovec: *const libc::iovec,
         len: u32,
         offset: libc::off_t,
@@ -292,7 +311,6 @@ impl IoUring {
     pub unsafe fn writev(
         &self,
         fd: Fd,
-        // fixed_fd: Fixed,
         iovec: *const libc::iovec,
         len: u32,
         offset: libc::off_t,
@@ -314,7 +332,6 @@ impl IoUring {
     pub unsafe fn recvmsg(
         &self,
         fd: Fd,
-        // fixed_fd: Fixed,
         msg: *mut libc::msghdr,
         flags: u32,
         callback: impl FnOnce(i32) + Send + 'static,
@@ -331,7 +348,6 @@ impl IoUring {
     pub unsafe fn sendmsg(
         &self,
         fd: Fd,
-        // fixed_fd: Fixed,
         msg: *const libc::msghdr,
         flags: u32,
         callback: impl FnOnce(i32) + Send + 'static,
@@ -361,6 +377,25 @@ impl IoUring {
         self.push_entry(entry, callback)
     }
 
+    /// Push a timeout request into the submission queue of the io_uring.
+    ///
+    /// # Safety
+    ///
+    /// See the safety section of the `IoUring`.
+    pub unsafe fn timeout(
+        &self,
+        timespec: *const types::Timespec,
+        count: u32,
+        flags: types::TimeoutFlags,
+        callback: impl FnOnce(i32) + Send + 'static,
+    ) -> IoHandle {
+        let entry = opcode::Timeout::new(timespec)
+            .count(count)
+            .flags(flags)
+            .build();
+        self.push_entry(entry, callback)
+    }
+
     /// Submit all I/O requests in the submission queue of io_uring.
     ///
     /// Without calling this method, new I/O requests pushed into the submission queue will
@@ -371,21 +406,46 @@ impl IoUring {
         }
     }
 
-    /// Poll new I/O completions in the completions queue of io_uring.
+    /// Poll new I/O completions in the completions queue of io_uring
+    /// and return the number of I/O completions.
     ///
     /// Upon receiving completed I/O, the corresponding user-registered callback functions
     /// will get invoked and the `IoHandle` (as a `Future`) will become ready.
-    pub fn poll_completions(&self) {
+    pub fn poll_completions(&self) -> usize {
         let cq = self.ring.completion();
+        let mut nr_complete = 0;
         while let Some(cqe) = cq.pop() {
             let retval = cqe.result();
-            let io_token = {
-                let token_idx = cqe.user_data() as usize;
-                let mut token_table = self.token_table.lock().unwrap();
-                token_table.remove(token_idx)
-            };
-            io_token.complete(retval);
+            let token_key = cqe.user_data();
+            if token_key != IoUring::CANCEL_TOKEN_KEY {
+                let io_token = {
+                    let token_idx = token_key as usize;
+                    let mut token_table = self.token_table.lock().unwrap();
+                    token_table.remove(token_idx)
+                };
+
+                io_token.complete(retval);
+                nr_complete += 1;
+            }
         }
+        nr_complete
+    }
+
+    /// Wait for at least min_complete new I/O completions in the completions queue of io_uring
+    /// and return the number of I/O completions.
+    ///
+    /// Upon receiving completed I/O, the corresponding user-registered callback functions
+    /// will get invoked and the `IoHandle` (as a `Future`) will become ready.
+    pub fn busywait_completions(&self, min_complete: usize) -> usize {
+        if min_complete == 0 {
+            return self.poll_completions();
+        }
+
+        let mut nr_complete = 0;
+        while nr_complete < min_complete {
+            nr_complete += self.poll_completions();
+        }
+        nr_complete
     }
 
     /// Start a helper thread that is busy doing `io_uring_enter` on this io_uring instance.
@@ -425,7 +485,9 @@ impl IoUring {
             let mut token_table = self.token_table.lock().unwrap();
             let token_slot = token_table.vacant_entry();
             let token_key = token_slot.key() as u64;
-            let token = Arc::new(IoToken::new(callback));
+            assert!(token_key != IoUring::CANCEL_TOKEN_KEY);
+
+            let token = Arc::new(IoToken::new(callback, token_key));
             token_slot.insert(token.clone());
             let handle = IoHandle::new(token);
 
@@ -442,9 +504,24 @@ impl IoUring {
         io_handle
     }
 
-    /// Cancel all ongoing async I/O.
-    pub fn cancel_all(&self) {
-        todo!("implement cancel in the future");
+    /// Cancel an ongoing I/O request.
+    ///
+    /// # safety
+    ///
+    /// The handle must be generated by this IoUring instance.
+    pub unsafe fn cancel(&self, handle: &IoHandle) {
+        let target_token_key = match handle.0.transit_to_cancelling() {
+            Ok(target_token_key) => target_token_key,
+            Err(_) => {
+                return;
+            }
+        };
+        let mut entry = opcode::AsyncCancel::new(target_token_key).build();
+        entry = entry.user_data(IoUring::CANCEL_TOKEN_KEY);
+
+        if self.ring.submission().push(entry).is_err() {
+            panic!("sq must be large enough");
+        }
     }
 }
 
@@ -495,14 +572,12 @@ impl Builder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::{IoSlice, IoSliceMut};
-    use std::os::unix::io::AsRawFd;
-    use std::sync::{Arc, Mutex};
-
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
+    use std::fs::File;
+    use std::io::{IoSlice, IoSliceMut, Write};
+    use std::os::unix::io::{AsRawFd, FromRawFd};
+    use std::thread;
+    use std::time::Duration;
+    use std::time::Instant;
 
     #[test]
     fn test_builder() {
@@ -529,14 +604,8 @@ mod tests {
         let w_iovecs = vec![IoSlice::new(text), IoSlice::new(text2)];
         let r_iovecs = vec![IoSliceMut::new(&mut output), IoSliceMut::new(&mut output2)];
 
-        let complete_io: Arc<Mutex<Option<i32>>> = Arc::new(Mutex::new(None));
-
-        let clone = complete_io.clone();
-        let complete_fn = move |retval: i32| {
-            let mut inner = clone.lock().unwrap();
-            inner.replace(retval);
-        };
-        let _handle = unsafe {
+        let complete_fn = move |_retval: i32| {};
+        let handle = unsafe {
             io_uring.writev(
                 fd,
                 w_iovecs.as_ptr().cast(),
@@ -547,24 +616,13 @@ mod tests {
             )
         };
         io_uring.submit_requests();
-        loop {
-            io_uring.poll_completions();
 
-            let clone = complete_io.clone();
-            let mut inner = clone.lock().unwrap();
-            if inner.is_some() {
-                let retval = inner.take().unwrap();
-                assert_eq!(retval, (text.len() + text2.len()) as i32);
-                break;
-            }
-        }
+        io_uring.busywait_completions(1);
+        let retval = handle.retval().unwrap();
+        assert_eq!(retval, (text.len() + text2.len()) as i32);
 
-        let clone = complete_io.clone();
-        let complete_fn = move |retval: i32| {
-            let mut inner = clone.lock().unwrap();
-            inner.replace(retval);
-        };
-        let _handle = unsafe {
+        let complete_fn = move |_retval: i32| {};
+        let handle = unsafe {
             io_uring.readv(
                 fd,
                 r_iovecs.as_ptr().cast(),
@@ -575,18 +633,149 @@ mod tests {
             )
         };
         io_uring.submit_requests();
-        loop {
-            io_uring.poll_completions();
 
-            let clone = complete_io.clone();
-            let mut inner = clone.lock().unwrap();
-            if inner.is_some() {
-                let retval = inner.take().unwrap();
-                assert_eq!(retval, (text.len() + text2.len()) as i32);
-                assert_eq!(&output, text);
-                assert_eq!(&output2, text2);
-                break;
-            }
+        io_uring.busywait_completions(1);
+        let retval = handle.retval().unwrap();
+        assert_eq!(retval, (text.len() + text2.len()) as i32);
+        assert_eq!(&output, text);
+        assert_eq!(&output2, text2);
+    }
+
+    #[test]
+    fn test_poll() {
+        let mut fd = unsafe {
+            let fd = libc::eventfd(0, libc::EFD_CLOEXEC);
+            assert!(fd != -1);
+            File::from_raw_fd(fd)
+        };
+
+        let io_uring = IoUring::new(io_uring::IoUring::new(256).unwrap());
+
+        let complete_fn = move |_retval: i32| {};
+        let handle = unsafe { io_uring.poll(Fd(fd.as_raw_fd()), libc::POLLIN as _, complete_fn) };
+        io_uring.submit_requests();
+
+        thread::sleep(Duration::from_millis(100));
+        assert_eq!(io_uring.poll_completions(), 0);
+
+        fd.write(&0x1u64.to_ne_bytes()).unwrap();
+        io_uring.busywait_completions(1);
+        assert_eq!(handle.retval().unwrap(), 1);
+    }
+
+    #[test]
+    fn test_cancel_poll() {
+        let mut fd = unsafe {
+            let fd = libc::eventfd(0, libc::EFD_CLOEXEC);
+            assert!(fd != -1);
+            File::from_raw_fd(fd)
+        };
+
+        let io_uring = IoUring::new(io_uring::IoUring::new(256).unwrap());
+
+        let complete_fn = move |_retval: i32| {};
+        let poll_handle =
+            unsafe { io_uring.poll(Fd(fd.as_raw_fd()), libc::POLLIN as _, complete_fn) };
+        io_uring.submit_requests();
+
+        unsafe {
+            io_uring.cancel(&poll_handle);
         }
+        io_uring.submit_requests();
+
+        thread::sleep(Duration::from_millis(100));
+
+        fd.write(&0x1u64.to_ne_bytes()).unwrap();
+        io_uring.busywait_completions(1);
+
+        assert_eq!(poll_handle.retval().unwrap(), -libc::ECANCELED);
+    }
+
+    #[test]
+    fn test_cancel_poll_failed() {
+        let mut fd = unsafe {
+            let fd = libc::eventfd(0, libc::EFD_CLOEXEC);
+            assert!(fd != -1);
+            File::from_raw_fd(fd)
+        };
+
+        let io_uring = IoUring::new(io_uring::IoUring::new(256).unwrap());
+
+        let complete_fn = move |_retval: i32| {};
+        let poll_handle =
+            unsafe { io_uring.poll(Fd(fd.as_raw_fd()), libc::POLLIN as _, complete_fn) };
+        io_uring.submit_requests();
+
+        fd.write(&0x1u64.to_ne_bytes()).unwrap();
+        io_uring.busywait_completions(1);
+
+        unsafe {
+            io_uring.cancel(&poll_handle);
+        }
+        io_uring.submit_requests();
+
+        thread::sleep(Duration::from_millis(100));
+        assert_eq!(poll_handle.retval().unwrap(), 1);
+    }
+
+    #[test]
+    fn test_timeout() {
+        let io_uring = IoUring::new(io_uring::IoUring::new(256).unwrap());
+
+        let start = Instant::now();
+        let secs = 1;
+        let timespec = types::Timespec {
+            tv_sec: secs,
+            tv_nsec: 0,
+        };
+        let complete_fn = move |_retval: i32| {};
+
+        let handle = unsafe {
+            io_uring.timeout(
+                &timespec as *const _,
+                0,
+                types::TimeoutFlags::empty(),
+                complete_fn,
+            )
+        };
+        io_uring.submit_requests();
+        io_uring.busywait_completions(1);
+
+        assert_eq!(handle.retval().unwrap(), -libc::ETIME);
+        assert_eq!(start.elapsed().as_secs(), secs as u64);
+    }
+
+    #[test]
+    fn test_cancel_timeout() {
+        let io_uring = IoUring::new(io_uring::IoUring::new(256).unwrap());
+
+        let start = Instant::now();
+        let secs = 1;
+        let timespec = types::Timespec {
+            tv_sec: secs,
+            tv_nsec: 0,
+        };
+
+        let complete_fn = move |_retval: i32| {};
+
+        let handle = unsafe {
+            io_uring.timeout(
+                &timespec as *const _,
+                0,
+                types::TimeoutFlags::empty(),
+                complete_fn,
+            )
+        };
+        io_uring.submit_requests();
+
+        unsafe {
+            io_uring.cancel(&handle);
+        }
+        io_uring.submit_requests();
+
+        io_uring.busywait_completions(1);
+
+        assert_eq!(handle.retval().unwrap(), -libc::ECANCELED);
+        assert_eq!(start.elapsed().as_secs(), 0);
     }
 }

@@ -187,7 +187,7 @@ pub extern "C" fn run_sgx_example() -> sgx_status_t {
                     };
 
                     let handle =
-                        unsafe { ring.poll_add(types::Fd(fd), libc::POLLIN as _, complete_fn) };
+                        unsafe { ring.poll(types::Fd(fd), libc::POLLIN as _, complete_fn) };
 
                     slab_entry.insert(handle);
                 }

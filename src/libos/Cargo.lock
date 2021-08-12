@@ -475,9 +475,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "sgx_libc",
- "sgx_trts",
  "sgx_tstd",
- "sgx_types",
  "slab",
 ]
 

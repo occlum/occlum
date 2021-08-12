@@ -13,20 +13,23 @@ cfg_if::cfg_if! {
 
 /// The handle to an I/O request pushed to the submission queue of an io_uring instance.
 #[derive(Debug)]
-pub struct IoHandle(Arc<IoToken>);
+pub struct IoHandle(pub(crate) Arc<IoToken>);
 
 /// The state of an I/O request represented by an [`IoHandle`].
+/// If a request is in `Processed` or `Cancelled` state, means that the request is completed.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum IoState {
-    /// Submitted.
+    /// The I/O request has been submitted.
     Submitted,
-    /// Completed with a return value.
-    Completed(i32),
-    /// Cancelling (not used yet).
+    /// The I/O request has been processed by the kernel and returns a value.
+    Processed(i32),
+    /// The I/O request is being cancelled.
     Cancelling,
-    /// Cancelled (not used yet).
+    /// The I/O request has been cancelled by the kernel.
     Cancelled,
 }
+
+const CANCEL_RETVAL: i32 = -libc::ECANCELED;
 
 impl IoHandle {
     pub(crate) fn new(token: Arc<IoToken>) -> Self {
@@ -42,13 +45,6 @@ impl IoHandle {
     pub fn retval(&self) -> Option<i32> {
         self.0.retval()
     }
-
-    /// Cancel the I/O request.
-    ///
-    /// This is NOT implemented, yet.
-    pub fn cancel(&self) {
-        self.0.cancel()
-    }
 }
 
 impl Unpin for IoHandle {}
@@ -59,13 +55,11 @@ impl Future for IoHandle {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut inner = self.0.inner.lock().unwrap();
         match inner.state {
-            IoState::Completed(retval) => Poll::Ready(retval),
-            IoState::Submitted => {
+            IoState::Processed(retval) => Poll::Ready(retval),
+            IoState::Cancelled => Poll::Ready(CANCEL_RETVAL),
+            IoState::Submitted | IoState::Cancelling => {
                 inner.waker = Some(cx.waker().clone());
                 Poll::Pending
-            }
-            _ => {
-                todo!("handle cancel-related states");
             }
         }
     }
@@ -73,8 +67,8 @@ impl Future for IoHandle {
 
 impl Drop for IoHandle {
     fn drop(&mut self) {
-        // The user cannot drop a handle without completing or canceling it first.
-        assert!(matches!(self.state(), IoState::Completed(_) | IoState::Cancelled));
+        // The user cannot drop a handle if the request isn't completed.
+        assert!(matches!(self.state(), IoState::Processed(_) | IoState::Cancelled));
     }
 }
 
@@ -87,8 +81,8 @@ pub(crate) struct IoToken {
 }
 
 impl IoToken {
-    pub fn new(callback: impl FnOnce(i32) + Send + 'static) -> Self {
-        let inner = Mutex::new(Inner::new(callback));
+    pub fn new(completion_callback: impl FnOnce(i32) + Send + 'static, token_key: u64) -> Self {
+        let inner = Mutex::new(Inner::new(completion_callback, token_key));
         Self { inner }
     }
 
@@ -113,9 +107,11 @@ impl IoToken {
         (callback)(retval);
     }
 
-    pub fn cancel(&self) {
+    /// Change the state from submited to cancelling.
+    /// If transition succeeds, return the token_key for following cancel operation.
+    pub fn transit_to_cancelling(&self) -> Result<u64, ()> {
         let mut inner = self.inner.lock().unwrap();
-        inner.cancel()
+        inner.transit_to_cancelling()
     }
 }
 
@@ -129,44 +125,65 @@ impl std::fmt::Debug for IoToken {
 
 struct Inner {
     state: IoState,
-    callback: Option<Callback>,
+    completion_callback: Option<Callback>,
     waker: Option<Waker>,
+    token_key: u64,
 }
 
 type Callback = Box<dyn FnOnce(i32) + Send + 'static>;
 
 impl Inner {
-    pub fn new(callback: impl FnOnce(i32) + Send + 'static) -> Self {
+    pub fn new(completion_callback: impl FnOnce(i32) + Send + 'static, token_key: u64) -> Self {
         let state = IoState::Submitted;
-        let callback = Some(Box::new(callback) as _);
+        let completion_callback = Some(Box::new(completion_callback) as _);
         let waker = None;
         Self {
             state,
-            callback,
+            completion_callback,
             waker,
+            token_key,
         }
     }
 
     pub fn complete(&mut self, retval: i32) -> Callback {
         match self.state {
-            IoState::Submitted | IoState::Cancelling => {
-                self.state = IoState::Completed(retval);
+            IoState::Submitted => {
+                self.state = IoState::Processed(retval);
+            }
+            IoState::Cancelling => {
+                if retval == CANCEL_RETVAL {
+                    // case 1: The request was cancelled successfully.
+                    self.state = IoState::Cancelled;
+                } else {
+                    // case 2.1: The request was cancelled with error.
+                    // case 2.2: The request was not actually canceled.
+                    self.state = IoState::Processed(retval);
+                }
             }
             _ => {
-                unreachable!("cannot do complete twice or after cancelled");
+                unreachable!("cannot do complete twice");
             }
         }
 
-        self.callback.take().unwrap()
+        self.completion_callback.take().unwrap()
     }
 
-    pub fn cancel(&mut self) {
-        todo!("implement cancel in future")
+    pub fn transit_to_cancelling(&mut self) -> Result<u64, ()> {
+        match self.state {
+            IoState::Submitted => {
+                self.state = IoState::Cancelling;
+                return Ok(self.token_key);
+            }
+            _ => {
+                return Err(());
+            }
+        }
     }
 
     pub fn retval(&self) -> Option<i32> {
         match self.state {
-            IoState::Completed(retval) => Some(retval),
+            IoState::Processed(retval) => Some(retval),
+            IoState::Cancelled => Some(CANCEL_RETVAL),
             _ => None,
         }
     }

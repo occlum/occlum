@@ -111,7 +111,7 @@ fn main() {
                     };
 
                     let handle =
-                        unsafe { ring.poll_add(types::Fd(fd), libc::POLLIN as _, complete_fn) };
+                        unsafe { ring.poll(types::Fd(fd), libc::POLLIN as _, complete_fn) };
 
                     slab_entry.insert(handle);
                 }
@@ -212,7 +212,7 @@ fn main() {
                         };
 
                         let handle =
-                            unsafe { ring.poll_add(types::Fd(fd), libc::POLLIN as _, complete_fn) };
+                            unsafe { ring.poll(types::Fd(fd), libc::POLLIN as _, complete_fn) };
 
                         slab_entry.insert(handle);
                     } else {
