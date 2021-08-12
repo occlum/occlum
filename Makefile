@@ -88,7 +88,7 @@ install: minimal_sgx_libs
 
 	@echo "Installation is done."
 
-SGX_SDK=/opt/intel/sgxsdk
+SGX_SDK ?= /opt/intel/sgxsdk
 # Install minimum sgx-sdk set to support Occlum cmd execution in non-customized sgx-sdk environment
 minimal_sgx_libs: $(SGX_SDK)/lib64/libsgx_uae_service_sim.so $(SGX_SDK)/lib64/libsgx_quote_ex_sim.so
 	@echo "Install needed sgx-sdk tools ..."
