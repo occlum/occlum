@@ -212,5 +212,5 @@ jobs:
         file: ./tools/docker/ci/Dockerfile.tf_serving
         platforms: linux/amd64
         build-args: OCCLUM_VERSION=${{ env.OCCLUM_VERSION }}
-        load: true
+        push: true
         tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu18.04-tf_serving
