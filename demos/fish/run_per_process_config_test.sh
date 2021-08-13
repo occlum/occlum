@@ -15,7 +15,7 @@ cp ../test_per_process_config.sh image/bin
 # Set process memory space size to very small values and will fail when running target script using default configuration
 new_json="$(jq '.process.default_stack_size = "1MB" |
                 .process.default_heap_size = "1MB" |
-                .process.default_mmap_size = "8MB"' Occlum.json)" && \
+                .process.default_mmap_size = "10MB"' Occlum.json)" && \
 echo "${new_json}" > Occlum.json
 
 pushd image/bin

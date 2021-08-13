@@ -134,10 +134,10 @@ jobs:
       run: docker exec fish_test bash -c "cd /root/occlum/demos/fish && ./download_and_build.sh"
 
     - name: Run Fish test
-      run: docker exec fish_test bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_fish_test.sh" &
+      run: docker exec fish_test bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_fish_test.sh"
 
     - name: Run Fish process rlimit test
-      run: docker exec fish_test bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_per_process_config_test.sh" &
+      run: docker exec fish_test bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_per_process_config_test.sh"
 
   Bazel_test:
     runs-on: ubuntu-18.04
