@@ -1,7 +1,6 @@
 [submodule "deps/rust-sgx-sdk"]
 	path = deps/rust-sgx-sdk
 	url = https://github.com/occlum/incubator-teaclave-sgx-sdk.git
-	branch = sgx_2.13_for_occlum
 [submodule "deps/sefs"]
 	path = deps/sefs
 	url = https://github.com/occlum/sefs.git
