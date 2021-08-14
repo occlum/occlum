@@ -25,7 +25,7 @@ pub use self::file_handle::FileHandle as FileRef;
 pub use self::file_table::{FileDesc, FileTable};
 pub use self::fs_view::FsView;
 pub use self::host_fd::HostFd;
-pub use self::inode_file::{AsyncInode, INodeExt, INodeFile, InodeFile};
+pub use self::inode_file::{INodeExt, INodeFile, InodeFile};
 pub use self::rootfs::ROOT_INODE;
 pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
 pub use self::syscalls::*;

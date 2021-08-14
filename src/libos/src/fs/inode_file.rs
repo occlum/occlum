@@ -1,5 +1,4 @@
 use super::*;
-use inherit_methods_macro::inherit_methods;
 use rcore_fs_sefs::dev::SefsMac;
 
 // TODO: rename all INodeFile to InodeFile
@@ -232,30 +231,4 @@ impl INodeExt for dyn INode {
         let file_mode = FileMode::from_bits_truncate(info.mode);
         Ok(file_mode.is_readable())
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct AsyncInode(Arc<InodeFile>);
-
-#[inherit_methods(from = "self.0")]
-#[rustfmt::skip]
-impl AsyncInode {
-    pub fn new(inode: InodeFile) -> Self {
-        Self(Arc::new(inode))
-    }
-
-    pub fn inner(&self) -> &Arc<InodeFile> {
-        &self.0
-    }
-
-    // Inherit methods from the inner InodeFile. Note that all I/O methods are
-    // async wrappers of the original sync ones.
-    pub async fn read(&self, buf: &mut [u8]) -> Result<usize>;
-    pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize>;
-    pub async fn write(&self, buf: &[u8]) -> Result<usize>;
-    pub async fn writev(&self, bufs: &[&[u8]]) -> Result<usize>;
-    pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events;
-    pub fn access_mode(&self) -> AccessMode;
-    pub fn status_flags(&self) -> StatusFlags;
-    pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()>;
 }

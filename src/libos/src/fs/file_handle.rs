@@ -1,4 +1,5 @@
-use async_io::file::{Async as AsyncFile, File};
+use async_io::file::{Async, File};
+use inherit_methods_macro::inherit_methods;
 
 use super::*;
 use crate::net::SocketFile;
@@ -30,8 +31,8 @@ struct Inner {
 
 #[derive(Clone, Debug)]
 enum AnyFile {
-    File(AsyncFile<Arc<dyn File>>),
-    Inode(AsyncInode),
+    File(Arc<Async<dyn File>>),
+    Inode(Arc<AsyncInode>),
     Socket(Arc<SocketFile>),
 }
 
@@ -57,16 +58,15 @@ impl FileHandle {
     /// Create a file handle for an object of `F: File`.
     pub fn new_file<F: File + 'static>(file: F) -> Self {
         let any_file = {
-            let new_arc = Arc::new(file) as Arc<dyn File>;
-            let new_async = AsyncFile::new(new_arc);
-            AnyFile::File(new_async)
+            let arc_async_file = Arc::new(Async::new(file)) as Arc<Async<dyn File>>;
+            AnyFile::File(arc_async_file)
         };
         Self::new(any_file)
     }
 
     /// Create a file handle for an inode file.
     pub fn new_inode(file: InodeFile) -> Self {
-        let any_file = AnyFile::Inode(AsyncInode::new(file));
+        let any_file = AnyFile::Inode(Arc::new(AsyncInode::new(file)));
         Self::new(any_file)
     }
 
@@ -142,13 +142,40 @@ impl PartialEq for FileHandle {
     fn eq(&self, other: &Self) -> bool {
         let rhs = (&self.0.file, &other.0.file);
         if let (AnyFile::File(self_file), AnyFile::File(other_file)) = rhs {
-            Arc::as_ptr(self_file.inner()) == Arc::as_ptr(other_file.inner())
+            Arc::as_ptr(self_file) == Arc::as_ptr(other_file)
         } else if let (AnyFile::Inode(self_inode), AnyFile::Inode(other_inode)) = rhs {
-            Arc::as_ptr(self_inode.inner()) == Arc::as_ptr(other_inode.inner())
+            Arc::as_ptr(self_inode) == Arc::as_ptr(other_inode)
         } else if let (AnyFile::Socket(self_socket), AnyFile::Socket(other_socket)) = rhs {
             Arc::as_ptr(self_socket) == Arc::as_ptr(other_socket)
         } else {
             false
         }
     }
+}
+
+/// A wrapper that makes `InodeFile`'s methods _async_.
+#[derive(Debug)]
+struct AsyncInode(InodeFile);
+
+#[inherit_methods(from = "self.0")]
+#[rustfmt::skip]
+impl AsyncInode {
+    pub fn new(inode: InodeFile) -> Self {
+        Self(inode)
+    }
+
+    pub fn inner(&self) -> &InodeFile {
+        &self.0
+    }
+
+    // Inherit methods from the inner InodeFile. Note that all I/O methods are
+    // async wrappers of the original sync ones.
+    pub async fn read(&self, buf: &mut [u8]) -> Result<usize>;
+    pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize>;
+    pub async fn write(&self, buf: &[u8]) -> Result<usize>;
+    pub async fn writev(&self, bufs: &[&[u8]]) -> Result<usize>;
+    pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events;
+    pub fn access_mode(&self) -> AccessMode;
+    pub fn status_flags(&self) -> StatusFlags;
+    pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()>;
 }
