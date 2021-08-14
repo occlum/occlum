@@ -203,9 +203,9 @@ impl<F: File + ?Sized> Async<F> {
     pub fn access_mode(&self) -> AccessMode;
 }
 
-impl<F: std::fmt::Debug> std::fmt::Debug for Async<F> {
+impl<F: ?Sized + std::fmt::Debug> std::fmt::Debug for Async<F> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Async").field("0", &self.0).finish()
+        self.0.fmt(f)
     }
 }
 
@@ -257,10 +257,12 @@ mod tests {
         // Case 1
         let async_file: Async<DummyFile> = Async::new(DummyFile);
         let _ = async_file.access_mode();
+        println!("{:?}", async_file);
 
         // Case 2
         let async_file: Arc<Async<dyn File>> = Arc::new(Async::new(DummyFile)) as _;
         let _ = async_file.access_mode();
+        println!("{:?}", async_file);
     }
 
     #[test]
@@ -269,11 +271,13 @@ mod tests {
         let not_async: Arc<DummyFile> = Arc::new(DummyFile);
         let async_file: Arc<Async<DummyFile>> = not_async.into_async();
         let _ = async_file.access_mode();
+        println!("{:?}", async_file);
 
         // Case 2
         let not_async: Arc<dyn File> = Arc::new(DummyFile) as _;
         let async_file: Arc<Async<dyn File>> = not_async.into_async();
         let _ = async_file.access_mode();
+        println!("{:?}", async_file);
     }
 
     #[derive(Debug)]
