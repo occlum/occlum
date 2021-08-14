@@ -1,12 +1,14 @@
 use async_io::file::{Async, File};
 use inherit_methods_macro::inherit_methods;
 
+use std::sync::Weak;
+
 use super::*;
 use crate::net::SocketFile;
 
 // TODO: add fd to FileHandle?
 
-/// A handle to a file-like object.
+/// A handle to a file-like object; similar to `Arc`, but for files.
 ///
 /// # Design notes
 ///
@@ -136,6 +138,16 @@ impl FileHandle {
             _ => None,
         }
     }
+
+    /// Downgrade the file handle to its weak counterpart.
+    pub fn downgrade(&self) -> WeakFileHandle {
+        let any_weak_file = match &self.0.file {
+            AnyFile::File(file) => AnyWeakFile::File(Arc::downgrade(file)),
+            AnyFile::Inode(file) => AnyWeakFile::Inode(Arc::downgrade(file)),
+            AnyFile::Socket(file) => AnyWeakFile::Socket(Arc::downgrade(file)),
+        };
+        WeakFileHandle(any_weak_file)
+    }
 }
 
 impl PartialEq for FileHandle {
@@ -178,4 +190,32 @@ impl AsyncInode {
     pub fn access_mode(&self) -> AccessMode;
     pub fn status_flags(&self) -> StatusFlags;
     pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()>;
+}
+
+/// The weak version of `FileHandle`. Similar to `Weak`, but for files.
+#[derive(Clone, Debug)]
+pub struct WeakFileHandle(AnyWeakFile);
+
+#[derive(Clone, Debug)]
+enum AnyWeakFile {
+    File(Weak<Async<dyn File>>),
+    Inode(Weak<AsyncInode>),
+    Socket(Weak<SocketFile>),
+}
+
+impl WeakFileHandle {
+    /// Upgrade the weak file handle to its strong counterpart.
+    pub fn upgrade(&self) -> Option<FileHandle> {
+        match &self.0 {
+            AnyWeakFile::File(weak) => weak
+                .upgrade()
+                .map(|arc| FileHandle::new(AnyFile::File(arc))),
+            AnyWeakFile::Inode(weak) => weak
+                .upgrade()
+                .map(|arc| FileHandle::new(AnyFile::Inode(arc))),
+            AnyWeakFile::Socket(weak) => weak
+                .upgrade()
+                .map(|arc| FileHandle::new(AnyFile::Socket(arc))),
+        }
+    }
 }

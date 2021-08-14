@@ -21,7 +21,7 @@ pub use async_io::fs::{
     IfConf, IoctlCmd, Stat, StatusFlags, StructuredIoctlArgType, StructuredIoctlNum,
 };*/
 pub use self::event_file::{EventFile, EventFileFlags};
-pub use self::file_handle::FileHandle as FileRef;
+pub use self::file_handle::{FileHandle as FileRef, WeakFileHandle as WeakFileRef};
 pub use self::file_table::{FileDesc, FileTable};
 pub use self::fs_view::FsView;
 pub use self::host_fd::HostFd;
