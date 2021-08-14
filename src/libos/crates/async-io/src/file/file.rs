@@ -1,4 +1,7 @@
 use std::fmt::Debug;
+use std::marker::Unsize;
+use std::mem::transmute;
+use std::ops::CoerceUnsized;
 use std::ops::Deref;
 
 use futures::future::{self, BoxFuture};
@@ -40,7 +43,9 @@ pub trait File: Debug + Sync + Send {
         Ok(0)
     }
 
-    fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events;
+    fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+        Events::empty()
+    }
 
     /*
         fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
@@ -61,14 +66,22 @@ pub trait File: Debug + Sync + Send {
     }
 }
 
-/// A wrapper type that extends a `File` object with async APIs.
-pub struct Async<T>(T);
+/// A wrapper type that makes a `T: File`'s I/O methods _async_.
+#[repr(transparent)]
+pub struct Async<F: ?Sized>(F);
 
-impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
-    pub fn new(file: T) -> Self {
+impl<F> Async<F> {
+    pub fn new(file: F) -> Self {
         Self(file)
     }
 
+    #[inline]
+    pub fn info_file(self) -> F {
+        self.0
+    }
+}
+
+impl<F: File + ?Sized> Async<F> {
     pub async fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let is_nonblocking = self.is_nonblocking();
 
@@ -166,13 +179,8 @@ impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
     }
 
     #[inline]
-    pub fn inner(&self) -> &T {
+    pub fn file(&self) -> &F {
         &self.0
-    }
-
-    #[inline]
-    pub fn into_inner(self) -> T {
-        self.0
     }
 
     fn should_io_return(res: &Result<usize>, is_nonblocking: bool) -> bool {
@@ -188,22 +196,51 @@ impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
 // Implement methods inherited from File
 #[inherit_methods(from = "self.0")]
 #[rustfmt::skip]
-impl<F: File + ?Sized, T: Deref<Target = F>> Async<T> {
+impl<F: File + ?Sized> Async<F> {
     pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events;
     pub fn status_flags(&self) -> StatusFlags;
     pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()>;
     pub fn access_mode(&self) -> AccessMode;
 }
 
-impl<T: std::fmt::Debug> std::fmt::Debug for Async<T> {
+impl<F: std::fmt::Debug> std::fmt::Debug for Async<F> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Async").field("0", &self.0).finish()
     }
 }
 
-impl<F: File + ?Sized, T: Deref<Target = F> + Clone> Clone for Async<T> {
+impl<F: Clone> Clone for Async<F> {
     fn clone(&self) -> Self {
         Self::new(self.0.clone())
+    }
+}
+
+// Enable converting Async<T> to Async<dyn S>, where type T implements trait S.
+impl<T: CoerceUnsized<U> + ?Sized, U: ?Sized> CoerceUnsized<Async<U>> for Async<T> {}
+
+/// Convert a file-like type `T` into an async version, e.g., `Box<F>` to `Box<Async<F>>`
+/// or `Arc<F>` to `Arc<Async<F>>`, where `F: File`.
+pub trait IntoAsync {
+    type AsyncFile;
+
+    fn into_async(self) -> Self::AsyncFile;
+}
+
+impl<F: File + ?Sized> IntoAsync for Box<F> {
+    type AsyncFile = Box<Async<F>>;
+
+    fn into_async(self) -> Box<Async<F>> {
+        // Safety. Async has a type wrapper with transparant memory representation.
+        unsafe { transmute(self) }
+    }
+}
+
+impl<F: File + ?Sized> IntoAsync for Arc<F> {
+    type AsyncFile = Arc<Async<F>>;
+
+    fn into_async(self) -> Arc<Async<F>> {
+        // Safety. Async has a type wrapper with transparant memory representation.
+        unsafe { transmute(self) }
     }
 }
 
@@ -214,57 +251,32 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use dummy_files::*;
 
     #[test]
-    fn with_arc_dyn() {
-        let foo = Arc::new(FooFile::new()) as Arc<dyn File>;
-        let bar = Arc::new(BarFile::new()) as Arc<dyn File>;
-        let async_foo = Async::new(foo);
-        let async_bar = Async::new(bar);
-        println!("foo file = {:?}", &async_foo);
-        println!("bar file = {:?}", &async_bar);
+    fn new_async() {
+        // Case 1
+        let async_file: Async<DummyFile> = Async::new(DummyFile);
+        let _ = async_file.access_mode();
+
+        // Case 2
+        let async_file: Arc<Async<dyn File>> = Arc::new(Async::new(DummyFile)) as _;
+        let _ = async_file.access_mode();
     }
 
-    mod dummy_files {
-        use super::*;
+    #[test]
+    fn into_async() {
+        // Case 1
+        let not_async: Arc<DummyFile> = Arc::new(DummyFile);
+        let async_file: Arc<Async<DummyFile>> = not_async.into_async();
+        let _ = async_file.access_mode();
 
-        #[derive(Debug)]
-        pub struct FooFile {
-            pollee: Pollee,
-        }
-
-        impl FooFile {
-            pub fn new() -> Self {
-                Self {
-                    pollee: Pollee::new(Events::empty()),
-                }
-            }
-        }
-
-        impl File for FooFile {
-            fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
-                self.pollee.poll_by(mask, poller)
-            }
-        }
-
-        #[derive(Debug)]
-        pub struct BarFile {
-            pollee: Pollee,
-        }
-
-        impl BarFile {
-            pub fn new() -> Self {
-                Self {
-                    pollee: Pollee::new(Events::empty()),
-                }
-            }
-        }
-
-        impl File for BarFile {
-            fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
-                self.pollee.poll_by(mask, poller)
-            }
-        }
+        // Case 2
+        let not_async: Arc<dyn File> = Arc::new(DummyFile) as _;
+        let async_file: Arc<Async<dyn File>> = not_async.into_async();
+        let _ = async_file.access_mode();
     }
+
+    #[derive(Debug)]
+    pub struct DummyFile;
+    impl File for DummyFile {}
 }

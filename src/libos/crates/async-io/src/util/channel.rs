@@ -325,8 +325,8 @@ mod tests {
     async fn do_transfer_data(total_nbytes: usize, channel_capacity: usize, buf_size: usize) {
         let channel = Channel::with_capacity(channel_capacity).unwrap();
         let (producer, consumer) = channel.split();
-        let producer = Async::new(Box::new(producer));
-        let consumer = Async::new(Box::new(consumer));
+        let producer = Async::new(producer);
+        let consumer = Async::new(consumer);
 
         let producer_handle = async_rt::task::spawn(async move {
             let mut buf = Vec::with_capacity(buf_size);

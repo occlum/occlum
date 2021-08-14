@@ -1,4 +1,6 @@
 #![cfg_attr(feature = "sgx", no_std)]
+#![feature(coerce_unsized)]
+#![feature(unsize)]
 
 #[cfg(feature = "sgx")]
 extern crate sgx_types;
