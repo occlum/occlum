@@ -5,6 +5,7 @@ mod epoll_file;
 mod epoll_flags;
 
 use self::epoll_entry::EpollEntry;
+use crate::prelude::*;
 
 pub use self::epoll_ctl::EpollCtl;
 pub use self::epoll_event::EpollEvent;

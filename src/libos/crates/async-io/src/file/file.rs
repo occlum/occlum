@@ -18,7 +18,7 @@ use crate::prelude::*;
 /// are non-blocking.
 pub trait File: Debug + Sync + Send {
     fn read(&self, _buf: &mut [u8]) -> Result<usize> {
-        return_errno!(EBADF, "not support read");
+        return_errno!(EINVAL, "not support read");
     }
 
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
@@ -31,7 +31,7 @@ pub trait File: Debug + Sync + Send {
     }
 
     fn write(&self, _buf: &[u8]) -> Result<usize> {
-        return_errno!(EBADF, "not support write");
+        return_errno!(EINVAL, "not support write");
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {

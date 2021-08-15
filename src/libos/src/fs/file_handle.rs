@@ -5,6 +5,7 @@ use std::sync::Weak;
 
 use super::*;
 use crate::net::SocketFile;
+use crate::poll::EpollFile;
 
 // TODO: add fd to FileHandle?
 
@@ -36,6 +37,7 @@ enum AnyFile {
     File(Arc<Async<dyn File>>),
     Inode(Arc<AsyncInode>),
     Socket(Arc<SocketFile>),
+    Epoll(Arc<EpollFile>),
 }
 
 // Apply a function all variants of AnyFile enum.
@@ -50,6 +52,9 @@ macro_rules! apply_fn_on_any_file {
                 $($fn_body)*
             }
             AnyFile::Socket($file) => {
+                $($fn_body)*
+            }
+            AnyFile::Epoll($file) => {
                 $($fn_body)*
             }
         }
@@ -75,6 +80,12 @@ impl FileHandle {
     /// Create a file handle for a socket file.
     pub fn new_socket(file: SocketFile) -> Self {
         let any_file = AnyFile::Socket(Arc::new(file));
+        Self::new(any_file)
+    }
+
+    /// Create a file handle for an epoll file.
+    pub fn new_epoll(file: Arc<EpollFile>) -> Self {
+        let any_file = AnyFile::Epoll(file);
         Self::new(any_file)
     }
 
@@ -135,7 +146,7 @@ impl FileHandle {
         apply_fn_on_any_file!(&self.0.file, |file| { file.unregister_observer(observer) })
     }
 
-    /// Returns the underlying inode file if there is one.
+    /// Returns the underlying inode file if it is one.
     pub fn as_inode_file(&self) -> Option<&InodeFile> {
         match &self.0.file {
             AnyFile::Inode(inode_file) => Some(inode_file.inner()),
@@ -143,10 +154,18 @@ impl FileHandle {
         }
     }
 
-    /// Returns the underlying socket file if there is one.
+    /// Returns the underlying socket file if it is one.
     pub fn as_socket_file(&self) -> Option<&SocketFile> {
         match &self.0.file {
             AnyFile::Socket(socket_file) => Some(socket_file),
+            _ => None,
+        }
+    }
+
+    // Returns the underlying epoll file if it is one.
+    pub fn as_epoll_file(&self) -> Option<&EpollFile> {
+        match &self.0.file {
+            AnyFile::Epoll(epoll_file) => Some(epoll_file),
             _ => None,
         }
     }
@@ -157,6 +176,7 @@ impl FileHandle {
             AnyFile::File(file) => AnyWeakFile::File(Arc::downgrade(file)),
             AnyFile::Inode(file) => AnyWeakFile::Inode(Arc::downgrade(file)),
             AnyFile::Socket(file) => AnyWeakFile::Socket(Arc::downgrade(file)),
+            AnyFile::Epoll(file) => AnyWeakFile::Epoll(Arc::downgrade(file)),
         };
         WeakFileHandle(any_weak_file)
     }
@@ -221,6 +241,7 @@ enum AnyWeakFile {
     File(Weak<Async<dyn File>>),
     Inode(Weak<AsyncInode>),
     Socket(Weak<SocketFile>),
+    Epoll(Weak<EpollFile>),
 }
 
 impl WeakFileHandle {
@@ -236,6 +257,9 @@ impl WeakFileHandle {
             AnyWeakFile::Socket(weak) => weak
                 .upgrade()
                 .map(|arc| FileHandle::new(AnyFile::Socket(arc))),
+            AnyWeakFile::Epoll(weak) => weak
+                .upgrade()
+                .map(|arc| FileHandle::new(AnyFile::Epoll(arc))),
         }
     }
 }

@@ -4,7 +4,7 @@ use std::sync::Weak;
 use new_self_ref_arc::new_self_ref_arc;
 
 use super::{EpollCtl, EpollEntry, EpollEvent, EpollFlags};
-use crate::fs::{Events, Observer, Pollee, Poller};
+use crate::fs::{AccessMode, Events, Observer, Pollee, Poller, StatusFlags};
 use crate::prelude::*;
 
 /// A file-like object that provides epoll API.
@@ -252,5 +252,52 @@ impl std::fmt::Debug for EpollFile {
             .field("ready", &*self.ready.lock().unwrap())
             .field("pollee", &self.pollee)
             .finish()
+    }
+}
+
+// Implement the common methods required by FileHandle
+impl EpollFile {
+    pub async fn read(&self, buf: &mut [u8]) -> Result<usize> {
+        return_errno!(EINVAL, "epoll files do not support read");
+    }
+
+    pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
+        return_errno!(EINVAL, "epoll files do not support read");
+    }
+
+    pub async fn write(&self, buf: &[u8]) -> Result<usize> {
+        return_errno!(EINVAL, "epoll files do not support write");
+    }
+
+    pub async fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
+        return_errno!(EINVAL, "epoll files do not support write");
+    }
+
+    pub fn access_mode(&self) -> AccessMode {
+        // We consider all epoll files read-only
+        AccessMode::O_RDONLY
+    }
+
+    pub fn status_flags(&self) -> StatusFlags {
+        StatusFlags::empty()
+    }
+
+    pub fn set_status_flags(&self, new_flags: StatusFlags) -> Result<()> {
+        return_errno!(EINVAL, "epoll files do not support set_status_flags");
+    }
+
+    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+        self.pollee.poll(mask, poller)
+    }
+
+    pub fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()> {
+        self.pollee.register_observer(observer, mask);
+        Ok(())
+    }
+
+    pub fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>> {
+        self.pollee
+            .unregister_observer(observer)
+            .ok_or_else(|| errno!(EINVAL, "observer is not registered"))
     }
 }
