@@ -171,6 +171,20 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         pollee.poll(mask, poller)
     }
 
+    pub fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()> {
+        let state = self.state.read().unwrap();
+        let pollee = state.common().pollee();
+        pollee.register_observer(observer, mask);
+        Ok(())
+    }
+
+    pub fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>> {
+        let state = self.state.read().unwrap();
+        let pollee = state.common().pollee();
+        pollee
+            .unregister_observer(observer)
+            .ok_or_else(|| errno!(ENOENT, "the observer is not registered"))
+    }
     /*
         pub async fn shutdown(&self, shutdown: Shutdown) -> Result<()> {
             let connected_stream = {

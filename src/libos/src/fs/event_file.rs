@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use async_io::event::{Events, Pollee, Poller};
+use async_io::event::{Events, Observer, Pollee, Poller};
 use async_io::file::{AccessMode, File, StatusFlags};
 use async_io::prelude::*;
 use atomic::{Atomic, Ordering};
@@ -112,6 +112,17 @@ impl File for EventFile {
 
     fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
         self.pollee.poll(mask, poller)
+    }
+
+    fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()> {
+        self.pollee.register_observer(observer, mask);
+        Ok(())
+    }
+
+    fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>> {
+        self.pollee
+            .unregister_observer(observer)
+            .ok_or_else(|| errno!(ENOENT, "the observer is not registered"))
     }
 
     fn status_flags(&self) -> StatusFlags {

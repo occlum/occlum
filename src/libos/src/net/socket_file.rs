@@ -1,5 +1,5 @@
 use self::impls::{Ipv4Stream, UnixStream};
-use crate::fs::{AccessMode, Events, Poller, StatusFlags};
+use crate::fs::{AccessMode, Events, Observer, Poller, StatusFlags};
 use crate::net::{Addr, AnyAddr, Domain, Ipv4SocketAddr, UnixAddr};
 use crate::prelude::*;
 
@@ -64,6 +64,18 @@ impl SocketFile {
 
     pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
         apply_fn_on_any_socket!(&self.socket, |socket| { socket.poll(mask, poller) })
+    }
+
+    pub fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()> {
+        apply_fn_on_any_socket!(&self.socket, |socket| {
+            socket.register_observer(observer, mask)
+        })
+    }
+
+    pub fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>> {
+        apply_fn_on_any_socket!(&self.socket, |socket| {
+            socket.unregister_observer(observer)
+        })
     }
 }
 

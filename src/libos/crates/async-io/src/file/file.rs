@@ -8,7 +8,7 @@ use futures::future::{self, BoxFuture};
 use futures::prelude::*;
 use inherit_methods_macro::inherit_methods;
 
-use crate::event::{Events, Pollee, Poller};
+use crate::event::{Events, Observer, Pollee, Poller};
 use crate::file::{AccessMode, StatusFlags};
 use crate::prelude::*;
 
@@ -45,6 +45,14 @@ pub trait File: Debug + Sync + Send {
 
     fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
         Events::empty()
+    }
+
+    fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()> {
+        return_errno!(EINVAL, "this file does not support observers");
+    }
+
+    fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>> {
+        return_errno!(EINVAL, "this file does not support observers");
     }
 
     /*
@@ -198,6 +206,8 @@ impl<F: File + ?Sized> Async<F> {
 #[rustfmt::skip]
 impl<F: File + ?Sized> Async<F> {
     pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events;
+    pub fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()>;
+    pub fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>>;
     pub fn status_flags(&self) -> StatusFlags;
     pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()>;
     pub fn access_mode(&self) -> AccessMode;

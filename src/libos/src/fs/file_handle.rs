@@ -123,6 +123,18 @@ impl FileHandle {
         apply_fn_on_any_file!(&self.0.file, |file| { file.poll(mask, poller) })
     }
 
+    /// Register an observer for the file.
+    pub fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()> {
+        apply_fn_on_any_file!(&self.0.file, |file| {
+            file.register_observer(observer, mask)
+        })
+    }
+
+    /// Unregister an observer for the file.
+    pub fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>> {
+        apply_fn_on_any_file!(&self.0.file, |file| { file.unregister_observer(observer) })
+    }
+
     /// Returns the underlying inode file if there is one.
     pub fn as_inode_file(&self) -> Option<&InodeFile> {
         match &self.0.file {
@@ -178,6 +190,14 @@ impl AsyncInode {
 
     pub fn inner(&self) -> &InodeFile {
         &self.0
+    }
+
+    pub fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()> {
+        return_errno!(EINVAL, "inode files do not support observers");
+    }
+
+    pub fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>> {
+        return_errno!(EINVAL, "inode files do not support observers");
     }
 
     // Inherit methods from the inner InodeFile. Note that all I/O methods are
