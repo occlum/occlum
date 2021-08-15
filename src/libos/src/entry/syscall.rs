@@ -38,7 +38,9 @@ use crate::net::{
     do_socket, do_socketpair, msghdr, msghdr_mut,
 };
 */
-use crate::poll::syscalls::*;
+use crate::poll::syscalls::{
+    do_epoll_create, do_epoll_create1, do_epoll_ctl, do_epoll_pwait, do_epoll_wait, do_poll,
+};
 use crate::prelude::*;
 use crate::process::{
     do_arch_prctl, do_clone, do_exit, do_exit_group, do_futex, do_getegid, do_geteuid, do_getgid,
@@ -229,6 +231,10 @@ macro_rules! process_syscall_table_with_callback {
             (Socket = 41) => do_socket(domain: c_int, socket_type: c_int, protocol: c_int),
 
             (Poll = 7) => do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int),
+            (EpollCreate = 213) => do_epoll_create(size: c_int),
+            (EpollWait = 232) => do_epoll_wait(epfd: c_int, events: *mut libc::epoll_event, maxevents: c_int, timeout: c_int),
+            (EpollCtl = 233) => do_epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *const libc::epoll_event),
+            (EpollPwait = 281) => do_epoll_pwait(epfd: c_int, events: *mut libc::epoll_event, maxevents: c_int, timeout: c_int, sigmask: *const usize),
 
             /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),
