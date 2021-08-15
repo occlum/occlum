@@ -171,6 +171,7 @@ format-c: $(C_SRCS) $(CXX_SRCS)
 
 format-rust: $(RUST_SRCS)
 	@$(call format-rust)
+	@cd crates && $(call format-rust)
 
 format-check: format-check-c format-check-rust
 
@@ -179,6 +180,7 @@ format-check-c: $(C_SRCS) $(CXX_SRCS)
 
 format-check-rust: $(RUST_SRCS)
 	@$(call format-check-rust)
+	@cd crates && $(call format-check-rust)
 
 COV_TARGET_DIR := $(RUST_TARGET_DIR)/debug/deps
 DEPS_DIR := $(shell pwd)/../../deps
