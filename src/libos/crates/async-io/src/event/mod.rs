@@ -47,7 +47,7 @@
 //!         loop {
 //!             // Try to push
 //!             let mask = Events::OUT; // = writable or the queue is empty
-//!             let is_writable = !self.pollee.poll_by(mask, poller.as_mut()).is_empty();
+//!             let is_writable = !self.pollee.poll(mask, poller.as_mut()).is_empty();
 //!             if is_writable {
 //!                 let mut slot = self.slot.lock().unwrap();
 //!                 if slot.is_none() {
@@ -74,7 +74,7 @@
 //!         loop {
 //!             // Try to pop
 //!             let mask = Events::IN; // = readable or the queue has an item
-//!             let is_readable = !self.pollee.poll_by(mask, poller.as_mut()).is_empty();
+//!             let is_readable = !self.pollee.poll(mask, poller.as_mut()).is_empty();
 //!             if is_readable {
 //!                 let mut slot = self.slot.lock().unwrap();
 //!                 let item = slot.take();
@@ -106,7 +106,7 @@
 //!     /// By providing this method, a poller can now monitor multiple instances of
 //!     /// `OneItemQueue`.
 //!     pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
-//!         self.pollee.poll_by(mask, poller)
+//!         self.pollee.poll(mask, poller)
 //!     }
 //! }
 //! ```

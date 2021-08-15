@@ -38,9 +38,7 @@ pub(crate) struct Executor {
 }
 
 impl Executor {
-    pub fn new(
-        parallelism: u32,
-    ) -> Result<Self> {
+    pub fn new(parallelism: u32) -> Result<Self> {
         if parallelism == 0 {
             return Err("invalid argument");
         }
@@ -127,12 +125,12 @@ impl Executor {
         if self.is_shutdown() {
             // Should not panic for now, return directly.
             // LibOS task may be waked up after shutdown, e.g. io_uring task.
-            // To solve this problem actually, 
+            // To solve this problem actually,
             // we can add task_attribute and task_status to task struct,
             // then we can prevent repeated wake-ups
             // we also need store these tasks in executor,
             // shutdown these tasks before shutdown executor.
-            
+
             // panic!("a shut-down executor cannot spawn new tasks");
             return;
         }

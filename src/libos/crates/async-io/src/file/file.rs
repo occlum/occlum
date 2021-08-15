@@ -43,7 +43,7 @@ pub trait File: Debug + Sync + Send {
         Ok(0)
     }
 
-    fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
         Events::empty()
     }
 
@@ -95,7 +95,7 @@ impl<F: File + ?Sized> Async<F> {
         let mask = Events::IN;
         let mut poller = Poller::new();
         loop {
-            let events = self.poll_by(mask, Some(&mut poller));
+            let events = self.poll(mask, Some(&mut poller));
             if events.contains(Events::IN) {
                 let res = self.0.read(buf);
                 if Self::should_io_return(&res, is_nonblocking) {
@@ -119,7 +119,7 @@ impl<F: File + ?Sized> Async<F> {
         let mask = Events::IN;
         let mut poller = Poller::new();
         loop {
-            let events = self.poll_by(mask, Some(&mut poller));
+            let events = self.poll(mask, Some(&mut poller));
             if events.contains(Events::IN) {
                 let res = self.0.readv(bufs);
                 if Self::should_io_return(&res, is_nonblocking) {
@@ -143,7 +143,7 @@ impl<F: File + ?Sized> Async<F> {
         let mask = Events::OUT;
         let mut poller = Poller::new();
         loop {
-            let events = self.poll_by(mask, Some(&mut poller));
+            let events = self.poll(mask, Some(&mut poller));
             if events.contains(Events::OUT) {
                 let res = self.0.write(buf);
                 if Self::should_io_return(&res, is_nonblocking) {
@@ -167,7 +167,7 @@ impl<F: File + ?Sized> Async<F> {
         let mask = Events::OUT;
         let mut poller = Poller::new();
         loop {
-            let events = self.poll_by(mask, Some(&mut poller));
+            let events = self.poll(mask, Some(&mut poller));
             if events.contains(Events::OUT) {
                 let res = self.0.writev(bufs);
                 if Self::should_io_return(&res, is_nonblocking) {
@@ -197,7 +197,7 @@ impl<F: File + ?Sized> Async<F> {
 #[inherit_methods(from = "self.0")]
 #[rustfmt::skip]
 impl<F: File + ?Sized> Async<F> {
-    pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events;
+    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events;
     pub fn status_flags(&self) -> StatusFlags;
     pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()>;
     pub fn access_mode(&self) -> AccessMode;

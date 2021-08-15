@@ -38,7 +38,7 @@ pub async fn do_poll(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) ->
             } else {
                 None
             };
-            let revents = file.poll_by(poll_fd.events, need_poller);
+            let revents = file.poll(poll_fd.events, need_poller);
             if !revents.is_empty() {
                 poll_fd.revents().set(revents);
                 num_revents += 1;

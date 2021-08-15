@@ -62,8 +62,8 @@ impl SocketFile {
         todo!("")
     }
 
-    pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
-        apply_fn_on_any_socket!(&self.socket, |socket| { socket.poll_by(mask, poller) })
+    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+        apply_fn_on_any_socket!(&self.socket, |socket| { socket.poll(mask, poller) })
     }
 }
 

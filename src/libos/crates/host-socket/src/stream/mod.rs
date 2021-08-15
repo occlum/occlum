@@ -165,10 +165,10 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         connected_stream.writev(bufs).await
     }
 
-    pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
         let state = self.state.read().unwrap();
         let pollee = state.common().pollee();
-        pollee.poll_by(mask, poller)
+        pollee.poll(mask, poller)
     }
 
     /*

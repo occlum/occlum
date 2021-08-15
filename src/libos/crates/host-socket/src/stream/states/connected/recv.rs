@@ -32,7 +32,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
                 poller = Some(Poller::new());
             }
             let mask = Events::IN;
-            let events = self.common.pollee().poll_by(mask, poller.as_mut());
+            let events = self.common.pollee().poll(mask, poller.as_mut());
             if events.is_empty() {
                 poller.as_ref().unwrap().wait().await;
             }

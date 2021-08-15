@@ -43,7 +43,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
         // Wait for the async connect to complete
         let mut poller = Poller::new();
         loop {
-            let events = pollee.poll_by(Events::OUT, Some(&mut poller));
+            let events = pollee.poll(Events::OUT, Some(&mut poller));
             if !events.is_empty() {
                 break;
             }

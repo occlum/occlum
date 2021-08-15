@@ -190,8 +190,8 @@ impl File for Producer {
 
     // TODO: implement writev
 
-    fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
-        self.this_end().pollee().poll_by(mask, poller)
+    fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+        self.this_end().pollee().poll(mask, poller)
     }
 
     fn status_flags(&self) -> StatusFlags {
@@ -271,8 +271,8 @@ impl File for Consumer {
 
     // TODO: implement read
 
-    fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
-        self.this_end().pollee().poll_by(mask, poller)
+    fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+        self.this_end().pollee().poll(mask, poller)
     }
 
     fn status_flags(&self) -> StatusFlags {
@@ -374,29 +374,29 @@ mod tests {
         let (producer, consumer) = channel.split();
 
         // Initial events
-        assert!(producer.poll_by(mask, None) == Events::OUT);
-        assert!(consumer.poll_by(mask, None) == Events::empty());
+        assert!(producer.poll(mask, None) == Events::OUT);
+        assert!(consumer.poll(mask, None) == Events::empty());
 
         // First write
         producer.write(&buf[..BUF_LEN]);
-        assert!(producer.poll_by(mask, None) == Events::OUT);
-        assert!(consumer.poll_by(mask, None) == Events::IN);
+        assert!(producer.poll(mask, None) == Events::OUT);
+        assert!(consumer.poll(mask, None) == Events::IN);
 
         // First read, but only half of the avail data
         consumer.read(&mut buf[..BUF_LEN / 2]);
-        assert!(producer.poll_by(mask, None) == Events::OUT);
-        assert!(consumer.poll_by(mask, None) == Events::IN);
+        assert!(producer.poll(mask, None) == Events::OUT);
+        assert!(consumer.poll(mask, None) == Events::IN);
 
         // Second read, consume the rest of avail data
         consumer.read(&mut buf[..BUF_LEN / 2]);
-        assert!(producer.poll_by(mask, None) == Events::OUT);
-        assert!(consumer.poll_by(mask, None) == Events::empty());
+        assert!(producer.poll(mask, None) == Events::OUT);
+        assert!(consumer.poll(mask, None) == Events::empty());
 
         // Second and third write, filling up the underlying buffer
         producer.write(&buf[..BUF_LEN]);
         producer.write(&buf[..BUF_LEN]);
-        assert!(producer.poll_by(mask, None) == Events::empty());
-        assert!(consumer.poll_by(mask, None) == Events::IN);
+        assert!(producer.poll(mask, None) == Events::empty());
+        assert!(consumer.poll(mask, None) == Events::IN);
     }
 }
 

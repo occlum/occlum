@@ -137,7 +137,7 @@ impl File for StdoutFile {
         Ok(total_bytes)
     }
 
-    fn poll_by(&self, mask: Events, _poller: Option<&mut Poller>) -> Events {
+    fn poll(&self, mask: Events, _poller: Option<&mut Poller>) -> Events {
         Events::OUT
     }
     /*
@@ -268,7 +268,7 @@ impl File for StdinFile {
         Ok(total_bytes)
     }
 
-    fn poll_by(&self, mask: Events, _poller: Option<&mut Poller>) -> Events {
+    fn poll(&self, mask: Events, _poller: Option<&mut Poller>) -> Events {
         Events::IN
     }
     /*

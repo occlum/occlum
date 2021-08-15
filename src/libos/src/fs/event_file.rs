@@ -110,8 +110,8 @@ impl File for EventFile {
         Ok(8)
     }
 
-    fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
-        self.pollee.poll_by(mask, poller)
+    fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+        self.pollee.poll(mask, poller)
     }
 
     fn status_flags(&self) -> StatusFlags {

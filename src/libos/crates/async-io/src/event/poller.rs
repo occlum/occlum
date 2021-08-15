@@ -52,7 +52,7 @@ impl Pollee {
     ///
     /// This operation is _atomic_ in the sense that either some interesting
     /// events are returned or the poller is registered (if a poller is provided).
-    pub fn poll_by(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
         let mask = mask | Events::ALWAYS_POLL;
 
         // Fast path: return events immediately
@@ -250,7 +250,7 @@ mod tests {
     fn poll() {
         let mut poller = Poller::new();
         let pollee = Pollee::new(Events::empty());
-        assert!(pollee.poll_by(Events::IN, Some(&mut poller)) == Events::empty());
+        assert!(pollee.poll(Events::IN, Some(&mut poller)) == Events::empty());
     }
 
     #[test]

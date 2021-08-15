@@ -8,7 +8,6 @@ pub fn set_parallelism(parallelism: u32) {
     CONFIG.set_parallelism(parallelism);
 }
 
-
 pub(crate) struct Config {
     inner: Mutex<Inner>,
 }
@@ -19,9 +18,7 @@ struct Inner {
 
 impl Config {
     pub fn new() -> Self {
-        let inner = Inner {
-            parallelism: 1,
-        };
+        let inner = Inner { parallelism: 1 };
         Self {
             inner: Mutex::new(inner),
         }
@@ -37,7 +34,6 @@ impl Config {
         let inner = self.inner.lock();
         inner.parallelism
     }
-
 }
 
 lazy_static! {
