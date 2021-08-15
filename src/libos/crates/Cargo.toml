@@ -2,9 +2,7 @@
 
 members = [
     "async-rt",
-    "async-file",
     "async-io",
-    "async-socket",
     "inherit-methods-macro",
     "errno",
     "host-socket",
@@ -18,8 +16,6 @@ members = [
 # Default members can run on Linux; non-default members can only run inside SGX.
 default-members = [
     "async-rt",
-    "async-file",
-    "async-socket",
     "inherit-methods-macro",
     "io-uring-callback",
     "keyable-arc",
