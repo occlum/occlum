@@ -39,12 +39,19 @@
 //!     assert!(Arc::ptr_eq(&dummy, &dummy2));
 //! }
 //!```
+#![cfg_attr(feature = "sgx", no_std)]
 #![feature(get_mut_unchecked)]
+
+#[cfg(feature = "sgx")]
+#[macro_use]
+extern crate sgx_tstd as std;
 
 /// A helper macro to initialize a self-referenced `Arc<T>`. See the crate level doc.
 #[macro_export]
 macro_rules! new_self_ref_arc {
     ($val:expr) => {{
+        use ::std::sync::Arc;
+
         let mut strong_self = Arc::new($val);
         let weak_self = Arc::downgrade(&strong_self);
         // Safety. This is safey since during the unsafe block the only two references
