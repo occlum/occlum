@@ -2,6 +2,7 @@ use crate::signal::constants::*;
 use std::intrinsics::atomic_store;
 
 use super::do_futex::futex_wake;
+use super::pgrp::clean_pgrp_when_exit;
 use super::process::{Process, ProcessFilter};
 use super::{table, ProcessRef, TermStatus, ThreadRef, ThreadStatus};
 use crate::prelude::*;
@@ -102,6 +103,7 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
         let main_tid = pid;
         table::del_thread(main_tid).expect("tid must be in the table");
         table::del_process(pid).expect("pid must be in the table");
+        clean_pgrp_when_exit(process);
 
         process_inner.exit(term_status, &idle_ref, &mut idle_inner);
         idle_inner.remove_zombie_child(pid);

@@ -5,7 +5,7 @@ use crate::util::mem_util::from_user::check_ptr;
 // Note: This is the Rust representation of `posix_spawnattr_t` defined in libc.
 // The name of the elements follow the glibc style. The comments show the name in musl.
 // Elements other than the listed ones are ignored because we don't care for now because
-// Only POSIX_SPAWN_SETSIGDEF and POSIX_SPAWN_SETSIGMASK are supported now.
+// Only POSIX_SPAWN_SETPGROUP, POSIX_SPAWN_SETSIGDEF and POSIX_SPAWN_SETSIGMASK are supported now.
 #[repr(C)]
 #[derive(Debug)]
 pub struct posix_spawnattr_t {
@@ -32,6 +32,7 @@ bitflags! {
 impl SpawnAttributeFlags {
     fn supported(&self) -> bool {
         let unsupported_flags = SpawnAttributeFlags::all()
+            - SpawnAttributeFlags::POSIX_SPAWN_SETPGROUP
             - SpawnAttributeFlags::POSIX_SPAWN_SETSIGDEF
             - SpawnAttributeFlags::POSIX_SPAWN_SETSIGMASK;
         if self.intersects(unsupported_flags) {
@@ -44,6 +45,7 @@ impl SpawnAttributeFlags {
 
 #[derive(Default, Debug, Copy, Clone)]
 pub struct SpawnAttr {
+    pub process_group: Option<pid_t>,
     pub sig_mask: Option<SigSet>,
     pub sig_default: Option<SigSet>,
 }
@@ -70,6 +72,12 @@ pub fn clone_spawn_atrributes_safely(
         );
     }
 
+    if spawn_attr
+        .flags
+        .contains(SpawnAttributeFlags::POSIX_SPAWN_SETPGROUP)
+    {
+        safe_attr.process_group = Some(spawn_attr.pgrp as pid_t);
+    }
     if spawn_attr
         .flags
         .contains(SpawnAttributeFlags::POSIX_SPAWN_SETSIGDEF)

@@ -1,3 +1,4 @@
+use super::pgrp::clean_pgrp_when_exit;
 use super::process::{ProcessFilter, ProcessInner};
 use super::wait::Waiter;
 use super::{table, ProcessRef, ProcessStatus};
@@ -101,6 +102,9 @@ fn free_zombie_child(mut parent_inner: SgxMutexGuard<ProcessInner>, zombie_pid: 
 
     let zombie = parent_inner.remove_zombie_child(zombie_pid);
     debug_assert!(zombie.status() == ProcessStatus::Zombie);
+
+    // This has to be done after removing from process table to make sure process.pgid() can work.
+    clean_pgrp_when_exit(&zombie);
 
     let zombie_inner = zombie.inner();
     zombie_inner.term_status().unwrap().as_u32() as i32
