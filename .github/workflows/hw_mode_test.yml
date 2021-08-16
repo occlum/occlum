@@ -291,7 +291,7 @@ jobs:
       run: docker exec $java_support_test bash -c "cd /root/occlum/demos/java && occlum-javac ./processBuilder/processBuilder.java"
 
     - name: Run processBuilder
-      run: docker exec $java_support_test bash -c "cd /root/occlum/demos/java && SGX_MODE=SIM ./run_java_on_occlum.sh processBuilder"
+      run: docker exec $java_support_test bash -c "cd /root/occlum/demos/java && ./run_java_on_occlum.sh processBuilder"
 
     - name: Clean the environment
       if: ${{ always() }}
