@@ -43,10 +43,10 @@ use crate::net::{
 };
 use crate::process::{
     do_arch_prctl, do_clone, do_execve, do_exit, do_exit_group, do_futex, do_get_robust_list,
-    do_getegid, do_geteuid, do_getgid, do_getgroups, do_getpgid, do_getpid, do_getppid, do_gettid,
-    do_getuid, do_prctl, do_set_robust_list, do_set_tid_address, do_spawn_for_glibc,
-    do_spawn_for_musl, do_wait4, pid_t, posix_spawnattr_t, FdOp, RobustListHead, SpawnFileActions,
-    ThreadStatus,
+    do_getegid, do_geteuid, do_getgid, do_getgroups, do_getpgid, do_getpgrp, do_getpid, do_getppid,
+    do_gettid, do_getuid, do_prctl, do_set_robust_list, do_set_tid_address, do_setpgid,
+    do_spawn_for_glibc, do_spawn_for_musl, do_wait4, pid_t, posix_spawnattr_t, FdOp,
+    RobustListHead, SpawnFileActions, ThreadStatus,
 };
 use crate::sched::{do_getcpu, do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
 use crate::signal::{
@@ -197,9 +197,9 @@ macro_rules! process_syscall_table_with_callback {
             (Setgid = 106) => handle_unsupported(),
             (Geteuid = 107) => do_geteuid(),
             (Getegid = 108) => do_getegid(),
-            (Setpgid = 109) => handle_unsupported(),
+            (Setpgid = 109) => do_setpgid(pid: i32, pgid: i32),
             (Getppid = 110) => do_getppid(),
-            (Getpgrp = 111) => handle_unsupported(),
+            (Getpgrp = 111) => do_getpgrp(),
             (Setsid = 112) => handle_unsupported(),
             (Setreuid = 113) => handle_unsupported(),
             (Setregid = 114) => handle_unsupported(),
@@ -209,7 +209,7 @@ macro_rules! process_syscall_table_with_callback {
             (Getresuid = 118) => handle_unsupported(),
             (Setresgid = 119) => handle_unsupported(),
             (Getresgid = 120) => handle_unsupported(),
-            (Getpgid = 121) => do_getpgid(),
+            (Getpgid = 121) => do_getpgid(pid: i32),
             (Setfsuid = 122) => handle_unsupported(),
             (Setfsgid = 123) => handle_unsupported(),
             (Getsid = 124) => handle_unsupported(),

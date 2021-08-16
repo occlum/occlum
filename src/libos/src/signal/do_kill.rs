@@ -56,11 +56,8 @@ fn get_processes(filter: &ProcessFilter) -> Result<Vec<ProcessRef>> {
             vec![process]
         }
         ProcessFilter::WithPgid(pgid) => {
-            // TODO: implement O(1) lookup for a process group
-            let processes: Vec<ProcessRef> = table::get_all_processes()
-                .into_iter()
-                .filter(|proc_ref| proc_ref.pgid() == *pgid)
-                .collect();
+            let pgrp = table::get_pgrp(*pgid)?;
+            let processes = pgrp.get_all_processes();
             if processes.len() == 0 {
                 return_errno!(EINVAL, "invalid pgid");
             }

@@ -8,7 +8,7 @@ use crate::exception::*;
 use crate::fs::HostStdioFds;
 use crate::interrupt;
 use crate::process::idle_reap_zombie_children;
-use crate::process::ProcessFilter;
+use crate::process::{ProcessFilter, SpawnAttr};
 use crate::signal::SigNum;
 use crate::time::up_time::init;
 use crate::util::log::LevelFilter;
@@ -270,12 +270,21 @@ fn do_new_process(
     let file_actions = Vec::new();
     let current = &process::IDLE;
     let program_path_str = program_path.to_str().unwrap();
+
+    // Called from occlum_ecall_new_process, give it an identical process group.
+    // So that "occlum run/exec" process will have its own process group.
+    let spawn_attribute = {
+        let mut attribute = SpawnAttr::default();
+        attribute.process_group = Some(0);
+        attribute
+    };
+
     let new_tid = process::do_spawn_without_exec(
         &program_path_str,
         argv,
         &env_concat,
         &file_actions,
-        None,
+        Some(spawn_attribute),
         host_stdio_fds,
         current,
     )?;
