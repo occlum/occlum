@@ -33,7 +33,6 @@ submodule: githooks
 	git submodule init
 	git submodule update $(OCCLUM_GIT_OPTIONS)
 	@# Try to apply the patches. If failed, check if the patches are already applied
-	cd deps/rust-sgx-sdk && git apply ../rust-sgx-sdk.patch >/dev/null 2>&1 || git apply ../rust-sgx-sdk.patch -R --check
 	cd deps/serde-json-sgx && git apply ../serde-json-sgx.patch >/dev/null 2>&1 || git apply ../serde-json-sgx.patch -R --check
 
 	@# Enclaves used by tools are running in simulation mode by default to run faster.

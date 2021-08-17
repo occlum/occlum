@@ -89,7 +89,7 @@ RUN git clone -b sgx_2.9.1_for_occlum https://github.com/occlum/linux-sgx && \
 
 # Install Rust
 ENV PATH="/root/.cargo/bin:$PATH"
-ENV OCCLUM_RUST_VERSION=nightly-2020-04-07
+ENV OCCLUM_RUST_VERSION=nightly-2020-10-25
 RUN curl https://sh.rustup.rs -sSf | \
         sh -s -- --default-toolchain ${OCCLUM_RUST_VERSION} -y && \
     rm -rf /root/.cargo/registry && rm -rf /root/.cargo/git && \

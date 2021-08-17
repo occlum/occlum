@@ -21,7 +21,7 @@ impl ToErrno for Errno {
     }
 }
 
-impl ToErrno for core::alloc::AllocErr {
+impl ToErrno for core::alloc::AllocError {
     fn errno(&self) -> Errno {
         Errno::ENOMEM
     }

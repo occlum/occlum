@@ -7,6 +7,7 @@
 )]
 #![feature(const_fn)]
 #![feature(thread_local)]
+#![feature(const_fn_fn_ptr_basics)]
 
 #[cfg(feature = "sgx")]
 #[macro_use]
