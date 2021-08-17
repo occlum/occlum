@@ -18,6 +18,7 @@ pub use self::ioctl::{
     StructuredIoctlNum,
 };
 pub use self::link::{do_linkat, LinkFlags};
+pub use self::log_util::detail_debug_print;
 pub use self::lseek::do_lseek;
 pub use self::mkdir::do_mkdirat;
 pub use self::open::do_openat;
@@ -45,6 +46,7 @@ mod fsync;
 mod getdents;
 mod ioctl;
 mod link;
+mod log_util;
 mod lseek;
 mod mkdir;
 mod open;
