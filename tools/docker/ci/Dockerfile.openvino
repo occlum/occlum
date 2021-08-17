@@ -4,7 +4,7 @@ LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
 
 WORKDIR /root
 RUN rm -rf /root/demos && \
-    git clone https://github.com/occlum/occlum.git && \
+    git clone -b rebuild_openvino https://github.com/occlum/occlum.git && \
     cp -r occlum/demos /root/demos && \
     rm -rf /root/occlum
 
