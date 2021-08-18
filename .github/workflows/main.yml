@@ -9,7 +9,7 @@ on:
 
 jobs:
   Make_test_on_ubuntu:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
 
     steps:
     - uses: actions/checkout@v1
@@ -20,7 +20,10 @@ jobs:
       run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
 
     - name: Create container with ubuntu image
-      run: docker run -itd --name=ubuntu-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+      # run: docker run -itd --name=ubuntu-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+      # TODO: This is a temporary dockerhub repo for ngo, need update dockerhub repo later.
+      # The new docker image should install libclang-dev
+      run: docker run -itd --name=ubuntu-test -v $GITHUB_WORKSPACE:/root/occlum shuochengwang/ngo:0.23.7-ubuntu18.04
 
     - name: Check format
       run:  docker exec ubuntu-test bash -c 'cd /root/occlum; info=$(make format-check);
@@ -34,16 +37,17 @@ jobs:
       run:  docker exec ubuntu-test bash -c "cd /root/occlum; make submodule"
 
     - name: Build source
-      run:  docker exec ubuntu-test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y SGX_MODE=SIM make"
+      run:  docker exec ubuntu-test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y SGX_MODE=SIM make"
 
     - name: Integration test
       run:  docker exec ubuntu-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test"
 
-    - name: Integration test with Glibc
-      run:  docker exec ubuntu-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test-glibc"
+    # TODO: Enable glibc test
+    # - name: Integration test with Glibc
+    #   run:  docker exec ubuntu-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test-glibc"
 
   Make_test_on_centos:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
 
     steps:
     - uses: actions/checkout@v1
@@ -54,7 +58,10 @@ jobs:
       run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
 
     - name: Create container with centos image
-      run: docker run -itd --name=centos-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-centos8.1
+      # run: docker run -itd --name=centos-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-centos8.1
+      # TODO: This is a temporary dockerhub repo for ngo, need update dockerhub repo later.
+      # The new docker image should install clang
+      run: docker run -itd --name=centos-test -v $GITHUB_WORKSPACE:/root/occlum shuochengwang/ngo:0.23.7-centos8.2
 
     - name: Check format
       run:  docker exec centos-test bash -c 'cd /root/occlum; info=$(make format-check);
@@ -68,10 +75,11 @@ jobs:
       run:  docker exec centos-test bash -c "cd /root/occlum; make submodule"
 
     - name: Build source
-      run:  docker exec centos-test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y SGX_MODE=SIM make"
+      run:  docker exec centos-test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y SGX_MODE=SIM make"
 
     - name: Integration test
       run:  docker exec centos-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test"
 
-    - name: Integration test with Glibc
-      run:  docker exec centos-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test-glibc"
+    # TODO: Enable glibc test
+    # - name: Integration test with Glibc
+    #   run:  docker exec centos-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test-glibc"
