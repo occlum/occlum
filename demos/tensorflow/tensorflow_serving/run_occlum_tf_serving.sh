@@ -42,6 +42,7 @@ cp $occlum_glibc/libnss_compat.so.2 image/$occlum_glibc
 
 #occlum build
 occlum build
+echo "hello" > /root/occlum/log1
 # 3. Run benchmark
 taskset -c 0-1 occlum run /bin/tensorflow_model_server \
     --model_name=${model_name} \
@@ -55,5 +56,5 @@ taskset -c 0-1 occlum run /bin/tensorflow_model_server \
     --tensorflow_session_parallelism=${session_parallelism} \
     --tensorflow_intra_op_parallelism=${parallel_num_threads} \
     --tensorflow_inter_op_parallelism=${parallel_num_threads} \
-    --ssl_config_file=${ssl_config_file} \
+    --ssl_config_file=${ssl_config_file} 2>&1 | tee /root/occlum/log \
 	&
