@@ -711,8 +711,11 @@ jobs:
     - name: Move tensorflow_model_server
       run: docker exec tf_serving_test bash -c "mv /root/tensorflow_model_server /root/occlum/demos/tensorflow/tensorflow_serving"
 
-    - name: Set up environment
+    - name: Set up host environment
       run: docker exec tf_serving_test bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving; ./prepare_model_and_env.sh"
+
+    - name: Set up client environment
+      run: docker exec tf_serving_test bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving/client; ./prepare_client_env.sh"
 
     - name: Run tf_serving server
       run: docker exec tf_serving_test bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving; SGX_MODE=SIM ./run_occlum_tf_serving.sh"
@@ -720,4 +723,4 @@ jobs:
     - name: Run tf_serving client
       run: |
         sleep 120;
-        docker exec tf_serving_test bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving/client; ./prepare_client_env.sh; ./benchmark.sh python3 localhost:8500 ../ssl_configure/server.crt"
+        docker exec tf_serving_test bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving/client; ./benchmark.sh python3 localhost:8500 ../ssl_configure/server.crt"
