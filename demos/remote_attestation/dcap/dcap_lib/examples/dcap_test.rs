@@ -1,5 +1,6 @@
 extern crate dcap_quote;
 use std::str;
+use std::convert::TryFrom;
 use dcap_quote::*;
 use sgx_types::{
     sgx_report_data_t, sgx_ql_qv_result_t, sgx_report_body_t, sgx_quote3_t
@@ -78,6 +79,44 @@ impl DcapDemo {
 
         Ok( quote_verification_result )
     }
+
+    fn dcap_dump_quote_info(&mut self) {
+        let report_body_ptr = self.dcap_quote_get_report_body().unwrap();
+
+        // Dump ISV FAMILY ID
+        let family_id = unsafe { (*report_body_ptr).isv_family_id };
+        let (fam_id_l, fam_id_h) = family_id.split_at(8);
+        let fam_id_l = <&[u8; 8]>::try_from(fam_id_l).unwrap();
+        let fam_id_l = u64::from_le_bytes(*fam_id_l);
+        let fam_id_h = <&[u8; 8]>::try_from(fam_id_h).unwrap();
+        let fam_id_h = u64::from_le_bytes(*fam_id_h);
+        println!("\nSGX ISV Family ID:");
+        println!("\t Low 8 bytes: 0x{:016x?}\t", fam_id_l);
+        println!("\t high 8 bytes: 0x{:016x?}\t", fam_id_h);
+
+        // Dump ISV EXT Product ID
+        let prod_id = unsafe { (*report_body_ptr).isv_ext_prod_id };
+        let (prod_id_l, prod_id_h) = prod_id.split_at(8);
+        let prod_id_l = <&[u8; 8]>::try_from(prod_id_l).unwrap();
+        let prod_id_l = u64::from_le_bytes(*prod_id_l);
+        let prod_id_h = <&[u8; 8]>::try_from(prod_id_h).unwrap();
+        let prod_id_h = u64::from_le_bytes(*prod_id_h);
+        println!("\nSGX ISV EXT Product ID:");
+        println!("\t Low 8 bytes: 0x{:016x?}\t", prod_id_l);
+        println!("\t high 8 bytes: 0x{:016x?}\t", prod_id_h);
+
+        // Dump CONFIG ID
+        let conf_id = unsafe { (*report_body_ptr).config_id };
+        println!("\nSGX CONFIG ID:");
+        println!("\t{:02x?}", &conf_id[..16]);
+        println!("\t{:02x?}", &conf_id[16..32]);
+        println!("\t{:02x?}", &conf_id[32..48]);
+        println!("\t{:02x?}", &conf_id[48..]);
+
+        // Dump CONFIG SVN
+        let conf_svn = unsafe { (*report_body_ptr).config_svn };
+        println!("\nSGX CONFIG SVN:\t {:04x?}", conf_svn);
+    }
 }
 
 impl Drop for DcapDemo {
@@ -102,6 +141,8 @@ fn main() {
     } else {
         println!("Report data from Quote: '{}' doesn't match !!!", string);
     }
+
+    dcap_demo.dcap_dump_quote_info();
 
     let result = dcap_demo.dcap_quote_ver().unwrap();
     match result {
