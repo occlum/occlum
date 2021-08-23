@@ -5,6 +5,46 @@
 #include "sgx_quote_3.h"
 #include "dcap_quote.h"
 
+
+void dump_quote_info(sgx_quote3_t *p_quote)
+{
+    unsigned int i;
+    sgx_report_body_t *p_rep_body;
+    sgx_report_data_t *p_rep_data;
+    sgx_ql_auth_data_t *p_auth_data;
+    sgx_ql_ecdsa_sig_data_t *p_sig_data;
+    sgx_ql_certification_data_t *p_cert_data;
+    uint64_t*pll;
+
+    p_rep_body = (sgx_report_body_t *)(&p_quote->report_body);
+    p_rep_data = (sgx_report_data_t *)(&p_rep_body->report_data);
+    p_sig_data = (sgx_ql_ecdsa_sig_data_t *)p_quote->signature_data;
+    p_auth_data = (sgx_ql_auth_data_t*)p_sig_data->auth_certification_data;
+    p_cert_data = (sgx_ql_certification_data_t *)((uint8_t *)p_auth_data + sizeof(*p_auth_data) + p_auth_data->size);
+
+    printf("cert_key_type = 0x%x\n", p_cert_data->cert_key_type);
+
+    printf("\nSGX ISV Family ID:\n");
+    pll = (uint64_t *)p_rep_body->isv_family_id;
+    printf("\tLow 8 bytes: \t0x%08lx\n", *pll++);
+    printf("\tHigh 8 bytes: \t0x%08lx\n", *pll);
+
+    printf("\nSGX ISV EXT Product ID:\n");
+    pll = (uint64_t *)p_rep_body->isv_ext_prod_id;
+    printf("\tLow 8 bytes: \t0x%08lx\n", *pll++);
+    printf("\tHigh 8 bytes: \t0x%08lx\n", *pll);
+
+    printf("\nSGX CONFIG ID:");
+    for (i = 0; i < SGX_CONFIGID_SIZE; i++) {
+        if (!(i % 16))
+            printf("\n\t");
+        printf("%02x ", p_rep_body->config_id[i]);
+    }
+
+    printf("\n\nSGX CONFIG SVN:\n");
+    printf("\t0x%04x\n", p_rep_body->config_svn);
+}
+
 void main() {
     void *handle;
     uint32_t quote_size, supplemental_size;
@@ -12,9 +52,6 @@ void main() {
     sgx_quote3_t *p_quote;
     sgx_report_body_t *p_rep_body;
     sgx_report_data_t *p_rep_data;
-    sgx_ql_auth_data_t *p_auth_data;
-    sgx_ql_ecdsa_sig_data_t *p_sig_data;
-    sgx_ql_certification_data_t *p_cert_data;
     int32_t ret;
     
     handle = dcap_quote_open();
@@ -44,16 +81,13 @@ void main() {
     p_quote = (sgx_quote3_t *)p_quote_buffer;
     p_rep_body = (sgx_report_body_t *)(&p_quote->report_body);
     p_rep_data = (sgx_report_data_t *)(&p_rep_body->report_data);
-    p_sig_data = (sgx_ql_ecdsa_sig_data_t *)p_quote->signature_data;
-    p_auth_data = (sgx_ql_auth_data_t*)p_sig_data->auth_certification_data;
-    p_cert_data = (sgx_ql_certification_data_t *)((uint8_t *)p_auth_data + sizeof(*p_auth_data) + p_auth_data->size);
 
     if (memcmp((void *)p_rep_data, (void *)&report_data, sizeof(sgx_report_data_t)) != 0) {
         printf("mismathced report data\n");
         goto CLEANUP;
     }
 
-    printf("cert_key_type = 0x%x\n", p_cert_data->cert_key_type);
+    dump_quote_info(p_quote);
 
     supplemental_size = dcap_get_supplemental_data_size(handle);
     printf("supplemental_size size = %d\n", supplemental_size);
