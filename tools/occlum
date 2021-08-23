@@ -36,6 +36,10 @@ get_enclave_debuggable_flag() {
     jq '.metadata.debuggable' $instance_dir/Occlum.json
 }
 
+get_enclave_enable_kss_flag() {
+    jq '.metadata.enable_kss' $instance_dir/Occlum.json
+}
+
 exit_error() {
     echo "Error: $@" >&2
     exit 1
@@ -312,10 +316,20 @@ cmd_build() {
     echo "Built the Occlum image and enclave successfully"
 }
 
+
 cmd_run() {
     check_has_built
     check_has_run
     check_aesm_service
+
+    loop=true
+    while [ -n "$1" ] && [ "$loop" = "true" ]; do
+        case "$1" in
+        --config-id)     [ -n "$2" ] && export OCCLUM_CONF_ID_BASE64=$2 ; shift 2 || exit_error "Empty Base64 Encoded Occlum Config ID provided"     ;;
+        --config-svn)    [ -n "$2" ] && export OCCLUM_CONF_SVN=$2 ; shift 2 || exit_error "Empty Occlum Config SVN provided"   ;;
+        *) loop=false ;;
+        esac
+    done
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
@@ -329,6 +343,11 @@ cmd_run() {
     if [ "`get_enclave_debuggable_flag`" == "false" ]; then
         export OCCLUM_RELEASE_ENCLAVE=1
     fi
+
+    if [ "`get_enclave_enable_kss_flag`" == "true" ]; then
+        export OCCLUM_ENABLE_KSS=1
+    fi
+
     RUST_BACKTRACE=1 "$instance_dir/build/bin/occlum-run" "$@"
 
     echo "built" > $status_file
@@ -338,6 +357,15 @@ cmd_start() {
     check_has_built
     check_aesm_service
 
+    loop=true
+    while [ -n "$1" ] && [ "$loop" = "true" ]; do
+        case "$1" in
+        --config-id)     [ -n "$2" ] && export OCCLUM_CONF_ID_BASE64=$2 ; shift 2 || exit_error "Empty Base64 Encoded Occlum Config ID provided"     ;;
+        --config-svn)    [ -n "$2" ] && export OCCLUM_CONF_SVN=$2 ; shift 2 || exit_error "Empty Occlum Config SVN provided"   ;;
+        *) loop=false ;;
+        esac
+    done
+
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
         export LD_LIBRARY_PATH="$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
@@ -349,6 +377,10 @@ cmd_start() {
 
     if [ "`get_enclave_debuggable_flag`" == "false" ]; then
         export OCCLUM_RELEASE_ENCLAVE=1
+    fi
+
+    if [ "`get_enclave_enable_kss_flag`" == "true" ]; then
+        export OCCLUM_ENABLE_KSS=1
     fi
     RUST_BACKTRACE=1 "$instance_dir/build/bin/occlum_exec_client" start
 
@@ -565,7 +597,7 @@ case "$cmd" in
         cmd_run "${@:2}"
         ;;
     start)
-        cmd_start
+        cmd_start "${@:2}"
         ;;
     exec)
         cmd_exec "${@:2}"

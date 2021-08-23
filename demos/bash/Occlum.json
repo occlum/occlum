@@ -1,27 +1,24 @@
 {
     "resource_limits": {
-        "kernel_space_heap_size": "40MB",
-        "kernel_space_stack_size": "1MB",
         "user_space_size": "600MB",
-        "max_num_of_threads": 32
+        "kernel_space_heap_size": "32MB",
+        "kernel_space_stack_size": "1MB",
+        "max_num_of_threads": 16
     },
     "process": {
-        "default_stack_size": "4MB",
-        "default_heap_size": "8MB",
-        "default_mmap_size": "100MB"
+        "default_stack_size": "2MB",
+        "default_heap_size": "16MB",
+        "default_mmap_size": "80MB"
     },
     "entry_points": [
-        "/bin"
+        "/root/bin"
     ],
     "env": {
         "default": [
             "OCCLUM=yes",
-            "STABLE=yes",
-            "OVERRIDE=N"
+            "HOME=/root"
         ],
         "untrusted": [
-            "TEST",
-            "OVERRIDE"
         ]
     },
     "metadata": {

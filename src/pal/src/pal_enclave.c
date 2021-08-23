@@ -22,6 +22,7 @@
 #include "pal_enclave.h"
 #include "pal_error.h"
 #include "pal_log.h"
+#include "base64.h"
 
 #define MAX_PATH            FILENAME_MAX
 #define TOKEN_FILENAME      "enclave.token"
@@ -41,6 +42,20 @@ static int get_enclave_debug_flag() {
         }
     }
     return 1;
+}
+
+/* Get enable kss flag according to env "OCCLUM_ENABLE_KSS" */
+static int get_enable_kss_flag() {
+    const char *enable_kss_val = getenv("OCCLUM_ENABLE_KSS");
+    if (enable_kss_val) {
+        if (!strcmp(enable_kss_val, "1") ||
+                !strcasecmp(enable_kss_val, "y") ||
+                !strcasecmp(enable_kss_val, "yes") ||
+                !strcasecmp(enable_kss_val, "true")) {
+            return 1;
+        }
+    }
+    return 0;
 }
 
 static const char *get_enclave_absolute_path(const char *instance_dir) {
@@ -102,8 +117,36 @@ int pal_init_enclave(const char *instance_dir) {
     /* Debug Support: set 2nd parameter to 1 */
     const char *enclave_path = get_enclave_absolute_path(instance_dir);
     int sgx_debug_flag = get_enclave_debug_flag();
-    ret = sgx_create_enclave(enclave_path, sgx_debug_flag, &token, &updated, &global_eid,
-                             NULL);
+    int sgx_enable_kss = get_enable_kss_flag();
+
+    /* If enable kss, use sgx_create_enclave_ex to create enclave */
+    if (sgx_enable_kss) {
+        sgx_kss_config_t kss_config = { 0 };
+        const void *enclave_ex_p[32] = { 0 };
+        const char *sgx_conf_id = getenv("OCCLUM_CONF_ID_BASE64");
+        const char *sgx_conf_svn = getenv("OCCLUM_CONF_SVN");
+
+        if (sgx_conf_id) {
+            base64_decode(sgx_conf_id, kss_config.config_id, SGX_CONFIGID_SIZE);
+        }
+
+        if (sgx_conf_svn) {
+            unsigned long svn_val = strtoul(sgx_conf_svn, NULL, 0);
+            /* CONFIG SVN is 16 bits long */
+            if (svn_val > 0xFFFF) {
+                PAL_WARN("Invalid CONFIG SVN value: 0x%lx\n", svn_val);
+            } else {
+                kss_config.config_svn = svn_val;
+            }
+        }
+
+        enclave_ex_p[SGX_CREATE_ENCLAVE_EX_KSS_BIT_IDX] = (const void *)&kss_config;
+        ret = sgx_create_enclave_ex(enclave_path, sgx_debug_flag, &token, &updated, &global_eid,
+                                    NULL, SGX_CREATE_ENCLAVE_EX_KSS, enclave_ex_p);
+    } else {
+        ret = sgx_create_enclave(enclave_path, sgx_debug_flag, &token, &updated, &global_eid,
+                                 NULL);
+    }
     if (ret != SGX_SUCCESS) {
         const char *sgx_err_msg = pal_get_sgx_error_msg(ret);
         PAL_ERROR("Failed to create enclave with error code 0x%x: %s", ret, sgx_err_msg);
