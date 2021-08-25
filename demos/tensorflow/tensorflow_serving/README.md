@@ -10,10 +10,14 @@ TensorFlow Serving is a flexible, high-performance serving system for machine le
 
 #### Executing the Tensorflow serving in Occlum
 
-The following command will download the Resnet50 model and convert the model format. It also will generate the TLS key and certificates for localhost( server domain name). The server.crt will be used by client. The sever.key and ssl.cfg is used by TF serving.
-
+The following command will download the Resnet50 model and convert the model format.
 ```
 ./prepare_model_and_env.sh 
+```
+
+The following command will generate the TLS key and certificates for localhost( server domain name). The server.crt will be used by client. The sever.key and ssl.cfg is used by TF serving.
+```
+./generate_ssl_config.sh localhost
 ```
 
 Run the Tensorflow Serving in occlum.
