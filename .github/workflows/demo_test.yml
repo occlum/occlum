@@ -712,7 +712,7 @@ jobs:
       run: docker exec tf_serving_test bash -c "mv /root/tensorflow_model_server /root/occlum/demos/tensorflow/tensorflow_serving"
 
     - name: Set up environment
-      run: docker exec tf_serving_test bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving; ./prepare_model_and_env.sh"
+      run: docker exec tf_serving_test bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving; ./prepare_model_and_env.sh; ./generate_ssl_config.sh localhost"
 
     - name: Run tf_serving server
       run: docker exec tf_serving_test bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving; SGX_MODE=SIM ./run_occlum_tf_serving.sh"
