@@ -145,3 +145,7 @@ where:
 - @ENCLAVE_TYPE: specify the type of enclave hardware to use, such as `intelSgx`.
 - @ENCLAVE_PATH: specify the path to enclave runtime PAL to launch.
 - @ENCLAVE_ARGS: specify the specific arguments to enclave runtime PAL, separated by the comma.
+
+# Deployment
+
+Please refer to this [guide](https://www.alibabacloud.com/help/doc-detail/254909.htm) to show how to deploy confidential containers in TEE-based ACK clusters and this [guide](https://www.alibabacloud.com/help/doc-detail/259685.htm) to show how to use confidential containers to implement remote attestation in TEE-based ACK clusters.
