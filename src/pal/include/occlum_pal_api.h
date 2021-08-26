@@ -93,6 +93,13 @@ struct occlum_pal_create_process_args {
     int *pid;
 };
 
+// todo: more detailed description
+struct host_file_buffer {
+    const char *resolv_conf_ptr;
+    const char *hosts_ptr;
+    const char *hostname_ptr;
+};
+
 /*
  * The struct which consists of arguments needed by occlum_pal_exec
  */

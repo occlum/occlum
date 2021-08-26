@@ -2,7 +2,7 @@
 #include "Enclave_u.h"
 #include "pal_enclave.h"
 #include "pal_error.h"
-#include "pal_load_resolv_conf.h"
+#include "pal_load_file.h"
 #include "pal_interrupt_thread.h"
 #include "pal_log.h"
 #include "pal_sig_handler.h"
@@ -107,11 +107,24 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
     eid = pal_get_enclave_id();
 
     int ecall_ret = 0;
-    const char *resolv_conf_ptr = pal_load_resolv_conf();
+    struct host_file_buffer file_buffer = {
+        .hostname_ptr = pal_load_file("/etc/hostname"),
+        .hosts_ptr = pal_load_file("/etc/hosts"),
+        .resolv_conf_ptr = pal_load_file("/etc/resolv.conf"),
+    };
+
+    const struct host_file_buffer *file_buffer_ptr = &file_buffer;
+
     sgx_status_t ecall_status = occlum_ecall_init(eid, &ecall_ret, attr->log_level,
-                                resolved_path, resolv_conf_ptr);
-    free((void *)resolv_conf_ptr);
-    resolv_conf_ptr = NULL;
+                                resolved_path, file_buffer_ptr);
+
+    free((void *)file_buffer.hostname_ptr);
+    file_buffer.hostname_ptr = NULL;
+    free((void *)file_buffer.hosts_ptr);
+    file_buffer.hosts_ptr = NULL;
+    free((void *)file_buffer.resolv_conf_ptr);
+    file_buffer.resolv_conf_ptr = NULL;
+
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
         PAL_ERROR("Failed to do ECall with error code 0x%x: %s", ecall_status, sgx_err);

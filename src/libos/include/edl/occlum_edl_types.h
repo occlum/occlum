@@ -29,6 +29,13 @@ typedef struct itimerspec{
     struct _timespec it_value;
 } itimerspec_t;
 
+// todo: more detailed description
+struct host_file_buffer {
+    const char* resolv_conf_ptr;
+    const char* hosts_ptr;
+    const char* hostname_ptr;
+};
+
 #define FD_SETSIZE 1024
 typedef struct {
     unsigned long fds_bits[FD_SETSIZE / 8 / sizeof(long)];
