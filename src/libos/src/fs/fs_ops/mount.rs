@@ -1,10 +1,9 @@
-use std::path::PathBuf;
-use std::sync::Once;
-
 use config::{parse_key, parse_mac, ConfigMount, ConfigMountFsType, ConfigMountOptions};
 use rcore_fs_mountfs::MNode;
+use std::path::PathBuf;
+use std::sync::Once;
+use util::host_file_util::{write_host_file, HostFile};
 use util::mem_util::from_user;
-use util::resolv_conf_util::write_resolv_conf;
 
 use super::rootfs::{mount_nonroot_fs_according_to, open_root_fs_according_to, umount_nonroot_fs};
 use super::*;
@@ -30,9 +29,18 @@ pub fn do_mount_rootfs(
         *rootfs = new_rootfs;
         *ENTRY_POINTS.write().unwrap() = user_config.entry_points.to_owned();
     });
+
     // Write resolv.conf file into mounted file system
-    write_resolv_conf()?;
+    write_host_file(HostFile::RESOLV_CONF)?;
     *RESOLV_CONF_STR.write().unwrap() = None;
+
+    // Write hostname file into mounted file system
+    write_host_file(HostFile::HOSTNAME)?;
+    *HOSTNAME_STR.write().unwrap() = None;
+
+    // Write hosts file into mounted file system
+    write_host_file(HostFile::HOSTS)?;
+    *HOSTS_STR.write().unwrap() = None;
 
     Ok(())
 }

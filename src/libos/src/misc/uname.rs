@@ -1,6 +1,7 @@
 use super::*;
+use crate::fs::{AccessMode, CreationFlags, FileMode, FsView};
 use std::ffi::{CStr, CString};
-
+use std::str;
 /// A sample of `struct utsname`
 /// ```
 ///   sysname = Linux
@@ -25,7 +26,7 @@ pub struct utsname_t {
 
 pub fn do_uname(name: &mut utsname_t) -> Result<()> {
     copy_from_cstr_to_u8_array(&SYSNAME, &mut name.sysname);
-    copy_from_cstr_to_u8_array(&NODENAME, &mut name.nodename);
+    obtain_nodename(&mut name.nodename);
     copy_from_cstr_to_u8_array(&RELEASE, &mut name.release);
     copy_from_cstr_to_u8_array(&VERSION, &mut name.version);
     copy_from_cstr_to_u8_array(&MACHINE, &mut name.machine);
@@ -46,5 +47,34 @@ fn copy_from_cstr_to_u8_array(src: &CStr, dst: &mut [u8]) {
     let src: &[u8] = src.to_bytes_with_nul();
     let len = min(dst.len() - 1, src.len());
     dst[..len].copy_from_slice(&src[..len]);
+    dst[len] = 0;
+}
+
+fn obtain_nodename(dst: &mut [u8]) {
+    const HOSTNAME_PATH: &'static str = "/etc/hostname";
+
+    let fs_view = FsView::new();
+
+    let hostname_file = match fs_view.open_file(
+        HOSTNAME_PATH,
+        AccessMode::O_RDONLY as u32,
+        FileMode::from_bits(0o666).unwrap(),
+    ) {
+        Ok(file) => file,
+        Err(e) => {
+            // If failed to open hostname file, use "occlum-node" nodename.
+            error!("failed to open /etc/hostname: {}", e.backtrace());
+            copy_from_cstr_to_u8_array(&NODENAME, dst);
+            return;
+        }
+    };
+
+    let mut nodename: [u8; 65] = [0; 65];
+    hostname_file.read(&mut nodename);
+
+    // The \n need to be eliminated.
+    let nodename_string = str::from_utf8(&nodename).unwrap().replace("\n", "");
+    let len = nodename_string.len();
+    dst[..len].copy_from_slice(&nodename_string.into_bytes());
     dst[len] = 0;
 }
