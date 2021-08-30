@@ -210,8 +210,7 @@ Step 1-3 are to be done on the host OS (Linux):
     # Two methods:
     # (1) Create softlinks on host
     mkdir -p /dev/sgx
-    ln -sf ../sgx_enclave /dev/sgx/enclave
-    ln -sf ../sgx_provision /dev/sgx/provision
+    cd /dev/sgx && ln -sf ../sgx_enclave enclave && ln -sf ../sgx_provision provision
     docker run -it --device /dev/sgx/enclave --device /dev/sgx/provision occlum/occlum:[version]-ubuntu18.04
 
     # (2) Create the docker with privileged mode
