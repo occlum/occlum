@@ -5,9 +5,11 @@ use super::file_ops::{
     FsPath, LinkFlags, StatFlags, UnlinkFlags, AT_FDCWD,
 };
 use super::fs_ops;
+use super::fs_ops::{MountFlags, MountOptions, UmountFlags};
 use super::time::{clockid_t, itimerspec_t, ClockID};
 use super::timer_file::{TimerCreationFlags, TimerSetFlags};
 use super::*;
+use config::ConfigMountFsType;
 use util::mem_util::from_user;
 
 #[allow(non_camel_case_types)]
@@ -651,5 +653,43 @@ pub fn do_statfs(path: *const i8, statfs_buf: *mut Statfs) -> Result<isize> {
     unsafe {
         statfs_buf.write(statfs);
     }
+    Ok(0)
+}
+
+pub fn do_mount(
+    source: *const i8,
+    target: *const i8,
+    fs_type: *const i8,
+    flags: u32,
+    options: *const i8,
+) -> Result<isize> {
+    let source = from_user::clone_cstring_safely(source)?
+        .to_string_lossy()
+        .into_owned();
+    let target = from_user::clone_cstring_safely(target)?
+        .to_string_lossy()
+        .into_owned();
+    let flags = MountFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
+    let mount_options = {
+        let fs_type = {
+            let fs_type = from_user::clone_cstring_safely(fs_type)?
+                .to_string_lossy()
+                .into_owned();
+            ConfigMountFsType::from_input(fs_type.as_str())?
+        };
+        MountOptions::from_fs_type_and_options(&fs_type, options)?
+    };
+
+    fs_ops::do_mount(&source, &target, flags, mount_options)?;
+    Ok(0)
+}
+
+pub fn do_umount(target: *const i8, flags: u32) -> Result<isize> {
+    let target = from_user::clone_cstring_safely(target)?
+        .to_string_lossy()
+        .into_owned();
+    let flags = UmountFlags::from_u32(flags)?;
+
+    fs_ops::do_umount(&target, flags)?;
     Ok(0)
 }
