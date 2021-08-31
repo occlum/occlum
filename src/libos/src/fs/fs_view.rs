@@ -161,9 +161,6 @@ impl FsView {
 
     /// Lookup INode from the cwd of the process, dereference symlink
     pub fn lookup_inode(&self, path: &str) -> Result<Arc<dyn INode>> {
-        // Linux uses 40 as the upper limit for resolving symbolic links,
-        // so Occlum use it as a reasonable value
-        const MAX_SYMLINKS: usize = 40;
         debug!("lookup_inode: cwd: {:?}, path: {:?}", self.cwd(), path);
         if path.len() > 0 && path.as_bytes()[0] == b'/' {
             // absolute path

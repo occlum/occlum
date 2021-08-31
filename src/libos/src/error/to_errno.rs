@@ -98,6 +98,7 @@ impl ToErrno for rcore_fs::vfs::FsError {
             FsError::NameTooLong => ENAMETOOLONG,
             FsError::FileTooBig => EFBIG,
             FsError::OpNotSupported => EOPNOTSUPP,
+            FsError::NotMountPoint => EINVAL,
         }
     }
 }
