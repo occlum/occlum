@@ -26,12 +26,12 @@ use crate::fs::{
     do_eventfd, do_eventfd2, do_faccessat, do_fallocate, do_fchdir, do_fchmod, do_fchmodat,
     do_fchown, do_fchownat, do_fcntl, do_fdatasync, do_fstat, do_fstatat, do_fstatfs, do_fsync,
     do_ftruncate, do_getcwd, do_getdents, do_getdents64, do_ioctl, do_lchown, do_link, do_linkat,
-    do_lseek, do_lstat, do_mkdir, do_mkdirat, do_mount_rootfs, do_open, do_openat, do_pipe,
-    do_pipe2, do_pread, do_pwrite, do_read, do_readlink, do_readlinkat, do_readv, do_rename,
-    do_renameat, do_rmdir, do_sendfile, do_stat, do_statfs, do_symlink, do_symlinkat, do_sync,
-    do_timerfd_create, do_timerfd_gettime, do_timerfd_settime, do_truncate, do_umask, do_unlink,
-    do_unlinkat, do_write, do_writev, iovec_t, AsTimer, File, FileDesc, FileRef, HostStdioFds,
-    Stat, Statfs,
+    do_lseek, do_lstat, do_mkdir, do_mkdirat, do_mount, do_mount_rootfs, do_open, do_openat,
+    do_pipe, do_pipe2, do_pread, do_pwrite, do_read, do_readlink, do_readlinkat, do_readv,
+    do_rename, do_renameat, do_rmdir, do_sendfile, do_stat, do_statfs, do_symlink, do_symlinkat,
+    do_sync, do_timerfd_create, do_timerfd_gettime, do_timerfd_settime, do_truncate, do_umask,
+    do_unlink, do_unlinkat, do_write, do_writev, iovec_t, AsTimer, File, FileDesc, FileRef,
+    HostStdioFds, Stat, Statfs,
 };
 use crate::interrupt::{do_handle_interrupt, sgx_interrupt_info_t};
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t};
@@ -253,7 +253,7 @@ macro_rules! process_syscall_table_with_callback {
             (Sync = 162) => do_sync(),
             (Acct = 163) => handle_unsupported(),
             (Settimeofday = 164) => handle_unsupported(),
-            (Mount = 165) => handle_unsupported(),
+            (Mount = 165) => do_mount(source: *const i8, target: *const i8, fs_type: *const i8, flags: u32, options: *const i8),
             (Umount2 = 166) => handle_unsupported(),
             (Swapon = 167) => handle_unsupported(),
             (Swapoff = 168) => handle_unsupported(),
