@@ -67,3 +67,7 @@ fn split_path(path: &str) -> (&str, &str) {
     }
     (dir_path, file_name)
 }
+
+// Linux uses 40 as the upper limit for resolving symbolic links,
+// so Occlum use it as a reasonable value
+pub const MAX_SYMLINKS: usize = 40;
