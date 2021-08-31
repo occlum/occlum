@@ -116,7 +116,29 @@ pub fn mount_nonroot_fs_according_to(
                 mount_fs_at(procfs, root, &mc.target)?;
             }
             TYPE_UNIONFS => {
-                return_errno!(EINVAL, "Cannot mount UnionFS at non-root path");
+                let layer_mcs = mc
+                    .options
+                    .layers
+                    .as_ref()
+                    .ok_or_else(|| errno!(EINVAL, "Invalid layers for unionfs"))?;
+                let image_fs_mc = layer_mcs
+                    .get(0)
+                    .ok_or_else(|| errno!(EINVAL, "Invalid image layer"))?;
+                let container_fs_mc = layer_mcs
+                    .get(1)
+                    .ok_or_else(|| errno!(EINVAL, "Invalid container layer"))?;
+                let unionfs = match (&image_fs_mc.type_, &container_fs_mc.type_) {
+                    (TYPE_SEFS, TYPE_SEFS) => {
+                        let image_sefs = open_or_create_sefs_according_to(image_fs_mc, user_key)?;
+                        let container_sefs =
+                            open_or_create_sefs_according_to(container_fs_mc, user_key)?;
+                        UnionFS::new(vec![container_sefs, image_sefs])?
+                    }
+                    (_, _) => {
+                        return_errno!(EINVAL, "Unsupported fs type inside unionfs");
+                    }
+                };
+                mount_fs_at(unionfs, root, &mc.target)?;
             }
         }
     }
