@@ -8,7 +8,7 @@ name = "occlum_libos_core_rs"
 crate-type = ["staticlib"]
 
 [dependencies]
-async-rt  = { path = "crates/async-rt", features = ["sgx", "thread_sleep"] }
+async-rt  = { path = "crates/async-rt", default-features = false, features = ["sgx"] }
 async-io  = { path = "crates/async-io", features = ["sgx"] }
 atomic = "0.5"
 bitflags = "1.0"

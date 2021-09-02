@@ -38,7 +38,7 @@ pub async fn do_wait4(child_filter: &ProcessFilter) -> Result<(pid_t, i32)> {
             let exit_status = free_zombie_child(&process, process_inner, zombie_pid);
             return Ok((zombie_pid, exit_status));
         }
-    });
+    })
 }
 
 fn free_zombie_child(

@@ -89,14 +89,17 @@ version = "0.1.0"
 dependencies = [
  "atomic",
  "bit-vec",
+ "errno",
  "flume",
  "futures",
+ "hierarchical_hash_wheel_timer",
  "intrusive-collections",
  "lazy_static",
  "log",
  "object-id",
  "sgx_tstd",
  "spin 0.7.0",
+ "vdso-time",
 ]
 
 [[package]]
@@ -353,6 +356,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "611834ce18aaa1bd13c4b374f5d653e1027cf99b6b502584ff8c9a64413b30bb"
 
 [[package]]
+name = "futures-macro"
+version = "0.3.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77408a692f1f97bcc61dc001d752e00643408fbc922e4d634c655df50d595556"
+dependencies = [
+ "proc-macro-hack",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "futures-sink"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -371,10 +386,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d304cff4a7b99cfb7986f7d43fbe93d175e72e704a8860787cc95e9ffd85cbd2"
 dependencies = [
  "futures-core",
+ "futures-macro",
  "futures-sink",
  "futures-task",
  "pin-project",
  "pin-utils",
+ "proc-macro-hack",
+ "proc-macro-nested",
 ]
 
 [[package]]
@@ -398,6 +416,13 @@ dependencies = [
 [[package]]
 name = "hashbrown_tstd"
 version = "0.9.0"
+
+[[package]]
+name = "hierarchical_hash_wheel_timer"
+version = "1.1.0"
+dependencies = [
+ "sgx_tstd",
+]
 
 [[package]]
 name = "host-socket"
@@ -625,6 +650,18 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
+name = "proc-macro-hack"
+version = "0.5.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbf0c48bc1d91375ae5c3cd81e3722dff1abcf81a30960240640d223f59fe0e5"
+
+[[package]]
+name = "proc-macro-nested"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc881b2c22681370c6a780e47af9840ef841837bc98118431d4e1868bd0c1086"
 
 [[package]]
 name = "proc-macro2"
@@ -1087,7 +1124,13 @@ dependencies = [
 name = "vdso-time"
 version = "0.1.0"
 dependencies = [
+ "cfg-if 1.0.0",
+ "errno",
+ "lazy_static",
+ "libc",
+ "log",
  "sgx_libc",
+ "sgx_trts",
  "sgx_tstd",
  "sgx_types",
 ]

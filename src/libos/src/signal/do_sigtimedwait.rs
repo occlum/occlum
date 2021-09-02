@@ -32,7 +32,7 @@ pub async fn do_sigtimedwait(interest: SigSet, timeout: Option<&Duration>) -> Re
             let siginfo = signal.to_info();
             return Ok(siginfo);
         }
-    });
+    })
 }
 
 fn dequeue_pending_signal(

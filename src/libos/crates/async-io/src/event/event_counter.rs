@@ -24,7 +24,8 @@ impl EventCounter {
             if val > 0 {
                 return val;
             }
-        });
+        })
+        .unwrap()
     }
 
     pub fn write(&self) {
