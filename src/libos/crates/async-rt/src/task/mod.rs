@@ -1,6 +1,3 @@
-use alloc::sync::Arc;
-use core::future::Future;
-
 use crate::executor::EXECUTOR;
 use crate::prelude::*;
 

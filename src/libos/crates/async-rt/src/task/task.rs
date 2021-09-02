@@ -1,6 +1,5 @@
 use core::fmt::{self, Debug};
 
-use futures::future::{BoxFuture, FutureExt};
 use futures::task::ArcWake;
 
 use crate::executor::EXECUTOR;

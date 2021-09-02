@@ -1,5 +1,3 @@
-use core::task::{Context, Poll};
-
 use crate::prelude::*;
 
 pub fn yield_() -> Yield {

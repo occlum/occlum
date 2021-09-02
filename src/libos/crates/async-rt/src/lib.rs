@@ -1,10 +1,4 @@
-#![cfg_attr(
-    any(
-        not(any(test, feature = "auto_run", feature = "thread_sleep")),
-        feature = "sgx"
-    ),
-    no_std
-)]
+#![cfg_attr(feature = "sgx", no_std)]
 #![feature(const_fn)]
 #![feature(thread_local)]
 #![feature(const_fn_fn_ptr_basics)]
@@ -13,18 +7,10 @@
 #[macro_use]
 extern crate sgx_tstd as std;
 extern crate alloc;
-extern crate bit_vec;
-#[macro_use]
-extern crate lazy_static;
-//#[macro_use]
-//extern crate log;
-extern crate flume;
-extern crate spin;
 
 pub mod config;
 pub mod executor;
 mod macros;
-#[cfg(feature = "thread_sleep")]
 mod parks;
 pub mod prelude;
 pub mod sched;
@@ -121,13 +107,13 @@ mod tests {
     }
 
     mod logger {
-        use log::{Level, LevelFilter, Metadata, Record, SetLoggerError};
+        use log::{Level, LevelFilter, Metadata, Record};
 
         #[ctor::ctor]
         fn auto_init() {
             log::set_logger(&LOGGER)
-                .map(|()| log::set_max_level(LevelFilter::Info))
-                .expect("failed to init the");
+                .map(|()| log::set_max_level(LevelFilter::Trace))
+                .expect("failed to init the logger");
         }
 
         static LOGGER: SimpleLogger = SimpleLogger;
@@ -136,7 +122,7 @@ mod tests {
 
         impl log::Log for SimpleLogger {
             fn enabled(&self, metadata: &Metadata) -> bool {
-                metadata.level() <= Level::Info
+                metadata.level() <= Level::Trace
             }
 
             fn log(&self, record: &Record) {

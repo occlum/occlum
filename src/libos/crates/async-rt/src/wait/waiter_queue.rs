@@ -124,7 +124,7 @@ impl WaiterQueueInner {
 
         // Make sure self.ptr refers to a valid items in the list
         if self.next_ptr.is_none() {
-            let mut cursor = self.list.front_mut();
+            let cursor = self.list.front_mut();
             if cursor.is_null() {
                 return 0;
             }

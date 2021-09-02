@@ -2,7 +2,6 @@ use flume::{Receiver, Sender};
 use futures::task::waker_ref;
 
 use crate::config::CONFIG;
-#[cfg(feature = "thread_sleep")]
 use crate::parks::Parks;
 use crate::prelude::*;
 use crate::sched::Affinity;
@@ -33,14 +32,13 @@ pub(crate) struct Executor {
     task_senders: Vec<Sender<Arc<Task>>>,
     next_run_queue_id: AtomicU32,
     is_shutdown: AtomicBool,
-    #[cfg(feature = "thread_sleep")]
     parks: Parks,
 }
 
 impl Executor {
     pub fn new(parallelism: u32) -> Result<Self> {
         if parallelism == 0 {
-            return Err("invalid argument");
+            return_errno!(EINVAL, "invalid argument");
         }
 
         const MAX_QUEUED_TASKS: usize = 1_000;
@@ -54,8 +52,6 @@ impl Executor {
 
         let is_shutdown = AtomicBool::new(false);
         let next_run_queue_id = AtomicU32::new(0);
-
-        #[cfg(feature = "thread_sleep")]
         let parks = Parks::new(parallelism);
 
         let new_self = Self {
@@ -64,7 +60,6 @@ impl Executor {
             task_senders,
             next_run_queue_id,
             is_shutdown,
-            #[cfg(feature = "thread_sleep")]
             parks,
         };
         Ok(new_self)
@@ -88,13 +83,10 @@ impl Executor {
 
                 match task_res {
                     Err(_) => {
-                        #[cfg(feature = "thread_sleep")]
                         self.parks.park_timeout(
                             run_queue_id as usize,
                             core::time::Duration::from_millis(10),
                         );
-                        #[cfg(not(feature = "thread_sleep"))]
-                        core::sync::atomic::spin_loop_hint();
                         continue;
                     }
                     Ok(task) => task,
@@ -140,7 +132,6 @@ impl Executor {
             .send(task)
             .expect("too many tasks enqueued");
 
-        #[cfg(feature = "thread_sleep")]
         self.parks.unpark(thread_id);
     }
 
@@ -160,7 +151,6 @@ impl Executor {
     pub fn shutdown(&self) {
         self.is_shutdown.store(true, Ordering::Relaxed);
 
-        #[cfg(feature = "thread_sleep")]
         self.parks.unpark_all();
     }
 

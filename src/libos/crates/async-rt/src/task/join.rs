@@ -1,6 +1,6 @@
 use alloc::sync::Weak;
 use core::marker::PhantomData;
-use core::task::{Context, Poll, Waker};
+use core::task::Waker;
 
 use crate::prelude::*;
 
