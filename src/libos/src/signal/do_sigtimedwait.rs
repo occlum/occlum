@@ -12,10 +12,6 @@ pub async fn do_sigtimedwait(interest: SigSet, timeout: Option<&Duration>) -> Re
         "do_rt_sigtimedwait: interest: {:?}, timeout: {:?}",
         interest, timeout,
     );
-    // TODO: support timeout
-    if let Some(timeout) = timeout {
-        warn!("do not support timeout yet");
-    }
 
     let thread = current!();
     let process = thread.process().clone();
@@ -26,13 +22,15 @@ pub async fn do_sigtimedwait(interest: SigSet, timeout: Option<&Duration>) -> Re
         *blocked & interest
     };
 
+    let mut timeout = timeout.cloned();
     // Loop until we find a pending signal or reach timeout
-    waiter_loop!(process.sig_waiters(), {
+    waiter_loop!(process.sig_waiters(), timeout, {
         if let Some(signal) = dequeue_pending_signal(&interest, &thread, &process) {
             let siginfo = signal.to_info();
             return Ok(siginfo);
         }
     })
+    .map_err(|e| errno!(EAGAIN, "no interesting, pending signal"))
 }
 
 fn dequeue_pending_signal(
