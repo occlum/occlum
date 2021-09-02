@@ -144,16 +144,15 @@ pub async fn futex_wait_bitset(
     // Must make sure that no locks are holded by this thread before wait
     drop(futex_bucket);
 
-    waiter.wait(/*timeout.as_ref()*/).await;
-
-    /* TODO: handle errror
-    if let Err(e) = res {
+    let mut timeout = timeout.map_or(None, |t| Some(t));
+    // Wait until we wake it up or reach timeout.
+    if let Err(e) = waiter.wait_timeout(timeout.as_mut()).await {
         let (_, futex_bucket_ref) = FUTEX_BUCKETS.get_bucket(futex_item.key);
         let mut futex_bucket = futex_bucket_ref.lock().unwrap();
         futex_bucket.dequeue_item(&futex_item);
         return_errno!(e.errno(), "futex wait timeout or interrupted");
     }
-    */
+
     Ok(())
 }
 
@@ -275,6 +274,12 @@ impl FutexItem {
     }
 }
 
+impl PartialEq for FutexItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key
+    }
+}
+
 struct FutexBucket {
     queue: VecDeque<FutexItem>,
 }
@@ -293,13 +298,13 @@ impl FutexBucket {
     }
 
     // TODO: this is an O(N) operation. Try to make it more efficient
-    /*pub fn dequeue_item(&mut self, futex_item: &FutexItem) -> Option<FutexItem> {
+    pub fn dequeue_item(&mut self, futex_item: &FutexItem) -> Option<FutexItem> {
         let item_i = self.queue.iter().position(|item| *item == *futex_item);
         if item_i.is_none() {
             return None;
         }
         self.queue.remove(item_i.unwrap())
-    }*/
+    }
 
     // TODO: consider using std::future to improve the readability
     pub fn dequeue_and_wake_items(
