@@ -7,7 +7,6 @@ use std::time::Duration;
 use async_rt::wait::{Waiter, Waker};
 
 use crate::prelude::*;
-use crate::time::{timespec_t, ClockID};
 
 /// `FutexOp`, `FutexFlags`, and `futex_op_and_flags_from_u32` are helper types and
 /// functions for handling the versatile commands and arguments of futex system

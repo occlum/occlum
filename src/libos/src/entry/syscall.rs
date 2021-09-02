@@ -54,7 +54,7 @@ use crate::signal::{
     do_rt_sigtimedwait, do_sigaltstack, do_tgkill, do_tkill, sigaction_t, siginfo_t, sigset_t,
     stack_t,
 };
-use crate::time::{clockid_t, timespec_t, timeval_t};
+use crate::time::{clockid_t, timespec_t, timeval_t, ClockId};
 use crate::util::log::{self, LevelFilter};
 use crate::util::mem_util::from_user::*;
 use crate::vm::{MMapFlags, MRemapFlags, MSyncFlags, VMPerms};
@@ -148,6 +148,7 @@ macro_rules! process_syscall_table_with_callback {
             (Futex = 202) => do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32, timeout: u64, futex_new_addr: *const i32, bitset: u32),
             (SchedYield = 24) => do_sched_yield(),
 
+            (Gettimeofday = 96) => do_gettimeofday(tv_u: *mut timeval_t),
             (ClockGettime = 228) => do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t),
             (ClockGetres = 229) => do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t),
 
@@ -806,7 +807,7 @@ fn do_sysinfo(info: *mut sysinfo_t) -> Result<isize> {
 }
 
 // TODO: handle tz: timezone_t
-fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<isize> {
+async fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<isize> {
     check_mut_ptr(tv_u)?;
     let tv = crate::time::do_gettimeofday();
     unsafe {
@@ -817,7 +818,7 @@ fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<isize> {
 
 async fn do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t) -> Result<isize> {
     check_mut_ptr(ts_u)?;
-    let clockid = crate::time::ClockID::from_raw(clockid)?;
+    let clockid = ClockId::try_from(clockid)?;
     let ts = crate::time::do_clock_gettime(clockid)?;
     unsafe {
         *ts_u = ts;
@@ -830,7 +831,7 @@ async fn do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t) -> Result<i
         return Ok(0);
     }
     check_mut_ptr(res_u)?;
-    let clockid = crate::time::ClockID::from_raw(clockid)?;
+    let clockid = ClockId::try_from(clockid)?;
     let res = crate::time::do_clock_getres(clockid)?;
     unsafe {
         *res_u = res;

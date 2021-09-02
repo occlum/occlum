@@ -6,16 +6,12 @@ use rcore_fs::dev::TimeProvider;
 use rcore_fs::vfs::Timespec;
 use std::time::Duration;
 use std::{fmt, u64};
-use vdso_time::Vdso;
+pub use vdso_time::ClockId;
 
 pub mod timer_slack;
 pub mod up_time;
 
 pub use timer_slack::TIMERSLACK;
-
-lazy_static! {
-    static ref VDSO: Option<Vdso> = Vdso::new().ok();
-}
 
 #[allow(non_camel_case_types)]
 pub type time_t = i64;
@@ -65,23 +61,7 @@ impl From<Duration> for timeval_t {
 }
 
 pub fn do_gettimeofday() -> timeval_t {
-    extern "C" {
-        fn occlum_ocall_gettimeofday(tv: *mut timeval_t) -> sgx_status_t;
-    }
-
-    let mut tv: timeval_t = Default::default();
-    if VDSO.is_none()
-        || VDSO
-            .as_ref()
-            .unwrap()
-            .gettimeofday(&mut tv as *mut timeval_t as *mut _, std::ptr::null_mut())
-            .is_err()
-    {
-        debug!("fallback to occlum_ocall_gettimeofday");
-        unsafe {
-            occlum_ocall_gettimeofday(&mut tv as *mut timeval_t);
-        }
-    }
+    let tv = timeval_t::from(vdso_time::clock_gettime(ClockId::CLOCK_REALTIME).unwrap());
     tv.validate()
         .expect("gettimeofday returned invalid timeval_t");
     tv
@@ -135,77 +115,22 @@ impl timespec_t {
 #[allow(non_camel_case_types)]
 pub type clockid_t = i32;
 
-#[derive(Debug, Copy, Clone)]
-#[allow(non_camel_case_types)]
-pub enum ClockID {
-    CLOCK_REALTIME = 0,
-    CLOCK_MONOTONIC = 1,
-    CLOCK_PROCESS_CPUTIME_ID = 2,
-    CLOCK_THREAD_CPUTIME_ID = 3,
-    CLOCK_MONOTONIC_RAW = 4,
-    CLOCK_REALTIME_COARSE = 5,
-    CLOCK_MONOTONIC_COARSE = 6,
-    CLOCK_BOOTTIME = 7,
-}
-
-impl ClockID {
-    #[deny(unreachable_patterns)]
-    pub fn from_raw(clockid: clockid_t) -> Result<ClockID> {
-        Ok(match clockid as i32 {
-            0 => ClockID::CLOCK_REALTIME,
-            1 => ClockID::CLOCK_MONOTONIC,
-            2 => ClockID::CLOCK_PROCESS_CPUTIME_ID,
-            3 => ClockID::CLOCK_THREAD_CPUTIME_ID,
-            4 => ClockID::CLOCK_MONOTONIC_RAW,
-            5 => ClockID::CLOCK_REALTIME_COARSE,
-            6 => ClockID::CLOCK_MONOTONIC_COARSE,
-            7 => ClockID::CLOCK_BOOTTIME,
-            _ => return_errno!(EINVAL, "invalid command"),
-        })
+pub fn do_clock_gettime(clockid: ClockId) -> Result<timespec_t> {
+    // TODO: support CLOCK_PROCESS_CPUTIME_ID and CLOCK_THREAD_CPUTIME_ID.
+    if clockid == ClockId::CLOCK_PROCESS_CPUTIME_ID || clockid == ClockId::CLOCK_THREAD_CPUTIME_ID {
+        return_errno!(
+            EINVAL,
+            "Not support CLOCK_PROCESS_CPUTIME_ID or CLOCK_THREAD_CPUTIME_ID"
+        );
     }
-}
-
-pub fn do_clock_gettime(clockid: ClockID) -> Result<timespec_t> {
-    extern "C" {
-        fn occlum_ocall_clock_gettime(clockid: clockid_t, tp: *mut timespec_t) -> sgx_status_t;
-    }
-
-    let mut tv: timespec_t = Default::default();
-    if VDSO.is_none()
-        || VDSO
-            .as_ref()
-            .unwrap()
-            .clock_gettime(clockid as clockid_t, &mut tv as *mut timespec_t as *mut _)
-            .is_err()
-    {
-        debug!("fallback to occlum_ocall_clock_gettime");
-        unsafe {
-            occlum_ocall_clock_gettime(clockid as clockid_t, &mut tv as *mut timespec_t);
-        }
-    }
+    let tv = timespec_t::from(vdso_time::clock_gettime(clockid).unwrap());
     tv.validate()
         .expect("clock_gettime returned invalid timespec");
     Ok(tv)
 }
 
-pub fn do_clock_getres(clockid: ClockID) -> Result<timespec_t> {
-    extern "C" {
-        fn occlum_ocall_clock_getres(clockid: clockid_t, res: *mut timespec_t) -> sgx_status_t;
-    }
-
-    let mut res: timespec_t = Default::default();
-    if VDSO.is_none()
-        || VDSO
-            .as_ref()
-            .unwrap()
-            .clock_getres(clockid as clockid_t, &mut res as *mut timespec_t as *mut _)
-            .is_err()
-    {
-        debug!("fallback to occlum_ocall_clock_getres");
-        unsafe {
-            occlum_ocall_clock_getres(clockid as clockid_t, &mut res as *mut timespec_t);
-        }
-    }
+pub fn do_clock_getres(clockid: ClockId) -> Result<timespec_t> {
+    let res = timespec_t::from(vdso_time::clock_getres(clockid).unwrap());
     let validate_resolution = |res: &timespec_t| -> Result<()> {
         // The resolution can be ranged from 1 nanosecond to a few milliseconds
         if res.sec == 0 && res.nsec > 0 && res.nsec < 1_000_000_000 {

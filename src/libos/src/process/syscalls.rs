@@ -8,7 +8,7 @@ use super::do_spawn::FileAction;
 use super::prctl::PrctlCmd;
 use super::process::ProcessFilter;
 use crate::prelude::*;
-use crate::time::{timespec_t, ClockID};
+use crate::time::{timespec_t, ClockId};
 use crate::util::mem_util::from_user::*;
 
 pub async fn do_spawn_for_musl(
@@ -281,9 +281,9 @@ pub async fn do_futex(
         if is_absolute {
             // TODO: use a secure clock to transfer the real time to monotonic time
             let clock_id = if futex_flags.contains(FutexFlags::FUTEX_CLOCK_REALTIME) {
-                ClockID::CLOCK_REALTIME
+                ClockId::CLOCK_REALTIME
             } else {
-                ClockID::CLOCK_MONOTONIC
+                ClockId::CLOCK_MONOTONIC
             };
             let now = crate::time::do_clock_gettime(clock_id)
                 .unwrap()
