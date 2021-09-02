@@ -1,6 +1,4 @@
-use libc::{
-    clockid_t, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE, CLOCK_REALTIME, CLOCK_REALTIME_COARSE,
-};
+use super::*;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 pub const PAGE_SIZE: u64 = 4096;
@@ -8,10 +6,75 @@ pub const PAGE_SIZE: u64 = 4096;
 pub const CLOCK_TAI: usize = 11;
 pub const VDSO_BASES: usize = CLOCK_TAI + 1;
 
-pub const NSEC_PER_USEC: u64 = 1000;
-pub const NSEC_PER_SEC: u64 = 1000000000;
+#[cfg(not(any(arget_arch = "x86", target_arch = "x86_64")))]
+compile_error!("Only support x86 or x86_64 architecture now.");
 
-/// The timers is divided in 3 sets (HRES, COARSE, RAW) since Linux v5.3
+/// Reads the current value of the processor’s time-stamp counter.
+///
+/// The processor monotonically increments the time-stamp counter MSR every clock cycle
+/// and resets it to 0 whenever the processor is reset.
+///
+/// The RDTSC instruction is not a serializing instruction. It does not necessarily
+/// wait until all previous instructions have been executed before reading the counter.
+/// Similarly, subsequent instructions may begin execution before the read operation is performed.
+pub fn rdtsc() -> u64 {
+    cfg_if::cfg_if! {
+        if #[cfg(target_arch = "x86_64")] {
+            unsafe { core::arch::x86_64::_rdtsc() as u64 }
+        } else if #[cfg(target_arch = "x86")] {
+            unsafe { core::arch::x86::_rdtsc() as u64 }
+        }
+    }
+}
+
+/// Reads the current value of the processor’s time-stamp counter.
+///
+/// The processor monotonically increments the time-stamp counter MSR every clock cycle
+/// and resets it to 0 whenever the processor is reset.
+/// The RDTSCP instruction waits until all previous instructions have been executed before
+/// reading the counter. However, subsequent instructions may begin execution before
+/// the read operation is performed.
+#[allow(dead_code)]
+pub fn rdtscp() -> u64 {
+    cfg_if::cfg_if! {
+        if #[cfg(target_arch = "x86_64")] {
+            let mut aux: u32 = 0;
+            unsafe { core::arch::x86_64::__rdtscp(&mut aux) as u64 }
+        } else if #[cfg(target_arch = "x86")] {
+            let mut aux: u32 = 0;
+            unsafe { core::arch::x86::__rdtscp(&mut aux) as u64 }
+        }
+    }
+}
+
+/// Performs a serializing operation on all load-from-memory instructions
+/// that were issued prior to this instruction.
+///
+/// Guarantees that every load instruction that precedes, in program order,
+/// is globally visible before any load instruction which follows the fence in program order.
+pub fn lfence() {
+    cfg_if::cfg_if! {
+        if #[cfg(target_arch = "x86_64")] {
+            unsafe { core::arch::x86_64::_mm_lfence() }
+        } else if #[cfg(target_arch = "x86")] {
+            unsafe { core::arch::x86::_mm_lfence() }
+        }
+    }
+}
+
+/// Read the current TSC in program order.
+///
+/// The RDTSC instruction might not be ordered relative to memory access.
+/// But an RDTSC immediately after an appropriate barrier appears to be ordered as a normal load.
+/// Hence, we could use a barrier before RDTSC to get ordered TSC.
+///
+/// We also can just use RDTSCP, which is also ordered.
+pub fn rdtsc_ordered() -> u64 {
+    lfence();
+    rdtsc()
+}
+
+/// The timers is divided in 3 sets (HRES, COARSE, RAW) since Linux v5.3.
 /// CS_HRES_COARSE refers to the first two and CS_RAW to the third.
 #[derive(Debug, Copy, Clone)]
 #[allow(non_camel_case_types)]
@@ -22,21 +85,18 @@ pub enum ClockSource {
 
 #[derive(Debug, Copy, Clone)]
 #[allow(non_camel_case_types)]
-pub enum vdso_clock_mode {
+pub enum VdsoClockMode {
     VDSO_CLOCKMODE_NONE = 0,
+    VDSO_CLOCKMODE_TSC = 1,
+    VDSO_CLOCKMODE_PVCLOCK = 2,
+    VDSO_CLOCKMODE_HVCLOCK = 3,
+    VDSO_CLOCKMODE_TIMENS = i32::MAX as isize,
 }
 
-// libc::timezone is enum {}, need re-define timezone
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct timezone {
-    pub tz_minuteswest: i32, /* Minutes west of GMT.  */
-    pub tz_dsttime: i32,     /* Nonzero if DST is ever in effect.  */
-}
-
+// Struct VdsoDataPtr must impl this trait to unify vdso_data interface of different linux verisons.
 pub trait VdsoData {
-    fn sec(&self, clockid: clockid_t) -> Result<u64, ()>;
-    fn nsec(&self, clockid: clockid_t) -> Result<u64, ()>;
+    fn sec(&self, clockid: ClockId) -> Result<u64>;
+    fn nsec(&self, clockid: ClockId) -> Result<u64>;
     fn seq(&self) -> u32;
     fn clock_mode(&self) -> i32;
     fn cycle_last(&self) -> u64;
@@ -52,11 +112,17 @@ pub trait VdsoData {
 }
 
 pub enum VdsoDataPtr {
+    // === Linux 4.0 - 4.4, 4.7 - 4.11 ===
     V4_0(*const vdso_data_v4_0),
+    // === Linux 4.5 - 4.6, 4.12 - 4.19 ===
     V4_5(*const vdso_data_v4_5),
+    // === Linux 5.0 - 5.2 ===
     V5_0(*const vdso_data_v5_0),
+    // === Linux 5.3 - 5.5 ===
     V5_3(*const vdso_data_v5_3),
+    // === Linux 5.6 - 5.8 ===
     V5_6(*const vdso_data_v5_6),
+    // === Linux 5.9 - 5.12 ===
     V5_9(*const vdso_data_v5_9),
 }
 
@@ -91,64 +157,54 @@ impl VdsoData for vdso_data_v4_0 {
         (vdso_addr - 2 * PAGE_SIZE + 128) as *const Self
     }
 
-    #[inline]
-    fn sec(&self, clockid: clockid_t) -> Result<u64, ()> {
+    fn sec(&self, clockid: ClockId) -> Result<u64> {
         match clockid {
-            CLOCK_REALTIME => Ok(self.wall_time_sec),
-            CLOCK_MONOTONIC => Ok(self.monotonic_time_sec),
-            CLOCK_REALTIME_COARSE => Ok(self.wall_time_coarse_sec),
-            CLOCK_MONOTONIC_COARSE => Ok(self.monotonic_time_coarse_sec),
-            _ => Err(()),
+            ClockId::CLOCK_REALTIME => Ok(self.wall_time_sec),
+            ClockId::CLOCK_MONOTONIC => Ok(self.monotonic_time_sec),
+            ClockId::CLOCK_REALTIME_COARSE => Ok(self.wall_time_coarse_sec),
+            ClockId::CLOCK_MONOTONIC_COARSE => Ok(self.monotonic_time_coarse_sec),
+            _ => return_errno!(EINVAL, "Unsupported clockid in sec()"),
         }
     }
 
-    #[inline]
-    fn nsec(&self, clockid: clockid_t) -> Result<u64, ()> {
+    fn nsec(&self, clockid: ClockId) -> Result<u64> {
         match clockid {
-            CLOCK_REALTIME => Ok(self.wall_time_snsec),
-            CLOCK_MONOTONIC => Ok(self.monotonic_time_snsec),
-            CLOCK_REALTIME_COARSE => Ok(self.wall_time_coarse_nsec),
-            CLOCK_MONOTONIC_COARSE => Ok(self.monotonic_time_coarse_nsec),
-            _ => Err(()),
+            ClockId::CLOCK_REALTIME => Ok(self.wall_time_snsec),
+            ClockId::CLOCK_MONOTONIC => Ok(self.monotonic_time_snsec),
+            ClockId::CLOCK_REALTIME_COARSE => Ok(self.wall_time_coarse_nsec),
+            ClockId::CLOCK_MONOTONIC_COARSE => Ok(self.monotonic_time_coarse_nsec),
+            _ => return_errno!(EINVAL, "Unsupported clockid in nsec()"),
         }
     }
 
-    #[inline]
     fn seq(&self) -> u32 {
-        self.seq.load(Ordering::Acquire)
+        self.seq.load(Ordering::Relaxed)
     }
 
-    #[inline]
     fn clock_mode(&self) -> i32 {
         self.vclock_mode
     }
 
-    #[inline]
     fn cycle_last(&self) -> u64 {
         self.cycle_last
     }
 
-    #[inline]
     fn mask(&self) -> u64 {
         self.mask
     }
 
-    #[inline]
     fn mult(&self) -> u32 {
         self.mult
     }
 
-    #[inline]
     fn shift(&self) -> u32 {
         self.shift
     }
 
-    #[inline]
     fn tz_minuteswest(&self) -> i32 {
         self.tz_minuteswest
     }
 
-    #[inline]
     fn tz_dsttime(&self) -> i32 {
         self.tz_dsttime
     }
@@ -185,64 +241,54 @@ impl VdsoData for vdso_data_v4_5 {
         (vdso_addr - 3 * PAGE_SIZE + 128) as *const Self
     }
 
-    #[inline]
-    fn sec(&self, clockid: clockid_t) -> Result<u64, ()> {
+    fn sec(&self, clockid: ClockId) -> Result<u64> {
         match clockid {
-            CLOCK_REALTIME => Ok(self.wall_time_sec),
-            CLOCK_MONOTONIC => Ok(self.monotonic_time_sec),
-            CLOCK_REALTIME_COARSE => Ok(self.wall_time_coarse_sec),
-            CLOCK_MONOTONIC_COARSE => Ok(self.monotonic_time_coarse_sec),
-            _ => Err(()),
+            ClockId::CLOCK_REALTIME => Ok(self.wall_time_sec),
+            ClockId::CLOCK_MONOTONIC => Ok(self.monotonic_time_sec),
+            ClockId::CLOCK_REALTIME_COARSE => Ok(self.wall_time_coarse_sec),
+            ClockId::CLOCK_MONOTONIC_COARSE => Ok(self.monotonic_time_coarse_sec),
+            _ => return_errno!(EINVAL, "Unsupported clockid in sec()"),
         }
     }
 
-    #[inline]
-    fn nsec(&self, clockid: clockid_t) -> Result<u64, ()> {
+    fn nsec(&self, clockid: ClockId) -> Result<u64> {
         match clockid {
-            CLOCK_REALTIME => Ok(self.wall_time_snsec),
-            CLOCK_MONOTONIC => Ok(self.monotonic_time_snsec),
-            CLOCK_REALTIME_COARSE => Ok(self.wall_time_coarse_nsec),
-            CLOCK_MONOTONIC_COARSE => Ok(self.monotonic_time_coarse_nsec),
-            _ => Err(()),
+            ClockId::CLOCK_REALTIME => Ok(self.wall_time_snsec),
+            ClockId::CLOCK_MONOTONIC => Ok(self.monotonic_time_snsec),
+            ClockId::CLOCK_REALTIME_COARSE => Ok(self.wall_time_coarse_nsec),
+            ClockId::CLOCK_MONOTONIC_COARSE => Ok(self.monotonic_time_coarse_nsec),
+            _ => return_errno!(EINVAL, "Unsupported clockid in nsec()"),
         }
     }
 
-    #[inline]
     fn seq(&self) -> u32 {
-        self.seq.load(Ordering::Acquire)
+        self.seq.load(Ordering::Relaxed)
     }
 
-    #[inline]
     fn clock_mode(&self) -> i32 {
         self.vclock_mode
     }
 
-    #[inline]
     fn cycle_last(&self) -> u64 {
         self.cycle_last
     }
 
-    #[inline]
     fn mask(&self) -> u64 {
         self.mask
     }
 
-    #[inline]
     fn mult(&self) -> u32 {
         self.mult
     }
 
-    #[inline]
     fn shift(&self) -> u32 {
         self.shift
     }
 
-    #[inline]
     fn tz_minuteswest(&self) -> i32 {
         self.tz_minuteswest
     }
 
-    #[inline]
     fn tz_dsttime(&self) -> i32 {
         self.tz_dsttime
     }
@@ -279,52 +325,42 @@ impl VdsoData for vdso_data_v5_0 {
         (vdso_addr - 3 * PAGE_SIZE + 128) as *const Self
     }
 
-    #[inline]
-    fn sec(&self, clockid: clockid_t) -> Result<u64, ()> {
+    fn sec(&self, clockid: ClockId) -> Result<u64> {
         Ok(self.basetime[clockid as usize].sec)
     }
 
-    #[inline]
-    fn nsec(&self, clockid: clockid_t) -> Result<u64, ()> {
+    fn nsec(&self, clockid: ClockId) -> Result<u64> {
         Ok(self.basetime[clockid as usize].nsec)
     }
 
-    #[inline]
     fn seq(&self) -> u32 {
-        self.seq.load(Ordering::Acquire)
+        self.seq.load(Ordering::Relaxed)
     }
 
-    #[inline]
     fn clock_mode(&self) -> i32 {
         self.vclock_mode
     }
 
-    #[inline]
     fn cycle_last(&self) -> u64 {
         self.cycle_last
     }
 
-    #[inline]
     fn mask(&self) -> u64 {
         self.mask
     }
 
-    #[inline]
     fn mult(&self) -> u32 {
         self.mult
     }
 
-    #[inline]
     fn shift(&self) -> u32 {
         self.shift
     }
 
-    #[inline]
     fn tz_minuteswest(&self) -> i32 {
         self.tz_minuteswest
     }
 
-    #[inline]
     fn tz_dsttime(&self) -> i32 {
         self.tz_dsttime
     }
@@ -363,52 +399,42 @@ impl VdsoData for vdso_data_v5_3 {
         (vdso_addr - 3 * PAGE_SIZE + 128) as *const Self
     }
 
-    #[inline]
-    fn sec(&self, clockid: clockid_t) -> Result<u64, ()> {
+    fn sec(&self, clockid: ClockId) -> Result<u64> {
         Ok(self.basetime[clockid as usize].sec)
     }
 
-    #[inline]
-    fn nsec(&self, clockid: clockid_t) -> Result<u64, ()> {
+    fn nsec(&self, clockid: ClockId) -> Result<u64> {
         Ok(self.basetime[clockid as usize].nsec)
     }
 
-    #[inline]
     fn seq(&self) -> u32 {
-        self.seq.load(Ordering::Acquire)
+        self.seq.load(Ordering::Relaxed)
     }
 
-    #[inline]
     fn clock_mode(&self) -> i32 {
         self.clock_mode
     }
 
-    #[inline]
     fn cycle_last(&self) -> u64 {
         self.cycle_last
     }
 
-    #[inline]
     fn mask(&self) -> u64 {
         self.mask
     }
 
-    #[inline]
     fn mult(&self) -> u32 {
         self.mult
     }
 
-    #[inline]
     fn shift(&self) -> u32 {
         self.shift
     }
 
-    #[inline]
     fn tz_minuteswest(&self) -> i32 {
         self.tz_minuteswest
     }
 
-    #[inline]
     fn tz_dsttime(&self) -> i32 {
         self.tz_dsttime
     }
@@ -454,52 +480,42 @@ impl VdsoData for vdso_data_v5_6 {
         (vdso_addr - 4 * PAGE_SIZE + 128) as *const Self
     }
 
-    #[inline]
-    fn sec(&self, clockid: clockid_t) -> Result<u64, ()> {
+    fn sec(&self, clockid: ClockId) -> Result<u64> {
         unsafe { Ok(self.union_1.basetime[clockid as usize].sec) }
     }
 
-    #[inline]
-    fn nsec(&self, clockid: clockid_t) -> Result<u64, ()> {
+    fn nsec(&self, clockid: ClockId) -> Result<u64> {
         unsafe { Ok(self.union_1.basetime[clockid as usize].nsec) }
     }
 
-    #[inline]
     fn seq(&self) -> u32 {
-        self.seq.load(Ordering::Acquire)
+        self.seq.load(Ordering::Relaxed)
     }
 
-    #[inline]
     fn clock_mode(&self) -> i32 {
         self.clock_mode
     }
 
-    #[inline]
     fn cycle_last(&self) -> u64 {
         self.cycle_last
     }
 
-    #[inline]
     fn mask(&self) -> u64 {
         self.mask
     }
 
-    #[inline]
     fn mult(&self) -> u32 {
         self.mult
     }
 
-    #[inline]
     fn shift(&self) -> u32 {
         self.shift
     }
 
-    #[inline]
     fn tz_minuteswest(&self) -> i32 {
         self.tz_minuteswest
     }
 
-    #[inline]
     fn tz_dsttime(&self) -> i32 {
         self.tz_dsttime
     }
@@ -537,52 +553,42 @@ impl VdsoData for vdso_data_v5_9 {
         (vdso_addr - 4 * PAGE_SIZE + 128) as *const Self
     }
 
-    #[inline]
-    fn sec(&self, clockid: clockid_t) -> Result<u64, ()> {
+    fn sec(&self, clockid: ClockId) -> Result<u64> {
         unsafe { Ok(self.union_1.basetime[clockid as usize].sec) }
     }
 
-    #[inline]
-    fn nsec(&self, clockid: clockid_t) -> Result<u64, ()> {
+    fn nsec(&self, clockid: ClockId) -> Result<u64> {
         unsafe { Ok(self.union_1.basetime[clockid as usize].nsec) }
     }
 
-    #[inline]
     fn seq(&self) -> u32 {
-        self.seq.load(Ordering::Acquire)
+        self.seq.load(Ordering::Relaxed)
     }
 
-    #[inline]
     fn clock_mode(&self) -> i32 {
         self.clock_mode
     }
 
-    #[inline]
     fn cycle_last(&self) -> u64 {
         self.cycle_last
     }
 
-    #[inline]
     fn mask(&self) -> u64 {
         self.mask
     }
 
-    #[inline]
     fn mult(&self) -> u32 {
         self.mult
     }
 
-    #[inline]
     fn shift(&self) -> u32 {
         self.shift
     }
 
-    #[inline]
     fn tz_minuteswest(&self) -> i32 {
         self.tz_minuteswest
     }
 
-    #[inline]
     fn tz_dsttime(&self) -> i32 {
         self.tz_dsttime
     }

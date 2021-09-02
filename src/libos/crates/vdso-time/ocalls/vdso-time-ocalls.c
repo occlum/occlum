@@ -5,39 +5,26 @@
 
 int vdso_ocall_get_vdso_info(
     unsigned long *vdso_addr,
-    long *hres_resolution,
-    long *coarse_resolution,
     char *release,
-    int release_len,
-    struct timespec *tss,
-    int tss_len) {
+    int release_len) {
+    // If AT_SYSINFO_EHDR isn't found, getauxval will return 0.
     *vdso_addr = getauxval(AT_SYSINFO_EHDR);
-
-    struct timespec tp;
-    if (!clock_getres(CLOCK_REALTIME, &tp)) {
-        *hres_resolution = tp.tv_nsec;
-    } else { *hres_resolution = 0; }
-    if (!clock_getres(CLOCK_REALTIME_COARSE, &tp)) {
-        *coarse_resolution = tp.tv_nsec;
-    } else { *coarse_resolution = 0; }
 
     struct utsname buf;
     int ret = uname(&buf);
+    // uname should always succeed here, since uname only fails when buf is not invalid.
     if (ret != 0) { return -1; }
 
-    int buf_rel_len = strlen(buf.release);
-    int len = buf_rel_len > release_len ? release_len : buf_rel_len;
-    memcpy(release, buf.release, len);
-
-    clockid_t clockids[] = { CLOCK_REALTIME, CLOCK_MONOTONIC, CLOCK_MONOTONIC_RAW,
-                             CLOCK_REALTIME_COARSE, CLOCK_MONOTONIC_COARSE, CLOCK_BOOTTIME
-                           };
-    for (int i = 0; i < sizeof(clockids) / sizeof(clockid_t); ++i) {
-        if (tss_len > clockids[i] && clock_gettime(clockids[i], &tss[clockids[i]]) != 0) {
-            tss[clockids[i]].tv_sec = 0;
-            tss[clockids[i]].tv_nsec = 0;
-        }
-    }
+    strncpy(release, buf.release, release_len);
+    release[release_len - 1] = '\0';
 
     return 0;
+}
+
+int vdso_ocall_clock_gettime(int clockid, struct timespec *tp) {
+    return clock_gettime(clockid, tp);
+}
+
+int vdso_ocall_clock_getres(int clockid, struct timespec *res) {
+    return clock_getres(clockid, res);
 }
