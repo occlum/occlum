@@ -1,10 +1,13 @@
-pub use core::task::Waker as RawWaker;
+use core::borrow::BorrowMut;
+use core::task::Waker as RawWaker;
+use futures::select_biased;
 
 use atomic::{Atomic, Ordering};
-use intrusive_collections::{LinkedList, LinkedListLink};
+use intrusive_collections::LinkedListLink;
 use object_id::ObjectId;
 
 use crate::prelude::*;
+use crate::time::{TimerEntry, TimerFutureEntry, DURATION_ZERO};
 
 /// A waiter.
 ///
@@ -36,8 +39,37 @@ impl Waiter {
         self.inner.state.store(WaiterState::Idle, Ordering::Relaxed);
     }
 
-    pub fn wait(&self) -> WaitFuture<'_> {
-        self.inner.wait()
+    /// Wait until being woken by the waker.
+    pub async fn wait(&self) {
+        self.inner.wait().await;
+    }
+
+    /// Wait until being woken by the waker or reaching timeout.
+    ///
+    /// In each poll, we will first poll a `WaitFuture` object, if the result is `Ready`, return `Ok`.
+    /// If the result is `Pending`, we will poll a `TimerEntry` object, return `Err` if got `Ready`.
+    pub async fn wait_timeout<'a, T: BorrowMut<Duration>>(
+        &'a self,
+        timeout: Option<&'a mut T>,
+    ) -> Result<()> {
+        match timeout {
+            Some(t) => {
+                let timer_entry = TimerEntry::new(*t.borrow_mut());
+                select_biased! {
+                    _ = self.inner.wait().fuse() => {
+                        // We wake up before timeout expired.
+                        *t.borrow_mut() = timer_entry.remained_duration();
+                    }
+                    _ = TimerFutureEntry::new(&timer_entry).fuse() => {
+                        // The timer expired, we reached timeout.
+                        *t.borrow_mut() = DURATION_ZERO;
+                        return_errno!(ETIMEDOUT, "the waiter reached timeout");
+                    }
+                };
+            }
+            None => self.wait().await,
+        };
+        Ok(())
     }
 
     pub fn waker(&self) -> Waker {
@@ -152,6 +184,16 @@ impl<'a> Future for WaitFuture<'a> {
                 debug_assert!(raw_waker.is_none());
                 Poll::Ready(())
             }
+        }
+    }
+}
+
+impl<'a> Drop for WaitFuture<'a> {
+    fn drop(&mut self) {
+        let mut raw_waker = self.waiter.raw_waker.lock();
+        if let WaiterState::Waiting = self.waiter.state() {
+            *raw_waker = None;
+            self.waiter.set_state(WaiterState::Idle);
         }
     }
 }

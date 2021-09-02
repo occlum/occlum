@@ -6,6 +6,32 @@ use super::{Waiter, WaiterQueue};
 /// is used to avoid busy loop. The user code of the loop body can use
 /// `break`, `continue`, or `return` as it would do in a normal loop.
 ///
+/// However, there are restrictions on the return value, the user code
+/// must return a `Result` when it `break` or `return`. If the user code
+/// doesn't use `break` and the waiter_loop isn't the return value, the user
+/// code need to use explicit annotation to tell compiler the type of `Result`.
+///
+/// ```
+/// use async_rt::wait::WaiterQueue;
+///
+/// // Init runtime if not enable "auto_run" feature.
+/// async_rt::config::set_parallelism(2);
+/// for _ in 0..async_rt::executor::parallelism() {
+///     std::thread::spawn(|| {
+///         async_rt::executor::run_tasks();
+///     });
+/// }
+///
+/// async_rt::task::block_on(async {
+///     let waiter_queue = WaiterQueue::new();
+///
+///     async_rt::waiter_loop!(&waiter_queue, {
+///         // do something in each attempt
+///         return Ok(());
+///     })
+/// });
+/// ```
+///
 /// Between each rounds of loop (e.g., via `continue`), the execution will
 /// pause until the waiter queue given to the macro call wakes up the waiter
 /// associated with this loop.
@@ -13,10 +39,45 @@ use super::{Waiter, WaiterQueue};
 /// This macro is more preferable than using Waiter and WaiterQueue directly.
 /// Not only because the macro is more easy to use, but also because it is
 /// much harder to be misuse.
+///
+/// The waiter_loop also support timeout. if user privide a timeout, this loop
+/// will be forced to exit when the timeout expired. When the the timeout expired,
+/// the loop will break, user should deal with the timeout case by themselves.
+/// The timeout argument should be an Option of Duration, e.g., `Option<Duration>`
+/// `Option<&mut Duration>`.
+///
+/// ```
+/// # use async_rt::wait::WaiterQueue;
+/// #
+/// # // Init runtime if not enable "auto_run" feature.
+/// # async_rt::config::set_parallelism(2);
+/// # for _ in 0..async_rt::executor::parallelism() {
+/// #     std::thread::spawn(|| {
+/// #         async_rt::executor::run_tasks();
+/// #     });
+/// # }
+/// #
+/// # async_rt::task::block_on(async {
+/// #     let waiter_queue = WaiterQueue::new();
+/// #
+///     let mut timeout = Some(std::time::Duration::from_millis(10));
+///     async_rt::waiter_loop!(&waiter_queue, timeout, {
+///         // do something in each attempt
+///         return Ok(());
+///     })
+///     .map_err(|e| {
+///         println!("reach timeout");
+///         e
+///     })
+/// # });
+/// ```
 #[macro_export]
 macro_rules! waiter_loop {
     ($waiter_queue:expr, $loop_body:block) => {{
-        use $crate::wait::{AutoWaiter, Waiter, WaiterQueue};
+        $crate::waiter_loop!($waiter_queue, None::<core::time::Duration>, $loop_body)
+    }};
+    ($waiter_queue:expr, $timeout:expr, $loop_body:block) => {{
+        use $crate::wait::{AutoWaiter, WaiterQueue};
 
         let waiter_queue: &WaiterQueue = $waiter_queue;
         let mut auto_waiter = AutoWaiter::new(waiter_queue);
@@ -48,7 +109,14 @@ macro_rules! waiter_loop {
                     // For the third attempt and beyond, we will wait
                     let waiter = auto_waiter.waiter();
                     // Wait until being woken by the waiter queue
-                    waiter.wait().await;
+                    if $timeout.is_none() {
+                        waiter.wait().await;
+                    }
+                    // Wait until being woken by the waiter queue or reach timeout
+                    else if let Err(e) = waiter.wait_timeout($timeout.as_mut()).await {
+                        // The timeout expired, exit loop.
+                        break Err(e);
+                    }
                     // Prepare the waiter so that we can try the loop body again
                     waiter.reset();
                 }
