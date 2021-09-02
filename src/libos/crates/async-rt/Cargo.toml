@@ -7,9 +7,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = []
+default = ["vdso-time/std"]
 auto_run = []
-sgx = ["flume/sgx", "sgx_tstd"]
+sgx = ["sgx_tstd", "flume/sgx", "vdso-time/sgx", "hierarchical_hash_wheel_timer/sgx"]
 
 [dependencies]
 atomic = "0.5"
@@ -17,12 +17,14 @@ bit-vec = { version = "0.6", default-features = false }
 errno = { path = "../errno" }
 flume = { path = "../../../../deps/flume", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["alloc", "async-await"] }
+hierarchical_hash_wheel_timer = { path = "../../../../deps/rust-hash-wheel-timer", default-features = false, features = ["sip-hash"]}
 intrusive-collections = "0.9"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 log = "0.4"
 object-id = { path = "../object-id" }
 spin = "0.7"
 sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", features = ["backtrace", "thread"], optional = true }
+vdso-time = { path = "../vdso-time", default-features = false }
 
 [dev-dependencies]
 ctor = "0.1"

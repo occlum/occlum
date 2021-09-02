@@ -2,6 +2,9 @@
 #![feature(const_fn)]
 #![feature(thread_local)]
 #![feature(const_fn_fn_ptr_basics)]
+#![feature(duration_zero)]
+#![feature(duration_constants)]
+#![feature(duration_saturating_ops)]
 
 #[cfg(feature = "sgx")]
 #[macro_use]
@@ -15,6 +18,7 @@ mod parks;
 pub mod prelude;
 pub mod sched;
 pub mod task;
+pub mod time;
 pub mod wait;
 
 // All unit tests

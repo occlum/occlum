@@ -9,6 +9,7 @@ pub(crate) use spin::mutex::Mutex;
 
 pub use core::future::Future;
 pub use core::pin::Pin;
+pub use core::time::Duration;
 pub use futures::future::{BoxFuture, FutureExt};
 
 pub use crate::task_local;
