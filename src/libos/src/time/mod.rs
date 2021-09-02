@@ -1,5 +1,6 @@
 use self::timer_slack::*;
 use super::*;
+use async_rt::wait::Waiter;
 use core::convert::TryFrom;
 use process::pid_t;
 use rcore_fs::dev::TimeProvider;
@@ -144,27 +145,21 @@ pub fn do_clock_getres(clockid: ClockId) -> Result<timespec_t> {
     Ok(res)
 }
 
-pub fn do_nanosleep(req: &timespec_t, rem: Option<&mut timespec_t>) -> Result<()> {
-    extern "C" {
-        fn occlum_ocall_nanosleep(
-            ret: *mut i32,
-            req: *const timespec_t,
-            rem: *mut timespec_t,
-        ) -> sgx_status_t;
+pub async fn do_nanosleep(req: &timespec_t, rem: Option<&mut timespec_t>) -> Result<()> {
+    let waiter = Waiter::new();
+    let mut duration = Duration::new(req.sec as u64, req.nsec as u32);
+    if let Ok(_) = waiter.wait_timeout(Some(&mut duration)).await {
+        // TODO: support interrupt sleep.
+        // return_errno!(EINTR, "sleep interrupted");
+        unreachable!("this waiter can not be interrupted");
     }
-    unsafe {
-        let mut ret = 0;
-        let mut u_rem: timespec_t = timespec_t { sec: 0, nsec: 0 };
-        let sgx_status = occlum_ocall_nanosleep(&mut ret, req, &mut u_rem);
-        assert!(sgx_status == sgx_status_t::SGX_SUCCESS);
-        assert!(ret == 0 || libc::errno() == Errno::EINTR as i32);
-        if ret != 0 {
-            assert!(u_rem.as_duration() <= req.as_duration() + (*TIMERSLACK).to_duration());
-            if let Some(rem) = rem {
-                *rem = u_rem;
-            }
-            return_errno!(EINTR, "sleep interrupted");
-        }
+
+    if let Some(rem) = rem {
+        // wait_timeout() can guarantee that rem <= req.
+        *rem = timespec_t {
+            sec: duration.as_secs() as i64,
+            nsec: duration.subsec_nanos() as i64,
+        };
     }
     Ok(())
 }

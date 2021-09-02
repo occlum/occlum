@@ -4,10 +4,6 @@
 #include "ocalls.h"
 
 
-int occlum_ocall_nanosleep(const struct timespec *req, struct timespec *rem) {
-    return nanosleep(req, rem);
-}
-
 int occlum_ocall_thread_getcpuclock(struct timespec *tp) {
     clockid_t thread_clock_id;
     int ret = pthread_getcpuclockid(pthread_self(), &thread_clock_id);

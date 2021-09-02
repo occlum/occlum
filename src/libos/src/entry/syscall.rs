@@ -147,6 +147,7 @@ macro_rules! process_syscall_table_with_callback {
 
             (Futex = 202) => do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32, timeout: u64, futex_new_addr: *const i32, bitset: u32),
             (SchedYield = 24) => do_sched_yield(),
+            (Nanosleep = 35) => do_nanosleep(req_u: *const timespec_t, rem_u: *mut timespec_t),
 
             (Gettimeofday = 96) => do_gettimeofday(tv_u: *mut timeval_t),
             (ClockGettime = 228) => do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t),
@@ -840,7 +841,7 @@ async fn do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t) -> Result<i
 }
 
 // TODO: handle remainder
-fn do_nanosleep(req_u: *const timespec_t, rem_u: *mut timespec_t) -> Result<isize> {
+async fn do_nanosleep(req_u: *const timespec_t, rem_u: *mut timespec_t) -> Result<isize> {
     let req = {
         check_ptr(req_u)?;
         timespec_t::from_raw_ptr(req_u)?
@@ -851,7 +852,7 @@ fn do_nanosleep(req_u: *const timespec_t, rem_u: *mut timespec_t) -> Result<isiz
     } else {
         None
     };
-    crate::time::do_nanosleep(&req, rem)?;
+    crate::time::do_nanosleep(&req, rem).await?;
     Ok(0)
 }
 
