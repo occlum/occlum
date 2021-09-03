@@ -3,6 +3,7 @@
 #include <net/if.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <sys/vfs.h>
 
 void occlum_ocall_sync(void) {
     sync();
@@ -40,4 +41,8 @@ int occlum_ocall_ioctl(int fd, int request, void *arg, size_t len) {
     }
 
     return ioctl(fd, request, arg);
+}
+
+int occlum_ocall_statfs(const char *path, struct statfs *buf) {
+    return statfs(path, buf);
 }
