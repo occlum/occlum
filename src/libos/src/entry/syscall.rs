@@ -29,7 +29,7 @@ use crate::fs::{
     FileDesc, FileRef, HostStdioFds, Stat,
 };
 */
-use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t};
+use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t, RandFlags};
 use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_getpeername, do_getsockname, do_getsockopt,
     do_listen, do_recvfrom, do_recvmsg, do_sendmsg, do_sendto, do_setsockopt, do_shutdown,
@@ -161,6 +161,7 @@ macro_rules! process_syscall_table_with_callback {
             (Prctl = 157) => do_prctl(option: i32, arg2: u64, arg3: u64, arg4: u64, arg5: u64),
             (SysInfo = 99) => do_sysinfo(info: *mut sysinfo_t),
             (Uname = 63) => do_uname(name: *mut utsname_t),
+            (Getrandom = 318) => do_getrandom(buf: *mut u8, len: size_t, flags: u32),
 
             (Futex = 202) => do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32, timeout: u64, futex_new_addr: *const i32, bitset: u32),
             (SchedYield = 24) => do_sched_yield(),
@@ -848,6 +849,20 @@ async fn do_sysinfo(info: *mut sysinfo_t) -> Result<isize> {
     let info = unsafe { &mut *info };
     *info = crate::misc::do_sysinfo()?;
     Ok(0)
+}
+
+async fn do_getrandom(buf: *mut u8, len: size_t, flags: u32) -> Result<isize> {
+    check_mut_array(buf, len)?;
+    let checked_len = if len > u32::MAX as usize {
+        u32::MAX as usize
+    } else {
+        len
+    };
+    let rand_buf = unsafe { std::slice::from_raw_parts_mut(buf, checked_len) };
+    let flags = RandFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
+
+    crate::misc::do_getrandom(rand_buf, flags)?;
+    Ok(checked_len as isize)
 }
 
 // TODO: handle tz: timezone_t
