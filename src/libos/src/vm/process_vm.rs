@@ -52,10 +52,10 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
             return range;
         }
 
-        use crate::util::random;
+        use crate::misc;
         trace!("entrophy size = {}", range);
         let mut random_buf: [u8; 8] = [0u8; 8]; // same length as usize
-        random::get_random(&mut random_buf).expect("failed to get random number");
+        misc::get_random(&mut random_buf).expect("failed to get random number");
         let random_num: usize = u64::from_le_bytes(random_buf) as usize;
         random_num % range
     }
