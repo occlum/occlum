@@ -34,7 +34,7 @@ use crate::fs::{
     Stat, Statfs,
 };
 use crate::interrupt::{do_handle_interrupt, sgx_interrupt_info_t};
-use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t};
+use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t, RandFlags};
 use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
     do_epoll_pwait, do_epoll_wait, do_getpeername, do_getsockname, do_getsockopt, do_listen,
@@ -406,7 +406,7 @@ macro_rules! process_syscall_table_with_callback {
             (SchedGetattr = 315) => handle_unsupported(),
             (Renameat2 = 316) => handle_unsupported(),
             (Seccomp = 317) => handle_unsupported(),
-            (Getrandom = 318) => handle_unsupported(),
+            (Getrandom = 318) => do_getrandom(buf: *mut u8, len: size_t, flags: u32),
             (MemfdCreate = 319) => handle_unsupported(),
             (KexecFileLoad = 320) => handle_unsupported(),
             (Bpf = 321) => handle_unsupported(),
@@ -825,6 +825,20 @@ fn do_sysinfo(info: *mut sysinfo_t) -> Result<isize> {
     let info = unsafe { &mut *info };
     *info = misc::do_sysinfo()?;
     Ok(0)
+}
+
+fn do_getrandom(buf: *mut u8, len: size_t, flags: u32) -> Result<isize> {
+    check_mut_array(buf, len)?;
+    let checked_len = if len > u32::MAX as usize {
+        u32::MAX as usize
+    } else {
+        len
+    };
+    let rand_buf = unsafe { std::slice::from_raw_parts_mut(buf, checked_len) };
+    let flags = RandFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
+
+    misc::do_getrandom(rand_buf, flags)?;
+    Ok(checked_len as isize)
 }
 
 // TODO: handle tz: timezone_t

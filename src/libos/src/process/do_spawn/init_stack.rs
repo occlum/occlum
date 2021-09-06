@@ -3,8 +3,8 @@ use std::os::raw::c_char;
 use std::{mem, ptr};
 
 use super::aux_vec::{AuxKey, AuxVec};
+use crate::misc;
 use crate::prelude::*;
-use crate::util::random;
 
 /*
  * The initial stack of a process looks like below:
@@ -152,7 +152,7 @@ impl StackBuf {
 fn generate_random_on_stack(stack: &StackBuf) -> Result<*const u8> {
     let rand_val = {
         let mut rand: [u8; 16] = [0; 16];
-        random::get_random(&mut rand)?;
+        misc::get_random(&mut rand)?;
         rand
     };
     stack.put_slice(&rand_val)

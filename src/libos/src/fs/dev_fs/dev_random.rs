@@ -1,12 +1,12 @@
 use super::*;
-use crate::util::random;
+use crate::misc;
 
 #[derive(Debug)]
 pub struct DevRandom;
 
 impl INode for DevRandom {
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> vfs::Result<usize> {
-        random::get_random(buf).map_err(|_| FsError::Again)?;
+        misc::get_random(buf).map_err(|_| FsError::Again)?;
         Ok(buf.len())
     }
 
