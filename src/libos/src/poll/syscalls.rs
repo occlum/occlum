@@ -101,12 +101,12 @@ pub async fn do_epoll_wait(
     let epoll_file = file_ref
         .as_epoll_file()
         .ok_or_else(|| errno!(EINVAL, "not an epoll file"))?;
-    let timeout = if timeout_ms >= 0 {
+    let mut timeout = if timeout_ms >= 0 {
         Some(Duration::from_millis(timeout_ms as u64))
     } else {
         None
     };
-    let ep_events = epoll_file.wait(max_events /*, timeout.as_ref()*/).await?;
+    let ep_events = epoll_file.wait(max_events, timeout.as_mut()).await?;
 
     for (i, ep_event) in ep_events.iter().enumerate() {
         raw_events[i] = ep_event.into();

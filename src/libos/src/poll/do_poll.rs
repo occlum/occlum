@@ -49,7 +49,15 @@ pub async fn do_poll(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) ->
             return Ok(num_revents);
         }
 
-        poller.wait().await;
+        // Return immediately if specifying a timeout of zero
+        if timeout.is_some() && timeout.as_ref().unwrap().is_zero() {
+            return Ok(0);
+        }
+
+        // Return if the timeout expires.
+        if let Err(_) = poller.wait_timeout(timeout.as_mut()).await {
+            return Ok(0);
+        }
     }
 }
 

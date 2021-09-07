@@ -1,5 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::sync::Weak;
+use std::time::Duration;
 
 use new_self_ref_arc::new_self_ref_arc;
 
@@ -148,7 +149,7 @@ impl EpollFile {
     pub async fn wait(
         &self,
         max_events: usize,
-        //timeout: Option<&mut Duration>,
+        mut timeout: Option<&mut Duration>,
     ) -> Result<Vec<EpollEvent>> {
         let mut ep_events = Vec::new();
         let mut poller = None;
@@ -158,11 +159,25 @@ impl EpollFile {
                 return Ok(ep_events);
             }
 
+            // Return immediately if specifying a timeout of zero
+            if timeout.is_some() && timeout.as_ref().unwrap().is_zero() {
+                return Ok(ep_events);
+            }
+
             // If no ready entries for now, wait for them
             if poller.is_none() {
                 poller = Some(Poller::new());
             }
-            poller.as_ref().unwrap().wait().await;
+
+            // Return if the timeout expires.
+            if let Err(_) = poller
+                .as_ref()
+                .unwrap()
+                .wait_timeout(timeout.as_mut())
+                .await
+            {
+                return Ok(ep_events);
+            }
         }
     }
 
