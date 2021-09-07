@@ -1,6 +1,10 @@
+use std::borrow::BorrowMut;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 
 use async_rt::{wait::WaiterQueue, waiter_loop};
+
+use crate::prelude::*;
 
 /// A counter for wait and wakeup.
 ///
@@ -26,6 +30,18 @@ impl EventCounter {
             }
         })
         .unwrap()
+    }
+
+    pub async fn read_timeout<T: BorrowMut<Duration>>(
+        &self,
+        mut timeout: Option<&mut T>,
+    ) -> Result<u64> {
+        waiter_loop!(&self.waiters, timeout, {
+            let val = self.counter.swap(0, Ordering::Relaxed);
+            if val > 0 {
+                return Ok(val);
+            }
+        })
     }
 
     pub fn write(&self) {

@@ -1,6 +1,8 @@
+use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+use std::time::Duration;
 
 use keyable_arc::KeyableArc;
 use object_id::ObjectId;
@@ -212,6 +214,18 @@ impl Poller {
     /// Wait until there are any interesting events happen since last `wait`.
     pub async fn wait(&self) {
         self.inner.event_counter.read().await;
+    }
+
+    /// Wait until there are any interesting events happen since last `wait`, or reach timeout.
+    pub async fn wait_timeout<T: BorrowMut<Duration>>(
+        &self,
+        mut timeout: Option<&mut T>,
+    ) -> Result<()> {
+        self.inner
+            .event_counter
+            .read_timeout(timeout)
+            .await
+            .map(|_| ())
     }
 }
 
