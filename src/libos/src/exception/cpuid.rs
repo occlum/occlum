@@ -7,6 +7,7 @@ use std::rsgx_cpuidex;
 pub const CPUID_OPCODE: u16 = 0xA20F;
 const CPUID_MIN_BASIC_LEAF: u32 = 0;
 const CPUID_MIN_EXTEND_LEAF: u32 = 0x8000_0000;
+const CPUID_MIN_HVPERVISOR_LEAF: u32 = 0x4000_0000;
 const CPUID_MAX_SUBLEAF: u32 = u32::max_value();
 
 #[repr(C)]
@@ -33,14 +34,15 @@ struct CpuId {
     cache: CpuIdCache,
     max_basic_leaf: u32,
     max_extend_leaf: u32,
+    max_hypervisor_leaf: u32,
 }
 
 impl CpuIdCache {
-    pub fn new(max_basic_leaf: u32, max_extend_leaf: u32) -> CpuIdCache {
+    pub fn new(max_basic_leaf: u32, max_extend_leaf: u32, max_hypervisor_leaf: u32) -> CpuIdCache {
         let mut cache = CpuIdCache {
             inner: HashMap::new(),
         };
-        cache.generate_cpuid_cache(max_basic_leaf, max_extend_leaf);
+        cache.generate_cpuid_cache(max_basic_leaf, max_extend_leaf, max_hypervisor_leaf);
         cache
     }
 
@@ -55,7 +57,12 @@ impl CpuIdCache {
         }
     }
 
-    fn generate_cpuid_cache(&mut self, max_basic_leaf: u32, max_extend_leaf: u32) {
+    fn generate_cpuid_cache(
+        &mut self,
+        max_basic_leaf: u32,
+        max_extend_leaf: u32,
+        max_hypervisor_leaf: u32,
+    ) {
         let mut sgx_support: bool = false;
         // Generate basic leaf cpuid cache
         for leaf in CPUID_MIN_BASIC_LEAF..=max_basic_leaf {
@@ -138,6 +145,12 @@ impl CpuIdCache {
             let cpuid_result = get_cpuid_info_via_ocall(cpuid_input);
             self.insert(cpuid_input, cpuid_result);
         }
+        // Generate hypervisor leaf cpuid cache
+        for leaf in CPUID_MIN_HVPERVISOR_LEAF..=max_hypervisor_leaf {
+            let cpuid_input = CpuIdInput { leaf, subleaf: 0 };
+            let cpuid_result = get_cpuid_info_via_ocall(cpuid_input);
+            self.insert(cpuid_input, cpuid_result);
+        }
     }
 }
 
@@ -151,10 +164,15 @@ impl CpuId {
             Ok(sgx_cpuinfo) => sgx_cpuinfo[0] as u32,
             _ => panic!("failed to call sgx_cpuidex"),
         };
+        let max_hypervisor_leaf = match rsgx_cpuidex(CPUID_MIN_HVPERVISOR_LEAF as i32, 0) {
+            Ok(sgx_cpuinfo) => sgx_cpuinfo[0] as u32,
+            _ => panic!("failed to call sgx_cpuidex"),
+        };
         let cpuid = CpuId {
-            cache: CpuIdCache::new(max_basic_leaf, max_extend_leaf),
+            cache: CpuIdCache::new(max_basic_leaf, max_extend_leaf, max_hypervisor_leaf),
             max_basic_leaf,
             max_extend_leaf,
+            max_hypervisor_leaf,
         };
         cpuid
     }
@@ -180,6 +198,7 @@ impl CpuId {
         // highest basic information leaf is returned.
         let fixed_leaf = if (CPUID_MIN_BASIC_LEAF..=self.max_basic_leaf).contains(&leaf)
             || (CPUID_MIN_EXTEND_LEAF..=self.max_extend_leaf).contains(&leaf)
+            || (CPUID_MIN_HVPERVISOR_LEAF..=self.max_hypervisor_leaf).contains(&leaf)
         {
             leaf
         } else {
