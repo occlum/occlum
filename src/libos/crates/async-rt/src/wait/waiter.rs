@@ -48,9 +48,9 @@ impl Waiter {
     ///
     /// In each poll, we will first poll a `WaitFuture` object, if the result is `Ready`, return `Ok`.
     /// If the result is `Pending`, we will poll a `TimerEntry` object, return `Err` if got `Ready`.
-    pub async fn wait_timeout<'a, T: BorrowMut<Duration>>(
-        &'a self,
-        timeout: Option<&'a mut T>,
+    pub async fn wait_timeout<T: BorrowMut<Duration>>(
+        &self,
+        timeout: Option<&mut T>,
     ) -> Result<()> {
         match timeout {
             Some(t) => {

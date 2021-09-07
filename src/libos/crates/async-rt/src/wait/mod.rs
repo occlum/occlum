@@ -162,6 +162,67 @@ mod tests {
         });
     }
 
+    #[test]
+    fn test_waiter_loop_timeout_args() {
+        crate::task::block_on(async {
+            let waiter_queue = WaiterQueue::new();
+
+            // mut Option<Duration>
+            let mut duration = Duration::from_millis(100);
+            let mut timeout = Some(duration);
+            crate::waiter_loop!(&waiter_queue, timeout, {}) as Result<()>;
+            assert!(timeout.as_ref().unwrap().is_zero());
+
+            // mut Option<&mut Duration>
+            let mut duration = Duration::from_millis(100);
+            let mut timeout = Some(duration);
+            let mut timeout_as_mut = timeout.as_mut();
+            crate::waiter_loop!(&waiter_queue, timeout_as_mut, {}) as Result<()>;
+            assert!(timeout.as_ref().unwrap().is_zero());
+
+            // mut Option<&mut Duration>
+            let mut duration = Duration::from_millis(100);
+            let mut timeout = Some(&mut duration);
+            crate::waiter_loop!(&waiter_queue, timeout, {}) as Result<()>;
+            assert!(timeout.as_ref().unwrap().is_zero());
+            assert!(duration.is_zero());
+
+            // mut Option<&mut &mut Duration>
+            let mut duration = Duration::from_millis(100);
+            let mut timeout = Some(&mut duration);
+            let mut timeout_as_mut = timeout.as_mut();
+            crate::waiter_loop!(&waiter_queue, timeout_as_mut, {}) as Result<()>;
+            assert!(timeout.as_ref().unwrap().is_zero());
+            assert!(duration.is_zero());
+        });
+    }
+
+    #[test]
+    fn test_wait_timeout_timeout_args() {
+        crate::task::block_on(async {
+            let waiter = Waiter::new();
+
+            // Option<&mut Duration>
+            let mut duration = Duration::from_millis(100);
+            let mut timeout = Some(duration);
+            waiter.wait_timeout(timeout.as_mut()).await;
+            assert!(timeout.as_ref().unwrap().is_zero());
+
+            // Option<&mut Duration>
+            let mut duration = Duration::from_millis(100);
+            let mut timeout = Some(&mut duration);
+            waiter.wait_timeout(timeout).await;
+            assert!(duration.is_zero());
+
+            // Option<&mut &mut Duration>
+            let mut duration = Duration::from_millis(100);
+            let mut timeout = Some(&mut duration);
+            waiter.wait_timeout(timeout.as_mut()).await;
+            assert!(timeout.as_ref().unwrap().is_zero());
+            assert!(duration.is_zero());
+        });
+    }
+
     async fn imagined_blocking_func1(timeout: Option<&mut Duration>) {
         assert!(timeout.is_some());
 
@@ -172,9 +233,8 @@ mod tests {
         assert!(res.is_err());
     }
 
-    async fn imagined_blocking_func2(timeout: Option<&mut Duration>) {
+    async fn imagined_blocking_func2(mut timeout: Option<&mut Duration>) {
         assert!(timeout.is_some());
-        let mut timeout = timeout.map_or(None, |t| Some(t));
 
         let waiter = Waiter::new();
         loop {

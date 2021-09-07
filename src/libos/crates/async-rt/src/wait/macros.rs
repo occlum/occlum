@@ -74,9 +74,11 @@ use super::{Waiter, WaiterQueue};
 #[macro_export]
 macro_rules! waiter_loop {
     ($waiter_queue:expr, $loop_body:block) => {{
-        $crate::waiter_loop!($waiter_queue, None::<core::time::Duration>, $loop_body)
+        let mut timeout = None::<core::time::Duration>;
+        $crate::waiter_loop!($waiter_queue, timeout, $loop_body)
     }};
     ($waiter_queue:expr, $timeout:expr, $loop_body:block) => {{
+        use core::borrow::BorrowMut;
         use $crate::wait::{AutoWaiter, WaiterQueue};
 
         let waiter_queue: &WaiterQueue = $waiter_queue;
@@ -108,14 +110,16 @@ macro_rules! waiter_loop {
                 2 => {
                     // For the third attempt and beyond, we will wait
                     let waiter = auto_waiter.waiter();
-                    // Wait until being woken by the waiter queue
-                    if $timeout.is_none() {
+                    if let Some(timeout) = $timeout.as_mut() {
+                        // Wait until being woken by the waiter queue or reach timeout
+                        let timeout: &mut core::time::Duration = (*timeout).borrow_mut();
+                        if let Err(e) = waiter.wait_timeout(Some(timeout)).await {
+                            // The timeout expired, exit loop.
+                            break Err(e);
+                        }
+                    } else {
+                        // Wait until being woken by the waiter queue
                         waiter.wait().await;
-                    }
-                    // Wait until being woken by the waiter queue or reach timeout
-                    else if let Err(e) = waiter.wait_timeout($timeout.as_mut()).await {
-                        // The timeout expired, exit loop.
-                        break Err(e);
                     }
                     // Prepare the waiter so that we can try the loop body again
                     waiter.reset();
