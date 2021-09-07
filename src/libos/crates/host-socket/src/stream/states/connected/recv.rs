@@ -21,7 +21,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         // Initialize the poller only when needed
         let mut poller = None;
         loop {
-            // Attempt to reade
+            // Attempt to read
             let res = self.try_readv(bufs);
             if !res.has_errno(EAGAIN) {
                 return res;

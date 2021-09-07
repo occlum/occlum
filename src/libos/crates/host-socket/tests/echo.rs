@@ -19,7 +19,7 @@ fn ipv4() {
 fn unix() {
     let server_addr = {
         let path = "test.sock";
-        std::fs::remove_file(&path).unwrap();
+        std::fs::remove_file(&path);
         UnixAddr::Pathname(path.to_string())
     };
     let num_clients = 2;
@@ -100,10 +100,12 @@ mod runtime {
                 unsafe {
                     ring.start_enter_syscall_thread();
                 }
-                let callback = move || {
-                    ring.poll_completions();
-                };
-                async_rt::config::set_sched_callback(callback);
+                async_rt::task::spawn(async move {
+                    loop {
+                        ring.poll_completions();
+                        async_rt::sched::yield_().await;
+                    }
+                });
             });
         }
     }
