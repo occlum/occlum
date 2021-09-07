@@ -20,12 +20,19 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
     pub fn new(common: Arc<Common<A, R>>) -> Arc<Self> {
         let sender = Sender::new();
         let receiver = Receiver::new();
-        let new_self = Self {
+        let new_self = Arc::new(Self {
             common,
             sender,
             receiver,
-        };
-        Arc::new(new_self)
+        });
+
+        // Start async recv requests right as early as possible to support poll and
+        // improve performance. If we don't start recv requests early, the poll()
+        // might block forever when user just invokes poll(Event::In) without read().
+        // Once we have recv requests completed, we can have Event::In in the events.
+        new_self.initiate_async_recv();
+
+        new_self
     }
 
     pub fn common(&self) -> &Arc<Common<A, R>> {

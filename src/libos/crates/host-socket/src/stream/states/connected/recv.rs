@@ -138,6 +138,11 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         let handle = unsafe { io_uring.recvmsg(host_fd, msghdr_ptr, 0, complete_fn) };
         inner.io_handle.replace(handle);
     }
+
+    pub(super) fn initiate_async_recv(self: &Arc<Self>) {
+        let mut inner = self.receiver.inner.lock().unwrap();
+        self.do_recv(&mut inner);
+    }
 }
 
 pub struct Receiver {

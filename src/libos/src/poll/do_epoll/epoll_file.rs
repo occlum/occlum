@@ -167,6 +167,7 @@ impl EpollFile {
             // If no ready entries for now, wait for them
             if poller.is_none() {
                 poller = Some(Poller::new());
+                self.pollee.poll(Events::IN, poller.as_mut());
             }
 
             // Return if the timeout expires.
@@ -203,6 +204,9 @@ impl EpollFile {
             // we want to return as many results as possible, this has to
             // be done in a loop.
             let pop_count = (max_events - count_events).min(pop_quota);
+            if pop_count == 0 {
+                break;
+            }
             let ready_entries: Vec<Arc<EpollEntry>> = ready
                 .drain(..pop_count)
                 .filter(|entry| !entry.is_deleted())
