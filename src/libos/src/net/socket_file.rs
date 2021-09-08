@@ -172,13 +172,33 @@ impl SocketFile {
                 AnySocket::UnixStream(accepted_unix_stream)
             }
             _ => {
-                return_errno!(EINVAL, "listen is not supported");
+                return_errno!(EINVAL, "accept is not supported");
             }
         };
         let accepted_socket_file = SocketFile {
             socket: accepted_any_socket,
         };
         Ok(accepted_socket_file)
+    }
+
+    pub fn addr(&self) -> Result<AnyAddr> {
+        Ok(match &self.socket {
+            AnySocket::Ipv4Stream(ipv4_stream) => AnyAddr::Ipv4(ipv4_stream.addr()?),
+            AnySocket::UnixStream(unix_stream) => AnyAddr::Unix(unix_stream.addr()?),
+            _ => {
+                return_errno!(EINVAL, "addr is not supported");
+            }
+        })
+    }
+
+    pub fn peer_addr(&self) -> Result<AnyAddr> {
+        Ok(match &self.socket {
+            AnySocket::Ipv4Stream(ipv4_stream) => AnyAddr::Ipv4(ipv4_stream.peer_addr()?),
+            AnySocket::UnixStream(unix_stream) => AnyAddr::Unix(unix_stream.peer_addr()?),
+            _ => {
+                return_errno!(EINVAL, "peer_addr is not supported");
+            }
+        })
     }
 }
 

@@ -182,6 +182,36 @@ pub async fn do_accept4(
     Ok(new_fd as isize)
 }
 
+pub async fn do_getpeername(
+    fd: c_int,
+    addr: *mut libc::sockaddr,
+    addr_len: *mut libc::socklen_t,
+) -> Result<isize> {
+    let file_ref = current!().file(fd as FileDesc)?;
+    let socket_file = file_ref
+        .as_socket_file()
+        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+
+    let src_addr = socket_file.peer_addr()?;
+    copy_sock_addr_to_user(src_addr, addr, addr_len)?;
+    Ok(0)
+}
+
+pub async fn do_getsockname(
+    fd: c_int,
+    addr: *mut libc::sockaddr,
+    addr_len: *mut libc::socklen_t,
+) -> Result<isize> {
+    let file_ref = current!().file(fd as FileDesc)?;
+    let socket_file = file_ref
+        .as_socket_file()
+        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+
+    let src_addr = socket_file.addr()?;
+    copy_sock_addr_to_user(src_addr, addr, addr_len)?;
+    Ok(0)
+}
+
 // Flags to use when creating a new socket
 bitflags! {
     struct SocketFlags: i32 {
@@ -226,4 +256,36 @@ fn copy_sock_addr_from_user(
         sockaddr_storage
     };
     Ok(sockaddr_storage)
+}
+
+fn copy_sock_addr_to_user(
+    src_addr: AnyAddr,
+    dst_addr: *mut libc::sockaddr,
+    dst_addr_len: *mut libc::socklen_t,
+) -> Result<()> {
+    if dst_addr.is_null() {
+        return Ok(());
+    }
+    from_user::check_ptr(dst_addr_len)?;
+    if unsafe { *dst_addr_len } < 0 {
+        return_errno!(EINVAL, "addrlen is invalid");
+    }
+    from_user::check_mut_array(dst_addr as *mut u8, unsafe { *dst_addr_len } as usize)?;
+
+    let (src_addr, src_addr_len) = src_addr.to_c_storage();
+    let len = std::cmp::min(src_addr_len, unsafe { *dst_addr_len } as usize);
+
+    let sockaddr_src_buf = unsafe {
+        let ptr = &src_addr as *const _ as *const u8;
+        std::slice::from_raw_parts(ptr, len)
+    };
+
+    let sockaddr_dst_buf = unsafe {
+        let ptr = dst_addr as *mut u8;
+        std::slice::from_raw_parts_mut(ptr, len)
+    };
+    sockaddr_dst_buf.copy_from_slice(sockaddr_src_buf);
+
+    unsafe { *dst_addr_len = src_addr_len as u32 };
+    Ok(())
 }
