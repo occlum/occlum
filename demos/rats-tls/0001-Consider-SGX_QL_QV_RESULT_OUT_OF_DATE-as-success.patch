@@ -1,0 +1,30 @@
+From b6d9a22fdac5c35565960d046f1985df0049cbe2 Mon Sep 17 00:00:00 2001
+From: "Zheng, Qi" <huaiqing.zq@antgroup.com>
+Date: Wed, 8 Sep 2021 14:52:36 +0800
+Subject: [PATCH] Consider SGX_QL_QV_RESULT_OUT_OF_DATE as success
+
+Signed-off-by: Zheng, Qi <huaiqing.zq@antgroup.com>
+---
+ rats-tls/src/verifiers/sgx-ecdsa/verify_evidence.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/rats-tls/src/verifiers/sgx-ecdsa/verify_evidence.c b/rats-tls/src/verifiers/sgx-ecdsa/verify_evidence.c
+index ba744762..29d84910 100644
+--- a/rats-tls/src/verifiers/sgx-ecdsa/verify_evidence.c
++++ b/rats-tls/src/verifiers/sgx-ecdsa/verify_evidence.c
+@@ -181,11 +181,11 @@ enclave_verifier_err_t sgx_ecdsa_verify_evidence(enclave_verifier_ctx_t *ctx,
+ 	/* Check verification result */
+ 	switch (quote_verification_result) {
+ 	case SGX_QL_QV_RESULT_OK:
++	case SGX_QL_QV_RESULT_OUT_OF_DATE:
+ 		RTLS_INFO("verification completed successfully.\n");
+ 		err = ENCLAVE_VERIFIER_ERR_NONE;
+ 		break;
+ 	case SGX_QL_QV_RESULT_CONFIG_NEEDED:
+-	case SGX_QL_QV_RESULT_OUT_OF_DATE:
+ 	case SGX_QL_QV_RESULT_OUT_OF_DATE_CONFIG_NEEDED:
+ 	case SGX_QL_QV_RESULT_SW_HARDENING_NEEDED:
+ 	case SGX_QL_QV_RESULT_CONFIG_AND_SW_HARDENING_NEEDED:
+-- 
+2.25.1
+
