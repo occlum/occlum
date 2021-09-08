@@ -93,6 +93,7 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
 
         let common = {
             let mut common = Arc::new(Common::with_host_fd(accepted_fd));
+            common.set_peer_addr(&accepted_addr);
             common.pollee().add_events(Events::OUT);
             common
         };

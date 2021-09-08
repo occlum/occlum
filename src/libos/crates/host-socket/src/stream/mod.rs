@@ -185,6 +185,47 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             .unregister_observer(observer)
             .ok_or_else(|| errno!(ENOENT, "the observer is not registered"))
     }
+
+    pub fn addr(&self) -> Result<A> {
+        let state = self.state.read().unwrap();
+        match &*state {
+            State::Init(init_stream) => init_stream.common().addr().map_or_else(
+                || init_stream.common().get_addr_from_host(),
+                |addr| Ok(addr),
+            ),
+            State::Connect(connecting_stream) => connecting_stream.common().addr().map_or_else(
+                || connecting_stream.common().get_addr_from_host(),
+                |addr| Ok(addr),
+            ),
+            State::Connected(connected_stream) => connected_stream.common().addr().map_or_else(
+                || {
+                    let addr = connected_stream.common().get_addr_from_host()?;
+                    connected_stream.common().set_addr(&addr);
+                    Ok(addr)
+                },
+                |addr| Ok(addr),
+            ),
+            State::Listen(listener_stream) => listener_stream.common().addr().map_or_else(
+                || {
+                    let addr = listener_stream.common().get_addr_from_host()?;
+                    listener_stream.common().set_addr(&addr);
+                    Ok(addr)
+                },
+                |addr| Ok(addr),
+            ),
+        }
+    }
+
+    pub fn peer_addr(&self) -> Result<A> {
+        let state = self.state.read().unwrap();
+        match &*state {
+            State::Connected(connected_stream) => {
+                Ok(connected_stream.common().peer_addr().unwrap())
+            }
+            _ => return_errno!(ENOTCONN, "the socket is not connected"),
+        }
+    }
+
     /*
         pub async fn shutdown(&self, shutdown: Shutdown) -> Result<()> {
             let connected_stream = {
@@ -211,26 +252,6 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
                 Connect(connect_stream) => connect_stream.poll_by(mask, poller),
                 Connected(connected_stream) = connected_stream.poll_by(mask, poller),
                 Listen(listener_stream) = listener_stream.poll_by(mask, poller),
-            }
-        }
-
-        pub fn addr(&self) -> Option<A> {
-            let state = self.state.read().unwrap();
-            match &*state {
-                Init(init_stream) => init_stream.addr(),
-                Connect(connecting_stream) => connecting_stream.addr(),
-                Connected(connected_stream) = connected_stream.addr(),
-                Listen(listener_stream) = listener_stream.addr(),
-            }
-        }
-
-        pub fn peer_addr(&self) -> Option<A> {
-            let state = self.state.read();
-            match *state {
-                Connected(connected_stream) = connected_stream.peer_addr(),
-                _ => {
-                    return_errno!(EINVAL, "")
-                }
             }
         }
     */

@@ -4,8 +4,10 @@ use io_uring_callback::IoUring;
 cfg_if::cfg_if! {
     if #[cfg(feature = "sgx")] {
         use libc::ocall::socket as do_socket;
+        use libc::ocall::getsockname as do_getsockname;
     } else {
         use libc::socket as do_socket;
+        use libc::getsockname as do_getsockname;
     }
 }
 
@@ -69,6 +71,30 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
     pub fn set_addr(&self, addr: &A) {
         let mut inner = self.inner.lock().unwrap();
         inner.addr = Some(addr.clone())
+    }
+
+    pub fn get_addr_from_host(&self) -> Result<A> {
+        let mut c_addr: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
+        let mut c_addr_len = std::mem::size_of::<libc::sockaddr_storage>() as u32;
+        let retval = unsafe {
+            do_getsockname(
+                self.host_fd as _,
+                &mut c_addr as *mut libc::sockaddr_storage as *mut _,
+                &mut c_addr_len as *mut _,
+            )
+        };
+        if retval != 0 {
+            cfg_if::cfg_if! {
+                if #[cfg(feature = "sgx")] {
+                    let errno = libc::errno();
+                } else {
+                    let errno = unsafe { libc::__errno_location() };
+                }
+            }
+            return_errno!(Errno::from(errno as u32), "libc do_getsockname error");
+        }
+
+        A::from_c_storage(&c_addr, c_addr_len as _)
     }
 
     pub fn peer_addr(&self) -> Option<A> {
