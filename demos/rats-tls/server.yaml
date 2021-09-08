@@ -1,0 +1,16 @@
+includes:
+  - base.yaml
+# rats_tls server
+targets:
+  - target: /bin
+    copy:
+      - files:
+        - /usr/share/rats-tls/samples/rats-tls-server
+  - target: /opt/occlum/glibc/lib
+    copy:
+      - files:
+        - /usr/lib/x86_64-linux-gnu/libssl.so.1.1
+  - target: /usr/local/lib
+    copy:
+      - dirs:
+        - /usr/local/lib/rats-tls
