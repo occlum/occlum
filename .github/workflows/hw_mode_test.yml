@@ -51,6 +51,9 @@ jobs:
         fi;
         echo "occlum_test=$occlum_test" >> $GITHUB_ENV
 
+    - name: Update PCCS server
+      run: docker exec $occlum_test bash -c "sed -r -i 's/PCCS_URL=[^\s]*/PCCS_URL=https:\/\/sgx-dcap-server.cn-shanghai.aliyuncs.com\/sgx\/certification\/v3\//g' /etc/sgx_default_qcnl.conf"
+
     - name: Change download source of crates.io
       run: |
         docker exec $occlum_test bash -c "cat <<- EOF >/root/.cargo/config
@@ -122,6 +125,8 @@ jobs:
         fi;
         echo "occlum_test=$occlum_test" >> $GITHUB_ENV
 
+    - name: Update PCCS server
+      run: docker exec $occlum_test bash -c "sed -r -i 's/PCCS_URL=[^\s]*/PCCS_URL=https:\/\/sgx-dcap-server.cn-shanghai.aliyuncs.com\/sgx\/certification\/v3\//g' /etc/sgx_default_qcnl.conf"
 
     - name: Change download source of crates.io
       run: |
