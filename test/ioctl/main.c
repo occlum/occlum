@@ -21,6 +21,37 @@
 #endif
 #include "test.h"
 
+#define SGX_LEAF 0x12
+#define SGX2_SHIFT 1
+
+typedef struct t_cpuid {
+    unsigned int eax;
+    unsigned int ebx;
+    unsigned int ecx;
+    unsigned int edx;
+} t_cpuid_t;
+
+static inline void native_cpuid(int leaf, int subleaf, t_cpuid_t *p) {
+    memset(p, 0, sizeof(*p));
+    /* ecx is often an input as well as an output. */
+    asm volatile("cpuid"
+                 : "=a" (p->eax),
+                 "=b" (p->ebx),
+                 "=c" (p->ecx),
+                 "=d" (p->edx)
+                 : "a" (leaf), "c" (subleaf));
+}
+
+// check the hw is SGX1 or SGX2
+int is_sgx2_supported() {
+    t_cpuid_t cpu_info = {0, 0, 0, 0};
+    native_cpuid(SGX_LEAF, 0, &cpu_info);
+    if (!(cpu_info.eax & (1 << SGX2_SHIFT))) {
+        return 0;
+    }
+    return 1;
+}
+
 // ============================================================================
 // Test cases for TTY ioctls
 // ============================================================================
@@ -392,7 +423,12 @@ static int do_SGXIOC_GENERATE_AND_VERIFY_DCAP_QUOTE(int sgx_fd) {
 }
 
 int test_sgx_ioctl_SGXIOC_GENERATE_AND_VERIFY_DCAP_QUOTE(void) {
-    return do_sgx_ioctl_test(do_SGXIOC_GENERATE_AND_VERIFY_DCAP_QUOTE);
+    if (is_sgx2_supported()) {
+        return do_sgx_ioctl_test(do_SGXIOC_GENERATE_AND_VERIFY_DCAP_QUOTE);
+    } else {
+        printf("Warning: test_sgx_ioctl_SGXIOC_GENERATE_AND_VERIFY_DCAP_QUOTE is skipped\n");
+        return 0;
+    }
 }
 #endif
 
@@ -401,10 +437,20 @@ int test_sgx_ioctl_SGXIOC_IS_EDMM_SUPPORTED(void) {
 }
 
 int test_sgx_ioctl_SGXIOC_GET_EPID_GROUP_ID(void) {
+    // skip the EPID test on SGX2 HW
+    if (is_sgx2_supported()) {
+        printf("Warning: test_sgx_ioctl_SGXIOC_GET_EPID_GROUP_ID is skipped\n");
+        return 0;
+    }
     return do_sgx_ioctl_test(do_SGXIOC_GET_EPID_GROUP_ID);
 }
 
 int test_sgx_ioctl_SGXIOC_GEN_EPID_QUOTE(void) {
+    // skip the EPID test on SGX2 HW
+    if (is_sgx2_supported()) {
+        printf("Warning: test_sgx_ioctl_SGXIOC_GEN_EPID_QUOTE is skipped\n");
+        return 0;
+    }
     return do_sgx_ioctl_test(do_SGXIOC_GEN_QUOTE);
 }
 
