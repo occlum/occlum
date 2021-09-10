@@ -124,7 +124,7 @@ RUN git clone -b sgx_2.14_for_occlum https://github.com/occlum/linux-sgx && \
     mkdir /etc/init && \
     cd linux-sgx && \
     make preparation && \
-    ./compile_and_install.sh no_mitigation USE_OPT_LIBS=2 && \
+    ./compile_and_install.sh no_mitigation USE_OPT_LIBS=3 && \
     echo 'source /opt/intel/sgxsdk/environment' >> /root/.bashrc && \
     rm -rf /tmp/linux-sgx
 
