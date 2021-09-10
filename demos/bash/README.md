@@ -9,11 +9,24 @@ Now, Bash is finally supported with modification to the source code of Bash. We 
 Please follow below steps to run this demo:
 
 1. Download and build Busybox and Occlum-version Bash
+* glibc version
 ```
 ./prepare_bash_demo.sh
 ```
 
+* musl-libc version
+```
+./prepare_bash_musl_demo.sh
+```
+
 2. Run Bash script in Occlum
+* glibc version
 ```
 ./run_bash_demo.sh
 ```
+
+* musl-libc version
+```
+./run_bash_musl_demo.sh
+```
+
