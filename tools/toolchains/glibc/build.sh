@@ -3,8 +3,8 @@ SRC_DIR=/tmp/glibc/glibc
 BUILD_DIR=/tmp/glibc/glibc_build
 INSTALL_DIR=/opt/occlum/glibc
 
-# GCC 10 introduces many new checkings and will cause the build to fail.
-if [ "$(gcc -dumpversion)" = "10" ]; then
+# GCC 9/10 introduces many new checkings and will cause the build to fail.
+if [ "$(gcc -dumpversion)" = "9" -o "$(gcc -dumpversion)" = "10" ]; then
     EXTRA_CFLAGS=-fcommon
     EXTRA_CONFIG_OPTION="--disable-werror"
 fi
