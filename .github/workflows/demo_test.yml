@@ -665,7 +665,7 @@ jobs:
     - name: Check SOFABoot result
       run: |
         sleep ${{ env.nap_time }};
-        docker exec sofaboot_test bash -c "curl http://localhost:8080/actuator/versions"
+        docker exec sofaboot_test bash -c "curl -s http://localhost:8080/actuator/readiness | grep -v DOWN"
 
   Bash_test:
     runs-on: ubuntu-18.04
