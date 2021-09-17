@@ -1,0 +1,9 @@
+/target
+run*
+*-test/*
+.vscode
+*backup
+*demos
+install.sh
+base.yaml
+occlum_elf_loader.config
