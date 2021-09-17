@@ -500,6 +500,113 @@ fn find_all_included_bom_files(bom_file: &str, included_dirs: &Vec<String>) -> V
     res
 }
 
+/// This function will try to remove redundant operations in all target_managements
+fn remove_redundant(bom_managements: &mut Vec<BomManagement>) {
+    remove_redundant_mkdir(bom_managements);
+    remove_redundant_createlink(bom_managements);
+    remove_redudant_copydir(bom_managements);
+    remove_redundant_copyfile(bom_managements);
+}
+
+/// If multiple operation tries to make the same directory. Only the *FIRST* mkdir will reserve.
+fn remove_redundant_mkdir(bom_managements: &mut Vec<BomManagement>) {
+    let mut all_mkdirs = Vec::new();
+    for bom_management in bom_managements.iter_mut() {
+        let mkdirs = bom_management
+            .dirs_to_make
+            .iter()
+            .map(|s| s.trim_end_matches("/").to_string())
+            .collect();
+        let tmp = remove_redundant_items_in_vec(&mkdirs, all_mkdirs.iter());
+        bom_management.dirs_to_make = tmp.clone();
+        all_mkdirs.extend(tmp);
+    }
+}
+
+/// If multiple operation tries to create the same link, Only the *LAST* createlink will reserve
+fn remove_redundant_createlink(bom_managements: &mut Vec<BomManagement>) {
+    // reverse the array. Then we can reserve the first operation
+    bom_managements.reverse();
+    let mut all_createlinks = HashSet::new();
+    for bom_management in bom_managements.iter_mut() {
+        let mut tmp = Vec::new();
+        bom_management.links_to_create.reverse();
+        for (src, linkname) in bom_management.links_to_create.iter() {
+            if all_createlinks.insert(linkname.clone()) {
+                tmp.push((src.clone(), linkname.clone()));
+            }
+        }
+        tmp.reverse();
+        bom_management.links_to_create = tmp;
+    }
+    // reverse back
+    bom_managements.reverse();
+}
+
+/// If multiple operation tries to copy dir to the same dest, Only the *LAST* copy dir will reserve.
+/// Known limitations: if the source dir does not have filename, e.g., /home/root/, it will not be analyzed now.
+fn remove_redudant_copydir(bom_managements: &mut Vec<BomManagement>) {
+    // reverse, then can save the first operation
+    bom_managements.reverse();
+    let mut all_copydirs = HashSet::new();
+    for bom_management in bom_managements.iter_mut() {
+        let mut tmp = Vec::new();
+        bom_management.dirs_to_copy.reverse();
+        for (src, dest) in bom_management.dirs_to_copy.iter() {
+            let src_path = PathBuf::from(src);
+            match src_path.file_name() {
+                None => tmp.push((src.clone(), dest.clone())),
+                Some(filename) => {
+                    let dest_dir = PathBuf::from(dest)
+                        .join(filename)
+                        .to_string_lossy()
+                        .to_string();
+                    if all_copydirs.insert(dest_dir) {
+                        tmp.push((src.clone(), dest.clone()));
+                    }
+                }
+            }
+        }
+        tmp.reverse();
+        bom_management.dirs_to_copy = tmp;
+    }
+    // reverse back
+    bom_managements.reverse();
+}
+
+/// If multiple files will be copied to the same destination, only the *LAST* file will be copied.
+/// This function will deal with files to copy and shared objects to copy.
+/// In the same bom file, if shared objects and user-written file has the same destination, the user-written file first.
+fn remove_redundant_copyfile(bom_managements: &mut Vec<BomManagement>) {
+    // reverse the array
+    bom_managements.reverse();
+    let mut all_files = HashSet::new();
+    for bom_management in bom_managements.iter_mut() {
+        let mut tmp_files = Vec::new();
+        bom_management.files_to_copy.reverse();
+        // files first
+        for (src, dest) in bom_management.files_to_copy.iter() {
+            if all_files.insert(dest.clone()) {
+                tmp_files.push((src.clone(), dest.clone()));
+            }
+        }
+        tmp_files.reverse();
+        bom_management.files_to_copy = tmp_files;
+        // then shared object
+        let mut tmp_shared_objects = Vec::new();
+        bom_management.shared_objects_to_copy.reverse();
+        for (src, dest) in bom_management.shared_objects_to_copy.iter() {
+            if all_files.insert(dest.clone()) {
+                tmp_shared_objects.push((src.clone(), dest.clone()));
+            }
+        }
+        tmp_shared_objects.reverse();
+        bom_management.shared_objects_to_copy = tmp_shared_objects;
+    }
+    // reverse back
+    bom_managements.reverse();
+}
+
 // remove redundant items in a vec. For duplicate items, only the first item will be reserved
 fn remove_redundant_items_in_vec<T>(raw: &Vec<T>, excludes: Iter<'_, T>) -> Vec<T>
 where
