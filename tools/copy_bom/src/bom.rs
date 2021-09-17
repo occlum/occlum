@@ -291,6 +291,67 @@ impl Source {
     }
 }
 
+impl NormalFile {
+    fn get_file_to_copy_and_autodep(
+        &self,
+        src_dir: &str,
+        target_dir: &str,
+    ) -> (Vec<(String, String)>, Vec<String>) {
+        let target_dir_path = PathBuf::from(target_dir);
+        let src_dir_path = PathBuf::from(src_dir);
+        let mut file_to_copy = Vec::new();
+        let mut file_autodep = Vec::new();
+        match self {
+            NormalFile::FileName(file_name) => {
+                let src_file_path = src_dir_path.join(file_name);
+                // This unwrap should never fail
+                let src_file_name = src_file_path
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string();
+                let src_file = src_file_path.to_string_lossy().to_string();
+                let target_file = target_dir_path
+                    .join(src_file_name)
+                    .to_string_lossy()
+                    .to_string();
+                file_to_copy.push((src_file.clone(), target_file));
+                // default : autodep is true
+                file_autodep.push(src_file);
+            }
+            NormalFile::FileWithOption(file_with_option) => {
+                let file_name = &file_with_option.name;
+                let src_file_path = src_dir_path.join(file_name);
+                //This unwrap should never fail
+                let src_file_name = src_file_path
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string();
+                let src_file = src_file_path.to_string_lossy().to_string();
+                // check file hash
+                if let Some(ref hash) = file_with_option.hash {
+                    check_file_hash(&src_file, hash);
+                }
+                // autodep
+                if file_with_option.autodep.clone().unwrap_or(true) {
+                    file_autodep.push(src_file.clone())
+                }
+                // rename file
+                let target_file = match file_with_option.rename {
+                    Some(ref rename) => target_dir_path.join(rename).to_string_lossy().to_string(),
+                    None => target_dir_path
+                        .join(src_file_name)
+                        .to_string_lossy()
+                        .to_string(),
+                };
+                file_to_copy.push((src_file, target_file));
+            }
+        }
+        (file_to_copy, file_autodep)
+    }
+}
+
 impl BomManagement {
     fn add_target_management(&mut self, mut target_management: TargetManagement, root_dir: &str) {
         // First, we need to resolve environmental variables
