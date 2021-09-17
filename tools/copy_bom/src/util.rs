@@ -45,6 +45,81 @@ lazy_static! {
     static ref DEPENDENCY_REGEX: Regex = Regex::new(r"^(?P<name>\S+) => (?P<path>\S+) ").unwrap();
 }
 
+pub fn copy_file(src: &str, dest: &str, dry_run: bool) {
+    info!("rsync -aL {} {}", src, dest);
+    if !dry_run {
+        let output = Command::new("rsync").arg("-aL").arg(src).arg(dest).output();
+        match output {
+            Ok(output) => deal_with_output(output, COPY_FILE_ERROR),
+            Err(e) => {
+                error!("copy file {} to {} failed. {}", src, dest, e);
+                std::process::exit(COPY_FILE_ERROR);
+            }
+        }
+    }
+}
+
+fn format_command_args(args: &Vec<String>) -> String {
+    let mut res = String::new();
+    for arg in args {
+        res = format!("{} {}", res, arg);
+    }
+    res.trim().to_string()
+}
+
+pub fn mkdir(dest: &str, dry_run: bool) {
+    info!("mkdir -p {}", dest);
+    if !dry_run {
+        if let Err(e) = std::fs::create_dir_all(dest) {
+            error!("mkdir {} fails. {}", dest, e);
+            std::process::exit(CREATE_DIR_ERROR);
+        }
+    }
+}
+
+pub fn create_link(src: &str, linkname: &str, dry_run: bool) {
+    info!("ln -s {} {}", src, linkname);
+    if !dry_run {
+        // When we try to create a link, if there is already a file, the create will fail
+        // So we delete the link at first if an old file exists.
+        let _ = std::fs::remove_file(linkname);
+        if let Err(e) = std::os::unix::fs::symlink(src, linkname) {
+            error!("ln -s {} {} failed. {}", src, linkname, e);
+            std::process::exit(CREATE_SYMLINK_ERROR);
+        }
+    }
+}
+
+pub fn copy_dir(src: &str, dest: &str, dry_run: bool, excludes: &Vec<String>) {
+    // we should not pass --delete args. Otherwise it will overwrite files in the same place
+    // We pass --copy-unsafe-links instead of -L arg. So links point to current directory will be kept.
+    let mut args: Vec<_> = vec!["-ar", "--copy-unsafe-links"]
+        .into_iter()
+        .map(|s| s.to_string())
+        .collect();
+    let excludes: Vec<_> = excludes
+        .iter()
+        .map(|arg| format!("--exclude={}", arg))
+        .collect();
+    args.extend(excludes.into_iter());
+    info!("rsync {} {} {}", format_command_args(&args), src, dest);
+    if !dry_run {
+        let output = Command::new("rsync").args(args).arg(src).arg(dest).output();
+        match output {
+            Ok(output) => deal_with_output(output, CREATE_DIR_ERROR),
+            Err(e) => {
+                error!("copy dir {} to {} failed. {}", src, dest, e);
+                std::process::exit(COPY_DIR_ERROR);
+            }
+        }
+    }
+}
+
+pub fn copy_shared_object(src: &str, dest: &str, dry_run: bool) {
+    debug!("copy shared object {} to {}.", src, dest);
+    copy_file(src, dest, dry_run);
+}
+
 /// convert a dest path(usually absolute) to a dest path in root directory
 pub fn dest_in_root(root_dir: &str, dest: &str) -> PathBuf {
     let root_path = PathBuf::from(root_dir);
@@ -277,3 +352,15 @@ pub fn resolve_envs(path: &str) -> String {
     )
 }
 
+fn deal_with_output(output: Output, error_number: i32) {
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    if stdout.trim().len() > 0 {
+        debug!("{}", stdout);
+    }
+    // if stderr is not None, the operation fails. We should abort the process and output error log.
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    if stderr.trim().len() > 0 {
+        error!("{}", stderr);
+        std::process::exit(error_number);
+    }
+}
