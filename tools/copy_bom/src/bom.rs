@@ -223,6 +223,74 @@ impl Target {
     }
 }
 
+impl Source {
+    fn get_source_management(&self, workspace_dir: &str, target_dir: &str) -> SourceManagement {
+        let src_dir = self
+            .from
+            .as_deref()
+            .map(|from| {
+                PathBuf::from(workspace_dir)
+                    .join(from)
+                    .to_string_lossy()
+                    .to_string()
+            })
+            .unwrap_or(workspace_dir.to_string());
+        let mut dirs_to_copy = self.get_dirs_to_copy(&src_dir, target_dir);
+        let (files_to_copy, files_autodep) =
+            self.get_files_to_copy_and_autodep(&src_dir, target_dir);
+        // if files and dirs are all None, we will copy the entire `from` directory
+        if None == self.files && None == self.dirs {
+            let src = self.from.as_deref().unwrap_or_else(|| {
+                error!("field 'from' cannot be empty");
+                std::process::exit(INVALID_BOM_FILE_ERROR);
+            });
+            // add the "/" to the directory and will copy the entire directory
+            let mut new_src = src.to_string();
+            if !new_src.ends_with("/") {
+                new_src.push('/');
+            }
+            dirs_to_copy.push((new_src, target_dir.to_string()));
+        }
+        SourceManagement {
+            dirs_to_copy,
+            files_to_copy,
+            files_autodep,
+        }
+    }
+
+    fn get_files_to_copy_and_autodep(
+        &self,
+        src_dir: &str,
+        target_dir: &str,
+    ) -> (Vec<(String, String)>, Vec<String>) {
+        let mut files_to_copy = Vec::new();
+        let mut files_autodep = Vec::new();
+        if let Some(ref files) = self.files {
+            for file in files {
+                let (file_to_copy, file_autodep) =
+                    file.get_file_to_copy_and_autodep(src_dir, target_dir);
+                files_to_copy.extend(file_to_copy.into_iter());
+                files_autodep.extend(file_autodep.into_iter());
+            }
+        }
+        (files_to_copy, files_autodep)
+    }
+
+    fn get_dirs_to_copy(&self, src_dir: &str, target_dir: &str) -> Vec<(String, String)> {
+        let mut dirs_to_copy = Vec::new();
+        if let Some(ref dirs) = self.dirs {
+            for dir in dirs {
+                let src_path = PathBuf::from(src_dir).join(dir);
+                dirs_to_copy.push((
+                    src_path.to_string_lossy().to_string(),
+                    target_dir.to_string(),
+                ));
+            }
+        }
+        dirs_to_copy
+    }
+}
+
 impl BomManagement {
     fn add_target_management(&mut self, mut target_management: TargetManagement, root_dir: &str) {
         // First, we need to resolve environmental variables
