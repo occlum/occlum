@@ -80,3 +80,16 @@ pub fn find_included_bom_file(
     std::process::exit(FILE_NOT_EXISTS_ERROR);
 }
 
+/// Try to resolve a path may contain environmental variables to a path without environmental variables
+/// This function relies on a third-party crate shellexpand.
+/// Known limitations: If the environmental variable points to an empty value, the conversion may fail.
+pub fn resolve_envs(path: &str) -> String {
+    shellexpand::env(path).map_or_else(
+        |_| {
+            warn!("{} resolve fails.", path);
+            path.to_string()
+        },
+        |res| res.to_string(),
+    )
+}
+

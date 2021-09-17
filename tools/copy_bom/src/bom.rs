@@ -408,6 +408,33 @@ impl TargetManagement {
         self.files_autodep.extend(files_autodep.into_iter());
     }
 
+    fn resolve_environmental_variables(&mut self) {
+        self.dirs_to_make = self
+            .dirs_to_make
+            .iter()
+            .map(|dir| resolve_envs(dir))
+            .collect();
+        self.links_to_create = self
+            .links_to_create
+            .iter()
+            .map(|(src, linkname)| (resolve_envs(src), resolve_envs(linkname)))
+            .collect();
+        self.dirs_to_copy = self
+            .dirs_to_copy
+            .iter()
+            .map(|(src, dest)| (resolve_envs(src), resolve_envs(dest)))
+            .collect();
+        self.files_to_copy = self
+            .files_to_copy
+            .iter()
+            .map(|(src, dest)| (resolve_envs(src), resolve_envs(dest)))
+            .collect();
+        self.files_autodep = self
+            .files_autodep
+            .iter()
+            .map(|file| resolve_envs(file))
+            .collect();
+    }
 }
 
 /// This function will return all included bom files in the order to deal with.
