@@ -370,6 +370,22 @@ impl BomManagement {
         self.autodep(files_autodep, root_dir);
     }
 
+    fn autodep(&mut self, files_autodep: Vec<String>, root_dir: &str) {
+        for file_autodep in files_autodep.iter() {
+            let mut shared_objects = find_dependent_shared_objects(file_autodep);
+            for (src, dest) in shared_objects.drain() {
+                let dest_path = dest_in_root(root_dir, &dest);
+                // First, we create dir to store the dependency
+                // This unwrap should *NEVER* fail
+                let dest_dir = dest_path.parent().unwrap().to_string_lossy().to_string();
+                self.dirs_to_make.push(dest_dir);
+                // Then we copy the dependency to the the dir
+                let dest_file = dest_path.to_string_lossy().to_string();
+                self.shared_objects_to_copy.push((src, dest_file));
+            }
+        }
+    }
+
     // do real jobs
     // mkdirs, create links, copy dirs, copy files(including shared objects)
     fn manage(&self, dry_run: bool, excludes: Vec<String>) {
