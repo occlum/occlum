@@ -30,16 +30,18 @@ jobs:
     - name: C test
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/hello_c && make;
             occlum new occlum_instance;
-            cp hello_world occlum_instance/image/bin;
-            cd occlum_instance && SGX_MODE=SIM occlum build;
+            cd occlum_instance && rm -rf image;
+            copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
+            SGX_MODE=SIM occlum build;
             occlum run /bin/hello_world"
 
     - name: C with encrypted image test
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/hello_c && make;
             rm -rf occlum_instance && occlum new occlum_instance;
             occlum gen-image-key occlum_instance/image_key;
-            cp hello_world occlum_instance/image/bin;
-            cd occlum_instance && SGX_MODE=SIM occlum build --image-key ./image_key --buildin-image-key;
+            cd occlum_instance && rm -rf image;
+            copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
+            SGX_MODE=SIM occlum build --image-key ./image_key --buildin-image-key;
             occlum run /bin/hello_world"
 
     - name: C++ test
