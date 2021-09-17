@@ -1,0 +1,9 @@
+includes:
+  - base.yaml
+  - java-11-alibaba-dragonwell.yaml
+targets:
+  # copy the web server
+  - target: /usr/lib/spring
+    copy:
+      - files:
+        - ../gs-messaging-stomp-websocket/complete/target/gs-messaging-stomp-websocket-0.1.0.jar
