@@ -1,0 +1,11 @@
+targets:
+  # copy jvm
+  - target: /usr/lib/jvm
+    copy:
+      - dirs:
+        - /opt/occlum/toolchains/jvm/java-11-alibaba-dragonwell
+  # emplicit copy java to enable autodep for java
+  - target: /usr/lib/jvm/java-11-alibaba-dragonwell/bin
+    copy:
+      - files:
+        - /opt/occlum/toolchains/jvm/java-11-alibaba-dragonwell/bin/java
