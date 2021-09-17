@@ -10,6 +10,18 @@ use std::path::PathBuf;
 use std::process::{Command, Output};
 use std::vec;
 
+/// convert a dest path(usually absolute) to a dest path in root directory
+pub fn dest_in_root(root_dir: &str, dest: &str) -> PathBuf {
+    let root_path = PathBuf::from(root_dir);
+    let dest_path = PathBuf::from(dest);
+    let dest_relative = if dest_path.is_absolute() {
+        PathBuf::from(dest_path.strip_prefix("/").unwrap())
+    } else {
+        dest_path
+    };
+    return root_path.join(dest_relative);
+}
+
 /// find an included file in the file system. If we can find the bom file, return the path
 /// otherwise, the process exit with error
 /// if included dir is relative path, if will be viewed as path relative to the `current` path (where we execute command)

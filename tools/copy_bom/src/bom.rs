@@ -163,6 +163,66 @@ impl Bom {
     }
 }
 
+impl Target {
+    fn get_target_management(&self, root_dir: &str) -> TargetManagement {
+        let dirs_to_make = self.get_dirs_to_make(root_dir);
+        let links_to_create = self.get_links_to_create(root_dir);
+        let source_managements = self.get_source_managements(root_dir);
+        let mut target_management = TargetManagement::default();
+        target_management.dirs_to_make = dirs_to_make;
+        target_management.links_to_create = links_to_create;
+        for source_management in source_managements.into_iter() {
+            target_management.add_source_management(source_management);
+        }
+        target_management
+    }
+
+    fn get_dirs_to_make(&self, root_dir: &str) -> Vec<String> {
+        let mut dirs_to_make = Vec::new();
+        let target_path = dest_in_root(root_dir, &self.target);
+        // mkdir: target path
+        dirs_to_make.push(target_path.to_string_lossy().to_string());
+        // mkdir: each sub dir
+        if let Some(ref dirs) = self.mkdirs {
+            for dir in dirs {
+                let dir_path = target_path.join(dir);
+                dirs_to_make.push(dir_path.to_string_lossy().to_string());
+            }
+        }
+        dirs_to_make
+    }
+
+    fn get_links_to_create(&self, root_dir: &str) -> Vec<(String, String)> {
+        let target_path = dest_in_root(root_dir, &self.target);
+        let mut links_to_create = Vec::new();
+        if let Some(ref links) = self.createlinks {
+            for link in links {
+                let linkname = target_path.join(&link.linkname);
+                links_to_create.push((link.src.clone(), linkname.to_string_lossy().to_string()));
+            }
+        }
+        links_to_create
+    }
+
+    fn get_source_managements(&self, root_dir: &str) -> Vec<SourceManagement> {
+        let target_path = dest_in_root(root_dir, &self.target);
+        let mut source_managements = Vec::new();
+        if let Some(ref sources) = self.copy {
+            let root_dir_path = PathBuf::from(root_dir);
+            let workspace_dir = root_dir_path
+                .parent()
+                .map(|parent| parent.to_string_lossy().to_string())
+                .unwrap_or(".".to_string());
+            for source in sources {
+                let source_management =
+                    source.get_source_management(&workspace_dir, &target_path.to_string_lossy());
+                source_managements.push(source_management);
+            }
+        }
+        source_managements
+    }
+}
+
 impl BomManagement {
     fn add_target_management(&mut self, mut target_management: TargetManagement, root_dir: &str) {
         // First, we need to resolve environmental variables
@@ -205,6 +265,20 @@ impl BomManagement {
             .iter()
             .for_each(|(src, dest)| copy_shared_object(src, dest, dry_run));
     }
+}
+
+impl TargetManagement {
+    fn add_source_management(&mut self, source_management: SourceManagement) {
+        let SourceManagement {
+            dirs_to_copy,
+            files_to_copy,
+            files_autodep,
+        } = source_management;
+        self.dirs_to_copy.extend(dirs_to_copy.into_iter());
+        self.files_to_copy.extend(files_to_copy.into_iter());
+        self.files_autodep.extend(files_autodep.into_iter());
+    }
+
 }
 
 /// This function will return all included bom files in the order to deal with.
