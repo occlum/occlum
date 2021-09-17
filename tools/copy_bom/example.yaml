@@ -1,0 +1,38 @@
+# include other bom files
+includes: 
+  - base.yaml
+  - java-11-alibaba-dragonwell.yaml
+# This excludes will only take effect when copy directories. We will exclude files or dirs with following patterns.
+excludes:
+  - .git
+  - .dockerignore
+targets: 
+  # one target represents operations at the same destination
+  - target: /
+    # make directory in dest: mkdir -p $target/dirname
+    mkdirs: 
+     - bin
+     - proc
+    # build a symlink: ln -s $src $target/linkname
+    createlinks:
+      - src: ../hello
+        linkname: hello_softlink
+    copy: 
+      # from represents the prefix of copydirs and files(to copy)
+      # If there's no copydirs or files, copy the *ENTIRE from directory* to target: cp -r $from/ $target
+      - from: .
+        # copy directory: cp -r $from/dirname $target
+        dirs:
+          - hello_c_demo
+          - example_dirname
+        # copy file: cp $from/filename $target
+        files: 
+          - Makefile
+          - name: Cargo.toml
+            hash: DA665E483C11922D07239B1A04BEE0F0C7C1AB6D60AF041DDA7CE56D07AF723E
+            autodep: false
+            rename: Cargo.toml.backup
+  - target: /bin
+    mkdirs:
+      - python-occlum
+      - python-occlum/bin
