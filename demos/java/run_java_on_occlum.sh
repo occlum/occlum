@@ -36,11 +36,8 @@ init_instance() {
 
 build_web() {
     # Copy JVM and JAR file into Occlum instance and build
-    mkdir -p image/usr/lib/jvm
-    cp -r /opt/occlum/toolchains/jvm/java-11-alibaba-dragonwell image/usr/lib/jvm
-    cp /usr/local/occlum/x86_64-linux-musl/lib/libz.so.1 image/lib
-    mkdir -p image/usr/lib/spring
-    cp ../${jar_path} image/usr/lib/spring/
+    rm -rf image
+    copy_bom -f ../webserver.yaml --root image --include-dir /opt/occlum/etc/template
     occlum build
 }
 
@@ -56,10 +53,8 @@ run_web() {
 
 build_hello() {
     # Copy JVM and class file into Occlum instance and build
-    mkdir -p image/usr/lib/jvm
-    cp -r /opt/occlum/toolchains/jvm/java-11-alibaba-dragonwell image/usr/lib/jvm
-    cp /usr/local/occlum/x86_64-linux-musl/lib/libz.so.1 image/lib
-    cp ../${hello} image
+    rm -rf image
+    copy_bom -f ../hello_world.yaml --root image --include-dir /opt/occlum/etc/template
     occlum build
 }
 
@@ -74,11 +69,8 @@ run_hello() {
 
 build_processBuilder() {
     # Copy JVM and class file into Occlum instance and build
-    mkdir -p image/usr/lib/jvm
-    cp -r /opt/occlum/toolchains/jvm/java-11-alibaba-dragonwell image/usr/lib/jvm
-    cp /usr/local/occlum/x86_64-linux-musl/lib/libz.so.1 image/lib
-    cp ../${app} image
-    cp /bin/date image/bin/
+    rm -rf image
+    copy_bom -f ../process_builder.yaml --root image --include-dir /opt/occlum/etc/template
     # Need bigger user space size for multiprocess
     new_json="$(jq '.resource_limits.user_space_size = "6000MB"' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
@@ -94,6 +86,12 @@ run_processBuilder() {
     occlum run /usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin/java -Xmx512m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=64m -Dos.name=Linux \
         -Djdk.lang.Process.launchMechanism=posix_spawn processBuilder
 }
+
+# check if the libz softlink exists. If not, create the softlink to enable autodep for java
+libz_file=/lib/libz.so.1
+if [ ! -f ${libz_file} ];then
+    ln -sf /usr/local/occlum/x86_64-linux-musl/lib/libz.so.1 ${libz_file}
+fi
 
 arg=$1
 case "$arg" in
