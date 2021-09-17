@@ -206,3 +206,68 @@ impl BomManagement {
             .for_each(|(src, dest)| copy_shared_object(src, dest, dry_run));
     }
 }
+
+/// This function will return all included bom files in the order to deal with.
+/// This function operates in such a way: It starts from putting the root bom into a queue,
+/// In each iteration of the loop, it will fetch the first bom from the head of the queue,
+/// Then it find all included files of the bom file. The all included bom files will put into the queue as well as a vector(sorted boms).
+/// The loop will end if there's no more elements in the queue.
+/// There is also a max_iteration bound. If the loop exceeds the bound and the queue is not empty, the function will abort the program.
+/// Because excess of the bound often means there's a reference cycles in the bom tree, which is an invalid case.
+/// After we visit all boms in the queue, we will get all boms sorted in the order of being included in the vector.
+/// Then we will remove redudant boms in the vector. For a bom file that may exist more than one time,
+/// only the last one will be kept in the final result. To remove redundancy, we will reverse the vector,
+/// and only keep the first one for each duplicate bom.
+fn find_all_included_bom_files(bom_file: &str, included_dirs: &Vec<String>) -> Vec<String> {
+    let mut boms = VecDeque::new();
+    let mut sorted_boms = Vec::new();
+    const MAX_ITERATION: usize = 100;
+
+    boms.push_back(bom_file.to_string());
+    sorted_boms.push(bom_file.to_string());
+    for _ in 0..MAX_ITERATION {
+        if boms.is_empty() {
+            break;
+        }
+        // This unwrap can never fail
+        let current_bom = boms.pop_front().unwrap();
+        let bom = Bom::from_yaml_file(&current_bom);
+        // find includes for current bom
+        if let Some(includes) = bom.includes {
+            includes.into_iter().for_each(|include| {
+                let included_bom_file =
+                    find_included_bom_file(&include, &current_bom, included_dirs);
+                boms.push_back(included_bom_file.clone());
+                sorted_boms.push(included_bom_file);
+            });
+        }
+    }
+    if !boms.is_empty() {
+        // The iteration exceeds the MAX_ITERATION and there still are elements in the queue.
+        error!("The bom file number exceeds the MAX_ITERATION bound. Please check if there is including cycle.");
+        std::process::exit(INVALID_BOM_FILE_ERROR);
+    }
+    // remove redundant boms in sorted boms
+    sorted_boms.reverse();
+    let mut res = remove_redundant_items_in_vec(&sorted_boms, Vec::new().iter());
+    res.reverse();
+    res
+}
+
+// remove redundant items in a vec. For duplicate items, only the first item will be reserved
+fn remove_redundant_items_in_vec<T>(raw: &Vec<T>, excludes: Iter<'_, T>) -> Vec<T>
+where
+    T: Hash + Eq + Clone,
+{
+    let mut exists = HashSet::new();
+    for item in excludes {
+        exists.insert(item.clone());
+    }
+    let mut res = Vec::new();
+    for item in raw {
+        if exists.insert(item.clone()) {
+            res.push(item.clone());
+        }
+    }
+    res
+}
