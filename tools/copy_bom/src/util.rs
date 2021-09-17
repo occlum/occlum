@@ -22,6 +22,31 @@ pub fn dest_in_root(root_dir: &str, dest: &str) -> PathBuf {
     return root_path.join(dest_relative);
 }
 
+/// check if hash of the file is equal to the passed hash value.
+pub fn check_file_hash(filename: &str, hash: &str) {
+    let file_hash = calculate_file_hash(filename);
+    if file_hash != hash.to_string() {
+        error!(
+            "The hash value of {} should be {:?}. Please correct it.",
+            filename, file_hash
+        );
+        std::process::exit(INCORRECT_HASH_ERROR);
+    }
+}
+
+/// Use sha256 to calculate hash for file content. The returned hash is a hex-encoded string.
+pub fn calculate_file_hash(filename: &str) -> String {
+    let mut file = std::fs::File::open(filename).unwrap_or_else(|e| {
+        println!("can not open file {}. {}", filename, e);
+        std::process::exit(FILE_NOT_EXISTS_ERROR);
+    });
+    let mut hasher = Sha256::new();
+    std::io::copy(&mut file, &mut hasher).unwrap();
+    let hash = hasher.finalize();
+    let hash = HEXUPPER.encode(&hash);
+    hash
+}
+
 /// find an included file in the file system. If we can find the bom file, return the path
 /// otherwise, the process exit with error
 /// if included dir is relative path, if will be viewed as path relative to the `current` path (where we execute command)
