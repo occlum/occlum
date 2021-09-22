@@ -83,40 +83,6 @@ RUN curl https://sh.rustup.rs -sSf | \
     rm -rf /root/.cargo/registry && rm -rf /root/.cargo/git && \
     cargo -V 
 
-# Install Occlum toolchain
-COPY toolchains/musl-gcc /tmp/musl-gcc
-WORKDIR /tmp
-RUN cd musl-gcc && ./build.sh && ./install_zlib.sh && rm -rf /tmp/musl-gcc
-ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
-
-# Install glibc
-COPY toolchains/glibc /tmp/glibc
-WORKDIR /tmp
-RUN cd glibc && ./build.sh && rm -rf /tmp/glibc
-
-# Install Occlum Golang toolchain
-COPY toolchains/golang /tmp/golang
-WORKDIR /tmp
-RUN cd golang && ./build.sh && rm -rf /tmp/golang
-ENV PATH="/opt/occlum/toolchains/golang/bin:$PATH"
-
-# Install Occlum Rust toolchain
-COPY toolchains/rust /tmp/rust
-WORKDIR /tmp
-RUN cd rust && ./build.sh && rm -rf /tmp/rust
-ENV PATH="/opt/occlum/toolchains/rust/bin:$PATH"
-ENV LD_LIBRARY_PATH="/opt/intel/sgxsdk/sdk_libs"
-
-# Install Occlum Java toolchain (JDK 11)
-ARG JDK11_PATH=/opt/occlum/toolchains/jvm/java-11-openjdk
-COPY --from=alpine /usr/lib/jvm/java-11-openjdk $JDK11_PATH
-RUN rm $JDK11_PATH/lib/security/cacerts
-COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK11_PATH/lib/security/cacerts
-COPY toolchains/java /tmp/java
-WORKDIR /tmp
-RUN cd java && ./install_dragonwell.sh && rm -rf /tmp/java
-ENV PATH="/opt/occlum/toolchains/jvm/bin:$PATH"
-
 # Install SGX PSW
 ARG PSW_VERSION=2.13.103.1
 ARG DCAP_VERSION=1.10.103.1
@@ -162,11 +128,44 @@ RUN git clone -b sgx_2.13.3_for_occlum https://github.com/occlum/linux-sgx && \
     echo 'source /opt/intel/sgxsdk/environment' >> /root/.bashrc && \
     rm -rf /tmp/linux-sgx
 
-# Install the latest version of Occlum
+# Download the Occlum source
 ARG OCCLUM_BRANCH
 WORKDIR /root
 RUN git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum && \
-    cd occlum && \
+    cp -r /root/occlum/tools/toolchains/* /tmp/ && mkdir -p /opt/occlum/ && \
+    cp /root/occlum/tools/docker/start_aesm.sh /opt/occlum/
+
+# Install Occlum toolchain
+WORKDIR /tmp
+RUN cd musl-gcc && ./build.sh && ./install_zlib.sh && rm -rf /tmp/musl-gcc
+ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
+
+# Install glibc
+WORKDIR /tmp
+RUN cd glibc && ./build.sh && rm -rf /tmp/glibc
+
+# Install Occlum Golang toolchain
+WORKDIR /tmp
+RUN cd golang && ./build.sh && rm -rf /tmp/golang
+ENV PATH="/opt/occlum/toolchains/golang/bin:$PATH"
+
+# Install Occlum Rust toolchain
+WORKDIR /tmp
+RUN cd rust && ./build.sh && rm -rf /tmp/rust
+ENV PATH="/opt/occlum/toolchains/rust/bin:$PATH"
+ENV LD_LIBRARY_PATH="/opt/intel/sgxsdk/sdk_libs"
+
+# Install Occlum Java toolchain (JDK 11)
+ARG JDK11_PATH=/opt/occlum/toolchains/jvm/java-11-openjdk
+COPY --from=alpine /usr/lib/jvm/java-11-openjdk $JDK11_PATH
+RUN rm $JDK11_PATH/lib/security/cacerts
+COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK11_PATH/lib/security/cacerts
+WORKDIR /tmp
+RUN cd java && ./install_dragonwell.sh && rm -rf /tmp/java
+ENV PATH="/opt/occlum/toolchains/jvm/bin:$PATH"
+
+WORKDIR /root
+RUN cd occlum && \
     source /opt/intel/sgxsdk/environment && \
     make submodule && \
     OCCLUM_RELEASE_BUILD=1 make && \
@@ -179,7 +178,6 @@ RUN git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum && \
 # To do so, we add the script to ~/.bashrc. We cannot use systemd to run AESM
 # as a "real" service since the pid 1 is not systemd in Docker. So we start
 # up AESM service when an user login with an interative shell.
-COPY docker/start_aesm.sh /opt/occlum/ 
 RUN mkdir -p /var/run/aesmd && echo '/opt/occlum/start_aesm.sh' >> /root/.bashrc
 
 WORKDIR /root
