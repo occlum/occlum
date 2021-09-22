@@ -87,12 +87,6 @@ run_processBuilder() {
         -Djdk.lang.Process.launchMechanism=posix_spawn processBuilder
 }
 
-# check if the libz softlink exists. If not, create the softlink to enable autodep for java
-libz_file=/lib/libz.so.1
-if [ ! -f ${libz_file} ];then
-    ln -sf /usr/local/occlum/x86_64-linux-musl/lib/libz.so.1 ${libz_file}
-fi
-
 arg=$1
 case "$arg" in
     web_app)

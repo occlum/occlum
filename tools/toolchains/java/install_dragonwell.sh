@@ -41,6 +41,3 @@ EOF
 
 chmod +x ${INSTALL_DIR}/bin/occlum-java
 chmod +x ${INSTALL_DIR}/bin/occlum-javac
-
-# create softlink for libz to enable autodep for java
-ln -sf /usr/local/occlum/x86_64-linux-musl/lib/libz.so.1 /lib/libz.so.1

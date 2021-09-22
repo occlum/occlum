@@ -31,7 +31,3 @@ CFLAGS="-O2 -g ${EXTRA_CFLAGS}" ${SRC_DIR}/configure \
   --enable-stack-protector=strong --disable-nscd ${EXTRA_CONFIG_OPTION}
 make
 make install
-
-# prepare softlinks to enable autodep for C++
-ln -sf /usr/lib/x86_64-linux-gnu/libstdc++.so.6 /opt/occlum/glibc/lib/libstdc++.so.6
-ln -sf /lib/x86_64-linux-gnu/libgcc_s.so.1 /opt/occlum/glibc/lib/libgcc_s.so.1
