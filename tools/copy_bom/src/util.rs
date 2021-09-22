@@ -1,6 +1,6 @@
 use crate::error::{
     COPY_DIR_ERROR, COPY_FILE_ERROR, CREATE_DIR_ERROR, CREATE_SYMLINK_ERROR, FILE_NOT_EXISTS_ERROR,
-    INCORRECT_HASH_ERROR,
+    INCORRECT_HASH_ERROR, SHARED_OBJECT_NOT_EXISTS_ERROR,
 };
 use data_encoding::HEXUPPER;
 use regex::Regex;
@@ -10,13 +10,30 @@ use std::path::PathBuf;
 use std::process::{Command, Output};
 use std::vec;
 
+/// This structure represents loader information in config file.
+/// `loader_paths` stores the actual path of each loader. key: the loader name, value: the loader path in host
+/// `ld_library_path_envs` stores the LD_LIBRARY_PATH environmental variable.
+/// We combine the loader dir and the user provided path to get the environmental variable.
+/// `default_lib_dirs` stores all directories we parse from the LD_LIBRARY_PATH variable.
+/// We use `default_lib_dirs` because we may not have the same LD_LIBRARY_PATH in occlum image.
+/// When we use `occlum run`, the loader in occlum image won‘t try to find libraries in all libs in LD_LIBRARY_PATH.
+/// So, we will copy libraries in these `default_lib_dirs` to the directory of loader.
+#[derive(Debug)]
+struct OcclumLoaders {
+    loader_paths: HashMap<String, String>,
+    ld_library_path_envs: HashMap<String, String>,
+    default_lib_dirs: HashMap<String, Vec<String>>,
+}
+
 lazy_static! {
     /// This map stores the path of occlum-modified loaders.
     /// The `key` is the name of the loader. The `value` is the loader path.
     /// We read the loaders from the `LOADER_CONFIG_FILE`
-    static ref OCCLUM_LOADERS: HashMap<String, String> = {
+    static ref OCCLUM_LOADERS: OcclumLoaders = {
         const LOADER_CONFIG_FILE: &'static str = "/opt/occlum/etc/template/occlum_elf_loader.config";
-        let mut m = HashMap::new();
+        let mut loader_paths = HashMap::new();
+        let mut ld_library_path_envs = HashMap::new();
+        let mut default_lib_dirs = HashMap::new();
         let config_path = PathBuf::from(LOADER_CONFIG_FILE);
         if !config_path.is_file() {
             // if no given config file is found, we will use the default loader in elf headers
@@ -24,17 +41,29 @@ lazy_static! {
         } else {
             let file_content = std::fs::read_to_string(config_path).unwrap();
             for line in file_content.lines() {
-                let full_path = line.trim();
-                if full_path.len() <= 0 {
+                let trim_line = line.trim();
+                if trim_line.len() <= 0 {
                     continue;
                 }
-                let loader_path = PathBuf::from(full_path);
-                let loader_file_name = loader_path.file_name().unwrap().to_string_lossy().to_string();
-                m.insert(loader_file_name, full_path.to_string());
+                let line_split: Vec<_> = trim_line.split(' ').collect();
+                // The first string is loader path
+                let loader_path = line_split[0].to_string();
+                let loader_path_buf = PathBuf::from(&loader_path);
+                let loader_file_name = loader_path_buf.file_name().unwrap().to_string_lossy().to_string();
+                // The second string plus the loader directory is LD_LIBRARY_PATH
+                let loader_dir = loader_path_buf.parent().unwrap().to_string_lossy().to_string();
+                let ld_library_path = format!("{}:{}", loader_dir, line_split[1]);
+                // parse all libraries in LD_LIBRARY_PATH
+                let lib_paths = ld_library_path.split(':').filter(|s| s.len()>0).map(|s| s.to_string()).collect();
+                loader_paths.insert(loader_file_name, loader_path.clone());
+                ld_library_path_envs.insert(loader_path.clone(), ld_library_path);
+                default_lib_dirs.insert(loader_path, lib_paths);
             }
         }
-        debug!("occlum elf loaders: {:?}", m);
-        m
+        debug!("occlum elf loaders: {:?}", loader_paths);
+        debug!("occlum ld_library_path envs: {:?}", ld_library_path_envs);
+        debug!("default lib dirs: {:?}", default_lib_dirs);
+        OcclumLoaders {loader_paths, ld_library_path_envs, default_lib_dirs}
     };
 }
 
@@ -175,11 +204,15 @@ pub fn find_dependent_shared_objects(file_path: &str) -> HashSet<(String, String
     if dynamic_loader.is_none() {
         return shared_objects;
     }
-    let (dynamic_loader_src, dynamic_loader_dest) = dynamic_loader.unwrap();
-    shared_objects.insert((dynamic_loader_src.clone(), dynamic_loader_dest));
-    let output = command_output_of_executing_dynamic_loader(&file_path, &dynamic_loader_src);
+    let (occlum_elf_loader, inlined_elf_loader) = dynamic_loader.unwrap();
+    shared_objects.insert((occlum_elf_loader.clone(), inlined_elf_loader));
+    let output = command_output_of_executing_dynamic_loader(&file_path, &occlum_elf_loader);
     if let Ok(output) = output {
-        let mut objects = extract_dependencies_from_output(&file_path, output);
+        let default_lib_dirs = OCCLUM_LOADERS
+            .default_lib_dirs
+            .get(&occlum_elf_loader)
+            .cloned();
+        let mut objects = extract_dependencies_from_output(&file_path, output, default_lib_dirs);
         for item in objects.drain() {
             shared_objects.insert(item);
         }
@@ -205,11 +238,26 @@ fn command_output_of_executing_dynamic_loader(
         file_path_buf.to_string_lossy().to_string()
     };
     // return the output of the command to analyze dependencies
-    debug!("{} --list {}", dynamic_loader, file_path);
-    Command::new(dynamic_loader)
-        .arg("--list")
-        .arg(file_path)
-        .output()
+    match OCCLUM_LOADERS.ld_library_path_envs.get(dynamic_loader) {
+        None => {
+            debug!("{} --list {}", dynamic_loader, file_path);
+            Command::new(dynamic_loader)
+                .arg("--list")
+                .arg(file_path)
+                .output()
+        }
+        Some(ld_library_path) => {
+            debug!(
+                "LD_LIBRARY_PATH='{}' {} --list {}",
+                ld_library_path, dynamic_loader, file_path
+            );
+            Command::new(dynamic_loader)
+                .arg("--list")
+                .arg(file_path)
+                .env("LD_LIBRARY_PATH", ld_library_path)
+                .output()
+        }
+    }
 }
 
 /// This function will try to find a dynamic loader for a elf file automatically
@@ -235,6 +283,7 @@ fn auto_dynamic_loader(filename: &str) -> Option<(String, String)> {
         .unwrap();
     // If the loader file name is glibc loader or musl loader, we will use occlum-modified loader
     let occlum_elf_loader = OCCLUM_LOADERS
+        .loader_paths
         .get(loader_file_name)
         .cloned()
         .unwrap_or(inlined_elf_loader.to_string());
@@ -248,6 +297,7 @@ fn auto_dynamic_loader(filename: &str) -> Option<(String, String)> {
 pub fn extract_dependencies_from_output(
     file_path: &str,
     output: Output,
+    default_lib_dirs: Option<Vec<String>>,
 ) -> HashSet<(String, String)> {
     let mut shared_objects = HashSet::new();
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -256,6 +306,7 @@ pub fn extract_dependencies_from_output(
     // audodep may output error message. We should return this message to user for further checking.
     if stderr.trim().len() > 0 {
         error!("cannot autodep for {}. {}", file_path, stderr);
+        std::process::exit(SHARED_OBJECT_NOT_EXISTS_ERROR);
     }
     for line in stdout.lines() {
         let line = line.trim();
@@ -263,11 +314,31 @@ pub fn extract_dependencies_from_output(
         if let Some(captures) = captures {
             let raw_path = (&captures["path"]).to_string();
             if let Some(absolute_path) = convert_to_absolute(file_path, &raw_path) {
-                shared_objects.insert((absolute_path.clone(), absolute_path.clone()));
-                let raw_name = (&captures["name"]).to_string();
-                let raw_name_path = PathBuf::from(&raw_name);
-                if raw_name_path.is_absolute() {
-                    shared_objects.insert((absolute_path, raw_name));
+                match default_lib_dirs {
+                    None => {
+                        shared_objects.insert((absolute_path.clone(), absolute_path));
+                    }
+                    Some(ref default_lib_dirs) => {
+                        let file_name = (&captures["name"]).to_string();
+                        let lib_dir_in_host = PathBuf::from(&absolute_path)
+                            .parent()
+                            .unwrap()
+                            .to_string_lossy()
+                            .to_string();
+                        // if the shared object is from one of the default dirs,
+                        // we will copy to the first default dir(the loader dir)
+                        // Otherwise it will be copied to the same dir as its dir in host.
+                        if default_lib_dirs.contains(&lib_dir_in_host) {
+                            let target_dir = default_lib_dirs.first().unwrap();
+                            let target_path = PathBuf::from(target_dir)
+                                .join(file_name)
+                                .to_string_lossy()
+                                .to_string();
+                            shared_objects.insert((absolute_path, target_path));
+                        } else {
+                            shared_objects.insert((absolute_path.clone(), absolute_path));
+                        }
+                    }
                 }
             }
         }
