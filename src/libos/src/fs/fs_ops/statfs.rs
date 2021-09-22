@@ -1,5 +1,6 @@
 use super::*;
 use rcore_fs::vfs::FsInfo;
+use std::convert::TryFrom;
 use std::ffi::CString;
 
 pub fn do_fstatfs(fd: FileDesc) -> Result<Statfs> {
@@ -8,7 +9,7 @@ pub fn do_fstatfs(fd: FileDesc) -> Result<Statfs> {
     let file_ref = current!().file(fd)?;
     let statfs = {
         let fs_info = file_ref.fs()?.info();
-        do_statfs_inner(fs_info)?
+        Statfs::try_from(fs_info)?
     };
     trace!("fstatfs result: {:?}", statfs);
     Ok(statfs)
@@ -24,22 +25,9 @@ pub fn do_statfs(path: &str) -> Result<Statfs> {
     };
     let statfs = {
         let fs_info = inode.fs().info();
-        do_statfs_inner(fs_info)?
+        Statfs::try_from(fs_info)?
     };
     trace!("statfs result: {:?}", statfs);
-    Ok(statfs)
-}
-
-fn do_statfs_inner(fs_info: FsInfo) -> Result<Statfs> {
-    let statfs = if fs_info.magic == rcore_fs_unionfs::UNIONFS_MAGIC
-        || fs_info.magic == rcore_fs_sefs::SEFS_MAGIC as usize
-    {
-        let mut host_statfs = host_statfs()?;
-        host_statfs.f_type = fs_info.magic;
-        host_statfs
-    } else {
-        Statfs::from(fs_info)
-    };
     Ok(statfs)
 }
 
@@ -87,30 +75,41 @@ impl Statfs {
     }
 }
 
-impl From<FsInfo> for Statfs {
-    fn from(info: FsInfo) -> Self {
-        Self {
-            f_type: match info.magic {
-                // The "/dev" and "/dev/shm" are tmpfs on Linux, so we transform the
-                // magic number to TMPFS_MAGIC.
-                rcore_fs_ramfs::RAMFS_MAGIC | rcore_fs_devfs::DEVFS_MAGIC => {
-                    const TMPFS_MAGIC: usize = 0x0102_1994;
-                    TMPFS_MAGIC
-                }
-                val => val,
-            },
-            f_bsize: info.bsize,
-            f_blocks: info.blocks,
-            f_bfree: info.bfree,
-            f_bavail: info.bavail,
-            f_files: info.files,
-            f_ffree: info.ffree,
-            f_fsid: [0i32; 2],
-            f_namelen: info.namemax,
-            f_frsize: info.frsize,
-            f_flags: 0,
-            f_spare: [0usize; 4],
-        }
+impl TryFrom<FsInfo> for Statfs {
+    type Error = error::Error;
+
+    fn try_from(info: FsInfo) -> Result<Self> {
+        let statfs = if info.magic == rcore_fs_unionfs::UNIONFS_MAGIC
+            || info.magic == rcore_fs_sefs::SEFS_MAGIC as usize
+        {
+            let mut host_statfs = host_statfs()?;
+            host_statfs.f_type = info.magic;
+            host_statfs
+        } else {
+            Self {
+                f_type: match info.magic {
+                    // The "/dev" and "/dev/shm" are tmpfs on Linux, so we transform the
+                    // magic number to TMPFS_MAGIC.
+                    rcore_fs_ramfs::RAMFS_MAGIC | rcore_fs_devfs::DEVFS_MAGIC => {
+                        const TMPFS_MAGIC: usize = 0x0102_1994;
+                        TMPFS_MAGIC
+                    }
+                    val => val,
+                },
+                f_bsize: info.bsize,
+                f_blocks: info.blocks,
+                f_bfree: info.bfree,
+                f_bavail: info.bavail,
+                f_files: info.files,
+                f_ffree: info.ffree,
+                f_fsid: [0i32; 2],
+                f_namelen: info.namemax,
+                f_frsize: info.frsize,
+                f_flags: 0,
+                f_spare: [0usize; 4],
+            }
+        };
+        Ok(statfs)
     }
 }
 
