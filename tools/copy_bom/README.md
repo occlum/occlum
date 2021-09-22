@@ -32,6 +32,19 @@ All dependencies will be copied to the corresponding directory in root directory
 - -i, --include-dir: This flag is used to indicate which directory to find included bom files. This flag can be set multiple times. If the `include-dir` is set as a relative path, it is a path relative to the current path where you run the `copy_bom` command. 
 - -h, --help: print help message
 
+# About the `occlum_elf_loader.config` file
+
+This file is put in `/etc/template`. This file is used to define where to find occlum-specific loaders and occlum-specific libraries. If you want to find libraries in different paths, you should modify this config file.  
+
+The file content looks like as below:
+```
+/opt/occlum/glibc/lib/ld-linux-x86-64.so.2 /usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu 
+/lib/ld-musl-x86_64.so.1 /opt/occlum/toolchains/gcc/x86_64-linux-musl/lib
+```
+Each line in this file represents a loader. Since occlum supports both musl and glibc loader, there are two loaders in the config file now.  
+Each line contains two parts, which is seperated with a space. The first part is the path of occlum-specific loader. This loader is used to analyse dependencies of elf file.  
+The second part in the line indicates where to find shared libraries. All paths should be separated by colons. The loader will first try to find libraries in the loader path, then will try to find libraries in user-provided path. This is done by set the `LD_LIBRARY_APTH` environmental variables. The order of paths matters, since we will find libraries in the order of given path.
+
 # known limitations
 
 - The use of wildcard(like *) in files or directories is not supported. It may result in `copy_bom` behaving incorrectly.
