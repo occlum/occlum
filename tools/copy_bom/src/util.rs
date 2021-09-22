@@ -196,11 +196,14 @@ pub fn calculate_file_hash(filename: &str) -> String {
 /// and analyze the stdout. We use regex to match the pattern of the loader output.
 /// The loader will automatically find all dependencies recursively, i.e., it will also find dependencies
 /// for each shared object, so we only need to analyze the top elf file.
-pub fn find_dependent_shared_objects(file_path: &str) -> HashSet<(String, String)> {
+pub fn find_dependent_shared_objects(
+    file_path: &str,
+    default_loader: &Option<(String, String)>,
+) -> HashSet<(String, String)> {
     let mut shared_objects = HashSet::new();
     // find dependencies for the input file
     // first, we find the dynamic loader for the elf file, if we can't find the loader, return empty shared objects
-    let dynamic_loader = auto_dynamic_loader(file_path);
+    let dynamic_loader = auto_dynamic_loader(file_path, default_loader);
     if dynamic_loader.is_none() {
         return shared_objects;
     }
@@ -260,11 +263,37 @@ fn command_output_of_executing_dynamic_loader(
     }
 }
 
-/// This function will try to find a dynamic loader for a elf file automatically
-/// If we find the loader, we will return Some((loader_src, loader_dest)).
-/// This is because the loader_src and loader_dest may not be the same directory.
-/// If we can't find the loader, this function will return None
-fn auto_dynamic_loader(filename: &str) -> Option<(String, String)> {
+/// This function will try to find a dynamic loader for a elf file automatically.
+/// If will first try to read the interp section of elf file. If the file does not have interp section,
+/// and the default loader is *NOT* None, it will return default loader.
+/// It there is no interp section and default loader is None, it will return None.
+/// If we find the loader, we will return Some((occlum_elf_loader, inlined_elf_loader)).
+/// This is because the occlum_elf_loader and inlined_elf_loader may not be the same directory.
+fn auto_dynamic_loader(
+    filename: &str,
+    default_loader: &Option<(String, String)>,
+) -> Option<(String, String)> {
+    let elf_file = match elf::File::open_path(filename) {
+        Err(_) => return None,
+        Ok(elf_file) => elf_file,
+    };
+    match elf_file.get_section(".interp") {
+        None => {
+            // When the elf file does not has interp section
+            // 1. if we have default loader, we will return the default loader
+            // 2. Otherwise we will return None and give warning.
+            if let Some(default_loader) = default_loader {
+                return Some(default_loader.clone());
+            } else {
+                warn!("cannot autodep for file {}. ", filename);
+                return None;
+            }
+        }
+        Some(_) => read_loader_from_interp_section(filename),
+    }
+}
+
+fn read_loader_from_interp_section(filename: &str) -> Option<(String, String)> {
     let elf_file = match elf::File::open_path(filename) {
         Err(_) => return None,
         Ok(elf_file) => elf_file,
@@ -291,6 +320,24 @@ fn auto_dynamic_loader(filename: &str) -> Option<(String, String)> {
         occlum_elf_loader.to_string(),
         inlined_elf_loader.to_string(),
     ))
+}
+
+// try to infer default loader for all files to autodep
+// If all files with .interp section points to the same loader,
+// this loader will be viewed as the default loader
+// Otherwise, no default loader can be found.
+pub fn infer_default_loader(files_autodep: &Vec<String>) -> Option<(String, String)> {
+    let mut loaders = HashSet::new();
+    for filename in files_autodep.iter() {
+        if let Some(loader) = read_loader_from_interp_section(filename) {
+            loaders.insert(loader);
+        }
+    }
+    if loaders.len() == 1 {
+        return loaders.into_iter().next();
+    } else {
+        return None;
+    }
 }
 
 /// resolve the results of dynamic loader to extract dependencies

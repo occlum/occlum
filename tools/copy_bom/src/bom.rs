@@ -8,7 +8,8 @@
 use crate::error::{FILE_NOT_EXISTS_ERROR, INVALID_BOM_FILE_ERROR};
 use crate::util::{
     check_file_hash, copy_dir, copy_file, copy_shared_object, create_link, dest_in_root,
-    find_dependent_shared_objects, find_included_bom_file, mkdir, resolve_envs,
+    find_dependent_shared_objects, find_included_bom_file, infer_default_loader, mkdir,
+    resolve_envs,
 };
 use serde::{Deserialize, Serialize};
 use serde_yaml;
@@ -136,12 +137,14 @@ impl Bom {
     fn get_bom_management(self, root_dir: &str) -> BomManagement {
         let mut bom_management = BomManagement::default();
         bom_management.dirs_to_make.push(root_dir.to_string()); // init root dir
+        let mut target_managements = Vec::new();
         if let Some(ref targets) = self.targets {
             for target in targets {
                 let target_management = target.get_target_management(root_dir);
-                bom_management.add_target_management(target_management, root_dir);
+                target_managements.push(target_management);
             }
         }
+        bom_management.add_target_managements(target_managements, root_dir);
         bom_management
     }
 
@@ -353,26 +356,37 @@ impl NormalFile {
 }
 
 impl BomManagement {
-    fn add_target_management(&mut self, mut target_management: TargetManagement, root_dir: &str) {
-        // First, we need to resolve environmental variables
-        target_management.resolve_environmental_variables();
-        let TargetManagement {
-            dirs_to_make,
-            links_to_create,
-            dirs_to_copy,
-            files_to_copy,
-            files_autodep,
-        } = target_management;
-        self.dirs_to_make.extend(dirs_to_make.into_iter());
-        self.links_to_create.extend(links_to_create.into_iter());
-        self.dirs_to_copy.extend(dirs_to_copy.into_iter());
-        self.files_to_copy.extend(files_to_copy.into_iter());
-        self.autodep(files_autodep, root_dir);
+    fn add_target_managements(
+        &mut self,
+        target_managements: Vec<TargetManagement>,
+        root_dir: &str,
+    ) {
+        let mut files_autodep_in_bom = Vec::new();
+        for mut target_management in target_managements.into_iter() {
+             // First, we need to resolve environmental variables
+            target_management.resolve_environmental_variables();
+            let TargetManagement {
+                dirs_to_make,
+                links_to_create,
+                dirs_to_copy,
+                files_to_copy,
+                files_autodep,
+            } = target_management;
+            self.dirs_to_make.extend(dirs_to_make.into_iter());
+            self.links_to_create.extend(links_to_create.into_iter());
+            self.dirs_to_copy.extend(dirs_to_copy.into_iter());
+            self.files_to_copy.extend(files_to_copy.into_iter());
+            files_autodep_in_bom.extend(files_autodep.into_iter());
+        }
+
+        self.autodep(files_autodep_in_bom, root_dir);
     }
 
     fn autodep(&mut self, files_autodep: Vec<String>, root_dir: &str) {
+        let default_loader = infer_default_loader(&files_autodep);
+        debug!("default loader in autodep: {:?}", default_loader);
         for file_autodep in files_autodep.iter() {
-            let mut shared_objects = find_dependent_shared_objects(file_autodep);
+            let mut shared_objects = find_dependent_shared_objects(file_autodep, &default_loader);
             for (src, dest) in shared_objects.drain() {
                 let dest_path = dest_in_root(root_dir, &dest);
                 // First, we create dir to store the dependency
