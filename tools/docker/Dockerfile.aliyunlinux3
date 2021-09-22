@@ -120,32 +120,27 @@ RUN wget http://www.etallen.com/cpuid/cpuid-20200211.x86_64.tar.gz && \
     cp ./cpuid-20200211/cpuid /usr/bin/ && \
     rm -rf /tmp/cpuid-20200211*
 
+
+# Download the Occlum source
+ARG OCCLUM_BRANCH
+WORKDIR /root
+RUN git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum && \
+    cp -r /root/occlum/tools/toolchains/* /tmp/ && mkdir -p /opt/occlum/ && \
+    cp /root/occlum/tools/docker/start_aesm.sh /opt/occlum/
+
 # Install Occlum toolchain
-COPY toolchains/musl-gcc /tmp/musl-gcc
 WORKDIR /tmp
 RUN cd musl-gcc && ./build.sh && ./install_zlib.sh && rm -rf /tmp/musl-gcc
 ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
 
 # Install glibc
-COPY toolchains/glibc /tmp/glibc
 WORKDIR /tmp
 RUN cd glibc && ./build.sh && rm -rf /tmp/glibc
 
 # Install Occlum Golang toolchain
-COPY toolchains/golang /tmp/golang
 WORKDIR /tmp
-RUN yum install -y go && cd golang && ./build.sh && rm -rf /tmp/golang
-ENV PATH="/usr/local/occlum/golang/bin:$PATH"
-
-# Install Occlum Java toolchain (JDK 11)
-ARG JDK11_PATH=/opt/occlum/toolchains/jvm/java-11-openjdk
-COPY --from=alpine /usr/lib/jvm/java-11-openjdk $JDK11_PATH
-RUN rm $JDK11_PATH/lib/security/cacerts
-COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK11_PATH/lib/security/cacerts
-COPY toolchains/java /tmp/java
-WORKDIR /tmp
-RUN cd java && ./install_dragonwell.sh && rm -rf /tmp/java
-ENV PATH="/opt/occlum/toolchains/jvm/bin:$PATH"
+RUN cd golang && ./build.sh && rm -rf /tmp/golang
+ENV PATH="/opt/occlum/toolchains/golang/bin:$PATH"
 
 # Install Rust
 ENV PATH="/root/.cargo/bin:$PATH"
@@ -156,18 +151,24 @@ RUN curl https://sh.rustup.rs -sSf | \
     cargo -V
 
 # Install Occlum Rust toolchain
-COPY toolchains/rust /tmp/rust
 WORKDIR /tmp
 RUN cd rust && ./build.sh && rm -rf /tmp/rust
 ENV PATH="/opt/occlum/toolchains/rust/bin:$PATH"
 
-ARG OCCLUM_BRANCH
+# Install Occlum Java toolchain (JDK 11)
+ARG JDK11_PATH=/opt/occlum/toolchains/jvm/java-11-openjdk
+COPY --from=alpine /usr/lib/jvm/java-11-openjdk $JDK11_PATH
+RUN rm $JDK11_PATH/lib/security/cacerts
+COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK11_PATH/lib/security/cacerts
+WORKDIR /tmp
+RUN cd java && ./install_dragonwell.sh && rm -rf /tmp/java
+ENV PATH="/opt/occlum/toolchains/jvm/bin:$PATH"
+
+
 ENV LD_LIBRARY_PATH="/opt/intel/sgxpsw/aesm:/usr/lib64/:/usr/local/lib:/opt/intel/sgxsdk/sdk_libs:/usr/lib:$LD_LIBRARY_PATH"
-# Install the latest version of Occlum
-WORKDIR /root/occlum
-RUN rm -rf occlum && \
-    git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum && \
-    cd occlum && \
+# Build and install Occlum
+WORKDIR /root
+RUN cd occlum && \
     source /opt/intel/sgxsdk/environment && \
     make submodule && \
     OCCLUM_RELEASE_BUILD=1 make install && \
@@ -179,7 +180,6 @@ RUN rm -rf occlum && \
 # To do so, we add the script to ~/.bashrc. We cannot use systemd to run AESM
 # as a "real" service since the pid 1 is not systemd in Docker. So we start
 # up AESM service when an user login with an interative shell.
-COPY docker/start_aesm.sh /opt/occlum/
-RUN mkdir -p /var/run/aesmd && echo 'sudo /opt/occlum/start_aesm.sh' >> /root/.bashrc
+RUN mkdir -p /var/run/aesmd && echo '/opt/occlum/start_aesm.sh' >> /root/.bashrc
 
 WORKDIR /root

@@ -23,13 +23,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Because "Build and push" step `context` field can't be subdir,
-      # we need to copy files needed by dockerfile to root dir of the project
-      - name: Copy context for docker build
-        run: |
-          cp -r tools/toolchains .
-          cp -r tools/docker .
-
       - name: Get Occlum release version
         run: echo "RELEASE_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
 
