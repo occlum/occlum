@@ -1,3 +1,4 @@
+# musl backend openjdk
 targets:
   # copy jvm
   - target: /usr/lib/jvm

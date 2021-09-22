@@ -28,15 +28,8 @@ init_instance() {
 
 build_flink() {
     # Copy JVM and class file into Occlum instance and build
-    mkdir -p image/usr/lib/jvm
-    cp -r /usr/lib/jvm/java-11-openjdk-amd64 image/usr/lib/jvm
-    cp /lib/x86_64-linux-gnu/libz.so.1 image/lib
-    cp $occlum_glibc/libdl.so.2 image/$occlum_glibc
-    cp $occlum_glibc/librt.so.1 image/$occlum_glibc
-    cp $occlum_glibc/libm.so.6 image/$occlum_glibc
-    cp $occlum_glibc/libnss_files.so.2 image/$occlum_glibc
-    cp -rf ../flink-1.10.1/* image/bin/
-    cp -rf ../hosts image/etc/
+    rm -rf image
+    copy_bom -f ../flink.yaml --root image --include-dir /opt/occlum/etc/template
     occlum build
 }
 
