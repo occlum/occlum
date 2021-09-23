@@ -6,6 +6,7 @@ extern crate elf;
 extern crate env_logger;
 extern crate regex;
 extern crate shellexpand;
+extern crate walkdir;
 use bom::Bom;
 use env_logger::Env;
 use structopt::StructOpt;

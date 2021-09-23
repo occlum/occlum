@@ -1,8 +1,9 @@
 use crate::error::{
     COPY_DIR_ERROR, COPY_FILE_ERROR, CREATE_DIR_ERROR, CREATE_SYMLINK_ERROR, FILE_NOT_EXISTS_ERROR,
-    INCORRECT_HASH_ERROR, SHARED_OBJECT_NOT_EXISTS_ERROR,
+    INCORRECT_HASH_ERROR, 
 };
 use data_encoding::HEXUPPER;
+use elf::types::{ET_DYN, ET_EXEC, Type};
 use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -196,6 +197,9 @@ pub fn calculate_file_hash(filename: &str) -> String {
 /// and analyze the stdout. We use regex to match the pattern of the loader output.
 /// The loader will automatically find all dependencies recursively, i.e., it will also find dependencies
 /// for each shared object, so we only need to analyze the top elf file.
+/// The flag `exit_when_encountering_errors` is used to indicate the behavior if we can't find dependencies for an elf file.
+/// If this flag is set true, the default behavior when encountering autodep errors is to print error message and exit program.
+/// Otherwise, we will only print error message.
 pub fn find_dependent_shared_objects(
     file_path: &str,
     default_loader: &Option<(String, String)>,
@@ -215,7 +219,11 @@ pub fn find_dependent_shared_objects(
             .default_lib_dirs
             .get(&occlum_elf_loader)
             .cloned();
-        let mut objects = extract_dependencies_from_output(&file_path, output, default_lib_dirs);
+        let mut objects = extract_dependencies_from_output(
+            &file_path,
+            output,
+            default_lib_dirs,
+        );
         for item in objects.drain() {
             shared_objects.insert(item);
         }
@@ -277,6 +285,12 @@ fn auto_dynamic_loader(
         Err(_) => return None,
         Ok(elf_file) => elf_file,
     };
+    // We should only try to find dependencies for dynamic libraries or executables
+    // relocatable files and core files are not included
+    match elf_file.ehdr.elftype {
+        ET_DYN|ET_EXEC => {},
+        Type(_) => return None,
+    }
     match elf_file.get_section(".interp") {
         None => {
             // When the elf file does not has interp section
@@ -285,7 +299,7 @@ fn auto_dynamic_loader(
             if let Some(default_loader) = default_loader {
                 return Some(default_loader.clone());
             } else {
-                warn!("cannot autodep for file {}. ", filename);
+                warn!("cannot autodep for file {}. No dynamic loader can be found or inferred.", filename);
                 return None;
             }
         }
@@ -352,8 +366,7 @@ pub fn extract_dependencies_from_output(
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     // audodep may output error message. We should return this message to user for further checking.
     if stderr.trim().len() > 0 {
-        error!("cannot autodep for {}. {}", file_path, stderr);
-        std::process::exit(SHARED_OBJECT_NOT_EXISTS_ERROR);
+        warn!("cannot autodep for {}. stderr: {}", file_path, stderr);
     }
     for line in stdout.lines() {
         let line = line.trim();

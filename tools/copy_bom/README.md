@@ -9,12 +9,12 @@ Bom file is used to describe which files should be copied to the root directory(
 `copy_bom` is the tool designed to create directories and symbolic links, copy all files and directories defined in a bom file to the root directory. Internally, `copy_bom` will use `rsync` to do the real file operations. `copy_bom` will copy each file and directory incrementally, i.e., only changed parts will be copied. The permission bits and modification times will be reserved. This is done by the `-a` option of `rsync`. `copy_bom` will not ensure the whole image directory as described in bom file (sync behavior) because it will not try to delete old files. To pursue a sync behavior, one can delete the old image directory and copy files again.
 
 ### dependencies
-`copy_bom` will analyze all dependencies(shared objects) of each ELF file via the dynamic loader defined in the `.interp` section in the file and automatically copy dependencies to the root directory. Currently, `copy_bom` only copy dependencies with absolute paths. We support only one dependency pattern in the result of dynamic loader.
+`copy_bom` will analyze all dependencies(shared objects) of each ELF file. `copy_bom` will analyze dependencies for each user-defined file in `files` entry as well as files in user-defined directory in `dirs` entry. For user-defined elf file, it will report error and abort the program if we can't find the dependent shared objects. For files in user-defined directories, we will report warning if autodep fails. We analyze dependencies via the dynamic loader defined in the `.interp` section in elf files and automatically copy dependencies to the root directory. If there's no `.interp` section for an elf file, `copy_bom` will try to infer the loader if all other elf files have the same loader. Currently, `copy_bom` only copy dependencies with absolute paths. We support only one dependency pattern in the result of dynamic loader.
 - name => path   e.g., `libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6`  
-All dependencies will be copied to the corresponding directory in root directory. For example, if root directory is `image`, then the dependency `/lib64/ld-linux-x86-64.so.2` will be copied to `image/lib/ld-linux-x86-64.so.2`. An entry named `autodep` with value `false` can be added to each file to avoid finding and copying dependencies automatically.
+All dependencies will be copied to the corresponding directory in root directory. For example, if root directory is `image`, then the dependency `/lib64/ld-linux-x86-64.so.2` will be copied to `image/lib64/ld-linux-x86-64.so.2`. An entry named `autodep` with value `false` can be added to each file to avoid finding and copying dependencies automatically.
 
 ### log
-`copy_bom` uses the same log setting as `occlum`. One can set `OCCLUM_LOG_LEVEL=trace` to see all logs printed by `copy_bom`.
+`copy_bom` uses the same log setting as `occlum`. One can set `OCCLUM_LOG_LEVEL=trace` to see all logs printed by `copy_bom`. To only view real file operations, `OCCLUM_LOG_LEVEL=info` is a proper level.
 
 ### prepare and install
 1.prepare. Since `copy_bom` relies on `rsync` to copy files. We need to install `rsync` at first. On ubuntu, this can be done by `apt install rsync -y`.
@@ -52,5 +52,5 @@ The second part in the line indicates where to find shared libraries. All paths 
 - Environmental variables pointing to an empty value may fail to resolve.
 
 # demos
-1. The demos with `copy_bom` are in the `../../demos/bom-demos` directory.
-2. Before using these demos, `rsync` and `copy_bom` should be installed. The file `base.yaml` should be copied to `/opt/occlum/etc/template`.
+1. We have modify several demos with `copy_bom`. 
+2. Before using these demos, `rsync` and `copy_bom` should be installed. There should be at least `base.yaml` and `occlum_elf_loader.config` in  `/opt/occlum/etc/template`.
