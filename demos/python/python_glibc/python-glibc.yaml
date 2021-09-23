@@ -10,11 +10,6 @@ targets:
     copy: 
       - dirs:
           - ../python-occlum
-  # explicit copy python3 to enable autodep for python3
-  - target: /opt/python-occlum/bin
-    copy:
-      - files:
-        - ../python-occlum/bin/python3
   # below are python code and data
   - target: /
     copy:
