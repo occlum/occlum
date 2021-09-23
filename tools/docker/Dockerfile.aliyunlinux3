@@ -76,7 +76,7 @@ RUN yum install -y --nogpgcheck \
 
 # Install PSW and DCAP RPM packages
 WORKDIR /tmp
-RUN wget https://mirrors.openanolis.cn/inclavare-containers/alinux3/sgx_rpm_local_repo.tar.gz && \
+RUN wget https://mirrors.openanolis.cn/inclavare-containers/alinux3/sgx-2.13/sgx_rpm_local_repo.tar.gz && \
     tar -xzf sgx_rpm_local_repo.tar.gz && \
     rm -f sgx_rpm_local_repo.tar.gz && \
     cd /tmp/sgx_rpm_local_repo && \
