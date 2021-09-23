@@ -9,13 +9,3 @@ targets:
     copy:
       - dirs:
         - /etc/java-11-openjdk
-  # explicit copy java to enable autodep for java
-  - target: /usr/lib/jvm/java-11-openjdk-amd64/bin
-    copy:
-      - files:
-        - /usr/lib/jvm/java-11-openjdk-amd64/bin/java
-  # explicit copy libjvm to enable autodep for this library 
-  - target: /usr/lib/jvm/java-11-openjdk-amd64/lib/server
-    copy:
-      - files:
-        - /usr/lib/jvm/java-11-openjdk-amd64/lib/server/libjvm.so
