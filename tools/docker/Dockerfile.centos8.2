@@ -138,6 +138,10 @@ RUN cd rust && ./build.sh && rm -rf /tmp/rust
 ENV PATH="/opt/occlum/toolchains/rust/bin:$PATH"
 ENV LD_LIBRARY_PATH="/opt/intel/sgxsdk/sdk_libs"
 
+# Install Occlum bash
+WORKDIR /tmp
+RUN cd bash && ./build.sh && rm -rf /tmp/bash
+
 # Install Occlum Java toolchain (JDK 11)
 ARG JDK11_PATH=/opt/occlum/toolchains/jvm/java-11-openjdk
 COPY --from=alpine /usr/lib/jvm/java-11-openjdk $JDK11_PATH
