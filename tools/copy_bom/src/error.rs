@@ -6,4 +6,3 @@ pub static CREATE_DIR_ERROR: i32 = -4;
 pub static CREATE_SYMLINK_ERROR: i32 = -5;
 pub static COPY_DIR_ERROR: i32 = -6;
 pub static INCORRECT_HASH_ERROR: i32 = -7;
-pub static SHARED_OBJECT_NOT_EXISTS_ERROR: i32 = -8;

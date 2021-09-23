@@ -17,6 +17,7 @@ use std::collections::{HashSet, VecDeque};
 use std::hash::Hash;
 use std::path::PathBuf;
 use std::slice::Iter;
+use walkdir::WalkDir;
 
 // The whole bom file
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,15 +121,29 @@ impl Bom {
         // remove redundant operations in each bom management
         remove_redundant(&mut bom_managements);
         // Since we have different copy options for each bom, we cannot copy all targets together.
-        let mut bom_managements_iter = bom_managements.into_iter();
+        let mut bom_managements_iter = bom_managements.iter();
         for bom in sorted_boms.into_iter() {
             // each bom corresponds to a bom management, so the unwrap will never fail
             bom.manage_self(bom_managements_iter.next().unwrap(), dry_run);
         }
+        // Try to autodep for each copydir
+        if !dry_run {
+            let mut made_dirs = Vec::new();
+            let mut copied_shared_objects = Vec::new();
+            for bom_management in bom_managements.iter() {
+                let dirs = bom_management.dirs_to_make.clone();
+                let shared_objects = bom_management.shared_objects_to_copy.clone();
+                made_dirs.extend(dirs);
+                copied_shared_objects.extend(shared_objects);
+            }
+            for bom_management in bom_managements.iter() {
+                bom_management.autodep_for_copydirs(&made_dirs, &copied_shared_objects, root_dir);
+            }
+        }
     }
 
     /// This func will only manage the current bom file without finding included bom files
-    pub fn manage_self(self, bom_management: BomManagement, dry_run: bool) {
+    pub fn manage_self(self, bom_management: &BomManagement, dry_run: bool) {
         let excludes = self.excludes.unwrap_or(Vec::new());
         bom_management.manage(dry_run, excludes);
     }
@@ -363,7 +378,7 @@ impl BomManagement {
     ) {
         let mut files_autodep_in_bom = Vec::new();
         for mut target_management in target_managements.into_iter() {
-             // First, we need to resolve environmental variables
+            // First, we need to resolve environmental variables
             target_management.resolve_environmental_variables();
             let TargetManagement {
                 dirs_to_make,
@@ -386,7 +401,8 @@ impl BomManagement {
         let default_loader = infer_default_loader(&files_autodep);
         debug!("default loader in autodep: {:?}", default_loader);
         for file_autodep in files_autodep.iter() {
-            let mut shared_objects = find_dependent_shared_objects(file_autodep, &default_loader);
+            let mut shared_objects =
+                find_dependent_shared_objects(file_autodep, &default_loader);
             for (src, dest) in shared_objects.drain() {
                 let dest_path = dest_in_root(root_dir, &dest);
                 // First, we create dir to store the dependency
@@ -423,6 +439,93 @@ impl BomManagement {
         shared_objects_to_copy
             .iter()
             .for_each(|(src, dest)| copy_shared_object(src, dest, dry_run));
+    }
+
+    // Try to analyse and copy dependencies for files in copydirs.
+    // We do this job after we really copy dirs. This is because rsync will help deal with soft link
+    // when we copy dirs. soft links pointing to file/dir out of tree will be transformed to the referent file/dir.
+    // soft links pointing to files(dirs) in tree will be kept.
+    // So, we can simply skip any soft link when we walk the dir.
+    // This func will also not take effect if we are with dry run mode.
+    // `copied_shared_objects` stores shared objects for copyfiles. We use it here to remove redundance.
+    fn autodep_for_copydirs(
+        &self,
+        made_dirs: &Vec<String>,
+        copied_shared_objects: &Vec<(String, String)>,
+        root_dir: &str,
+    ) {
+        let BomManagement { dirs_to_copy, .. } = self;
+        // get all files in copydirs. filter directories and symlinks
+        let mut files_in_copied_dirs = Vec::new();
+        for (src, dest) in dirs_to_copy {
+            let dirname = PathBuf::from(src)
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .to_string();
+            let dest_dir = PathBuf::from(dest)
+                .join(dirname)
+                .to_string_lossy()
+                .to_string();
+            for entry in WalkDir::new(dest_dir)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .filter(|entry| entry.file_type().is_file())
+            {
+                files_in_copied_dirs.push(entry.path().to_string_lossy().to_string());
+            }
+        }
+        // analyse dependencies for all files
+        // TODO: fix false-positive warnings
+        // When we find dependent shared objects for all files in copydir, it may report warning
+        // if we can't find the shared object. For files in directories, it may be a false-positive case,
+        // because we may already copy these shared objects when we copy the directory. 
+        // But the loader cannot find these libraries antomatically 
+        // since we don't know how to set the proper LD_LIBRARY_PATH env.
+        // One possible method to fix this problem is that we don't directly report warning message 
+        // when we can't find dependencies. We return all warning message instead. Before we log these message,
+        // we can check whether these libraries has already been copied when we copy the directory.
+        // This method can help avoid most false-positive warnings while not affecting which files to copy.
+        // User also can avoid these warnings by setting proper LD_LIBRARY_PATH in `/opt/occlum/etc/template/occlum_elf_loader.config`.
+        let default_loader = infer_default_loader(&files_in_copied_dirs);
+        let mut all_shared_objects = Vec::new();
+        for file_path in files_in_copied_dirs.into_iter() {
+            let shared_objects = find_dependent_shared_objects(&file_path, &default_loader);
+            all_shared_objects.extend(shared_objects);
+        }
+        // We should not copy shared libraries already in image directory.
+        // This is due to some libraries are in relative path. We will filter these libraries.
+        let absolute_root_dir = std::fs::canonicalize(root_dir)
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+        all_shared_objects = all_shared_objects
+            .into_iter()
+            .filter(|(src, _)| !src.starts_with(&absolute_root_dir))
+            .map(|(src, dest)| {
+                let dest = dest_in_root(root_dir, &dest);
+                (src, dest.to_string_lossy().to_string())
+            })
+            .collect();
+        // remove redundancy
+        let shared_objects =
+            remove_redundant_items_in_vec(&all_shared_objects, copied_shared_objects.iter());
+        // create dirs for shared objects
+        let mut mkdirs = Vec::new();
+        for (_, shared_object_dest) in shared_objects.iter() {
+            let shared_object_dir = PathBuf::from(shared_object_dest)
+                .parent()
+                .unwrap()
+                .to_string_lossy()
+                .to_string();
+            mkdirs.push(shared_object_dir);
+        }
+        let mkdirs = remove_redundant_items_in_vec(&mkdirs, made_dirs.iter());
+        // do real operations
+        mkdirs.iter().for_each(|dir| mkdir(dir, false));
+        shared_objects
+            .iter()
+            .for_each(|(src, dest)| copy_shared_object(src, dest, false));
     }
 }
 
