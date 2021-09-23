@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 use std::mem::MaybeUninit;
 
+use async_io::socket::Type;
 use num_enum::TryFromPrimitive;
 
 use super::*;
@@ -9,19 +10,6 @@ use crate::prelude::*;
 use crate::util::mem_util::from_user;
 
 pub async fn do_socket(domain: c_int, type_and_flags: c_int, protocol: c_int) -> Result<isize> {
-    #[derive(Clone, Copy, Debug, Eq, PartialEq, TryFromPrimitive)]
-    #[repr(i32)]
-    #[allow(non_camel_case_types)]
-    enum Type {
-        STREAM = 1,
-        DGRAM = 2,
-        RAW = 3,
-        RDM = 4,
-        SEQPACKET = 5,
-        DCCP = 6,
-        PACKET = 10,
-    }
-
     // Check arguments
     let domain = Domain::try_from(domain)
         .map_err(|_| errno!(EINVAL, "invalid or unsupported network domain"))?;

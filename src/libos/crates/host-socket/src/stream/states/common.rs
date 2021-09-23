@@ -17,34 +17,34 @@ use crate::runtime::Runtime;
 /// The common parts of all stream sockets.
 pub struct Common<A: Addr + 'static, R: Runtime> {
     host_fd: HostFd,
+    type_: Type,
     pollee: Pollee,
     inner: Mutex<Inner<A>>,
     phantom_data: PhantomData<(A, R)>,
 }
 
 impl<A: Addr + 'static, R: Runtime> Common<A, R> {
-    pub fn new() -> Self {
+    pub fn new(type_: Type) -> Result<Self> {
         let domain_c = A::domain() as libc::c_int;
-        let host_fd = {
-            let retval = unsafe { do_socket(domain_c, libc::SOCK_STREAM, 0) };
-            assert!(retval >= 0);
-            retval as HostFd
-        };
+        let type_c = type_ as libc::c_int;
+        let host_fd = try_libc!(do_socket(domain_c, type_c, 0)) as HostFd;
         let pollee = Pollee::new(Events::empty());
         let inner = Mutex::new(Inner::new());
-        Self {
+        Ok(Self {
             host_fd,
+            type_,
             pollee,
             inner,
             phantom_data: PhantomData,
-        }
+        })
     }
 
-    pub fn with_host_fd(host_fd: HostFd) -> Self {
+    pub fn with_host_fd(host_fd: HostFd, type_: Type) -> Self {
         let pollee = Pollee::new(Events::empty());
         let inner = Mutex::new(Inner::new());
         Self {
             host_fd,
+            type_,
             pollee,
             inner,
             phantom_data: PhantomData,
@@ -57,6 +57,10 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
 
     pub fn host_fd(&self) -> HostFd {
         self.host_fd
+    }
+
+    pub fn type_(&self) -> Type {
+        self.type_
     }
 
     pub fn pollee(&self) -> &Pollee {
@@ -76,24 +80,11 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
     pub fn get_addr_from_host(&self) -> Result<A> {
         let mut c_addr: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
         let mut c_addr_len = std::mem::size_of::<libc::sockaddr_storage>() as u32;
-        let retval = unsafe {
-            do_getsockname(
-                self.host_fd as _,
-                &mut c_addr as *mut libc::sockaddr_storage as *mut _,
-                &mut c_addr_len as *mut _,
-            )
-        };
-        if retval != 0 {
-            cfg_if::cfg_if! {
-                if #[cfg(feature = "sgx")] {
-                    let errno = libc::errno();
-                } else {
-                    let errno = unsafe { libc::__errno_location() };
-                }
-            }
-            return_errno!(Errno::from(errno as u32), "libc do_getsockname error");
-        }
-
+        try_libc!(do_getsockname(
+            self.host_fd as _,
+            &mut c_addr as *mut libc::sockaddr_storage as *mut _,
+            &mut c_addr_len as *mut _,
+        ));
         A::from_c_storage(&c_addr, c_addr_len as _)
     }
 

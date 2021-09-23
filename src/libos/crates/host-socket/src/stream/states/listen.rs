@@ -92,7 +92,7 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
         self.initiate_async_accepts(inner);
 
         let common = {
-            let mut common = Arc::new(Common::with_host_fd(accepted_fd));
+            let mut common = Arc::new(Common::with_host_fd(accepted_fd, Type::STREAM));
             common.set_peer_addr(&accepted_addr);
             common.pollee().add_events(Events::OUT);
             common

@@ -15,7 +15,7 @@ struct Inner {
 impl<A: Addr + 'static, R: Runtime> InitStream<A, R> {
     pub fn new() -> Result<Arc<Self>> {
         let new_self = Self {
-            common: Arc::new(Common::new()),
+            common: Arc::new(Common::new(Type::STREAM)?),
             inner: Mutex::new(Inner::new()),
         };
         Ok(Arc::new(new_self))
@@ -40,13 +40,9 @@ impl<A: Addr + 'static, R: Runtime> InitStream<A, R> {
         let c_addr_ptr = &c_addr_storage as *const _ as _;
         let c_addr_len = c_addr_len as u32;
         #[cfg(not(feature = "sgx"))]
-        let retval = unsafe { libc::bind(fd, c_addr_ptr, c_addr_len) };
+        try_libc!(libc::bind(fd, c_addr_ptr, c_addr_len));
         #[cfg(feature = "sgx")]
-        let retval = unsafe { libc::ocall::bind(fd, c_addr_ptr, c_addr_len) };
-        if retval < 0 {
-            let errno = Errno::from(-retval as u32);
-            return_errno!(errno, "bind failed");
-        }
+        try_libc!(libc::ocall::bind(fd, c_addr_ptr, c_addr_len));
         Ok(())
     }
 

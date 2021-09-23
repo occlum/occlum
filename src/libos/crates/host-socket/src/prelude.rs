@@ -15,7 +15,7 @@ cfg_if::cfg_if! {
 pub(crate) type HostFd = u32;
 
 pub(crate) use async_io::event::{Events, Observer, Pollee, Poller};
-pub(crate) use async_io::socket::{Addr, Domain};
+pub(crate) use async_io::socket::{Addr, Domain, Type};
 
 macro_rules! function {
     () => {{
@@ -41,4 +41,22 @@ macro_rules! debug_trace {
             file!()
         )
     };
+}
+
+// return Err(errno) if libc return -1
+macro_rules! try_libc {
+    ($ret: expr) => {{
+        let ret = unsafe { $ret };
+        if ret < 0 {
+            cfg_if::cfg_if! {
+                if #[cfg(feature = "sgx")] {
+                    let errno = libc::errno();
+                } else {
+                    let errno = unsafe { libc::__errno_location() };
+                }
+            }
+            return_errno!(Errno::from(errno as u32), "libc error");
+        }
+        ret
+    }};
 }
