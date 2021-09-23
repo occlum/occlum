@@ -119,3 +119,9 @@ impl Addr for UnixAddr {
         c_un_addr.to_c_storage()
     }
 }
+
+impl Default for UnixAddr {
+    fn default() -> Self {
+        Self::Unnamed
+    }
+}

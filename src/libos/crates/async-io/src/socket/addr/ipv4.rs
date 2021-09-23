@@ -72,6 +72,13 @@ impl Ipv4SocketAddr {
     }
 }
 
+impl Default for Ipv4SocketAddr {
+    fn default() -> Self {
+        let addr = Ipv4Addr::new(0, 0, 0, 0);
+        Self::new(addr, 0)
+    }
+}
+
 /// An Ipv4 address.
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Ipv4Addr([u8; 4] /* big endian */);

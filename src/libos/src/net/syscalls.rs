@@ -192,8 +192,8 @@ pub async fn do_getpeername(
         .as_socket_file()
         .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
 
-    let src_addr = socket_file.peer_addr()?;
-    copy_sock_addr_to_user(src_addr, addr, addr_len)?;
+    let (src_addr, src_addr_len) = socket_file.peer_addr()?.to_c_storage();
+    copy_sock_addr_to_user(src_addr, src_addr_len, addr, addr_len)?;
     Ok(0)
 }
 
@@ -207,8 +207,8 @@ pub async fn do_getsockname(
         .as_socket_file()
         .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
 
-    let src_addr = socket_file.addr()?;
-    copy_sock_addr_to_user(src_addr, addr, addr_len)?;
+    let (src_addr, src_addr_len) = socket_file.addr()?.to_c_storage();
+    copy_sock_addr_to_user(src_addr, src_addr_len, addr, addr_len)?;
     Ok(0)
 }
 
@@ -259,7 +259,8 @@ fn copy_sock_addr_from_user(
 }
 
 fn copy_sock_addr_to_user(
-    src_addr: AnyAddr,
+    src_addr: libc::sockaddr_storage,
+    src_addr_len: usize,
     dst_addr: *mut libc::sockaddr,
     dst_addr_len: *mut libc::socklen_t,
 ) -> Result<()> {
@@ -267,19 +268,13 @@ fn copy_sock_addr_to_user(
         return Ok(());
     }
     from_user::check_ptr(dst_addr_len)?;
-    if unsafe { *dst_addr_len } < 0 {
-        return_errno!(EINVAL, "addrlen is invalid");
-    }
     from_user::check_mut_array(dst_addr as *mut u8, unsafe { *dst_addr_len } as usize)?;
 
-    let (src_addr, src_addr_len) = src_addr.to_c_storage();
     let len = std::cmp::min(src_addr_len, unsafe { *dst_addr_len } as usize);
-
     let sockaddr_src_buf = unsafe {
         let ptr = &src_addr as *const _ as *const u8;
         std::slice::from_raw_parts(ptr, len)
     };
-
     let sockaddr_dst_buf = unsafe {
         let ptr = dst_addr as *mut u8;
         std::slice::from_raw_parts_mut(ptr, len)
