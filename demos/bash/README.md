@@ -6,14 +6,14 @@ Bash is the most widely used shell implementation around the world. Previously, 
 
 Now, Bash is finally supported with modification to the source code of Bash. We have evaluated and all commands defined in `occlum_bash_test.sh` are all supported.
 
-Please follow below steps to run this demo:
+Two versions [`musl-libc` and `glibc`] of bash demo is provided:
 
-1. Download and build Busybox and Occlum-version Bash
+* musl-libc bash demo
 ```
-./prepare_bash_demo.sh
+./run_bash_demo.sh musl
 ```
 
-2. Run Bash script in Occlum
+* glibc bash demo
 ```
 ./run_bash_demo.sh
 ```

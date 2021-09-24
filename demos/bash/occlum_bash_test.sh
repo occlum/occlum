@@ -58,7 +58,7 @@ fi
 fake_inst || true
 
 # Test builtin command
-cd /opt/occlum/glibc/lib
+cd /host
 pwd
 cd -
 
