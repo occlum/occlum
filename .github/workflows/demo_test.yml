@@ -689,8 +689,8 @@ jobs:
     - name: Make install
       run: docker exec bash_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
-    - name: Build Bash dependencies
-      run: docker exec bash_test bash -c "cd /root/occlum/demos/bash && ./prepare_bash_demo.sh"
+    - name: Run musl-libc Bash test
+      run: docker exec bash_test bash -c "cd /root/occlum/demos/bash && SGX_MODE=SIM ./run_bash_demo.sh musl"
 
-    - name: Run Bash test
+    - name: Run glibc Bash test
       run: docker exec bash_test bash -c "cd /root/occlum/demos/bash && SGX_MODE=SIM ./run_bash_demo.sh"
