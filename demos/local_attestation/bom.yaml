@@ -1,0 +1,14 @@
+includes:
+  - base.yaml
+# local attestation
+targets:
+  # copy bins
+  - target: /bin
+    copy:
+      - files:
+        - ../AppResponder/responder
+  # copy lib
+  - target: /lib
+    copy:
+      - files:
+        - ../DiffieHellmanLibrary/libecdh.so
