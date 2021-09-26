@@ -1,0 +1,16 @@
+includes:
+  - base.yaml
+# dcap
+targets:
+  # copy bins
+  - target: /bin
+    copy:
+      - files:
+        - ../dcap_lib/target/debug/examples/dcap_test
+        - ../c_app/dcap_c_test
+  # copy lib
+  - target: /opt/occlum/glibc/lib
+    copy:
+      - files:
+        - ../dcap_lib/target/debug/libdcap_quote.so
+
