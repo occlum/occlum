@@ -24,7 +24,7 @@ then
 fi
 
 rm -rf image && \
-copy_bom -f ../grpc_client.yaml --root image --include-dir /opt/occlum/etc/template && \
+copy_bom -f ../../grpc_client.yaml --root image --include-dir /opt/occlum/etc/template && \
 occlum build
 
 if [ $? -ne 0 ]
