@@ -1,0 +1,7 @@
+includes:
+  - base.yaml
+targets:
+  - target: /bin
+    copy:
+      - files:
+        - ../trusted_memcpy_bench/build/trusted_memcpy_bench
