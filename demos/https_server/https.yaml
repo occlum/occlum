@@ -1,0 +1,16 @@
+includes:
+  - base.yaml
+# https_server
+targets:
+  # copy bin
+  - target: /bin
+    copy:
+      - files:
+        - ../mongoose_src/examples/simplest_web_server_ssl/$https_server
+  # copy keys
+  - target: /
+    copy:
+      - files:
+        - ../mongoose_src/examples/simplest_web_server_ssl/server.key
+        - ../mongoose_src/examples/simplest_web_server_ssl/server.pem
+

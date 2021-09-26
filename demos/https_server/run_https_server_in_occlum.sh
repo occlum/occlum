@@ -1,6 +1,9 @@
 #!/bin/bash
-https_server=simplest_web_server_ssl
+export https_server=simplest_web_server_ssl
 set -e
+
+SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+bomfile=${SCRIPT_DIR}/https.yaml
 
 # 1. Init Occlum Workspace
 rm -rf occlum_workspace
@@ -9,10 +12,9 @@ cd occlum_workspace
 occlum init
 
 # 2. Copy files into Occlum Workspace and Build
-cp ../mongoose_src/examples/simplest_web_server_ssl/$https_server image/bin
-cp -r ../mongoose_src/examples/simplest_web_server_ssl/server.* image
-cp /usr/local/occlum/x86_64-linux-musl/lib/libssl.so.1.1 image/lib
-cp /usr/local/occlum/x86_64-linux-musl/lib/libcrypto.so.1.1 image/lib
+rm -rf image
+copy_bom -f $bomfile --root image --include-dir /opt/occlum/etc/template
+
 occlum build
 
 # 3. Run https_server
