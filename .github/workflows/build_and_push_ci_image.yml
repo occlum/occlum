@@ -32,11 +32,17 @@ jobs:
     - name: Get occlum version
       run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
 
+    - name: Get branch name
+      # GITHUB_REF=refs/heads/branch-name
+      # ${GITHUB_REF##*/} == branch-name
+      run: echo "OCCLUM_BRANCH=$(echo ${GITHUB_REF##*/})" >> $GITHUB_ENV;
+
     # Because "Build and push" step `context` field can't be subdir,
     # we need to copy files needed by dockerfile to root dir of the project
     - name: Copy context for docker build
       run: |
         cp -r tools/docker .
+
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v1
 
@@ -55,7 +61,9 @@ jobs:
         context: .
         file: ./tools/docker/ci/Dockerfile.grpc
         platforms: linux/amd64
-        build-args: OCCLUM_VERSION=${{ env.OCCLUM_VERSION }}
+        build-args: |
+          "OCCLUM_VERSION=${{ env.OCCLUM_VERSION }}"
+          "OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}"
         push: true
         tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu18.04-grpc
 
