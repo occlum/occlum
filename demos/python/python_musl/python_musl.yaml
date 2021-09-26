@@ -1,0 +1,41 @@
+includes:
+  - base.yaml
+targets:
+  # python
+  - target: /bin
+    copy: 
+      - files:
+          - /root/alpine_python/usr/local/bin/python3.7
+  # dependencies
+  - target: /lib
+    copy:
+      - from: /root/alpine_python/usr/local/lib
+        files: 
+          - libpython3.7m.so.1.0
+          - libpython3.so
+        dirs:
+          - python3.7
+      - from: /root/alpine_python/usr/lib
+        files: 
+          - libblas.so.3
+          - libcblas.so.3
+          - libbz2.so.1
+          - libffi.so.6
+          - libgcc_s.so.1
+          - libgfortran.so.5
+          - liblapack.so.3
+          - liblzma.so.5
+          - libquadmath.so.0
+      - from: /root/alpine_python/lib
+        files:
+          - libz.so.1
+      - files: 
+          - /opt/occlum/toolchains/gcc/x86_64-linux-musl/lib/libstdc++.so.6
+  # below are python code and data
+  - target: /
+    copy:
+      - from: ..
+        dirs:
+          - dataset
+        files: 
+          - demo.py
