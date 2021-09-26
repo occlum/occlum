@@ -42,9 +42,8 @@ jobs:
     - name: Integration test
       run:  docker exec ubuntu-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test"
 
-    # TODO: Enable glibc test
-    # - name: Integration test with Glibc
-    #   run:  docker exec ubuntu-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test-glibc"
+    - name: Integration test with Glibc
+      run:  docker exec ubuntu-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test-glibc"
 
   Make_test_on_centos:
     runs-on: ubuntu-20.04
@@ -80,6 +79,5 @@ jobs:
     - name: Integration test
       run:  docker exec centos-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test"
 
-    # TODO: Enable glibc test
-    # - name: Integration test with Glibc
-    #   run:  docker exec centos-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test-glibc"
+    - name: Integration test with Glibc
+      run:  docker exec centos-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test-glibc"

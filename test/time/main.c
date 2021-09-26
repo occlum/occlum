@@ -3,18 +3,6 @@
 #include "test.h"
 
 // ============================================================================
-// Test cases for time
-// ============================================================================
-int test_time() {
-    time_t tloc;
-    time_t ret = time(&tloc);
-    if (ret < 0 || ret != tloc) {
-        THROW_ERROR("time(...) failed");
-    }
-    return 0;
-}
-
-// ============================================================================
 // Test cases for gettimeofday
 // ============================================================================
 
@@ -89,7 +77,6 @@ int test_clock_getres() {
 // ============================================================================
 
 static test_case_t test_cases[] = {
-    TEST_CASE(test_time),
     TEST_CASE(test_gettimeofday),
     TEST_CASE(test_clock_gettime),
     TEST_CASE(test_clock_getres),
