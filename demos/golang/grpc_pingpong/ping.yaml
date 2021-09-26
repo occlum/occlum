@@ -1,0 +1,11 @@
+includes:
+  - base.yaml
+targets:
+  - target: /bin
+    copy:
+      - files:
+        - ../occlum_ping
+  - target: /etc
+    copy:
+      - files:
+        - /etc/hosts
