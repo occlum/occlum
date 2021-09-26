@@ -23,18 +23,10 @@ then
   exit 1
 fi
 
-mkdir -p image/etc
-cp ../greeter_client image/bin
-cp $INSTALL_DIR/lib/libprotobuf.so.3.10.0.0 image/lib
-cp $INSTALL_DIR/lib/libcares.so.2 image/lib
-cp $INSTALL_DIR/lib/libz.so.1 image/lib
-if [ $? -ne 0 ]
-then
-  echo "libraries copied failed"
-  exit 1
-fi
-
+rm -rf image && \
+copy_bom -f ../grpc_client.yaml --root image --include-dir /opt/occlum/etc/template && \
 occlum build
+
 if [ $? -ne 0 ]
 then
   echo "occlum build failed"
