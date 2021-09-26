@@ -1,0 +1,11 @@
+includes:
+  - base.yaml
+targets:
+  - target: /bin
+    copy:
+      - files:
+        - /usr/share/enclave-tls/samples/enclave-tls-server
+  - target: /opt/enclave-tls
+    copy:
+      - dirs:
+        - /opt/enclave-tls/lib
