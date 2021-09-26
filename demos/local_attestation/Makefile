@@ -13,12 +13,10 @@ occlum_=$(CUR_DIR)/../..
 all: occlum_instance
 
 occlum_instance: build_src
-	@mkdir -p occlum_instance
+	@rm -rf occlum_instance && mkdir -p occlum_instance
 	@cd occlum_instance && \
-		occlum init && \
-		cp $(CUR_DIR)/AppResponder/responder image/bin/ && \
-		cp $(OPENSSL)/libcrypto.so.1.1 image/lib/ && \
-		cp $(CUR_DIR)/DiffieHellmanLibrary/libecdh.so image/lib/ && \
+		occlum init && rm -rf image && \
+		copy_bom -f ../bom.yaml --root image --include-dir /opt/occlum/etc/template && \
 		occlum build
 	@cp -t occlum_instance $(APP) $(BUILD_DIR)/libenclave_initiator.signed.so
 
