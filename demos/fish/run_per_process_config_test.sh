@@ -1,28 +1,25 @@
 #!/bin/bash
 set -e
 
+SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+bomfile=${SCRIPT_DIR}/fish.yaml
+
 option=$1
 
 rm -rf occlum-test
-mkdir occlum-test && cd occlum-test
-occlum init
-mkdir -p image/usr/bin
-cp ../Occlum.json .
-cp ../fish-shell/build/fish image/usr/bin
-cp ../busybox/busybox image/usr/bin
-cp ../test_per_process_config.sh image/bin
+occlum new occlum-test && cd occlum-test
 
 # Set process memory space size to very small values and will fail when running target script using default configuration
-new_json="$(jq '.process.default_stack_size = "1MB" |
+new_json="$(jq '.resource_limits.user_space_size = "512MB" |
+                .resource_limits.kernel_space_heap_size= "64MB" |
+                .process.default_stack_size = "1MB" |
                 .process.default_heap_size = "1MB" |
-                .process.default_mmap_size = "10MB"' Occlum.json)" && \
+                .process.default_mmap_size = "10MB" |
+                .env.default = [ "OCCLUM=yes", "HOME=/root" ]' Occlum.json)" && \
 echo "${new_json}" > Occlum.json
 
-pushd image/bin
-ln -s /usr/bin/busybox cat
-ln -s /usr/bin/busybox echo
-ln -s /usr/bin/busybox awk
-popd
+rm -rf image
+copy_bom -f $bomfile --root image --include-dir /opt/occlum/etc/template
 
 # If `--without-ulimit` is specified, run without ulimit command and thus will fail
 if [[ $1 == "--without-ulimit" ]]; then
