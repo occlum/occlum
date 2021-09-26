@@ -1,6 +1,4 @@
 #!/bin/bash
-occlum_glibc=/opt/occlum/glibc/lib/
-
 set -e
 
 BLUE='\033[1;34m'
@@ -15,11 +13,9 @@ make -C c_app
 
 rm -rf ${INSTANCE_DIR} && occlum new ${INSTANCE_DIR}
 cd ${INSTANCE_DIR}
-cp ../dcap_lib/target/debug/examples/dcap_test image/bin
-cp ../dcap_lib/target/debug/libdcap_quote.so image/$occlum_glibc
-cp ../c_app/dcap_c_test image/bin
-cp $occlum_glibc/libdl.so.2 image/$occlum_glibc
-cp $occlum_glibc/librt.so.1 image/$occlum_glibc
+
+rm -rf image
+copy_bom -f ../dcap.yaml --root image --include-dir /opt/occlum/etc/template
 
 occlum build
 
