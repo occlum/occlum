@@ -145,8 +145,17 @@ macro_rules! process_syscall_table_with_callback {
             (ArchPrctl = 158) => do_arch_prctl(code: u32, addr: *mut usize),
             (Getpid = 39) => do_getpid(),
             (Getppid = 110) => do_getppid(),
+            (Getuid = 102) => do_getuid(),
+            (Getgid = 104) => do_getgid(),
+            (Geteuid = 107) => do_geteuid(),
+            (Getegid = 108) => do_getegid(),
+            (Getpgid = 121) => do_getpgid(),
+            (Gettid = 186) => do_gettid(),
             (SetTidAddress = 218) => do_set_tid_address(tidptr: *mut pid_t),
             (Prlimit64 = 302) => do_prlimit(pid: pid_t, resource: u32, new_limit: *const rlimit_t, old_limit: *mut rlimit_t),
+            (Prctl = 157) => do_prctl(option: i32, arg2: u64, arg3: u64, arg4: u64, arg5: u64),
+            (SysInfo = 99) => do_sysinfo(info: *mut sysinfo_t),
+            (Uname = 63) => do_uname(name: *mut utsname_t),
 
             (Futex = 202) => do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32, timeout: u64, futex_new_addr: *const i32, bitset: u32),
             (SchedYield = 24) => do_sched_yield(),
@@ -806,7 +815,7 @@ async fn do_msync(addr: usize, size: usize, flags: u32) -> Result<isize> {
     Ok(0)
 }
 
-fn do_sysinfo(info: *mut sysinfo_t) -> Result<isize> {
+async fn do_sysinfo(info: *mut sysinfo_t) -> Result<isize> {
     check_mut_ptr(info)?;
     let info = unsafe { &mut *info };
     *info = crate::misc::do_sysinfo()?;
@@ -862,7 +871,7 @@ async fn do_nanosleep(req_u: *const timespec_t, rem_u: *mut timespec_t) -> Resul
     Ok(0)
 }
 
-fn do_uname(name: *mut utsname_t) -> Result<isize> {
+async fn do_uname(name: *mut utsname_t) -> Result<isize> {
     check_mut_ptr(name)?;
     let name = unsafe { &mut *name };
     crate::misc::do_uname(name).map(|_| 0)
