@@ -21,7 +21,8 @@ new_json="$(jq '.resource_limits.user_space_size = "1000MB" |
 echo "${new_json}" > Occlum.json
 
 # 2. Copy program into Occlum Workspace and build
-cp ../web_server image/bin
+rm -rf image && \
+copy_bom -f ../web_server.yaml --root image --include-dir /opt/occlum/etc/template && \
 occlum build
 
 # 3. Run the web server sample
