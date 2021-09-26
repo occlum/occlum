@@ -1,0 +1,10 @@
+includes:
+  - base.yaml
+# sqlite
+targets:
+  # copy bins
+  - target: /bin
+    copy:
+      - files:
+        - ../$DEMO
+        - ../$SPEEDTEST
