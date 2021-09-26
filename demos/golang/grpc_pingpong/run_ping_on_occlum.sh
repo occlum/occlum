@@ -25,8 +25,8 @@ new_json="$(jq '.resource_limits.user_space_size = "2560MB" |
 echo "${new_json}" > Occlum.json
 
 # 2. Copy program into Occlum Workspace and build
-cp ../occlum_ping image/bin
-cp /etc/hosts image/etc/
+rm -rf image && \
+copy_bom -f ../ping.yaml --root image --include-dir /opt/occlum/etc/template && \
 occlum build
 
 # 3. Run the hello world sample
