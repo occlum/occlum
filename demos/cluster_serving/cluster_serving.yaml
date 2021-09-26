@@ -1,0 +1,23 @@
+includes: 
+  - base.yaml
+  - java-11-openjdk-amd64.yaml
+targets: 
+  # copy flink
+  - target: /bin
+    copy:
+      - from: ../flink-${FLINK_VERSION}
+  - target: /opt
+    copy:
+      - dirs:
+        - ../flink-${FLINK_VERSION}/conf
+  # copy hosts and localtime
+  - target: /etc
+    copy: 
+      - files: 
+          - ../hosts
+          - /etc/localtime
+  # copy libnss_files
+  - target: /opt/occlum/glibc/lib
+    copy: 
+      - files: 
+          - /opt/occlum/glibc/lib/libnss_files.so.2
