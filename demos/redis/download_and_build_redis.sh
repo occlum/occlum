@@ -28,7 +28,7 @@ build_redis() {
     export CC=/opt/occlum/toolchains/gcc/bin/occlum-gcc
     export CXX=/opt/occlum/toolchains/gcc/bin/occlum-g++
     make -j `getconf _NPROCESSORS_ONLN` BUILD_TLS=yes
-    make  PREFIX=$PREFIX install
+    make  PREFIX=$PREFIX/redis install
     popd
 }
 
