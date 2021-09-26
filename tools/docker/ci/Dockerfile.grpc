@@ -2,9 +2,10 @@ ARG OCCLUM_VERSION
 FROM occlum/occlum:$OCCLUM_VERSION-ubuntu18.04 as base
 LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
 
+ARG OCCLUM_BRANCH
 WORKDIR /root
 RUN rm -rf /root/demos && \
-    git clone https://github.com/occlum/occlum.git && \
+    git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum.git && \
     cp -r occlum/demos /root/demos && \
     rm -rf /root/occlum
 
