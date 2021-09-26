@@ -29,11 +29,8 @@ init_instance() {
 
 build_sofa() {
     # Copy JVM and JAR file into Occlum instance and build
-    mkdir -p image/usr/lib/jvm
-    cp -r /opt/occlum/toolchains/jvm/java-11-alibaba-dragonwell image/usr/lib/jvm
-    cp /usr/local/occlum/x86_64-linux-musl/lib/libz.so.1 image/lib
-    mkdir -p image/usr/lib/spring
-    cp ../${jar_path} image/usr/lib/spring/
+    rm -rf image
+    copy_bom -f ../sofaboot.yaml --root image --include-dir /opt/occlum/etc/template
     occlum build
 }
 
