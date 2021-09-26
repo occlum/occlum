@@ -24,7 +24,8 @@ new_json="$(jq '.resource_limits.user_space_size = "2560MB" |
 echo "${new_json}" > Occlum.json
 
 # Copy program into Occlum Workspace and build
-cp ../simple_demo image/bin
+rm -rf image && \
+copy_bom -f ../go_sqlite.yaml --root image --include-dir /opt/occlum/etc/template && \
 occlum build
 
 # Run the Golang SQLite demo
