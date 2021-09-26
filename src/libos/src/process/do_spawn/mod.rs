@@ -178,12 +178,16 @@ fn new_process(
             let user_stack_limit = vm.get_stack_limit();
             let user_rsp = init_stack::do_init(user_stack_base, 4096, &argv, envp, &mut auxvec)?;
 
+            // Set the default user fsbase to an address on user stack, which is
+            // a relatively safe address in case the user program uses %fs before
+            // initializing fs base address.
             CpuContext {
                 gp_regs: GpRegs {
                     rsp: user_rsp as _,
                     rip: ldso_entry as _,
                     ..Default::default()
                 },
+                fs_base: user_stack_limit as _,
                 ..Default::default()
             }
         };

@@ -30,13 +30,21 @@ pub async fn do_clone(
     // TODO: add pointer checking
     let thread_entry = unsafe { *(user_rsp as *mut usize) };
 
+    let fs_base = if let Some(tls) = new_tls {
+        tls
+    } else {
+        // Set the default user fsbase to an address on user stack, which is
+        // a relatively safe address in case the user program uses %fs before
+        // initializing fs base address.
+        guess_user_stack_bound(current!().vm(), user_rsp)?.start()
+    };
     let init_cpu_state = CpuContext {
         gp_regs: GpRegs {
             rsp: user_rsp as _,
             rip: thread_entry as _,
             ..Default::default()
         },
-        fs_base: new_tls.unwrap_or(0) as _,
+        fs_base: fs_base as _,
         ..Default::default()
     };
 
