@@ -1,0 +1,19 @@
+includes:
+  - base.yaml
+targets:
+  - target: /bin
+    createlinks:
+      - src: /opt/python-occlum/bin/python3
+        linkname: python3
+  # python packages
+  - target: /opt
+    copy: 
+      - dirs:
+          - ../python-occlum
+  # below are python code and data
+  - target: /bin
+    copy:
+      - from: ..
+        files: 
+          - demo.py
+          - mnist.npz

@@ -17,14 +17,8 @@ fi
 cd occlum_instance
 # Copy files into Occlum Workspace and build
 if [ ! -L "image/bin/python3" ];then
-    mkdir -p image/opt
-    cp -rf $python_dir image/opt/python-occlum
-    ln -s /opt/python-occlum/bin/python3 image/bin/python3
-    cp -f /opt/occlum/glibc/lib/libdl.so.2 image/opt/occlum/glibc/lib/
-    cp -f /opt/occlum/glibc/lib/libutil.so.1 image/opt/occlum/glibc/lib/
-    cp -f /opt/occlum/glibc/lib/librt.so.1 image/opt/occlum/glibc/lib/
-    cp -f ../demo.py image/bin
-    cp -f ../mnist.npz image/bin
+    rm -rf image
+    copy_bom -f ../tensorflow_training.yaml --root image --include-dir /opt/occlum/etc/template
     new_json="$(jq '.resource_limits.user_space_size = "5400MB" |
                     .resource_limits.kernel_space_heap_size = "512MB" |
                     .process.default_mmap_size = "5000MB" |

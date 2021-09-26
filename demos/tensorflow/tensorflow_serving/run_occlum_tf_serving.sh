@@ -27,18 +27,8 @@ new_json="$(jq '.resource_limits.user_space_size = "7000MB" |
 echo "${new_json}" > Occlum.json
 
 # 2. Copy files into Occlum Workspace and Build
-mkdir -p image/model
-cp -rf ../resnet50-v15-fp32  image/model/
-cp -rf ../ssl_configure  image/bin/
-cp ../tensorflow_model_server image/bin
-cp ../hosts image/etc/
-cp $occlum_glibc/libdl.so.2 image/$occlum_glibc
-cp $occlum_glibc/librt.so.1 image/$occlum_glibc
-cp $occlum_glibc/libm.so.6 image/$occlum_glibc
-cp $occlum_glibc/libutil.so.1 image/$occlum_glibc
-cp $occlum_glibc/libpthread.so.0 image/$occlum_glibc
-cp $occlum_glibc/libnss_files.so.2 image/$occlum_glibc
-cp $occlum_glibc/libnss_compat.so.2 image/$occlum_glibc
+rm -rf image
+copy_bom -f ../tensorflow_serving.yaml --root image --include-dir /opt/occlum/etc/template
 
 #occlum build
 occlum build
