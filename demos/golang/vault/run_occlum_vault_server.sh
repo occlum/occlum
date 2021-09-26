@@ -25,7 +25,8 @@ new_json="$(jq '.resource_limits.user_space_size = "2560MB" |
 echo "${new_json}" > Occlum.json
 
 # 2. Copy executable into Occlum Workspace and build
-cp ../source_code/bin/vault image/bin
+rm -rf image && \
+copy_bom -f ../vault.yaml --root image --include-dir /opt/occlum/etc/template && \
 occlum build
 
 # 3. Run the Hashicorp Vault server listening on "127.0.0.1:8200" 
