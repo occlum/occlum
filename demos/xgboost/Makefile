@@ -28,9 +28,7 @@ occlum_workspace: $(BIN) $(DATA)
 	occlum init && \
 	jq '.process.default_mmap_size = "96MB" | .resource_limits.max_num_of_threads = $(TCS_NUM)' Occlum.json > temp_Occlum.json && \
 	mv temp_Occlum.json Occlum.json && \
-	cp ../$(BIN) image/bin && \
-	cp ../xgboost_src/lib/libxgboost.so image/lib && \
-	cp -r ../$(DATA) image && \
+	copy_bom -f ../xgboost.yaml --root image --include-dir /opt/occlum/etc/template && \
 	occlum build
 
 test: occlum_workspace
