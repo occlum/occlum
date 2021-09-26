@@ -171,8 +171,8 @@ jobs:
 
     - name: Test bazel
       run: docker exec hello_bazel_test bash -c "cd /root/occlum/demos/hello_bazel && occlum new occlum_instance;
-            cp examples/cpp-tutorial/stage3/bazel-bin/main/hello-world occlum_instance/image/bin;
-            cd occlum_instance && SGX_MODE=SIM occlum build;
+            cd occlum_instance && rm -rf image && copy_bom -f ../bazel.yaml --root image --include-dir /opt/occlum/etc/template;
+            SGX_MODE=SIM occlum build;
             occlum run /bin/hello-world"
 
 
