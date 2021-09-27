@@ -8,6 +8,9 @@ env:
 
 jobs:
   Collect-code-coverage:
+    environment: CC_TOKEN
+    env:
+      cov_token: ${{ secrets.COV_TOKEN }}
     runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@v2
@@ -43,7 +46,7 @@ jobs:
       run:  docker exec code_coverage bash -c "cd /root/occlum; SGX_MODE=SIM make test-glibc"
 
     - name: Upload coverage report
-      run: docker exec code_coverage bash -c "cd /root/occlum/build/internal/src/libos/cargo-target/debug/deps; export CODECOV_TOKEN="${{ secrets.COV_TOKEN }}"; bash <(curl -s https://codecov.io/bash)"
+      run: docker exec code_coverage bash -c "cd /root/occlum/build/internal/src/libos/cargo-target/debug/deps; export CODECOV_TOKEN="${{ env.cov_token }}"; bash <(curl -s https://codecov.io/bash)"
 
     - name: Clean the environment
       if: ${{ always() }}
