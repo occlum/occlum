@@ -42,6 +42,34 @@ jobs:
     - name: Integration test with Glibc
       run:  docker exec code_coverage bash -c "cd /root/occlum; SGX_MODE=SIM make test-glibc"
 
+    - name: C test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/hello_c && make;
+            occlum new occlum_instance;
+            cd occlum_instance && rm -rf image;
+            copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
+            SGX_MODE=SIM occlum build;
+            occlum run /bin/hello_world"
+
+    - name: C with encrypted image test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/hello_c && make;
+            rm -rf occlum_instance && occlum new occlum_instance;
+            occlum gen-image-key occlum_instance/image_key;
+            cd occlum_instance && rm -rf image;
+            copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
+            SGX_MODE=SIM occlum build --image-key ./image_key --buildin-image-key;
+            occlum run /bin/hello_world"
+
+    - name: C++ test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/hello_cc && make;
+            occlum new occlum_instance;
+            cd occlum_instance && rm -rf image;
+            copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
+            SGX_MODE=SIM occlum build;
+            occlum run /bin/hello_world"
+
+    - name: Rust test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/rust && SGX_MODE=SIM ./run_rust_demo_on_occlum.sh"
+
     - name: Upload coverage report
       run: docker exec code_coverage bash -c "cd /root/occlum/build/internal/src/libos/cargo-target/debug/deps; export CODECOV_TOKEN="${{ secrets.COV_TOKEN }}"; bash <(curl -s https://codecov.io/bash)"
 
