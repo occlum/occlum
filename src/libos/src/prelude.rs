@@ -2,6 +2,7 @@ pub use sgx_trts::libc;
 pub use sgx_trts::libc::off_t;
 pub use sgx_types::*;
 
+pub use core::intrinsics::unreachable;
 use std;
 pub use std::cell::{Cell, RefCell};
 pub use std::cmp::{max, min};

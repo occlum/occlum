@@ -103,7 +103,6 @@ enclave {
          */
         public int occlum_ecall_kill(int pid, int sig);
 
-
         /*
          * Broadcast interrupts to LibOS threads.
          *

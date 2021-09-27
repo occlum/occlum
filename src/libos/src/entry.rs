@@ -15,6 +15,7 @@ use crate::util::log::LevelFilter;
 use crate::util::mem_util::from_untrusted::*;
 use crate::util::resolv_conf_util::{parse_resolv_conf, write_resolv_conf};
 use crate::util::sgx::allow_debug as sgx_allow_debug;
+use crate::vm::USER_SPACE_VM_MANAGER;
 use sgx_tse::*;
 
 pub static mut INSTANCE_DIR: String = String::new();

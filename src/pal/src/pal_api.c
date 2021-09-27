@@ -239,7 +239,6 @@ int occlum_pal_destroy(void) {
     }
 
     int ret = 0;
-
     if (pal_interrupt_thread_stop() < 0) {
         ret = -1;
         PAL_WARN("Cannot stop the interrupt thread: %s", errno2str(errno));

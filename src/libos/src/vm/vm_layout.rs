@@ -8,7 +8,7 @@ pub struct VMLayout {
 
 impl VMLayout {
     pub fn new(size: usize, align: usize) -> Result<VMLayout> {
-        if !align.is_power_of_two() || align % PAGE_SIZE != 0 {
+        if !align.is_power_of_two() {
             return_errno!(EINVAL, "invalid layout");
         }
         Ok(VMLayout { size, align })
