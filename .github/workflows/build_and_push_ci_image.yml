@@ -209,6 +209,10 @@ jobs:
         tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu18.04-python
 
 
+  # TODO: Add actions to build tf_serving_base image.
+  # Building TF serving demo image needs a lot of time which exceeds the maximum time limit for a jong of GitHub Actions.
+  # Thus dividing into two jobs.
+
   Build_tf_serving_image:
     runs-on: ubuntu-18.04
     if: github.event.inputs.image_name == 'tf_serving'
@@ -244,12 +248,12 @@ jobs:
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
-    
+
     - name: Build and push
       uses: docker/build-push-action@v2
       with:
         context: .
-        file: ./tools/docker/ci/Dockerfile.tf_serving
+        file: ./tools/docker/ci/Dockerfile.tf_serving_occlum
         platforms: linux/amd64
         build-args: |
           "OCCLUM_VERSION=${{ env.OCCLUM_VERSION }}"
