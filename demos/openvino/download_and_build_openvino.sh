@@ -28,7 +28,7 @@ build_opencv() {
       -DBUILD_opencv_python=OFF -DBUILD_PYTHON_SUPPORT=OFF \
       -DBUILD_EXAMPLES=OFF -DWITH_FFMPEG=OFF \
       -DWITH_QT=OFF -DWITH_CUDA=OFF
-    make -j
+    make -j4
     sudo make install
     popd
 }
