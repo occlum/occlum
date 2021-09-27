@@ -1,7 +1,7 @@
 name: Code Coverage
 
 # Controls when the action will run. Triggers the workflow on push or pull request
-on: [push, pull_request]
+on: [push]
 
 env:
   nap_time: 60
@@ -69,6 +69,121 @@ jobs:
 
     - name: Rust test
       run: docker exec code_coverage bash -c "cd /root/occlum/demos/rust && SGX_MODE=SIM ./run_rust_demo_on_occlum.sh"
+
+    - name: Run Golang sqlite test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh"
+
+    - name: Go Server set up and run
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/golang/web_server && occlum-go mod init web_server && occlum-go get -u -v github.com/gin-gonic/gin;
+            occlum-go build -o web_server ./web_server.go;
+            SGX_MODE=SIM ./run_golang_on_occlum.sh" &
+
+    - name: Set up Golang grpc pingpong test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/golang/grpc_pingpong && ./prepare_ping_pong.sh"
+
+    - name: Start Golang grpc pingpong server
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/golang/grpc_pingpong && SGX_MODE=SIM ./run_pong_on_occlum.sh" &
+
+    - name: Run Golang grpc ping test
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec code_coverage bash -c "cd /root/occlum/demos/golang/grpc_pingpong && SGX_MODE=SIM ./run_ping_on_occlum.sh" &
+
+    - name: Curl test
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec code_coverage bash -c "curl http://127.0.0.1:8090/ping"
+
+    - name: Compile Java hello
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/java && occlum-javac ./hello_world/Main.java"
+
+    - name: Run hello world
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/java && SGX_MODE=SIM ./run_java_on_occlum.sh hello"
+
+    - name: Build Fish dependencies
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/fish && ./download_and_build.sh"
+
+    - name: Run Fish test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_fish_test.sh"
+
+    - name: Run Fish process rlimit test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_per_process_config_test.sh"
+
+    - name: Build LA dependencies
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/local_attestation && ./download_src_and_build_deps.sh"
+
+    - name: Run LA test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/local_attestation && SGX_MODE=SIM make;
+              SGX_MODE=SIM make test"
+
+    - name: Build sqlite dependencies
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/sqlite && ./download_and_build_sqlite.sh"
+
+    - name: Run sqlite test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/sqlite && SGX_MODE=SIM ./run_sqlite_on_occlum.sh"
+
+    - name: Build xgboost dependencies
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/xgboost && ./download_and_build_xgboost.sh"
+
+    - name: Run xgboost test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test"
+
+    - name: Run xgboost cluster test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test-local-cluster"
+    
+    - name: Build Tensorflow-lite dependencies
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/tensorflow_lite && ./download_and_build_tflite.sh"
+
+    - name: Run Tensorflow-lite demo
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/tensorflow_lite && SGX_MODE=SIM ./run_tflite_in_occlum.sh demo"
+
+    - name: Run Tensorflow-lite benchmark
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/tensorflow_lite && SGX_MODE=SIM ./run_tflite_in_occlum.sh benchmark"
+
+    - name: download and build redis
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/redis; ./download_and_build_redis.sh"
+
+    - name: Run redis benchmark
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/redis; SGX_MODE=SIM ./benchmark.sh"
+
+    - name: Download flink
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/flink && ./download_flink.sh"
+
+    - name: Run jobmanager on host
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_jobmanager_on_host.sh"
+
+    - name: Run flink taskmanager
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_on_occlum_glibc.sh tm"
+
+    - name: Run flink task
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec code_coverage bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_on_occlum_glibc.sh task"
+
+    - name: Download and build HashiCorp Vault
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/golang/vault && ./prepare_vault.sh"
+
+    - name: Run the Vault server on Occlum
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/golang/vault && SGX_MODE=SIM ./run_occlum_vault_server.sh"
+
+    - name: Run the Vault client
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec code_coverage bash -c "cd /root/occlum/demos/golang/vault && ./run_occlum_vault_test.sh"
+
+    - name: Install Maven
+      run: docker exec code_coverage bash -c "apt update && apt install -y maven"
+
+    - name: Download and compile sofaboot web demos
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/sofaboot && ./download_compile_sofaboot.sh"
+
+    - name: Run SOFABoot web demo
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/sofaboot && SGX_MODE=SIM ./run_sofaboot_on_occlum.sh"
+
+    - name: Check SOFABoot result
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec code_coverage bash -c "curl -s http://localhost:8080/actuator/readiness | grep -v DOWN"
 
     - name: Upload coverage report
       run: docker exec code_coverage bash -c "cd /root/occlum/build/internal/src/libos/cargo-target/debug/deps; export CODECOV_TOKEN="${{ secrets.COV_TOKEN }}"; bash <(curl -s https://codecov.io/bash)"
