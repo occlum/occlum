@@ -436,6 +436,7 @@ dependencies = [
  "io-uring-callback",
  "log",
  "memoffset 0.6.1",
+ "num_enum",
  "sgx-untrusted-alloc",
  "sgx_libc",
  "sgx_trts",

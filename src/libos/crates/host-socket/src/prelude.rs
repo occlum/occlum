@@ -15,6 +15,7 @@ cfg_if::cfg_if! {
 pub(crate) type HostFd = u32;
 
 pub(crate) use async_io::event::{Events, Observer, Pollee, Poller};
+pub(crate) use async_io::ioctl::IoctlCmd;
 pub(crate) use async_io::socket::{Addr, Domain, Type};
 
 macro_rules! function {

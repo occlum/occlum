@@ -16,6 +16,7 @@ atomic = "0.5.0"
 bitflags = "1.2"
 cfg-if = "1.0"
 errno = { path = "../errno" }
+num_enum = { version = "0.5", default-features = false }
 slab = { git = "https://github.com/tokio-rs/slab.git", default-features = false }
 libc = { version = "0.2", optional = true }
 log = { version = "0.4" }
