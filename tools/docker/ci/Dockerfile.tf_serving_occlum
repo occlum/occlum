@@ -1,0 +1,22 @@
+ARG OCCLUM_VERSION
+FROM occlumbackup/occlum:latest-ubuntu18.04-tf_serving_base as binary_build
+WORKDIR /root
+
+FROM occlum/occlum:$OCCLUM_VERSION-ubuntu18.04 as base
+LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
+
+WORKDIR /root
+COPY --from=binary_build /root/tensorflow_model_server /root/tensorflow_model_server
+
+ARG OCCLUM_BRANCH
+RUN apt-get update && apt-get install git && \
+    git clone -b $OCCLUM_BRANCH git://github.com/occlum/occlum.git && \
+    cd occlum && \
+    cd demos/tensorflow/tensorflow_serving && \
+    ./prepare_model_and_env.sh && \
+    cd client && \
+    ./prepare_client_env.sh && \
+    mv ../resnet50-v15-fp32/ /root && \
+    rm -rf /root/occlum
+
+WORKDIR /root
