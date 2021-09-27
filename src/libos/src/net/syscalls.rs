@@ -1,7 +1,12 @@
 use std::convert::TryFrom;
 use std::mem::MaybeUninit;
 
+use async_io::ioctl::IoctlCmd;
 use async_io::socket::Type;
+use host_socket::sockopt::{
+    GetAcceptConnCmd, GetDomainCmd, GetPeerNameCmd, GetSockOptRawCmd, GetTypeCmd, SetSockOptRawCmd,
+    SockOptName,
+};
 use num_enum::TryFromPrimitive;
 
 use super::*;
@@ -200,6 +205,67 @@ pub async fn do_getsockname(
     Ok(0)
 }
 
+pub async fn do_getsockopt(
+    fd: c_int,
+    level: c_int,
+    optname: c_int,
+    optval: *mut c_void,
+    optlen: *mut libc::socklen_t,
+) -> Result<isize> {
+    debug!(
+        "getsockopt: fd: {}, level: {}, optname: {}, optval: {:?}, optlen: {:?}",
+        fd, level, optname, optval, optlen
+    );
+
+    let file_ref = current!().file(fd as FileDesc)?;
+    let socket_file = file_ref
+        .as_socket_file()
+        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+
+    let optlen_mut = {
+        from_user::check_mut_ptr(optlen)?;
+        unsafe { &mut *optlen }
+    };
+    let optlen = *optlen_mut;
+    let optval_mut = {
+        from_user::check_mut_array(optval as *mut u8, optlen as usize)?;
+        unsafe { std::slice::from_raw_parts_mut(optval as *mut u8, optlen as usize) }
+    };
+
+    let mut cmd = new_getsockopt_cmd(level, optname, optlen)?;
+    socket_file.ioctl(cmd.as_mut())?;
+    let src_optval = get_optval(cmd.as_ref())?;
+    copy_bytes_to_user(src_optval, optval_mut, optlen_mut);
+    Ok(0)
+}
+
+pub async fn do_setsockopt(
+    fd: c_int,
+    level: c_int,
+    optname: c_int,
+    optval: *const c_void,
+    optlen: libc::socklen_t,
+) -> Result<isize> {
+    debug!(
+        "setsockopt: fd: {}, level: {}, optname: {}, optval: {:?}, optlen: {:?}",
+        fd, level, optname, optval, optlen
+    );
+
+    let file_ref = current!().file(fd as FileDesc)?;
+    let socket_file = file_ref
+        .as_socket_file()
+        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+
+    let optval = {
+        from_user::check_array(optval as *const u8, optlen as usize)?;
+        unsafe { std::slice::from_raw_parts(optval as *const u8, optlen as usize) }
+    };
+
+    let mut cmd = new_setsockopt_cmd(level, optname, optval)?;
+    socket_file.ioctl(cmd.as_mut())?;
+    Ok(0)
+}
+
 // Flags to use when creating a new socket
 bitflags! {
     struct SocketFlags: i32 {
@@ -271,4 +337,78 @@ fn copy_sock_addr_to_user(
 
     unsafe { *dst_addr_len = src_addr_len as u32 };
     Ok(())
+}
+
+/// Create a new ioctl command for getsockopt syscall
+fn new_getsockopt_cmd(level: i32, optname: i32, optlen: u32) -> Result<Box<dyn IoctlCmd>> {
+    if level != libc::SOL_SOCKET {
+        return Ok(Box::new(GetSockOptRawCmd::new(level, optname, optlen)));
+    }
+
+    let opt =
+        SockOptName::try_from(optname).map_err(|_| errno!(ENOPROTOOPT, "Not a valid optname"))?;
+    Ok(match opt {
+        SockOptName::SO_ACCEPTCONN => Box::new(GetAcceptConnCmd::new(())),
+        SockOptName::SO_DOMAIN => Box::new(GetDomainCmd::new(())),
+        SockOptName::SO_PEERNAME => Box::new(GetPeerNameCmd::new(())),
+        SockOptName::SO_TYPE => Box::new(GetTypeCmd::new(())),
+        SockOptName::SO_CNX_ADVICE => return_errno!(ENOPROTOOPT, "it's a write-only option"),
+        _ => Box::new(GetSockOptRawCmd::new(level, optname, optlen)),
+    })
+}
+
+/// Create a new ioctl command for setsockopt syscall
+fn new_setsockopt_cmd(level: i32, optname: i32, optval: &[u8]) -> Result<Box<dyn IoctlCmd>> {
+    if level != libc::SOL_SOCKET {
+        return Ok(Box::new(SetSockOptRawCmd::new(level, optname, optval)));
+    }
+
+    let opt =
+        SockOptName::try_from(optname).map_err(|_| errno!(ENOPROTOOPT, "Not a valid optname"))?;
+    Ok(match opt {
+        SockOptName::SO_ACCEPTCONN
+        | SockOptName::SO_DOMAIN
+        | SockOptName::SO_PEERNAME
+        | SockOptName::SO_TYPE
+        | SockOptName::SO_ERROR
+        | SockOptName::SO_PEERCRED
+        | SockOptName::SO_SNDLOWAT
+        | SockOptName::SO_PEERSEC
+        | SockOptName::SO_PROTOCOL
+        | SockOptName::SO_MEMINFO
+        | SockOptName::SO_INCOMING_NAPI_ID
+        | SockOptName::SO_COOKIE
+        | SockOptName::SO_PEERGROUPS => return_errno!(ENOPROTOOPT, "it's a read-only option"),
+        _ => Box::new(SetSockOptRawCmd::new(level, optname, optval)),
+    })
+}
+
+fn get_optval(cmd: &dyn IoctlCmd) -> Result<&[u8]> {
+    async_io::match_ioctl_cmd_ref!(cmd, {
+        cmd : GetAcceptConnCmd => {
+            cmd.get_output_as_bytes()
+        },
+        cmd : GetDomainCmd => {
+            cmd.get_output_as_bytes()
+        },
+        cmd : GetPeerNameCmd => {
+            cmd.get_output_as_bytes()
+        },
+        cmd : GetTypeCmd => {
+            cmd.get_output_as_bytes()
+        },
+        cmd : GetSockOptRawCmd => {
+            cmd.get_output_as_bytes()
+        },
+        _ => {
+            return_errno!(EINVAL, "invalid sockopt command");
+        }
+    })
+    .ok_or_else(|| errno!(EINVAL, "no available output"))
+}
+
+fn copy_bytes_to_user(src_buf: &[u8], dst_buf: &mut [u8], dst_len: &mut u32) {
+    let copy_len = dst_buf.len().min(src_buf.len());
+    dst_buf[..copy_len].copy_from_slice(&src_buf[..copy_len]);
+    *dst_len = copy_len as _;
 }

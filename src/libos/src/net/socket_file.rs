@@ -1,3 +1,5 @@
+use async_io::ioctl::IoctlCmd;
+
 use self::impls::{Ipv4Stream, UnixStream};
 use crate::fs::{AccessMode, Events, Observer, Poller, StatusFlags};
 use crate::net::{Addr, AnyAddr, Domain, Ipv4SocketAddr, UnixAddr};
@@ -76,6 +78,10 @@ impl SocketFile {
         apply_fn_on_any_socket!(&self.socket, |socket| {
             socket.unregister_observer(observer)
         })
+    }
+
+    pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+        apply_fn_on_any_socket!(&self.socket, |socket| { socket.ioctl(cmd) })
     }
 }
 

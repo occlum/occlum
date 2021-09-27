@@ -30,8 +30,8 @@ use crate::fs::{
 */
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t};
 use crate::net::{
-    do_accept, do_accept4, do_bind, do_connect, do_getpeername, do_getsockname, do_listen,
-    do_socket,
+    do_accept, do_accept4, do_bind, do_connect, do_getpeername, do_getsockname, do_getsockopt,
+    do_listen, do_setsockopt, do_socket,
 };
 /*
 use crate::net::{
@@ -245,6 +245,8 @@ macro_rules! process_syscall_table_with_callback {
             (Socket = 41) => do_socket(domain: c_int, socket_type: c_int, protocol: c_int),
             (Getsockname = 51) => do_getsockname(fd: c_int, addr: *mut libc::sockaddr, addr_len: *mut libc::socklen_t),
             (Getpeername = 52) => do_getpeername(fd: c_int, addr: *mut libc::sockaddr, addr_len: *mut libc::socklen_t),
+            (Setsockopt = 54) => do_setsockopt(fd: c_int, level: c_int, optname: c_int, optval: *const c_void, optlen: libc::socklen_t),
+            (Getsockopt = 55) => do_getsockopt(fd: c_int, level: c_int, optname: c_int, optval: *mut c_void, optlen: *mut libc::socklen_t),
 
             (Poll = 7) => do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int),
             (EpollCreate = 213) => do_epoll_create(size: c_int),
