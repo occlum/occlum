@@ -9,6 +9,7 @@ use super::{table, ProcessRef, TermStatus, ThreadRef, ThreadStatus};
 use crate::prelude::*;
 use crate::signal::{KernelSignal, SigNum};
 use crate::syscall::CpuContext;
+use crate::vm::USER_SPACE_VM_MANAGER;
 
 pub fn do_exit_group(status: i32, curr_user_ctxt: &mut CpuContext) -> Result<isize> {
     if is_vforked_child_process() {
@@ -103,6 +104,8 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
     };
     // Lock the current process
     let mut process_inner = process.inner();
+    // Clean used VM
+    USER_SPACE_VM_MANAGER.free_chunks_when_exit(thread);
 
     // The parent is the idle process
     if parent_inner.is_none() {
@@ -201,6 +204,9 @@ fn exit_process_for_execve(
 
     // Lock the current process
     let mut process_inner = process.inner();
+    // Clean used VM
+    USER_SPACE_VM_MANAGER.free_chunks_when_exit(thread);
+
     let mut new_parent_inner = new_parent_ref.inner();
     let pid = process.pid();
 

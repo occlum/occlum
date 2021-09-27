@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Clone, Copy, Default, PartialEq)]
+#[derive(Clone, Copy, Default, Eq, PartialEq, Hash)]
 pub struct VMRange {
     pub(super) start: usize,
     pub(super) end: usize,
@@ -130,7 +130,7 @@ impl VMRange {
     pub fn intersect(&self, other: &VMRange) -> Option<VMRange> {
         let intersection_start = self.start().max(other.start());
         let intersection_end = self.end().min(other.end());
-        if intersection_start > intersection_end {
+        if intersection_start >= intersection_end {
             return None;
         }
         unsafe {

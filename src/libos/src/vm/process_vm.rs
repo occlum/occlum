@@ -1,12 +1,12 @@
 use super::*;
 
+use super::chunk::{Chunk, ChunkRef};
 use super::config;
 use super::process::elf_file::{ElfFile, ProgramHeaderExt};
-use super::user_space_vm::{UserSpaceVMManager, UserSpaceVMRange, USER_SPACE_VM_MANAGER};
-use super::vm_manager::{
-    VMInitializer, VMManager, VMMapAddr, VMMapOptions, VMMapOptionsBuilder, VMRemapOptions,
-};
+use super::user_space_vm::USER_SPACE_VM_MANAGER;
 use super::vm_perms::VMPerms;
+use super::vm_util::{VMInitializer, VMMapAddr, VMMapOptions, VMMapOptionsBuilder, VMRemapOptions};
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 // Used for heap and stack start address randomization.
@@ -69,9 +69,6 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
         let stack_size = self
             .stack_size
             .unwrap_or(config::LIBOS_CONFIG.process.default_stack_size);
-        let mmap_size = self
-            .mmap_size
-            .unwrap_or(config::LIBOS_CONFIG.process.default_mmap_size);
 
         // Before allocating memory, let's first calcualte how much memory
         // we need in total by iterating the memory layouts required by
@@ -92,11 +89,10 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
             })
             .collect();
 
-        // TODO: Make heap and stack 16-byte aligned instead of page aligned.
+        // Make heap and stack 16-byte aligned
         let other_layouts = vec![
-            VMLayout::new(heap_size, PAGE_SIZE)?,
-            VMLayout::new(stack_size, PAGE_SIZE)?,
-            VMLayout::new(mmap_size, PAGE_SIZE)?,
+            VMLayout::new(heap_size, 16)?,
+            VMLayout::new(stack_size, 16)?,
         ];
         let process_layout = elf_layouts.iter().chain(other_layouts.iter()).fold(
             VMLayout::new_empty(),
@@ -108,85 +104,61 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
 
         // Now that we end up with the memory layout required by the process,
         // let's allocate the memory for the process
-        let process_range = { USER_SPACE_VM_MANAGER.alloc(process_layout)? };
-        let process_base = process_range.range().start();
-        // Use the vm_manager to manage the whole process VM (including mmap region)
-        let mut vm_manager = VMManager::from(process_base, process_range.range().size())?;
-        // Note: we do not need to fill zeros of the mmap region.
-        // VMManager will fill zeros (if necessary) on mmap.
-
-        // Tracker to track the min_start for each part
-        let mut min_start =
-            process_base + Self::get_randomize_offset(process_range.range().size() >> 3);
+        let mut chunks = HashSet::new();
         // Init the memory for ELFs in the process
         let mut elf_ranges = Vec::with_capacity(2);
         elf_layouts
             .iter()
             .zip(self.elfs.iter())
             .map(|(elf_layout, elf_file)| {
-                let desired_range = VMRange::new_with_layout(elf_layout, min_start);
                 let vm_option = VMMapOptionsBuilder::default()
-                    .size(desired_range.size())
-                    .addr(VMMapAddr::Need(desired_range.start()))
+                    .size(elf_layout.size())
+                    .align(elf_layout.align())
                     .perms(VMPerms::ALL) // set it to read | write | exec for simplicity
                     .initializer(VMInitializer::DoNothing())
                     .build()?;
-                let elf_start = vm_manager.mmap(vm_option)?;
-                debug_assert!(desired_range.start == elf_start);
-                debug_assert!(elf_start % elf_layout.align() == 0);
-                debug_assert!(process_range.range().is_superset_of(&desired_range));
-                Self::init_elf_memory(&desired_range, elf_file)?;
-                min_start = desired_range.end();
-                elf_ranges.push(desired_range);
-                trace!("elf range = {:?}", desired_range);
+                let (elf_range, chunk_ref) = USER_SPACE_VM_MANAGER.alloc(&vm_option)?;
+                debug_assert!(elf_range.start() % elf_layout.align() == 0);
+                Self::init_elf_memory(&elf_range, elf_file)?;
+                trace!("elf range = {:?}", elf_range);
+                elf_ranges.push(elf_range);
+                chunks.insert(chunk_ref);
                 Ok(())
             })
             .collect::<Result<()>>()?;
 
         // Init the heap memory in the process
         let heap_layout = &other_layouts[0];
-        let heap_min_start = min_start + Self::get_randomize_offset(RANGE_FOR_RANDOMIZATION);
-        let heap_range = VMRange::new_with_layout(heap_layout, heap_min_start);
         let vm_option = VMMapOptionsBuilder::default()
-            .size(heap_range.size())
-            .addr(VMMapAddr::Need(heap_range.start()))
+            .size(heap_layout.size())
+            .align(heap_layout.align())
             .perms(VMPerms::READ | VMPerms::WRITE)
             .build()?;
-        let heap_start = vm_manager.mmap(vm_option)?;
-        debug_assert!(heap_range.start == heap_start);
+        let (heap_range, chunk_ref) = USER_SPACE_VM_MANAGER.alloc(&vm_option)?;
+        debug_assert!(heap_range.start() % heap_layout.align() == 0);
         trace!("heap range = {:?}", heap_range);
         let brk = AtomicUsize::new(heap_range.start());
-        min_start = heap_range.end();
+        chunks.insert(chunk_ref);
 
         // Init the stack memory in the process
         let stack_layout = &other_layouts[1];
-        let stack_min_start = min_start + Self::get_randomize_offset(RANGE_FOR_RANDOMIZATION);
-        let stack_range = VMRange::new_with_layout(stack_layout, stack_min_start);
         let vm_option = VMMapOptionsBuilder::default()
-            .size(stack_range.size())
-            .addr(VMMapAddr::Need(stack_range.start()))
+            .size(stack_layout.size())
+            .align(heap_layout.align())
             .perms(VMPerms::READ | VMPerms::WRITE)
             .build()?;
-        let stack_start = vm_manager.mmap(vm_option)?;
-        debug_assert!(stack_range.start == stack_start);
+        let (stack_range, chunk_ref) = USER_SPACE_VM_MANAGER.alloc(&vm_option)?;
+        debug_assert!(stack_range.start() % stack_layout.align() == 0);
+        chunks.insert(chunk_ref);
         trace!("stack range = {:?}", stack_range);
-        min_start = stack_range.end();
-        // Note: we do not need to fill zeros for stack
 
-        debug_assert!(process_range.range().is_superset_of(&heap_range));
-        debug_assert!(process_range.range().is_superset_of(&stack_range));
-
-        // Set mmap prefered start address
-        vm_manager.set_mmap_prefered_start_addr(min_start);
-        let vm_manager = SgxMutex::new(vm_manager);
-
+        let mem_chunks = Arc::new(RwLock::new(chunks));
         Ok(ProcessVM {
-            process_range,
             elf_ranges,
             heap_range,
             stack_range,
             brk,
-            vm_manager,
+            mem_chunks,
         })
     }
 
@@ -255,39 +227,83 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
     }
 }
 
+// MemChunks is the structure to track all the chunks which are used by this process.
+type MemChunks = Arc<RwLock<HashSet<ChunkRef>>>;
+
 /// The per-process virtual memory
 #[derive(Debug)]
 pub struct ProcessVM {
-    vm_manager: SgxMutex<VMManager>, // manage the whole process VM
     elf_ranges: Vec<VMRange>,
     heap_range: VMRange,
     stack_range: VMRange,
     brk: AtomicUsize,
-    // Memory safety notes: the process_range field must be the last one.
+    // Memory safety notes: the mem_chunks field must be the last one.
     //
     // Rust drops fields in the same order as they are declared. So by making
-    // process_range the last field, we ensure that when all other fields are
+    // mem_chunks the last field, we ensure that when all other fields are
     // dropped, their drop methods (if provided) can still access the memory
-    // region represented by the process_range field.
-    process_range: UserSpaceVMRange,
+    // region represented by the mem_chunks field.
+    mem_chunks: MemChunks,
 }
 
 impl Default for ProcessVM {
     fn default() -> ProcessVM {
         ProcessVM {
-            process_range: USER_SPACE_VM_MANAGER.alloc_dummy(),
             elf_ranges: Default::default(),
             heap_range: Default::default(),
             stack_range: Default::default(),
             brk: Default::default(),
-            vm_manager: Default::default(),
+            mem_chunks: Arc::new(RwLock::new(HashSet::new())),
         }
     }
 }
 
+impl Drop for ProcessVM {
+    fn drop(&mut self) {
+        let mut mem_chunks = self.mem_chunks.write().unwrap();
+        // There are two cases when this drop is called:
+        // (1) Process exits normally and in the end, drop process VM
+        // (2) During creating process stage, process VM is ready but there are some other errors when creating the process, e.g. spawn_attribute is set
+        // to a wrong value
+        //
+        // For the first case, the process VM is cleaned in the exit procedure and nothing is needed. For the second cases, mem_chunks is not empty and should
+        // be cleaned here.
+
+        // In the first case, the current is reset to idle thread
+        // In the second case, the current thread belongs to parent process
+        let current = current!();
+        if current.tid() != 0 {
+            mem_chunks
+                .drain_filter(|chunk| chunk.is_single_vma())
+                .for_each(|chunk| USER_SPACE_VM_MANAGER.free_chunk(&chunk))
+        }
+        assert!(mem_chunks.len() == 0);
+        info!("Process VM dropped");
+    }
+}
+
 impl ProcessVM {
+    pub fn mem_chunks(&self) -> &MemChunks {
+        &self.mem_chunks
+    }
+
+    pub fn add_mem_chunk(&self, chunk: ChunkRef) {
+        let mut mem_chunks = self.mem_chunks.write().unwrap();
+        mem_chunks.insert(chunk);
+    }
+
+    pub fn remove_mem_chunk(&self, chunk: &ChunkRef) {
+        let mut mem_chunks = self.mem_chunks.write().unwrap();
+        mem_chunks.remove(chunk);
+    }
+
+    pub fn replace_mem_chunk(&self, old_chunk: &ChunkRef, new_chunk: ChunkRef) {
+        self.remove_mem_chunk(old_chunk);
+        self.add_mem_chunk(new_chunk)
+    }
+
     pub fn get_process_range(&self) -> &VMRange {
-        self.process_range.range()
+        USER_SPACE_VM_MANAGER.range()
     }
 
     pub fn get_elf_ranges(&self) -> &[VMRange] {
@@ -335,6 +351,18 @@ impl ProcessVM {
         Ok(new_brk)
     }
 
+    // Get a NON-accurate free size for current process
+    pub fn get_free_size(&self) -> usize {
+        let chunk_free_size = {
+            let process_chunks = self.mem_chunks.read().unwrap();
+            process_chunks
+                .iter()
+                .fold(0, |acc, chunks| acc + chunks.free_size())
+        };
+        let free_size = chunk_free_size + USER_SPACE_VM_MANAGER.free_size();
+        free_size
+    }
+
     pub fn mmap(
         &self,
         addr: usize,
@@ -346,9 +374,6 @@ impl ProcessVM {
     ) -> Result<usize> {
         let addr_option = {
             if flags.contains(MMapFlags::MAP_FIXED) {
-                if !self.process_range.range().contains(addr) {
-                    return_errno!(EINVAL, "Beyond valid memory range");
-                }
                 VMMapAddr::Force(addr)
             } else {
                 if addr == 0 {
@@ -360,7 +385,8 @@ impl ProcessVM {
         };
         let initializer = {
             if flags.contains(MMapFlags::MAP_ANONYMOUS) {
-                VMInitializer::FillZeros()
+                // There is no need to fill zeros in mmap. Cleaning is done after munmap.
+                VMInitializer::DoNothing()
             } else {
                 let file_ref = current!().file(fd)?;
                 VMInitializer::LoadFromFile {
@@ -386,7 +412,7 @@ impl ProcessVM {
             .initializer(initializer)
             .writeback_file(writeback_file)
             .build()?;
-        let mmap_addr = self.vm_manager.lock().unwrap().mmap(mmap_options)?;
+        let mmap_addr = USER_SPACE_VM_MANAGER.mmap(&mmap_options)?;
         Ok(mmap_addr)
     }
 
@@ -397,18 +423,12 @@ impl ProcessVM {
         new_size: usize,
         flags: MRemapFlags,
     ) -> Result<usize> {
-        if let Some(new_addr) = flags.new_addr() {
-            if !self.process_range.range().contains(new_addr) {
-                return_errno!(EINVAL, "new_addr is beyond valid memory range");
-            }
-        }
-
         let mremap_option = VMRemapOptions::new(old_addr, old_size, new_size, flags)?;
-        self.vm_manager.lock().unwrap().mremap(&mremap_option)
+        USER_SPACE_VM_MANAGER.mremap(&mremap_option)
     }
 
     pub fn munmap(&self, addr: usize, size: usize) -> Result<()> {
-        self.vm_manager.lock().unwrap().munmap(addr, size)
+        USER_SPACE_VM_MANAGER.munmap(addr, size)
     }
 
     pub fn mprotect(&self, addr: usize, size: usize, perms: VMPerms) -> Result<()> {
@@ -419,38 +439,21 @@ impl ProcessVM {
             align_up(size, PAGE_SIZE)
         };
         let protect_range = VMRange::new_with_size(addr, size)?;
-        if !self.process_range.range().is_superset_of(&protect_range) {
-            return_errno!(ENOMEM, "invalid range");
-        }
-        let mut mmap_manager = self.vm_manager.lock().unwrap();
 
-        // TODO: support mprotect vm regions in addition to mmap
-        if !mmap_manager.range().is_superset_of(&protect_range) {
-            warn!("Do not support mprotect memory outside the mmap region yet");
-            return Ok(());
-        }
-
-        mmap_manager.mprotect(addr, size, perms)
+        return USER_SPACE_VM_MANAGER.mprotect(addr, size, perms);
     }
 
     pub fn msync(&self, addr: usize, size: usize) -> Result<()> {
-        let sync_range = VMRange::new_with_size(addr, size)?;
-        let mut mmap_manager = self.vm_manager.lock().unwrap();
-        mmap_manager.msync_by_range(&sync_range)
+        return USER_SPACE_VM_MANAGER.msync(addr, size);
     }
 
     pub fn msync_by_file(&self, sync_file: &FileRef) {
-        let mut mmap_manager = self.vm_manager.lock().unwrap();
-        mmap_manager.msync_by_file(sync_file);
+        return USER_SPACE_VM_MANAGER.msync_by_file(sync_file);
     }
 
     // Return: a copy of the found region
     pub fn find_mmap_region(&self, addr: usize) -> Result<VMRange> {
-        self.vm_manager
-            .lock()
-            .unwrap()
-            .find_mmap_region(addr)
-            .map(|range_ref| *range_ref)
+        USER_SPACE_VM_MANAGER.find_mmap_region(addr)
     }
 }
 

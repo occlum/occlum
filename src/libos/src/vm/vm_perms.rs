@@ -31,6 +31,26 @@ impl VMPerms {
     pub fn is_default(&self) -> bool {
         self.bits == Self::DEFAULT.bits
     }
+
+    pub fn apply_perms(protect_range: &VMRange, perms: VMPerms) {
+        extern "C" {
+            pub fn occlum_ocall_mprotect(
+                retval: *mut i32,
+                addr: *const c_void,
+                len: usize,
+                prot: i32,
+            ) -> sgx_status_t;
+        };
+
+        unsafe {
+            let mut retval = 0;
+            let addr = protect_range.start() as *const c_void;
+            let len = protect_range.size();
+            let prot = perms.bits() as i32;
+            let sgx_status = occlum_ocall_mprotect(&mut retval, addr, len, prot);
+            assert!(sgx_status == sgx_status_t::SGX_SUCCESS && retval == 0);
+        }
+    }
 }
 
 impl Default for VMPerms {

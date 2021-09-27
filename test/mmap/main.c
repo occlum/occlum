@@ -47,6 +47,10 @@ static int get_a_valid_range_of_hints(size_t *hint_begin, size_t *hint_end) {
     if (big_buf == MAP_FAILED) {
         THROW_ERROR("mmap failed");
     }
+
+    // Check if munmap will clean the range
+    memset(big_buf, 0xff, big_buf_len);
+
     int ret = munmap(big_buf, big_buf_len);
     if (ret < 0) {
         THROW_ERROR("munmap failed");
@@ -1038,6 +1042,47 @@ int test_mprotect_with_non_page_aligned_size() {
     *(char *)buf = 1;
     *(char *)(buf  + PAGE_SIZE) = 1;
 
+    ret = munmap(buf, PAGE_SIZE * 2);
+    if (ret < 0) {
+        THROW_ERROR("munmap failed");
+    }
+    return 0;
+}
+
+int test_mprotect_multiple_vmas() {
+    // Create multiple VMA with PROT_NONE
+    int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+    void *buf_a = mmap((void *)HINT_BEGIN, PAGE_SIZE * 2, PROT_NONE, flags, -1, 0);
+    if (buf_a == MAP_FAILED || buf_a != (void *)HINT_BEGIN) {
+        THROW_ERROR("mmap failed");
+    }
+    void *buf_b = mmap((void *)(HINT_BEGIN + 2 * PAGE_SIZE), PAGE_SIZE, PROT_NONE, flags, -1,
+                       0);
+    if (buf_b == MAP_FAILED || buf_b != (void *)(HINT_BEGIN + 2 * PAGE_SIZE)) {
+        THROW_ERROR("mmap failed");
+    }
+    void *buf_c = mmap((void *)(HINT_BEGIN + 3 * PAGE_SIZE), PAGE_SIZE * 2, PROT_NONE, flags,
+                       -1, 0);
+    if (buf_c == MAP_FAILED || buf_c != (void *)(HINT_BEGIN + 3 * PAGE_SIZE)) {
+        THROW_ERROR("mmap failed");
+    }
+
+    // Set a part of the ranges to read-write
+    int ret = mprotect(buf_a + PAGE_SIZE, 3 * PAGE_SIZE, PROT_READ | PROT_WRITE);
+    if (ret < 0) {
+        THROW_ERROR("mprotect multiple vmas failed");
+    }
+
+    // Check if these ranges are writable
+    *(char *)(buf_a + PAGE_SIZE) = 1;
+    *(char *)(buf_b) = 1;
+    *(char *)(buf_c) = 1;
+
+    ret = munmap(buf_a, PAGE_SIZE * 5);
+    if (ret < 0) {
+        THROW_ERROR("munmap multiple vmas failed");
+    }
+
     return 0;
 }
 
@@ -1231,11 +1276,13 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_munmap_with_null_addr),
     TEST_CASE(test_munmap_with_zero_len),
     TEST_CASE(test_munmap_with_non_page_aligned_len),
+#ifdef MREMAP_SUPPORTED
     TEST_CASE(test_mremap),
     TEST_CASE(test_mremap_subrange),
     TEST_CASE(test_mremap_with_fixed_addr),
     TEST_CASE(test_file_backed_mremap),
     TEST_CASE(test_file_backed_mremap_mem_may_move),
+#endif
     TEST_CASE(test_mprotect_once),
     TEST_CASE(test_mprotect_twice),
     TEST_CASE(test_mprotect_triple),
@@ -1243,6 +1290,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_mprotect_with_invalid_addr),
     TEST_CASE(test_mprotect_with_invalid_prot),
     TEST_CASE(test_mprotect_with_non_page_aligned_size),
+    TEST_CASE(test_mprotect_multiple_vmas),
 };
 
 int main() {

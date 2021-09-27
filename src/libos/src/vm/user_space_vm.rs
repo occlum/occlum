@@ -1,62 +1,69 @@
 use super::*;
+use crate::ctor::dtor;
 use config::LIBOS_CONFIG;
+use std::ops::{Deref, DerefMut};
+use vm_manager::VMManager;
 
 /// The virtual memory manager for the entire user space
-pub struct UserSpaceVMManager {
-    total_size: usize,
-    free_size: SgxMutex<usize>,
-}
+pub struct UserSpaceVMManager(VMManager);
 
 impl UserSpaceVMManager {
-    fn new() -> UserSpaceVMManager {
+    fn new() -> Result<UserSpaceVMManager> {
         let rsrv_mem_size = LIBOS_CONFIG.resource_limits.user_space_size;
-        UserSpaceVMManager {
-            total_size: rsrv_mem_size,
-            free_size: SgxMutex::new(rsrv_mem_size),
-        }
-    }
-
-    pub fn alloc(&self, vm_layout: VMLayout) -> Result<UserSpaceVMRange> {
-        let size = align_up(vm_layout.size(), vm_layout.align());
         let vm_range = unsafe {
-            let ptr = sgx_alloc_rsrv_mem(size);
+            // TODO: Current sgx_alloc_rsrv_mem implmentation will commit all the pages of the desired size, which will consume
+            // a lot of time. When EDMM is supported, there is no need to commit all the pages at the initialization stage. A function
+            // which reserves memory but not commit pages should be provided then.
+            let ptr = sgx_alloc_rsrv_mem(rsrv_mem_size);
             let perm = MemPerm::READ | MemPerm::WRITE;
             if ptr.is_null() {
                 return_errno!(ENOMEM, "run out of reserved memory");
             }
             // Change the page permission to RW (default)
-            assert!(sgx_tprotect_rsrv_mem(ptr, size, perm.bits()) == sgx_status_t::SGX_SUCCESS);
+            assert!(
+                sgx_tprotect_rsrv_mem(ptr, rsrv_mem_size, perm.bits()) == sgx_status_t::SGX_SUCCESS
+            );
 
             let addr = ptr as usize;
-            debug!("allocated rsrv addr is 0x{:x}, len is 0x{:x}", addr, size);
-            VMRange::from_unchecked(addr, addr + size)
+            debug!(
+                "allocated rsrv addr is 0x{:x}, len is 0x{:x}",
+                addr, rsrv_mem_size
+            );
+            VMRange::from_unchecked(addr, addr + rsrv_mem_size)
         };
 
-        *self.free_size.lock().unwrap() -= size;
-        Ok(UserSpaceVMRange::new(vm_range))
-    }
+        let vm_manager = VMManager::init(vm_range)?;
 
-    fn add_free_size(&self, user_space_vmrange: &UserSpaceVMRange) {
-        *self.free_size.lock().unwrap() += user_space_vmrange.range().size();
-    }
-
-    // The empty range is not added to sub_range
-    pub fn alloc_dummy(&self) -> UserSpaceVMRange {
-        let empty_user_vm_range = unsafe { VMRange::from_unchecked(0, 0) };
-        UserSpaceVMRange::new(empty_user_vm_range)
+        Ok(UserSpaceVMManager(vm_manager))
     }
 
     pub fn get_total_size(&self) -> usize {
-        self.total_size
+        self.range().size()
     }
+}
 
-    pub fn get_free_size(&self) -> usize {
-        *self.free_size.lock().unwrap()
+// This provides module teardown function attribute similar with `__attribute__((destructor))` in C/C++ and will
+// be called after the main function. Static variables are still safe to visit at this time.
+#[dtor]
+fn free_user_space() {
+    let range = USER_SPACE_VM_MANAGER.range();
+    assert!(USER_SPACE_VM_MANAGER.verified_clean_when_exit());
+    let addr = range.start() as *const c_void;
+    let size = range.size();
+    info!("free user space VM: {:?}", range);
+    assert!(unsafe { sgx_free_rsrv_mem(addr, size) == 0 });
+}
+
+impl Deref for UserSpaceVMManager {
+    type Target = VMManager;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
 lazy_static! {
-    pub static ref USER_SPACE_VM_MANAGER: UserSpaceVMManager = UserSpaceVMManager::new();
+    pub static ref USER_SPACE_VM_MANAGER: UserSpaceVMManager = UserSpaceVMManager::new().unwrap();
 }
 
 bitflags! {
@@ -95,33 +102,4 @@ extern "C" {
     // Return: sgx_status_t
     //
     fn sgx_tprotect_rsrv_mem(addr: *const c_void, length: usize, prot: i32) -> sgx_status_t;
-}
-
-#[derive(Debug)]
-pub struct UserSpaceVMRange {
-    vm_range: VMRange,
-}
-
-impl UserSpaceVMRange {
-    fn new(vm_range: VMRange) -> UserSpaceVMRange {
-        UserSpaceVMRange { vm_range }
-    }
-
-    pub fn range(&self) -> &VMRange {
-        &self.vm_range
-    }
-}
-
-impl Drop for UserSpaceVMRange {
-    fn drop(&mut self) {
-        let addr = self.vm_range.start() as *const c_void;
-        let size = self.vm_range.size();
-        if size == 0 {
-            return;
-        }
-
-        USER_SPACE_VM_MANAGER.add_free_size(self);
-        info!("user space vm free: {:?}", self.vm_range);
-        assert!(unsafe { sgx_free_rsrv_mem(addr, size) == 0 });
-    }
 }

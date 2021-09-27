@@ -710,7 +710,7 @@ fn do_syscall(user_context: &mut CpuContext) {
             retval
         }
     };
-    trace!("Retval = {:?}", retval);
+    trace!("Retval = 0x{:x}", retval);
 
     // Put the return value into user_context.rax, except for syscalls that may
     // modify user_context directly. Currently, there are three such syscalls:
