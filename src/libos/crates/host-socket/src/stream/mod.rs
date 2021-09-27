@@ -3,6 +3,7 @@ mod states;
 use self::states::{Common, ConnectedStream, ConnectingStream, InitStream, ListenerStream};
 use crate::prelude::*;
 use crate::runtime::Runtime;
+use crate::sockopt::*;
 
 pub struct StreamSocket<A: Addr + 'static, R: Runtime> {
     state: RwLock<State<A, R>>,
@@ -35,6 +36,11 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
 
     pub fn domain(&self) -> Domain {
         A::domain()
+    }
+
+    pub fn host_fd(&self) -> HostFd {
+        let state = self.state.read().unwrap();
+        state.common().host_fd()
     }
 
     pub fn bind(&self, addr: &A) -> Result<()> {
@@ -212,6 +218,40 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         }
     }
 
+    pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+        async_io::match_ioctl_cmd_mut!(&mut *cmd, {
+            cmd: GetSockOptRawCmd => {
+                cmd.execute(self.host_fd())?;
+            },
+            cmd: SetSockOptRawCmd => {
+                cmd.execute(self.host_fd())?;
+            },
+            cmd: GetAcceptConnCmd => {
+                let mut is_listen = false;
+                let state = self.state.read().unwrap();
+                if let State::Listen(listener_stream) = &*state {
+                    is_listen = true;
+                }
+                cmd.set_output(is_listen as _);
+            },
+            cmd: GetDomainCmd => {
+                cmd.set_output(self.domain() as _);
+            },
+            cmd: GetPeerNameCmd => {
+                let peer = self.peer_addr()?;
+                cmd.set_output(AddrStorage(peer.to_c_storage()));
+            },
+            cmd: GetTypeCmd => {
+                let state = self.state.read().unwrap();
+                cmd.set_output(state.common().type_() as _);
+            },
+            _ => {
+                return_errno!(EINVAL, "Not supported yet");
+            }
+        });
+        Ok(())
+    }
+
     /*
         pub async fn shutdown(&self, shutdown: Shutdown) -> Result<()> {
             let connected_stream = {
@@ -225,10 +265,6 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             };
 
             connected_stream.shutdown(shutdown)
-        }
-
-        pub fn ioctl(&self, ioctl: &mut dyn IoctlCmd) -> Result<()> {
-            return_errno!(EINVAL, "")
         }
 
         pub fn poll_by(&self, mask: Events, mut poller: Option<&mut Poller>) -> Events {
