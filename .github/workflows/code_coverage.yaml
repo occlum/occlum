@@ -1,0 +1,50 @@
+name: Code Coverage
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+on: [push, pull_request]
+
+env:
+  nap_time: 60
+
+jobs:
+  Collect-code-coverage:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+
+    - name: Get Occlum version
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+
+    - name: Create container
+      run: docker run -itd --name=code_coverage -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+
+    - name: Change download source of crates.io
+      run: |
+        docker exec code_coverage bash -c "cat <<- EOF >/root/.cargo/config
+        [source.crates-io]
+        registry = \"https://github.com/rust-lang/crates.io-index\"
+        replace-with = 'ustc'
+        [source.ustc]
+        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+        EOF"
+
+    - name: Build dependencies
+      run: docker exec code_coverage bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
+
+    - name: Build source
+      run: docker exec code_coverage bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_COV=1 make install"
+
+    - name: Integration test
+      run:  docker exec code_coverage bash -c "cd /root/occlum; SGX_MODE=SIM make test"
+
+    - name: Integration test with Glibc
+      run:  docker exec code_coverage bash -c "cd /root/occlum; SGX_MODE=SIM make test-glibc"
+
+    - name: Upload coverage report
+      run: docker exec code_coverage bash -c "cd /root/occlum/build/internal/src/libos/cargo-target/debug/deps; export CODECOV_TOKEN="${{ secrets.COV_TOKEN }}"; bash <(curl -s https://codecov.io/bash)"
+
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop code_coverage
