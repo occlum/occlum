@@ -367,14 +367,121 @@ int test_poll() {
     return 0;
 }
 
+int test_sockopt() {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) {
+        THROW_ERROR("create socket error");
+    }
+    int reuse = 1;
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+        THROW_ERROR("setsockopt port to reuse failed");
+    }
+
+    int optval = 0;
+    int optlen = sizeof(optval);
+    if (getsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &optval, &optlen) < 0 ||
+            optval != 1) {
+        THROW_ERROR("getsockopt(SO_REUSEADDR) failed");
+    }
+
+    optval = 0;
+    optlen = sizeof(optval);
+    if (getsockopt(fd, SOL_SOCKET, SO_DOMAIN, &optval, &optlen) < 0 ||
+            optval != AF_INET) {
+        THROW_ERROR("getsockopt(SO_DOMAIN) failed");
+    }
+
+    close(fd);
+    return 0;
+}
+
+int test_getname() {
+    int child_pid = 0;
+    int client_fd = connect_with_child(8806, &child_pid);
+    if (client_fd < 0) {
+        THROW_ERROR("connect failed");
+    }
+
+    struct sockaddr_in myaddr;
+    int myaddr_len = sizeof(myaddr);
+    if (getsockname(client_fd, &myaddr, &myaddr_len) < 0) {
+        THROW_ERROR("getsockname() failed");
+    }
+    printf("[socket with bind] address: %s\n", inet_ntoa(myaddr.sin_addr));
+    printf("[socket with bind] port: %d\n", (int) ntohs(myaddr.sin_port));
+
+    if (server_getpeername(client_fd) < 0) {
+        THROW_ERROR("server_getpeername failed");
+    }
+
+    int status = 0;
+    if (wait4(child_pid, &status, 0, NULL) < 0) {
+        THROW_ERROR("failed to wait4 the child process");
+    }
+    close(client_fd);
+    return 0;
+}
+
+int server_getpeername(int client_fd) {
+    struct sockaddr_in peer;
+    int peer_len = sizeof(peer);
+    if (getpeername(client_fd, &peer, &peer_len) < 0) {
+        THROW_ERROR("getpeername() failed");
+    }
+    printf("Peer address: %s\n", inet_ntoa(peer.sin_addr));
+    printf("Peer port: %d\n", (int) ntohs(peer.sin_port));
+
+    struct sockaddr_in peer2;
+    int peer_len2 = sizeof(peer2);
+    if (getsockopt(client_fd, SOL_SOCKET, SO_PEERNAME, &peer2, &peer_len2) < 0) {
+        THROW_ERROR("getsockopt(SO_PEERNAME) failed");
+    }
+    if (strcmp(inet_ntoa(peer.sin_addr), inet_ntoa(peer2.sin_addr)) != 0 ||
+            peer.sin_port != peer2.sin_port ||
+            peer_len != peer_len2) {
+        THROW_ERROR("the result of getsockopt(SO_PEERNAME) and getpeername is different");
+    }
+    return 0;
+}
+
+int test_getname_without_bind() {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+
+    struct sockaddr_in myaddr;
+    int myaddr_len = sizeof(myaddr);
+    if (getsockname(fd, &myaddr, &myaddr_len) < 0) {
+        THROW_ERROR("getsockname() failed");
+    }
+    printf("[socket without bind] address: %s\n", inet_ntoa(myaddr.sin_addr));
+    printf("[socket without bind] port: %d\n", (int) ntohs(myaddr.sin_port));
+
+    struct sockaddr_in peer;
+    int peer_len = sizeof(peer);
+    if (getpeername(fd, &peer, &peer_len) == 0) {
+        THROW_ERROR("getpeername() should failed");
+    }
+
+    struct sockaddr_in peer2;
+    int peer_len2 = sizeof(peer2);
+    if (getsockopt(fd, SOL_SOCKET, SO_PEERNAME, &peer2, &peer_len2) == 0) {
+        THROW_ERROR("getsockopt(SO_PEERNAME) should failed");
+    }
+
+    close(fd);
+    return 0;
+}
+
 static test_case_t test_cases[] = {
     TEST_CASE(test_read_write),
-    TEST_CASE(test_send_recv),
-    TEST_CASE(test_sendmsg_recvmsg),
-    TEST_CASE(test_sendmsg_recvmsg_connectionless),
-    TEST_CASE(test_fcntl_setfl_and_getfl),
-    TEST_CASE(test_poll),
+    // TEST_CASE(test_send_recv),
+    // TEST_CASE(test_sendmsg_recvmsg),
+    // TEST_CASE(test_sendmsg_recvmsg_connectionless),
+    // TEST_CASE(test_fcntl_setfl_and_getfl),
+    // TEST_CASE(test_poll),
     TEST_CASE(test_poll_events_unchanged),
+    TEST_CASE(test_sockopt),
+    TEST_CASE(test_getname),
+    TEST_CASE(test_getname_without_bind),
 };
 
 int main(int argc, const char *argv[]) {
