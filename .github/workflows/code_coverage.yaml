@@ -20,16 +20,6 @@ jobs:
     - name: Create container
       run: docker run -itd --name=code_coverage -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
 
-    - name: Change download source of crates.io
-      run: |
-        docker exec code_coverage bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
-
     - name: Build dependencies
       run: docker exec code_coverage bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
@@ -146,20 +136,6 @@ jobs:
     - name: Run redis benchmark
       run: docker exec code_coverage bash -c "cd /root/occlum/demos/redis; SGX_MODE=SIM ./benchmark.sh"
 
-    - name: Download flink
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/flink && ./download_flink.sh"
-
-    - name: Run jobmanager on host
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_jobmanager_on_host.sh"
-
-    - name: Run flink taskmanager
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_on_occlum_glibc.sh tm"
-
-    - name: Run flink task
-      run: |
-        sleep ${{ env.nap_time }};
-        docker exec code_coverage bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_on_occlum_glibc.sh task"
-
     - name: Download and build HashiCorp Vault
       run: docker exec code_coverage bash -c "cd /root/occlum/demos/golang/vault && ./prepare_vault.sh"
 
@@ -170,20 +146,6 @@ jobs:
       run: |
         sleep ${{ env.nap_time }};
         docker exec code_coverage bash -c "cd /root/occlum/demos/golang/vault && ./run_occlum_vault_test.sh"
-
-    - name: Install Maven
-      run: docker exec code_coverage bash -c "apt update && apt install -y maven"
-
-    - name: Download and compile sofaboot web demos
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/sofaboot && ./download_compile_sofaboot.sh"
-
-    - name: Run SOFABoot web demo
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/sofaboot && SGX_MODE=SIM ./run_sofaboot_on_occlum.sh"
-
-    - name: Check SOFABoot result
-      run: |
-        sleep ${{ env.nap_time }};
-        docker exec code_coverage bash -c "curl -s http://localhost:8080/actuator/readiness | grep -v DOWN"
 
     - name: Upload coverage report
       run: docker exec code_coverage bash -c "cd /root/occlum/build/internal/src/libos/cargo-target/debug/deps; export CODECOV_TOKEN="${{ secrets.COV_TOKEN }}"; bash <(curl -s https://codecov.io/bash)"
