@@ -4,7 +4,7 @@ name: Code Coverage
 on: [push]
 
 env:
-  nap_time: 60
+  nap_time: 120
 
 jobs:
   Collect-code-coverage:
