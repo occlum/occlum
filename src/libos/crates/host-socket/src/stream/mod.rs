@@ -21,8 +21,8 @@ enum State<A: Addr + 'static, R: Runtime> {
 }
 
 impl<A: Addr, R: Runtime> StreamSocket<A, R> {
-    pub fn new() -> Result<Self> {
-        let init_stream = InitStream::new()?;
+    pub fn new(nonblocking: bool) -> Result<Self> {
+        let init_stream = InitStream::new(nonblocking)?;
         let init_state = State::Init(init_stream);
         Ok(Self {
             state: RwLock::new(init_state),
@@ -118,7 +118,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         res
     }
 
-    pub async fn accept(&self) -> Result<Self> {
+    pub async fn accept(&self, nonblocking: bool) -> Result<Self> {
         let listener_stream = {
             let state = self.state.read().unwrap();
             match &*state {
@@ -129,7 +129,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             }
         };
 
-        let connected_stream = listener_stream.accept().await?;
+        let connected_stream = listener_stream.accept(nonblocking).await?;
 
         let new_self = Self::new_connected(connected_stream);
         Ok(new_self)

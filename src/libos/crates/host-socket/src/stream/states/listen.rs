@@ -50,14 +50,18 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
         Ok(())
     }
 
-    pub async fn accept(self: &Arc<Self>) -> Result<Arc<ConnectedStream<A, R>>> {
+    pub async fn accept(self: &Arc<Self>, nonblocking: bool) -> Result<Arc<ConnectedStream<A, R>>> {
         // Init the poller only when needed
         let mut poller = None;
         loop {
             // Attempt to accept
-            let res = self.try_accept();
+            let res = self.try_accept(nonblocking);
             if !res.has_errno(EAGAIN) {
                 return res;
+            }
+
+            if self.common.nonblocking() {
+                return_errno!(EAGAIN, "no connections are present to be accepted");
             }
 
             // Ensure the poller is initialized
@@ -73,7 +77,7 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
         }
     }
 
-    pub fn try_accept(self: &Arc<Self>) -> Result<Arc<ConnectedStream<A, R>>> {
+    pub fn try_accept(self: &Arc<Self>, nonblocking: bool) -> Result<Arc<ConnectedStream<A, R>>> {
         let mut inner = self.inner.lock().unwrap();
 
         if let Some(errno) = inner.fatal {
@@ -92,7 +96,7 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
         self.initiate_async_accepts(inner);
 
         let common = {
-            let mut common = Arc::new(Common::with_host_fd(accepted_fd, Type::STREAM));
+            let mut common = Arc::new(Common::with_host_fd(accepted_fd, Type::STREAM, nonblocking));
             common.set_peer_addr(&accepted_addr);
             common.pollee().add_events(Events::OUT);
             common

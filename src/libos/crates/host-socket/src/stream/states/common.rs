@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use io_uring_callback::IoUring;
 cfg_if::cfg_if! {
@@ -18,33 +19,38 @@ use crate::runtime::Runtime;
 pub struct Common<A: Addr + 'static, R: Runtime> {
     host_fd: HostFd,
     type_: Type,
+    nonblocking: AtomicBool,
     pollee: Pollee,
     inner: Mutex<Inner<A>>,
     phantom_data: PhantomData<(A, R)>,
 }
 
 impl<A: Addr + 'static, R: Runtime> Common<A, R> {
-    pub fn new(type_: Type) -> Result<Self> {
+    pub fn new(type_: Type, nonblocking: bool) -> Result<Self> {
         let domain_c = A::domain() as libc::c_int;
         let type_c = type_ as libc::c_int;
         let host_fd = try_libc!(do_socket(domain_c, type_c, 0)) as HostFd;
+        let nonblocking = AtomicBool::new(nonblocking);
         let pollee = Pollee::new(Events::empty());
         let inner = Mutex::new(Inner::new());
         Ok(Self {
             host_fd,
             type_,
+            nonblocking,
             pollee,
             inner,
             phantom_data: PhantomData,
         })
     }
 
-    pub fn with_host_fd(host_fd: HostFd, type_: Type) -> Self {
+    pub fn with_host_fd(host_fd: HostFd, type_: Type, nonblocking: bool) -> Self {
+        let nonblocking = AtomicBool::new(nonblocking);
         let pollee = Pollee::new(Events::empty());
         let inner = Mutex::new(Inner::new());
         Self {
             host_fd,
             type_,
+            nonblocking,
             pollee,
             inner,
             phantom_data: PhantomData,
@@ -61,6 +67,14 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
 
     pub fn type_(&self) -> Type {
         self.type_
+    }
+
+    pub fn nonblocking(&self) -> bool {
+        self.nonblocking.load(Ordering::Relaxed)
+    }
+
+    pub fn set_nonblocking(&self, is_nonblocking: bool) {
+        self.nonblocking.store(is_nonblocking, Ordering::Relaxed)
     }
 
     pub fn pollee(&self) -> &Pollee {
@@ -103,6 +117,8 @@ impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for Common<A, R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Common")
             .field("host_fd", &self.host_fd)
+            .field("type", &self.type_)
+            .field("nonblocking", &self.nonblocking)
             .field("pollee", &self.pollee)
             .field("inner", &self.inner.lock().unwrap())
             .finish()

@@ -13,9 +13,9 @@ struct Inner {
 }
 
 impl<A: Addr + 'static, R: Runtime> InitStream<A, R> {
-    pub fn new() -> Result<Arc<Self>> {
+    pub fn new(nonblocking: bool) -> Result<Arc<Self>> {
         let new_self = Self {
-            common: Arc::new(Common::new(Type::STREAM)?),
+            common: Arc::new(Common::new(Type::STREAM, nonblocking)?),
             inner: Mutex::new(Inner::new()),
         };
         Ok(Arc::new(new_self))

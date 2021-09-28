@@ -27,6 +27,10 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
                 return res;
             }
 
+            if self.common.nonblocking() {
+                return_errno!(EAGAIN, "try write again");
+            }
+
             // Wait for interesting events by polling
             if poller.is_none() {
                 poller = Some(Poller::new());
