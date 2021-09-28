@@ -7,13 +7,12 @@ targets:
     copy:
       - files:
         - ../openvino_src/bin/intel64/Release/benchmark_app
-  # copy plugins.xml
-  - target: /lib
-    copy:
-      - files:
-        - ../openvino_src/bin/intel64/Release/lib/plugins.xml
-  # copy models
+  # copy models and libs
   - target: /
     copy:
-      - files:
+      - dirs:
         - ../model
+  - target: /root/demos/openvino/openvino_src/bin/intel64/Release/
+    copy:
+      - dirs:
+        - ../openvino_src/bin/intel64/Release/lib
