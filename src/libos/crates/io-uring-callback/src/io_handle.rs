@@ -165,6 +165,10 @@ impl Inner {
             }
         }
 
+        if let Some(waker) = self.waker.take() {
+            waker.wake();
+        }
+
         self.completion_callback.take().unwrap()
     }
 
