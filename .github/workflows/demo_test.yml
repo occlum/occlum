@@ -427,7 +427,7 @@ jobs:
       run: docker exec openvino_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Run openVINO benchmark
-      run: docker exec openvino_test bash -c "cd /root/demos/openvino && SGX_MODE=SIM ./run_benchmark_on_occlum.sh"
+      run: docker exec openvino_test bash -c "cd /root/demos/openvino && cp -rf /root/occlum/demos/openvino/* . && SGX_MODE=SIM ./run_benchmark_on_occlum.sh"
 
 
   # Python test also needs its own image because in Alpine environment, modules are built locally and consumes a lot of time.
