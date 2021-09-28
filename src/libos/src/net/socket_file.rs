@@ -87,15 +87,15 @@ impl SocketFile {
 
 // Implement socket-specific methods
 impl SocketFile {
-    pub fn new(domain: Domain, is_stream: bool) -> Result<Self> {
+    pub fn new(domain: Domain, is_stream: bool, nonblocking: bool) -> Result<Self> {
         if is_stream {
             let any_socket = match domain {
                 Domain::Ipv4 => {
-                    let ipv4_stream = Ipv4Stream::new()?;
+                    let ipv4_stream = Ipv4Stream::new(nonblocking)?;
                     AnySocket::Ipv4Stream(ipv4_stream)
                 }
                 Domain::Unix => {
-                    let unix_stream = UnixStream::new()?;
+                    let unix_stream = UnixStream::new(nonblocking)?;
                     AnySocket::UnixStream(unix_stream)
                 }
                 _ => {
@@ -167,14 +167,14 @@ impl SocketFile {
         }
     }
 
-    pub async fn accept(&self) -> Result<Self> {
+    pub async fn accept(&self, nonblocking: bool) -> Result<Self> {
         let accepted_any_socket = match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => {
-                let accepted_ipv4_stream = ipv4_stream.accept().await?;
+                let accepted_ipv4_stream = ipv4_stream.accept(nonblocking).await?;
                 AnySocket::Ipv4Stream(accepted_ipv4_stream)
             }
             AnySocket::UnixStream(unix_stream) => {
-                let accepted_unix_stream = unix_stream.accept().await?;
+                let accepted_unix_stream = unix_stream.accept(nonblocking).await?;
                 AnySocket::UnixStream(accepted_unix_stream)
             }
             _ => {

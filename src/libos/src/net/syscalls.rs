@@ -22,7 +22,7 @@ pub async fn do_socket(domain: c_int, type_and_flags: c_int, protocol: c_int) ->
     let is_stream = {
         let type_bits = type_and_flags & !flags.bits();
         let type_ = Type::try_from(type_bits).map_err(|_| errno!(EINVAL, "invalid socket type"))?;
-        // Only the two most commonn stream types are supported for now
+        // Only the two most common stream types are supported for now
         match type_ {
             Type::STREAM => true,
             Type::DGRAM => false,
@@ -38,7 +38,8 @@ pub async fn do_socket(domain: c_int, type_and_flags: c_int, protocol: c_int) ->
     };
 
     // Create the socket
-    let socket_file = SocketFile::new(domain, is_stream)?;
+    let nonblocking = flags.contains(SocketFlags::SOCK_NONBLOCK);
+    let socket_file = SocketFile::new(domain, is_stream, nonblocking)?;
     let file_ref = FileRef::new_socket(socket_file);
 
     let close_on_spawn = flags.contains(SocketFlags::SOCK_CLOEXEC);
@@ -109,24 +110,6 @@ pub async fn do_accept4(
     addr_len: *mut libc::socklen_t,
     flags: c_int,
 ) -> Result<isize> {
-    // Set output vars for the accepted address and its length, if needed
-    let output_addr_buf_and_len: Option<(&mut [u8], &mut libc::socklen_t)> = {
-        if !addr.is_null() {
-            let output_len = {
-                from_user::check_ptr(addr_len)?;
-                unsafe { &mut *addr_len }
-            };
-            let addr = addr as *mut u8;
-            let addr_len = *output_len as usize;
-            let output_buf = {
-                from_user::check_mut_array(addr, addr_len)?;
-                unsafe { std::slice::from_raw_parts_mut(addr, addr_len) }
-            };
-            Some((output_buf, output_len))
-        } else {
-            None
-        }
-    };
     // Process other input arguments
     let flags = SocketFlags::from_bits_truncate(flags);
     let file_ref = current!().file(fd as FileDesc)?;
@@ -135,36 +118,13 @@ pub async fn do_accept4(
         .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
 
     // Do accept
-    let accepted_socket = socket_file.accept().await?;
+    let nonblocking = flags.contains(SocketFlags::SOCK_NONBLOCK);
+    let accepted_socket = socket_file.accept(nonblocking).await?;
 
-    // Set the non-blocking flag
-    if flags.contains(SocketFlags::SOCK_NONBLOCK) {
-        /*
-        let new_flags = StatusFlags::O_NONBLOCK;
-        socket_file.set_status_flags(new_flags).unwrap();
-        */
-        todo!("implement SocketFile::set_status_flags()")
-    }
     // Output the address
-    if let Some((output_addr_buf, output_addr_len)) = output_addr_buf_and_len {
-        /*
-        let (addr_storage, addr_len) = {
-            let addr = accepted_socket.addr();
-            addr.to_c_storage()
-        };
-
-        // Output the address's _actual_ length
-        *output_addr_len = addr_len as _;
-        // Output the address content
-        let addr_buf = {
-            let ptr = &addr_storage as *const u8;
-            let len = addr_len;
-            std::slice::from_raw_parts(ptr, len)
-        };
-        let copy_len = output_addr_buf.len().min(addr_buf.len());
-        (&mut output_addr_buf[..copy_len]).copy_from_slice(&addr_buf[..copy_len]);
-        */
-        todo!("implement SocketFile::addr()")
+    if !addr.is_null() {
+        let (src_addr, src_addr_len) = accepted_socket.addr()?.to_c_storage();
+        copy_sock_addr_to_user(src_addr, src_addr_len, addr, addr_len)?;
     };
     // Update the file table
     let new_fd = {
