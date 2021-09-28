@@ -55,13 +55,13 @@ impl SocketFile {
     }
 
     pub fn status_flags(&self) -> StatusFlags {
-        //apply_fn_on_any_socket!(&self.socket, |socket| { socket.status_flags() })
-        todo!("")
+        apply_fn_on_any_socket!(&self.socket, |socket| { socket.status_flags() })
     }
 
     pub fn set_status_flags(&self, new_flags: StatusFlags) -> Result<()> {
-        //apply_fn_on_any_socket!(&self.socket, |socket| { socket.set_status_flags(new_flags) })
-        todo!("")
+        apply_fn_on_any_socket!(&self.socket, |socket| {
+            socket.set_status_flags(new_flags)
+        })
     }
 
     pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {

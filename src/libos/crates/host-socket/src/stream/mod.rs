@@ -43,6 +43,24 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         state.common().host_fd()
     }
 
+    pub fn status_flags(&self) -> StatusFlags {
+        // Only support O_NONBLOCK
+        let state = self.state.read().unwrap();
+        if state.common().nonblocking() {
+            StatusFlags::O_NONBLOCK
+        } else {
+            StatusFlags::empty()
+        }
+    }
+
+    pub fn set_status_flags(&self, new_flags: StatusFlags) -> Result<()> {
+        // Only support O_NONBLOCK
+        let state = self.state.read().unwrap();
+        let nonblocking = new_flags.is_nonblocking();
+        state.common().set_nonblocking(nonblocking);
+        Ok(())
+    }
+
     pub fn bind(&self, addr: &A) -> Result<()> {
         let state = self.state.read().unwrap();
         match &*state {
