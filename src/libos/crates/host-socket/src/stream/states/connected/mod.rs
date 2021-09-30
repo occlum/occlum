@@ -39,7 +39,15 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         &self.common
     }
 
-    // TODO: implement other methods
+    pub fn shutdown(&self, how: Shutdown) -> Result<()> {
+        if how.should_shut_read() {
+            self.receiver.shutdown();
+        }
+        if how.should_shut_write() {
+            self.sender.shutdown();
+        }
+        Ok(())
+    }
 
     // Other methods are implemented in the send and receive modules
 }

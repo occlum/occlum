@@ -270,21 +270,21 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         Ok(())
     }
 
-    /*
-        pub async fn shutdown(&self, shutdown: Shutdown) -> Result<()> {
-            let connected_stream = {
-                let state = self.state.read();
-                match *state {
-                    Connected(connected_stream) => connected_stream.clone(),
-                    _ => {
-                        return_errno!(ENOTCONN, "the socket is not connected");
-                    }
+    pub fn shutdown(&self, shutdown: Shutdown) -> Result<()> {
+        let connected_stream = {
+            let state = self.state.read().unwrap();
+            match &*state {
+                State::Connected(connected_stream) => connected_stream.clone(),
+                _ => {
+                    return_errno!(ENOTCONN, "the socket is not connected");
                 }
-            };
+            }
+        };
 
-            connected_stream.shutdown(shutdown)
-        }
+        connected_stream.shutdown(shutdown)
+    }
 
+    /*
         pub fn poll_by(&self, mask: Events, mut poller: Option<&mut Poller>) -> Events {
             let state = self.state.read();
             match *state {
