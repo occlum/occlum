@@ -47,6 +47,50 @@ pub async fn do_socket(domain: c_int, type_and_flags: c_int, protocol: c_int) ->
     Ok(fd as isize)
 }
 
+pub async fn do_socketpair(
+    domain: c_int,
+    type_and_flags: c_int,
+    protocol: c_int,
+    sv: *mut c_int,
+) -> Result<isize> {
+    from_user::check_mut_array(sv, 2)?;
+    let mut sock_pair = unsafe { std::slice::from_raw_parts_mut(sv as *mut u32, 2) };
+
+    let domain = Domain::try_from(domain)
+        .map_err(|_| errno!(EAFNOSUPPORT, "invalid or unsupported network domain"))?;
+    if domain != Domain::Unix {
+        return_errno!(EAFNOSUPPORT, "unsupported network domain");
+    }
+    let flags = SocketFlags::from_bits_truncate(type_and_flags);
+    let is_stream = {
+        let type_bits = type_and_flags & !flags.bits();
+        let type_ = Type::try_from(type_bits).map_err(|_| errno!(EINVAL, "invalid socket type"))?;
+        match type_ {
+            Type::STREAM => true,
+            Type::DGRAM => false,
+            _ => return_errno!(EINVAL, "invalid type"),
+        }
+    };
+    let _protocol = {
+        // Only the default protocol is supported for now
+        if protocol != 0 {
+            return_errno!(EOPNOTSUPP, "invalid protocol");
+        }
+        protocol
+    };
+
+    let nonblocking = flags.contains(SocketFlags::SOCK_NONBLOCK);
+    let (socket_file1, socket_file2) = SocketFile::new_pair(is_stream, nonblocking)?;
+
+    let file_ref1 = FileRef::new_socket(socket_file1);
+    let file_ref2 = FileRef::new_socket(socket_file2);
+    let close_on_spawn = flags.contains(SocketFlags::SOCK_CLOEXEC);
+    sock_pair[0] = current!().add_file(file_ref1, close_on_spawn);
+    sock_pair[1] = current!().add_file(file_ref2, close_on_spawn);
+    debug!("socketpair: ({}, {})", sock_pair[0], sock_pair[1]);
+    Ok(0)
+}
+
 pub async fn do_bind(
     fd: c_int,
     addr: *const libc::sockaddr,

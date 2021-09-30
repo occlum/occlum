@@ -110,6 +110,21 @@ impl SocketFile {
         }
     }
 
+    pub fn new_pair(is_stream: bool, nonblocking: bool) -> Result<(Self, Self)> {
+        if is_stream {
+            let (stream1, stream2) = UnixStream::new_pair(nonblocking)?;
+            let sock_file1 = Self {
+                socket: AnySocket::UnixStream(stream1),
+            };
+            let sock_file2 = Self {
+                socket: AnySocket::UnixStream(stream2),
+            };
+            Ok((sock_file1, sock_file2))
+        } else {
+            return_errno!(EINVAL, "not support non-stream sockets, yet");
+        }
+    }
+
     pub fn domain(&self) -> Domain {
         apply_fn_on_any_socket!(&self.socket, |socket| { socket.domain() })
     }
