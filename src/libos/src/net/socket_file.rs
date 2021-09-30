@@ -1,4 +1,5 @@
 use async_io::ioctl::IoctlCmd;
+use async_io::socket::Shutdown;
 
 use self::impls::{Ipv4Stream, UnixStream};
 use crate::fs::{AccessMode, Events, Observer, Poller, StatusFlags};
@@ -205,6 +206,16 @@ impl SocketFile {
                 return_errno!(EINVAL, "peer_addr is not supported");
             }
         })
+    }
+
+    pub fn shutdown(&self, how: Shutdown) -> Result<()> {
+        match &self.socket {
+            AnySocket::Ipv4Stream(ipv4_stream) => ipv4_stream.shutdown(how),
+            AnySocket::UnixStream(unix_stream) => unix_stream.shutdown(how),
+            _ => {
+                return_errno!(EINVAL, "shutdown is not supported");
+            }
+        }
     }
 }
 

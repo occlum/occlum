@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 use std::mem::MaybeUninit;
 
 use async_io::ioctl::IoctlCmd;
-use async_io::socket::Type;
+use async_io::socket::{Shutdown, Type};
 use host_socket::sockopt::{
     GetAcceptConnCmd, GetDomainCmd, GetPeerNameCmd, GetSockOptRawCmd, GetTypeCmd, SetSockOptRawCmd,
     SockOptName,
@@ -223,6 +223,19 @@ pub async fn do_setsockopt(
 
     let mut cmd = new_setsockopt_cmd(level, optname, optval)?;
     socket_file.ioctl(cmd.as_mut())?;
+    Ok(0)
+}
+
+pub async fn do_shutdown(fd: c_int, how: c_int) -> Result<isize> {
+    debug!("shutdown: fd: {}, how: {}", fd, how);
+    let how = Shutdown::from_c(how as _)?;
+
+    let file_ref = current!().file(fd as FileDesc)?;
+    let socket_file = file_ref
+        .as_socket_file()
+        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+
+    socket_file.shutdown(how)?;
     Ok(0)
 }
 

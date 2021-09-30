@@ -471,6 +471,27 @@ int test_getname_without_bind() {
     return 0;
 }
 
+int test_shutdown() {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (shutdown(fd, SHUT_RDWR) == 0) {
+        THROW_ERROR("shutdown should return error");
+    }
+
+    int child_pid = 0;
+    int client_fd = connect_with_child(8807, &child_pid);
+
+    if (shutdown(client_fd, SHUT_RDWR) < 0) {
+        THROW_ERROR("failed to shutdown");
+    }
+
+    int status = 0;
+    if (wait4(child_pid, &status, 0, NULL) < 0) {
+        THROW_ERROR("failed to wait4 the child process");
+    }
+    close(client_fd);
+    return 0;
+}
+
 static test_case_t test_cases[] = {
     TEST_CASE(test_read_write),
     // TEST_CASE(test_send_recv),
@@ -482,6 +503,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_sockopt),
     TEST_CASE(test_getname),
     TEST_CASE(test_getname_without_bind),
+    TEST_CASE(test_shutdown),
 };
 
 int main(int argc, const char *argv[]) {
