@@ -24,7 +24,7 @@ int create_connected_sockets(int *sockets, char *sock_path) {
     memset(&addr, 0, sizeof(struct sockaddr_un)); //Clear structure
     addr.sun_family = AF_UNIX;
     strcpy(addr.sun_path, sock_path);
-    socklen_t addr_len = strlen(addr.sun_path) + sizeof(addr.sun_family);
+    socklen_t addr_len = strlen(addr.sun_path) + sizeof(addr.sun_family) + 1;
     if (bind(listen_fd, (struct sockaddr *)&addr, addr_len) == -1) {
         close(listen_fd);
         THROW_ERROR("failed to bind");
@@ -35,7 +35,7 @@ int create_connected_sockets(int *sockets, char *sock_path) {
         THROW_ERROR("failed to listen");
     }
 
-    int client_fd = socket(AF_UNIX, SOCK_STREAM, PF_UNIX);
+    int client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (client_fd == -1) {
         close(listen_fd);
         THROW_ERROR("failed to create a unix socket");
