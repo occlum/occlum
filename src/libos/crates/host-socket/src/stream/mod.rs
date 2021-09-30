@@ -29,6 +29,15 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         })
     }
 
+    pub fn new_pair(nonblocking: bool) -> Result<(Self, Self)> {
+        let (common1, common2) = Common::new_pair(Type::STREAM, nonblocking)?;
+        let connected1 = ConnectedStream::new(Arc::new(common1));
+        let connected2 = ConnectedStream::new(Arc::new(common2));
+        let socket1 = Self::new_connected(connected1);
+        let socket2 = Self::new_connected(connected2);
+        Ok((socket1, socket2))
+    }
+
     fn new_connected(connected_stream: Arc<ConnectedStream<A, R>>) -> Self {
         let state = RwLock::new(State::Connected(connected_stream));
         Self { state }
