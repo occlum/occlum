@@ -1,5 +1,5 @@
 use async_io::ioctl::IoctlCmd;
-use async_io::socket::Shutdown;
+use async_io::socket::{RecvFlags, SendFlags, Shutdown};
 
 use self::impls::{Ipv4Stream, UnixStream};
 use crate::fs::{AccessMode, Events, Observer, Poller, StatusFlags};
@@ -186,6 +186,69 @@ impl SocketFile {
             socket: accepted_any_socket,
         };
         Ok(accepted_socket_file)
+    }
+
+    pub async fn recvfrom(
+        &self,
+        buf: &mut [u8],
+        flags: RecvFlags,
+    ) -> Result<(usize, Option<AnyAddr>)> {
+        self.recvmsg(&mut [buf], flags).await
+    }
+
+    pub async fn recvmsg(
+        &self,
+        bufs: &mut [&mut [u8]],
+        flags: RecvFlags,
+    ) -> Result<(usize, Option<AnyAddr>)> {
+        // TODO: support msg_flags and msg_control
+        Ok(match &self.socket {
+            AnySocket::Ipv4Stream(ipv4_stream) => {
+                let bytes_recv = ipv4_stream.recvmsg(bufs, flags).await?;
+                (bytes_recv, None)
+            }
+            AnySocket::UnixStream(unix_stream) => {
+                let bytes_recv = unix_stream.recvmsg(bufs, flags).await?;
+                (bytes_recv, None)
+            }
+            _ => {
+                return_errno!(EINVAL, "recvfrom is not supported");
+            }
+        })
+    }
+
+    pub async fn sendto(
+        &self,
+        buf: &[u8],
+        addr: Option<AnyAddr>,
+        flags: SendFlags,
+    ) -> Result<usize> {
+        self.sendmsg(&[buf], addr, flags).await
+    }
+
+    pub async fn sendmsg(
+        &self,
+        bufs: &[&[u8]],
+        addr: Option<AnyAddr>,
+        flags: SendFlags,
+    ) -> Result<usize> {
+        match &self.socket {
+            AnySocket::Ipv4Stream(ipv4_stream) => {
+                if addr.is_some() {
+                    return_errno!(EISCONN, "addr should be none");
+                }
+                ipv4_stream.sendmsg(bufs, flags).await
+            }
+            AnySocket::UnixStream(unix_stream) => {
+                if addr.is_some() {
+                    return_errno!(EISCONN, "addr should be none");
+                }
+                unix_stream.sendmsg(bufs, flags).await
+            }
+            _ => {
+                return_errno!(EINVAL, "sendmsg is not supported");
+            }
+        }
     }
 
     pub fn addr(&self) -> Result<AnyAddr> {

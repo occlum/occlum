@@ -21,6 +21,7 @@
 #![feature(drain_filter)]
 #![feature(test)]
 #![feature(duration_zero)]
+#![feature(raw_ref_op)]
 
 #[macro_use]
 extern crate async_rt;

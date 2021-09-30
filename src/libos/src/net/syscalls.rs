@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 use std::mem::MaybeUninit;
 
 use async_io::ioctl::IoctlCmd;
-use async_io::socket::{Shutdown, Type};
+use async_io::socket::{RecvFlags, SendFlags, Shutdown, Type};
 use host_socket::sockopt::{
     GetAcceptConnCmd, GetDomainCmd, GetPeerNameCmd, GetSockOptRawCmd, GetTypeCmd, SetSockOptRawCmd,
     SockOptName,
@@ -111,6 +111,7 @@ pub async fn do_accept4(
     flags: c_int,
 ) -> Result<isize> {
     // Process other input arguments
+    let addr_and_addr_len = get_slice_from_sock_addr_ptr_mut(addr, addr_len)?;
     let flags = SocketFlags::from_bits_truncate(flags);
     let file_ref = current!().file(fd as FileDesc)?;
     let socket_file = file_ref
@@ -122,10 +123,10 @@ pub async fn do_accept4(
     let accepted_socket = socket_file.accept(nonblocking).await?;
 
     // Output the address
-    if !addr.is_null() {
+    if let Some((addr_mut, addr_len_mut)) = addr_and_addr_len {
         let (src_addr, src_addr_len) = accepted_socket.addr()?.to_c_storage();
-        copy_sock_addr_to_user(src_addr, src_addr_len, addr, addr_len)?;
-    };
+        copy_sock_addr_to_user(src_addr, src_addr_len, addr_mut, addr_len_mut);
+    }
     // Update the file table
     let new_fd = {
         let new_file_ref = FileRef::new_socket(accepted_socket);
@@ -135,18 +136,136 @@ pub async fn do_accept4(
     Ok(new_fd as isize)
 }
 
-pub async fn do_getpeername(
+pub async fn do_sendto(
     fd: c_int,
-    addr: *mut libc::sockaddr,
-    addr_len: *mut libc::socklen_t,
+    base: *const c_void,
+    len: size_t,
+    flags: c_int,
+    addr: *const libc::sockaddr,
+    addr_len: libc::socklen_t,
 ) -> Result<isize> {
     let file_ref = current!().file(fd as FileDesc)?;
     let socket_file = file_ref
         .as_socket_file()
         .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
 
+    let flags = SendFlags::from_bits_truncate(flags);
+
+    from_user::check_array(base as *const u8, len)?;
+    let buf = unsafe { std::slice::from_raw_parts(base as *const u8, len as usize) };
+
+    let addr = if socket_file.is_stream() {
+        if !addr.is_null() || addr_len != 0 {
+            return_errno!(EISCONN, "addr and addr_len should be null and 0");
+        }
+        None
+    } else {
+        if addr.is_null() || addr_len == 0 {
+            None
+        } else {
+            let addr_storage = copy_sock_addr_from_user(addr, addr_len as _)?;
+            Some(AnyAddr::from_c_storage(&addr_storage, addr_len as usize)?)
+        }
+    };
+
+    socket_file
+        .sendto(&buf, addr, flags)
+        .await
+        .map(|bytes_send| bytes_send as isize)
+}
+
+pub async fn do_recvfrom(
+    fd: c_int,
+    base: *mut c_void,
+    len: size_t,
+    flags: c_int,
+    addr: *mut libc::sockaddr,
+    addr_len: *mut libc::socklen_t,
+) -> Result<isize> {
+    let addr_and_addr_len = get_slice_from_sock_addr_ptr_mut(addr, addr_len)?;
+
+    let file_ref = current!().file(fd as FileDesc)?;
+    let socket_file = file_ref
+        .as_socket_file()
+        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+
+    let flags = RecvFlags::from_bits_truncate(flags);
+
+    from_user::check_array(base as *mut u8, len)?;
+    let mut buf = unsafe { std::slice::from_raw_parts_mut(base as *mut u8, len as usize) };
+
+    let (bytes_recv, addr_recv) = socket_file.recvfrom(&mut buf, flags).await?;
+
+    if let Some((addr_mut, addr_len_mut)) = addr_and_addr_len {
+        if let Some(addr_recv) = addr_recv {
+            let (c_addr_storage, c_addr_len) = addr_recv.to_c_storage();
+            copy_sock_addr_to_user(c_addr_storage, c_addr_len, addr_mut, addr_len_mut);
+        }
+    }
+    Ok(bytes_recv as _)
+}
+
+pub async fn do_sendmsg(fd: c_int, msg_ptr: *const libc::msghdr, flags: c_int) -> Result<isize> {
+    debug!(
+        "sendmsg: fd: {}, msg: {:?}, flags: 0x{:x}",
+        fd, msg_ptr, flags
+    );
+
+    let file_ref = current!().file(fd as FileDesc)?;
+    let socket_file = file_ref
+        .as_socket_file()
+        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+
+    let flags = SendFlags::from_bits_truncate(flags);
+
+    let (addr, bufs) = extract_msghdr_from_user(msg_ptr)?;
+    socket_file
+        .sendmsg(&bufs[..], addr, flags)
+        .await
+        .map(|bytes_send| bytes_send as isize)
+}
+
+pub async fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut libc::msghdr, flags: c_int) -> Result<isize> {
+    debug!(
+        "recvmsg: fd: {}, msg: {:?}, flags: 0x{:x}",
+        fd, msg_mut_ptr, flags
+    );
+
+    let file_ref = current!().file(fd as FileDesc)?;
+    let socket_file = file_ref
+        .as_socket_file()
+        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+
+    let flags = RecvFlags::from_bits_truncate(flags);
+
+    let (mut msg, mut addr, mut bufs) = extract_msghdr_mut_from_user(msg_mut_ptr)?;
+    let (bytes_recv, recv_addr) = socket_file.recvmsg(&mut bufs[..], flags).await?;
+
+    if let Some(addr) = addr {
+        if let Some(recv_addr) = recv_addr {
+            let (c_addr_storage, c_addr_len) = recv_addr.to_c_storage();
+            copy_sock_addr_to_user(c_addr_storage, c_addr_len, addr, &mut msg.msg_namelen);
+        }
+    }
+
+    Ok(bytes_recv as isize)
+}
+
+pub async fn do_getpeername(
+    fd: c_int,
+    addr: *mut libc::sockaddr,
+    addr_len: *mut libc::socklen_t,
+) -> Result<isize> {
+    let addr_and_addr_len = get_slice_from_sock_addr_ptr_mut(addr, addr_len)?;
+    let file_ref = current!().file(fd as FileDesc)?;
+    let socket_file = file_ref
+        .as_socket_file()
+        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+
     let (src_addr, src_addr_len) = socket_file.peer_addr()?.to_c_storage();
-    copy_sock_addr_to_user(src_addr, src_addr_len, addr, addr_len)?;
+    if let Some((addr_mut, addr_len_mut)) = addr_and_addr_len {
+        copy_sock_addr_to_user(src_addr, src_addr_len, addr_mut, addr_len_mut);
+    }
     Ok(0)
 }
 
@@ -155,13 +274,16 @@ pub async fn do_getsockname(
     addr: *mut libc::sockaddr,
     addr_len: *mut libc::socklen_t,
 ) -> Result<isize> {
+    let addr_and_addr_len = get_slice_from_sock_addr_ptr_mut(addr, addr_len)?;
     let file_ref = current!().file(fd as FileDesc)?;
     let socket_file = file_ref
         .as_socket_file()
         .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
 
     let (src_addr, src_addr_len) = socket_file.addr()?.to_c_storage();
-    copy_sock_addr_to_user(src_addr, src_addr_len, addr, addr_len)?;
+    if let Some((addr_mut, addr_len_mut)) = addr_and_addr_len {
+        copy_sock_addr_to_user(src_addr, src_addr_len, addr_mut, addr_len_mut);
+    }
     Ok(0)
 }
 
@@ -288,28 +410,39 @@ fn copy_sock_addr_from_user(
 fn copy_sock_addr_to_user(
     src_addr: libc::sockaddr_storage,
     src_addr_len: usize,
-    dst_addr: *mut libc::sockaddr,
-    dst_addr_len: *mut libc::socklen_t,
-) -> Result<()> {
-    if dst_addr.is_null() {
-        return Ok(());
-    }
-    from_user::check_ptr(dst_addr_len)?;
-    from_user::check_mut_array(dst_addr as *mut u8, unsafe { *dst_addr_len } as usize)?;
-
-    let len = std::cmp::min(src_addr_len, unsafe { *dst_addr_len } as usize);
+    dst_addr: &mut [u8],
+    dst_addr_len: &mut u32,
+) {
+    let len = std::cmp::min(src_addr_len, *dst_addr_len as usize);
     let sockaddr_src_buf = unsafe {
         let ptr = &src_addr as *const _ as *const u8;
         std::slice::from_raw_parts(ptr, len)
     };
-    let sockaddr_dst_buf = unsafe {
-        let ptr = dst_addr as *mut u8;
-        std::slice::from_raw_parts_mut(ptr, len)
-    };
-    sockaddr_dst_buf.copy_from_slice(sockaddr_src_buf);
+    dst_addr[..len].copy_from_slice(sockaddr_src_buf);
+    *dst_addr_len = src_addr_len as u32;
+}
 
-    unsafe { *dst_addr_len = src_addr_len as u32 };
-    Ok(())
+fn get_slice_from_sock_addr_ptr_mut<'a>(
+    addr_ptr: *mut libc::sockaddr,
+    addr_len_ptr: *mut libc::socklen_t,
+) -> Result<Option<(&'a mut [u8], &'a mut u32)>> {
+    if addr_ptr.is_null() ^ addr_len_ptr.is_null() {
+        return_errno!(EINVAL, "addr and addr_len should be both null or not null");
+    }
+    if addr_ptr.is_null() {
+        return Ok(None);
+    }
+
+    let addr_len_mut = {
+        from_user::check_mut_ptr(addr_len_ptr)?;
+        unsafe { &mut *addr_len_ptr }
+    };
+    let addr_len = *addr_len_mut;
+    let addr_mut = {
+        from_user::check_mut_array(addr_ptr as *mut u8, addr_len as usize)?;
+        unsafe { std::slice::from_raw_parts_mut(addr_ptr as *mut u8, addr_len as usize) }
+    };
+    Ok(Some((addr_mut, addr_len_mut)))
 }
 
 /// Create a new ioctl command for getsockopt syscall
@@ -384,4 +517,83 @@ fn copy_bytes_to_user(src_buf: &[u8], dst_buf: &mut [u8], dst_len: &mut u32) {
     let copy_len = dst_buf.len().min(src_buf.len());
     dst_buf[..copy_len].copy_from_slice(&src_buf[..copy_len]);
     *dst_len = copy_len as _;
+}
+
+fn extract_msghdr_from_user<'a>(
+    msg_ptr: *const libc::msghdr,
+) -> Result<(Option<AnyAddr>, Vec<&'a [u8]>)> {
+    from_user::check_ptr(msg_ptr)?;
+    let msg = unsafe { &*msg_ptr };
+
+    let msg_name = msg.msg_name;
+    let msg_namelen = msg.msg_namelen;
+    let name = if msg_name.is_null() || msg_namelen == 0 {
+        None
+    } else {
+        let sockaddr_storage = copy_sock_addr_from_user(msg_name as *const _, msg_namelen as _)?;
+        Some(AnyAddr::from_c_storage(
+            &sockaddr_storage,
+            msg_namelen as _,
+        )?)
+    };
+
+    let msg_iov = msg.msg_iov;
+    let msg_iovlen = msg.msg_iovlen;
+    let bufs = if msg_iov.is_null() || msg_iovlen == 0 {
+        Vec::new()
+    } else {
+        from_user::check_array(msg_iov, msg_iovlen)?;
+        let iovs = unsafe { std::slice::from_raw_parts(msg_iov, msg_iovlen) };
+        let mut bufs = Vec::with_capacity(msg_iovlen);
+        for iov in iovs {
+            let base_ptr = iov.iov_base as *const u8;
+            let len = iov.iov_len;
+            from_user::check_array(base_ptr, len)?;
+            let buf = unsafe { std::slice::from_raw_parts(base_ptr, len) };
+            bufs.push(buf);
+        }
+        bufs
+    };
+
+    Ok((name, bufs))
+}
+
+fn extract_msghdr_mut_from_user<'a>(
+    msg_mut_ptr: *mut libc::msghdr,
+) -> Result<(
+    &'a mut libc::msghdr,
+    Option<&'a mut [u8]>,
+    Vec<&'a mut [u8]>,
+)> {
+    from_user::check_mut_ptr(msg_mut_ptr)?;
+    let msg_mut = unsafe { &mut *msg_mut_ptr };
+
+    let msg_name = msg_mut.msg_name;
+    let msg_namelen = msg_mut.msg_namelen;
+    let name = if msg_name.is_null() || msg_namelen == 0 {
+        None
+    } else {
+        from_user::check_mut_array(msg_name as *mut u8, msg_namelen as usize)?;
+        Some(unsafe { std::slice::from_raw_parts_mut(msg_name as *mut u8, msg_namelen as usize) })
+    };
+
+    let msg_iov = msg_mut.msg_iov;
+    let msg_iovlen = msg_mut.msg_iovlen;
+    let bufs = if msg_iov.is_null() || msg_iovlen == 0 {
+        Vec::new()
+    } else {
+        from_user::check_mut_array(msg_iov, msg_iovlen)?;
+        let iovs = unsafe { std::slice::from_raw_parts_mut(msg_iov, msg_iovlen) };
+        let mut bufs = Vec::with_capacity(msg_iovlen);
+        for iov in iovs {
+            let base_ptr = iov.iov_base as *mut u8;
+            let len = iov.iov_len;
+            from_user::check_mut_array(base_ptr, len)?;
+            let buf = unsafe { std::slice::from_raw_parts_mut(base_ptr, len) };
+            bufs.push(buf);
+        }
+        bufs
+    };
+
+    Ok((msg_mut, name, bufs))
 }

@@ -140,6 +140,15 @@ int test_ip_socket() {
                     THROW_ERROR("read error");
                 }
 
+                // TODO: remove this temporary bug fix.
+                // The bug of epoll: Report EEXIST error when two different files with the same fd
+                // since we reuse fd in libos. See issue #48 for detail.
+                ret = epoll_ctl(epfd, EPOLL_CTL_DEL, events[i].data.fd, NULL);
+                if (ret == -1) {
+                    close(events[i].data.fd);
+                    THROW_ERROR("epoll_ctl delete failed");
+                }
+
                 close(events[i].data.fd);
                 // Finish communication with one process.
                 count++;
