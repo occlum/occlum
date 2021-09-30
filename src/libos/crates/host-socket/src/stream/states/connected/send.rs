@@ -12,7 +12,7 @@ use crate::runtime::Runtime;
 use crate::util::UntrustedCircularBuf;
 
 impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
-    pub async fn writev(self: &Arc<Self>, bufs: &[&[u8]]) -> Result<usize> {
+    pub async fn sendmsg(self: &Arc<Self>, bufs: &[&[u8]], flags: SendFlags) -> Result<usize> {
         let total_len: usize = bufs.iter().map(|buf| buf.len()).sum();
         if total_len == 0 {
             return Ok(0);
@@ -22,12 +22,12 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         let mut poller = None;
         loop {
             // Attempt to write
-            let res = self.try_writev(bufs);
+            let res = self.try_sendmsg(bufs, flags);
             if !res.has_errno(EAGAIN) {
                 return res;
             }
 
-            if self.common.nonblocking() {
+            if self.common.nonblocking() || flags.contains(SendFlags::MSG_DONTWAIT) {
                 return_errno!(EAGAIN, "try write again");
             }
 
@@ -43,8 +43,12 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         }
     }
 
-    fn try_writev(self: &Arc<Self>, bufs: &[&[u8]]) -> Result<usize> {
+    fn try_sendmsg(self: &Arc<Self>, bufs: &[&[u8]], flags: SendFlags) -> Result<usize> {
         let mut inner = self.sender.inner.lock().unwrap();
+
+        if !flags.is_empty() && flags != SendFlags::MSG_DONTWAIT {
+            todo!("Support other flags");
+        }
 
         // Check for error condition before write.
         //

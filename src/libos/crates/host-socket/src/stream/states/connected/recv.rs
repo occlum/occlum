@@ -12,7 +12,11 @@ use crate::runtime::Runtime;
 use crate::util::UntrustedCircularBuf;
 
 impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
-    pub async fn readv(self: &Arc<Self>, bufs: &mut [&mut [u8]]) -> Result<usize> {
+    pub async fn recvmsg(
+        self: &Arc<Self>,
+        bufs: &mut [&mut [u8]],
+        flags: RecvFlags,
+    ) -> Result<usize> {
         let total_len: usize = bufs.iter().map(|buf| buf.len()).sum();
         if total_len == 0 {
             return Ok(0);
@@ -22,12 +26,12 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         let mut poller = None;
         loop {
             // Attempt to read
-            let res = self.try_readv(bufs);
+            let res = self.try_recvmsg(bufs, flags);
             if !res.has_errno(EAGAIN) {
                 return res;
             }
 
-            if self.common.nonblocking() {
+            if self.common.nonblocking() || flags.contains(RecvFlags::MSG_DONTWAIT) {
                 return_errno!(EAGAIN, "no data are present to be received");
             }
 
@@ -43,8 +47,12 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         }
     }
 
-    fn try_readv(self: &Arc<Self>, bufs: &mut [&mut [u8]]) -> Result<usize> {
+    fn try_recvmsg(self: &Arc<Self>, bufs: &mut [&mut [u8]], flags: RecvFlags) -> Result<usize> {
         let mut inner = self.receiver.inner.lock().unwrap();
+
+        if !flags.is_empty() && flags != RecvFlags::MSG_DONTWAIT {
+            todo!("Support other flags");
+        }
 
         // Copy data from the recv buffer to the bufs
         let nbytes = {

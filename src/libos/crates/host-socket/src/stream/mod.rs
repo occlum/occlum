@@ -157,7 +157,17 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         self.readv(&mut [buf]).await
     }
 
-    pub async fn readv(&self, buf: &mut [&mut [u8]]) -> Result<usize> {
+    pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
+        self.recvmsg(bufs, RecvFlags::empty()).await
+    }
+
+    /// Receive messages from connected socket
+    ///
+    /// Linux behavior:
+    /// Unlike datagram socket, `recvfrom` / `recvmsg` of stream socket will
+    /// ignore the address even if user specified it. For stream socket, If user
+    /// want to get source address , user should use `getpeername` syscall.
+    pub async fn recvmsg(&self, buf: &mut [&mut [u8]], flags: RecvFlags) -> Result<usize> {
         let connected_stream = {
             let state = self.state.read().unwrap();
             match &*state {
@@ -168,7 +178,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             }
         };
 
-        connected_stream.readv(buf).await
+        connected_stream.recvmsg(buf, flags).await
     }
 
     pub async fn write(&self, buf: &[u8]) -> Result<usize> {
@@ -176,6 +186,10 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     pub async fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
+        self.sendmsg(bufs, SendFlags::empty()).await
+    }
+
+    pub async fn sendmsg(&self, bufs: &[&[u8]], flags: SendFlags) -> Result<usize> {
         let connected_stream = {
             let state = self.state.read().unwrap();
             match &*state {
@@ -186,7 +200,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             }
         };
 
-        connected_stream.writev(bufs).await
+        connected_stream.sendmsg(bufs, flags).await
     }
 
     pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
