@@ -116,8 +116,69 @@ impl VMArea {
         }
     }
 
+    pub fn is_the_same_to(&self, other: &VMArea) -> bool {
+        if self.pid() != other.pid() {
+            return false;
+        }
+
+        if self.range() != other.range() {
+            return false;
+        }
+
+        if self.perms() != other.perms() {
+            return false;
+        }
+
+        let self_writeback_file = self.writeback_file();
+        let other_writeback_file = other.writeback_file();
+        match (self_writeback_file, other_writeback_file) {
+            (None, None) => return true,
+            (Some(_), None) => return false,
+            (None, Some(_)) => return false,
+            (Some((self_file, self_offset)), Some((other_file, other_offset))) => {
+                Arc::ptr_eq(&self_file, &other_file) && self_offset == other_offset
+            }
+        }
+    }
+
     pub fn set_end(&mut self, new_end: usize) {
         self.range.set_end(new_end);
+    }
+
+    pub fn can_merge_vmas(left: &VMArea, right: &VMArea) -> bool {
+        debug_assert!(left.end() <= right.start());
+
+        // Both of the two VMAs must not be sentry (whose size == 0)
+        if left.size() == 0 || right.size() == 0 {
+            return false;
+        }
+        // The two VMAs must be owned by the same process
+        if left.pid() != right.pid() {
+            return false;
+        }
+        // The two VMAs must border with each other
+        if left.end() != right.start() {
+            return false;
+        }
+        // The two VMAs must have the same memory permissions
+        if left.perms() != right.perms() {
+            return false;
+        }
+
+        // If the two VMAs have write-back files, the files must be the same and
+        // the two file regions must be continuous.
+        let left_writeback_file = left.writeback_file();
+        let right_writeback_file = right.writeback_file();
+        match (left_writeback_file, right_writeback_file) {
+            (None, None) => true,
+            (Some(_), None) => false,
+            (None, Some(_)) => false,
+            (Some((left_file, left_offset)), Some((right_file, right_offset))) => {
+                Arc::ptr_eq(&left_file, &right_file)
+                    && right_offset > left_offset
+                    && right_offset - left_offset == left.size()
+            }
+        }
     }
 }
 
