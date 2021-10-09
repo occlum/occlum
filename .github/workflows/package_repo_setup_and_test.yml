@@ -169,7 +169,7 @@ jobs:
       run: echo "OCCLUM_VERSION=${{needs.Package_repository_setup_and_test.outputs.occlum_version}}" >> $GITHUB_ENV
 
     - name: Install sgx dependencies
-      run: docker exec centos bash -c "yum install -y wget yum-utils make jq gdb; cd /root && wget https://download.01.org/intel-sgx/sgx-linux/2.13.3/distro/centos8.2-server/sgx_rpm_local_repo.tgz;
+      run: docker exec centos bash -c "yum install -y wget yum-utils make jq gdb; cd /root && wget https://download.01.org/intel-sgx/sgx-linux/2.14/distro/centos8.2-server/sgx_rpm_local_repo.tgz;
         tar -xvzf sgx_rpm_local_repo.tgz; yum-config-manager --add-repo file:///root/sgx_rpm_local_repo; yum --nogpgcheck install -y libsgx-dcap-ql libsgx-epid libsgx-urts;
         yum --nogpgcheck install -y libsgx-quote-ex; rpm -i /root/sgx_rpm_local_repo/libsgx-uae-service-*.rpm || true"
 
