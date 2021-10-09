@@ -1276,13 +1276,11 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_munmap_with_null_addr),
     TEST_CASE(test_munmap_with_zero_len),
     TEST_CASE(test_munmap_with_non_page_aligned_len),
-#ifdef MREMAP_SUPPORTED
     TEST_CASE(test_mremap),
     TEST_CASE(test_mremap_subrange),
     TEST_CASE(test_mremap_with_fixed_addr),
     TEST_CASE(test_file_backed_mremap),
     TEST_CASE(test_file_backed_mremap_mem_may_move),
-#endif
     TEST_CASE(test_mprotect_once),
     TEST_CASE(test_mprotect_twice),
     TEST_CASE(test_mprotect_triple),

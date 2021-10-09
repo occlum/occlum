@@ -25,6 +25,7 @@
 #![feature(test)]
 #![feature(atomic_from_mut)]
 #![feature(thread_local)]
+#![feature(btree_drain_filter)]
 
 #[macro_use]
 extern crate async_rt;
@@ -60,9 +61,10 @@ extern crate serde;
 extern crate serde_json;
 #[macro_use]
 extern crate memoffset;
-extern crate resolv_conf;
 extern crate ctor;
 extern crate intrusive_collections;
+extern crate itertools;
+extern crate resolv_conf;
 extern crate vdso_time;
 
 use sgx_trts::libc;

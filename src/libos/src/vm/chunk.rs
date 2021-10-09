@@ -19,6 +19,9 @@ pub type ChunkID = usize;
 pub type ChunkRef = Arc<Chunk>;
 
 pub struct Chunk {
+    // This range is used for fast check without any locks. However, when mremap, the size of this range could be
+    // different with the internal VMA range for single VMA chunk. This can only be corrected by getting the internal
+    // VMA, creating a new chunk and replacing the old chunk.
     range: VMRange,
     internal: ChunkType,
 }
@@ -65,6 +68,13 @@ impl Chunk {
 
     pub fn internal(&self) -> &ChunkType {
         &self.internal
+    }
+
+    pub fn get_vma_for_single_vma_chunk(&self) -> VMArea {
+        match self.internal() {
+            ChunkType::MultiVMA(internal_manager) => unreachable!(),
+            ChunkType::SingleVMA(vma) => return vma.lock().unwrap().clone(),
+        }
     }
 
     pub fn free_size(&self) -> usize {
@@ -155,6 +165,33 @@ impl Chunk {
     pub fn is_single_vma(&self) -> bool {
         if let ChunkType::SingleVMA(_) = self.internal {
             true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_single_dummy_vma(&self) -> bool {
+        if let ChunkType::SingleVMA(vma) = &self.internal {
+            vma.lock().unwrap().size() == 0
+        } else {
+            false
+        }
+    }
+
+    // Chunk size and internal VMA size are conflict.
+    // This is due to the change of internal VMA.
+    pub fn is_single_vma_with_conflict_size(&self) -> bool {
+        if let ChunkType::SingleVMA(vma) = &self.internal {
+            vma.lock().unwrap().size() != self.range.size()
+        } else {
+            false
+        }
+    }
+
+    pub fn is_single_vma_chunk_should_be_removed(&self) -> bool {
+        if let ChunkType::SingleVMA(vma) = &self.internal {
+            let vma_size = vma.lock().unwrap().size();
+            vma_size == 0 || vma_size != self.range.size()
         } else {
             false
         }
