@@ -4,7 +4,7 @@
 FROM centos:8.2.2004 as base
 LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
 
-ADD https://download.01.org/intel-sgx/sgx-linux/2.13.3/distro/centos8.2-server/sgx_rpm_local_repo.tgz /tmp/
+ADD https://download.01.org/intel-sgx/sgx-linux/2.14/distro/centos8.2-server/sgx_rpm_local_repo.tgz /tmp/
 RUN cd /tmp && tar -xvzf sgx_rpm_local_repo.tgz && \
     yum install -y jq yum-utils && \
     yum-config-manager --add-repo file:///tmp/sgx_rpm_local_repo && \
