@@ -146,4 +146,10 @@ impl VMFreeSpaceManager {
         trace!("after add range back free list = {:?}", free_list);
         return Ok(());
     }
+
+    pub fn is_free_range(&self, request_range: &VMRange) -> bool {
+        self.free_manager
+            .iter()
+            .any(|free_range| free_range.is_superset_of(request_range))
+    }
 }
