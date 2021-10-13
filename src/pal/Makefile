@@ -18,8 +18,10 @@ C_SRCS := $(sort $(wildcard src/*.c src/*/*.c))
 CXX_SRCS := $(sort $(wildcard src/*.cpp src/*/*.cpp))
 C_OBJS := $(addprefix $(OBJ_DIR)/pal/,$(C_SRCS:.c=.o))
 CXX_OBJS := $(addprefix $(OBJ_DIR)/pal/,$(CXX_SRCS:.cpp=.o))
-EXTERNAL_SRCS := $(CRATES_DIR)/vdso-time/ocalls/vdso-time-ocalls.c
-EXTERNAL_OBJS := $(addprefix $(OBJ_DIR)/pal/external_ocalls/,vdso-time-ocalls.o)
+VDSO_SRCS := $(CRATES_DIR)/vdso-time/ocalls/vdso-time-ocalls.c
+VDSO_OBJS := $(addprefix $(OBJ_DIR)/pal/external_ocalls/,$(VDSO_SRCS:.c=.o))
+SOCKET_SRCS := $(CRATES_DIR)/host-socket/ocalls/host_socket_ocalls.c
+SOCKET_OBJS := $(addprefix $(OBJ_DIR)/pal/external_ocalls/,$(SOCKET_SRCS:.c=.o))
 
 # Object files for simulation mode are stored in libos/src_sim
 ifneq ($(SGX_MODE), HW)
@@ -48,7 +50,7 @@ endif
 
 LINK_FLAGS += -L$(PROJECT_DIR)/deps/io-uring/ocalls/target/release/ -lsgx_io_uring_ocalls
 
-ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(LIBOCCLUM_PAL_SO_REAL) $(EDL_C_OBJS) $(C_OBJS) $(CXX_OBJS) $(EXTERNAL_OBJS))))
+ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(LIBOCCLUM_PAL_SO_REAL) $(EDL_C_OBJS) $(C_OBJS) $(CXX_OBJS) $(VDSO_OBJS) $(SOCKET_OBJS))))
 
 .PHONY: all format format-check clean
 
@@ -57,7 +59,7 @@ all: $(ALL_BUILD_SUBDIRS) $(LIBOCCLUM_PAL_SO_REAL)
 $(ALL_BUILD_SUBDIRS):
 	@mkdir -p $@
 
-$(LIBOCCLUM_PAL_SO_REAL): $(LIBSGX_USTDC_A) $(EDL_C_OBJS) $(C_OBJS) $(CXX_OBJS) $(EXTERNAL_OBJS)
+$(LIBOCCLUM_PAL_SO_REAL): $(LIBSGX_USTDC_A) $(EDL_C_OBJS) $(C_OBJS) $(CXX_OBJS) $(VDSO_OBJS) $(SOCKET_OBJS)
 	@$(CXX) $^ -o $@ $(LINK_FLAGS) -Wl,-soname=$(LIBOCCLUM_PAL_SONAME)
 	@# Create symbolic files because occlum run and exec will need it when linking.
 	@cd $(BUILD_DIR)/lib && ln -sf $(notdir $(LIBOCCLUM_PAL_SO_REAL)) $(notdir $(LIBOCCLUM_PAL_SONAME)) && \
@@ -74,6 +76,7 @@ $(OBJ_DIR)/pal/$(SRC_OBJ)/Enclave_u.c: $(SGX_EDGER8R) ../Enclave.edl
 		--search-path $(SGX_SDK)/include \
 		--search-path $(RUST_SGX_SDK_DIR)/edl/ \
 		--search-path $(CRATES_DIR)/vdso-time/ocalls \
+		--search-path $(CRATES_DIR)/host-socket/ocalls \
 		--search-path $(PROJECT_DIR)/deps/io-uring/ocalls
 	@echo "GEN <= $@"
 
@@ -85,7 +88,11 @@ $(OBJ_DIR)/pal/$(SRC_OBJ)/%.o: src/%.cpp
 	@$(CXX) $(CXX_FLAGS) -c $< -o $@
 	@echo "CXX <= $@"
 
-$(EXTERNAL_OBJS): $(EXTERNAL_SRCS)
+$(VDSO_OBJS): $(VDSO_SRCS)
+	@$(CC) $(C_FLAGS) -c $< -o $@
+	@echo "CC <= $@"
+
+$(SOCKET_OBJS): $(SOCKET_SRCS)
 	@$(CC) $(C_FLAGS) -c $< -o $@
 	@echo "CC <= $@"
 

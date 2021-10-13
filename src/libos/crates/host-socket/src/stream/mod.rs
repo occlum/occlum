@@ -2,6 +2,7 @@ mod states;
 
 use self::states::{ConnectedStream, ConnectingStream, InitStream, ListenerStream};
 use crate::common::Common;
+use crate::ioctl::*;
 use crate::prelude::*;
 use crate::runtime::Runtime;
 use crate::sockopt::*;
@@ -286,6 +287,25 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             cmd: GetTypeCmd => {
                 let state = self.state.read().unwrap();
                 cmd.set_output(state.common().type_() as _);
+            },
+            cmd: SetNonBlocking => {
+                let state = self.state.read().unwrap();
+                state.common().set_nonblocking(*cmd.input() != 0);
+            },
+            cmd: GetReadBufLen => {
+                let state = self.state.read().unwrap();
+                if let State::Connected(connected_stream) = &*state {
+                    let read_buf_len = connected_stream.bytes_to_consume();
+                    cmd.set_output(read_buf_len as _);
+                } else {
+                    return_errno!(ENOTCONN, "unconnected socket");
+                }
+            },
+            cmd: GetIfReqWithRawCmd => {
+                cmd.execute(self.host_fd())?;
+            },
+            cmd: GetIfConf => {
+                cmd.execute(self.host_fd())?;
             },
             _ => {
                 return_errno!(EINVAL, "Not supported yet");

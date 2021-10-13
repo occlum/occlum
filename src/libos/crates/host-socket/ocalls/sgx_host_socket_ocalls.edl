@@ -1,0 +1,11 @@
+enclave {
+    untrusted {
+        int socket_ocall_ioctl_repack(
+            int fd,
+            int request,
+            [in, out, size=len] char *buf,
+            int len,
+            [out] int* recv_len
+        ) propagate_errno;
+    };
+};

@@ -166,6 +166,11 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             unsafe { io_uring.cancel(io_handle) };
         }
     }
+
+    pub fn bytes_to_consume(self: &Arc<Self>) -> usize {
+        let mut inner = self.receiver.inner.lock().unwrap();
+        inner.recv_buf.consumable()
+    }
 }
 
 pub struct Receiver {

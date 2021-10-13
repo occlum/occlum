@@ -8,6 +8,7 @@ enclave {
     from "sgx_thread.edl" import *;
     from "sgx_occlum_utils.edl" import *;
     from "sgx_vdso_time_ocalls.edl" import *;
+    from "sgx_host_socket_ocalls.edl" import *;
     from "sgx_io_uring_ocalls.edl" import *;
 
     include "sgx_quote.h"
@@ -224,14 +225,6 @@ enclave {
 
         void occlum_ocall_print_log(uint32_t level, [in, string] const char* msg);
         void occlum_ocall_flush_log(void);
-
-        int occlum_ocall_ioctl_repack(
-            int fd,
-            int request,
-            [in, out, size=len] char *buf,
-            int len,
-            [out] int* recv_len
-        ) propagate_errno;
 
         int occlum_ocall_ioctl(
             int fd,

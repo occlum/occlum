@@ -12,11 +12,14 @@
 extern crate sgx_libc as libc;
 #[cfg(feature = "sgx")]
 extern crate sgx_tstd as std;
+#[cfg(feature = "sgx")]
+extern crate sgx_types;
 
 #[macro_use]
 mod prelude;
 mod common;
 mod datagram;
+pub mod ioctl;
 mod runtime;
 pub mod sockopt;
 mod stream;
