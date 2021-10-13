@@ -348,7 +348,7 @@ int test_poll() {
         ssize_t count;
         char buf[512];
         if ((count = read(client_fd, buf, sizeof buf)) != 0) {
-            if (strcmp(buf, DEFAULT_MSG) != 0) {
+            if (count != strlen(DEFAULT_MSG) || strncmp(buf, DEFAULT_MSG, strlen(DEFAULT_MSG)) != 0) {
                 printf(buf);
                 THROW_ERROR("msg mismatched");
             }
