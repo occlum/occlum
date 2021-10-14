@@ -51,9 +51,6 @@ impl LockedPidDirINode {
         // exe
         let exe_inode = ProcExeSymINode::new(&file.process_ref);
         file.entries.insert(String::from("exe"), exe_inode);
-        // fd
-        let fd_inode = LockedProcFdDirINode::new(&file.process_ref, file.this.upgrade().unwrap());
-        file.entries.insert(String::from("fd"), fd_inode);
         // root
         let root_inode = ProcRootSymINode::new(&file.process_ref);
         file.entries.insert(String::from("root"), root_inode);
@@ -77,6 +74,16 @@ impl DirProcINode for LockedPidDirINode {
         if name == ".." {
             return Ok(Arc::clone(&file.parent));
         }
+        // The 'fd' entry holds 1 Arc of LockedPidDirINode, so the LockedPidDirINode
+        // ifself will hold 2 Arcs. This makes it cannot be dropped automatically.
+        // We initialize the 'fd' here to avoid this.
+        // TODO:: Try to find a better solution.
+        if name == "fd" {
+            let fd_inode =
+                LockedProcFdDirINode::new(&file.process_ref, file.this.upgrade().unwrap());
+            return Ok(fd_inode);
+        }
+
         if let Some(inode) = file.entries.get(name) {
             Ok(Arc::clone(inode))
         } else {
@@ -90,12 +97,13 @@ impl DirProcINode for LockedPidDirINode {
             1 => Ok(String::from("..")),
             i => {
                 let file = self.0.read().unwrap();
-                let name = file
-                    .entries
-                    .keys()
-                    .nth(i - 2)
-                    .ok_or(FsError::EntryNotFound)?;
-                Ok(name.to_owned())
+                if let Some(name) = file.entries.keys().nth(i - 2) {
+                    Ok(name.to_owned())
+                } else if i == file.entries.len() + 2 {
+                    Ok(String::from("fd"))
+                } else {
+                    Err(FsError::EntryNotFound)
+                }
             }
         }
     }
@@ -112,6 +120,17 @@ impl DirProcINode for LockedPidDirINode {
         let skipped = if idx < 2 { 0 } else { idx - 2 };
         for (name, inode) in file.entries.iter().skip(skipped) {
             write_inode_entry!(&mut ctx, name, inode, &mut total_written_len);
+        }
+
+        // Write the fd entry
+        if idx <= 2 + file.entries.len() {
+            write_entry!(
+                &mut ctx,
+                "fd",
+                PROC_INO,
+                vfs::FileType::Dir,
+                &mut total_written_len
+            );
         }
 
         Ok(total_written_len)
