@@ -136,7 +136,12 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
 
     pub fn set_peer_addr(&self, peer_addr: &A) {
         let mut inner = self.inner.lock().unwrap();
-        inner.peer_addr = Some(peer_addr.clone())
+        inner.peer_addr = Some(peer_addr.clone());
+    }
+
+    pub fn reset_peer_addr(&self) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.peer_addr = None;
     }
 }
 

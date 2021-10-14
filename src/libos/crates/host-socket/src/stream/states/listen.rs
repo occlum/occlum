@@ -6,7 +6,8 @@ use io_uring_callback::{Fd, IoHandle};
 use memoffset::offset_of;
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
-use super::{Common, ConnectedStream};
+use super::ConnectedStream;
+use crate::common::Common;
 use crate::prelude::*;
 use crate::runtime::Runtime;
 

@@ -1,4 +1,4 @@
-use super::Common;
+use crate::common::Common;
 use crate::prelude::*;
 use crate::runtime::Runtime;
 
@@ -27,22 +27,10 @@ impl<A: Addr + 'static, R: Runtime> InitStream<A, R> {
             return_errno!(EINVAL, "the socket is already bound to an address");
         }
 
-        Self::do_bind(self.common.host_fd(), addr)?;
+        crate::common::do_bind(self.common.host_fd(), addr)?;
 
         inner.has_bound = true;
         self.common.set_addr(addr);
-        Ok(())
-    }
-
-    fn do_bind(host_fd: HostFd, addr: &A) -> Result<()> {
-        let fd = host_fd as i32;
-        let (c_addr_storage, c_addr_len) = addr.to_c_storage();
-        let c_addr_ptr = &c_addr_storage as *const _ as _;
-        let c_addr_len = c_addr_len as u32;
-        #[cfg(not(feature = "sgx"))]
-        try_libc!(libc::bind(fd, c_addr_ptr, c_addr_len));
-        #[cfg(feature = "sgx")]
-        try_libc!(libc::ocall::bind(fd, c_addr_ptr, c_addr_len));
         Ok(())
     }
 

@@ -14,6 +14,7 @@ extern crate sgx_tstd as std;
 
 #[macro_use]
 mod prelude;
+mod common;
 mod runtime;
 pub mod sockopt;
 mod stream;

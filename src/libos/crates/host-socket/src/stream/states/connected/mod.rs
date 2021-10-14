@@ -1,6 +1,6 @@
 use self::recv::Receiver;
 use self::send::Sender;
-use super::Common;
+use crate::common::Common;
 use crate::prelude::*;
 use crate::runtime::Runtime;
 

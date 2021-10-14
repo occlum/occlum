@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use io_uring_callback::{Fd, IoHandle};
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
-use super::Common;
+use crate::common::Common;
 use crate::prelude::*;
 use crate::runtime::Runtime;
 

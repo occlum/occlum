@@ -1,6 +1,7 @@
 mod states;
 
-use self::states::{Common, ConnectedStream, ConnectingStream, InitStream, ListenerStream};
+use self::states::{ConnectedStream, ConnectingStream, InitStream, ListenerStream};
+use crate::common::Common;
 use crate::prelude::*;
 use crate::runtime::Runtime;
 use crate::sockopt::*;
