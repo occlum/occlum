@@ -124,10 +124,6 @@ pub async fn do_connect(
     addr: *const libc::sockaddr,
     addr_len: libc::socklen_t,
 ) -> Result<isize> {
-    // TODO: allow addr be null.
-    // In case of datagram sockets (UDP), the addr can be null, which means forgetting
-    // about the destination address, i.e., making the UDP sockets _unconnected_.
-
     let file_ref = current!().file(fd as FileDesc)?;
     let socket_file = file_ref
         .as_socket_file()

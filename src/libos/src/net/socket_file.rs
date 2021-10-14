@@ -1,7 +1,7 @@
 use async_io::ioctl::IoctlCmd;
 use async_io::socket::{RecvFlags, SendFlags, Shutdown};
 
-use self::impls::{Ipv4Stream, UnixStream};
+use self::impls::{Ipv4Datagram, Ipv4Stream, UnixDatagram, UnixStream};
 use crate::fs::{AccessMode, Events, Observer, Poller, StatusFlags};
 use crate::net::{Addr, AnyAddr, Domain, Ipv4SocketAddr, UnixAddr};
 use crate::prelude::*;
@@ -15,6 +15,8 @@ pub struct SocketFile {
 enum AnySocket {
     UnixStream(UnixStream),
     Ipv4Stream(Ipv4Stream),
+    UnixDatagram(UnixDatagram),
+    Ipv4Datagram(Ipv4Datagram),
 }
 
 // Apply a function to all variants of AnySocket enum.
@@ -26,6 +28,12 @@ macro_rules! apply_fn_on_any_socket {
                 $($fn_body)*
             }
             AnySocket::Ipv4Stream($socket) => {
+                $($fn_body)*
+            }
+            AnySocket::UnixDatagram($socket) => {
+                $($fn_body)*
+            }
+            AnySocket::Ipv4Datagram($socket) => {
                 $($fn_body)*
             }
         }
@@ -106,7 +114,21 @@ impl SocketFile {
             let new_self = Self { socket: any_socket };
             Ok(new_self)
         } else {
-            return_errno!(EINVAL, "not support non-stream sockets, yet");
+            let any_socket = match domain {
+                Domain::Ipv4 => {
+                    let ipv4_datagram = Ipv4Datagram::new(nonblocking)?;
+                    AnySocket::Ipv4Datagram(ipv4_datagram)
+                }
+                Domain::Unix => {
+                    let unix_datagram = UnixDatagram::new(nonblocking)?;
+                    AnySocket::UnixDatagram(unix_datagram)
+                }
+                _ => {
+                    return_errno!(EINVAL, "not support IPv6, yet");
+                }
+            };
+            let new_self = Self { socket: any_socket };
+            Ok(new_self)
         }
     }
 
@@ -121,7 +143,14 @@ impl SocketFile {
             };
             Ok((sock_file1, sock_file2))
         } else {
-            return_errno!(EINVAL, "not support non-stream sockets, yet");
+            let (datagram1, datagram2) = UnixDatagram::new_pair(nonblocking)?;
+            let sock_file1 = Self {
+                socket: AnySocket::UnixDatagram(datagram1),
+            };
+            let sock_file2 = Self {
+                socket: AnySocket::UnixDatagram(datagram2),
+            };
+            Ok((sock_file1, sock_file2))
         }
     }
 
@@ -136,16 +165,28 @@ impl SocketFile {
     pub async fn connect(&self, addr: &AnyAddr) -> Result<()> {
         match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => {
-                let ip_addr = addr
-                    .as_ipv4()
-                    .ok_or_else(|| errno!(EAFNOSUPPORT, "not ipv4 address"))?;
+                let ip_addr = addr.to_ipv4()?;
                 ipv4_stream.connect(ip_addr).await
             }
             AnySocket::UnixStream(unix_stream) => {
-                let unix_addr = addr
-                    .as_unix()
-                    .ok_or_else(|| errno!(EAFNOSUPPORT, "not unix address"))?;
+                let unix_addr = addr.to_unix()?;
                 unix_stream.connect(unix_addr).await
+            }
+            AnySocket::Ipv4Datagram(ipv4_datagram) => {
+                let ip_addr = if addr.is_unspec() {
+                    None
+                } else {
+                    Some(addr.to_ipv4()?)
+                };
+                ipv4_datagram.connect(ip_addr).await
+            }
+            AnySocket::UnixDatagram(unix_datagram) => {
+                let unix_addr = if addr.is_unspec() {
+                    None
+                } else {
+                    Some(addr.to_unix()?)
+                };
+                unix_datagram.connect(unix_addr).await
             }
             _ => {
                 return_errno!(EINVAL, "connect is not supported");
@@ -156,16 +197,20 @@ impl SocketFile {
     pub fn bind(&self, addr: &AnyAddr) -> Result<()> {
         match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => {
-                let ip_addr = addr
-                    .as_ipv4()
-                    .ok_or_else(|| errno!(EAFNOSUPPORT, "not ipv4 address"))?;
+                let ip_addr = addr.to_ipv4()?;
                 ipv4_stream.bind(ip_addr)
             }
             AnySocket::UnixStream(unix_stream) => {
-                let unix_addr = addr
-                    .as_unix()
-                    .ok_or_else(|| errno!(EAFNOSUPPORT, "not unix address"))?;
+                let unix_addr = addr.to_unix()?;
                 unix_stream.bind(unix_addr)
+            }
+            AnySocket::Ipv4Datagram(ipv4_datagram) => {
+                let ip_addr = addr.to_ipv4()?;
+                ipv4_datagram.bind(ip_addr)
+            }
+            AnySocket::UnixDatagram(unix_datagram) => {
+                let unix_addr = addr.to_unix()?;
+                unix_datagram.bind(unix_addr)
             }
             _ => {
                 return_errno!(EINVAL, "bind is not supported");
@@ -226,6 +271,14 @@ impl SocketFile {
                 let bytes_recv = unix_stream.recvmsg(bufs, flags).await?;
                 (bytes_recv, None)
             }
+            AnySocket::Ipv4Datagram(ipv4_datagram) => {
+                let (bytes_recv, addr_recv) = ipv4_datagram.recvmsg(bufs, flags).await?;
+                (bytes_recv, Some(AnyAddr::Ipv4(addr_recv)))
+            }
+            AnySocket::UnixDatagram(unix_datagram) => {
+                let (bytes_recv, addr_recv) = unix_datagram.recvmsg(bufs, flags).await?;
+                (bytes_recv, Some(AnyAddr::Unix(addr_recv)))
+            }
             _ => {
                 return_errno!(EINVAL, "recvfrom is not supported");
             }
@@ -260,6 +313,22 @@ impl SocketFile {
                 }
                 unix_stream.sendmsg(bufs, flags).await
             }
+            AnySocket::Ipv4Datagram(ipv4_datagram) => {
+                let ip_addr = if let Some(addr) = addr.as_ref() {
+                    Some(addr.to_ipv4()?)
+                } else {
+                    None
+                };
+                ipv4_datagram.sendmsg(bufs, ip_addr, flags).await
+            }
+            AnySocket::UnixDatagram(unix_datagram) => {
+                let unix_addr = if let Some(addr) = addr.as_ref() {
+                    Some(addr.to_unix()?)
+                } else {
+                    None
+                };
+                unix_datagram.sendmsg(bufs, unix_addr, flags).await
+            }
             _ => {
                 return_errno!(EINVAL, "sendmsg is not supported");
             }
@@ -270,6 +339,8 @@ impl SocketFile {
         Ok(match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => AnyAddr::Ipv4(ipv4_stream.addr()?),
             AnySocket::UnixStream(unix_stream) => AnyAddr::Unix(unix_stream.addr()?),
+            AnySocket::Ipv4Datagram(ipv4_datagram) => AnyAddr::Ipv4(ipv4_datagram.addr()?),
+            AnySocket::UnixDatagram(unix_datagram) => AnyAddr::Unix(unix_datagram.addr()?),
             _ => {
                 return_errno!(EINVAL, "addr is not supported");
             }
@@ -280,6 +351,8 @@ impl SocketFile {
         Ok(match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => AnyAddr::Ipv4(ipv4_stream.peer_addr()?),
             AnySocket::UnixStream(unix_stream) => AnyAddr::Unix(unix_stream.peer_addr()?),
+            AnySocket::Ipv4Datagram(ipv4_datagram) => AnyAddr::Ipv4(ipv4_datagram.peer_addr()?),
+            AnySocket::UnixDatagram(unix_datagram) => AnyAddr::Unix(unix_datagram.peer_addr()?),
             _ => {
                 return_errno!(EINVAL, "peer_addr is not supported");
             }
@@ -307,6 +380,9 @@ mod impls {
     // and host paths. Second, we need two types of unix domain sockets: the trusted one that
     // is implemented inside LibOS and the untrusted one that is implemented by host OS.
     pub type UnixStream = host_socket::StreamSocket<UnixAddr, SocketRuntime>;
+
+    pub type Ipv4Datagram = host_socket::DatagramSocket<Ipv4SocketAddr, SocketRuntime>;
+    pub type UnixDatagram = host_socket::DatagramSocket<UnixAddr, SocketRuntime>;
 
     pub struct SocketRuntime;
 
