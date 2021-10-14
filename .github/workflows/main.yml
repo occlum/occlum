@@ -4,8 +4,13 @@ on:
   push:
   pull_request:
   schedule:
-    # Schedule to run everyday at 9PM UTC (5AM CST)
-    - cron:  '0 9 * * *'
+    # Schedule to run everyday at 6PM UTC (2AM CST)
+    - cron:  '* 18 * * *'
+
+# It needs about 1 minute to run "make test" once. For a GitHub Action's job, the maximum execution time
+# is 6 hours. Thus, this value should be no greater than 360.
+env:
+  repeat_times: 300
 
 jobs:
   Make_test_on_ubuntu:
@@ -42,6 +47,14 @@ jobs:
     - name: Integration test with Glibc
       run:  docker exec ubuntu-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test-glibc"
 
+    - name: Stress test with Glibc
+      if: ${{ github.event_name == 'schedule' }}
+      run: docker exec ubuntu-test bash -c "cd /root/occlum; SGX_MODE=SIM make test-glibc times=${{ env.repeat_times }};"
+
+    - name: Show failed cases
+      if: ${{ failure() }}
+      run: docker exec ubuntu-test bash -c "cat /root/occlum/build/test/.fail"
+
   Make_test_on_centos:
     runs-on: ubuntu-18.04
 
@@ -75,3 +88,11 @@ jobs:
 
     - name: Integration test with Glibc
       run:  docker exec centos-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test-glibc"
+
+    - name: Stress test with musl
+      if: ${{ github.event_name == 'schedule' }}
+      run: docker exec centos-test bash -c "cd /root/occlum; SGX_MODE=SIM make test times=${{ env.repeat_times }}"
+
+    - name: Show failed cases
+      if: ${{ failure() }}
+      run: docker exec centos-test bash -c "cat /root/occlum/build/test/.fail"
