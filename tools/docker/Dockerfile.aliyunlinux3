@@ -159,6 +159,10 @@ ENV PATH="/opt/occlum/toolchains/rust/bin:$PATH"
 WORKDIR /tmp
 RUN cd bash && ./build.sh && rm -rf /tmp/bash
 
+# Install Occlum busybox
+WORKDIR /tmp
+RUN cd busybox && ./build.sh && rm -rf /tmp/busybox
+
 # Install Occlum Java toolchain (JDK 11)
 ARG JDK11_PATH=/opt/occlum/toolchains/jvm/java-11-openjdk
 COPY --from=alpine /usr/lib/jvm/java-11-openjdk $JDK11_PATH
