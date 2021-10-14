@@ -243,7 +243,15 @@ To build Occlum from the latest source code, do the following steps in an Occlum
 3. Compile and test Occlum
     ```
     make
+
+    # test musl based binary
     make test
+
+    # test glibc based binary
+    make test-glibc
+
+    # stress test
+    make test times=100
     ```
 
     For platforms that don't support SGX
