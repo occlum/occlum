@@ -57,7 +57,8 @@ LIBOS_CORE_A := $(OBJ_DIR)/libos/lib/lib$(LIBOS_CORE_LIB_NAME).a
 LIBOS_CORE_RS_A := $(OBJ_DIR)/libos/lib/libocclum_libos_core_rs.a
 
 # All source code
-RUST_SRCS := $(wildcard src/*.rs src/*/*.rs src/*/*/*.rs src/*/*/*/*.rs src/*/*/*/*/*.rs)
+RUST_SRCS := $(wildcard src/*.rs src/*/*.rs src/*/*/*.rs src/*/*/*/*.rs src/*/*/*/*/*.rs \
+				crates/*/src/*.rs crates/*/src/*/*.rs crates/*/src/*/*/*.rs crates/*/src/*/*/*/*.rs)
 RUST_TARGET_DIR := $(OBJ_DIR)/libos/cargo-target
 RUST_OUT_DIR := $(OBJ_DIR)/libos/lib
 EDL_C_SRCS := $(addprefix $(OBJ_DIR)/libos/,$(SRC_OBJ)/Enclave_t.c $(SRC_OBJ)/Enclave_t.h)
