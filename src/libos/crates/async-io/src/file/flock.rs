@@ -1,11 +1,11 @@
 /// File POSIX advisory lock
-use super::*;
-use process::pid_t;
+use crate::prelude::*;
+use libc::{off_t, pid_t};
 
 /// C struct for a lock
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct flock {
+pub struct flock_c {
     pub l_type: u16,
     pub l_whence: u16,
     pub l_start: off_t,
@@ -13,7 +13,7 @@ pub struct flock {
     pub l_pid: pid_t,
 }
 
-impl flock {
+impl flock_c {
     pub fn copy_from_safe(&mut self, lock: &Flock) {
         self.l_type = lock.l_type as u16;
         self.l_whence = lock.l_whence as u16;
@@ -34,7 +34,7 @@ pub struct Flock {
 }
 
 impl Flock {
-    pub fn from_c(flock_c: &flock) -> Result<Self> {
+    pub fn from_c(flock_c: &flock_c) -> Result<Self> {
         let l_type = FlockType::from_u16(flock_c.l_type)?;
         let l_whence = FlockWhence::from_u16(flock_c.l_whence)?;
         Ok(Self {
