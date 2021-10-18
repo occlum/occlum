@@ -4,7 +4,7 @@ THIS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
 INSTALL_DIR=/opt/occlum/toolchains/busybox
 
 busybox_source="https://github.com/mirror/busybox.git"
-busybox_tag="1_31_1"
+busybox_tag="1_32_1"
 busybox_config=${THIS_DIR}/config
 
 function build_and_install_busybox()
