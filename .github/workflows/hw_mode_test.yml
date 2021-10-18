@@ -5,9 +5,13 @@ on:
   push:
   pull_request_target:
     types: labeled
+  schedule:
+  # Schedule to run everyday at 6PM UTC (2AM CST)
+    - cron:  '0 18 * * *'
 
 env:
   nap_time: 60
+  repeat_times: 500  # Stress test repeat times
 
 jobs:
   Make-test-on-ubuntu:
@@ -969,6 +973,7 @@ jobs:
       if: ${{ always() }}
       run: docker stop $tf_serving_test
 
+
   Remote_attestation_test:
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
@@ -1027,3 +1032,123 @@ jobs:
 
     - name: Build and run remote attestation demo
       run: docker exec $ra_test bash -c "cd /root/occlum/demos/remote_attestation/dcap; ./run_dcap_quote_on_occlum.sh"
+
+
+  Stress_test_with_musl:
+    if: github.event_name == 'schedule'
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
+
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+
+    - name: Get Occlum version
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+
+    - name: Create container
+      run: |
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        else
+          echo "Unsupported Hardware"
+        fi;
+        echo "occlum_test=$occlum_test" >> $GITHUB_ENV
+
+    - name: Update PCCS server
+      run: docker exec $occlum_test bash -c "sed -r -i 's/PCCS_URL=https:\/\/localhost:8081\/sgx\/certification\/v3\//PCCS_URL=https:\/\/sgx-dcap-server.cn-shanghai.aliyuncs.com\/sgx\/certification\/v3\//g' /etc/sgx_default_qcnl.conf"
+
+    - name: Change download source of crates.io
+      run: |
+        docker exec $occlum_test bash -c "cat <<- EOF >/root/.cargo/config
+        [source.crates-io]
+        registry = \"https://github.com/rust-lang/crates.io-index\"
+        replace-with = 'ustc'
+        [source.ustc]
+        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+        EOF"
+
+    - name: Build dependencies
+      run: docker exec $occlum_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
+
+    - name: Build source
+      run: docker exec $occlum_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+
+    - name: Stress test with musl
+      run:  docker exec $occlum_test bash -c "cd /root/occlum; make test times=${{ env.repeat_times }}"
+
+    - name: Show failed cases and clean the environment
+      if: ${{ always() }}
+      run: |
+        docker exec $occlum_test bash -c "cat /root/occlum/build/test/.fail"
+        docker stop $occlum_test
+
+
+  Stress_test_with_glibc:
+    if: github.event_name == 'schedule'
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
+
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+
+    - name: Get Occlum version
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+
+    - name: Create container
+      run: |
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
+        else
+          echo "Unsupported Hardware"
+        fi;
+        echo "occlum_test=$occlum_test" >> $GITHUB_ENV
+
+    - name: Update PCCS server
+      run: docker exec $occlum_test bash -c "sed -r -i 's/PCCS_URL=https:\/\/localhost:8081\/sgx\/certification\/v3\//PCCS_URL=https:\/\/sgx-dcap-server.cn-shanghai.aliyuncs.com\/sgx\/certification\/v3\//g' /etc/sgx_default_qcnl.conf"
+
+    - name: Change download source of crates.io
+      run: |
+        docker exec $occlum_test bash -c "cat <<- EOF >/root/.cargo/config
+        [source.crates-io]
+        registry = \"https://github.com/rust-lang/crates.io-index\"
+        replace-with = 'ustc'
+        [source.ustc]
+        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+        EOF"
+
+    - name: Build dependencies
+      run: docker exec $occlum_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
+
+    - name: Build source
+      run: docker exec $occlum_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+
+    - name: Stress test with Glibc
+      run:  docker exec $occlum_test bash -c "cd /root/occlum; make test-glibc times=${{ env.repeat_times }}"
+
+    - name: Show failed cases and clean the environment
+      if: ${{ always() }}
+      run: |
+        docker exec $occlum_test bash -c "cat /root/occlum/build/test/.fail"
+        docker stop $occlum_test
