@@ -1086,6 +1086,23 @@ int test_mprotect_multiple_vmas() {
     return 0;
 }
 
+int test_mprotect_grow_down() {
+    int flags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN;
+    void *buf = mmap(0, PAGE_SIZE * 2, PROT_NONE, flags, -1, 0);
+    if (buf == MAP_FAILED) {
+        THROW_ERROR("mmap failed");
+    }
+
+    // Mprotect can use PROT_GROWSDOWN on a stack segment or a segment mapped with the MAP_GROWSDOWN flag set
+    int ret = mprotect(buf, 2 * PAGE_SIZE,
+                       PROT_READ | PROT_WRITE | PROT_EXEC | PROT_GROWSDOWN);
+    if (ret < 0) {
+        THROW_ERROR("mprotect  failed");
+    }
+
+    return 0;
+}
+
 int check_file_first_four_page(char *file_path, int first_page_val, int secend_page_val,
                                int third_page_val, int fourth_page_val) {
     int fd = open(file_path, O_RDONLY);
@@ -1289,6 +1306,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_mprotect_with_invalid_prot),
     TEST_CASE(test_mprotect_with_non_page_aligned_size),
     TEST_CASE(test_mprotect_multiple_vmas),
+    TEST_CASE(test_mprotect_grow_down),
 };
 
 int main() {

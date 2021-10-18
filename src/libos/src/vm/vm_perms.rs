@@ -8,6 +8,7 @@ bitflags! {
         const EXEC        = 0x4;
         const DEFAULT     = Self::READ.bits | Self::WRITE.bits;
         const ALL         = Self::DEFAULT.bits | Self::EXEC.bits;
+        const GROWSDOWN   = 0x01000000; // For x86, stack direction always grow downwards.
     }
 }
 
@@ -46,8 +47,11 @@ impl VMPerms {
             let mut retval = 0;
             let addr = protect_range.start() as *const c_void;
             let len = protect_range.size();
-            let prot = perms.bits() as i32;
-            let sgx_status = occlum_ocall_mprotect(&mut retval, addr, len, prot);
+            // PT_GROWSDOWN should only be applied to stack segment or a segment mapped with the MAP_GROWSDOWN flag set.
+            // Since the memory are managed by our own, mprotect ocall shouldn't use this flag. Otherwise, EINVAL will be thrown.
+            let mut prot = perms.clone();
+            prot.remove(VMPerms::GROWSDOWN);
+            let sgx_status = occlum_ocall_mprotect(&mut retval, addr, len, prot.bits() as i32);
             assert!(sgx_status == sgx_status_t::SGX_SUCCESS && retval == 0);
         }
     }
