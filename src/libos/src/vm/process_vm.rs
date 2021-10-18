@@ -413,17 +413,19 @@ impl ProcessVM {
         let heap_start = self.heap_range.start();
         let heap_end = self.heap_range.end();
 
-        if new_brk == 0 {
-            return Ok(self.get_brk());
-        } else if new_brk < heap_start {
-            return_errno!(EINVAL, "New brk address is too low");
-        } else if new_brk > heap_end {
-            return_errno!(EINVAL, "New brk address is too high");
-        }
+        if new_brk >= heap_start && new_brk <= heap_end {
+            self.brk
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |old_brk| Some(new_brk));
+            Ok(new_brk)
+        } else {
+            if new_brk < heap_start {
+                error!("New brk address is too low");
+            } else if new_brk > heap_end {
+                error!("New brk address is too high");
+            }
 
-        self.brk
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |old_brk| Some(new_brk));
-        Ok(new_brk)
+            Ok(self.get_brk())
+        }
     }
 
     // Get a NON-accurate free size for current process
