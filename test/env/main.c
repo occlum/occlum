@@ -209,7 +209,7 @@ int main(int argc, const char *argv[]) {
     g_argc = argc;
     g_argv = argv;
     // Test argc
-    if (getpid() > 2) {
+    if (g_argc == 2) {
         return test_suite_run(child_test_cases, ARRAY_SIZE(child_test_cases));
     } else  {
         return test_suite_run(test_cases, ARRAY_SIZE(test_cases));

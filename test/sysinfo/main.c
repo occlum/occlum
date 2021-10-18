@@ -31,8 +31,8 @@ int test_sysinfo() {
     printf ("free RAM: %5.1f MB\n", info.freeram / MEGABYTE);
     printf ("process count: %d\n", info.procs);
 
-    // make sure update is in a valid range (1s ~ 5min)
-    if (info.uptime < 1 || info.uptime / MIN > 5 ) {
+    // make sure update is in a valid range ( > 1s)
+    if (info.uptime < 1) {
         THROW_ERROR("system uptime error");
     }
 
