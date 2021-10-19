@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+rm -rf ncurses
 # download and install ncurses
 git clone -b v6.1 --depth 1 https://github.com/mirror/ncurses.git
 cd ncurses
@@ -25,10 +26,3 @@ cmake ../  -DCMAKE_BUILD_TYPE=Debug -DCURSES_LIBRARY=/opt/occlum/toolchains/gcc/
 make -j$(nproc)
 cd ../../
 
-# download and build busybox
-git clone -b 1_31_1 --depth 1 https://github.com/mirror/busybox.git
-cd busybox
-CROSS_COMPILE=/opt/occlum/toolchains/gcc/bin/occlum-
-make CROSS_COMPILE="$CROSS_COMPILE" defconfig
-cp ../.config .
-make CROSS_COMPILE="$CROSS_COMPILE" -j$(nproc)

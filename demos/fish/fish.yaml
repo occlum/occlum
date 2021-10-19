@@ -7,7 +7,7 @@ targets:
     copy:
       - files:
         - ../fish-shell/build/fish
-        - ../busybox/busybox
+        - /opt/occlum/toolchains/busybox/musl/busybox
   - target: /bin
     # copy script
     copy:
