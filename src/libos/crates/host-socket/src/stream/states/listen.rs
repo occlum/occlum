@@ -7,7 +7,7 @@ use memoffset::offset_of;
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
 use super::ConnectedStream;
-use crate::common::Common;
+use crate::common::{do_close, Common};
 use crate::prelude::*;
 use crate::runtime::Runtime;
 
@@ -320,6 +320,12 @@ impl<A: Addr + 'static> std::fmt::Debug for Backlog<A> {
 
 impl<A: Addr> Drop for Backlog<A> {
     fn drop(&mut self) {
-        // TODO: close the accepted fds
+        for entry in self.entries.iter() {
+            if let Entry::Completed { host_fd } = entry {
+                if let Err(e) = do_close(*host_fd) {
+                    log::error!("close fd failed, host_fd: {}, err: {}", host_fd, e);
+                }
+            }
+        }
     }
 }
