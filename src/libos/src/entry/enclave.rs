@@ -266,6 +266,7 @@ fn do_new_process(
         argv,
         &env_concat,
         &file_actions,
+        None,
         host_stdio_fds,
         wake_host,
         current,

@@ -9,7 +9,7 @@ use super::super::{
 };
 use super::{Process, ProcessInner};
 use crate::prelude::*;
-use crate::signal::{SigDispositions, SigQueues};
+use crate::signal::{SigDispositions, SigQueues, SigSet};
 
 #[derive(Debug)]
 pub struct ProcessBuilder {
@@ -22,6 +22,7 @@ pub struct ProcessBuilder {
     parent: Option<ProcessRef>,
     no_parent: bool,
     host_waker: Option<HostWaker>,
+    sig_dispositions: Option<SigDispositions>,
 }
 
 impl ProcessBuilder {
@@ -35,6 +36,7 @@ impl ProcessBuilder {
             parent: None,
             no_parent: false,
             host_waker: None,
+            sig_dispositions: None,
         }
     }
 
@@ -63,6 +65,11 @@ impl ProcessBuilder {
         self
     }
 
+    pub fn sig_dispositions(mut self, sig_dispositions: SigDispositions) -> Self {
+        self.sig_dispositions = Some(sig_dispositions);
+        self
+    }
+
     pub fn sched(mut self, sched: SchedAgentRef) -> Self {
         self.thread_builder(|tb| tb.sched(sched))
     }
@@ -77,6 +84,10 @@ impl ProcessBuilder {
 
     pub fn files(mut self, files: FileTableRef) -> Self {
         self.thread_builder(|tb| tb.files(files))
+    }
+
+    pub fn sig_mask(mut self, sig_mask: SigSet) -> Self {
+        self.thread_builder(|tb| tb.sig_mask(sig_mask))
     }
 
     pub fn rlimits(mut self, rlimits: ResourceLimitsRef) -> Self {
@@ -106,7 +117,7 @@ impl ProcessBuilder {
             let parent = self.parent.take().map(|parent| RwLock::new(parent));
             let host_waker = self.host_waker.take();
             let inner = SgxMutex::new(ProcessInner::new());
-            let sig_dispositions = RwLock::new(SigDispositions::new());
+            let sig_dispositions = RwLock::new(self.sig_dispositions.unwrap_or_default());
             let sig_queues = RwLock::new(SigQueues::new());
             let forced_exit_status = ForcedExitStatus::new();
             let exit_waiters = WaiterQueue::new();

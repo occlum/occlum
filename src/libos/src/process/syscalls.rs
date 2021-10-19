@@ -8,6 +8,7 @@ use super::do_spawn::FileAction;
 use super::do_wait4::WaitOptions;
 use super::prctl::PrctlCmd;
 use super::process::ProcessFilter;
+use super::spawn_attribute::{clone_spawn_atrributes_safely, posix_spawnattr_t, SpawnAttr};
 use crate::prelude::*;
 use crate::time::{timespec_t, ClockId};
 use crate::util::mem_util::from_user::*;
@@ -18,19 +19,22 @@ pub async fn do_spawn_for_musl(
     argv: *const *const i8,
     envp: *const *const i8,
     fdop_list: *const FdOp,
+    attribute_list: *const posix_spawnattr_t,
 ) -> Result<isize> {
     check_mut_ptr(child_pid_ptr)?;
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     let argv = clone_cstrings_safely(argv)?;
     let envp = clone_cstrings_safely(envp)?;
     let file_actions = clone_file_actions_safely(fdop_list)?;
+    let spawn_attrs = clone_spawn_atrributes_safely(attribute_list)?;
     let current = current!();
     debug!(
-        "spawn: path: {:?}, argv: {:?}, envp: {:?}, fdop: {:?}",
-        path, argv, envp, file_actions
+        "spawn: path: {:?}, argv: {:?}, envp: {:?}, fdop: {:?}, spawn_attr: {:?}",
+        path, argv, envp, file_actions, spawn_attrs
     );
 
-    let child_pid = super::do_spawn::do_spawn(&path, &argv, &envp, &file_actions, &current)?;
+    let child_pid =
+        super::do_spawn::do_spawn(&path, &argv, &envp, &file_actions, spawn_attrs, &current)?;
 
     unsafe { *child_pid_ptr = child_pid };
     Ok(0)
@@ -94,19 +98,22 @@ pub async fn do_spawn_for_glibc(
     argv: *const *const i8,
     envp: *const *const i8,
     fa: *const SpawnFileActions,
+    attribute_list: *const posix_spawnattr_t,
 ) -> Result<isize> {
     check_mut_ptr(child_pid_ptr)?;
     let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
     let argv = clone_cstrings_safely(argv)?;
     let envp = clone_cstrings_safely(envp)?;
     let file_actions = clone_file_actions_from_fa_safely(fa)?;
+    let spawn_attrs = clone_spawn_atrributes_safely(attribute_list)?;
     let current = current!();
     debug!(
-        "spawn: path: {:?}, argv: {:?}, envp: {:?}, actions: {:?}",
-        path, argv, envp, file_actions
+        "spawn: path: {:?}, argv: {:?}, envp: {:?}, actions: {:?}, attributes: {:?}",
+        path, argv, envp, file_actions, spawn_attrs
     );
 
-    let child_pid = super::do_spawn::do_spawn(&path, &argv, &envp, &file_actions, &current)?;
+    let child_pid =
+        super::do_spawn::do_spawn(&path, &argv, &envp, &file_actions, spawn_attrs, &current)?;
 
     unsafe { *child_pid_ptr = child_pid };
     Ok(0)

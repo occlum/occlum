@@ -50,8 +50,8 @@ use crate::prelude::*;
 use crate::process::{
     do_arch_prctl, do_clone, do_exit, do_exit_group, do_futex, do_getegid, do_geteuid, do_getgid,
     do_getpgid, do_getpid, do_getppid, do_gettid, do_getuid, do_prctl, do_set_tid_address,
-    do_spawn_for_glibc, do_spawn_for_musl, do_wait4, pid_t, FdOp, SpawnFileActions, ThreadRef,
-    ThreadStatus,
+    do_spawn_for_glibc, do_spawn_for_musl, do_wait4, pid_t, posix_spawnattr_t, FdOp,
+    SpawnFileActions, ThreadRef, ThreadStatus,
 };
 use crate::sched::{do_getcpu, do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
 use crate::signal::{
@@ -137,8 +137,8 @@ macro_rules! process_syscall_table_with_callback {
             //
             // TODO: Unify the use of C types. For example, u8 or i8 or char_c for C string?
 
-            (SpawnGlibc = 359) => do_spawn_for_glibc(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fa: *const SpawnFileActions),
-            (SpawnMusl = 360) => do_spawn_for_musl(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp),
+            (SpawnGlibc = 359) => do_spawn_for_glibc(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fa: *const SpawnFileActions, attribute_list: *const posix_spawnattr_t),
+            (SpawnMusl = 360) => do_spawn_for_musl(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp, attribute_list: *const posix_spawnattr_t),
             (Clone = 56) => do_clone(flags: u32, stack_addr: usize, ptid: *mut pid_t, ctid: *mut pid_t, new_tls: usize),
             (Wait4 = 61) => do_wait4(pid: i32, _exit_status: *mut i32, options: u32),
             (Exit = 60) => do_exit(exit_status: i32),
