@@ -5,6 +5,7 @@ use super::do_poll::PollFd;
 use crate::fs::CreationFlags;
 use crate::misc::resource_t;
 use crate::prelude::*;
+use crate::time::timeval_t;
 use crate::util::mem_util::from_user;
 
 pub async fn do_epoll_create(size: c_int) -> Result<isize> {
@@ -165,4 +166,62 @@ pub async fn do_poll(
         raw_poll_fd.revents = poll_fd.revents().get().bits() as i16;
     }
     Ok(count as isize)
+}
+
+pub async fn do_select(
+    nfds: c_int,
+    readfds: *mut libc::fd_set,
+    writefds: *mut libc::fd_set,
+    exceptfds: *mut libc::fd_set,
+    timeout: *mut timeval_t,
+) -> Result<isize> {
+    let nfds = {
+        let soft_rlimit_nofile = current!()
+            .rlimits()
+            .lock()
+            .unwrap()
+            .get(resource_t::RLIMIT_NOFILE)
+            .get_cur();
+        if nfds < 0 || nfds > libc::FD_SETSIZE as i32 || nfds as u64 > soft_rlimit_nofile {
+            return_errno!(
+                EINVAL,
+                "nfds is negative or exceeds the resource limit or FD_SETSIZE"
+            );
+        }
+        nfds as FileDesc
+    };
+
+    let mut timeout_c = if !timeout.is_null() {
+        let timeval = from_user::make_mut_ref(timeout)?;
+        timeval.validate()?;
+        Some(timeval)
+    } else {
+        None
+    };
+    let mut timeout = timeout_c.as_ref().map(|timeout_c| timeout_c.as_duration());
+
+    let readfds = if !readfds.is_null() {
+        Some(from_user::make_mut_ref(readfds)?)
+    } else {
+        None
+    };
+    let writefds = if !writefds.is_null() {
+        Some(from_user::make_mut_ref(writefds)?)
+    } else {
+        None
+    };
+    let exceptfds = if !exceptfds.is_null() {
+        Some(from_user::make_mut_ref(exceptfds)?)
+    } else {
+        None
+    };
+
+    let ret =
+        super::do_select::do_select(nfds, readfds, writefds, exceptfds, timeout.as_mut()).await;
+
+    if let Some(timeout_c) = timeout_c {
+        *timeout_c = timeout.unwrap().into();
+    }
+
+    ret
 }
