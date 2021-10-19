@@ -167,7 +167,10 @@ impl EpollFile {
             // If no ready entries for now, wait for them
             if poller.is_none() {
                 poller = Some(Poller::new());
-                self.pollee.poll(Events::IN, poller.as_mut());
+                let events = self.pollee.poll(Events::IN, poller.as_mut());
+                if !events.is_empty() {
+                    continue;
+                }
             }
 
             // Return if the timeout expires.
