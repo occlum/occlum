@@ -17,6 +17,7 @@
 #define ECHO_MSG "msg for client/server test"
 #define RESPONSE "ACK"
 #define DEFAULT_MSG "Hello World!\n"
+#define SYNC_MSG "sync"
 
 int connect_with_child(int port, int *child_pid) {
     int ret = 0;
@@ -262,7 +263,16 @@ int test_sendmsg_recvmsg_connectionless() {
     int ret = 0;
     int child_pid = 0;
 
-    char *client_argv[] = {"client", "NULL", "8803", NULL};
+    int sync_fds[2];
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sync_fds) < 0) {
+        THROW_ERROR("socketpair failed");
+    }
+    int server_sync_fd = sync_fds[0];
+    int client_sync_fd = sync_fds[1];
+
+    char sync_fd_string[8];
+    sprintf(sync_fd_string, "%d", client_sync_fd);
+    char *client_argv[] = {"client", "NULL", "8803", sync_fd_string, NULL};
     ret = posix_spawn(&child_pid, "/bin/client", NULL, NULL, client_argv, NULL);
     if (ret < 0) {
         THROW_ERROR("spawn client process error");
@@ -270,6 +280,8 @@ int test_sendmsg_recvmsg_connectionless() {
 
     ret = server_connectionless_recvmsg();
     if (ret < 0) { return -1; }
+
+    write(server_sync_fd, SYNC_MSG, strlen(SYNC_MSG));
 
     ret = wait_for_child_exit(child_pid);
 
@@ -496,7 +508,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_read_write),
     TEST_CASE(test_send_recv),
     TEST_CASE(test_sendmsg_recvmsg),
-    // TEST_CASE(test_sendmsg_recvmsg_connectionless),
+    TEST_CASE(test_sendmsg_recvmsg_connectionless),
     // TEST_CASE(test_fcntl_setfl_and_getfl),
     TEST_CASE(test_poll),
     TEST_CASE(test_poll_events_unchanged),

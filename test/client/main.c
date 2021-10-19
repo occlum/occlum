@@ -126,7 +126,7 @@ int client_connectionless_sendmsg(char *buf) {
 }
 
 int main(int argc, const char *argv[]) {
-    if (argc != 3) {
+    if (argc < 3) {
         THROW_ERROR("usage: ./client <ipaddress> <port>\n");
     }
 
@@ -149,7 +149,17 @@ int main(int argc, const char *argv[]) {
             ret = client_sendmsg(server_fd, buf);
             break;
         case 8803:
+            if (argc < 4) {
+                THROW_ERROR("should specify sync fd\n");
+            }
+            int sync_fd = strtol(argv[3], NULL, 10);
+
             ret = client_connectionless_sendmsg(DEFAULT_MSG);
+
+            char sync_buf[4];
+            if (read(sync_fd, sync_buf, sizeof(sync_buf)) < 0) {
+                THROW_ERROR("read sync_fd failed\n");
+            }
             break;
         default:
             ret = client_send(server_fd, DEFAULT_MSG);
