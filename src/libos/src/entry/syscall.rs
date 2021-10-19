@@ -139,7 +139,7 @@ macro_rules! process_syscall_table_with_callback {
             (SpawnGlibc = 359) => do_spawn_for_glibc(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fa: *const SpawnFileActions),
             (SpawnMusl = 360) => do_spawn_for_musl(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp),
             (Clone = 56) => do_clone(flags: u32, stack_addr: usize, ptid: *mut pid_t, ctid: *mut pid_t, new_tls: usize),
-            (Wait4 = 61) => do_wait4(pid: i32, _exit_status: *mut i32),
+            (Wait4 = 61) => do_wait4(pid: i32, _exit_status: *mut i32, options: u32),
             (Exit = 60) => do_exit(exit_status: i32),
             (ExitGroup = 231) => do_exit_group(exit_status: i32),
 
@@ -324,7 +324,7 @@ macro_rules! process_syscall_table_with_callback {
             (Vfork = 58) => handle_unsupported(),
             (Execve = 59) => handle_unsupported(),
             (Exit = 60) => do_exit(exit_status: i32),
-            (Wait4 = 61) => do_wait4(pid: i32, _exit_status: *mut i32),
+            (Wait4 = 61) => do_wait4(pid: i32, _exit_status: *mut i32, options: u32),
             (Kill = 62) => do_kill(pid: i32, sig: c_int),
             (Uname = 63) => do_uname(name: *mut utsname_t),
             (Semget = 64) => handle_unsupported(),

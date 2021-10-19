@@ -6,7 +6,7 @@ use super::process::{ProcessFilter, ProcessInner};
 use super::{table, ProcessRef, ProcessStatus};
 use crate::prelude::*;
 
-pub async fn do_wait4(child_filter: &ProcessFilter) -> Result<(pid_t, i32)> {
+pub async fn do_wait4(child_filter: &ProcessFilter, options: WaitOptions) -> Result<(pid_t, i32)> {
     let thread = current!();
     let process = thread.process();
 
@@ -38,6 +38,18 @@ pub async fn do_wait4(child_filter: &ProcessFilter) -> Result<(pid_t, i32)> {
             let exit_status = free_zombie_child(&process, process_inner, zombie_pid);
             return Ok((zombie_pid, exit_status));
         }
+
+        // TODO: Support these options
+        if !options.supported() {
+            warn!("Unsupported options contained. wait options: {:?}", options);
+        }
+
+        // If the WNOHANG bit is set in OPTIONS, and that child
+        // is not already dead, return (pid_t) 0.  If successful,
+        // return PID and store the dead child's status in STAT_LOC.
+        if options.contains(WaitOptions::WNOHANG) {
+            return Ok((0, 0));
+        }
     })
 }
 
@@ -56,3 +68,26 @@ fn free_zombie_child(
     let zombie_inner = zombie.inner();
     zombie_inner.term_status().unwrap().as_u32() as i32
 }
+
+// Based on waitflags.h
+// WNOWAIT is not listed here which can only be used in "waitid" syscall.
+bitflags! {
+    pub struct WaitOptions: u32 {
+        const WNOHANG = 0x1;
+        //Note: Below flags are not supported yet
+        const WSTOPPED = 0x2; // Same as WUNTRACED
+        const WEXITED = 0x4;
+        const WCONTINUED = 0x8;
+    }
+}
+
+impl WaitOptions {
+    fn supported(&self) -> bool {
+        let unsupported_flags = WaitOptions::all() - WaitOptions::WNOHANG;
+        !self.intersects(unsupported_flags)
+    }
+}
+
+// Based on waitstatus.h
+const WAIT_STATUS_STOPPED: i32 = 0x7f;
+const WAIT_STATUS_CONTINUED: i32 = 0xffff;
