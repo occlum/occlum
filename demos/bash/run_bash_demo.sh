@@ -3,11 +3,9 @@ set -e
 
 if [[ $1 == "musl" ]]; then
     echo "*** Run musl-libc bash demo ***"
-    ./prepare_busybox.sh musl
     bomfile="../bash-musl.yaml"
 else
     echo "*** Run glibc bash demo ***"
-    ./prepare_busybox.sh
     bomfile="../bash.yaml"
 fi
 

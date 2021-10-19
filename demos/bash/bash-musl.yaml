@@ -7,5 +7,5 @@ targets:
     copy:
       - files:
         - /opt/occlum/toolchains/bash/musl/bash
-        - ../busybox/busybox
+        - /opt/occlum/toolchains/busybox/musl/busybox
         - ../occlum_bash_test.sh

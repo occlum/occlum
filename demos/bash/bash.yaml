@@ -7,5 +7,5 @@ targets:
     copy:
       - files:
         - /opt/occlum/toolchains/bash/glibc/bash
-        - ../busybox/busybox
+        - /opt/occlum/toolchains/busybox/glibc/busybox
         - ../occlum_bash_test.sh
