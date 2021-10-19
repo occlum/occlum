@@ -19,7 +19,7 @@ TEST_DEPS := client data_sink
 # 	truncate readdir mkdir open stat link symlink chmod chown tls pthread uname rlimit \
 # 	server server_epoll unix_socket cout hostfs cpuid rdtsc device sleep exit_group \
 # 	ioctl fcntl eventfd emulate_syscall access signal sysinfo prctl rename procfs
-TESTS ?= access chmod chown cpuid empty emulate_syscall eventfd exit_group file \
+TESTS ?= access chmod chown cpuid empty emulate_syscall pipe eventfd exit_group file \
 	getpid hello_world link malloc mkdir mmap pthread rdtsc rename rlimit server \
 	server_epoll signal sleep spawn stat symlink time tls truncate unix_socket wait \
 	fcntl

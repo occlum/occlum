@@ -315,9 +315,9 @@ int test_select_read_write() {
 // Test suite
 // ============================================================================
 static test_case_t test_cases[] = {
-    TEST_CASE(test_fcntl_get_flags),
-    TEST_CASE(test_fcntl_set_flags),
-    TEST_CASE(test_create_with_flags),
+    // TEST_CASE(test_fcntl_get_flags),
+    // TEST_CASE(test_fcntl_set_flags),
+    // TEST_CASE(test_create_with_flags),
     TEST_CASE(test_select_timeout),
     TEST_CASE(test_poll_timeout),
     TEST_CASE(test_epoll_timeout),

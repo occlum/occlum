@@ -287,6 +287,18 @@ impl File for Consumer {
         self.this_end().pollee().poll(mask, poller)
     }
 
+    fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()> {
+        self.this_end().pollee().register_observer(observer, mask);
+        Ok(())
+    }
+
+    fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>> {
+        self.this_end()
+            .pollee()
+            .unregister_observer(observer)
+            .ok_or_else(|| errno!(ENOENT, "the observer is not registered"))
+    }
+
     fn status_flags(&self) -> StatusFlags {
         self.this_end().flags.load(Ordering::Relaxed)
     }
