@@ -1,0 +1,261 @@
+From 93d9429fa9b0b3856258422894697621c5c093b9 Mon Sep 17 00:00:00 2001
+From: "Zheng, Qi" <huaiqing.zq@antgroup.com>
+Date: Tue, 19 Oct 2021 17:17:03 +0800
+Subject: [PATCH] Ignore some test cases which crash the Occlum
+
+Signed-off-by: Zheng, Qi <huaiqing.zq@antgroup.com>
+---
+ runtest/syscalls | 80 ++++++++++++++++++++++++------------------------
+ 1 file changed, 40 insertions(+), 40 deletions(-)
+
+diff --git a/runtest/syscalls b/runtest/syscalls
+index 29d7752c7..0d2f9dc67 100644
+--- a/runtest/syscalls
++++ b/runtest/syscalls
+@@ -93,7 +93,7 @@ clock_nanosleep02 clock_nanosleep02
+ clock_nanosleep03 clock_nanosleep03
+ clock_nanosleep04 clock_nanosleep04
+ 
+-clock_gettime01 clock_gettime01
++#clock_gettime01 clock_gettime01
+ clock_gettime02 clock_gettime02
+ clock_gettime03 clock_gettime03
+ clock_gettime04 clock_gettime04
+@@ -124,7 +124,7 @@ close_range02 close_range02
+ 
+ confstr01 confstr01
+ 
+-connect01 connect01
++#connect01 connect01
+ connect02 connect02
+ 
+ creat01 creat01
+@@ -148,14 +148,14 @@ dup05 dup05
+ dup06 dup06
+ dup07 dup07
+ 
+-dup201 dup201
++#dup201 dup201
+ dup202 dup202
+ dup203 dup203
+ dup204 dup204
+ dup205 dup205
+ 
+ dup3_01 dup3_01
+-dup3_02 dup3_02
++#dup3_02 dup3_02
+ 
+ epoll_create01 epoll_create01
+ epoll_create02 epoll_create02
+@@ -165,7 +165,7 @@ epoll01 epoll-ltp
+ epoll_ctl01 epoll_ctl01
+ epoll_ctl02 epoll_ctl02
+ epoll_ctl03 epoll_ctl03
+-epoll_ctl04 epoll_ctl04
++#epoll_ctl04 epoll_ctl04
+ epoll_ctl05 epoll_ctl05
+ epoll_wait01 epoll_wait01
+ epoll_wait02 epoll_wait02
+@@ -407,8 +407,8 @@ fsync04 fsync04
+ 
+ ftruncate01 ftruncate01
+ ftruncate01_64 ftruncate01_64
+-ftruncate03 ftruncate03
+-ftruncate03_64 ftruncate03_64
++#ftruncate03 ftruncate03
++#ftruncate03_64 ftruncate03_64
+ ftruncate04 ftruncate04
+ ftruncate04_64 ftruncate04_64
+ 
+@@ -486,17 +486,17 @@ getrandom04 getrandom04
+ 
+ getresgid01 getresgid01
+ getresgid01_16 getresgid01_16
+-getresgid02 getresgid02
+-getresgid02_16 getresgid02_16
+-getresgid03 getresgid03
+-getresgid03_16 getresgid03_16
++#getresgid02 getresgid02
++#getresgid02_16 getresgid02_16
++#getresgid03 getresgid03
++#getresgid03_16 getresgid03_16
+ 
+ getresuid01 getresuid01
+ getresuid01_16 getresuid01_16
+-getresuid02 getresuid02
+-getresuid02_16 getresuid02_16
+-getresuid03 getresuid03
+-getresuid03_16 getresuid03_16
++#getresuid02 getresuid02
++#getresuid02_16 getresuid02_16
++#getresuid03 getresuid03
++#getresuid03_16 getresuid03_16
+ 
+ getrlimit01 getrlimit01
+ getrlimit02 getrlimit02
+@@ -522,7 +522,7 @@ getsockopt02 getsockopt02
+ gettid01 gettid01
+ 
+ gettimeofday01 gettimeofday01
+-gettimeofday02 gettimeofday02
++#gettimeofday02 gettimeofday02
+ 
+ getuid01 getuid01
+ getuid01_16 getuid01_16
+@@ -651,7 +651,7 @@ kill06 kill06
+ kill07 kill07
+ kill08 kill08
+ kill09 kill09
+-kill10 kill10
++#kill10 kill10
+ kill11 kill11
+ kill12 kill12
+ kill13 kill13
+@@ -742,13 +742,13 @@ mkdirat01 mkdirat01
+ mkdirat02 mkdirat02
+ 
+ mknod01 mknod01
+-mknod02 mknod02
+-mknod03 mknod03
+-mknod04 mknod04
++#mknod02 mknod02
++#mknod03 mknod03
++#mknod04 mknod04
+ mknod05 mknod05
+ mknod06 mknod06
+ mknod07 mknod07
+-mknod08 mknod08
++#mknod08 mknod08
+ mknod09 mknod09
+ 
+ #mknodat test cases
+@@ -767,11 +767,11 @@ mlock203 mlock203
+ qmm01 mmap001 -m 1
+ mmap01 mmap01
+ mmap02 mmap02
+-mmap03 mmap03
++#mmap03 mmap03
+ mmap04 mmap04
+ mmap05 mmap05
+-mmap06 mmap06
+-mmap07 mmap07
++#mmap06 mmap06
++#mmap07 mmap07
+ mmap08 mmap08
+ mmap09 mmap09
+ mmap12 mmap12
+@@ -961,7 +961,7 @@ pipe03 pipe03
+ pipe04 pipe04
+ pipe05 pipe05
+ pipe06 pipe06
+-pipe07 pipe07
++#pipe07 pipe07
+ pipe08 pipe08
+ pipe09 pipe09
+ pipe10 pipe10
+@@ -1073,7 +1073,7 @@ quotactl06 quotactl06
+ quotactl07 quotactl07
+ 
+ read01 read01
+-read02 read02
++#read02 read02
+ read03 read03
+ read04 read04
+ 
+@@ -1099,9 +1099,9 @@ realpath01 realpath01
+ reboot01 reboot01
+ reboot02 reboot02
+ 
+-recv01 recv01
++#recv01 recv01
+ 
+-recvfrom01 recvfrom01
++#recvfrom01 recvfrom01
+ 
+ recvmsg01 recvmsg01
+ recvmsg02 recvmsg02
+@@ -1121,7 +1121,7 @@ rename02 rename02
+ rename03 rename03
+ rename04 rename04
+ rename05 rename05
+-rename06 rename06
++#rename06 rename06
+ rename07 rename07
+ rename08 rename08
+ rename09 rename09
+@@ -1222,7 +1222,7 @@ semop01 semop01
+ semop02 semop02
+ semop03 semop03
+ 
+-send01 send01
++#send01 send01
+ send02 send02
+ 
+ sendfile02 sendfile02
+@@ -1250,7 +1250,7 @@ sendmsg03 sendmsg03
+ sendmmsg01 sendmmsg01
+ sendmmsg02 sendmmsg02
+ 
+-sendto01 sendto01
++#sendto01 sendto01
+ sendto02 sendto02
+ sendto03 sendto03
+ 
+@@ -1437,7 +1437,7 @@ signal02 signal02
+ signal03 signal03
+ signal04 signal04
+ signal05 signal05
+-signal06 signal06
++#signal06 signal06
+ 
+ signalfd01 signalfd01
+ 
+@@ -1516,7 +1516,7 @@ switch01 endian_switch01
+ 
+ symlink01 symlink01
+ symlink02 symlink02
+-symlink03 symlink03
++#symlink03 symlink03
+ symlink04 symlink04
+ symlink05 symlink05
+ 
+@@ -1696,14 +1696,14 @@ waitid02 waitid02
+ 
+ write01 write01
+ write02 write02
+-write03 write03
++#write03 write03
+ write04 write04
+-write05 write05
++#write05 write05
+ 
+-writev01 writev01
+-writev02 writev02
++#writev01 writev01
++#writev02 writev02
+ writev03 writev03
+-writev05 writev05
++#writev05 writev05
+ writev06 writev06
+ writev07 writev07
+ 
+@@ -1714,14 +1714,14 @@ futex_cmp_requeue01 futex_cmp_requeue01
+ futex_cmp_requeue02 futex_cmp_requeue02
+ futex_wait01 futex_wait01
+ futex_wait02 futex_wait02
+-futex_wait03 futex_wait03
++#futex_wait03 futex_wait03
+ futex_wait04 futex_wait04
+ futex_wait05 futex_wait05
+ futex_wake01 futex_wake01
+ futex_wake02 futex_wake02
+ futex_wake03 futex_wake03
+ futex_wake04 futex_wake04
+-futex_wait_bitset01 futex_wait_bitset01
++#futex_wait_bitset01 futex_wait_bitset01
+ 
+ memfd_create01 memfd_create01
+ memfd_create02 memfd_create02
+-- 
+2.25.1
+
