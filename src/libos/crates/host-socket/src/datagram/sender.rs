@@ -49,6 +49,7 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
 
         let retval = handle.await;
         if retval < 0 {
+            // TODO: add PRI event if set SO_SELECT_ERR_QUEUE
             self.common.pollee().add_events(Events::ERR);
             return_errno!(Errno::from(-retval as u32), "sendmsg failed");
         }

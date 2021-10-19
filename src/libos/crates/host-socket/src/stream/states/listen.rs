@@ -24,6 +24,7 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
 
         Self::do_listen(common.host_fd(), backlog)?;
 
+        common.pollee().reset_events();
         let new_self = Arc::new(Self {
             common,
             inner: Mutex::new(inner),
@@ -85,10 +86,10 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
             return_errno!(errno, "accept failed");
         }
 
-        let (accepted_fd, accepted_addr) = inner
-            .backlog
-            .pop_completed_req()
-            .ok_or_else(|| errno!(EAGAIN, "try accept again"))?;
+        let (accepted_fd, accepted_addr) = inner.backlog.pop_completed_req().ok_or_else(|| {
+            self.common.pollee().del_events(Events::IN);
+            errno!(EAGAIN, "try accept again")
+        })?;
 
         if !inner.backlog.has_completed_reqs() {
             self.common.pollee().del_events(Events::IN);
@@ -99,7 +100,6 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
         let common = {
             let mut common = Arc::new(Common::with_host_fd(accepted_fd, Type::STREAM, nonblocking));
             common.set_peer_addr(&accepted_addr);
-            common.pollee().add_events(Events::OUT);
             common
         };
         let accepted_stream = ConnectedStream::new(common);

@@ -105,6 +105,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
                 // TODO: guard against Iago attack through errno
                 let errno = Errno::from(-retval as u32);
                 inner.fatal = Some(errno);
+                // TODO: add PRI event if set SO_SELECT_ERR_QUEUE
                 receiver.common.pollee().add_events(Events::ERR);
                 return;
             }

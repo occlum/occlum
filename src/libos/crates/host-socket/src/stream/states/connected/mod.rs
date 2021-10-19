@@ -18,6 +18,9 @@ pub struct ConnectedStream<A: Addr + 'static, R: Runtime> {
 
 impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
     pub fn new(common: Arc<Common<A, R>>) -> Arc<Self> {
+        common.pollee().reset_events();
+        common.pollee().add_events(Events::OUT);
+
         let sender = Sender::new();
         let receiver = Receiver::new();
         let new_self = Arc::new(Self {
@@ -42,10 +45,17 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
     pub fn shutdown(&self, how: Shutdown) -> Result<()> {
         if how.should_shut_read() {
             self.receiver.shutdown();
+            self.common.pollee().add_events(Events::IN);
         }
         if how.should_shut_write() {
             self.sender.shutdown();
+            self.common.pollee().add_events(Events::OUT);
         }
+
+        if how == Shutdown::Both {
+            self.common.pollee().add_events(Events::HUP);
+        }
+
         Ok(())
     }
 

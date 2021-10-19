@@ -153,7 +153,6 @@ impl Sender {
     pub fn shutdown(&self) {
         let mut inner = self.inner.lock().unwrap();
         inner.is_shutdown = true;
-        // TODO: update pollee?
     }
 }
 

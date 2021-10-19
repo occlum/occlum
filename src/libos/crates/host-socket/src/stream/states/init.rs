@@ -14,10 +14,10 @@ struct Inner {
 
 impl<A: Addr + 'static, R: Runtime> InitStream<A, R> {
     pub fn new(nonblocking: bool) -> Result<Arc<Self>> {
-        let new_self = Self {
-            common: Arc::new(Common::new(Type::STREAM, nonblocking)?),
-            inner: Mutex::new(Inner::new()),
-        };
+        let common = Arc::new(Common::new(Type::STREAM, nonblocking)?);
+        common.pollee().add_events(Events::HUP | Events::OUT);
+        let inner = Mutex::new(Inner::new());
+        let new_self = Self { common, inner };
         Ok(Arc::new(new_self))
     }
 
