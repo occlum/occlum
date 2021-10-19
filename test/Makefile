@@ -21,7 +21,7 @@ TEST_DEPS := client data_sink
 # 	ioctl fcntl eventfd emulate_syscall access signal sysinfo prctl rename procfs
 TESTS ?= access chmod chown cpuid empty emulate_syscall eventfd exit_group file \
 	getpid hello_world link malloc mkdir mmap pthread rdtsc rename rlimit server \
-	server_epoll signal sleep spawn stat symlink time tls truncate unix_socket
+	server_epoll signal sleep spawn stat symlink time tls truncate unix_socket wait
 # Benchmarks: need to be compiled and run by bench-% target
 BENCHES := spawn_and_exit_latency pipe_throughput unix_socket_throughput
 
