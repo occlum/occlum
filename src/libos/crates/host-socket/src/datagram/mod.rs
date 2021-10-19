@@ -295,6 +295,17 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
         });
         Ok(())
     }
+
+    fn cancel_requests(&self) {
+        self.receiver.cancel_requests();
+    }
+}
+
+impl<A: Addr + 'static, R: Runtime> Drop for DatagramSocket<A, R> {
+    fn drop(&mut self) {
+        self.common.set_closed();
+        self.cancel_requests();
+    }
 }
 
 impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for DatagramSocket<A, R> {

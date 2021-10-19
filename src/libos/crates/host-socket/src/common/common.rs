@@ -23,6 +23,7 @@ pub struct Common<A: Addr + 'static, R: Runtime> {
     host_fd: HostFd,
     type_: Type,
     nonblocking: AtomicBool,
+    is_closed: AtomicBool,
     pollee: Pollee,
     inner: Mutex<Inner<A>>,
     phantom_data: PhantomData<(A, R)>,
@@ -34,12 +35,14 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
         let type_c = type_ as libc::c_int;
         let host_fd = try_libc!(do_socket(domain_c, type_c, 0)) as HostFd;
         let nonblocking = AtomicBool::new(nonblocking);
+        let is_closed = AtomicBool::new(false);
         let pollee = Pollee::new(Events::empty());
         let inner = Mutex::new(Inner::new());
         Ok(Self {
             host_fd,
             type_,
             nonblocking,
+            is_closed,
             pollee,
             inner,
             phantom_data: PhantomData,
@@ -73,12 +76,14 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
 
     pub fn with_host_fd(host_fd: HostFd, type_: Type, nonblocking: bool) -> Self {
         let nonblocking = AtomicBool::new(nonblocking);
+        let is_closed = AtomicBool::new(false);
         let pollee = Pollee::new(Events::empty());
         let inner = Mutex::new(Inner::new());
         Self {
             host_fd,
             type_,
             nonblocking,
+            is_closed,
             pollee,
             inner,
             phantom_data: PhantomData,
@@ -103,6 +108,14 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
 
     pub fn set_nonblocking(&self, is_nonblocking: bool) {
         self.nonblocking.store(is_nonblocking, Ordering::Relaxed)
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.is_closed.load(Ordering::Relaxed)
+    }
+
+    pub fn set_closed(&self) {
+        self.is_closed.store(true, Ordering::Relaxed)
     }
 
     pub fn pollee(&self) -> &Pollee {

@@ -308,6 +308,15 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         connected_stream.shutdown(shutdown)
     }
 
+    fn cancel_requests(&self) {
+        let state = self.state.read().unwrap();
+        match &*state {
+            State::Listen(listener_stream) => listener_stream.cancel_requests(),
+            State::Connected(connected_stream) => connected_stream.cancel_requests(),
+            _ => {}
+        }
+    }
+
     /*
         pub fn poll_by(&self, mask: Events, mut poller: Option<&mut Poller>) -> Events {
             let state = self.state.read();
@@ -319,6 +328,16 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             }
         }
     */
+}
+
+impl<A: Addr + 'static, R: Runtime> Drop for StreamSocket<A, R> {
+    fn drop(&mut self) {
+        let state = self.state.read().unwrap();
+        state.common().set_closed();
+        drop(state);
+
+        self.cancel_requests();
+    }
 }
 
 impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for State<A, R> {

@@ -102,6 +102,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             || inner.is_shutdown
             || inner.io_handle.is_some()
             || inner.end_of_file
+            || self.common.is_closed()
         {
             return;
         }
@@ -117,7 +118,9 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             // Handle error
             if retval < 0 {
                 // TODO: guard against Iago attack through errno
-                // TODO: should we ignore EINTR and try again?
+                // We should return here, The error may be due to network reasons
+                // or because the request was cancelled. We don't want to start a
+                // new request after cancelled a request.
                 let errno = Errno::from(-retval as u32);
                 inner.fatal = Some(errno);
                 stream.common.pollee().add_events(Events::ERR);
@@ -154,6 +157,14 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
     pub(super) fn initiate_async_recv(self: &Arc<Self>) {
         let mut inner = self.receiver.inner.lock().unwrap();
         self.do_recv(&mut inner);
+    }
+
+    pub fn cancel_requests(&self) {
+        let inner = self.receiver.inner.lock().unwrap();
+        if let Some(io_handle) = &inner.io_handle {
+            let io_uring = self.common.io_uring();
+            unsafe { io_uring.cancel(io_handle) };
+        }
     }
 }
 

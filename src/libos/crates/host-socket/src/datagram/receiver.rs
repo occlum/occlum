@@ -70,7 +70,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
             return Ok((recv_bytes, recv_addr));
         }
 
-        if let Some(errno) = inner.fatal {
+        if let Some(errno) = inner.error {
             self.do_recv(&mut inner);
             return_errno!(errno, "recv failed");
         }
@@ -80,12 +80,12 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
     }
 
     fn do_recv(self: &Arc<Self>, inner: &mut MutexGuard<Inner>) {
-        if inner.io_handle.is_some() {
+        if inner.io_handle.is_some() || self.common.is_closed() {
             return;
         }
-        // Clear recv_len and fatal
+        // Clear recv_len and error
         inner.recv_len.take();
-        inner.fatal.take();
+        inner.error.take();
 
         let receiver = self.clone();
         // Init the callback invoked upon the completion of the async recv
@@ -104,7 +104,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
 
                 // TODO: guard against Iago attack through errno
                 let errno = Errno::from(-retval as u32);
-                inner.fatal = Some(errno);
+                inner.error = Some(errno);
                 // TODO: add PRI event if set SO_SELECT_ERR_QUEUE
                 receiver.common.pollee().add_events(Events::ERR);
                 return;
@@ -144,6 +144,14 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         let mut inner = self.inner.lock().unwrap();
         self.do_recv(&mut inner);
     }
+
+    pub fn cancel_requests(&self) {
+        let inner = self.inner.lock().unwrap();
+        if let Some(io_handle) = &inner.io_handle {
+            let io_uring = self.common.io_uring();
+            unsafe { io_uring.cancel(io_handle) };
+        }
+    }
 }
 
 struct Inner {
@@ -153,7 +161,7 @@ struct Inner {
     recv_len: Option<usize>,
     req: UntrustedBox<RecvReq>,
     io_handle: Option<IoHandle>,
-    fatal: Option<Errno>,
+    error: Option<Errno>,
 }
 
 unsafe impl Send for Inner {}
@@ -165,7 +173,7 @@ impl Inner {
             recv_len: None,
             req: UntrustedBox::new_uninit(),
             io_handle: None,
-            fatal: None,
+            error: None,
         }
     }
 

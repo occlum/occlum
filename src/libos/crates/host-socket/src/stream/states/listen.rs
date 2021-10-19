@@ -116,6 +116,16 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
     pub fn common(&self) -> &Arc<Common<A, R>> {
         &self.common
     }
+
+    pub fn cancel_requests(&self) {
+        let io_uring = self.common.io_uring();
+        let inner = self.inner.lock().unwrap();
+        for entry in inner.backlog.entries.iter() {
+            if let Entry::Pending { io_handle } = entry {
+                unsafe { io_uring.cancel(io_handle) };
+            }
+        }
+    }
 }
 
 impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for ListenerStream<A, R> {
@@ -224,6 +234,9 @@ impl<A: Addr> Backlog<A> {
 
     /// Start a new async accept request, turning a free entry into a pending one.
     pub fn start_new_req<R: Runtime>(&mut self, stream: &Arc<ListenerStream<A, R>>) {
+        if stream.common.is_closed() {
+            return;
+        }
         debug_assert!(self.has_free_entries());
 
         let entry_idx = self
@@ -263,13 +276,17 @@ impl<A: Addr> Backlog<A> {
 
                     inner.backlog.entries[entry_idx] = Entry::Free;
                     inner.backlog.num_free += 1;
-                } else {
-                    let host_fd = retval as HostFd;
-                    inner.backlog.entries[entry_idx] = Entry::Completed { host_fd };
-                    inner.backlog.completed.push_back(entry_idx);
-
-                    stream.common.pollee().add_events(Events::IN);
+                    // After getting the error from the accept system call, we should not start
+                    // the async accept requests again, because this may cause a large number of
+                    // io-uring requests to be retried
+                    return;
                 }
+
+                let host_fd = retval as HostFd;
+                inner.backlog.entries[entry_idx] = Entry::Completed { host_fd };
+                inner.backlog.completed.push_back(entry_idx);
+
+                stream.common.pollee().add_events(Events::IN);
 
                 stream.initiate_async_accepts(inner);
             }
