@@ -1091,6 +1091,166 @@ int test_mprotect_with_non_page_aligned_size() {
     return 0;
 }
 
+int check_file_first_four_page(char *file_path, int first_page_val, int secend_page_val,
+                               int third_page_val, int fourth_page_val) {
+    int fd = open(file_path, O_RDONLY);
+    if (fd < 0) {
+        THROW_ERROR("file open failed");
+    }
+    if (check_file_with_repeated_bytes(fd, PAGE_SIZE, first_page_val) < 0) {
+        THROW_ERROR("unexpected file content");
+    }
+    if (check_file_with_repeated_bytes(fd, PAGE_SIZE, secend_page_val) < 0) {
+        THROW_ERROR("unexpected file content");
+    }
+
+    if (check_file_with_repeated_bytes(fd, PAGE_SIZE, third_page_val) < 0) {
+        THROW_ERROR("unexpected file content\n");
+    }
+
+    if (check_file_with_repeated_bytes(fd, PAGE_SIZE, fourth_page_val) < 0) {
+        THROW_ERROR("unexpectbed file content");
+    }
+    close(fd);
+    return 0;
+}
+
+typedef int (* test_file_backed_mremap_fn_t) (void *, size_t, void **);
+
+static int byte_val_0 = 0xff;
+static int byte_val_1 = 0xab;
+static int byte_val_2 = 0xcd;
+static int byte_val_3 = 0xef;
+
+int file_backed_mremap_simple(void *buf, size_t len, void **new_buf) {
+    void *expand_buf = mremap(buf, len, 2 * len, 0);
+    if (expand_buf == MAP_FAILED) {
+        THROW_ERROR("mremap with big size failed");
+    }
+    // Check the value assigned before
+    if (check_bytes_in_buf(expand_buf, len, byte_val_1) != 0 ) {
+        THROW_ERROR("check expand_buf error");
+    };
+    // Check the value of second page which should be mapped from file
+    if (check_bytes_in_buf(expand_buf + len, len, byte_val_0) != 0 ) {
+        THROW_ERROR("check expand_buf error");
+    };
+    // Assign new value to the second page
+    for (int i = len; i < len * 2; i++) { ((char *)expand_buf)[i] = byte_val_2; }
+
+    expand_buf = mremap(expand_buf, len * 2, 4 * len, 0);
+    if (expand_buf == MAP_FAILED) {
+        THROW_ERROR("mremap with bigger size failed");
+    }
+    // Third and fourth page are not assigned any new value, so should still be 0.
+    if (check_bytes_in_buf((void *)(expand_buf + len * 2), len * 2, 0) != 0) {
+        THROW_ERROR("check buf content error");
+    };
+
+    // Assign new value  to the fourth page
+    for (int i = len * 3; i < len * 4; i++) { ((char *)expand_buf)[i] = byte_val_3; }
+    *new_buf = expand_buf;
+    return 0;
+}
+
+int file_backed_mremap_mem_may_move(void *buf, size_t len, void **new_buf) {
+    int prot = PROT_READ | PROT_WRITE;
+    // Allocate a gap buffer to make sure mremap buf must move to a new range
+    unsigned long gap_buf = (unsigned long) buf + len;
+    assert(gap_buf % PAGE_SIZE == 0);
+    void *ret = mmap((void *)gap_buf, PAGE_SIZE, prot,
+                     MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, 0, 0);
+    if ((unsigned long)ret != gap_buf) {
+        THROW_ERROR("mmap gap_buf with prefered address failed");
+    }
+
+    void *expand_buf = mremap(buf, len, 2 * len, MREMAP_MAYMOVE);
+    if (expand_buf == MAP_FAILED) {
+        THROW_ERROR("mremap with big size failed");
+    }
+    // Check the value assigned before
+    if (check_bytes_in_buf(expand_buf, len, byte_val_1) != 0 ) {
+        THROW_ERROR("check expand_buf error");
+    };
+    // Check the value of second page which should be mapped from file
+    if (check_bytes_in_buf(expand_buf + len, len, byte_val_0) != 0 ) {
+        THROW_ERROR("check expand_buf error");
+    };
+    // Assign new value to the second page
+    for (int i = len; i < len * 2; i++) { ((char *)expand_buf)[i] = byte_val_2; }
+
+    // Mremap to a new fixed address
+    unsigned long fixed_addr = (unsigned long) expand_buf + 2 * len;
+    ret = mremap(expand_buf, len * 2, 4 * len, MREMAP_FIXED | MREMAP_MAYMOVE,
+                 (void *)fixed_addr);
+    if ((unsigned long)ret != fixed_addr) {
+        THROW_ERROR("mremap with fixed address and more big size failed");
+    }
+    // Third and fourth page are not assigned any new value, so should still be 0.
+    if (check_bytes_in_buf((void *)(fixed_addr + len * 2), len * 2, 0) != 0) {
+        THROW_ERROR("check buf content error");
+    };
+
+    // Assign new value  to the fourth page
+    for (int i = len * 3; i < len * 4; i++) { ((char *)fixed_addr)[i] = byte_val_3; }
+
+    int rc = munmap((void *)gap_buf, PAGE_SIZE);
+    if (rc < 0) {
+        THROW_ERROR("munmap gap_buf failed");
+    }
+
+    *new_buf = (void *)fixed_addr;
+    return 0;
+}
+
+int _test_file_backed_mremap(test_file_backed_mremap_fn_t fn) {
+    int prot = PROT_READ | PROT_WRITE;
+    size_t len = PAGE_SIZE;
+    char *file_path = "/tmp/test";
+
+    // O_TRUNC is not supported by Occlum yet.
+    remove(file_path);
+    int fd = open(file_path, O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC | O_TRUNC, 0600);
+    if (fd < 0) {
+        THROW_ERROR("open file error");
+    }
+    fallocate(fd, 0, 0, len * 4);
+    fill_file_with_repeated_bytes(fd, len * 2, byte_val_0);
+
+    void *buf = mmap(0, len, prot, MAP_SHARED, fd, 0);
+    if (buf == MAP_FAILED) {
+        THROW_ERROR("mmap failed");
+    }
+    for (int i = 0; i < len; i++) { ((char *)buf)[i] = byte_val_1; }
+
+    void *expand_buf = 0;
+    int ret = fn(buf, len, &expand_buf);
+    if (ret != 0) {
+        THROW_ERROR("mremap test failed");
+    }
+
+    int rc = msync((void *)expand_buf, 4 * len, MS_SYNC);
+    if (rc < 0) {
+        THROW_ERROR("msync failed");
+    }
+    rc = munmap((void *)expand_buf, 4 * len);
+    if (rc < 0) {
+        THROW_ERROR("munmap failed");
+    }
+
+    close(fd);
+
+    return check_file_first_four_page(file_path, byte_val_1, byte_val_2, 0, byte_val_3);;
+}
+
+int test_file_backed_mremap() {
+    return _test_file_backed_mremap(file_backed_mremap_simple);
+}
+
+int test_file_backed_mremap_mem_may_move() {
+    return _test_file_backed_mremap(file_backed_mremap_mem_may_move);
+}
+
 // ============================================================================
 // Test suite main
 // ============================================================================
@@ -1124,6 +1284,8 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_mremap),
     TEST_CASE(test_mremap_subrange),
     TEST_CASE(test_mremap_with_fixed_addr),
+    TEST_CASE(test_file_backed_mremap),
+    TEST_CASE(test_file_backed_mremap_mem_may_move),
     TEST_CASE(test_mprotect_once),
     TEST_CASE(test_mprotect_twice),
     TEST_CASE(test_mprotect_triple),
