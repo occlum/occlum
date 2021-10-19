@@ -13,7 +13,7 @@ PASS_LOG = $(BUILD_DIR)/test/.pass
 FAIL_LOG = $(BUILD_DIR)/test/.fail
 
 # Dependencies: need to be compiled but not to run by any Makefile target
-TEST_DEPS := client data_sink
+TEST_DEPS := client data_sink naughty_child
 # Tests: need to be compiled and run by test-% target
 # TESTS ?= env empty hello_world malloc mmap file fs_perms getpid spawn sched pipe time \
 # 	truncate readdir mkdir open stat link symlink chmod chown tls pthread uname rlimit \
@@ -22,7 +22,7 @@ TEST_DEPS := client data_sink
 TESTS ?= access chmod chown cpuid empty emulate_syscall pipe eventfd exit_group file \
 	getpid hello_world link malloc mkdir mmap pthread rdtsc rename rlimit server \
 	server_epoll signal sleep spawn stat symlink time tls truncate unix_socket wait \
-	fcntl
+	fcntl spawn_attribute
 # Benchmarks: need to be compiled and run by bench-% target
 BENCHES := spawn_and_exit_latency pipe_throughput unix_socket_throughput
 
