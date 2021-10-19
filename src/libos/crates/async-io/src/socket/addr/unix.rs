@@ -1,4 +1,5 @@
 use libc::c_char;
+use std::any::Any;
 use std::mem::MaybeUninit;
 
 use super::{Addr, CSockAddr, Domain};
@@ -117,6 +118,10 @@ impl Addr for UnixAddr {
     fn to_c_storage(&self) -> (libc::sockaddr_storage, usize) {
         let c_un_addr = self.to_c();
         c_un_addr.to_c_storage()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 

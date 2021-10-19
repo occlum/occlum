@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::fmt::Debug;
 
 use super::Domain;
@@ -26,6 +27,8 @@ pub trait Addr: Clone + Debug + Default + PartialEq + Send + Sync {
     ///
     /// The actual length used in sockaddr_storage is also returned.
     fn to_c_storage(&self) -> (libc::sockaddr_storage, usize);
+
+    fn as_any(&self) -> &dyn Any;
 }
 
 pub use self::c_sock_addr::CSockAddr;

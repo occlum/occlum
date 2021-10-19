@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::fmt::{self, Debug};
 use std::mem::MaybeUninit;
 
@@ -28,6 +29,10 @@ impl Addr for Ipv4SocketAddr {
     fn to_c_storage(&self) -> (libc::sockaddr_storage, usize) {
         let c_in_addr = self.to_c();
         c_in_addr.to_c_storage()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
