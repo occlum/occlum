@@ -1,0 +1,104 @@
+From a8b88e78b863d54135436a866d375c67aaaec905 Mon Sep 17 00:00:00 2001
+From: "Zheng, Qi" <huaiqing.zq@antgroup.com>
+Date: Tue, 19 Oct 2021 10:53:08 +0800
+Subject: [PATCH] Make it work on Occlum
+
+Signed-off-by: Zheng, Qi <huaiqing.zq@antgroup.com>
+---
+ lib/tst_kvercmp.c |  4 +++-
+ lib/tst_test.c    | 21 +++++++++++----------
+ 2 files changed, 14 insertions(+), 11 deletions(-)
+
+diff --git a/lib/tst_kvercmp.c b/lib/tst_kvercmp.c
+index 8bf65d309..d299c4cb5 100644
+--- a/lib/tst_kvercmp.c
++++ b/lib/tst_kvercmp.c
+@@ -102,7 +102,9 @@ int tst_kvercmp(int r1, int r2, int r3)
+ {
+ 	struct utsname uval;
+ 
+-	uname(&uval);
++	//uname(&uval);
++	/* Hack the uname kernel version to 4.19.1 to make it work on Occlum */
++	strcpy(uval.release, "4.19.1");
+ 
+ 	return tst_kvcmp(uval.release, r1, r2, r3);
+ }
+diff --git a/lib/tst_test.c b/lib/tst_test.c
+index ec80e17a6..a8c414ac8 100644
+--- a/lib/tst_test.c
++++ b/lib/tst_test.c
+@@ -1163,7 +1163,7 @@ static void run_tests(void)
+ 		tst_test->test_all();
+ 
+ 		if (getpid() != main_pid) {
+-			exit(0);
++			_exit(0);
+ 		}
+ 
+ 		tst_reap_children();
+@@ -1178,7 +1178,7 @@ static void run_tests(void)
+ 		tst_test->test(i);
+ 
+ 		if (getpid() != main_pid) {
+-			exit(0);
++			_exit(0);
+ 		}
+ 
+ 		tst_reap_children();
+@@ -1230,7 +1230,7 @@ static void heartbeat(void)
+ 		exit(TBROK);
+ 	}
+ 
+-	kill(getppid(), SIGUSR1);
++	//kill(getppid(), SIGUSR1);
+ }
+ 
+ static void testrun(void)
+@@ -1265,7 +1265,7 @@ static void testrun(void)
+ 	}
+ 
+ 	do_test_cleanup();
+-	exit(0);
++	_exit(0);
+ }
+ 
+ static pid_t test_pid;
+@@ -1374,27 +1374,28 @@ static int fork_testrun(void)
+ {
+ 	int status;
+ 
+-	if (tst_test->timeout)
++	/*if (tst_test->timeout)
+ 		tst_set_timeout(tst_test->timeout);
+ 	else
+-		tst_set_timeout(300);
++		tst_set_timeout(300);*/
+ 
+ 	SAFE_SIGNAL(SIGINT, sigint_handler);
+ 
+-	test_pid = fork();
++	test_pid = vfork();
+ 	if (test_pid < 0)
+ 		tst_brk(TBROK | TERRNO, "fork()");
+ 
+ 	if (!test_pid) {
+-		SAFE_SIGNAL(SIGALRM, SIG_DFL);
++		tst_res(TINFO, "In Child process ...\n");
++		//SAFE_SIGNAL(SIGALRM, SIG_DFL);
+ 		SAFE_SIGNAL(SIGUSR1, SIG_DFL);
+ 		SAFE_SIGNAL(SIGINT, SIG_DFL);
+ 		SAFE_SETPGID(0, 0);
+ 		testrun();
+ 	}
+ 
+-	SAFE_WAITPID(test_pid, &status, 0);
+-	alarm(0);
++	waitpid(test_pid, &status, 0);
++	//alarm(0);
+ 	SAFE_SIGNAL(SIGINT, SIG_DFL);
+ 
+ 	if (tst_test->taint_check && tst_taint_check()) {
+-- 
+2.25.1
+
