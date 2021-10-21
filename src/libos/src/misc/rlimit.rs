@@ -98,8 +98,9 @@ pub enum resource_t {
     RLIMIT_MSGQUEUE = 12,
     RLIMIT_NICE = 13,
     RLIMIT_RTPRIO = 14,
+    RLIMIT_RTTIME = 15,
 }
-const RLIMIT_COUNT: usize = 15;
+const RLIMIT_COUNT: usize = 16;
 
 impl resource_t {
     pub fn from_u32(bits: u32) -> Result<resource_t> {
@@ -119,6 +120,7 @@ impl resource_t {
             12 => Ok(resource_t::RLIMIT_MSGQUEUE),
             13 => Ok(resource_t::RLIMIT_NICE),
             14 => Ok(resource_t::RLIMIT_RTPRIO),
+            15 => Ok(resource_t::RLIMIT_RTTIME),
             _ => return_errno!(EINVAL, "invalid resource"),
         }
     }
