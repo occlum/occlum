@@ -8,6 +8,14 @@ pub fn do_renameat(old_fs_path: &FsPath, new_fs_path: &FsPath) -> Result<()> {
 
     let oldpath = old_fs_path.to_abs_path()?;
     let newpath = new_fs_path.to_abs_path()?;
+
+    let old_path = Path::new(&oldpath);
+    let new_path = Path::new(&newpath);
+    // Limitation: only compare the whole path components, cannot handle symlink or ".."
+    if new_path.starts_with(old_path) && new_path != old_path {
+        return_errno!(EINVAL, "newpath contains a path prefix of the oldpath");
+    }
+
     let current = current!();
     let fs = current.fs().read().unwrap();
 

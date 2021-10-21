@@ -178,6 +178,31 @@ static int test_rename_dir() {
     return 0;
 }
 
+static int test_rename_dir_to_subdir() {
+    const char *old_dir = "/root/test_old_dir";
+    mode_t mode = 00775;
+    int ret;
+
+    char sub_dir[PATH_MAX] = { 0 };
+    ret = snprintf(sub_dir, sizeof(sub_dir), "%s/test_new_dir", old_dir);
+    if (ret >= sizeof(sub_dir) || ret < 0) {
+        THROW_ERROR("failed to init new dir path");
+    }
+
+    if (mkdir(old_dir, mode) < 0) {
+        THROW_ERROR("failed to mkdir");
+    }
+
+    ret = rename(old_dir, sub_dir);
+    if (ret == 0 || errno != EINVAL) {
+        THROW_ERROR("failed to check rename dir to subdir");
+    }
+    if (rmdir(old_dir) < 0) {
+        THROW_ERROR("failed to rmdir");
+    }
+    return 0;
+}
+
 // ============================================================================
 // Test suite main
 // ============================================================================
@@ -188,6 +213,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_rename_with_target_exist),
     TEST_CASE(test_renameat),
     TEST_CASE(test_rename_dir),
+    TEST_CASE(test_rename_dir_to_subdir),
 };
 
 int main(int argc, const char *argv[]) {
