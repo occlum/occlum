@@ -32,12 +32,16 @@ impl Default for ResourceLimits {
         // heap, stack and mmap size.
         let address_space = rlimit_t::new(cfg_heap_size + cfg_stack_size + cfg_mmap_size);
 
+        // Set init open files limit to 1024 which is default value for Ubuntu
+        let open_files = rlimit_t::new(1024);
+
         let mut rlimits = ResourceLimits {
             rlimits: [Default::default(); RLIMIT_COUNT],
         };
         *rlimits.get_mut(resource_t::RLIMIT_DATA) = data_size;
         *rlimits.get_mut(resource_t::RLIMIT_STACK) = stack_size;
         *rlimits.get_mut(resource_t::RLIMIT_AS) = address_space;
+        *rlimits.get_mut(resource_t::RLIMIT_NOFILE) = open_files;
 
         rlimits
     }
