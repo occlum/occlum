@@ -346,7 +346,7 @@ jobs:
     # FIXME: PyTorch can't exit normally in SIM mode
     - name: Kill the container
       run: |
-        sleep 240;
+        sleep 360;
         cat "$GITHUB_WORKSPACE/log";
         if grep -q Done "$GITHUB_WORKSPACE/log"; then
           docker stop pytorch_test
