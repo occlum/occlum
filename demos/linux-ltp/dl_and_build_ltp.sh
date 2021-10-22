@@ -13,7 +13,6 @@ git clone -b $TAG https://github.com/linux-test-project/ltp.git
 pushd ltp
 # Apply patch to support running ltp in Occlum
 git apply ../0001-Make-it-work-on-Occlum.patch
-git apply ../0002-Ignore-some-test-cases-which-crash-the-Occlum.patch
 make autotools
 ./configure --prefix=${LTP_INSTALL_DIR}
 make -j && make install

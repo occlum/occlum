@@ -107,3 +107,4 @@ main()
 
 setup
 main "$@"
+exit 0
