@@ -13,12 +13,13 @@ And a light weight [`test script`](./run-ltp.sh) running in Occlum is provided t
 ./dl_and_build_ltp.sh
 ```
 
-Two patches are applied to make it work on Occlum.
-Many test cases are failed due to multiple reasons, such as syscall is not implemented or not completely implemented in Occlum.
+Some test cases are failed due to multiple reasons, such as syscall is not implemented or not completely implemented in Occlum.
 
-* Some test cases may make the Occlum crash or hang (Only checked the cases in syscalls), they are ignored by applying the [`patch`](./0002-Ignore-some-test-cases-which-crash-the-Occlum.patch)
+* Some default LTP test cases may make the Occlum crash or hang (Only checked the cases in syscalls for now).
+* Occlum runable syscall test cases are defined in [`syscalls-occlum`](./syscalls-occlum). It may be updated with Occlum development.
 
-It may be updated with Occlum development.
+The original [`syscalls`] test cases could be found in the built demo `ltp_instance/image/opt/ltp/runtest/syscalls`.
+Panic/Sefault/hang testcases could be listed by a simple diff for these two files.
 
 ## Prepare the Occlum instance for LTP demo
 ```
@@ -35,10 +36,10 @@ The script `run-ltp.sh` supports two optional arguments as below.
     -f CMDFILES     Execute user defined list of testcases
     -s PATTERN      Only run test cases which match PATTERN.
 
-    example: run-ltp.sh -f syscalls -s timerfd
+    example: run-ltp.sh -f syscalls-occlum -s timerfd
 ```
 
-If no options provided, all the test cases in syscalls will be run one by one.
+If no options provided, all the test cases in default LTP syscalls will be run one by one.
 
 Note:
 

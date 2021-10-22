@@ -18,6 +18,11 @@ targets:
     copy:
       - files:
         - ../run-ltp.sh
+  # copy syscalls demo cases for Occlum
+  - target: /opt/ltp/runtest
+    copy:
+      - files:
+        - ../syscalls-occlum
   - target: /bin
     # build a symlink: ln -s $linksrc $target/linkname
     createlinks:
