@@ -10,7 +10,7 @@ use std::path::Path;
 use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
 
 pub use async_io::event::{Events, Observer, Pollee, Poller};
-pub use async_io::file::{AccessMode, CreationFlags, File, StatusFlags};
+pub use async_io::file::{AccessMode, CreationFlags, File, Flock, FlockType, StatusFlags};
 pub use async_io::fs::{
     FileMode, FileSystem, FileType, FsError, INode, Metadata, SeekFrom, StatBuf, StatFlags,
     StatMode, Timespec, PATH_MAX,

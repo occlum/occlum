@@ -1,7 +1,7 @@
 use super::file_ops::{
     /* AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath, LinkFlags,
     StatFlags, UnlinkFlags, AT_FDCWD, */
-    self, AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FsPath, LinkFlags,
+    self, AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath, LinkFlags,
     UnlinkFlags, AT_FDCWD,
 };
 //use super::fs_ops;
@@ -493,6 +493,12 @@ pub async fn do_lchown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
     )
     .await
 }
+
+pub async fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize> {
+    let mut cmd = FcntlCmd::from_raw(cmd, arg)?;
+    file_ops::do_fcntl(fd, &mut cmd)
+}
+
 /*
 pub fn do_sendfile(
     out_fd: FileDesc,
@@ -514,11 +520,6 @@ pub fn do_sendfile(
         }
     }
     Ok(len as isize)
-}
-
-pub fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize> {
-    let mut cmd = FcntlCmd::from_raw(cmd, arg)?;
-    file_ops::do_fcntl(fd, &mut cmd)
 }
 
 pub async fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
