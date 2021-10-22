@@ -3,7 +3,7 @@ LABEL maintainer="Qing Li <geding.lq@antgroup.com>"
 RUN apk update && \
     apk --no-cache add openjdk11 --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
 
-FROM centos:8.2.2004
+FROM centos:8
 
 LABEL maintainer="He Sun <bochang.sh@antgroup.com>"
 
@@ -15,7 +15,10 @@ SHELL ["/bin/bash", "-c"]
 RUN yum install epel-release -y && \
     dnf clean all && rm -r /var/cache/dnf && \
     dnf group install 'Development Tools' -y && \
-    dnf --enablerepo=PowerTools install -y \
+    dnf -y install dnf-plugins-core && \
+    dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && \
+    dnf config-manager --set-enabled powertools && \
+    dnf install -y \
     astyle \
     bison \
     boost-devel \
