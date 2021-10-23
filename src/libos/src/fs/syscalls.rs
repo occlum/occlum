@@ -1,8 +1,8 @@
 use super::file_ops::{
     /* AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath, LinkFlags,
     StatFlags, UnlinkFlags, AT_FDCWD, */
-    self, AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath, LinkFlags,
-    UnlinkFlags, AT_FDCWD,
+    self, AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath,
+    IoctlRawCmd, LinkFlags, UnlinkFlags, AT_FDCWD,
 };
 //use super::fs_ops;
 use super::*;
@@ -499,6 +499,17 @@ pub async fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize> {
     file_ops::do_fcntl(fd, &mut cmd)
 }
 
+pub async fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
+    let mut raw_cmd = unsafe {
+        if !argp.is_null() {
+            from_user::check_mut_ptr(argp)?;
+        }
+        IoctlRawCmd::new(cmd, argp)?
+    };
+    file_ops::do_ioctl(fd, &mut raw_cmd)?;
+    Ok(0)
+}
+
 /*
 pub fn do_sendfile(
     out_fd: FileDesc,
@@ -520,16 +531,5 @@ pub fn do_sendfile(
         }
     }
     Ok(len as isize)
-}
-
-pub async fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
-    let mut ioctl_cmd = unsafe {
-        if argp.is_null() == false {
-            from_user::check_mut_ptr(argp)?;
-        }
-        IoctlCmd::new(cmd, argp)?
-    };
-    file_ops::do_ioctl(fd, &mut ioctl_cmd)?;
-    Ok(0)
 }
 */

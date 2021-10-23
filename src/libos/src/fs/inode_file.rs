@@ -185,6 +185,10 @@ impl INodeFile {
         Ok(())
     }
 
+    pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+        return_errno!(EINVAL, "unsupported cmd");
+    }
+
     pub fn test_advisory_lock(&self, lock: &mut Flock) -> Result<()> {
         // Let the advisory lock could be placed
         // TODO: Implement the real advisory lock

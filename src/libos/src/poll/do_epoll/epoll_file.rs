@@ -5,7 +5,7 @@ use std::time::Duration;
 use new_self_ref_arc::new_self_ref_arc;
 
 use super::{EpollCtl, EpollEntry, EpollEvent, EpollFlags};
-use crate::fs::{AccessMode, Events, Observer, Pollee, Poller, StatusFlags};
+use crate::fs::{AccessMode, Events, IoctlCmd, Observer, Pollee, Poller, StatusFlags};
 use crate::prelude::*;
 
 /// A file-like object that provides epoll API.
@@ -306,6 +306,10 @@ impl EpollFile {
 
     pub fn set_status_flags(&self, new_flags: StatusFlags) -> Result<()> {
         return_errno!(EINVAL, "epoll files do not support set_status_flags");
+    }
+
+    pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+        return_errno!(EINVAL, "epoll files do not support ioctl");
     }
 
     pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {

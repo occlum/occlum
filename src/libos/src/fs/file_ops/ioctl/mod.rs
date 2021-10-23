@@ -61,38 +61,38 @@ impl_ioctl_nums_and_cmds! {
 ///
 /// Sanity checks are mostly useful when the argument values are returned from
 /// the untrusted host OS.
-impl<'a> IoctlCmd<'a> {
-    pub fn validate_arg_and_ret_vals(&self, ret: i32) -> Result<()> {
+impl<'a> IoctlRawCmd<'a> {
+    pub fn to_safe_ioctlcmd(&self) -> Result<Box<dyn IoctlCmd>> {
         match self {
-            IoctlCmd::TIOCGWINSZ(winsize_ref) => {
-                // ws_row and ws_col are usually not zeros
-                if winsize_ref.ws_row == 0 || winsize_ref.ws_col == 0 {
-                    warn!(
-                        "window size: row: {:?}, col: {:?}",
-                        winsize_ref.ws_row, winsize_ref.ws_col
-                    );
-                }
+            IoctlRawCmd::TIOCGWINSZ(_) => Ok(Box::new(GetWinSize::new(()))),
+            IoctlRawCmd::TIOCSWINSZ(winsize_ref) => {
+                let winsize = **winsize_ref;
+                Ok(Box::new(SetWinSize::new(winsize)))
             }
-            IoctlCmd::FIONREAD(nread_ref) => {
-                if (**nread_ref < 0) {
-                    return_errno!(EINVAL, "invalid data from host");
-                }
+            _ => {
+                return_errno!(EINVAL, "unsupported cmd");
+            }
+        }
+    }
+
+    pub fn copy_output_from_safe(&mut self, cmd: &dyn IoctlCmd) {
+        match self {
+            IoctlRawCmd::TIOCGWINSZ(winsize_mut) => {
+                let cmd = cmd.downcast_ref::<GetWinSize>().unwrap();
+                **winsize_mut = *cmd.output().unwrap();
             }
             _ => {}
         }
-
-        // Current ioctl commands all return zero
-        if ret != 0 {
-            return_errno!(EINVAL, "return value should be zero");
-        }
-        Ok(())
     }
 }
 
-pub fn do_ioctl(fd: FileDesc, cmd: &mut IoctlCmd) -> Result<i32> {
-    debug!("ioctl: fd: {}, cmd: {:?}", fd, cmd);
+pub fn do_ioctl(fd: FileDesc, raw_cmd: &mut IoctlRawCmd) -> Result<i32> {
+    debug!("ioctl: fd: {}, cmd: {:?}", fd, raw_cmd);
     let file_ref = current!().file(fd)?;
-    file_ref.ioctl(cmd)
+    let mut cmd = raw_cmd.to_safe_ioctlcmd()?;
+    file_ref.ioctl(cmd.as_mut())?;
+    raw_cmd.copy_output_from_safe(cmd.as_ref());
+    Ok(0)
 }
 
 extern "C" {

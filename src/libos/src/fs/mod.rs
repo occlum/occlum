@@ -3,6 +3,7 @@ use super::*;
 use process;
 use std;
 use std::any::Any;
+use std::boxed::Box;
 use std::fmt;
 use std::io::{Read, Seek, Write};
 use std::mem::MaybeUninit;
@@ -15,6 +16,7 @@ pub use async_io::fs::{
     FileMode, FileSystem, FileType, FsError, INode, Metadata, SeekFrom, StatBuf, StatFlags,
     StatMode, Timespec, PATH_MAX,
 };
+pub use async_io::ioctl::IoctlCmd;
 
 /*pub use self::file_ops::{
     occlum_ocall_ioctl, AccessMode, BuiltinIoctlNum, CreationFlags, FileMode, Flock, FlockType,

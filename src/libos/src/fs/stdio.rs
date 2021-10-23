@@ -140,38 +140,10 @@ impl File for StdoutFile {
     fn poll(&self, mask: Events, _poller: Option<&mut Poller>) -> Events {
         Events::OUT
     }
-    /*
-        fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-            let can_delegate_to_host = match cmd {
-                IoctlCmd::TIOCGWINSZ(_) => true,
-                IoctlCmd::TIOCSWINSZ(_) => true,
-                _ => false,
-            };
-            if !can_delegate_to_host {
-                return_errno!(EINVAL, "unknown ioctl cmd for stdout");
-            }
 
-            let cmd_bits = cmd.cmd_num() as c_int;
-            let cmd_arg_ptr = cmd.arg_ptr() as *mut c_void;
-            let host_stdout_fd = self.host_fd() as i32;
-            let cmd_arg_len = cmd.arg_len();
-            let ret = try_libc!({
-                let mut retval: i32 = 0;
-                let status = occlum_ocall_ioctl(
-                    &mut retval as *mut i32,
-                    host_stdout_fd,
-                    cmd_bits,
-                    cmd_arg_ptr,
-                    cmd_arg_len,
-                );
-                assert!(status == sgx_status_t::SGX_SUCCESS);
-                retval
-            });
-            cmd.validate_arg_and_ret_vals(ret)?;
-
-            Ok(ret)
-        }
-    */
+    fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+        stdio_ioctl(cmd, self.host_fd())
+    }
 }
 
 impl Debug for StdoutFile {
@@ -271,38 +243,10 @@ impl File for StdinFile {
     fn poll(&self, mask: Events, _poller: Option<&mut Poller>) -> Events {
         Events::IN
     }
-    /*
-        fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-            let can_delegate_to_host = match cmd {
-                IoctlCmd::TIOCGWINSZ(_) => true,
-                IoctlCmd::TIOCSWINSZ(_) => true,
-                _ => false,
-            };
-            if !can_delegate_to_host {
-                return_errno!(EINVAL, "unknown ioctl cmd for stdin");
-            }
 
-            let cmd_bits = cmd.cmd_num() as c_int;
-            let cmd_arg_ptr = cmd.arg_ptr() as *mut c_void;
-            let host_stdin_fd = self.host_fd() as i32;
-            let cmd_arg_len = cmd.arg_len();
-            let ret = try_libc!({
-                let mut retval: i32 = 0;
-                let status = occlum_ocall_ioctl(
-                    &mut retval as *mut i32,
-                    host_stdin_fd,
-                    cmd_bits,
-                    cmd_arg_ptr,
-                    cmd_arg_len,
-                );
-                assert!(status == sgx_status_t::SGX_SUCCESS);
-                retval
-            });
-            cmd.validate_arg_and_ret_vals(ret)?;
-
-            Ok(ret)
-        }
-    */
+    fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+        stdio_ioctl(cmd, self.host_fd())
+    }
 }
 
 impl Debug for StdinFile {
@@ -313,3 +257,20 @@ impl Debug for StdinFile {
 
 unsafe impl Send for StdinFile {}
 unsafe impl Sync for StdinFile {}
+
+fn stdio_ioctl(cmd: &mut dyn IoctlCmd, host_fd: FileDesc) -> Result<()> {
+    debug!("stdio ioctl: cmd: {:?}", cmd);
+    use crate::fs::file_ops::ioctl::{GetWinSize, SetWinSize};
+    async_io::match_ioctl_cmd_mut!(cmd, {
+        cmd : SetWinSize => {
+            cmd.execute(host_fd)?
+        },
+        cmd : GetWinSize => {
+            cmd.execute(host_fd)?
+        },
+        _ => {
+            return_errno!(EINVAL, "unsupported ioctl cmd");
+        }
+    });
+    Ok(())
+}

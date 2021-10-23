@@ -10,6 +10,7 @@ use inherit_methods_macro::inherit_methods;
 
 use crate::event::{Events, Observer, Pollee, Poller};
 use crate::file::{AccessMode, StatusFlags};
+use crate::ioctl::IoctlCmd;
 use crate::prelude::*;
 
 /// An abstract for file APIs.
@@ -55,11 +56,9 @@ pub trait File: Debug + Sync + Send {
         return_errno!(EINVAL, "this file does not support observers");
     }
 
-    /*
-        fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-            return_op_unsupported_error!("ioctl")
-        }
-    */
+    fn ioctl(&self, _cmd: &mut dyn IoctlCmd) -> Result<()> {
+        return_errno!(EINVAL, "this file does not support ioctl");
+    }
 
     fn access_mode(&self) -> AccessMode {
         AccessMode::O_RDWR
@@ -211,6 +210,7 @@ impl<F: File + ?Sized> Async<F> {
     pub fn status_flags(&self) -> StatusFlags;
     pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()>;
     pub fn access_mode(&self) -> AccessMode;
+    pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()>;
 }
 
 impl<F: ?Sized + std::fmt::Debug> std::fmt::Debug for Async<F> {

@@ -11,10 +11,10 @@ pub use self::fcntl::{do_fcntl, FcntlCmd};
 // pub use self::file_flags::{AccessMode, CreationFlags, StatusFlags};
 pub use self::fspath::{FsPath, AT_FDCWD};
 pub use self::fsync::{do_fdatasync, do_fsync};
-// pub use self::ioctl::{
-//     do_ioctl, occlum_ocall_ioctl, BuiltinIoctlNum, IfConf, IoctlCmd, StructuredIoctlArgType,
-//     StructuredIoctlNum,
-// };
+pub use self::ioctl::{
+    do_ioctl, occlum_ocall_ioctl, BuiltinIoctlNum, IfConf, IoctlRawCmd, StructuredIoctlArgType,
+    StructuredIoctlNum,
+};
 pub use self::link::{do_linkat, LinkFlags};
 pub use self::lseek::do_lseek;
 pub use self::mkdir::do_mkdirat;
@@ -39,7 +39,7 @@ pub mod fcntl;
 // mod file_flags;
 mod fspath;
 mod fsync;
-// mod ioctl;
+pub mod ioctl;
 mod link;
 mod lseek;
 mod mkdir;

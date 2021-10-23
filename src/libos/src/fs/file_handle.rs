@@ -146,6 +146,10 @@ impl FileHandle {
         apply_fn_on_any_file!(&self.0.file, |file| { file.unregister_observer(observer) })
     }
 
+    pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+        apply_fn_on_any_file!(&self.0.file, |file| { file.ioctl(cmd) })
+    }
+
     /// Returns the underlying inode file if it is one.
     pub fn as_inode_file(&self) -> Option<&InodeFile> {
         match &self.0.file {
@@ -230,6 +234,7 @@ impl AsyncInode {
     pub fn access_mode(&self) -> AccessMode;
     pub fn status_flags(&self) -> StatusFlags;
     pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()>;
+    pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()>;
 }
 
 /// The weak version of `FileHandle`. Similar to `Weak`, but for files.
