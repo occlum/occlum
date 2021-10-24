@@ -37,6 +37,7 @@ impl Parks {
 
         let mut sleep_thread = self.sleep_threads[thread_id].lock();
         let thread = sleep_thread.take();
+        drop(sleep_thread);
         if thread.is_some() {
             thread.unwrap().unpark();
         }
@@ -46,5 +47,9 @@ impl Parks {
         for thread_id in 0..self.sleep_threads.len() {
             self.unpark(thread_id);
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.sleep_threads.len()
     }
 }
