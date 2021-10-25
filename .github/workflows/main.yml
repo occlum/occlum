@@ -23,7 +23,7 @@ jobs:
       # run: docker run -itd --name=ubuntu-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
       # TODO: This is a temporary dockerhub repo for ngo, need update dockerhub repo later.
       # The new docker image should install libclang-dev
-      run: docker run -itd --name=ubuntu-test -v $GITHUB_WORKSPACE:/root/occlum shuochengwang/ngo:0.23.7-ubuntu18.04
+      run: docker run -itd --name=ubuntu-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:0.24.2-ubuntu18.04
 
     - name: Check format
       run:  docker exec ubuntu-test bash -c 'cd /root/occlum; info=$(make format-check);
@@ -60,7 +60,7 @@ jobs:
       # run: docker run -itd --name=centos-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-centos8.1
       # TODO: This is a temporary dockerhub repo for ngo, need update dockerhub repo later.
       # The new docker image should install clang
-      run: docker run -itd --name=centos-test -v $GITHUB_WORKSPACE:/root/occlum shuochengwang/ngo:0.23.7-centos8.2
+      run: docker run -itd --name=centos-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:0.24.2-centos8.2
 
     - name: Check format
       run:  docker exec centos-test bash -c 'cd /root/occlum; info=$(make format-check);
