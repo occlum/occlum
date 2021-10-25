@@ -127,17 +127,6 @@ enclave {
             [out, count=ncpus] uint32_t *numa_buf,
             size_t ncpus
         ) propagate_errno;
-        void occlum_ocall_sched_yield(void);
-        int occlum_ocall_sched_setaffinity(
-            int host_tid,
-            size_t cpusize,
-            [in, size=cpusize] const unsigned char* buf
-        ) propagate_errno;
-        int occlum_ocall_sched_getaffinity(
-            size_t cpusize,
-            [out, size=cpusize] unsigned char* buf
-        ) propagate_errno;
-        int occlum_ocall_ncores(void);
 
         sgx_status_t occlum_ocall_sgx_init_quote(
             [out] sgx_target_info_t* target_info,
