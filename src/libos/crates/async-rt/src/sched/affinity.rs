@@ -1,6 +1,7 @@
 use bit_vec::BitVec;
 
 use crate::executor::EXECUTOR;
+use crate::prelude::*;
 
 /// The set of executor threads that a task can be scheduled to.
 #[derive(Debug, Clone, PartialEq)]
@@ -54,5 +55,23 @@ impl Affinity {
     /// Returns an iterator that allows accessing the underlying bits.
     pub fn iter(&self) -> impl Iterator<Item = bool> + '_ {
         self.bits.iter()
+    }
+
+    /// Returns an iterator that allows accessing all indexs of bits that are set to 1.
+    pub fn iter_ones(&self) -> impl Iterator<Item = usize> + '_ {
+        self.bits
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, bit)| if bit { Some(idx) } else { None })
+    }
+
+    /// Returns a best thread id according to affinity and the length of thread's run_queue.
+    pub(crate) fn get_best_thread_by_length(&self, lengths: &Vec<usize>) -> usize {
+        self.bits
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, bit)| if bit { Some(idx) } else { None })
+            .min_by_key(|k| lengths[*k])
+            .unwrap()
     }
 }
