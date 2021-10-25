@@ -9,6 +9,8 @@ pub struct SchedInfo {
     last_thread_id: AtomicU32,
     affinity: RwLock<Affinity>,
     priority: RwLock<SchedPriority>,
+    #[cfg(feature = "use_latency")]
+    enqueue_epochs: AtomicU64,
 }
 
 impl SchedInfo {
@@ -22,11 +24,15 @@ impl SchedInfo {
         };
         let affinity = RwLock::new(Affinity::new_full());
         let priority = RwLock::new(priority);
+        #[cfg(feature = "use_latency")]
+        let enqueue_epochs = AtomicU64::new(0);
 
         Self {
             last_thread_id,
             affinity,
             priority,
+            #[cfg(feature = "use_latency")]
+            enqueue_epochs,
         }
     }
 
@@ -50,9 +56,16 @@ impl SchedInfo {
         self.last_thread_id.store(id, Ordering::Relaxed);
     }
 
-    pub fn affinity(&self) -> &RwLock<Affinity> {
-        &self.affinity
+    #[cfg(feature = "use_latency")]
+    pub(crate) fn enqueue_epochs(&self) -> u64 {
+        self.enqueue_epochs.load(Ordering::Relaxed)
     }
+
+    #[cfg(feature = "use_latency")]
+    pub(crate) fn set_enqueue_epochs(&self, data: u64) {
+        self.enqueue_epochs.store(data, Ordering::Relaxed);
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum SchedPriority {

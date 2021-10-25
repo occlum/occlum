@@ -7,8 +7,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["vdso-time/std"]
+default = ["vdso-time/std", "use_latency" ]
 auto_run = []
+use_latency = []
 sgx = ["sgx_tstd", "flume/sgx", "vdso-time/sgx", "hierarchical_hash_wheel_timer/sgx"]
 
 [dependencies]

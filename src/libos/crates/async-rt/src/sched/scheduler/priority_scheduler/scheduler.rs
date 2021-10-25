@@ -69,6 +69,7 @@ impl PriorityScheduler {
 
     /// Pick a thread for the task.
     /// Use the task's priority if not specify priority in args.
+    #[cfg(not(feature = "use_latency"))]
     fn pick_thread_for(&self, task: &Arc<Task>) -> usize {
         let last_thread_id = task.sched_info().last_thread_id() as usize;
         let priority = task.sched_info().priority();
@@ -92,6 +93,31 @@ impl PriorityScheduler {
         thread_id
     }
 
+    #[cfg(feature = "use_latency")]
+    fn pick_thread_for(&self, task: &Arc<Task>) -> usize {
+        let last_thread_id = task.sched_info().last_thread_id() as usize;
+        let priority = task.sched_info().priority();
+
+        // Meaningfull sched data of candidates thread: (index, length, latency)
+        let mut candidates: Vec<(usize, u64, u64)> = Vec::new();
+
+        let affinity = task.sched_info().affinity().read();
+        affinity.iter_ones().for_each(|idx| {
+            candidates.push((idx, 0, 0));
+        });
+        drop(affinity);
+
+        for idx in 0..candidates.len() {
+            candidates[idx].1 = self.workers[idx].len(priority) as u64;
+            candidates[idx].2 = self.workers[idx].latency() as u64;
+        }
+
+        let thread_id = self.pick_best_candidates(&candidates, last_thread_id);
+        task.sched_info().set_last_thread_id(thread_id as u32);
+        task.reset_budget();
+        thread_id
+    }
+
     /// Insert the task to specific worker. If the queue of worker is full, insert the task to injector.
     /// Return True if the task is inserted to worker, return False if the task is inserted to injector.
     fn insert_task(&self, task: Arc<Task>, thread_id: usize) -> bool {
@@ -104,6 +130,7 @@ impl PriorityScheduler {
         insert_to_worker
     }
 
+    #[cfg(not(feature = "use_latency"))]
     fn pick_best_candidates(
         &self,
         // candidates: (index, length)
@@ -130,6 +157,32 @@ impl PriorityScheduler {
         min_len_candidate.0
     }
 
+    #[cfg(feature = "use_latency")]
+    fn pick_best_candidates(
+        &self,
+        // candidates: (index, length, latency)
+        candidates: &Vec<(usize, u64, u64)>,
+        last_thread_id: usize,
+    ) -> usize {
+        assert!(candidates.len() != 0);
+
+        // TODO: Use a better method to calculate weights.
+        let min_latency_candidate = candidates.iter().min_by_key(|x| x.2).unwrap();
+        if min_latency_candidate.0 == last_thread_id {
+            return min_latency_candidate.0;
+        }
+
+        let min_len_candidate = candidates.iter().min_by_key(|x| x.1).unwrap();
+        if min_len_candidate.0 == last_thread_id {
+            return min_len_candidate.0;
+        }
+
+        // TODO: Find a better difference
+        if min_latency_candidate.1 - min_len_candidate.1 <= 2 {
+            return min_latency_candidate.0;
+        }
+        min_len_candidate.0
+    }
 
     fn try_rebalance_workload(&self) {
         if let Some(guard) = self.rebalance_lock.try_lock() {
