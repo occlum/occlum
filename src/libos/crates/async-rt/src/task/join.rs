@@ -3,23 +3,26 @@ use core::marker::PhantomData;
 use core::task::Waker;
 
 use crate::prelude::*;
-
-pub fn new<T: Send + 'static>() -> (JoinHandle<T>, OutputHandle<T>) {
-    let state = Arc::new(Mutex::new(State::new()));
-    let output_handle = OutputHandle {
-        state: Arc::downgrade(&state),
-        phantom: PhantomData,
-    };
-    let join_handle = JoinHandle {
-        state: state,
-        phantom: PhantomData,
-    };
-    (join_handle, output_handle)
-}
+use crate::task::Task;
 
 pub struct JoinHandle<T: Send + 'static> {
-    state: Arc<Mutex<State<T>>>,
+    state: Arc<Mutex<JoinState<T>>>,
+    task: Arc<Task>,
     phantom: PhantomData<T>,
+}
+
+impl<T: Send + 'static> JoinHandle<T> {
+    pub(crate) fn new(state: Arc<Mutex<JoinState<T>>>, task: Arc<Task>) -> Self {
+        Self {
+            state: state,
+            task: task,
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn task(&self) -> &Arc<Task> {
+        &self.task
+    }
 }
 
 impl<T: Send + 'static> Unpin for JoinHandle<T> {}
@@ -38,11 +41,18 @@ impl<T: Send + 'static> Future for JoinHandle<T> {
 }
 
 pub struct OutputHandle<T: Send + 'static> {
-    state: Weak<Mutex<State<T>>>,
+    state: Weak<Mutex<JoinState<T>>>,
     phantom: PhantomData<T>,
 }
 
 impl<T: Send + 'static> OutputHandle<T> {
+    pub fn new(state: &Arc<Mutex<JoinState<T>>>) -> Self {
+        Self {
+            state: Arc::downgrade(state),
+            phantom: PhantomData,
+        }
+    }
+
     pub fn set(self, output: T) {
         if let Some(state) = self.state.upgrade() {
             let mut state = state.lock();
@@ -53,26 +63,26 @@ impl<T: Send + 'static> OutputHandle<T> {
 
 // The state of a task that is to be joined.
 #[derive(Debug)]
-enum State<T: Send + 'static> {
+pub enum JoinState<T: Send + 'static> {
     Init,
     Pending(Waker),
     Ready(T),
     Finish,
 }
 
-impl<T: Send + 'static> State<T> {
+impl<T: Send + 'static> JoinState<T> {
     pub fn new() -> Self {
-        State::Init
+        JoinState::Init
     }
 
     pub fn set_output(&mut self, value: T) {
         *self = match self {
-            State::Init => State::Ready(value),
-            State::Pending(waker) => {
+            JoinState::Init => JoinState::Ready(value),
+            JoinState::Pending(waker) => {
                 waker.wake_by_ref();
-                State::Ready(value)
+                JoinState::Ready(value)
             }
-            State::Ready(_) | State::Finish => {
+            JoinState::Ready(_) | JoinState::Finish => {
                 panic!("a task's output must not be set twice");
             }
         };
@@ -80,21 +90,21 @@ impl<T: Send + 'static> State<T> {
 
     pub fn take_output(&mut self, cx: &mut Context<'_>) -> Option<T> {
         match self {
-            State::Init | State::Pending(_) => {
-                *self = State::Pending(cx.waker().clone());
+            JoinState::Init | JoinState::Pending(_) => {
+                *self = JoinState::Pending(cx.waker().clone());
                 None
             }
-            State::Ready(value) => {
+            JoinState::Ready(value) => {
                 drop(value);
-                let mut result = State::Finish;
+                let mut result = JoinState::Finish;
                 core::mem::swap(self, &mut result);
-                if let State::Ready(value) = result {
+                if let JoinState::Ready(value) = result {
                     Some(value)
                 } else {
                     unreachable!();
                 }
             }
-            State::Finish => {
+            JoinState::Finish => {
                 panic!("a task's output must not be taken again");
             }
         }

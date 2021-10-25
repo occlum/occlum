@@ -4,30 +4,21 @@ use futures::task::ArcWake;
 
 use crate::executor::EXECUTOR;
 use crate::prelude::*;
-use crate::sched::SchedInfo;
+use crate::sched::{SchedInfo, SchedPriority};
 use crate::task::{LocalsMap, TaskId};
+
+const DEFAULT_BUDGET: u8 = 64;
 
 pub struct Task {
     tid: TaskId,
     sched_info: SchedInfo,
     future: Mutex<Option<BoxFuture<'static, ()>>>,
     locals: LocalsMap,
+    budget: u8,
+    consumed_budget: AtomicU8,
 }
 
 impl Task {
-    pub fn new(future: impl Future<Output = ()> + 'static + Send) -> Self {
-        let tid = TaskId::new();
-        let sched_info = SchedInfo::new();
-        let future = Mutex::new(Some(future.boxed()));
-        let locals = LocalsMap::new();
-        Self {
-            tid,
-            sched_info,
-            future,
-            locals,
-        }
-    }
-
     pub fn tid(&self) -> TaskId {
         self.tid
     }
@@ -42,6 +33,18 @@ impl Task {
 
     pub(crate) fn locals(&self) -> &LocalsMap {
         &self.locals
+    }
+
+    pub(crate) fn has_remained_budget(&self) -> bool {
+        self.consumed_budget.load(Ordering::Relaxed) < self.budget
+    }
+
+    pub(crate) fn reset_budget(&self) {
+        self.consumed_budget.store(0, Ordering::Relaxed);
+    }
+
+    pub(crate) fn consume_budget(&self) {
+        self.consumed_budget.fetch_add(1, Ordering::Relaxed);
     }
 }
 
@@ -61,12 +64,57 @@ impl Drop for Task {
 
 impl ArcWake for Task {
     fn wake_by_ref(arc_self: &Arc<Self>) {
-        EXECUTOR.accept_task(arc_self.clone());
+        EXECUTOR.wake_task(arc_self.clone());
     }
 }
 
 impl Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Task").field("tid", &self.tid).finish()
+    }
+}
+
+pub struct TaskBuilder {
+    future: Option<BoxFuture<'static, ()>>,
+    priority: SchedPriority,
+    budget: u8,
+}
+
+impl TaskBuilder {
+    pub fn new(future: impl Future<Output = ()> + 'static + Send) -> Self {
+        Self {
+            future: Some(future.boxed()),
+            priority: SchedPriority::Normal,
+            budget: DEFAULT_BUDGET,
+        }
+    }
+
+    pub fn priority(mut self, priority: SchedPriority) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    pub fn budget(mut self, budget: u8) -> Self {
+        self.budget = budget;
+        self
+    }
+
+    pub fn build(&mut self) -> Arc<Task> {
+        assert!(self.future.is_some());
+
+        let tid = TaskId::new();
+        let sched_info = SchedInfo::new(self.priority);
+        let future = Mutex::new(self.future.take());
+        let locals = LocalsMap::new();
+        let budget = self.budget;
+        let consumed_budget = AtomicU8::new(0);
+        Arc::new(Task {
+            tid,
+            sched_info,
+            future,
+            locals,
+            budget,
+            consumed_budget,
+        })
     }
 }

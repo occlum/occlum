@@ -82,8 +82,10 @@ pub extern "C" fn occlum_ecall_init(
         super::interrupt::init();
 
         info!("num_vcpus = {:?}", num_vcpus);
+        assert!(num_vcpus > 0 && num_vcpus <= 1024);
         async_rt::config::set_parallelism(num_vcpus);
-        async_rt::task::spawn(async {
+
+        async_rt::task::SpawnOptions::new(async {
             let io_uring = &crate::io_uring::SINGLETON;
             loop {
                 for _ in 0..100 {
@@ -91,7 +93,9 @@ pub extern "C" fn occlum_ecall_init(
                 }
                 async_rt::sched::yield_().await;
             }
-        });
+        })
+        .priority(async_rt::sched::SchedPriority::Low)
+        .spawn();
 
         HAS_INIT.store(true, Ordering::SeqCst);
 

@@ -1,5 +1,8 @@
+use self::join::{JoinState, OutputHandle};
+use self::task::TaskBuilder;
 use crate::executor::EXECUTOR;
 use crate::prelude::*;
+use crate::sched::SchedPriority;
 
 pub use self::id::TaskId;
 pub use self::join::JoinHandle;
@@ -15,17 +18,7 @@ mod locals;
 mod task;
 
 pub fn spawn<T: Send + 'static>(future: impl Future<Output = T> + 'static + Send) -> JoinHandle<T> {
-    #[cfg(any(test, feature = "auto_run"))]
-    init_runner_threads();
-
-    let (join_handle, output_handle) = join::new();
-    let future = async move {
-        let output = future.await;
-        output_handle.set(output);
-    };
-    let task = Arc::new(Task::new(future));
-    EXECUTOR.accept_task(task);
-    join_handle
+    SpawnOptions::new(future).spawn()
 }
 
 pub fn block_on<T: Send + 'static>(future: impl Future<Output = T> + 'static + Send) -> T {
@@ -48,7 +41,7 @@ pub fn block_on<T: Send + 'static>(future: impl Future<Output = T> + 'static + S
         }
     };
 
-    let task = Arc::new(Task::new(future));
+    let task = TaskBuilder::new(future).build();
     EXECUTOR.accept_task(task);
     while !completed.load(Ordering::Acquire) {}
 
@@ -67,4 +60,44 @@ fn init_runner_threads() {
             });
         }
     });
+}
+
+pub struct SpawnOptions<T> {
+    raw_future: Option<BoxFuture<'static, T>>,
+    priority: SchedPriority,
+}
+
+impl<T: Send + 'static> SpawnOptions<T> {
+    pub fn new(future: impl Future<Output = T> + 'static + Send) -> Self {
+        Self {
+            raw_future: Some(future.boxed()),
+            priority: SchedPriority::Normal,
+        }
+    }
+
+    pub fn priority(mut self, priority: SchedPriority) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    pub fn spawn(&mut self) -> JoinHandle<T> {
+        #[cfg(any(test, feature = "auto_run"))]
+        init_runner_threads();
+
+        let state = Arc::new(Mutex::new(JoinState::new()));
+        let output_handle = OutputHandle::new(&state);
+
+        let future = {
+            let raw_future = self.raw_future.take().unwrap();
+            async move {
+                let output = raw_future.await;
+                output_handle.set(output);
+            }
+        };
+        let task = TaskBuilder::new(future).priority(self.priority).build();
+        let join_handle = JoinHandle::new(state, task.clone());
+
+        EXECUTOR.accept_task(task);
+        join_handle
+    }
 }

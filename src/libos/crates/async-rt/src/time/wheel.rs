@@ -7,20 +7,18 @@ use hierarchical_hash_wheel_timer::wheels::quad_wheel::QuadWheelWithOverflow;
 
 lazy_static! {
     pub static ref TIMER_WHEEL: TimerWheel = {
-        use crate::executor::EXECUTOR;
-        use crate::sched::yield_;
-        use crate::task::Task;
+        use crate::sched::{yield_, SchedPriority};
+        use crate::task::SpawnOptions;
 
         let wheel = TimerWheel::new();
 
         // TODO: Don't always run this task when no useful tasks to run and no timeouts to expire.
-        let task = Arc::new(Task::new(async {
+        SpawnOptions::new(async {
             loop {
                 TIMER_WHEEL.try_make_progress();
                 yield_().await;
             }
-        }));
-        EXECUTOR.accept_task(task);
+        }).priority(SchedPriority::Low).spawn();
 
         wheel
     };
