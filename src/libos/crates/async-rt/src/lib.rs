@@ -1,3 +1,16 @@
+//! async-rt
+//!
+//! async-rt is a Rust async / await runtime for std or SGX environment. Support:
+//! - Multi-threading: Users can specify the number of threads to use in the runtime
+//! to speed up task execution through multiple threads.
+//! - Save computing power: When the thread is idle, it will sleep, avoiding busy
+//! waiting and wasting computing power.
+//! - Priority scheduling: Tasks support different priorities and can be scheduled
+//! according to priority. Schedule higher priority tasks first.
+//! - Load balancing: Adaptively maintains workloads between threads to ensure
+//! load balancing as much as possible.
+//! - Timeout: Wait for a task to complete within a specified time, and return if
+//! reach timeout.
 #![cfg_attr(feature = "sgx", no_std)]
 #![feature(const_fn)]
 #![feature(thread_local)]
@@ -25,6 +38,10 @@ pub mod wait;
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
+    use crate::sched::SchedPriority;
+    use crate::task::{JoinHandle, SpawnOptions};
+
+    const TEST_PARALLELISM: u32 = 4;
 
     #[test]
     fn test_hello() {
@@ -105,9 +122,94 @@ mod tests {
         });
     }
 
+    #[test]
+    fn test_scheduler() {
+        crate::task::block_on(async {
+            let task_num = TEST_PARALLELISM * 100;
+            let mut join_handles: Vec<JoinHandle<u32>> = (0..task_num)
+                .map(|i| {
+                    crate::task::spawn(async move {
+                        for _ in 0..100 {
+                            crate::sched::yield_().await;
+                        }
+                        i
+                    })
+                })
+                .collect();
+
+            for (i, join_handle) in join_handles.iter_mut().enumerate() {
+                assert!(join_handle.await == (i as u32));
+            }
+        });
+    }
+
+    #[test]
+    fn test_scheduler_priority() {
+        crate::task::block_on(async {
+            let task_num = TEST_PARALLELISM * 100;
+            let low_handle = spawn_priority_tasks(task_num, SchedPriority::Low);
+            let normal_handle = spawn_priority_tasks(task_num, SchedPriority::Normal);
+            let high_handle = spawn_priority_tasks(task_num, SchedPriority::High);
+
+            let low_time = low_handle.await;
+            let normal_time = normal_handle.await;
+            let high_time = high_handle.await;
+
+            assert!(low_time > normal_time);
+            assert!(normal_time > high_time);
+        });
+    }
+
+    fn spawn_priority_tasks(task_num: u32, priority: SchedPriority) -> JoinHandle<Duration> {
+        SpawnOptions::new(async move {
+            let start = std::time::Instant::now();
+            let join_handles: Vec<JoinHandle<()>> = (0..task_num)
+                .map(|_| {
+                    SpawnOptions::new(async move {
+                        for _ in 0..100u32 {
+                            crate::sched::yield_().await;
+                        }
+                    })
+                    .priority(priority)
+                    .spawn()
+                })
+                .collect();
+            for join_handle in join_handles {
+                join_handle.await;
+            }
+            start.elapsed()
+        })
+        .priority(SchedPriority::High)
+        .spawn()
+    }
+
+    #[test]
+    #[ignore]
+    fn test_scheduler_full() {
+        crate::task::block_on(async {
+            use crate::sched::MAX_QUEUED_TASKS;
+            use crate::task::JoinHandle;
+
+            let task_num = TEST_PARALLELISM * MAX_QUEUED_TASKS as u32 * 2;
+            let mut join_handles: Vec<JoinHandle<()>> = (0..task_num)
+                .map(|_| {
+                    crate::task::spawn(async move {
+                        for _ in 0..100u32 {
+                            crate::sched::yield_().await;
+                        }
+                    })
+                })
+                .collect();
+
+            for join_handle in join_handles.iter_mut() {
+                join_handle.await;
+            }
+        });
+    }
+
     #[ctor::ctor]
     fn auto_init_executor() {
-        crate::config::set_parallelism(3);
+        crate::config::set_parallelism(TEST_PARALLELISM);
     }
 
     mod logger {
@@ -116,8 +218,8 @@ mod tests {
         #[ctor::ctor]
         fn auto_init() {
             log::set_logger(&LOGGER)
-                .map(|()| log::set_max_level(LevelFilter::Trace))
-                .expect("failed to init the logger");
+                .map(|()| log::set_max_level(LevelFilter::Info))
+                .expect("failed to init the");
         }
 
         static LOGGER: SimpleLogger = SimpleLogger;
@@ -126,7 +228,7 @@ mod tests {
 
         impl log::Log for SimpleLogger {
             fn enabled(&self, metadata: &Metadata) -> bool {
-                metadata.level() <= Level::Trace
+                metadata.level() <= Level::Info
             }
 
             fn log(&self, record: &Record) {
