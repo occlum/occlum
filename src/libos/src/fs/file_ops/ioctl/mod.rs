@@ -5,6 +5,7 @@
 //! driver.
 
 use super::*;
+use util::mem_util::from_user;
 
 pub use self::builtin::*;
 pub use self::non_builtin::{NonBuiltinIoctlCmd, StructuredIoctlArgType, StructuredIoctlNum};
@@ -63,21 +64,44 @@ impl_ioctl_nums_and_cmds! {
 /// the untrusted host OS.
 impl<'a> IoctlRawCmd<'a> {
     pub fn to_safe_ioctlcmd(&self) -> Result<Box<dyn IoctlCmd>> {
-        match self {
-            IoctlRawCmd::TIOCGWINSZ(_) => Ok(Box::new(GetWinSize::new(()))),
+        Ok(match self {
+            IoctlRawCmd::TIOCGWINSZ(_) => Box::new(GetWinSize::new(())),
             IoctlRawCmd::TIOCSWINSZ(winsize_ref) => {
                 let winsize = **winsize_ref;
-                Ok(Box::new(SetWinSize::new(winsize)))
+                Box::new(SetWinSize::new(winsize))
             }
             IoctlRawCmd::NonBuiltin(inner) => {
                 let nonbuiltin_cmd =
                     unsafe { NonBuiltinIoctlCmd::new(*inner.cmd_num(), inner.arg_ptr() as _)? };
-                Ok(Box::new(nonbuiltin_cmd))
+                Box::new(nonbuiltin_cmd)
             }
+            IoctlRawCmd::FIONBIO(non_blocking) => Box::new(SetNonBlocking::new(**non_blocking)),
+            IoctlRawCmd::FIONREAD(_) => Box::new(GetReadBufLen::new(())),
+            IoctlRawCmd::SIOCGIFCONF(ifconf_mut) => {
+                if !ifconf_mut.ifc_buf.is_null() {
+                    if ifconf_mut.ifc_len < 0 {
+                        return_errno!(EINVAL, "invalid ifc_len");
+                    }
+                    from_user::check_array(ifconf_mut.ifc_buf, ifconf_mut.ifc_len as usize)?;
+                }
+                Box::new(GetIfConf::new(ifconf_mut))
+            }
+            IoctlRawCmd::SIOCGIFNAME(_)
+            | IoctlRawCmd::SIOCGIFFLAGS(_)
+            | IoctlRawCmd::SIOCGIFADDR(_)
+            | IoctlRawCmd::SIOCGIFDSTADDR(_)
+            | IoctlRawCmd::SIOCGIFBRDADDR(_)
+            | IoctlRawCmd::SIOCGIFNETMASK(_)
+            | IoctlRawCmd::SIOCGIFMTU(_)
+            | IoctlRawCmd::SIOCGIFHWADDR(_)
+            | IoctlRawCmd::SIOCGIFINDEX(_)
+            | IoctlRawCmd::SIOCGIFPFLAGS(_)
+            | IoctlRawCmd::SIOCGIFTXQLEN(_)
+            | IoctlRawCmd::SIOCGIFMAP(_) => Box::new(GetIfReqWithRawCmd::new(self.cmd_num())),
             _ => {
                 return_errno!(EINVAL, "unsupported cmd");
             }
-        }
+        })
     }
 
     pub fn copy_output_from_safe(&mut self, cmd: &dyn IoctlCmd) {
@@ -85,6 +109,38 @@ impl<'a> IoctlRawCmd<'a> {
             IoctlRawCmd::TIOCGWINSZ(winsize_mut) => {
                 let cmd = cmd.downcast_ref::<GetWinSize>().unwrap();
                 **winsize_mut = *cmd.output().unwrap();
+            }
+            IoctlRawCmd::FIONREAD(len_mut) => {
+                let cmd = cmd.downcast_ref::<GetReadBufLen>().unwrap();
+                **len_mut = *cmd.output().unwrap();
+            }
+            IoctlRawCmd::SIOCGIFCONF(ifconf_mut) => {
+                let cmd = cmd.downcast_ref::<GetIfConf>().unwrap();
+                ifconf_mut.ifc_len = cmd.len() as i32;
+                if !ifconf_mut.ifc_buf.is_null() {
+                    let mut raw_buf = unsafe {
+                        std::slice::from_raw_parts_mut(
+                            ifconf_mut.ifc_buf as _,
+                            ifconf_mut.ifc_len as _,
+                        )
+                    };
+                    raw_buf.copy_from_slice(cmd.as_slice().unwrap());
+                }
+            }
+            IoctlRawCmd::SIOCGIFNAME(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFFLAGS(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFADDR(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFDSTADDR(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFBRDADDR(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFNETMASK(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFMTU(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFHWADDR(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFINDEX(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFPFLAGS(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFTXQLEN(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFMAP(ifreq_mut) => {
+                let cmd = cmd.downcast_ref::<GetIfReqWithRawCmd>().unwrap();
+                **ifreq_mut = *cmd.output().unwrap();
             }
             _ => {}
         }
