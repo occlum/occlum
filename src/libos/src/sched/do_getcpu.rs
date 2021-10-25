@@ -4,7 +4,9 @@ use crate::process::ThreadRef;
 
 pub fn do_getcpu() -> Result<(u32, u32)> {
     let cpu = pick_cpu_within_affinity_mask();
-    let node = NUMA_TOPOLOGY[cpu as usize];
+    // TODO: support NUMA in async_rt.
+    // let node = NUMA_TOPOLOGY[cpu as usize];
+    let node = 0;
     debug!("do_getcpu cpu = {}, node = {}", cpu, node);
     Ok((cpu, node))
 }

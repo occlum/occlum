@@ -21,7 +21,7 @@ pub struct CpuSet {
 impl CpuSet {
     /// Returns the length of a CPU set in bytes.
     pub fn len() -> usize {
-        align_up(Self::ncores(), 8) / 8
+        align_up(align_up(Self::ncores(), 8) / 8, 8)
     }
 
     /// Returns the number CPU of cores in a CPU set.
@@ -122,46 +122,11 @@ impl Index<usize> for CpuSet {
 
 lazy_static! {
     /// The number of all CPU cores on the platform
-    pub static ref NCORES: usize = {
-        extern "C" {
-            fn occlum_ocall_ncores(ret: *mut i32) -> sgx_status_t;
-        }
-        unsafe {
-            let mut ncores = 0;
-            let status = occlum_ocall_ncores(&mut ncores);
-            assert!(
-                status == sgx_status_t::SGX_SUCCESS &&
-                // Ncores == 0 is meaningless
-                0 < ncores &&
-                // A reasonble upper limit for the foreseeable future
-                ncores <= 1024
-            );
-            ncores as usize
-        }
-    };
+    pub static ref NCORES: usize = async_rt::sched::Affinity::max_threads();
 
     /// The set of all available CPU cores.
     ///
-    /// While `AVAIL_CPUSET` is likely to be equal to `CpuSet::new_full()`, this is not always the
-    /// case.  For example, when the enclave is running on a container or a virtual machine on a public
-    /// cloud platform, the container or vm is usually given access to a subset of the CPU cores on
-    /// the host machine.
-    ///
-    /// Property: `AVAIL_CPUSET.empty() == false`.
-    pub static ref AVAIL_CPUSET: CpuSet = {
-        extern "C" {
-            fn occlum_ocall_sched_getaffinity(
-                ret: *mut i32,
-                cpusetsize: size_t,
-                mask: *mut c_uchar,
-            ) -> sgx_status_t;
-        }
-        let mut cpuset = CpuSet::new_empty();
-        let mut retval = 0;
-        let sgx_status = unsafe{occlum_ocall_sched_getaffinity(&mut retval, CpuSet::len(), cpuset.as_mut_slice().as_mut_ptr())};
-        assert!(sgx_status == sgx_status_t::SGX_SUCCESS);
-        CpuSet::clear_unused(&mut cpuset.bits);
-        assert!(!cpuset.empty());
-        cpuset
-    };
+    /// Our cpuset is based on vcpu (the threads of rust async runtime),
+    /// hence, The `AVAIL_CPUSET` is always equal to `CpuSet::new_full()`.
+    pub static ref AVAIL_CPUSET: CpuSet = CpuSet::new_full();
 }

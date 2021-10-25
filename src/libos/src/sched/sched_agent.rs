@@ -24,6 +24,7 @@
 use super::cpu_set::{CpuSet, AVAIL_CPUSET};
 use crate::prelude::*;
 use crate::util::dirty::Dirty;
+use async_rt::task::Task;
 
 #[derive(Debug)]
 pub struct SchedAgent {
@@ -64,7 +65,7 @@ impl Clone for SchedAgent {
 #[derive(Debug, Clone)]
 enum Inner {
     Detached { affinity: Dirty<CpuSet> },
-    Attached { host_tid: pid_t, affinity: CpuSet },
+    Attached { task: Arc<Task>, affinity: CpuSet },
 }
 
 impl SchedAgent {
@@ -74,13 +75,6 @@ impl SchedAgent {
             Inner::Detached { affinity }
         });
         Self { inner }
-    }
-
-    pub fn host_tid(&self) -> Option<pid_t> {
-        match self.inner() {
-            Inner::Detached { .. } => None,
-            Inner::Attached { host_tid, .. } => Some(*host_tid),
-        }
     }
 
     pub fn affinity(&self) -> &CpuSet {
@@ -104,24 +98,24 @@ impl SchedAgent {
             Inner::Detached { affinity } => {
                 *affinity.as_mut() = new_affinity;
             }
-            Inner::Attached { host_tid, affinity } => {
-                update_affinity(*host_tid, &new_affinity);
+            Inner::Attached { task, affinity } => {
+                update_affinity(task, &new_affinity);
                 *affinity = new_affinity;
             }
         };
         Ok(())
     }
 
-    pub fn attach(&mut self, host_tid: pid_t) {
+    pub fn attach(&mut self, task: Arc<Task>) {
         self.update_inner(|inner| match inner {
             Inner::Detached { affinity } => {
                 let affinity = {
                     if affinity.dirty() {
-                        update_affinity(host_tid, affinity.as_ref())
+                        update_affinity(&task, affinity.as_ref())
                     }
                     affinity.unwrap()
                 };
-                Inner::Attached { host_tid, affinity }
+                Inner::Attached { task, affinity }
             }
             Inner::Attached { .. } => panic!("cannot attach when the agent is already attached"),
         });
@@ -168,22 +162,13 @@ impl Default for SchedAgent {
     }
 }
 
-fn update_affinity(host_tid: pid_t, affinity: &CpuSet) {
-    let mask = affinity.as_slice();
-    let mut retval = 0;
-    let sgx_status = unsafe {
-        occlum_ocall_sched_setaffinity(&mut retval, host_tid as i32, mask.len(), mask.as_ptr())
-    };
-    assert!(sgx_status == sgx_status_t::SGX_SUCCESS);
-    // sched_setaffinity should never fail
-    assert!(retval == 0);
-}
-
-extern "C" {
-    fn occlum_ocall_sched_setaffinity(
-        ret: *mut i32,
-        host_tid: i32,
-        cpusetsize: size_t,
-        mask: *const c_uchar,
-    ) -> sgx_status_t;
+fn update_affinity(task: &Arc<Task>, affinity: &CpuSet) {
+    let ncores = CpuSet::ncores();
+    let mut task_affinity = task.sched_info().affinity().write();
+    for (idx, bit) in affinity.iter().enumerate() {
+        if idx >= ncores {
+            break;
+        }
+        task_affinity.set(idx, *bit)
+    }
 }

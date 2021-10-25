@@ -128,7 +128,11 @@ impl Thread {
     }
 
     pub fn start(&self) {
-        //self.sched().lock().unwrap().attach(host_tid);
+        self.sched()
+            .lock()
+            .unwrap()
+            .attach(async_rt::task::current::get());
+
         self.inner().start();
         /*
                 let eventfd = EventFile::new(
@@ -152,9 +156,9 @@ impl Thread {
             .unwrap()
             .remove(&self.tid())
             .unwrap();
+        */
 
         self.sched().lock().unwrap().detach();
-        */
 
         // Remove this thread from its owner process
         let mut process_inner = self.process.inner();
