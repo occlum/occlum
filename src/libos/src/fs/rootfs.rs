@@ -1,4 +1,4 @@
-//use super::dev_fs;
+use super::dev_fs;
 use super::hostfs::HostFS;
 //use super::procfs::ProcFS;
 use super::sefs::{SgxStorage, SgxUuidProvider};
@@ -147,9 +147,8 @@ fn mount_nonroot_fs_according_to(mount_config: &Vec<ConfigMount>, root: &MNode) 
                 mount_fs_at(ramfs, root, &mc.target)?;
             }
             TYPE_DEVFS => {
-                //let devfs = dev_fs::init_devfs()?;
-                //mount_fs_at(devfs, root, &mc.target)?;
-                warn!("devfs is not supported");
+                let devfs = dev_fs::init_devfs()?;
+                mount_fs_at(devfs, root, &mc.target)?;
             }
             TYPE_PROCFS => {
                 //let procfs = ProcFS::new();

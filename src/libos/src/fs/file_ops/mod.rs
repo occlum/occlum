@@ -12,8 +12,7 @@ pub use self::fcntl::{do_fcntl, FcntlCmd};
 pub use self::fspath::{FsPath, AT_FDCWD};
 pub use self::fsync::{do_fdatasync, do_fsync};
 pub use self::ioctl::{
-    do_ioctl, occlum_ocall_ioctl, BuiltinIoctlNum, IfConf, IoctlRawCmd, StructuredIoctlArgType,
-    StructuredIoctlNum,
+    do_ioctl, IoctlRawCmd, NonBuiltinIoctlCmd, StructuredIoctlArgType, StructuredIoctlNum,
 };
 pub use self::link::{do_linkat, LinkFlags};
 pub use self::lseek::do_lseek;

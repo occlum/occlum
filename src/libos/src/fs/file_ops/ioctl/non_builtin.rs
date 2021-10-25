@@ -71,6 +71,8 @@ impl<'a> NonBuiltinIoctlCmd<'a> {
     }
 }
 
+impl IoctlCmd for NonBuiltinIoctlCmd<'static> {}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct StructuredIoctlNum {
     cmd_id: u8,

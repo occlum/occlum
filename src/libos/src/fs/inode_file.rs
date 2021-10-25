@@ -1,3 +1,4 @@
+use super::file_ops::NonBuiltinIoctlCmd;
 use super::*;
 use rcore_fs_sefs::dev::SefsMac;
 
@@ -186,7 +187,15 @@ impl INodeFile {
     }
 
     pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
-        return_errno!(EINVAL, "unsupported cmd");
+        async_io::match_ioctl_cmd_mut!(cmd, {
+            cmd : NonBuiltinIoctlCmd => {
+                self.inode.io_control(cmd.cmd_num().as_u32(), cmd.arg_ptr() as usize)?;
+            },
+            _ => {
+                return_errno!(EINVAL, "unsupported ioctl cmd");
+            }
+        });
+        Ok(())
     }
 
     pub fn test_advisory_lock(&self, lock: &mut Flock) -> Result<()> {

@@ -32,8 +32,8 @@ pub use self::rootfs::ROOT_INODE;
 pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
 pub use self::syscalls::*;
 
+mod dev_fs;
 mod event_file;
-//mod dev_fs;
 // TODO: remove the file
 //mod file;
 mod file_handle;

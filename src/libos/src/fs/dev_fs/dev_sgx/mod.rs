@@ -1,5 +1,6 @@
 //! SGX Device (/dev/sgx).
 
+use super::file_ops::{NonBuiltinIoctlCmd, StructuredIoctlArgType, StructuredIoctlNum};
 use super::*;
 
 mod consts;
@@ -47,10 +48,17 @@ impl INode for DevSgx {
         })
     }
 
-    fn io_control(&self, _cmd: u32, _data: usize) -> vfs::Result<()> {
-        let mut ioctl_cmd =
-            unsafe { IoctlCmd::new(_cmd, _data as *mut u8).map_err(|_| FsError::InvalidParam)? };
-        self.ioctl(&mut ioctl_cmd).map_err(|e| {
+    fn io_control(&self, cmd: u32, data: usize) -> vfs::Result<()> {
+        let mut ioctl_cmd = {
+            let structured_cmd_num =
+                StructuredIoctlNum::from_u32(cmd).map_err(|_| FsError::InvalidParam)?;
+            let ioctl_cmd = unsafe {
+                NonBuiltinIoctlCmd::new(structured_cmd_num, data as *mut u8)
+                    .map_err(|_| FsError::InvalidParam)?
+            };
+            Box::new(ioctl_cmd)
+        };
+        self.ioctl(ioctl_cmd.as_mut()).map_err(|e| {
             error!("{}", e.backtrace());
             FsError::IOCTLError
         })?;
@@ -63,11 +71,13 @@ impl INode for DevSgx {
 }
 
 impl DevSgx {
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-        let nonbuiltin_cmd = match cmd {
-            IoctlCmd::NonBuiltin(nonbuiltin_cmd) => nonbuiltin_cmd,
-            _ => return_errno!(EINVAL, "unknown ioctl cmd for /dev/sgx"),
-        };
+    fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<i32> {
+        let nonbuiltin_cmd = async_io::match_ioctl_cmd_mut!(cmd, {
+            cmd : NonBuiltinIoctlCmd => cmd,
+            _ => {
+                return_errno!(EINVAL, "unsupported ioctl cmd for /dev/sgx");
+            }
+        });
         let cmd_num = nonbuiltin_cmd.cmd_num().as_u32();
         match cmd_num {
             SGX_CMD_NUM_IS_EDMM_SUPPORTED => {

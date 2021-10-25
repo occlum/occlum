@@ -69,6 +69,11 @@ impl<'a> IoctlRawCmd<'a> {
                 let winsize = **winsize_ref;
                 Ok(Box::new(SetWinSize::new(winsize)))
             }
+            IoctlRawCmd::NonBuiltin(inner) => {
+                let nonbuiltin_cmd =
+                    unsafe { NonBuiltinIoctlCmd::new(*inner.cmd_num(), inner.arg_ptr() as _)? };
+                Ok(Box::new(nonbuiltin_cmd))
+            }
             _ => {
                 return_errno!(EINVAL, "unsupported cmd");
             }
