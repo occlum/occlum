@@ -59,7 +59,7 @@ impl VMInitializer {
                 // TODO: make sure that read_at does not move file cursor
                 let len = file
                     .read_at(*offset, buf)
-                    .cause_err(|_| errno!(EIO, "failed to init memory from file"))?;
+                    .cause_err(|_| errno!(EACCES, "failed to init memory from file"))?;
                 for b in &mut buf[len..] {
                     *b = 0;
                 }
@@ -77,7 +77,7 @@ impl VMInitializer {
                 buf[..copy_len].copy_from_slice(&src_slice[..copy_len]);
                 let len = file
                     .read_at(*offset, &mut buf[copy_len..])
-                    .cause_err(|_| errno!(EIO, "failed to init memory from file"))?;
+                    .cause_err(|_| errno!(EACCES, "failed to init memory from file"))?;
                 for b in &mut buf[(copy_len + len)..] {
                     *b = 0;
                 }
