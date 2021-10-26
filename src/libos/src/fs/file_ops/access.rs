@@ -48,15 +48,15 @@ pub fn do_faccessat(
     );
 
     let inode = {
-        let path = fs_path.to_abs_path()?;
         let current = current!();
         let fs = current.fs().lock().unwrap();
         if flags.contains(AccessibilityCheckFlags::AT_SYMLINK_NOFOLLOW) {
-            fs.lookup_inode_no_follow(&path)?
+            fs.lookup_inode_no_follow(fs_path)?
         } else {
-            fs.lookup_inode(&path)?
+            fs.lookup_inode(fs_path)?
         }
     };
+
     if mode.test_for_exist() {
         return Ok(());
     }

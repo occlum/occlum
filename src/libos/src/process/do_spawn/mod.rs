@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::ffi::{CStr, CString};
 use std::path::Path;
 
@@ -10,7 +11,8 @@ use super::thread::ThreadName;
 use super::{table, HostWaker, ProcessRef, ThreadRef};
 use crate::entry::context_switch::{CpuContext, GpRegs};
 use crate::fs::{
-    CreationFlags, FileDesc, FileTable, FsView, HostStdioFds, StdinFile, StdoutFile, ROOT_INODE,
+    CreationFlags, FileDesc, FileTable, FsPath, FsView, HostStdioFds, StdinFile, StdoutFile,
+    AT_FDCWD, ROOT_INODE,
 };
 use crate::prelude::*;
 use crate::vm::ProcessVM;
@@ -298,12 +300,11 @@ fn init_files(
                     oflag,
                     fd,
                 } => {
-                    let inode_file =
-                        current_ref
-                            .fs()
-                            .lock()
-                            .unwrap()
-                            .open_file(path.as_str(), oflag, mode)?;
+                    let inode_file = current_ref.fs().lock().unwrap().open_file(
+                        &FsPath::try_from(path.as_str())?,
+                        oflag,
+                        mode,
+                    )?;
                     let file_ref = FileRef::new_inode(inode_file);
                     let creation_flags = CreationFlags::from_bits_truncate(oflag);
                     cloned_file_table.put_at(fd, file_ref, creation_flags.must_close_on_spawn());

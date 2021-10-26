@@ -7,14 +7,13 @@ pub use self::INodeFile as InodeFile;
 
 pub struct INodeFile {
     inode: Arc<dyn INode>,
-    abs_path: String,
     offset: SgxMutex<usize>,
     access_mode: AccessMode,
     status_flags: RwLock<StatusFlags>,
 }
 
 impl INodeFile {
-    pub fn open(inode: Arc<dyn INode>, abs_path: &str, flags: u32) -> Result<Self> {
+    pub fn open(inode: Arc<dyn INode>, flags: u32) -> Result<Self> {
         let access_mode = AccessMode::from_u32(flags)?;
         if (access_mode.readable() && !inode.allow_read()?) {
             return_errno!(EACCES, "File not readable");
@@ -28,15 +27,10 @@ impl INodeFile {
         let status_flags = StatusFlags::from_bits_truncate(flags);
         Ok(INodeFile {
             inode,
-            abs_path: abs_path.to_owned(),
             offset: SgxMutex::new(0),
             access_mode,
             status_flags: RwLock::new(status_flags),
         })
-    }
-
-    pub fn abs_path(&self) -> &str {
-        &self.abs_path
     }
 
     pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
@@ -224,8 +218,8 @@ impl INodeFile {
         Ok(())
     }
 
-    pub fn inode(&self) -> &dyn INode {
-        &*self.inode as _
+    pub fn inode(&self) -> &Arc<dyn INode> {
+        &self.inode
     }
 }
 
@@ -233,8 +227,7 @@ impl Debug for INodeFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "INodeFile {{ inode: ???, abs_path: {}, pos: {}, access_mode: {:?}, status_flags: {:#o} }}",
-            self.abs_path,
+            "INodeFile {{ inode: ???, pos: {}, access_mode: {:?}, status_flags: {:#o} }}",
             *self.offset.lock().unwrap(),
             self.access_mode,
             *self.status_flags.read().unwrap()

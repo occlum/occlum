@@ -4,10 +4,9 @@ pub fn do_fchmodat(fs_path: &FsPath, mode: FileMode) -> Result<()> {
     debug!("fchmodat: fs_path: {:?}, mode: {:#o}", fs_path, mode);
 
     let inode = {
-        let path = fs_path.to_abs_path()?;
         let current = current!();
         let fs = current.fs().lock().unwrap();
-        fs.lookup_inode(&path)?
+        fs.lookup_inode(fs_path)?
     };
     let mut info = inode.metadata()?;
     info.mode = mode.bits();

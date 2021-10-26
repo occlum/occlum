@@ -3,11 +3,10 @@ use super::*;
 pub fn do_unlinkat(fs_path: &FsPath, flags: UnlinkFlags) -> Result<()> {
     debug!("unlinkat: fs_path: {:?}, flags: {:?}", fs_path, flags);
 
-    let abs_path = fs_path.to_abs_path()?;
     if flags.contains(UnlinkFlags::AT_REMOVEDIR) {
-        super::do_rmdir(&abs_path)
+        super::do_rmdir(fs_path)
     } else {
-        do_unlink(&abs_path)
+        do_unlink(fs_path)
     }
 }
 
@@ -17,14 +16,13 @@ bitflags::bitflags! {
     }
 }
 
-fn do_unlink(path: &str) -> Result<()> {
-    let (dir_path, file_name) = split_path(&path);
-    let dir_inode = {
+fn do_unlink(fs_path: &FsPath) -> Result<()> {
+    let (dir_inode, file_name) = {
         let current = current!();
         let fs = current.fs().lock().unwrap();
-        fs.lookup_inode(dir_path)?
+        fs.lookup_dirinode_and_basename(fs_path)?
     };
-    let file_inode = dir_inode.find(file_name)?;
+    let file_inode = dir_inode.find(&file_name)?;
     let metadata = file_inode.metadata()?;
     if metadata.type_ == FileType::Dir {
         return_errno!(EISDIR, "unlink on directory");
@@ -33,6 +31,6 @@ fn do_unlink(path: &str) -> Result<()> {
     if file_mode.has_sticky_bit() {
         warn!("ignoring the sticky bit");
     }
-    dir_inode.unlink(file_name)?;
+    dir_inode.unlink(&file_name)?;
     Ok(())
 }

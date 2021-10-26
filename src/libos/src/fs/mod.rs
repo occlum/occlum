@@ -22,10 +22,12 @@ pub use async_io::ioctl::IoctlCmd;
     occlum_ocall_ioctl, AccessMode, BuiltinIoctlNum, CreationFlags, FileMode, Flock, FlockType,
     IfConf, IoctlCmd, Stat, StatusFlags, StructuredIoctlArgType, StructuredIoctlNum,
 };*/
+
 pub use self::event_file::{EventFile, EventFileFlags};
 pub use self::file_handle::{FileHandle as FileRef, WeakFileHandle as WeakFileRef};
 pub use self::file_table::{FileDesc, FileTable};
 pub use self::fs_view::FsView;
+pub use self::fspath::{FsPath, AT_FDCWD};
 pub use self::host_fd::HostFd;
 pub use self::inode_file::{INodeExt, INodeFile, InodeFile};
 pub use self::rootfs::ROOT_INODE;
@@ -46,18 +48,19 @@ mod hostfs;
 mod inode_file;
 mod pipe;
 //mod procfs;
+mod fspath;
 mod rootfs;
 mod sefs;
 mod stdio;
 mod syscalls;
 
-/// Split a `path` str to `(base_path, file_name)`
+/// Split a `path` str to `(dir_path, base_name)`
 fn split_path(path: &str) -> (&str, &str) {
     let mut split = path.trim_end_matches('/').rsplitn(2, '/');
-    let file_name = split.next().unwrap();
+    let base_name = split.next().unwrap();
     let mut dir_path = split.next().unwrap_or(".");
     if dir_path == "" {
         dir_path = "/";
     }
-    (dir_path, file_name)
+    (dir_path, base_name)
 }

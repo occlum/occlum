@@ -6,17 +6,13 @@ pub fn do_renameat(old_fs_path: &FsPath, new_fs_path: &FsPath) -> Result<()> {
         old_fs_path, new_fs_path
     );
 
-    let oldpath = old_fs_path.to_abs_path()?;
-    let newpath = new_fs_path.to_abs_path()?;
     let current = current!();
     let fs = current.fs().lock().unwrap();
 
-    let (old_dir_path, old_file_name) = split_path(&oldpath);
-    let (new_dir_path, new_file_name) = split_path(&newpath);
-    let old_dir_inode = fs.lookup_inode(old_dir_path)?;
-    let new_dir_inode = fs.lookup_inode(new_dir_path)?;
+    let (old_dir_inode, old_file_name) = fs.lookup_dirinode_and_basename(old_fs_path)?;
+    let (new_dir_inode, new_file_name) = fs.lookup_dirinode_and_basename(new_fs_path)?;
     let old_file_mode = {
-        let old_file_inode = old_dir_inode.find(old_file_name)?;
+        let old_file_inode = old_dir_inode.find(&old_file_name)?;
         let metadata = old_file_inode.metadata()?;
         FileMode::from_bits_truncate(metadata.mode)
     };
@@ -24,6 +20,6 @@ pub fn do_renameat(old_fs_path: &FsPath, new_fs_path: &FsPath) -> Result<()> {
         warn!("ignoring the sticky bit");
     }
     // TODO: support to modify file's absolute path
-    old_dir_inode.move_(old_file_name, &new_dir_inode, new_file_name)?;
+    old_dir_inode.move_(&old_file_name, &new_dir_inode, &new_file_name)?;
     Ok(())
 }

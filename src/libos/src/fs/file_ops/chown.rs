@@ -14,13 +14,12 @@ pub fn do_fchownat(fs_path: &FsPath, uid: u32, gid: u32, flags: ChownFlags) -> R
     );
 
     let inode = {
-        let path = fs_path.to_abs_path()?;
         let current = current!();
         let fs = current.fs().lock().unwrap();
         if flags.contains(ChownFlags::AT_SYMLINK_NOFOLLOW) {
-            fs.lookup_inode_no_follow(&path)?
+            fs.lookup_inode_no_follow(fs_path)?
         } else {
-            fs.lookup_inode(&path)?
+            fs.lookup_inode(fs_path)?
         }
     };
     let mut info = inode.metadata()?;

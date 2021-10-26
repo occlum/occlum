@@ -16,13 +16,12 @@ pub fn do_fstatat(fs_path: &FsPath, flags: StatFlags) -> Result<StatBuf> {
     debug!("fstatat: fs_path: {:?}, flags: {:?}", fs_path, flags);
 
     let inode = {
-        let path = fs_path.to_abs_path()?;
         let current = current!();
         let fs = current.fs().lock().unwrap();
         if flags.contains(StatFlags::AT_SYMLINK_NOFOLLOW) {
-            fs.lookup_inode_no_follow(&path)?
+            fs.lookup_inode_no_follow(fs_path)?
         } else {
-            fs.lookup_inode(&path)?
+            fs.lookup_inode(fs_path)?
         }
     };
     let stat = StatBuf::from(inode.metadata()?);

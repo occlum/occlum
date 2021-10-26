@@ -6,21 +6,18 @@ pub fn do_linkat(old_fs_path: &FsPath, new_fs_path: &FsPath, flags: LinkFlags) -
         old_fs_path, new_fs_path, flags
     );
 
-    let newpath = new_fs_path.to_abs_path()?;
-    let (new_dir_path, new_file_name) = split_path(&newpath);
-    let (inode, new_dir_inode) = {
-        let oldpath = old_fs_path.to_abs_path()?;
+    let (inode, new_dir_inode, new_file_name) = {
         let current = current!();
         let fs = current.fs().lock().unwrap();
         let inode = if flags.contains(LinkFlags::AT_SYMLINK_FOLLOW) {
-            fs.lookup_inode(&oldpath)?
+            fs.lookup_inode(old_fs_path)?
         } else {
-            fs.lookup_inode_no_follow(&oldpath)?
+            fs.lookup_inode_no_follow(old_fs_path)?
         };
-        let new_dir_inode = fs.lookup_inode(new_dir_path)?;
-        (inode, new_dir_inode)
+        let (new_dir_inode, new_file_name) = fs.lookup_dirinode_and_basename(new_fs_path)?;
+        (inode, new_dir_inode, new_file_name)
     };
-    new_dir_inode.link(new_file_name, &inode)?;
+    new_dir_inode.link(&new_file_name, &inode)?;
     Ok(())
 }
 

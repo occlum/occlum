@@ -6,11 +6,10 @@ pub fn do_openat(fs_path: &FsPath, flags: u32, mode: u32) -> Result<FileDesc> {
         fs_path, flags, mode
     );
 
-    let path = fs_path.to_abs_path()?;
     let current = current!();
     let fs = current.fs().lock().unwrap();
 
-    let inode_file = fs.open_file(&path, flags, mode)?;
+    let inode_file = fs.open_file(&fs_path, flags, mode)?;
     let file_ref = FileRef::new_inode(inode_file);
 
     let fd = {

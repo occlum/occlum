@@ -3,12 +3,11 @@ use super::*;
 pub fn do_readlinkat(fs_path: &FsPath, buf: &mut [u8]) -> Result<usize> {
     debug!("readlinkat: fs_path: {:?}", fs_path);
 
-    let path = fs_path.to_abs_path()?;
     let file_path = {
         let inode = {
             let current = current!();
             let fs = current.fs().lock().unwrap();
-            fs.lookup_inode_no_follow(&path)?
+            fs.lookup_inode_no_follow(fs_path)?
         };
         if inode.metadata()?.type_ != FileType::SymLink {
             return_errno!(EINVAL, "not a symbolic link");
@@ -34,17 +33,15 @@ pub fn do_symlinkat(target: &str, link_path: &FsPath) -> Result<usize> {
         return_errno!(ENAMETOOLONG, "target is too long");
     }
 
-    let link_path = link_path.to_abs_path()?;
-    let (dir_path, link_name) = split_path(&link_path);
-    let dir_inode = {
+    let (dir_inode, link_name) = {
         let current = current!();
         let fs = current.fs().lock().unwrap();
-        fs.lookup_inode(dir_path)?
+        fs.lookup_dirinode_and_basename(link_path)?
     };
     if !dir_inode.allow_write()? {
         return_errno!(EPERM, "symlink cannot be created");
     }
-    let link_inode = dir_inode.create(link_name, FileType::SymLink, 0o0777)?;
+    let link_inode = dir_inode.create(&link_name, FileType::SymLink, 0o0777)?;
     let data = target.as_bytes();
     link_inode.resize(data.len())?;
     link_inode.write_at(0, data)?;

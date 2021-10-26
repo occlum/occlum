@@ -1,11 +1,12 @@
 use super::file_ops::{
     /* AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath, LinkFlags,
     StatFlags, UnlinkFlags, AT_FDCWD, */
-    self, AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath,
-    IoctlRawCmd, LinkFlags, UnlinkFlags, AT_FDCWD,
+    self, AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, IoctlRawCmd,
+    LinkFlags, UnlinkFlags,
 };
 //use super::fs_ops;
 use super::*;
+use std::convert::TryFrom;
 use util::mem_util::from_user;
 
 #[allow(non_camel_case_types)]
@@ -32,7 +33,10 @@ pub async fn do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u32) -> Re
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    let fs_path = FsPath::new(&path, dirfd, false)?;
+    if path.is_empty() {
+        return_errno!(ENOENT, "path is an empty string");
+    }
+    let fs_path = FsPath::new(&path, dirfd)?;
     let fd = file_ops::do_openat(&fs_path, flags, mode)?;
     Ok(fd as isize)
 }
@@ -162,7 +166,10 @@ pub async fn do_fstatat(
         .to_string_lossy()
         .into_owned();
     let flags = StatFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
-    let fs_path = FsPath::new(&path, dirfd, flags.contains(StatFlags::AT_EMPTY_PATH))?;
+    if path.is_empty() && !flags.contains(StatFlags::AT_EMPTY_PATH) {
+        return_errno!(ENOENT, "path is an empty string");
+    }
+    let fs_path = FsPath::new(&path, dirfd)?;
     from_user::check_mut_ptr(stat_buf)?;
     let stat = file_ops::do_fstatat(&fs_path, flags)?;
     unsafe {
@@ -179,7 +186,10 @@ pub async fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) ->
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    let fs_path = FsPath::new(&path, dirfd, false)?;
+    if path.is_empty() {
+        return_errno!(ENOENT, "path is an empty string");
+    }
+    let fs_path = FsPath::new(&path, dirfd)?;
     let mode = AccessibilityCheckMode::from_u32(mode)?;
     let flags = AccessibilityCheckFlags::from_u32(flags)?;
     file_ops::do_faccessat(&fs_path, mode, flags).map(|_| 0)
@@ -225,7 +235,7 @@ pub async fn do_truncate(path: *const i8, len: usize) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    file_ops::do_truncate(&path, len)?;
+    file_ops::do_truncate(&FsPath::try_from(path.as_str())?, len)?;
     Ok(0)
 }
 
@@ -330,8 +340,11 @@ pub async fn do_renameat(
     let newpath = from_user::clone_cstring_safely(newpath)?
         .to_string_lossy()
         .into_owned();
-    let old_fs_path = FsPath::new(&oldpath, olddirfd, false)?;
-    let new_fs_path = FsPath::new(&newpath, newdirfd, false)?;
+    if oldpath.is_empty() || newpath.is_empty() {
+        return_errno!(ENOENT, "oldpath or newpath is an empty string");
+    }
+    let old_fs_path = FsPath::new(&oldpath, olddirfd)?;
+    let new_fs_path = FsPath::new(&newpath, newdirfd)?;
     file_ops::do_renameat(&old_fs_path, &new_fs_path)?;
     Ok(0)
 }
@@ -344,7 +357,10 @@ pub async fn do_mkdirat(dirfd: i32, path: *const i8, mode: usize) -> Result<isiz
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    let fs_path = FsPath::new(&path, dirfd, false)?;
+    if path.is_empty() {
+        return_errno!(ENOENT, "path is an empty string");
+    }
+    let fs_path = FsPath::new(&path, dirfd)?;
     file_ops::do_mkdirat(&fs_path, mode)?;
     Ok(0)
 }
@@ -353,7 +369,7 @@ pub async fn do_rmdir(path: *const i8) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    file_ops::do_rmdir(&path)?;
+    file_ops::do_rmdir(&FsPath::try_from(path.as_str())?)?;
     Ok(0)
 }
 
@@ -375,8 +391,14 @@ pub async fn do_linkat(
         .to_string_lossy()
         .into_owned();
     let flags = LinkFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
-    let old_fs_path = FsPath::new(&oldpath, olddirfd, flags.contains(LinkFlags::AT_EMPTY_PATH))?;
-    let new_fs_path = FsPath::new(&newpath, newdirfd, false)?;
+    if oldpath.is_empty() && !flags.contains(LinkFlags::AT_EMPTY_PATH) {
+        return_errno!(ENOENT, "oldpath is an empty string");
+    }
+    let old_fs_path = FsPath::new(&oldpath, olddirfd)?;
+    if newpath.is_empty() {
+        return_errno!(ENOENT, "newpath is an empty string");
+    }
+    let new_fs_path = FsPath::new(&newpath, newdirfd)?;
     file_ops::do_linkat(&old_fs_path, &new_fs_path, flags)?;
     Ok(0)
 }
@@ -389,7 +411,10 @@ pub async fn do_unlinkat(dirfd: i32, path: *const i8, flags: i32) -> Result<isiz
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    let fs_path = FsPath::new(&path, dirfd, false)?;
+    if path.is_empty() {
+        return_errno!(ENOENT, "path is an empty string");
+    }
+    let fs_path = FsPath::new(&path, dirfd)?;
     let flags =
         UnlinkFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flag value"))?;
     file_ops::do_unlinkat(&fs_path, flags)?;
@@ -413,7 +438,10 @@ pub async fn do_readlinkat(
         from_user::check_array(buf, size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, size) }
     };
-    let fs_path = FsPath::new(&path, dirfd, false)?;
+    if path.is_empty() {
+        return_errno!(ENOENT, "path is an empty string");
+    }
+    let fs_path = FsPath::new(&path, dirfd)?;
     let len = file_ops::do_readlinkat(&fs_path, buf)?;
     Ok(len as isize)
 }
@@ -433,7 +461,10 @@ pub async fn do_symlinkat(
     let link_path = from_user::clone_cstring_safely(link_path)?
         .to_string_lossy()
         .into_owned();
-    let fs_path = FsPath::new(&link_path, new_dirfd, false)?;
+    if link_path.is_empty() {
+        return_errno!(ENOENT, "link_path is an empty string");
+    }
+    let fs_path = FsPath::new(&link_path, new_dirfd)?;
     file_ops::do_symlinkat(&target, &fs_path)?;
     Ok(0)
 }
@@ -452,8 +483,11 @@ pub async fn do_fchmodat(dirfd: i32, path: *const i8, mode: u16) -> Result<isize
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
+    if path.is_empty() {
+        return_errno!(ENOENT, "path is an empty string");
+    }
     let mode = FileMode::from_bits_truncate(mode);
-    let fs_path = FsPath::new(&path, dirfd, false)?;
+    let fs_path = FsPath::new(&path, dirfd)?;
     file_ops::do_fchmodat(&fs_path, mode)?;
     Ok(0)
 }
@@ -478,7 +512,10 @@ pub async fn do_fchownat(
         .to_string_lossy()
         .into_owned();
     let flags = ChownFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
-    let fs_path = FsPath::new(&path, dirfd, flags.contains(ChownFlags::AT_EMPTY_PATH))?;
+    if path.is_empty() && !flags.contains(ChownFlags::AT_EMPTY_PATH) {
+        return_errno!(ENOENT, "newpath is an empty string");
+    }
+    let fs_path = FsPath::new(&path, dirfd)?;
     file_ops::do_fchownat(&fs_path, uid, gid, flags)?;
     Ok(0)
 }

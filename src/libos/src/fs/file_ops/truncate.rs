@@ -1,11 +1,11 @@
 use super::*;
 
-pub fn do_truncate(path: &str, len: usize) -> Result<()> {
-    debug!("truncate: path: {:?}, len: {}", path, len);
+pub fn do_truncate(fs_path: &FsPath, len: usize) -> Result<()> {
+    debug!("truncate: path: {:?}, len: {}", fs_path, len);
     let inode = {
         let current = current!();
         let fs = current.fs().lock().unwrap();
-        fs.lookup_inode(&path)?
+        fs.lookup_inode(fs_path)?
     };
     inode.resize(len)?;
     Ok(())

@@ -1,18 +1,17 @@
 use super::*;
 
-pub fn do_rmdir(path: &str) -> Result<()> {
-    debug!("rmdir: path: {:?}", path);
+pub fn do_rmdir(fs_path: &FsPath) -> Result<()> {
+    debug!("rmdir: fs_path: {:?}", fs_path);
 
-    let (dir_path, file_name) = split_path(&path);
-    let dir_inode = {
+    let (dir_inode, file_name) = {
         let current = current!();
         let fs = current.fs().lock().unwrap();
-        fs.lookup_inode(dir_path)?
+        fs.lookup_dirinode_and_basename(fs_path)?
     };
-    let file_inode = dir_inode.find(file_name)?;
+    let file_inode = dir_inode.find(&file_name)?;
     if file_inode.metadata()?.type_ != FileType::Dir {
         return_errno!(ENOTDIR, "rmdir on not directory");
     }
-    dir_inode.unlink(file_name)?;
+    dir_inode.unlink(&file_name)?;
     Ok(())
 }
