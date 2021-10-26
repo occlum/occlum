@@ -60,7 +60,7 @@ impl VMInitializer {
                     .as_inode_file()
                     .unwrap()
                     .read_at(*offset, buf)
-                    .map_err(|_| errno!(EIO, "failed to init memory from file"))?;
+                    .map_err(|_| errno!(EACCES, "failed to init memory from file"))?;
                 for b in &mut buf[len..] {
                     *b = 0;
                 }
@@ -80,7 +80,7 @@ impl VMInitializer {
                     .as_inode_file()
                     .unwrap()
                     .read_at(*offset, &mut buf[copy_len..])
-                    .cause_err(|_| errno!(EIO, "failed to init memory from file"))?;
+                    .cause_err(|_| errno!(EACCES, "failed to init memory from file"))?;
                 for b in &mut buf[(copy_len + len)..] {
                     *b = 0;
                 }

@@ -117,13 +117,13 @@ impl VMManager {
         // Allocate a new chunk with chunk default size.
         // Lock on ChunkManager.
         if let Ok(new_chunk) = self.internal().mmap_chunk_default(addr) {
-            // Allocate in the new chunk
-            let start = new_chunk.mmap(options);
-            debug_assert!(start.is_ok()); // We just allocate a chunk for you. You must succeed.
-                                          // Add this new chunk to process' chunk list
+            // Add this new chunk to process' chunk list
             new_chunk.add_process(&current);
-            current.vm().add_mem_chunk(new_chunk);
-            return start;
+            current.vm().add_mem_chunk(new_chunk.clone());
+
+            // Allocate in the new chunk
+            // This mmap could still fail due to invalid options
+            return new_chunk.mmap(options);
         }
 
         // Slow path: Sadly, there is no free chunk, iterate every chunk to find a range
@@ -468,7 +468,14 @@ impl InternalVMManager {
         let size = *options.size();
         let align = *options.align();
         let free_range = self.find_free_gaps(size, align, addr)?;
-        let chunk = Arc::new(Chunk::new_single_vma_chunk(free_range, options));
+        let free_chunk = Chunk::new_single_vma_chunk(&free_range, options);
+        if let Err(e) = free_chunk {
+            // Error when creating chunks. Must return the free space before returning error
+            self.free_manager
+                .add_range_back_to_free_manager(&free_range);
+            return_errno!(e.errno(), "mmap_chunk failure");
+        }
+        let chunk = Arc::new(free_chunk.unwrap());
         trace!("allocate a new single vma chunk: {:?}", chunk);
         self.chunks.insert(chunk.clone());
         Ok(chunk)

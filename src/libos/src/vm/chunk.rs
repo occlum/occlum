@@ -82,7 +82,7 @@ impl Chunk {
         })
     }
 
-    pub fn new_single_vma_chunk(vm_range: VMRange, options: &VMMapOptions) -> Self {
+    pub fn new_single_vma_chunk(vm_range: &VMRange, options: &VMMapOptions) -> Result<Self> {
         let writeback_file = options.writeback_file().clone();
         let vm_area = VMArea::new(
             vm_range.clone(),
@@ -93,13 +93,13 @@ impl Chunk {
         // Initialize the memory of the new range
         unsafe {
             let buf = vm_range.as_slice_mut();
-            options.initializer().init_slice(buf);
+            options.initializer().init_slice(buf)?;
         }
         // Set memory permissions
         if !options.perms().is_default() {
             VMPerms::apply_perms(&vm_area, vm_area.perms());
         }
-        Self::new_chunk_with_vma(vm_area)
+        Ok(Self::new_chunk_with_vma(vm_area))
     }
 
     pub fn new_chunk_with_vma(vma: VMArea) -> Self {

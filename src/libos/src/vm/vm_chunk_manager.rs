@@ -121,10 +121,15 @@ impl ChunkManager {
         let new_vma = VMArea::new(new_range, *options.perms(), writeback_file, current_pid);
 
         // Initialize the memory of the new range
-        unsafe {
-            let buf = new_vma.as_slice_mut();
-            options.initializer().init_slice(buf)?;
+        let buf = unsafe { new_vma.as_slice_mut() };
+        let ret = options.initializer().init_slice(buf);
+        if let Err(e) = ret {
+            // Return the free range before return with error
+            self.free_manager
+                .add_range_back_to_free_manager(new_vma.range());
+            return_errno!(e.errno(), "failed to mmap");
         }
+
         // Set memory permissions
         if !options.perms().is_default() {
             VMPerms::apply_perms(&new_vma, new_vma.perms());
