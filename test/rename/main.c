@@ -186,8 +186,7 @@ static test_case_t test_cases[] = {
     // TODO: test more corner cases
     TEST_CASE(test_rename),
     TEST_CASE(test_rename_with_target_exist),
-    // TODO: enable the test after FsPath::to_abs_path is fixed
-    //TEST_CASE(test_renameat),
+    TEST_CASE(test_renameat),
     TEST_CASE(test_rename_dir),
 };
 

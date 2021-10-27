@@ -418,9 +418,8 @@ static test_case_t test_cases[] = {
     // TODO: enable the two tests after procfs is enabled
     //TEST_CASE(test_readlink_from_proc_self_fd),
     //TEST_CASE(test_realpath),
-    // TODO: enable the two tests after FsPath::to_abs_path is fixed
-    //TEST_CASE(test_readlinkat),
-    //TEST_CASE(test_symlinkat),
+    TEST_CASE(test_readlinkat),
+    TEST_CASE(test_symlinkat),
     TEST_CASE(test_symlink_to_absolute_target),
     TEST_CASE(test_symlink_to_relative_target),
     TEST_CASE(test_symlink_from_ramfs),

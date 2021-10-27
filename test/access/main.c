@@ -134,8 +134,7 @@ static int test_faccessat_with_dirfd() {
 static test_case_t test_cases[] = {
     TEST_CASE(test_access),
     TEST_CASE(test_faccessat_with_abs_path),
-    // TODO: enable this test after FsPath::to_abs_path is fixed
-    //TEST_CASE(test_faccessat_with_dirfd),
+    TEST_CASE(test_faccessat_with_dirfd),
 };
 
 int main(int argc, const char *argv[]) {

@@ -179,8 +179,7 @@ static int test_rmdir_via_unlinkat() {
 
 static test_case_t test_cases[] = {
     TEST_CASE(test_mkdir),
-    // TODO: enable the test after FsPath::to_abs_path is fixed
-    //TEST_CASE(test_mkdirat),
+    TEST_CASE(test_mkdirat),
     TEST_CASE(test_chdir),
     TEST_CASE(test_rmdir_via_unlinkat),
 };

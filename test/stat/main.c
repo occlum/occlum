@@ -183,9 +183,9 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_stat),
     TEST_CASE(test_fstat),
     TEST_CASE(test_lstat),
-    //TEST_CASE(test_fstatat_with_abs_path),
-    //TEST_CASE(test_fstatat_with_empty_path),
-    //TEST_CASE(test_fstatat_with_dirfd),
+    TEST_CASE(test_fstatat_with_abs_path),
+    TEST_CASE(test_fstatat_with_empty_path),
+    TEST_CASE(test_fstatat_with_dirfd),
 };
 
 int main(int argc, const char *argv[]) {
