@@ -10,7 +10,8 @@ pub fn parallelism() -> u32 {
     EXECUTOR.parallelism()
 }
 
-pub fn run_tasks() {
+// Returning number of running vcpus
+pub fn run_tasks() -> u32 {
     EXECUTOR.run_tasks()
 }
 
@@ -27,6 +28,7 @@ lazy_static! {
 
 pub(crate) struct Executor {
     parallelism: u32,
+    running_vcpu_num: AtomicU32,
     next_thread_id: AtomicU32,
     is_shutdown: AtomicBool,
     parks: Arc<Parks>,
@@ -40,6 +42,7 @@ impl Executor {
         }
 
         let next_thread_id = AtomicU32::new(0);
+        let running_vcpu_num = AtomicU32::new(0);
         let is_shutdown = AtomicBool::new(false);
         let parks = Arc::new(Parks::new(parallelism));
         let scheduler = Box::new(BasicScheduler::new(parks.clone()));
@@ -47,6 +50,7 @@ impl Executor {
 
         let new_self = Self {
             parallelism,
+            running_vcpu_num,
             next_thread_id,
             is_shutdown,
             parks,
@@ -59,9 +63,10 @@ impl Executor {
         self.parallelism
     }
 
-    pub fn run_tasks(&self) {
+    pub fn run_tasks(&self) -> u32 {
         let thread_id = self.next_thread_id.fetch_add(1, Ordering::Relaxed) as usize;
         assert!(thread_id < self.parallelism as usize);
+        self.running_vcpu_num.fetch_add(1, Ordering::Relaxed);
 
         crate::task::current::set_vcpu_id(thread_id as u32);
         debug!("run tasks on vcpu {}", thread_id);
@@ -72,7 +77,10 @@ impl Executor {
             let task_option = self.scheduler.dequeue_task(thread_id);
 
             if self.is_shutdown() {
-                break;
+                let num = self.running_vcpu_num.fetch_sub(1, Ordering::Relaxed) as u32;
+                assert!(num >= 1);
+                self.parks.unregister(thread_id);
+                return num - 1;
             }
 
             match task_option {
