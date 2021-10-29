@@ -34,7 +34,6 @@ submodule: githooks
 	git submodule update $(OCCLUM_GIT_OPTIONS)
 	@# Try to apply the patches. If failed, check if the patches are already applied
 	cd deps/serde-json-sgx && git apply ../serde-json-sgx.patch >/dev/null 2>&1 || git apply ../serde-json-sgx.patch -R --check
-	cd deps/sefs && git apply ../sefs.patch
 
 	@# Enclaves used by tools are running in simulation mode by default to run faster.
 	@rm -rf build build_sim
