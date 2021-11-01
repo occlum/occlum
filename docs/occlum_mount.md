@@ -22,9 +22,9 @@ To mount an Occlum's secure FS image successfully, three conditions must be sati
 
 1. The secure FS image exists and is not being used (e.g., via the `occlum run` or `occlum mount` command). This condition ensures that the secure FS will not be broken due to the concurrent access of different Occlum commands.
 
-2. The two (optional) sign key and sign tool arguments that are given to the `occlum mount` command must have the same values as those given to the `occlum build` command, which is how the image is created in the first place. This ensures that the secure FS can only be accessed by the owner of the enclave.
+2. The three (optional) sign key, sign tool and image key arguments that are given to the `occlum mount` command must have the same values as those given to the `occlum build` command, which is how the image is created in the first place. This ensures that the secure FS can only be accessed by the owner of the enclave.
 
-3. The `occlum mount` command must be run on the same machine as the `occlum run` command that runs the current Occlum instance and writes to the image. This condition is due to the fact that the encryption key of the secure FS is bound to the machine.
+3. If the image key is not given to the `occlum build` command, the `occlum mount` command must be run on the same machine as the `occlum run` command that runs the current Occlum instance and writes to the image. This condition is due to the fact that the encryption key of the secure FS is bound to the machine.
 
 With the three conditions satisfied, the mount command is able to start a Linux FUSE FS server. Any I/O operations on the FUSE FS mounted at the specified path will be redirected by Linux kernel as I/O requests to the FUSE server. The FUSE server is backed by a special enclave, which can encrypt or decrypt the content of the secure FS image on demand.
 
@@ -37,6 +37,6 @@ mkdir <path>
 
 Step 2: Mount the secure FS at the newly created mount point
 ```
-occlum mount [--sign-key <key_path>] [--sign-tool <tool_path>] <path>
+occlum mount [--sign-key <key_path>] [--sign-tool <tool_path>] [--image-key <key_path>] <path>
 ```
 After mounting the secure FS successfully, you can access and manipulate the FS from the mount point as easy as regular Linux FS.
