@@ -13,7 +13,7 @@ git clone -b ${bash_branch} ${bash_source}
 
 echo "Building bash with musl-gcc (occlum-gcc) ..."
 cd bash
-CC=occlum-gcc CXX=occlum-g++ ./configure --without-bash-malloc
+CC="occlum-gcc -fPIE -pie" CXX="occlum-g++ -fPIE -pie" ./configure --without-bash-malloc
 make clean
 make -j
 
@@ -26,7 +26,7 @@ git clean -dxf
 git reset HEAD --hard
 
 echo "Building bash with gcc ..."
-./configure
+CC="gcc -fPIE -pie" CXX="g++ -fPIE -pie" ./configure
 make -j
 
 mkdir -p ${INSTALL_DIR}/glibc
