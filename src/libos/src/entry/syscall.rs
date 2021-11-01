@@ -9,8 +9,8 @@ use std::ptr;
 
 use crate::fs::{
     do_access, do_chdir, do_chmod, do_chown, do_close, do_dup, do_dup2, do_dup3, do_eventfd,
-    do_eventfd2, do_faccessat, do_fchmod, do_fchmodat, do_fchown, do_fchownat, do_fcntl,
-    do_fdatasync, do_fstat, do_fstatat, do_fsync, do_ftruncate, do_getcwd, do_getdents,
+    do_eventfd2, do_faccessat, do_fallocate, do_fchmod, do_fchmodat, do_fchown, do_fchownat,
+    do_fcntl, do_fdatasync, do_fstat, do_fstatat, do_fsync, do_ftruncate, do_getcwd, do_getdents,
     do_getdents64, do_ioctl, do_lchown, do_link, do_linkat, do_lseek, do_lstat, do_mkdir,
     do_mkdirat, do_mount_rootfs, do_open, do_openat, do_pipe, do_pipe2, do_pread, do_pwrite,
     do_read, do_readlink, do_readlinkat, do_readv, do_rename, do_renameat, do_rmdir, do_stat,
@@ -223,6 +223,7 @@ macro_rules! process_syscall_table_with_callback {
             (Fdatasync = 75) => do_fdatasync(fd: FileDesc),
             (Access = 21) => do_access(path: *const i8, mode: u32),
             (Faccessat = 269) => do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32),
+            (Fallocate = 285) => do_fallocate(fd: FileDesc, mode: u32, offset: off_t, len: off_t),
             (Mkdir = 83) => do_mkdir(path: *const i8, mode: usize),
             (Mkdirat = 258) => do_mkdirat(dirfd: i32, path: *const i8, mode: usize),
             (Getcwd = 79) => do_getcwd(buf: *mut u8, size: usize),
