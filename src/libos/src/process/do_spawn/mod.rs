@@ -12,7 +12,6 @@ use super::{table, HostWaker, ProcessRef, ThreadRef};
 use crate::entry::context_switch::{CpuContext, GpRegs};
 use crate::fs::{
     CreationFlags, FileDesc, FileTable, FsPath, FsView, HostStdioFds, StdinFile, StdoutFile,
-    AT_FDCWD, ROOT_INODE,
 };
 use crate::prelude::*;
 use crate::vm::ProcessVM;

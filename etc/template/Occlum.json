@@ -1,8 +1,8 @@
 {
     "resource_limits": {
-        "user_space_size": "256MB",
         "kernel_space_heap_size": "32MB",
         "kernel_space_stack_size": "1MB",
+        "user_space_size": "256MB",
         "min_num_of_cpus": 1,
         "max_num_of_cpus": 128
     },
@@ -36,14 +36,15 @@
                     {
                         "target": "/",
                         "type": "sefs",
-                        "source": "./image",
+                        "source": "./build/mount/__ROOT",
                         "options": {
-                            "integrity_only": true
+                            "MAC": ""
                         }
                     },
                     {
                         "target": "/",
-                        "type": "sefs"
+                        "type": "sefs",
+                        "source": "./run/mount/__ROOT"
                     }
                 ]
             }
@@ -54,15 +55,16 @@
             "source": "."
         },
         {
-            "target": "/proc",
-            "type": "procfs"
-        },
-        {
             "target": "/tmp",
             "type": "sefs",
+            "source": "./run/mount/tmp",
             "options": {
                 "temporary": true
             }
+        },
+        {
+            "target": "/proc",
+            "type": "procfs"
         },
         {
             "target": "/dev",

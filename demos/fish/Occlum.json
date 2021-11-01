@@ -1,7 +1,7 @@
 {
     "resource_limits": {
         "user_space_size": "512MB",
-        "kernel_space_heap_size": "32MB",
+        "kernel_space_heap_size": "64MB",
         "kernel_space_stack_size": "1MB",
         "max_num_of_threads": 32
     },
@@ -29,15 +29,24 @@
     "mount": [
         {
             "target": "/",
-            "type": "sefs",
-            "source": "./image",
+            "type": "unionfs",
             "options": {
-                "integrity_only": true
+                "layers": [
+                    {
+                        "target": "/",
+                        "type": "sefs",
+                        "source": "./build/mount/__ROOT",
+                        "options": {
+                            "MAC": ""
+                        }
+                    },
+                    {
+                        "target": "/",
+                        "type": "sefs",
+                        "source": "./run/mount/__ROOT"
+                    }
+                ]
             }
-        },
-        {
-            "target": "/root",
-            "type": "sefs"
         },
         {
             "target": "/host",
@@ -46,7 +55,19 @@
         },
         {
             "target": "/tmp",
-            "type": "ramfs"
+            "type": "sefs",
+            "source": "./run/mount/tmp",
+            "options": {
+                "temporary": true
+            }
+        },
+        {
+            "target": "/proc",
+            "type": "procfs"
+        },
+        {
+            "target": "/dev",
+            "type": "devfs"
         }
     ]
 }

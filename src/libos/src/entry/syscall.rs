@@ -11,10 +11,10 @@ use crate::fs::{
     do_access, do_chdir, do_chmod, do_chown, do_close, do_dup, do_dup2, do_dup3, do_eventfd,
     do_eventfd2, do_faccessat, do_fchmod, do_fchmodat, do_fchown, do_fchownat, do_fcntl,
     do_fdatasync, do_fstat, do_fstatat, do_fsync, do_ftruncate, do_getcwd, do_ioctl, do_lchown,
-    do_link, do_linkat, do_lseek, do_lstat, do_mkdir, do_mkdirat, do_open, do_openat, do_pipe,
-    do_pipe2, do_pread, do_pwrite, do_read, do_readlink, do_readlinkat, do_readv, do_rename,
-    do_renameat, do_rmdir, do_stat, do_symlink, do_symlinkat, do_sync, do_truncate, do_unlink,
-    do_unlinkat, do_write, do_writev, iovec_t, FileDesc, FileRef, StatBuf,
+    do_link, do_linkat, do_lseek, do_lstat, do_mkdir, do_mkdirat, do_mount_rootfs, do_open,
+    do_openat, do_pipe, do_pipe2, do_pread, do_pwrite, do_read, do_readlink, do_readlinkat,
+    do_readv, do_rename, do_renameat, do_rmdir, do_stat, do_symlink, do_symlinkat, do_sync,
+    do_truncate, do_unlink, do_unlinkat, do_write, do_writev, iovec_t, FileDesc, FileRef, StatBuf,
 };
 /*
 use crate::fs::{
@@ -139,6 +139,7 @@ macro_rules! process_syscall_table_with_callback {
 
             (SpawnGlibc = 359) => do_spawn_for_glibc(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fa: *const SpawnFileActions, attribute_list: *const posix_spawnattr_t),
             (SpawnMusl = 360) => do_spawn_for_musl(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp, attribute_list: *const posix_spawnattr_t),
+            (MountRootFS = 363) => do_mount_rootfs(key_ptr: *const sgx_key_128bit_t, occlum_json_mac_ptr: *const sgx_aes_gcm_128bit_tag_t),
             (Clone = 56) => do_clone(flags: u32, stack_addr: usize, ptid: *mut pid_t, ctid: *mut pid_t, new_tls: usize),
             (Wait4 = 61) => do_wait4(pid: i32, _exit_status: *mut i32, options: u32),
             (Exit = 60) => do_exit(exit_status: i32),

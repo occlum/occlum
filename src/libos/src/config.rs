@@ -12,34 +12,10 @@ use crate::prelude::*;
 
 lazy_static! {
     pub static ref LIBOS_CONFIG: Config = {
-        fn load_config(config_path: &str) -> Result<Config> {
-            let mut config_file = {
-                let config_file =
-                    SgxFile::open_integrity_only(config_path).map_err(|e| errno!(e))?;
-
-                let actual_mac = config_file.get_mac().map_err(|e| errno!(e))?;
-                let expected_mac = conf_get_hardcoded_file_mac();
-                if actual_mac != expected_mac {
-                    return_errno!(EINVAL, "unexpected file MAC");
-                }
-
-                config_file
-            };
-            let config_json = {
-                let mut config_json = String::new();
-                config_file
-                    .read_to_string(&mut config_json)
-                    .map_err(|e| errno!(e))?;
-                config_json
-            };
-            let config_input: InputConfig =
-                serde_json::from_str(&config_json).map_err(|e| errno!(e))?;
-            let config = Config::from_input(&config_input)
-                .cause_err(|e| errno!(EINVAL, "invalid config JSON"))?;
-            Ok(config)
-        }
-        let config_path = unsafe { format!("{}{}", INSTANCE_DIR, "/build/Occlum.json.protected") };
-        match load_config(&config_path) {
+        let config_path =
+            unsafe { format!("{}{}", INSTANCE_DIR, "/build/.Occlum_sys.json.protected") };
+        let expected_mac = conf_get_hardcoded_file_mac();
+        match load_config(&config_path, &expected_mac) {
             Err(e) => {
                 error!("failed to load config: {}", e.backtrace());
                 panic!();
@@ -47,6 +23,28 @@ lazy_static! {
             Ok(config) => config,
         }
     };
+}
+
+pub fn load_config(config_path: &str, expected_mac: &sgx_aes_gcm_128bit_tag_t) -> Result<Config> {
+    let mut config_file = {
+        let config_file = SgxFile::open_integrity_only(config_path).map_err(|e| errno!(e))?;
+        let actual_mac = config_file.get_mac().map_err(|e| errno!(e))?;
+        if actual_mac != *expected_mac {
+            return_errno!(EINVAL, "unexpected file MAC");
+        }
+        config_file
+    };
+    let config_json = {
+        let mut config_json = String::new();
+        config_file
+            .read_to_string(&mut config_json)
+            .map_err(|e| errno!(e))?;
+        config_json
+    };
+    let config_input: InputConfig = serde_json::from_str(&config_json).map_err(|e| errno!(e))?;
+    let config =
+        Config::from_input(&config_input).cause_err(|e| errno!(EINVAL, "invalid config JSON"))?;
+    Ok(config)
 }
 
 // This value will be modified during occlum build
@@ -134,7 +132,6 @@ pub enum ConfigMountFsType {
 
 #[derive(Debug)]
 pub struct ConfigMountOptions {
-    pub integrity_only: bool,
     pub mac: Option<sgx_aes_gcm_128bit_tag_t>,
     pub layers: Option<Vec<ConfigMount>>,
     pub temporary: bool,
@@ -243,13 +240,10 @@ impl ConfigMount {
 
 impl ConfigMountOptions {
     fn from_input(input: &InputConfigMountOptions) -> Result<ConfigMountOptions> {
-        let (integrity_only, mac) = if !input.integrity_only {
-            (false, None)
+        let mac = if input.mac.is_some() {
+            Some(parse_mac(&input.mac.as_ref().unwrap())?)
         } else {
-            if input.mac.is_none() {
-                return_errno!(EINVAL, "MAC is expected");
-            }
-            (true, Some(parse_mac(&input.mac.as_ref().unwrap())?))
+            None
         };
         let layers = if let Some(layers) = &input.layers {
             let layers = layers
@@ -261,7 +255,6 @@ impl ConfigMountOptions {
             None
         };
         Ok(ConfigMountOptions {
-            integrity_only,
             mac,
             layers,
             temporary: input.temporary,
@@ -394,8 +387,6 @@ struct InputConfigMount {
 #[derive(Deserialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 struct InputConfigMountOptions {
-    #[serde(default)]
-    pub integrity_only: bool,
     #[serde(rename = "MAC")]
     #[serde(default)]
     pub mac: Option<String>,

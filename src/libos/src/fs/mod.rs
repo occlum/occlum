@@ -23,6 +23,8 @@ pub use async_io::ioctl::IoctlCmd;
     IfConf, IoctlCmd, Stat, StatusFlags, StructuredIoctlArgType, StructuredIoctlNum,
 };*/
 
+use crate::config::ConfigMount;
+
 pub use self::event_file::{EventFile, EventFileFlags};
 pub use self::file_handle::{FileHandle as FileRef, WeakFileHandle as WeakFileRef};
 pub use self::file_table::{FileDesc, FileTable};

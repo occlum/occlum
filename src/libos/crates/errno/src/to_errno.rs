@@ -123,6 +123,7 @@ mod if_occlum {
                 FsError::NoIntegrity => EIO,
                 FsError::PermError => EPERM,
                 FsError::NameTooLong => ENAMETOOLONG,
+                FsError::FileTooBig => EFBIG,
             }
         }
     }

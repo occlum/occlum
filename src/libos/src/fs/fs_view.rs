@@ -213,12 +213,17 @@ impl FsView {
         if let Some('/') = path.chars().next() {
             // absolute path
             let abs_path = path.trim_start_matches('/');
-            let inode = ROOT_INODE.lookup_follow(abs_path, MAX_SYMLINKS)?;
+            let inode = ROOT_INODE
+                .read()
+                .unwrap()
+                .lookup_follow(abs_path, MAX_SYMLINKS)?;
             Ok(inode)
         } else {
             // relative path
             let cwd = self.cwd().trim_start_matches('/');
             let inode = ROOT_INODE
+                .read()
+                .unwrap()
                 .lookup_follow(cwd, MAX_SYMLINKS)?
                 .lookup_follow(path, MAX_SYMLINKS)?;
             Ok(inode)

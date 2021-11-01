@@ -30,23 +30,21 @@ macro_rules! convert_result {
 
 pub struct SgxStorage {
     path: PathBuf,
-    integrity_only: bool,
+    encrypt_mode: EncryptMode,
     file_cache: Mutex<BTreeMap<u64, LockedFile>>,
-    root_mac: Option<sgx_aes_gcm_128bit_tag_t>,
 }
 
 impl SgxStorage {
     pub fn new(
         path: impl AsRef<Path>,
-        integrity_only: bool,
-        file_mac: Option<sgx_aes_gcm_128bit_tag_t>,
+        key: &Option<sgx_key_128bit_t>,
+        root_mac: &Option<sgx_aes_gcm_128bit_tag_t>,
     ) -> Self {
         // assert!(path.as_ref().is_dir());
         SgxStorage {
             path: path.as_ref().to_path_buf(),
-            integrity_only: integrity_only,
+            encrypt_mode: EncryptMode::new(key, root_mac),
             file_cache: Mutex::new(BTreeMap::new()),
-            root_mac: file_mac,
         }
     }
     /// Get file by `file_id`.
@@ -86,15 +84,6 @@ impl SgxStorage {
     ) -> Result<LockedFile> {
         open_fn(self)
     }
-
-    /// Set the expected root MAC of the SGX storage.
-    ///
-    /// By giving this root MAC, we can be sure that the root file (file_id = 0) opened
-    /// by the storage has a MAC that is equal to the given root MAC.
-    pub fn set_root_mac(&mut self, mac: sgx_aes_gcm_128bit_tag_t) -> Result<()> {
-        self.root_mac = Some(mac);
-        Ok(())
-    }
 }
 
 impl Storage for SgxStorage {
@@ -107,19 +96,21 @@ impl Storage for SgxStorage {
                 options.read(true).update(true);
                 options
             };
-            let file = if !self.integrity_only {
-                options.open(path)?
-            } else {
-                options.open_integrity_only(path)?
+            let file = match self.encrypt_mode {
+                EncryptMode::IntegrityOnly(_) => options.open_integrity_only(path)?,
+                EncryptMode::EncryptWithIntegrity(key, _) | EncryptMode::Encrypt(key) => {
+                    options.open_ex(path, &key)?
+                }
+                EncryptMode::EncryptAutoKey => options.open(path)?,
             };
 
             // Check the MAC of the root file against the given root MAC of the storage
-            if file_id == "metadata" && self.root_mac.is_some() {
+            if file_id == "metadata" && self.protect_integrity() {
                 let root_file_mac = file.get_mac().expect("Failed to get mac");
-                if root_file_mac != self.root_mac.unwrap() {
+                if root_file_mac != self.encrypt_mode.root_mac().unwrap() {
                     error!(
                         "MAC validation for metadata file failed: expected = {:#?}, found = {:?}",
-                        self.root_mac.unwrap(),
+                        self.encrypt_mode.root_mac().unwrap(),
                         root_file_mac
                     );
                     return_errno!(EACCES);
@@ -140,10 +131,12 @@ impl Storage for SgxStorage {
                 options.write(true).update(true);
                 options
             };
-            let file = if !self.integrity_only {
-                options.open(path)?
-            } else {
-                options.open_integrity_only(path)?
+            let file = match self.encrypt_mode {
+                EncryptMode::IntegrityOnly(_) => options.open_integrity_only(path)?,
+                EncryptMode::EncryptWithIntegrity(key, _) | EncryptMode::Encrypt(key) => {
+                    options.open_ex(path, &key)?
+                }
+                EncryptMode::EncryptAutoKey => options.open(path)?,
             };
             Ok(LockedFile(Arc::new(Mutex::new(file))))
         })?;
@@ -163,8 +156,11 @@ impl Storage for SgxStorage {
         })
     }
 
-    fn is_integrity_only(&self) -> bool {
-        self.integrity_only
+    fn protect_integrity(&self) -> bool {
+        match self.encrypt_mode {
+            EncryptMode::IntegrityOnly(_) | EncryptMode::EncryptWithIntegrity(_, _) => true,
+            _ => false,
+        }
     }
 
     fn clear(&self) -> DevResult<()> {
@@ -178,6 +174,36 @@ impl Storage for SgxStorage {
             caches.clear();
             Ok(())
         })
+    }
+}
+
+enum EncryptMode {
+    IntegrityOnly(sgx_aes_gcm_128bit_tag_t),
+    EncryptWithIntegrity(sgx_key_128bit_t, sgx_aes_gcm_128bit_tag_t),
+    Encrypt(sgx_key_128bit_t),
+    EncryptAutoKey,
+}
+
+impl EncryptMode {
+    pub fn new(
+        key: &Option<sgx_key_128bit_t>,
+        root_mac: &Option<sgx_aes_gcm_128bit_tag_t>,
+    ) -> Self {
+        match (key, root_mac) {
+            (Some(key), Some(root_mac)) => Self::EncryptWithIntegrity(*key, *root_mac),
+            (Some(key), None) => Self::Encrypt(*key),
+            (None, Some(root_mac)) => Self::IntegrityOnly(*root_mac),
+            (None, None) => Self::EncryptAutoKey,
+        }
+    }
+
+    pub fn root_mac(&self) -> Option<sgx_aes_gcm_128bit_tag_t> {
+        match self {
+            Self::IntegrityOnly(root_mac) | Self::EncryptWithIntegrity(_, root_mac) => {
+                Some(*root_mac)
+            }
+            _ => None,
+        }
     }
 }
 

@@ -11,10 +11,57 @@
 #include "pal_check_fsgsbase.h"
 #include "errno2str.h"
 #include <linux/limits.h>
+#include <linux/futex.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 
 int occlum_pal_get_version(void) {
     return OCCLUM_PAL_VERSION;
+}
+
+int pal_run_init_process() {
+    const char *init_path = "/bin/init";
+    const char *init_argv[2] = {
+        "init",
+        NULL,
+    };
+    struct occlum_stdio_fds init_io_fds = {
+        .stdin_fd = STDIN_FILENO,
+        .stdout_fd = STDOUT_FILENO,
+        .stderr_fd = STDERR_FILENO,
+    };
+    int libos_tid = 0;
+    volatile int exit_status = -1;
+    struct occlum_pal_create_process_args init_process_args = {
+        .path = init_path,
+        .argv = init_argv,
+        .env = NULL,
+        .stdio = &init_io_fds,
+        .pid = &libos_tid,
+        .exit_status = (int *) &exit_status,
+    };
+    if (occlum_pal_create_process(&init_process_args) < 0) {
+        return -1;
+    }
+
+    int futex_val;
+    while ((futex_val = exit_status) < 0) {
+        (void)syscall(__NR_futex, &exit_status, FUTEX_WAIT, futex_val, NULL);
+    }
+
+    // Convert the exit status to a value in a shell-like encoding
+    if (WIFEXITED(exit_status)) { // terminated normally
+        exit_status = WEXITSTATUS(exit_status) & 0x7F; // [0, 127]
+    } else { // killed by signal
+        exit_status = 128 + WTERMSIG(exit_status); // [128 + 1, 128 + 64]
+    }
+    if (exit_status != 0) {
+        errno = EINVAL;
+        PAL_ERROR("The init process exit with code: %d", exit_status);
+        return -1;
+    }
+
+    return 0;
 }
 
 int occlum_pal_init(const struct occlum_pal_attr *attr) {
@@ -92,6 +139,11 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
 
     if (pal_interrupt_thread_start() < 0) {
         PAL_ERROR("Failed to start the interrupt thread: %s", errno2str(errno));
+        goto on_destroy_enclave;
+    }
+
+    if (pal_run_init_process() < 0) {
+        PAL_ERROR("Failed to run the init process: %s", errno2str(errno));
         goto on_destroy_enclave;
     }
 

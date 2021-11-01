@@ -39,14 +39,15 @@
                     {
                         "target": "/",
                         "type": "sefs",
-                        "source": "./image",
+                        "source": "./build/mount/__ROOT",
                         "options": {
-                            "integrity_only": true
+                            "MAC": ""
                         }
                     },
                     {
                         "target": "/",
-                        "type": "sefs"
+                        "type": "sefs",
+                        "source": "./run/mount/__ROOT"
                     }
                 ]
             }
@@ -57,15 +58,16 @@
             "source": "."
         },
         {
-            "target": "/proc",
-            "type": "procfs"
-        },
-        {
             "target": "/tmp",
             "type": "sefs",
+            "source": "./run/mount/tmp",
             "options": {
                 "temporary": true
             }
+        },
+        {
+            "target": "/proc",
+            "type": "procfs"
         },
         {
             "target": "/dev",
