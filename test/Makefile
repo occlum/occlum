@@ -26,7 +26,7 @@ TESTS ?= access chmod chown cpuid empty emulate_syscall pipe eventfd exit_group 
 	getpid hello_world link malloc mkdir mmap pthread rdtsc rename rlimit server \
 	server_epoll signal sleep spawn stat symlink time tls truncate unix_socket wait \
 	fcntl spawn_attribute device ioctl readdir statfs random umask procfs flock resolv_conf \
-	exec
+	exec pgrp
 # Benchmarks: need to be compiled and run by bench-% target
 BENCHES := spawn_and_exit_latency pipe_throughput unix_socket_throughput
 
