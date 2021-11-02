@@ -215,6 +215,10 @@ impl File for Producer {
         self.this_end().flags.store(new_status, Ordering::Relaxed);
         Ok(())
     }
+
+    fn access_mode(&self) -> AccessMode {
+        AccessMode::O_WRONLY
+    }
 }
 
 impl Drop for Producer {
@@ -307,6 +311,10 @@ impl File for Consumer {
         check_status_flags(new_status)?;
         self.this_end().flags.store(new_status, Ordering::Relaxed);
         Ok(())
+    }
+
+    fn access_mode(&self) -> AccessMode {
+        AccessMode::O_RDONLY
     }
 }
 
