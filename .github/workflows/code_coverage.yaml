@@ -85,6 +85,11 @@ jobs:
     - name: Run sqlite test
       run: docker exec code_coverage bash -c "cd /root/occlum/demos/sqlite && SGX_MODE=SIM ./run_sqlite_on_occlum.sh"
 
+    - name: LTP test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/linux-ltp && ./dl_and_build_ltp.sh && SGX_MODE=SIM ./prepare_ltp.sh;
+            cd ltp_instance;
+            occlum run /opt/ltp/run-ltp.sh -f syscalls-occlum"
+
     - name: Upload coverage report
       run: docker exec code_coverage bash -c "cd /root/occlum/build/internal/src/libos/cargo-target/debug/deps; export CODECOV_TOKEN="${{ secrets.COV_TOKEN }}"; bash <(curl -s https://codecov.io/bash)"
 
