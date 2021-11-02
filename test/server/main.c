@@ -509,7 +509,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_send_recv),
     TEST_CASE(test_sendmsg_recvmsg),
     TEST_CASE(test_sendmsg_recvmsg_connectionless),
-    // TEST_CASE(test_fcntl_setfl_and_getfl),
+    TEST_CASE(test_fcntl_setfl_and_getfl),
     TEST_CASE(test_poll),
     TEST_CASE(test_poll_events_unchanged),
     TEST_CASE(test_sockopt),

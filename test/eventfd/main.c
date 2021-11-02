@@ -247,10 +247,9 @@ int test_epoll_with_socket() {
 // ============================================================================
 
 static test_case_t test_cases[] = {
-    // TODO: enable the tests after adding fcntl
-    //TEST_CASE(test_fcntl_get_flags),
-    //TEST_CASE(test_fcntl_set_flags),
-    //TEST_CASE(test_create_with_flags),
+    TEST_CASE(test_fcntl_get_flags),
+    TEST_CASE(test_fcntl_set_flags),
+    TEST_CASE(test_create_with_flags),
     TEST_CASE(test_read_write),
     TEST_CASE(test_epoll_with_socket),
     TEST_CASE(test_poll_with_socket),
