@@ -4,7 +4,7 @@
 #include <poll.h>
 #include <unistd.h>
 #include <stdio.h>
-#include "test.h"
+#include "test_fs.h"
 
 // ============================================================================
 // Test utilities
@@ -115,6 +115,34 @@ int test_dev_arandom() {
     return 0;
 }
 
+int test_dev_shm() {
+    struct stat stat_buf;
+    if (stat("/dev/shm", &stat_buf) < 0) {
+        THROW_ERROR("failed to stat /dev/shm");
+    }
+    if (!S_ISDIR(stat_buf.st_mode)) {
+        THROW_ERROR("failed to check if it is dir");
+    }
+
+    char *write_str = "Hello World\n";
+    char *file_path = "/dev/shm/test_read_write.txt";
+    int fd = open(file_path, O_WRONLY | O_CREAT | O_TRUNC, 00666);
+    if (fd < 0) {
+        THROW_ERROR("failed to open a file to write");
+    }
+    if (write(fd, write_str, strlen(write_str)) <= 0) {
+        THROW_ERROR("failed to write");
+    }
+    close(fd);
+    if (fs_check_file_content(file_path, write_str) < 0) {
+        THROW_ERROR("failed to check file content");
+    }
+    if (unlink(file_path) < 0) {
+        THROW_ERROR("failed to unlink the file");
+    }
+    return 0;
+}
+
 // ============================================================================
 // Test suite
 // ============================================================================
@@ -127,6 +155,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_dev_urandom_fstat),
     TEST_CASE(test_dev_urandom_poll),
     TEST_CASE(test_dev_arandom),
+    TEST_CASE(test_dev_shm),
 };
 
 int main() {

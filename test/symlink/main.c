@@ -366,12 +366,12 @@ static int test_symlink_to_relative_target() {
 
 static int test_symlink_from_ramfs() {
     char *target = "/root/test_symlink.file";
-    char *link = "/tmp/test_symlink.link";
+    char *link = "/dev/shm/test_symlink.link";
     return test_symlink_framework(__test_symlink, target, link);
 }
 
 static int test_symlink_to_ramfs() {
-    char *target = "/tmp/test_symlink.file";
+    char *target = "/dev/shm/test_symlink.file";
     char *link = "/root/test_symlink.link";
     return test_symlink_framework(__test_symlink, target, link);
 }
