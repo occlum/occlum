@@ -154,6 +154,21 @@ static int __test_readdir(const char *file_path) {
     return 0;
 }
 
+static int __test_truncate(const char *file_path) {
+    off_t len = 256;
+    if (truncate(file_path, len) < 0) {
+        THROW_ERROR("failed to call truncate");
+    }
+    struct stat stat_buf;
+    if (stat(file_path, &stat_buf) < 0) {
+        THROW_ERROR("failed to stat file");
+    }
+    if (stat_buf.st_size != len) {
+        THROW_ERROR("failed to check the len after truncate");
+    }
+    return 0;
+}
+
 typedef int(*test_hostfs_func_t)(const char *);
 
 static int test_hostfs_framework(test_hostfs_func_t fn) {
@@ -191,6 +206,10 @@ static int test_readdir() {
     return test_hostfs_framework(__test_readdir);
 }
 
+static int test_truncate() {
+    return test_hostfs_framework(__test_truncate);
+}
+
 static int test_mkdir_then_rmdir() {
     const char *dir_path = "/host/hostfs_dir";
     struct stat stat_buf;
@@ -221,6 +240,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_write_fsync_read),
     TEST_CASE(test_rename),
     TEST_CASE(test_readdir),
+    TEST_CASE(test_truncate),
     TEST_CASE(test_mkdir_then_rmdir),
 };
 

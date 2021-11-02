@@ -49,4 +49,14 @@ void close_files(int count, ...) {
     va_end(ap);
 }
 
+int check_bytes_in_buf(char *buf, size_t len, int expected_byte_val) {
+    for (size_t bi = 0; bi < len; bi++) {
+        if (buf[bi] != (char)expected_byte_val) {
+            THROW_ERROR("check_bytes_in_buf: expect %02X, but found %02X, at offset %lu\n",
+                        (unsigned char)expected_byte_val, (unsigned char)buf[bi], bi);
+        }
+    }
+    return 0;
+}
+
 #endif /* __TEST_H */
