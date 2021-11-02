@@ -172,6 +172,7 @@ macro_rules! process_syscall_table_with_callback {
             (Gettimeofday = 96) => do_gettimeofday(tv_u: *mut timeval_t),
             (ClockGettime = 228) => do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t),
             (ClockGetres = 229) => do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t),
+            (Time = 201) => do_time(tloc_u: *mut time_t),
 
             (Mprotect = 10) => do_mprotect(addr: usize, len: usize, prot: u32),
             (Mmap = 9) => do_mmap(addr: usize, size: usize, perms: i32, flags: i32, fd: FileDesc, offset: off_t),
@@ -873,6 +874,17 @@ async fn do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t) -> Result<i
         *res_u = res;
     }
     Ok(0)
+}
+
+async fn do_time(tloc_u: *mut time_t) -> Result<isize> {
+    let ts = crate::time::do_clock_gettime(crate::time::ClockId::CLOCK_REALTIME)?;
+    if !tloc_u.is_null() {
+        check_mut_ptr(tloc_u)?;
+        unsafe {
+            *tloc_u = ts.sec();
+        }
+    }
+    Ok(ts.sec() as isize)
 }
 
 // TODO: handle remainder
