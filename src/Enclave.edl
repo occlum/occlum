@@ -119,6 +119,8 @@ enclave {
 
         void occlum_ocall_sync(void);
 
+        int occlum_ocall_statfs([in, string] const char* path, [out] struct statfs* buf) propagate_errno;
+
         void* occlum_ocall_posix_memalign(size_t alignment, size_t size);
         void occlum_ocall_free([user_check] void* ptr);
 

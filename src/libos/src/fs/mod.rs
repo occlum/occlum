@@ -13,8 +13,8 @@ use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
 pub use async_io::event::{Events, Observer, Pollee, Poller};
 pub use async_io::file::{AccessMode, CreationFlags, File, Flock, FlockType, StatusFlags};
 pub use async_io::fs::{
-    DirentWriter, DirentWriterContext, FileMode, FileSystem, FileType, FsError, INode, Metadata,
-    SeekFrom, StatBuf, StatFlags, StatMode, Timespec, PATH_MAX,
+    DirentWriter, DirentWriterContext, FileMode, FileSystem, FileType, FsError, FsInfo, INode,
+    Metadata, SeekFrom, StatBuf, StatFlags, StatMode, Timespec, PATH_MAX,
 };
 pub use async_io::ioctl::IoctlCmd;
 
@@ -28,6 +28,7 @@ use crate::config::ConfigMount;
 pub use self::event_file::{EventFile, EventFileFlags};
 pub use self::file_handle::{FileHandle as FileRef, WeakFileHandle as WeakFileRef};
 pub use self::file_table::{FileDesc, FileTable};
+pub use self::fs_ops::Statfs;
 pub use self::fs_view::FsView;
 pub use self::fspath::{FsPath, AT_FDCWD};
 pub use self::host_fd::HostFd;
