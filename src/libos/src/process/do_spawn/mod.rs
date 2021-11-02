@@ -15,6 +15,7 @@ use crate::fs::{
     StdoutFile,
 };
 use crate::prelude::*;
+use crate::process::pgrp::{get_spawn_attribute_pgrp, update_pgrp_for_new_process};
 use crate::vm::ProcessVM;
 
 mod aux_vec;
@@ -284,6 +285,11 @@ fn new_process_common(
         trace!("new process sig_dispositions = {:?}", sig_dispositions);
         let umask = process_ref.umask();
 
+        // Check for process group spawn attribute. This must be done before building the new process.
+        let new_pgid = get_spawn_attribute_pgrp(spawn_attributes)?;
+        // Use parent process's process group by default.
+        let pgrp_ref = process_ref.pgrp();
+
         // Make the default thread name to be the process's corresponding elf file name
         let elf_name = elf_path.rsplit('/').collect::<Vec<&str>>()[0];
         let thread_name = ThreadName::new(elf_name);
@@ -319,12 +325,16 @@ fn new_process_common(
             .sched(sched_ref)
             .rlimits(rlimit_ref)
             .fs(fs_ref)
+            .pgrp(pgrp_ref)
             .files(files_ref)
             .name(thread_name)
             .sig_mask(sig_mask)
             .sig_dispositions(sig_dispositions);
 
         let new_process = builder.build()?;
+        // This is done here becuase if we want to create a new process group, we must have a new process first.
+        // So we can't set "pgrp" during the build above.
+        update_pgrp_for_new_process(&new_process, new_pgid)?;
         (new_process, init_cpu_state)
     };
 

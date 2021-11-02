@@ -15,6 +15,7 @@ use crate::signal::{SigDispositions, SigQueues};
 use crate::vm::ProcessVM;
 
 use self::host_waker::HostWaker;
+use self::pgrp::ProcessGrp;
 use self::process::{ProcessBuilder, ProcessInner};
 use self::thread::{ThreadBuilder, ThreadId, ThreadInner};
 
@@ -24,6 +25,7 @@ pub use self::do_robust_list::RobustListHead;
 pub use self::do_spawn::do_spawn_root;
 pub use self::process::{Process, ProcessFilter, ProcessStatus, IDLE};
 pub use self::spawn_attribute::posix_spawnattr_t;
+pub use self::spawn_attribute::SpawnAttr;
 pub use self::syscalls::*;
 pub use self::term_status::{ForcedExitStatus, TermStatus};
 pub use self::thread::{Thread, ThreadStatus};
@@ -39,6 +41,7 @@ mod do_set_tid_address;
 mod do_spawn;
 mod do_wait4;
 mod host_waker;
+mod pgrp;
 mod prctl;
 mod process;
 mod spawn_attribute;
@@ -66,3 +69,4 @@ pub type ProcessVMRef = Arc<ProcessVM>;
 pub type FsViewRef = Arc<RwLock<FsView>>;
 pub type SchedAgentRef = Arc<SgxMutex<SchedAgent>>;
 pub type ResourceLimitsRef = Arc<SgxMutex<ResourceLimits>>;
+pub type ProcessGrpRef = Arc<ProcessGrp>;

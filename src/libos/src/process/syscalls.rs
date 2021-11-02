@@ -8,6 +8,7 @@ use super::do_futex::{FutexFlags, FutexOp};
 use super::do_robust_list::RobustListHead;
 use super::do_spawn::FileAction;
 use super::do_wait4::WaitOptions;
+use super::pgrp::*;
 use super::prctl::PrctlCmd;
 use super::process::ProcessFilter;
 use super::spawn_attribute::{clone_spawn_atrributes_safely, posix_spawnattr_t, SpawnAttr};
@@ -422,9 +423,42 @@ pub async fn do_getppid() -> Result<isize> {
     Ok(ppid as isize)
 }
 
-pub async fn do_getpgid() -> Result<isize> {
-    let pgid = super::do_getpid::do_getpgid();
+pub async fn do_getpgrp() -> Result<isize> {
+    do_getpgid(0).await
+}
+
+pub async fn do_getpgid(pid: i32) -> Result<isize> {
+    if pid < 0 {
+        return_errno!(ESRCH, "process with negative pid is not found");
+    }
+
+    let real_pid = if pid == 0 {
+        super::do_getpid::do_getpid()
+    } else {
+        pid as pid_t
+    };
+    let pgid = super::pgrp::do_getpgid(real_pid)?;
     Ok(pgid as isize)
+}
+
+pub async fn do_setpgid(pid: i32, pgid: i32) -> Result<isize> {
+    if pgid < 0 {
+        return_errno!(EINVAL, "pgid can't be negative");
+    }
+
+    let pid = pid as pid_t;
+    let pgid = pgid as pid_t;
+    // Pid should be the calling process or a child of the calling process.
+    let current_pid = current!().process().pid();
+    if pid != 0 && pid != current_pid && current!().process().inner().is_child_of(pid) == false {
+        return_errno!(ESRCH, "pid not calling process or child processes");
+    }
+
+    // When this function is calling, the process must be executing.
+    let is_executing = true;
+    let ret = super::pgrp::do_setpgid(pid, pgid, is_executing)?;
+
+    Ok(ret)
 }
 
 // TODO: implement uid, gid, euid, egid

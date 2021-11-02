@@ -2,9 +2,10 @@ use std::sync::Weak;
 
 use async_rt::wait::WaiterQueue;
 
+use super::super::table;
 use super::super::thread::{ThreadBuilder, ThreadId, ThreadName};
 use super::super::{
-    FileTableRef, ForcedExitStatus, FsViewRef, HostWaker, ProcessRef, ProcessVMRef,
+    FileTableRef, ForcedExitStatus, FsViewRef, HostWaker, ProcessGrpRef, ProcessRef, ProcessVMRef,
     ResourceLimitsRef, SchedAgentRef,
 };
 use super::{Process, ProcessInner};
@@ -18,6 +19,7 @@ pub struct ProcessBuilder {
     thread_builder: Option<ThreadBuilder>,
     // Mandatory fields
     vm: Option<ProcessVMRef>,
+    pgrp: Option<ProcessGrpRef>,
     // Optional fields, which have reasonable default values
     exec_path: Option<String>,
     umask: Option<FileMode>,
@@ -34,6 +36,7 @@ impl ProcessBuilder {
             tid: None,
             thread_builder: Some(thread_builder),
             vm: None,
+            pgrp: None,
             exec_path: None,
             umask: None,
             parent: None,
@@ -75,6 +78,11 @@ impl ProcessBuilder {
 
     pub fn sig_dispositions(mut self, sig_dispositions: SigDispositions) -> Self {
         self.sig_dispositions = Some(sig_dispositions);
+        self
+    }
+
+    pub fn pgrp(mut self, pgrp: ProcessGrpRef) -> Self {
+        self.pgrp = Some(pgrp);
         self
     }
 
@@ -125,6 +133,7 @@ impl ProcessBuilder {
             let umask = RwLock::new(self.umask.unwrap_or(FileMode::default_umask()));
             let parent = self.parent.take().map(|parent| RwLock::new(parent));
             let host_waker = self.host_waker.take();
+            let pgrp = RwLock::new(self.pgrp.clone());
             let inner = SgxMutex::new(ProcessInner::new());
             let sig_dispositions = RwLock::new(self.sig_dispositions.unwrap_or_default());
             let sig_queues = RwLock::new(SigQueues::new());
@@ -137,6 +146,7 @@ impl ProcessBuilder {
                 host_waker,
                 umask,
                 parent,
+                pgrp,
                 inner,
                 sig_dispositions,
                 sig_queues,
@@ -158,6 +168,13 @@ impl ProcessBuilder {
                 .children_mut()
                 .unwrap()
                 .push(new_process.clone());
+        }
+
+        // Only set leader process and process group id during process building when idle process first time init
+        let pgrp_ref = new_process.pgrp();
+        if !pgrp_ref.leader_process_is_set() && pgrp_ref.pgid() == 0 {
+            pgrp_ref.set_leader_process(new_process.clone());
+            pgrp_ref.set_pgid(pid);
         }
 
         Ok(new_process)

@@ -51,10 +51,10 @@ use crate::poll::syscalls::{
 use crate::prelude::*;
 use crate::process::{
     do_arch_prctl, do_clone, do_execve, do_exit, do_exit_group, do_futex, do_get_robust_list,
-    do_getegid, do_geteuid, do_getgid, do_getpgid, do_getpid, do_getppid, do_gettid, do_getuid,
-    do_prctl, do_set_robust_list, do_set_tid_address, do_spawn_for_glibc, do_spawn_for_musl,
-    do_wait4, pid_t, posix_spawnattr_t, FdOp, RobustListHead, SpawnFileActions, ThreadRef,
-    ThreadStatus,
+    do_getegid, do_geteuid, do_getgid, do_getpgid, do_getpgrp, do_getpid, do_getppid, do_gettid,
+    do_getuid, do_prctl, do_set_robust_list, do_set_tid_address, do_setpgid, do_spawn_for_glibc,
+    do_spawn_for_musl, do_wait4, pid_t, posix_spawnattr_t, FdOp, RobustListHead, SpawnFileActions,
+    ThreadRef, ThreadStatus,
 };
 use crate::sched::{do_getcpu, do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
 use crate::signal::{
@@ -157,7 +157,9 @@ macro_rules! process_syscall_table_with_callback {
             (Getgid = 104) => do_getgid(),
             (Geteuid = 107) => do_geteuid(),
             (Getegid = 108) => do_getegid(),
-            (Getpgid = 121) => do_getpgid(),
+            (Setpgid = 109) => do_setpgid(pid: i32, pgid: i32),
+            (Getpgrp = 111) => do_getpgrp(),
+            (Getpgid = 121) => do_getpgid(pid: i32),
             (Gettid = 186) => do_gettid(),
             (SetTidAddress = 218) => do_set_tid_address(tidptr: *mut pid_t),
             (Prlimit64 = 302) => do_prlimit(pid: pid_t, resource: u32, new_limit: *const rlimit_t, old_limit: *mut rlimit_t),
