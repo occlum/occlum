@@ -10,6 +10,7 @@ pub use self::dup::{do_dup, do_dup2, do_dup3};
 pub use self::fcntl::{do_fcntl, FcntlCmd};
 // pub use self::file_flags::{AccessMode, CreationFlags, StatusFlags};
 pub use self::fsync::{do_fdatasync, do_fsync};
+pub use self::getdents::{do_getdents, do_getdents64};
 pub use self::ioctl::{
     do_ioctl, IoctlRawCmd, NonBuiltinIoctlCmd, StructuredIoctlArgType, StructuredIoctlNum,
 };
@@ -31,9 +32,9 @@ mod access;
 mod chmod;
 mod chown;
 mod close;
-// mod dirent;
 mod dup;
 pub mod fcntl;
+mod getdents;
 // mod file_flags;
 mod fsync;
 pub mod ioctl;

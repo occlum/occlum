@@ -244,8 +244,7 @@ pub async fn do_ftruncate(fd: FileDesc, len: usize) -> Result<isize> {
     Ok(0)
 }
 
-/*
-pub fn do_getdents64(fd: FileDesc, buf: *mut u8, buf_size: usize) -> Result<isize> {
+pub async fn do_getdents64(fd: FileDesc, buf: *mut u8, buf_size: usize) -> Result<isize> {
     let safe_buf = {
         from_user::check_mut_array(buf, buf_size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, buf_size) }
@@ -254,7 +253,7 @@ pub fn do_getdents64(fd: FileDesc, buf: *mut u8, buf_size: usize) -> Result<isiz
     Ok(len as isize)
 }
 
-pub fn do_getdents(fd: FileDesc, buf: *mut u8, buf_size: usize) -> Result<isize> {
+pub async fn do_getdents(fd: FileDesc, buf: *mut u8, buf_size: usize) -> Result<isize> {
     let safe_buf = {
         from_user::check_mut_array(buf, buf_size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, buf_size) }
@@ -262,7 +261,6 @@ pub fn do_getdents(fd: FileDesc, buf: *mut u8, buf_size: usize) -> Result<isize>
     let len = file_ops::do_getdents(fd, safe_buf)?;
     Ok(len as isize)
 }
-*/
 
 pub async fn do_sync() -> Result<isize> {
     fs_ops::do_sync()?;

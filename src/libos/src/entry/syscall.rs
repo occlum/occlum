@@ -10,11 +10,12 @@ use std::ptr;
 use crate::fs::{
     do_access, do_chdir, do_chmod, do_chown, do_close, do_dup, do_dup2, do_dup3, do_eventfd,
     do_eventfd2, do_faccessat, do_fchmod, do_fchmodat, do_fchown, do_fchownat, do_fcntl,
-    do_fdatasync, do_fstat, do_fstatat, do_fsync, do_ftruncate, do_getcwd, do_ioctl, do_lchown,
-    do_link, do_linkat, do_lseek, do_lstat, do_mkdir, do_mkdirat, do_mount_rootfs, do_open,
-    do_openat, do_pipe, do_pipe2, do_pread, do_pwrite, do_read, do_readlink, do_readlinkat,
-    do_readv, do_rename, do_renameat, do_rmdir, do_stat, do_symlink, do_symlinkat, do_sync,
-    do_truncate, do_unlink, do_unlinkat, do_write, do_writev, iovec_t, FileDesc, FileRef, StatBuf,
+    do_fdatasync, do_fstat, do_fstatat, do_fsync, do_ftruncate, do_getcwd, do_getdents,
+    do_getdents64, do_ioctl, do_lchown, do_link, do_linkat, do_lseek, do_lstat, do_mkdir,
+    do_mkdirat, do_mount_rootfs, do_open, do_openat, do_pipe, do_pipe2, do_pread, do_pwrite,
+    do_read, do_readlink, do_readlinkat, do_readv, do_rename, do_renameat, do_rmdir, do_stat,
+    do_symlink, do_symlinkat, do_sync, do_truncate, do_unlink, do_unlinkat, do_write, do_writev,
+    iovec_t, FileDesc, FileRef, StatBuf,
 };
 /*
 use crate::fs::{
@@ -237,6 +238,8 @@ macro_rules! process_syscall_table_with_callback {
             (Symlink = 88) => do_symlink(target: *const i8, link_path: *const i8),
             (Symlinkat = 266) => do_symlinkat(target: *const i8, new_dirfd: i32, link_path: *const i8),
             (Sync = 162) => do_sync(),
+            (Getdents = 78) => do_getdents(fd: FileDesc, buf: *mut u8, buf_size: usize),
+            (Getdents64 = 217) => do_getdents64(fd: FileDesc, buf: *mut u8, buf_size: usize),
 
             (Pipe = 22) => do_pipe(fds_u: *mut i32),
             (Pipe2 = 293) => do_pipe2(fds_u: *mut i32, flags: u32),

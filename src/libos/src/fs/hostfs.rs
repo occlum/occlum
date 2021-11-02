@@ -3,6 +3,7 @@ use alloc::sync::{Arc, Weak};
 use core::any::Any;
 use rcore_fs::vfs::*;
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::os::unix::fs::{DirEntryExt, FileTypeExt};
 use std::path::{Path, PathBuf};
 use std::sync::{SgxMutex as Mutex, SgxMutexGuard as MutexGuard};
 use std::untrusted::fs;
@@ -208,6 +209,39 @@ impl INode for HNode {
         }
     }
 
+    fn iterate_entries(&self, ctx: &mut DirentWriterContext) -> Result<usize> {
+        if !self.path.is_dir() {
+            return Err(FsError::NotDir);
+        }
+        let idx = ctx.pos();
+        let mut total_written_len = 0;
+        for entry in try_std!(self.path.read_dir()).skip(idx) {
+            let entry = try_std!(entry);
+            let written_len = match ctx.write_entry(
+                &entry
+                    .file_name()
+                    .into_string()
+                    .map_err(|_| FsError::InvalidParam)?,
+                entry.ino(),
+                entry
+                    .file_type()
+                    .map_err(|_| FsError::InvalidParam)?
+                    .into_fs_filetype(),
+            ) {
+                Ok(written_len) => written_len,
+                Err(e) => {
+                    if total_written_len == 0 {
+                        return Err(e);
+                    } else {
+                        break;
+                    }
+                }
+            };
+            total_written_len += written_len;
+        }
+        Ok(total_written_len)
+    }
+
     fn io_control(&self, cmd: u32, data: usize) -> Result<()> {
         warn!("HostFS: io_control is unimplemented");
         Ok(())
@@ -260,6 +294,32 @@ impl IntoFsError for std::io::Error {
             ErrorKind::InvalidInput => FsError::InvalidParam,
             ErrorKind::InvalidData => FsError::InvalidParam,
             _ => FsError::NotSupported,
+        }
+    }
+}
+
+trait IntoFsFileType {
+    fn into_fs_filetype(self) -> FileType;
+}
+
+impl IntoFsFileType for fs::FileType {
+    fn into_fs_filetype(self) -> FileType {
+        if self.is_dir() {
+            FileType::Dir
+        } else if self.is_file() {
+            FileType::File
+        } else if self.is_symlink() {
+            FileType::SymLink
+        } else if self.is_block_device() {
+            FileType::BlockDevice
+        } else if self.is_char_device() {
+            FileType::CharDevice
+        } else if self.is_fifo() {
+            FileType::NamedPipe
+        } else if self.is_socket() {
+            FileType::Socket
+        } else {
+            unimplemented!("unknown file type")
         }
     }
 }
