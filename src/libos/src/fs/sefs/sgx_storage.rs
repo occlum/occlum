@@ -248,11 +248,11 @@ impl File for LockedFile {
             let file_size = file.seek(SeekFrom::End(0))? as usize;
             if file_size < offset {
                 static ZEROS: [u8; 0x1000] = [0; 0x1000];
-                let mut rest_len = offset - file_size;
-                while rest_len != 0 {
-                    let l = rest_len.min(0x1000);
+                let mut remaining_len = offset - file_size;
+                while remaining_len != 0 {
+                    let l = remaining_len.min(0x1000);
                     let len = file.write(&ZEROS[..l])?;
-                    rest_len -= len;
+                    remaining_len -= len;
                 }
             }
 
@@ -264,8 +264,31 @@ impl File for LockedFile {
     }
 
     fn set_len(&self, len: usize) -> DevResult<()> {
-        // NOTE: do nothing ??
-        Ok(())
+        // The set_len() is unsupported for SgxFile, we have to
+        // implement it in a slow way by padding null bytes.
+        convert_result!({
+            let mut file = self.0.lock().unwrap();
+            let file_size = file.seek(SeekFrom::End(0))? as usize;
+            let mut reset_len = if len > file_size {
+                // Expand the file by padding null bytes
+                len - file_size
+            } else {
+                // Shrink the file by setting null bytes between len and file_size
+                file.seek(SeekFrom::Start(len as u64))?;
+                file_size - len
+            };
+            static ZEROS: [u8; 0x1000] = [0; 0x1000];
+            while reset_len != 0 {
+                let l = reset_len.min(0x1000);
+                // Probably there's not enough space on disk, let's panic here
+                let written_len = file.write(&ZEROS[..l]).unwrap_or_else(|e| {
+                    error!("failed to set null bytes: {}", e);
+                    panic!();
+                });
+                reset_len -= written_len;
+            }
+            Ok(())
+        })
     }
 
     fn flush(&self) -> DevResult<()> {

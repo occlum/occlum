@@ -127,7 +127,9 @@ impl INode for HNode {
     }
 
     fn resize(&self, len: usize) -> Result<()> {
-        warn!("HostFS: resize() is unimplemented");
+        let mut guard = self.open_file()?;
+        let file = guard.as_mut().unwrap();
+        try_std!(file.set_len(len as u64));
         Ok(())
     }
 

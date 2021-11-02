@@ -87,6 +87,10 @@ impl CreationFlags {
         }
         self.contains(CreationFlags::O_DIRECTORY)
     }
+
+    pub fn should_truncate(&self) -> bool {
+        self.contains(CreationFlags::O_TRUNC)
+    }
 }
 
 bitflags! {
