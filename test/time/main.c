@@ -73,6 +73,24 @@ int test_clock_getres() {
 }
 
 // ============================================================================
+// Test cases for localtime
+// ============================================================================
+
+int test_get_localtime() {
+    time_t t = time(NULL);
+    if (t == (time_t) -1) {
+        THROW_ERROR("failed to get time");
+    }
+    struct tm *local_time = localtime(&t);
+    if (local_time == NULL) {
+        THROW_ERROR("failed to convert a time value to a local time");
+    }
+    printf("Offset to GMT is %lds.\n", local_time->tm_gmtoff);
+    printf("The time zone is '%s'.\n", local_time->tm_zone);
+    return 0;
+}
+
+// ============================================================================
 // Test suite
 // ============================================================================
 
@@ -80,6 +98,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_gettimeofday),
     TEST_CASE(test_clock_gettime),
     TEST_CASE(test_clock_getres),
+    TEST_CASE(test_get_localtime),
 };
 
 int main() {
