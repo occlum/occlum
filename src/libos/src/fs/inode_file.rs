@@ -43,7 +43,7 @@ impl INodeFile {
 
     pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
         if !self.access_mode.readable() {
-            return_errno!(EACCES, "File not readable");
+            return_errno!(EBADF, "File not readable");
         }
         let mut offset = self.offset.lock().unwrap();
         let len = self.inode.read_at(*offset, buf).map_err(|e| errno!(e))?;
@@ -53,7 +53,7 @@ impl INodeFile {
 
     pub fn write(&self, buf: &[u8]) -> Result<usize> {
         if !self.access_mode.writable() {
-            return_errno!(EACCES, "File not writable");
+            return_errno!(EBADF, "File not writable");
         }
         let mut offset = self.offset.lock().unwrap();
         if self.status_flags.read().unwrap().always_append() {
@@ -67,7 +67,7 @@ impl INodeFile {
 
     pub fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         if !self.access_mode.readable() {
-            return_errno!(EACCES, "File not readable");
+            return_errno!(EBADF, "File not readable");
         }
         let len = self.inode.read_at(offset, buf)?;
         Ok(len)
@@ -75,7 +75,7 @@ impl INodeFile {
 
     pub fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
         if !self.access_mode.writable() {
-            return_errno!(EACCES, "File not writable");
+            return_errno!(EBADF, "File not writable");
         }
         let len = self.inode.write_at(offset, buf)?;
         Ok(len)
@@ -83,7 +83,7 @@ impl INodeFile {
 
     pub fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
         if !self.access_mode.readable() {
-            return_errno!(EACCES, "File not readable");
+            return_errno!(EBADF, "File not readable");
         }
         let mut offset = self.offset.lock().unwrap();
         let mut total_len = 0;
@@ -102,7 +102,7 @@ impl INodeFile {
 
     pub fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
         if !self.access_mode.writable() {
-            return_errno!(EACCES, "File not writable");
+            return_errno!(EBADF, "File not writable");
         }
         let mut offset = self.offset.lock().unwrap();
         if self.status_flags.read().unwrap().always_append() {
@@ -208,12 +208,12 @@ impl INodeFile {
         match lock.l_type {
             FlockType::F_RDLCK => {
                 if !self.access_mode.readable() {
-                    return_errno!(EACCES, "File not readable");
+                    return_errno!(EBADF, "File not readable");
                 }
             }
             FlockType::F_WRLCK => {
                 if !self.access_mode.writable() {
-                    return_errno!(EACCES, "File not writable");
+                    return_errno!(EBADF, "File not writable");
                 }
             }
             _ => (),

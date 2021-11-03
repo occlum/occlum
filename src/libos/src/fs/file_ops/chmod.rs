@@ -20,7 +20,7 @@ pub fn do_fchmod(fd: FileDesc, mode: FileMode) -> Result<()> {
     let file_ref = current!().file(fd)?;
     let inode_file = file_ref
         .as_inode_file()
-        .ok_or_else(|| errno!(EINVAL, "not an inode"))?;
+        .ok_or_else(|| errno!(EBADF, "not an inode"))?;
     let inode = inode_file.inode();
     let mut info = inode.metadata()?;
     info.mode = mode.bits();
