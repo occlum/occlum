@@ -233,7 +233,12 @@ fn new_process_common(
             };
             let user_stack_base = vm.get_stack_base();
             let user_stack_limit = vm.get_stack_limit();
-            let user_rsp = init_stack::do_init(user_stack_base, 4096, &argv, envp, &mut auxvec)?;
+            let init_stack_size = min(
+                max(vm.get_stack_range().size() >> 8, 4096),
+                vm.get_stack_range().size(),
+            ); // size in [4096, stack_range], by default 1/256 of stack range
+            let user_rsp =
+                init_stack::do_init(user_stack_base, init_stack_size, &argv, envp, &mut auxvec)?;
             unsafe {
                 Task::new(
                     ldso_entry,
