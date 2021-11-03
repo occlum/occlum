@@ -1,0 +1,20 @@
+[package]
+name = "copy_bom"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.8"
+log = "0.4.14"
+env_logger = "0.9.0"
+sha2 = "0.9.5"
+data-encoding = "2.3.2"
+lazy_static = "1.4.0"
+regex = "1.5.4"
+shellexpand = "2.1"
+elf = "0.0.10"
+structopt = "0.3.23"
+walkdir = "2"

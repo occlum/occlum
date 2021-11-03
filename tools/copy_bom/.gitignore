@@ -1,0 +1,12 @@
+/target
+run*
+*-test/*
+.vscode
+*backup
+*demos
+install.sh
+base.yaml
+occlum_elf_loader.config
+java-11-alibaba-dragonwell.yaml
+java-11-openjdk.yaml
+java-11-openjdk-amd64.yaml
