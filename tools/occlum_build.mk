@@ -23,13 +23,13 @@ LIB_LINKS := libocclum-pal.so.$(major_ver) libocclum-pal.so
 LIB_LINKS := $(addprefix $(instance_dir)/build/lib/, $(LIB_LINKS))
 
 ifneq (, $(wildcard $(IMAGE)/. ))
-	IMAGE_DIRS := $(shell find $(IMAGE) -type d 2>/dev/null | sed 's/ /\\ /g' || true)
-	IMAGE_FILES := $(shell find $(IMAGE) -type f 2>/dev/null | sed 's/ /\\ /g' || true)
+	IMAGE_DIRS := $(shell find $(IMAGE) -type d 2>/dev/null | sed 's/ /\\ /g' | sed 's/:/\\:/g' || true)
+	IMAGE_FILES := $(shell find $(IMAGE) -type f 2>/dev/null | sed 's/ /\\ /g' | sed 's/:/\\:/g' || true)
 endif
 
 ifneq (, $(wildcard $(INITFS)/. ))
-	INITFS_DIRS := $(shell find $(INITFS) -type d 2>/dev/null | sed 's/ /\\ /g' || true)
-	INITFS_FILES := $(shell find $(INITFS) -type f 2>/dev/null | sed 's/ /\\ /g' || true)
+	INITFS_DIRS := $(shell find $(INITFS) -type d 2>/dev/null | sed 's/ /\\ /g' | sed 's/:/\\:/g' || true)
+	INITFS_FILES := $(shell find $(INITFS) -type f 2>/dev/null | sed 's/ /\\ /g' | sed 's/:/\\:/g' || true)
 endif
 
 SHELL:=/bin/bash
