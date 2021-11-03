@@ -250,15 +250,12 @@ impl Drop for ProcessVM {
         //
         // For the first case, the process VM is cleaned in the exit procedure and nothing is needed. For the second cases, mem_chunks is not empty and should
         // be cleaned here.
+        mem_chunks
+            .drain_filter(|chunk| chunk.is_single_vma())
+            .for_each(|chunk| {
+                USER_SPACE_VM_MANAGER.internal().munmap_chunk(&chunk, None);
+            });
 
-        // In the first case, the current is reset to idle thread
-        // In the second case, the current thread belongs to parent process
-        let current = current!();
-        if current.tid() != 0 {
-            mem_chunks
-                .drain_filter(|chunk| chunk.is_single_vma())
-                .for_each(|chunk| USER_SPACE_VM_MANAGER.free_chunk(&chunk))
-        }
         assert!(mem_chunks.len() == 0);
         info!("Process VM dropped");
     }

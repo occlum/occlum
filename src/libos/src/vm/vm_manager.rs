@@ -38,7 +38,7 @@ impl VMManager {
         &self.range
     }
 
-    fn internal(&self) -> SgxMutexGuard<InternalVMManager> {
+    pub fn internal(&self) -> SgxMutexGuard<InternalVMManager> {
         self.internal.lock().unwrap()
     }
 
@@ -425,7 +425,7 @@ impl VMManager {
         });
         mem_chunks.clear();
 
-        debug_assert!(mem_chunks.len() == 0);
+        assert!(mem_chunks.len() == 0);
     }
 }
 
