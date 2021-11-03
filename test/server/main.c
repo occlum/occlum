@@ -301,7 +301,11 @@ int test_sendmsg_recvmsg_connectionless() {
     }
 
     ret = server_connectionless_recvmsg();
-    if (ret < 0) { return -1; }
+    /* If child client send happens before recvmsg, EINTR may
+    be triggered which is not failed case */
+    if (ret < 0 && errno != EINTR) {
+        return -1;
+    }
 
     ret = wait_for_child_exit(child_pid);
 
