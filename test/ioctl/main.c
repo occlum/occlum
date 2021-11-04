@@ -36,6 +36,54 @@ int test_tty_ioctl_TIOCGWINSZ(void) {
     return 0;
 }
 
+int test_ioctl_TCGETS_TCSETS(void) {
+    struct termios term;
+    // FIXME: /dev/tty should be opened. But it has not been implemented in Occlum yet.
+    // So we just skip this test if STDOUT is redirected.
+    if (!isatty(STDOUT_FILENO)) {
+        printf("Warning: test_ioctl_TCGETS_TCSETS is skipped\n");
+        return 0;
+    }
+
+    if (ioctl(STDOUT_FILENO, TCGETS, &term) < 0) {
+        THROW_ERROR("failed to ioctl TCGETS");
+    }
+
+    if (ioctl(STDOUT_FILENO, TCSETS, &term) < 0) {
+        THROW_ERROR("failed to ioctl TCSETS");
+    }
+
+    const char *file_path = "/root/test_ioctl.txt";
+    int flags = O_RDONLY | O_CREAT | O_TRUNC;
+    int mode = 00666;
+    int fd = open(file_path, flags, mode);
+    if (fd < 0) {
+        THROW_ERROR("failed to open test file");
+    }
+
+    int pipefds[2];
+    int ret = pipe(pipefds);
+    if (ret != 0) {
+        THROW_ERROR("failed to create pipe");
+    }
+
+    ret = ioctl(fd, TCGETS, &term);
+    if (ret != -1 || errno != ENOTTY) {
+        THROW_ERROR("failed catch error");
+    }
+
+    ret = ioctl(pipefds[0], TCGETS, &term);
+    if (ret != -1 || errno != ENOTTY) {
+        THROW_ERROR("failed catch error");
+    }
+
+    close(fd);
+    close(pipefds[0]);
+    close(pipefds[1]);
+
+    return 0;
+}
+
 // ============================================================================
 // Test cases for SGX ioctls
 // ============================================================================
@@ -463,6 +511,7 @@ int test_ioctl_FIONBIO(void) {
 
 static test_case_t test_cases[] = {
     TEST_CASE(test_tty_ioctl_TIOCGWINSZ),
+    TEST_CASE(test_ioctl_TCGETS_TCSETS),
     TEST_CASE(test_sgx_ioctl_SGXIOC_IS_EDMM_SUPPORTED),
     TEST_CASE(test_sgx_ioctl_SGXIOC_GET_EPID_GROUP_ID),
     TEST_CASE(test_sgx_ioctl_SGXIOC_GEN_EPID_QUOTE),
