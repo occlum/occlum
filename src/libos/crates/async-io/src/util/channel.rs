@@ -285,7 +285,7 @@ impl File for Consumer {
         }
     }
 
-    // TODO: implement read
+    // TODO: implement readv
 
     fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
         self.this_end().pollee().poll(mask, poller)

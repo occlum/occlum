@@ -253,6 +253,44 @@ macro_rules! match_ioctl_cmd_mut {
     }}
 }
 
+// Macro for ioctl auto error number.
+// If the corresponding cmds are not defined, a default error number will be return
+#[macro_export]
+macro_rules! match_ioctl_cmd_auto_error {
+    (
+        $cmd:expr,
+        {
+            $( $bind:ident : $ty:ty => $arm:expr ),* $(,)?
+        }
+    ) => {{
+        use crate::fs::file_ops::ioctl::*;
+        let __cmd : &mut dyn IoctlCmd = $cmd;
+        $(
+            if __cmd.is::<$ty>() {
+                let $bind = __cmd.downcast_mut::<$ty>().unwrap();
+                $arm
+            } else
+        )*
+        // If the corresponding cmds are not defined, it will go here for default error
+        if __cmd.is::<TcGets>() {
+            return_errno!(ENOTTY, "not tty device");
+        }
+        else if __cmd.is::<TcSets>() {
+            return_errno!(ENOTTY, "not tty device");
+        }
+        else if __cmd.is::<GetWinSize>() {
+            return_errno!(ENOTTY, "not tty device");
+        }
+        else if __cmd.is::<SetWinSize>() {
+            return_errno!(ENOTTY, "not tty device");
+        }
+        else {
+            // Default branch
+            return_errno!(EINVAL, "unsupported ioctl cmd");
+        }
+    }}
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
