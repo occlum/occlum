@@ -1,0 +1,6 @@
+targets:
+  # copy jvm
+  - target: /usr/lib/jvm
+    copy:
+      - dirs:
+        - /opt/occlum/toolchains/jvm/java-11-alibaba-dragonwell

@@ -1,0 +1,11 @@
+# glibc backend openjdk
+targets:
+  # copy jvm
+  - target: /usr/lib/jvm
+    copy:
+      - dirs:
+        - /usr/lib/jvm/java-11-openjdk-amd64
+  - target: /etc
+    copy:
+      - dirs:
+        - /etc/java-11-openjdk

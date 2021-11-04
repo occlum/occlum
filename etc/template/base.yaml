@@ -1,0 +1,15 @@
+# basic directories in image
+targets:
+  - target: /
+    mkdirs:
+      - bin
+      - dev
+      - etc
+      - host
+      - lib
+      - lib64
+      - opt
+      - proc
+      - root
+      - sys
+      - tmp
