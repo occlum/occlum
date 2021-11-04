@@ -103,6 +103,7 @@ pub async fn handle_syscall() -> Result<()> {
         CURRENT_CONTEXT.with(|context| {
             context.borrow_mut().gp_regs.rax = retval as u64;
         });
+        trace!("ret = 0x{:x}", retval);
     }
 
     syscall_res.map(|_| ())

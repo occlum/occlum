@@ -260,17 +260,19 @@ unsafe impl Sync for StdinFile {}
 
 fn stdio_ioctl(cmd: &mut dyn IoctlCmd, host_fd: FileDesc) -> Result<()> {
     debug!("stdio ioctl: cmd: {:?}", cmd);
-    use crate::fs::file_ops::ioctl::{GetWinSize, SetWinSize};
-    async_io::match_ioctl_cmd_mut!(cmd, {
+    async_io::match_ioctl_cmd_auto_error!(cmd, {
+        cmd : TcGets => {
+            cmd.execute(host_fd)?
+        },
+        cmd : TcSets => {
+            cmd.execute(host_fd)?
+        },
         cmd : SetWinSize => {
             cmd.execute(host_fd)?
         },
         cmd : GetWinSize => {
             cmd.execute(host_fd)?
         },
-        _ => {
-            return_errno!(EINVAL, "unsupported ioctl cmd");
-        }
     });
     Ok(())
 }

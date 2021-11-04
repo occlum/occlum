@@ -27,6 +27,9 @@ impl_ioctl_nums_and_cmds! {
     // Format:
     // ioctl_name => (ioctl_num, ioctl_type_arg)
 
+    // Get terminal attributes
+    TCGETS => (0x5401, mut Termios),
+    TCSETS => (0x5402, Termios),
     // Get window size
     TIOCGWINSZ => (0x5413, mut WinSize),
     // Set window size
@@ -65,6 +68,11 @@ impl_ioctl_nums_and_cmds! {
 impl<'a> IoctlRawCmd<'a> {
     pub fn to_safe_ioctlcmd(&self) -> Result<Box<dyn IoctlCmd>> {
         Ok(match self {
+            IoctlRawCmd::TCGETS(_) => Box::new(TcGets::new(())),
+            IoctlRawCmd::TCSETS(termios_ref) => {
+                let termios = **termios_ref;
+                Box::new(TcSets::new(termios))
+            }
             IoctlRawCmd::TIOCGWINSZ(_) => Box::new(GetWinSize::new(())),
             IoctlRawCmd::TIOCSWINSZ(winsize_ref) => {
                 let winsize = **winsize_ref;
@@ -106,6 +114,10 @@ impl<'a> IoctlRawCmd<'a> {
 
     pub fn copy_output_from_safe(&mut self, cmd: &dyn IoctlCmd) {
         match self {
+            IoctlRawCmd::TCGETS(termios_mut) => {
+                let cmd = cmd.downcast_ref::<TcGets>().unwrap();
+                **termios_mut = *cmd.output().unwrap();
+            }
             IoctlRawCmd::TIOCGWINSZ(winsize_mut) => {
                 let cmd = cmd.downcast_ref::<GetWinSize>().unwrap();
                 **winsize_mut = *cmd.output().unwrap();
