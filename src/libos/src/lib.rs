@@ -61,6 +61,8 @@ extern crate serde_json;
 #[macro_use]
 extern crate memoffset;
 extern crate resolv_conf;
+extern crate ctor;
+extern crate intrusive_collections;
 extern crate vdso_time;
 
 use sgx_trts::libc;

@@ -36,6 +36,9 @@ inherit-methods-macro= { path = "crates/inherit-methods-macro" }
 io-uring-callback = { path = "crates/io-uring-callback", features = ["sgx"] }
 host-socket  = { path = "crates/host-socket", default-features = false, features = ["sgx"] }
 scroll = { version = "0.10.2", default-features = false }
+futures = { version = "0.3", default-features = false, features = ["alloc", "async-await"] }
+itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"]  }
+ctor = "0.1"
 
 [patch.'https://github.com/apache/teaclave-sgx-sdk.git']
 sgx_tstd = { path = "../../deps/rust-sgx-sdk/sgx_tstd" }
@@ -56,3 +59,4 @@ sgx_tse = { path = "../../deps/rust-sgx-sdk/sgx_tse" }
 sgx_tcrypto = { path = "../../deps/rust-sgx-sdk/sgx_tcrypto" }
 sgx_cov = { path = "../../deps/rust-sgx-sdk/sgx_cov", optional = true }
 goblin = { version = "0.3.4", default-features = false, features = ["elf64", "elf32", "endian_fd"] }
+intrusive-collections = "0.9"

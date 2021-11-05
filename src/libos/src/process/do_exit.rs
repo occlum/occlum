@@ -10,6 +10,7 @@ use crate::entry::context_switch::CURRENT_CONTEXT;
 use crate::prelude::*;
 use crate::signal::constants::*;
 use crate::signal::{KernelSignal, SigNum};
+use crate::vm::USER_SPACE_VM_MANAGER;
 
 pub fn do_exit_group(status: i32) -> Result<isize> {
     if is_vforked_child_process() {
@@ -120,6 +121,8 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus, new_parent_ref: Opt
     };
     // Lock the current process
     let mut process_inner = process.inner();
+    // Clean used VM
+    USER_SPACE_VM_MANAGER.free_chunks_when_exit(thread);
 
     if let Some(new_parent_ref) = new_parent_ref {
         // Exit old process in execve syscall

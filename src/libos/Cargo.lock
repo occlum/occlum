@@ -10,12 +10,16 @@ dependencies = [
  "atomic",
  "bitflags",
  "bitvec",
+ "ctor",
  "derive_builder",
  "errno",
+ "futures",
  "goblin",
  "host-socket",
  "inherit-methods-macro",
+ "intrusive-collections",
  "io-uring-callback",
+ "itertools",
  "lazy_static",
  "log",
  "memoffset 0.6.1",
@@ -175,6 +179,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 dependencies = [
  "bitflags",
+]
+
+[[package]]
+name = "ctor"
+version = "0.1.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccc0a48a9b826acdf4028595adc9db92caea352f7af011a3034acd172a52a0aa"
+dependencies = [
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -521,6 +535,15 @@ dependencies = [
  "sgx_libc",
  "sgx_tstd",
  "slab",
+]
+
+[[package]]
+name = "itertools"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69ddb889f9d0d08a67338271fa9b62996bc788c7796a5c18cf057420aaed5eaf"
+dependencies = [
+ "either",
 ]
 
 [[package]]

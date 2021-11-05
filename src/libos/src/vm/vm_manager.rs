@@ -1,982 +1,714 @@
 use super::*;
 
+use super::chunk::{
+    Chunk, ChunkID, ChunkRef, ChunkType, CHUNK_DEFAULT_SIZE, DUMMY_CHUNK_PROCESS_ID,
+};
+use super::free_space_manager::VMFreeSpaceManager;
 use super::vm_area::VMArea;
+use super::vm_chunk_manager::ChunkManager;
 use super::vm_perms::VMPerms;
+use super::vm_util::*;
+use crate::process::{ThreadRef, ThreadStatus};
+use std::ops::Bound::{Excluded, Included};
 
-#[derive(Clone, Debug)]
-pub enum VMInitializer {
-    DoNothing(),
-    FillZeros(),
-    CopyFrom {
-        range: VMRange,
-    },
-    LoadFromFile {
-        file: FileRef,
-        offset: usize,
-    },
-    // For file-backed mremap which may move from old range to new range and read extra bytes from file
-    CopyOldAndReadNew {
-        old_range: VMRange,
-        file: FileRef,
-        offset: usize, // read file from this offset
-    },
-}
+use crate::util::sync::*;
+use std::collections::{BTreeSet, HashSet};
 
-impl Default for VMInitializer {
-    fn default() -> VMInitializer {
-        VMInitializer::DoNothing()
-    }
-}
-
-impl VMInitializer {
-    pub fn init_slice(&self, buf: &mut [u8]) -> Result<()> {
-        match self {
-            VMInitializer::DoNothing() => {
-                // Do nothing
-            }
-            VMInitializer::FillZeros() => {
-                for b in buf {
-                    *b = 0;
-                }
-            }
-            VMInitializer::CopyFrom { range } => {
-                let src_slice = unsafe { range.as_slice() };
-                let copy_len = min(buf.len(), src_slice.len());
-                buf[..copy_len].copy_from_slice(&src_slice[..copy_len]);
-                for b in &mut buf[copy_len..] {
-                    *b = 0;
-                }
-            }
-            VMInitializer::LoadFromFile { file, offset } => {
-                let len = file
-                    .as_inode_file()
-                    .unwrap()
-                    .read_at(*offset, buf)
-                    .map_err(|_| errno!(EIO, "failed to init memory from file"))?;
-                for b in &mut buf[len..] {
-                    *b = 0;
-                }
-            }
-            VMInitializer::CopyOldAndReadNew {
-                old_range,
-                file,
-                offset,
-            } => {
-                // TODO: Handle old_range with non-readable subrange
-                let src_slice = unsafe { old_range.as_slice() };
-                let copy_len = src_slice.len();
-                debug_assert!(copy_len <= buf.len());
-                let read_len = buf.len() - copy_len;
-                buf[..copy_len].copy_from_slice(&src_slice[..copy_len]);
-                let len = file
-                    .as_inode_file()
-                    .unwrap()
-                    .read_at(*offset, &mut buf[copy_len..])
-                    .cause_err(|_| errno!(EIO, "failed to init memory from file"))?;
-                for b in &mut buf[(copy_len + len)..] {
-                    *b = 0;
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum VMMapAddr {
-    Any,          // Free to choose any address
-    Hint(usize),  // Prefer the address, but can use other address
-    Need(usize),  // Need to use the address, otherwise report error
-    Force(usize), // Force using the address by munmap first
-}
-
-impl Default for VMMapAddr {
-    fn default() -> VMMapAddr {
-        VMMapAddr::Any
-    }
-}
-
-#[derive(Builder, Debug)]
-#[builder(pattern = "owned", build_fn(skip), no_std)]
-pub struct VMMapOptions {
-    size: usize,
-    align: usize,
-    perms: VMPerms,
-    addr: VMMapAddr,
-    initializer: VMInitializer,
-    // The content of the VMA can be written back to a given file at a given offset
-    writeback_file: Option<(FileRef, usize)>,
-}
-
-// VMMapOptionsBuilder is generated automatically, except the build function
-impl VMMapOptionsBuilder {
-    pub fn build(mut self) -> Result<VMMapOptions> {
-        // TODO: support async I/O in vm code
-        self.check_files_are_inodes()?;
-
-        let size = {
-            let size = self
-                .size
-                .ok_or_else(|| errno!(EINVAL, "invalid size for mmap"))?;
-            if size == 0 {
-                return_errno!(EINVAL, "invalid size for mmap");
-            }
-            align_up(size, PAGE_SIZE)
-        };
-        let align = {
-            let align = self.align.unwrap_or(PAGE_SIZE);
-            if align == 0 || align % PAGE_SIZE != 0 {
-                return_errno!(EINVAL, "invalid size for mmap");
-            }
-            align
-        };
-        let perms = self
-            .perms
-            .ok_or_else(|| errno!(EINVAL, "perms must be given"))?;
-        let addr = {
-            let addr = self.addr.unwrap_or_default();
-            match addr {
-                // TODO: check addr + size overflow
-                VMMapAddr::Any => VMMapAddr::Any,
-                VMMapAddr::Hint(addr) => {
-                    let addr = align_down(addr, PAGE_SIZE);
-                    VMMapAddr::Hint(addr)
-                }
-                VMMapAddr::Need(addr_) | VMMapAddr::Force(addr_) => {
-                    if addr_ % align != 0 {
-                        return_errno!(EINVAL, "unaligned addr for fixed mmap");
-                    }
-                    addr
-                }
-            }
-        };
-        let initializer = match self.initializer.as_ref() {
-            Some(initializer) => initializer.clone(),
-            None => VMInitializer::default(),
-        };
-        let writeback_file = self.writeback_file.take().unwrap_or_default();
-
-        Ok(VMMapOptions {
-            size,
-            align,
-            perms,
-            addr,
-            initializer,
-            writeback_file,
-        })
-    }
-
-    fn check_files_are_inodes(&self) -> Result<()> {
-        if let Some(VMInitializer::LoadFromFile { file, .. }) = self.initializer.as_ref() {
-            if file.as_inode_file().is_none() {
-                return_errno!(ENODEV, "VMA must be backed by inode files");
-            }
-        }
-        if let Some(Some((file, _))) = self.writeback_file.as_ref() {
-            if file.as_inode_file().is_none() {
-                return_errno!(ENODEV, "VMA must be backed by inode files");
-            }
-        }
-        Ok(())
-    }
-}
-
-impl VMMapOptions {
-    pub fn size(&self) -> &usize {
-        &self.size
-    }
-
-    pub fn addr(&self) -> &VMMapAddr {
-        &self.addr
-    }
-
-    pub fn perms(&self) -> &VMPerms {
-        &self.perms
-    }
-
-    pub fn initializer(&self) -> &VMInitializer {
-        &self.initializer
-    }
-
-    pub fn writeback_file(&self) -> &Option<(FileRef, usize)> {
-        &self.writeback_file
-    }
-}
+// Incorrect order of locks could cause deadlock easily.
+// Don't hold a low-order lock and then try to get a high-order lock.
+// High order -> Low order:
+// VMManager.internal > ProcessVM.mem_chunks > locks in chunks
 
 #[derive(Debug)]
-pub struct VMRemapOptions {
-    old_addr: usize,
-    old_size: usize,
-    new_size: usize,
-    flags: MRemapFlags,
-}
-
-impl VMRemapOptions {
-    pub fn new(
-        old_addr: usize,
-        old_size: usize,
-        new_size: usize,
-        flags: MRemapFlags,
-    ) -> Result<Self> {
-        let old_addr = if old_addr % PAGE_SIZE != 0 {
-            return_errno!(EINVAL, "unaligned old address");
-        } else {
-            old_addr
-        };
-        let old_size = if old_size == 0 {
-            // TODO: support old_size is zero for shareable mapping
-            warn!("do not support old_size is zero");
-            return_errno!(EINVAL, "invalid old size");
-        } else {
-            align_up(old_size, PAGE_SIZE)
-        };
-        if let Some(new_addr) = flags.new_addr() {
-            if new_addr % PAGE_SIZE != 0 {
-                return_errno!(EINVAL, "unaligned new address");
-            }
-        }
-        let new_size = if new_size == 0 {
-            return_errno!(EINVAL, "invalid new size");
-        } else {
-            align_up(new_size, PAGE_SIZE)
-        };
-        Ok(Self {
-            old_addr,
-            old_size,
-            new_size,
-            flags,
-        })
-    }
-
-    pub fn old_addr(&self) -> usize {
-        self.old_addr
-    }
-
-    pub fn old_size(&self) -> usize {
-        self.old_size
-    }
-
-    pub fn new_size(&self) -> usize {
-        self.new_size
-    }
-
-    pub fn flags(&self) -> MRemapFlags {
-        self.flags
-    }
-}
-
-/// Memory manager.
-///
-/// VMManager provides useful memory management APIs such as mmap, munmap, mremap, etc.
-///
-/// # Invariants
-///
-/// Behind the scene, VMManager maintains a list of VMArea that have been allocated.
-/// (denoted as `self.vmas`). To reason about the correctness of VMManager, we give
-/// the set of invariants hold by VMManager.
-///
-/// 1. The rule of sentry:
-/// ```
-/// self.range.begin() == self.vmas[0].start() == self.vmas[0].end()
-/// ```
-/// and
-/// ```
-/// self.range.end() == self.vmas[N-1].start() == self.vmas[N-1].end()
-/// ```
-/// where `N = self.vmas.len()`.
-///
-/// 2. The rule of non-emptyness:
-/// ```
-/// self.vmas[i].size() > 0, for 1 <= i < self.vmas.len() - 1
-/// ```
-///
-/// 3. The rule of ordering:
-/// ```
-/// self.vmas[i].end() <= self.vmas[i+1].start() for 0 <= i < self.vmas.len() - 1
-/// ```
-///
-/// 4. The rule of non-mergablility:
-/// ```
-/// self.vmas[i].end() !=  self.vmas[i+1].start() || self.vmas[i].perms() !=  self.vmas[i+1].perms()
-///     for 1 <= i < self.vmas.len() - 2
-/// ```
-///
-#[derive(Debug, Default)]
 pub struct VMManager {
     range: VMRange,
-    vmas: Vec<VMArea>,
+    internal: SgxMutex<InternalVMManager>,
 }
 
 impl VMManager {
-    pub fn from(addr: usize, size: usize) -> Result<VMManager> {
-        let range = VMRange::new(addr, addr + size)?;
-        let vmas = {
-            let start = range.start();
-            let end = range.end();
-            let start_sentry = {
-                let range = VMRange::new_empty(start)?;
-                let perms = VMPerms::empty();
-                VMArea::new(range, perms, None)
-            };
-            let end_sentry = {
-                let range = VMRange::new_empty(end)?;
-                let perms = VMPerms::empty();
-                VMArea::new(range, perms, None)
-            };
-            vec![start_sentry, end_sentry]
-        };
-        Ok(VMManager { range, vmas })
+    pub fn init(vm_range: VMRange) -> Result<Self> {
+        let internal = InternalVMManager::init(vm_range.clone());
+        Ok(VMManager {
+            range: vm_range,
+            internal: SgxMutex::new(internal),
+        })
     }
 
     pub fn range(&self) -> &VMRange {
         &self.range
     }
 
-    pub fn mmap(&mut self, mut options: VMMapOptions) -> Result<usize> {
-        // TODO: respect options.align when mmap
+    fn internal(&self) -> SgxMutexGuard<InternalVMManager> {
+        self.internal.lock().unwrap()
+    }
+
+    pub fn free_size(&self) -> usize {
+        self.internal().free_manager.free_size()
+    }
+
+    pub fn verified_clean_when_exit(&self) -> bool {
+        let internal = self.internal();
+        internal.chunks.len() == 0 && internal.free_manager.free_size() == self.range.size()
+    }
+
+    pub fn free_chunk(&self, chunk: &ChunkRef) {
+        let mut internal = self.internal();
+        internal.free_chunk(chunk);
+    }
+
+    // Allocate single VMA chunk for new process whose process VM is not ready yet
+    pub fn alloc(&self, options: &VMMapOptions) -> Result<(VMRange, ChunkRef)> {
+        let addr = *options.addr();
+        let size = *options.size();
+        if let Ok(new_chunk) = self.internal().mmap_chunk(options) {
+            return Ok((new_chunk.range().clone(), new_chunk));
+        }
+        return_errno!(ENOMEM, "can't allocate free chunks");
+    }
+
+    pub fn mmap(&self, options: &VMMapOptions) -> Result<usize> {
+        let addr = *options.addr();
+        let size = *options.size();
+        let align = *options.align();
+
+        match addr {
+            VMMapAddr::Any => {}
+            VMMapAddr::Hint(addr) => {
+                let target_range = unsafe { VMRange::from_unchecked(addr, addr + size) };
+                let ret = self.mmap_with_addr(target_range, options);
+                if ret.is_ok() {
+                    return ret;
+                }
+            }
+            VMMapAddr::Need(addr) | VMMapAddr::Force(addr) => {
+                let target_range = unsafe { VMRange::from_unchecked(addr, addr + size) };
+                return self.mmap_with_addr(target_range, options);
+            }
+        }
+
+        if size > CHUNK_DEFAULT_SIZE {
+            if let Ok(new_chunk) = self.internal().mmap_chunk(options) {
+                let start = new_chunk.range().start();
+                current!().vm().add_mem_chunk(new_chunk);
+                return Ok(start);
+            } else {
+                return_errno!(ENOMEM, "can't allocate free chunks");
+            }
+        }
+
+        // Allocate in default chunk
+        let current = current!();
+        {
+            // Fast path: Try to go to assigned chunks to do mmap
+            // There is no lock on VMManager in this path.
+            let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
+            for chunk in process_mem_chunks
+                .iter()
+                .filter(|&chunk| !chunk.is_single_vma())
+            {
+                let result_start = chunk.try_mmap(options);
+                if result_start.is_ok() {
+                    return result_start;
+                }
+            }
+        }
+
+        // Process' chunks are all busy or can't allocate from process_mem_chunks list.
+        // Allocate a new chunk with chunk default size.
+        // Lock on ChunkManager.
+        if let Ok(new_chunk) = self.internal().mmap_chunk_default(addr) {
+            // Allocate in the new chunk
+            let start = new_chunk.mmap(options);
+            debug_assert!(start.is_ok()); // We just allocate a chunk for you. You must succeed.
+                                          // Add this new chunk to process' chunk list
+            new_chunk.add_process(&current);
+            current.vm().add_mem_chunk(new_chunk);
+            return start;
+        }
+
+        // Slow path: Sadly, there is no free chunk, iterate every chunk to find a range
+        {
+            // Release lock after this block
+            let mut result_start = Ok(0);
+            let chunks = &self.internal().chunks;
+            let chunk = chunks
+                .iter()
+                .filter(|&chunk| !chunk.is_single_vma())
+                .find(|&chunk| {
+                    result_start = chunk.mmap(options);
+                    result_start.is_ok()
+                });
+            if let Some(chunk) = chunk {
+                chunk.add_process(&current);
+                current.vm().add_mem_chunk(chunk.clone());
+                return result_start;
+            }
+        }
+
+        // Can't find a range in default chunks. Maybe there is still free range in the global free list.
+        if let Ok(new_chunk) = self.internal().mmap_chunk(options) {
+            let start = new_chunk.range().start();
+            current!().vm().add_mem_chunk(new_chunk);
+            return Ok(start);
+        }
+
+        // No free range
+        return_errno!(ENOMEM, "Can't find a free chunk for this allocation");
+    }
+
+    // If addr is specified, use single VMA chunk to record this
+    fn mmap_with_addr(&self, range: VMRange, options: &VMMapOptions) -> Result<usize> {
         let addr = *options.addr();
         let size = *options.size();
 
-        if let VMMapAddr::Force(addr) = addr {
-            self.munmap(addr, size)?;
+        let current = current!();
+
+        let chunk = {
+            let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
+            process_mem_chunks
+                .iter()
+                .find(|&chunk| chunk.range().intersect(&range).is_some())
+                .cloned()
+        };
+
+        if let Some(chunk) = chunk {
+            // This range is currently in a allocated chunk
+            match chunk.internal() {
+                ChunkType::MultiVMA(chunk_internal) => {
+                    // If the chunk only intersect, but not a superset, we can't handle this.
+                    if !chunk.range().is_superset_of(&range) {
+                        return_errno!(EINVAL, "mmap with specified addr spans over two chunks");
+                    }
+                    trace!(
+                        "mmap with addr in existing default chunk: {:?}",
+                        chunk.range()
+                    );
+                    return chunk_internal.lock().unwrap().chunk_manager().mmap(options);
+                }
+                ChunkType::SingleVMA(_) => {
+                    match addr {
+                        VMMapAddr::Hint(addr) => {
+                            return_errno!(ENOMEM, "Single VMA is currently in use. Hint failure");
+                        }
+                        VMMapAddr::Need(addr) => {
+                            return_errno!(ENOMEM, "Single VMA is currently in use. Need failure");
+                        }
+                        VMMapAddr::Force(addr) => {
+                            // Munmap the corresponding single vma chunk
+                            // If the chunk only intersect, but not a superset, we can't handle this.
+                            if !chunk.range().is_superset_of(&range) {
+                                trace!(
+                                    "chunk range = {:?}, target range = {:?}",
+                                    chunk.range(),
+                                    range
+                                );
+                                return_errno!(EINVAL, "mmap with specified addr spans two chunks");
+                            }
+                            let mut internal_manager = self.internal();
+                            internal_manager.munmap_chunk(&chunk, Some(&range))?;
+                        }
+                        VMMapAddr::Any => unreachable!(),
+                    }
+                }
+            }
         }
 
-        // Allocate a new range for this mmap request
-        let (insert_idx, free_range) = self.find_free_range(size, addr)?;
-        let new_range = self.alloc_range_from(size, addr, &free_range);
-        let new_addr = new_range.start();
-        let writeback_file = options.writeback_file.take();
-        let new_vma = VMArea::new(new_range, *options.perms(), writeback_file);
-
-        // Initialize the memory of the new range
-        unsafe {
-            let buf = new_vma.as_slice_mut();
-            options.initializer.init_slice(buf)?;
+        // This range is not currently using, allocate one in global list
+        if let Ok(new_chunk) = self.internal().mmap_chunk(options) {
+            let start = new_chunk.range().start();
+            debug_assert!({
+                match addr {
+                    VMMapAddr::Force(addr) | VMMapAddr::Need(addr) => start == range.start(),
+                    _ => true,
+                }
+            });
+            current.vm().add_mem_chunk(new_chunk);
+            return Ok(start);
+        } else {
+            return_errno!(ENOMEM, "can't allocate a chunk in global list")
         }
-        // Set memory permissions
-        if !options.perms.is_default() {
-            Self::apply_perms(&new_vma, new_vma.perms());
-        }
-
-        // After initializing, we can safely insert the new VMA
-        self.insert_new_vma(insert_idx, new_vma);
-        Ok(new_addr)
     }
 
-    pub fn munmap(&mut self, addr: usize, size: usize) -> Result<()> {
+    pub fn munmap(&self, addr: usize, size: usize) -> Result<()> {
+        // Go to every process chunk to see if it contains the range.
         let size = {
             if size == 0 {
                 return_errno!(EINVAL, "size of munmap must not be zero");
             }
             align_up(size, PAGE_SIZE)
         };
-        let munmap_range = {
-            let munmap_range = VMRange::new(addr, addr + size)?;
-
-            let effective_munmap_range_opt = munmap_range.intersect(&self.range);
-            if effective_munmap_range_opt.is_none() {
+        let munmap_range = { VMRange::new(addr, addr + size) }?;
+        let chunk = {
+            let current = current!();
+            let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
+            let chunk = process_mem_chunks
+                .iter()
+                .find(|&chunk| chunk.range().intersect(&munmap_range).is_some());
+            if chunk.is_none() {
+                // Note:
+                // The man page of munmap states that "it is not an error if the indicated
+                // range does not contain any mapped pages". This is not considered as
+                // an error!
+                trace!("the munmap range is not mapped");
                 return Ok(());
             }
-
-            let effective_munmap_range = effective_munmap_range_opt.unwrap();
-            if effective_munmap_range.empty() {
-                return Ok(());
-            }
-            effective_munmap_range
+            chunk.unwrap().clone()
         };
 
-        let old_vmas = {
-            let mut old_vmas = Vec::new();
-            std::mem::swap(&mut self.vmas, &mut old_vmas);
-            old_vmas
-        };
-        let new_vmas = old_vmas
-            .into_iter()
-            .flat_map(|vma| {
-                // Keep the two sentry VMA intact
-                if vma.size() == 0 {
-                    return vec![vma];
+        if !chunk.range().is_superset_of(&munmap_range) {
+            // munmap range spans multiple chunks
+            let munmap_single_vma_chunks = {
+                let current = current!();
+                let mut process_mem_chunks = current.vm().mem_chunks().write().unwrap();
+                let munmap_single_vma_chunks = process_mem_chunks
+                    .drain_filter(|p_chunk| {
+                        p_chunk.is_single_vma() && p_chunk.range().overlap_with(&munmap_range)
+                    })
+                    .collect::<Vec<ChunkRef>>();
+                if munmap_single_vma_chunks
+                    .iter()
+                    .find(|chunk| !munmap_range.is_superset_of(chunk.range()))
+                    .is_some()
+                {
+                    // TODO: Support munmap multiple single VMA chunk with remaining ranges.
+                    return_errno!(
+                        EINVAL,
+                        "munmap multiple chunks with remaining ranges is not supported"
+                    );
                 }
 
-                let intersection_vma = match vma.intersect(&munmap_range) {
-                    None => return vec![vma],
-                    Some(intersection_vma) => intersection_vma,
-                };
-
-                // File-backed VMA needs to be flushed upon munmap
-                Self::flush_file_vma(&intersection_vma);
-
-                // Reset memory permissions
-                if !&intersection_vma.perms().is_default() {
-                    Self::apply_perms(&intersection_vma, VMPerms::default());
+                // TODO: Support munmap a part of default chunks
+                // Check munmap default chunks
+                if process_mem_chunks
+                    .iter()
+                    .find(|p_chunk| p_chunk.range().overlap_with(&munmap_range))
+                    .is_some()
+                {
+                    return_errno!(
+                        EINVAL,
+                        "munmap range overlap with default chunks is not supported"
+                    );
                 }
+                munmap_single_vma_chunks
+            };
 
-                vma.subtract(&intersection_vma)
-            })
-            .collect();
-        self.vmas = new_vmas;
-        Ok(())
-    }
-
-    pub fn mremap(&mut self, options: &VMRemapOptions) -> Result<usize> {
-        let old_addr = options.old_addr();
-        let old_size = options.old_size();
-        let old_range = VMRange::new_with_size(old_addr, old_size)?;
-        let new_size = options.new_size();
-        let flags = options.flags();
-
-        #[derive(Clone, Copy, PartialEq)]
-        enum SizeType {
-            Same,
-            Shrinking,
-            Growing,
-        };
-        let size_type = if new_size == old_size {
-            SizeType::Same
-        } else if new_size < old_size {
-            SizeType::Shrinking
-        } else {
-            SizeType::Growing
-        };
-        // The old range must be contained in one VMA
-        let idx = self
-            .find_containing_vma_idx(&old_range)
-            .ok_or_else(|| errno!(EFAULT, "invalid range"))?;
-        let containing_vma = &self.vmas[idx];
-        // Get the memory permissions of the old range
-        let perms = containing_vma.perms();
-        // Get the write back file of the old range if there is one.
-        let writeback_file = containing_vma.writeback_file();
-
-        // FIXME: Current implementation for file-backed memory mremap has limitation that if a SUBRANGE of the previous
-        // file-backed mmap with MAP_SHARED is then mremap-ed with MREMAP_MAYMOVE, there will be two vmas that have the same backed file.
-        // For Linux, writing to either memory vma or the file will update the other two equally. But we won't be able to support this before
-        // we really have paging. Thus, if the old_range is not equal to a recorded vma, we will just return with error.
-        if writeback_file.is_some() && &old_range != containing_vma.range() {
-            return_errno!(EINVAL, "Known limition")
-        }
-
-        // Implement mremap as one optional mmap followed by one optional munmap.
-        //
-        // The exact arguments for the mmap and munmap are determined by the values of MRemapFlags,
-        // SizeType and writeback_file. There is a total of 18 combinations among MRemapFlags and
-        // SizeType and writeback_file. As some combinations result in the same mmap and munmap operations,
-        // the following code only needs to match below patterns of (MRemapFlags, SizeType, writeback_file)
-        // and treat each case accordingly.
-
-        // Determine whether need to do mmap. And when possible, determine the returned address
-        let (need_mmap, mut ret_addr) = match (flags, size_type, writeback_file) {
-            (MRemapFlags::None, SizeType::Growing, None) => {
-                let vm_initializer_for_new_range = VMInitializer::FillZeros();
-                let mmap_opts = VMMapOptionsBuilder::default()
-                    .size(new_size - old_size)
-                    .addr(VMMapAddr::Need(old_range.end()))
-                    .perms(perms)
-                    .initializer(vm_initializer_for_new_range)
-                    .build()?;
-                let ret_addr = Some(old_addr);
-                (Some(mmap_opts), ret_addr)
-            }
-            (MRemapFlags::None, SizeType::Growing, Some((backed_file, offset))) => {
-                // Update writeback file offset
-                let new_writeback_file =
-                    Some((backed_file.clone(), offset + containing_vma.size()));
-                let vm_initializer_for_new_range = VMInitializer::LoadFromFile {
-                    file: backed_file.clone(),
-                    offset: offset + containing_vma.size(), // file-backed mremap should start from the end of previous mmap/mremap file
-                };
-                let mmap_opts = VMMapOptionsBuilder::default()
-                    .size(new_size - old_size)
-                    .addr(VMMapAddr::Need(old_range.end()))
-                    .perms(perms)
-                    .initializer(vm_initializer_for_new_range)
-                    .writeback_file(new_writeback_file)
-                    .build()?;
-                let ret_addr = Some(old_addr);
-                (Some(mmap_opts), ret_addr)
-            }
-            (MRemapFlags::MayMove, SizeType::Growing, None) => {
-                let prefered_new_range =
-                    VMRange::new_with_size(old_addr + old_size, new_size - old_size)?;
-                if self.is_free_range(&prefered_new_range) {
-                    // Don't need to move the old range
-                    let vm_initializer_for_new_range = VMInitializer::FillZeros();
-                    let mmap_ops = VMMapOptionsBuilder::default()
-                        .size(prefered_new_range.size())
-                        .addr(VMMapAddr::Need(prefered_new_range.start()))
-                        .perms(perms)
-                        .initializer(vm_initializer_for_new_range)
-                        .build()?;
-                    (Some(mmap_ops), Some(old_addr))
-                } else {
-                    // Need to move old range to a new range and init the new range
-                    let vm_initializer_for_new_range = VMInitializer::CopyFrom { range: old_range };
-                    let mmap_ops = VMMapOptionsBuilder::default()
-                        .size(new_size)
-                        .addr(VMMapAddr::Any)
-                        .perms(perms)
-                        .initializer(vm_initializer_for_new_range)
-                        .build()?;
-                    // Cannot determine the returned address for now, which can only be obtained after calling mmap
-                    let ret_addr = None;
-                    (Some(mmap_ops), ret_addr)
-                }
-            }
-            (MRemapFlags::MayMove, SizeType::Growing, Some((backed_file, offset))) => {
-                let prefered_new_range =
-                    VMRange::new_with_size(old_addr + old_size, new_size - old_size)?;
-                if self.is_free_range(&prefered_new_range) {
-                    // Don't need to move the old range
-                    let vm_initializer_for_new_range = VMInitializer::LoadFromFile {
-                        file: backed_file.clone(),
-                        offset: offset + containing_vma.size(), // file-backed mremap should start from the end of previous mmap/mremap file
-                    };
-                    // Write back file should start from new offset
-                    let new_writeback_file =
-                        Some((backed_file.clone(), offset + containing_vma.size()));
-                    let mmap_ops = VMMapOptionsBuilder::default()
-                        .size(prefered_new_range.size())
-                        .addr(VMMapAddr::Need(prefered_new_range.start()))
-                        .perms(perms)
-                        .initializer(vm_initializer_for_new_range)
-                        .writeback_file(new_writeback_file)
-                        .build()?;
-                    (Some(mmap_ops), Some(old_addr))
-                } else {
-                    // Need to move old range to a new range and init the new range
-                    let vm_initializer_for_new_range = {
-                        let copy_end = containing_vma.end();
-                        let copy_range = VMRange::new(old_range.start(), copy_end)?;
-                        let reread_file_start_offset = copy_end - containing_vma.start();
-                        VMInitializer::CopyOldAndReadNew {
-                            old_range: copy_range,
-                            file: backed_file.clone(),
-                            offset: reread_file_start_offset,
-                        }
-                    };
-                    let new_writeback_file = Some((backed_file.clone(), *offset));
-                    let mmap_ops = VMMapOptionsBuilder::default()
-                        .size(new_size)
-                        .addr(VMMapAddr::Any)
-                        .perms(perms)
-                        .initializer(vm_initializer_for_new_range)
-                        .writeback_file(new_writeback_file)
-                        .build()?;
-                    // Cannot determine the returned address for now, which can only be obtained after calling mmap
-                    let ret_addr = None;
-                    (Some(mmap_ops), ret_addr)
-                }
-            }
-            (MRemapFlags::FixedAddr(new_addr), _, None) => {
-                let vm_initializer_for_new_range = { VMInitializer::CopyFrom { range: old_range } };
-                let mmap_opts = VMMapOptionsBuilder::default()
-                    .size(new_size)
-                    .addr(VMMapAddr::Force(new_addr))
-                    .perms(perms)
-                    .initializer(vm_initializer_for_new_range)
-                    .build()?;
-                let ret_addr = Some(new_addr);
-                (Some(mmap_opts), ret_addr)
-            }
-            (MRemapFlags::FixedAddr(new_addr), _, Some((backed_file, offset))) => {
-                let vm_initializer_for_new_range = {
-                    let copy_end = containing_vma.end();
-                    let copy_range = VMRange::new(old_range.start(), copy_end)?;
-                    let reread_file_start_offset = copy_end - containing_vma.start();
-                    VMInitializer::CopyOldAndReadNew {
-                        old_range: copy_range,
-                        file: backed_file.clone(),
-                        offset: reread_file_start_offset,
-                    }
-                };
-                let new_writeback_file = Some((backed_file.clone(), *offset));
-                let mmap_opts = VMMapOptionsBuilder::default()
-                    .size(new_size)
-                    .addr(VMMapAddr::Force(new_addr))
-                    .perms(perms)
-                    .initializer(vm_initializer_for_new_range)
-                    .writeback_file(new_writeback_file)
-                    .build()?;
-                let ret_addr = Some(new_addr);
-                (Some(mmap_opts), ret_addr)
-            }
-            _ => (None, Some(old_addr)),
-        };
-
-        let need_munmap = match (flags, size_type) {
-            (MRemapFlags::None, SizeType::Shrinking)
-            | (MRemapFlags::MayMove, SizeType::Shrinking) => {
-                let unmap_addr = old_addr + new_size;
-                let unmap_size = old_size - new_size;
-                Some((unmap_addr, unmap_size))
-            }
-            (MRemapFlags::MayMove, SizeType::Growing) => {
-                if ret_addr.is_none() {
-                    // We must need to do mmap. Thus unmap the old range
-                    Some((old_addr, old_size))
-                } else {
-                    // We must choose to reuse the old range. Thus, no need to unmap
-                    None
-                }
-            }
-            (MRemapFlags::FixedAddr(new_addr), _) => {
-                let new_range = VMRange::new_with_size(new_addr, new_size)?;
-                if new_range.overlap_with(&old_range) {
-                    return_errno!(EINVAL, "new range cannot overlap with the old one");
-                }
-                Some((old_addr, old_size))
-            }
-            _ => None,
-        };
-
-        // Perform mmap and munmap if needed
-        if let Some(mmap_options) = need_mmap {
-            let mmap_addr = self.mmap(mmap_options)?;
-
-            if ret_addr.is_none() {
-                ret_addr = Some(mmap_addr);
-            }
-        }
-        if let Some((addr, size)) = need_munmap {
-            self.munmap(addr, size).expect("never fail");
-        }
-
-        debug_assert!(ret_addr.is_some());
-        Ok(ret_addr.unwrap())
-    }
-
-    pub fn mprotect(&mut self, addr: usize, size: usize, new_perms: VMPerms) -> Result<()> {
-        let protect_range = VMRange::new_with_size(addr, size)?;
-
-        // FIXME: the current implementation requires the target range to be
-        // contained in exact one VMA.
-        let containing_idx = self
-            .find_containing_vma_idx(&protect_range)
-            .ok_or_else(|| errno!(ENOMEM, "invalid range"))?;
-        let containing_vma = &self.vmas[containing_idx];
-
-        let old_perms = containing_vma.perms();
-        if new_perms == old_perms {
+            let mut internl_manager = self.internal();
+            munmap_single_vma_chunks.iter().for_each(|p_chunk| {
+                internl_manager.munmap_chunk(p_chunk, None);
+            });
             return Ok(());
         }
 
-        let same_start = protect_range.start() == containing_vma.start();
-        let same_end = protect_range.end() == containing_vma.end();
-        let containing_vma = &mut self.vmas[containing_idx];
-        match (same_start, same_end) {
-            (true, true) => {
-                containing_vma.set_perms(new_perms);
-
-                Self::apply_perms(containing_vma, containing_vma.perms());
+        match chunk.internal() {
+            ChunkType::MultiVMA(manager) => {
+                return manager
+                    .lock()
+                    .unwrap()
+                    .chunk_manager()
+                    .munmap_range(munmap_range);
             }
-            (false, true) => {
-                containing_vma.set_end(protect_range.start());
-
-                let new_vma = VMArea::inherits_file_from(containing_vma, protect_range, new_perms);
-                Self::apply_perms(&new_vma, new_vma.perms());
-                self.insert_new_vma(containing_idx + 1, new_vma);
-            }
-            (true, false) => {
-                containing_vma.set_start(protect_range.end());
-
-                let new_vma = VMArea::inherits_file_from(containing_vma, protect_range, new_perms);
-                Self::apply_perms(&new_vma, new_vma.perms());
-                self.insert_new_vma(containing_idx, new_vma);
-            }
-            (false, false) => {
-                // The containing VMA is divided into three VMAs:
-                // Shrinked old VMA:    [containing_vma.start,     protect_range.start)
-                // New VMA:             [protect_range.start,      protect_range.end)
-                // Another new vma:     [protect_range.end,        containing_vma.end)
-
-                let old_end = containing_vma.end();
-                let protect_end = protect_range.end();
-
-                // Shrinked old VMA
-                containing_vma.set_end(protect_range.start());
-
-                // New VMA
-                let new_vma = VMArea::inherits_file_from(containing_vma, protect_range, new_perms);
-                Self::apply_perms(&new_vma, new_vma.perms());
-
-                // Another new VMA
-                let new_vma2 = {
-                    let range = VMRange::new(protect_end, old_end).unwrap();
-                    VMArea::inherits_file_from(containing_vma, range, old_perms)
-                };
-
-                drop(containing_vma);
-                self.insert_new_vma(containing_idx + 1, new_vma);
-                self.insert_new_vma(containing_idx + 2, new_vma2);
+            ChunkType::SingleVMA(_) => {
+                let mut internal_manager = self.internal();
+                return internal_manager.munmap_chunk(&chunk, Some(&munmap_range));
             }
         }
-
-        Ok(())
     }
 
-    /// Sync all shared, file-backed memory mappings in the given range by flushing the
-    /// memory content to its underlying file.
-    pub fn msync_by_range(&mut self, sync_range: &VMRange) -> Result<()> {
-        if !self.range().is_superset_of(&sync_range) {
-            return_errno!(ENOMEM, "invalid range");
-        }
-
-        // FIXME: check if sync_range covers unmapped memory
-        for vma in &self.vmas {
-            let vma = match vma.intersect(sync_range) {
-                None => continue,
-                Some(vma) => vma,
-            };
-            Self::flush_file_vma(&vma);
-        }
-        Ok(())
+    pub fn find_mmap_region(&self, addr: usize) -> Result<VMRange> {
+        let current = current!();
+        let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
+        let mut vm_range = Ok(Default::default());
+        process_mem_chunks.iter().find(|&chunk| {
+            vm_range = chunk.find_mmap_region(addr);
+            vm_range.is_ok()
+        });
+        return vm_range;
     }
 
-    /// Sync all shared, file-backed memory mappings of the given file by flushing
-    /// the memory content to the file.
-    pub fn msync_by_file(&mut self, sync_file: &FileRef) {
-        for vma in &self.vmas {
-            let is_same_file = |file: &FileRef| -> bool { file == sync_file };
-            Self::flush_file_vma_with_cond(vma, is_same_file);
-        }
-    }
-
-    /// Flush a file-backed VMA to its file. This has no effect on anonymous VMA.
-    fn flush_file_vma(vma: &VMArea) {
-        Self::flush_file_vma_with_cond(vma, |_| true)
-    }
-
-    /// Same as flush_vma, except that an extra condition on the file needs to satisfy.
-    fn flush_file_vma_with_cond<F: Fn(&FileRef) -> bool>(vma: &VMArea, cond_fn: F) {
-        let (file, file_offset) = match vma.writeback_file().as_ref() {
-            None => return,
-            Some((file_and_offset)) => file_and_offset,
-        };
-        let inode_file = file.as_inode_file().unwrap();
-        let file_writable = inode_file.access_mode().writable();
-        if !file_writable {
-            return;
-        }
-        if !cond_fn(file) {
-            return;
-        }
-        inode_file.write_at(*file_offset, unsafe { vma.as_slice() });
-    }
-
-    pub fn find_mmap_region(&self, addr: usize) -> Result<&VMRange> {
-        self.vmas
-            .iter()
-            .map(|vma| vma.range())
-            .find(|vma| vma.contains(addr))
-            .ok_or_else(|| errno!(ESRCH, "no mmap regions that contains the address"))
-    }
-
-    // Find a VMA that contains the given range, returning the VMA's index
-    fn find_containing_vma_idx(&self, target_range: &VMRange) -> Option<usize> {
-        self.vmas
-            .iter()
-            .position(|vma| vma.is_superset_of(target_range))
-    }
-
-    // Returns whether the requested range is free
-    fn is_free_range(&self, request_range: &VMRange) -> bool {
-        self.range.is_superset_of(request_range)
-            && self
-                .vmas
+    pub fn mprotect(&self, addr: usize, size: usize, perms: VMPerms) -> Result<()> {
+        let protect_range = VMRange::new_with_size(addr, size)?;
+        let chunk = {
+            let current = current!();
+            let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
+            let chunk = process_mem_chunks
                 .iter()
-                .all(|range| range.overlap_with(request_range) == false)
-    }
-
-    // Find the free range that satisfies the constraints of size and address
-    fn find_free_range(&self, size: usize, addr: VMMapAddr) -> Result<(usize, VMRange)> {
-        // TODO: reduce the complexity from O(N) to O(log(N)), where N is
-        // the number of existing VMAs.
-
-        // Record the minimal free range that satisfies the contraints
-        let mut result_free_range: Option<VMRange> = None;
-        let mut result_idx: Option<usize> = None;
-
-        for (idx, range_pair) in self.vmas.windows(2).enumerate() {
-            // Since we have two sentry vmas at both ends, we can be sure that the free
-            // space only appears between two consecutive vmas.
-            let pre_range = &range_pair[0];
-            let next_range = &range_pair[1];
-
-            let mut free_range = {
-                let free_range_start = pre_range.end();
-                let free_range_end = next_range.start();
-
-                let free_range_size = free_range_end - free_range_start;
-                if free_range_size < size {
-                    continue;
-                }
-
-                unsafe { VMRange::from_unchecked(free_range_start, free_range_end) }
-            };
-
-            match addr {
-                // Want a minimal free_range
-                VMMapAddr::Any => {}
-                // Prefer to have free_range.start == addr
-                VMMapAddr::Hint(addr) => {
-                    if free_range.contains(addr) {
-                        if free_range.end() - addr >= size {
-                            free_range.start = addr;
-                            let insert_idx = idx + 1;
-                            return Ok((insert_idx, free_range));
-                        }
-                    }
-                }
-                // Must have free_range.start == addr
-                VMMapAddr::Need(addr) | VMMapAddr::Force(addr) => {
-                    if free_range.start() > addr {
-                        return_errno!(ENOMEM, "not enough memory for fixed mmap");
-                    }
-                    if !free_range.contains(addr) {
-                        continue;
-                    }
-                    if free_range.end() - addr < size {
-                        return_errno!(ENOMEM, "not enough memory for fixed mmap");
-                    }
-                    free_range.start = addr;
-                    let insert_idx = idx + 1;
-                    return Ok((insert_idx, free_range));
-                }
+                .find(|&chunk| chunk.range().intersect(&protect_range).is_some());
+            if chunk.is_none() {
+                return_errno!(ENOMEM, "invalid range");
             }
-
-            if result_free_range == None
-                || result_free_range.as_ref().unwrap().size() > free_range.size()
-            {
-                result_free_range = Some(free_range);
-                result_idx = Some(idx);
-            }
-        }
-
-        if result_free_range.is_none() {
-            return_errno!(ENOMEM, "not enough memory");
-        }
-
-        let free_range = result_free_range.unwrap();
-        let insert_idx = result_idx.unwrap() + 1;
-        Ok((insert_idx, free_range))
-    }
-
-    fn alloc_range_from(&self, size: usize, addr: VMMapAddr, free_range: &VMRange) -> VMRange {
-        debug_assert!(free_range.size() >= size);
-
-        let mut new_range = *free_range;
-
-        if let VMMapAddr::Need(addr) = addr {
-            debug_assert!(addr == new_range.start());
-        }
-        if let VMMapAddr::Force(addr) = addr {
-            debug_assert!(addr == new_range.start());
-        }
-
-        new_range.resize(size);
-        new_range
-    }
-
-    // Insert a new VMA, and when possible, merge it with its neighbors.
-    fn insert_new_vma(&mut self, insert_idx: usize, new_vma: VMArea) {
-        // New VMA can only be inserted between the two sentry VMAs
-        debug_assert!(0 < insert_idx && insert_idx < self.vmas.len());
-
-        let left_idx = insert_idx - 1;
-        let right_idx = insert_idx;
-
-        let left_vma = &self.vmas[left_idx];
-        let right_vma = &self.vmas[right_idx];
-
-        // Double check the order
-        debug_assert!(left_vma.end() <= new_vma.start());
-        debug_assert!(new_vma.end() <= right_vma.start());
-
-        let left_mergable = Self::can_merge_vmas(left_vma, &new_vma);
-        let right_mergable = Self::can_merge_vmas(&new_vma, right_vma);
-
-        drop(left_vma);
-        drop(right_vma);
-
-        match (left_mergable, right_mergable) {
-            (false, false) => {
-                self.vmas.insert(insert_idx, new_vma);
-            }
-            (true, false) => {
-                self.vmas[left_idx].set_end(new_vma.end);
-            }
-            (false, true) => {
-                self.vmas[right_idx].set_start(new_vma.start);
-            }
-            (true, true) => {
-                let left_new_end = self.vmas[right_idx].end();
-                self.vmas[left_idx].set_end(left_new_end);
-                self.vmas.remove(right_idx);
-            }
-        }
-    }
-
-    fn can_merge_vmas(left: &VMArea, right: &VMArea) -> bool {
-        debug_assert!(left.end() <= right.start());
-
-        // Both of the two VMAs must not be sentry (whose size == 0)
-        if left.size() == 0 || right.size() == 0 {
-            return false;
-        }
-        // The two VMAs must border with each other
-        if left.end() != right.start() {
-            return false;
-        }
-        // The two VMAs must have the same memory permissions
-        if left.perms() != right.perms() {
-            return false;
-        }
-
-        // If the two VMAs have write-back files, the files must be the same and
-        // the two file regions must be continuous.
-        let left_writeback_file = left.writeback_file();
-        let right_writeback_file = right.writeback_file();
-        match (left_writeback_file, right_writeback_file) {
-            (None, None) => true,
-            (Some(_), None) => false,
-            (None, Some(_)) => false,
-            (Some((left_file, left_offset)), Some((right_file, right_offset))) => {
-                left_file == right_file
-                    && right_offset > left_offset
-                    && right_offset - left_offset == left.size()
-            }
-        }
-    }
-
-    fn apply_perms(protect_range: &VMRange, perms: VMPerms) {
-        extern "C" {
-            pub fn occlum_ocall_mprotect(
-                retval: *mut i32,
-                addr: *const c_void,
-                len: usize,
-                prot: i32,
-            ) -> sgx_status_t;
+            chunk.unwrap().clone()
         };
 
-        unsafe {
-            let mut retval = 0;
-            let addr = protect_range.start() as *const c_void;
-            let len = protect_range.size();
-            let prot = perms.bits() as i32;
-            let sgx_status = occlum_ocall_mprotect(&mut retval, addr, len, prot);
-            assert!(sgx_status == sgx_status_t::SGX_SUCCESS && retval == 0);
+        // TODO: Support mprotect range spans multiple chunks
+        if !chunk.range().is_superset_of(&protect_range) {
+            return_errno!(EINVAL, "mprotect range is not in a single chunk");
         }
+
+        match chunk.internal() {
+            ChunkType::MultiVMA(manager) => {
+                trace!("mprotect default chunk: {:?}", chunk.range());
+                return manager
+                    .lock()
+                    .unwrap()
+                    .chunk_manager()
+                    .mprotect(addr, size, perms);
+            }
+            ChunkType::SingleVMA(_) => {
+                let mut internal_manager = self.internal();
+                return internal_manager.mprotect_single_vma_chunk(&chunk, protect_range, perms);
+            }
+        }
+    }
+
+    pub fn msync(&self, addr: usize, size: usize) -> Result<()> {
+        let sync_range = VMRange::new_with_size(addr, size)?;
+        let chunk = {
+            let current = current!();
+            let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
+            let chunk = process_mem_chunks
+                .iter()
+                .find(|&chunk| chunk.range().is_superset_of(&sync_range));
+            if chunk.is_none() {
+                return_errno!(ENOMEM, "invalid range");
+            }
+            chunk.unwrap().clone()
+        };
+
+        match chunk.internal() {
+            ChunkType::MultiVMA(manager) => {
+                trace!("msync default chunk: {:?}", chunk.range());
+                return manager
+                    .lock()
+                    .unwrap()
+                    .chunk_manager()
+                    .msync_by_range(&sync_range);
+            }
+            ChunkType::SingleVMA(vma) => {
+                let vma = vma.lock().unwrap();
+                ChunkManager::flush_file_vma(&vma);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn msync_by_file(&self, sync_file: &FileRef) {
+        let current = current!();
+        let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
+        let is_same_file = |file: &FileRef| -> bool { file == sync_file };
+        process_mem_chunks
+            .iter()
+            .for_each(|chunk| match chunk.internal() {
+                ChunkType::MultiVMA(manager) => {
+                    manager
+                        .lock()
+                        .unwrap()
+                        .chunk_manager()
+                        .msync_by_file(sync_file);
+                }
+                ChunkType::SingleVMA(vma) => {
+                    ChunkManager::flush_file_vma_with_cond(&vma.lock().unwrap(), is_same_file);
+                }
+            });
+    }
+
+    pub fn mremap(&self, options: &VMRemapOptions) -> Result<usize> {
+        return_errno!(ENOSYS, "Under development");
+    }
+
+    // When process is exiting, free all owned chunks
+    pub fn free_chunks_when_exit(&self, thread: &ThreadRef) {
+        let mut internal_manager = self.internal();
+        let mut mem_chunks = thread.vm().mem_chunks().write().unwrap();
+
+        mem_chunks.iter().for_each(|chunk| {
+            internal_manager.munmap_chunk(&chunk, None);
+        });
+        mem_chunks.clear();
+
+        debug_assert!(mem_chunks.len() == 0);
     }
 }
 
-impl Drop for VMManager {
-    fn drop(&mut self) {
-        // Ensure that memory permissions are recovered
-        for vma in &self.vmas {
-            if vma.size() == 0 || vma.perms() == VMPerms::default() {
-                continue;
-            }
-            Self::apply_perms(vma, VMPerms::default());
+// Modification on this structure must aquire the global lock.
+// TODO: Enable fast_default_chunks for faster chunk allocation
+#[derive(Debug)]
+pub struct InternalVMManager {
+    chunks: BTreeSet<ChunkRef>, // track in-use chunks, use B-Tree for better performance and simplicity (compared with red-black tree)
+    fast_default_chunks: Vec<ChunkRef>, // empty default chunks
+    free_manager: VMFreeSpaceManager,
+}
+
+impl InternalVMManager {
+    pub fn init(vm_range: VMRange) -> Self {
+        let chunks = BTreeSet::new();
+        let fast_default_chunks = Vec::new();
+        let free_manager = VMFreeSpaceManager::new(vm_range);
+        Self {
+            chunks,
+            fast_default_chunks,
+            free_manager,
         }
+    }
+
+    // Allocate a new chunk with default size
+    pub fn mmap_chunk_default(&mut self, addr: VMMapAddr) -> Result<ChunkRef> {
+        // Find a free range from free_manager
+        let free_range = self.find_free_gaps(CHUNK_DEFAULT_SIZE, PAGE_SIZE, addr)?;
+
+        // Add this range to chunks
+        let chunk = Arc::new(Chunk::new_default_chunk(free_range)?);
+        trace!("allocate a default chunk = {:?}", chunk);
+        self.chunks.insert(chunk.clone());
+        Ok(chunk)
+    }
+
+    // Allocate a chunk with single vma
+    pub fn mmap_chunk(&mut self, options: &VMMapOptions) -> Result<ChunkRef> {
+        let addr = *options.addr();
+        let size = *options.size();
+        let align = *options.align();
+        let free_range = self.find_free_gaps(size, align, addr)?;
+        let chunk = Arc::new(Chunk::new_single_vma_chunk(free_range, options));
+        trace!("allocate a new single vma chunk: {:?}", chunk);
+        self.chunks.insert(chunk.clone());
+        Ok(chunk)
+    }
+
+    // Munmap a chunk
+    // For Single VMA chunk, a part of the chunk could be munmapped if munmap_range is specified.
+    pub fn munmap_chunk(&mut self, chunk: &ChunkRef, munmap_range: Option<&VMRange>) -> Result<()> {
+        trace!(
+            "munmap_chunk range = {:?}, munmap_range = {:?}",
+            chunk.range(),
+            munmap_range
+        );
+        let vma = match chunk.internal() {
+            ChunkType::MultiVMA(manager) => {
+                let mut manager = manager.lock().unwrap();
+                let is_cleaned = manager.clean_multi_vmas();
+                // If the manager is cleaned, there is only one process using this chunk. Thus it can be freed safely.
+                // If the manager is not cleaned, there is at least another process which is using this chunk. Don't free it here.
+                if is_cleaned {
+                    self.free_chunk(chunk)?;
+                }
+                return Ok(());
+            }
+            ChunkType::SingleVMA(vma) => vma,
+        };
+
+        let munmap_range = {
+            if munmap_range.is_none() {
+                chunk.range()
+            } else {
+                munmap_range.unwrap()
+            }
+        };
+        debug_assert!(chunk.range().is_superset_of(munmap_range));
+
+        let mut vma = vma.lock().unwrap();
+        debug_assert!(chunk.range() == vma.range());
+        let intersection_vma = match vma.intersect(munmap_range) {
+            Some(intersection_vma) => intersection_vma,
+            _ => unreachable!(),
+        };
+
+        // File-backed VMA needs to be flushed upon munmap
+        ChunkManager::flush_file_vma(&intersection_vma);
+
+        // Reset memory permissions
+        if !&intersection_vma.perms().is_default() {
+            VMPerms::apply_perms(&intersection_vma, VMPerms::default());
+        }
+
+        // Reset to zero
+        unsafe {
+            let buf = intersection_vma.as_slice_mut();
+            buf.iter_mut().for_each(|b| *b = 0)
+        }
+
+        let mut new_vmas = vma.subtract(&intersection_vma);
+        let current = current!();
+        // Release lock in chunk before getting lock for process mem_chunks to avoid deadlock
+        drop(vma);
+
+        match new_vmas.len() {
+            0 => {
+                // Exact size
+                self.free_chunk(&chunk);
+                if current.status() != ThreadStatus::Exited {
+                    // If the current thread is exiting, there is no need to remove the chunk from process' mem_list.
+                    // It will be drained.
+                    current.vm().remove_mem_chunk(&chunk);
+                }
+            }
+            1 => {
+                // Update the current vma to the new vma
+                let updated_vma = new_vmas.pop().unwrap();
+                self.update_single_vma_chunk(&current, &chunk, updated_vma);
+
+                // Return the intersection range to free list
+                self.free_manager
+                    .add_range_back_to_free_manager(intersection_vma.range());
+            }
+            2 => {
+                // single vma => (updated_vma, munmapped_vma, new_vma)
+                self.free_manager
+                    .add_range_back_to_free_manager(intersection_vma.range());
+
+                let new_vma = new_vmas.pop().unwrap();
+                let new_vma_chunk = Arc::new(Chunk::new_chunk_with_vma(new_vma));
+                self.chunks.insert(new_vma_chunk.clone());
+                current.vm().add_mem_chunk(new_vma_chunk);
+
+                let updated_vma = new_vmas.pop().unwrap();
+                self.update_single_vma_chunk(&current, &chunk, updated_vma);
+            }
+            _ => unreachable!(),
+        }
+        Ok(())
+    }
+
+    fn update_single_vma_chunk(
+        &mut self,
+        current_thread: &ThreadRef,
+        old_chunk: &ChunkRef,
+        new_vma: VMArea,
+    ) {
+        let new_chunk = Arc::new(Chunk::new_chunk_with_vma(new_vma));
+        current_thread
+            .vm()
+            .replace_mem_chunk(old_chunk, new_chunk.clone());
+        self.chunks.remove(old_chunk);
+        self.chunks.insert(new_chunk);
+    }
+
+    pub fn mprotect_single_vma_chunk(
+        &mut self,
+        chunk: &ChunkRef,
+        protect_range: VMRange,
+        new_perms: VMPerms,
+    ) -> Result<()> {
+        let vma = match chunk.internal() {
+            ChunkType::MultiVMA(_) => {
+                unreachable!();
+            }
+            ChunkType::SingleVMA(vma) => vma,
+        };
+
+        let mut updated_vmas = {
+            let mut containing_vma = vma.lock().unwrap();
+            trace!(
+                "mprotect_single_vma_chunk range = {:?}, mprotect_range = {:?}",
+                chunk.range(),
+                protect_range
+            );
+            debug_assert!(chunk.range() == containing_vma.range());
+
+            if containing_vma.perms() == new_perms {
+                return Ok(());
+            }
+
+            let same_start = protect_range.start() == containing_vma.start();
+            let same_end = protect_range.end() == containing_vma.end();
+            match (same_start, same_end) {
+                (true, true) => {
+                    // Exact the same vma
+                    containing_vma.set_perms(new_perms);
+                    VMPerms::apply_perms(&containing_vma, containing_vma.perms());
+                    return Ok(());
+                }
+                (false, false) => {
+                    // The containing VMA is divided into three VMAs:
+                    // Shrinked old VMA:    [containing_vma.start,     protect_range.start)
+                    // New VMA:             [protect_range.start,      protect_range.end)
+                    // remaining old VMA:     [protect_range.end,        containing_vma.end)
+
+                    let old_end = containing_vma.end();
+                    let old_perms = containing_vma.perms();
+
+                    containing_vma.set_end(protect_range.start());
+
+                    let new_vma = VMArea::inherits_file_from(
+                        &containing_vma,
+                        protect_range,
+                        new_perms,
+                        DUMMY_CHUNK_PROCESS_ID,
+                    );
+                    VMPerms::apply_perms(&new_vma, new_vma.perms());
+
+                    let remaining_old_vma = {
+                        let range = VMRange::new(protect_range.end(), old_end).unwrap();
+                        VMArea::inherits_file_from(
+                            &containing_vma,
+                            range,
+                            old_perms,
+                            DUMMY_CHUNK_PROCESS_ID,
+                        )
+                    };
+
+                    let updated_vmas = vec![containing_vma.clone(), new_vma, remaining_old_vma];
+                    updated_vmas
+                }
+                _ => {
+                    if same_start {
+                        // Protect range is at left side of the cotaining vma
+                        containing_vma.set_start(protect_range.end());
+                    } else {
+                        // Protect range is at right side of the cotaining vma
+                        containing_vma.set_end(protect_range.start());
+                    }
+
+                    let new_vma = VMArea::inherits_file_from(
+                        &containing_vma,
+                        protect_range,
+                        new_perms,
+                        DUMMY_CHUNK_PROCESS_ID,
+                    );
+                    VMPerms::apply_perms(&new_vma, new_vma.perms());
+
+                    let updated_vmas = vec![containing_vma.clone(), new_vma];
+                    updated_vmas
+                }
+            }
+        };
+
+        let current = current!();
+        while updated_vmas.len() > 1 {
+            let vma = updated_vmas.pop().unwrap();
+            self.add_new_chunk(&current, vma);
+        }
+
+        debug_assert!(updated_vmas.len() == 1);
+        let vma = updated_vmas.pop().unwrap();
+        self.update_single_vma_chunk(&current, &chunk, vma);
+
+        Ok(())
+    }
+
+    fn add_new_chunk(&mut self, current_thread: &ThreadRef, new_vma: VMArea) {
+        let new_vma_chunk = Arc::new(Chunk::new_chunk_with_vma(new_vma));
+        self.chunks.insert(new_vma_chunk.clone());
+        current_thread.vm().add_mem_chunk(new_vma_chunk);
+    }
+
+    pub fn free_chunk(&mut self, chunk: &ChunkRef) -> Result<()> {
+        let range = chunk.range();
+        // Remove from chunks
+        self.chunks.remove(chunk);
+
+        // Add range back to freespace manager
+        self.free_manager.add_range_back_to_free_manager(range);
+        Ok(())
+    }
+
+    pub fn find_free_gaps(
+        &mut self,
+        size: usize,
+        align: usize,
+        addr: VMMapAddr,
+    ) -> Result<VMRange> {
+        return self
+            .free_manager
+            .find_free_range_internal(size, align, addr);
     }
 }
