@@ -72,7 +72,12 @@ impl File for PipeReader {
     }
 
     fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
-        async_io::match_ioctl_cmd_auto_error!(cmd, {});
+        async_io::match_ioctl_cmd_auto_error!(cmd, {
+            cmd : GetReadBufLen => {
+                let read_buf_len = self.consumer.ready_len();
+                cmd.set_output(read_buf_len as _);
+            },
+        });
         Ok(())
     }
 }

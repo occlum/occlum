@@ -43,6 +43,10 @@ impl_ioctl_nums_and_cmds! {
     TIOCNOTTY => (0x5422, ()),
     // Get the number of bytes in the input buffer
     FIONREAD => (0x541B, mut i32),
+    // Don't close on exec
+    FIONCLEX => (0x5450, ()),
+    // Set close on exec
+    FIOCLEX => (0x5451, ()),
     // Low-level access to Linux network devices on man7/netdevice.7
     // Only non-privileged operations are supported for now
     SIOCGIFNAME => (0x8910, mut IfReq),
@@ -85,6 +89,8 @@ impl<'a> IoctlRawCmd<'a> {
             }
             IoctlRawCmd::FIONBIO(non_blocking) => Box::new(SetNonBlocking::new(**non_blocking)),
             IoctlRawCmd::FIONREAD(_) => Box::new(GetReadBufLen::new(())),
+            IoctlRawCmd::FIONCLEX(_) => Box::new(SetCloseOnExec::new(false)),
+            IoctlRawCmd::FIOCLEX(_) => Box::new(SetCloseOnExec::new(true)),
             IoctlRawCmd::SIOCGIFCONF(ifconf_mut) => {
                 if !ifconf_mut.ifc_buf.is_null() {
                     if ifconf_mut.ifc_len < 0 {
@@ -161,8 +167,18 @@ impl<'a> IoctlRawCmd<'a> {
 
 pub fn do_ioctl(fd: FileDesc, raw_cmd: &mut IoctlRawCmd) -> Result<i32> {
     debug!("ioctl: fd: {}, cmd: {:?}", fd, raw_cmd);
-    let file_ref = current!().file(fd)?;
+    let current = current!();
+    let file_ref = current.file(fd)?;
     let mut cmd = raw_cmd.to_safe_ioctlcmd()?;
+
+    if cmd.is::<SetCloseOnExec>() {
+        let is_close_on_exec = cmd.downcast_ref::<SetCloseOnExec>().unwrap().input();
+        let mut file_table = current.files().lock().unwrap();
+        let entry = file_table.get_entry_mut(fd)?;
+        entry.set_close_on_spawn(*is_close_on_exec);
+        return Ok(0);
+    }
+
     file_ref.ioctl(cmd.as_mut())?;
     raw_cmd.copy_output_from_safe(cmd.as_ref());
     Ok(0)

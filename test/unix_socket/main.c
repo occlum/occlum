@@ -2,6 +2,7 @@
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/ioctl.h>
 #include <poll.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -263,12 +264,64 @@ int test_getname() {
     return 0;
 }
 
+int test_ioctl_fionread() {
+    int ret = 0;
+    int sockets[2];
+    ret = socketpair(AF_UNIX, SOCK_STREAM, 0, sockets);
+    if (ret < 0) {
+        THROW_ERROR("failed to create a unix socket");
+    }
+
+    const char *child_prog = "/bin/hello_world";
+    const char *child_argv[3] = { child_prog, ECHO_MSG, NULL };
+    int child_pid;
+    posix_spawn_file_actions_t file_actions;
+
+    posix_spawn_file_actions_init(&file_actions);
+    posix_spawn_file_actions_adddup2(&file_actions, sockets[0], STDOUT_FILENO);
+    posix_spawn_file_actions_addclose(&file_actions, sockets[1]);
+
+    if (posix_spawn(&child_pid, child_prog, &file_actions,
+                    NULL, (char *const *)child_argv, NULL) < 0) {
+        THROW_ERROR("failed to spawn a child process");
+    }
+
+    int status = 0;
+    if (wait4(child_pid, &status, 0, NULL) < 0) {
+        THROW_ERROR("failed to wait4 the child process");
+    }
+
+    // data should be ready
+    int data_len_ready = 0;
+    if (ioctl(sockets[1], FIONREAD, &data_len_ready) < 0) {
+        THROW_ERROR("failed to ioctl with FIONREAD option");
+    }
+
+    printf("data_len_ready = %d\n", data_len_ready);
+
+    // data_len_ready will include '\0'
+    // If the system has limited resources, this len might not be updated here. And will only be updated in read syscall.
+    if (data_len_ready - 1 != strlen(ECHO_MSG)) {
+        printf("warning: ioctl FIONREAD value not match\n");
+    }
+
+    char actual_str[32] = {0};
+    read(sockets[1], actual_str, 32);
+    if (strncmp(actual_str, ECHO_MSG, sizeof(ECHO_MSG) - 1) != 0) {
+        printf("data read is :%s\n", actual_str);
+        THROW_ERROR("received string is not as expected");
+    }
+
+    return 0;
+}
+
 static test_case_t test_cases[] = {
     TEST_CASE(test_unix_socket_inter_process),
     TEST_CASE(test_socketpair_inter_process),
     TEST_CASE(test_multiple_socketpairs),
     TEST_CASE(test_poll),
     TEST_CASE(test_getname),
+    TEST_CASE(test_ioctl_fionread),
 };
 
 int main(int argc, const char *argv[]) {

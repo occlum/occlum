@@ -255,6 +255,13 @@ impl Consumer {
             peer_end.pollee().add_events(Events::OUT);
         }
     }
+
+    // Get the length of data stored in the buffer
+    pub fn ready_len(&self) -> usize {
+        let this_end = self.this_end();
+        let rb = this_end.ringbuf();
+        rb.len()
+    }
 }
 
 impl File for Consumer {
