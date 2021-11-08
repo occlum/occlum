@@ -5,14 +5,20 @@ use super::fspath::FsPathInner;
 
 #[derive(Debug, Clone)]
 pub struct FsView {
+    root: String,
     cwd: String,
 }
 
 impl FsView {
     pub fn new() -> FsView {
-        Self {
-            cwd: "/".to_owned(),
-        }
+        let root = String::from("/");
+        let cwd = root.clone();
+        Self { root, cwd }
+    }
+
+    /// Get the root directory
+    pub fn root(&self) -> &str {
+        &self.root
     }
 
     /// Get the current working directory.
@@ -293,9 +299,7 @@ impl FsView {
 
 impl Default for FsView {
     fn default() -> Self {
-        Self {
-            cwd: "/".to_owned(),
-        }
+        Self::new()
     }
 }
 
