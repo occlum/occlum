@@ -1,9 +1,9 @@
 use super::*;
 
-pub fn do_fallocate(fd: FileDesc, mode: u32, offset: u64, len: u64) -> Result<()> {
+pub fn do_fallocate(fd: FileDesc, flags: FallocateFlags, offset: usize, len: usize) -> Result<()> {
     debug!(
-        "fallocate: fd: {}, mode: {}, offset: {}, len: {}",
-        fd, mode, offset, len
+        "fallocate: fd: {}, flags: {:?}, offset: {}, len: {}",
+        fd, flags, offset, len
     );
     let file_ref = current!().file(fd)?;
     let inode_file = file_ref
@@ -12,6 +12,7 @@ pub fn do_fallocate(fd: FileDesc, mode: u32, offset: u64, len: u64) -> Result<()
     if !inode_file.access_mode().writable() {
         return_errno!(EBADF, "File is not opened for writing");
     }
-    inode_file.inode().fallocate(mode, offset, len)?;
+    let mode = FallocateMode::from(flags);
+    inode_file.inode().fallocate(&mode, offset, len)?;
     Ok(())
 }

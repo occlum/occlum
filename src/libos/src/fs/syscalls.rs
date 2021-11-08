@@ -1,6 +1,4 @@
 use super::file_ops::{
-    /* AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath, LinkFlags,
-    StatFlags, UnlinkFlags, AT_FDCWD, */
     self, AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, IoctlRawCmd,
     LinkFlags, UnlinkFlags,
 };
@@ -586,12 +584,8 @@ pub async fn do_fallocate(fd: FileDesc, mode: u32, offset: off_t, len: off_t) ->
             "offset was less than 0, or len was less than or equal to 0"
         );
     }
-    // Current implementation is just the posix_fallocate
-    // TODO: Support more modes in fallocate
-    if mode != 0 {
-        return_errno!(ENOSYS, "unsupported mode");
-    }
-    file_ops::do_fallocate(fd, mode, offset as u64, len as u64)?;
+    let flags = FallocateFlags::from_u32(mode)?;
+    file_ops::do_fallocate(fd, flags, offset as usize, len as usize)?;
     Ok(0)
 }
 

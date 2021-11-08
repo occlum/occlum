@@ -1,11 +1,13 @@
+mod fallocate_flags;
 mod file_mode;
 mod stat_buf;
 
 pub use rcore_fs::vfs::{
-    DirentWriter, DirentWriterContext, FileSystem, FileType, FsError, FsInfo, INode, Metadata,
-    Timespec, PATH_MAX,
+    DirentWriter, DirentWriterContext, FallocateMode, FileSystem, FileType, FsError, FsInfo, INode,
+    Metadata, Timespec, PATH_MAX,
 };
 
+pub use self::fallocate_flags::FallocateFlags;
 pub use self::file_mode::FileMode;
 pub use self::stat_buf::{StatBuf, StatFlags, StatMode};
 
