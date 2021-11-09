@@ -1,19 +1,17 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
-#include <dirent.h>
 #include <stdbool.h>
 #include <errno.h>
 #include <fcntl.h>
 #include "test_fs.h"
 
 // ============================================================================
-// Helper function
+// The test case of readdir
 // ============================================================================
 
-#define NUM 9
-static bool check_dir_entries(char entries[][256], int entry_cnt) {
-    char *expected_entries[NUM] = {
+static int test_readdir() {
+    char expected_entries[9][NAME_MAX] = {
         "bin",
         "dev",
         "host",
@@ -24,52 +22,10 @@ static bool check_dir_entries(char entries[][256], int entry_cnt) {
         "root",
         "tmp",
     };
-    for (int i = 0; i < NUM; i++) {
-        bool find_entry = false;
-        for (int j = 0; j < entry_cnt; j++) {
-            if (strncmp(expected_entries[i], entries[j], strlen(expected_entries[i])) == 0) {
-                find_entry = true;
-                break;
-            }
-        }
-        if (!find_entry) {
-            return false;
-        }
-    }
-    return true;
-}
 
-// ============================================================================
-// The test case of readdir
-// ============================================================================
-
-static int test_readdir() {
-    struct dirent *dp;
-    DIR *dirp;
-    char entries[32][256] = { 0 };
-
-    dirp = opendir("/");
-    if (dirp == NULL) {
-        THROW_ERROR("failed to open directory");
-    }
-    int entry_cnt = 0;
-    while (1) {
-        errno = 0;
-        dp = readdir(dirp);
-        if (dp == NULL) {
-            if (errno != 0) {
-                closedir(dirp);
-                THROW_ERROR("failed to call readdir");
-            }
-            break;
-        }
-        strncpy(entries[entry_cnt], dp->d_name, 256);
-        ++entry_cnt;
-    }
-    if (!check_dir_entries(entries, entry_cnt)) {
+    if (check_readdir_with_expected_entries("/", expected_entries, 9) < 0) {
         THROW_ERROR("failed to check the result of readdir");
     }
-    closedir(dirp);
     return 0;
 }
 

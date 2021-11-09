@@ -6,6 +6,8 @@
 #include <string.h>
 #include <libgen.h>
 #include <unistd.h>
+#include <dirent.h>
+#include <stdbool.h>
 #include "test.h"
 
 int fs_split_path(const char *path, char *dir_buf, char **dir_name, char *base_buf,
@@ -90,6 +92,58 @@ int check_file_with_repeated_bytes(int fd, size_t len, int expected_byte_val) {
             THROW_ERROR("Incorrect data");
         }
     }
+    return 0;
+}
+
+bool check_dir_entries(char entries[][NAME_MAX], int entry_cnt,
+                       char expected_entries[][NAME_MAX], int expected_cnt) {
+    for (int i = 0; i < expected_cnt; i++) {
+        bool found = false;
+        for (int j = 0; j < entry_cnt; j++) {
+            if (strncmp(expected_entries[i], entries[j], strlen(expected_entries[i])) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            printf("can't find: %s\n", expected_entries[i]);
+            return false;
+        }
+    }
+    return true;
+}
+
+int check_readdir_with_expected_entries(const char *dir_path,
+                                        char expected_entries[][NAME_MAX],
+                                        int expected_cnt) {
+    struct dirent *dp;
+    DIR *dirp;
+    char entries[128][NAME_MAX] = { 0 };
+
+    dirp = opendir(dir_path);
+    if (dirp == NULL) {
+        THROW_ERROR("failed to open directory");
+    }
+
+    int entry_cnt = 0;
+    while (1) {
+        errno = 0;
+        dp = readdir(dirp);
+        if (dp == NULL) {
+            if (errno != 0) {
+                THROW_ERROR("failed to call readdir");
+            }
+            break;
+        }
+        memcpy(entries[entry_cnt], dp->d_name, strlen(dp->d_name));
+        ++entry_cnt;
+    }
+
+    if (!check_dir_entries(entries, entry_cnt, expected_entries, expected_cnt)) {
+        THROW_ERROR("failed to check the result of readdir");
+    }
+
+    closedir(dirp);
     return 0;
 }
 
