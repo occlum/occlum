@@ -3,35 +3,56 @@ use super::{FileType, Metadata, Timespec};
 #[repr(C)]
 pub struct StatBuf {
     /// ID of device containing file
-    dev: u64,
+    pub dev: u64,
     /// inode number
-    ino: u64,
+    pub ino: u64,
     /// number of hard links
-    nlink: u64,
+    pub nlink: u64,
 
     /// file type and mode
-    mode: StatMode,
+    pub mode: StatMode,
     /// user ID of owner
-    uid: u32,
+    pub uid: u32,
     /// group ID of owner
-    gid: u32,
+    pub gid: u32,
     /// padding
-    _pad0: u32,
+    pub _pad0: u32,
     /// device ID (if special file)
-    rdev: u64,
+    pub rdev: u64,
     /// total size, in bytes
-    size: u64,
+    pub size: u64,
     /// blocksize for filesystem I/O
-    blksize: u64,
+    pub blksize: u64,
     /// number of 512B blocks allocated
-    blocks: u64,
+    pub blocks: u64,
 
     /// last access time
-    atime: Timespec,
+    pub atime: Timespec,
     /// last modification time
-    mtime: Timespec,
+    pub mtime: Timespec,
     /// last status change time
-    ctime: Timespec,
+    pub ctime: Timespec,
+}
+
+impl Default for StatBuf {
+    fn default() -> Self {
+        Self {
+            dev: 0,
+            ino: 0,
+            mode: StatMode::NULL,
+            nlink: 0,
+            uid: 0,
+            gid: 0,
+            rdev: 0,
+            size: 0,
+            blksize: 0,
+            blocks: 0,
+            atime: Timespec { sec: 0, nsec: 0 },
+            mtime: Timespec { sec: 0, nsec: 0 },
+            ctime: Timespec { sec: 0, nsec: 0 },
+            _pad0: 0,
+        }
+    }
 }
 
 impl From<Metadata> for StatBuf {
@@ -39,7 +60,7 @@ impl From<Metadata> for StatBuf {
         StatBuf {
             dev: info.dev as u64,
             ino: info.inode as u64,
-            mode: StatMode::from_type_mode(info.type_, info.mode as u16),
+            mode: StatMode::from_type_and_mode(info.type_, info.mode),
             nlink: info.nlinks as u64,
             uid: info.uid as u32,
             gid: info.gid as u32,
@@ -110,7 +131,7 @@ bitflags::bitflags! {
 }
 
 impl StatMode {
-    fn from_type_mode(type_: FileType, mode: u16) -> Self {
+    pub fn from_type_and_mode(type_: FileType, mode: u16) -> Self {
         let type_ = match type_ {
             FileType::File => StatMode::FILE,
             FileType::Dir => StatMode::DIR,

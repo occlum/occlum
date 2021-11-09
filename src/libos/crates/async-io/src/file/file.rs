@@ -10,6 +10,7 @@ use inherit_methods_macro::inherit_methods;
 
 use crate::event::{Events, Observer, Pollee, Poller};
 use crate::file::{AccessMode, StatusFlags};
+use crate::fs::StatBuf;
 use crate::ioctl::IoctlCmd;
 use crate::prelude::*;
 
@@ -70,6 +71,10 @@ pub trait File: Debug + Sync + Send {
 
     fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
         return_errno!(ENOSYS, "not support setting status flags");
+    }
+
+    fn stat(&self) -> StatBuf {
+        Default::default()
     }
 }
 
@@ -211,6 +216,7 @@ impl<F: File + ?Sized> Async<F> {
     pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()>;
     pub fn access_mode(&self) -> AccessMode;
     pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()>;
+    pub fn stat(&self) -> StatBuf;
 }
 
 impl<F: ?Sized + std::fmt::Debug> std::fmt::Debug for Async<F> {
