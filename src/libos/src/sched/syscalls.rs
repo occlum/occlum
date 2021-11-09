@@ -11,7 +11,7 @@ pub async fn do_sched_yield() -> Result<isize> {
 pub async fn do_sched_getaffinity(pid: pid_t, buf_size: size_t, buf_ptr: *mut u8) -> Result<isize> {
     // Construct safe Rust types
     let buf_size = {
-        if buf_size * 8 < AVAIL_CPUSET.cpu_count() {
+        if buf_size < CpuSet::len() {
             return_errno!(EINVAL, "buf size is not big enough");
         }
 
@@ -39,7 +39,7 @@ pub async fn do_sched_setaffinity(
 ) -> Result<isize> {
     // Convert unsafe C types into safe Rust types
     let buf_size = {
-        if buf_size * 8 < AVAIL_CPUSET.cpu_count() {
+        if buf_size < CpuSet::len() {
             return_errno!(EINVAL, "buf size is not big enough");
         }
         CpuSet::len()
