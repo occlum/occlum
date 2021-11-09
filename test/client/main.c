@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -92,6 +93,39 @@ int client_sendmsg(int server_fd, char *buf) {
     return ret;
 }
 
+#ifdef __GLIBC__
+
+int client_sendmmsg(int server_fd, char *buf) {
+    int ret = 0;
+    struct mmsghdr msg_v[2] = {};
+    struct iovec iov[1];
+    struct msghdr *msg_ptr = &msg_v[0].msg_hdr;
+
+    // Set msg0
+    msg_ptr->msg_name = NULL;
+    msg_ptr->msg_namelen = 0;
+    iov[0].iov_base = buf;
+    iov[0].iov_len = strlen(buf);
+    msg_ptr->msg_iov = iov;
+    msg_ptr->msg_iovlen = 1;
+    msg_ptr->msg_control = 0;
+    msg_ptr->msg_controllen = 0;
+    msg_ptr->msg_flags = 0;
+
+    // Set msg1
+    msg_v[1] = msg_v[0];
+    msg_ptr = &msg_v[1].msg_hdr;
+    msg_ptr->msg_iov = NULL;
+    msg_ptr->msg_iovlen = 0;
+
+    ret = sendmmsg(server_fd, msg_v,  2, 0);
+    if (ret != 2 || msg_v[0].msg_len <= 0 || msg_v[1].msg_len != 0) {
+        THROW_ERROR("sendmsg failed");
+    }
+    return 0;
+}
+#endif
+
 int client_connectionless_sendmsg(char *buf) {
     int ret = 0;
     struct msghdr msg;
@@ -148,7 +182,13 @@ int main(int argc, const char *argv[]) {
             neogotiate_msg(server_fd, buf, buf_size);
             ret = client_sendmsg(server_fd, buf);
             break;
+#ifdef __GLIBC__
         case 8803:
+            neogotiate_msg(server_fd, buf, buf_size);
+            ret = client_sendmmsg(server_fd, buf);
+            break;
+#endif
+        case 8804:
             if (argc < 4) {
                 THROW_ERROR("should specify sync fd\n");
             }

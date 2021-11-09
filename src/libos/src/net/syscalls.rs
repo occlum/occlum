@@ -14,6 +14,13 @@ use crate::fs::StatusFlags;
 use crate::prelude::*;
 use crate::util::mem_util::from_user;
 
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct mmsghdr {
+    pub msg_hdr: libc::msghdr,
+    pub msg_len: c_uint,
+}
+
 pub async fn do_socket(domain: c_int, type_and_flags: c_int, protocol: c_int) -> Result<isize> {
     // Check arguments
     let domain = Domain::try_from(domain)
@@ -114,7 +121,7 @@ pub async fn do_listen(fd: c_int, backlog: c_int) -> Result<isize> {
     let file_ref = current!().file(fd as FileDesc)?;
     let socket_file = file_ref
         .as_socket_file()
-        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+        .ok_or_else(|| errno!(ENOTSOCK, "not a socket"))?;
     socket_file.listen(backlog as u32)?;
     Ok(0)
 }
@@ -127,7 +134,7 @@ pub async fn do_connect(
     let file_ref = current!().file(fd as FileDesc)?;
     let socket_file = file_ref
         .as_socket_file()
-        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+        .ok_or_else(|| errno!(ENOTSOCK, "not a socket"))?;
 
     let addr = {
         let addr_len = addr_len as usize;
@@ -156,7 +163,7 @@ pub async fn do_accept4(
     let file_ref = current!().file(fd as FileDesc)?;
     let socket_file = file_ref
         .as_socket_file()
-        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+        .ok_or_else(|| errno!(ENOTSOCK, "not a socket"))?;
 
     // Process other input arguments
     let addr_and_addr_len = get_slice_from_sock_addr_ptr_mut(addr, addr_len)?;
@@ -191,7 +198,7 @@ pub async fn do_sendto(
     let file_ref = current!().file(fd as FileDesc)?;
     let socket_file = file_ref
         .as_socket_file()
-        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+        .ok_or_else(|| errno!(ENOTSOCK, "not a socket"))?;
 
     let buf = from_user::make_slice(base as *const u8, len as usize)?;
     let flags = SendFlags::from_bits_truncate(flags);
@@ -230,7 +237,7 @@ pub async fn do_recvfrom(
     let file_ref = current!().file(fd as FileDesc)?;
     let socket_file = file_ref
         .as_socket_file()
-        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+        .ok_or_else(|| errno!(ENOTSOCK, "not a socket"))?;
 
     let mut buf = from_user::make_mut_slice(base as *mut u8, len as usize)?;
     let flags = RecvFlags::from_bits_truncate(flags);
@@ -256,7 +263,7 @@ pub async fn do_sendmsg(fd: c_int, msg_ptr: *const libc::msghdr, flags: c_int) -
     let file_ref = current!().file(fd as FileDesc)?;
     let socket_file = file_ref
         .as_socket_file()
-        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+        .ok_or_else(|| errno!(ENOTSOCK, "not a socket"))?;
 
     let (addr, bufs) = extract_msghdr_from_user(msg_ptr)?;
     let flags = SendFlags::from_bits_truncate(flags);
@@ -276,7 +283,7 @@ pub async fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut libc::msghdr, flags: c_int)
     let file_ref = current!().file(fd as FileDesc)?;
     let socket_file = file_ref
         .as_socket_file()
-        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+        .ok_or_else(|| errno!(ENOTSOCK, "not a socket"))?;
 
     let (mut msg, mut addr, mut bufs) = extract_msghdr_mut_from_user(msg_mut_ptr)?;
     let flags = RecvFlags::from_bits_truncate(flags);
@@ -291,6 +298,48 @@ pub async fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut libc::msghdr, flags: c_int)
     }
 
     Ok(bytes_recv as isize)
+}
+
+pub async fn do_sendmmsg(
+    fd: c_int,
+    msgvec_ptr: *mut mmsghdr,
+    vlen: c_uint,
+    flags_c: c_int,
+) -> Result<isize> {
+    debug!(
+        "sendmmsg: fd: {}, msg: {:?}, flags: 0x{:x}",
+        fd, msgvec_ptr, flags_c
+    );
+
+    from_user::check_ptr(msgvec_ptr)?;
+
+    let mut msgvec = unsafe { std::slice::from_raw_parts_mut(msgvec_ptr, vlen as usize) };
+    let flags = SendFlags::from_bits_truncate(flags_c);
+    let file_ref = current!().file(fd as FileDesc)?;
+    let socket_file = file_ref
+        .as_socket_file()
+        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+
+    let mut send_count = 0;
+    for mmsg in (msgvec) {
+        let (addr, bufs) = extract_msghdr_from_user(&mmsg.msg_hdr)?;
+
+        if socket_file
+            .sendmsg(&bufs[..], addr, flags)
+            .await
+            .map(|bytes_send| {
+                mmsg.msg_len += bytes_send as c_uint;
+                bytes_send as isize
+            })
+            .is_ok()
+        {
+            send_count += 1;
+        } else {
+            break;
+        }
+    }
+
+    Ok(send_count as isize)
 }
 
 pub async fn do_getpeername(

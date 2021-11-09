@@ -32,8 +32,8 @@ use crate::fs::{
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t, RandFlags};
 use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_getpeername, do_getsockname, do_getsockopt,
-    do_listen, do_recvfrom, do_recvmsg, do_sendmsg, do_sendto, do_setsockopt, do_shutdown,
-    do_socket, do_socketpair,
+    do_listen, do_recvfrom, do_recvmsg, do_sendmmsg, do_sendmsg, do_sendto, do_setsockopt,
+    do_shutdown, do_socket, do_socketpair, mmsghdr,
 };
 /*
 use crate::net::{
@@ -282,6 +282,7 @@ macro_rules! process_syscall_table_with_callback {
             (EpollWait = 232) => do_epoll_wait(epfd: c_int, events: *mut libc::epoll_event, maxevents: c_int, timeout: c_int),
             (EpollCtl = 233) => do_epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *const libc::epoll_event),
             (EpollPwait = 281) => do_epoll_pwait(epfd: c_int, events: *mut libc::epoll_event, maxevents: c_int, timeout: c_int, sigmask: *const usize),
+            (Sendmmsg = 307) => do_sendmmsg(fd: c_int, msg_ptr: *mut mmsghdr, vlen: c_uint, flags_c: c_int),
 
             /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),
