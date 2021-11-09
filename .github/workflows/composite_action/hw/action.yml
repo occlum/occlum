@@ -1,0 +1,59 @@
+name: 'Occlum HW composite action'
+description: 'Occlum HW mode container run and source build/install'
+inputs:
+  container-name:
+    description: 'Occlum container name'
+    required: true
+  build-envs:
+    description: 'Occlum build environments'
+    required: false
+    default: 'OCCLUM_RELEASE_BUILD=1'
+  os:
+    description: 'Occlum docker image base OS'
+    required: false
+    default: 'ubuntu18.04'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Print info
+      run: echo Occlum build environment ${{ inputs.build-envs }}
+      shell: bash
+
+    - name: Get Occlum version
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+      shell: bash
+
+    - name: Create container
+      run: |
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          docker run -itd --name=${{ inputs.container-name }} --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }};
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          docker run -itd --name=${{ inputs.container-name }} --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }};
+        else
+          echo "Unsupported Hardware"
+        fi;
+      shell: bash
+
+    - name: Update PCCS server
+      run: docker exec ${{ inputs.container-name }} bash -c "sed -r -i 's/PCCS_URL=https:\/\/localhost:8081\/sgx\/certification\/v3\//PCCS_URL=https:\/\/sgx-dcap-server.cn-shanghai.aliyuncs.com\/sgx\/certification\/v3\//g' /etc/sgx_default_qcnl.conf"
+      shell: bash
+
+    - name: Change download source of crates.io
+      run: |
+        docker exec ${{ inputs.container-name }} bash -c "cat <<- EOF >/root/.cargo/config
+        [source.crates-io]
+        registry = \"https://github.com/rust-lang/crates.io-index\"
+        replace-with = 'ustc'
+        [source.ustc]
+        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+        EOF"
+      shell: bash
+
+    - name: Build dependencies
+      run: docker exec ${{ inputs.container-name }} bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
+      shell: bash
+
+    - name: Build source
+      run: docker exec ${{ inputs.container-name }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; ${{ inputs.build-envs}} make install"
+      shell: bash
