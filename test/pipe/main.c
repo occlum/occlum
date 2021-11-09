@@ -28,6 +28,23 @@ static void free_pipe(int *pipe) {
 // ============================================================================
 // Test cases
 // ============================================================================
+int test_fstat() {
+    int pipe_fds[2];
+    struct stat stat_bufs[2];
+    if (pipe(pipe_fds) < 0) {
+        THROW_ERROR("failed to create a pipe");
+    }
+    if (fstat(pipe_fds[0], &stat_bufs[0]) < 0 || fstat(pipe_fds[1], &stat_bufs[1]) < 0) {
+        free_pipe(pipe_fds);
+        THROW_ERROR("failed to fstat pipe fd");
+    }
+    free_pipe(pipe_fds);
+    if (!S_ISFIFO(stat_bufs[0].st_mode) || !S_ISFIFO(stat_bufs[1].st_mode)) {
+        THROW_ERROR("failed to check the pipe st_mode");
+    }
+    return 0;
+}
+
 int test_fcntl_get_flags() {
     int pipe_fds[2];
     if (pipe(pipe_fds) < 0) {
@@ -372,6 +389,7 @@ int test_ioctl_fionread() {
 // Test suite
 // ============================================================================
 static test_case_t test_cases[] = {
+    TEST_CASE(test_fstat),
     TEST_CASE(test_fcntl_get_flags),
     TEST_CASE(test_fcntl_set_flags),
     TEST_CASE(test_create_with_flags),
