@@ -174,6 +174,13 @@ impl FileHandle {
         }
     }
 
+    pub fn as_async_file(&self) -> Option<&Async<dyn File>> {
+        match &self.0.file {
+            AnyFile::File(async_file) => Some(async_file),
+            _ => None,
+        }
+    }
+
     /// Downgrade the file handle to its weak counterpart.
     pub fn downgrade(&self) -> WeakFileHandle {
         let any_weak_file = match &self.0.file {

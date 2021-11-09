@@ -80,6 +80,14 @@ impl File for PipeReader {
         });
         Ok(())
     }
+
+    fn stat(&self) -> StatBuf {
+        StatBuf {
+            mode: StatMode::from_type_and_mode(FileType::NamedPipe, 0o400),
+            nlink: 1,
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -123,5 +131,13 @@ impl File for PipeWriter {
     fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
         async_io::match_ioctl_cmd_auto_error!(cmd, {});
         Ok(())
+    }
+
+    fn stat(&self) -> StatBuf {
+        StatBuf {
+            mode: StatMode::from_type_and_mode(FileType::NamedPipe, 0o200),
+            nlink: 1,
+            ..Default::default()
+        }
     }
 }

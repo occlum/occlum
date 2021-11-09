@@ -6,6 +6,8 @@ pub fn do_fstat(fd: u32) -> Result<StatBuf> {
     if let Some(inode_file) = file_ref.as_inode_file() {
         let stat = StatBuf::from(inode_file.inode().metadata()?);
         Ok(stat)
+    } else if let Some(async_file) = file_ref.as_async_file() {
+        Ok(async_file.stat())
     } else {
         // TODO: support the stat operation on non-inode files
         return_errno!(ENODEV, "the file is not inode");
