@@ -41,48 +41,20 @@ jobs:
         ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
-    - name: Get Occlum version
-      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
-
-    - name: Create container
-      run: |
-        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        else
-          echo "Unsupported Hardware"
-        fi;
-        echo "occlum_test=$occlum_test" >> $GITHUB_ENV
-
-    - name: Update PCCS server
-      run: docker exec $occlum_test bash -c "sed -r -i 's/PCCS_URL=https:\/\/localhost:8081\/sgx\/certification\/v3\//PCCS_URL=https:\/\/sgx-dcap-server.cn-shanghai.aliyuncs.com\/sgx\/certification\/v3\//g' /etc/sgx_default_qcnl.conf"
-
-    - name: Change download source of crates.io
-      run: |
-        docker exec $occlum_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
-
-    - name: Build dependencies
-      run: docker exec $occlum_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
-
-    - name: Build source
-      run: docker exec $occlum_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Integration test
-      run:  docker exec $occlum_test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace make test"
+      run:  docker exec ${{ github.job }} bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace make test"
 
     - name: Integration test with Glibc
-      run:  docker exec $occlum_test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace make test-glibc"
+      run:  docker exec ${{ github.job }} bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace make test-glibc"
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop $occlum_test
+      run: docker stop ${{ github.job }}
 
 
   C_cpp_rust_golang_embedded_mode_support_test:
@@ -110,45 +82,20 @@ jobs:
         ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
-    - name: Get Occlum version
-      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
-
-    - name: Create container
-      run: |
-        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          language_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          language_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        else
-          echo "Unsupported Hardware"
-        fi;
-        echo "language_support_test=$language_support_test" >> $GITHUB_ENV
-
-    - name: Configure dependency source
-      run: |
-        docker exec $language_support_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
-
-    - name: Build dependencies
-      run: docker exec $language_support_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec $language_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: C test
-      run: docker exec $language_support_test bash -c "cd /root/occlum/demos/hello_c && make;
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/hello_c && make;
             occlum new occlum_instance;
             cp hello_world occlum_instance/image/bin;
             cd occlum_instance && occlum build;
             occlum run /bin/hello_world"
 
     - name: C with encrypted image test
-      run: docker exec $language_support_test bash -c "cd /root/occlum/demos/hello_c && make;
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/hello_c && make;
             rm -rf occlum_instance && occlum new occlum_instance;
             occlum gen-image-key occlum_instance/image_key;
             cp hello_world occlum_instance/image/bin;
@@ -156,50 +103,50 @@ jobs:
             occlum run /bin/hello_world"
 
     - name: C++ test
-      run: docker exec $language_support_test bash -c "cd /root/occlum/demos/hello_cc && make;
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/hello_cc && make;
             occlum new occlum_instance;
             cp hello_world occlum_instance/image/bin;
             cd occlum_instance && occlum build;
             occlum run /bin/hello_world"
 
     - name: Rust test
-      run: docker exec $language_support_test bash -c "cd /root/occlum/demos/rust && ./run_rust_demo_on_occlum.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/rust && ./run_rust_demo_on_occlum.sh"
 
     - name: Embedded mode test
-      run: docker exec $language_support_test bash -c "cd /root/occlum/demos/embedded_mode && make;
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/embedded_mode && make;
             make test"
 
     - name: Run Golang sqlite test
-      run: docker exec $language_support_test bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
+      run: docker exec ${{ github.job }} bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
             cd /root/occlum/demos/golang/go_sqlite/ && ./run_go_sqlite_demo.sh"
 
     - name: Go server set up and run
-      run: docker exec $language_support_test bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
+      run: docker exec ${{ github.job }} bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
             cd /root/occlum/demos/golang/web_server && occlum-go mod init web_server && occlum-go get -u -v github.com/gin-gonic/gin;
             occlum-go build -o web_server ./web_server.go;
             ./run_golang_on_occlum.sh" &
 
     - name: Set up Golang grpc pingpong test
-      run: docker exec $language_support_test bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
+      run: docker exec ${{ github.job }} bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
             cd /root/occlum/demos/golang/grpc_pingpong && ./prepare_ping_pong.sh"
 
     - name: Start Golang grpc pingpong server
-      run: docker exec $language_support_test bash -c "cd /root/occlum/demos/golang/grpc_pingpong && ./run_pong_on_occlum.sh" &
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/grpc_pingpong && ./run_pong_on_occlum.sh" &
 
     - name: Run Golang grpc ping test
       run: |
         sleep ${{ env.nap_time }};
-        docker exec $language_support_test bash -c "cd /root/occlum/demos/golang/grpc_pingpong && ./run_ping_on_occlum.sh"
+        docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/grpc_pingpong && ./run_ping_on_occlum.sh"
 
     # Sleeps longer to make sure the server is up.
     - name: Curl test
       run: |
         sleep ${{ env.nap_time }};
-        docker exec $language_support_test bash -c "curl http://127.0.0.1:8090/ping"
+        docker exec ${{ github.job }} bash -c "curl http://127.0.0.1:8090/ping"
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop $language_support_test
+      run: docker stop ${{ github.job }}
 
 
   Java_support_test:
@@ -227,51 +174,26 @@ jobs:
         ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
-    - name: Get Occlum version
-      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
-
-    - name: Create container
-      run: |
-        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          java_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          java_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        else
-          echo "Unsupported Hardware"
-        fi;
-        echo "java_support_test=$java_support_test" >> $GITHUB_ENV
-
-    - name: Configure dependency source
-      run: |
-        docker exec $java_support_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
-
-    - name: Build dependencies
-      run: docker exec $java_support_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec $java_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Compile Java
-      run: docker exec $java_support_test bash -c "cd /root/occlum/demos/java && occlum-javac ./hello_world/Main.java"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/java && occlum-javac ./hello_world/Main.java"
 
     - name: Run hello world
-      run: docker exec $java_support_test bash -c "cd /root/occlum/demos/java && ./run_java_on_occlum.sh hello"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/java && ./run_java_on_occlum.sh hello"
 
     - name: Compile processBuilder demo
-      run: docker exec $java_support_test bash -c "cd /root/occlum/demos/java && occlum-javac ./processBuilder/processBuilder.java"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/java && occlum-javac ./processBuilder/processBuilder.java"
 
     - name: Run processBuilder
-      run: docker exec $java_support_test bash -c "cd /root/occlum/demos/java && ./run_java_on_occlum.sh processBuilder"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/java && ./run_java_on_occlum.sh processBuilder"
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop $java_support_test
+      run: docker stop ${{ github.job }}
 
 
   Bazel_test:
@@ -299,57 +221,32 @@ jobs:
         ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
-    - name: Get Occlum version
-      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
-
-    - name: Create container
-      run: |
-        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          hello_bazel_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          hello_bazel_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        else
-          echo "Unsupported Hardware"
-        fi;
-        echo "hello_bazel_test=$hello_bazel_test" >> $GITHUB_ENV
-
-    - name: Configure dependency source
-      run: |
-        docker exec $hello_bazel_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
-
-    - name: Build dependencies
-      run: docker exec $hello_bazel_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec $hello_bazel_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Config git proxy
       run: |
-        docker exec $hello_bazel_test bash -c "git config --global http.proxy socks5://localhost:5432"
-        docker exec $hello_bazel_test bash -c "git config --global https.proxy socks5://localhost:5432"
+        docker exec ${{ github.job }} bash -c "git config --global http.proxy socks5://localhost:5432"
+        docker exec ${{ github.job }} bash -c "git config --global https.proxy socks5://localhost:5432"
 
     - name: Install bazel
-      run: docker exec $hello_bazel_test bash -c "cd /root/occlum/demos/hello_bazel && wget https://github.com/bazelbuild/bazel/releases/download/3.2.0/bazel-3.2.0-installer-linux-x86_64.sh;
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/hello_bazel && wget https://github.com/bazelbuild/bazel/releases/download/3.2.0/bazel-3.2.0-installer-linux-x86_64.sh;
               chmod +x bazel-3.2.0-installer-linux-x86_64.sh;
               ./bazel-3.2.0-installer-linux-x86_64.sh"
 
     - name: Build bazel dependencies
-      run: docker exec $hello_bazel_test bash -c "cd /root/occlum/demos/hello_bazel && ./build_bazel_sample.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/hello_bazel && ./build_bazel_sample.sh"
 
     - name: Test bazel
-      run: docker exec $hello_bazel_test bash -c "cd /root/occlum/demos/hello_bazel && occlum new occlum_instance;
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/hello_bazel && occlum new occlum_instance;
             cp examples/cpp-tutorial/stage3/bazel-bin/main/hello-world occlum_instance/image/bin;
             cd occlum_instance && occlum build;
             occlum run /bin/hello-world"
 
     - name: Clean the environment
-      run: docker stop $hello_bazel_test
+      run: docker stop ${{ github.job }}
 
 
   Fish_test:
@@ -377,53 +274,28 @@ jobs:
         ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
-    - name: Get Occlum version
-      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
-
-    - name: Create container
-      run: |
-        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          fish_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          fish_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        else
-          echo "Unsupported Hardware"
-        fi;
-        echo "fish_test=$fish_test" >> $GITHUB_ENV
-
-    - name: Configure dependency source
-      run: |
-        docker exec $fish_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
-
-    - name: Build dependencies
-      run: docker exec $fish_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec $fish_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Config git proxy
       run: |
-        docker exec $fish_test bash -c "git config --global http.proxy socks5://localhost:5432"
-        docker exec $fish_test bash -c "git config --global https.proxy socks5://localhost:5432"
+        docker exec ${{ github.job }} bash -c "git config --global http.proxy socks5://localhost:5432"
+        docker exec ${{ github.job }} bash -c "git config --global https.proxy socks5://localhost:5432"
 
     - name: Build Fish dependencies
-      run: docker exec $fish_test bash -c "cd /root/occlum/demos/fish && ./download_and_build.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/fish && ./download_and_build.sh"
 
     - name: Run Fish test
-      run: docker exec $fish_test bash -c "cd /root/occlum/demos/fish && ./run_fish_test.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/fish && ./run_fish_test.sh"
 
     - name: Run Fish process rlimit test
-      run: docker exec $fish_test bash -c "cd /root/occlum/demos/fish && ./run_per_process_config_test.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/fish && ./run_per_process_config_test.sh"
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop $fish_test
+      run: docker stop ${{ github.job }}
 
 
   Xgboost_test:
@@ -451,53 +323,28 @@ jobs:
         ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
-    - name: Get Occlum version
-      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
-
-    - name: Create container
-      run: |
-        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          xgboost_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          xgboost_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        else
-          echo "Unsupported Hardware"
-        fi;
-        echo "xgboost_test=$xgboost_test" >> $GITHUB_ENV
-
-    - name: Configure dependency source
-      run: |
-        docker exec $xgboost_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
-
-    - name: Build dependencies
-      run: docker exec $xgboost_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec $xgboost_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Config git proxy
       run: |
-        docker exec $xgboost_test bash -c "git config --global http.proxy socks5://localhost:5432"
-        docker exec $xgboost_test bash -c "git config --global https.proxy socks5://localhost:5432"
+        docker exec ${{ github.job }} bash -c "git config --global http.proxy socks5://localhost:5432"
+        docker exec ${{ github.job }} bash -c "git config --global https.proxy socks5://localhost:5432"
 
     - name: Build xgboost dependencies
-      run: docker exec $xgboost_test bash -c "cd /root/occlum/demos/xgboost && ./download_and_build_xgboost.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/xgboost && ./download_and_build_xgboost.sh"
 
     - name: Run xgboost test
-      run: docker exec $xgboost_test bash -c "cd /root/occlum/demos/xgboost && make test"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/xgboost && make test"
 
     - name: Run xgboost cluster test
-      run: docker exec $xgboost_test bash -c "cd /root/occlum/demos/xgboost && make test-local-cluster"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/xgboost && make test-local-cluster"
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop $xgboost_test
+      run: docker stop ${{ github.job }}
 
 
   Sqlite_test:
@@ -525,50 +372,25 @@ jobs:
         ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
-    - name: Get Occlum version
-      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
-
-    - name: Create container
-      run: |
-        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          sqlite_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          sqlite_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        else
-          echo "Unsupported Hardware"
-        fi;
-        echo "sqlite_test=$sqlite_test" >> $GITHUB_ENV
-
-    - name: Configure dependency source
-      run: |
-        docker exec $sqlite_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
-
-    - name: Build dependencies
-      run: docker exec $sqlite_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec $sqlite_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Config git proxy
       run: |
-        docker exec $sqlite_test bash -c "git config --global http.proxy socks5://localhost:5432"
-        docker exec $sqlite_test bash -c "git config --global https.proxy socks5://localhost:5432"
+        docker exec ${{ github.job }} bash -c "git config --global http.proxy socks5://localhost:5432"
+        docker exec ${{ github.job }} bash -c "git config --global https.proxy socks5://localhost:5432"
 
     - name: Build sqlite dependencies
-      run: docker exec $sqlite_test bash -c "cd /root/occlum/demos/sqlite && ./download_and_build_sqlite.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/sqlite && ./download_and_build_sqlite.sh"
 
     - name: Run sqlite test
-      run: docker exec $sqlite_test bash -c "cd /root/occlum/demos/sqlite && ./run_sqlite_on_occlum.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/sqlite && ./run_sqlite_on_occlum.sh"
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop $sqlite_test
+      run: docker stop ${{ github.job }}
 
 
   Python_musl_support_test:
@@ -999,39 +821,13 @@ jobs:
         ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
-    - name: Get Occlum version
-      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
-
-    - name: Create container
-      run: |
-        if [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          ra_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        else
-          echo "Unsupported Hardware"
-        fi;
-        echo "ra_test=$ra_test" >> $GITHUB_ENV
-
-    - name: Update PCCS server
-      run: docker exec $ra_test bash -c "sed -r -i 's/PCCS_URL=https:\/\/localhost:8081\/sgx\/certification\/v3\//PCCS_URL=https:\/\/sgx-dcap-server.cn-shanghai.aliyuncs.com\/sgx\/certification\/v3\//g' /etc/sgx_default_qcnl.conf"
-
-    - name: Change download source of crates.io
-      run: |
-        docker exec $ra_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
-
-    - name: Build dependencies
-      run: docker exec $ra_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
-
-    - name: Build source
-      run: docker exec $ra_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Build and run remote attestation demo
-      run: docker exec $ra_test bash -c "cd /root/occlum/demos/remote_attestation/dcap; ./run_dcap_quote_on_occlum.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/remote_attestation/dcap; ./run_dcap_quote_on_occlum.sh"
 
 
   Stress_test_with_musl:
@@ -1051,47 +847,19 @@ jobs:
       with:
         submodules: true
 
-    - name: Get Occlum version
-      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
-
-    - name: Create container
-      run: |
-        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        else
-          echo "Unsupported Hardware"
-        fi;
-        echo "occlum_test=$occlum_test" >> $GITHUB_ENV
-
-    - name: Update PCCS server
-      run: docker exec $occlum_test bash -c "sed -r -i 's/PCCS_URL=https:\/\/localhost:8081\/sgx\/certification\/v3\//PCCS_URL=https:\/\/sgx-dcap-server.cn-shanghai.aliyuncs.com\/sgx\/certification\/v3\//g' /etc/sgx_default_qcnl.conf"
-
-    - name: Change download source of crates.io
-      run: |
-        docker exec $occlum_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
-
-    - name: Build dependencies
-      run: docker exec $occlum_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
-
-    - name: Build source
-      run: docker exec $occlum_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Stress test with musl
-      run:  docker exec $occlum_test bash -c "cd /root/occlum; make test times=${{ env.repeat_times }}"
+      run:  docker exec ${{ github.job }} bash -c "cd /root/occlum; make test times=${{ env.repeat_times }}"
 
     - name: Show failed cases and clean the environment
       if: ${{ always() }}
       run: |
-        docker exec $occlum_test bash -c "cat /root/occlum/build/test/.fail"
-        docker stop $occlum_test
+        docker exec ${{ github.job }} bash -c "cat /root/occlum/build/test/.fail"
+        docker stop ${{ github.job }}
 
 
   Stress_test_with_glibc:
@@ -1111,44 +879,16 @@ jobs:
       with:
         submodules: true
 
-    - name: Get Occlum version
-      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
-
-    - name: Create container
-      run: |
-        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          occlum_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:$OCCLUM_VERSION-ubuntu18.04);
-        else
-          echo "Unsupported Hardware"
-        fi;
-        echo "occlum_test=$occlum_test" >> $GITHUB_ENV
-
-    - name: Update PCCS server
-      run: docker exec $occlum_test bash -c "sed -r -i 's/PCCS_URL=https:\/\/localhost:8081\/sgx\/certification\/v3\//PCCS_URL=https:\/\/sgx-dcap-server.cn-shanghai.aliyuncs.com\/sgx\/certification\/v3\//g' /etc/sgx_default_qcnl.conf"
-
-    - name: Change download source of crates.io
-      run: |
-        docker exec $occlum_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
-
-    - name: Build dependencies
-      run: docker exec $occlum_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
-
-    - name: Build source
-      run: docker exec $occlum_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Stress test with Glibc
-      run:  docker exec $occlum_test bash -c "cd /root/occlum; make test-glibc times=${{ env.repeat_times }}"
+      run:  docker exec ${{ github.job }} bash -c "cd /root/occlum; make test-glibc times=${{ env.repeat_times }}"
 
     - name: Show failed cases and clean the environment
       if: ${{ always() }}
       run: |
-        docker exec $occlum_test bash -c "cat /root/occlum/build/test/.fail"
-        docker stop $occlum_test
+        docker exec ${{ github.job }} bash -c "cat /root/occlum/build/test/.fail"
+        docker stop ${{ github.job }}
