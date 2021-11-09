@@ -23,6 +23,8 @@
 #[macro_use]
 extern crate sgx_tstd as std;
 extern crate alloc;
+#[macro_use]
+extern crate log;
 
 pub mod config;
 pub mod executor;
