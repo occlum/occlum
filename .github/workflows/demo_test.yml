@@ -15,7 +15,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'language_support_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -83,7 +83,7 @@ jobs:
       with:
         submodules: true
     
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'java_support_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -107,7 +107,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'fish_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -128,7 +128,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'hello_bazel_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -155,7 +155,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'https_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -179,7 +179,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'la_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -199,7 +199,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'sqlite_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -218,7 +218,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'xgboost_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -240,7 +240,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'tflite_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -262,7 +262,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'pytorch_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -292,7 +292,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'tensorflow_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -383,7 +383,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'python_glibc_support_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -405,7 +405,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'redis_support_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -434,7 +434,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'flink_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -460,7 +460,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'cluster_serving_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -478,7 +478,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'enclave_ra_tls_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -502,7 +502,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'vault_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -525,7 +525,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'sofaboot_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -551,7 +551,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'bash_test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'

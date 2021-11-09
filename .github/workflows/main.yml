@@ -16,7 +16,7 @@ jobs:
       with:
         submodules: true
     
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'ubuntu-test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
@@ -47,7 +47,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: 'centos-test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
