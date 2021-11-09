@@ -1,0 +1,11 @@
+includes:
+  - base.yaml
+# musl bash
+targets:
+  # copy bash and busybox
+  - target: /bin
+    copy:
+      - files:
+        - /opt/occlum/toolchains/bash/musl/bash
+        - /opt/occlum/toolchains/busybox/musl/busybox
+        - ../occlum_bash_test.sh

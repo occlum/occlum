@@ -24,8 +24,8 @@ Either way, the resulting `hello_world` can be found in the current directory.
 3. Run `hello_world` on Occlum
 ```
 mkdir occlum_workspace && cd occlum_workspace
-occlum init
-cp ../hello_world image/bin
+occlum init && rm -rf image
+copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template
 occlum build
 occlum run /bin/hello_world
 ```

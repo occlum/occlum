@@ -1,0 +1,58 @@
+# base stage:
+# Install dependencies for deployment to get minimum size for deployer.
+# For deployment environment, only occlum-runtime and sgx-psw are needed.
+FROM centos:8.2.2004 as base
+LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
+
+ADD https://download.01.org/intel-sgx/sgx-linux/2.14/distro/centos8.2-server/sgx_rpm_local_repo.tgz /tmp/
+RUN cd /tmp && tar -xvzf sgx_rpm_local_repo.tgz && \
+    yum install -y jq yum-utils && \
+    yum-config-manager --add-repo file:///tmp/sgx_rpm_local_repo && \
+    echo -e '[occlum]\n\
+name=occlum\n\
+enabled=1\n\
+baseurl=https://occlum.io/occlum-package-repos/rpm-repo/\n\
+gpgcheck=1\n\
+repo_gpgcheck=1\n\
+gpgkey=https://occlum.io/occlum-package-repos/rpm-repo/RPM-GPG-KEY-rpm-sign\n\
+gpgcakey=https://occlum.io/occlum-package-repos/rpm-repo/RPM-GPG-KEY-rpm-sign-ca'\
+>> /etc/yum.repos.d/occlum.repo && \
+    yum install --nogpgcheck -y occlum-runtime && \
+    yum clean all && \
+    yum-config-manager --disable tmp_sgx_rpm_local_repo && \
+    rm -rf /tmp/* /etc/yum.repos.d/tmp_sgx_rpm_local_repo.repo
+ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
+
+
+# packager stage:
+# Users can build their own applications and put to occlum instance.
+# And then use "occlum package" to get a minimum subset of files to run in deployment environment.
+# In this demo, the occlum instance is built in debug mode.
+# So "--debug" flag is required for the "occlum package".
+FROM base as packager
+RUN yum install -y fuse-libs libtool make gdb git && \
+    cd /root && \
+    git clone https://github.com/occlum/occlum.git && \
+    cp -r /root/occlum/demos /root/demos && \
+    yum install --nogpgcheck -y occlum && \
+    yum clean all && \
+    rm -rf /tmp/* && \
+    rm -rf /root/occlum && \
+    cd /root && \
+    occlum new occlum-instance && \
+    cd /root/demos/hello_c && \
+    make && cp hello_world /root/occlum-instance/image/bin && \
+    cd /root/occlum-instance && occlum build && \
+    occlum package --debug
+
+
+# deployer stage:
+# Unpack the package from packager
+FROM base as deployer
+WORKDIR /root
+COPY --from=packager /root/occlum-instance/occlum-instance.tar.gz .
+RUN tar -xvzf occlum-instance.tar.gz && \
+    mkdir -p /var/run/aesmd && \
+    echo "LD_LIBRARY_PATH=/opt/intel/sgx-aesm-service/aesm nohup /opt/intel/sgx-aesm-service/aesm/aesm_service --no-daemon >/dev/null 2>&1 &" > /root/.bashrc
+
+WORKDIR /root

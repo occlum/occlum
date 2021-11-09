@@ -7,7 +7,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	"grpc_pingpong/github.com/occlum/demos/grpc_pingpong/pingpong"
+	pingpong "grpc_pingpong/github.com/occlum/demos/grpc_pingpong/pingpong"
 )
 
 func main() {

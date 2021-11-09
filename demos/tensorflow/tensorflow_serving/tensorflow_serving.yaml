@@ -1,0 +1,20 @@
+includes:
+  - base.yaml
+targets:
+  # copy model
+  - target: /model
+    copy: 
+      - dirs:
+        - ../resnet50-v15-fp32
+  - target: /bin
+    copy:
+      - from: ..
+        dirs:
+          - ssl_configure
+        files:
+          - tensorflow_model_server
+  # copy hosts
+  - target: /etc
+    copy: 
+      - files:
+        - ../hosts

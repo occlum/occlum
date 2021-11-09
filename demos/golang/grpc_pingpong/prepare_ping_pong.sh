@@ -41,16 +41,25 @@ fi
 
 # install protoc-gen-go and protoc-gen-go-grpc plugin
 if ! type "protoc-gen-go" > /dev/null 2>&1; then
-        go get google.golang.org/protobuf/cmd/protoc-gen-go
+        occlum-go get google.golang.org/protobuf/cmd/protoc-gen-go
 fi
 if ! type "protoc-gen-go-grpc" > /dev/null 2>&1; then
-        go get google.golang.org/grpc/cmd/protoc-gen-go-grpc
+        occlum-go get google.golang.org/grpc/cmd/protoc-gen-go-grpc
 fi
 
 # compiling pingpong gRPC .proto file
+export PATH=$PATH:$HOME/go/bin
 export GOPRIVATE=github.com/occlum/demos/\*
 protoc --proto_path=pingpong --go-grpc_out=. --go_out=. pingpong/pingpong.proto
 
 # prepare occlum images
+occlum-go mod download golang.org/x/net
+occlum-go mod download google.golang.org/grpc
+occlum-go mod download github.com/golang/protobuf
+occlum-go mod download golang.org/x/sys
+occlum-go mod download golang.org/x/text
+occlum-go mod download google.golang.org/genproto
+occlum-go mod download google.golang.org/protobuf
+
 occlum-go build -o occlum_pong pong.go
 occlum-go build -o occlum_ping ping.go

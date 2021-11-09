@@ -1,0 +1,15 @@
+includes:
+  - base.yaml
+  - java-11-alibaba-dragonwell.yaml
+targets:
+  # copy java class file
+  - target: /
+    copy:
+      - files:
+        - ../processBuilder/processBuilder.class
+  # copy date used by processBuilder
+  - target: /bin
+    copy:
+      - files:
+        - /bin/date
+  

@@ -1,0 +1,24 @@
+includes:
+  - base.yaml
+# fish
+targets:
+  - target: /usr/bin
+    # copy bins
+    copy:
+      - files:
+        - ../fish-shell/build/fish
+        - /opt/occlum/toolchains/busybox/musl/busybox
+  - target: /bin
+    # copy script
+    copy:
+      - files:
+        - ../fish_script.sh
+        - ../test_per_process_config.sh
+    # busybox links
+    createlinks:
+      - src: /usr/bin/busybox
+        linkname: cat
+      - src: /usr/bin/busybox
+        linkname: echo
+      - src: /usr/bin/busybox
+        linkname: awk

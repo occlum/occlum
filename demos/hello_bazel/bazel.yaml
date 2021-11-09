@@ -1,0 +1,7 @@
+includes:
+  - base.yaml
+targets:
+  - target: /bin
+    copy:
+      - files:
+        - ../examples/cpp-tutorial/stage3/bazel-bin/main/hello-world

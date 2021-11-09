@@ -15,10 +15,8 @@ init_workspace() {
 }
 
 build_occlum() {
-    cp ../tensorflow_src/tensorflow/lite/tools/make/gen/linux_x86_64/bin/* image/bin
-    cp /usr/local/occlum/x86_64-linux-musl/lib/libz.so.1 image/lib
-    cp -r ../models image
-    cp -r ../tensorflow_src/tensorflow/lite/examples/label_image/testdata image
+    rm -rf image
+    copy_bom -f ../tflite.yaml --root image --include-dir /opt/occlum/etc/template;
     occlum build
 }
 

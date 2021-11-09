@@ -1,19 +1,20 @@
 #!/bin/bash
 set -e
 
+SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+bomfile=${SCRIPT_DIR}/fish.yaml
+
 rm -rf occlum-instance
-mkdir occlum-instance && cd occlum-instance
-occlum init
-mkdir -p image/usr/bin
-cp ../Occlum.json .
-cp ../fish-shell/build/fish image/usr/bin
-cp ../busybox/busybox image/usr/bin
-cp ../fish_script.sh image/bin
-pushd image/bin
-ln -s /usr/bin/busybox cat
-ln -s /usr/bin/busybox echo
-ln -s /usr/bin/busybox awk
-popd
+occlum new occlum-instance
+cd occlum-instance
+
+new_json="$(jq '.resource_limits.user_space_size = "512MB" |
+            .resource_limits.kernel_space_heap_size = "64MB" |
+            .env.default = [ "OCCLUM=yes", "HOME=/root" ]' Occlum.json)" && \
+    echo "${new_json}" > Occlum.json
+
+rm -rf image
+copy_bom -f $bomfile --root image --include-dir /opt/occlum/etc/template
 
 occlum build
 echo -e "\nBuild done. Running fish script ..."

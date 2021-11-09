@@ -9,7 +9,8 @@ occlum_instance: build_src
 	@mkdir -p occlum_instance
 	@cd occlum_instance && \
 		occlum init && \
-		cp ../trusted_memcpy_bench/build/trusted_memcpy_bench image/bin/ && \
+		rm -rf image && \
+		copy_bom -f ../embedded_mode.yaml --root image --include-dir /opt/occlum/etc/template && \
 		occlum build
 
 build_src:

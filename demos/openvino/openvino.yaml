@@ -1,0 +1,18 @@
+includes:
+  - base.yaml
+# openvino benchmark
+targets:
+  # copy benchmark_app
+  - target: /bin
+    copy:
+      - files:
+        - ../openvino_src/bin/intel64/Release/benchmark_app
+  # copy models and libs
+  - target: /
+    copy:
+      - dirs:
+        - ../model
+  - target: /root/demos/openvino/openvino_src/bin/intel64/Release/
+    copy:
+      - dirs:
+        - ../openvino_src/bin/intel64/Release/lib

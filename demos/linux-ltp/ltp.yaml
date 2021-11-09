@@ -1,0 +1,68 @@
+includes:
+  - base.yaml
+# bash
+targets:
+  # copy LTP
+  - target: /opt
+    copy:
+      - dirs:
+        - ../ltp_install/ltp
+  # copy bash and busybox
+  - target: /bin
+    copy:
+      - files:
+        - /opt/occlum/toolchains/bash/glibc/bash
+        - /opt/occlum/toolchains/busybox/glibc/busybox
+  # copy test script
+  - target: /opt/ltp
+    copy:
+      - files:
+        - ../run-ltp.sh
+  # copy syscalls demo cases for Occlum
+  - target: /opt/ltp/runtest
+    copy:
+      - files:
+        - ../syscalls-occlum
+  - target: /bin
+    # build a symlink: ln -s $linksrc $target/linkname
+    createlinks:
+      - src: /bin/bash
+        linkname: sh
+      - src: /bin/busybox
+        linkname: basename
+      - src: /bin/busybox
+        linkname: echo
+      - src: /bin/busybox
+        linkname: sed
+      - src: /bin/busybox
+        linkname: grep
+      - src: /bin/busybox
+        linkname: cp
+      - src: /bin/busybox
+        linkname: mkdir
+      - src: /bin/busybox
+        linkname: cat
+      - src: /bin/busybox
+        linkname: dirname
+      - src: /bin/busybox
+        linkname: date
+      - src: /bin/busybox
+        linkname: pwd
+      - src: /bin/busybox
+        linkname: mktemp
+      - src: /bin/busybox
+        linkname: chmod
+      - src: /bin/busybox
+        linkname: rm
+      - src: /bin/busybox
+        linkname: awk
+      - src: /bin/busybox
+        linkname: cut
+      - src: /bin/busybox
+        linkname: tr
+      - src: /bin/busybox
+        linkname: id
+      - src: /bin/busybox
+        linkname: mv
+      - src: /bin/busybox
+        linkname: uname

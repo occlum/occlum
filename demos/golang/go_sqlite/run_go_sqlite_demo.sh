@@ -5,6 +5,7 @@ BLUE='\033[1;34m'
 NC='\033[0m'
 
 # Install SQLite with occlum-go
+occlum-go mod init simple_demo_instance && \
 occlum-go get -u -v github.com/mattn/go-sqlite3
 
 # Build the Golang SQLite demo program using the Occlum Golang toolchain (i.e., occlum-go)
@@ -23,7 +24,8 @@ new_json="$(jq '.resource_limits.user_space_size = "2560MB" |
 echo "${new_json}" > Occlum.json
 
 # Copy program into Occlum Workspace and build
-cp ../simple_demo image/bin
+rm -rf image && \
+copy_bom -f ../go_sqlite.yaml --root image --include-dir /opt/occlum/etc/template && \
 occlum build
 
 # Run the Golang SQLite demo
