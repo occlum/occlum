@@ -22,7 +22,8 @@ override_dh_auto_build:
 
 override_dh_install:
 	# install Occlum
-	cd $(deb_build_dir)/occlum-$(VERSION)/occlum-src; OCCLUM_RELEASE_BUILD=1 OCCLUM_PREFIX=$(buildroot)/opt/occlum make install
+	cd $(deb_build_dir)/occlum-$(VERSION)/occlum-src; source /opt/intel/sgxsdk/environment; \
+	OCCLUM_RELEASE_BUILD=1 OCCLUM_PREFIX=$(buildroot)/opt/occlum make install
 	mkdir -p $(buildroot)/etc/profile.d
 	cp $(deb_build_dir)/occlum-$(VERSION)/debian/{occlum-pal.sh,occlum-runtime.sh} $(buildroot)/etc/profile.d
 	chmod 644 $(buildroot)/etc/profile.d/{occlum-pal.sh,occlum-runtime.sh}
