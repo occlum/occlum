@@ -144,7 +144,7 @@ static int test_env_set_child_env_and_argv() {
     if (ret < 0) {
         THROW_ERROR("failed to wait4 the child process");
     }
-    if (!WIFEXITED(status)) {
+    if (!(WIFEXITED(status) && WEXITSTATUS(status) == 0)) {
         THROW_ERROR("test cases in child faild");
     }
     return 0;
