@@ -152,6 +152,11 @@ impl INodeFile {
         Ok(new_offset)
     }
 
+    pub fn position(&self) -> usize {
+        let offset = self.offset.lock().unwrap();
+        *offset
+    }
+
     pub fn flush(&self) -> Result<()> {
         self.inode.sync_data()?;
         Ok(())
@@ -197,30 +202,96 @@ impl INodeFile {
         Ok(())
     }
 
-    pub fn test_advisory_lock(&self, lock: &mut Flock) -> Result<()> {
-        // Let the advisory lock could be placed
-        // TODO: Implement the real advisory lock
-        lock.l_type = FlockType::F_UNLCK;
+    pub fn test_advisory_lock(&self, lock: &mut RangeLock) -> Result<()> {
+        let ext = match self.inode.ext() {
+            Some(ext) => ext,
+            None => {
+                warn!("Inode extension is not supportted, the lock could be placed");
+                lock.set_type(RangeLockType::F_UNLCK);
+                return Ok(());
+            }
+        };
+
+        match ext.get::<RangeLockList>() {
+            None => {
+                // The advisory lock could be placed if there is no lock list
+                lock.set_type(RangeLockType::F_UNLCK);
+            }
+            Some(range_lock_list) => {
+                range_lock_list.test_lock(lock);
+            }
+        }
         Ok(())
     }
 
-    pub fn set_advisory_lock(&self, lock: &Flock) -> Result<()> {
-        match lock.l_type {
-            FlockType::F_RDLCK => {
+    pub async fn set_advisory_lock(&self, lock: &RangeLock, is_nonblocking: bool) -> Result<()> {
+        if RangeLockType::F_UNLCK == lock.type_() {
+            return Ok(self.unlock_advisory_lock(lock));
+        }
+
+        self.check_advisory_lock_with_access_mode(lock)?;
+        let ext = match self.inode.ext() {
+            Some(ext) => ext,
+            None => {
+                warn!(
+                    "Inode extension is not supported, let the lock could be acquired or released"
+                );
+                // TODO: Implement inode extension for FS
+                return Ok(());
+            }
+        };
+        let range_lock_list = match ext.get::<RangeLockList>() {
+            Some(list) => list,
+            None => ext.get_or_put_default::<RangeLockList>(),
+        };
+
+        range_lock_list.set_lock(lock, is_nonblocking).await?;
+        Ok(())
+    }
+
+    pub fn release_advisory_locks(&self) {
+        let range_lock = RangeLockBuilder::new()
+            .owner(current!().process().pid() as _)
+            .type_(RangeLockType::F_UNLCK)
+            .range(FileRange::new(0, OFFSET_MAX).unwrap())
+            .build()
+            .unwrap();
+
+        self.unlock_advisory_lock(&range_lock)
+    }
+
+    fn check_advisory_lock_with_access_mode(&self, lock: &RangeLock) -> Result<()> {
+        match lock.type_() {
+            RangeLockType::F_RDLCK => {
                 if !self.access_mode.readable() {
                     return_errno!(EBADF, "File not readable");
                 }
             }
-            FlockType::F_WRLCK => {
+            RangeLockType::F_WRLCK => {
                 if !self.access_mode.writable() {
                     return_errno!(EBADF, "File not writable");
                 }
             }
             _ => (),
         }
-        // Let the advisory lock could be acquired or released
-        // TODO: Implement the real advisory lock
         Ok(())
+    }
+
+    fn unlock_advisory_lock(&self, lock: &RangeLock) {
+        let ext = match self.inode.ext() {
+            Some(ext) => ext,
+            None => {
+                return;
+            }
+        };
+        let range_lock_list = match ext.get::<RangeLockList>() {
+            Some(list) => list,
+            None => {
+                return;
+            }
+        };
+
+        range_lock_list.unlock(lock)
     }
 
     pub fn iterate_entries(&self, writer: &mut dyn DirentWriter) -> Result<usize> {

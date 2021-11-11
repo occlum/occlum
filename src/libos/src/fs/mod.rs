@@ -11,7 +11,10 @@ use std::path::Path;
 use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
 
 pub use async_io::event::{Events, Observer, Pollee, Poller};
-pub use async_io::file::{AccessMode, CreationFlags, File, Flock, FlockType, StatusFlags};
+pub use async_io::file::{
+    AccessMode, CreationFlags, File, FileRange, RangeLock, RangeLockBuilder, RangeLockList,
+    RangeLockType, StatusFlags, OFFSET_MAX,
+};
 pub use async_io::fs::{
     DirentWriter, DirentWriterContext, FallocateFlags, FallocateMode, FileMode, FileSystem,
     FileType, FsError, FsInfo, INode, Metadata, SeekFrom, StatBuf, StatFlags, StatMode, Timespec,

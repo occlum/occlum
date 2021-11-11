@@ -544,7 +544,7 @@ pub async fn do_lchown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
 
 pub async fn do_fcntl(fd: FileDesc, cmd: u32, arg: u64) -> Result<isize> {
     let mut cmd = FcntlCmd::from_raw(cmd, arg)?;
-    file_ops::do_fcntl(fd, &mut cmd)
+    file_ops::do_fcntl(fd, &mut cmd).await
 }
 
 pub async fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
