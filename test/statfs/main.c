@@ -109,8 +109,7 @@ static int test_statfs_on_dev_shm() {
 
 static test_case_t test_cases[] = {
     TEST_CASE(test_statfs_on_root),
-    // TODO: Enable it when dev/shm is ready
-    //TEST_CASE(test_statfs_on_dev_shm),
+    TEST_CASE(test_statfs_on_dev_shm),
 };
 
 int main(int argc, const char *argv[]) {
