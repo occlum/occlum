@@ -7,13 +7,14 @@ pub use self::INodeFile as InodeFile;
 
 pub struct INodeFile {
     inode: Arc<dyn INode>,
+    open_path: String,
     offset: SgxMutex<usize>,
     access_mode: AccessMode,
     status_flags: RwLock<StatusFlags>,
 }
 
 impl INodeFile {
-    pub fn open(inode: Arc<dyn INode>, flags: u32) -> Result<Self> {
+    pub fn open(inode: Arc<dyn INode>, flags: u32, open_path: String) -> Result<Self> {
         let access_mode = AccessMode::from_u32(flags)?;
         if (access_mode.readable() && !inode.allow_read()?) {
             return_errno!(EACCES, "File not readable");
@@ -35,6 +36,7 @@ impl INodeFile {
         let status_flags = StatusFlags::from_bits_truncate(flags);
         Ok(INodeFile {
             inode,
+            open_path,
             offset: SgxMutex::new(0),
             access_mode,
             status_flags: RwLock::new(status_flags),
@@ -169,6 +171,13 @@ impl INodeFile {
     pub fn status_flags(&self) -> StatusFlags {
         let status_flags = self.status_flags.read().unwrap();
         *status_flags
+    }
+
+    /// Get the full path of the file when opened.
+    ///
+    /// Limitation: If file is renamed, the path will be invalid.
+    pub fn open_path(&self) -> &str {
+        &self.open_path
     }
 
     pub fn poll(&self, mask: Events, _poller: Option<&mut Poller>) -> Events {
@@ -314,7 +323,8 @@ impl Debug for INodeFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "INodeFile {{ inode: ???, pos: {}, access_mode: {:?}, status_flags: {:#o} }}",
+            "INodeFile {{ inode: ???, open_path: {}, pos: {}, access_mode: {:?}, status_flags: {:#o} }}",
+            self.open_path,
             *self.offset.lock().unwrap(),
             self.access_mode,
             *self.status_flags.read().unwrap()

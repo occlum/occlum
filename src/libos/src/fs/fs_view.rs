@@ -104,7 +104,8 @@ impl FsView {
                 Err(e) => return Err(e),
             }
         };
-        Ok(INodeFile::open(inode, flags)?)
+        let open_path = self.convert_fspath_to_abs(fs_path)?;
+        Ok(INodeFile::open(inode, flags, open_path)?)
     }
 
     /// Lookup INode, dereference symlink
@@ -139,11 +140,8 @@ impl FsView {
                     self.lookup_inode_cwd_no_follow(self.cwd())?
                 }
             }
-            FsPathInner::FdRelative(fd, path) => {
-                let inode = self.lookup_inode_from_fd(*fd)?;
-                if inode.metadata()?.type_ != FileType::Dir {
-                    return_errno!(ENOTDIR, "dirfd is not a directory");
-                }
+            FsPathInner::FdRelative(dirfd, path) => {
+                let inode = self.lookup_inode_from_fd(*dirfd)?;
                 if follow_symlink {
                     inode.lookup_follow(path, MAX_SYMLINKS)?
                 } else {
@@ -168,8 +166,8 @@ impl FsView {
                 let (dir_path, base_name) = split_path(path);
                 (self.lookup_inode_cwd(dir_path)?, base_name.to_owned())
             }
-            FsPathInner::FdRelative(fd, path) => {
-                let inode = self.lookup_inode_from_fd(*fd)?;
+            FsPathInner::FdRelative(dirfd, path) => {
+                let inode = self.lookup_inode_from_fd(*dirfd)?;
                 let (dir_path, base_name) = split_path(path);
                 let dir_inode = inode.lookup_follow(dir_path, MAX_SYMLINKS)?;
                 (dir_inode, base_name.to_owned())
@@ -191,8 +189,8 @@ impl FsView {
                 let (dir_path, base_name) = split_path(&real_path);
                 (self.lookup_inode_cwd(dir_path)?, base_name.to_owned())
             }
-            FsPathInner::FdRelative(fd, path) => {
-                let inode = self.lookup_inode_from_fd(*fd)?;
+            FsPathInner::FdRelative(dirfd, path) => {
+                let inode = self.lookup_inode_from_fd(*dirfd)?;
                 let real_path = self.lookup_real_path(Some(&inode), path)?;
                 let (dir_path, base_name) = split_path(&real_path);
                 let dir_inode = if let Some('/') = dir_path.chars().next() {
@@ -294,6 +292,47 @@ impl FsView {
             }
             Err(e) => return Err(Error::from(e)),
         }
+    }
+
+    /// Convert the FsPath to the absolute path.
+    /// This function is used to record the open path for a file.
+    ///
+    /// TODO: Introducing dentry cache to get the full path from inode.
+    pub fn convert_fspath_to_abs(&self, fs_path: &FsPath) -> Result<String> {
+        let abs_path = match fs_path.inner() {
+            FsPathInner::Absolute(path) => (*path).to_owned(),
+            FsPathInner::CwdRelative(path) => {
+                if !self.cwd().ends_with("/") {
+                    self.cwd().to_owned() + "/" + path
+                } else {
+                    self.cwd().to_owned() + path
+                }
+            }
+            FsPathInner::FdRelative(dirfd, path) => {
+                let file_ref = current!().file(*dirfd)?;
+                let inode_file = file_ref
+                    .as_inode_file()
+                    .ok_or_else(|| errno!(EBADF, "dirfd is not an inode file"))?;
+                if inode_file.inode().metadata()?.type_ != FileType::Dir {
+                    return_errno!(ENOTDIR, "dirfd is not a directory");
+                }
+                let dir_path = inode_file.open_path().to_owned();
+                if !dir_path.ends_with("/") {
+                    dir_path + "/" + path
+                } else {
+                    dir_path + path
+                }
+            }
+            FsPathInner::Cwd => self.cwd().to_owned(),
+            FsPathInner::Fd(fd) => {
+                let file_ref = current!().file(*fd)?;
+                let inode_file = file_ref
+                    .as_inode_file()
+                    .ok_or_else(|| errno!(EBADF, "dirfd is not an inode file"))?;
+                inode_file.open_path().to_owned()
+            }
+        };
+        Ok(abs_path)
     }
 }
 
