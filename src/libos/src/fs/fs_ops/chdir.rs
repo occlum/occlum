@@ -16,3 +16,19 @@ pub fn do_chdir(path: &str) -> Result<()> {
     current.fs().write().unwrap().set_cwd(path)?;
     Ok(())
 }
+
+pub fn do_fchdir(fd: FileDesc) -> Result<()> {
+    debug!("fchdir: fd: {}", fd);
+
+    let current = current!();
+    let file_ref = current.file(fd)?;
+    let inode_file = file_ref
+        .as_inode_file()
+        .ok_or_else(|| errno!(EBADF, "not an inode"))?;
+    if inode_file.inode().metadata()?.type_ != FileType::Dir {
+        return_errno!(ENOTDIR, "cwd must be directory");
+    }
+    let path = inode_file.open_path();
+    current.fs().write().unwrap().set_cwd(path)?;
+    Ok(())
+}

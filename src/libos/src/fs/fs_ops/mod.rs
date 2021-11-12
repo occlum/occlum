@@ -1,6 +1,6 @@
 use super::*;
 
-pub use self::chdir::do_chdir;
+pub use self::chdir::{do_chdir, do_fchdir};
 pub use self::getcwd::do_getcwd;
 pub use self::mount::do_mount_rootfs;
 pub use self::statfs::{do_fstatfs, do_statfs, Statfs};

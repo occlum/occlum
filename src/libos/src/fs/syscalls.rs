@@ -316,6 +316,11 @@ pub async fn do_chdir(path: *const i8) -> Result<isize> {
     Ok(0)
 }
 
+pub async fn do_fchdir(fd: FileDesc) -> Result<isize> {
+    fs_ops::do_fchdir(fd)?;
+    Ok(0)
+}
+
 pub async fn do_getcwd(buf_ptr: *mut u8, size: usize) -> Result<isize> {
     let buf = {
         from_user::check_mut_array(buf_ptr, size)?;
