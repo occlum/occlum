@@ -126,6 +126,38 @@ static int __test_chdir(const char *dir_path) {
     if (ret != strlen(dir_path) + 1) {
         THROW_ERROR("failed to check the return value from kernel");
     }
+
+    if (chdir("/") < 0) {
+        THROW_ERROR("failed to chdir back");
+    }
+    return 0;
+}
+
+static int __test_fchdir(const char *dir_path) {
+    char buf[128] = { 0 };
+    char *cwd;
+
+    int dirfd = open(dir_path, O_RDONLY);
+    if (dirfd < 0) {
+        THROW_ERROR("failed to open dir");
+    }
+
+    if (fchdir(dirfd) < 0) {
+        THROW_ERROR("failed to fchdir");
+    }
+
+    cwd = getcwd(buf, sizeof(buf));
+    if (cwd != buf) {
+        THROW_ERROR("failed to getcwd");
+    }
+    if (strcmp(buf, dir_path)) {
+        THROW_ERROR("the cwd is incorrect after chdir");
+    }
+
+    if (chdir("/") < 0) {
+        THROW_ERROR("failed to chdir back");
+    }
+    close(dirfd);
     return 0;
 }
 
@@ -146,6 +178,10 @@ static int test_chdir_framework(test_mkdir_func_t fn) {
 
 static int test_chdir() {
     return test_chdir_framework(__test_chdir);
+}
+
+static int test_fchdir() {
+    return test_chdir_framework(__test_fchdir);
 }
 
 // ============================================================================
@@ -191,6 +227,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_mkdir),
     TEST_CASE(test_mkdirat),
     TEST_CASE(test_chdir),
+    TEST_CASE(test_fchdir),
     TEST_CASE(test_rmdir_via_unlinkat),
 };
 
