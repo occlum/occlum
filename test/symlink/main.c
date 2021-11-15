@@ -199,7 +199,10 @@ static int __test_symlinkat(const char *target, const char *link_path) {
     }
     close(dirfd);
 
-    fd = open(link_path, O_RDONLY);
+    if (chdir(dir_name) < 0) {
+        THROW_ERROR("failed to chdir to %s", dir_name);
+    }
+    fd = open(link_name, O_RDONLY);
     if (fd < 0) {
         THROW_ERROR("failed to open link file to read");
     }
@@ -214,6 +217,9 @@ static int __test_symlinkat(const char *target, const char *link_path) {
 
     if (remove_file(target) < 0) {
         THROW_ERROR("failed to delete target file");
+    }
+    if (chdir("/") < 0) {
+        THROW_ERROR("failed to chdir back");
     }
     return 0;
 }
@@ -345,6 +351,12 @@ static int test_symlinkat() {
     return test_symlink_framework(__test_symlinkat, target, link);
 }
 
+static int test_symlinkat_ramfs() {
+    char *target = "/root/test_symlink.file";
+    char *link = "/dev/shm/test_symlink.link";
+    return test_symlink_framework(__test_symlinkat, target, link);
+}
+
 static int test_symlink_to_absolute_target() {
     char *target = "/root/test_symlink.file";
     char *link = "/root/test_symlink.link";
@@ -419,6 +431,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_realpath),
     TEST_CASE(test_readlinkat),
     TEST_CASE(test_symlinkat),
+    TEST_CASE(test_symlinkat_ramfs),
     TEST_CASE(test_symlink_to_absolute_target),
     TEST_CASE(test_symlink_to_relative_target),
     TEST_CASE(test_symlink_from_ramfs),
