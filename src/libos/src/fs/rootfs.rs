@@ -75,7 +75,7 @@ pub fn open_root_fs_according_to(
 }
 
 pub fn mount_nonroot_fs_according_to(
-    root: &MNode,
+    root: &Arc<dyn INode>,
     mount_configs: &Vec<ConfigMount>,
     user_key: &Option<sgx_key_128bit_t>,
 ) -> Result<()> {
@@ -123,11 +123,15 @@ pub fn mount_nonroot_fs_according_to(
     Ok(())
 }
 
-pub fn mount_fs_at(fs: Arc<dyn FileSystem>, parent_inode: &MNode, abs_path: &Path) -> Result<()> {
-    let mut mount_dir = parent_inode.find(false, ".")?;
+pub fn mount_fs_at(
+    fs: Arc<dyn FileSystem>,
+    parent_inode: &Arc<dyn INode>,
+    abs_path: &Path,
+) -> Result<()> {
+    let mut mount_dir = parent_inode.find(".")?;
     // The first component of abs_path is the RootDir, skip it.
     for dirname in abs_path.iter().skip(1) {
-        mount_dir = match mount_dir.find(false, dirname.to_str().unwrap()) {
+        mount_dir = match mount_dir.find(dirname.to_str().unwrap()) {
             Ok(existing_dir) => {
                 if existing_dir.metadata()?.type_ != FileType::Dir {
                     return_errno!(EIO, "not a directory");
@@ -137,7 +141,7 @@ pub fn mount_fs_at(fs: Arc<dyn FileSystem>, parent_inode: &MNode, abs_path: &Pat
             Err(_) => return_errno!(ENOENT, "Mount point does not exist"),
         };
     }
-    mount_dir.mount(fs);
+    mount_dir.downcast_ref::<MNode>().unwrap().mount(fs);
     Ok(())
 }
 
