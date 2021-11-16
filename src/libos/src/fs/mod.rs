@@ -7,7 +7,7 @@ use std::boxed::Box;
 use std::fmt;
 use std::io::{Read, Seek, Write};
 use std::mem::MaybeUninit;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
 
 pub use async_io::event::{Events, Observer, Pollee, Poller};
