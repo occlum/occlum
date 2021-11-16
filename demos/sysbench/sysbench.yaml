@@ -1,0 +1,9 @@
+includes:
+  - base.yaml
+# sysbench
+targets:
+  # copy sysbench
+  - target: /bin
+    copy:
+      - files:
+        - ../sysbench-install/bin/sysbench
