@@ -9,49 +9,42 @@ env:
 
 jobs:
   C_cpp_rust_golang_embedded_mode_support_test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: true
 
-    - name: Get occlum version
-      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'language_support_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
-    - name: Create container
-      run: docker run -itd --name=language_support_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
-
-    - name: Build dependencies
-      run: docker exec language_support_test bash -c "cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec language_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
-
-    - name: Make test
-      run: docker exec language_support_test bash -c "cd /root/occlum; SGX_MODE=SIM make test"
-    
     - name: C test
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/hello_c && make;
             occlum new occlum_instance;
-            cp hello_world occlum_instance/image/bin;
-            cd occlum_instance && SGX_MODE=SIM occlum build;
+            cd occlum_instance && rm -rf image;
+            copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
+            SGX_MODE=SIM occlum build;
             occlum run /bin/hello_world"
 
     - name: C with encrypted image test
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/hello_c && make;
             rm -rf occlum_instance && occlum new occlum_instance;
             occlum gen-image-key occlum_instance/image_key;
-            cp hello_world occlum_instance/image/bin;
-            cd occlum_instance && SGX_MODE=SIM occlum build --image-key ./image_key --buildin-image-key;
+            cd occlum_instance && rm -rf image;
+            copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
+            SGX_MODE=SIM occlum build --image-key ./image_key --buildin-image-key;
             occlum run /bin/hello_world"
 
     - name: C++ test
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/hello_cc && make;
             occlum new occlum_instance;
-            cp hello_world occlum_instance/image/bin;
-            cd occlum_instance && SGX_MODE=SIM occlum build;
+            cd occlum_instance && rm -rf image;
+            copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
+            SGX_MODE=SIM occlum build;
             occlum run /bin/hello_world"
-  
+
     - name: Rust test
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/rust && SGX_MODE=SIM ./run_rust_demo_on_occlum.sh"
 
@@ -59,15 +52,13 @@ jobs:
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/embedded_mode && SGX_MODE=SIM make;
             SGX_MODE=SIM make test"
 
+    - name: Run Golang sqlite test
+      run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh"
+
     - name: Go Server set up and run
-      run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/web_server && occlum-go get -u -v github.com/gin-gonic/gin;
+      run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/web_server && occlum-go mod init web_server && occlum-go get -u -v github.com/gin-gonic/gin;
             occlum-go build -o web_server ./web_server.go;
             SGX_MODE=SIM ./run_golang_on_occlum.sh" &
-
-    - name: Curl test
-      run: |
-        sleep ${{ env.nap_time }};
-        docker exec language_support_test bash -c "curl http://127.0.0.1:8090/ping"
 
     - name: Set up Golang grpc pingpong test
       run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/grpc_pingpong && ./prepare_ping_pong.sh"
@@ -80,103 +71,67 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec language_support_test bash -c "cd /root/occlum/demos/golang/grpc_pingpong && SGX_MODE=SIM ./run_ping_on_occlum.sh" &
 
-    # TODO: Remove " || true " because in simulation mode, process exits brutely and can cause segmentation fault in some cases.
-    - name: Run Golang sqlite test
-      run: docker exec language_support_test bash -c "cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh" || true
-
-    # TODO: When sgx simulation mode can handle interrupt signal, remove this.
-    - name: Kill the container
+    - name: Curl test
       run: |
         sleep ${{ env.nap_time }};
-        docker stop language_support_test
+        docker exec language_support_test bash -c "curl http://127.0.0.1:8090/ping"
 
-
-  # TODO: Add Java web server test
   Java_support_test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: true
 
-    - name: Get occlum version
-      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
-
-    - name: Create container
-      run: docker run -itd --name=java_support_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
-
-    - name: Build dependencies
-      run: docker exec java_support_test bash -c "cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec java_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'java_support_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Compile Java
       run: docker exec java_support_test bash -c "cd /root/occlum/demos/java && occlum-javac ./hello_world/Main.java"
 
     - name: Run hello world
-      run: docker exec java_support_test bash -c "cd /root/occlum/demos/java && SGX_MODE=SIM ./run_java_on_occlum.sh hello" &
+      run: docker exec java_support_test bash -c "cd /root/occlum/demos/java && SGX_MODE=SIM ./run_java_on_occlum.sh hello"
 
-    # TODO: When sgx simulation mode can handle page fault exception, remove this.
-    - name: Kill the container
-      run: |
-        sleep ${{ env.nap_time }};
-        docker stop java_support_test
+    - name: Compile processBuilder demo
+      run: docker exec java_support_test bash -c "cd /root/occlum/demos/java && occlum-javac ./processBuilder/processBuilder.java"
 
+    - name: Run processBuilder
+      run: docker exec java_support_test bash -c "cd /root/occlum/demos/java && SGX_MODE=SIM ./run_java_on_occlum.sh processBuilder"
 
   Fish_test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: true
 
-    - name: Get occlum version
-      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
-
-    - name: Create container
-      run: docker run -itd --name=fish_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
-
-    - name: Build dependencies
-      run: docker exec fish_test bash -c "cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec fish_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'fish_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Build Fish dependencies
       run: docker exec fish_test bash -c "cd /root/occlum/demos/fish && ./download_and_build.sh"
 
     - name: Run Fish test
-      run: docker exec fish_test bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_fish_test.sh" &
+      run: docker exec fish_test bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_fish_test.sh"
 
     - name: Run Fish process rlimit test
-      run: docker exec fish_test bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_per_process_config_test.sh" &
-
-    # TODO: When sgx simulation mode supports interrupt signal, remove this.
-    - name: Kill the container
-      run: |
-        sleep ${{ env.nap_time }};
-        docker stop fish_test
-
+      run: docker exec fish_test bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_per_process_config_test.sh"
 
   Bazel_test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: true
 
-    - name: Get occlum version
-      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
-
-    - name: Create container
-      run: docker run -itd --name=hello_bazel_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
-
-    - name: Build dependencies
-      run: docker exec hello_bazel_test bash -c "cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec hello_bazel_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'hello_bazel_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Install bazel
       run: docker exec hello_bazel_test bash -c "cd /root/occlum/demos/hello_bazel && wget https://github.com/bazelbuild/bazel/releases/download/3.2.0/bazel-3.2.0-installer-linux-x86_64.sh;
@@ -188,29 +143,22 @@ jobs:
 
     - name: Test bazel
       run: docker exec hello_bazel_test bash -c "cd /root/occlum/demos/hello_bazel && occlum new occlum_instance;
-            cp examples/cpp-tutorial/stage3/bazel-bin/main/hello-world occlum_instance/image/bin;
-            cd occlum_instance && SGX_MODE=SIM occlum build;
+            cd occlum_instance && rm -rf image && copy_bom -f ../bazel.yaml --root image --include-dir /opt/occlum/etc/template;
+            SGX_MODE=SIM occlum build;
             occlum run /bin/hello-world"
 
 
   Https_server_test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: true
 
-    - name: Get occlum version
-      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
-
-    - name: Create container
-      run: docker run -itd --name=https_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
-
-    - name: Build dependencies
-      run: docker exec https_test bash -c "cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec https_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'https_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Build https server dependencies
       run: docker exec https_test bash -c "cd /root/occlum/demos/https_server && ./download_and_build_mongoose.sh"
@@ -225,23 +173,16 @@ jobs:
 
 
   Local_attestation_test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: true
 
-    - name: Get occlum version
-      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
-
-    - name: Create container
-      run: docker run -itd --name=la_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
-
-    - name: Build dependencies
-      run: docker exec la_test bash -c "cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec la_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'la_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Build LA dependencies
       run: docker exec la_test bash -c "cd /root/occlum/demos/local_attestation && ./download_src_and_build_deps.sh"
@@ -252,23 +193,16 @@ jobs:
 
 
   Sqlite_test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: true
 
-    - name: Get occlum version
-      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
-
-    - name: Create container
-      run: docker run -itd --name=sqlite_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
-
-    - name: Build dependencies
-      run: docker exec sqlite_test bash -c "cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec sqlite_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'sqlite_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Build sqlite dependencies
       run: docker exec sqlite_test bash -c "cd /root/occlum/demos/sqlite && ./download_and_build_sqlite.sh"
@@ -278,54 +212,38 @@ jobs:
 
 
   Xgboost_test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: true
 
-    - name: Get occlum version
-      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
-
-    - name: Create container
-      run: docker run -itd --name=xgboost_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
-
-    - name: Build dependencies
-      run: docker exec xgboost_test bash -c "cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec xgboost_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'xgboost_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Build xgboost dependencies
       run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && ./download_and_build_xgboost.sh"
 
-    # TODO: Remove " || true " because in simulation mode, process exits brutely and can cause segmentation fault in some cases.
     - name: Run xgboost test
-      run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test" || true
+      run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test"
 
-    # TODO: Remove " || true " because in simulation mode, process exits brutely and can cause segmentation fault in some cases.
     - name: Run xgboost cluster test
-      run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test-local-cluster" || true
+      run: docker exec xgboost_test bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test-local-cluster"
 
 
   Tensorflow_lite_test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: true
 
-    - name: Get occlum version
-      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
-
-    - name: Create container
-      run: docker run -itd --name=tflite_test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
-
-    - name: Build dependencies
-      run: docker exec tflite_test bash -c "cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec tflite_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'tflite_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Build Tensorflow-lite dependencies
       run: docker exec tflite_test bash -c "cd /root/occlum/demos/tensorflow_lite && ./download_and_build_tflite.sh"
@@ -337,9 +255,58 @@ jobs:
       run: docker exec tflite_test bash -c "cd /root/occlum/demos/tensorflow_lite && SGX_MODE=SIM ./run_tflite_in_occlum.sh benchmark"
 
 
+  Pytorch_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'pytorch_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Build python and pytorch
+      run: docker exec pytorch_test bash -c "cd /root/occlum/demos/pytorch; ./install_python_with_conda.sh"
+
+    - name: Run pytorch test
+      run: docker exec -d pytorch_test bash -c "cd /root/occlum/demos/pytorch; SGX_MODE=SIM ./run_pytorch_on_occlum.sh 2>&1 | tee /root/occlum/log"
+
+    # FIXME: PyTorch can't exit normally in SIM mode
+    - name: Kill the container
+      run: |
+        sleep 360;
+        cat "$GITHUB_WORKSPACE/log";
+        if grep -q Done "$GITHUB_WORKSPACE/log"; then
+          docker stop pytorch_test
+        else
+          exit 1
+        fi
+
+
+  Tensorflow_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'tensorflow_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Build python and tensorflow
+      run: docker exec tensorflow_test bash -c "cd /root/occlum/demos/tensorflow/tensorflow_training; ./install_python_with_conda.sh"
+
+    - name: Run tensorflow test
+      run: docker exec tensorflow_test bash -c "cd /root/occlum/demos/tensorflow/tensorflow_training; SGX_MODE=SIM ./run_tensorflow_on_occlum.sh 2>&1 | tee /root/occlum/log"
+
+
 # Below tests needs test image to run faster
   Grpc_test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
       with:
@@ -352,7 +319,7 @@ jobs:
       run: docker exec grpc_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec grpc_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+      run: docker exec grpc_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Prepare grpc sample project
       run: docker exec grpc_test bash -c "cd /root/demos/grpc && ./prepare_client_server.sh"
@@ -360,15 +327,14 @@ jobs:
     - name: Run grpc server
       run: docker exec grpc_test bash -c "cd /root/demos/grpc && SGX_MODE=SIM ./run_server_on_occlum.sh" &
 
-    # TODO: Remove " || true " because in simulation mode, process exits brutely and can cause segmentation fault in some cases.
     - name: Run grpc client
       run: |
         sleep ${{ env.nap_time }};
-        docker exec grpc_test bash -c "cd /root/demos/grpc && SGX_MODE=SIM ./run_client_on_occlum.sh" || true
+        docker exec grpc_test bash -c "cd /root/demos/grpc && SGX_MODE=SIM ./run_client_on_occlum.sh"
 
 
   Openvino_test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
       with:
@@ -381,30 +347,217 @@ jobs:
       run: docker exec openvino_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec openvino_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+      run: docker exec openvino_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Run openVINO benchmark
-      run: docker exec openvino_test bash -c "cd /root/demos/openvino && SGX_MODE=SIM ./run_benchmark_on_occlum.sh"
+      run: docker exec openvino_test bash -c "cd /root/demos/openvino && cp -rf /root/occlum/demos/openvino/* . && SGX_MODE=SIM ./run_benchmark_on_occlum.sh"
 
 
   # Python test also needs its own image because in Alpine environment, modules are built locally and consumes a lot of time.
-  Python_support_test:
-    runs-on: ubuntu-18.04
+  Python_musl_support_test:
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: true
     - name: Create container
-      run: docker run -itd --name=python_support_test -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-python
+      run: docker run -itd --name=python_musl_support_test -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-python
 
     - name: Build dependencies
-      run: docker exec python_support_test bash -c "cd /root/occlum; make submodule"
+      run: docker exec python_musl_support_test bash -c "cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec python_support_test bash -c "cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      run: docker exec python_musl_support_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Run python support test
-      run: docker exec python_support_test bash -c "cd /root/occlum/demos/python; SGX_MODE=SIM ./run_python_on_occlum.sh"
+      run: docker exec python_musl_support_test bash -c "cd /root/occlum/demos/python/python_musl; SGX_MODE=SIM ./run_python_on_occlum.sh"
 
     - name: Check result
-      run: docker exec python_support_test bash -c "cd /root/occlum/demos/python/occlum_instance; cat smvlight.dat"
+      run: docker exec python_musl_support_test bash -c "cd /root/occlum/demos/python/python_musl/occlum_instance; cat smvlight.dat"
+
+  # Python glibc support test
+  Python_glibc_support_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'python_glibc_support_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: download conda and build python
+      run: docker exec python_glibc_support_test bash -c "cd /root/occlum/demos/python/python_glibc; ./install_python_with_conda.sh"
+
+    - name: Run python glibc support test
+      run: docker exec python_glibc_support_test bash -c "cd /root/occlum/demos/python/python_glibc; SGX_MODE=SIM ./run_python_on_occlum.sh"
+
+    - name: Check result
+      run: docker exec python_glibc_support_test bash -c "cd /root/occlum/demos/python/python_glibc/occlum_instance; cat smvlight.dat"
+
+  # Redis test
+  Redis_support_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'redis_support_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: download and build redis
+      run: docker exec redis_support_test bash -c "cd /root/occlum/demos/redis; ./download_and_build_redis.sh"
+
+    - name: Run redis benchmark
+      run: docker exec redis_support_test bash -c "cd /root/occlum/demos/redis; SGX_MODE=SIM ./benchmark.sh"
+
+    - name: Restart the container
+      run: |
+        sleep ${{ env.nap_time }};
+        docker restart redis_support_test
+
+    - name: download and build redis with glibc
+      run: docker exec redis_support_test bash -c "cd /root/occlum/demos/redis; ./download_and_build_redis_glibc.sh"
+
+    - name: Run redis benchmark
+      run: docker exec redis_support_test bash -c "cd /root/occlum/demos/redis; SGX_MODE=SIM ./benchmark_glibc.sh"
+
+  flink_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'flink_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Download flink
+      run: docker exec flink_test bash -c "cd /root/occlum/demos/flink && ./download_flink.sh"
+
+    - name: Run jobmanager on host
+      run: docker exec flink_test bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_jobmanager_on_host.sh"
+
+    - name: Run flink taskmanager
+      run: docker exec flink_test bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_on_occlum_glibc.sh tm"
+
+    - name: Run flink task
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec flink_test bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_on_occlum_glibc.sh task"
+
+  Cluster_serving_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'cluster_serving_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Set up environment
+      run: docker exec cluster_serving_test bash -c "cd /root/occlum/demos/cluster_serving; source ./environment.sh; ./install-dependencies.sh"
+
+    - name: Run cluster serving test
+      run: docker exec cluster_serving_test bash -c "cd /root/occlum/demos/cluster_serving; source ./environment.sh; SGX_MODE=SIM ./start-all.sh; ./push-image.sh"
+
+  enclave_ra_tls_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'enclave_ra_tls_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Download and build Enclave TLS
+      run: docker exec enclave_ra_tls_test bash -c "cd /root/occlum/demos/enclave_tls && ./download_and_build_enclave_tls.sh"
+
+    - name: Run the encalve tls server on Occlum
+      run: docker exec enclave_ra_tls_test bash -c "cd /root/occlum/demos/enclave_tls && SGX_MODE=SIM ./run_enclave_tls_server_in_occlum.sh"
+
+    # Ignore the result here as simulation mode doesn't have RA capabilities
+    - name: Run the encalve tls client
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec enclave_ra_tls_test bash -c "/usr/share/enclave-tls/samples/enclave-tls-client" || true
+
+  vault_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'vault_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Download and build HashiCorp Vault
+      run: docker exec vault_test bash -c "cd /root/occlum/demos/golang/vault && ./prepare_vault.sh"
+
+    - name: Run the Vault server on Occlum
+      run: docker exec vault_test bash -c "cd /root/occlum/demos/golang/vault && SGX_MODE=SIM ./run_occlum_vault_server.sh"
+
+    - name: Run the Vault client
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec vault_test bash -c "cd /root/occlum/demos/golang/vault && ./run_occlum_vault_test.sh"
+
+  sofaboot_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'sofaboot_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Install Maven
+      run: docker exec sofaboot_test bash -c "apt update && apt install -y maven"
+
+    - name: Download and compile sofaboot web demos
+      run: docker exec sofaboot_test bash -c "cd /root/occlum/demos/sofaboot && ./download_compile_sofaboot.sh"
+
+    - name: Run SOFABoot web demo
+      run: docker exec sofaboot_test bash -c "cd /root/occlum/demos/sofaboot && SGX_MODE=SIM ./run_sofaboot_on_occlum.sh"
+
+    - name: Check SOFABoot result
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec sofaboot_test bash -c "curl -s http://localhost:8080/actuator/readiness | grep -v DOWN"
+
+  Bash_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'bash_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Run musl-libc Bash test
+      run: docker exec bash_test bash -c "cd /root/occlum/demos/bash && SGX_MODE=SIM ./run_bash_demo.sh musl"
+
+    - name: Run glibc Bash test
+      run: docker exec bash_test bash -c "cd /root/occlum/demos/bash && SGX_MODE=SIM ./run_bash_demo.sh"

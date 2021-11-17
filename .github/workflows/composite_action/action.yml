@@ -1,0 +1,37 @@
+name: 'Occlum composite action'
+description: 'Occlum container run and source build/install'
+inputs:
+  container-name:
+    description: 'Occlum container name'
+    required: true
+  build-envs:
+    description: 'Occlum build environments'
+    required: false
+    default: 'OCCLUM_RELEASE_BUILD=1'
+  os:
+    description: 'Occlum docker image base OS'
+    required: false
+    default: 'ubuntu18.04'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Print info
+      run: echo Occlum build environment ${{ inputs.build-envs }}
+      shell: bash
+
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Create container
+      run: docker run -itd --name=${{ inputs.container-name }} -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }}
+      shell: bash
+
+    - name: Build dependencies
+      run: docker exec ${{ inputs.container-name }} bash -c "cd /root/occlum; make submodule"
+      shell: bash
+
+    - name: Make install
+      run: docker exec ${{ inputs.container-name }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; ${{ inputs.build-envs}} make install"
+      shell: bash
