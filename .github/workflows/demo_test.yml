@@ -561,3 +561,25 @@ jobs:
 
     - name: Run glibc Bash test
       run: docker exec bash_test bash -c "cd /root/occlum/demos/bash && SGX_MODE=SIM ./run_bash_demo.sh"
+
+  Sysbench_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'sysbench_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Run sysbench download and build
+      run: docker exec sysbench_test bash -c "cd /root/occlum/demos/sysbench && SGX_MODE=SIM ./dl_and_build.sh"
+
+    - name: Run prepare sysbench occlum instance
+      run: docker exec sysbench_test bash -c "cd /root/occlum/demos/sysbench && SGX_MODE=SIM ./prepare_sysbench.sh"
+
+    - name: Run sysbench threads benchmark
+      run: docker exec sysbench_test bash -c "cd /root/occlum/demos/sysbench/occlum_instance;
+            occlum run /bin/sysbench threads --threads=200 --thread-yields=100 --thread-locks=4 --time=30 run"
