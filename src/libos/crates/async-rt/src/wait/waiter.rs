@@ -31,12 +31,8 @@ impl Waiter {
         Self { inner }
     }
 
-    pub fn state(&self) -> WaiterState {
-        self.inner.state()
-    }
-
     pub fn reset(&self) {
-        self.inner.state.store(WaiterState::Idle, Ordering::Relaxed);
+        self.inner.shared_state.lock().state = WaiterState::Idle
     }
 
     /// Wait until being woken by the waker.
@@ -98,10 +94,24 @@ impl Waker {
     }
 }
 
+// Note: state and waker must be updated together.
+struct SharedState {
+    state: WaiterState,
+    raw_waker: Option<RawWaker>,
+}
+
+impl SharedState {
+    pub fn new() -> Self {
+        Self {
+            state: WaiterState::Idle,
+            raw_waker: None,
+        }
+    }
+}
+
 // Accesible by WaiterQueue.
 pub(super) struct WaiterInner {
-    state: Atomic<WaiterState>,
-    raw_waker: Mutex<Option<RawWaker>>,
+    shared_state: Mutex<SharedState>,
     queue_id: Atomic<ObjectId>,
     pub(super) link: LinkedListLink,
 }
@@ -109,19 +119,14 @@ pub(super) struct WaiterInner {
 impl WaiterInner {
     pub fn new() -> Self {
         Self {
-            state: Atomic::new(WaiterState::Idle),
+            shared_state: Mutex::new(SharedState::new()),
             link: LinkedListLink::new(),
-            raw_waker: Mutex::new(None),
             queue_id: Atomic::new(ObjectId::null()),
         }
     }
 
     pub fn state(&self) -> WaiterState {
-        self.state.load(Ordering::Relaxed)
-    }
-
-    pub fn set_state(&self, new_state: WaiterState) {
-        self.state.store(new_state, Ordering::Relaxed)
+        self.shared_state.lock().state.clone()
     }
 
     pub fn queue_id(&self) -> &Atomic<ObjectId> {
@@ -133,16 +138,15 @@ impl WaiterInner {
     }
 
     pub fn wake(&self) -> Option<()> {
-        let mut raw_waker = self.raw_waker.lock();
-        match self.state() {
+        let mut shared_state = self.shared_state.lock();
+        match shared_state.state {
             WaiterState::Idle => {
-                self.set_state(WaiterState::Woken);
+                shared_state.state = WaiterState::Woken;
                 Some(())
             }
             WaiterState::Waiting => {
-                self.set_state(WaiterState::Woken);
-
-                let raw_waker = raw_waker.take().unwrap();
+                shared_state.state = WaiterState::Woken;
+                let raw_waker = shared_state.raw_waker.take().unwrap();
                 raw_waker.wake();
                 Some(())
             }
@@ -168,20 +172,19 @@ impl<'a> Future for WaitFuture<'a> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut raw_waker = self.waiter.raw_waker.lock();
-        match self.waiter.state() {
+        let mut shared_state = self.waiter.shared_state.lock();
+        match shared_state.state {
             WaiterState::Idle => {
-                self.waiter.set_state(WaiterState::Waiting);
-
-                *raw_waker = Some(cx.waker().clone());
+                shared_state.state = WaiterState::Waiting;
+                shared_state.raw_waker = Some(cx.waker().clone());
                 Poll::Pending
             }
             WaiterState::Waiting => {
-                *raw_waker = Some(cx.waker().clone());
+                shared_state.raw_waker = Some(cx.waker().clone());
                 Poll::Pending
             }
             WaiterState::Woken => {
-                debug_assert!(raw_waker.is_none());
+                debug_assert!(shared_state.raw_waker.is_none());
                 Poll::Ready(())
             }
         }
@@ -190,10 +193,10 @@ impl<'a> Future for WaitFuture<'a> {
 
 impl<'a> Drop for WaitFuture<'a> {
     fn drop(&mut self) {
-        let mut raw_waker = self.waiter.raw_waker.lock();
-        if let WaiterState::Waiting = self.waiter.state() {
-            *raw_waker = None;
-            self.waiter.set_state(WaiterState::Idle);
+        let mut shared_state = self.waiter.shared_state.lock();
+        if let WaiterState::Waiting = shared_state.state {
+            shared_state.raw_waker = None;
+            shared_state.state = WaiterState::Idle;
         }
     }
 }
