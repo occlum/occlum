@@ -42,8 +42,8 @@ impl Executor {
         let next_thread_id = AtomicU32::new(0);
         let is_shutdown = AtomicBool::new(false);
         let parks = Arc::new(Parks::new(parallelism));
-        // let scheduler = Box::new(BasicScheduler::new(parks.clone()));
-        let scheduler = Box::new(PriorityScheduler::new(parks.clone()));
+        let scheduler = Box::new(BasicScheduler::new(parks.clone()));
+        // let scheduler = Box::new(PriorityScheduler::new(parks.clone()));
 
         let new_self = Self {
             parallelism,
