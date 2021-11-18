@@ -17,6 +17,9 @@
 static pthread_t thread;
 static int is_running = 0;
 
+extern pthread_t *pal_vcpu_threads;
+extern struct occlum_pal_vcpu_data *pal_vcpu_data;
+
 static void *thread_func(void *_data) {
     while (1) {
         struct timespec timeout = { .tv_sec = 0, .tv_nsec = 250 * MS };
@@ -27,7 +30,11 @@ static void *thread_func(void *_data) {
 
         for (int vcpu_i = 0; vcpu_i < pal_num_vcpus; vcpu_i++) {
             pthread_t vcpu_thread = pal_vcpu_threads[vcpu_i];
-            pthread_kill(vcpu_thread, INTERRUPT_SIGNAL);
+            struct occlum_pal_vcpu_data pal_data = pal_vcpu_data[vcpu_i];
+
+            if ( pal_data.user_space_mark == 1) {
+                pthread_kill(vcpu_thread, INTERRUPT_SIGNAL);
+            }
         }
     }
 }

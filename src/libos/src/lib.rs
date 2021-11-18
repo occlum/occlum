@@ -24,6 +24,7 @@
 // for std::hint::black_box
 #![feature(test)]
 #![feature(atomic_from_mut)]
+#![feature(thread_local)]
 
 #[macro_use]
 extern crate async_rt;

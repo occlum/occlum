@@ -2,7 +2,7 @@ use std::backtrace::{self, PrintFormat};
 use std::ffi::{CStr, CString, OsString};
 use std::panic::{self};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Once;
 
 use sgx_tse::*;
@@ -31,6 +31,12 @@ macro_rules! ecall_errno {
         let errno: Errno = $errno;
         -(errno as i32)
     }};
+}
+
+#[derive(Debug, Default)]
+#[repr(C)]
+pub struct occlum_pal_vcpu_data {
+    user_space_mark: u32,
 }
 
 #[no_mangle]
@@ -150,10 +156,13 @@ pub extern "C" fn occlum_ecall_new_process(
 }
 
 #[no_mangle]
-pub extern "C" fn occlum_ecall_run_vcpu() -> i32 {
+pub extern "C" fn occlum_ecall_run_vcpu(pal_data_ptr: *const occlum_pal_vcpu_data) -> i32 {
     if HAS_INIT.load(Ordering::SeqCst) == false {
         return ecall_errno!(EAGAIN);
     }
+
+    assert!(!pal_data_ptr.is_null());
+    set_pal_data_addr(pal_data_ptr);
 
     async_rt::executor::run_tasks();
 
@@ -364,3 +373,18 @@ fn merge_env(env: *const *const c_char) -> Result<Vec<CString>> {
     trace!("env_checked from env untrusted: {:?}", env_checked);
     Ok([env_default.content, env_checked].concat())
 }
+
+pub(crate) fn set_pal_data_addr(pal_data_ptr: *const occlum_pal_vcpu_data) {
+    let pal_data_addr = pal_data_ptr as usize;
+    PAL_DATA.store(pal_data_addr, Ordering::Relaxed);
+}
+
+pub fn set_user_space_mark(mark: u32) {
+    let pal_data_addr = PAL_DATA.load(Ordering::Relaxed);
+    let pal_data_ptr = unsafe { &mut *(pal_data_addr as *mut occlum_pal_vcpu_data) };
+
+    (*pal_data_ptr).user_space_mark = mark;
+}
+
+#[thread_local]
+static PAL_DATA: AtomicUsize = AtomicUsize::new(0);

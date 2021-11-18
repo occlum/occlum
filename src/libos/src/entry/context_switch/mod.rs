@@ -42,7 +42,9 @@ pub unsafe fn switch_to_user() -> Fault {
 
     crate::entry::interrupt::enable_current_thread();
     unsafe {
+        crate::entry::enclave::set_user_space_mark(1);
         _switch_to_user(context_ptr, fault_ptr);
+        crate::entry::enclave::set_user_space_mark(0);
     }
     crate::entry::interrupt::disable_current_thread();
 

@@ -102,6 +102,14 @@ struct occlum_pal_create_process_args {
     int *exit_status;
 };
 
+struct occlum_pal_vcpu_data {
+    // Output. Mark to indicate if the enclave threads running in the VCPU is in user space
+    // Set to 1 if entering to user space.
+    // Set to 0 if exited from user space.
+    // Only do sig64 kill when VCPU is running in user space.
+    unsigned int user_space_mark;
+};
+
 /*
  * @brief Initialize an Occlum enclave
  *
@@ -121,7 +129,7 @@ int occlum_pal_init(const struct occlum_pal_attr *attr);
 int occlum_pal_create_process(struct occlum_pal_create_process_args *args);
 
 
-int occlum_pal_run_vcpu(void);
+int occlum_pal_run_vcpu(struct occlum_pal_vcpu_data *vcpu_ptr);
 
 
 /*

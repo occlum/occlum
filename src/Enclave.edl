@@ -75,7 +75,7 @@ enclave {
         /*
          * Run a vCPU.
          */
-        public int occlum_ecall_run_vcpu(void);
+        public int occlum_ecall_run_vcpu([user_check] struct occlum_pal_vcpu_data * vcpu_ptr);
 
         /*
          * Shut down all vCPUs.

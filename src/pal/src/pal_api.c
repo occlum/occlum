@@ -187,7 +187,7 @@ int occlum_pal_create_process(struct occlum_pal_create_process_args *args) {
     return 0;
 }
 
-int occlum_pal_run_vcpu(void) {
+int occlum_pal_run_vcpu(struct occlum_pal_vcpu_data *vcpu_ptr) {
     sgx_enclave_id_t eid = pal_get_enclave_id();
     if (eid == SGX_INVALID_ENCLAVE_ID) {
         PAL_ERROR("Enclave is not initialized yet.");
@@ -196,7 +196,7 @@ int occlum_pal_run_vcpu(void) {
     }
 
     int ecall_ret = 0;
-    sgx_status_t ecall_status = occlum_ecall_run_vcpu(eid, &ecall_ret);
+    sgx_status_t ecall_status = occlum_ecall_run_vcpu(eid, &ecall_ret, vcpu_ptr);
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
         PAL_ERROR("Failed to do ECall: %s", sgx_err);
