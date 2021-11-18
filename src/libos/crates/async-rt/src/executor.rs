@@ -63,6 +63,9 @@ impl Executor {
         let thread_id = self.next_thread_id.fetch_add(1, Ordering::Relaxed) as usize;
         assert!(thread_id < self.parallelism as usize);
 
+        crate::task::current::set_vcpu_id(thread_id as u32);
+        debug!("run tasks on vcpu {}", thread_id);
+
         loop {
             let task_option = self.scheduler.dequeue_task(thread_id);
 

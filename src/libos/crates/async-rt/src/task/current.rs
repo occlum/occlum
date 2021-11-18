@@ -37,3 +37,14 @@ fn free_task_ptr(ptr: *const Task) {
 
 #[thread_local]
 static CURRENT: Cell<*const Task> = Cell::new(ptr::null_mut());
+
+pub(crate) fn set_vcpu_id(vcpu_id: u32) {
+    VCPU_ID.store(vcpu_id, Ordering::Relaxed);
+}
+
+pub fn get_vcpu_id() -> u32 {
+    VCPU_ID.load(Ordering::Relaxed)
+}
+
+#[thread_local]
+static VCPU_ID: AtomicU32 = AtomicU32::new(0);
