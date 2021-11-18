@@ -82,6 +82,12 @@ fn tid() -> Option<u64> {
     async_rt::task::current::try_get().map(|current| current.tid().0)
 }
 
+fn vcpu_id() -> Option<i32> {
+    let vcpu_id = async_rt::task::current::get_vcpu_id();
+
+    Some(vcpu_id as i32)
+}
+
 async_rt::task_local! {
     static ROUND_COUNT : Cell<u64> = Default::default();
     static ROUND_DESC : Cell<Option<&'static str>> = Default::default();
@@ -108,12 +114,14 @@ impl Log for SimpleLogger {
         if self.enabled(record.metadata()) {
             // parts of message
             let level = record.level();
+            let vcpu_id = vcpu_id();
             let tid = tid();
             let rounds = round_count();
             let desc = round_desc();
             let message = format!(
-                "[{:>5}]{}{}{} {}\0",
+                "[{:>5}]{}{}{}{} {}\0",
                 level,
+                format_option!("[C:{}]", vcpu_id),
                 format_option!("[T{}]", tid),
                 format_option!("[#{}]", rounds),
                 format_option!("[{:·>8}]", desc),
