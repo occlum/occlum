@@ -14,21 +14,25 @@ impl Parks {
         Self { sleep_threads }
     }
 
-    pub fn park(&self, thread_id: usize) {
+    pub fn register(&self, thread_id: usize) {
         assert!(thread_id < self.sleep_threads.len());
 
         let mut sleep_thread = self.sleep_threads[thread_id].lock();
         sleep_thread.replace(std::thread::current());
-        drop(sleep_thread);
+    }
+
+    pub fn unregister(&self, thread_id: usize) {
+        assert!(thread_id < self.sleep_threads.len());
+
+        let mut sleep_thread = self.sleep_threads[thread_id].lock();
+        sleep_thread.take();
+    }
+
+    pub fn park(&self) {
         std::thread::park();
     }
 
-    pub fn park_timeout(&self, thread_id: usize, duration: core::time::Duration) {
-        assert!(thread_id < self.sleep_threads.len());
-
-        let mut sleep_thread = self.sleep_threads[thread_id].lock();
-        sleep_thread.replace(std::thread::current());
-        drop(sleep_thread);
+    pub fn park_timeout(&self, duration: core::time::Duration) {
         std::thread::park_timeout(duration);
     }
 
@@ -36,7 +40,7 @@ impl Parks {
         assert!(thread_id < self.sleep_threads.len());
 
         let mut sleep_thread = self.sleep_threads[thread_id].lock();
-        let thread = sleep_thread.take();
+        let thread = sleep_thread.clone();
         drop(sleep_thread);
         if thread.is_some() {
             thread.unwrap().unpark();

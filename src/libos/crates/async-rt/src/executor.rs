@@ -66,6 +66,8 @@ impl Executor {
         crate::task::current::set_vcpu_id(thread_id as u32);
         debug!("run tasks on vcpu {}", thread_id);
 
+        self.parks.register(thread_id);
+
         loop {
             let task_option = self.scheduler.dequeue_task(thread_id);
 
@@ -75,11 +77,11 @@ impl Executor {
 
             match task_option {
                 Some(task) => self.execute_task(task),
-                None => self
-                    .parks
-                    .park_timeout(thread_id, Duration::from_millis(10)),
+                None => self.parks.park(),
             }
         }
+
+        self.parks.unregister(thread_id);
     }
 
     pub fn execute_task(&self, task: Arc<Task>) {
