@@ -92,7 +92,7 @@ _Other_Enclave_Libs += -lsgx_dcap_tvl
 endif
 LINK_FLAGS := $(SGX_LFLAGS_T)
 
-.PHONY: all clean format format-c format-rust format-check format-check-c format-check-rust gen_cov_report
+.PHONY: all clean format format-c format-rust format-check format-check-c format-check-rust gen_cov_report unit-test
 all: $(ALL_BUILD_SUBDIRS) $(LIBOS_SO_REAL)
 
 $(ALL_BUILD_SUBDIRS):
@@ -203,6 +203,11 @@ gen_cov_report:
 	lcov --gcov-tool $(LLVM_GCOV) --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --exclude 'occlum/deps' --capture --directory ${COV_TARGET_DIR} -o $(ALL_TAG_INFO)
 	lcov --gcov-tool $(LLVM_GCOV) --rc lcov_branch_coverage=1 --rc lcov_excl_line=assert --extract $(ALL_TAG_INFO) `find -L $(COV_TARGET_DIR) -name *.rs` -o $(FINAL_INFO)
 	genhtml --branch-coverage --demangle-cpp --legend $(FINAL_INFO) -o $(COV_REPORT) --ignore-errors source
+
+# Unit tests and doc tests for active crates
+unit-test:
+	cd crates && RUST_BACKTRACE=full cargo test && \
+		cargo doc
 
 clean:
 	@-$(RM) -rf $(OBJ_DIR)/libos

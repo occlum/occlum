@@ -1,4 +1,4 @@
-.PHONY: all submodule githooks src test tools install format format-check gen_cov_report clean
+.PHONY: all submodule githooks src test tools install format format-check gen_cov_report unit-test clean
 
 all: src
 
@@ -57,6 +57,9 @@ test:
 
 test-glibc:
 	@$(MAKE) --no-print-directory -C test test-glibc
+
+unit-test:
+	$(MAKE) --no-print-directory -C src unit-test
 
 OCCLUM_PREFIX ?= /opt/occlum
 install: minimal_sgx_libs

@@ -1,4 +1,4 @@
-.PHONY: all format format-check gen_cov_report clean
+.PHONY: all format format-check gen_cov_report unit-test clean
 
 all:
 	@$(MAKE) --no-print-directory -C libos
@@ -20,6 +20,9 @@ format-check:
 
 gen_cov_report:
 	@$(MAKE) --no-print-directory -C libos gen_cov_report
+
+unit-test:
+	@$(MAKE) --no-print-directory -C libos unit-test
 
 clean:
 	@$(MAKE) --no-print-directory -C libos clean
