@@ -1,4 +1,5 @@
 use std::sync::Once;
+use util::resolv_conf_util::write_resolv_conf;
 
 use super::rootfs::{mount_nonroot_fs_according_to, open_root_fs_according_to};
 use super::*;
@@ -27,5 +28,10 @@ pub fn do_mount_rootfs(
         *root_inode = new_root_inode;
         *ENTRY_POINTS.write().unwrap() = user_config.entry_points.to_owned();
     });
+
+    // Write resolv.conf file into mounted file system
+    write_resolv_conf()?;
+    *RESOLV_CONF_STR.write().unwrap() = None;
+
     Ok(())
 }

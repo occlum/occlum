@@ -29,3 +29,6 @@
 	path = deps/rust-hash-wheel-timer
 	url = https://github.com/ShuochengWang/rust-hash-wheel-timer.git
 	branch = sgx
+[submodule "deps/resolv-conf"]
+	path = deps/resolv-conf
+	url = https://github.com/tailhook/resolv-conf.git
