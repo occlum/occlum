@@ -89,6 +89,10 @@ jobs:
       run: docker exec code_coverage bash -c "cd /root/occlum/demos/linux-ltp && ./dl_and_build_ltp.sh && SGX_MODE=SIM ./prepare_ltp.sh;
             cd ltp_instance;
             occlum run /opt/ltp/run-ltp.sh -f syscalls-occlum"
+    
+    - name : gvisor syscall test
+      run: docker exec code_coverage bash -c "git clone https://github.com/occlum/gvisor.git && cd gvisor/occlum && ./run_occlum_passed_tests.sh && SGX_MODE=SIM ./run_occlum_passed_tests.sh"
+
 
     - name: Upload coverage report
       run: docker exec code_coverage bash -c "cd /root/occlum/build/internal/src/libos/cargo-target/debug/deps; export CODECOV_TOKEN="${{ secrets.COV_TOKEN }}"; bash <(curl -s https://codecov.io/bash)"
