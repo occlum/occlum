@@ -12,6 +12,10 @@ inputs:
     description: 'Occlum docker image base OS'
     required: false
     default: 'ubuntu18.04'
+  container-flags: 
+    description: 'Occlum container flags'
+    required: false
+    default: ''
 
 runs:
   using: "composite"
@@ -25,7 +29,7 @@ runs:
       shell: bash
 
     - name: Create container
-      run: docker run -itd --name=${{ inputs.container-name }} -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }}
+      run: docker run -itd ${{ inputs.container-flags }} --name=${{ inputs.container-name }} -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }}
       shell: bash
 
     - name: Build dependencies

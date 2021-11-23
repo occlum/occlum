@@ -16,10 +16,12 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - name: Set up environment
+      uses: ./.github/workflows/composite_action
       with:
         container-name: 'ubuntu-test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
+        container-flags: '--privileged'
 
     - name: Check format
       run:  docker exec ubuntu-test bash -c 'cd /root/occlum; info=$(make format-check);
@@ -28,6 +30,9 @@ jobs:
           echo "$info";
           exit 1;
         fi'
+
+    - name: Unit test
+      run: docker exec ubuntu-test bash -c "cd /root/occlum; make unit-test"
 
     - name: Integration test
       run:  docker exec ubuntu-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test"
@@ -47,11 +52,13 @@ jobs:
       with:
         submodules: true
 
-    - uses: ./.github/workflows/composite_action
+    - name: Set up environment
+      uses: ./.github/workflows/composite_action
       with:
         container-name: 'centos-test'
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
         os: 'centos8.2'
+        container-flags: '--privileged'
 
     - name: Check format
       run:  docker exec centos-test bash -c 'cd /root/occlum; info=$(make format-check);
@@ -60,6 +67,9 @@ jobs:
           echo "$info";
           exit 1;
         fi'
+
+    - name: Unit test
+      run: docker exec centos-test bash -c "cd /root/occlum; make unit-test"
 
     - name: Integration test
       run:  docker exec centos-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test"
