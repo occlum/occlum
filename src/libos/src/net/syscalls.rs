@@ -7,8 +7,9 @@ use super::io_multiplexing::{AsEpollFile, EpollCtl, EpollFile, EpollFlags, FdSet
 use fs::{CreationFlags, File, FileDesc, FileRef};
 use misc::resource_t;
 use process::Process;
+use signal::{sigset_t, SigSet};
 use std::convert::TryFrom;
-use time::timeval_t;
+use time::{timespec_t, timeval_t};
 use util::mem_util::from_user;
 
 pub fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize> {
@@ -714,7 +715,40 @@ pub fn do_select(
     ret
 }
 
+pub fn do_ppoll(
+    fds: *mut libc::pollfd,
+    nfds: libc::nfds_t,
+    timeout_ts: *const timespec_t,
+    sigmask: *const sigset_t,
+) -> Result<isize> {
+    let mut timeout = if timeout_ts.is_null() {
+        None
+    } else {
+        from_user::check_ptr(timeout_ts)?;
+        let timeout_ts = unsafe { &*timeout_ts };
+        Some(timeout_ts.as_duration())
+    };
+    if !sigmask.is_null() {
+        warn!("ppoll sigmask is not supported!");
+    }
+    do_poll_common(fds, nfds, timeout.as_mut(), None)
+}
+
 pub fn do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout_ms: c_int) -> Result<isize> {
+    let mut timeout = if timeout_ms >= 0 {
+        Some(Duration::from_millis(timeout_ms as u64))
+    } else {
+        None
+    };
+    do_poll_common(fds, nfds, timeout.as_mut(), None)
+}
+
+fn do_poll_common(
+    fds: *mut libc::pollfd,
+    nfds: libc::nfds_t,
+    timeout: Option<&mut Duration>,
+    sigmask: Option<SigSet>,
+) -> Result<isize> {
     // It behaves like sleep when fds is null and nfds is zero.
     if !fds.is_null() || nfds != 0 {
         from_user::check_mut_array(fds, nfds as usize)?;
@@ -737,13 +771,7 @@ pub fn do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout_ms: c_int) ->
         .map(|raw| PollFd::from_raw(raw))
         .collect();
 
-    let mut timeout = if timeout_ms >= 0 {
-        Some(Duration::from_millis(timeout_ms as u64))
-    } else {
-        None
-    };
-
-    let count = io_multiplexing::do_poll_new(&poll_fds, timeout.as_mut())?;
+    let count = io_multiplexing::do_poll_new(&poll_fds, timeout)?;
 
     for (raw_poll_fd, poll_fd) in raw_poll_fds.iter_mut().zip(poll_fds.iter()) {
         raw_poll_fd.revents = poll_fd.revents().get().to_raw() as i16;

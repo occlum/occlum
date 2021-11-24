@@ -38,8 +38,8 @@ use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t, RandFlags};
 use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
     do_epoll_pwait, do_epoll_wait, do_getpeername, do_getsockname, do_getsockopt, do_listen,
-    do_poll, do_recvfrom, do_recvmsg, do_select, do_sendmmsg, do_sendmsg, do_sendto, do_setsockopt,
-    do_shutdown, do_socket, do_socketpair, mmsghdr, msghdr, msghdr_mut,
+    do_poll, do_ppoll, do_recvfrom, do_recvmsg, do_select, do_sendmmsg, do_sendmsg, do_sendto,
+    do_setsockopt, do_shutdown, do_socket, do_socketpair, mmsghdr, msghdr, msghdr_mut,
 };
 use crate::process::{
     do_arch_prctl, do_clone, do_execve, do_exit, do_exit_group, do_futex, do_get_robust_list,
@@ -359,7 +359,7 @@ macro_rules! process_syscall_table_with_callback {
             (Fchmodat = 268) => do_fchmodat(dirfd: i32, path: *const i8, mode: u16),
             (Faccessat = 269) => do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32),
             (Pselect6 = 270) => handle_unsupported(),
-            (Ppoll = 271) => handle_unsupported(),
+            (Ppoll = 271) => do_ppoll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout_ts: *const timespec_t, sigmask: *const sigset_t),
             (Unshare = 272) => handle_unsupported(),
             (SetRobustList = 273) => do_set_robust_list(list_head_ptr: *mut RobustListHead, len: usize),
             (GetRobustList = 274) => do_get_robust_list(tid: pid_t, list_head_ptr_ptr: *mut *mut RobustListHead, len_ptr: *mut usize),
