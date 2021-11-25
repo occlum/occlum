@@ -48,9 +48,12 @@ pub mod from_user {
             return_errno!(EINVAL, "NULL address is invalid");
         }
 
+        // confirm that at least the fisrt byte of the string is from user
+        check_ptr(out_ptr)?;
+
         let cstr = unsafe { CStr::from_ptr(out_ptr) };
         let cstring = CString::from(cstr);
-        if !is_inside_user_space(out_ptr as *const u8, cstring.as_bytes().len()) {
+        if !is_inside_user_space(out_ptr as *const u8, cstring.as_bytes_with_nul().len()) {
             return_errno!(EFAULT, "the whole buffer is not in the user space");
         }
         Ok(cstring)
@@ -127,11 +130,14 @@ pub mod from_untrusted {
             return_errno!(EINVAL, "NULL address is invalid");
         }
 
+        // confirm that at least the fisrt byte of the string is out side of enclave
+        check_ptr(out_ptr)?;
+
         let cstr = unsafe { CStr::from_ptr(out_ptr) };
         let cstring = CString::from(cstr);
         if !sgx_trts::trts::rsgx_raw_is_outside_enclave(
             out_ptr as *const u8,
-            cstring.as_bytes().len(),
+            cstring.as_bytes_with_nul().len(),
         ) {
             return_errno!(EFAULT, "the string is not outside enclave");
         }
