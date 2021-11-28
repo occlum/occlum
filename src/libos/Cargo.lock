@@ -100,6 +100,7 @@ dependencies = [
  "intrusive-collections",
  "lazy_static",
  "log",
+ "new-self-ref-arc",
  "object-id",
  "sgx_tstd",
  "spin 0.7.0",

@@ -6,7 +6,7 @@ use futures::task::ArcWake;
 use crate::executor::EXECUTOR;
 use crate::prelude::*;
 use crate::sched::{SchedInfo, SchedPriority};
-use crate::task::{LocalsMap, TaskId};
+use crate::task::{LocalsMap, TaskId, Tirqs};
 
 const DEFAULT_BUDGET: u8 = 64;
 
@@ -17,6 +17,7 @@ pub struct Task {
     locals: LocalsMap,
     budget: u8,
     consumed_budget: AtomicU8,
+    tirqs: Tirqs,
     weak_self: Weak<Self>,
 }
 
@@ -27,6 +28,27 @@ impl Task {
 
     pub fn sched_info(&self) -> &SchedInfo {
         &self.sched_info
+    }
+
+    pub fn tirqs(&self) -> &Tirqs {
+        &self.tirqs
+    }
+
+    /// Get the task that a given tirqs is associated to.
+    ///
+    /// # Safety
+    ///
+    /// This behavior of this function is undefined if the given tirqs is not
+    /// a field of a task.
+    pub(crate) unsafe fn from_tirqs(tirqs: &Tirqs) -> Arc<Self> {
+        use intrusive_collections::container_of;
+
+        let tirqs_ptr = tirqs as *const _;
+        // Safety. The pointer is valid and the field-container relationship is hold
+        let task_ptr = unsafe { container_of!(tirqs_ptr, Task, tirqs) };
+        // Safety. The container's pointer is valid as long as the field's pointer is valid.
+        let task = unsafe { &*task_ptr };
+        task.to_arc()
     }
 
     pub(crate) fn future(&self) -> &Mutex<Option<BoxFuture<'static, ()>>> {
@@ -114,6 +136,8 @@ impl TaskBuilder {
         let locals = LocalsMap::new();
         let budget = self.budget;
         let consumed_budget = AtomicU8::new(0);
+        // Safety. The tirqs will be inserted into a Task before using it.
+        let tirqs = unsafe { Tirqs::new() };
         let weak_self = Weak::new();
         let task = Task {
             tid,
@@ -122,6 +146,7 @@ impl TaskBuilder {
             locals,
             budget,
             consumed_budget,
+            tirqs,
             weak_self,
         };
         // Create an Arc and update the weak_self

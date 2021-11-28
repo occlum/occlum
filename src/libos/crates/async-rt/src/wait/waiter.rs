@@ -35,12 +35,17 @@ impl Waiter {
         self.inner.shared_state.lock().state = WaiterState::Idle
     }
 
-    /// Wait until being woken by the waker.
-    pub async fn wait(&self) {
-        self.inner.wait().await;
+    /// Wait until being woken by the waker or interrupted by TIRQs.
+    pub async fn wait(&self) -> Result<()> {
+        let is_interrupted = self.inner.wait().await;
+        if !is_interrupted {
+            Ok(())
+        } else {
+            Err(errno!(EINTR, "the waiter is interrupted"))
+        }
     }
 
-    /// Wait until being woken by the waker or reaching timeout.
+    /// Wait until being woken by the waker or being interrupted by TIRQs or reaching timeout.
     ///
     /// In each poll, we will first poll a `WaitFuture` object, if the result is `Ready`, return `Ok`.
     /// If the result is `Pending`, we will poll a `TimerEntry` object, return `Err` if got `Ready`.
@@ -52,20 +57,24 @@ impl Waiter {
             Some(t) => {
                 let timer_entry = TimerEntry::new(*t.borrow_mut());
                 select_biased! {
-                    _ = self.inner.wait().fuse() => {
+                    is_interrupted = self.inner.wait().fuse() => {
                         // We wake up before timeout expired.
                         *t.borrow_mut() = timer_entry.remained_duration();
+                        if !is_interrupted {
+                            Ok(())
+                        } else {
+                            Err(errno!(EINTR, "the waiter is interrupted"))
+                        }
                     }
                     _ = TimerFutureEntry::new(&timer_entry).fuse() => {
                         // The timer expired, we reached timeout.
                         *t.borrow_mut() = DURATION_ZERO;
-                        return_errno!(ETIMEDOUT, "the waiter reached timeout");
+                        Err(errno!(ETIMEDOUT, "the waiter reached timeout"))
                     }
-                };
+                }
             }
             None => self.wait().await,
-        };
-        Ok(())
+        }
     }
 
     pub fn waker(&self) -> Waker {
@@ -169,23 +178,45 @@ impl<'a> WaitFuture<'a> {
 }
 
 impl<'a> Future for WaitFuture<'a> {
-    type Output = ();
+    // Is the future interrupted by TIRQs?
+    type Output = bool;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // A macro that checks if there are any active TIRQs, and if so,
+        // return the future prematurely, indicating that it is interrupted.
+        macro_rules! handle_interrupt {
+            ($shared_state:expr) => {{
+                let is_interrupted = {
+                    let current = crate::task::current::get();
+                    let tirqs = current.tirqs();
+                    tirqs.has_active_reqs()
+                };
+
+                if is_interrupted {
+                    $shared_state.state = WaiterState::Woken;
+                    return Poll::Ready(true);
+                }
+            }};
+        }
+
         let mut shared_state = self.waiter.shared_state.lock();
         match shared_state.state {
             WaiterState::Idle => {
+                handle_interrupt!(&mut shared_state);
+
                 shared_state.state = WaiterState::Waiting;
                 shared_state.raw_waker = Some(cx.waker().clone());
                 Poll::Pending
             }
             WaiterState::Waiting => {
+                handle_interrupt!(&mut shared_state);
+
                 shared_state.raw_waker = Some(cx.waker().clone());
                 Poll::Pending
             }
             WaiterState::Woken => {
                 debug_assert!(shared_state.raw_waker.is_none());
-                Poll::Ready(())
+                Poll::Ready(false)
             }
         }
     }

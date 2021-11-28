@@ -8,6 +8,7 @@ pub use self::id::TaskId;
 pub use self::join::JoinHandle;
 pub use self::locals::LocalKey;
 pub use self::task::Task;
+pub use self::tirqs::Tirqs;
 
 pub(crate) use self::locals::LocalsMap;
 
@@ -16,6 +17,7 @@ mod id;
 mod join;
 mod locals;
 mod task;
+mod tirqs;
 
 pub fn spawn<T: Send + 'static>(future: impl Future<Output = T> + 'static + Send) -> JoinHandle<T> {
     SpawnOptions::new(future).spawn()
