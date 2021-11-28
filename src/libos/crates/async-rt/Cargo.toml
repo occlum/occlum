@@ -22,6 +22,7 @@ hierarchical_hash_wheel_timer = { path = "../../../../deps/rust-hash-wheel-timer
 intrusive-collections = "0.9"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 log = "0.4"
+new-self-ref-arc = { path = "../new-self-ref-arc" }
 object-id = { path = "../object-id" }
 spin = "0.7"
 sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", features = ["backtrace", "thread"], optional = true }

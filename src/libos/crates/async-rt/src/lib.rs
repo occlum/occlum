@@ -18,6 +18,7 @@
 #![feature(duration_zero)]
 #![feature(duration_constants)]
 #![feature(duration_saturating_ops)]
+#![feature(get_mut_unchecked)]
 
 #[cfg(feature = "sgx")]
 #[macro_use]

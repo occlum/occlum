@@ -1,3 +1,4 @@
+use alloc::sync::Weak;
 use core::fmt::{self, Debug};
 
 use futures::task::ArcWake;
@@ -16,6 +17,7 @@ pub struct Task {
     locals: LocalsMap,
     budget: u8,
     consumed_budget: AtomicU8,
+    weak_self: Weak<Self>,
 }
 
 impl Task {
@@ -45,6 +47,10 @@ impl Task {
 
     pub(crate) fn consume_budget(&self) {
         self.consumed_budget.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(crate) fn to_arc(&self) -> Arc<Self> {
+        self.weak_self.upgrade().unwrap()
     }
 }
 
@@ -108,13 +114,17 @@ impl TaskBuilder {
         let locals = LocalsMap::new();
         let budget = self.budget;
         let consumed_budget = AtomicU8::new(0);
-        Arc::new(Task {
+        let weak_self = Weak::new();
+        let task = Task {
             tid,
             sched_info,
             future,
             locals,
             budget,
             consumed_budget,
-        })
+            weak_self,
+        };
+        // Create an Arc and update the weak_self
+        new_self_ref_arc::new_self_ref_arc!(task)
     }
 }
