@@ -65,17 +65,22 @@ pub fn do_rt_sigreturn() -> Result<()> {
 /// syscall and at a very late stage.
 ///
 /// **Post-condition.** The temporary signal mask of the current thread is cleared.
+///
+/// **Interaction with force_signal.** If force_signal is called during a syscall,
+/// then deliver_signal won't deliver any signals.
 pub fn deliver_signal() {
     let thread = current!();
     let process = thread.process();
 
-    if !process.is_forced_to_exit() {
-        do_deliver_signal(&thread, &process);
+    if process.is_forced_to_exit() {
+        return;
     }
 
-    // Ensure the tmp signal mask is cleared before sysret
-    let mut tmp_sig_mask = thread.sig_tmp_mask().write().unwrap();
-    *tmp_sig_mask = SigSet::new_empty();
+    if !forced_signal_flag::get() {
+        do_deliver_signal(&thread, &process);
+    } else {
+        forced_signal_flag::reset();
+    }
 }
 
 fn do_deliver_signal(thread: &ThreadRef, process: &ProcessRef) {
@@ -86,11 +91,9 @@ fn do_deliver_signal(thread: &ThreadRef, process: &ProcessRef) {
             return;
         }
 
+        // Dequeue a signal, respecting the signal mask
         let signal = {
-            // Dequeue a signal, respecting the signal mask and tmp mask
-            let sig_mask =
-                *thread.sig_mask().read().unwrap() | *thread.sig_tmp_mask().read().unwrap();
-
+            let sig_mask = *thread.sig_mask().read().unwrap();
             let signal_opt = process
                 .sig_queues()
                 .write()
@@ -122,13 +125,10 @@ pub fn force_signal(signal: Box<dyn Signal>) {
     let thread = current!();
     let process = thread.process();
 
-    handle_signal(signal, &thread, &process);
+    assert!(forced_signal_flag::get() == false);
+    forced_signal_flag::set();
 
-    // Temporarily block all signals from being delivered until this syscall is
-    // over. This ensures that the updated curr_cpu_ctxt will not be overriden
-    // to deliver any other signal.
-    let mut tmp_sig_mask = thread.sig_tmp_mask().write().unwrap();
-    *tmp_sig_mask = SigSet::new_full();
+    handle_signal(signal, &thread, &process);
 }
 
 fn handle_signal(signal: Box<dyn Signal>, thread: &ThreadRef, process: &ProcessRef) -> bool {
@@ -411,5 +411,32 @@ impl CpuContextStack {
         }
         self.count -= 1;
         self.stack[self.count].take()
+    }
+}
+
+// This module maintain a flag about whether a task already has a forced signal.
+// The goal is to ensure that during the execution of a syscall at most one
+// signal is forced.
+mod forced_signal_flag {
+    use core::cell::Cell;
+
+    pub fn get() -> bool {
+        HAS_FORCED_SIGNAL.with(|has_forced_signal| has_forced_signal.get())
+    }
+
+    pub fn set() {
+        HAS_FORCED_SIGNAL.with(|has_forced_signal| {
+            has_forced_signal.set(true);
+        })
+    }
+
+    pub fn reset() {
+        HAS_FORCED_SIGNAL.with(|has_forced_signal| {
+            has_forced_signal.set(false);
+        })
+    }
+
+    task_local! {
+        static HAS_FORCED_SIGNAL: Cell<bool> = Cell::new(false);
     }
 }

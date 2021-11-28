@@ -35,7 +35,6 @@ pub struct Thread {
     // Signal
     sig_queues: RwLock<SigQueues>,
     sig_mask: RwLock<SigSet>,
-    sig_tmp_mask: RwLock<SigSet>,
     sig_stack: SgxMutex<Option<SigStack>>,
 }
 
@@ -79,14 +78,6 @@ impl Thread {
     /// Get the per-thread signal mask.
     pub fn sig_mask(&self) -> &RwLock<SigSet> {
         &self.sig_mask
-    }
-
-    /// Get the per-thread, temporary signal mask.
-    ///
-    /// The tmp mask is always cleared at the end of the execution
-    /// of a syscall.
-    pub fn sig_tmp_mask(&self) -> &RwLock<SigSet> {
-        &self.sig_tmp_mask
     }
 
     /// Get the alternate signal stack.

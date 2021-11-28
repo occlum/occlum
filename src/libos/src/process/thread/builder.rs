@@ -114,7 +114,6 @@ impl ThreadBuilder {
         let name = RwLock::new(self.name.unwrap_or_default());
         let sig_mask = RwLock::new(self.sig_mask.unwrap_or_default());
         let sig_queues = RwLock::new(SigQueues::new());
-        let sig_tmp_mask = RwLock::new(SigSet::new_empty());
         let sig_stack = SgxMutex::new(None);
 
         let new_thread = Arc::new(Thread {
@@ -131,7 +130,6 @@ impl ThreadBuilder {
             name,
             sig_queues,
             sig_mask,
-            sig_tmp_mask,
             sig_stack,
         });
 
