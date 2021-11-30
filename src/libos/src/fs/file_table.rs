@@ -1,4 +1,6 @@
 use super::*;
+use crate::poll::EpollFile;
+use std::sync::Weak;
 
 pub type FileDesc = u32;
 
@@ -140,6 +142,7 @@ impl FileTable {
         match del_table_entry {
             Some(del_table_entry) => {
                 self.num_fds -= 1;
+                del_table_entry.remove_from_epoll(fd);
                 Ok(del_table_entry.file)
             }
             None => return_errno!(EBADF, "Invalid file descriptor"),
@@ -155,7 +158,9 @@ impl FileTable {
             .filter(|entry| entry.is_some())
             .enumerate()
         {
-            deleted_files.push(entry.as_ref().unwrap().file.clone());
+            let deleted_entry = entry.as_ref().unwrap();
+            deleted_files.push(deleted_entry.file.clone());
+            deleted_entry.remove_from_epoll(fd as FileDesc);
             *entry = None;
         }
         self.num_fds = 0;
@@ -172,7 +177,9 @@ impl FileTable {
                 false
             };
             if need_close {
-                deleted_files.push(entry.as_ref().unwrap().file.clone());
+                let deleted_entry = entry.as_ref().unwrap();
+                deleted_files.push(deleted_entry.file.clone());
+                deleted_entry.remove_from_epoll(fd as FileDesc);
                 *entry = None;
                 self.num_fds -= 1;
             }
@@ -196,10 +203,21 @@ impl Default for FileTable {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FileTableEntry {
     file: FileRef,
     close_on_spawn: bool,
+    registered_epolls: Vec<Weak<EpollFile>>,
+}
+
+impl Clone for FileTableEntry {
+    fn clone(&self) -> Self {
+        Self {
+            file: self.file.clone(),
+            close_on_spawn: self.close_on_spawn,
+            registered_epolls: Vec::new(),
+        }
+    }
 }
 
 impl FileTableEntry {
@@ -207,6 +225,7 @@ impl FileTableEntry {
         FileTableEntry {
             file,
             close_on_spawn,
+            registered_epolls: Vec::new(),
         }
     }
 
@@ -224,5 +243,22 @@ impl FileTableEntry {
 
     pub fn set_close_on_spawn(&mut self, close_on_spawn: bool) {
         self.close_on_spawn = close_on_spawn;
+    }
+
+    pub fn register_epoll(&mut self, epoll_file: &Weak<EpollFile>) {
+        self.registered_epolls.push(epoll_file.clone());
+    }
+
+    pub fn unregister_epoll(&mut self, epoll_file: &Weak<EpollFile>) {
+        self.registered_epolls
+            .retain(|item| !Weak::ptr_eq(epoll_file, item) && item.upgrade().is_some());
+    }
+
+    pub fn remove_from_epoll(&self, fd: FileDesc) {
+        for epoll in self.registered_epolls.iter() {
+            if let Some(epoll_file) = epoll.upgrade() {
+                epoll_file.on_file_closed(fd);
+            }
+        }
     }
 }

@@ -123,9 +123,6 @@ impl Thread {
     /// Close a file from the file table. It will release the POSIX advisory locks owned
     /// by current process.
     pub fn close_file(&self, fd: FileDesc) -> Result<()> {
-        // Deadlock note: EpollFile's drop method needs to access file table. So
-        // if the drop method is invoked inside the del method, then there will be
-        // a deadlock.
         let file = self.files().lock().unwrap().del(fd)?;
         if let Some(inode_file) = file.as_inode_file() {
             inode_file.release_advisory_locks();
@@ -136,7 +133,6 @@ impl Thread {
     /// Close all files in the file table. It will release the POSIX advisory locks owned
     /// by current process.
     pub fn close_all_files(&self) {
-        // Deadlock note: Same with the issue in close_file method
         let files = self.files().lock().unwrap().del_all();
         for file in files {
             if let Some(inode_file) = file.as_inode_file() {

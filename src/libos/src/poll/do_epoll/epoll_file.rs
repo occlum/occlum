@@ -49,7 +49,11 @@ impl EpollFile {
     pub fn control(&self, cmd: &EpollCtl) -> Result<()> {
         match *cmd {
             EpollCtl::Add(fd, ep_event, ep_flags) => self.add_interest(fd, ep_event, ep_flags),
-            EpollCtl::Del(fd) => self.del_interest(fd),
+            EpollCtl::Del(fd) => {
+                self.del_interest(fd)?;
+                self.unregister_from_file(fd);
+                Ok(())
+            }
             EpollCtl::Mod(fd, ep_event, ep_flags) => self.mod_interest(fd, ep_event, ep_flags),
         }
     }
@@ -57,7 +61,10 @@ impl EpollFile {
     fn add_interest(&self, fd: FileDesc, ep_event: EpollEvent, ep_flags: EpollFlags) -> Result<()> {
         self.warn_unsupported_flags(&ep_flags);
 
-        let file = current!().file(fd)?;
+        let current = current!();
+        let mut file_table = current.files().lock().unwrap();
+        let mut file_entry = file_table.get_entry_mut(fd)?;
+        let file = file_entry.get_file().clone();
         let weak_file = FileRef::downgrade(&file);
         let mask = ep_event.events;
         let entry = EpollEntry::new(fd, weak_file, ep_event, ep_flags, self.weak_self.clone());
@@ -69,6 +76,10 @@ impl EpollFile {
         }
         file.register_observer(entry.clone(), Events::all())?;
         interest.insert(fd, entry.clone());
+        // Register self to the file entry
+        file_entry.register_epoll(&self.weak_self);
+        drop(file_entry);
+        drop(file_table);
         drop(interest);
 
         // Add the new entry to the ready list if the file is ready
@@ -134,6 +145,14 @@ impl EpollFile {
             self.push_ready(entry);
         }
         Ok(())
+    }
+
+    fn unregister_from_file(&self, fd: FileDesc) {
+        let current = current!();
+        let mut file_table = current.files().lock().unwrap();
+        if let Ok(mut file_entry) = file_table.get_entry_mut(fd) {
+            file_entry.unregister_epoll(&self.weak_self);
+        }
     }
 
     /// Wait for interesting events happen on the files in the interest list
@@ -252,6 +271,14 @@ impl EpollFile {
         if flags.intersects(EpollFlags::EXCLUSIVE | EpollFlags::WAKE_UP) {
             warn!("{:?} contains unsupported flags", flags);
         }
+    }
+
+    /// Delete the file from the interest list if it is closed.
+    ///
+    /// Must register the epoll to the file entry when adding the file into the
+    /// interest list.
+    pub fn on_file_closed(&self, fd: FileDesc) {
+        self.del_interest(fd);
     }
 }
 
