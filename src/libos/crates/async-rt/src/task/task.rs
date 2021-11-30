@@ -18,6 +18,9 @@ pub struct Task {
     budget: u8,
     consumed_budget: AtomicU8,
     tirqs: Tirqs,
+    // Used by executor to avoid a task consuming too much space in enqueues
+    // due to a task being enqueued multiple times.
+    is_enqueued: AtomicBool,
     weak_self: Weak<Self>,
 }
 
@@ -74,6 +77,26 @@ impl Task {
     pub(crate) fn to_arc(&self) -> Arc<Self> {
         self.weak_self.upgrade().unwrap()
     }
+
+    /// Returns whether the task is enqueued.
+    pub(crate) fn is_enqueued(&self) -> bool {
+        self.is_enqueued.load(Ordering::Relaxed)
+    }
+
+    /// Try to set the status of the task as enqueued.
+    ///
+    /// If the task is already enqueued, return an error.
+    pub(crate) fn try_set_enqueued(&self) -> Result<()> {
+        self.is_enqueued
+            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
+            .map(|_| ())
+            .map_err(|_| errno!(EEXIST, "already enqueued"))
+    }
+
+    /// Set the status of the task as NOT enqueued.
+    pub(crate) fn reset_enqueued(&self) {
+        self.is_enqueued.store(false, Ordering::Relaxed);
+    }
 }
 
 unsafe impl Sync for Task {}
@@ -92,7 +115,7 @@ impl Drop for Task {
 
 impl ArcWake for Task {
     fn wake_by_ref(arc_self: &Arc<Self>) {
-        EXECUTOR.wake_task(arc_self.clone());
+        EXECUTOR.wake_task(arc_self);
     }
 }
 
@@ -138,6 +161,7 @@ impl TaskBuilder {
         let consumed_budget = AtomicU8::new(0);
         // Safety. The tirqs will be inserted into a Task before using it.
         let tirqs = unsafe { Tirqs::new() };
+        let is_enqueued = AtomicBool::new(false);
         let weak_self = Weak::new();
         let task = Task {
             tid,
@@ -147,6 +171,7 @@ impl TaskBuilder {
             budget,
             consumed_budget,
             tirqs,
+            is_enqueued,
             weak_self,
         };
         // Create an Arc and update the weak_self

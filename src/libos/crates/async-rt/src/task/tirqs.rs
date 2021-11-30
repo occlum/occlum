@@ -328,7 +328,7 @@ mod tests {
             };
             let receiver = receiver_handle.task().clone();
 
-            let sent_ues: u32 = 10;
+            let sent_ues: u32 = 5000;
             let sender_handle = {
                 let ue_channel = ue_channel.clone();
                 crate::task::spawn(async move {

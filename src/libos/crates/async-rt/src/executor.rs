@@ -76,7 +76,11 @@ impl Executor {
             }
 
             match task_option {
-                Some(task) => self.execute_task(task),
+                Some(task) => {
+                    task.reset_enqueued();
+
+                    self.execute_task(task)
+                }
                 None => self.parks.park(),
             }
         }
@@ -113,11 +117,12 @@ impl Executor {
             panic!("a shut-down executor cannot spawn new tasks");
         }
 
+        task.try_set_enqueued().unwrap();
         self.scheduler.enqueue_task(task);
     }
 
-    /// Wake up a old task and schedule it.
-    pub fn wake_task(&self, task: Arc<Task>) {
+    /// Wake up an old task and schedule it.
+    pub fn wake_task(&self, task: &Arc<Task>) {
         if self.is_shutdown() {
             // TODO: What to do if there are still task in the run queues
             // of the scheduler when the executor is shutdown.
@@ -126,7 +131,14 @@ impl Executor {
             return;
         }
 
-        self.scheduler.enqueue_task(task);
+        // Avoid a task from consuming the limited space of the queues of
+        // the underlying scheduler due to the task being enqueued multiple
+        // times
+        if let Err(_) = task.try_set_enqueued() {
+            return;
+        }
+
+        self.scheduler.enqueue_task(task.clone());
     }
 
     pub fn shutdown(&self) {
