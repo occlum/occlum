@@ -110,16 +110,17 @@ macro_rules! waiter_loop {
                 2 => {
                     // For the third attempt and beyond, we will wait
                     let waiter = auto_waiter.waiter();
-                    if let Some(timeout) = $timeout.as_mut() {
-                        // Wait until being woken by the waiter queue or reach timeout
+                    let wait_res = if let Some(timeout) = $timeout.as_mut() {
+                        // Create a temp mut reference rather than passing timeout
+                        // directly. This avoids losing the ownership.
                         let timeout: &mut core::time::Duration = (*timeout).borrow_mut();
-                        if let Err(e) = waiter.wait_timeout(Some(timeout)).await {
-                            // The timeout expired, exit loop.
-                            break Err(e);
-                        }
+                        waiter.wait_timeout(Some(timeout)).await
                     } else {
-                        // Wait until being woken by the waiter queue
-                        waiter.wait().await;
+                        waiter.wait().await
+                    };
+                    // If the timeout expires or the task gets interrupted, exit loop.
+                    if let Err(e) = wait_res {
+                        break Err(e);
                     }
                     // Prepare the waiter so that we can try the loop body again
                     waiter.reset();
