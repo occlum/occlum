@@ -211,7 +211,7 @@ fn new_process(
         {
             spawn_attributes.unwrap().sig_mask.unwrap()
         } else {
-            current_ref.sig_mask().read().unwrap().clone()
+            current_ref.sig_mask()
         };
         trace!("new process sigmask = {:?}", sig_mask);
 

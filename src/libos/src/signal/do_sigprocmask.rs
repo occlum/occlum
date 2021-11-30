@@ -13,30 +13,18 @@ pub fn do_rt_sigprocmask(
     );
 
     let thread = current!();
-    let mut sig_mask = thread.sig_mask().write().unwrap();
+    let old_sig_mask = thread.sig_mask();
     if let Some(oldset) = oldset {
-        *oldset = sig_mask.to_c();
+        *oldset = old_sig_mask.to_c();
     }
     if let Some((op, &set)) = op_and_set {
-        let set = {
-            let mut set = SigSet::from_c(set);
-            // According to man pages, "it is not possible to block SIGKILL or SIGSTOP.
-            // Attempts to do so are silently ignored."
-            set -= SIGKILL;
-            set -= SIGSTOP;
-            set
+        let set = SigSet::from_c(set);
+        let new_sig_mask = match op {
+            MaskOp::Block => old_sig_mask | set,
+            MaskOp::Unblock => old_sig_mask & !set,
+            MaskOp::SetMask => set,
         };
-        match op {
-            MaskOp::Block => {
-                *sig_mask |= set;
-            }
-            MaskOp::Unblock => {
-                *sig_mask &= !set;
-            }
-            MaskOp::SetMask => {
-                *sig_mask = set;
-            }
-        };
+        thread.set_sig_mask(new_sig_mask);
     }
     Ok(())
 }

@@ -18,8 +18,8 @@ pub async fn do_sigtimedwait(interest: SigSet, timeout: Option<&Duration>) -> Re
 
     // Interesting, blocked signals
     let interest = {
-        let blocked = thread.sig_mask().read().unwrap();
-        *blocked & interest
+        let blocked = thread.sig_mask();
+        blocked & interest
     };
 
     let mut timeout = timeout.cloned();

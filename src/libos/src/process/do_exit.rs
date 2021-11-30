@@ -21,8 +21,8 @@ pub fn do_exit_group(status: i32) {
             None => return,
         };
 
-        const SIGKILL: u32 = 9;
-        task.tirqs().put_req(SIGKILL);
+        use crate::signal::SIGKILL;
+        task.tirqs().put_req(SIGKILL.as_u8() as u32);
     });
 }
 

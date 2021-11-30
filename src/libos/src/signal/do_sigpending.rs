@@ -8,6 +8,6 @@ pub fn do_sigpending() -> Result<SigSet> {
     let process = thread.process();
     let pending = (thread.sig_queues().read().unwrap().pending()
         | process.sig_queues().read().unwrap().pending())
-        & *thread.sig_mask().read().unwrap();
+        & thread.sig_mask();
     Ok(pending)
 }

@@ -32,7 +32,7 @@ pub fn do_rt_sigreturn() -> Result<()> {
     };
 
     // Restore sigmask
-    *current!().sig_mask().write().unwrap() = SigSet::from_c(last_ucontext.uc_sigmask);
+    current!().set_sig_mask(SigSet::from_c(last_ucontext.uc_sigmask));
     // Restore user context
     CURRENT_CONTEXT.with(|_context| {
         let mut context = _context.borrow_mut();
@@ -93,7 +93,7 @@ fn do_deliver_signal(thread: &ThreadRef, process: &ProcessRef) {
 
         // Dequeue a signal, respecting the signal mask
         let signal = {
-            let sig_mask = *thread.sig_mask().read().unwrap();
+            let sig_mask = thread.sig_mask();
             let signal_opt = process
                 .sig_queues()
                 .write()
@@ -200,19 +200,17 @@ fn handle_signals_by_user(
     handler_addr: usize,
     flags: SigActionFlags,
     restorer_addr: usize,
-    new_sigmask: SigSet,
+    new_sig_mask: SigSet,
     curr_user_ctxt: &mut CpuContext,
 ) -> Result<()> {
-    let old_sigmask = {
-        let mut sigmask = thread.sig_mask().write().unwrap();
-        let old_sigmask = *sigmask;
-        *sigmask = new_sigmask;
-        if !flags.contains(SigActionFlags::SA_NODEFER) {
-            // Block the current signal while executing the signal handler
-            *sigmask += signal.num();
-        }
-        old_sigmask
+    // Set a new signal mask and get the old one
+    let new_sig_mask = if flags.contains(SigActionFlags::SA_NODEFER) {
+        new_sig_mask
+    } else {
+        // Block the current signal while executing the signal handler
+        new_sig_mask + signal.num()
     };
+    let old_sig_mask = thread.set_sig_mask(new_sig_mask);
 
     // Represent the user stack in a memory safe way
     let mut user_stack = {
@@ -259,7 +257,7 @@ fn handle_signals_by_user(
         // TODO: set all fields in ucontext
         *ucontext = unsafe { std::mem::zeroed() };
         // Save the old sigmask
-        ucontext.uc_sigmask = old_sigmask.to_c();
+        ucontext.uc_sigmask = old_sig_mask.to_c();
         // Save the user context
         ucontext.uc_mcontext.gp_regs = curr_user_ctxt.gp_regs;
         // Save the floating point registers

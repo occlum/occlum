@@ -55,7 +55,7 @@ pub async fn do_clone(
         let rlimits = current.rlimits().clone();
         let fs = current.fs().clone();
         let name = current.name().clone();
-        let sig_mask = current.sig_mask().read().unwrap().clone();
+        let sig_mask = current.sig_mask();
 
         let mut builder = ThreadBuilder::new()
             .process(current.process().clone())

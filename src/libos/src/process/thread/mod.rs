@@ -1,4 +1,4 @@
-use async_rt::task::Task;
+use async_rt::task::{Task, Tirqs};
 use std::fmt;
 use std::ptr::NonNull;
 
@@ -76,9 +76,33 @@ impl Thread {
         &self.sig_queues
     }
 
-    /// Get the per-thread signal mask.
-    pub fn sig_mask(&self) -> &RwLock<SigSet> {
-        &self.sig_mask
+    /// Get the signal mask.
+    pub fn sig_mask(&self) -> SigSet {
+        *self.sig_mask.read().unwrap()
+    }
+
+    /// Set a new signal mask, returning the old one.
+    ///
+    /// According to man pages, "it is not possible to block SIGKILL or SIGSTOP.
+    /// Attempts to do so are silently ignored." So this method will ignore
+    /// SIGKILL and SIGSTOP even if they are given in the new mask.
+    ///
+    /// This method also updates the TIRQ mask so that the two masks are kept in sync.
+    pub fn set_sig_mask(&self, mut new_sig_mask: SigSet) -> SigSet {
+        use crate::signal::{SIGKILL, SIGSTOP};
+        new_sig_mask -= SIGKILL;
+        new_sig_mask -= SIGSTOP;
+
+        let mut sig_mask = self.sig_mask.write().unwrap();
+        let old_sig_mask = *sig_mask;
+        *sig_mask = new_sig_mask;
+        drop(sig_mask);
+
+        // Keep the TIRQ mask in sync with the signal mask
+        debug_assert!(self.task().map(|t| t.tid()) == current!().task().map(|t| t.tid()));
+        Tirqs::set_mask(new_sig_mask.to_c() as u64);
+
+        old_sig_mask
     }
 
     /// Get the alternate signal stack.
@@ -186,6 +210,7 @@ impl Thread {
             .lock()
             .unwrap()
             .attach(async_rt::task::current::get());
+        Tirqs::set_mask(self.sig_mask().to_c() as u64);
 
         self.inner().start();
         /*
