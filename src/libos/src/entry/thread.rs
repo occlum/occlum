@@ -27,6 +27,10 @@ async fn __main_loop(current: ThreadRef, init_cpu_state: CpuContext) {
 
     current.start();
 
+    // The exit_group logic may not interrupt a newly created threads. An extra
+    // check is added here to handle such rare race conditions.
+    crate::process::handle_force_exit();
+
     while current.status() != ThreadStatus::Exited {
         // Continue the execution in the user space
         let fault = unsafe { context_switch::switch_to_user() };
@@ -36,6 +40,10 @@ async fn __main_loop(current: ThreadRef, init_cpu_state: CpuContext) {
         log::next_round(None);
 
         handle_fault(fault).await;
+
+        crate::signal::deliver_signal();
+
+        crate::process::handle_force_exit();
     }
 }
 
@@ -69,10 +77,6 @@ async fn handle_fault(fault: Fault) {
             error!("Error = {}", e.backtrace());
         }
     }
-
-    crate::signal::deliver_signal();
-
-    crate::process::handle_force_exit();
 }
 
 mod mark_send {

@@ -106,6 +106,13 @@ impl SchedAgent {
         Ok(())
     }
 
+    pub fn task(&self) -> Option<Arc<Task>> {
+        match self.inner() {
+            Inner::Detached { .. } => None,
+            Inner::Attached { task, .. } => Some(task.clone()),
+        }
+    }
+
     pub fn attach(&mut self, task: Arc<Task>) {
         self.update_inner(|inner| match inner {
             Inner::Detached { affinity } => {

@@ -10,8 +10,20 @@ use crate::signal::{KernelSignal, SigNum};
 
 pub fn do_exit_group(status: i32) {
     let term_status = TermStatus::Exited(status as u8);
-    current!().process().force_exit(term_status);
+    let current = current!();
+    current.process().force_exit(term_status);
     exit_thread(term_status);
+
+    // Interrupt all threads in the process to ensure that they exit
+    current.process().access_threads_with(|thread| {
+        let task = match thread.task() {
+            Some(task) => task,
+            None => return,
+        };
+
+        const SIGKILL: u32 = 9;
+        task.tirqs().put_req(SIGKILL);
+    });
 }
 
 pub fn do_exit(status: i32) {
@@ -19,7 +31,7 @@ pub fn do_exit(status: i32) {
     exit_thread(term_status);
 }
 
-/// Exit this thread if its has been forced to exit.
+/// Exit this thread if it has been forced to exit.
 ///
 /// A thread may be forced to exit for two reasons: 1) a fatal signal; 2)
 /// exit_group syscall.

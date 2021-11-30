@@ -97,6 +97,19 @@ impl Process {
             .unwrap_or_else(|| Vec::new())
     }
 
+    /// Access threads with a closure.
+    pub fn access_threads_with<F>(&self, f: F)
+    where
+        F: FnMut(&ThreadRef),
+    {
+        let inner = self.inner();
+        let threads = match inner.threads() {
+            Some(threads) => threads,
+            None => return,
+        };
+        threads.iter().for_each(f);
+    }
+
     /// Get status.
     pub fn status(&self) -> ProcessStatus {
         self.inner().status()

@@ -1,3 +1,4 @@
+use async_rt::task::Task;
 use std::fmt;
 use std::ptr::NonNull;
 
@@ -173,6 +174,11 @@ impl Thread {
 
     pub fn set_name(&self, new_name: ThreadName) {
         *self.name.write().unwrap() = new_name;
+    }
+
+    /// Get the task that the thread is executing on.
+    pub fn task(&self) -> Option<Arc<Task>> {
+        self.sched().lock().unwrap().task()
     }
 
     pub fn start(&self) {
