@@ -25,6 +25,10 @@ impl SigNum {
         self.num
     }
 
+    pub fn as_tirq_line(&self) -> u32 {
+        (self.num as u32) - 1
+    }
+
     pub fn is_std(&self) -> bool {
         self.num <= MAX_STD_SIG_NUM
     }

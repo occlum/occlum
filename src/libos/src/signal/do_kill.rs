@@ -1,4 +1,5 @@
 use super::constants::*;
+use super::sig_queues::{enqueue_process_signal, enqueue_thread_signal};
 use super::signals::{KernelSignal, UserSignal, UserSignalKind};
 use super::{SigNum, Signal};
 use crate::prelude::*;
@@ -10,15 +11,13 @@ pub fn do_kill(filter: ProcessFilter, signum: SigNum) -> Result<()> {
     let pid = current!().process().pid();
     let uid = 0;
     let processes = get_processes(&filter)?;
+    let signal = Box::new(UserSignal::new(signum, UserSignalKind::Kill, pid, uid));
     for process in processes {
         if process.status() == ProcessStatus::Zombie {
             continue;
         }
 
-        let signal = Box::new(UserSignal::new(signum, UserSignalKind::Kill, pid, uid));
-        let mut sig_queues = process.sig_queues().write().unwrap();
-        sig_queues.enqueue(signal);
-        process.sig_waiters().wake_all();
+        enqueue_process_signal(&process, signal.clone());
     }
     Ok(())
 }
@@ -43,9 +42,7 @@ pub fn do_kill_from_outside_enclave(filter: ProcessFilter, signum: SigNum) -> Re
             continue;
         }
 
-        let mut sig_queues = process.sig_queues().write().unwrap();
-        sig_queues.enqueue(signal.clone());
-        process.sig_waiters().wake_all();
+        enqueue_process_signal(&process, signal.clone());
     }
     Ok(())
 }
@@ -100,8 +97,6 @@ pub fn do_tgkill(pid: Option<pid_t>, tid: pid_t, signum: SigNum) -> Result<()> {
             src_uid,
         ))
     };
-    let mut sig_queues = thread.sig_queues().write().unwrap();
-    sig_queues.enqueue(signal);
-    process.sig_waiters().wake_all();
+    enqueue_thread_signal(&thread, signal);
     Ok(())
 }

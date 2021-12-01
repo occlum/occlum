@@ -1,14 +1,16 @@
+use aligned::{Aligned, A16};
+use core::arch::x86_64::{_fxrstor, _fxsave};
+use std::{ptr, slice};
+
 use super::c_types::{mcontext_t, siginfo_t, ucontext_t};
 use super::constants::SIGKILL;
+use super::sig_queues::dequeue_signal;
 use super::sig_stack::SigStackFlags;
 use super::{SigAction, SigActionFlags, SigDefaultAction, SigSet, Signal};
 use crate::entry::context_switch::{CpuContext, FpRegs, CURRENT_CONTEXT};
 use crate::lazy_static::__Deref;
 use crate::prelude::*;
 use crate::process::{ProcessRef, TermStatus, ThreadRef};
-use aligned::{Aligned, A16};
-use core::arch::x86_64::{_fxrstor, _fxsave};
-use std::{ptr, slice};
 
 pub fn do_rt_sigreturn() -> Result<()> {
     debug!("do_rt_sigreturn");
@@ -70,45 +72,29 @@ pub fn do_rt_sigreturn() -> Result<()> {
 /// then deliver_signal won't deliver any signals.
 pub fn deliver_signal() {
     let thread = current!();
-    let process = thread.process();
 
-    if process.is_forced_to_exit() {
+    if thread.process().is_forced_to_exit() {
         return;
     }
 
     if !forced_signal_flag::get() {
-        do_deliver_signal(&thread, &process);
+        do_deliver_signal(&thread);
     } else {
         forced_signal_flag::reset();
     }
 }
 
-fn do_deliver_signal(thread: &ThreadRef, process: &ProcessRef) {
+fn do_deliver_signal(thread: &ThreadRef) {
     loop {
-        if process.sig_queues().read().unwrap().empty()
-            && thread.sig_queues().read().unwrap().empty()
-        {
-            return;
-        }
-
-        // Dequeue a signal, respecting the signal mask
-        let signal = {
-            let sig_mask = thread.sig_mask();
-            let signal_opt = process
-                .sig_queues()
-                .write()
-                .unwrap()
-                .dequeue(&sig_mask)
-                .or_else(|| thread.sig_queues().write().unwrap().dequeue(&sig_mask));
-            if signal_opt.is_none() {
-                return;
-            }
-            signal_opt.unwrap()
+        let sig_mask = thread.sig_mask();
+        let signal = match dequeue_signal(thread, sig_mask) {
+            Some(signal) => signal,
+            None => return,
         };
 
-        let continue_handling = handle_signal(signal, thread, process);
+        let continue_handling = handle_signal(signal, thread);
         if !continue_handling {
-            break;
+            return;
         }
     }
 }
@@ -123,15 +109,14 @@ fn do_deliver_signal(thread: &ThreadRef, process: &ProcessRef) {
 /// a syscall.
 pub fn force_signal(signal: Box<dyn Signal>) {
     let thread = current!();
-    let process = thread.process();
 
     assert!(forced_signal_flag::get() == false);
     forced_signal_flag::set();
 
-    handle_signal(signal, &thread, &process);
+    handle_signal(signal, &thread);
 }
 
-fn handle_signal(signal: Box<dyn Signal>, thread: &ThreadRef, process: &ProcessRef) -> bool {
+fn handle_signal(signal: Box<dyn Signal>, thread: &ThreadRef) -> bool {
     let is_sig_stack_full = PRE_UCONTEXTS.with(|ref_cell| {
         let stack = ref_cell.borrow();
         stack.full()
@@ -140,7 +125,12 @@ fn handle_signal(signal: Box<dyn Signal>, thread: &ThreadRef, process: &ProcessR
         panic!("the nested signal is too deep to handle");
     }
 
-    let action = process.sig_dispositions().read().unwrap().get(signal.num());
+    let action = thread
+        .process()
+        .sig_dispositions()
+        .read()
+        .unwrap()
+        .get(signal.num());
     debug!(
         "Handle signal: signal: {:?}, action: {:?}",
         &signal, &action
@@ -154,7 +144,7 @@ fn handle_signal(signal: Box<dyn Signal>, thread: &ThreadRef, process: &ProcessR
                 SigDefaultAction::Ign => true,
                 SigDefaultAction::Term | SigDefaultAction::Core => {
                     let term_status = TermStatus::Killed(signal.num());
-                    process.force_exit(term_status);
+                    thread.process().force_exit(term_status);
                     false
                 }
                 SigDefaultAction::Stop => {

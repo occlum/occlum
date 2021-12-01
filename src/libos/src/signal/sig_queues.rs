@@ -1,10 +1,138 @@
 use std::collections::VecDeque;
 use std::fmt;
 
+use async_rt::task::Tirqs;
+
 use super::constants::*;
 use super::{SigNum, SigSet, Signal};
 use crate::prelude::*;
+use crate::process::{ProcessRef, ThreadRef};
 
+/// Enqueue a process-target signal.
+///
+/// Enqueuing a signal triggers a TIRQ.
+pub fn enqueue_process_signal(process: &ProcessRef, signal: Box<dyn Signal>) {
+    let signum = signal.num();
+    let mut sig_queues = process.sig_queues().write().unwrap();
+    sig_queues.enqueue(signal);
+
+    // Notify the waiter of sigtimedwait
+    process.sig_waiters().wake_all();
+
+    // Interrupt the main thread of the process
+    // TODO: is it enough to just interrupt the main thread? Interrupting all
+    // threads seem to be detrimental to performance, while interrupting one
+    // thread may not be enough.
+    if let Some(thread) = process.leader_thread() {
+        if let Some(task) = thread.task() {
+            task.tirqs().put_req(signum.as_tirq_line());
+        } else {
+            // TODO: fix this race condition
+            warn!("potential a signal loss when interrupting a thread before its first scheduling");
+        }
+    }
+}
+
+/// Enqueue a thread-target signal.
+///
+/// Enqueuing a signal triggers a TIRQ.
+pub fn enqueue_thread_signal(thread: &ThreadRef, signal: Box<dyn Signal>) {
+    let signum = signal.num();
+    let mut sig_queues = thread.sig_queues().write().unwrap();
+    sig_queues.enqueue(signal);
+
+    // Notify the waiter of sigtimedwait
+    thread.process().sig_waiters().wake_all();
+
+    // Interrupt the thread
+    if let Some(task) = thread.task() {
+        task.tirqs().put_req(signum.as_tirq_line());
+    } else {
+        // TODO: fix this race condition
+        warn!("potential a signal loss when interrupting a thread before its first scheduling");
+    }
+}
+
+/// Dequeue a signal that may be delivered to the (current) thread.
+///
+/// Signals whose signal numbers are within the given mask will not be considered
+/// for dequeuing.
+///
+/// Signals are dequeued in the following priorities, from high to low.
+/// 1. Standard signals;
+/// 2. Real-time signals;
+/// 3. Process-targeted signals;
+/// 4. Thread-targeted signals.
+///
+/// When dequeuing signals, we check whether there are any remaining signals
+/// for a specific signal number. If there are none, then the corresponding
+/// TIRQ line will be cleared.
+///
+/// Check out the `async_rt` crate for how the task interrupt mechanism works.
+pub fn dequeue_signal(thread: &ThreadRef, mask: SigSet) -> Option<Box<dyn Signal>> {
+    debug_assert!(current!().tid() == thread.tid());
+
+    let process = thread.process().clone();
+    let mut process_sqs = process.sig_queues().write().unwrap();
+    let mut thread_sqs = thread.sig_queues().write().unwrap();
+    let mut sigqueues_list = [&mut *process_sqs, &mut *thread_sqs];
+    do_dequeue_signal(&mut sigqueues_list, mask)
+}
+
+fn do_dequeue_signal(
+    sigqueues_list: &mut [&mut SigQueues],
+    mask: SigSet,
+) -> Option<Box<dyn Signal>> {
+    // Fast path: no signals at all
+    if sigqueues_list.iter().all(|sq| sq.is_empty()) {
+        Tirqs::clear_all_reqs();
+        return None;
+    }
+
+    // Enumerate all interesting signal numbers
+    let interest = !mask;
+    for signum in interest.iter() {
+        let mut signal = None;
+        let mut has_more_signals = false;
+
+        // Try to pop a signal of this signum
+        let mut sq_i = 0;
+        while sq_i < sigqueues_list.len() {
+            let sq = &mut sigqueues_list[sq_i];
+            if let Some(_signal) = sq.dequeue(signum) {
+                signal = Some(_signal);
+                break;
+            }
+            sq_i += 1;
+        }
+
+        // Check if there are any more signals of this signum
+        if signal.is_some() {
+            while sq_i < sigqueues_list.len() {
+                let sq = &mut sigqueues_list[sq_i];
+                if sq.can_dequeue(signum) {
+                    has_more_signals = true;
+                    break;
+                }
+                sq_i += 1;
+            }
+        }
+
+        if !has_more_signals {
+            Tirqs::clear_req(signum.as_tirq_line());
+        }
+
+        if signal.is_some() {
+            return signal;
+        }
+    }
+
+    None
+}
+
+/// The signal queues of a thread or a process.
+///
+/// Each queue keeps signals for a specific signal number.
 pub struct SigQueues {
     count: usize,
     std_queues: Vec<Option<Box<dyn Signal>>>,
@@ -23,10 +151,12 @@ impl SigQueues {
         }
     }
 
-    pub fn empty(&self) -> bool {
+    /// Is all signal queues empty?
+    pub fn is_empty(&self) -> bool {
         self.count == 0
     }
 
+    /// Enqueue a signal to the queue that corresponds to the signal number.
     pub fn enqueue(&mut self, signal: Box<dyn Signal>) {
         let signum = signal.num();
         if signum.is_std() {
@@ -58,68 +188,38 @@ impl SigQueues {
         }
     }
 
-    pub fn dequeue(&mut self, blocked: &SigSet) -> Option<Box<dyn Signal>> {
-        // Fast path for the common case of no pending signals
-        if self.empty() {
-            return None;
-        }
-
-        // Deliver standard signals.
-        //
-        // According to signal(7):
-        // If both standard and real-time signals are pending for a process,
-        // POSIX leaves it unspecified which is delivered first. Linux, like
-        // many other implementations, gives priority to standard signals in
-        // this case.
-
-        // POSIX leaves unspecified which to deliver first if there are multiple
-        // pending standard signals. So we are free to define our own. The
-        // principle is to give more urgent signals higher priority (like SIGKILL).
-        const ORDERED_STD_SIGS: [SigNum; COUNT_STD_SIGS] = [
-            SIGKILL, SIGTERM, SIGSTOP, SIGCONT, SIGSEGV, SIGILL, SIGHUP, SIGINT, SIGQUIT, SIGTRAP,
-            SIGABRT, SIGBUS, SIGFPE, SIGUSR1, SIGUSR2, SIGPIPE, SIGALRM, SIGSTKFLT, SIGCHLD,
-            SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGXCPU, SIGXFSZ, SIGVTALRM, SIGPROF, SIGWINCH,
-            SIGIO, SIGPWR, SIGSYS,
-        ];
-        for &signum in &ORDERED_STD_SIGS {
-            if blocked.contains(signum) {
-                continue;
-            }
-
+    /// Dequeue a signal with the given signal number.
+    pub fn dequeue(&mut self, signum: SigNum) -> Option<Box<dyn Signal>> {
+        if signum.is_std() {
             let queue = self.get_std_queue_mut(signum);
             let signal = queue.take();
             if signal.is_some() {
                 self.count -= 1;
-                return signal;
             }
-        }
-
-        // If no standard signals, then deliver real-time signals.
-        //
-        // According to signal (7):
-        // Real-time signals are delivered in a guaranteed order.  Multiple
-        // real-time signals of the same type are delivered in the order
-        // they were sent.  If different real-time signals are sent to a
-        // process, they are delivered starting with the lowest-numbered
-        // signal.  (I.e., low-numbered signals have highest priority.)
-        for signum in MIN_RT_SIG_NUM..=MAX_RT_SIG_NUM {
-            let signum = unsafe { SigNum::from_u8_unchecked(signum) };
-            if blocked.contains(signum) {
-                continue;
-            }
-
+            signal
+        } else {
             let queue = self.get_rt_queue_mut(signum);
             let signal = queue.pop_front();
             if signal.is_some() {
                 self.count -= 1;
-                return signal;
             }
+            signal
         }
-
-        // There must be pending but blocked signals
-        None
     }
 
+    /// Can a signal with the given signal number be dequeued?
+    pub fn can_dequeue(&mut self, signum: SigNum) -> bool {
+        if signum.is_std() {
+            let queue = self.get_std_queue_mut(signum);
+            let signal = queue.take();
+            signal.is_some()
+        } else {
+            let queue = self.get_rt_queue_mut(signum);
+            !queue.is_empty()
+        }
+    }
+
+    /// Returns the sigal numbers of pending signals.
     pub fn pending(&self) -> SigSet {
         let mut pending_sigs = SigSet::new_empty();
         for signum in MIN_STD_SIG_NUM..=MAX_STD_SIG_NUM {

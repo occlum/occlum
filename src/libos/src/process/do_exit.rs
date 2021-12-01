@@ -22,7 +22,7 @@ pub fn do_exit_group(status: i32) {
         };
 
         use crate::signal::SIGKILL;
-        task.tirqs().put_req(SIGKILL.as_u8() as u32);
+        task.tirqs().put_req(SIGKILL.as_tirq_line());
     });
 }
 

@@ -33,11 +33,11 @@ impl SigSet {
         self.bits
     }
 
-    pub fn empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.bits == 0
     }
 
-    pub fn full(&self) -> bool {
+    pub fn is_full(&self) -> bool {
         self.bits == !0
     }
 
