@@ -232,7 +232,7 @@ dependencies = [
 
 [[package]]
 name = "hashbrown_tstd"
-version = "0.9.0"
+version = "0.11.2"
 
 [[package]]
 name = "ident_case"
@@ -588,11 +588,11 @@ dependencies = [
 
 [[package]]
 name = "sgx_alloc"
-version = "1.1.3"
+version = "1.1.4"
 
 [[package]]
 name = "sgx_backtrace_sys"
-version = "1.1.3"
+version = "1.1.4"
 dependencies = [
  "cc",
  "sgx_build_helper",
@@ -601,11 +601,11 @@ dependencies = [
 
 [[package]]
 name = "sgx_build_helper"
-version = "0.1.3"
+version = "1.1.4"
 
 [[package]]
 name = "sgx_cov"
-version = "1.1.3"
+version = "1.1.4"
 dependencies = [
  "lazy_static",
  "profiler_builtins",
@@ -617,18 +617,18 @@ dependencies = [
 
 [[package]]
 name = "sgx_demangle"
-version = "1.1.3"
+version = "1.1.4"
 
 [[package]]
 name = "sgx_libc"
-version = "1.1.3"
+version = "1.1.4"
 dependencies = [
  "sgx_types",
 ]
 
 [[package]]
 name = "sgx_rand"
-version = "1.1.3"
+version = "1.1.4"
 dependencies = [
  "sgx_trts",
  "sgx_tstd",
@@ -637,14 +637,14 @@ dependencies = [
 
 [[package]]
 name = "sgx_tcrypto"
-version = "1.1.3"
+version = "1.1.4"
 dependencies = [
  "sgx_types",
 ]
 
 [[package]]
 name = "sgx_tprotected_fs"
-version = "1.1.3"
+version = "1.1.4"
 dependencies = [
  "sgx_trts",
  "sgx_types",
@@ -652,7 +652,7 @@ dependencies = [
 
 [[package]]
 name = "sgx_trts"
-version = "1.1.3"
+version = "1.1.4"
 dependencies = [
  "sgx_libc",
  "sgx_types",
@@ -660,14 +660,14 @@ dependencies = [
 
 [[package]]
 name = "sgx_tse"
-version = "1.1.3"
+version = "1.1.4"
 dependencies = [
  "sgx_types",
 ]
 
 [[package]]
 name = "sgx_tstd"
-version = "1.1.3"
+version = "1.1.4"
 dependencies = [
  "hashbrown_tstd",
  "sgx_alloc",
@@ -682,11 +682,11 @@ dependencies = [
 
 [[package]]
 name = "sgx_types"
-version = "1.1.3"
+version = "1.1.4"
 
 [[package]]
 name = "sgx_unwind"
-version = "0.1.1"
+version = "1.1.4"
 dependencies = [
  "sgx_build_helper",
 ]

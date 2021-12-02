@@ -14,7 +14,6 @@
 #![feature(negative_impls)]
 // for may_dangle in rw_lock
 #![feature(dropck_eyepatch)]
-#![feature(option_expect_none)]
 // for UntrustedSliceAlloc in slice_alloc
 #![feature(slice_ptr_get)]
 #![feature(maybe_uninit_extra)]
@@ -23,6 +22,7 @@
 #![feature(test)]
 #![feature(atomic_from_mut)]
 #![feature(btree_drain_filter)]
+#![feature(bench_black_box)]
 
 #[macro_use]
 extern crate alloc;
