@@ -5,7 +5,8 @@ use super::do_poll::PollFd;
 use crate::fs::CreationFlags;
 use crate::misc::resource_t;
 use crate::prelude::*;
-use crate::time::timeval_t;
+use crate::signal::sigset_t;
+use crate::time::{timespec_t, timeval_t};
 use crate::util::mem_util::from_user;
 
 pub async fn do_epoll_create(size: c_int) -> Result<isize> {
@@ -135,6 +136,38 @@ pub async fn do_poll(
     nfds: libc::nfds_t,
     timeout_ms: c_int,
 ) -> Result<isize> {
+    let mut timeout = if timeout_ms >= 0 {
+        Some(Duration::from_millis(timeout_ms as u64))
+    } else {
+        None
+    };
+    do_poll_common(fds, nfds, timeout.as_mut()).await
+}
+
+pub async fn do_ppoll(
+    fds: *mut libc::pollfd,
+    nfds: libc::nfds_t,
+    timeout_ts: *const timespec_t,
+    sigmask: *const sigset_t,
+) -> Result<isize> {
+    let mut timeout = if timeout_ts.is_null() {
+        None
+    } else {
+        from_user::check_ptr(timeout_ts)?;
+        let timeout_ts = unsafe { &*timeout_ts };
+        Some(timeout_ts.as_duration())
+    };
+    if !sigmask.is_null() {
+        warn!("ppoll sigmask is not supported!");
+    }
+    do_poll_common(fds, nfds, timeout.as_mut()).await
+}
+
+async fn do_poll_common(
+    fds: *mut libc::pollfd,
+    nfds: libc::nfds_t,
+    timeout: Option<&mut Duration>,
+) -> Result<isize> {
     // It behaves like sleep when fds is null and nfds is zero.
     if !fds.is_null() || nfds != 0 {
         from_user::check_mut_array(fds, nfds as usize)?;
@@ -154,13 +187,7 @@ pub async fn do_poll(
     let raw_poll_fds = unsafe { std::slice::from_raw_parts_mut(fds, nfds as usize) };
     let poll_fds: Vec<PollFd> = raw_poll_fds.iter().map(|raw| PollFd::from(raw)).collect();
 
-    let mut timeout = if timeout_ms >= 0 {
-        Some(Duration::from_millis(timeout_ms as u64))
-    } else {
-        None
-    };
-
-    let count = super::do_poll::do_poll(&poll_fds, timeout.as_mut()).await?;
+    let count = super::do_poll::do_poll(&poll_fds, timeout).await?;
 
     for (raw_poll_fd, poll_fd) in raw_poll_fds.iter_mut().zip(poll_fds.iter()) {
         raw_poll_fd.revents = poll_fd.revents().get().bits() as i16;

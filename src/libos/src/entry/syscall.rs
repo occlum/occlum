@@ -46,7 +46,7 @@ use crate::net::{
 */
 use crate::poll::syscalls::{
     do_epoll_create, do_epoll_create1, do_epoll_ctl, do_epoll_pwait, do_epoll_wait, do_poll,
-    do_select,
+    do_ppoll, do_select,
 };
 use crate::prelude::*;
 use crate::process::{
@@ -283,6 +283,7 @@ macro_rules! process_syscall_table_with_callback {
             (Shutdown = 48) => do_shutdown(fd: c_int, how: c_int),
 
             (Poll = 7) => do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int),
+            (Ppoll = 271) => do_ppoll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout_ts: *const timespec_t, sigmask: *const sigset_t),
             (Select = 23) => do_select(nfds: c_int, readfds: *mut libc::fd_set, writefds: *mut libc::fd_set, exceptfds: *mut libc::fd_set, timeout: *mut timeval_t),
             (EpollCreate = 213) => do_epoll_create(size: c_int),
             (EpollCreate1 = 291) => do_epoll_create1(flags: c_int),
