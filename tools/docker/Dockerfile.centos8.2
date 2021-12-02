@@ -1,7 +1,7 @@
 FROM alpine:3.11 AS alpine
 LABEL maintainer="Qing Li <geding.lq@antgroup.com>"
 RUN apk update && \
-    apk --no-cache add openjdk11 --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
+    apk --no-cache add openjdk11 openjdk8 --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
 
 FROM centos:8
 
@@ -155,6 +155,12 @@ COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK11_PATH/lib/security/cacerts
 WORKDIR /tmp
 RUN cd java && ./install_dragonwell.sh && rm -rf /tmp/java
 ENV PATH="/opt/occlum/toolchains/jvm/bin:$PATH"
+
+# Install OpenJDK 8
+ARG JDK8_PATH=/opt/occlum/toolchains/jvm/java-1.8-openjdk
+COPY --from=alpine /usr/lib/jvm/java-1.8-openjdk $JDK8_PATH
+RUN rm $JDK8_PATH/jre/lib/security/cacerts
+COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK8_PATH/jre/lib/security/cacerts
 
 # Build and install Occlum
 WORKDIR /root
