@@ -2,10 +2,12 @@ use super::file_ops::{
     self, AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd, IoctlRawCmd,
     LinkFlags, UnlinkFlags,
 };
-//use super::fs_ops;
+use super::fs_ops::{self, MountOptions};
 use super::*;
+
+use crate::config::ConfigMountFsType;
+use crate::util::mem_util::from_user;
 use std::convert::TryFrom;
-use util::mem_util::from_user;
 
 #[allow(non_camel_case_types)]
 pub struct iovec_t {
@@ -580,6 +582,44 @@ pub async fn do_mount_rootfs(
     let user_config = config::load_config(&user_config_path, &expected_occlum_json_mac)?;
     fs_ops::do_mount_rootfs(&user_config, &key)?;
     Ok((0))
+}
+
+pub async fn do_mount(
+    source: *const i8,
+    target: *const i8,
+    fs_type: *const i8,
+    flags: u32,
+    options: *const i8,
+) -> Result<isize> {
+    let source = from_user::clone_cstring_safely(source)?
+        .to_string_lossy()
+        .into_owned();
+    let target = from_user::clone_cstring_safely(target)?
+        .to_string_lossy()
+        .into_owned();
+    let flags = MountFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
+    let mount_options = {
+        let fs_type = {
+            let fs_type = from_user::clone_cstring_safely(fs_type)?
+                .to_string_lossy()
+                .into_owned();
+            ConfigMountFsType::from_input(fs_type.as_str())?
+        };
+        MountOptions::from_fs_type_and_options(&fs_type, options)?
+    };
+
+    fs_ops::do_mount(&source, &target, flags, mount_options)?;
+    Ok(0)
+}
+
+pub async fn do_umount(target: *const i8, flags: u32) -> Result<isize> {
+    let target = from_user::clone_cstring_safely(target)?
+        .to_string_lossy()
+        .into_owned();
+    let flags = UmountFlags::from_u32(flags)?;
+
+    fs_ops::do_umount(&target, flags)?;
+    Ok(0)
 }
 
 pub async fn do_fallocate(fd: FileDesc, mode: u32, offset: off_t, len: off_t) -> Result<isize> {

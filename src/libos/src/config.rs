@@ -60,7 +60,7 @@ fn conf_get_hardcoded_file_mac() -> sgx_aes_gcm_128bit_tag_t {
     mac
 }
 
-fn parse_mac(mac_str: &str) -> Result<sgx_aes_gcm_128bit_tag_t> {
+pub fn parse_mac(mac_str: &str) -> Result<sgx_aes_gcm_128bit_tag_t> {
     let bytes_str_vec = {
         let bytes_str_vec: Vec<&str> = mac_str.split("-").collect();
         if bytes_str_vec.len() != 16 {
@@ -74,6 +74,22 @@ fn parse_mac(mac_str: &str) -> Result<sgx_aes_gcm_128bit_tag_t> {
         mac[byte_i] = u8::from_str_radix(byte_str, 16).map_err(|e| errno!(e))?;
     }
     Ok(mac)
+}
+
+pub fn parse_key(key_str: &str) -> Result<sgx_key_128bit_t> {
+    let bytes_str_vec = {
+        let bytes_str_vec: Vec<&str> = key_str.split("-").collect();
+        if bytes_str_vec.len() != 16 {
+            return_errno!(EINVAL, "The length or format of KEY string is invalid");
+        }
+        bytes_str_vec
+    };
+
+    let mut key: sgx_key_128bit_t = Default::default();
+    for (byte_i, byte_str) in bytes_str_vec.iter().enumerate() {
+        key[byte_i] = u8::from_str_radix(byte_str, 16).map_err(|e| errno!(e))?;
+    }
+    Ok(key)
 }
 
 #[derive(Debug)]
@@ -122,7 +138,26 @@ pub enum ConfigMountFsType {
     TYPE_PROCFS,
 }
 
-#[derive(Debug)]
+impl ConfigMountFsType {
+    pub fn from_input(input: &str) -> Result<ConfigMountFsType> {
+        const ALL_FS_TYPES: [&str; 6] = ["sefs", "hostfs", "ramfs", "unionfs", "devfs", "procfs"];
+
+        let type_ = match input {
+            "sefs" => ConfigMountFsType::TYPE_SEFS,
+            "hostfs" => ConfigMountFsType::TYPE_HOSTFS,
+            "ramfs" => ConfigMountFsType::TYPE_RAMFS,
+            "unionfs" => ConfigMountFsType::TYPE_UNIONFS,
+            "devfs" => ConfigMountFsType::TYPE_DEVFS,
+            "procfs" => ConfigMountFsType::TYPE_PROCFS,
+            _ => {
+                return_errno!(EINVAL, "Unsupported file system type");
+            }
+        };
+        Ok(type_)
+    }
+}
+
+#[derive(Default, Debug)]
 pub struct ConfigMountOptions {
     pub mac: Option<sgx_aes_gcm_128bit_tag_t>,
     pub layers: Option<Vec<ConfigMount>>,
@@ -193,19 +228,7 @@ impl ConfigEnv {
 
 impl ConfigMount {
     fn from_input(input: &InputConfigMount) -> Result<ConfigMount> {
-        const ALL_FS_TYPES: [&str; 6] = ["sefs", "hostfs", "ramfs", "unionfs", "devfs", "procfs"];
-
-        let type_ = match input.type_.as_str() {
-            "sefs" => ConfigMountFsType::TYPE_SEFS,
-            "hostfs" => ConfigMountFsType::TYPE_HOSTFS,
-            "ramfs" => ConfigMountFsType::TYPE_RAMFS,
-            "unionfs" => ConfigMountFsType::TYPE_UNIONFS,
-            "devfs" => ConfigMountFsType::TYPE_DEVFS,
-            "procfs" => ConfigMountFsType::TYPE_PROCFS,
-            _ => {
-                return_errno!(EINVAL, "Unsupported file system type");
-            }
-        };
+        let type_ = ConfigMountFsType::from_input(input.type_.as_str())?;
         let target = {
             let target = PathBuf::from(&input.target);
             if !target.starts_with("/") {

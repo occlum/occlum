@@ -12,11 +12,11 @@ use crate::fs::{
     do_eventfd, do_eventfd2, do_faccessat, do_fallocate, do_fchdir, do_fchmod, do_fchmodat,
     do_fchown, do_fchownat, do_fcntl, do_fdatasync, do_fstat, do_fstatat, do_fstatfs, do_fsync,
     do_ftruncate, do_getcwd, do_getdents, do_getdents64, do_ioctl, do_lchown, do_link, do_linkat,
-    do_lseek, do_lstat, do_mkdir, do_mkdirat, do_mount_rootfs, do_open, do_openat, do_pipe,
-    do_pipe2, do_pread, do_pwrite, do_read, do_readlink, do_readlinkat, do_readv, do_rename,
-    do_renameat, do_rmdir, do_sendfile, do_stat, do_statfs, do_symlink, do_symlinkat, do_sync,
-    do_truncate, do_umask, do_unlink, do_unlinkat, do_write, do_writev, iovec_t, FileDesc, FileRef,
-    StatBuf, Statfs,
+    do_lseek, do_lstat, do_mkdir, do_mkdirat, do_mount, do_mount_rootfs, do_open, do_openat,
+    do_pipe, do_pipe2, do_pread, do_pwrite, do_read, do_readlink, do_readlinkat, do_readv,
+    do_rename, do_renameat, do_rmdir, do_sendfile, do_stat, do_statfs, do_symlink, do_symlinkat,
+    do_sync, do_truncate, do_umask, do_umount, do_unlink, do_unlinkat, do_write, do_writev,
+    iovec_t, FileDesc, FileRef, StatBuf, Statfs,
 };
 /*
 use crate::fs::{
@@ -259,6 +259,8 @@ macro_rules! process_syscall_table_with_callback {
             (Getdents64 = 217) => do_getdents64(fd: FileDesc, buf: *mut u8, buf_size: usize),
             (Statfs = 137) => do_statfs(path: *const i8, statfs_buf: *mut Statfs),
             (Fstatfs = 138) => do_fstatfs(fd: FileDesc, statfs_buf: *mut Statfs),
+            (Mount = 165) => do_mount(source: *const i8, target: *const i8, fs_type: *const i8, flags: u32, options: *const i8),
+            (Umount2 = 166) => do_umount(target: *const i8, flags: u32),
 
             (Pipe = 22) => do_pipe(fds_u: *mut i32),
             (Pipe2 = 293) => do_pipe2(fds_u: *mut i32, flags: u32),

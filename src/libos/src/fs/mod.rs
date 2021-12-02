@@ -17,8 +17,8 @@ pub use async_io::file::{
 };
 pub use async_io::fs::{
     DirentWriter, DirentWriterContext, FallocateFlags, FallocateMode, FileMode, FileSystem,
-    FileType, FsError, FsInfo, INode, Metadata, SeekFrom, StatBuf, StatFlags, StatMode, Timespec,
-    PATH_MAX,
+    FileType, FsError, FsInfo, INode, Metadata, MountFlags, SeekFrom, StatBuf, StatFlags, StatMode,
+    Timespec, UmountFlags, PATH_MAX,
 };
 pub use async_io::ioctl::IoctlCmd;
 

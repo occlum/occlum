@@ -344,4 +344,4 @@ impl Default for FsView {
 
 // Linux uses 40 as the upper limit for resolving symbolic links,
 // so Occlum use it as a reasonable value
-const MAX_SYMLINKS: usize = 40;
+pub const MAX_SYMLINKS: usize = 40;

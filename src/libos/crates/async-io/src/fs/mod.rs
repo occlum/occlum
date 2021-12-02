@@ -1,5 +1,6 @@
 mod fallocate_flags;
 mod file_mode;
+mod mount_flags;
 mod stat_buf;
 
 pub use rcore_fs::vfs::{
@@ -9,6 +10,7 @@ pub use rcore_fs::vfs::{
 
 pub use self::fallocate_flags::FallocateFlags;
 pub use self::file_mode::FileMode;
+pub use self::mount_flags::{MountFlags, UmountFlags};
 pub use self::stat_buf::{StatBuf, StatFlags, StatMode};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

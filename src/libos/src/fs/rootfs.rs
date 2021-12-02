@@ -1,4 +1,5 @@
 use super::dev_fs;
+use super::fs_view::MAX_SYMLINKS;
 use super::hostfs::HostFS;
 use super::procfs::ProcFS;
 use super::sefs::{SgxStorage, SgxUuidProvider};
@@ -22,7 +23,7 @@ lazy_static! {
                 let rootfs = open_root_fs_according_to(mount_config, &None)?;
                 rootfs.root_inode()
             };
-            mount_nonroot_fs_according_to(&root_inode, mount_config, &None)?;
+            mount_nonroot_fs_according_to(&root_inode, mount_config, &None, true)?;
             Ok(root_inode)
         }
 
@@ -74,10 +75,28 @@ pub fn open_root_fs_according_to(
     Ok(root_mountable_unionfs)
 }
 
+pub fn umount_nonroot_fs(
+    root: &Arc<dyn INode>,
+    abs_path: &str,
+    follow_symlink: bool,
+) -> Result<()> {
+    let mount_dir = if follow_symlink {
+        root.lookup_follow(abs_path, MAX_SYMLINKS)?
+    } else {
+        let (dir_path, file_name) = split_path(abs_path);
+        root.lookup_follow(dir_path, MAX_SYMLINKS)?
+            .lookup(file_name)?
+    };
+
+    mount_dir.downcast_ref::<MNode>().unwrap().umount()?;
+    Ok(())
+}
+
 pub fn mount_nonroot_fs_according_to(
     root: &Arc<dyn INode>,
     mount_configs: &Vec<ConfigMount>,
     user_key: &Option<sgx_key_128bit_t>,
+    follow_symlink: bool,
 ) -> Result<()> {
     for mc in mount_configs {
         if mc.target == Path::new("/") {
@@ -92,7 +111,7 @@ pub fn mount_nonroot_fs_according_to(
         match mc.type_ {
             TYPE_SEFS => {
                 let sefs = open_or_create_sefs_according_to(&mc, user_key)?;
-                mount_fs_at(sefs, root, &mc.target)?;
+                mount_fs_at(sefs, root, &mc.target, follow_symlink)?;
             }
             TYPE_HOSTFS => {
                 if mc.source.is_none() {
@@ -101,22 +120,44 @@ pub fn mount_nonroot_fs_according_to(
                 let source_path = mc.source.as_ref().unwrap();
 
                 let hostfs = HostFS::new(source_path);
-                mount_fs_at(hostfs, root, &mc.target)?;
+                mount_fs_at(hostfs, root, &mc.target, follow_symlink)?;
             }
             TYPE_RAMFS => {
                 let ramfs = RamFS::new();
-                mount_fs_at(ramfs, root, &mc.target)?;
+                mount_fs_at(ramfs, root, &mc.target, follow_symlink)?;
             }
             TYPE_DEVFS => {
                 let devfs = dev_fs::init_devfs()?;
-                mount_fs_at(devfs, root, &mc.target)?;
+                mount_fs_at(devfs, root, &mc.target, follow_symlink)?;
             }
             TYPE_PROCFS => {
                 let procfs = ProcFS::new();
-                mount_fs_at(procfs, root, &mc.target)?;
+                mount_fs_at(procfs, root, &mc.target, follow_symlink)?;
             }
             TYPE_UNIONFS => {
-                return_errno!(EINVAL, "Cannot mount UnionFS at non-root path");
+                let layer_mcs = mc
+                    .options
+                    .layers
+                    .as_ref()
+                    .ok_or_else(|| errno!(EINVAL, "Invalid layers for unionfs"))?;
+                let image_fs_mc = layer_mcs
+                    .get(0)
+                    .ok_or_else(|| errno!(EINVAL, "Invalid image layer"))?;
+                let container_fs_mc = layer_mcs
+                    .get(1)
+                    .ok_or_else(|| errno!(EINVAL, "Invalid container layer"))?;
+                let unionfs = match (&image_fs_mc.type_, &container_fs_mc.type_) {
+                    (TYPE_SEFS, TYPE_SEFS) => {
+                        let image_sefs = open_or_create_sefs_according_to(image_fs_mc, user_key)?;
+                        let container_sefs =
+                            open_or_create_sefs_according_to(container_fs_mc, user_key)?;
+                        UnionFS::new(vec![container_sefs, image_sefs])?
+                    }
+                    (_, _) => {
+                        return_errno!(EINVAL, "Unsupported fs type inside unionfs");
+                    }
+                };
+                mount_fs_at(unionfs, root, &mc.target, follow_symlink)?;
             }
         }
     }
@@ -126,22 +167,21 @@ pub fn mount_nonroot_fs_according_to(
 pub fn mount_fs_at(
     fs: Arc<dyn FileSystem>,
     parent_inode: &Arc<dyn INode>,
-    abs_path: &Path,
+    path: &Path,
+    follow_symlink: bool,
 ) -> Result<()> {
-    let mut mount_dir = parent_inode.find(".")?;
-    // The first component of abs_path is the RootDir, skip it.
-    for dirname in abs_path.iter().skip(1) {
-        mount_dir = match mount_dir.find(dirname.to_str().unwrap()) {
-            Ok(existing_dir) => {
-                if existing_dir.metadata()?.type_ != FileType::Dir {
-                    return_errno!(EIO, "not a directory");
-                }
-                existing_dir
-            }
-            Err(_) => return_errno!(ENOENT, "Mount point does not exist"),
-        };
-    }
-    mount_dir.downcast_ref::<MNode>().unwrap().mount(fs);
+    let path = path
+        .to_str()
+        .ok_or_else(|| errno!(EINVAL, "invalid path"))?;
+    let mount_dir = if follow_symlink {
+        parent_inode.lookup_follow(path, MAX_SYMLINKS)?
+    } else {
+        let (dir_path, file_name) = split_path(path);
+        parent_inode
+            .lookup_follow(dir_path, MAX_SYMLINKS)?
+            .lookup(file_name)?
+    };
+    mount_dir.downcast_ref::<MNode>().unwrap().mount(fs)?;
     Ok(())
 }
 
