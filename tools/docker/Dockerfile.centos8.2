@@ -66,7 +66,7 @@ RUN wget http://www.etallen.com/cpuid/cpuid-20200211.x86_64.tar.gz && \
 
 # Install Rust
 ENV PATH="/root/.cargo/bin:$PATH"
-ENV OCCLUM_RUST_VERSION=nightly-2020-10-25
+ENV OCCLUM_RUST_VERSION=nightly-2021-09-13
 RUN curl https://sh.rustup.rs -sSf | \
         sh -s -- --default-toolchain ${OCCLUM_RUST_VERSION} -y && \
     rm -rf /root/.cargo/registry && rm -rf /root/.cargo/git && \
@@ -75,7 +75,7 @@ RUN curl https://sh.rustup.rs -sSf | \
 # Install SGX PSW
 WORKDIR /tmp
 RUN echo "ca_directory=/etc/ssl/certs" >> /etc/wgetrc && \
-    wget https://download.01.org/intel-sgx/sgx-linux/2.14/distro/centos8.2-server/sgx_rpm_local_repo.tgz && \
+    wget https://download.01.org/intel-sgx/sgx-linux/2.15.1/distro/centos8.2-server/sgx_rpm_local_repo.tgz && \
     tar -xvf sgx_rpm_local_repo.tgz && \
     rm sgx_rpm_local_repo.tgz && \
     cd /tmp/sgx_rpm_local_repo && \
@@ -105,7 +105,7 @@ RUN echo "ca_directory=/etc/ssl/certs" >> /etc/wgetrc && \
 
 # Install SGX SDK
 WORKDIR /tmp
-RUN git clone -b sgx_2.14_for_occlum https://github.com/occlum/linux-sgx && \
+RUN git clone -b sgx_2.15.1_for_occlum https://github.com/occlum/linux-sgx && \
     cd linux-sgx && \
     make preparation && \
     ./compile_and_install.sh no_mitigation USE_OPT_LIBS=3 && \
