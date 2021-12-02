@@ -214,11 +214,12 @@ impl Thread {
         )
         .unwrap();
 
-        THREAD_NOTIFIERS
-            .lock()
-            .unwrap()
-            .insert(self.tid(), eventfd)
-            .expect_none("this thread should not have an eventfd before start");
+        let event_file = THREAD_NOTIFIERS.lock().unwrap().insert(self.tid(), eventfd);
+
+        assert!(
+            event_file.is_none(),
+            "this thread should not have an eventfd before start"
+        );
 
         #[cfg(feature = "syscall_timing")]
         self.profiler()
