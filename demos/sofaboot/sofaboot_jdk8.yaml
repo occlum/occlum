@@ -1,0 +1,9 @@
+includes: 
+  - base.yaml
+  - java-8-openjdk.yaml
+targets: 
+  # copy sofaboot jar
+  - target: /usr/lib/spring
+    copy: 
+      - files: 
+        - ../sofa-boot-guides/sofaboot-sample-standard/target/boot/sofaboot-sample-standard-web-0.0.1-SNAPSHOT-executable.jar
