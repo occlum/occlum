@@ -94,13 +94,11 @@ int test_ioctl_fioclex() {
         THROW_ERROR("fstat pipe reader fd error");
     }
 
-#if 0 // Need fstat support for pipe
     // pipe writer is set with default and should inherit by child
     ret = fstat(pipe_writer_fd, &stat_buf);
     if (ret != 0 || !S_ISFIFO(stat_buf.st_mode)) {
         THROW_ERROR("fstat pipe writer fd error");
     }
-#endif
 
     return 0;
 }
@@ -193,6 +191,39 @@ int test_execve_child_thread() {
     return -1;
 }
 
+// /bin/naughty_child -t vfork reader_fd writer_fd
+// pipe_reader should remain open becuase it is inherited.
+// pipe_writer should be closed already before execve naughty_child.
+int test_vfork_child() {
+    int pipe_reader_fd = atoi(g_argv[3]);
+    int pipe_writer_fd = atoi(g_argv[4]);
+    char buf[30] = {0};
+    struct stat stat_buf;
+
+    int ret = read(pipe_reader_fd, buf, sizeof(buf));
+    if (ret < 0) {
+        THROW_ERROR("[child] read from pipe error");
+    }
+
+    // Check pipe reader
+    if (fstat(pipe_reader_fd, &stat_buf) < 0 ) {
+        THROW_ERROR("[child] fstat pipe files error");
+    }
+
+    if (!S_ISFIFO(stat_buf.st_mode)) {
+        THROW_ERROR("failed to check the pipe reader st_mode");
+    }
+
+    // Check pipe writer which should be closed already
+    ret = fstat(pipe_writer_fd, &stat_buf);
+    if (ret >= 0 || errno != EBADF) {
+        THROW_ERROR("failed to check the pipe writer which should be closed");
+    }
+
+    printf("[child] received mesg: %s", buf);
+    return 0;
+}
+
 // ============================================================================
 // Test suite
 // ============================================================================
@@ -208,6 +239,8 @@ int start_test(const char *test_name) {
         return test_ioctl_fioclex();
     } else if (strcmp(test_name, "execve_thread") == 0) {
         return test_execve_child_thread();
+    } else if (strcmp(test_name, "vfork") == 0) {
+        return test_vfork_child();
     } else {
         fprintf(stderr, "[child] test case not found\n");
         return -1;
@@ -216,7 +249,8 @@ int start_test(const char *test_name) {
 
 void print_usage() {
     fprintf(stderr, "Usage:\n nauty_child [-t testcase1] [-t testcase2] ...\n\n");
-    fprintf(stderr, " Now support testcase: <sigmask, sigdef, fioclex, execve_thread>\n");
+    fprintf(stderr,
+            " Now support testcase: <sigmask, sigdef, fioclex, execve_thread, vfork>\n");
 }
 
 int main(int argc, char *argv[]) {
