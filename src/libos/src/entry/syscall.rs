@@ -50,10 +50,11 @@ use crate::poll::syscalls::{
 };
 use crate::prelude::*;
 use crate::process::{
-    do_arch_prctl, do_clone, do_exit, do_exit_group, do_futex, do_get_robust_list, do_getegid,
-    do_geteuid, do_getgid, do_getpgid, do_getpid, do_getppid, do_gettid, do_getuid, do_prctl,
-    do_set_robust_list, do_set_tid_address, do_spawn_for_glibc, do_spawn_for_musl, do_wait4, pid_t,
-    posix_spawnattr_t, FdOp, RobustListHead, SpawnFileActions, ThreadRef, ThreadStatus,
+    do_arch_prctl, do_clone, do_execve, do_exit, do_exit_group, do_futex, do_get_robust_list,
+    do_getegid, do_geteuid, do_getgid, do_getpgid, do_getpid, do_getppid, do_gettid, do_getuid,
+    do_prctl, do_set_robust_list, do_set_tid_address, do_spawn_for_glibc, do_spawn_for_musl,
+    do_wait4, pid_t, posix_spawnattr_t, FdOp, RobustListHead, SpawnFileActions, ThreadRef,
+    ThreadStatus,
 };
 use crate::sched::{do_getcpu, do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
 use crate::signal::{
@@ -144,6 +145,7 @@ macro_rules! process_syscall_table_with_callback {
             (SpawnMusl = 360) => do_spawn_for_musl(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp, attribute_list: *const posix_spawnattr_t),
             (MountRootFS = 363) => do_mount_rootfs(key_ptr: *const sgx_key_128bit_t, occlum_json_mac_ptr: *const sgx_aes_gcm_128bit_tag_t),
             (Clone = 56) => do_clone(flags: u32, stack_addr: usize, ptid: *mut pid_t, ctid: *mut pid_t, new_tls: usize),
+            (Execve = 59) => do_execve(path: *const i8, argv: *const *const i8, envp: *const *const i8),
             (Wait4 = 61) => do_wait4(pid: i32, _exit_status: *mut i32, options: u32),
             (Exit = 60) => do_exit(exit_status: i32),
             (ExitGroup = 231) => do_exit_group(exit_status: i32),

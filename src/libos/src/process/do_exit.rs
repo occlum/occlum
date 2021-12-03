@@ -14,8 +14,12 @@ pub fn do_exit_group(status: i32) {
     current.process().force_exit(term_status);
     exit_thread(term_status);
 
-    // Interrupt all threads in the process to ensure that they exit
-    current.process().access_threads_with(|thread| {
+    notify_all_threads_to_exit(current.process());
+}
+
+// Interrupt all threads in the process to ensure that they exit
+pub fn notify_all_threads_to_exit(current_process: &ProcessRef) {
+    current_process.access_threads_with(|thread| {
         let task = match thread.task() {
             Some(task) => task,
             None => return,
@@ -71,13 +75,16 @@ fn exit_thread(term_status: TermStatus) {
     // If this thread is the last thread, close all files then exit the process
     if num_remaining_threads == 0 {
         thread.close_all_files();
-        exit_process(&thread, term_status);
+        exit_process(&thread, term_status, None);
     }
+
+    // Notify a thread, if any, that wait on this thread to exit.
+    // E.g. In execve, the new thread should wait for old process's all thread to exit
+    futex_wake(Arc::as_ptr(&thread.process()) as *const i32, 1);
 }
 
-fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
+fn exit_process(thread: &ThreadRef, term_status: TermStatus, new_parent_ref: Option<ProcessRef>) {
     let process = thread.process();
-
     // Deadlock note: always lock parent first, then child.
 
     // Lock the idle process since it may adopt new children.
@@ -104,6 +111,24 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
     // Lock the current process
     let mut process_inner = process.inner();
 
+    if let Some(new_parent_ref) = new_parent_ref {
+        // Exit old process in execve syscall
+        let mut new_parent_inner = new_parent_ref.inner();
+        let pid = process.pid();
+
+        // Let new_process to adopt the children of current process
+        process_inner.exit(term_status, &new_parent_ref, &mut new_parent_inner, &parent);
+
+        // Remove current process from parent process' zombie list.
+        if parent_inner.is_none() {
+            debug_assert!(parent.pid() == 0);
+            idle_inner.remove_zombie_child(pid);
+        } else {
+            parent_inner.unwrap().remove_zombie_child(pid);
+        }
+        return;
+    }
+
     // The parent is the idle process
     if parent_inner.is_none() {
         debug_assert!(parent.pid() == 0);
@@ -115,22 +140,21 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
 
         process_inner.exit(term_status, &idle_ref, &mut idle_inner, &parent);
         idle_inner.remove_zombie_child(pid);
-        wake_host(&process, term_status);
-        return;
+    } else {
+        // Otherwise, we need to notify the parent process
+        let mut parent_inner = parent_inner.unwrap();
+        process_inner.exit(term_status, &idle_ref, &mut idle_inner, &parent);
+
+        //Send SIGCHLD to parent
+        send_sigchld_to(&parent);
+
+        drop(idle_inner);
+        drop(parent_inner);
+        drop(process_inner);
+
+        // Notify the parent that this child process's status has changed
+        parent.exit_waiters().wake_all();
     }
-    // Otherwise, we need to notify the parent process
-    let mut parent_inner = parent_inner.unwrap();
-    process_inner.exit(term_status, &idle_ref, &mut idle_inner, &parent);
-
-    //Send SIGCHLD to parent
-    send_sigchld_to(&parent);
-
-    drop(idle_inner);
-    drop(parent_inner);
-    drop(process_inner);
-
-    // Notify the parent that this child process's status has changed
-    parent.exit_waiters().wake_all();
 
     // Notify the host threads that wait the status change of this process
     wake_host(&process, term_status);
@@ -146,4 +170,19 @@ fn wake_host(process: &ProcessRef, term_status: TermStatus) {
     if let Some(host_waker) = process.host_waker() {
         host_waker.wake(term_status);
     }
+}
+
+pub fn exit_old_process_for_execve(term_status: TermStatus, new_parent_ref: ProcessRef) {
+    let thread = current!();
+
+    // Exit current thread
+    let num_remaining_threads = thread.exit(term_status);
+    if thread.tid() != thread.process().pid() {
+        // Keep the main thread's tid available as long as the process is not destroyed.
+        // Main thread doesn't need to delete here. It will be repalced later.
+        table::del_thread(thread.tid()).expect("tid must be in the table");
+    }
+
+    debug_assert!(num_remaining_threads == 0);
+    exit_process(&thread, term_status, Some(new_parent_ref));
 }

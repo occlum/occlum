@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use super::do_arch_prctl::ArchPrctlCode;
 use super::do_clone::CloneFlags;
+use super::do_exec::do_exec;
 use super::do_futex::{FutexFlags, FutexOp};
 use super::do_robust_list::RobustListHead;
 use super::do_spawn::FileAction;
@@ -465,4 +466,21 @@ pub async fn do_get_robust_list(
         len_ptr.write(std::mem::size_of::<RobustListHead>());
     }
     Ok(0)
+}
+
+pub async fn do_execve(
+    path: *const i8,
+    argv: *const *const i8,
+    envp: *const *const i8,
+) -> Result<isize> {
+    let path = clone_cstring_safely(path)?.to_string_lossy().into_owned();
+    let argv = clone_cstrings_safely(argv)?;
+    let envp = clone_cstrings_safely(envp)?;
+    let current = current!();
+    debug!(
+        "execve: path: {:?}, argv: {:?}, envp: {:?}",
+        path, argv, envp
+    );
+
+    do_exec(&path, &argv, &envp, &current).await
 }

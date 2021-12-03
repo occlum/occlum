@@ -7,7 +7,7 @@ use self::exec_loader::{load_exec_file_hdr_to_vec, load_file_hdr_to_vec};
 use super::elf_file::{ElfFile, ElfHeader, ProgramHeaderExt};
 use super::process::ProcessBuilder;
 use super::spawn_attribute::SpawnAttr;
-use super::thread::ThreadName;
+use super::thread::{ThreadId, ThreadName};
 use super::{table, HostWaker, ProcessRef, ThreadRef};
 use crate::entry::context_switch::{CpuContext, GpRegs};
 use crate::fs::{
@@ -114,6 +114,59 @@ fn new_process(
     host_stdio_fds: Option<&HostStdioFds>,
     wake_host_ptr: Option<*mut i32>,
     current_ref: &ThreadRef,
+) -> Result<(ProcessRef, CpuContext)> {
+    let (new_process_ref, init_cpu_state) = new_process_common(
+        file_path,
+        argv,
+        envp,
+        file_actions,
+        spawn_attributes,
+        host_stdio_fds,
+        wake_host_ptr,
+        current_ref,
+        None,
+    )?;
+    table::add_process(new_process_ref.clone());
+    table::add_thread(new_process_ref.main_thread().unwrap());
+
+    Ok((new_process_ref, init_cpu_state))
+}
+
+/// Create a new process for execve which will use same parent, pid, tid
+pub fn new_process_for_exec(
+    file_path: &str,
+    argv: &[CString],
+    envp: &[CString],
+    current_ref: &ThreadRef,
+) -> Result<(ProcessRef, CpuContext)> {
+    let tid = ThreadId {
+        tid: current_ref.process().pid() as u32,
+    };
+    let (new_process_ref, init_cpu_state) = new_process_common(
+        file_path,
+        argv,
+        envp,
+        &Vec::new(),
+        None,
+        None,
+        None,
+        current_ref,
+        Some(tid),
+    )?;
+
+    Ok((new_process_ref, init_cpu_state))
+}
+
+fn new_process_common(
+    file_path: &str,
+    argv: &[CString],
+    envp: &[CString],
+    file_actions: &[FileAction],
+    spawn_attributes: Option<SpawnAttr>,
+    host_stdio_fds: Option<&HostStdioFds>,
+    wake_host_ptr: Option<*mut i32>,
+    current_ref: &ThreadRef,
+    reuse_tid: Option<ThreadId>,
 ) -> Result<(ProcessRef, CpuContext)> {
     let mut argv = argv.clone().to_vec();
     let (is_script, elf_inode, mut elf_buf, elf_header) =
@@ -229,16 +282,40 @@ fn new_process(
             })
         }
         trace!("new process sig_dispositions = {:?}", sig_dispositions);
+        let umask = process_ref.umask();
 
         // Make the default thread name to be the process's corresponding elf file name
         let elf_name = elf_path.rsplit('/').collect::<Vec<&str>>()[0];
         let thread_name = ThreadName::new(elf_name);
 
-        let mut builder = ProcessBuilder::new()
+        let mut builder = ProcessBuilder::new();
+        let parent = {
+            match reuse_tid {
+                None => {
+                    // spawn new process path
+                    if let Some(wake_host_ptr) = wake_host_ptr {
+                        let host_waker = HostWaker::new(wake_host_ptr)?;
+                        builder = builder.host_waker(host_waker);
+                    }
+                    process_ref
+                }
+                Some(tid) => {
+                    // execve new process path
+                    builder = builder.tid(tid);
+                    if let Some(host_waker) = current_ref.process().host_waker() {
+                        builder = builder.host_waker(host_waker.clone());
+                    }
+                    // use current process' parent as new process parent
+                    current_ref.process().parent()
+                }
+            }
+        };
+
+        builder = builder
             .vm(vm_ref)
             .exec_path(&elf_path)
-            .umask(process_ref.umask())
-            .parent(process_ref)
+            .umask(umask)
+            .parent(parent)
             .sched(sched_ref)
             .rlimits(rlimit_ref)
             .fs(fs_ref)
@@ -247,17 +324,9 @@ fn new_process(
             .sig_mask(sig_mask)
             .sig_dispositions(sig_dispositions);
 
-        if let Some(wake_host_ptr) = wake_host_ptr {
-            let host_waker = HostWaker::new(wake_host_ptr)?;
-            builder = builder.host_waker(host_waker);
-        }
-
         let new_process = builder.build()?;
         (new_process, init_cpu_state)
     };
-
-    table::add_process(new_process_ref.clone());
-    table::add_thread(new_process_ref.main_thread().unwrap());
 
     info!(
         "Process created: elf = {}, pid = {}",

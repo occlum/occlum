@@ -6,7 +6,7 @@ use crate::prelude::*;
 
 /// A waker to wake up a host thread that waits on the status changes of a LibOS
 /// process.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HostWaker {
     ptr: NonNull<i32>,
 }
