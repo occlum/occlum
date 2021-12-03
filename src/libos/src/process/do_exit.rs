@@ -2,20 +2,29 @@ use std::intrinsics::atomic_store;
 use std::sync::Weak;
 
 use super::do_futex::futex_wake;
+use super::do_vfork::{is_vforked_child_process, vfork_return_to_parent};
 use super::pgrp::clean_pgrp_when_exit;
 use super::process::{Process, ProcessFilter};
 use super::{table, ProcessRef, TermStatus, ThreadRef, ThreadStatus};
+use crate::entry::context_switch::CURRENT_CONTEXT;
 use crate::prelude::*;
 use crate::signal::constants::*;
 use crate::signal::{KernelSignal, SigNum};
 
-pub fn do_exit_group(status: i32) {
-    let term_status = TermStatus::Exited(status as u8);
-    let current = current!();
-    current.process().force_exit(term_status);
-    exit_thread(term_status);
+pub fn do_exit_group(status: i32) -> Result<isize> {
+    if is_vforked_child_process() {
+        let current = current!();
+        let mut curr_user_ctxt = CURRENT_CONTEXT.with(|context| context.as_ptr());
+        return vfork_return_to_parent(curr_user_ctxt as *mut _, &current);
+    } else {
+        let term_status = TermStatus::Exited(status as u8);
+        let current = current!();
+        current.process().force_exit(term_status);
+        exit_thread(term_status);
 
-    notify_all_threads_to_exit(current.process());
+        notify_all_threads_to_exit(current.process());
+        Ok(0)
+    }
 }
 
 // Interrupt all threads in the process to ensure that they exit

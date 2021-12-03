@@ -126,6 +126,7 @@ fn new_process(
         wake_host_ptr,
         current_ref,
         None,
+        None,
     )?;
     table::add_process(new_process_ref.clone());
     table::add_thread(new_process_ref.main_thread().unwrap());
@@ -139,6 +140,8 @@ pub fn new_process_for_exec(
     argv: &[CString],
     envp: &[CString],
     current_ref: &ThreadRef,
+    reuse_tid: Option<ThreadId>,
+    parent_process: Option<ProcessRef>,
 ) -> Result<(ProcessRef, CpuContext)> {
     let tid = ThreadId {
         tid: current_ref.process().pid() as u32,
@@ -152,7 +155,8 @@ pub fn new_process_for_exec(
         None,
         None,
         current_ref,
-        Some(tid),
+        reuse_tid,
+        parent_process,
     )?;
 
     Ok((new_process_ref, init_cpu_state))
@@ -168,6 +172,7 @@ fn new_process_common(
     wake_host_ptr: Option<*mut i32>,
     current_ref: &ThreadRef,
     reuse_tid: Option<ThreadId>,
+    parent_process: Option<ProcessRef>,
 ) -> Result<(ProcessRef, CpuContext)> {
     let mut argv = argv.clone().to_vec();
     let (is_script, elf_inode, mut elf_buf, elf_header) =
@@ -308,11 +313,16 @@ fn new_process_common(
                 Some(tid) => {
                     // execve new process path
                     builder = builder.tid(tid);
-                    if let Some(host_waker) = current_ref.process().host_waker() {
-                        builder = builder.host_waker(host_waker.clone());
+                    if let Some(parent) = parent_process {
+                        // current process directly call execve
+                        if let Some(host_waker) = current_ref.process().host_waker() {
+                            builder = builder.host_waker(host_waker.clone());
+                        }
+                        parent
+                    } else {
+                        // vfork + execve, same as spawn, use current process_ref as parent process
+                        process_ref
                     }
-                    // use current process' parent as new process parent
-                    current_ref.process().parent()
                 }
             }
         };
