@@ -22,15 +22,21 @@ init_instance() {
                 .resource_limits.max_num_of_threads = 64 |
                 .process.default_heap_size = "256MB" |
                 .process.default_mmap_size = "1400MB" |
-                .entry_points = [ "/usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin" ] |
-                .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-11-alibaba-dragonwell/jre/lib/server:/usr/lib/jvm/java-11-alibaba-dragonwell/jre/lib:/usr/lib/jvm/java-11-alibaba-dragonwell/jre/../lib" ]' Occlum.json)" && \
+                .entry_points = [ "JDK_BIN" ] |
+                .env.default = [ "JDK_LIB_PATH" ]' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
+
+    # Update JDK bin Path
+    sed -i "s#JDK_BIN#${JDK_BIN}#g" Occlum.json
+
+    # Update JDK Lib Path
+    sed -i "s#JDK_LIB_PATH#${JDK_LIB_PATH}#g" Occlum.json
 }
 
 build_sofa() {
     # Copy JVM and JAR file into Occlum instance and build
     rm -rf image
-    copy_bom -f ../sofaboot.yaml --root image --include-dir /opt/occlum/etc/template
+    copy_bom -f ${bomfile} --root image --include-dir /opt/occlum/etc/template
     occlum build
 }
 
@@ -41,7 +47,22 @@ run_sofa() {
     init_instance
     build_sofa
     echo -e "${BLUE}occlum run SOFABoot demo${NC}"
-    occlum run /usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin/java -Xmx512m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=64m -Dos.name=Linux -jar /usr/lib/spring/${jar_file} > ../sofaboot.log &
+    occlum run ${jdk_path}/jre/bin/java -Xmx512m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=64m -Dos.name=Linux -jar /usr/lib/spring/${jar_file} > ../sofaboot.log &
 }
 
+if [[ $1 == "jdk8" ]]; then
+    echo ""
+    echo "*** Run sofaboot demo with openjdk 8 in Occlum ***"
+    bomfile="../sofaboot_jdk8.yaml"
+    jdk_path="/usr/lib/jvm/java-1.8-openjdk"
+    JDK_LIB_PATH="LD_LIBRARY_PATH=${jdk_path}/jre/lib:${jdk_path}/lib"
+else
+    echo ""
+    echo "*** Run sofaboot demo with openjdk 11 in Occlum ***"
+    bomfile="../sofaboot.yaml"
+    jdk_path="/usr/lib/jvm/java-11-alibaba-dragonwell"
+    JDK_LIB_PATH="LD_LIBRARY_PATH=${jdk_path}/jre/lib/server:${jdk_path}/jre/lib:${jdk_path}/jre/../lib"
+fi
+
+JDK_BIN="${jdk_path}/jre/bin"
 run_sofa
