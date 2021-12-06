@@ -19,5 +19,4 @@ use fs::{AsEvent, AsINodeFile, AsTimer, CreationFlags, File, FileDesc, FileRef, 
 use std::any::Any;
 use std::convert::TryFrom;
 use std::fmt;
-use std::sync::atomic::spin_loop_hint;
 use time::timeval_t;

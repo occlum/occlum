@@ -154,8 +154,8 @@ impl Inner {
     pub fn wake(&self) {
         if self
             .is_woken
-            .compare_and_swap(false, true, Ordering::SeqCst)
-            == false
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
         {
             self.host_eventfd.write_u64(1);
         }
@@ -167,8 +167,8 @@ impl Inner {
             .filter(|inner| {
                 inner
                     .is_woken
-                    .compare_and_swap(false, true, Ordering::SeqCst)
-                    == false
+                    .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_ok()
             })
             .map(|inner| inner.host_eventfd.host_fd())
             .collect::<Vec<FileDesc>>();
