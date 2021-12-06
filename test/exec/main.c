@@ -82,7 +82,7 @@ int test_execve_no_return(void) {
 }
 
 static test_case_t test_cases[] = {
-    // TEST_CASE(test_execve_on_child_thread), // similar with pthread test_mutex_with_cond_wait test case
+    TEST_CASE(test_execve_on_child_thread), // similar with pthread test_mutex_with_cond_wait test case
     TEST_CASE(test_execve_error_return),
     TEST_CASE(test_execve_no_return),
 };
