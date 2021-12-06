@@ -71,8 +71,9 @@ impl AtomicIoEvents for Atomic<IoEvents> {
             let new_val = old_val & !*mask | *ready;
             let success_ordering = ordering;
             let failure_ordering = Ordering::Relaxed;
-            if let Ok(_) =
-                self.compare_exchange(old_val, new_val, success_ordering, failure_ordering)
+            if self
+                .compare_exchange(old_val, new_val, success_ordering, failure_ordering)
+                .is_ok()
             {
                 return;
             }

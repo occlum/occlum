@@ -52,7 +52,8 @@
 use super::*;
 
 use crate::process::{futex_wait, futex_wake};
-use std::sync::atomic::{spin_loop_hint, AtomicI32, Ordering};
+use std::hint;
+use std::sync::atomic::{AtomicI32, Ordering};
 
 // The implementaion of RwLock
 //
@@ -97,7 +98,7 @@ impl RwLockInner {
             && self.rw_lock.load(Ordering::SeqCst) != 0
             && self.rw_waiters.load(Ordering::SeqCst) == 0
         {
-            spin_loop_hint();
+            hint::spin_loop();
             spins -= 1;
         }
 
@@ -121,7 +122,8 @@ impl RwLockInner {
             self.rw_waiters.fetch_add(1, Ordering::SeqCst);
 
             let tmp = (val as u32 | 0x8000_0000) as i32;
-            self.rw_lock.compare_and_swap(val, tmp, Ordering::SeqCst);
+            self.rw_lock
+                .compare_exchange(val, tmp, Ordering::SeqCst, Ordering::SeqCst);
             ret = futex_wait(&self.rw_lock as *const _ as *const i32, tmp, &None);
 
             self.rw_waiters.fetch_sub(1, Ordering::SeqCst);
@@ -148,8 +150,8 @@ impl RwLockInner {
 
             if self
                 .rw_lock
-                .compare_and_swap(val, val + 1, Ordering::SeqCst)
-                == val
+                .compare_exchange(val, val + 1, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
             {
                 break;
             }
@@ -168,7 +170,7 @@ impl RwLockInner {
             && self.rw_lock.load(Ordering::SeqCst) != 0
             && self.rw_waiters.load(Ordering::SeqCst) == 0
         {
-            spin_loop_hint();
+            hint::spin_loop();
             spins -= 1;
         }
 
@@ -186,7 +188,8 @@ impl RwLockInner {
             self.rw_waiters.fetch_add(1, Ordering::SeqCst);
 
             let tmp = (val as u32 | 0x8000_0000) as i32;
-            self.rw_lock.compare_and_swap(val, tmp, Ordering::SeqCst);
+            self.rw_lock
+                .compare_exchange(val, tmp, Ordering::SeqCst, Ordering::SeqCst);
             ret = futex_wait(&self.rw_lock as *const _ as *const i32, tmp, &None);
 
             self.rw_waiters.fetch_sub(1, Ordering::SeqCst);
@@ -201,12 +204,14 @@ impl RwLockInner {
     }
 
     pub fn try_write(&self) -> Result<()> {
-        let val = self
+        if self
             .rw_lock
-            .compare_and_swap(0, 0x7FFF_FFFF, Ordering::SeqCst);
-        match val {
-            0 => Ok(()),
-            _ => return_errno!(EBUSY, "the lock is held for reading or writing"),
+            .compare_exchange(0, 0x7FFF_FFFF, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
+            Ok(())
+        } else {
+            Err(errno!(EBUSY, "the lock is held for reading or writing"))
         }
     }
 
@@ -227,7 +232,11 @@ impl RwLockInner {
                 _ => val - 1,
             };
 
-            if self.rw_lock.compare_and_swap(val, new, Ordering::SeqCst) == val {
+            if self
+                .rw_lock
+                .compare_exchange(val, new, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+            {
                 break;
             }
         }

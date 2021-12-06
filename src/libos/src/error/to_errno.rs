@@ -109,7 +109,7 @@ impl ToErrno for std::alloc::AllocError {
     }
 }
 
-impl ToErrno for std::alloc::LayoutErr {
+impl ToErrno for std::alloc::LayoutError {
     fn errno(&self) -> Errno {
         EINVAL
     }
