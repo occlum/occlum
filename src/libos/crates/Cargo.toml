@@ -3,6 +3,7 @@
 members = [
     "async-rt",
     "async-io",
+    "block-device",
     "inherit-methods-macro",
     "errno",
     "host-socket",
