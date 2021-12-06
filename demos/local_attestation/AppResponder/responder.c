@@ -28,7 +28,7 @@ int server_init() {
     srv_addr.sin_addr.s_addr = INADDR_ANY;
     srv_addr.sin_port = htons(SERVER_PORT);
 
-    m_server_sock_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);;
+    m_server_sock_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (m_server_sock_fd == -1) {
         printf("socket initiazation error: %d\n", errno);
         return -1;

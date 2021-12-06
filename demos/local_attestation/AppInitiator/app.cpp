@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
     int update = 0;
     sgx_launch_token_t token = {0};
     sgx_status_t status;
-    int exit_status = 0;
+    volatile int exit_status = -1;
     const char *cmd_path = "/bin/responder"; // Prepare cmd path and arguments
     const char *cmd_args[] = {NULL};
 
@@ -62,18 +62,10 @@ int main(int argc, char *argv[]) {
         .env = NULL,
         .stdio = (const struct occlum_stdio_fds *) &io_fds,
         .pid = &libos_tid,
+        .exit_status = (int *) &exit_status,
     };
 
     if (occlum_pal_create_process(&create_process_args) < 0) {
-        return EXIT_FAILURE;
-    }
-
-    // execute the responder process
-    struct occlum_pal_exec_args exec_args = {
-        .pid = libos_tid,
-        .exit_value = &exit_status,
-    };
-    if (occlum_pal_exec(&exec_args) < 0) {
         return EXIT_FAILURE;
     }
 
