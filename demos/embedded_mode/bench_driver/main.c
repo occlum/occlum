@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <occlum_pal_api.h>
+#include <sys/syscall.h>
+#include <linux/futex.h>
 
 //============================================================================
 // Help message
@@ -32,6 +34,8 @@ static void print_help_msg(const char *prog_name) {
 // Main
 //============================================================================
 
+#define FUTEX_WAIT_TIMEOUT(addr, val, timeout)  ((int)syscall(__NR_futex, (addr), FUTEX_WAIT, (val), (timeout)))
+
 int main(int argc, char *argv[]) {
     // Parse arguments
     const char *prog_name = (const char *)argv[0];
@@ -46,6 +50,7 @@ int main(int argc, char *argv[]) {
     occlum_pal_attr_t pal_attr = OCCLUM_PAL_ATTR_INITVAL;
     pal_attr.instance_dir = "occlum_instance";
     pal_attr.log_level = "off";
+    pal_attr.num_vcpus = 0;
     if (occlum_pal_init(&pal_attr) < 0) {
         return EXIT_FAILURE;
     }
@@ -75,25 +80,29 @@ int main(int argc, char *argv[]) {
 
     // Use Occlum PAL to create new process
     int libos_tid = 0;
+    volatile int exit_status = -1;
     struct occlum_pal_create_process_args create_process_args = {
         .path = cmd_path,
         .argv = cmd_args,
         .env = NULL,
         .stdio = (const struct occlum_stdio_fds *) &io_fds,
         .pid = &libos_tid,
+        .exit_status = (int *) &exit_status,
     };
     if (occlum_pal_create_process(&create_process_args) < 0) {
         return EXIT_FAILURE;
     }
 
-    // Use Occlum PAL to execute the cmd
-    int exit_status = 0;
-    struct occlum_pal_exec_args exec_args = {
-        .pid = libos_tid,
-        .exit_value = &exit_status,
-    };
-    if (occlum_pal_exec(&exec_args) < 0) {
-        return EXIT_FAILURE;
+    int futex_val;
+    while ((futex_val = exit_status) < 0) {
+        (void)FUTEX_WAIT_TIMEOUT(&exit_status, futex_val, NULL);
+    }
+
+    // Convert the exit status to a value in a shell-like encoding
+    if (WIFEXITED(exit_status)) { // terminated normally
+        exit_status = WEXITSTATUS(exit_status) & 0x7F; // [0, 127]
+    } else { // killed by signal
+        exit_status = 128 + WTERMSIG(exit_status); // [128 + 1, 128 + 64]
     }
 
     // Destroy Occlum PAL
