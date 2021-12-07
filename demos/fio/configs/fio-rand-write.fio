@@ -1,0 +1,16 @@
+; fio-rand-write.job for fiotest
+
+[global]
+name=fio-rand-write
+filename=/root/fio-rand-write
+rw=randwrite
+bs=4K
+direct=0
+numjobs=1
+time_based
+runtime=100
+
+[file1]
+size=256M
+ioengine=sync
+iodepth=16
