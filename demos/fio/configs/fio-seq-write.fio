@@ -1,0 +1,16 @@
+; fio-seq-write.job for fiotest
+
+[global]
+name=fio-seq-write
+filename=/root/fio-seq-write
+rw=write
+bs=256K
+direct=0
+numjobs=1
+time_based
+runtime=100
+
+[file1]
+size=256M
+ioengine=sync
+iodepth=16
