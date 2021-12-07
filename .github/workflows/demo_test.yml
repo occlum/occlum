@@ -584,3 +584,22 @@ jobs:
     - name: Run sysbench threads benchmark
       run: docker exec sysbench_test bash -c "cd /root/occlum/demos/sysbench/occlum_instance;
             occlum run /bin/sysbench threads --threads=200 --thread-yields=100 --thread-locks=4 --time=30 run"
+
+  FIO_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'fio_test'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Build fio dependencies
+      run: docker exec fio_test bash -c "cd /root/occlum/demos/fio && ./download_and_build_fio.sh"
+
+    - name: Run fio test
+      run: docker exec fio_test bash -c "cd /root/occlum/demos/fio && SGX_MODE=SIM ./run_fio_on_occlum.sh fio-seq-read.fio"
+

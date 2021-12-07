@@ -1,0 +1,22 @@
+diff --git a/configure b/configure
+index 84ccce04..6744a4b2 100755
+--- a/configure
++++ b/configure
+@@ -1068,7 +1068,7 @@ int main(int argc, char **argv)
+ }
+ EOF
+ if compile_prog "" "" "posix_fadvise"; then
+-    posix_fadvise="yes"
++    posix_fadvise="no"
+ fi
+ print_config "POSIX fadvise" "$posix_fadvise"
+ 
+@@ -2824,7 +2824,7 @@ int main(int argc, char **argv)
+ }
+ EOF
+   if compile_prog "" "" "timerfd_create"; then
+-    timerfd_create="yes"
++    timerfd_create="no"
+   fi
+ fi
+ print_config "timerfd_create" "$timerfd_create"
