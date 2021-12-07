@@ -10,3 +10,6 @@ edition = "2018"
 errno = { path = "../errno" }
 object-id = { path = "../object-id" }
 spin = "0.7"
+
+[dev-dependencies]
+async-rt = { path = "../async-rt", features = ["auto_run"] }

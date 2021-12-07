@@ -34,7 +34,7 @@ pub type BioResp = core::result::Result<(), Errno>;
 
 /// The closure type for the callback function invoked upon the completion of
 /// a request to a block device.
-pub type BioCompletionCallback = Box<dyn FnOnce(/* req = */ &BioReq, /* resp = */ BioResp)>;
+pub type BioCompletionCallback = Box<dyn FnOnce(/* req = */ &BioReq, /* resp = */ BioResp) + Send>;
 
 struct Inner {
     waker: Option<Waker>,
@@ -93,7 +93,7 @@ impl BioReq {
         bufs: Vec<BlockBuf>,
         callback: Option<BioCompletionCallback>,
     ) -> Result<Self> {
-        if addr.checked_add(bufs.len() as u64).is_none() {
+        if addr.checked_add(bufs.len()).is_none() {
             return Err(errno!(EINVAL, "addr overflow"));
         }
 
@@ -126,7 +126,7 @@ impl BioReq {
     }
 
     /// Access the immutable buffers with a closure.
-    pub fn bufs_with<F>(&self, mut f: F)
+    pub fn access_bufs_with<F>(&self, mut f: F)
     where
         F: FnMut(&[BlockBuf]),
     {
@@ -135,12 +135,20 @@ impl BioReq {
     }
 
     /// Access the mutable buffers with a closure.
-    pub fn mut_bufs_with<F>(&self, mut f: F)
+    pub fn access_mut_bufs_with<F>(&self, mut f: F)
     where
         F: FnMut(&mut [BlockBuf]),
     {
         let mut bufs = self.bufs.lock();
         (f)(&mut bufs)
+    }
+
+    /// Take the buffers out of the request.
+    pub fn take_bufs(&self) -> Vec<BlockBuf> {
+        let mut bufs = self.bufs.lock();
+        let mut ret_bufs = Vec::new();
+        core::mem::swap(&mut *bufs, &mut ret_bufs);
+        ret_bufs
     }
 
     /// Returns the number of block buffers.
