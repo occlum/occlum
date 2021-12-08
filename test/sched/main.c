@@ -7,6 +7,7 @@
 #include <sched.h>
 #include <errno.h>
 #include <spawn.h>
+#include <sys/resource.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
 #include "test.h"
@@ -304,6 +305,58 @@ static int test_getcpu_after_setaffinity() {
 }
 
 // ============================================================================
+// Test cases for setpriority and getpriority
+// ============================================================================
+
+static int test_set_get_priority(int which, id_t who, int prio) {
+    if (setpriority(which, who, prio) < 0) {
+        THROW_ERROR("failed to setpriority");
+    }
+
+    errno = 0;
+    int ret_prio = getpriority(which, who);
+    if (errno != 0) {
+        THROW_ERROR("failed to getpriority");
+    }
+
+    if (ret_prio != prio) {
+        THROW_ERROR("failed to check prio after set");
+    }
+
+    return 0;
+}
+
+static int test_set_get_priority_process() {
+    int which = PRIO_PROCESS;
+    id_t who = getpid();
+    int prio = 10;
+    if (test_set_get_priority(which, who, prio) < 0) {
+        THROW_ERROR("failed to test process");
+    }
+    return 0;
+}
+
+static int test_set_get_priority_pgrp() {
+    int which = PRIO_PGRP;
+    id_t who = getpgrp();
+    int prio = -10;
+    if (test_set_get_priority(which, who, prio) < 0) {
+        THROW_ERROR("failed to test pgrp");
+    }
+    return 0;
+}
+
+static int test_set_get_priority_user() {
+    int which = PRIO_USER;
+    id_t who = 0;
+    int prio = -1;
+    if (test_set_get_priority(which, who, prio) < 0) {
+        THROW_ERROR("failed to test user");
+    }
+    return 0;
+}
+
+// ============================================================================
 // Test suite main
 // ============================================================================
 
@@ -321,6 +374,9 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_sched_xetaffinity_children_inheritance),
     TEST_CASE(test_getcpu),
     TEST_CASE(test_getcpu_after_setaffinity),
+    TEST_CASE(test_set_get_priority_process),
+    TEST_CASE(test_set_get_priority_pgrp),
+    TEST_CASE(test_set_get_priority_user),
 };
 
 int main() {
