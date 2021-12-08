@@ -6,6 +6,7 @@ members = [
     "block-device",
     "inherit-methods-macro",
     "errno",
+    "host-disk",
     "host-socket",
     "io-uring-callback",
     "keyable-arc",
