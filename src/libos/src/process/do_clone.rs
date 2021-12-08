@@ -52,6 +52,7 @@ pub async fn do_clone(
         let current = current!();
         let vm = current.vm().clone();
         let files = current.files().clone();
+        let nice = current.nice().clone();
         let rlimits = current.rlimits().clone();
         let fs = current.fs().clone();
         let name = current.name().clone();
@@ -63,6 +64,7 @@ pub async fn do_clone(
             .fs(fs)
             .files(files)
             .name(name)
+            .nice(nice)
             .rlimits(rlimits)
             .sig_mask(sig_mask);
         if let Some(ctid) = ctid {

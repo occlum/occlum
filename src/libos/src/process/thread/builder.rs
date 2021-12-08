@@ -1,7 +1,7 @@
 use std::ptr::NonNull;
 
 use super::{
-    FileTableRef, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef, ResourceLimitsRef,
+    FileTableRef, FsViewRef, NiceValueRef, ProcessRef, ProcessVM, ProcessVMRef, ResourceLimitsRef,
     RobustListHead, SchedAgentRef, SigQueues, SigSet, Thread, ThreadId, ThreadInner, ThreadName,
     ThreadRef,
 };
@@ -17,6 +17,7 @@ pub struct ThreadBuilder {
     fs: Option<FsViewRef>,
     files: Option<FileTableRef>,
     sched: Option<SchedAgentRef>,
+    nice: Option<NiceValueRef>,
     rlimits: Option<ResourceLimitsRef>,
     sig_mask: Option<SigSet>,
     clear_ctid: Option<NonNull<pid_t>>,
@@ -33,6 +34,7 @@ impl ThreadBuilder {
             fs: None,
             files: None,
             sched: None,
+            nice: None,
             rlimits: None,
             sig_mask: None,
             clear_ctid: None,
@@ -76,6 +78,11 @@ impl ThreadBuilder {
         self
     }
 
+    pub fn nice(mut self, nice: NiceValueRef) -> Self {
+        self.nice = Some(nice);
+        self
+    }
+
     pub fn rlimits(mut self, rlimits: ResourceLimitsRef) -> Self {
         self.rlimits = Some(rlimits);
         self
@@ -110,6 +117,7 @@ impl ThreadBuilder {
         let fs = self.fs.unwrap_or_default();
         let files = self.files.unwrap_or_default();
         let sched = self.sched.unwrap_or_default();
+        let nice = self.nice.unwrap_or_default();
         let rlimits = self.rlimits.unwrap_or_default();
         let name = RwLock::new(self.name.unwrap_or_default());
         let sig_mask = RwLock::new(self.sig_mask.unwrap_or_default());
@@ -126,6 +134,7 @@ impl ThreadBuilder {
             fs,
             files,
             sched,
+            nice,
             rlimits,
             name,
             sig_queues,

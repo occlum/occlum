@@ -56,7 +56,10 @@ use crate::process::{
     do_spawn_for_glibc, do_spawn_for_musl, do_vfork, do_wait4, pid_t, posix_spawnattr_t, FdOp,
     RobustListHead, SpawnFileActions, ThreadRef, ThreadStatus,
 };
-use crate::sched::{do_getcpu, do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
+use crate::sched::{
+    do_get_priority, do_getcpu, do_sched_getaffinity, do_sched_setaffinity, do_sched_yield,
+    do_set_priority,
+};
 use crate::signal::{
     do_kill, do_rt_sigaction, do_rt_sigpending, do_rt_sigprocmask, do_rt_sigreturn,
     do_rt_sigtimedwait, do_sigaltstack, do_tgkill, do_tkill, sigaction_t, siginfo_t, sigset_t,
@@ -185,6 +188,8 @@ macro_rules! process_syscall_table_with_callback {
             (Nanosleep = 35) => do_nanosleep(req_u: *const timespec_t, rem_u: *mut timespec_t),
             (SchedSetaffinity = 203) => do_sched_setaffinity(pid: pid_t, cpusize: size_t, buf: *const c_uchar),
             (SchedGetaffinity = 204) => do_sched_getaffinity(pid: pid_t, cpusize: size_t, buf: *mut c_uchar),
+            (Getpriority = 140) => do_get_priority(which: i32, who: i32),
+            (Setpriority = 141) => do_set_priority(which: i32, who: i32, prio: i32),
             (Getcpu = 309) => do_getcpu(cpu_ptr: *mut u32, node_ptr: *mut u32),
             (SetRobustList = 273) => do_set_robust_list(list_head_ptr: *mut RobustListHead, len: usize),
             (GetRobustList = 274) => do_get_robust_list(tid: pid_t, list_head_ptr_ptr: *mut *mut RobustListHead, len_ptr: *mut usize),

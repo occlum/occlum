@@ -270,6 +270,7 @@ fn new_process_common(
         };
         let fs_ref = Arc::new(RwLock::new(current_ref.fs().read().unwrap().clone()));
         let sched_ref = Arc::new(SgxMutex::new(current_ref.sched().lock().unwrap().clone()));
+        let nice_ref = Arc::new(RwLock::new(current_ref.nice().read().unwrap().clone()));
         let rlimit_ref = Arc::new(SgxMutex::new(current_ref.rlimits().lock().unwrap().clone()));
         let sig_mask = if spawn_attributes.is_some() && spawn_attributes.unwrap().sig_mask.is_some()
         {
@@ -338,6 +339,7 @@ fn new_process_common(
             .umask(umask)
             .parent(parent)
             .sched(sched_ref)
+            .nice(nice_ref)
             .rlimits(rlimit_ref)
             .fs(fs_ref)
             .pgrp(pgrp_ref)

@@ -1,6 +1,8 @@
 use super::cpu_set::{CpuSet, AVAIL_CPUSET};
+use super::priority::{NiceValue, PrioWhich};
 use crate::prelude::*;
 use crate::util::mem_util::from_user::*;
+use core::convert::TryFrom;
 
 pub async fn do_sched_yield() -> Result<isize> {
     //super::do_sched_yield::do_sched_yield();
@@ -82,4 +84,20 @@ pub async fn do_getcpu(cpu_ptr: *mut u32, node_ptr: *mut u32) -> Result<isize> {
         }
     }
     Ok(0)
+}
+
+pub async fn do_set_priority(which: i32, who: i32, prio: i32) -> Result<isize> {
+    let which = PrioWhich::try_from(which)?;
+    let prio = NiceValue::from(prio);
+    super::do_priority::do_set_priority(which, who, prio)?;
+    Ok(0)
+}
+
+pub async fn do_get_priority(which: i32, who: i32) -> Result<isize> {
+    let which = PrioWhich::try_from(which)?;
+    let prio = super::do_priority::do_get_priority(which, who)?;
+    // To avoid negative return values, "getpriority()" will
+    // not return the normal nice-value, but a negated value that
+    // has been offset by 20 (ie., it returns 40..1 instead of -20..19)
+    Ok(prio.to_rlimit_val() as isize)
 }

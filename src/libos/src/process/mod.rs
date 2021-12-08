@@ -10,7 +10,7 @@
 use crate::fs::{FileRef, FileTable, FsView};
 use crate::misc::ResourceLimits;
 use crate::prelude::*;
-use crate::sched::SchedAgent;
+use crate::sched::{NiceValue, SchedAgent};
 use crate::signal::{SigDispositions, SigQueues};
 use crate::vm::ProcessVM;
 
@@ -72,3 +72,4 @@ pub type FsViewRef = Arc<RwLock<FsView>>;
 pub type SchedAgentRef = Arc<SgxMutex<SchedAgent>>;
 pub type ResourceLimitsRef = Arc<SgxMutex<ResourceLimits>>;
 pub type ProcessGrpRef = Arc<ProcessGrp>;
+pub type NiceValueRef = Arc<RwLock<NiceValue>>;

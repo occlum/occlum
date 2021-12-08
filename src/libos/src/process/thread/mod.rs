@@ -3,7 +3,7 @@ use std::fmt;
 use std::ptr::NonNull;
 
 use super::{
-    FileTableRef, ForcedExitStatus, FsViewRef, ProcessRef, ProcessVM, ProcessVMRef,
+    FileTableRef, ForcedExitStatus, FsViewRef, NiceValueRef, ProcessRef, ProcessVM, ProcessVMRef,
     ResourceLimitsRef, RobustListHead, SchedAgentRef, TermStatus, ThreadRef,
 };
 use crate::prelude::*;
@@ -32,6 +32,7 @@ pub struct Thread {
     fs: FsViewRef,
     files: FileTableRef,
     sched: SchedAgentRef,
+    nice: NiceValueRef,
     rlimits: ResourceLimitsRef,
     // Signal
     sig_queues: RwLock<SigQueues>,
@@ -143,6 +144,10 @@ impl Thread {
 
     pub fn fs(&self) -> &FsViewRef {
         &self.fs
+    }
+
+    pub fn nice(&self) -> &NiceValueRef {
+        &self.nice
     }
 
     pub fn rlimits(&self) -> &ResourceLimitsRef {
