@@ -2,8 +2,8 @@ use super::super::table;
 use super::super::task::Task;
 use super::super::thread::{ThreadBuilder, ThreadId, ThreadName};
 use super::super::{
-    FileTableRef, ForcedExitStatus, FsViewRef, ProcessGrpRef, ProcessRef, ProcessVMRef,
-    ResourceLimitsRef, SchedAgentRef,
+    FileTableRef, ForcedExitStatus, FsViewRef, NiceValueRef, ProcessGrpRef, ProcessRef,
+    ProcessVMRef, ResourceLimitsRef, SchedAgentRef,
 };
 use super::{Process, ProcessInner};
 use crate::fs::FileMode;
@@ -98,6 +98,10 @@ impl ProcessBuilder {
 
     pub fn sig_mask(mut self, sig_mask: SigSet) -> Self {
         self.thread_builder(|tb| tb.sig_mask(sig_mask))
+    }
+
+    pub fn nice(mut self, nice: NiceValueRef) -> Self {
+        self.thread_builder(|tb| tb.nice(nice))
     }
 
     pub fn rlimits(mut self, rlimits: ResourceLimitsRef) -> Self {

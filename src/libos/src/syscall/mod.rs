@@ -50,7 +50,10 @@ use crate::process::{
     do_spawn_for_glibc, do_spawn_for_musl, do_vfork, do_wait4, pid_t, posix_spawnattr_t, FdOp,
     RobustListHead, SpawnFileActions, ThreadStatus,
 };
-use crate::sched::{do_getcpu, do_sched_getaffinity, do_sched_setaffinity, do_sched_yield};
+use crate::sched::{
+    do_get_priority, do_getcpu, do_sched_getaffinity, do_sched_setaffinity, do_sched_yield,
+    do_set_priority,
+};
 use crate::signal::{
     do_kill, do_rt_sigaction, do_rt_sigpending, do_rt_sigprocmask, do_rt_sigreturn,
     do_rt_sigtimedwait, do_sigaltstack, do_tgkill, do_tkill, sigaction_t, siginfo_t, sigset_t,
@@ -230,8 +233,8 @@ macro_rules! process_syscall_table_with_callback {
             (Statfs = 137) => do_statfs(path: *const i8, statfs_buf: *mut Statfs),
             (Fstatfs = 138) => do_fstatfs(fd: FileDesc, statfs_buf: *mut Statfs),
             (SysFs = 139) => handle_unsupported(),
-            (Getpriority = 140) => handle_unsupported(),
-            (Setpriority = 141) => handle_unsupported(),
+            (Getpriority = 140) => do_get_priority(which: i32, who: i32),
+            (Setpriority = 141) => do_set_priority(which: i32, who: i32, prio: i32),
             (SchedSetparam = 142) => handle_unsupported(),
             (SchedGetparam = 143) => handle_unsupported(),
             (SchedSetscheduler = 144) => handle_unsupported(),
