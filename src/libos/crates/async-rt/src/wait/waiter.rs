@@ -2,7 +2,7 @@ use core::borrow::BorrowMut;
 use core::task::Waker as RawWaker;
 use futures::select_biased;
 
-use atomic::{Atomic, Ordering};
+use atomic::Atomic;
 use intrusive_collections::LinkedListLink;
 use object_id::ObjectId;
 

@@ -27,7 +27,7 @@ impl ToErrno for core::alloc::AllocError {
     }
 }
 
-impl ToErrno for core::alloc::LayoutErr {
+impl ToErrno for core::alloc::LayoutError {
     fn errno(&self) -> Errno {
         Errno::EINVAL
     }

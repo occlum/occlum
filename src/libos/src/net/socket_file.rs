@@ -159,7 +159,10 @@ impl SocketFile {
     }
 
     pub fn is_stream(&self) -> bool {
-        matches!(&self.socket, AnySocket::Ipv4Stream(_) | AnySocket::UnixStream(_))
+        matches!(
+            &self.socket,
+            AnySocket::Ipv4Stream(_) | AnySocket::UnixStream(_)
+        )
     }
 
     pub async fn connect(&self, addr: &AnyAddr) -> Result<()> {

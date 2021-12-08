@@ -765,10 +765,10 @@ process_syscall_table_with_callback!(impl_fmt_syscall);
 /// Generate the code that can dispatch any system call to its actual implementation function.
 macro_rules! impl_dispatch_syscall {
     (@do_syscall $fn:ident, $syscall:ident, $arg_i:expr, ($(,)?) -> ($($output:tt)*) ) => {
-        impl_dispatch_syscall!(@as_expr $fn($($output)*));
+        impl_dispatch_syscall!(@as_expr $fn($($output)*))
     };
     (@do_syscall $fn:ident, $syscall:ident, $arg_i:expr, ($_arg_name:ident : $arg_type:ty, $($more_args:tt)*) -> ($($output:tt)*)) => {
-        impl_dispatch_syscall!(@do_syscall $fn, $syscall, ($arg_i + 1), ($($more_args)*) -> ($($output)* ($syscall.args[$arg_i] as $arg_type),));
+        impl_dispatch_syscall!(@do_syscall $fn, $syscall, ($arg_i + 1), ($($more_args)*) -> ($($output)* ($syscall.args[$arg_i] as $arg_type),))
     };
     (@as_expr $e:expr) => { $e.await };
 

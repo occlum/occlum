@@ -72,7 +72,7 @@ impl Executor {
             let task_option = self.scheduler.dequeue_task(thread_id);
 
             if self.is_shutdown() {
-                return;
+                break;
             }
 
             match task_option {

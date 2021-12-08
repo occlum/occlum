@@ -1,5 +1,5 @@
 use super::*;
-use std::alloc::{AllocError, AllocRef, Layout};
+use std::alloc::{AllocError, Allocator, Layout};
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -26,7 +26,7 @@ impl UntrustedSliceAlloc {
         }
 
         let layout = Layout::from_size_align(buf_size, 1)?;
-        let buf_ptr = unsafe { UNTRUSTED_ALLOC.alloc(layout)?.as_mut_ptr() };
+        let buf_ptr = unsafe { UNTRUSTED_ALLOC.allocate(layout)?.as_mut_ptr() };
 
         let buf_pos = AtomicUsize::new(0);
         Ok(Self {
@@ -72,7 +72,7 @@ impl Drop for UntrustedSliceAlloc {
 
         let layout = Layout::from_size_align(self.buf_size, 1).unwrap();
         unsafe {
-            UNTRUSTED_ALLOC.dealloc(NonNull::new(self.buf_ptr).unwrap(), layout);
+            UNTRUSTED_ALLOC.deallocate(NonNull::new(self.buf_ptr).unwrap(), layout);
         }
     }
 }

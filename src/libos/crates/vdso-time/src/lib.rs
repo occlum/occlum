@@ -16,8 +16,8 @@ use errno::prelude::*;
 use lazy_static::lazy_static;
 use log::trace;
 use std::convert::TryFrom;
-use std::str;
 use std::time::Duration;
+use std::{hint, str};
 use sys::*;
 
 pub const NANOS_PER_SEC: u32 = 1_000_000_000;
@@ -306,7 +306,7 @@ impl Vdso {
             // if seq is odd, it might means that a concurrent update is in progress.
             // Hence, we do some instructions to spin waiting for seq to become even again.
             if seq & 1 != 0 {
-                core::sync::atomic::spin_loop_hint();
+                hint::spin_loop();
                 continue;
             }
 
@@ -350,7 +350,7 @@ impl Vdso {
             let seq = vdso_data.seq();
             // see comments in do_hres
             if seq & 1 != 0 {
-                core::sync::atomic::spin_loop_hint();
+                hint::spin_loop();
                 continue;
             }
 

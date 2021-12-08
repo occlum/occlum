@@ -12,9 +12,9 @@
 //! - Timeout: Wait for a task to complete within a specified time, and return if
 //! reach timeout.
 #![cfg_attr(feature = "sgx", no_std)]
-#![feature(const_fn)]
 #![feature(thread_local)]
 #![feature(const_fn_fn_ptr_basics)]
+#![feature(const_fn_trait_bound)]
 #![feature(duration_zero)]
 #![feature(duration_constants)]
 #![feature(duration_saturating_ops)]

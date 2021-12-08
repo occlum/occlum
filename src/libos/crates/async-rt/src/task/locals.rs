@@ -65,9 +65,9 @@ impl<T: Send + 'static> LocalKey<T> {
                 panic!("counter overflow");
             }
 
-            match key.compare_and_swap(0, counter, Ordering::AcqRel) {
-                0 => counter,
-                k => k,
+            match key.compare_exchange(0, counter, Ordering::AcqRel, Ordering::Acquire) {
+                Ok(_) => counter,
+                Err(x) => x,
             }
         }
 

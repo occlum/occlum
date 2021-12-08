@@ -1,5 +1,5 @@
 use super::*;
-use std::alloc::{AllocError, AllocRef, Layout};
+use std::alloc::{AllocError, Allocator, Layout};
 use std::ptr::{self, write_bytes, NonNull};
 
 /// The global memory allocator for untrusted memory
@@ -7,8 +7,8 @@ pub static mut UNTRUSTED_ALLOC: UntrustedAlloc = UntrustedAlloc;
 
 pub struct UntrustedAlloc;
 
-unsafe impl AllocRef for UntrustedAlloc {
-    fn alloc(&self, layout: Layout) -> std::result::Result<NonNull<[u8]>, AllocError> {
+unsafe impl Allocator for UntrustedAlloc {
+    fn allocate(&self, layout: Layout) -> std::result::Result<NonNull<[u8]>, AllocError> {
         if layout.size() == 0 {
             return Err(AllocError);
         }
@@ -43,7 +43,7 @@ unsafe impl AllocRef for UntrustedAlloc {
         .unwrap())
     }
 
-    unsafe fn dealloc(&self, ptr: NonNull<u8>, layout: Layout) {
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
         // Pre-condition: out-of-enclave
         debug_assert!(sgx_trts::trts::rsgx_raw_is_outside_enclave(
             ptr.as_ptr(),

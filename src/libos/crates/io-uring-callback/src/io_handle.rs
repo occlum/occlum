@@ -68,7 +68,10 @@ impl Future for IoHandle {
 impl Drop for IoHandle {
     fn drop(&mut self) {
         // The user cannot drop a handle if the request isn't completed.
-        assert!(matches!(self.state(), IoState::Processed(_) | IoState::Cancelled));
+        assert!(matches!(
+            self.state(),
+            IoState::Processed(_) | IoState::Cancelled
+        ));
     }
 }
 

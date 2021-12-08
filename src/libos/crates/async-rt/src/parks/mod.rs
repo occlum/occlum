@@ -39,7 +39,7 @@ impl Parks {
     pub fn unpark(&self, thread_id: usize) {
         assert!(thread_id < self.sleep_threads.len());
 
-        let mut sleep_thread = self.sleep_threads[thread_id].lock();
+        let sleep_thread = self.sleep_threads[thread_id].lock();
         let thread = sleep_thread.clone();
         drop(sleep_thread);
         if thread.is_some() {
