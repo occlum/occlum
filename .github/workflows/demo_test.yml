@@ -603,3 +603,17 @@ jobs:
     - name: Run fio test
       run: docker exec fio_test bash -c "cd /root/occlum/demos/fio && SGX_MODE=SIM ./run_fio_on_occlum.sh fio-seq-read.fio"
 
+  Cross_world_unix_socket_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'cross_world_unix_socket'
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Run unix socket test
+      run: docker exec cross_world_unix_socket bash -c "cd /root/occlum/demos/cross_world_uds; SGX_MODE=SIM ./run_cross_world_uds_test.sh"
