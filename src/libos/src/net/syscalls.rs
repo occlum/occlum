@@ -36,17 +36,13 @@ pub async fn do_socket(domain: c_int, type_and_flags: c_int, protocol: c_int) ->
             _ => return_errno!(EINVAL, "invalid type"),
         }
     };
-    let _protocol = {
-        // Only the default protocol is supported for now
-        if protocol != 0 {
-            return_errno!(EINVAL, "invalid protocol");
-        }
-        protocol
-    };
+
+    let protocol = SocketProtocol::try_from(protocol)
+        .map_err(|_| errno!(EINVAL, "invalid or unsupported network protocol"))?;
 
     // Create the socket
     let nonblocking = flags.contains(SocketFlags::SOCK_NONBLOCK);
-    let socket_file = SocketFile::new(domain, is_stream, nonblocking)?;
+    let socket_file = SocketFile::new(domain, protocol, is_stream, nonblocking)?;
     let file_ref = FileRef::new_socket(socket_file);
 
     let close_on_spawn = flags.contains(SocketFlags::SOCK_CLOEXEC);
