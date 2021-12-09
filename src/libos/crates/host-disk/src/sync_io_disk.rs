@@ -17,7 +17,7 @@ impl BlockDevice for SyncIoDisk {
 }
 
 impl HostDisk for SyncIoDisk {
-    fn new(options: &OpenOptions<Self>, file: File) -> Result<Self> {
+    fn from_options_and_file(options: &OpenOptions<Self>, file: File) -> Result<Self> {
         todo!()
     }
 }

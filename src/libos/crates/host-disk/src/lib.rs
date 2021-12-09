@@ -19,11 +19,3 @@ pub use self::host_disk::HostDisk;
 pub use self::io_uring_disk::IoUringDisk;
 pub use self::open_options::OpenOptions;
 pub use self::sync_io_disk::SyncIoDisk;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}

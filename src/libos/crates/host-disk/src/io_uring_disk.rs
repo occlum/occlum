@@ -17,7 +17,7 @@ impl BlockDevice for IoUringDisk {
 }
 
 impl HostDisk for IoUringDisk {
-    fn new(options: &OpenOptions<Self>, file: File) -> Result<Self> {
+    fn from_options_and_file(options: &OpenOptions<Self>, file: File) -> Result<Self> {
         todo!()
     }
 }
