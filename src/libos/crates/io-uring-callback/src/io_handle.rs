@@ -13,6 +13,7 @@ cfg_if::cfg_if! {
 
 /// The handle to an I/O request pushed to the submission queue of an io_uring instance.
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct IoHandle(pub(crate) Arc<IoToken>);
 
 /// The state of an I/O request represented by an [`IoHandle`].
@@ -44,6 +45,20 @@ impl IoHandle {
     /// Returns the return value of the I/O request if it is completed.
     pub fn retval(&self) -> Option<i32> {
         self.0.retval()
+    }
+
+    /// Release a handle.
+    ///
+    /// Normally, a handle is not alloed to be dropped before the I/O is completed.
+    /// This helps discover memory safety problems due to potential misuse by users.
+    ///
+    /// But sometimes keeping handles can be pointless. This is when the `release`
+    /// method can help.  The release method explictly states that a handle is
+    /// useless and then drop it.
+    pub fn release(self) {
+        // Safety. The representation is transparent.
+        let token = unsafe { std::mem::transmute::<Self, Arc<IoToken>>(self) };
+        drop(token);
     }
 }
 
