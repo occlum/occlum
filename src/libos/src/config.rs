@@ -41,6 +41,7 @@ pub fn load_config(config_path: &str, expected_mac: &sgx_aes_gcm_128bit_tag_t) -
             .map_err(|e| errno!(e))?;
         config_json
     };
+    info!("config_json = {:?}", config_json);
     let config_input: InputConfig = serde_json::from_str(&config_json).map_err(|e| errno!(e))?;
     let config =
         Config::from_input(&config_input).cause_err(|e| errno!(EINVAL, "invalid config JSON"))?;
@@ -98,6 +99,7 @@ pub struct Config {
     pub process: ConfigProcess,
     pub env: ConfigEnv,
     pub entry_points: Vec<PathBuf>,
+    pub untrusted_unix_socks: Option<Vec<ConfigUntrustedUnixSock>>,
     pub mount: Vec<ConfigMount>,
 }
 
@@ -117,6 +119,13 @@ pub struct ConfigProcess {
 pub struct ConfigEnv {
     pub default: Vec<CString>,
     pub untrusted: HashSet<String>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct ConfigUntrustedUnixSock {
+    pub host: PathBuf,
+    pub libos: PathBuf,
 }
 
 #[derive(Debug)]
@@ -180,6 +189,22 @@ impl Config {
             }
             entry_points
         };
+        let untrusted_unix_socks = {
+            if let Some(input_socks) = &input.untrusted_unix_socks {
+                let mut untrusted_socks = Vec::new();
+                for sock in input_socks {
+                    info!("sock = {:?}", sock);
+                    let untrusted_sock = ConfigUntrustedUnixSock {
+                        host: Path::new(&sock.host).to_path_buf(),
+                        libos: Path::new(&sock.libos).to_path_buf(),
+                    };
+                    untrusted_socks.push(untrusted_sock);
+                }
+                Some(untrusted_socks)
+            } else {
+                None
+            }
+        };
         let mount = {
             let mut mount = Vec::new();
             for input_mount in &input.mount {
@@ -192,6 +217,7 @@ impl Config {
             process,
             env,
             entry_points,
+            untrusted_unix_socks,
             mount,
         })
     }
@@ -314,6 +340,8 @@ struct InputConfig {
     #[serde(default)]
     pub entry_points: Vec<String>,
     #[serde(default)]
+    pub untrusted_unix_socks: Option<Vec<InputConfigUntrustedUnixSock>>,
+    #[serde(default)]
     pub mount: Vec<InputConfigMount>,
 }
 
@@ -386,6 +414,15 @@ impl Default for InputConfigEnv {
             untrusted: HashSet::new(),
         }
     }
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+struct InputConfigUntrustedUnixSock {
+    #[serde(default)]
+    pub host: String,
+    #[serde(default)]
+    pub libos: String,
 }
 
 #[derive(Deserialize, Debug)]

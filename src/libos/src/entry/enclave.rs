@@ -113,6 +113,9 @@ pub extern "C" fn occlum_ecall_init(
         // Init boot up time stamp here.
         crate::time::up_time::init();
 
+        // Init untrusted unix sockets
+        crate::net::untrusted_unix_socks_init();
+
         // Enable global backtrace
         unsafe { std::backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Full) };
     });

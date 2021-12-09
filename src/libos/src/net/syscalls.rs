@@ -103,13 +103,14 @@ pub async fn do_bind(
         .as_socket_file()
         .ok_or_else(|| errno!(ENOTSOCK, "not a socket"))?;
 
-    let addr = {
+    let mut addr = {
         let addr_len = addr_len as usize;
         let sockaddr_storage = copy_sock_addr_from_user(addr, addr_len)?;
-        AnyAddr::from_c_storage(&sockaddr_storage, addr_len)?
+        let addr = AnyAddr::from_c_storage(&sockaddr_storage, addr_len)?;
+        addr
     };
 
-    socket_file.bind(&addr)?;
+    socket_file.bind(&mut addr)?;
     Ok(0)
 }
 

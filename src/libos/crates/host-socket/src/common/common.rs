@@ -176,19 +176,6 @@ impl<A: Addr + 'static, R: Runtime> Drop for Common<A, R> {
         if let Err(e) = super::do_close(self.host_fd) {
             log::error!("do_close failed, host_fd: {}, err: {:?}", self.host_fd, e);
         }
-
-        if A::domain() != Domain::Unix {
-            return;
-        }
-        if let Some(addr) = self.addr() {
-            if let Some(unix_addr) = addr.as_any().downcast_ref::<UnixAddr>() {
-                if let UnixAddr::Pathname(path) = unix_addr {
-                    if let Err(e) = super::do_unlink(path) {
-                        log::error!("do_unlink failed, path: {}, err: {:?}", path, e);
-                    }
-                }
-            }
-        }
     }
 }
 

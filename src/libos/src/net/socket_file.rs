@@ -1,11 +1,15 @@
 use async_io::ioctl::IoctlCmd;
 use async_io::socket::{RecvFlags, SendFlags, Shutdown};
 
-use self::impls::{Ipv4Datagram, Ipv4Stream, Ipv6Stream, UnixDatagram, UnixStream};
+use self::impls::{Ipv4Datagram, Ipv4Stream, Ipv6Stream, UnixDatagram};
+use super::unix::trusted::Stream as TrustedStream;
+use super::unix::UnixStream;
 use crate::fs::{AccessMode, Events, Observer, Poller, StatusFlags};
 use crate::net::{Addr, AnyAddr, Domain, Ipv4SocketAddr, Ipv6SocketAddr, UnixAddr};
 use crate::prelude::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+
+pub use self::impls::UntrustedUnixStream;
 
 #[derive(Debug)]
 pub struct SocketFile {
@@ -14,11 +18,12 @@ pub struct SocketFile {
 
 #[derive(Debug)]
 enum AnySocket {
-    UnixStream(UnixStream),
+    UnixStream(UnixStream), // for general usage
     Ipv4Stream(Ipv4Stream),
     Ipv6Stream(Ipv6Stream),
     UnixDatagram(UnixDatagram),
     Ipv4Datagram(Ipv4Datagram),
+    TrustedUDS(TrustedStream), // for socket pair use only
 }
 
 /* Standard well-defined IP protocols.  */
@@ -72,6 +77,9 @@ macro_rules! apply_fn_on_any_socket {
                 $($fn_body)*
             }
             AnySocket::Ipv4Datagram($socket) => {
+                $($fn_body)*
+            }
+            AnySocket::TrustedUDS($socket) => {
                 $($fn_body)*
             }
         }
@@ -155,7 +163,7 @@ impl SocketFile {
                     AnySocket::Ipv6Stream(ipv6_stream)
                 }
                 Domain::Unix => {
-                    let unix_stream = UnixStream::new(nonblocking)?;
+                    let unix_stream = UnixStream::new_trusted(nonblocking);
                     AnySocket::UnixStream(unix_stream)
                 }
             };
@@ -182,12 +190,13 @@ impl SocketFile {
 
     pub fn new_pair(is_stream: bool, nonblocking: bool) -> Result<(Self, Self)> {
         if is_stream {
-            let (stream1, stream2) = UnixStream::new_pair(nonblocking)?;
+            // Use trusted Unix domain sockets as stream socket pair
+            let (stream1, stream2) = TrustedStream::socketpair(nonblocking)?;
             let sock_file1 = Self {
-                socket: AnySocket::UnixStream(stream1),
+                socket: AnySocket::TrustedUDS(stream1),
             };
             let sock_file2 = Self {
-                socket: AnySocket::UnixStream(stream2),
+                socket: AnySocket::TrustedUDS(stream2),
             };
             Ok((sock_file1, sock_file2))
         } else {
@@ -209,7 +218,7 @@ impl SocketFile {
     pub fn is_stream(&self) -> bool {
         matches!(
             &self.socket,
-            AnySocket::Ipv4Stream(_) | AnySocket::UnixStream(_)
+            AnySocket::Ipv4Stream(_) | AnySocket::UnixStream(_) | AnySocket::TrustedUDS(_)
         )
     }
 
@@ -224,7 +233,7 @@ impl SocketFile {
                 ipv6_stream.connect(ip_addr).await
             }
             AnySocket::UnixStream(unix_stream) => {
-                let unix_addr = addr.to_unix()?;
+                let unix_addr = addr.to_trusted_unix()?;
                 unix_stream.connect(unix_addr).await
             }
             AnySocket::Ipv4Datagram(ipv4_datagram) => {
@@ -249,7 +258,7 @@ impl SocketFile {
         }
     }
 
-    pub fn bind(&self, addr: &AnyAddr) -> Result<()> {
+    pub fn bind(&self, addr: &mut AnyAddr) -> Result<()> {
         match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => {
                 let ip_addr = addr.to_ipv4()?;
@@ -260,8 +269,8 @@ impl SocketFile {
                 ipv6_stream.bind(ip_addr)
             }
             AnySocket::UnixStream(unix_stream) => {
-                let unix_addr = addr.to_unix()?;
-                unix_stream.bind(unix_addr)
+                let mut trusted_addr = addr.to_trusted_unix_mut()?;
+                unix_stream.bind(trusted_addr)
             }
             AnySocket::Ipv4Datagram(ipv4_datagram) => {
                 let ip_addr = addr.to_ipv4()?;
@@ -339,6 +348,10 @@ impl SocketFile {
                 let bytes_recv = unix_stream.recvmsg(bufs, flags).await?;
                 (bytes_recv, None)
             }
+            AnySocket::TrustedUDS(trusted_stream) => {
+                let bytes_recv = trusted_stream.recvmsg(bufs, flags).await?;
+                (bytes_recv, None)
+            }
             AnySocket::Ipv4Datagram(ipv4_datagram) => {
                 let (bytes_recv, addr_recv) = ipv4_datagram.recvmsg(bufs, flags).await?;
                 (bytes_recv, Some(AnyAddr::Ipv4(addr_recv)))
@@ -387,6 +400,12 @@ impl SocketFile {
                 }
                 unix_stream.sendmsg(bufs, flags).await
             }
+            AnySocket::TrustedUDS(trusted_stream) => {
+                if addr.is_some() {
+                    return_errno!(EISCONN, "addr should be none");
+                }
+                trusted_stream.sendmsg(bufs, flags).await
+            }
             AnySocket::Ipv4Datagram(ipv4_datagram) => {
                 let ip_addr = if let Some(addr) = addr.as_ref() {
                     Some(addr.to_ipv4()?)
@@ -418,7 +437,8 @@ impl SocketFile {
         Ok(match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => AnyAddr::Ipv4(ipv4_stream.addr()?),
             AnySocket::Ipv6Stream(ipv6_stream) => AnyAddr::Ipv6(ipv6_stream.addr()?),
-            AnySocket::UnixStream(unix_stream) => AnyAddr::Unix(unix_stream.addr()?),
+            AnySocket::UnixStream(unix_stream) => unix_stream.addr()?,
+            AnySocket::TrustedUDS(trusted_stream) => AnyAddr::TrustedUnix(trusted_stream.addr()?),
             AnySocket::Ipv4Datagram(ipv4_datagram) => AnyAddr::Ipv4(ipv4_datagram.addr()?),
             AnySocket::UnixDatagram(unix_datagram) => AnyAddr::Unix(unix_datagram.addr()?),
             _ => {
@@ -431,7 +451,10 @@ impl SocketFile {
         Ok(match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => AnyAddr::Ipv4(ipv4_stream.peer_addr()?),
             AnySocket::Ipv6Stream(ipv6_stream) => AnyAddr::Ipv6(ipv6_stream.peer_addr()?),
-            AnySocket::UnixStream(unix_stream) => AnyAddr::Unix(unix_stream.peer_addr()?),
+            AnySocket::UnixStream(unix_stream) => unix_stream.peer_addr()?,
+            AnySocket::TrustedUDS(trusted_stream) => {
+                AnyAddr::TrustedUnix(trusted_stream.peer_addr()?)
+            }
             AnySocket::Ipv4Datagram(ipv4_datagram) => AnyAddr::Ipv4(ipv4_datagram.peer_addr()?),
             AnySocket::UnixDatagram(unix_datagram) => AnyAddr::Unix(unix_datagram.peer_addr()?),
             _ => {
@@ -462,7 +485,7 @@ mod impls {
     // There are two reasons. First, there needs to be some translation between LibOS
     // and host paths. Second, we need two types of unix domain sockets: the trusted one that
     // is implemented inside LibOS and the untrusted one that is implemented by host OS.
-    pub type UnixStream = host_socket::StreamSocket<UnixAddr, SocketRuntime>;
+    pub type UntrustedUnixStream = host_socket::StreamSocket<UnixAddr, SocketRuntime>;
 
     pub type Ipv4Datagram = host_socket::DatagramSocket<Ipv4SocketAddr, SocketRuntime>;
     pub type UnixDatagram = host_socket::DatagramSocket<UnixAddr, SocketRuntime>;

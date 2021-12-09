@@ -11,6 +11,7 @@ enclave {
     from "sgx_vdso_time_ocalls.edl" import *;
     from "sgx_host_socket_ocalls.edl" import *;
     from "sgx_io_uring_ocalls.edl" import *;
+    from "sgx_env.edl" import u_getcwd_ocall;
 
     include "sgx_quote.h"
     include "occlum_edl_types.h"

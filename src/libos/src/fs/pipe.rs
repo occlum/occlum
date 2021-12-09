@@ -35,7 +35,7 @@ pub fn pipe(flags: StatusFlags) -> Result<(PipeReader, PipeWriter)> {
 
 #[derive(Debug)]
 pub struct PipeReader {
-    consumer: Consumer,
+    consumer: Consumer<u8>,
 }
 
 impl File for PipeReader {
@@ -92,7 +92,7 @@ impl File for PipeReader {
 
 #[derive(Debug)]
 pub struct PipeWriter {
-    producer: Producer,
+    producer: Producer<u8>,
 }
 
 impl File for PipeWriter {

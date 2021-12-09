@@ -2,9 +2,10 @@ use std::any::Any;
 
 use super::{Addr, CSockAddr, Domain};
 use crate::prelude::*;
+use std::hash::Hash;
 
 /// A UNIX address.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum UnixAddr {
     Unnamed,
     Pathname(String),
@@ -54,7 +55,7 @@ impl UnixAddr {
                 };
                 let path_str = std::str::from_utf8(path_slice)
                     .map_err(|_| errno!(EINVAL, "path is not UTF8"))?;
-                path_str.to_string()
+                path_str.trim_end_matches('\u{0}').to_string()
             };
             Ok(UnixAddr::Pathname(pathname))
         }
@@ -96,6 +97,17 @@ impl UnixAddr {
             sun_path,
         };
         (c_addr, c_len)
+    }
+
+    pub fn get_path_name(&self) -> Result<&str> {
+        match self {
+            UnixAddr::Pathname(path) => Ok(path.as_ref()),
+            _ => return_errno!(EINVAL, "can't get path name for abstract or unnamed socket"),
+        }
+    }
+
+    pub fn new_with_path_name(path: &str) -> Self {
+        Self::Pathname(path.to_owned())
     }
 }
 

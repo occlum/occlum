@@ -25,6 +25,8 @@
 #![feature(thread_local)]
 #![feature(btree_drain_filter)]
 #![feature(bench_black_box)]
+#![feature(div_duration)]
+#![feature(result_cloned)]
 
 #[macro_use]
 extern crate async_rt;

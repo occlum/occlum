@@ -27,6 +27,7 @@ pub mod sockopt;
 mod stream;
 mod util;
 
+pub use self::common::do_unlink;
 pub use self::datagram::DatagramSocket;
 pub use self::runtime::Runtime;
 pub use self::stream::StreamSocket;

@@ -27,6 +27,14 @@ fn do_unlink(fs_path: &FsPath) -> Result<()> {
     if metadata.type_ == FileType::Dir {
         return_errno!(EISDIR, "unlink on directory");
     }
+    if metadata.type_ == FileType::Socket {
+        use host_socket::do_unlink as do_unlink_ocall;
+        let mut path_buf = [0 as u8; PATH_MAX];
+        let host_addr_len = file_inode.read_at(0, &mut path_buf)?;
+        let host_addr = String::from_utf8(path_buf[..host_addr_len].to_vec())
+            .expect("The path string is invalid");
+        do_unlink_ocall(&host_addr);
+    }
     let file_mode = FileMode::from_bits_truncate(metadata.mode);
     if file_mode.has_sticky_bit() {
         warn!("ignoring the sticky bit");

@@ -10,25 +10,25 @@ use crate::prelude::*;
 /// A unidirectional communication channel, intended to implement IPC, e.g., pipe,
 /// unix domain sockets, etc.
 #[derive(Debug)]
-pub struct Channel {
-    producer: Producer,
-    consumer: Consumer,
+pub struct Channel<T> {
+    producer: Producer<T>,
+    consumer: Consumer<T>,
 }
 
 #[derive(Debug)]
-pub struct Producer {
-    common: Arc<Common>,
+pub struct Producer<T> {
+    common: Arc<Common<T>>,
 }
 
 #[derive(Debug)]
-pub struct Consumer {
-    common: Arc<Common>,
+pub struct Consumer<T> {
+    common: Arc<Common<T>>,
 }
 
 #[derive(Debug)]
-struct Common {
-    producer: EndPoint<RbProducer<u8>>,
-    consumer: EndPoint<RbConsumer<u8>>,
+struct Common<T> {
+    producer: EndPoint<RbProducer<T>>,
+    consumer: EndPoint<RbConsumer<T>>,
     event_lock: Mutex<()>,
 }
 
@@ -39,7 +39,7 @@ struct EndPoint<T> {
     flags: Atomic<StatusFlags>,
 }
 
-impl Channel {
+impl<T> Channel<T> {
     pub fn with_capacity(capacity: usize) -> Result<Self> {
         Self::with_capacity_and_flags(capacity, StatusFlags::empty())
     }
@@ -53,21 +53,74 @@ impl Channel {
         Ok(Self { producer, consumer })
     }
 
-    pub fn split(self) -> (Producer, Consumer) {
+    pub fn split(self) -> (Producer<T>, Consumer<T>) {
         let Self { producer, consumer } = self;
         (producer, consumer)
     }
 
-    pub fn producer(&self) -> &Producer {
+    pub fn producer(&self) -> &Producer<T> {
         &self.producer
     }
 
-    pub fn consumer(&self) -> &Consumer {
+    pub fn consumer(&self) -> &Consumer<T> {
         &self.consumer
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.producer.common.capacity()
+    }
+
+    pub fn push(&self, item: T) -> Result<()> {
+        self.producer
+            .common
+            .producer
+            .ringbuf
+            .lock()
+            .push(item)
+            .map_err(|_| errno!(EAGAIN, "push ring buffer failure"))?;
+
+        self.consumer
+            .common
+            .consumer
+            .pollee()
+            .add_events(Events::IN);
+        Ok(())
+    }
+
+    /// Pop an item out of the channel.
+    pub async fn pop(&self) -> Result<T> {
+        // Init the poller only when needed
+        let mut poller = None;
+        loop {
+            let ret = self.consumer.common.consumer.ringbuf.lock().pop();
+            if let Some(item) = ret {
+                return Ok(item);
+            }
+
+            if self.consumer.is_nonblocking() {
+                return_errno!(EAGAIN, "no connections are present to be accepted");
+            }
+
+            // Ensure the poller is initialized
+            if poller.is_none() {
+                poller = Some(Poller::new());
+            }
+            // Wait for interesting events by polling
+            let mask = Events::IN;
+            let events = self
+                .consumer
+                .common
+                .consumer
+                .pollee()
+                .poll(mask, poller.as_mut());
+            if events.is_empty() {
+                poller.as_ref().unwrap().wait().await?;
+            }
+        }
     }
 }
 
-impl Common {
+impl<T> Common<T> {
     pub fn with_capacity_and_flags(capacity: usize, flags: StatusFlags) -> Result<Self> {
         check_status_flags(flags)?;
 
@@ -75,7 +128,7 @@ impl Common {
             return_errno!(EINVAL, "capacity cannot be zero");
         }
 
-        let rb: RingBuffer<u8> = RingBuffer::new(capacity);
+        let rb: RingBuffer<T> = RingBuffer::new(capacity);
         let (rb_producer, rb_consumer) = rb.split();
 
         let producer = EndPoint::new(rb_producer, Events::OUT, flags);
@@ -92,6 +145,10 @@ impl Common {
 
     pub fn lock_event(&self) -> MutexGuard<()> {
         self.event_lock.lock()
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.producer.ringbuf.lock().capacity()
     }
 }
 
@@ -132,12 +189,12 @@ impl<T> std::fmt::Debug for EndPoint<T> {
     }
 }
 
-impl Producer {
-    fn this_end(&self) -> &EndPoint<RbProducer<u8>> {
+impl<T> Producer<T> {
+    fn this_end(&self) -> &EndPoint<RbProducer<T>> {
         &self.common.producer
     }
 
-    fn peer_end(&self) -> &EndPoint<RbConsumer<u8>> {
+    fn peer_end(&self) -> &EndPoint<RbConsumer<T>> {
         &self.common.consumer
     }
 
@@ -162,9 +219,92 @@ impl Producer {
             peer_end.pollee().add_events(Events::IN);
         }
     }
+
+    pub fn shutdown(&self) {
+        self.common.producer.shutdown()
+    }
+
+    pub fn is_shutdown(&self) -> bool {
+        self.common.producer.is_shutdown()
+    }
+
+    pub fn status_flags(&self) -> StatusFlags {
+        self.this_end().flags.load(Ordering::Relaxed)
+    }
+
+    pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
+        check_status_flags(new_status)?;
+        self.this_end().flags.store(new_status, Ordering::Relaxed);
+        Ok(())
+    }
+
+    pub fn is_nonblocking(&self) -> bool {
+        self.status_flags().contains(StatusFlags::O_NONBLOCK)
+    }
+
+    pub fn pollee(&self) -> &Pollee {
+        self.common.producer.pollee()
+    }
 }
 
-impl File for Producer {
+impl Producer<u8> {
+    pub async fn writev_async(&self, bufs: &[&[u8]]) -> Result<usize> {
+        let total_len: usize = bufs.iter().map(|buf| buf.len()).sum();
+        if total_len == 0 {
+            return Ok(0);
+        }
+
+        let mut poller = None;
+        loop {
+            // Attempt to write
+            let ret = self.try_writev(bufs);
+            if !ret.has_errno(EAGAIN) {
+                return ret;
+            }
+
+            if self.is_nonblocking() {
+                return_errno!(EAGAIN, "buffer is full");
+            }
+
+            // Wait for interesting events by polling
+            if poller.is_none() {
+                poller = Some(Poller::new());
+            }
+            let mask = Events::OUT;
+            let events = self.pollee().poll(mask, poller.as_mut());
+            if events.is_empty() {
+                poller.as_ref().unwrap().wait().await?;
+            }
+        }
+    }
+
+    fn try_writev(&self, bufs: &[&[u8]]) -> Result<usize> {
+        let mut total_nbytes = 0;
+        let mut errno = EAGAIN;
+        for buf in bufs {
+            match self.write(buf) {
+                Ok(nbytes) => {
+                    total_nbytes += nbytes;
+                    if nbytes < buf.len() {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    errno = e.errno();
+                    break;
+                }
+            }
+        }
+
+        if total_nbytes > 0 {
+            return Ok(total_nbytes);
+        }
+
+        return_errno!(errno, "error when writing");
+    }
+}
+
+impl File for Producer<u8> {
     fn write(&self, buf: &[u8]) -> Result<usize> {
         let this_end = self.this_end();
         let peer_end = self.peer_end();
@@ -211,13 +351,11 @@ impl File for Producer {
     }
 
     fn status_flags(&self) -> StatusFlags {
-        self.this_end().flags.load(Ordering::Relaxed)
+        self.status_flags()
     }
 
     fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
-        check_status_flags(new_status)?;
-        self.this_end().flags.store(new_status, Ordering::Relaxed);
-        Ok(())
+        self.set_status_flags(new_status)
     }
 
     fn access_mode(&self) -> AccessMode {
@@ -225,7 +363,7 @@ impl File for Producer {
     }
 }
 
-impl Drop for Producer {
+impl<T> Drop for Producer<T> {
     fn drop(&mut self) {
         // This is called when the writer end is closed (not shutdown)
         let this_end = self.this_end();
@@ -247,12 +385,12 @@ impl Drop for Producer {
     }
 }
 
-impl Consumer {
-    fn this_end(&self) -> &EndPoint<RbConsumer<u8>> {
+impl<T> Consumer<T> {
+    fn this_end(&self) -> &EndPoint<RbConsumer<T>> {
         &self.common.consumer
     }
 
-    fn peer_end(&self) -> &EndPoint<RbProducer<u8>> {
+    fn peer_end(&self) -> &EndPoint<RbProducer<T>> {
         &self.common.producer
     }
 
@@ -280,9 +418,91 @@ impl Consumer {
         let rb = this_end.ringbuf();
         rb.len()
     }
+
+    pub fn shutdown(&self) {
+        self.common.consumer.shutdown()
+    }
+
+    pub fn is_shutdown(&self) -> bool {
+        self.common.consumer.is_shutdown()
+    }
+
+    pub fn status_flags(&self) -> StatusFlags {
+        self.this_end().flags.load(Ordering::Relaxed)
+    }
+
+    pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
+        check_status_flags(new_status)?;
+        self.this_end().flags.store(new_status, Ordering::Relaxed);
+        Ok(())
+    }
+
+    pub fn is_nonblocking(&self) -> bool {
+        self.status_flags().contains(StatusFlags::O_NONBLOCK)
+    }
+
+    pub fn pollee(&self) -> &Pollee {
+        self.common.consumer.pollee()
+    }
 }
 
-impl File for Consumer {
+impl Consumer<u8> {
+    pub async fn readv_async(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
+        let total_len: usize = bufs.iter().map(|buf| buf.len()).sum();
+        if total_len == 0 {
+            return Ok(0);
+        }
+
+        let mut poller = None;
+        loop {
+            // Attempt to read
+            let ret = self.try_readv(bufs);
+            if !ret.has_errno(EAGAIN) {
+                return ret;
+            }
+
+            if self.is_nonblocking() {
+                return_errno!(EAGAIN, "no data are present to be received");
+            }
+
+            if poller.is_none() {
+                poller = Some(Poller::new());
+            }
+            let mask = Events::IN;
+            let events = self.pollee().poll(mask, poller.as_mut());
+            if events.is_empty() {
+                poller.as_ref().unwrap().wait().await?;
+            }
+        }
+    }
+
+    fn try_readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
+        let mut total_nbytes = 0;
+        let mut errno = EAGAIN;
+        for buf in bufs {
+            match self.read(buf) {
+                Ok(nbytes) => {
+                    total_nbytes += nbytes;
+                    if nbytes < buf.len() {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    errno = e.errno();
+                    break;
+                }
+            }
+        }
+
+        if total_nbytes > 0 {
+            return Ok(total_nbytes);
+        }
+
+        return_errno!(errno, "error when reading");
+    }
+}
+
+impl File for Consumer<u8> {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let this_end = self.this_end();
         let peer_end = self.peer_end();
@@ -333,13 +553,11 @@ impl File for Consumer {
     }
 
     fn status_flags(&self) -> StatusFlags {
-        self.this_end().flags.load(Ordering::Relaxed)
+        self.status_flags()
     }
 
     fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
-        check_status_flags(new_status)?;
-        self.this_end().flags.store(new_status, Ordering::Relaxed);
-        Ok(())
+        self.set_status_flags(new_status)
     }
 
     fn access_mode(&self) -> AccessMode {
@@ -347,7 +565,7 @@ impl File for Consumer {
     }
 }
 
-impl Drop for Consumer {
+impl<T> Drop for Consumer<T> {
     fn drop(&mut self) {
         // This is called when the reader end is closed (not shutdown)
         let this_end = self.this_end();

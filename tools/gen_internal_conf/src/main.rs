@@ -198,6 +198,13 @@ fn main() {
             }
             user_mount_config.unwrap()
         };
+        let untrusted_unix_socks = {
+            if let Some(socks) = occlum_config.untrusted_unix_socks {
+                Some(serde_json::to_value(socks).unwrap())
+            } else {
+                None
+            }
+        };
         let user_occlum_json_config = InternalOcclumJson {
             resource_limits: InternalResourceLimits {
                 user_space_size: occlum_config.resource_limits.user_space_size.to_string(),
@@ -208,6 +215,7 @@ fn main() {
                 default_mmap_size: occlum_config.process.default_mmap_size,
             },
             entry_points: occlum_config.entry_points,
+            untrusted_unix_socks,
             env: occlum_config.env,
             mount: serde_json::to_value(user_mount_config).unwrap(),
         };
@@ -236,6 +244,14 @@ fn main() {
             occlum_sys_json_file_path
         );
 
+        let untrusted_unix_socks = {
+            if let Some(socks) = occlum_config.untrusted_unix_socks {
+                Some(serde_json::to_value(socks).unwrap())
+            } else {
+                None
+            }
+        };
+
         // Generate sys Occlum.json - "sys_json"
         let sys_occlum_json_config = InternalOcclumJson {
             resource_limits: InternalResourceLimits {
@@ -248,6 +264,7 @@ fn main() {
             },
             entry_points: json!(["/bin"]),
             env: occlum_config.env,
+            untrusted_unix_socks,
             mount: gen_sys_mount_config(occlum_conf_init_fs_mac.to_string()),
         };
 
@@ -399,6 +416,8 @@ struct OcclumConfiguration {
     process: OcclumProcess,
     entry_points: serde_json::Value,
     env: serde_json::Value,
+    #[serde(default)]
+    untrusted_unix_socks: Option<Vec<UntrustedUnixSock>>,
     metadata: OcclumMetadata,
     mount: Vec<OcclumMount>,
 }
@@ -417,6 +436,12 @@ struct OcclumProcess {
     default_stack_size: String,
     default_heap_size: String,
     default_mmap_size: String,
+}
+
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
+struct UntrustedUnixSock {
+    host: serde_json::Value, // host path
+    libos: serde_json::Value, // libos path
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
@@ -506,5 +531,6 @@ struct InternalOcclumJson {
     process: OcclumProcess,
     entry_points: serde_json::Value,
     env: serde_json::Value,
+    untrusted_unix_socks: Option<serde_json::Value>,
     mount: serde_json::Value,
 }

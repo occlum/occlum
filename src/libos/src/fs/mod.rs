@@ -46,7 +46,7 @@ mod event_file;
 // TODO: remove the file
 //mod file;
 mod file_handle;
-mod file_ops;
+pub mod file_ops;
 mod file_table;
 mod fs_ops;
 mod fs_view;

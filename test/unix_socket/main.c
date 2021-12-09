@@ -270,24 +270,8 @@ int test_poll() {
         THROW_ERROR("socketpair failed");
     }
 
-    write(socks[0], "not today\n", 10);
-
-    // Known bug: the socketpair is implemented by io-uring in host-socket,
-    // which means outside the enclave. We will return early when write to
-    // stream socket, the receiver socket might not get data when write()
-    // returned, that is, poll socket[1] might get nothing, then the test
-    // will failed.
-    // Since the *promised execution* strategy, it's hard to ensure the sync
-    // of write and read.
-
-    // TODO: Remove the temorary bug fix, or maybe it's not a good test?
-    // TODO: implement socketpair and other user specified unix domain socket
-    // inside enclave
-    struct pollfd tmp_polls[] = {
-        { .fd = socks[1], .events = POLLIN },
-    };
-    if (poll(tmp_polls, 1, 5000) <= 0) {
-        THROW_ERROR("poll error");
+    if (write(socks[0], "not today\n", 10) < 0) {
+        THROW_ERROR("failed to write to socket");
     }
 
     struct pollfd polls[] = {
@@ -396,7 +380,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_poll),
     TEST_CASE(test_getname),
     TEST_CASE(test_ioctl_fionread),
-    // TEST_CASE(test_unix_socket_rename),
+    TEST_CASE(test_unix_socket_rename),
 };
 
 int main(int argc, const char *argv[]) {
