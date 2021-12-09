@@ -100,7 +100,6 @@
 #![feature(allocator_api)]
 // Use no_std and alloc crate except when given std feature or during test.
 #![cfg_attr(not(any(feature = "std", test, doctest)), no_std)]
-#[cfg(not(any(feature = "std", test, doctest)))]
 extern crate alloc;
 // Use Rust SGX SDK's std when given SGX feature.
 #[cfg(feature = "sgx")]
