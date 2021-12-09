@@ -68,7 +68,7 @@ impl SyncIoDisk {
         Ok(())
     }
 
-    fn flush(&self, _req: &Arc<BioReq>) -> Result<()> {
+    fn flush(&self) -> Result<()> {
         if !self.can_write {
             return Err(errno!(EACCES, "flush is not allowed"));
         }
@@ -106,7 +106,7 @@ impl BlockDevice for SyncIoDisk {
         let res = match type_ {
             BioType::Read => self.read(req),
             BioType::Write => self.write(req),
-            BioType::Flush => self.flush(req),
+            BioType::Flush => self.flush(),
         };
 
         // Update the status of req to completed and set the response
@@ -135,5 +135,12 @@ impl HostDisk for SyncIoDisk {
             can_write,
         };
         Ok(new_self)
+    }
+}
+
+impl Drop for SyncIoDisk {
+    fn drop(&mut self) {
+        // Ensure all data are peristed before the disk is dropped
+        let _ = self.flush();
     }
 }
