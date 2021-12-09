@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 errno = { path = "../errno" }
 object-id = { path = "../object-id" }
+static_assertions = "1.1.0"
 spin = "0.7"
 
 [dev-dependencies]

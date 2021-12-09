@@ -18,4 +18,8 @@ pub use self::block_buf::BlockBuf;
 pub use self::block_device::BlockDevice;
 pub use self::block_io::{BioCompletionCallback, BioReq, BioResp, BioSubmission, BioType};
 
+// This crate assumes the machine is 64-bit to use u64 and usize interchangably.
+use static_assertions::assert_eq_size;
+assert_eq_size!(usize, u64);
+
 pub type BlockId = usize;
