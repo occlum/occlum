@@ -10,12 +10,12 @@ use crate::HostDisk;
 /// This builder exposes the ability to configure how a host disk is opened and
 /// what operations are permitted on the open host disk.
 pub struct OpenOptions<D> {
-    read: bool,
-    write: bool,
+    pub(crate) read: bool,
+    pub(crate) write: bool,
     clear: bool,
     create: bool,
     create_new: bool,
-    num_blocks: Option<usize>,
+    pub(crate) total_blocks: Option<usize>,
     _phantom: PhantomData<D>,
 }
 
@@ -28,7 +28,7 @@ impl<D: HostDisk + Sized> OpenOptions<D> {
             clear: false,
             create: false,
             create_new: false,
-            num_blocks: None,
+            total_blocks: None,
             _phantom: PhantomData,
         }
     }
@@ -67,8 +67,8 @@ impl<D: HostDisk + Sized> OpenOptions<D> {
     }
 
     /// Sets the option for the size of the host disk in blocks.
-    pub fn num_blocks(&mut self, num_blocks: usize) -> &mut Self {
-        self.num_blocks = Some(num_blocks);
+    pub fn total_blocks(&mut self, total_blocks: usize) -> &mut Self {
+        self.total_blocks = Some(total_blocks);
         self
     }
 
@@ -76,14 +76,14 @@ impl<D: HostDisk + Sized> OpenOptions<D> {
     pub fn open<P: AsRef<Path>>(&self, path: P) -> Result<D> {
         // Try to capture input errors before creating a file on the host
         let maybe_new_file = self.create || self.create_new;
-        let num_blocks = self.num_blocks.unwrap_or(0);
-        if maybe_new_file && num_blocks == 0 {
+        let total_blocks = self.total_blocks.unwrap_or(0);
+        if maybe_new_file && total_blocks == 0 {
             return Err(errno!(
                 EINVAL,
                 "a new host disk must be given a non-zero size"
             ));
         }
-        if num_blocks.checked_mul(block_device::BLOCK_SIZE).is_none() {
+        if total_blocks.checked_mul(block_device::BLOCK_SIZE).is_none() {
             return Err(errno!(EOVERFLOW, "the disk size is too large"));
         }
 
@@ -98,8 +98,8 @@ impl<D: HostDisk + Sized> OpenOptions<D> {
 
         // If the size of the disk is specified, we set the length regradless
         // of the file is new or existing.
-        if let Some(num_blocks) = self.num_blocks {
-            let file_len = num_blocks * block_device::BLOCK_SIZE;
+        if let Some(total_blocks) = self.total_blocks {
+            let file_len = total_blocks * block_device::BLOCK_SIZE;
             file.set_len(file_len as u64)
                 .expect("an error from set_len at this stage is hard to recover");
         }

@@ -1,4 +1,5 @@
 // Convenient reexports for internal uses.
+pub(crate) use block_device::BLOCK_SIZE;
 pub(crate) use errno::prelude::*;
 pub(crate) use std::sync::Arc;
 

@@ -31,7 +31,7 @@ pub trait HostDisk: BlockDevice {
     /// If there exists a file on the given path, then the file must have the
     /// exact number of blocks as specified by the method. And all blocks of
     /// the file will be zeroed.
-    fn create<P: AsRef<Path>>(path: P, num_blocks: usize) -> Result<Self>
+    fn create<P: AsRef<Path>>(path: P, total_blocks: usize) -> Result<Self>
     where
         Self: Sized,
     {
@@ -40,14 +40,14 @@ pub trait HostDisk: BlockDevice {
             .write(true)
             .create(true)
             .clear(true)
-            .num_blocks(num_blocks)
+            .total_blocks(total_blocks)
             .open(path)
     }
 
     /// Open a host disk backed by creating a new file on the host Linux.
     ///
     /// If there exists a file on the given path, then an error will be returned.
-    fn create_new<P: AsRef<Path>>(path: P, num_blocks: usize) -> Result<Self>
+    fn create_new<P: AsRef<Path>>(path: P, total_blocks: usize) -> Result<Self>
     where
         Self: Sized,
     {
@@ -55,7 +55,7 @@ pub trait HostDisk: BlockDevice {
             .read(true)
             .write(true)
             .create_new(true)
-            .num_blocks(num_blocks)
+            .total_blocks(total_blocks)
             .open(path)
     }
 
