@@ -223,6 +223,7 @@ impl File for Producer {
 
 impl Drop for Producer {
     fn drop(&mut self) {
+        self.this_end().shutdown();
         self.peer_end()
             .pollee()
             .add_events(Events::IN | Events::HUP);
@@ -269,7 +270,7 @@ impl File for Consumer {
         let this_end = self.this_end();
         let peer_end = self.peer_end();
 
-        if this_end.is_shutdown() || peer_end.is_shutdown() {
+        if this_end.is_shutdown() {
             return_errno!(EPIPE, "");
         }
 
@@ -284,6 +285,10 @@ impl File for Consumer {
         };
 
         self.update_pollee();
+
+        if peer_end.is_shutdown() {
+            return Ok(nbytes);
+        }
 
         if nbytes > 0 {
             Ok(nbytes)
@@ -327,6 +332,7 @@ impl File for Consumer {
 
 impl Drop for Consumer {
     fn drop(&mut self) {
+        self.this_end().shutdown();
         self.peer_end()
             .pollee()
             .add_events(Events::OUT | Events::HUP);
