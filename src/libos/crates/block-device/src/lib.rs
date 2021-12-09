@@ -1,4 +1,7 @@
 //! This crate provide the abstractions for block devices.
+
+// TODO: add O_DIRECT flag?
+
 #![cfg_attr(not(test), no_std)]
 #![feature(new_uninit)]
 #![feature(slice_fill)]

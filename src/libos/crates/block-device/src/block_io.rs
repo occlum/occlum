@@ -126,18 +126,18 @@ impl BioReq {
     }
 
     /// Access the immutable buffers with a closure.
-    pub fn access_bufs_with<F>(&self, mut f: F)
+    pub fn access_bufs_with<F, R>(&self, mut f: F) -> R
     where
-        F: FnMut(&[BlockBuf]),
+        F: FnMut(&[BlockBuf]) -> R,
     {
         let bufs = self.bufs.lock();
         (f)(&bufs)
     }
 
     /// Access the mutable buffers with a closure.
-    pub fn access_mut_bufs_with<F>(&self, mut f: F)
+    pub fn access_mut_bufs_with<F, R>(&self, mut f: F) -> R
     where
-        F: FnMut(&mut [BlockBuf]),
+        F: FnMut(&mut [BlockBuf]) -> R,
     {
         let mut bufs = self.bufs.lock();
         (f)(&mut bufs)
