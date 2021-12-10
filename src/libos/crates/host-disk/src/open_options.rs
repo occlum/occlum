@@ -1,4 +1,4 @@
-use std::fs::{File, OpenOptions as FileOpenOptions};
+use std::fs::OpenOptions as FileOpenOptions;
 use std::marker::PhantomData;
 use std::path::Path;
 
@@ -94,7 +94,7 @@ impl<D: HostDisk + Sized> OpenOptions<D> {
             .create(self.create)
             .create_new(self.create_new)
             .truncate(self.clear)
-            .open(path)?;
+            .open(path.as_ref())?;
 
         // If the size of the disk is specified, we set the length regradless
         // of the file is new or existing.
@@ -104,6 +104,6 @@ impl<D: HostDisk + Sized> OpenOptions<D> {
                 .expect("an error from set_len at this stage is hard to recover");
         }
 
-        D::from_options_and_file(self, file)
+        D::from_options_and_file(self, file, path.as_ref())
     }
 }

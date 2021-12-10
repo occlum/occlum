@@ -1,6 +1,7 @@
 //! Virtual disks backed by files on the host Linux kernel.
 
 #![cfg_attr(feature = "sgx", no_std)]
+#![feature(new_uninit)]
 
 #[cfg(feature = "sgx")]
 extern crate sgx_libc as libc;

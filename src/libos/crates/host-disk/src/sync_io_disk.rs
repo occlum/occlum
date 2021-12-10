@@ -2,6 +2,7 @@ use block_device::{BioReq, BioSubmission, BioType, BlockDevice};
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{IoSlice, IoSliceMut, SeekFrom};
+use std::path::{Path, PathBuf};
 
 use crate::prelude::*;
 use crate::{HostDisk, OpenOptions};
@@ -18,6 +19,7 @@ use crate::{HostDisk, OpenOptions};
 /// It is recommended to use `IoUringDisk` for an optimal performance.
 pub struct SyncIoDisk {
     file: Mutex<File>,
+    path: PathBuf,
     total_blocks: usize,
     can_read: bool,
     can_write: bool,
@@ -120,7 +122,7 @@ impl BlockDevice for SyncIoDisk {
 }
 
 impl HostDisk for SyncIoDisk {
-    fn from_options_and_file(options: &OpenOptions<Self>, file: File) -> Result<Self> {
+    fn from_options_and_file(options: &OpenOptions<Self>, file: File, path: &Path) -> Result<Self> {
         let total_blocks = options.total_blocks.unwrap_or_else(|| {
             let file_len = file.metadata().unwrap().len() as usize;
             assert!(file_len >= BLOCK_SIZE);
@@ -128,13 +130,19 @@ impl HostDisk for SyncIoDisk {
         });
         let can_read = options.read;
         let can_write = options.write;
+        let path = path.to_owned();
         let new_self = Self {
             file: Mutex::new(file),
+            path,
             total_blocks,
             can_read,
             can_write,
         };
         Ok(new_self)
+    }
+
+    fn path(&self) -> &Path {
+        self.path.as_path()
     }
 }
 
@@ -143,4 +151,32 @@ impl Drop for SyncIoDisk {
         // Ensure all data are peristed before the disk is dropped
         let _ = self.flush();
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn test_setup() -> SyncIoDisk {
+        // As unit tests may run concurrently, they must operate on different
+        // files. This helper function generates unique file paths.
+        fn gen_unique_path() -> String {
+            use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
+
+            static UT_ID: AtomicU32 = AtomicU32::new(0);
+
+            let ut_id = UT_ID.fetch_add(1, Relaxed);
+            format!("sync_io_disk{}.image", ut_id)
+        }
+
+        let total_blocks = 16;
+        let path = gen_unique_path();
+        SyncIoDisk::create(&path, total_blocks).unwrap()
+    }
+
+    fn test_teardown(disk: SyncIoDisk) {
+        let _ = std::fs::remove_file(disk.path());
+    }
+
+    block_device::gen_unit_tests!(test_setup, test_teardown);
 }

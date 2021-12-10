@@ -59,12 +59,15 @@ pub trait HostDisk: BlockDevice {
             .open(path)
     }
 
+    /// Returns the path of the host file which stores the content of the disk.
+    fn path(&self) -> &Path;
+
     /// Create a host disk according to the options and backed by the file.
     ///
     /// This method is supposed to use directly. So we hide its API document.
     /// Users should use `Self::with_options` instead.
     #[doc(hidden)]
-    fn from_options_and_file(options: &OpenOptions<Self>, file: File) -> Result<Self>
+    fn from_options_and_file(options: &OpenOptions<Self>, file: File, path: &Path) -> Result<Self>
     where
         Self: Sized;
 }

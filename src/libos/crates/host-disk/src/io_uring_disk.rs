@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::marker::PhantomData;
 use std::os::unix::io::{AsRawFd, RawFd};
+use std::path::{Path, PathBuf};
 
 use crate::prelude::*;
 use crate::{HostDisk, OpenOptions};
@@ -23,6 +24,7 @@ pub struct IoUringDisk<P: IoUringProvider>(Arc<Inner>, PhantomData<P>);
 struct Inner {
     fd: RawFd,
     file: Mutex<File>,
+    path: PathBuf,
     total_blocks: usize,
     can_read: bool,
     can_write: bool,
@@ -239,7 +241,7 @@ impl<P: IoUringProvider> BlockDevice for IoUringDisk<P> {
 }
 
 impl<P: IoUringProvider> HostDisk for IoUringDisk<P> {
-    fn from_options_and_file(options: &OpenOptions<Self>, file: File) -> Result<Self> {
+    fn from_options_and_file(options: &OpenOptions<Self>, file: File, path: &Path) -> Result<Self> {
         let fd = file.as_raw_fd();
         let total_blocks = options.total_blocks.unwrap_or_else(|| {
             let file_len = file.metadata().unwrap().len() as usize;
@@ -248,15 +250,21 @@ impl<P: IoUringProvider> HostDisk for IoUringDisk<P> {
         });
         let can_read = options.read;
         let can_write = options.write;
+        let path = path.to_owned();
         let inner = Inner {
             fd,
             file: Mutex::new(file),
+            path,
             total_blocks,
             can_read,
             can_write,
         };
         let new_self = Self(Arc::new(inner), PhantomData);
         Ok(new_self)
+    }
+
+    fn path(&self) -> &Path {
+        self.0.path.as_path()
     }
 }
 
@@ -288,3 +296,65 @@ impl<T> MarkSend<T> {
 }
 
 unsafe impl<T> Send for MarkSend<T> {}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use runtime::IoUringSingleton;
+
+    fn test_setup() -> IoUringDisk<IoUringSingleton> {
+        // As unit tests may run concurrently, they must operate on different
+        // files. This helper function generates unique file paths.
+        fn gen_unique_path() -> String {
+            use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
+
+            static UT_ID: AtomicU32 = AtomicU32::new(0);
+
+            let ut_id = UT_ID.fetch_add(1, Relaxed);
+            format!("io_uring_disk{}.image", ut_id)
+        }
+
+        let total_blocks = 16;
+        let path = gen_unique_path();
+        IoUringDisk::<IoUringSingleton>::create(&path, total_blocks).unwrap()
+    }
+
+    fn test_teardown(disk: IoUringDisk<IoUringSingleton>) {
+        let _ = std::fs::remove_file(disk.path());
+    }
+
+    block_device::gen_unit_tests!(test_setup, test_teardown);
+
+    mod runtime {
+        use super::*;
+        use io_uring_callback::{Builder, IoUring};
+        use lazy_static::lazy_static;
+
+        pub struct IoUringSingleton;
+
+        impl IoUringProvider for IoUringSingleton {
+            fn io_uring() -> &'static IoUring {
+                &*IO_URING
+            }
+        }
+
+        lazy_static! {
+            static ref IO_URING: Arc<IoUring> = {
+                let ring = Arc::new(Builder::new().build(256).unwrap());
+                unsafe {
+                    ring.start_enter_syscall_thread();
+                }
+                async_rt::task::spawn({
+                    let ring = ring.clone();
+                    async move {
+                        loop {
+                            ring.poll_completions();
+                            async_rt::sched::yield_().await;
+                        }
+                    }
+                });
+                ring
+            };
+        }
+    }
+}
