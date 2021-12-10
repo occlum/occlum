@@ -101,93 +101,16 @@ impl BlockDevice for MemDisk {
 
 #[cfg(test)]
 mod test {
-    use self::helper::check_disk_filled_with_val;
     use super::*;
 
-    #[test]
-    fn check_zeroed() {
-        async_rt::task::block_on(async move {
-            // Create a small MemDisk
-            let mem_disk = {
-                let total_blocks = 16;
-                MemDisk::new(total_blocks).unwrap()
-            };
-
-            // MemDisk should be filled with zeros
-            check_disk_filled_with_val(&mem_disk, 0).await.unwrap();
-        });
+    fn test_setup() -> MemDisk {
+        let total_blocks = 16;
+        MemDisk::new(total_blocks).unwrap()
     }
 
-    #[test]
-    fn write_all() {
-        async_rt::task::block_on(async move {
-            // Create a small MemDisk
-            let mem_disk = {
-                let total_blocks = 16;
-                MemDisk::new(total_blocks).unwrap()
-            };
-            let val = 39_u8;
-
-            // Send a write that fills all blocks with a single byte
-            let bufs = (0..mem_disk.total_blocks)
-                .map(|addr| {
-                    let mut boxed_slice =
-                        unsafe { Box::new_uninit_slice(BLOCK_SIZE).assume_init() };
-                    for b in boxed_slice.iter_mut() {
-                        *b = val;
-                    }
-                    let buf = BlockBuf::from_boxed(boxed_slice);
-                    buf
-                })
-                .collect();
-            let req = BioReq::new_write(0, bufs, None).unwrap();
-            let submission = mem_disk.submit(Arc::new(req));
-            submission.complete().await;
-
-            // MemDisk should be filled with the value
-            check_disk_filled_with_val(&mem_disk, val).await.unwrap();
-        });
+    fn test_teardown(disk: MemDisk) {
+        drop(disk);
     }
 
-    mod helper {
-        use super::*;
-
-        /// Check whether a disk is filled with a given byte value.
-        pub async fn check_disk_filled_with_val(disk: &dyn BlockDevice, val: u8) -> Result<()> {
-            // Initiate multiple reads, each of which reads just one block
-            let reads: Vec<_> = (0..disk.total_blocks())
-                .map(|addr| {
-                    let bufs = {
-                        let boxed_slice =
-                            unsafe { Box::new_uninit_slice(BLOCK_SIZE).assume_init() };
-                        let buf = BlockBuf::from_boxed(boxed_slice);
-                        vec![buf]
-                    };
-                    let callback: BioCompletionCallback = Box::new(|req, resp| {
-                        assert!(resp == Ok(()));
-                    }
-                        as _);
-                    let req = BioReq::new_read(addr, bufs, Some(callback)).unwrap();
-                    disk.submit(Arc::new(req))
-                })
-                .collect();
-
-            // Wait for reads to complete and check bytes
-            for read in reads {
-                let req = read.complete().await;
-
-                let mut bufs = req.take_bufs();
-                for buf in bufs.drain(..) {
-                    // Check if any byte read does not equal to the value
-                    if buf.as_slice().iter().any(|b| *b != val) {
-                        return Err(errno!(EINVAL, "found unexpected byte"));
-                    }
-
-                    // Safety. It is safe to drop the memory of buffers here
-                    drop(unsafe { BlockBuf::into_boxed(buf) });
-                }
-            }
-            Ok(())
-        }
-    }
+    crate::gen_unit_tests!(test_setup, test_teardown);
 }

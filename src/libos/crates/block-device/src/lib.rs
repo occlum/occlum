@@ -6,6 +6,7 @@
 #![feature(new_uninit)]
 #![feature(slice_fill)]
 
+#[macro_use]
 extern crate alloc;
 
 pub mod block_buf;
@@ -14,6 +15,7 @@ pub mod block_device;
 pub mod block_io;
 pub mod mem_disk;
 mod prelude;
+pub mod util;
 
 pub const BLOCK_SIZE: usize = 4096;
 
