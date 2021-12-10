@@ -16,6 +16,7 @@ cfg-if = "1.0"
 errno = { path = "../errno" }
 io-uring-callback = { path = "../io-uring-callback" }
 libc = { version = "0.2", optional = true }
+new-self-ref-arc = { path = "../new-self-ref-arc" }
 sgx-untrusted-alloc = { path = "../sgx-untrusted-alloc", default-features = false  }
 sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }
 sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", optional = true, features = ["backtrace"] }

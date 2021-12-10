@@ -1,10 +1,12 @@
 use block_device::{BioReq, BioSubmission, BioType, BlockDevice};
 use io_uring_callback::{Fd, IoHandle, IoUring};
+use new_self_ref_arc::new_self_ref_arc;
 use std::fs::File;
 use std::io::prelude::*;
 use std::marker::PhantomData;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::{Path, PathBuf};
+use std::sync::Weak;
 
 use crate::prelude::*;
 use crate::{HostDisk, OpenOptions};
@@ -19,15 +21,17 @@ pub trait IoUringProvider: Send + Sync + 'static {
 
 /// A type of host disk that implements a block device interface by performing
 /// async I/O via Linux's io_uring.
-pub struct IoUringDisk<P: IoUringProvider>(Arc<Inner>, PhantomData<P>);
+pub struct IoUringDisk<P: IoUringProvider>(Arc<Inner<P>>);
 
-struct Inner {
+struct Inner<P: IoUringProvider> {
     fd: RawFd,
     file: Mutex<File>,
     path: PathBuf,
     total_blocks: usize,
     can_read: bool,
     can_write: bool,
+    phantom: PhantomData<P>,
+    weak_self: Weak<Inner<P>>,
 }
 
 impl<P: IoUringProvider> IoUringDisk<P> {
@@ -59,6 +63,7 @@ impl<P: IoUringProvider> IoUringDisk<P> {
         let iovecs_ptr = iovecs.as_ptr() as _;
         let iovecs_len = iovecs.len();
         let complete_fn = {
+            let self_ = self.clone_self();
             let req = req.clone();
             // Safety. All pointers contained in iovecs are still valid as the
             // buffers of the BIO request is valid.
@@ -67,6 +72,9 @@ impl<P: IoUringProvider> IoUringDisk<P> {
                 // When the callback is invoked, the iovecs must have been
                 // useless. And we call drop it safely.
                 drop(send_iovecs);
+                // When the callback is invoked, IoUringDisk and its associated
+                // resources are no longer needed.
+                drop(self_);
 
                 let resp = if retval >= 0 {
                     let expected_len = req.num_bufs() * BLOCK_SIZE;
@@ -127,6 +135,7 @@ impl<P: IoUringProvider> IoUringDisk<P> {
         let iovecs_ptr = iovecs.as_ptr() as _;
         let iovecs_len = iovecs.len();
         let complete_fn = {
+            let self_ = self.clone_self();
             let req = req.clone();
             // Safety. All pointers contained in iovecs are still valid as the
             // buffers of the BIO request is valid.
@@ -135,6 +144,9 @@ impl<P: IoUringProvider> IoUringDisk<P> {
                 // When the callback is invoked, the iovecs must have been
                 // useless. And we call drop it safely.
                 drop(send_iovecs);
+                // When the callback is invoked, IoUringDisk and its associated
+                // resources are no longer needed.
+                drop(self_);
 
                 let resp = if retval >= 0 {
                     let expected_len = req.num_bufs() * BLOCK_SIZE;
@@ -175,8 +187,13 @@ impl<P: IoUringProvider> IoUringDisk<P> {
         let fd = Fd(self.0.fd as i32);
         let is_datasync = true;
         let complete_fn = {
+            let self_ = self.clone_self();
             let req = req.clone();
             move |retval: i32| {
+                // When the callback is invoked, IoUringDisk and its associated
+                // resources are no longer needed.
+                drop(self_);
+
                 let resp = if retval == 0 {
                     Ok(())
                 } else if retval < 0 {
@@ -207,6 +224,16 @@ impl<P: IoUringProvider> IoUringDisk<P> {
         let begin_offset = begin_block * BLOCK_SIZE;
         let end_offset = end_block * BLOCK_SIZE;
         Ok((begin_offset, end_offset))
+    }
+
+    // Returns a `Self` from `&self`.
+    //
+    // We pass the ownership of `Self` to the callback closure of an async
+    // io_uring request to ensure that IoUringDisk and all its associated
+    // resources (e.g., file descriptor) is valid while the async I/O request
+    // is being processed.
+    fn clone_self(&self) -> Self {
+        Self(self.0.weak_self.upgrade().unwrap())
     }
 }
 
@@ -258,8 +285,11 @@ impl<P: IoUringProvider> HostDisk for IoUringDisk<P> {
             total_blocks,
             can_read,
             can_write,
+            phantom: PhantomData,
+            weak_self: Weak::new(),
         };
-        let new_self = Self(Arc::new(inner), PhantomData);
+        let arc_inner = new_self_ref_arc!(inner);
+        let new_self = Self(arc_inner);
         Ok(new_self)
     }
 
