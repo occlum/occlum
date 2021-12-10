@@ -7,3 +7,7 @@ targets:
     copy:
       - dirs:
         - /usr/local/occlum/x86_64-linux-musl/redis/bin
+  - target: /etc/
+    copy:
+      - files:
+        - ../redis.conf
