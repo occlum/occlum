@@ -35,7 +35,7 @@ struct Inner<P: IoUringProvider> {
 }
 
 impl<P: IoUringProvider> IoUringDisk<P> {
-    fn read(&self, req: &Arc<BioReq>) -> Result<()> {
+    fn do_read(&self, req: &Arc<BioReq>) -> Result<()> {
         if !self.0.can_read {
             return Err(errno!(EACCES, "read is not allowed"));
         }
@@ -50,7 +50,7 @@ impl<P: IoUringProvider> IoUringDisk<P> {
                     let buf_slice = buf.as_slice_mut();
                     libc::iovec {
                         iov_base: buf_slice.as_mut_ptr() as _,
-                        iov_len: BLOCK_SIZE,
+                        iov_len: buf_slice.len(),
                     }
                 })
                 .collect();
@@ -77,9 +77,9 @@ impl<P: IoUringProvider> IoUringDisk<P> {
                 drop(self_);
 
                 let resp = if retval >= 0 {
-                    let expected_len = req.num_bufs() * BLOCK_SIZE;
+                    let expected_len = req.num_blocks() * BLOCK_SIZE;
                     // We don't expect short reads on regular files
-                    assert!(retval as usize == expected_len);
+                    debug_assert!(retval as usize == expected_len);
                     Ok(())
                 } else {
                     Err(Errno::from((-retval) as u32))
@@ -107,7 +107,7 @@ impl<P: IoUringProvider> IoUringDisk<P> {
         Ok(())
     }
 
-    fn write(&self, req: &Arc<BioReq>) -> Result<()> {
+    fn do_write(&self, req: &Arc<BioReq>) -> Result<()> {
         if !self.0.can_write {
             return Err(errno!(EACCES, "write is not allowed"));
         }
@@ -122,7 +122,7 @@ impl<P: IoUringProvider> IoUringDisk<P> {
                     let buf_slice = buf.as_slice();
                     libc::iovec {
                         iov_base: buf_slice.as_ptr() as *mut u8 as _,
-                        iov_len: BLOCK_SIZE,
+                        iov_len: buf_slice.len(),
                     }
                 })
                 .collect();
@@ -149,9 +149,9 @@ impl<P: IoUringProvider> IoUringDisk<P> {
                 drop(self_);
 
                 let resp = if retval >= 0 {
-                    let expected_len = req.num_bufs() * BLOCK_SIZE;
+                    let expected_len = req.num_blocks() * BLOCK_SIZE;
                     // We don't expect short writes on regular files
-                    assert!(retval as usize == expected_len);
+                    debug_assert!(retval as usize == expected_len);
                     Ok(())
                 } else {
                     Err(Errno::from((-retval) as u32))
@@ -179,7 +179,7 @@ impl<P: IoUringProvider> IoUringDisk<P> {
         Ok(())
     }
 
-    fn flush(&self, req: &Arc<BioReq>) -> Result<()> {
+    fn do_flush(&self, req: &Arc<BioReq>) -> Result<()> {
         if !self.0.can_write {
             return Err(errno!(EACCES, "flush is not allowed"));
         }
@@ -217,7 +217,7 @@ impl<P: IoUringProvider> IoUringDisk<P> {
 
     fn get_range_in_bytes(&self, req: &Arc<BioReq>) -> Result<(usize, usize)> {
         let begin_block = req.addr();
-        let end_block = begin_block + req.num_bufs();
+        let end_block = begin_block + req.num_blocks();
         if end_block > self.0.total_blocks {
             return Err(errno!(EINVAL, "invalid block range"));
         }
@@ -250,9 +250,9 @@ impl<P: IoUringProvider> BlockDevice for IoUringDisk<P> {
         let req = submission.req();
         let type_ = req.type_();
         let res = match type_ {
-            BioType::Read => self.read(req),
-            BioType::Write => self.write(req),
-            BioType::Flush => self.flush(req),
+            BioType::Read => self.do_read(req),
+            BioType::Write => self.do_write(req),
+            BioType::Flush => self.do_flush(req),
         };
 
         // If any error returns, then the request must have failed to submit. So

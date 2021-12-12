@@ -125,7 +125,7 @@ mod tests {
         let mut anymap = AnyMap::new();
         assert!(anymap.insert(123_usize).is_none());
         assert!(anymap.insert(String::from("hello")).is_none());
-        assert!(anymap.insert((0..10)).is_none());
+        assert!(anymap.insert(0..10).is_none());
         println!("anymap = {:?}", anymap);
     }
 }

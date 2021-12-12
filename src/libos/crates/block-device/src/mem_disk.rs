@@ -29,9 +29,10 @@ impl MemDisk {
         let mut offset = begin_offset;
         req.access_mut_bufs_with(|bufs| {
             for buf in bufs.iter_mut() {
+                let buf_len = buf.len();
                 buf.as_slice_mut()
-                    .copy_from_slice(&disk[offset..offset + BLOCK_SIZE]);
-                offset += BLOCK_SIZE;
+                    .copy_from_slice(&disk[offset..offset + buf_len]);
+                offset += buf.len();
             }
         });
         drop(disk);
@@ -46,8 +47,8 @@ impl MemDisk {
         let mut offset = begin_offset;
         req.access_bufs_with(|bufs| {
             for buf in bufs.iter() {
-                disk[offset..offset + BLOCK_SIZE].copy_from_slice(buf.as_slice());
-                offset += BLOCK_SIZE;
+                disk[offset..offset + buf.len()].copy_from_slice(buf.as_slice());
+                offset += buf.len();
             }
         });
         drop(disk);
@@ -62,7 +63,7 @@ impl MemDisk {
 
     fn get_range_in_bytes(&self, req: &Arc<BioReq>) -> Result<(usize, usize)> {
         let begin_block = req.addr();
-        let end_block = begin_block + req.num_bufs();
+        let end_block = begin_block + req.num_blocks();
         if end_block > self.total_blocks {
             return Err(errno!(EINVAL, "invalid block range"));
         }

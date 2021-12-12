@@ -9,7 +9,7 @@ macro_rules! gen_unit_tests {
     ($setup:ident, $teardown:ident) => {
         use std::sync::Arc;
         use $crate::util::test::check_disk_filled_with_val;
-        use $crate::{BioReq, BlockBuf, BlockDevice, BLOCK_SIZE};
+        use $crate::{BioReq, BioReqBuilder, BioType, BlockBuf, BlockDevice, BLOCK_SIZE};
 
         // Check a new disk is initialized with zeros.
         #[test]
@@ -33,18 +33,28 @@ macro_rules! gen_unit_tests {
                 let val = b'@'; // a printable byte
 
                 // Send a write that fills all blocks with a single byte
-                let bufs = (0..disk.total_blocks())
-                    .map(|_| {
-                        let mut boxed_slice =
-                            unsafe { Box::new_uninit_slice(BLOCK_SIZE).assume_init() };
-                        for b in boxed_slice.iter_mut() {
-                            *b = val;
-                        }
-                        let buf = BlockBuf::from_boxed(boxed_slice);
-                        buf
+                let mut boxed_slice = unsafe {
+                    Box::new_uninit_slice(disk.total_blocks() * BLOCK_SIZE).assume_init()
+                };
+                for b in boxed_slice.iter_mut() {
+                    *b = val;
+                }
+                let buf = BlockBuf::from_boxed(boxed_slice);
+                let bufs = vec![buf];
+                let req = BioReqBuilder::new(BioType::Write)
+                    .addr(0)
+                    .bufs(bufs)
+                    .on_drop(|req: &BioReq, mut bufs: Vec<BlockBuf>| {
+                        // Free the boxed slice that we allocated before
+                        bufs.drain(..).for_each(|buf| {
+                            // Safety. BlockBuffer is created with from_boxed
+                            let boxed_slice = unsafe {
+                                BlockBuf::into_boxed(buf);
+                            };
+                            drop(boxed_slice);
+                        });
                     })
-                    .collect();
-                let req = BioReq::new_write(0, bufs, None).unwrap();
+                    .build();
                 let submission = disk.submit(Arc::new(req));
                 let req = submission.complete().await;
                 assert!(req.response() == Some(Ok(())));
@@ -59,40 +69,37 @@ macro_rules! gen_unit_tests {
 }
 
 use crate::prelude::*;
-use crate::{BioCompletionCallback, BioReq, BlockBuf, BlockDevice, BLOCK_SIZE};
+use crate::{BioReq, BioReqBuilder, BioType, BlockBuf, BlockDevice, BLOCK_SIZE};
 
 /// Check whether a disk is filled with a given byte value.
 pub async fn check_disk_filled_with_val(disk: &dyn BlockDevice, val: u8) -> Result<()> {
-    // Initiate multiple reads, each of which reads just one block
-    let reads: Vec<_> = (0..disk.total_blocks())
-        .map(|addr| {
-            let bufs = {
-                let boxed_slice = unsafe { Box::new_uninit_slice(BLOCK_SIZE).assume_init() };
-                let buf = BlockBuf::from_boxed(boxed_slice);
-                vec![buf]
-            };
-            let callback: BioCompletionCallback = Box::new(|_req, resp| {
-                assert!(resp == Ok(()));
-            } as _);
-            let req = BioReq::new_read(addr, bufs, Some(callback)).unwrap();
-            disk.submit(Arc::new(req))
+    // Send a big read that reads all blocks of the disk
+    let boxed_slice = unsafe { Box::new_uninit_slice(disk.total_bytes()).assume_init() };
+    let buf = BlockBuf::from_boxed(boxed_slice);
+    let bufs = vec![buf];
+    let req = BioReqBuilder::new(BioType::Read)
+        .addr(0)
+        .bufs(bufs)
+        .on_drop(|req: &BioReq, mut bufs: Vec<BlockBuf>| {
+            // Free the boxed slice that we allocated before
+            bufs.drain(..).for_each(|buf| {
+                // Safety. BlockBuffer is created with from_boxed
+                let boxed_slice = unsafe { BlockBuf::into_boxed(buf) };
+                drop(boxed_slice);
+            });
         })
-        .collect();
+        .build();
+    let submission = disk.submit(Arc::new(req));
+    let req = submission.complete().await;
+    assert!(req.response() == Some(Ok(())));
 
-    // Wait for reads to complete and check bytes
-    for read in reads {
-        let req = read.complete().await;
-
-        let mut bufs = req.take_bufs();
-        for buf in bufs.drain(..) {
-            // Check if any byte read does not equal to the value
+    // Check if all bytes read equal to the value
+    req.access_bufs_with(|bufs| {
+        for buf in bufs {
             if buf.as_slice().iter().any(|b| *b != val) {
                 return Err(errno!(EINVAL, "found unexpected byte"));
             }
-
-            // Safety. It is safe to drop the memory of buffers here
-            drop(unsafe { BlockBuf::into_boxed(buf) });
         }
-    }
-    Ok(())
+        Ok(())
+    })
 }

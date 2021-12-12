@@ -8,6 +8,7 @@ use core::task::Waker;
 use object_id::ObjectId;
 
 use crate::prelude::*;
+use crate::util::anymap::{Any, AnyMap};
 
 /// The type of a block request.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -20,26 +21,139 @@ pub enum BioType {
     Flush,
 }
 
-/// A request to a block device.
+/// A builder for `BioReq`.
+pub struct BioReqBuilder {
+    type_: BioType,
+    addr: Option<BlockId>,
+    bufs: Option<Vec<BlockBuf>>,
+    ext: Option<AnyMap>,
+    on_complete: Option<BioReqOnCompleteFn>,
+    on_drop: Option<BioReqOnDropFn>,
+}
+
+impl BioReqBuilder {
+    /// Create a builder of a block request of the give type.
+    pub fn new(type_: BioType) -> Self {
+        Self {
+            type_,
+            addr: None,
+            bufs: None,
+            ext: None,
+            on_complete: None,
+            on_drop: None,
+        }
+    }
+
+    /// Specify the block address of the request.
+    pub fn addr(mut self, addr: BlockId) -> Self {
+        self.addr = Some(addr);
+        self
+    }
+
+    /// Give the buffers of the request.
+    pub fn bufs(mut self, bufs: Vec<BlockBuf>) -> Self {
+        self.bufs = Some(bufs);
+        self
+    }
+
+    /// Add an extension object to the request.
+    pub fn ext<T: Any + Sized>(mut self, obj: T) -> Self {
+        if self.ext.is_none() {
+            self.ext = Some(AnyMap::new());
+        }
+        let _ = self.ext.as_mut().unwrap().insert(obj);
+        self
+    }
+
+    /// Specify a callback invoked when the request is complete.
+    pub fn on_complete(mut self, on_complete: BioReqOnCompleteFn) -> Self {
+        self.on_complete = Some(on_complete);
+        self
+    }
+
+    /// Specify a callback invoked when the request is dropped.
+    pub fn on_drop(mut self, on_drop: BioReqOnDropFn) -> Self {
+        self.on_drop = Some(on_drop);
+        self
+    }
+
+    /// Build the request.
+    pub fn build(mut self) -> BioReq {
+        let type_ = self.type_;
+        if ![BioType::Read, BioType::Write].contains(&type_) {
+            debug_assert!(
+                self.addr.is_some(),
+                "addr is only meaningful for a read or write",
+            );
+            debug_assert!(
+                self.bufs.is_some(),
+                "bufs is only meaningful for a read or write",
+            );
+        }
+
+        let addr = self.addr.unwrap_or(0);
+        debug_assert!(
+            BLOCK_SIZE.saturating_mul(addr) <= isize::MAX as usize,
+            "addr is too big"
+        );
+
+        let bufs = self.bufs.take().unwrap_or_else(|| Vec::new());
+        let num_bytes = bufs
+            .iter()
+            .map(|buf| buf.len())
+            .fold(0_usize, |sum, len| sum.saturating_add(len));
+        debug_assert!(num_bytes <= isize::MAX as usize, "# of bytes is too large");
+        let num_blocks = num_bytes / BLOCK_SIZE;
+        debug_assert!(num_blocks <= u32::MAX as usize, "# of blocks is too large");
+
+        let ext = self.ext.take().unwrap_or_else(|| AnyMap::new());
+        let on_complete = self.on_complete.take();
+        let on_drop = self.on_drop.take();
+
+        let id = ObjectId::new();
+        let inner = Inner::new();
+
+        BioReq {
+            id,
+            type_,
+            addr,
+            num_blocks: num_blocks as u32,
+            bufs: Mutex::new(bufs),
+            inner: Mutex::new(inner),
+            ext: Mutex::new(ext),
+            on_complete,
+            on_drop,
+        }
+    }
+}
+
+/// A block I/O request.
 pub struct BioReq {
     id: ObjectId,
     type_: BioType,
     addr: BlockId,
+    num_blocks: u32,
     bufs: Mutex<Vec<BlockBuf>>,
     inner: Mutex<Inner>,
+    ext: Mutex<AnyMap>,
+    on_complete: Option<BioReqOnCompleteFn>,
+    on_drop: Option<BioReqOnDropFn>,
 }
 
 /// A response from a block device.
 pub type BioResp = core::result::Result<(), Errno>;
 
-/// The closure type for the callback function invoked upon the completion of
-/// a request to a block device.
-pub type BioCompletionCallback = Box<dyn FnOnce(/* req = */ &BioReq, /* resp = */ BioResp) + Send>;
+/// The type of the callback function invoked upon the completion of
+/// a block I/O request.
+pub type BioReqOnCompleteFn = fn(/* req = */ &BioReq, /* resp = */ &BioResp);
+
+/// The type of the callback function invoked upon the drop of a block I/O
+/// request.
+pub type BioReqOnDropFn = fn(/* req = */ &BioReq, /* bufs = */ Vec<BlockBuf>);
 
 struct Inner {
     waker: Option<Waker>,
     status: Status,
-    callback: Option<BioCompletionCallback>,
 }
 
 enum Status {
@@ -49,65 +163,15 @@ enum Status {
 }
 
 impl Inner {
-    fn new(callback: Option<BioCompletionCallback>) -> Self {
+    fn new() -> Self {
         Self {
             waker: None,
             status: Status::Init,
-            callback,
         }
     }
 }
 
 impl BioReq {
-    /// Create a read request for a block device.
-    pub fn new_read(
-        addr: BlockId,
-        bufs: Vec<BlockBuf>,
-        callback: Option<BioCompletionCallback>,
-    ) -> Result<Self> {
-        let type_ = BioType::Read;
-        Self::do_new(type_, addr, bufs, callback)
-    }
-
-    /// Create a write request for a block device.
-    pub fn new_write(
-        addr: BlockId,
-        bufs: Vec<BlockBuf>,
-        callback: Option<BioCompletionCallback>,
-    ) -> Result<Self> {
-        let type_ = BioType::Write;
-        Self::do_new(type_, addr, bufs, callback)
-    }
-
-    /// Create a flush request for a block device.
-    pub fn new_flush(callback: Option<BioCompletionCallback>) -> Result<Self> {
-        let type_ = BioType::Flush;
-        let addr = BlockId::max_value();
-        let bufs = Vec::new();
-        Self::do_new(type_, addr, bufs, callback)
-    }
-
-    fn do_new(
-        type_: BioType,
-        addr: BlockId,
-        bufs: Vec<BlockBuf>,
-        callback: Option<BioCompletionCallback>,
-    ) -> Result<Self> {
-        if addr.checked_add(bufs.len()).is_none() {
-            return Err(errno!(EINVAL, "addr overflow"));
-        }
-
-        let inner = Inner::new(callback);
-        let new_self = Self {
-            id: ObjectId::new(),
-            type_,
-            addr,
-            bufs: Mutex::new(bufs),
-            inner: Mutex::new(inner),
-        };
-        Ok(new_self)
-    }
-
     /// Returns a unique ID of the request.
     pub fn id(&self) -> u64 {
         self.id.get()
@@ -144,16 +208,25 @@ impl BioReq {
     }
 
     /// Take the buffers out of the request.
-    pub fn take_bufs(&self) -> Vec<BlockBuf> {
+    fn take_bufs(&self) -> Vec<BlockBuf> {
         let mut bufs = self.bufs.lock();
         let mut ret_bufs = Vec::new();
         core::mem::swap(&mut *bufs, &mut ret_bufs);
         ret_bufs
     }
 
-    /// Returns the number of block buffers.
+    /// Returns the number of buffers associated with the request.
+    ///
+    /// If the request is a flush, then the returned value is meaningless.
     pub fn num_bufs(&self) -> usize {
         self.bufs.lock().len()
+    }
+
+    /// Returns the number of blocks to read or write by this request.
+    ///
+    /// If the request is a flush, then the returned value is meaningless.
+    pub fn num_blocks(&self) -> usize {
+        self.num_blocks as usize
     }
 
     /// Returns the response to the request.
@@ -166,6 +239,17 @@ impl BioReq {
             Status::Completed(res) => Some(res),
             _ => None,
         }
+    }
+
+    /// Returns the extensions of the request.
+    ///
+    /// The extensions of a request is a set of objects that may be added, removed,
+    /// or accessed by block devices and their users. Implemented with `AnyMap`,
+    /// each of the extension objects must have a different type. To avoid
+    /// conflicts, it is recommened to use only private types for the extension
+    /// objects.
+    pub fn ext(&self) -> MutexGuard<AnyMap> {
+        self.ext.lock()
     }
 
     /// Update the status of the request to "completed" by giving the response
@@ -184,11 +268,10 @@ impl BioReq {
             Status::Submitted => {
                 let waker = inner.waker.take();
                 inner.status = Status::Completed(resp);
-                let callback = inner.callback.take();
                 drop(inner);
 
-                if let Some(callback) = callback {
-                    (callback)(self, resp);
+                if let Some(on_complete) = self.on_complete {
+                    (on_complete)(self, &resp);
                 }
                 if let Some(waker) = waker {
                     waker.wake();
@@ -211,6 +294,15 @@ impl BioReq {
     }
 }
 
+impl Drop for BioReq {
+    fn drop(&mut self) {
+        if let Some(on_drop) = self.on_drop {
+            let bufs = self.take_bufs();
+            (on_drop)(self, bufs);
+        }
+    }
+}
+
 impl fmt::Debug for BioReq {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = f.debug_struct("BioReq");
@@ -219,8 +311,10 @@ impl fmt::Debug for BioReq {
         if self.type_() == BioType::Read || self.type_() == BioType::Write {
             ds.field("addr", &self.addr());
             ds.field("num_bufs", &self.num_bufs());
+            ds.field("num_blocks", &self.num_blocks());
         }
         ds.field("resp", &self.response());
+        ds.field("ext", &*self.ext());
         ds.finish()
     }
 }

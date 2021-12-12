@@ -26,7 +26,7 @@ pub struct SyncIoDisk {
 }
 
 impl SyncIoDisk {
-    fn read(&self, req: &Arc<BioReq>) -> Result<()> {
+    fn do_read(&self, req: &Arc<BioReq>) -> Result<()> {
         if !self.can_read {
             return Err(errno!(EACCES, "read is not allowed"));
         }
@@ -44,11 +44,11 @@ impl SyncIoDisk {
         })?;
         drop(file);
 
-        assert!(read_len / BLOCK_SIZE == req.num_bufs());
+        assert!(read_len / BLOCK_SIZE == req.num_blocks());
         Ok(())
     }
 
-    fn write(&self, req: &Arc<BioReq>) -> Result<()> {
+    fn do_write(&self, req: &Arc<BioReq>) -> Result<()> {
         if !self.can_write {
             return Err(errno!(EACCES, "write is not allowed"));
         }
@@ -66,11 +66,11 @@ impl SyncIoDisk {
         })?;
         drop(file);
 
-        assert!(write_len / BLOCK_SIZE == req.num_bufs());
+        debug_assert!(write_len / BLOCK_SIZE == req.num_blocks());
         Ok(())
     }
 
-    fn flush(&self) -> Result<()> {
+    fn do_flush(&self) -> Result<()> {
         if !self.can_write {
             return Err(errno!(EACCES, "flush is not allowed"));
         }
@@ -84,7 +84,7 @@ impl SyncIoDisk {
 
     fn get_range_in_bytes(&self, req: &Arc<BioReq>) -> Result<(usize, usize)> {
         let begin_block = req.addr();
-        let end_block = begin_block + req.num_bufs();
+        let end_block = begin_block + req.num_blocks();
         if end_block > self.total_blocks {
             return Err(errno!(EINVAL, "invalid block range"));
         }
@@ -106,9 +106,9 @@ impl BlockDevice for SyncIoDisk {
         let req = submission.req();
         let type_ = req.type_();
         let res = match type_ {
-            BioType::Read => self.read(req),
-            BioType::Write => self.write(req),
-            BioType::Flush => self.flush(),
+            BioType::Read => self.do_read(req),
+            BioType::Write => self.do_write(req),
+            BioType::Flush => self.do_flush(),
         };
 
         // Update the status of req to completed and set the response
@@ -149,7 +149,7 @@ impl HostDisk for SyncIoDisk {
 impl Drop for SyncIoDisk {
     fn drop(&mut self) {
         // Ensure all data are peristed before the disk is dropped
-        let _ = self.flush();
+        let _ = self.do_flush();
     }
 }
 

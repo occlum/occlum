@@ -18,10 +18,15 @@ mod prelude;
 pub mod util;
 
 pub const BLOCK_SIZE: usize = 4096;
+pub const BLOCK_SIZE_LOG2: usize = 12;
 
 pub use self::block_buf::BlockBuf;
 pub use self::block_device::BlockDevice;
-pub use self::block_io::{BioCompletionCallback, BioReq, BioResp, BioSubmission, BioType};
+//pub use self::block_device_ext::BlockDeviceExt;
+pub use self::block_io::{
+    BioReq, BioReqBuilder, BioReqOnCompleteFn, BioReqOnDropFn, BioResp, BioSubmission, BioType,
+};
+pub use self::util::anymap::{Any, AnyMap};
 
 // This crate assumes the machine is 64-bit to use u64 and usize interchangably.
 use static_assertions::assert_eq_size;
