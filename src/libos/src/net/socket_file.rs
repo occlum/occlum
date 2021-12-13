@@ -346,7 +346,7 @@ impl SocketFile {
         addr: Option<AnyAddr>,
         flags: SendFlags,
     ) -> Result<usize> {
-        match &self.socket {
+        let res = match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => {
                 if addr.is_some() {
                     return_errno!(EISCONN, "addr should be none");
@@ -378,7 +378,12 @@ impl SocketFile {
             _ => {
                 return_errno!(EINVAL, "sendmsg is not supported");
             }
+        };
+        if res.has_errno(EPIPE) && !flags.contains(SendFlags::MSG_NOSIGNAL) {
+            crate::signal::do_tkill(current!().tid(), crate::signal::SIGPIPE.as_u8() as i32);
         }
+
+        res
     }
 
     pub fn addr(&self) -> Result<AnyAddr> {

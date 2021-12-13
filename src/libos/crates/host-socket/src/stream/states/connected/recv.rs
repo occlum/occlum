@@ -51,7 +51,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         let mut inner = self.receiver.inner.lock().unwrap();
 
         if !flags.is_empty() && flags != RecvFlags::MSG_DONTWAIT {
-            todo!("Support other flags");
+            todo!("Support other flags: {:?}", flags);
         }
 
         // Copy data from the recv buffer to the bufs

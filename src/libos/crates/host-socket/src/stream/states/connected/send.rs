@@ -46,8 +46,10 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
     fn try_sendmsg(self: &Arc<Self>, bufs: &[&[u8]], flags: SendFlags) -> Result<usize> {
         let mut inner = self.sender.inner.lock().unwrap();
 
-        if !flags.is_empty() && flags != SendFlags::MSG_DONTWAIT {
-            todo!("Support other flags");
+        if !flags.is_empty()
+            && flags.intersects(!(SendFlags::MSG_DONTWAIT | SendFlags::MSG_NOSIGNAL))
+        {
+            todo!("Support other flags: {:?}", flags);
         }
 
         // Check for error condition before write.
