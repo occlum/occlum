@@ -8,3 +8,11 @@ pub mod test;
 pub fn unbox<T: Sized>(value: Box<T>) -> T {
     *value
 }
+
+pub(crate) const fn align_down(x: usize, align: usize) -> usize {
+    (x / align) * align
+}
+
+pub(crate) const fn align_up(x: usize, align: usize) -> usize {
+    ((x + align - 1) / align) * align
+}

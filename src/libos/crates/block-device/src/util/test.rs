@@ -9,7 +9,9 @@ macro_rules! gen_unit_tests {
     ($setup:ident, $teardown:ident) => {
         use std::sync::Arc;
         use $crate::util::test::check_disk_filled_with_val;
-        use $crate::{BioReq, BioReqBuilder, BioType, BlockBuf, BlockDevice, BLOCK_SIZE};
+        use $crate::{
+            BioReq, BioReqBuilder, BioType, BlockBuf, BlockDevice, BlockDeviceExt, BLOCK_SIZE,
+        };
 
         // Check a new disk is initialized with zeros.
         #[test]
@@ -44,7 +46,7 @@ macro_rules! gen_unit_tests {
                 let req = BioReqBuilder::new(BioType::Write)
                     .addr(0)
                     .bufs(bufs)
-                    .on_drop(|req: &BioReq, mut bufs: Vec<BlockBuf>| {
+                    .on_drop(|_req: &BioReq, mut bufs: Vec<BlockBuf>| {
                         // Free the boxed slice that we allocated before
                         bufs.drain(..).for_each(|buf| {
                             // Safety. BlockBuffer is created with from_boxed
@@ -65,11 +67,32 @@ macro_rules! gen_unit_tests {
                 $teardown(disk);
             });
         }
+
+        // Write a short message and then read it back
+        #[test]
+        fn write_read_partial_blocks() {
+            async_rt::task::block_on(async move {
+                let disk = $setup();
+
+                for offset in 0..BLOCK_SIZE {
+                    let msg = b"hell_world!!!";
+                    let len = disk.write(offset, msg).await.unwrap();
+                    assert!(len == msg.len(), "unexpected write len");
+
+                    let mut read_buf = unsafe { Box::new_uninit_slice(msg.len()).assume_init() };
+                    let len = disk.read(offset, &mut read_buf).await.unwrap();
+                    assert!(len == msg.len());
+                    assert!(&*read_buf == msg, "unexpected read len");
+                }
+
+                $teardown(disk);
+            });
+        }
     };
 }
 
 use crate::prelude::*;
-use crate::{BioReq, BioReqBuilder, BioType, BlockBuf, BlockDevice, BLOCK_SIZE};
+use crate::{BioReq, BioReqBuilder, BioType, BlockBuf, BlockDevice};
 
 /// Check whether a disk is filled with a given byte value.
 pub async fn check_disk_filled_with_val(disk: &dyn BlockDevice, val: u8) -> Result<()> {
@@ -80,7 +103,7 @@ pub async fn check_disk_filled_with_val(disk: &dyn BlockDevice, val: u8) -> Resu
     let req = BioReqBuilder::new(BioType::Read)
         .addr(0)
         .bufs(bufs)
-        .on_drop(|req: &BioReq, mut bufs: Vec<BlockBuf>| {
+        .on_drop(|_req: &BioReq, mut bufs: Vec<BlockBuf>| {
             // Free the boxed slice that we allocated before
             bufs.drain(..).for_each(|buf| {
                 // Safety. BlockBuffer is created with from_boxed

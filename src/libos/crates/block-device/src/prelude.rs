@@ -6,6 +6,6 @@ pub(crate) use errno::prelude::{Errno::*, Result, *};
 pub(crate) use spin::mutex::{Mutex, MutexGuard};
 
 pub use crate::{
-    BioReq, BioResp, BioSubmission, BioType, BlockBuf, BlockDevice, BlockId, BLOCK_SIZE,
-    BLOCK_SIZE_LOG2,
+    BioReq, BioReqBuilder, BioResp, BioSubmission, BioType, BlockBuf, BlockDevice, BlockId,
+    BLOCK_SIZE, BLOCK_SIZE_LOG2,
 };

@@ -22,7 +22,7 @@ impl MemDisk {
 }
 
 impl MemDisk {
-    fn read(&self, req: &Arc<BioReq>) -> Result<()> {
+    fn do_read(&self, req: &Arc<BioReq>) -> Result<()> {
         let (begin_offset, _end_offset) = self.get_range_in_bytes(&req)?;
 
         let disk = self.disk.lock();
@@ -40,7 +40,7 @@ impl MemDisk {
         Ok(())
     }
 
-    fn write(&self, req: &Arc<BioReq>) -> Result<()> {
+    fn do_write(&self, req: &Arc<BioReq>) -> Result<()> {
         let (begin_offset, _end_offset) = self.get_range_in_bytes(&req)?;
 
         let mut disk = self.disk.lock();
@@ -56,7 +56,7 @@ impl MemDisk {
         Ok(())
     }
 
-    fn flush(&self, _req: &Arc<BioReq>) -> Result<()> {
+    fn do_flush(&self, _req: &Arc<BioReq>) -> Result<()> {
         // Do nothing
         Ok(())
     }
@@ -85,9 +85,9 @@ impl BlockDevice for MemDisk {
         let req = submission.req();
         let type_ = req.type_();
         let res = match type_ {
-            BioType::Read => self.read(req),
-            BioType::Write => self.write(req),
-            BioType::Flush => self.flush(req),
+            BioType::Read => self.do_read(req),
+            BioType::Write => self.do_write(req),
+            BioType::Flush => self.do_flush(req),
         };
 
         // Update the status of req to completed and set the response

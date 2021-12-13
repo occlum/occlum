@@ -18,7 +18,7 @@ impl BlockBuf {
     /// The given pointer must point to a valid memory region of the size of
     /// a block and the block buffer should be the only way to mutate the memory.
     #[inline]
-    pub unsafe fn from_ptr(ptr: NonNull<u8>, len: usize) -> Self {
+    pub unsafe fn from_raw_parts(ptr: NonNull<u8>, len: usize) -> Self {
         debug_assert!(
             len <= isize::MAX as usize,
             "attempt to create a buffer that covers at least half of the address space"
