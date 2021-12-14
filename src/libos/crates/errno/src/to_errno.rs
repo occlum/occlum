@@ -125,6 +125,7 @@ mod if_occlum {
                 FsError::NameTooLong => ENAMETOOLONG,
                 FsError::FileTooBig => EFBIG,
                 FsError::OpNotSupported => EOPNOTSUPP,
+                FsError::NotMountPoint => ESRMNT,
             }
         }
     }
