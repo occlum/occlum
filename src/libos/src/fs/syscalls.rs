@@ -615,12 +615,11 @@ pub async fn do_statfs(path: *const i8, statfs_buf: *mut Statfs) -> Result<isize
     Ok(0)
 }
 
-/*
-pub fn do_sendfile(
+pub async fn do_sendfile(
     out_fd: FileDesc,
     in_fd: FileDesc,
     offset_ptr: *mut off_t,
-    count: usize,
+    count: size_t,
 ) -> Result<isize> {
     let offset = if offset_ptr.is_null() {
         None
@@ -628,13 +627,16 @@ pub fn do_sendfile(
         from_user::check_mut_ptr(offset_ptr)?;
         Some(unsafe { offset_ptr.read() })
     };
+    if count < 0 {
+        return_errno!(EINVAL, "count is negative");
+    }
 
-    let (len, offset) = file_ops::do_sendfile(out_fd, in_fd, offset, count)?;
+    let (written_len, read_offset) =
+        file_ops::do_sendfile(out_fd, in_fd, offset, count as usize).await?;
     if !offset_ptr.is_null() {
         unsafe {
-            offset_ptr.write(offset as off_t);
+            offset_ptr.write(read_offset as off_t);
         }
     }
-    Ok(len as isize)
+    Ok(written_len as isize)
 }
-*/

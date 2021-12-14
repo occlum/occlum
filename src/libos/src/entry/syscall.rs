@@ -14,9 +14,9 @@ use crate::fs::{
     do_ftruncate, do_getcwd, do_getdents, do_getdents64, do_ioctl, do_lchown, do_link, do_linkat,
     do_lseek, do_lstat, do_mkdir, do_mkdirat, do_mount_rootfs, do_open, do_openat, do_pipe,
     do_pipe2, do_pread, do_pwrite, do_read, do_readlink, do_readlinkat, do_readv, do_rename,
-    do_renameat, do_rmdir, do_stat, do_statfs, do_symlink, do_symlinkat, do_sync, do_truncate,
-    do_umask, do_unlink, do_unlinkat, do_write, do_writev, iovec_t, FileDesc, FileRef, StatBuf,
-    Statfs,
+    do_renameat, do_rmdir, do_sendfile, do_stat, do_statfs, do_symlink, do_symlinkat, do_sync,
+    do_truncate, do_umask, do_unlink, do_unlinkat, do_write, do_writev, iovec_t, FileDesc, FileRef,
+    StatBuf, Statfs,
 };
 /*
 use crate::fs::{
@@ -212,6 +212,7 @@ macro_rules! process_syscall_table_with_callback {
             (Readv = 19) => do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32),
             (Pread64 = 17) => do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: off_t),
             (Lseek = 8) => do_lseek(fd: FileDesc, offset: off_t, whence: i32),
+            (Sendfile = 40) => do_sendfile(out_fd: FileDesc, in_fd: FileDesc, offset_ptr: *mut off_t, count: size_t),
             (Fcntl = 72) => do_fcntl(fd: FileDesc, cmd: u32, arg: u64),
             (Ioctl = 16) => do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8),
 
