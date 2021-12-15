@@ -22,14 +22,13 @@ impl EventCounter {
         }
     }
 
-    pub async fn read(&self) -> u64 {
+    pub async fn read(&self) -> Result<u64> {
         waiter_loop!(&self.waiters, {
             let val = self.counter.swap(0, Ordering::Relaxed);
             if val > 0 {
-                return val;
+                return Ok(val);
             }
         })
-        .unwrap()
     }
 
     pub async fn read_timeout<T: BorrowMut<Duration>>(

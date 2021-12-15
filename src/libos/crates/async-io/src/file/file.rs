@@ -114,7 +114,7 @@ impl<F: File + ?Sized> Async<F> {
                     return res;
                 }
             }
-            poller.wait().await;
+            poller.wait().await?;
         }
     }
 
@@ -138,7 +138,7 @@ impl<F: File + ?Sized> Async<F> {
                     return res;
                 }
             }
-            poller.wait().await;
+            poller.wait().await?;
         }
     }
 

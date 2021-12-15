@@ -160,24 +160,28 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus, new_parent_ref: Opt
         process_inner.exit(term_status, &idle_ref, &mut idle_inner, &parent);
 
         //Send SIGCHLD to parent
-        send_sigchld_to(&parent);
+        let signal = Box::new(KernelSignal::new(SigNum::from(SIGCHLD)));
+        let mut sig_queues = parent.sig_queues().write().unwrap();
+        sig_queues.enqueue(signal);
+
+        process.sig_waiters().wake_all();
+
+        if let Some(thread) = parent_inner.leader_thread() {
+            if let Some(task) = thread.task() {
+                task.tirqs().put_req(SIGCHLD.as_tirq_line());
+            }
+        }
+
+        // Notify the parent that this child process's status has changed
+        parent.exit_waiters().wake_all();
 
         drop(idle_inner);
         drop(parent_inner);
         drop(process_inner);
-
-        // Notify the parent that this child process's status has changed
-        parent.exit_waiters().wake_all();
     }
 
     // Notify the host threads that wait the status change of this process
     wake_host(&process, term_status);
-}
-
-fn send_sigchld_to(parent: &Arc<Process>) {
-    let signal = Box::new(KernelSignal::new(SigNum::from(SIGCHLD)));
-    let mut sig_queues = parent.sig_queues().write().unwrap();
-    sig_queues.enqueue(signal);
 }
 
 fn wake_host(process: &ProcessRef, term_status: TermStatus) {

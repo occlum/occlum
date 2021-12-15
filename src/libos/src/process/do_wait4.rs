@@ -11,7 +11,8 @@ pub async fn do_wait4(child_filter: &ProcessFilter, options: WaitOptions) -> Res
     let thread = current!();
     let process = thread.process();
 
-    waiter_loop!(process.exit_waiters(), {
+    let mut timeout = None::<core::time::Duration>;
+    waiter_loop!(process.exit_waiters(), timeout, false, {
         // Lock order: always lock parent then child to avoid deadlock
         let mut process_inner = process.inner();
 

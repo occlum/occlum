@@ -73,11 +73,7 @@ use super::{Waiter, WaiterQueue};
 /// ```
 #[macro_export]
 macro_rules! waiter_loop {
-    ($waiter_queue:expr, $loop_body:block) => {{
-        let mut timeout = None::<core::time::Duration>;
-        $crate::waiter_loop!($waiter_queue, timeout, $loop_body)
-    }};
-    ($waiter_queue:expr, $timeout:expr, $loop_body:block) => {{
+    ($waiter_queue:expr, $timeout:expr, $interruptable:expr, $loop_body:block) => {{
         use core::borrow::BorrowMut;
         use $crate::wait::{AutoWaiter, WaiterQueue};
 
@@ -120,7 +116,10 @@ macro_rules! waiter_loop {
                     };
                     // If the timeout expires or the task gets interrupted, exit loop.
                     if let Err(e) = wait_res {
-                        break Err(e);
+                        let interruptable: bool = $interruptable;
+                        if interruptable || e.errno() != EINTR {
+                            break Err(e);
+                        }
                     }
                     // Prepare the waiter so that we can try the loop body again
                     waiter.reset();
@@ -132,6 +131,13 @@ macro_rules! waiter_loop {
                 $loop_body
             }
         }
+    }};
+    ($waiter_queue:expr, $loop_body:block) => {{
+        let mut timeout = None::<core::time::Duration>;
+        $crate::waiter_loop!($waiter_queue, timeout, true, $loop_body)
+    }};
+    ($waiter_queue:expr, $timeout:expr, $loop_body:block) => {{
+        $crate::waiter_loop!($waiter_queue, $timeout, true, $loop_body)
     }};
 }
 

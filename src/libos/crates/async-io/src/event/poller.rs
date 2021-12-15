@@ -212,8 +212,8 @@ impl Poller {
     }
 
     /// Wait until there are any interesting events happen since last `wait`.
-    pub async fn wait(&self) {
-        self.inner.event_counter.read().await;
+    pub async fn wait(&self) -> Result<u64> {
+        self.inner.event_counter.read().await
     }
 
     /// Wait until there are any interesting events happen since last `wait`, or reach timeout.

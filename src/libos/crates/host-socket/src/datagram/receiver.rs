@@ -43,7 +43,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
             let mask = Events::IN;
             let events = self.common.pollee().poll(mask, poller.as_mut());
             if events.is_empty() {
-                poller.as_ref().unwrap().wait().await;
+                poller.as_ref().unwrap().wait().await?;
             }
         }
     }
