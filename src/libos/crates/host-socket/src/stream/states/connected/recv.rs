@@ -22,14 +22,34 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             return Ok(0);
         }
 
+        let mut total_received = 0;
+        let mut iov_buffer_index = 0;
+        let mut iov_buffer_offset = 0;
+
         // Initialize the poller only when needed
         let mut poller = None;
         loop {
             // Attempt to read
-            let res = self.try_recvmsg(bufs, flags);
-            if !res.has_errno(EAGAIN) {
-                return res;
-            }
+            let res = self.try_recvmsg(bufs, flags, iov_buffer_index, iov_buffer_offset);
+
+            match res {
+                Ok((received_size, index, offset)) => {
+                    total_received += received_size;
+
+                    if !flags.contains(RecvFlags::MSG_WAITALL) || total_received == total_len {
+                        return Ok(total_received);
+                    } else {
+                        // save the index and offset for the next round
+                        iov_buffer_index = index;
+                        iov_buffer_offset = offset;
+                    }
+                }
+                Err(e) => {
+                    if e.errno() != EAGAIN {
+                        return Err(e);
+                    }
+                }
+            };
 
             if self.common.nonblocking() || flags.contains(RecvFlags::MSG_DONTWAIT) {
                 return_errno!(EAGAIN, "no data are present to be received");
@@ -47,28 +67,49 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         }
     }
 
-    fn try_recvmsg(self: &Arc<Self>, bufs: &mut [&mut [u8]], flags: RecvFlags) -> Result<usize> {
+    fn try_recvmsg(
+        self: &Arc<Self>,
+        bufs: &mut [&mut [u8]],
+        flags: RecvFlags,
+        iov_buffer_index: usize,
+        iov_buffer_offset: usize,
+    ) -> Result<(usize, usize, usize)> {
         let mut inner = self.receiver.inner.lock().unwrap();
 
-        if !flags.is_empty() && flags != RecvFlags::MSG_DONTWAIT {
+        if !flags.is_empty()
+            && flags.intersects(!(RecvFlags::MSG_DONTWAIT | RecvFlags::MSG_WAITALL))
+        {
             todo!("Support other flags: {:?}", flags);
         }
 
-        // Copy data from the recv buffer to the bufs
-        let nbytes = {
+        let res = {
             let mut total_consumed = 0;
-            for buf in bufs {
-                let this_consumed = inner.recv_buf.consume(buf);
+            let mut iov_buffer_index = iov_buffer_index;
+            let mut iov_buffer_offset = iov_buffer_offset;
+
+            // save the received data from bufs[iov_buffer_index][iov_buffer_offset..]
+            for (_, buf) in bufs.iter_mut().skip(iov_buffer_index).enumerate() {
+                let this_consumed = inner.recv_buf.consume(&mut buf[iov_buffer_offset..]);
                 if this_consumed == 0 {
                     break;
                 }
                 total_consumed += this_consumed;
+
+                // if the buffer is not full, then the try_recvmsg will be used again
+                // next time, the data will be stored from the offset
+                if this_consumed < buf[iov_buffer_offset..].len() {
+                    iov_buffer_offset += this_consumed;
+                    break;
+                } else {
+                    iov_buffer_index += 1;
+                    iov_buffer_offset = 0;
+                }
             }
-            total_consumed
+            (total_consumed, iov_buffer_index, iov_buffer_offset)
         };
 
         if inner.end_of_file {
-            return Ok(nbytes);
+            return Ok(res);
         }
 
         if inner.recv_buf.is_empty() {
@@ -76,9 +117,9 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             self.common.pollee().del_events(Events::IN);
         }
 
-        if nbytes > 0 {
+        if res.0 > 0 {
             self.do_recv(&mut inner);
-            return Ok(nbytes);
+            return Ok(res);
         }
 
         // Only when there are no data available in the recv buffer, shall we check
