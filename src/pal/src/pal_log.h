@@ -8,7 +8,7 @@
 #define PAL_INFO(fmt, ...) \
     fprintf(stderr, "[INFO] occlum-pal: " fmt " (line %d, file %s)\n", ##__VA_ARGS__, __LINE__, __FILE__)
 #define PAL_WARN(fmt, ...) \
-    fprintf(stderr, "[WARM] occlum-pal: " fmt " (line %d, file %s)\n", ##__VA_ARGS__, __LINE__, __FILE__)
+    fprintf(stderr, "[WARN] occlum-pal: " fmt " (line %d, file %s)\n", ##__VA_ARGS__, __LINE__, __FILE__)
 #define PAL_ERROR(fmt, ...) \
     fprintf(stderr, "[ERROR] occlum-pal: " fmt " (line %d, file %s)\n", ##__VA_ARGS__, __LINE__, __FILE__)
 
