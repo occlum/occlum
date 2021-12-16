@@ -472,6 +472,18 @@ impl IoUring {
         self.ring.start_enter_syscall_thread();
     }
 
+    unsafe fn push(&self, entry: SqEntry) {
+        loop {
+            if self.ring.submission().push(entry.clone()).is_err() {
+                if self.ring.enter(1, 1, 0, None).is_err() {
+                    panic!("sq broken");
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
     // Push a submission entry to io_uring and return a corresponding handle.
     //
     // Safety. All resources referenced by the entry must be valid before its completion.
@@ -497,9 +509,7 @@ impl IoUring {
             handle
         };
 
-        if self.ring.submission().push(entry).is_err() {
-            panic!("sq must be large enough");
-        }
+        self.push(entry);
 
         io_handle
     }
@@ -519,9 +529,7 @@ impl IoUring {
         let mut entry = opcode::AsyncCancel::new(target_token_key).build();
         entry = entry.user_data(IoUring::CANCEL_TOKEN_KEY);
 
-        if self.ring.submission().push(entry).is_err() {
-            panic!("sq must be large enough");
-        }
+        self.push(entry);
     }
 }
 
