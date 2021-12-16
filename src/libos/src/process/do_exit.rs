@@ -53,6 +53,7 @@ fn exit_thread(term_status: TermStatus) {
         }
         futex_wake(ctid_ptr.as_ptr() as *const i32, 1);
     }
+    thread.set_clear_ctid(None);
 
     // Notify waiters that the owner of robust futex has died.
     thread.wake_robust_list();
