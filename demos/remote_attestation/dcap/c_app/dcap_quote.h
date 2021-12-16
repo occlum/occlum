@@ -10,15 +10,19 @@
 #include "sgx_pce.h"
 #include "sgx_error.h"
 
-extern "C" void *dcap_quote_open(void);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-extern "C" uint32_t dcap_get_quote_size(void *handle);
+void *dcap_quote_open(void);
 
-extern "C" int32_t dcap_generate_quote(void *handle, uint8_t *quote_buf, const sgx_report_data_t *report_data);
+uint32_t dcap_get_quote_size(void *handle);
 
-extern "C" uint32_t dcap_get_supplemental_data_size(void *handle);
+int32_t dcap_generate_quote(void *handle, uint8_t *quote_buf, const sgx_report_data_t *report_data);
 
-extern "C" int32_t dcap_verify_quote(void *handle,
+uint32_t dcap_get_supplemental_data_size(void *handle);
+
+int32_t dcap_verify_quote(void *handle,
                           const uint8_t *quote_buf,
                           uint32_t quote_size,
                           uint32_t *collateral_expiration_status,
@@ -27,4 +31,8 @@ extern "C" int32_t dcap_verify_quote(void *handle,
                           uint8_t *supplemental_data);
 
 
-extern "C" void dcap_quote_close(void *handle);
+void dcap_quote_close(void *handle);
+
+#ifdef __cplusplus
+}
+#endif
