@@ -35,7 +35,7 @@ int connect_with_child(int port, int *child_pid) {
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(port);
-    ret = bind(listen_fd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+    ret = bind(listen_fd, (struct sockaddr *)&servaddr, sizeof(servaddr));
     if (ret < 0) {
         close(listen_fd);
         THROW_ERROR("bind socket failed");
@@ -56,7 +56,7 @@ int connect_with_child(int port, int *child_pid) {
         THROW_ERROR("spawn client process error");
     }
 
-    int connected_fd = accept(listen_fd, (struct sockaddr *) NULL, NULL);
+    int connected_fd = accept(listen_fd, (struct sockaddr *)NULL, NULL);
     if (connected_fd < 0) {
         close(listen_fd);
         THROW_ERROR("accept socket error");
@@ -103,8 +103,8 @@ int server_recvmsg(int client_fd) {
     struct msghdr msg;
     struct iovec iov[3];
 
-    msg.msg_name  = NULL;
-    msg.msg_namelen  = 0;
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
     iov[0].iov_base = buf[0];
     iov[0].iov_len = buf_size;
     iov[1].iov_base = buf[1];
@@ -157,14 +157,14 @@ int server_connectionless_recvmsg() {
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(9900);
-    ret = bind(sock, (struct sockaddr *) &servaddr, sizeof(servaddr));
+    ret = bind(sock, (struct sockaddr *)&servaddr, sizeof(servaddr));
     if (ret < 0) {
         close(sock);
         THROW_ERROR("bind socket failed");
     }
 
-    msg.msg_name  = &clientaddr;
-    msg.msg_namelen  = sizeof(clientaddr);
+    msg.msg_name = &clientaddr;
+    msg.msg_namelen = sizeof(clientaddr);
     iov[0].iov_base = buf;
     iov[0].iov_len = buf_size;
     msg.msg_iov = iov;
@@ -232,7 +232,9 @@ int test_send_recv() {
     }
 
     ret = server_recv(client_fd);
-    if (ret < 0) { return -1; }
+    if (ret < 0) {
+        return -1;
+    }
 
     ret = wait_for_child_exit(child_pid);
 
@@ -252,7 +254,9 @@ int test_sendmsg_recvmsg() {
     }
 
     ret = server_recvmsg(client_fd);
-    if (ret < 0) { return -1; }
+    if (ret < 0) {
+        return -1;
+    }
 
     ret = wait_for_child_exit(child_pid);
 
@@ -272,7 +276,9 @@ int test_sendmmsg_recvmsg() {
     }
 
     ret = server_recvmsg(client_fd);
-    if (ret < 0) { return -1; }
+    if (ret < 0) {
+        return -1;
+    }
 
     ret = wait_for_child_exit(child_pid);
 
@@ -299,7 +305,9 @@ int test_sendmsg_recvmsg_connectionless() {
     }
 
     ret = server_connectionless_recvmsg();
-    if (ret < 0) { return -1; }
+    if (ret < 0) {
+        return -1;
+    }
 
     write(server_sync_fd, SYNC_MSG, strlen(SYNC_MSG));
 
@@ -343,8 +351,8 @@ int test_poll_events_unchanged() {
     socks[0] = socket(AF_INET, SOCK_STREAM, 0);
     socks[1] = socket(AF_INET, SOCK_STREAM, 0);
     struct pollfd pollfds[] = {
-        { .fd = socks[0], .events = POLLIN },
-        { .fd = socks[1], .events = POLLIN },
+        {.fd = socks[0], .events = POLLIN},
+        {.fd = socks[1], .events = POLLIN},
     };
 
     ret = poll(pollfds, 2, 0);
@@ -369,7 +377,7 @@ int test_poll() {
     }
 
     struct pollfd polls[] = {
-        { .fd = client_fd, .events = POLLIN }
+        {.fd = client_fd, .events = POLLIN}
     };
     int ret = poll(polls, 1, -1);
     if (ret <= 0) {
@@ -440,7 +448,7 @@ int test_getname() {
         THROW_ERROR("getsockname() failed");
     }
     printf("[socket with bind] address: %s\n", inet_ntoa(myaddr.sin_addr));
-    printf("[socket with bind] port: %d\n", (int) ntohs(myaddr.sin_port));
+    printf("[socket with bind] port: %d\n", (int)ntohs(myaddr.sin_port));
 
     if (server_getpeername(client_fd) < 0) {
         THROW_ERROR("server_getpeername failed");
@@ -461,7 +469,7 @@ int server_getpeername(int client_fd) {
         THROW_ERROR("getpeername() failed");
     }
     printf("Peer address: %s\n", inet_ntoa(peer.sin_addr));
-    printf("Peer port: %d\n", (int) ntohs(peer.sin_port));
+    printf("Peer port: %d\n", (int)ntohs(peer.sin_port));
 
     struct sockaddr_in peer2;
     int peer_len2 = sizeof(peer2);
@@ -485,7 +493,7 @@ int test_getname_without_bind() {
         THROW_ERROR("getsockname() failed");
     }
     printf("[socket without bind] address: %s\n", inet_ntoa(myaddr.sin_addr));
-    printf("[socket without bind] port: %d\n", (int) ntohs(myaddr.sin_port));
+    printf("[socket without bind] port: %d\n", (int)ntohs(myaddr.sin_port));
 
     struct sockaddr_in peer;
     int peer_len = sizeof(peer);
@@ -524,7 +532,169 @@ int test_shutdown() {
     return 0;
 }
 
+// the MSG_WAITALL test
+char *msg[] = {"This is message 1", "...and this is message 2", "and this is the last message."};
+
+void *connection_routine(void *arg) {
+    int socketFd = *((int *)arg);
+    sleep(1);
+
+    int msg_count = 0;
+    for (;;) {
+        uint16_t len;
+        int byteCount = recv(socketFd, &len, sizeof(len), MSG_WAITALL);
+        if (byteCount < 1) {
+            break;
+        }
+        char buff[1024] = {
+            0,
+        };
+        byteCount = recv(socketFd, buff, ntohs(len), MSG_WAITALL);
+        if (byteCount < 1) {
+            break;
+        }
+
+        if (strncmp(msg[msg_count], buff, sizeof(msg[msg_count])) != 0) {
+            printf("message is wrong!\n");
+            return NULL;
+        }
+
+        // printf("%s\n", msg[msg_count]);
+
+        msg_count++;
+        if (msg_count == 3) {
+            break;
+        }
+    }
+
+    close(socketFd);
+    return NULL;
+}
+
+void *server_routine(void *arg) {
+    uint16_t port = *((uint16_t *)arg);
+
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        printf("server_routine, error creating socket");
+        return NULL;
+    }
+
+    struct sockaddr_in serv_addr = {};
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(port);
+
+    if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        printf("server_routine, error binding socket");
+        return NULL;
+    }
+
+    if (listen(sockfd, 5) != 0) {
+        printf("server_routine, error in listen");
+        return NULL;
+    }
+
+    for (;;) {
+        struct sockaddr_in saddr;
+        unsigned int saddr_ln = sizeof(saddr);
+
+        int newsock = accept(sockfd, (struct sockaddr *)&saddr, &saddr_ln);
+        if (newsock == -1) {
+            printf("server_routine, error in accept");
+            return NULL;
+        }
+        pthread_t child_tid;
+        if (pthread_create(&child_tid, NULL, connection_routine, (void *)&newsock)) {
+            printf("Failure creating connection thread");
+            return NULL;
+        }
+
+        pthread_join(child_tid, NULL);
+        break;
+    }
+
+    return NULL;
+}
+
+/*
+ * NOT A GOOD IDEA for general use.
+ * But to validate the receiver's use of MSG_WAITALL,
+ * send one byte at a time.
+ */
+void writeMsg(int socketFd, size_t ln, char msg[]) {
+    uint16_t netLn = htons(ln);
+    send(socketFd, &netLn, 1, 0);
+    char *arr = (char *)&netLn;
+    send(socketFd, &arr[1], 1, 0);
+    for (unsigned int i = 0; i < ln; i++) {
+        send(socketFd, &msg[i], 1, 0);
+    }
+}
+
+void *client_routine(void *arg) {
+    struct timespec ts = {0, 1};
+    nanosleep(&ts, NULL);
+
+    uint16_t port = *((uint16_t *)arg);
+    int sockFd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockFd < 0) {
+        printf("connectToTcp: error in socket(), %s\n", strerror(errno));
+        return (void *) -1;
+    }
+
+    struct sockaddr_in sockAdr;
+
+    memset(&sockAdr, 0, sizeof(struct sockaddr_in));
+    sockAdr.sin_port = htons(port);
+    sockAdr.sin_family = AF_INET;
+    sockAdr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+    int connRtn = connect(sockFd, (struct sockaddr *)&sockAdr,
+                          sizeof(sockAdr));
+
+    if (connRtn != 0) {
+        printf("clientRoutine: error in connec");
+        return NULL;
+    }
+
+    writeMsg(sockFd, sizeof(msg[0]), msg[0]);
+    writeMsg(sockFd, sizeof(msg[1]), msg[1]);
+    writeMsg(sockFd, sizeof(msg[2]), msg[2]);
+
+    shutdown(sockFd, SHUT_RDWR);
+
+    close(sockFd);
+
+    return NULL;
+}
+
+int test_MSG_WAITALL() {
+    const uint16_t DEFAULT_PORT = 54321;
+    uint16_t port = DEFAULT_PORT;
+
+    pthread_t server_tid;
+    if (pthread_create(&server_tid, NULL, server_routine, (void *)&port)) {
+        THROW_ERROR("Failure creating server thread");
+    }
+
+    struct timespec ts = {0, 5000000};
+    nanosleep(&ts, NULL);
+
+    pthread_t client_tid;
+    if (pthread_create(&client_tid, NULL, client_routine, (void *)&port)) {
+        THROW_ERROR("Failure creating client thread");
+    }
+
+    pthread_join(client_tid, NULL);
+    pthread_join(server_tid, NULL);
+
+    return 0;
+}
+
 static test_case_t test_cases[] = {
+    TEST_CASE(test_MSG_WAITALL),
     TEST_CASE(test_read_write),
     TEST_CASE(test_send_recv),
     TEST_CASE(test_sendmsg_recvmsg),
