@@ -31,6 +31,9 @@ async fn __main_loop(current: ThreadRef, init_cpu_state: CpuContext) {
     // check is added here to handle such rare race conditions.
     crate::process::handle_force_exit();
 
+    static YIELD_INTERVAL: u64 = 64; // same as DEFAULT_BUDGET
+    let mut rounds: u64 = 0;
+
     while current.status() != ThreadStatus::Exited {
         // Continue the execution in the user space
         let fault = unsafe { context_switch::switch_to_user() };
@@ -44,6 +47,13 @@ async fn __main_loop(current: ThreadRef, init_cpu_state: CpuContext) {
         crate::signal::deliver_signal();
 
         crate::process::handle_force_exit();
+
+        // If app check system info in a user level spin lock, the whole system would hung
+        // workaround this issue, the final solution should update the scheduler
+        rounds += 1;
+        if rounds % YIELD_INTERVAL == 0 {
+            async_rt::sched::yield_().await;
+        }
     }
 }
 
