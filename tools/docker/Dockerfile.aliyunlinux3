@@ -1,0 +1,199 @@
+FROM alpine:3.11 AS alpine
+
+RUN apk update && \
+    apk --no-cache add openjdk11 openjdk8 --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
+
+FROM registry.cn-hangzhou.aliyuncs.com/alinux/alinux3:3.210714.1
+
+LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
+
+#The default shell for the RUN instruction is ["/bin/sh", "-c"], which sometimes cause unexpected error
+#for example "source a_file". Use bash as default shell instead.
+SHELL ["/bin/bash", "-c"]
+
+RUN yum install -y --nogpgcheck \
+        astyle \
+        autoconf \
+        automake \
+        bison \
+        bzip2 \
+        boost-devel \
+        ca-certificates \
+        clang \
+        cmake \
+        curl \
+        curl-devel \
+        createrepo \
+        expect \
+        expat \
+        expat-devel \
+        gettext \
+        file \
+        fuse-devel \
+        fuse-libs \
+        gawk \
+        gcc \
+        gcc-c++ \
+        glibc-headers \
+        gdb \
+        git-core \
+        gmp-devel \
+        golang \
+        jq \
+        libmpc-devel \
+        libxml2-devel \
+        libtool \
+        pkgconfig \
+        python2 \
+        kmod \
+        make \
+        mod_ssl \
+        mpfr-devel \
+        ocaml \
+        ocaml-ocamlbuild \
+        openssl \
+        openssl-devel \
+        patch \
+        python3 \
+        sudo \
+        uuid-devel \
+        vim \
+        wget \
+        yum-utils \
+        rpm-build \
+        git \
+        protobuf \
+        protobuf-c \
+        protobuf-compiler \
+        protobuf-c-compiler \
+        protobuf-c-devel \
+        protobuf-devel \
+        rsync && \
+    yum groupinstall -y 'Development Tools' && \
+    yum clean all && \
+    alternatives --set python /usr/bin/python3
+
+# Aliyunlinux3 use GCC 10 as default toolchain
+
+# Install PSW and DCAP RPM packages
+WORKDIR /tmp
+RUN wget https://mirrors.openanolis.cn/inclavare-containers/alinux3/sgx-2.14/sgx_rpm_local_repo.tar.gz && \
+    tar -xzf sgx_rpm_local_repo.tar.gz && \
+    rm -f sgx_rpm_local_repo.tar.gz && \
+    cd /tmp/sgx_rpm_local_repo && \
+    rpm -ivh --nodeps libsgx-ae-pce*.rpm \
+    libsgx-headers*.rpm \
+    libsgx-ae-qe3*.rpm \
+    libsgx-ae-qve*.rpm \
+    libsgx-enclave-common*.rpm \
+    libsgx-quote-ex*.rpm \
+    libsgx-urts*.rpm \
+    libsgx-dcap-ql*.rpm \
+    libsgx-qe3-logic*.rpm \
+    libsgx-pce-logic*.rpm \
+    libsgx-dcap-quote-verify*.rpm \
+    libsgx-dcap-ql*.rpm \
+    libsgx-dcap-ql-dev*.rpm \
+    libsgx-dcap-default-qpl*.rpm \
+    libsgx-dcap-default-qpl-dev*.rpm \
+    libsgx-dcap-quote-verify-dev*.rpm \
+    libsgx-uae-service*.rpm \
+    libsgx-epid*.rpm \
+    libsgx-launch*.rpm \
+    libsgx-ae-le-*.rpm \
+    libsgx-aesm-launch-plugin-*.rpm \
+    sgx-aesm-service*.rpm && \
+    rm -rf /tmp/sgx_rpm_local_repo
+
+# Install SGX SDK
+WORKDIR /tmp
+RUN git clone -b sgx_2.14_for_occlum https://github.com/occlum/linux-sgx && \
+    cd linux-sgx && \
+    make preparation && \
+    ./compile_and_install.sh no_mitigation USE_OPT_LIBS=3 && \
+    echo 'source /opt/intel/sgxsdk/environment' >> /root/.bashrc && \
+    rm -rf /tmp/linux-sgx
+
+# Install cpuid tool for tests
+WORKDIR /tmp
+RUN wget http://www.etallen.com/cpuid/cpuid-20200211.x86_64.tar.gz && \
+    tar -xf ./cpuid-20200211.x86_64.tar.gz && \
+    cp ./cpuid-20200211/cpuid /usr/bin/ && \
+    rm -rf /tmp/cpuid-20200211*
+
+
+# Download the Occlum source
+ARG OCCLUM_BRANCH
+WORKDIR /root
+RUN git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum && \
+    cp -r /root/occlum/tools/toolchains/* /tmp/ && mkdir -p /opt/occlum/ && \
+    cp /root/occlum/tools/docker/start_aesm.sh /opt/occlum/
+
+# Install Occlum toolchain
+WORKDIR /tmp
+RUN cd musl-gcc && ./build.sh && ./install_zlib.sh && rm -rf /tmp/musl-gcc
+ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
+
+# Install glibc
+WORKDIR /tmp
+RUN cd glibc && ./build.sh && rm -rf /tmp/glibc
+
+# Install Occlum Golang toolchain
+WORKDIR /tmp
+RUN cd golang && ./build.sh && rm -rf /tmp/golang
+ENV PATH="/opt/occlum/toolchains/golang/bin:$PATH"
+
+# Install Rust
+ENV PATH="/root/.cargo/bin:$PATH"
+ENV OCCLUM_RUST_VERSION=nightly-2020-10-25
+RUN curl https://sh.rustup.rs -sSf | \
+        sh -s -- --default-toolchain ${OCCLUM_RUST_VERSION} -y && \
+    rm -rf /root/.cargo/registry && rm -rf /root/.cargo/git && \
+    cargo -V
+
+# Install Occlum Rust toolchain
+WORKDIR /tmp
+RUN cd rust && ./build.sh && rm -rf /tmp/rust
+ENV PATH="/opt/occlum/toolchains/rust/bin:$PATH"
+
+# Install Occlum bash
+WORKDIR /tmp
+RUN cd bash && ./build.sh && rm -rf /tmp/bash
+
+# Install Occlum busybox
+WORKDIR /tmp
+RUN cd busybox && ./build.sh && rm -rf /tmp/busybox
+
+# Install Occlum Java toolchain (JDK 11)
+ARG JDK11_PATH=/opt/occlum/toolchains/jvm/java-11-openjdk
+COPY --from=alpine /usr/lib/jvm/java-11-openjdk $JDK11_PATH
+RUN rm $JDK11_PATH/lib/security/cacerts
+COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK11_PATH/lib/security/cacerts
+WORKDIR /tmp
+RUN cd java && ./install_dragonwell.sh && rm -rf /tmp/java
+ENV PATH="/opt/occlum/toolchains/jvm/bin:$PATH"
+
+# Install OpenJDK 8
+ARG JDK8_PATH=/opt/occlum/toolchains/jvm/java-1.8-openjdk
+COPY --from=alpine /usr/lib/jvm/java-1.8-openjdk $JDK8_PATH
+RUN rm $JDK8_PATH/jre/lib/security/cacerts
+COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK8_PATH/jre/lib/security/cacerts
+
+ENV LD_LIBRARY_PATH="/opt/intel/sgxpsw/aesm:/usr/lib64/:/usr/local/lib:/opt/intel/sgxsdk/sdk_libs:/usr/lib:$LD_LIBRARY_PATH"
+# Build and install Occlum
+WORKDIR /root
+RUN cd occlum && \
+    source /opt/intel/sgxsdk/environment && \
+    make submodule && \
+    OCCLUM_RELEASE_BUILD=1 make install && \
+    cp -r demos /root/demos && \
+    rm -rf /root/occlum
+
+# Start AESM service automatically
+#
+# To do so, we add the script to ~/.bashrc. We cannot use systemd to run AESM
+# as a "real" service since the pid 1 is not systemd in Docker. So we start
+# up AESM service when an user login with an interative shell.
+RUN mkdir -p /var/run/aesmd && echo '/opt/occlum/start_aesm.sh' >> /root/.bashrc
+
+WORKDIR /root
