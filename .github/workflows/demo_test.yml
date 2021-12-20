@@ -453,6 +453,10 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec flink_test bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_on_occlum_glibc.sh task"
 
+    - name: Check flink task manager's log
+      if: ${{ always() }}
+      run: docker exec flink_test bash -c "cd /root/occlum/demos/flink; cat occlum_instance_taskmanager/flink--taskmanager-0.log"
+
   Cluster_serving_test:
     runs-on: ubuntu-20.04
     steps:
