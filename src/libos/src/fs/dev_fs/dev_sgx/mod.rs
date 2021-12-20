@@ -164,7 +164,11 @@ impl DevSgx {
             #[cfg(feature = "dcap")]
             SGX_CMD_NUM_GET_DCAP_QUOTE_SIZE => {
                 let arg = nonbuiltin_cmd.arg_mut::<u32>()?;
-                let quote_size = SGX_DCAP_QUOTE_GENERATOR.get_quote_size();
+                if SGX_DCAP_QUOTE_GENERATOR.is_none() {
+                    return_errno!(EIO, "DCAP device not ready");
+                }
+
+                let quote_size = SGX_DCAP_QUOTE_GENERATOR.unwrap().get_quote_size();
                 unsafe {
                     *arg = quote_size;
                 }
@@ -176,13 +180,18 @@ impl DevSgx {
                 let input_len = unsafe { *arg.quote_size };
                 check_mut_array(arg.quote_buf, input_len as usize)?;
 
-                let quote_size = SGX_DCAP_QUOTE_GENERATOR.get_quote_size();
+                if SGX_DCAP_QUOTE_GENERATOR.is_none() {
+                    return_errno!(EIO, "DCAP device not ready");
+                }
+
+                let quote_size = SGX_DCAP_QUOTE_GENERATOR.unwrap().get_quote_size();
                 if input_len < quote_size {
                     return_errno!(EINVAL, "provided quote is too small");
                 }
 
-                let quote =
-                    SGX_DCAP_QUOTE_GENERATOR.generate_quote(unsafe { &*arg.report_data })?;
+                let quote = SGX_DCAP_QUOTE_GENERATOR
+                    .unwrap()
+                    .generate_quote(unsafe { &*arg.report_data })?;
                 let mut input_quote_buf =
                     unsafe { std::slice::from_raw_parts_mut(arg.quote_buf, quote_size as usize) };
                 input_quote_buf.copy_from_slice(&quote);
@@ -190,7 +199,14 @@ impl DevSgx {
             #[cfg(feature = "dcap")]
             SGX_CMD_NUM_GET_DCAP_SUPPLEMENTAL_SIZE => {
                 let arg = nonbuiltin_cmd.arg_mut::<u32>()?;
-                let supplemental_size = SGX_DCAP_QUOTE_VERIFIER.get_supplemental_data_size();
+
+                if SGX_DCAP_QUOTE_VERIFIER.is_none() {
+                    return_errno!(EIO, "DCAP device not ready");
+                }
+
+                let supplemental_size = SGX_DCAP_QUOTE_VERIFIER
+                    .unwrap()
+                    .get_supplemental_data_size();
                 unsafe {
                     *arg = supplemental_size;
                 }
@@ -199,7 +215,14 @@ impl DevSgx {
             SGX_CMD_NUM_VER_DCAP_QUOTE => {
                 let arg = nonbuiltin_cmd.arg_mut::<IoctlVerDCAPQuoteArg>()?;
                 let quote_size = arg.quote_size as usize;
-                let supplemental_size = SGX_DCAP_QUOTE_VERIFIER.get_supplemental_data_size();
+
+                if SGX_DCAP_QUOTE_VERIFIER.is_none() {
+                    return_errno!(EIO, "DCAP device not ready");
+                }
+
+                let supplemental_size = SGX_DCAP_QUOTE_VERIFIER
+                    .unwrap()
+                    .get_supplemental_data_size();
                 check_array(arg.quote_buf, quote_size)?;
                 let supplemental_slice = if !arg.supplemental_data.is_null() {
                     check_array(arg.supplemental_data, arg.supplemental_data_size as usize)?;
@@ -220,7 +243,9 @@ impl DevSgx {
                 let input_quote_buf =
                     unsafe { std::slice::from_raw_parts(arg.quote_buf, quote_size) };
                 let (collateral_expiration_status, quote_verification_result, supplemental_data) =
-                    SGX_DCAP_QUOTE_VERIFIER.verify_quote(input_quote_buf)?;
+                    SGX_DCAP_QUOTE_VERIFIER
+                        .unwrap()
+                        .verify_quote(input_quote_buf)?;
 
                 unsafe {
                     *arg.collateral_expiration_status = collateral_expiration_status;
@@ -246,9 +271,10 @@ lazy_static! {
 
 #[cfg(feature = "dcap")]
 lazy_static! {
-    pub static ref SGX_DCAP_QUOTE_GENERATOR: SgxDCAPQuoteGenerator =
+    pub static ref SGX_DCAP_QUOTE_GENERATOR: Option<SgxDCAPQuoteGenerator> =
         { SgxDCAPQuoteGenerator::new() };
-    pub static ref SGX_DCAP_QUOTE_VERIFIER: SgxDCAPQuoteVerifier = { SgxDCAPQuoteVerifier::new() };
+    pub static ref SGX_DCAP_QUOTE_VERIFIER: Option<SgxDCAPQuoteVerifier> =
+        { SgxDCAPQuoteVerifier::new() };
 }
 
 #[repr(C)]

@@ -1,34 +1,37 @@
 use super::*;
 pub use sgx_types::{sgx_ql_qv_result_t, sgx_quote3_error_t, sgx_report_data_t, sgx_target_info_t};
 
+#[derive(Copy, Clone)]
 pub struct QuoteGenerator {
     qe_target_info: sgx_target_info_t,
     quote_size: u32,
 }
 
 impl QuoteGenerator {
-    pub fn new() -> Self {
+    pub fn new() -> Option<Self> {
         let mut qe_target_info = sgx_target_info_t::default();
         let mut quote_size: u32 = 0;
+        let mut sgx_status = sgx_status_t::SGX_SUCCESS;
+        let mut qe3_ret = sgx_quote3_error_t::SGX_QL_SUCCESS;
 
         unsafe {
-            let mut qe3_ret = sgx_quote3_error_t::SGX_QL_SUCCESS;
-            let sgx_status = occlum_ocall_init_dcap_quote_generator(
+            sgx_status = occlum_ocall_init_dcap_quote_generator(
                 &mut qe3_ret,
                 &mut qe_target_info,
                 &mut quote_size,
             );
-            assert_eq!(sgx_status_t::SGX_SUCCESS, sgx_status);
-            assert_eq!(
-                sgx_quote3_error_t::SGX_QL_SUCCESS,
-                qe3_ret,
-                "fail to launch QE"
-            );
         }
 
-        Self {
-            qe_target_info,
-            quote_size,
+        if sgx_status != sgx_status_t::SGX_SUCCESS || qe3_ret != sgx_quote3_error_t::SGX_QL_SUCCESS
+        {
+            error!("Init dcap quote generator return {}", sgx_status);
+            error!("DCAP quote qe3_ret {}", qe3_ret);
+            None
+        } else {
+            Some(Self {
+                qe_target_info,
+                quote_size,
+            })
         }
     }
 
