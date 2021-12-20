@@ -238,17 +238,13 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     pub fn addr(&self) -> Result<A> {
         let state = self.state.read().unwrap();
         let common = state.common();
-        match &*state {
-            State::Init(_) | State::Connect(_) => Ok(common.addr().unwrap_or_default()),
-            State::Connected(_) | State::Listen(_) => common.addr().map_or_else(
-                || {
-                    let addr = common.get_addr_from_host()?;
-                    common.set_addr(&addr);
-                    Ok(addr)
-                },
-                |addr| Ok(addr),
-            ),
-        }
+
+        // Always get addr from host.
+        // Because for IP socket, users can specify "0" as port and the kernel should select a usable port for him.
+        // Thus, when calling getsockname, this should be updated.
+        let addr = common.get_addr_from_host()?;
+        common.set_addr(&addr);
+        Ok(addr)
     }
 
     pub fn peer_addr(&self) -> Result<A> {
