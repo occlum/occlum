@@ -155,6 +155,12 @@ int server_recvmsg(int client_fd) {
     return ret;
 }
 
+int sigchld = 0;
+
+void proc_exit() {
+    sigchld = 1;
+}
+
 int server_connectionless_recvmsg() {
     int ret = 0;
     const int buf_size = 1000;
@@ -310,6 +316,8 @@ int test_sendmsg_recvmsg_connectionless() {
     int ret = 0;
     int child_pid = 0;
 
+    signal(SIGCHLD, proc_exit);
+
     int sync_fds[2];
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, sync_fds) < 0) {
         THROW_ERROR("socketpair failed");
@@ -326,7 +334,10 @@ int test_sendmsg_recvmsg_connectionless() {
     }
 
     ret = server_connectionless_recvmsg();
-    if (ret < 0) {
+
+    /* If child client send happens before recvmsg, EINTR may
+    be triggered which is not failed case */
+    if (ret < 0 && errno != EINTR) {
         return -1;
     }
 

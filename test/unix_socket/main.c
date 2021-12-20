@@ -15,6 +15,75 @@
 
 #define ECHO_MSG "echo msg for unix_socket test"
 
+int create_connected_sockets_then_rename(int *sockets) {
+    char *socket_original_path = "/tmp/socket_tmp";
+    char *socket_ready_path = "/tmp/.socket_tmp";
+    int listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (listen_fd == -1) {
+        THROW_ERROR("failed to create a unix socket");
+    }
+
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(struct sockaddr_un)); //Clear structure
+    addr.sun_family = AF_UNIX;
+    strcpy(addr.sun_path, socket_original_path);
+
+    // About addr_len (from man page):
+    // a UNIX domain socket can be bound to a null-terminated
+    // filesystem pathname using bind(2).  When the address of
+    // a pathname socket is returned (by one of the system
+    // calls noted above), its length is:
+    //  offsetof(struct sockaddr_un, sun_path) + strlen(sun_path) + 1
+    socklen_t addr_len = strlen(addr.sun_path) + sizeof(addr.sun_family) + 1;
+    if (bind(listen_fd, (struct sockaddr *)&addr, addr_len) == -1) {
+        close(listen_fd);
+        THROW_ERROR("failed to bind");
+    }
+
+    if (listen(listen_fd, 5) == -1) {
+        close(listen_fd);
+        THROW_ERROR("failed to listen");
+    }
+
+    // rename to new path
+    unlink(socket_ready_path);
+    if (rename(socket_original_path, socket_ready_path) < 0) {
+        THROW_ERROR("failed to rename");
+    }
+
+    int client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (client_fd == -1) {
+        close(listen_fd);
+        THROW_ERROR("failed to create a unix socket");
+    }
+
+    struct sockaddr_un addr_client;
+    memset(&addr_client, 0, sizeof(struct sockaddr_un)); //Clear structure
+    addr_client.sun_family = AF_UNIX;
+    strcpy(addr_client.sun_path, "/proc/self/root");
+    strcat(addr_client.sun_path, socket_ready_path);
+
+    socklen_t client_addr_len = strlen(addr_client.sun_path) + sizeof(
+                                    addr_client.sun_family) + 1;
+    if (connect(client_fd, (struct sockaddr *)&addr_client, client_addr_len) == -1) {
+        close(listen_fd);
+        close(client_fd);
+        THROW_ERROR("failed to connect");
+    }
+
+    int accepted_fd = accept(listen_fd, (struct sockaddr *)&addr_client, &client_addr_len);
+    if (accepted_fd == -1) {
+        close(listen_fd);
+        close(client_fd);
+        THROW_ERROR("failed to accept socket");
+    }
+
+    sockets[0] = client_fd;
+    sockets[1] = accepted_fd;
+    close(listen_fd);
+    return 0;
+}
+
 int create_connected_sockets(int *sockets, char *sock_path) {
     int listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (listen_fd == -1) {
@@ -190,6 +259,11 @@ int test_socketpair_inter_process() {
     return test_connected_sockets_inter_process(create_connceted_sockets_default);
 }
 
+// To emulate JVM bahaviour on UDS
+int test_unix_socket_rename() {
+    return test_connected_sockets_inter_process(create_connected_sockets_then_rename);
+}
+
 int test_poll() {
     int socks[2];
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, socks) < 0) {
@@ -322,6 +396,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_poll),
     TEST_CASE(test_getname),
     TEST_CASE(test_ioctl_fionread),
+    // TEST_CASE(test_unix_socket_rename),
 };
 
 int main(int argc, const char *argv[]) {

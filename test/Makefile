@@ -18,15 +18,12 @@ FAIL_LOG = $(BUILD_DIR)/test/.fail
 # Dependencies: need to be compiled but not to run by any Makefile target
 TEST_DEPS := client data_sink naughty_child
 # Tests: need to be compiled and run by test-% target
-# TESTS ?= env empty hello_world malloc mmap file fs_perms getpid spawn sched pipe time \
-# 	truncate readdir mkdir open stat link symlink chmod chown tls pthread uname rlimit \
-# 	server server_epoll unix_socket cout hostfs cpuid rdtsc device sleep exit_group \
-# 	ioctl fcntl eventfd emulate_syscall access signal sysinfo prctl rename procfs
-TESTS ?= access chmod chown cpuid empty emulate_syscall pipe eventfd exit_group file \
-	getpid hello_world link malloc mkdir mmap pthread system_info rdtsc rename rlimit server \
-	server_epoll signal sleep spawn stat symlink time tls truncate unix_socket wait \
-	fcntl spawn_attribute device ioctl readdir statfs random umask procfs flock resolv_conf \
-	exec pgrp vfork mount
+TESTS ?= env empty hello_world malloc mmap file fs_perms getpid spawn sched pipe time \
+	truncate readdir mkdir open stat link symlink chmod chown tls pthread system_info rlimit \
+	server server_epoll unix_socket cout hostfs cpuid rdtsc device sleep exit_group flock \
+	ioctl fcntl eventfd emulate_syscall access signal prctl rename procfs wait \
+	spawn_attribute exec statfs random umask pgrp vfork mount sysinfo
+
 # Benchmarks: need to be compiled and run by bench-% target
 BENCHES := spawn_and_exit_latency pipe_throughput unix_socket_throughput
 

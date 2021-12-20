@@ -4,7 +4,6 @@
 #include <assert.h>
 #include <sys/wait.h>
 #include <stdlib.h>
-#include <string.h>
 #include "test.h"
 
 void sigchld_handler(int sig) {

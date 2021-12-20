@@ -472,6 +472,12 @@ int test_sigtimedwait() {
         THROW_ERROR("sigprocmask failed unexpectedly");
     }
 
+    // There is no pending signal, yet; so the syscall must return EAGAIN error
+    ret = sigtimedwait(&new_mask, &info, NULL);
+    if (ret == 0 || (ret < 0 && errno != EAGAIN)) {
+        THROW_ERROR("sigprocmask must return with EAGAIN error");
+    }
+
     // Let's generate a pending signal and then get it
     raise(SIGIO);
     if ((ret = sigtimedwait(&new_mask, &info, NULL)) < 0 || info.si_signo != SIGIO) {

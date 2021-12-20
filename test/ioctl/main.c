@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <net/if.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -5,7 +6,6 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <fcntl.h>
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -75,7 +75,7 @@ int test_ioctl_TCGETS_TCSETS(void) {
     // FIXME: /dev/tty should be opened. But it has not been implemented in Occlum yet.
     // So we just skip this test if STDOUT is redirected.
     if (!isatty(STDOUT_FILENO)) {
-        printf("Warning: test_ioctl_TCGETS_TCSETS is skipped\n");
+        printf("Warning: test_tty_ioctl_TIOCGWINSZ is skipped\n");
         return 0;
     }
 
@@ -536,21 +536,26 @@ int test_ioctl_SIOCGIFCONF(void) {
 }
 
 int test_ioctl_FIONBIO(void) {
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    int test_sock[2], sock;
+    test_sock[0] = socket(AF_INET, SOCK_STREAM, 0);
+    test_sock[1] = socket(AF_UNIX, SOCK_STREAM, 0);
 
-    int on = 1;
-    if (ioctl(sock, FIONBIO, &on) < 0) {
+    for (int i = 0; i < 2; i++) {
+        sock = test_sock[i];
+        int on = 1;
+        if (ioctl(sock, FIONBIO, &on) < 0) {
+            close(sock);
+            THROW_ERROR("ioctl FIONBIO failed");
+        }
+
+        int actual_flags = fcntl(sock, F_GETFL);
+        if ((actual_flags & O_NONBLOCK) == 0) {
+            close(sock);
+            THROW_ERROR("failed to check the O_NONBLOCK flag after FIONBIO");
+        }
+
         close(sock);
-        THROW_ERROR("ioctl FIONBIO failed");
     }
-
-    int actual_flags = fcntl(sock, F_GETFL);
-    if ((actual_flags & O_NONBLOCK) == 0) {
-        close(sock);
-        THROW_ERROR("failed to check the O_NONBLOCK flag after FIONBIO");
-    }
-
-    close(sock);
     return 0;
 }
 
@@ -588,9 +593,11 @@ int test_ioctl_FIOCLEX(void) {
     child_argv[0] = strdup("naughty_child");
     child_argv[1] = strdup("-t");
     child_argv[2] = strdup("fioclex");
-    asprintf(&child_argv[3], "%d", fd);
-    asprintf(&child_argv[4], "%d", pipefds[0]);
-    asprintf(&child_argv[5], "%d", pipefds[1]);
+    if (asprintf(&child_argv[3], "%d", fd) < 0 ||
+            asprintf(&child_argv[4], "%d", pipefds[0]) < 0 ||
+            asprintf(&child_argv[5], "%d", pipefds[1]) < 0) {
+        THROW_ERROR("failed to call asprintf");
+    }
 
     ret = posix_spawn(&child_pid, "/bin/naughty_child", NULL, NULL, child_argv, NULL);
     if (ret != 0) {

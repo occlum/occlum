@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
@@ -158,7 +159,9 @@ int test_dev_fd() {
     if (fd_str == NULL) {
         THROW_ERROR("calloc failed");
     }
-    asprintf(&fd_str, "%d", fd);
+    if (asprintf(&fd_str, "%d", fd) < 0) {
+        THROW_ERROR("failed to asprintf");
+    }
     strcat(dev_fd_path, fd_str);
     int dev_fd = open(dev_fd_path, O_WRONLY, 0666);
     if (dev_fd < 0) {

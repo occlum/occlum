@@ -22,6 +22,39 @@ static void *just_sleep(void *_arg) {
     return NULL;
 }
 
+int test_execve_no_return(void) {
+    bool should_exit_by_execve = true;
+    pthread_t child_thread;
+    if (pthread_create(&child_thread, NULL, just_sleep, (void *)&should_exit_by_execve) < 0) {
+        THROW_ERROR("pthread_create failed");
+    }
+
+    char *args[] = {"spawn", NULL};
+    execve("/bin/spawn", args, NULL);
+
+    THROW_ERROR("The program shouldn't reach here.");
+    return -1;
+}
+
+int test_execve_error_return(void) {
+    // execve will fail in this case and thus the child thread will not exit until finish
+    bool should_exit_by_execve = false;
+    pthread_t child_thread;
+    if (pthread_create(&child_thread, NULL, just_sleep, (void *)&should_exit_by_execve) < 0) {
+        THROW_ERROR("pthread_create failed");
+    }
+
+    // during the time, try execve a non-exit process
+    char *args[] = {"joke", NULL};
+    int ret = execve("/bin/joke", args, NULL);
+    if (ret != -1 || errno != ENOENT) {
+        THROW_ERROR("execve error code wrong");
+    }
+
+    pthread_join(child_thread, NULL);
+    return 0;
+}
+
 int test_execve_on_child_thread(void) {
     int ret, child_pid, status;
 
@@ -49,40 +82,8 @@ int test_execve_on_child_thread(void) {
     return 0;
 }
 
-int test_execve_error_return(void) {
-    // execve will fail in this case and thus the child thread will not exit until finish
-    bool should_exit_by_execve = false;
-    pthread_t child_thread;
-    if (pthread_create(&child_thread, NULL, just_sleep, (void *)&should_exit_by_execve) < 0) {
-        THROW_ERROR("pthread_create failed");
-    }
-
-    // during the time, try execve a non-exit process
-    int ret = execve("/bin/joke", NULL, NULL);
-    if (ret != -1 || errno != ENOENT) {
-        THROW_ERROR("execve error code wrong");
-    }
-
-    pthread_join(child_thread, NULL);
-    return 0;
-}
-
-int test_execve_no_return(void) {
-    bool should_exit_by_execve = true;
-    pthread_t child_thread;
-    if (pthread_create(&child_thread, NULL, just_sleep, (void *)&should_exit_by_execve) < 0) {
-        THROW_ERROR("pthread_create failed");
-    }
-
-    char *args[] = {"spawn", NULL};
-    execve("/bin/spawn", args, NULL);
-
-    THROW_ERROR("The program shouldn't reach here.");
-    return -1;
-}
-
 static test_case_t test_cases[] = {
-    TEST_CASE(test_execve_on_child_thread), // similar with pthread test_mutex_with_cond_wait test case
+    TEST_CASE(test_execve_on_child_thread),
     TEST_CASE(test_execve_error_return),
     TEST_CASE(test_execve_no_return),
 };
