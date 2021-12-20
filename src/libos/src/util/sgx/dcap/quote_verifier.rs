@@ -1,5 +1,6 @@
 use super::*;
 
+#[derive(Copy, Clone)]
 pub struct QuoteVerifier {
     supplemental_data_size: u32,
 }
@@ -9,15 +10,20 @@ pub struct QuoteVerifier {
 const QVE_ISVSVN_THRESHOLD: sgx_isv_svn_t = 3;
 
 impl QuoteVerifier {
-    pub fn new() -> Self {
+    pub fn new() -> Option<Self> {
         let mut supplemental_data_size = 0;
+        let mut sgx_status = sgx_status_t::SGX_SUCCESS;
         unsafe {
-            let sgx_status = occlum_ocall_get_supplement_size(&mut supplemental_data_size);
-            assert_eq!(sgx_status_t::SGX_SUCCESS, sgx_status);
-            assert_ne!(supplemental_data_size, 0);
+            sgx_status = occlum_ocall_get_supplement_size(&mut supplemental_data_size);
         }
-        Self {
-            supplemental_data_size,
+
+        if sgx_status != sgx_status_t::SGX_SUCCESS || supplemental_data_size == 0 {
+            error!("DCAP Quote Verifier new failed {}", sgx_status);
+            None
+        } else {
+            Some(Self {
+                supplemental_data_size,
+            })
         }
     }
 
