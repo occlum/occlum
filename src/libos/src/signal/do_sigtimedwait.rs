@@ -23,6 +23,19 @@ pub async fn do_sigtimedwait(interest: SigSet, timeout: Option<&Duration>) -> Re
         blocked & interest
     };
 
+    // If the timespec structure pointed to by timeout is zero-valued
+    // and if none of the signals specified by set are pending,
+    // then sigtimedwait() shall return immediately with an error.
+    // If timeout is the null pointer, the behavior is unspecified.
+    if timeout.is_none() || timeout.unwrap().is_zero() {
+        if let Some(signal) = dequeue_signal(&thread, !interest) {
+            let siginfo = signal.to_info();
+            return Ok(siginfo);
+        } else {
+            return Err(errno!(EAGAIN, "no interesting, pending signal"));
+        }
+    }
+
     let mut timeout = timeout.cloned();
     // Loop until we find a pending signal or reach timeout or get interrupted
     waiter_loop!(process.sig_waiters(), timeout, {
