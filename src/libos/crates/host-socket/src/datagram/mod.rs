@@ -5,6 +5,7 @@ mod sender;
 use self::receiver::Receiver;
 use self::sender::Sender;
 use crate::common::{do_bind, Common};
+use crate::ioctl::*;
 use crate::prelude::*;
 use crate::runtime::Runtime;
 use crate::sockopt::*;
@@ -288,6 +289,12 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
             },
             cmd: GetTypeCmd => {
                 cmd.set_output(self.common.type_() as _);
+            },
+            cmd: GetIfReqWithRawCmd => {
+                cmd.execute(self.host_fd())?;
+            },
+            cmd: GetIfConf => {
+                cmd.execute(self.host_fd())?;
             },
             _ => {
                 return_errno!(EINVAL, "Not supported yet");
