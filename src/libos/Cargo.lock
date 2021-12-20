@@ -44,6 +44,7 @@ dependencies = [
  "sgx_tse",
  "sgx_tstd",
  "sgx_types",
+ "spin 0.7.0",
  "vdso-time",
 ]
 

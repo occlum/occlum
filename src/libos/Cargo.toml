@@ -39,6 +39,7 @@ scroll = { version = "0.10.2", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["alloc", "async-await"] }
 itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"]  }
 ctor = "0.1"
+spin = "0.7"
 
 [patch.'https://github.com/apache/teaclave-sgx-sdk.git']
 sgx_tstd = { path = "../../deps/rust-sgx-sdk/sgx_tstd" }

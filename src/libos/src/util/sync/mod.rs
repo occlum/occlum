@@ -1,6 +1,6 @@
 use super::*;
 
-pub use std::sync::{
-    SgxRwLock as RwLock, SgxRwLockReadGuard as RwLockReadGuard,
-    SgxRwLockWriteGuard as RwLockWriteGuard,
-};
+mod rw_lock;
+
+pub use self::rw_lock::RwLockWrapper as RwLock;
+pub use spin::rw_lock::{RwLockReadGuard, RwLockWriteGuard};
