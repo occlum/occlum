@@ -3,7 +3,25 @@
 #include <sys/sysinfo.h>
 #include <spawn.h>
 #include <sys/wait.h>
+#include <dirent.h>
 #include "test.h"
+
+void get_proc_list() {
+    DIR *dr;
+    struct dirent *en;
+
+    printf("-------------\n");
+
+    dr = opendir("/proc/");
+    if (dr) {
+        while ((en = readdir(dr)) != NULL) {
+            printf("%s\n", en->d_name);
+        }
+        closedir(dr);
+    }
+
+    printf("-------------\n");
+}
 
 int test_sysinfo() {
     const long MIN = 60;
@@ -37,6 +55,7 @@ int test_sysinfo() {
     }
 
     if (info.procs != 2 ) {
+        get_proc_list();
         THROW_ERROR("system process count error");
     }
 
