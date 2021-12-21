@@ -28,8 +28,8 @@ impl_ioctl_nums_and_cmds! {
     // ioctl_name => (ioctl_num, ioctl_type_arg)
 
     // Get terminal attributes
-    TCGETS => (0x5401, mut Termios),
-    TCSETS => (0x5402, Termios),
+    TCGETS => (0x5401, mut KernelTermios),
+    TCSETS => (0x5402, KernelTermios),
     // Get window size
     TIOCGWINSZ => (0x5413, mut WinSize),
     // Set window size
