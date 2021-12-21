@@ -18,15 +18,14 @@ docker pull occlum/occlum:0.23.0-ubuntu18.04
 docker run -it --name=pythonDemo --device /dev/sgx/enclave occlum/occlum:0.23.0-ubuntu18.04 bash
 ```
 
-Step 2 (on the host): Download miniconda and install python to prefix position.
+Step 2 (in the Occlum container): Download miniconda and install python to prefix position.
 ```
-cd /root/occlum/demos/pytorch
+cd /root/demos/pytorch
 bash ./install_python_with_conda.sh
 ```
 
-Step 3 (on the host): Run the sample code on Occlum
+Step 3 (in the Occlum container): Run the sample code on Occlum
 ```
-cd /root/occlum/demos/pytorch
+cd /root/demos/pytorch
 bash ./run_pytorch_on_occlum.sh
 ```
-
