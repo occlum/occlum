@@ -4,7 +4,7 @@ name: Demo Test
 on: [push, pull_request]
 
 env:
-  nap_time: 120
+  nap_time: 240
 
 
 jobs:
@@ -511,6 +511,10 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec vault_test bash -c "cd /root/occlum/demos/golang/vault && ./run_occlum_vault_test.sh"
 
+    - name: Check Vault log
+      if: ${{ always() }}
+      run: docker exec vault_test bash -c "cd /root/occlum/demos/golang/vault && sync && cat vault.log"
+
   sofaboot_test:
     runs-on: ubuntu-20.04
     steps:
@@ -536,6 +540,10 @@ jobs:
       run: |
         sleep ${{ env.nap_time }};
         docker exec sofaboot_test bash -c "curl -s http://localhost:8080/actuator/readiness | grep -v DOWN"
+        
+    - name: Check SOFABoot log
+      if: ${{ always() }}
+      run: docker exec sofaboot_test bash -c "cd /root/occlum/demos/sofaboot && sync && cat sofaboot.log"
 
   Bash_test:
     runs-on: ubuntu-20.04

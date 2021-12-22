@@ -41,7 +41,7 @@ run_sofa() {
     init_instance
     build_sofa
     echo -e "${BLUE}occlum run SOFABoot demo${NC}"
-    occlum run /usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin/java -Xmx512m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=64m -Dos.name=Linux -jar /usr/lib/spring/${jar_file} &
+    occlum run /usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin/java -Xmx512m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=64m -Dos.name=Linux -jar /usr/lib/spring/${jar_file} > ../sofaboot.log &
 }
 
 run_sofa

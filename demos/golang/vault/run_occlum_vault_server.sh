@@ -31,4 +31,4 @@ occlum build
 
 # 3. Run the Hashicorp Vault server listening on "127.0.0.1:8200" 
 echo -e "${BLUE}occlum run /bin/vault server -dev -dev-no-store-token -dev-root-token-id mytoken${NC}"
-time occlum run /bin/vault server -dev -dev-no-store-token -dev-root-token-id mytoken &
+time occlum run /bin/vault server -dev -dev-no-store-token -dev-root-token-id mytoken > ../vault.log &
