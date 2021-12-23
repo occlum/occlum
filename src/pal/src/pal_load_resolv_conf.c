@@ -17,7 +17,11 @@ char *pal_load_resolv_conf(void) {
         PAL_WARN("Warning: Failed to malloc for /etc/resolv.conf buffer");
         return NULL;
     }
-    fread(resolv_conf_buffer, 1, fsize, fp);
+    size_t ret = fread(resolv_conf_buffer, 1, fsize, fp);
+    if (ret != fsize) {
+        PAL_WARN("Warning: expect %ld bytes but read %ld bytes\n", fsize, ret);
+    }
+
     resolv_conf_buffer[fsize] = 0;
     fclose(fp);
     return resolv_conf_buffer;

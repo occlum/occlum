@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stddef.h>
 #include "ocalls.h"
+#include "../errno2str.h"
 
 ssize_t occlum_ocall_sendmsg(int sockfd,
                              const void *msg_name,
@@ -83,7 +84,10 @@ int occlum_ocall_poll(struct pollfd *fds,
     int saved_errno = errno;
     // clear the status of the eventfd
     uint64_t u = 0;
-    read(efd, &u, sizeof(uint64_t));
+    if (read(efd, &u, sizeof(uint64_t)) < 0) {
+        PAL_ERROR("Failed to read eventfd: %d, error: %s", efd, errno2str(errno));
+        return -1;
+    }
     // restore the errno of poll
     errno = saved_errno;
     return ret;

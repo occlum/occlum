@@ -5,6 +5,7 @@
 #include <poll.h>
 #include <unistd.h>
 #include <sys/eventfd.h>
+#include "../errno2str.h"
 
 int occlum_ocall_eventfd(unsigned int initval, int flags) {
     return eventfd(initval, flags);
@@ -28,7 +29,11 @@ int occlum_ocall_eventfd_poll(int eventfd, struct timespec *timeout) {
     }
 
     char buf[8];
-    read(eventfd, buf, 8);
+    if (read(eventfd, buf, 8) < 0) {
+        PAL_ERROR("Failed to read eventfd: %d, error: %s", eventfd, errno2str(errno));
+        return -1;
+    }
+
     return 0;
 }
 
@@ -37,8 +42,13 @@ void occlum_ocall_eventfd_write_batch(
     size_t num_fds,
     uint64_t val
 ) {
+    int ret;
+
     for (int fd_i = 0; fd_i < num_fds; fd_i++) {
-        write(eventfds[fd_i], &val, sizeof(val));
+        ret = write(eventfds[fd_i], &val, sizeof(val));
+        if (ret < 0) {
+            PAL_ERROR("Failed to write eventfd: %d, error: %s", eventfds[fd_i], errno2str(errno));
+        }
     }
 }
 
@@ -64,7 +74,10 @@ int occlum_ocall_poll_with_eventfd(
     if (eventfd_idx >= 0 && (pollfds[eventfd_idx].revents & POLLIN) != 0) {
         int eventfd = pollfds[eventfd_idx].fd;
         char buf[8];
-        read(eventfd, buf, 8);
+        if (read(eventfd, buf, 8) < 0) {
+            PAL_ERROR("Failed to read eventfd: %d, error: %s", eventfd, errno2str(errno));
+            return -1;
+        }
     }
 
     return ret;
