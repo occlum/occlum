@@ -1,6 +1,4 @@
-use libc::c_char;
 use std::any::Any;
-use std::mem::MaybeUninit;
 
 use super::{Addr, CSockAddr, Domain};
 use crate::prelude::*;

@@ -41,8 +41,6 @@ impl CSockAddr for libc::sockaddr_in {
     }
 
     fn c_addr(&self) -> &[u8] {
-        // Note that libc::sockaddr_in contains a useless sin_zero field of 8 bytes. Do not use it.
-        let port_and_addr_len = size_of_val(&self.sin_port) + size_of_val(&self.sin_addr);
         // Safety. The slice is part of self.
         unsafe {
             let addr_ptr = (self as *const _ as *const u8).add(size_of_val(&self.sin_family));

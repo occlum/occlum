@@ -1,14 +1,10 @@
 use std::fmt::Debug;
-use std::marker::Unsize;
 use std::mem::transmute;
 use std::ops::CoerceUnsized;
-use std::ops::Deref;
 
-use futures::future::{self, BoxFuture};
-use futures::prelude::*;
 use inherit_methods_macro::inherit_methods;
 
-use crate::event::{Events, Observer, Pollee, Poller};
+use crate::event::{Events, Observer, Poller};
 use crate::file::{AccessMode, StatusFlags};
 use crate::fs::StatBuf;
 use crate::ioctl::IoctlCmd;
@@ -45,15 +41,15 @@ pub trait File: Debug + Sync + Send {
         Ok(0)
     }
 
-    fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    fn poll(&self, _mask: Events, _poller: Option<&mut Poller>) -> Events {
         Events::empty()
     }
 
-    fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()> {
+    fn register_observer(&self, _observer: Arc<dyn Observer>, _mask: Events) -> Result<()> {
         return_errno!(EINVAL, "this file does not support observers");
     }
 
-    fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>> {
+    fn unregister_observer(&self, _observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>> {
         return_errno!(EINVAL, "this file does not support observers");
     }
 
@@ -69,7 +65,7 @@ pub trait File: Debug + Sync + Send {
         StatusFlags::empty()
     }
 
-    fn set_status_flags(&self, new_status: StatusFlags) -> Result<()> {
+    fn set_status_flags(&self, _new_status: StatusFlags) -> Result<()> {
         return_errno!(ENOSYS, "not support setting status flags");
     }
 
@@ -162,7 +158,7 @@ impl<F: File + ?Sized> Async<F> {
                     return res;
                 }
             }
-            poller.wait().await;
+            poller.wait().await?;
         }
     }
 
@@ -186,7 +182,7 @@ impl<F: File + ?Sized> Async<F> {
                     return res;
                 }
             }
-            poller.wait().await;
+            poller.wait().await?;
         }
     }
 

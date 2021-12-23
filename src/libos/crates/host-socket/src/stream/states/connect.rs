@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use io_uring_callback::{Fd, IoHandle};
-use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
+use sgx_untrusted_alloc::UntrustedBox;
 
 use crate::common::Common;
 use crate::prelude::*;
@@ -47,7 +47,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
             if !events.is_empty() {
                 break;
             }
-            poller.wait().await;
+            poller.wait().await?;
         }
 
         // Finish the async connect
@@ -93,6 +93,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
         req.io_handle = Some(io_handle);
     }
 
+    #[allow(dead_code)]
     pub fn peer_addr(&self) -> &A {
         &self.peer_addr
     }

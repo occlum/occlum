@@ -140,7 +140,6 @@ impl StatMode {
             FileType::BlockDevice => StatMode::BLOCK,
             FileType::Socket => StatMode::SOCKET,
             FileType::NamedPipe => StatMode::FIFO,
-            _ => StatMode::NULL,
         };
         let mode = StatMode::from_bits_truncate(mode as u32);
         type_ | mode

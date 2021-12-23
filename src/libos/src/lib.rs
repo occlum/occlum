@@ -18,7 +18,6 @@
 #![feature(maybe_uninit_extra)]
 #![feature(get_mut_unchecked)]
 #![feature(drain_filter)]
-#![feature(duration_zero)]
 #![feature(raw_ref_op)]
 // for std::hint::black_box
 #![feature(test)]

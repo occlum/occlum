@@ -1,6 +1,5 @@
 use std::any::Any;
 use std::fmt::{self, Debug};
-use std::mem::MaybeUninit;
 
 use super::{Addr, CSockAddr, Domain};
 use crate::prelude::*;

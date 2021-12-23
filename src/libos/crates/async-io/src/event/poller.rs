@@ -1,6 +1,6 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use std::time::Duration;
 
@@ -219,7 +219,7 @@ impl Poller {
     /// Wait until there are any interesting events happen since last `wait`, or reach timeout.
     pub async fn wait_timeout<T: BorrowMut<Duration>>(
         &self,
-        mut timeout: Option<&mut T>,
+        timeout: Option<&mut T>,
     ) -> Result<()> {
         self.inner
             .event_counter
@@ -246,8 +246,8 @@ impl Drop for Poller {
         for weak_pollee in pollees.drain(..) {
             if let Some(pollee) = weak_pollee.upgrade() {
                 let mut pollers = pollee.pollers.lock();
-                let res = pollers.remove(&self_observer);
-                //assert!(res.is_some());
+                let _res = pollers.remove(&self_observer);
+                assert!(_res.is_some());
                 drop(pollers);
 
                 pollee.num_pollers.fetch_sub(1, Ordering::Relaxed);

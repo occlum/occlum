@@ -148,7 +148,7 @@ impl Producer {
         // Update the event of pollee in a critical region so that pollee
         // always reflects the _true_ state of the underlying ring buffer
         // regardless of any race conditions.
-        let event_lock = self.common.lock_event();
+        self.common.lock_event();
 
         let rb = this_end.ringbuf();
         if rb.is_full() {
@@ -246,7 +246,7 @@ impl Consumer {
         // Update the event of pollee in a critical region so that pollee
         // always reflects the _true_ state of the underlying ring buffer
         // regardless of any race conditions.
-        let event_lock = self.common.lock_event();
+        self.common.lock_event();
 
         let rb = this_end.ringbuf();
         if rb.is_empty() {
@@ -446,8 +446,8 @@ mod tests {
 }
 
 fn check_status_flags(flags: StatusFlags) -> Result<()> {
-    let VALID_FLAGS: StatusFlags = StatusFlags::O_NONBLOCK | StatusFlags::O_DIRECT;
-    if !VALID_FLAGS.contains(flags) {
+    let valid_flags: StatusFlags = StatusFlags::O_NONBLOCK | StatusFlags::O_DIRECT;
+    if !valid_flags.contains(flags) {
         return_errno!(EINVAL, "invalid flags");
     }
     if flags.contains(StatusFlags::O_DIRECT) {

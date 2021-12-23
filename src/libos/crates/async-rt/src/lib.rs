@@ -15,10 +15,9 @@
 #![feature(thread_local)]
 #![feature(const_fn_fn_ptr_basics)]
 #![feature(const_fn_trait_bound)]
-#![feature(duration_zero)]
 #![feature(duration_constants)]
-#![feature(duration_saturating_ops)]
 #![feature(get_mut_unchecked)]
+#![allow(dead_code)]
 
 #[cfg(feature = "sgx")]
 #[macro_use]

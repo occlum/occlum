@@ -146,8 +146,8 @@ impl std::fmt::Debug for EventFile {
 }
 
 fn check_status_flags(flags: StatusFlags) -> Result<()> {
-    let VALID_FLAGS: StatusFlags = StatusFlags::O_NONBLOCK;
-    if !VALID_FLAGS.contains(flags) {
+    let valid_flags: StatusFlags = StatusFlags::O_NONBLOCK;
+    if !valid_flags.contains(flags) {
         return_errno!(EINVAL, "invalid flags");
     }
     Ok(())

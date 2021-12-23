@@ -1,9 +1,8 @@
 use std::collections::VecDeque;
 use std::marker::PhantomData;
-use std::mem::{size_of, MaybeUninit};
+use std::mem::size_of;
 
 use io_uring_callback::{Fd, IoHandle};
-use memoffset::offset_of;
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
 use super::ConnectedStream;
@@ -32,7 +31,7 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
 
         // Start async accept requests right as early as possible to improve performance
         {
-            let mut inner = new_self.inner.lock().unwrap();
+            let inner = new_self.inner.lock().unwrap();
             new_self.initiate_async_accepts(inner);
         }
 
@@ -98,7 +97,7 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
         self.initiate_async_accepts(inner);
 
         let common = {
-            let mut common = Arc::new(Common::with_host_fd(accepted_fd, Type::STREAM, nonblocking));
+            let common = Arc::new(Common::with_host_fd(accepted_fd, Type::STREAM, nonblocking));
             common.set_peer_addr(&accepted_addr);
             common
         };

@@ -3,6 +3,7 @@ use futures::task::waker_ref;
 use crate::config::CONFIG;
 use crate::parks::Parks;
 use crate::prelude::*;
+#[allow(unused_imports)]
 use crate::sched::{BasicScheduler, PriorityScheduler, Scheduler};
 use crate::task::Task;
 

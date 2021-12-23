@@ -1,8 +1,6 @@
 use std::mem::{self};
-use std::ptr::NonNull;
-use std::slice::{self};
 
-use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
+use sgx_untrusted_alloc::UntrustedBox;
 
 use crate::prelude::*;
 
@@ -186,11 +184,13 @@ impl UntrustedCircularBuf {
     }
 
     /// Returns a slice that contains the entire buffer.
+    #[allow(dead_code)]
     pub fn as_slice(&self) -> &[u8] {
         &*self.buf
     }
 
     /// Returns a mutable slice that contains the entire buffer.
+    #[allow(dead_code)]
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
         &mut *self.buf
     }

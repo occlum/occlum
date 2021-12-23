@@ -19,32 +19,6 @@ pub(crate) use async_io::file::StatusFlags;
 pub(crate) use async_io::ioctl::IoctlCmd;
 pub(crate) use async_io::socket::{Addr, Domain, RecvFlags, SendFlags, Shutdown, Type};
 
-macro_rules! function {
-    () => {{
-        fn f() {}
-        fn type_name_of<T>(_: T) -> &'static str {
-            std::any::type_name::<T>()
-        }
-        let name = type_name_of(f);
-
-        match &name[..name.len() - 3].rfind(':') {
-            Some(pos) => &name[pos + 1..name.len() - 3],
-            None => &name[..name.len() - 3],
-        }
-    }};
-}
-
-macro_rules! debug_trace {
-    () => {
-        println!(
-            "> Function = {}, Line = {}, File = {}",
-            function!(),
-            line!(),
-            file!()
-        )
-    };
-}
-
 // return Err(errno) if libc return -1
 macro_rules! try_libc {
     ($ret: expr) => {{

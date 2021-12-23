@@ -619,7 +619,7 @@ pub async fn do_sendfile(
     out_fd: FileDesc,
     in_fd: FileDesc,
     offset_ptr: *mut off_t,
-    count: size_t,
+    count: isize,
 ) -> Result<isize> {
     let offset = if offset_ptr.is_null() {
         None

@@ -60,7 +60,7 @@ impl RangeLockList {
                 conflict_lock.enqueue_waiter(&mut waiter);
                 // Ensure that we drop any locks before wait
                 drop(list);
-                waiter.wait().await;
+                waiter.wait().await?;
                 // Wake up, let's try to set lock again
                 continue;
             }

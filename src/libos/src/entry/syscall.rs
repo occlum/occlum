@@ -212,7 +212,7 @@ macro_rules! process_syscall_table_with_callback {
             (Readv = 19) => do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32),
             (Pread64 = 17) => do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: off_t),
             (Lseek = 8) => do_lseek(fd: FileDesc, offset: off_t, whence: i32),
-            (Sendfile = 40) => do_sendfile(out_fd: FileDesc, in_fd: FileDesc, offset_ptr: *mut off_t, count: size_t),
+            (Sendfile = 40) => do_sendfile(out_fd: FileDesc, in_fd: FileDesc, offset_ptr: *mut off_t, count: isize),
             (Fcntl = 72) => do_fcntl(fd: FileDesc, cmd: u32, arg: u64),
             (Ioctl = 16) => do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8),
 

@@ -1,9 +1,7 @@
-use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::ptr::{self};
 
 use io_uring_callback::{Fd, IoHandle};
-use memoffset::offset_of;
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
 use super::ConnectedStream;
@@ -38,7 +36,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             let mask = Events::OUT;
             let events = self.common.pollee().poll(mask, poller.as_mut());
             if events.is_empty() {
-                poller.as_ref().unwrap().wait().await;
+                poller.as_ref().unwrap().wait().await?;
             }
         }
     }

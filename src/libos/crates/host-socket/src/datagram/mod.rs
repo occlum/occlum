@@ -349,10 +349,12 @@ impl State {
         self.bind_state.is_bound()
     }
 
+    #[allow(dead_code)]
     pub fn is_explicit_bound(&self) -> bool {
         self.bind_state.is_explicit_bound()
     }
 
+    #[allow(dead_code)]
     pub fn is_implicit_bound(&self) -> bool {
         self.bind_state.is_implicit_bound()
     }
@@ -393,6 +395,7 @@ impl BindState {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_explicit_bound(&self) -> bool {
         match self {
             Self::ExplicitBound => true,
@@ -400,6 +403,7 @@ impl BindState {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_implicit_bound(&self) -> bool {
         match self {
             Self::ImplicitBound => true,

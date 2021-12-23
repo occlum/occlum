@@ -1,5 +1,3 @@
-use object_id::ObjectId;
-
 use super::Events;
 
 /// An observer for events on pollees.

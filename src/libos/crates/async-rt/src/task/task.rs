@@ -48,9 +48,10 @@ impl Task {
 
         let tirqs_ptr = tirqs as *const _;
         // Safety. The pointer is valid and the field-container relationship is hold
+        #[allow(unused_unsafe)]
         let task_ptr = unsafe { container_of!(tirqs_ptr, Task, tirqs) };
         // Safety. The container's pointer is valid as long as the field's pointer is valid.
-        let task = unsafe { &*task_ptr };
+        let task = &*task_ptr;
         task.to_arc()
     }
 

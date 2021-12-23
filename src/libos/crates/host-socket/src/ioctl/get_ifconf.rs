@@ -23,7 +23,7 @@ impl GetIfConf {
                 buf.resize(ifconf.ifc_len as usize, 0);
                 buf
             };
-            unsafe { Self::IfConfBuf(buf) }
+            Self::IfConfBuf(buf)
         }
     }
 

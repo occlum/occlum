@@ -43,7 +43,6 @@
 #![feature(get_mut_unchecked)]
 
 #[cfg(feature = "sgx")]
-#[macro_use]
 extern crate sgx_tstd as std;
 
 /// A helper macro to initialize a self-referenced `Arc<T>`. See the crate level doc.

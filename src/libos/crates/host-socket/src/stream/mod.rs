@@ -139,7 +139,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
                 let mut state = self.state.write().unwrap();
                 *state = State::Connected(connected_stream);
             }
-            Err(e) => {
+            Err(_) => {
                 let mut state = self.state.write().unwrap();
                 *state = State::Init(init_stream);
             }
@@ -268,7 +268,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             cmd: GetAcceptConnCmd => {
                 let mut is_listen = false;
                 let state = self.state.read().unwrap();
-                if let State::Listen(listener_stream) = &*state {
+                if let State::Listen(_listener_stream) = &*state {
                     is_listen = true;
                 }
                 cmd.set_output(is_listen as _);

@@ -1,9 +1,7 @@
-use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::ptr::{self};
 
 use io_uring_callback::{Fd, IoHandle};
-use memoffset::offset_of;
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
 use super::ConnectedStream;
@@ -209,7 +207,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
     }
 
     pub fn bytes_to_consume(self: &Arc<Self>) -> usize {
-        let mut inner = self.receiver.inner.lock().unwrap();
+        let inner = self.receiver.inner.lock().unwrap();
         inner.recv_buf.consumable()
     }
 }

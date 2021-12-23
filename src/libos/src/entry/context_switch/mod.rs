@@ -110,6 +110,7 @@ extern "C" {
 
     // Assembly functions
     fn __switch_to_kernel() -> !;
+    #[allow(improper_ctypes)]
     fn __current_context_ptr() -> *mut CpuContext;
     fn __current_fault_ptr() -> *mut Fault;
 }
