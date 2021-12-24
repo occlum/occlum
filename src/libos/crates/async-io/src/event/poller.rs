@@ -68,7 +68,7 @@ impl Pollee {
 
         let mut pollers = self.inner.pollers.lock();
         let is_new = {
-            let observer = poller.inner.clone() as KeyableArc<dyn Observer>;
+            let observer = poller.observer();
             pollers.insert(observer, mask).is_none()
         };
         if is_new {
@@ -227,6 +227,10 @@ impl Poller {
             .await
             .map(|_| ())
     }
+
+    pub fn observer(&self) -> KeyableArc<dyn Observer> {
+        self.inner.clone() as KeyableArc<dyn Observer>
+    }
 }
 
 impl Observer for PollerInner {
@@ -242,12 +246,12 @@ impl Drop for Poller {
             return;
         }
 
-        let self_observer = self.inner.clone() as KeyableArc<dyn Observer>;
+        let self_observer = self.observer();
         for weak_pollee in pollees.drain(..) {
             if let Some(pollee) = weak_pollee.upgrade() {
                 let mut pollers = pollee.pollers.lock();
-                let _res = pollers.remove(&self_observer);
-                assert!(_res.is_some());
+                let res = pollers.remove(&self_observer);
+                assert!(res.is_some());
                 drop(pollers);
 
                 pollee.num_pollers.fetch_sub(1, Ordering::Relaxed);
