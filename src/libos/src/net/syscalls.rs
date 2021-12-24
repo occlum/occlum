@@ -171,7 +171,7 @@ pub async fn do_accept4(
 
     // Output the address
     if let Some((addr_mut, addr_len_mut)) = addr_and_addr_len {
-        let (src_addr, src_addr_len) = accepted_socket.addr()?.to_c_storage();
+        let (src_addr, src_addr_len) = accepted_socket.peer_addr()?.to_c_storage();
         copy_sock_addr_to_user(src_addr, src_addr_len, addr_mut, addr_len_mut);
     }
     // Update the file table
