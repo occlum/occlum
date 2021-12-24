@@ -49,15 +49,16 @@ int pal_interrupt_thread_start(void) {
     is_running = 1;
     pal_thread_counter_inc();
 
-    int ret = 0;
-    if ((ret = pthread_create(&thread, NULL, thread_func, NULL))) {
-        is_running = 0;
-        pal_thread_counter_dec();
+    // FIXME: temporary disable interrupt thread
+    // int ret = 0;
+    // if ((ret = pthread_create(&thread, NULL, thread_func, NULL))) {
+    //     is_running = 0;
+    //     pal_thread_counter_dec();
 
-        errno = ret;
-        PAL_ERROR("Failed to start the interrupt thread: %s", errno2str(errno));
-        return -1;
-    }
+    //     errno = ret;
+    //     PAL_ERROR("Failed to start the interrupt thread: %s", errno2str(errno));
+    //     return -1;
+    // }
     return 0;
 }
 
@@ -70,12 +71,13 @@ int pal_interrupt_thread_stop(void) {
     is_running = 0;
     pal_thread_counter_dec();
 
-    int ret = 0;
-    if ((ret = pthread_join(thread, NULL))) {
-        errno = ret;
-        PAL_ERROR("Failed to free the interrupt thread: %s", errno2str(errno));
-        return -1;
-    }
+    // FIXME: temporary disable interrupt thread
+    // int ret = 0;
+    // if ((ret = pthread_join(thread, NULL))) {
+    //     errno = ret;
+    //     PAL_ERROR("Failed to free the interrupt thread: %s", errno2str(errno));
+    //     return -1;
+    // }
 
     return 0;
 }

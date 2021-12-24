@@ -271,8 +271,18 @@ jobs:
       run: docker exec pytorch_test bash -c "cd /root/occlum/demos/pytorch; ./install_python_with_conda.sh"
 
     - name: Run pytorch test
-      run: docker exec pytorch_test bash -c "cd /root/occlum/demos/pytorch; SGX_MODE=SIM ./run_pytorch_on_occlum.sh"
+      run: docker exec -d pytorch_test bash -c "cd /root/occlum/demos/pytorch; SGX_MODE=SIM ./run_pytorch_on_occlum.sh 2>&1 | tee /root/occlum/log"
 
+    # FIXME: PyTorch can't exit with interrupt support
+    - name: Kill the container
+      run: |
+        sleep 360;
+        cat "$GITHUB_WORKSPACE/log";
+        if grep -q Done "$GITHUB_WORKSPACE/log"; then
+          docker stop pytorch_test
+        else
+          exit 1
+        fi
 
   Tensorflow_test:
     runs-on: ubuntu-20.04
@@ -508,7 +518,7 @@ jobs:
 
     - name: Run the Vault client
       run: |
-        sleep ${{ env.nap_time }};
+        sleep 360;
         docker exec vault_test bash -c "cd /root/occlum/demos/golang/vault && ./run_occlum_vault_test.sh"
 
     - name: Check Vault log
