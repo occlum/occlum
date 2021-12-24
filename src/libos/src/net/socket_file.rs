@@ -1,9 +1,9 @@
 use async_io::ioctl::IoctlCmd;
 use async_io::socket::{RecvFlags, SendFlags, Shutdown};
 
-use self::impls::{Ipv4Datagram, Ipv4Stream, UnixDatagram, UnixStream};
+use self::impls::{Ipv4Datagram, Ipv4Stream, Ipv6Stream, UnixDatagram, UnixStream};
 use crate::fs::{AccessMode, Events, Observer, Poller, StatusFlags};
-use crate::net::{Addr, AnyAddr, Domain, Ipv4SocketAddr, UnixAddr};
+use crate::net::{Addr, AnyAddr, Domain, Ipv4SocketAddr, Ipv6SocketAddr, UnixAddr};
 use crate::prelude::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
@@ -16,6 +16,7 @@ pub struct SocketFile {
 enum AnySocket {
     UnixStream(UnixStream),
     Ipv4Stream(Ipv4Stream),
+    Ipv6Stream(Ipv6Stream),
     UnixDatagram(UnixDatagram),
     Ipv4Datagram(Ipv4Datagram),
 }
@@ -62,6 +63,9 @@ macro_rules! apply_fn_on_any_socket {
                 $($fn_body)*
             }
             AnySocket::Ipv4Stream($socket) => {
+                $($fn_body)*
+            }
+            AnySocket::Ipv6Stream($socket) => {
                 $($fn_body)*
             }
             AnySocket::UnixDatagram($socket) => {
@@ -146,12 +150,13 @@ impl SocketFile {
                     let ipv4_stream = Ipv4Stream::new(nonblocking)?;
                     AnySocket::Ipv4Stream(ipv4_stream)
                 }
+                Domain::Ipv6 => {
+                    let ipv6_stream = Ipv6Stream::new(nonblocking)?;
+                    AnySocket::Ipv6Stream(ipv6_stream)
+                }
                 Domain::Unix => {
                     let unix_stream = UnixStream::new(nonblocking)?;
                     AnySocket::UnixStream(unix_stream)
-                }
-                _ => {
-                    return_errno!(EINVAL, "not support IPv6, yet");
                 }
             };
             let new_self = Self { socket: any_socket };
@@ -214,6 +219,10 @@ impl SocketFile {
                 let ip_addr = addr.to_ipv4()?;
                 ipv4_stream.connect(ip_addr).await
             }
+            AnySocket::Ipv6Stream(ipv6_stream) => {
+                let ip_addr = addr.to_ipv6()?;
+                ipv6_stream.connect(ip_addr).await
+            }
             AnySocket::UnixStream(unix_stream) => {
                 let unix_addr = addr.to_unix()?;
                 unix_stream.connect(unix_addr).await
@@ -246,6 +255,10 @@ impl SocketFile {
                 let ip_addr = addr.to_ipv4()?;
                 ipv4_stream.bind(ip_addr)
             }
+            AnySocket::Ipv6Stream(ipv6_stream) => {
+                let ip_addr = addr.to_ipv6()?;
+                ipv6_stream.bind(ip_addr)
+            }
             AnySocket::UnixStream(unix_stream) => {
                 let unix_addr = addr.to_unix()?;
                 unix_stream.bind(unix_addr)
@@ -266,7 +279,8 @@ impl SocketFile {
 
     pub fn listen(&self, backlog: u32) -> Result<()> {
         match &self.socket {
-            AnySocket::Ipv4Stream(ipv4_stream) => ipv4_stream.listen(backlog),
+            AnySocket::Ipv4Stream(ip_stream) => ip_stream.listen(backlog),
+            AnySocket::Ipv6Stream(ip_stream) => ip_stream.listen(backlog),
             AnySocket::UnixStream(unix_stream) => unix_stream.listen(backlog),
             _ => {
                 return_errno!(EINVAL, "listen is not supported");
@@ -279,6 +293,10 @@ impl SocketFile {
             AnySocket::Ipv4Stream(ipv4_stream) => {
                 let accepted_ipv4_stream = ipv4_stream.accept(nonblocking).await?;
                 AnySocket::Ipv4Stream(accepted_ipv4_stream)
+            }
+            AnySocket::Ipv6Stream(ipv6_stream) => {
+                let accepted_ipv6_stream = ipv6_stream.accept(nonblocking).await?;
+                AnySocket::Ipv6Stream(accepted_ipv6_stream)
             }
             AnySocket::UnixStream(unix_stream) => {
                 let accepted_unix_stream = unix_stream.accept(nonblocking).await?;
@@ -311,6 +329,10 @@ impl SocketFile {
         Ok(match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => {
                 let bytes_recv = ipv4_stream.recvmsg(bufs, flags).await?;
+                (bytes_recv, None)
+            }
+            AnySocket::Ipv6Stream(ipv6_stream) => {
+                let bytes_recv = ipv6_stream.recvmsg(bufs, flags).await?;
                 (bytes_recv, None)
             }
             AnySocket::UnixStream(unix_stream) => {
@@ -353,6 +375,12 @@ impl SocketFile {
                 }
                 ipv4_stream.sendmsg(bufs, flags).await
             }
+            AnySocket::Ipv6Stream(ipv6_stream) => {
+                if addr.is_some() {
+                    return_errno!(EISCONN, "addr should be none");
+                }
+                ipv6_stream.sendmsg(bufs, flags).await
+            }
             AnySocket::UnixStream(unix_stream) => {
                 if addr.is_some() {
                     return_errno!(EISCONN, "addr should be none");
@@ -389,6 +417,7 @@ impl SocketFile {
     pub fn addr(&self) -> Result<AnyAddr> {
         Ok(match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => AnyAddr::Ipv4(ipv4_stream.addr()?),
+            AnySocket::Ipv6Stream(ipv6_stream) => AnyAddr::Ipv6(ipv6_stream.addr()?),
             AnySocket::UnixStream(unix_stream) => AnyAddr::Unix(unix_stream.addr()?),
             AnySocket::Ipv4Datagram(ipv4_datagram) => AnyAddr::Ipv4(ipv4_datagram.addr()?),
             AnySocket::UnixDatagram(unix_datagram) => AnyAddr::Unix(unix_datagram.addr()?),
@@ -401,6 +430,7 @@ impl SocketFile {
     pub fn peer_addr(&self) -> Result<AnyAddr> {
         Ok(match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => AnyAddr::Ipv4(ipv4_stream.peer_addr()?),
+            AnySocket::Ipv6Stream(ipv6_stream) => AnyAddr::Ipv6(ipv6_stream.peer_addr()?),
             AnySocket::UnixStream(unix_stream) => AnyAddr::Unix(unix_stream.peer_addr()?),
             AnySocket::Ipv4Datagram(ipv4_datagram) => AnyAddr::Ipv4(ipv4_datagram.peer_addr()?),
             AnySocket::UnixDatagram(unix_datagram) => AnyAddr::Unix(unix_datagram.peer_addr()?),
@@ -413,6 +443,7 @@ impl SocketFile {
     pub fn shutdown(&self, how: Shutdown) -> Result<()> {
         match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => ipv4_stream.shutdown(how),
+            AnySocket::Ipv6Stream(ipv6_stream) => ipv6_stream.shutdown(how),
             AnySocket::UnixStream(unix_stream) => unix_stream.shutdown(how),
             _ => {
                 return_errno!(EINVAL, "shutdown is not supported");
@@ -426,6 +457,7 @@ mod impls {
     use io_uring_callback::IoUring;
 
     pub type Ipv4Stream = host_socket::StreamSocket<Ipv4SocketAddr, SocketRuntime>;
+    pub type Ipv6Stream = host_socket::StreamSocket<Ipv6SocketAddr, SocketRuntime>;
     // TODO: UnixStream cannot be simply re-exported from host_socket.
     // There are two reasons. First, there needs to be some translation between LibOS
     // and host paths. Second, we need two types of unix domain sockets: the trusted one that

@@ -2,12 +2,15 @@ use std::mem::{self, MaybeUninit};
 
 use crate::prelude::*;
 
-pub use async_io::socket::{Addr, CSockAddr, Domain, Ipv4Addr, Ipv4SocketAddr, UnixAddr};
+pub use async_io::socket::{
+    Addr, CSockAddr, Domain, Ipv4Addr, Ipv4SocketAddr, Ipv6SocketAddr, UnixAddr,
+};
 use num_enum::IntoPrimitive;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AnyAddr {
     Ipv4(Ipv4SocketAddr),
+    Ipv6(Ipv6SocketAddr),
     Unix(UnixAddr),
     Unspec,
 }
@@ -18,6 +21,10 @@ impl AnyAddr {
             libc::AF_INET => {
                 let ipv4_addr = Ipv4SocketAddr::from_c_storage(c_addr, c_addr_len)?;
                 Self::Ipv4(ipv4_addr)
+            }
+            libc::AF_INET6 => {
+                let ipv6_addr = Ipv6SocketAddr::from_c_storage(c_addr, c_addr_len)?;
+                Self::Ipv6(ipv6_addr)
             }
             libc::AF_UNIX | libc::AF_LOCAL => {
                 let unix_addr = UnixAddr::from_c_storage(c_addr, c_addr_len)?;
@@ -34,6 +41,7 @@ impl AnyAddr {
     pub fn to_c_storage(&self) -> (libc::sockaddr_storage, usize) {
         match self {
             Self::Ipv4(ipv4_addr) => ipv4_addr.to_c_storage(),
+            Self::Ipv6(ipv6_addr) => ipv6_addr.to_c_storage(),
             Self::Unix(unix_addr) => unix_addr.to_c_storage(),
             Self::Unspec => {
                 let mut sockaddr_storage =
@@ -62,6 +70,13 @@ impl AnyAddr {
         match self {
             Self::Ipv4(ipv4_addr) => Ok(ipv4_addr),
             _ => return_errno!(EAFNOSUPPORT, "not ipv4 address"),
+        }
+    }
+
+    pub fn to_ipv6(&self) -> Result<&Ipv6SocketAddr> {
+        match self {
+            Self::Ipv6(ipv6_addr) => Ok(ipv6_addr),
+            _ => return_errno!(EAFNOSUPPORT, "not ipv6 address"),
         }
     }
 

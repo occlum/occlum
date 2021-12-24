@@ -63,6 +63,23 @@ impl CSockAddr for (libc::sockaddr_in, usize) {
     }
 }
 
+impl CSockAddr for (libc::sockaddr_in6, usize) {
+    fn c_family(&self) -> libc::sa_family_t {
+        self.0.sin6_family
+    }
+
+    fn c_addr(&self) -> &[u8] {
+        assert!(self.1 == size_of::<libc::sockaddr_in6>());
+        unsafe {
+            let addr_ptr = (self as *const _ as *const u8).add(size_of_val(&self.c_family()));
+            std::slice::from_raw_parts(
+                addr_ptr,
+                size_of::<libc::sockaddr_in6>() - size_of_val(&self.c_family()),
+            )
+        }
+    }
+}
+
 impl CSockAddr for (libc::sockaddr_un, usize) {
     fn c_family(&self) -> libc::sa_family_t {
         libc::AF_UNIX as _
