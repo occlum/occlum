@@ -100,18 +100,20 @@ impl<'a> IoctlRawCmd<'a> {
                 }
                 Box::new(GetIfConf::new(ifconf_mut))
             }
-            IoctlRawCmd::SIOCGIFNAME(_)
-            | IoctlRawCmd::SIOCGIFFLAGS(_)
-            | IoctlRawCmd::SIOCGIFADDR(_)
-            | IoctlRawCmd::SIOCGIFDSTADDR(_)
-            | IoctlRawCmd::SIOCGIFBRDADDR(_)
-            | IoctlRawCmd::SIOCGIFNETMASK(_)
-            | IoctlRawCmd::SIOCGIFMTU(_)
-            | IoctlRawCmd::SIOCGIFHWADDR(_)
-            | IoctlRawCmd::SIOCGIFINDEX(_)
-            | IoctlRawCmd::SIOCGIFPFLAGS(_)
-            | IoctlRawCmd::SIOCGIFTXQLEN(_)
-            | IoctlRawCmd::SIOCGIFMAP(_) => Box::new(GetIfReqWithRawCmd::new(self.cmd_num())),
+            IoctlRawCmd::SIOCGIFFLAGS(req)
+            | IoctlRawCmd::SIOCGIFNAME(req)
+            | IoctlRawCmd::SIOCGIFADDR(req)
+            | IoctlRawCmd::SIOCGIFDSTADDR(req)
+            | IoctlRawCmd::SIOCGIFBRDADDR(req)
+            | IoctlRawCmd::SIOCGIFNETMASK(req)
+            | IoctlRawCmd::SIOCGIFMTU(req)
+            | IoctlRawCmd::SIOCGIFHWADDR(req)
+            | IoctlRawCmd::SIOCGIFINDEX(req)
+            | IoctlRawCmd::SIOCGIFPFLAGS(req)
+            | IoctlRawCmd::SIOCGIFTXQLEN(req)
+            | IoctlRawCmd::SIOCGIFMAP(req) => {
+                Box::new(GetIfReqWithRawCmd::new(self.cmd_num(), **req))
+            }
             _ => {
                 return_errno!(EINVAL, "unsupported cmd");
             }
