@@ -170,9 +170,22 @@ impl File for StdoutFile {
     }
 
     fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
+        let host_stdout_fd = self.host_fd() as i32;
+        let cmd_bits = cmd.cmd_num() as c_int;
+
+        // Handle special case for TCGETS/TCSETS which use different structures
+        // in linux kernel and libc
+        match cmd {
+            IoctlCmd::TCGETS(kernel_termios) => {
+                return kernel_termios.execute_tcgets(host_stdout_fd, cmd_bits);
+            }
+            IoctlCmd::TCSETS(kernel_termios) => {
+                return kernel_termios.execute_tcsets(host_stdout_fd, cmd_bits);
+            }
+            _ => {}
+        };
+
         let can_delegate_to_host = match cmd {
-            IoctlCmd::TCGETS(_) => true,
-            IoctlCmd::TCSETS(_) => true,
             IoctlCmd::TIOCGWINSZ(_) => true,
             IoctlCmd::TIOCSWINSZ(_) => true,
             _ => false,
@@ -181,9 +194,7 @@ impl File for StdoutFile {
             return_errno!(EINVAL, "unknown ioctl cmd for stdout");
         }
 
-        let cmd_bits = cmd.cmd_num() as c_int;
         let cmd_arg_ptr = cmd.arg_ptr() as *mut c_void;
-        let host_stdout_fd = self.host_fd() as i32;
         let cmd_arg_len = cmd.arg_len();
         let ret = try_libc!({
             let mut retval: i32 = 0;
@@ -321,9 +332,22 @@ impl File for StdinFile {
     }
 
     fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
+        let host_stdin_fd = self.host_fd() as i32;
+        let cmd_bits = cmd.cmd_num() as c_int;
+
+        // Handle special case for TCGETS/TCSETS which use different structures
+        // in linux kernel and libc
+        match cmd {
+            IoctlCmd::TCGETS(kernel_termios) => {
+                return kernel_termios.execute_tcgets(host_stdin_fd, cmd_bits);
+            }
+            IoctlCmd::TCSETS(kernel_termios) => {
+                return kernel_termios.execute_tcsets(host_stdin_fd, cmd_bits);
+            }
+            _ => {}
+        };
+
         let can_delegate_to_host = match cmd {
-            IoctlCmd::TCGETS(_) => true,
-            IoctlCmd::TCSETS(_) => true,
             IoctlCmd::TIOCGWINSZ(_) => true,
             IoctlCmd::TIOCSWINSZ(_) => true,
             _ => false,
@@ -332,9 +356,7 @@ impl File for StdinFile {
             return_errno!(EINVAL, "unknown ioctl cmd for stdin");
         }
 
-        let cmd_bits = cmd.cmd_num() as c_int;
         let cmd_arg_ptr = cmd.arg_ptr() as *mut c_void;
-        let host_stdin_fd = self.host_fd() as i32;
         let cmd_arg_len = cmd.arg_len();
         let ret = try_libc!({
             let mut retval: i32 = 0;
