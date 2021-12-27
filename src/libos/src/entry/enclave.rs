@@ -2,7 +2,7 @@ use std::backtrace::{self, PrintFormat};
 use std::ffi::{CStr, CString, OsString};
 use std::panic::{self};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::Once;
 
 use sgx_tse::*;
@@ -417,9 +417,19 @@ pub(crate) fn set_pal_data_addr(pal_data_ptr: *const occlum_pal_vcpu_data) {
 pub fn set_user_space_mark(mark: u32) {
     let pal_data_addr = PAL_DATA.load(Ordering::Relaxed);
     let pal_data_ptr = unsafe { &mut *(pal_data_addr as *mut occlum_pal_vcpu_data) };
+    let mut mark = mark;
+
+    // Add 1 to switch count every time before entering user space.
+    // Reset it to 0 after switching back.
+    // The logic here is if the switch count keeps no change, one task in this
+    // VCPU is somehow blocked in userspace.
+    if mark != 0 {
+        mark = CONTEXT_SWITCH_CNT.fetch_add(1, Ordering::Relaxed);
+    }
 
     (*pal_data_ptr).user_space_mark = mark;
 }
 
 #[thread_local]
 static PAL_DATA: AtomicUsize = AtomicUsize::new(0);
+static CONTEXT_SWITCH_CNT: AtomicU32 = AtomicU32::new(0);

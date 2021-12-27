@@ -21,10 +21,17 @@ extern pthread_t *pal_vcpu_threads;
 extern struct occlum_pal_vcpu_data *pal_vcpu_data;
 
 static void *thread_func(void *_data) {
+    unsigned int *switch_cnts = calloc(pal_num_vcpus, sizeof(unsigned int));
+    if (switch_cnts == NULL) {
+        errno = ENOMEM;
+        return NULL;
+    }
+
     while (1) {
         struct timespec timeout = { .tv_sec = 0, .tv_nsec = 250 * MS };
         int counter = pal_thread_counter_wait_zero(&timeout);
         if (counter == 0) {
+            free(switch_cnts);
             return NULL;
         }
 
@@ -32,8 +39,20 @@ static void *thread_func(void *_data) {
             pthread_t vcpu_thread = pal_vcpu_threads[vcpu_i];
             struct occlum_pal_vcpu_data pal_data = pal_vcpu_data[vcpu_i];
 
-            if ( pal_data.user_space_mark == 1) {
-                pthread_kill(vcpu_thread, INTERRUPT_SIGNAL);
+            /*
+            * For each VCPU, every context switch (in libos) to userspace
+            * adds 1 to switch count. Reset it to 0 after switching back.
+            * The logic here is if the switch count keeps no change, one task in
+            * this VCPU is somehow blocked in userspace. Thus a wake-up interrupt
+            * signal sent is expected to force the blocked VCPU task to yield.
+            */
+            if ( pal_data.user_space_mark != 0 ) {
+                /*PAL_DEBUG("vcpu %d: previous: %d, current %d\n",
+                    vcpu_i, switch_cnts[vcpu_i], pal_data.user_space_mark);*/
+                if ( pal_data.user_space_mark == switch_cnts[vcpu_i] ) {
+                    pthread_kill(vcpu_thread, INTERRUPT_SIGNAL);
+                }
+                switch_cnts[vcpu_i] = pal_data.user_space_mark;
             }
         }
     }
