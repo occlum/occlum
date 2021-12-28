@@ -83,7 +83,15 @@ pub async fn handle_syscall() -> Result<()> {
         let arg4 = gp_regs.r8 as isize;
         let arg5 = gp_regs.r9 as isize;
         Syscall::new(num, arg0, arg1, arg2, arg3, arg4, arg5)
-    })?;
+    });
+    if let Err(ref e) = syscall {
+        let retval = -(e.errno() as i64);
+        CURRENT_CONTEXT.with(|context| {
+            context.borrow_mut().gp_regs.rax = retval as u64;
+        });
+    }
+
+    let mut syscall = syscall?;
     let syscall_num = syscall.num;
 
     log::set_round_desc(Some(syscall_num.as_str()));
@@ -690,7 +698,7 @@ macro_rules! impl_syscall_nums {
 
         impl ToErrno for SyscallNumError {
             fn errno(&self) -> Errno {
-                EINVAL
+                ENOSYS
             }
         }
 
