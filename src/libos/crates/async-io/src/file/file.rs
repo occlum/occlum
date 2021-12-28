@@ -20,12 +20,17 @@ pub trait File: Debug + Sync + Send {
     }
 
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
+        let mut ret_len = 0;
         for buf in bufs {
             if buf.len() > 0 {
-                return self.read(buf);
+                let ret = self.read(buf)?;
+                if ret == 0 {
+                    return Ok(ret_len);
+                }
+                ret_len += ret;
             }
         }
-        Ok(0)
+        Ok(ret_len)
     }
 
     fn write(&self, _buf: &[u8]) -> Result<usize> {
@@ -33,12 +38,17 @@ pub trait File: Debug + Sync + Send {
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
+        let mut ret_len = 0;
         for buf in bufs {
             if buf.len() > 0 {
-                return self.write(buf);
+                let ret = self.write(buf)?;
+                if ret == 0 {
+                    return Ok(ret_len);
+                }
+                ret_len += ret;
             }
         }
-        Ok(0)
+        Ok(ret_len)
     }
 
     fn poll(&self, _mask: Events, _poller: Option<&mut Poller>) -> Events {
