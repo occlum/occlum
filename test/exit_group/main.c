@@ -38,13 +38,12 @@ static void *futex_wait_thread_func(void *_) {
 
 // exit_group syscall should terminate all threads in a thread group.
 int test_exit_group_to_force_threads_terminate(void) {
-    // TODO: Enable this test case when fixed the interrupt thread bug
     // Create three types of threads that will not exit voluntarily
-    // pthread_t busyloop_thread;
-    // if (pthread_create(&busyloop_thread, NULL, busyloop_thread_func, NULL) < 0) {
-    //     printf("ERROR: pthread_create failed\n");
-    //     return -1;
-    // }
+    pthread_t busyloop_thread;
+    if (pthread_create(&busyloop_thread, NULL, busyloop_thread_func, NULL) < 0) {
+        printf("ERROR: pthread_create failed\n");
+        return -1;
+    }
     pthread_t sleeping_thread;
     if (pthread_create(&sleeping_thread, NULL, sleeping_thread_func, NULL) < 0) {
         printf("ERROR: pthread_create failed\n");
