@@ -24,7 +24,6 @@ pub async fn do_sendfile(
         Some(offset) => offset as usize,
         None => in_inode_file.position(),
     };
-
     // read from specified offset and write new offset back
     let mut bytes_read = 0;
     let mut bytes_write = 0;
@@ -35,9 +34,11 @@ pub async fn do_sendfile(
             break;
         }
         bytes_read += read_len;
-        read_offset += read_len;
         let write_len = out_file.write(&buffer[..read_len]).await?;
         bytes_write += write_len;
+        // read_offset should be updated based on write length, because the write length could be smaller than read length.
+        // For socket send/write, there is no guarantee that the actual send number is equal to the requested number.
+        read_offset += write_len;
         if write_len != read_len {
             break;
         }
@@ -46,7 +47,7 @@ pub async fn do_sendfile(
     // If offset is not none, does not modify file offset of in_fd;
     // otherwise the file offset is adjusted to reflect the number of bytes read
     if offset.is_none() {
-        in_inode_file.seek(SeekFrom::Current(bytes_read as i64))?;
+        in_inode_file.seek(SeekFrom::Current((bytes_write) as i64))?;
     }
     Ok((bytes_write, read_offset))
 }
