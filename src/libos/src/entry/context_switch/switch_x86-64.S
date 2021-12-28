@@ -21,8 +21,13 @@ __switch_to_user:
     wrfsbase %rsi
 
     // Get the user's RIP
-    movq (16*8)(%rdi), %rcx
+    movq CPU_CONTEXT_RIP(%rdi), %rcx
     movq %rcx, %gs:(TD_USER_RIP)
+
+    // Restore rflags
+    sub $8, %rsp
+    leaq CPU_CONTEXT_RFLAGS(%rdi), %rsp
+    popfq
 
     // Restore the CPU context of the user space
     movq %rdi, %rsp
