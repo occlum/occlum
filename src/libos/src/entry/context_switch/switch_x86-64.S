@@ -52,6 +52,28 @@ __switch_to_user:
     // This should never happen
     ud2
 
+.macro SWITCH_TO_KERNEL 
+      // Switch to the kernel stack
+    movq %gs:(TD_KERNEL_RSP), %rsp
+
+    // Switch to the kernel FS
+    movq %gs:(TD_KERNEL_FS), %rcx
+    wrfsbase %rcx
+
+    // Set the two pointers to NULL so that we can detect misuse
+    xor %rax, %rax
+    movq %rax, %gs:(TD_USER_CONTEXT)
+    movq %rax, %gs:(TD_USER_FAULT)
+
+    movq %gs:(TD_KERNEL_JMPBUF), %rdi
+    // Keep the stack 16-byte alignment
+    and $-16, %rsp
+    call _restore_kernel_state
+
+    // This should never happen
+    ud2
+.endm
+
     .global __syscall_entry_linux_abi
     .type __syscall_entry_linux_abi, @function
 __syscall_entry_linux_abi:
@@ -87,53 +109,17 @@ __syscall_entry_linux_abi:
     movq %rsp, CPU_CONTEXT_RSP(%r11)
     movq %rcx, CPU_CONTEXT_RIP(%r11)
 
-    // Switch to the kernel stack
-    movq %gs:(TD_KERNEL_RSP), %rsp
-
     // Save the rflags of user
     pushfq
     popq %rcx
     movq %rcx, CPU_CONTEXT_RFLAGS(%r11)
 
-    // Switch to the kernel FS
-    movq %gs:(TD_KERNEL_FS), %rcx
-    wrfsbase %rcx
-
-    // Set the two pointers to NULL so that we can detect misuse
-    xor %rax, %rax
-    movq %rax, %gs:(TD_USER_CONTEXT)
-    movq %rax, %gs:(TD_USER_FAULT)
-
-    movq %gs:(TD_KERNEL_JMPBUF), %rdi
-    // Keep the stack 16-byte alignment
-    and $-16, %rsp
-    call _restore_kernel_state
-
-    // This should never happen
-    ud2
+    SWITCH_TO_KERNEL
 
     .global __switch_to_kernel
     .type __switch_to_kernel, @function
 __switch_to_kernel:
-    // Switch to the kernel stack
-    movq %gs:(TD_KERNEL_RSP), %rsp
-
-    // Switch to the kernel FS
-    movq %gs:(TD_KERNEL_FS), %rcx
-    wrfsbase %rcx
-
-    // Set the two pointers to NULL so that we can detect misuse
-    xor %rax, %rax
-    movq %rax, %gs:(TD_USER_CONTEXT)
-    movq %rax, %gs:(TD_USER_FAULT)
-
-    movq %gs:(TD_KERNEL_JMPBUF), %rdi
-    // Keep the stack 16-byte alignment
-    and $-16, %rsp
-    call _restore_kernel_state
-
-    // This should never happen
-    ud2
+    SWITCH_TO_KERNEL
 
     .global __current_context_ptr
     .type __current_context_ptr, @function
