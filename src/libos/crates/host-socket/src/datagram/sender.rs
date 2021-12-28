@@ -45,6 +45,12 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
         let complete_fn = move |_retval: i32| {};
         let io_uring = self.common.io_uring();
         let host_fd = Fd(self.common.host_fd() as _);
+        trace!(
+            "sendmsg hostfd = {:?}, send_flags = {:?}, addr = {:?}",
+            host_fd,
+            send_flags,
+            addr
+        );
         let handle = unsafe { io_uring.sendmsg(host_fd, msghdr_ptr, send_flags, complete_fn) };
 
         let retval = handle.await;

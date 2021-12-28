@@ -8,6 +8,7 @@
 #![feature(raw_ref_op)]
 #![cfg_attr(feature = "sgx", no_std)]
 
+#[macro_use]
 extern crate log;
 #[cfg(feature = "sgx")]
 extern crate sgx_libc as libc;

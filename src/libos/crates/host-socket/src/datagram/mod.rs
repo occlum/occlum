@@ -245,19 +245,14 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
     }
 
     pub fn addr(&self) -> Result<A> {
-        match self.common.addr() {
-            Some(addr) => Ok(addr),
-            None => {
-                let state = self.state.read().unwrap();
-                if state.is_bound() {
-                    let addr = self.common.get_addr_from_host()?;
-                    self.common.set_addr(&addr);
-                    Ok(addr)
-                } else {
-                    Ok(A::default())
-                }
-            }
-        }
+        let common = &self.common;
+
+        // Always get addr from host.
+        // Because for IP socket, users can specify "0" as port and the kernel should select a usable port for him.
+        // Thus, when calling getsockname, this should be updated.
+        let addr = common.get_addr_from_host()?;
+        common.set_addr(&addr);
+        Ok(addr)
     }
 
     pub fn peer_addr(&self) -> Result<A> {
