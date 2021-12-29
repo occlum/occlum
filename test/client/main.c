@@ -14,6 +14,7 @@
 
 #define RESPONSE "ACK"
 #define DEFAULT_MSG "Hello World!\n"
+#define CLIENT_FD 98
 
 int connect_with_server(const char *addr_string, const char *port_string) {
     //"NULL" addr means connectionless, no need to connect to server
@@ -206,5 +207,11 @@ int main(int argc, const char *argv[]) {
     }
 
     close(server_fd);
+
+    // blocking here, waiting for the server
+    if (read(CLIENT_FD, buf, sizeof(buf) - 1) < 0) {
+        THROW_ERROR("reading pipe failed");
+    };
+
     return ret;
 }

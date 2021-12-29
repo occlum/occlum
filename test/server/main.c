@@ -19,8 +19,24 @@
 #define DEFAULT_MSG "Hello World!\n"
 #define SYNC_MSG "sync"
 
+#define CLIENT_FD 98
+int pipe_fds[2];
+
 int connect_with_child(int port, int *child_pid) {
     int ret = 0;
+
+    if (pipe(pipe_fds) < 0) {
+        THROW_ERROR("failed to create a pipe");
+    }
+
+    int pipe_rd_fd = pipe_fds[0];
+    int pipe_wr_fd = pipe_fds[1];
+
+    posix_spawn_file_actions_t file_actions;
+    posix_spawn_file_actions_init(&file_actions);
+    posix_spawn_file_actions_adddup2(&file_actions, pipe_rd_fd, CLIENT_FD);
+    posix_spawn_file_actions_addclose(&file_actions, pipe_wr_fd);
+
     int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (listen_fd < 0) {
         THROW_ERROR("create socket error");
@@ -50,11 +66,13 @@ int connect_with_child(int port, int *child_pid) {
     char port_string[8];
     sprintf(port_string, "%d", port);
     char *client_argv[] = {"client", "127.0.0.1", port_string, NULL};
-    ret = posix_spawn(child_pid, "/bin/client", NULL, NULL, client_argv, NULL);
+    ret = posix_spawn(child_pid, "/bin/client", &file_actions, NULL, client_argv, NULL);
     if (ret < 0) {
         close(listen_fd);
         THROW_ERROR("spawn client process error");
     }
+
+    close(pipe_rd_fd);
 
     int connected_fd = accept(listen_fd, (struct sockaddr *)NULL, NULL);
     if (connected_fd < 0) {
@@ -194,9 +212,16 @@ int server_connectionless_recvmsg() {
 
 int wait_for_child_exit(int child_pid) {
     int status = 0;
+    int pipe_wr_fd = pipe_fds[1];
+    char finish_str[] = "finished";
+
+    write(pipe_wr_fd, finish_str, sizeof(finish_str));
+    close(pipe_wr_fd);
+
     if (wait4(child_pid, &status, 0, NULL) < 0) {
         THROW_ERROR("failed to wait4 the child process");
     }
+
     return 0;
 }
 
@@ -211,11 +236,7 @@ int test_read_write() {
     }
 
     //wait for the child to exit for next spawn
-    int status = 0;
-    if (wait4(child_pid, &status, 0, NULL) < 0) {
-        THROW_ERROR("failed to wait4 the child process");
-    }
-
+    wait_for_child_exit(child_pid);
     return ret;
 }
 
@@ -399,10 +420,8 @@ int test_poll() {
         THROW_ERROR("unexpected return events");
     }
 
-    int status = 0;
-    if (wait4(child_pid, &status, 0, NULL) < 0) {
-        THROW_ERROR("failed to wait4 the child process");
-    }
+    wait_for_child_exit(child_pid);
+
     close(client_fd);
     return 0;
 }
@@ -454,10 +473,8 @@ int test_getname() {
         THROW_ERROR("server_getpeername failed");
     }
 
-    int status = 0;
-    if (wait4(child_pid, &status, 0, NULL) < 0) {
-        THROW_ERROR("failed to wait4 the child process");
-    }
+    wait_for_child_exit(child_pid);
+
     close(client_fd);
     return 0;
 }
@@ -524,10 +541,8 @@ int test_shutdown() {
         THROW_ERROR("failed to shutdown");
     }
 
-    int status = 0;
-    if (wait4(child_pid, &status, 0, NULL) < 0) {
-        THROW_ERROR("failed to wait4 the child process");
-    }
+    wait_for_child_exit(child_pid);
+
     close(client_fd);
     return 0;
 }
