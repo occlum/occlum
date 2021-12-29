@@ -155,6 +155,8 @@ fn main() {
             return;
         }
 
+        let kss_tuple = parse_kss_conf(&occlum_config);
+
         // Generate the enclave configuration
         let sgx_enclave_configuration = EnclaveConfiguration {
             ProdID: occlum_config.metadata.product_id,
@@ -177,6 +179,11 @@ fn main() {
             ReservedMemMinSize: user_space_size.unwrap() as u64,
             ReservedMemInitSize: user_space_size.unwrap() as u64,
             ReservedMemExecutable: 1,
+            EnableKSS: kss_tuple.0,
+            ISVEXTPRODID_H: kss_tuple.1,
+            ISVEXTPRODID_L: kss_tuple.2,
+            ISVFAMILYID_H: kss_tuple.3,
+            ISVFAMILYID_L: kss_tuple.4,
         };
         let enclave_config = serde_xml_rs::to_string(&sgx_enclave_configuration).unwrap();
         debug!("The enclave config:{:?}", enclave_config);
@@ -288,6 +295,30 @@ fn parse_memory_size(mem_str: &str) -> Result<usize, &str> {
     Ok(mem_val * unit_factor)
 }
 
+fn get_u64_id_high_and_low(id: &OcclumMetaID) -> (u64, u64) {
+    let id_high = u64::from_str_radix(id.high.trim_start_matches("0x"), 16)
+        .expect("64 bit hex string ID required, such as 0x1234567812345678");
+    let id_low = u64::from_str_radix(id.low.trim_start_matches("0x"), 16)
+        .expect("64 bit hex string ID required, such as 0x1234567812345678");
+
+    (id_high, id_low)
+}
+
+// Return a tuple (EnableKSS, ISVEXTPRODID_H, ISVEXTPRODID_L, ISVFAMILYID_H, ISVFAMILYID_L)
+fn parse_kss_conf(occlum_config: &OcclumConfiguration
+) -> (u32, u64, u64, u64, u64)
+{
+    match occlum_config.metadata.enable_kss {
+        true => {
+            let ext_prod_id = get_u64_id_high_and_low(&occlum_config.metadata.ext_prod_id);
+            let family_id = get_u64_id_high_and_low(&occlum_config.metadata.family_id);
+
+            (1, ext_prod_id.0, ext_prod_id.1, family_id.0, family_id.1)
+        },
+        false => (0, 0, 0, 0, 0)
+    }
+}
+
 fn gen_user_mount_config(
     mount_conf: Vec<OcclumMount>,
     occlum_conf_user_fs_mac: String,
@@ -389,10 +420,19 @@ struct OcclumProcess {
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
+struct OcclumMetaID {
+    high: String,
+    low: String
+}
+
+#[derive(Debug, PartialEq, Deserialize)]
 struct OcclumMetadata {
     product_id: u32,
     version_number: u32,
     debuggable: bool,
+    enable_kss: bool,
+    family_id: OcclumMetaID,
+    ext_prod_id: OcclumMetaID
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -448,6 +488,11 @@ struct EnclaveConfiguration {
     ReservedMemMinSize: u64,
     ReservedMemInitSize: u64,
     ReservedMemExecutable: u32,
+    EnableKSS: u32,
+    ISVEXTPRODID_H: u64,
+    ISVEXTPRODID_L: u64,
+    ISVFAMILYID_H: u64,
+    ISVFAMILYID_L: u64,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]

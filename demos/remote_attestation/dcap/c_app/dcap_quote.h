@@ -10,6 +10,10 @@
 #include "sgx_pce.h"
 #include "sgx_error.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void *dcap_quote_open(void);
 
 uint32_t dcap_get_quote_size(void *handle);
@@ -28,3 +32,7 @@ int32_t dcap_verify_quote(void *handle,
 
 
 void dcap_quote_close(void *handle);
+
+#ifdef __cplusplus
+}
+#endif

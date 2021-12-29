@@ -11,4 +11,4 @@ sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types" }
 libc = "0.2"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib", "rlib", "staticlib"]
