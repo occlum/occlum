@@ -8,11 +8,8 @@ use crate::prelude::*;
 pub async fn do_poll(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) -> Result<usize> {
     debug!("poll: poll_fds: {:?}, timeout: {:?}", poll_fds, timeout);
 
-    // Return immediately if there are actually no fds in poll_fds.
-    let none_fd = poll_fds.iter().all(|poll_fd| poll_fd.fd().is_none());
-    if none_fd {
-        return Ok(0);
-    }
+    // Even if there are actually no fds in poll_fds, but timeout is set to negative, poll should
+    // wait forever.
 
     // Always clear the revents fields first
     for poll_fd in poll_fds {
@@ -55,8 +52,12 @@ pub async fn do_poll(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) ->
         }
 
         // Return if the timeout expires.
-        if let Err(_) = poller.wait_timeout(timeout.as_mut()).await {
-            return Ok(0);
+        if let Err(e) = poller.wait_timeout(timeout.as_mut()).await {
+            if e.errno() == ETIMEDOUT {
+                return Ok(0);
+            } else {
+                return_errno!(e.errno(), "wait timeout error");
+            }
         }
     }
 }
