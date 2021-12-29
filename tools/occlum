@@ -342,7 +342,7 @@ cmd_run() {
     fi
 
     # Add back vcpu args to let pal/enclave to take over
-    set -- $vcpus_arg $@
+    set -- $vcpus_arg "$@"
 
     RUST_BACKTRACE=1 "$instance_dir/build/bin/occlum-run" "$@"
 
@@ -382,7 +382,7 @@ cmd_start() {
     fi
 
     # Add back vcpu args to let pal/enclave to take over
-    set -- $vcpus_arg $@
+    set -- $vcpus_arg "$@"
 
     RUST_BACKTRACE=1 "$instance_dir/build/bin/occlum_exec_client" start "$@"
 
