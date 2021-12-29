@@ -304,7 +304,7 @@ pub async fn do_futex(
                 .as_duration();
             timeout = timeout
                 .checked_sub(now)
-                .ok_or_else(|| errno!(EINVAL, "timeout is invalid"))?;
+                .ok_or_else(|| errno!(ETIMEDOUT, "timeout is invalid"))?;
         }
 
         // By now, the timeout argument has been converted to a Duration,
