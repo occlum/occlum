@@ -104,6 +104,7 @@ impl Waker {
 }
 
 // Note: state and waker must be updated together.
+#[derive(Debug)]
 struct SharedState {
     state: WaiterState,
     raw_waker: Option<RawWaker>,
@@ -119,6 +120,7 @@ impl SharedState {
 }
 
 // Accesible by WaiterQueue.
+#[derive(Debug)]
 pub(super) struct WaiterInner {
     shared_state: Mutex<SharedState>,
     queue_id: Atomic<ObjectId>,

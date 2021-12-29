@@ -2,10 +2,12 @@ use async_io::file::{Async, File};
 use inherit_methods_macro::inherit_methods;
 
 use std::sync::Weak;
+use std::time::Duration;
 
 use super::*;
 use crate::net::SocketFile;
 use crate::poll::EpollFile;
+use crate::time::TimerFile;
 
 // TODO: add fd to FileHandle?
 
@@ -38,6 +40,7 @@ enum AnyFile {
     Inode(Arc<AsyncInode>),
     Socket(Arc<SocketFile>),
     Epoll(Arc<EpollFile>),
+    Timer(Arc<TimerFile>),
 }
 
 // Apply a function all variants of AnyFile enum.
@@ -55,6 +58,9 @@ macro_rules! apply_fn_on_any_file {
                 $($fn_body)*
             }
             AnyFile::Epoll($file) => {
+                $($fn_body)*
+            }
+            AnyFile::Timer($file) => {
                 $($fn_body)*
             }
         }
@@ -86,6 +92,12 @@ impl FileHandle {
     /// Create a file handle for an epoll file.
     pub fn new_epoll(file: Arc<EpollFile>) -> Self {
         let any_file = AnyFile::Epoll(file);
+        Self::new(any_file)
+    }
+
+    /// Create a file handle for an timer fd file.
+    pub fn new_timer(file: TimerFile) -> Self {
+        let any_file = AnyFile::Timer(Arc::new(file));
         Self::new(any_file)
     }
 
@@ -181,6 +193,13 @@ impl FileHandle {
         }
     }
 
+    pub fn as_timer_file(&self) -> Option<&TimerFile> {
+        match &self.0.file {
+            AnyFile::Timer(timer_file) => Some(timer_file),
+            _ => None,
+        }
+    }
+
     /// Downgrade the file handle to its weak counterpart.
     pub fn downgrade(&self) -> WeakFileHandle {
         let any_weak_file = match &self.0.file {
@@ -188,6 +207,7 @@ impl FileHandle {
             AnyFile::Inode(file) => AnyWeakFile::Inode(Arc::downgrade(file)),
             AnyFile::Socket(file) => AnyWeakFile::Socket(Arc::downgrade(file)),
             AnyFile::Epoll(file) => AnyWeakFile::Epoll(Arc::downgrade(file)),
+            AnyFile::Timer(file) => AnyWeakFile::Timer(Arc::downgrade(file)),
         };
         WeakFileHandle(any_weak_file)
     }
@@ -202,6 +222,8 @@ impl PartialEq for FileHandle {
             Arc::as_ptr(self_inode) == Arc::as_ptr(other_inode)
         } else if let (AnyFile::Socket(self_socket), AnyFile::Socket(other_socket)) = rhs {
             Arc::as_ptr(self_socket) == Arc::as_ptr(other_socket)
+        } else if let (AnyFile::Timer(self_timer), AnyFile::Timer(other_timer)) = rhs {
+            Arc::as_ptr(self_timer) == Arc::as_ptr(other_timer)
         } else {
             false
         }
@@ -254,6 +276,7 @@ enum AnyWeakFile {
     Inode(Weak<AsyncInode>),
     Socket(Weak<SocketFile>),
     Epoll(Weak<EpollFile>),
+    Timer(Weak<TimerFile>),
 }
 
 impl WeakFileHandle {
@@ -272,6 +295,9 @@ impl WeakFileHandle {
             AnyWeakFile::Epoll(weak) => weak
                 .upgrade()
                 .map(|arc| FileHandle::new(AnyFile::Epoll(arc))),
+            AnyWeakFile::Timer(weak) => weak
+                .upgrade()
+                .map(|arc| FileHandle::new(AnyFile::Timer(arc))),
         }
     }
 }

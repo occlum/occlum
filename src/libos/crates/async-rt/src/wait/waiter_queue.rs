@@ -19,6 +19,7 @@ use crate::prelude::*;
 ///
 /// To do so, the queue maintains an internal cursor to the next waiter to be
 /// woken up.
+#[derive(Debug)]
 pub struct WaiterQueue {
     inner: Mutex<WaiterQueueInner>,
 }
@@ -60,6 +61,7 @@ impl WaiterQueue {
     }
 }
 
+#[derive(Debug)]
 struct WaiterQueueInner {
     list: LinkedList<LinkedListAdapter>,
     next_ptr: Option<NonNull<WaiterInner>>,

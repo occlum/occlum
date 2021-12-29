@@ -5,6 +5,7 @@ use core::task::Waker;
 use crate::prelude::*;
 use crate::task::Task;
 
+#[derive(Debug)]
 pub struct JoinHandle<T: Send + 'static> {
     state: Arc<Mutex<JoinState<T>>>,
     task: Arc<Task>,

@@ -62,7 +62,10 @@ use crate::signal::{
     do_rt_sigtimedwait, do_sigaltstack, do_tgkill, do_tkill, sigaction_t, siginfo_t, sigset_t,
     stack_t,
 };
-use crate::time::{clockid_t, timespec_t, timeval_t, ClockId};
+use crate::time::{
+    clockid_t, do_timerfd_create, do_timerfd_gettime, do_timerfd_settime, itimerspec_t, timespec_t,
+    timeval_t, ClockId,
+};
 use crate::util::log::{self, LevelFilter};
 use crate::util::mem_util::from_user::*;
 use crate::vm::{MMapFlags, MRemapFlags, MSyncFlags, VMPerms};
@@ -303,6 +306,11 @@ macro_rules! process_syscall_table_with_callback {
             (EpollPwait = 281) => do_epoll_pwait(epfd: c_int, events: *mut libc::epoll_event, maxevents: c_int, timeout: c_int, sigmask: *const usize),
             (Sendmmsg = 307) => do_sendmmsg(fd: c_int, msg_ptr: *mut mmsghdr, vlen: c_uint, flags_c: c_int),
             (Getgroups = 115) => do_getgroups(size: isize, buf_ptr: *mut u32),
+
+            (TimerfdCreate = 283) => do_timerfd_create(clockid: clockid_t, flags: i32 ),
+            (TimerfdSettime = 286) => do_timerfd_settime(fd: FileDesc, flags: i32, new_value: *const itimerspec_t, old_value: *mut itimerspec_t),
+            (TimerfdGettime = 287) => do_timerfd_gettime(fd: FileDesc, curr_value: *mut itimerspec_t),
+
             /*
             (Read = 0) => do_read(fd: FileDesc, buf: *mut u8, size: usize),
             (Write = 1) => do_write(fd: FileDesc, buf: *const u8, size: usize),
