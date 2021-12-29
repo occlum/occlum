@@ -141,6 +141,10 @@ impl Producer {
         &self.common.consumer
     }
 
+    pub fn peer_is_shutdown(&self) -> bool {
+        self.peer_end().is_shutdown()
+    }
+
     fn update_pollee(&self) {
         let this_end = self.this_end();
         let peer_end = self.peer_end();
@@ -223,10 +227,23 @@ impl File for Producer {
 
 impl Drop for Producer {
     fn drop(&mut self) {
-        self.this_end().shutdown();
-        self.peer_end()
-            .pollee()
-            .add_events(Events::IN | Events::HUP);
+        // This is called when the writer end is closed (not shutdown)
+        let this_end = self.this_end();
+        // man poll:
+        // When reading from a channel such as a pipe or a stream socket, POLLHUP merely indicates that the peer
+        // closed its end of the channel.
+        let mut revents = Events::HUP;
+
+        this_end.shutdown();
+
+        self.common.lock_event();
+
+        let rb = this_end.ringbuf();
+        if !rb.is_empty() {
+            revents |= Events::IN;
+        }
+
+        self.peer_end().pollee().add_events(revents);
     }
 }
 
@@ -332,10 +349,25 @@ impl File for Consumer {
 
 impl Drop for Consumer {
     fn drop(&mut self) {
-        self.this_end().shutdown();
-        self.peer_end()
-            .pollee()
-            .add_events(Events::OUT | Events::HUP);
+        // This is called when the reader end is closed (not shutdown)
+        let this_end = self.this_end();
+        // Man poll:
+        // POLLERR is also set for a file descriptor referring to the write end of a pipe when the read end has
+        // been closed.
+        let mut revents = Events::ERR;
+
+        this_end.shutdown();
+
+        self.common.lock_event();
+
+        let rb = this_end.ringbuf();
+        if !rb.is_full() {
+            // poll reacts to event happening on the file descriptors. when file is closed,
+            // there will be no fd anymore and the events are not updated.
+            revents |= Events::OUT;
+        }
+
+        self.peer_end().pollee().add_events(revents);
     }
 }
 
