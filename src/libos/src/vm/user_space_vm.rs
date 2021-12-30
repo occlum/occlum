@@ -29,7 +29,7 @@ impl UserSpaceVMManager {
                 "allocated rsrv addr is 0x{:x}, len is 0x{:x}",
                 addr, rsrv_mem_size
             );
-            VMRange::from_unchecked(addr, addr + rsrv_mem_size)
+            VMRange::new(addr, addr + rsrv_mem_size)?
         };
 
         let vm_manager = VMManager::init(vm_range)?;

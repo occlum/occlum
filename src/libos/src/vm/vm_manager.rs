@@ -74,14 +74,14 @@ impl VMManager {
         match addr {
             VMMapAddr::Any => {}
             VMMapAddr::Hint(addr) => {
-                let target_range = unsafe { VMRange::from_unchecked(addr, addr + size) };
+                let target_range = VMRange::new(addr, addr + size)?;
                 let ret = self.mmap_with_addr(target_range, options);
                 if ret.is_ok() {
                     return ret;
                 }
             }
             VMMapAddr::Need(addr) | VMMapAddr::Force(addr) => {
-                let target_range = unsafe { VMRange::from_unchecked(addr, addr + size) };
+                let target_range = VMRange::new(addr, addr + size)?;
                 return self.mmap_with_addr(target_range, options);
             }
         }
