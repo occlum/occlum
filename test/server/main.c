@@ -597,53 +597,6 @@ void *connection_routine(void *arg) {
     return NULL;
 }
 
-void *server_routine(void *arg) {
-    uint16_t port = *((uint16_t *)arg);
-
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) {
-        printf("server_routine, error creating socket");
-        return NULL;
-    }
-
-    struct sockaddr_in serv_addr = {};
-
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_port = htons(port);
-
-    if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-        printf("server_routine, error binding socket");
-        return NULL;
-    }
-
-    if (listen(sockfd, 5) != 0) {
-        printf("server_routine, error in listen");
-        return NULL;
-    }
-
-    for (;;) {
-        struct sockaddr_in saddr;
-        unsigned int saddr_ln = sizeof(saddr);
-
-        int newsock = accept(sockfd, (struct sockaddr *)&saddr, &saddr_ln);
-        if (newsock == -1) {
-            printf("server_routine, error in accept");
-            return NULL;
-        }
-        pthread_t child_tid;
-        if (pthread_create(&child_tid, NULL, connection_routine, (void *)&newsock)) {
-            printf("Failure creating connection thread");
-            return NULL;
-        }
-
-        pthread_join(child_tid, NULL);
-        break;
-    }
-
-    return NULL;
-}
-
 /*
  * NOT A GOOD IDEA for general use.
  * But to validate the receiver's use of MSG_WAITALL,
@@ -696,6 +649,59 @@ void *client_routine(void *arg) {
     return NULL;
 }
 
+void *server_routine(void *arg) {
+    uint16_t port = *((uint16_t *)arg);
+
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        printf("server_routine, error creating socket");
+        return NULL;
+    }
+
+    struct sockaddr_in serv_addr = {};
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(port);
+
+    if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        printf("server_routine, error binding socket");
+        return NULL;
+    }
+
+    if (listen(sockfd, 5) != 0) {
+        printf("server_routine, error in listen");
+        return NULL;
+    }
+
+    pthread_t client_tid;
+    if (pthread_create(&client_tid, NULL, client_routine, (void *)&port)) {
+        THROW_ERROR("Failure creating client thread");
+    }
+
+    for (;;) {
+        struct sockaddr_in saddr;
+        unsigned int saddr_ln = sizeof(saddr);
+
+        int newsock = accept(sockfd, (struct sockaddr *)&saddr, &saddr_ln);
+        if (newsock == -1) {
+            printf("server_routine, error in accept");
+            return NULL;
+        }
+        pthread_t child_tid;
+        if (pthread_create(&child_tid, NULL, connection_routine, (void *)&newsock)) {
+            printf("Failure creating connection thread");
+            return NULL;
+        }
+
+        pthread_join(child_tid, NULL);
+        break;
+    }
+
+    pthread_join(client_tid, NULL);
+    return NULL;
+}
+
 int test_MSG_WAITALL() {
     const uint16_t DEFAULT_PORT = 54321;
     uint16_t port = DEFAULT_PORT;
@@ -705,17 +711,7 @@ int test_MSG_WAITALL() {
         THROW_ERROR("Failure creating server thread");
     }
 
-    struct timespec ts = {0, 5000000};
-    nanosleep(&ts, NULL);
-
-    pthread_t client_tid;
-    if (pthread_create(&client_tid, NULL, client_routine, (void *)&port)) {
-        THROW_ERROR("Failure creating client thread");
-    }
-
-    pthread_join(client_tid, NULL);
     pthread_join(server_tid, NULL);
-
     return 0;
 }
 
