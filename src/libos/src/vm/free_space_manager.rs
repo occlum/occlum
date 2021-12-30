@@ -48,7 +48,7 @@ impl VMFreeSpaceManager {
                 if free_range.size() < size {
                     continue;
                 }
-                unsafe { VMRange::from_unchecked(free_range.start(), free_range.end()) }
+                free_range.clone()
             };
 
             match addr {
