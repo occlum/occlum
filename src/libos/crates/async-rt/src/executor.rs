@@ -93,8 +93,6 @@ impl Executor {
                 None => self.parks.park(),
             }
         }
-
-        self.parks.unregister(thread_id);
     }
 
     pub fn execute_task(&self, task: Arc<Task>) {
