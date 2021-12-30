@@ -13,24 +13,41 @@ __switch_to_user:
     movq %rsi, %gs:(TD_KERNEL_JMPBUF)
     movq %rdx, %gs:(TD_USER_FAULT)
     movq %rsp, %gs:(TD_KERNEL_RSP)
+
+    // Save the context point in r12
+    movq %rdi, %r12
+
+#if SGX_MODE_SIM
+    sub $8, %rsp
+    movq %rsp, %rsi
+    movq $ARCH_GET_FS, %rdi
+    call __occlum_arch_prctl
+    popq %rcx
+#else // SGX_MODE_HW
     rdfsbase %rcx
+#endif
     movq %rcx, %gs:(TD_KERNEL_FS)
 
     // Use user FS
-    movq CPU_CONTEXT_FSBASE(%rdi), %rsi
+    movq CPU_CONTEXT_FSBASE(%r12), %rsi
+#if SGX_MODE_SIM
+    movq $ARCH_SET_FS, %rdi
+    call __occlum_arch_prctl
+#else // SGX_MODE_HW
     wrfsbase %rsi
+#endif
 
     // Get the user's RIP
-    movq CPU_CONTEXT_RIP(%rdi), %rcx
+    movq CPU_CONTEXT_RIP(%r12), %rcx
     movq %rcx, %gs:(TD_USER_RIP)
 
     // Restore rflags
     sub $8, %rsp
-    leaq CPU_CONTEXT_RFLAGS(%rdi), %rsp
+    leaq CPU_CONTEXT_RFLAGS(%r12), %rsp
     popfq
 
     // Restore the CPU context of the user space
-    movq %rdi, %rsp
+    movq %r12, %rsp
     pop %r8
     pop %r9
     pop %r10
@@ -57,8 +74,13 @@ __switch_to_user:
     movq %gs:(TD_KERNEL_RSP), %rsp
 
     // Switch to the kernel FS
-    movq %gs:(TD_KERNEL_FS), %rcx
-    wrfsbase %rcx
+    movq %gs:(TD_KERNEL_FS), %rsi
+#if SGX_MODE_SIM
+    movq $ARCH_SET_FS, %rdi
+    call __occlum_arch_prctl
+#else // SGX_MODE_HW
+    wrfsbase %rsi
+#endif
 
     // Set the two pointers to NULL so that we can detect misuse
     xor %rax, %rax

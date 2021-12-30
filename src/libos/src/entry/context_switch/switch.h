@@ -33,6 +33,11 @@ less than 4096 is unused by anyone. We can use it.*/
 #define CPU_CONTEXT_RFLAGS  (17*8)
 #define CPU_CONTEXT_FSBASE  (18*8)
 
+/* arch_prctl syscall number and parameter */
+#define ARCH_PRCTL          (0x9E)
+#define ARCH_SET_FS         (0x01002)
+#define ARCH_GET_FS         (0x01003)
+
 #else /* ! __ASSEMBLY_ */
 
 #include <stddef.h>
