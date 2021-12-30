@@ -198,8 +198,12 @@ int server_connectionless_recvmsg() {
     msg.msg_flags = 0;
 
     ret = recvmsg(sock, &msg, 0);
-    if (ret <= 0) {
-        THROW_ERROR("recvmsg failed");
+    if (ret < 0 ) {
+        if (errno != EINTR) {
+            THROW_ERROR("recvmsg failed");
+        } else {
+            return 0;
+        }
     } else {
         if (strncmp(buf, DEFAULT_MSG, strlen(DEFAULT_MSG)) != 0) {
             printf("recvmsg : %d, msg: %s\n", ret, buf);
@@ -318,16 +322,7 @@ int test_sendmsg_recvmsg_connectionless() {
 
     signal(SIGCHLD, proc_exit);
 
-    int sync_fds[2];
-    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sync_fds) < 0) {
-        THROW_ERROR("socketpair failed");
-    }
-    int server_sync_fd = sync_fds[0];
-    int client_sync_fd = sync_fds[1];
-
-    char sync_fd_string[8];
-    sprintf(sync_fd_string, "%d", client_sync_fd);
-    char *client_argv[] = {"client", "NULL", "8804", sync_fd_string, NULL};
+    char *client_argv[] = {"client", "NULL", "8804", NULL, NULL};
     ret = posix_spawn(&child_pid, "/bin/client", NULL, NULL, client_argv, NULL);
     if (ret < 0) {
         THROW_ERROR("spawn client process error");
@@ -338,12 +333,13 @@ int test_sendmsg_recvmsg_connectionless() {
     /* If child client send happens before recvmsg, EINTR may
     be triggered which is not failed case */
     if (ret < 0 && errno != EINTR) {
-        return -1;
+        THROW_ERROR("server_connectionless_recvmsg failed");
     }
 
-    write(server_sync_fd, SYNC_MSG, strlen(SYNC_MSG));
-
-    ret = wait_for_child_exit(child_pid);
+    int status = 0;
+    if (wait4(child_pid, &status, 0, NULL) < 0) {
+        THROW_ERROR("failed to wait4 the child process");
+    }
 
     return ret;
 }
@@ -354,7 +350,7 @@ int test_fcntl_setfl_and_getfl() {
     int client_fd = -1;
     int original_flags, actual_flags;
 
-    client_fd = connect_with_child(8804, &child_pid);
+    client_fd = connect_with_child(8808, &child_pid);
     if (client_fd < 0) {
         THROW_ERROR("connect failed");
     }

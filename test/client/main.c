@@ -190,23 +190,21 @@ int main(int argc, const char *argv[]) {
             break;
 #endif
         case 8804:
-            if (argc < 4) {
-                THROW_ERROR("should specify sync fd\n");
-            }
-            int sync_fd = strtol(argv[3], NULL, 10);
-
             ret = client_connectionless_sendmsg(DEFAULT_MSG);
-
-            char sync_buf[4];
-            if (read(sync_fd, sync_buf, sizeof(sync_buf)) < 0) {
-                THROW_ERROR("read sync_fd failed\n");
-            }
+            break;
+        case 8808:
+            ret = client_connectionless_sendmsg(DEFAULT_MSG);
             break;
         default:
             ret = client_send(server_fd, DEFAULT_MSG);
     }
 
     close(server_fd);
+
+    // return without sync
+    if (port == 8804) {
+        return;
+    }
 
     // blocking here, waiting for the server
     if (read(CLIENT_FD, buf, sizeof(buf) - 1) < 0) {
