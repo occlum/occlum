@@ -508,7 +508,7 @@ jobs:
 
     - name: Run the Vault client
       run: |
-        sleep ${{ env.nap_time }};
+        sleep 360;
         docker exec vault_test bash -c "cd /root/occlum/demos/golang/vault && ./run_occlum_vault_test.sh"
 
     - name: Check Vault log
