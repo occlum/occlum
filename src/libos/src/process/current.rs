@@ -14,7 +14,7 @@ pub fn get() -> ThreadRef {
 /// Attempt to get the thread associated with the current task.
 fn try_get() -> Option<ThreadRef> {
     let current_opt = CURRENT.try_with(|current| unsafe { &*current.get() });
-    current_opt.map(|current| current.as_ref().unwrap().clone())
+    current_opt.map_or(None, |current| current.clone())
 }
 
 /// Set the thread associated with the current task.
