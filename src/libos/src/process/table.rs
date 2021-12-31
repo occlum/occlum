@@ -53,7 +53,38 @@ pub(super) fn add_process(process: ProcessRef) -> Result<()> {
 }
 
 pub(super) fn del_process(pid: pid_t) -> Result<ProcessRef> {
-    PROCESS_TABLE.lock().unwrap().del(pid)
+    let mut process_table = PROCESS_TABLE.lock().unwrap();
+    let res = process_table.del(pid);
+
+    // update the clean flag to true, and notify the waiting thread
+    if process_table.iter().len() == 0 {
+        let (lock, cvar) = &*PROCESSES_STATUS.clone();
+        let mut clean = lock.lock().unwrap();
+        *clean = true;
+        // We notify the condvar that the value has changed.
+        cvar.notify_one();
+    }
+    res
+}
+
+pub fn wait_all_process_exit() {
+    let (lock, cvar) = &*PROCESSES_STATUS.clone();
+
+    // set the clean flag to false before check the existing process number
+    let mut clean = lock.lock().unwrap();
+    *clean = false;
+    // must drop the lock before check the existing process number
+    drop(clean);
+
+    if PROCESS_TABLE.lock().unwrap().iter().len() == 0 {
+        return;
+    }
+
+    let mut clean = lock.lock().unwrap();
+    // As long as the value inside the flag is `false`, we wait.
+    while !*clean {
+        clean = cvar.wait(clean).unwrap();
+    }
 }
 
 pub fn replace_process(pid: pid_t, new_process: ProcessRef) -> Result<()> {
@@ -91,6 +122,8 @@ lazy_static! {
         { SgxMutex::new(Table::<ThreadRef>::with_capacity(8)) };
     static ref PROCESSGRP_TABLE: SgxMutex<Table<ProcessGrpRef>> =
         { SgxMutex::new(Table::<ProcessGrpRef>::with_capacity(4)) };
+    static ref PROCESSES_STATUS: Arc<(SgxMutex<bool>, SgxCondvar)> =
+        Arc::new((SgxMutex::new(false), SgxCondvar::new()));
 }
 
 #[derive(Debug, Clone)]

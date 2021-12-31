@@ -9,7 +9,7 @@ use sgx_tse::*;
 
 use crate::fs::HostStdioFds;
 use crate::prelude::*;
-use crate::process::{self, ProcessFilter, SpawnAttr};
+use crate::process::{self, table, ProcessFilter, SpawnAttr};
 use crate::signal::SigNum;
 use crate::time::up_time::init;
 use crate::util::log::LevelFilter;
@@ -182,7 +182,6 @@ pub extern "C" fn occlum_ecall_run_vcpu(pal_data_ptr: *const occlum_pal_vcpu_dat
     let running_vcpu_num = async_rt::executor::run_tasks();
     if running_vcpu_num == 0 {
         // It is the last vcpu for the executor. We can perform some check to make sure there is no resource leakage
-        use crate::process::table;
         use crate::vm::USER_SPACE_VM_MANAGER;
         assert!(
             table::get_all_pgrp().len() == 0
@@ -204,6 +203,13 @@ pub extern "C" fn occlum_ecall_shutdown_vcpus() -> i32 {
         return ecall_errno!(EAGAIN);
     }
 
+    // Send SIGKILL to all existing process
+    use crate::signal::SIGKILL;
+    crate::signal::do_kill_from_outside_enclave(ProcessFilter::WithAnyPid, SIGKILL);
+
+    table::wait_all_process_exit();
+
+    // TODO: stop all the kernel threads/tasks
     async_rt::executor::shutdown();
     0
 }

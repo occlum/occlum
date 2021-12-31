@@ -10,7 +10,7 @@ pub use std::collections::{HashMap, VecDeque};
 pub use std::fmt::{Debug, Display};
 pub use std::ops::{Deref, DerefMut};
 pub use std::prelude::v1::*;
-pub use std::sync::{Arc, SgxMutex, SgxMutexGuard};
+pub use std::sync::{Arc, SgxCondvar, SgxMutex, SgxMutexGuard};
 
 pub use async_io::file::File;
 

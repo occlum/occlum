@@ -135,6 +135,7 @@ impl Executor {
             // of the scheduler when the executor is shutdown.
             // e.g., yield-loop tasks might be waken up when the executer
             // is shutdown.
+            debug!("task {:?} is running when executor shut-down", task.tid());
             return;
         }
 
