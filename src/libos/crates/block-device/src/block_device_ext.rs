@@ -19,7 +19,7 @@ pub trait BlockDeviceExt {
 }
 
 #[async_trait]
-impl<B: BlockDevice> BlockDeviceExt for B {
+impl BlockDeviceExt for dyn BlockDevice {
     async fn read(&self, offset: usize, read_buf: &mut [u8]) -> Result<usize> {
         Impl::new(self).read(offset, read_buf).await
     }

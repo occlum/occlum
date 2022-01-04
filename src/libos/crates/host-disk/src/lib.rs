@@ -3,6 +3,7 @@
 #![cfg_attr(feature = "sgx", no_std)]
 #![feature(new_uninit)]
 #![feature(get_mut_unchecked)]
+#![feature(trait_upcasting)]
 
 #[cfg(feature = "sgx")]
 extern crate sgx_libc as libc;
@@ -10,6 +11,8 @@ extern crate sgx_libc as libc;
 extern crate sgx_tstd as std;
 #[cfg(feature = "sgx")]
 extern crate sgx_types;
+#[macro_use]
+extern crate log;
 
 mod host_disk;
 mod io_uring_disk;
@@ -18,6 +21,6 @@ mod prelude;
 mod sync_io_disk;
 
 pub use self::host_disk::HostDisk;
-pub use self::io_uring_disk::IoUringDisk;
+pub use self::io_uring_disk::{IoUringDisk, IoUringProvider};
 pub use self::open_options::OpenOptions;
 pub use self::sync_io_disk::SyncIoDisk;

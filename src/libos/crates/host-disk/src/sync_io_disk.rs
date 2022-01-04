@@ -1,5 +1,5 @@
 use block_device::{BioReq, BioSubmission, BioType, BlockDevice};
-use std::fs::File;
+use fs::File;
 use std::io::prelude::*;
 use std::io::{IoSlice, IoSliceMut, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -44,7 +44,7 @@ impl SyncIoDisk {
         })?;
         drop(file);
 
-        assert!(read_len / BLOCK_SIZE == req.num_blocks());
+        debug_assert!(read_len / BLOCK_SIZE == req.num_blocks());
         Ok(())
     }
 
@@ -156,8 +156,9 @@ impl Drop for SyncIoDisk {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::any::Any;
 
-    fn test_setup() -> SyncIoDisk {
+    fn test_setup() -> Box<dyn BlockDevice> {
         // As unit tests may run concurrently, they must operate on different
         // files. This helper function generates unique file paths.
         fn gen_unique_path() -> String {
@@ -171,11 +172,14 @@ mod test {
 
         let total_blocks = 16;
         let path = gen_unique_path();
-        SyncIoDisk::create(&path, total_blocks).unwrap()
+        Box::new(SyncIoDisk::create(&path, total_blocks).unwrap())
     }
 
-    fn test_teardown(disk: SyncIoDisk) {
-        let _ = std::fs::remove_file(disk.path());
+    fn test_teardown(disk: Box<dyn BlockDevice>) {
+        let disk_ref = (disk.as_ref() as &dyn Any)
+            .downcast_ref::<SyncIoDisk>()
+            .unwrap();
+        let _ = std::fs::remove_file(disk_ref.path());
     }
 
     block_device::gen_unit_tests!(test_setup, test_teardown);

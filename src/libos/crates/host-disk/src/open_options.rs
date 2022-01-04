@@ -1,4 +1,4 @@
-use std::fs::OpenOptions as FileOpenOptions;
+use fs::OpenOptions as FileOpenOptions;
 use std::marker::PhantomData;
 use std::path::Path;
 

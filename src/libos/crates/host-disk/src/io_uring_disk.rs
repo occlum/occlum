@@ -1,12 +1,15 @@
 use block_device::{BioReq, BioSubmission, BioType, BlockDevice};
+use fs::File;
 use io_uring_callback::{Fd, IoHandle, IoUring};
 use new_self_ref_arc::new_self_ref_arc;
-use std::fs::File;
 use std::io::prelude::*;
 use std::marker::PhantomData;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::{Path, PathBuf};
 use std::sync::Weak;
+
+#[cfg(feature = "sgx")]
+use sgx_untrusted_alloc::UntrustedBox;
 
 use crate::prelude::*;
 use crate::{HostDisk, OpenOptions};
@@ -60,18 +63,49 @@ impl<P: IoUringProvider> IoUringDisk<P> {
             // the callback closure.
             Box::new(iovecs)
         });
-        let iovecs_ptr = iovecs.as_ptr() as _;
-        let iovecs_len = iovecs.len();
+
+        #[cfg(not(feature = "sgx"))]
+        let (iovecs_ptr, iovecs_len) = { (iovecs.as_ptr() as _, iovecs.len()) };
+        #[cfg(feature = "sgx")]
+        let (iovecs_ptr, iovecs_len, untrusted_bufs, untrusted_iovecs) = {
+            let mut untrusted_bufs = Vec::with_capacity(iovecs.len());
+            let mut untrusted_iovecs = UntrustedBox::<[libc::iovec]>::new_slice(iovecs.as_slice());
+            for (iov, mut untrusted_iov) in iovecs.iter().zip(untrusted_iovecs.iter_mut()) {
+                let buf = UntrustedBox::<[u8]>::new_uninit_slice(iov.iov_len);
+                untrusted_iov.iov_base = buf.as_ptr() as _;
+                untrusted_bufs.push(buf);
+            }
+            (
+                untrusted_iovecs.as_ptr() as _,
+                untrusted_iovecs.len(),
+                untrusted_bufs,
+                untrusted_iovecs,
+            )
+        };
+
+        #[cfg(feature = "sgx")]
+        let mut recv_bufs: Vec<_> = iovecs
+            .iter()
+            .map(|iov| unsafe {
+                std::slice::from_raw_parts_mut(iov.iov_base as *mut u8, iov.iov_len)
+            })
+            .collect();
+
         let complete_fn = {
             let self_ = self.clone_self();
             let req = req.clone();
+
             // Safety. All pointers contained in iovecs are still valid as the
             // buffers of the BIO request is valid.
             let send_iovecs = unsafe { MarkSend::new(iovecs) };
+            #[cfg(feature = "sgx")]
+            let send_u_iovecs = unsafe { MarkSend::new(untrusted_iovecs) };
             move |retval: i32| {
                 // When the callback is invoked, the iovecs must have been
                 // useless. And we call drop it safely.
                 drop(send_iovecs);
+                #[cfg(feature = "sgx")]
+                drop(send_u_iovecs);
                 // When the callback is invoked, IoUringDisk and its associated
                 // resources are no longer needed.
                 drop(self_);
@@ -80,6 +114,11 @@ impl<P: IoUringProvider> IoUringDisk<P> {
                     let expected_len = req.num_blocks() * BLOCK_SIZE;
                     // We don't expect short reads on regular files
                     debug_assert!(retval as usize == expected_len);
+                    // Copy the buffer from untrusted
+                    #[cfg(feature = "sgx")]
+                    for (buf, u_buf) in recv_bufs.iter_mut().zip(untrusted_bufs.iter()) {
+                        buf.copy_from_slice(u_buf);
+                    }
                     Ok(())
                 } else {
                     Err(Errno::from((-retval) as u32))
@@ -103,7 +142,6 @@ impl<P: IoUringProvider> IoUringDisk<P> {
         };
         // We don't need to keep the handle
         IoHandle::release(io_handle);
-
         Ok(())
     }
 
@@ -132,18 +170,44 @@ impl<P: IoUringProvider> IoUringDisk<P> {
             // the callback closure.
             Box::new(iovecs)
         });
-        let iovecs_ptr = iovecs.as_ptr() as _;
-        let iovecs_len = iovecs.len();
+
+        #[cfg(not(feature = "sgx"))]
+        let (iovecs_ptr, iovecs_len) = { (iovecs.as_ptr() as _, iovecs.len()) };
+        #[cfg(feature = "sgx")]
+        let (iovecs_ptr, iovecs_len, untrusted_bufs, untrusted_iovecs) = {
+            let mut untrusted_bufs = Vec::with_capacity(iovecs.len());
+            let mut untrusted_iovecs = UntrustedBox::<[libc::iovec]>::new_slice(iovecs.as_slice());
+            for (iov, mut untrusted_iov) in iovecs.iter().zip(untrusted_iovecs.iter_mut()) {
+                let write_buf =
+                    unsafe { std::slice::from_raw_parts(iov.iov_base as *const u8, iov.iov_len) };
+                let buf = UntrustedBox::<[u8]>::new_slice(write_buf);
+                untrusted_iov.iov_base = buf.as_ptr() as _;
+                untrusted_bufs.push(buf);
+            }
+            (
+                untrusted_iovecs.as_ptr() as _,
+                untrusted_iovecs.len(),
+                untrusted_bufs,
+                untrusted_iovecs,
+            )
+        };
+
         let complete_fn = {
             let self_ = self.clone_self();
             let req = req.clone();
             // Safety. All pointers contained in iovecs are still valid as the
             // buffers of the BIO request is valid.
             let send_iovecs = unsafe { MarkSend::new(iovecs) };
+            #[cfg(feature = "sgx")]
+            let send_u_iovecs = unsafe { MarkSend::new(untrusted_iovecs) };
             move |retval: i32| {
                 // When the callback is invoked, the iovecs must have been
                 // useless. And we call drop it safely.
                 drop(send_iovecs);
+                #[cfg(feature = "sgx")]
+                drop(send_u_iovecs);
+                #[cfg(feature = "sgx")]
+                drop(untrusted_bufs);
                 // When the callback is invoked, IoUringDisk and its associated
                 // resources are no longer needed.
                 drop(self_);
@@ -331,8 +395,9 @@ unsafe impl<T> Send for MarkSend<T> {}
 mod test {
     use super::*;
     use runtime::IoUringSingleton;
+    use std::any::Any;
 
-    fn test_setup() -> IoUringDisk<IoUringSingleton> {
+    fn test_setup() -> Box<dyn BlockDevice> {
         // As unit tests may run concurrently, they must operate on different
         // files. This helper function generates unique file paths.
         fn gen_unique_path() -> String {
@@ -346,11 +411,14 @@ mod test {
 
         let total_blocks = 16;
         let path = gen_unique_path();
-        IoUringDisk::<IoUringSingleton>::create(&path, total_blocks).unwrap()
+        Box::new(IoUringDisk::<IoUringSingleton>::create(&path, total_blocks).unwrap())
     }
 
-    fn test_teardown(disk: IoUringDisk<IoUringSingleton>) {
-        let _ = std::fs::remove_file(disk.path());
+    fn test_teardown(disk: Box<dyn BlockDevice>) {
+        let disk_ref = (disk.as_ref() as &dyn Any)
+            .downcast_ref::<IoUringDisk<IoUringSingleton>>()
+            .unwrap();
+        let _ = std::fs::remove_file(disk_ref.path());
     }
 
     block_device::gen_unit_tests!(test_setup, test_teardown);

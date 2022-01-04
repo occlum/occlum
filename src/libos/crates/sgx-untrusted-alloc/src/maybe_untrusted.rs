@@ -86,7 +86,8 @@ impl_maybe_untrusted! {
     isize,
 
     // Libc types
-    libc::sockaddr_storage
+    libc::sockaddr_storage,
+    libc::iovec
 }
 
 unsafe impl<T: MaybeUntrusted> MaybeUntrusted for *const T {}

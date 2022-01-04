@@ -7,7 +7,9 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "sgx")] {
         pub(crate) use std::prelude::v1::*;
         pub(crate) use std::sync::{SgxMutex as Mutex};
+        pub(crate) use std::untrusted::fs as fs;
     } else {
         pub(crate) use std::sync::{Mutex};
+        pub(crate) use std::fs;
     }
 }

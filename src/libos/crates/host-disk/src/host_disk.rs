@@ -1,5 +1,5 @@
 use block_device::BlockDevice;
-use std::fs::File;
+use fs::File;
 use std::path::Path;
 
 use crate::prelude::*;
