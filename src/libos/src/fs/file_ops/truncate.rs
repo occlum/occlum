@@ -20,7 +20,10 @@ pub fn do_ftruncate(fd: FileDesc, len: usize) -> Result<()> {
         }
         inode_file.inode().resize(len)?;
         Ok(())
+    } else if let Some(disk_file) = file_ref.as_disk_file() {
+        warn!("disk_file does not support ftruncate");
+        Ok(())
     } else {
-        return_errno!(EBADF, "not an inode file");
+        return_errno!(EBADF, "not supported");
     }
 }

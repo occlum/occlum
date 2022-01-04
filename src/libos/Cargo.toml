@@ -35,6 +35,8 @@ vdso-time  = { path = "crates/vdso-time", default-features = false, features = [
 inherit-methods-macro= { path = "crates/inherit-methods-macro" }
 io-uring-callback = { path = "crates/io-uring-callback", features = ["sgx"] }
 host-socket  = { path = "crates/host-socket", default-features = false, features = ["sgx"] }
+host-disk  = { path = "crates/host-disk", default-features = false, features = ["sgx"] }
+block-device  = { path = "crates/block-device" }
 scroll = { version = "0.10.2", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["alloc", "async-await"] }
 itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"]  }

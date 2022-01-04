@@ -29,6 +29,7 @@ pub use async_io::ioctl::IoctlCmd;
 
 use crate::config::ConfigMount;
 
+pub use self::disk_file::DiskFile;
 pub use self::event_file::{EventFile, EventFileFlags};
 pub use self::file_handle::{FileHandle as FileRef, WeakFileHandle as WeakFileRef};
 pub use self::file_table::{FileDesc, FileTable};
@@ -42,6 +43,7 @@ pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
 pub use self::syscalls::*;
 
 mod dev_fs;
+mod disk_file;
 mod event_file;
 // TODO: remove the file
 //mod file;

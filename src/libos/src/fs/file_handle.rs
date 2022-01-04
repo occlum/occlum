@@ -5,6 +5,7 @@ use std::sync::Weak;
 use std::time::Duration;
 
 use super::*;
+use crate::fs::DiskFile;
 use crate::net::SocketFile;
 use crate::poll::EpollFile;
 use crate::time::TimerFile;
@@ -41,6 +42,7 @@ enum AnyFile {
     Socket(Arc<SocketFile>),
     Epoll(Arc<EpollFile>),
     Timer(Arc<TimerFile>),
+    Disk(Arc<DiskFile>),
 }
 
 // Apply a function all variants of AnyFile enum.
@@ -61,6 +63,9 @@ macro_rules! apply_fn_on_any_file {
                 $($fn_body)*
             }
             AnyFile::Timer($file) => {
+                $($fn_body)*
+            }
+            AnyFile::Disk($file) => {
                 $($fn_body)*
             }
         }
@@ -98,6 +103,12 @@ impl FileHandle {
     /// Create a file handle for an timer fd file.
     pub fn new_timer(file: TimerFile) -> Self {
         let any_file = AnyFile::Timer(Arc::new(file));
+        Self::new(any_file)
+    }
+
+    /// Create a file handle for a disk file.
+    pub fn new_disk(file: Arc<DiskFile>) -> Self {
+        let any_file = AnyFile::Disk(file);
         Self::new(any_file)
     }
 
@@ -200,6 +211,13 @@ impl FileHandle {
         }
     }
 
+    pub fn as_disk_file(&self) -> Option<&DiskFile> {
+        match &self.0.file {
+            AnyFile::Disk(disk_file) => Some(disk_file),
+            _ => None,
+        }
+    }
+
     /// Downgrade the file handle to its weak counterpart.
     pub fn downgrade(&self) -> WeakFileHandle {
         let any_weak_file = match &self.0.file {
@@ -208,6 +226,7 @@ impl FileHandle {
             AnyFile::Socket(file) => AnyWeakFile::Socket(Arc::downgrade(file)),
             AnyFile::Epoll(file) => AnyWeakFile::Epoll(Arc::downgrade(file)),
             AnyFile::Timer(file) => AnyWeakFile::Timer(Arc::downgrade(file)),
+            AnyFile::Disk(file) => AnyWeakFile::Disk(Arc::downgrade(file)),
         };
         WeakFileHandle(any_weak_file)
     }
@@ -224,6 +243,8 @@ impl PartialEq for FileHandle {
             Arc::as_ptr(self_socket) == Arc::as_ptr(other_socket)
         } else if let (AnyFile::Timer(self_timer), AnyFile::Timer(other_timer)) = rhs {
             Arc::as_ptr(self_timer) == Arc::as_ptr(other_timer)
+        } else if let (AnyFile::Disk(self_disk), AnyFile::Disk(other_disk)) = rhs {
+            Arc::as_ptr(self_disk) == Arc::as_ptr(other_disk)
         } else {
             false
         }
@@ -277,6 +298,7 @@ enum AnyWeakFile {
     Socket(Weak<SocketFile>),
     Epoll(Weak<EpollFile>),
     Timer(Weak<TimerFile>),
+    Disk(Weak<DiskFile>),
 }
 
 impl WeakFileHandle {
@@ -298,6 +320,9 @@ impl WeakFileHandle {
             AnyWeakFile::Timer(weak) => weak
                 .upgrade()
                 .map(|arc| FileHandle::new(AnyFile::Timer(arc))),
+            AnyWeakFile::Disk(weak) => weak
+                .upgrade()
+                .map(|arc| FileHandle::new(AnyFile::Disk(arc))),
         }
     }
 }

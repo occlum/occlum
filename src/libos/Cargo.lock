@@ -12,11 +12,13 @@ dependencies = [
  "atomic",
  "bitflags",
  "bitvec",
+ "block-device",
  "ctor",
  "derive_builder",
  "errno",
  "futures",
  "goblin",
+ "host-disk",
  "host-socket",
  "inherit-methods-macro",
  "intrusive-collections",
@@ -120,6 +122,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-trait"
+version = "0.1.52"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "061a7acccaa286c011ddc30970520b98fa40e00c9d644633fb26b5fc63a265e3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "atomic"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -160,6 +173,17 @@ checksum = "41262f11d771fd4a61aa3ce019fca363b4b6c282fca9da2a31186d3965a47a5c"
 dependencies = [
  "either",
  "radium",
+]
+
+[[package]]
+name = "block-device"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "errno",
+ "object-id",
+ "spin 0.7.0",
+ "static_assertions 1.1.0",
 ]
 
 [[package]]
@@ -460,6 +484,23 @@ name = "hierarchical_hash_wheel_timer"
 version = "1.1.0"
 dependencies = [
  "sgx_tstd",
+]
+
+[[package]]
+name = "host-disk"
+version = "0.1.0"
+dependencies = [
+ "block-device",
+ "cfg-if 1.0.0",
+ "errno",
+ "io-uring-callback",
+ "log",
+ "new-self-ref-arc",
+ "sgx-untrusted-alloc",
+ "sgx_libc",
+ "sgx_trts",
+ "sgx_tstd",
+ "sgx_types",
 ]
 
 [[package]]
@@ -900,7 +941,7 @@ dependencies = [
  "log",
  "rcore-fs",
  "spin 0.5.2",
- "static_assertions",
+ "static_assertions 0.3.4",
  "uuid",
 ]
 
@@ -1169,6 +1210,12 @@ name = "static_assertions"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f3eb36b47e512f8f1c9e3d10c2c1965bc992bd9cdb024fa581e2194501c83d3"
+
+[[package]]
+name = "static_assertions"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "strsim"
