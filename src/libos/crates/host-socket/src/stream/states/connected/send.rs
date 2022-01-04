@@ -53,7 +53,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         // Check for error condition before write.
         //
         // Case 1. If the write side of the connection has been shutdown...
-        if inner.is_shutdown {
+        if inner.is_shutdown() {
             return_errno!(EPIPE, "write side is shutdown");
         }
         // Case 2. If the connenction has been broken...
@@ -92,8 +92,11 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
     }
 
     fn do_send(self: &Arc<Self>, inner: &mut MutexGuard<Inner>) {
+        // This function can also be called even if the socket is set to shutdown by shutdown syscall. This is due to the
+        // async behaviour that the kernel may return to user before actually issuing the request. We should
+        // keep sending the request as long as the send buffer is not empty even if the socket is shutdown.
+        debug_assert!(inner.is_shutdown != ShutdownStatus::PostShutdown);
         debug_assert!(!inner.send_buf.is_empty());
-        debug_assert!(!inner.is_shutdown);
         debug_assert!(inner.io_handle.is_none());
 
         // Init the callback invoked upon the completion of the async send
@@ -126,6 +129,8 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             // Attempt to send again if there are available data in the buf.
             if !inner.send_buf.is_empty() {
                 stream.do_send(&mut inner);
+            } else if inner.is_shutdown == ShutdownStatus::PreShutdown {
+                inner.is_shutdown = ShutdownStatus::PostShutdown
             }
         };
 
@@ -152,7 +157,7 @@ impl Sender {
 
     pub fn shutdown(&self) {
         let mut inner = self.inner.lock().unwrap();
-        inner.is_shutdown = true;
+        inner.is_shutdown = ShutdownStatus::PreShutdown;
     }
 }
 
@@ -168,7 +173,7 @@ struct Inner {
     send_buf: UntrustedCircularBuf,
     send_req: UntrustedBox<SendReq>,
     io_handle: Option<IoHandle>,
-    is_shutdown: bool,
+    is_shutdown: ShutdownStatus,
     fatal: Option<Errno>,
 }
 
@@ -184,9 +189,14 @@ impl Inner {
             send_buf: UntrustedCircularBuf::with_capacity(super::SEND_BUF_SIZE),
             send_req: UntrustedBox::new_uninit(),
             io_handle: None,
-            is_shutdown: false,
+            is_shutdown: ShutdownStatus::Running,
             fatal: None,
         }
+    }
+
+    pub fn is_shutdown(&self) -> bool {
+        self.is_shutdown == ShutdownStatus::PreShutdown
+            || self.is_shutdown == ShutdownStatus::PostShutdown
     }
 
     /// Constructs a new send request according to the sender's internal state.
@@ -270,4 +280,11 @@ impl Clone for SendReq {
     fn clone(&self) -> Self {
         *self
     }
+}
+
+#[derive(Debug, PartialEq)]
+enum ShutdownStatus {
+    Running,      // not shutdown
+    PreShutdown,  // start the shutdown process, set by calling shutdown syscall
+    PostShutdown, // shutdown process is done, set when the buffer is empty
 }
