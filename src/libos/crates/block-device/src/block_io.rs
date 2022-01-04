@@ -82,11 +82,11 @@ impl BioReqBuilder {
         let type_ = self.type_;
         if ![BioType::Read, BioType::Write].contains(&type_) {
             debug_assert!(
-                self.addr.is_some(),
+                self.addr.is_none(),
                 "addr is only meaningful for a read or write",
             );
             debug_assert!(
-                self.bufs.is_some(),
+                self.bufs.is_none(),
                 "bufs is only meaningful for a read or write",
             );
         }
