@@ -1,0 +1,64 @@
+--- Makefile-orig	2022-01-04 08:37:31.975521982 +0000
++++ Makefile	2022-01-04 08:37:58.709192999 +0000
+@@ -16,29 +16,32 @@
+ 
+ HOST_SYSTEM = $(shell uname | cut -f 1 -d_)
+ SYSTEM ?= $(HOST_SYSTEM)
+-CXX = g++
+-CPPFLAGS += `pkg-config --cflags protobuf grpc`
++CXX = occlum-g++
++CPPFLAGS += -I/usr/local/occlum/x86_64-linux-musl/include
+ CXXFLAGS += -std=c++11
+ ifeq ($(SYSTEM),Darwin)
+ LDFLAGS += -L/usr/local/lib `pkg-config --libs protobuf grpc++ grpc`\
+            -pthread\
+            -lgrpc++_reflection\
+-           -ldl
++           -ldl \
++	   -lssl -lcrypto
+ else
+-LDFLAGS += -L/usr/local/lib `pkg-config --libs protobuf grpc++ grpc`\
++LDFLAGS += -L/usr/local/occlum/x86_64-linux-musl/lib -lgrpc++ -lgrpc -lprotobuf -lgpr \
++           -lcares -lz -laddress_sorting -pie\
+            -pthread\
+            -Wl,--no-as-needed -lgrpc++_reflection -Wl,--as-needed\
+-           -ldl
++           -ldl \
++	   -lssl -lcrypto
+ endif
+ PROTOC = protoc
+ GRPC_CPP_PLUGIN = grpc_cpp_plugin
+ GRPC_CPP_PLUGIN_PATH ?= `which $(GRPC_CPP_PLUGIN)`
+ 
+-PROTOS_PATH = ../../protos
++PROTOS_PATH = .
+ 
+ vpath %.proto $(PROTOS_PATH)
+ 
+-all: system-check greeter_client greeter_server greeter_async_client greeter_async_client2 greeter_async_server
++all: system-check greeter_client greeter_server greeter_async_client greeter_async_client2 greeter_async_server greeter_secure_client greeter_secure_server
+ 
+ greeter_client: helloworld.pb.o helloworld.grpc.pb.o greeter_client.o
+ 	$(CXX) $^ $(LDFLAGS) -o $@
+@@ -55,6 +58,12 @@ greeter_async_client2: helloworld.pb.o h
+ greeter_async_server: helloworld.pb.o helloworld.grpc.pb.o greeter_async_server.o
+ 	$(CXX) $^ $(LDFLAGS) -o $@
+ 
++greeter_secure_client: helloworld.pb.o helloworld.grpc.pb.o greeter_secure_client.o
++	$(CXX) $^ $(LDFLAGS) -o $@
++
++greeter_secure_server: helloworld.pb.o helloworld.grpc.pb.o greeter_secure_server.o
++	$(CXX) $^ $(LDFLAGS) -o $@
++
+ .PRECIOUS: %.grpc.pb.cc
+ %.grpc.pb.cc: %.proto
+ 	$(PROTOC) -I $(PROTOS_PATH) --grpc_out=. --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH) $<
+@@ -64,7 +73,7 @@ greeter_async_server: helloworld.pb.o he
+ 	$(PROTOC) -I $(PROTOS_PATH) --cpp_out=. $<
+ 
+ clean:
+-	rm -f *.o *.pb.cc *.pb.h greeter_client greeter_server greeter_async_client greeter_async_client2 greeter_async_server
++	rm -f *.o *.pb.cc *.pb.h greeter_client greeter_server greeter_async_client greeter_async_client2 greeter_async_server greeter_secure_server greeter_secure_client
+ 
+ 
+ # The following is to test your system and ensure a smoother experience.

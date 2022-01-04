@@ -1,0 +1,13 @@
+includes:
+  - base.yaml
+targets:
+  - target: /bin/
+    copy:
+      - files:
+        - ../build/greeter_secure_server
+  - target: /
+    copy:
+      - files:
+        - ../server.crt
+        - ../server.key
+        - ../ca.crt
