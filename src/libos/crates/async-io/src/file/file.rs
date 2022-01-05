@@ -113,14 +113,14 @@ impl<F: File + ?Sized> Async<F> {
         let mask = Events::IN;
         let mut poller = Poller::new();
         loop {
-            let events = self.poll(mask, Some(&mut poller));
-            if events.contains(Events::IN) {
-                let res = self.0.read(buf);
-                if Self::should_io_return(&res, is_nonblocking) {
-                    return res;
-                }
+            let res = self.0.read(buf);
+            if Self::should_io_return(&res, is_nonblocking) {
+                return res;
             }
-            poller.wait().await?;
+            let events = self.poll(mask, Some(&mut poller));
+            if events.is_empty() {
+                poller.wait().await?;
+            }
         }
     }
 
@@ -137,14 +137,14 @@ impl<F: File + ?Sized> Async<F> {
         let mask = Events::IN;
         let mut poller = Poller::new();
         loop {
-            let events = self.poll(mask, Some(&mut poller));
-            if events.contains(Events::IN) {
-                let res = self.0.readv(bufs);
-                if Self::should_io_return(&res, is_nonblocking) {
-                    return res;
-                }
+            let res = self.0.readv(bufs);
+            if Self::should_io_return(&res, is_nonblocking) {
+                return res;
             }
-            poller.wait().await?;
+            let events = self.poll(mask, Some(&mut poller));
+            if events.is_empty() {
+                poller.wait().await?;
+            }
         }
     }
 
@@ -161,14 +161,14 @@ impl<F: File + ?Sized> Async<F> {
         let mask = Events::OUT;
         let mut poller = Poller::new();
         loop {
-            let events = self.poll(mask, Some(&mut poller));
-            if events.contains(Events::OUT) {
-                let res = self.0.write(buf);
-                if Self::should_io_return(&res, is_nonblocking) {
-                    return res;
-                }
+            let res = self.0.write(buf);
+            if Self::should_io_return(&res, is_nonblocking) {
+                return res;
             }
-            poller.wait().await?;
+            let events = self.poll(mask, Some(&mut poller));
+            if events.is_empty() {
+                poller.wait().await?;
+            }
         }
     }
 
@@ -185,14 +185,14 @@ impl<F: File + ?Sized> Async<F> {
         let mask = Events::OUT;
         let mut poller = Poller::new();
         loop {
-            let events = self.poll(mask, Some(&mut poller));
-            if events.contains(Events::OUT) {
-                let res = self.0.writev(bufs);
-                if Self::should_io_return(&res, is_nonblocking) {
-                    return res;
-                }
+            let res = self.0.writev(bufs);
+            if Self::should_io_return(&res, is_nonblocking) {
+                return res;
             }
-            poller.wait().await?;
+            let events = self.poll(mask, Some(&mut poller));
+            if events.is_empty() {
+                poller.wait().await?;
+            }
         }
     }
 
