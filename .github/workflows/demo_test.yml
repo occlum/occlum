@@ -332,6 +332,36 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "cd /root/demos/grpc && SGX_MODE=SIM ./run_client_on_occlum.sh"
 
+  Grpc_tls_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/sim
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Build openssl and grpc
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_tls;
+            ./download_and_install_openssl.sh && ./download_and_install_grpc.sh"
+
+    - name: Prepare grpc tls occlum instance
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_tls;
+            SGX_MODE=SIM ./prepare_occlum_instance.sh"
+
+    - name: Run grpc tls server
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_tls/occlum_server;
+            occlum run /bin/greeter_secure_server" &
+
+    - name: Run grpc tls client
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_tls/occlum_client;
+            occlum run /bin/greeter_secure_client"
+
 
   Openvino_test:
     runs-on: ubuntu-18.04
