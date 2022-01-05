@@ -156,7 +156,7 @@ int verify_child_echo(int *connected_sockets) {
     // Test for blocking poll, poll will be only interrupted by sigchld
     // if socket does not support waking up a sleeping poller
     int ret = poll(polls, 1, -1);
-    if (ret < 0) {
+    if (ret < 0 && errno != EINTR) {
         THROW_ERROR("failed to poll");
     }
 
