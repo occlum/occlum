@@ -114,7 +114,7 @@ pub extern "C" fn occlum_ecall_init(
         crate::time::up_time::init();
 
         // Enable global backtrace
-        unsafe { std::backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
+        unsafe { std::backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Full) };
     });
 
     match parse_resolv_conf(resolv_conf_ptr) {
