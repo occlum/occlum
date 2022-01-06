@@ -2,6 +2,7 @@ use std::mem::MaybeUninit;
 use std::ptr::{self};
 
 use io_uring_callback::{Fd, IoHandle};
+use log::error;
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
 use super::ConnectedStream;
@@ -47,7 +48,8 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         if !flags.is_empty()
             && flags.intersects(!(SendFlags::MSG_DONTWAIT | SendFlags::MSG_NOSIGNAL))
         {
-            todo!("Support other flags: {:?}", flags);
+            error!("Not supported flags: {:?}", flags);
+            return_errno!(EINVAL, "not supported flags");
         }
 
         // Check for error condition before write.
