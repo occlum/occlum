@@ -27,23 +27,10 @@ async fn __main_loop(current: ThreadRef, init_cpu_state: CpuContext) {
 
     current.start();
 
-    // The exit_group logic may not interrupt a newly created threads. An extra
-    // check is added here to handle such rare race conditions.
-    crate::process::handle_force_exit();
-
     static YIELD_INTERVAL: u64 = 64; // same as DEFAULT_BUDGET
     let mut rounds: u64 = 0;
 
     while current.status() != ThreadStatus::Exited {
-        // Continue the execution in the user space
-        let fault = unsafe { context_switch::switch_to_user() };
-
-        // Start a new round of log messages. We will set the description for
-        // this round later when we have extracted more info from the fault.
-        log::next_round(None);
-
-        handle_fault(fault).await;
-
         crate::signal::deliver_signal();
 
         crate::process::handle_force_exit();
@@ -54,6 +41,15 @@ async fn __main_loop(current: ThreadRef, init_cpu_state: CpuContext) {
         if rounds % YIELD_INTERVAL == 0 {
             async_rt::sched::yield_().await;
         }
+
+        // Continue the execution in the user space
+        let fault = unsafe { context_switch::switch_to_user() };
+
+        // Start a new round of log messages. We will set the description for
+        // this round later when we have extracted more info from the fault.
+        log::next_round(None);
+
+        handle_fault(fault).await;
     }
 }
 

@@ -77,7 +77,8 @@ impl Executor {
         loop {
             let task_option = self.scheduler.dequeue_task(thread_id);
 
-            if self.is_shutdown() {
+            // Stop the executor iff all the ready tasks are executed
+            if self.is_shutdown() && task_option.is_none() {
                 let num = self.running_vcpu_num.fetch_sub(1, Ordering::Relaxed) as u32;
                 assert!(num >= 1);
                 self.parks.unregister(thread_id);
