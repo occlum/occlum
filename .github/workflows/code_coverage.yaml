@@ -1,0 +1,88 @@
+name: Code Coverage
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+on: [push]
+
+env:
+  nap_time: 120
+
+jobs:
+  Collect-code-coverage:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Set up environment
+      uses: ./.github/workflows/composite_action
+      with:
+        container-name: 'code_coverage'
+        build-envs: 'OCCLUM_COV=1'
+        container-flags: '--privileged -e OCCLUM_LOG_LEVEL=trace'
+
+    - name: Integration test
+      run:  docker exec code_coverage bash -c "cd /root/occlum; SGX_MODE=SIM make test"
+
+    - name: Integration test with Glibc
+      run:  docker exec code_coverage bash -c "cd /root/occlum; SGX_MODE=SIM make test-glibc"
+
+    - name: C test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/hello_c && make;
+            occlum new occlum_instance;
+            cd occlum_instance && rm -rf image;
+            copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
+            SGX_MODE=SIM occlum build;
+            occlum run /bin/hello_world"
+
+    - name: C with encrypted image test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/hello_c && make;
+            rm -rf occlum_instance && occlum new occlum_instance;
+            occlum gen-image-key occlum_instance/image_key;
+            cd occlum_instance && rm -rf image;
+            copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
+            SGX_MODE=SIM occlum build --image-key ./image_key --buildin-image-key;
+            occlum run /bin/hello_world"
+
+    - name: C++ test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/hello_cc && make;
+            occlum new occlum_instance;
+            cd occlum_instance && rm -rf image;
+            copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
+            SGX_MODE=SIM occlum build;
+            occlum run /bin/hello_world"
+
+    - name: Rust test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/rust && SGX_MODE=SIM ./run_rust_demo_on_occlum.sh"
+
+    - name: Run Golang sqlite test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh"
+
+    - name: Build Fish dependencies
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/fish && ./download_and_build.sh"
+
+    - name: Run Fish test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_fish_test.sh"
+
+    - name: Run Fish process rlimit test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_per_process_config_test.sh"
+
+    - name: Build LA dependencies
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/local_attestation && ./download_src_and_build_deps.sh"
+
+    - name: Run LA test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/local_attestation && SGX_MODE=SIM make;
+              SGX_MODE=SIM make test"
+
+    - name: Build sqlite dependencies
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/sqlite && ./download_and_build_sqlite.sh"
+
+    - name: Run sqlite test
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/sqlite && SGX_MODE=SIM ./run_sqlite_on_occlum.sh"
+
+    - name: Upload coverage report
+      run: docker exec code_coverage bash -c "cd /root/occlum/build/internal/src/libos/cargo-target/debug/deps; export CODECOV_TOKEN="${{ secrets.COV_TOKEN }}"; bash <(curl -s https://codecov.io/bash)"
+
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop code_coverage
