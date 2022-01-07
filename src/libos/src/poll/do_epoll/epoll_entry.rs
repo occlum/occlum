@@ -129,4 +129,9 @@ impl EpollEntry {
     pub fn set_deleted(&self) {
         self.is_deleted.store(true, Relaxed);
     }
+
+    /// Get the file descriptor associated with the epoll entry.
+    pub fn fd(&self) -> FileDesc {
+        self.fd
+    }
 }

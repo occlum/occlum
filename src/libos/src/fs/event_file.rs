@@ -111,7 +111,20 @@ impl File for EventFile {
     }
 
     fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
-        self.pollee.poll(mask, poller)
+        let mut events = self.pollee.poll(mask, poller);
+        let val = self.val.lock().unwrap();
+        if *val == 0 {
+            // If the val is 0, the read should be blocking.
+            events -= Events::IN;
+        }
+        if *val == u64::MAX - 1 {
+            // Man eventfd:
+            // The maximum value that may be stored in the counter is the largest unsigned 64-bit value
+            // minus 1 (i.e., 0xfffffffffffffffe). If the addition would cause the counter's value to exceed
+            // the maximum, then the write should be blocking.
+            events -= Events::OUT;
+        }
+        events
     }
 
     fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()> {

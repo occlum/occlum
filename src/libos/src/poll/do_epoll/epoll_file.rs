@@ -193,12 +193,15 @@ impl EpollFile {
             }
 
             // Return if the timeout expires.
-            if let Err(_) = poller
+            if let Err(e) = poller
                 .as_ref()
                 .unwrap()
                 .wait_timeout(timeout.as_mut())
                 .await
             {
+                if e.errno() == EINTR {
+                    return_errno!(EINTR, "interrupted");
+                }
                 return Ok(ep_events);
             }
         }
@@ -239,11 +242,11 @@ impl EpollFile {
             // to be returned.
             for entry in ready_entries {
                 let (ep_event, ep_flags) = entry.event_and_flags();
-
                 // If this entry's file is ready, save it in the output array.
-                let ready_events = entry.poll() & ep_event.events;
+                // EPOLLHUP and EPOLLERR should always be reported.
+                let ready_events = entry.poll() & (ep_event.events | Events::HUP | Events::ERR);
                 if !ready_events.is_empty() {
-                    ep_events.push(ep_event);
+                    ep_events.push(EpollEvent::new(ready_events, ep_event.user_data));
                     count_events += 1;
                 }
 
@@ -256,6 +259,11 @@ impl EpollFile {
                 // its ready flag.
                 else {
                     entry.reset_ready();
+                    // For EPOLLONESHOT flag, this entry should also be removed from the interest list
+                    if ep_flags.intersects(EpollFlags::ONE_SHOT) {
+                        self.del_interest(entry.fd())
+                            .expect("this entry should be in the interest list");
+                    }
                 }
             }
         }
