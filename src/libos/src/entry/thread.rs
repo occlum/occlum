@@ -30,10 +30,14 @@ async fn __main_loop(current: ThreadRef, init_cpu_state: CpuContext) {
     static YIELD_INTERVAL: u64 = 64; // same as DEFAULT_BUDGET
     let mut rounds: u64 = 0;
 
-    while current.status() != ThreadStatus::Exited {
+    loop {
         crate::signal::deliver_signal();
 
         crate::process::handle_force_exit();
+
+        if current.status() == ThreadStatus::Exited {
+            break;
+        }
 
         // If app check system info in a user level spin lock, the whole system would hung
         // workaround this issue, the final solution should update the scheduler
