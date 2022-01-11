@@ -110,6 +110,7 @@ impl EpollFile {
             // TODO: should we warn about it?
             None => return Ok(()),
         };
+
         file.unregister_observer(&(entry as _)).unwrap();
         Ok(())
     }
@@ -287,6 +288,29 @@ impl EpollFile {
     /// interest list.
     pub fn on_file_closed(&self, fd: FileDesc) {
         self.del_interest(fd);
+    }
+}
+
+impl Drop for EpollFile {
+    fn drop(&mut self) {
+        trace!("EpollFile Drop");
+        let mut interest = self.interest.lock().unwrap();
+        let fds: Vec<_> = interest
+            .drain()
+            .map(|(fd, entry)| {
+                entry.set_deleted();
+                if let Some(file) = entry.file() {
+                    file.unregister_observer(&(entry as _));
+                }
+                fd
+            })
+            .collect();
+        drop(interest);
+
+        // There is a deadlock with below code when do vfork exit.
+        // The reason is current vfork exit won't release opened files locks.
+        // Todo: revisit this code once vfork implemetaion updated.
+        //fds.iter().for_each(|&fd| self.unregister_from_file(fd));
     }
 }
 

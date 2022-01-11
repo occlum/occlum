@@ -87,6 +87,11 @@ fn restore_parent_process(mut context: *mut CpuContext, current_ref: &ThreadRef)
     let current_thread = current!();
     let current_pid = current_ref.process().pid();
 
+    // Todo: close all child created files, such as below.
+    // But parent opened files need to be filterd.
+    // Please revisit Drop for EpollFile once the implementation is ready.
+    // current_thread.close_all_files();
+
     // Restore parent file table
     let parent_file_table = {
         let mut parent_file_tables = VFORK_PARENT_FILE_TABLES.lock().unwrap();
