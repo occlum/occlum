@@ -7,13 +7,15 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["vdso-time/std", "use_latency" ]
+default = ["vdso-time/std", "use_latency", "libc"]
 auto_run = []
 use_latency = []
-sgx = ["sgx_tstd", "flume/sgx", "vdso-time/sgx", "hierarchical_hash_wheel_timer/sgx"]
+sgx = ["sgx_tstd", "flume/sgx", "vdso-time/sgx", "hierarchical_hash_wheel_timer/sgx", "sgx_types", "sgx_libc", "sgx-untrusted-alloc"]
 
 [dependencies]
+cfg-if = "1.0"
 atomic = "0.5"
+libc = { version = "0.2", optional = true }
 bit-vec = { version = "0.6", default-features = false }
 errno = { path = "../errno" }
 flume = { path = "../../../../deps/flume", default-features = false }
@@ -27,6 +29,10 @@ object-id = { path = "../object-id" }
 spin = "0.7"
 sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", features = ["backtrace", "thread"], optional = true }
 vdso-time = { path = "../vdso-time", default-features = false }
+sgx-untrusted-alloc = { path = "../sgx-untrusted-alloc", optional = true }
+sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }
+sgx_libc = { path = "../../../../deps/rust-sgx-sdk/sgx_libc", optional = true }
 
 [dev-dependencies]
 ctor = "0.1"
+env_logger = "0.8.4"

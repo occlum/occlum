@@ -1,0 +1,8 @@
+enclave {
+    include "time.h"
+
+    untrusted {
+        int ocall_futex_wait_timeout([out] int32_t *err, [user_check] uint32_t *uaddr, [in, out] struct timespec *timeout, uint32_t val);
+        int ocall_futex_wake([out] int32_t *err, [user_check] uint32_t *uaddr);
+    };
+};

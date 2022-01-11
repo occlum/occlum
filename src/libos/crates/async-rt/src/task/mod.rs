@@ -55,7 +55,16 @@ pub fn block_on<T: Send + 'static>(future: impl Future<Output = T> + 'static + S
 fn init_runner_threads() {
     use std::sync::Once;
     static INIT: Once = Once::new();
+
     INIT.call_once(|| {
+        // Run test with log:
+        // RUST_LOG=trace cargo test -- --nocapture
+        let _ = env_logger::builder().is_test(true).try_init().unwrap();
+
+        std::thread::spawn(|| {
+            crate::time::run_timer_wheel_thread();
+        });
+
         for _ in 0..crate::executor::parallelism() {
             std::thread::spawn(|| {
                 crate::executor::run_tasks();

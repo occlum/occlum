@@ -154,6 +154,7 @@ impl Executor {
         self.is_shutdown.store(true, Ordering::Relaxed);
 
         self.parks.unpark_all();
+        crate::time::wake_timer_wheel(&Duration::default()); // wake the time wheel right now
     }
 
     pub fn is_shutdown(&self) -> bool {

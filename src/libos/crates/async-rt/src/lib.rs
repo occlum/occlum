@@ -26,6 +26,15 @@ extern crate alloc;
 #[macro_use]
 extern crate log;
 
+#[cfg(not(feature = "sgx"))]
+extern crate libc;
+#[cfg(feature = "sgx")]
+extern crate sgx_libc as libc;
+#[cfg(feature = "sgx")]
+extern crate sgx_types;
+#[cfg(feature = "sgx")]
+extern crate sgx_untrusted_alloc;
+
 pub mod config;
 pub mod executor;
 mod macros;
@@ -219,35 +228,6 @@ mod tests {
     #[ctor::ctor]
     fn auto_init_executor() {
         crate::config::set_parallelism(TEST_PARALLELISM);
-    }
-
-    mod logger {
-        use log::{Level, LevelFilter, Metadata, Record};
-
-        #[ctor::ctor]
-        fn auto_init() {
-            log::set_logger(&LOGGER)
-                .map(|()| log::set_max_level(LevelFilter::Info))
-                .expect("failed to init the");
-        }
-
-        static LOGGER: SimpleLogger = SimpleLogger;
-
-        struct SimpleLogger;
-
-        impl log::Log for SimpleLogger {
-            fn enabled(&self, metadata: &Metadata) -> bool {
-                metadata.level() <= Level::Info
-            }
-
-            fn log(&self, record: &Record) {
-                if self.enabled(record.metadata()) {
-                    println!("[{}] {}", record.level(), record.args());
-                }
-            }
-
-            fn flush(&self) {}
-        }
     }
 }
 
