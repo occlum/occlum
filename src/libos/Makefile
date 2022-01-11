@@ -154,6 +154,7 @@ $(OBJ_DIR)/libos/$(SRC_OBJ)/Enclave_t.c: $(SGX_EDGER8R) ../Enclave.edl
 		$(SGX_EDGER8R) --trusted $(CUR_DIR)/../Enclave.edl \
 		--search-path $(SGX_SDK)/include \
 		--search-path $(RUST_SGX_SDK_DIR)/edl \
+		--search-path $(CRATES_DIR)/async-rt/src/ocalls \
 		--search-path $(CRATES_DIR)/vdso-time/ocalls \
 		--search-path $(CRATES_DIR)/host-socket/ocalls \
 		--search-path $(PROJECT_DIR)/deps/io-uring/ocalls

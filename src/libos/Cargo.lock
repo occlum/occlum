@@ -100,16 +100,21 @@ version = "0.1.0"
 dependencies = [
  "atomic",
  "bit-vec",
+ "cfg-if 1.0.0",
  "errno",
  "flume",
  "futures",
  "hierarchical_hash_wheel_timer",
  "intrusive-collections",
  "lazy_static",
+ "libc",
  "log",
  "new-self-ref-arc",
  "object-id",
+ "sgx-untrusted-alloc",
+ "sgx_libc",
  "sgx_tstd",
+ "sgx_types",
  "spin 0.7.0",
  "vdso-time",
 ]
@@ -1004,6 +1009,7 @@ name = "sgx-untrusted-alloc"
 version = "0.1.0"
 dependencies = [
  "cfg-if 1.0.0",
+ "libc",
  "sgx_libc",
  "sgx_trts",
  "sgx_tstd",

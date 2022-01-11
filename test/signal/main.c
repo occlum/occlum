@@ -494,9 +494,12 @@ int test_sigtimedwait() {
     pthread_t thread = raise_async(SIGIO, &delay);
 
     timeout.tv_sec = 0;
-    timeout.tv_nsec = 2 * delay.tv_nsec;
+    timeout.tv_nsec = 4 * delay.tv_nsec;
 
-    if ((ret = sigtimedwait(&new_mask, &info, &timeout)) < 0 || info.si_signo != SIGIO) {
+    while ((ret = sigtimedwait(&new_mask, &info, &timeout)) < 0 || info.si_signo != SIGIO) {
+        if (errno == EAGAIN) {
+            continue;
+        }
         THROW_ERROR("sigtimedwait should return the SIGIO");
     }
 

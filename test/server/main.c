@@ -161,31 +161,14 @@ void proc_exit() {
     sigchld = 1;
 }
 
-int server_connectionless_recvmsg() {
+int server_connectionless_recvmsg(int sock) {
     int ret = 0;
     const int buf_size = 1000;
     char buf[buf_size];
     struct msghdr msg;
     struct iovec iov[1];
-
-    struct sockaddr_in servaddr;
     struct sockaddr_in clientaddr;
-    memset(&servaddr, 0, sizeof(servaddr));
     memset(&clientaddr, 0, sizeof(clientaddr));
-
-    int sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sock < 0) {
-        THROW_ERROR("create socket error");
-    }
-
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(9900);
-    ret = bind(sock, (struct sockaddr *)&servaddr, sizeof(servaddr));
-    if (ret < 0) {
-        close(sock);
-        THROW_ERROR("bind socket failed");
-    }
 
     msg.msg_name = &clientaddr;
     msg.msg_namelen = sizeof(clientaddr);
@@ -319,8 +302,24 @@ int test_sendmmsg_recvmsg() {
 int test_sendmsg_recvmsg_connectionless() {
     int ret = 0;
     int child_pid = 0;
+    struct sockaddr_in servaddr;
+    memset(&servaddr, 0, sizeof(servaddr));
 
     signal(SIGCHLD, proc_exit);
+
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0) {
+        THROW_ERROR("create socket error");
+    }
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(9900);
+    ret = bind(sock, (struct sockaddr *)&servaddr, sizeof(servaddr));
+    if (ret < 0) {
+        close(sock);
+        THROW_ERROR("bind socket failed");
+    }
 
     char *client_argv[] = {"client", "NULL", "8804", NULL, NULL};
     ret = posix_spawn(&child_pid, "/bin/client", NULL, NULL, client_argv, NULL);
@@ -328,7 +327,7 @@ int test_sendmsg_recvmsg_connectionless() {
         THROW_ERROR("spawn client process error");
     }
 
-    ret = server_connectionless_recvmsg();
+    ret = server_connectionless_recvmsg(sock);
 
     /* If child client send happens before recvmsg, EINTR may
     be triggered which is not failed case */

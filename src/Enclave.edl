@@ -7,6 +7,7 @@ enclave {
     from "sgx_net.edl" import *;
     from "sgx_thread.edl" import *;
     from "sgx_occlum_utils.edl" import *;
+    from "sgx_async_rt_ocalls.edl" import *;
     from "sgx_vdso_time_ocalls.edl" import *;
     from "sgx_host_socket_ocalls.edl" import *;
     from "sgx_io_uring_ocalls.edl" import *;
@@ -82,6 +83,11 @@ enclave {
          * Shut down all vCPUs.
          */
         public int occlum_ecall_shutdown_vcpus(void);
+
+        /*
+         * Create the timer thread.
+         */
+        public int occlum_ecall_timer_thread_create(void);
 
         /*
          * Send a signal to one or multiple LibOS processes.

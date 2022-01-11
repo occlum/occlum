@@ -198,6 +198,16 @@ pub extern "C" fn occlum_ecall_run_vcpu(pal_data_ptr: *const occlum_pal_vcpu_dat
 }
 
 #[no_mangle]
+pub extern "C" fn occlum_ecall_timer_thread_create() -> i32 {
+    if HAS_INIT.load(Ordering::SeqCst) == false {
+        return ecall_errno!(EAGAIN);
+    }
+
+    async_rt::time::run_timer_wheel_thread();
+    0
+}
+
+#[no_mangle]
 pub extern "C" fn occlum_ecall_shutdown_vcpus() -> i32 {
     if HAS_INIT.load(Ordering::SeqCst) == false {
         return ecall_errno!(EAGAIN);

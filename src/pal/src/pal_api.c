@@ -3,6 +3,7 @@
 #include "pal_enclave.h"
 #include "pal_error.h"
 #include "pal_interrupt_thread.h"
+#include "pal_timer_thread.h"
 #include "pal_load_resolv_conf.h"
 #include "pal_log.h"
 #include "pal_sig_handler.h"
@@ -141,6 +142,11 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
         goto on_destroy_enclave;
     }
 
+    if (pal_timer_thread_start() < 0) {
+        PAL_ERROR("Failed to start the timer thread: %s", errno2str(errno));
+        goto on_destroy_enclave;
+    }
+
     if (pal_interrupt_thread_start() < 0) {
         PAL_ERROR("Failed to start the interrupt thread: %s", errno2str(errno));
         goto on_destroy_enclave;
@@ -252,6 +258,11 @@ int occlum_pal_destroy(void) {
     if (pal_vcpu_threads_stop() < 0) {
         ret = -1;
         PAL_WARN("Cannot stop the vCPU threads: %s", errno2str(errno));
+    }
+
+    if (pal_timer_thread_stop() < 0) {
+        ret = -1;
+        PAL_WARN("Cannot stop the timer thread: %s", errno2str(errno));
     }
 
     if (pal_interrupt_thread_stop() < 0) {
