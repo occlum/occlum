@@ -14,7 +14,12 @@ pub fn try_get() -> Option<Arc<Task>> {
         return None;
     }
     let current_task = unsafe { Arc::from_raw(ptr) };
-    Arc::into_raw(current_task.clone());
+
+    // The memory would free in function free_task_ptr
+    #[allow(unused_must_use)]
+    {
+        Arc::into_raw(current_task.clone());
+    }
     Some(current_task)
 }
 

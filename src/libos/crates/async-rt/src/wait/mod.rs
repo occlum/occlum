@@ -102,8 +102,6 @@ mod tests {
     }
 
     #[test]
-    // FIXME: This will panic in CI!
-    #[ignore]
     fn wait_timeout_err() {
         crate::task::block_on(async {
             let ms = 100;
@@ -170,22 +168,25 @@ mod tests {
             let waiter_queue = WaiterQueue::new();
 
             // mut Option<Duration>
-            let mut duration = Duration::from_millis(100);
+            let duration = Duration::from_millis(100);
             let mut timeout = Some(duration);
-            crate::waiter_loop!(&waiter_queue, timeout, {}) as Result<()>;
+            let res = crate::waiter_loop!(&waiter_queue, timeout, {}) as Result<()>;
+            assert!(res.is_err() && res.errno() == Some(ETIMEDOUT));
             assert!(timeout.as_ref().unwrap().is_zero());
 
             // mut Option<&mut Duration>
-            let mut duration = Duration::from_millis(100);
+            let duration = Duration::from_millis(100);
             let mut timeout = Some(duration);
             let mut timeout_as_mut = timeout.as_mut();
-            crate::waiter_loop!(&waiter_queue, timeout_as_mut, {}) as Result<()>;
+            let res = crate::waiter_loop!(&waiter_queue, timeout_as_mut, {}) as Result<()>;
+            assert!(res.is_err() && res.errno() == Some(ETIMEDOUT));
             assert!(timeout.as_ref().unwrap().is_zero());
 
             // mut Option<&mut Duration>
             let mut duration = Duration::from_millis(100);
             let mut timeout = Some(&mut duration);
-            crate::waiter_loop!(&waiter_queue, timeout, {}) as Result<()>;
+            let res = crate::waiter_loop!(&waiter_queue, timeout, {}) as Result<()>;
+            assert!(res.is_err() && res.errno() == Some(ETIMEDOUT));
             assert!(timeout.as_ref().unwrap().is_zero());
             assert!(duration.is_zero());
 
@@ -193,7 +194,8 @@ mod tests {
             let mut duration = Duration::from_millis(100);
             let mut timeout = Some(&mut duration);
             let mut timeout_as_mut = timeout.as_mut();
-            crate::waiter_loop!(&waiter_queue, timeout_as_mut, {}) as Result<()>;
+            let res = crate::waiter_loop!(&waiter_queue, timeout_as_mut, {}) as Result<()>;
+            assert!(res.is_err() && res.errno() == Some(ETIMEDOUT));
             assert!(timeout.as_ref().unwrap().is_zero());
             assert!(duration.is_zero());
         });
@@ -205,21 +207,24 @@ mod tests {
             let waiter = Waiter::new();
 
             // Option<&mut Duration>
-            let mut duration = Duration::from_millis(100);
+            let duration = Duration::from_millis(100);
             let mut timeout = Some(duration);
-            waiter.wait_timeout(timeout.as_mut()).await;
+            let res = waiter.wait_timeout(timeout.as_mut()).await;
+            assert!(res.is_err() && res.errno() == Some(ETIMEDOUT));
             assert!(timeout.as_ref().unwrap().is_zero());
 
             // Option<&mut Duration>
             let mut duration = Duration::from_millis(100);
-            let mut timeout = Some(&mut duration);
-            waiter.wait_timeout(timeout).await;
+            let timeout = Some(&mut duration);
+            let res = waiter.wait_timeout(timeout).await;
+            assert!(res.is_err() && res.errno() == Some(ETIMEDOUT));
             assert!(duration.is_zero());
 
             // Option<&mut &mut Duration>
             let mut duration = Duration::from_millis(100);
             let mut timeout = Some(&mut duration);
-            waiter.wait_timeout(timeout.as_mut()).await;
+            let res = waiter.wait_timeout(timeout.as_mut()).await;
+            assert!(res.is_err() && res.errno() == Some(ETIMEDOUT));
             assert!(timeout.as_ref().unwrap().is_zero());
             assert!(duration.is_zero());
         });
@@ -232,7 +237,7 @@ mod tests {
         let res = waiter.wait_timeout(timeout).await;
 
         // timeout expired.
-        assert!(res.is_err());
+        assert!(res.is_err() && res.errno() == Some(ETIMEDOUT));
     }
 
     async fn imagined_blocking_func2(mut timeout: Option<&mut Duration>) {
@@ -240,7 +245,8 @@ mod tests {
 
         let waiter = Waiter::new();
         loop {
-            if let Err(_) = waiter.wait_timeout(timeout.as_mut()).await {
+            if let Err(e) = waiter.wait_timeout(timeout.as_mut()).await {
+                assert!(e.errno() == ETIMEDOUT);
                 // timeout expired, return.
                 break;
             }

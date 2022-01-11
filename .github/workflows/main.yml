@@ -31,8 +31,8 @@ jobs:
           exit 1;
         fi'
 
-    # - name: Unit test
-    #   run: docker exec ubuntu-test bash -c "cd /root/occlum; make unit-test"
+    - name: Unit test
+      run: docker exec ubuntu-test bash -c "cd /root/occlum; make unit-test"
 
     - name: Integration test
       run:  docker exec ubuntu-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test"
@@ -68,8 +68,8 @@ jobs:
           exit 1;
         fi'
 
-    # - name: Unit test
-    #   run: docker exec centos-test bash -c "cd /root/occlum; make unit-test"
+    - name: Unit test
+      run: docker exec centos-test bash -c "cd /root/occlum; make unit-test"
 
     - name: Integration test
       run:  docker exec centos-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test"

@@ -13,6 +13,7 @@ use super::{Waiter, WaiterQueue};
 ///
 /// ```
 /// use async_rt::wait::WaiterQueue;
+/// use errno::prelude::*;
 ///
 /// // Init runtime if not enable "auto_run" feature.
 /// async_rt::config::set_parallelism(2);
@@ -48,6 +49,7 @@ use super::{Waiter, WaiterQueue};
 ///
 /// ```
 /// # use async_rt::wait::WaiterQueue;
+/// # use errno::prelude::*;
 /// #
 /// # // Init runtime if not enable "auto_run" feature.
 /// # async_rt::config::set_parallelism(2);
