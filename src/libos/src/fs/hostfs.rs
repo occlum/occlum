@@ -343,15 +343,15 @@ impl IntoFsMetadata for fs::Metadata {
             blocks: self.st_blocks() as usize,
             atime: Timespec {
                 sec: self.st_atime(),
-                nsec: self.st_atime_nsec() as i32,
+                nsec: self.st_atime_nsec(),
             },
             mtime: Timespec {
                 sec: self.st_mtime(),
-                nsec: self.st_mtime_nsec() as i32,
+                nsec: self.st_mtime_nsec(),
             },
             ctime: Timespec {
                 sec: self.st_ctime(),
-                nsec: self.st_ctime_nsec() as i32,
+                nsec: self.st_ctime_nsec(),
             },
             type_: match self.st_mode() & 0xf000 {
                 libc::S_IFCHR => FileType::CharDevice,
