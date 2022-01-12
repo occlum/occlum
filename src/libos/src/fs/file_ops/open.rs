@@ -1,4 +1,4 @@
-use host_disk::{HostDisk, IoUringDisk, SyncIoDisk};
+use host_disk::{HostDisk, IoUringDisk, SyncEncIoDisk, SyncIoDisk};
 
 use super::*;
 use crate::fs::DiskFile;
@@ -28,6 +28,7 @@ pub fn do_openat(fs_path: &FsPath, flags: u32, mode: FileMode) -> Result<FileDes
     Ok(fd)
 }
 
+// Built-in disks for testing purposes
 mod disks {
     use super::*;
 
@@ -47,6 +48,11 @@ mod disks {
             let total_blocks = to_blocks(2 * GB);
             let path = String::from("async_io_dev");
             let disk = IoUringDisk::<runtime::DeviceRuntime>::create(&path, total_blocks).unwrap();
+            DiskFile::new(disk)
+        } else if abs_path == "/dev/sync_io_enc" {
+            let total_blocks = to_blocks(2 * GB);
+            let path = String::from("sync_io_enc");
+            let disk = SyncEncIoDisk::create(&path, total_blocks).unwrap();
             DiskFile::new(disk)
         } else {
             return Ok(None);

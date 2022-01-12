@@ -498,6 +498,7 @@ dependencies = [
  "new-self-ref-arc",
  "sgx-untrusted-alloc",
  "sgx_libc",
+ "sgx_tcrypto",
  "sgx_trts",
  "sgx_tstd",
  "sgx_types",
