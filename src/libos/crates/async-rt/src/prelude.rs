@@ -1,4 +1,5 @@
 pub(crate) use alloc::boxed::Box;
+pub(crate) use alloc::collections::VecDeque;
 pub(crate) use alloc::sync::Arc;
 pub(crate) use alloc::vec::Vec;
 pub(crate) use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};

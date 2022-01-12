@@ -155,7 +155,7 @@ mod tests {
     }
 
     #[test]
-    // FIXME: check the time when priority task enabled
+    // FIXME: enable this test when async Mutex is ready
     #[ignore]
     fn test_scheduler_priority() {
         crate::task::block_on(async {
@@ -168,8 +168,9 @@ mod tests {
             let normal_time = normal_handle.await;
             let high_time = high_handle.await;
 
-            assert!(low_time > normal_time);
-            assert!(normal_time > high_time);
+            // FIXME: check the time when priority task enabled
+            // assert!(low_time > normal_time);
+            // assert!(normal_time > high_time);
         });
     }
 
@@ -197,18 +198,14 @@ mod tests {
     }
 
     #[test]
-    // FIXME: The yield_ implemetation has a deadlock issue
+    // FIXME: enable this test when async Mutex is ready
     #[ignore]
     fn test_scheduler_full() {
         crate::task::block_on(async {
             use crate::sched::MAX_QUEUED_TASKS;
             use crate::task::JoinHandle;
 
-            // FIXME: The yield_ implemetation has a deadlock issue
-            // If the task queue is full, then the yield_.await would be blocked,
-            // and if the yield_.await is blocked, then the queue would not dequeue anything.
-            // let task_num = TEST_PARALLELISM * MAX_QUEUED_TASKS as u32 * 2;
-            let task_num = TEST_PARALLELISM * MAX_QUEUED_TASKS as u32 / 2;
+            let task_num = TEST_PARALLELISM * MAX_QUEUED_TASKS as u32 * 2;
             let mut join_handles: Vec<JoinHandle<()>> = (0..task_num)
                 .map(|_| {
                     crate::task::spawn(async move {

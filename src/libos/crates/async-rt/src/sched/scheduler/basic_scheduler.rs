@@ -5,7 +5,11 @@ use crate::task::Task;
 
 use super::{Scheduler, MAX_QUEUED_TASKS};
 
-use flume::{Receiver, Sender};
+use flume::{Receiver, Sender, TrySendError};
+
+lazy_static! {
+    static ref PENDING_TASKS: Mutex<VecDeque<Arc<Task>>> = Mutex::new(VecDeque::new());
+}
 
 pub struct BasicScheduler {
     parallelism: usize,
@@ -45,14 +49,41 @@ impl Scheduler for BasicScheduler {
         drop(affinity);
 
         task.sched_info().set_last_thread_id(thread_id as u32);
-        self.task_senders[thread_id]
-            .send(task)
-            .expect("too many tasks enqueued");
+        let res = self.task_senders[thread_id].try_send(task);
 
-        self.parks.unpark(thread_id);
+        match res {
+            Ok(()) => {
+                self.parks.unpark(thread_id);
+            }
+            Err(TrySendError::Full(task)) => {
+                let mut pending_tasks = PENDING_TASKS.lock();
+                pending_tasks.push_back(task);
+            }
+            _ => panic!("task queue disconnected"),
+        }
     }
 
     fn dequeue_task(&self, thread_id: usize) -> Option<Arc<Task>> {
-        self.run_queues[thread_id].try_recv().ok()
+        let res = self.run_queues[thread_id].try_recv().ok();
+
+        // If there is any pending task, try to enqueue it
+        let mut pending_tasks = PENDING_TASKS.lock();
+        let task = pending_tasks.pop_front();
+        drop(pending_tasks);
+
+        if let Some(task) = task {
+            self.enqueue_task(task);
+        }
+
+        res
+    }
+}
+
+impl Drop for BasicScheduler {
+    fn drop(&mut self) {
+        let pending_tasks = PENDING_TASKS.lock();
+        if pending_tasks.len() > 0 {
+            panic!("There are some pending tasks.")
+        }
     }
 }
