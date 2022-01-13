@@ -2,8 +2,6 @@ use std::mem::{self};
 
 use sgx_untrusted_alloc::UntrustedBox;
 
-use crate::prelude::*;
-
 /// A circular buffer in untrusted memory.
 pub struct UntrustedCircularBuf {
     // The underlying storage of the buffer.

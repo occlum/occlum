@@ -31,4 +31,4 @@ sgx-untrusted-alloc = { path = "../sgx-untrusted-alloc", default-features = fals
 [dev-dependencies]
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 futures = { version = "0.3", default-features = false, features = ["alloc"]  }
-async-rt = { path = "../async-rt", features = ["auto_run"] } 
+async-rt = { path = "../async-rt", features = ["auto_run"] }

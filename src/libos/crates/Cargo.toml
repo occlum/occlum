@@ -24,6 +24,7 @@ default-members = [
     "keyable-arc",
     "new-self-ref-arc",
     "vdso-time",
+    "host-socket"
 ]
 
 exclude = [ 

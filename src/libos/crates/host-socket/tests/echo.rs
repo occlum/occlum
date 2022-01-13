@@ -159,7 +159,7 @@ mod server {
                 let addr = self
                     .addr
                     .ok_or_else(|| errno!(EINVAL, "an address must be given"))?;
-                let socket = StreamSocket::new()?;
+                let socket = StreamSocket::new(false)?;
                 socket.bind(&addr)?;
                 socket.listen(2)?;
                 socket
@@ -180,7 +180,7 @@ mod server {
     impl<A: Addr + 'static> EchoServer<A> {
         pub async fn run(mut self) -> Result<()> {
             while self.remain_accept > 0 {
-                let client_socket = self.socket.accept().await?;
+                let client_socket = self.socket.accept(false).await?;
 
                 async_rt::task::spawn(async move {
                     let mut buf = vec![0u8; 4 * 1024];
@@ -262,7 +262,7 @@ mod client {
                 .ok_or_else(|| errno!(EINVAL, "an address must be given"))?;
             let remain_data = self.total_data.unwrap_or(Self::DEFAULT_TOTAL_DATA);
             let buf_size = self.buf_size.unwrap_or(Self::DEFAULT_BUF_SIZE);
-            let socket = StreamSocket::new()?;
+            let socket = StreamSocket::new(false)?;
             let random_base64 = RandomBase64::new();
             let client = Client {
                 addr,

@@ -24,7 +24,8 @@ pub fn do_close(host_fd: HostFd) -> Result<()> {
 }
 
 pub fn do_unlink(path: &String) -> Result<()> {
-    let c_string = CString::new(path.as_bytes())?;
+    let c_string =
+        CString::new(path.as_bytes()).map_err(|_| errno!(EINVAL, "cstring new failure"))?;
     let c_path = c_string.as_c_str().as_ptr();
     #[cfg(not(feature = "sgx"))]
     try_libc!(libc::unlink(c_path));

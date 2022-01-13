@@ -27,6 +27,8 @@ extern crate alloc;
 extern crate log;
 
 #[cfg(not(feature = "sgx"))]
+extern crate env_logger;
+#[cfg(not(feature = "sgx"))]
 extern crate libc;
 #[cfg(feature = "sgx")]
 extern crate sgx_libc as libc;
