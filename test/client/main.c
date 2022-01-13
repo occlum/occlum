@@ -127,6 +127,31 @@ int client_sendmmsg(int server_fd, char *buf) {
 }
 #endif
 
+int client_sendmsg_big_buf(int server_fd) {
+    int ret = 0;
+    struct msghdr msg;
+    struct iovec iov[1];
+    int length = 256 * 1024;
+    char *buf = (char *)malloc(length);
+
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
+    iov[0].iov_base = (void *)buf;
+    iov[0].iov_len = length;
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = 0;
+    msg.msg_controllen = 0;
+    msg.msg_flags = 0;
+    memset(buf, 'a', length);
+
+    ret = sendmsg(server_fd, &msg, 0);
+    if (ret <= 0) {
+        THROW_ERROR("sendmsg failed");
+    }
+    return ret;
+}
+
 int client_connectionless_sendmsg(char *buf) {
     int ret = 0;
     struct msghdr msg;
@@ -194,6 +219,10 @@ int main(int argc, const char *argv[]) {
             break;
         case 8808:
             ret = client_connectionless_sendmsg(DEFAULT_MSG);
+            break;
+        case 8809:
+            neogotiate_msg(server_fd, buf, buf_size);
+            ret = client_sendmsg_big_buf(server_fd);
             break;
         default:
             ret = client_send(server_fd, DEFAULT_MSG);

@@ -155,6 +155,67 @@ int server_recvmsg(int client_fd) {
     return ret;
 }
 
+int server_recvmsg_big_buf(int client_fd) {
+    int ret = 0;
+    const int buf_size = 128 * 1024;
+    char *buffer[2];
+    struct msghdr msg;
+    struct iovec iov[2];
+    int total_len = 0;
+    char *check_buf = (char *)malloc(buf_size);
+
+    // Set the two buffers to random value
+    int fd = open("/dev/urandom", O_RDONLY);
+    for (int i = 0; i < 2; i++) {
+        char *buf = (char *)malloc(buf_size);
+        if (read(fd, buf, buf_size) < 0) {
+            THROW_ERROR("read /dev/urandom failure");
+        }
+        buffer[i] = buf;
+    }
+    // Check buffer is set to the same value as client send buffer
+    memset(check_buf, 'a', buf_size);
+
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
+    iov[0].iov_base = buffer[0];
+    iov[0].iov_len = buf_size;
+    iov[1].iov_base = buffer[1];
+    iov[1].iov_len = buf_size;
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 2;
+    msg.msg_control = 0;
+    msg.msg_controllen = 0;
+    msg.msg_flags = 0;
+
+    while (total_len < buf_size * 2) {
+        ret = recvmsg(client_fd, &msg, 0);
+        if (ret < 0) {
+            THROW_ERROR("recvmsg failed");
+        }
+        total_len += ret;
+        // Update the iov and msg
+        if (total_len < buf_size) {
+            iov[0].iov_base = buffer[0] + total_len;
+            iov[0].iov_len = buf_size - total_len;
+        } else {
+            int index = total_len - buf_size;
+            iov[1].iov_base = buffer[1] + index;
+            iov[1].iov_len = buf_size - index;
+            msg.msg_iov = iov + 1;
+            msg.msg_iovlen = 1;
+        }
+    }
+
+    if (strncmp(buffer[0], check_buf, buf_size) != 0 ||
+            strncmp(buffer[1], check_buf, buf_size) != 0 ) {
+        printf("recvmsg : %d, msg: %s,  %s\n", total_len, buffer[0], buffer[1]);
+        THROW_ERROR("msg recvmsg mismatch");
+    }
+
+    return ret;
+}
+
 int sigchld = 0;
 
 void proc_exit() {
@@ -290,6 +351,28 @@ int test_sendmmsg_recvmsg() {
     }
 
     ret = server_recvmsg(client_fd);
+    if (ret < 0) {
+        return -1;
+    }
+
+    ret = wait_for_child_exit(child_pid);
+
+    return ret;
+}
+
+int test_sendmsg_recvmsg_big_buf() {
+    int ret = 0;
+    int child_pid = 0;
+    int client_fd = connect_with_child(8809, &child_pid);
+    if (client_fd < 0) {
+        THROW_ERROR("connect failed");
+    }
+
+    if (neogotiate_msg(client_fd) < 0) {
+        THROW_ERROR("neogotiate failed");
+    }
+
+    ret = server_recvmsg_big_buf(client_fd);
     if (ret < 0) {
         return -1;
     }
@@ -580,8 +663,6 @@ void *connection_routine(void *arg) {
             return NULL;
         }
 
-        // printf("%s\n", msg[msg_count]);
-
         msg_count++;
         if (msg_count == 3) {
             break;
@@ -718,6 +799,7 @@ static test_case_t test_cases[] = {
 #ifdef __GLIBC__
     TEST_CASE(test_sendmmsg_recvmsg),
 #endif
+    TEST_CASE(test_sendmsg_recvmsg_big_buf),
     TEST_CASE(test_sendmsg_recvmsg_connectionless),
     TEST_CASE(test_fcntl_setfl_and_getfl),
     TEST_CASE(test_poll),
