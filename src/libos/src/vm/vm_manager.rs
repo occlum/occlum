@@ -74,14 +74,14 @@ impl VMManager {
         match addr {
             VMMapAddr::Any => {}
             VMMapAddr::Hint(addr) => {
-                let target_range = unsafe { VMRange::from_unchecked(addr, addr + size) };
+                let target_range = VMRange::new_with_size(addr, size)?;
                 let ret = self.mmap_with_addr(target_range, options);
                 if ret.is_ok() {
                     return ret;
                 }
             }
             VMMapAddr::Need(addr) | VMMapAddr::Force(addr) => {
-                let target_range = unsafe { VMRange::from_unchecked(addr, addr + size) };
+                let target_range = VMRange::new_with_size(addr, size)?;
                 return self.mmap_with_addr(target_range, options);
             }
         }
@@ -237,7 +237,7 @@ impl VMManager {
             }
             align_up(size, PAGE_SIZE)
         };
-        let munmap_range = { VMRange::new(addr, addr + size) }?;
+        let munmap_range = { VMRange::new_with_size(addr, size) }?;
         let chunk = {
             let current = current!();
             let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
