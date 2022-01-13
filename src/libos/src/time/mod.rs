@@ -203,7 +203,7 @@ impl TimeProvider for OcclumTimeProvider {
         let time = do_gettimeofday();
         Timespec {
             sec: time.sec,
-            nsec: time.usec as i32 * 1000,
+            nsec: time.usec * 1000,
         }
     }
 }
