@@ -11,21 +11,33 @@ use crate::runtime::Runtime;
 use crate::util::UntrustedCircularBuf;
 
 impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
+    // We make sure the all the buffer contents are buffered in kernel and then return.
     pub async fn sendmsg(self: &Arc<Self>, bufs: &[&[u8]], flags: SendFlags) -> Result<usize> {
         let total_len: usize = bufs.iter().map(|buf| buf.len()).sum();
         if total_len == 0 {
             return Ok(0);
         }
 
+        let mut send_len = 0;
+        // variables to track the position of async sendmsg.
+        let mut iov_buf_id = 0; // user buffer id tracker
+        let mut iov_buf_index = 0; // user buffer index tracker
+
         // Initialize the poller only when needed
         let mut poller = None;
         loop {
             // Attempt to write
-            let res = self.try_sendmsg(bufs, flags);
-            if !res.has_errno(EAGAIN) {
+            let res = self.try_sendmsg(bufs, flags, &mut iov_buf_id, &mut iov_buf_index);
+            if let Ok(len) = res {
+                send_len += len;
+                if send_len == total_len {
+                    return Ok(total_len);
+                }
+            } else if !res.has_errno(EAGAIN) {
                 return res;
             }
 
+            // Still some buffer contents pending
             if self.common.nonblocking() || flags.contains(SendFlags::MSG_DONTWAIT) {
                 return_errno!(EAGAIN, "try write again");
             }
@@ -42,7 +54,13 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         }
     }
 
-    fn try_sendmsg(self: &Arc<Self>, bufs: &[&[u8]], flags: SendFlags) -> Result<usize> {
+    fn try_sendmsg(
+        self: &Arc<Self>,
+        bufs: &[&[u8]],
+        flags: SendFlags,
+        iov_buf_id: &mut usize,
+        iov_buf_index: &mut usize,
+    ) -> Result<usize> {
         let mut inner = self.sender.inner.lock().unwrap();
 
         if !flags.is_empty()
@@ -64,14 +82,25 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         }
 
         // Copy data from the bufs to the send buffer
+        // If the send buffer is full, update the user buffer tracker, return error to wait for events
+        // And once there is free space, continue from the user buffer tracker
         let nbytes = {
             let mut total_produced = 0;
-            for buf in bufs {
-                let this_produced = inner.send_buf.produce(buf);
-                if this_produced == 0 {
-                    break;
-                }
+            let last_time_buf_id = iov_buf_id.clone();
+            let mut last_time_buf_idx = iov_buf_index.clone();
+            for (_i, buf) in bufs.iter().skip(last_time_buf_id).enumerate() {
+                let i = _i + last_time_buf_id; // After skipping ,the index still starts from 0
+                let this_produced = inner.send_buf.produce(&buf[last_time_buf_idx..]);
                 total_produced += this_produced;
+                if this_produced < buf[last_time_buf_idx..].len() {
+                    // Send buffer is full.
+                    *iov_buf_id = i;
+                    *iov_buf_index = last_time_buf_idx + this_produced;
+                    break;
+                } else {
+                    // For next buffer, start from the front
+                    last_time_buf_idx = 0;
+                }
             }
             total_produced
         };

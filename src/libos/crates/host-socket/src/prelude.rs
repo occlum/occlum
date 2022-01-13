@@ -28,7 +28,7 @@ macro_rules! try_libc {
                 if #[cfg(feature = "sgx")] {
                     let errno = libc::errno();
                 } else {
-                    let errno = unsafe { libc::__errno_location() };
+                    let errno = unsafe { *libc::__errno_location() };
                 }
             }
             return_errno!(Errno::from(errno as u32), "libc error");
