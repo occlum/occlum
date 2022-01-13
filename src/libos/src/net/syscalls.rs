@@ -416,10 +416,14 @@ pub async fn do_setsockopt(
         fd, level, optname, optval, optlen
     );
 
+    if optval as usize != 0 && optlen == 0 {
+        return_errno!(EINVAL, "the optlen size is 0");
+    }
+
     let file_ref = current!().file(fd as FileDesc)?;
     let socket_file = file_ref
         .as_socket_file()
-        .ok_or_else(|| errno!(EINVAL, "not a socket"))?;
+        .ok_or_else(|| errno!(ENOTSOCK, "not a socket"))?;
 
     let optval = from_user::make_slice(optval as *const u8, optlen as usize)?;
 
