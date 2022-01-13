@@ -128,6 +128,10 @@ ifneq ($(OCCLUM_COV),)
         -Coverflow-checks=off -Cpanic=abort"
 endif
 
+ifneq ($(RUST_LOG),)
+	SHOW_UT_LOG := "--nocapture"
+endif
+
 # Release build is for production use. We enable code coverage only for debug
 # build.  It also simplifies the implementation as the release and debug build
 # have different output paths.
@@ -207,7 +211,7 @@ gen_cov_report:
 
 # Unit tests and doc tests for active crates
 unit-test:
-	cd crates && RUST_BACKTRACE=full cargo test && \
+	cd crates && RUST_BACKTRACE=full cargo test -- $(SHOW_UT_LOG) && \
 		cargo doc
 
 clean:

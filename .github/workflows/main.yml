@@ -32,7 +32,7 @@ jobs:
         fi'
 
     - name: Unit test
-      run: docker exec ubuntu-test bash -c "cd /root/occlum; make unit-test"
+      run: docker exec ubuntu-test bash -c "cd /root/occlum; RUST_LOG=trace make unit-test"
 
     - name: Integration test
       run:  docker exec ubuntu-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test"
