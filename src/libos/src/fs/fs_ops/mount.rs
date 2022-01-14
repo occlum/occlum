@@ -23,15 +23,12 @@ pub fn do_mount_rootfs(
     if MOUNT_ONCE.is_completed() {
         return_errno!(EPERM, "rootfs cannot be mounted more than once");
     }
-    let new_root_inode = {
-        let rootfs = open_root_fs_according_to(&user_config.mount, user_key)?;
-        rootfs.root_inode()
-    };
-    mount_nonroot_fs_according_to(&new_root_inode, &user_config.mount, user_key, true)?;
+    let new_rootfs = open_root_fs_according_to(&user_config.mount, user_key)?;
+    mount_nonroot_fs_according_to(&new_rootfs.root_inode(), &user_config.mount, user_key, true)?;
     MOUNT_ONCE.call_once(|| {
-        let mut root_inode = ROOT_INODE.write().unwrap();
-        root_inode.fs().sync().expect("failed to sync old rootfs");
-        *root_inode = new_root_inode;
+        let mut rootfs = ROOT_FS.write().unwrap();
+        rootfs.sync().expect("failed to sync old rootfs");
+        *rootfs = new_rootfs;
         *ENTRY_POINTS.write().unwrap() = user_config.entry_points.to_owned();
     });
 
@@ -133,11 +130,16 @@ pub fn do_mount(
         }
     };
 
-    let mut root_inode = ROOT_INODE.write().unwrap();
+    let mut rootfs = ROOT_FS.write().unwrap();
     // Should we sync the fs before mount?
-    root_inode.fs().sync()?;
+    rootfs.sync()?;
     let follow_symlink = !flags.contains(MountFlags::MS_NOSYMFOLLOW);
-    mount_nonroot_fs_according_to(&*root_inode, &mount_configs, &user_key, follow_symlink)?;
+    mount_nonroot_fs_according_to(
+        &rootfs.root_inode(),
+        &mount_configs,
+        &user_key,
+        follow_symlink,
+    )?;
     Ok(())
 }
 
@@ -153,11 +155,11 @@ pub fn do_umount(target: &str, flags: UmountFlags) -> Result<()> {
         fs.convert_fspath_to_abs(&fs_path)?
     };
 
-    let mut root_inode = ROOT_INODE.write().unwrap();
+    let mut rootfs = ROOT_FS.write().unwrap();
     // Should we sync the fs before umount?
-    root_inode.fs().sync()?;
+    rootfs.sync()?;
     let follow_symlink = !flags.contains(UmountFlags::UMOUNT_NOFOLLOW);
-    umount_nonroot_fs(&*root_inode, &target, follow_symlink)?;
+    umount_nonroot_fs(&rootfs.root_inode(), &target, follow_symlink)?;
     Ok(())
 }
 

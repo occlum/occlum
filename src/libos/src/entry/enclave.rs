@@ -195,7 +195,7 @@ pub extern "C" fn occlum_ecall_run_vcpu(pal_data_ptr: *const occlum_pal_vcpu_dat
     }
 
     use rcore_fs::vfs::FileSystem;
-    crate::fs::ROOT_INODE.read().unwrap().fs().sync().unwrap();
+    crate::fs::ROOT_FS.read().unwrap().sync().unwrap();
 
     0
 }

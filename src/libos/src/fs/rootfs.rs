@@ -16,29 +16,26 @@ use rcore_fs_unionfs::UnionFS;
 
 lazy_static! {
     /// The root of file system
-    pub static ref ROOT_INODE: RwLock<Arc<dyn INode>> = {
-        fn init_root_inode() -> Result<Arc<dyn INode>> {
+    pub static ref ROOT_FS: RwLock<Arc<dyn FileSystem>> = {
+        fn init_root_fs() -> Result<Arc<dyn FileSystem>> {
             let mount_config = &config::LIBOS_CONFIG.mount;
-            let root_inode = {
-                let rootfs = open_root_fs_according_to(mount_config, &None)?;
-                rootfs.root_inode()
-            };
-            mount_nonroot_fs_according_to(&root_inode, mount_config, &None, true)?;
-            Ok(root_inode)
+            let rootfs = open_root_fs_according_to(mount_config, &None)?;
+            mount_nonroot_fs_according_to(&rootfs.root_inode(), mount_config, &None, true)?;
+            Ok(rootfs)
         }
 
-        let root_inode = init_root_inode().unwrap_or_else(|e| {
-            error!("failed to init root inode: {}", e.backtrace());
+        let rootfs = init_root_fs().unwrap_or_else(|e| {
+            error!("failed to init root fs: {}", e.backtrace());
             panic!();
         });
-        RwLock::new(root_inode)
+        RwLock::new(rootfs)
     };
 }
 
 pub fn open_root_fs_according_to(
     mount_configs: &Vec<ConfigMount>,
     user_key: &Option<sgx_key_128bit_t>,
-) -> Result<Arc<MountFS>> {
+) -> Result<Arc<dyn FileSystem>> {
     let root_mount_config = mount_configs
         .iter()
         .find(|m| m.target == Path::new("/") && m.type_ == ConfigMountFsType::TYPE_UNIONFS)

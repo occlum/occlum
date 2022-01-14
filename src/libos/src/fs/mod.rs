@@ -37,7 +37,7 @@ pub use self::fs_view::FsView;
 pub use self::fspath::{FsPath, AT_FDCWD};
 pub use self::host_fd::HostFd;
 pub use self::inode_file::{INodeExt, INodeFile, InodeFile};
-pub use self::rootfs::ROOT_INODE;
+pub use self::rootfs::ROOT_FS;
 pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
 pub use self::syscalls::*;
 
