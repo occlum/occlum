@@ -31,7 +31,7 @@ pub use self::fs_view::FsView;
 pub use self::host_fd::HostFd;
 pub use self::inode_file::{AsINodeFile, INodeExt, INodeFile};
 pub use self::pipe::PipeType;
-pub use self::rootfs::ROOT_INODE;
+pub use self::rootfs::ROOT_FS;
 pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
 pub use self::syscalls::*;
 pub use self::timer_file::{AsTimer, TimerCreationFlags, TimerFile};
