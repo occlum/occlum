@@ -41,11 +41,12 @@ run_taskmanager() {
     occlum run /usr/lib/jvm/java-11-openjdk-amd64/bin/java \
 	-Xmx800m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=256m \
 	-XX:ActiveProcessorCount=2 \
+	-Djdk.lang.Process.launchMechanism=posix_spawn \
 	-Dlog.file=$log \
 	-Dos.name=Linux \
-	-Dlog4j.configuration=file:/bin/conf/log4j.properties \
+        -Dlog4j.configurationFile=file:/bin/conf/log4j.properties \
 	-Dlogback.configurationFile=file:/bin/conf/logback.xml \
-	-classpath /bin/lib/flink-table-blink_2.11-1.10.1.jar:/bin/lib/flink-table_2.11-1.10.1.jar:/bin/lib/log4j-1.2.17.jar:/bin/lib/slf4j-log4j12-1.7.15.jar:/bin/lib/flink-dist_2.11-1.10.1.jar org.apache.flink.runtime.taskexecutor.TaskManagerRunner \
+	-classpath /bin/lib/* org.apache.flink.runtime.taskexecutor.TaskManagerRunner \
 	--configDir /bin/conf \
 	-D taskmanager.memory.network.max=64mb \
 	-D taskmanager.memory.network.min=64mb \
@@ -57,8 +58,8 @@ run_taskmanager() {
 
 run_task() {
     
-    export FLINK_CONF_DIR=$PWD/flink-1.10.1/conf && \
-        ./flink-1.10.1/bin/flink run ./flink-1.10.1/examples/streaming/WordCount.jar
+    export FLINK_CONF_DIR=$PWD/flink-1.11.3/conf && \
+        ./flink-1.11.3/bin/flink run ./flink-1.11.3/examples/streaming/WordCount.jar
 }
 
 id=$([ -f "$pid" ] && echo $(wc -l < "$pid") || echo "0")
