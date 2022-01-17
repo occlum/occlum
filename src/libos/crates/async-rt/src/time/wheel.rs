@@ -64,15 +64,15 @@ pub fn run_timer_wheel_thread() {
 }
 
 pub fn wake_timer_wheel(timeout: &Duration) {
-    let mut status = TIMER_WHEEL.status().lock();
-    match *status {
-        TimerWheelStatus::Idle | TimerWheelStatus::Running => {}
-        TimerWheelStatus::Asleep(duration) => {
-            // If timeout is greater than sleep time, there is no need to wake up the timer wheel.
-            // It will be updated when it gets timeout.
-            if timeout < &duration {
-                // Must loop to gurantee the timer wheel is woken up
-                loop {
+    loop {
+        let mut status = TIMER_WHEEL.status().lock();
+        match *status {
+            TimerWheelStatus::Idle | TimerWheelStatus::Running => return,
+            TimerWheelStatus::Asleep(duration) => {
+                // If timeout is greater than sleep time, there is no need to wake up the timer wheel.
+                // It will be updated when it gets timeout.
+                if timeout < &duration {
+                    // Must loop to gurantee the timer wheel is woken up
                     debug!("Timer Wheel: try waking");
                     if let Ok(num) = futex_wake(&TIMER_WHEEL_WAKER) {
                         if num > 0 {
@@ -80,9 +80,13 @@ pub fn wake_timer_wheel(timeout: &Duration) {
                             break;
                         }
                     }
-                }
-            } // end if timeout < &duration
+                } else {
+                    return;
+                } // end if timeout < &duration
+            }
         }
+        // Let timer wheel thread to update the status.
+        drop(status);
     }
 }
 
