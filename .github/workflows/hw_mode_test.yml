@@ -834,6 +834,54 @@ jobs:
       if: ${{ always() }}
       run: docker stop ${{ env.CONTAINER_NAME }}
 
+  RA_TLS_test:
+    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX2-HW]]
+
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - name: Checkout code
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+
+    - name: Checkout code from fork
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Download and build the pakckages
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/ra_tls; ./prepare_and_build_package.sh"
+    
+    - name: Build occlum instances
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/ra_tls; ./build_occlum_instance.sh"
+
+    - name: Run gRPC server
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/ra_tls; ./run.sh server &"
+    
+    - name: Run gRPC client
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/ra_tls; ./run.sh client"
+ 
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop ${{ env.CONTAINER_NAME }}
+
   Stress_test_with_musl:
     if: github.event_name == 'schedule'
     runs-on: ${{ matrix.self_runner }}
