@@ -24,24 +24,28 @@ runs:
       run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
       shell: bash
 
+    - name: Set container name
+      run: echo "CONTAINER_NAME=${{ inputs.container-name }}_$RANDOM" >> $GITHUB_ENV
+      shell: bash
+
     - name: Create container
       run: |
         if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          docker run -itd --name=${{ inputs.container-name }} --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }};
+          docker run -itd --name=${{ env.CONTAINER_NAME }} --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }};
         elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          docker run -itd --name=${{ inputs.container-name }} --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }};
+          docker run -itd --name=${{ env.CONTAINER_NAME }} --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }};
         else
           echo "Unsupported Hardware"
         fi;
       shell: bash
 
     - name: Update PCCS server
-      run: docker exec ${{ inputs.container-name }} bash -c "sed -r -i 's/PCCS_URL=https:\/\/localhost:8081\/sgx\/certification\/v3\//PCCS_URL=https:\/\/sgx-dcap-server.cn-shanghai.aliyuncs.com\/sgx\/certification\/v3\//g' /etc/sgx_default_qcnl.conf"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "sed -r -i 's/PCCS_URL=https:\/\/localhost:8081\/sgx\/certification\/v3\//PCCS_URL=https:\/\/sgx-dcap-server.cn-shanghai.aliyuncs.com\/sgx\/certification\/v3\//g' /etc/sgx_default_qcnl.conf"
       shell: bash
 
     - name: Change download source of crates.io
       run: |
-        docker exec ${{ inputs.container-name }} bash -c "cat <<- EOF >/root/.cargo/config
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "cat <<- EOF >/root/.cargo/config
         [source.crates-io]
         registry = \"https://github.com/rust-lang/crates.io-index\"
         replace-with = 'ustc'
@@ -51,9 +55,9 @@ runs:
       shell: bash
 
     - name: Build dependencies
-      run: docker exec ${{ inputs.container-name }} bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
       shell: bash
 
     - name: Build source
-      run: docker exec ${{ inputs.container-name }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; ${{ inputs.build-envs}} make install"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; ${{ inputs.build-envs}} make install"
       shell: bash
