@@ -47,7 +47,9 @@ jobs:
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Integration test
-      run:  docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace make test"
+      run:  |
+        echo ${{ env.CONTAINER_NAME }}
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace make test"
 
     - name: Integration test with Glibc
       run:  docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace make test-glibc"
@@ -228,6 +230,7 @@ jobs:
 
     - name: Config git proxy
       run: |
+        echo ${{ env.CONTAINER_NAME }}
         docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global http.proxy socks5://localhost:5432"
         docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global https.proxy socks5://localhost:5432"
 
