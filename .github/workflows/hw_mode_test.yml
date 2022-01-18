@@ -47,14 +47,14 @@ jobs:
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Integration test
-      run:  docker exec ${{ github.job }} bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace make test"
+      run:  docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace make test"
 
     - name: Integration test with Glibc
-      run:  docker exec ${{ github.job }} bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace make test-glibc"
+      run:  docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace make test-glibc"
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop ${{ github.job }}
+      run: docker stop ${{ env.CONTAINER_NAME }}
 
 
   C_cpp_rust_golang_embedded_mode_support_test:
@@ -88,14 +88,14 @@ jobs:
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: C test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/hello_c && make;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/hello_c && make;
             occlum new occlum_instance;
             cp hello_world occlum_instance/image/bin;
             cd occlum_instance && occlum build;
             occlum run /bin/hello_world"
 
     - name: C with encrypted image test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/hello_c && make;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/hello_c && make;
             rm -rf occlum_instance && occlum new occlum_instance;
             occlum gen-image-key occlum_instance/image_key;
             cp hello_world occlum_instance/image/bin;
@@ -103,50 +103,50 @@ jobs:
             occlum run /bin/hello_world"
 
     - name: C++ test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/hello_cc && make;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/hello_cc && make;
             occlum new occlum_instance;
             cp hello_world occlum_instance/image/bin;
             cd occlum_instance && occlum build;
             occlum run /bin/hello_world"
 
     - name: Rust test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/rust && ./run_rust_demo_on_occlum.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/rust && ./run_rust_demo_on_occlum.sh"
 
     - name: Embedded mode test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/embedded_mode && make;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/embedded_mode && make;
             make test"
 
     - name: Run Golang sqlite test
-      run: docker exec ${{ github.job }} bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
             cd /root/occlum/demos/golang/go_sqlite/ && ./run_go_sqlite_demo.sh"
 
     - name: Go server set up and run
-      run: docker exec ${{ github.job }} bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
             cd /root/occlum/demos/golang/web_server && occlum-go mod init web_server && occlum-go get -u -v github.com/gin-gonic/gin;
             occlum-go build -o web_server ./web_server.go;
             ./run_golang_on_occlum.sh" &
 
     - name: Set up Golang grpc pingpong test
-      run: docker exec ${{ github.job }} bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
             cd /root/occlum/demos/golang/grpc_pingpong && ./prepare_ping_pong.sh"
 
     - name: Start Golang grpc pingpong server
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/grpc_pingpong && ./run_pong_on_occlum.sh" &
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/golang/grpc_pingpong && ./run_pong_on_occlum.sh" &
 
     - name: Run Golang grpc ping test
       run: |
         sleep ${{ env.nap_time }};
-        docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/grpc_pingpong && ./run_ping_on_occlum.sh"
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/golang/grpc_pingpong && ./run_ping_on_occlum.sh"
 
     # Sleeps longer to make sure the server is up.
     - name: Curl test
       run: |
         sleep ${{ env.nap_time }};
-        docker exec ${{ github.job }} bash -c "curl http://127.0.0.1:8090/ping"
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "curl http://127.0.0.1:8090/ping"
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop ${{ github.job }}
+      run: docker stop ${{ env.CONTAINER_NAME }}
 
 
   Java_support_test:
@@ -180,20 +180,20 @@ jobs:
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Compile Java
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/java && occlum-javac ./hello_world/Main.java"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/java && occlum-javac ./hello_world/Main.java"
 
     - name: Run hello world
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/java && ./run_java_on_occlum.sh hello"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/java && ./run_java_on_occlum.sh hello"
 
     - name: Compile processBuilder demo
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/java && occlum-javac ./processBuilder/processBuilder.java"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/java && occlum-javac ./processBuilder/processBuilder.java"
 
     - name: Run processBuilder
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/java && ./run_java_on_occlum.sh processBuilder"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/java && ./run_java_on_occlum.sh processBuilder"
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop ${{ github.job }}
+      run: docker stop ${{ env.CONTAINER_NAME }}
 
 
   Bazel_test:
@@ -228,25 +228,26 @@ jobs:
 
     - name: Config git proxy
       run: |
-        docker exec ${{ github.job }} bash -c "git config --global http.proxy socks5://localhost:5432"
-        docker exec ${{ github.job }} bash -c "git config --global https.proxy socks5://localhost:5432"
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global http.proxy socks5://localhost:5432"
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global https.proxy socks5://localhost:5432"
 
     - name: Install bazel
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/hello_bazel && wget https://github.com/bazelbuild/bazel/releases/download/3.2.0/bazel-3.2.0-installer-linux-x86_64.sh;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/hello_bazel && wget https://github.com/bazelbuild/bazel/releases/download/3.2.0/bazel-3.2.0-installer-linux-x86_64.sh;
               chmod +x bazel-3.2.0-installer-linux-x86_64.sh;
               ./bazel-3.2.0-installer-linux-x86_64.sh"
 
     - name: Build bazel dependencies
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/hello_bazel && ./build_bazel_sample.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/hello_bazel && ./build_bazel_sample.sh"
 
     - name: Test bazel
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/hello_bazel && occlum new occlum_instance;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/hello_bazel && occlum new occlum_instance;
             cp examples/cpp-tutorial/stage3/bazel-bin/main/hello-world occlum_instance/image/bin;
             cd occlum_instance && occlum build;
             occlum run /bin/hello-world"
 
     - name: Clean the environment
-      run: docker stop ${{ github.job }}
+      if: ${{ always() }}
+      run: docker stop ${{ env.CONTAINER_NAME }}
 
 
   Fish_test:
@@ -281,21 +282,21 @@ jobs:
 
     - name: Config git proxy
       run: |
-        docker exec ${{ github.job }} bash -c "git config --global http.proxy socks5://localhost:5432"
-        docker exec ${{ github.job }} bash -c "git config --global https.proxy socks5://localhost:5432"
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global http.proxy socks5://localhost:5432"
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global https.proxy socks5://localhost:5432"
 
     - name: Build Fish dependencies
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/fish && ./download_and_build.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/fish && ./download_and_build.sh"
 
     - name: Run Fish test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/fish && ./run_fish_test.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/fish && ./run_fish_test.sh"
 
     - name: Run Fish process rlimit test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/fish && ./run_per_process_config_test.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/fish && ./run_per_process_config_test.sh"
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop ${{ github.job }}
+      run: docker stop ${{ env.CONTAINER_NAME }}
 
 
   Xgboost_test:
@@ -330,21 +331,21 @@ jobs:
 
     - name: Config git proxy
       run: |
-        docker exec ${{ github.job }} bash -c "git config --global http.proxy socks5://localhost:5432"
-        docker exec ${{ github.job }} bash -c "git config --global https.proxy socks5://localhost:5432"
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global http.proxy socks5://localhost:5432"
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global https.proxy socks5://localhost:5432"
 
     - name: Build xgboost dependencies
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/xgboost && ./download_and_build_xgboost.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/xgboost && ./download_and_build_xgboost.sh"
 
     - name: Run xgboost test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/xgboost && make test"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/xgboost && make test"
 
     - name: Run xgboost cluster test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/xgboost && make test-local-cluster"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/xgboost && make test-local-cluster"
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop ${{ github.job }}
+      run: docker stop ${{ env.CONTAINER_NAME }}
 
 
   Sqlite_test:
@@ -379,18 +380,18 @@ jobs:
 
     - name: Config git proxy
       run: |
-        docker exec ${{ github.job }} bash -c "git config --global http.proxy socks5://localhost:5432"
-        docker exec ${{ github.job }} bash -c "git config --global https.proxy socks5://localhost:5432"
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global http.proxy socks5://localhost:5432"
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global https.proxy socks5://localhost:5432"
 
     - name: Build sqlite dependencies
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/sqlite && ./download_and_build_sqlite.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/sqlite && ./download_and_build_sqlite.sh"
 
     - name: Run sqlite test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/sqlite && ./run_sqlite_on_occlum.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/sqlite && ./run_sqlite_on_occlum.sh"
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop ${{ github.job }}
+      run: docker stop ${{ env.CONTAINER_NAME }}
 
 
   Python_musl_support_test:
@@ -827,8 +828,11 @@ jobs:
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Build and run remote attestation demo
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/remote_attestation/dcap; ./run_dcap_quote_on_occlum.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/remote_attestation/dcap; ./run_dcap_quote_on_occlum.sh"
 
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop ${{ env.CONTAINER_NAME }}
 
   Stress_test_with_musl:
     if: github.event_name == 'schedule'
@@ -853,13 +857,13 @@ jobs:
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Stress test with musl
-      run:  docker exec ${{ github.job }} bash -c "cd /root/occlum; make test times=${{ env.repeat_times }}"
+      run:  docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum; make test times=${{ env.repeat_times }}"
 
     - name: Show failed cases and clean the environment
       if: ${{ always() }}
       run: |
-        docker exec ${{ github.job }} bash -c "cat /root/occlum/build/test/.fail"
-        docker stop ${{ github.job }}
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "cat /root/occlum/build/test/.fail"
+        docker stop ${{ env.CONTAINER_NAME }}
 
 
   Stress_test_with_glibc:
@@ -885,10 +889,10 @@ jobs:
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Stress test with Glibc
-      run:  docker exec ${{ github.job }} bash -c "cd /root/occlum; make test-glibc times=${{ env.repeat_times }}"
+      run:  docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum; make test-glibc times=${{ env.repeat_times }}"
 
     - name: Show failed cases and clean the environment
       if: ${{ always() }}
       run: |
-        docker exec ${{ github.job }} bash -c "cat /root/occlum/build/test/.fail"
-        docker stop ${{ github.job }}
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "cat /root/occlum/build/test/.fail"
+        docker stop ${{ env.CONTAINER_NAME }}
