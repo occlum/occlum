@@ -91,7 +91,6 @@ mod process;
 mod sched;
 mod signal;
 mod time;
-mod untrusted;
 mod util;
 mod vm;
 

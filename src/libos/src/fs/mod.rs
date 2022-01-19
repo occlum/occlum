@@ -8,7 +8,7 @@ use std::fmt;
 use std::io::{Read, Seek, Write};
 use std::mem::MaybeUninit;
 use std::path::{Path, PathBuf};
-use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
+use util::slice_ext::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
 
 pub use async_io::event::{Events, Observer, Pollee, Poller};
 pub use async_io::file::{
