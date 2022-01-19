@@ -613,3 +613,28 @@ jobs:
     - name: Run sysbench threads benchmark
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/sysbench/occlum_instance;
             occlum run /bin/sysbench threads --threads=200 --thread-yields=100 --thread-locks=4 --time=30 run"
+
+  Gvisor_syscalls_test:
+    runs-on: ubnutu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+              submodules: true
+
+    - uses: ./.github/workflows/composite_action/sim
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: install bazel
+       run: docker exec code_coverage bash -c "apt update && apt install curl gnupg -y;
+            curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel.gpg;
+            mv bazel.gpg /etc/apt/trusted.gpg.d/;
+            echo 'deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8' | tee /etc/apt/sources.list.d/bazel.list;
+            apt update && apt install bazel -y;"
+
+    - name: Build and install system call tests
+       run: occlum exec ${{github.job}} bash -c "git clone -b occlum-release-20200921.0 https://github.com/occlum/gvisor.git && cd gvisor/occlum && ./build_and_install_syscall_tests.sh"
+
+    - name: run gvisor syscalls test
+       run: docker exec ${{ github.job }} bash -c "cd gvisor/occlum && SGX_MODE=SIM ./run_occlum_passed_tests.sh"
