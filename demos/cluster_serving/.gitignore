@@ -1,0 +1,11 @@
+flink-1.11.3
+redis-6.0.6
+resnet50
+analytics-zoo-bigdl_0.12.2-spark_2.4.3-0.10.0-http.jar
+analytics-zoo-bigdl_0.12.2-spark_2.4.3-0.10.0-serving.jar
+flink-1.11.3-bin-scala_2.11.tgz
+redis-6.0.6.tar.gz
+flink/
+flink-jobmanager-sgx.log
+redis-sgx.log
+cluster-serving-job-sgx.log

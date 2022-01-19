@@ -5,6 +5,7 @@ BLUE='\033[1;34m'
 NC='\033[0m'
 conf_dir=conf
 
+postfix="taskmanager"
 id=$([ -f "$pid" ] && echo $(wc -l < "$pid") || echo "0")
 FLINK_LOG_PREFIX="/host/flink--$postfix-${id}"
 log="${FLINK_LOG_PREFIX}.log"
@@ -37,11 +38,11 @@ run_taskmanager() {
     echo -e "${BLUE}logfile=$log${NC}"
     # start task manager in occlum
     occlum run /usr/lib/jvm/java-11-openjdk-amd64/bin/java \
-    -XX:+UseG1GC -Xmx1152m -Xms1152m -XX:MaxDirectMemorySize=512m -XX:MaxMetaspaceSize=256m \
+    -XX:+UseG1GC -Xmx1152m -Xms1152m -XX:MaxDirectMemorySize=512m -XX:MaxMetaspaceSize=256m -XX:-UseCompressedOops\
     -Dos.name=Linux \
     -XX:ActiveProcessorCount=${core_num} \
     -Dlog.file=$log \
-    -Dlog4j.configuration=file:/opt/conf/log4j.properties \
+    -Dlog4j.configurationFile=file:/opt/conf/log4j.properties \
     -Dlogback.configurationFile=file:/opt/conf/logback.xml \
     -classpath /bin/lib/* org.apache.flink.runtime.taskexecutor.TaskManagerRunner \
     -Dorg.apache.flink.shaded.netty4.io.netty.tryReflectionSetAccessible=true \

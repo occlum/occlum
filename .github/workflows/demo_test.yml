@@ -464,6 +464,10 @@ jobs:
     - name: Run cluster serving test
       run: docker exec cluster_serving_test bash -c "cd /root/occlum/demos/cluster_serving; source ./environment.sh; SGX_MODE=SIM ./start-all.sh && ./push-image.sh"
 
+    - name: Check flink task manager's log
+      if: ${{ always() }}
+      run: docker exec cluster_serving_test bash -c "cd /root/occlum/demos/cluster_serving; cat flink/flink--taskmanager-0.log"
+
   enclave_ra_tls_test:
     runs-on: ubuntu-20.04
     steps:
