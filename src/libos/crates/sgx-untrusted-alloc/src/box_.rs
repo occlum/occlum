@@ -1,12 +1,12 @@
+use crate::untrusted_allocator::Allocator;
 use std::mem::{align_of, size_of};
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
-cfg_if::cfg_if! {
-    if #[cfg(feature = "sgx")] {
-        use libc::ocall::{malloc, free};
-    } else {
-        use libc::{malloc, free};
-    }
+
+const MEM_SIZE: usize = 64 * 1024 * 1024; // 64M
+
+lazy_static! {
+    static ref UNTRUSTED_MEM_INSTANCE: Allocator = Allocator::new(MEM_SIZE);
 }
 
 use crate::MaybeUntrusted;
@@ -31,7 +31,11 @@ impl<T: MaybeUntrusted> UntrustedBox<T> {
     /// Creates an _uninitialized_ value of `T` on the heap in untrusted memory.
     pub fn new_uninit() -> Self {
         let ptr = {
-            let raw_ptr = unsafe { malloc(size_of::<T>()) } as *mut T;
+            let raw_ptr = unsafe {
+                UNTRUSTED_MEM_INSTANCE
+                    .alloc(size_of::<T>(), None)
+                    .expect("memory allocation failure")
+            } as *mut T;
             assert!(raw_ptr != std::ptr::null_mut());
             assert!((raw_ptr as usize) % align_of::<T>() == 0);
             NonNull::new(raw_ptr).unwrap()
@@ -58,7 +62,11 @@ impl<T: MaybeUntrusted> UntrustedBox<[T]> {
     pub fn new_uninit_slice(len: usize) -> Self {
         let ptr = {
             let total_bytes = size_of::<T>() * len;
-            let raw_slice_ptr = unsafe { malloc(total_bytes) } as *mut T;
+            let raw_slice_ptr = unsafe {
+                UNTRUSTED_MEM_INSTANCE
+                    .alloc(total_bytes, None)
+                    .expect("memory allocation failure")
+            } as *mut T;
             assert!(raw_slice_ptr != std::ptr::null_mut());
             assert!((raw_slice_ptr as usize) % align_of::<T>() == 0);
             let untrusted_slice = unsafe { std::slice::from_raw_parts_mut(raw_slice_ptr, len) };
@@ -84,7 +92,7 @@ impl<T: ?Sized> UntrustedBox<T> {
 impl<T: ?Sized> Drop for UntrustedBox<T> {
     fn drop(&mut self) {
         unsafe {
-            free(self.as_mut_ptr() as _);
+            UNTRUSTED_MEM_INSTANCE.free(self.as_mut_ptr() as *mut u8);
         }
     }
 }

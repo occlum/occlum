@@ -75,8 +75,20 @@ extern crate sgx_libc as libc;
 #[cfg(feature = "sgx")]
 extern crate sgx_tstd as std;
 
+#[macro_use]
+extern crate alloc;
+#[macro_use]
+extern crate lazy_static;
+extern crate intrusive_collections;
+#[macro_use]
+extern crate log;
+extern crate spin;
+
 mod maybe_untrusted;
 pub use maybe_untrusted::MaybeUntrusted;
 
 mod box_;
 pub use box_::UntrustedBox;
+
+mod prelude;
+mod untrusted_allocator;

@@ -10,6 +10,11 @@ sgx = ["sgx_types", "sgx_tstd", "sgx_trts", "sgx_libc"]
 [dependencies]
 cfg-if = "1.0.0"
 libc = { version = "0.2.0", optional = true }
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+intrusive-collections = "0.9"
+log = "0.4"
+spin = "0.5"
+errno = { path = "../errno" }
 
 sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }
 sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", optional = true, features = ["backtrace"] }

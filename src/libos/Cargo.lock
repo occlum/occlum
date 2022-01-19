@@ -1009,11 +1009,16 @@ name = "sgx-untrusted-alloc"
 version = "0.1.0"
 dependencies = [
  "cfg-if 1.0.0",
+ "errno",
+ "intrusive-collections",
+ "lazy_static",
  "libc",
+ "log",
  "sgx_libc",
  "sgx_trts",
  "sgx_tstd",
  "sgx_types",
+ "spin 0.5.2",
 ]
 
 [[package]]
