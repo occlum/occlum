@@ -5,10 +5,24 @@ use sgx_types::{
     sgx_report_data_t, sgx_ql_qv_result_t
 };
 
-const SGXIOC_GET_DCAP_QUOTE_SIZE: c_ulong = 0x80047307;
-const SGXIOC_GEN_DCAP_QUOTE: c_ulong = 0xc0187308;
-const SGXIOC_GET_DCAP_SUPPLEMENTAL_SIZE: c_ulong = 0x80047309;
-const SGXIOC_VER_DCAP_QUOTE: c_ulong = 0xc030730a;
+const SGXIOC_GET_DCAP_QUOTE_SIZE: u64 = 0x80047307;
+const SGXIOC_GEN_DCAP_QUOTE: u64 = 0xc0187308;
+const SGXIOC_GET_DCAP_SUPPLEMENTAL_SIZE: u64 = 0x80047309;
+const SGXIOC_VER_DCAP_QUOTE: u64 = 0xc030730a;
+
+cfg_if::cfg_if! {
+    if #[cfg(target_env = "musl")] {
+        const IOCTL_GET_DCAP_QUOTE_SIZE: i32 = SGXIOC_GET_DCAP_QUOTE_SIZE as i32;
+        const IOCTL_GEN_DCAP_QUOTE: i32 = SGXIOC_GEN_DCAP_QUOTE as i32;
+        const IOCTL_GET_DCAP_SUPPLEMENTAL_SIZE: i32 = SGXIOC_GET_DCAP_SUPPLEMENTAL_SIZE as i32;
+        const IOCTL_VER_DCAP_QUOTE: i32 = SGXIOC_VER_DCAP_QUOTE as i32;
+    } else {
+        const IOCTL_GET_DCAP_QUOTE_SIZE: u64 = SGXIOC_GET_DCAP_QUOTE_SIZE;
+        const IOCTL_GEN_DCAP_QUOTE: u64 = SGXIOC_GEN_DCAP_QUOTE;
+        const IOCTL_GET_DCAP_SUPPLEMENTAL_SIZE: u64 = SGXIOC_GET_DCAP_SUPPLEMENTAL_SIZE;
+        const IOCTL_VER_DCAP_QUOTE: u64 = SGXIOC_VER_DCAP_QUOTE;
+    }
+}
 
 
 // Copy from occlum/src/libos/src/fs/dev_fs/dev_sgx/mod.rs
@@ -59,9 +73,9 @@ impl DcapQuote {
         println!("DcapQuote: get_quote_size");
 
         let size: u32 = 0;
-        let ret = unsafe { libc::ioctl(self.fd, SGXIOC_GET_DCAP_QUOTE_SIZE, &size) };
+        let ret = unsafe { libc::ioctl(self.fd, IOCTL_GET_DCAP_QUOTE_SIZE, &size) };
         if ret < 0 {
-            panic!("IOCTRL SGXIOC_GET_DCAP_QUOTE_SIZE failed");
+            panic!("IOCTRL IOCTL_GET_DCAP_QUOTE_SIZE failed");
         } else {
             self.quote_size = size;
             size
@@ -77,9 +91,9 @@ impl DcapQuote {
             quote_buf: quote_buf,
         };
 
-        let ret = unsafe { libc::ioctl(self.fd, SGXIOC_GEN_DCAP_QUOTE, &quote_arg) };
+        let ret = unsafe { libc::ioctl(self.fd, IOCTL_GEN_DCAP_QUOTE, &quote_arg) };
         if ret < 0 {
-            Err("IOCTRL SGXIOC_GEN_DCAP_QUOTE failed")
+            Err("IOCTRL IOCTL_GEN_DCAP_QUOTE failed")
         } else {
             Ok( 0 )
         }
@@ -89,9 +103,9 @@ impl DcapQuote {
         println!("DcapQuote: get_supplemental_data_size");
 
         let size: u32 = 0;
-        let ret = unsafe { libc::ioctl(self.fd, SGXIOC_GET_DCAP_SUPPLEMENTAL_SIZE, &size) };
+        let ret = unsafe { libc::ioctl(self.fd, IOCTL_GET_DCAP_SUPPLEMENTAL_SIZE, &size) };
         if ret < 0 {
-            panic!("IOCTRL SGXIOC_GET_DCAP_SUPPLEMENTAL_SIZE failed");
+            panic!("IOCTRL IOCTL_GET_DCAP_SUPPLEMENTAL_SIZE failed");
         } else {
             self.supplemental_size = size;
             size
@@ -101,10 +115,10 @@ impl DcapQuote {
     pub fn verify_quote(&mut self, verify_arg: *mut IoctlVerDCAPQuoteArg) -> Result<i32, &'static str> {
         println!("DcapQuote: verify_quote");
 
-        let ret = unsafe { libc::ioctl(self.fd, SGXIOC_VER_DCAP_QUOTE, verify_arg) };
+        let ret = unsafe { libc::ioctl(self.fd, IOCTL_VER_DCAP_QUOTE, verify_arg) };
         if ret < 0 {
             println!("ret = {}", ret);
-            Err("IOCTRL SGXIOC_VER_DCAP_QUOTE failed")
+            Err("IOCTRL IOCTL_VER_DCAP_QUOTE failed")
         } else {
             Ok( 0 )
         }        

@@ -6,7 +6,6 @@
 #include "sgx_urts.h"
 #include "sgx_report.h"
 #include "sgx_qve_header.h"
-#include "sgx_dcap_ql_wrapper.h"
 #include "sgx_pce.h"
 #include "sgx_error.h"
 
