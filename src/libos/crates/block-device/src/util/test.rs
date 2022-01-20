@@ -20,7 +20,7 @@ macro_rules! gen_unit_tests {
                 let disk = $setup();
 
                 // The disk should be filled with zeros
-                check_disk_filled_with_val(disk.as_ref(), 0).await.unwrap();
+                check_disk_filled_with_val(&disk, 0).await.unwrap();
 
                 $teardown(disk);
             });
@@ -62,9 +62,7 @@ macro_rules! gen_unit_tests {
                 assert!(req.response() == Some(Ok(())));
 
                 // The disk should be filled with the value
-                check_disk_filled_with_val(disk.as_ref(), val)
-                    .await
-                    .unwrap();
+                check_disk_filled_with_val(&disk, val).await.unwrap();
 
                 $teardown(disk);
             });

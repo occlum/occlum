@@ -3,7 +3,6 @@
 #![cfg_attr(feature = "sgx", no_std)]
 #![feature(new_uninit)]
 #![feature(get_mut_unchecked)]
-#![feature(trait_upcasting)]
 
 #[cfg(feature = "sgx")]
 extern crate sgx_libc as libc;

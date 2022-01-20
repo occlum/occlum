@@ -33,6 +33,21 @@ impl BlockDeviceExt for dyn BlockDevice {
     }
 }
 
+#[async_trait]
+impl<B: BlockDevice> BlockDeviceExt for B {
+    async fn read(&self, offset: usize, read_buf: &mut [u8]) -> Result<usize> {
+        Impl::new(self).read(offset, read_buf).await
+    }
+
+    async fn write(&self, offset: usize, write_buf: &[u8]) -> Result<usize> {
+        Impl::new(self).write(offset, write_buf).await
+    }
+
+    async fn flush(&self) -> Result<()> {
+        Impl::new(self).flush().await
+    }
+}
+
 // TODO: The following implementation does not gurantee the atomicity of concurrent
 // reads and writes when their offsets or lengths are not block aligned.
 // Is this a problem? Should the interface promise such properties?
@@ -110,7 +125,6 @@ impl<'a> Impl<'a> {
 
         // Copy back the partial blocks
         req.access_bufs_with(|bufs| {
-            let buf = &bufs[0];
             let one_block = bufs[0].as_slice();
             let in_block_offset = offset % BLOCK_SIZE;
             let src_buf = &one_block[in_block_offset..in_block_offset + read_buf_len];

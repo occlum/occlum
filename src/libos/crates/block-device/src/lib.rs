@@ -4,7 +4,6 @@
 
 #![cfg_attr(not(test), no_std)]
 #![feature(new_uninit)]
-#![feature(slice_fill)]
 
 #[macro_use]
 extern crate alloc;

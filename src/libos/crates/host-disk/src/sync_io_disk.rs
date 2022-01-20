@@ -17,6 +17,7 @@ use crate::{HostDisk, OpenOptions};
 /// system calls from the enclave triggers enclave switching, which is costly.
 ///
 /// It is recommended to use `IoUringDisk` for an optimal performance.
+#[derive(Debug)]
 pub struct SyncIoDisk {
     file: Mutex<File>,
     path: PathBuf,
@@ -40,6 +41,11 @@ impl SyncIoDisk {
                 .iter_mut()
                 .map(|buf| IoSliceMut::new(buf.as_slice_mut()))
                 .collect();
+
+            // TODO: fix this limitation
+            const LINUX_IOVS_MAX: usize = 1024;
+            debug_assert!(slices.len() < LINUX_IOVS_MAX);
+
             file.read_vectored(&mut slices)
         })?;
         drop(file);
@@ -62,6 +68,11 @@ impl SyncIoDisk {
                 .iter()
                 .map(|buf| IoSlice::new(buf.as_slice()))
                 .collect();
+
+            // TODO: fix this limitation
+            const LINUX_IOVS_MAX: usize = 1024;
+            debug_assert!(slices.len() < LINUX_IOVS_MAX);
+
             file.write_vectored(&slices)
         })?;
         drop(file);
@@ -75,8 +86,8 @@ impl SyncIoDisk {
             return Err(errno!(EACCES, "flush is not allowed"));
         }
 
-        let mut file = self.file.lock().unwrap();
-        file.flush()?;
+        let file = self.file.lock().unwrap();
+        file.sync_data()?;
         drop(file);
 
         Ok(())
@@ -156,9 +167,8 @@ impl Drop for SyncIoDisk {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::any::Any;
 
-    fn test_setup() -> Box<dyn BlockDevice> {
+    fn test_setup() -> SyncIoDisk {
         // As unit tests may run concurrently, they must operate on different
         // files. This helper function generates unique file paths.
         fn gen_unique_path() -> String {
@@ -172,14 +182,11 @@ mod test {
 
         let total_blocks = 16;
         let path = gen_unique_path();
-        Box::new(SyncIoDisk::create(&path, total_blocks).unwrap())
+        SyncIoDisk::create(&path, total_blocks).unwrap()
     }
 
-    fn test_teardown(disk: Box<dyn BlockDevice>) {
-        let disk_ref = (disk.as_ref() as &dyn Any)
-            .downcast_ref::<SyncIoDisk>()
-            .unwrap();
-        let _ = std::fs::remove_file(disk_ref.path());
+    fn test_teardown(disk: SyncIoDisk) {
+        let _ = std::fs::remove_file(disk.path());
     }
 
     block_device::gen_unit_tests!(test_setup, test_teardown);

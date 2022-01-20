@@ -64,6 +64,10 @@ impl<P: IoUringProvider> IoUringDisk<P> {
             Box::new(iovecs)
         });
 
+        // TODO: fix this limitation
+        const LINUX_IOVECS_MAX: usize = 1024;
+        debug_assert!(iovecs.len() < LINUX_IOVECS_MAX);
+
         #[cfg(not(feature = "sgx"))]
         let (iovecs_ptr, iovecs_len) = { (iovecs.as_ptr() as _, iovecs.len()) };
         #[cfg(feature = "sgx")]
@@ -170,6 +174,10 @@ impl<P: IoUringProvider> IoUringDisk<P> {
             // the callback closure.
             Box::new(iovecs)
         });
+
+        // TODO: fix this limitation
+        const LINUX_IOVECS_MAX: usize = 1024;
+        debug_assert!(iovecs.len() < LINUX_IOVECS_MAX);
 
         #[cfg(not(feature = "sgx"))]
         let (iovecs_ptr, iovecs_len) = { (iovecs.as_ptr() as _, iovecs.len()) };
@@ -395,9 +403,8 @@ unsafe impl<T> Send for MarkSend<T> {}
 mod test {
     use super::*;
     use runtime::IoUringSingleton;
-    use std::any::Any;
 
-    fn test_setup() -> Box<dyn BlockDevice> {
+    fn test_setup() -> IoUringDisk<IoUringSingleton> {
         // As unit tests may run concurrently, they must operate on different
         // files. This helper function generates unique file paths.
         fn gen_unique_path() -> String {
@@ -411,14 +418,11 @@ mod test {
 
         let total_blocks = 16;
         let path = gen_unique_path();
-        Box::new(IoUringDisk::<IoUringSingleton>::create(&path, total_blocks).unwrap())
+        IoUringDisk::<IoUringSingleton>::create(&path, total_blocks).unwrap()
     }
 
-    fn test_teardown(disk: Box<dyn BlockDevice>) {
-        let disk_ref = (disk.as_ref() as &dyn Any)
-            .downcast_ref::<IoUringDisk<IoUringSingleton>>()
-            .unwrap();
-        let _ = std::fs::remove_file(disk_ref.path());
+    fn test_teardown(disk: IoUringDisk<IoUringSingleton>) {
+        let _ = std::fs::remove_file(disk.path());
     }
 
     block_device::gen_unit_tests!(test_setup, test_teardown);
