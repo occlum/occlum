@@ -1,19 +1,3 @@
-name: Demo Test
-
-# Controls when the action will run. Triggers the workflow on push or pull request
-on: [push, pull_request]
-
-env:
-  nap_time: 60
-
-
-jobs:
-  C_cpp_rust_golang_embedded_mode_support_test:
-    runs-on: ubuntu-18.04
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        submodules: true
 
     - uses: ./.github/workflows/composite_action/sim
       with:
@@ -613,3 +597,20 @@ jobs:
     - name: Run sysbench threads benchmark
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/sysbench/occlum_instance;
             occlum run /bin/sysbench threads --threads=200 --thread-yields=100 --thread-locks=4 --time=30 run"
+
+  Gvisor_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Build dependencies
+      run: docker exec ${{github.job}} bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec ${{github.job}} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+
+    - name: Run gvisor syscall test
+      run: docker exec ${{github.job}} bash -c "cd /root/gvisor_occlum; ./run_occlum_passed_tests.sh"
