@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types" }
 libc = "0.2"
+cfg-if = "1.0.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

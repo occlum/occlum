@@ -23,6 +23,11 @@ You can run the DCAP quote generation and verification demo, including dcap libr
 ./run_dcap_quote_on_occlum.sh
 ```
 
+Or if musl-libc version is expected, run
+```
+./run_dcap_quote_on_occlum.sh musl
+```
+
 ## Preinstalled DCAP package in Ubuntu 18.04 and CentOS 8.1
 The DCAP package has been preinstalled in the Occlum official docker images
 including Ubuntu 18.04 and CentOS 8.1 since Occlum 0.19.0. The versions of DCAP
