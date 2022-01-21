@@ -18,8 +18,6 @@ set -ex
 export BUILD_TYPE=Release
 export EXP_PATH=`dirname $0`
 
-${GRPC_PATH}/build_cpp.sh
-
 # build c++ example
 cd ${EXP_PATH}
 mkdir -p build
