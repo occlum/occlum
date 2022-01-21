@@ -1,5 +1,5 @@
 [package]
-name = "host-disk"
+name = "sgx-disk"
 version = "0.1.0"
 authors = ["Tate, Hongliang Tian <tate.thl@antgroup.com>"]
 edition = "2018"

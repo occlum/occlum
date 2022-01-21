@@ -6,12 +6,12 @@ members = [
     "block-device",
     "inherit-methods-macro",
     "errno",
-    "host-disk",
     "host-socket",
     "io-uring-callback",
     "keyable-arc",
     "new-self-ref-arc",
     "object-id",
+    "sgx-disk",
     "sgx-untrusted-alloc",
     "vdso-time",
 ]

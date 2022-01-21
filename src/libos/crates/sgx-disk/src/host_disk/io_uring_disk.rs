@@ -11,8 +11,9 @@ use std::sync::Weak;
 #[cfg(feature = "sgx")]
 use sgx_untrusted_alloc::UntrustedBox;
 
+use super::OpenOptions;
 use crate::prelude::*;
-use crate::{HostDisk, OpenOptions};
+use crate::HostDisk;
 
 /// Providing an io_uring instance to be used by IoUringDisk.
 ///

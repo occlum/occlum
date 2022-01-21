@@ -2,8 +2,8 @@ use block_device::BlockDevice;
 use fs::File;
 use std::path::Path;
 
+use super::OpenOptions;
 use crate::prelude::*;
-use crate::OpenOptions;
 
 /// A host disk is a block device backed by a file on the host Linux.
 pub trait HostDisk: BlockDevice {

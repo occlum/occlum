@@ -273,6 +273,7 @@ impl BioReq {
                 if let Some(on_complete) = self.on_complete {
                     (on_complete)(self, &resp);
                 }
+
                 if let Some(waker) = waker {
                     waker.wake();
                 }

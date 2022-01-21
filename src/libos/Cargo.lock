@@ -18,7 +18,6 @@ dependencies = [
  "errno",
  "futures",
  "goblin",
- "host-disk",
  "host-socket",
  "inherit-methods-macro",
  "intrusive-collections",
@@ -40,6 +39,7 @@ dependencies = [
  "scroll",
  "serde",
  "serde_json",
+ "sgx-disk",
  "sgx_cov",
  "sgx_tcrypto",
  "sgx_trts",
@@ -484,24 +484,6 @@ name = "hierarchical_hash_wheel_timer"
 version = "1.1.0"
 dependencies = [
  "sgx_tstd",
-]
-
-[[package]]
-name = "host-disk"
-version = "0.1.0"
-dependencies = [
- "block-device",
- "cfg-if 1.0.0",
- "errno",
- "io-uring-callback",
- "log",
- "new-self-ref-arc",
- "sgx-untrusted-alloc",
- "sgx_libc",
- "sgx_tcrypto",
- "sgx_trts",
- "sgx_tstd",
- "sgx_types",
 ]
 
 [[package]]
@@ -1044,6 +1026,24 @@ dependencies = [
  "ryu",
  "serde",
  "sgx_tstd",
+]
+
+[[package]]
+name = "sgx-disk"
+version = "0.1.0"
+dependencies = [
+ "block-device",
+ "cfg-if 1.0.0",
+ "errno",
+ "io-uring-callback",
+ "log",
+ "new-self-ref-arc",
+ "sgx-untrusted-alloc",
+ "sgx_libc",
+ "sgx_tcrypto",
+ "sgx_trts",
+ "sgx_tstd",
+ "sgx_types",
 ]
 
 [[package]]

@@ -4,10 +4,9 @@ use std::io::prelude::*;
 use std::io::{IoSlice, IoSliceMut, SeekFrom};
 use std::path::{Path, PathBuf};
 
+use super::OpenOptions;
 use crate::prelude::*;
-use crate::{HostDisk, OpenOptions};
-
-use sgx_tcrypto::{rsgx_rijndael128GCM_decrypt, rsgx_rijndael128GCM_encrypt};
+use crate::HostDisk;
 
 /// A type of host disk that implements a block device interface by performing
 /// normal synchronous I/O to the underlying host file.
@@ -20,7 +19,7 @@ use sgx_tcrypto::{rsgx_rijndael128GCM_decrypt, rsgx_rijndael128GCM_encrypt};
 ///
 /// It is recommended to use `IoUringDisk` for an optimal performance.
 #[derive(Debug)]
-pub struct SyncEncIoDisk {
+pub struct SyncIoDisk {
     file: Mutex<File>,
     path: PathBuf,
     total_blocks: usize,
@@ -28,7 +27,7 @@ pub struct SyncEncIoDisk {
     can_write: bool,
 }
 
-impl SyncEncIoDisk {
+impl SyncIoDisk {
     fn do_read(&self, req: &Arc<BioReq>) -> Result<()> {
         if !self.can_read {
             return Err(errno!(EACCES, "read is not allowed"));
@@ -44,9 +43,12 @@ impl SyncEncIoDisk {
                 .map(|buf| IoSliceMut::new(buf.as_slice_mut()))
                 .collect();
 
+            // TODO: fix this limitation
+            const LINUX_IOVS_MAX: usize = 1024;
+            debug_assert!(slices.len() < LINUX_IOVS_MAX);
+
             file.read_vectored(&mut slices)
         })?;
-
         drop(file);
 
         debug_assert!(read_len / BLOCK_SIZE == req.num_blocks());
@@ -57,49 +59,23 @@ impl SyncEncIoDisk {
         if !self.can_write {
             return Err(errno!(EACCES, "write is not allowed"));
         }
+
         let (offset, _) = self.get_range_in_bytes(&req)?;
 
         let mut file = self.file.lock().unwrap();
-
         file.seek(SeekFrom::Start(offset as u64))?;
-        const IOV_MAX_IN_LINUX: usize = 1024;
-
         let write_len = req.access_bufs_with(|bufs| {
-            let writev_times = bufs.len() / IOV_MAX_IN_LINUX;
-            let rem_len = bufs.len() % IOV_MAX_IN_LINUX;
-            let mut total_write_len = 0;
-            let mut idx = 0;
+            let slices: Vec<IoSlice<'_>> = bufs
+                .iter()
+                .map(|buf| IoSlice::new(buf.as_slice()))
+                .collect();
 
-            while idx < writev_times {
-                let (ciphers, gmacs) = {
-                    let mut ciphers = Vec::with_capacity(bufs.len());
-                    let mut gmacs = Vec::with_capacity(bufs.len());
-                    for buf in bufs[idx * IOV_MAX_IN_LINUX..(idx + 1) * IOV_MAX_IN_LINUX].iter() {
-                        let (cipher, gmac) = aes_gcm_encrypt(buf.as_slice());
-                        ciphers.push(cipher);
-                        gmacs.push(gmac);
-                    }
-                    (ciphers, gmacs)
-                };
+            // TODO: fix this limitation
+            const LINUX_IOVS_MAX: usize = 1024;
+            debug_assert!(slices.len() < LINUX_IOVS_MAX);
 
-                let slices: Vec<IoSlice<'_>> = ciphers
-                    .iter()
-                    .map(|buf| IoSlice::new(buf.as_slice()))
-                    .collect();
-                total_write_len += file.write_vectored(&slices).unwrap();
-                idx += 1;
-            }
-
-            if rem_len > 0 {
-                let slices: Vec<IoSlice<'_>> = bufs
-                    [writev_times * IOV_MAX_IN_LINUX..writev_times * IOV_MAX_IN_LINUX + rem_len]
-                    .iter()
-                    .map(|buf| IoSlice::new(buf.as_slice()))
-                    .collect();
-                total_write_len += file.write_vectored(&slices).unwrap();
-            }
-            total_write_len
-        });
+            file.write_vectored(&slices)
+        })?;
         drop(file);
 
         debug_assert!(write_len / BLOCK_SIZE == req.num_blocks());
@@ -111,9 +87,8 @@ impl SyncEncIoDisk {
             return Err(errno!(EACCES, "flush is not allowed"));
         }
 
-        let mut file = self.file.lock().unwrap();
-        file.flush()?;
-        file.sync_all()?;
+        let file = self.file.lock().unwrap();
+        file.sync_data()?;
         drop(file);
 
         Ok(())
@@ -131,29 +106,7 @@ impl SyncEncIoDisk {
     }
 }
 
-fn aes_gcm_encrypt(plain: &[u8]) -> (Vec<u8>, [u8; 16]) {
-    let mut gmac = [0; 16];
-    let aes_key: [u8; 16] = [1; 16];
-    let nonce: [u8; 12] = [2; 12];
-    let aad: [u8; 0] = [0; 0];
-    let ciphertxt = {
-        let mut ciphertxt = vec![0u8; plain.len()];
-        rsgx_rijndael128GCM_encrypt(&aes_key, plain, &nonce, &aad, &mut ciphertxt, &mut gmac)
-            .unwrap();
-        ciphertxt
-    };
-
-    (ciphertxt, gmac)
-}
-
-fn aes_gcm_decrypt(gmac: &[u8; 16], cipher: &[u8], plain: &mut [u8]) {
-    let aes_key: [u8; 16] = [1; 16];
-    let nonce: [u8; 12] = [2; 12];
-    let aad: [u8; 0] = [0; 0];
-    rsgx_rijndael128GCM_decrypt(&aes_key, cipher, &nonce, &aad, gmac, plain).unwrap();
-}
-
-impl BlockDevice for SyncEncIoDisk {
+impl BlockDevice for SyncIoDisk {
     fn total_blocks(&self) -> usize {
         self.total_blocks
     }
@@ -180,7 +133,7 @@ impl BlockDevice for SyncEncIoDisk {
     }
 }
 
-impl HostDisk for SyncEncIoDisk {
+impl HostDisk for SyncIoDisk {
     fn from_options_and_file(options: &OpenOptions<Self>, file: File, path: &Path) -> Result<Self> {
         let total_blocks = options.total_blocks.unwrap_or_else(|| {
             let file_len = file.metadata().unwrap().len() as usize;
@@ -205,9 +158,37 @@ impl HostDisk for SyncEncIoDisk {
     }
 }
 
-impl Drop for SyncEncIoDisk {
+impl Drop for SyncIoDisk {
     fn drop(&mut self) {
         // Ensure all data are peristed before the disk is dropped
         let _ = self.do_flush();
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn test_setup() -> SyncIoDisk {
+        // As unit tests may run concurrently, they must operate on different
+        // files. This helper function generates unique file paths.
+        fn gen_unique_path() -> String {
+            use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
+
+            static UT_ID: AtomicU32 = AtomicU32::new(0);
+
+            let ut_id = UT_ID.fetch_add(1, Relaxed);
+            format!("sync_io_disk{}.image", ut_id)
+        }
+
+        let total_blocks = 16;
+        let path = gen_unique_path();
+        SyncIoDisk::create(&path, total_blocks).unwrap()
+    }
+
+    fn test_teardown(disk: SyncIoDisk) {
+        let _ = std::fs::remove_file(disk.path());
+    }
+
+    block_device::gen_unit_tests!(test_setup, test_teardown);
 }

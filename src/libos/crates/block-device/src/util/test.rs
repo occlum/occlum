@@ -62,7 +62,7 @@ macro_rules! gen_unit_tests {
                 assert!(req.response() == Some(Ok(())));
 
                 // The disk should be filled with the value
-                check_disk_filled_with_val(&disk, val).await.unwrap();
+                assert!(check_disk_filled_with_val(&disk, val).await.is_ok());
 
                 $teardown(disk);
             });
@@ -73,6 +73,8 @@ macro_rules! gen_unit_tests {
         fn write_read_partial_blocks() {
             async_rt::task::block_on(async move {
                 let disk = $setup();
+
+                debug_assert!(disk.total_blocks() >= 2);
 
                 for offset in 0..BLOCK_SIZE {
                     let msg = b"hell_world!!!";

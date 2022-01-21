@@ -1,4 +1,4 @@
-use host_disk::{HostDisk, IoUringDisk, SyncEncIoDisk, SyncIoDisk};
+use sgx_disk::{CryptDisk, HostDisk, IoUringDisk, SyncIoDisk};
 
 use super::*;
 use crate::fs::DiskFile;
@@ -39,21 +39,29 @@ mod disks {
         }
 
         const GB: usize = 1024 * 1024 * 1024;
-        let disk_file = if abs_path == "/dev/sync_io_dev" {
+        let disk_file = if abs_path == "/dev/sync_disk" {
             let total_blocks = to_blocks(2 * GB);
-            let path = String::from("sync_io_dev");
+            let path = String::from("sync_disk");
             let disk = SyncIoDisk::create(&path, total_blocks).unwrap();
             DiskFile::new(disk)
-        } else if abs_path == "/dev/async_io_dev" {
+        } else if abs_path == "/dev/iou_disk" {
             let total_blocks = to_blocks(2 * GB);
-            let path = String::from("async_io_dev");
+            let path = String::from("iou_disk");
             let disk = IoUringDisk::<runtime::DeviceRuntime>::create(&path, total_blocks).unwrap();
             DiskFile::new(disk)
-        } else if abs_path == "/dev/sync_io_enc" {
+        } else if abs_path == "/dev/crypt_sync_disk" {
             let total_blocks = to_blocks(2 * GB);
-            let path = String::from("sync_io_enc");
-            let disk = SyncEncIoDisk::create(&path, total_blocks).unwrap();
-            DiskFile::new(disk)
+            let path = String::from("crypt_sync_disk");
+            let sync_disk = SyncIoDisk::create(&path, total_blocks).unwrap();
+            let crypt_sync_disk = CryptDisk::new(Box::new(sync_disk));
+            DiskFile::new(crypt_sync_disk)
+        } else if abs_path == "/dev/crypt_iou_disk" {
+            let total_blocks = to_blocks(2 * GB);
+            let path = String::from("crypt_iou_disk");
+            let iou_disk =
+                IoUringDisk::<runtime::DeviceRuntime>::create(&path, total_blocks).unwrap();
+            let crypt_iou_disk = CryptDisk::new(Box::new(iou_disk));
+            DiskFile::new(crypt_iou_disk)
         } else {
             return Ok(None);
         };
@@ -66,8 +74,8 @@ mod disks {
     }
 
     mod runtime {
-        use host_disk::IoUringProvider;
         use io_uring_callback::IoUring;
+        use sgx_disk::IoUringProvider;
 
         pub struct DeviceRuntime;
 

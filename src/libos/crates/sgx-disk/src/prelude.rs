@@ -13,3 +13,7 @@ cfg_if::cfg_if! {
         pub(crate) use std::fs;
     }
 }
+
+pub(crate) const fn align_down(x: usize, align: usize) -> usize {
+    (x / align) * align
+}
