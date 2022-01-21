@@ -1,9 +1,8 @@
 #!/bin/bash
-occlum_glibc=/opt/occlum/glibc/lib/
-set -ex
+set -e
 
-get_mr() {
-    sgx_sign dump -enclave ../occlum_instance_$1/build/lib/libocclum-libos.signed.so -dumpfile ../metadata_info_$1.txt
+function get_mr() {
+    sgx_sign dump -enclave ../occlum_$1/build/lib/libocclum-libos.signed.so -dumpfile ../metadata_info_$1.txt
     if [ "$2" == "mr_enclave" ]; then
         sed -n -e '/enclave_hash.m/,/metadata->enclave_css.body.isv_prod_id/p' ../metadata_info_$1.txt |head -3|tail -2|xargs|sed 's/0x//g'|sed 's/ //g'
     elif [ "$2" == "mr_signer" ]; then
@@ -11,42 +10,55 @@ get_mr() {
     fi
 }
 
-build_instance() {
+function build_instance() {
     # 1. Init Occlum Workspace
-    rm -rf occlum_instance_$postfix
-    mkdir occlum_instance_$postfix
-    pushd occlum_instance_$postfix
+    rm -rf occlum_$postfix
+    mkdir occlum_$postfix
+    pushd occlum_$postfix
     occlum init
-    new_json="$(jq '.resource_limits.user_space_size = "320MB" |
-                    .process.default_mmap_size = "256MB"' Occlum.json)" && \
+    new_json="$(jq '.resource_limits.user_space_size = "500MB"' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
-    # 2. Copy files into Occlum Workspace and Build
-    #cp ../dynamic_config.json image/etc/dynamic_config.json
-    cp ../dynamic_config.json image/dynamic_config.json
-    #cp ../dynamic_config_$postfix.json image/dynamic_config.json
+
     if [ "$postfix" == "server" ]; then
+        # Server will verify client's mr_enclave and mr_signer
         jq ' .verify_mr_enclave = "on" |
              .verify_mr_signer = "on" |
+             .verify_isv_prod_id = "off" |
+             .verify_isv_svn = "off" |
 	     .sgx_mrs[0].mr_enclave = ''"'`get_mr client mr_enclave`'" |
-	     .sgx_mrs[0].mr_signer = ''"'`get_mr client mr_signer`'" ' ../dynamic_config.json > image/dynamic_config.json 
+	     .sgx_mrs[0].mr_signer = ''"'`get_mr client mr_signer`'" ' ../ra_config_template.json > dynamic_config.json
+    
+        if [ "$libnss_require" == "y" ]; then
+            cp /lib/x86_64-linux-gnu/libnss*.so.2 image/$occlum_glibc
+            cp /lib/x86_64-linux-gnu/libresolv.so.2 image/$occlum_glibc
+        fi
+
+        bomfile="../grpc_ratls_server.yaml"
+    else
+        # Client verify nothing from server
+        jq ' .verify_mr_enclave = "off" |
+             .verify_mr_signer = "off" |
+             .verify_isv_prod_id = "off" |
+             .verify_isv_svn = "off" ' ../ra_config_template.json > dynamic_config.json
+
+        bomfile="../grpc_ratls_client.yaml"
     fi
-    mkdir -p image/usr/share/grpc
-    cp -rf /share/grpc/*  image/usr/share/grpc/
-    cp $occlum_glibc/libdl.so.2 image/$occlum_glibc
-    cp $occlum_glibc/librt.so.1 image/$occlum_glibc
-    cp $occlum_glibc/libm.so.6 image/$occlum_glibc
-    cp /lib/x86_64-linux-gnu/libtinfo.so.5 image/$occlum_glibc
-    cp /lib/x86_64-linux-gnu/libnss*.so.2 image/$occlum_glibc
-    cp /lib/x86_64-linux-gnu/libresolv.so.2 image/$occlum_glibc
-    cp -rf /etc/hostname image/etc/
-    cp -rf /etc/ssl image/etc/
-    cp -rf /etc/passwd image/etc/
-    cp -rf /etc/group image/etc/
-    cp -rf /etc/nsswitch.conf image/etc/
-    cp -rf /grpc/examples/cpp/ratls/build/* image/bin/
+
+    rm -rf image
+    copy_bom -f $bomfile --root image --include-dir /opt/occlum/etc/template
+
     occlum build
     popd
 }
+
+if [[ $1 == "musl" ]]; then
+    echo "*** Build and musl-libc Occlum instance ***"
+else
+    echo "*** Build and run glibc Occlum instance ***"
+    # glibc version requires libnss
+    libnss_require="y"
+    occlum_glibc=/opt/occlum/glibc/lib/
+fi
 
 postfix=client
 build_instance

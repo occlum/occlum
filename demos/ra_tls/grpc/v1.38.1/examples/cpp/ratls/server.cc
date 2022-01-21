@@ -15,66 +15,15 @@
  * limitations under the License.
  *
  */
+#include "../grpc_ratls_server.h"
 
-#include <grpcpp/grpcpp.h>
-#include <grpcpp/security/sgx/sgx_ra_tls.h>
-#include <grpcpp/ext/proto_server_reflection_plugin.h>
-
-#ifdef BAZEL_BUILD
-#include "examples/protos/ratls.grpc.pb.h"
-#else
-#include "ratls.grpc.pb.h"
-#endif
-
-#include "../getopt.hpp"
-
-using ratls::Greeter;
-using ratls::HelloReply;
-using ratls::HelloRequest;
-
-struct argparser {
-    const char* config;
-    std::string server_address;
-    argparser() {
-        server_address = getarg("localhost:50051", "-host", "--host");
-        config = getarg("dynamic_config.json", "-cfg", "--config");
-    };
-};
-
-// Logic and data behind the server's behavior.
-class GreeterServiceImpl final : public Greeter::Service {
-    grpc::Status SayHello(
-        grpc::ServerContext* context, const HelloRequest* request, HelloReply* reply) override {
-        std::string prefix("Hello ");
-        reply->set_message(prefix + request->name());
-        return grpc::Status::OK;
-    }
-};
-
-void RunServer() {
-    argparser args;
-
-    GreeterServiceImpl service;
-
-    grpc::EnableDefaultHealthCheckService(true);
-    grpc::reflection::InitProtoReflectionServerBuilderPlugin();
-
-    grpc::ServerBuilder builder;
-
-    auto creds = grpc::sgx::TlsServerCredentials(args.config);
-    GPR_ASSERT(creds.get() != nullptr);
-
-    builder.AddListeningPort(args.server_address, creds);
-
-    builder.RegisterService(&service);
-
-    std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
-    std::cout << "Server listening on " << args.server_address << std::endl;
-
-    server->Wait();
-}
 
 int main(int argc, char** argv) {
-    RunServer();
+    gr_start_server(
+        "localhost:50051",
+        "dynamic_config.json",
+        "secret_config.json"
+    );
+
     return 0;
 }

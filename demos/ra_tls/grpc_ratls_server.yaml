@@ -1,0 +1,16 @@
+includes:
+  - base.yaml
+targets:
+  - target: /bin/
+    copy:
+      - files:
+        - ../grpc-src/examples/cpp/ratls/build/server
+  - target: /
+    copy:
+      - files:
+        - dynamic_config.json
+        - ../secret_config.json
+  - target: /usr/share/grpc/
+    copy:
+      - files:
+        - ../grpc-src/etc/roots.pem
