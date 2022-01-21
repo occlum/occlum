@@ -3,14 +3,28 @@
 
 #### Executing the demo in Occlum
 
-The following command will download the gRPC source code and apply the ra-tls patches, then build gRPC source code and demo.
+The following command will download prerequisite source and the gRPC source code.
 ```
-./prepare_and_build_package.sh 
+./download_and_prepare.sh
+```
+
+The following command will patch the gRPC source code and do the build and install.
+```
+./build_and_install.sh
+```
+
+If musl-libc version is expected.
+```
+./build_and_install.sh musl
 ```
 
 The following command will generate the client and server occlum images. It automatically parses the mr_enclave and mr_signer of the client, and write the value into dynamic_config.json. If you want to verify the other measurements of client, please modify the dynamic_config.json before run the script.
 ```
 ./build_occlum_instance.sh
+```
+If previous build choice is `musl`.
+```
+./build_occlum_instance.sh musl
 ```
 
 Run the gRPC server & client in occlum.

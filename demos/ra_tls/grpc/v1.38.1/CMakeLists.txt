@@ -54,6 +54,7 @@ option(DEFINE_SGX_RA_TLS_OCCLUM_BACKEND "SGX Occlum Backend" OFF)
 
 if(DEFINE_SGX_RA_TLS_OCCLUM_BACKEND)
   message("SGX_RA_TLS_OCCLUM_BACKEND is defined")
+  include_directories(/opt/intel/sgxsdk/include)
   add_definitions(-DSGX_RA_TLS_OCCLUM_BACKEND)
 endif()
 
