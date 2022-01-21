@@ -19,6 +19,10 @@ impl FileTable {
         }
     }
 
+    pub fn table(&self) -> &Vec<Option<FileTableEntry>> {
+        &self.table
+    }
+
     pub fn dup(
         &mut self,
         fd: FileDesc,

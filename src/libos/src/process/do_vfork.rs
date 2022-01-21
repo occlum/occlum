@@ -84,15 +84,8 @@ pub fn vfork_return_to_parent(
 }
 
 fn restore_parent_process(mut context: *mut CpuContext, current_ref: &ThreadRef) -> Result<isize> {
-    let current_thread = current!();
     let current_pid = current_ref.process().pid();
 
-    // Todo: close all child created files, such as below.
-    // But parent opened files need to be filterd.
-    // Please revisit Drop for EpollFile once the implementation is ready.
-    // current_thread.close_all_files();
-
-    // Restore parent file table
     let parent_file_table = {
         let mut parent_file_tables = VFORK_PARENT_FILE_TABLES.lock().unwrap();
         if let Some(table) = parent_file_tables.remove(&current_pid) {
@@ -101,6 +94,11 @@ fn restore_parent_process(mut context: *mut CpuContext, current_ref: &ThreadRef)
             return_errno!(EFAULT, "couldn't restore parent file table");
         }
     };
+
+    // Close all child opened files
+    close_files_opened_by_child(current_ref, &parent_file_table)?;
+
+    // Restore parent file table
     let mut current_file_table = current_ref.files().lock().unwrap();
     *current_file_table = parent_file_table;
 
@@ -139,4 +137,25 @@ pub fn check_vfork_for_exec(current_ref: &ThreadRef) -> Option<(ThreadId, Option
     } else {
         None
     }
+}
+
+fn close_files_opened_by_child(current: &ThreadRef, parent_file_table: &FileTable) -> Result<()> {
+    let current_file_table = current.files().lock().unwrap();
+    let child_open_fds: Vec<FileDesc> = current_file_table
+        .table()
+        .iter()
+        .enumerate()
+        .filter(|(fd, _entry)| {
+            // Entry is only shown in the child file table
+            _entry.is_some() && parent_file_table.get_entry(*fd as FileDesc).is_err()
+        })
+        .map(|(fd, entry)| fd as FileDesc)
+        .collect();
+
+    drop(current_file_table);
+
+    child_open_fds
+        .iter()
+        .for_each(|&fd| current.close_file(fd).expect("close child file error"));
+    Ok(())
 }

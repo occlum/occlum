@@ -307,10 +307,7 @@ impl Drop for EpollFile {
             .collect();
         drop(interest);
 
-        // There is a deadlock with below code when do vfork exit.
-        // The reason is current vfork exit won't release opened files locks.
-        // Todo: revisit this code once vfork implemetaion updated.
-        //fds.iter().for_each(|&fd| self.unregister_from_file(fd));
+        fds.iter().for_each(|&fd| self.unregister_from_file(fd));
     }
 }
 
