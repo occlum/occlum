@@ -10,6 +10,6 @@ if [ "$postfix" != "server" ] && [ "$postfix" != "client" ]; then
     exit 1
 fi
 
-pushd occlum_instance_$postfix
+pushd occlum_$postfix
 occlum run /bin/$postfix
 popd
