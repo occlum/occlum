@@ -1,14 +1,19 @@
 name: Occlum Docker Build and Push
 
-# Triggers the workflow on pre-release events
+# This is a manual trigger.
 on:
-  release:
-    types: [prereleased]
+  workflow_dispatch:
+    inputs:
+      OS:
+        description: 'OS name (must choose from <centos, ubuntu>)'
+        required: true
+        default: 'ubuntu'
 
 jobs:
   generate-centos-image:
       # GitHub Actions doesn't have CentOS VM provided
       runs-on: ubuntu-18.04
+      if: github.event.inputs.OS == 'centos'
 
       steps:
       - name: Prepare tools
@@ -18,16 +23,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Because "Build and push" step `context` field can't be subdir,
-      # we need to copy files needed by dockerfile to root dir of the project
-      - name: Copy context for docker build
-        run: |
-          cp -r tools/toolchains .
-          cp -r tools/docker .
-
-      - name: Get release version
-        id: get_version
-        run: echo "RELEASE_VERSION=$(echo ${GITHUB_REF:10})" >> $GITHUB_ENV;
+      - name: Get Occlum release version
+        run: echo "RELEASE_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
 
       - name: Get branch name
         # GITHUB_REF=refs/heads/branch-name
@@ -52,15 +49,16 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          file: ./tools/docker/Dockerfile.centos8.1
+          file: ./tools/docker/Dockerfile.centos8.2
           platforms: linux/amd64
           build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
           push: true
-          tags: occlum/occlum:${{ env.RELEASE_VERSION }}-centos8.1
+          tags: occlum/occlum:${{ env.RELEASE_VERSION }}-centos8.2
 
 
   generate-ubuntu-image:
       runs-on: ubuntu-18.04
+      if: github.event.inputs.OS == 'ubuntu'
 
       steps:
       - name: Checkout code
@@ -73,9 +71,8 @@ jobs:
           cp -r tools/toolchains .
           cp -r tools/docker .
 
-      - name: Get release version
-        id: get_version
-        run: echo "RELEASE_VERSION=$(echo ${GITHUB_REF:10})" >> $GITHUB_ENV;
+      - name: Get Occlum release version
+        run: echo "RELEASE_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
 
       - name: Get branch name
         # GITHUB_REF=refs/heads/branch-name

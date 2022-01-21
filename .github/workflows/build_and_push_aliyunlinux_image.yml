@@ -1,0 +1,80 @@
+name: Aliyunlinux Docker Build and Push
+
+# This is a manual trigger.
+on:
+  workflow_dispatch:
+    inputs:
+      only_test:
+        description: 'Only Test? <Y/N>'
+        required: true
+        default: 'N'
+
+jobs:
+  generate-aliyunlinux-image:
+    runs-on: ubuntu-18.04
+    if: github.event.inputs.only_test == 'N'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Get Occlum release version
+      run: echo "RELEASE_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+
+    - name: Get branch name
+        # GITHUB_REF=refs/heads/branch-name
+        # ${GITHUB_REF##*/} == branch-name
+      run: echo "OCCLUM_BRANCH=$(echo ${GITHUB_REF##*/})" >> $GITHUB_ENV;
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v1
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+      with:
+        driver-opts: env.BUILDKIT_STEP_LOG_MAX_SIZE=104857600
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        file: ./tools/docker/Dockerfile.aliyunlinux3
+        platforms: linux/amd64
+        build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
+        push: true
+        tags: occlum/occlum:${{ env.RELEASE_VERSION }}-aliyunlinux3
+
+
+  Make_test_on_aliyunlinux:
+    if: ${{ always() }}
+    needs: generate-aliyunlinux-image
+    runs-on: ubuntu-18.04
+
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+
+    - name: Create container with Aliyun Linux image
+      run: docker run -itd --name=alinux-test -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-aliyunlinux3
+
+    - name: Build dependencies
+      run:  docker exec alinux-test bash -c "cd /root/occlum; make submodule"
+
+    - name: Build source
+      run:  docker exec alinux-test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y SGX_MODE=SIM make"
+
+    - name: Integration test
+      run:  docker exec alinux-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test"
+
+    - name: Integration test with Glibc
+      run:  docker exec alinux-test bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test-glibc"
