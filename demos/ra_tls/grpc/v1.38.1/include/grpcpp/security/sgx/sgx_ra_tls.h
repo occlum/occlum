@@ -24,6 +24,8 @@
 #include <grpcpp/security/credentials.h>
 #include <grpcpp/security/server_credentials.h>
 
+#include <cjson/cJSON.h>
+
 namespace grpc {
 namespace sgx {
 
@@ -50,6 +52,30 @@ std::shared_ptr<grpc::ServerCredentials> TlsServerCredentials(const char* sgx_cf
 
 std::shared_ptr<grpc::Channel> CreateSecureChannel(
     string target_str, std::shared_ptr<grpc::ChannelCredentials> channel_creds);
+
+class json_engine {
+    public:
+        json_engine();
+
+        json_engine(const char*);
+
+        ~json_engine();
+
+        bool open(const char*);
+
+        void close();
+
+        cJSON* get_handle();
+
+        cJSON* get_item(cJSON* obj, const char* item);
+
+        char* print_item(cJSON* obj);
+
+        bool compare_item(cJSON* obj, const char* item);
+
+    private:
+        cJSON* handle;
+};
 
 }  // namespace sgx
 }  // namespace grpc

@@ -1,8 +1,8 @@
 {
-    "verify_mr_enclave" : "off",
-    "verify_mr_signer" : "off",
-    "verify_isv_prod_id" : "off",
-    "verify_isv_svn" : "off",
+    "verify_mr_enclave" : "on",
+    "verify_mr_signer" : "on",
+    "verify_isv_prod_id" : "on",
+    "verify_isv_svn" : "on",
     "sgx_mrs": [
         {
             "mr_enclave" : "",

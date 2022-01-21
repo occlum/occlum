@@ -41,7 +41,7 @@ add_custom_command(
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
 # hw_grpc_proto
-add_library(hw_grpc_proto
+add_library(hw_grpc_proto SHARED
   ${hw_grpc_srcs}
   ${hw_grpc_hdrs}
   ${hw_proto_srcs}
@@ -51,12 +51,14 @@ target_link_libraries(hw_grpc_proto
   ${_GRPC_GRPCPP}
   ${_PROTOBUF_LIBPROTOBUF})
 
-# Targets greeter_[async_](client|server)
+foreach(_target grpc_ratls_client grpc_ratls_server)
+  add_library(${_target} SHARED "${_target}.cc")
+  target_link_libraries(${_target}
+    hw_grpc_proto)
+endforeach()
+
 foreach(_target client server)
   add_executable(${_target} "${_target}.cc")
   target_link_libraries(${_target}
-    hw_grpc_proto
-    ${_REFLECTION}
-    ${_GRPC_GRPCPP}
-    ${_PROTOBUF_LIBPROTOBUF})
+    grpc_ratls_${_target})
 endforeach()

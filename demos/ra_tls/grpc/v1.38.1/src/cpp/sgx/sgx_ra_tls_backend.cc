@@ -1,7 +1,7 @@
 #include "sgx_ra_tls_utils.h"
 #include "sgx_ra_tls_backend.h"
 #include "sgx_quote_3.h"
-#include "dcap_quote.h"
+#include "occlum_dcap.h"
 
 namespace grpc {
 namespace sgx {

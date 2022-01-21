@@ -865,11 +865,14 @@ jobs:
         container-name: ${{ github.job }}
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
-    - name: Download and build the pakckages
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/ra_tls; ./prepare_and_build_package.sh"
+    - name: Download source code
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/ra_tls; ./download_and_prepare.sh"
     
+    - name: Build and install gRPC+RATLS
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/ra_tls; ./build_and_install.sh musl"
+
     - name: Build occlum instances
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/ra_tls; ./build_occlum_instance.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/ra_tls; ./build_occlum_instance.sh musl"
 
     - name: Run gRPC server
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/ra_tls; ./run.sh server &"

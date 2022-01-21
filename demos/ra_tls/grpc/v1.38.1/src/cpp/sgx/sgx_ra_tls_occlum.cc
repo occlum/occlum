@@ -32,7 +32,7 @@ namespace sgx {
 #include <openssl/asn1.h>
 
 #include "sgx_quote_3.h"
-#include "dcap_quote.h"
+#include "occlum_dcap.h"
 
 const char * RA_TLS_LONG_NAME = "RA-TLS Extension";
 const char * RA_TLS_SHORT_NAME = "RA-TLS";
