@@ -42,6 +42,7 @@ pub use self::rootfs::ROOT_FS;
 pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
 pub use self::syscalls::*;
 
+mod builtin_disk;
 mod dev_fs;
 mod disk_file;
 mod event_file;

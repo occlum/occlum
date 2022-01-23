@@ -6,15 +6,15 @@ use crate::prelude::*;
 
 /// A file wrapper for a block device.
 pub struct DiskFile {
-    disk: Box<dyn BlockDevice>,
+    disk: Arc<dyn BlockDevice>,
     // TODO: use async lock
     offset: SgxMutex<usize>,
 }
 
 impl DiskFile {
-    pub fn new<B: BlockDevice>(disk: B) -> Self {
+    pub fn new(disk: Arc<dyn BlockDevice>) -> Self {
         Self {
-            disk: Box::new(disk),
+            disk,
             offset: SgxMutex::new(0),
         }
     }

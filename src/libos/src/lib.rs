@@ -27,6 +27,7 @@
 #![feature(bench_black_box)]
 #![feature(div_duration)]
 #![feature(result_cloned)]
+#![feature(once_cell)]
 
 #[macro_use]
 extern crate async_rt;

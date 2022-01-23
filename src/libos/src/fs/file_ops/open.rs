@@ -1,8 +1,6 @@
-use sgx_disk::{CryptDisk, HostDisk, IoUringDisk, SyncIoDisk};
-
+use super::builtin_disk::try_open_disk;
 use super::*;
 use crate::fs::DiskFile;
-use disks::try_open_disk;
 
 pub fn do_openat(fs_path: &FsPath, flags: u32, mode: FileMode) -> Result<FileDesc> {
     debug!(
@@ -26,63 +24,4 @@ pub fn do_openat(fs_path: &FsPath, flags: u32, mode: FileMode) -> Result<FileDes
         current.add_file(file_ref, creation_flags.must_close_on_spawn())
     };
     Ok(fd)
-}
-
-// Built-in disks for testing purposes
-mod disks {
-    use super::*;
-
-    pub fn try_open_disk(fs: &FsView, fs_path: &FsPath) -> Result<Option<Arc<DiskFile>>> {
-        let abs_path = fs.convert_fspath_to_abs(&fs_path)?;
-        if !abs_path.starts_with("/dev") {
-            return Ok(None);
-        }
-
-        const GB: usize = 1024 * 1024 * 1024;
-        let disk_file = if abs_path == "/dev/sync_disk" {
-            let total_blocks = to_blocks(2 * GB);
-            let path = String::from("sync_disk");
-            let disk = SyncIoDisk::create(&path, total_blocks).unwrap();
-            DiskFile::new(disk)
-        } else if abs_path == "/dev/iou_disk" {
-            let total_blocks = to_blocks(2 * GB);
-            let path = String::from("iou_disk");
-            let disk = IoUringDisk::<runtime::DeviceRuntime>::create(&path, total_blocks).unwrap();
-            DiskFile::new(disk)
-        } else if abs_path == "/dev/crypt_sync_disk" {
-            let total_blocks = to_blocks(2 * GB);
-            let path = String::from("crypt_sync_disk");
-            let sync_disk = SyncIoDisk::create(&path, total_blocks).unwrap();
-            let crypt_sync_disk = CryptDisk::new(Box::new(sync_disk));
-            DiskFile::new(crypt_sync_disk)
-        } else if abs_path == "/dev/crypt_iou_disk" {
-            let total_blocks = to_blocks(2 * GB);
-            let path = String::from("crypt_iou_disk");
-            let iou_disk =
-                IoUringDisk::<runtime::DeviceRuntime>::create(&path, total_blocks).unwrap();
-            let crypt_iou_disk = CryptDisk::new(Box::new(iou_disk));
-            DiskFile::new(crypt_iou_disk)
-        } else {
-            return Ok(None);
-        };
-        Ok(Some(Arc::new(disk_file)))
-    }
-
-    const fn to_blocks(size_in_bytes: usize) -> usize {
-        const PAGE_SIZE: usize = 4096;
-        size_in_bytes / PAGE_SIZE
-    }
-
-    mod runtime {
-        use io_uring_callback::IoUring;
-        use sgx_disk::IoUringProvider;
-
-        pub struct DeviceRuntime;
-
-        impl IoUringProvider for DeviceRuntime {
-            fn io_uring() -> &'static IoUring {
-                &*crate::io_uring::SINGLETON
-            }
-        }
-    }
 }
