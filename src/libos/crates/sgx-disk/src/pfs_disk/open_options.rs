@@ -2,7 +2,7 @@ use std::io::{ErrorKind, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::sgxfs::SgxFile as PfsFile;
 
-use super::PfsDisk;
+use super::{PfsDisk, PFS_INNER_OFFSET};
 use crate::prelude::*;
 
 /// Options that are used to configure how a PFS disk is opened.
@@ -72,11 +72,11 @@ impl OpenOptions {
         if !self.read && !self.write {
             return Err(errno!(EINVAL, "the disk must be readable or writable"));
         }
-        let mut total_blocks = self.total_blocks.unwrap_or(0);
-        if total_blocks == 0 && (self.create || self.create_new) {
-            return Err(errno!(EINVAL, "the disk size must be non-zero"));
+        if (self.create || self.create_new) && self.total_blocks.is_none() {
+            return Err(errno!(EINVAL, "the disk size must be given"));
         }
 
+        // Open or create the PFS file
         let mut file_exists = false;
         let mut pfs_file = {
             let mut pfs_file_opt = None;
@@ -104,26 +104,42 @@ impl OpenOptions {
             }
         };
 
-        let old_len = {
-            let real_len = pfs_file.seek(SeekFrom::End(0)).unwrap() as usize;
-            align_down(real_len, BLOCK_SIZE)
+        // Get the current length of the PFS file
+        let old_len = if file_exists {
+            let file_len = pfs_file.seek(SeekFrom::End(0)).unwrap() as usize;
+            if file_len < (PFS_INNER_OFFSET + BLOCK_SIZE) {
+                return Err(errno!(EINVAL, "file size is too small"));
+            }
+            if (file_len - PFS_INNER_OFFSET) % BLOCK_SIZE != 0 {
+                return Err(errno!(EINVAL, "file size is not aligned"));
+            }
+            file_len
+        } else {
+            0
         };
-        if total_blocks == 0 && file_exists {
-            total_blocks = old_len / BLOCK_SIZE;
-        }
-        let new_len = total_blocks * BLOCK_SIZE;
-        if old_len > new_len {
-            return Err(errno!(EEXIST, "cannot shrink an existed disk"));
-        }
+
+        // Determine the total blocks
+        let total_blocks = if let Some(total_blocks) = self.total_blocks {
+            let new_len = PFS_INNER_OFFSET + total_blocks * BLOCK_SIZE;
+            if old_len > new_len {
+                return Err(errno!(EEXIST, "cannot shrink an existed disk"));
+            }
+            write_zeros(&mut pfs_file, old_len, new_len);
+            total_blocks
+        } else {
+            debug_assert!(file_exists);
+            (old_len - PFS_INNER_OFFSET) / BLOCK_SIZE
+        };
+
+        // Ensure all existing data are zeroed if clear is required
         if self.clear {
-            write_zeros(&mut pfs_file, 0, old_len);
+            write_zeros(&mut pfs_file, PFS_INNER_OFFSET, old_len);
         }
-        write_zeros(&mut pfs_file, old_len, new_len);
 
         let pfs_disk = PfsDisk {
             file: Mutex::new(pfs_file),
             path: path.as_ref().to_path_buf(),
-            total_blocks: total_blocks,
+            total_blocks,
             can_read: self.read,
             can_write: self.write,
         };
@@ -133,8 +149,8 @@ impl OpenOptions {
 
 fn write_zeros(pfs_file: &mut PfsFile, begin: usize, end: usize) {
     debug_assert!(begin <= end);
-    debug_assert!(begin % BLOCK_SIZE == 0);
-    debug_assert!(end % BLOCK_SIZE == 0);
+    debug_assert!(begin % BLOCK_SIZE == PFS_INNER_OFFSET);
+    debug_assert!(end % BLOCK_SIZE == PFS_INNER_OFFSET);
 
     const ZEROS: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
     pfs_file.seek(SeekFrom::Start(begin as u64)).unwrap();

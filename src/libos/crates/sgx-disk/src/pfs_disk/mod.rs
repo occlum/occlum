@@ -26,6 +26,11 @@ unsafe impl Send for PfsDisk {}
 // Safety. PfsFile does not implement Sync but it is safe to do so.
 unsafe impl Sync for PfsDisk {}
 
+// The first 3KB file data of PFS are stored in the metadata node. All remaining
+// file data are stored in nodes of 4KB. We need to consider this internal
+// offset so that our block I/O are aligned with the PFS internal node boundaries.
+const PFS_INNER_OFFSET: usize = 3 * 1024;
+
 impl PfsDisk {
     /// Open a disk backed by an existing PFS file on the host.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
@@ -53,6 +58,7 @@ impl PfsDisk {
         }
 
         let (offset, _) = self.get_range_in_bytes(&req)?;
+        let offset = offset + PFS_INNER_OFFSET;
 
         let mut file = self.file.lock().unwrap();
         file.seek(SeekFrom::Start(offset as u64)).unwrap();
@@ -73,7 +79,9 @@ impl PfsDisk {
         if !self.can_write {
             return Err(errno!(EACCES, "write is not allowed"));
         }
+
         let (offset, _) = self.get_range_in_bytes(&req)?;
+        let offset = offset + PFS_INNER_OFFSET;
 
         let mut file = self.file.lock().unwrap();
         file.seek(SeekFrom::Start(offset as u64)).unwrap();
