@@ -226,11 +226,6 @@ jobs:
         container-name: ${{ github.job }}
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
-    - name: Config git proxy
-      run: |
-        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global http.proxy socks5://localhost:5432"
-        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global https.proxy socks5://localhost:5432"
-
     - name: Install bazel
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/hello_bazel && wget https://github.com/bazelbuild/bazel/releases/download/3.2.0/bazel-3.2.0-installer-linux-x86_64.sh;
               chmod +x bazel-3.2.0-installer-linux-x86_64.sh;
@@ -280,11 +275,6 @@ jobs:
         container-name: ${{ github.job }}
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
-    - name: Config git proxy
-      run: |
-        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global http.proxy socks5://localhost:5432"
-        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global https.proxy socks5://localhost:5432"
-
     - name: Build Fish dependencies
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/fish && ./download_and_build.sh"
 
@@ -329,11 +319,6 @@ jobs:
         container-name: ${{ github.job }}
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
-    - name: Config git proxy
-      run: |
-        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global http.proxy socks5://localhost:5432"
-        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global https.proxy socks5://localhost:5432"
-
     - name: Build xgboost dependencies
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/xgboost && ./download_and_build_xgboost.sh"
 
@@ -377,11 +362,6 @@ jobs:
       with:
         container-name: ${{ github.job }}
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
-
-    - name: Config git proxy
-      run: |
-        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global http.proxy socks5://localhost:5432"
-        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global https.proxy socks5://localhost:5432"
 
     - name: Build sqlite dependencies
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/sqlite && ./download_and_build_sqlite.sh"
