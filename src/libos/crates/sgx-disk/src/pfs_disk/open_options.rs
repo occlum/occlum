@@ -133,7 +133,7 @@ impl OpenOptions {
 
         // Ensure all existing data are zeroed if clear is required
         if self.clear {
-            write_zeros(&mut pfs_file, PFS_INNER_OFFSET, old_len);
+            write_zeros(&mut pfs_file, 0, old_len);
         }
 
         let pfs_disk = PfsDisk {
@@ -149,12 +149,14 @@ impl OpenOptions {
 
 fn write_zeros(pfs_file: &mut PfsFile, begin: usize, end: usize) {
     debug_assert!(begin <= end);
-    debug_assert!(begin % BLOCK_SIZE == PFS_INNER_OFFSET);
-    debug_assert!(end % BLOCK_SIZE == PFS_INNER_OFFSET);
 
     const ZEROS: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
+
     pfs_file.seek(SeekFrom::Start(begin as u64)).unwrap();
-    (0..(end - begin) / BLOCK_SIZE).for_each(|_| {
-        pfs_file.write(&ZEROS).unwrap();
-    });
+    let mut remain = end - begin;
+    while remain > 0 {
+        let buf_len = remain.min(ZEROS.len());
+        pfs_file.write(&ZEROS[0..buf_len]).unwrap();
+        remain -= buf_len;
+    }
 }
