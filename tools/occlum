@@ -73,6 +73,8 @@ Usage:
         All runtime dependencies required by the Occlum instance---except Intel SGX driver,
         enable_rdfsbase kernel module, and Intel SGX PSW---are included in the package.
         If package_name is not specified, the directory name of Occlum instance will be used.
+        In default only HW release mode package is supported. Debug or simulation mode package
+        could be supported by adding "--debug" flag.
 
     occlum gdb <program_name> <program_args>
         Debug the program running inside an SGX enclave with GDB.
@@ -426,37 +428,57 @@ cmd_stop() {
 cmd_package() {
     check_has_built
 
-    SGX_MODE=$(cat $instance_dir/.sgx_mode)
-    if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        echo '"occlum package" command should only be used for an Occlum instance of SGX hardware mode, not the simulation mode.'
-        echo 'Please run "occlum build --sgx-mode HW" and then use "occlum package"'
+    debug="false"
+    instance_base_name=$(basename $instance_dir)
+    package_name="$instance_base_name.tar.gz"
+    while [ -n "$1" ]; do
+        case "$1" in
+        --debug)  debug="true" ; shift ;;
+        *) package_name=$1 ; shift ;;
+        esac
+    done
+
+    if [[ "$package_name" != *.tar.gz ]]; then
+        package_name="$package_name.tar.gz"
+    fi
+
+    if [[ "`get_enclave_debuggable_flag`" == "true" && "$debug" != "true" ]]; then
+        echo 'Warning: current Occlum instance is configured as "debuggable".'
+        echo '(If it is not expected, you can modify the Occlum.json "metadata" - "debuggable" field to "false" and build again. And then use "occlum package")'
+        echo 'Or, use "occlum package --debug" to support debug mode package'
         exit 1
     fi
 
-    instance_base_name=$(basename $instance_dir)
-    if [[ -z "$@" ]]; then
-        package_name="$instance_base_name.tar.gz"
-    else
-        if [[ "$@" == *.tar.gz ]];then
-            package_name="$@"
-        else
-            package_name="$@.tar.gz"
-        fi
+    SGX_MODE=$(cat $instance_dir/.sgx_mode)
+    if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" && "$debug" != "true" ]]; then
+        echo '"occlum package" command should only be used for an Occlum instance of SGX hardware mode, not the simulation mode.'
+        echo 'Please run "occlum build --sgx-mode HW" and then use "occlum package"'
+        echo 'Or, use "occlum package --debug" to support similation mode package'
+        exit 1
     fi
 
     rm -f $package_name
 
-    cd .. && tar -cvzf $instance_dir/$package_name $instance_base_name/Occlum.json $instance_base_name/build/bin \
-        $instance_base_name/build/lib/libocclum-libos.signed.so $instance_base_name/build/lib/libocclum-pal.so* \
-        $instance_base_name/build/mount $instance_base_name/build/Occlum.json.protected \
-        $instance_base_name/build/initfs $instance_base_name/build/.Occlum_sys.json.protected \
-        $instance_base_name/initfs $instance_base_name/run \
-        $instance_base_name/.__occlum_status $instance_base_name/.sgx_mode
-
-    if [ "`get_enclave_debuggable_flag`" == "true" ]; then
-        echo 'Warning: current Occlum instance is configured as "debuggable".'
-        echo '(If it is not expected, you can modify the Occlum.json "metadata" - "debuggable" field to "false" and build again. And then use "occlum package")'
+    pkg_files="\
+    $instance_base_name/Occlum.json \
+    $instance_base_name/build/bin \
+    $instance_base_name/build/lib/libocclum-libos.signed.so \
+    $instance_base_name/build/lib/libocclum-pal.so* \
+    $instance_base_name/build/mount $instance_base_name/build/Occlum.json.protected \
+    $instance_base_name/build/initfs $instance_base_name/build/.Occlum_sys.json.protected \
+    $instance_base_name/initfs $instance_base_name/run \
+    $instance_base_name/.__occlum_status $instance_base_name/.sgx_mode \
+    "
+    if [[ "$debug" == "true" && "$SGX_MODE" != "HW" ]]; then
+        sim_files="\
+        $instance_base_name/build/lib/libocclum-libos_sim.so* \
+        $instance_base_name/build/lib/libocclum-pal_sim.so* \
+        "
     fi
+
+    cd .. && tar -cvzf $instance_dir/$package_name \
+                --transform s/$instance_base_name/$(basename $package_name .tar.gz)/ \
+                $pkg_files $sim_files
 
     echo "The package $package_name is generated successfully"
 }
