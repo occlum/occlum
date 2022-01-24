@@ -871,7 +871,7 @@ jobs:
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/ra_tls; ./build_and_install.sh musl"
 
     - name: Build occlum instances
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/ra_tls; ./build_occlum_instance.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/ra_tls; ./build_occlum_instance.sh musl"
 
     - name: Run gRPC server
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/ra_tls; ./run.sh server &"

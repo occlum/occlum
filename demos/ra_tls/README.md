@@ -22,6 +22,10 @@ The following command will generate the client and server occlum images. It auto
 ```
 ./build_occlum_instance.sh
 ```
+If previous build choice is `musl`.
+```
+./build_occlum_instance.sh musl
+```
 
 Run the gRPC server & client in occlum.
 
