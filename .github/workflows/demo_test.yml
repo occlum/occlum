@@ -621,3 +621,22 @@ jobs:
 
     - name: Run unix socket test
       run: docker exec cross_world_unix_socket bash -c "cd /root/occlum/demos/cross_world_uds; SGX_MODE=SIM ./run_cross_world_uds_test.sh"
+
+  Gvisor_syscalls_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Create container
+      run: |
+        docker pull occlumbackup/occlum:latest-ubuntu18.04-gvisor_test
+        gvisor_test=$(docker run -itd -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-gvisor_test);
+        echo "gvisor_test=$gvisor_test" >> $GITHUB_ENV
+    
+    - name: clone code
+      run: docker exec $gvisor_test bash -c "git clone https://github.com/occlum/gvisor.git"
+
+    - name: Run gvisor syscall test
+      run: docker exec $gvisor_test bash -c "cd /root/gvisor/occlum && SGX_MODE=SIM ./run_occlum_passed_tests.sh ngo"
