@@ -54,6 +54,12 @@ runs:
         EOF"
       shell: bash
 
+    - name: Config git proxy
+      run: |
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global http.proxy socks5://localhost:5432"
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global https.proxy socks5://localhost:5432"
+      shell: bash
+
     - name: Build dependencies
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
       shell: bash
