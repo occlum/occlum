@@ -1,9 +1,10 @@
 extern crate dcap_quote;
 use std::str;
+use std::io::Result;
 use std::convert::TryFrom;
 use dcap_quote::*;
 use sgx_types::{
-    sgx_report_data_t, sgx_ql_qv_result_t, sgx_report_body_t, sgx_quote3_t
+    sgx_quote_header_t, sgx_report_data_t, sgx_ql_qv_result_t, sgx_report_body_t
 };
 
 struct DcapDemo {
@@ -39,7 +40,7 @@ impl DcapDemo {
         }
     }
 
-    fn dcap_quote_gen(&mut self) -> Result<i32, &'static str> {
+    fn dcap_quote_gen(&mut self) -> Result<i32> {
         self.dcap_quote.generate_quote(self.quote_buf.as_mut_ptr(), &mut self.req_data).unwrap();
 
         println!("DCAP generate quote successfully");
@@ -47,21 +48,30 @@ impl DcapDemo {
         Ok( 0 )
     }
 
-    fn dcap_quote_get_report_body(&mut self) -> Result<*const sgx_report_body_t, &'static str> {
-        let quote3: *mut sgx_quote3_t = self.quote_buf.as_mut_ptr() as *mut sgx_quote3_t;
-        let report_body = unsafe { &((*quote3).report_body) };
+    // Quote has type `sgx_quote3_t` and is structured as
+    // pub struct sgx_quote3_t {
+    //     pub header: sgx_quote_header_t,
+    //     pub report_body: sgx_report_body_t,
+    //     pub signature_data_len: uint32_t,
+    //     pub signature_data: [uint8_t; 0],
+    // }
+
+    fn dcap_quote_get_report_body(&mut self) -> Result<*const sgx_report_body_t> {
+        let report_body_offset = std::mem::size_of::<sgx_quote_header_t>();
+        let report_body: *const sgx_report_body_t
+            = (self.quote_buf[report_body_offset..]).as_ptr() as _;
 
         Ok(report_body)
     }
 
-    fn dcap_quote_get_report_data(&mut self) -> Result<*const sgx_report_data_t, &'static str> {
+    fn dcap_quote_get_report_data(&mut self) -> Result<*const sgx_report_data_t> {
         let report_body_ptr = self.dcap_quote_get_report_body().unwrap();
         let report_data_ptr = unsafe { &(*report_body_ptr).report_data };
 
         Ok(report_data_ptr)
     }
 
-    fn dcap_quote_ver(&mut self) -> Result<sgx_ql_qv_result_t, &'static str> {
+    fn dcap_quote_ver(&mut self) -> Result<sgx_ql_qv_result_t> {
         let mut quote_verification_result = sgx_ql_qv_result_t::SGX_QL_QV_RESULT_UNSPECIFIED;
         let mut status = 1;
     
