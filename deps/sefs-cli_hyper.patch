@@ -1,0 +1,121 @@
+diff --git a/sefs-cli/Makefile b/sefs-cli/Makefile
+index f0eeb8c..8c6fae0 100644
+--- a/sefs-cli/Makefile
++++ b/sefs-cli/Makefile
+@@ -14,13 +14,19 @@ endif
+ ifeq ($(SGX_ARCH), x86)
+ 	SGX_COMMON_CFLAGS := -m32
+ 	SGX_LIBRARY_PATH := $(SGX_SDK)/lib
+-	SGX_ENCLAVE_SIGNER := $(SGX_SDK)/bin/x86/sgx_sign
+-	SGX_EDGER8R := $(SGX_SDK)/bin/x86/sgx_edger8r
++	SGX_BIN_PATH := $(SGX_SDK)/bin/x86
+ else
+ 	SGX_COMMON_CFLAGS := -m64
+ 	SGX_LIBRARY_PATH := $(SGX_SDK)/lib64
+-	SGX_ENCLAVE_SIGNER := $(SGX_SDK)/bin/x64/sgx_sign
+-	SGX_EDGER8R := $(SGX_SDK)/bin/x64/sgx_edger8r
++	SGX_BIN_PATH := $(SGX_SDK)/bin/x64
++endif
++
++SGX_EDGER8R := $(SGX_BIN_PATH)/sgx_edger8r
++ifneq ($(SGX_MODE), HYPER)
++	SGX_ENCLAVE_SIGNER := $(SGX_BIN_PATH)/sgx_sign
++else
++	SGX_ENCLAVE_SIGNER := $(SGX_BIN_PATH)/sgx_sign_hyper
++	SGX_EDGER8R_MODE := --sgx-mode $(SGX_MODE)
+ endif
+ 
+ ifeq ($(SGX_DEBUG), 1)
+@@ -59,9 +65,15 @@ App_Enclave_u_Object :=app/libEnclave_u.a
+ 
+ ######## Enclave Settings ########
+ 
+-ifneq ($(SGX_MODE), HW)
++ifeq ($(SGX_MODE), HW)
++	Trts_Library_Name := sgx_trts
++	Service_Library_Name := sgx_tservice
++else ifeq ($(SGX_MODE), SIM)
+ 	Trts_Library_Name := sgx_trts_sim
+ 	Service_Library_Name := sgx_tservice_sim
++else ifeq ($(SGX_MODE), HYPER)
++	Trts_Library_Name := sgx_trts_hyper
++	Service_Library_Name := sgx_tservice_hyper
+ else
+ 	Trts_Library_Name := sgx_trts
+ 	Service_Library_Name := sgx_tservice
+@@ -85,9 +97,15 @@ RustEnclave_Link_Flags := $(SGX_COMMON_CFLAGS) -Wl,--no-undefined -nostdlib -nod
+ 	-Wl,--gc-sections \
+ 	-Wl,--version-script=enclave/Enclave.lds
+ 
+-ifneq ($(SGX_MODE), HW)
++ifeq ($(SGX_MODE), HW)
++	RustEnclave_Name := lib/libsefs-cli.so
++	App_Name := bin/sefs-cli
++else ifeq ($(SGX_MODE), SIM)
+ 	RustEnclave_Name := lib/libsefs-cli_sim.so
+ 	App_Name := bin/sefs-cli_sim
++else ifeq ($(SGX_MODE), HYPER)
++	RustEnclave_Name := lib/libsefs-cli_hyper.so
++	App_Name := bin/sefs-cli_hyper
+ else
+ 	RustEnclave_Name := lib/libsefs-cli.so
+ 	App_Name := bin/sefs-cli
+@@ -102,8 +120,8 @@ no_sign: $(App_Name) $(RustEnclave_Name)
+ ######## EDL Objects ########
+ 
+ $(Enclave_EDL_Files): $(SGX_EDGER8R) enclave/Enclave.edl
+-	$(SGX_EDGER8R) --trusted enclave/Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK)/edl --trusted-dir enclave
+-	$(SGX_EDGER8R) --untrusted enclave/Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK)/edl --untrusted-dir app
++	$(SGX_EDGER8R) $(SGX_EDGER8R_MODE) --trusted enclave/Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK)/edl --trusted-dir enclave
++	$(SGX_EDGER8R) $(SGX_EDGER8R_MODE) --untrusted enclave/Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK)/edl --untrusted-dir app
+ 	@echo "GEN  =>  $(Enclave_EDL_Files)"
+ 
+ ######## App Objects ########
+diff --git a/sefs-cli/app/build.rs b/sefs-cli/app/build.rs
+index 4bf4c0a..96391ac 100644
+--- a/sefs-cli/app/build.rs
++++ b/sefs-cli/app/build.rs
+@@ -14,6 +14,7 @@ fn main() {
+     match is_sim.as_ref() {
+         "SW" | "SIM" => println!("cargo:rustc-link-lib=static=sgx_urts_sim_with_se_event"),
+         "HW" => println!("cargo:rustc-link-lib=dylib=sgx_urts"),
++        "HYPER" => println!("cargo:rustc-link-lib=static=sgx_urts_hyper_with_se_event"),
+         _ => println!("cargo:rustc-link-lib=dylib=sgx_urts"), // Treat undefined as HW
+     }
+ 
+@@ -21,6 +22,7 @@ fn main() {
+     match is_sim.as_ref() {
+         "SW" | "SIM" => println!("cargo:rustc-link-lib=dylib=sgx_uae_service_sim"),
+         "HW" => println!("cargo:rustc-link-lib=dylib=sgx_uae_service"),
++        "HYPER" => println!("cargo:rustc-link-lib=dylib=sgx_uae_service_hyper"),
+         _ => println!("cargo:rustc-link-lib=dylib=sgx_uae_service"), // Treat undefined as HW
+     }
+ 
+diff --git a/sefs-cli/enclave/Enclave.config.xml b/sefs-cli/enclave/Enclave.config.xml
+index 109fcd2..e69f2b6 100644
+--- a/sefs-cli/enclave/Enclave.config.xml
++++ b/sefs-cli/enclave/Enclave.config.xml
+@@ -4,6 +4,7 @@
+   <ISVSVN>0</ISVSVN>
+   <StackMaxSize>0x100000</StackMaxSize>
+   <HeapMaxSize>0x20000000</HeapMaxSize>
++  <MarshalBufferSize>0x20000</MarshalBufferSize>
+   <TCSNum>1</TCSNum>
+   <TCSPolicy>1</TCSPolicy>
+   <DisableDebug>0</DisableDebug>
+diff --git a/sefs-cli/enclave/Enclave.lds b/sefs-cli/enclave/Enclave.lds
+index 92bebf2..d93532c 100644
+--- a/sefs-cli/enclave/Enclave.lds
++++ b/sefs-cli/enclave/Enclave.lds
+@@ -1,8 +1,11 @@
+ {
+     global:
+         g_global_data_sim;
++        g_global_data_hyper;
+         g_global_data;
+         enclave_entry;
++        g_peak_heap_used;
++        g_peak_rsrv_mem_committed;
+     local:
+         *;
+ };
