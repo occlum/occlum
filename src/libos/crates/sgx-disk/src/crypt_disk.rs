@@ -1,6 +1,9 @@
 use std::fmt;
 
-use block_device::{BioReq, BioReqBuilder, BioResp, BioSubmission, BioType, BlockBuf, BlockDevice};
+use block_device::{
+    BioReq, BioReqBuilder, BioResp, BioSubmission, BioType, BlockBuf, BlockDevice, BLOCK_SIZE,
+};
+use cfg_if::cfg_if;
 #[cfg(feature = "sgx")]
 use sgx_tcrypto::{rsgx_rijndael128GCM_decrypt, rsgx_rijndael128GCM_encrypt};
 #[cfg(feature = "sgx")]
@@ -176,41 +179,69 @@ impl OriginReq {
     }
 }
 
-#[cfg(feature = "sgx")]
-fn dummy_encrypt(plaintext: &[u8], ciphertext: &mut [u8]) {
-    let mut gmac = [0; 16];
-    let aes_key: [u8; 16] = [1; 16];
-    let nonce: [u8; 12] = [2; 12];
-    let aad: [u8; 0] = [0; 0];
-    rsgx_rijndael128GCM_encrypt(&aes_key, plaintext, &nonce, &aad, ciphertext, &mut gmac).unwrap();
-}
+fn dummy_encrypt(mut plaintext: &[u8], mut ciphertext: &mut [u8]) {
+    let mut remain = ciphertext.len();
+    debug_assert!(ciphertext.len() == plaintext.len());
+    debug_assert!(remain % BLOCK_SIZE == 0);
+    // Encrypt data in units of blocks to simulate the behaviors when
+    // different blocks are required to have different keys.
+    while remain > 0 {
+        let pb = &plaintext[..BLOCK_SIZE];
+        let cb = &mut ciphertext[..BLOCK_SIZE];
 
-#[cfg(not(feature = "sgx"))]
-fn dummy_encrypt(plaintext: &[u8], ciphertext: &mut [u8]) {
-    // TODO: do encryption
-    ciphertext.copy_from_slice(plaintext);
-}
+        cfg_if! {
+            if #[cfg(feature = "sgx")] {
+                let mut gmac = [0; 16];
+                let aes_key: [u8; 16] = [1; 16];
+                let nonce: [u8; 12] = [2; 12];
+                let aad: [u8; 0] = [0; 0];
+                rsgx_rijndael128GCM_encrypt(&aes_key, pb, &nonce, &aad, cb, &mut gmac).unwrap();
+            } else {
+                // TODO: add encryption for non-SGX builds
+                cb.copy_from_slice(pb);
+            }
+        }
 
-#[cfg(feature = "sgx")]
-fn dummy_decrypt(ciphertext: &[u8], plaintext: &mut [u8]) {
-    let gmac = [0; 16];
-    let aes_key: [u8; 16] = [1; 16];
-    let nonce: [u8; 12] = [2; 12];
-    let aad: [u8; 0] = [0; 0];
-    let sgx_res = rsgx_rijndael128GCM_decrypt(&aes_key, ciphertext, &nonce, &aad, &gmac, plaintext);
-    match sgx_res {
-        Ok(()) => (),
-        // MAC mismatch is expected as our naive implementation does not persist
-        // the correct MACs.
-        Err(sgx_status_t::SGX_ERROR_MAC_MISMATCH) => (),
-        _ => panic!("this should not happen"),
+        plaintext = &plaintext[BLOCK_SIZE..];
+        ciphertext = &mut ciphertext[BLOCK_SIZE..];
+        remain -= BLOCK_SIZE;
     }
 }
 
-#[cfg(not(feature = "sgx"))]
-fn dummy_decrypt(ciphertext: &[u8], plaintext: &mut [u8]) {
-    // TODO: do decryption
-    plaintext.copy_from_slice(ciphertext);
+fn dummy_decrypt(mut ciphertext: &[u8], mut plaintext: &mut [u8]) {
+    let mut remain = ciphertext.len();
+    debug_assert!(ciphertext.len() == plaintext.len());
+    debug_assert!(remain % BLOCK_SIZE == 0);
+    // Decrypt data in units of blocks to simulate the behaviors when
+    // different blocks are required to have different keys.
+    while remain > 0 {
+        let cb = &ciphertext[..BLOCK_SIZE];
+        let pb = &mut plaintext[..BLOCK_SIZE];
+
+        cfg_if! {
+            if #[cfg(feature = "sgx")] {
+                let gmac = [0; 16];
+                let aes_key: [u8; 16] = [1; 16];
+                let nonce: [u8; 12] = [2; 12];
+                let aad: [u8; 0] = [0; 0];
+                let sgx_res = rsgx_rijndael128GCM_decrypt(&aes_key, cb, &nonce, &aad, &gmac, pb);
+                match sgx_res {
+                    Ok(()) => (),
+                    // MAC mismatch is expected as our naive implementation does not persist
+                    // the correct MACs.
+                    Err(sgx_status_t::SGX_ERROR_MAC_MISMATCH) => (),
+                    _ => panic!("this should not happen"),
+                }
+            } else {
+                // TODO: add decryption for non-SGX builds
+                pb.copy_from_slice(cb);
+            }
+        }
+
+        ciphertext = &ciphertext[BLOCK_SIZE..];
+        plaintext = &mut plaintext[BLOCK_SIZE..];
+        remain -= BLOCK_SIZE;
+    }
 }
 
 #[cfg(test)]
