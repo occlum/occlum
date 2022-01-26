@@ -154,8 +154,28 @@ fn main() {
             );
             return;
         }
+        #[cfg(feature = "ms_buffer")]
+        let marshal_buffer_size = if occlum_config.resource_limits.marshal_buffer_size.is_some() {
+            let marshal_buffer_size = parse_memory_size(
+                occlum_config
+                    .resource_limits
+                    .marshal_buffer_size
+                    .as_ref()
+                    .unwrap(),
+            );
+            if marshal_buffer_size.is_err() {
+                println!(
+                    "The marshal_buffer_size \"{}\" is not correct.",
+                    occlum_config.resource_limits.marshal_buffer_size.unwrap()
+                );
+                return;
+            }
+            marshal_buffer_size.unwrap()
+        } else {
+            0x10_0000
+        };
 
-       let kss_tuple = parse_kss_conf(&occlum_config);
+        let kss_tuple = parse_kss_conf(&occlum_config);
 
         // Generate the enclave configuration
         let sgx_enclave_configuration = EnclaveConfiguration {
@@ -177,6 +197,8 @@ fn main() {
             ReservedMemMinSize: user_space_size.unwrap() as u64,
             ReservedMemInitSize: user_space_size.unwrap() as u64,
             ReservedMemExecutable: 1,
+            #[cfg(feature = "ms_buffer")]
+            MarshalBufferSize: marshal_buffer_size as u64,
             EnableKSS: kss_tuple.0,
             ISVEXTPRODID_H: kss_tuple.1,
             ISVEXTPRODID_L: kss_tuple.2,
@@ -303,17 +325,15 @@ fn get_u64_id_high_and_low(id: &OcclumMetaID) -> (u64, u64) {
 }
 
 // Return a tuple (EnableKSS, ISVEXTPRODID_H, ISVEXTPRODID_L, ISVFAMILYID_H, ISVFAMILYID_L)
-fn parse_kss_conf(occlum_config: &OcclumConfiguration
-) -> (u32, u64, u64, u64, u64)
-{
+fn parse_kss_conf(occlum_config: &OcclumConfiguration) -> (u32, u64, u64, u64, u64) {
     match occlum_config.metadata.enable_kss {
         true => {
             let ext_prod_id = get_u64_id_high_and_low(&occlum_config.metadata.ext_prod_id);
             let family_id = get_u64_id_high_and_low(&occlum_config.metadata.family_id);
 
             (1, ext_prod_id.0, ext_prod_id.1, family_id.0, family_id.1)
-        },
-        false => (0, 0, 0, 0, 0)
+        }
+        false => (0, 0, 0, 0, 0),
     }
 }
 
@@ -407,6 +427,8 @@ struct OcclumResourceLimits {
     kernel_space_heap_size: String,
     kernel_space_stack_size: String,
     user_space_size: String,
+    #[cfg(feature = "ms_buffer")]
+    marshal_buffer_size: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
@@ -419,7 +441,7 @@ struct OcclumProcess {
 #[derive(Debug, PartialEq, Deserialize)]
 struct OcclumMetaID {
     high: String,
-    low: String
+    low: String,
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
@@ -429,7 +451,7 @@ struct OcclumMetadata {
     debuggable: bool,
     enable_kss: bool,
     family_id: OcclumMetaID,
-    ext_prod_id: OcclumMetaID
+    ext_prod_id: OcclumMetaID,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -483,6 +505,8 @@ struct EnclaveConfiguration {
     ReservedMemMinSize: u64,
     ReservedMemInitSize: u64,
     ReservedMemExecutable: u32,
+    #[cfg(feature = "ms_buffer")]
+    MarshalBufferSize: u64,
     EnableKSS: u32,
     ISVEXTPRODID_H: u64,
     ISVEXTPRODID_L: u64,

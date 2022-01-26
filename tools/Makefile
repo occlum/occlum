@@ -1,4 +1,5 @@
 SGX_MODE ?= HW
+MS_BUFFER ?= 0
 BUILD_DIR := build
 
 .PHONY: all format format-check clean
