@@ -634,7 +634,13 @@ jobs:
         docker pull occlumbackup/occlum:latest-ubuntu18.04-gvisor_test
         gvisor_test=$(docker run -itd -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-gvisor_test);
         echo "gvisor_test=$gvisor_test" >> $GITHUB_ENV
-    
+
+    - name: Build dependencies
+      run: docker exec $gvisor_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec $gvisor_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+
     - name: clone code
       run: docker exec $gvisor_test bash -c "git clone https://github.com/occlum/gvisor.git"
 
