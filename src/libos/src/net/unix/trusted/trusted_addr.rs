@@ -72,10 +72,12 @@ impl TrustedAddr {
 
     // Return host OS FS path defined in Occlum.json and if it is a socket file (false: a name of dir)
     pub fn get_crossworld_sock_path(&self) -> Option<(UnixAddr, bool)> {
-        let path_str = self
-            .as_str()
-            .map_err(|_| return None::<(&UnixAddr, bool)>)
-            .unwrap();
+        let path_str = if let Ok(str) = self.as_str() {
+            str
+        } else {
+            // unamed or abstract name address
+            return None;
+        };
         let untrusted_socks = UNTRUSTED_SOCKS.read().unwrap();
         let cross_world_socket_path = untrusted_socks.get(path_str);
         if let Some(socket_file_path) = cross_world_socket_path {

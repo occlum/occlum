@@ -93,6 +93,7 @@ impl UnixStream {
     }
 
     pub fn bind(&self, addr: &mut TrustedAddr) -> Result<()> {
+        debug!("bind addr = {:?}", addr);
         // Distinguish if the real socket is internal trusted or cross-world untrusted
         if let Some((host_path, is_socket_file)) = addr.get_crossworld_sock_path() {
             let nonblocking = self.is_nonblocking();
