@@ -1,3 +1,5 @@
+use std::fmt;
+
 use block_device::{BioReq, BioReqBuilder, BioResp, BioSubmission, BioType, BlockBuf, BlockDevice};
 #[cfg(feature = "sgx")]
 use sgx_tcrypto::{rsgx_rijndael128GCM_decrypt, rsgx_rijndael128GCM_encrypt};
@@ -148,6 +150,14 @@ impl BlockDevice for CryptDisk {
         } else {
             self.do_flush(req)
         }
+    }
+}
+
+impl fmt::Debug for CryptDisk {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CryptDisk")
+            .field("inner", &self.inner)
+            .finish()
     }
 }
 

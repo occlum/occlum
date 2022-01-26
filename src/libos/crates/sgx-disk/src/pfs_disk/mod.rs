@@ -1,8 +1,10 @@
-use block_device::{BioReq, BioSubmission, BioType, BlockDevice};
+use std::fmt;
 use std::io::prelude::*;
 use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
 use std::sgxfs::SgxFile as PfsFile;
+
+use block_device::{BioReq, BioSubmission, BioType, BlockDevice};
 
 pub use self::open_options::OpenOptions;
 use crate::prelude::*;
@@ -157,5 +159,14 @@ impl Drop for PfsDisk {
         file.flush().unwrap();
         // TODO: sync
         // file.sync_all()?;
+    }
+}
+
+impl fmt::Debug for PfsDisk {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PfsDisk")
+            .field("path", &self.path)
+            .field("total_blocks", &self.total_blocks)
+            .finish()
     }
 }

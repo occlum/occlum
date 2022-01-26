@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use core::fmt;
 
 /// An in-memory disk.
 pub struct MemDisk {
@@ -97,6 +98,14 @@ impl BlockDevice for MemDisk {
         }
 
         submission
+    }
+}
+
+impl fmt::Debug for MemDisk {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MemDisk")
+            .field("total_blocks", &self.total_blocks)
+            .finish()
     }
 }
 

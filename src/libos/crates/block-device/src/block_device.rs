@@ -3,7 +3,7 @@ use core::any::Any;
 use crate::prelude::*;
 
 /// A block device.
-pub trait BlockDevice: Any + Send + Sync {
+pub trait BlockDevice: Any + Send + Sync + Debug {
     /// Return the total number of blocks in the device.
     fn total_blocks(&self) -> usize;
 

@@ -5,6 +5,7 @@ use crate::prelude::*;
 /// A buffer for block requests.
 ///
 /// The size of `BlockBuf` is a multiple of block size.
+#[derive(Debug)]
 pub struct BlockBuf {
     ptr: NonNull<u8>,
     len: usize,

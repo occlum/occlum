@@ -2,6 +2,7 @@ use block_device::{BioReq, BioSubmission, BioType, BlockDevice};
 use fs::File;
 use io_uring_callback::{Fd, IoHandle, IoUring};
 use new_self_ref_arc::new_self_ref_arc;
+use std::fmt;
 use std::io::prelude::*;
 use std::marker::PhantomData;
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -368,6 +369,16 @@ impl<P: IoUringProvider> HostDisk for IoUringDisk<P> {
 
     fn path(&self) -> &Path {
         self.0.path.as_path()
+    }
+}
+
+impl<P: IoUringProvider> fmt::Debug for IoUringDisk<P> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let inner = &self.0;
+        f.debug_struct("IoUringDisk")
+            .field("path", &inner.path)
+            .field("total_blocks", &inner.total_blocks)
+            .finish()
     }
 }
 
