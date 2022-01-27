@@ -181,7 +181,7 @@ impl Vdso {
             (5, 0..=2) => VdsoDataPtr::V5_0(vdso_data_v5_0::vdsodata_ptr(vdso_addr)),
             (5, 3..=5) => VdsoDataPtr::V5_3(vdso_data_v5_3::vdsodata_ptr(vdso_addr)),
             (5, 6..=8) => VdsoDataPtr::V5_6(vdso_data_v5_6::vdsodata_ptr(vdso_addr)),
-            (5, 9..=12) => VdsoDataPtr::V5_9(vdso_data_v5_9::vdsodata_ptr(vdso_addr)),
+            (5, 9..=13) => VdsoDataPtr::V5_9(vdso_data_v5_9::vdsodata_ptr(vdso_addr)),
             (_, _) => return_errno!(EINVAL, "Vdso match kernel release failed"),
         })
     }
