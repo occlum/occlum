@@ -45,10 +45,10 @@ impl HostSocket {
         let mut remain = retval.0;
         for (i, buf) in data.iter_mut().enumerate() {
             if remain >= buf.len() {
-                buf.copy_from_slice(u_data[i]);
+                u_data[i].write_to_slice(buf)?;
                 remain -= buf.len();
             } else {
-                buf[0..remain].copy_from_slice(&u_data[i][0..remain]);
+                u_data[i].write_to_slice(&mut buf[0..remain])?;
                 break;
             }
         }
@@ -57,7 +57,7 @@ impl HostSocket {
 
     fn do_recvmsg_untrusted_data(
         &self,
-        data: &mut [&mut [u8]],
+        data: &mut [UntrustedSlice],
         flags: RecvFlags,
         mut name: Option<&mut [u8]>,
         mut control: Option<&mut [u8]>,
@@ -70,8 +70,10 @@ impl HostSocket {
         let msg_name = msg_name as *mut c_void;
         let mut msg_namelen_recvd = 0_u32;
         // Iovs
-        let mut raw_iovs: Vec<libc::iovec> =
-            data.iter().map(|slice| slice.as_libc_iovec()).collect();
+        let mut raw_iovs: Vec<libc::iovec> = data
+            .iter()
+            .map(|slice| slice.as_ref().as_libc_iovec())
+            .collect();
         let (msg_iov, msg_iovlen) = raw_iovs.as_mut_slice().as_mut_ptr_and_len();
         // Control
         let (msg_control, msg_controllen) = control.as_mut_ptr_and_len();
