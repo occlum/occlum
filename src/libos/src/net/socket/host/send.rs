@@ -38,7 +38,7 @@ impl HostSocket {
 
     fn do_sendmsg_untrusted_data(
         &self,
-        u_data: &[&[u8]],
+        u_data: &[UntrustedSlice],
         flags: SendFlags,
         name: Option<&[u8]>,
         control: Option<&[u8]>,
@@ -51,7 +51,10 @@ impl HostSocket {
         let (msg_name, msg_namelen) = name.as_ptr_and_len();
         let msg_name = msg_name as *const c_void;
         // Iovs
-        let raw_iovs: Vec<libc::iovec> = u_data.iter().map(|slice| slice.as_libc_iovec()).collect();
+        let raw_iovs: Vec<libc::iovec> = u_data
+            .iter()
+            .map(|slice| slice.as_ref().as_libc_iovec())
+            .collect();
         let (msg_iov, msg_iovlen) = raw_iovs.as_slice().as_ptr_and_len();
         // Control
         let (msg_control, msg_controllen) = control.as_ptr_and_len();

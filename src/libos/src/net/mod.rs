@@ -1,6 +1,6 @@
 use super::*;
 use std;
-use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen, UntrustedSliceAlloc};
+use untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen, UntrustedSlice, UntrustedSliceAlloc};
 
 pub use self::io_multiplexing::{
     clear_notifier_status, notify_thread, wait_for_notification, EpollEvent, IoEvent, PollEvent,
