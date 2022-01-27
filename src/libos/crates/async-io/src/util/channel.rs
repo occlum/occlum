@@ -465,6 +465,10 @@ impl Consumer<u8> {
                 return_errno!(EAGAIN, "no data are present to be received");
             }
 
+            if self.peer_end().is_shutdown() {
+                return Ok(0);
+            }
+
             if poller.is_none() {
                 poller = Some(Poller::new());
             }

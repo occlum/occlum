@@ -34,11 +34,19 @@ impl TrustedAddr {
             let inode_num = {
                 let current = current!();
                 let fs = current.fs().read().unwrap();
-                let file_ref = fs.open_file(
-                    &FsPath::try_from(path.as_ref())?,
-                    (CreationFlags::O_CREAT | CreationFlags::O_EXCL).bits(),
-                    FileMode::from_bits(0o777).unwrap(),
-                )?;
+                let file_ref = fs
+                    .open_file(
+                        &FsPath::try_from(path.as_ref())?,
+                        (CreationFlags::O_CREAT | CreationFlags::O_EXCL).bits(),
+                        FileMode::from_bits(0o777).unwrap(),
+                    )
+                    .map_err(|e| {
+                        if e.errno() == EEXIST {
+                            errno!(EADDRINUSE)
+                        } else {
+                            e
+                        }
+                    })?;
                 file_ref.inode().metadata()?.inode
             };
             self.inode = Some(inode_num);

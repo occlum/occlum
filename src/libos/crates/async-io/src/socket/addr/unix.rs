@@ -2,7 +2,10 @@ use std::any::Any;
 
 use super::{Addr, CSockAddr, Domain};
 use crate::prelude::*;
+use std::ffi::CStr;
 use std::hash::Hash;
+
+const MAX_PATH_LEN: usize = 108;
 
 /// A UNIX address.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -48,14 +51,19 @@ impl UnixAddr {
             }
 
             let pathname = {
-                // Safety. Converting from &[c_char] to &[u8] is harmless.
-                let path_slice: &[u8] = unsafe {
+                // Safety. Converting from &[c_char] to &[i8] is harmless.
+                let path_slice: &[i8] = unsafe {
                     let char_slice = &c_addr.sun_path[..(path_len - 1)];
                     std::mem::transmute(char_slice)
                 };
-                let path_str = std::str::from_utf8(path_slice)
-                    .map_err(|_| errno!(EINVAL, "path is not UTF8"))?;
-                path_str.trim_end_matches('\u{0}').to_string()
+                let path_cstr = unsafe { CStr::from_ptr(path_slice.as_ptr()) };
+                if path_cstr.to_bytes_with_nul().len() > MAX_PATH_LEN {
+                    return_errno!(EINVAL, "no null in the address");
+                }
+                path_cstr
+                    .to_str()
+                    .map_err(|_| errno!(EINVAL, "path is not UTF8"))?
+                    .to_string()
             };
             Ok(UnixAddr::Pathname(pathname))
         }

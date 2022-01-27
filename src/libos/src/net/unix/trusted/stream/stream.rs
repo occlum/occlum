@@ -148,6 +148,11 @@ impl Stream {
             cmd: SetNonBlocking => {
                 self.set_nonblocking(*cmd.input() != 0); // 0 means blocking
             },
+            cmd: SetSockOptRawCmd => {
+                // FIXME: Currently, it is harmless to ignore errors here.
+                // When it is, implement this cmd or throw specific errors.
+                warn!("setsockopt command has not been supported");
+            }
         });
         Ok(())
     }
@@ -167,16 +172,13 @@ impl Stream {
     }
 
     pub fn addr(&self) -> Result<TrustedAddr> {
-        match &*self.inner() {
-            Status::Idle(info) => info
-                .addr()
-                .clone()
-                .ok_or_else(|| errno!(EINVAL, " no address")),
-            Status::Connected(endpoint) => {
-                endpoint.addr().ok_or_else(|| errno!(EINVAL, " no address"))
-            }
-            Status::Listening(addr) => Ok(addr).cloned(),
-        }
+        let addr = match &*self.inner() {
+            Status::Idle(info) => info.addr().clone(),
+            Status::Connected(endpoint) => endpoint.addr(),
+            Status::Listening(addr) => Some(addr).cloned(),
+        };
+
+        return Ok(addr.unwrap_or_default());
     }
 
     pub fn domain(&self) -> Domain {
