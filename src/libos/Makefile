@@ -45,12 +45,15 @@ LIBOS_LOG ?= error
 
 LIBOS_SONAME := libocclum-libos.so.$(MAJOR_VER_NUM)
 
-ifneq ($(SGX_MODE), HW)
-	LIBOS_CORE_LIB_NAME := occlum-libos-core_sim
-	LIBOS_SO_REAL := $(BUILD_DIR)/lib/libocclum-libos_sim.so.$(VERSION_NUM)
-else
+ifeq ($(SGX_MODE), HW)
 	LIBOS_CORE_LIB_NAME := occlum-libos-core
 	LIBOS_SO_REAL := $(BUILD_DIR)/lib/libocclum-libos.so.$(VERSION_NUM)
+else ifeq ($(SGX_MODE), HYPER)
+	LIBOS_CORE_LIB_NAME := occlum-libos-core_hyper
+	LIBOS_SO_REAL := $(BUILD_DIR)/lib/libocclum-libos_hyper.so.$(VERSION_NUM)
+else
+	LIBOS_CORE_LIB_NAME := occlum-libos-core_sim
+	LIBOS_SO_REAL := $(BUILD_DIR)/lib/libocclum-libos_sim.so.$(VERSION_NUM)
 endif
 
 LIBOS_CORE_A := $(OBJ_DIR)/libos/lib/lib$(LIBOS_CORE_LIB_NAME).a
@@ -70,10 +73,14 @@ CXX_OBJS := $(addprefix $(OBJ_DIR)/libos/,$(CXX_SRCS:.cpp=.o))
 S_OBJS := $(addprefix $(OBJ_DIR)/libos/,$(S_SRCS:.S=.o))
 
 # Object files for simulation mode are stored in libos/src_sim
-ifneq ($(SGX_MODE), HW)
+ifeq ($(SGX_MODE), SIM)
 	C_OBJS := $(subst libos/src,libos/src_sim,$(C_OBJS))
 	CXX_OBJS := $(subst libos/src,libos/src_sim,$(CXX_OBJS))
 	S_OBJS := $(subst libos/src,libos/src_sim,$(S_OBJS))
+else ifeq ($(SGX_MODE), HYPER)
+	C_OBJS := $(subst libos/src,libos/src_hyper,$(C_OBJS))
+	CXX_OBJS := $(subst libos/src,libos/src_hyper,$(CXX_OBJS))
+	S_OBJS := $(subst libos/src,libos/src_hyper,$(S_OBJS))
 endif
 
 ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(LIBOS_SO_REAL) $(EDL_C_OBJS) $(C_OBJS) $(CXX_OBJS) $(S_OBJS)) $(RUST_TARGET_DIR) $(RUST_OUT_DIR)))
@@ -127,6 +134,10 @@ ifneq ($(OCCLUM_COV),)
         -Coverflow-checks=off -Cpanic=abort"
 endif
 
+ifeq ($(SGX_MODE), HYPER)
+    LIBOS_FEATURES += hyper_mode
+endif
+
 # Release build is for production use. We enable code coverage only for debug
 # build.  It also simplifies the implementation as the release and debug build
 # have different output paths.
@@ -149,7 +160,7 @@ $(OBJ_DIR)/libos/$(SRC_OBJ)/Enclave_t.o: $(OBJ_DIR)/libos/$(SRC_OBJ)/Enclave_t.c
 	@echo "CC <= $@"
 
 $(OBJ_DIR)/libos/$(SRC_OBJ)/Enclave_t.c: $(SGX_EDGER8R) ../Enclave.edl
-	@cd $(OBJ_DIR)/libos/$(SRC_OBJ) && $(SGX_EDGER8R) --trusted $(CUR_DIR)/../Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_DIR)/edl
+	@cd $(OBJ_DIR)/libos/$(SRC_OBJ) && $(SGX_EDGER8R) $(SGX_EDGER8R_MODE) --trusted $(CUR_DIR)/../Enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_DIR)/edl
 	@echo "GEN <= $@"
 
 $(C_OBJS):$(OBJ_DIR)/libos/$(SRC_OBJ)/%.o: src/%.c

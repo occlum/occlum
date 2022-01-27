@@ -27,10 +27,12 @@ NO_COLOR := \033[0m
 
 # Save code and object file generated during building src
 OBJ_DIR := $(PROJECT_DIR)/build/internal/src
-ifneq ($(SGX_MODE), HW)
-	SRC_OBJ := src_sim
-else
+ifeq ($(SGX_MODE), HW)
 	SRC_OBJ := src
+else ifeq ($(SGX_MODE), HYPER)
+	SRC_OBJ := src_hyper
+else
+	SRC_OBJ := src_sim
 endif
 
 BUILD_DIR := $(PROJECT_DIR)/build
@@ -54,13 +56,19 @@ SGX_COMMON_CFLAGS := -Wall -std=gnu11
 ifeq ($(SGX_ARCH), x86)
 	SGX_COMMON_CFLAGS += -m32
 	SGX_LIBRARY_PATH := $(SGX_SDK)/lib
-	SGX_ENCLAVE_SIGNER := $(SGX_SDK)/bin/x86/sgx_sign
-	SGX_EDGER8R := $(SGX_SDK)/bin/x86/sgx_edger8r
+	SGX_BIN_PATH := $(SGX_SDK)/bin/x86
 else
 	SGX_COMMON_CFLAGS += -m64
 	SGX_LIBRARY_PATH := $(SGX_SDK)/lib64
-	SGX_ENCLAVE_SIGNER := $(SGX_SDK)/bin/x64/sgx_sign
-	SGX_EDGER8R := $(SGX_SDK)/bin/x64/sgx_edger8r
+	SGX_BIN_PATH := $(SGX_SDK)/bin/x64
+endif
+
+SGX_EDGER8R := $(SGX_BIN_PATH)/sgx_edger8r
+ifneq ($(SGX_MODE), HYPER)
+	SGX_ENCLAVE_SIGNER := $(SGX_BIN_PATH)/sgx_sign
+else
+	SGX_ENCLAVE_SIGNER := $(SGX_BIN_PATH)/sgx_sign_hyper
+	SGX_EDGER8R_MODE := --sgx-mode $(SGX_MODE)
 endif
 
 ifeq ($(OCCLUM_RELEASE_BUILD), 1)
@@ -71,18 +79,23 @@ endif
 
 RUST_SGX_SDK_DIR := $(PROJECT_DIR)/deps/rust-sgx-sdk
 
-ifneq ($(SGX_MODE), HW)
-	SGX_COMMON_CFLAGS += -D SGX_MODE_SIM
-else
+ifeq ($(SGX_MODE), HW)
 	SGX_COMMON_CFLAGS += -D SGX_MODE_HW
+else ifeq ($(SGX_MODE), HYPER)
+	SGX_COMMON_CFLAGS += -D SGX_MODE_HYPER
+else
+	SGX_COMMON_CFLAGS += -D SGX_MODE_SIM
 endif
 
-ifneq ($(SGX_MODE), HW)
-	Trts_Library_Name := sgx_trts_sim
-	Service_Library_Name := sgx_tservice_sim
-else
+ifeq ($(SGX_MODE), HW)
 	Trts_Library_Name := sgx_trts
 	Service_Library_Name := sgx_tservice
+else ifeq ($(SGX_MODE), HYPER)
+	Trts_Library_Name := sgx_trts_hyper
+	Service_Library_Name := sgx_tservice_hyper
+else
+	Trts_Library_Name := sgx_trts_sim
+	Service_Library_Name := sgx_tservice_sim
 endif
 Crypto_Library_Name := sgx_tcrypto
 KeyExchange_Library_Name := sgx_tkey_exchange
@@ -95,10 +108,12 @@ SGX_CFLAGS_U := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes \
 	-I$(RUST_SGX_SDK_DIR)/edl -I$(SGX_SDK)/include
 SGX_CXXFLAGS_U := $(SGX_CFLAGS_U) -std=c++11
 
-ifneq ($(SGX_MODE), HW)
-	SGX_LFLAGS_U := $(SGX_COMMON_CFLAGS) -lpthread -L$(SGX_LIBRARY_PATH) -Wl,-Bstatic -lsgx_urts_sim -Wl,-Bdynamic -lsgx_uae_service_sim
-else
+ifeq ($(SGX_MODE), HW)
 	SGX_LFLAGS_U := $(SGX_COMMON_CFLAGS) -lpthread -L$(SGX_LIBRARY_PATH) -Wl,-Bstatic -lsgx_urts -Wl,-Bdynamic -lsgx_uae_service -lsgx_enclave_common
+else ifeq ($(SGX_MODE), HYPER)
+	SGX_LFLAGS_U := $(SGX_COMMON_CFLAGS) -lpthread -L$(SGX_LIBRARY_PATH) -Wl,-Bstatic -lsgx_urts_hyper -Wl,-Bdynamic -lsgx_uae_service_hyper
+else
+	SGX_LFLAGS_U := $(SGX_COMMON_CFLAGS) -lpthread -L$(SGX_LIBRARY_PATH) -Wl,-Bstatic -lsgx_urts_sim -Wl,-Bdynamic -lsgx_uae_service_sim
 endif
 
 #

@@ -3,10 +3,12 @@ include ../sgxenv.mk
 LIBOCCLUM_PAL_SO := $(BUILD_DIR)/lib/libocclum-pal.so
 LIBOCCLUM_PAL_SONAME := libocclum-pal.so.$(MAJOR_VER_NUM)
 
-ifneq ($(SGX_MODE), HW)
-	LIBOCCLUM_PAL_SO_REAL := $(BUILD_DIR)/lib/libocclum-pal_sim.so.$(VERSION_NUM)
-else
+ifeq ($(SGX_MODE), HW)
 	LIBOCCLUM_PAL_SO_REAL := $(BUILD_DIR)/lib/libocclum-pal.so.$(VERSION_NUM)
+else ifeq ($(SGX_MODE), HYPER)
+	LIBOCCLUM_PAL_SO_REAL := $(BUILD_DIR)/lib/libocclum-pal_hyper.so.$(VERSION_NUM)
+else
+	LIBOCCLUM_PAL_SO_REAL := $(BUILD_DIR)/lib/libocclum-pal_sim.so.$(VERSION_NUM)
 endif
 
 # A dependency on Rust SGX SDK
@@ -19,10 +21,13 @@ CXX_SRCS := $(sort $(wildcard src/*.cpp src/*/*.cpp))
 C_OBJS := $(addprefix $(OBJ_DIR)/pal/,$(C_SRCS:.c=.o))
 CXX_OBJS := $(addprefix $(OBJ_DIR)/pal/,$(CXX_SRCS:.cpp=.o))
 
-# Object files for simulation mode are stored in libos/src_sim
-ifneq ($(SGX_MODE), HW)
+# Object files for simulation mode are stored in pal/src_sim
+ifeq ($(SGX_MODE), SIM)
 	C_OBJS := $(subst pal/src,pal/src_sim,$(C_OBJS))
 	CXX_OBJS := $(subst pal/src,pal/src_sim,$(CXX_OBJS))
+else ifeq ($(SGX_MODE), HYPER)
+	C_OBJS := $(subst pal/src,pal/src_hyper,$(C_OBJS))
+	CXX_OBJS := $(subst pal/src,pal/src_hyper,$(CXX_OBJS))
 endif
 
 HEADER_FILES := $(sort $(wildcard src/*.h include/*.h include/*/*.h))
@@ -37,10 +42,12 @@ LINK_FLAGS := $(SGX_LFLAGS_U) -shared -L$(RUST_SGX_SDK_DIR)/sgx_ustdc/ -lsgx_ust
 LINK_FLAGS += -Wl,--version-script=pal.lds
 ifndef OCCLUM_DISABLE_DCAP
 LINK_FLAGS += -lsgx_dcap_ql -lsgx_dcap_quoteverify
-ifneq ($(SGX_MODE), HW)
-LINK_FLAGS += -lsgx_quote_ex_sim
-else
+ifeq ($(SGX_MODE), HW)
 LINK_FLAGS += -lsgx_quote_ex
+else ifeq ($(SGX_MODE), HYPER)
+LINK_FLAGS += -lsgx_quote_ex_hyper
+else
+LINK_FLAGS += -lsgx_quote_ex_sim
 endif
 endif
 
@@ -66,7 +73,7 @@ $(OBJ_DIR)/pal/$(SRC_OBJ)/Enclave_u.o: $(OBJ_DIR)/pal/$(SRC_OBJ)/Enclave_u.c
 
 $(OBJ_DIR)/pal/$(SRC_OBJ)/Enclave_u.c: $(SGX_EDGER8R) ../Enclave.edl
 	@cd $(OBJ_DIR)/pal/$(SRC_OBJ) && \
-		$(SGX_EDGER8R) --untrusted $(CUR_DIR)/../Enclave.edl \
+		$(SGX_EDGER8R) $(SGX_EDGER8R_MODE) --untrusted $(CUR_DIR)/../Enclave.edl \
 		--search-path $(SGX_SDK)/include \
 		--search-path $(RUST_SGX_SDK_DIR)/edl/
 	@echo "GEN <= $@"

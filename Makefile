@@ -28,17 +28,10 @@ VERSION_NUM = $(MAJOR_VER_NUM).$(MINOR_VER_NUM).$(PATCH_VER_NUM)
 EXCLUDE_FILES = "libocclum-libos.so.$(MAJOR_VER_NUM)\$$|libocclum-pal.so.$(MAJOR_VER_NUM)\$$|libocclum-pal.so\$$|.a\$$|occlum-protect-integrity.so.*"
 
 SHELL := bash
-
-submodule: githooks
-	git submodule init
-	git submodule update $(OCCLUM_GIT_OPTIONS)
-	@# Try to apply the patches. If failed, check if the patches are already applied
-	cd deps/serde-json-sgx && git apply ../serde-json-sgx.patch >/dev/null 2>&1 || git apply ../serde-json-sgx.patch -R --check
-	cd deps/ringbuf && git apply ../ringbuf.patch >/dev/null 2>&1 || git apply ../ringbuf.patch -R --check
-	cd deps/resolv-conf && git apply ../resolv-conf.patch >/dev/null 2>&1 || git apply ../resolv-conf.patch -R --check
-
+ifneq ($(SGX_MODE), HYPER)
+submodule: githooks init-submodule
+	@rm -rf build
 	@# Enclaves used by tools are running in simulation mode by default to run faster.
-	@rm -rf build build_sim
 	@$(MAKE) SGX_MODE=SIM --no-print-directory -C tools
 	@$(MAKE) --no-print-directory -C deps/sefs/sefs-cli clean
 	@$(MAKE) --no-print-directory -C deps/sefs/sefs-cli no_sign SGX_MODE=HW
@@ -49,9 +42,35 @@ submodule: githooks
 	@cp deps/sefs/sefs-cli/lib/libsefs-cli_sim.so build/lib
 	@cp deps/sefs/sefs-cli/lib/libsefs-cli.signed.so build/lib
 	@cp deps/sefs/sefs-cli/enclave/Enclave.config.xml build/sefs-cli.Enclave.xml
-
 	@# Build and install Occlum dcap lib
 	@cd tools/toolchains/dcap_lib && ./build.sh
+else
+submodule: githooks init-submodule
+	@rm -rf build
+	@# Enclaves used by tools are running in simulation mode by default to run faster.
+	@$(MAKE) SGX_MODE=SIM MS_BUFFER=1 --no-print-directory -C tools
+	@# Apply the sefs-cli's patch for HYPER mode
+	cd deps/sefs && git apply ../sefs-cli_hyper.patch >/dev/null 2>&1 || git apply ../sefs-cli_hyper.patch -R --check
+	@$(MAKE) --no-print-directory -C deps/sefs/sefs-cli clean
+	@$(MAKE) --no-print-directory -C deps/sefs/sefs-cli no_sign SGX_MODE=HYPER
+	@cp deps/sefs/sefs-cli/bin/sefs-cli_hyper build/bin
+	@cp deps/sefs/sefs-cli/lib/libsefs-cli_hyper.so build/lib
+	@# Cleanup the Enclave_u.* and Enclave_t.* generated in HYPER mode
+	@$(MAKE) --no-print-directory -C deps/sefs/sefs-cli clean
+	@$(MAKE) --no-print-directory -C deps/sefs/sefs-cli SGX_MODE=SIM
+	@cp deps/sefs/sefs-cli/bin/sefs-cli_sim build/bin
+	@cp deps/sefs/sefs-cli/lib/libsefs-cli_sim.so build/lib
+	@cp deps/sefs/sefs-cli/lib/libsefs-cli.signed.so build/lib
+	@cp deps/sefs/sefs-cli/enclave/Enclave.config.xml build/sefs-cli.Enclave.xml
+endif
+
+init-submodule:
+	git submodule init
+	git submodule update $(OCCLUM_GIT_OPTIONS)
+	@# Try to apply the patches. If failed, check if the patches are already applied
+	cd deps/serde-json-sgx && git apply ../serde-json-sgx.patch >/dev/null 2>&1 || git apply ../serde-json-sgx.patch -R --check
+	cd deps/ringbuf && git apply ../ringbuf.patch >/dev/null 2>&1 || git apply ../ringbuf.patch -R --check
+	cd deps/resolv-conf && git apply ../resolv-conf.patch >/dev/null 2>&1 || git apply ../resolv-conf.patch -R --check
 
 src:
 	@$(MAKE) --no-print-directory -C src
@@ -63,22 +82,7 @@ test-glibc:
 	@$(MAKE) --no-print-directory -C test test-glibc
 
 OCCLUM_PREFIX ?= /opt/occlum
-install: minimal_sgx_libs
-	@# Install both libraries for HW mode and SIM mode
-	@$(MAKE) SGX_MODE=HW --no-print-directory -C src
-	@$(MAKE) SGX_MODE=SIM --no-print-directory -C src
-
-	@echo "Install libraries ..."
-	@mkdir -p $(OCCLUM_PREFIX)/build/bin/
-	@cp build/bin/* $(OCCLUM_PREFIX)/build/bin
-	@mkdir -p $(OCCLUM_PREFIX)/build/lib/
-	@# Don't copy libos library and pal library symbolic files to install dir
-	@cd build/lib && cp --no-dereference `ls | grep -Ev $(EXCLUDE_FILES)` $(OCCLUM_PREFIX)/build/lib/ && cd -
-	@# Create symbolic for pal library and libos (hardware mode)
-	@cd $(OCCLUM_PREFIX)/build/lib && ln -sf libocclum-pal.so.$(VERSION_NUM) libocclum-pal.so.$(MAJOR_VER_NUM) && \
-		ln -sf libocclum-pal.so.$(MAJOR_VER_NUM) libocclum-pal.so && \
-		ln -sf libocclum-libos.so.$(VERSION_NUM) libocclum-libos.so.$(MAJOR_VER_NUM) && ln -sf libocclum-libos.so.$(MAJOR_VER_NUM) libocclum-libos.so
-
+install: minimal_sgx_libs install_bins_and_libs
 	@echo "Install headers and miscs ..."
 	@mkdir -p $(OCCLUM_PREFIX)/include/
 	@cp -r src/pal/include/*.h $(OCCLUM_PREFIX)/include
@@ -91,7 +95,49 @@ install: minimal_sgx_libs
 
 	@echo "Installation is done."
 
+ifneq ($(SGX_MODE), HYPER)
+install_bins_and_libs:
+	@# Install both libraries for HW mode and SIM mode
+	@$(MAKE) SGX_MODE=HW --no-print-directory -C src
+	@$(MAKE) SGX_MODE=SIM --no-print-directory -C src
+	@echo "Install libraries ..."
+	@mkdir -p $(OCCLUM_PREFIX)/build/bin/
+	@cp build/bin/* $(OCCLUM_PREFIX)/build/bin
+	@mkdir -p $(OCCLUM_PREFIX)/build/lib/
+	@# Don't copy libos library and pal library symbolic files to install dir
+	@cd build/lib && cp --no-dereference `ls | grep -Ev $(EXCLUDE_FILES)` $(OCCLUM_PREFIX)/build/lib/ && cd -
+	@# Create symbolic for pal library and libos (hardware mode)
+	@cd $(OCCLUM_PREFIX)/build/lib && \
+		ln -sf libocclum-pal.so.$(VERSION_NUM) libocclum-pal.so.$(MAJOR_VER_NUM) && \
+		ln -sf libocclum-pal.so.$(MAJOR_VER_NUM) libocclum-pal.so && \
+		ln -sf libocclum-libos.so.$(VERSION_NUM) libocclum-libos.so.$(MAJOR_VER_NUM) && \
+		ln -sf libocclum-libos.so.$(MAJOR_VER_NUM) libocclum-libos.so
+else
+install_bins_and_libs: hyper_mode_libs
+	@# Install both libraries for SIM mode and HYPER mode
+	@# Cleanup the Enclave_u.* and Enclave_t.* generated in HYPER mode
+	@$(MAKE) --no-print-directory -C src clean
+	@$(MAKE) SGX_MODE=SIM --no-print-directory -C src
+	@# Cleanup the Enclave_u.* and Enclave_t.* generated in SIM mode
+	@$(MAKE) --no-print-directory -C src clean
+	@$(MAKE) SGX_MODE=HYPER --no-print-directory -C src
+	@echo "Install libraries ..."
+	@mkdir -p $(OCCLUM_PREFIX)/build/bin/
+	@cp build/bin/* $(OCCLUM_PREFIX)/build/bin
+	@mkdir -p $(OCCLUM_PREFIX)/build/lib/
+	@# Don't copy libos library and pal library symbolic files to install dir
+	@cd build/lib && cp --no-dereference `ls | grep -Ev $(EXCLUDE_FILES)` $(OCCLUM_PREFIX)/build/lib/ && cd -
+	@# Create symbolic for pal library and libos (HYPER mode)
+	@cd $(OCCLUM_PREFIX)/build/lib && \
+		ln -sf libocclum-pal_hyper.so.$(VERSION_NUM) libocclum-pal.so.$(MAJOR_VER_NUM) && \
+		ln -sf libocclum-pal.so.$(MAJOR_VER_NUM) libocclum-pal.so && \
+		ln -sf libocclum-libos_hyper.so.$(VERSION_NUM) libocclum-libos.so.$(MAJOR_VER_NUM) && \
+		ln -sf libocclum-libos.so.$(MAJOR_VER_NUM) libocclum-libos.so
+endif
+
+
 SGX_SDK ?= /opt/intel/sgxsdk
+
 # Install minimum sgx-sdk set to support Occlum cmd execution in non-customized sgx-sdk environment
 minimal_sgx_libs: $(SGX_SDK)/lib64/libsgx_uae_service_sim.so $(SGX_SDK)/lib64/libsgx_quote_ex_sim.so
 	@echo "Install needed sgx-sdk tools ..."
@@ -99,13 +145,24 @@ minimal_sgx_libs: $(SGX_SDK)/lib64/libsgx_uae_service_sim.so $(SGX_SDK)/lib64/li
 	@cp $(SGX_SDK)/lib64/{libsgx_ptrace.so,libsgx_uae_service_sim.so,libsgx_quote_ex_sim.so} $(OCCLUM_PREFIX)/sgxsdk-tools/lib64
 	@mkdir -p $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/gdb-sgx-plugin
 	@cd $(SGX_SDK)/lib64/gdb-sgx-plugin/ && cp $$(ls -A | grep -v __pycache__) $(OCCLUM_PREFIX)/sgxsdk-tools/lib64/gdb-sgx-plugin
-	@cd $(SGX_SDK) && cp -a --parents {bin/sgx-gdb,bin/x64/sgx_sign} $(OCCLUM_PREFIX)/sgxsdk-tools/
+	@cd $(SGX_SDK) && cp -a --parents {bin/sgx-gdb,bin/x64/sgx_sign*} $(OCCLUM_PREFIX)/sgxsdk-tools/
 	@mkdir -p $(OCCLUM_PREFIX)/sgxsdk-tools/sdk_libs && cd $(OCCLUM_PREFIX)/sgxsdk-tools/sdk_libs && \
 		ln -sf ../lib64/libsgx_uae_service_sim.so libsgx_uae_service_sim.so && \
 		ln -sf ../lib64/libsgx_quote_ex_sim.so libsgx_quote_ex_sim.so
 	@# Delete SGX_LIBRARY_PATH env in sgx-gdb which are defined in etc/environment
 	@sed -i '/^SGX_LIBRARY_PATH=/d' $(OCCLUM_PREFIX)/sgxsdk-tools/bin/sgx-gdb
 	@cp etc/environment $(OCCLUM_PREFIX)/sgxsdk-tools/
+
+ifeq ($(SGX_MODE), HYPER)
+# Install HYPER mode libs
+hyper_mode_libs: $(SGX_SDK)/lib64/libsgx_uae_service_hyper.so $(SGX_SDK)/lib64/libsgx_quote_ex_hyper.so
+	@echo "Install needed HYPER mode libs ..."
+	@mkdir -p $(OCCLUM_PREFIX)/sgxsdk-tools/lib64
+	@cp $(SGX_SDK)/lib64/{libsgx_uae_service_hyper.so,libsgx_quote_ex_hyper.so} $(OCCLUM_PREFIX)/sgxsdk-tools/lib64
+	@mkdir -p $(OCCLUM_PREFIX)/sgxsdk-tools/sdk_libs && cd $(OCCLUM_PREFIX)/sgxsdk-tools/sdk_libs && \
+		ln -sf ../lib64/libsgx_uae_service_hyper.so libsgx_uae_service_hyper.so && \
+		ln -sf ../lib64/libsgx_quote_ex_hyper.so libsgx_quote_ex_hyper.so
+endif
 
 format:
 	@$(MAKE) --no-print-directory -C test format
