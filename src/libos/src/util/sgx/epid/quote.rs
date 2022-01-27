@@ -14,6 +14,7 @@ impl Quote {
         qe_report: &sgx_report_t,
     ) -> Result<Self> {
         let quote_buf = Self::new_buf(quote_raw_buf)?;
+        #[cfg(not(feature = "hyper_mode"))]
         Self::validate_quote_buf(&quote_buf, quote_nonce, qe_report)?;
         Ok(Self { quote_buf })
     }
