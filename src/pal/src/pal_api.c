@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <occlum_pal_api.h>
 #include "Enclave_u.h"
 #include "pal_enclave.h"
@@ -16,6 +17,9 @@
 #include <linux/futex.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#include <sched.h>
+
+#define MAX_NUM_VCPUS 1024
 
 int occlum_pal_get_version(void) {
     return OCCLUM_PAL_VERSION;
@@ -66,6 +70,20 @@ int pal_run_init_process() {
     return 0;
 }
 
+int occlum_pal_get_available_cpu_count() {
+    unsigned int count = 0;
+    cpu_set_t set;
+    // Check process cpu affinity
+    if (sched_getaffinity(0, sizeof (set), &set) == 0) {
+        count = CPU_COUNT(&set);
+    }
+
+    count = (count > 0 ) ? count : 1;
+    count = (count < MAX_NUM_VCPUS) ? count : MAX_NUM_VCPUS;
+
+    return count;
+}
+
 int occlum_pal_init(const struct occlum_pal_attr *attr) {
     if (attr == NULL) {
         errno = EINVAL;
@@ -90,18 +108,8 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
     }
 #endif
 
-    const int MAX_NUM_VCPUS = 1024;
     if (attr->num_vcpus == 0 || attr->num_vcpus > MAX_NUM_VCPUS) {
-        long number_of_processors = sysconf(_SC_NPROCESSORS_ONLN);
-        if (number_of_processors < 0) {
-            PAL_ERROR("sysconf returns %s", errno2str(errno));
-            number_of_processors = 1;
-        } else if (number_of_processors > MAX_NUM_VCPUS) {
-            PAL_ERROR("sysconf returns an excessively large number: %ld", number_of_processors);
-            number_of_processors = 1;
-        }
-
-        *(int *)(&attr->num_vcpus) = number_of_processors;
+        *(int *)(&attr->num_vcpus) = occlum_pal_get_available_cpu_count();
     }
 
     sgx_enclave_id_t eid = pal_get_enclave_id();
