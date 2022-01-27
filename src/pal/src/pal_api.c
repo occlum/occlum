@@ -9,6 +9,9 @@
 #include "pal_syscall.h"
 #include "pal_thread_counter.h"
 #include "pal_check_fsgsbase.h"
+#ifdef SGX_MODE_HYPER
+#include "pal_ms_buffer.h"
+#endif
 #include "errno2str.h"
 #include <linux/limits.h>
 
@@ -153,8 +156,26 @@ int occlum_pal_create_process(struct occlum_pal_create_process_args *args) {
         return -1;
     }
 
+#ifndef SGX_MODE_HYPER
     sgx_status_t ecall_status = occlum_ecall_new_process(eid, &ecall_ret, args->path,
                                 args->argv, args->env, args->stdio);
+#else
+    const char **ms_buffer_argv = ms_buffer_convert_string_array(eid, args->argv);
+    const char **ms_buffer_env = ms_buffer_convert_string_array(eid, args->env);
+    if ((!args->argv != !ms_buffer_argv) || (!args->env != !ms_buffer_env)) {
+        PAL_ERROR("Marshal buffer size is not enough");
+        return -1;
+    }
+    sgx_status_t ecall_status = occlum_ecall_new_process(
+                                    eid,
+                                    &ecall_ret,
+                                    args->path,
+                                    ms_buffer_argv,
+                                    ms_buffer_env,
+                                    args->stdio);
+    ms_buffer_string_array_free(eid, ms_buffer_argv);
+    ms_buffer_string_array_free(eid, ms_buffer_env);
+#endif
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
         PAL_ERROR("Failed to do ECall with error code 0x%x: %s", ecall_status, sgx_err);
