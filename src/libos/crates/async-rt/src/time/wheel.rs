@@ -142,8 +142,10 @@ impl TimerWheel {
         let entries = self.make_progress_locked(&mut guard);
 
         // The minimum resolution of QuadWheelWithOverflow is 1 ms.
-        // If the timeout less than 1 ms, wait 1ms instead.
-        let timeout = core::cmp::max(timeout, Duration::MILLISECOND);
+        // Based on experiments, the timer is very likely to expire about 1 ms earlier, which truly follows the minimum resolution.
+        // But this is a unacceptable behavior for many test suite, because elapsed time could be smaller than timeout time.
+        // Thus, we wait one more milli-second here. For timeout less than 1 ms, we try to wait more than 1 ms.
+        let timeout = timeout + Duration::MILLISECOND;
         guard.insert_with_delay(entry, timeout).unwrap();
         let insert_ticks = self.latest_ticks();
 
