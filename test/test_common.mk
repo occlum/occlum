@@ -26,12 +26,12 @@ else
 endif
 
 C_FLAGS = -Wall -Wno-return-local-addr -I../include -O2 -fPIC $(EXTRA_C_FLAGS)
-ifeq ($(SGX_MODE), SIM)
-	C_FLAGS += -D SGX_MODE_SIM
-else ifeq ($(SGX_MODE), SW)
-	C_FLAGS += -D SGX_MODE_SIM
-else
+ifeq ($(SGX_MODE), HW)
 	C_FLAGS += -D SGX_MODE_HW
+else ifeq ($(SGX_MODE), HYPER)
+	C_FLAGS += -D SGX_MODE_HYPER
+else
+	C_FLAGS += -D SGX_MODE_SIM
 endif
 LINK_FLAGS = $(C_FLAGS) -pie $(EXTRA_LINK_FLAGS)
 

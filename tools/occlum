@@ -28,7 +28,11 @@ status_file=$instance_dir/.__occlum_status
 if [ -f "$occlum_sgx_env" ]; then
     source $occlum_sgx_env
     SGX_GDB="$SGX_SDK/bin/sgx-gdb"
-    ENCLAVE_SIGN_TOOL="$SGX_SDK/bin/x64/sgx_sign"
+    if [[ -n $SGX_MODE && "$SGX_MODE" == "HYPER" ]]; then
+        ENCLAVE_SIGN_TOOL="$SGX_SDK/bin/x64/sgx_sign_hyper"
+    else
+        ENCLAVE_SIGN_TOOL="$SGX_SDK/bin/x64/sgx_sign"
+    fi
     ENCLAVE_SIGN_KEY="$occlum_dir/etc/template/Enclave.pem"
 fi
 
@@ -252,7 +256,7 @@ cmd_build() {
         case "$1" in
         --sign-key)     [ -n "$2" ] && ENCLAVE_SIGN_KEY=$2 ; shift 2 || exit_error "empty signing key path"     ;;
         --sign-tool)    [ -n "$2" ] && ENCLAVE_SIGN_TOOL=$2 ; shift 2 || exit_error "empty signing tool path"   ;;
-        --sgx-mode)     [[ -n "$2" && "$2" != "HW" ]] && export SGX_MODE=SIM ; shift 2 || exit_error "empty sgx mode";;
+        --sgx-mode)     [[ -n "$2" && "$2" != "HW" ]] && export SGX_MODE=$2 ; shift 2 || exit_error "empty sgx mode";;
         --image-key)    [ -n "$2" ] && SECURE_IMAGE_KEY=$2 ; shift 2 || exit_error "empty secure image key path"   ;;
         --buildin-image-key)  BUILDIN_IMAGE_KEY=true ; shift ;;
         --force | -f)   MAKE_OPTION="clean" ; shift ;;
@@ -270,8 +274,13 @@ cmd_build() {
 
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SGX_SDK/sdk_libs
-        pal_lib=libocclum-pal_sim.so
-        libos_lib=libocclum-libos_sim.so
+        if [[ "$SGX_MODE" != "HYPER" ]]; then
+            pal_lib=libocclum-pal_sim.so
+            libos_lib=libocclum-libos_sim.so
+        else
+            pal_lib=libocclum-pal_hyper.so
+            libos_lib=libocclum-libos_hyper.so
+        fi
         echo "SGX mode: $SGX_MODE"
     else
         echo "SGX mode: HW"
@@ -279,7 +288,7 @@ cmd_build() {
 
     # If sgx mode is changed, build thoroughly again
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        if [ "$(cat $instance_dir/.sgx_mode 2>/dev/null)" != "SIM" ]; then
+        if [ "$(cat $instance_dir/.sgx_mode 2>/dev/null)" != "$SGX_MODE" ]; then
             MAKE_OPTION="clean"
         fi
     else
@@ -304,7 +313,7 @@ cmd_build() {
     echo "built" > $status_file
 
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        echo "SIM" > .sgx_mode
+        echo "$SGX_MODE" > .sgx_mode
     else
         echo "HW" > .sgx_mode
     fi
@@ -520,8 +529,13 @@ cmd_mount() {
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        sefs_cli="$occlum_dir/build/bin/sefs-cli_sim"
-        sefs_cli_lib="$occlum_dir/build/lib/libsefs-cli_sim.so"
+        if [[ "$SGX_MODE" != "HYPER" ]]; then
+            sefs_cli="$occlum_dir/build/bin/sefs-cli_sim"
+            sefs_cli_lib="$occlum_dir/build/lib/libsefs-cli_sim.so"
+        else
+            sefs_cli="$occlum_dir/build/bin/sefs-cli_hyper"
+            sefs_cli_lib="$occlum_dir/build/lib/libsefs-cli_hyper.so"
+        fi
         echo "SGX mode: $SGX_MODE"
     else
         sefs_cli="$occlum_dir/build/bin/sefs-cli"
