@@ -183,6 +183,7 @@ impl InnerAgent {
         }
 
         // Make sure the QE report is valid
+        #[cfg(not(feature = "hyper_mode"))]
         SgxQeReportValidator::new(&self.target_info, nonce).validate(&qe_report)?;
 
         // Construct the resulting quote

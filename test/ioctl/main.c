@@ -240,9 +240,11 @@ static int do_SGXIOC_GEN_QUOTE(int sgx_fd) {
     }
 
     sgx_quote_t *quote = (sgx_quote_t *)quote_buf;
+#ifndef SGX_MODE_HYPER
     if (quote->sign_type != SGX_LINKABLE_SIGNATURE) {
         THROW_ERROR("invalid quote: wrong sign type");
     }
+#endif
     if (quote->signature_len == 0) {
         THROW_ERROR("invalid quote: zero-length signature");
     }
