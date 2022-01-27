@@ -9,6 +9,7 @@ use flume::{Receiver, Sender, TrySendError};
 
 lazy_static! {
     static ref PENDING_TASKS: Mutex<VecDeque<Arc<Task>>> = Mutex::new(VecDeque::new());
+    static ref HAS_PENDING: AtomicBool = AtomicBool::new(false);
 }
 
 pub struct BasicScheduler {
@@ -58,6 +59,7 @@ impl Scheduler for BasicScheduler {
             Err(TrySendError::Full(task)) => {
                 let mut pending_tasks = PENDING_TASKS.lock();
                 pending_tasks.push_back(task);
+                HAS_PENDING.store(true, Ordering::Relaxed);
             }
             _ => panic!("task queue disconnected"),
         }
@@ -67,12 +69,16 @@ impl Scheduler for BasicScheduler {
         let res = self.run_queues[thread_id].try_recv().ok();
 
         // If there is any pending task, try to enqueue it
-        let mut pending_tasks = PENDING_TASKS.lock();
-        let task = pending_tasks.pop_front();
-        drop(pending_tasks);
+        if HAS_PENDING.load(Ordering::Relaxed) == true {
+            let mut pending_tasks = PENDING_TASKS.lock();
+            let task = pending_tasks.pop_front();
+            drop(pending_tasks);
 
-        if let Some(task) = task {
-            self.enqueue_task(task);
+            if let Some(task) = task {
+                self.enqueue_task(task);
+            } else {
+                HAS_PENDING.store(false, Ordering::Relaxed);
+            }
         }
 
         res
