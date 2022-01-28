@@ -131,7 +131,7 @@ jobs:
       run: |
         sleep ${{ env.nap_time }};
         sleep ${{ env.nap_time }};
-        docker exec $language_support_test bash -c "curl http://127.0.0.1:8090/ping"
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "curl http://127.0.0.1:8090/ping"
 
     - name: Set up Golang grpc pingpong test
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
