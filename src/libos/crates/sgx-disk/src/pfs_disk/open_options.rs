@@ -1,6 +1,6 @@
 use std::io::{ErrorKind, Seek, SeekFrom, Write};
 use std::path::Path;
-use std::sgxfs::SgxFile as PfsFile;
+use std::sgxfs::{OpenOptions as PfsOpenOptions, SgxFile as PfsFile};
 
 use super::{PfsDisk, PFS_INNER_OFFSET};
 use crate::prelude::*;
@@ -83,19 +83,19 @@ impl OpenOptions {
 
             // If not create_new, then we should first try to open it
             if !self.create_new {
-                pfs_file_opt = match PfsFile::open(path.as_ref()) {
+                pfs_file_opt = match open_pfs_file(path.as_ref()) {
                     Ok(file) => {
                         file_exists = true;
                         Some(file)
                     }
-                    Err(e) if e.kind() == ErrorKind::NotFound => None,
-                    Err(e) => return Err(e.into()),
+                    Err(e) if e.errno() == Errno::ENOENT => None,
+                    Err(e) => return Err(e),
                 };
             }
 
             // If we haven't opened one, then create it
             if pfs_file_opt.is_none() && (self.create || self.create_new) {
-                pfs_file_opt = Some(PfsFile::create(path.as_ref())?);
+                pfs_file_opt = Some(create_pfs_file(path.as_ref())?);
             }
 
             match pfs_file_opt {
@@ -145,6 +145,25 @@ impl OpenOptions {
         };
         Ok(pfs_disk)
     }
+}
+
+/// Open an existing PFS file with read and write permissions.
+fn open_pfs_file<P: AsRef<Path>>(path: P) -> Result<PfsFile> {
+    PfsOpenOptions::new()
+        .read(true)
+        .update(true)
+        .open(path.as_ref())
+        .map_err(|e| e.into())
+}
+
+/// Create a PFS file with read and write permissions. The length of the
+/// opened file is zero.
+fn create_pfs_file<P: AsRef<Path>>(path: P) -> Result<PfsFile> {
+    PfsOpenOptions::new()
+        .write(true)
+        .update(true)
+        .open(path.as_ref())
+        .map_err(|e| e.into())
 }
 
 fn write_zeros(pfs_file: &mut PfsFile, begin: usize, end: usize) {
