@@ -44,6 +44,10 @@ GREEN := \033[1;32m
 RED := \033[1;31m
 NO_COLOR := \033[0m
 
+ifneq ($(TEST_CPUS), )
+	cpu_options = --cpus $(TEST_CPUS)
+endif
+
 #############################################################################
 # Build targets
 #############################################################################
@@ -89,7 +93,7 @@ test-internal: build pretest $(TEST_TARGETS) posttest
 pretest:
 	@$(RM) $(PASS_LOG) $(FAIL_LOG)
 	@cd $(BUILD_DIR)/test && \
-		$(BUILD_DIR)/bin/occlum start
+		$(BUILD_DIR)/bin/occlum start $(cpu_options)
 
 # Restart server if test failed
 $(TEST_TARGETS): test-%: %
