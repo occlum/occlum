@@ -95,6 +95,7 @@ int create_connected_sockets(int *sockets, char *sock_path) {
     addr.sun_family = AF_UNIX;
     strcpy(addr.sun_path, sock_path);
     socklen_t addr_len = strlen(addr.sun_path) + sizeof(addr.sun_family) + 1;
+    unlink(addr.sun_path);
     if (bind(listen_fd, (struct sockaddr *)&addr, addr_len) == -1) {
         close(listen_fd);
         THROW_ERROR("failed to bind");
@@ -300,6 +301,7 @@ int test_getname() {
     addr.sun_family = AF_UNIX;
     strcpy(addr.sun_path, name);
     socklen_t addr_len = strlen(addr.sun_path) + sizeof(addr.sun_family) + 1;
+    unlink(addr.sun_path);
     if (bind(sock, (struct sockaddr *)&addr, addr_len) == -1) {
         close(sock);
         THROW_ERROR("failed to bind");

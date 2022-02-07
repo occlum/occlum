@@ -45,6 +45,9 @@ int connect_with_child(int port, int *child_pid) {
     if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
         THROW_ERROR("setsockopt port to reuse failed");
     }
+    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse)) < 0) {
+        THROW_ERROR("setsockopt port to reuse failed");
+    }
 
     struct sockaddr_in servaddr;
     memset(&servaddr, 0, sizeof(servaddr));
@@ -393,6 +396,13 @@ int test_sendmsg_recvmsg_connectionless() {
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0) {
         THROW_ERROR("create socket error");
+    }
+    int reuse = 1;
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+        THROW_ERROR("setsockopt port to reuse failed");
+    }
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse)) < 0) {
+        THROW_ERROR("setsockopt port to reuse failed");
     }
 
     servaddr.sin_family = AF_INET;
