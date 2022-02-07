@@ -11,6 +11,7 @@ use crate::entry::context_switch::{CpuContext, FpRegs, CURRENT_CONTEXT};
 use crate::lazy_static::__Deref;
 use crate::prelude::*;
 use crate::process::{ProcessRef, TermStatus, ThreadRef};
+use crate::vm::{VMRange, PAGE_SIZE};
 
 pub fn do_rt_sigreturn() -> Result<()> {
     debug!("do_rt_sigreturn");
@@ -224,7 +225,23 @@ fn handle_signals_by_user(
             const BIG_ENOUGH_SIZE: u64 = 4096;
             BIG_ENOUGH_SIZE as usize
         };
-        // TODO: validate the memory range of the stack
+
+        // Validate the stack
+        let stack_range = VMRange::new(
+            align_down(stack_top - stack_size, PAGE_SIZE),
+            align_up(stack_top, PAGE_SIZE),
+        )
+        .unwrap();
+
+        let mem_chunks = thread.vm().mem_chunks().read().unwrap();
+        if mem_chunks
+            .iter()
+            .find(|chunk| chunk.range().is_superset_of(&stack_range))
+            .is_none()
+        {
+            return_errno!(ENOMEM, "the user stack is not enough to handle the signal");
+        }
+
         unsafe { Stack::new(stack_top, stack_size)? }
     };
 
