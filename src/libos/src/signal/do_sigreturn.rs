@@ -1,5 +1,6 @@
 use aligned::{Aligned, A16};
 use core::arch::x86_64::{_fxrstor, _fxsave};
+use core::convert::TryInto;
 use std::{ptr, slice};
 
 use super::c_types::{mcontext_t, siginfo_t, ucontext_t};
@@ -216,14 +217,25 @@ fn handle_signals_by_user(
                     }
                 }
             }
-            const BIG_ENOUGH_GAP: u64 = 1024;
-            let stack_top = (curr_user_ctxt.gp_regs.rsp - BIG_ENOUGH_GAP) as usize;
+
+            // The 128-byte area beyond the location pointed to by %rsp is considered to be reserved and
+            // shall not be modified by signal or interrupt handlers. Therefore, functions may use this
+            // area for temporary data that is not needed across function calls. In particular, leaf functions
+            // may use this area for their entire stack frame, rather than adjusting the stack pointer in the
+            // prologue and epilogue. This area is known as the red zone.
+            const RED_ZONE: u64 = 128;
+            let stack_top = (curr_user_ctxt.gp_regs.rsp - RED_ZONE).try_into().unwrap();
             stack_top
         };
+
         let stack_top = get_stack_top();
         let stack_size = {
-            const BIG_ENOUGH_SIZE: u64 = 4096;
-            BIG_ENOUGH_SIZE as usize
+            // define MINSIGSTKSZ with the same value in libc
+            const MINSIGSTKSZ: u64 = 2048;
+
+            // Use MINSIGSTKSZ as the default stack size
+            // When the stack is not enough, the #PF happens in user's code
+            MINSIGSTKSZ as usize
         };
 
         // Validate the stack
