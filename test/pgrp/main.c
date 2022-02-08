@@ -12,8 +12,8 @@
 // ============================================================================
 
 static void handle_sigsegv(int num) {
-    printf("SIGSEGV Caught in child with pid = %d, pgid = %d\n", getpid(), getpgid(0));
-    assert(num == SIGSEGV);
+    printf("SIGABRT Caught in child with pid = %d, pgid = %d\n", getpid(), getpgid(0));
+    assert(num == SIGABRT);
     exit(0);
 }
 
@@ -106,7 +106,7 @@ int test_child_setpgid() {
         THROW_ERROR("child process group error");
     }
 
-    kill(child_pid, SIGSEGV);
+    kill(child_pid, SIGABRT);
     ret = wait4(-1, &status, 0, NULL);
     if (ret < 0) {
         printf("ERROR: failed to wait4 the child process\n");
@@ -146,9 +146,9 @@ int test_child_setpgid_to_other_child() {
     if (second_child_pgid != child_pgid) {
         THROW_ERROR("second child process group error");
     }
-    kill(0 - second_child_pid, SIGSEGV);
+    kill(0 - second_child_pid, SIGABRT);
 
-    ret = kill(0 - child_pgid, SIGSEGV);
+    ret = kill(0 - child_pgid, SIGABRT);
     if (ret < 0) {
         THROW_ERROR("ERROR: failed to kill process group 1\n");
     }
@@ -251,7 +251,7 @@ int test_signal_a_group_of_process() {
     }
 
     // other children should be in process group 1
-    ret = kill(0 - process_group_1, SIGSEGV);
+    ret = kill(0 - process_group_1, SIGABRT);
     if (ret < 0) {
         THROW_ERROR("ERROR: failed to kill process group 1\n");
     }
@@ -262,7 +262,7 @@ int test_signal_a_group_of_process() {
         THROW_ERROR("join child process group error");
     }
 
-    ret = kill(0 - process_group_2, SIGSEGV);
+    ret = kill(0 - process_group_2, SIGABRT);
     if (ret < 0) {
         THROW_ERROR("ERROR: failed to kill process group 2\n");
     }
@@ -292,7 +292,7 @@ int main(int argc, char **argv) {
     if (argc > 1) {
         // Spawn self. Do some extra work here.
         printf("pgrp run again as child with pid = %d, pgid = %d\n", getpid(), getpgid(0));
-        signal(SIGSEGV, handle_sigsegv);
+        signal(SIGABRT, handle_sigsegv);
         sleep(10);
         // This shouldn't be reached.
         abort();
