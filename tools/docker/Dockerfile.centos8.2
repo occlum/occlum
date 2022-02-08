@@ -162,6 +162,10 @@ COPY --from=alpine /usr/lib/jvm/java-1.8-openjdk $JDK8_PATH
 RUN rm $JDK8_PATH/jre/lib/security/cacerts
 COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK8_PATH/jre/lib/security/cacerts
 
+# Install Occlum dcap lib
+WORKDIR /root/occlum/tools/toolchains
+RUN cd dcap_lib && ./build.sh
+
 # Build and install Occlum
 WORKDIR /root
 RUN cd occlum && \
