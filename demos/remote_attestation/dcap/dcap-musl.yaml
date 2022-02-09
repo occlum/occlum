@@ -6,11 +6,11 @@ targets:
   - target: /bin
     copy:
       - files:
-        - ../dcap_lib/target/x86_64-unknown-linux-musl/release/examples/dcap_test
+        - /opt/occlum/toolchains/dcap_lib/musl/dcap_test
         - ../c_app/dcap_c_test
   # copy lib
   - target: /lib
     copy:
       - files:
-        - ../dcap_lib/target/x86_64-unknown-linux-musl/release/libdcap_quote.so
+        - /opt/occlum/toolchains/dcap_lib/musl/libocclum_dcap.so
 
