@@ -50,6 +50,9 @@ submodule: githooks
 	@cp deps/sefs/sefs-cli/lib/libsefs-cli.signed.so build/lib
 	@cp deps/sefs/sefs-cli/enclave/Enclave.config.xml build/sefs-cli.Enclave.xml
 
+	@# Build and install Occlum dcap lib
+	@cd tools/toolchains/dcap_lib && ./build.sh
+
 src:
 	@$(MAKE) --no-print-directory -C src
 
