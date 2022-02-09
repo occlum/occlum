@@ -1,4 +1,4 @@
-# SGX DCAP Remote Attestation Demo in Rust
+# SGX DCAP Remote Attestation Demo
 
 This project demonstrates how to do Intel SGX DCAP (Datacenter Attestation
 Primitives) remote attestation on Occlum. Occlum provides SGX capabilities to
@@ -18,7 +18,7 @@ applications through ioctls on device `/dev/sgx`.
 
 ## Run this demo on Occlum
 
-You can run the DCAP quote generation and verification demo, including dcap library build, rust test demo and C test demo on Occlum via
+You can run the DCAP quote generation and verification demo, including rust test demo and C test demo on Occlum via
 ```
 ./run_dcap_quote_on_occlum.sh
 ```

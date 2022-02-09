@@ -10,23 +10,19 @@ if [[ $1 == "musl" ]]; then
     bomfile="../dcap-musl.yaml"
     CC=occlum-gcc
     LD=occlum-ld
-    CARGO=occlum-cargo
-    LIBPATH="../dcap_lib/target/x86_64-unknown-linux-musl/release"
+    LIBPATH="/opt/occlum/toolchains/dcap_lib/musl"
 else
     echo "*** Build and run glibc dcap demo ***"
     bomfile="../dcap.yaml"
     CC=gcc
     LD=ld
-    CARGO=cargo
-    LIBPATH="../dcap_lib/target/release"
+    LIBPATH="/opt/occlum/toolchains/dcap_lib/glibc"
 fi
 
-pushd dcap_lib
-$CARGO build --all-targets --release
-popd
+INCPATH="/opt/occlum/toolchains/dcap_lib/inc"
 
 CC=$CC LD=$LD LIBPATH=$LIBPATH make -C c_app clean
-CC=$CC LD=$LD LIBPATH=$LIBPATH make -C c_app
+CC=$CC LD=$LD LIBPATH=$LIBPATH INCPATH=$INCPATH make -C c_app
 
 rm -rf ${INSTANCE_DIR} && occlum new ${INSTANCE_DIR}
 cd ${INSTANCE_DIR}
