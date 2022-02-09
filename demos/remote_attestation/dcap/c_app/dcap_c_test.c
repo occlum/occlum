@@ -3,8 +3,11 @@
 #include <string.h>
 
 #include "sgx_quote_3.h"
-#include "dcap_quote.h"
+#include "sgx_urts.h"
+#include "sgx_pce.h"
+#include "sgx_error.h"
 
+#include "occlum_dcap.h"
 
 void dump_quote_info(sgx_quote3_t *p_quote)
 {
