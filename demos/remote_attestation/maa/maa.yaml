@@ -11,6 +11,6 @@ targets:
   - target: /opt/occlum/glibc/lib
     copy:
       - files:
-        - /opt/occlum/toolchains/dcap_lib/glibc/libocclum_dcap.so
+        - /opt/occlum/toolchains/dcap_lib/glibc/libocclum_dcap.so.0.1.0
         - /usr/lib/x86_64-linux-gnu/libcrypto.so.1.1
 
