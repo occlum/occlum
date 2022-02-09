@@ -17,10 +17,7 @@ use crate::vm::{VMRange, PAGE_SIZE};
 pub fn do_rt_sigreturn() -> Result<()> {
     debug!("do_rt_sigreturn");
     let last_ucontext = {
-        let last_ucontext = PRE_UCONTEXTS.with(|ref_cell| {
-            let mut stack = ref_cell.borrow_mut();
-            stack.pop()
-        });
+        let last_ucontext = SIGNAL_CONTEXT.with(|signal_context| signal_context.borrow_mut().pop());
 
         // Handle a (very unlikely) error condition
         if last_ucontext.is_none() {
@@ -119,14 +116,6 @@ pub fn force_signal(signal: Box<dyn Signal>) {
 }
 
 fn handle_signal(signal: Box<dyn Signal>, thread: &ThreadRef) -> bool {
-    let is_sig_stack_full = PRE_UCONTEXTS.with(|ref_cell| {
-        let stack = ref_cell.borrow();
-        stack.full()
-    });
-    if is_sig_stack_full {
-        panic!("the nested signal is too deep to handle");
-    }
-
     let action = thread
         .process()
         .sig_dispositions()
@@ -314,10 +303,7 @@ fn handle_signals_by_user(
         fp_regs.clear();
     }
 
-    PRE_UCONTEXTS.with(|ref_cell| {
-        let mut stack = ref_cell.borrow_mut();
-        stack.push(ucontext).unwrap();
-    });
+    SIGNAL_CONTEXT.with(|signal_context| unsafe { signal_context.borrow_mut().push(ucontext) });
     Ok(())
 }
 
@@ -390,46 +376,49 @@ impl Stack {
     }
 }
 
-thread_local! {
-    static PRE_UCONTEXTS: RefCell<CpuContextStack> = Default::default();
+async_rt::task_local! {
+    static SIGNAL_CONTEXT: RefCell<SignalContext> = RefCell::new(SignalContext::new());
 }
 
-#[derive(Debug, Default)]
-struct CpuContextStack {
-    stack: [Option<*mut ucontext_t>; 32],
-    count: usize,
+struct SignalContext {
+    context: *mut ucontext_t,
 }
 
-impl CpuContextStack {
+// Using using userlevel memory to cache the old context
+// Reference https://man7.org/linux/man-pages/man2/getcontext.2.html
+// "Here uc_link points to the context that will be resumed when the current context terminates."
+impl SignalContext {
     pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub fn full(&self) -> bool {
-        self.count == self.stack.len()
-    }
-
-    pub fn empty(&self) -> bool {
-        self.count == 0
-    }
-
-    pub fn push(&mut self, cpu_context: *mut ucontext_t) -> Result<()> {
-        if self.full() {
-            return_errno!(ENOMEM, "cpu context stack is full");
+        SignalContext {
+            context: ptr::null_mut(),
         }
-        self.stack[self.count] = Some(cpu_context);
-        self.count += 1;
-        Ok(())
+    }
+
+    pub unsafe fn push(&mut self, cpu_context: *mut ucontext_t) {
+        if cpu_context.is_null() {
+            panic!("the signal context is null");
+        }
+
+        unsafe {
+            (*cpu_context).uc_link = self.context;
+        }
+        self.context = cpu_context;
     }
 
     pub fn pop(&mut self) -> Option<*mut ucontext_t> {
-        if self.empty() {
+        if self.context.is_null() {
             return None;
         }
-        self.count -= 1;
-        self.stack[self.count].take()
+
+        let cpu_context = self.context;
+        unsafe {
+            self.context = (*cpu_context).uc_link;
+            Some(cpu_context)
+        }
     }
 }
+
+unsafe impl Send for SignalContext {}
 
 // This module maintain a flag about whether a task already has a forced signal.
 // The goal is to ensure that during the execution of a syscall at most one
