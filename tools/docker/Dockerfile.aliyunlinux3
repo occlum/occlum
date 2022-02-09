@@ -179,10 +179,6 @@ COPY --from=alpine /usr/lib/jvm/java-1.8-openjdk $JDK8_PATH
 RUN rm $JDK8_PATH/jre/lib/security/cacerts
 COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK8_PATH/jre/lib/security/cacerts
 
-# Install Occlum dcap lib
-WORKDIR /root/occlum/tools/toolchains
-RUN cd dcap_lib && ./build.sh
-
 ENV LD_LIBRARY_PATH="/opt/intel/sgxpsw/aesm:/usr/lib64/:/usr/local/lib:/opt/intel/sgxsdk/sdk_libs:/usr/lib:$LD_LIBRARY_PATH"
 # Build and install Occlum
 WORKDIR /root
