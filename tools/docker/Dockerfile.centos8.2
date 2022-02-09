@@ -5,6 +5,11 @@ RUN apk update && \
 
 FROM centos:8
 
+RUN sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-Linux-* &&\
+    sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
+
+RUN yum upgrade -y
+
 LABEL maintainer="He Sun <bochang.sh@antgroup.com>"
 
 #The default shell for the RUN instruction is ["/bin/sh", "-c"], which sometimes cause unexpected error
@@ -66,7 +71,7 @@ RUN wget http://www.etallen.com/cpuid/cpuid-20200211.x86_64.tar.gz && \
 
 # Install Rust
 ENV PATH="/root/.cargo/bin:$PATH"
-ENV OCCLUM_RUST_VERSION=nightly-2021-09-13
+ENV OCCLUM_RUST_VERSION=nightly-2021-11-01
 RUN curl https://sh.rustup.rs -sSf | \
         sh -s -- --default-toolchain ${OCCLUM_RUST_VERSION} -y && \
     rm -rf /root/.cargo/registry && rm -rf /root/.cargo/git && \
