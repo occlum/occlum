@@ -12,5 +12,5 @@ targets:
   - target: /lib
     copy:
       - files:
-        - /opt/occlum/toolchains/dcap_lib/musl/libocclum_dcap.so
+        - /opt/occlum/toolchains/dcap_lib/musl/libocclum_dcap.so.0.1.0
 
