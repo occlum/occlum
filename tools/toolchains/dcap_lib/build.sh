@@ -2,23 +2,40 @@
 set -e
 
 INSTALL_DIR=/opt/occlum/toolchains/dcap_lib
+SONAME=libocclum_dcap.so.0.1.0
 
-echo "*** Build and install musl-libc dcap ***"
-occlum-cargo clean
-occlum-cargo build --all-targets --release
+function build_lib() {
+    if [[ $1 == "musl" ]]; then
+        echo "*** Build and install musl-libc dcap ***"
+        CARGO=occlum-cargo
+        TARGET_PATH=target/x86_64-unknown-linux-musl/release
+        LIB_PATH=${INSTALL_DIR}/musl/
+    else
+        echo "*** Build and install glibc dcap ***"
+        CARGO=cargo
+        TARGET_PATH=target/release
+        LIB_PATH=${INSTALL_DIR}/glibc/
+    fi
 
-mkdir -p ${INSTALL_DIR}/musl
-cp target/x86_64-unknown-linux-musl/release/libocclum_dcap.a ${INSTALL_DIR}/musl/
-cp target/x86_64-unknown-linux-musl/release/libocclum_dcap.so ${INSTALL_DIR}/musl/
-cp target/x86_64-unknown-linux-musl/release/examples/dcap_test ${INSTALL_DIR}/musl/
+    # cargo build libs and rust example
+    $CARGO clean
+    $CARGO rustc --release  -- -Clink-arg=-Wl,-soname,$SONAME
+    $CARGO build --release  --examples
 
-echo "*** Build and install glibc dcap ***"
-cargo clean
-cargo build --all-targets --release
+    # Copy files
+    mkdir -p ${LIB_PATH}
+    cp ${TARGET_PATH}/libocclum_dcap.a ${LIB_PATH}
+    cp ${TARGET_PATH}/examples/dcap_test ${LIB_PATH}
 
-mkdir -p ${INSTALL_DIR}/glibc
-cp target/release/libocclum_dcap.a ${INSTALL_DIR}/glibc/
-cp target/release/libocclum_dcap.so ${INSTALL_DIR}/glibc/
-cp target/release/examples/dcap_test ${INSTALL_DIR}/glibc/
+    # Create SO links
+    pushd ${TARGET_PATH}
+    mv libocclum_dcap.so $SONAME
+    ln -s $SONAME libocclum_dcap.so
+    popd
+    cp -Pf ${TARGET_PATH}/libocclum_dcap.so* ${LIB_PATH}
+}
+
+build_lib musl
+build_lib glibc
 
 cp -r inc ${INSTALL_DIR}/
