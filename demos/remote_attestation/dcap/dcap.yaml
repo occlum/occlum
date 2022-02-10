@@ -12,5 +12,5 @@ targets:
   - target: /opt/occlum/glibc/lib
     copy:
       - files:
-        - /opt/occlum/toolchains/dcap_lib/glibc/libocclum_dcap.so
+        - /opt/occlum/toolchains/dcap_lib/glibc/libocclum_dcap.so.0.1.0
 
