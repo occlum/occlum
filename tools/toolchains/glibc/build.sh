@@ -20,7 +20,7 @@ rm -rf ${INSTALL_DIR}
 mkdir -p ${SRC_DIR}
 cd ${SRC_DIR}
 # Download glibc
-git clone -b occlum-glibc-2.27 https://github.com/occlum/glibc .
+git clone -b occlum-glibc-2.31 https://github.com/occlum/glibc .
 
 mkdir -p ${BUILD_DIR}
 cd ${BUILD_DIR}
