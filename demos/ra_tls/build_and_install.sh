@@ -7,25 +7,19 @@ if [[ $1 == "musl" ]]; then
     echo "*** Build and run musl-libc demo ***"
     CC=occlum-gcc
     CXX=occlum-g++
-    CARGO=occlum-cargo
-    DCAP_LIB_PATH="target/x86_64-unknown-linux-musl/release"
+    DCAP_LIB_PATH="/opt/occlum/toolchains/dcap_lib/musl"
     INSTALL_PREFIX="/usr/local/occlum/x86_64-linux-musl"
 else
     echo "*** Build and run glibc demo ***"
     CC=gcc
     CXX=g++
-    CARGO=cargo
-    DCAP_LIB_PATH="target/release"
+    DCAP_LIB_PATH="/opt/occlum/toolchains/dcap_lib/glibc"
     INSTALL_PREFIX="/usr/local"
 fi
 
-# Build occlum dcap lib first
-pushd occlum
-cd demos/remote_attestation/dcap/dcap_lib
-$CARGO build --all-targets --release
-cp ${DCAP_LIB_PATH}/libdcap_quote.a ${INSTALL_PREFIX}/lib
-cp ../c_app/dcap_quote.h ${INSTALL_PREFIX}/include/
-popd
+# Copy occlum dcap lib first
+cp ${DCAP_LIB_PATH}/libocclum_dcap.a ${INSTALL_PREFIX}/lib
+cp /opt/occlum/toolchains/dcap_lib/inc/occlum_dcap.h ${INSTALL_PREFIX}/include/
 
 # Copy ratls added/updated files to grpc source
 GRPC_PATH=grpc-src

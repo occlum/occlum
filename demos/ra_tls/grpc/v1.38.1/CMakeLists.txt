@@ -2090,7 +2090,7 @@ if(DEFINE_SGX_RA_TLS_OCCLUM_BACKEND)
     gpr
     ${_gRPC_SSL_LIBRARIES}
     address_sorting
-    libdcap_quote.a
+    libocclum_dcap.a
   )
 endif()
 
