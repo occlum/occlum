@@ -22,11 +22,4 @@ pushd ${GRPC_PATH} \
     && git submodule update --init
 popd
 
-# Occlum source code
-rm -rf occlum
-git clone  https://github.com/occlum/occlum
-pushd occlum
-make submodule
-popd
-
 
