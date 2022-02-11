@@ -13,7 +13,6 @@ else
     echo "*** Build and run glibc demo ***"
     CC=gcc
     CXX=g++
-    CARGO=cargo
     DCAP_LIB_PATH="/opt/occlum/toolchains/dcap_lib/glibc"
     INSTALL_PREFIX="/usr/local"
 fi

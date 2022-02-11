@@ -22,4 +22,3 @@ pushd ${GRPC_PATH} \
     && git submodule update --init
 popd
 
-
