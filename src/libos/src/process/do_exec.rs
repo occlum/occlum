@@ -77,13 +77,8 @@ pub async fn do_exec(
         let term_status = TermStatus::Exited(0 as u8);
         current_ref.process().force_exit(term_status);
 
-        notify_all_threads_to_exit(current_ref.process());
-
-        // Must yield here for other threads to run
-        async_rt::sched::yield_().await;
-
         // Wait for all threads (except calling thread) to exit
-        wait_for_other_threads_to_exit(current_ref);
+        wait_for_other_threads_to_exit(current_ref).await;
 
         // Exit current thread and let new process to adopt current's child process
         exit_old_process_for_execve(term_status, new_process_ref.clone());
@@ -112,7 +107,7 @@ pub async fn do_exec(
 }
 
 // Blocking wait until there is only one thread in the calling process
-fn wait_for_other_threads_to_exit(current_ref: &ThreadRef) {
+async fn wait_for_other_threads_to_exit(current_ref: &ThreadRef) {
     use super::do_futex::{self};
     use crate::time::{timespec_t, ClockId};
     use core::time::Duration;
@@ -122,6 +117,12 @@ fn wait_for_other_threads_to_exit(current_ref: &ThreadRef) {
     // Use calling process's pointer as futex value
     let futex_val = Arc::as_ptr(current_ref.process()) as *const i32;
     loop {
+        // Do this for every loop in case a new thread is created just after the notification
+        notify_all_threads_to_exit(current_ref.process());
+
+        // Must yield here for other threads to run
+        async_rt::sched::yield_().await;
+
         let thread_num = current_ref.process().threads().len();
         if thread_num == 1 {
             return;

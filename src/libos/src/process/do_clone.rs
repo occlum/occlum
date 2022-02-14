@@ -74,6 +74,13 @@ pub async fn do_clone(
     };
     trace!("new thread sigmask = {:?}", new_thread_ref.sig_mask());
     let new_tid = new_thread_ref.tid();
+    let process = new_thread_ref.process();
+    // If the current thread is forced to exit, there is no need to let the new thread to execute.
+    if process.is_forced_to_exit() {
+        new_thread_ref.exit(process.term_status().unwrap());
+        return Ok(0);
+    }
+
     table::add_thread(new_thread_ref.clone());
     info!("Thread created: tid = {}", new_tid);
 

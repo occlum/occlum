@@ -130,7 +130,15 @@ impl SchedAgent {
 
     pub fn detach(&mut self) {
         self.update_inner(|inner| match inner {
-            Inner::Detached { .. } => panic!("cannot detach when the agent is already detached"),
+            Inner::Detached { affinity } => {
+                // Technically speaking, a detached thread should never calls this function. Thus for "Detached" branch, this should panic.
+                // However, considering this case:
+                // When the current thread clones a new thread, and before the new thread starting to run, the current thread is
+                // forced to exit, the new thread will need to exit too and will call this detach function.
+                // Thus don't panic here.
+                warn!("detach when the agent is already detached");
+                Inner::Detached { affinity }
+            }
             Inner::Attached { affinity, .. } => {
                 let affinity = Dirty::new(affinity);
                 Inner::Detached { affinity }
