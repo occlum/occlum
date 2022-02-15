@@ -1,7 +1,10 @@
-use block_device::{BlockDevice, BlockDeviceExt};
+use block_device::{BlockDevice, BlockDeviceExt, BLOCK_SIZE};
 use std::fmt;
 
-use crate::fs::{AccessMode, Events, IoctlCmd, Observer, Pollee, Poller, SeekFrom, StatusFlags};
+use crate::fs::{
+    AccessMode, Events, FileType, IoctlCmd, Metadata, Observer, Pollee, Poller, SeekFrom,
+    StatusFlags, Timespec,
+};
 use crate::prelude::*;
 
 /// A file wrapper for a block device.
@@ -130,6 +133,28 @@ impl DiskFile {
 
     pub fn ioctl(&self, _cmd: &mut dyn IoctlCmd) -> Result<()> {
         return_errno!(EINVAL, "this file does not support ioctl");
+    }
+
+    pub fn metadata(&self) -> Metadata {
+        Metadata {
+            dev: 0,
+            // Use a large number to avoid to coincide with a valid inode number.
+            inode: 0xfe23_1d08,
+            size: self.disk.total_bytes(),
+            blk_size: BLOCK_SIZE,
+            blocks: self.disk.total_bytes() / 512,
+            atime: Timespec { sec: 0, nsec: 0 },
+            mtime: Timespec { sec: 0, nsec: 0 },
+            ctime: Timespec { sec: 0, nsec: 0 },
+            // FIO will access FileType::BlockDevice with some raw ioctls.
+            // To test the R/W speed of blockdevice as normal file, return FileType::File.
+            type_: FileType::File,
+            mode: 0o666,
+            nlinks: 1,
+            uid: 0,
+            gid: 0,
+            rdev: 0,
+        }
     }
 }
 
