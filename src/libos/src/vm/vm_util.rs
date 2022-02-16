@@ -548,3 +548,17 @@ pub trait VMRemapParser {
 
     fn is_free_range(&self, request_range: &VMRange) -> bool;
 }
+
+// Generate a random address within [0, range]
+// Note: This function doesn't gurantee alignment
+pub fn get_randomize_offset(range: usize) -> usize {
+    if cfg!(debug_assertions) {
+        return range;
+    }
+
+    use crate::misc::get_random;
+    let mut random_buf: [u8; 8] = [0u8; 8]; // same length as usize
+    get_random(&mut random_buf).expect("failed to get random number");
+    let random_num: usize = u64::from_le_bytes(random_buf) as usize;
+    random_num % range
+}

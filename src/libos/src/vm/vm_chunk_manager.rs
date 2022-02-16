@@ -112,9 +112,7 @@ impl ChunkManager {
         }
 
         // Find and allocate a new range for this mmap request
-        let new_range = self
-            .free_manager
-            .find_free_range_internal(size, align, addr)?;
+        let new_range = self.free_manager.find_free_range(size, align, addr)?;
         let new_addr = new_range.start();
         let writeback_file = options.writeback_file().clone();
         let current_pid = current!().process().pid();
@@ -149,7 +147,6 @@ impl ChunkManager {
         let mut vmas_cursor = self.vmas.upper_bound_mut(Bound::Included(&bound));
         while !vmas_cursor.is_null() && vmas_cursor.get().unwrap().vma().start() <= range.end() {
             let vma = &vmas_cursor.get().unwrap().vma();
-            warn!("munmap related vma = {:?}", vma);
             if vma.size() == 0 || current_pid != vma.pid() {
                 vmas_cursor.move_next();
                 continue;
@@ -190,7 +187,6 @@ impl ChunkManager {
 
             // Reset zero
             unsafe {
-                warn!("intersection vma = {:?}", intersection_vma);
                 let buf = intersection_vma.as_slice_mut();
                 buf.iter_mut().for_each(|b| *b = 0)
             }
@@ -301,7 +297,6 @@ impl ChunkManager {
                 // The whole containing_vma is mprotected
                 containing_vma.set_perms(new_perms);
                 VMPerms::apply_perms(&containing_vma, containing_vma.perms());
-                warn!("containing_vma = {:?}", containing_vma);
                 containing_vmas.replace_with(VMAObj::new_vma_obj(containing_vma));
                 containing_vmas.move_next();
                 continue;

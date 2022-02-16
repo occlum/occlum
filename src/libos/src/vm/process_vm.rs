@@ -72,10 +72,12 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
             })
             .collect();
 
-        // Make heap and stack 16-byte aligned
+        // Make heap and stack page-aligned for simplicity
+        // Heap and stack can be 16-byte aligned, but with address space layout randomization, this can make many
+        // assertion failure.
         let other_layouts = vec![
-            VMLayout::new(heap_size, 16)?,
-            VMLayout::new(stack_size, 16)?,
+            VMLayout::new(heap_size, PAGE_SIZE)?,
+            VMLayout::new(stack_size, PAGE_SIZE)?,
         ];
         let process_layout = elf_layouts.iter().chain(other_layouts.iter()).fold(
             VMLayout::new_empty(),

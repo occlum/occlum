@@ -14,6 +14,10 @@ use std::ops::Bound::{Excluded, Included};
 use crate::util::sync::*;
 use std::collections::{BTreeSet, HashSet};
 
+// When allocating chunks, each allocation will have a random offset above the start address of available space.
+// The random value will be in [0, CHUNK_RANDOM_OFFSET].
+const CHUNK_RANDOM_RANGE: usize = 1024 * 1024; // 1M
+
 // Incorrect order of locks could cause deadlock easily.
 // Don't hold a low-order lock and then try to get a high-order lock.
 // High order -> Low order:
@@ -533,7 +537,8 @@ impl InternalVMManager {
     // Allocate a new chunk with default size
     pub fn mmap_chunk_default(&mut self, addr: VMMapAddr) -> Result<ChunkRef> {
         // Find a free range from free_manager
-        let free_range = self.find_free_gaps(CHUNK_DEFAULT_SIZE, PAGE_SIZE, addr)?;
+        let free_range =
+            self.find_free_gaps_with_random_offset(CHUNK_DEFAULT_SIZE, PAGE_SIZE, addr)?;
 
         // Add this range to chunks
         let chunk = Arc::new(Chunk::new_default_chunk(free_range)?);
@@ -547,7 +552,7 @@ impl InternalVMManager {
         let addr = *options.addr();
         let size = *options.size();
         let align = *options.align();
-        let free_range = self.find_free_gaps(size, align, addr)?;
+        let free_range = self.find_free_gaps_with_random_offset(size, align, addr)?;
         let free_chunk = Chunk::new_single_vma_chunk(&free_range, options);
         if let Err(e) = free_chunk {
             // Error when creating chunks. Must return the free space before returning error
@@ -788,15 +793,20 @@ impl InternalVMManager {
         Ok(())
     }
 
-    pub fn find_free_gaps(
+    // This function is used to find free gaps for chunks
+    pub fn find_free_gaps_with_random_offset(
         &mut self,
         size: usize,
         align: usize,
         addr: VMMapAddr,
     ) -> Result<VMRange> {
-        return self
-            .free_manager
-            .find_free_range_internal(size, align, addr);
+        let random_offset = super::vm_util::get_randomize_offset(CHUNK_RANDOM_RANGE);
+        return self.free_manager.find_free_range_with_random_offset(
+            size,
+            align,
+            addr,
+            random_offset,
+        );
     }
 
     pub fn clean_single_vma_chunks(&mut self) {
