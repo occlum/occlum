@@ -45,7 +45,7 @@ impl FaultSignal {
                 (SIGSEGV, code, addr)
             },
             // General protection exception
-            SGX_EXCEPTION_VECTOR_PF => (SIGBUS, BUS_ADRERR, None),
+            SGX_EXCEPTION_VECTOR_GP => (SIGBUS, BUS_ADRERR, None),
             _ => panic!("exception cannot be converted to signal"),
         };
         Self { num, code, addr }
