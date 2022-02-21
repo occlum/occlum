@@ -1,0 +1,23 @@
+includes:
+  - base.yaml
+targets:
+  - target: /usr/bin
+    createlinks:
+      - src: /opt/python-occlum/bin/python3
+        linkname: python3
+  # python packages
+  - target: /opt
+    copy: 
+      - dirs:
+          - ../python-occlum
+  # below are python code and data
+  - target: /bin
+    copy:
+      - files: 
+        - ../rest_api.py
+  # Flask server key/cert
+  - target: /etc
+    copy:
+      - files:
+        - ../flask.crt
+        - ../flask.key

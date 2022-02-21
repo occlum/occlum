@@ -675,3 +675,34 @@ jobs:
 
     - name: Run gvisor syscall test
       run: docker exec $gvisor_test bash -c "cd /root/gvisor/occlum && SGX_MODE=SIM ./run_occlum_passed_tests.sh"
+
+  Flask_tls_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/sim
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Download conda and build python
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/flask; ./install_python_with_conda.sh"
+
+    - name: Generate sample cert/key
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/flask; ./gen-cert.sh"
+
+    - name: Prepare and start Flask Occlum instance
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/flask;
+            SGX_MODE=SIM ./build_occlum_instance.sh; ./run_flask_on_occlum.sh &"
+
+    - name: Test PUT
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/flask;
+            curl --cacert flask.crt -X PUT https://localhost:4996/customer/1 -d "data=Tom""
+    - name: Test Get
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/flask;
+            curl --cacert flask.crt -X GET https://localhost:4996/customer/1"
