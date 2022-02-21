@@ -286,6 +286,28 @@ pub fn do_futex(
         } else {
             ClockID::CLOCK_MONOTONIC
         };
+
+        // From futex man page:
+        // for FUTEX_WAIT, timeout is interpreted as a relative value. This differs from other futex operations, where
+        // timeout is interpreted as an absolute value. To obtain the equivalent of FUTEX_WAIT with an absolute timeout,
+        // employ FUTEX_WAIT_BITSET with val3 specified as FUTEX_BITSET_MATCH_ANY.
+        //
+        // However, in Occlum, we prefer to use relative value for timeout for performance consideration because getting current time
+        // requires an extra ocall.
+        let ts = match futex_op {
+            FutexOp::FUTEX_WAIT => ts,
+            _ => {
+                let relative_ts = {
+                    let absolute_ts = ts.as_duration();
+                    let current_ts = crate::time::do_clock_gettime(clock_id)?.as_duration();
+                    debug_assert!(current_ts <= absolute_ts);
+
+                    timespec_t::from(absolute_ts - current_ts)
+                };
+                relative_ts
+            }
+        };
+
         Ok(Some(FutexTimeout::new(clock_id, ts)))
     };
 
