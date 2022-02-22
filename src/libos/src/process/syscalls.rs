@@ -282,6 +282,14 @@ pub fn do_futex(
         ts.validate()?;
         // TODO: use a secure clock to transfer the real time to monotonic time
         let clock_id = if futex_flags.contains(FutexFlags::FUTEX_CLOCK_REALTIME) {
+            // FUTEX_WAIT can't work with FUTEX_CLOCK_REALTIME. This rule is applied by Linux. And we shall just obey it.
+            // Reference: https://github.com/torvalds/linux/commit/4fbf5d6837bf81fd7a27d771358f4ee6c4f243f8
+            if futex_op == FutexOp::FUTEX_WAIT {
+                return_errno!(
+                    ENOSYS,
+                    "FUTEX_CLOCK_REALTIME with this futex operation is not supported"
+                );
+            }
             ClockID::CLOCK_REALTIME
         } else {
             ClockID::CLOCK_MONOTONIC
@@ -291,24 +299,14 @@ pub fn do_futex(
         // for FUTEX_WAIT, timeout is interpreted as a relative value. This differs from other futex operations, where
         // timeout is interpreted as an absolute value. To obtain the equivalent of FUTEX_WAIT with an absolute timeout,
         // employ FUTEX_WAIT_BITSET with val3 specified as FUTEX_BITSET_MATCH_ANY.
-        //
-        // However, in Occlum, we prefer to use relative value for timeout for performance consideration because getting current time
-        // requires an extra ocall.
-        let ts = match futex_op {
-            FutexOp::FUTEX_WAIT => ts,
-            _ => {
-                let relative_ts = {
-                    let absolute_ts = ts.as_duration();
-                    let current_ts = crate::time::do_clock_gettime(clock_id)?.as_duration();
-                    debug_assert!(current_ts <= absolute_ts);
-
-                    timespec_t::from(absolute_ts - current_ts)
-                };
-                relative_ts
+        let absolute_time = {
+            match futex_op {
+                FutexOp::FUTEX_WAIT => false,
+                _ => true,
             }
         };
 
-        Ok(Some(FutexTimeout::new(clock_id, ts)))
+        Ok(Some(FutexTimeout::new(clock_id, ts, absolute_time)))
     };
 
     match futex_op {
