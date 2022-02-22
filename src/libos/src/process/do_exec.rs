@@ -109,6 +109,7 @@ fn wait_for_other_threads_to_exit(current_ref: &ThreadRef) {
     let timeout = FutexTimeout::new(
         ClockID::CLOCK_MONOTONIC,
         timespec_t::from(Duration::from_millis(50)),
+        false,
     );
     // Use calling process's pointer as futex value
     let futex_val = Arc::as_ptr(current_ref.process()) as *const i32;
