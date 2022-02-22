@@ -2090,7 +2090,8 @@ if(DEFINE_SGX_RA_TLS_OCCLUM_BACKEND)
     gpr
     ${_gRPC_SSL_LIBRARIES}
     address_sorting
-    libocclum_dcap.a
+    occlum_dcap
+    cjson
   )
 endif()
 
@@ -2794,7 +2795,6 @@ add_library(grpc++
   src/cpp/sgx/sgx_ra_tls_backends.cc
   src/cpp/sgx/sgx_ra_tls_occlum.cc
   src/cpp/sgx/sgx_ra_tls_utils.cc
-  src/cpp/sgx/cjson/cJSON.c
 )
 
 set_target_properties(grpc++ PROPERTIES

@@ -9,6 +9,7 @@ targets:
     copy:
       - files:
         - ../dynamic_config.json
+        - ../secret_config.json
   - target: /usr/share/grpc/
     copy:
       - files:

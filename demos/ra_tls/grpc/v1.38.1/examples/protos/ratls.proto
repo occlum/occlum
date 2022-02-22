@@ -21,18 +21,18 @@ option objc_class_prefix = "HLW";
 
 package ratls;
 
-// The greeting service definition.
-service Greeter {
+// The GRPC_RATLS secret service definition.
+service GrSecret {
   // Sends a greeting
-  rpc SayHello (HelloRequest) returns (HelloReply) {}
+  rpc GetSecret (SecretRequest) returns (SecretReply) {}
 }
 
-// The request message containing the user's name.
-message HelloRequest {
+// The request message containing the request's name.
+message SecretRequest {
   string name = 1;
 }
 
-// The response message containing the greetings
-message HelloReply {
-  string message = 1;
+// The response message containing the secret (base64 encoded string)
+message SecretReply {
+  string secret = 1;
 }

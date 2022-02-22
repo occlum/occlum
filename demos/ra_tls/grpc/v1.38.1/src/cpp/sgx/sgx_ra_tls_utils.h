@@ -27,10 +27,11 @@
 #define grpc_printf printf
 #define grpc_fprintf fprintf
 
+#include <grpcpp/security/sgx/sgx_ra_tls.h>
+
 namespace grpc {
 namespace sgx {
 
-#include "cjson/cJSON.h"
 
 class library_engine {
     public:
@@ -51,30 +52,6 @@ class library_engine {
     private:
         void* handle;
         char* error;
-};
-
-class json_engine {
-    public:
-        json_engine();
-
-        json_engine(const char*);
-
-        ~json_engine();
-
-        bool open(const char*);
-
-        void close();
-
-        cJSON* get_handle();
-
-        cJSON* get_item(cJSON* obj, const char* item);
-
-        char* print_item(cJSON* obj);
-
-        bool compare_item(cJSON* obj, const char* item);
-
-    private:
-        cJSON* handle;
 };
 
 void check_free(void* ptr);

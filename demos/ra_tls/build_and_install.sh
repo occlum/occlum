@@ -17,8 +17,17 @@ else
     INSTALL_PREFIX="/usr/local"
 fi
 
+# Build and install cJSON
+CJSON_VER=1.7.15
+pushd cJSON-${CJSON_VER}
+rm -rf build && mkdir build && cd build
+cmake -DENABLE_CJSON_UTILS=On -DENABLE_CJSON_TEST=Off -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
+    -DCMAKE_C_COMPILER=${CC} ..
+make install
+popd
+
 # Copy occlum dcap lib first
-cp ${DCAP_LIB_PATH}/libocclum_dcap.a ${INSTALL_PREFIX}/lib
+cp ${DCAP_LIB_PATH}/libocclum_dcap.so* ${INSTALL_PREFIX}/lib
 cp /opt/occlum/toolchains/dcap_lib/inc/occlum_dcap.h ${INSTALL_PREFIX}/include/
 
 # Copy ratls added/updated files to grpc source
@@ -53,7 +62,7 @@ popd
 
 # Build grpc ratls client and server demo
 pushd ${GRPC_PATH}/examples/cpp/ratls
-mkdir -p build
+rm -rf build && mkdir -p build
 cd build
 cmake -D CMAKE_PREFIX_PATH=${INSTALL_PREFIX} -D CMAKE_BUILD_TYPE=${BUILD_TYPE} \
 	-DCMAKE_CXX_COMPILER=${CXX} -DCMAKE_C_COMPILER=${CC} ..
