@@ -9,7 +9,7 @@ use crate::time::{timespec_t, ClockID};
 /// `FutexOp`, `FutexFlags`, and `futex_op_and_flags_from_u32` are helper types and
 /// functions for handling the versatile commands and arguments of futex system
 /// call in a memory-safe way.
-
+#[derive(PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum FutexOp {
     FUTEX_WAIT = 0,
@@ -77,11 +77,16 @@ const FUTEX_BITSET_MATCH_ANY: u32 = 0xFFFF_FFFF;
 pub struct FutexTimeout {
     clock_id: ClockID,
     ts: timespec_t,
+    absolute_time: bool,
 }
 
 impl FutexTimeout {
-    pub fn new(clock_id: ClockID, ts: timespec_t) -> Self {
-        Self { clock_id, ts }
+    pub fn new(clock_id: ClockID, ts: timespec_t, absolute_time: bool) -> Self {
+        Self {
+            clock_id,
+            ts,
+            absolute_time,
+        }
     }
 
     pub fn clock_id(&self) -> &ClockID {
@@ -90,6 +95,10 @@ impl FutexTimeout {
 
     pub fn ts(&self) -> &timespec_t {
         &self.ts
+    }
+
+    pub fn absolute_time(&self) -> bool {
+        self.absolute_time
     }
 }
 
@@ -485,16 +494,20 @@ unsafe impl Sync for Waiter {}
 fn wait_event_timeout(thread: *const c_void, timeout: &Option<FutexTimeout>) -> Result<()> {
     let mut ret: c_int = 0;
     let mut sgx_ret: c_int = 0;
-    let (clockbit, ts_ptr) = timeout
+    let (clockbit, ts_ptr, absolute_time) = timeout
         .as_ref()
         .map(|timeout| {
             let clockbit = match timeout.clock_id() {
                 ClockID::CLOCK_REALTIME => FutexFlags::FUTEX_CLOCK_REALTIME.bits() as i32,
                 _ => 0,
             };
-            (clockbit, timeout.ts() as *const timespec_t)
+            (
+                clockbit,
+                timeout.ts() as *const timespec_t,
+                timeout.absolute_time() as i32,
+            )
         })
-        .unwrap_or((0, 0 as *const _));
+        .unwrap_or((0, 0 as *const _, 0));
     let mut errno: c_int = 0;
     unsafe {
         sgx_ret = sgx_thread_wait_untrusted_event_timeout_ocall(
@@ -502,6 +515,7 @@ fn wait_event_timeout(thread: *const c_void, timeout: &Option<FutexTimeout>) -> 
             thread,
             clockbit,
             ts_ptr,
+            absolute_time,
             &mut errno as *mut c_int,
         );
         assert!(sgx_ret == 0);
@@ -550,6 +564,7 @@ extern "C" {
         self_thread: *const c_void,
         clockbit: i32,
         ts: *const timespec_t,
+        absolute_time: i32,
         errno: *mut c_int,
     ) -> c_int;
 
