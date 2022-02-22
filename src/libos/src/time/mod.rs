@@ -188,29 +188,63 @@ pub fn do_clock_getres(clockid: ClockID) -> Result<timespec_t> {
     Ok(res)
 }
 
-pub fn do_nanosleep(req: &timespec_t, rem: Option<&mut timespec_t>) -> Result<()> {
+const TIMER_ABSTIME: i32 = 0x01;
+
+pub fn do_clock_nanosleep(
+    clockid: ClockID,
+    flags: i32,
+    req: &timespec_t,
+    rem: Option<&mut timespec_t>,
+) -> Result<()> {
     extern "C" {
-        fn occlum_ocall_nanosleep(
+        fn occlum_ocall_clock_nanosleep(
             ret: *mut i32,
+            clockid: clockid_t,
+            flags: i32,
             req: *const timespec_t,
             rem: *mut timespec_t,
         ) -> sgx_status_t;
     }
-    unsafe {
-        let mut ret = 0;
-        let mut u_rem: timespec_t = timespec_t { sec: 0, nsec: 0 };
-        let sgx_status = occlum_ocall_nanosleep(&mut ret, req, &mut u_rem);
-        assert!(sgx_status == sgx_status_t::SGX_SUCCESS);
-        assert!(ret == 0 || libc::errno() == Errno::EINTR as i32);
-        if ret != 0 {
-            assert!(u_rem.as_duration() <= req.as_duration() + (*TIMERSLACK).to_duration());
+
+    let mut ret = 0;
+    let mut u_rem: timespec_t = timespec_t { sec: 0, nsec: 0 };
+    match clockid {
+        ClockID::CLOCK_REALTIME
+        | ClockID::CLOCK_MONOTONIC
+        | ClockID::CLOCK_BOOTTIME
+        | ClockID::CLOCK_PROCESS_CPUTIME_ID => {}
+        ClockID::CLOCK_THREAD_CPUTIME_ID => {
+            return_errno!(EINVAL, "CLOCK_THREAD_CPUTIME_ID is not a permitted value");
+        }
+        _ => {
+            return_errno!(EOPNOTSUPP, "does not support sleeping against this clockid");
+        }
+    }
+    let sgx_status = unsafe {
+        occlum_ocall_clock_nanosleep(&mut ret, clockid as clockid_t, flags, req, &mut u_rem)
+    };
+    assert!(sgx_status == sgx_status_t::SGX_SUCCESS);
+    assert!(ret == 0 || ret == Errno::EINTR as i32);
+    if ret != 0 {
+        assert!(u_rem.as_duration() <= req.as_duration() + (*TIMERSLACK).to_duration());
+        // rem is only valid if TIMER_ABSTIME flag is not set
+        if flags != TIMER_ABSTIME {
             if let Some(rem) = rem {
                 *rem = u_rem;
             }
-            return_errno!(EINTR, "sleep interrupted");
         }
+        return_errno!(EINTR, "sleep interrupted");
     }
-    Ok(())
+    return Ok(());
+}
+
+pub fn do_nanosleep(req: &timespec_t, rem: Option<&mut timespec_t>) -> Result<()> {
+    // POSIX.1 specifies that nanosleep() should measure time against
+    // the CLOCK_REALTIME clock.  However, Linux measures the time using
+    // the CLOCK_MONOTONIC clock.
+    // Here we follow the POSIX.1
+    let clock_id = ClockID::CLOCK_REALTIME;
+    return do_clock_nanosleep(clock_id, 0, req, rem);
 }
 
 pub fn do_thread_getcpuclock() -> Result<timespec_t> {

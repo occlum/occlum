@@ -16,8 +16,9 @@ void occlum_ocall_clock_getres(int clockid, struct timespec *res) {
     clock_getres(clockid, res);
 }
 
-int occlum_ocall_nanosleep(const struct timespec *req, struct timespec *rem) {
-    return nanosleep(req, rem);
+int occlum_ocall_clock_nanosleep(clockid_t clockid, int flags, const struct timespec *req,
+                                 struct timespec *rem) {
+    return clock_nanosleep(clockid, flags, req, rem);
 }
 
 int occlum_ocall_thread_getcpuclock(struct timespec *tp) {

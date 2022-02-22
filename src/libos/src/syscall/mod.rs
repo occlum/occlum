@@ -318,7 +318,7 @@ macro_rules! process_syscall_table_with_callback {
             (ClockSettime = 227) => handle_unsupported(),
             (ClockGettime = 228) => do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t),
             (ClockGetres = 229) => do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t),
-            (ClockNanosleep = 230) => handle_unsupported(),
+            (ClockNanosleep = 230) => do_clock_nanosleep(clockid: clockid_t, flags: i32, request: *const timespec_t, remain: *mut timespec_t),
             (ExitGroup = 231) => do_exit_group(exit_status: i32, user_context: *mut CpuContext),
             (EpollWait = 232) => do_epoll_wait(epfd: c_int, events: *mut libc::epoll_event, maxevents: c_int, timeout: c_int),
             (EpollCtl = 233) => do_epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *const libc::epoll_event),
@@ -882,6 +882,27 @@ fn do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t) -> Result<isize> 
     unsafe {
         *res_u = res;
     }
+    Ok(0)
+}
+
+fn do_clock_nanosleep(
+    clockid: clockid_t,
+    flags: i32,
+    req_u: *const timespec_t,
+    rem_u: *mut timespec_t,
+) -> Result<isize> {
+    let req = {
+        check_ptr(req_u)?;
+        timespec_t::from_raw_ptr(req_u)?
+    };
+    let rem = if !rem_u.is_null() {
+        check_mut_ptr(rem_u)?;
+        Some(unsafe { &mut *rem_u })
+    } else {
+        None
+    };
+    let clockid = time::ClockID::from_raw(clockid)?;
+    time::do_clock_nanosleep(clockid, flags, &req, rem)?;
     Ok(0)
 }
 

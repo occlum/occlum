@@ -141,7 +141,8 @@ enclave {
         void occlum_ocall_rdtsc([out] uint32_t* low, [out] uint32_t* high);
         void occlum_ocall_get_timerslack([out] int *timer_slack);
 
-        int occlum_ocall_nanosleep(
+        int occlum_ocall_clock_nanosleep(
+            clockid_t clockid, int flags,
             [in] const struct timespec* req,
             [out] struct timespec* rem
         ) propagate_errno;
