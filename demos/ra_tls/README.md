@@ -1,7 +1,44 @@
 # gRPC Package With RA-TLS
 
+## Simple GRPC protocol for the demo
 
-#### Executing the demo in Occlum
+* Server side, holds a [`json file`](./secret_config.json) including secret name and the secret's base64 encoded string.
+
+* Client side, request the secret by the secret name.
+
+## Example libraries/executables in the demo
+
+* libhw_grpc_proto.so
+* libgrpc_ratls_client.so
+* libgrpc_ratls_server.so
+* client
+* server
+
+### APIs defined for sample server and client
+
+* Server
+```
+int gr_start_server(
+    const char *server_addr, // grpc server address+port, such as "localhost:50051"
+    const char *config_json, // ratls handshake config json file
+    const char *secret_json  // secret config json file
+);
+```
+
+* Client
+```
+int gr_client_get_secret(
+    const char *server_addr, // grpc server address+port, such as "localhost:50051"
+    const char *config_json, // ratls handshake config json file
+    const char *name, // secret name to be requested
+    const char *secret_file // secret file to be saved
+);
+```
+
+All source could be found on [`example`](./grpc/v1.38.1/examples/cpp/ratls/)
+
+
+## Executing the demo in Occlum
 
 The following command will download prerequisite source and the gRPC source code.
 ```
@@ -31,7 +68,7 @@ Run the gRPC server & client in occlum.
 
 ```
 ./run.sh server &
-./run.sh client
+./run.sh client <request_secret_name> ( cert, key )
 ```
 
 ***Note:*** 1. The demo runs in the same machine by default. If you want to run server and client in different machines. Please modify the examples/cpp/ratls.

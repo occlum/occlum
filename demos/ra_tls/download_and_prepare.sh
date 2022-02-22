@@ -23,3 +23,9 @@ pushd ${GRPC_PATH} \
 popd
 
 
+# Download cJSON
+CJSON_VER=1.7.15
+rm -rf cJSON*
+wget https://github.com/DaveGamble/cJSON/archive/refs/tags/v${CJSON_VER}.tar.gz
+tar zxvf v${CJSON_VER}.tar.gz
+
