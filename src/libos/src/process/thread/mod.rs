@@ -241,6 +241,23 @@ impl Thread {
         self.sched().lock().unwrap().detach();
 
         // Remove this thread from its owner process
+        let remaining_thread_num = self.remove_thread_from_owner_process();
+        self.inner().exit(term_status);
+
+        remaining_thread_num
+    }
+
+    // Call this function when a thread exits before the thread is scheduled to run
+    pub(super) fn exit_early(&self, term_status: TermStatus) -> usize {
+        // Don't call sched detach here. Because this thread has never been scheduled to run,
+        warn!("Thread early exit here");
+        let remaining_thread_num = self.remove_thread_from_owner_process();
+        self.inner().exit_early(term_status);
+
+        remaining_thread_num
+    }
+
+    fn remove_thread_from_owner_process(&self) -> usize {
         let mut process_inner = self.process.inner();
         let threads = process_inner.threads_mut().unwrap();
         let thread_i = threads
@@ -248,9 +265,6 @@ impl Thread {
             .position(|thread| thread.tid() == self.tid())
             .expect("the thread must belong to the process");
         threads.swap_remove(thread_i);
-
-        self.inner().exit(term_status);
-
         threads.len()
     }
 
@@ -321,6 +335,10 @@ impl ThreadInner {
 
     pub fn exit(&mut self, term_status: TermStatus) {
         debug_assert!(self.status() == ThreadStatus::Running);
+        *self = Self::Exited { term_status };
+    }
+
+    pub fn exit_early(&mut self, term_status: TermStatus) {
         *self = Self::Exited { term_status };
     }
 }

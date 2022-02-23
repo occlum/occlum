@@ -77,7 +77,7 @@ pub async fn do_clone(
     let process = new_thread_ref.process();
     // If the current thread is forced to exit, there is no need to let the new thread to execute.
     if process.is_forced_to_exit() {
-        new_thread_ref.exit(process.term_status().unwrap());
+        new_thread_ref.exit_early(process.term_status().unwrap());
         return Ok(0);
     }
 
