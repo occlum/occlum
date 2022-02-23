@@ -23,7 +23,7 @@ lazy_static! {
     static ref VFORK_PARENT_FILE_TABLES: SgxMutex<HashMap<pid_t, FileTable>> = SgxMutex::new(HashMap::new());
 }
 
-thread_local! {
+async_rt::task_local! {
     // Store the current process' vforked child and current thread's cpu context. A parent only has one vforked child at a time.
     static VFORK_CONTEXT: RefCell<Option<(pid_t, CpuContext)>> = Default::default();
 }
