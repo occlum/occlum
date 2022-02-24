@@ -617,3 +617,25 @@ jobs:
     - name: Run sysbench threads benchmark
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/sysbench/occlum_instance;
             occlum run /bin/sysbench threads --threads=200 --thread-yields=100 --thread-locks=4 --time=30 run"
+        
+  Gvisor_syscalls_test:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Create container
+      run: |
+        docker pull occlumbackup/occlum:latest-ubuntu18.04-gvisor_test
+        gvisor_test=$(docker run -itd -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-gvisor_test);
+        echo "gvisor_test=$gvisor_test" >> $GITHUB_ENV
+
+    - name: Build dependencies
+      run: docker exec $gvisor_test bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec $gvisor_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+    
+    - name: Run gvisor syscall test
+      run: docker exec $gvisor_test bash -c "cd /root/gvisor_occlum && SGX_MODE=SIM ./run_occlum_passed_tests.sh"
