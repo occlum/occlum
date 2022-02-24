@@ -122,7 +122,7 @@ RUN apt-get update && aptitude install -y \
 
 # Install SGX SDK
 WORKDIR /tmp
-RUN git clone -b sgx_2.15.1_for_occlum https://github.com/occlum/linux-sgx && \
+RUN git clone -b sgx_2.15.1_for_occlum https://github.com/jessehui/linux-sgx && \
     mkdir /etc/init && \
     cd linux-sgx && \
     make preparation && \
