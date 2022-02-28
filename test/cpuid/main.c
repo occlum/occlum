@@ -41,6 +41,10 @@ static bool is_cpuidinfo_equal(int leaf, t_cpuid_t *cpu, t_cpuid_t *cpu_sgx) {
                 (cpu->ebx == cpu_sgx->ebx) &&
                 (cpu->ecx == cpu_sgx->ecx));
     }
+    /* Leaf 0x8000001E is for threads/core_id/apic_ids/socket_id */
+    if (leaf == 0x8000001E) {
+        return cpu->edx == cpu_sgx->edx;
+    }
     return ((cpu->eax == cpu_sgx->eax) &&
             (cpu->ebx == cpu_sgx->ebx) &&
             (cpu->ecx == cpu_sgx->ecx) &&
@@ -222,7 +226,7 @@ static int test_cpuid_with_oversized_leaf() {
     native_cpuid(leaf, subleaf, &cpu);
 
     t_cpuid_t cpu_max;
-    leaf = g_max_basic_leaf;
+    leaf = g_max_basic_leaf + 1;
     subleaf = 1;
     native_cpuid(leaf, subleaf, &cpu_max);
 
