@@ -8,7 +8,7 @@ env:
 
 jobs:
   Collect-code-coverage:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
       with:
@@ -18,7 +18,7 @@ jobs:
       run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
 
     - name: Create container
-      run: docker run -itd --name=code_coverage -e OCCLUM_LOG_LEVEL=trace -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu18.04
+      run: docker run -itd --name=code_coverage -e OCCLUM_LOG_LEVEL=trace -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04
 
     - name: Build dependencies
       run: docker exec code_coverage bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
