@@ -28,7 +28,7 @@ build_opencv() {
       -DBUILD_opencv_python=OFF -DBUILD_PYTHON_SUPPORT=OFF \
       -DBUILD_EXAMPLES=OFF -DWITH_FFMPEG=OFF \
       -DWITH_QT=OFF -DWITH_CUDA=OFF
-    make -j4
+    make -j$(nproc)
     sudo make install
     popd
 }
@@ -79,7 +79,7 @@ build_openvino() {
       -DENABLE_MYRIAD=OFF \
       -DENABLE_GNA=OFF \
       -DENABLE_VPU=OFF
-    make -j4
+    make -j$(nproc)
     popd
 }
 
