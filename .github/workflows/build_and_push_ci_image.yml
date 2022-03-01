@@ -22,7 +22,7 @@ on:
 
 jobs:
   Build_grpc_image:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     if: github.event.inputs.image_name == 'grpc'
 
     steps:
@@ -67,11 +67,11 @@ jobs:
           "OCCLUM_VERSION=${{ env.OCCLUM_VERSION }}"
           "OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}"
         push: true
-        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu18.04-grpc
+        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu20.04-grpc
 
 
   Build_gvisor_test_image:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     if: github.event.inputs.image_name == 'gvisor_test'
 
     steps:
@@ -110,11 +110,11 @@ jobs:
           "OCCLUM_VERSION=${{ env.OCCLUM_VERSION }}"
           "OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}"
         push: true
-        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu18.04-gvisor_test
+        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu20.04-gvisor_test
 
 
   Build_openvino_image:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     if: github.event.inputs.image_name == 'openvino'
 
     steps:
@@ -158,11 +158,11 @@ jobs:
           "OCCLUM_VERSION=${{ env.OCCLUM_VERSION }}"
           "OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}"
         push: true
-        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu18.04-openvino
+        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu20.04-openvino
 
 
   Build_python_image:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     if: github.event.inputs.image_name == 'python'
 
     steps:
@@ -206,7 +206,7 @@ jobs:
           "OCCLUM_VERSION=${{ env.OCCLUM_VERSION }}"
           "OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}"
         push: true
-        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu18.04-python
+        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu20.04-python
 
 
   # TODO: Add actions to build tf_serving_base image.
@@ -214,7 +214,7 @@ jobs:
   # Thus dividing into two jobs.
 
   Build_tf_serving_image:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     if: github.event.inputs.image_name == 'tf_serving'
 
     steps:
@@ -259,4 +259,4 @@ jobs:
           "OCCLUM_VERSION=${{ env.OCCLUM_VERSION }}"
           "OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}"
         push: true
-        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu18.04-tf_serving
+        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu20.04-tf_serving
