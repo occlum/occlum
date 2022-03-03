@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 this_dir="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
 occlum_dir="$( cd "$( dirname "$this_dir/../../../"  )" >/dev/null 2>&1 && pwd )"
 build_makefile=$occlum_dir/build/bin/occlum_build.mk
@@ -118,6 +120,12 @@ check_has_run() {
 check_aesm_service() {
     # Ignore AESM service status for simulation mode
     if [ "$(cat $instance_dir/.sgx_mode 2>/dev/null)" != "HW" ]; then
+        return
+    fi
+
+    # AESM is not necessary for SGX2
+    lscpu | grep sgx_lc > /dev/null 2>&1 || ret=$?
+    if [[ $ret -eq 0 ]]; then
         return
     fi
 
@@ -617,8 +625,6 @@ cmd_print_info() {
         exit_error "No valid info name provided"
     fi
 }
-
-set -e
 
 if [[ ( "$#" < 1 ) ]] ; then
     report_arg_error "Error: no sub-command is given"
