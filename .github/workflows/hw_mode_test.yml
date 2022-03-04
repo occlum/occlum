@@ -650,41 +650,41 @@ jobs:
       run: docker stop $gvisor_test
 
 
-  Test_rpm_deploy:
-    if: github.event_name == 'push'
-    runs-on: ${{ matrix.self_runner }}
-    strategy:
-      matrix:
-        self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
+  # Test_rpm_deploy:
+  #   if: github.event_name == 'push'
+  #   runs-on: ${{ matrix.self_runner }}
+  #   strategy:
+  #     matrix:
+  #       self_runner: [[self-hosted, SGX1-HW], [self-hosted, SGX2-HW]]
 
-    steps:
-    - name: Clean before running
-      run: |
-        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+  #   steps:
+  #   - name: Clean before running
+  #     run: |
+  #       sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
-    - name: Checkout code
-      if: github.event_name == 'push'
-      uses: actions/checkout@v2
-      with:
-        submodules: false
+  #   - name: Checkout code
+  #     if: github.event_name == 'push'
+  #     uses: actions/checkout@v2
+  #     with:
+  #       submodules: false
 
-    - name: Test deployment
-      run: |
-        cd demos/deployment
-        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          ./deploy_image_test.sh centos8.2
-        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          DEVICE_OPTION="-v /dev/sgx:/dev/sgx" ./deploy_image_test.sh centos8.2
-        else
-          echo "Unsupported Hardware"
-          exit 1
-        fi;
+  #   - name: Test deployment
+  #     run: |
+  #       cd demos/deployment
+  #       if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+  #         ./deploy_image_test.sh centos8.2
+  #       elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+  #         DEVICE_OPTION="-v /dev/sgx:/dev/sgx" ./deploy_image_test.sh centos8.2
+  #       else
+  #         echo "Unsupported Hardware"
+  #         exit 1
+  #       fi;
 
-    - name: Clean the environment
-      if: ${{ always() }}
-      run: |
-        docker stop centos8.2_deploy_test
-        docker rm -f centos8.2_deploy_test
+  #   - name: Clean the environment
+  #     if: ${{ always() }}
+  #     run: |
+  #       docker stop centos8.2_deploy_test
+  #       docker rm -f centos8.2_deploy_test
 
 
   Test_deb_deploy:
