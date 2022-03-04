@@ -1,6 +1,6 @@
 [package]
 name = "occlum_exec"
-version = "0.26.3"
+version = "0.27.0"
 edition = "2018"
 
 [lib]
