@@ -305,7 +305,7 @@ jobs:
 
 
 # Below tests needs test image to run faster
-  Grpc_test:
+  Grpc_musl_test:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
@@ -313,7 +313,7 @@ jobs:
         submodules: true
 
     - name: Create container
-      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-grpc
+      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc
 
     - name: Build dependencies
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum; make submodule"
@@ -322,15 +322,15 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Prepare grpc sample project
-      run: docker exec ${{ github.job }} bash -c "cd /root/demos/grpc && ./prepare_client_server.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_musl && ./prepare_client_server.sh"
 
     - name: Run grpc server
-      run: docker exec ${{ github.job }} bash -c "cd /root/demos/grpc && SGX_MODE=SIM ./run_server_on_occlum.sh" &
+      run: docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_musl && SGX_MODE=SIM ./run_server_on_occlum.sh" &
 
     - name: Run grpc client
       run: |
         sleep ${{ env.nap_time }};
-        docker exec ${{ github.job }} bash -c "cd /root/demos/grpc && SGX_MODE=SIM ./run_client_on_occlum.sh"
+        docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_musl && SGX_MODE=SIM ./run_client_on_occlum.sh"
 
 
   Openvino_test:
@@ -341,7 +341,7 @@ jobs:
         submodules: true
 
     - name: Create container
-      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-openvino
+      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-openvino
 
     - name: Build dependencies
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum; make submodule"
@@ -361,7 +361,7 @@ jobs:
       with:
         submodules: true
     - name: Create container
-      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-python
+      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-python
 
     - name: Build dependencies
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum; make submodule"
@@ -642,8 +642,8 @@ jobs:
 
     - name: Create container
       run: |
-        docker pull occlumbackup/occlum:latest-ubuntu18.04-gvisor_test
-        gvisor_test=$(docker run -itd -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu18.04-gvisor_test);
+        docker pull occlumbackup/occlum:latest-ubuntu20.04-gvisor_test
+        gvisor_test=$(docker run -itd -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-gvisor_test);
         echo "gvisor_test=$gvisor_test" >> $GITHUB_ENV
 
     - name: Build dependencies

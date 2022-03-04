@@ -22,7 +22,8 @@ cmake ../  -DCMAKE_BUILD_TYPE=Debug -DCURSES_LIBRARY=/opt/occlum/toolchains/gcc/
 -DCMAKE_C_COMPILER_AR=/usr/local/occlum/bin/occlum-ar \
 -DCMAKE_C_COMPILER_RANLIB=/usr/local/occlum/bin/occlum-ranlib \
 -DCMAKE_LINKER=/usr/local/occlum/bin/occlum-ld -DCMAKE_C_FLAGS="-I/usr/local/occlum/include -fpic -pie" \
--DCMAKE_CXX_FLAGS="-I/usr/local/occlum/include -fpic -pie"
+-DCMAKE_CXX_FLAGS="-I/usr/local/occlum/include -fpic -pie" \
+-DIntl_INCLUDE_DIR=/usr/local/occlum/x86_64-linux-musl/include
 make -j$(nproc)
 cd ../../
 
