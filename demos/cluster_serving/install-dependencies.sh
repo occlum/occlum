@@ -1,8 +1,11 @@
 #!/bin/bash
 
 apt-get update
-apt-get install -y openjdk-11-jdk
+apt-get install -y openjdk-11-jre
 apt-get install -y netcat
+
+#The openjdk has a broken symlink, remove it as a workaround
+rm /usr/lib/jvm/java-11-openjdk-amd64/lib/security/blacklisted.certs
 
 # Redis
 [ -f redis-${REDIS_VERSION}.tar.gz ] || wget http://download.redis.io/releases/redis-${REDIS_VERSION}.tar.gz
