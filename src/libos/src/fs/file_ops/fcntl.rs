@@ -1,4 +1,4 @@
-use super::flock::c_flock;
+use super::locks::range_lock::c_flock;
 use super::*;
 use util::mem_util::from_user;
 
