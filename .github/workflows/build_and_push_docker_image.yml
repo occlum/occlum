@@ -7,7 +7,7 @@ on:
       OS:
         description: 'OS name (must choose from <centos, ubuntu18, ubuntu20>)'
         required: true
-        default: 'ubuntu18'
+        default: 'ubuntu20'
 
 jobs:
   generate-centos-image:
