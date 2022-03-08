@@ -23,7 +23,7 @@ pub use self::file_ops::{
     IfConf, IoctlCmd, Stat, StatusFlags, StructuredIoctlArgType, StructuredIoctlNum,
 };
 pub use self::file_table::{FileDesc, FileTable, FileTableEvent, FileTableNotifier};
-pub use self::flock::{
+pub use self::locks::range_lock::{
     FileRange, RangeLock, RangeLockBuilder, RangeLockList, RangeLockType, OFFSET_MAX,
 };
 pub use self::fs_ops::Statfs;
@@ -43,7 +43,7 @@ mod events;
 mod file;
 mod file_ops;
 mod file_table;
-mod flock;
+mod locks;
 mod fs_ops;
 mod fs_view;
 mod host_fd;
