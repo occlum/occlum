@@ -16,7 +16,7 @@ C_TOOLCHAIN_PACKAGE_NAME := occlum-toolchains-gcc
 # The version numbers are only needed to update when the toolchains are updated.
 # When updating the toolchain packages for Deb, please first update RPM configuration. And then
 # update the "changelog" file accordingly.
-MUSL_VERSION := 0.15.0
+MUSL_VERSION := 0.27.0
 GOLAN_VERSION := 0.16.0
 
 GO_PATCH = $(PROJECT_DIR)/tools/toolchains/golang/adapt-golang-to-occlum.patch
