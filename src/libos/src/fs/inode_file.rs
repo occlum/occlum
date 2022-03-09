@@ -338,6 +338,46 @@ impl INodeFile {
 
         range_lock_list.unlock(lock)
     }
+
+    pub fn set_flock(&self, lock: Flock, is_nonblocking: bool) -> Result<()> {
+        let ext = match self.inode.ext() {
+            Some(ext) => ext,
+            None => {
+                warn!("Inode extension is not supported, let the lock could be acquired");
+                // TODO: Implement inode extension for FS
+                return Ok(());
+            }
+        };
+        let flock_list = match ext.get::<FlockList>() {
+            Some(list) => list,
+            None => ext.get_or_put_default::<FlockList>(),
+        };
+
+        flock_list.set_lock(lock, is_nonblocking)
+    }
+
+    pub fn unlock_flock(&self) {
+        let ext = match self.inode.ext() {
+            Some(ext) => ext,
+            None => {
+                return;
+            }
+        };
+        let flock_list = match ext.get::<FlockList>() {
+            Some(list) => list,
+            None => {
+                return;
+            }
+        };
+
+        flock_list.unlock(self);
+    }
+}
+
+impl Drop for INodeFile {
+    fn drop(&mut self) {
+        self.unlock_flock()
+    }
 }
 
 impl Debug for INodeFile {

@@ -23,13 +23,14 @@ pub use self::file_ops::{
     IfConf, IoctlCmd, Stat, StatusFlags, StructuredIoctlArgType, StructuredIoctlNum,
 };
 pub use self::file_table::{FileDesc, FileTable, FileTableEvent, FileTableNotifier};
-pub use self::locks::range_lock::{
-    FileRange, RangeLock, RangeLockBuilder, RangeLockList, RangeLockType, OFFSET_MAX,
-};
 pub use self::fs_ops::Statfs;
 pub use self::fs_view::FsView;
 pub use self::host_fd::HostFd;
 pub use self::inode_file::{AsINodeFile, INodeExt, INodeFile};
+pub use self::locks::flock::{Flock, FlockList, FlockOps, FlockType};
+pub use self::locks::range_lock::{
+    FileRange, RangeLock, RangeLockBuilder, RangeLockList, RangeLockType, OFFSET_MAX,
+};
 pub use self::pipe::PipeType;
 pub use self::rootfs::ROOT_FS;
 pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
@@ -43,12 +44,12 @@ mod events;
 mod file;
 mod file_ops;
 mod file_table;
-mod locks;
 mod fs_ops;
 mod fs_view;
 mod host_fd;
 mod hostfs;
 mod inode_file;
+mod locks;
 mod pipe;
 mod procfs;
 mod rootfs;

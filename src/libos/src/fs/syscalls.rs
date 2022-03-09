@@ -693,3 +693,10 @@ pub fn do_umount(target: *const i8, flags: u32) -> Result<isize> {
     fs_ops::do_umount(&target, flags)?;
     Ok(0)
 }
+
+pub fn do_flock(fd: FileDesc, operation: i32) -> Result<isize> {
+    let flock_ops = FlockOps::from_i32(operation)?;
+
+    file_ops::do_flock(fd, flock_ops)?;
+    Ok(0)
+}
