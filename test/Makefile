@@ -21,7 +21,7 @@ TEST_DEPS := client data_sink naughty_child wait_child
 
 TESTS ?= env empty hello_world malloc mmap file fs_perms getpid spawn sched pipe time \
 	truncate readdir mkdir open stat link symlink chmod chown tls pthread system_info rlimit \
-	server server_epoll unix_socket cout hostfs cpuid rdtsc device sleep exit_group flock \
+	server server_epoll unix_socket cout hostfs cpuid rdtsc device sleep exit_group posix_flock \
 	ioctl fcntl eventfd emulate_syscall access signal prctl rename procfs wait \
 	spawn_attribute exec statfs random umask pgrp vfork mount sysinfo timerfd
 
