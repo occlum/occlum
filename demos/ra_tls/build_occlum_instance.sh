@@ -16,7 +16,8 @@ function build_instance() {
     mkdir occlum_$postfix
     pushd occlum_$postfix
     occlum init
-    new_json="$(jq '.resource_limits.user_space_size = "500MB"' Occlum.json)" && \
+    new_json="$(jq '.resource_limits.user_space_size = "500MB" |
+                    .metadata.debuggable = false' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
 
     if [ "$postfix" == "server" ]; then
@@ -25,8 +26,10 @@ function build_instance() {
              .verify_mr_signer = "on" |
              .verify_isv_prod_id = "off" |
              .verify_isv_svn = "off" |
+             .verify_enclave_debuggable = "on" |
 	     .sgx_mrs[0].mr_enclave = ''"'`get_mr client mr_enclave`'" |
-	     .sgx_mrs[0].mr_signer = ''"'`get_mr client mr_signer`'" ' ../ra_config_template.json > dynamic_config.json
+	     .sgx_mrs[0].mr_signer = ''"'`get_mr client mr_signer`'" |
+         .sgx_mrs[0].debuggable = false ' ../ra_config_template.json > dynamic_config.json
     
         if [ "$libnss_require" == "y" ]; then
             cp /lib/x86_64-linux-gnu/libnss*.so.2 image/$occlum_glibc
@@ -35,11 +38,13 @@ function build_instance() {
 
         bomfile="../grpc_ratls_server.yaml"
     else
-        # Client verify nothing from server
+        # Client verify only enclave non-debuggable from server
         jq ' .verify_mr_enclave = "off" |
              .verify_mr_signer = "off" |
              .verify_isv_prod_id = "off" |
-             .verify_isv_svn = "off" ' ../ra_config_template.json > dynamic_config.json
+             .verify_isv_svn = "off" |
+             .verify_enclave_debuggable = "on" |
+             .sgx_mrs[0].debuggable = false ' ../ra_config_template.json > dynamic_config.json
 
         bomfile="../grpc_ratls_client.yaml"
     fi
@@ -52,9 +57,9 @@ function build_instance() {
 }
 
 if [[ $1 == "musl" ]]; then
-    echo "*** Build and musl-libc Occlum instance ***"
+    echo "*** Build musl-libc Occlum instance ***"
 else
-    echo "*** Build and run glibc Occlum instance ***"
+    echo "*** Build glibc Occlum instance ***"
     # glibc version requires libnss
     libnss_require="y"
     occlum_glibc=/opt/occlum/glibc/lib/
