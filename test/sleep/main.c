@@ -14,6 +14,13 @@
 #define NS          (1)
 
 // ============================================================================
+// Global variables
+// ============================================================================
+
+static const int SUCCESS = 1;
+static const int FAIL = -1;
+
+// ============================================================================
 // Helper functions
 // ============================================================================
 
@@ -67,11 +74,18 @@ static int timespec_equal(const struct timespec *a, const struct timespec *b,
                           const struct timespec *precision) {
     struct timespec diff;
     timespec_diff(a, b, &diff);
-    return timespec_cmp(&diff, precision) <= 0;
+    if (timespec_cmp(&diff, precision) <= 0) {
+        return 1;
+    } else {
+        printf("Greater than precision, diff={ %ld s, %ld ns}, precision={ %ld s, %ld ns}\n",
+               diff.tv_sec, diff.tv_nsec, precision->tv_sec, precision->tv_nsec);
+        return 0;
+    }
 }
 
 
-static int check_nanosleep(struct timespec *expected_sleep_period) {
+// Return SUCCESS(1) if check passed, FAIL(-1) if check failed
+static int check_nanosleep(const struct timespec *expected_sleep_period) {
     // The time obtained from Occlum is not very precise.
     // Here we take 1 millisecond as the time precision of Occlum.
     static struct timespec OS_TIME_PRECISION = {
@@ -91,66 +105,68 @@ static int check_nanosleep(struct timespec *expected_sleep_period) {
     timespec_diff(&begin_timestamp, &end_timestamp, &actual_sleep_period);
 
     return timespec_equal(expected_sleep_period, &actual_sleep_period,
-                          &OS_TIME_PRECISION);
+                          &OS_TIME_PRECISION) ? SUCCESS : FAIL;
 }
 
 // ============================================================================
 // Test cases
+// Return SUCCESS(1) if check passed, FAIL(-1) if check failed
 // ============================================================================
 
-int test_nanosleep_0_second() {
+static int test_nanosleep_0_second() {
     struct timespec period_of_0s = { .tv_sec = 0, .tv_nsec = 0 };
     return check_nanosleep(&period_of_0s);
 }
 
-int test_nanosleep_1_second() {
+static int test_nanosleep_1_second() {
     struct timespec period_of_1s = { .tv_sec = 1, .tv_nsec = 0 };
     return check_nanosleep(&period_of_1s);
 }
 
-int test_nanosleep_10ms() {
+static int test_nanosleep_10ms() {
     struct timespec period_of_10ms = { .tv_sec = 0, .tv_nsec = 10 * MS };
     return check_nanosleep(&period_of_10ms);
 }
 
 // ============================================================================
 // Test cases with invalid arguments
+// Return SUCCESS(1) if check passed, FAIL(-1) if check failed
 // ============================================================================
 
-int test_nanosleep_with_null_req() {
+static int test_nanosleep_with_null_req() {
     if (nanosleep(NULL, NULL) != -1 && errno != EINVAL) {
         THROW_ERROR("nanosleep should report error");
     }
-    return 0;
+    return SUCCESS;
 }
 
-int test_nanosleep_with_negative_tv_sec() {
+static int test_nanosleep_with_negative_tv_sec() {
     // nanosleep returns EINVAL if the value in the tv_sec field is negative
     struct timespec invalid_period = { .tv_sec = -1, .tv_nsec = 0};
     if (nanosleep(&invalid_period, NULL) != -1 && errno != EINVAL) {
         THROW_ERROR("nanosleep should report EINVAL error");
     }
-    return 0;
+    return SUCCESS;
 }
 
-int test_nanosleep_with_negative_tv_nsec() {
+static int test_nanosleep_with_negative_tv_nsec() {
     // nanosleep returns EINVAL if the value in the tv_nsec field
     // was not in the range 0 to 999999999.
     struct timespec invalid_period = { .tv_sec = 0, .tv_nsec = -1};
     if (nanosleep(&invalid_period, NULL) != -1 && errno != EINVAL) {
         THROW_ERROR("nanosleep should report EINVAL error");
     }
-    return 0;
+    return SUCCESS;
 }
 
-int test_nanosleep_with_too_large_tv_nsec() {
+static int test_nanosleep_with_too_large_tv_nsec() {
     // nanosleep returns EINVAL if the value in the tv_nsec field
     // was not in the range 0 to 999999999 (10^6 - 1).
     struct timespec invalid_period = { .tv_sec = 0, .tv_nsec = S};
     if (nanosleep(&invalid_period, NULL) != -1 && errno != EINVAL) {
         THROW_ERROR("nanosleep should report EINVAL error");
     }
-    return 0;
+    return SUCCESS;
 }
 
 // ============================================================================
