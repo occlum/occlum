@@ -55,7 +55,7 @@ If musl-libc version is expected.
 ./build_and_install.sh musl
 ```
 
-The following command will generate the client and server occlum images. It automatically parses the mr_enclave and mr_signer of the client, and write the value into dynamic_config.json. If you want to verify the other measurements of client, please modify the dynamic_config.json before run the script.
+The following command will generate the client and server occlum images. It automatically parses the mr_enclave and mr_signer of the client, and write the value into dynamic_config.json. If you want to verify the other measurements of client, please modify the `ra_config_template.json` before run the script.
 ```
 ./build_occlum_instance.sh
 ```

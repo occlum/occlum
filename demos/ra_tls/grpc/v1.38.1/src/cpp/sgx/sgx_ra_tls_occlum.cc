@@ -299,10 +299,16 @@ int occlum_verify_cert(const unsigned char * der_crt, size_t len) {
         return -1;
     }
 
+    // Check if enclave is debuggable
+    bool debuggable = false;
+    if (p_rep_body->attributes.flags & SGX_FLAGS_DEBUG)
+        debuggable = true;
+
     ret = verify_measurement((const char *)&p_rep_body->mr_enclave,
                              (const char *)&p_rep_body->mr_signer,
                              (const char *)&p_rep_body->isv_prod_id,
-                             (const char *)&p_rep_body->isv_svn); 
+                             (const char *)&p_rep_body->isv_svn,
+                             debuggable);
     if (ret != 0) {
         grpc_printf("verify the measurement failed!\n");
         return -1;
