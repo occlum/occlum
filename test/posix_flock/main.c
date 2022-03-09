@@ -14,14 +14,14 @@
 
 const char **g_argv;
 int g_argc;
-const char *g_file_path = "/root/test_flock_file.txt";
+const char *g_file_path = "/root/test_posix_flock_file.txt";
 int g_fd;
 off_t g_file_len = 128;
 
 // Expected child arguments
 const int child_argc = 2;
 const char *child_argv[3] = {
-    "flock",
+    "posix_flock",
     "child",
     NULL
 };
@@ -86,7 +86,7 @@ static int test_setlk() {
 static int test_spawn_child_and_unlock() {
     int status, child_pid;
     int ret = posix_spawn(&child_pid,
-                          "/bin/flock", NULL, NULL,
+                          "/bin/posix_flock", NULL, NULL,
                           (char *const *)child_argv,
                           NULL);
     if (ret < 0) {
