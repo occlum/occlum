@@ -1,4 +1,10 @@
-occlum-toolchains-gcc ($MUSL_VERSION-1) unstable; urgency=medium
+occlum-toolchains-gcc (0.27.0-1) unstable; urgency=medium
+
+  * Upgrade to support Ubuntu20.04
+
+ -- Chunyang Hui <sanqian.hcy@antfin.com>  Wed, 9 Mar 2022 13:50:00 +0000
+
+occlum-toolchains-gcc (0.15.0-1) unstable; urgency=medium
 
   * Initial release
 
