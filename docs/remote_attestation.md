@@ -26,6 +26,12 @@ For details how to use the library, please refer to the [`demo`](../demos/remote
 
 The source code of the library is in the [`path`](../tools/toolchains/dcap_lib/).
 
+## Init-RA solution
+
+To ease the effort to utilize the remote attestation in real project, Occlum provides a `Init RA` way to seperate the RA operation and the actual application. With this way, the APP developers don't need know too much about the RA and the application doesn't need to be modified for RA.
+
+Details please refer to the demo [`init_ra_flow`](demos/remote_attestation/init_ra_flow).
+
 ## SGX KSS (Key Separation and Sharing feature) support
 
 Starting from SGX2, there is a new Key Separation and Sharing feature which provides more  flexibility. The new feature gives user a chance to fill in some meaningful information to the enclave either in the signing or running stage.
