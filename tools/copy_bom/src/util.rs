@@ -1,9 +1,9 @@
 use crate::error::{
     COPY_DIR_ERROR, COPY_FILE_ERROR, CREATE_DIR_ERROR, CREATE_SYMLINK_ERROR, FILE_NOT_EXISTS_ERROR,
-    INCORRECT_HASH_ERROR, 
+    INCORRECT_HASH_ERROR,
 };
 use data_encoding::HEXUPPER;
-use elf::types::{ET_DYN, ET_EXEC, Type};
+use elf::types::{Type, ET_DYN, ET_EXEC};
 use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -75,11 +75,23 @@ lazy_static! {
     static ref DEPENDENCY_REGEX: Regex = Regex::new(r"^(?P<name>\S+) => (?P<path>\S+) ").unwrap();
 }
 
-pub fn copy_file(src: &str, dest: &str, dry_run: bool) {
-    info!("rsync -aL {} {}", src, dest);
+fn format_command(command: &Command) -> String {
+    let program = command.get_program().to_string_lossy().to_string();
+    let args: Vec<_> = command
+        .get_args()
+        .map(|arg| arg.to_string_lossy().to_string())
+        .collect();
+    let args = args.join(" ");
+    format!("{} {}", program, args)
+}
+
+pub fn copy_file(src: &str, dest: &str, dry_run: bool, rootfs: &Option<String>) {
+    let mut command = Command::new("rsync");
+    command.arg("-aL").arg(src).arg(dest);
+    command = wrap_command_with_chroot(command, rootfs);
+    info!("{}", format_command(&command));
     if !dry_run {
-        let output = Command::new("rsync").arg("-aL").arg(src).arg(dest).output();
-        match output {
+        match command.output() {
             Ok(output) => deal_with_output(output, COPY_FILE_ERROR),
             Err(e) => {
                 error!("copy file {} to {} failed. {}", src, dest, e);
@@ -89,41 +101,55 @@ pub fn copy_file(src: &str, dest: &str, dry_run: bool) {
     }
 }
 
-fn format_command_args(args: &Vec<String>) -> String {
-    let mut res = String::new();
-    for arg in args {
-        res = format!("{} {}", res, arg);
-    }
-    res.trim().to_string()
-}
-
-pub fn mkdir(dest: &str, dry_run: bool) {
-    info!("mkdir -p {}", dest);
+pub fn mkdir(dest: &str, dry_run: bool, rootfs: &Option<String>) {
+    let mut command = Command::new("mkdir");
+    command.arg("-p").arg(dest);
+    command = wrap_command_with_chroot(command, rootfs);
+    info!("{}", format_command(&command));
     if !dry_run {
-        if let Err(e) = std::fs::create_dir_all(dest) {
-            error!("mkdir {} fails. {}", dest, e);
-            std::process::exit(CREATE_DIR_ERROR);
+        match command.output() {
+            Ok(output) => deal_with_output(output, CREATE_DIR_ERROR),
+            Err(e) => {
+                error!("mkdir {} fails. {}", dest, e);
+                std::process::exit(CREATE_DIR_ERROR);
+            }
         }
     }
 }
 
-pub fn create_link(src: &str, linkname: &str, dry_run: bool) {
-    info!("ln -s {} {}", src, linkname);
+pub fn create_link(src: &str, linkname: &str, dry_run: bool, rootfs: &Option<String>) {
+    let mut command = Command::new("ln");
+    command.arg("-s").arg(src).arg(linkname);
+    command = wrap_command_with_chroot(command, rootfs);
+    info!("{}", format_command(&command));
     if !dry_run {
         // When we try to create a link, if there is already a file, the create will fail
         // So we delete the link at first if an old file exists.
-        let _ = std::fs::remove_file(linkname);
-        if let Err(e) = std::os::unix::fs::symlink(src, linkname) {
-            error!("ln -s {} {} failed. {}", src, linkname, e);
-            std::process::exit(CREATE_SYMLINK_ERROR);
+        let mut remove_oldlink_command = Command::new("rm");
+        remove_oldlink_command.arg(linkname);
+        remove_oldlink_command = wrap_command_with_chroot(remove_oldlink_command, rootfs);
+        let _ = remove_oldlink_command.status();
+        // execute command
+        match command.output() {
+            Ok(output) => deal_with_output(output, CREATE_SYMLINK_ERROR),
+            Err(e) => {
+                error!("ln -s {} {} failed. {}", src, linkname, e);
+                std::process::exit(CREATE_SYMLINK_ERROR);
+            }
         }
     }
 }
 
-pub fn copy_dir(src: &str, dest: &str, dry_run: bool, excludes: &Vec<String>) {
+pub fn copy_dir(
+    src: &str,
+    dest: &str,
+    dry_run: bool,
+    excludes: &Vec<String>,
+    rootfs: &Option<String>,
+) {
     // we should not pass --delete args. Otherwise it will overwrite files in the same place
     // We pass --copy-unsafe-links instead of -L arg. So links point to current directory will be kept.
-    let mut args: Vec<_> = vec!["-ar", "--copy-unsafe-links"]
+    let args: Vec<_> = vec!["-ar", "--copy-unsafe-links"]
         .into_iter()
         .map(|s| s.to_string())
         .collect();
@@ -131,11 +157,12 @@ pub fn copy_dir(src: &str, dest: &str, dry_run: bool, excludes: &Vec<String>) {
         .iter()
         .map(|arg| format!("--exclude={}", arg))
         .collect();
-    args.extend(excludes.into_iter());
-    info!("rsync {} {} {}", format_command_args(&args), src, dest);
+    let mut command = Command::new("rsync");
+    command.args(args).args(excludes).arg(src).arg(dest);
+    command = wrap_command_with_chroot(command, rootfs);
+    info!("{}", format_command(&command));
     if !dry_run {
-        let output = Command::new("rsync").args(args).arg(src).arg(dest).output();
-        match output {
+        match command.output() {
             Ok(output) => deal_with_output(output, CREATE_DIR_ERROR),
             Err(e) => {
                 error!("copy dir {} to {} failed. {}", src, dest, e);
@@ -145,9 +172,9 @@ pub fn copy_dir(src: &str, dest: &str, dry_run: bool, excludes: &Vec<String>) {
     }
 }
 
-pub fn copy_shared_object(src: &str, dest: &str, dry_run: bool) {
+pub fn copy_shared_object(src: &str, dest: &str, dry_run: bool, rootfs: &Option<String>) {
     debug!("copy shared object {} to {}.", src, dest);
-    copy_file(src, dest, dry_run);
+    copy_file(src, dest, dry_run, rootfs);
 }
 
 /// convert a dest path(usually absolute) to a dest path in root directory
@@ -203,27 +230,24 @@ pub fn calculate_file_hash(filename: &str) -> String {
 pub fn find_dependent_shared_objects(
     file_path: &str,
     default_loader: &Option<(String, String)>,
+    rootfs: &Option<String>,
 ) -> HashSet<(String, String)> {
     let mut shared_objects = HashSet::new();
     // find dependencies for the input file
     // first, we find the dynamic loader for the elf file, if we can't find the loader, return empty shared objects
-    let dynamic_loader = auto_dynamic_loader(file_path, default_loader);
+    let dynamic_loader = auto_dynamic_loader(file_path, default_loader, rootfs);
     if dynamic_loader.is_none() {
         return shared_objects;
     }
     let (occlum_elf_loader, inlined_elf_loader) = dynamic_loader.unwrap();
     shared_objects.insert((occlum_elf_loader.clone(), inlined_elf_loader));
-    let output = command_output_of_executing_dynamic_loader(&file_path, &occlum_elf_loader);
+    let output = command_output_of_executing_dynamic_loader(&file_path, &occlum_elf_loader, rootfs);
     if let Ok(output) = output {
         let default_lib_dirs = OCCLUM_LOADERS
             .default_lib_dirs
             .get(&occlum_elf_loader)
             .cloned();
-        let mut objects = extract_dependencies_from_output(
-            &file_path,
-            output,
-            default_lib_dirs,
-        );
+        let mut objects = extract_dependencies_from_output(&file_path, output, default_lib_dirs);
         for item in objects.drain() {
             shared_objects.insert(item);
         }
@@ -237,6 +261,7 @@ pub fn find_dependent_shared_objects(
 fn command_output_of_executing_dynamic_loader(
     file_path: &str,
     dynamic_loader: &str,
+    rootfs: &Option<String>,
 ) -> Result<Output, std::io::Error> {
     // if the file path has only filename, we need to add a "." directory
     let file_path_buf = PathBuf::from(file_path);
@@ -251,22 +276,29 @@ fn command_output_of_executing_dynamic_loader(
     // return the output of the command to analyze dependencies
     match OCCLUM_LOADERS.ld_library_path_envs.get(dynamic_loader) {
         None => {
-            debug!("{} --list {}", dynamic_loader, file_path);
-            Command::new(dynamic_loader)
-                .arg("--list")
-                .arg(file_path)
-                .output()
+            let mut command = Command::new(dynamic_loader);
+            command.arg("--list").arg(file_path);
+            command = wrap_command_with_chroot(command, rootfs);
+            debug!("{}", format_command(&command));
+            command.output()
         }
         Some(ld_library_path) => {
             debug!(
                 "LD_LIBRARY_PATH='{}' {} --list {}",
                 ld_library_path, dynamic_loader, file_path
             );
-            Command::new(dynamic_loader)
+            let mut command = Command::new(dynamic_loader);
+            command
                 .arg("--list")
                 .arg(file_path)
-                .env("LD_LIBRARY_PATH", ld_library_path)
-                .output()
+                .env("LD_LIBRARY_PATH", ld_library_path);
+            command = wrap_command_with_chroot(command, rootfs);
+            debug!(
+                "LD_LIBRARY_PATH='{}' {}",
+                ld_library_path,
+                format_command(&command)
+            );
+            command.output()
         }
     }
 }
@@ -280,15 +312,25 @@ fn command_output_of_executing_dynamic_loader(
 fn auto_dynamic_loader(
     filename: &str,
     default_loader: &Option<(String, String)>,
+    rootfs: &Option<String>,
 ) -> Option<(String, String)> {
-    let elf_file = match elf::File::open_path(filename) {
+    // if rootfs is not None , filename should be path relative to rootfs
+    let filename = if let Some(rootfs) = rootfs {
+        dest_in_root(rootfs, filename)
+            .as_os_str()
+            .to_string_lossy()
+            .to_string()
+    } else {
+        filename.to_string()
+    };
+    let elf_file = match elf::File::open_path(&filename) {
         Err(_) => return None,
         Ok(elf_file) => elf_file,
     };
     // We should only try to find dependencies for dynamic libraries or executables
     // relocatable files and core files are not included
     match elf_file.ehdr.elftype {
-        ET_DYN|ET_EXEC => {},
+        ET_DYN | ET_EXEC => {}
         Type(_) => return None,
     }
     match elf_file.get_section(".interp") {
@@ -299,14 +341,18 @@ fn auto_dynamic_loader(
             if let Some(default_loader) = default_loader {
                 return Some(default_loader.clone());
             } else {
-                warn!("cannot autodep for file {}. No dynamic loader can be found or inferred.", filename);
+                warn!(
+                    "cannot autodep for file {}. No dynamic loader can be found or inferred.",
+                    filename
+                );
                 return None;
             }
         }
-        Some(_) => read_loader_from_interp_section(filename),
+        Some(_) => read_loader_from_interp_section(&filename),
     }
 }
 
+/// If the file is in rootfs, the filename should already be path in rootfs
 fn read_loader_from_interp_section(filename: &str) -> Option<(String, String)> {
     let elf_file = match elf::File::open_path(filename) {
         Err(_) => return None,
@@ -340,10 +386,22 @@ fn read_loader_from_interp_section(filename: &str) -> Option<(String, String)> {
 // If all files with .interp section points to the same loader,
 // this loader will be viewed as the default loader
 // Otherwise, no default loader can be found.
-pub fn infer_default_loader(files_autodep: &Vec<String>) -> Option<(String, String)> {
+pub fn infer_default_loader(
+    files_autodep: &Vec<String>,
+    rootfs: &Option<String>,
+) -> Option<(String, String)> {
     let mut loaders = HashSet::new();
     for filename in files_autodep.iter() {
-        if let Some(loader) = read_loader_from_interp_section(filename) {
+        // if rootfs is not None, filename should have rootfs as prefix
+        let filename = if let Some(rootfs) = rootfs {
+            dest_in_root(rootfs, filename)
+                .as_os_str()
+                .to_string_lossy()
+                .to_string()
+        } else {
+            filename.to_string()
+        };
+        if let Some(loader) = read_loader_from_interp_section(&filename) {
             loaders.insert(loader);
         }
     }
@@ -494,4 +552,23 @@ fn deal_with_output(output: Output, error_number: i32) {
         error!("{}", stderr);
         std::process::exit(error_number);
     }
+}
+
+/// wrap normal command to chroot commands if rootfs is not None
+/// so the command can be executed in rootfs
+/// This new command requires sudo privilege
+/// e.g. cp a b => chroot rootfs cp a b
+fn wrap_command_with_chroot(command: Command, rootfs: &Option<String>) -> Command {
+    if *rootfs == None {
+        return command;
+    }
+    use std::ffi::OsStr;
+    let rootfs = OsStr::new(rootfs.as_ref().unwrap());
+    let program = command.get_program();
+    let args: Vec<_> = command.get_args().collect();
+    let mut new_args = vec![rootfs, program];
+    new_args.extend(args);
+    let mut wrapper_command = Command::new("chroot");
+    wrapper_command.args(new_args);
+    wrapper_command
 }

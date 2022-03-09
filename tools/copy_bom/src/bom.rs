@@ -106,6 +106,7 @@ impl Bom {
         root_dir: &str,
         dry_run: bool,
         included_dirs: &Vec<String>,
+        rootfs: &Option<String>,
     ) {
         // We need to keep the order of boms and bom managements
         let mut sorted_boms = Vec::new();
@@ -115,7 +116,7 @@ impl Bom {
         for included_bom in all_included_boms.iter() {
             let bom = Bom::from_yaml_file(included_bom);
             sorted_boms.push(bom.clone());
-            let bom_management = bom.get_bom_management(root_dir);
+            let bom_management = bom.get_bom_management(root_dir, rootfs);
             bom_managements.push(bom_management);
         }
         // remove redundant operations in each bom management
@@ -124,7 +125,7 @@ impl Bom {
         let mut bom_managements_iter = bom_managements.iter();
         for bom in sorted_boms.into_iter() {
             // each bom corresponds to a bom management, so the unwrap will never fail
-            bom.manage_self(bom_managements_iter.next().unwrap(), dry_run);
+            bom.manage_self(bom_managements_iter.next().unwrap(), dry_run, rootfs);
         }
         // Try to autodep for each copydir
         if !dry_run {
@@ -137,19 +138,29 @@ impl Bom {
                 copied_shared_objects.extend(shared_objects);
             }
             for bom_management in bom_managements.iter() {
-                bom_management.autodep_for_copydirs(&made_dirs, &copied_shared_objects, root_dir);
+                bom_management.autodep_for_copydirs(
+                    &made_dirs,
+                    &copied_shared_objects,
+                    root_dir,
+                    rootfs,
+                );
             }
         }
     }
 
     /// This func will only manage the current bom file without finding included bom files
-    pub fn manage_self(self, bom_management: &BomManagement, dry_run: bool) {
+    pub fn manage_self(
+        self,
+        bom_management: &BomManagement,
+        dry_run: bool,
+        rootfs: &Option<String>,
+    ) {
         let excludes = self.excludes.unwrap_or(Vec::new());
-        bom_management.manage(dry_run, excludes);
+        bom_management.manage(dry_run, excludes, rootfs);
     }
 
     /// This func will return all operations in one bom
-    fn get_bom_management(self, root_dir: &str) -> BomManagement {
+    fn get_bom_management(self, root_dir: &str, rootfs: &Option<String>) -> BomManagement {
         let mut bom_management = BomManagement::default();
         bom_management.dirs_to_make.push(root_dir.to_string()); // init root dir
         let mut target_managements = Vec::new();
@@ -159,7 +170,7 @@ impl Bom {
                 target_managements.push(target_management);
             }
         }
-        bom_management.add_target_managements(target_managements, root_dir);
+        bom_management.add_target_managements(target_managements, root_dir, rootfs);
         bom_management
     }
 
@@ -375,6 +386,7 @@ impl BomManagement {
         &mut self,
         target_managements: Vec<TargetManagement>,
         root_dir: &str,
+        rootfs: &Option<String>,
     ) {
         let mut files_autodep_in_bom = Vec::new();
         for mut target_management in target_managements.into_iter() {
@@ -394,15 +406,15 @@ impl BomManagement {
             files_autodep_in_bom.extend(files_autodep.into_iter());
         }
 
-        self.autodep(files_autodep_in_bom, root_dir);
+        self.autodep(files_autodep_in_bom, root_dir, rootfs);
     }
 
-    fn autodep(&mut self, files_autodep: Vec<String>, root_dir: &str) {
-        let default_loader = infer_default_loader(&files_autodep);
+    fn autodep(&mut self, files_autodep: Vec<String>, root_dir: &str, rootfs: &Option<String>) {
+        let default_loader = infer_default_loader(&files_autodep, rootfs);
         debug!("default loader in autodep: {:?}", default_loader);
         for file_autodep in files_autodep.iter() {
             let mut shared_objects =
-                find_dependent_shared_objects(file_autodep, &default_loader);
+                find_dependent_shared_objects(file_autodep, &default_loader, rootfs);
             for (src, dest) in shared_objects.drain() {
                 let dest_path = dest_in_root(root_dir, &dest);
                 // First, we create dir to store the dependency
@@ -418,7 +430,7 @@ impl BomManagement {
 
     // do real jobs
     // mkdirs, create links, copy dirs, copy files(including shared objects)
-    fn manage(&self, dry_run: bool, excludes: Vec<String>) {
+    fn manage(&self, dry_run: bool, excludes: Vec<String>, rootfs: &Option<String>) {
         let BomManagement {
             dirs_to_make,
             links_to_create,
@@ -426,19 +438,21 @@ impl BomManagement {
             files_to_copy,
             shared_objects_to_copy,
         } = self;
-        dirs_to_make.iter().for_each(|dir| mkdir(dir, dry_run));
+        dirs_to_make
+            .iter()
+            .for_each(|dir| mkdir(dir, dry_run, rootfs));
         links_to_create
             .iter()
-            .for_each(|(src, linkname)| create_link(src, linkname, dry_run));
+            .for_each(|(src, linkname)| create_link(src, linkname, dry_run, rootfs));
         dirs_to_copy
             .iter()
-            .for_each(|(src, dest)| copy_dir(src, dest, dry_run, &excludes));
+            .for_each(|(src, dest)| copy_dir(src, dest, dry_run, &excludes, rootfs));
         files_to_copy
             .iter()
-            .for_each(|(src, dest)| copy_file(src, dest, dry_run));
+            .for_each(|(src, dest)| copy_file(src, dest, dry_run, rootfs));
         shared_objects_to_copy
             .iter()
-            .for_each(|(src, dest)| copy_shared_object(src, dest, dry_run));
+            .for_each(|(src, dest)| copy_shared_object(src, dest, dry_run, rootfs));
     }
 
     // Try to analyse and copy dependencies for files in copydirs.
@@ -453,6 +467,7 @@ impl BomManagement {
         made_dirs: &Vec<String>,
         copied_shared_objects: &Vec<(String, String)>,
         root_dir: &str,
+        rootfs: &Option<String>,
     ) {
         let BomManagement { dirs_to_copy, .. } = self;
         // get all files in copydirs. filter directories and symlinks
@@ -479,18 +494,18 @@ impl BomManagement {
         // TODO: fix false-positive warnings
         // When we find dependent shared objects for all files in copydir, it may report warning
         // if we can't find the shared object. For files in directories, it may be a false-positive case,
-        // because we may already copy these shared objects when we copy the directory. 
-        // But the loader cannot find these libraries antomatically 
+        // because we may already copy these shared objects when we copy the directory.
+        // But the loader cannot find these libraries antomatically
         // since we don't know how to set the proper LD_LIBRARY_PATH env.
-        // One possible method to fix this problem is that we don't directly report warning message 
+        // One possible method to fix this problem is that we don't directly report warning message
         // when we can't find dependencies. We return all warning message instead. Before we log these message,
         // we can check whether these libraries has already been copied when we copy the directory.
         // This method can help avoid most false-positive warnings while not affecting which files to copy.
         // User also can avoid these warnings by setting proper LD_LIBRARY_PATH in `/opt/occlum/etc/template/occlum_elf_loader.config`.
-        let default_loader = infer_default_loader(&files_in_copied_dirs);
+        let default_loader = infer_default_loader(&files_in_copied_dirs, rootfs);
         let mut all_shared_objects = Vec::new();
         for file_path in files_in_copied_dirs.into_iter() {
-            let shared_objects = find_dependent_shared_objects(&file_path, &default_loader);
+            let shared_objects = find_dependent_shared_objects(&file_path, &default_loader, rootfs);
             all_shared_objects.extend(shared_objects);
         }
         // We should not copy shared libraries already in image directory.
@@ -522,10 +537,10 @@ impl BomManagement {
         }
         let mkdirs = remove_redundant_items_in_vec(&mkdirs, made_dirs.iter());
         // do real operations
-        mkdirs.iter().for_each(|dir| mkdir(dir, false));
+        mkdirs.iter().for_each(|dir| mkdir(dir, false, rootfs));
         shared_objects
             .iter()
-            .for_each(|(src, dest)| copy_shared_object(src, dest, false));
+            .for_each(|(src, dest)| copy_shared_object(src, dest, false, rootfs));
     }
 }
 

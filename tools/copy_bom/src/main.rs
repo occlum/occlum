@@ -30,6 +30,9 @@ struct CopyBomOption {
     /// Set the paths where to find included bom files
     #[structopt(long = "include-dir")]
     included_dirs: Vec<String>,
+    /// Set the rootfs where to do file operations. Bom file should not be poot in rootfs.
+    #[structopt(long = "rootfs")]
+    rootfs: Option<String>,
 }
 
 impl CopyBomOption {
@@ -39,9 +42,10 @@ impl CopyBomOption {
             root_dir,
             dry_run,
             included_dirs,
+            rootfs,
         } = self;
         let image = Bom::from_yaml_file(bom_file);
-        image.manage_top_bom(bom_file, root_dir, *dry_run, included_dirs);
+        image.manage_top_bom(bom_file, root_dir, *dry_run, included_dirs, rootfs);
     }
 }
 

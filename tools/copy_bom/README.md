@@ -31,6 +31,7 @@ All dependencies will be copied to the corresponding directory in root directory
 ### flags
 - -i, --include-dir: This flag is used to indicate which directory to find included bom files. This flag can be set multiple times. If the `include-dir` is set as a relative path, it is a path relative to the current path where you run the `copy_bom` command. 
 - -h, --help: print help message
+- --rootfs: This flag is used to indicate the rootfs directory. If this flag is set, copy_bom will require sudo privilege to run.
 
 # About the `occlum_elf_loader.config` file
 
