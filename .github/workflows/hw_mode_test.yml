@@ -920,7 +920,7 @@ jobs:
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "apt update && apt install -y netcat"
 
     - name: Build the init-ra all content
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/remote_attestation/init_ra_flow; ./build_content.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum/demos/remote_attestation/init_ra_flow; ./build_content.sh"
 
     - name: Run init-ra server and client(flask-tls) on backgroud tiil ready
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/remote_attestation/init_ra_flow; ./run_till_ready.sh"
