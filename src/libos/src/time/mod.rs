@@ -149,23 +149,65 @@ pub fn do_clock_getres(clockid: ClockId) -> Result<timespec_t> {
     Ok(res)
 }
 
-pub async fn do_nanosleep(req: &timespec_t, rem: Option<&mut timespec_t>) -> Result<()> {
-    let waiter = Waiter::new();
-    let mut duration = Duration::new(req.sec as u64, req.nsec as u32);
-    if let Ok(_) = waiter.wait_timeout(Some(&mut duration)).await {
-        // TODO: support interrupt sleep.
-        // return_errno!(EINTR, "sleep interrupted");
-        unreachable!("this waiter can not be interrupted");
+const TIMER_ABSTIME: i32 = 0x01;
+
+pub async fn do_nanosleep(req: &timespec_t, rem: Option<&mut timespec_t>) -> Result<isize> {
+    do_clock_nanosleep(ClockId::CLOCK_REALTIME, 0, req, rem).await
+}
+
+pub async fn do_clock_nanosleep(
+    clockid: ClockId,
+    flags: i32,
+    req: &timespec_t,
+    rem: Option<&mut timespec_t>,
+) -> Result<isize> {
+    match clockid {
+        ClockId::CLOCK_REALTIME | ClockId::CLOCK_MONOTONIC | ClockId::CLOCK_BOOTTIME => {}
+        _ => {
+            // Follow the implementaion in Linux here
+            return_errno!(EINVAL, "clockid was invalid");
+        }
     }
 
-    if let Some(rem) = rem {
-        // wait_timeout() can guarantee that rem <= req.
-        *rem = timespec_t {
-            sec: duration.as_secs() as i64,
-            nsec: duration.subsec_nanos() as i64,
-        };
+    let waiter = Waiter::new();
+    let mut duration = {
+        if flags != TIMER_ABSTIME {
+            req.as_duration()
+        } else {
+            let now = vdso_time::clock_gettime(clockid)?;
+            let target = req.as_duration();
+            if target > now {
+                target - now
+            } else {
+                return Ok(0);
+            }
+        }
+    };
+
+    let wait_res = waiter.wait_timeout(Some(&mut duration)).await;
+    let res = match wait_res {
+        Ok(_) => unreachable!("this waiter has been unexpected interrupted"),
+        Err(e) => {
+            if e.errno() == ETIMEDOUT {
+                Ok(0)
+            } else if e.errno() == EINTR {
+                Err(errno!(EINTR, "sleep was interrupted by a signal handler"))
+            } else {
+                unreachable!("unexpected errno from wait_timeout()");
+            }
+        }
+    };
+
+    if flags != TIMER_ABSTIME {
+        if let Some(rem) = rem {
+            *rem = timespec_t {
+                sec: duration.as_secs() as i64,
+                nsec: duration.subsec_nanos() as i64,
+            };
+        }
     }
-    Ok(())
+
+    res
 }
 
 pub fn do_thread_getcpuclock() -> Result<timespec_t> {

@@ -186,6 +186,7 @@ macro_rules! process_syscall_table_with_callback {
             (Futex = 202) => do_futex(futex_addr: *const i32, futex_op: u32, futex_val: i32, timeout: u64, futex_new_addr: *const i32, bitset: u32),
             (SchedYield = 24) => do_sched_yield(),
             (Nanosleep = 35) => do_nanosleep(req_u: *const timespec_t, rem_u: *mut timespec_t),
+            (ClockNanosleep = 230) => do_clock_nanosleep(clockid: clockid_t, flags: i32, request: *const timespec_t, remain: *mut timespec_t),
             (SchedSetaffinity = 203) => do_sched_setaffinity(pid: pid_t, cpusize: size_t, buf: *const c_uchar),
             (SchedGetaffinity = 204) => do_sched_getaffinity(pid: pid_t, cpusize: size_t, buf: *mut c_uchar),
             (Getpriority = 140) => do_get_priority(which: i32, who: i32),
@@ -955,8 +956,27 @@ async fn do_nanosleep(req_u: *const timespec_t, rem_u: *mut timespec_t) -> Resul
     } else {
         None
     };
-    crate::time::do_nanosleep(&req, rem).await?;
-    Ok(0)
+    crate::time::do_nanosleep(&req, rem).await
+}
+
+async fn do_clock_nanosleep(
+    clockid: clockid_t,
+    flags: i32,
+    req_u: *const timespec_t,
+    rem_u: *mut timespec_t,
+) -> Result<isize> {
+    let req = {
+        check_ptr(req_u)?;
+        timespec_t::from_raw_ptr(req_u)?
+    };
+    let rem = if !rem_u.is_null() {
+        check_mut_ptr(rem_u)?;
+        Some(unsafe { &mut *rem_u })
+    } else {
+        None
+    };
+    let clockid = ClockId::try_from(clockid)?;
+    crate::time::do_clock_nanosleep(clockid, flags, &req, rem).await
 }
 
 async fn do_uname(name: *mut utsname_t) -> Result<isize> {
