@@ -11,6 +11,9 @@ If the Kernel version is before `v5.9`, please follow [this README](https://gith
 
 ## Install Occlum with RPM on CentOS 8.2
 
+Occlum stops the support for CentOS 8.2 since `0.27.0`. Future RPM support might be developed and evaluated on different Linux distributions. Please let us know if you are interested in this feature.
+
+<!---
 1. Install Prerequisite
 ```
 yum install -y wget yum-utils make jq gdb
@@ -51,9 +54,12 @@ yum --showduplicate list -y occlum
 yum install -y occlum
 echo "source /etc/profile" >> $HOME/.bashrc
 ```
+--->
 
 
-## Install Occlum with APT on Ubuntu 18.04
+## Install Occlum with APT on Ubuntu 20.04
+
+Occlum starts to support Ubuntu 20.04 since `0.27.0`.
 
 1. Install Prerequisite
 ```
@@ -63,7 +69,7 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-cer
 
 2. Install Intel® SGX Driver and Intel® SGX PSW
 
-Please follow [Intel SGX Installation Guide](https://download.01.org/intel-sgx/sgx-linux/2.13/docs/Intel_SGX_Installation_Guide_Linux_2.13_Open_Source.pdf) to install SGX driver and SGX PSW. SGX SDK is not required. Using PSW installer is recommanded.
+Please follow [Intel SGX Installation Guide](https://download.01.org/intel-sgx/sgx-linux/2.15.1/docs/Intel_SGX_SW_Installation_Guide_for_Linux.pdf) to install SGX driver and SGX PSW. SGX SDK is not required. Using PSW installer is recommanded.
 
 To install PSW, follow the guide to add Intel® SGX repository to APT source. And then run:
 ```
@@ -78,7 +84,7 @@ service aesmd status
 
 3. Install Occlum
 ```
-echo 'deb [arch=amd64] https://occlum.io/occlum-package-repos/debian bionic main' | tee /etc/apt/sources.list.d/occlum.list
+echo 'deb [arch=amd64] https://occlum.io/occlum-package-repos/debian focal main' | tee /etc/apt/sources.list.d/occlum.list
 wget -qO - https://occlum.io/occlum-package-repos/debian/public.key | apt-key add -
 apt-get update
 apt-get install -y occlum
@@ -115,5 +121,9 @@ The matrix below shows the version compatability since Occlum `0.16.0`. Please c
 |     0.21.0      |       2.13        |        18.04        |         8.2         |
 |     0.23.1      |       2.13.3      |        18.04        |         8.2         |
 |     0.24.1      |       2.14        |        18.04        |         8.2         |
+|     0.25.0      |       2.14        |        18.04        |         8.2         |
+|     0.26.0      |       2.14        |        18.04        |         8.2         |
+|     0.26.1      |       2.15.1      |        18.04        |         8.2         |
+|     0.27.0      |       2.15.1      |        20.04        |          \          |
 
 For more information about the packages, please checkout [here](../tools/installer/README.md).
