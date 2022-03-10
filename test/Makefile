@@ -16,7 +16,7 @@ PASS_LOG = $(BUILD_DIR)/test/.pass
 FAIL_LOG = $(BUILD_DIR)/test/.fail
 
 # Dependencies: need to be compiled but not to run by any Makefile target
-TEST_DEPS := client data_sink naughty_child
+TEST_DEPS := client data_sink naughty_child wait_child
 # Tests: need to be compiled and run by test-% target
 
 TESTS ?= env empty hello_world malloc mmap file fs_perms getpid spawn sched pipe time \
