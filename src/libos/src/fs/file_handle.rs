@@ -326,3 +326,22 @@ impl WeakFileHandle {
         }
     }
 }
+
+impl PartialEq for WeakFileHandle {
+    fn eq(&self, other: &Self) -> bool {
+        let rhs = (&self.0, &other.0);
+        if let (AnyWeakFile::File(self_file), AnyWeakFile::File(other_file)) = rhs {
+            self_file.ptr_eq(&other_file)
+        } else if let (AnyWeakFile::Inode(self_inode), AnyWeakFile::Inode(other_inode)) = rhs {
+            self_inode.ptr_eq(&other_inode)
+        } else if let (AnyWeakFile::Socket(self_socket), AnyWeakFile::Socket(other_socket)) = rhs {
+            self_socket.ptr_eq(&other_socket)
+        } else if let (AnyWeakFile::Timer(self_timer), AnyWeakFile::Timer(other_timer)) = rhs {
+            self_timer.ptr_eq(&other_timer)
+        } else if let (AnyWeakFile::Disk(self_disk), AnyWeakFile::Disk(other_disk)) = rhs {
+            self_disk.ptr_eq(&other_disk)
+        } else {
+            false
+        }
+    }
+}

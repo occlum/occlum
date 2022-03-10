@@ -680,3 +680,10 @@ pub async fn do_sendfile(
     }
     Ok(written_len as isize)
 }
+
+pub async fn do_flock(fd: FileDesc, operation: i32) -> Result<isize> {
+    let flock_ops = FlockOps::from_i32(operation)?;
+
+    file_ops::do_flock(fd, flock_ops).await?;
+    Ok(0)
+}

@@ -36,7 +36,8 @@ pub use self::fspath::{FsPath, AT_FDCWD};
 pub use self::host_fd::HostFd;
 pub use self::inode_file::{INodeExt, INodeFile, InodeFile};
 pub use self::locks::{
-    FileRange, RangeLock, RangeLockBuilder, RangeLockList, RangeLockType, OFFSET_MAX,
+    FileRange, Flock, FlockList, FlockOps, FlockType, RangeLock, RangeLockBuilder, RangeLockList,
+    RangeLockType, OFFSET_MAX,
 };
 pub use self::rootfs::ROOT_FS;
 pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};

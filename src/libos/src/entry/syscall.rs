@@ -10,13 +10,13 @@ use std::ptr;
 use crate::fs::{
     do_access, do_chdir, do_chmod, do_chown, do_close, do_creat, do_dup, do_dup2, do_dup3,
     do_eventfd, do_eventfd2, do_faccessat, do_fallocate, do_fchdir, do_fchmod, do_fchmodat,
-    do_fchown, do_fchownat, do_fcntl, do_fdatasync, do_fstat, do_fstatat, do_fstatfs, do_fsync,
-    do_ftruncate, do_getcwd, do_getdents, do_getdents64, do_ioctl, do_lchown, do_link, do_linkat,
-    do_lseek, do_lstat, do_mkdir, do_mkdirat, do_mount, do_mount_rootfs, do_open, do_openat,
-    do_pipe, do_pipe2, do_pread, do_pwrite, do_read, do_readlink, do_readlinkat, do_readv,
-    do_rename, do_renameat, do_rmdir, do_sendfile, do_stat, do_statfs, do_symlink, do_symlinkat,
-    do_sync, do_truncate, do_umask, do_umount, do_unlink, do_unlinkat, do_write, do_writev,
-    iovec_t, FileDesc, FileRef, StatBuf, Statfs,
+    do_fchown, do_fchownat, do_fcntl, do_fdatasync, do_flock, do_fstat, do_fstatat, do_fstatfs,
+    do_fsync, do_ftruncate, do_getcwd, do_getdents, do_getdents64, do_ioctl, do_lchown, do_link,
+    do_linkat, do_lseek, do_lstat, do_mkdir, do_mkdirat, do_mount, do_mount_rootfs, do_open,
+    do_openat, do_pipe, do_pipe2, do_pread, do_pwrite, do_read, do_readlink, do_readlinkat,
+    do_readv, do_rename, do_renameat, do_rmdir, do_sendfile, do_stat, do_statfs, do_symlink,
+    do_symlinkat, do_sync, do_truncate, do_umask, do_umount, do_unlink, do_unlinkat, do_write,
+    do_writev, iovec_t, FileDesc, FileRef, StatBuf, Statfs,
 };
 /*
 use crate::fs::{
@@ -232,6 +232,7 @@ macro_rules! process_syscall_table_with_callback {
             (Sendfile = 40) => do_sendfile(out_fd: FileDesc, in_fd: FileDesc, offset_ptr: *mut off_t, count: isize),
             (Fcntl = 72) => do_fcntl(fd: FileDesc, cmd: u32, arg: u64),
             (Ioctl = 16) => do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8),
+            (Flock = 73) => do_flock(fd: FileDesc, operation: i32),
 
             (Rmdir = 84) => do_rmdir(path: *const i8),
             (Link = 86) => do_link(oldpath: *const i8, newpath: *const i8),
