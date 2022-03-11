@@ -1,9 +1,9 @@
 mod file;
 mod flags;
-mod flock;
+mod locks;
 
 pub use self::file::{Async, File, IntoAsync};
 pub use self::flags::{AccessMode, CreationFlags, StatusFlags};
-pub use self::flock::{
+pub use self::locks::{
     flock_c, FileRange, RangeLock, RangeLockBuilder, RangeLockList, RangeLockType, OFFSET_MAX,
 };

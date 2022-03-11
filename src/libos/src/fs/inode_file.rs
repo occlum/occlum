@@ -211,7 +211,7 @@ impl INodeFile {
         Ok(())
     }
 
-    pub fn test_advisory_lock(&self, lock: &mut RangeLock) -> Result<()> {
+    pub fn test_range_lock(&self, lock: &mut RangeLock) -> Result<()> {
         let ext = match self.inode.ext() {
             Some(ext) => ext,
             None => {
@@ -233,12 +233,12 @@ impl INodeFile {
         Ok(())
     }
 
-    pub async fn set_advisory_lock(&self, lock: &RangeLock, is_nonblocking: bool) -> Result<()> {
+    pub async fn set_range_lock(&self, lock: &RangeLock, is_nonblocking: bool) -> Result<()> {
         if RangeLockType::F_UNLCK == lock.type_() {
-            return Ok(self.unlock_advisory_lock(lock));
+            return Ok(self.unlock_range_lock(lock));
         }
 
-        self.check_advisory_lock_with_access_mode(lock)?;
+        self.check_range_lock_with_access_mode(lock)?;
         let ext = match self.inode.ext() {
             Some(ext) => ext,
             None => {
@@ -258,7 +258,7 @@ impl INodeFile {
         Ok(())
     }
 
-    pub fn release_advisory_locks(&self) {
+    pub fn release_range_locks(&self) {
         let range_lock = RangeLockBuilder::new()
             .owner(current!().process().pid() as _)
             .type_(RangeLockType::F_UNLCK)
@@ -266,10 +266,10 @@ impl INodeFile {
             .build()
             .unwrap();
 
-        self.unlock_advisory_lock(&range_lock)
+        self.unlock_range_lock(&range_lock)
     }
 
-    fn check_advisory_lock_with_access_mode(&self, lock: &RangeLock) -> Result<()> {
+    fn check_range_lock_with_access_mode(&self, lock: &RangeLock) -> Result<()> {
         match lock.type_() {
             RangeLockType::F_RDLCK => {
                 if !self.access_mode.readable() {
@@ -286,7 +286,7 @@ impl INodeFile {
         Ok(())
     }
 
-    fn unlock_advisory_lock(&self, lock: &RangeLock) {
+    fn unlock_range_lock(&self, lock: &RangeLock) {
         let ext = match self.inode.ext() {
             Some(ext) => ext,
             None => {

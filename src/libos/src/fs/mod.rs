@@ -11,10 +11,7 @@ use std::path::{Path, PathBuf};
 use util::slice_ext::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
 
 pub use async_io::event::{Events, Observer, Pollee, Poller};
-pub use async_io::file::{
-    AccessMode, CreationFlags, File, FileRange, RangeLock, RangeLockBuilder, RangeLockList,
-    RangeLockType, StatusFlags, OFFSET_MAX,
-};
+pub use async_io::file::{AccessMode, CreationFlags, File, StatusFlags};
 pub use async_io::fs::{
     DirentWriter, DirentWriterContext, FallocateFlags, FallocateMode, FileMode, FileSystem,
     FileType, FsError, FsInfo, INode, Metadata, MountFlags, SeekFrom, StatBuf, StatFlags, StatMode,
@@ -38,6 +35,9 @@ pub use self::fs_view::FsView;
 pub use self::fspath::{FsPath, AT_FDCWD};
 pub use self::host_fd::HostFd;
 pub use self::inode_file::{INodeExt, INodeFile, InodeFile};
+pub use self::locks::{
+    FileRange, RangeLock, RangeLockBuilder, RangeLockList, RangeLockType, OFFSET_MAX,
+};
 pub use self::rootfs::ROOT_FS;
 pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
 pub use self::syscalls::*;
@@ -57,6 +57,7 @@ mod fspath;
 mod host_fd;
 mod hostfs;
 mod inode_file;
+mod locks;
 mod pipe;
 mod procfs;
 mod rootfs;

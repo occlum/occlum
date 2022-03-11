@@ -64,7 +64,7 @@ pub async fn do_fcntl(fd: FileDesc, cmd: &mut FcntlCmd<'_>) -> Result<isize> {
                     .range(file_range)
                     .build()?
             };
-            inode_file.test_advisory_lock(&mut range_lock)?;
+            inode_file.test_range_lock(&mut range_lock)?;
             trace!("getlk returns: {:?}", range_lock);
             (*flock_mut_c).copy_from_range_lock(&range_lock);
             0
@@ -90,7 +90,7 @@ pub async fn do_fcntl(fd: FileDesc, cmd: &mut FcntlCmd<'_>) -> Result<isize> {
             };
             let is_nonblocking = true;
             inode_file
-                .set_advisory_lock(&range_lock, is_nonblocking)
+                .set_range_lock(&range_lock, is_nonblocking)
                 .await?;
             0
         }
@@ -115,7 +115,7 @@ pub async fn do_fcntl(fd: FileDesc, cmd: &mut FcntlCmd<'_>) -> Result<isize> {
             };
             let is_nonblocking = false;
             inode_file
-                .set_advisory_lock(&range_lock, is_nonblocking)
+                .set_range_lock(&range_lock, is_nonblocking)
                 .await?;
             0
         }
