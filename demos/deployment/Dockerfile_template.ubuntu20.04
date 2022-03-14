@@ -1,14 +1,14 @@
 # base stage:
 # Install dependencies for deployment to get minimum size for deployer.
 # For deployment environment, only occlum-runtime and sgx-psw are needed.
-FROM ubuntu:18.04 as base
+FROM ubuntu:20.04 as base
 LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
 
 ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-install-recommends gnupg wget ca-certificates jq && \
-    echo 'deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu bionic main' | tee /etc/apt/sources.list.d/intel-sgx.list && \
+    echo 'deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu focal main' | tee /etc/apt/sources.list.d/intel-sgx.list && \
     wget -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key | apt-key add - && \
-    echo 'deb [arch=amd64] https://occlum.io/occlum-package-repos/debian bionic main' | tee /etc/apt/sources.list.d/occlum.list && \
+    echo 'deb [arch=amd64] https://occlum.io/occlum-package-repos/debian focal main' | tee /etc/apt/sources.list.d/occlum.list && \
     wget -qO - https://occlum.io/occlum-package-repos/debian/public.key | apt-key add - && \
     apt-get update && \
     apt-get install -y occlum libsgx-uae-service libsgx-dcap-ql&& \
