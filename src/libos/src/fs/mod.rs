@@ -29,6 +29,7 @@ use crate::config::ConfigMount;
 pub use self::disk_file::DiskFile;
 pub use self::event_file::{EventFile, EventFileFlags};
 pub use self::file_handle::{FileHandle as FileRef, WeakFileHandle as WeakFileRef};
+pub use self::file_ops::utimbuf_t;
 pub use self::file_table::{FileDesc, FileTable};
 pub use self::fs_ops::Statfs;
 pub use self::fs_view::FsView;

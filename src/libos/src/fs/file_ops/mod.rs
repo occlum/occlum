@@ -28,6 +28,9 @@ pub use self::stat::{do_fstat, do_fstatat};
 pub use self::symlink::{do_readlinkat, do_symlinkat};
 pub use self::truncate::{do_ftruncate, do_truncate};
 pub use self::unlink::{do_unlinkat, UnlinkFlags};
+pub use self::utimes::{
+    do_utimes_fd, do_utimes_path, get_utimes, utimbuf_t, Utime, UtimeFlags, UTIME_OMIT,
+};
 pub use self::write::{do_pwrite, do_write, do_writev};
 
 mod access;
@@ -54,4 +57,5 @@ mod stat;
 mod symlink;
 mod truncate;
 mod unlink;
+mod utimes;
 mod write;

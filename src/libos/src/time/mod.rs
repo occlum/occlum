@@ -51,6 +51,14 @@ impl timeval_t {
         }
     }
 
+    pub fn sec(&self) -> time_t {
+        self.sec
+    }
+
+    pub fn usec(&self) -> suseconds_t {
+        self.usec
+    }
+
     pub fn as_duration(&self) -> Duration {
         Duration::new(self.sec as u64, (self.usec * 1_000) as u32)
     }
@@ -86,6 +94,21 @@ impl From<Duration> for timespec_t {
         let nsec = duration.subsec_nanos() as i64;
         debug_assert!(sec >= 0); // nsec >= 0 always holds
         timespec_t { sec, nsec }
+    }
+}
+
+impl From<timeval_t> for timespec_t {
+    fn from(timval: timeval_t) -> timespec_t {
+        timespec_t {
+            sec: timval.sec(),
+            nsec: timval.usec() * 1_000,
+        }
+    }
+}
+
+impl From<time_t> for timespec_t {
+    fn from(time: time_t) -> timespec_t {
+        timespec_t { sec: time, nsec: 0 }
     }
 }
 
@@ -242,10 +265,10 @@ pub struct OcclumTimeProvider;
 
 impl TimeProvider for OcclumTimeProvider {
     fn current_time(&self) -> Timespec {
-        let time = do_gettimeofday();
+        let time = do_clock_gettime(ClockId::CLOCK_REALTIME).expect("do_clock_gettime() failed");
         Timespec {
             sec: time.sec,
-            nsec: time.usec * 1000,
+            nsec: time.nsec,
         }
     }
 }
