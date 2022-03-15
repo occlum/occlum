@@ -115,7 +115,7 @@ void base64_decode(const char *b64input, unsigned char *dest, size_t dest_len) {
     }
 }
 
-int gr_client_get_secret(
+int grpc_ratls_get_secret(
     const char *server_addr,
     const char *config_json,
     const char *name,

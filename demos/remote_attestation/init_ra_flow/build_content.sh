@@ -61,7 +61,7 @@ function build_client_instance()
     # Get server mrsigner.
     # Here client and server use the same signer-key thus using client mrsigner directly.
     jq ' .verify_mr_enclave = "off" |
-        .verify_mr_signer = "off" |
+        .verify_mr_signer = "on" |
         .verify_isv_prod_id = "off" |
         .verify_isv_svn = "off" |
         .verify_enclave_debuggable = "on" |

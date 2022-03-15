@@ -18,7 +18,7 @@
 
 * Server
 ```
-int gr_start_server(
+int grpc_ratls_start_server(
     const char *server_addr, // grpc server address+port, such as "localhost:50051"
     const char *config_json, // ratls handshake config json file
     const char *secret_json  // secret config json file
@@ -27,7 +27,7 @@ int gr_start_server(
 
 * Client
 ```
-int gr_client_get_secret(
+int grpc_ratls_get_secret(
     const char *server_addr, // grpc server address+port, such as "localhost:50051"
     const char *config_json, // ratls handshake config json file
     const char *name, // secret name to be requested

@@ -15,12 +15,20 @@
  * limitations under the License.
  *
  */
+#include <stdio.h>
+#include <stdlib.h>
 #include "../grpc_ratls_server.h"
 
 
 int main(int argc, char** argv) {
-    gr_start_server(
-        "localhost:50051",
+    if (argc < 2) {
+        printf("[ERROR] One argument must be provided\n\n");
+        printf("Usage: server <grpc-server addr>\n");
+        return -1;
+    }
+
+    grpc_ratls_start_server(
+        argv[1],
         "dynamic_config.json",
         "secret_config.json"
     );

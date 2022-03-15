@@ -9,7 +9,7 @@ FLASK_SERVER_PORT=4996
 echo "Start GRPC server on backgound ..."
 
 pushd occlum_server
-occlum run /bin/server &
+occlum run /bin/server "${GRPC_SERVER_IP}:${GRPC_SERVER_PORT}" &
 popd
 
 while ! nc -z $GRPC_SERVER_IP $GRPC_SERVER_PORT; do
