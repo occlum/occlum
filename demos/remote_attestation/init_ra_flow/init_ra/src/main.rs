@@ -15,7 +15,7 @@ use std::os::raw::{c_int, c_char};
 
 #[link(name = "grpc_ratls_client")]
 extern "C" {
-    fn gr_client_get_secret(
+    fn grpc_ratls_get_secret(
         server_addr: *const c_char, // grpc server address+port, such as "localhost:50051"
         config_json: *const c_char, // ratls handshake config json file
         name: *const c_char, // secret name to be requested
@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let filename = CString::new("/etc/image_key").unwrap();
 
             let ret = unsafe {
-                gr_client_get_secret(
+                grpc_ratls_get_secret(
                     server_addr.as_ptr(),
                     config_json.as_ptr(),
                     secret.as_ptr(),
@@ -56,7 +56,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
 
             if ret != 0 {
-                println!("gr_client_get_secret failed return {}", ret);
+                println!("grpc_ratls_get_secret failed return {}", ret);
                 return Err(Box::new(std::io::Error::last_os_error()));
             }
 
@@ -79,7 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let filename = CString::new("cert_file").unwrap();
 
     let ret = unsafe {
-        gr_client_get_secret(
+        grpc_ratls_get_secret(
             server_addr.as_ptr(),
             config_json.as_ptr(),
             secret.as_ptr(),
@@ -87,7 +87,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     if ret != 0 {
-        println!("gr_client_get_secret failed return {}", ret);
+        println!("grpc_ratls_get_secret failed return {}", ret);
         return Err(Box::new(std::io::Error::last_os_error()));
     }
 
@@ -99,7 +99,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let filename = CString::new("key_file").unwrap();
 
     let ret = unsafe {
-        gr_client_get_secret(
+        grpc_ratls_get_secret(
             server_addr.as_ptr(),
             config_json.as_ptr(),
             secret.as_ptr(),
@@ -107,7 +107,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     if ret != 0 {
-        println!("gr_client_get_secret failed return {}", ret);
+        println!("grpc_ratls_get_secret failed return {}", ret);
         return Err(Box::new(std::io::Error::last_os_error()));
     }
 

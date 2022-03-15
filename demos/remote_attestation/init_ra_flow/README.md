@@ -55,7 +55,7 @@ The `RA Verify Config` JSON records the secrets. Each secret has a name and its 
 
 * Starts the Flask-TLS-Infer demo. For every Occlum built application, it starts `init` process first, then starts the real application in RootFS. The default [`init`](../../../tools/init/) process just run RootFS integrity check and then load the RootFS where the real application is located.
 
-For this demo, a modified [`init`](./init_ra/) is used. Besides the general `init` operation, it embeds the `GRPC-RATLS` client API `gr_client_get_secret`, gets the secrets(base64 encoded) from the `GRPC-RATLS server`, does base64 decoding, acquires the real secrets. The `image_key` is used to decrypt the RootFS image. The other two are saved to RootFS. In this example, they are `/etc/flask.crt` and `/etc/flask.key`. Finally, when the Flask-TLS app is running, all secrets are securely obtained already in `init` thus the app runs successfully without RA involvement in this stage.
+For this demo, a modified [`init`](./init_ra/) is used. Besides the general `init` operation, it embeds the `GRPC-RATLS` client API `grpc_ratls_get_secret`, gets the secrets(base64 encoded) from the `GRPC-RATLS server`, does base64 decoding, acquires the real secrets. The `image_key` is used to decrypt the RootFS image. The other two are saved to RootFS. In this example, they are `/etc/flask.crt` and `/etc/flask.key`. Finally, when the Flask-TLS app is running, all secrets are securely obtained already in `init` thus the app runs successfully without RA involvement in this stage.
 
 
 ## How-to build the demo
@@ -72,7 +72,7 @@ occlum_server
 * Starts the GRPC-RATLS server in background.
 ```
 cd occlum_server
-occlum run /bin/server &
+occlum run /bin/server localhost:50051 &
 ```
 
 * Starts the Flask-TLS web portal in backgroud.

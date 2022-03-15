@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 // client get secret
-extern int gr_client_get_secret(
+extern int grpc_ratls_get_secret(
     const char *server_addr, // grpc server address+port, such as "localhost:50051"
     const char *config_json, // ratls handshake config json file
     const char *name, // secret name to be requested

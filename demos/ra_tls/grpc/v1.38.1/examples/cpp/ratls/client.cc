@@ -24,17 +24,17 @@
 
 int main(int argc, char** argv) {
     // Parse arguments
-    if (argc < 3) {
-        printf("[ERROR] At least one argument must be provided\n\n");
-        printf("Usage: client [<request_name>] [<secret_file_to_be_saved>]\n");
+    if (argc < 4) {
+        printf("[ERROR] Three arguments must be provided\n\n");
+        printf("Usage: client <grpc-server addr> <request_name> <secret_file_to_be_saved>\n");
         return -1;
     }
 
-    gr_client_get_secret(
-        "localhost:50051",
-        "dynamic_config.json",
+    grpc_ratls_get_secret(
         argv[1],
-        argv[2]
+        "dynamic_config.json",
+        argv[2],
+        argv[3]
     );
 
     return 0;

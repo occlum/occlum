@@ -68,7 +68,7 @@ class GrSecretServiceImpl final: public GrSecret::Service {
 };
 
 
-int gr_start_server(
+int grpc_ratls_start_server(
     const char *server_addr,
     const char *config_json,
     const char *secret_json
