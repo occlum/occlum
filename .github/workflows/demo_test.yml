@@ -369,28 +369,28 @@ jobs:
       with:
         submodules: true
 
-    - name: Create container
-      run: docker run -itd --name=grpc_test -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc
+    - uses: ./.github/workflows/composite_action/sim
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
-    - name: Build dependencies
-      run: docker exec grpc_test bash -c "cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec grpc_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+    - name: Download and Install grpc
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./download_and_install_grpc_glibc.sh"
 
     - name: Prepare grpc sample project
-      run: docker exec grpc_test bash -c "cd /root/demos/grpc/grpc_glibc && ./prepare_client_server_glibc.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./prepare_client_server_glibc.sh"
 
     - name: Run grpc server
-      run: docker exec grpc_test bash -c "cd /root/demos/grpc/grpc_glibc && SGX_MODE=SIM ./run_server_on_occlum_glibc.sh" &
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && SGX_MODE=SIM ./run_server_on_occlum_glibc.sh" &
 
     - name: Run grpc client
-      run: |
-        sleep ${{ env.nap_time }};
-        docker exec grpc_test bash -c "cd /root/demos/grpc/grpc_glibc && SGX_MODE=SIM ./run_client_on_occlum_glibc.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && SGX_MODE=SIM ./run_client_on_occlum_glibc.sh"
+
+    - name: Prepare grpc stress test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./prepare_stress_test_tool.sh"
 
     - name: Run grpc stress client
-      run: docker exec grpc_test bash -c "cd /root/demos/grpc/grpc_glibc && ./run_stress_test.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && SGX_MODE=SIM ./run_stress_test.sh"
 
   Openvino_test:
     runs-on: ubuntu-20.04

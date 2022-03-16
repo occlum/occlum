@@ -11,7 +11,7 @@ on:
 
 env:
   nap_time: 60
-  repeat_times: 500  # Stress test repeat times
+  repeat_times: 300  # Stress test repeat times
 
 jobs:
   Make-test-on-ubuntu:
@@ -505,8 +505,7 @@ jobs:
       if: ${{ always() }}
       run: docker stop $openvino_test
 
-
-  Grpc_test:
+  Grpc_musl_test:
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -535,17 +534,17 @@ jobs:
       run: |
         docker pull occlumbackup/occlum:latest-ubuntu20.04-grpc
         if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc);
+          grpc_musl_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc);
         elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc);
+          grpc_musl_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc);
         else
           echo "Unsupported Hardware"
         fi;
-        echo "grpc_test=$grpc_test" >> $GITHUB_ENV
+        echo "grpc_musl_test=$grpc_musl_test" >> $GITHUB_ENV
 
     - name: Change download source of crates.io
       run: |
-        docker exec $grpc_test bash -c "cat <<- EOF >/root/.cargo/config
+        docker exec $grpc_musl_test bash -c "cat <<- EOF >/root/.cargo/config
         [source.crates-io]
         registry = \"https://github.com/rust-lang/crates.io-index\"
         replace-with = 'ustc'
@@ -554,47 +553,77 @@ jobs:
         EOF"
 
     - name: Build dependencies
-      run: docker exec $grpc_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
+      run: docker exec $grpc_musl_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec $grpc_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+      run: docker exec $grpc_musl_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Prepare grpc musl sample project
-      run: docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_musl && ./prepare_client_server.sh"
+      run: docker exec $grpc_musl_test bash -c "cd /root/demos/grpc/grpc_musl && ./prepare_client_server.sh"
 
     - name: Run grpc musl server
-      run: docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_musl && ./run_server_on_occlum.sh" &
+      run: docker exec $grpc_musl_test bash -c "cd /root/demos/grpc/grpc_musl && ./run_server_on_occlum.sh" &
 
     - name: Run grpc musl client
       run: |
         sleep ${{ env.nap_time }};
-        docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_musl && ./run_client_on_occlum.sh"
+        docker exec $grpc_musl_test bash -c "cd /root/demos/grpc/grpc_musl && ./run_client_on_occlum.sh"
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop $grpc_test
+      run: docker stop $grpc_musl_test
 
-    - name: Restart the docker
-      run: docker start $grpc_test
+  Grpc_glibc_test:
+    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX2-HW]]
 
-    - name: Prepare grpc glibc sample project
-      run: docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_glibc && ./prepare_client_server_glibc.sh"
-
-    - name: Run grpc glibc server
-      run: docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_glibc && ./run_server_on_occlum_glibc.sh" &
-
-    - name: Run grpc glibc client
+    steps:
+    - name: Clean before running
       run: |
-        sleep ${{ env.nap_time }};
-        docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_glibc && ./run_client_on_occlum_glibc.sh"
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
-    - name: Run grpc stress test
-      run: docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_glibc && ./run_stress_test.sh"
+    - name: Checkout code
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2
+      with:
+        submodules: true
 
+    - name: Checkout code from fork
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Download and Install grpc
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./download_and_install_grpc_glibc.sh"
+
+    - name: Prepare grpc sample project
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./prepare_client_server_glibc.sh"
+
+    - name: Run grpc server
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./run_server_on_occlum_glibc.sh" &
+
+    - name: Run grpc client
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./run_client_on_occlum_glibc.sh"
+
+    - name: Prepare grpc stress test
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./prepare_stress_test_tool.sh"
+
+    - name: Run grpc stress client
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./run_stress_test.sh"
+    
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop $grpc_test
-
+      run: docker stop ${{ env.CONTAINER_NAME }}
 
   # Gvisor_test:
   #   if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}

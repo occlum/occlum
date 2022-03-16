@@ -13,4 +13,11 @@ else
     cd occlum_client_instance
 fi
 
+apt update && apt install -y netcat
+
+while ! nc -z 127.0.0.1 50051; do
+    sleep 1
+done
+
+echo "greeter_client is running"
 occlum run /bin/greeter_client
