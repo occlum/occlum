@@ -19,8 +19,8 @@ pub use self::event_file::{AsEvent, EventCreationFlags, EventFile};
 pub use self::events::{AtomicIoEvents, IoEvents, IoNotifier};
 pub use self::file::{File, FileRef};
 pub use self::file_ops::{
-    occlum_ocall_ioctl, AccessMode, BuiltinIoctlNum, CreationFlags, FallocateFlags, FileMode,
-    IfConf, IoctlCmd, Stat, StatusFlags, StructuredIoctlArgType, StructuredIoctlNum,
+    occlum_ocall_ioctl, utimbuf_t, AccessMode, BuiltinIoctlNum, CreationFlags, FallocateFlags,
+    FileMode, IfConf, IoctlCmd, Stat, StatusFlags, StructuredIoctlArgType, StructuredIoctlNum,
 };
 pub use self::file_table::{FileDesc, FileTable, FileTableEvent, FileTableNotifier};
 pub use self::fs_ops::Statfs;
