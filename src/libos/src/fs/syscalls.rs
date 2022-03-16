@@ -1,12 +1,12 @@
 use super::event_file::EventCreationFlags;
 use super::file_ops;
 use super::file_ops::{
-    get_abs_path_by_fd, AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags, FcntlCmd,
-    FsPath, LinkFlags, StatFlags, UnlinkFlags, AT_FDCWD,
+    get_abs_path_by_fd, get_utimes, AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags,
+    FcntlCmd, FsPath, LinkFlags, StatFlags, UnlinkFlags, Utime, UtimeFlags, AT_FDCWD, UTIME_OMIT,
 };
 use super::fs_ops;
 use super::fs_ops::{MountFlags, MountOptions, UmountFlags};
-use super::time::{clockid_t, itimerspec_t, ClockID};
+use super::time::{clockid_t, itimerspec_t, timespec_t, timeval_t, ClockID};
 use super::timer_file::{TimerCreationFlags, TimerSetFlags};
 use super::*;
 use config::ConfigMountFsType;
@@ -699,4 +699,88 @@ pub fn do_flock(fd: FileDesc, operation: i32) -> Result<isize> {
 
     file_ops::do_flock(fd, flock_ops)?;
     Ok(0)
+}
+
+pub fn do_utime(path: *const i8, times_u: *const utimbuf_t) -> Result<isize> {
+    let times = if !times_u.is_null() {
+        from_user::check_ptr(times_u)?;
+        let utimbuf = unsafe { *times_u };
+        let atime = timespec_t::from(utimbuf.atime());
+        atime.validate()?;
+        let mtime = timespec_t::from(utimbuf.mtime());
+        mtime.validate()?;
+        Some((atime, mtime))
+    } else {
+        None
+    };
+
+    let (atime, mtime) = file_ops::get_utimes(times)?;
+    self::do_utimes_wrapper(AT_FDCWD, path, atime, mtime, 0)
+}
+
+pub fn do_utimes(path: *const i8, times: *const timeval_t) -> Result<isize> {
+    self::do_futimesat(AT_FDCWD, path, times)
+}
+
+pub fn do_futimesat(dirfd: i32, path: *const i8, times_u: *const timeval_t) -> Result<isize> {
+    let times = if !times_u.is_null() {
+        from_user::check_array(times_u, 2)?;
+        let atime_ptr = unsafe { times_u.offset(0) };
+        let atime = unsafe { *atime_ptr };
+        let atime = timespec_t::from(atime);
+        atime.validate()?;
+        let mtime_ptr = unsafe { times_u.offset(1) };
+        let mtime = unsafe { *mtime_ptr };
+        let mtime = timespec_t::from(mtime);
+        mtime.validate()?;
+        Some((atime, mtime))
+    } else {
+        None
+    };
+
+    let (atime, mtime) = file_ops::get_utimes(times)?;
+    self::do_utimes_wrapper(dirfd, path, atime, mtime, 0)
+}
+
+pub fn do_utimensat(
+    dirfd: i32,
+    path: *const i8,
+    times_u: *const timespec_t,
+    flags: i32,
+) -> Result<isize> {
+    let times = if !times_u.is_null() {
+        from_user::check_array(times_u, 2)?;
+        let atime_ptr = unsafe { times_u.offset(0) };
+        let atime = unsafe { *atime_ptr };
+        let mtime_ptr = unsafe { times_u.offset(1) };
+        let mtime = unsafe { *mtime_ptr };
+        if atime.nsec() == UTIME_OMIT && mtime.nsec() == UTIME_OMIT {
+            return Ok(0);
+        }
+        Some((atime, mtime))
+    } else {
+        None
+    };
+
+    let (atime, mtime) = file_ops::get_utimes(times)?;
+    self::do_utimes_wrapper(dirfd, path, atime, mtime, flags)
+}
+
+fn do_utimes_wrapper(
+    dirfd: i32,
+    path: *const i8,
+    atime: Utime,
+    mtime: Utime,
+    flags: i32,
+) -> Result<isize> {
+    if path.is_null() && dirfd != AT_FDCWD {
+        file_ops::do_utimes_fd(dirfd as FileDesc, atime, mtime, flags)
+    } else {
+        let path = from_user::clone_cstring_safely(path)?
+            .to_string_lossy()
+            .into_owned();
+        let flags = UtimeFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
+        let fs_path = FsPath::new(&path, dirfd, false)?;
+        file_ops::do_utimes_path(&fs_path, atime, mtime, flags)
+    }
 }
