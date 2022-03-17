@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "pal_log.h"
 
-char *pal_load_file(const char *filename) {
+char *pal_load_file_to_string(const char *filename) {
     FILE *fp = fopen(filename, "rb");
 
     if (fp == NULL) {
@@ -18,7 +18,7 @@ char *pal_load_file(const char *filename) {
         return NULL;
     }
     fread(file_buffer, 1, fsize, fp);
-    file_buffer[fsize] = 0;
+    file_buffer[fsize] = '\0';
     fclose(fp);
     return file_buffer;
 }

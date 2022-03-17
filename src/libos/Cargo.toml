@@ -29,6 +29,7 @@ memoffset = "0.6.1"
 scroll = { version = "0.10.2", default-features = false }
 itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"]  }
 ctor = "0.1"
+regex = { git = "https://github.com/mesalock-linux/regex-sgx", default-features = false, features = ["std", "unicode", "mesalock_sgx"] }
 
 [patch.'https://github.com/apache/teaclave-sgx-sdk.git']
 sgx_tstd = { path = "../../deps/rust-sgx-sdk/sgx_tstd" }
