@@ -93,11 +93,10 @@ struct occlum_pal_create_process_args {
     int *pid;
 };
 
-// todo: more detailed description
 struct host_file_buffer {
-    const char *resolv_conf_ptr;
-    const char *hosts_ptr;
-    const char *hostname_ptr;
+    const char *resolv_conf_buf;
+    const char *hosts_buf;
+    const char *hostname_buf;
 };
 
 /*
@@ -164,6 +163,8 @@ int occlum_pal_kill(int pid, int sig);
  * @retval if 0, then success; otherwise, check errno for the exact error type.
  */
 int occlum_pal_destroy(void);
+
+void free_host_file_buffer(struct host_file_buffer file_buffer);
 
 #ifdef __cplusplus
 }

@@ -1,7 +1,5 @@
 use super::*;
-use crate::fs::{AccessMode, CreationFlags, FileMode, FsView};
 use std::ffi::{CStr, CString};
-use std::str;
 /// A sample of `struct utsname`
 /// ```
 ///   sysname = Linux
@@ -26,7 +24,7 @@ pub struct utsname_t {
 
 pub fn do_uname(name: &mut utsname_t) -> Result<()> {
     copy_from_cstr_to_u8_array(&SYSNAME, &mut name.sysname);
-    obtain_nodename(&mut name.nodename);
+    copy_from_cstr_to_u8_array(&NODENAME.read().unwrap(), &mut name.nodename);
     copy_from_cstr_to_u8_array(&RELEASE, &mut name.release);
     copy_from_cstr_to_u8_array(&VERSION, &mut name.version);
     copy_from_cstr_to_u8_array(&MACHINE, &mut name.machine);
@@ -36,7 +34,7 @@ pub fn do_uname(name: &mut utsname_t) -> Result<()> {
 
 lazy_static! {
     static ref SYSNAME: CString = CString::new("Occlum").unwrap();
-    static ref NODENAME: CString = CString::new("occlum-node").unwrap();
+    static ref NODENAME: RwLock<CString> = RwLock::new(CString::new("occlum-node").unwrap());
     static ref RELEASE: CString = CString::new("0.1").unwrap();
     static ref VERSION: CString = CString::new("0.1").unwrap();
     static ref MACHINE: CString = CString::new("x86-64").unwrap();
@@ -50,31 +48,8 @@ fn copy_from_cstr_to_u8_array(src: &CStr, dst: &mut [u8]) {
     dst[len] = 0;
 }
 
-fn obtain_nodename(dst: &mut [u8]) {
-    const HOSTNAME_PATH: &'static str = "/etc/hostname";
-
-    let fs_view = FsView::new();
-
-    let hostname_file = match fs_view.open_file(
-        HOSTNAME_PATH,
-        AccessMode::O_RDONLY as u32,
-        FileMode::from_bits(0o666).unwrap(),
-    ) {
-        Ok(file) => file,
-        Err(e) => {
-            // If failed to open hostname file, use "occlum-node" nodename.
-            error!("failed to open /etc/hostname: {}", e.backtrace());
-            copy_from_cstr_to_u8_array(&NODENAME, dst);
-            return;
-        }
-    };
-
-    let mut nodename: [u8; 65] = [0; 65];
-    hostname_file.read(&mut nodename);
-
-    // The \n need to be eliminated.
-    let nodename_string = str::from_utf8(&nodename).unwrap().replace("\n", "");
-    let len = nodename_string.len();
-    dst[..len].copy_from_slice(&nodename_string.into_bytes());
-    dst[len] = 0;
+pub fn init_nodename(nodename_str: &str) {
+    let nodename_cstr = CString::new(nodename_str).unwrap();
+    let mut nodename = NODENAME.write().unwrap();
+    *nodename = nodename_cstr;
 }

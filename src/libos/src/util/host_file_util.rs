@@ -6,9 +6,9 @@ use std::str;
 
 #[repr(C)]
 pub struct host_file_buffer {
-    pub resolv_conf_ptr: *const c_char,
-    pub hosts_ptr: *const c_char,
-    pub hostname_ptr: *const c_char,
+    pub resolv_conf_buf: *const c_char,
+    pub hosts_buf: *const c_char,
+    pub hostname_buf: *const c_char,
 }
 
 pub enum HostFile {
@@ -57,15 +57,22 @@ pub fn parse_host_file(host_file: HostFile, host_file_ptr: *const c_char) -> Res
     let host_file_str = str::from_utf8(host_file_bytes)
         .map_err(|_| errno!(EINVAL, "host file contains non UTF-8 characters"))?;
 
+    // Parse and inspect host file
     match host_file {
         HostFile::HOSTS => {
-            // TODO: Parsing hosts
+            if let Err(_) = hosts_parser_util::parse_hosts_buffer(host_file_bytes) {
+                return_errno!(EINVAL, "malformated host /etc/hosts");
+            }
         }
-        HostFile::HOSTNAME => {
-            // TODO: Parsing hostname
-        }
+        HostFile::HOSTNAME => match hosts_parser_util::parse_hostname_buffer(host_file_bytes) {
+            Err(_) => {
+                return_errno!(EINVAL, "malformated host /etc/hostname");
+            }
+            Ok(hostname_str) => {
+                return Ok(hostname_str);
+            }
+        },
         HostFile::RESOLV_CONF => {
-            // Parse and inspect host file
             if let Err(_) = resolv_conf::Config::parse(host_file_bytes) {
                 return_errno!(EINVAL, "malformated host /etc/resolv.conf");
             }

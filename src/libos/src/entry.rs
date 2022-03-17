@@ -98,7 +98,7 @@ pub extern "C" fn occlum_ecall_init(
     });
 
     // Parse host file
-    let resolv_conf_ptr = unsafe { (*file_buffer).resolv_conf_ptr };
+    let resolv_conf_ptr = unsafe { (*file_buffer).resolv_conf_buf };
     match parse_host_file(HostFile::RESOLV_CONF, resolv_conf_ptr) {
         Err(e) => {
             error!("failed to parse /etc/resolv.conf: {}", e.backtrace());
@@ -111,12 +111,13 @@ pub extern "C" fn occlum_ecall_init(
         }
     }
 
-    let hostname_ptr = unsafe { (*file_buffer).hostname_ptr };
+    let hostname_ptr = unsafe { (*file_buffer).hostname_buf };
     match parse_host_file(HostFile::HOSTNAME, hostname_ptr) {
         Err(e) => {
             error!("failed to parse /etc/hostname: {}", e.backtrace());
         }
         Ok(hostname_str) => {
+            misc::init_nodename(&hostname_str);
             *HOSTNAME_STR.write().unwrap() = Some(hostname_str);
             if let Err(e) = write_host_file(HostFile::HOSTNAME) {
                 error!("failed to write /etc/hostname: {}", e.backtrace());
@@ -124,7 +125,7 @@ pub extern "C" fn occlum_ecall_init(
         }
     }
 
-    let hosts_ptr = unsafe { (*file_buffer).hosts_ptr };
+    let hosts_ptr = unsafe { (*file_buffer).hosts_buf };
     match parse_host_file(HostFile::HOSTS, hosts_ptr) {
         Err(e) => {
             error!("failed to parse /etc/hosts: {}", e.backtrace());
