@@ -11,6 +11,7 @@ use bom::Bom;
 use env_logger::Env;
 use structopt::StructOpt;
 use util::check_rsync;
+use util::set_aditional_lib_path;
 
 mod bom;
 mod error;
@@ -31,6 +32,9 @@ struct CopyBomOption {
     /// Set the paths where to find included bom files
     #[structopt(long = "include-dir")]
     included_dirs: Vec<String>,
+    /// Set the paths where to find dependent libraries
+    #[structopt(long = "lib-path")]
+    lib_path: Option<String>,
 }
 
 impl CopyBomOption {
@@ -40,7 +44,9 @@ impl CopyBomOption {
             root_dir,
             dry_run,
             included_dirs,
+            lib_path,
         } = self;
+        set_aditional_lib_path(lib_path);
         let image = Bom::from_yaml_file(bom_file);
         image.manage_top_bom(bom_file, root_dir, *dry_run, included_dirs);
     }

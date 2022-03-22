@@ -28,10 +28,9 @@ struct OcclumLoaders {
 }
 
 lazy_static! {
-    /// This map stores the path of occlum-modified loaders.
-    /// The `key` is the name of the loader. The `value` is the loader path.
+    /// This variable stores the path of occlum-modified loaders.
     /// We read the loaders from the `LOADER_CONFIG_FILE`
-    static ref OCCLUM_LOADERS: OcclumLoaders = {
+    static ref OCCLUM_LOADERS: Mutex<OcclumLoaders> = {
         const LOADER_CONFIG_FILE: &'static str = "/opt/occlum/etc/template/occlum_elf_loader.config";
         let mut loader_paths = HashMap::new();
         let mut ld_library_path_envs = HashMap::new();
@@ -65,7 +64,7 @@ lazy_static! {
         debug!("occlum elf loaders: {:?}", loader_paths);
         debug!("occlum ld_library_path envs: {:?}", ld_library_path_envs);
         debug!("default lib dirs: {:?}", default_lib_dirs);
-        OcclumLoaders {loader_paths, ld_library_path_envs, default_lib_dirs}
+        Mutex::new(OcclumLoaders {loader_paths, ld_library_path_envs, default_lib_dirs})
     };
 }
 
@@ -231,6 +230,8 @@ pub fn find_dependent_shared_objects(
 
     if let Ok(output) = output {
         let default_lib_dirs = OCCLUM_LOADERS
+            .lock()
+            .unwrap()
             .default_lib_dirs
             .get(&occlum_elf_loader)
             .cloned();
@@ -265,7 +266,12 @@ fn command_output_of_executing_dynamic_loader(
         file_path_buf.to_string_lossy().to_string()
     };
     // return the output of the command to analyze dependencies
-    match OCCLUM_LOADERS.ld_library_path_envs.get(dynamic_loader) {
+    match OCCLUM_LOADERS
+        .lock()
+        .unwrap()
+        .ld_library_path_envs
+        .get(dynamic_loader)
+    {
         None => {
             debug!("{} --list {}", dynamic_loader, file_path);
             Command::new(dynamic_loader)
@@ -345,6 +351,8 @@ fn read_loader_from_interp_section(filename: &str) -> Option<(String, String)> {
         .unwrap();
     // If the loader file name is glibc loader or musl loader, we will use occlum-modified loader
     let occlum_elf_loader = OCCLUM_LOADERS
+        .lock()
+        .unwrap()
         .loader_paths
         .get(loader_file_name)
         .cloned()
@@ -615,4 +623,49 @@ pub fn check_rsync() {
     }
     println!("rsync is not installed.");
     std::process::exit(RSYNC_NOT_FOUND_ERROR);
+}
+
+/// Set additional path to find libraries.
+/// The user set paths have lower priority than paths defined in occlum_elf_loader.config.
+pub fn set_aditional_lib_path(lib_path: &Option<String>) {
+    if let Some(lib_path) = lib_path {
+        let mut occlum_loaders = OCCLUM_LOADERS.lock().unwrap();
+        let loader_paths = occlum_loaders
+            .loader_paths
+            .iter()
+            .map(|(_, loader_path)| loader_path.clone())
+            .collect::<Vec<_>>();
+        for loader_path in loader_paths.iter() {
+            let template_lib_path = occlum_loaders
+                .ld_library_path_envs
+                .get(loader_path)
+                .unwrap()
+                .to_owned();
+            let mut template_lib_paths: Vec<_> = template_lib_path
+                .split(":")
+                .map(ToString::to_string)
+                .collect();
+            // We insert user-provided lib path after lib path in config
+            let lib_paths: Vec<_> = lib_path
+                .split(":")
+                .filter(|s| s.len() > 0)
+                .map(ToString::to_string)
+                .collect();
+            for lib_path in lib_paths.into_iter() {
+                template_lib_paths.push(lib_path);
+            }
+            let ld_library_path = template_lib_paths.join(":");
+            occlum_loaders
+                .ld_library_path_envs
+                .insert(loader_path.to_owned(), ld_library_path);
+            occlum_loaders
+                .default_lib_dirs
+                .insert(loader_path.to_owned(), template_lib_paths);
+        }
+        debug!(
+            "user-provided LD_LIBRARY_PATH: {:?}",
+            occlum_loaders.ld_library_path_envs
+        );
+        debug!("default lib dirs: {:?}", occlum_loaders.default_lib_dirs);
+    }
 }
