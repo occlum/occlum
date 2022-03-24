@@ -18,7 +18,10 @@ impl VMRange {
     }
 
     pub fn new_with_size(start: usize, size: usize) -> Result<VMRange> {
-        Self::new(start, start + size)
+        let end = start
+            .checked_add(size)
+            .ok_or_else(|| errno!(EINVAL, "end address overflow"))?;
+        Self::new(start, end)
     }
 
     pub fn new_empty(start: usize) -> Result<VMRange> {
