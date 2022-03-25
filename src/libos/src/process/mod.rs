@@ -68,6 +68,8 @@ pub mod task;
 pub type pid_t = u32;
 #[allow(non_camel_case_types)]
 pub type uid_t = u32;
+#[allow(non_camel_case_types)]
+pub type gid_t = u32;
 
 pub type ProcessRef = Arc<Process>;
 pub type ThreadRef = Arc<Thread>;

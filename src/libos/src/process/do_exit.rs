@@ -6,6 +6,7 @@ use super::do_vfork::{is_vforked_child_process, vfork_return_to_parent};
 use super::pgrp::clean_pgrp_when_exit;
 use super::process::{Process, ProcessFilter};
 use super::{table, ProcessRef, TermStatus, ThreadRef, ThreadStatus};
+use crate::ipc::SHM_MANAGER;
 use crate::prelude::*;
 use crate::signal::{KernelSignal, SigNum};
 use crate::syscall::CpuContext;
@@ -107,6 +108,7 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
     let mut process_inner = process.inner();
     // Clean used VM
     USER_SPACE_VM_MANAGER.free_chunks_when_exit(thread);
+    SHM_MANAGER.detach_shm_when_process_exit(thread);
 
     // The parent is the idle process
     if parent_inner.is_none() {
