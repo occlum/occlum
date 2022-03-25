@@ -81,6 +81,7 @@ mod events;
 mod exception;
 mod fs;
 mod interrupt;
+mod ipc;
 mod misc;
 mod net;
 mod process;

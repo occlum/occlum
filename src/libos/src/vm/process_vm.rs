@@ -2,6 +2,7 @@ use super::*;
 
 use super::chunk::*;
 use super::config;
+use super::ipc::SHM_MANAGER;
 use super::process::elf_file::{ElfFile, ProgramHeaderExt};
 use super::user_space_vm::USER_SPACE_VM_MANAGER;
 use super::vm_area::VMArea;

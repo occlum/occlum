@@ -35,6 +35,7 @@ use crate::fs::{
     FileRef, HostStdioFds, Stat, Statfs,
 };
 use crate::interrupt::{do_handle_interrupt, sgx_interrupt_info_t};
+use crate::ipc::{do_shmat, do_shmctl, do_shmdt, do_shmget, key_t, shmids_t};
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t, RandFlags};
 use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
@@ -118,9 +119,9 @@ macro_rules! process_syscall_table_with_callback {
             (Msync = 26) => do_msync(addr: usize, size: usize, flags: u32),
             (Mincore = 27) => handle_unsupported(),
             (Madvise = 28) => handle_unsupported(),
-            (Shmget = 29) => handle_unsupported(),
-            (Shmat = 30) => handle_unsupported(),
-            (Shmctl = 31) => handle_unsupported(),
+            (Shmget = 29) => do_shmget(key: key_t, size: size_t, shmflg: i32),
+            (Shmat = 30) => do_shmat(shmid: i32, shmaddr: usize, shmflg: i32),
+            (Shmctl = 31) => do_shmctl(shmid: i32, cmd: i32, buf: *mut shmids_t),
             (Dup = 32) => do_dup(old_fd: FileDesc),
             (Dup2 = 33) => do_dup2(old_fd: FileDesc, new_fd: FileDesc),
             (Pause = 34) => handle_unsupported(),
@@ -156,7 +157,7 @@ macro_rules! process_syscall_table_with_callback {
             (Semget = 64) => handle_unsupported(),
             (Semop = 65) => handle_unsupported(),
             (Semctl = 66) => handle_unsupported(),
-            (Shmdt = 67) => handle_unsupported(),
+            (Shmdt = 67) => do_shmdt(shmaddr: usize),
             (Msgget = 68) => handle_unsupported(),
             (Msgsnd = 69) => handle_unsupported(),
             (Msgrcv = 70) => handle_unsupported(),
