@@ -12,6 +12,8 @@ use super::*;
 use config::ConfigMountFsType;
 use util::mem_util::from_user;
 
+pub const PATH_LEN: usize = 255;
+
 #[allow(non_camel_case_types)]
 pub struct iovec_t {
     base: *const c_void,
@@ -113,6 +115,11 @@ pub fn do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u16) -> Result<i
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
+    if path.is_empty() {
+        return_errno!(ENOENT, "path is an empty string");
+    } else if path.len() > PATH_LEN {
+        return_errno!(ENAMETOOLONG, "path name too long");
+    }
     let fs_path = FsPath::new(&path, dirfd, false)?;
     let mode = FileMode::from_bits_truncate(mode);
     let fd = file_ops::do_openat(&fs_path, flags, mode)?;
@@ -373,6 +380,11 @@ pub fn do_chdir(path: *const i8) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
+    if path.is_empty() {
+        return_errno!(ENOENT, "path is an empty string");
+    } else if path.len() > PATH_LEN {
+        return_errno!(ENAMETOOLONG, "path name too long");
+    }
     fs_ops::do_chdir(&path)?;
     Ok(0)
 }
@@ -417,6 +429,11 @@ pub fn do_renameat(
     let newpath = from_user::clone_cstring_safely(newpath)?
         .to_string_lossy()
         .into_owned();
+    if oldpath.is_empty() || newpath.is_empty() {
+        return_errno!(ENOENT, "oldpath or newpath is an empty string");
+    } else if oldpath.len() > PATH_LEN || newpath.len() > PATH_LEN {
+        return_errno!(ENAMETOOLONG, "oldpath or newpath name too long");
+    }
     let old_fs_path = FsPath::new(&oldpath, olddirfd, false)?;
     let new_fs_path = FsPath::new(&newpath, newdirfd, false)?;
     file_ops::do_renameat(&old_fs_path, &new_fs_path)?;
@@ -431,6 +448,11 @@ pub fn do_mkdirat(dirfd: i32, path: *const i8, mode: u16) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
+    if path.is_empty() {
+        return_errno!(ENOENT, "path is an empty string");
+    } else if path.len() > PATH_LEN {
+        return_errno!(ENAMETOOLONG, "path name too long");
+    }
     let fs_path = FsPath::new(&path, dirfd, false)?;
     let mode = FileMode::from_bits_truncate(mode);
     file_ops::do_mkdirat(&fs_path, mode)?;
@@ -441,6 +463,11 @@ pub fn do_rmdir(path: *const i8) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
+    if path.is_empty() {
+        return_errno!(ENOENT, "path is an empty string");
+    } else if path.len() > PATH_LEN {
+        return_errno!(ENAMETOOLONG, "path name too long");
+    }
     file_ops::do_rmdir(&path)?;
     Ok(0)
 }
@@ -531,6 +558,11 @@ pub fn do_fchmodat(dirfd: i32, path: *const i8, mode: u16) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
+    if path.is_empty() {
+        return_errno!(ENOENT, "path is an empty string");
+    } else if path.len() > PATH_LEN {
+        return_errno!(ENAMETOOLONG, "path name too long");
+    }
     let mode = FileMode::from_bits_truncate(mode);
     let fs_path = FsPath::new(&path, dirfd, false)?;
     file_ops::do_fchmodat(&fs_path, mode)?;
