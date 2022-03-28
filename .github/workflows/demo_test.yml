@@ -747,3 +747,25 @@ jobs:
     - name: Test Get
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/flask;
             curl --cacert flask.crt -X GET https://localhost:4996/customer/1"
+
+  Linux_LTP_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/sim
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Download and build Linux LTP
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/linux-ltp && ./dl_and_build_ltp.sh"
+
+    - name: Prepare occlum instance for LTP demo
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/linux-ltp && SGX_MODE=SIM ./prepare_ltp.sh"
+
+    - name: Run the LTP demo
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/linux-ltp/ltp_instance;
+            occlum run /opt/ltp/run-ltp.sh -f syscalls-occlum"

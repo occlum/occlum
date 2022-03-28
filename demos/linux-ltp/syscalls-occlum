@@ -669,7 +669,7 @@ lgetxattr02 lgetxattr02
 link01 symlink01 -T link01
 link02 link02
 link03 link03
-link04 link04
+# link04 link04
 link05 link05
 link06 link06
 link07 link07
@@ -1123,7 +1123,7 @@ rename04 rename04
 rename05 rename05
 rename06 rename06
 rename07 rename07
-rename08 rename08
+# rename08 rename08
 rename09 rename09
 rename10 rename10
 rename11 rename11
@@ -1497,7 +1497,7 @@ statfs03 statfs03
 statfs03_64 statfs03_64
 
 statvfs01 statvfs01
-statvfs02 statvfs02
+# statvfs02 statvfs02
 
 stime01 stime01
 stime02 stime02
@@ -1618,7 +1618,7 @@ uname04 uname04
 
 unlink01 symlink01 -T unlink01
 unlink05 unlink05
-unlink07 unlink07
+# unlink07 unlink07
 unlink08 unlink08
 
 #unlinkat test cases
