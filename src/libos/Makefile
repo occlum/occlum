@@ -131,7 +131,7 @@ ifneq ($(OCCLUM_COV),)
     LIBOS_FEATURES += cov
     COV_FLAGS += "-Zprofile -Ccodegen-units=1 \
         -Cllvm_args=-inline-threshold=0 -Clink-dead-code \
-        -Coverflow-checks=off -Cpanic=abort"
+        -Cpanic=abort"
 endif
 
 ifeq ($(SGX_MODE), HYPER)
