@@ -104,6 +104,15 @@ impl Default for VMMapAddr {
     }
 }
 
+impl VMMapAddr {
+    pub(super) fn is_force(&self) -> bool {
+        match self {
+            VMMapAddr::Force(_) => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Builder, Debug)]
 #[builder(pattern = "owned", build_fn(skip), no_std)]
 pub struct VMMapOptions {
