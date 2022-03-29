@@ -119,6 +119,25 @@ impl Chunk {
         }
     }
 
+    pub fn is_owned_by_current_process(&self) -> bool {
+        let current = current!();
+        let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
+        if !process_mem_chunks
+            .iter()
+            .any(|chunk| chunk.range() == self.range())
+        {
+            return false;
+        }
+
+        match self.internal() {
+            ChunkType::SingleVMA(vma) => true,
+            ChunkType::MultiVMA(internal_manager) => {
+                let internal_manager = internal_manager.lock().unwrap();
+                internal_manager.is_owned_by_current_process()
+            }
+        }
+    }
+
     pub fn add_process(&self, current: &ThreadRef) {
         match self.internal() {
             ChunkType::SingleVMA(vma) => unreachable!(),
@@ -215,6 +234,17 @@ impl Chunk {
                     .chunk_manager
                     .find_mmap_region(addr);
             }
+        }
+    }
+
+    pub fn is_free_range(&self, request_range: &VMRange) -> bool {
+        match self.internal() {
+            ChunkType::SingleVMA(_) => false, // single-vma chunk can't be free
+            ChunkType::MultiVMA(internal_manager) => internal_manager
+                .lock()
+                .unwrap()
+                .chunk_manager
+                .is_free_range(request_range),
         }
     }
 }
