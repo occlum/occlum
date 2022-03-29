@@ -522,6 +522,43 @@ int test_fixed_mmap_with_non_page_aligned_addr() {
     return 0;
 }
 
+int test_fixed_mmap_spans_over_two_chunks() {
+    size_t hint = HINT_BEGIN + (HINT_END - HINT_BEGIN) / 3;
+    hint = ALIGN_DOWN(hint, PAGE_SIZE);
+    size_t len = (HINT_END - HINT_BEGIN) / 3 + 1;
+    len = ALIGN_UP(len, PAGE_SIZE);
+    int prot = PROT_READ | PROT_WRITE;
+    int flags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED;
+    // Firstly, allocate memory at the default chunk
+    void *addr = mmap((void *)hint, len, prot, flags, -1, 0);
+    if ((size_t)addr != hint) {
+        THROW_ERROR("fixed mmap with good hint failed");
+    }
+
+    // Second, allocate single-vma chunk after the default chunk
+    hint = HINT_BEGIN + 36 * MB;
+    len = 2 * MB;
+    addr = mmap((void *)hint, len, prot, flags, -1, 0);
+    if ((size_t)addr != hint) {
+        THROW_ERROR("fixed mmap with good hint failed");
+    }
+
+    // Last, force allocate memory spans over these two chunks
+    hint = HINT_BEGIN + 30 * MB;
+    len = 16 * MB;
+    addr = mmap((void *)hint, len, prot, flags, -1, 0);
+    if ((size_t)addr != hint) {
+        THROW_ERROR("fixed mmap spans over two chunks failed");
+    }
+
+    // Free all potential allocated memory
+    size_t overall_len = (HINT_END - HINT_BEGIN) + (30 + 16) * MB;
+    if (munmap((void *)HINT_BEGIN, overall_len) < 0) {
+        THROW_ERROR("munmap failed");
+    }
+    return 0;
+}
+
 // ============================================================================
 // Test cases for munmap
 // ============================================================================
@@ -1285,6 +1322,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_fixed_mmap_that_does_not_override_any_mmaping),
     TEST_CASE(test_fixed_mmap_that_overrides_existing_mmaping),
     TEST_CASE(test_fixed_mmap_with_non_page_aligned_addr),
+    TEST_CASE(test_fixed_mmap_spans_over_two_chunks),
     TEST_CASE(test_munmap_whose_range_is_a_subset_of_a_mmap_region),
     TEST_CASE(test_munmap_whose_range_is_a_superset_of_a_mmap_region),
     TEST_CASE(test_munmap_whose_range_intersects_with_a_mmap_region),
