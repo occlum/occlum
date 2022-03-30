@@ -227,6 +227,12 @@ Step 4-5 are to be done on the guest OS running inside the Docker container:
 
 Alternatively, to use Occlum without Docker, one can install Occlum on popular Linux distributions like Ubuntu and CentOS with the Occlum DEB and RPM packages, respectively. These packages are provided for every release of Occlum since `0.16.0`. For more info about the packages, see [here](docs/install_occlum_packages.md).
 
+## Demos and example
+
+There are many different projects to demonstrate how Occlum can be used to build and run user applications, which could be found on [`demos`](./demos/).
+
+There is also a whole-flow confidential inference service [`example`](./example/) to demonstrate how to convert a real application directly from Docker image to Occlum image, how to integrate Occlum [`Init-RA`](./demos/remote_attestation/init_ra_flow/) solution for whole-flow sensitive data protection plus how to generate and run the Docker container based Occlum instances.
+
 ## How to Build?
 
 To build Occlum from the latest source code, do the following steps in an Occlum Docker container (which can be prepared as shown in the last section):

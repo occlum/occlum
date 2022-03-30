@@ -1,0 +1,13 @@
+includes:
+  - base.yaml
+targets:
+  # copy model
+  - target: /model
+    copy: 
+      - dirs:
+        - ${TF_DIR}/INCEPTION
+  - target: /bin
+    copy: 
+      - files:
+        - ${TF_DIR}/rootfs/usr/bin/tensorflow_model_server
+
