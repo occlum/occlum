@@ -1,0 +1,8 @@
+includes:
+  - base.yaml
+targets:
+  - target: /bin
+    copy:
+      - files:
+        - ../rocksdb/examples/simple_rocksdb_example
+        - ../rocksdb/db_bench
