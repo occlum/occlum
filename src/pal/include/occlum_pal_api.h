@@ -54,6 +54,12 @@ typedef struct occlum_stdio_fds {
     int stderr_fd;
 } occlum_stdio_fds_t;
 
+struct host_file_buffer {
+    const char *resolv_conf_buf;
+    const char *hosts_buf;
+    const char *hostname_buf;
+};
+
 /*
  * The struct which consists of arguments needed by occlum_pal_create_process
  */
@@ -150,6 +156,8 @@ int occlum_pal_kill(int pid, int sig);
  * @retval if 0, then success; otherwise, check errno for the exact error type.
  */
 int occlum_pal_destroy(void);
+
+void free_host_file_buffer(struct host_file_buffer file_buffer);
 
 #ifdef __cplusplus
 }

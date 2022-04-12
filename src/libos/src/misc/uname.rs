@@ -25,7 +25,7 @@ pub struct utsname_t {
 
 pub fn do_uname(name: &mut utsname_t) -> Result<()> {
     copy_from_cstr_to_u8_array(&SYSNAME, &mut name.sysname);
-    copy_from_cstr_to_u8_array(&NODENAME, &mut name.nodename);
+    copy_from_cstr_to_u8_array(&NODENAME.read().unwrap(), &mut name.nodename);
     copy_from_cstr_to_u8_array(&RELEASE, &mut name.release);
     copy_from_cstr_to_u8_array(&VERSION, &mut name.version);
     copy_from_cstr_to_u8_array(&MACHINE, &mut name.machine);
@@ -35,7 +35,7 @@ pub fn do_uname(name: &mut utsname_t) -> Result<()> {
 
 lazy_static! {
     static ref SYSNAME: CString = CString::new("Occlum").unwrap();
-    static ref NODENAME: CString = CString::new("occlum-node").unwrap();
+    static ref NODENAME: RwLock<CString> = RwLock::new(CString::new("occlum-node").unwrap());
     static ref RELEASE: CString = CString::new("0.1").unwrap();
     static ref VERSION: CString = CString::new("0.1").unwrap();
     static ref MACHINE: CString = CString::new("x86-64").unwrap();
@@ -47,4 +47,10 @@ fn copy_from_cstr_to_u8_array(src: &CStr, dst: &mut [u8]) {
     let len = min(dst.len() - 1, src.len());
     dst[..len].copy_from_slice(&src[..len]);
     dst[len] = 0;
+}
+
+pub fn init_nodename(nodename_str: &str) {
+    let nodename_cstr = CString::new(nodename_str).unwrap();
+    let mut nodename = NODENAME.write().unwrap();
+    *nodename = nodename_cstr;
 }

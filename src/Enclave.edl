@@ -51,7 +51,7 @@ enclave {
         public int occlum_ecall_init(
             [in, string] const char* log_level,
             [in, string] const char* instance_dir,
-            [in, string] const char* resolv_conf_ptr,
+            [in] const struct host_file_buffer* file_buffer,
             uint32_t num_vcpus);
 
         /*

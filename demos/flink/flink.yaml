@@ -6,11 +6,6 @@ targets:
   - target: /bin
     copy: 
       - from: ../flink-1.11.3
-  # copy hosts file
-  - target: /etc
-    copy: 
-      - files: 
-          - ../hosts
   # copy localtime
   - target: /etc
     copy: 

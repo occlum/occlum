@@ -8,13 +8,14 @@ use std::sync::Once;
 use sgx_tse::*;
 
 use crate::fs::HostStdioFds;
+use crate::misc;
 use crate::prelude::*;
 use crate::process::{self, table, ProcessFilter, SpawnAttr};
 use crate::signal::SigNum;
 use crate::time::up_time::init;
+use crate::util::host_file_util::{host_file_buffer, parse_host_file, write_host_file, HostFile};
 use crate::util::log::LevelFilter;
 use crate::util::mem_util::from_untrusted::*;
-use crate::util::resolv_conf_util::{parse_resolv_conf, write_resolv_conf};
 use crate::util::sgx::allow_debug as sgx_allow_debug;
 
 pub static mut INSTANCE_DIR: String = String::new();
@@ -26,6 +27,8 @@ lazy_static! {
     pub static ref ENTRY_POINTS: RwLock<Vec<PathBuf>> =
         RwLock::new(crate::config::LIBOS_CONFIG.entry_points.clone());
     pub static ref RESOLV_CONF_STR: RwLock<Option<String>> = RwLock::new(None);
+    pub static ref HOSTNAME_STR: RwLock<Option<String>> = RwLock::new(None);
+    pub static ref HOSTS_STR: RwLock<Option<String>> = RwLock::new(None);
 }
 
 macro_rules! ecall_errno {
@@ -45,7 +48,7 @@ pub struct occlum_pal_vcpu_data {
 pub extern "C" fn occlum_ecall_init(
     log_level: *const c_char,
     instance_dir: *const c_char,
-    resolv_conf_ptr: *const c_char,
+    file_buffer: *const host_file_buffer,
     num_vcpus: u32,
 ) -> i32 {
     if HAS_INIT.load(Ordering::SeqCst) == true {
@@ -120,14 +123,43 @@ pub extern "C" fn occlum_ecall_init(
         unsafe { std::backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Full) };
     });
 
-    match parse_resolv_conf(resolv_conf_ptr) {
+    // Parse host file
+    let resolv_conf_ptr = unsafe { (*file_buffer).resolv_conf_buf };
+    match parse_host_file(HostFile::RESOLV_CONF, resolv_conf_ptr) {
         Err(e) => {
             error!("failed to parse /etc/resolv.conf: {}", e.backtrace());
         }
         Ok(resolv_conf_str) => {
             *RESOLV_CONF_STR.write().unwrap() = Some(resolv_conf_str);
-            if let Err(e) = write_resolv_conf() {
+            if let Err(e) = write_host_file(HostFile::RESOLV_CONF) {
                 error!("failed to write /etc/resolv.conf: {}", e.backtrace());
+            }
+        }
+    }
+
+    let hostname_ptr = unsafe { (*file_buffer).hostname_buf };
+    match parse_host_file(HostFile::HOSTNAME, hostname_ptr) {
+        Err(e) => {
+            error!("failed to parse /etc/hostname: {}", e.backtrace());
+        }
+        Ok(hostname_str) => {
+            misc::init_nodename(&hostname_str);
+            *HOSTNAME_STR.write().unwrap() = Some(hostname_str);
+            if let Err(e) = write_host_file(HostFile::HOSTNAME) {
+                error!("failed to write /etc/hostname: {}", e.backtrace());
+            }
+        }
+    }
+
+    let hosts_ptr = unsafe { (*file_buffer).hosts_buf };
+    match parse_host_file(HostFile::HOSTS, hosts_ptr) {
+        Err(e) => {
+            error!("failed to parse /etc/hosts: {}", e.backtrace());
+        }
+        Ok(hosts_str) => {
+            *HOSTS_STR.write().unwrap() = Some(hosts_str);
+            if let Err(e) = write_host_file(HostFile::HOSTS) {
+                error!("failed to write /etc/hosts: {}", e.backtrace());
             }
         }
     }
