@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 this_dir="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
 occlum_dir="$( cd "$( dirname "$this_dir/../../../"  )" >/dev/null 2>&1 && pwd )"
 build_makefile=$occlum_dir/build/bin/occlum_build.mk
@@ -122,8 +124,8 @@ check_aesm_service() {
     fi
 
     # AESM is not necessary for SGX2
-    lscpu | grep sgx_lc > /dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    lscpu | grep sgx_lc > /dev/null 2>&1 || ret=$?
+    if [[ $ret -eq 0 ]]; then
         return
     fi
 
@@ -594,8 +596,6 @@ cmd_gen_image_key() {
     fi
     cat /dev/urandom | tr -dc 'a-f0-9' | fold -w 32 | head -n 1 | sed -r 's/.{2}/&-/g; s/.$//' > $key_path
 }
-
-set -e
 
 if [[ ( "$#" < 1 ) ]] ; then
     report_arg_error "Error: no sub-command is given"
