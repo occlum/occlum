@@ -424,8 +424,9 @@ impl VMManager {
 
         // Try merging all connecting chunks
         {
-            let mut merged_vmas = current.vm().merge_all_single_vma_chunks()?;
+            // Must lock the internal manager first here in case the chunk's range and vma are conflict when other threads are operating the VM
             let mut internal_manager = self.internal.lock().unwrap();
+            let mut merged_vmas = current.vm().merge_all_single_vma_chunks()?;
             while merged_vmas.len() != 0 {
                 let merged_vma = merged_vmas.pop().unwrap();
                 internal_manager.add_new_chunk(&current, merged_vma);
