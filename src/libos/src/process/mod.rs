@@ -37,6 +37,7 @@ mod do_exec;
 mod do_exit;
 mod do_futex;
 mod do_getpid;
+pub mod do_getuid;
 mod do_robust_list;
 mod do_set_tid_address;
 mod do_spawn;
@@ -63,6 +64,8 @@ pub mod table;
 pub type pid_t = u32;
 #[allow(non_camel_case_types)]
 pub type uid_t = u32;
+#[allow(non_camel_case_types)]
+pub type gid_t = u32;
 
 pub type ProcessRef = Arc<Process>;
 pub type ThreadRef = Arc<Thread>;

@@ -85,6 +85,7 @@ mod config;
 mod entry;
 mod fs;
 mod io_uring;
+mod ipc;
 mod misc;
 mod net;
 mod poll;

@@ -1,3 +1,4 @@
+use super::ipc::SHM_MANAGER;
 use super::*;
 use crate::ctor::dtor;
 use config::LIBOS_CONFIG;
@@ -46,6 +47,7 @@ impl UserSpaceVMManager {
 // be called after the main function. Static variables are still safe to visit at this time.
 #[dtor]
 fn free_user_space() {
+    SHM_MANAGER.clean_when_libos_exit();
     let range = USER_SPACE_VM_MANAGER.range();
     assert!(USER_SPACE_VM_MANAGER.verified_clean_when_exit());
     let addr = range.start() as *const c_void;

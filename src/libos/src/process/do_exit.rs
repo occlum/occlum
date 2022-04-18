@@ -8,6 +8,7 @@ use super::pgrp::clean_pgrp_when_exit;
 use super::process::{Process, ProcessFilter};
 use super::{table, ProcessRef, TermStatus, ThreadRef, ThreadStatus};
 use crate::entry::context_switch::CURRENT_CONTEXT;
+use crate::ipc::SHM_MANAGER;
 use crate::prelude::*;
 use crate::signal::constants::*;
 use crate::signal::{KernelSignal, SigNum};
@@ -124,6 +125,7 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus, new_parent_ref: Opt
     let mut process_inner = process.inner();
     // Clean used VM
     USER_SPACE_VM_MANAGER.free_chunks_when_exit(thread);
+    SHM_MANAGER.detach_shm_when_process_exit(thread);
 
     if let Some(new_parent_ref) = new_parent_ref {
         // Exit old process in execve syscall

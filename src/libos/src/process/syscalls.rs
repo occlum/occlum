@@ -460,22 +460,24 @@ pub async fn do_setpgid(pid: i32, pgid: i32) -> Result<isize> {
     Ok(ret)
 }
 
-// TODO: implement uid, gid, euid, egid
-
 pub async fn do_getuid() -> Result<isize> {
-    Ok(0)
+    let uid = super::do_getuid::do_getuid();
+    Ok(uid as isize)
 }
 
 pub async fn do_getgid() -> Result<isize> {
-    Ok(0)
+    let gid = super::do_getuid::do_getgid();
+    Ok(gid as isize)
 }
 
 pub async fn do_geteuid() -> Result<isize> {
-    Ok(0)
+    let euid = super::do_getuid::do_geteuid();
+    Ok(euid as isize)
 }
 
 pub async fn do_getegid() -> Result<isize> {
-    Ok(0)
+    let egid = super::do_getuid::do_getegid();
+    Ok(egid as isize)
 }
 
 pub async fn do_set_robust_list(list_head_ptr: *mut RobustListHead, len: usize) -> Result<isize> {
