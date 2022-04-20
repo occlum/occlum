@@ -210,12 +210,17 @@ impl EpollFile {
 
     fn push_ready(&self, entry: Arc<EpollEntry>) {
         let mut ready = self.ready.lock().unwrap();
-        if entry.is_ready() || entry.is_deleted() {
+        if entry.is_deleted() {
             return;
         }
-        entry.set_ready();
-        ready.push_back(entry);
 
+        if !entry.is_ready() {
+            entry.set_ready();
+            ready.push_back(entry);
+        }
+
+        // Even if the entry is already set to ready, there might be new events that we are interested in.
+        // Wake the poller anyway.
         self.pollee.add_events(Events::IN);
     }
 
@@ -314,7 +319,7 @@ impl Drop for EpollFile {
 impl Observer for EpollEntry {
     fn on_events(&self, _pollee_id: u64, _events: Events) {
         // Fast path
-        if self.is_ready() || self.is_deleted() {
+        if self.is_deleted() {
             return;
         }
 

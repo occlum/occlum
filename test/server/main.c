@@ -11,6 +11,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
+#include <sys/epoll.h>
+#include <time.h>
+#include <pthread.h>
 
 #include "test.h"
 
@@ -724,9 +727,19 @@ void *client_routine(void *arg) {
         return NULL;
     }
 
-    writeMsg(sockFd, sizeof(msg[0]), msg[0]);
-    writeMsg(sockFd, sizeof(msg[1]), msg[1]);
-    writeMsg(sockFd, sizeof(msg[2]), msg[2]);
+    switch (port) {
+        case 54321: { // for test_MSG_WAITALL
+            writeMsg(sockFd, strlen(msg[0]), msg[0]);
+            writeMsg(sockFd, strlen(msg[1]), msg[1]);
+            writeMsg(sockFd, strlen(msg[2]), msg[2]);
+            break;
+        };
+        case 54322: { // for test_epoll_wait
+            sleep(2);
+            write(sockFd, msg[0], strlen(msg[0]));
+            break;
+        };
+    }
 
     shutdown(sockFd, SHUT_RDWR);
 
@@ -762,7 +775,8 @@ void *server_routine(void *arg) {
 
     pthread_t client_tid;
     if (pthread_create(&client_tid, NULL, client_routine, (void *)&port)) {
-        THROW_ERROR("Failure creating client thread");
+        printf("Failure creating client thread");
+        return NULL;
     }
 
     for (;;) {
@@ -801,6 +815,81 @@ int test_MSG_WAITALL() {
     return 0;
 }
 
+int test_epoll_wait() {
+    struct sockaddr_in serv_addr = {};
+    int port = 54322;
+    int ret;
+    struct epoll_event event;
+    uint32_t interest_events = EPOLLIN;
+    pthread_t client_tid;
+    struct sockaddr_in saddr;
+    unsigned int saddr_ln = sizeof(saddr);
+    struct epoll_event polled_events;
+    char read_buf[10];
+
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        THROW_ERROR("server_routine, error creating socket");
+    }
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(port);
+
+    if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        THROW_ERROR("server_routine, error binding socket");
+    }
+
+    if (listen(sockfd, 5) != 0) {
+        THROW_ERROR("server_routine, error in listen");
+    }
+
+    int ep_fd = epoll_create1(0);
+    if (ep_fd < 0) {
+        THROW_ERROR("failed to create an epoll");
+    }
+
+    if (pthread_create(&client_tid, NULL, client_routine, (void *)&port)) {
+        THROW_ERROR("Failure creating client thread");
+    }
+
+    int newsock = accept(sockfd, (struct sockaddr *)&saddr, &saddr_ln);
+    if (newsock == -1) {
+        THROW_ERROR("server_routine, error in accept");
+    }
+
+    event.events = interest_events;
+    event.data.u32 = newsock;
+    ret = epoll_ctl(ep_fd, EPOLL_CTL_ADD, newsock, &event);
+    if (ret < 0) {
+        THROW_ERROR("failed to do epoll ctl");
+    }
+
+    // write to socket before epoll wait
+    ret = write(newsock, msg[1], strlen(msg[1]));
+    if (ret < 0) {
+        THROW_ERROR("failed to write");
+    }
+
+    // wait infinitely
+    ret = epoll_wait(ep_fd, &polled_events, 1, -1);
+    if (ret != 1) {
+        THROW_ERROR("failed to do epoll wait");
+    }
+
+    if (polled_events.events != interest_events) {
+        THROW_ERROR("bad epoll event");
+    }
+
+    ret = read(newsock, read_buf, sizeof(read_buf));
+    if (ret < 0) {
+        THROW_ERROR("failed to read");
+    }
+
+    pthread_join(client_tid, NULL);
+    return 0;
+}
+
 static test_case_t test_cases[] = {
     TEST_CASE(test_MSG_WAITALL),
     TEST_CASE(test_read_write),
@@ -818,6 +907,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_getname),
     TEST_CASE(test_getname_without_bind),
     TEST_CASE(test_shutdown),
+    TEST_CASE(test_epoll_wait),
 };
 
 int main(int argc, const char *argv[]) {
