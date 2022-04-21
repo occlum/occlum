@@ -655,6 +655,20 @@ pub fn do_mount_rootfs(
     Ok(0)
 }
 
+pub fn do_mount_runtime_rootfs(key_ptr: *const sgx_key_128bit_t) -> Result<isize> {
+    let key = if key_ptr.is_null() {
+        None
+    } else {
+        Some(unsafe { key_ptr.read() })
+    };
+
+    let user_config_path =
+        unsafe { format!("{}{}", INSTANCE_DIR, "/build/Occlum.json.unprotected") };
+    let user_config = config::load_runtime_config(&user_config_path)?;
+    fs_ops::do_mount_rootfs(&user_config, &key)?;
+    Ok(0)
+}
+
 pub fn do_fallocate(fd: FileDesc, mode: u32, offset: off_t, len: off_t) -> Result<isize> {
     if offset < 0 || len <= 0 {
         return_errno!(

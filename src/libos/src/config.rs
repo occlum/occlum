@@ -6,6 +6,7 @@ use std::ffi::CString;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sgxfs::SgxFile;
+use std::untrusted::fs::File;
 
 lazy_static! {
     pub static ref LIBOS_CONFIG: Config = {
@@ -31,6 +32,21 @@ pub fn load_config(config_path: &str, expected_mac: &sgx_aes_gcm_128bit_tag_t) -
         }
         config_file
     };
+    let config_json = {
+        let mut config_json = String::new();
+        config_file
+            .read_to_string(&mut config_json)
+            .map_err(|e| errno!(e))?;
+        config_json
+    };
+    let config_input: InputConfig = serde_json::from_str(&config_json).map_err(|e| errno!(e))?;
+    let config =
+        Config::from_input(&config_input).cause_err(|e| errno!(EINVAL, "invalid config JSON"))?;
+    Ok(config)
+}
+
+pub fn load_runtime_config(config_path: &str) -> Result<Config> {
+    let mut config_file = File::open(config_path).map_err(|e| errno!(e))?;
     let config_json = {
         let mut config_json = String::new();
         config_file
@@ -159,6 +175,7 @@ pub struct ConfigMountOptions {
     pub mac: Option<sgx_aes_gcm_128bit_tag_t>,
     pub layers: Option<Vec<ConfigMount>>,
     pub temporary: bool,
+    pub index: u32,
 }
 
 impl Config {
@@ -270,6 +287,7 @@ impl ConfigMountOptions {
             mac,
             layers,
             temporary: input.temporary,
+            index: input.index,
         })
     }
 }
@@ -406,4 +424,6 @@ struct InputConfigMountOptions {
     pub layers: Option<Vec<InputConfigMount>>,
     #[serde(default)]
     pub temporary: bool,
+    #[serde(default)]
+    pub index: u32,
 }

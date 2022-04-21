@@ -49,7 +49,7 @@ pub fn open_root_fs_according_to(
         .find(|m| {
             m.target == Path::new("/")
                 && m.type_ == ConfigMountFsType::TYPE_SEFS
-                && m.options.mac.is_some()
+                && (m.options.mac.is_some() || m.options.index == 1)
         })
         .ok_or_else(|| errno!(Errno::ENOENT, "the image SEFS in layers is not valid"))?;
     let root_image_sefs =
@@ -61,6 +61,7 @@ pub fn open_root_fs_according_to(
             m.target == Path::new("/")
                 && m.type_ == ConfigMountFsType::TYPE_SEFS
                 && m.options.mac.is_none()
+                && m.options.index == 0
         })
         .ok_or_else(|| errno!(Errno::ENOENT, "the container SEFS in layers is not valid"))?;
     let root_container_sefs =

@@ -27,12 +27,12 @@ use crate::fs::{
     do_fchown, do_fchownat, do_fcntl, do_fdatasync, do_flock, do_fstat, do_fstatat, do_fstatfs,
     do_fsync, do_ftruncate, do_futimesat, do_getcwd, do_getdents, do_getdents64, do_ioctl,
     do_lchown, do_link, do_linkat, do_lseek, do_lstat, do_mkdir, do_mkdirat, do_mount,
-    do_mount_rootfs, do_open, do_openat, do_pipe, do_pipe2, do_pread, do_pwrite, do_read,
-    do_readlink, do_readlinkat, do_readv, do_rename, do_renameat, do_rmdir, do_sendfile, do_stat,
-    do_statfs, do_symlink, do_symlinkat, do_sync, do_timerfd_create, do_timerfd_gettime,
-    do_timerfd_settime, do_truncate, do_umask, do_umount, do_unlink, do_unlinkat, do_utime,
-    do_utimensat, do_utimes, do_write, do_writev, iovec_t, utimbuf_t, AsTimer, File, FileDesc,
-    FileRef, HostStdioFds, Stat, Statfs,
+    do_mount_rootfs, do_mount_runtime_rootfs, do_open, do_openat, do_pipe, do_pipe2, do_pread,
+    do_pwrite, do_read, do_readlink, do_readlinkat, do_readv, do_rename, do_renameat, do_rmdir,
+    do_sendfile, do_stat, do_statfs, do_symlink, do_symlinkat, do_sync, do_timerfd_create,
+    do_timerfd_gettime, do_timerfd_settime, do_truncate, do_umask, do_umount, do_unlink,
+    do_unlinkat, do_utime, do_utimensat, do_utimes, do_write, do_writev, iovec_t, utimbuf_t,
+    AsTimer, File, FileDesc, FileRef, HostStdioFds, Stat, Statfs,
 };
 use crate::interrupt::{do_handle_interrupt, sgx_interrupt_info_t};
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t, RandFlags};
@@ -422,6 +422,7 @@ macro_rules! process_syscall_table_with_callback {
             (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
             (HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
             (MountRootFS = 363) => do_mount_rootfs(key_ptr: *const sgx_key_128bit_t, occlum_json_mac_ptr: *const sgx_aes_gcm_128bit_tag_t),
+            (MountRuntimeRootFS = 364) => do_mount_runtime_rootfs(key_ptr: *const sgx_key_128bit_t),
         }
     };
 }
