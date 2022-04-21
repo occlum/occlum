@@ -86,8 +86,8 @@ RUN curl https://sh.rustup.rs -sSf | \
     cargo -V
 
 # Install SGX PSW
-ARG PSW_VERSION=2.15.101.1
-ARG DCAP_VERSION=1.12.101.1
+ARG PSW_VERSION=2.16.100.4
+ARG DCAP_VERSION=1.13.100.4
 RUN apt-get update && aptitude install -y \
         libsgx-launch-dev=$PSW_VERSION-focal1 \
         libsgx-epid-dev=$PSW_VERSION-focal1 \
@@ -123,7 +123,7 @@ RUN apt-get update && aptitude install -y \
 
 # Install SGX SDK
 WORKDIR /tmp
-RUN git clone -b sgx_2.15.1_for_occlum https://github.com/occlum/linux-sgx && \
+RUN git clone -b sgx_2.16_for_occlum https://github.com/occlum/linux-sgx && \
     mkdir /etc/init && \
     cd linux-sgx && \
     make preparation && \
