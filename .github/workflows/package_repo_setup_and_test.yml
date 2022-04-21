@@ -88,7 +88,7 @@ jobs:
             aptly -distribution='focal' -architectures=amd64 repo create deb-focal-new;
             aptly repo add deb-focal-new /root/workspace/occlum/build/debs/*;
             aptly snapshot create focal-new from repo deb-focal-new;
-            aptly snapshot merge focal-main focal-new focal-old;
+            aptly -no-remove snapshot merge focal-main focal-old focal-new;
             aptly publish snapshot -distribution=focal focal-main;
             tree /root/.aptly/public'
 
