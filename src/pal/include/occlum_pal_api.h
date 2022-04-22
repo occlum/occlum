@@ -93,10 +93,13 @@ struct occlum_pal_create_process_args {
     int *pid;
 };
 
-struct host_file_buffer {
-    const char *resolv_conf_buf;
-    const char *hosts_buf;
-    const char *hostname_buf;
+struct host_file_buffer_t {
+    char *resolv_conf_buf;
+    unsigned int resolv_conf_buf_size;
+    char *hosts_buf;
+    unsigned int hosts_buf_size;
+    char *hostname_buf;
+    unsigned int hostname_buf_size;
 };
 
 /*
@@ -164,7 +167,7 @@ int occlum_pal_kill(int pid, int sig);
  */
 int occlum_pal_destroy(void);
 
-void free_host_file_buffer(struct host_file_buffer file_buffer);
+void free_host_file_buffer_t(struct host_file_buffer_t file_buffer);
 
 #ifdef __cplusplus
 }

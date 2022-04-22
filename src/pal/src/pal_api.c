@@ -107,18 +107,33 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
     eid = pal_get_enclave_id();
 
     int ecall_ret = 0;
-    struct host_file_buffer file_buffer = {
-        .hostname_buf = pal_load_file_to_string("/etc/hostname"),
-        .hosts_buf = pal_load_file_to_string("/etc/hosts"),
-        .resolv_conf_buf = pal_load_file_to_string("/etc/resolv.conf"),
+
+    load_file_t hostname_ptr = {0, NULL};
+    load_file_t hosts_ptr = {0, NULL};
+    load_file_t resolv_conf_ptr = {0, NULL};
+
+    pal_load_file("/etc/hostname", &hostname_ptr);
+    pal_load_file("/etc/hosts", &hosts_ptr);
+    pal_load_file("/etc/resolv.conf", &resolv_conf_ptr);
+
+    struct host_file_buffer_t file_buffer = {
+        .hostname_buf = hostname_ptr.buffer,
+        .hostname_buf_size = hostname_ptr.size,
+        .hosts_buf = hosts_ptr.buffer,
+        .hosts_buf_size = hosts_ptr.size,
+        .resolv_conf_buf = resolv_conf_ptr.buffer,
+        .resolv_conf_buf_size = resolv_conf_ptr.size,
     };
 
-    const struct host_file_buffer *file_buffer_ptr = &file_buffer;
+    const struct host_file_buffer_t *file_buffer_ptr = &file_buffer;
 
     sgx_status_t ecall_status = occlum_ecall_init(eid, &ecall_ret, attr->log_level,
                                 resolved_path, file_buffer_ptr);
 
-    free_host_file_buffer(file_buffer);
+    free_host_file_buffer_t(file_buffer);
+    hostname_ptr.buffer = NULL;
+    hosts_ptr.buffer = NULL;
+    resolv_conf_ptr.buffer = NULL;
 
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
@@ -280,7 +295,7 @@ int occlum_pal_destroy(void) {
     return ret;
 }
 
-void free_host_file_buffer(struct host_file_buffer file_buffer) {
+void free_host_file_buffer_t(struct host_file_buffer_t file_buffer) {
     free((void *)file_buffer.hostname_buf);
     file_buffer.hostname_buf = NULL;
 
