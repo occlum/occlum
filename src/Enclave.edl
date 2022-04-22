@@ -32,6 +32,15 @@ enclave {
         uint32_t qe_identity_size;
     };
 
+    struct host_file_buffer {
+        [size=resolv_conf_buf_size]char *resolv_conf_buf;
+        uint32_t resolv_conf_buf_size;
+        [size=hosts_buf_size]char *hosts_buf;
+        uint32_t hosts_buf_size;
+        [size=hostname_buf_size]char *hostname_buf;
+        uint32_t hostname_buf_size;
+    };
+
     trusted {
         /*
          * Initialize the LibOS according to the specified attributes.
@@ -43,7 +52,10 @@ enclave {
          *      EINVAL - The value of an argument are invalid.
          */
 
-        public int occlum_ecall_init([in, string] const char* log_level, [in, string] const char* instance_dir, [in] const struct host_file_buffer* file_buffer);
+        public int occlum_ecall_init(
+            [in, string] const char* log_level, 
+            [in, string] const char* instance_dir, 
+            [in] const struct host_file_buffer* file_buffer);
         
         /*
          * Create a new LibOS process to do the task specified by the given 

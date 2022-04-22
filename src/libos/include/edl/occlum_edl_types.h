@@ -29,13 +29,6 @@ typedef struct itimerspec{
     struct _timespec it_value;
 } itimerspec_t;
 
-// The host_file_buffer struct includes /etc/resolv.conf, /etc/hosts and /etc/hostname buffer
-struct host_file_buffer {
-    const char* resolv_conf_buf;
-    const char* hosts_buf;
-    const char* hostname_buf;
-};
-
 #define FD_SETSIZE 1024
 typedef struct {
     unsigned long fds_bits[FD_SETSIZE / 8 / sizeof(long)];

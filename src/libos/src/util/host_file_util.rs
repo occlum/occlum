@@ -7,8 +7,11 @@ use std::str;
 #[repr(C)]
 pub struct host_file_buffer {
     pub resolv_conf_buf: *const c_char,
+    resolv_conf_buf_size: u32,
     pub hosts_buf: *const c_char,
+    hosts_buf_size: u32,
     pub hostname_buf: *const c_char,
+    hostname_buf_size: u32,
 }
 
 pub enum HostFile {
