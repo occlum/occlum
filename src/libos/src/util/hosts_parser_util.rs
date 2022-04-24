@@ -24,33 +24,36 @@ pub struct Hosts {
 impl FromStr for HostEntry {
     type Err = error::Error;
     fn from_str(line: &str) -> Result<Self> {
-        let slice: Vec<String> = line.split_whitespace().map(|s| s.to_string()).collect();
+        let slice: Vec<&str> = line.split_whitespace().collect();
 
         // check IP:
         let ip = match slice.first() {
             Some(ip) => ip,
             None => {
-                return_errno!(EINVAL, "malformated ip in hosts file");
+                return_errno!(EINVAL, "malformated ip in /etc/hosts file");
             }
         };
 
         let _ip_addr: IpAddr = match ip.parse() {
             Ok(ip) => ip,
             Err(_) => {
-                return_errno!(EINVAL, "malformated ip in hosts file");
+                return_errno!(EINVAL, "malformated ip in /etc/hosts file");
             }
         };
 
         let mut hostname: Vec<String> = Vec::new();
-        for i in slice[1..].to_vec() {
-            if !HOSTNAME_RE.is_match(&i) {
-                return_errno!(EINVAL, "malformated hostname in hosts file");
+        if !slice.iter().skip(1).all(|&s| {
+            let is_match = HOSTNAME_RE.is_match(s);
+            if is_match {
+                hostname.push(s.to_string());
             }
-            hostname.push(i.to_owned());
+            is_match
+        }) {
+            return_errno!(EINVAL, "malformated hostname in /etc/hosts file");
         }
 
         if hostname.is_empty() {
-            return_errno!(EINVAL, "malformated hostname in hosts file");
+            return_errno!(EINVAL, "malformated hostname in /etc/hosts file");
         }
         Ok(HostEntry {
             ip: ip.to_string(),
