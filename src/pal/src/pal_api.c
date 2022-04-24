@@ -112,9 +112,9 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
     load_file_t hosts_ptr = {0, NULL};
     load_file_t resolv_conf_ptr = {0, NULL};
 
-    pal_load_file("/etc/hostname", &hostname_ptr);
-    pal_load_file("/etc/hosts", &hosts_ptr);
-    pal_load_file("/etc/resolv.conf", &resolv_conf_ptr);
+    pal_load_file(eid, "/etc/hostname", &hostname_ptr);
+    pal_load_file(eid, "/etc/hosts", &hosts_ptr);
+    pal_load_file(eid, "/etc/resolv.conf", &resolv_conf_ptr);
 
     struct host_file_buffer_t file_buffer = {
         .hostname_buf = hostname_ptr.buffer,
@@ -125,15 +125,10 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
         .resolv_conf_buf_size = resolv_conf_ptr.size,
     };
 
-    const struct host_file_buffer_t *file_buffer_ptr = &file_buffer;
-
     sgx_status_t ecall_status = occlum_ecall_init(eid, &ecall_ret, attr->log_level,
-                                resolved_path, file_buffer_ptr);
+                                resolved_path, &file_buffer);
 
-    free_host_file_buffer_t(file_buffer);
-    hostname_ptr.buffer = NULL;
-    hosts_ptr.buffer = NULL;
-    resolv_conf_ptr.buffer = NULL;
+    free_host_file_buffer(eid, &file_buffer);
 
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
@@ -293,17 +288,6 @@ int occlum_pal_destroy(void) {
         PAL_WARN("Cannot destroy the enclave");
     }
     return ret;
-}
-
-void free_host_file_buffer_t(struct host_file_buffer_t file_buffer) {
-    free((void *)file_buffer.hostname_buf);
-    file_buffer.hostname_buf = NULL;
-
-    free((void *)file_buffer.hosts_buf);
-    file_buffer.hosts_buf = NULL;
-
-    free((void *)file_buffer.resolv_conf_buf);
-    file_buffer.resolv_conf_buf = NULL;
 }
 
 int pal_get_version(void) __attribute__((weak, alias ("occlum_pal_get_version")));
