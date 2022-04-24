@@ -167,8 +167,6 @@ int occlum_pal_kill(int pid, int sig);
  */
 int occlum_pal_destroy(void);
 
-void free_host_file_buffer_t(struct host_file_buffer_t file_buffer);
-
 #ifdef __cplusplus
 }
 #endif
