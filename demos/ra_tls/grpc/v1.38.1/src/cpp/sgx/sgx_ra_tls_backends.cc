@@ -158,15 +158,15 @@ int verify_measurement(const char* mr_enclave, const char* mr_signer,
     try {
         assert(mr_enclave && mr_signer && isv_prod_id && isv_svn);
         status = verify_measurement_internal(mr_enclave, mr_signer, isv_prod_id, isv_svn, debuggable);
-        grpc_printf("remote sgx measurements\n"); 
-        grpc_printf("  |- mr_enclave     :  %s\n", byte_to_hex(mr_enclave, 32).c_str());
-        grpc_printf("  |- mr_signer      :  %s\n", byte_to_hex(mr_signer, 32).c_str());
-        grpc_printf("  |- isv_prod_id    :  %hu\n", *((uint16_t*)isv_prod_id));
-        grpc_printf("  |- isv_svn        :  %hu\n", *((uint16_t*)isv_svn));
-        grpc_printf("  |- debuggable     :  %s", debuggable?"true":"false");
         if (status) {
             grpc_printf("  |- verify result  :  success\n");
         } else {
+            grpc_printf("Below remote sgx measurements is not in the allowable list.\n");
+            grpc_printf("  |- mr_enclave     :  %s\n", byte_to_hex(mr_enclave, 32).c_str());
+            grpc_printf("  |- mr_signer      :  %s\n", byte_to_hex(mr_signer, 32).c_str());
+            grpc_printf("  |- isv_prod_id    :  %hu\n", *((uint16_t*)isv_prod_id));
+            grpc_printf("  |- isv_svn        :  %hu\n", *((uint16_t*)isv_svn));
+            grpc_printf("  |- debuggable     :  %s\n", debuggable?"true":"false");
             grpc_printf("  |- verify result  :  failed\n");
         }
     } catch (...) {
