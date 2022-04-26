@@ -17,7 +17,8 @@ pub struct RwLock<T: ?Sized> {
 }
 
 unsafe impl<T: ?Sized + Send> Send for RwLock<T> {}
-unsafe impl<T: ?Sized + Send + Sync> Sync for RwLock<T> {}
+// RwLock doesn't need T to be Sync here because RwLock doesn't access T directly.
+unsafe impl<T: ?Sized + Send> Sync for RwLock<T> {}
 
 // The RAII guard for read that can be held by many readers
 pub struct RwLockReadGuard<'a, T: ?Sized + 'a> {
@@ -86,7 +87,6 @@ impl<T: ?Sized> RwLock<T> {
                 (ptr::read(inner), ptr::read(data))
             };
             mem::forget(self);
-            inner.destroy();
             drop(inner);
 
             Ok(data.into_inner())
@@ -96,13 +96,6 @@ impl<T: ?Sized> RwLock<T> {
     pub fn get_mut(&mut self) -> Result<&mut T> {
         let data = unsafe { &mut *self.data.get() };
         Ok(data)
-    }
-}
-
-// Use may_dangle to assert not to access T
-unsafe impl<#[may_dangle] T: ?Sized> Drop for RwLock<T> {
-    fn drop(&mut self) {
-        self.inner.destroy().unwrap();
     }
 }
 
