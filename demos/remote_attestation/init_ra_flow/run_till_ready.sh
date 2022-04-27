@@ -19,7 +19,7 @@ done
 echo "Start Flask-TLS restful web portal on backgound ..."
 
 pushd occlum_client
-occlum run /bin/rest_api.py &
+occlum run --config-svn 1234 /bin/rest_api.py &
 popd
 
 while ! nc -z $FLASK_SERVER_IP $FLASK_SERVER_PORT; do

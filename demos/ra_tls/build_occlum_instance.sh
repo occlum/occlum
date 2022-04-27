@@ -26,6 +26,7 @@ function build_instance() {
              .verify_mr_signer = "on" |
              .verify_isv_prod_id = "off" |
              .verify_isv_svn = "off" |
+             .verify_config_svn = "off" |
              .verify_enclave_debuggable = "on" |
 	     .sgx_mrs[0].mr_enclave = ''"'`get_mr client mr_enclave`'" |
 	     .sgx_mrs[0].mr_signer = ''"'`get_mr client mr_signer`'" |
@@ -43,6 +44,7 @@ function build_instance() {
              .verify_mr_signer = "off" |
              .verify_isv_prod_id = "off" |
              .verify_isv_svn = "off" |
+             .verify_config_svn = "off" |
              .verify_enclave_debuggable = "on" |
              .sgx_mrs[0].debuggable = false ' ../ra_config_template.json > dynamic_config.json
 
