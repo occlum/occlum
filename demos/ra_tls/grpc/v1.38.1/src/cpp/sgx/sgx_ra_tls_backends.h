@@ -50,6 +50,7 @@ struct sgx_measurement {
     char mr_signer[32];
     uint16_t isv_prod_id;
     uint16_t isv_svn;
+    uint16_t config_svn;
     bool debuggable;
 };
 
@@ -58,6 +59,7 @@ struct sgx_config {
     bool verify_mr_signer   = true;
     bool verify_isv_prod_id = true;
     bool verify_isv_svn     = true;
+    bool verify_config_svn = true;
     bool verify_enclave_debuggable = true;
     std::vector<sgx_measurement> sgx_mrs;
 };
@@ -100,7 +102,7 @@ void ra_tls_verify_init();
 
 int verify_measurement(const char* mr_enclave, const char* mr_signer,
                        const char* isv_prod_id, const char* isv_svn,
-                       bool debuggable);
+                       const char* config_svn, bool debuggable);
 
 void credential_option_set_certificate_provider(grpc::sgx::CredentialsOptions& options);
 

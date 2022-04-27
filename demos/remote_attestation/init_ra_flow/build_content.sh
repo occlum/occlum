@@ -53,6 +53,8 @@ function build_client_instance()
         .resource_limits.kernel_space_heap_size = "128MB" |
         .resource_limits.max_num_of_threads = 32 |
         .metadata.debuggable = false |
+        .metadata.enable_kss = true |
+        .metadata.version_number = 88 |
         .env.default += ["PYTHONHOME=/opt/python-occlum"]' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
 
@@ -64,6 +66,7 @@ function build_client_instance()
         .verify_mr_signer = "on" |
         .verify_isv_prod_id = "off" |
         .verify_isv_svn = "off" |
+        .verify_config_svn = "off" |
         .verify_enclave_debuggable = "on" |
         .sgx_mrs[0].mr_signer = ''"'`get_mr client mr_signer`'" |
         .sgx_mrs[0].debuggable = false ' ../ra_config_template.json > dynamic_config.json
@@ -109,10 +112,13 @@ function build_server_instance()
     jq '.verify_mr_enclave = "on" |
         .verify_mr_signer = "on" |
         .verify_isv_prod_id = "off" |
-        .verify_isv_svn = "off" |
+        .verify_isv_svn = "on" |
+        .verify_config_svn = "on" |
         .verify_enclave_debuggable = "on" |
         .sgx_mrs[0].mr_enclave = ''"'`get_mr client mr_enclave`'" |
         .sgx_mrs[0].mr_signer = ''"'`get_mr client mr_signer`'" |
+        .sgx_mrs[0].isv_svn = 88 |
+        .sgx_mrs[0].config_svn = 1234 |
         .sgx_mrs[0].debuggable = false ' ../ra_config_template.json > dynamic_config.json
 
     new_json="$(jq '.resource_limits.user_space_size = "500MB" |

@@ -308,6 +308,7 @@ int occlum_verify_cert(const unsigned char * der_crt, size_t len) {
                              (const char *)&p_rep_body->mr_signer,
                              (const char *)&p_rep_body->isv_prod_id,
                              (const char *)&p_rep_body->isv_svn,
+                             (const char *)&p_rep_body->config_svn,
                              debuggable);
     if (ret != 0) {
         grpc_printf("verify the measurement failed!\n");

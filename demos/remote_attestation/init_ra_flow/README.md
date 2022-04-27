@@ -21,13 +21,15 @@ The GRPC-RATLS server holds some sensitive data thus it is usually deploed on se
     "verify_mr_signer" : "on",
     "verify_isv_prod_id" : "on",
     "verify_isv_svn" : "on",
+    "verify_config_svn" : "on",
     "verify_enclave_debuggable" : "on",
     "sgx_mrs": [
         {
             "mr_enclave" : "",
             "mr_signer" : "",
-            "isv_prod_id" : "0",
-            "isv_svn" : "0",
+            "isv_prod_id" : 0,
+            "isv_svn" : 0,
+            "config_svn" : 0,
             "debuggable" : false
         }
     ],
@@ -37,6 +39,8 @@ The GRPC-RATLS server holds some sensitive data thus it is usually deploed on se
 Users need decide which `verify_xxx` are taking effect.
 1. if yes, fill in the measures data under `sgx_mrs`.
 2. if no, set `verify_xxx` to `off`.
+
+* **config_svn** is a 16 bits information brought by [`SGX KSS feature`](https://github.com/occlum/occlum/blob/master/docs/remote_attestation.md#sgx-kss-key-separation-and-sharing-feature-support), which provides a benefit that the enclave SGX quote (config_svn part) could be modified in running stage instead of signing stage.
 
 Details could refer to the `build_server_instance` in script [`build_content.sh`](./build_content.sh).
 

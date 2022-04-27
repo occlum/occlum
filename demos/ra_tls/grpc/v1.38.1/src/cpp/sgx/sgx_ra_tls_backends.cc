@@ -65,6 +65,7 @@ static sgx_config parse_sgx_config_json(const char* file) {
     sgx_cfg.verify_mr_signer = sgx_json.compare_item(sgx_json.get_item(sgx_json.get_handle(), "verify_mr_signer"), "on");
     sgx_cfg.verify_isv_prod_id = sgx_json.compare_item(sgx_json.get_item(sgx_json.get_handle(), "verify_isv_prod_id"), "on");
     sgx_cfg.verify_isv_svn = sgx_json.compare_item(sgx_json.get_item(sgx_json.get_handle(), "verify_isv_svn"), "on");
+    sgx_cfg.verify_config_svn = sgx_json.compare_item(sgx_json.get_item(sgx_json.get_handle(), "verify_config_svn"), "on");
     sgx_cfg.verify_enclave_debuggable =
         sgx_json.compare_item(sgx_json.get_item(sgx_json.get_handle(), "verify_enclave_debuggable"), "on");
 
@@ -89,6 +90,9 @@ static sgx_config parse_sgx_config_json(const char* file) {
         auto isv_svn = sgx_json.print_item(sgx_json.get_item(obj, "isv_svn"));
         sgx_cfg.sgx_mrs[i].isv_svn = strtoul(isv_svn, nullptr, 10);
 
+        auto config_svn = sgx_json.print_item(sgx_json.get_item(obj, "config_svn"));
+        sgx_cfg.sgx_mrs[i].config_svn = strtoul(config_svn, nullptr, 10);
+
         if (cJSON_IsTrue(sgx_json.get_item(obj, "debuggable")) == 0)
             sgx_cfg.sgx_mrs[i].debuggable = false;
         else
@@ -112,7 +116,7 @@ void ra_tls_verify_init() {
 
 static bool verify_measurement_internal(const char* mr_enclave, const char* mr_signer,
                                         const char* isv_prod_id, const char* isv_svn,
-                                        bool debuggable) {
+                                        const char* config_svn, bool debuggable) {
     bool status = false;
     auto & sgx_cfg = _ctx_.sgx_cfg;
     for (auto & obj : sgx_cfg.sgx_mrs) {
@@ -138,6 +142,11 @@ static bool verify_measurement_internal(const char* mr_enclave, const char* mr_s
             status = false;
         }
 
+        if (status && sgx_cfg.verify_config_svn && \
+            (obj.config_svn != *(uint16_t*)config_svn)) {
+            status = false;
+        }
+
         if (status && sgx_cfg.verify_enclave_debuggable && \
             (obj.debuggable != debuggable)) {
             status = false;
@@ -152,12 +161,14 @@ static bool verify_measurement_internal(const char* mr_enclave, const char* mr_s
 
 int verify_measurement(const char* mr_enclave, const char* mr_signer,
                        const char* isv_prod_id, const char* isv_svn,
-                       bool debuggable) {
+                       const char* config_svn, bool debuggable) {
     std::lock_guard<std::mutex> lock(_ctx_.mtx);
     bool status = false;
     try {
-        assert(mr_enclave && mr_signer && isv_prod_id && isv_svn);
-        status = verify_measurement_internal(mr_enclave, mr_signer, isv_prod_id, isv_svn, debuggable);
+        assert(mr_enclave && mr_signer && isv_prod_id && isv_svn && config_svn);
+        status = verify_measurement_internal(
+            mr_enclave, mr_signer, isv_prod_id, isv_svn, config_svn, debuggable
+            );
         if (status) {
             grpc_printf("  |- verify result  :  success\n");
         } else {
@@ -166,6 +177,7 @@ int verify_measurement(const char* mr_enclave, const char* mr_signer,
             grpc_printf("  |- mr_signer      :  %s\n", byte_to_hex(mr_signer, 32).c_str());
             grpc_printf("  |- isv_prod_id    :  %hu\n", *((uint16_t*)isv_prod_id));
             grpc_printf("  |- isv_svn        :  %hu\n", *((uint16_t*)isv_svn));
+            grpc_printf("  |- config_svn     :  %hu\n", *((uint16_t*)config_svn));
             grpc_printf("  |- debuggable     :  %s\n", debuggable?"true":"false");
             grpc_printf("  |- verify result  :  failed\n");
         }
