@@ -32,6 +32,10 @@ impl WaiterQueue {
         }
     }
 
+    pub(crate) fn inner(&self) -> &Mutex<WaiterQueueInner> {
+        &self.inner
+    }
+
     /// Enqueue a waiter.
     pub fn enqueue(&self, waiter: &mut Waiter) {
         let mut inner = self.inner.lock();
@@ -62,7 +66,7 @@ impl WaiterQueue {
 }
 
 #[derive(Debug)]
-struct WaiterQueueInner {
+pub(crate) struct WaiterQueueInner {
     list: LinkedList<LinkedListAdapter>,
     next_ptr: Option<NonNull<WaiterInner>>,
     id: ObjectId,

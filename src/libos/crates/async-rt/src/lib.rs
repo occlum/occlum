@@ -17,6 +17,11 @@
 #![feature(const_fn_trait_bound)]
 #![feature(duration_constants)]
 #![feature(get_mut_unchecked)]
+#![feature(negative_impls)]
+#![feature(dropck_eyepatch)]
+#![feature(core_intrinsics)]
+#![feature(drain_filter)]
+#![feature(arbitrary_enum_discriminant)]
 #![allow(dead_code)]
 
 #[cfg(feature = "sgx")]
@@ -26,8 +31,9 @@ extern crate alloc;
 #[macro_use]
 extern crate log;
 
-#[cfg(not(feature = "sgx"))]
+#[cfg(feature = "auto_run")]
 extern crate env_logger;
+extern crate lazy_static;
 #[cfg(not(feature = "sgx"))]
 extern crate libc;
 #[cfg(feature = "sgx")]
@@ -43,6 +49,7 @@ mod macros;
 mod parks;
 pub mod prelude;
 pub mod sched;
+pub mod sync;
 pub mod task;
 pub mod time;
 pub mod wait;

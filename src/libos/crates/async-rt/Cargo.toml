@@ -36,3 +36,4 @@ sgx_libc = { path = "../../../../deps/rust-sgx-sdk/sgx_libc", optional = true }
 
 [dev-dependencies]
 ctor = "0.1"
+env_logger = "0.8.4"
