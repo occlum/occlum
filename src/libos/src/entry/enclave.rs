@@ -212,6 +212,7 @@ pub extern "C" fn occlum_ecall_run_vcpu(pal_data_ptr: *const occlum_pal_vcpu_dat
     }
 
     assert!(!pal_data_ptr.is_null());
+    assert!(check_ptr(pal_data_ptr).is_ok()); // Make sure the ptr is outside the enclave
     set_pal_data_addr(pal_data_ptr);
 
     let running_vcpu_num = async_rt::executor::run_tasks();
