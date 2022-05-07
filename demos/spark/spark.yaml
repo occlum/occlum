@@ -1,0 +1,22 @@
+includes: 
+  - base.yaml
+  - java-11-openjdk-amd64.yaml
+targets: 
+  # copy spark directory
+  - target: /opt/spark
+    copy: 
+      - from: /opt/spark
+  # copy spark libs
+  - target: /opt/occlum/glibc/lib
+    copy: 
+      - files: 
+          - /lib/x86_64-linux-gnu/libtinfo.so.6
+          - /lib/x86_64-linux-gnu/libnss_files.so.2
+          - /lib/x86_64-linux-gnu/libresolv.so.2
+  - target: /etc
+    copy: 
+      - files: 
+          - /etc/nsswitch.conf
+          - /etc/ssl
+          - /etc/passwd
+          - /etc/group

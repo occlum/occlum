@@ -25,6 +25,7 @@ This set of demos shows how real-world apps can be easily run inside SGX enclave
 * [pytorch](pytorch/): A demo of [PyTorch](https://pytorch.org/).
 * [redis](redis/): A demo of [Redis](https://redis.io).
 * [sofaboot](sofaboot/): A demo of [SOFABoot](https://github.com/sofastack/sofa-boot), an open source Java development framework based on Spring Boot.
+* [spark](spark/):  A demo of [Spark](https://github.com/apache/spark), a unified analytics engine for large-scale data processing. 
 * [sqlite](sqlite/) A demo of [SQLite](https://www.sqlite.org) SQL database engine.
 * [tensorflow](tensorflow/tensorflow_training): A demo of [TensorFlow](https://www.tensorflow.org/) MNIST classification training.
 * [tensorflow_lite](tensorflow_lite/): A demo and benchmark of [TensorFlow Lite](https://www.tensorflow.org/lite) inference engine.

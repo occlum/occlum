@@ -965,3 +965,44 @@ jobs:
       run: |
         docker exec ${{ env.CONTAINER_NAME }} bash -c "cat /root/occlum/build/test/.fail"
         docker stop ${{ env.CONTAINER_NAME }}
+  
+  Spark_test:
+    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX2-HW]]
+
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - name: Checkout code
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+    
+    - name: Checkout code from fork
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+        container-flags: '-v $(which docker):/usr/bin/docker -v /var/run/docker.sock:/var/run/docker.sock'
+    
+    - name: Prepare env
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/spark && ./prepare_env.sh"
+    
+    - name: Run spark pi
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/spark && ./run_spark.sh pi"
+
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop ${{ env.CONTAINER_NAME }}
