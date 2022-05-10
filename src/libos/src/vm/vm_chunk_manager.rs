@@ -139,7 +139,9 @@ impl ChunkManager {
     }
 
     pub fn munmap_range(&mut self, range: VMRange) -> Result<()> {
-        let bound = range.start();
+        // The bound should be no smaller than the chunk range's start address.
+        let bound = range.start().max(self.range.start());
+
         let current_pid = current!().process().pid();
 
         // The cursor to iterate vmas that might intersect with munmap_range.
