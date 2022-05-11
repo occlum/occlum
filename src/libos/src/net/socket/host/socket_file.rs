@@ -6,7 +6,7 @@ use atomic::{Atomic, Ordering};
 use super::*;
 use crate::fs::{
     occlum_ocall_ioctl, AccessMode, AtomicIoEvents, CreationFlags, File, FileRef, HostFd, IoEvents,
-    IoctlCmd, StatusFlags,
+    IoctlCmd, StatusFlags, STATUS_FLAGS_MASK,
 };
 
 //TODO: refactor write syscall to allow zero length with non-zero buffer
@@ -63,12 +63,7 @@ impl File for HostSocket {
     }
 
     fn set_status_flags(&self, new_status_flags: StatusFlags) -> Result<()> {
-        let valid_flags_mask = StatusFlags::O_APPEND
-            | StatusFlags::O_ASYNC
-            | StatusFlags::O_DIRECT
-            | StatusFlags::O_NOATIME
-            | StatusFlags::O_NONBLOCK;
-        let raw_status_flags = (new_status_flags & valid_flags_mask).bits();
+        let raw_status_flags = (new_status_flags & STATUS_FLAGS_MASK).bits();
         try_libc!(libc::ocall::fcntl_arg1(
             self.raw_host_fd() as i32,
             libc::F_SETFL,

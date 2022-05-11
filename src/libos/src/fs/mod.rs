@@ -21,6 +21,7 @@ pub use self::file::{File, FileRef};
 pub use self::file_ops::{
     occlum_ocall_ioctl, utimbuf_t, AccessMode, BuiltinIoctlNum, CreationFlags, FallocateFlags,
     FileMode, IfConf, IoctlCmd, Stat, StatusFlags, StructuredIoctlArgType, StructuredIoctlNum,
+    STATUS_FLAGS_MASK,
 };
 pub use self::file_table::{FileDesc, FileTable, FileTableEvent, FileTableNotifier};
 pub use self::fs_ops::Statfs;
