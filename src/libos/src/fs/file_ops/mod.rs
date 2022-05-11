@@ -8,7 +8,7 @@ pub use self::close::do_close;
 pub use self::dup::{do_dup, do_dup2, do_dup3};
 pub use self::fallocate::{do_fallocate, FallocateFlags};
 pub use self::fcntl::{do_fcntl, FcntlCmd};
-pub use self::file_flags::{AccessMode, CreationFlags, StatusFlags};
+pub use self::file_flags::{AccessMode, CreationFlags, StatusFlags, STATUS_FLAGS_MASK};
 pub use self::flock::do_flock;
 pub use self::fspath::{get_abs_path_by_fd, FsPath, AT_FDCWD};
 pub use self::fsync::{do_fdatasync, do_fsync};

@@ -130,12 +130,7 @@ impl File for TimerFile {
     }
 
     fn set_status_flags(&self, new_status_flags: StatusFlags) -> Result<()> {
-        let valid_flags_mask = StatusFlags::O_APPEND
-            | StatusFlags::O_ASYNC
-            | StatusFlags::O_DIRECT
-            | StatusFlags::O_NOATIME
-            | StatusFlags::O_NONBLOCK;
-        let raw_status_flags = (new_status_flags & valid_flags_mask).bits();
+        let raw_status_flags = (new_status_flags & STATUS_FLAGS_MASK).bits();
         try_libc!(libc::ocall::fcntl_arg1(
             self.host_fd(),
             libc::F_SETFL,
