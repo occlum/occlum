@@ -787,3 +787,21 @@ jobs:
 
     - name: Prepare occlum instance and Run benchmark of Rocksdb
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/rocksdb && SGX_MODE=SIM ./run_benchmark.sh"
+
+  Filebench_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/sim
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Download and build Filebench
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/filebench && ./dl_and_build_filebench.sh"
+
+    - name: Prepare occlum instance and Run Filebench
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/filebench && SGX_MODE=SIM ./run_benchmark.sh"

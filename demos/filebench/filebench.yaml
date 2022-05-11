@@ -1,0 +1,27 @@
+includes:
+  - base.yaml
+# filebench
+targets:
+  # copy filebench, bash and busybox
+  - target: /bin
+    copy:
+      - files:
+        - /usr/local/bin/filebench
+        - /opt/occlum/toolchains/bash/glibc/bash
+        - /opt/occlum/toolchains/busybox/glibc/busybox
+  # copy workload files
+  - target: /
+    copy:
+      - dirs:
+        - ../workloads
+  - target: /opt/occlum/glibc/lib
+    copy:
+      - files:
+        - /lib/x86_64-linux-gnu/libgcc_s.so.1
+  - target: /bin
+    # build a symlink: ln -s $linksrc $target/linkname
+    createlinks:
+      - src: /bin/bash
+        linkname: sh
+      - src: /bin/busybox
+        linkname: rm
