@@ -114,6 +114,15 @@ bitflags! {
         const O_PATH = 1 << 21;
     }
 }
+// On Linux, F_SETFL can change only the O_APPEND,
+// O_ASYNC, O_DIRECT, O_NOATIME, and O_NONBLOCK flags
+pub const STATUS_FLAGS_MASK: StatusFlags = StatusFlags::from_bits_truncate(
+    StatusFlags::O_APPEND.bits()
+        | StatusFlags::O_ASYNC.bits()
+        | StatusFlags::O_DIRECT.bits()
+        | StatusFlags::O_NOATIME.bits()
+        | StatusFlags::O_NONBLOCK.bits(),
+);
 
 impl StatusFlags {
     pub fn always_append(&self) -> bool {

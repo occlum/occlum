@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use util::slice_ext::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
 
 pub use async_io::event::{Events, Observer, Pollee, Poller};
-pub use async_io::file::{AccessMode, CreationFlags, File, StatusFlags};
+pub use async_io::file::{AccessMode, CreationFlags, File, StatusFlags, STATUS_FLAGS_MASK};
 pub use async_io::fs::{
     DirentWriter, DirentWriterContext, FallocateFlags, FallocateMode, FileMode, FileSystem,
     FileType, FsError, FsInfo, INode, Metadata, MountFlags, SeekFrom, StatBuf, StatFlags, StatMode,

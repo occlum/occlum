@@ -144,6 +144,29 @@ impl File for StdoutFile {
     fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
         stdio_ioctl(cmd, self.host_fd())
     }
+
+    fn status_flags(&self) -> StatusFlags {
+        let ret = try_libc_stdio!(libc::ocall::fcntl_arg0(
+            self.host_fd() as i32,
+            libc::F_GETFL
+        ))
+        .unwrap_or_else(|err| {
+            warn!("failed to getfl for stdout, error: {:?}", err.errno());
+            StatusFlags::empty().bits() as i32
+        });
+
+        StatusFlags::from_bits_truncate(ret as u32)
+    }
+
+    fn set_status_flags(&self, new_status_flags: StatusFlags) -> Result<()> {
+        let raw_status_flags = (new_status_flags & STATUS_FLAGS_MASK).bits();
+        try_libc!(libc::ocall::fcntl_arg1(
+            self.host_fd() as i32,
+            libc::F_SETFL,
+            raw_status_flags as c_int
+        ));
+        Ok(())
+    }
 }
 
 impl Debug for StdoutFile {
@@ -246,6 +269,29 @@ impl File for StdinFile {
 
     fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
         stdio_ioctl(cmd, self.host_fd())
+    }
+
+    fn status_flags(&self) -> StatusFlags {
+        let ret = try_libc_stdio!(libc::ocall::fcntl_arg0(
+            self.host_fd() as i32,
+            libc::F_GETFL
+        ))
+        .unwrap_or_else(|err| {
+            warn!("failed to getfl for stdin, error: {:?}", err.errno());
+            StatusFlags::empty().bits() as i32
+        });
+
+        StatusFlags::from_bits_truncate(ret as u32)
+    }
+
+    fn set_status_flags(&self, new_status_flags: StatusFlags) -> Result<()> {
+        let raw_status_flags = (new_status_flags & STATUS_FLAGS_MASK).bits();
+        try_libc!(libc::ocall::fcntl_arg1(
+            self.host_fd() as i32,
+            libc::F_SETFL,
+            raw_status_flags as c_int
+        ));
+        Ok(())
     }
 }
 

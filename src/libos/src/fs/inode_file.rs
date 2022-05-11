@@ -191,14 +191,8 @@ impl INodeFile {
 
     pub fn set_status_flags(&self, new_status_flags: StatusFlags) -> Result<()> {
         let mut status_flags = self.status_flags.write().unwrap();
-        // Currently, F_SETFL can change only the O_APPEND,
-        // O_ASYNC, O_NOATIME, and O_NONBLOCK flags
-        let valid_flags_mask = StatusFlags::O_APPEND
-            | StatusFlags::O_ASYNC
-            | StatusFlags::O_NOATIME
-            | StatusFlags::O_NONBLOCK;
-        status_flags.remove(valid_flags_mask);
-        status_flags.insert(new_status_flags & valid_flags_mask);
+        status_flags.remove(STATUS_FLAGS_MASK);
+        status_flags.insert(new_status_flags & STATUS_FLAGS_MASK);
         Ok(())
     }
 
