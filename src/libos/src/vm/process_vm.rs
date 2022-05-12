@@ -300,7 +300,7 @@ impl ProcessVM {
                 .unwrap()
         });
 
-        // Try merging connecting VMAs
+        // Try merging connecting single VMA chunks
         for chunks in single_vma_chunks.windows(2) {
             let chunk_a = &chunks[0];
             let chunk_b = &chunks[1];
@@ -326,36 +326,28 @@ impl ProcessVM {
             }
         }
 
-        // Remove single dummy VMA chunk
-        single_vma_chunks
-            .drain_filter(|chunk| chunk.is_single_dummy_vma())
-            .collect::<Vec<ChunkRef>>();
+        // Collect merged vmas which will be the output of this function
+        let mut merged_vmas = Vec::new();
 
-        // Get all merged chunks whose vma and range are conflict
-        let merged_chunks = single_vma_chunks
-            .drain_filter(|chunk| chunk.is_single_vma_with_conflict_size())
-            .collect::<Vec<ChunkRef>>();
+        // Insert the merged chunks or unchanged chunks back to mem_chunk list
+        for chunk in single_vma_chunks.into_iter().filter_map(|chunk| {
+            if !chunk.is_single_dummy_vma() {
+                if chunk.is_single_vma_with_conflict_size() {
+                    let new_vma = chunk.get_vma_for_single_vma_chunk();
+                    merged_vmas.push(new_vma.clone());
 
-        // Get merged vmas
-        let mut new_vmas = Vec::new();
-        merged_chunks.iter().for_each(|chunk| {
-            let vma = chunk.get_vma_for_single_vma_chunk();
-            new_vmas.push(vma)
-        });
-
-        // Add all merged vmas back to mem_chunk list of the process
-        new_vmas.iter().for_each(|vma| {
-            let chunk = Arc::new(Chunk::new_chunk_with_vma(vma.clone()));
-            mem_chunks.insert(chunk);
-        });
-
-        // Add all unchanged single vma chunks back to mem_chunk list
-        while single_vma_chunks.len() > 0 {
-            let chunk = single_vma_chunks.pop().unwrap();
+                    Some(Arc::new(Chunk::new_chunk_with_vma(new_vma)))
+                } else {
+                    Some(chunk)
+                }
+            } else {
+                None
+            }
+        }) {
             mem_chunks.insert(chunk);
         }
 
-        Ok(new_vmas)
+        Ok(merged_vmas)
     }
 
     pub fn get_process_range(&self) -> &VMRange {
