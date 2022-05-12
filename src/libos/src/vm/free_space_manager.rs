@@ -2,11 +2,12 @@
 // Currently only use simple vector as the base structure.
 //
 // Basically use address-ordered first fit to find free ranges.
+use std::cmp::Ordering;
 
 use super::vm_util::VMMapAddr;
 use super::*;
 
-static INITIAL_SIZE: usize = 100;
+const INITIAL_SIZE: usize = 100;
 
 #[derive(Debug, Default)]
 pub struct VMFreeSpaceManager {
@@ -174,21 +175,77 @@ impl VMFreeSpaceManager {
 
     pub fn add_range_back_to_free_manager(&mut self, dirty_range: &VMRange) -> Result<()> {
         let mut free_list = &mut self.free_manager;
-        free_list.push(*dirty_range);
-        // Sort and merge small ranges
-        free_list.sort_unstable_by(|range_a, range_b| range_a.start().cmp(&range_b.start()));
+
+        // If the free list is empty, insert the dirty range and it's done.
+        if free_list.is_empty() {
+            free_list.push(*dirty_range);
+            return Ok(());
+        }
+
+        let dirty_range_start = dirty_range.start();
+        let dirty_range_end = dirty_range.end();
+
+        // If the dirty range is before the first free range or after the last free range
+        let head_range = &mut free_list[0];
+        match dirty_range_end.cmp(&head_range.start()) {
+            Ordering::Equal => {
+                head_range.set_start(dirty_range_start);
+                return Ok(());
+            }
+            Ordering::Less => {
+                free_list.insert(0, *dirty_range);
+                return Ok(());
+            }
+            _ => (),
+        }
+
+        let tail_range = free_list.last_mut().unwrap();
+        match dirty_range_start.cmp(&tail_range.end()) {
+            Ordering::Equal => {
+                tail_range.set_end(dirty_range_end);
+                return Ok(());
+            }
+            Ordering::Greater => {
+                free_list.push(*dirty_range);
+                return Ok(());
+            }
+            _ => (),
+        }
+
+        // The dirty range must be between some two ranges.
+        debug_assert!(free_list.len() >= 2);
         let mut idx = 0;
-        while (idx < free_list.len() - 1) {
+
+        while idx < free_list.len() - 1 {
+            let left_range = free_list[idx];
             let right_range = free_list[idx + 1];
-            let mut left_range = &mut free_list[idx];
-            if left_range.end() == right_range.start() {
-                left_range.set_end(right_range.end());
-                free_list.remove(idx + 1);
-                continue;
+
+            if left_range.end() <= dirty_range_start && dirty_range_end <= right_range.start() {
+                match (
+                    dirty_range.is_contiguous_with(&left_range),
+                    dirty_range.is_contiguous_with(&right_range),
+                ) {
+                    (true, true) => {
+                        let left_range = &mut free_list[idx];
+                        left_range.set_end(right_range.end());
+                        free_list.remove(idx + 1);
+                    }
+                    (true, false) => {
+                        let left_range = &mut free_list[idx];
+                        left_range.set_end(dirty_range_end);
+                    }
+                    (false, true) => {
+                        let right_range = &mut free_list[idx + 1];
+                        right_range.set_start(dirty_range_start);
+                    }
+                    (false, false) => {
+                        free_list.insert(idx + 1, *dirty_range);
+                    }
+                }
+                break;
             }
             idx += 1;
         }
-        trace!("after add range back free list = {:?}", free_list);
         return Ok(());
     }
 

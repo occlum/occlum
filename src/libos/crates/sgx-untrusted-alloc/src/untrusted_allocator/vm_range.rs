@@ -52,6 +52,11 @@ impl VMRange {
         self.end - self.start
     }
 
+    pub fn set_start(&mut self, new_start: usize) {
+        debug_assert!(new_start % PAGE_SIZE == 0 && new_start <= self.end);
+        self.start = new_start;
+    }
+
     pub fn set_end(&mut self, new_end: usize) {
         debug_assert!(new_end >= self.start);
         self.end = new_end;
@@ -74,6 +79,10 @@ impl VMRange {
         let intersection_start = self.start().max(other.start());
         let intersection_end = self.end().min(other.end());
         intersection_start < intersection_end
+    }
+
+    pub fn is_contiguous_with(&self, other: &VMRange) -> bool {
+        self.start == other.end || self.end == other.start
     }
 
     // Returns a set of ranges by subtracting self with the other.

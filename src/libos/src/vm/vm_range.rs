@@ -144,6 +144,10 @@ impl VMRange {
         }
     }
 
+    pub fn is_contiguous_with(&self, other: &VMRange) -> bool {
+        self.start == other.end || self.end == other.start
+    }
+
     pub unsafe fn as_slice(&self) -> &[u8] {
         let buf_ptr = self.start() as *const u8;
         let buf_size = self.size() as usize;
