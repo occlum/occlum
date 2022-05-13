@@ -15,6 +15,7 @@ env:
 
 jobs:
   Make-test-on-ubuntu:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -58,6 +59,7 @@ jobs:
 
 
   C_cpp_rust_golang_embedded_mode_support_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -150,6 +152,7 @@ jobs:
 
 
   Java_support_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -197,6 +200,7 @@ jobs:
 
 
   Bazel_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -246,6 +250,7 @@ jobs:
 
 
   Fish_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -290,6 +295,7 @@ jobs:
 
 
   Xgboost_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -334,6 +340,7 @@ jobs:
 
 
   Sqlite_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -375,6 +382,7 @@ jobs:
 
 
   Python_musl_support_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -439,6 +447,7 @@ jobs:
 
 
   Openvino_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -500,6 +509,7 @@ jobs:
 
 
   Grpc_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -590,6 +600,7 @@ jobs:
 
 
   Gvisor_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -688,6 +699,7 @@ jobs:
 
 
   Test_deb_deploy:
+    timeout-minutes: 180
     if: github.event_name == 'push'
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -726,6 +738,7 @@ jobs:
 
 # Tensorflow_serving requires binary tensorflow_serving PIC, here we compile tensorflow_model_server before workflow
   Tensorflow_serving_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -799,6 +812,7 @@ jobs:
 
 
   Remote_attestation_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -836,6 +850,7 @@ jobs:
       run: docker stop ${{ env.CONTAINER_NAME }}
 
   Init_RA_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -887,6 +902,7 @@ jobs:
       run: docker stop ${{ env.CONTAINER_NAME }}
 
   Stress_test_with_musl:
+    timeout-minutes: 180
     if: github.event_name == 'schedule'
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -919,6 +935,7 @@ jobs:
 
 
   Stress_test_with_glibc:
+    timeout-minutes: 180
     if: github.event_name == 'schedule'
     runs-on: ${{ matrix.self_runner }}
     strategy:
