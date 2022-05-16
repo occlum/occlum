@@ -23,6 +23,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         let mut iov_buf_id = 0; // user buffer id tracker
         let mut iov_buf_index = 0; // user buffer index tracker
 
+        let mask = Events::OUT;
         // Initialize the poller only when needed
         let mut poller = None;
         loop {
@@ -48,10 +49,12 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
 
             // Wait for interesting events by polling
             if poller.is_none() {
-                poller = Some(Poller::new());
+                let new_poller = Poller::new();
+                self.common.pollee().connect_poller(mask, &new_poller);
+                poller = Some(new_poller);
             }
-            let mask = Events::OUT;
-            let events = self.common.pollee().poll(mask, poller.as_mut());
+
+            let events = self.common.pollee().poll(mask, None);
             if events.is_empty() {
                 poller.as_ref().unwrap().wait().await?;
             }

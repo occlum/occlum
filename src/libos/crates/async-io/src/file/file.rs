@@ -51,7 +51,7 @@ pub trait File: Debug + Sync + Send {
         Ok(ret_len)
     }
 
-    fn poll(&self, _mask: Events, _poller: Option<&mut Poller>) -> Events {
+    fn poll(&self, _mask: Events, _poller: Option<&Poller>) -> Events {
         Events::empty()
     }
 
@@ -215,7 +215,7 @@ impl<F: File + ?Sized> Async<F> {
 #[inherit_methods(from = "self.0")]
 #[rustfmt::skip]
 impl<F: File + ?Sized> Async<F> {
-    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events;
+    pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events;
     pub fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()>;
     pub fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>>;
     pub fn status_flags(&self) -> StatusFlags;

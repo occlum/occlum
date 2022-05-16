@@ -214,7 +214,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         connected_stream.sendmsg(bufs, flags).await
     }
 
-    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
         let state = self.state.read().unwrap();
         let pollee = state.common().pollee();
         pollee.poll(mask, poller)

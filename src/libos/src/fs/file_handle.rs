@@ -153,7 +153,7 @@ impl FileHandle {
     }
 
     /// Poll the I/O readiness of the file.
-    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
         apply_fn_on_any_file!(&self.0.file, |file| { file.poll(mask, poller) })
     }
 
@@ -280,7 +280,7 @@ impl AsyncInode {
     pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize>;
     pub async fn write(&self, buf: &[u8]) -> Result<usize>;
     pub async fn writev(&self, bufs: &[&[u8]]) -> Result<usize>;
-    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events;
+    pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events;
     pub fn access_mode(&self) -> AccessMode;
     pub fn status_flags(&self) -> StatusFlags;
     pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()>;

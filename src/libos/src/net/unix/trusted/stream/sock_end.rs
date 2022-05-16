@@ -111,7 +111,7 @@ impl Inner {
         Ok(())
     }
 
-    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
         let mut events = Events::empty();
 
         let (reader_events, writer_events) = if let Some(poller) = poller {

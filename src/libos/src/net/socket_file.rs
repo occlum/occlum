@@ -119,7 +119,7 @@ impl SocketFile {
         })
     }
 
-    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
         apply_fn_on_any_socket!(&self.socket, |socket| { socket.poll(mask, poller) })
     }
 

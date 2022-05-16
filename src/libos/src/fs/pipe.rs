@@ -59,7 +59,7 @@ impl File for PipeReader {
         self.consumer.set_status_flags(new_status_flags)
     }
 
-    fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
         self.consumer.poll(mask, poller)
     }
 
@@ -116,7 +116,7 @@ impl File for PipeWriter {
         self.producer.set_status_flags(new_status_flags)
     }
 
-    fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
         self.producer.poll(mask, poller)
     }
 

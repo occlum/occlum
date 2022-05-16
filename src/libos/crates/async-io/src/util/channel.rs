@@ -90,6 +90,7 @@ impl<T> Channel<T> {
     /// Pop an item out of the channel.
     pub async fn pop(&self) -> Result<T> {
         // Init the poller only when needed
+        let mask = Events::IN;
         let mut poller = None;
         loop {
             let ret = self.consumer.common.consumer.ringbuf.lock().pop();
@@ -103,16 +104,16 @@ impl<T> Channel<T> {
 
             // Ensure the poller is initialized
             if poller.is_none() {
-                poller = Some(Poller::new());
+                let new_poller = Poller::new();
+                self.consumer
+                    .common
+                    .consumer
+                    .pollee()
+                    .connect_poller(mask, &new_poller);
+                poller = Some(new_poller);
             }
             // Wait for interesting events by polling
-            let mask = Events::IN;
-            let events = self
-                .consumer
-                .common
-                .consumer
-                .pollee()
-                .poll(mask, poller.as_mut());
+            let events = self.consumer.common.consumer.pollee().poll(mask, None);
             if events.is_empty() {
                 poller.as_ref().unwrap().wait().await?;
             }
@@ -254,6 +255,7 @@ impl Producer<u8> {
             return Ok(0);
         }
 
+        let mask = Events::OUT;
         let mut poller = None;
         loop {
             // Attempt to write
@@ -268,10 +270,11 @@ impl Producer<u8> {
 
             // Wait for interesting events by polling
             if poller.is_none() {
-                poller = Some(Poller::new());
+                let new_poller = Poller::new();
+                self.pollee().connect_poller(mask, &new_poller);
+                poller = Some(new_poller);
             }
-            let mask = Events::OUT;
-            let events = self.pollee().poll(mask, poller.as_mut());
+            let events = self.pollee().poll(mask, None);
             if events.is_empty() {
                 poller.as_ref().unwrap().wait().await?;
             }
@@ -334,7 +337,7 @@ impl File for Producer<u8> {
 
     // TODO: implement writev
 
-    fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
         self.this_end().pollee().poll(mask, poller)
     }
 
@@ -453,6 +456,7 @@ impl Consumer<u8> {
             return Ok(0);
         }
 
+        let mask = Events::IN;
         let mut poller = None;
         loop {
             // Attempt to read
@@ -470,10 +474,11 @@ impl Consumer<u8> {
             }
 
             if poller.is_none() {
-                poller = Some(Poller::new());
+                let new_poller = Poller::new();
+                self.pollee().connect_poller(mask, &new_poller);
+                poller = Some(new_poller);
             }
-            let mask = Events::IN;
-            let events = self.pollee().poll(mask, poller.as_mut());
+            let events = self.pollee().poll(mask, None);
             if events.is_empty() {
                 poller.as_ref().unwrap().wait().await?;
             }
@@ -540,7 +545,7 @@ impl File for Consumer<u8> {
 
     // TODO: implement readv
 
-    fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
         self.this_end().pollee().poll(mask, poller)
     }
 

@@ -102,7 +102,7 @@ impl Stream {
         Ok(())
     }
 
-    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
         match &*self.inner() {
             Status::Idle(info) => Events::OUT | Events::HUP,
             Status::Connected(endpoint) => endpoint.poll(mask, poller),

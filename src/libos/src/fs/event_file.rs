@@ -110,7 +110,7 @@ impl File for EventFile {
         Ok(8)
     }
 
-    fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
         let mut events = self.pollee.poll(mask, poller);
         let val = self.val.lock().unwrap();
         if *val == 0 {

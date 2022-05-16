@@ -52,6 +52,7 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
     }
 
     pub async fn accept(self: &Arc<Self>, nonblocking: bool) -> Result<Arc<ConnectedStream<A, R>>> {
+        let mask = Events::IN;
         // Init the poller only when needed
         let mut poller = None;
         loop {
@@ -67,11 +68,13 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
 
             // Ensure the poller is initialized
             if poller.is_none() {
-                poller = Some(Poller::new());
+                let new_poller = Poller::new();
+                self.common.pollee().connect_poller(mask, &new_poller);
+                poller = Some(new_poller);
             }
             // Wait for interesting events by polling
-            let mask = Events::IN;
-            let events = self.common.pollee().poll(mask, poller.as_mut());
+
+            let events = self.common.pollee().poll(mask, None);
             if events.is_empty() {
                 poller.as_ref().unwrap().wait().await?;
             }

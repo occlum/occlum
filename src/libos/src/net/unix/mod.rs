@@ -234,7 +234,7 @@ impl UnixStream {
         })
     }
 
-    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
         apply_fn_on_any_stream!(self.inner(), |stream| { stream.poll(mask, poller) })
     }
 

@@ -348,7 +348,7 @@ impl TimerFile {
         return_errno!(EINVAL, "timer fds do not support ioctl");
     }
 
-    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
         self.pollee.poll(mask, poller)
     }
 

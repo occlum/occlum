@@ -115,7 +115,7 @@ impl DiskFile {
         Ok(new_offset)
     }
 
-    pub fn poll(&self, _mask: Events, _poller: Option<&mut Poller>) -> Events {
+    pub fn poll(&self, _mask: Events, _poller: Option<&Poller>) -> Events {
         Events::IN | Events::OUT
     }
 

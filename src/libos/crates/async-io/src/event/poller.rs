@@ -54,7 +54,7 @@ impl Pollee {
     ///
     /// This operation is _atomic_ in the sense that either some interesting
     /// events are returned or the poller is registered (if a poller is provided).
-    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
         let mask = mask | Events::ALWAYS_POLL;
 
         // Fast path: return events immediately
@@ -64,7 +64,15 @@ impl Pollee {
         }
 
         // Slow path: connect the pollee with the poller
-        let poller = poller.unwrap();
+        self.connect_poller(mask, poller.unwrap());
+
+        // It is important to check events again to handle race conditions
+        let revents = self.events() & mask;
+        revents
+    }
+
+    pub fn connect_poller(&self, mask: Events, poller: &Poller) {
+        let mask = mask | Events::ALWAYS_POLL;
 
         let mut pollers = self.inner.pollers.lock();
         let is_new = {
@@ -77,11 +85,6 @@ impl Pollee {
 
             self.inner.num_pollers.fetch_add(1, Ordering::Release);
         }
-        drop(pollers);
-
-        // It is important to check events again to handle race conditions
-        let revents = self.events() & mask;
-        revents
     }
 
     /// Add some events to the pollee's state.

@@ -180,7 +180,7 @@ impl INodeFile {
         &self.open_path
     }
 
-    pub fn poll(&self, mask: Events, _poller: Option<&mut Poller>) -> Events {
+    pub fn poll(&self, mask: Events, _poller: Option<&Poller>) -> Events {
         let events = match self.access_mode {
             AccessMode::O_RDONLY => Events::IN,
             AccessMode::O_WRONLY => Events::OUT,

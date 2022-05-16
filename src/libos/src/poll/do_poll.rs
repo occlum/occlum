@@ -17,7 +17,7 @@ pub async fn do_poll(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) ->
     }
 
     // The main loop of polling
-    let mut poller = Poller::new();
+    let poller = Poller::new();
     loop {
         let mut num_revents = 0;
 
@@ -31,7 +31,7 @@ pub async fn do_poll(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) ->
             // Poll the file
             let file = current!().file(fd)?;
             let need_poller = if num_revents == 0 {
-                Some(&mut poller)
+                Some(&poller)
             } else {
                 None
             };

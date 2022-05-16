@@ -23,6 +23,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
     ) -> Result<(usize, A)> {
+        let mask = Events::IN;
         // Initialize the poller only when needed
         let mut poller = None;
         loop {
@@ -38,10 +39,11 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
 
             // Wait for interesting events by polling
             if poller.is_none() {
-                poller = Some(Poller::new());
+                let new_poller = Poller::new();
+                self.common.pollee().connect_poller(mask, &new_poller);
+                poller = Some(new_poller);
             }
-            let mask = Events::IN;
-            let events = self.common.pollee().poll(mask, poller.as_mut());
+            let events = self.common.pollee().poll(mask, None);
             if events.is_empty() {
                 poller.as_ref().unwrap().wait().await?;
             }

@@ -226,7 +226,7 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
         res
     }
 
-    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
         let pollee = self.common.pollee();
         pollee.poll(mask, poller)
     }

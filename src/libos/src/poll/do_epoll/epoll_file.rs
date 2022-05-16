@@ -187,7 +187,7 @@ impl EpollFile {
             // If no ready entries for now, wait for them
             if poller.is_none() {
                 poller = Some(Poller::new());
-                let events = self.pollee.poll(Events::IN, poller.as_mut());
+                let events = self.pollee.poll(Events::IN, poller.as_ref());
                 if !events.is_empty() {
                     continue;
                 }
@@ -373,7 +373,7 @@ impl EpollFile {
         return_errno!(EINVAL, "epoll files do not support ioctl");
     }
 
-    pub fn poll(&self, mask: Events, poller: Option<&mut Poller>) -> Events {
+    pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
         self.pollee.poll(mask, poller)
     }
 
