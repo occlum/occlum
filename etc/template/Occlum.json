@@ -62,14 +62,6 @@
             "target": "/host",
             "type": "hostfs",
             "source": "."
-        },
-        {
-            "target": "/proc",
-            "type": "procfs"
-        },
-        {
-            "target": "/dev",
-            "type": "devfs"
         }
     ]
 }
