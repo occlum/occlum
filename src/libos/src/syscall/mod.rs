@@ -31,8 +31,8 @@ use crate::fs::{
     do_pwritev, do_read, do_readlink, do_readlinkat, do_readv, do_rename, do_renameat, do_rmdir,
     do_sendfile, do_stat, do_statfs, do_symlink, do_symlinkat, do_sync, do_timerfd_create,
     do_timerfd_gettime, do_timerfd_settime, do_truncate, do_umask, do_umount, do_unlink,
-    do_unlinkat, do_utime, do_utimensat, do_utimes, do_write, do_writev, iovec_t, utimbuf_t,
-    AsTimer, File, FileDesc, FileRef, HostStdioFds, Stat, Statfs,
+    do_unlinkat, do_utime, do_utimensat, do_utimes, do_write, do_writev, iovec_t,
+    user_rootfs_config, utimbuf_t, AsTimer, File, FileDesc, FileRef, HostStdioFds, Stat, Statfs,
 };
 use crate::interrupt::{do_handle_interrupt, sgx_interrupt_info_t};
 use crate::ipc::{do_shmat, do_shmctl, do_shmdt, do_shmget, key_t, shmids_t};
@@ -425,7 +425,7 @@ macro_rules! process_syscall_table_with_callback {
             (SpawnMusl = 360) => do_spawn_for_musl(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp, attribute_list: *const posix_spawnattr_t),
             (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
             (HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
-            (MountRootFS = 363) => do_mount_rootfs(key_ptr: *const sgx_key_128bit_t, occlum_json_mac_ptr: *const sgx_aes_gcm_128bit_tag_t),
+            (MountRootFS = 363) => do_mount_rootfs(key_ptr: *const sgx_key_128bit_t, rootfs_config: *const user_rootfs_config),
         }
     };
 }

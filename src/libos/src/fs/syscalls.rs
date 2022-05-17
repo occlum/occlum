@@ -660,20 +660,26 @@ pub fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
 
 pub fn do_mount_rootfs(
     key_ptr: *const sgx_key_128bit_t,
-    occlum_json_mac_ptr: *const sgx_aes_gcm_128bit_tag_t,
+    rootfs_config: *const user_rootfs_config,
 ) -> Result<isize> {
     let key = if key_ptr.is_null() {
         None
     } else {
         Some(unsafe { key_ptr.read() })
     };
-    if occlum_json_mac_ptr.is_null() {
-        return_errno!(EINVAL, "occlum_json_mac_ptr cannot be null");
+
+    // If user provided valid parameters, do runtime mount and boot
+    // Otherwise, do general mount and boot
+    if !rootfs_config.is_null() {
+        from_user::check_ptr(rootfs_config)?;
+        let rootfs_config = user_rootfs_config::from_raw_ptr(rootfs_config)?;
+        let app_config = gen_config_app(&rootfs_config)?;
+        debug!("user provided app config: {:?}", app_config);
+        fs_ops::do_mount_rootfs(&app_config, &key)?;
+    } else {
+        fs_ops::do_mount_rootfs(&config::LIBOS_CONFIG.get_app_config("app").unwrap(), &key)?;
     }
-    let expected_occlum_json_mac = unsafe { occlum_json_mac_ptr.read() };
-    let user_config_path = unsafe { format!("{}{}", INSTANCE_DIR, "/build/Occlum.json.protected") };
-    let user_config = config::load_config(&user_config_path, &expected_occlum_json_mac)?;
-    fs_ops::do_mount_rootfs(&user_config, &key)?;
+
     Ok(0)
 }
 
