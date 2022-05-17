@@ -176,7 +176,7 @@ mod tests {
         async fn test_wake_readers() {
             let rwlock = Arc::new(RwLock::new(1));
             let c_rwlock = rwlock.clone();
-            let counter = Arc::new(AtomicU32::new(1));
+            let counter = Arc::new(AtomicU32::new(0));
 
             let mut n = rwlock.write().await;
 
@@ -203,6 +203,7 @@ mod tests {
                 if counter.load(Ordering::Relaxed) == 3 {
                     break;
                 }
+                crate::sched::yield_().await;
             }
         }
 
