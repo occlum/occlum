@@ -13,7 +13,7 @@ lazy_static! {
 }
 
 pub fn do_mount_rootfs(
-    user_config: &config::Config,
+    user_app_config: &config::ConfigApp,
     user_key: &Option<sgx_key_128bit_t>,
 ) -> Result<()> {
     debug!("mount rootfs");
@@ -21,13 +21,15 @@ pub fn do_mount_rootfs(
     if MOUNT_ONCE.is_completed() {
         return_errno!(EPERM, "rootfs cannot be mounted more than once");
     }
-    let new_rootfs = open_root_fs_according_to(&user_config.mount, user_key)?;
-    mount_nonroot_fs_according_to(&new_rootfs.root_inode(), &user_config.mount, user_key, true)?;
+
+    let mount_config = &user_app_config.mount;
+    let new_rootfs = open_root_fs_according_to(mount_config, user_key)?;
+    mount_nonroot_fs_according_to(&new_rootfs.root_inode(), mount_config, user_key, true)?;
     MOUNT_ONCE.call_once(|| {
         let mut rootfs = ROOT_FS.write().unwrap();
         rootfs.sync().expect("failed to sync old rootfs");
         *rootfs = new_rootfs;
-        *ENTRY_POINTS.write().unwrap() = user_config.entry_points.to_owned();
+        *ENTRY_POINTS.write().unwrap() = user_app_config.entry_points.to_owned();
     });
 
     // Write resolv.conf file into mounted file system

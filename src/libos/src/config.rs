@@ -94,8 +94,7 @@ pub struct Config {
     pub resource_limits: ConfigResourceLimits,
     pub process: ConfigProcess,
     pub env: ConfigEnv,
-    pub entry_points: Vec<PathBuf>,
-    pub mount: Vec<ConfigMount>,
+    pub app: Vec<ConfigApp>,
 }
 
 #[derive(Debug)]
@@ -116,7 +115,7 @@ pub struct ConfigEnv {
     pub untrusted: HashSet<String>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ConfigMount {
     pub type_: ConfigMountFsType,
     pub target: PathBuf,
@@ -124,7 +123,14 @@ pub struct ConfigMount {
     pub options: ConfigMountOptions,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug)]
+pub struct ConfigApp {
+    pub entry_points: Vec<PathBuf>,
+    pub stage: String,
+    pub mount: Vec<ConfigMount>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum ConfigMountFsType {
     TYPE_SEFS,
@@ -154,12 +160,13 @@ impl ConfigMountFsType {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct ConfigMountOptions {
     pub mac: Option<sgx_aes_gcm_128bit_tag_t>,
     pub layers: Option<Vec<ConfigMount>>,
     pub temporary: bool,
     pub cache_size: Option<u64>,
+    pub index: u32,
 }
 
 impl Config {
@@ -167,31 +174,31 @@ impl Config {
         let resource_limits = ConfigResourceLimits::from_input(&input.resource_limits)?;
         let process = ConfigProcess::from_input(&input.process)?;
         let env = ConfigEnv::from_input(&input.env)?;
-        let entry_points = {
-            let mut entry_points = Vec::new();
-            for ep in &input.entry_points {
-                let ep_path = Path::new(ep).to_path_buf();
-                if !ep_path.is_absolute() {
-                    return_errno!(EINVAL, "entry point must be an absolute path")
-                }
-                entry_points.push(ep_path);
+
+        let app = {
+            let mut app = Vec::new();
+            for input_app in &input.app {
+                app.push(ConfigApp::from_input(&input_app)?);
             }
-            entry_points
+            app
         };
-        let mount = {
-            let mut mount = Vec::new();
-            for input_mount in &input.mount {
-                mount.push(ConfigMount::from_input(&input_mount)?);
-            }
-            mount
-        };
+
         Ok(Config {
             resource_limits,
             process,
             env,
-            entry_points,
-            mount,
+            app,
         })
+    }
+
+    pub fn get_app_config(&self, stage: &str) -> Result<&ConfigApp> {
+        let config_app = self
+            .app
+            .iter()
+            .find(|m| m.stage.eq(stage))
+            .ok_or_else(|| errno!(Errno::ENOENT, "No expected config app"))?;
+
+        Ok(config_app)
     }
 }
 
@@ -220,6 +227,36 @@ impl ConfigEnv {
         Ok(ConfigEnv {
             default: input.default.clone(),
             untrusted: input.untrusted.clone(),
+        })
+    }
+}
+
+impl ConfigApp {
+    fn from_input(input: &InputConfigApp) -> Result<ConfigApp> {
+        let stage = input.stage.clone();
+        let entry_points = {
+            let mut entry_points = Vec::new();
+            for ep in &input.entry_points {
+                let ep_path = Path::new(ep).to_path_buf();
+                if !ep_path.is_absolute() {
+                    return_errno!(EINVAL, "entry point must be an absolute path")
+                }
+                entry_points.push(ep_path);
+            }
+            entry_points
+        };
+        let mount = {
+            let mut mount = Vec::new();
+            for input_mount in &input.mount {
+                mount.push(ConfigMount::from_input(&input_mount)?);
+            }
+            mount
+        };
+
+        Ok(ConfigApp {
+            stage,
+            entry_points,
+            mount,
         })
     }
 }
@@ -277,6 +314,7 @@ impl ConfigMountOptions {
             layers,
             temporary: input.temporary,
             cache_size,
+            index: input.index,
         })
     }
 }
@@ -316,9 +354,7 @@ struct InputConfig {
     #[serde(default)]
     pub env: InputConfigEnv,
     #[serde(default)]
-    pub entry_points: Vec<String>,
-    #[serde(default)]
-    pub mount: Vec<InputConfigMount>,
+    pub app: Vec<InputConfigApp>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -415,4 +451,17 @@ struct InputConfigMountOptions {
     pub temporary: bool,
     #[serde(default)]
     pub cache_size: Option<String>,
+    #[serde(default)]
+    pub index: u32,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+struct InputConfigApp {
+    #[serde(default)]
+    pub stage: String,
+    #[serde(default)]
+    pub entry_points: Vec<String>,
+    #[serde(default)]
+    pub mount: Vec<InputConfigMount>,
 }

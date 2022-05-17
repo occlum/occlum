@@ -3,7 +3,7 @@ use super::hostfs::HostFS;
 use super::procfs::ProcFS;
 use super::sefs::{SgxStorage, SgxUuidProvider};
 use super::*;
-use config::ConfigMountFsType;
+use config::{ConfigApp, ConfigMountFsType};
 use std::path::{Path, PathBuf};
 use std::untrusted::path::PathEx;
 
@@ -13,11 +13,13 @@ use rcore_fs_sefs::dev::*;
 use rcore_fs_sefs::SEFS;
 use rcore_fs_unionfs::UnionFS;
 
+use util::mem_util::from_user;
+
 lazy_static! {
     /// The root of file system
     pub static ref ROOT_FS: RwLock<Arc<dyn FileSystem>> = {
         fn init_root_fs() -> Result<Arc<dyn FileSystem>> {
-            let mount_config = &config::LIBOS_CONFIG.mount;
+            let mount_config = &config::LIBOS_CONFIG.get_app_config("init").unwrap().mount;
             let rootfs = open_root_fs_according_to(mount_config, &None)?;
             mount_nonroot_fs_according_to(&rootfs.root_inode(), mount_config, &None, true)?;
             Ok(rootfs)
@@ -49,7 +51,7 @@ pub fn open_root_fs_according_to(
         .find(|m| {
             m.target == Path::new("/")
                 && m.type_ == ConfigMountFsType::TYPE_SEFS
-                && m.options.mac.is_some()
+                && (m.options.mac.is_some() || m.options.index == 1)
         })
         .ok_or_else(|| errno!(Errno::ENOENT, "the image SEFS in layers is not valid"))?;
     let root_image_sefs =
@@ -61,6 +63,7 @@ pub fn open_root_fs_according_to(
             m.target == Path::new("/")
                 && m.type_ == ConfigMountFsType::TYPE_SEFS
                 && m.options.mac.is_none()
+                && m.options.index == 0
         })
         .ok_or_else(|| errno!(Errno::ENOENT, "the container SEFS in layers is not valid"))?;
     let root_container_sefs =
@@ -261,4 +264,110 @@ fn open_or_create_sefs_according_to(
         )?
     };
     Ok(sefs)
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+#[allow(non_camel_case_types)]
+pub struct user_rootfs_config {
+    upper_layer_path: *const i8,
+    lower_layer_path: *const i8,
+    entry_point: *const i8,
+    hostfs_source: *const i8,
+    hostfs_target: *const i8,
+}
+
+impl user_rootfs_config {
+    pub fn from_raw_ptr(ptr: *const user_rootfs_config) -> Result<user_rootfs_config> {
+        let config = unsafe { *ptr };
+        Ok(config)
+    }
+}
+
+fn to_option_pathbuf(path: *const i8) -> Result<Option<PathBuf>> {
+    let path = if path.is_null() {
+        None
+    } else {
+        Some(PathBuf::from(
+            from_user::clone_cstring_safely(path)?
+                .to_string_lossy()
+                .into_owned(),
+        ))
+    };
+
+    Ok(path)
+}
+
+pub fn gen_config_app(config: &user_rootfs_config) -> Result<ConfigApp> {
+    let upper_layer = to_option_pathbuf(config.upper_layer_path)?;
+    let lower_layer = to_option_pathbuf(config.lower_layer_path)?;
+    let entry_point = to_option_pathbuf(config.entry_point)?;
+    let hostfs_source = to_option_pathbuf(config.hostfs_source)?;
+
+    let hostfs_target = if config.hostfs_target.is_null() {
+        PathBuf::from("/host")
+    } else {
+        PathBuf::from(
+            from_user::clone_cstring_safely(config.hostfs_target)?
+                .to_string_lossy()
+                .into_owned(),
+        )
+    };
+
+    let mut config_app = config::LIBOS_CONFIG.get_app_config("app").unwrap().clone();
+    let root_mount_config = config_app
+        .mount
+        .iter_mut()
+        .find(|m| m.target == Path::new("/") && m.type_ == ConfigMountFsType::TYPE_UNIONFS)
+        .ok_or_else(|| errno!(Errno::ENOENT, "the root UnionFS is not valid"))?;
+
+    if upper_layer.is_some() {
+        let layer_mount_configs = root_mount_config.options.layers.as_mut().unwrap();
+        // image SEFS in layers
+        let root_image_sefs_mount_config = layer_mount_configs
+            .iter_mut()
+            .find(|m| {
+                m.target == Path::new("/")
+                    && m.type_ == ConfigMountFsType::TYPE_SEFS
+                    && (m.options.mac.is_some() || m.options.index == 1)
+            })
+            .ok_or_else(|| errno!(Errno::ENOENT, "the image SEFS in layers is not valid"))?;
+
+        root_image_sefs_mount_config.source = upper_layer;
+        root_image_sefs_mount_config.options.mac = None;
+        root_image_sefs_mount_config.options.index = 1;
+    }
+
+    if lower_layer.is_some() {
+        let layer_mount_configs = root_mount_config.options.layers.as_mut().unwrap();
+        // container SEFS in layers
+        let root_container_sefs_mount_config = layer_mount_configs
+            .iter_mut()
+            .find(|m| {
+                m.target == Path::new("/")
+                    && m.type_ == ConfigMountFsType::TYPE_SEFS
+                    && m.options.mac.is_none()
+                    && m.options.index == 0
+            })
+            .ok_or_else(|| errno!(Errno::ENOENT, "the container SEFS in layers is not valid"))?;
+
+        root_container_sefs_mount_config.source = lower_layer;
+    }
+
+    if entry_point.is_some() {
+        config_app.entry_points.clear();
+        config_app.entry_points.push(entry_point.unwrap())
+    }
+
+    if hostfs_source.is_some() {
+        let hostfs_mount_config = config_app
+            .mount
+            .iter_mut()
+            .find(|m| m.type_ == ConfigMountFsType::TYPE_HOSTFS)
+            .ok_or_else(|| errno!(Errno::ENOENT, "the HostFS is not valid"))?;
+        hostfs_mount_config.source = hostfs_source;
+        hostfs_mount_config.target = hostfs_target;
+    }
+
+    Ok(config_app)
 }

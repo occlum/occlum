@@ -68,9 +68,11 @@ $(instance_dir)/build/.Occlum_sys.json.protected: $(instance_dir)/build/.Occlum_
 	@cd "$(instance_dir)/build" ; \
 		LD_LIBRARY_PATH="$(SGX_SDK)/sdk_libs" "$(occlum_dir)/build/bin/occlum-protect-integrity" protect .Occlum_sys.json ;
 
-$(instance_dir)/build/.Occlum_sys.json: $(INITFS_IMAGE) $(INITFS_IMAGE_MAC) $(JSON_CONF)
-	@$(occlum_dir)/build/bin/gen_internal_conf --user_json "$(JSON_CONF)" gen_sys_conf \
-		--init_fs_mac "`cat $(INITFS_IMAGE_MAC)`" --sys_json $(instance_dir)/build/.Occlum_sys.json
+$(instance_dir)/build/Enclave.xml:
+$(instance_dir)/build/.Occlum_sys.json: $(INITFS_IMAGE) $(INITFS_IMAGE_MAC) $(JSON_CONF) $(SECURE_IMAGE) $(SECURE_IMAGE_MAC)
+	@$(occlum_dir)/build/bin/gen_internal_conf --user_json "$(JSON_CONF)" gen_conf \
+		--user_fs_mac "`cat $(SECURE_IMAGE_MAC)`" --sdk_xml "$(instance_dir)/build/Enclave.xml"  \
+		--init_fs_mac "`cat $(INITFS_IMAGE_MAC)`" --output_json $(instance_dir)/build/.Occlum_sys.json
 
 $(BIN_LINKS): $(instance_dir)/build/bin/%: $(occlum_dir)/build/bin/% | $(instance_dir)/build/bin
 	@ln -sf $< $@
@@ -103,24 +105,11 @@ $(INITFS_IMAGE): $(INITFS) $(INITFS_DIRS) $(INITFS_FILES) $(IMAGE_CONFIG_JSON) $
 		"$(instance_dir)/build/initfs/__ROOT" \
 		"$(INITFS_IMAGE_MAC)"
 
-$(IMAGE_CONFIG_JSON): $(instance_dir)/build/Occlum.json.protected
-	@$(call get_occlum_file_mac, "$(instance_dir)/build/Occlum.json.protected", "$(CONF_TMP_MAC)") && \
-		[ -n "$(SECURE_IMAGE_KEY)" ] && \
-		jq -n --arg mac_val "`cat $(CONF_TMP_MAC)`" \
-		'{image_type: "encrypted", occlum_json_mac: $$mac_val}' > $(IMAGE_CONFIG_JSON) || \
-		jq -n --arg mac_val "`cat $(CONF_TMP_MAC)`" \
-		'{image_type: "integrity-only", occlum_json_mac: $$mac_val}' > $(IMAGE_CONFIG_JSON)
-	@rm -f "$(CONF_TMP_MAC)"
-
-$(instance_dir)/build/Occlum.json.protected: $(instance_dir)/build/Occlum.json
-	@cd "$(instance_dir)/build" ; \
-		LD_LIBRARY_PATH="$(SGX_SDK)/sdk_libs" "$(occlum_dir)/build/bin/occlum-protect-integrity" protect Occlum.json ;
-
-$(instance_dir)/build/Enclave.xml:
-$(instance_dir)/build/Occlum.json: $(SECURE_IMAGE) $(SECURE_IMAGE_MAC) $(JSON_CONF) | $(instance_dir)/build/lib
-	@$(occlum_dir)/build/bin/gen_internal_conf --user_json "$(JSON_CONF)" gen_user_conf \
-		--user_fs_mac "`cat $(SECURE_IMAGE_MAC)`" --sdk_xml "$(instance_dir)/build/Enclave.xml"  \
-		--output_user_json $(instance_dir)/build/Occlum.json
+$(IMAGE_CONFIG_JSON):
+	@mkdir -p "$(instance_dir)/build/lib"
+	@[ -n "$(SECURE_IMAGE_KEY)" ] && \
+		jq -n '{image_type: "encrypted"}' > $(IMAGE_CONFIG_JSON) || \
+		jq -n '{image_type: "integrity-only"}' > $(IMAGE_CONFIG_JSON)
 
 # If image dir not exist, just use the secure Occlum FS image
 ifneq ($(wildcard $(IMAGE)/. ),)

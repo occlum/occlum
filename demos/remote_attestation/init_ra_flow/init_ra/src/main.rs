@@ -39,14 +39,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     const IMAGE_CONFIG_FILE: &str = "/etc/image_config.json";
     let image_config = load_config(IMAGE_CONFIG_FILE)?;
 
-    // Get the MAC of Occlum.json.protected file
-    let occlum_json_mac = {
-        let mut mac: sgx_aes_gcm_128bit_tag_t = Default::default();
-        parse_str_to_bytes(&image_config.occlum_json_mac, &mut mac)?;
-        mac
-    };
-    let occlum_json_mac_ptr = &occlum_json_mac as *const sgx_aes_gcm_128bit_tag_t;
-
     // Get client secrets through grpc-ratls
     let server_addr = CString::new("localhost:50051").unwrap();
     let config_json = CString::new("dynamic_config.json").unwrap();
@@ -136,7 +128,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Mount the image
     const SYS_MOUNT_FS: i64 = 363;
-    let ret = unsafe { syscall(SYS_MOUNT_FS, key_ptr, occlum_json_mac_ptr) };
+    // User can provide valid path for runtime mount and boot
+    // Otherwise, just pass null pointer to do general mount and boot
+    let root_config_path: *const i8 = std::ptr::null();
+    let ret = unsafe { syscall(SYS_MOUNT_FS, key_ptr, root_config_path) };
     if ret < 0 {
         return Err(Box::new(std::io::Error::last_os_error()));
     }
@@ -150,13 +145,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 #[allow(non_camel_case_types)]
 type sgx_key_128bit_t = [u8; 16];
-#[allow(non_camel_case_types)]
-type sgx_aes_gcm_128bit_tag_t = [u8; 16];
 
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 struct ImageConfig {
-    occlum_json_mac: String,
     image_type: String,
 }
 

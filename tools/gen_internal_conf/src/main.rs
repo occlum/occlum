@@ -67,8 +67,8 @@ fn main() {
                 .takes_value(true),
         )
         .subcommand(
-            SubCommand::with_name("gen_user_conf")
-                .about("Generate user image config")
+            SubCommand::with_name("gen_conf")
+                .about("Generate image config")
                 // Input: User's Secure Occlum FS image MAC
                 .arg(
                     Arg::with_name("user_fs_mac")
@@ -77,11 +77,19 @@ fn main() {
                         .required(true)
                         .takes_value(true),
                 )
+                // Input: InitFS image MAC
+                .arg(
+                    Arg::with_name("init_fs_mac")
+                        .long("init_fs_mac")
+                        .value_name("input MAC of init image fs")
+                        .required(true)
+                        .takes_value(true),
+                )
                 // Output: JSON file used by libOS and users shouldn't touch
                 .arg(
-                    Arg::with_name("output_user_json")
-                        .long("output_user_json")
-                        .value_name("output user json")
+                    Arg::with_name("output_json")
+                        .long("output_json")
+                        .value_name("output json")
                         .required(true)
                         .validator(|f| match File::create(f) {
                             Ok(_) => Ok(()),
@@ -102,30 +110,6 @@ fn main() {
                         .takes_value(true),
                 ),
         )
-        .subcommand(
-            SubCommand::with_name("gen_sys_conf")
-                .about("Generate initfs image config")
-                // Input: InitFS image MAC
-                .arg(
-                    Arg::with_name("init_fs_mac")
-                        .long("init_fs_mac")
-                        .value_name("input MAC of init image fs")
-                        .required(true)
-                        .takes_value(true),
-                )
-                // Output: JSON file for initfs and users shouldn't touch
-                .arg(
-                    Arg::with_name("sys_json")
-                        .long("sys_json")
-                        .value_name("output sys json")
-                        .required(true)
-                        .validator(|f| match File::create(f) {
-                            Ok(_) => Ok(()),
-                            Err(e) => Err(e.to_string()),
-                        })
-                        .takes_value(true),
-                ),
-        )
         .get_matches();
 
     let occlum_config_file_path = matches.value_of("user_json").unwrap();
@@ -141,14 +125,17 @@ fn main() {
     debug!("The occlum config is:{:?}", occlum_config);
 
     // Match subcommand
-    if let Some(sub_matches) = matches.subcommand_matches("gen_user_conf") {
+    if let Some(sub_matches) = matches.subcommand_matches("gen_conf") {
         let occlum_conf_user_fs_mac = sub_matches.value_of("user_fs_mac").unwrap();
         debug!("Occlum config user FS MAC {:?}", occlum_conf_user_fs_mac);
 
-        let occlum_user_json_file_path = sub_matches.value_of("output_user_json").unwrap();
+        let occlum_conf_init_fs_mac = sub_matches.value_of("init_fs_mac").unwrap();
+        debug!("Occlum config init FS MAC {:?}", occlum_conf_init_fs_mac);
+
+        let occlum_json_file_path = sub_matches.value_of("output_json").unwrap();
         debug!(
-            "Generated Occlum user config (json) file name {:?}",
-            occlum_user_json_file_path
+            "Genereated Occlum user config (json) file name {:?}",
+            occlum_json_file_path
         );
 
         let enclave_config_file_path = sub_matches.value_of("sdk_xml").unwrap();
@@ -273,17 +260,23 @@ fn main() {
         let enclave_config = serde_xml_rs::to_string(&sgx_enclave_configuration).unwrap();
         debug!("The enclave config:{:?}", enclave_config);
 
-        // Generate user Occlum.json - "output_user_json"
-        let user_mount_config = {
-            let user_mount_config =
-                gen_user_mount_config(occlum_config.mount, occlum_conf_user_fs_mac.to_string());
-            if user_mount_config.is_err() {
-                println!("Mount configuration invalid: {:?}", user_mount_config);
+        // Generate app config, including "init" and user app
+        let app_config = {
+            let app_config =
+                gen_app_config(
+                    occlum_config.entry_points,
+                    occlum_config.mount,
+                    occlum_conf_user_fs_mac.to_string(),
+                    occlum_conf_init_fs_mac.to_string(),
+                );
+            if app_config.is_err() {
+                println!("Mount configuration invalid: {:?}", app_config);
                 return;
             }
-            user_mount_config.unwrap()
+            app_config.unwrap()
         };
-        let user_occlum_json_config = InternalOcclumJson {
+
+        let occlum_json_config = InternalOcclumJson {
             resource_limits: InternalResourceLimits {
                 user_space_size: occlum_config.resource_limits.user_space_size.to_string(),
             },
@@ -292,12 +285,12 @@ fn main() {
                 default_heap_size: occlum_config.process.default_heap_size,
                 default_mmap_size: occlum_config.process.default_mmap_size,
             },
-            entry_points: occlum_config.entry_points,
             env: occlum_config.env,
-            mount: serde_json::to_value(user_mount_config).unwrap(),
+            app: app_config,
         };
-        let user_occlum_json_str = serde_json::to_string_pretty(&user_occlum_json_config).unwrap();
-        debug!("The user Occlum.json config:\n{:?}", user_occlum_json_str);
+
+        let occlum_json_str = serde_json::to_string_pretty(&occlum_json_config).unwrap();
+        debug!("The Occlum.json config:\n{:?}", occlum_json_str);
 
         // Update the output file
         let mut enclave_config_file = File::create(enclave_config_file_path)
@@ -306,44 +299,11 @@ fn main() {
             .write_all(enclave_config.as_bytes())
             .expect("Failed to update the Enclave configuration file.");
 
-        let mut user_occlum_json = File::create(occlum_user_json_file_path)
-            .expect("Could not open the output user Occlum.json file.");
-        user_occlum_json
-            .write_all(user_occlum_json_str.as_bytes())
-            .expect("Failed to update the output user Occlum.json file.");
-    } else if let Some(sub_matches) = matches.subcommand_matches("gen_sys_conf") {
-        let occlum_conf_init_fs_mac = sub_matches.value_of("init_fs_mac").unwrap();
-        debug!("Occlum config init FS MAC {:?}", occlum_conf_init_fs_mac);
-
-        let occlum_sys_json_file_path = sub_matches.value_of("sys_json").unwrap();
-        debug!(
-            "Generated Occlum sys config (json) file name {:?}",
-            occlum_sys_json_file_path
-        );
-
-        // Generate sys Occlum.json - "sys_json"
-        let sys_occlum_json_config = InternalOcclumJson {
-            resource_limits: InternalResourceLimits {
-                user_space_size: occlum_config.resource_limits.user_space_size.to_string(),
-            },
-            process: OcclumProcess {
-                default_stack_size: occlum_config.process.default_stack_size,
-                default_heap_size: occlum_config.process.default_heap_size,
-                default_mmap_size: occlum_config.process.default_mmap_size,
-            },
-            entry_points: json!(["/bin"]),
-            env: occlum_config.env,
-            mount: gen_sys_mount_config(occlum_conf_init_fs_mac.to_string()),
-        };
-
-        // Update the output file
-        let sys_occlum_json_str = serde_json::to_string_pretty(&sys_occlum_json_config).unwrap();
-        debug!("The sys Occlum.json config:\n{:?}", sys_occlum_json_str);
-        let mut sys_occlum_json = File::create(occlum_sys_json_file_path)
-            .expect("Could not open the output sys Occlum.json file.");
-        sys_occlum_json
-            .write_all(sys_occlum_json_str.as_bytes())
-            .expect("Failed to update the output sys Occlum.json file.");
+        let mut occlum_json = File::create(occlum_json_file_path)
+            .expect("Could not open the output Occlum.json file.");
+        occlum_json
+            .write_all(occlum_json_str.as_bytes())
+            .expect("Failed to update the output Occlum.json file.");
     } else {
         unreachable!();
     }
@@ -402,78 +362,151 @@ fn parse_kss_conf(occlum_config: &OcclumConfiguration) -> (u32, u64, u64, u64, u
     }
 }
 
-fn gen_user_mount_config(
+fn gen_app_config(
+    entry_points: serde_json::Value,
     mount_conf: Vec<OcclumMount>,
     occlum_conf_user_fs_mac: String,
-) -> Result<Vec<OcclumMount>, &'static str> {
-    let mut user_mount_config = mount_conf;
-    let root_mc = user_mount_config
-        .iter_mut()
-        .find(|m| m.target == String::from("/") && m.type_ == String::from("unionfs"))
-        .ok_or("the root UnionFS is not valid")?;
-    if root_mc.options.layers.is_none() {
-        return Err("the root UnionFS must be given layers");
-    }
-    let mut root_image_sefs_mc = root_mc
-        .options
-        .layers
-        .as_mut()
-        .unwrap()
+    occlum_conf_init_fs_mac: String,
+) -> Result<serde_json::Value, &'static str> {
+    let mut app_config: serde_json::Value = json!({
+        "app": [
+        {
+            "stage": "init",
+            "entry_points": [
+                "/bin"
+            ],
+            "mount": [
+                {
+                    "target": "/",
+                    "type": "unionfs",
+                    "options": {
+                        "layers": [
+                            {
+                                "target": "/",
+                                "type": "sefs",
+                                "source": "./build/initfs/__ROOT",
+                                "options": {
+                                    "MAC": ""
+                                }
+                            },
+                            {
+                                "target": "/",
+                                "type": "sefs",
+                                "source": "./run/initfs/__ROOT"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "target": "/proc",
+                    "type": "procfs"
+                },
+                {
+                    "target": "/dev",
+                    "type": "devfs"
+                }
+            ]
+        },
+        {
+            "stage": "app",
+            "entry_points": [],
+            "mount": [
+                {
+                    "target": "/",
+                    "type": "unionfs",
+                    "options": {
+                        "layers": [
+                            {
+                                "target": "/",
+                                "type": "sefs",
+                                "source": "./build/mount/__ROOT",
+                                "options": {
+                                    "MAC": ""
+                                }
+                            },
+                            {
+                                "target": "/",
+                                "type": "sefs",
+                                "source": "./run/mount/__ROOT"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "target": "/host",
+                    "type": "hostfs",
+                    "source": "."
+                },
+                {
+                    "target": "/proc",
+                    "type": "procfs"
+                },
+                {
+                    "target": "/dev",
+                    "type": "devfs"
+                }
+            ]
+        }]
+    });
+
+    // Update init root mount fs MAC
+    *app_config
+        .pointer_mut("/app/0/mount/0/options/layers/0/options/MAC")
+        .unwrap() = serde_json::Value::String(occlum_conf_init_fs_mac);
+
+    // Update app entry points
+    *app_config
+        .pointer_mut("/app/1/entry_points")
+        .unwrap() = entry_points;
+
+    let mut mount_config = mount_conf;
+    if let Some(root_mc) = mount_config
         .iter_mut()
         .find(|m| {
             m.target == String::from("/")
-                && m.type_ == String::from("sefs")
-                && m.options.mac.is_some()
-        })
-        .ok_or("the image SEFS in layers is not valid")?;
-    root_image_sefs_mc.options.mac = Some(occlum_conf_user_fs_mac);
+                && m.type_ == String::from("unionfs")
+        }) {
+        debug!("User provides Root mount config:\n{:?}", root_mc);
+        root_mc
+            .options
+            .layers
+            .as_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|m| {
+                m.target == String::from("/")
+                    && m.type_ == String::from("sefs")
+                    && m.options.mac.is_some()
+            })
+            .ok_or("the image SEFS in layers is not valid")?;
 
-    debug!("user Occlum.json mount config:\n{:?}", user_mount_config);
-    Ok(user_mount_config)
-}
+        // Update app root mount
+        *app_config
+            .pointer_mut("/app/1/mount/0")
+            .unwrap() = serde_json::to_value(root_mc).unwrap();
+    }
 
-fn gen_sys_mount_config(occlum_conf_init_fs_mac: String) -> serde_json::Value {
-    let mut init_fs_mount_config: serde_json::Value = json!({
-        "mount": [
-            {
-                "target": "/",
-                "type": "unionfs",
-                "options": {
-                    "layers": [
-                        {
-                            "target": "/",
-                            "type": "sefs",
-                            "source": "./build/initfs/__ROOT",
-                            "options": {
-                                "MAC": ""
-                            }
-                        },
-                        {
-                            "target": "/",
-                            "type": "sefs",
-                            "source": "./run/initfs/__ROOT"
-                        }
-                    ]
-                }
-            },
-            {
-                "target": "/proc",
-                "type": "procfs"
-            },
-            {
-                "target": "/dev",
-                "type": "devfs"
-            }
-        ]
-    });
+    // Update app root mount fs MAC
+    *app_config
+        .pointer_mut("/app/1/mount/0/options/layers/0/options/MAC")
+        .unwrap() = serde_json::Value::String(occlum_conf_user_fs_mac);
 
-    *init_fs_mount_config
-        .pointer_mut("/mount/0/options/layers/0/options/MAC")
-        .unwrap() = serde_json::Value::String(occlum_conf_init_fs_mac);
+    // Update host mount
+    if let Some(host_mc) = mount_config
+        .iter_mut()
+        .find(|m| {
+            m.type_ == String::from("hostfs")
+        }) {
+        debug!("User provides host mount config:\n{:?}", host_mc);
+        // Update app root mount
+        *app_config
+            .pointer_mut("/app/1/mount/1")
+            .unwrap() = serde_json::to_value(host_mc).unwrap();
+    }
 
-    debug!("initfs mount config:\n{:?}", init_fs_mount_config);
+    debug!("Occlum.json mount config:\n{:?}", app_config);
 
-    init_fs_mount_config["mount"].to_owned()
+    Ok(app_config["app"].to_owned())
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
@@ -598,7 +631,6 @@ struct InternalResourceLimits {
 struct InternalOcclumJson {
     resource_limits: InternalResourceLimits,
     process: OcclumProcess,
-    entry_points: serde_json::Value,
     env: serde_json::Value,
-    mount: serde_json::Value,
+    app: serde_json::Value,
 }
