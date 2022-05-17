@@ -24,8 +24,13 @@ static mut ENCLAVE_PATH: String = String::new();
 lazy_static! {
     static ref INIT_ONCE: Once = Once::new();
     static ref HAS_INIT: AtomicBool = AtomicBool::new(false);
-    pub static ref ENTRY_POINTS: RwLock<Vec<PathBuf>> =
-        RwLock::new(config::LIBOS_CONFIG.entry_points.clone());
+    pub static ref ENTRY_POINTS: RwLock<Vec<PathBuf>> = RwLock::new(
+        config::LIBOS_CONFIG
+            .get_app_config("init")
+            .unwrap()
+            .entry_points
+            .clone()
+    );
     pub static ref RESOLV_CONF_STR: RwLock<Option<String>> = RwLock::new(None);
     pub static ref HOSTNAME_STR: RwLock<Option<String>> = RwLock::new(None);
     pub static ref HOSTS_STR: RwLock<Option<String>> = RwLock::new(None);
