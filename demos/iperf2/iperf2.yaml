@@ -1,0 +1,9 @@
+includes:
+  - base.yaml
+# bash
+targets:
+  # copy iperf
+  - target: /bin
+    copy:
+      - files:
+        - ${IPERF_INSTALL_DIR}/bin/iperf
