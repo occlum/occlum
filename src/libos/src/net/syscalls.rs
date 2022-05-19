@@ -14,6 +14,10 @@ use crate::fs::StatusFlags;
 use crate::prelude::*;
 use crate::util::mem_util::from_user;
 
+// 4096 is default max socket connection value in Ubuntu 20.04
+const SOMAXCONN: u32 = 4096;
+const SOCONN_DEFAULT: u32 = 16;
+
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct mmsghdr {
@@ -119,7 +123,16 @@ pub async fn do_listen(fd: c_int, backlog: c_int) -> Result<isize> {
     let socket_file = file_ref
         .as_socket_file()
         .ok_or_else(|| errno!(ENOTSOCK, "not a socket"))?;
-    socket_file.listen(backlog as u32)?;
+
+    let backlog: u32 = if backlog as u32 > SOMAXCONN {
+        SOMAXCONN
+    } else if backlog == 0 {
+        SOCONN_DEFAULT
+    } else {
+        backlog as u32
+    };
+
+    socket_file.listen(backlog)?;
     Ok(0)
 }
 
