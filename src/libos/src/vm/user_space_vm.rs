@@ -1,9 +1,13 @@
 use super::ipc::SHM_MANAGER;
 use super::*;
 use crate::ctor::dtor;
+use crate::util::pku_util;
 use config::LIBOS_CONFIG;
 use std::ops::{Deref, DerefMut};
 use vm_manager::VMManager;
+
+const RSRV_MEM_PERM: MemPerm =
+    MemPerm::from_bits_truncate(MemPerm::READ.bits() | MemPerm::WRITE.bits());
 
 /// The virtual memory manager for the entire user space
 pub struct UserSpaceVMManager(VMManager);
@@ -16,13 +20,13 @@ impl UserSpaceVMManager {
             // a lot of time. When EDMM is supported, there is no need to commit all the pages at the initialization stage. A function
             // which reserves memory but not commit pages should be provided then.
             let ptr = sgx_alloc_rsrv_mem(rsrv_mem_size);
-            let perm = MemPerm::READ | MemPerm::WRITE;
             if ptr.is_null() {
                 return_errno!(ENOMEM, "run out of reserved memory");
             }
             // Change the page permission to RW (default)
             assert!(
-                sgx_tprotect_rsrv_mem(ptr, rsrv_mem_size, perm.bits()) == sgx_status_t::SGX_SUCCESS
+                sgx_tprotect_rsrv_mem(ptr, rsrv_mem_size, RSRV_MEM_PERM.bits())
+                    == sgx_status_t::SGX_SUCCESS
             );
 
             let addr = ptr as usize;
@@ -30,6 +34,7 @@ impl UserSpaceVMManager {
                 "allocated rsrv addr is 0x{:x}, len is 0x{:x}",
                 addr, rsrv_mem_size
             );
+            pku_util::pkey_mprotect_userspace_mem(addr, rsrv_mem_size, RSRV_MEM_PERM.bits());
             VMRange::new(addr, addr + rsrv_mem_size)?
         };
 
@@ -50,10 +55,11 @@ fn free_user_space() {
     SHM_MANAGER.clean_when_libos_exit();
     let range = USER_SPACE_VM_MANAGER.range();
     assert!(USER_SPACE_VM_MANAGER.verified_clean_when_exit());
-    let addr = range.start() as *const c_void;
+    let addr = range.start();
     let size = range.size();
     info!("free user space VM: {:?}", range);
-    assert!(unsafe { sgx_free_rsrv_mem(addr, size) == 0 });
+    pku_util::clear_pku_when_libos_exit(addr, size, RSRV_MEM_PERM.bits());
+    assert!(unsafe { sgx_free_rsrv_mem(addr as *const c_void, size) == 0 });
 }
 
 impl Deref for UserSpaceVMManager {

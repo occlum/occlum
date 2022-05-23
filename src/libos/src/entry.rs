@@ -70,10 +70,18 @@ pub extern "C" fn occlum_ecall_init(
         // Init the log infrastructure first so that log messages will be printed afterwards
         util::log::init(log_level);
 
-        // Init MPX for SFI if MPX is available
         let report = rsgx_self_report();
+        // Init MPX for SFI if MPX is available
         if (report.body.attributes.xfrm & SGX_XFRM_MPX != 0) {
             util::mpx_util::mpx_enable();
+        }
+        // Init PKU for isolating LibOS form user-apps if PKU is available
+        // Occlum only turns on `pku` feature in HW mode
+        #[cfg(feature = "pku")]
+        {
+            if (report.body.attributes.xfrm & SGX_XFRM_PKRU != 0) {
+                crate::util::pku_util::try_set_pku_enabled();
+            }
         }
 
         // Register exception handlers (support cpuid & rdtsc for now)

@@ -68,6 +68,20 @@ __exec_task:
 
     // Use user stack
     movq TASK_USER_RSP(%rdi), %rsp
-    // Run user code
+    // Get user code address
     movq TASK_USER_ENTRY_ADDR(%rdi), %r11
+
+    // Whether to switch PKRU value
+    mov pku_enabled(%rip), %r10
+    cmp $1, %r10
+    je update_pkru_in_exec_task
+
+    // Run user code
+    jmp *%r11
+
+update_pkru_in_exec_task:
+    xor %ecx, %ecx
+    xor %edx, %edx
+    mov $PKRU_USER, %eax
+    wrpkru
     jmp *%r11
