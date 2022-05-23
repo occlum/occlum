@@ -37,6 +37,9 @@ void do_exit_task(void);
 
 #else  /* __ASSEMBLY__ */
 
+#define PKRU_LIBOS          (0x0)
+#define PKRU_USER           (0x55555551)
+
 /* See /<path-to-linux-sgx>/common/inc/internal/thread_data.h */
 #define TD_STACKGUARD_OFFSET        (8 * 5)
 /* Override the field for stack guard */

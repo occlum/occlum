@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <sys/mman.h>
 #include "ocalls.h"
@@ -29,4 +30,16 @@ void occlum_ocall_free(void *ptr) {
 
 int occlum_ocall_mprotect(void *addr, size_t len, int prot) {
     return mprotect(addr, len, prot);
+}
+
+int occlum_ocall_pkey_alloc(unsigned int flags, unsigned int access_rights) {
+    return pkey_alloc(flags, access_rights);
+}
+
+int occlum_ocall_pkey_mprotect(void *addr, size_t len, int prot, int pkey) {
+    return pkey_mprotect(addr, len, prot, pkey);
+}
+
+int occlum_ocall_pkey_free(int pkey) {
+    return pkey_free(pkey);
 }

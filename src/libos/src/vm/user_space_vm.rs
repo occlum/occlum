@@ -1,6 +1,7 @@
 use super::ipc::SHM_MANAGER;
 use super::*;
 use crate::ctor::dtor;
+use crate::util::pku_util;
 use config::LIBOS_CONFIG;
 use std::ops::{Deref, DerefMut};
 use vm_manager::VMManager;
@@ -30,6 +31,7 @@ impl UserSpaceVMManager {
                 "allocated rsrv addr is 0x{:x}, len is 0x{:x}",
                 addr, rsrv_mem_size
             );
+            pku_util::config_userspace_mem(addr, rsrv_mem_size, perm.bits());
             VMRange::new(addr, addr + rsrv_mem_size)?
         };
 
@@ -54,6 +56,7 @@ fn free_user_space() {
     let size = range.size();
     info!("free user space VM: {:?}", range);
     assert!(unsafe { sgx_free_rsrv_mem(addr, size) == 0 });
+    pku_util::free_pkey_when_libos_exit();
 }
 
 impl Deref for UserSpaceVMManager {
