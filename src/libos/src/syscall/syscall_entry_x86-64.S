@@ -3,6 +3,22 @@
 
 
     .file "syscall_entry_x86-64.S"
+    .global __occlum_syscall_linux_pku_abi
+    .type __occlum_syscall_linux_pku_abi, @function
+__occlum_syscall_linux_pku_abi:
+    pushq %rcx
+    pushq %rdx
+    pushq %rax
+
+    xor %ecx, %ecx
+    xor %edx, %edx
+    mov $PKRU_LIBOS, %eax
+    wrpkru
+
+    popq %rax
+    popq %rdx
+    popq %rcx
+
     .global __occlum_syscall_linux_abi
     .type __occlum_syscall_linux_abi, @function
 __occlum_syscall_linux_abi:
@@ -128,7 +144,42 @@ __occlum_sysret:
     pop %rax
     pop %rcx
     pop %rsp
+
+    // Store RFLAGS since `cmp` operation may overwrite it
+    pushfq
+    push %rax
+
+    mov pku_enabled(%rip), %rax
+    cmp $1, %rax
+    je update_pkru_in_sysret
+
+    pop %rax
+    popfq
+
     jmp *%gs:(TD_SYSCALL_RET_ADDR_OFFSET)
+    // This should never happen
+    ud2
+
+update_pkru_in_sysret:
+    pop %rax
+    popfq
+
+    sub $0x20, %rsp
+    mov %rax, (%rsp)
+    mov %rdx, 0x8(%rsp)
+    mov %rcx, 0x10(%rsp)
+    mov %gs:(TD_SYSCALL_RET_ADDR_OFFSET), %rcx
+    mov %rcx, 0x18(%rsp)
+
+    xor %ecx, %ecx
+    xor %edx, %edx
+    mov $PKRU_USER, %eax
+    wrpkru
+
+    pop %rax
+    pop %rdx
+    pop %rcx
+    ret
 
     .global __occlum_syscall_c_abi
     .type __occlum_syscall_c_abi, @function
