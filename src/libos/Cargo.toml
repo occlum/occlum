@@ -43,6 +43,7 @@ sgx1_exception_sim = [] # Simulate #PF and #GP exceptions on SGX 1
 dcap = []               # DCAP support. The compilation relies on DCAP package.
 cov = ["sgx_cov"]       # Enable coverage colletcion.
 hyper_mode = []         # For running in hyper mode.
+pku = []                # PKU Support
 
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
 sgx_types = { path = "../../deps/rust-sgx-sdk/sgx_types" }
