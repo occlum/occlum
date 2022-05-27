@@ -30,8 +30,12 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             let res = self.try_sendmsg(bufs, flags, &mut iov_buf_id, &mut iov_buf_index);
             if let Ok(len) = res {
                 send_len += len;
-                if send_len == total_len {
-                    return Ok(total_len);
+                // Sent all or sent partial but it is nonblocking, return bytes sent
+                if send_len == total_len
+                    || self.common.nonblocking()
+                    || flags.contains(SendFlags::MSG_DONTWAIT)
+                {
+                    return Ok(send_len);
                 }
             } else if !res.has_errno(EAGAIN) {
                 return res;
