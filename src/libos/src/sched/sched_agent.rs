@@ -24,6 +24,7 @@
 use super::cpu_set::{CpuSet, AVAIL_CPUSET};
 use crate::prelude::*;
 use crate::util::dirty::Dirty;
+use async_rt::scheduler::SchedEntity;
 use async_rt::task::Task;
 
 #[derive(Debug)]
@@ -171,7 +172,7 @@ impl Default for SchedAgent {
 
 fn update_affinity(task: &Arc<Task>, affinity: &CpuSet) {
     let ncores = CpuSet::ncores();
-    let mut task_affinity = task.sched_info().affinity().write();
+    let mut task_affinity = task.sched_state().affinity();
     for (idx, bit) in affinity.iter().enumerate() {
         if idx >= ncores {
             break;

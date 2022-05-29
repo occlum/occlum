@@ -39,7 +39,7 @@ extern "C" fn interrupt_entrypoint(sgx_interrupt_info: *mut sgx_interrupt_info_t
 pub async fn handle_interrupt() -> Result<()> {
     debug!("handle interrupt");
     // We use the interrupt as a chance to do preemptivee sceduling
-    async_rt::sched::yield_().await;
+    async_rt::scheduler::yield_now().await;
     Ok(())
 }
 

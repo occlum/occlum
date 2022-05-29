@@ -87,7 +87,7 @@ mod tests {
             // Make sure that the child executes first
             let _20ms = std::time::Duration::from_millis(20);
             std::thread::sleep(_20ms);
-            async_rt::sched::yield_().await;
+            async_rt::scheduler::yield_now().await;
 
             // Wake up the child task
             counter.write();

@@ -143,7 +143,7 @@ mod tests {
                 assert!(waiter.wait_timeout(Some(&mut timeout)).await.is_ok());
             });
 
-            crate::sched::yield_().await;
+            crate::scheduler::yield_now().await;
             std::thread::sleep(Duration::from_millis(sleep_time));
             waker.wake();
             join_handle.await;
@@ -160,7 +160,7 @@ mod tests {
                 waiter.wait_timeout::<Duration>(None).await.unwrap();
             });
 
-            crate::sched::yield_().await;
+            crate::scheduler::yield_now().await;
             waker.wake();
             join_handle.await;
         });

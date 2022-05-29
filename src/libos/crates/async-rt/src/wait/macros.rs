@@ -16,8 +16,8 @@ use super::{Waiter, WaiterQueue};
 /// use errno::prelude::*;
 ///
 /// // Init runtime if not enable "auto_run" feature.
-/// async_rt::config::set_parallelism(2);
-/// for _ in 0..async_rt::executor::parallelism() {
+/// async_rt::vcpu::set_total(2);
+/// for _ in 0..async_rt::executor::num_vcpus() {
 ///     std::thread::spawn(|| {
 ///         async_rt::executor::run_tasks();
 ///     });
@@ -52,8 +52,8 @@ use super::{Waiter, WaiterQueue};
 /// # use errno::prelude::*;
 /// #
 /// # // Init runtime if not enable "auto_run" feature.
-/// # async_rt::config::set_parallelism(2);
-/// # for _ in 0..async_rt::executor::parallelism() {
+/// # async_rt::vcpu::set_total(2);
+/// # for _ in 0..async_rt::executor::num_vcpus() {
 /// #     std::thread::spawn(|| {
 /// #         async_rt::executor::run_tasks();
 /// #     });

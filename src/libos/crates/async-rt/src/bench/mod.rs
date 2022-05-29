@@ -15,7 +15,7 @@
 //! #[bench]
 //! fn bench_yield(b: &mut Bencher) {
 //!     async_bench_iter!(b, async || {
-//!         crate::sched::yield_().await;
+//!         crate::scheduler::yield_now().await;
 //!     });
 //! }
 //! ```
@@ -65,7 +65,7 @@ macro_rules! async_bench_iter {
                                     break;
                                 }
                                 _ => {
-                                    $crate::sched::yield_().await;
+                                    $crate::scheduler::yield_now().await;
                                     continue;
                                 }
                             }

@@ -43,7 +43,7 @@ async fn __main_loop(current: ThreadRef, init_cpu_state: CpuContext) {
         // workaround this issue, the final solution should update the scheduler
         rounds += 1;
         if rounds % YIELD_INTERVAL == 0 {
-            async_rt::sched::yield_().await;
+            async_rt::scheduler::yield_now().await;
         }
 
         // Continue the execution in the user space

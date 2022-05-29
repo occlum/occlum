@@ -238,8 +238,8 @@ impl RwLockInner {
 
     pub fn rw_unlock(&self) -> Result<()> {
         let mut status;
-        let mut waiters;
         let mut new_status;
+        let waiters;
         // Set status to Free or subtract one reader lock holder
         loop {
             status = self.status();

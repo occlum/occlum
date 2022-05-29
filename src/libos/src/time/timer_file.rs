@@ -248,8 +248,8 @@ impl TimerFile {
                 trace!("Timerfd poll task end");
             }
         })
-        .priority(async_rt::sched::SchedPriority::Low)
         .spawn();
+        //.priority(async_rt::sched::SchedPriority::Low)
 
         inner.status = TimerFdStatus::RUN;
         inner.task_handle = Some(join_handle);

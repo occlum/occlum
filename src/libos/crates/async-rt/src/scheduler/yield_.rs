@@ -1,11 +1,21 @@
 use crate::prelude::*;
 
-pub fn yield_() -> Yield {
+use super::SchedEntity;
+
+pub fn yield_now() -> Yield {
+    let current = crate::task::current::get();
+    current.sched_state().report_yield();
     Yield::new()
 }
 
 pub struct Yield {
     has_polled: bool,
+}
+
+impl Default for Yield {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Yield {

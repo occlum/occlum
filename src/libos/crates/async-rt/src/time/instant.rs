@@ -120,8 +120,23 @@ mod tests {
         thread::sleep(Duration::from_millis(ms));
 
         let elapsed = start.elapsed();
+        println!("Elapsed time: {:}", elapsed.as_millis());
         assert!(elapsed.as_millis() as u64 >= ms - 1);
         assert!(elapsed.as_millis() as u64 <= ms + 1);
+    }
+
+    #[test]
+    fn test_accuracy() {
+        let start = Instant::now();
+
+        let ms = 100;
+
+        thread::sleep(Duration::from_millis(ms));
+
+        let elapsed = start.elapsed().as_micros();
+        println!("Elapsed time: {:}", elapsed);
+        // assert!(elapsed.as_millis() as u64 >= ms - 1);
+        // assert!(elapsed.as_millis() as u64 <= ms + 1);
     }
 
     #[bench]

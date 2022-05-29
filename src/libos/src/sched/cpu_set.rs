@@ -122,7 +122,7 @@ impl Index<usize> for CpuSet {
 
 lazy_static! {
     /// The number of all CPU cores on the platform
-    pub static ref NCORES: usize = async_rt::sched::Affinity::max_threads();
+    pub static ref NCORES: usize = async_rt::executor::num_vcpus() as usize;
 
     /// The set of all available CPU cores.
     ///

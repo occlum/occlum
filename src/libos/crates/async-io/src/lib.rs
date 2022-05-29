@@ -25,7 +25,7 @@ pub mod util;
 mod tests {
     #[ctor::ctor]
     fn auto_init_executor() {
-        const TEST_PARALLELISM: u32 = 2;
-        async_rt::config::set_parallelism(TEST_PARALLELISM);
+        const TEST_VCPU: u32 = 2;
+        async_rt::vcpu::set_total(TEST_VCPU);
     }
 }

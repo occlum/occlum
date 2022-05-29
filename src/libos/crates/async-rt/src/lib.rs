@@ -24,6 +24,9 @@
 #![feature(arbitrary_enum_discriminant)]
 #![feature(test)]
 #![allow(dead_code)]
+#![feature(maybe_uninit_uninit_array)]
+#![feature(new_uninit)]
+#![feature(destructuring_assignment)]
 
 #[cfg(test)]
 extern crate test;
@@ -49,15 +52,16 @@ extern crate sgx_untrusted_alloc;
 
 #[cfg(not(feature = "sgx"))]
 pub mod bench;
-pub mod config;
 pub mod executor;
+mod load_balancer;
 mod macros;
-mod parks;
 pub mod prelude;
-pub mod sched;
+pub mod scheduler;
 pub mod sync;
 pub mod task;
 pub mod time;
+pub mod util;
+pub mod vcpu;
 pub mod wait;
 
 // All unit tests
@@ -67,8 +71,8 @@ mod tests {
 
     use crate::async_bench_iter;
     use crate::prelude::*;
-    use crate::sched::SchedPriority;
-    use crate::task::{JoinHandle, SpawnOptions};
+    use crate::scheduler::SchedEntity;
+    use crate::task::JoinHandle;
 
     const TEST_PARALLELISM: u32 = 4;
 
@@ -84,7 +88,7 @@ mod tests {
     fn test_yield() {
         crate::task::block_on(async {
             for _ in 0..100 {
-                crate::sched::yield_().await;
+                crate::scheduler::yield_now().await;
             }
         });
     }
@@ -114,7 +118,7 @@ mod tests {
             let mut join_handles: Vec<JoinHandle<i32>> = (0..10)
                 .map(|i| {
                     crate::task::spawn(async move {
-                        crate::sched::yield_().await;
+                        crate::scheduler::yield_now().await;
                         i
                     })
                 })
@@ -129,25 +133,15 @@ mod tests {
     #[test]
     fn test_affinity() {
         crate::task::block_on(async {
-            use crate::sched::Affinity;
-
             let current = crate::task::current::get();
+            let affinity = current.sched_state().affinity();
 
-            let mut affinity = current.sched_info().affinity().write();
-            assert!(affinity.is_full());
-
-            let new_affinity = {
-                let mut new_affinity = Affinity::new_empty();
-                new_affinity.set(1, true);
-                new_affinity
-            };
-            *affinity = new_affinity.clone();
+            affinity.set(1, true);
             drop(affinity);
 
             // The new affinity will take effect after the next scheduling
-            crate::sched::yield_().await;
-
-            assert!(*current.sched_info().affinity().read() == new_affinity);
+            crate::scheduler::yield_now().await;
+            assert!(current.sched_state().affinity().get(1));
         });
     }
 
@@ -159,7 +153,7 @@ mod tests {
                 .map(|i| {
                     crate::task::spawn(async move {
                         for _ in 0..100 {
-                            crate::sched::yield_().await;
+                            crate::scheduler::yield_now().await;
                         }
                         i
                     })
@@ -172,55 +166,55 @@ mod tests {
         });
     }
 
-    #[test]
-    // FIXME: enable this test when async Mutex is ready
-    #[ignore]
-    fn test_scheduler_priority() {
-        crate::task::block_on(async {
-            let task_num = TEST_PARALLELISM * 100;
-            let low_handle = spawn_priority_tasks(task_num, SchedPriority::Low);
-            let normal_handle = spawn_priority_tasks(task_num, SchedPriority::Normal);
-            let high_handle = spawn_priority_tasks(task_num, SchedPriority::High);
+    // #[test]
+    // // FIXME: enable this test when async Mutex is ready
+    // #[ignore]
+    // fn test_scheduler_priority() {
+    //     crate::task::block_on(async {
+    //         let task_num = TEST_PARALLELISM * 100;
+    //         let low_handle = spawn_priority_tasks(task_num, SchedPriority::Low);
+    //         let normal_handle = spawn_priority_tasks(task_num, SchedPriority::Normal);
+    //         let high_handle = spawn_priority_tasks(task_num, SchedPriority::High);
 
-            let low_time = low_handle.await;
-            let normal_time = normal_handle.await;
-            let high_time = high_handle.await;
+    //         let low_time = low_handle.await;
+    //         let normal_time = normal_handle.await;
+    //         let high_time = high_handle.await;
 
-            // FIXME: check the time when priority task enabled
-            // assert!(low_time > normal_time);
-            // assert!(normal_time > high_time);
-        });
-    }
+    //         // FIXME: check the time when priority task enabled
+    //         // assert!(low_time > normal_time);
+    //         // assert!(normal_time > high_time);
+    //     });
+    // }
 
-    fn spawn_priority_tasks(task_num: u32, priority: SchedPriority) -> JoinHandle<Duration> {
-        SpawnOptions::new(async move {
-            let start = std::time::Instant::now();
-            let join_handles: Vec<JoinHandle<()>> = (0..task_num)
-                .map(|_| {
-                    SpawnOptions::new(async move {
-                        for _ in 0..100u32 {
-                            crate::sched::yield_().await;
-                        }
-                    })
-                    .priority(priority)
-                    .spawn()
-                })
-                .collect();
-            for join_handle in join_handles {
-                join_handle.await;
-            }
-            start.elapsed()
-        })
-        .priority(SchedPriority::High)
-        .spawn()
-    }
+    // fn spawn_priority_tasks(task_num: u32, priority: SchedPriority) -> JoinHandle<Duration> {
+    //     SpawnOptions::new(async move {
+    //         let start = std::time::Instant::now();
+    //         let join_handles: Vec<JoinHandle<()>> = (0..task_num)
+    //             .map(|_| {
+    //                 SpawnOptions::new(async move {
+    //                     for _ in 0..100u32 {
+    //                         crate::scheduler::yield_now().await;
+    //                     }
+    //                 })
+    //                 .priority(priority)
+    //                 .spawn()
+    //             })
+    //             .collect();
+    //         for join_handle in join_handles {
+    //             join_handle.await;
+    //         }
+    //         start.elapsed()
+    //     })
+    //     .priority(SchedPriority::High)
+    //     .spawn()
+    // }
 
     #[test]
     // FIXME: enable this test when async Mutex is ready
     #[ignore]
     fn test_scheduler_full() {
         crate::task::block_on(async {
-            use crate::sched::MAX_QUEUED_TASKS;
+            const MAX_QUEUED_TASKS: usize = 1_000;
             use crate::task::JoinHandle;
 
             let task_num = TEST_PARALLELISM * MAX_QUEUED_TASKS as u32 * 2;
@@ -228,7 +222,7 @@ mod tests {
                 .map(|_| {
                     crate::task::spawn(async move {
                         for _ in 0..100u32 {
-                            crate::sched::yield_().await;
+                            crate::scheduler::yield_now().await;
                         }
                     })
                 })
@@ -251,7 +245,7 @@ mod tests {
     #[bench]
     fn bench_yield(b: &mut Bencher) {
         async_bench_iter!(b, async move {
-            crate::sched::yield_().await;
+            crate::scheduler::yield_now().await;
         });
     }
 
@@ -269,7 +263,8 @@ mod tests {
 
     #[ctor::ctor]
     fn auto_init_executor() {
-        crate::config::set_parallelism(TEST_PARALLELISM);
+        // crate::config::set_parallelism(TEST_PARALLELISM);
+        crate::vcpu::set_total(TEST_PARALLELISM);
     }
 }
 

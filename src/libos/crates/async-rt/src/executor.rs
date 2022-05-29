@@ -1,145 +1,194 @@
 use futures::task::waker_ref;
 
-use crate::config::CONFIG;
-use crate::parks::Parks;
+use crate::load_balancer::LoadBalancer;
 use crate::prelude::*;
 #[allow(unused_imports)]
-use crate::sched::{BasicScheduler, PriorityScheduler, Scheduler};
 use crate::task::Task;
+use crate::time::Instant;
+use crate::vcpu;
 
-pub fn parallelism() -> u32 {
-    EXECUTOR.parallelism()
+use crate::scheduler::{SchedEntity, Scheduler};
+
+/// Returning number of running vcpus
+pub fn num_vcpus() -> u32 {
+    EXECUTOR.num_vcpus()
 }
 
-// Returning number of running vcpus
+/// Start running tasks in this vcpu of executor
 pub fn run_tasks() -> u32 {
     EXECUTOR.run_tasks()
 }
 
+/// Shutdown the executor
 pub fn shutdown() {
     EXECUTOR.shutdown()
 }
 
+/// Start the load balancer
+pub fn start_load_balancer() {
+    // EXECUTOR.load_balancer.start();
+}
+
 lazy_static! {
     pub(crate) static ref EXECUTOR: Executor = {
-        let parallelism = CONFIG.parallelism();
-        Executor::new(parallelism).unwrap()
+        let num_vcpus = vcpu::get_total();
+        Executor::new(num_vcpus).unwrap()
     };
 }
 
 pub(crate) struct Executor {
-    parallelism: u32,
-    running_vcpu_num: AtomicU32,
-    next_thread_id: AtomicU32,
+    num_vcpus: u32,
+    running_vcpus: AtomicU32,
+    scheduler: Arc<Scheduler<Task>>,
     is_shutdown: AtomicBool,
-    parks: Arc<Parks>,
-    scheduler: Box<dyn Scheduler>,
+    load_balancer: LoadBalancer,
+    // Todo: calculate the number of pending tasks in vcpus, integrate it into vcpu selecting mechanism
+    // vcpus_pending_len: Box<[AtomicU32]>,
 }
 
 impl Executor {
-    pub fn new(parallelism: u32) -> Result<Self> {
-        if parallelism == 0 {
+    /// Initialize executor
+    pub fn new(num_vcpus: u32) -> Result<Self> {
+        if num_vcpus == 0 {
             return_errno!(EINVAL, "invalid argument");
         }
 
-        let next_thread_id = AtomicU32::new(0);
-        let running_vcpu_num = AtomicU32::new(0);
+        let running_vcpus = AtomicU32::new(0);
+        let scheduler = Arc::new(Scheduler::new(num_vcpus));
         let is_shutdown = AtomicBool::new(false);
-        let parks = Arc::new(Parks::new(parallelism));
-        let scheduler = Box::new(BasicScheduler::new(parks.clone()));
-        // let scheduler = Box::new(PriorityScheduler::new(parks.clone()));
+        let load_balancer = LoadBalancer::new(scheduler.clone());
+
+        // Init the vector of pending tasks number per vcpus
+        // let vcpus_pending_len = {
+        //     let mut vcpus_pending_len = Vec::with_capacity(num_vcpus as usize);
+        //     for _ in 0..num_vcpus {
+        //         vcpus_pending_len.push(AtomicU32::new(0));
+        //     }
+        //     vcpus_pending_len.into_boxed_slice()
+        // };
 
         let new_self = Self {
-            parallelism,
-            running_vcpu_num,
-            next_thread_id,
-            is_shutdown,
-            parks,
+            num_vcpus,
+            running_vcpus,
             scheduler,
+            is_shutdown,
+            load_balancer,
+            // vcpus_pending_len,
         };
         Ok(new_self)
     }
 
-    pub fn parallelism(&self) -> u32 {
-        self.parallelism
+    /// Return the number of vcpus in the executor
+    pub fn num_vcpus(&self) -> u32 {
+        self.num_vcpus
     }
 
+    /// Start running tasks in this vcpu of executor
     pub fn run_tasks(&self) -> u32 {
-        let thread_id = self.next_thread_id.fetch_add(1, Ordering::Relaxed) as usize;
-        assert!(thread_id < self.parallelism as usize);
-        self.running_vcpu_num.fetch_add(1, Ordering::Relaxed);
+        let this_vcpu = self.running_vcpus.fetch_add(1, Ordering::Relaxed);
+        debug_assert!(this_vcpu < self.num_vcpus);
 
-        crate::task::current::set_vcpu_id(thread_id as u32);
-        debug!("run tasks on vcpu {}", thread_id);
+        vcpu::set_current(this_vcpu);
 
-        self.parks.register(thread_id);
+        let this_local_scheduler = &self.scheduler.local_schedulers[this_vcpu as usize];
 
-        // The max number of dequeue retries before go to sleep
-        const MAX_DEQUEUE_RETRIES: usize = 5000;
-        let mut dequeue_retries = 0;
         loop {
-            let task_option = self.scheduler.dequeue_task(thread_id);
-
-            // Stop the executor iff all the ready tasks are executed
-            if self.is_shutdown() && task_option.is_none() {
-                let num = self.running_vcpu_num.fetch_sub(1, Ordering::Relaxed) as u32;
-                assert!(num >= 1);
-                self.parks.unregister(thread_id);
-                return num - 1;
-            }
-
-            match task_option {
-                Some(task) => {
-                    dequeue_retries = 0;
-
-                    task.reset_enqueued();
-                    self.execute_task(task)
-                }
+            let task = match self.dequeue_wait() {
+                Some(entity) => entity,
                 None => {
-                    dequeue_retries += 1;
-                    if dequeue_retries >= MAX_DEQUEUE_RETRIES {
-                        self.parks.park();
-                        dequeue_retries = 0;
-                    }
+                    break;
                 }
+            };
+
+            let mut future_slot = match task.future().try_lock() {
+                Some(future) => future,
+                None => {
+                    // The task happens to be executed by other vCPUs at the moment.
+                    // Try to execute it later.
+                    debug!("the task happens to be executed by other vcpus, re-enqueue it");
+                    self.scheduler.enqueue(&task);
+                    continue;
+                }
+            };
+
+            let future = match future_slot.as_mut() {
+                Some(future) => future,
+                None => {
+                    debug!("the task happens to be completed, task: {:?}", task.tid());
+                    // The task happens to be completed
+                    continue;
+                }
+            };
+
+            crate::task::current::set(task.clone());
+
+            let start = Instant::now();
+            // Execute task
+            let waker = waker_ref(&task);
+            let context = &mut Context::from_waker(&*waker);
+            let ret = future.as_mut().poll(context);
+            let mut elapsed = start.elapsed().as_millis();
+            if elapsed == 0 {
+                elapsed = 1;
             }
+            let remain_ms = task.sched_state().elapse(elapsed as u32);
+            if remain_ms == 0 {
+                task.sched_state().report_preemption();
+            }
+
+            if let Poll::Ready(()) = ret {
+                // As the task is completed, we can destory the future
+                drop(future_slot.take());
+            }
+
+            // Add the number of pending tasks in this vcpu.
+            // match ret {
+            //     Poll::Ready(()) => {
+            //         drop(future_slot.take());
+            //     }
+            //     Poll::Pending => {
+            //         self.vcpus_pending_len[this_vcpu as usize].fetch_add(1, Ordering::Relaxed);
+            //     }
+            // }
+
+            // Reset current task
+            crate::task::current::reset();
+        }
+
+        vcpu::clear_current();
+        let num = self.running_vcpus.load(Ordering::Relaxed);
+        num - 1
+    }
+
+    // Dequeue task. If no task in this vcpu, wait for enqueueing.
+    // Return None if the executor has been shutdown.
+    #[inline]
+    fn dequeue_wait(&self) -> Option<Arc<Task>> {
+        let this_vcpu = vcpu::get_current().unwrap();
+        loop {
+            if self.is_shutdown() {
+                return None;
+            }
+
+            let entity = self.scheduler.dequeue();
+            if entity.is_some() {
+                return entity;
+            }
+
+            self.scheduler.local_schedulers[this_vcpu as usize].wait_enqueue();
         }
     }
 
-    pub fn execute_task(&self, task: Arc<Task>) {
-        // Keep the lock to avoid race contidion in yield process.
-        let mut future_slot = task.future().lock();
-        let mut future = match future_slot.take() {
-            None => {
-                return;
-            }
-            Some(future) => future,
-        };
-
-        crate::task::current::set(task.clone());
-
-        task.consume_budget();
-
-        let waker = waker_ref(&task);
-        let context = &mut Context::from_waker(&*waker);
-        if let Poll::Pending = future.as_mut().poll(context) {
-            *future_slot = Some(future);
-        }
-
-        crate::task::current::reset();
-    }
-
-    /// Accept a new task and schedule it.
+    /// Accept a new task and schedule it, mainly called by spawn
     pub fn accept_task(&self, task: Arc<Task>) {
-        if self.is_shutdown() {
-            panic!("a shut-down executor cannot spawn new tasks");
-        }
-
-        task.try_set_enqueued().unwrap();
-        self.scheduler.enqueue_task(task);
+        assert!(
+            !self.is_shutdown(),
+            "a shut-down executor cannot spawn new tasks"
+        );
+        self.schedule_task(&task);
     }
 
-    /// Wake up an old task and schedule it.
+    /// Wake up an old task and schedule it, mainly called by wake_by_ref
     pub fn wake_task(&self, task: &Arc<Task>) {
         if self.is_shutdown() {
             // TODO: What to do if there are still task in the run queues
@@ -150,24 +199,43 @@ impl Executor {
             return;
         }
 
-        // Avoid a task from consuming the limited space of the queues of
-        // the underlying scheduler due to the task being enqueued multiple
-        // times
-        if let Err(_) = task.try_set_enqueued() {
+        // the task has been enqueued, not neccessary to enqueue more than once
+        if task.sched_state().is_enqueued() {
             return;
         }
 
-        self.scheduler.enqueue_task(task.clone());
+        // When waking up a pending tasks in vcpu,
+        // the pending task number of corresponding vcpus should subtract one
+        // if let Some(last_vcpu) = task.sched_state().vcpu() {
+        //     self.vcpus_pending_len[last_vcpu as usize].fetch_sub(1, Ordering::Relaxed);
+        // }
+
+        self.schedule_task(task);
     }
 
-    pub fn shutdown(&self) {
-        self.is_shutdown.store(true, Ordering::Relaxed);
-
-        self.parks.unpark_all();
-        crate::time::wake_timer_wheel(&Duration::default()); // wake the time wheel right now
+    /// Re-schedule task
+    pub fn schedule_task(&self, task: &Arc<Task>) {
+        self.scheduler.enqueue(task);
     }
 
+    /// Check the shutdown status of executor
     pub fn is_shutdown(&self) -> bool {
         self.is_shutdown.load(Ordering::Relaxed)
+    }
+
+    /// Shutdown executor and wake threads of all vcpus and timer
+    pub fn shutdown(&self) {
+        self.stop_load_balancer();
+        self.is_shutdown.store(true, Ordering::Relaxed);
+
+        vcpu::unpark_all();
+        // wake the time wheel right now
+        crate::time::wake_timer_wheel(&Duration::default());
+    }
+
+    /// Stop the load balancer.
+    /// Todo: reimplement and enable load balancer for improving scheduler performance
+    pub fn stop_load_balancer(&self) {
+        // self.load_balancer.stop();
     }
 }

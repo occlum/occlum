@@ -82,10 +82,9 @@ fn tid() -> Option<u64> {
     async_rt::task::current::try_get().map(|current| current.tid().0)
 }
 
-fn vcpu_id() -> Option<i32> {
-    let vcpu_id = async_rt::task::current::get_vcpu_id();
-
-    Some(vcpu_id as i32)
+fn vcpu_id() -> Option<u32> {
+    let vcpu_id = async_rt::vcpu::get_current();
+    vcpu_id
 }
 
 async_rt::task_local! {

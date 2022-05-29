@@ -58,7 +58,7 @@ impl TimerShared {
     pub fn new(timeout: Duration) -> Self {
         Self {
             state: TimerState::Init,
-            timeout: timeout,
+            timeout,
         }
     }
 

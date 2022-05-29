@@ -4,33 +4,30 @@ use core::fmt::{self, Debug};
 use futures::task::ArcWake;
 
 use crate::executor::EXECUTOR;
-use crate::prelude::*;
-use crate::sched::{SchedInfo, SchedPriority};
+use crate::scheduler::{Priority, SchedEntity, SchedState};
 use crate::task::{LocalsMap, TaskId, Tirqs};
+use crate::{prelude::*, vcpu};
 
 const DEFAULT_BUDGET: u8 = 64;
 
 pub struct Task {
     tid: TaskId,
-    sched_info: SchedInfo,
     future: Mutex<Option<BoxFuture<'static, ()>>>,
     locals: LocalsMap,
-    budget: u8,
-    consumed_budget: AtomicU8,
     tirqs: Tirqs,
-    // Used by executor to avoid a task consuming too much space in enqueues
-    // due to a task being enqueued multiple times.
-    is_enqueued: AtomicBool,
     weak_self: Weak<Self>,
+    sched_state: SchedState,
+}
+
+impl SchedEntity for Task {
+    fn sched_state(&self) -> &SchedState {
+        &self.sched_state
+    }
 }
 
 impl Task {
     pub fn tid(&self) -> TaskId {
         self.tid
-    }
-
-    pub fn sched_info(&self) -> &SchedInfo {
-        &self.sched_info
     }
 
     pub fn tirqs(&self) -> &Tirqs {
@@ -63,40 +60,8 @@ impl Task {
         &self.locals
     }
 
-    pub(crate) fn has_remained_budget(&self) -> bool {
-        self.consumed_budget.load(Ordering::Relaxed) < self.budget
-    }
-
-    pub(crate) fn reset_budget(&self) {
-        self.consumed_budget.store(0, Ordering::Relaxed);
-    }
-
-    pub(crate) fn consume_budget(&self) {
-        self.consumed_budget.fetch_add(1, Ordering::Relaxed);
-    }
-
     pub(crate) fn to_arc(&self) -> Arc<Self> {
         self.weak_self.upgrade().unwrap()
-    }
-
-    /// Returns whether the task is enqueued.
-    pub(crate) fn is_enqueued(&self) -> bool {
-        self.is_enqueued.load(Ordering::Relaxed)
-    }
-
-    /// Try to set the status of the task as enqueued.
-    ///
-    /// If the task is already enqueued, return an error.
-    pub(crate) fn try_set_enqueued(&self) -> Result<()> {
-        self.is_enqueued
-            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
-            .map(|_| ())
-            .map_err(|_| errno!(EEXIST, "already enqueued"))
-    }
-
-    /// Set the status of the task as NOT enqueued.
-    pub(crate) fn reset_enqueued(&self) {
-        self.is_enqueued.store(false, Ordering::Relaxed);
     }
 }
 
@@ -128,52 +93,37 @@ impl Debug for Task {
 
 pub struct TaskBuilder {
     future: Option<BoxFuture<'static, ()>>,
-    priority: SchedPriority,
-    budget: u8,
 }
 
+// schedstate need to be initialized
 impl TaskBuilder {
     pub fn new(future: impl Future<Output = ()> + 'static + Send) -> Self {
         Self {
             future: Some(future.boxed()),
-            priority: SchedPriority::Normal,
-            budget: DEFAULT_BUDGET,
         }
     }
-
-    pub fn priority(mut self, priority: SchedPriority) -> Self {
-        self.priority = priority;
-        self
-    }
-
-    pub fn budget(mut self, budget: u8) -> Self {
-        self.budget = budget;
-        self
-    }
-
     pub fn build(&mut self) -> Arc<Task> {
         assert!(self.future.is_some());
 
         let tid = TaskId::new();
-        let sched_info = SchedInfo::new(self.priority);
         let future = Mutex::new(self.future.take());
         let locals = LocalsMap::new();
-        let budget = self.budget;
-        let consumed_budget = AtomicU8::new(0);
         // Safety. The tirqs will be inserted into a Task before using it.
         let tirqs = unsafe { Tirqs::new() };
-        let is_enqueued = AtomicBool::new(false);
         let weak_self = Weak::new();
+
+        // need to initialize sched entity
+        let vcpus = vcpu::get_total();
+        let base_prio = Priority::NORMAL;
+        let sched_state = SchedState::new(vcpus, base_prio);
+
         let task = Task {
             tid,
-            sched_info,
             future,
             locals,
-            budget,
-            consumed_budget,
             tirqs,
-            is_enqueued,
             weak_self,
+            sched_state,
         };
         // Create an Arc and update the weak_self
         new_self_ref_arc::new_self_ref_arc!(task)

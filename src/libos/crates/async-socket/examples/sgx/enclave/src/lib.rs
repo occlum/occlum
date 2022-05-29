@@ -42,9 +42,9 @@ pub extern "C" fn run_sgx_example(port: u16) -> sgx_status_t {
     // std::backtrace::enable_backtrace("enclave.signed.so", std::backtrace::PrintFormat::Full);
     println!("[ECALL] run_sgx_example");
 
-    let parallelism: u32 = 1;
+    let vcpus: u32 = 1;
 
-    init_async_rt(parallelism);
+    init_async_rt(vcpus);
 
     async_rt::task::block_on(tcp_echo(port));
 

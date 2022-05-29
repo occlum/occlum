@@ -15,8 +15,8 @@ pub struct JoinHandle<T: Send + 'static> {
 impl<T: Send + 'static> JoinHandle<T> {
     pub(crate) fn new(state: Arc<Mutex<JoinState<T>>>, task: Arc<Task>) -> Self {
         Self {
-            state: state,
-            task: task,
+            state,
+            task,
             phantom: PhantomData,
         }
     }
@@ -95,8 +95,7 @@ impl<T: Send + 'static> JoinState<T> {
                 *self = JoinState::Pending(cx.waker().clone());
                 None
             }
-            JoinState::Ready(value) => {
-                drop(value);
+            JoinState::Ready(_) => {
                 let mut result = JoinState::Finish;
                 core::mem::swap(self, &mut result);
                 if let JoinState::Ready(value) = result {

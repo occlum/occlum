@@ -9,9 +9,9 @@ fn main() {
         3456
     };
 
-    let parallelism: u32 = 1;
+    let vcpus: u32 = 1;
 
-    init_async_rt(parallelism);
+    init_async_rt(vcpus);
 
     async_rt::task::block_on(tcp_echo(port));
 }

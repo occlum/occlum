@@ -11,7 +11,7 @@ use self::util::{DisplayData, DisplayThroughput};
 
 fn main() {
     // Specify the number of threads to execute async tasks
-    async_rt::config::set_parallelism(4);
+    async_rt::vcpu::set_total(4);
 
     // Specify all benchmarks
     let mut benches = [

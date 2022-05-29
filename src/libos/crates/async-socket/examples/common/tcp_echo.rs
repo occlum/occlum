@@ -76,8 +76,8 @@ impl IoUringProvider for IoUringInstanceType {
     }
 }
 
-fn init_async_rt(parallelism: u32) {
-    async_rt::config::set_parallelism(parallelism);
+fn init_async_rt(vcpus: u32) {
+    async_rt::vcpu::set_total(vcpus);
 
     let ring = RING.clone();
     let callback = move || {

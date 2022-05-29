@@ -121,7 +121,7 @@ async fn wait_for_other_threads_to_exit(current_ref: &ThreadRef) {
         notify_all_threads_to_exit(current_ref.process());
 
         // Must yield here for other threads to run
-        async_rt::sched::yield_().await;
+        async_rt::scheduler::yield_now().await;
 
         let thread_num = current_ref.process().threads().len();
         if thread_num == 1 {

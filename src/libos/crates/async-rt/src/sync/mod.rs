@@ -15,11 +15,11 @@ pub use rwlock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
-    const TEST_PARALLELISM: u32 = 4;
+    const TEST_VPUS: u32 = 4;
 
     #[ctor::ctor]
     fn auto_init_executor() {
-        crate::config::set_parallelism(TEST_PARALLELISM);
+        crate::vcpu::set_total(TEST_VPUS);
     }
 
     #[test]
@@ -203,7 +203,7 @@ mod tests {
                 if counter.load(Ordering::Relaxed) == 3 {
                     break;
                 }
-                crate::sched::yield_().await;
+                crate::scheduler::yield_now().await;
             }
         }
 

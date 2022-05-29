@@ -97,7 +97,8 @@ pub extern "C" fn occlum_ecall_init(
 
         info!("num_vcpus = {:?}", num_vcpus);
         assert!(num_vcpus > 0 && num_vcpus <= 1024);
-        async_rt::config::set_parallelism(num_vcpus);
+
+        async_rt::vcpu::set_total(num_vcpus);
 
         std::thread::spawn(move || {
             let io_uring = &crate::io_uring::SINGLETON;
@@ -118,6 +119,9 @@ pub extern "C" fn occlum_ecall_init(
 
         // Enable global backtrace
         unsafe { std::backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Full) };
+
+        // Start load balancer
+        async_rt::executor::start_load_balancer();
     });
 
     // Parse host file

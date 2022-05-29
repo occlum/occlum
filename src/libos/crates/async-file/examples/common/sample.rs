@@ -102,7 +102,7 @@ mod runtime {
 }
 
 fn init_async_rt() {
-    async_rt::config::set_parallelism(1);
+    async_rt::vcpu::set_total(1);
 
     let ring = &runtime::RING;
     unsafe {

@@ -91,10 +91,10 @@ mod runtime {
     pub struct SocketRuntime;
 
     impl SocketRuntime {
-        pub fn init(parallelism: u32) {
+        pub fn init(vcpus: u32) {
             static INIT: Once = Once::new();
             INIT.call_once(|| {
-                async_rt::config::set_parallelism(parallelism);
+                async_rt::vcpu::set_total(vcpus);
 
                 let ring = Self::io_uring();
                 std::thread::spawn(move || loop {

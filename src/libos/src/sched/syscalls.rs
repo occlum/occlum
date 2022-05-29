@@ -6,7 +6,7 @@ use core::convert::TryFrom;
 
 pub async fn do_sched_yield() -> Result<isize> {
     //super::do_sched_yield::do_sched_yield();
-    async_rt::sched::yield_().await;
+    async_rt::scheduler::yield_now().await;
     Ok(0)
 }
 

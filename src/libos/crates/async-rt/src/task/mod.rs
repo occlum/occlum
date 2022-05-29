@@ -2,7 +2,6 @@ use self::join::{JoinState, OutputHandle};
 use self::task::TaskBuilder;
 use crate::executor::EXECUTOR;
 use crate::prelude::*;
-use crate::sched::SchedPriority;
 
 pub use self::id::TaskId;
 pub use self::join::JoinHandle;
@@ -65,7 +64,7 @@ fn init_runner_threads() {
             crate::time::run_timer_wheel_thread();
         });
 
-        for _ in 0..crate::executor::parallelism() {
+        for _ in 0..crate::executor::num_vcpus() {
             std::thread::spawn(|| {
                 crate::executor::run_tasks();
             });
@@ -75,20 +74,13 @@ fn init_runner_threads() {
 
 pub struct SpawnOptions<T> {
     raw_future: Option<BoxFuture<'static, T>>,
-    priority: SchedPriority,
 }
 
 impl<T: Send + 'static> SpawnOptions<T> {
     pub fn new(future: impl Future<Output = T> + 'static + Send) -> Self {
         Self {
             raw_future: Some(future.boxed()),
-            priority: SchedPriority::Normal,
         }
-    }
-
-    pub fn priority(mut self, priority: SchedPriority) -> Self {
-        self.priority = priority;
-        self
     }
 
     pub fn spawn(&mut self) -> JoinHandle<T> {
@@ -105,7 +97,7 @@ impl<T: Send + 'static> SpawnOptions<T> {
                 output_handle.set(output);
             }
         };
-        let task = TaskBuilder::new(future).priority(self.priority).build();
+        let task = TaskBuilder::new(future).build();
         let join_handle = JoinHandle::new(state, task.clone());
 
         EXECUTOR.accept_task(task);

@@ -28,6 +28,7 @@ env_logger = { version = "0.8.4", optional = true }
 new-self-ref-arc = { path = "../new-self-ref-arc" }
 object-id = { path = "../object-id" }
 spin = "0.7"
+#spin = { version = "0.9.3", default-features = false, features = ["mutex", "spin_mutex"] }
 sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", features = ["backtrace", "thread"], optional = true }
 vdso-time = { path = "../vdso-time", default-features = false }
 sgx-untrusted-alloc = { path = "../sgx-untrusted-alloc", optional = true }

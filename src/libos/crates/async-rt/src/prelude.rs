@@ -1,8 +1,8 @@
 pub(crate) use alloc::boxed::Box;
-pub(crate) use alloc::collections::VecDeque;
+// pub(crate) use alloc::collections::VecDeque;
 pub(crate) use alloc::sync::Arc;
 pub(crate) use alloc::vec::Vec;
-pub(crate) use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};
+pub(crate) use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 pub(crate) use core::task::{Context, Poll};
 pub(crate) use errno::prelude::*;
 pub(crate) use lazy_static::lazy_static;
