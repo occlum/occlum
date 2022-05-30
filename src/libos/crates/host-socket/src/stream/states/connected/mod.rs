@@ -44,10 +44,16 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
 
     pub fn shutdown(&self, how: Shutdown) -> Result<()> {
         if how.should_shut_read() {
+            // Ignore the pending buffer and on-going request will return 0.
+            self.common.host_shutdown(Shutdown::Read)?;
             self.receiver.shutdown();
             self.common.pollee().add_events(Events::IN);
         }
         if how.should_shut_write() {
+            // Don't call host_shutdown until the content in the pending buffer is sent.
+            if self.sender.is_empty() {
+                self.common.host_shutdown(Shutdown::Write)?;
+            }
             self.sender.shutdown();
             self.common.pollee().add_events(Events::OUT);
         }

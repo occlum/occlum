@@ -142,6 +142,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         let complete_fn = move |retval: i32| {
             let mut inner = stream.sender.inner.lock().unwrap();
 
+            trace!("send request complete with retval: {}", retval);
             // Release the handle to the async send
             inner.io_handle.take();
 
@@ -168,6 +169,8 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             if !inner.send_buf.is_empty() {
                 stream.do_send(&mut inner);
             } else if inner.is_shutdown == ShutdownStatus::PreShutdown {
+                // The buffer is empty and the write side is shutdown by the user. We can safely shutdown host file here.
+                let _ = stream.common.host_shutdown(Shutdown::Write);
                 inner.is_shutdown = ShutdownStatus::PostShutdown
             }
         };
@@ -175,6 +178,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         // Generate the async send request
         let msghdr_ptr = inner.new_send_req();
 
+        trace!("send submit request");
         // Submit the async send to io_uring
         let io_uring = self.common.io_uring();
         let host_fd = Fd(self.common.host_fd() as _);
@@ -196,6 +200,11 @@ impl Sender {
     pub fn shutdown(&self) {
         let mut inner = self.inner.lock().unwrap();
         inner.is_shutdown = ShutdownStatus::PreShutdown;
+    }
+
+    pub fn is_empty(&self) -> bool {
+        let inner = self.inner.lock().unwrap();
+        inner.send_buf.is_empty()
     }
 }
 

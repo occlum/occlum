@@ -7,10 +7,12 @@ cfg_if::cfg_if! {
         use libc::ocall::socket as do_socket;
         use libc::ocall::getsockname as do_getsockname;
         use libc::ocall::socketpair as do_socketpair;
+        use libc::ocall::shutdown as do_shutdown;
     } else {
         use libc::socket as do_socket;
         use libc::getsockname as do_getsockname;
         use libc::socketpair as do_socketpair;
+        use libc::shutdown as do_shutdown;
     }
 }
 
@@ -157,6 +159,22 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
     pub fn reset_peer_addr(&self) {
         let mut inner = self.inner.lock().unwrap();
         inner.peer_addr = None;
+    }
+
+    pub fn host_shutdown(&self, how: Shutdown) -> Result<()> {
+        trace!("host shutdown: {:?}", how);
+        match how {
+            Shutdown::Write => {
+                try_libc!(do_shutdown(self.host_fd as _, libc::SHUT_WR));
+            }
+            Shutdown::Read => {
+                try_libc!(do_shutdown(self.host_fd as _, libc::SHUT_RD));
+            }
+            Shutdown::Both => {
+                try_libc!(do_shutdown(self.host_fd as _, libc::SHUT_RDWR));
+            }
+        }
+        Ok(())
     }
 }
 
