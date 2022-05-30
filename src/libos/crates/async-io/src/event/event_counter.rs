@@ -67,7 +67,7 @@ mod tests {
         async_rt::task::block_on(async {
             let counter = EventCounter::new();
             counter.write();
-            assert!(counter.read().await == 1);
+            assert!(counter.read().await.unwrap() == 1);
         });
     }
 
@@ -80,7 +80,7 @@ mod tests {
             let handle = {
                 let counter = counter.clone();
                 async_rt::task::spawn(async move {
-                    assert!(counter.read().await == 1);
+                    assert!(counter.read().await.unwrap() == 1);
                 })
             };
 
