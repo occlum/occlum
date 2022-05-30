@@ -110,6 +110,7 @@ impl SubAssign<Duration> for Instant {
 mod tests {
     use super::{Duration, Instant};
     use std::thread;
+    use test::Bencher;
 
     #[test]
     fn test_instant() {
@@ -121,5 +122,10 @@ mod tests {
         let elapsed = start.elapsed();
         assert!(elapsed.as_millis() as u64 >= ms - 1);
         assert!(elapsed.as_millis() as u64 <= ms + 1);
+    }
+
+    #[bench]
+    fn bench_instant(b: &mut Bencher) {
+        b.iter(|| Instant::now());
     }
 }

@@ -22,7 +22,11 @@
 #![feature(core_intrinsics)]
 #![feature(drain_filter)]
 #![feature(arbitrary_enum_discriminant)]
+#![feature(test)]
 #![allow(dead_code)]
+
+#[cfg(test)]
+extern crate test;
 
 #[cfg(feature = "sgx")]
 #[macro_use]
@@ -43,6 +47,8 @@ extern crate sgx_types;
 #[cfg(feature = "sgx")]
 extern crate sgx_untrusted_alloc;
 
+#[cfg(not(feature = "sgx"))]
+pub mod bench;
 pub mod config;
 pub mod executor;
 mod macros;
@@ -57,6 +63,9 @@ pub mod wait;
 // All unit tests
 #[cfg(test)]
 mod tests {
+    use test::Bencher;
+
+    use crate::async_bench_iter;
     use crate::prelude::*;
     use crate::sched::SchedPriority;
     use crate::task::{JoinHandle, SpawnOptions};
@@ -228,6 +237,33 @@ mod tests {
             for join_handle in join_handles.iter_mut() {
                 join_handle.await;
             }
+        });
+    }
+
+    #[bench]
+    fn bench_spawn_and_join(b: &mut Bencher) {
+        async_bench_iter!(b, async move {
+            let handle = crate::task::spawn(async {});
+            handle.await;
+        });
+    }
+
+    #[bench]
+    fn bench_yield(b: &mut Bencher) {
+        async_bench_iter!(b, async move {
+            crate::sched::yield_().await;
+        });
+    }
+
+    #[bench]
+    fn bench_task_local(b: &mut Bencher) {
+        use std::cell::Cell;
+        task_local! {
+            static TASK_LOCAL_U32: Cell<u32> = Cell::new(0);
+        }
+
+        async_bench_iter!(b, async move {
+            black_box(TASK_LOCAL_U32.with(|cell| cell.get()));
         });
     }
 
