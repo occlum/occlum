@@ -20,3 +20,12 @@ pub mod ioctl;
 pub mod prelude;
 pub mod socket;
 pub mod util;
+
+#[cfg(test)]
+mod tests {
+    #[ctor::ctor]
+    fn auto_init_executor() {
+        const TEST_PARALLELISM: u32 = 2;
+        async_rt::config::set_parallelism(TEST_PARALLELISM);
+    }
+}

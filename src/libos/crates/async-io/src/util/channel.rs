@@ -598,10 +598,22 @@ impl<T> Drop for Consumer<T> {
     }
 }
 
+fn check_status_flags(flags: StatusFlags) -> Result<()> {
+    let valid_flags: StatusFlags = StatusFlags::O_NONBLOCK | StatusFlags::O_DIRECT;
+    if !valid_flags.contains(flags) {
+        return_errno!(EINVAL, "invalid flags");
+    }
+    if flags.contains(StatusFlags::O_DIRECT) {
+        return_errno!(EINVAL, "O_DIRECT is not supported");
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::fmt::Debug;
     use std::sync::Arc;
+    use std::time::Instant;
 
     use super::*;
     use crate::file::{Async, File};
@@ -612,25 +624,34 @@ mod tests {
             const TOTAL_NBYTES: usize = 4 * 1024 * 1024;
             const CHANNEL_CAPACITY: usize = 4 * 1024;
             const BUF_SIZE: usize = 128;
-            do_transfer_data(TOTAL_NBYTES, CHANNEL_CAPACITY, BUF_SIZE).await;
+            let is_benchmark = false;
+            do_transfer_data(TOTAL_NBYTES, CHANNEL_CAPACITY, BUF_SIZE, is_benchmark).await;
         });
     }
 
     #[test]
     fn transfer_data_with_big_buf() {
         async_rt::task::block_on(async {
-            const TOTAL_NBYTES: usize = 16 * 1024 * 1024;
-            const CHANNEL_CAPACITY: usize = 4 * 1024;
-            const BUF_SIZE: usize = 6 * 1024;
-            do_transfer_data(TOTAL_NBYTES, CHANNEL_CAPACITY, BUF_SIZE).await;
+            const TOTAL_NBYTES: usize = 4 * 1024 * 1024 * 1024;
+            const CHANNEL_CAPACITY: usize = 1 * 1024 * 1024;
+            const BUF_SIZE: usize = 4 * 1024;
+            let is_benchmark = true;
+            do_transfer_data(TOTAL_NBYTES, CHANNEL_CAPACITY, BUF_SIZE, is_benchmark).await;
         });
     }
 
-    async fn do_transfer_data(total_nbytes: usize, channel_capacity: usize, buf_size: usize) {
+    async fn do_transfer_data(
+        total_nbytes: usize,
+        channel_capacity: usize,
+        buf_size: usize,
+        is_benchmark: bool,
+    ) {
         let channel = Channel::with_capacity(channel_capacity).unwrap();
         let (producer, consumer) = channel.split();
         let producer = Async::new(producer);
         let consumer = Async::new(consumer);
+
+        let start = Instant::now();
 
         let producer_handle = async_rt::task::spawn(async move {
             let mut buf = Vec::with_capacity(buf_size);
@@ -660,6 +681,23 @@ mod tests {
 
         producer_handle.await;
         consumer_handle.await;
+
+        let stop = Instant::now();
+
+        if !is_benchmark {
+            return;
+        }
+
+        let elapsed = stop - start;
+        let buf_size_kb = buf_size / 1024;
+        let total_mb = (total_nbytes as f64) / 1_000_000.0;
+        let elapsed_secs = (elapsed.as_nanos() as f64) / 1_000_000_000.0;
+        let throughput = (total_mb / elapsed_secs) as u64;
+        println!(
+            "channel: buf_size = {} KiB, transfered data = {:.1} MB, \
+            elapsed time = {:.1} s, throughput = {:.0} MB/s",
+            buf_size_kb, total_mb, elapsed_secs, throughput
+        );
     }
 
     #[test]
@@ -702,15 +740,4 @@ mod tests {
         assert!(producer.poll(mask, None) == Events::empty());
         assert!(consumer.poll(mask, None) == Events::IN);
     }
-}
-
-fn check_status_flags(flags: StatusFlags) -> Result<()> {
-    let valid_flags: StatusFlags = StatusFlags::O_NONBLOCK | StatusFlags::O_DIRECT;
-    if !valid_flags.contains(flags) {
-        return_errno!(EINVAL, "invalid flags");
-    }
-    if flags.contains(StatusFlags::O_DIRECT) {
-        return_errno!(EINVAL, "O_DIRECT is not supported");
-    }
-    Ok(())
 }
