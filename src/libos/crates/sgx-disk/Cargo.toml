@@ -26,5 +26,10 @@ sgx_libc = { path = "../../../../deps/rust-sgx-sdk/sgx_libc", optional = true }
 sgx_tcrypto = { path = "../../../../deps/rust-sgx-sdk/sgx_tcrypto", optional = true }
 
 [dev-dependencies]
+async-trait = "0.1.52"
 async-rt = { path = "../async-rt", features = ["auto_run"] }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+
+[[bench]]
+name = "disk_bench"
+harness = false
