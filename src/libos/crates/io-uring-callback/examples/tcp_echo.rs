@@ -85,7 +85,7 @@ fn main() {
     loop {
         accept.try_push_accept(&ring);
 
-        ring.poll_completions();
+        ring.poll_completions(0, 100);
 
         let mut queue = TOKEN_QUEUE.lock().unwrap();
         while !queue.is_empty() {

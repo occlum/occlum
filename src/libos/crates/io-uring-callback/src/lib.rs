@@ -45,7 +45,7 @@
 //! };
 //! # io_uring.submit_requests();
 //! # while handle.retval().is_none() {
-//! #    io_uring.poll_completions();
+//! #    io_uring.wait_completions(1);
 //! # }
 //! ```
 //!
@@ -63,29 +63,17 @@
 //!
 //! After completing the I/O requests, Linux will push I/O responses into the completion queue of
 //! the io_uring instance. You need _periodically_ poll completions from the queue:
-//! ```
+//! ```no_run
 //! # use io_uring_callback::{Builder};
 //! # let io_uring = Builder::new().build(256).unwrap();
-//! io_uring.poll_completions();
+//! let min_complete = 1;
+//! let polling_retries = 5000;
+//! io_uring.poll_completions(min_complete, polling_retries);
 //! ```
 //! which will trigger registered callbacks and wake up handles.
 //!
-//! If you want to busywait _min_complete_ completions, which mainly used in the simple test:
-//! ```
-//! # use io_uring_callback::{Builder, Timespec, TimeoutFlags};
-//! # let io_uring = Builder::new().build(256).unwrap();
-//! # let tp = Timespec { tv_sec: 1, tv_nsec: 0, };
-//! # let completion_callback = move |_retval: i32| {};
-//! # let handle = unsafe {
-//! #     io_uring.timeout(&tp as *const _, 0, TimeoutFlags::empty(), completion_callback)
-//! # };
-//! # io_uring.submit_requests();
-//! let min_complete = 1;
-//! io_uring.busywait_completions(min_complete);
-//! ```
-//!
 //! When the I/O request is completed (the request is processed or cancelled by the kernel),
-//! `poll_completions` and `busywait_completions` will trigger the user-registered callback.
+//! `poll_completions` will trigger the user-registered callback.
 //!
 //! # I/O Handles
 //!
@@ -121,9 +109,7 @@
 //! };
 //! io_uring.submit_requests();
 //! unsafe { io_uring.cancel(&handle); }
-//! # while handle.retval().is_none() {
-//! #    io_uring.poll_completions();
-//! # }
+//! io_uring.wait_completions(1);
 //! ```
 
 #![feature(get_mut_unchecked)]
@@ -411,41 +397,56 @@ impl IoUring {
     ///
     /// Upon receiving completed I/O, the corresponding user-registered callback functions
     /// will get invoked and the `IoHandle` (as a `Future`) will become ready.
-    pub fn poll_completions(&self) -> usize {
+    ///
+    /// The method guarantees at least the specified number of entries are
+    /// popped from the completion queue. To do so, it starts by polling the
+    /// completion queue for at most the specified number of retries.
+    /// If the number of completion entries popped so far does not reach the
+    /// the specified minimum value, then the method shall block
+    /// until new completions arrive. After getting unblocked, the method
+    /// repeats polling.
+    ///
+    /// If the user does not want to the method to block, set `min_complete`
+    /// to 0. If the user does not want to the method to busy polling, set
+    /// `polling_retries` to 0.
+    pub fn poll_completions(&self, min_complete: usize, polling_retries: usize) -> usize {
         let cq = self.ring.completion();
         let mut nr_complete = 0;
-        while let Some(cqe) = cq.pop() {
-            let retval = cqe.result();
-            let token_key = cqe.user_data();
-            if token_key != IoUring::CANCEL_TOKEN_KEY {
-                let io_token = {
-                    let token_idx = token_key as usize;
-                    let mut token_table = self.token_table.lock().unwrap();
-                    token_table.remove(token_idx)
-                };
+        loop {
+            // Polling for at most a specified number of times
+            let mut nr_retries = 0;
+            while nr_retries <= polling_retries {
+                if let Some(cqe) = cq.pop() {
+                    let retval = cqe.result();
+                    let token_key = cqe.user_data();
+                    if token_key != IoUring::CANCEL_TOKEN_KEY {
+                        let io_token = {
+                            let token_idx = token_key as usize;
+                            let mut token_table = self.token_table.lock().unwrap();
+                            token_table.remove(token_idx)
+                        };
 
-                io_token.complete(retval);
-                nr_complete += 1;
+                        io_token.complete(retval);
+                        nr_complete += 1;
+                    }
+                } else {
+                    nr_retries += 1;
+                    std::hint::spin_loop();
+                }
             }
+
+            if nr_complete >= min_complete {
+                return nr_complete;
+            }
+
+            // Wait until at least one new completion entry arrives
+            let _ = self.ring.submit_and_wait(1);
         }
-        nr_complete
     }
 
-    /// Wait for at least min_complete new I/O completions in the completions queue of io_uring
-    /// and return the number of I/O completions.
-    ///
-    /// Upon receiving completed I/O, the corresponding user-registered callback functions
-    /// will get invoked and the `IoHandle` (as a `Future`) will become ready.
-    pub fn busywait_completions(&self, min_complete: usize) -> usize {
-        if min_complete == 0 {
-            return self.poll_completions();
-        }
-
-        let mut nr_complete = 0;
-        while nr_complete < min_complete {
-            nr_complete += self.poll_completions();
-        }
-        nr_complete
+    /// Wait for at least the specified number of I/O completions.
+    pub fn wait_completions(&self, min_complete: usize) -> usize {
+        self.poll_completions(min_complete, 10)
     }
 
     /// Start a helper thread that is busy doing `io_uring_enter` on this io_uring instance.
@@ -625,7 +626,7 @@ mod tests {
         };
         io_uring.submit_requests();
 
-        io_uring.busywait_completions(1);
+        io_uring.wait_completions(1);
         let retval = handle.retval().unwrap();
         assert_eq!(retval, (text.len() + text2.len()) as i32);
 
@@ -642,7 +643,7 @@ mod tests {
         };
         io_uring.submit_requests();
 
-        io_uring.busywait_completions(1);
+        io_uring.wait_completions(1);
         let retval = handle.retval().unwrap();
         assert_eq!(retval, (text.len() + text2.len()) as i32);
         assert_eq!(&output, text);
@@ -664,10 +665,10 @@ mod tests {
         io_uring.submit_requests();
 
         thread::sleep(Duration::from_millis(100));
-        assert_eq!(io_uring.poll_completions(), 0);
+        assert_eq!(io_uring.poll_completions(0, 10000), 0);
 
         fd.write(&0x1u64.to_ne_bytes()).unwrap();
-        io_uring.busywait_completions(1);
+        io_uring.wait_completions(1);
         assert_eq!(handle.retval().unwrap(), 1);
     }
 
@@ -694,7 +695,7 @@ mod tests {
         thread::sleep(Duration::from_millis(100));
 
         fd.write(&0x1u64.to_ne_bytes()).unwrap();
-        io_uring.busywait_completions(1);
+        io_uring.wait_completions(1);
 
         assert_eq!(poll_handle.retval().unwrap(), -libc::ECANCELED);
     }
@@ -715,7 +716,7 @@ mod tests {
         io_uring.submit_requests();
 
         fd.write(&0x1u64.to_ne_bytes()).unwrap();
-        io_uring.busywait_completions(1);
+        io_uring.wait_completions(1);
 
         unsafe {
             io_uring.cancel(&poll_handle);
@@ -747,7 +748,7 @@ mod tests {
             )
         };
         io_uring.submit_requests();
-        io_uring.busywait_completions(1);
+        io_uring.wait_completions(1);
 
         assert_eq!(handle.retval().unwrap(), -libc::ETIME);
         assert_eq!(start.elapsed().as_secs(), secs as u64);
@@ -781,7 +782,7 @@ mod tests {
         }
         io_uring.submit_requests();
 
-        io_uring.busywait_completions(1);
+        io_uring.wait_completions(1);
 
         assert_eq!(handle.retval().unwrap(), -libc::ECANCELED);
         assert_eq!(start.elapsed().as_secs(), 0);

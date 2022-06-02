@@ -447,13 +447,12 @@ mod test {
                 unsafe {
                     ring.start_enter_syscall_thread();
                 }
-                async_rt::task::spawn({
+                std::thread::spawn({
                     let ring = ring.clone();
-                    async move {
-                        loop {
-                            ring.poll_completions();
-                            async_rt::sched::yield_().await;
-                        }
+                    move || loop {
+                        let min_complete = 1;
+                        let polling_retries = 10000;
+                        ring.poll_completions(min_complete, polling_retries);
                     }
                 });
                 ring

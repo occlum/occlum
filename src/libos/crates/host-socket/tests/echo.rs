@@ -100,11 +100,8 @@ mod runtime {
                 unsafe {
                     ring.start_enter_syscall_thread();
                 }
-                async_rt::task::spawn(async move {
-                    loop {
-                        ring.poll_completions();
-                        async_rt::sched::yield_().await;
-                    }
+                std::thread::spawn(move || loop {
+                    ring.poll_completions(1, 5000);
                 });
             });
         }

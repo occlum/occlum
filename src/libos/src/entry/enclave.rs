@@ -99,17 +99,14 @@ pub extern "C" fn occlum_ecall_init(
         assert!(num_vcpus > 0 && num_vcpus <= 1024);
         async_rt::config::set_parallelism(num_vcpus);
 
-        async_rt::task::SpawnOptions::new(async {
+        std::thread::spawn(move || {
             let io_uring = &crate::io_uring::SINGLETON;
             loop {
-                for _ in 0..100 {
-                    io_uring.poll_completions();
-                }
-                async_rt::sched::yield_().await;
+                let min_complete = 1;
+                let polling_retries = 10000;
+                io_uring.poll_completions(min_complete, polling_retries);
             }
-        })
-        .priority(async_rt::sched::SchedPriority::Low)
-        .spawn();
+        });
 
         HAS_INIT.store(true, Ordering::SeqCst);
 

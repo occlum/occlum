@@ -114,11 +114,6 @@ impl<'a> Impl<'a> {
         let req = submission.complete().await;
         let res = req.response().unwrap();
 
-        // When this function returns, the buffers associated with the request
-        // will become invalid. So we add this guard to ensure that the block device
-        // does not hold any reference to the Arc<BioReq> for some unknown reason.
-        debug_assert!(Arc::strong_count(&req) == 1);
-
         if let Err(e) = res {
             return Err(errno!(e.errno(), "read on a block device failed"));
         }
@@ -226,8 +221,6 @@ impl<'a> Impl<'a> {
         let req = submission.complete().await;
         let res = req.response().unwrap();
 
-        debug_assert!(Arc::strong_count(&req) == 1);
-
         if let Err(e) = res {
             return Err(errno!(e.errno(), "read on a block device failed"));
         }
@@ -307,8 +300,6 @@ impl<'a> Impl<'a> {
         let submission = self.disk.submit(Arc::new(req));
         let req = submission.complete().await;
         let res = req.response().unwrap();
-
-        debug_assert!(Arc::strong_count(&req) == 1);
 
         if let Err(e) = res {
             return Err(errno!(e.errno(), "write on a block device failed"));
@@ -445,8 +436,6 @@ impl<'a> Impl<'a> {
         let submission = self.disk.submit(Arc::new(req));
         let req = submission.complete().await;
         let res = req.response().unwrap();
-
-        debug_assert!(Arc::strong_count(&req) == 1);
 
         if let Err(e) = res {
             return Err(errno!(e.errno(), "write on a block device failed"));
