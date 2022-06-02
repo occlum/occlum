@@ -238,7 +238,7 @@ pub async fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize>
         }
     };
 
-    let offset = file_ops::do_lseek(fd, seek_from)?;
+    let offset = file_ops::do_lseek(fd, seek_from).await?;
     Ok(offset as isize)
 }
 
