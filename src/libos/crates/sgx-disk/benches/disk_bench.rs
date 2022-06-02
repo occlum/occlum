@@ -439,16 +439,18 @@ mod tmp_disk {
 
         lazy_static! {
             static ref IO_URING: Arc<IoUring> = {
-                let ring = Arc::new(Builder::new().build(256).unwrap());
-                unsafe {
-                    ring.start_enter_syscall_thread();
-                }
-                async_rt::task::spawn({
+                let ring = Arc::new(
+                    Builder::new()
+                        .setup_sqpoll(Some(500 /* ms */))
+                        .build(256)
+                        .unwrap());
+                std::thread::spawn({
                     let ring = ring.clone();
-                    async move {
+                    move || {
                         loop {
-                            ring.poll_completions();
-                            async_rt::sched::yield_().await;
+                            let min_complete = 1;
+                            let polling_retries = 10000;
+                            ring.poll_completions(min_complete, polling_retries);
                         }
                     }
                 });

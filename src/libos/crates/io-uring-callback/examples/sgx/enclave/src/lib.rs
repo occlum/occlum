@@ -109,8 +109,10 @@ pub extern "C" fn run_sgx_example() -> sgx_status_t {
     // std::backtrace::enable_backtrace("enclave.signed.so", std::backtrace::PrintFormat::Full);
     println!("[ECALL] run_sgx_example");
 
-    let ring = Builder::new().build(256).unwrap();
-    unsafe { ring.start_enter_syscall_thread(); }
+    let ring = Builder::new()
+        .setup_sqpoll(Some(500/* ms */))
+        .build(256)
+        .unwrap();
 
     let socket_fd = {
         let socket_fd = unsafe { libc::ocall::socket(libc::AF_INET, libc::SOCK_STREAM, 0) };

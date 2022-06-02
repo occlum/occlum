@@ -58,7 +58,12 @@ async fn tcp_echo(port: u16) {
 }
 
 lazy_static! {
-    static ref RING: Arc<IoUring> = Arc::new(Builder::new().build(4096).unwrap());
+    static ref RING: Arc<IoUring> = Arc::new(
+        Builder::new()
+            .setup_sqpoll(Some(500/* ms */))
+            .build(4096)
+            .unwrap()
+        );
 }
 
 struct IoUringInstanceType {}
@@ -75,9 +80,6 @@ fn init_async_rt(parallelism: u32) {
     async_rt::config::set_parallelism(parallelism);
 
     let ring = RING.clone();
-    unsafe {
-        ring.start_enter_syscall_thread();
-    }
     let callback = move || {
         ring.trigger_callbacks();
     };

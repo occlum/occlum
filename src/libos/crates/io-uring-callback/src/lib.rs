@@ -43,7 +43,6 @@
 //! let handle = unsafe {
 //!     io_uring.write(fd, msg.as_ptr(), msg.len() as u32, 0, RwFlags::default(), completion_callback)
 //! };
-//! # io_uring.submit_requests();
 //! # while handle.retval().is_none() {
 //! #    io_uring.wait_completions(1);
 //! # }
@@ -52,14 +51,6 @@
 //! You have to two ways to get notified about the completion of I/O requests. The first
 //! is through the registered callback function and the second is by `await`ing the handle
 //! (which is a `Future`) obtained as a result of pushing I/O requests.
-//!
-//! After pushing a batch of I/O requests into the submission queue, you can now _submit_ them
-//! to the Linux kernel. Without an explict submit, Linux will not be aware of the new I/O requests.
-//! ```
-//! # use io_uring_callback::{Builder};
-//! # let io_uring = Builder::new().build(256).unwrap();
-//! io_uring.submit_requests();
-//! ```
 //!
 //! After completing the I/O requests, Linux will push I/O responses into the completion queue of
 //! the io_uring instance. You need _periodically_ poll completions from the queue:
@@ -107,7 +98,6 @@
 //! let handle = unsafe {
 //!     io_uring.timeout(&tp as *const _, 0, TimeoutFlags::empty(), completion_callback)
 //! };
-//! io_uring.submit_requests();
 //! unsafe { io_uring.cancel(&handle); }
 //! io_uring.wait_completions(1);
 //! ```
@@ -382,16 +372,6 @@ impl IoUring {
         self.push_entry(entry, callback)
     }
 
-    /// Submit all I/O requests in the submission queue of io_uring.
-    ///
-    /// Without calling this method, new I/O requests pushed into the submission queue will
-    /// not get popped by Linux kernel.
-    pub fn submit_requests(&self) {
-        if let Err(e) = self.ring.submit() {
-            panic!("submit failed, error: {}", e);
-        }
-    }
-
     /// Poll new I/O completions in the completions queue of io_uring
     /// and return the number of I/O completions.
     ///
@@ -449,31 +429,8 @@ impl IoUring {
         self.poll_completions(min_complete, 10)
     }
 
-    /// Start a helper thread that is busy doing `io_uring_enter` on this io_uring instance.
-    ///
-    /// # Why a helper thread?
-    ///
-    /// The io_uring implementation on the latest Linux kernel only has a limited (even buggy)
-    /// support for kernel-polling mode. To address this limitation, we simulate the kernel-polling
-    /// mode in the user space by starting a helper thread that keeps entering into the kernel
-    /// and polling I/O requests from the submission queue of the io_uring instance.
-    ///
-    /// While the helper thread comes with a performance cost, we believe it is acceptable as a
-    /// short-term workaround. We expect the io_uring implementation in Linux kernel to become mature
-    /// in the near future.
-    ///
-    /// # Safety
-    ///
-    /// This API is _unsafe_ due to the fact that the thread has no idea when the io_uring instance
-    /// is destroyed, thus invalidating the file descriptor of io_uring that is still in use by the thread.
-    /// This unexpected invalidation is---in most cases---harmless. This is because an io_uring
-    /// instance is most likely used as a singleton in a process and will not get destroyed until
-    /// the end of the process.
-    pub unsafe fn start_enter_syscall_thread(&self) {
-        self.ring.start_enter_syscall_thread();
-    }
-
     unsafe fn push(&self, entry: SqEntry) {
+        // Push the entry into the submission queue
         loop {
             if self.ring.submission().push(entry.clone()).is_err() {
                 if self.ring.enter(1, 1, 0, None).is_err() {
@@ -482,6 +439,11 @@ impl IoUring {
             } else {
                 break;
             }
+        }
+
+        // Make sure Linux is aware of the new submission
+        if let Err(e) = self.ring.submit() {
+            panic!("submit failed, error: {}", e);
         }
     }
 
@@ -624,7 +586,6 @@ mod tests {
                 complete_fn,
             )
         };
-        io_uring.submit_requests();
 
         io_uring.wait_completions(1);
         let retval = handle.retval().unwrap();
@@ -641,7 +602,6 @@ mod tests {
                 complete_fn,
             )
         };
-        io_uring.submit_requests();
 
         io_uring.wait_completions(1);
         let retval = handle.retval().unwrap();
@@ -662,7 +622,6 @@ mod tests {
 
         let complete_fn = move |_retval: i32| {};
         let handle = unsafe { io_uring.poll(Fd(fd.as_raw_fd()), libc::POLLIN as _, complete_fn) };
-        io_uring.submit_requests();
 
         thread::sleep(Duration::from_millis(100));
         assert_eq!(io_uring.poll_completions(0, 10000), 0);
@@ -685,12 +644,10 @@ mod tests {
         let complete_fn = move |_retval: i32| {};
         let poll_handle =
             unsafe { io_uring.poll(Fd(fd.as_raw_fd()), libc::POLLIN as _, complete_fn) };
-        io_uring.submit_requests();
 
         unsafe {
             io_uring.cancel(&poll_handle);
         }
-        io_uring.submit_requests();
 
         thread::sleep(Duration::from_millis(100));
 
@@ -713,7 +670,6 @@ mod tests {
         let complete_fn = move |_retval: i32| {};
         let poll_handle =
             unsafe { io_uring.poll(Fd(fd.as_raw_fd()), libc::POLLIN as _, complete_fn) };
-        io_uring.submit_requests();
 
         fd.write(&0x1u64.to_ne_bytes()).unwrap();
         io_uring.wait_completions(1);
@@ -721,7 +677,6 @@ mod tests {
         unsafe {
             io_uring.cancel(&poll_handle);
         }
-        io_uring.submit_requests();
 
         thread::sleep(Duration::from_millis(100));
         assert_eq!(poll_handle.retval().unwrap(), 1);
@@ -747,7 +702,6 @@ mod tests {
                 complete_fn,
             )
         };
-        io_uring.submit_requests();
         io_uring.wait_completions(1);
 
         assert_eq!(handle.retval().unwrap(), -libc::ETIME);
@@ -775,12 +729,10 @@ mod tests {
                 complete_fn,
             )
         };
-        io_uring.submit_requests();
 
         unsafe {
             io_uring.cancel(&handle);
         }
-        io_uring.submit_requests();
 
         io_uring.wait_completions(1);
 

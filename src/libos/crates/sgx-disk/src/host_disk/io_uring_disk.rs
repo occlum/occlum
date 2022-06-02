@@ -443,10 +443,11 @@ mod test {
 
         lazy_static! {
             static ref IO_URING: Arc<IoUring> = {
-                let ring = Arc::new(Builder::new().build(256).unwrap());
-                unsafe {
-                    ring.start_enter_syscall_thread();
-                }
+                let ring = Arc::new(
+                    Builder::new()
+                        .setup_sqpoll(Some(500/* ms */))
+                        .build(256)
+                        .unwrap());
                 std::thread::spawn({
                     let ring = ring.clone();
                     move || loop {

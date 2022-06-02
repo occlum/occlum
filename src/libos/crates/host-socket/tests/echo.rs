@@ -97,9 +97,6 @@ mod runtime {
                 async_rt::config::set_parallelism(parallelism);
 
                 let ring = Self::io_uring();
-                unsafe {
-                    ring.start_enter_syscall_thread();
-                }
                 std::thread::spawn(move || loop {
                     ring.poll_completions(1, 5000);
                 });
@@ -108,7 +105,10 @@ mod runtime {
     }
 
     lazy_static::lazy_static! {
-        static ref IO_URING: IoUring = IoUringBuilder::new().build(4096).unwrap();
+        static ref IO_URING: IoUring = IoUringBuilder::new()
+            .setup_sqpoll(Some(500/* ms */))
+            .build(4096)
+            .unwrap();
     }
 
     impl Runtime for SocketRuntime {

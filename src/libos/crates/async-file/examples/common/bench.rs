@@ -204,9 +204,6 @@ fn init_async_rt() {
     async_rt::config::set_parallelism(1);
 
     let ring = &runtime::RING;
-    unsafe {
-        ring.start_enter_syscall_thread();
-    }
     let callback = move || {
         ring.trigger_callbacks();
     };
