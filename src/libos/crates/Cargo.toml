@@ -13,18 +13,22 @@ members = [
     "object-id",
     "sgx-disk",
     "sgx-untrusted-alloc",
-    "vdso-time",
+    "vdso-time"
 ]
 
 # Default members can run on Linux; non-default members can only run inside SGX.
 default-members = [
     "async-rt",
+    "async-io",
+    "block-device",
+    "host-socket",
     "inherit-methods-macro",
     "io-uring-callback",
     "keyable-arc",
     "new-self-ref-arc",
-    "vdso-time",
-    "host-socket"
+    "object-id",
+    "sgx-disk",
+    "vdso-time"
 ]
 
 exclude = [ 
