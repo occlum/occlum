@@ -74,6 +74,9 @@ impl Executor {
 
         self.parks.register(thread_id);
 
+        // The max number of dequeue retries before go to sleep
+        const MAX_DEQUEUE_RETRIES: usize = 5000;
+        let mut dequeue_retries = 0;
         loop {
             let task_option = self.scheduler.dequeue_task(thread_id);
 
@@ -87,11 +90,18 @@ impl Executor {
 
             match task_option {
                 Some(task) => {
-                    task.reset_enqueued();
+                    dequeue_retries = 0;
 
+                    task.reset_enqueued();
                     self.execute_task(task)
                 }
-                None => self.parks.park(),
+                None => {
+                    dequeue_retries += 1;
+                    if dequeue_retries >= MAX_DEQUEUE_RETRIES {
+                        self.parks.park();
+                        dequeue_retries = 0;
+                    }
+                }
             }
         }
     }
