@@ -61,7 +61,7 @@ pub async fn do_umask(mask: u16) -> Result<isize> {
 }
 
 pub async fn do_close(fd: FileDesc) -> Result<isize> {
-    file_ops::do_close(fd)?;
+    file_ops::do_close(fd).await?;
     Ok(0)
 }
 
