@@ -1,8 +1,8 @@
 #! /bin/bash
 set -xe
 
-if [[ $1 != "ubuntu18.04" && $1 != "centos8.2" ]]; then
-    echo "Must choose between <ubuntu18.04/centos8.2>."
+if [[ $1 != "ubuntu20.04" ]]; then
+    echo "Only ubuntu20.04 is supported."
     exit 1
 fi
 
