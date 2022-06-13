@@ -1,7 +1,8 @@
-use block_device::{BioReq, BioSubmission, BioType, BlockDevice};
+use block_device::{BioReq, BioSubmission, BioType, BlockBuf, BlockDevice};
 use fs::File;
 use std::io::prelude::*;
 use std::io::{IoSlice, IoSliceMut, SeekFrom};
+use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 
 use super::OpenOptions;
@@ -20,7 +21,7 @@ use crate::HostDisk;
 /// It is recommended to use `IoUringDisk` for an optimal performance.
 #[derive(Debug)]
 pub struct SyncIoDisk {
-    file: Mutex<File>,
+    file: File,
     path: PathBuf,
     total_blocks: usize,
     can_read: bool,
@@ -33,23 +34,10 @@ impl SyncIoDisk {
             return Err(errno!(EACCES, "read is not allowed"));
         }
 
+        let fd = self.file.as_raw_fd();
         let (offset, _) = self.get_range_in_bytes(&req)?;
 
-        let mut file = self.file.lock().unwrap();
-        file.seek(SeekFrom::Start(offset as u64))?;
-        let read_len = req.access_mut_bufs_with(|bufs| {
-            let mut slices: Vec<IoSliceMut<'_>> = bufs
-                .iter_mut()
-                .map(|buf| IoSliceMut::new(buf.as_slice_mut()))
-                .collect();
-
-            // TODO: fix this limitation
-            const LINUX_IOVS_MAX: usize = 1024;
-            debug_assert!(slices.len() < LINUX_IOVS_MAX);
-
-            file.read_vectored(&mut slices)
-        })?;
-        drop(file);
+        let read_len = req.access_mut_bufs_with(|bufs| self.preadv(fd, bufs, offset as i64))?;
 
         debug_assert!(read_len / BLOCK_SIZE == req.num_blocks());
         Ok(())
@@ -60,23 +48,10 @@ impl SyncIoDisk {
             return Err(errno!(EACCES, "write is not allowed"));
         }
 
+        let fd = self.file.as_raw_fd();
         let (offset, _) = self.get_range_in_bytes(&req)?;
 
-        let mut file = self.file.lock().unwrap();
-        file.seek(SeekFrom::Start(offset as u64))?;
-        let write_len = req.access_bufs_with(|bufs| {
-            let slices: Vec<IoSlice<'_>> = bufs
-                .iter()
-                .map(|buf| IoSlice::new(buf.as_slice()))
-                .collect();
-
-            // TODO: fix this limitation
-            const LINUX_IOVS_MAX: usize = 1024;
-            debug_assert!(slices.len() < LINUX_IOVS_MAX);
-
-            file.write_vectored(&slices)
-        })?;
-        drop(file);
+        let write_len = req.access_bufs_with(|bufs| self.pwritev(fd, bufs, offset as i64))?;
 
         debug_assert!(write_len / BLOCK_SIZE == req.num_blocks());
         Ok(())
@@ -87,9 +62,7 @@ impl SyncIoDisk {
             return Err(errno!(EACCES, "flush is not allowed"));
         }
 
-        let file = self.file.lock().unwrap();
-        file.sync_data()?;
-        drop(file);
+        self.file.sync_data()?;
 
         Ok(())
     }
@@ -103,6 +76,85 @@ impl SyncIoDisk {
         let begin_offset = begin_block * BLOCK_SIZE;
         let end_offset = end_block * BLOCK_SIZE;
         Ok((begin_offset, end_offset))
+    }
+
+    fn preadv(&self, fd: i32, bufs: &mut [BlockBuf], offset: i64) -> Result<usize> {
+        let mut total_len = 0;
+
+        let iovecs: Box<Vec<libc::iovec>> = Box::new(
+            bufs.iter_mut()
+                .map(|buf| {
+                    let iov_base = buf.as_slice_mut().as_mut_ptr();
+                    let iov_len = buf.as_slice().len();
+                    total_len += iov_len;
+                    libc::iovec {
+                        iov_base: iov_base as _,
+                        iov_len,
+                    }
+                })
+                .collect(),
+        );
+        let (iovecs_ptr, iovecs_len) =
+            { (iovecs.as_ptr() as *const libc::iovec, iovecs.len() as i32) };
+
+        let read_len = unsafe {
+            #[cfg(not(feature = "sgx"))]
+            let read_len = libc::preadv64(fd, iovecs_ptr, iovecs_len, offset);
+            #[cfg(feature = "sgx")]
+            let read_len = libc::ocall::preadv64(fd, iovecs_ptr, iovecs_len, offset);
+            read_len
+        };
+
+        if read_len < 0 {
+            return_errno!(Errno::from(libc_errno() as u32), "libc::preadv64 error");
+        }
+        // Partial reads are unlikely to happen since buffers and offset are all within legal range
+        // of the host file (file size is truncated to size of total blocks when created)
+        assert!(
+            read_len == total_len as isize,
+            "libc::preadv64 return wrong read length"
+        );
+
+        Ok(read_len as usize)
+    }
+
+    fn pwritev(&self, fd: i32, bufs: &[BlockBuf], offset: i64) -> Result<usize> {
+        let mut total_len = 0;
+
+        let iovecs: Box<Vec<libc::iovec>> = Box::new(
+            bufs.iter()
+                .map(|buf| {
+                    let iov_base = buf.as_slice().as_ptr();
+                    let iov_len = buf.as_slice().len();
+                    total_len += iov_len;
+                    libc::iovec {
+                        iov_base: iov_base as _,
+                        iov_len,
+                    }
+                })
+                .collect(),
+        );
+        let (iovecs_ptr, iovecs_len) =
+            { (iovecs.as_ptr() as *const libc::iovec, iovecs.len() as i32) };
+
+        let write_len = unsafe {
+            #[cfg(not(feature = "sgx"))]
+            let write_len = libc::pwritev64(fd, iovecs_ptr, iovecs_len, offset);
+            #[cfg(feature = "sgx")]
+            let write_len = libc::ocall::pwritev64(fd, iovecs_ptr, iovecs_len, offset);
+            write_len
+        };
+
+        if write_len < 0 {
+            return_errno!(Errno::from(libc_errno() as u32), "libc::pwritev64 error");
+        }
+        // Partial writes are unlikely to happen, same as preadv
+        assert!(
+            write_len == total_len as isize,
+            "libc::pwritev64 return wrong write length"
+        );
+
+        Ok(write_len as usize)
     }
 }
 
@@ -144,7 +196,7 @@ impl HostDisk for SyncIoDisk {
         let can_write = options.write;
         let path = path.to_owned();
         let new_self = Self {
-            file: Mutex::new(file),
+            file,
             path,
             total_blocks,
             can_read,
@@ -163,6 +215,16 @@ impl Drop for SyncIoDisk {
         // Ensure all data are peristed before the disk is dropped
         let _ = self.do_flush();
     }
+}
+
+#[cfg(not(feature = "sgx"))]
+fn libc_errno() -> i32 {
+    unsafe { *(libc::__errno_location()) }
+}
+
+#[cfg(feature = "sgx")]
+fn libc_errno() -> i32 {
+    libc::errno()
 }
 
 #[cfg(test)]
