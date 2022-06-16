@@ -18,36 +18,45 @@ pub async fn do_sendfile(
         .as_inode_file()
         .ok_or_else(|| errno!(EINVAL, "not an inode"))?;
     let out_file = current.file(out_fd)?;
-    let mut buffer: [u8; 0x1000] = unsafe { MaybeUninit::uninit().assume_init() };
+    let mut buffer: [u8; 1024 * 11] = unsafe { MaybeUninit::uninit().assume_init() };
 
     let mut read_offset = match offset {
         Some(offset) => offset as usize,
         None => in_inode_file.position(),
     };
+
     // read from specified offset and write new offset back
-    let mut bytes_read = 0;
-    let mut bytes_write = 0;
-    while bytes_read < count {
-        let len = buffer.len().min(count - bytes_read);
-        let read_len = in_inode_file.read_at(read_offset, &mut buffer[..len])?;
-        if read_len == 0 {
-            break;
-        }
-        bytes_read += read_len;
-        let write_len = out_file.write(&buffer[..read_len]).await?;
-        bytes_write += write_len;
-        // read_offset should be updated based on write length, because the write length could be smaller than read length.
-        // For socket send/write, there is no guarantee that the actual send number is equal to the requested number.
-        read_offset += write_len;
-        if write_len != read_len {
-            break;
+    let mut bytes_sent = 0;
+    let mut send_error = None;
+    while bytes_sent < count {
+        let len = min(buffer.len(), count - bytes_sent);
+
+        match in_inode_file.read_at(read_offset, &mut buffer[..len]) {
+            Ok(read_len) if read_len > 0 => match out_file.write(&buffer[..read_len]).await {
+                Ok(write_len) => {
+                    bytes_sent += write_len;
+                    read_offset += write_len;
+                }
+                Err(e) => {
+                    send_error = Some(e);
+                    break;
+                }
+            },
+            Ok(..) => break,
+            Err(e) => {
+                send_error = Some(e);
+                break;
+            }
         }
     }
 
-    // If offset is not none, does not modify file offset of in_fd;
-    // otherwise the file offset is adjusted to reflect the number of bytes read
     if offset.is_none() {
-        in_inode_file.seek(SeekFrom::Current((bytes_write) as i64))?;
+        in_inode_file.seek(SeekFrom::Current(bytes_sent as i64))?;
     }
-    Ok((bytes_write, read_offset))
+
+    if bytes_sent > 0 {
+        Ok((bytes_sent, read_offset))
+    } else {
+        send_error.map_or_else(|| Ok((0, read_offset)), |e| Err(e))
+    }
 }

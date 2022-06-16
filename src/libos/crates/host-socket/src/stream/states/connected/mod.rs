@@ -7,8 +7,8 @@ use crate::runtime::Runtime;
 mod recv;
 mod send;
 
-pub const SEND_BUF_SIZE: usize = 32 * 1024;
-pub const RECV_BUF_SIZE: usize = 32 * 1024;
+pub const SEND_BUF_SIZE: usize = 128 * 1024;
+pub const RECV_BUF_SIZE: usize = 128 * 1024;
 
 pub struct ConnectedStream<A: Addr + 'static, R: Runtime> {
     common: Arc<Common<A, R>>,
