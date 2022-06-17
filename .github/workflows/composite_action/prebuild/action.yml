@@ -1,0 +1,22 @@
+name: 'Occlum composite action for pre-build'
+description: 'Prepare environment before build Occlum'
+inputs:
+  container-name:
+    description: 'Occlum container name'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: work around permission issue
+      run: |
+        docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum";
+        docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/grpc-rust";
+        docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/itoa-sgx";
+        docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/resolv-conf";
+        docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/ringbuf";
+        docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/rust-sgx-sdk";
+        docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/sefs";
+        docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/serde-json-sgx";
+        docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/serde-sgx"
+      shell: bash

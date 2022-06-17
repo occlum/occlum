@@ -419,6 +419,10 @@ jobs:
         fi;
         echo "python_musl_support_test=$python_musl_support_test" >> $GITHUB_ENV
 
+    - uses: ./.github/workflows/composite_action/prebuild
+      with:
+        container-name: $python_musl_support_test
+
     - name: Configure dependency source
       run: |
         docker exec $python_musl_support_test bash -c "cat <<- EOF >/root/.cargo/config
@@ -484,6 +488,10 @@ jobs:
         fi;
         echo "openvino_test=$openvino_test" >> $GITHUB_ENV
 
+    - uses: ./.github/workflows/composite_action/prebuild
+      with:
+        container-name: $openvino_test
+
     - name: Configure dependency source
       run: |
         docker exec $openvino_test bash -c "cat <<- EOF >/root/.cargo/config
@@ -545,6 +553,10 @@ jobs:
           echo "Unsupported Hardware"
         fi;
         echo "grpc_test=$grpc_test" >> $GITHUB_ENV
+
+    - uses: ./.github/workflows/composite_action/prebuild
+      with:
+        container-name: $grpc_test
 
     - name: Change download source of crates.io
       run: |
@@ -629,6 +641,10 @@ jobs:
           echo "Unsupported Hardware"
         fi;
         echo "gvisor_test=$gvisor_test" >> $GITHUB_ENV
+
+    - uses: ./.github/workflows/composite_action/prebuild
+      with:
+        container-name: $gvisor_test
 
     - name: Change download source of crates.io
       run: |
@@ -771,6 +787,10 @@ jobs:
           echo "Unsupported Hardware"
         fi;
         echo "tf_serving_test=$tf_serving_test" >> $GITHUB_ENV
+
+    - uses: ./.github/workflows/composite_action/prebuild
+      with:
+        container-name: $tf_serving_test
 
     - name: Change download source of crates.io
       run: |

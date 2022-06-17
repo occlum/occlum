@@ -315,6 +315,10 @@ jobs:
     - name: Create container
       run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc
 
+    - uses: ./.github/workflows/composite_action/prebuild
+      with:
+        container-name: ${{ github.job }}
+
     - name: Build dependencies
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum; make submodule"
 
@@ -342,6 +346,10 @@ jobs:
 
     - name: Create container
       run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc
+
+    - uses: ./.github/workflows/composite_action/prebuild
+      with:
+        container-name: ${{ github.job }}
 
     - name: Build dependencies
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum; make submodule"
@@ -405,6 +413,10 @@ jobs:
     - name: Create container
       run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-openvino
 
+    - uses: ./.github/workflows/composite_action/prebuild
+      with:
+        container-name: ${{ github.job }}
+
     - name: Build dependencies
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum; make submodule"
 
@@ -424,6 +436,10 @@ jobs:
         submodules: true
     - name: Create container
       run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-python
+
+    - uses: ./.github/workflows/composite_action/prebuild
+      with:
+        container-name: ${{ github.job }}
 
     - name: Build dependencies
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum; make submodule"
@@ -663,6 +679,10 @@ jobs:
         docker pull occlumbackup/occlum:latest-ubuntu20.04-gvisor_test
         gvisor_test=$(docker run -itd -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-gvisor_test);
         echo "gvisor_test=$gvisor_test" >> $GITHUB_ENV
+
+    - uses: ./.github/workflows/composite_action/prebuild
+      with:
+        container-name: $gvisor_test
 
     - name: Build dependencies
       run: docker exec $gvisor_test bash -c "cd /root/occlum; make submodule"
