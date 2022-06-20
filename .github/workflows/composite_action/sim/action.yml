@@ -32,6 +32,10 @@ runs:
       run: docker run -itd ${{ inputs.container-flags }} --name=${{ inputs.container-name }} -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }}
       shell: bash
 
+    - uses: ./.github/workflows/composite_action/prebuild
+      with:
+        container-name: ${{ inputs.container-name }}
+
     - name: Build dependencies
       run: docker exec ${{ inputs.container-name }} bash -c "cd /root/occlum; make submodule"
       shell: bash

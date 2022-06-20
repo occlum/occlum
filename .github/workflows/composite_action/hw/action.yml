@@ -60,6 +60,10 @@ runs:
         docker exec ${{ env.CONTAINER_NAME }} bash -c "git config --global https.proxy socks5://localhost:5432"
       shell: bash
 
+    - uses: ./.github/workflows/composite_action/prebuild
+      with:
+        container-name: ${{ env.CONTAINER_NAME }}
+
     - name: Build dependencies
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
       shell: bash
