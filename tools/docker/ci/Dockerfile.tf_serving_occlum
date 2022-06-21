@@ -10,7 +10,7 @@ COPY --from=binary_build /root/tensorflow_model_server /root/tensorflow_model_se
 
 ARG OCCLUM_BRANCH
 RUN apt-get update && apt-get install git && \
-    git clone -b $OCCLUM_BRANCH git://github.com/occlum/occlum.git && \
+    git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum.git && \
     cd occlum && \
     cd demos/tensorflow/tensorflow_serving && \
     ./prepare_model_and_env.sh && \
