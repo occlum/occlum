@@ -161,7 +161,7 @@ int occlum_pal_exec(struct occlum_pal_exec_args *args);
 int occlum_pal_kill(int pid, int sig);
 
 /*
- * @brief Destroy teh Occlum enclave
+ * @brief Destroy the Occlum enclave
  *
  * @retval if 0, then success; otherwise, check errno for the exact error type.
  */
