@@ -11,7 +11,7 @@ use grpc::prelude::*;
 use grpc::ClientConf;
 use occlum_exec::occlum_exec::HealthCheckRequest;
 use occlum_exec::occlum_exec_grpc::{OcclumExecClient, OcclumExecServer};
-use occlum_exec::server::OcclumExecImpl;
+use occlum_exec::server::{OcclumExecImpl, ServerStatus};
 use occlum_exec::DEFAULT_SOCK_FILE;
 use std::env;
 use std::ffi::{CStr, OsString};
@@ -20,7 +20,7 @@ use std::path::Path;
 use std::sync::{Arc, Condvar, Mutex};
 
 //Checks the server status, if the server is running return true, else recover the socket file and return false.
-fn check_server_status(sock_file: &str) -> bool {
+fn is_server_running(sock_file: &str) -> bool {
     if let Err(e) = std::fs::File::open(sock_file) {
         debug!("failed to open the sock_file {:?}", e);
 
@@ -53,7 +53,7 @@ fn check_server_status(sock_file: &str) -> bool {
     }
 }
 
-fn main() {
+fn main() -> Result<(), i32> {
     let matches = App::new("Occlum_server")
         .version("0.1.0")
         .arg(
@@ -71,15 +71,15 @@ fn main() {
     assert!(env::set_current_dir(&instance_dir).is_ok());
 
     //If the server already startted, then return
-    if check_server_status(DEFAULT_SOCK_FILE) {
+    if is_server_running(DEFAULT_SOCK_FILE) {
         println!("server stared");
-        return;
+        return Ok(());
     }
 
-    let server_stopped = Arc::new((Mutex::new(true), Condvar::new()));
+    let server_status = Arc::new((Mutex::new(ServerStatus::default()), Condvar::new()));
 
     let service_def = OcclumExecServer::new_service_def(
-        OcclumExecImpl::new_and_save_execution_lock(server_stopped.clone()),
+        OcclumExecImpl::new_and_save_execution_lock(server_status.clone()),
     );
     let mut server_builder = grpc::ServerBuilder::new_plain();
     server_builder.add_service(service_def);
@@ -87,23 +87,33 @@ fn main() {
         Ok(_) => {}
         Err(e) => {
             debug!("{:?}", e);
-            return;
+            return Err(-1);
         }
     };
 
     if let Ok(server) = server_builder.build() {
-        rust_occlum_pal_init().expect("Occlum image initialization failed");
+        if let Err(_) = rust_occlum_pal_init() {
+            let (status, _) = &*server_status;
+            status.lock().unwrap().set_error();
+            return Err(-1);
+        }
         //server is running
         println!("server stared on addr {}", server.local_addr());
-        let (lock, cvar) = &*server_stopped;
-        let mut server_stopped = lock.lock().unwrap();
-        *server_stopped = false;
-        while !*server_stopped {
-            server_stopped = cvar.wait(server_stopped).unwrap();
+        let (lock, cvar) = &*server_status;
+        let mut status = lock.lock().unwrap();
+        // *server_stopped = false;
+        status.set_running();
+        while status.is_running() {
+            status = cvar.wait(status).unwrap();
         }
-        rust_occlum_pal_destroy().expect("Destory occlum image failed");
+        rust_occlum_pal_destroy()?;
         println!("server stopped");
+    } else {
+        println!("server build failed");
+        return Err(-1);
     }
+
+    Ok(())
 }
 
 extern "C" {
