@@ -116,6 +116,7 @@ fn exec_command(
 /// Starts the server if the server is not running
 fn start_server(client: &OcclumExecClient, server_name: &str) -> Result<u32, String> {
     let mut server_launched = false;
+    let mut child = None;
 
     loop {
         let resp = executor::block_on(
@@ -149,15 +150,18 @@ fn start_server(client: &OcclumExecClient, server_name: &str) -> Result<u32, Str
                         Err(_r) => {
                             return Err("Failed to launch server".to_string());
                         }
-                        Ok(_r) => {
+                        Ok(ret_child) => {
                             server_launched = true;
-
+                            child = Some(ret_child);
                             //wait server 10 millis
                             thread::sleep(time::Duration::from_millis(100));
                             continue;
                         }
                     };
                 } else {
+                    if let Some(mut child) = child {
+                        let _ = child.wait();
+                    }
                     return Err("Failed to launch server".to_string());
                 }
             }

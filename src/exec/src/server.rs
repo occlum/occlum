@@ -22,16 +22,56 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use timer::{Guard, Timer};
 
+pub enum ServerStatus {
+    Stopped,
+    Running,
+    Error,
+}
+
+impl Default for ServerStatus {
+    fn default() -> Self {
+        Self::Stopped
+    }
+}
+
+impl ServerStatus {
+    pub fn set_error(&mut self) {
+        *self = Self::Error
+    }
+
+    pub fn set_running(&mut self) {
+        *self = Self::Running
+    }
+
+    fn set_stopped(&mut self) {
+        *self = Self::Stopped
+    }
+
+    pub fn is_running(&self) -> bool {
+        matches!(self, Self::Running)
+    }
+
+    fn is_error(&self) -> bool {
+        matches!(self, Self::Error)
+    }
+
+    fn is_stopped(&self) -> bool {
+        matches!(self, Self::Stopped)
+    }
+}
+
 #[derive(Default)]
 pub struct OcclumExecImpl {
     //process_id, return value, execution status
     commands: Arc<Mutex<HashMap<i32, (Option<i32>, bool)>>>,
-    execution_lock: Arc<(Mutex<bool>, Condvar)>,
+    execution_lock: Arc<(Mutex<ServerStatus>, Condvar)>,
     stop_timer: Arc<Mutex<Option<(Timer, Guard)>>>,
 }
 
 impl OcclumExecImpl {
-    pub fn new_and_save_execution_lock(lock: Arc<(Mutex<bool>, Condvar)>) -> OcclumExecImpl {
+    pub fn new_and_save_execution_lock(
+        lock: Arc<(Mutex<ServerStatus>, Condvar)>,
+    ) -> OcclumExecImpl {
         OcclumExecImpl {
             commands: Default::default(),
             execution_lock: lock,
@@ -111,8 +151,7 @@ impl OcclumExec for OcclumExecImpl {
                 warn!("SIGKILL failed.")
             }
             let (execution_lock, cvar) = &*lock;
-            let mut server_stopped = execution_lock.lock().unwrap();
-            *server_stopped = true;
+            execution_lock.lock().unwrap().set_stopped();
             cvar.notify_one();
         });
 
@@ -132,13 +171,18 @@ impl OcclumExec for OcclumExecImpl {
         *self.stop_timer.lock().unwrap() = None;
 
         //Waits for the Occlum loaded
-        let (lock, _) = &*self.execution_lock.clone();
+        let (status, _) = &*self.execution_lock.clone();
         loop {
-            let server_stopped = lock.lock().unwrap();
-            if *server_stopped {
-                drop(server_stopped);
+            let server_status = status.lock().unwrap();
+            if server_status.is_stopped() {
+                drop(server_status);
                 continue;
             }
+
+            if server_status.is_error() {
+                return Err(grpc::Error::Other("server error"));
+            }
+
             break;
         }
 
