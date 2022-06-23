@@ -7,6 +7,7 @@ ifeq ($(SGX_MODE), HW)
 	LIBOCCLUM_PAL_SO_REAL := $(BUILD_DIR)/lib/libocclum-pal.so.$(VERSION_NUM)
 else ifeq ($(SGX_MODE), HYPER)
 	LIBOCCLUM_PAL_SO_REAL := $(BUILD_DIR)/lib/libocclum-pal_hyper.so.$(VERSION_NUM)
+	OCCLUM_DISABLE_DCAP := 1
 else
 	LIBOCCLUM_PAL_SO_REAL := $(BUILD_DIR)/lib/libocclum-pal_sim.so.$(VERSION_NUM)
 endif
