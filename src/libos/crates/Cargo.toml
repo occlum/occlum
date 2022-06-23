@@ -3,6 +3,7 @@
 members = [
     "async-rt",
     "async-io",
+    "async-sfs",
     "async-vfs",
     "block-device",
     "inherit-methods-macro",
@@ -22,6 +23,7 @@ members = [
 default-members = [
     "async-rt",
     "async-io",
+    "async-sfs",
     "async-vfs",
     "block-device",
     "host-socket",
