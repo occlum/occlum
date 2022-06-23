@@ -147,7 +147,7 @@ use downcast_rs::{impl_downcast, Downcast};
 /// let dummy : Box<dyn IoctlCmd> = Box::new(DummyCmd);
 /// assert!(dummy.downcast_ref::<DummyCmd>().is_some());
 /// ```
-pub trait IoctlCmd: Downcast + Debug {}
+pub trait IoctlCmd: Downcast + Debug + Sync + Send {}
 impl_downcast!(IoctlCmd);
 
 /// A convenient macro to define a struct for some type of ioctl command.

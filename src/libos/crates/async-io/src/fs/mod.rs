@@ -4,8 +4,8 @@ mod mount_flags;
 mod stat_buf;
 
 pub use rcore_fs::vfs::{
-    DirentWriter, DirentWriterContext, FallocateMode, FileSystem, FileType, FsError, FsInfo, INode,
-    Metadata, Timespec, PATH_MAX,
+    AnyExt, DirentWriter, DirentWriterContext, Extension, FallocateMode, FileSystem, FileType,
+    FsError, FsInfo, INode, Metadata, Timespec, PATH_MAX,
 };
 
 pub use self::fallocate_flags::FallocateFlags;

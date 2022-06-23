@@ -69,7 +69,7 @@ impl<'a, T: Dirent> DirentWriter for DirentBufWriter<'a, T> {
     }
 }
 
-trait Dirent {
+trait Dirent: Sync + Send {
     fn new(name: &str, ino: u64, type_: FileType) -> Self;
     fn rec_len(&self) -> usize;
     fn dump(&self, buf: &mut [u8], name: &str, type_: FileType) -> Result<()>;
