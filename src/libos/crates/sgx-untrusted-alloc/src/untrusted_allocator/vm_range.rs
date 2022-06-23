@@ -53,7 +53,7 @@ impl VMRange {
     }
 
     pub fn set_start(&mut self, new_start: usize) {
-        debug_assert!(new_start % PAGE_SIZE == 0 && new_start <= self.end);
+        debug_assert!(new_start <= self.end);
         self.start = new_start;
     }
 
