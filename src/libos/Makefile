@@ -51,6 +51,7 @@ ifeq ($(SGX_MODE), HW)
 else ifeq ($(SGX_MODE), HYPER)
 	LIBOS_CORE_LIB_NAME := occlum-libos-core_hyper
 	LIBOS_SO_REAL := $(BUILD_DIR)/lib/libocclum-libos_hyper.so.$(VERSION_NUM)
+	OCCLUM_DISABLE_DCAP := 1
 else
 	LIBOS_CORE_LIB_NAME := occlum-libos-core_sim
 	LIBOS_SO_REAL := $(BUILD_DIR)/lib/libocclum-libos_sim.so.$(VERSION_NUM)
