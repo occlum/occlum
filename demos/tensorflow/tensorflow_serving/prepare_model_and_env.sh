@@ -1,6 +1,10 @@
+#!/bin/bash
+
+set -e
+
 apt-get update
 apt install -y python3-pip 
 pip3 install --upgrade pip
-pip3 install --upgrade tensorflow==2.4
+pip3 install --upgrade tensorflow==2.4 protobuf==3.19.2
 ./download_model.sh
 python3 ./model_graph_to_saved_model.py --import_path ./models/resnet50-v15-fp32/resnet50-v15-fp32.pb --export_dir ./resnet50-v15-fp32 --model_version 1 --inputs input --outputs predict
