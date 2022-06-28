@@ -1,3 +1,6 @@
+
+set -e
+
 cur_dir=`pwd -P`
 models_abs_dir=${cur_dir}/models
 mkdir ${models_abs_dir}
