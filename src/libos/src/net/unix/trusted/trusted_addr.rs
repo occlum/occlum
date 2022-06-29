@@ -33,9 +33,9 @@ impl TrustedAddr {
         if let UnixAddr::Pathname(path) = &self.unix_addr {
             let inode_num = {
                 let current = current!();
-                let fs = current.fs().read().unwrap();
-                let file_ref = fs
-                    .open_file(
+                let fs = current.fs();
+                let inode_file = fs
+                    .open_file_sync(
                         &FsPath::try_from(path.as_ref())?,
                         (CreationFlags::O_CREAT | CreationFlags::O_EXCL).bits(),
                         FileMode::from_bits(0o777).unwrap(),
@@ -47,7 +47,7 @@ impl TrustedAddr {
                             e
                         }
                     })?;
-                file_ref.inode().metadata()?.inode
+                inode_file.inode().metadata()?.inode
             };
             self.inode = Some(inode_num);
         }
@@ -58,9 +58,9 @@ impl TrustedAddr {
         if let UnixAddr::Pathname(path) = &self.unix_addr {
             let (dir_inode, sock_name) = {
                 let current = current!();
-                let fs = current.fs().read().unwrap();
+                let fs = current.fs();
                 let path = FsPath::try_from(path.as_ref())?;
-                fs.lookup_dirinode_and_basename(&path)?
+                fs.lookup_dirinode_and_basename_sync(&path)?
             };
 
             if !dir_inode.allow_write()? {

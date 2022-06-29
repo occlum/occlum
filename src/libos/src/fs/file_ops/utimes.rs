@@ -83,7 +83,7 @@ fn timespec_valid(time: timespec_t) -> bool {
     }
 }
 
-pub fn do_utimes_fd(fd: FileDesc, atime: Utime, mtime: Utime, flags: i32) -> Result<isize> {
+pub async fn do_utimes_fd(fd: FileDesc, atime: Utime, mtime: Utime, flags: i32) -> Result<()> {
     debug!(
         "utimes_fd: fd: {:?}, atime: {:?}, mtime: {:?}, flags: {:?}",
         fd, atime, mtime, flags
@@ -94,27 +94,39 @@ pub fn do_utimes_fd(fd: FileDesc, atime: Utime, mtime: Utime, flags: i32) -> Res
     }
 
     let file_ref = current!().file(fd)?;
-    let inode_file = file_ref
-        .as_inode_file()
-        .ok_or_else(|| errno!(EBADF, "not an inode"))?;
-    let inode = inode_file.inode();
-    let mut info = inode.metadata()?;
-    if let Utime::UTIME(atime) = atime {
-        info.atime = atime;
+
+    if let Some(inode_file) = file_ref.as_inode_file() {
+        let inode = inode_file.inode();
+        let mut info = inode.metadata()?;
+        if let Utime::UTIME(atime) = atime {
+            info.atime = atime;
+        }
+        if let Utime::UTIME(mtime) = mtime {
+            info.mtime = mtime;
+        }
+        inode.set_metadata(&info)?;
+    } else if let Some(async_file_handle) = file_ref.as_async_file_handle() {
+        let inode = async_file_handle.dentry().inode();
+        let mut info = inode.metadata().await?;
+        if let Utime::UTIME(atime) = atime {
+            info.atime = atime;
+        }
+        if let Utime::UTIME(mtime) = mtime {
+            info.mtime = mtime;
+        }
+        inode.set_metadata(&info).await?;
+    } else {
+        return_errno!(EBADF, "not an inode");
     }
-    if let Utime::UTIME(mtime) = mtime {
-        info.mtime = mtime;
-    }
-    inode.set_metadata(&info)?;
-    Ok(0)
+    Ok(())
 }
 
-pub fn do_utimes_path(
+pub async fn do_utimes_path(
     fs_path: &FsPath,
     atime: Utime,
     mtime: Utime,
     flags: UtimeFlags,
-) -> Result<isize> {
+) -> Result<()> {
     debug!(
         "utimes_path: fs_path: {:?}, atime: {:?}, mtime: {:?}, flags: {:?}",
         fs_path, atime, mtime, flags
@@ -122,20 +134,20 @@ pub fn do_utimes_path(
 
     let inode = {
         let current = current!();
-        let fs = current.fs().read().unwrap();
+        let fs = current.fs();
         if flags.contains(UtimeFlags::AT_SYMLINK_NOFOLLOW) {
-            fs.lookup_inode_no_follow(fs_path)?
+            fs.lookup_inode_no_follow(fs_path).await?
         } else {
-            fs.lookup_inode(fs_path)?
+            fs.lookup_inode(fs_path).await?
         }
     };
-    let mut info = inode.metadata()?;
+    let mut info = inode.metadata().await?;
     if let Utime::UTIME(atime) = atime {
         info.atime = atime;
     }
     if let Utime::UTIME(mtime) = mtime {
         info.mtime = mtime;
     }
-    inode.set_metadata(&info)?;
-    Ok(0)
+    inode.set_metadata(&info).await?;
+    Ok(())
 }

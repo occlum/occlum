@@ -167,7 +167,7 @@ impl<'a> IoctlRawCmd<'a> {
     }
 }
 
-pub fn do_ioctl(fd: FileDesc, raw_cmd: &mut IoctlRawCmd) -> Result<i32> {
+pub async fn do_ioctl(fd: FileDesc, raw_cmd: &mut IoctlRawCmd<'_>) -> Result<i32> {
     debug!("ioctl: fd: {}, cmd: {:?}", fd, raw_cmd);
     let current = current!();
     let file_ref = current.file(fd)?;
@@ -181,7 +181,7 @@ pub fn do_ioctl(fd: FileDesc, raw_cmd: &mut IoctlRawCmd) -> Result<i32> {
         return Ok(0);
     }
 
-    file_ref.ioctl(cmd.as_mut())?;
+    file_ref.ioctl(cmd.as_mut()).await?;
     raw_cmd.copy_output_from_safe(cmd.as_ref());
     Ok(0)
 }

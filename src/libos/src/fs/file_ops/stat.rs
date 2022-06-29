@@ -1,38 +1,39 @@
 use super::builtin_disk::try_open_disk;
 use super::*;
 
-pub fn do_fstat(fd: u32) -> Result<StatBuf> {
+pub async fn do_fstat(fd: u32) -> Result<StatBuf> {
     debug!("fstat: fd: {}", fd);
     let file_ref = current!().file(fd as FileDesc)?;
-    if let Some(inode_file) = file_ref.as_inode_file() {
-        let stat = StatBuf::from(inode_file.inode().metadata()?);
-        Ok(stat)
+    let stat = if let Some(inode_file) = file_ref.as_inode_file() {
+        StatBuf::from(inode_file.inode().metadata()?)
     } else if let Some(async_file) = file_ref.as_async_file() {
-        Ok(async_file.stat())
+        async_file.stat()
     } else if let Some(disk_file) = file_ref.as_disk_file() {
-        let stat = StatBuf::from(disk_file.metadata());
-        Ok(stat)
+        StatBuf::from(disk_file.metadata())
+    } else if let Some(async_file_handle) = file_ref.as_async_file_handle() {
+        StatBuf::from(async_file_handle.dentry().inode().metadata().await?)
     } else {
         // TODO: support the stat operation on non-inode files
         return_errno!(ENODEV, "the file is not inode");
-    }
+    };
+    Ok(stat)
 }
 
-pub fn do_fstatat(fs_path: &FsPath, flags: StatFlags) -> Result<StatBuf> {
+pub async fn do_fstatat(fs_path: &FsPath, flags: StatFlags) -> Result<StatBuf> {
     debug!("fstatat: fs_path: {:?}, flags: {:?}", fs_path, flags);
 
     let current = current!();
-    let fs = current.fs().read().unwrap();
+    let fs = current.fs();
 
     let stat = if let Some(disk_file) = try_open_disk(&fs, fs_path)? {
         StatBuf::from(disk_file.metadata())
     } else {
         let inode = if flags.contains(StatFlags::AT_SYMLINK_NOFOLLOW) {
-            fs.lookup_inode_no_follow(fs_path)?
+            fs.lookup_inode_no_follow(fs_path).await?
         } else {
-            fs.lookup_inode(fs_path)?
+            fs.lookup_inode(fs_path).await?
         };
-        StatBuf::from(inode.metadata()?)
+        StatBuf::from(inode.metadata().await?)
     };
 
     Ok(stat)

@@ -76,9 +76,7 @@ pub fn load_file_hdr_to_vec(
 ) -> Result<(Arc<dyn INode>, Vec<u8>, Option<ElfHeader>)> {
     let inode = current_ref
         .fs()
-        .read()
-        .unwrap()
-        .lookup_inode(&FsPath::try_from(file_path)?)
+        .lookup_inode_sync(&FsPath::try_from(file_path)?)
         .map_err(|e| errno!(e.errno(), "cannot find the file"))?;
 
     // Make sure the final file to exec is not a directory

@@ -89,7 +89,7 @@ async fn handle_fault(fault: Fault) {
     }
 }
 
-mod mark_send {
+pub mod mark_send {
     //! Mark an arbitrary future with Send trait.
 
     use std::future::Future;

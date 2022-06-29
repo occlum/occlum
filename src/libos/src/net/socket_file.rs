@@ -135,7 +135,7 @@ impl SocketFile {
         })
     }
 
-    pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+    pub async fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
         apply_fn_on_any_socket!(&self.socket, |socket| { socket.ioctl(cmd) })
     }
 }

@@ -61,8 +61,8 @@ pub fn do_mount(
         return_errno!(EPERM, "can not mount on root");
     } else {
         let fs_path = FsPath::try_from(target)?;
-        let thread = current!();
-        let fs = thread.fs().read().unwrap();
+        let current = current!();
+        let fs = current.fs();
         PathBuf::from(fs.convert_fspath_to_abs(&fs_path)?)
     };
 
@@ -157,8 +157,8 @@ pub fn do_umount(target: &str, flags: UmountFlags) -> Result<()> {
         return_errno!(EPERM, "cannot umount rootfs");
     } else {
         let fs_path = FsPath::try_from(target)?;
-        let thread = current!();
-        let fs = thread.fs().read().unwrap();
+        let current = current!();
+        let fs = current.fs();
         fs.convert_fspath_to_abs(&fs_path)?
     };
 

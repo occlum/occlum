@@ -221,7 +221,7 @@ impl<F: File + ?Sized> Async<F> {
     pub fn status_flags(&self) -> StatusFlags;
     pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()>;
     pub fn access_mode(&self) -> AccessMode;
-    pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()>;
+    pub async fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()>;
     pub fn stat(&self) -> StatBuf;
 }
 

@@ -369,7 +369,7 @@ impl EpollFile {
         return_errno!(EINVAL, "epoll files do not support set_status_flags");
     }
 
-    pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+    pub async fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
         return_errno!(EINVAL, "epoll files do not support ioctl");
     }
 

@@ -268,7 +268,7 @@ fn new_process_common(
             let files = init_files(current_ref, file_actions, host_stdio_fds)?;
             Arc::new(SgxMutex::new(files))
         };
-        let fs_ref = Arc::new(RwLock::new(current_ref.fs().read().unwrap().clone()));
+        let fs_ref = Arc::new((**current_ref.fs()).clone());
         let sched_ref = Arc::new(SgxMutex::new(current_ref.sched().lock().unwrap().clone()));
         let nice_ref = Arc::new(RwLock::new(current_ref.nice().read().unwrap().clone()));
         let rlimit_ref = Arc::new(SgxMutex::new(current_ref.rlimits().lock().unwrap().clone()));
@@ -397,7 +397,7 @@ fn init_files(
                     oflag,
                     fd,
                 } => {
-                    let inode_file = current_ref.fs().read().unwrap().open_file(
+                    let inode_file = current_ref.fs().open_file_sync(
                         &FsPath::try_from(path.as_str())?,
                         oflag,
                         FileMode::from_bits_truncate(mode as u16),

@@ -131,7 +131,7 @@ impl DiskFile {
         return_errno!(ENOSYS, "not support setting status flags");
     }
 
-    pub fn ioctl(&self, _cmd: &mut dyn IoctlCmd) -> Result<()> {
+    pub async fn ioctl(&self, _cmd: &mut dyn IoctlCmd) -> Result<()> {
         return_errno!(EINVAL, "this file does not support ioctl");
     }
 

@@ -412,7 +412,7 @@ pub async fn do_getsockopt(
     let optval_mut = from_user::make_mut_slice(optval as *mut u8, optlen as usize)?;
 
     let mut cmd = new_getsockopt_cmd(level, optname, optlen)?;
-    socket_file.ioctl(cmd.as_mut())?;
+    socket_file.ioctl(cmd.as_mut()).await?;
     let src_optval = get_optval(cmd.as_ref())?;
     copy_bytes_to_user(src_optval, optval_mut, optlen_mut);
     Ok(0)
@@ -442,7 +442,7 @@ pub async fn do_setsockopt(
     let optval = from_user::make_slice(optval as *const u8, optlen as usize)?;
 
     let mut cmd = new_setsockopt_cmd(level, optname, optval)?;
-    socket_file.ioctl(cmd.as_mut())?;
+    socket_file.ioctl(cmd.as_mut()).await?;
     Ok(0)
 }
 

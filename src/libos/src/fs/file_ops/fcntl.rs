@@ -44,83 +44,77 @@ pub async fn do_fcntl(fd: FileDesc, cmd: &mut FcntlCmd<'_>) -> Result<isize> {
         }
         FcntlCmd::GetLk(flock_mut_c) => {
             let file = file_table.get(fd)?;
-            let inode_file = file
-                .as_inode_file()
-                .ok_or_else(|| errno!(EBADF, "not an inode file"))?;
-
-            let mut range_lock = {
-                let lock_type = RangeLockType::from_u16(flock_mut_c.l_type)?;
-                if RangeLockType::F_UNLCK == lock_type {
-                    return_errno!(EINVAL, "invalid flock type for getlk");
-                }
-                let file_range = FileRange::from_flock_with_file_metadata(
-                    &flock_mut_c,
-                    inode_file.position(),
-                    inode_file.inode().metadata()?.size,
-                )?;
-                RangeLockBuilder::new()
-                    .owner(current!().process().pid() as _)
-                    .type_(lock_type)
-                    .range(file_range)
-                    .build()?
-            };
-            inode_file.test_range_lock(&mut range_lock)?;
-            trace!("getlk returns: {:?}", range_lock);
-            (*flock_mut_c).copy_from_range_lock(&range_lock);
+            drop(file_table);
+            let mut req_range_lock = build_range_lock_from_c(flock_mut_c, &file).await?;
+            if let Some(inode_file) = file.as_inode_file() {
+                inode_file.test_range_lock(&mut req_range_lock)?;
+            } else if let Some(async_file_handle) = file.as_async_file_handle() {
+                async_file_handle.test_range_lock(&mut req_range_lock)?;
+            } else {
+                return_errno!(EBADF, "not a file");
+            }
+            trace!("getlk returns: {:?}", req_range_lock);
+            (*flock_mut_c).copy_from_range_lock(&req_range_lock);
             0
         }
         FcntlCmd::SetLk(flock_c) => {
             let file = file_table.get(fd)?;
-            let inode_file = file
-                .as_inode_file()
-                .ok_or_else(|| errno!(EBADF, "not an inode file"))?;
-
-            let range_lock = {
-                let lock_type = RangeLockType::from_u16(flock_c.l_type)?;
-                let file_range = FileRange::from_flock_with_file_metadata(
-                    &flock_c,
-                    inode_file.position(),
-                    inode_file.inode().metadata()?.size,
-                )?;
-                RangeLockBuilder::new()
-                    .owner(current!().process().pid() as _)
-                    .type_(lock_type)
-                    .range(file_range)
-                    .build()?
-            };
+            drop(file_table);
+            let range_lock = build_range_lock_from_c(flock_c, &file).await?;
             let is_nonblocking = true;
-            inode_file
-                .set_range_lock(&range_lock, is_nonblocking)
-                .await?;
+            if let Some(inode_file) = file.as_inode_file() {
+                inode_file
+                    .set_range_lock(&range_lock, is_nonblocking)
+                    .await?;
+            } else if let Some(async_file_handle) = file.as_async_file_handle() {
+                async_file_handle
+                    .set_range_lock(&range_lock, is_nonblocking)
+                    .await?;
+            } else {
+                return_errno!(EBADF, "not a file");
+            }
             0
         }
         FcntlCmd::SetLkWait(flock_c) => {
             let file = file_table.get(fd)?;
-            let inode_file = file
-                .as_inode_file()
-                .ok_or_else(|| errno!(EBADF, "not an inode file"))?;
-
-            let range_lock = {
-                let lock_type = RangeLockType::from_u16(flock_c.l_type)?;
-                let file_range = FileRange::from_flock_with_file_metadata(
-                    &flock_c,
-                    inode_file.position(),
-                    inode_file.inode().metadata()?.size,
-                )?;
-                RangeLockBuilder::new()
-                    .owner(current!().process().pid() as _)
-                    .type_(lock_type)
-                    .range(file_range)
-                    .build()?
-            };
+            drop(file_table);
+            let range_lock = build_range_lock_from_c(flock_c, &file).await?;
             let is_nonblocking = false;
-            inode_file
-                .set_range_lock(&range_lock, is_nonblocking)
-                .await?;
+            if let Some(inode_file) = file.as_inode_file() {
+                inode_file
+                    .set_range_lock(&range_lock, is_nonblocking)
+                    .await?;
+            } else if let Some(async_file_handle) = file.as_async_file_handle() {
+                async_file_handle
+                    .set_range_lock(&range_lock, is_nonblocking)
+                    .await?;
+            } else {
+                return_errno!(EBADF, "not a file");
+            }
             0
         }
     };
     Ok(ret)
+}
+
+async fn build_range_lock_from_c(c_flock: &flock_c, file: &FileRef) -> Result<RangeLock> {
+    let lock_type = RangeLockType::from_u16(c_flock.l_type)?;
+    let (file_offset, file_size) = if let Some(inode_file) = file.as_inode_file() {
+        (inode_file.position(), inode_file.inode().metadata()?.size)
+    } else if let Some(async_file_handle) = file.as_async_file_handle() {
+        (
+            async_file_handle.offset().await,
+            async_file_handle.dentry().inode().metadata().await?.size,
+        )
+    } else {
+        return_errno!(EBADF, "not a file");
+    };
+    let file_range = FileRange::from_flock_with_file_metadata(&c_flock, file_offset, file_size)?;
+    RangeLockBuilder::new()
+        .owner(current!().process().pid() as _)
+        .type_(lock_type)
+        .range(file_range)
+        .build()
 }
 
 #[derive(Debug)]

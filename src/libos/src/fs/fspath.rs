@@ -6,13 +6,13 @@ pub const AT_FDCWD: i32 = -100;
 
 /// The representation of path in FS
 #[derive(Debug)]
-pub struct FsPath<'a> {
-    inner: FsPathInner<'a>,
+pub struct FsPath {
+    inner: FsPathInner,
 }
 
-impl<'a> FsPath<'a> {
+impl FsPath {
     /// Construct a FsPath
-    pub fn new(path: &'a str, dirfd: i32) -> Result<Self> {
+    pub fn new(path: String, dirfd: i32) -> Result<Self> {
         Ok(FsPath {
             inner: FsPathInner::new(path, dirfd)?,
         })
@@ -23,35 +23,35 @@ impl<'a> FsPath<'a> {
     }
 }
 
-impl<'a> TryFrom<&'a str> for FsPath<'a> {
+impl TryFrom<&str> for FsPath {
     type Error = errno::Error;
 
     fn try_from(path: &str) -> Result<FsPath> {
         if path.is_empty() {
             return_errno!(ENOENT, "path is an empty string");
         }
-        FsPath::new(path, AT_FDCWD)
+        FsPath::new(String::from(path), AT_FDCWD)
     }
 }
 
 /// The internal representation of path in FS
 #[derive(Debug)]
-pub(in crate::fs) enum FsPathInner<'a> {
+pub(in crate::fs) enum FsPathInner {
     /// absolute path
-    Absolute(&'a str),
+    Absolute(String),
     /// path is relative to cwd
-    CwdRelative(&'a str),
+    CwdRelative(String),
     /// cwd
     Cwd,
     /// path is relative to dir fd
-    FdRelative(FileDesc, &'a str),
+    FdRelative(FileDesc, String),
     /// fd itself
     Fd(FileDesc),
 }
 
-impl<'a> FsPathInner<'a> {
-    pub fn new(path: &'a str, dirfd: i32) -> Result<Self> {
-        let fs_path_inner = if Path::new(path).is_absolute() {
+impl FsPathInner {
+    pub fn new(path: String, dirfd: i32) -> Result<Self> {
+        let fs_path_inner = if Path::new(&path).is_absolute() {
             Self::Absolute(path)
         } else if dirfd >= 0 {
             if path.is_empty() {

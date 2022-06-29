@@ -48,9 +48,9 @@ pub async fn do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u16) -> Re
     } else if path.len() > MAX_PATH_LEN {
         return_errno!(ENAMETOOLONG, "path name too long");
     }
-    let fs_path = FsPath::new(&path, dirfd)?;
+    let fs_path = FsPath::new(path, dirfd)?;
     let mode = FileMode::from_bits_truncate(mode);
-    let fd = file_ops::do_openat(&fs_path, flags, mode)?;
+    let fd = file_ops::do_openat(&fs_path, flags, mode).await?;
     Ok(fd as isize)
 }
 
@@ -154,7 +154,7 @@ pub async fn do_pwrite(fd: FileDesc, buf: *const u8, size: usize, offset: off_t)
 pub async fn do_fstat(fd: FileDesc, stat_buf: *mut StatBuf) -> Result<isize> {
     from_user::check_mut_ptr(stat_buf)?;
 
-    let stat = file_ops::do_fstat(fd)?;
+    let stat = file_ops::do_fstat(fd).await?;
     unsafe {
         stat_buf.write(stat);
     }
@@ -188,9 +188,9 @@ pub async fn do_fstatat(
     if path.is_empty() && !flags.contains(StatFlags::AT_EMPTY_PATH) {
         return_errno!(ENOENT, "path is an empty string");
     }
-    let fs_path = FsPath::new(&path, dirfd)?;
+    let fs_path = FsPath::new(path, dirfd)?;
     from_user::check_mut_ptr(stat_buf)?;
-    let stat = file_ops::do_fstatat(&fs_path, flags)?;
+    let stat = file_ops::do_fstatat(&fs_path, flags).await?;
     unsafe {
         stat_buf.write(stat);
     }
@@ -210,10 +210,11 @@ pub async fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) ->
     } else if path.len() > MAX_PATH_LEN {
         return_errno!(ENAMETOOLONG, "path name too long");
     }
-    let fs_path = FsPath::new(&path, dirfd)?;
+    let fs_path = FsPath::new(path, dirfd)?;
     let mode = AccessibilityCheckMode::from_u32(mode)?;
     let flags = AccessibilityCheckFlags::from_u32(flags)?;
-    file_ops::do_faccessat(&fs_path, mode, flags).map(|_| 0)
+    file_ops::do_faccessat(&fs_path, mode, flags).await?;
+    Ok(0)
 }
 
 pub async fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize> {
@@ -256,12 +257,12 @@ pub async fn do_truncate(path: *const i8, len: usize) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    file_ops::do_truncate(&FsPath::try_from(path.as_str())?, len)?;
+    file_ops::do_truncate(&FsPath::try_from(path.as_str())?, len).await?;
     Ok(0)
 }
 
 pub async fn do_ftruncate(fd: FileDesc, len: usize) -> Result<isize> {
-    file_ops::do_ftruncate(fd, len)?;
+    file_ops::do_ftruncate(fd, len).await?;
     Ok(0)
 }
 
@@ -270,7 +271,7 @@ pub async fn do_getdents64(fd: FileDesc, buf: *mut u8, buf_size: usize) -> Resul
         from_user::check_mut_array(buf, buf_size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, buf_size) }
     };
-    let len = file_ops::do_getdents64(fd, safe_buf)?;
+    let len = file_ops::do_getdents64(fd, safe_buf).await?;
     Ok(len as isize)
 }
 
@@ -279,12 +280,12 @@ pub async fn do_getdents(fd: FileDesc, buf: *mut u8, buf_size: usize) -> Result<
         from_user::check_mut_array(buf, buf_size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, buf_size) }
     };
-    let len = file_ops::do_getdents(fd, safe_buf)?;
+    let len = file_ops::do_getdents(fd, safe_buf).await?;
     Ok(len as isize)
 }
 
 pub async fn do_sync() -> Result<isize> {
-    fs_ops::do_sync()?;
+    fs_ops::do_sync().await?;
     Ok(0)
 }
 
@@ -327,12 +328,12 @@ pub async fn do_chdir(path: *const i8) -> Result<isize> {
     } else if path.len() > MAX_PATH_LEN {
         return_errno!(ENAMETOOLONG, "path name too long");
     }
-    fs_ops::do_chdir(&path)?;
+    fs_ops::do_chdir(&path).await?;
     Ok(0)
 }
 
 pub async fn do_fchdir(fd: FileDesc) -> Result<isize> {
-    fs_ops::do_fchdir(fd)?;
+    fs_ops::do_fchdir(fd).await?;
     Ok(0)
 }
 
@@ -375,9 +376,9 @@ pub async fn do_renameat(
     } else if oldpath.len() > MAX_PATH_LEN || newpath.len() > MAX_PATH_LEN {
         return_errno!(ENAMETOOLONG, "oldpath or newpath name too long");
     }
-    let old_fs_path = FsPath::new(&oldpath, olddirfd)?;
-    let new_fs_path = FsPath::new(&newpath, newdirfd)?;
-    file_ops::do_renameat(&old_fs_path, &new_fs_path)?;
+    let old_fs_path = FsPath::new(oldpath, olddirfd)?;
+    let new_fs_path = FsPath::new(newpath, newdirfd)?;
+    file_ops::do_renameat(&old_fs_path, &new_fs_path).await?;
     Ok(0)
 }
 
@@ -394,9 +395,9 @@ pub async fn do_mkdirat(dirfd: i32, path: *const i8, mode: u16) -> Result<isize>
     } else if path.len() > MAX_PATH_LEN {
         return_errno!(ENAMETOOLONG, "path name too long");
     }
-    let fs_path = FsPath::new(&path, dirfd)?;
+    let fs_path = FsPath::new(path, dirfd)?;
     let mode = FileMode::from_bits_truncate(mode);
-    file_ops::do_mkdirat(&fs_path, mode)?;
+    file_ops::do_mkdirat(&fs_path, mode).await?;
     Ok(0)
 }
 
@@ -409,7 +410,7 @@ pub async fn do_rmdir(path: *const i8) -> Result<isize> {
     } else if path.len() > MAX_PATH_LEN {
         return_errno!(ENAMETOOLONG, "path name too long");
     }
-    file_ops::do_rmdir(&FsPath::try_from(path.as_str())?)?;
+    file_ops::do_rmdir(&FsPath::try_from(path.as_str())?).await?;
     Ok(0)
 }
 
@@ -434,12 +435,12 @@ pub async fn do_linkat(
     if oldpath.is_empty() && !flags.contains(LinkFlags::AT_EMPTY_PATH) {
         return_errno!(ENOENT, "oldpath is an empty string");
     }
-    let old_fs_path = FsPath::new(&oldpath, olddirfd)?;
+    let old_fs_path = FsPath::new(oldpath, olddirfd)?;
     if newpath.is_empty() {
         return_errno!(ENOENT, "newpath is an empty string");
     }
-    let new_fs_path = FsPath::new(&newpath, newdirfd)?;
-    file_ops::do_linkat(&old_fs_path, &new_fs_path, flags)?;
+    let new_fs_path = FsPath::new(newpath, newdirfd)?;
+    file_ops::do_linkat(&old_fs_path, &new_fs_path, flags).await?;
     Ok(0)
 }
 
@@ -454,10 +455,10 @@ pub async fn do_unlinkat(dirfd: i32, path: *const i8, flags: i32) -> Result<isiz
     if path.is_empty() {
         return_errno!(ENOENT, "path is an empty string");
     }
-    let fs_path = FsPath::new(&path, dirfd)?;
+    let fs_path = FsPath::new(path, dirfd)?;
     let flags =
         UnlinkFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flag value"))?;
-    file_ops::do_unlinkat(&fs_path, flags)?;
+    file_ops::do_unlinkat(&fs_path, flags).await?;
     Ok(0)
 }
 
@@ -481,8 +482,8 @@ pub async fn do_readlinkat(
     if path.is_empty() {
         return_errno!(ENOENT, "path is an empty string");
     }
-    let fs_path = FsPath::new(&path, dirfd)?;
-    let len = file_ops::do_readlinkat(&fs_path, buf)?;
+    let fs_path = FsPath::new(path, dirfd)?;
+    let len = file_ops::do_readlinkat(&fs_path, buf).await?;
     Ok(len as isize)
 }
 
@@ -504,8 +505,8 @@ pub async fn do_symlinkat(
     if link_path.is_empty() {
         return_errno!(ENOENT, "link_path is an empty string");
     }
-    let fs_path = FsPath::new(&link_path, new_dirfd)?;
-    file_ops::do_symlinkat(&target, &fs_path)?;
+    let fs_path = FsPath::new(link_path, new_dirfd)?;
+    file_ops::do_symlinkat(&target, &fs_path).await?;
     Ok(0)
 }
 
@@ -515,7 +516,7 @@ pub async fn do_chmod(path: *const i8, mode: u16) -> Result<isize> {
 
 pub async fn do_fchmod(fd: FileDesc, mode: u16) -> Result<isize> {
     let mode = FileMode::from_bits_truncate(mode);
-    file_ops::do_fchmod(fd, mode)?;
+    file_ops::do_fchmod(fd, mode).await?;
     Ok(0)
 }
 
@@ -529,8 +530,8 @@ pub async fn do_fchmodat(dirfd: i32, path: *const i8, mode: u16) -> Result<isize
         return_errno!(ENAMETOOLONG, "path name too long");
     }
     let mode = FileMode::from_bits_truncate(mode);
-    let fs_path = FsPath::new(&path, dirfd)?;
-    file_ops::do_fchmodat(&fs_path, mode)?;
+    let fs_path = FsPath::new(path, dirfd)?;
+    file_ops::do_fchmodat(&fs_path, mode).await?;
     Ok(0)
 }
 
@@ -539,7 +540,7 @@ pub async fn do_chown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
 }
 
 pub async fn do_fchown(fd: FileDesc, uid: u32, gid: u32) -> Result<isize> {
-    file_ops::do_fchown(fd, uid, gid)?;
+    file_ops::do_fchown(fd, uid, gid).await?;
     Ok(0)
 }
 
@@ -557,8 +558,8 @@ pub async fn do_fchownat(
     if path.is_empty() && !flags.contains(ChownFlags::AT_EMPTY_PATH) {
         return_errno!(ENOENT, "newpath is an empty string");
     }
-    let fs_path = FsPath::new(&path, dirfd)?;
-    file_ops::do_fchownat(&fs_path, uid, gid, flags)?;
+    let fs_path = FsPath::new(path, dirfd)?;
+    file_ops::do_fchownat(&fs_path, uid, gid, flags).await?;
     Ok(0)
 }
 
@@ -585,7 +586,7 @@ pub async fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
         }
         IoctlRawCmd::new(cmd, argp)?
     };
-    file_ops::do_ioctl(fd, &mut raw_cmd)?;
+    file_ops::do_ioctl(fd, &mut raw_cmd).await?;
     Ok(0)
 }
 
@@ -654,14 +655,14 @@ pub async fn do_fallocate(fd: FileDesc, mode: u32, offset: off_t, len: off_t) ->
         );
     }
     let flags = FallocateFlags::from_u32(mode)?;
-    file_ops::do_fallocate(fd, flags, offset as usize, len as usize)?;
+    file_ops::do_fallocate(fd, flags, offset as usize, len as usize).await?;
     Ok(0)
 }
 
 pub async fn do_fstatfs(fd: FileDesc, statfs_buf: *mut Statfs) -> Result<isize> {
     from_user::check_mut_ptr(statfs_buf)?;
 
-    let statfs = fs_ops::do_fstatfs(fd)?;
+    let statfs = fs_ops::do_fstatfs(fd).await?;
     unsafe {
         statfs_buf.write(statfs);
     }
@@ -672,7 +673,7 @@ pub async fn do_statfs(path: *const i8, statfs_buf: *mut Statfs) -> Result<isize
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    let statfs = fs_ops::do_statfs(&FsPath::try_from(path.as_str())?)?;
+    let statfs = fs_ops::do_statfs(&FsPath::try_from(path.as_str())?).await?;
     unsafe {
         statfs_buf.write(statfs);
     }
@@ -726,7 +727,8 @@ pub async fn do_utime(path: *const i8, times_u: *const utimbuf_t) -> Result<isiz
     };
 
     let (atime, mtime) = file_ops::get_utimes(times)?;
-    self::do_utimes_wrapper(AT_FDCWD, path, atime, mtime, 0)
+    self::do_utimes_wrapper(AT_FDCWD, path, atime, mtime, 0).await?;
+    Ok(0)
 }
 
 pub async fn do_utimes(path: *const i8, times: *const timeval_t) -> Result<isize> {
@@ -750,7 +752,8 @@ pub async fn do_futimesat(dirfd: i32, path: *const i8, times_u: *const timeval_t
     };
 
     let (atime, mtime) = file_ops::get_utimes(times)?;
-    self::do_utimes_wrapper(dirfd, path, atime, mtime, 0)
+    self::do_utimes_wrapper(dirfd, path, atime, mtime, 0).await?;
+    Ok(0)
 }
 
 pub async fn do_utimensat(
@@ -774,24 +777,26 @@ pub async fn do_utimensat(
     };
 
     let (atime, mtime) = file_ops::get_utimes(times)?;
-    self::do_utimes_wrapper(dirfd, path, atime, mtime, flags)
+    self::do_utimes_wrapper(dirfd, path, atime, mtime, flags).await?;
+    Ok(0)
 }
 
-fn do_utimes_wrapper(
+async fn do_utimes_wrapper(
     dirfd: i32,
     path: *const i8,
     atime: Utime,
     mtime: Utime,
     flags: i32,
-) -> Result<isize> {
+) -> Result<()> {
     if path.is_null() && dirfd != AT_FDCWD {
-        file_ops::do_utimes_fd(dirfd as FileDesc, atime, mtime, flags)
+        file_ops::do_utimes_fd(dirfd as FileDesc, atime, mtime, flags).await?;
     } else {
         let path = from_user::clone_cstring_safely(path)?
             .to_string_lossy()
             .into_owned();
         let flags = UtimeFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
-        let fs_path = FsPath::new(&path, dirfd)?;
-        file_ops::do_utimes_path(&fs_path, atime, mtime, flags)
+        let fs_path = FsPath::new(path, dirfd)?;
+        file_ops::do_utimes_path(&fs_path, atime, mtime, flags).await?;
     }
+    Ok(())
 }

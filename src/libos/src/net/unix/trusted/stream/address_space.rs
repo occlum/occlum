@@ -127,8 +127,8 @@ impl AddressSpace {
                     let inode = {
                         let file_path = FsPath::try_from(unix_path.as_ref()).unwrap();
                         let current = current!();
-                        let fs = current.fs().read().unwrap();
-                        fs.lookup_inode(&file_path)
+                        let fs = current.fs();
+                        fs.lookup_inode_sync(&file_path)
                     };
                     if let Ok(inode) = inode {
                         Some(AddressSpaceKey::from_inode(inode.metadata().unwrap().inode))

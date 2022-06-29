@@ -10,6 +10,8 @@ crate-type = ["staticlib"]
 [dependencies]
 async-rt  = { path = "crates/async-rt", default-features = false, features = ["sgx"] }
 async-io  = { path = "crates/async-io", features = ["sgx"] }
+async-vfs = { path = "crates/async-vfs", features = ["sgx"] }
+async-sfs = { path = "crates/async-sfs", default-features = false, features = ["sgx"] }
 atomic = "0.5"
 bitflags = "1.0"
 bitvec = { version = "0.17", default-features = false, features = ["alloc"]  }

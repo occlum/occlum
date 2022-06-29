@@ -250,6 +250,16 @@ pub extern "C" fn occlum_ecall_shutdown_vcpus() -> i32 {
 
     table::wait_all_process_exit();
 
+    // Flush the async sfs
+    if crate::fs::async_sfs_initilized() {
+        async_rt::task::block_on(unsafe {
+            super::thread::mark_send::mark_send(async {
+                //use async_vfs::AsyncFileSystem;
+                crate::fs::async_sfs().await.sync().await.unwrap();
+            })
+        });
+    }
+
     // TODO: stop all the kernel threads/tasks
     async_rt::executor::shutdown();
     0

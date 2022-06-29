@@ -344,7 +344,7 @@ impl TimerFile {
         Ok(())
     }
 
-    pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+    pub async fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
         return_errno!(EINVAL, "timer fds do not support ioctl");
     }
 

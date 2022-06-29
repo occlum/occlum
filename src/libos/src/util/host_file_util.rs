@@ -13,6 +13,7 @@ pub struct host_file_buffer {
     pub hostname_buf: *const c_char,
 }
 
+#[allow(non_camel_case_types)]
 pub enum HostFile {
     HOSTS,
     HOSTNAME,
@@ -29,7 +30,7 @@ pub fn write_host_file(host_file: HostFile) -> Result<()> {
 
     let fs_view = FsView::new();
     // overwrite host file if existed in Occlum fs
-    let enclave_file = fs_view.open_file(
+    let enclave_file = fs_view.open_file_sync(
         &FsPath::try_from(file_path)?,
         AccessMode::O_RDWR as u32 | CreationFlags::O_CREAT.bits() | CreationFlags::O_TRUNC.bits(),
         FileMode::from_bits(0o666).unwrap(),

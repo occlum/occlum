@@ -9,6 +9,8 @@ dependencies = [
  "aligned",
  "async-io",
  "async-rt",
+ "async-sfs",
+ "async-vfs",
  "atomic",
  "bitflags",
  "bitvec",
@@ -123,6 +125,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-sfs"
+version = "0.1.0"
+dependencies = [
+ "async-io",
+ "async-rt",
+ "async-trait",
+ "async-vfs",
+ "bitvec",
+ "block-device",
+ "cfg-if 1.0.0",
+ "errno",
+ "lazy_static",
+ "log",
+ "lru",
+ "page-cache",
+ "sgx_libc",
+ "sgx_trts",
+ "sgx_tstd",
+ "sgx_types",
+ "static_assertions 0.3.4",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -131,6 +156,21 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "async-vfs"
+version = "0.1.0"
+dependencies = [
+ "async-io",
+ "async-trait",
+ "errno",
+ "libc",
+ "log",
+ "sgx_libc",
+ "sgx_trts",
+ "sgx_tstd",
+ "sgx_types",
 ]
 
 [[package]]
@@ -624,6 +664,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lru"
+version = "0.7.5"
+dependencies = [
+ "sgx_tstd",
+]
+
+[[package]]
 name = "memoffset"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -672,6 +719,26 @@ dependencies = [
 [[package]]
 name = "object-id"
 version = "0.1.0"
+
+[[package]]
+name = "page-cache"
+version = "0.1.0"
+dependencies = [
+ "async-io",
+ "async-rt",
+ "async-trait",
+ "block-device",
+ "errno",
+ "lazy_static",
+ "log",
+ "lru",
+ "object-id",
+ "sgx_libc",
+ "sgx_trts",
+ "sgx_tstd",
+ "sgx_types",
+ "spin 0.7.0",
+]
 
 [[package]]
 name = "parking_lot"
