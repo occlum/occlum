@@ -18,7 +18,7 @@ resources.
     - Error message: `[____Mmap] Error = ENOMEM (#12, Out of memory): not
       enough memory`
 
-    - Solution: Enlarge `process.default_mmap_size`
+    - Solution: Enlarge `resource_limits.user_space_size`
 
 2. Brk syscall error:
     - Error message: `[_____Brk] Error = EINVAL (#22, Invalid argument): New

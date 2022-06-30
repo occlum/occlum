@@ -88,7 +88,7 @@ Occlum can be configured easily via a configuration file named `Occlum.json`, wh
         "default_stack_size": "4MB",
         // The max size of memory allocated by brk syscall
         "default_heap_size": "16MB",
-        // The max size of memory by mmap syscall
+        // The max size of memory by mmap syscall (OBSOLETE. Users don't need to modify this field. Keep it only for compatibility)
         "default_mmap_size": "32MB"
     },
     // Entry points
@@ -185,24 +185,24 @@ occlum stop
 
 ## How to Use?
 
-We have built and tested Occlum on Ubuntu 18.04 with or without hardware SGX support (if the CPU does not support SGX, Occlum can be run in the SGX simulation mode). To give Occlum a quick try, one can use the Occlum Docker image by following the steps below:
+We have built and tested Occlum on Ubuntu 20.04 with or without hardware SGX support (if the CPU does not support SGX, Occlum can be run in the SGX simulation mode). To give Occlum a quick try, one can use the Occlum Docker image by following the steps below:
 
 Step 1-3 are to be done on the host OS (Linux):
 
-1. Install [Intel SGX driver for Linux](https://github.com/intel/linux-sgx-driver), which is required by Intel SGX SDK.
+1. For Linux kernel before 5.11, [Intel SGX driver for Linux](https://github.com/intel/SGXDataCenterAttestationPrimitives/tree/master/driver/linux) must be installed manually.
 
-2. Install [enable_rdfsbase kernel module](https://github.com/occlum/enable_rdfsbase), which enables Occlum to use `rdfsbase`-family instructions in enclaves.
+2. For Linux kernel before 5.9, install [enable_rdfsbase kernel module](https://github.com/occlum/enable_rdfsbase), which enables Occlum to use `rdfsbase`-family instructions in enclaves.
 
 3. Run the Occlum Docker container, which has Occlum and its demos preinstalled:
 
     For old IAS driver (not DCAP aware):
     ```bash
-    docker run -it --device /dev/isgx occlum/occlum:[version]-ubuntu18.04
+    docker run -it --device /dev/isgx occlum/occlum:[version]-ubuntu20.04
     ```
 
     For DCAP driver before v1.41:
     ```bash
-    docker run -it --device /dev/sgx/enclave --device /dev/sgx/provision occlum/occlum:[version]-ubuntu18.04
+    docker run -it --device /dev/sgx/enclave --device /dev/sgx/provision occlum/occlum:[version]-ubuntu20.04
     ```
 
     For DCAP driver since v1.41 or in-tree kernel driver:
@@ -211,10 +211,10 @@ Step 1-3 are to be done on the host OS (Linux):
     # (1) Create softlinks on host
     mkdir -p /dev/sgx
     cd /dev/sgx && ln -sf ../sgx_enclave enclave && ln -sf ../sgx_provision provision
-    docker run -it --device /dev/sgx/enclave --device /dev/sgx/provision occlum/occlum:[version]-ubuntu18.04
+    docker run -it --device /dev/sgx/enclave --device /dev/sgx/provision occlum/occlum:[version]-ubuntu20.04
 
     # (2) Create the docker with privileged mode
-    docker run -it --privileged -v /dev/sgx_enclave:/dev/sgx/enclave -v /dev/sgx_provision:/dev/sgx/provision occlum/occlum:[version]-ubuntu18.04
+    docker run -it --privileged -v /dev/sgx_enclave:/dev/sgx/enclave -v /dev/sgx_provision:/dev/sgx/provision occlum/occlum:[version]-ubuntu20.04
     ```
 
 Step 4-5 are to be done on the guest OS running inside the Docker container:
@@ -278,6 +278,8 @@ The Occlum Dockerfile can be found at [here](tools/docker/). Use it to build the
 Occlum supports running any executable binaries that are 1) based on [musl libc](https://www.musl-libc.org/) and 2) position independent. We chose musl libc instead of Glibc since the codebase of musl libc is 10X smaller than Glibc, which means a much smaller Trusted Computing Base (TCB) and attack surface. We argue this is an important consideration for Occlum, which targets security-critical apps running inside SGX enclaves.
 
 The two aforementioned requirements are not only satisfied by the Occlum toolchain, but also the native toolchains from some Linux distributions, e.g., [Alpine Linux](https://www.alpinelinux.org/). We think Alpine Linux, a popular Linux distribution that emphasizes simplicity and security, is a natural fit for Occlum. We have provided demos (see [Python](demos/python/)) to run unmodified apps from [Alpine Linux packages](https://pkgs.alpinelinux.org/packages).
+
+Since `0.19.0`, Occlum added Glibc support. Thus, now users can run executables from popular Linux distributions (e.g., Ubuntu) on Occlum without recompiling them.
 
 ## How to Debug?
 
