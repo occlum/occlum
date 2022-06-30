@@ -412,6 +412,13 @@ pub async fn do_getsockopt(
     let optlen = *optlen_mut;
     let optval_mut = from_user::make_mut_slice(optval as *mut u8, optlen as usize)?;
 
+    // Man getsockopt:
+    // If the size of the option value is greater than option_len, the value stored in the object pointed to by the option_value argument will be silently truncated.
+    // Thus if the optlen is 0, nothing is returned to optval. We can just return here.
+    if optlen == 0 {
+        return Ok(0);
+    }
+
     let mut cmd = new_getsockopt_cmd(level, optname, optlen)?;
     socket_file.ioctl(cmd.as_mut()).await?;
     let src_optval = get_optval(cmd.as_ref())?;
