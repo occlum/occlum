@@ -7,6 +7,10 @@ use crate::prelude::*;
 use crate::runtime::Runtime;
 use crate::sockopt::*;
 
+use async_io::socket::{
+    timeout_to_timeval, GetRecvTimeoutCmd, GetSendTimeoutCmd, SetRecvTimeoutCmd, SetSendTimeoutCmd,
+};
+
 pub struct StreamSocket<A: Addr + 'static, R: Runtime> {
     state: RwLock<State<A, R>>,
 }
@@ -265,6 +269,20 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             cmd: SetSockOptRawCmd => {
                 cmd.execute(self.host_fd())?;
             },
+            cmd: SetRecvTimeoutCmd => {
+                self.set_recv_timeout(*cmd.timeout());
+            },
+            cmd: SetSendTimeoutCmd => {
+                self.set_send_timeout(*cmd.timeout());
+            },
+            cmd: GetRecvTimeoutCmd => {
+                let timeval = timeout_to_timeval(self.recv_timeout());
+                cmd.set_output(timeval);
+            },
+            cmd: GetSendTimeoutCmd => {
+                let timeval = timeout_to_timeval(self.send_timeout());
+                cmd.set_output(timeval);
+            },
             cmd: GetAcceptConnCmd => {
                 let mut is_listen = false;
                 let state = self.state.read().unwrap();
@@ -331,6 +349,26 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             State::Connected(connected_stream) => connected_stream.cancel_requests(),
             _ => {}
         }
+    }
+
+    fn send_timeout(&self) -> Option<Duration> {
+        let state = self.state.read().unwrap();
+        state.common().send_timeout()
+    }
+
+    fn recv_timeout(&self) -> Option<Duration> {
+        let state = self.state.read().unwrap();
+        state.common().recv_timeout()
+    }
+
+    fn set_send_timeout(&self, timeout: Duration) {
+        let state = self.state.read().unwrap();
+        state.common().set_send_timeout(timeout);
+    }
+
+    fn set_recv_timeout(&self, timeout: Duration) {
+        let state = self.state.read().unwrap();
+        state.common().set_recv_timeout(timeout);
     }
 
     /*

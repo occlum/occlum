@@ -27,6 +27,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         let mask = Events::IN;
         // Initialize the poller only when needed
         let mut poller = None;
+        let mut timeout = self.common.recv_timeout();
         loop {
             // Attempt to read
             let res = self.try_recvmsg(bufs, flags, iov_buffer_index, iov_buffer_offset);
@@ -62,7 +63,22 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             }
             let events = self.common.pollee().poll(mask, None);
             if events.is_empty() {
-                poller.as_ref().unwrap().wait().await?;
+                let ret = poller
+                    .as_ref()
+                    .unwrap()
+                    .wait_timeout(timeout.as_mut())
+                    .await;
+                if let Err(e) = ret {
+                    warn!("recv wait errno = {:?}", e.errno());
+                    match e.errno() {
+                        ETIMEDOUT => {
+                            return_errno!(EAGAIN, "timeout reached")
+                        }
+                        _ => {
+                            return_errno!(e.errno(), "wait error")
+                        }
+                    }
+                }
             }
         }
     }

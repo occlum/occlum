@@ -1,6 +1,9 @@
+use async_io::socket::{GetRecvTimeoutCmd, GetSendTimeoutCmd};
 use host_socket::sockopt::{
     GetAcceptConnCmd, GetDomainCmd, GetPeerNameCmd, GetSockOptRawCmd, GetTypeCmd,
 };
+use libc::timeval;
+use std::time::Duration;
 
 use crate::prelude::*;
 
@@ -42,6 +45,28 @@ impl GetOutputAsBytes for GetTypeCmd {
     fn get_output_as_bytes(&self) -> Option<&[u8]> {
         self.output().map(|val_ref| unsafe {
             std::slice::from_raw_parts(val_ref as *const _ as *const u8, std::mem::size_of::<i32>())
+        })
+    }
+}
+
+impl GetOutputAsBytes for GetRecvTimeoutCmd {
+    fn get_output_as_bytes(&self) -> Option<&[u8]> {
+        self.output().map(|val_ref| unsafe {
+            std::slice::from_raw_parts(
+                val_ref as *const _ as *const u8,
+                std::mem::size_of::<timeval>(),
+            )
+        })
+    }
+}
+
+impl GetOutputAsBytes for GetSendTimeoutCmd {
+    fn get_output_as_bytes(&self) -> Option<&[u8]> {
+        self.output().map(|val_ref| unsafe {
+            std::slice::from_raw_parts(
+                val_ref as *const _ as *const u8,
+                std::mem::size_of::<timeval>(),
+            )
         })
     }
 }

@@ -1,6 +1,7 @@
 // Convenient reexports for internal uses.
 pub(crate) use errno::prelude::*;
 pub(crate) use std::sync::Arc;
+pub(crate) use std::time::Duration;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "sgx")] {
