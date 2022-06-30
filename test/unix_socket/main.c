@@ -563,6 +563,53 @@ int test_sendmsg_recvmsg() {
     return ret;
 }
 
+int test_send_recv_timeout() {
+    int socks[2];
+    char read_buf[10];
+    int ret = 0;
+    int test_sock_end;
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+
+    if (socketpair_default(socks) < 0) {
+        THROW_ERROR("failed to create a unix socket pair");
+    }
+    test_sock_end = socks[0];
+
+    ret = setsockopt(test_sock_end, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    if (ret < 0) {
+        THROW_ERROR("failed to set socket recv timeout");
+    }
+    ret = setsockopt(test_sock_end, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+    if (ret < 0) {
+        THROW_ERROR("failed to set socket send timeout");
+    }
+
+    // send continuously until kernel buffer is full and send is blocked
+    while (1) {
+        ret = send(test_sock_end, LONG_TEST_MSG, strlen(LONG_TEST_MSG), 0);
+        if (ret < 0 ) {
+            if (errno == EAGAIN) {
+                printf("send timeout caught successfully\n");
+                break;
+            } else {
+                THROW_ERROR("failed to send");
+            }
+        }
+    }
+
+    // blocking recv
+    ret = recv(test_sock_end, read_buf, sizeof(read_buf), 0);
+    if (ret < 0 && errno == EAGAIN) {
+        printf("read timeout caught successfully\n");
+    } else {
+        THROW_ERROR("read should have timed out");
+    }
+
+    return 0;
+}
+
 static test_case_t test_cases[] = {
     TEST_CASE(test_unix_socket_inter_process),
     TEST_CASE(test_socketpair_inter_process),
@@ -573,6 +620,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_unix_socket_rename),
     TEST_CASE(test_epoll_wait),
     TEST_CASE(test_sendmsg_recvmsg),
+    TEST_CASE(test_send_recv_timeout),
 };
 
 int main(int argc, const char *argv[]) {
