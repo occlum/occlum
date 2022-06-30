@@ -21,6 +21,14 @@ impl<A: Addr + 'static, R: Runtime> InitStream<A, R> {
         Ok(Arc::new(new_self))
     }
 
+    pub fn new_with_common(common: Arc<Common<A, R>>) -> Result<Arc<Self>> {
+        let inner = Mutex::new(Inner {
+            has_bound: common.addr().is_some(),
+        });
+        let new_self = Self { common, inner };
+        Ok(Arc::new(new_self))
+    }
+
     pub fn bind(&self, addr: &A) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
         if inner.has_bound {

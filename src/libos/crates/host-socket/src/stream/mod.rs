@@ -35,6 +35,24 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         })
     }
 
+    fn set_init_state(&self) -> Result<()> {
+        let mut state = self.state.write().unwrap();
+        match &*state {
+            State::Init(init_stream) => {
+                warn!("already in init state");
+            }
+            State::Listen(listener_stream) => {
+                let init_stream = InitStream::new_with_common(listener_stream.common().clone())?;
+                let init_state = State::Init(init_stream);
+                *state = init_state;
+            }
+            _ => {
+                return_errno!(EINVAL, "invalid state transition");
+            }
+        }
+        Ok(())
+    }
+
     pub fn new_pair(nonblocking: bool) -> Result<(Self, Self)> {
         let (common1, common2) = Common::new_pair(Type::STREAM, nonblocking)?;
         let connected1 = ConnectedStream::new(Arc::new(common1));
@@ -329,17 +347,25 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     pub fn shutdown(&self, shutdown: Shutdown) -> Result<()> {
-        let connected_stream = {
-            let state = self.state.read().unwrap();
-            match &*state {
-                State::Connected(connected_stream) => connected_stream.clone(),
-                _ => {
-                    return_errno!(ENOTCONN, "the socket is not connected");
+        let state = self.state.read().unwrap();
+        match &*state {
+            State::Listen(listener_stream) => {
+                // listening socket can be shutdown and then re-use by calling listen again.
+                listener_stream.shutdown(shutdown)?;
+                listener_stream.common().set_closed();
+                if shutdown.should_shut_read() {
+                    drop(state);
+                    self.set_init_state()
+                } else {
+                    // shutdown the writer of the listener expect to have no effect
+                    Ok(())
                 }
             }
-        };
-
-        connected_stream.shutdown(shutdown)
+            State::Connected(connected_stream) => connected_stream.shutdown(shutdown),
+            _ => {
+                return_errno!(ENOTCONN, "the socket is not connected");
+            }
+        }
     }
 
     fn cancel_requests(&self) {
