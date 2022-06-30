@@ -105,6 +105,8 @@ RUN apt-get update && aptitude install -y \
         libsgx-aesm-ecdsa-plugin=$PSW_VERSION-focal1 \
         libsgx-aesm-epid-plugin=$PSW_VERSION-focal1 \
         libsgx-aesm-quote-ex-plugin=$PSW_VERSION-focal1 \
+        libsgx-ae-id-enclave=$DCAP_VERSION-focal1 \
+        libsgx-ae-qe3=$DCAP_VERSION-focal1 \
         libsgx-ae-qve=$DCAP_VERSION-focal1 \
         libsgx-dcap-quote-verify=$DCAP_VERSION-focal1 \
         libsgx-dcap-quote-verify-dev=$DCAP_VERSION-focal1 \
