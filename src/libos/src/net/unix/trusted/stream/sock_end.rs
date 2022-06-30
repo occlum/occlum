@@ -65,6 +65,14 @@ impl Inner {
         self.peer.upgrade().map(|end| end.addr().clone()).flatten()
     }
 
+    pub fn writer(&self) -> &Producer<u8> {
+        &self.writer
+    }
+
+    pub fn reader(&self) -> &Consumer<u8> {
+        &self.reader
+    }
+
     pub fn set_nonblocking(&self, nonblocking: bool) {
         let status_flag = {
             match nonblocking {

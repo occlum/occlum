@@ -4,11 +4,12 @@ use super::*;
 use async_io::event::{Events, Observer, Poller};
 use async_io::file::StatusFlags;
 use async_io::ioctl::IoctlCmd;
-use async_io::socket::Shutdown;
+use async_io::socket::{SetRecvTimeoutCmd, SetSendTimeoutCmd, Shutdown, Timeout};
 use async_io::util::channel::Channel;
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Unix socket based on trusted channel. It has three statuses: unconnected, listening and connected.  When a
 /// socket is created, it is in unconnected status.  It will transfer to listening after listen is
@@ -164,6 +165,22 @@ impl Stream {
             },
             cmd: SetNonBlocking => {
                 self.set_nonblocking(*cmd.input() != 0); // 0 means blocking
+            },
+            cmd: SetRecvTimeoutCmd => {
+                match &*self.inner() {
+                    Status::Connected(endpoint) => {
+                        endpoint.reader().set_receiver_timeout(*cmd.timeout());
+                    }
+                    _ => warn!("set recv timeout for other states not supported"),
+                }
+            },
+            cmd: SetSendTimeoutCmd => {
+                match &mut *self.inner() {
+                    Status::Connected(endpoint) => {
+                        endpoint.writer().set_sender_timeout(*cmd.timeout());
+                    }
+                    _ => warn!("set send timeout for other states not supported"),
+                }
             },
             cmd: SetSockOptRawCmd => {
                 // FIXME: Currently, it is harmless to ignore errors here.
@@ -329,7 +346,6 @@ impl Stream {
             Status::Idle(info) => info.nonblocking(),
             Status::Connected(endpoint) => endpoint.nonblocking(),
             Status::Listening(addr) => ADDRESS_SPACE.get_listener_ref(&addr).unwrap().nonblocking(),
-            // _ => unreachable!(),
         }
     }
 
@@ -341,7 +357,6 @@ impl Stream {
                 .get_listener_ref(&addr)
                 .unwrap()
                 .set_nonblocking(nonblocking),
-            // _ => unreachable!(),
         }
     }
 }
