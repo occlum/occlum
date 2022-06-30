@@ -12,6 +12,9 @@
 #define MIN(a, b)               ((a) <= (b) ? (a) : (b))
 #define MAX(a, b)               ((a) >= (b) ? (a) : (b))
 #define ARRAY_SIZE(array)   (sizeof(array)/sizeof(array[0]))
+#define LONG_TEST_MSG "Occlum is a memory-safe, multi-process library OS (LibOS) for Intel SGX. \
+                    As a LibOS, it enables legacy applications to run on SGX with little or even \
+                    no modifications of source code, thus protecting the confidentiality and integrity of user workloads transparently."
 
 typedef int(*test_case_func_t)(void);
 
