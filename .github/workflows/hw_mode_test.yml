@@ -918,7 +918,7 @@ jobs:
       run: docker stop ${{ env.CONTAINER_NAME }}
 
   Stress_test_with_musl:
-    timeout-minutes: 180
+    timeout-minutes: 360
     if: github.event_name == 'schedule'
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -951,7 +951,7 @@ jobs:
 
 
   Stress_test_with_glibc:
-    timeout-minutes: 180
+    timeout-minutes: 360
     if: github.event_name == 'schedule'
     runs-on: ${{ matrix.self_runner }}
     strategy:
