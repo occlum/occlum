@@ -1,5 +1,13 @@
-apt-get update
-apt install -y python3-pip 
+#!/bin/bash
+set -e
+
+OS=`awk -F= '/^NAME/{print $2}' /etc/os-release`
+if [ "$OS" == "\"Ubuntu\"" ]; then
+  apt-get update -y && apt-get install -y python3-pip
+else
+  yum install -y python3-pip
+fi
+
 pip3 install --upgrade pip
 pip3 install --upgrade tensorflow==2.4
 ./download_model.sh

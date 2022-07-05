@@ -5,6 +5,7 @@ export PATH=$PATH:$INSTALL_DIR/bin
 # Tell CMake to search for packages in Occlum toolchain's directory only
 export PKG_CONFIG_LIBDIR=$INSTALL_DIR/lib
 
+rm -rf grpc
 git clone https://github.com/grpc/grpc.git 
 cd grpc
 git checkout tags/v1.24.3
