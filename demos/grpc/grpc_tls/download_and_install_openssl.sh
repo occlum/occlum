@@ -2,6 +2,7 @@
 #copyright@antfinancial:adopted from a script written by geding
 set -e
 
+rm -rf openssl
 git clone -b OpenSSL_1_1_1 --depth 1 http://github.com/openssl/openssl
 cd openssl
 CC=occlum-gcc ./config \
