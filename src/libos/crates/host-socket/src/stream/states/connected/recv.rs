@@ -70,6 +70,10 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
                     .await;
                 if let Err(e) = ret {
                     warn!("recv wait errno = {:?}", e.errno());
+                    // For recv with MSG_WAITALL, return total received bytes if timeout or interrupt
+                    if flags.contains(RecvFlags::MSG_WAITALL) && total_received > 0 {
+                        return Ok(total_received);
+                    }
                     match e.errno() {
                         ETIMEDOUT => {
                             return_errno!(EAGAIN, "timeout reached")
