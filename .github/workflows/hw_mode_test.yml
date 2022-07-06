@@ -119,17 +119,17 @@ jobs:
             make test"
 
     - name: Run Golang sqlite test
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "export GO111MODULE=on;
             cd /root/occlum/demos/golang/go_sqlite/ && ./run_go_sqlite_demo.sh"
 
     - name: Go server set up and run
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "export GO111MODULE=on;
             cd /root/occlum/demos/golang/web_server && occlum-go mod init web_server && occlum-go get -u -v github.com/gin-gonic/gin;
             occlum-go build -o web_server ./web_server.go;
             ./run_golang_on_occlum.sh" &
 
     - name: Set up Golang grpc pingpong test
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "export GO111MODULE=on;
             cd /root/occlum/demos/golang/grpc_pingpong && ./prepare_ping_pong.sh"
 
     - name: Start Golang grpc pingpong server
