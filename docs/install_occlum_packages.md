@@ -125,5 +125,6 @@ The matrix below shows the version compatability since Occlum `0.16.0`. Please c
 |     0.26.0      |       2.14        |        18.04        |         8.2         |
 |     0.26.1      |       2.15.1      |        18.04        |         8.2         |
 |     0.27.0      |       2.15.1      |        20.04        |          \          |
+|     0.28.0      |       2.16        |        20.04        |          \          |
 
 For more information about the packages, please checkout [here](../tools/installer/README.md).
