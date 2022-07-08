@@ -7,7 +7,7 @@ use super::fs_ops::{self, MountOptions};
 use super::time::{timespec_t, timeval_t};
 use super::*;
 
-use crate::config::ConfigMountFsType;
+use crate::config::{user_rootfs_config, ConfigApp, ConfigMountFsType};
 use crate::util::mem_util::from_user;
 use std::convert::TryFrom;
 
@@ -570,20 +570,24 @@ pub async fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
 
 pub async fn do_mount_rootfs(
     key_ptr: *const sgx_key_128bit_t,
-    occlum_json_mac_ptr: *const sgx_aes_gcm_128bit_tag_t,
+    rootfs_config_ptr: *const user_rootfs_config,
 ) -> Result<isize> {
     let key = if key_ptr.is_null() {
         None
     } else {
         Some(unsafe { key_ptr.read() })
     };
-    if occlum_json_mac_ptr.is_null() {
-        return_errno!(EINVAL, "occlum_json_mac_ptr cannot be null");
+    // If user provided valid parameters, do runtime mount and boot
+    // Otherwise, do general mount and boot
+    if !rootfs_config_ptr.is_null() {
+        from_user::check_ptr(rootfs_config_ptr)?;
+        let rootfs_config = unsafe { *rootfs_config_ptr };
+        let app_config = ConfigApp::from_user(&rootfs_config)?;
+        debug!("user provided app config: {:?}", app_config);
+        fs_ops::do_mount_rootfs(&app_config, &key).await?;
+    } else {
+        fs_ops::do_mount_rootfs(&config::LIBOS_CONFIG.get_app_config("app").unwrap(), &key).await?;
     }
-    let expected_occlum_json_mac = unsafe { occlum_json_mac_ptr.read() };
-    let user_config_path = unsafe { format!("{}{}", INSTANCE_DIR, "/build/Occlum.json.protected") };
-    let user_config = config::load_config(&user_config_path, &expected_occlum_json_mac)?;
-    fs_ops::do_mount_rootfs(&user_config, &key).await?;
     Ok((0))
 }
 

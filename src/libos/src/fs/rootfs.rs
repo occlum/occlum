@@ -5,7 +5,7 @@ use super::procfs::ProcFS;
 use super::sefs::{SgxStorage, SgxUuidProvider};
 use super::sync_fs_wrapper::{SyncFS, SyncInode};
 use super::*;
-use config::ConfigMountFsType;
+use config::{ConfigApp, ConfigMountFsType};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::untrusted::path::PathEx;
@@ -30,12 +30,11 @@ pub async fn rootfs() -> &'static Arc<dyn AsyncFileSystem> {
             Ordering::SeqCst,
         ) {
             Ok(_) => {
-                let rootfs = init_rootfs(&config::LIBOS_CONFIG.mount, &None)
-                    .await
-                    .unwrap_or_else(|e| {
-                        error!("failed to init the rootfs: {}", e.backtrace());
-                        panic!();
-                    });
+                let mount_config = &config::LIBOS_CONFIG.get_app_config("init").unwrap().mount;
+                let rootfs = init_rootfs(mount_config, &None).await.unwrap_or_else(|e| {
+                    error!("failed to init the rootfs: {}", e.backtrace());
+                    panic!();
+                });
                 unsafe {
                     ROOT_FS = Some(rootfs);
                 }
@@ -127,7 +126,7 @@ fn open_rootfs_according_to(
         .find(|m| {
             m.target == Path::new("/")
                 && m.type_ == ConfigMountFsType::TYPE_SEFS
-                && m.options.mac.is_some()
+                && (m.options.mac.is_some() || m.options.index == 1)
         })
         .ok_or_else(|| errno!(Errno::ENOENT, "the image SEFS in layers is not valid"))?;
     let root_image_sefs =
@@ -139,6 +138,7 @@ fn open_rootfs_according_to(
             m.target == Path::new("/")
                 && m.type_ == ConfigMountFsType::TYPE_SEFS
                 && m.options.mac.is_none()
+                && m.options.index == 0
         })
         .ok_or_else(|| errno!(Errno::ENOENT, "the container SEFS in layers is not valid"))?;
     let root_container_sefs =

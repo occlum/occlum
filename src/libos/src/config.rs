@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::entry::enclave::INSTANCE_DIR;
 use crate::prelude::*;
+use crate::util::mem_util::from_user;
 
 lazy_static! {
     pub static ref LIBOS_CONFIG: Config = {
@@ -98,9 +99,9 @@ pub struct Config {
     pub resource_limits: ConfigResourceLimits,
     pub process: ConfigProcess,
     pub env: ConfigEnv,
-    pub entry_points: Vec<PathBuf>,
+
     pub untrusted_unix_socks: Option<Vec<ConfigUntrustedUnixSock>>,
-    pub mount: Vec<ConfigMount>,
+    pub app: Vec<ConfigApp>,
 }
 
 #[derive(Debug)]
@@ -128,7 +129,7 @@ pub struct ConfigUntrustedUnixSock {
     pub libos: PathBuf,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ConfigMount {
     pub type_: ConfigMountFsType,
     pub target: PathBuf,
@@ -136,7 +137,14 @@ pub struct ConfigMount {
     pub options: ConfigMountOptions,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug)]
+pub struct ConfigApp {
+    pub entry_points: Vec<PathBuf>,
+    pub stage: String,
+    pub mount: Vec<ConfigMount>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum ConfigMountFsType {
     TYPE_SEFS,
@@ -176,12 +184,13 @@ impl ConfigMountFsType {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct ConfigMountOptions {
     pub mac: Option<sgx_aes_gcm_128bit_tag_t>,
     pub layers: Option<Vec<ConfigMount>>,
     pub temporary: bool,
     pub total_size: Option<usize>,
+    pub index: u32,
 }
 
 impl Config {
@@ -189,16 +198,12 @@ impl Config {
         let resource_limits = ConfigResourceLimits::from_input(&input.resource_limits)?;
         let process = ConfigProcess::from_input(&input.process)?;
         let env = ConfigEnv::from_input(&input.env)?;
-        let entry_points = {
-            let mut entry_points = Vec::new();
-            for ep in &input.entry_points {
-                let ep_path = Path::new(ep).to_path_buf();
-                if !ep_path.is_absolute() {
-                    return_errno!(EINVAL, "entry point must be an absolute path")
-                }
-                entry_points.push(ep_path);
+        let app = {
+            let mut app = Vec::new();
+            for input_app in &input.app {
+                app.push(ConfigApp::from_input(&input_app)?);
             }
-            entry_points
+            app
         };
         let untrusted_unix_socks = {
             if let Some(input_socks) = &input.untrusted_unix_socks {
@@ -216,21 +221,25 @@ impl Config {
                 None
             }
         };
-        let mount = {
-            let mut mount = Vec::new();
-            for input_mount in &input.mount {
-                mount.push(ConfigMount::from_input(&input_mount)?);
-            }
-            mount
-        };
+
         Ok(Config {
             resource_limits,
             process,
             env,
-            entry_points,
+
             untrusted_unix_socks,
-            mount,
+            app,
         })
+    }
+
+    pub fn get_app_config(&self, stage: &str) -> Result<&ConfigApp> {
+        let config_app = self
+            .app
+            .iter()
+            .find(|m| m.stage.eq(stage))
+            .ok_or_else(|| errno!(Errno::ENOENT, "No expected config app"))?;
+
+        Ok(config_app)
     }
 }
 
@@ -259,6 +268,36 @@ impl ConfigEnv {
         Ok(ConfigEnv {
             default: input.default.clone(),
             untrusted: input.untrusted.clone(),
+        })
+    }
+}
+
+impl ConfigApp {
+    fn from_input(input: &InputConfigApp) -> Result<ConfigApp> {
+        let stage = input.stage.clone();
+        let entry_points = {
+            let mut entry_points = Vec::new();
+            for ep in &input.entry_points {
+                let ep_path = Path::new(ep).to_path_buf();
+                if !ep_path.is_absolute() {
+                    return_errno!(EINVAL, "entry point must be an absolute path")
+                }
+                entry_points.push(ep_path);
+            }
+            entry_points
+        };
+        let mount = {
+            let mut mount = Vec::new();
+            for input_mount in &input.mount {
+                mount.push(ConfigMount::from_input(&input_mount)?);
+            }
+            mount
+        };
+
+        Ok(ConfigApp {
+            stage,
+            entry_points,
+            mount,
         })
     }
 }
@@ -316,6 +355,7 @@ impl ConfigMountOptions {
             layers,
             temporary: input.temporary,
             total_size,
+            index: input.index,
         })
     }
 }
@@ -354,12 +394,12 @@ struct InputConfig {
     pub process: InputConfigProcess,
     #[serde(default)]
     pub env: InputConfigEnv,
-    #[serde(default)]
-    pub entry_points: Vec<String>,
+
     #[serde(default)]
     pub untrusted_unix_socks: Option<Vec<InputConfigUntrustedUnixSock>>,
+
     #[serde(default)]
-    pub mount: Vec<InputConfigMount>,
+    pub app: Vec<InputConfigApp>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -465,4 +505,120 @@ struct InputConfigMountOptions {
     pub temporary: bool,
     #[serde(default)]
     pub total_size: Option<String>,
+    #[serde(default)]
+    pub index: u32,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+struct InputConfigApp {
+    #[serde(default)]
+    pub stage: String,
+    #[serde(default)]
+    pub entry_points: Vec<String>,
+    #[serde(default)]
+    pub mount: Vec<InputConfigMount>,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+#[allow(non_camel_case_types)]
+pub struct user_rootfs_config {
+    upper_layer_path: *const i8,
+    lower_layer_path: *const i8,
+    entry_point: *const i8,
+    hostfs_source: *const i8,
+    hostfs_target: *const i8,
+}
+
+fn to_option_pathbuf(path: *const i8) -> Result<Option<PathBuf>> {
+    let path = if path.is_null() {
+        None
+    } else {
+        Some(PathBuf::from(
+            from_user::clone_cstring_safely(path)?
+                .to_string_lossy()
+                .into_owned(),
+        ))
+    };
+
+    Ok(path)
+}
+
+impl ConfigApp {
+    pub fn from_user(config: &user_rootfs_config) -> Result<ConfigApp> {
+        let upper_layer = to_option_pathbuf(config.upper_layer_path)?;
+        let lower_layer = to_option_pathbuf(config.lower_layer_path)?;
+        let entry_point = to_option_pathbuf(config.entry_point)?;
+        let hostfs_source = to_option_pathbuf(config.hostfs_source)?;
+
+        let hostfs_target = if config.hostfs_target.is_null() {
+            PathBuf::from("/host")
+        } else {
+            PathBuf::from(
+                from_user::clone_cstring_safely(config.hostfs_target)?
+                    .to_string_lossy()
+                    .into_owned(),
+            )
+        };
+
+        let mut config_app = LIBOS_CONFIG.get_app_config("app").unwrap().clone();
+        let root_mount_config = config_app
+            .mount
+            .iter_mut()
+            .find(|m| m.target == Path::new("/") && m.type_ == ConfigMountFsType::TYPE_UNIONFS)
+            .ok_or_else(|| errno!(Errno::ENOENT, "the root UnionFS is not valid"))?;
+
+        if upper_layer.is_some() {
+            let layer_mount_configs = root_mount_config.options.layers.as_mut().unwrap();
+            // image SEFS in layers
+            let root_image_sefs_mount_config = layer_mount_configs
+                .iter_mut()
+                .find(|m| {
+                    m.target == Path::new("/")
+                        && m.type_ == ConfigMountFsType::TYPE_SEFS
+                        && (m.options.mac.is_some() || m.options.index == 1)
+                })
+                .ok_or_else(|| errno!(Errno::ENOENT, "the image SEFS in layers is not valid"))?;
+
+            root_image_sefs_mount_config.source = upper_layer;
+            root_image_sefs_mount_config.options.mac = None;
+            root_image_sefs_mount_config.options.index = 1;
+        }
+
+        if lower_layer.is_some() {
+            let layer_mount_configs = root_mount_config.options.layers.as_mut().unwrap();
+            // container SEFS in layers
+            let root_container_sefs_mount_config = layer_mount_configs
+                .iter_mut()
+                .find(|m| {
+                    m.target == Path::new("/")
+                        && m.type_ == ConfigMountFsType::TYPE_SEFS
+                        && m.options.mac.is_none()
+                        && m.options.index == 0
+                })
+                .ok_or_else(|| {
+                    errno!(Errno::ENOENT, "the container SEFS in layers is not valid")
+                })?;
+
+            root_container_sefs_mount_config.source = lower_layer;
+        }
+
+        if entry_point.is_some() {
+            config_app.entry_points.clear();
+            config_app.entry_points.push(entry_point.unwrap())
+        }
+
+        if hostfs_source.is_some() {
+            let hostfs_mount_config = config_app
+                .mount
+                .iter_mut()
+                .find(|m| m.type_ == ConfigMountFsType::TYPE_HOSTFS)
+                .ok_or_else(|| errno!(Errno::ENOENT, "the HostFS is not valid"))?;
+            hostfs_mount_config.source = hostfs_source;
+            hostfs_mount_config.target = hostfs_target;
+        }
+
+        Ok(config_app)
+    }
 }

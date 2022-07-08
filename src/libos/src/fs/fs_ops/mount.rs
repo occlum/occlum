@@ -9,18 +9,18 @@ use super::rootfs::{init_rootfs, mount_nonroot_fs_according_to, umount_nonroot_f
 use super::*;
 
 pub async fn do_mount_rootfs(
-    user_config: &config::Config,
+    user_app_config: &config::ConfigApp,
     user_key: &Option<sgx_key_128bit_t>,
 ) -> Result<()> {
     debug!("mount rootfs");
 
-    let new_rootfs = init_rootfs(&user_config.mount, user_key).await?;
+    let new_rootfs = init_rootfs(&user_app_config.mount, user_key).await?;
 
     // Update the rootfs
     update_rootfs(new_rootfs).await?;
 
     // Update entry_points
-    *ENTRY_POINTS.write().unwrap() = user_config.entry_points.to_owned();
+    *ENTRY_POINTS.write().unwrap() = user_app_config.entry_points.to_owned();
 
     // Write resolv.conf file into mounted file system
     write_host_file(HostFile::ResolvConf).await?;
