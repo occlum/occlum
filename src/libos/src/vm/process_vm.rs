@@ -118,13 +118,24 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
                     .align(elf_layout.align())
                     .perms(VMPerms::ALL) // set it to read | write | exec for simplicity
                     .initializer(VMInitializer::DoNothing())
-                    .build()?;
-                let (elf_range, chunk_ref) = USER_SPACE_VM_MANAGER.alloc(&vm_option)?;
+                    .build()
+                    .map_err(|e| {
+                        &self.handle_error_when_init(&chunks);
+                        e
+                    })?;
+                let (elf_range, chunk_ref) =
+                    USER_SPACE_VM_MANAGER.alloc(&vm_option).map_err(|e| {
+                        &self.handle_error_when_init(&chunks);
+                        e
+                    })?;
                 debug_assert!(elf_range.start() % elf_layout.align() == 0);
-                Self::init_elf_memory(&elf_range, elf_file)?;
+                chunks.insert(chunk_ref);
+                Self::init_elf_memory(&elf_range, elf_file).map_err(|e| {
+                    &self.handle_error_when_init(&chunks);
+                    e
+                })?;
                 trace!("elf range = {:?}", elf_range);
                 elf_ranges.push(elf_range);
-                chunks.insert(chunk_ref);
                 Ok(())
             })
             .collect::<Result<()>>()?;
@@ -135,8 +146,16 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
             .size(heap_layout.size())
             .align(heap_layout.align())
             .perms(VMPerms::READ | VMPerms::WRITE)
-            .build()?;
-        let (heap_range, chunk_ref) = USER_SPACE_VM_MANAGER.alloc(&vm_option)?;
+            .build()
+            .map_err(|e| {
+                &self.handle_error_when_init(&chunks);
+                e
+            })?;
+
+        let (heap_range, chunk_ref) = USER_SPACE_VM_MANAGER.alloc(&vm_option).map_err(|e| {
+            &self.handle_error_when_init(&chunks);
+            e
+        })?;
         debug_assert!(heap_range.start() % heap_layout.align() == 0);
         trace!("heap range = {:?}", heap_range);
         let brk = AtomicUsize::new(heap_range.start());
@@ -148,8 +167,15 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
             .size(stack_layout.size())
             .align(heap_layout.align())
             .perms(VMPerms::READ | VMPerms::WRITE)
-            .build()?;
-        let (stack_range, chunk_ref) = USER_SPACE_VM_MANAGER.alloc(&vm_option)?;
+            .build()
+            .map_err(|e| {
+                &self.handle_error_when_init(&chunks);
+                e
+            })?;
+        let (stack_range, chunk_ref) = USER_SPACE_VM_MANAGER.alloc(&vm_option).map_err(|e| {
+            &self.handle_error_when_init(&chunks);
+            e
+        })?;
         debug_assert!(stack_range.start() % stack_layout.align() == 0);
         chunks.insert(chunk_ref);
         trace!("stack range = {:?}", stack_range);
@@ -177,6 +203,12 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
         validate_size(self.stack_size)?;
         validate_size(self.mmap_size)?;
         Ok(())
+    }
+
+    fn handle_error_when_init(&self, chunks: &HashSet<Arc<Chunk>>) {
+        chunks.iter().for_each(|chunk| {
+            USER_SPACE_VM_MANAGER.internal().munmap_chunk(chunk, None);
+        });
     }
 
     fn init_elf_memory(elf_range: &VMRange, elf_file: &ElfFile) -> Result<()> {
