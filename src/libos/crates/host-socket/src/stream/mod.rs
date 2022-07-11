@@ -206,7 +206,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             match &*state {
                 State::Connected(connected_stream) => connected_stream.clone(),
                 _ => {
-                    return_errno!(EINVAL, "the socket is not connected");
+                    return_errno!(ENOTCONN, "the socket is not connected");
                 }
             }
         };
@@ -228,7 +228,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             match &*state {
                 State::Connected(connected_stream) => connected_stream.clone(),
                 _ => {
-                    return_errno!(ENOTCONN, "the socket is not connected");
+                    return_errno!(EPIPE, "the socket is not connected");
                 }
             }
         };

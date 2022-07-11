@@ -440,30 +440,10 @@ impl SocketFile {
         flags: SendFlags,
     ) -> Result<usize> {
         let res = match &self.socket {
-            AnySocket::Ipv4Stream(ipv4_stream) => {
-                if addr.is_some() {
-                    return_errno!(EISCONN, "addr should be none");
-                }
-                ipv4_stream.sendmsg(bufs, flags).await
-            }
-            AnySocket::Ipv6Stream(ipv6_stream) => {
-                if addr.is_some() {
-                    return_errno!(EISCONN, "addr should be none");
-                }
-                ipv6_stream.sendmsg(bufs, flags).await
-            }
-            AnySocket::UnixStream(unix_stream) => {
-                if addr.is_some() {
-                    return_errno!(EISCONN, "addr should be none");
-                }
-                unix_stream.sendmsg(bufs, flags).await
-            }
-            AnySocket::TrustedUDS(trusted_stream) => {
-                if addr.is_some() {
-                    return_errno!(EISCONN, "addr should be none");
-                }
-                trusted_stream.sendmsg(bufs, flags).await
-            }
+            AnySocket::Ipv4Stream(ipv4_stream) => ipv4_stream.sendmsg(bufs, flags).await,
+            AnySocket::Ipv6Stream(ipv6_stream) => ipv6_stream.sendmsg(bufs, flags).await,
+            AnySocket::UnixStream(unix_stream) => unix_stream.sendmsg(bufs, flags).await,
+            AnySocket::TrustedUDS(trusted_stream) => trusted_stream.sendmsg(bufs, flags).await,
             AnySocket::Ipv4Datagram(ipv4_datagram) => {
                 let ip_addr = if let Some(addr) = addr.as_ref() {
                     Some(addr.to_ipv4()?)

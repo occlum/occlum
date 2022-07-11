@@ -217,12 +217,7 @@ pub async fn do_sendto(
     if addr.is_null() ^ (addr_len == 0) {
         return_errno!(EINVAL, "addr and addr_len should be both null and 0 or not");
     }
-    let addr = if socket_file.is_stream() {
-        if !addr.is_null() {
-            return_errno!(EISCONN, "addr and addr_len should be null and 0");
-        }
-        None
-    } else {
+    let addr = {
         if addr.is_null() {
             None
         } else {
