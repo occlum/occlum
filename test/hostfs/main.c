@@ -213,6 +213,7 @@ static int test_truncate() {
 static int test_mkdir_then_rmdir() {
     const char *dir_path = "/host/hostfs_dir";
     struct stat stat_buf;
+    int dir_fd;
 
     if (mkdir(dir_path, 00775) < 0) {
         THROW_ERROR("failed to create the dir");
@@ -223,6 +224,16 @@ static int test_mkdir_then_rmdir() {
     if (!S_ISDIR(stat_buf.st_mode)) {
         THROW_ERROR("failed to check if it is dir");
     }
+
+    dir_fd = open(dir_path, O_RDONLY | O_DIRECTORY);
+    if (dir_fd < 0) {
+        THROW_ERROR("failed to open dir");
+    }
+
+    if (fsync(dir_fd) < 0) {
+        THROW_ERROR("failed to fsync dir");
+    }
+    close(dir_fd);
 
     if (rmdir(dir_path) < 0) {
         THROW_ERROR("failed to remove the created dir");

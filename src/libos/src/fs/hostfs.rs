@@ -125,16 +125,24 @@ impl INode for HNode {
     }
 
     fn sync_all(&self) -> Result<()> {
-        let mut guard = self.open_file()?;
-        let file = guard.as_mut().unwrap();
-        try_std!(file.sync_all());
+        if self.path.is_file() {
+            let mut guard = self.open_file()?;
+            let file = guard.as_mut().unwrap();
+            try_std!(file.sync_all());
+        } else {
+            warn!("no sync_all method about dir, do nothing");
+        }
         Ok(())
     }
 
     fn sync_data(&self) -> Result<()> {
-        let mut guard = self.open_file()?;
-        let file = guard.as_mut().unwrap();
-        try_std!(file.sync_data());
+        if self.path.is_file() {
+            let mut guard = self.open_file()?;
+            let file = guard.as_mut().unwrap();
+            try_std!(file.sync_data());
+        } else {
+            warn!("no sync_data method about dir, do nothing");
+        }
         Ok(())
     }
 
