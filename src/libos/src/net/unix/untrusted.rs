@@ -25,5 +25,4 @@ pub fn untrusted_unix_socks_init() {
             untrusted_socks.insert(libos_addr, host_unix_addr);
         })
     }
-    info!("untrusted socks = {:?}", &*untrusted_socks);
 }

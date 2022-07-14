@@ -36,17 +36,33 @@ impl Stream {
     }
 
     pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-        self.recvmsg(bufs, RecvFlags::empty()).await
+        self.recvmsg(bufs, RecvFlags::empty())
+            .await
+            .map(|ret| ret.0)
     }
 
     /// Linux behavior:
     /// Unlike datagram socket, `recvfrom` / `recvmsg` of stream socket will
-    /// ignore the address even if user specified it. For stream socket, If user
-    /// want to get source address , user should use `getpeername` syscall.
+    /// ignore the address even if user specified it.
     /// TODO: handle flags
-    pub async fn recvmsg(&self, bufs: &mut [&mut [u8]], flags: RecvFlags) -> Result<usize> {
-        let addr = self.peer_addr().ok();
-        debug!("recvfrom {:?}", addr);
+    pub async fn recvmsg(
+        &self,
+        bufs: &mut [&mut [u8]],
+        flags: RecvFlags,
+    ) -> Result<(usize, Option<UnixAddr>)> {
+        let addr = {
+            let trusted_addr = self.peer_addr().ok();
+            debug!("recvfrom {:?}", trusted_addr);
+            if let Some(addr) = trusted_addr {
+                match addr.inner() {
+                    UnixAddr::Pathname(path) => Some(UnixAddr::Pathname(path.clone())),
+                    UnixAddr::Abstract(name) => Some(UnixAddr::Abstract(name.clone())),
+                    UnixAddr::Unnamed => None,
+                }
+            } else {
+                None
+            }
+        };
 
         let connected_stream = {
             match &*self.inner() {
@@ -58,7 +74,7 @@ impl Stream {
         };
         let data_len = connected_stream.readv(bufs).await?;
 
-        Ok(data_len)
+        Ok((data_len, addr))
     }
 
     pub async fn write(&self, buf: &[u8]) -> Result<usize> {
@@ -72,7 +88,7 @@ impl Stream {
     // TODO: handle flags
     pub async fn sendmsg(&self, bufs: &[&[u8]], flags: SendFlags) -> Result<usize> {
         let addr = self.peer_addr().ok();
-        debug!("recvfrom {:?}", addr);
+        debug!("sendmsg to {:?}", addr);
 
         let connected_stream = {
             match &*self.inner() {
@@ -269,9 +285,15 @@ impl Stream {
                     return_errno!(EINVAL, "the socket is not bound");
                 }
             }
+            Status::Listening(addr) => {
+                if let Some(listener) = ADDRESS_SPACE.get_listener_ref(addr) {
+                    let nonblocking = listener.nonblocking();
+                    ADDRESS_SPACE.add_listener(addr, capacity, nonblocking)?;
+                } else {
+                    return_errno!(EINVAL, "something wrong with listen");
+                }
+            }
             Status::Connected(_) => return_errno!(EINVAL, "the socket is already connected"),
-            // Modify the capacity of the channel holding incoming sockets
-            Status::Listening(addr) => return_errno!(EINVAL, "already listening"),
         }
 
         Ok(())
@@ -372,11 +394,9 @@ impl Debug for Stream {
 
 impl Drop for Stream {
     fn drop(&mut self) {
-        info!("Drop trusted stream in idle state");
         match &*self.inner() {
             Status::Idle(info) => {
                 if let Some(addr) = info.addr() {
-                    info!("Drop trusted stream in idle state");
                     ADDRESS_SPACE.remove_addr(&addr);
                 }
             }

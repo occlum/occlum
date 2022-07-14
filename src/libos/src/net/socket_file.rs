@@ -391,20 +391,20 @@ impl SocketFile {
         // TODO: support msg_flags and msg_control
         Ok(match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => {
-                let bytes_recv = ipv4_stream.recvmsg(bufs, flags).await?;
-                (bytes_recv, None)
+                let (bytes_recv, addr_recv) = ipv4_stream.recvmsg(bufs, flags).await?;
+                (bytes_recv, addr_recv.map(|addr| AnyAddr::Ipv4(addr)))
             }
             AnySocket::Ipv6Stream(ipv6_stream) => {
-                let bytes_recv = ipv6_stream.recvmsg(bufs, flags).await?;
-                (bytes_recv, None)
+                let (bytes_recv, addr_recv) = ipv6_stream.recvmsg(bufs, flags).await?;
+                (bytes_recv, addr_recv.map(|addr| AnyAddr::Ipv6(addr)))
             }
             AnySocket::UnixStream(unix_stream) => {
-                let bytes_recv = unix_stream.recvmsg(bufs, flags).await?;
-                (bytes_recv, None)
+                let (bytes_recv, addr_recv) = unix_stream.recvmsg(bufs, flags).await?;
+                (bytes_recv, addr_recv.map(|addr| AnyAddr::Unix(addr)))
             }
             AnySocket::TrustedUDS(trusted_stream) => {
-                let bytes_recv = trusted_stream.recvmsg(bufs, flags).await?;
-                (bytes_recv, None)
+                let (bytes_recv, addr_recv) = trusted_stream.recvmsg(bufs, flags).await?;
+                (bytes_recv, addr_recv.map(|addr| AnyAddr::Unix(addr)))
             }
             AnySocket::Ipv4Datagram(ipv4_datagram) => {
                 let (bytes_recv, addr_recv) = ipv4_datagram.recvmsg(bufs, flags).await?;

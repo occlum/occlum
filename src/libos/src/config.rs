@@ -215,7 +215,6 @@ impl Config {
             if let Some(input_socks) = &input.untrusted_unix_socks {
                 let mut untrusted_socks = Vec::new();
                 for sock in input_socks {
-                    info!("sock = {:?}", sock);
                     let untrusted_sock = ConfigUntrustedUnixSock {
                         host: Path::new(&sock.host).to_path_buf(),
                         libos: Path::new(&sock.libos).to_path_buf(),

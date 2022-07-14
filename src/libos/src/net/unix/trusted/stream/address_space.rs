@@ -61,12 +61,8 @@ impl AddressSpace {
         let mut space = self.get_space(addr);
 
         if let Some(option) = space.get(&key) {
-            if option.is_none() {
-                space.insert(key, Some(Arc::new(Listener::new(capacity, nonblocking)?)));
-                Ok(())
-            } else {
-                return_errno!(EINVAL, "the socket is already listened");
-            }
+            space.insert(key, Some(Arc::new(Listener::new(capacity, nonblocking)?)));
+            Ok(())
         } else {
             return_errno!(EINVAL, "the socket is not bound");
         }

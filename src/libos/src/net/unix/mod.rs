@@ -103,9 +103,10 @@ impl UnixStream {
 
             // Bind the Host FS address
             let host_addr = Self::get_host_socket_file_path(addr, host_path, is_socket_file);
-            info!(
-                "bind crossworld sock: libos path: {:?}, host path: {:?}",
-                addr, host_addr
+            trace!(
+                "bind cross world sock: libos path: {:?}, host path: {:?}",
+                addr,
+                host_addr
             );
             addr.bind_untrusted_addr(&host_addr).await?; // bind two address
             untrusted_sock.bind(&host_addr)?;
@@ -135,9 +136,10 @@ impl UnixStream {
             let untrusted_sock = UntrustedUnixStream::new(nonblocking)?;
 
             let host_addr = Self::get_host_socket_file_path(addr, host_path, is_socket_file);
-            info!(
-                "connect crossworld sock: libos path: {:?}, host path: {:?}",
-                addr, host_addr
+            trace!(
+                "connect cross world sock: libos path: {:?}, host path: {:?}",
+                addr,
+                host_addr
             );
             untrusted_sock.connect(&host_addr).await?;
 
@@ -182,7 +184,11 @@ impl UnixStream {
         }
     }
 
-    pub async fn recvmsg(&self, buf: &mut [&mut [u8]], flags: RecvFlags) -> Result<usize> {
+    pub async fn recvmsg(
+        &self,
+        buf: &mut [&mut [u8]],
+        flags: RecvFlags,
+    ) -> Result<(usize, Option<UnixAddr>)> {
         apply_fn_on_any_stream!(self.inner(), |stream| { stream.recvmsg(buf, flags).await })
     }
 

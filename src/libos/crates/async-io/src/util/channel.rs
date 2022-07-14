@@ -543,12 +543,12 @@ impl Consumer<u8> {
                 return ret;
             }
 
-            if self.is_nonblocking() {
-                return_errno!(EAGAIN, "no data are present to be received");
-            }
-
             if self.peer_end().is_shutdown() {
                 return Ok(0);
+            }
+
+            if self.is_nonblocking() {
+                return_errno!(EAGAIN, "no data are present to be received");
             }
 
             if poller.is_none() {

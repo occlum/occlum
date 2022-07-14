@@ -255,6 +255,9 @@ pub async fn do_recvfrom(
         if let Some(addr_recv) = addr_recv {
             let (c_addr_storage, c_addr_len) = addr_recv.to_c_storage();
             copy_sock_addr_to_user(c_addr_storage, c_addr_len, addr_mut, addr_len_mut);
+        } else {
+            // If addr_recv is not filled, set addr_len to 0
+            *addr_len_mut = 0;
         }
     }
     Ok(bytes_recv as _)
