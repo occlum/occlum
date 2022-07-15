@@ -3,7 +3,7 @@ use alloc::sync::{Arc, Weak};
 use core::any::Any;
 use rcore_fs::vfs::*;
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::os::unix::fs::{DirEntryExt, FileTypeExt};
+use std::os::unix::fs::{DirEntryExt, FileTypeExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{SgxMutex as Mutex, SgxMutexGuard as MutexGuard};
 use std::untrusted::fs;
@@ -76,6 +76,9 @@ macro_rules! try_std {
 
 impl INode for HNode {
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+        if !self.path.is_file() {
+            return Err(FsError::NotFile);
+        }
         let mut guard = self.open_file()?;
         let file = guard.as_mut().unwrap();
         try_std!(file.seek(SeekFrom::Start(offset as u64)));
@@ -84,6 +87,9 @@ impl INode for HNode {
     }
 
     fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+        if !self.path.is_file() {
+            return Err(FsError::NotFile);
+        }
         let mut guard = self.open_file()?;
         let file = guard.as_mut().unwrap();
         try_std!(file.seek(SeekFrom::Start(offset as u64)));
@@ -109,25 +115,41 @@ impl INode for HNode {
     }
 
     fn set_metadata(&self, metadata: &Metadata) -> Result<()> {
-        warn!("HostFS: set_metadata() is unimplemented");
+        warn!(
+            "HostFS: set_metadata() only support chmod: {:#o}",
+            metadata.mode
+        );
+        let perms = fs::Permissions::from_mode(metadata.mode as u32);
+        try_std!(fs::set_permissions(&self.path, perms));
         Ok(())
     }
 
     fn sync_all(&self) -> Result<()> {
-        let mut guard = self.open_file()?;
-        let file = guard.as_mut().unwrap();
-        try_std!(file.sync_all());
+        if self.path.is_file() {
+            let mut guard = self.open_file()?;
+            let file = guard.as_mut().unwrap();
+            try_std!(file.sync_all());
+        } else {
+            warn!("no sync_all method about dir, do nothing");
+        }
         Ok(())
     }
 
     fn sync_data(&self) -> Result<()> {
-        let mut guard = self.open_file()?;
-        let file = guard.as_mut().unwrap();
-        try_std!(file.sync_data());
+        if self.path.is_file() {
+            let mut guard = self.open_file()?;
+            let file = guard.as_mut().unwrap();
+            try_std!(file.sync_data());
+        } else {
+            warn!("no sync_data method about dir, do nothing");
+        }
         Ok(())
     }
 
     fn resize(&self, len: usize) -> Result<()> {
+        if !self.path.is_file() {
+            return Err(FsError::NotFile);
+        }
         let mut guard = self.open_file()?;
         let file = guard.as_mut().unwrap();
         try_std!(file.set_len(len as u64));
@@ -139,12 +161,15 @@ impl INode for HNode {
         if new_path.exists() {
             return Err(FsError::EntryExist);
         }
+        let perms = fs::Permissions::from_mode(mode as u32);
         match type_ {
             FileType::File => {
-                try_std!(fs::File::create(&new_path));
+                let file = try_std!(fs::File::create(&new_path));
+                try_std!(file.set_permissions(perms));
             }
             FileType::Dir => {
                 try_std!(fs::create_dir(&new_path));
+                try_std!(fs::set_permissions(&new_path, perms));
             }
             _ => {
                 warn!("only support creating regular file or directory in HostFS");
@@ -262,13 +287,9 @@ impl INode for HNode {
 impl HNode {
     /// Ensure to open the file and store a `File` into `self.file`,
     /// return the `MutexGuard`.
-    /// If the type of `self.path` is not file, then return Err
     fn open_file(&self) -> Result<MutexGuard<Option<fs::File>>> {
         if !self.path.exists() {
             return Err(FsError::EntryNotFound);
-        }
-        if !self.path.is_file() {
-            return Err(FsError::NotFile);
         }
         let mut maybe_file = self.file.lock().unwrap();
         if maybe_file.is_none() {

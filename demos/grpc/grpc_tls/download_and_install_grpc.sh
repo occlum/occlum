@@ -13,11 +13,13 @@ export PATH=$PATH:$INSTALL_DIR/bin
 export PKG_CONFIG_LIBDIR=$INSTALL_DIR/lib
 
 # Download grpc
+rm -rf v${GRPC_VER}*
 wget https://github.com/grpc/grpc/archive/refs/tags/v${GRPC_VER}.tar.gz
 rm -rf ${GRPC_SRC_DIR} && mkdir ${GRPC_SRC_DIR}
 tar zxvf v${GRPC_VER}.tar.gz -C ${GRPC_SRC_DIR} --strip-components 1
 
 # Download and Install c-ares
+rm -rf cares-${CARES_VER}*
 wget https://github.com/c-ares/c-ares/archive/refs/tags/cares-${CARES_VER}.tar.gz
 tar zxvf cares-${CARES_VER}.tar.gz -C ${GRPC_SRC_DIR}/third_party/cares/cares/ --strip-components 1
 cd $GRPC_SRC_DIR/third_party/cares/cares
@@ -33,6 +35,7 @@ make install
 cd $PWD
 
 # Download and Install protobuf
+rm -rf v${RPOTOBUF_VER}*
 wget https://github.com/protocolbuffers/protobuf/archive/refs/tags/v${RPOTOBUF_VER}.tar.gz
 tar zxvf v${RPOTOBUF_VER}.tar.gz -C $GRPC_SRC_DIR/third_party/protobuf/ --strip-components 1
 cd $GRPC_SRC_DIR/third_party/protobuf
@@ -50,7 +53,7 @@ cmake ../ \
 make -j$(nproc)
 make install
 
-cp $INSTALL_DIR/bin/protoc /usr/bin
+cp -f $INSTALL_DIR/bin/protoc /usr/bin
 
 # Install gRPC
 cd $GRPC_SRC_DIR/cmake

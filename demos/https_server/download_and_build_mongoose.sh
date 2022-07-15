@@ -2,7 +2,7 @@
 set -e
 
 # 1. Download and install OpenSSL 1.1.1
-mkdir -p deps/openssl
+rm -rf deps/openssl && mkdir -p deps/openssl
 pushd deps/openssl
 git clone https://github.com/openssl/openssl .
 git checkout tags/OpenSSL_1_1_1 -b OpenSSL_1_1_1
@@ -16,7 +16,7 @@ sudo make install
 popd
 
 # 2. Download Mongoose 6.15
-mkdir -p mongoose_src
+rm -rf mongoose_src && mkdir -p mongoose_src
 pushd mongoose_src
 git clone https://github.com/cesanta/mongoose .
 git checkout tags/6.15 -b 6.15
@@ -26,3 +26,5 @@ popd
 pushd mongoose_src/examples/simplest_web_server_ssl
 CC=occlum-gcc CFLAGS_EXTRA="-Wno-format-truncation" make
 popd
+
+echo "Build Mongoose Success"
