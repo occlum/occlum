@@ -3,6 +3,7 @@
 #include <sys/timerfd.h>
 #include <sys/select.h>
 #include <pthread.h>
+#include <fcntl.h>
 #include <time.h>
 #include "test.h"
 
@@ -64,6 +65,12 @@ int test_timerfd() {
     printf("%ld ns left for next expire\n", curr.it_value.tv_nsec);
     printf("Expired at %d! (%d) (%ld)\n", (int)time(NULL), retval, read(tfd, dummybuf, 8) );
 
+    printf("Set timerfd as non block mode\n");
+    retval = fcntl(tfd, F_SETFL, TFD_NONBLOCK);
+    if (retval == -1) {
+        printf("fcntl failed\n");
+    }
+
     printf("Disalarm timerfd\n");
     struct itimerspec stop = {
         { 0, 0 },
@@ -83,7 +90,7 @@ int test_timerfd() {
 }
 
 int test_invalid_argument() {
-    int tfd = timerfd_create(CLOCK_REALTIME,  0);
+    int tfd = timerfd_create(CLOCK_REALTIME, TFD_NONBLOCK);
     if (tfd <= 0) {
         THROW_ERROR("timerfd_create(CLOCK_REALTIME, ...) failed");
     }

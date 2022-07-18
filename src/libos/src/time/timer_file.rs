@@ -102,6 +102,8 @@ impl TimerFile {
         // Check if the it_value is 0 which means stop the timer
         if new_value.it_value.is_zero() == true {
             debug!("TimerFd: stop timer");
+            // Reset expired count
+            inner.exp_cnt = 0;
             inner.status = TimerFdStatus::STOP;
             if inner.task_handle.is_some() {
                 // If timer task started, send signal to end the task
@@ -297,9 +299,7 @@ impl TimerFile {
                 return Ok(buf.len());
             }
 
-            if inner.status == TimerFdStatus::STOP
-                || flags.contains(TimerCreationFlags::TFD_NONBLOCK)
-            {
+            if flags.contains(TimerCreationFlags::TFD_NONBLOCK) {
                 return_errno!(EAGAIN, "try again");
             }
         })
