@@ -36,6 +36,9 @@ pub fn do_symlinkat(target: &str, link_path: &FsPath) -> Result<usize> {
 
     let link_path = link_path.to_abs_path()?;
     let (dir_path, link_name) = split_path(&link_path);
+    if link_name.ends_with('/') {
+        return_errno!(EISDIR, "link path is dir");
+    }
     let dir_inode = {
         let current = current!();
         let fs = current.fs().read().unwrap();

@@ -59,14 +59,33 @@ mod stdio;
 mod syscalls;
 mod timer_file;
 
-/// Split a `path` str to `(base_path, file_name)`
+/// Split a `path` to (`dir_path`, `file_name`).
+///
+/// The `dir_path` must be a directory.
+///
+/// The `file_name` is the last component. It can be suffixed by "/".
+///
+/// Example:
+///
+/// The path "/dir/file/" will be split to ("/dir", "file/").
 fn split_path(path: &str) -> (&str, &str) {
+    let file_name = path
+        .split_inclusive('/')
+        .filter(|&x| x != "/")
+        .last()
+        .unwrap_or(".");
+
     let mut split = path.trim_end_matches('/').rsplitn(2, '/');
-    let file_name = split.next().unwrap();
-    let mut dir_path = split.next().unwrap_or(".");
-    if dir_path == "" {
-        dir_path = "/";
-    }
+    let dir_path = if split.next().unwrap().is_empty() {
+        "/"
+    } else {
+        let mut dir = split.next().unwrap_or(".").trim_end_matches('/');
+        if dir.is_empty() {
+            dir = "/";
+        }
+        dir
+    };
+
     (dir_path, file_name)
 }
 

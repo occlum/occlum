@@ -4,7 +4,7 @@ pub fn do_mkdirat(fs_path: &FsPath, mode: FileMode) -> Result<()> {
     debug!("mkdirat: fs_path: {:?}, mode: {:#o}", fs_path, mode.bits());
 
     let path = fs_path.to_abs_path()?;
-    let (dir_path, file_name) = split_path(&path);
+    let (dir_path, file_name) = split_path(&path.trim_end_matches('/'));
     let current = current!();
     let inode = {
         let fs = current.fs().read().unwrap();

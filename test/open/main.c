@@ -27,17 +27,33 @@ static int __test_open(const char *file_path, int flags, int mode) {
         THROW_ERROR("failed to open a file");
     }
     close(fd);
+
+    return 0;
+}
+
+static int __test_open_file_as_dir(const char *file_path, int flags, int mode) {
+    char dir_path[PATH_MAX] = { 0 };
+    snprintf(dir_path, sizeof(dir_path), "%s/", file_path);
+
+    int fd = open(dir_path, flags, mode);
+    if (!(fd < 0 && errno == EISDIR)) {
+        THROW_ERROR("failed check open a file as dir");
+    }
+
+    if (__test_open(file_path, flags, mode) < 0) {
+        THROW_ERROR("failed to create file");
+    }
     return 0;
 }
 
 static int __test_open_file_with_dir_flags(const char *file_path, int flags, int mode) {
-    flags = O_DIRECTORY | O_RDWR | O_CREAT;
     int fd = open(file_path, flags, mode);
     if (fd < 0) {
-        THROW_ERROR("failed to check creating file with O_DIRECTORY");
+        THROW_ERROR("failed to open a file");
     }
     close(fd);
 
+    flags = O_DIRECTORY | O_RDWR;
     fd = open(file_path, flags, mode);
     if (!(fd < 0 && errno == ENOTDIR)) {
         THROW_ERROR("open file with O_DIRECTORY should return ENOTDIR");
@@ -132,6 +148,10 @@ static int test_open() {
     return test_open_framework(__test_open);
 }
 
+static int test_open_file_as_dir() {
+    return test_open_framework(__test_open_file_as_dir);
+}
+
 static int test_open_file_with_dir_flags() {
     return test_open_framework(__test_open_file_with_dir_flags);
 }
@@ -158,6 +178,7 @@ static int test_creat() {
 
 static test_case_t test_cases[] = {
     TEST_CASE(test_open),
+    TEST_CASE(test_open_file_as_dir),
     TEST_CASE(test_open_file_with_dir_flags),
     TEST_CASE(test_open_dir_with_write_flags),
     TEST_CASE(test_openat_with_abs_path),
