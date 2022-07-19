@@ -21,6 +21,33 @@ impl FsPath {
     pub(in crate::fs) fn inner(&self) -> &FsPathInner {
         &self.inner
     }
+
+    pub fn ends_with(&self, pat: &str) -> bool {
+        match &self.inner {
+            FsPathInner::Absolute(path) => path.ends_with(pat),
+            FsPathInner::CwdRelative(path) => path.ends_with(pat),
+            FsPathInner::Cwd => false,
+            FsPathInner::FdRelative(_, path) => path.ends_with(pat),
+            FsPathInner::Fd(_) => false,
+        }
+    }
+
+    pub fn trim_end_matches(&self, pat: char) -> Self {
+        let trim_inner = match &self.inner {
+            FsPathInner::Absolute(path) => {
+                FsPathInner::Absolute(path.trim_end_matches(pat).to_string())
+            }
+            FsPathInner::CwdRelative(path) => {
+                FsPathInner::CwdRelative(path.trim_end_matches(pat).to_string())
+            }
+            FsPathInner::Cwd => FsPathInner::Cwd,
+            FsPathInner::FdRelative(fd, path) => {
+                FsPathInner::FdRelative(*fd, path.trim_end_matches(pat).to_string())
+            }
+            FsPathInner::Fd(fd) => FsPathInner::Fd(*fd),
+        };
+        Self { inner: trim_inner }
+    }
 }
 
 impl TryFrom<&str> for FsPath {

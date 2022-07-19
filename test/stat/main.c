@@ -47,6 +47,19 @@ static int __test_stat(const char *file_path) {
     return 0;
 }
 
+static int __test_stat_file_as_dir(const char *file_path) {
+    struct stat stat_buf;
+    char dir_path[PATH_MAX] = { 0 };
+    snprintf(dir_path, sizeof(dir_path), "%s/", file_path);
+
+    int ret = stat(dir_path, &stat_buf);
+    if (ret == 0 || errno != ENOTDIR) {
+        THROW_ERROR("failed to check stat file as dir");
+    }
+
+    return 0;
+}
+
 static int __test_fstat(const char *file_path) {
     struct stat stat_buf;
     int fd, ret;
@@ -155,6 +168,10 @@ static int test_stat() {
     return test_stat_framework(__test_stat);
 }
 
+static int test_stat_file_as_dir() {
+    return test_stat_framework(__test_stat_file_as_dir);
+}
+
 static int test_fstat() {
     return test_stat_framework(__test_fstat);
 }
@@ -181,6 +198,7 @@ static int test_fstatat_with_dirfd() {
 
 static test_case_t test_cases[] = {
     TEST_CASE(test_stat),
+    TEST_CASE(test_stat_file_as_dir),
     TEST_CASE(test_fstat),
     TEST_CASE(test_lstat),
     TEST_CASE(test_fstatat_with_abs_path),

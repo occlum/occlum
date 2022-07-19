@@ -211,7 +211,7 @@ static int test_truncate() {
 }
 
 static int test_mkdir_then_rmdir() {
-    const char *dir_path = "/host/hostfs_dir";
+    const char *dir_path = "/host/hostfs_dir/";
     struct stat stat_buf;
 
     if (mkdir(dir_path, 00775) < 0) {

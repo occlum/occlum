@@ -46,7 +46,7 @@ impl FsView {
         }
 
         let mut cwd = self.cwd.write().unwrap();
-        if let Some('/') = path.chars().next() {
+        if path.starts_with("/") {
             // absolute
             *cwd = path.to_owned();
         } else {
@@ -90,6 +90,12 @@ impl FsView {
                     inode
                 }
                 Err(e) if e.errno() == ENOENT && creation_flags.can_create() => {
+                    if creation_flags.must_be_directory() {
+                        return_errno!(ENOTDIR, "file is not directory");
+                    }
+                    if fs_path.ends_with("/") {
+                        return_errno!(EISDIR, "path is a directory");
+                    }
                     let (dir_inode, file_name) = self.lookup_dirinode_and_basename_sync(fs_path)?;
                     if !dir_inode.allow_write()? {
                         return_errno!(EPERM, "file cannot be created");
@@ -115,8 +121,17 @@ impl FsView {
                     inode
                 }
                 Err(e) if e.errno() == ENOENT && creation_flags.can_create() => {
+                    if creation_flags.must_be_directory() {
+                        return_errno!(ENOTDIR, "file is not directory");
+                    }
+                    if fs_path.ends_with("/") {
+                        return_errno!(EISDIR, "path is a directory");
+                    }
                     let (dir_inode, file_name) =
                         self.lookup_real_dirinode_and_basename_sync(fs_path)?;
+                    if file_name.ends_with("/") {
+                        return_errno!(EISDIR, "path refers to directory");
+                    }
                     if !dir_inode.allow_write()? {
                         return_errno!(EPERM, "file cannot be created");
                     }
@@ -128,6 +143,8 @@ impl FsView {
         Ok(INodeFile::open(inode, flags, open_path)?)
     }
 
+    /// Lookup Inode from the fs view of the process.
+    /// If last component is a symlink, do not dereference it
     pub fn lookup_inode_sync(&self, fs_path: &FsPath) -> Result<Arc<dyn INode>> {
         debug!(
             "lookup_inode_sync: cwd: {:?}, path: {:?}",
@@ -137,6 +154,7 @@ impl FsView {
         self.lookup_inode_inner_sync(fs_path, true)
     }
 
+    /// Lookup Inode from the fs view of the process, dereference symlinks
     pub fn lookup_inode_no_follow_sync(&self, fs_path: &FsPath) -> Result<Arc<dyn INode>> {
         debug!(
             "lookup_inode_no_follow_sync: cwd: {:?}, path: {:?}",
@@ -171,9 +189,13 @@ impl FsView {
                 if follow_symlink {
                     inode.lookup_follow(path, MAX_SYMLINKS)?
                 } else {
-                    let (dir_path, base_name) = split_path(path);
-                    let dir_inode = inode.lookup_follow(dir_path, MAX_SYMLINKS)?;
-                    dir_inode.lookup(base_name)?
+                    if path.ends_with("/") {
+                        inode.lookup_follow(path, MAX_SYMLINKS)?
+                    } else {
+                        let (dir_path, base_name) = split_path(path);
+                        let dir_inode = inode.lookup_follow(dir_path, MAX_SYMLINKS)?;
+                        dir_inode.lookup(base_name)?
+                    }
                 }
             }
             FsPathInner::Fd(fd) => self.lookup_inode_from_fd(*fd)?.as_sync().unwrap(),
@@ -181,14 +203,17 @@ impl FsView {
     }
 
     fn lookup_inode_cwd_no_follow_sync(&self, path: &str) -> Result<Arc<dyn INode>> {
-        let (dir_path, file_name) = split_path(&path);
-        let dir_inode = self.lookup_inode_cwd_sync(dir_path)?;
-        Ok(dir_inode.lookup(file_name)?)
+        if path.ends_with("/") {
+            Ok(self.lookup_inode_cwd_sync(path)?)
+        } else {
+            let (dir_path, file_name) = split_path(&path);
+            let dir_inode = self.lookup_inode_cwd_sync(dir_path)?;
+            Ok(dir_inode.lookup(file_name)?)
+        }
     }
 
-    /// Lookup Inode from the cwd of the process, dereference symlink
     fn lookup_inode_cwd_sync(&self, path: &str) -> Result<Arc<dyn INode>> {
-        let inode = if let Some('/') = path.chars().next() {
+        let inode = if path.starts_with("/") {
             // absolute path
             let abs_path = path.trim_start_matches('/');
             ROOT_FS
@@ -209,7 +234,9 @@ impl FsView {
         Ok(inode)
     }
 
-    /// Lookup dir inode and basename
+    /// Lookup the dir_inode and basename
+    ///
+    /// The `basename` is the last component of fs_path. It can be suffixed by "/".
     pub fn lookup_dirinode_and_basename_sync(
         &self,
         fs_path: &FsPath,
@@ -246,7 +273,7 @@ impl FsView {
                 let inode = self.lookup_inode_from_fd(*dirfd)?.as_sync().unwrap();
                 let real_path = self.lookup_real_path_sync(Some(&inode), path)?;
                 let (dir_path, base_name) = split_path(&real_path);
-                let dir_inode = if let Some('/') = dir_path.chars().next() {
+                let dir_inode = if dir_path.starts_with("/") {
                     self.lookup_inode_cwd_sync(dir_path)?
                 } else {
                     inode.lookup_follow(dir_path, MAX_SYMLINKS)?
@@ -264,7 +291,7 @@ impl FsView {
     fn lookup_real_path_sync(&self, parent: Option<&Arc<dyn INode>>, path: &str) -> Result<String> {
         let (dir_path, file_name) = split_path(&path);
         let dir_inode = if let Some(parent_inode) = parent {
-            if let Some('/') = path.chars().next() {
+            if path.starts_with("/") {
                 self.lookup_inode_cwd_sync(dir_path)?
             } else {
                 // relative path from parent inode
@@ -274,31 +301,28 @@ impl FsView {
             self.lookup_inode_cwd_sync(dir_path)?
         };
 
-        match dir_inode.lookup(file_name) {
+        match dir_inode.lookup(file_name.trim_end_matches('/')) {
             // Handle symlink
             Ok(inode) if inode.metadata()?.type_ == FileType::SymLink => {
                 let new_path = {
-                    let path = {
+                    let link_path = {
                         let mut content = vec![0u8; PATH_MAX];
                         let len = inode.read_at(0, &mut content)?;
-                        let path = std::str::from_utf8(&content[..len])
+                        let link_path = std::str::from_utf8(&content[..len])
                             .map_err(|_| errno!(ENOENT, "invalid symlink content"))?;
-                        String::from(path)
+                        String::from(link_path)
                     };
-                    match path.chars().next() {
+                    let mut new_path = match link_path.chars().next() {
+                        None => return_errno!(ENOENT, "empty symlink"),
                         // absolute path
-                        Some('/') => path,
+                        Some('/') => link_path,
                         // relative path
-                        Some(_) => {
-                            let dir_path = if dir_path.ends_with("/") {
-                                String::from(dir_path)
-                            } else {
-                                String::from(dir_path) + "/"
-                            };
-                            dir_path + &path
-                        }
-                        None => unreachable!(),
+                        Some(_) => String::from(dir_path) + "/" + &link_path,
+                    };
+                    if path.ends_with("/") && !new_path.ends_with("/") {
+                        new_path += "/";
                     }
+                    new_path
                 };
                 self.lookup_real_path_sync(parent, &new_path)
             }
@@ -318,6 +342,7 @@ impl FsView {
         mode: FileMode,
     ) -> Result<AsyncFileHandle> {
         let creation_flags = CreationFlags::from_bits_truncate(flags);
+        let open_path = self.convert_fspath_to_abs(fs_path)?;
         let inode = if creation_flags.no_follow_symlink() {
             match self.lookup_inode_no_follow(fs_path).await {
                 Ok(inode) => {
@@ -341,6 +366,12 @@ impl FsView {
                     inode
                 }
                 Err(e) if e.errno() == ENOENT && creation_flags.can_create() => {
+                    if creation_flags.must_be_directory() {
+                        return_errno!(ENOTDIR, "file is not directory");
+                    }
+                    if fs_path.ends_with("/") {
+                        return_errno!(EISDIR, "path is a directory");
+                    }
                     let (dir_inode, file_name) = self.lookup_dirinode_and_basename(fs_path).await?;
                     if !dir_inode.allow_write() {
                         return_errno!(EPERM, "file cannot be created");
@@ -368,6 +399,12 @@ impl FsView {
                     inode
                 }
                 Err(e) if e.errno() == ENOENT && creation_flags.can_create() => {
+                    if creation_flags.must_be_directory() {
+                        return_errno!(ENOTDIR, "file is not directory");
+                    }
+                    if fs_path.ends_with("/") {
+                        return_errno!(EISDIR, "path is a directory");
+                    }
                     let (dir_inode, file_name) = self.lookup_dirinode_and_basename(fs_path).await?;
                     if !dir_inode.allow_write() {
                         return_errno!(EPERM, "file cannot be created");
@@ -379,7 +416,6 @@ impl FsView {
                 Err(e) => return Err(e),
             }
         };
-        let open_path = self.convert_fspath_to_abs(fs_path)?;
         let dentry = Dentry::new(inode.as_async().unwrap(), open_path);
         Ok(AsyncFileHandle::open(
             dentry,
@@ -390,13 +426,8 @@ impl FsView {
         .await?)
     }
 
-    /// Lookup Inode, dereference symlink
-    pub async fn lookup_inode(&self, fs_path: &FsPath) -> Result<InodeHandle> {
-        debug!("lookup_inode: cwd: {:?}, path: {:?}", self.cwd(), fs_path);
-        self.lookup_inode_inner(fs_path, true).await
-    }
-
-    /// Lookup Inode, do not dereference the last symlink component
+    /// Lookup Inode from the fs view of the process.
+    /// If last component is a symlink, do not dereference it
     pub async fn lookup_inode_no_follow(&self, fs_path: &FsPath) -> Result<InodeHandle> {
         debug!(
             "lookup_inode_no_follow: cwd: {:?}, path: {:?}",
@@ -404,6 +435,12 @@ impl FsView {
             fs_path
         );
         self.lookup_inode_inner(fs_path, false).await
+    }
+
+    /// Lookup inode from the fs view of the process, dereference symlinks
+    pub async fn lookup_inode(&self, fs_path: &FsPath) -> Result<InodeHandle> {
+        debug!("lookup_inode: cwd: {:?}, path: {:?}", self.cwd(), fs_path);
+        self.lookup_inode_inner(fs_path, true).await
     }
 
     async fn lookup_inode_inner(
@@ -431,9 +468,13 @@ impl FsView {
                 if follow_symlink {
                     inode.lookup(path, Some(MAX_SYMLINKS)).await?
                 } else {
-                    let (dir_path, base_name) = split_path(path);
-                    let dir_inode = inode.lookup(dir_path, Some(MAX_SYMLINKS)).await?;
-                    dir_inode.lookup_no_follow(base_name).await?
+                    if path.ends_with("/") {
+                        inode.lookup(path, Some(MAX_SYMLINKS)).await?
+                    } else {
+                        let (dir_path, base_name) = split_path(path);
+                        let dir_inode = inode.lookup(dir_path, Some(MAX_SYMLINKS)).await?;
+                        dir_inode.lookup_no_follow(base_name).await?
+                    }
                 }
             }
             FsPathInner::Fd(fd) => self.lookup_inode_from_fd(*fd)?,
@@ -442,7 +483,9 @@ impl FsView {
         Ok(inode)
     }
 
-    /// Lookup dir inode and basename
+    /// Lookup the dir_inode and basename
+    ///
+    /// The `basename` is the last component of fs_path. It can be suffixed by "/".
     pub async fn lookup_dirinode_and_basename(
         &self,
         fs_path: &FsPath,
@@ -463,16 +506,18 @@ impl FsView {
         Ok((dir_inode, base_name))
     }
 
-    /// Lookup Inode from the cwd of the process. If path is a symlink, do not dereference it
     async fn lookup_inode_cwd_no_follow(&self, path: &str) -> Result<InodeHandle> {
-        let (dir_path, file_name) = split_path(&path);
-        let dir_inode = self.lookup_inode_cwd(dir_path).await?;
-        Ok(dir_inode.lookup_no_follow(file_name).await?)
+        if path.ends_with("/") {
+            Ok(self.lookup_inode_cwd(path).await?)
+        } else {
+            let (dir_path, file_name) = split_path(&path);
+            let dir_inode = self.lookup_inode_cwd(dir_path).await?;
+            Ok(dir_inode.lookup_no_follow(file_name).await?)
+        }
     }
 
-    /// Lookup Inode from the cwd of the process, dereference symlink
     async fn lookup_inode_cwd(&self, path: &str) -> Result<InodeHandle> {
-        let full_path_string = if let Some('/') = path.chars().next() {
+        let full_path_string = if path.starts_with("/") {
             // absolute path
             path.to_owned()
         } else {
@@ -573,6 +618,36 @@ impl Default for FsView {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Split a `path` to (`dir_path`, `file_name`).
+///
+/// The `dir_path` must be a directory.
+///
+/// The `file_name` is the last component. It can be suffixed by "/".
+///
+/// Example:
+///
+/// The path "/dir/file/" will be split to ("/dir", "file/").
+pub fn split_path(path: &str) -> (&str, &str) {
+    let file_name = path
+        .split_inclusive('/')
+        .filter(|&x| x != "/")
+        .last()
+        .unwrap_or(".");
+
+    let mut split = path.trim_end_matches('/').rsplitn(2, '/');
+    let dir_path = if split.next().unwrap().is_empty() {
+        "/"
+    } else {
+        let mut dir = split.next().unwrap_or(".").trim_end_matches('/');
+        if dir.is_empty() {
+            dir = "/";
+        }
+        dir
+    };
+
+    (dir_path, file_name)
 }
 
 // Linux uses 40 as the upper limit for resolving symbolic links,

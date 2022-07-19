@@ -60,6 +60,9 @@ impl TrustedAddr {
                 let current = current!();
                 let fs = current.fs();
                 let path = FsPath::try_from(path.as_ref())?;
+                if path.ends_with("/") {
+                    return_errno!(EISDIR, "path is a directory");
+                }
                 fs.lookup_dirinode_and_basename_sync(&path)?
             };
 

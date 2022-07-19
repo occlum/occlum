@@ -32,6 +32,9 @@ pub async fn do_symlinkat(target: &str, link_path: &FsPath) -> Result<usize> {
     let (dir_inode, link_name) = {
         let current = current!();
         let fs = current.fs();
+        if link_path.ends_with("/") {
+            return_errno!(EISDIR, "link path is dir");
+        }
         fs.lookup_dirinode_and_basename(link_path).await?
     };
     if !dir_inode.allow_write() {

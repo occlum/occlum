@@ -14,6 +14,9 @@ pub async fn do_linkat(old_fs_path: &FsPath, new_fs_path: &FsPath, flags: LinkFl
         } else {
             fs.lookup_inode_no_follow(old_fs_path).await?
         };
+        if new_fs_path.ends_with("/") {
+            return_errno!(EISDIR, "new path is dir");
+        }
         let (new_dir_inode, new_file_name) = fs.lookup_dirinode_and_basename(new_fs_path).await?;
         (inode, new_dir_inode, new_file_name)
     };

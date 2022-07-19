@@ -132,7 +132,7 @@ static int test_renameat() {
 }
 
 static int test_rename_dir() {
-    const char *old_dir = "/root/test_old_dir";
+    const char *old_dir = "/root/test_old_dir/";
     const char *new_dir = "/root/test_new_dir";
     const char *file_name = "test_file.txt";
     char file_buf[128] = { 0 };
@@ -203,6 +203,26 @@ static int test_rename_dir_to_subdir() {
     return 0;
 }
 
+static int test_rename_file_as_dir() {
+    const char *old_file = "/root/test_old_file";
+    const char *old_dir = "/root/test_old_file/";
+    const char *new_dir = "/root/test_new_dir";
+
+    if (create_file_with_content(old_file, WRITE_MSG) < 0) {
+        THROW_ERROR("failed to create old file with content");
+    }
+
+    int ret = rename(old_dir, new_dir);
+    if (ret == 0 || errno != ENOTDIR) {
+        THROW_ERROR("failed to check rename file as dir");
+    }
+
+    if (unlink(old_file) < 0) {
+        THROW_ERROR("failed to remove file");
+    }
+    return 0;
+}
+
 // ============================================================================
 // Test suite main
 // ============================================================================
@@ -214,6 +234,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_renameat),
     TEST_CASE(test_rename_dir),
     TEST_CASE(test_rename_dir_to_subdir),
+    TEST_CASE(test_rename_file_as_dir),
 };
 
 int main(int argc, const char *argv[]) {

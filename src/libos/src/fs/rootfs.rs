@@ -1,5 +1,5 @@
 use super::dev_fs;
-use super::fs_view::MAX_SYMLINKS;
+use super::fs_view::{split_path, MAX_SYMLINKS};
 use super::hostfs::HostFS;
 use super::procfs::ProcFS;
 use super::sefs::{SgxStorage, SgxUuidProvider};
@@ -80,9 +80,13 @@ pub fn umount_nonroot_fs(
     let mount_dir = if follow_symlink {
         root.lookup_follow(abs_path, MAX_SYMLINKS)?
     } else {
-        let (dir_path, file_name) = split_path(abs_path);
-        root.lookup_follow(dir_path, MAX_SYMLINKS)?
-            .lookup(file_name)?
+        if abs_path.ends_with("/") {
+            root.lookup_follow(abs_path, MAX_SYMLINKS)?
+        } else {
+            let (dir_path, file_name) = split_path(abs_path);
+            root.lookup_follow(dir_path, MAX_SYMLINKS)?
+                .lookup(file_name)?
+        }
     };
 
     mount_dir.downcast_ref::<MNode>().unwrap().umount()?;
@@ -173,10 +177,14 @@ pub fn mount_fs_at(
     let mount_dir = if follow_symlink {
         parent_inode.lookup_follow(path, MAX_SYMLINKS)?
     } else {
-        let (dir_path, file_name) = split_path(path);
-        parent_inode
-            .lookup_follow(dir_path, MAX_SYMLINKS)?
-            .lookup(file_name)?
+        if path.ends_with("/") {
+            parent_inode.lookup_follow(path, MAX_SYMLINKS)?
+        } else {
+            let (dir_path, file_name) = split_path(path);
+            parent_inode
+                .lookup_follow(dir_path, MAX_SYMLINKS)?
+                .lookup(file_name)?
+        }
     };
     mount_dir.downcast_ref::<MNode>().unwrap().mount(fs)?;
     Ok(())
