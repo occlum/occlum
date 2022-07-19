@@ -10,6 +10,10 @@ This demo is programming in C, covering the SGX quote generation and format the 
 
 This demo is programming in RUST, based on the Azure provided [`REST APIs`](https://docs.microsoft.com/en-us/rest/api/attestation/). It provides steps to do SGX quote generation and attestation.
 
+### MAA attestation in Occlum init stage [`maa_init`](./maa_init)
+
+This demo bases on [`maa_attestation`](./maa_attestation), provides steps to do SGX quote generation and attestation in Occlum init process and save the attestation token to rootfs. With this flow, the real application loaded after Occlum init process may get the attestation token and do whatever it wants, without getting involved in the messy attestation part.
+
 ## Prerequisites
 
 ### Platform

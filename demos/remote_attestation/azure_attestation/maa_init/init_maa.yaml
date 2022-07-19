@@ -1,0 +1,19 @@
+includes:
+  - base.yaml
+targets:
+  - target: /bin/
+    copy:
+      - files:
+        - ../init/target/release/init
+  # copy libnss_files
+  - target: /opt/occlum/glibc/lib
+    copy: 
+      - files: 
+          - /opt/occlum/glibc/lib/libnss_files.so.2
+          - /opt/occlum/glibc/lib/libnss_dns.so.2
+          - /opt/occlum/glibc/lib/libresolv.so.2
+  # copy root CA
+  - target: /etc/ssl
+    copy:
+      - dirs:
+        - /etc/ssl/
