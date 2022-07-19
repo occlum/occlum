@@ -11,6 +11,7 @@ members = [
     "keyable-arc",
     "new-self-ref-arc",
     "object-id",
+    "page-cache",
     "sgx-disk",
     "sgx-untrusted-alloc",
     "vdso-time"
@@ -27,6 +28,7 @@ default-members = [
     "keyable-arc",
     "new-self-ref-arc",
     "object-id",
+    "page-cache",
     "sgx-disk",
     "vdso-time"
 ]

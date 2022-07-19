@@ -26,6 +26,7 @@ pub use self::block_io::{
     BioReq, BioReqBuilder, BioReqOnCompleteFn, BioReqOnDropFn, BioResp, BioSubmission, BioType,
 };
 pub use self::util::anymap::{Any, AnyMap};
+pub use self::util::block_range::{BlockRange, BlockRangeIter};
 
 // This crate assumes the machine is 64-bit to use u64 and usize interchangably.
 use static_assertions::assert_eq_size;

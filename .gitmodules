@@ -32,3 +32,6 @@
 [submodule "deps/resolv-conf"]
 	path = deps/resolv-conf
 	url = https://github.com/tailhook/resolv-conf.git
+[submodule "deps/lru-rs"]
+	path = deps/lru-rs
+	url = https://github.com/liqinggd/lru-rs.git

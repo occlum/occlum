@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
 pub mod anymap;
+pub mod block_range;
 pub mod test;
 
 /// Equivalent to `Box::into_inner`. The latter method is not available in
