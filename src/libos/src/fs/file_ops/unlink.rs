@@ -8,6 +8,9 @@ bitflags! {
 
 fn do_unlink(path: &str) -> Result<()> {
     let (dir_path, file_name) = split_path(&path);
+    if file_name.ends_with("/") {
+        return_errno!(EISDIR, "unlink on directory");
+    }
     let dir_inode = {
         let current = current!();
         let fs = current.fs().read().unwrap();

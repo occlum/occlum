@@ -48,6 +48,24 @@ static int __test_mkdir(const char *dir_path) {
     return 0;
 }
 
+static int __test_mkdir_with_suffix(const char *dir_path) {
+    struct stat stat_buf;
+    char new_dir_path[PATH_MAX] = { 0 };
+    snprintf(new_dir_path, sizeof(new_dir_path), "%s/", dir_path);
+    mode_t mode = 00775;
+
+    if (mkdir(new_dir_path, mode) < 0) {
+        THROW_ERROR("failed to mkdir");
+    }
+    if (stat(new_dir_path, &stat_buf) < 0) {
+        THROW_ERROR("failed to stat dir");
+    }
+    if (!S_ISDIR(stat_buf.st_mode)) {
+        THROW_ERROR("failed to check if it is dir");
+    }
+    return 0;
+}
+
 static int __test_mkdirat(const char *dir_path) {
     struct stat stat_buf;
     mode_t mode = 00775;
@@ -93,6 +111,10 @@ static int test_mkdir_framework(test_mkdir_func_t fn) {
 
 static int test_mkdir() {
     return test_mkdir_framework(__test_mkdir);
+}
+
+static int test_mkdir_with_suffix() {
+    return test_mkdir_framework(__test_mkdir_with_suffix);
 }
 
 static int test_mkdirat() {
@@ -189,6 +211,7 @@ static int test_rmdir_via_unlinkat() {
 
 static test_case_t test_cases[] = {
     TEST_CASE(test_mkdir),
+    TEST_CASE(test_mkdir_with_suffix),
     TEST_CASE(test_mkdirat),
     TEST_CASE(test_chdir),
     TEST_CASE(test_rmdir_via_unlinkat),

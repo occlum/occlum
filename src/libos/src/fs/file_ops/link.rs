@@ -15,6 +15,9 @@ pub fn do_linkat(old_fs_path: &FsPath, new_fs_path: &FsPath, flags: LinkFlags) -
 
     let newpath = new_fs_path.to_abs_path()?;
     let (new_dir_path, new_file_name) = split_path(&newpath);
+    if new_file_name.ends_with("/") {
+        return_errno!(EISDIR, "new path is dir");
+    }
     let (inode, new_dir_inode) = {
         let oldpath = old_fs_path.to_abs_path()?;
         let current = current!();

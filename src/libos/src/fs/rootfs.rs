@@ -80,8 +80,12 @@ pub fn umount_nonroot_fs(
         root.lookup_follow(abs_path, MAX_SYMLINKS)?
     } else {
         let (dir_path, file_name) = split_path(abs_path);
-        root.lookup_follow(dir_path, MAX_SYMLINKS)?
-            .lookup(file_name)?
+        if file_name.ends_with("/") {
+            root.lookup_follow(abs_path, MAX_SYMLINKS)?
+        } else {
+            root.lookup_follow(dir_path, MAX_SYMLINKS)?
+                .lookup(file_name)?
+        }
     };
 
     mount_dir.downcast_ref::<MNode>().unwrap().umount()?;
@@ -173,9 +177,13 @@ pub fn mount_fs_at(
         parent_inode.lookup_follow(path, MAX_SYMLINKS)?
     } else {
         let (dir_path, file_name) = split_path(path);
-        parent_inode
-            .lookup_follow(dir_path, MAX_SYMLINKS)?
-            .lookup(file_name)?
+        if file_name.ends_with("/") {
+            parent_inode.lookup_follow(path, MAX_SYMLINKS)?
+        } else {
+            parent_inode
+                .lookup_follow(dir_path, MAX_SYMLINKS)?
+                .lookup(file_name)?
+        }
     };
     mount_dir.downcast_ref::<MNode>().unwrap().mount(fs)?;
     Ok(())
