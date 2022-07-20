@@ -80,7 +80,7 @@ impl VMFreeSpaceManager {
     }
 
     pub fn add_range_back_to_free_manager(&mut self, dirty_range: &VMRange) -> Result<()> {
-        let mut free_list = &mut self.free_manager;
+        let free_list = &mut self.free_manager;
 
         // If the free list is empty, insert the dirty range and it's done.
         if free_list.is_empty() {

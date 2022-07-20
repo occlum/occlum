@@ -69,6 +69,7 @@
 //! Both `untrusted_array` and `untrusted_slice` above consist of four `u8` integers.
 
 #![cfg_attr(feature = "sgx", no_std)]
+#![feature(linked_list_remove)]
 
 #[cfg(feature = "sgx")]
 extern crate sgx_libc as libc;

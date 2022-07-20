@@ -3,10 +3,8 @@ use std::mem::{align_of, size_of};
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
 
-const MEM_SIZE: usize = 64 * 1024 * 1024; // 64M
-
 lazy_static! {
-    static ref UNTRUSTED_MEM_INSTANCE: Allocator = Allocator::new(MEM_SIZE);
+    static ref UNTRUSTED_MEM_INSTANCE: Allocator = Allocator::new();
 }
 
 use crate::MaybeUntrusted;

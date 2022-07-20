@@ -6,12 +6,20 @@ use super::vm_area::*;
 use intrusive_collections::rbtree::RBTree;
 use intrusive_collections::Bound;
 
+use libc::c_void;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "sgx")] {
+        use libc::ocall::{mmap, munmap};
+    } else {
+        use libc::{mmap, munmap};
+    }
+}
+
 /// Memory chunk manager.
 ///
-/// Chunk is the memory unit for the allocator. For chunks with `default` size, every chunk is managed by a ChunkManager.
+/// Chunk is the memory unit for the allocator.
 /// ChunkManager is implemented basically with two data structures: a red-black tree to track vmas in use and a FreeRangeManager to track
 /// ranges which are free.
-/// For vmas-in-use, there are two sentry vmas with zero length at the front and end of the red-black tree.
 
 #[derive(Debug, Default)]
 pub struct ChunkManager {
@@ -23,24 +31,34 @@ pub struct ChunkManager {
 
 #[allow(dead_code)]
 impl ChunkManager {
-    pub fn from(addr: usize, size: usize) -> Result<Self> {
-        let range = VMRange::new(addr, addr + size)?;
-        let vmas = {
-            let start = range.start();
-            let end = range.end();
-            let start_sentry = {
-                let range = VMRange::new_empty(start)?;
-                VMAObj::new_vma_obj(VMArea::new(range))
+    pub fn new(total_size: usize) -> Result<Self> {
+        let start_address = {
+            let addr = unsafe {
+                mmap(
+                    0 as *mut _,
+                    total_size,
+                    PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANONYMOUS,
+                    0,
+                    0,
+                )
             };
-            let end_sentry = {
-                let range = VMRange::new_empty(end)?;
-                VMAObj::new_vma_obj(VMArea::new(range))
-            };
-            let mut new_tree = RBTree::new(VMAAdapter::new());
-            new_tree.insert(start_sentry);
-            new_tree.insert(end_sentry);
-            new_tree
+
+            if addr == libc::MAP_FAILED {
+                return_errno!(ENOMEM, "allocate new chunk failed");
+            }
+
+            let addr = addr as usize;
+            assert!(addr.checked_add(total_size).is_some());
+            addr
         };
+
+        let range = VMRange::new(start_address, start_address + total_size)?;
+        let vmas = RBTree::new(VMAAdapter::new());
+        debug!(
+            "[untrusted alloc] create a new mem chunk, range = {:?}",
+            range
+        );
         Ok(ChunkManager {
             range,
             free_size: range.size(),
@@ -61,8 +79,8 @@ impl ChunkManager {
         &self.free_size
     }
 
-    pub fn check_empty(&self) -> bool {
-        self.vmas.iter().count() == 2 // only sentry vmas
+    pub fn is_empty(&self) -> bool {
+        self.vmas.iter().count() == 0
     }
 
     pub fn alloc(&mut self, size: usize, align: usize) -> Result<usize> {
@@ -123,12 +141,18 @@ impl ChunkManager {
     pub fn is_free_range(&self, request_range: &VMRange) -> bool {
         self.free_manager.is_free_range(request_range)
     }
+
+    pub fn contains(&self, addr: usize) -> bool {
+        self.range.contains(addr)
+    }
 }
 
 impl Drop for ChunkManager {
     fn drop(&mut self) {
-        debug_assert!(self.check_empty() == true);
+        debug_assert!(self.is_empty() == true);
         debug_assert!(self.free_size == self.range.size());
         debug_assert!(self.free_manager.free_size() == self.range.size());
+        let ret = unsafe { munmap(self.range().start as *mut c_void, self.range().size()) };
+        assert!(ret == 0);
     }
 }
