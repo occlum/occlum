@@ -521,7 +521,7 @@ impl VdsoData for vdso_data_v5_6 {
     }
 }
 
-// === Linux 5.9 - 5.12 ===
+// === Linux 5.9 - 5.18 ===
 // struct vdso_data
 
 #[repr(C)]
