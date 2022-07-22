@@ -423,15 +423,15 @@ jobs:
       with:
         container-name: $python_musl_support_test
 
-    - name: Configure dependency source
-      run: |
-        docker exec $python_musl_support_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'tuna'
-        [source.tuna]
-        registry = \"https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git\"
-        EOF"
+    # - name: Configure dependency source
+    #   run: |
+    #     docker exec $python_musl_support_test bash -c "cat <<- EOF >/root/.cargo/config
+    #     [source.crates-io]
+    #     registry = \"https://github.com/rust-lang/crates.io-index\"
+    #     replace-with = 'tuna'
+    #     [source.tuna]
+    #     registry = \"https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git\"
+    #     EOF"
 
     - name: Build dependencies
       run: docker exec $python_musl_support_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
@@ -492,15 +492,15 @@ jobs:
       with:
         container-name: $openvino_test
 
-    - name: Configure dependency source
-      run: |
-        docker exec $openvino_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
+    # - name: Configure dependency source
+    #   run: |
+    #     docker exec $openvino_test bash -c "cat <<- EOF >/root/.cargo/config
+    #     [source.crates-io]
+    #     registry = \"https://github.com/rust-lang/crates.io-index\"
+    #     replace-with = 'ustc'
+    #     [source.ustc]
+    #     registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+    #     EOF"
 
     - name: Build dependencies
       run: docker exec $openvino_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
@@ -558,15 +558,15 @@ jobs:
       with:
         container-name: $grpc_test
 
-    - name: Change download source of crates.io
-      run: |
-        docker exec $grpc_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
+    # - name: Change download source of crates.io
+    #   run: |
+    #     docker exec $grpc_test bash -c "cat <<- EOF >/root/.cargo/config
+    #     [source.crates-io]
+    #     registry = \"https://github.com/rust-lang/crates.io-index\"
+    #     replace-with = 'ustc'
+    #     [source.ustc]
+    #     registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+    #     EOF"
 
     - name: Build dependencies
       run: docker exec $grpc_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
@@ -646,15 +646,15 @@ jobs:
       with:
         container-name: $gvisor_test
 
-    - name: Change download source of crates.io
-      run: |
-        docker exec $gvisor_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
+    # - name: Change download source of crates.io
+    #   run: |
+    #     docker exec $gvisor_test bash -c "cat <<- EOF >/root/.cargo/config
+    #     [source.crates-io]
+    #     registry = \"https://github.com/rust-lang/crates.io-index\"
+    #     replace-with = 'ustc'
+    #     [source.ustc]
+    #     registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+    #     EOF"
 
     - name: Build dependencies
       run: docker exec $gvisor_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
@@ -792,15 +792,15 @@ jobs:
       with:
         container-name: $tf_serving_test
 
-    - name: Change download source of crates.io
-      run: |
-        docker exec $tf_serving_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
+    # - name: Change download source of crates.io
+    #   run: |
+    #     docker exec $tf_serving_test bash -c "cat <<- EOF >/root/.cargo/config
+    #     [source.crates-io]
+    #     registry = \"https://github.com/rust-lang/crates.io-index\"
+    #     replace-with = 'ustc'
+    #     [source.ustc]
+    #     registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+    #     EOF"
 
     - name: Build dependencies
       run: docker exec $tf_serving_test bash -c "cd /root/occlum; make submodule"
