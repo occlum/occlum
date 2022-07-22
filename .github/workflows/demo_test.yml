@@ -6,6 +6,10 @@ on: [push, pull_request]
 env:
   nap_time: 60
 
+# Cancel previous running jobs on push or pull request
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   C_cpp_rust_golang_embedded_mode_support_test:

@@ -7,6 +7,11 @@ on:
     # Schedule to run everyday at 6PM UTC (2AM CST)
     - cron:  '0 18 * * *'
 
+# Cancel previous running jobs on push or pull request
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   Make_test_on_ubuntu:
     runs-on: ubuntu-20.04
