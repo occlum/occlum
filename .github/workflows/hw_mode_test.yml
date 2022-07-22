@@ -13,6 +13,11 @@ env:
   nap_time: 60
   repeat_times: 500  # Stress test repeat times
 
+# Cancel previous running jobs on push or pull request
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   Make-test-on-ubuntu:
     timeout-minutes: 180
