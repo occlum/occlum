@@ -91,7 +91,7 @@ impl Stream {
                     return_errno!(EINVAL, "the socket is already bound");
                 }
 
-                // check the global address space to see if the address is avaiable before bind
+                // check the global address space to see if the address is available before bind
                 ADDRESS_SPACE.add_binder(addr)?;
                 info.set_addr(addr);
             }
