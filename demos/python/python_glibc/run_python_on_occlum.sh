@@ -7,6 +7,8 @@ NC='\033[0m'
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
 python_dir="$script_dir/occlum_instance/image/opt/python-occlum"
 
+[ -d occlum_instance ] || occlum new occlum_instance
+
 cd occlum_instance && rm -rf image
 copy_bom -f ../python-glibc.yaml --root image --include-dir /opt/occlum/etc/template
 
