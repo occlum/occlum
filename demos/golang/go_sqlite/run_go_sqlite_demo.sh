@@ -5,6 +5,7 @@ BLUE='\033[1;34m'
 NC='\033[0m'
 
 # Install SQLite with occlum-go
+rm -f go.mod
 occlum-go mod init simple_demo_instance && \
 occlum-go get -u -v github.com/mattn/go-sqlite3
 

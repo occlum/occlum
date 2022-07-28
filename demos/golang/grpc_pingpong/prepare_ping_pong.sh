@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-
 BLUE='\033[1;34m'
 NC='\033[0m'
 
@@ -9,6 +8,7 @@ FILE_SET="
 occlum_ping
 occlum_pong
 go.sum"
+
 for CURR_FILE in $FILE_SET
 do
         if [ -f "$CURR_FILE" ]; then
@@ -27,9 +27,14 @@ do
         fi
 done
 
-# enable Go modules for package management 
+# enable Go modules for package management
+GOVERSION=`occlum-go version|awk -F ' ' '{printf $3}'`
 export GO111MODULE=on
-
+if [[ $GOVERSION != 'go1.16.3' ]];then
+	rm -f go.mod
+	occlum-go mod init grpc_pingpong
+	occlum-go mod tidy
+fi
 # update PATH so that the protoc compiler can find the plugin:
 export PATH="$PATH:$(go env GOPATH)/bin"
 
@@ -41,10 +46,20 @@ fi
 
 # install protoc-gen-go and protoc-gen-go-grpc plugin
 if ! type "protoc-gen-go" > /dev/null 2>&1; then
+	if [[ $GOVERSION != 'go1.16.3' ]];then
         occlum-go get google.golang.org/protobuf/cmd/protoc-gen-go
+        occlum-go install google.golang.org/protobuf/cmd/protoc-gen-go
+	else
+	occlum-go get google.golang.org/protobuf/cmd/protoc-gen-go
+	fi
 fi
 if ! type "protoc-gen-go-grpc" > /dev/null 2>&1; then
-        occlum-go get google.golang.org/grpc/cmd/protoc-gen-go-grpc
+	if [[ $GOVERSION != 'go1.16.3' ]];then
+	occlum-go get google.golang.org/grpc/cmd/protoc-gen-go-grpc
+	occlum-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc
+	else
+	occlum-go get google.golang.org/grpc/cmd/protoc-gen-go-grpc
+	fi
 fi
 
 # compiling pingpong gRPC .proto file
