@@ -2,7 +2,7 @@
 name = "gen_internal_conf"
 version = "0.2.0"
 authors = ["zongmin.gu <zongmin.gzm@alibaba-inc.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

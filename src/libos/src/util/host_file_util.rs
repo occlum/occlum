@@ -15,16 +15,16 @@ pub struct host_file_buffer {
 }
 
 pub enum HostFile {
-    HOSTS,
-    HOSTNAME,
-    RESOLV_CONF,
+    Hosts,
+    HostName,
+    ResolvConf,
 }
 
 pub fn write_host_file(host_file: HostFile) -> Result<()> {
     let file_path: &str = match host_file {
-        HostFile::HOSTS => "/etc/hosts",
-        HostFile::HOSTNAME => "/etc/hostname",
-        HostFile::RESOLV_CONF => "/etc/resolv.conf",
+        HostFile::Hosts => "/etc/hosts",
+        HostFile::HostName => "/etc/hostname",
+        HostFile::ResolvConf => "/etc/resolv.conf",
         _ => return_errno!(EINVAL, "Unsupported host file"),
     };
 
@@ -37,9 +37,9 @@ pub fn write_host_file(host_file: HostFile) -> Result<()> {
     )?;
 
     let host_file_str = match host_file {
-        HostFile::HOSTS => HOSTS_STR.read().unwrap(),
-        HostFile::HOSTNAME => HOSTNAME_STR.read().unwrap(),
-        HostFile::RESOLV_CONF => RESOLV_CONF_STR.read().unwrap(),
+        HostFile::Hosts => HOSTS_STR.read().unwrap(),
+        HostFile::HostName => HOSTNAME_STR.read().unwrap(),
+        HostFile::ResolvConf => RESOLV_CONF_STR.read().unwrap(),
         _ => return_errno!(EINVAL, "Unsupported host file"),
     };
 
@@ -62,12 +62,12 @@ pub fn parse_host_file(host_file: HostFile, host_file_ptr: *const c_char) -> Res
 
     // Parse and inspect host file
     match host_file {
-        HostFile::HOSTS => {
+        HostFile::Hosts => {
             if let Err(_) = hosts_parser_util::parse_hosts_buffer(host_file_bytes) {
                 return_errno!(EINVAL, "malformated host /etc/hosts");
             }
         }
-        HostFile::HOSTNAME => match hosts_parser_util::parse_hostname_buffer(host_file_bytes) {
+        HostFile::HostName => match hosts_parser_util::parse_hostname_buffer(host_file_bytes) {
             Err(_) => {
                 return_errno!(EINVAL, "malformated host /etc/hostname");
             }
@@ -75,7 +75,7 @@ pub fn parse_host_file(host_file: HostFile, host_file_ptr: *const c_char) -> Res
                 return Ok(hostname_str);
             }
         },
-        HostFile::RESOLV_CONF => {
+        HostFile::ResolvConf => {
             if let Err(_) = resolv_conf::Config::parse(host_file_bytes) {
                 return_errno!(EINVAL, "malformated host /etc/resolv.conf");
             }

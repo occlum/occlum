@@ -3,7 +3,7 @@ name = "init"
 version = "0.0.1"
 build = "build.rs"
 authors = ["LI Qing geding.lq@antgroup.com"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 libc = "0.2.84"
