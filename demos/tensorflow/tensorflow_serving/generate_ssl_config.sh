@@ -1,3 +1,6 @@
+#!/bin/bash
+set -e
+
 service_domain_name=$1
 
 rm -rf ssl_configure

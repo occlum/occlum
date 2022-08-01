@@ -29,7 +29,7 @@ popd
 # 1. Replace fork to vfork
 # 2. Prepare shared memory region for child processes
 # 3. Disable SYSV semaphores
-patch -s -p0 < filebench.patch
+patch -s -p0 < apply-filebench-to-occlum.patch
 
 pushd filebench
 # Build and install filebench tool

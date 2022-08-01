@@ -1,7 +1,7 @@
 #!/bin/bash
 INSTALL_DIR=/usr/local/occlum/x86_64-linux-musl
 
-export PATH=$PATH:$INSTALL_DIR/bin
+export PATH=$INSTALL_DIR/bin:$PATH
 
 cd client
 

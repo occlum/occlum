@@ -5,6 +5,7 @@ export PATH=$PATH:$INSTALL_DIR/bin
 # Tell CMake to search for packages in Occlum toolchain's directory only
 export PKG_CONFIG_LIBDIR=$INSTALL_DIR/lib
 
+rm -rf grpc
 git clone https://github.com/grpc/grpc.git 
 cd grpc
 git checkout tags/v1.24.3
@@ -47,7 +48,8 @@ cmake ../ \
 	-Dprotobuf_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=TRUE \
 	-DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=occlum-gcc \
 	-DCMAKE_CXX_COMPILER=occlum-g++ -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
-	-DCMAKE_NO_SYSTEM_FROM_IMPORTED=TRUE
+	-DCMAKE_NO_SYSTEM_FROM_IMPORTED=TRUE \
+	-DZLIB_INCLUDE_DIR=/usr/local/occlum/x86_64-linux-musl/include
 
 if [ $? -ne 0 ]
 then

@@ -6,6 +6,10 @@ on: [push, pull_request]
 env:
   nap_time: 60
 
+# Cancel previous running jobs on push or pull request
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   C_cpp_rust_golang_embedded_mode_support_test:
@@ -60,11 +64,6 @@ jobs:
             occlum-go build -o web_server ./web_server.go;
             SGX_MODE=SIM ./run_golang_on_occlum.sh" &
 
-    - name: Curl test
-      run: |
-        sleep ${{ 240 }};
-        docker exec ${{ github.job }} bash -c "curl http://127.0.0.1:8090/ping"
-
     - name: Set up Golang grpc pingpong test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/grpc_pingpong && ./prepare_ping_pong.sh"
 
@@ -76,13 +75,18 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/grpc_pingpong && SGX_MODE=SIM ./run_ping_on_occlum.sh" &
 
+    # - name: Curl test
+    #   run: |
+    #     sleep ${{ env.nap_time }};
+    #     docker exec ${{ github.job }} bash -c "curl http://127.0.0.1:8090/ping"
+
   Java_support_test:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: true
-
+    
     - uses: ./.github/workflows/composite_action/sim
       with:
         container-name: ${{ github.job }}
@@ -325,6 +329,40 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_musl && SGX_MODE=SIM ./run_client_on_occlum.sh"
 
+  Grpc_glibc_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Create container
+      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc
+
+    - uses: ./.github/workflows/composite_action/prebuild
+      with:
+        container-name: ${{ github.job }}
+
+    - name: Build dependencies
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum; make submodule"
+
+    - name: Make install
+      run: docker exec ${{ github.job }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+
+    - name: Prepare grpc sample project
+      run: docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_glibc && ./prepare_client_server_glibc.sh"
+
+    - name: Run grpc server
+      run: docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_glibc && SGX_MODE=SIM ./run_server_on_occlum_glibc.sh" &
+
+    - name: Run grpc client
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_glibc && SGX_MODE=SIM ./run_client_on_occlum_glibc.sh"
+
+    - name: Run grpc stress client
+      run: docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_glibc && ./run_stress_test.sh"
+
   Grpc_tls_test:
     runs-on: ubuntu-20.04
     steps:
@@ -354,36 +392,6 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_tls/occlum_client;
             occlum run /bin/greeter_secure_client"
-
-  Grpc_glibc_test:
-    runs-on: ubuntu-20.04
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        submodules: true
-
-    - uses: ./.github/workflows/composite_action/sim
-      with:
-        container-name: ${{ github.job }}
-        build-envs: 'OCCLUM_RELEASE_BUILD=1'
-
-    - name: Download and Install grpc
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./download_and_install_grpc_glibc.sh"
-
-    - name: Prepare grpc sample project
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./prepare_client_server_glibc.sh"
-
-    - name: Run grpc server
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && SGX_MODE=SIM ./run_server_on_occlum_glibc.sh" &
-
-    - name: Run grpc client
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && SGX_MODE=SIM ./run_client_on_occlum_glibc.sh"
-
-    - name: Prepare grpc stress test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./prepare_stress_test_tool.sh"
-
-    - name: Run grpc stress client
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && SGX_MODE=SIM ./run_stress_test.sh"
 
   Openvino_test:
     runs-on: ubuntu-20.04
@@ -487,7 +495,7 @@ jobs:
     - name: Run redis benchmark
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/redis; SGX_MODE=SIM ./benchmark_glibc.sh"
 
-  flink_test:
+  Flink_test:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
@@ -533,13 +541,9 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/cluster_serving; source ./environment.sh; ./install-dependencies.sh"
 
     - name: Run cluster serving test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/cluster_serving; source ./environment.sh; SGX_MODE=SIM ./start-all.sh && ./push-image.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/cluster_serving; source ./environment.sh; SGX_MODE=SIM ./start-all.sh; ./push-image.sh"
 
-    - name: Check flink task manager's log
-      if: ${{ always() }}
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/cluster_serving; cat flink/flink--taskmanager-0.log"
-
-  enclave_ra_tls_test:
+  Enclave_ra_tls_test:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
@@ -563,7 +567,7 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "/usr/share/enclave-tls/samples/enclave-tls-client" || true
 
-  vault_test:
+  Vault_test:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
@@ -583,14 +587,10 @@ jobs:
 
     - name: Run the Vault client
       run: |
-        sleep 360;
+        sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/vault && ./run_occlum_vault_test.sh"
-
-    - name: Check Vault log
-      if: ${{ always() }}
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/vault && sync && cat vault.log"
-
-  sofaboot_test:
+  
+  Sofaboot_test:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
@@ -615,10 +615,6 @@ jobs:
       run: |
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "curl -s http://localhost:8080/actuator/readiness | grep -v DOWN"
-        
-    - name: Check SOFABoot log
-      if: ${{ always() }}
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/sofaboot && sync && cat sofaboot.log"
 
   Bash_test:
     runs-on: ubuntu-20.04
@@ -713,10 +709,10 @@ jobs:
     - name: Build dependencies
       run: docker exec $gvisor_test bash -c "cd /root/occlum; make submodule"
 
-    - name: Make install
-      run: docker exec $gvisor_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+    - name: Make install in debug mode
+      run: docker exec $gvisor_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; make install"
 
-    - name: clone code
+    - name: Clone gvisor code
       run: docker exec $gvisor_test bash -c "git clone https://github.com/occlum/gvisor.git"
 
     - name: Run gvisor syscall test
@@ -752,6 +748,31 @@ jobs:
     - name: Test Get
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/flask;
             curl --cacert flask.crt -X GET https://localhost:4996/customer/1"
+
+  # Iperf2_test:
+  #   runs-on: ubuntu-20.04
+  #   steps:
+  #   - uses: actions/checkout@v1
+  #     with:
+  #       submodules: true
+
+  #   - uses: ./.github/workflows/composite_action/sim
+  #     with:
+  #       container-name: ${{ github.job }}
+  #       build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+  #   - name: Build iperf2
+  #     run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/iperf2; SGX_MODE=SIM ./build.sh"
+
+  #   - name: Start iperf2 server
+  #     run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/iperf2/occlum_server;
+  #           occlum run /bin/iperf -s -p 6888 &"
+
+  #   - name: Start iperf2 client
+  #     run: |
+  #       sleep ${{ 5 }};
+  #       docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/iperf2/occlum_client;
+  #           occlum run /bin/iperf -c 127.0.0.1 -p 6888 -P 16"
 
   Linux_LTP_test:
     runs-on: ubuntu-20.04
@@ -809,4 +830,4 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/filebench && ./dl_and_build_filebench.sh"
 
     - name: Prepare occlum instance and Run Filebench
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/filebench && SGX_MODE=SIM ./run_benchmark.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/filebench && SGX_MODE=SIM ./run_workload.sh readfiles"

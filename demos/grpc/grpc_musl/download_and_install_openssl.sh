@@ -1,6 +1,7 @@
 #!/bin/sh
 #copyright@antfinancial:adopted from a script written by geding
 
+rm -rf openssl
 git clone http://github.com/openssl/openssl
 cd openssl
 git checkout tags/OpenSSL_1_1_1

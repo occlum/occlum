@@ -7,6 +7,11 @@ on:
     # Schedule to run everyday at 6PM UTC (2AM CST)
     - cron:  '0 18 * * *'
 
+# Cancel previous running jobs on push or pull request
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   Make_test_on_ubuntu:
     runs-on: ubuntu-20.04
@@ -20,7 +25,6 @@ jobs:
       with:
         container-name: ${{ github.job }}
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
-        container-flags: '--privileged'
 
     - name: Check format
       run:  docker exec ${{ github.job }} bash -c 'cd /root/occlum; info=$(make format-check);
@@ -29,9 +33,6 @@ jobs:
           echo "$info";
           exit 1;
         fi'
-
-    - name: Unit test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum; RUST_LOG=trace make unit-test"
 
     - name: Integration test
       run:  docker exec ${{ github.job }} bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test"

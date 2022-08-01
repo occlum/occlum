@@ -19,7 +19,7 @@ This project demonstrates how to execute an unmodified sofaboot projects with Oc
 
 * Run with openjdk 8
 ```
-./run_sofaboot_on_occlum.sh jdk8
+./run_sofaboot_on_occlum_jdk8.sh
 ```
 
 * Run with openjdk 11

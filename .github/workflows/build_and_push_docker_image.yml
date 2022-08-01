@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       OS:
-        description: 'OS name (must choose from <centos, ubuntu>)'
+        description: 'OS name (must choose from <centos, ubuntu18, ubuntu20>)'
         required: true
-        default: 'ubuntu'
+        default: 'ubuntu20'
 
 jobs:
   generate-centos-image:
@@ -55,10 +55,9 @@ jobs:
           push: true
           tags: occlum/occlum:${{ env.RELEASE_VERSION }}-centos8.2
 
-
-  generate-ubuntu-image:
+  generate-ubuntu18-image:
       runs-on: ubuntu-18.04
-      if: github.event.inputs.OS == 'ubuntu'
+      if: github.event.inputs.OS == 'ubuntu18'
 
       steps:
       - name: Checkout code
@@ -102,3 +101,50 @@ jobs:
           build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
           push: true
           tags: occlum/occlum:${{ env.RELEASE_VERSION }}-ubuntu18.04
+
+  generate-ubuntu20-image:
+      runs-on: ubuntu-20.04
+      if: github.event.inputs.OS == 'ubuntu20'
+
+      steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Because "Build and push" step `context` field can't be subdir,
+      # we need to copy files needed by dockerfile to root dir of the project
+      - name: Copy context for docker build
+        run: |
+          cp -r tools/toolchains .
+          cp -r tools/docker .
+
+      - name: Get Occlum release version
+        run: echo "RELEASE_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+
+      - name: Get branch name
+        # GITHUB_REF=refs/heads/branch-name
+        # ${GITHUB_REF##*/} == branch-name
+        run: echo "OCCLUM_BRANCH=$(echo ${GITHUB_REF##*/})" >> $GITHUB_ENV;
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+        with:
+          driver-opts: env.BUILDKIT_STEP_LOG_MAX_SIZE=104857600
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./tools/docker/Dockerfile.ubuntu20.04
+          platforms: linux/amd64
+          build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
+          push: true
+          tags: occlum/occlum:${{ env.RELEASE_VERSION }}-ubuntu20.04

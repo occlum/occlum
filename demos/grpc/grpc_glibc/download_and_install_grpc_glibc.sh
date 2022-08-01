@@ -3,7 +3,7 @@ set -e
 
 GRPC_SRC_DIR=$PWD/grpc_src
 
-mkdir -p $GRPC_SRC_DIR && cd $GRPC_SRC_DIR
+rm -rf $GRPC_SRC_DIR && mkdir -p $GRPC_SRC_DIR && cd $GRPC_SRC_DIR
 git clone https://github.com/grpc/grpc.git .
 git checkout tags/v1.24.3
 

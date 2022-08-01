@@ -16,7 +16,6 @@ This set of demos shows how real-world apps can be easily run inside SGX enclave
 
 * [bash](bash/): A demo of [Bash](https://www.gnu.org/software/bash/) shell script.
 * [cluster_serving](cluster_serving/): A demo of [Analytics Zoo Cluster Serving](https://analytics-zoo.github.io/master/#ClusterServingGuide/ProgrammingGuide/) inference solution.
-* [fio](fio/): A demo of [Flexible I/O Tester](https://github.com/axboe/fio).
 * [fish](fish/): A demo of [FISH](https://fishshell.com) shell script.
 * [flink](flink/): A demo of [Apache Flink](https://flink.apache.org).
 * [font](font/font_support_for_java): A demo of supporting font with Java.
@@ -25,6 +24,7 @@ This set of demos shows how real-world apps can be easily run inside SGX enclave
 * [openvino](openvino/) A benchmark of [OpenVINO Inference Engine](https://docs.openvinotoolkit.org/2019_R3/_docs_IE_DG_inference_engine_intro.html).
 * [pytorch](pytorch/): A demo of [PyTorch](https://pytorch.org/).
 * [redis](redis/): A demo of [Redis](https://redis.io).
+* [rocksdb](rocksdb/): A demo of [RocksDB](https://github.com/facebook/rocksdb).
 * [sofaboot](sofaboot/): A demo of [SOFABoot](https://github.com/sofastack/sofa-boot), an open source Java development framework based on Spring Boot.
 * [sqlite](sqlite/) A demo of [SQLite](https://www.sqlite.org) SQL database engine.
 * [tensorflow](tensorflow/tensorflow_training): A demo of [TensorFlow](https://www.tensorflow.org/) MNIST classification training.
@@ -42,8 +42,20 @@ This set of demos shows how apps written with popular programming languages can 
 * [python](python/) A collection of [Python](https://www.python.org) program demos, contain [glibc-supported python](python/python_glibc) demo and [musl-supported python](python/python_musl) demo.
 * [rust](rust/) A demo of [Rust](https://www.rust-lang.org) program.
 
+## Benchmark demos
+
+This set of demos shows how commonly used benchmarking tools can be run inside SGX enclaves with Occlum.
+
+* [filebench](filebench/): A demo of [Filebench](https://github.com/filebench/filebench), a file system and storage benchmark tool.
+* [fio](fio/): A demo of [Flexible I/O Tester](https://github.com/axboe/fio).
+* [iperf2](iperf2/): A demo of [Iperf2](https://sourceforge.net/projects/iperf2/), a tool for measuring Internet bandwidth performance.
+* [iperf3](iperf3/): A demo of [Iperf3](https://github.com/esnet/iperf), a tool for measuring Internet bandwidth performance.
+* [linux-ltp](linux-ltp/): A demo of [Linux LTP](https://github.com/linux-test-project/ltp), the most popular test suite for Linux.
+* [sysbench](sysbench/): A demo of [Sysbench](https://github.com/akopytov/sysbench), a scriptable multi-threaded benchmark tool for Linux.
+
 ## Other demos
 
+* [cross_world_uds](cross_world_uds/): A demo of cross world communication between unix domain socket.
 * [embedded_mode](embedded_mode/): A cross-enclave memory throughput benchmark enabled by the embedded mode of Occlum.
 * [enclave_tls](enclave_tls/): Running TLS server inside Occlum. Client connects with server associate with Enclave-RA information.  
 * [gdb_support](gdb_support/): This demo explains the technical detail of GDB support and demonstrates how to debug an app running upon Occlum with GDB.

@@ -22,15 +22,15 @@ init_instance() {
                 .resource_limits.max_num_of_threads = 64 |
                 .process.default_heap_size = "256MB" |
                 .process.default_mmap_size = "1400MB" |
-                .entry_points = [ "/usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin" ] |
-                .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-11-alibaba-dragonwell/jre/lib/server:/usr/lib/jvm/java-11-alibaba-dragonwell/jre/lib:/usr/lib/jvm/java-11-alibaba-dragonwell/jre/../lib" ]' Occlum.json)" && \
+                .entry_points = [ "/usr/lib/jvm/java-1.8-openjdk/jre/bin" ] |
+                .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-1.8-openjdk/jre/lib:/usr/lib/jvm/java-1.8-openjdk/lib" ]' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
 }
 
 build_sofa() {
     # Copy JVM and JAR file into Occlum instance and build
     rm -rf image
-    copy_bom -f ../sofaboot.yaml --root image --include-dir /opt/occlum/etc/template
+    copy_bom -f ../sofaboot_jdk8.yaml --root image --include-dir /opt/occlum/etc/template
     occlum build
 }
 
@@ -41,7 +41,7 @@ run_sofa() {
     init_instance
     build_sofa
     echo -e "${BLUE}occlum run SOFABoot demo${NC}"
-    occlum run /usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin/java -Xmx512m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=64m -Dos.name=Linux -jar /usr/lib/spring/${jar_file} &
+    occlum run /usr/lib/jvm/java-1.8-openjdk/jre/bin/java -Xmx512m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=64m -Dos.name=Linux -jar /usr/lib/spring/${jar_file} &
 }
 
 run_sofa

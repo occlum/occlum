@@ -11,10 +11,16 @@ on:
 
 env:
   nap_time: 60
-  repeat_times: 300  # Stress test repeat times
+  repeat_times: 500  # Stress test repeat times
+
+# Cancel previous running jobs on push or pull request
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   Make-test-on-ubuntu:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -58,6 +64,7 @@ jobs:
 
 
   C_cpp_rust_golang_embedded_mode_support_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -117,24 +124,17 @@ jobs:
             make test"
 
     - name: Run Golang sqlite test
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "export GO111MODULE=on;
             cd /root/occlum/demos/golang/go_sqlite/ && ./run_go_sqlite_demo.sh"
 
     - name: Go server set up and run
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "export GO111MODULE=on;
             cd /root/occlum/demos/golang/web_server && occlum-go mod init web_server && occlum-go get -u -v github.com/gin-gonic/gin;
             occlum-go build -o web_server ./web_server.go;
             ./run_golang_on_occlum.sh" &
 
-    # Sleeps longer to make sure the server is up.
-    - name: Curl test
-      run: |
-        sleep ${{ env.nap_time }};
-        sleep ${{ env.nap_time }};
-        docker exec ${{ env.CONTAINER_NAME }} bash -c "curl http://127.0.0.1:8090/ping"
-
     - name: Set up Golang grpc pingpong test
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "export GO111MODULE=on && export GOPROXY=https://goproxy.cn;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "export GO111MODULE=on;
             cd /root/occlum/demos/golang/grpc_pingpong && ./prepare_ping_pong.sh"
 
     - name: Start Golang grpc pingpong server
@@ -157,6 +157,7 @@ jobs:
 
 
   Java_support_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -204,6 +205,7 @@ jobs:
 
 
   Bazel_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -253,6 +255,7 @@ jobs:
 
 
   Fish_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -297,6 +300,7 @@ jobs:
 
 
   Xgboost_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -341,6 +345,7 @@ jobs:
 
 
   Sqlite_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -382,6 +387,7 @@ jobs:
 
 
   Python_musl_support_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -422,15 +428,15 @@ jobs:
       with:
         container-name: $python_musl_support_test
 
-    - name: Configure dependency source
-      run: |
-        docker exec $python_musl_support_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'tuna'
-        [source.tuna]
-        registry = \"https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git\"
-        EOF"
+    # - name: Configure dependency source
+    #   run: |
+    #     docker exec $python_musl_support_test bash -c "cat <<- EOF >/root/.cargo/config
+    #     [source.crates-io]
+    #     registry = \"https://github.com/rust-lang/crates.io-index\"
+    #     replace-with = 'tuna'
+    #     [source.tuna]
+    #     registry = \"https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git\"
+    #     EOF"
 
     - name: Build dependencies
       run: docker exec $python_musl_support_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
@@ -450,6 +456,7 @@ jobs:
 
 
   Openvino_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -490,15 +497,15 @@ jobs:
       with:
         container-name: $openvino_test
 
-    - name: Configure dependency source
-      run: |
-        docker exec $openvino_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
+    # - name: Configure dependency source
+    #   run: |
+    #     docker exec $openvino_test bash -c "cat <<- EOF >/root/.cargo/config
+    #     [source.crates-io]
+    #     registry = \"https://github.com/rust-lang/crates.io-index\"
+    #     replace-with = 'ustc'
+    #     [source.ustc]
+    #     registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+    #     EOF"
 
     - name: Build dependencies
       run: docker exec $openvino_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
@@ -513,7 +520,9 @@ jobs:
       if: ${{ always() }}
       run: docker stop $openvino_test
 
-  Grpc_musl_test:
+
+  Grpc_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -542,50 +551,66 @@ jobs:
       run: |
         docker pull occlumbackup/occlum:latest-ubuntu20.04-grpc
         if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          grpc_musl_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc);
+          grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc);
         elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          grpc_musl_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc);
+          grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc);
         else
           echo "Unsupported Hardware"
         fi;
-        echo "grpc_musl_test=$grpc_musl_test" >> $GITHUB_ENV
+        echo "grpc_test=$grpc_test" >> $GITHUB_ENV
 
     - uses: ./.github/workflows/composite_action/prebuild
       with:
-        container-name: $grpc_musl_test
+        container-name: $grpc_test
 
-    - name: Change download source of crates.io
-      run: |
-        docker exec $grpc_musl_test bash -c "cat <<- EOF >/root/.cargo/config
-        [source.crates-io]
-        registry = \"https://github.com/rust-lang/crates.io-index\"
-        replace-with = 'ustc'
-        [source.ustc]
-        registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-        EOF"
+    # - name: Change download source of crates.io
+    #   run: |
+    #     docker exec $grpc_test bash -c "cat <<- EOF >/root/.cargo/config
+    #     [source.crates-io]
+    #     registry = \"https://github.com/rust-lang/crates.io-index\"
+    #     replace-with = 'ustc'
+    #     [source.ustc]
+    #     registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+    #     EOF"
 
     - name: Build dependencies
-      run: docker exec $grpc_musl_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
+      run: docker exec $grpc_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
     - name: Make install
-      run: docker exec $grpc_musl_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
+      run: docker exec $grpc_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Prepare grpc musl sample project
-      run: docker exec $grpc_musl_test bash -c "cd /root/demos/grpc/grpc_musl && ./prepare_client_server.sh"
+      run: docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_musl && ./prepare_client_server.sh"
 
     - name: Run grpc musl server
-      run: docker exec $grpc_musl_test bash -c "cd /root/demos/grpc/grpc_musl && ./run_server_on_occlum.sh" &
+      run: docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_musl && ./run_server_on_occlum.sh" &
 
     - name: Run grpc musl client
       run: |
         sleep ${{ env.nap_time }};
-        docker exec $grpc_musl_test bash -c "cd /root/demos/grpc/grpc_musl && ./run_client_on_occlum.sh"
+        docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_musl && ./run_client_on_occlum.sh"
+
+    - name: Prepare grpc glibc sample project
+      run: docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_glibc && ./prepare_client_server_glibc.sh"
+
+    - name: Run grpc glibc server
+      run: docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_glibc && ./run_server_on_occlum_glibc.sh" &
+
+    - name: Run grpc glibc client
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_glibc && ./run_client_on_occlum_glibc.sh"
+
+    - name: Run grpc stress test
+      run: docker exec $grpc_test bash -c "cd /root/demos/grpc/grpc_glibc && ./run_stress_test.sh"
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop $grpc_musl_test
+      run: docker stop $grpc_test
 
-  Grpc_glibc_test:
+
+  Gvisor_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -610,92 +635,47 @@ jobs:
         ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
-    - uses: ./.github/workflows/composite_action/hw
+    - name: Create container
+      run: |
+        docker pull occlumbackup/occlum:latest-ubuntu20.04-gvisor_test
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
+          gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-gvisor_test);
+        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+          gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-gvisor_test);
+        else
+          echo "Unsupported Hardware"
+        fi;
+        echo "gvisor_test=$gvisor_test" >> $GITHUB_ENV
+
+    - uses: ./.github/workflows/composite_action/prebuild
       with:
-        container-name: ${{ github.job }}
-        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+        container-name: $gvisor_test
 
-    - name: Download and Install grpc
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./download_and_install_grpc_glibc.sh"
+    # - name: Change download source of crates.io
+    #   run: |
+    #     docker exec $gvisor_test bash -c "cat <<- EOF >/root/.cargo/config
+    #     [source.crates-io]
+    #     registry = \"https://github.com/rust-lang/crates.io-index\"
+    #     replace-with = 'ustc'
+    #     [source.ustc]
+    #     registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+    #     EOF"
 
-    - name: Prepare grpc sample project
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./prepare_client_server_glibc.sh"
+    - name: Build dependencies
+      run: docker exec $gvisor_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
 
-    - name: Run grpc server
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./run_server_on_occlum_glibc.sh" &
+    - name: Make install
+      run: docker exec $gvisor_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
-    - name: Run grpc client
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./run_client_on_occlum_glibc.sh"
+    - name: Clone gvisor code
+      run: docker exec $gvisor_test bash -c "git clone https://github.com/occlum/gvisor.git"
 
-    - name: Prepare grpc stress test
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./prepare_stress_test_tool.sh"
+    - name: Run gvisor syscall test
+      run: docker exec $gvisor_test bash -c "cd /root/gvisor/occlum; ./run_occlum_passed_tests.sh ngo"
 
-    - name: Run grpc stress client
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/grpc/grpc_glibc && ./run_stress_test.sh"
-    
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop ${{ env.CONTAINER_NAME }}
-
-  # Gvisor_test:
-  #   if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
-  #   runs-on: ${{ matrix.self_runner }}
-  #   strategy:
-  #     matrix:
-  #       self_runner: [[self-hosted, SGX2-HW]]
-
-  #   steps:
-  #   - name: Clean before running
-  #     run: |
-  #       sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
-
-  #   - name: Checkout code
-  #     if: github.event_name == 'push'
-  #     uses: actions/checkout@v2
-  #     with:
-  #       submodules: true
-
-  #   - name: Checkout code from fork
-  #     if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
-  #     uses: actions/checkout@v2
-  #     with:
-  #       ref: refs/pull/${{ github.event.pull_request.number }}/merge
-  #       submodules: true
-
-  #   - name: Create container
-  #     run: |
-  #       docker pull occlumbackup/occlum:latest-ubuntu20.04-gvisor_test
-  #       if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-  #         gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-gvisor_test);
-  #       elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-  #         gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-gvisor_test);
-  #       else
-  #         echo "Unsupported Hardware"
-  #       fi;
-  #       echo "gvisor_test=$gvisor_test" >> $GITHUB_ENV
-
-  #   - name: Change download source of crates.io
-  #     run: |
-  #       docker exec $gvisor_test bash -c "cat <<- EOF >/root/.cargo/config
-  #       [source.crates-io]
-  #       registry = \"https://github.com/rust-lang/crates.io-index\"
-  #       replace-with = 'ustc'
-  #       [source.ustc]
-  #       registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-  #       EOF"
-
-  #   - name: Build dependencies
-  #     run: docker exec $gvisor_test bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
-
-  #   - name: Make install
-  #     run: docker exec $gvisor_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
-
-  #   - name: Run gvisor syscall test
-  #     run: docker exec $gvisor_test bash -c "cd /root/gvisor_occlum; ./run_occlum_passed_tests.sh"
-
-  #   - name: Clean the environment
-  #     if: ${{ always() }}
-  #     run: docker stop $gvisor_test
+      run: docker stop $gvisor_test
 
 
   # Test_rpm_deploy:
@@ -736,6 +716,7 @@ jobs:
 
 
   Test_deb_deploy:
+    timeout-minutes: 180
     if: github.event_name == 'push'
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -774,6 +755,7 @@ jobs:
 
 # # Tensorflow_serving requires binary tensorflow_serving PIC, here we compile tensorflow_model_server before workflow
 #   Tensorflow_serving_test:
+#     timeout-minutes: 180
 #     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
 #     runs-on: ${{ matrix.self_runner }}
 #     strategy:
@@ -811,15 +793,19 @@ jobs:
 #         fi;
 #         echo "tf_serving_test=$tf_serving_test" >> $GITHUB_ENV
 
-#     - name: Change download source of crates.io
-#       run: |
-#         docker exec $tf_serving_test bash -c "cat <<- EOF >/root/.cargo/config
-#         [source.crates-io]
-#         registry = \"https://github.com/rust-lang/crates.io-index\"
-#         replace-with = 'ustc'
-#         [source.ustc]
-#         registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
-#         EOF"
+#     - uses: ./.github/workflows/composite_action/prebuild
+#       with:
+#         container-name: $tf_serving_test
+
+#     # - name: Change download source of crates.io
+#     #   run: |
+#     #     docker exec $tf_serving_test bash -c "cat <<- EOF >/root/.cargo/config
+#     #     [source.crates-io]
+#     #     registry = \"https://github.com/rust-lang/crates.io-index\"
+#     #     replace-with = 'ustc'
+#     #     [source.ustc]
+#     #     registry = \"git://mirrors.ustc.edu.cn/crates.io-index\"
+#     #     EOF"
 
 #     - name: Build dependencies
 #       run: docker exec $tf_serving_test bash -c "cd /root/occlum; make submodule"
@@ -847,6 +833,7 @@ jobs:
 
 
   Remote_attestation_test:
+    timeout-minutes: 180
     if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -883,7 +870,60 @@ jobs:
       if: ${{ always() }}
       run: docker stop ${{ env.CONTAINER_NAME }}
 
+  # Init_RA_test:
+  #   timeout-minutes: 180
+  #   if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+  #   runs-on: ${{ matrix.self_runner }}
+  #   strategy:
+  #     matrix:
+  #       self_runner: [[self-hosted, SGX2-HW]]
+
+  #   steps:
+  #   - name: Clean before running
+  #     run: |
+  #       sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+  #   - name: Checkout code
+  #     if: github.event_name == 'push'
+  #     uses: actions/checkout@v2
+  #     with:
+  #       submodules: true
+
+  #   - name: Checkout code from fork
+  #     if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+  #     uses: actions/checkout@v2
+  #     with:
+  #       ref: refs/pull/${{ github.event.pull_request.number }}/merge
+  #       submodules: true
+
+  #   - uses: ./.github/workflows/composite_action/hw
+  #     with:
+  #       container-name: ${{ github.job }}
+  #       build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+  #   - name: Install dependencies
+  #     run: docker exec ${{ env.CONTAINER_NAME }} bash -c "apt update && apt install -y netcat"
+
+  #   - name: Build the init-ra all content
+  #     run: docker exec ${{ env.CONTAINER_NAME }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum/demos/remote_attestation/init_ra_flow; ./build_content.sh"
+
+  #   - name: Run init-ra server and client(flask-tls) on backgroud tiil ready
+  #     run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/remote_attestation/init_ra_flow; ./run_till_ready.sh"
+
+  #   - name: Test PUT data with certificate
+  #     run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/remote_attestation/init_ra_flow;
+  #           curl --cacert flask.crt -X PUT https://localhost:4996/customer/1 -d "data=Tom""
+
+  #   - name: Test GET data with certificate
+  #     run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/remote_attestation/init_ra_flow;
+  #           curl --cacert flask.crt -X GET https://localhost:4996/customer/1"
+
+  #   - name: Clean the environment
+  #     if: ${{ always() }}
+  #     run: docker stop ${{ env.CONTAINER_NAME }}
+
   Stress_test_with_musl:
+    timeout-minutes: 500
     if: github.event_name == 'schedule'
     runs-on: ${{ matrix.self_runner }}
     strategy:
@@ -916,6 +956,7 @@ jobs:
 
 
   Stress_test_with_glibc:
+    timeout-minutes: 500
     if: github.event_name == 'schedule'
     runs-on: ${{ matrix.self_runner }}
     strategy:

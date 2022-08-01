@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/bin/bash
+set -e
+
 echo Building tf-serving with pic
 cd docker
 ./build_tf_serving_with_pic.sh

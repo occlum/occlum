@@ -9,10 +9,10 @@ cd occlum_instance
 rm -rf image
 copy_bom -f ../rocksdb.yaml --root image --include-dir /opt/occlum/etc/template
 
-new_json="$(jq '.resource_limits.user_space_size = "3000MB" |
-                .resource_limits.kernel_space_heap_size ="1024MB" |
-                .resource_limits.kernel_space_stack_size ="4MB" |
-                .resource_limits.max_num_of_threads = 96' Occlum.json)" && \
+TCS_NUM=$(($(nproc) * 2))
+new_json="$(jq --argjson THREAD_NUM ${TCS_NUM} '.resource_limits.user_space_size = "1024MB" |
+                .resource_limits.kernel_space_heap_size ="512MB" |
+                .resource_limits.max_num_of_threads = $THREAD_NUM' Occlum.json)" && \
 echo "${new_json}" > Occlum.json
 
 occlum build
@@ -23,11 +23,11 @@ NC='\033[0m'
 echo -e "${BLUE}Run simple_rocksdb_example in Occlum.${NC}"
 occlum run /bin/simple_rocksdb_example
 
-echo -e "${BLUE}Run benchmark in Occlum.${NC}"
+echo -e "${BLUE}Run benchmark on Occlum.${NC}"
 
 # More benchmark config at https://github.com/facebook/rocksdb/wiki/Benchmarking-tools
 BENCHMARK_CONFIG="fillseq,fillrandom,readseq,readrandom,deleteseq"
 occlum run /bin/db_bench --benchmarks=${BENCHMARK_CONFIG}
 
-echo -e "${BLUE}Run benchmark in host.${NC}"
+echo -e "${BLUE}Run benchmark on host.${NC}"
 cd ../rocksdb && ./db_bench --benchmarks=$BENCHMARK_CONFIG

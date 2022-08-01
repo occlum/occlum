@@ -7,7 +7,3 @@ targets:
     copy:
       - dirs:
         - /usr/local/redis/bin
-  - target: /etc/
-    copy:
-      - files:
-        - ../redis.conf
