@@ -16,7 +16,6 @@
 #![feature(dropck_eyepatch)]
 // for UntrustedSliceAlloc in slice_alloc
 #![feature(slice_ptr_get)]
-#![feature(maybe_uninit_extra)]
 #![feature(get_mut_unchecked)]
 // for std::hint::black_box
 #![feature(test)]
