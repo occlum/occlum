@@ -3,7 +3,7 @@ name: Bug report
 about: Create a report to help us improve
 title: "[BUG]"
 labels: 'bug'
-assignees: guzongmin
+assignees: volcano0dr
 
 ---
 
@@ -27,8 +27,8 @@ If applicable, add logs to help explain your problem.
 # Environment
 <!--- Please complete the following information -->
 - HW: [e.g. SGX1, SGX2] 
-- OS: [e.g. Ubuntu18.04, CentOS8.2]
-- Occlum version: [e.g. 0.17.0]
+- OS: [e.g. Ubuntu20.04, CentOS8.2]
+- Occlum version: [e.g. 0.28.0]
 
 # Additional context
 Add any other context about the problem here.
