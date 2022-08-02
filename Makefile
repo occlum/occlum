@@ -49,6 +49,8 @@ submodule: githooks
 	@cp deps/sefs/sefs-cli/lib/libsefs-cli.signed.so build/lib
 	@cp deps/sefs/sefs-cli/enclave/Enclave.config.xml build/sefs-cli.Enclave.xml
 	@cd deps/io-uring/ocalls && cargo clean && cargo build --release
+	@# Build and install Occlum dcap lib
+	@cd tools/toolchains/dcap_lib && ./build.sh
 
 src:
 	@$(MAKE) --no-print-directory -C src
@@ -91,7 +93,7 @@ install: minimal_sgx_libs
 
 	@echo "Installation is done."
 
-SGX_SDK=/opt/intel/sgxsdk
+SGX_SDK ?= /opt/intel/sgxsdk
 # Install minimum sgx-sdk set to support Occlum cmd execution in non-customized sgx-sdk environment
 minimal_sgx_libs: $(SGX_SDK)/lib64/libsgx_uae_service_sim.so $(SGX_SDK)/lib64/libsgx_quote_ex_sim.so
 	@echo "Install needed sgx-sdk tools ..."
