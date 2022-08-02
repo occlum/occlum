@@ -6,11 +6,11 @@ targets:
   - target: /bin
     copy:
       - files:
-        - /opt/occlum/toolchains/dcap_lib/glibc/dcap_test
+        - /opt/occlum/toolchains/dcap_lib/musl/dcap_test
         - ../c_app/dcap_c_test
   # copy lib
-  - target: /opt/occlum/glibc/lib
+  - target: /lib
     copy:
       - files:
-        - /opt/occlum/toolchains/dcap_lib/glibc/libocclum_dcap.so.0.1.0
+        - /opt/occlum/toolchains/dcap_lib/musl/libocclum_dcap.so.0.1.0
 
