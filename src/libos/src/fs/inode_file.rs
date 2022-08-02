@@ -1,5 +1,6 @@
 use super::*;
 use crate::net::PollEventFlags;
+use crate::process::do_getuid;
 use rcore_fs::vfs::FallocateMode;
 use rcore_fs_sefs::dev::SefsMac;
 
@@ -409,12 +410,23 @@ impl INodeExt for dyn INode {
     }
 
     fn allow_write(&self) -> Result<bool> {
+        // TODO: Since Occlum does not support the capability,
+        //       just skip the permission check if uid is root.
+        if do_getuid().unwrap() == 0 {
+            return Ok(true);
+        }
+
         let info = self.metadata()?;
         let file_mode = FileMode::from_bits_truncate(info.mode);
         Ok(file_mode.is_writable())
     }
 
     fn allow_read(&self) -> Result<bool> {
+        // TODO: See the comments in allow_write
+        if do_getuid().unwrap() == 0 {
+            return Ok(true);
+        }
+
         let info = self.metadata()?;
         let file_mode = FileMode::from_bits_truncate(info.mode);
         Ok(file_mode.is_readable())
