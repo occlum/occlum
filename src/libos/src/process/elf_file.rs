@@ -15,7 +15,7 @@ const ELF64_HDR_SIZE: usize = 64;
 pub struct ElfFile<'a> {
     elf_buf: &'a [u8],
     elf_inner: Elf<'a>,
-    file_inode: &'a Arc<dyn INode>,
+    file_ref: &'a FileRef,
 }
 
 impl<'a> Debug for ElfFile<'a> {
@@ -30,7 +30,7 @@ impl<'a> Debug for ElfFile<'a> {
 
 impl<'a> ElfFile<'a> {
     pub fn new(
-        file_inode: &'a Arc<dyn INode>,
+        file_ref: &'a FileRef,
         mut elf_buf: &'a mut [u8],
         header: ElfHeader,
     ) -> Result<ElfFile<'a>> {
@@ -64,7 +64,7 @@ impl<'a> ElfFile<'a> {
                     intepreter_offset,
                     intepreter_count
                 );
-                file_inode.read_at(
+                file_ref.read_at(
                     intepreter_offset,
                     &mut elf_buf[intepreter_offset..intepreter_offset + intepreter_count],
                 );
@@ -87,7 +87,7 @@ impl<'a> ElfFile<'a> {
         Ok(ElfFile {
             elf_buf,
             elf_inner,
-            file_inode,
+            file_ref,
         })
     }
 
@@ -107,11 +107,11 @@ impl<'a> ElfFile<'a> {
         self.elf_buf
     }
 
-    pub fn file_inode(&self) -> &Arc<dyn INode> {
-        self.file_inode
+    pub fn file_ref(&self) -> &FileRef {
+        self.file_ref
     }
 
-    pub fn parse_elf_hdr(inode: &Arc<dyn INode>, elf_buf: &mut Vec<u8>) -> Result<ElfHeader> {
+    pub fn parse_elf_hdr(elf_file: &FileRef, elf_buf: &mut Vec<u8>) -> Result<ElfHeader> {
         // TODO: Sanity check the number of program headers..
         let mut phdr_start = 0;
         let mut phdr_end = 0;
@@ -130,7 +130,7 @@ impl<'a> ElfFile<'a> {
         }
 
         let program_hdr_table_size = elf_hdr.e_phnum * elf_hdr.e_phentsize;
-        inode.read_at(
+        elf_file.read_at(
             elf_hdr.e_phoff as usize,
             &mut elf_buf[hdr_size..hdr_size + (program_hdr_table_size as usize)],
         )?;
