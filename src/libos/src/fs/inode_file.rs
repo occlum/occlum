@@ -1,5 +1,6 @@
 use super::file_ops::{ioctl::TcGets, ioctl::TcSets, NonBuiltinIoctlCmd};
 use super::*;
+use crate::process::do_getuid::do_getuid;
 use rcore_fs_sefs::dev::SefsMac;
 
 // TODO: rename all INodeFile to InodeFile
@@ -385,12 +386,23 @@ impl INodeExt for dyn INode {
     }
 
     fn allow_write(&self) -> Result<bool> {
+        // TODO: Since Occlum does not support the capability,
+        //       just skip the permission check if uid is root.
+        if do_getuid() == 0 {
+            return Ok(true);
+        }
+
         let info = self.metadata()?;
         let file_mode = FileMode::from_bits_truncate(info.mode);
         Ok(file_mode.is_writable())
     }
 
     fn allow_read(&self) -> Result<bool> {
+        // TODO: See the comments in allow_write
+        if do_getuid() == 0 {
+            return Ok(true);
+        }
+
         let info = self.metadata()?;
         let file_mode = FileMode::from_bits_truncate(info.mode);
         Ok(file_mode.is_readable())
