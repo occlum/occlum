@@ -1,6 +1,6 @@
 use super::super::elf_file::*;
 use super::ThreadRef;
-use crate::fs::{FileMode, INodeExt};
+use crate::fs::{AsINodeFile, FileMode, INodeExt};
 use crate::prelude::*;
 use rcore_fs::vfs::{FileType, INode, Metadata};
 use std::ffi::CString;
@@ -13,10 +13,10 @@ use std::ffi::CString;
 pub fn load_exec_file_hdr_to_vec(
     file_path: &str,
     current_ref: &ThreadRef,
-) -> Result<(Option<String>, Arc<dyn INode>, Vec<u8>, ElfHeader)> {
-    let (inode, file_buf, elf_hdr) = load_file_hdr_to_vec(&file_path, current_ref)?;
+) -> Result<(Option<String>, FileRef, Vec<u8>, ElfHeader)> {
+    let (file_ref, file_buf, elf_hdr) = load_file_hdr_to_vec(&file_path, current_ref)?;
     if elf_hdr.is_some() {
-        Ok((None, inode, file_buf, elf_hdr.unwrap()))
+        Ok((None, file_ref, file_buf, elf_hdr.unwrap()))
     } else {
         // loaded file is not Elf format, try script file
         if !is_script_file(&file_buf) {
@@ -30,14 +30,14 @@ pub fn load_exec_file_hdr_to_vec(
                 "libos doesn't support executing binaries from \"/host\" directory"
             );
         }
-        let (interp_inode, interp_buf, interp_hdr) =
+        let (interp_file, interp_buf, interp_hdr) =
             load_file_hdr_to_vec(&interpreter_path, current_ref)?;
         let interp_hdr = if interp_hdr.is_none() {
             return_errno!(ENOEXEC, "scrip interpreter is not ELF format");
         } else {
             interp_hdr.unwrap()
         };
-        Ok((Some(interpreter_path), interp_inode, interp_buf, interp_hdr))
+        Ok((Some(interpreter_path), interp_file, interp_buf, interp_hdr))
     }
 }
 
@@ -72,13 +72,13 @@ fn parse_script_interpreter(file_buf: &Vec<u8>) -> Result<String> {
 pub fn load_file_hdr_to_vec(
     file_path: &str,
     current_ref: &ThreadRef,
-) -> Result<(Arc<dyn INode>, Vec<u8>, Option<ElfHeader>)> {
-    let inode = current_ref
+) -> Result<(FileRef, Vec<u8>, Option<ElfHeader>)> {
+    let file_ref = current_ref
         .fs()
         .read()
         .unwrap()
-        .lookup_inode(file_path)
-        .map_err(|e| errno!(e.errno(), "cannot find the file"))?;
+        .open_file(file_path, 0, FileMode::S_IRUSR)?;
+    let inode = file_ref.as_inode_file()?.inode();
 
     // Make sure the final file to exec is not a directory
     let metadata = inode.metadata()?;
@@ -105,12 +105,12 @@ pub fn load_file_hdr_to_vec(
         .read_elf64_lazy_as_vec()
         .map_err(|e| errno!(e.errno(), "failed to read the file"))?;
 
-    let elf_header = ElfFile::parse_elf_hdr(&inode, &mut file_buf);
+    let elf_header = ElfFile::parse_elf_hdr(&file_ref, &mut file_buf);
     if let Ok(elf_header) = elf_header {
-        Ok((inode, file_buf, Some(elf_header)))
+        Ok((file_ref, file_buf, Some(elf_header)))
     } else {
         // this file is not ELF format or there is something wrong when parsing
         warn!("parse elf header error = {}", elf_header.err().unwrap());
-        Ok((inode, file_buf, None))
+        Ok((file_ref, file_buf, None))
     }
 }

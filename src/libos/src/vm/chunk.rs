@@ -93,11 +93,10 @@ impl Chunk {
     }
 
     pub fn new_single_vma_chunk(vm_range: &VMRange, options: &VMMapOptions) -> Result<Self> {
-        let writeback_file = options.writeback_file().clone();
         let vm_area = VMArea::new(
             vm_range.clone(),
             *options.perms(),
-            writeback_file,
+            options.initializer().backed_file(),
             DUMMY_CHUNK_PROCESS_ID,
         );
         // Initialize the memory of the new range
@@ -178,7 +177,7 @@ impl Chunk {
         if internal_manager.chunk_manager().free_size() < options.size() {
             return_errno!(ENOMEM, "no enough size without trying. try other chunks");
         }
-        internal_manager.chunk_manager().mmap(options)
+        internal_manager.chunk_manager_mut().mmap(options)
     }
 
     pub fn is_single_vma(&self) -> bool {
@@ -279,7 +278,11 @@ impl ChunkInternal {
         self.process_set.insert(pid);
     }
 
-    pub fn chunk_manager(&mut self) -> &mut ChunkManager {
+    pub fn chunk_manager(&self) -> &ChunkManager {
+        &self.chunk_manager
+    }
+
+    pub fn chunk_manager_mut(&mut self) -> &mut ChunkManager {
         &mut self.chunk_manager
     }
 

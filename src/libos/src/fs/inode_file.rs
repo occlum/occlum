@@ -266,6 +266,10 @@ impl File for INodeFile {
 }
 
 impl INodeFile {
+    pub fn inode(&self) -> &Arc<dyn INode> {
+        &self.inode
+    }
+
     pub fn open(inode: Arc<dyn INode>, abs_path: &str, flags: u32) -> Result<Self> {
         let access_mode = AccessMode::from_u32(flags)?;
         if (access_mode.readable() && !inode.allow_read()?) {

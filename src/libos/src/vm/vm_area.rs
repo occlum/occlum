@@ -2,6 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use super::vm_perms::VMPerms;
 use super::vm_range::VMRange;
+use super::vm_util::FileBacked;
 use super::*;
 
 use intrusive_collections::rbtree::{Link, RBTree};
@@ -11,7 +12,7 @@ use intrusive_collections::{intrusive_adapter, KeyAdapter};
 pub struct VMArea {
     range: VMRange,
     perms: VMPerms,
-    writeback_file: Option<(FileRef, usize)>,
+    file_backed: Option<FileBacked>,
     pid: pid_t,
 }
 
@@ -19,13 +20,13 @@ impl VMArea {
     pub fn new(
         range: VMRange,
         perms: VMPerms,
-        writeback_file: Option<(FileRef, usize)>,
+        file_backed: Option<FileBacked>,
         pid: pid_t,
     ) -> Self {
         Self {
             range,
             perms,
-            writeback_file,
+            file_backed,
             pid,
         }
     }
@@ -38,20 +39,25 @@ impl VMArea {
         new_perms: VMPerms,
         pid: pid_t,
     ) -> Self {
-        let new_writeback_file = vma.writeback_file.as_ref().map(|(file, file_offset)| {
-            let new_file = file.clone();
+        let new_backed_file = vma.file_backed.as_ref().map(|file| {
+            let mut new_file = file.clone();
+            let file_offset = file.offset();
 
             let new_file_offset = if vma.start() < new_range.start() {
                 let vma_offset = new_range.start() - vma.start();
-                *file_offset + vma_offset
+                file_offset + vma_offset
             } else {
                 let vma_offset = vma.start() - new_range.start();
-                debug_assert!(*file_offset >= vma_offset);
-                *file_offset - vma_offset
+                debug_assert!(file_offset >= vma_offset);
+                file_offset - vma_offset
             };
-            (new_file, new_file_offset)
+
+            new_file.set_offset(new_file_offset);
+
+            new_file
         });
-        Self::new(new_range, new_perms, new_writeback_file, pid)
+
+        Self::new(new_range, new_perms, new_backed_file, pid)
     }
 
     pub fn perms(&self) -> VMPerms {
@@ -66,8 +72,20 @@ impl VMArea {
         self.pid
     }
 
-    pub fn writeback_file(&self) -> &Option<(FileRef, usize)> {
-        &self.writeback_file
+    pub fn init_file(&self) -> Option<(&FileRef, usize)> {
+        if let Some(file) = &self.file_backed {
+            Some(file.init_file())
+        } else {
+            None
+        }
+    }
+
+    pub fn writeback_file(&self) -> Option<(&FileRef, usize)> {
+        if let Some(file) = &self.file_backed {
+            file.writeback_file()
+        } else {
+            None
+        }
     }
 
     pub fn set_perms(&mut self, new_perms: VMPerms) {
@@ -103,15 +121,19 @@ impl VMArea {
         let old_start = self.start();
         self.range.set_start(new_start);
 
-        // If the updates to the VMA needs to write back to a file, then the
-        // file offset must be adjusted according to the new start address.
-        if let Some((_, offset)) = self.writeback_file.as_mut() {
+        if let Some(file) = self.file_backed.as_mut() {
+            if !file.need_write_back() {
+                return;
+            }
+            // If the updates to the VMA needs to write back to a file, then the
+            // file offset must be adjusted according to the new start address.
+            let offset = file.offset();
             if old_start < new_start {
-                *offset += new_start - old_start;
+                file.set_offset(offset + (new_start - old_start));
             } else {
                 // The caller must guarantee that the new start makes sense
-                debug_assert!(*offset >= old_start - new_start);
-                *offset -= old_start - new_start;
+                debug_assert!(offset >= old_start - new_start);
+                file.set_offset(offset - (old_start - new_start));
             }
         }
     }
@@ -221,24 +243,5 @@ impl VMAObj {
 
     pub fn vma(&self) -> &VMArea {
         &self.vma
-    }
-}
-
-impl VMArea {
-    pub fn new_obj(
-        range: VMRange,
-        perms: VMPerms,
-        writeback_file: Option<(FileRef, usize)>,
-        pid: pid_t,
-    ) -> Box<VMAObj> {
-        Box::new(VMAObj {
-            link: Link::new(),
-            vma: VMArea {
-                range,
-                perms,
-                writeback_file,
-                pid,
-            },
-        })
     }
 }

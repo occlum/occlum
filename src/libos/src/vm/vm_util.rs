@@ -1,9 +1,8 @@
 use super::*;
 
-// use super::vm_area::VMArea;
-// use super::free_space_manager::VMFreeSpaceManager;
 use super::vm_area::*;
 use super::vm_perms::VMPerms;
+use crate::fs::FileMode;
 use std::collections::BTreeSet;
 
 use intrusive_collections::rbtree::{Link, RBTree};
@@ -18,15 +17,19 @@ pub enum VMInitializer {
     CopyFrom {
         range: VMRange,
     },
-    LoadFromFile {
-        file: FileRef,
-        offset: usize,
+    FileBacked {
+        file: FileBacked,
+    },
+    // For ELF files, there is specical handling to not copy all the contents of the file. This is only used for tracking.
+    ElfSpecific {
+        elf_file: FileRef,
     },
     // For file-backed mremap which may move from old range to new range and read extra bytes from file
     CopyOldAndReadNew {
         old_range: VMRange,
         file: FileRef,
         offset: usize, // read file from this offset
+        new_writeback_file: FileBacked,
     },
 }
 
@@ -39,7 +42,7 @@ impl Default for VMInitializer {
 impl VMInitializer {
     pub fn init_slice(&self, buf: &mut [u8]) -> Result<()> {
         match self {
-            VMInitializer::DoNothing() => {
+            VMInitializer::DoNothing() | VMInitializer::ElfSpecific { .. } => {
                 // Do nothing
             }
             VMInitializer::FillZeros() => {
@@ -55,10 +58,11 @@ impl VMInitializer {
                     *b = 0;
                 }
             }
-            VMInitializer::LoadFromFile { file, offset } => {
+            VMInitializer::FileBacked { file } => {
                 // TODO: make sure that read_at does not move file cursor
                 let len = file
-                    .read_at(*offset, buf)
+                    .file_ref()
+                    .read_at(file.offset(), buf)
                     .cause_err(|_| errno!(EACCES, "failed to init memory from file"))?;
                 for b in &mut buf[len..] {
                     *b = 0;
@@ -68,6 +72,7 @@ impl VMInitializer {
                 old_range,
                 file,
                 offset,
+                new_writeback_file,
             } => {
                 // TODO: Handle old_range with non-readable subrange
                 let src_slice = unsafe { old_range.as_slice() };
@@ -84,6 +89,66 @@ impl VMInitializer {
             }
         }
         Ok(())
+    }
+
+    pub fn backed_file(&self) -> Option<FileBacked> {
+        match self {
+            VMInitializer::ElfSpecific { elf_file } => {
+                let file_ref = elf_file.clone();
+                Some(FileBacked::new(file_ref, 0, false))
+            }
+            VMInitializer::FileBacked { file } => Some(file.clone()),
+            VMInitializer::CopyOldAndReadNew {
+                new_writeback_file, ..
+            } => Some(new_writeback_file.clone()),
+            _ => None,
+        }
+    }
+}
+
+// This struct is used to record file-backed memory type.
+#[derive(Debug, Clone)]
+pub struct FileBacked {
+    file: FileRef,
+    offset: usize,
+    write_back: bool,
+}
+
+impl FileBacked {
+    pub fn new(file: FileRef, offset: usize, write_back: bool) -> Self {
+        Self {
+            file,
+            offset,
+            write_back,
+        }
+    }
+
+    pub fn file_ref(&self) -> &FileRef {
+        &self.file
+    }
+
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+
+    pub fn set_offset(&mut self, offset: usize) {
+        self.offset = offset;
+    }
+
+    pub fn need_write_back(&self) -> bool {
+        self.write_back
+    }
+
+    pub fn init_file(&self) -> (&FileRef, usize) {
+        (&self.file, self.offset)
+    }
+
+    pub fn writeback_file(&self) -> Option<(&FileRef, usize)> {
+        if self.write_back {
+            Some((&self.file, self.offset))
+        } else {
+            None
+        }
     }
 }
 
@@ -118,8 +183,6 @@ pub struct VMMapOptions {
     perms: VMPerms,
     addr: VMMapAddr,
     initializer: VMInitializer,
-    // The content of the VMA can be written back to a given file at a given offset
-    writeback_file: Option<(FileRef, usize)>,
 }
 
 // VMMapOptionsBuilder is generated automatically, except the build function
@@ -165,14 +228,12 @@ impl VMMapOptionsBuilder {
             Some(initializer) => initializer.clone(),
             None => VMInitializer::default(),
         };
-        let writeback_file = self.writeback_file.take().unwrap_or_default();
         Ok(VMMapOptions {
             size,
             align,
             perms,
             addr,
             initializer,
-            writeback_file,
         })
     }
 }
@@ -196,10 +257,6 @@ impl VMMapOptions {
 
     pub fn initializer(&self) -> &VMInitializer {
         &self.initializer
-    }
-
-    pub fn writeback_file(&self) -> &Option<(FileRef, usize)> {
-        &self.writeback_file
     }
 }
 
@@ -375,17 +432,18 @@ pub trait VMRemapParser {
             }
             (MRemapFlags::None, VMRemapSizeType::Growing, Some((backed_file, offset))) => {
                 // Update writeback file offset
-                let new_writeback_file = Some((backed_file.clone(), offset + vma.size()));
-                let vm_initializer_for_new_range = VMInitializer::LoadFromFile {
-                    file: backed_file.clone(),
-                    offset: offset + vma.size(), // file-backed mremap should start from the end of previous mmap/mremap file
+                let vm_initializer_for_new_range = VMInitializer::FileBacked {
+                    file: FileBacked::new(
+                        backed_file.clone(),
+                        offset + vma.size(), // file-backed mremap should start from the end of previous mmap/mremap file
+                        true,
+                    ),
                 };
                 let mmap_opts = VMMapOptionsBuilder::default()
                     .size(new_size - old_size)
                     .addr(VMMapAddr::Need(old_range.end()))
                     .perms(perms)
                     .initializer(vm_initializer_for_new_range)
-                    .writeback_file(new_writeback_file)
                     .build()?;
                 let ret_addr = Some(old_addr);
                 (Some(mmap_opts), ret_addr)
@@ -421,18 +479,18 @@ pub trait VMRemapParser {
                     VMRange::new_with_size(old_addr + old_size, new_size - old_size)?;
                 if self.is_free_range(&prefered_new_range) {
                     // Don't need to move the old range
-                    let vm_initializer_for_new_range = VMInitializer::LoadFromFile {
-                        file: backed_file.clone(),
-                        offset: offset + vma.size(), // file-backed mremap should start from the end of previous mmap/mremap file
+                    let vm_initializer_for_new_range = VMInitializer::FileBacked {
+                        file: FileBacked::new(
+                            backed_file.clone(),
+                            offset + vma.size(), // file-backed mremap should start from the end of previous mmap/mremap file
+                            true,
+                        ),
                     };
-                    // Write back file should start from new offset
-                    let new_writeback_file = Some((backed_file.clone(), offset + vma.size()));
                     let mmap_ops = VMMapOptionsBuilder::default()
                         .size(prefered_new_range.size())
                         .addr(VMMapAddr::Need(prefered_new_range.start()))
                         .perms(perms)
                         .initializer(vm_initializer_for_new_range)
-                        .writeback_file(new_writeback_file)
                         .build()?;
                     (Some(mmap_ops), Some(old_addr))
                 } else {
@@ -441,19 +499,19 @@ pub trait VMRemapParser {
                         let copy_end = vma.end();
                         let copy_range = VMRange::new(old_range.start(), copy_end)?;
                         let reread_file_start_offset = copy_end - vma.start();
+                        let new_writeback_file = FileBacked::new(backed_file.clone(), offset, true);
                         VMInitializer::CopyOldAndReadNew {
                             old_range: copy_range,
                             file: backed_file.clone(),
                             offset: reread_file_start_offset,
+                            new_writeback_file: new_writeback_file,
                         }
                     };
-                    let new_writeback_file = Some((backed_file.clone(), *offset));
                     let mmap_ops = VMMapOptionsBuilder::default()
                         .size(new_size)
                         .addr(VMMapAddr::Any)
                         .perms(perms)
                         .initializer(vm_initializer_for_new_range)
-                        .writeback_file(new_writeback_file)
                         .build()?;
                     // Cannot determine the returned address for now, which can only be obtained after calling mmap
                     let ret_addr = None;
@@ -476,19 +534,19 @@ pub trait VMRemapParser {
                     let copy_end = vma.end();
                     let copy_range = VMRange::new(old_range.start(), copy_end)?;
                     let reread_file_start_offset = copy_end - vma.start();
+                    let new_writeback_file = FileBacked::new(backed_file.clone(), offset, true);
                     VMInitializer::CopyOldAndReadNew {
                         old_range: copy_range,
                         file: backed_file.clone(),
                         offset: reread_file_start_offset,
+                        new_writeback_file: new_writeback_file,
                     }
                 };
-                let new_writeback_file = Some((backed_file.clone(), *offset));
                 let mmap_opts = VMMapOptionsBuilder::default()
                     .size(new_size)
                     .addr(VMMapAddr::Force(new_addr))
                     .perms(perms)
                     .initializer(vm_initializer_for_new_range)
-                    .writeback_file(new_writeback_file)
                     .build()?;
                 let ret_addr = Some(new_addr);
                 (Some(mmap_opts), ret_addr)
