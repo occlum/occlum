@@ -46,12 +46,13 @@ This set of demos shows how apps written with popular programming languages can 
 
 This set of demos shows how commonly used benchmarking tools can be run inside SGX enclaves with Occlum.
 
-* [filebench](filebench/): A demo of [Filebench](https://github.com/filebench/filebench), a file system and storage benchmark tool.
-* [fio](fio/): A demo of [Flexible I/O Tester](https://github.com/axboe/fio).
-* [iperf2](iperf2/): A demo of [Iperf2](https://sourceforge.net/projects/iperf2/), a tool for measuring Internet bandwidth performance.
-* [iperf3](iperf3/): A demo of [Iperf3](https://github.com/esnet/iperf), a tool for measuring Internet bandwidth performance.
+* [filebench](benchmarks/filebench/): A demo of [Filebench](https://github.com/filebench/filebench), a file system and storage benchmark tool.
+* [fio](benchmarks/fio/): A demo of [Flexible I/O Tester](https://github.com/axboe/fio).
+* [iperf2](benchmarks/iperf2/): A demo of [Iperf2](https://sourceforge.net/projects/iperf2/), a tool for measuring Internet bandwidth performance.
+* [iperf3](benchmarks/iperf3/): A demo of [Iperf3](https://github.com/esnet/iperf), a tool for measuring Internet bandwidth performance.
+* [sysbench](benchmarks/sysbench/): A demo of [Sysbench](https://github.com/akopytov/sysbench), a scriptable multi-threaded benchmark tool for Linux.
+
 * [linux-ltp](linux-ltp/): A demo of [Linux LTP](https://github.com/linux-test-project/ltp), the most popular test suite for Linux.
-* [sysbench](sysbench/): A demo of [Sysbench](https://github.com/akopytov/sysbench), a scriptable multi-threaded benchmark tool for Linux.
 
 ## Other demos
 
