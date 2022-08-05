@@ -135,12 +135,49 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
         &self.common
     }
 
-    pub fn cancel_requests(&self) {
-        let io_uring = self.common.io_uring();
-        let inner = self.inner.lock().unwrap();
-        for entry in inner.backlog.entries.iter() {
-            if let Entry::Pending { io_handle } = entry {
-                unsafe { io_uring.cancel(io_handle) };
+    pub async fn cancel_accept_requests(&self) {
+        {
+            // Set the listener stream as closed to prevent submitting new request in the callback fn
+            self.common().set_closed();
+            let io_uring = self.common.io_uring();
+            let inner = self.inner.lock().unwrap();
+            for entry in inner.backlog.entries.iter() {
+                if let Entry::Pending { io_handle } = entry {
+                    unsafe { io_uring.cancel(io_handle) };
+                }
+            }
+        }
+
+        // wait for all the cancel requests to complete
+        let poller = Poller::new();
+        let mask = Events::ERR | Events::IN;
+        self.common.pollee().connect_poller(mask, &poller);
+
+        loop {
+            let pending_entry_exists = {
+                let inner = self.inner.lock().unwrap();
+                inner
+                    .backlog
+                    .entries
+                    .iter()
+                    .find(|entry| match entry {
+                        Entry::Pending { .. } => true,
+                        _ => false,
+                    })
+                    .is_some()
+            };
+
+            if pending_entry_exists {
+                let mut timeout = Some(Duration::from_secs(20));
+                let ret = poller.wait_timeout(timeout.as_mut()).await;
+                if let Err(e) = ret {
+                    warn!("wait cancel accept request error = {:?}", e.errno());
+                    continue;
+                }
+            } else {
+                // Reset the stream for re-listen
+                self.common().reset_closed();
+                return;
             }
         }
     }
@@ -305,11 +342,14 @@ impl<A: Addr> Backlog<A> {
                     // TODO: throw fatal errors to the upper layer.
                     let errno = Errno::from(-retval as u32);
                     log::error!("Accept error: errno = {}", errno);
-                    //inner.fatal = Some(errno);
-                    //stream.common.pollee().add_events(Events::ERR);
 
                     inner.backlog.entries[entry_idx] = Entry::Free;
                     inner.backlog.num_free += 1;
+
+                    // When canceling request, a poller might be waiting for this to return.
+                    inner.fatal = Some(errno);
+                    stream.common.pollee().add_events(Events::ERR);
+
                     // After getting the error from the accept system call, we should not start
                     // the async accept requests again, because this may cause a large number of
                     // io-uring requests to be retried

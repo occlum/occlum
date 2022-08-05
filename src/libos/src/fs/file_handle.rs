@@ -181,6 +181,13 @@ impl FileHandle {
         }
     }
 
+    pub fn as_socket_file_arc(&self) -> Option<&Arc<SocketFile>> {
+        match &self.0.file {
+            AnyFile::Socket(socket_file) => Some(socket_file),
+            _ => None,
+        }
+    }
+
     // Returns the underlying epoll file if it is one.
     pub fn as_epoll_file(&self) -> Option<&EpollFile> {
         match &self.0.file {

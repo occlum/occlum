@@ -18,6 +18,15 @@ pub async fn do_close(fd: FileDesc) -> Result<()> {
     if let Some(disk_file) = file_ref.as_disk_file() {
         let _ = disk_file.flush().await;
     }
+    // Make sure the socket async request completes so that when removing from the file table,
+    // the host socket is actually dropped and closed.
+    if let Some(socket_file) = file_ref.as_socket_file_arc() {
+        let ref_count = Arc::strong_count(socket_file);
+        if ref_count == 2 {
+            // One here, one in the file table.
+            let _ = socket_file.close().await;
+        }
+    }
 
     // Make sure the async inode flushing data when being closed.
     if let Some(async_file_handle) = file_ref.as_async_file_handle() {

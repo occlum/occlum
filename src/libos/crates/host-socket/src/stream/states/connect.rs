@@ -55,8 +55,8 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
                 warn!("connect wait errno = {:?}", e.errno());
                 match e.errno() {
                     ETIMEDOUT => {
-                        // Cancel connect request if timeout
-                        self.cancel_connect_request();
+                        // Cancel connect request if timeout. No need to wait for cancel to complete.
+                        self.cancel_connect_request(false).await;
                         // This error code is same as the connect timeout error code on Linux
                         return_errno!(EINPROGRESS, "timeout reached")
                     }
@@ -81,16 +81,15 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
             // Guard against Igao attack
             assert!(retval <= 0);
 
+            let mut req = arc_self.req.lock().unwrap();
+            // Release the handle to the async connect
+            req.io_handle.take();
+
             if retval == 0 {
                 arc_self.common.pollee().add_events(Events::OUT);
             } else {
                 // Store the errno
-                let mut req = arc_self.req.lock().unwrap();
                 let errno = Errno::from(-retval as u32);
-                // If connect request is canceled, just ignore it to avoid spurious wake up on the other end
-                if errno == ECANCELED {
-                    return;
-                }
                 req.errno = Some(errno);
                 drop(req);
 
@@ -114,11 +113,42 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
         req.io_handle = Some(io_handle);
     }
 
-    fn cancel_connect_request(&self) {
-        let io_uring = self.common.io_uring();
-        let req = self.req.lock().unwrap();
-        if let Some(io_handle) = &req.io_handle {
-            unsafe { io_uring.cancel(io_handle) };
+    pub async fn cancel_connect_request(&self, need_wait: bool) {
+        {
+            let io_uring = self.common.io_uring();
+            let req = self.req.lock().unwrap();
+            if let Some(io_handle) = &req.io_handle {
+                unsafe { io_uring.cancel(io_handle) };
+            } else {
+                return;
+            }
+        }
+
+        // Wait for the cancel to complete if needed
+        if !need_wait {
+            return;
+        }
+
+        let poller = Poller::new();
+        let mask = Events::ERR | Events::IN;
+        self.common.pollee().connect_poller(mask, &poller);
+
+        loop {
+            let pending_request_exist = {
+                let req = self.req.lock().unwrap();
+                req.io_handle.is_some()
+            };
+
+            if pending_request_exist {
+                let mut timeout = Some(Duration::from_secs(10));
+                let ret = poller.wait_timeout(timeout.as_mut()).await;
+                if let Err(e) = ret {
+                    warn!("wait cancel connect request error = {:?}", e.errno());
+                    continue;
+                }
+            } else {
+                break;
+            }
         }
     }
 

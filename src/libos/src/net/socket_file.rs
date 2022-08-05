@@ -513,14 +513,22 @@ impl SocketFile {
         })
     }
 
-    pub fn shutdown(&self, how: Shutdown) -> Result<()> {
+    pub async fn shutdown(&self, how: Shutdown) -> Result<()> {
         match &self.socket {
-            AnySocket::Ipv4Stream(ipv4_stream) => ipv4_stream.shutdown(how),
-            AnySocket::Ipv6Stream(ipv6_stream) => ipv6_stream.shutdown(how),
-            AnySocket::UnixStream(unix_stream) => unix_stream.shutdown(how),
+            AnySocket::Ipv4Stream(ipv4_stream) => ipv4_stream.shutdown(how).await,
+            AnySocket::Ipv6Stream(ipv6_stream) => ipv6_stream.shutdown(how).await,
+            AnySocket::UnixStream(unix_stream) => unix_stream.shutdown(how).await,
             _ => {
                 return_errno!(EINVAL, "shutdown is not supported");
             }
+        }
+    }
+
+    pub async fn close(&self) -> Result<()> {
+        match &self.socket {
+            AnySocket::Ipv4Stream(ipv4_stream) => ipv4_stream.close().await,
+            AnySocket::Ipv6Stream(ipv6_stream) => ipv6_stream.close().await,
+            _ => Ok(()),
         }
     }
 }

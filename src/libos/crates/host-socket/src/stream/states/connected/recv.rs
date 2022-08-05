@@ -166,6 +166,12 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             || inner.end_of_file
             || self.common.is_closed()
         {
+            // Delete ERR events from sender. If io_handle is some, the recv request must be
+            // pending and the events can't be for the reciever. Just delete this event.
+            let events = self.common.pollee().poll(Events::IN, None);
+            if events.contains(Events::ERR) && inner.io_handle.is_some() {
+                self.common.pollee().del_events(Events::ERR);
+            }
             return;
         }
 
@@ -217,15 +223,43 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
     }
 
     pub(super) fn initiate_async_recv(self: &Arc<Self>) {
+        // trace!("initiate async recv");
         let mut inner = self.receiver.inner.lock().unwrap();
         self.do_recv(&mut inner);
     }
 
-    pub fn cancel_requests(&self) {
-        let inner = self.receiver.inner.lock().unwrap();
-        if let Some(io_handle) = &inner.io_handle {
-            let io_uring = self.common.io_uring();
-            unsafe { io_uring.cancel(io_handle) };
+    pub async fn cancel_recv_requests(&self) {
+        {
+            let inner = self.receiver.inner.lock().unwrap();
+            if let Some(io_handle) = &inner.io_handle {
+                let io_uring = self.common.io_uring();
+                unsafe { io_uring.cancel(io_handle) };
+            } else {
+                return;
+            }
+        }
+
+        // wait for the cancel to complete
+        let poller = Poller::new();
+        let mask = Events::ERR | Events::IN;
+        self.common.pollee().connect_poller(mask, &poller);
+
+        loop {
+            let pending_request_exist = {
+                let inner = self.receiver.inner.lock().unwrap();
+                inner.io_handle.is_some()
+            };
+
+            if pending_request_exist {
+                let mut timeout = Some(Duration::from_secs(10));
+                let ret = poller.wait_timeout(timeout.as_mut()).await;
+                if let Err(e) = ret {
+                    warn!("wait cancel recv request error = {:?}", e.errno());
+                    continue;
+                }
+            } else {
+                break;
+            }
         }
     }
 

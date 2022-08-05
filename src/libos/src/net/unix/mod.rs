@@ -210,8 +210,8 @@ impl UnixStream {
         }
     }
 
-    pub fn shutdown(&self, how: Shutdown) -> Result<()> {
-        apply_fn_on_any_stream!(self.inner(), |stream| { stream.shutdown(how) })
+    pub async fn shutdown(&self, how: Shutdown) -> Result<()> {
+        apply_fn_on_any_stream!(self.inner(), |stream| { stream.shutdown(how).await })
     }
 }
 

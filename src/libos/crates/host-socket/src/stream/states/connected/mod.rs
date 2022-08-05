@@ -65,6 +65,14 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         Ok(())
     }
 
+    pub fn set_closed(&self) {
+        // Mark the sender and receiver to shutdown to prevent submitting new requests.
+        self.receiver.shutdown();
+        self.sender.shutdown();
+
+        self.common.set_closed();
+    }
+
     // Other methods are implemented in the send and receive modules
 }
 

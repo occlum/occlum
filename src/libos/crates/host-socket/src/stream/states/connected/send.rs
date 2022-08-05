@@ -169,10 +169,6 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
                 // TODO: guard against Iago attack through errno
                 // TODO: should we ignore EINTR and try again?
                 let errno = Errno::from(-retval as u32);
-                // If send request is canceled, just ignore it to avoid spurious wake up on the other end.
-                if errno == ECANCELED {
-                    return;
-                }
 
                 inner.fatal = Some(errno);
                 stream.common.pollee().add_events(Events::ERR);
@@ -209,13 +205,57 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         inner.io_handle.replace(handle);
     }
 
-    fn cancel_send_requests(&self) {
+    pub fn cancel_send_requests(&self) {
         let io_uring = self.common.io_uring();
         let inner = self.sender.inner.lock().unwrap();
         if let Some(io_handle) = &inner.io_handle {
             unsafe { io_uring.cancel(io_handle) };
-        } else {
+        }
+    }
+
+    // Normally, We will always try to send as long as the kernel send buf is not empty. However, if the user calls close, we will wait LINGER time
+    // and then cancel on-going or new-issued send requests.
+    pub async fn try_empty_send_buf_when_close(&self) {
+        let inner = self.sender.inner.lock().unwrap();
+        debug_assert!(inner.is_shutdown());
+        if inner.send_buf.is_empty() {
             return;
+        }
+
+        // Wait for linger time to empty the kernel buffer or cancel subsequent requests.
+        drop(inner);
+        const DEFUALT_LINGER_TIME: usize = 10;
+        let poller = Poller::new();
+        let mask = Events::ERR | Events::OUT;
+        self.common.pollee().connect_poller(mask, &poller);
+
+        loop {
+            let pending_request_exist = {
+                let inner = self.sender.inner.lock().unwrap();
+                inner.io_handle.is_some()
+            };
+
+            if pending_request_exist {
+                let mut timeout = Some(Duration::from_secs(DEFUALT_LINGER_TIME as u64));
+                let ret = poller.wait_timeout(timeout.as_mut()).await;
+                trace!("wait empty send buffer ret = {:?}", ret);
+                if let Err(_) = ret {
+                    // No complete request to wake. Just cancel the send requests.
+                    let io_uring = self.common.io_uring();
+                    let inner = self.sender.inner.lock().unwrap();
+                    if let Some(io_handle) = &inner.io_handle {
+                        unsafe { io_uring.cancel(io_handle) };
+                        // Loop again to wait the cancel request to complete
+                        continue;
+                    } else {
+                        // No pending request, just break
+                        break;
+                    }
+                }
+            } else {
+                // There is no pending requests
+                break;
+            }
         }
     }
 }

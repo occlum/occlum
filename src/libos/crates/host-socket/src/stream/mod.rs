@@ -35,24 +35,6 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         })
     }
 
-    fn set_init_state(&self) -> Result<()> {
-        let mut state = self.state.write().unwrap();
-        match &*state {
-            State::Init(init_stream) => {
-                warn!("already in init state");
-            }
-            State::Listen(listener_stream) => {
-                let init_stream = InitStream::new_with_common(listener_stream.common().clone())?;
-                let init_state = State::Init(init_stream);
-                *state = init_state;
-            }
-            _ => {
-                return_errno!(EINVAL, "invalid state transition");
-            }
-        }
-        Ok(())
-    }
-
     pub fn new_pair(nonblocking: bool) -> Result<(Self, Self)> {
         let (common1, common2) = Common::new_pair(Type::STREAM, nonblocking)?;
         let connected1 = ConnectedStream::new(Arc::new(common1));
@@ -351,16 +333,21 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         Ok(())
     }
 
-    pub fn shutdown(&self, shutdown: Shutdown) -> Result<()> {
+    pub async fn shutdown(&self, shutdown: Shutdown) -> Result<()> {
         let state = self.state.read().unwrap();
         match &*state {
             State::Listen(listener_stream) => {
                 // listening socket can be shutdown and then re-use by calling listen again.
                 listener_stream.shutdown(shutdown)?;
-                listener_stream.common().set_closed();
                 if shutdown.should_shut_read() {
-                    drop(state);
-                    self.set_init_state()
+                    // Cancel pending accept requests. This is necessary because the socket is reusable.
+                    listener_stream.cancel_accept_requests().await;
+                    // Set init state
+                    let init_stream =
+                        InitStream::new_with_common(listener_stream.common().clone())?;
+                    let init_state = State::Init(init_stream);
+                    *state = init_state;
+                    Ok(())
                 } else {
                     // shutdown the writer of the listener expect to have no effect
                     Ok(())
@@ -373,13 +360,26 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         }
     }
 
-    fn cancel_requests(&self) {
+    pub async fn close(&self) -> Result<()> {
         let state = self.state.read().unwrap();
         match &*state {
-            State::Listen(listener_stream) => listener_stream.cancel_requests(),
-            State::Connected(connected_stream) => connected_stream.cancel_requests(),
-            _ => {}
+            State::Init(_) => {}
+            State::Listen(listener_stream) => {
+                listener_stream.common().set_closed();
+                listener_stream.cancel_accept_requests().await;
+            }
+            State::Connect(connecting_stream) => {
+                connecting_stream.common().set_closed();
+                let need_wait = true;
+                connecting_stream.cancel_connect_request(need_wait).await;
+            }
+            State::Connected(connected_stream) => {
+                connected_stream.set_closed();
+                connected_stream.cancel_recv_requests().await;
+                connected_stream.try_empty_send_buf_when_close().await;
+            }
         }
+        Ok(())
     }
 
     fn send_timeout(&self) -> Option<Duration> {
@@ -420,8 +420,6 @@ impl<A: Addr + 'static, R: Runtime> Drop for StreamSocket<A, R> {
         let state = self.state.read().unwrap();
         state.common().set_closed();
         drop(state);
-
-        self.cancel_requests();
     }
 }
 

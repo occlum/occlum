@@ -462,7 +462,7 @@ pub async fn do_shutdown(fd: c_int, how: c_int) -> Result<isize> {
 
     let how = Shutdown::from_c(how as _)?;
 
-    socket_file.shutdown(how)?;
+    socket_file.shutdown(how).await?;
     Ok(0)
 }
 

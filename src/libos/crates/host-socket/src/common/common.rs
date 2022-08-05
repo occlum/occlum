@@ -142,6 +142,10 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
         self.is_closed.store(true, Ordering::Relaxed)
     }
 
+    pub fn reset_closed(&self) {
+        self.is_closed.store(false, Ordering::Relaxed)
+    }
+
     pub fn pollee(&self) -> &Pollee {
         &self.pollee
     }
