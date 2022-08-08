@@ -7,6 +7,7 @@ grpc_domain=localhost
 grpc_port=50051
 pccs_url="https://localhost:8081/sgx/certification/v3/"
 registry="demo"
+tag="latest"
 
 function usage {
     cat << EOM
@@ -22,12 +23,13 @@ EOM
 }
 
 function process_args {
-    while getopts ":s:p:u:r:h" option; do
+    while getopts ":s:p:u:r:g:h" option; do
         case "${option}" in
             s) grpc_domain=${OPTARG};;
             p) grpc_port=${OPTARG};;
             u) pccs_url=${OPTARG};;
             r) registry=${OPTARG};;
+            g) tag=${OPTARG};;
             h) usage;;
         esac
     done
@@ -40,7 +42,7 @@ echo "Start GRPC server on backgound ..."
 docker run --network host \
         --device /dev/sgx/enclave --device /dev/sgx/provision \
         --env PCCS_URL=${pccs_url} \
-        ${registry}/init_ra_server \
+        ${registry}/init_ra_server:${tag} \
         occlum run /bin/server ${grpc_domain}:${grpc_port} &
 
 sleep 3
@@ -50,7 +52,7 @@ echo "Start Tensorflow-Serving on backgound ..."
 docker run --network host \
         --device /dev/sgx/enclave --device /dev/sgx/provision \
         --env PCCS_URL=${pccs_url} \
-        ${registry}/tf_demo \
+        ${registry}/tf_demo:${tag} \
         taskset -c 0,1 occlum run /bin/tensorflow_model_server \
         --model_name=INCEPTION --model_base_path=/model/INCEPTION/INCEPTION \
         --port=9000 --ssl_config_file="/etc/tf_ssl.cfg" &
