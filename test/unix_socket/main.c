@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <spawn.h>
 #include <string.h>
+#include <sys/epoll.h>
+#include <pthread.h>
 
 #include "test.h"
 
@@ -21,7 +23,7 @@ int create_connected_sockets(int *sockets, char *sock_path) {
     }
 
     struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(struct sockaddr_un)); //Clear structure
+    memset(&addr, 0, sizeof(struct sockaddr_un)); // Clear structure
     addr.sun_family = AF_UNIX;
     strcpy(addr.sun_path, sock_path);
     socklen_t addr_len = strlen(addr.sun_path) + sizeof(addr.sun_family) + 1;
@@ -73,7 +75,7 @@ int create_connected_sockets_then_rename(int *sockets) {
     }
 
     struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(struct sockaddr_un)); //Clear structure
+    memset(&addr, 0, sizeof(struct sockaddr_un)); // Clear structure
     addr.sun_family = AF_UNIX;
     strcpy(addr.sun_path, socket_original_path);
 
@@ -107,7 +109,7 @@ int create_connected_sockets_then_rename(int *sockets) {
     }
 
     struct sockaddr_un addr_client;
-    memset(&addr_client, 0, sizeof(struct sockaddr_un)); //Clear structure
+    memset(&addr_client, 0, sizeof(struct sockaddr_un)); // Clear structure
     addr_client.sun_family = AF_UNIX;
     strcpy(addr_client.sun_path, "/proc/self/root");
     strcat(addr_client.sun_path, socket_ready_path);
@@ -135,7 +137,7 @@ int create_connected_sockets_then_rename(int *sockets) {
 
 int verify_child_echo(int *connected_sockets) {
     const char *child_prog = "/bin/hello_world";
-    const char *child_argv[3] = { child_prog, ECHO_MSG, NULL };
+    const char *child_argv[3] = {child_prog, ECHO_MSG, NULL};
     int child_pid;
     posix_spawn_file_actions_t file_actions;
 
@@ -149,7 +151,7 @@ int verify_child_echo(int *connected_sockets) {
     }
 
     struct pollfd polls[] = {
-        { .fd = connected_sockets[1], .events = POLLIN },
+        {.fd = connected_sockets[1], .events = POLLIN},
     };
 
     // Test for blocking poll, poll will be only interrupted by sigchld
@@ -199,7 +201,7 @@ int verify_connection(int src_sock, int dest_sock) {
     return 0;
 }
 
-//this value should not be too large as one pair consumes 2MB memory
+// this value should not be too large as one pair consumes 2MB memory
 #define PAIR_NUM 15
 
 int test_multiple_socketpairs() {
@@ -235,7 +237,7 @@ int socketpair_default(int *sockets) {
     return socketpair(AF_UNIX, SOCK_STREAM, 0, sockets);
 }
 
-typedef int(*create_connection_func_t)(int *);
+typedef int (*create_connection_func_t)(int *);
 int test_connected_sockets_inter_process(create_connection_func_t fn) {
     int ret = 0;
     int sockets[2];
@@ -274,12 +276,14 @@ int test_poll() {
     }
 
     struct pollfd polls[] = {
-        { .fd = socks[0], .events = POLLOUT },
-        { .fd = socks[1], .events = POLLIN },
+        {.fd = socks[0], .events = POLLOUT},
+        {.fd = socks[1], .events = POLLIN},
     };
 
     int ret = poll(polls, 2, 5000);
-    if (ret <= 0) { THROW_ERROR("poll error"); }
+    if (ret <= 0) {
+        THROW_ERROR("poll error");
+    }
     if (((polls[0].revents & POLLOUT) && (polls[1].revents & POLLIN)) == 0) {
         printf("%d %d\n", polls[0].revents, polls[1].revents);
         THROW_ERROR("wrong return events");
@@ -295,7 +299,7 @@ int test_getname() {
     }
 
     struct sockaddr_un addr = {0};
-    memset(&addr, 0, sizeof(struct sockaddr_un)); //Clear structure
+    memset(&addr, 0, sizeof(struct sockaddr_un)); // Clear structure
     addr.sun_family = AF_UNIX;
     strcpy(addr.sun_path, name);
     socklen_t addr_len = strlen(addr.sun_path) + sizeof(addr.sun_family) + 1;
@@ -330,7 +334,7 @@ int test_ioctl_fionread() {
     }
 
     const char *child_prog = "/bin/hello_world";
-    const char *child_argv[3] = { child_prog, ECHO_MSG, NULL };
+    const char *child_argv[3] = {child_prog, ECHO_MSG, NULL};
     int child_pid;
     posix_spawn_file_actions_t file_actions;
 
@@ -369,6 +373,98 @@ int test_ioctl_fionread() {
     return 0;
 }
 
+void *client_routine(void *arg) {
+    // Sleep a while before connect
+    sleep(3);
+    printf("sleep is done\n");
+
+    char *sock_path = "/tmp/test.sock";
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(struct sockaddr_un)); // Clear structure
+    addr.sun_family = AF_UNIX;
+    strcpy(addr.sun_path, sock_path);
+    socklen_t addr_len = strlen(addr.sun_path) + sizeof(addr.sun_family) + 1;
+
+    int client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (client_fd == -1) {
+        printf("failed to create a unix socket\n");
+        return NULL;
+    }
+
+    if (connect(client_fd, (struct sockaddr *)&addr, addr_len) == -1) {
+        close(client_fd);
+        printf("failed to connect\n");
+        return NULL;
+    }
+
+    printf("connect success\n");
+    return NULL;
+}
+
+int test_epoll_wait() {
+    char *sock_path = "/tmp/test.sock";
+    int ret;
+    struct epoll_event event;
+    uint32_t interest_events = EPOLLIN | EPOLLOUT;
+    struct epoll_event polled_events;
+    pthread_t client_tid;
+    struct sockaddr_un addr;
+
+    int listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (listen_fd == -1) {
+        THROW_ERROR("failed to create a unix socket");
+    }
+
+    memset(&addr, 0, sizeof(struct sockaddr_un)); // Clear structure
+    addr.sun_family = AF_UNIX;
+    strcpy(addr.sun_path, sock_path);
+    socklen_t addr_len = strlen(addr.sun_path) + sizeof(addr.sun_family) + 1;
+    unlink(addr.sun_path);
+    if (bind(listen_fd, (struct sockaddr *)&addr, addr_len) == -1) {
+        close(listen_fd);
+        THROW_ERROR("failed to bind");
+    }
+
+    if (listen(listen_fd, 5) != 0) {
+        THROW_ERROR("server_routine, error in listen");
+    }
+
+    int ep_fd = epoll_create1(0);
+    if (ep_fd < 0) {
+        THROW_ERROR("failed to create an epoll");
+    }
+
+    event.events = interest_events;
+    event.data.u32 = listen_fd;
+    ret = epoll_ctl(ep_fd, EPOLL_CTL_ADD, listen_fd, &event);
+    if (ret < 0) {
+        THROW_ERROR("failed to do epoll ctl");
+    }
+
+    if (pthread_create(&client_tid, NULL, client_routine, NULL)) {
+        THROW_ERROR("Failure creating client thread");
+    }
+
+    // wait infinitely
+    ret = epoll_wait(ep_fd, &polled_events, 1, -1);
+    if (ret != 1) {
+        THROW_ERROR("failed to do epoll wait");
+    }
+
+    if (polled_events.data.u32 != listen_fd) {
+        THROW_ERROR("epoll wait returned wrong fd");
+    }
+
+    int newsock = accept(listen_fd, (struct sockaddr *)&addr, &addr_len);
+    if (newsock == -1) {
+        THROW_ERROR("server_routine, error in accept");
+    }
+
+    printf("accept done, new socket = %d\n", newsock);
+    pthread_join(client_tid, NULL);
+    return 0;
+}
+
 static test_case_t test_cases[] = {
     TEST_CASE(test_unix_socket_inter_process),
     TEST_CASE(test_socketpair_inter_process),
@@ -377,6 +473,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_getname),
     TEST_CASE(test_ioctl_fionread),
     TEST_CASE(test_unix_socket_rename),
+    TEST_CASE(test_epoll_wait),
 };
 
 int main(int argc, const char *argv[]) {
