@@ -251,20 +251,20 @@ fn command_output_of_executing_dynamic_loader(
     // return the output of the command to analyze dependencies
     match OCCLUM_LOADERS.ld_library_path_envs.get(dynamic_loader) {
         None => {
-            debug!("{} --list {}", dynamic_loader, file_path);
+            debug!("LD_TRACE_LOADED_OBJECTS=1 {} {}", dynamic_loader, file_path);
             Command::new(dynamic_loader)
-                .arg("--list")
                 .arg(file_path)
+                .env("LD_TRACE_LOADED_OBJECTS", "1")
                 .output()
         }
         Some(ld_library_path) => {
             debug!(
-                "LD_LIBRARY_PATH='{}' {} --list {}",
+                "LD_TRACE_LOADED_OBJECTS=1 LD_LIBRARY_PATH='{}' {} {}",
                 ld_library_path, dynamic_loader, file_path
             );
             Command::new(dynamic_loader)
-                .arg("--list")
                 .arg(file_path)
+                .env("LD_TRACE_LOADED_OBJECTS", "1")
                 .env("LD_LIBRARY_PATH", ld_library_path)
                 .output()
         }
@@ -370,6 +370,9 @@ pub fn extract_dependencies_from_output(
     }
     for line in stdout.lines() {
         let line = line.trim();
+        if line.contains(" => not found") {
+            continue;
+        }
         let captures = DEPENDENCY_REGEX.captures(line);
         if let Some(captures) = captures {
             let raw_path = (&captures["path"]).to_string();
