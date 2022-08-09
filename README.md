@@ -239,7 +239,13 @@ Alternatively, to use Occlum without Docker, one can install Occlum on popular L
 
 There are many different projects to demonstrate how Occlum can be used to build and run user applications, which could be found on [`demos`](./demos/).
 
+### Deployment by Docker
+
 There is also a whole-flow confidential inference service [`example`](./example/) to demonstrate how to convert a real application directly from Docker image to Occlum image, how to integrate Occlum [`Init-RA`](./demos/remote_attestation/init_ra_flow/) solution for whole-flow sensitive data protection plus how to generate and run the Docker container based Occlum instances.
+
+### Deployment by Kubernetes
+
+Moreover, an example to deploy Occlum Confidential Inference Service on Kubernetes can be found [`here`](./example/kubernetes/).
 
 ## How to Build?
 

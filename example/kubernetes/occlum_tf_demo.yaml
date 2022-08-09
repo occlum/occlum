@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tf-demo-deployment
+spec:
+  selector:
+    matchLabels:
+      app: tf-demo
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: tf-demo
+    spec:
+      containers:
+      - name: tf-demo-1
+        image: <registry>/tf_demo:<tag>
+        # imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: PCCS_URL
+          value: https://sgx-dcap-server.cn-shanghai.aliyuncs.com/sgx/certification/v3/
+        args:
+        - taskset
+        - -c
+        - 2,3,4,5
+        - occlum
+        - run
+        - /bin/tensorflow_model_server
+        - --model_name=INCEPTION
+        - --model_base_path=/model/INCEPTION/INCEPTION
+        - --port=9001
+        - --ssl_config_file=/etc/tf_ssl.cfg
+        ports:
+        - name: grpc
+          containerPort: 9001
+        volumeMounts:
+          - name: sgx-enclave
+            mountPath: /dev/sgx/enclave
+          - name: sgx-provision
+            mountPath: /dev/sgx/provision
+        securityContext:
+            privileged: true
+        resources:
+          limits:
+            sgx.intel.com/epc: "8000Mi"
+            cpu: "1000m"
+      volumes:
+        - name: sgx-enclave
+          hostPath:
+            path: /dev/sgx_enclave
+        - name: sgx-provision
+          hostPath:
+            path: /dev/sgx_provision
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tf-demo-svc
+spec:
+  type: NodePort
+  ports:
+  - name: grpc
+    port: 9001
+    targetPort: 9001
+    nodePort: 31001
+  selector:
+    app: tf-demo

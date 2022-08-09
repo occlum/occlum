@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: init-ra-server-deployment
+spec:
+  selector:
+    matchLabels:
+      app: init-ra-server
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: init-ra-server
+    spec:
+      containers:
+      - name: init-ra-server-1
+        image: <registry>/init_ra_server:<tag>
+        # imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
+        args: ["occlum","run", "/bin/server", "0.0.0.0:5000"]
+        ports:
+        - containerPort: 5000
+        volumeMounts:
+          - name: sgx-enclave
+            mountPath: /dev/sgx/enclave
+          - name: sgx-provision
+            mountPath: /dev/sgx/provision
+        env:
+        - name: PCCS_URL
+          value: https://sgx-dcap-server.cn-shanghai.aliyuncs.com/sgx/certification/v3/
+        securityContext:
+            privileged: true
+        resources:
+          limits:
+            sgx.intel.com/epc: "1000Mi"
+      volumes:
+        - name: sgx-enclave
+          hostPath:
+            path: /dev/sgx_enclave
+        - name: sgx-provision
+          hostPath:
+            path: /dev/sgx_provision
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: init-ra-server-svc
+spec:
+  # type: NodePort
+  ports:
+  - port: 5000
+    targetPort: 5000
+    # nodePort: 31002
+  selector:
+    app: init-ra-server
