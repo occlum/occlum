@@ -139,8 +139,13 @@ impl UnixPath {
         if self.inner.is_absolute() {
             path_str.to_string()
         } else {
-            let mut prefix = path_str.to_owned();
-            prefix.push_str(self.cwd.as_ref().unwrap());
+            let mut prefix = self.cwd.as_ref().unwrap().clone();
+            if prefix.ends_with("/") {
+                prefix.push_str(path_str);
+            } else {
+                prefix.push_str("/");
+                prefix.push_str(path_str);
+            }
             prefix
         }
     }

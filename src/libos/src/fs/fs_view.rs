@@ -67,6 +67,7 @@ impl FsView {
         mode: FileMode,
     ) -> Result<InodeFile> {
         let creation_flags = CreationFlags::from_bits_truncate(flags);
+        let open_path = self.convert_fspath_to_abs(fs_path)?;
         let inode = if creation_flags.no_follow_symlink() {
             match self.lookup_inode_no_follow_sync(fs_path) {
                 Ok(inode) => {
@@ -124,7 +125,6 @@ impl FsView {
                 Err(e) => return Err(e),
             }
         };
-        let open_path = self.convert_fspath_to_abs(fs_path)?;
         Ok(INodeFile::open(inode, flags, open_path)?)
     }
 
@@ -562,6 +562,9 @@ impl FsView {
                 }
             }
         };
+        if abs_path.len() > PATH_MAX {
+            return_errno!(ENAMETOOLONG, "abs path too long");
+        }
         Ok(abs_path)
     }
 }

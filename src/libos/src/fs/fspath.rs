@@ -51,6 +51,10 @@ pub(in crate::fs) enum FsPathInner {
 
 impl FsPathInner {
     pub fn new(path: String, dirfd: i32) -> Result<Self> {
+        if path.len() > PATH_MAX {
+            return_errno!(ENAMETOOLONG, "path name too long");
+        }
+
         let fs_path_inner = if Path::new(&path).is_absolute() {
             Self::Absolute(path)
         } else if dirfd >= 0 {
