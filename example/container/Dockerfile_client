@@ -1,0 +1,13 @@
+FROM python:3.8
+LABEL maintainer="Qi Zheng <huaiqing.zq@antgroup.com>"
+
+ARG pip_mirror
+
+COPY ./client /app
+
+# RUN apt update && apt install -y python3-opencv
+
+RUN pip install ${pip_mirror} -r /app/requirements.txt
+
+WORKDIR /app
+CMD ["bash"]

@@ -13,6 +13,8 @@ This example introduces the development and deployment of a whole-flow confident
 
 * Way to build out the Docker container image in minimum size based on the Occlum package.
 
+* Deploy Occlum Confidential Inference Service on Kubernetes please refer to [`kubernetes`](./kubernetes/).
+
 ## Overview
 
 ![Arch Overview](./overview.png)
