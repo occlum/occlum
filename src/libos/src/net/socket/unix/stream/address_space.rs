@@ -1,4 +1,5 @@
 use super::endpoint::Endpoint;
+use super::endpoint::RelayNotifier;
 use super::stream::Listener;
 use super::*;
 use std::collections::btree_map::BTreeMap;
@@ -49,13 +50,22 @@ impl AddressSpace {
         }
     }
 
-    pub fn add_listener(&self, addr: &Addr, capacity: usize, nonblocking: bool) -> Result<()> {
+    pub(super) fn add_listener(
+        &self,
+        addr: &Addr,
+        capacity: usize,
+        nonblocking: bool,
+        notifier: Arc<RelayNotifier>,
+    ) -> Result<()> {
         let key = Self::get_key(addr).ok_or_else(|| errno!(EINVAL, "the socket is not bound"))?;
         let mut space = self.get_space(addr);
 
         if let Some(option) = space.get(&key) {
             if option.is_none() {
-                space.insert(key, Some(Arc::new(Listener::new(capacity, nonblocking)?)));
+                space.insert(
+                    key,
+                    Some(Arc::new(Listener::new(capacity, nonblocking, notifier)?)),
+                );
                 Ok(())
             } else {
                 return_errno!(EINVAL, "the socket is already listened");
