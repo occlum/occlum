@@ -1,3 +1,4 @@
+use super::address_space::ADDRESS_SPACE;
 use super::stream::Status;
 use super::*;
 use fs::{AccessMode, File, FileRef, IoEvents, IoNotifier, IoctlCmd, StatusFlags};
@@ -100,9 +101,12 @@ impl File for Stream {
             // linux return value
             Status::Idle(info) => IoEvents::OUT | IoEvents::HUP,
             Status::Connected(endpoint) => endpoint.poll(),
-            Status::Listening(_) => {
-                warn!("poll is not fully implemented for the listener socket");
-                IoEvents::empty()
+            Status::Listening(addr) => {
+                if let Some(listener) = ADDRESS_SPACE.get_listener_ref(addr) {
+                    listener.poll_new()
+                } else {
+                    IoEvents::empty()
+                }
             }
         }
     }

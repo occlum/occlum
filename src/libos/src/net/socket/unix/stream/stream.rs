@@ -121,7 +121,12 @@ impl Stream {
             Status::Idle(info) => {
                 if let Some(addr) = info.addr() {
                     warn!("addr = {:?}", addr);
-                    ADDRESS_SPACE.add_listener(addr, capacity, info.nonblocking())?;
+                    ADDRESS_SPACE.add_listener(
+                        addr,
+                        capacity,
+                        info.nonblocking(),
+                        self.notifier.clone(),
+                    )?;
                     *inner = Status::Listening(addr.clone());
                 } else {
                     return_errno!(EINVAL, "the socket is not bound");
@@ -164,6 +169,11 @@ impl Stream {
                     })?;
 
                 self.notifier.observe_endpoint(&end_self);
+
+                // Notify listener for this event
+                if let Some(listener) = ADDRESS_SPACE.get_listener_ref(addr) {
+                    listener.notifier.notifier().broadcast(&IoEvents::IN);
+                }
 
                 *inner = Status::Connected(end_self);
                 Ok(())
@@ -322,16 +332,22 @@ impl Info {
 /// ECONNREFUSED rather than block when the channel is full.
 pub struct Listener {
     channel: RwLock<Channel<Endpoint>>,
+    notifier: Arc<RelayNotifier>,
 }
 
 impl Listener {
-    pub fn new(capacity: usize, nonblocking: bool) -> Result<Self> {
+    pub(super) fn new(
+        capacity: usize,
+        nonblocking: bool,
+        notifier: Arc<RelayNotifier>,
+    ) -> Result<Self> {
         let channel = Channel::new(capacity)?;
         channel.producer().set_nonblocking(true);
         channel.consumer().set_nonblocking(nonblocking);
 
         Ok(Self {
             channel: RwLock::new(channel),
+            notifier,
         })
     }
 
@@ -390,5 +406,15 @@ impl Listener {
     pub fn shutdown(&self) {
         let channel = self.channel.read().unwrap();
         channel.shutdown();
+    }
+
+    pub fn poll_new(&self) -> IoEvents {
+        let mut events = IoEvents::empty();
+        let channel = self.channel.read().unwrap();
+        let item_num = channel.items_to_consume();
+        if item_num > 0 {
+            events |= IoEvents::IN;
+        }
+        events
     }
 }
