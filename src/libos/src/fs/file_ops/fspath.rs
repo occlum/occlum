@@ -23,6 +23,9 @@ enum FsPathInner<'a> {
 impl<'a> FsPath<'a> {
     /// Construct a FsPath
     pub fn new(path: &'a str, fd: i32, allow_empty_path: bool) -> Result<Self> {
+        if path.len() > PATH_MAX {
+            return_errno!(ENAMETOOLONG, "path name too long");
+        }
         let fs_path_inner = if Path::new(path).is_absolute() {
             FsPathInner::Absolute(path)
         } else if fd >= 0 {
@@ -83,6 +86,9 @@ impl<'a> FsPath<'a> {
                 fs.cwd().to_owned()
             }
         };
+        if abs_path.len() > PATH_MAX {
+            return_errno!(ENAMETOOLONG, "abs path too long");
+        }
         Ok(abs_path)
     }
 }

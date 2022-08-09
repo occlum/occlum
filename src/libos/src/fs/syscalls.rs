@@ -12,8 +12,6 @@ use super::*;
 use config::ConfigMountFsType;
 use util::mem_util::from_user;
 
-pub const MAX_PATH_LEN: usize = 255;
-
 #[allow(non_camel_case_types)]
 pub struct iovec_t {
     base: *const c_void,
@@ -115,11 +113,6 @@ pub fn do_openat(dirfd: i32, path: *const i8, flags: u32, mode: u16) -> Result<i
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    if path.is_empty() {
-        return_errno!(ENOENT, "path is an empty string");
-    } else if path.len() > MAX_PATH_LEN {
-        return_errno!(ENAMETOOLONG, "path name too long");
-    }
     let fs_path = FsPath::new(&path, dirfd, false)?;
     let mode = FileMode::from_bits_truncate(mode);
     let fd = file_ops::do_openat(&fs_path, flags, mode)?;
@@ -382,7 +375,7 @@ pub fn do_chdir(path: *const i8) -> Result<isize> {
         .into_owned();
     if path.is_empty() {
         return_errno!(ENOENT, "path is an empty string");
-    } else if path.len() > MAX_PATH_LEN {
+    } else if path.len() > PATH_MAX {
         return_errno!(ENAMETOOLONG, "path name too long");
     }
     fs_ops::do_chdir(&path)?;
@@ -429,11 +422,6 @@ pub fn do_renameat(
     let newpath = from_user::clone_cstring_safely(newpath)?
         .to_string_lossy()
         .into_owned();
-    if oldpath.is_empty() || newpath.is_empty() {
-        return_errno!(ENOENT, "oldpath or newpath is an empty string");
-    } else if oldpath.len() > MAX_PATH_LEN || newpath.len() > MAX_PATH_LEN {
-        return_errno!(ENAMETOOLONG, "oldpath or newpath name too long");
-    }
     let old_fs_path = FsPath::new(&oldpath, olddirfd, false)?;
     let new_fs_path = FsPath::new(&newpath, newdirfd, false)?;
     file_ops::do_renameat(&old_fs_path, &new_fs_path)?;
@@ -448,11 +436,6 @@ pub fn do_mkdirat(dirfd: i32, path: *const i8, mode: u16) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    if path.is_empty() {
-        return_errno!(ENOENT, "path is an empty string");
-    } else if path.len() > MAX_PATH_LEN {
-        return_errno!(ENAMETOOLONG, "path name too long");
-    }
     let fs_path = FsPath::new(&path, dirfd, false)?;
     let mode = FileMode::from_bits_truncate(mode);
     file_ops::do_mkdirat(&fs_path, mode)?;
@@ -465,7 +448,7 @@ pub fn do_rmdir(path: *const i8) -> Result<isize> {
         .into_owned();
     if path.is_empty() {
         return_errno!(ENOENT, "path is an empty string");
-    } else if path.len() > MAX_PATH_LEN {
+    } else if path.len() > PATH_MAX {
         return_errno!(ENAMETOOLONG, "path name too long");
     }
     file_ops::do_rmdir(&path)?;
@@ -558,11 +541,6 @@ pub fn do_fchmodat(dirfd: i32, path: *const i8, mode: u16) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
-    if path.is_empty() {
-        return_errno!(ENOENT, "path is an empty string");
-    } else if path.len() > MAX_PATH_LEN {
-        return_errno!(ENAMETOOLONG, "path name too long");
-    }
     let mode = FileMode::from_bits_truncate(mode);
     let fs_path = FsPath::new(&path, dirfd, false)?;
     file_ops::do_fchmodat(&fs_path, mode)?;
@@ -681,6 +659,13 @@ pub fn do_statfs(path: *const i8, statfs_buf: *mut Statfs) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
+    if path.is_empty() {
+        return_errno!(ENOENT, "path is an empty string");
+    } else if path.len() > PATH_MAX {
+        return_errno!(ENAMETOOLONG, "path name too long");
+    }
+    from_user::check_mut_ptr(statfs_buf)?;
+
     let statfs = fs_ops::do_statfs(&path)?;
     unsafe {
         statfs_buf.write(statfs);
@@ -701,6 +686,11 @@ pub fn do_mount(
     let target = from_user::clone_cstring_safely(target)?
         .to_string_lossy()
         .into_owned();
+    if target.is_empty() {
+        return_errno!(ENOENT, "target is an empty string");
+    } else if target.len() > PATH_MAX {
+        return_errno!(ENAMETOOLONG, "target name too long");
+    }
     let flags = MountFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
     let mount_options = {
         let fs_type = {
