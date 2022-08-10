@@ -1489,8 +1489,8 @@ stat04_64 symlink01 -T stat04_64
 
 statfs01 statfs01
 statfs01_64 statfs01_64
-statfs02 statfs02
-statfs02_64 statfs02_64
+#statfs02 statfs02
+#statfs02_64 statfs02_64
 statfs03 statfs03
 statfs03_64 statfs03_64
 
