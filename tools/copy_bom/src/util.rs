@@ -1,6 +1,6 @@
 use crate::error::{
-    COPY_DIR_ERROR, COPY_FILE_ERROR, CREATE_DIR_ERROR, CREATE_SYMLINK_ERROR, FILE_NOT_EXISTS_ERROR,
-    INCORRECT_HASH_ERROR, 
+    AUTODEP_ERROR, COPY_DIR_ERROR, COPY_FILE_ERROR, CREATE_DIR_ERROR, CREATE_SYMLINK_ERROR,
+    FILE_NOT_EXISTS_ERROR, INCORRECT_HASH_ERROR,
 };
 use data_encoding::HEXUPPER;
 use elf::types::{ET_DYN, ET_EXEC, Type};
@@ -203,6 +203,7 @@ pub fn calculate_file_hash(filename: &str) -> String {
 pub fn find_dependent_shared_objects(
     file_path: &str,
     default_loader: &Option<(String, String)>,
+    abort_on_failure: bool,
 ) -> HashSet<(String, String)> {
     let mut shared_objects = HashSet::new();
     // find dependencies for the input file
@@ -214,6 +215,24 @@ pub fn find_dependent_shared_objects(
     let (occlum_elf_loader, inlined_elf_loader) = dynamic_loader.unwrap();
     shared_objects.insert((occlum_elf_loader.clone(), inlined_elf_loader));
     let output = command_output_of_executing_dynamic_loader(&file_path, &occlum_elf_loader);
+    if abort_on_failure {
+        match &output {
+            Err(err) => {
+                error!("cannot autodep for {}: {}", file_path, err);
+                std::process::exit(AUTODEP_ERROR);
+            }
+            Ok(output) if !output.status.success() => {
+                error!(
+                    "cannot autodep for {}. {} stderr: {}",
+                    file_path,
+                    output.status,
+                    String::from_utf8_lossy(&output.stderr).trim()
+                );
+                std::process::exit(AUTODEP_ERROR);
+            }
+            _ => {}
+        }
+    }
     if let Ok(output) = output {
         let default_lib_dirs = OCCLUM_LOADERS
             .default_lib_dirs

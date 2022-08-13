@@ -402,7 +402,7 @@ impl BomManagement {
         debug!("default loader in autodep: {:?}", default_loader);
         for file_autodep in files_autodep.iter() {
             let mut shared_objects =
-                find_dependent_shared_objects(file_autodep, &default_loader);
+                find_dependent_shared_objects(file_autodep, &default_loader, true);
             for (src, dest) in shared_objects.drain() {
                 let dest_path = dest_in_root(root_dir, &dest);
                 // First, we create dir to store the dependency
@@ -490,7 +490,7 @@ impl BomManagement {
         let default_loader = infer_default_loader(&files_in_copied_dirs);
         let mut all_shared_objects = Vec::new();
         for file_path in files_in_copied_dirs.into_iter() {
-            let shared_objects = find_dependent_shared_objects(&file_path, &default_loader);
+            let shared_objects = find_dependent_shared_objects(&file_path, &default_loader, false);
             all_shared_objects.extend(shared_objects);
         }
         // We should not copy shared libraries already in image directory.
