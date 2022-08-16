@@ -6,7 +6,7 @@ use crate::utils::{AsBuf, Dirty, InodeCache};
 use async_trait::async_trait;
 use async_vfs::{AsyncFileSystem, AsyncInode};
 use bitvec::prelude::*;
-use block_device::{BlockDevice, BlockRangeIter};
+use block_device::{BlockDeviceAsFile, BlockRangeIter};
 use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::mem::MaybeUninit;
@@ -32,15 +32,15 @@ pub struct AsyncSimpleFS {
 
 impl AsyncSimpleFS {
     /// Create a new fs on blank block device
-    pub async fn create(device: Arc<dyn BlockDevice>) -> Result<Arc<Self>> {
-        let blocks = if device.total_blocks() > MAX_NBLOCKS {
+    pub async fn create(device: Arc<dyn BlockDeviceAsFile>) -> Result<Arc<Self>> {
+        let blocks = if device.total_bytes() / BLOCK_SIZE > MAX_NBLOCKS {
             warn!(
                 "device size is too big, use first {:#x} blocks",
                 MAX_NBLOCKS
             );
             MAX_NBLOCKS
         } else {
-            device.total_blocks()
+            device.total_bytes() / BLOCK_SIZE
         };
         if blocks < MIN_NBLOCKS {
             return_errno!(EINVAL, "device size is too small");
@@ -84,7 +84,7 @@ impl AsyncSimpleFS {
     }
 
     /// Load fs from an existing block device
-    pub async fn open(device: Arc<dyn BlockDevice>) -> Result<Arc<Self>> {
+    pub async fn open(device: Arc<dyn BlockDeviceAsFile>) -> Result<Arc<Self>> {
         let device_storage = Storage::new(device);
         // Load the super_block
         let super_block = device_storage
@@ -236,14 +236,14 @@ impl AsyncSimpleFS {
         Ok(inode)
     }
 
-    /// Flush all the inodes and metadata, then send flush request to storage
+    /// Flush all the inodes and metadata, then commit to underlying storage for durability
     async fn sync_all(&self) -> Result<()> {
         // writeback cached inodes
         self.sync_cached_inodes().await?;
         // writeback alloc_map and super_block
         self.sync_metadata().await?;
-        // flush to device
-        self.storage.flush().await?;
+        // Sync the data in device
+        self.storage.sync().await?;
         Ok(())
     }
 
@@ -441,9 +441,7 @@ impl AsyncInode for Inode {
                 if range.1 > file_size as usize {
                     let mut inner_mut = self.inner.write().await;
                     // When we get the lock, the file size may be changed
-                    if range.1 > inner_mut.disk_inode.size as usize
-                        && inner_mut.disk_inode.nlinks > 0
-                    {
+                    if range.1 > inner_mut.disk_inode.size as usize {
                         inner_mut._resize(range.1).await?;
                     }
                 }
@@ -1023,7 +1021,7 @@ impl InodeInner {
         }
     }
 
-    /// Get the indirect block ids of the file
+    /// Get the indirect blocks
     async fn indirect_blocks(&self) -> Result<Vec<BlockId>> {
         let mut indirect_blocks = Vec::new();
         let file_blocks = self.disk_inode.blocks as usize;
@@ -1440,17 +1438,15 @@ impl InodeInner {
     }
 
     async fn sync_data(&self) -> Result<()> {
-        // if let Some(cache) = self.fs().storage.as_page_cache() {
-        //     let data_pages = {
-        //         let mut data_pages = Vec::new();
-        //         for id in 0..self.disk_inode.blocks as BlockId {
-        //             let device_block_id = self.get_device_block_id(id).await?;
-        //             data_pages.push(device_block_id);
-        //         }
-        //         data_pages
-        //     };
-        //     cache.flush_pages(&data_pages).await?;
-        // }
+        let data_blocks = {
+            let mut data_blocks = Vec::new();
+            for id in 0..self.disk_inode.blocks as BlockId {
+                let device_block_id = self.get_device_block_id(id).await?;
+                data_blocks.push(device_block_id);
+            }
+            data_blocks
+        };
+        self.fs().storage.flush_blocks(&data_blocks).await?;
         Ok(())
     }
 
@@ -1471,15 +1467,14 @@ impl InodeInner {
             .storage
             .store_struct::<DiskInode>(self.id, 0, &self.disk_inode)
             .await?;
-        // if let Some(cache) = self.fs().storage.as_page_cache() {
-        //     let metadata_pages = {
-        //         let mut metadata_pages = self.indirect_blocks().await?;
-        //         metadata_pages.push(self.id as BlockId);
-        //         metadata_pages
-        //     };
-        //     cache.flush_pages(&metadata_pages).await?;
-        // }
+        let metadata_blocks = {
+            let mut metadata_blocks = self.indirect_blocks().await?;
+            metadata_blocks.push(self.id as BlockId);
+            metadata_blocks
+        };
+        self.fs().storage.flush_blocks(&metadata_blocks).await?;
         self.disk_inode.sync();
+
         Ok(())
     }
 }

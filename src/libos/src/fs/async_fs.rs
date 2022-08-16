@@ -1,7 +1,8 @@
 use super::*;
 
 use async_sfs::AsyncSimpleFS;
-use block_device::{BlockDevice, BLOCK_SIZE};
+use block_device::{BlockDeviceAsFile, BLOCK_SIZE};
+use page_cache::{impl_fixed_size_page_alloc, CachedDisk};
 use sgx_disk::{HostDisk, IoUringDisk, SyncIoDisk};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -66,20 +67,31 @@ pub fn async_sfs_initilized() -> bool {
 }
 
 async fn init_async_sfs() -> Result<Arc<dyn AsyncFileSystem>> {
+    const GB: usize = 1024 * 1024 * 1024;
+    // AsyncFsPageAlloc is a fixed-size allocator for page cache.
+    impl_fixed_size_page_alloc! { AsyncFsPageAlloc, 1 * GB };
+
+    const ASYNC_SFS_IMAGE_PATH: &str = "./run/async_sfs.image";
     let image_path = PathBuf::from(ASYNC_SFS_IMAGE_PATH);
+
+    // Open or create the FS
     let async_sfs = if image_path.exists() {
-        let sync_disk = SyncIoDisk::open(&image_path)?;
-        AsyncSimpleFS::open(Arc::new(sync_disk)).await?
+        let cache_disk = {
+            let sync_disk = SyncIoDisk::open(&image_path)?;
+            CachedDisk::<AsyncFsPageAlloc>::new(Arc::new(sync_disk))?
+        };
+        AsyncSimpleFS::open(Arc::new(cache_disk)).await?
     } else {
-        const GB: usize = 1024 * 1024 * 1024;
-        let total_blocks = 8 * GB / BLOCK_SIZE;
-        let sync_disk = SyncIoDisk::create_new(&image_path, total_blocks)?;
-        AsyncSimpleFS::create(Arc::new(sync_disk)).await?
+        let cache_disk = {
+            let total_blocks = 8 * GB / BLOCK_SIZE;
+            let sync_disk = SyncIoDisk::create_new(&image_path, total_blocks)?;
+            CachedDisk::<AsyncFsPageAlloc>::new(Arc::new(sync_disk))?
+        };
+        AsyncSimpleFS::create(Arc::new(cache_disk)).await?
     };
     Ok(async_sfs as _)
 }
 
-const ASYNC_SFS_IMAGE_PATH: &str = "./run/async_sfs.image";
 static mut ASYNC_SFS: Option<Arc<dyn AsyncFileSystem>> = None;
 static STATE: AtomicUsize = AtomicUsize::new(UNINITIALIZED);
 const UNINITIALIZED: usize = 0;
