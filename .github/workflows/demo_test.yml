@@ -743,30 +743,30 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/flask;
             curl --cacert flask.crt -X GET https://localhost:4996/customer/1"
 
-  # Iperf2_test:
-  #   runs-on: ubuntu-20.04
-  #   steps:
-  #   - uses: actions/checkout@v1
-  #     with:
-  #       submodules: true
+  iperf2_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
 
-  #   - uses: ./.github/workflows/composite_action/sim
-  #     with:
-  #       container-name: ${{ github.job }}
-  #       build-envs: 'OCCLUM_RELEASE_BUILD=1'
+    - uses: ./.github/workflows/composite_action/sim
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
-  #   - name: Build iperf2
-  #     run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/iperf2; SGX_MODE=SIM ./build.sh"
+    - name: Build iperf2
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/iperf2; SGX_MODE=SIM ./build.sh"
 
-  #   - name: Start iperf2 server
-  #     run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/iperf2/occlum_server;
-  #           occlum run /bin/iperf -s -p 6888 &"
+    - name: Start iperf2 server
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/iperf2/occlum_server;
+            occlum run /bin/iperf -s -p 6888 &"
 
-  #   - name: Start iperf2 client
-  #     run: |
-  #       sleep ${{ 5 }};
-  #       docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/iperf2/occlum_client;
-  #           occlum run /bin/iperf -c 127.0.0.1 -p 6888 -P 16"
+    - name: Start iperf2 client
+      run: |
+        sleep ${{ 5 }};
+        docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/iperf2/occlum_client;
+            occlum run /bin/iperf -c 127.0.0.1 -p 6888 -P 16"
 
   Linux_LTP_test:
     runs-on: ubuntu-20.04
