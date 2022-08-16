@@ -39,6 +39,14 @@ define get_occlum_file_mac
 		"$(occlum_dir)/build/bin/occlum-protect-integrity" show-mac $(1) $(2)
 endef
 
+define set_kss_isv_family_id
+	conf_mac=$$(cat $(2) | sed 's/-//g')  && \
+	conf_mac_h=$$(printf "%u" "0x$${conf_mac:0:16}") && \
+	conf_mac_l=$$(printf "%u" "0x$${conf_mac:16:16}") && \
+	sed -i "s/<ISVFAMILYID_H>0/<ISVFAMILYID_H>$$conf_mac_h/g" $(1) && \
+	sed -i "s/<ISVFAMILYID_L>0/<ISVFAMILYID_L>$$conf_mac_l/g" $(1)
+endef
+
 .PHONY : all clean
 
 ALL_TARGETS := $(SIGNED_ENCLAVE) $(BIN_LINKS) $(LIB_LINKS)
@@ -61,7 +69,7 @@ $(LIBOS): $(instance_dir)/build/.Occlum_sys.json.protected
 		ln -sf "$(libos_lib).$(occlum_version)" "libocclum-libos.so.$(major_ver)" && \
 		ln -sf "libocclum-libos.so.$(major_ver)" libocclum-libos.so ; \
 		$(call get_occlum_file_mac, "$(instance_dir)/build/.Occlum_sys.json.protected", "$(CONF_TMP_MAC)") && \
-		objcopy --update-section .builtin_config="$(CONF_TMP_MAC)" libocclum-libos.so && \
+		$(call set_kss_isv_family_id, "$(instance_dir)/build/Enclave.xml", "$(CONF_TMP_MAC)") && \
 		rm -f "$(CONF_TMP_MAC)"
 
 $(instance_dir)/build/.Occlum_sys.json.protected: $(instance_dir)/build/.Occlum_sys.json

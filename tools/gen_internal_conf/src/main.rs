@@ -169,8 +169,9 @@ fn main() {
             EnableKSS: kss_tuple.0,
             ISVEXTPRODID_H: kss_tuple.1,
             ISVEXTPRODID_L: kss_tuple.2,
-            ISVFAMILYID_H: kss_tuple.3,
-            ISVFAMILYID_L: kss_tuple.4,
+            // ISV Family ID is reserved for saving conf MAC in Occlum build stage
+            ISVFAMILYID_H: 0,
+            ISVFAMILYID_L: 0,
             PKRU: occlum_config.metadata.pkru,
         };
         let enclave_config = serde_xml_rs::to_string(&sgx_enclave_configuration).unwrap();
@@ -271,18 +272,17 @@ fn get_u64_id_high_and_low(id: &OcclumMetaID) -> (u64, u64) {
     (id_high, id_low)
 }
 
-// Return a tuple (EnableKSS, ISVEXTPRODID_H, ISVEXTPRODID_L, ISVFAMILYID_H, ISVFAMILYID_L)
+// Return a tuple (EnableKSS, ISVEXTPRODID_H, ISVEXTPRODID_L)
 fn parse_kss_conf(occlum_config: &OcclumConfiguration
-) -> (u32, u64, u64, u64, u64)
+) -> (u32, u64, u64)
 {
     match occlum_config.metadata.enable_kss {
         true => {
             let ext_prod_id = get_u64_id_high_and_low(&occlum_config.metadata.ext_prod_id);
-            let family_id = get_u64_id_high_and_low(&occlum_config.metadata.family_id);
 
-            (1, ext_prod_id.0, ext_prod_id.1, family_id.0, family_id.1)
+            (1, ext_prod_id.0, ext_prod_id.1)
         },
-        false => (0, 0, 0, 0, 0)
+        false => (0, 0, 0)
     }
 }
 
@@ -479,7 +479,6 @@ struct OcclumMetadata {
     version_number: u32,
     debuggable: bool,
     enable_kss: bool,
-    family_id: OcclumMetaID,
     ext_prod_id: OcclumMetaID,
     pkru: u32,
 }

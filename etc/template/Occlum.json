@@ -26,11 +26,7 @@
         "product_id": 0,
         "version_number": 0,
         "debuggable": true,
-        "enable_kss": false,
-        "family_id": {
-            "high": "0x0",
-            "low": "0x0"
-        },
+        "enable_kss": true,
         "ext_prod_id": {
             "high": "0x0",
             "low": "0x0"

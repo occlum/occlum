@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use std::sgxfs::SgxFile;
 use std::untrusted::path::PathEx;
 
+use sgx_tse::rsgx_self_report;
+
 use serde::{Deserialize, Serialize};
 
 use crate::entry::enclave::INSTANCE_DIR;
@@ -15,7 +17,7 @@ lazy_static! {
     pub static ref LIBOS_CONFIG: Config = {
         let config_path =
             unsafe { format!("{}{}", INSTANCE_DIR, "/build/.Occlum_sys.json.protected") };
-        let expected_mac = conf_get_hardcoded_file_mac();
+        let expected_mac = conf_get_file_mac();
         match load_config(&config_path, &expected_mac) {
             Err(e) => {
                 error!("failed to load config: {}", e.backtrace());
@@ -49,16 +51,10 @@ pub fn load_config(config_path: &str, expected_mac: &sgx_aes_gcm_128bit_tag_t) -
     Ok(config)
 }
 
-// This value will be modified during occlum build
-#[used]
-#[link_section = ".builtin_config"]
-static OCCLUM_JSON_MAC: [u8; 47] = [0; 47];
-
-fn conf_get_hardcoded_file_mac() -> sgx_aes_gcm_128bit_tag_t {
-    // Use black_box to avoid the compiler's optimization for OCCLUM_JSON_MAC
-    let json_mac = std::hint::black_box(&OCCLUM_JSON_MAC);
-    let mac_str = String::from_utf8(json_mac.to_vec()).expect("MAC contains non UTF-8 characters");
-    let mac = parse_mac(&mac_str).expect("MAC string cannot be converted to numbers");
+fn conf_get_file_mac() -> sgx_aes_gcm_128bit_tag_t {
+    let report = rsgx_self_report();
+    let mut mac = report.body.isv_family_id;
+    mac.reverse();
     mac
 }
 
