@@ -1,9 +1,6 @@
 name: Benchmarks Test
 
 on:
-  push:
-    branches:
-      - master
   schedule:
     # Schedule to run everyday at 10PM UTC (6AM CST)
     - cron:  '0 22 * * *'
@@ -11,7 +8,6 @@ on:
 jobs:
   Sysbench_Test:
     timeout-minutes: 20
-    if: github.event_name == 'push'
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -23,7 +19,6 @@ jobs:
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
     - name: Checkout code
-      if: github.event_name == 'push'
       uses: actions/checkout@v2
       with:
         submodules: true
@@ -63,7 +58,6 @@ jobs:
 
   Iperf3_Test:
     timeout-minutes: 20
-    if: github.event_name == 'push'
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -75,7 +69,6 @@ jobs:
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
     - name: Checkout code
-      if: github.event_name == 'push'
       uses: actions/checkout@v2
       with:
         submodules: true
