@@ -489,23 +489,27 @@ pub fn do_sendmsg(fd: c_int, msg_ptr: *const msghdr, flags_c: c_int) -> Result<i
         fd, msg_ptr, flags_c
     );
 
+    let msg_hdr = {
+        let msg_hdr_c = {
+            from_user::check_ptr(msg_ptr)?;
+            let msg_hdr_c = unsafe { &*msg_ptr };
+            msg_hdr_c.check_member_ptrs()?;
+            msg_hdr_c
+        };
+        unsafe { MsgHdr::from_c(&msg_hdr_c)? }
+    };
+
+    let flags = SendFlags::from_bits_truncate(flags_c);
+
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_host_socket() {
-        let msg_c = {
-            from_user::check_ptr(msg_ptr)?;
-            let msg_c = unsafe { &*msg_ptr };
-            msg_c.check_member_ptrs()?;
-            msg_c
-        };
-        let msg = unsafe { MsgHdr::from_c(&msg_c)? };
-
-        let flags = SendFlags::from_bits_truncate(flags_c);
-
         socket
-            .sendmsg(&msg, flags)
+            .sendmsg(&msg_hdr, flags)
             .map(|bytes_sent| bytes_sent as isize)
     } else if let Ok(socket) = file_ref.as_unix_socket() {
-        return_errno!(EOPNOTSUPP, "does not support unix socket")
+        socket
+            .sendmsg(&msg_hdr, flags)
+            .map(|bytes_sent| bytes_sent as isize)
     } else {
         return_errno!(ENOTSOCK, "not a socket")
     }
@@ -517,23 +521,27 @@ pub fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut msghdr_mut, flags_c: c_int) -> Re
         fd, msg_mut_ptr, flags_c
     );
 
+    let mut msg_hdr_mut = {
+        let msg_hdr_mut_c = {
+            from_user::check_mut_ptr(msg_mut_ptr)?;
+            let msg_hdr_mut_c = unsafe { &mut *msg_mut_ptr };
+            msg_hdr_mut_c.check_member_ptrs()?;
+            msg_hdr_mut_c
+        };
+        unsafe { MsgHdrMut::from_c(msg_hdr_mut_c) }?
+    };
+
+    let flags = RecvFlags::from_bits_truncate(flags_c);
+
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_host_socket() {
-        let msg_mut_c = {
-            from_user::check_mut_ptr(msg_mut_ptr)?;
-            let msg_mut_c = unsafe { &mut *msg_mut_ptr };
-            msg_mut_c.check_member_ptrs()?;
-            msg_mut_c
-        };
-        let mut msg_mut = unsafe { MsgHdrMut::from_c(msg_mut_c)? };
-
-        let flags = RecvFlags::from_bits_truncate(flags_c);
-
         socket
-            .recvmsg(&mut msg_mut, flags)
+            .recvmsg(&mut msg_hdr_mut, flags)
             .map(|bytes_recvd| bytes_recvd as isize)
     } else if let Ok(socket) = file_ref.as_unix_socket() {
-        return_errno!(EOPNOTSUPP, "does not support unix socket")
+        socket
+            .recvmsg(&mut msg_hdr_mut, flags)
+            .map(|bytes_recvd| bytes_recvd as isize)
     } else {
         return_errno!(ENOTSOCK, "not a socket")
     }

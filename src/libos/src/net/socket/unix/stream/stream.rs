@@ -5,6 +5,7 @@ use events::{Event, EventFilter, Notifier, Observer};
 use fs::channel::Channel;
 use fs::IoEvents;
 use fs::{CreationFlags, FileMode};
+use net::socket::{Iovs, MsgHdr, MsgHdrMut};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -221,6 +222,32 @@ impl Stream {
         debug!("recvfrom {:?}", addr);
 
         Ok((data_len, addr))
+    }
+
+    pub fn sendmsg(&self, msg_hdr: &MsgHdr, flags: SendFlags) -> Result<usize> {
+        if !flags.is_empty() {
+            warn!("unsupported flags: {:?}", flags);
+        }
+        if msg_hdr.get_control().is_some() {
+            warn!("sendmsg with msg_control is not supported");
+        }
+
+        let bufs = msg_hdr.get_iovs().as_slices();
+        self.writev(bufs)
+    }
+
+    pub fn recvmsg(&self, msg_hdr: &mut MsgHdrMut, flags: RecvFlags) -> Result<usize> {
+        if !flags.is_empty() {
+            warn!("unsupported flags: {:?}", flags);
+        }
+
+        let bufs = msg_hdr.get_iovs_mut().as_slices_mut();
+        let data_len = self.readv(bufs)?;
+
+        // For stream socket, the msg_name is ignored. And other fields are not supported.
+        msg_hdr.set_name_len(0);
+
+        Ok(data_len)
     }
 
     /// perform shutdown on the socket.
