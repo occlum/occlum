@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use io_uring_callback::{Fd, IoHandle};
 use sgx_untrusted_alloc::UntrustedBox;
@@ -12,6 +13,7 @@ pub struct ConnectingStream<A: Addr + 'static, R: Runtime> {
     common: Arc<Common<A, R>>,
     peer_addr: A,
     req: Mutex<ConnectReq<A>>,
+    connected: AtomicBool, // Mainly use for nonblocking socket to update status asynchronously
 }
 
 struct ConnectReq<A: Addr> {
@@ -29,6 +31,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
             common,
             peer_addr: peer_addr.clone(),
             req,
+            connected: AtomicBool::new(false),
         };
         Ok(Arc::new(new_self))
     }
@@ -39,6 +42,10 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
         pollee.reset_events();
 
         self.initiate_async_connect();
+
+        if self.common.nonblocking() {
+            return_errno!(EINPROGRESS, "non-blocking connect request in progress");
+        }
 
         // Wait for the async connect to complete
         let mask = Events::OUT;
@@ -76,6 +83,13 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
     }
 
     fn initiate_async_connect(self: &Arc<Self>) {
+        let io_uring = self.common.io_uring();
+        let mut req = self.req.lock().unwrap();
+        // Skip if there is pending request
+        if req.io_handle.is_some() {
+            return;
+        }
+
         let arc_self = self.clone();
         let callback = move |retval: i32| {
             // Guard against Igao attack
@@ -86,6 +100,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
             req.io_handle.take();
 
             if retval == 0 {
+                arc_self.connected.store(true, Ordering::Relaxed);
                 arc_self.common.pollee().add_events(Events::OUT);
             } else {
                 // Store the errno
@@ -93,12 +108,11 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
                 req.errno = Some(errno);
                 drop(req);
 
+                arc_self.connected.store(false, Ordering::Relaxed);
                 arc_self.common.pollee().add_events(Events::ERR);
             }
         };
 
-        let io_uring = self.common.io_uring();
-        let mut req = self.req.lock().unwrap();
         let host_fd = self.common.host_fd() as _;
         let c_addr_ptr = req.c_addr.as_ptr();
         let c_addr_len = req.c_addr_len;
@@ -160,6 +174,12 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
     pub fn common(&self) -> &Arc<Common<A, R>> {
         &self.common
     }
+
+    // This can be used in connecting state to check non-blocking connect status.
+    pub fn check_connection(&self) -> bool {
+        // It is fine whether the load happens before or after the store operation
+        self.connected.load(Ordering::Relaxed)
+    }
 }
 
 impl<A: Addr> ConnectReq<A> {
@@ -181,6 +201,7 @@ impl<A: Addr, R: Runtime> std::fmt::Debug for ConnectingStream<A, R> {
             .field("common", &self.common)
             .field("peer_addr", &self.peer_addr)
             .field("req", &*self.req.lock().unwrap())
+            .field("connected", &self.connected)
             .finish()
     }
 }
