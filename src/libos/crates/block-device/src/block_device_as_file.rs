@@ -4,22 +4,32 @@ use core::ptr::NonNull;
 use crate::prelude::*;
 use crate::util::{align_down, align_up};
 
-/// An extension trait for block devices to support file-like I/O operations.
+/// A wrapper trait for block devices to support file-like I/O operations.
 /// This trait can be convenient when a block device should behave like a file.
 #[async_trait]
-pub trait BlockDeviceExt {
+pub trait BlockDeviceAsFile: Send + Sync {
+    /// Return the total number of bytes of the underlying device.
+    fn total_bytes(&self) -> usize;
+
     /// Read a specified number of bytes at a byte offset on the device.
     async fn read(&self, offset: usize, buf: &mut [u8]) -> Result<usize>;
 
     /// Write a specified number of bytes at a byte offset on the device.
     async fn write(&self, offset: usize, buf: &[u8]) -> Result<usize>;
 
-    /// Flush all cached data in the device to the storage medium for durability.
-    async fn flush(&self) -> Result<()>;
+    /// Sync all cached data in the device to the storage medium for durability.
+    async fn sync(&self) -> Result<()>;
+
+    /// Flush specified cached blocks to the underlying device.
+    async fn flush_blocks(&self, blocks: &[BlockId]) -> Result<usize>;
 }
 
 #[async_trait]
-impl BlockDeviceExt for dyn BlockDevice {
+impl BlockDeviceAsFile for dyn BlockDevice {
+    fn total_bytes(&self) -> usize {
+        Impl::new(self).total_bytes()
+    }
+
     async fn read(&self, offset: usize, read_buf: &mut [u8]) -> Result<usize> {
         Impl::new(self).read(offset, read_buf).await
     }
@@ -28,13 +38,21 @@ impl BlockDeviceExt for dyn BlockDevice {
         Impl::new(self).write(offset, write_buf).await
     }
 
-    async fn flush(&self) -> Result<()> {
-        Impl::new(self).flush().await
+    async fn sync(&self) -> Result<()> {
+        Impl::new(self).sync().await
+    }
+
+    async fn flush_blocks(&self, blocks: &[BlockId]) -> Result<usize> {
+        Impl::new(self).flush_blocks(blocks).await
     }
 }
 
 #[async_trait]
-impl<B: BlockDevice> BlockDeviceExt for B {
+impl<B: BlockDevice> BlockDeviceAsFile for B {
+    fn total_bytes(&self) -> usize {
+        Impl::new(self).total_bytes()
+    }
+
     async fn read(&self, offset: usize, read_buf: &mut [u8]) -> Result<usize> {
         Impl::new(self).read(offset, read_buf).await
     }
@@ -43,8 +61,12 @@ impl<B: BlockDevice> BlockDeviceExt for B {
         Impl::new(self).write(offset, write_buf).await
     }
 
-    async fn flush(&self) -> Result<()> {
-        Impl::new(self).flush().await
+    async fn sync(&self) -> Result<()> {
+        Impl::new(self).sync().await
+    }
+
+    async fn flush_blocks(&self, blocks: &[BlockId]) -> Result<usize> {
+        Impl::new(self).flush_blocks(blocks).await
     }
 }
 
@@ -55,7 +77,7 @@ impl<B: BlockDevice> BlockDeviceExt for B {
 // The atomicity of block-aligned reads and writes are determined by the block
 // device.
 
-// We cannot add private methods to trait (e.g., BlockDeviceExt). So the Impl
+// We cannot add private methods to trait (e.g., BlockDeviceAsFile). So the Impl
 // struct is introduced as a zero-cost means to workaround the limitation.
 struct Impl<'a> {
     disk: &'a dyn BlockDevice,
@@ -64,6 +86,10 @@ struct Impl<'a> {
 impl<'a> Impl<'a> {
     pub fn new(disk: &'a dyn BlockDevice) -> Self {
         Self { disk }
+    }
+
+    pub fn total_bytes(&self) -> usize {
+        self.disk.total_blocks() * BLOCK_SIZE
     }
 
     pub async fn read(&self, offset: usize, read_buf: &mut [u8]) -> Result<usize> {
@@ -444,13 +470,19 @@ impl<'a> Impl<'a> {
         Ok(write_buf_len)
     }
 
-    pub async fn flush(&self) -> Result<()> {
+    pub async fn sync(&self) -> Result<()> {
         let req = BioReqBuilder::new(BioType::Flush).build();
         let submission = self.disk.submit(Arc::new(req));
         let req = submission.complete().await;
         req.response()
             .unwrap()
             .map_err(|e| errno!(e.errno(), "flush on a block device failed"))
+    }
+
+    // Do nothing in default implementation.
+    #[allow(unused)]
+    pub async fn flush_blocks(&self, blocks: &[BlockId]) -> Result<usize> {
+        Ok(0)
     }
 
     // Check if a read or writer covers only one partial block. In other words,

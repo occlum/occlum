@@ -1,7 +1,5 @@
 use block_device::{BioReq, BioSubmission, BioType, BlockBuf, BlockDevice};
 use fs::File;
-use std::io::prelude::*;
-use std::io::{IoSlice, IoSliceMut, SeekFrom};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 

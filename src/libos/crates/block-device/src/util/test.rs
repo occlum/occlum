@@ -10,7 +10,7 @@ macro_rules! gen_unit_tests {
         use std::sync::Arc;
         use $crate::util::test::check_disk_filled_with_val;
         use $crate::{
-            BioReq, BioReqBuilder, BioType, BlockBuf, BlockDevice, BlockDeviceExt, BLOCK_SIZE,
+            BioReq, BioReqBuilder, BioType, BlockBuf, BlockDevice, BlockDeviceAsFile, BLOCK_SIZE,
         };
 
         // Check a new disk is initialized with zeros.

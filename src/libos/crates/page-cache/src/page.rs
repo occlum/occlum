@@ -55,12 +55,14 @@ impl<A: PageAlloc> Page<A> {
     }
 
     /// Return the page align.
+    #[allow(dead_code)]
     #[inline]
     pub const fn align() -> usize {
         PAGE_SIZE
     }
 
     /// Return the page layout.
+    #[allow(dead_code)]
     #[inline]
     pub const fn layout() -> Layout {
         unsafe { Layout::from_size_align_unchecked(Self::size(), Self::align()) }

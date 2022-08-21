@@ -167,7 +167,7 @@ impl<K: PageKey, A: PageAlloc> PageCache<K, A> {
     ///         continue;
     ///     }
     ///
-    ///     poller.wait().await;
+    ///     poller.wait().await.unwrap();
     /// }
     /// # }
     /// ```

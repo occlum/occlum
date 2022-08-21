@@ -39,6 +39,7 @@ io-uring-callback = { path = "crates/io-uring-callback", features = ["sgx"] }
 host-socket  = { path = "crates/host-socket", default-features = false, features = ["sgx"] }
 sgx-disk  = { path = "crates/sgx-disk", default-features = false, features = ["sgx"] }
 block-device  = { path = "crates/block-device" }
+page-cache = { path = "crates/page-cache", default-features = false, feature = ["sgx"] }
 scroll = { version = "0.10.2", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["alloc", "async-await"] }
 itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"]  }

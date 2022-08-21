@@ -24,6 +24,7 @@ extern crate sgx_tstd as std;
 #[cfg(feature = "sgx")]
 extern crate sgx_types;
 #[macro_use]
+#[allow(unused)]
 extern crate log;
 
 mod crypt_disk;

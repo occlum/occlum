@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use block_device::{
-    BioReqBuilder, BioType, BlockBuf, BlockDevice, BlockDeviceExt, BlockId, BlockRange,
-    BlockRangeIter, BLOCK_SIZE,
+    BioReqBuilder, BioType, BlockBuf, BlockDevice, BlockDeviceAsFile, BlockId, BlockRangeIter,
+    BLOCK_SIZE,
 };
 
 use std::sync::{
@@ -96,44 +96,49 @@ impl<A: PageAlloc> CachedDisk<A> {
         });
     }
 
+    /// Write back cached blocks to the underlying block device.
+    ///
+    /// On success, return the number of flushed pages.
+    pub async fn flush(&self) -> Result<usize> {
+        self.0.flush().await
+    }
+}
+
+#[async_trait]
+impl<A: PageAlloc> BlockDeviceAsFile for CachedDisk<A> {
+    fn total_bytes(&self) -> usize {
+        self.0.disk.total_blocks() * BLOCK_SIZE
+    }
+
+    async fn read(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+        self.0.read(offset, buf).await
+    }
+
+    async fn write(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+        self.0.write(offset, buf).await
+    }
+
+    async fn sync(&self) -> Result<()> {
+        self.0.sync().await
+    }
+
+    async fn flush_blocks(&self, blocks: &[BlockId]) -> Result<usize> {
+        self.0.flush_pages(blocks).await
+    }
+}
+
+impl<A: PageAlloc> Inner<A> {
     /// Read cache content from `offset` into the given buffer.
     ///
     /// The length of buffer and offset can be arbitrary.
     /// On success, return the number of read bytes.
     pub async fn read(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        self.0.read(offset, buf).await
-    }
-
-    /// Write buffer content into cache starting from `offset`.
-    ///
-    /// The length of buffer and offset can be arbitrary.
-    /// On success, return the number of written bytes.
-    pub async fn write(&self, offset: usize, buf: &[u8]) -> Result<usize> {
-        self.0.write(offset, buf).await
-    }
-
-    /// Flush all changes onto the backing disk.
-    pub async fn flush(&self) -> Result<usize> {
-        self.0.flush_disk().await
-    }
-
-    /// Flush specific pages onto the backing disk.
-    pub async fn flush_pages(&self, pages: &[BlockId]) -> Result<usize> {
-        self.0.flush_pages(pages).await
-    }
-}
-
-impl<A: PageAlloc> Drop for CachedDisk<A> {
-    fn drop(&mut self) {
-        self.0.is_dropped.store(true, Ordering::Relaxed);
-        self.0.flusher_wq.wake_all();
-    }
-}
-
-impl<A: PageAlloc> Inner<A> {
-    /// Byte-level read function.
-    pub async fn read(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        let block_range_iter = self.check_rw_args(offset, buf);
+        self.check_rw_args(offset, buf);
+        let block_range_iter = BlockRangeIter {
+            begin: offset,
+            end: offset + buf.len(),
+            block_size: BLOCK_SIZE,
+        };
 
         let mut read_len = 0;
         for range in block_range_iter {
@@ -147,9 +152,17 @@ impl<A: PageAlloc> Inner<A> {
         Ok(read_len)
     }
 
-    /// Byte-level write function.
+    /// Write buffer content into cache starting from `offset`.
+    ///
+    /// The length of buffer and offset can be arbitrary.
+    /// On success, return the number of written bytes.
     pub async fn write(&self, offset: usize, buf: &[u8]) -> Result<usize> {
-        let block_range_iter = self.check_rw_args(offset, buf);
+        self.check_rw_args(offset, buf);
+        let block_range_iter = BlockRangeIter {
+            begin: offset,
+            end: offset + buf.len(),
+            block_size: BLOCK_SIZE,
+        };
 
         let mut write_len = 0;
         for range in block_range_iter {
@@ -164,20 +177,14 @@ impl<A: PageAlloc> Inner<A> {
     }
 
     /// Check if the arguments for a read or write is valid.
-    /// If so, return the formed BlockRangeIter.
-    fn check_rw_args(&self, offset: usize, buf: &[u8]) -> BlockRangeIter {
+    fn check_rw_args(&self, offset: usize, buf: &[u8]) {
         debug_assert!(
             offset + buf.len() <= self.disk.total_blocks() * BLOCK_SIZE,
             "read/write length exceeds total blocks limit"
         );
-        BlockRangeIter {
-            begin: offset,
-            end: offset + buf.len(),
-            block_size: BLOCK_SIZE,
-        }
     }
 
-    /// Page/Block-level read function.
+    /// Read a single page content from `offset` into the given buffer.
     async fn read_one_page(&self, bid: BlockId, buf: &mut [u8], offset: usize) -> Result<usize> {
         debug_assert!(buf.len() + offset <= BLOCK_SIZE);
 
@@ -231,7 +238,7 @@ impl<A: PageAlloc> Inner<A> {
         Ok(read_len)
     }
 
-    /// Page/Block-level write function.
+    /// Write a single page content from `offset` into the given buffer.
     async fn write_one_page(&self, bid: BlockId, buf: &[u8], offset: usize) -> Result<usize> {
         debug_assert!(buf.len() + offset <= BLOCK_SIZE);
 
@@ -293,6 +300,7 @@ impl<A: PageAlloc> Inner<A> {
     ///
     /// Currently we use `flush()` (write back to disk in batches) rather than `flush_by_block()`
     /// for better I/O performance.
+    #[allow(dead_code)]
     pub async fn flush_by_block(&self) -> Result<usize> {
         let mut total_pages = 0;
         let aw_lock = self.arw_lock.write().await;
@@ -340,7 +348,9 @@ impl<A: PageAlloc> Inner<A> {
         Ok(total_pages)
     }
 
-    /// Write back to block device in consecutive batches.
+    /// Write back cached pages to block device in consecutive batches.
+    ///
+    /// On success, return the number of flushed pages.
     pub async fn flush(&self) -> Result<usize> {
         let mut total_pages = 0;
         let aw_lock = self.arw_lock.write().await;
@@ -394,7 +404,7 @@ impl<A: PageAlloc> Inner<A> {
         Ok(total_pages)
     }
 
-    /// Write back specific pages to block device, given an array of block IDs.
+    /// Write back specified pages to block device, given an array of block IDs.
     pub async fn flush_pages(&self, pages: &[BlockId]) -> Result<usize> {
         let mut total_pages = 0;
 
@@ -427,16 +437,16 @@ impl<A: PageAlloc> Inner<A> {
             drop(aw_lock)
         }
 
-        trace!("[CachedDisk] flush specific pages: {}", total_pages);
+        trace!("[CachedDisk] flush specified pages: {}", total_pages);
         Ok(total_pages)
     }
 
     /// Write back all changes to block device then flush
     /// the underlying disk to ensure persistency.
-    pub async fn flush_disk(&self) -> Result<usize> {
-        let flush_num = self.flush().await?;
-        self.disk.flush().await?;
-        Ok(flush_num)
+    pub async fn sync(&self) -> Result<()> {
+        self.flush().await?;
+        self.disk.sync().await?;
+        Ok(())
     }
 
     /// Acquire one page from page cache.
@@ -493,6 +503,7 @@ impl<A: PageAlloc> Inner<A> {
         page_handle.pollee().add_events(events);
     }
 
+    #[allow(unused)]
     async fn wait_page_events(page_handle: &PageHandle<BlockId, A>, events: Events) {
         let poller = Poller::new();
         if page_handle.pollee().poll(events, Some(&poller)).is_empty() {
@@ -501,19 +512,10 @@ impl<A: PageAlloc> Inner<A> {
     }
 }
 
-#[async_trait]
-impl<A: PageAlloc> BlockDeviceExt for CachedDisk<A> {
-    async fn read(&self, offset: usize, read_buf: &mut [u8]) -> Result<usize> {
-        self.read(offset, read_buf).await
-    }
-
-    async fn write(&self, offset: usize, write_buf: &[u8]) -> Result<usize> {
-        self.write(offset, write_buf).await
-    }
-
-    async fn flush(&self) -> Result<()> {
-        self.flush().await?;
-        Ok(())
+impl<A: PageAlloc> Drop for CachedDisk<A> {
+    fn drop(&mut self) {
+        self.0.is_dropped.store(true, Ordering::Relaxed);
+        self.0.flusher_wq.wake_all();
     }
 }
 

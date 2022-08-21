@@ -30,6 +30,7 @@ dependencies = [
  "memoffset 0.6.1",
  "new-self-ref-arc",
  "num_enum",
+ "page-cache",
  "rcore-fs",
  "rcore-fs-devfs",
  "rcore-fs-mountfs",

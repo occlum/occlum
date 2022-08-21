@@ -90,7 +90,7 @@ mod benches {
     use super::*;
     use async_rt::task::JoinHandle;
     use async_trait::async_trait;
-    use block_device::{BlockDevice, BlockDeviceExt, BLOCK_SIZE};
+    use block_device::{BlockDevice, BlockDeviceAsFile, BLOCK_SIZE};
 
     pub trait Bench: fmt::Display {
         /// Returns the name of the benchmark.
@@ -317,7 +317,7 @@ mod benches {
                 remain_bytes -= write_len;
                 offset += write_len;
             }
-            self.flush().await?;
+            self.sync().await?;
             Ok(())
         }
     }
@@ -363,7 +363,7 @@ mod consts {
 mod tmp_disk {
     use std::sync::Arc;
 
-    use block_device::{BioReq, BioSubmission, BlockDevice, BlockDeviceExt, BLOCK_SIZE};
+    use block_device::{BioReq, BioSubmission, BlockDevice, BlockDeviceAsFile, BLOCK_SIZE};
     use sgx_disk::{HostDisk, IoUringDisk, SyncIoDisk};
 
     use self::io_uring_rt::IoUringSingleton;

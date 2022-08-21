@@ -1,5 +1,5 @@
 use async_rt::sync::Mutex as AsyncMutex;
-use block_device::{BlockDevice, BlockDeviceExt, BLOCK_SIZE};
+use block_device::{BlockDevice, BlockDeviceAsFile, BLOCK_SIZE};
 use std::fmt;
 
 use crate::fs::{
@@ -83,7 +83,7 @@ impl DiskFile {
     }
 
     pub async fn flush(&self) -> Result<()> {
-        self.disk.flush().await
+        self.disk.sync().await
     }
 
     pub async fn seek(&self, pos: SeekFrom) -> Result<usize> {

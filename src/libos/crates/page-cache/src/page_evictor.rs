@@ -104,6 +104,7 @@ impl<K: PageKey, A: PageAlloc> EvictorTaskInner<K, A> {
         self.is_dropped.store(true, Ordering::Relaxed);
     }
 
+    #[allow(unused)]
     async fn task_main(&self) {
         let mut waiter = Waiter::new();
         self.evictor_wq.enqueue(&mut waiter);

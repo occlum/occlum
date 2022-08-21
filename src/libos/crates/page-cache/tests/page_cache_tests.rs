@@ -1,7 +1,7 @@
 //! PageCache tests
 use async_rt::wait::Waiter;
 use async_trait::async_trait;
-use block_device::{mem_disk::MemDisk, BLOCK_SIZE};
+use block_device::BLOCK_SIZE;
 use errno::prelude::*;
 use page_cache::*;
 
@@ -124,6 +124,7 @@ fn page_cache_group_consecutive_pages() {
 }
 
 #[test]
+#[allow(unused)]
 fn page_cache_evictor_task() -> Result<()> {
     async_rt::task::block_on(async move {
         impl_fixed_size_page_alloc! { TestPageAlloc, BLOCK_SIZE * 100 }

@@ -1,6 +1,6 @@
 //! CachedDisk tests
 use async_rt::wait::Waiter;
-use block_device::{mem_disk::MemDisk, BLOCK_SIZE};
+use block_device::{mem_disk::MemDisk, BlockDeviceAsFile, BLOCK_SIZE};
 use errno::prelude::*;
 use page_cache::*;
 
@@ -44,6 +44,8 @@ fn cached_disk_read_write() -> Result<()> {
             cached_disk.read(offset, &mut buf[..]).await?;
             cached_disk.write(offset, &buf[..]).await?;
         }
+
+        cached_disk.sync().await?;
         Ok(())
     })
 }
@@ -72,6 +74,8 @@ fn cached_disk_flush() -> Result<()> {
         }
         let flush_num = cached_disk.flush().await?;
         assert_eq!(flush_num, write_cnt, "[CachedDisk] flush failed");
+
+        cached_disk.sync().await?;
         Ok(())
     })
 }
@@ -90,13 +94,16 @@ fn cached_disk_flush_pages() -> Result<()> {
         }
 
         let pages = vec![0, 1, 2];
-        let flush_num = cached_disk.flush_pages(&pages).await?;
+        let flush_num = cached_disk.flush_blocks(&pages).await?;
         assert_eq!(flush_num, pages.len(), "[CachedDisk] flush pages failed");
+
+        cached_disk.sync().await?;
         Ok(())
     })
 }
 
 #[test]
+#[allow(unused)]
 fn cached_disk_flusher_task() -> Result<()> {
     async_rt::task::block_on(async move {
         let cached_disk = Arc::new(new_cached_disk());
@@ -128,6 +135,8 @@ fn cached_disk_flusher_task() -> Result<()> {
         let flush_num = cached_disk.flush().await?;
         // Pages are already flushed by flusher task
         assert_eq!(flush_num, 0, "[CachedDisk] flush failed");
+
+        cached_disk.sync().await?;
         Ok(())
     })
 }
@@ -145,8 +154,9 @@ fn cached_disk_evictor_task() -> Result<()> {
         for i in 0..rw_cnt {
             let offset = i * BLOCK_SIZE;
             cached_disk.read(offset, &mut buf[..]).await?;
-            cached_disk.write(offset, &buf[..]).await?;
         }
+
+        cached_disk.sync().await?;
         Ok(())
     })
 }
