@@ -24,6 +24,7 @@
 #define ALIGN_UP(x, a)          ALIGN_DOWN((x+(a-1)), (a))
 
 #define MAX_MMAP_USED_MEMORY    (4 * MB)
+#define DEFAULT_CHUNK_SIZE      (32 * MB) // This is the default chunk size used in Occlum kernel.
 
 // ============================================================================
 // Helper functions
@@ -671,6 +672,49 @@ int test_munmap_whose_range_intersects_with_multiple_mmap_regions() {
     }
     if (check_buf_is_munmapped(munmap_addr, munmap_len) < 0) {
         THROW_ERROR("munmap does not really free the memory");
+    }
+
+    return 0;
+}
+
+int test_munmap_whose_range_intersects_with_several_chunks() {
+    int prot = PROT_READ | PROT_WRITE;
+    int flags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED;
+    size_t len = 1 * MB;
+
+    // Allocate three continuous single vma chunks at the end of the default chunk
+    size_t hint_1 = HINT_BEGIN + DEFAULT_CHUNK_SIZE;
+    void *addr = mmap((void *)hint_1, len, prot, flags, -1, 0);
+    if ((size_t)addr != hint_1) {
+        THROW_ERROR("fixed mmap with good hint failed");
+    }
+
+    size_t hint_2 = hint_1 + len;
+    addr = mmap((void *)hint_2, len, prot, flags, -1, 0);
+    if ((size_t)addr != hint_2) {
+        THROW_ERROR("fixed mmap spans over two chunks failed");
+    }
+
+    size_t hint_3 = hint_2 + len;
+    addr = mmap((void *)hint_3, len, prot, flags, -1, 0);
+    if ((size_t)addr != hint_3) {
+        THROW_ERROR("fixed mmap spans over two chunks failed");
+    }
+
+    // Munmap the range spans above three ranges
+    size_t munmap_start = hint_1 + len / 2;
+    size_t munmap_end = hint_3 + len / 2;
+
+    if (munmap((void *)munmap_start, munmap_end - munmap_start) < 0) {
+        THROW_ERROR("munmap failed");
+    }
+
+    if (check_buf_is_munmapped((void *)munmap_start, munmap_end - munmap_start) < 0) {
+        THROW_ERROR("munmap does not really free the memory");
+    }
+
+    if (munmap((void *)hint_1, 3 * len) < 0) {
+        THROW_ERROR("munmap remaining ranges failed");
     }
 
     return 0;
@@ -1328,6 +1372,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_munmap_whose_range_intersects_with_a_mmap_region),
     TEST_CASE(test_munmap_whose_range_intersects_with_no_mmap_regions),
     TEST_CASE(test_munmap_whose_range_intersects_with_multiple_mmap_regions),
+    TEST_CASE(test_munmap_whose_range_intersects_with_several_chunks),
     TEST_CASE(test_munmap_with_null_addr),
     TEST_CASE(test_munmap_with_zero_len),
     TEST_CASE(test_munmap_with_non_page_aligned_len),

@@ -257,55 +257,37 @@ impl VMManager {
             chunk.unwrap().clone()
         };
 
+        // Case 1: the overlapping chunk IS NOT a super set of munmap range
         if !chunk.range().is_superset_of(&munmap_range) {
             // munmap range spans multiple chunks
-            let munmap_single_vma_chunks = {
+            let overlapping_chunks = {
                 let current = current!();
-                let mut process_mem_chunks = current.vm().mem_chunks().write().unwrap();
-                let munmap_single_vma_chunks = process_mem_chunks
-                    .drain_filter(|p_chunk| {
-                        p_chunk.is_single_vma() && p_chunk.range().overlap_with(&munmap_range)
-                    })
-                    .collect::<Vec<ChunkRef>>();
-                if munmap_single_vma_chunks
-                    .iter()
-                    .find(|chunk| !munmap_range.is_superset_of(chunk.range()))
-                    .is_some()
-                {
-                    // TODO: Support munmap multiple single VMA chunk with remaining ranges.
-                    return_errno!(
-                        EINVAL,
-                        "munmap multiple chunks with remaining ranges is not supported"
-                    );
-                }
-
-                // Munmap ranges in default chunks
-                for chunk in process_mem_chunks
+                let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
+                process_mem_chunks
                     .iter()
                     .filter(|p_chunk| p_chunk.range().overlap_with(&munmap_range))
-                {
-                    match chunk.internal() {
-                        ChunkType::SingleVMA(_) => {
-                            unreachable!() // single-vma chunks should be drained already
-                        }
-                        ChunkType::MultiVMA(manager) => manager
-                            .lock()
-                            .unwrap()
-                            .chunk_manager_mut()
-                            .munmap_range(munmap_range)?,
-                    }
-                }
-
-                munmap_single_vma_chunks
+                    .cloned()
+                    .collect::<Vec<ChunkRef>>()
             };
 
-            let mut internl_manager = self.internal();
-            munmap_single_vma_chunks.iter().for_each(|p_chunk| {
-                internl_manager.munmap_chunk(p_chunk, None);
-            });
+            for chunk in overlapping_chunks.iter() {
+                match chunk.internal() {
+                    ChunkType::SingleVMA(_) => {
+                        let mut internl_manager = self.internal();
+                        internl_manager.munmap_chunk(chunk, Some(&munmap_range))?
+                    }
+                    ChunkType::MultiVMA(manager) => manager
+                        .lock()
+                        .unwrap()
+                        .chunk_manager_mut()
+                        .munmap_range(munmap_range)?,
+                }
+            }
             return Ok(());
         }
 
+        // Case 2: the overlapping chunk IS a super set of munmap range
+        debug_assert!(chunk.range().is_superset_of(&munmap_range));
         match chunk.internal() {
             ChunkType::MultiVMA(manager) => {
                 return manager
@@ -696,7 +678,9 @@ impl InternalVMManager {
                 munmap_range.unwrap()
             }
         };
-        debug_assert!(chunk.range().is_superset_of(munmap_range));
+
+        // Either the munmap range is a subset of the chunk range or the munmap range is
+        // a superset of the chunk range. We can handle both cases.
 
         let mut vma = vma.lock().unwrap();
         debug_assert!(chunk.range() == vma.range());
