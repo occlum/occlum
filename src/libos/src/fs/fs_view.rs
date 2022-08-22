@@ -405,7 +405,11 @@ impl FsView {
                     if fs_path.ends_with("/") {
                         return_errno!(EISDIR, "path is a directory");
                     }
-                    let (dir_inode, file_name) = self.lookup_dirinode_and_basename(fs_path).await?;
+                    let (dir_inode, file_name) =
+                        self.lookup_real_dirinode_and_basename(fs_path).await?;
+                    if file_name.ends_with("/") {
+                        return_errno!(EISDIR, "path refers to directory");
+                    }
                     if !dir_inode.allow_write() {
                         return_errno!(EPERM, "file cannot be created");
                     }
@@ -506,6 +510,83 @@ impl FsView {
         Ok((dir_inode, base_name))
     }
 
+    /// Lookup the real dir inode and basename.
+    /// It is used to create new file in `open_file`.
+    async fn lookup_real_dirinode_and_basename(
+        &self,
+        fs_path: &FsPath,
+    ) -> Result<(InodeHandle, String)> {
+        let (dir_inode, base_name) = match fs_path.inner() {
+            FsPathInner::Absolute(path) | FsPathInner::CwdRelative(path) => {
+                let real_path = self.lookup_real_path(None, path).await?;
+                let (dir_path, base_name) = split_path(&real_path);
+                (self.lookup_inode_cwd(dir_path).await?, base_name.to_owned())
+            }
+            FsPathInner::FdRelative(dirfd, path) => {
+                let inode = self.lookup_inode_from_fd(*dirfd)?;
+                let real_path = self.lookup_real_path(Some(&inode), path).await?;
+                let (dir_path, base_name) = split_path(&real_path);
+                let dir_inode = if dir_path.starts_with("/") {
+                    self.lookup_inode_cwd(dir_path).await?
+                } else {
+                    inode.lookup(dir_path, Some(MAX_SYMLINKS)).await?
+                };
+                (dir_inode, base_name.to_owned())
+            }
+            _ => return_errno!(ENOENT, "cannot find real dir and basename with empty path"),
+        };
+        Ok((dir_inode, base_name))
+    }
+
+    /// Lookup the real path of giving path, dereference symlinks.
+    /// If parent is provided, it will lookup the real path from the parent inode.
+    /// If parent is not provided, it will lookup the real path from the cwd of process.
+    async fn lookup_real_path(&self, parent: Option<&InodeHandle>, path: &str) -> Result<String> {
+        let mut real_path = String::from(path);
+
+        loop {
+            let (dir_path, file_name) = split_path(&real_path);
+            let dir_inode = if let Some(parent_inode) = parent {
+                parent_inode.lookup(dir_path, Some(MAX_SYMLINKS)).await?
+            } else {
+                self.lookup_inode_cwd(dir_path).await?
+            };
+
+            match dir_inode
+                .lookup_no_follow(file_name.trim_end_matches('/'))
+                .await
+            {
+                Ok(inode) if inode.metadata().await?.type_ == FileType::SymLink => {
+                    // Update real_path for next round
+                    real_path = {
+                        let mut new_path = {
+                            let link_path = inode.read_link().await?;
+                            if link_path.starts_with("/") {
+                                link_path
+                            } else {
+                                String::from(dir_path) + "/" + &link_path
+                            }
+                        };
+                        if real_path.ends_with("/") && !new_path.ends_with("/") {
+                            new_path += "/";
+                        }
+                        new_path
+                    };
+                }
+                Ok(_) => {
+                    debug!("real path: {:?}", real_path);
+                    return Ok(real_path);
+                }
+                Err(e) if e.errno() == ENOENT => {
+                    debug!("real path: {:?}", real_path);
+                    return Ok(real_path);
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    }
+
+    /// Lookup Inode from the cwd of the process. If path is a symlink, do not dereference it
     async fn lookup_inode_cwd_no_follow(&self, path: &str) -> Result<InodeHandle> {
         if path.ends_with("/") {
             Ok(self.lookup_inode_cwd(path).await?)
