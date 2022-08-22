@@ -3,7 +3,6 @@ use std::ffi::CStr;
 use std::fmt;
 use std::str;
 
-use crate::fs::INodeFile;
 use goblin::container::{Container, Ctx};
 pub use goblin::elf::header::Header as ElfHeader;
 use goblin::elf::{program_header, Elf, ProgramHeader};
@@ -112,10 +111,6 @@ impl<'a> ElfFile<'a> {
 
     pub fn file_ref(&self) -> &FileRef {
         self.file_ref
-    }
-
-    pub fn inode_file(&self) -> &INodeFile {
-        self.file_ref.as_inode_file().unwrap()
     }
 
     pub fn parse_elf_hdr(elf_file: &FileRef, elf_buf: &mut Vec<u8>) -> Result<ElfHeader> {

@@ -111,7 +111,7 @@ pub async fn do_bind(
         addr
     };
 
-    socket_file.bind(&mut addr)?;
+    socket_file.bind(&mut addr).await?;
     Ok(0)
 }
 

@@ -86,6 +86,11 @@ enclave {
         public int occlum_ecall_shutdown_vcpus(void);
 
         /*
+         * Initilize the host file.
+         */
+        public int occlum_ecall_init_host_file(void);
+
+        /*
          * Create the timer thread.
          */
         public int occlum_ecall_timer_thread_create(void);

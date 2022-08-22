@@ -20,7 +20,7 @@ pub enum HostFile {
     ResolvConf,
 }
 
-pub fn write_host_file(host_file: HostFile) -> Result<()> {
+pub async fn write_host_file(host_file: HostFile) -> Result<()> {
     let file_path: &str = match host_file {
         HostFile::Hosts => "/etc/hosts",
         HostFile::HostName => "/etc/hostname",
@@ -30,11 +30,15 @@ pub fn write_host_file(host_file: HostFile) -> Result<()> {
 
     let fs_view = FsView::new();
     // overwrite host file if existed in Occlum fs
-    let enclave_file = fs_view.open_file_sync(
-        &FsPath::try_from(file_path)?,
-        AccessMode::O_RDWR as u32 | CreationFlags::O_CREAT.bits() | CreationFlags::O_TRUNC.bits(),
-        FileMode::from_bits(0o666).unwrap(),
-    )?;
+    let enclave_file = fs_view
+        .open_file(
+            &FsPath::try_from(file_path)?,
+            AccessMode::O_RDWR as u32
+                | CreationFlags::O_CREAT.bits()
+                | CreationFlags::O_TRUNC.bits(),
+            FileMode::from_bits(0o666).unwrap(),
+        )
+        .await?;
 
     let host_file_str = match host_file {
         HostFile::Hosts => HOSTS_STR.read().unwrap(),
@@ -45,7 +49,7 @@ pub fn write_host_file(host_file: HostFile) -> Result<()> {
 
     match &*host_file_str {
         Some(str) => {
-            enclave_file.write(str.as_bytes());
+            enclave_file.write(str.as_bytes()).await?;
         }
         None => {
             warn!("The host file: {:?} does not exist", file_path);

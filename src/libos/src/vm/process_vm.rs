@@ -211,6 +211,10 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
         let mut empty_end_offset = 0;
 
         // Init all loadable segements
+        let elf_file_inode = elf_file
+            .file_ref()
+            .as_inode_file()
+            .ok_or_else(|| errno!(EINVAL, "not an inode"))?;
         elf_file
             .program_headers()
             .filter(|segment| segment.loadable())
@@ -231,7 +235,7 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
                 }
 
                 // Bytes of file_size length are loaded from the ELF file
-                elf_file.inode_file().read_at(
+                elf_file_inode.read_at(
                     file_offset,
                     &mut elf_proc_buf[mem_start_offset..mem_start_offset + file_size],
                 );

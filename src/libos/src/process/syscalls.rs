@@ -37,7 +37,8 @@ pub async fn do_spawn_for_musl(
     );
 
     let child_pid =
-        super::do_spawn::do_spawn(&path, &argv, &envp, &file_actions, spawn_attrs, &current)?;
+        super::do_spawn::do_spawn(&path, &argv, &envp, &file_actions, spawn_attrs, &current)
+            .await?;
 
     unsafe { *child_pid_ptr = child_pid };
     Ok(0)
@@ -116,7 +117,8 @@ pub async fn do_spawn_for_glibc(
     );
 
     let child_pid =
-        super::do_spawn::do_spawn(&path, &argv, &envp, &file_actions, spawn_attrs, &current)?;
+        super::do_spawn::do_spawn(&path, &argv, &envp, &file_actions, spawn_attrs, &current)
+            .await?;
 
     unsafe { *child_pid_ptr = child_pid };
     Ok(0)

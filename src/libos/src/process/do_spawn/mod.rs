@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
 use std::ffi::{CStr, CString};
+use std::future::Future;
 use std::path::Path;
 
 use self::aux_vec::{AuxKey, AuxVec};
@@ -25,7 +26,7 @@ mod init_stack;
 mod init_vm;
 
 /// Spawn a new process and execute it in a new host thread.
-pub fn do_spawn(
+pub async fn do_spawn(
     elf_path: &str,
     argv: &[CString],
     envp: &[CString],
@@ -45,10 +46,11 @@ pub fn do_spawn(
         current_ref,
         exec_now,
     )
+    .await
 }
 
 /// Spawn a new process but execute it later.
-pub fn do_spawn_root(
+pub async fn do_spawn_root(
     elf_path: &str,
     argv: &[CString],
     envp: &[CString],
@@ -70,9 +72,10 @@ pub fn do_spawn_root(
         current_ref,
         exec_now,
     )
+    .await
 }
 
-fn do_spawn_common(
+async fn do_spawn_common(
     elf_path: &str,
     argv: &[CString],
     envp: &[CString],
@@ -92,7 +95,8 @@ fn do_spawn_common(
         host_stdio_fds,
         wake_host,
         current_ref,
-    )?;
+    )
+    .await?;
 
     let new_main_thread = new_process_ref
         .main_thread()
@@ -107,7 +111,7 @@ fn do_spawn_common(
 }
 
 /// Create a new process and its main thread.
-fn new_process(
+async fn new_process(
     file_path: &str,
     argv: &[CString],
     envp: &[CString],
@@ -128,7 +132,8 @@ fn new_process(
         current_ref,
         None,
         None,
-    )?;
+    )
+    .await?;
     table::add_process(new_process_ref.clone());
     table::add_thread(new_process_ref.main_thread().unwrap());
 
@@ -136,17 +141,14 @@ fn new_process(
 }
 
 /// Create a new process for execve which will use same parent, pid, tid
-pub fn new_process_for_exec(
+pub async fn new_process_for_exec(
     file_path: &str,
     argv: &[CString],
     envp: &[CString],
     current_ref: &ThreadRef,
-    reuse_tid: Option<ThreadId>,
+    reuse_tid: ThreadId,
     parent_process: Option<ProcessRef>,
 ) -> Result<(ProcessRef, CpuContext)> {
-    let tid = ThreadId {
-        tid: current_ref.process().pid() as u32,
-    };
     let (new_process_ref, init_cpu_state) = new_process_common(
         file_path,
         argv,
@@ -156,14 +158,15 @@ pub fn new_process_for_exec(
         None,
         None,
         current_ref,
-        reuse_tid,
+        Some(reuse_tid),
         parent_process,
-    )?;
+    )
+    .await?;
 
     Ok((new_process_ref, init_cpu_state))
 }
 
-fn new_process_common(
+async fn new_process_common(
     file_path: &str,
     argv: &[CString],
     envp: &[CString],
@@ -177,7 +180,7 @@ fn new_process_common(
 ) -> Result<(ProcessRef, CpuContext)> {
     let mut argv = argv.clone().to_vec();
     let (is_script, elf_file, mut elf_buf, elf_header) =
-        load_exec_file_hdr_to_vec(file_path, current_ref)?;
+        load_exec_file_hdr_to_vec(file_path, current_ref).await?;
 
     // elf_path might be different from file_path because file_path could lead to a script text file.
     // And intepreter will be the loaded ELF.
@@ -200,6 +203,7 @@ fn new_process_common(
     trace!("ldso_path = {:?}", ldso_path);
     let (ldso_file, mut ldso_elf_hdr_buf, ldso_elf_header) =
         load_file_hdr_to_vec(ldso_path, current_ref)
+            .await
             .cause_err(|e| errno!(e.errno(), "cannot load ld.so"))?;
     let ldso_elf_header = if ldso_elf_header.is_none() {
         return_errno!(ENOEXEC, "ldso header is not ELF format");
@@ -266,7 +270,7 @@ fn new_process_common(
         };
         let vm_ref = Arc::new(vm);
         let files_ref = {
-            let files = init_files(current_ref, file_actions, host_stdio_fds)?;
+            let files = init_files(current_ref, file_actions, host_stdio_fds).await?;
             Arc::new(SgxMutex::new(files))
         };
         let fs_ref = Arc::new((**current_ref.fs()).clone());
@@ -365,7 +369,7 @@ fn new_process_common(
     Ok((new_process_ref, init_cpu_state))
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FileAction {
     /// open(path, oflag, mode) had been called, and the returned file
     /// descriptor, if not `fd`, had been changed to `fd`.
@@ -379,7 +383,7 @@ pub enum FileAction {
     Close(FileDesc),
 }
 
-fn init_files(
+async fn init_files(
     current_ref: &ThreadRef,
     file_actions: &[FileAction],
     host_stdio_fds: Option<&HostStdioFds>,
@@ -398,12 +402,14 @@ fn init_files(
                     oflag,
                     fd,
                 } => {
-                    let inode_file = current_ref.fs().open_file_sync(
-                        &FsPath::try_from(path.as_str())?,
-                        oflag,
-                        FileMode::from_bits_truncate(mode as u16),
-                    )?;
-                    let file_ref = FileRef::new_inode(inode_file);
+                    let file_ref = current_ref
+                        .fs()
+                        .open_file(
+                            &FsPath::try_from(path.as_str())?,
+                            oflag,
+                            FileMode::from_bits_truncate(mode as u16),
+                        )
+                        .await?;
                     let creation_flags = CreationFlags::from_bits_truncate(oflag);
                     cloned_file_table.put_at(fd, file_ref, creation_flags.must_close_on_spawn());
                 }

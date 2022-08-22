@@ -43,14 +43,9 @@ pub async fn do_exec(
             )
         };
 
-    let ret = super::do_spawn::new_process_for_exec(
-        path,
-        argv,
-        envp,
-        current_ref,
-        Some(tid),
-        parent_process,
-    );
+    let ret =
+        super::do_spawn::new_process_for_exec(path, argv, envp, current_ref, tid, parent_process)
+            .await;
 
     if let Ok((new_process_ref, init_cpu_state)) = ret {
         let new_main_thread = new_process_ref

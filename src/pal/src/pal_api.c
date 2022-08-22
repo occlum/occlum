@@ -168,6 +168,11 @@ int occlum_pal_init(const struct occlum_pal_attr *attr) {
         goto on_destroy_enclave;
     }
 
+    if (pal_init_host_file() < 0) {
+        PAL_ERROR("Failed to init host file: %s", errno2str(errno));
+        goto on_destroy_enclave;
+    }
+
     if (pal_run_init_process() < 0) {
         PAL_ERROR("Failed to run the init process: %s", errno2str(errno));
         goto on_destroy_enclave;

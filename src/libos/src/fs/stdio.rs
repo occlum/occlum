@@ -18,6 +18,7 @@ macro_rules! try_libc_stdio {
 
 // Struct for the occlum_stdio_fds
 #[repr(C)]
+#[derive(Clone)]
 pub struct HostStdioFds {
     pub stdin_fd: i32,
     pub stdout_fd: i32,

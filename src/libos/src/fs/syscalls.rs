@@ -583,7 +583,7 @@ pub async fn do_mount_rootfs(
     let expected_occlum_json_mac = unsafe { occlum_json_mac_ptr.read() };
     let user_config_path = unsafe { format!("{}{}", INSTANCE_DIR, "/build/Occlum.json.protected") };
     let user_config = config::load_config(&user_config_path, &expected_occlum_json_mac)?;
-    fs_ops::do_mount_rootfs(&user_config, &key)?;
+    fs_ops::do_mount_rootfs(&user_config, &key).await?;
     Ok((0))
 }
 

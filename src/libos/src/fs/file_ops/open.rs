@@ -1,4 +1,3 @@
-use super::async_fs::try_open_async_file;
 use super::builtin_disk::try_open_disk;
 use super::*;
 use crate::fs::DiskFile;
@@ -15,13 +14,8 @@ pub async fn do_openat(fs_path: &FsPath, flags: u32, mode: FileMode) -> Result<F
 
     let file_ref = if let Some(disk_file) = try_open_disk(&fs, fs_path)? {
         FileRef::new_disk(disk_file)
-    } else if let Some(async_file_handle) =
-        try_open_async_file(&fs, fs_path, flags, masked_mode).await?
-    {
-        FileRef::new_async_file_handle(async_file_handle)
     } else {
-        let inode_file = fs.open_file_sync(&fs_path, flags, masked_mode)?;
-        FileRef::new_inode(inode_file)
+        fs.open_file(&fs_path, flags, masked_mode).await?
     };
 
     let fd = {

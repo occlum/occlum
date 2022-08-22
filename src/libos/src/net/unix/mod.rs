@@ -92,7 +92,7 @@ impl UnixStream {
         }
     }
 
-    pub fn bind(&self, addr: &mut TrustedAddr) -> Result<()> {
+    pub async fn bind(&self, addr: &mut TrustedAddr) -> Result<()> {
         debug!("bind addr = {:?}", addr);
         // Distinguish if the real socket is internal trusted or cross-world untrusted
         if let Some((host_path, is_socket_file)) = addr.get_crossworld_sock_path() {
@@ -107,7 +107,7 @@ impl UnixStream {
                 "bind crossworld sock: libos path: {:?}, host path: {:?}",
                 addr, host_addr
             );
-            addr.bind_untrusted_addr(&host_addr)?; // bind two address
+            addr.bind_untrusted_addr(&host_addr).await?; // bind two address
             untrusted_sock.bind(&host_addr)?;
 
             // replace the trusted socket end with untrusted socket end
@@ -120,7 +120,7 @@ impl UnixStream {
 
         if let StreamInner::Trusted(stream) = &*self.inner() {
             // Create a file in libos FS
-            addr.bind_addr()?;
+            addr.bind_addr().await?;
             return stream.bind(addr);
         }
 

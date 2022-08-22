@@ -1,8 +1,7 @@
 use super::super::elf_file::*;
 use super::ThreadRef;
-use crate::fs::{FileMode, FsPath, INodeExt};
+use crate::fs::{FileMode, FileType, FsPath, Metadata};
 use crate::prelude::*;
-use rcore_fs::vfs::{FileType, INode, Metadata};
 use std::convert::TryFrom;
 use std::ffi::CString;
 
@@ -11,11 +10,11 @@ use std::ffi::CString;
 /// If the file is an executable binary, then just load this file's header.
 /// If the file is an script text, then parse the shebang and load
 /// the interpreter header.
-pub fn load_exec_file_hdr_to_vec(
+pub async fn load_exec_file_hdr_to_vec(
     file_path: &str,
     current_ref: &ThreadRef,
 ) -> Result<(Option<String>, FileRef, Vec<u8>, ElfHeader)> {
-    let (file_ref, file_buf, elf_hdr) = load_file_hdr_to_vec(&file_path, current_ref)?;
+    let (file_ref, file_buf, elf_hdr) = load_file_hdr_to_vec(&file_path, current_ref).await?;
     if elf_hdr.is_some() {
         Ok((None, file_ref, file_buf, elf_hdr.unwrap()))
     } else {
@@ -32,7 +31,7 @@ pub fn load_exec_file_hdr_to_vec(
             );
         }
         let (interp_file, interp_buf, interp_hdr) =
-            load_file_hdr_to_vec(&interpreter_path, current_ref)?;
+            load_file_hdr_to_vec(&interpreter_path, current_ref).await?;
         let interp_hdr = if interp_hdr.is_none() {
             return_errno!(ENOEXEC, "scrip interpreter is not ELF format");
         } else {
@@ -70,26 +69,29 @@ fn parse_script_interpreter(file_buf: &Vec<u8>) -> Result<String> {
     Ok(interpreter.to_owned())
 }
 
-pub fn load_file_hdr_to_vec(
+pub async fn load_file_hdr_to_vec(
     file_path: &str,
     current_ref: &ThreadRef,
 ) -> Result<(FileRef, Vec<u8>, Option<ElfHeader>)> {
-    let inode_file =
-        current_ref
-            .fs()
-            .open_file_sync(&FsPath::try_from(file_path)?, 0, FileMode::S_IRUSR)?;
-    let inode = inode_file.inode();
+    let file_ref = current_ref
+        .fs()
+        .open_file(&FsPath::try_from(file_path)?, 0, FileMode::S_IRUSR)
+        .await?;
 
     // Make sure the final file to exec is not a directory
-    let metadata = inode.metadata()?;
+    let metadata = if let Some(inode_file) = file_ref.as_inode_file() {
+        inode_file.inode().metadata()?
+    } else if let Some(async_file_handle) = file_ref.as_async_file_handle() {
+        async_file_handle.dentry().inode().metadata().await?
+    } else {
+        unreachable!()
+    };
+
     if metadata.type_ != FileType::File {
         return_errno!(EACCES, "it is not a regular file");
     }
 
-    let file_mode = {
-        let info = inode.metadata()?;
-        FileMode::from_bits_truncate(info.mode)
-    };
+    let file_mode = FileMode::from_bits_truncate(metadata.mode);
     if !file_mode.is_executable() {
         return_errno!(EACCES, "file is not executable");
     }
@@ -101,12 +103,15 @@ pub fn load_file_hdr_to_vec(
     }
 
     // Try to read the file as ELF64
-    let mut file_buf = inode
+    let mut file_buf = file_ref
+        .as_inode_file()
+        .unwrap()
+        .inode()
         .read_elf64_lazy_as_vec()
         .map_err(|e| errno!(e.errno(), "failed to read the file"))?;
 
-    let file_ref = FileRef::new_inode(inode_file);
     let elf_header = ElfFile::parse_elf_hdr(&file_ref, &mut file_buf);
+
     if let Ok(elf_header) = elf_header {
         Ok((file_ref, file_buf, Some(elf_header)))
     } else {

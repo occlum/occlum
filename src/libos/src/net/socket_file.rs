@@ -308,7 +308,7 @@ impl SocketFile {
         }
     }
 
-    pub fn bind(&self, addr: &mut AnyAddr) -> Result<()> {
+    pub async fn bind(&self, addr: &mut AnyAddr) -> Result<()> {
         match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => {
                 let ip_addr = addr.to_ipv4()?;
@@ -320,7 +320,7 @@ impl SocketFile {
             }
             AnySocket::UnixStream(unix_stream) => {
                 let mut trusted_addr = addr.to_trusted_unix_mut()?;
-                unix_stream.bind(trusted_addr)
+                unix_stream.bind(trusted_addr).await
             }
             AnySocket::Ipv4Datagram(ipv4_datagram) => {
                 let ip_addr = addr.to_ipv4()?;

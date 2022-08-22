@@ -29,7 +29,7 @@ pub use async_vfs::{AsyncFileSystem, AsyncInode};
 use crate::config::ConfigMount;
 
 pub use self::async_file_handle::AsyncFileHandle;
-pub use self::async_fs::{async_sfs, async_sfs_initilized, try_open_async_file};
+pub use self::async_fs::{async_sfs, async_sfs_initilized};
 pub use self::dentry::Dentry;
 pub use self::disk_file::DiskFile;
 pub use self::event_file::{EventFile, EventFileFlags};

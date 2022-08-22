@@ -26,6 +26,7 @@ lazy_static! {
     static ref HAS_INIT: AtomicBool = AtomicBool::new(false);
     pub static ref ENTRY_POINTS: RwLock<Vec<PathBuf>> =
         RwLock::new(crate::config::LIBOS_CONFIG.entry_points.clone());
+    static ref HOST_FILE_INIT_ONCE: Once = Once::new();
     pub static ref RESOLV_CONF_STR: RwLock<Option<String>> = RwLock::new(None);
     pub static ref HOSTNAME_STR: RwLock<Option<String>> = RwLock::new(None);
     pub static ref HOSTS_STR: RwLock<Option<String>> = RwLock::new(None);
@@ -117,8 +118,6 @@ pub extern "C" fn occlum_ecall_init(
             }
         });
 
-        HAS_INIT.store(true, Ordering::SeqCst);
-
         // Init boot up time stamp here.
         crate::time::up_time::init();
 
@@ -130,48 +129,41 @@ pub extern "C" fn occlum_ecall_init(
 
         // Start load balancer
         async_rt::executor::start_load_balancer();
+
+        // Parse host file and store in memory
+        let resolv_conf_ptr = unsafe { (*file_buffer).resolv_conf_buf };
+        match parse_host_file(HostFile::ResolvConf, resolv_conf_ptr) {
+            Err(e) => {
+                error!("failed to parse host /etc/resolv.conf: {}", e.backtrace());
+            }
+            Ok(resolv_conf_str) => {
+                *RESOLV_CONF_STR.write().unwrap() = Some(resolv_conf_str);
+            }
+        }
+
+        let hostname_ptr = unsafe { (*file_buffer).hostname_buf };
+        match parse_host_file(HostFile::HostName, hostname_ptr) {
+            Err(e) => {
+                error!("failed to parse host /etc/hostname: {}", e.backtrace());
+            }
+            Ok(hostname_str) => {
+                misc::init_nodename(&hostname_str);
+                *HOSTNAME_STR.write().unwrap() = Some(hostname_str);
+            }
+        }
+
+        let hosts_ptr = unsafe { (*file_buffer).hosts_buf };
+        match parse_host_file(HostFile::Hosts, hosts_ptr) {
+            Err(e) => {
+                error!("failed to parse host /etc/hosts: {}", e.backtrace());
+            }
+            Ok(hosts_str) => {
+                *HOSTS_STR.write().unwrap() = Some(hosts_str);
+            }
+        }
+
+        HAS_INIT.store(true, Ordering::SeqCst);
     });
-
-    // Parse host file
-    let resolv_conf_ptr = unsafe { (*file_buffer).resolv_conf_buf };
-    match parse_host_file(HostFile::ResolvConf, resolv_conf_ptr) {
-        Err(e) => {
-            error!("failed to parse /etc/resolv.conf: {}", e.backtrace());
-        }
-        Ok(resolv_conf_str) => {
-            *RESOLV_CONF_STR.write().unwrap() = Some(resolv_conf_str);
-            if let Err(e) = write_host_file(HostFile::ResolvConf) {
-                error!("failed to write /etc/resolv.conf: {}", e.backtrace());
-            }
-        }
-    }
-
-    let hostname_ptr = unsafe { (*file_buffer).hostname_buf };
-    match parse_host_file(HostFile::HostName, hostname_ptr) {
-        Err(e) => {
-            error!("failed to parse /etc/hostname: {}", e.backtrace());
-        }
-        Ok(hostname_str) => {
-            misc::init_nodename(&hostname_str);
-            *HOSTNAME_STR.write().unwrap() = Some(hostname_str);
-            if let Err(e) = write_host_file(HostFile::HostName) {
-                error!("failed to write /etc/hostname: {}", e.backtrace());
-            }
-        }
-    }
-
-    let hosts_ptr = unsafe { (*file_buffer).hosts_buf };
-    match parse_host_file(HostFile::Hosts, hosts_ptr) {
-        Err(e) => {
-            error!("failed to parse /etc/hosts: {}", e.backtrace());
-        }
-        Ok(hosts_str) => {
-            *HOSTS_STR.write().unwrap() = Some(hosts_str);
-            if let Err(e) = write_host_file(HostFile::Hosts) {
-                error!("failed to write /etc/hosts: {}", e.backtrace());
-            }
-        }
-    }
 
     0
 }
@@ -264,16 +256,38 @@ pub extern "C" fn occlum_ecall_shutdown_vcpus() -> i32 {
 
     // Flush the async sfs
     if crate::fs::async_sfs_initilized() {
-        async_rt::task::block_on(unsafe {
-            super::thread::mark_send::mark_send(async {
-                //use async_vfs::AsyncFileSystem;
-                crate::fs::async_sfs().await.sync().await.unwrap();
-            })
+        async_rt::task::block_on(async {
+            crate::fs::async_sfs().await.sync().await.unwrap();
         });
     }
 
     // TODO: stop all the kernel threads/tasks
     async_rt::executor::shutdown();
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn occlum_ecall_init_host_file() -> i32 {
+    if HAS_INIT.load(Ordering::SeqCst) == false {
+        return ecall_errno!(EAGAIN);
+    }
+
+    HOST_FILE_INIT_ONCE.call_once(|| {
+        async_rt::task::block_on(unsafe {
+            super::thread::mark_send::mark_send(async {
+                if let Err(e) = write_host_file(HostFile::ResolvConf).await {
+                    error!("failed to init /etc/resolv.conf: {}", e.backtrace());
+                }
+                if let Err(e) = write_host_file(HostFile::HostName).await {
+                    error!("failed to init /etc/hostname: {}", e.backtrace());
+                }
+                if let Err(e) = write_host_file(HostFile::Hosts).await {
+                    error!("failed to init /etc/hosts: {}", e.backtrace());
+                }
+            })
+        });
+    });
+
     0
 }
 
@@ -376,16 +390,27 @@ fn do_new_process(
         attribute
     };
 
-    let new_tid = process::do_spawn_root(
-        &program_path_str,
-        argv,
-        &env_concat,
-        &file_actions,
-        Some(spawn_attribute),
-        host_stdio_fds,
-        wake_host,
-        current,
-    )?;
+    // Clone some arguments for calling async
+    let program_path_str = program_path_str.to_owned();
+    let argv = argv.to_owned();
+    let host_stdio_fds = host_stdio_fds.to_owned();
+
+    let new_tid = async_rt::task::block_on(unsafe {
+        super::thread::mark_send::mark_send(async move {
+            process::do_spawn_root(
+                &program_path_str,
+                &argv,
+                &env_concat,
+                &file_actions,
+                Some(spawn_attribute),
+                &host_stdio_fds,
+                wake_host,
+                current,
+            )
+            .await
+        })
+    })?;
+
     Ok(new_tid)
 }
 

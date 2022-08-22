@@ -10,20 +10,6 @@ use std::untrusted::path::PathEx;
 
 pub const ASYNC_SFS_NAME: &str = "async_sfs";
 
-pub async fn try_open_async_file(
-    fs: &FsView,
-    fs_path: &FsPath,
-    flags: u32,
-    mode: FileMode,
-) -> Result<Option<AsyncFileHandle>> {
-    let abs_path = fs.convert_fspath_to_abs(&fs_path)?;
-    if !abs_path.trim_start_matches('/').starts_with(ASYNC_SFS_NAME) {
-        return Ok(None);
-    }
-    let file_handle = fs.open_file(fs_path, flags, mode).await?;
-    Ok(Some(file_handle))
-}
-
 /// Get or initilize the async sfs
 pub async fn async_sfs() -> &'static Arc<dyn AsyncFileSystem> {
     loop {
