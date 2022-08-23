@@ -124,17 +124,8 @@ impl AddressSpace {
         } else {
             match &*addr.inner() {
                 UnixAddr::Pathname(unix_path) => {
-                    let inode = {
-                        let file_path = FsPath::try_from(unix_path.as_ref()).unwrap();
-                        let current = current!();
-                        let fs = current.fs();
-                        fs.lookup_inode_sync(&file_path)
-                    };
-                    if let Ok(inode) = inode {
-                        Some(AddressSpaceKey::from_inode(inode.metadata().unwrap().inode))
-                    } else {
-                        None
-                    }
+                    warn!("unix socket address should corresponds to a inode number");
+                    None
                 }
                 UnixAddr::Abstract(path) => Some(AddressSpaceKey::from_path(
                     String::from_utf8_lossy(&path).to_string(),

@@ -105,6 +105,20 @@ impl TrustedAddr {
 
         return None;
     }
+
+    // Init inode field of TrustedAddr for connect.
+    pub async fn try_init_inode(&mut self) -> Result<()> {
+        if let UnixAddr::Pathname(path) = &self.unix_addr {
+            let inode_num = {
+                let current = current!();
+                let fs = current.fs();
+                let inode_file = fs.lookup_inode(&FsPath::try_from(path.as_ref())?).await?;
+                inode_file.metadata().await?.inode
+            };
+            self.inode = Some(inode_num);
+        }
+        Ok(())
+    }
 }
 
 impl Addr for TrustedAddr {

@@ -102,7 +102,6 @@ impl UnixStream {
             let untrusted_sock = UntrustedUnixStream::new(nonblocking)?;
 
             // Bind the Host FS address
-            // let untrusted_socks = UNTRUSTED_SOCKS.read().unwrap();
             let host_addr = Self::get_host_socket_file_path(addr, host_path, is_socket_file);
             info!(
                 "bind crossworld sock: libos path: {:?}, host path: {:?}",
@@ -150,7 +149,11 @@ impl UnixStream {
         }
 
         if let StreamInner::Trusted(stream) = &*self.inner() {
-            return stream.connect(addr).await;
+            // Init inode for libos local file
+            let mut addr = addr.clone();
+            addr.try_init_inode().await?;
+
+            return stream.connect(&addr).await;
         }
 
         unreachable!();
