@@ -7,6 +7,7 @@ use self::comm::ProcCommINode;
 use self::cwd::ProcCwdSymINode;
 use self::exe::ProcExeSymINode;
 use self::fd::LockedProcFdDirINode;
+use self::maps::ProcMapsINode;
 use self::root::ProcRootSymINode;
 use self::stat::ProcStatINode;
 
@@ -15,6 +16,7 @@ mod comm;
 mod cwd;
 mod exe;
 mod fd;
+mod maps;
 mod root;
 mod stat;
 
@@ -60,6 +62,9 @@ impl LockedPidDirINode {
         // stat
         let stat_inode = ProcStatINode::new(&file.process_ref);
         file.entries.insert(String::from("stat"), stat_inode);
+        // maps
+        let maps_inode = ProcMapsINode::new(&file.process_ref);
+        file.entries.insert(String::from("maps"), maps_inode);
 
         Ok(())
     }

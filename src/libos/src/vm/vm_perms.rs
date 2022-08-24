@@ -54,6 +54,26 @@ impl VMPerms {
             assert!(sgx_status == sgx_status_t::SGX_SUCCESS && retval == 0);
         }
     }
+
+    pub fn display(&self) -> String {
+        let mut str = String::new();
+        if self.can_read() {
+            str += "r";
+        } else {
+            str += "-";
+        }
+        if self.can_write() {
+            str += "w";
+        } else {
+            str += "-";
+        }
+        if self.can_execute() {
+            str += "x";
+        } else {
+            str += "-";
+        }
+        str
+    }
 }
 
 impl Default for VMPerms {

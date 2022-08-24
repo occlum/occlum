@@ -114,9 +114,13 @@ impl ChunkManager {
         // Find and allocate a new range for this mmap request
         let new_range = self.free_manager.find_free_range(size, align, addr)?;
         let new_addr = new_range.start();
-        let writeback_file = options.writeback_file().clone();
         let current_pid = current!().process().pid();
-        let new_vma = VMArea::new(new_range, *options.perms(), writeback_file, current_pid);
+        let new_vma = VMArea::new(
+            new_range,
+            *options.perms(),
+            options.initializer().backed_file(),
+            current_pid,
+        );
 
         // Initialize the memory of the new range
         let buf = unsafe { new_vma.as_slice_mut() };
@@ -411,7 +415,7 @@ impl ChunkManager {
 
     /// Same as flush_vma, except that an extra condition on the file needs to satisfy.
     pub fn flush_file_vma_with_cond<F: Fn(&FileRef) -> bool>(vma: &VMArea, cond_fn: F) {
-        let (file, file_offset) = match vma.writeback_file().as_ref() {
+        let (file, file_offset) = match vma.writeback_file() {
             None => return,
             Some((file_and_offset)) => file_and_offset,
         };
@@ -423,7 +427,7 @@ impl ChunkManager {
         if !cond_fn(file) {
             return;
         }
-        inode_file.write_at(*file_offset, unsafe { vma.as_slice() });
+        inode_file.write_at(file_offset, unsafe { vma.as_slice() });
     }
 
     pub fn find_mmap_region(&self, addr: usize) -> Result<VMRange> {

@@ -75,9 +75,10 @@ mod vm_util;
 
 use self::vm_layout::VMLayout;
 
-pub use self::chunk::{Chunk, ChunkRef};
+pub use self::chunk::{Chunk, ChunkRef, ChunkType};
 pub use self::process_vm::{MMapFlags, MRemapFlags, MSyncFlags, ProcessVM, ProcessVMBuilder};
 pub use self::user_space_vm::USER_SPACE_VM_MANAGER;
+pub use self::vm_area::VMArea;
 pub use self::vm_perms::VMPerms;
 pub use self::vm_range::VMRange;
 pub use self::vm_util::{VMInitializer, VMMapOptionsBuilder};

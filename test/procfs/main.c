@@ -44,6 +44,7 @@ static int test_read_from_procfs(const char *proc_inode) {
         }
     } while (len == sizeof(buf));
     close(fd);
+    printf("test read from %s:\n%s\n", proc_inode, buf);
     return 0;
 }
 
@@ -86,6 +87,15 @@ static int test_readlink_from_proc_self_cwd() {
         THROW_ERROR("failed to chdir");
     }
 
+    return 0;
+}
+
+static int test_read_from_proc_self_maps() {
+    const char *proc_maps = "/proc/self/maps";
+
+    if (test_read_from_procfs(proc_maps) < 0) {
+        THROW_ERROR("failed to read the cpuinfo");
+    }
     return 0;
 }
 
@@ -282,6 +292,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_readdir_root),
     TEST_CASE(test_readdir_self),
     TEST_CASE(test_readdir_self_fd),
+    TEST_CASE(test_read_from_proc_self_maps),
 };
 
 int main(int argc, const char *argv[]) {

@@ -6,7 +6,9 @@ use super::process::elf_file::{ElfFile, ProgramHeaderExt};
 use super::user_space_vm::USER_SPACE_VM_MANAGER;
 use super::vm_area::VMArea;
 use super::vm_perms::VMPerms;
-use super::vm_util::{VMInitializer, VMMapAddr, VMMapOptions, VMMapOptionsBuilder, VMRemapOptions};
+use super::vm_util::{
+    FileBacked, VMInitializer, VMMapAddr, VMMapOptions, VMMapOptionsBuilder, VMRemapOptions,
+};
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -100,7 +102,9 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
                     .size(elf_layout.size())
                     .align(elf_layout.align())
                     .perms(VMPerms::ALL) // set it to read | write | exec for simplicity
-                    .initializer(VMInitializer::DoNothing())
+                    .initializer(VMInitializer::ElfSpecific {
+                        elf_file: elf_file.file_ref().clone(),
+                    })
                     .build()
                     .map_err(|e| {
                         &self.handle_error_when_init(&chunks);
@@ -227,7 +231,7 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
                 }
 
                 // Bytes of file_size length are loaded from the ELF file
-                elf_file.file_inode().read_at(
+                elf_file.inode_file().read_at(
                     file_offset,
                     &mut elf_proc_buf[mem_start_offset..mem_start_offset + file_size],
                 );
@@ -299,6 +303,14 @@ impl Drop for ProcessVM {
 impl ProcessVM {
     pub fn mem_chunks(&self) -> &MemChunks {
         &self.mem_chunks
+    }
+
+    pub fn stack_range(&self) -> &VMRange {
+        &self.stack_range
+    }
+
+    pub fn heap_range(&self) -> &VMRange {
+        &self.heap_range
     }
 
     pub fn add_mem_chunk(&self, chunk: ChunkRef) {
@@ -471,28 +483,22 @@ impl ProcessVM {
                 VMInitializer::DoNothing()
             } else {
                 let file_ref = current!().file(fd)?;
-                VMInitializer::LoadFromFile {
-                    file: file_ref,
-                    offset: offset,
+                // Only shared, file-backed memory mappings have write-back files
+                let need_write_back = if flags.contains(MMapFlags::MAP_SHARED) {
+                    true
+                } else {
+                    false
+                };
+                VMInitializer::FileBacked {
+                    file: FileBacked::new(file_ref, offset, need_write_back),
                 }
             }
-        };
-        // Only shared, file-backed memory mappings have write-back files
-        let writeback_file = if flags.contains(MMapFlags::MAP_SHARED) {
-            if let VMInitializer::LoadFromFile { file, offset } = &initializer {
-                Some((file.clone(), *offset))
-            } else {
-                None
-            }
-        } else {
-            None
         };
         let mmap_options = VMMapOptionsBuilder::default()
             .size(size)
             .addr(addr_option)
             .perms(perms)
             .initializer(initializer)
-            .writeback_file(writeback_file)
             .build()?;
         let mmap_addr = USER_SPACE_VM_MANAGER.mmap(&mmap_options)?;
         Ok(mmap_addr)
