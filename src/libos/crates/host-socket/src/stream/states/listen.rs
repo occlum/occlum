@@ -101,6 +101,9 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
         let mut inner = self.inner.lock().unwrap();
 
         if let Some(errno) = inner.fatal {
+            // Reset error
+            inner.fatal = None;
+            self.common.pollee().del_events(Events::ERR);
             return_errno!(errno, "accept failed");
         }
 

@@ -103,6 +103,9 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         }
         // Case 2. If the connenction has been broken...
         if let Some(errno) = inner.fatal {
+            // Reset error
+            inner.fatal = None;
+            self.common.pollee().del_events(Events::ERR);
             return_errno!(errno, "write failed");
         }
 

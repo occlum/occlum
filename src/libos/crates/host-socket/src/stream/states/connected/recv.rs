@@ -152,6 +152,9 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         }
         // Case 2: If the connenction has been broken...
         if let Some(errno) = inner.fatal {
+            // Reset error
+            inner.fatal = None;
+            self.common.pollee().del_events(Events::ERR);
             return_errno!(errno, "read failed");
         }
 
@@ -168,6 +171,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         {
             // Delete ERR events from sender. If io_handle is some, the recv request must be
             // pending and the events can't be for the reciever. Just delete this event.
+            // This can happen when send request is timeout and canceled.
             let events = self.common.pollee().poll(Events::IN, None);
             if events.contains(Events::ERR) && inner.io_handle.is_some() {
                 self.common.pollee().del_events(Events::ERR);
