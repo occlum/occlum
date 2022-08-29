@@ -8,6 +8,10 @@ on:
         description: 'OS name (must choose from <centos, ubuntu18, ubuntu20>)'
         required: true
         default: 'ubuntu20'
+      release:
+        description: 'Whether it is a release image (must choose from <Y/N>)'
+        required: true
+        default: 'N'
 
 jobs:
   generate-centos-image:
@@ -125,6 +129,13 @@ jobs:
         # ${GITHUB_REF##*/} == branch-name
         run: echo "OCCLUM_BRANCH=$(echo ${GITHUB_REF##*/})" >> $GITHUB_ENV;
 
+      - name: Get image tag name for release image
+        if: github.event.inputs.release == 'Y'
+        run: echo "IMAGE_TAG=${{ env.RELEASE_VERSION }}" >> $GITHUB_ENV
+      - name: Get image tage name for dev image
+        if: github.event.inputs.release == 'N'
+        run: echo "IMAGE_TAG=latest-dev-${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
 
@@ -147,4 +158,4 @@ jobs:
           platforms: linux/amd64
           build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
           push: true
-          tags: occlum/occlum:${{ env.RELEASE_VERSION }}-ubuntu20.04
+          tags: occlum/occlum:${{ env.IMAGE_TAG }}-ubuntu20.04
