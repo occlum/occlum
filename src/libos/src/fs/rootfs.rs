@@ -115,12 +115,21 @@ pub fn mount_nonroot_fs_according_to(
                 mount_fs_at(sefs, root, &mc.target, follow_symlink)?;
             }
             TYPE_HOSTFS => {
-                if mc.source.is_none() {
+                let source_path =
+                    mc.source.as_ref().and_then(
+                        |source| {
+                            if source.is_dir() {
+                                Some(source)
+                            } else {
+                                None
+                            }
+                        },
+                    );
+                if source_path.is_none() {
                     return_errno!(EINVAL, "Source is expected for HostFS");
                 }
-                let source_path = mc.source.as_ref().unwrap();
 
-                let hostfs = HostFS::new(source_path);
+                let hostfs = HostFS::new(source_path.unwrap());
                 mount_fs_at(hostfs, root, &mc.target, follow_symlink)?;
             }
             TYPE_RAMFS => {

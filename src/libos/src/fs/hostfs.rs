@@ -3,7 +3,7 @@ use alloc::sync::{Arc, Weak};
 use core::any::Any;
 use rcore_fs::vfs::*;
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::os::unix::fs::{DirEntryExt, FileTypeExt, PermissionsExt};
+use std::os::unix::fs::{DirEntryExt, FileExt, FileTypeExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{SgxMutex as Mutex, SgxMutexGuard as MutexGuard};
 use std::untrusted::fs;
@@ -19,6 +19,7 @@ pub struct HostFS {
 pub struct HNode {
     path: PathBuf,
     file: Mutex<Option<fs::File>>,
+    type_: FileType,
     fs: Arc<HostFS>,
 }
 
@@ -32,6 +33,7 @@ impl FileSystem for HostFS {
         Arc::new(HNode {
             path: self.path.clone(),
             file: Mutex::new(None),
+            type_: FileType::Dir,
             fs: self.self_ref.upgrade().unwrap(),
         })
     }
@@ -76,32 +78,32 @@ macro_rules! try_std {
 
 impl INode for HNode {
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        if !self.path.is_file() {
+        if !self.is_file() {
             return Err(FsError::NotFile);
         }
         let mut guard = self.open_file()?;
         let file = guard.as_mut().unwrap();
-        try_std!(file.seek(SeekFrom::Start(offset as u64)));
-        let len = try_std!(file.read(buf));
+        let len = try_std!(file.read_at(buf, offset as u64));
         Ok(len)
     }
 
     fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
-        if !self.path.is_file() {
+        if !self.is_file() {
             return Err(FsError::NotFile);
         }
         let mut guard = self.open_file()?;
         let file = guard.as_mut().unwrap();
-        try_std!(file.seek(SeekFrom::Start(offset as u64)));
-        let len = try_std!(file.write(buf));
+        let len = try_std!(file.write_at(buf, offset as u64));
         Ok(len)
     }
 
     fn poll(&self) -> Result<PollStatus> {
-        let metadata = try_std!(self.path.metadata());
-        if !metadata.is_file() {
+        if !self.is_file() {
             return Err(FsError::NotFile);
         }
+        let guard = self.open_file()?;
+        let file = guard.as_ref().unwrap();
+        let metadata = try_std!(file.metadata());
         Ok(PollStatus {
             read: true,
             write: !metadata.permissions().readonly(),
@@ -110,7 +112,13 @@ impl INode for HNode {
     }
 
     fn metadata(&self) -> Result<Metadata> {
-        let metadata = try_std!(self.path.metadata());
+        let metadata = if self.is_file() {
+            let guard = self.open_file()?;
+            let file = guard.as_ref().unwrap();
+            try_std!(file.metadata())
+        } else {
+            try_std!(self.path.metadata())
+        };
         Ok(metadata.into_fs_metadata())
     }
 
@@ -125,9 +133,9 @@ impl INode for HNode {
     }
 
     fn sync_all(&self) -> Result<()> {
-        if self.path.is_file() {
-            let mut guard = self.open_file()?;
-            let file = guard.as_mut().unwrap();
+        if self.is_file() {
+            let guard = self.open_file()?;
+            let file = guard.as_ref().unwrap();
             try_std!(file.sync_all());
         } else {
             warn!("no sync_all method about dir, do nothing");
@@ -136,9 +144,9 @@ impl INode for HNode {
     }
 
     fn sync_data(&self) -> Result<()> {
-        if self.path.is_file() {
-            let mut guard = self.open_file()?;
-            let file = guard.as_mut().unwrap();
+        if self.is_file() {
+            let guard = self.open_file()?;
+            let file = guard.as_ref().unwrap();
             try_std!(file.sync_data());
         } else {
             warn!("no sync_data method about dir, do nothing");
@@ -147,11 +155,11 @@ impl INode for HNode {
     }
 
     fn resize(&self, len: usize) -> Result<()> {
-        if !self.path.is_file() {
+        if !self.is_file() {
             return Err(FsError::NotFile);
         }
-        let mut guard = self.open_file()?;
-        let file = guard.as_mut().unwrap();
+        let guard = self.open_file()?;
+        let file = guard.as_ref().unwrap();
         try_std!(file.set_len(len as u64));
         Ok(())
     }
@@ -162,23 +170,32 @@ impl INode for HNode {
             return Err(FsError::EntryExist);
         }
         let perms = fs::Permissions::from_mode(mode as u32);
-        match type_ {
+        let file = match type_ {
             FileType::File => {
-                let file = try_std!(fs::File::create(&new_path));
+                let file = try_std!(fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open(&new_path));
                 try_std!(file.set_permissions(perms));
+                Some(file)
             }
             FileType::Dir => {
                 try_std!(fs::create_dir(&new_path));
                 try_std!(fs::set_permissions(&new_path, perms));
+                None
             }
             _ => {
                 warn!("only support creating regular file or directory in HostFS");
                 return Err(FsError::PermError);
             }
-        }
+        };
+
         Ok(Arc::new(HNode {
             path: new_path,
-            file: Mutex::new(None),
+            file: Mutex::new(file),
+            type_,
             fs: self.fs.clone(),
         }))
     }
@@ -213,18 +230,27 @@ impl INode for HNode {
 
     fn find(&self, name: &str) -> Result<Arc<dyn INode>> {
         let new_path = self.path.join(name);
-        if !new_path.exists() {
-            return Err(FsError::EntryNotFound);
-        }
+        let metadata = fs::metadata(&new_path).map_err(|_| FsError::EntryNotFound)?;
+        let file = if metadata.is_file() {
+            try_std!(fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(&new_path)
+                .map(Some))
+        } else {
+            None
+        };
+
         Ok(Arc::new(HNode {
             path: new_path,
-            file: Mutex::new(None),
+            file: Mutex::new(file),
+            type_: metadata.file_type().into_fs_filetype(),
             fs: self.fs.clone(),
         }))
     }
 
     fn get_entry(&self, id: usize) -> Result<String> {
-        if !self.path.is_dir() {
+        if !self.is_dir() {
             return Err(FsError::NotDir);
         }
         if let Some(entry) = try_std!(self.path.read_dir()).nth(id) {
@@ -238,7 +264,7 @@ impl INode for HNode {
     }
 
     fn iterate_entries(&self, ctx: &mut DirentWriterContext) -> Result<usize> {
-        if !self.path.is_dir() {
+        if !self.is_dir() {
             return Err(FsError::NotDir);
         }
         let idx = ctx.pos();
@@ -288,19 +314,25 @@ impl HNode {
     /// Ensure to open the file and store a `File` into `self.file`,
     /// return the `MutexGuard`.
     fn open_file(&self) -> Result<MutexGuard<Option<fs::File>>> {
-        if !self.path.exists() {
-            return Err(FsError::EntryNotFound);
-        }
         let mut maybe_file = self.file.lock().unwrap();
         if maybe_file.is_none() {
             let file = try_std!(fs::OpenOptions::new()
                 .read(true)
                 .write(true)
-                .create(true)
                 .open(&self.path));
             *maybe_file = Some(file);
         }
         Ok(maybe_file)
+    }
+
+    /// Returns `true` if this HNode is for a regular file.
+    fn is_file(&self) -> bool {
+        self.type_ == FileType::File
+    }
+
+    /// Returns `true` if this HNode is for a directory.
+    fn is_dir(&self) -> bool {
+        self.type_ == FileType::Dir
     }
 }
 
