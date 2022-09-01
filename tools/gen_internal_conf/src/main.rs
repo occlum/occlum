@@ -453,6 +453,7 @@ struct OcclumMetadata {
     enable_kss: bool,
     family_id: OcclumMetaID,
     ext_prod_id: OcclumMetaID,
+    #[serde(default)]
     pkru: u32,
 }
 
