@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use core::any::Any;
 use core::ptr::NonNull;
 
 use crate::prelude::*;
@@ -7,7 +8,7 @@ use crate::util::{align_down, align_up};
 /// A wrapper trait for block devices to support file-like I/O operations.
 /// This trait can be convenient when a block device should behave like a file.
 #[async_trait]
-pub trait BlockDeviceAsFile: Send + Sync {
+pub trait BlockDeviceAsFile: Any + Send + Sync {
     /// Return the total number of bytes of the underlying device.
     fn total_bytes(&self) -> usize;
 
@@ -93,13 +94,20 @@ impl<'a> Impl<'a> {
     }
 
     pub async fn read(&self, offset: usize, read_buf: &mut [u8]) -> Result<usize> {
+        let total_bytes = self.disk.total_blocks() * BLOCK_SIZE;
+
         if offset > isize::MAX as usize {
             return Err(errno!(EINVAL, "offset too large"));
+        }
+        if offset >= total_bytes {
+            return Ok(0);
+        }
+        if read_buf.len() == 0 {
+            return Ok(0);
         }
 
         // Block devices do not support "short reads". So we need to make sure
         // that all requested bytes are within the capability of the block device.
-        let total_bytes = self.disk.total_blocks() * BLOCK_SIZE;
         let read_buf = if offset + read_buf.len() <= total_bytes {
             read_buf
         } else {
@@ -191,6 +199,7 @@ impl<'a> Impl<'a> {
                     // Safety. The pointer of a slice must not be null.
                     let ptr = NonNull::new_unchecked(whole_block_buf.as_mut_ptr());
                     let len = whole_block_buf.len();
+                    debug_assert!(len % BLOCK_SIZE == 0);
                     // Safety. The memory refered to by the pair of pointer and
                     // length is valid during the entire life cyle of the request.
                     BlockBuf::from_raw_parts(ptr, len)
@@ -270,23 +279,25 @@ impl<'a> Impl<'a> {
     }
 
     pub async fn write(&self, offset: usize, write_buf: &[u8]) -> Result<usize> {
+        let total_bytes = self.disk.total_blocks() * BLOCK_SIZE;
+
         if offset > isize::MAX as usize {
             return Err(errno!(EINVAL, "offset too large"));
+        }
+        if offset >= total_bytes {
+            return Ok(0);
+        }
+        if write_buf.len() == 0 {
+            return Ok(0);
         }
 
         // Block devices do not support "short writes". So we need to make sure
         // that all requested bytes are within the capability of the block device.
-        let total_bytes = self.disk.total_blocks() * BLOCK_SIZE;
         let write_buf = if offset + write_buf.len() <= total_bytes {
             write_buf
         } else {
             &write_buf[..total_bytes - offset]
         };
-
-        let write_buf_len = write_buf.len();
-        if write_buf_len == 0 {
-            return Ok(0);
-        }
 
         if Self::cover_one_partial_block(offset, write_buf.len()) {
             self.do_write_one_partial_block(offset, write_buf).await
@@ -382,6 +393,7 @@ impl<'a> Impl<'a> {
                     // Safety. The pointer of a slice must not be null.
                     let ptr = NonNull::new_unchecked(whole_block_buf.as_ptr() as _);
                     let len = whole_block_buf.len();
+                    debug_assert!(len % BLOCK_SIZE == 0);
                     // Safety. The memory refered to by the pair of pointer and
                     // length is valid during the entire life cyle of the request.
                     BlockBuf::from_raw_parts(ptr, len)
@@ -486,7 +498,7 @@ impl<'a> Impl<'a> {
     }
 
     // Check if a read or writer covers only one partial block. In other words,
-    // it cannot cover more than one partial blocks or cover a whole block.
+    // it cannot cover more than one partial blocks or cover at least one whole block.
     fn cover_one_partial_block(offset: usize, len: usize) -> bool {
         if len >= BLOCK_SIZE {
             return false;
