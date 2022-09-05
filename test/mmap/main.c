@@ -10,6 +10,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/syscall.h>
+#include <pthread.h>
 #include "test_fs.h"
 
 // ============================================================================
@@ -671,6 +672,78 @@ int test_munmap_whose_range_intersects_with_multiple_mmap_regions() {
         THROW_ERROR("munmap failed");
     }
     if (check_buf_is_munmapped(munmap_addr, munmap_len) < 0) {
+        THROW_ERROR("munmap does not really free the memory");
+    }
+
+    return 0;
+}
+
+
+static void *child_routine(void *_arg) {
+    size_t len = 1 * MB;
+    void *old_addr = _arg;
+    void *new_addr = old_addr + 3 * len;
+
+    void *addr = mremap(old_addr, len, 2 * len, MREMAP_MAYMOVE | MREMAP_FIXED,
+                        new_addr);
+    if (addr != new_addr) {
+        printf("mremap fail in client routine\n");
+        return (void *) -1;
+    }
+
+    int ret = munmap(addr, 2 * len);
+    if (ret < 0) {
+        printf("munmap failed");
+        return (void *) -1;
+    }
+
+    return NULL;
+}
+
+int test_mremap_concurrent() {
+    int prot = PROT_READ | PROT_WRITE;
+    int flags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED;
+    size_t len = 1 * MB;
+    void *child_ret;
+
+    // Allocate continuous single vma chunks at the end of the default chunk
+    size_t hint_1 = HINT_BEGIN + DEFAULT_CHUNK_SIZE;
+    void *addr = mmap((void *)hint_1, len, prot, flags, -1, 0);
+    if ((size_t)addr != hint_1) {
+        THROW_ERROR("fixed mmap with good hint failed");
+    }
+
+    size_t hint_2 = hint_1 + len;
+    addr = mmap((void *)hint_2, len, prot, flags, -1, 0);
+    if ((size_t)addr != hint_2) {
+        THROW_ERROR("fixed mmap spans over two chunks failed");
+    }
+
+    // create a child thread to mremap chunk from hint_2 to address after the chunk which starts with hint_3
+    pthread_t child_thread = 0;
+    int ret = pthread_create(&child_thread, NULL, child_routine, (void *)hint_2);
+    if (ret < 0) {
+        THROW_ERROR("pthread create failed");
+    }
+
+    // mremap chunk from hint_1 to hint_3
+    size_t hint_3 = hint_2 + len;
+    void *ret_addr = mremap((void *)hint_1, len, len * 2, MREMAP_MAYMOVE | MREMAP_FIXED,
+                            (void *)hint_3);
+    if (ret_addr != (void *)hint_3) {
+        THROW_ERROR("mremap failed");
+    }
+
+    ret = pthread_join(child_thread, &child_ret);
+    if (ret < 0 || child_ret != NULL) {
+        THROW_ERROR("pthread_join failed");
+    }
+
+    if (munmap((void *)hint_3, len * 2) < 0) {
+        THROW_ERROR("munmap failed");
+    }
+
+    if (check_buf_is_munmapped((void *)hint_1, len * 5) < 0) {
         THROW_ERROR("munmap does not really free the memory");
     }
 
@@ -1390,6 +1463,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_mprotect_with_non_page_aligned_size),
     TEST_CASE(test_mprotect_multiple_vmas),
     TEST_CASE(test_mprotect_grow_down),
+    TEST_CASE(test_mremap_concurrent),
 };
 
 int main() {

@@ -54,6 +54,7 @@ impl Eq for Chunk {}
 
 impl Debug for Chunk {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "range = {:?}, ", self.range);
         match self.internal() {
             ChunkType::SingleVMA(vma) => write!(f, "Single VMA chunk: {:?}", vma),
             ChunkType::MultiVMA(internal_manager) => write!(f, "default chunk: {:?}", self.range()),
