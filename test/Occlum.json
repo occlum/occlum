@@ -29,7 +29,7 @@
         "product_id": 0,
         "version_number": 0,
         "debuggable": true,
-        "enable_kss": false,
+        "enable_kss": true,
         "ext_prod_id": {
             "high": "0x0",
             "low": "0x0"
@@ -70,14 +70,6 @@
             "options": {
                 "total_size": "4GB"
             }
-        },
-        {
-            "target": "/proc",
-            "type": "procfs"
-        },
-        {
-            "target": "/dev",
-            "type": "devfs"
         }
     ]
 }
