@@ -244,8 +244,8 @@ impl VMManager {
             align_up(size, PAGE_SIZE)
         };
         let munmap_range = { VMRange::new_with_size(addr, size) }?;
+        let current = current!();
         let chunk = {
-            let current = current!();
             let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
             let chunk = process_mem_chunks
                 .iter()
@@ -264,8 +264,10 @@ impl VMManager {
         // Case 1: the overlapping chunk IS NOT a super set of munmap range
         if !chunk.range().is_superset_of(&munmap_range) {
             // munmap range spans multiple chunks
+
+            // Must lock the internal manager first here in case the chunk's range and vma are conflict when other threads are operating the VM
+            let mut internal_manager = self.internal();
             let overlapping_chunks = {
-                let current = current!();
                 let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
                 process_mem_chunks
                     .iter()
@@ -277,8 +279,7 @@ impl VMManager {
             for chunk in overlapping_chunks.iter() {
                 match chunk.internal() {
                     ChunkType::SingleVMA(_) => {
-                        let mut internl_manager = self.internal();
-                        internl_manager.munmap_chunk(chunk, Some(&munmap_range))?
+                        internal_manager.munmap_chunk(chunk, Some(&munmap_range))?
                     }
                     ChunkType::MultiVMA(manager) => manager
                         .lock()
@@ -301,8 +302,22 @@ impl VMManager {
                     .munmap_range(munmap_range);
             }
             ChunkType::SingleVMA(_) => {
+                // Single VMA Chunk could be updated during the release of internal manager lock. Get overlapping chunk again.
+                // This is done here because we don't want to acquire the big internal manager lock as soon as entering this function.
                 let mut internal_manager = self.internal();
-                return internal_manager.munmap_chunk(&chunk, Some(&munmap_range));
+                let overlapping_chunk = {
+                    let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
+                    process_mem_chunks
+                        .iter()
+                        .find(|&chunk| chunk.range().intersect(&munmap_range).is_some())
+                        .map(|chunk| chunk.clone())
+                };
+                if let Some(overlapping_chunk) = overlapping_chunk {
+                    return internal_manager.munmap_chunk(&overlapping_chunk, Some(&munmap_range));
+                } else {
+                    warn!("no overlapping chunks anymore");
+                    return Ok(());
+                }
             }
         }
     }
