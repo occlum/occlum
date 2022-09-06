@@ -58,7 +58,7 @@ fn main() -> Result<(), i32> {
         .version("0.1.0")
         .arg(
             Arg::with_name("instance_dir")
-                .short("d")
+                .short('d')
                 .long("instance_dir")
                 .takes_value(true)
                 .default_value("./")
