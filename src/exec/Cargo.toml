@@ -13,17 +13,17 @@ path = "../../deps/grpc-rust/grpc"
 path = "../../deps/grpc-rust/grpc-protobuf"
 
 [dependencies]
-protobuf        = "2.14"
+protobuf        = "2.18"
 futures         = "0.3"
-env_logger      = "0.7"
+env_logger      = "0.9"
 tempdir         = "0.3"
-clap            = "2.33"
+clap            = "3.2.17"
 timer           = "0.2"
 chrono          = "0.4"
 libc            = "0.2"
-sendfd          = "0.3"
-signal-hook     = "0.1"
-nix             = "0.17"
+sendfd          = "0.4.3"
+signal-hook     = "0.3.14"
+nix             = "0.25.0"
 log             = "0.4.8"
 
 [build-dependencies]

@@ -21,8 +21,8 @@ use occlum_exec::occlum_exec_grpc::OcclumExecClient;
 use occlum_exec::{DEFAULT_SERVER_FILE, DEFAULT_SERVER_TIMER, DEFAULT_SOCK_FILE};
 use protobuf::RepeatedField;
 use sendfd::SendWithFd;
+use signal_hook::consts::{SIGINT, SIGKILL, SIGQUIT, SIGTERM, SIGUSR1};
 use signal_hook::iterator::Signals;
-use signal_hook::{SIGINT, SIGKILL, SIGQUIT, SIGTERM, SIGUSR1};
 use std::cmp;
 use std::env;
 use std::os::unix::net::UnixListener;
@@ -242,7 +242,7 @@ fn main() -> Result<(), i32> {
         .version("0.1.0")
         .arg(
             Arg::with_name("instance_dir")
-                .short("d")
+                .short('d')
                 .long("instance_dir")
                 .takes_value(true)
                 .default_value("./")
@@ -260,7 +260,7 @@ fn main() -> Result<(), i32> {
                 )
                 .arg(
                     Arg::with_name("time")
-                        .short("t")
+                        .short('t')
                         .long("time")
                         .takes_value(true)
                         .help("Seconds to wait before killing the applications running on the Occlum server.")
@@ -322,7 +322,7 @@ fn main() -> Result<(), i32> {
         // Create the signal handler
         let process_killed = Arc::new(Mutex::new(false));
         let process_killed_clone = Arc::clone(&process_killed);
-        let signals = Signals::new(&[SIGUSR1, SIGINT, SIGQUIT, SIGTERM]).unwrap();
+        let mut signals = Signals::new(&[SIGUSR1, SIGINT, SIGQUIT, SIGTERM]).unwrap();
         let signal_thread = thread::spawn(move || {
             for signal in signals.forever() {
                 debug!("Received signal {:?}", signal);
