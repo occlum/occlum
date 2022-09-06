@@ -56,7 +56,7 @@ Usage:
     occlum init
         Initialize a directory as the Occlum instance.
 
-    occlum build [--sign-key <key_path>] [--sign-tool <tool_path>] [--image-key <key_path>] [--buildin-image-key] [-f/--force]
+    occlum build [--sign-key <key_path>] [--sign-tool <tool_path>] [--image-key <key_path>] [-f/--force]
         Build and sign an Occlum SGX enclave (.so) and generate its associated secure
         FS image according to the user-provided image directory and Occlum.json config file.
         The whole building process is incremental: the building artifacts are built only
@@ -245,15 +245,14 @@ cmd_build() {
 
     pal_lib=libocclum-pal.so
     libos_lib=libocclum-libos.so
-    BUILDIN_IMAGE_KEY=false
+    SECURE_IMAGE_ENCRYPTED=false
 
     while [ -n "$1" ]; do
         case "$1" in
         --sign-key)     [ -n "$2" ] && ENCLAVE_SIGN_KEY=$2 ; shift 2 || exit_error "empty signing key path"     ;;
         --sign-tool)    [ -n "$2" ] && ENCLAVE_SIGN_TOOL=$2 ; shift 2 || exit_error "empty signing tool path"   ;;
         --sgx-mode)     [[ -n "$2" && "$2" != "HW" ]] && export SGX_MODE=SIM ; shift 2 || exit_error "empty sgx mode";;
-        --image-key) [ -n "$2" ] && SECURE_IMAGE_KEY=$2 ; shift 2 || exit_error "empty secure image key path" ;;
-        --buildin-image-key) BUILDIN_IMAGE_KEY=true ; shift ;;
+        --image-key) [ -n "$2" ] && SECURE_IMAGE_KEY=$2 ; SECURE_IMAGE_ENCRYPTED=true; shift 2 || exit_error "empty secure image key path" ;;
         --force | -f)   MAKE_OPTION="clean" ; shift ;;
         *) exit_error "Unknown option: $1"                                                                      ;;
         esac
@@ -296,7 +295,7 @@ cmd_build() {
     occlum_dir=$occlum_dir instance_dir=$instance_dir pal_lib=$pal_lib major_ver=$major_ver \
     occlum_version=$occlum_version libos_lib=$libos_lib \
     ENCLAVE_SIGN_KEY=$ENCLAVE_SIGN_KEY ENCLAVE_SIGN_TOOL=$ENCLAVE_SIGN_TOOL \
-    SECURE_IMAGE_KEY=$SECURE_IMAGE_KEY BUILDIN_IMAGE_KEY=$BUILDIN_IMAGE_KEY \
+    SECURE_IMAGE_KEY=$SECURE_IMAGE_KEY SECURE_IMAGE_ENCRYPTED=$SECURE_IMAGE_ENCRYPTED \
     make -f $build_makefile --no-builtin-rules
 
     cd "$instance_dir"

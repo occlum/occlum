@@ -18,6 +18,7 @@ lazy_static! {
         let config_path =
             unsafe { format!("{}{}", INSTANCE_DIR, "/build/.Occlum_sys.json.protected") };
         let expected_mac = conf_get_file_mac();
+        trace!("expected_mac: {:?}", expected_mac);
         match load_config(&config_path, &expected_mac) {
             Err(e) => {
                 error!("failed to load config: {}", e.backtrace());
@@ -32,6 +33,7 @@ pub fn load_config(config_path: &str, expected_mac: &sgx_aes_gcm_128bit_tag_t) -
     let mut config_file = {
         let config_file = SgxFile::open_integrity_only(config_path).map_err(|e| errno!(e))?;
         let actual_mac = config_file.get_mac().map_err(|e| errno!(e))?;
+        trace!("actual_mac: {:?}", actual_mac);
         if actual_mac != *expected_mac {
             return_errno!(EINVAL, "unexpected file MAC");
         }
@@ -138,6 +140,7 @@ pub struct ConfigApp {
     pub entry_points: Vec<PathBuf>,
     pub stage: String,
     pub mount: Vec<ConfigMount>,
+    pub encrypted: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -271,6 +274,7 @@ impl ConfigEnv {
 impl ConfigApp {
     fn from_input(input: &InputConfigApp) -> Result<ConfigApp> {
         let stage = input.stage.clone();
+        let encrypted = input.encrypted;
         let entry_points = {
             let mut entry_points = Vec::new();
             for ep in &input.entry_points {
@@ -294,7 +298,12 @@ impl ConfigApp {
             stage,
             entry_points,
             mount,
+            encrypted,
         })
+    }
+
+    pub fn is_image_encrypted(&self) -> bool {
+        self.encrypted
     }
 }
 
@@ -514,6 +523,8 @@ struct InputConfigApp {
     pub entry_points: Vec<String>,
     #[serde(default)]
     pub mount: Vec<InputConfigMount>,
+    #[serde(default)]
+    pub encrypted: bool,
 }
 
 #[repr(C)]

@@ -586,7 +586,13 @@ pub async fn do_mount_rootfs(
         debug!("user provided app config: {:?}", app_config);
         fs_ops::do_mount_rootfs(&app_config, &key).await?;
     } else {
-        fs_ops::do_mount_rootfs(&config::LIBOS_CONFIG.get_app_config("app").unwrap(), &key).await?;
+        let app_config = config::LIBOS_CONFIG.get_app_config("app")?;
+        // Only check if the key existed for general boot
+        if key.is_none() && app_config.is_image_encrypted() {
+            return_errno!(EINVAL, "Encrypted image requires key provided.");
+        }
+
+        fs_ops::do_mount_rootfs(&app_config, &key).await?;
     }
     Ok((0))
 }

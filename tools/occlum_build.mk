@@ -3,7 +3,6 @@ SGX_SDK ?= /opt/occlum/sgxsdk-tools
 IMAGE := $(instance_dir)/image
 SECURE_IMAGE := $(instance_dir)/build/mount/__ROOT/metadata
 SECURE_IMAGE_MAC := $(instance_dir)/build/mount/.ROOT_MAC
-IMAGE_CONFIG_JSON := $(instance_dir)/build/image_config.json
 INITFS := $(instance_dir)/initfs
 INITFS_IMAGE := $(instance_dir)/build/initfs/__ROOT/metadata
 INITFS_IMAGE_MAC := $(instance_dir)/build/initfs/.ROOT_MAC
@@ -64,6 +63,7 @@ $(SIGNED_ENCLAVE): $(LIBOS)
 
 $(LIBOS): $(instance_dir)/build/.Occlum_sys.json.protected
 	@echo "Building libOS..."
+	@mkdir -p "$(instance_dir)/build/lib"
 	@cd $(instance_dir)/build/lib && \
 		cp "$(occlum_dir)/build/lib/$(libos_lib).$(occlum_version)" . && \
 		ln -sf "$(libos_lib).$(occlum_version)" "libocclum-libos.so.$(major_ver)" && \
@@ -80,7 +80,8 @@ $(instance_dir)/build/Enclave.xml:
 $(instance_dir)/build/.Occlum_sys.json: $(INITFS_IMAGE) $(INITFS_IMAGE_MAC) $(JSON_CONF) $(SECURE_IMAGE) $(SECURE_IMAGE_MAC)
 	@$(occlum_dir)/build/bin/gen_internal_conf --user_json "$(JSON_CONF)" gen_conf \
 		--user_fs_mac "`cat $(SECURE_IMAGE_MAC)`" --sdk_xml "$(instance_dir)/build/Enclave.xml"  \
-		--init_fs_mac "`cat $(INITFS_IMAGE_MAC)`" --output_json $(instance_dir)/build/.Occlum_sys.json
+		--init_fs_mac "`cat $(INITFS_IMAGE_MAC)`" --output_json $(instance_dir)/build/.Occlum_sys.json \
+		--encrypted "$(SECURE_IMAGE_ENCRYPTED)"
 
 $(BIN_LINKS): $(instance_dir)/build/bin/%: $(occlum_dir)/build/bin/% | $(instance_dir)/build/bin
 	@ln -sf $< $@
@@ -98,26 +99,16 @@ $(instance_dir)/build/lib:
 	@mkdir -p build/lib
 
 $(INITFS_IMAGE_MAC):
-$(INITFS_IMAGE): $(INITFS) $(INITFS_DIRS) $(INITFS_FILES) $(IMAGE_CONFIG_JSON) $(SEFS_CLI_SIM) $(SIGNED_SEFS_CLI_LIB)
+$(INITFS_IMAGE): $(INITFS) $(INITFS_DIRS) $(INITFS_FILES) $(SEFS_CLI_SIM) $(SIGNED_SEFS_CLI_LIB)
 	@echo "Building the initfs..."
 	@rm -rf build/initfs
 	@mkdir -p build/initfs
-	@[ "$(BUILDIN_IMAGE_KEY)" == "true" ] && \
-		cp "$(SECURE_IMAGE_KEY)" "$(INITFS)/etc/image_key" || \
-		rm -f "$(INITFS)/etc/image_key"
-	@cp "$(IMAGE_CONFIG_JSON)" "$(INITFS)/etc/"
 	@LD_LIBRARY_PATH="$(SGX_SDK)/sdk_libs" $(SEFS_CLI_SIM) \
 		--enclave "$(SIGNED_SEFS_CLI_LIB)" \
 		zip \
 		"$(INITFS)" \
 		"$(instance_dir)/build/initfs/__ROOT" \
 		"$(INITFS_IMAGE_MAC)"
-
-$(IMAGE_CONFIG_JSON):
-	@mkdir -p "$(instance_dir)/build/lib"
-	@[ -n "$(SECURE_IMAGE_KEY)" ] && \
-		jq -n '{image_type: "encrypted"}' > $(IMAGE_CONFIG_JSON) || \
-		jq -n '{image_type: "integrity-only"}' > $(IMAGE_CONFIG_JSON)
 
 # If image dir not exist, just use the secure Occlum FS image
 ifneq ($(wildcard $(IMAGE)/. ),)

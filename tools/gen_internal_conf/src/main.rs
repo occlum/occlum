@@ -76,6 +76,14 @@ fn main() {
                             Err(e) => Err(e.to_string()),
                         })
                         .takes_value(true),
+                )
+                // Input: InitFS image encrypted or not
+                .arg(
+                    Arg::with_name("encrypted")
+                        .long("encrypted")
+                        .value_name("InitFS image encrypted or not")
+                        .required(true)
+                        .takes_value(true),
                 ),
         )
         .get_matches();
@@ -111,6 +119,10 @@ fn main() {
             "Enclave config (xml) file name {:?}",
             enclave_config_file_path
         );
+
+        let image_encrypted = sub_matches.value_of("encrypted").unwrap()
+            .parse::<bool>().unwrap();
+        debug!("Occlum image is encrypted: {}", image_encrypted);
 
         // get the kernel stack size
         let stack_max_size =
@@ -185,6 +197,7 @@ fn main() {
                     occlum_config.mount,
                     occlum_conf_user_fs_mac.to_string(),
                     occlum_conf_init_fs_mac.to_string(),
+                    image_encrypted,
                 );
             if app_config.is_err() {
                 println!("Mount configuration invalid: {:?}", app_config);
@@ -291,6 +304,7 @@ fn gen_app_config(
     mount_conf: Vec<OcclumMount>,
     occlum_conf_user_fs_mac: String,
     occlum_conf_init_fs_mac: String,
+    image_encrypted: bool,
 ) -> Result<serde_json::Value, &'static str> {
     let mut app_config: serde_json::Value = json!({
         "app": [
@@ -334,6 +348,7 @@ fn gen_app_config(
         {
             "stage": "app",
             "entry_points": [],
+            "encrypted": false,
             "mount": [
                 {
                     "target": "/",
@@ -414,6 +429,11 @@ fn gen_app_config(
     *app_config
         .pointer_mut("/app/1/mount/0/options/layers/0/options/MAC")
         .unwrap() = serde_json::Value::String(occlum_conf_user_fs_mac);
+
+    // Update app encrypted tag
+    *app_config
+        .pointer_mut("/app/1/encrypted")
+        .unwrap() = image_encrypted.into();
 
     // Update host mount
     if let Some(host_mc) = mount_config
