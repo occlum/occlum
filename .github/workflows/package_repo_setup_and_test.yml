@@ -73,7 +73,7 @@ jobs:
             gpg1 --export -a "deb_gpg_key" > /root/public.key;
             gpg1 --import /root/public.key;
             gpg1 --list-keys;
-            apt-key add /root/public.key; apt-key list'
+            apt-key add /root/public.key && apt-key list'
 
     - name: Inherit apt repo for Ubuntu 18.04
       run: docker exec ubuntu bash -c 'aptly -architectures="amd64" -keyring=/etc/apt/trusted.gpg mirror create bionic-mirror https://occlum.io/occlum-package-repos/debian/ bionic main;
@@ -89,8 +89,7 @@ jobs:
             aptly repo add deb-focal-new /root/workspace/occlum/build/debs/*;
             aptly snapshot create focal-new from repo deb-focal-new;
             aptly -no-remove snapshot merge focal-main focal-old focal-new;
-            aptly publish snapshot -distribution=focal focal-main;
-            tree /root/.aptly/public'
+            aptly publish snapshot -distribution=focal focal-main && tree /root/.aptly/public'
 
     - name: Update Git repo
       run: docker exec ubuntu bash -c 'cd /root/workspace/occlum-package-repos; rm -rf debian; cp -r /root/.aptly/public/ /root/workspace/occlum-package-repos/debian;
@@ -137,7 +136,7 @@ jobs:
         force: true
 
     - name: Wait for package repo to deploy
-      run: sleep 180
+      run: sleep 600
 
 
   Test_deb_package:
