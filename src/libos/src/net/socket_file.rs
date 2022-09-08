@@ -1,7 +1,9 @@
 use async_io::ioctl::IoctlCmd;
 use async_io::socket::{NetlinkFamily, RecvFlags, SendFlags, Shutdown, Type};
 
-use self::impls::{Ipv4Datagram, Ipv4Stream, Ipv6Stream, NetlinkDatagram, UnixDatagram};
+use self::impls::{
+    Ipv4Datagram, Ipv4Stream, Ipv6Datagram, Ipv6Stream, NetlinkDatagram, UnixDatagram,
+};
 use super::unix::trusted::Stream as TrustedStream;
 use super::unix::UnixStream;
 use crate::fs::{AccessMode, Events, Observer, Poller, StatusFlags};
@@ -25,6 +27,7 @@ enum AnySocket {
     Ipv6Stream(Ipv6Stream),
     UnixDatagram(UnixDatagram),
     Ipv4Datagram(Ipv4Datagram),
+    Ipv6Datagram(Ipv6Datagram),
     TrustedUDS(TrustedStream), // for socket pair use only
     NetlinkDatagram(NetlinkDatagram),
 }
@@ -80,6 +83,9 @@ macro_rules! apply_fn_on_any_socket {
                 $($fn_body)*
             }
             AnySocket::Ipv4Datagram($socket) => {
+                $($fn_body)*
+            }
+            AnySocket::Ipv6Datagram($socket) => {
                 $($fn_body)*
             }
             AnySocket::TrustedUDS($socket) => {
@@ -189,6 +195,10 @@ impl SocketFile {
                     Domain::Ipv4 => {
                         let ipv4_datagram = Ipv4Datagram::new(nonblocking)?;
                         AnySocket::Ipv4Datagram(ipv4_datagram)
+                    }
+                    Domain::Ipv6 => {
+                        let ipv6_datagram = Ipv6Datagram::new(nonblocking)?;
+                        AnySocket::Ipv6Datagram(ipv6_datagram)
                     }
                     Domain::Unix => {
                         let unix_datagram = UnixDatagram::new(nonblocking)?;
@@ -326,6 +336,12 @@ impl SocketFile {
                 let ip_addr = addr.to_ipv4()?;
                 ipv4_datagram.bind(ip_addr)
             }
+
+            AnySocket::Ipv6Datagram(ipv6_datagram) => {
+                let ip_addr = addr.to_ipv6()?;
+                ipv6_datagram.bind(ip_addr)
+            }
+
             AnySocket::UnixDatagram(unix_datagram) => {
                 let unix_addr = addr.to_unix()?;
                 unix_datagram.bind(unix_addr)
@@ -410,6 +426,10 @@ impl SocketFile {
                 let (bytes_recv, addr_recv) = ipv4_datagram.recvmsg(bufs, flags).await?;
                 (bytes_recv, Some(AnyAddr::Ipv4(addr_recv)))
             }
+            AnySocket::Ipv6Datagram(ipv6_datagram) => {
+                let (bytes_recv, addr_recv) = ipv6_datagram.recvmsg(bufs, flags).await?;
+                (bytes_recv, Some(AnyAddr::Ipv6(addr_recv)))
+            }
             AnySocket::UnixDatagram(unix_datagram) => {
                 let (bytes_recv, addr_recv) = unix_datagram.recvmsg(bufs, flags).await?;
                 (bytes_recv, Some(AnyAddr::Unix(addr_recv)))
@@ -452,6 +472,14 @@ impl SocketFile {
                 };
                 ipv4_datagram.sendmsg(bufs, ip_addr, flags).await
             }
+            AnySocket::Ipv6Datagram(ipv6_datagram) => {
+                let ip_addr = if let Some(addr) = addr.as_ref() {
+                    Some(addr.to_ipv6()?)
+                } else {
+                    None
+                };
+                ipv6_datagram.sendmsg(bufs, ip_addr, flags).await
+            }
             AnySocket::UnixDatagram(unix_datagram) => {
                 let unix_addr = if let Some(addr) = addr.as_ref() {
                     Some(addr.to_unix()?)
@@ -486,6 +514,7 @@ impl SocketFile {
             AnySocket::UnixStream(unix_stream) => unix_stream.addr()?,
             AnySocket::TrustedUDS(trusted_stream) => AnyAddr::TrustedUnix(trusted_stream.addr()?),
             AnySocket::Ipv4Datagram(ipv4_datagram) => AnyAddr::Ipv4(ipv4_datagram.addr()?),
+            AnySocket::Ipv6Datagram(ipv6_datagram) => AnyAddr::Ipv6(ipv6_datagram.addr()?),
             AnySocket::UnixDatagram(unix_datagram) => AnyAddr::Unix(unix_datagram.addr()?),
             AnySocket::NetlinkDatagram(netlink_socket) => AnyAddr::Netlink(netlink_socket.addr()?),
             _ => {
@@ -546,6 +575,7 @@ mod impls {
     pub type UntrustedUnixStream = host_socket::StreamSocket<UnixAddr, SocketRuntime>;
 
     pub type Ipv4Datagram = host_socket::DatagramSocket<Ipv4SocketAddr, SocketRuntime>;
+    pub type Ipv6Datagram = host_socket::DatagramSocket<Ipv6SocketAddr, SocketRuntime>;
     pub type UnixDatagram = host_socket::DatagramSocket<UnixAddr, SocketRuntime>;
     pub type NetlinkDatagram = host_socket::NetlinkSocket<NetlinkSocketAddr, SocketRuntime>;
 
