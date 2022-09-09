@@ -1,14 +1,15 @@
 use crate::error::{
     COPY_DIR_ERROR, COPY_FILE_ERROR, CREATE_DIR_ERROR, CREATE_SYMLINK_ERROR, FILE_NOT_EXISTS_ERROR,
-    INCORRECT_HASH_ERROR, 
+    INCORRECT_HASH_ERROR, MISSING_LIBRARY_ERROR,
 };
 use data_encoding::HEXUPPER;
-use elf::types::{ET_DYN, ET_EXEC, Type};
+use elf::types::{Type, ET_DYN, ET_EXEC};
 use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::process::{Command, Output};
+use std::sync::Mutex;
 use std::vec;
 
 /// This structure represents loader information in config file.
@@ -73,6 +74,18 @@ lazy_static! {
     /// pattern: name => path
     /// example: libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6
     static ref DEPENDENCY_REGEX: Regex = Regex::new(r"^(?P<name>\S+) => (?P<path>\S+) ").unwrap();
+
+    /// pattern: name => not found
+    /// example: libstdc++.so.6 => not found
+    static ref NOT_FOUND_REGEX: Regex = Regex::new(r"^(?P<name>\S+) => not found").unwrap();
+
+    /// pattern: Error loading shared library name: No such file or directory
+    /// example: Error loading shared library libstdc++.so.6: No such file or directory
+    static ref ERROR_LOADING_REGEX: Regex = Regex::new(r"Error loading shared library (?P<name>\S+): No such file or directory").unwrap();
+}
+
+lazy_static! {
+    static ref MISSING_LIBRARIES: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
 }
 
 pub fn copy_file(src: &str, dest: &str, dry_run: bool) {
@@ -203,6 +216,7 @@ pub fn calculate_file_hash(filename: &str) -> String {
 pub fn find_dependent_shared_objects(
     file_path: &str,
     default_loader: &Option<(String, String)>,
+    lazy_check_missing_libraries: bool,
 ) -> HashSet<(String, String)> {
     let mut shared_objects = HashSet::new();
     // find dependencies for the input file
@@ -214,6 +228,7 @@ pub fn find_dependent_shared_objects(
     let (occlum_elf_loader, inlined_elf_loader) = dynamic_loader.unwrap();
     shared_objects.insert((occlum_elf_loader.clone(), inlined_elf_loader));
     let output = command_output_of_executing_dynamic_loader(&file_path, &occlum_elf_loader);
+
     if let Ok(output) = output {
         let default_lib_dirs = OCCLUM_LOADERS
             .default_lib_dirs
@@ -223,6 +238,7 @@ pub fn find_dependent_shared_objects(
             &file_path,
             output,
             default_lib_dirs,
+            lazy_check_missing_libraries,
         );
         for item in objects.drain() {
             shared_objects.insert(item);
@@ -288,7 +304,7 @@ fn auto_dynamic_loader(
     // We should only try to find dependencies for dynamic libraries or executables
     // relocatable files and core files are not included
     match elf_file.ehdr.elftype {
-        ET_DYN|ET_EXEC => {},
+        ET_DYN | ET_EXEC => {}
         Type(_) => return None,
     }
     match elf_file.get_section(".interp") {
@@ -299,7 +315,10 @@ fn auto_dynamic_loader(
             if let Some(default_loader) = default_loader {
                 return Some(default_loader.clone());
             } else {
-                warn!("cannot autodep for file {}. No dynamic loader can be found or inferred.", filename);
+                warn!(
+                    "cannot autodep for file {}. No dynamic loader can be found or inferred.",
+                    filename
+                );
                 return None;
             }
         }
@@ -359,6 +378,7 @@ pub fn extract_dependencies_from_output(
     file_path: &str,
     output: Output,
     default_lib_dirs: Option<Vec<String>>,
+    lazy_check_missing_libraries: bool,
 ) -> HashSet<(String, String)> {
     let mut shared_objects = HashSet::new();
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -367,9 +387,25 @@ pub fn extract_dependencies_from_output(
     // audodep may output error message. We should return this message to user for further checking.
     if stderr.trim().len() > 0 {
         warn!("cannot autodep for {}. stderr: {}", file_path, stderr);
+        if lazy_check_missing_libraries {
+            for line in stderr.lines() {
+                if let Some(captures) = ERROR_LOADING_REGEX.captures(line) {
+                    let missing_library = (&captures["name"]).to_string();
+                    add_missing_library(missing_library);
+                }
+            }
+        }
     }
     for line in stdout.lines() {
         let line = line.trim();
+        // whether the line contains a not found library
+        if let Some(captures) = NOT_FOUND_REGEX.captures(line) {
+            if lazy_check_missing_libraries {
+                let missing_library = (&captures["name"]).to_string();
+                add_missing_library(missing_library);
+            }
+            continue;
+        }
         let captures = DEPENDENCY_REGEX.captures(line);
         if let Some(captures) = captures {
             let raw_path = (&captures["path"]).to_string();
@@ -493,5 +529,53 @@ fn deal_with_output(output: Output, error_number: i32) {
     if stderr.trim().len() > 0 {
         error!("{}", stderr);
         std::process::exit(error_number);
+    }
+}
+
+/// Add missing library to a global hashset
+fn add_missing_library(missing_library: String) {
+    MISSING_LIBRARIES
+        .lock()
+        .expect("Acquire lock should not fail")
+        .insert(missing_library);
+}
+
+/// Check whether missing library exists in image directory
+fn check_missing_library(missing_library: &str, image_dir: &str) -> bool {
+    let mut command = Command::new("find");
+    command.arg(image_dir).arg("-name").arg(missing_library);
+    let output = command.output().expect("find missing library failed");
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    if stdout.len() == 0 {
+        return false;
+    } else {
+        let mut lines = stdout.lines();
+        debug!(
+            "find missing library {} in {}",
+            missing_library,
+            lines.nth(0).unwrap()
+        );
+        return true;
+    }
+}
+
+/// check whether missing libraries exist in image dir
+pub fn lazy_check_missing_libraries(image_dir: &str) {
+    let mut check_failed_missing_libraries = HashSet::new();
+    MISSING_LIBRARIES
+        .lock()
+        .unwrap()
+        .iter()
+        .for_each(|missing_library| {
+            if !check_missing_library(missing_library, image_dir) {
+                check_failed_missing_libraries.insert(missing_library.to_owned());
+            }
+        });
+    if check_failed_missing_libraries.len() > 0 {
+        println!("copy_bom failed due to following libraries are missing:");
+        for library in check_failed_missing_libraries {
+            println!("{}", library);
+        }
+        std::process::exit(MISSING_LIBRARY_ERROR);
     }
 }
