@@ -8,8 +8,8 @@
 use crate::error::{FILE_NOT_EXISTS_ERROR, INVALID_BOM_FILE_ERROR};
 use crate::util::{
     check_file_hash, copy_dir, copy_file, copy_shared_object, create_link, dest_in_root,
-    find_dependent_shared_objects, find_included_bom_file, infer_default_loader, mkdir,
-    resolve_envs,
+    find_dependent_shared_objects, find_included_bom_file, infer_default_loader,
+    lazy_check_missing_libraries, mkdir, resolve_envs,
 };
 use serde::{Deserialize, Serialize};
 use serde_yaml;
@@ -139,6 +139,8 @@ impl Bom {
             for bom_management in bom_managements.iter() {
                 bom_management.autodep_for_copydirs(&made_dirs, &copied_shared_objects, root_dir);
             }
+            // check all missing libraries after building the image directory
+            lazy_check_missing_libraries(root_dir);
         }
     }
 
@@ -402,7 +404,7 @@ impl BomManagement {
         debug!("default loader in autodep: {:?}", default_loader);
         for file_autodep in files_autodep.iter() {
             let mut shared_objects =
-                find_dependent_shared_objects(file_autodep, &default_loader);
+                find_dependent_shared_objects(file_autodep, &default_loader, true);
             for (src, dest) in shared_objects.drain() {
                 let dest_path = dest_in_root(root_dir, &dest);
                 // First, we create dir to store the dependency
@@ -479,10 +481,10 @@ impl BomManagement {
         // TODO: fix false-positive warnings
         // When we find dependent shared objects for all files in copydir, it may report warning
         // if we can't find the shared object. For files in directories, it may be a false-positive case,
-        // because we may already copy these shared objects when we copy the directory. 
-        // But the loader cannot find these libraries antomatically 
+        // because we may already copy these shared objects when we copy the directory.
+        // But the loader cannot find these libraries antomatically
         // since we don't know how to set the proper LD_LIBRARY_PATH env.
-        // One possible method to fix this problem is that we don't directly report warning message 
+        // One possible method to fix this problem is that we don't directly report warning message
         // when we can't find dependencies. We return all warning message instead. Before we log these message,
         // we can check whether these libraries has already been copied when we copy the directory.
         // This method can help avoid most false-positive warnings while not affecting which files to copy.
@@ -490,7 +492,7 @@ impl BomManagement {
         let default_loader = infer_default_loader(&files_in_copied_dirs);
         let mut all_shared_objects = Vec::new();
         for file_path in files_in_copied_dirs.into_iter() {
-            let shared_objects = find_dependent_shared_objects(&file_path, &default_loader);
+            let shared_objects = find_dependent_shared_objects(&file_path, &default_loader, false);
             all_shared_objects.extend(shared_objects);
         }
         // We should not copy shared libraries already in image directory.
