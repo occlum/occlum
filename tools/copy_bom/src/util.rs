@@ -579,3 +579,22 @@ pub fn lazy_check_missing_libraries(image_dir: &str) {
         std::process::exit(MISSING_LIBRARY_ERROR);
     }
 }
+
+/// Print warn message if image directory is not empty.
+/// The image dir should be empty before running copy_bom so copy bom can track all files to copy in bom file.
+/// Users can ignore the warning now if they are sure the image directory contains correct contents.
+pub fn warn_on_nonempty_image_dir(image_dir: &str) {
+    let image_path_buf = PathBuf::from(image_dir);
+    let image_path = image_path_buf.as_path();
+    if image_path.is_dir() {
+        if let Ok(read_dir) = image_path.read_dir() {
+            let dir_entries = read_dir.collect::<Vec<_>>();
+            if dir_entries.len() > 0 {
+                println!(
+                    "WARNING: {} is not an empty directory before running copy_bom.",
+                    image_dir
+                );
+            }
+        }
+    }
+}
