@@ -1,0 +1,61 @@
+#!/usr/bin/make -f
+export DH_VERBOSE = 1
+export deb_build_dir = /tmp/deb_build
+export name = occlum-toolchains-glibc
+export buildroot := $(deb_build_dir)/$(name)/debian/$(name)
+
+export tmp_build_dir = $(deb_build_dir)/$(name)/tmp_build
+export src_dir = $(tmp_build_dir)/glibc
+export install_dir = $(buildroot)/opt/occlum/glibc
+
+SHELL = /bin/bash
+
+export DEB_BUILD_MAINT_OPTIONS=hardening=+pie,-fortify
+
+# Users can pass "-j$(nproc)" by specifying this env.
+# This is not enabled by default because under certain scenarios,
+# make will use too many jobs and gcc will be killed because out
+# of memory.
+BUILD_OPTIONS +=
+
+.ONESHELL: prepare_glibc override_dh_install
+
+%:
+	dh $@
+
+# All rules executed in one shell
+prepare_glibc:
+	rm -rf $(tmp_build_dir)
+	rm -rf $(install_dir)
+	mkdir -p $(src_dir)
+	cd $(src_dir)
+	git clone -b occlum-glibc-2.31 https://github.com/occlum/glibc .
+
+
+override_dh_auto_build: prepare_glibc
+	mkdir -p $(tmp_build_dir)/build
+	cd $(tmp_build_dir)/build
+	unset LD_LIBRARY_PATH
+	${src_dir}/configure \
+		--prefix=${install_dir} --with-tls --without-selinux \
+		--disable-nscd
+	make
+
+
+# We create symlinks in /usr/local
+override_dh_usrlocal:
+	echo "Skip ..."
+
+override_dh_fixperms:
+	dh_fixperms
+
+override_dh_install:
+	cd $(tmp_build_dir)/build
+	make install
+
+clean:
+	dh_clean
+	rm -f $(buildroot)
+
+override_dh_shlibdeps:
+	echo "skip ..."

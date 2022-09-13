@@ -1,0 +1,12 @@
+Source: occlum-toolchains-glibc
+Section: libs
+Priority: optional
+Maintainer: Qi Zheng <huaiqing.zq@antgroup.com>
+Build-Depends: debhelper (>=9), autoconf, automake, build-essential, cmake, libtool, ocaml, ocamlbuild, python, libssl-dev, libcurl4-openssl-dev, libprotobuf-dev, git, protobuf-compiler
+Standards-Version: 4.1.2
+Homepage: https://github.com/occlum/glibc
+
+Package: occlum-toolchains-glibc
+Architecture: amd64
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: Occlum glibc libraries

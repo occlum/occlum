@@ -26,7 +26,7 @@ If a user wants to build his application on a platform installed with Occlum ins
 cd tools/installer/deb
 make <language option>
 ```
-Now, only `musl-gcc` and `golang` options are supported. And the installer can be found under `build/debs`.
+Now, only `musl-gcc`, `glibc` and `golang` options are supported. And the installer can be found under `build/debs`.
 
 ### How to Use
 
@@ -36,7 +36,7 @@ To run Occlum on clean Ubuntu 18.04, please follow below steps:
 **Step 1. Install Prerequisites**
 ```
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libcurl4-openssl-dev libssl-dev libprotobuf-dev libfuse-dev autoconf automake make cmake libtool gdb python jq ca-certificates gnupg wget vim
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libcurl4-openssl-dev libssl-dev libprotobuf-dev libfuse-dev autoconf automake make cmake libtool gdb python jq ca-certificates gnupg wget vim rsync
 ```
 
 **Step 2. Install Intel® SGX driver and Intel® SGX PSW**
@@ -65,9 +65,14 @@ apt install -y ./occlum-sgx-tools*.deb
 ```
 
 Toolchains are needed when compiling applications and also during runtime. C/C++ toolchain is a must for Occlum commands.
-To install C/C++ toolchain, just run the command:
+To install musl C/C++ toolchain, just run the command:
 ```
 apt install -y ./occlum-toolchains-gcc*.deb
+```
+
+Also, users can install glibc to support glibc based applications.
+```
+apt install -y ./occlum-toolchains-glibc*.deb
 ```
 
 Besides, users can choose to install the toolchain installer based on the application's language. Currently, we also supports Golang. More language toolchain installers are on the way. To install Golang toolchain, run the below commands:
