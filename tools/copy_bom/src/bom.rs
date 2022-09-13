@@ -9,7 +9,7 @@ use crate::error::{FILE_NOT_EXISTS_ERROR, INVALID_BOM_FILE_ERROR};
 use crate::util::{
     check_file_hash, copy_dir, copy_file, copy_shared_object, create_link, dest_in_root,
     find_dependent_shared_objects, find_included_bom_file, infer_default_loader,
-    lazy_check_missing_libraries, mkdir, resolve_envs,
+    lazy_check_missing_libraries, mkdir, resolve_envs, warn_on_nonempty_image_dir,
 };
 use serde::{Deserialize, Serialize};
 use serde_yaml;
@@ -107,6 +107,7 @@ impl Bom {
         dry_run: bool,
         included_dirs: &Vec<String>,
     ) {
+        warn_on_nonempty_image_dir(root_dir);
         // We need to keep the order of boms and bom managements
         let mut sorted_boms = Vec::new();
         let mut bom_managements = Vec::new();
