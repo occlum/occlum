@@ -525,6 +525,8 @@ struct OcclumMountOptions {
     pub temporary: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub total_size: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    autokey_policy: Option<u32>,
 }
 
 #[inline]

@@ -190,6 +190,7 @@ pub struct ConfigMountOptions {
     pub temporary: bool,
     pub total_size: Option<usize>,
     pub index: u32,
+    pub autokey_policy: Option<u32>,
 }
 
 impl Config {
@@ -361,6 +362,7 @@ impl ConfigMountOptions {
             temporary: input.temporary,
             total_size,
             index: input.index,
+            autokey_policy: input.autokey_policy,
         })
     }
 }
@@ -512,6 +514,8 @@ struct InputConfigMountOptions {
     pub total_size: Option<String>,
     #[serde(default)]
     pub index: u32,
+    #[serde(default)]
+    pub autokey_policy: Option<u32>,
 }
 
 #[derive(Deserialize, Debug)]
