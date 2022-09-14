@@ -1,0 +1,32 @@
+[package]
+name = "async-mountfs"
+version = "0.1.0"
+authors = ["Li Qing <geding.lq@antgroup.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["libc"]
+sgx = ["sgx_types", "sgx_tstd", "sgx_trts", "sgx_libc", "async-vfs/sgx", "async-io/sgx", "async-rt/sgx"]
+
+[dependencies]
+async-vfs = { path = "../async-vfs" }
+async-io = { path = "../async-io" }
+async-rt = { path = "../async-rt" }
+errno = { path = "../errno" }
+async-trait = "0.1.52"
+static_assertions = "0.3"
+log = "0.4"
+cfg-if = "1.0"
+libc = { version = "0.2", optional = true }
+
+sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }
+sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", optional = true, features = ["backtrace"] }
+sgx_trts = { path = "../../../../deps/rust-sgx-sdk/sgx_trts", optional = true }
+sgx_libc = { path = "../../../../deps/rust-sgx-sdk/sgx_libc", optional = true }
+
+[dev-dependencies]
+async-rt = { path = "../async-rt", features = ["auto_run"] }
+async-sfs = { path = "../async-sfs" }
+block-device = { path = "../block-device" }

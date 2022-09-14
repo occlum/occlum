@@ -114,6 +114,16 @@ pub trait AsyncInode: Any + Sync + Send {
         return_errno!(ENOSYS, "not support");
     }
 
+    /// Mount filesystem at this inode
+    async fn mount(&self, _fs: Arc<dyn AsyncFileSystem>) -> Result<()> {
+        return_errno!(ENOTDIR, "self is not dir");
+    }
+
+    /// Unmount the filesystem which is mounted at this inode
+    async fn umount(&self) -> Result<()> {
+        return_errno!(ENOTDIR, "self is not dir");
+    }
+
     /// Get the file system of the inode
     fn fs(&self) -> Arc<dyn AsyncFileSystem>;
 
