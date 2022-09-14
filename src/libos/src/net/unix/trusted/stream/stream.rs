@@ -106,9 +106,12 @@ impl Stream {
         match &*self.inner() {
             Status::Idle(info) => Events::OUT | Events::HUP,
             Status::Connected(endpoint) => endpoint.poll(mask, poller),
-            Status::Listening(_) => {
-                warn!("poll is not fully implemented for the listener socket");
-                Events::empty()
+            Status::Listening(addr) => {
+                if let Some(listener) = ADDRESS_SPACE.get_listener_ref(addr) {
+                    listener.poll()
+                } else {
+                    Events::empty()
+                }
             }
         }
     }
@@ -116,6 +119,13 @@ impl Stream {
     pub fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()> {
         match &*self.inner() {
             Status::Connected(endpoint) => endpoint.register_observer(observer, mask),
+            Status::Listening(addr) => {
+                if let Some(listener) = ADDRESS_SPACE.get_listener_ref(addr) {
+                    listener.register_observer(observer, mask)
+                } else {
+                    return_errno!(EINVAL, "can't find listener");
+                }
+            }
             _ => {
                 return_errno!(EINVAL, "can't register observer");
             }
@@ -126,6 +136,13 @@ impl Stream {
     pub fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>> {
         match &*self.inner() {
             Status::Connected(endpoint) => endpoint.unregister_observer(observer),
+            Status::Listening(addr) => {
+                if let Some(listener) = ADDRESS_SPACE.get_listener_ref(addr) {
+                    listener.unregister_observer(observer)
+                } else {
+                    return_errno!(EINVAL, "can't find listener");
+                }
+            }
             _ => {
                 return_errno!(EINVAL, "can't unregister observer");
             }
@@ -461,5 +478,28 @@ impl Listener {
     pub fn shutdown(&self) {
         let channel = self.channel.read().unwrap();
         channel.consumer().shutdown();
+    }
+
+    pub fn poll(&self) -> Events {
+        let mut events = Events::empty();
+        let channel = self.channel.read().unwrap();
+        let item_num = channel.items_to_consume();
+        if item_num > 0 {
+            events |= Events::IN;
+        }
+        events
+    }
+
+    pub fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) {
+        let channel = self.channel.read().unwrap();
+        channel
+            .consumer()
+            .register_observer(observer, mask)
+            .unwrap()
+    }
+
+    pub fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>> {
+        let channel = self.channel.read().unwrap();
+        channel.consumer().unregister_observer(observer)
     }
 }

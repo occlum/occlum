@@ -119,6 +119,10 @@ impl<T> Channel<T> {
             }
         }
     }
+
+    pub fn items_to_consume(&self) -> usize {
+        self.consumer.items_to_consume()
+    }
 }
 
 impl<T> Common<T> {
@@ -447,6 +451,26 @@ impl<T> Consumer<T> {
     pub fn pollee(&self) -> &Pollee {
         self.common.consumer.pollee()
     }
+
+    pub fn items_to_consume(&self) -> usize {
+        if self.is_shutdown() {
+            0
+        } else {
+            self.ready_len()
+        }
+    }
+
+    pub fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()> {
+        self.this_end().pollee().register_observer(observer, mask);
+        Ok(())
+    }
+
+    pub fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>> {
+        self.this_end()
+            .pollee()
+            .unregister_observer(observer)
+            .ok_or_else(|| errno!(ENOENT, "the observer is not registered"))
+    }
 }
 
 impl Consumer<u8> {
@@ -550,15 +574,11 @@ impl File for Consumer<u8> {
     }
 
     fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()> {
-        self.this_end().pollee().register_observer(observer, mask);
-        Ok(())
+        self.register_observer(observer, mask)
     }
 
     fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>> {
-        self.this_end()
-            .pollee()
-            .unregister_observer(observer)
-            .ok_or_else(|| errno!(ENOENT, "the observer is not registered"))
+        self.unregister_observer(observer)
     }
 
     fn status_flags(&self) -> StatusFlags {
