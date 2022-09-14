@@ -471,6 +471,98 @@ int test_epoll_wait() {
     return 0;
 }
 
+int client_sendmsg(int server_fd, char *buf) {
+    int ret = 0;
+    struct msghdr msg;
+    struct iovec iov[1];
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
+    iov[0].iov_base = buf;
+    iov[0].iov_len = strlen(buf);
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = 0;
+    msg.msg_controllen = 0;
+    msg.msg_flags = 0;
+
+    ret = sendmsg(server_fd, &msg, 0);
+    if (ret <= 0) {
+        THROW_ERROR("sendmsg failed");
+    }
+
+    msg.msg_iov = NULL;
+    msg.msg_iovlen = 0;
+
+    ret = sendmsg(server_fd, &msg, 0);
+    if (ret != 0) {
+        THROW_ERROR("empty sendmsg failed");
+    }
+    return ret;
+}
+
+int server_recvmsg(int client_fd) {
+    int ret = 0;
+    const int buf_size = 10;
+    char buf[3][buf_size];
+    struct msghdr msg;
+    struct iovec iov[3];
+    char result_buf[] = {ECHO_MSG}; // 30 bytes
+
+    memset(&msg, 0, sizeof(struct msghdr));
+    msg.msg_name  = NULL;
+    msg.msg_namelen  = 0;
+    iov[0].iov_base = buf[0];
+    iov[0].iov_len = buf_size;
+    iov[1].iov_base = buf[1];
+    iov[1].iov_len = buf_size;
+    iov[2].iov_base = buf[2];
+    iov[2].iov_len = buf_size;
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 3;
+    msg.msg_control = 0;
+    msg.msg_controllen = 0;
+    msg.msg_flags = 0;
+
+    ret = recvmsg(client_fd, &msg, 0);
+    if (ret <= 0) {
+        THROW_ERROR("recvmsg failed");
+    } else {
+        if (strncmp(buf[0], result_buf, buf_size) != 0 &&
+                strncmp(buf[1], result_buf + buf_size, buf_size) != 0 &&
+                strncmp(buf[0], result_buf + buf_size * 2, buf_size) != 0) {
+            printf("recvmsg : %d, msg: %s,  %s, %s\n", ret, buf[0], buf[1], buf[2]);
+            THROW_ERROR("msg recvmsg mismatch");
+        }
+    }
+    return ret;
+}
+
+int test_sendmsg_recvmsg() {
+    int ret = 0;
+    char test_buf[] = {ECHO_MSG};
+    int socks[2];
+
+    ret = socketpair(AF_UNIX, SOCK_STREAM, 0, socks);
+    if (ret < 0) {
+        THROW_ERROR("socket pair create failed");
+    }
+
+    int server_fd = socks[0];
+    int client_fd = socks[1];
+
+    ret = client_sendmsg(server_fd, test_buf);
+    if (ret < 0) {
+        THROW_ERROR("client_sendmsg failed");
+    }
+
+    ret = server_recvmsg(client_fd);
+    if (ret < 0) {
+        THROW_ERROR("server_recvmsg failed");
+    }
+
+    return ret;
+}
+
 static test_case_t test_cases[] = {
     TEST_CASE(test_unix_socket_inter_process),
     TEST_CASE(test_socketpair_inter_process),
@@ -480,6 +572,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_ioctl_fionread),
     TEST_CASE(test_unix_socket_rename),
     TEST_CASE(test_epoll_wait),
+    TEST_CASE(test_sendmsg_recvmsg),
 };
 
 int main(int argc, const char *argv[]) {
