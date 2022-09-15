@@ -127,6 +127,7 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
 
             self.common.set_peer_addr(peer);
             state.mark_connected();
+            do_connect(self.host_fd(), Some(peer))?;
             if !state.is_bound() {
                 state.mark_implicit_bind();
                 // Start async recv after explicit binding or implicit binding
@@ -143,6 +144,8 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
             self.common.reset_peer_addr();
             state.mark_disconnected();
 
+            do_connect::<A>(self.host_fd(), None)?;
+
             // TODO: clear binding in some cases.
             // Disconnect will effect the binding address. In Linux, for socket that
             // explicit bound to local IP address, disconnect will clear the binding address,
@@ -158,9 +161,6 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
 
     pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
         let state = self.state.read().unwrap();
-        if !state.is_connected() {
-            return_errno!(ENOTCONN, "the socket is not connected");
-        }
         drop(state);
 
         self.recvmsg(bufs, RecvFlags::empty())
@@ -192,7 +192,7 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
     ) -> Result<usize> {
         let state = self.state.read().unwrap();
         if addr.is_none() && !state.is_connected() {
-            return_errno!(ENOTCONN, "the socket is not connected");
+            return_errno!(EDESTADDRREQ, "Destination address required");
         }
 
         let res = if addr.is_some() {

@@ -6,7 +6,7 @@ mod sender;
 
 use self::receiver::Receiver;
 use self::sender::Sender;
-use crate::common::{do_bind, Common};
+use crate::common::{do_bind, do_connect, Common};
 use crate::ioctl::*;
 use crate::prelude::*;
 use crate::runtime::Runtime;
