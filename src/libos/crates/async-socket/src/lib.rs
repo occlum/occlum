@@ -1,5 +1,4 @@
 #![cfg_attr(feature = "sgx", no_std)]
-#![feature(maybe_uninit_extra)]
 #![allow(unused_variables)]
 #![allow(dead_code)]
 // When using Rust SGX SDK, feature(hash_set_entry) cannot be recoganized. So

@@ -26,7 +26,6 @@
 #![allow(dead_code)]
 #![feature(maybe_uninit_uninit_array)]
 #![feature(new_uninit)]
-#![feature(destructuring_assignment)]
 
 #[cfg(test)]
 extern crate test;

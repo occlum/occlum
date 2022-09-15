@@ -2,7 +2,7 @@
 name = "host-socket"
 version = "0.1.0"
 authors = ["Tate, Hongliang Tian <tate.thl@antgroup.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -19,7 +19,7 @@ errno = { path = "../errno" }
 num_enum = { version = "0.5", default-features = false }
 slab = { version = "0.4.5", default-features = false }
 libc = { version = "0.2", optional = true }
-log = { version = "0.4" }
+log = "0.4"
 io-uring-callback = { path = "../io-uring-callback" }
 memoffset = "0.6"
 sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }

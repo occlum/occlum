@@ -2,7 +2,7 @@
 name = "async-rt"
 version = "0.1.0"
 authors = ["Tate, Hongliang Tian <tate.thl@antfin.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -27,8 +27,7 @@ log = "0.4"
 env_logger = { version = "0.8.4", optional = true }
 new-self-ref-arc = { path = "../new-self-ref-arc" }
 object-id = { path = "../object-id" }
-spin = "0.7"
-#spin = { version = "0.9.3", default-features = false, features = ["mutex", "spin_mutex"] }
+spin = "0.9.4"
 sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", features = ["backtrace", "thread"], optional = true }
 vdso-time = { path = "../vdso-time", default-features = false }
 sgx-untrusted-alloc = { path = "../sgx-untrusted-alloc", optional = true }
@@ -37,4 +36,4 @@ sgx_libc = { path = "../../../../deps/rust-sgx-sdk/sgx_libc", optional = true }
 
 [dev-dependencies]
 ctor = "0.1"
-env_logger = "0.8.4"
+env_logger = "0.9"

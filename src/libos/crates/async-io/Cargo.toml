@@ -2,7 +2,7 @@
 name = "async-io"
 version = "0.1.0"
 authors = ["Tate, Hongliang Tian <tate.thl@antfin.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -19,13 +19,13 @@ errno = { path = "../errno" }
 futures = { version = "0.3", default-features = false, features = ["alloc"]  }
 inherit-methods-macro = { path = "../inherit-methods-macro" }
 keyable-arc = { path = "../keyable-arc" }
-log = { version = "0.4" }
+log = "0.4"
 cfg-if = "1.0"
 libc = { version = "0.2", optional = true }
 num_enum = { version = "0.5", default-features = false }
 object-id = { path = "../object-id" }
 ringbuf = { version = "0.2.3", default-features = false }
-spin = "0.7"
+spin = "0.9.4"
 
 sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }
 sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", optional = true, features = ["backtrace"] }

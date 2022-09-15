@@ -232,7 +232,7 @@ int main(int argc, const char *argv[]) {
 
     // return without sync
     if (port == 8804) {
-        return;
+        return ret;
     }
 
     // blocking here, waiting for the server

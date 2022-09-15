@@ -90,7 +90,7 @@ impl Executor {
 
         vcpu::set_current(this_vcpu);
 
-        let this_local_scheduler = &self.scheduler.local_schedulers[this_vcpu as usize];
+        let _this_local_scheduler = &self.scheduler.local_schedulers[this_vcpu as usize];
 
         loop {
             let task = match self.dequeue_wait() {

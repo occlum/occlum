@@ -2,7 +2,7 @@
 name = "page-cache"
 version = "0.1.0"
 authors = ["Song Shaowei <songshaowei.ssw@antgroup.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -16,7 +16,7 @@ lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 libc = { version = "0.2", optional = true }
 log = "0.4"
 lru = { path = "../../../../deps/lru-rs", default-features = false }
-spin = "0.7"
+spin = "0.9.4"
 
 async-io = { path = "../async-io" }
 async-rt = { path = "../async-rt" }

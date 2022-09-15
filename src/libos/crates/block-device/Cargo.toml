@@ -2,7 +2,7 @@
 name = "block-device"
 version = "0.1.0"
 authors = ["Tate, Hongliang Tian <tate.thl@antgroup.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -11,7 +11,7 @@ async-trait = "0.1.52"
 errno = { path = "../errno" }
 object-id = { path = "../object-id" }
 static_assertions = "1.1.0"
-spin = "0.7"
+spin = "0.9.4"
 
 [dev-dependencies]
 async-rt = { path = "../async-rt", features = ["auto_run"] }

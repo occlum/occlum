@@ -15,7 +15,6 @@
 #![feature(dropck_eyepatch)]
 // for UntrustedSliceAlloc in slice_alloc
 #![feature(slice_ptr_get)]
-#![feature(maybe_uninit_extra)]
 #![feature(get_mut_unchecked)]
 #![feature(drain_filter)]
 #![feature(raw_ref_op)]
@@ -26,7 +25,6 @@
 #![feature(btree_drain_filter)]
 #![feature(bench_black_box)]
 #![feature(div_duration)]
-#![feature(result_cloned)]
 #![feature(once_cell)]
 
 #[macro_use]

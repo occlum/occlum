@@ -32,15 +32,15 @@ pub fn do_mount_rootfs(
     });
 
     // Write resolv.conf file into mounted file system
-    write_host_file(HostFile::RESOLV_CONF)?;
+    write_host_file(HostFile::ResolvConf)?;
     *RESOLV_CONF_STR.write().unwrap() = None;
 
     // Write hostname file into mounted file system
-    write_host_file(HostFile::HOSTNAME)?;
+    write_host_file(HostFile::HostName)?;
     *HOSTNAME_STR.write().unwrap() = None;
 
     // Write hosts file into mounted file system
-    write_host_file(HostFile::HOSTS)?;
+    write_host_file(HostFile::Hosts)?;
     *HOSTS_STR.write().unwrap() = None;
 
     Ok(())

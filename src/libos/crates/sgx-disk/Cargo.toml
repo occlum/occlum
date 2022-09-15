@@ -2,7 +2,7 @@
 name = "sgx-disk"
 version = "0.1.0"
 authors = ["Tate, Hongliang Tian <tate.thl@antgroup.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -14,7 +14,7 @@ sgx = ["errno/sgx", "sgx_types", "sgx_tstd", "sgx_trts", "sgx_libc", "sgx_tcrypt
 block-device = { path = "../block-device" }
 cfg-if = "1.0"
 errno = { path = "../errno" }
-log = { version = "0.4" }
+log = "0.4"
 io-uring-callback = { path = "../io-uring-callback" }
 libc = { version = "0.2", optional = true }
 new-self-ref-arc = { path = "../new-self-ref-arc" }
