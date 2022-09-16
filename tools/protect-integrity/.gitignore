@@ -1,4 +1,3 @@
-protect-integrity
 App/Enclave_u.h
 App/Enclave_u.c
 Enclave/Enclave_t.h
