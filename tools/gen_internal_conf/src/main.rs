@@ -28,7 +28,7 @@ fn main() {
                 .validator(|f| match Path::new(&f).exists() {
                     true => Ok(()),
                     false => {
-                        let err_message = f + " is not exist";
+                        let err_message = f.to_owned() + " is not exist";
                         Err(err_message)
                     }
                 })
