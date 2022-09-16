@@ -73,7 +73,7 @@ function build_tf_instance()
         .verify_isv_svn = "off" |
         .verify_config_svn = "off" |
         .verify_enclave_debuggable = "on" |
-        .sgx_mrs[0].mr_signer = ''"'`get_mr tf mr_signer`'" |
+        .sgx_mrs[0].mr_signer = ''"'`get_mr tf mrsigner`'" |
         .sgx_mrs[0].debuggable = false ' ../ra_config_template.json > dynamic_config.json
 
     # prepare init-ra content
@@ -87,12 +87,7 @@ function build_tf_instance()
 }
 
 function get_mr() {
-    sgx_sign dump -enclave ${script_dir}/occlum_$1/build/lib/libocclum-libos.signed.so -dumpfile ../metadata_info_$1.txt
-    if [ "$2" == "mr_enclave" ]; then
-        sed -n -e '/enclave_hash.m/,/metadata->enclave_css.body.isv_prod_id/p' ../metadata_info_$1.txt |head -3|tail -2|xargs|sed 's/0x//g'|sed 's/ //g'
-    elif [ "$2" == "mr_signer" ]; then
-        tail -2 ../metadata_info_$1.txt |xargs|sed 's/0x//g'|sed 's/ //g'
-    fi
+    cd ${script_dir}/occlum_$1 && occlum print $2
 }
 
 function gen_secret_json() {
@@ -120,8 +115,8 @@ function build_server_instance()
         .verify_isv_svn = "off" |
         .verify_config_svn = "off" |
         .verify_enclave_debuggable = "on" |
-        .sgx_mrs[0].mr_enclave = ''"'`get_mr tf mr_enclave`'" |
-        .sgx_mrs[0].mr_signer = ''"'`get_mr tf mr_signer`'" |
+        .sgx_mrs[0].mr_enclave = ''"'`get_mr tf mrenclave`'" |
+        .sgx_mrs[0].mr_signer = ''"'`get_mr tf mrsigner`'" |
         .sgx_mrs[0].debuggable = false ' ../ra_config_template.json > dynamic_config.json 
 
     new_json="$(jq '.resource_limits.user_space_size = "500MB" |
