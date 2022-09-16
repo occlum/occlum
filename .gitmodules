@@ -1,7 +1,6 @@
 [submodule "deps/rust-sgx-sdk"]
 	path = deps/rust-sgx-sdk
 	url = https://github.com/occlum/incubator-teaclave-sgx-sdk.git
-	branch = sgx_2.13_for_occlum
 [submodule "deps/sefs"]
 	path = deps/sefs
 	url = https://github.com/occlum/sefs.git
@@ -27,11 +26,10 @@
 	url = https://github.com/occlum/io-uring
 [submodule "deps/rust-hash-wheel-timer"]
 	path = deps/rust-hash-wheel-timer
-	url = https://github.com/ShuochengWang/rust-hash-wheel-timer.git
-	branch = sgx
+	url = https://github.com/occlum/rust-hash-wheel-timer.git
 [submodule "deps/resolv-conf"]
 	path = deps/resolv-conf
 	url = https://github.com/tailhook/resolv-conf.git
 [submodule "deps/lru-rs"]
 	path = deps/lru-rs
-	url = https://github.com/liqinggd/lru-rs.git
+	url = https://github.com/occlum/lru-rs.git
