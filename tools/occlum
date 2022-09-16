@@ -91,6 +91,9 @@ Usage:
 
     occlum gen-image-key <key_path>
         Generate a file consists of a randomly generated 128-bit key for encryption of the FS image.
+
+    occlum print mrsigner|mrenclave
+        Print Occlum instance's mrsigner, mrenclave.
 EOF
 }
 
@@ -597,6 +600,32 @@ cmd_gen_image_key() {
     cat /dev/urandom | tr -dc 'a-f0-9' | fold -w 32 | head -n 1 | sed -r 's/.{2}/&-/g; s/.$//' > $key_path
 }
 
+cmd_print_info() {
+    if [ -z $1 ]; then
+        echo "Error: print info name not provided"
+        exit 1
+    fi
+
+    libos_so="build/lib/libocclum-libos.signed.so"
+    info="$1"
+
+    [ -e "$libos_so" ] || \
+        exit_error "No $libos_so existed"
+
+    if [[ "$info" == "mrenclave" ]]; then
+        sgx_sign dump -enclave $libos_so -dumpfile dumpfile >/dev/null 2>&1
+        sed -n -e '/enclave_hash.m/,/metadata->enclave_css.body.isv_prod_id/p' dumpfile \
+            |head -3|tail -2|xargs|sed 's/0x//g'|sed 's/ //g'
+        rm dumpfile
+    elif [[ "$info" == "mrsigner" ]]; then
+        sgx_sign dump -enclave $libos_so -dumpfile dumpfile >/dev/null 2>&1
+        tail -2 dumpfile |xargs|sed 's/0x//g'|sed 's/ //g'
+        rm dumpfile
+    else
+        exit_error "No valid info name provided"
+    fi
+}
+
 if [[ ( "$#" < 1 ) ]] ; then
     report_arg_error "Error: no sub-command is given"
     exit 1
@@ -639,6 +668,9 @@ case "$cmd" in
         ;;
     gen-image-key)
         cmd_gen_image_key "${@:2:1}"
+        ;;
+    print)
+        cmd_print_info "${@:2:1}"
         ;;
     *)
         report_arg_error "Error: unknown sub-command $cmd"
