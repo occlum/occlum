@@ -20,14 +20,14 @@ rm -rf ${INSTALL_DIR}
 mkdir -p ${SRC_DIR}
 cd ${SRC_DIR}
 # Download glibc
-git clone -b occlum-glibc-2.27 https://github.com/occlum/glibc .
+git clone -b occlum-glibc-2.31 https://github.com/occlum/glibc .
 
 mkdir -p ${BUILD_DIR}
 cd ${BUILD_DIR}
 # Build and install glibc
 unset LD_LIBRARY_PATH
-CFLAGS="-O2 -g" ${SRC_DIR}/configure \
+CFLAGS="-O2 -g ${EXTRA_CFLAGS}" ${SRC_DIR}/configure \
   --prefix=${INSTALL_DIR} --with-tls --without-selinux \
-  --enable-stack-protector=strong --disable-nscd
+  --enable-stack-protector=strong --disable-nscd ${EXTRA_CONFIG_OPTION}
 make
 make install
