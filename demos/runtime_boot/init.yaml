@@ -4,4 +4,4 @@ targets:
   - target: /bin/
     copy:
       - files:
-        - ${INIT_DIR}/target/x86_64-unknown-linux-musl/release/init
+        - ${INIT_DIR}/target/release/init
