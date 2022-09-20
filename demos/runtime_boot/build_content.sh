@@ -29,8 +29,8 @@ function build_bash_demo()
 function build_init()
 {
     pushd ${INIT_DIR}
-    occlum-cargo clean
-    occlum-cargo build --release
+    cargo clean
+    cargo build --release
     popd
 }
 
