@@ -5,7 +5,11 @@ on:
   workflow_dispatch:
     inputs:
       update_musl:
-        description: 'Need build new musl pacakge? <Y/N>'
+        description: 'Need build new musl package? <Y/N>'
+        required: true
+        default: 'N'
+      update_glibc:
+        description: 'Need build new glibc package? <Y/N>'
         required: true
         default: 'N'
       only_test:
@@ -13,7 +17,7 @@ on:
         required: true
         default: 'N'
       test_version:
-        description: 'Test Occlum version'
+        description: 'Test Occlum version (Required if only test)'
         required: false
 
 jobs:
@@ -66,6 +70,10 @@ jobs:
     - name: Build musl toolchain package
       if: github.event.inputs.update_musl == 'Y'
       run: docker exec ubuntu bash -c "cd /root/workspace/occlum/tools/installer/deb; make musl-gcc"
+
+    - name: Build glibc toolchain package
+      if: github.event.inputs.update_glibc == 'Y'
+      run: docker exec ubuntu bash -c "cd /root/workspace/occlum/tools/installer/deb; make glibc"
 
     - name: Prepare tools and keys    # Since aptly still use gpg1 by default, we all use gpg1 as gpg tool.
       run: docker exec ubuntu bash -c 'apt-get update; apt-get install -y tree apt-utils gnupg reprepro rng-tools aptly; rm -rf /root/.gnupg;
@@ -175,6 +183,14 @@ jobs:
     # If there is no match, it will return 1.
     - name: Check installed version
       run: docker exec ubuntu bash -c "cat /opt/occlum/include/occlum_version.h | grep -n5 ${{ env.OCCLUM_VERSION }}"
+
+    - name: Install occlum-glibc toolchain
+      run: |
+          docker exec ubuntu bash -c "apt-get install -y occlum-toolchains-glibc"
+          docker exec ubuntu bash -c "apt-get install -y git python python3-pip rsync"
+
+    - name: Run occlum python glibc test
+      run: docker exec ubuntu bash -c "source /etc/profile; cd /root && git clone https://github.com/occlum/occlum.git && cd /root/occlum/demos/python/python_glibc && ./install_python_with_conda.sh && SGX_MODE=SIM ./run_python_on_occlum.sh && cat occlum_instance/smvlight.dat"
 
 
   # Test_rpm_package:
