@@ -312,9 +312,6 @@ impl EpollFile {
 
             let new_ep_inner = EpollEntryInner { event, flags };
             let mut old_ep_inner = ep_entry.inner.lock().unwrap();
-            if *old_ep_inner == new_ep_inner {
-                return Ok(());
-            }
             *old_ep_inner = new_ep_inner;
             drop(old_ep_inner);
 
