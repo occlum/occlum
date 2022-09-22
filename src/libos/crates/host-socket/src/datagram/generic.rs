@@ -126,6 +126,8 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
             // which might increase the design complexity.
 
             self.common.set_peer_addr(peer);
+            self.receiver.reset_shutdown();
+            self.sender.reset_shutdown();
             state.mark_connected();
             do_connect(self.host_fd(), Some(peer))?;
             if !state.is_bound() {
@@ -155,6 +157,36 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
         Ok(())
     }
 
+    /// Shutdown the udp socket. This syscall is very TCP-oriented, but it is also useful for udp socket.
+    /// Not like tcp, shutdown does nothing on the wire, it only changes shutdown states.
+    /// The shutdown states block the io-uring request of receiving or sending message.
+    pub async fn shutdown(&self, how: Shutdown) -> Result<()> {
+        let state = self.state.read().unwrap();
+        if !state.is_connected() {
+            return_errno!(ENOTCONN, "The udp socket is not connected");
+        }
+        drop(state);
+        self.common.host_shutdown(how)?;
+        match how {
+            Shutdown::Read => {
+                self.receiver.shutdown();
+                self.common.pollee().add_events(Events::IN);
+            }
+            Shutdown::Write => {
+                self.sender.shutdown();
+                self.common.pollee().add_events(Events::OUT);
+            }
+            Shutdown::Both => {
+                self.receiver.shutdown();
+                self.sender.shutdown();
+                self.common
+                    .pollee()
+                    .add_events(Events::IN | Events::OUT | Events::HUP);
+            }
+        }
+        Ok(())
+    }
+
     pub async fn read(&self, buf: &mut [u8]) -> Result<usize> {
         self.readv(&mut [buf]).await
     }
@@ -172,7 +204,11 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
     /// That is because `recvfrom` doesn't privide a implicit binding. If you
     /// don't do a explicit or implicit binding, the sender doesn't know where
     /// to send the data.
-    pub async fn recvmsg(&self, bufs: &mut [&mut [u8]], flags: RecvFlags) -> Result<(usize, A)> {
+    pub async fn recvmsg(
+        &self,
+        bufs: &mut [&mut [u8]],
+        flags: RecvFlags,
+    ) -> Result<(usize, Option<A>)> {
         self.receiver.recvmsg(bufs, flags).await
     }
 

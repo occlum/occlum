@@ -441,15 +441,15 @@ impl SocketFile {
             }
             AnySocket::Ipv4Datagram(ipv4_datagram) => {
                 let (bytes_recv, addr_recv) = ipv4_datagram.recvmsg(bufs, flags).await?;
-                (bytes_recv, Some(AnyAddr::Ipv4(addr_recv)))
+                (bytes_recv, addr_recv.map(|addr| AnyAddr::Ipv4(addr)))
             }
             AnySocket::Ipv6Datagram(ipv6_datagram) => {
                 let (bytes_recv, addr_recv) = ipv6_datagram.recvmsg(bufs, flags).await?;
-                (bytes_recv, Some(AnyAddr::Ipv6(addr_recv)))
+                (bytes_recv, addr_recv.map(|addr| AnyAddr::Ipv6(addr)))
             }
             AnySocket::UnixDatagram(unix_datagram) => {
                 let (bytes_recv, addr_recv) = unix_datagram.recvmsg(bufs, flags).await?;
-                (bytes_recv, Some(AnyAddr::Unix(addr_recv)))
+                (bytes_recv, addr_recv.map(|addr| AnyAddr::Unix(addr)))
             }
             AnySocket::NetlinkDatagram(netlink_socket) => {
                 let (bytes_recv, addr_recv) = netlink_socket.recvmsg(bufs, flags).await?;
@@ -564,6 +564,8 @@ impl SocketFile {
             AnySocket::Ipv4Stream(ipv4_stream) => ipv4_stream.shutdown(how).await,
             AnySocket::Ipv6Stream(ipv6_stream) => ipv6_stream.shutdown(how).await,
             AnySocket::UnixStream(unix_stream) => unix_stream.shutdown(how).await,
+            AnySocket::Ipv4Datagram(ipv4_datagram) => ipv4_datagram.shutdown(how).await,
+            AnySocket::Ipv6Datagram(ipv6_datagram) => ipv6_datagram.shutdown(how).await,
             _ => {
                 return_errno!(EINVAL, "shutdown is not supported");
             }

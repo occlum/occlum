@@ -58,7 +58,7 @@ mod if_std {
                 AddrNotAvailable => EADDRNOTAVAIL,
                 BrokenPipe => EPIPE,
                 AlreadyExists => EEXIST,
-                WouldBlock => EWOULDBLOCK,
+                WouldBlock => Errno::EWOULDBLOCK,
                 InvalidInput => EINVAL,
                 InvalidData => EBADMSG, /* TODO: correct? */
                 TimedOut => ETIMEDOUT,

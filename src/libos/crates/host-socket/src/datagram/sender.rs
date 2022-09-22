@@ -1,6 +1,8 @@
+use core::sync::atomic::{AtomicBool, Ordering};
 use std::ptr::{self};
 
 use io_uring_callback::Fd;
+use sgx_trts::libc::EWOULDBLOCK;
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
 use crate::common::Common;
@@ -9,12 +11,32 @@ use crate::runtime::Runtime;
 
 pub struct Sender<A: Addr + 'static, R: Runtime> {
     common: Arc<Common<A, R>>,
+    is_shutdown: AtomicBool,
 }
 
 impl<A: Addr, R: Runtime> Sender<A, R> {
     pub fn new(common: Arc<Common<A, R>>) -> Self {
         common.pollee().add_events(Events::OUT);
-        Self { common }
+        let is_shutdown = AtomicBool::new(false);
+        Self {
+            common,
+            is_shutdown,
+        }
+    }
+
+    /// Shutdown udp sender.
+    pub fn shutdown(&self) {
+        self.is_shutdown.store(true, Ordering::Relaxed)
+    }
+
+    /// Reset udp sender shutdown state.
+    pub fn reset_shutdown(&self) {
+        self.is_shutdown.store(false, Ordering::Relaxed)
+    }
+
+    /// Obtain udp sender shutdown state.
+    fn is_shutdown(&self) -> bool {
+        self.is_shutdown.load(Ordering::Relaxed)
     }
 
     pub async fn sendmsg(
@@ -23,6 +45,9 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
         addr: Option<&A>,
         flags: SendFlags,
     ) -> Result<usize> {
+        if self.is_shutdown() {
+            return_errno!(Errno::EWOULDBLOCK, "the write has been shutdown")
+        }
         let total_len: usize = bufs.iter().map(|buf| buf.len()).sum();
         if total_len > super::MAX_BUF_SIZE {
             return_errno!(EMSGSIZE, "the message is too large")
