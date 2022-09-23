@@ -64,7 +64,42 @@ __switch_to_user:
     pop %rax
     pop %rcx
     pop %rsp
+
+    // Store RFLAGS since `cmp` operation may overwrite it
+    pushfq
+    push %rax
+
+    mov pku_enabled(%rip), %rax
+    cmp $1, %rax
+    je update_pkru_at_switch_to_user
+
+    pop %rax
+    popfq
+
     jmp *%gs:(TD_USER_RIP)
+    // This should never happen
+    ud2
+
+update_pkru_at_switch_to_user:
+    pop %rax
+    popfq
+
+    sub $0x20, %rsp
+    mov %rax, (%rsp)
+    mov %rdx, 0x8(%rsp)
+    mov %rcx, 0x10(%rsp)
+    mov %gs:(TD_USER_RIP), %rcx
+    mov %rcx, 0x18(%rsp)
+
+    xor %ecx, %ecx
+    xor %edx, %edx
+    mov $PKRU_USER, %eax
+    wrpkru
+
+    pop %rax
+    pop %rdx
+    pop %rcx
+    ret
 
     // This should never happen
     ud2
@@ -95,6 +130,22 @@ __switch_to_user:
     // This should never happen
     ud2
 .endm
+
+    .global __syscall_entry_linux_pku_abi
+    .type __syscall_entry_linux_pku_abi, @function
+__syscall_entry_linux_pku_abi:
+    pushq %rcx
+    pushq %rdx
+    pushq %rax
+
+    xor %ecx, %ecx
+    xor %edx, %edx
+    mov $PKRU_LIBOS, %eax
+    wrpkru
+
+    popq %rax
+    popq %rdx
+    popq %rcx
 
     .global __syscall_entry_linux_abi
     .type __syscall_entry_linux_abi, @function

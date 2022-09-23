@@ -134,6 +134,10 @@ enclave {
 
         int occlum_ocall_mprotect([user_check] void* addr, size_t len, int prot);
 
+        int occlum_ocall_pkey_alloc(unsigned int flags, unsigned int access_rights);
+        int occlum_ocall_pkey_mprotect([user_check] void* addr, size_t len, int prot, int pkey);
+        int occlum_ocall_pkey_free(int pkey);
+
         int occlum_ocall_get_numa_topology(
             [out, count=ncpus] uint32_t *numa_buf,
             size_t ncpus

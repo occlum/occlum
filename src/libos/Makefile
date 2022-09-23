@@ -45,9 +45,12 @@ LIBOS_LOG ?= error
 
 LIBOS_SONAME := libocclum-libos.so.$(MAJOR_VER_NUM)
 
+LIBOS_FEATURES :=
+
 ifneq ($(SGX_MODE), HW)
 	LIBOS_CORE_LIB_NAME := occlum-libos-core_sim
 	LIBOS_SO_REAL := $(BUILD_DIR)/lib/libocclum-libos_sim.so.$(VERSION_NUM)
+	LIBOS_FEATURES += pku
 else
 	LIBOS_CORE_LIB_NAME := occlum-libos-core
 	LIBOS_SO_REAL := $(BUILD_DIR)/lib/libocclum-libos.so.$(VERSION_NUM)
@@ -114,8 +117,6 @@ ifneq (, $(shell which sccache))
 else
     RUSTC_WRAPPER :=
 endif
-
-LIBOS_FEATURES :=
 
 ifndef OCCLUM_DISABLE_DCAP
     LIBOS_FEATURES += dcap

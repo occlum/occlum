@@ -38,6 +38,10 @@ less than 4096 is unused by anyone. We can use it.*/
 #define ARCH_SET_FS         (0x01002)
 #define ARCH_GET_FS         (0x01003)
 
+/* PKU configuraion for LibOS and userspace applications */
+#define PKRU_LIBOS          (0x0)
+#define PKRU_USER           (0x55555551)
+
 #else /* ! __ASSEMBLY_ */
 
 #include <stddef.h>

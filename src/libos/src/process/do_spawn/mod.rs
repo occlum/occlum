@@ -16,6 +16,7 @@ use crate::fs::{
 };
 use crate::prelude::*;
 use crate::process::pgrp::{get_spawn_attribute_pgrp, update_pgrp_for_new_process};
+use crate::util::pku_util;
 use crate::vm::ProcessVM;
 
 mod aux_vec;
@@ -464,7 +465,11 @@ fn init_auxvec(process_vm: &ProcessVM, exec_elf_file: &ElfFile) -> Result<AuxVec
     let ldso_elf_base = process_vm.get_elf_ranges()[1].start() as u64;
     auxvec.set(AuxKey::AT_BASE, ldso_elf_base)?;
 
-    let syscall_addr = __syscall_entry_linux_abi as *const () as u64;
+    let syscall_addr = if pku_util::check_pku_enabled() {
+        __syscall_entry_linux_pku_abi
+    } else {
+        __syscall_entry_linux_abi
+    } as *const () as u64;
     auxvec.set(AuxKey::AT_OCCLUM_ENTRY, syscall_addr)?;
     // TODO: init AT_EXECFN
     // auxvec.set_val(AuxKey::AT_EXECFN, "program_name")?;
@@ -474,5 +479,6 @@ fn init_auxvec(process_vm: &ProcessVM, exec_elf_file: &ElfFile) -> Result<AuxVec
 
 extern "C" {
     fn __syscall_entry_linux_abi() -> i64;
+    fn __syscall_entry_linux_pku_abi() -> i64;
     fn occlum_gdb_hook_load_elf(elf_base: u64, elf_path: *const u8, elf_path_len: u64);
 }
