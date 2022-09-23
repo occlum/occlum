@@ -28,30 +28,26 @@ prepare_glibc:
 	rm -rf $(tmp_build_dir)
 	rm -rf $(install_dir)
 	mkdir -p $(src_dir)
-	cd $(src_dir)
-	git clone -b occlum-glibc-2.31 https://github.com/occlum/glibc .
+	mkdir -p $(install_dir)
 
 
 override_dh_auto_build: prepare_glibc
-	mkdir -p $(tmp_build_dir)/build
-	cd $(tmp_build_dir)/build
-	unset LD_LIBRARY_PATH
-	${src_dir}/configure \
-		--prefix=${install_dir} --with-tls --without-selinux \
-		--disable-nscd
-	make
+	echo "skip override_dh_auto_build"
 
 
 # We create symlinks in /usr/local
 override_dh_usrlocal:
-	echo "Skip ..."
+	echo "Skip override_dh_usrlocal"
 
 override_dh_fixperms:
 	dh_fixperms
+	# Occlum need this to be executable
+	chmod 755 $(install_dir)/lib/ld-2.31.so
+	chmod 755 $(install_dir)/lib/libc.so.6
 
 override_dh_install:
-	cd $(tmp_build_dir)/build
-	make install
+	mkdir -p $(install_dir)
+	cp -rf /opt/occlum/glibc/* $(install_dir)/
 
 clean:
 	dh_clean
