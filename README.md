@@ -124,7 +124,15 @@ Occlum can be configured easily via a configuration file named `Occlum.json`, wh
         "version_number": 0,
         // Whether the enclave is debuggable through special SGX instructions.
         // For production enclave, it is IMPORTANT to set this value to false.
-        "debuggable": true
+        "debuggable": true,
+        // Whether to turn on PKU feature in Occlum
+        // Occlum uses PKU for isolation between LibOS and userspace program,
+        // It is useful for developers to detect potential bugs.
+        //
+        // "pkru" = 0: PKU feature must be disabled
+        // "pkru" = 1: PKU feature must be enabled
+        // "pkru" = 2: PKU feature is enabled if the platform supports it
+        "pkru": 0
     },
     // Mount points and their file systems
     //
