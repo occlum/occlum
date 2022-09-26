@@ -186,6 +186,11 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
     fn is_shutdown(&self) -> bool {
         self.inner.lock().unwrap().is_shutdown
     }
+
+    pub fn ready_len(&self) -> usize {
+        let inner = self.inner.lock().unwrap();
+        inner.recv_len().unwrap_or(0)
+    }
 }
 
 struct Inner {
@@ -322,6 +327,10 @@ impl Inner {
 
             copy_offset
         })
+    }
+
+    pub fn recv_len(&self) -> Option<usize> {
+        self.recv_len
     }
 
     /// Return the addr of the received packet if udp socket is not connected.

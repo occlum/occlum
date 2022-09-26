@@ -315,6 +315,10 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
             cmd: GetIfConf => {
                 cmd.execute(self.host_fd())?;
             },
+            cmd: GetReadBufLen => {
+                let read_buf_len = self.receiver.ready_len();
+                cmd.set_output(read_buf_len as _);
+            },
             _ => {
                 return_errno!(EINVAL, "Not supported yet");
             }
