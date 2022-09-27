@@ -31,10 +31,11 @@ int pal_run_init_process() {
         .stderr_fd = STDERR_FILENO,
     };
     int libos_tid = 0;
+    extern const char **environ;
     struct occlum_pal_create_process_args init_process_args = {
         .path = init_path,
         .argv = init_argv,
-        .env = NULL,
+        .env = environ,
         .stdio = &init_io_fds,
         .pid = &libos_tid,
     };
