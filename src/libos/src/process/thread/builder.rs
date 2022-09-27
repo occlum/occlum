@@ -134,6 +134,7 @@ impl ThreadBuilder {
             SgxMutex::new(None)
         };
         let host_eventfd = Arc::new(HostEventFd::new()?);
+        let raw_ptr = RwLock::new(0);
 
         let new_thread = Arc::new(Thread {
             task,
@@ -154,6 +155,7 @@ impl ThreadBuilder {
             sig_stack,
             profiler,
             host_eventfd,
+            raw_ptr,
         });
 
         let mut inner = new_thread.process().inner();

@@ -48,6 +48,7 @@ pub struct Thread {
     profiler: SgxMutex<Option<ThreadProfiler>>,
     // Misc
     host_eventfd: Arc<HostEventFd>,
+    raw_ptr: RwLock<usize>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -55,6 +56,7 @@ pub enum ThreadStatus {
     Init,
     Running,
     Exited,
+    Stopped,
 }
 
 impl Thread {
@@ -112,6 +114,11 @@ impl Thread {
     /// Get the alternate thread performance profiler
     pub fn profiler(&self) -> &SgxMutex<Option<ThreadProfiler>> {
         &self.profiler
+    }
+
+    /// Get the host thread's raw pointer of this libos thread
+    pub fn raw_ptr(&self) -> usize {
+        self.raw_ptr.read().unwrap().clone()
     }
 
     /// Get a file from the file table.
@@ -206,7 +213,15 @@ impl Thread {
 
     pub(super) fn start(&self, host_tid: pid_t) {
         self.sched().lock().unwrap().attach(host_tid);
-        self.inner().start();
+        let mut raw_ptr = self.raw_ptr.write().unwrap();
+        *raw_ptr = (unsafe { sgx_thread_get_self() } as usize);
+
+        // Before the thread starts, this thread could be stopped by other threads
+        if self.is_forced_to_stop() {
+            info!("thread is forced to stopped before this thread starts");
+        } else {
+            self.inner().start();
+        }
 
         let eventfd = EventFile::new(
             0,
@@ -266,6 +281,20 @@ impl Thread {
     pub(super) fn inner(&self) -> SgxMutexGuard<ThreadInner> {
         self.inner.lock().unwrap()
     }
+
+    pub fn force_stop(&self) {
+        let mut inner = self.inner();
+        inner.stop();
+    }
+
+    pub fn is_forced_to_stop(&self) -> bool {
+        self.inner().status() == ThreadStatus::Stopped
+    }
+
+    pub fn resume(&self) {
+        let mut inner = self.inner();
+        inner.resume();
+    }
 }
 
 impl PartialEq for Thread {
@@ -302,6 +331,7 @@ pub enum ThreadInner {
     Init,
     Running,
     Exited { term_status: TermStatus },
+    Stopped,
 }
 
 impl ThreadInner {
@@ -314,6 +344,7 @@ impl ThreadInner {
             Self::Init { .. } => ThreadStatus::Init,
             Self::Running { .. } => ThreadStatus::Running,
             Self::Exited { .. } => ThreadStatus::Exited,
+            Self::Stopped { .. } => ThreadStatus::Stopped,
         }
     }
 
@@ -325,7 +356,14 @@ impl ThreadInner {
     }
 
     pub fn start(&mut self) {
-        debug_assert!(self.status() == ThreadStatus::Init);
+        *self = Self::Running;
+    }
+
+    pub fn stop(&mut self) {
+        *self = Self::Stopped;
+    }
+
+    pub fn resume(&mut self) {
         *self = Self::Running;
     }
 
@@ -333,4 +371,8 @@ impl ThreadInner {
         debug_assert!(self.status() == ThreadStatus::Running);
         *self = Self::Exited { term_status };
     }
+}
+
+extern "C" {
+    pub(crate) fn sgx_thread_get_self() -> *const c_void;
 }
