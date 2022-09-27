@@ -1,6 +1,6 @@
 use crate::error::{
     COPY_DIR_ERROR, COPY_FILE_ERROR, CREATE_DIR_ERROR, CREATE_SYMLINK_ERROR, FILE_NOT_EXISTS_ERROR,
-    INCORRECT_HASH_ERROR, MISSING_LIBRARY_ERROR,
+    INCORRECT_HASH_ERROR, MISSING_LIBRARY_ERROR, RSYNC_NOT_FOUND_ERROR,
 };
 use data_encoding::HEXUPPER;
 use elf::types::{Type, ET_DYN, ET_EXEC};
@@ -8,7 +8,7 @@ use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 use std::sync::Mutex;
 use std::vec;
 
@@ -597,4 +597,22 @@ pub fn warn_on_nonempty_image_dir(image_dir: &str) {
             }
         }
     }
+}
+
+/// Check rsync is installed by running command `rsync --version`.
+/// The exit code should be zero if rsync is installed.
+/// If rsync is not installed, copy_bom will abort.
+pub fn check_rsync() {
+    let mut command = Command::new("rsync");
+    command.arg("--version");
+    command.stdout(Stdio::null());
+    if let Ok(status) = command.status() {
+        if let Some(exit_code) = status.code() {
+            if exit_code == 0 {
+                return;
+            }
+        }
+    }
+    println!("rsync is not installed.");
+    std::process::exit(RSYNC_NOT_FOUND_ERROR);
 }

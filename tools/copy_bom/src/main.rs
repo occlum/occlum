@@ -10,6 +10,7 @@ extern crate walkdir;
 use bom::Bom;
 use env_logger::Env;
 use structopt::StructOpt;
+use util::check_rsync;
 
 mod bom;
 mod error;
@@ -49,6 +50,7 @@ fn main() {
     // the copy_bom log environmental variable
     let env = Env::new().filter("OCCLUM_LOG_LEVEL");
     env_logger::init_from_env(env);
+    check_rsync();
 
     let copy_bom_option = CopyBomOption::from_args();
     copy_bom_option.copy_files();
