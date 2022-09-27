@@ -730,6 +730,8 @@ fn do_syscall(user_context: &mut CpuContext) {
 
     crate::signal::deliver_signal(user_context);
 
+    crate::process::handle_force_stop();
+
     crate::process::handle_force_exit();
 }
 

@@ -46,6 +46,7 @@ pub fn broadcast_interrupts() -> Result<usize> {
     let should_interrupt_thread = |thread: &&ThreadRef| -> bool {
         // TODO: check Thread::sig_mask to reduce false positives
         thread.process().is_forced_to_exit()
+            || thread.is_forced_to_stop()
             || !thread.sig_queues().read().unwrap().empty()
             || !thread.process().sig_queues().read().unwrap().empty()
     };

@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <sys/wait.h>
+#include <pthread.h>
 #include "test.h"
 
 // Note: This test intends to test the case that child process directly calls _exit()
@@ -89,10 +90,87 @@ parent_exit:
     exit(1);
 }
 
+volatile static int test_stop_child_flag = 0;
+
+static void *child_thread_routine(void *_arg) {
+    printf("Child thread starts\n");
+    test_stop_child_flag = 1;
+
+    struct timespec t1, t2;
+    if (clock_gettime(CLOCK_REALTIME, &t1)) {
+        return (void *) -1;
+    }
+
+    sleep(1);
+
+    if (clock_gettime(CLOCK_REALTIME, &t2)) {
+        return (void *) -1;
+    }
+
+    // Parent thread vfork and will stop this thread for several seconds
+    if (t2.tv_sec - t1.tv_sec <= 1) {
+        printf("the thread is not stopped");
+        exit(-1);
+    }
+
+    printf("child thread exits\n");
+    return NULL;
+}
+
+// Test the behavior that when vfork is called, the parent process' other child threads are forced to stopped.
+//
+// This test case has different behaviors for Linux and Occlum
+// This limitation is recorded in src/libos/src/process/do_vfork.rs
+int test_vfork_stop_child_thread() {
+    pthread_t child_thread;
+    pid_t child_pid;
+    struct timespec ts;
+    ts.tv_sec = 3;
+    ts.tv_nsec = 0;
+    if (pthread_create(&child_thread, NULL, child_thread_routine, NULL) < 0) {
+        THROW_ERROR("pthread_create failed\n");
+    }
+
+    // Wait for child thread to start
+    while (test_stop_child_flag == 0);
+
+    child_pid = vfork();
+    if (child_pid == 0) {
+        printf("child process created\n");
+        char **child_argv = calloc(1, sizeof(char *) * 2);
+        child_argv[0] = "getpid";
+
+        // Wait for a few seconds
+        while (1) {
+            int ret = nanosleep(&ts, &ts);
+            if (ret == 0) {
+                break;
+            }
+            if (ret < 0 && errno != EINTR) {
+                THROW_ERROR("nanosleep failed");
+            }
+        }
+
+        printf("child process exec\n");
+        int ret = execve("/bin/getpid", child_argv, NULL);
+        if (ret != 0) {
+            printf("child process execve error\n");
+        }
+        _exit(1);
+    } else {
+        printf("return to parent\n");
+
+        pthread_join(child_thread, NULL);
+    }
+
+    return 0;
+}
+
 static test_case_t test_cases[] = {
     TEST_CASE(test_vfork_exit),
     TEST_CASE(test_multiple_vfork_execve),
     TEST_CASE(test_vfork_isolate_file_table),
+    TEST_CASE(test_vfork_stop_child_thread),
 };
 
 int main() {
