@@ -8,9 +8,6 @@ export INITRA_DIR="${script_dir}/init_ra"
 export RATLS_DIR="${script_dir}/../demos/ra_tls"
 export TF_DIR="${script_dir}/tf_serving"
 
-GRPC_SERVER_DOMAIN=${1:-localhost}
-GRPC_SERVER_PORT=${2:-50051}
-
 function build_ratls()
 {
     rm -rf ${DEP_LIBS_DIR} && mkdir ${DEP_LIBS_DIR}
@@ -62,12 +59,9 @@ function build_tf_instance()
                     .process.default_heap_size = "128MB" |
                     .resource_limits.max_num_of_threads = 64 |
                     .metadata.debuggable = false |
-                    .env.default += ["GRPC_SERVER=localhost:50051"]' Occlum.json)" && \
+                    .env.default += ["GRPC_SERVER=localhost:50051"] |
+                    .env.untrusted += ["GRPC_SERVER"]' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
-
-    # Update GRPC_SERVER env
-    GRPC_SERVER="${GRPC_SERVER_DOMAIN}:${GRPC_SERVER_PORT}"
-    sed -i "s/localhost:50051/$GRPC_SERVER/g" Occlum.json
 
     occlum build --image-key ../image_key
 
@@ -85,9 +79,6 @@ function build_tf_instance()
     # prepare init-ra content
     rm -rf initfs
     copy_bom -f ../init_ra_client.yaml --root initfs --include-dir /opt/occlum/etc/template
-
-    # Set GRPC_SERVER_DOMAIN to the hosts
-    # echo "$IP ${GRPC_SERVER_DOMAIN}" >> initfs/etc/hosts
 
     occlum build -f --image-key ../image_key
     occlum package occlum_instance
@@ -139,9 +130,6 @@ function build_server_instance()
 
     rm -rf image
     copy_bom -f ../ra_server.yaml --root image --include-dir /opt/occlum/etc/template
-
-    # Set GRPC_SERVER_DOMAIN to the hosts
-    # echo "$IP ${GRPC_SERVER_DOMAIN} " >> image/etc/hosts
 
     occlum build
     occlum package occlum_instance

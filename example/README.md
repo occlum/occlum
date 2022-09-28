@@ -51,15 +51,26 @@ Extra model_key could be added to protect the models if necessary. (not included
 
 Now users could send inference request with server certificates (`server.crt`).
 
+## Get the demo docker images
+
+There are prebuilt docker images could be used for the examples, either in the following docker way or [`kubernates`](./kubernetes/) way. Users could pull them directly and try the example.
+```
+docker pull occlum/init_ra_server:0.29.0
+docker pull occlum/tf_demo:0.29.0
+docker pull occlum/tf_demo_client:0.29.0
+```
+
+If users want to build or customize the images, please check below part.
+
 ## How-to build
 
 Our target is to deploy the demo in separated container images, so docker build is necessary steps. Thanks to the `docker run in docker` method, this example build could be done in Occlum development container image.
 
-First, please make sure `docker` is installed successfully in your host. Then start the Occlum container (use version `0.27.0-ubuntu20.04` for example) as below.
+First, please make sure `docker` is installed successfully in your host. Then start the Occlum container (use version `0.29.0-ubuntu20.04` for example) as below.
 ```
 $ sudo docker run --rm -itd --network host \
         -v $(which docker):/usr/bin/docker -v /var/run/docker.sock:/var/run/docker.sock \
-        occlum/occlum:0.27.0-ubuntu20.04
+        occlum/occlum:0.29.0-ubuntu20.04
 ```
 
 All the following are running in the above container.
@@ -69,11 +80,8 @@ All the following are running in the above container.
 This step prepares all the content and builds the Occlum images.
 
 ```
-# ./build_content.sh localhost 50051
+# ./build_content.sh
 ```
-
-Parameters `localhost` and `50051` indicate the network domain and port for the GRPC server.
-Users could modify them depending on the real case situation.
 
 Below are the two Occlum images.
 
@@ -137,4 +145,9 @@ There is an example python based [`inference client`](./client/inception_client.
 ```
 # cd client
 # python3 inception_client.py --server=localhost:9000 --crt ../ssl_configure/server.crt --image cat.jpg
+```
+
+Or you can use the demo client container image to do the inference test.
+```
+$ docker run --rm --network host <registry>/tf_demo_client:<tag> python3 inception_client.py --server=localhost:9000 --crt server.crt --image cat.jpg
 ```

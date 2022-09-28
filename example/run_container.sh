@@ -17,6 +17,7 @@ usage: $(basename "$0") [OPTION]...
     -p <GRPC Server port> default 50051.
     -u <PCCS URL> default https://localhost:8081/sgx/certification/v3/.
     -r <registry prefix> the registry for this demo container images.
+    -g <image tag> the container images tag, default it is "latest".
     -h <usage> usage help
 EOM
     exit 0
@@ -48,10 +49,12 @@ docker run --network host \
 sleep 3
 
 echo "Start Tensorflow-Serving on backgound ..."
+GRPC_SERVER="${grpc_domain}:${grpc_port}"
 
 docker run --network host \
         --device /dev/sgx/enclave --device /dev/sgx/provision \
         --env PCCS_URL=${pccs_url} \
+        --env GRPC_SERVER="${GRPC_SERVER}" \
         ${registry}/tf_demo:${tag} \
         taskset -c 0,1 occlum run /bin/tensorflow_model_server \
         --model_name=INCEPTION --model_base_path=/model/INCEPTION/INCEPTION \
