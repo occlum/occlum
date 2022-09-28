@@ -4,7 +4,7 @@ This folder contains scripts and Dockerfiles for users to build the Docker image
 for Occlum. An Occlum Docker image sets up the development environment for
 Occlum and also gets Occlum preinstalled.
 
-Currently, three Linux OS distributions are supported: Ubuntu 18.04, CentOS 8.2 and aliyunlinux3.
+Currently, three Linux OS distributions are supported: Ubuntu 18.04, Ubuntu 20.04, CentOS 8.2, aliyunlinux3 and anolis8.4.
 
 ## How to Build
 
@@ -17,7 +17,7 @@ describe the version of Occlum preinstalled in the Docker image
 (e.g., "latest", "0.24.0", and "prerelease") and `<OS_NAME>` is the
 name of the OS distribution that the Docker image is based on.
 Currently, `<OS_NAME>` must be one of the following values:
-`ubuntu18.04`, `centos8.2` and `aliyunlinux3`.
+`ubuntu18.04`, `ubuntu20.04`, `centos8.2`, `aliyunlinux3` and `anolis8.4`.
 `<OCCLUM_BRANCH>` indicates which the docker image is built on, e.g "0.24.0".
 It is optional, if not provided, "master" branch will be used.
 
