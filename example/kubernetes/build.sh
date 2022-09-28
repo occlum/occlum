@@ -9,8 +9,6 @@ pip_mirror="-i https://pypi.douban.com/simple"
 
 registry="demo"
 tag="latest"
-grpc_server_domain="init-ra-server-svc"
-grpc_server_port="5000"
 
 function usage {
     cat << EOM
@@ -18,20 +16,16 @@ Build Occlum TF examples container images for k8s deployment.
 usage: $(basename "$0") [OPTION]...
     -r <container image registry> the container image registry
     -g <tag> container image tag
-    -d <grpc_server_domain> GPRC RA server domain
-    -p <grpc_server_port> GPRC RA server port
     -h <usage> usage help
 EOM
     exit 0
 }
 
 function process_args {
-    while getopts ":r:g:d:p:h" option; do
+    while getopts ":r:g:h" option; do
         case "${option}" in
             r) registry=${OPTARG};;
             g) tag=${OPTARG};;
-            d) grpc_server_domain=${OPTARG};;
-            p) grpc_server_port=${OPTARG};;
             h) usage;;
         esac
     done
@@ -44,13 +38,11 @@ echo "############################"
 echo "Build Occlum TF examples container images for k8s deployment"
 echo "  Container images registry: ${registry}"
 echo "  Container images tag: ${tag}"
-echo "  GRPC RA server domain: ${grpc_server_domain}"
-echo "  GRPC RA server port: ${grpc_server_port}"
 echo ""
 
 pushd ${top_dir}
 echo "Build Occlum instances first ..."
-./build_content.sh ${grpc_server_domain} ${grpc_server_port}
+./build_content.sh
 
 echo ""
 echo "Build Occlum container images ..."

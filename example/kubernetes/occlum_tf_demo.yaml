@@ -20,6 +20,8 @@ spec:
         env:
         - name: PCCS_URL
           value: https://sgx-dcap-server.cn-shanghai.aliyuncs.com/sgx/certification/v3/
+        - name: GRPC_SERVER
+          value: init-ra-server-svc:5000
         args:
         - taskset
         - -c
