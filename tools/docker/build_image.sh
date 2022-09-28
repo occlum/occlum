@@ -23,6 +23,7 @@ USAGE:
         ubuntu20.04         Use Ubuntu 20.04 as the base image
         centos8.2           Use CentOS 8.2 as the base image
         aliyunlinux3        Use AliyunLinux 3 as the base image
+        anolis8.4           Use Anolis 8.4 as the base image
 
 <OCCLUM_BRANCH>:
     The Occlum branch which the docker image is built on, e.g "0.24.0".
@@ -49,7 +50,7 @@ function check_item_in_list() {
     [[ $list =~ (^|[[:space:]])$item($|[[:space:]]) ]]
 }
 
-check_item_in_list "$os_name" "ubuntu18.04 ubuntu20.04 centos8.2 aliyunlinux3" || report_error
+check_item_in_list "$os_name" "ubuntu18.04 ubuntu20.04 centos8.2 aliyunlinux3 anolis8.4" || report_error
 
 cd "$script_dir/.."
 docker build -f "$script_dir/Dockerfile.$os_name" -t "occlum/occlum:$occlum_label-$os_name" --build-arg OCCLUM_BRANCH=$occlum_branch .
