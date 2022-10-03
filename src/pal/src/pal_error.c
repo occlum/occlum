@@ -27,6 +27,10 @@ static sgx_err_msg_t err_msg_table[] = {
         "Power transition occurred."
     },
     {
+        SGX_ERROR_OUT_OF_TCS,
+        "Out of TCS."
+    },
+    {
         SGX_ERROR_INVALID_ENCLAVE,
         "Invalid enclave image."
     },
