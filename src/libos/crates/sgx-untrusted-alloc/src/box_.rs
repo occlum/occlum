@@ -1,4 +1,5 @@
 use crate::untrusted_allocator::Allocator;
+use std::fmt::Debug;
 use std::mem::{align_of, size_of};
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
@@ -16,6 +17,17 @@ use crate::MaybeUntrusted;
 /// measure to avoid potential misuses.
 pub struct UntrustedBox<T: ?Sized> {
     ptr: NonNull<T>,
+}
+
+impl<T> Debug for UntrustedBox<T>
+where
+    T: ?Sized + Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Untrusted T")
+            .field("T", unsafe { &self.ptr.as_ref() })
+            .finish()
+    }
 }
 
 impl<T: MaybeUntrusted> UntrustedBox<T> {

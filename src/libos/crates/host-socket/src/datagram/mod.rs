@@ -16,3 +16,4 @@ pub use generic::DatagramSocket;
 pub use netlink::NetlinkSocket;
 
 const MAX_BUF_SIZE: usize = 64 * 1024;
+const OPTMEM_MAX: usize = 64 * 1024;

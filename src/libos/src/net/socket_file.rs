@@ -413,42 +413,43 @@ impl SocketFile {
         buf: &mut [u8],
         flags: RecvFlags,
     ) -> Result<(usize, Option<AnyAddr>)> {
-        self.recvmsg(&mut [buf], flags).await
+        self.recvmsg(&mut [buf], flags, None).await
     }
 
     pub async fn recvmsg(
         &self,
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
+        control: Option<&mut [u8]>,
     ) -> Result<(usize, Option<AnyAddr>)> {
         // TODO: support msg_flags and msg_control
         Ok(match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => {
-                let (bytes_recv, addr_recv) = ipv4_stream.recvmsg(bufs, flags).await?;
+                let (bytes_recv, addr_recv) = ipv4_stream.recvmsg(bufs, flags, control).await?;
                 (bytes_recv, addr_recv.map(|addr| AnyAddr::Ipv4(addr)))
             }
             AnySocket::Ipv6Stream(ipv6_stream) => {
-                let (bytes_recv, addr_recv) = ipv6_stream.recvmsg(bufs, flags).await?;
+                let (bytes_recv, addr_recv) = ipv6_stream.recvmsg(bufs, flags, control).await?;
                 (bytes_recv, addr_recv.map(|addr| AnyAddr::Ipv6(addr)))
             }
             AnySocket::UnixStream(unix_stream) => {
-                let (bytes_recv, addr_recv) = unix_stream.recvmsg(bufs, flags).await?;
+                let (bytes_recv, addr_recv) = unix_stream.recvmsg(bufs, flags, control).await?;
                 (bytes_recv, addr_recv.map(|addr| AnyAddr::Unix(addr)))
             }
             AnySocket::TrustedUDS(trusted_stream) => {
-                let (bytes_recv, addr_recv) = trusted_stream.recvmsg(bufs, flags).await?;
+                let (bytes_recv, addr_recv) = trusted_stream.recvmsg(bufs, flags, control).await?;
                 (bytes_recv, addr_recv.map(|addr| AnyAddr::Unix(addr)))
             }
             AnySocket::Ipv4Datagram(ipv4_datagram) => {
-                let (bytes_recv, addr_recv) = ipv4_datagram.recvmsg(bufs, flags).await?;
+                let (bytes_recv, addr_recv) = ipv4_datagram.recvmsg(bufs, flags, control).await?;
                 (bytes_recv, addr_recv.map(|addr| AnyAddr::Ipv4(addr)))
             }
             AnySocket::Ipv6Datagram(ipv6_datagram) => {
-                let (bytes_recv, addr_recv) = ipv6_datagram.recvmsg(bufs, flags).await?;
+                let (bytes_recv, addr_recv) = ipv6_datagram.recvmsg(bufs, flags, control).await?;
                 (bytes_recv, addr_recv.map(|addr| AnyAddr::Ipv6(addr)))
             }
             AnySocket::UnixDatagram(unix_datagram) => {
-                let (bytes_recv, addr_recv) = unix_datagram.recvmsg(bufs, flags).await?;
+                let (bytes_recv, addr_recv) = unix_datagram.recvmsg(bufs, flags, control).await?;
                 (bytes_recv, addr_recv.map(|addr| AnyAddr::Unix(addr)))
             }
             AnySocket::NetlinkDatagram(netlink_socket) => {
@@ -467,7 +468,7 @@ impl SocketFile {
         addr: Option<AnyAddr>,
         flags: SendFlags,
     ) -> Result<usize> {
-        self.sendmsg(&[buf], addr, flags).await
+        self.sendmsg(&[buf], addr, flags, None).await
     }
 
     pub async fn sendmsg(
@@ -475,6 +476,7 @@ impl SocketFile {
         bufs: &[&[u8]],
         addr: Option<AnyAddr>,
         flags: SendFlags,
+        control: Option<&[u8]>,
     ) -> Result<usize> {
         let res = match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => ipv4_stream.sendmsg(bufs, flags).await,
@@ -487,7 +489,7 @@ impl SocketFile {
                 } else {
                     None
                 };
-                ipv4_datagram.sendmsg(bufs, ip_addr, flags).await
+                ipv4_datagram.sendmsg(bufs, ip_addr, flags, control).await
             }
             AnySocket::Ipv6Datagram(ipv6_datagram) => {
                 let ip_addr = if let Some(addr) = addr.as_ref() {
@@ -495,7 +497,7 @@ impl SocketFile {
                 } else {
                     None
                 };
-                ipv6_datagram.sendmsg(bufs, ip_addr, flags).await
+                ipv6_datagram.sendmsg(bufs, ip_addr, flags, control).await
             }
             AnySocket::UnixDatagram(unix_datagram) => {
                 let unix_addr = if let Some(addr) = addr.as_ref() {
@@ -503,7 +505,7 @@ impl SocketFile {
                 } else {
                     None
                 };
-                unix_datagram.sendmsg(bufs, unix_addr, flags).await
+                unix_datagram.sendmsg(bufs, unix_addr, flags, control).await
             }
             AnySocket::NetlinkDatagram(netlink_socket) => {
                 let netlink_addr = if let Some(addr) = addr.as_ref() {

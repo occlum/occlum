@@ -1,8 +1,8 @@
+use core::ops::Deref;
 use core::sync::atomic::{AtomicBool, Ordering};
 use std::ptr::{self};
 
 use io_uring_callback::Fd;
-use sgx_trts::libc::EWOULDBLOCK;
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
 use crate::common::Common;
@@ -42,8 +42,9 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
     pub async fn sendmsg(
         &self,
         bufs: &[&[u8]],
-        addr: Option<&A>,
+        addr: &A,
         flags: SendFlags,
+        control: Option<&[u8]>,
     ) -> Result<usize> {
         if self.is_shutdown() {
             return_errno!(Errno::EWOULDBLOCK, "the write has been shutdown")
@@ -61,9 +62,19 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
             total_copied += buf.len();
         }
 
+        let send_control_buf = if let Some(msg_control) = control {
+            let send_controllen = msg_control.len();
+            let mut send_control_buf = UntrustedBox::new_uninit_slice(send_controllen);
+            send_control_buf.copy_from_slice(&msg_control[..send_controllen]);
+            Some(send_control_buf)
+        } else {
+            None
+        };
+
         // Generate the async send request
         let mut send_req = UntrustedBox::<SendReq>::new_uninit();
-        let msghdr_ptr = new_send_req(&mut send_req, &send_buf, addr);
+        let send_control_buf = send_control_buf.as_ref().map(|buf| &**buf);
+        let msghdr_ptr = new_send_req(&mut send_req, &send_buf, addr, send_control_buf);
 
         let send_flags = if self.common.nonblocking() || flags.contains(SendFlags::MSG_DONTWAIT) {
             libc::MSG_DONTWAIT as _
@@ -93,7 +104,12 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
     }
 }
 
-fn new_send_req<A: Addr>(req: &mut SendReq, buf: &[u8], addr: Option<&A>) -> *mut libc::msghdr {
+fn new_send_req<A: Addr>(
+    req: &mut SendReq,
+    buf: &[u8],
+    addr: &A,
+    msg_control: Option<&[u8]>,
+) -> *mut libc::msghdr {
     req.iovec = libc::iovec {
         iov_base: buf.as_ptr() as _,
         iov_len: buf.len(),
@@ -111,8 +127,16 @@ fn new_send_req<A: Addr>(req: &mut SendReq, buf: &[u8], addr: Option<&A>) -> *mu
     req.msg.msg_name = &raw mut req.addr as _;
     req.msg.msg_namelen = c_addr_len as _;
 
-    req.msg.msg_control = ptr::null_mut();
-    req.msg.msg_controllen = 0;
+    match msg_control {
+        Some(inner_control) => {
+            req.msg.msg_control = inner_control.as_ptr() as _;
+            req.msg.msg_controllen = inner_control.len() as _;
+        }
+        None => {
+            req.msg.msg_control = ptr::null_mut();
+            req.msg.msg_controllen = 0;
+        }
+    }
 
     &mut req.msg
 }

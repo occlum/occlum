@@ -36,7 +36,7 @@ impl Stream {
     }
 
     pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-        self.recvmsg(bufs, RecvFlags::empty())
+        self.recvmsg(bufs, RecvFlags::empty(), None)
             .await
             .map(|ret| ret.0)
     }
@@ -49,6 +49,7 @@ impl Stream {
         &self,
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
+        control: Option<&mut [u8]>,
     ) -> Result<(usize, Option<UnixAddr>)> {
         let addr = {
             let trusted_addr = self.peer_addr().ok();

@@ -274,11 +274,11 @@ pub async fn do_sendmsg(fd: c_int, msg_ptr: *const libc::msghdr, flags: c_int) -
         .as_socket_file()
         .ok_or_else(|| errno!(ENOTSOCK, "not a socket"))?;
 
-    let (addr, bufs) = extract_msghdr_from_user(msg_ptr)?;
+    let (addr, bufs, control) = extract_msghdr_from_user(msg_ptr)?;
     let flags = SendFlags::from_bits_truncate(flags);
 
     socket_file
-        .sendmsg(&bufs[..], addr, flags)
+        .sendmsg(&bufs[..], addr, flags, control)
         .await
         .map(|bytes_send| bytes_send as isize)
 }
@@ -294,10 +294,10 @@ pub async fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut libc::msghdr, flags: c_int)
         .as_socket_file()
         .ok_or_else(|| errno!(ENOTSOCK, "not a socket"))?;
 
-    let (mut msg, mut addr, mut bufs) = extract_msghdr_mut_from_user(msg_mut_ptr)?;
+    let (mut msg, mut addr, mut control, mut bufs) = extract_msghdr_mut_from_user(msg_mut_ptr)?;
     let flags = RecvFlags::from_bits_truncate(flags);
 
-    let (bytes_recv, recv_addr) = socket_file.recvmsg(&mut bufs[..], flags).await?;
+    let (bytes_recv, recv_addr) = socket_file.recvmsg(&mut bufs[..], flags, control).await?;
 
     if let Some(addr) = addr {
         if let Some(recv_addr) = recv_addr {
@@ -335,10 +335,10 @@ pub async fn do_sendmmsg(
 
     let mut send_count = 0;
     for mmsg in (msgvec) {
-        let (addr, bufs) = extract_msghdr_from_user(&mmsg.msg_hdr)?;
+        let (addr, bufs, control) = extract_msghdr_from_user(&mmsg.msg_hdr)?;
 
         if socket_file
-            .sendmsg(&bufs[..], addr, flags)
+            .sendmsg(&bufs[..], addr, flags, control)
             .await
             .map(|bytes_send| {
                 mmsg.msg_len += bytes_send as c_uint;
@@ -668,7 +668,7 @@ fn copy_bytes_to_user(src_buf: &[u8], dst_buf: &mut [u8], dst_len: &mut u32) {
 
 fn extract_msghdr_from_user<'a>(
     msg_ptr: *const libc::msghdr,
-) -> Result<(Option<AnyAddr>, Vec<&'a [u8]>)> {
+) -> Result<(Option<AnyAddr>, Vec<&'a [u8]>, Option<&'a [u8]>)> {
     let msg = from_user::make_ref(msg_ptr)?;
 
     let msg_name = msg.msg_name;
@@ -683,6 +683,25 @@ fn extract_msghdr_from_user<'a>(
         Some(AnyAddr::from_c_storage(
             &sockaddr_storage,
             msg_namelen as _,
+        )?)
+    };
+
+    let msg_control = msg.msg_control;
+    let msg_controllen = msg.msg_controllen;
+
+    if msg_control.is_null() ^ (msg_controllen == 0) {
+        return_errno!(
+            EINVAL,
+            "message control and controllen should be both null and 0 or not"
+        );
+    }
+
+    let control = if msg_control.is_null() {
+        None
+    } else {
+        Some(from_user::make_slice(
+            msg_control as *const u8,
+            msg_controllen as _,
         )?)
     };
 
@@ -703,13 +722,14 @@ fn extract_msghdr_from_user<'a>(
         bufs
     };
 
-    Ok((name, bufs))
+    Ok((name, bufs, control))
 }
 
 fn extract_msghdr_mut_from_user<'a>(
     msg_mut_ptr: *mut libc::msghdr,
 ) -> Result<(
     &'a mut libc::msghdr,
+    Option<&'a mut [u8]>,
     Option<&'a mut [u8]>,
     Vec<&'a mut [u8]>,
 )> {
@@ -726,6 +746,25 @@ fn extract_msghdr_mut_from_user<'a>(
         Some(from_user::make_mut_slice(
             msg_name as *mut u8,
             msg_namelen as usize,
+        )?)
+    };
+
+    let msg_control = msg_mut.msg_control;
+    let msg_controllen = msg_mut.msg_controllen;
+
+    if msg_control.is_null() ^ (msg_controllen == 0) {
+        return_errno!(
+            EINVAL,
+            "message control and controllen should be both null and 0 or not"
+        );
+    }
+
+    let control = if msg_control.is_null() {
+        None
+    } else {
+        Some(from_user::make_mut_slice(
+            msg_control as *mut u8,
+            msg_controllen as usize,
         )?)
     };
 
@@ -746,5 +785,5 @@ fn extract_msghdr_mut_from_user<'a>(
         bufs
     };
 
-    Ok((msg_mut, name, bufs))
+    Ok((msg_mut, name, control, bufs))
 }

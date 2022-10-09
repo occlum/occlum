@@ -188,8 +188,11 @@ impl UnixStream {
         &self,
         buf: &mut [&mut [u8]],
         flags: RecvFlags,
+        control: Option<&mut [u8]>,
     ) -> Result<(usize, Option<UnixAddr>)> {
-        apply_fn_on_any_stream!(self.inner(), |stream| { stream.recvmsg(buf, flags).await })
+        apply_fn_on_any_stream!(self.inner(), |stream| {
+            stream.recvmsg(buf, flags, None).await
+        })
     }
 
     pub async fn sendmsg(&self, bufs: &[&[u8]], flags: SendFlags) -> Result<usize> {

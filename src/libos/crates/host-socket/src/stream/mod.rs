@@ -201,7 +201,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-        let ret = self.recvmsg(bufs, RecvFlags::empty()).await?;
+        let ret = self.recvmsg(bufs, RecvFlags::empty(), None).await?;
         Ok(ret.0)
     }
 
@@ -214,6 +214,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         &self,
         buf: &mut [&mut [u8]],
         flags: RecvFlags,
+        control: Option<&mut [u8]>,
     ) -> Result<(usize, Option<A>)> {
         let connected_stream = {
             let mut state = self.state.write().unwrap();

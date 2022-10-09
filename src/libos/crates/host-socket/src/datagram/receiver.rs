@@ -7,6 +7,7 @@ use super::netlink::NetlinkMsg;
 use crate::common::Common;
 use crate::prelude::*;
 use crate::runtime::Runtime;
+use core::ffi::c_void;
 
 pub struct Receiver<A: Addr + 'static, R: Runtime> {
     common: Arc<Common<A, R>>,
@@ -23,19 +24,23 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         self: &Arc<Self>,
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
+        mut control: Option<&mut [u8]>,
     ) -> Result<(usize, Option<A>)> {
         let mask = Events::IN;
         // Initialize the poller only when needed
         let mut poller = None;
         loop {
             // Attempt to recv
-            let res = self.try_recvmsg(bufs, flags);
+            let res = self.try_recvmsg(bufs, flags, &mut control);
             if !res.has_errno(EAGAIN) {
                 return res;
             }
 
             // Need more handles for flags not MSG_DONTWAIT
-            if self.common.nonblocking() || flags.contains(RecvFlags::MSG_DONTWAIT) {
+            if self.common.nonblocking()
+                || flags.contains(RecvFlags::MSG_DONTWAIT)
+                || flags.contains(RecvFlags::MSG_ERRQUEUE)
+            {
                 return_errno!(EAGAIN, "no data are present to be received");
             }
 
@@ -60,9 +65,11 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         self: &Arc<Self>,
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
+        control: &mut Option<&mut [u8]>,
     ) -> Result<(usize, Option<A>)> {
         let mut inner = self.inner.lock().unwrap();
-        if !flags.is_empty() && flags != RecvFlags::MSG_DONTWAIT {
+        if !flags.is_empty() && flags != RecvFlags::MSG_DONTWAIT && flags != RecvFlags::MSG_ERRQUEUE
+        {
             // todo!("Support other flags");
             return_errno!(EINVAL, "the socket flags is not supported");
         }
@@ -74,7 +81,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         if A::domain() == Domain::Netlink {
             let recv_bytes = inner.try_copy_buf_netlink(bufs);
             if let Some(recv_bytes) = recv_bytes {
-                let recv_addr = inner.get_addr().unwrap();
+                let recv_addr = inner.get_packet_addr();
                 if inner.recv_len.is_none() {
                     // All recv_len are consumed, do next host recv.
                     self.do_recv(&mut inner);
@@ -86,6 +93,11 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
             let recv_bytes = inner.try_copy_buf(bufs);
             if let Some(recv_bytes) = recv_bytes {
                 let recv_addr = inner.get_packet_addr();
+                // Copy ancillary data from control buffer
+                control
+                    .as_mut()
+                    .map(|buf| buf.copy_from_slice(&inner.msg_control[..buf.len()]));
+
                 self.do_recv(&mut inner);
                 return Ok((recv_bytes, recv_addr));
             }
@@ -199,6 +211,7 @@ struct Inner {
     // Hence the recv_len might be 0.
     recv_len: Option<usize>,
     recv_buf_offset: usize, // When the recv_buf content length is greater than user buffer, store the offset for the recv_buf for read loop
+    msg_control: UntrustedBox<[u8]>,
     req: UntrustedBox<RecvReq>,
     io_handle: Option<IoHandle>,
     error: Option<Errno>,
@@ -213,6 +226,7 @@ impl Inner {
             recv_buf: UntrustedBox::new_uninit_slice(super::MAX_BUF_SIZE),
             recv_len: None,
             recv_buf_offset: 0,
+            msg_control: UntrustedBox::new_uninit_slice(super::OPTMEM_MAX),
             req: UntrustedBox::new_uninit(),
             io_handle: None,
             error: None,
@@ -233,6 +247,10 @@ impl Inner {
         msg.msg_iovlen = 1;
         msg.msg_name = &raw mut self.req.addr as _;
         msg.msg_namelen = std::mem::size_of::<libc::sockaddr_storage>() as _;
+
+        self.req.control = self.msg_control.as_mut_ptr() as _;
+        msg.msg_control = self.req.control as _;
+        msg.msg_controllen = self.msg_control.len() as _;
 
         self.req.msg = msg;
         self.req.iovec = iovec;
@@ -346,6 +364,7 @@ struct RecvReq {
     msg: libc::msghdr,
     iovec: libc::iovec,
     addr: libc::sockaddr_storage,
+    control: *mut c_void,
 }
 
 unsafe impl MaybeUntrusted for RecvReq {}
