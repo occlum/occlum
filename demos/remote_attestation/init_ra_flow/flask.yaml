@@ -1,0 +1,17 @@
+includes:
+  - base.yaml
+targets:
+  - target: /usr/bin
+    createlinks:
+      - src: /opt/python-occlum/bin/python3
+        linkname: python3
+  # python packages
+  - target: /opt
+    copy:
+      - dirs:
+          - ${FLASK_DIR}/python-occlum
+  # below are python code and data
+  - target: /bin
+    copy:
+      - files:
+        - ${FLASK_DIR}/rest_api.py

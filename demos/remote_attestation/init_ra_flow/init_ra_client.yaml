@@ -1,0 +1,19 @@
+includes:
+  - base.yaml
+targets:
+  - target: /bin/
+    copy:
+      - files:
+        - ${INITRA_DIR}/target/x86_64-unknown-linux-musl/release/init
+  - target: /lib/
+    copy:
+      - files:
+        - ${DEP_LIBS_DIR}/libgrpc_ratls_client.so
+  - target: /
+    copy:
+      - files:
+        - dynamic_config.json
+  - target: /usr/share/grpc/
+    copy:
+      - files:
+        - ${RATLS_DIR}/grpc-src/etc/roots.pem
