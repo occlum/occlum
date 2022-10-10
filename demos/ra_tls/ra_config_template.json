@@ -1,0 +1,18 @@
+{
+    "verify_mr_enclave" : "on",
+    "verify_mr_signer" : "on",
+    "verify_isv_prod_id" : "on",
+    "verify_isv_svn" : "on",
+    "verify_config_svn" : "on",
+    "verify_enclave_debuggable" : "on",
+    "sgx_mrs": [
+        {
+            "mr_enclave" : "",
+            "mr_signer" : "",
+            "isv_prod_id" : 0,
+            "isv_svn" : 0,
+            "config_svn" : 0,
+            "debuggable" : false
+        }
+    ]
+}
