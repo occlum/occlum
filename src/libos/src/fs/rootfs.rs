@@ -328,34 +328,51 @@ fn open_or_create_sefs_according_to(
     if mc.source.is_none() {
         return_errno!(EINVAL, "Source is expected for SEFS");
     }
-    if mc.options.temporary && mc.options.mac.is_some() {
+    let temporary = mc.options.temporary;
+    let root_mac = mc.options.mac;
+    let autokey_policy = mc.options.autokey_policy;
+    if temporary && root_mac.is_some() {
         return_errno!(EINVAL, "Integrity protected SEFS cannot be temporary");
     }
     let source_path = mc.source.as_ref().unwrap();
-    let root_mac = mc.options.mac;
-    let sefs = if !mc.options.temporary {
+    let sefs = if !temporary {
         if root_mac.is_some() {
             SEFS::open(
-                Box::new(SgxStorage::new(source_path, user_key, &root_mac)),
+                Box::new(SgxStorage::new(source_path, user_key, &root_mac, &None)),
                 &time::OcclumTimeProvider,
                 &SgxUuidProvider,
             )?
         } else if source_path.join("metadata").exists() {
             SEFS::open(
-                Box::new(SgxStorage::new(source_path, user_key, &root_mac)),
+                Box::new(SgxStorage::new(
+                    source_path,
+                    user_key,
+                    &None,
+                    &autokey_policy,
+                )),
                 &time::OcclumTimeProvider,
                 &SgxUuidProvider,
             )?
         } else {
             SEFS::create(
-                Box::new(SgxStorage::new(source_path, user_key, &root_mac)),
+                Box::new(SgxStorage::new(
+                    source_path,
+                    user_key,
+                    &None,
+                    &autokey_policy,
+                )),
                 &time::OcclumTimeProvider,
                 &SgxUuidProvider,
             )?
         }
     } else {
         SEFS::create(
-            Box::new(SgxStorage::new(source_path, user_key, &root_mac)),
+            Box::new(SgxStorage::new(
+                source_path,
+                user_key,
+                &None,
+                &autokey_policy,
+            )),
             &time::OcclumTimeProvider,
             &SgxUuidProvider,
         )?

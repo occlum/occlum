@@ -39,11 +39,12 @@ impl SgxStorage {
         path: impl AsRef<Path>,
         key: &Option<sgx_key_128bit_t>,
         root_mac: &Option<sgx_aes_gcm_128bit_tag_t>,
+        autokey_policy: &Option<u32>,
     ) -> Self {
         // assert!(path.as_ref().is_dir());
         SgxStorage {
             path: path.as_ref().to_path_buf(),
-            encrypt_mode: EncryptMode::new(key, root_mac),
+            encrypt_mode: EncryptMode::new(key, root_mac, autokey_policy),
             file_cache: Mutex::new(BTreeMap::new()),
         }
     }
@@ -101,7 +102,10 @@ impl Storage for SgxStorage {
                 EncryptMode::EncryptWithIntegrity(key, _) | EncryptMode::Encrypt(key) => {
                     options.open_ex(path, &key)?
                 }
-                EncryptMode::EncryptAutoKey => options.open(path)?,
+                EncryptMode::EncryptAutoKey(key_policy) => match key_policy {
+                    None => options.open(path)?,
+                    Some(policy) => options.open_with(path, None, Some(policy.bits()), None)?,
+                },
             };
 
             // Check the MAC of the root file against the given root MAC of the storage
@@ -136,7 +140,10 @@ impl Storage for SgxStorage {
                 EncryptMode::EncryptWithIntegrity(key, _) | EncryptMode::Encrypt(key) => {
                     options.open_ex(path, &key)?
                 }
-                EncryptMode::EncryptAutoKey => options.open(path)?,
+                EncryptMode::EncryptAutoKey(key_policy) => match key_policy {
+                    None => options.open(path)?,
+                    Some(policy) => options.open_with(path, None, Some(policy.bits()), None)?,
+                },
             };
             Ok(LockedFile(Arc::new(Mutex::new(file))))
         })?;
@@ -181,19 +188,23 @@ enum EncryptMode {
     IntegrityOnly(sgx_aes_gcm_128bit_tag_t),
     EncryptWithIntegrity(sgx_key_128bit_t, sgx_aes_gcm_128bit_tag_t),
     Encrypt(sgx_key_128bit_t),
-    EncryptAutoKey,
+    EncryptAutoKey(Option<KeyPolicy>),
 }
 
 impl EncryptMode {
     pub fn new(
         key: &Option<sgx_key_128bit_t>,
         root_mac: &Option<sgx_aes_gcm_128bit_tag_t>,
+        autokey_policy: &Option<u32>,
     ) -> Self {
         match (key, root_mac) {
             (Some(key), Some(root_mac)) => Self::EncryptWithIntegrity(*key, *root_mac),
             (Some(key), None) => Self::Encrypt(*key),
             (None, Some(root_mac)) => Self::IntegrityOnly(*root_mac),
-            (None, None) => Self::EncryptAutoKey,
+            (None, None) => {
+                let policy = autokey_policy.and_then(|policy| KeyPolicy::from_u32(policy));
+                Self::EncryptAutoKey(policy)
+            }
         }
     }
 
@@ -203,6 +214,30 @@ impl EncryptMode {
                 Some(*root_mac)
             }
             _ => None,
+        }
+    }
+}
+
+bitflags! {
+    struct KeyPolicy: u16 {
+        const KEYPOLICY_MRENCLAVE = 0x0001;
+        const KEYPOLICY_MRSIGNER = 0x0002;
+        const KEYPOLICY_NOISVPRODID = 0x0004;
+        const KEYPOLICY_CONFIGID = 0x0008;
+        const KEYPOLICY_ISVFAMILYID = 0x0010;
+        const KEYPOLICY_ISVEXTPRODID = 0x0020;
+    }
+}
+
+impl KeyPolicy {
+    pub fn from_u32(bits: u32) -> Option<Self> {
+        // If the bits is not zero, set the key_policy to "MRSIGNER|MRENCLAVE|ISVFAMILYID"
+        if bits != 0 {
+            let key_policy =
+                Self::KEYPOLICY_MRSIGNER | Self::KEYPOLICY_MRENCLAVE | Self::KEYPOLICY_ISVFAMILYID;
+            Some(key_policy)
+        } else {
+            None
         }
     }
 }
