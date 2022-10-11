@@ -62,10 +62,14 @@ impl VMInitializer {
                 // TODO: make sure that read_at does not move file cursor
                 let len = file
                     .file_ref()
-                    .as_inode_file()
+                    .as_async_file_handle()
+                    .unwrap()
+                    .dentry()
+                    .inode()
+                    .as_sync_inode()
                     .unwrap()
                     .read_at(file.offset(), buf)
-                    .cause_err(|_| errno!(EACCES, "failed to init memory from file"))?;
+                    .map_err(|_| errno!(EACCES, "failed to init memory from file"))?;
                 for b in &mut buf[len..] {
                     *b = 0;
                 }
@@ -83,10 +87,14 @@ impl VMInitializer {
                 let read_len = buf.len() - copy_len;
                 buf[..copy_len].copy_from_slice(&src_slice[..copy_len]);
                 let len = file
-                    .as_inode_file()
+                    .as_async_file_handle()
+                    .unwrap()
+                    .dentry()
+                    .inode()
+                    .as_sync_inode()
                     .unwrap()
                     .read_at(*offset, &mut buf[copy_len..])
-                    .cause_err(|_| errno!(EACCES, "failed to init memory from file"))?;
+                    .map_err(|_| errno!(EACCES, "failed to init memory from file"))?;
                 for b in &mut buf[(copy_len + len)..] {
                     *b = 0;
                 }
@@ -247,12 +255,12 @@ impl VMMapOptionsBuilder {
     fn check_files_are_inodes(&self) -> Result<()> {
         match &self.initializer {
             Some(VMInitializer::FileBacked { file, .. }) => {
-                if file.file_ref().as_inode_file().is_none() {
+                if file.file_ref().as_async_file_handle().is_none() {
                     return_errno!(ENODEV, "VMA must be backed by inode files");
                 }
             }
             Some(VMInitializer::ElfSpecific { elf_file }) => {
-                if elf_file.as_inode_file().is_none() {
+                if elf_file.as_async_file_handle().is_none() {
                     return_errno!(ENODEV, "VMA must be backed by inode files");
                 }
             }

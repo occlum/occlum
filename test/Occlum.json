@@ -1,6 +1,6 @@
 {
     "resource_limits": {
-        "kernel_space_heap_size": "40MB",
+        "kernel_space_heap_size": "512MB",
         "kernel_space_stack_size": "1MB",
         "user_space_size": "420MB",
         "min_num_of_cpus": 1,
@@ -66,6 +66,14 @@
             "target": "/host",
             "type": "hostfs",
             "source": "."
+        },
+        {
+            "target": "/sfs",
+            "type": "async_sfs",
+            "source": "./run/async_sfs_image",
+            "options": {
+                "total_size": "4GB"
+            }
         },
         {
             "target": "/proc",

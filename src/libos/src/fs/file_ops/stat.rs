@@ -4,9 +4,7 @@ use super::*;
 pub async fn do_fstat(fd: u32) -> Result<StatBuf> {
     debug!("fstat: fd: {}", fd);
     let file_ref = current!().file(fd as FileDesc)?;
-    let stat = if let Some(inode_file) = file_ref.as_inode_file() {
-        StatBuf::from(inode_file.inode().metadata()?)
-    } else if let Some(async_file) = file_ref.as_async_file() {
+    let stat = if let Some(async_file) = file_ref.as_async_file() {
         async_file.stat()
     } else if let Some(disk_file) = file_ref.as_disk_file() {
         StatBuf::from(disk_file.metadata())

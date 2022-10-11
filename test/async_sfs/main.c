@@ -165,7 +165,7 @@ static int __test_lseek(const char *file_path) {
 }
 
 static int __test_rename(const char *file_path) {
-    char *rename_path = "/async_sfs/test_async_sfs_rename.txt";
+    char *rename_path = "/sfs/test_async_sfs_rename.txt";
     struct stat stat_buf;
     int ret;
 
@@ -227,7 +227,7 @@ static int __test_readdir(const char *file_path) {
 typedef int(*test_file_func_t)(const char *);
 
 static int test_file_framework(test_file_func_t fn) {
-    const char *file_path = "/async_sfs/test_async_fs_file.txt";
+    const char *file_path = "/sfs/test_async_fs_file.txt";
 
     if (create_file(file_path) < 0) {
         return -1;
@@ -268,7 +268,7 @@ static int test_readdir() {
 static int test_mkdir_and_rmdir() {
     struct stat stat_buf;
     mode_t mode = 00775;
-    const char *dir_path = "/async_sfs/test_async_fs_dir";
+    const char *dir_path = "/sfs/test_async_fs_dir";
 
     if (mkdir(dir_path, mode) < 0) {
         THROW_ERROR("failed to mkdir");

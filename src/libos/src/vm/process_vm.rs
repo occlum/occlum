@@ -213,8 +213,12 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
         // Init all loadable segements
         let elf_file_inode = elf_file
             .file_ref()
-            .as_inode_file()
-            .ok_or_else(|| errno!(EINVAL, "not an inode"))?;
+            .as_async_file_handle()
+            .ok_or_else(|| errno!(EINVAL, "not file handle"))?
+            .dentry()
+            .inode()
+            .as_sync_inode()
+            .ok_or_else(|| errno!(EINVAL, "not sync inode"))?;
         elf_file
             .program_headers()
             .filter(|segment| segment.loadable())

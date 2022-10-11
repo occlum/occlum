@@ -161,6 +161,7 @@ cmd_init() {
     mkdir -p image/root
     mkdir -p image/host
     mkdir -p image/tmp
+    mkdir -p image/sfs
     mkdir -p image/dev
     mkdir -p image/proc
     mkdir -p image/etc

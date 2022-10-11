@@ -38,7 +38,6 @@ struct Inner {
 #[derive(Clone, Debug)]
 enum AnyFile {
     File(Arc<Async<dyn File>>),
-    Inode(Arc<AsyncInodeFile>),
     Socket(Arc<SocketFile>),
     Epoll(Arc<EpollFile>),
     Timer(Arc<TimerFile>),
@@ -52,9 +51,6 @@ macro_rules! apply_fn_on_any_file {
         let any_file: &AnyFile = $any_file;
         match any_file {
             AnyFile::File($file) => {
-                $($fn_body)*
-            }
-            AnyFile::Inode($file) => {
                 $($fn_body)*
             }
             AnyFile::Socket($file) => {
@@ -83,12 +79,6 @@ impl FileHandle {
             let arc_async_file = Arc::new(Async::new(file)) as Arc<Async<dyn File>>;
             AnyFile::File(arc_async_file)
         };
-        Self::new(any_file)
-    }
-
-    /// Create a file handle for an inode file.
-    pub fn new_inode(file: InodeFile) -> Self {
-        let any_file = AnyFile::Inode(Arc::new(AsyncInodeFile::new(file)));
         Self::new(any_file)
     }
 
@@ -183,14 +173,6 @@ impl FileHandle {
         apply_fn_on_any_file!(&self.0.file, |file| { file.unregister_observer(observer) })
     }
 
-    /// Returns the underlying inode file if it is one.
-    pub fn as_inode_file(&self) -> Option<&InodeFile> {
-        match &self.0.file {
-            AnyFile::Inode(inode_file) => Some(inode_file.inner()),
-            _ => None,
-        }
-    }
-
     /// Returns the underlying socket file if it is one.
     pub fn as_socket_file(&self) -> Option<&SocketFile> {
         match &self.0.file {
@@ -239,7 +221,6 @@ impl FileHandle {
     pub fn downgrade(&self) -> WeakFileHandle {
         let any_weak_file = match &self.0.file {
             AnyFile::File(file) => AnyWeakFile::File(Arc::downgrade(file)),
-            AnyFile::Inode(file) => AnyWeakFile::Inode(Arc::downgrade(file)),
             AnyFile::Socket(file) => AnyWeakFile::Socket(Arc::downgrade(file)),
             AnyFile::Epoll(file) => AnyWeakFile::Epoll(Arc::downgrade(file)),
             AnyFile::Timer(file) => AnyWeakFile::Timer(Arc::downgrade(file)),
@@ -255,8 +236,6 @@ impl PartialEq for FileHandle {
         let rhs = (&self.0.file, &other.0.file);
         if let (AnyFile::File(self_file), AnyFile::File(other_file)) = rhs {
             Arc::as_ptr(self_file) == Arc::as_ptr(other_file)
-        } else if let (AnyFile::Inode(self_inode), AnyFile::Inode(other_inode)) = rhs {
-            Arc::as_ptr(self_inode) == Arc::as_ptr(other_inode)
         } else if let (AnyFile::Socket(self_socket), AnyFile::Socket(other_socket)) = rhs {
             Arc::as_ptr(self_socket) == Arc::as_ptr(other_socket)
         } else if let (AnyFile::Timer(self_timer), AnyFile::Timer(other_timer)) = rhs {
@@ -273,42 +252,6 @@ impl PartialEq for FileHandle {
     }
 }
 
-/// A wrapper that makes `InodeFile`'s methods _async_.
-#[derive(Debug)]
-struct AsyncInodeFile(InodeFile);
-
-#[inherit_methods(from = "self.0")]
-#[rustfmt::skip]
-impl AsyncInodeFile {
-    pub fn new(inode: InodeFile) -> Self {
-        Self(inode)
-    }
-
-    pub fn inner(&self) -> &InodeFile {
-        &self.0
-    }
-
-    pub fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()> {
-        return_errno!(EINVAL, "inode files do not support observers");
-    }
-
-    pub fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>> {
-        return_errno!(EINVAL, "inode files do not support observers");
-    }
-
-    // Inherit methods from the inner InodeFile. Note that all I/O methods are
-    // async wrappers of the original sync ones.
-    pub async fn read(&self, buf: &mut [u8]) -> Result<usize>;
-    pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize>;
-    pub async fn write(&self, buf: &[u8]) -> Result<usize>;
-    pub async fn writev(&self, bufs: &[&[u8]]) -> Result<usize>;
-    pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events;
-    pub fn access_mode(&self) -> AccessMode;
-    pub fn status_flags(&self) -> StatusFlags;
-    pub fn set_status_flags(&self, new_status: StatusFlags) -> Result<()>;
-    pub async fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()>;
-}
-
 /// The weak version of `FileHandle`. Similar to `Weak`, but for files.
 #[derive(Clone, Debug)]
 pub struct WeakFileHandle(AnyWeakFile);
@@ -316,7 +259,6 @@ pub struct WeakFileHandle(AnyWeakFile);
 #[derive(Clone, Debug)]
 enum AnyWeakFile {
     File(Weak<Async<dyn File>>),
-    Inode(Weak<AsyncInodeFile>),
     Socket(Weak<SocketFile>),
     Epoll(Weak<EpollFile>),
     Timer(Weak<TimerFile>),
@@ -331,9 +273,6 @@ impl WeakFileHandle {
             AnyWeakFile::File(weak) => weak
                 .upgrade()
                 .map(|arc| FileHandle::new(AnyFile::File(arc))),
-            AnyWeakFile::Inode(weak) => weak
-                .upgrade()
-                .map(|arc| FileHandle::new(AnyFile::Inode(arc))),
             AnyWeakFile::Socket(weak) => weak
                 .upgrade()
                 .map(|arc| FileHandle::new(AnyFile::Socket(arc))),
@@ -358,8 +297,6 @@ impl PartialEq for WeakFileHandle {
         let rhs = (&self.0, &other.0);
         if let (AnyWeakFile::File(self_file), AnyWeakFile::File(other_file)) = rhs {
             self_file.ptr_eq(&other_file)
-        } else if let (AnyWeakFile::Inode(self_inode), AnyWeakFile::Inode(other_inode)) = rhs {
-            self_inode.ptr_eq(&other_inode)
         } else if let (AnyWeakFile::Socket(self_socket), AnyWeakFile::Socket(other_socket)) = rhs {
             self_socket.ptr_eq(&other_socket)
         } else if let (AnyWeakFile::Timer(self_timer), AnyWeakFile::Timer(other_timer)) = rhs {

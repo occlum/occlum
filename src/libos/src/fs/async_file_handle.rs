@@ -1,6 +1,10 @@
+use super::sync_fs_wrapper::SyncInode;
 use super::*;
+use crate::process::do_getuid::do_getuid;
 
+use async_mountfs::AsyncMInode;
 use async_rt::sync::Mutex as AsyncMutex;
+use async_trait::async_trait;
 
 /// The opened async inode through sys_open()
 pub struct AsyncFileHandle {
@@ -175,7 +179,7 @@ impl AsyncFileHandle {
     }
 
     pub async fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
-        self.dentry.inode().ioctl(cmd).await
+        self.dentry().inode().ioctl(cmd).await
     }
 
     pub async fn iterate_entries(&self, writer: &mut dyn DirentWriter) -> Result<usize> {
@@ -190,7 +194,14 @@ impl AsyncFileHandle {
     }
 
     pub fn test_range_lock(&self, lock: &mut RangeLock) -> Result<()> {
-        let ext = self.dentry().inode().ext().unwrap();
+        let ext = match self.dentry().inode().ext() {
+            Some(ext) => ext,
+            None => {
+                warn!("Inode extension is not supportted, the lock could be placed");
+                lock.set_type(RangeLockType::F_UNLCK);
+                return Ok(());
+            }
+        };
         match ext.get::<RangeLockList>() {
             None => {
                 // The advisory lock could be placed if there is no list
@@ -209,7 +220,15 @@ impl AsyncFileHandle {
         }
 
         self.check_range_lock_with_access_mode(lock)?;
-        let ext = self.dentry().inode().ext().unwrap();
+        let ext = match self.dentry().inode().ext() {
+            Some(ext) => ext,
+            None => {
+                warn!(
+                    "Inode extension is not supported, let the lock could be acquired or released"
+                );
+                return Ok(());
+            }
+        };
         let range_lock_list = match ext.get::<RangeLockList>() {
             Some(list) => list,
             None => ext.get_or_put_default::<RangeLockList>(),
@@ -231,7 +250,12 @@ impl AsyncFileHandle {
     }
 
     fn unlock_range_lock(&self, lock: &RangeLock) {
-        let ext = self.dentry().inode().ext().unwrap();
+        let ext = match self.dentry().inode().ext() {
+            Some(ext) => ext,
+            None => {
+                return;
+            }
+        };
         let range_lock_list = match ext.get::<RangeLockList>() {
             Some(list) => list,
             None => {
@@ -259,6 +283,40 @@ impl AsyncFileHandle {
         Ok(())
     }
 
+    pub async fn set_flock(&self, lock: Flock, is_nonblocking: bool) -> Result<()> {
+        let ext = match self.dentry().inode().ext() {
+            Some(ext) => ext,
+            None => {
+                warn!("Inode extension is not supported, let the lock could be acquired");
+                return Ok(());
+            }
+        };
+        let flock_list = match ext.get::<FlockList>() {
+            Some(list) => list,
+            None => ext.get_or_put_default::<FlockList>(),
+        };
+
+        flock_list.set_lock(lock, is_nonblocking).await?;
+        Ok(())
+    }
+
+    pub fn unlock_flock(&self) {
+        let ext = match self.dentry().inode().ext() {
+            Some(ext) => ext,
+            None => {
+                return;
+            }
+        };
+        let flock_list = match ext.get::<FlockList>() {
+            Some(list) => list,
+            None => {
+                return;
+            }
+        };
+
+        flock_list.unlock(self);
+    }
+
     pub fn dentry(&self) -> &Dentry {
         &self.dentry
     }
@@ -272,5 +330,76 @@ impl std::fmt::Debug for AsyncFileHandle {
             self.access_mode,
             *self.status_flags.read().unwrap()
         )
+    }
+}
+
+impl Drop for AsyncFileHandle {
+    fn drop(&mut self) {
+        self.unlock_flock()
+    }
+}
+
+#[async_trait]
+pub trait AsyncInodeExt {
+    async fn allow_write(&self) -> bool;
+    async fn allow_read(&self) -> bool;
+    async fn read_elf64_lazy_as_vec(&self) -> Result<Vec<u8>>;
+    // Workaround to convert AsyncInode to sync INode
+    fn as_sync_inode(&self) -> Option<&Arc<dyn INode>>;
+}
+
+#[async_trait]
+impl AsyncInodeExt for dyn AsyncInode {
+    async fn allow_write(&self) -> bool {
+        // TODO: Since Occlum does not support the capability,
+        //       just skip the permission check if uid is root.
+        if do_getuid() == 0 {
+            return true;
+        }
+
+        let info = self.metadata().await.unwrap();
+        let file_mode = FileMode::from_bits_truncate(info.mode);
+        file_mode.is_writable()
+    }
+
+    async fn allow_read(&self) -> bool {
+        // TODO: See the comments in allow_write
+        if do_getuid() == 0 {
+            return true;
+        }
+
+        let info = self.metadata().await.unwrap();
+        let file_mode = FileMode::from_bits_truncate(info.mode);
+        file_mode.is_readable()
+    }
+
+    async fn read_elf64_lazy_as_vec(&self) -> Result<Vec<u8>> {
+        let size = self.metadata().await.unwrap().size;
+        let mut buf = vec![0; size];
+        let elf64_hdr_size = 64;
+        self.read_at(
+            0,
+            &mut buf.as_mut_slice()[..core::cmp::min(elf64_hdr_size, size)],
+        )
+        .await?;
+        Ok(buf)
+    }
+
+    fn as_sync_inode(&self) -> Option<&Arc<dyn INode>> {
+        let mnt_inode = self.downcast_ref::<AsyncMInode>();
+        if mnt_inode.is_none() {
+            return None;
+        }
+        let mut mnt_inode = mnt_inode.unwrap();
+        loop {
+            if let Some(inode) = mnt_inode.inner().downcast_ref::<SyncInode>() {
+                return Some(inode.inner());
+            } else if let Some(inode) = mnt_inode.inner().downcast_ref::<AsyncMInode>() {
+                mnt_inode = inode;
+            } else {
+                break;
+            }
+        }
+        None
     }
 }

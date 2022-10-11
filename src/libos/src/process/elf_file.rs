@@ -28,7 +28,7 @@ impl<'a> Debug for ElfFile<'a> {
 }
 
 impl<'a> ElfFile<'a> {
-    pub fn new(
+    pub async fn new(
         file_ref: &'a FileRef,
         mut elf_buf: &'a mut [u8],
         header: ElfHeader,
@@ -63,13 +63,17 @@ impl<'a> ElfFile<'a> {
                     intepreter_offset,
                     intepreter_count
                 );
-                let inode_file = file_ref
-                    .as_inode_file()
+                let async_file_handle = file_ref
+                    .as_async_file_handle()
                     .ok_or_else(|| errno!(EINVAL, "not an inode"))?;
-                inode_file.read_at(
-                    intepreter_offset,
-                    &mut elf_buf[intepreter_offset..intepreter_offset + intepreter_count],
-                );
+                async_file_handle
+                    .dentry()
+                    .inode()
+                    .read_at(
+                        intepreter_offset,
+                        &mut elf_buf[intepreter_offset..intepreter_offset + intepreter_count],
+                    )
+                    .await;
                 break;
             }
         }
@@ -113,7 +117,7 @@ impl<'a> ElfFile<'a> {
         self.file_ref
     }
 
-    pub fn parse_elf_hdr(elf_file: &FileRef, elf_buf: &mut Vec<u8>) -> Result<ElfHeader> {
+    pub async fn parse_elf_hdr(elf_file: &FileRef, elf_buf: &mut Vec<u8>) -> Result<ElfHeader> {
         // TODO: Sanity check the number of program headers..
         let mut phdr_start = 0;
         let mut phdr_end = 0;
@@ -132,13 +136,17 @@ impl<'a> ElfFile<'a> {
         }
 
         let program_hdr_table_size = elf_hdr.e_phnum * elf_hdr.e_phentsize;
-        let elf_inode_file = elf_file
-            .as_inode_file()
+        let elf_file_handle = elf_file
+            .as_async_file_handle()
             .ok_or_else(|| errno!(EINVAL, "not an inode"))?;
-        elf_inode_file.read_at(
-            elf_hdr.e_phoff as usize,
-            &mut elf_buf[hdr_size..hdr_size + (program_hdr_table_size as usize)],
-        )?;
+        elf_file_handle
+            .dentry()
+            .inode()
+            .read_at(
+                elf_hdr.e_phoff as usize,
+                &mut elf_buf[hdr_size..hdr_size + (program_hdr_table_size as usize)],
+            )
+            .await?;
         Ok(elf_hdr)
     }
 

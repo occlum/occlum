@@ -19,9 +19,7 @@ async fn getdents_common<T: Dirent>(fd: FileDesc, buf: &mut [u8]) -> Result<usiz
 
     let file_ref = current!().file(fd)?;
     let mut writer = DirentBufWriter::<T>::new(buf);
-    let written_size = if let Some(inode_file) = file_ref.as_inode_file() {
-        inode_file.iterate_entries(&mut writer)?
-    } else if let Some(async_file_handle) = file_ref.as_async_file_handle() {
+    let written_size = if let Some(async_file_handle) = file_ref.as_async_file_handle() {
         async_file_handle.iterate_entries(&mut writer).await?
     } else {
         return_errno!(EBADF, "not an inode");

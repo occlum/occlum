@@ -1,10 +1,7 @@
-use super::rootfs::mount_fs_at;
 use super::*;
 
 use rcore_fs::vfs;
 use rcore_fs_devfs::DevFS;
-use rcore_fs_mountfs::MountFS;
-use rcore_fs_ramfs::RamFS;
 
 use self::dev_fd::DevFd;
 use self::dev_null::DevNull;
@@ -21,7 +18,7 @@ mod dev_shm;
 mod dev_zero;
 
 /// API to initialize the DevFS
-pub fn init_devfs() -> Result<Arc<MountFS>> {
+pub fn init_devfs() -> Result<Arc<DevFS>> {
     let devfs = DevFS::new();
     let dev_null = Arc::new(DevNull) as _;
     devfs.add("null", dev_null)?;
@@ -37,15 +34,6 @@ pub fn init_devfs() -> Result<Arc<MountFS>> {
     devfs.add("shm", dev_shm)?;
     let dev_fd = Arc::new(DevFd) as _;
     devfs.add("fd", dev_fd);
-    let mountable_devfs = MountFS::new(devfs);
-    // Mount the ramfs at '/shm'
-    let ramfs = RamFS::new();
-    mount_fs_at(
-        ramfs,
-        &mountable_devfs.root_inode(),
-        &Path::new("/shm"),
-        true,
-    )?;
     // TODO: Add stdio(stdin, stdout, stderr) into DevFS
-    Ok(mountable_devfs)
+    Ok(devfs)
 }

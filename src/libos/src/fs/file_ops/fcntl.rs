@@ -46,9 +46,7 @@ pub async fn do_fcntl(fd: FileDesc, cmd: &mut FcntlCmd<'_>) -> Result<isize> {
             let file = file_table.get(fd)?;
             drop(file_table);
             let mut req_range_lock = build_range_lock_from_c(flock_mut_c, &file).await?;
-            if let Some(inode_file) = file.as_inode_file() {
-                inode_file.test_range_lock(&mut req_range_lock)?;
-            } else if let Some(async_file_handle) = file.as_async_file_handle() {
+            if let Some(async_file_handle) = file.as_async_file_handle() {
                 async_file_handle.test_range_lock(&mut req_range_lock)?;
             } else {
                 return_errno!(EBADF, "not a file");
@@ -62,11 +60,7 @@ pub async fn do_fcntl(fd: FileDesc, cmd: &mut FcntlCmd<'_>) -> Result<isize> {
             drop(file_table);
             let range_lock = build_range_lock_from_c(flock_c, &file).await?;
             let is_nonblocking = true;
-            if let Some(inode_file) = file.as_inode_file() {
-                inode_file
-                    .set_range_lock(&range_lock, is_nonblocking)
-                    .await?;
-            } else if let Some(async_file_handle) = file.as_async_file_handle() {
+            if let Some(async_file_handle) = file.as_async_file_handle() {
                 async_file_handle
                     .set_range_lock(&range_lock, is_nonblocking)
                     .await?;
@@ -80,11 +74,7 @@ pub async fn do_fcntl(fd: FileDesc, cmd: &mut FcntlCmd<'_>) -> Result<isize> {
             drop(file_table);
             let range_lock = build_range_lock_from_c(flock_c, &file).await?;
             let is_nonblocking = false;
-            if let Some(inode_file) = file.as_inode_file() {
-                inode_file
-                    .set_range_lock(&range_lock, is_nonblocking)
-                    .await?;
-            } else if let Some(async_file_handle) = file.as_async_file_handle() {
+            if let Some(async_file_handle) = file.as_async_file_handle() {
                 async_file_handle
                     .set_range_lock(&range_lock, is_nonblocking)
                     .await?;
@@ -99,9 +89,7 @@ pub async fn do_fcntl(fd: FileDesc, cmd: &mut FcntlCmd<'_>) -> Result<isize> {
 
 async fn build_range_lock_from_c(c_flock: &flock_c, file: &FileRef) -> Result<RangeLock> {
     let lock_type = RangeLockType::from_u16(c_flock.l_type)?;
-    let (file_offset, file_size) = if let Some(inode_file) = file.as_inode_file() {
-        (inode_file.position(), inode_file.inode().metadata()?.size)
-    } else if let Some(async_file_handle) = file.as_async_file_handle() {
+    let (file_offset, file_size) = if let Some(async_file_handle) = file.as_async_file_handle() {
         (
             async_file_handle.offset().await,
             async_file_handle.dentry().inode().metadata().await?.size,

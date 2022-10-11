@@ -8,8 +8,10 @@ version = "0.29.0"
 dependencies = [
  "aligned",
  "async-io",
+ "async-mountfs",
  "async-rt",
  "async-sfs",
+ "async-trait",
  "async-vfs",
  "atomic",
  "bitflags",
@@ -96,6 +98,25 @@ dependencies = [
  "sgx_tstd",
  "sgx_types",
  "spin 0.9.4",
+]
+
+[[package]]
+name = "async-mountfs"
+version = "0.1.0"
+dependencies = [
+ "async-io",
+ "async-rt",
+ "async-trait",
+ "async-vfs",
+ "cfg-if",
+ "errno",
+ "libc",
+ "log",
+ "sgx_libc",
+ "sgx_trts",
+ "sgx_tstd",
+ "sgx_types",
+ "static_assertions 0.3.4",
 ]
 
 [[package]]

@@ -13,3 +13,4 @@ targets:
       - root
       - sys
       - tmp
+      - sfs

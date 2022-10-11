@@ -65,9 +65,9 @@ impl Drop for Flock {
 impl Debug for Flock {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let owner = self.owner().unwrap();
-        let inode = owner.as_inode_file().unwrap();
+        let inode = owner.as_async_file_handle().unwrap();
         f.debug_struct("Flock")
-            .field("owner", &(inode as *const InodeFile))
+            .field("owner", &(inode as *const AsyncFileHandle))
             .field("type_", &self.type_)
             .finish()
     }
@@ -120,19 +120,19 @@ impl FlockList {
         Ok(())
     }
 
-    pub fn unlock(&self, req_owner: &InodeFile) {
+    pub fn unlock(&self, req_owner: &AsyncFileHandle) {
         debug!(
             "flock unlock with owner: {:?}",
-            req_owner as *const InodeFile
+            req_owner as *const AsyncFileHandle
         );
 
         let mut list = self.inner.write().unwrap();
         list.retain(|lock| {
             if let Some(owner) = lock.owner() {
-                let inode_file = owner.as_inode_file().unwrap();
+                let inode_file = owner.as_async_file_handle().unwrap();
                 !ptr::eq(
-                    inode_file as *const InodeFile,
-                    req_owner as *const InodeFile,
+                    inode_file as *const AsyncFileHandle,
+                    req_owner as *const AsyncFileHandle,
                 )
             } else {
                 false

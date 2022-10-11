@@ -1,6 +1,6 @@
 use super::super::elf_file::*;
 use super::ThreadRef;
-use crate::fs::{FileMode, FileType, FsPath, Metadata};
+use crate::fs::{AsyncInodeExt, FileMode, FileType, FsPath, Metadata};
 use crate::prelude::*;
 use std::convert::TryFrom;
 use std::ffi::CString;
@@ -79,13 +79,13 @@ pub async fn load_file_hdr_to_vec(
         .await?;
 
     // Make sure the final file to exec is not a directory
-    let metadata = if let Some(inode_file) = file_ref.as_inode_file() {
-        inode_file.inode().metadata()?
-    } else if let Some(async_file_handle) = file_ref.as_async_file_handle() {
-        async_file_handle.dentry().inode().metadata().await?
-    } else {
-        unreachable!()
-    };
+    let metadata = file_ref
+        .as_async_file_handle()
+        .unwrap()
+        .dentry()
+        .inode()
+        .metadata()
+        .await?;
 
     if metadata.type_ != FileType::File {
         return_errno!(EACCES, "it is not a regular file");
@@ -104,13 +104,15 @@ pub async fn load_file_hdr_to_vec(
 
     // Try to read the file as ELF64
     let mut file_buf = file_ref
-        .as_inode_file()
+        .as_async_file_handle()
         .unwrap()
+        .dentry()
         .inode()
         .read_elf64_lazy_as_vec()
+        .await
         .map_err(|e| errno!(e.errno(), "failed to read the file"))?;
 
-    let elf_header = ElfFile::parse_elf_hdr(&file_ref, &mut file_buf);
+    let elf_header = ElfFile::parse_elf_hdr(&file_ref, &mut file_buf).await;
 
     if let Ok(elf_header) = elf_header {
         Ok((file_ref, file_buf, Some(elf_header)))

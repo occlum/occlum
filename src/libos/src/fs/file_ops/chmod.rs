@@ -18,12 +18,7 @@ pub async fn do_fchmod(fd: FileDesc, mode: FileMode) -> Result<()> {
     debug!("fchmod: fd: {}, mode: {:#o}", fd, mode);
 
     let file_ref = current!().file(fd)?;
-    if let Some(inode_file) = file_ref.as_inode_file() {
-        let inode = inode_file.inode();
-        let mut info = inode.metadata()?;
-        info.mode = mode.bits();
-        inode.set_metadata(&info)?;
-    } else if let Some(async_file_handle) = file_ref.as_async_file_handle() {
+    if let Some(async_file_handle) = file_ref.as_async_file_handle() {
         let inode = async_file_handle.dentry().inode();
         let mut info = inode.metadata().await?;
         info.mode = mode.bits();

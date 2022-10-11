@@ -33,13 +33,7 @@ pub async fn do_fchown(fd: FileDesc, uid: u32, gid: u32) -> Result<()> {
     debug!("fchown: fd: {}, uid: {}, gid: {}", fd, uid, gid);
 
     let file_ref = current!().file(fd)?;
-    if let Some(inode_file) = file_ref.as_inode_file() {
-        let inode = inode_file.inode();
-        let mut info = inode.metadata()?;
-        info.uid = uid as usize;
-        info.gid = gid as usize;
-        inode.set_metadata(&info)?;
-    } else if let Some(async_file_handle) = file_ref.as_async_file_handle() {
+    if let Some(async_file_handle) = file_ref.as_async_file_handle() {
         let inode = async_file_handle.dentry().inode();
         let mut info = inode.metadata().await?;
         info.uid = uid as usize;

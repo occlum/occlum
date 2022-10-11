@@ -226,9 +226,6 @@ pub extern "C" fn occlum_ecall_run_vcpu(pal_data_ptr: *const occlum_pal_vcpu_dat
         );
     }
 
-    use rcore_fs::vfs::FileSystem;
-    crate::fs::ROOT_FS.read().unwrap().sync().unwrap();
-
     0
 }
 
@@ -254,12 +251,10 @@ pub extern "C" fn occlum_ecall_shutdown_vcpus() -> i32 {
 
     table::wait_all_process_exit();
 
-    // Flush the async sfs
-    if crate::fs::async_sfs_initilized() {
-        async_rt::task::block_on(async {
-            crate::fs::async_sfs().await.sync().await.unwrap();
-        });
-    }
+    // Flush the async rootfs
+    async_rt::task::block_on(async {
+        crate::fs::rootfs().await.sync().await.unwrap();
+    });
 
     // TODO: stop all the kernel threads/tasks
     async_rt::executor::shutdown();

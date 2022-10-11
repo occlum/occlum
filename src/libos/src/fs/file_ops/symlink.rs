@@ -37,7 +37,7 @@ pub async fn do_symlinkat(target: &str, link_path: &FsPath) -> Result<usize> {
         }
         fs.lookup_dirinode_and_basename(link_path).await?
     };
-    if !dir_inode.allow_write() {
+    if !dir_inode.allow_write().await {
         return_errno!(EPERM, "symlink cannot be created");
     }
     let link_inode = dir_inode

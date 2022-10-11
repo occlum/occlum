@@ -12,7 +12,7 @@ pub async fn do_mkdirat(fs_path: &FsPath, mode: FileMode) -> Result<()> {
     if dir_inode.find(&file_name).await.is_ok() {
         return_errno!(EEXIST, "");
     }
-    if !dir_inode.allow_write() {
+    if !dir_inode.allow_write().await {
         return_errno!(EPERM, "dir cannot be written");
     }
     let masked_mode = mode & !current!().process().umask();

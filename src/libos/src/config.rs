@@ -145,11 +145,20 @@ pub enum ConfigMountFsType {
     TYPE_UNIONFS,
     TYPE_DEVFS,
     TYPE_PROCFS,
+    TYPE_ASYNC_SFS,
 }
 
 impl ConfigMountFsType {
     pub fn from_input(input: &str) -> Result<ConfigMountFsType> {
-        const ALL_FS_TYPES: [&str; 6] = ["sefs", "hostfs", "ramfs", "unionfs", "devfs", "procfs"];
+        const ALL_FS_TYPES: [&str; 7] = [
+            "sefs",
+            "hostfs",
+            "ramfs",
+            "unionfs",
+            "devfs",
+            "procfs",
+            "async_sfs",
+        ];
 
         let type_ = match input {
             "sefs" => ConfigMountFsType::TYPE_SEFS,
@@ -158,6 +167,7 @@ impl ConfigMountFsType {
             "unionfs" => ConfigMountFsType::TYPE_UNIONFS,
             "devfs" => ConfigMountFsType::TYPE_DEVFS,
             "procfs" => ConfigMountFsType::TYPE_PROCFS,
+            "async_sfs" => ConfigMountFsType::TYPE_ASYNC_SFS,
             _ => {
                 return_errno!(EINVAL, "Unsupported file system type");
             }
@@ -171,6 +181,7 @@ pub struct ConfigMountOptions {
     pub mac: Option<sgx_aes_gcm_128bit_tag_t>,
     pub layers: Option<Vec<ConfigMount>>,
     pub temporary: bool,
+    pub total_size: Option<usize>,
 }
 
 impl Config {
@@ -267,7 +278,7 @@ impl ConfigMount {
             None
         } else {
             let path = unsafe { PathBuf::from(&INSTANCE_DIR) };
-            path.join(source.unwrap()).canonicalize().ok()
+            Some(path.join(source.unwrap()))
         };
         let options = ConfigMountOptions::from_input(&input.options)?;
         Ok(ConfigMount {
@@ -286,6 +297,11 @@ impl ConfigMountOptions {
         } else {
             None
         };
+        let total_size = if input.total_size.is_some() {
+            Some(parse_memory_size(input.total_size.as_ref().unwrap())?)
+        } else {
+            None
+        };
         let layers = if let Some(layers) = &input.layers {
             let layers = layers
                 .iter()
@@ -299,6 +315,7 @@ impl ConfigMountOptions {
             mac,
             layers,
             temporary: input.temporary,
+            total_size,
         })
     }
 }
@@ -446,4 +463,6 @@ struct InputConfigMountOptions {
     pub layers: Option<Vec<InputConfigMount>>,
     #[serde(default)]
     pub temporary: bool,
+    #[serde(default)]
+    pub total_size: Option<String>,
 }

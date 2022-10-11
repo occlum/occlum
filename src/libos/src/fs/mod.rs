@@ -28,8 +28,7 @@ pub use async_vfs::{AsyncFileSystem, AsyncInode};
 
 use crate::config::ConfigMount;
 
-pub use self::async_file_handle::AsyncFileHandle;
-pub use self::async_fs::{async_sfs, async_sfs_initilized};
+pub use self::async_file_handle::{AsyncFileHandle, AsyncInodeExt};
 pub use self::dentry::Dentry;
 pub use self::disk_file::DiskFile;
 pub use self::event_file::{EventFile, EventFileFlags};
@@ -40,13 +39,11 @@ pub use self::fs_ops::Statfs;
 pub use self::fs_view::FsView;
 pub use self::fspath::{FsPath, AT_FDCWD};
 pub use self::host_fd::HostFd;
-pub use self::inode_file::{INodeExt, INodeFile, InodeFile};
-pub use self::inode_handle::InodeHandle;
 pub use self::locks::{
     FileRange, Flock, FlockList, FlockOps, FlockType, RangeLock, RangeLockBuilder, RangeLockList,
     RangeLockType, OFFSET_MAX,
 };
-pub use self::rootfs::ROOT_FS;
+pub use self::rootfs::rootfs;
 pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
 pub use self::syscalls::*;
 
@@ -57,7 +54,6 @@ mod event_file;
 // TODO: remove the file
 //mod file;
 mod async_file_handle;
-mod async_fs;
 mod dentry;
 mod file_handle;
 pub mod file_ops;
@@ -67,12 +63,11 @@ mod fs_view;
 mod fspath;
 mod host_fd;
 mod hostfs;
-mod inode_file;
-mod inode_handle;
 mod locks;
 mod pipe;
 mod procfs;
 mod rootfs;
 mod sefs;
 mod stdio;
+mod sync_fs_wrapper;
 mod syscalls;

@@ -96,8 +96,8 @@ impl FdSymINode {
 
 impl ProcINode for FdSymINode {
     fn generate_data_in_bytes(&self) -> vfs::Result<Vec<u8>> {
-        let path = if let Some(inode_file) = self.0.as_inode_file() {
-            inode_file.open_path().to_owned()
+        let path = if let Some(async_file_handle) = self.0.as_async_file_handle() {
+            async_file_handle.dentry().abs_path().to_owned()
         } else {
             // TODO: Support other file types
             // For file descriptors for pipes and sockets,

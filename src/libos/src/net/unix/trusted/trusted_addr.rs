@@ -1,8 +1,6 @@
 use super::untrusted::UNTRUSTED_SOCKS;
 use super::*;
-use crate::fs::INodeExt;
-use crate::fs::{CreationFlags, EventFileFlags, FileMode};
-use crate::fs::{FileType, FsPath};
+use crate::fs::{AsyncInodeExt, CreationFlags, EventFileFlags, FileMode, FileType, FsPath};
 use crate::util::sync::*;
 use std::any::Any;
 use std::convert::TryFrom;
@@ -48,13 +46,14 @@ impl TrustedAddr {
                             e
                         }
                     })?;
-                if let Some(inode_file) = file_ref.as_inode_file() {
-                    inode_file.inode().metadata()?.inode
-                } else if let Some(async_file_handle) = file_ref.as_async_file_handle() {
-                    async_file_handle.dentry().inode().metadata().await?.inode
-                } else {
-                    unreachable!();
-                }
+                file_ref
+                    .as_async_file_handle()
+                    .unwrap()
+                    .dentry()
+                    .inode()
+                    .metadata()
+                    .await?
+                    .inode
             };
             self.inode = Some(inode_num);
         }
@@ -73,7 +72,7 @@ impl TrustedAddr {
                 fs.lookup_dirinode_and_basename(&path).await?
             };
 
-            if !dir_inode.allow_write() {
+            if !dir_inode.allow_write().await {
                 return_errno!(EPERM, "libos socket file cannot be created");
             }
 

@@ -57,7 +57,7 @@ running in the same Occlum instance can use dramatically different sizes of memo
 */
 
 use super::*;
-use fs::{FileDesc, FileRef};
+use fs::{AsyncInodeExt, FileDesc, FileRef, INode};
 use process::{Process, ProcessRef};
 use std::fmt;
 

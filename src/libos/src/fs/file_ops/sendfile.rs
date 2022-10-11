@@ -14,15 +14,15 @@ pub async fn do_sendfile(
 
     let current = current!();
     let in_file = current.file(in_fd)?;
-    let in_inode_file = in_file
-        .as_inode_file()
+    let in_file_handle = in_file
+        .as_async_file_handle()
         .ok_or_else(|| errno!(EINVAL, "not an inode"))?;
     let out_file = current.file(out_fd)?;
     let mut buffer: [u8; 1024 * 11] = unsafe { MaybeUninit::uninit().assume_init() };
 
     let mut read_offset = match offset {
         Some(offset) => offset as usize,
-        None => in_inode_file.position(),
+        None => in_file_handle.offset().await,
     };
 
     // read from specified offset and write new offset back
@@ -31,7 +31,12 @@ pub async fn do_sendfile(
     while bytes_sent < count {
         let len = min(buffer.len(), count - bytes_sent);
 
-        match in_inode_file.read_at(read_offset, &mut buffer[..len]) {
+        match in_file_handle
+            .dentry()
+            .inode()
+            .read_at(read_offset, &mut buffer[..len])
+            .await
+        {
             Ok(read_len) if read_len > 0 => match out_file.write(&buffer[..read_len]).await {
                 Ok(write_len) => {
                     bytes_sent += write_len;
@@ -51,7 +56,9 @@ pub async fn do_sendfile(
     }
 
     if offset.is_none() {
-        in_inode_file.seek(SeekFrom::Current(bytes_sent as i64))?;
+        in_file_handle
+            .seek(SeekFrom::Current(bytes_sent as i64))
+            .await?;
     }
 
     if bytes_sent > 0 {

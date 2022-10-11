@@ -419,15 +419,20 @@ impl ChunkManager {
             None => return,
             Some((file_and_offset)) => file_and_offset,
         };
-        let inode_file = file.as_inode_file().unwrap();
-        let file_writable = inode_file.access_mode().writable();
+        let file_handle = file.as_async_file_handle().unwrap();
+        let file_writable = file_handle.access_mode().writable();
         if !file_writable {
             return;
         }
         if !cond_fn(file) {
             return;
         }
-        inode_file.write_at(file_offset, unsafe { vma.as_slice() });
+        file_handle
+            .dentry()
+            .inode()
+            .as_sync_inode()
+            .unwrap()
+            .write_at(file_offset, unsafe { vma.as_slice() });
     }
 
     pub fn find_mmap_region(&self, addr: usize) -> Result<VMRange> {

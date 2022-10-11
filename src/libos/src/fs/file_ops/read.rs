@@ -18,9 +18,7 @@ pub async fn do_pread(fd: FileDesc, buf: &mut [u8], offset: off_t) -> Result<usi
         return_errno!(EINVAL, "the offset is negative");
     }
     let file_ref = current!().file(fd)?;
-    if let Some(inode_file) = file_ref.as_inode_file() {
-        inode_file.read_at(offset as usize, buf)
-    } else if let Some(async_file_handle) = file_ref.as_async_file_handle() {
+    if let Some(async_file_handle) = file_ref.as_async_file_handle() {
         async_file_handle
             .dentry()
             .inode()

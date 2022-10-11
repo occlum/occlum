@@ -125,6 +125,10 @@ impl AsyncMInode {
         }
     }
 
+    pub fn inner(&self) -> &Arc<dyn AsyncInode> {
+        &self.inner
+    }
+
     /// Get the root inode of the mounted fs at here.
     /// Return self if no mounted fs.
     async fn overlaid_inode(&self) -> Arc<AsyncMInode> {

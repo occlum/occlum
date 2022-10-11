@@ -196,6 +196,7 @@ async fn new_process_common(
     };
 
     let exec_elf_hdr = ElfFile::new(&elf_file, &mut elf_buf, elf_header)
+        .await
         .cause_err(|e| errno!(e.errno(), "invalid executable"))?;
     let ldso_path = exec_elf_hdr
         .elf_interpreter()
@@ -211,6 +212,7 @@ async fn new_process_common(
         ldso_elf_header.unwrap()
     };
     let ldso_elf_hdr = ElfFile::new(&ldso_file, &mut ldso_elf_hdr_buf, ldso_elf_header)
+        .await
         .cause_err(|e| errno!(e.errno(), "invalid ld.so"))?;
 
     let (new_process_ref, init_cpu_state) = {

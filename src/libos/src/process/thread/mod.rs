@@ -133,9 +133,7 @@ impl Thread {
     /// by current process.
     pub fn close_file(&self, fd: FileDesc) -> Result<()> {
         let file = self.files().lock().unwrap().del(fd)?;
-        if let Some(inode_file) = file.as_inode_file() {
-            inode_file.release_range_locks();
-        } else if let Some(async_file_handle) = file.as_async_file_handle() {
+        if let Some(async_file_handle) = file.as_async_file_handle() {
             async_file_handle.release_range_locks();
         }
         Ok(())
@@ -146,9 +144,7 @@ impl Thread {
     pub fn close_all_files(&self) {
         let files = self.files().lock().unwrap().del_all();
         for file in files {
-            if let Some(inode_file) = file.as_inode_file() {
-                inode_file.release_range_locks();
-            } else if let Some(async_file_handle) = file.as_async_file_handle() {
+            if let Some(async_file_handle) = file.as_async_file_handle() {
                 async_file_handle.release_range_locks();
             }
         }

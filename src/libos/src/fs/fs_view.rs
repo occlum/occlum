@@ -1,7 +1,6 @@
 /// Present a per-process view of FS.
 use super::*;
 
-use super::async_fs::ASYNC_SFS_NAME;
 use super::fspath::FsPathInner;
 
 #[derive(Debug)]
@@ -93,7 +92,7 @@ impl FsView {
                         return_errno!(EISDIR, "path is a directory");
                     }
                     let (dir_inode, file_name) = self.lookup_dirinode_and_basename(fs_path).await?;
-                    if !dir_inode.allow_write() {
+                    if !dir_inode.allow_write().await {
                         return_errno!(EPERM, "file cannot be created");
                     }
                     dir_inode
@@ -130,7 +129,7 @@ impl FsView {
                     if file_name.ends_with("/") {
                         return_errno!(EISDIR, "path refers to directory");
                     }
-                    if !dir_inode.allow_write() {
+                    if !dir_inode.allow_write().await {
                         return_errno!(EPERM, "file cannot be created");
                     }
                     dir_inode
@@ -141,28 +140,23 @@ impl FsView {
             }
         };
 
-        Ok(match inode {
-            InodeHandle::Sync(inode) => {
-                let inode_file = InodeFile::open(inode, flags, open_path)?;
-                FileRef::new_inode(inode_file)
-            }
-            InodeHandle::Async(inode) => {
-                let dentry = Dentry::new(inode, open_path);
-                let async_file_handle = AsyncFileHandle::open(
-                    dentry,
-                    AccessMode::from_u32(flags)?,
-                    CreationFlags::from_bits_truncate(flags),
-                    StatusFlags::from_bits_truncate(flags),
-                )
-                .await?;
-                FileRef::new_async_file_handle(async_file_handle)
-            }
-        })
+        let file_ref = {
+            let dentry = Dentry::new(inode, open_path);
+            let async_file_handle = AsyncFileHandle::open(
+                dentry,
+                AccessMode::from_u32(flags)?,
+                CreationFlags::from_bits_truncate(flags),
+                StatusFlags::from_bits_truncate(flags),
+            )
+            .await?;
+            FileRef::new_async_file_handle(async_file_handle)
+        };
+        Ok(file_ref)
     }
 
     /// Lookup Inode from the fs view of the process.
     /// If last component is a symlink, do not dereference it
-    pub async fn lookup_inode_no_follow(&self, fs_path: &FsPath) -> Result<InodeHandle> {
+    pub async fn lookup_inode_no_follow(&self, fs_path: &FsPath) -> Result<Arc<dyn AsyncInode>> {
         debug!(
             "lookup_inode_no_follow: cwd: {:?}, path: {:?}",
             self.cwd(),
@@ -172,7 +166,7 @@ impl FsView {
     }
 
     /// Lookup inode from the fs view of the process, dereference symlinks
-    pub async fn lookup_inode(&self, fs_path: &FsPath) -> Result<InodeHandle> {
+    pub async fn lookup_inode(&self, fs_path: &FsPath) -> Result<Arc<dyn AsyncInode>> {
         debug!("lookup_inode: cwd: {:?}, path: {:?}", self.cwd(), fs_path);
         self.lookup_inode_inner(fs_path, true).await
     }
@@ -181,7 +175,7 @@ impl FsView {
         &self,
         fs_path: &FsPath,
         follow_symlink: bool,
-    ) -> Result<InodeHandle> {
+    ) -> Result<Arc<dyn AsyncInode>> {
         let inode = match fs_path.inner() {
             FsPathInner::Absolute(path) | FsPathInner::CwdRelative(path) => {
                 if follow_symlink {
@@ -200,14 +194,14 @@ impl FsView {
             FsPathInner::FdRelative(dirfd, path) => {
                 let inode = self.lookup_inode_from_fd(*dirfd)?;
                 if follow_symlink {
-                    inode.lookup(path, Some(MAX_SYMLINKS)).await?
+                    inode.lookup_follow(path, Some(MAX_SYMLINKS)).await?
                 } else {
                     if path.ends_with("/") {
-                        inode.lookup(path, Some(MAX_SYMLINKS)).await?
+                        inode.lookup_follow(path, Some(MAX_SYMLINKS)).await?
                     } else {
                         let (dir_path, base_name) = split_path(path);
-                        let dir_inode = inode.lookup(dir_path, Some(MAX_SYMLINKS)).await?;
-                        dir_inode.lookup_no_follow(base_name).await?
+                        let dir_inode = inode.lookup_follow(dir_path, Some(MAX_SYMLINKS)).await?;
+                        dir_inode.lookup(base_name).await?
                     }
                 }
             }
@@ -223,7 +217,7 @@ impl FsView {
     pub async fn lookup_dirinode_and_basename(
         &self,
         fs_path: &FsPath,
-    ) -> Result<(InodeHandle, String)> {
+    ) -> Result<(Arc<dyn AsyncInode>, String)> {
         let (dir_inode, base_name) = match fs_path.inner() {
             FsPathInner::Absolute(path) | FsPathInner::CwdRelative(path) => {
                 let (dir_path, base_name) = split_path(path);
@@ -232,7 +226,7 @@ impl FsView {
             FsPathInner::FdRelative(dirfd, path) => {
                 let inode = self.lookup_inode_from_fd(*dirfd)?;
                 let (dir_path, base_name) = split_path(path);
-                let dir_inode = inode.lookup(dir_path, Some(MAX_SYMLINKS)).await?;
+                let dir_inode = inode.lookup_follow(dir_path, Some(MAX_SYMLINKS)).await?;
                 (dir_inode, base_name.to_owned())
             }
             _ => return_errno!(ENOENT, "cannot find dir and basename with empty path"),
@@ -245,7 +239,7 @@ impl FsView {
     async fn lookup_real_dirinode_and_basename(
         &self,
         fs_path: &FsPath,
-    ) -> Result<(InodeHandle, String)> {
+    ) -> Result<(Arc<dyn AsyncInode>, String)> {
         let (dir_inode, base_name) = match fs_path.inner() {
             FsPathInner::Absolute(path) | FsPathInner::CwdRelative(path) => {
                 let real_path = self.lookup_real_path(None, path).await?;
@@ -259,7 +253,7 @@ impl FsView {
                 let dir_inode = if dir_path.starts_with("/") {
                     self.lookup_inode_cwd(dir_path).await?
                 } else {
-                    inode.lookup(dir_path, Some(MAX_SYMLINKS)).await?
+                    inode.lookup_follow(dir_path, Some(MAX_SYMLINKS)).await?
                 };
                 (dir_inode, base_name.to_owned())
             }
@@ -271,21 +265,24 @@ impl FsView {
     /// Lookup the real path of giving path, dereference symlinks.
     /// If parent is provided, it will lookup the real path from the parent inode.
     /// If parent is not provided, it will lookup the real path from the cwd of process.
-    async fn lookup_real_path(&self, parent: Option<&InodeHandle>, path: &str) -> Result<String> {
+    async fn lookup_real_path(
+        &self,
+        parent: Option<&Arc<dyn AsyncInode>>,
+        path: &str,
+    ) -> Result<String> {
         let mut real_path = String::from(path);
 
         loop {
             let (dir_path, file_name) = split_path(&real_path);
             let dir_inode = if let Some(parent_inode) = parent {
-                parent_inode.lookup(dir_path, Some(MAX_SYMLINKS)).await?
+                parent_inode
+                    .lookup_follow(dir_path, Some(MAX_SYMLINKS))
+                    .await?
             } else {
                 self.lookup_inode_cwd(dir_path).await?
             };
 
-            match dir_inode
-                .lookup_no_follow(file_name.trim_end_matches('/'))
-                .await
-            {
+            match dir_inode.lookup(file_name.trim_end_matches('/')).await {
                 Ok(inode) if inode.metadata().await?.type_ == FileType::SymLink => {
                     // Update real_path for next round
                     real_path = {
@@ -317,17 +314,17 @@ impl FsView {
     }
 
     /// Lookup Inode from the cwd of the process. If path is a symlink, do not dereference it
-    async fn lookup_inode_cwd_no_follow(&self, path: &str) -> Result<InodeHandle> {
+    async fn lookup_inode_cwd_no_follow(&self, path: &str) -> Result<Arc<dyn AsyncInode>> {
         if path.ends_with("/") {
             Ok(self.lookup_inode_cwd(path).await?)
         } else {
             let (dir_path, file_name) = split_path(&path);
             let dir_inode = self.lookup_inode_cwd(dir_path).await?;
-            Ok(dir_inode.lookup_no_follow(file_name).await?)
+            Ok(dir_inode.lookup(file_name).await?)
         }
     }
 
-    async fn lookup_inode_cwd(&self, path: &str) -> Result<InodeHandle> {
+    async fn lookup_inode_cwd(&self, path: &str) -> Result<Arc<dyn AsyncInode>> {
         let full_path_string = if path.starts_with("/") {
             // absolute path
             path.to_owned()
@@ -340,36 +337,19 @@ impl FsView {
                 cwd + path
             }
         };
-        let full_path = full_path_string.trim_start_matches('/');
 
-        let inode = if full_path.starts_with(ASYNC_SFS_NAME) {
-            let path = full_path.strip_prefix(ASYNC_SFS_NAME).unwrap();
-            let inode = async_sfs()
-                .await
-                .root_inode()
-                .await
-                .lookup_follow(path, Some(MAX_SYMLINKS))
-                .await?;
-            InodeHandle::from_async(inode)
-        } else {
-            let inode = ROOT_FS
-                .read()
-                .unwrap()
-                .root_inode()
-                .lookup_follow(full_path, MAX_SYMLINKS)?;
-            InodeHandle::from_sync(inode)
-        };
-        Ok(inode)
+        rootfs()
+            .await
+            .root_inode()
+            .await
+            .lookup_follow(full_path_string.trim_start_matches('/'), Some(MAX_SYMLINKS))
+            .await
     }
 
-    fn lookup_inode_from_fd(&self, fd: FileDesc) -> Result<InodeHandle> {
+    fn lookup_inode_from_fd(&self, fd: FileDesc) -> Result<Arc<dyn AsyncInode>> {
         let file_ref = current!().file(fd)?;
-        let inode = if let Some(inode_file) = file_ref.as_inode_file() {
-            let inode = Arc::clone(inode_file.inode());
-            InodeHandle::from_sync(inode)
-        } else if let Some(async_file_handle) = file_ref.as_async_file_handle() {
-            let inode = Arc::clone(async_file_handle.dentry().inode());
-            InodeHandle::from_async(inode)
+        let inode = if let Some(async_file_handle) = file_ref.as_async_file_handle() {
+            Arc::clone(async_file_handle.dentry().inode())
         } else {
             return_errno!(EBADF, "dirfd is not an inode file");
         };
@@ -393,9 +373,7 @@ impl FsView {
             }
             FsPathInner::FdRelative(dirfd, path) => {
                 let file_ref = current!().file(*dirfd)?;
-                let dir_path = if let Some(inode_file) = file_ref.as_inode_file() {
-                    inode_file.open_path().to_owned()
-                } else if let Some(async_file_handle) = file_ref.as_async_file_handle() {
+                let dir_path = if let Some(async_file_handle) = file_ref.as_async_file_handle() {
                     async_file_handle.dentry().abs_path().to_owned()
                 } else {
                     return_errno!(EBADF, "dirfd is not an inode file");
@@ -409,9 +387,7 @@ impl FsView {
             FsPathInner::Cwd => self.cwd(),
             FsPathInner::Fd(fd) => {
                 let file_ref = current!().file(*fd)?;
-                if let Some(inode_file) = file_ref.as_inode_file() {
-                    inode_file.open_path().to_owned()
-                } else if let Some(async_file_handle) = file_ref.as_async_file_handle() {
+                if let Some(async_file_handle) = file_ref.as_async_file_handle() {
                     async_file_handle.dentry().abs_path().to_owned()
                 } else {
                     return_errno!(EBADF, "dirfd is not an inode file");

@@ -616,7 +616,7 @@ pub async fn do_mount(
         MountOptions::from_fs_type_and_options(&fs_type, options)?
     };
 
-    fs_ops::do_mount(&source, &target, flags, mount_options)?;
+    fs_ops::do_mount(&source, &target, flags, mount_options).await?;
     Ok(0)
 }
 
@@ -626,7 +626,7 @@ pub async fn do_umount(target: *const i8, flags: u32) -> Result<isize> {
         .into_owned();
     let flags = UmountFlags::from_u32(flags)?;
 
-    fs_ops::do_umount(&target, flags)?;
+    fs_ops::do_umount(&target, flags).await?;
     Ok(0)
 }
 

@@ -1,17 +1,12 @@
 use config::{parse_key, parse_mac, ConfigMount, ConfigMountFsType, ConfigMountOptions};
-use rcore_fs_mountfs::MNode;
 use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::sync::Once;
 use util::host_file_util::{write_host_file, HostFile};
 use util::mem_util::from_user;
 
-use super::rootfs::{mount_nonroot_fs_according_to, open_root_fs_according_to, umount_nonroot_fs};
+use super::rootfs::{init_rootfs, mount_nonroot_fs_according_to, umount_nonroot_fs, update_rootfs};
 use super::*;
-
-lazy_static! {
-    static ref MOUNT_ONCE: Once = Once::new();
-}
 
 pub async fn do_mount_rootfs(
     user_config: &config::Config,
@@ -19,17 +14,13 @@ pub async fn do_mount_rootfs(
 ) -> Result<()> {
     debug!("mount rootfs");
 
-    if MOUNT_ONCE.is_completed() {
-        return_errno!(EPERM, "rootfs cannot be mounted more than once");
-    }
-    let new_rootfs = open_root_fs_according_to(&user_config.mount, user_key)?;
-    mount_nonroot_fs_according_to(&new_rootfs.root_inode(), &user_config.mount, user_key, true)?;
-    MOUNT_ONCE.call_once(|| {
-        let mut rootfs = ROOT_FS.write().unwrap();
-        rootfs.sync().expect("failed to sync old rootfs");
-        *rootfs = new_rootfs;
-        *ENTRY_POINTS.write().unwrap() = user_config.entry_points.to_owned();
-    });
+    let new_rootfs = init_rootfs(&user_config.mount, user_key).await?;
+
+    // Update the rootfs
+    update_rootfs(new_rootfs).await?;
+
+    // Update entry_points
+    *ENTRY_POINTS.write().unwrap() = user_config.entry_points.to_owned();
 
     // Write resolv.conf file into mounted file system
     write_host_file(HostFile::ResolvConf).await?;
@@ -46,7 +37,7 @@ pub async fn do_mount_rootfs(
     Ok(())
 }
 
-pub fn do_mount(
+pub async fn do_mount(
     source: &str,
     target: &str,
     flags: MountFlags,
@@ -137,20 +128,21 @@ pub fn do_mount(
         }
     };
 
-    let mut rootfs = ROOT_FS.write().unwrap();
     // Should we sync the fs before mount?
-    rootfs.sync()?;
+    let rootfs = rootfs().await;
+    rootfs.sync().await?;
     let follow_symlink = !flags.contains(MountFlags::MS_NOSYMFOLLOW);
     mount_nonroot_fs_according_to(
-        &rootfs.root_inode(),
+        &rootfs.root_inode().await,
         &mount_configs,
         &user_key,
         follow_symlink,
-    )?;
+    )
+    .await?;
     Ok(())
 }
 
-pub fn do_umount(target: &str, flags: UmountFlags) -> Result<()> {
+pub async fn do_umount(target: &str, flags: UmountFlags) -> Result<()> {
     debug!("umount: target: {}, flags: {:?}", target, flags);
 
     let target = if target == "/" {
@@ -162,11 +154,11 @@ pub fn do_umount(target: &str, flags: UmountFlags) -> Result<()> {
         fs.convert_fspath_to_abs(&fs_path)?
     };
 
-    let mut rootfs = ROOT_FS.write().unwrap();
     // Should we sync the fs before umount?
-    rootfs.sync()?;
+    let rootfs = rootfs().await;
+    rootfs.sync().await?;
     let follow_symlink = !flags.contains(UmountFlags::UMOUNT_NOFOLLOW);
-    umount_nonroot_fs(&rootfs.root_inode(), &target, follow_symlink)?;
+    umount_nonroot_fs(&rootfs.root_inode().await, &target, follow_symlink).await?;
     Ok(())
 }
 

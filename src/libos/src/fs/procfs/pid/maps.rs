@@ -97,10 +97,11 @@ fn get_output_for_vma(vma: &VMArea, heap_or_stack: Option<&str>) -> String {
 
     let (file_path, offset, device_id, inode_num) = {
         if let Some((file, offset)) = vma.init_file() {
-            let inode_file = file.as_inode_file().unwrap();
-            let file_path = inode_file.open_path();
-            let inode_num = inode_file.inode().metadata().unwrap().inode;
-            let device_id = inode_file.inode().metadata().unwrap().dev;
+            let file_handle = file.as_async_file_handle().unwrap();
+            let file_path = file_handle.dentry().abs_path();
+            let inode = file_handle.dentry().inode().as_sync_inode().unwrap();
+            let inode_num = inode.metadata().unwrap().inode;
+            let device_id = inode.metadata().unwrap().dev;
             (file_path, offset, device_id, inode_num)
         } else if heap_or_stack.is_some() {
             (heap_or_stack.unwrap(), 0, 0, 0)

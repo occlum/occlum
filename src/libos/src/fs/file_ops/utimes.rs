@@ -95,17 +95,7 @@ pub async fn do_utimes_fd(fd: FileDesc, atime: Utime, mtime: Utime, flags: i32) 
 
     let file_ref = current!().file(fd)?;
 
-    if let Some(inode_file) = file_ref.as_inode_file() {
-        let inode = inode_file.inode();
-        let mut info = inode.metadata()?;
-        if let Utime::UTIME(atime) = atime {
-            info.atime = atime;
-        }
-        if let Utime::UTIME(mtime) = mtime {
-            info.mtime = mtime;
-        }
-        inode.set_metadata(&info)?;
-    } else if let Some(async_file_handle) = file_ref.as_async_file_handle() {
+    if let Some(async_file_handle) = file_ref.as_async_file_handle() {
         let inode = async_file_handle.dentry().inode();
         let mut info = inode.metadata().await?;
         if let Utime::UTIME(atime) = atime {

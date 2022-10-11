@@ -5,7 +5,7 @@ pub async fn do_flock(fd: FileDesc, ops: FlockOps) -> Result<()> {
 
     let file_ref = current!().file(fd)?;
     let inode_file = file_ref
-        .as_inode_file()
+        .as_async_file_handle()
         .ok_or_else(|| errno!(EBADF, "not an inode file"))?;
     if ops.contains(FlockOps::LOCK_UN) {
         inode_file.unlock_flock();

@@ -482,6 +482,8 @@ struct OcclumMountOptions {
     pub layers: Option<Vec<OcclumMount>>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub temporary: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total_size: Option<String>,
 }
 
 #[inline]
