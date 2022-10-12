@@ -597,8 +597,10 @@ fn new_setsockopt_cmd(level: i32, optname: i32, optval: &[u8]) -> Result<Box<dyn
                 } else {
                     (*timeout).tv_sec
                 };
-                if ((*timeout).tv_usec as u32).checked_mul(1000).is_none() {
-                    return_errno!(EDOM, "time struct conversion overflow");
+
+                let usec = (*timeout).tv_usec;
+                if usec < 0 || usec > 1000000 || (usec as u32).checked_mul(1000).is_none() {
+                    return_errno!(EDOM, "time struct value is invalid");
                 }
                 Duration::new(secs as u64, (*timeout).tv_usec as u32 * 1000)
             };
@@ -618,10 +620,12 @@ fn new_setsockopt_cmd(level: i32, optname: i32, optval: &[u8]) -> Result<Box<dyn
                 } else {
                     (*timeout).tv_sec
                 };
-                if ((*timeout).tv_usec as u32).checked_mul(1000).is_none() {
-                    return_errno!(EDOM, "time struct conversion overflow");
+
+                let usec = (*timeout).tv_usec;
+                if usec < 0 || usec > 1000000 || (usec as u32).checked_mul(1000).is_none() {
+                    return_errno!(EDOM, "time struct value is invalid");
                 }
-                Duration::new(secs as u64, (*timeout).tv_usec as u32 * 1000)
+                Duration::new(secs as u64, usec as u32 * 1000)
             };
             trace!("send timeout = {:?}", timeout);
             Box::new(SetSendTimeoutCmd::new(timeout))
