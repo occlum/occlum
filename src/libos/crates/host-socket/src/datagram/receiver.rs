@@ -71,7 +71,10 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
 
         if !flags.is_empty()
             && flags.intersects(
-                !(RecvFlags::MSG_DONTWAIT | RecvFlags::MSG_ERRQUEUE | RecvFlags::MSG_TRUNC),
+                !(RecvFlags::MSG_DONTWAIT
+                    | RecvFlags::MSG_ERRQUEUE
+                    | RecvFlags::MSG_TRUNC
+                    | RecvFlags::MSG_PEEK),
             )
         {
             // todo!("Support other flags");
@@ -118,7 +121,12 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
                     copied_bytes
                 };
 
-                self.do_recv(&mut inner);
+                // When flags contain MSG_PEEK and there is data in socket recv buffer, it is unnecessary to
+                // send blocking recv request (do_recv) to fetch data from iouring buffer, which may flush the data in recv buffer.
+                // When flags don't contain MSG_PEEK or there is no available data, it is time to send blocking request to iouring for notifying events.
+                if !flags.contains(RecvFlags::MSG_PEEK) {
+                    self.do_recv(&mut inner);
+                }
                 return Ok((recv_bytes, recv_addr, msg_flags));
             }
         }
