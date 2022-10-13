@@ -315,7 +315,8 @@ impl RangeLockList {
                 .skip(skipped)
                 .position(|lk| lk.owner() == lock.owner())
             {
-                Some(idx) => idx,
+                // (idx + skipped) is the original position in list
+                Some(idx) => idx + skipped,
                 None => break,
             };
 
