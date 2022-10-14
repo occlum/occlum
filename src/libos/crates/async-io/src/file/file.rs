@@ -6,7 +6,7 @@ use inherit_methods_macro::inherit_methods;
 
 use crate::event::{Events, Observer, Poller};
 use crate::file::{AccessMode, StatusFlags};
-use crate::fs::StatBuf;
+use crate::fs::{SeekFrom, StatBuf};
 use crate::ioctl::IoctlCmd;
 use crate::prelude::*;
 
@@ -81,6 +81,10 @@ pub trait File: Debug + Sync + Send {
 
     fn stat(&self) -> StatBuf {
         Default::default()
+    }
+
+    fn seek(&self, pos: SeekFrom) -> Result<usize> {
+        return_errno!(ENOSYS, "not support seeking");
     }
 }
 

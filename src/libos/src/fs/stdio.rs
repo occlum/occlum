@@ -167,6 +167,16 @@ impl File for StdoutFile {
         ));
         Ok(())
     }
+
+    fn seek(&self, pos: SeekFrom) -> Result<usize> {
+        let (off, whence) = match pos {
+            SeekFrom::Start(off) => (off as off_t, 0 /* SEEK_SET */),
+            SeekFrom::Current(off) => (off as off_t, 1 /* SEEK_CUR */),
+            SeekFrom::End(off) => (off as off_t, 2 /* SEEK_END */),
+        };
+        let offset = try_libc!(libc::ocall::lseek(self.host_fd() as i32, off, whence));
+        Ok(offset as usize)
+    }
 }
 
 impl Debug for StdoutFile {
@@ -292,6 +302,16 @@ impl File for StdinFile {
             raw_status_flags as c_int
         ));
         Ok(())
+    }
+
+    fn seek(&self, pos: SeekFrom) -> Result<usize> {
+        let (off, whence) = match pos {
+            SeekFrom::Start(off) => (off as off_t, 0 /* SEEK_SET */),
+            SeekFrom::Current(off) => (off as off_t, 1 /* SEEK_CUR */),
+            SeekFrom::End(off) => (off as off_t, 2 /* SEEK_END */),
+        };
+        let offset = try_libc!(libc::ocall::lseek(self.host_fd() as i32, off, whence));
+        Ok(offset as usize)
     }
 }
 
