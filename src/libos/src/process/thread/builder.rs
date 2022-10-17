@@ -1,3 +1,4 @@
+use async_rt::wait::Waiter;
 use std::ptr::NonNull;
 
 use super::{
@@ -123,6 +124,7 @@ impl ThreadBuilder {
         let sig_mask = RwLock::new(self.sig_mask.unwrap_or_default());
         let sig_queues = RwLock::new(SigQueues::new());
         let sig_stack = SgxMutex::new(None);
+        let waiter = Waiter::new();
 
         let new_thread = Arc::new(Thread {
             tid,
@@ -140,6 +142,7 @@ impl ThreadBuilder {
             sig_queues,
             sig_mask,
             sig_stack,
+            waiter,
         });
 
         let mut inner = new_thread.process().inner();

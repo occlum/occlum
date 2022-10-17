@@ -23,7 +23,7 @@ pub use self::do_exit::handle_force_exit;
 pub use self::do_futex::{futex_wait, futex_wake};
 pub use self::do_robust_list::RobustListHead;
 pub use self::do_spawn::do_spawn_root;
-pub use self::do_vfork::do_vfork;
+pub use self::do_vfork::{do_vfork, handle_force_stop};
 pub use self::process::{Process, ProcessFilter, ProcessStatus, IDLE};
 pub use self::spawn_attribute::posix_spawnattr_t;
 pub use self::spawn_attribute::SpawnAttr;

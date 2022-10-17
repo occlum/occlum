@@ -72,7 +72,7 @@ pub fn do_rt_sigreturn() -> Result<()> {
 pub fn deliver_signal() {
     let thread = current!();
 
-    if thread.process().is_forced_to_exit() {
+    if thread.process().is_forced_to_exit() || thread.is_forced_to_stop() {
         return;
     }
 

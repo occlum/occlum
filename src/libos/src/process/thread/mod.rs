@@ -1,4 +1,5 @@
 use async_rt::task::{Task, Tirqs};
+use async_rt::wait::Waiter;
 use std::fmt;
 use std::ptr::NonNull;
 
@@ -38,6 +39,8 @@ pub struct Thread {
     sig_queues: RwLock<SigQueues>,
     sig_mask: RwLock<SigSet>,
     sig_stack: SgxMutex<Option<SigStack>>,
+    // Waiter
+    waiter: Waiter,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -45,6 +48,7 @@ pub enum ThreadStatus {
     Init,
     Running,
     Exited,
+    Stopped,
 }
 
 impl Thread {
@@ -80,6 +84,10 @@ impl Thread {
     /// Get the signal mask.
     pub fn sig_mask(&self) -> SigSet {
         *self.sig_mask.read().unwrap()
+    }
+
+    pub fn waiter(&self) -> &Waiter {
+        &self.waiter
     }
 
     /// Set a new signal mask, returning the old one.
@@ -217,7 +225,12 @@ impl Thread {
             .attach(async_rt::task::current::get());
         Tirqs::set_mask(self.sig_mask().to_c() as u64);
 
-        self.inner().start();
+        // Before the thread starts, this thread could be stopped by other threads
+        if self.is_forced_to_stop() {
+            info!("thread is forced to stopped before this thread starts");
+        } else {
+            self.inner().start();
+        }
         /*
                 let eventfd = EventFile::new(
                     0,
@@ -231,6 +244,18 @@ impl Thread {
                     .insert(self.tid(), eventfd)
                     .expect_none("this thread should not have an eventfd before start");
         */
+    }
+
+    pub(super) async fn stop(&self) {
+        self.waiter.reset();
+
+        while self.is_forced_to_stop() {
+            self.waiter.wait().await;
+        }
+    }
+
+    pub(super) fn wake(&self) {
+        self.waiter.waker().wake();
     }
 
     pub(super) fn exit(&self, term_status: TermStatus) -> usize {
@@ -275,6 +300,20 @@ impl Thread {
     pub(super) fn inner(&self) -> SgxMutexGuard<ThreadInner> {
         self.inner.lock().unwrap()
     }
+
+    pub fn force_stop(&self) {
+        let mut inner = self.inner();
+        inner.stop();
+    }
+
+    pub fn is_forced_to_stop(&self) -> bool {
+        self.inner().status() == ThreadStatus::Stopped
+    }
+
+    pub fn resume(&self) {
+        let mut inner = self.inner();
+        inner.resume();
+    }
 }
 
 impl PartialEq for Thread {
@@ -310,6 +349,7 @@ pub enum ThreadInner {
     Init,
     Running,
     Exited { term_status: TermStatus },
+    Stopped,
 }
 
 impl ThreadInner {
@@ -322,6 +362,7 @@ impl ThreadInner {
             Self::Init { .. } => ThreadStatus::Init,
             Self::Running { .. } => ThreadStatus::Running,
             Self::Exited { .. } => ThreadStatus::Exited,
+            Self::Stopped { .. } => ThreadStatus::Stopped,
         }
     }
 
@@ -333,7 +374,14 @@ impl ThreadInner {
     }
 
     pub fn start(&mut self) {
-        debug_assert!(self.status() == ThreadStatus::Init);
+        *self = Self::Running;
+    }
+
+    pub fn stop(&mut self) {
+        *self = Self::Stopped;
+    }
+
+    pub fn resume(&mut self) {
         *self = Self::Running;
     }
 
