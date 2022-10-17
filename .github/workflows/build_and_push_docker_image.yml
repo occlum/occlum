@@ -57,7 +57,7 @@ jobs:
           platforms: linux/amd64
           build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
           push: true
-          tags: occlum/occlum:${{ env.RELEASE_VERSION }}-centos8.2
+          tags: occlum/ngo:${{ env.RELEASE_VERSION }}-centos8.2
 
   generate-ubuntu18-image:
       runs-on: ubuntu-18.04
@@ -104,7 +104,7 @@ jobs:
           platforms: linux/amd64
           build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
           push: true
-          tags: occlum/occlum:${{ env.RELEASE_VERSION }}-ubuntu18.04
+          tags: occlum/ngo:${{ env.RELEASE_VERSION }}-ubuntu18.04
 
   generate-ubuntu20-image:
       runs-on: ubuntu-20.04
@@ -158,4 +158,4 @@ jobs:
           platforms: linux/amd64
           build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
           push: true
-          tags: occlum/occlum:${{ env.IMAGE_TAG }}-ubuntu20.04
+          tags: occlum/ngo:${{ env.IMAGE_TAG }}-ubuntu20.04

@@ -125,7 +125,7 @@ RUN wget http://www.etallen.com/cpuid/cpuid-20200211.x86_64.tar.gz && \
 # Download the Occlum source
 ARG OCCLUM_BRANCH
 WORKDIR /root
-RUN git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum && \
+RUN git clone -b $OCCLUM_BRANCH https://github.com/occlum/ngo occlum/ && \
     cp -r /root/occlum/tools/toolchains/* /tmp/ && mkdir -p /opt/occlum/ && \
     cp /root/occlum/tools/docker/start_aesm.sh /opt/occlum/
 

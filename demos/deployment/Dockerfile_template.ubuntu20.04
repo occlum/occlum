@@ -26,7 +26,7 @@ FROM base as packager
 WORKDIR /root
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends make gdb git libfuse-dev libtool tzdata && \
-    git clone https://github.com/occlum/occlum.git && \
+    git clone https://github.com/occlum/ngo.git occlum/ && \
     cp -r /root/occlum/demos /root/demos && \
     apt-get install -y occlum && \
     apt-get clean && \

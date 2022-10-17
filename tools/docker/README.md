@@ -21,4 +21,4 @@ Currently, `<OS_NAME>` must be one of the following values:
 `<OCCLUM_BRANCH>` indicates which the docker image is built on, e.g "0.24.0".
 It is optional, if not provided, "master" branch will be used.
 
-The resulting Docker image will have `occlum/occlum:<OCCLUM_LABEL>-<OS_NAME>` as its label.
+The resulting Docker image will have `occlum/ngo:<OCCLUM_LABEL>-<OS_NAME>` as its label.

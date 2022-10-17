@@ -28,7 +28,7 @@ USAGE:
     The Occlum branch which the docker image is built on, e.g "0.24.0".
     It is optional, if not provided, "master" branch will be used.
 
-The resulting Docker image will have "occlum/occlum:<OCCLUM_LABEL>-<OS_NAME>" as its label.
+The resulting Docker image will have "occlum/ngo:<OCCLUM_LABEL>-<OS_NAME>" as its label.
 EOF
     exit 1
 }
@@ -52,4 +52,4 @@ function check_item_in_list() {
 check_item_in_list "$os_name" "ubuntu18.04 ubuntu20.04 centos8.2 aliyunlinux3" || report_error
 
 cd "$script_dir/.."
-docker build -f "$script_dir/Dockerfile.$os_name" -t "occlum/occlum:$occlum_label-$os_name" --build-arg OCCLUM_BRANCH=$occlum_branch .
+docker build -f "$script_dir/Dockerfile.$os_name" -t "occlum/ngo:$occlum_label-$os_name" --build-arg OCCLUM_BRANCH=$occlum_branch .

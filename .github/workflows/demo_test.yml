@@ -309,7 +309,7 @@ jobs:
         submodules: true
 
     - name: Create container
-      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc
+      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/ngo:latest-ubuntu20.04-grpc
 
     - uses: ./.github/workflows/composite_action/prebuild
       with:
@@ -340,7 +340,7 @@ jobs:
         submodules: true
 
     - name: Create container
-      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc
+      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/ngo:latest-ubuntu20.04-grpc
 
     - uses: ./.github/workflows/composite_action/prebuild
       with:
@@ -404,7 +404,7 @@ jobs:
         submodules: true
 
     - name: Create container
-      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-openvino
+      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/ngo:latest-ubuntu20.04-openvino
 
     - uses: ./.github/workflows/composite_action/prebuild
       with:
@@ -428,7 +428,7 @@ jobs:
       with:
         submodules: true
     - name: Create container
-      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-python
+      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/ngo:latest-ubuntu20.04-python
 
     - uses: ./.github/workflows/composite_action/prebuild
       with:
@@ -701,8 +701,8 @@ jobs:
 
     - name: Create container
       run: |
-        docker pull occlumbackup/occlum:latest-ubuntu20.04-gvisor_test
-        gvisor_test=$(docker run -itd -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-gvisor_test);
+        docker pull occlumbackup/ngo:latest-ubuntu20.04-gvisor_test
+        gvisor_test=$(docker run -itd -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/ngo:latest-ubuntu20.04-gvisor_test);
         echo "gvisor_test=$gvisor_test" >> $GITHUB_ENV
 
     - uses: ./.github/workflows/composite_action/prebuild
