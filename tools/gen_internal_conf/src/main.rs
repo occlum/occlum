@@ -351,32 +351,6 @@ fn gen_app_config(
             "encrypted": false,
             "mount": [
                 {
-                    "target": "/",
-                    "type": "unionfs",
-                    "options": {
-                        "layers": [
-                            {
-                                "target": "/",
-                                "type": "sefs",
-                                "source": "./build/mount/__ROOT",
-                                "options": {
-                                    "MAC": ""
-                                }
-                            },
-                            {
-                                "target": "/",
-                                "type": "sefs",
-                                "source": "./run/mount/__ROOT"
-                            }
-                        ]
-                    }
-                },
-                {
-                    "target": "/host",
-                    "type": "hostfs",
-                    "source": "."
-                },
-                {
                     "target": "/proc",
                     "type": "procfs"
                 },
@@ -398,57 +372,46 @@ fn gen_app_config(
         .pointer_mut("/app/1/entry_points")
         .unwrap() = entry_points;
 
-    let mut mount_config = mount_conf;
-    if let Some(root_mc) = mount_config
+    debug!("User provided root mount config: {:?}", mount_conf);
+    let mut root_mount_config = mount_conf;
+
+    //Check the validity of the user provided root mount
+    let root_mc = &mut root_mount_config
+        .iter_mut()
+        .find(|m| m.target == String::from("/") && m.type_ == String::from("unionfs"))
+        .ok_or("the root UnionFS is not valid")?;
+    if root_mc.options.layers.is_none() {
+        return Err("the root UnionFS must be given layers");
+    }
+    let mut root_image_sefs_mc = root_mc
+        .options
+        .layers
+        .as_mut()
+        .unwrap()
         .iter_mut()
         .find(|m| {
             m.target == String::from("/")
-                && m.type_ == String::from("unionfs")
-        }) {
-        debug!("User provides Root mount config:\n{:?}", root_mc);
-        root_mc
-            .options
-            .layers
-            .as_mut()
-            .unwrap()
-            .iter_mut()
-            .find(|m| {
-                m.target == String::from("/")
-                    && m.type_ == String::from("sefs")
-                    && m.options.mac.is_some()
-            })
-            .ok_or("the image SEFS in layers is not valid")?;
-
-        // Update app root mount
-        *app_config
-            .pointer_mut("/app/1/mount/0")
-            .unwrap() = serde_json::to_value(root_mc).unwrap();
-    }
-
+                && m.type_ == String::from("sefs")
+                && m.options.mac.is_some()
+        })
+        .ok_or("the image SEFS in layers is not valid")?;
     // Update app root mount fs MAC
-    *app_config
-        .pointer_mut("/app/1/mount/0/options/layers/0/options/MAC")
-        .unwrap() = serde_json::Value::String(occlum_conf_user_fs_mac);
+    root_image_sefs_mc.options.mac = Some(occlum_conf_user_fs_mac);
+
+    // Combine the user provided mount
+    let mut mount_json = serde_json::to_value(root_mount_config).unwrap();
+    let mut mount_array = mount_json.as_array_mut().unwrap();
+    app_config["app"][1]["mount"]
+        .as_array_mut()
+        .unwrap()
+        .append(&mut mount_array);
 
     // Update app encrypted tag
     *app_config
         .pointer_mut("/app/1/encrypted")
         .unwrap() = image_encrypted.into();
 
-    // Update host mount
-    if let Some(host_mc) = mount_config
-        .iter_mut()
-        .find(|m| {
-            m.type_ == String::from("hostfs")
-        }) {
-        debug!("User provides host mount config:\n{:?}", host_mc);
-        // Update app root mount
-        *app_config
-            .pointer_mut("/app/1/mount/1")
-            .unwrap() = serde_json::to_value(host_mc).unwrap();
-    }
-
-    debug!("Occlum.json mount config:\n{:?}", app_config);
+    debug!("Occlum.json app config:\n{:?}", app_config);
 
     Ok(app_config["app"].to_owned())
 }
