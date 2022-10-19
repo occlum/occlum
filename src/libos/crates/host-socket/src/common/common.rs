@@ -1,7 +1,6 @@
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use async_io::socket::UnixAddr;
 use io_uring_callback::IoUring;
 cfg_if::cfg_if! {
     if #[cfg(feature = "sgx")] {
@@ -30,10 +29,11 @@ pub struct Common<A: Addr + 'static, R: Runtime> {
 }
 
 impl<A: Addr + 'static, R: Runtime> Common<A, R> {
-    pub fn new(type_: Type, nonblocking: bool) -> Result<Self> {
+    pub fn new(type_: Type, nonblocking: bool, protocol: Option<i32>) -> Result<Self> {
         let domain_c = A::domain() as libc::c_int;
         let type_c = type_ as libc::c_int;
-        let host_fd = try_libc!(do_socket(domain_c, type_c, 0)) as HostFd;
+        let protocol = protocol.unwrap_or(0) as libc::c_int;
+        let host_fd = try_libc!(do_socket(domain_c, type_c, protocol)) as HostFd;
         let nonblocking = AtomicBool::new(nonblocking);
         let is_closed = AtomicBool::new(false);
         let pollee = Pollee::new(Events::empty());
@@ -122,6 +122,7 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
         &self.pollee
     }
 
+    #[allow(unused)]
     pub fn addr(&self) -> Option<A> {
         let inner = self.inner.lock().unwrap();
         inner.addr.clone()

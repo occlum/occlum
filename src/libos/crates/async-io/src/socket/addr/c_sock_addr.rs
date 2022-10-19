@@ -71,7 +71,7 @@ impl CSockAddr for (libc::sockaddr_in6, usize) {
     fn c_addr(&self) -> &[u8] {
         assert!(self.1 == size_of::<libc::sockaddr_in6>());
         unsafe {
-            let addr_ptr = (self as *const _ as *const u8).add(size_of_val(&self.c_family()));
+            let addr_ptr = (&self.0 as *const _ as *const u8).add(size_of_val(&self.c_family()));
             std::slice::from_raw_parts(
                 addr_ptr,
                 size_of::<libc::sockaddr_in6>() - size_of_val(&self.c_family()),
@@ -93,6 +93,24 @@ impl CSockAddr for (libc::sockaddr_un, usize) {
         unsafe {
             let addr_ptr = (&self.0 as *const _ as *const u8).add(size_of_val(&self.0.sun_family));
             std::slice::from_raw_parts(addr_ptr, self.1 - size_of_val(&self.0.sun_family))
+        }
+    }
+}
+
+impl CSockAddr for (libc::sockaddr_nl, usize) {
+    fn c_family(&self) -> libc::sa_family_t {
+        libc::AF_NETLINK as _
+    }
+
+    fn c_addr(&self) -> &[u8] {
+        assert!(self.1 == size_of::<libc::sockaddr_nl>());
+
+        unsafe {
+            let addr_ptr = (&self.0 as *const _ as *const u8).add(size_of_val(&self.c_family()));
+            std::slice::from_raw_parts(
+                addr_ptr,
+                size_of::<libc::sockaddr_nl>() - size_of_val(&self.c_family()),
+            )
         }
     }
 }

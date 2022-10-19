@@ -4,7 +4,7 @@ use crate::prelude::*;
 
 use super::unix::trusted::TrustedAddr;
 pub use async_io::socket::{
-    Addr, CSockAddr, Domain, Ipv4Addr, Ipv4SocketAddr, Ipv6SocketAddr, UnixAddr,
+    Addr, CSockAddr, Domain, Ipv4Addr, Ipv4SocketAddr, Ipv6SocketAddr, NetlinkSocketAddr, UnixAddr,
 };
 use num_enum::IntoPrimitive;
 use std::path::Path;
@@ -15,6 +15,7 @@ pub enum AnyAddr {
     Ipv6(Ipv6SocketAddr),
     Unix(UnixAddr),
     TrustedUnix(TrustedAddr),
+    Netlink(NetlinkSocketAddr),
     Unspec,
 }
 
@@ -35,6 +36,10 @@ impl AnyAddr {
                 let trusted_addr = TrustedAddr::from_c_storage(c_addr, c_addr_len)?;
                 Self::TrustedUnix(trusted_addr)
             }
+            libc::AF_NETLINK => {
+                let netlink_addr = NetlinkSocketAddr::from_c_storage(c_addr, c_addr_len)?;
+                Self::Netlink(netlink_addr)
+            }
             libc::AF_UNSPEC => Self::Unspec,
             _ => {
                 return_errno!(EINVAL, "unsupported or invalid address family");
@@ -49,6 +54,7 @@ impl AnyAddr {
             Self::Ipv6(ipv6_addr) => ipv6_addr.to_c_storage(),
             Self::Unix(unix_addr) => unix_addr.to_c_storage(),
             Self::TrustedUnix(trusted_addr) => trusted_addr.to_c_storage(),
+            Self::Netlink(netlink_addr) => netlink_addr.to_c_storage(),
             Self::Unspec => {
                 let mut sockaddr_storage =
                     unsafe { MaybeUninit::<libc::sockaddr_storage>::uninit().assume_init() };
@@ -96,6 +102,7 @@ impl AnyAddr {
     pub fn to_unix(&self) -> Result<&UnixAddr> {
         match self {
             Self::Unix(unix_addr) => Ok(unix_addr),
+            Self::TrustedUnix(trusted_addr) => Ok(trusted_addr.inner()),
             _ => return_errno!(EAFNOSUPPORT, "not unix address"),
         }
     }
@@ -113,6 +120,13 @@ impl AnyAddr {
         match self {
             Self::TrustedUnix(trusted_addr) => Ok(trusted_addr),
             _ => return_errno!(EAFNOSUPPORT, "not unix address"),
+        }
+    }
+
+    pub fn to_netlink(&self) -> Result<&NetlinkSocketAddr> {
+        match self {
+            Self::Netlink(netlink_addr) => Ok(netlink_addr),
+            _ => return_errno!(EAFNOSUPPORT, "not netlink address"),
         }
     }
 

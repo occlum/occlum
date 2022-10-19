@@ -1,11 +1,13 @@
 use async_io::ioctl::IoctlCmd;
-use async_io::socket::{RecvFlags, SendFlags, Shutdown};
+use async_io::socket::{NetlinkFamily, RecvFlags, SendFlags, Shutdown, Type};
 
-use self::impls::{Ipv4Datagram, Ipv4Stream, Ipv6Stream, UnixDatagram};
+use self::impls::{Ipv4Datagram, Ipv4Stream, Ipv6Stream, NetlinkDatagram, UnixDatagram};
 use super::unix::trusted::Stream as TrustedStream;
 use super::unix::UnixStream;
 use crate::fs::{AccessMode, Events, Observer, Poller, StatusFlags};
-use crate::net::{Addr, AnyAddr, Domain, Ipv4SocketAddr, Ipv6SocketAddr, UnixAddr};
+use crate::net::{
+    Addr, AnyAddr, Domain, Ipv4SocketAddr, Ipv6SocketAddr, NetlinkSocketAddr, UnixAddr,
+};
 use crate::prelude::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
@@ -24,6 +26,7 @@ enum AnySocket {
     UnixDatagram(UnixDatagram),
     Ipv4Datagram(Ipv4Datagram),
     TrustedUDS(TrustedStream), // for socket pair use only
+    NetlinkDatagram(NetlinkDatagram),
 }
 
 /* Standard well-defined IP protocols.  */
@@ -80,6 +83,9 @@ macro_rules! apply_fn_on_any_socket {
                 $($fn_body)*
             }
             AnySocket::TrustedUDS($socket) => {
+                $($fn_body)*
+            }
+            AnySocket::NetlinkDatagram($socket) => {
                 $($fn_body)*
             }
         }
@@ -144,47 +150,83 @@ impl SocketFile {
 impl SocketFile {
     pub fn new(
         domain: Domain,
-        protocol: SocketProtocol,
-        is_stream: bool,
+        protocol: c_int,
+        socket_type: Type,
         nonblocking: bool,
     ) -> Result<Self> {
-        if protocol != SocketProtocol::IPPROTO_IP && protocol != SocketProtocol::IPPROTO_TCP {
-            return_errno!(EINVAL, "unsupported protocol");
+        if domain != Domain::Netlink {
+            let protocol = SocketProtocol::try_from(protocol)
+                .map_err(|_| errno!(EINVAL, "invalid or unsupported network protocol"))?;
+            if protocol != SocketProtocol::IPPROTO_IP && protocol != SocketProtocol::IPPROTO_TCP {
+                return_errno!(EINVAL, "unsupported protocol");
+            }
         }
 
-        if is_stream {
-            let any_socket = match domain {
-                Domain::Ipv4 => {
-                    let ipv4_stream = Ipv4Stream::new(nonblocking)?;
-                    AnySocket::Ipv4Stream(ipv4_stream)
-                }
-                Domain::Ipv6 => {
-                    let ipv6_stream = Ipv6Stream::new(nonblocking)?;
-                    AnySocket::Ipv6Stream(ipv6_stream)
-                }
-                Domain::Unix => {
-                    let unix_stream = UnixStream::new_trusted(nonblocking);
-                    AnySocket::UnixStream(unix_stream)
-                }
-            };
-            let new_self = Self { socket: any_socket };
-            Ok(new_self)
-        } else {
-            let any_socket = match domain {
-                Domain::Ipv4 => {
-                    let ipv4_datagram = Ipv4Datagram::new(nonblocking)?;
-                    AnySocket::Ipv4Datagram(ipv4_datagram)
-                }
-                Domain::Unix => {
-                    let unix_datagram = UnixDatagram::new(nonblocking)?;
-                    AnySocket::UnixDatagram(unix_datagram)
-                }
-                _ => {
-                    return_errno!(EINVAL, "not support IPv6, yet");
-                }
-            };
-            let new_self = Self { socket: any_socket };
-            Ok(new_self)
+        match socket_type {
+            Type::STREAM => {
+                let any_socket = match domain {
+                    Domain::Ipv4 => {
+                        let ipv4_stream = Ipv4Stream::new(nonblocking)?;
+                        AnySocket::Ipv4Stream(ipv4_stream)
+                    }
+                    Domain::Ipv6 => {
+                        let ipv6_stream = Ipv6Stream::new(nonblocking)?;
+                        AnySocket::Ipv6Stream(ipv6_stream)
+                    }
+                    Domain::Unix => {
+                        let unix_stream = UnixStream::new_trusted(nonblocking);
+                        AnySocket::UnixStream(unix_stream)
+                    }
+                    Domain::Netlink => {
+                        return_errno!(ESOCKTNOSUPPORT, "netlink is a datagram-oriented service");
+                    }
+                };
+                let new_self = Self { socket: any_socket };
+                Ok(new_self)
+            }
+            Type::DGRAM => {
+                let any_socket = match domain {
+                    Domain::Ipv4 => {
+                        let ipv4_datagram = Ipv4Datagram::new(nonblocking)?;
+                        AnySocket::Ipv4Datagram(ipv4_datagram)
+                    }
+                    Domain::Unix => {
+                        let unix_datagram = UnixDatagram::new(nonblocking)?;
+                        AnySocket::UnixDatagram(unix_datagram)
+                    }
+                    Domain::Netlink => {
+                        let netlink_family = NetlinkFamily::try_from(protocol as u16)
+                            .map_err(|_| errno!(EINVAL, "unknown netlink family"))?;
+                        let netlink_socket =
+                            NetlinkDatagram::new(socket_type, netlink_family, nonblocking)?;
+                        AnySocket::NetlinkDatagram(netlink_socket)
+                    }
+                    _ => {
+                        return_errno!(EINVAL, "not support IPv6, yet");
+                    }
+                };
+                let new_self = Self { socket: any_socket };
+                Ok(new_self)
+            }
+            Type::RAW => {
+                let any_socket = match domain {
+                    Domain::Netlink => {
+                        let netlink_family = NetlinkFamily::try_from(protocol as u16)
+                            .map_err(|_| errno!(EINVAL, "unknown netlink family"))?;
+                        let netlink_socket =
+                            NetlinkDatagram::new(socket_type, netlink_family, nonblocking)?;
+                        AnySocket::NetlinkDatagram(netlink_socket)
+                    }
+                    _ => {
+                        return_errno!(EINVAL, "RAW socket not supported");
+                    }
+                };
+                let new_self = Self { socket: any_socket };
+                Ok(new_self)
+            }
+            _ => {
+                return_errno!(ESOCKTNOSUPPORT, "socket type not supported");
+            }
         }
     }
 
@@ -252,6 +294,14 @@ impl SocketFile {
                 };
                 unix_datagram.connect(unix_addr).await
             }
+            AnySocket::NetlinkDatagram(netlink_socket) => {
+                let netlink_addr = if addr.is_unspec() {
+                    None
+                } else {
+                    Some(addr.to_netlink()?)
+                };
+                netlink_socket.connect(netlink_addr).await
+            }
             _ => {
                 return_errno!(EINVAL, "connect is not supported");
             }
@@ -279,6 +329,10 @@ impl SocketFile {
             AnySocket::UnixDatagram(unix_datagram) => {
                 let unix_addr = addr.to_unix()?;
                 unix_datagram.bind(unix_addr)
+            }
+            AnySocket::NetlinkDatagram(netlink_socket) => {
+                let netlink_addr = addr.to_netlink()?;
+                netlink_socket.bind(netlink_addr)
             }
             _ => {
                 return_errno!(EINVAL, "bind is not supported");
@@ -360,6 +414,10 @@ impl SocketFile {
                 let (bytes_recv, addr_recv) = unix_datagram.recvmsg(bufs, flags).await?;
                 (bytes_recv, Some(AnyAddr::Unix(addr_recv)))
             }
+            AnySocket::NetlinkDatagram(netlink_socket) => {
+                let (bytes_recv, addr_recv) = netlink_socket.recvmsg(bufs, flags).await?;
+                (bytes_recv, Some(AnyAddr::Netlink(addr_recv)))
+            }
             _ => {
                 return_errno!(EINVAL, "recvfrom is not supported");
             }
@@ -422,6 +480,14 @@ impl SocketFile {
                 };
                 unix_datagram.sendmsg(bufs, unix_addr, flags).await
             }
+            AnySocket::NetlinkDatagram(netlink_socket) => {
+                let netlink_addr = if let Some(addr) = addr.as_ref() {
+                    Some(addr.to_netlink()?)
+                } else {
+                    None
+                };
+                netlink_socket.sendmsg(bufs, netlink_addr, flags).await
+            }
             _ => {
                 return_errno!(EINVAL, "sendmsg is not supported");
             }
@@ -441,6 +507,7 @@ impl SocketFile {
             AnySocket::TrustedUDS(trusted_stream) => AnyAddr::TrustedUnix(trusted_stream.addr()?),
             AnySocket::Ipv4Datagram(ipv4_datagram) => AnyAddr::Ipv4(ipv4_datagram.addr()?),
             AnySocket::UnixDatagram(unix_datagram) => AnyAddr::Unix(unix_datagram.addr()?),
+            AnySocket::NetlinkDatagram(netlink_socket) => AnyAddr::Netlink(netlink_socket.addr()?),
             _ => {
                 return_errno!(EINVAL, "addr is not supported");
             }
@@ -457,6 +524,9 @@ impl SocketFile {
             }
             AnySocket::Ipv4Datagram(ipv4_datagram) => AnyAddr::Ipv4(ipv4_datagram.peer_addr()?),
             AnySocket::UnixDatagram(unix_datagram) => AnyAddr::Unix(unix_datagram.peer_addr()?),
+            AnySocket::NetlinkDatagram(netlink_socket) => {
+                AnyAddr::Netlink(netlink_socket.peer_addr()?)
+            }
             _ => {
                 return_errno!(EINVAL, "peer_addr is not supported");
             }
@@ -489,6 +559,7 @@ mod impls {
 
     pub type Ipv4Datagram = host_socket::DatagramSocket<Ipv4SocketAddr, SocketRuntime>;
     pub type UnixDatagram = host_socket::DatagramSocket<UnixAddr, SocketRuntime>;
+    pub type NetlinkDatagram = host_socket::NetlinkSocket<NetlinkSocketAddr, SocketRuntime>;
 
     pub struct SocketRuntime;
 

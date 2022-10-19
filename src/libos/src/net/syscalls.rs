@@ -30,23 +30,20 @@ pub async fn do_socket(domain: c_int, type_and_flags: c_int, protocol: c_int) ->
     let domain = Domain::try_from(domain)
         .map_err(|_| errno!(EINVAL, "invalid or unsupported network domain"))?;
     let flags = SocketFlags::from_bits_truncate(type_and_flags);
-    let is_stream = {
-        let type_bits = type_and_flags & !flags.bits();
-        let type_ = Type::try_from(type_bits).map_err(|_| errno!(EINVAL, "invalid socket type"))?;
-        // Only the two most common stream types are supported for now
-        match type_ {
-            Type::STREAM => true,
-            Type::DGRAM => false,
-            _ => return_errno!(EINVAL, "invalid type"),
-        }
-    };
+    let type_bits = type_and_flags & !flags.bits();
+    let socket_type =
+        Type::try_from(type_bits).map_err(|_| errno!(EINVAL, "invalid socket type"))?;
 
-    let protocol = SocketProtocol::try_from(protocol)
-        .map_err(|_| errno!(EINVAL, "invalid or unsupported network protocol"))?;
+    trace!(
+        "create new socket. domain: {:?}, flags: {:?}, protocol: {:?}",
+        domain,
+        flags,
+        protocol
+    );
 
     // Create the socket
     let nonblocking = flags.contains(SocketFlags::SOCK_NONBLOCK);
-    let socket_file = SocketFile::new(domain, protocol, is_stream, nonblocking)?;
+    let socket_file = SocketFile::new(domain, protocol, socket_type, nonblocking)?;
     let file_ref = FileRef::new_socket(socket_file);
 
     let close_on_spawn = flags.contains(SocketFlags::SOCK_CLOEXEC);

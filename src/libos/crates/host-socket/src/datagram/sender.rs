@@ -17,7 +17,12 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
         Self { common }
     }
 
-    pub async fn sendmsg(&self, bufs: &[&[u8]], addr: &A, flags: SendFlags) -> Result<usize> {
+    pub async fn sendmsg(
+        &self,
+        bufs: &[&[u8]],
+        addr: Option<&A>,
+        flags: SendFlags,
+    ) -> Result<usize> {
         let total_len: usize = bufs.iter().map(|buf| buf.len()).sum();
         if total_len > super::MAX_BUF_SIZE {
             return_errno!(EMSGSIZE, "the message is too large")
@@ -63,7 +68,7 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
     }
 }
 
-fn new_send_req<A: Addr>(req: &mut SendReq, buf: &[u8], addr: &A) -> *mut libc::msghdr {
+fn new_send_req<A: Addr>(req: &mut SendReq, buf: &[u8], addr: Option<&A>) -> *mut libc::msghdr {
     req.iovec = libc::iovec {
         iov_base: buf.as_ptr() as _,
         iov_len: buf.len(),
@@ -71,7 +76,12 @@ fn new_send_req<A: Addr>(req: &mut SendReq, buf: &[u8], addr: &A) -> *mut libc::
     req.msg.msg_iov = &raw mut req.iovec as _;
     req.msg.msg_iovlen = 1;
 
-    let (c_addr_storage, c_addr_len) = addr.to_c_storage();
+    let (c_addr_storage, c_addr_len) = if let Some(addr) = addr {
+        addr.to_c_storage()
+    } else {
+        let storage: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
+        (storage, 0)
+    };
     req.addr = c_addr_storage;
     req.msg.msg_name = &raw mut req.addr as _;
     req.msg.msg_namelen = c_addr_len as _;

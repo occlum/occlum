@@ -7,6 +7,7 @@ use crate::prelude::*;
 mod c_sock_addr;
 mod ipv4;
 mod ipv6;
+mod netlink;
 mod unix;
 
 /// A trait for network addresses.
@@ -35,6 +36,7 @@ pub trait Addr: Clone + Debug + Default + PartialEq + Send + Sync {
 pub use self::c_sock_addr::CSockAddr;
 pub use self::ipv4::{Ipv4Addr, Ipv4SocketAddr};
 pub use self::ipv6::{Ipv6Addr, Ipv6SocketAddr};
+pub use self::netlink::{NetlinkFamily, NetlinkSocketAddr};
 pub use self::unix::UnixAddr;
 
 #[cfg(test)]

@@ -3,6 +3,7 @@ use std::mem::MaybeUninit;
 use io_uring_callback::{Fd, IoHandle};
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
+use super::netlink::NetlinkMsg;
 use crate::common::Common;
 use crate::prelude::*;
 use crate::runtime::Runtime;
@@ -56,7 +57,6 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         flags: RecvFlags,
     ) -> Result<(usize, A)> {
         let mut inner = self.inner.lock().unwrap();
-
         if !flags.is_empty() && flags != RecvFlags::MSG_DONTWAIT {
             todo!("Support other flags");
         }
@@ -65,11 +65,24 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         self.common.pollee().del_events(Events::IN);
 
         // Copy data from the recv buffer to the bufs
-        let recv_bytes = inner.try_copy_buf(bufs);
-        if let Some(recv_bytes) = recv_bytes {
-            let recv_addr = inner.get_addr().unwrap();
-            self.do_recv(&mut inner);
-            return Ok((recv_bytes, recv_addr));
+        if A::domain() == Domain::Netlink {
+            let recv_bytes = inner.try_copy_buf_netlink(bufs);
+            if let Some(recv_bytes) = recv_bytes {
+                let recv_addr = inner.get_addr().unwrap();
+                if inner.recv_len.is_none() {
+                    // All recv_len are consumed, do next host recv.
+                    self.do_recv(&mut inner);
+                }
+
+                return Ok((recv_bytes, recv_addr));
+            }
+        } else {
+            let recv_bytes = inner.try_copy_buf(bufs);
+            if let Some(recv_bytes) = recv_bytes {
+                let recv_addr = inner.get_addr().unwrap();
+                self.do_recv(&mut inner);
+                return Ok((recv_bytes, recv_addr));
+            }
         }
 
         if let Some(errno) = inner.error {
@@ -161,6 +174,7 @@ struct Inner {
     // Datagram sockets in various domains permit zero-length datagrams.
     // Hence the recv_len might be 0.
     recv_len: Option<usize>,
+    recv_buf_offset: usize, // When the recv_buf content length is greater than user buffer, store the offset for the recv_buf for read loop
     req: UntrustedBox<RecvReq>,
     io_handle: Option<IoHandle>,
     error: Option<Errno>,
@@ -173,6 +187,7 @@ impl Inner {
         Self {
             recv_buf: UntrustedBox::new_uninit_slice(super::MAX_BUF_SIZE),
             recv_len: None,
+            recv_buf_offset: 0,
             req: UntrustedBox::new_uninit(),
             io_handle: None,
             error: None,
@@ -214,6 +229,77 @@ impl Inner {
                 }
             }
             copy_len
+        })
+    }
+
+    // TODO: Support MSG_TRUNC flag
+    pub fn try_copy_buf_netlink(&mut self, bufs: &mut [&mut [u8]]) -> Option<usize> {
+        let user_buf_total_len = bufs.iter().map(|s| s.len()).sum();
+        self.recv_len.map(|recv_len| {
+            let mut copy_len = 0; // total copy length for user buffer
+            let kernel_recv_buf = &self.recv_buf[self.recv_buf_offset..recv_len];
+            let mut parsing_offset = 0; // kernel buf offset for msg parsing
+
+            loop {
+                // Try parse netlink message
+                let netlink_msg = NetlinkMsg::new(&kernel_recv_buf[parsing_offset..]);
+                if netlink_msg.is_none() {
+                    warn!("can't parse as netlink msg");
+                    if copy_len > 0 {
+                        // Just return parsed bytes.
+                        break;
+                    } else {
+                        // nothing can be parsed, copy all the bytes to user buffer
+                        copy_len = recv_len - self.recv_buf_offset;
+                        break;
+                    }
+                }
+
+                let msg_len = netlink_msg.unwrap().length() as usize;
+                // If the user buffer can't fill in one netlink msg, just break.
+                if copy_len == 0 && msg_len >= user_buf_total_len {
+                    copy_len = user_buf_total_len;
+                    parsing_offset = msg_len;
+                    break;
+                }
+
+                // Try to fill in the user buffer with as many complete netlink messages as possible, instead of truncating the msg.
+                if copy_len + msg_len <= user_buf_total_len {
+                    copy_len += msg_len;
+                    parsing_offset += msg_len;
+                    if copy_len + self.recv_buf_offset == recv_len {
+                        // reach the end of the kernel recv buffer
+                        break;
+                    } else {
+                        continue;
+                    }
+                } else {
+                    debug_assert!(copy_len + msg_len > user_buf_total_len);
+                    debug_assert!(copy_len != 0);
+                    break;
+                }
+            }
+
+            // fill the user buffers with the kernel buffer contents
+            let copy_buf = &self.recv_buf[self.recv_buf_offset..self.recv_buf_offset + copy_len];
+            let mut copy_offset = 0;
+            bufs.iter_mut().for_each(|buf| {
+                let once_copy_len = std::cmp::min(buf.len(), copy_buf.len() - copy_offset);
+                buf[..once_copy_len]
+                    .copy_from_slice(&copy_buf[copy_offset..copy_offset + once_copy_len]);
+                copy_offset += once_copy_len;
+            });
+
+            // Update global data
+            // The recv_buf_offset must be at the boundary of a message for next recv.
+            self.recv_buf_offset += std::cmp::max(copy_offset, parsing_offset);
+            if self.recv_buf_offset == recv_len {
+                // All bytes are consumed. Reset for next recv.
+                self.recv_len.take();
+                self.recv_buf_offset = 0;
+            }
+
+            copy_offset
         })
     }
 
