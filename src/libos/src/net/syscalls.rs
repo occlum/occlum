@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
 use std::mem::MaybeUninit;
+use std::ptr::{self};
 use std::time::Duration;
 
 use async_io::ioctl::IoctlCmd;
@@ -297,7 +298,7 @@ pub async fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut libc::msghdr, flags: c_int)
     let (mut msg, mut addr, mut control, mut bufs) = extract_msghdr_mut_from_user(msg_mut_ptr)?;
     let flags = RecvFlags::from_bits_truncate(flags);
 
-    let (bytes_recv, recv_addr, msg_flags) =
+    let (bytes_recv, recv_addr, msg_flags, msg_controllen) =
         socket_file.recvmsg(&mut bufs[..], flags, control).await?;
 
     if let Some(addr) = addr {
@@ -307,8 +308,12 @@ pub async fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut libc::msghdr, flags: c_int)
         }
     }
 
-    // update msghdr msg_flags
+    // update msghdr
     msg.msg_flags = msg_flags;
+    msg.msg_controllen = msg_controllen;
+    if msg_controllen == 0 {
+        msg.msg_control = ptr::null_mut();
+    }
 
     Ok(bytes_recv as isize)
 }

@@ -1,3 +1,4 @@
+use core::ptr::null_mut;
 use std::mem::MaybeUninit;
 
 use io_uring_callback::{Fd, IoHandle};
@@ -25,7 +26,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
         mut control: Option<&mut [u8]>,
-    ) -> Result<(usize, Option<A>, i32)> {
+    ) -> Result<(usize, Option<A>, i32, usize)> {
         let mask = Events::IN;
         // Initialize the poller only when needed
         let mut poller = None;
@@ -45,7 +46,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
             }
 
             if self.is_shutdown() {
-                return Ok((0, None, flags.bits()));
+                return Ok((0, None, flags.bits(), 0));
             }
 
             // Wait for interesting events by polling
@@ -81,17 +82,10 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
         control: &mut Option<&mut [u8]>,
-    ) -> Result<(usize, Option<A>, i32)> {
+    ) -> Result<(usize, Option<A>, i32, usize)> {
         let mut inner = self.inner.lock().unwrap();
 
-        if !flags.is_empty()
-            && flags.intersects(
-                !(RecvFlags::MSG_DONTWAIT
-                    | RecvFlags::MSG_ERRQUEUE
-                    | RecvFlags::MSG_TRUNC
-                    | RecvFlags::MSG_PEEK),
-            )
-        {
+        if !flags.is_empty() && flags.contains(RecvFlags::MSG_OOB | RecvFlags::MSG_CMSG_CLOEXEC) {
             // todo!("Support other flags");
             return_errno!(EINVAL, "the socket flags is not supported");
         }
@@ -116,7 +110,8 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
             if let Some(copied_bytes) = copied_bytes {
                 let recv_addr = inner.get_packet_addr();
                 // Copy ancillary data from control buffer
-                if inner.req.msg.msg_controllen > 0 {
+                let msg_controllen = inner.req.msg.msg_controllen;
+                if msg_controllen > 0 {
                     control
                         .as_mut()
                         .map(|buf| buf.copy_from_slice(&inner.msg_control[..buf.len()]));
@@ -124,25 +119,25 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
 
                 let bufs_len: usize = bufs.iter().map(|buf| buf.len()).sum();
                 let msg_flags = if bufs_len < inner.recv_len().unwrap() {
-                    RecvFlags::MSG_TRUNC
+                    // update msg.msg_flags to MSG_TRUNC
+                    RecvFlags::MSG_TRUNC.bits()
                 } else {
-                    flags
-                }
-                .bits();
+                    0
+                };
 
                 let recv_bytes = if flags.contains(RecvFlags::MSG_TRUNC) {
                     inner.recv_len().unwrap()
                 } else {
                     copied_bytes
                 };
-
                 // When flags contain MSG_PEEK and there is data in socket recv buffer, it is unnecessary to
                 // send blocking recv request (do_recv) to fetch data from iouring buffer, which may flush the data in recv buffer.
                 // When flags don't contain MSG_PEEK or there is no available data, it is time to send blocking request to iouring for notifying events.
                 if !flags.contains(RecvFlags::MSG_PEEK) {
                     self.do_recv(&mut inner);
                 }
-                return Ok((recv_bytes, recv_addr, msg_flags));
+
+                return Ok((recv_bytes, recv_addr, msg_flags, msg_controllen));
             }
         }
 
