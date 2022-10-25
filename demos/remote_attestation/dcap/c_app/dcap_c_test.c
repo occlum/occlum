@@ -48,7 +48,7 @@ void dump_quote_info(sgx_quote3_t *p_quote)
     printf("\t0x%04x\n", p_rep_body->config_svn);
 }
 
-void main() {
+void main(int argc, char *args[]) {
     void *handle;
     uint32_t quote_size, supplemental_size;
     uint8_t *p_quote_buffer, *p_supplemental_buffer;
@@ -56,7 +56,7 @@ void main() {
     sgx_report_body_t *p_rep_body;
     sgx_report_data_t *p_rep_data;
     int32_t ret;
-    
+
     handle = dcap_quote_open();
     quote_size = dcap_get_quote_size(handle);
     printf("quote size = %d\n", quote_size);
@@ -69,7 +69,11 @@ void main() {
     memset(p_quote_buffer, 0, quote_size);
 
     sgx_report_data_t report_data = { 0 };
-    char *data = "ioctl DCAP report data example";
+    char *data = "ppml";
+    if (args[1] != NULL && args[1] != "") {
+    	data = args[1];
+    }
+    printf("report data: %s\n", data);
     memcpy(report_data.d, data, strlen(data));
 
     // Get the Quote
@@ -82,6 +86,18 @@ void main() {
     printf("DCAP generate quote successfully\n");
 
     p_quote = (sgx_quote3_t *)p_quote_buffer;
+
+    // write quote
+    FILE *fp;
+    fp = fopen ("/etc/occlum_attestation/quote", "wb+");
+    if (fp == NULL) {
+        printf ("error open\n");
+        return;
+    }
+    fwrite(p_quote, quote_size, 1, fp);
+    fclose(fp);
+    printf("success write\n");
+
     p_rep_body = (sgx_report_body_t *)(&p_quote->report_body);
     p_rep_data = (sgx_report_data_t *)(&p_rep_body->report_data);
 
@@ -113,7 +129,7 @@ void main() {
         supplemental_size,
         p_supplemental_buffer
         );
-    
+
     if (0 != ret) {
         printf( "Error in dcap_verify_quote.\n");
         goto CLEANUP;
