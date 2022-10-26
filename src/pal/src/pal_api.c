@@ -37,11 +37,12 @@ int pal_run_init_process() {
         .stderr_fd = STDERR_FILENO,
     };
     int libos_tid = 0;
+    extern char **environ;
     volatile int exit_status = -1;
     struct occlum_pal_create_process_args init_process_args = {
         .path = init_path,
         .argv = init_argv,
-        .env = NULL,
+        .env = environ,
         .stdio = &init_io_fds,
         .pid = &libos_tid,
         .exit_status = (int *) &exit_status,
