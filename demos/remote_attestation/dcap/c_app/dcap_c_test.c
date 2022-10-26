@@ -48,7 +48,7 @@ void dump_quote_info(sgx_quote3_t *p_quote)
     printf("\t0x%04x\n", p_rep_body->config_svn);
 }
 
-void main(int argc, char *args[]) {
+void main() {
     void *handle;
     uint32_t quote_size, supplemental_size;
     uint8_t *p_quote_buffer, *p_supplemental_buffer;
@@ -69,11 +69,7 @@ void main(int argc, char *args[]) {
     memset(p_quote_buffer, 0, quote_size);
 
     sgx_report_data_t report_data = { 0 };
-    char *data = "ppml";
-    if (args[1] != NULL && args[1] != "") {
-    	data = args[1];
-    }
-    printf("report data: %s\n", data);
+    char *data = "ioctl DCAP report data example";
     memcpy(report_data.d, data, strlen(data));
 
     // Get the Quote
