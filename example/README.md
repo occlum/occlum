@@ -55,9 +55,9 @@ Now users could send inference request with server certificates (`server.crt`).
 
 There are prebuilt docker images could be used for the examples, either in the following docker way or [`kubernates`](./kubernetes/) way. Users could pull them directly and try the example.
 ```
-docker pull occlum/init_ra_server:0.29.0
-docker pull occlum/tf_demo:0.29.0
-docker pull occlum/tf_demo_client:0.29.0
+docker pull occlum/init_ra_server:0.29.1
+docker pull occlum/tf_demo:0.29.1
+docker pull occlum/tf_demo_client:0.29.1
 ```
 
 If users want to build or customize the images, please check below part.
@@ -66,11 +66,11 @@ If users want to build or customize the images, please check below part.
 
 Our target is to deploy the demo in separated container images, so docker build is necessary steps. Thanks to the `docker run in docker` method, this example build could be done in Occlum development container image.
 
-First, please make sure `docker` is installed successfully in your host. Then start the Occlum container (use version `0.29.0-ubuntu20.04` for example) as below.
+First, please make sure `docker` is installed successfully in your host. Then start the Occlum container (use version `0.29.1-ubuntu20.04` for example) as below.
 ```
 $ sudo docker run --rm -itd --network host \
         -v $(which docker):/usr/bin/docker -v /var/run/docker.sock:/var/run/docker.sock \
-        occlum/occlum:0.29.0-ubuntu20.04
+        occlum/occlum:0.29.1-ubuntu20.04
 ```
 
 All the following are running in the above container.
