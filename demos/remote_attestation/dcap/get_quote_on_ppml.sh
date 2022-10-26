@@ -6,13 +6,11 @@ NC='\033[0m'
 
 if [[ $1 == "musl" ]]; then
     echo "*** Build and run musl-libc dcap demo ***"
-    bomfile="../dcap-musl.yaml"
     CC=occlum-gcc
     LD=occlum-ld
     LIBPATH="/opt/occlum/toolchains/dcap_lib/musl"
 else
     echo "*** Build and run glibc dcap demo ***"
-    bomfile="../dcap.yaml"
     CC=gcc
     LD=ld
     LIBPATH="/opt/occlum/toolchains/dcap_lib/glibc"
