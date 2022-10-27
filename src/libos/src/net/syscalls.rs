@@ -306,6 +306,10 @@ pub async fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut libc::msghdr, flags: c_int)
         }
     }
 
+    // Clear msghdr flags to 0 after recvmsg
+    // FIXME: Several kinds of flags are set by the kernel, e.g. MSG_TRUNC. Support these flags in the future.
+    msg.msg_flags = 0;
+
     Ok(bytes_recv as isize)
 }
 
