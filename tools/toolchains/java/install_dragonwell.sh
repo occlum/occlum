@@ -16,10 +16,10 @@ mkdir -p ${DOWNLOAD_DIR}
 cd ${DOWNLOAD_DIR}
 
 # Download and install Dragonwell JDK
-wget https://dragonwell.oss-cn-shanghai.aliyuncs.com/11/11.0.8.3_GA/linux/x64/Alibaba_Dragonwell_11.0.8.3-Enclave-Experimental-WithoutDebugInfo_x64.zip
-unzip Alibaba_Dragonwell_11.0.8.3-Enclave-Experimental-WithoutDebugInfo_x64.zip
+wget https://github.com/alibaba/dragonwell11/releases/download/dragonwell-standard-11.0.16.12_jdk-11.0.16-ga/Alibaba_Dragonwell_Standard_11.0.16.12.8_x64_alpine-linux.tar.gz
+tar zxf Alibaba_Dragonwell_Standard_11.0.16.12.8_x64_alpine-linux.tar.gz
 mkdir -p ${INSTALL_DIR}
-mv ${DOWNLOAD_DIR}/jdk ${INSTALL_DIR}/${JDK}
+mv ${DOWNLOAD_DIR}/dragonwell-11.0.16.12+8-GA ${INSTALL_DIR}/${JDK}
 ln -sf . ${INSTALL_DIR}/${JDK}/jre
 
 # Clean the download directory
