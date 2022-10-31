@@ -2,22 +2,9 @@
 THIS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
 BUILD_DIR=/tmp/occlum_golang_toolchain
 INSTALL_DIR=/opt/occlum/toolchains/golang
-GO_VERSION="1.18.4"
 
-if [[ $# -ge 1 ]];then
-case $1 in
-          --help|help)
-               echo  "Usage:$0 [go1.16.3|go1.18.4]"
-               exit
-               ;;
-          "go1.16.3"|"1.16.3"|"v1.16.3")
-               GO_VERSION="1.16.3"
-               ;;
-          "go1.18.4"|"1.18.4"|"v1.18.4")
-               GO_VERSION="1.18.4"
-               ;;
-     esac
-fi
+#go1.18.4_for_occlum or go1.16.3_for_occlum
+GO_BRANCH=${1:-"go1.18.4_for_occlum"}
 
 # Exit if any command fails
 set -e
@@ -31,11 +18,7 @@ mkdir -p ${BUILD_DIR}
 cd ${BUILD_DIR}
 
 # Download Golang
-git clone https://github.com/golang/go .
-# Swtich to Golang 1.16.3 or Golang 1.18.4
-git checkout -b go${GO_VERSION} tags/go${GO_VERSION}
-# Apply the patch to adapt Golang to Occlum
-git apply ${THIS_DIR}/adapt-golang${GO_VERSION}-to-occlum.patch
+git clone -b ${GO_BRANCH} https://github.com/occlum/go.git .
 
 # Build Golang
 cd src

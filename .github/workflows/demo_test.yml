@@ -57,10 +57,10 @@ jobs:
             SGX_MODE=SIM make test"
 
     - name: Run Golang v1.16.3 sqlite test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/tools/toolchains/golang && ./build.sh go1.16.3 && cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/tools/toolchains/golang && ./build.sh go1.16.3_for_occlum && cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh"
 
     - name: Run Golang v1.18.4 sqlite test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/tools/toolchains/golang && ./build.sh go1.18.4 && cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/tools/toolchains/golang && ./build.sh go1.18.4_for_occlum && cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh"
 
     - name: Go Server set up and run
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/web_server && occlum-go mod init web_server && occlum-go get -u -v github.com/gin-gonic/gin;
