@@ -1,5 +1,11 @@
+occlum-toolchains-golang (1.18.4-1) unstable; urgency=medium
+
+  * Upgrade golang version to 1.18.4
+
+  -- Qi Zheng <huaiqing.zq@antgroup.com>  Tue, 1 Nov 2022 17:16:9 +0000
+
 occlum-toolchains-golang (0.16.0-1) unstable; urgency=medium
 
   * Initial release
 
- -- Chunyang Hui <sanqian.hcy@antfin.com>  Tue, 18 Aug 2020 14:37:39 +0000
+  -- Chunyang Hui <sanqian.hcy@antfin.com>  Tue, 18 Aug 2020 14:37:39 +0000
