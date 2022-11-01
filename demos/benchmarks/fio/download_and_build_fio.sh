@@ -16,6 +16,6 @@ fi
 
 # Build FIO
 ./configure --disable-shm --cc=occlum-gcc
-make
+make -j$(nproc)
 
 echo "Build FIO success!"

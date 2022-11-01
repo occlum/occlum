@@ -25,9 +25,7 @@ fi
 # 1. Init Occlum instance
 rm -rf occlum_instance && occlum new occlum_instance
 cd occlum_instance
-TCS_NUM=$(($(nproc) * 2))
-new_json="$(jq --argjson THREAD_NUM ${TCS_NUM} '.resource_limits.max_num_of_threads = $THREAD_NUM |
-                .resource_limits.user_space_size = "320MB"' Occlum.json)" && \
+new_json="$(jq '.resource_limits.user_space_size = "320MB"' Occlum.json)" && \
 echo "${new_json}" > Occlum.json
 
 # 2. Copy files into Occlum instance and build
