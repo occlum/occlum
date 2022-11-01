@@ -12,6 +12,10 @@ on:
         description: 'Need build new glibc package? <Y/N>'
         required: true
         default: 'N'
+      update_golang:
+        description: 'Need build new golang package? <Y/N>'
+        required: true
+        default: 'N'
       only_test:
         description: 'Only Test? <Y/N>'
         required: true
@@ -74,6 +78,10 @@ jobs:
     - name: Build glibc toolchain package
       if: github.event.inputs.update_glibc == 'Y'
       run: docker exec ubuntu bash -c "cd /root/workspace/occlum/tools/installer/deb; make glibc"
+
+    - name: Build golang toolchain package
+      if: github.event.inputs.update_golang == 'Y'
+      run: docker exec ubuntu bash -c "cd /root/workspace/occlum/tools/installer/deb; make golang"
 
     - name: Prepare tools and keys    # Since aptly still use gpg1 by default, we all use gpg1 as gpg tool.
       run: docker exec ubuntu bash -c 'apt-get update; apt-get install -y tree apt-utils gnupg reprepro rng-tools aptly; rm -rf /root/.gnupg;
