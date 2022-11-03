@@ -97,9 +97,11 @@ impl Storage for SgxStorage {
             let file = match self.encrypt_mode {
                 EncryptMode::IntegrityOnly(_) => options.open_integrity_only(path)?,
                 EncryptMode::EncryptWithIntegrity(key, _) | EncryptMode::Encrypt(key) => {
-                    options.open_ex(path, &key)?
+                    options.open_with(path, Some(&key), Some(SEFS_CACHE_SIZE))?
                 }
-                EncryptMode::EncryptAutoKey => options.open(path)?,
+                EncryptMode::EncryptAutoKey => {
+                    options.open_with(path, None, Some(SEFS_CACHE_SIZE))?
+                }
             };
 
             // Check the MAC of the root file against the given root MAC of the storage
@@ -132,9 +134,11 @@ impl Storage for SgxStorage {
             let file = match self.encrypt_mode {
                 EncryptMode::IntegrityOnly(_) => options.open_integrity_only(path)?,
                 EncryptMode::EncryptWithIntegrity(key, _) | EncryptMode::Encrypt(key) => {
-                    options.open_ex(path, &key)?
+                    options.open_with(path, Some(&key), Some(SEFS_CACHE_SIZE))?
                 }
-                EncryptMode::EncryptAutoKey => options.open(path)?,
+                EncryptMode::EncryptAutoKey => {
+                    options.open_with(path, None, Some(SEFS_CACHE_SIZE))?
+                }
             };
             Ok(LockedFile(Arc::new(Mutex::new(file))))
         })?;
