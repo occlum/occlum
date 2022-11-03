@@ -160,8 +160,8 @@ impl Executor {
         num - 1
     }
 
-    // Dequeue task. If no task in this vcpu, wait for enqueueing.
-    // Return None if the executor has been shutdown.
+    /// Dequeue task. If no task in current vcpu, wait for enqueueing.
+    /// Return None if the executor has been shutdown.
     #[inline]
     fn dequeue_wait(&self) -> Option<Arc<Task>> {
         let this_vcpu = vcpu::get_current().unwrap();
@@ -175,6 +175,8 @@ impl Executor {
                 return entity;
             }
 
+            // Firstly enter idle state waiting for tasks.
+            // If the idle time has been depleted, make this vcpu enter sleep state.
             self.scheduler.local_schedulers[this_vcpu as usize].wait_enqueue();
         }
     }

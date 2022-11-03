@@ -29,6 +29,7 @@ pub struct VcpuSelector {
     // The masks are usually accessed by iterators, so the cost of ”RwLock<BitMask>“ is much less than “AtomicBits”.
     idle_vcpu_mask: AtomicBits,
     sleep_vcpu_mask: AtomicBits,
+    num_running_vcpus: AtomicU32,
     num_vcpus: u32,
 }
 
@@ -39,6 +40,12 @@ impl StatusNotifier for Arc<VcpuSelector> {
 
     fn notify_sleep_status(&self, vcpu: u32, is_sleep: bool) {
         self.sleep_vcpu_mask.set(vcpu as usize, is_sleep);
+        if is_sleep {
+            self.num_running_vcpus.fetch_sub(1, Relaxed);
+        } else {
+            self.num_running_vcpus.fetch_add(1, Relaxed);
+        }
+        // TODO: assert num_running_vcpus.
     }
 }
 
@@ -48,8 +55,19 @@ impl VcpuSelector {
         Self {
             idle_vcpu_mask: AtomicBits::new_zeroes(num_vcpus as usize),
             sleep_vcpu_mask: AtomicBits::new_zeroes(num_vcpus as usize),
+            num_running_vcpus: AtomicU32::new(num_vcpus),
             num_vcpus,
         }
+    }
+
+    #[inline(always)]
+    pub fn sleep_vcpu_mask(&self) -> &AtomicBits {
+        &self.sleep_vcpu_mask
+    }
+
+    #[inline(always)]
+    pub fn num_running_vcpus(&self) -> u32 {
+        self.num_running_vcpus.load(Relaxed)
     }
 
     /// Select the vCPU for an entity, given its state.

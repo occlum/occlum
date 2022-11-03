@@ -1,6 +1,7 @@
 //! Scheduler.
 
 use crate::prelude::*;
+use crate::util::AtomicBits;
 use crate::vcpu;
 use std::sync::Arc;
 
@@ -26,6 +27,7 @@ use vcpu_selector::VcpuSelector;
 pub struct Scheduler<E> {
     pub local_schedulers: Arc<Box<[LocalScheduler<E>]>>,
     vcpu_selector: Arc<VcpuSelector>,
+    num_tasks: AtomicU32,
 }
 
 impl<E: SchedEntity> Scheduler<E> {
@@ -44,9 +46,12 @@ impl<E: SchedEntity> Scheduler<E> {
                 .into_boxed_slice(),
         );
 
+        let num_tasks = AtomicU32::new(0);
+
         Self {
             local_schedulers,
             vcpu_selector,
+            num_tasks,
         }
     }
 
@@ -65,6 +70,9 @@ impl<E: SchedEntity> Scheduler<E> {
             .select_vcpu(entity.sched_state(), this_vcpu);
         let local_scheduler = &self.local_schedulers[target_vcpu as usize];
         local_scheduler.enqueue(entity);
+
+        self.num_tasks.fetch_add(1, Ordering::Relaxed);
+        self.wake_vcpus();
     }
 
     /// Dequeue a scheduable entity on the current vCPU.
@@ -72,11 +80,37 @@ impl<E: SchedEntity> Scheduler<E> {
         let this_vcpu = vcpu::get_current().unwrap();
         let local_scheduler = &self.local_schedulers[this_vcpu as usize];
         let local_guard = local_scheduler.lock();
-        local_guard.dequeue()
+        let task = local_guard.dequeue();
+        if task.is_some() {
+            self.num_tasks.fetch_sub(1, Ordering::Relaxed);
+        }
+        task
     }
 
     /// Get the number of vCPUs.
     pub fn num_vcpus(&self) -> u32 {
         self.local_schedulers.len() as u32
+    }
+
+    #[inline(always)]
+    fn wake_vcpus(&self) {
+        let num_tasks = self.num_tasks.load(Ordering::Relaxed);
+        let num_running_vcpus = self.vcpu_selector.num_running_vcpus();
+
+        // Determine how many sleep vcpus need to be waked:
+        // We choose the ratio between active vcpus and tasks in queue is 1 / 1.5,
+        // because unpark is an operation with large performance loss.
+        // We want to balance the performance loss between park/unpark switching and
+        // lack of active vcpus. If the ratio between vcpus and tasks in queue equals to 1,
+        // the large amounts of unparking operation would cause the average latency up to 2 times.
+        if num_tasks * 2 / 3 > num_running_vcpus {
+            let num_wake = (self.num_vcpus() - num_running_vcpus)
+                .min(num_tasks * 2 / 3 - num_running_vcpus) as usize;
+            self.vcpu_selector
+                .sleep_vcpu_mask()
+                .iter_ones()
+                .take(num_wake)
+                .for_each(|vcpu_idx| vcpu::unpark(vcpu_idx));
+        }
     }
 }

@@ -244,7 +244,9 @@ impl<E: SchedEntity> LocalScheduler<E> {
     /// The running vcpu wait until being enqueued tasks
     pub fn wait_enqueue(&self) {
         // The thread should keep some time in idle state and avoid slumping into sleep state too quickly.
-        let mut count = 100_000;
+        // The loop time of count 5_000_000 is about 0.18 seconds in our dev machine.
+        let mut count = 5_000_000;
+
         // In the idle status
         {
             self.status_notifier
@@ -257,10 +259,9 @@ impl<E: SchedEntity> LocalScheduler<E> {
             }
             self.status_notifier
                 .notify_idle_status(self.this_vcpu, false);
-        }
-
-        if count > 0 {
-            return;
+            if count > 0 {
+                return;
+            }
         }
 
         // In the sleep status
