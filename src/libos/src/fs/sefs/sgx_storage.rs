@@ -100,11 +100,13 @@ impl Storage for SgxStorage {
             let file = match self.encrypt_mode {
                 EncryptMode::IntegrityOnly(_) => options.open_integrity_only(path)?,
                 EncryptMode::EncryptWithIntegrity(key, _) | EncryptMode::Encrypt(key) => {
-                    options.open_ex(path, &key)?
+                    options.open_with(path, Some(&key), None, Some(SEFS_CACHE_SIZE))?
                 }
                 EncryptMode::EncryptAutoKey(key_policy) => match key_policy {
                     None => options.open(path)?,
-                    Some(policy) => options.open_with(path, None, Some(policy.bits()), None)?,
+                    Some(policy) => {
+                        options.open_with(path, None, Some(policy.bits()), Some(SEFS_CACHE_SIZE))?
+                    }
                 },
             };
 
@@ -138,11 +140,13 @@ impl Storage for SgxStorage {
             let file = match self.encrypt_mode {
                 EncryptMode::IntegrityOnly(_) => options.open_integrity_only(path)?,
                 EncryptMode::EncryptWithIntegrity(key, _) | EncryptMode::Encrypt(key) => {
-                    options.open_ex(path, &key)?
+                    options.open_with(path, Some(&key), None, Some(SEFS_CACHE_SIZE))?
                 }
                 EncryptMode::EncryptAutoKey(key_policy) => match key_policy {
                     None => options.open(path)?,
-                    Some(policy) => options.open_with(path, None, Some(policy.bits()), None)?,
+                    Some(policy) => {
+                        options.open_with(path, None, Some(policy.bits()), Some(SEFS_CACHE_SIZE))?
+                    }
                 },
             };
             Ok(LockedFile(Arc::new(Mutex::new(file))))
