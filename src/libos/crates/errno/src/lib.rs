@@ -105,6 +105,9 @@ extern crate alloc;
 #[cfg(feature = "sgx")]
 extern crate sgx_tstd as std;
 
+#[macro_use]
+extern crate log;
+
 mod backtrace;
 mod errno;
 mod error;
