@@ -194,7 +194,10 @@ impl Errno {
 
 impl From<u32> for Errno {
     fn from(raw_errno: u32) -> Self {
-        assert!(ERRNO_MIN <= raw_errno && raw_errno <= ERRNO_MAX);
+        if raw_errno < ERRNO_MIN || raw_errno > ERRNO_MAX {
+            error!("unexpected raw errno: {}", raw_errno);
+            panic!();
+        }
         unsafe { core::mem::transmute(raw_errno as u8) }
     }
 }
