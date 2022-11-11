@@ -590,7 +590,7 @@ jobs:
 
     - name: Run the Vault client
       run: |
-        sleep ${{ env.nap_time }};
+        sleep 120;
         docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/vault && ./run_occlum_vault_test.sh"
   
   Sofaboot_test:
