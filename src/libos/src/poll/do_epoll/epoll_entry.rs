@@ -54,8 +54,8 @@ impl EpollEntry {
     }
 
     /// Get the epoll file associated with this epoll entry.
-    pub fn epoll_file(&self) -> Arc<EpollFile> {
-        self.weak_epoll.upgrade().unwrap()
+    pub fn epoll_file(&self) -> Option<Arc<EpollFile>> {
+        self.weak_epoll.upgrade()
     }
 
     /// Get an instance of `Arc` that refers to this epoll entry.

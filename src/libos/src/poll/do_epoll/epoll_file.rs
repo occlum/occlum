@@ -323,8 +323,9 @@ impl Observer for EpollEntry {
             return;
         }
 
-        let epoll_file = self.epoll_file();
-        epoll_file.push_ready(self.self_arc());
+        if let Some(epoll_file) = self.epoll_file() {
+            epoll_file.push_ready(self.self_arc());
+        }
     }
 }
 
