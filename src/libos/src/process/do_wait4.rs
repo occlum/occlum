@@ -88,11 +88,14 @@ pub fn do_wait4(child_filter: &ProcessFilter, options: WaitOptions) -> Result<(p
     // without risking missing events from the process's children.
     drop(process_inner);
     // Wait until a child has interesting events
-    let zombie_pid = waiter.sleep_until_woken_with_result();
-
-    let mut process_inner = process.inner();
-    let exit_status = free_zombie_child(process_inner, zombie_pid);
-    Ok((zombie_pid, exit_status))
+    if let Some(zombie_pid) = waiter.sleep_until_woken_with_result() {
+        let mut process_inner = process.inner();
+        let exit_status = free_zombie_child(process_inner, zombie_pid);
+        Ok((zombie_pid, exit_status))
+    } else {
+        // The wait is interrupted
+        return_errno!(EINTR, "wait is interrupted and not get any children");
+    }
 }
 
 fn free_zombie_child(mut parent_inner: SgxMutexGuard<ProcessInner>, zombie_pid: pid_t) -> i32 {

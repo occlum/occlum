@@ -19,6 +19,15 @@ pub fn do_exit_group(status: i32, curr_user_ctxt: &mut CpuContext) -> Result<isi
     } else {
         let term_status = TermStatus::Exited(status as u8);
         current!().process().force_exit(term_status);
+
+        // wake all child threads which are waiting
+        let _ = current!()
+            .process()
+            .inner()
+            .waiting_children_mut()
+            .unwrap()
+            .del_and_wake_all_waiters();
+
         exit_thread(term_status);
         Ok(0)
     }
