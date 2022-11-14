@@ -51,14 +51,14 @@ where
         self.inner.lock().unwrap().data
     }
 
-    pub fn sleep_until_woken_with_result(self) -> R {
+    pub fn sleep_until_woken_with_result(self) -> Option<R> {
         while !self.inner.lock().unwrap().is_woken {
             unsafe {
                 wait_event(self.thread);
             }
         }
 
-        self.inner.lock().unwrap().result.unwrap()
+        self.inner.lock().unwrap().result
     }
 }
 
@@ -113,5 +113,18 @@ where
         let del_waiter = waiters.swap_remove(del_waiter_i);
         set_event(del_waiter.thread);
         1
+    }
+
+    pub fn del_and_wake_all_waiters(&mut self) -> usize {
+        let mut waiters = &mut self.waiters;
+        let ret = waiters.len();
+        waiters.drain(..).for_each(|waiter| {
+            let mut waiter_inner = waiter.inner.lock().unwrap();
+            waiter_inner.is_woken = true;
+            waiter_inner.result = None;
+            set_event(waiter.thread);
+        });
+
+        ret
     }
 }

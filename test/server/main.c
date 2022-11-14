@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -11,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
+#include <pthread.h>
 
 #include "test.h"
 
@@ -209,6 +211,14 @@ int wait_for_child_exit(int child_pid) {
     return 0;
 }
 
+static void *thread_wait_func(void *_arg) {
+    pid_t *client_pid = _arg;
+
+    waitpid(*client_pid, NULL, 0);
+
+    return NULL;
+}
+
 int test_read_write() {
     int ret = 0;
     int child_pid = 0;
@@ -403,6 +413,93 @@ int test_poll() {
     return 0;
 }
 
+// This is a testcase mocking pyspark exit procedure. Client process is receiving and blocking.
+// One of server process' child thread waits for the client to exit and the main thread calls exit_group.
+static int test_exit_group() {
+    int port = 8888;
+    int pipes[2];
+    int ret = 0;
+    int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (listen_fd < 0) {
+        THROW_ERROR("create socket error");
+    }
+
+    ret = pipe2(pipes, 0);
+    if (ret < 0) {
+        THROW_ERROR("error happens");
+    }
+
+    printf("pipe fd = %d, %d\n", pipes[0], pipes[1]);
+
+    int child_pid = vfork();
+    if (child_pid == 0) {
+        ret = close(pipes[1]);
+        if (ret < 0) {
+            THROW_ERROR("error happens");
+        }
+        ret = dup2(pipes[0], 0);
+        if (ret < 0) {
+            THROW_ERROR("error happens");
+        }
+
+        ret = close(pipes[0]);
+        if (ret < 0) {
+            THROW_ERROR("error happens");
+        }
+
+        char port_string[8];
+        sprintf(port_string, "%d", port);
+        char *client_argv[] = {"client", "127.0.0.1", port_string, NULL};
+        printf("exec child\n");
+        execve("/bin/client", client_argv, NULL);
+    }
+
+    printf("return to parent\n");
+    close(pipes[0]);
+
+    int reuse = 1;
+    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+        THROW_ERROR("setsockopt port to reuse failed");
+    }
+
+    struct sockaddr_in servaddr;
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(port);
+    ret = bind(listen_fd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+    if (ret < 0) {
+        close(listen_fd);
+        THROW_ERROR("bind socket failed");
+    }
+
+    ret = listen(listen_fd, 5);
+    if (ret < 0) {
+        close(listen_fd);
+        THROW_ERROR("listen socket error");
+    }
+
+    int connected_fd = accept(listen_fd, (struct sockaddr *) NULL, NULL); // 4
+    if (connected_fd < 0) {
+        close(listen_fd);
+        THROW_ERROR("accept socket error");
+    }
+
+    if (neogotiate_msg(connected_fd) < 0) {
+        THROW_ERROR("neogotiate failed");
+    }
+
+    pthread_t tid;
+    ret = pthread_create(&tid, NULL, thread_wait_func, &child_pid);
+    if (ret != 0) {
+        THROW_ERROR("create child error");
+    }
+
+    // Wait a while here for client to call recvfrom and blocking
+    sleep(2);
+    return 0;
+}
+
 static test_case_t test_cases[] = {
     TEST_CASE(test_read_write),
     TEST_CASE(test_send_recv),
@@ -414,6 +511,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_fcntl_setfl_and_getfl),
     TEST_CASE(test_poll),
     TEST_CASE(test_poll_events_unchanged),
+    TEST_CASE(test_exit_group),
 };
 
 int main(int argc, const char *argv[]) {
