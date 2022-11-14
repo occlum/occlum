@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <spawn.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "test.h"
 
@@ -185,6 +186,28 @@ int client_connectionless_sendmsg(char *buf) {
     return ret;
 }
 
+int blocking_recvfrom(int server_fd, char *buf, int buf_size) {
+    int flags = fcntl(server_fd, F_GETFL, 0);
+    if (flags == -1) {
+        THROW_ERROR("fnctl failed");
+    }
+    flags = flags & ~O_NONBLOCK;
+    fcntl(server_fd, F_SETFL, flags);
+    if (flags == -1) {
+        THROW_ERROR("fnctl failed");
+    }
+
+    // wait for server to exit and the remote end is closed
+    sleep(1);
+    printf("client blocking recvfrom\n");
+    int ret = recvfrom(server_fd, buf, buf_size, 0, NULL, 0);
+    if (ret >= 0 || errno != ECONNRESET) {
+        THROW_ERROR("recvfrom failed");
+    }
+
+    return 0;
+}
+
 int main(int argc, const char *argv[]) {
     if (argc < 3) {
         THROW_ERROR("usage: ./client <ipaddress> <port>\n");
@@ -223,6 +246,17 @@ int main(int argc, const char *argv[]) {
         case 8809:
             neogotiate_msg(server_fd, buf, buf_size);
             ret = client_sendmsg_big_buf(server_fd);
+            break;
+        case 8888:
+            neogotiate_msg(server_fd, buf, buf_size);
+            ret = client_sendmsg(server_fd, buf);
+            if (ret < 0) {
+                THROW_ERROR("client sendmsg failed");
+            }
+            ret = blocking_recvfrom(server_fd, buf, buf_size);
+            if (ret < 0) {
+                THROW_ERROR("client blocking recvfrom failed");
+            }
             break;
         default:
             ret = client_send(server_fd, DEFAULT_MSG);

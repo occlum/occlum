@@ -81,6 +81,11 @@ pub async fn do_wait4(child_filter: &ProcessFilter, options: WaitOptions) -> Res
         if options.contains(WaitOptions::WNOHANG) {
             return Ok((0, 0));
         }
+
+        // The wait4 is interrupted by exit_group from other threads. In this case, just return.
+        if process.is_forced_to_exit() {
+            return_errno!(EINTR, "wait is interrupted and not get any children");
+        }
     })
 }
 

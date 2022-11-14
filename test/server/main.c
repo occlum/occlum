@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -275,7 +276,9 @@ int wait_for_child_exit(int child_pid) {
     int pipe_wr_fd = pipe_fds[1];
     char finish_str[] = "finished";
 
-    write(pipe_wr_fd, finish_str, sizeof(finish_str));
+    if (write(pipe_wr_fd, finish_str, sizeof(finish_str)) < 0) {
+        THROW_ERROR("failed to write");
+    }
     close(pipe_wr_fd);
 
     if (wait4(child_pid, &status, 0, NULL) < 0) {
@@ -283,6 +286,14 @@ int wait_for_child_exit(int child_pid) {
     }
 
     return 0;
+}
+
+static void *thread_wait_func(void *_arg) {
+    pid_t *client_pid = _arg;
+
+    waitpid(*client_pid, NULL, 0);
+
+    return NULL;
 }
 
 int test_read_write() {
@@ -512,7 +523,7 @@ int test_poll() {
         char buf[512];
         if ((count = read(client_fd, buf, sizeof buf)) != 0) {
             if (count != strlen(DEFAULT_MSG) || strncmp(buf, DEFAULT_MSG, strlen(DEFAULT_MSG)) != 0) {
-                printf(buf);
+                printf("%s", buf);
                 THROW_ERROR("msg mismatched");
             }
         } else {
@@ -539,7 +550,7 @@ int test_sockopt() {
     }
 
     int optval = 0;
-    int optlen = sizeof(optval);
+    socklen_t optlen = sizeof(optval);
     if (getsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &optval, &optlen) < 0 ||
             optval != 1) {
         THROW_ERROR("getsockopt(SO_REUSEADDR) failed");
@@ -556,6 +567,29 @@ int test_sockopt() {
     return 0;
 }
 
+int server_getpeername(int client_fd) {
+    struct sockaddr_in peer;
+    socklen_t peer_len = sizeof(peer);
+    if (getpeername(client_fd, (struct sockaddr *)&peer, &peer_len) < 0) {
+        THROW_ERROR("getpeername() failed");
+    }
+    printf("Peer address: %s\n", inet_ntoa(peer.sin_addr));
+    printf("Peer port: %d\n", (int)ntohs(peer.sin_port));
+
+    struct sockaddr_in peer2;
+    socklen_t peer_len2 = sizeof(peer2);
+    if (getsockopt(client_fd, SOL_SOCKET, SO_PEERNAME, (struct sockaddr *)&peer2,
+                   &peer_len2) < 0) {
+        THROW_ERROR("getsockopt(SO_PEERNAME) failed");
+    }
+    if (strcmp(inet_ntoa(peer.sin_addr), inet_ntoa(peer2.sin_addr)) != 0 ||
+            peer.sin_port != peer2.sin_port ||
+            peer_len != peer_len2) {
+        THROW_ERROR("the result of getsockopt(SO_PEERNAME) and getpeername is different");
+    }
+    return 0;
+}
+
 int test_getname() {
     int child_pid = 0;
     int client_fd = connect_with_child(8806, &child_pid);
@@ -564,8 +598,8 @@ int test_getname() {
     }
 
     struct sockaddr_in myaddr;
-    int myaddr_len = sizeof(myaddr);
-    if (getsockname(client_fd, &myaddr, &myaddr_len) < 0) {
+    socklen_t myaddr_len = sizeof(myaddr);
+    if (getsockname(client_fd, (struct sockaddr *)&myaddr, &myaddr_len) < 0) {
         THROW_ERROR("getsockname() failed");
     }
     printf("[socket with bind] address: %s\n", inet_ntoa(myaddr.sin_addr));
@@ -581,48 +615,26 @@ int test_getname() {
     return 0;
 }
 
-int server_getpeername(int client_fd) {
-    struct sockaddr_in peer;
-    int peer_len = sizeof(peer);
-    if (getpeername(client_fd, &peer, &peer_len) < 0) {
-        THROW_ERROR("getpeername() failed");
-    }
-    printf("Peer address: %s\n", inet_ntoa(peer.sin_addr));
-    printf("Peer port: %d\n", (int)ntohs(peer.sin_port));
-
-    struct sockaddr_in peer2;
-    int peer_len2 = sizeof(peer2);
-    if (getsockopt(client_fd, SOL_SOCKET, SO_PEERNAME, &peer2, &peer_len2) < 0) {
-        THROW_ERROR("getsockopt(SO_PEERNAME) failed");
-    }
-    if (strcmp(inet_ntoa(peer.sin_addr), inet_ntoa(peer2.sin_addr)) != 0 ||
-            peer.sin_port != peer2.sin_port ||
-            peer_len != peer_len2) {
-        THROW_ERROR("the result of getsockopt(SO_PEERNAME) and getpeername is different");
-    }
-    return 0;
-}
-
 int test_getname_without_bind() {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
 
     struct sockaddr_in myaddr;
-    int myaddr_len = sizeof(myaddr);
-    if (getsockname(fd, &myaddr, &myaddr_len) < 0) {
+    socklen_t myaddr_len = sizeof(myaddr);
+    if (getsockname(fd, (struct sockaddr *)&myaddr, &myaddr_len) < 0) {
         THROW_ERROR("getsockname() failed");
     }
     printf("[socket without bind] address: %s\n", inet_ntoa(myaddr.sin_addr));
     printf("[socket without bind] port: %d\n", (int)ntohs(myaddr.sin_port));
 
     struct sockaddr_in peer;
-    int peer_len = sizeof(peer);
-    if (getpeername(fd, &peer, &peer_len) == 0) {
+    socklen_t peer_len = sizeof(peer);
+    if (getpeername(fd, (struct sockaddr *)&peer, &peer_len) == 0) {
         THROW_ERROR("getpeername() should failed");
     }
 
     struct sockaddr_in peer2;
-    int peer_len2 = sizeof(peer2);
-    if (getsockopt(fd, SOL_SOCKET, SO_PEERNAME, &peer2, &peer_len2) == 0) {
+    socklen_t peer_len2 = sizeof(peer2);
+    if (getsockopt(fd, SOL_SOCKET, SO_PEERNAME, (struct sockaddr *)&peer2, &peer_len2) == 0) {
         THROW_ERROR("getsockopt(SO_PEERNAME) should failed");
     }
 
@@ -671,7 +683,7 @@ void *connection_routine(void *arg) {
             break;
         }
 
-        if (strncmp(msg[msg_count], buff, sizeof(msg[msg_count])) != 0) {
+        if (strncmp(msg[msg_count], buff, strlen(msg[msg_count])) != 0) {
             printf("message is wrong!\n");
             return NULL;
         }
@@ -736,7 +748,10 @@ void *client_routine(void *arg) {
         };
         case 54322: { // for test_epoll_wait
             sleep(2);
-            write(sockFd, msg[0], strlen(msg[0]));
+            if (write(sockFd, msg[0], strlen(msg[0])) < 0) {
+                printf("write error: %s\n", strerror(errno));
+                return (void *) -1;
+            }
             break;
         };
     }
@@ -890,6 +905,93 @@ int test_epoll_wait() {
     return 0;
 }
 
+// This is a testcase mocking pyspark exit procedure. Client process is receiving and blocking.
+// One of server process' child thread waits for the client to exit and the main thread calls exit_group.
+static int test_exit_group() {
+    int port = 8888;
+    int pipes[2];
+    int ret = 0;
+    int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (listen_fd < 0) {
+        THROW_ERROR("create socket error");
+    }
+
+    ret = pipe2(pipes, 0);
+    if (ret < 0) {
+        THROW_ERROR("error happens");
+    }
+
+    printf("pipe fd = %d, %d\n", pipes[0], pipes[1]);
+
+    int child_pid = vfork();
+    if (child_pid == 0) {
+        ret = close(pipes[1]);
+        if (ret < 0) {
+            THROW_ERROR("error happens");
+        }
+        ret = dup2(pipes[0], 0);
+        if (ret < 0) {
+            THROW_ERROR("error happens");
+        }
+
+        ret = close(pipes[0]);
+        if (ret < 0) {
+            THROW_ERROR("error happens");
+        }
+
+        char port_string[8];
+        sprintf(port_string, "%d", port);
+        char *client_argv[] = {"client", "127.0.0.1", port_string, NULL};
+        printf("exec child\n");
+        execve("/bin/client", client_argv, NULL);
+    }
+
+    printf("return to parent\n");
+    close(pipes[0]);
+
+    int reuse = 1;
+    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+        THROW_ERROR("setsockopt port to reuse failed");
+    }
+
+    struct sockaddr_in servaddr;
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(port);
+    ret = bind(listen_fd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+    if (ret < 0) {
+        close(listen_fd);
+        THROW_ERROR("bind socket failed");
+    }
+
+    ret = listen(listen_fd, 5);
+    if (ret < 0) {
+        close(listen_fd);
+        THROW_ERROR("listen socket error");
+    }
+
+    int connected_fd = accept(listen_fd, (struct sockaddr *) NULL, NULL); // 4
+    if (connected_fd < 0) {
+        close(listen_fd);
+        THROW_ERROR("accept socket error");
+    }
+
+    if (neogotiate_msg(connected_fd) < 0) {
+        THROW_ERROR("neogotiate failed");
+    }
+
+    pthread_t tid;
+    ret = pthread_create(&tid, NULL, thread_wait_func, &child_pid);
+    if (ret != 0) {
+        THROW_ERROR("create child error");
+    }
+
+    // Wait a while here for client to call recvfrom and blocking
+    sleep(2);
+    return 0;
+}
+
 static test_case_t test_cases[] = {
     TEST_CASE(test_MSG_WAITALL),
     TEST_CASE(test_read_write),
@@ -908,6 +1010,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_getname_without_bind),
     TEST_CASE(test_shutdown),
     TEST_CASE(test_epoll_wait),
+    TEST_CASE(test_exit_group),
 };
 
 int main(int argc, const char *argv[]) {
