@@ -4,7 +4,7 @@ use crate::scheduler::{Priority, SchedState};
 /// its `SchedState`. Currently, we only use the base priority to determine
 /// the length of the timeslice. The higher the priority, the longer the timeslice.
 pub fn calculate_timeslice(sched_state: &SchedState) -> u32 {
-    use self::{MAX_TIMESLICE_MS as MAX, MAX_TIMESLICE_MS as MIN};
+    use self::{MAX_TIMESLICE_MS as MAX, MIN_TIMESLICE_MS as MIN};
     // let prio_val = sched_state.base_prio().val();
     let prio_val = sched_state.effective_prio().val();
     if prio_val >= Priority::mid_val() {

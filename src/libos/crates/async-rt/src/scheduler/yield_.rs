@@ -5,6 +5,7 @@ use super::SchedEntity;
 pub fn yield_now() -> Yield {
     let current = crate::task::current::get();
     current.sched_state().report_yield();
+    current.sched_state().set_yielded(true);
     Yield::new()
 }
 

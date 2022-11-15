@@ -24,6 +24,7 @@ pub struct SchedState {
     timeslice_ms: AtomicU32,
     affinity: AtomicBits,
     vcpu: AtomicU32,
+    is_yielded: AtomicBool,
 }
 
 impl SchedState {
@@ -36,6 +37,7 @@ impl SchedState {
             timeslice_ms: AtomicU32::new(0),
             affinity: AtomicBits::new_ones(num_vcpus as usize),
             vcpu: AtomicU32::new(Self::NONE_VCPU),
+            is_yielded: AtomicBool::new(false),
         };
         new_self.assign_timeslice();
         new_self
@@ -170,5 +172,14 @@ impl SchedState {
     /// Set is_enqueued to false.
     pub(crate) fn clear_enqueued(&self) {
         self.is_enqueued.store(false, Release);
+    }
+
+    /// Set is_yielded, returning the old value.
+    ///
+    /// The is_yielded state helps the scheduler to
+    /// choose appropriate position of runqueue for task
+    #[inline(always)]
+    pub(crate) fn set_yielded(&self, is_yielded: bool) -> bool {
+        self.is_yielded.swap(is_yielded, Relaxed)
     }
 }

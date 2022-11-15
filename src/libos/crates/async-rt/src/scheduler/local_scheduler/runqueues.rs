@@ -22,6 +22,8 @@ use std::sync::Arc;
 /// `Scheduler` works. Each scheduler is per-VCPU: only one thread is supposed
 /// to dequeue entities, while multiple threads may enqueue entities.
 pub struct RunQueues<E> {
+    // Next slot of runqueue for cutline policy.
+    pub(super) next_entity: Option<Arc<E>>,
     // The i-th runqueue lists the entities with an effective priority equals to i.
     pub(super) run_queues: [RunQueue<E>; Priority::count()],
     // A bitmap where each bit indicates whether a corresponding
@@ -38,6 +40,7 @@ type RunQueue<E> = VecDeque<Arc<E>>;
 impl<E: SchedEntity> RunQueues<E> {
     /// Create an instance.
     pub fn new() -> Self {
+        let next_entity = None;
         let run_queues: [RunQueue<E>; Priority::count()] = {
             let mut run_queues: [MaybeUninit<RunQueue<E>>; Priority::count()] =
                 MaybeUninit::uninit_array();
@@ -48,9 +51,19 @@ impl<E: SchedEntity> RunQueues<E> {
             unsafe { mem::transmute(run_queues) }
         };
         Self {
+            next_entity,
             run_queues,
             nonempty_mask: 0,
         }
+    }
+
+    /// Enqueue the queue-jumped task
+    pub fn enqueue_jump(&mut self, entity: Arc<E>) {
+        let next_entity = &mut self.next_entity;
+        next_entity.replace(entity).and_then(|old_entity| {
+            self.enqueue(old_entity);
+            Some(())
+        });
     }
 
     /// Enqueue an entity.
@@ -68,6 +81,11 @@ impl<E: SchedEntity> RunQueues<E> {
 
     /// Try to dequeue an entity.
     pub fn try_dequeue(&mut self) -> Option<Arc<E>> {
+        let next_entity = &mut self.next_entity;
+        if next_entity.is_some() {
+            return next_entity.take();
+        }
+
         // Get the index of the non-empty runqueue with the highest priority
         let rq_i = {
             let num_leading_zeros = self.nonempty_mask.leading_zeros();

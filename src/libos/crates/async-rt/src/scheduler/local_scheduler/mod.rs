@@ -113,19 +113,26 @@ impl<E: SchedEntity> LocalScheduler<E> {
             return;
         }
 
+        let is_yielded = sched_state.set_yielded(false);
+
+        let last_vcpu = sched_state.vcpu();
         sched_state.set_vcpu(self.this_vcpu);
 
         // Depending on whether the entity still has remaining timeslice,
         // enqueue it into the front or back runqueues.
         let mut rqs = self.lock_rqs();
-        if sched_state.timeslice() > 0 {
+        if last_vcpu.is_some() && !is_yielded {
             let front_rqs = rqs.front_mut();
-            front_rqs.enqueue(entity.clone());
+            front_rqs.enqueue_jump(entity.clone());
         } else {
-            sched_state.assign_timeslice();
-
-            let back_rqs = rqs.back_mut();
-            back_rqs.enqueue(entity.clone());
+            if sched_state.timeslice() > 0 {
+                let front_rqs = rqs.front_mut();
+                front_rqs.enqueue(entity.clone());
+            } else {
+                sched_state.assign_timeslice();
+                let back_rqs = rqs.back_mut();
+                back_rqs.enqueue(entity.clone());
+            }
         }
 
         // To ensure that len won't underflow, we need to
