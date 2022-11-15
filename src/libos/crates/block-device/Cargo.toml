@@ -11,7 +11,7 @@ async-trait = "0.1.52"
 errno = { path = "../errno" }
 object-id = { path = "../object-id" }
 static_assertions = "1.1.0"
-spin = "0.9.4"
+spin = "0.7"
 
 [dev-dependencies]
 async-rt = { path = "../async-rt", features = ["auto_run"] }

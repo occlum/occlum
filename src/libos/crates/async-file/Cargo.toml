@@ -35,7 +35,7 @@ sgx_trts = { path = "../../../../deps/rust-sgx-sdk/sgx_trts", optional = true }
 sgx_libc = { path = "../../../../deps/rust-sgx-sdk/sgx_libc", optional = true }
 sgx-untrusted-alloc = { path = "../sgx-untrusted-alloc", optional = true }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-spin = "0.9.4"
+spin = "0.7"
 
 [dev-dependencies]
 ctor = "0.1"

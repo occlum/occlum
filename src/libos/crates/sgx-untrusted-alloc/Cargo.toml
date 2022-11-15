@@ -13,7 +13,7 @@ libc = { version = "0.2", optional = true }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 intrusive-collections = "0.9"
 log = "0.4"
-spin = "0.9.4"
+spin = "0.7"
 errno = { path = "../errno" }
 
 sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }
