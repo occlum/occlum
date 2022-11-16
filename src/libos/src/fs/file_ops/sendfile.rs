@@ -14,10 +14,16 @@ pub async fn do_sendfile(
 
     let current = current!();
     let in_file = current.file(in_fd)?;
+    if !in_file.access_mode().readable() {
+        return_errno!(EBADF, "in_file is not readable");
+    }
     let in_file_handle = in_file
         .as_async_file_handle()
         .ok_or_else(|| errno!(EINVAL, "not an inode"))?;
     let out_file = current.file(out_fd)?;
+    if !out_file.access_mode().writable() {
+        return_errno!(EBADF, "out_file is not writable");
+    }
     let mut buffer: [u8; 1024 * 11] = unsafe { MaybeUninit::uninit().assume_init() };
 
     let mut read_offset = match offset {

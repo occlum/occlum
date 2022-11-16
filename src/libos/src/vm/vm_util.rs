@@ -59,9 +59,12 @@ impl VMInitializer {
                 }
             }
             VMInitializer::FileBacked { file } => {
-                // TODO: make sure that read_at does not move file cursor
-                let len = file
-                    .file_ref()
+                let file_ref = file.file_ref();
+                if !file_ref.access_mode().readable() {
+                    return_errno!(EBADF, "file is not readable");
+                }
+                // make sure that read_at does not move file cursor
+                let len = file_ref
                     .as_async_file_handle()
                     .unwrap()
                     .dentry()
@@ -86,6 +89,9 @@ impl VMInitializer {
                 debug_assert!(copy_len <= buf.len());
                 let read_len = buf.len() - copy_len;
                 buf[..copy_len].copy_from_slice(&src_slice[..copy_len]);
+                if !file.access_mode().readable() {
+                    return_errno!(EBADF, "file is not readable");
+                }
                 let len = file
                     .as_async_file_handle()
                     .unwrap()

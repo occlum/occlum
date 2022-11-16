@@ -211,10 +211,14 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
         let mut empty_end_offset = 0;
 
         // Init all loadable segements
-        let elf_file_inode = elf_file
+        let elf_file_handle = elf_file
             .file_ref()
             .as_async_file_handle()
-            .ok_or_else(|| errno!(EINVAL, "not file handle"))?
+            .ok_or_else(|| errno!(EINVAL, "not file handle"))?;
+        if !elf_file_handle.access_mode().readable() {
+            return_errno!(EBADF, "elf file is not readable");
+        }
+        let elf_file_inode = elf_file_handle
             .dentry()
             .inode()
             .as_sync_inode()
