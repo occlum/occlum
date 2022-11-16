@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::ffi::{CStr, CString};
 use std::io::Read;
+use std::mem::size_of;
 use std::path::{Path, PathBuf};
 use std::sgxfs::SgxFile;
 use std::untrusted::path::PathEx;
@@ -27,6 +28,12 @@ lazy_static! {
             Ok(config) => config,
         }
     };
+}
+
+// Envs merged from default envs and possible envs passed by syscall do_mount_rootfs
+lazy_static! {
+    pub static ref TRUSTED_ENVS: RwLock<Vec<CString>> =
+        RwLock::new(LIBOS_CONFIG.env.default.clone());
 }
 
 pub fn load_config(config_path: &str, expected_mac: &sgx_aes_gcm_128bit_tag_t) -> Result<Config> {
@@ -97,7 +104,6 @@ pub struct Config {
     pub resource_limits: ConfigResourceLimits,
     pub process: ConfigProcess,
     pub env: ConfigEnv,
-
     pub untrusted_unix_socks: Option<Vec<ConfigUntrustedUnixSock>>,
     pub app: Vec<ConfigApp>,
 }
@@ -226,7 +232,6 @@ impl Config {
             resource_limits,
             process,
             env,
-
             untrusted_unix_socks,
             app,
         })
@@ -401,10 +406,8 @@ struct InputConfig {
     pub process: InputConfigProcess,
     #[serde(default)]
     pub env: InputConfigEnv,
-
     #[serde(default)]
     pub untrusted_unix_socks: Option<Vec<InputConfigUntrustedUnixSock>>,
-
     #[serde(default)]
     pub app: Vec<InputConfigApp>,
 }
@@ -535,11 +538,20 @@ struct InputConfigApp {
 #[derive(Debug, Copy, Clone)]
 #[allow(non_camel_case_types)]
 pub struct user_rootfs_config {
+    // length of the struct
+    len: usize,
+    // UnionFS type rootfs upper layer, read-write layer
     upper_layer_path: *const i8,
+    // UnionFS type rootfs lower layer, read-only layer
     lower_layer_path: *const i8,
     entry_point: *const i8,
+    // HostFS source path
     hostfs_source: *const i8,
+    // HostFS target path, default value is "/host"
     hostfs_target: *const i8,
+    // An array of pointers to null-terminated strings
+    // and must be terminated by a null pointer
+    envp: *const *const i8,
 }
 
 fn to_option_pathbuf(path: *const i8) -> Result<Option<PathBuf>> {
@@ -556,8 +568,46 @@ fn to_option_pathbuf(path: *const i8) -> Result<Option<PathBuf>> {
     Ok(path)
 }
 
+fn combine_trusted_envs(envp: *const *const i8) -> Result<()> {
+    let mut user_envs = from_user::clone_cstrings_safely(envp)?;
+    trace!("User envs: {:?}", user_envs);
+    let env_key: Vec<&str> = user_envs
+        .iter()
+        .map(|x| {
+            let kv: Vec<&str> = x.to_str().unwrap().splitn(2, '=').collect();
+            kv[0]
+        })
+        .collect();
+
+    let mut merged = TRUSTED_ENVS.write().unwrap();
+    // First clear the default envs then do the merge again
+    merged.clear();
+    merged.extend_from_slice(&user_envs);
+
+    for (_idx, val) in LIBOS_CONFIG.env.default.iter().enumerate() {
+        let kv: Vec<&str> = val.to_str().unwrap().splitn(2, '=').collect(); // only split the first "="
+        info!("kv: {:?}", kv);
+        if !env_key.contains(&kv[0]) {
+            unsafe { merged.push(val.clone()) };
+        }
+    }
+
+    trace!("Combined trusted envs: {:?}", merged);
+    Ok(())
+}
+
 impl ConfigApp {
     pub fn from_user(config: &user_rootfs_config) -> Result<ConfigApp> {
+        // Check config struct length for future possible extension
+        if config.len != size_of::<user_rootfs_config>() {
+            return_errno!(EINVAL, "User Config Struct length not match");
+        }
+
+        // Combine the default envs and user envs if necessary
+        if !config.envp.is_null() {
+            combine_trusted_envs(config.envp)?;
+        }
+
         let upper_layer = to_option_pathbuf(config.upper_layer_path)?;
         let lower_layer = to_option_pathbuf(config.lower_layer_path)?;
         let entry_point = to_option_pathbuf(config.entry_point)?;
