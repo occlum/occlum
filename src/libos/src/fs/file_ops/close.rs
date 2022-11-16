@@ -19,6 +19,14 @@ pub async fn do_close(fd: FileDesc) -> Result<()> {
         let _ = disk_file.flush().await;
     }
 
+    // Make sure the async inode flushing data when being closed.
+    if let Some(async_file_handle) = file_ref.as_async_file_handle() {
+        let inode = async_file_handle.dentry().inode();
+        if inode.as_sync_inode().is_none() {
+            let _ = inode.sync_all().await;
+        }
+    }
+
     current.close_file(fd)?;
     Ok(())
 }

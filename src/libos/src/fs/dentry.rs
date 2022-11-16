@@ -20,12 +20,3 @@ impl Dentry {
         &self.abs_path
     }
 }
-
-impl Drop for Dentry {
-    fn drop(&mut self) {
-        let inode = self.inode.clone();
-        async_rt::task::spawn(async move {
-            inode.sync_all().await;
-        });
-    }
-}
