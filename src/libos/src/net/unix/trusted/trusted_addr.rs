@@ -145,4 +145,9 @@ impl Addr for TrustedAddr {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn is_default(&self) -> bool {
+        let trusted_addr_default = Self::default();
+        *self == trusted_addr_default
+    }
 }

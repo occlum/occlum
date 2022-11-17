@@ -98,6 +98,11 @@ impl Addr for NetlinkSocketAddr {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn is_default(&self) -> bool {
+        let netlink_default = Self::default();
+        *self == netlink_default
+    }
 }
 
 impl Default for NetlinkSocketAddr {

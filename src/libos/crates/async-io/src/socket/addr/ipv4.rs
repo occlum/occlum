@@ -22,6 +22,7 @@ impl Addr for Ipv4SocketAddr {
         }
         // TODO: Use addr length more specifically.
         // The hard code value of 16 is the length of IN_ADDR_ANY.
+        // https://en.wikipedia.org/wiki/IPv4
         if c_addr_len < 16 {
             return_errno!(EINVAL, "address length is too small");
         }
@@ -37,6 +38,11 @@ impl Addr for Ipv4SocketAddr {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn is_default(&self) -> bool {
+        let inaddr_any = Self::default();
+        *self == inaddr_any
     }
 }
 
@@ -80,10 +86,10 @@ impl Ipv4SocketAddr {
         self.port = new_port;
     }
 
-    pub fn is_inaddr_any(&self) -> bool {
-        let INADDR_ANY = Self::default();
-        *self == INADDR_ANY
-    }
+    // pub fn is_default(&self) -> bool {
+    //     let inaddr_any = Self::default();
+    //     *self == inaddr_any
+    // }
 }
 
 impl Default for Ipv4SocketAddr {

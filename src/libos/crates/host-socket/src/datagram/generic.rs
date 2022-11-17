@@ -111,9 +111,10 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
     /// Ref 2: https://www.masterraghu.com/subjects/np/introduction/unix_network_programming_v1.3/ch08lev1sec11.html
     pub async fn connect(&self, peer_addr: Option<&A>) -> Result<()> {
         let mut state = self.state.write().unwrap();
-        if !state.is_connected() && peer_addr.is_none() {
-            return Ok(());
-        }
+
+        // if previous peer.is_default() and peer_addr.is_none()
+        // is unspec, so the situation exists that both
+        // !state.is_connected() and peer_addr.is_none() are true.
 
         if let Some(peer) = peer_addr {
             // We don't do connect syscall (or send connect io-uring requests) actually,
@@ -125,10 +126,15 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
             // disconnect or connect to new address might affect the ongoing async recv request,
             // which might increase the design complexity.
 
-            self.common.set_peer_addr(peer);
             self.receiver.reset_shutdown();
             self.sender.reset_shutdown();
-            state.mark_connected();
+            self.common.set_peer_addr(peer);
+
+            if peer.is_default() {
+                state.mark_disconnected();
+            } else {
+                state.mark_connected();
+            }
             do_connect(self.host_fd(), Some(peer))?;
             if !state.is_bound() {
                 state.mark_implicit_bind();
@@ -235,12 +241,17 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
 
         let res = if addr.is_some() {
             drop(state);
-            self.sender.sendmsg(bufs, addr, flags, control).await
+            self.sender
+                .sendmsg(bufs, addr.unwrap(), flags, control)
+                .await
         } else {
             let peer = self.common.peer_addr();
+            if peer.is_none() {
+                return_errno!(EDESTADDRREQ, "Destination address required");
+            }
             drop(state);
             self.sender
-                .sendmsg(bufs, peer.as_ref(), flags, control)
+                .sendmsg(bufs, &peer.unwrap(), flags, control)
                 .await
         };
 
@@ -358,10 +369,6 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
 
     fn set_recv_timeout(&self, timeout: Duration) {
         self.common.set_recv_timeout(timeout);
-    }
-
-    fn cancel_requests(&self) {
-        self.receiver.cancel_requests();
     }
 
     fn cancel_requests(&self) {

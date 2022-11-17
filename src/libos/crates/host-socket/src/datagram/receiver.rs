@@ -45,10 +45,6 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
                 return_errno!(EAGAIN, "no data are present to be received");
             }
 
-            if self.is_shutdown() {
-                return Ok((0, None, flags.bits(), 0));
-            }
-
             // Wait for interesting events by polling
             if poller.is_none() {
                 let new_poller = Poller::new();
@@ -103,7 +99,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
                     self.do_recv(&mut inner);
                 }
 
-                return Ok((recv_bytes, recv_addr));
+                return Ok((recv_bytes, recv_addr, 0, 0));
             }
         } else {
             let copied_bytes = inner.try_copy_buf(bufs);
@@ -111,6 +107,16 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
                 let recv_addr = inner.get_packet_addr();
                 // Copy ancillary data from control buffer
                 let msg_controllen = inner.req.msg.msg_controllen;
+                if msg_controllen > super::OPTMEM_MAX {
+                    return_errno!(EINVAL, "invalid msg control length");
+                }
+                let control_buf_len = if control.is_some() {
+                    control.as_ref().unwrap().len()
+                } else {
+                    0
+                };
+                assert!(msg_controllen >= control_buf_len);
+
                 if msg_controllen > 0 {
                     control
                         .as_mut()
@@ -147,7 +153,14 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         }
 
         if inner.is_shutdown {
-            return_errno!(Errno::EWOULDBLOCK, "the socket recv has been shutdown");
+            if self.common.nonblocking()
+                || flags.contains(RecvFlags::MSG_DONTWAIT)
+                || flags.contains(RecvFlags::MSG_ERRQUEUE)
+            {
+                return_errno!(Errno::EWOULDBLOCK, "the socket recv has been shutdown");
+            } else {
+                return Ok((0, None, flags.bits(), 0));
+            }
         }
 
         self.do_recv(&mut inner);
@@ -230,11 +243,6 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
     pub fn reset_shutdown(&self) {
         let mut inner = self.inner.lock().unwrap();
         inner.is_shutdown = false;
-    }
-
-    /// Obtain udp receiver shutdown state.
-    fn is_shutdown(&self) -> bool {
-        self.inner.lock().unwrap().is_shutdown
     }
 
     pub fn ready_len(&self) -> usize {

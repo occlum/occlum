@@ -295,9 +295,6 @@ impl SocketFile {
                 let mut ip_addr = None;
                 if !addr.is_unspec() {
                     let ipv4_addr = addr.to_ipv4()?;
-                    if ipv4_addr.is_inaddr_any() {
-                        return Ok(());
-                    }
                     ip_addr = Some(ipv4_addr);
                 }
                 ipv4_datagram.connect(ip_addr).await
@@ -306,9 +303,6 @@ impl SocketFile {
                 let mut ip_addr = None;
                 if !addr.is_unspec() {
                     let ipv6_addr = addr.to_ipv6()?;
-                    if ipv6_addr.is_in6addr_any_init() {
-                        return Ok(());
-                    }
                     ip_addr = Some(ipv6_addr);
                 }
                 ipv6_datagram.connect(ip_addr).await
@@ -472,8 +466,14 @@ impl SocketFile {
                 )
             }
             AnySocket::NetlinkDatagram(netlink_socket) => {
-                let (bytes_recv, addr_recv) = netlink_socket.recvmsg(bufs, flags).await?;
-                (bytes_recv, Some(AnyAddr::Netlink(addr_recv)))
+                let (bytes_recv, addr_recv, msg_flags, msg_controllen) =
+                    netlink_socket.recvmsg(bufs, flags).await?;
+                (
+                    bytes_recv,
+                    addr_recv.map(|addr| AnyAddr::Netlink(addr)),
+                    msg_flags,
+                    msg_controllen,
+                )
             }
             _ => {
                 return_errno!(EINVAL, "recvfrom is not supported");

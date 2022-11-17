@@ -27,6 +27,7 @@ impl Addr for Ipv6SocketAddr {
         }
         // TODO: Use addr length more specifically.
         // The hard code value of 16 is the length of IN_ADDR_ANY.
+        // https://en.wikipedia.org/wiki/IPv6
         if c_addr_len < 16 {
             return_errno!(EINVAL, "address length is too small");
         }
@@ -42,6 +43,11 @@ impl Addr for Ipv6SocketAddr {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn is_default(&self) -> bool {
+        let in6addr_any_init = Self::default();
+        *self == in6addr_any_init
     }
 }
 
@@ -96,10 +102,10 @@ impl Ipv6SocketAddr {
         self.port = new_port;
     }
 
-    pub fn is_in6addr_any_init(&self) -> bool {
-        let IN6ADDR_ANY_INIT = Self::default();
-        *self == IN6ADDR_ANY_INIT
-    }
+    // pub fn is_default(&self) -> bool {
+    //     let in6addr_any_init = Self::default();
+    //     *self == in6addr_any_init
+    // }
 }
 
 impl Default for Ipv6SocketAddr {

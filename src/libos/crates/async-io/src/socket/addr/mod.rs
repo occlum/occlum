@@ -31,6 +31,8 @@ pub trait Addr: Clone + Debug + Default + PartialEq + Send + Sync {
     fn to_c_storage(&self) -> (libc::sockaddr_storage, usize);
 
     fn as_any(&self) -> &dyn Any;
+
+    fn is_default(&self) -> bool;
 }
 
 pub use self::c_sock_addr::CSockAddr;

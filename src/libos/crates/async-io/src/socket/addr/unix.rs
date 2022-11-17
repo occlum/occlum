@@ -141,6 +141,11 @@ impl Addr for UnixAddr {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn is_default(&self) -> bool {
+        let unix_default = Self::default();
+        *self == unix_default
+    }
 }
 
 impl Default for UnixAddr {

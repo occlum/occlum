@@ -98,8 +98,12 @@ impl<A: Addr, R: Runtime> NetlinkSocket<A, R> {
             .map(|(ret, ..)| ret)
     }
 
-    pub async fn recvmsg(&self, bufs: &mut [&mut [u8]], flags: RecvFlags) -> Result<(usize, A)> {
-        self.receiver.recvmsg(bufs, flags).await
+    pub async fn recvmsg(
+        &self,
+        bufs: &mut [&mut [u8]],
+        flags: RecvFlags,
+    ) -> Result<(usize, Option<A>, i32, usize)> {
+        self.receiver.recvmsg(bufs, flags, None).await
     }
 
     pub async fn write(&self, buf: &[u8]) -> Result<usize> {
@@ -117,10 +121,11 @@ impl<A: Addr, R: Runtime> NetlinkSocket<A, R> {
         flags: SendFlags,
     ) -> Result<usize> {
         let res = if addr.is_some() {
-            self.sender.sendmsg(bufs, addr, flags).await
+            self.sender.sendmsg(bufs, addr.unwrap(), flags, None).await
         } else {
             let peer = self.common.peer_addr();
-            self.sender.sendmsg(bufs, peer.as_ref(), flags).await
+            // Need to check peer addr.
+            self.sender.sendmsg(bufs, &peer.unwrap(), flags, None).await
         };
 
         res
