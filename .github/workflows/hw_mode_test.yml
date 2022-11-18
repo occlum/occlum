@@ -101,14 +101,6 @@ jobs:
             cd occlum_instance && occlum build;
             occlum run /bin/hello_world"
 
-    - name: C with encrypted image test
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/hello_c && make;
-            rm -rf occlum_instance && occlum new occlum_instance;
-            occlum gen-image-key occlum_instance/image_key;
-            cp hello_world occlum_instance/image/bin;
-            cd occlum_instance && occlum build --image-key ./image_key --buildin-image-key;
-            occlum run /bin/hello_world"
-
     - name: C++ test
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/hello_cc && make;
             occlum new occlum_instance;
