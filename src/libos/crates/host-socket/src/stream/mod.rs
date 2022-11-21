@@ -305,10 +305,20 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     pub fn peer_addr(&self) -> Result<A> {
-        let state = self.state.read().unwrap();
+        let mut state = self.state.write().unwrap();
         match &*state {
             State::Connected(connected_stream) => {
                 Ok(connected_stream.common().peer_addr().unwrap())
+            }
+            State::Connect(connecting_stream) => {
+                if let Some(connected_stream) =
+                    Self::try_switch_to_connected_state(connecting_stream)
+                {
+                    *state = State::Connected(connected_stream.clone());
+                    Ok(connected_stream.common().peer_addr().unwrap())
+                } else {
+                    return_errno!(ENOTCONN, "the socket is not connected");
+                }
             }
             _ => return_errno!(ENOTCONN, "the socket is not connected"),
         }
