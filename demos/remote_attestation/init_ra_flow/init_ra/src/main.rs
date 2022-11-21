@@ -24,50 +24,34 @@ extern "C" {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // Load the configuration from initfs
-    const IMAGE_CONFIG_FILE: &str = "/etc/image_config.json";
-    let image_config = load_config(IMAGE_CONFIG_FILE)?;
-
-    // Get the MAC of Occlum.json.protected file
-    let occlum_json_mac = {
-        let mut mac: sgx_aes_gcm_128bit_tag_t = Default::default();
-        parse_str_to_bytes(&image_config.occlum_json_mac, &mut mac)?;
-        mac
-    };
-    let occlum_json_mac_ptr = &occlum_json_mac as *const sgx_aes_gcm_128bit_tag_t;
-
     // Get client secrets through grpc-ratls
     let server_addr = CString::new("localhost:50051").unwrap();
     let config_json = CString::new("dynamic_config.json").unwrap();
 
     // Get the key of FS image if needed
-    let key = match &image_config.image_type[..] {
-        "encrypted" => {
-            // Get the image encrypted key through RA
-            let secret = CString::new("image_key").unwrap();
-            let filename = CString::new("/etc/image_key").unwrap();
+    let key = {
+        // Get the image encrypted key through RA
+        let secret = CString::new("image_key").unwrap();
+        let filename = CString::new("/etc/image_key").unwrap();
 
-            let ret = unsafe {
-                grpc_ratls_get_secret(
-                    server_addr.as_ptr(),
-                    config_json.as_ptr(),
-                    secret.as_ptr(),
-                    filename.as_ptr())
-            };
+        let ret = unsafe {
+            grpc_ratls_get_secret(
+                server_addr.as_ptr(),
+                config_json.as_ptr(),
+                secret.as_ptr(),
+                filename.as_ptr())
+        };
 
-            if ret != 0 {
-                println!("grpc_ratls_get_secret failed return {}", ret);
-                return Err(Box::new(std::io::Error::last_os_error()));
-            }
-
-            const IMAGE_KEY_FILE: &str = "/etc/image_key";
-            let key_str = load_key(IMAGE_KEY_FILE)?;
-            let mut key: sgx_key_128bit_t = Default::default();
-            parse_str_to_bytes(&key_str, &mut key)?;
-            Some(key)
+        if ret != 0 {
+            println!("grpc_ratls_get_secret failed return {}", ret);
+            return Err(Box::new(std::io::Error::last_os_error()));
         }
-        "integrity-only" => None,
-        _ => unreachable!(),
+
+        const IMAGE_KEY_FILE: &str = "/etc/image_key";
+        let key_str = load_key(IMAGE_KEY_FILE)?;
+        let mut key: sgx_key_128bit_t = Default::default();
+        parse_str_to_bytes(&key_str, &mut key)?;
+        Some(key)
     };
     let key_ptr = key
         .as_ref()
@@ -116,7 +100,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Mount the image
     const SYS_MOUNT_FS: i64 = 363;
-    let ret = unsafe { syscall(SYS_MOUNT_FS, key_ptr, occlum_json_mac_ptr) };
+    // User can provide valid rootfs config pointer for runtime mount and boot
+    // Otherwise, just pass null pointer to do general mount and boot
+    let root_config_ptr: *const i8 = std::ptr::null();
+    let ret = unsafe { syscall(
+        SYS_MOUNT_FS, key_ptr, root_config_ptr) };
     if ret < 0 {
         return Err(Box::new(std::io::Error::last_os_error()));
     }

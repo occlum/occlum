@@ -16,9 +16,7 @@ fi
 rm -rf occlum_instance && mkdir occlum_instance
 cd occlum_instance
 occlum init
-new_json="$(jq '.resource_limits.user_space_size = "1000MB" |
-                .process.default_mmap_size = "900MB"' Occlum.json)" && \
-echo "${new_json}" > Occlum.json
+yq '.resource_limits.user_space_size = "1000MB"' -i Occlum.yaml
 
 # 2. Copy program into Occlum Workspace and build
 rm -rf image && \

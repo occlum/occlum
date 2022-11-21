@@ -26,8 +26,6 @@ occlum_workspace: $(BIN) $(DATA)
 	@rm -rf occlum_workspace && mkdir occlum_workspace
 	@cd occlum_workspace && \
 	occlum init && \
-	jq '.process.default_mmap_size = "96MB" | .resource_limits.max_num_of_threads = $(TCS_NUM)' Occlum.json > temp_Occlum.json && \
-	mv temp_Occlum.json Occlum.json && \
 	copy_bom -f ../xgboost.yaml --root image --include-dir /opt/occlum/etc/template && \
 	occlum build
 

@@ -11,17 +11,8 @@ mkdir occlum_instance
 cd occlum_instance
 occlum init
 cpu_cc=`cat /proc/cpuinfo | grep processor | wc -l`
-#new_json="$(jq '.resource_limits.user_space_size = "4GB" |
-#                .resource_limits.kernel_space_heap_size = "128MB" |
-#                .resource_limits.kernel_space_stack_size = "16MB" |
-#                .resource_limits.max_num_of_threads = 128 |
-#                .process.default_mmap_size = "1024MB" |
-#                .process.default_stack_size = "8MB" |
-#                .process.default_heap_size = "32MB" |
-#                .metadata.debuggable = false ' Occlum.json)" && \
-new_json="$(jq '.resource_limits.user_space_size = "320MB" |
-                .process.default_mmap_size = "256MB"' Occlum.json)" && \
-echo "${new_json}" > Occlum.json
+
+yq '.resource_limits.user_space_size = "320MB"' -i Occlum.yaml
 
 # 2. Copy files into Occlum Workspace and Build
 rm -rf image

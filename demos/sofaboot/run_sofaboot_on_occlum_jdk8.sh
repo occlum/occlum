@@ -17,14 +17,12 @@ init_instance() {
     # Init Occlum instance
     rm -rf occlum_instance && occlum new occlum_instance
     cd occlum_instance
-    new_json="$(jq '.resource_limits.user_space_size = "1680MB" |
-                .resource_limits.kernel_space_heap_size="64MB" |
-                .resource_limits.max_num_of_threads = 64 |
-                .process.default_heap_size = "256MB" |
-                .process.default_mmap_size = "1400MB" |
-                .entry_points = [ "/usr/lib/jvm/java-1.8-openjdk/jre/bin" ] |
-                .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-1.8-openjdk/jre/lib:/usr/lib/jvm/java-1.8-openjdk/lib" ]' Occlum.json)" && \
-    echo "${new_json}" > Occlum.json
+    yq '.resource_limits.user_space_size = "1680MB" |
+        .resource_limits.kernel_space_heap_size="64MB" |
+        .process.default_heap_size = "256MB" |
+        .entry_points = [ "/usr/lib/jvm/java-1.8-openjdk/jre/bin" ] |
+        .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-1.8-openjdk/jre/lib:/usr/lib/jvm/java-1.8-openjdk/lib" ]' \
+        -i Occlum.yaml
 }
 
 build_sofa() {

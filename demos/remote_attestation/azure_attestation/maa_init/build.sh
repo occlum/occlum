@@ -24,13 +24,12 @@ function build() {
     copy_bom -f ${IMG_BOM} --root image --include-dir /opt/occlum/etc/template
 
     # Update env
-    new_json="$(jq '.env.default += ["MAA_PROVIDER_URL=https://shareduks.uks.attest.azure.net"] |
+    yq '.env.default += ["MAA_PROVIDER_URL=https://shareduks.uks.attest.azure.net"] |
         .env.default += ["MAA_TOKEN_PATH=/root"] |
-        .env.default += ["MAA_REPORT_DATA=BASE64_STRING"]' Occlum.json)" && \
-    echo "${new_json}" > Occlum.json
+        .env.default += ["MAA_REPORT_DATA=BASE64_STRING"]' -i Occlum.yaml
 
     # Update report data string
-    sed -i "s/BASE64_STRING/$report_data/g" Occlum.json
+    sed -i "s/BASE64_STRING/$report_data/g" Occlum.yaml
 
     # prepare init maa content
     rm -rf initfs

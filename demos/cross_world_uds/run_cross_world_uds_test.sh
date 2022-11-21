@@ -13,11 +13,10 @@ echo -e "Test server and client both in host: ${BLUE}[Pass]${NC}"
 rm -rf occlum_instance*
 occlum new occlum_instance && cd occlum_instance
 
-new_json="$(jq '.untrusted_unix_socks += [
+yq '.untrusted_unix_socks += [
     {"host": "/tmp/occlum/test.sock", "libos": "/root/test.sock"},
     {"host": "/tmp/root/", "libos": "/root/"},
-    {"host": "../test.sock", "libos":"/tmp/test.sock" }]' Occlum.json)" && \
-echo "${new_json}" > Occlum.json
+    {"host": "../test.sock", "libos":"/tmp/test.sock" }]' -i Occlum.yaml
 
 mkdir -p /tmp/occlum
 mkdir -p /tmp/root

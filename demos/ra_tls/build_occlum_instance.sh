@@ -13,12 +13,11 @@ function get_mr() {
 function build_instance() {
     # 1. Init Occlum Workspace
     rm -rf occlum_$postfix
-    mkdir occlum_$postfix
+    mkdir occlum_$postfixy
     pushd occlum_$postfix
     occlum init
-    new_json="$(jq '.resource_limits.user_space_size = "500MB" |
-                    .metadata.debuggable = false' Occlum.json)" && \
-    echo "${new_json}" > Occlum.json
+    yq '.resource_limits.user_space_size = "500MB" |
+        .metadata.debuggable = false' -i Occlum.yaml
 
     if [ "$postfix" == "server" ]; then
         # Server will verify client's mr_enclave and mr_signer

@@ -42,10 +42,7 @@ rm -rf occlum_server && mkdir occlum_server
 rm -rf occlum_client && mkdir occlum_client
 cd occlum_client
 occlum init
-new_json="$(jq '.resource_limits.user_space_size = "2048MB" |
-	        .resource_limits.max_num_of_threads = 96 |
-                .process.default_mmap_size = "300MB"' Occlum.json)" && \
-echo "${new_json}" > Occlum.json
+yq '.resource_limits.user_space_size = "2048MB"' -i Occlum.yaml
 
 # 2. Copy program into Occlum Workspace and build
 cp ${out_dir}/client image/bin
@@ -55,10 +52,7 @@ occlum build
 
 cd ../occlum_server
 occlum init
-new_json="$(jq '.resource_limits.user_space_size = "2048MB" |
-	        .resource_limits.max_num_of_threads = 96 |
-                .process.default_mmap_size = "300MB"' Occlum.json)" && \
-echo "${new_json}" > Occlum.json
+yq '.resource_limits.user_space_size = "2048MB"' -i Occlum.yaml
 
 # 2. Copy program into Occlum Workspace and build
 cp ${out_dir}/server image/bin

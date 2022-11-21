@@ -16,10 +16,9 @@ if [ ! -d $python_dir ];then
     exit 1
 fi
 
-new_json="$(jq '.resource_limits.user_space_size = "640MB" |
-        .resource_limits.kernel_space_heap_size = "256MB" |
-        .process.default_mmap_size = "512MB" |
-        .env.default += ["PYTHONHOME=/opt/python-occlum"]' Occlum.json)" && \
-echo "${new_json}" > Occlum.json
+yq '.resource_limits.user_space_size = "640MB" |
+    .resource_limits.kernel_space_heap_size = "256MB" |
+    .env.default += ["PYTHONHOME=/opt/python-occlum"]' -i Occlum.yaml
+
 occlum build
 

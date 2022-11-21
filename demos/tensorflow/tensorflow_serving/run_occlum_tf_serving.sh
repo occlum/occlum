@@ -18,13 +18,11 @@ rm -rf occlum_instance
 mkdir occlum_instance
 cd occlum_instance
 occlum init
-new_json="$(jq '.resource_limits.user_space_size = "7000MB" |
-                .resource_limits.kernel_space_heap_size="384MB" |
-                .process.default_heap_size = "128MB" |
-                .resource_limits.max_num_of_threads = 64 |
-                .process.default_mmap_size = "6000MB" |
-                .env.default = [ "OMP_NUM_THREADS=8", "KMP_AFFINITY=verbose,granularity=fine,compact,1,0", "KMP_BLOCKTIME=20", "MKL_NUM_THREADS=8"]' Occlum.json)" && \
-echo "${new_json}" > Occlum.json
+yq '.resource_limits.user_space_size = "7000MB" |
+    .resource_limits.kernel_space_heap_size="384MB" |
+    .process.default_heap_size = "128MB" |
+    .env.default = [ "OMP_NUM_THREADS=8", "KMP_AFFINITY=verbose,granularity=fine,compact,1,0", "KMP_BLOCKTIME=20", "MKL_NUM_THREADS=8"]' \
+    -i Occlum.yaml
 
 # 2. Copy files into Occlum Workspace and Build
 rm -rf image
@@ -33,7 +31,7 @@ copy_bom -f ../tensorflow_serving.yaml --root image --include-dir /opt/occlum/et
 #occlum build
 occlum build
 # 3. Run benchmark
-taskset -c 0-1 occlum run /bin/tensorflow_model_server \
+occlum run /bin/tensorflow_model_server \
     --model_name=${model_name} \
     --model_base_path=/model/${model_name} \
     --port=8500 \

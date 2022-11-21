@@ -100,27 +100,27 @@ static int test_env_getauxval() {
 // Test cases for env
 // ============================================================================
 
-// The environment variables are specified in Occlum.json
+// The environment variables are specified in Occlum.yaml
 static int test_env_getenv() {
     if (test_env_val("OCCLUM", "yes") < 0) {
         THROW_ERROR("get environment variable failed");
     }
 
     // Here we call getenv() again to make sure that
-    // LibOS can handle several environment variables in Occlum.json correctly
-    // TEST is set as untrusted in Occlum.json thus can be changed
+    // LibOS can handle several environment variables in Occlum.yaml correctly
+    // TEST is set as untrusted in Occlum.yaml thus can be changed
     if (test_env_val("TEST", "true") < 0) {
         THROW_ERROR("get environment variable failed");
     }
 
-    // STABLE is set to "yes" as default in Occlum.json and is given a value of
+    // STABLE is set to "yes" as default in Occlum.yaml and is given a value of
     // "no" from outside. Because it is not set to untrusted thus can't be modified
-    // and should have the value defined in Occlum.json
+    // and should have the value defined in Occlum.yaml
     if (test_env_val("STABLE", "yes") < 0) {
         THROW_ERROR("get environment variable failed");
     }
 
-    // OVERRIDE is set to "N" as default in Occlum.json and is given a value of
+    // OVERRIDE is set to "N" as default in Occlum.yaml and is given a value of
     // "Y" from outside. As it is also set to untrusted thus it should be modified
     // and have the value passed from outside
     if (test_env_val("OVERRIDE", "Y") < 0) {

@@ -8,10 +8,9 @@ rm -rf occlum-instance
 occlum new occlum-instance
 cd occlum-instance
 
-new_json="$(jq '.resource_limits.user_space_size = "512MB" |
-            .resource_limits.kernel_space_heap_size = "64MB" |
-            .env.default = [ "OCCLUM=yes", "HOME=/root" ]' Occlum.json)" && \
-    echo "${new_json}" > Occlum.json
+yq '.resource_limits.user_space_size = "512MB" |
+    .resource_limits.kernel_space_heap_size = "64MB" |
+    .env.default = [ "OCCLUM=yes", "HOME=/root" ]' -i Occlum.yaml
 
 rm -rf image
 copy_bom -f $bomfile --root image --include-dir /opt/occlum/etc/template

@@ -62,7 +62,7 @@ cd /host
 pwd
 cd -
 
-# Test ulimit defined below will overide configuration in Occlum.json
+# Test ulimit defined below will overide configuration in Occlum.yaml
 ulimit -Ss 10240 # stack size 10M
 ulimit -Sd 40960 # heap size 40M
 ulimit -Sv 122880 # virtual memory size 120M (including heap, stack, mmap size)

@@ -9,11 +9,8 @@ cd occlum_instance
 rm -rf image
 copy_bom -f ../rocksdb.yaml --root image --include-dir /opt/occlum/etc/template
 
-TCS_NUM=$(($(nproc) * 2))
-new_json="$(jq --argjson THREAD_NUM ${TCS_NUM} '.resource_limits.user_space_size = "1024MB" |
-                .resource_limits.kernel_space_heap_size ="512MB" |
-                .resource_limits.max_num_of_threads = $THREAD_NUM' Occlum.json)" && \
-echo "${new_json}" > Occlum.json
+yq '.resource_limits.user_space_size = "1024MB" |
+    .resource_limits.kernel_space_heap_size ="512MB" ' -i Occlum.yaml
 
 occlum build
 

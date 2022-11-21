@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
         SERVER_PATH = SERVER_SOCK_READY_PATH_U_0;
     } else if (strncmp(env, ENV_U, sizeof(ENV_U)) == 0) {
         // Server running in libos, client running in host.
-        // Client connects to the host path defined in Occlum.json untrusted_unix_socks.host
+        // Client connects to the host path defined in Occlum.yaml untrusted_unix_socks.host
         SERVER_PATH = SERVER_SOCK_PATH_U_1;
     } else if (strncmp(env, ENV_T, sizeof(ENV_T)) == 0) {
         // Server running in host, client running in libos

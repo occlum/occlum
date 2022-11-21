@@ -25,8 +25,7 @@ fi
 # 1. Init Occlum instance
 rm -rf occlum_instance && occlum new occlum_instance
 cd occlum_instance
-new_json="$(jq '.resource_limits.user_space_size = "320MB"' Occlum.json)" && \
-echo "${new_json}" > Occlum.json
+yq '.resource_limits.user_space_size = "320MB"' -i Occlum.yaml
 
 # 2. Copy files into Occlum instance and build
 rm -rf image

@@ -16,12 +16,11 @@ fi
 rm -rf occlum_ping_instance && mkdir occlum_ping_instance
 cd occlum_ping_instance
 occlum init
-new_json="$(jq '.resource_limits.user_space_size = "800MB" |
+yq '.resource_limits.user_space_size = "800MB" |
 	.resource_limits.kernel_space_heap_size="40MB" |
 	.resource_limits.kernel_space_stack_size="1MB" |
 	.process.default_stack_size = "1MB" |
-	.process.default_heap_size = "20MB" ' Occlum.json)" && \
-echo "${new_json}" > Occlum.json
+	.process.default_heap_size = "20MB" ' -i Occlum.yaml
 
 # 2. Copy program into Occlum Workspace and build
 rm -rf image && \

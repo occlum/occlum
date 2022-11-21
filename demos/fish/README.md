@@ -51,9 +51,9 @@ And you should see `Hello world from fish`.
 
 ## Per-Process Resource Configuration with help of FISH
 
-Resource configuration for application running in Occlum is done only in `Occlum.json`. And only default size (mmap, heap, stack) can be
+Resource configuration for application running in Occlum is done only in `Occlum.yaml`. And only default size (heap, stack) can be
 configured. Since Occlum will claim all the memory space at initializtion, if an application doesn't really need the size as big as defined
-in `Occlum.json`, the exceeding memory space is wasted. If two applications are running, one of which needs only a small amount of space while
+in `Occlum.yaml`, the exceeding memory space is wasted. If two applications are running, one of which needs only a small amount of space while
 the other needs a lot more, it is better to run with per-process resource configuration.
 
 We achieve this with help of `prlimit` syscall (https://man7.org/linux/man-pages//man2/prlimit.2.html) and FISH shell built-in command
@@ -63,7 +63,7 @@ We achieve this with help of `prlimit` syscall (https://man7.org/linux/man-pages
 #! /usr/bin/fish
 ulimit -a
 
-# ulimit defined below will override configuration in Occlum.json
+# ulimit defined below will override configuration in Occlum.yaml
 ulimit -Ss 10240 # stack size 10M
 ulimit -Sd 40960 # heap size 40M
 ulimit -Sv 102400 # virtual memory size 100M (including heap, stack, mmap size)
@@ -83,7 +83,7 @@ Run command:
 ./run_per_process_config_test.sh --without-ulimit
 ```
 
-This test will fail because `ulimit` commands are commented out and the default memory size defined in Occlum.json is too small for application to run.
+This test will fail because `ulimit` commands are commented out and the default memory size defined in Occlum.yaml is too small for application to run.
 
 ### step 2:
 Run command:

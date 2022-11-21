@@ -8,9 +8,7 @@ bomfile=${SCRIPT_DIR}/redis_glibc.yaml
 rm -rf occlum_instance
 occlum new occlum_instance
 cd occlum_instance
-new_json="$(jq '.resource_limits.user_space_size = "320MB" |
-                .process.default_mmap_size = "256MB"' Occlum.json)" && \
-echo "${new_json}" > Occlum.json
+yq '.resource_limits.user_space_size = "320MB"' -i Occlum.yaml
 
 rm -rf image
 copy_bom -f $bomfile --root image --include-dir /opt/occlum/etc/template

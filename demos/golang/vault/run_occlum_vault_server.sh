@@ -16,13 +16,11 @@ fi
 rm -rf occlum_instance
 occlum new occlum_instance
 cd occlum_instance
-new_json="$(jq '.resource_limits.user_space_size = "2560MB" |
+yq '.resource_limits.user_space_size = "2560MB" |
 	.resource_limits.kernel_space_heap_size="320MB" |
 	.resource_limits.kernel_space_stack_size="10MB" |
 	.process.default_stack_size = "40MB" |
-	.process.default_heap_size = "320MB" |
-	.process.default_mmap_size = "960MB" ' Occlum.json)" && \
-echo "${new_json}" > Occlum.json
+	.process.default_heap_size = "320MB" ' -i Occlum.yaml
 
 # 2. Copy executable into Occlum Workspace and build
 rm -rf image && \

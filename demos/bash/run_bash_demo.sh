@@ -16,9 +16,8 @@ pushd occlum_instance
 rm -rf image
 copy_bom -f $bomfile --root image --include-dir /opt/occlum/etc/template
 
-new_json="$(jq '.resource_limits.user_space_size = "600MB" |
-                .resource_limits.kernel_space_stack_size ="2MB"	' Occlum.json)" && \
-    echo "${new_json}" > Occlum.json
+yq '.resource_limits.user_space_size = "600MB" |
+    .resource_limits.kernel_space_stack_size ="2MB"	' -i Occlum.yaml
 
 occlum build
 occlum run /bin/occlum_bash_test.sh

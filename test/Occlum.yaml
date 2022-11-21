@@ -1,13 +1,13 @@
 # All the settings below can only take effect after `occlum build`.
 resource_limits:
   # The heap size of LibOS kernel
-  kernel_space_heap_size: 32MB
+  kernel_space_heap_size: 512MB
   # The stack size of LibOS kernel. If not sure, don't modify it.
   kernel_space_stack_size: 1MB
   # The total size of enclave memory available to LibOS processes.
   # This size should be adjusted per different applications.
   # If reports ENOMEM error, try increase this size.
-  user_space_size: 256MB
+  user_space_size: 420MB
   # The minimum and maximum OS threads used by LibOS. If not sure, don't modify them.
   min_num_of_cpus: 1
   max_num_of_cpus: 128
@@ -15,7 +15,7 @@ process:
   # Default stack size for each process. If not sure, don't modify it.
   default_stack_size: 4MB
   # Default heap size for each process. If not sure, don't modify it.
-  default_heap_size: 32MB
+  default_heap_size: 8MB
 
 # Entry points
 # Specify all valid absolute <path> in `occlum run <path> <args>`.
@@ -33,6 +33,8 @@ env:
   # are specified in this config file, they are considered trusted.
   default:
     - OCCLUM=yes
+    - STABLE=yes
+    - OVERRIDE=N
   # The untrusted env vars that are captured by Occlum from the host environment
   # and passed to the "root" LibOS processes. These untrusted env vars can
   # override the trusted, default envs specified above.
@@ -44,7 +46,8 @@ env:
   #       untrusted:
   #         - OCCLUM
   untrusted:
-    - EXAMPLE
+    - TEST
+    - OVERRIDE
 
 # Enclave metadata
 # If not sure, just keep them no change
@@ -101,35 +104,14 @@ mount:
   # For example, below section mount the occlum_instance directory in the Host FS
   # to the path /host in the LibOS FS.
   # It is disabled in default. Uncomment it if you are very sure about it.
-  # - target: /host
-  #   type: hostfs
-  #   source: .
+  - target: /host
+    type: hostfs
+    source: .
   #
   # Async FS mount
-  # - target: /sfs
-  #   type: async_sfs
-  #   source: ./run/async_sfs_image
-  #   options:
-  #     total_size: 4GB
-
-# Untrusted Unix domain socket
-# Besides the common Unix domain socket support that both ends are created in the same
-# Occlum instance, the Untrusted Unix domain socket can support cross-world connection by
-# mapping a libos socket address with the host socket address. In this way, a Unix domain
-# socket created in Occlum can communicate with a Unix domain socket in the host OS or in
-# another Occlum instance.
-# Uncomment and customize below if you are very sure about it.
-#
-# untrusted_unix_socks:
-# The libos path and the host path correspond to the same host sock file.
-# The host side should use the host path and libos side should use the libos path.
-#
-# Specify socket file in absolute path
-  # - host: /tmp/occlum/test.sock
-  #   libos: /root/test.sock
-# Or any files in the path
-  # - host: /tmp/root/
-  #   libos: /root/
-# Or the host path can be a relative path and is relative to the current Occlum instance dir.
-  # - host: ../test.sock
-  #   libos: /tmp/test.sock
+  - target: /sfs
+    type: async_sfs
+    source: ./run/async_sfs_image
+    options:
+      total_size: 4GB
+ 

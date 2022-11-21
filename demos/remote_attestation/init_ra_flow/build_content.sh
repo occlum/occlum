@@ -49,14 +49,13 @@ function build_client_instance()
     rm -rf image
     copy_bom -f ../flask.yaml --root image --include-dir /opt/occlum/etc/template
 
-    new_json="$(jq '.resource_limits.user_space_size = "600MB" |
+    yq '.resource_limits.user_space_size = "600MB" |
         .resource_limits.kernel_space_heap_size = "128MB" |
         .resource_limits.max_num_of_threads = 32 |
         .metadata.debuggable = false |
         .metadata.enable_kss = true |
         .metadata.version_number = 88 |
-        .env.default += ["PYTHONHOME=/opt/python-occlum"]' Occlum.json)" && \
-    echo "${new_json}" > Occlum.json
+        .env.default += ["PYTHONHOME=/opt/python-occlum"]' -i Occlum.yaml
 
     occlum build --image-key ../image_key
 
@@ -121,9 +120,8 @@ function build_server_instance()
         .sgx_mrs[0].config_svn = 1234 |
         .sgx_mrs[0].debuggable = false ' ../ra_config_template.json > dynamic_config.json
 
-    new_json="$(jq '.resource_limits.user_space_size = "500MB" |
-                    .metadata.debuggable = false ' Occlum.json)" && \
-    echo "${new_json}" > Occlum.json
+    yq '.resource_limits.user_space_size = "500MB" |
+        .metadata.debuggable = false ' -i Occlum.yaml
 
     rm -rf image
     copy_bom -f ../ra_server.yaml --root image --include-dir /opt/occlum/etc/template
