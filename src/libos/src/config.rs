@@ -117,7 +117,6 @@ pub struct ConfigResourceLimits {
 pub struct ConfigProcess {
     pub default_stack_size: usize,
     pub default_heap_size: usize,
-    pub default_mmap_size: usize,
 }
 
 #[derive(Debug)]
@@ -258,11 +257,9 @@ impl ConfigProcess {
     fn from_input(input: &InputConfigProcess) -> Result<ConfigProcess> {
         let default_stack_size = parse_memory_size(&input.default_stack_size)?;
         let default_heap_size = parse_memory_size(&input.default_heap_size)?;
-        let default_mmap_size = parse_memory_size(&input.default_mmap_size)?;
         Ok(ConfigProcess {
             default_stack_size,
             default_heap_size,
-            default_mmap_size,
         })
     }
 }
@@ -438,8 +435,6 @@ struct InputConfigProcess {
     pub default_stack_size: String,
     #[serde(default = "InputConfigProcess::get_default_heap_size")]
     pub default_heap_size: String,
-    #[serde(default = "InputConfigProcess::get_default_mmap_size")]
-    pub default_mmap_size: String,
 }
 
 impl InputConfigProcess {
@@ -450,10 +445,6 @@ impl InputConfigProcess {
     fn get_default_heap_size() -> String {
         "16MB".to_string()
     }
-
-    fn get_default_mmap_size() -> String {
-        "32MB".to_string()
-    }
 }
 
 impl Default for InputConfigProcess {
@@ -461,7 +452,6 @@ impl Default for InputConfigProcess {
         InputConfigProcess {
             default_stack_size: InputConfigProcess::get_default_stack_size(),
             default_heap_size: InputConfigProcess::get_default_heap_size(),
-            default_mmap_size: InputConfigProcess::get_default_mmap_size(),
         }
     }
 }

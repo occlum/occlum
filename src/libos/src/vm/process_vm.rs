@@ -17,7 +17,6 @@ pub struct ProcessVMBuilder<'a, 'b> {
     elfs: Vec<&'b ElfFile<'a>>,
     heap_size: Option<usize>,
     stack_size: Option<usize>,
-    mmap_size: Option<usize>,
 }
 
 impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
@@ -26,7 +25,6 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
             elfs: elfs,
             heap_size: None,
             stack_size: None,
-            mmap_size: None,
         }
     }
 
@@ -37,11 +35,6 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
 
     pub fn set_stack_size(&mut self, stack_size: usize) -> &mut Self {
         self.stack_size = Some(stack_size);
-        self
-    }
-
-    pub fn set_mmap_size(&mut self, mmap_size: usize) -> &mut Self {
-        self.mmap_size = Some(mmap_size);
         self
     }
 
@@ -188,7 +181,6 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
         };
         validate_size(self.heap_size)?;
         validate_size(self.stack_size)?;
-        validate_size(self.mmap_size)?;
         Ok(())
     }
 

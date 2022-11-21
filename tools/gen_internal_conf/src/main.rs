@@ -219,7 +219,6 @@ fn main() {
             process: OcclumProcess {
                 default_stack_size: occlum_config.process.default_stack_size,
                 default_heap_size: occlum_config.process.default_heap_size,
-                default_mmap_size: occlum_config.process.default_mmap_size,
             },
             untrusted_unix_socks,
             env: occlum_config.env,
@@ -441,7 +440,6 @@ struct OcclumResourceLimits {
 struct OcclumProcess {
     default_stack_size: String,
     default_heap_size: String,
-    default_mmap_size: String,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]

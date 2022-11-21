@@ -20,18 +20,15 @@ pub fn do_init<'a, 'b>(
         let rlimit = current!().rlimits().lock().unwrap().clone();
         let child_heap_size = rlimit.get(resource_t::RLIMIT_DATA).get_cur();
         let child_stack_size = rlimit.get(resource_t::RLIMIT_STACK).get_cur();
-        let child_mmap_size =
-            rlimit.get(resource_t::RLIMIT_AS).get_cur() - child_heap_size - child_stack_size;
 
         debug!(
-            "new process: heap_size = {:?}, stack_size = {:?}, mmap_size = {:?}",
-            child_heap_size, child_stack_size, child_mmap_size
+            "new process: heap_size = {:?}, stack_size = {:?}",
+            child_heap_size, child_stack_size
         );
 
         ProcessVMBuilder::new(vec![elf_file, ldso_elf_file])
             .set_heap_size(child_heap_size as usize)
             .set_stack_size(child_stack_size as usize)
-            .set_mmap_size(child_mmap_size as usize)
             .clone()
             .build()
             .cause_err(|e| errno!(e.errno(), "failed to create process VM"))?

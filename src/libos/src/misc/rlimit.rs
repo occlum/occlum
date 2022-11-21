@@ -21,16 +21,15 @@ impl Default for ResourceLimits {
         // Get memory space limit from Occlum.json
         let cfg_heap_size: u64 = config::LIBOS_CONFIG.process.default_heap_size as u64;
         let cfg_stack_size: u64 = config::LIBOS_CONFIG.process.default_stack_size as u64;
-        let cfg_mmap_size: u64 = config::LIBOS_CONFIG.process.default_mmap_size as u64;
+        let cfg_user_space_size: u64 = config::LIBOS_CONFIG.resource_limits.user_space_size as u64;
 
         let stack_size = rlimit_t::new(cfg_stack_size);
 
         // Data segment consists of three parts: initialized data, uninitialized data, and heap.
         // Here we just approximatively consider this equal to the size of heap size.
         let data_size = rlimit_t::new(cfg_heap_size);
-        // Address space can be approximatively considered equal to the sum of application's
-        // heap, stack and mmap size.
-        let address_space = rlimit_t::new(cfg_heap_size + cfg_stack_size + cfg_mmap_size);
+        // Address space can be approximatively considered equal to user space.
+        let address_space = rlimit_t::new(cfg_user_space_size);
 
         // Set init open files limit to 1024 which is default value for Ubuntu
         let open_files = rlimit_t::new(1024);
