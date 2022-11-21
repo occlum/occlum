@@ -39,8 +39,16 @@ int connect_with_server(const char *addr_string, const char *port_string) {
         THROW_ERROR("inet_pton error");
     }
 
+    // If the server is not listening, sleep a while and try again.
+    int retry = 0;
+_connect_:
     ret = connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
     if (ret < 0) {
+        if (errno == ECONNREFUSED && retry == 0) {
+            sleep(1);
+            retry = 1;
+            goto _connect_;
+        }
         close(sockfd);
         THROW_ERROR("connect error");
     }

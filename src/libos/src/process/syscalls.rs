@@ -368,13 +368,13 @@ pub async fn do_set_tid_address(tidptr: *mut pid_t) -> Result<isize> {
 
 pub async fn do_exit(status: i32) -> Result<isize> {
     debug!("exit: {}", status);
-    super::do_exit::do_exit(status);
+    super::do_exit::do_exit(status).await;
     Ok(0)
 }
 
 pub async fn do_exit_group(status: i32) -> Result<isize> {
     debug!("exit_group: {}", status);
-    return super::do_exit::do_exit_group(status);
+    super::do_exit::do_exit_group(status).await
 }
 
 pub async fn do_wait4(pid: i32, exit_status_ptr: *mut i32, options: u32) -> Result<isize> {

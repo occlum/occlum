@@ -1154,9 +1154,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_shutdown),
     TEST_CASE(test_epoll_wait),
     TEST_CASE(test_timeout),
-#if 0 // FIXME: Temporarily disable this test because of flaw in close implementation
     TEST_CASE(test_exit_group),
-#endif
 };
 
 int main(int argc, const char *argv[]) {

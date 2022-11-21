@@ -35,7 +35,7 @@ async fn __main_loop(current: ThreadRef, init_cpu_state: CpuContext) {
 
         crate::process::handle_force_stop().await;
 
-        crate::process::handle_force_exit();
+        crate::process::handle_force_exit().await;
 
         if current.status() == ThreadStatus::Exited {
             break;

@@ -129,24 +129,18 @@ impl Thread {
         self.files().lock().unwrap().put(new_file, close_on_spawn)
     }
 
-    /// Close a file from the file table. It will release the POSIX advisory locks owned
-    /// by current process.
-    pub fn close_file(&self, fd: FileDesc) -> Result<()> {
-        let file = self.files().lock().unwrap().del(fd)?;
-        if let Some(async_file_handle) = file.as_async_file_handle() {
-            async_file_handle.release_range_locks();
-        }
+    /// Remove a file from the file table.
+    pub fn remove_file(&self, fd: FileDesc) -> Result<()> {
+        let _file = self.files().lock().unwrap().del(fd)?;
         Ok(())
     }
 
-    /// Close all files in the file table. It will release the POSIX advisory locks owned
+    /// Remove all files from the file table and close all the files. It will release the POSIX advisory locks owned
     /// by current process.
-    pub fn close_all_files(&self) {
+    pub async fn close_all_files_when_exit(&self) {
         let files = self.files().lock().unwrap().del_all();
         for file in files {
-            if let Some(async_file_handle) = file.as_async_file_handle() {
-                async_file_handle.release_range_locks();
-            }
+            file.clean_for_close().await;
         }
     }
 

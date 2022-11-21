@@ -90,11 +90,11 @@ pub fn is_vforked_child_process() -> bool {
 }
 
 // Return to parent process to continue executing
-pub fn vfork_return_to_parent(
+pub async fn vfork_return_to_parent(
     mut context: *mut CpuContext,
     current_ref: &ThreadRef,
 ) -> Result<isize> {
-    let child_pid = restore_parent_process(context, current_ref)?;
+    let child_pid = restore_parent_process(context, current_ref).await?;
 
     // Wake parent's child thread which are all sleeping
     let current = current!();
@@ -110,7 +110,10 @@ pub fn vfork_return_to_parent(
     Ok(child_pid)
 }
 
-fn restore_parent_process(mut context: *mut CpuContext, current_ref: &ThreadRef) -> Result<isize> {
+async fn restore_parent_process(
+    mut context: *mut CpuContext,
+    current_ref: &ThreadRef,
+) -> Result<isize> {
     let current_pid = current_ref.process().pid();
 
     let parent_file_table = {
@@ -123,7 +126,7 @@ fn restore_parent_process(mut context: *mut CpuContext, current_ref: &ThreadRef)
     };
 
     // Close all child opened files
-    close_files_opened_by_child(current_ref, &parent_file_table)?;
+    close_files_opened_by_child(current_ref, &parent_file_table).await?;
 
     // Restore parent file table
     let mut current_file_table = current_ref.files().lock().unwrap();
@@ -166,24 +169,39 @@ pub fn check_vfork_for_exec(current_ref: &ThreadRef) -> Option<(ThreadId, Option
     }
 }
 
-fn close_files_opened_by_child(current: &ThreadRef, parent_file_table: &FileTable) -> Result<()> {
-    let current_file_table = current.files().lock().unwrap();
-    let child_open_fds: Vec<FileDesc> = current_file_table
-        .table()
-        .iter()
-        .enumerate()
-        .filter(|(fd, _entry)| {
-            // Entry is only shown in the child file table
-            _entry.is_some() && parent_file_table.get_entry(*fd as FileDesc).is_err()
-        })
-        .map(|(fd, entry)| fd as FileDesc)
-        .collect();
+async fn close_files_opened_by_child(
+    current: &ThreadRef,
+    parent_file_table: &FileTable,
+) -> Result<()> {
+    let child_open_files = {
+        let mut current_file_table = current.files().lock().unwrap();
+        let child_open_files: Vec<FileDesc> = current_file_table
+            .table()
+            .iter()
+            .enumerate()
+            .filter_map(|(fd, entry)| {
+                // Entry is only shown in the child file table
+                if entry.is_some() && parent_file_table.get_entry(fd as FileDesc).is_err() {
+                    Some(fd as FileDesc)
+                } else {
+                    None
+                }
+            })
+            .collect();
 
-    drop(current_file_table);
+        // Remove from file table and collect file handle for clean
+        child_open_files
+            .iter()
+            .map(|(fd)| current_file_table.del(*fd).expect("close child file error"))
+            .collect::<Vec<FileRef>>()
+    };
 
-    child_open_fds
-        .iter()
-        .for_each(|&fd| current.close_file(fd).expect("close child file error"));
+    // Don't hold file table lock when clean for close. Otherwise, some types of the files may lock the file table when drop and will
+    // cause deadlock, e.g. epoll file.
+    for file in child_open_files {
+        file.clean_for_close().await;
+    }
+
     Ok(())
 }
 

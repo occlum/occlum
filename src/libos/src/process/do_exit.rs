@@ -14,16 +14,16 @@ use crate::signal::constants::*;
 use crate::signal::{KernelSignal, SigNum};
 use crate::vm::USER_SPACE_VM_MANAGER;
 
-pub fn do_exit_group(status: i32) -> Result<isize> {
+pub async fn do_exit_group(status: i32) -> Result<isize> {
     if is_vforked_child_process() {
         let current = current!();
         let mut curr_user_ctxt = CURRENT_CONTEXT.with(|context| context.as_ptr());
-        return vfork_return_to_parent(curr_user_ctxt as *mut _, &current);
+        vfork_return_to_parent(curr_user_ctxt as *mut _, &current).await
     } else {
         let term_status = TermStatus::Exited(status as u8);
         let current = current!();
         current.process().force_exit(term_status);
-        exit_thread(term_status);
+        exit_thread(term_status).await;
 
         notify_all_threads_to_exit(current.process());
         Ok(0)
@@ -43,22 +43,22 @@ pub fn notify_all_threads_to_exit(current_process: &ProcessRef) {
     });
 }
 
-pub fn do_exit(status: i32) {
+pub async fn do_exit(status: i32) {
     let term_status = TermStatus::Exited(status as u8);
-    exit_thread(term_status);
+    exit_thread(term_status).await;
 }
 
 /// Exit this thread if it has been forced to exit.
 ///
 /// A thread may be forced to exit for two reasons: 1) a fatal signal; 2)
 /// exit_group syscall.
-pub fn handle_force_exit() {
+pub async fn handle_force_exit() {
     if current!().process().is_forced_to_exit() {
-        exit_thread(current!().process().term_status().unwrap());
+        exit_thread(current!().process().term_status().unwrap()).await;
     }
 }
 
-fn exit_thread(term_status: TermStatus) {
+async fn exit_thread(term_status: TermStatus) {
     let thread = current!();
     if thread.status() == ThreadStatus::Exited {
         return;
@@ -87,7 +87,7 @@ fn exit_thread(term_status: TermStatus) {
 
     // If this thread is the last thread, close all files then exit the process
     if num_remaining_threads == 0 {
-        thread.close_all_files();
+        thread.close_all_files_when_exit().await;
         exit_process(&thread, term_status, None);
     }
 
