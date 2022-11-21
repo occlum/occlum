@@ -1,9 +1,10 @@
+#Notice:Anolis is not an official supported distribution now. Take your own risk to use it.
 FROM alpine:3.11 AS alpine
 
 RUN apk update && \
     apk --no-cache add openjdk11 openjdk8 --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
 
-FROM registry.cn-hangzhou.aliyuncs.com/alinux/alinux3:3.210714.1
+FROM openanolis/anolisos:8.4-x86_64 
 
 LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
 
@@ -11,7 +12,9 @@ LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
 #for example "source a_file". Use bash as default shell instead.
 SHELL ["/bin/bash", "-c"]
 
-RUN yum install -y --nogpgcheck \
+RUN yum install -y epel-release && \
+        yum install -y --nogpgcheck \
+        epel-release \
         astyle \
         autoconf \
         automake \
@@ -73,11 +76,11 @@ RUN yum install -y --nogpgcheck \
     yum clean all && \
     alternatives --set python /usr/bin/python3
 
-# Aliyunlinux3 use GCC 10 as default toolchain
+# Anolis8.4 use GCC 8.4.1 as default toolchain
 
 # Install PSW and DCAP RPM packages
 WORKDIR /tmp
-RUN wget https://mirrors.openanolis.cn/inclavare-containers/alinux3/sgx-2.14/sgx_rpm_local_repo.tar.gz && \
+RUN wget https://mirrors.openanolis.cn/inclavare-containers/bin/anolis8.4/sgx-2.17/sgx_rpm_local_repo.tar.gz && \
     tar -xzf sgx_rpm_local_repo.tar.gz && \
     rm -f sgx_rpm_local_repo.tar.gz && \
     cd /tmp/sgx_rpm_local_repo && \
@@ -107,7 +110,9 @@ RUN wget https://mirrors.openanolis.cn/inclavare-containers/alinux3/sgx-2.14/sgx
 
 # Install SGX SDK
 WORKDIR /tmp
-RUN git clone -b sgx_2.14_for_occlum https://github.com/occlum/linux-sgx && \
+WORKDIR /tmp
+RUN git clone -b sgx_2.17.1_for_ngo https://github.com/occlum/linux-sgx && \
+    mkdir /etc/init && \
     cd linux-sgx && \
     make preparation && \
     ./compile_and_install.sh no_mitigation USE_OPT_LIBS=3 && \
@@ -121,11 +126,13 @@ RUN wget http://www.etallen.com/cpuid/cpuid-20200211.x86_64.tar.gz && \
     cp ./cpuid-20200211/cpuid /usr/bin/ && \
     rm -rf /tmp/cpuid-20200211*
 
+# Install yq to support Occlum yaml format configuratiob file
+RUN wget https://github.com/mikefarah/yq/releases/download/v4.30.4/yq_linux_amd64 -O /usr/bin/yq && chmod +x /usr/bin/yq
 
 # Download the Occlum source
 ARG OCCLUM_BRANCH
 WORKDIR /root
-RUN git clone -b $OCCLUM_BRANCH https://github.com/occlum/ngo occlum/ && \
+RUN git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum && \
     cp -r /root/occlum/tools/toolchains/* /tmp/ && mkdir -p /opt/occlum/ && \
     cp /root/occlum/tools/docker/start_aesm.sh /opt/occlum/
 
@@ -145,7 +152,7 @@ ENV PATH="/opt/occlum/toolchains/golang/bin:$PATH"
 
 # Install Rust
 ENV PATH="/root/.cargo/bin:$PATH"
-ENV OCCLUM_RUST_VERSION=nightly-2020-10-25
+ENV OCCLUM_RUST_VERSION=nightly-2022-02-23
 RUN curl https://sh.rustup.rs -sSf | \
         sh -s -- --default-toolchain ${OCCLUM_RUST_VERSION} -y && \
     rm -rf /root/.cargo/registry && rm -rf /root/.cargo/git && \
@@ -179,7 +186,6 @@ COPY --from=alpine /usr/lib/jvm/java-1.8-openjdk $JDK8_PATH
 RUN rm $JDK8_PATH/jre/lib/security/cacerts
 COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK8_PATH/jre/lib/security/cacerts
 
-ENV LD_LIBRARY_PATH="/opt/intel/sgxpsw/aesm:/usr/lib64/:/usr/local/lib:/opt/intel/sgxsdk/sdk_libs:/usr/lib:$LD_LIBRARY_PATH"
 # Build and install Occlum
 WORKDIR /root
 RUN cd occlum && \

@@ -67,15 +67,9 @@ RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-i
     rm -rf /var/lib/apt/lists/*
 
 RUN echo "ca_directory=/etc/ssl/certs" >> /etc/wgetrc && \
+    wget https://github.com/mikefarah/yq/releases/download/v4.30.4/yq_linux_amd64 -O /usr/bin/yq && chmod +x /usr/bin/yq && \
     echo 'deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu focal main' | tee /etc/apt/sources.list.d/intel-sgx.list &&\
     wget -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key --no-check-certificate | apt-key add -
-
-# Install cpuid tool for tests
-# WORKDIR /tmp
-# RUN wget http://www.etallen.com/cpuid/cpuid-20200211.x86_64.tar.gz && \
-#    tar -xf ./cpuid-20200211.x86_64.tar.gz && \
-#    cp ./cpuid-20200211/cpuid /usr/bin/ && \
-#    rm -rf /tmp/cpuid-20200211*
 
 # Install Rust
 ENV PATH="/root/.cargo/bin:$PATH"
