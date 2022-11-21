@@ -76,8 +76,9 @@ jobs:
     - name: Run Golang grpc ping test
       run: |
         sleep ${{ env.nap_time }};
-        docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/grpc_pingpong && SGX_MODE=SIM ./run_ping_on_occlum.sh" &
+        docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/grpc_pingpong && SGX_MODE=SIM ./run_ping_on_occlum.sh"
 
+    # This is for the go web_server test
     - name: Curl test
       run: |
         sleep ${{ env.nap_time }};
