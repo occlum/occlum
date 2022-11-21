@@ -9,12 +9,9 @@ export install_dir = $(buildroot)/opt/occlum/toolchains/golang
 
 SHELL = /bin/bash
 
-# Needed by musl-cross-make config
-TARGET = x86_64-linux-musl
-GCC_VER = 8.3.0
-GO_VERSION = 1.13.7
-GO_REPO = https://github.com/golang/go/archive/go$(GO_VERSION).tar.gz
-GO_PATCH = adapt-golang-to-occlum.patch
+# go1.18.4_for_occlum or go1.16.3_for_occlum
+GO_BRANCH = go1.18.4_for_occlum
+GO_REPO = https://github.com/occlum/go.git
 
 .ONESHELL: prepare override_dh_install
 
@@ -27,19 +24,15 @@ prepare:
 	rm -rf $(install_dir)
 	mkdir -p $(tmp_build_dir)
 	cd $(tmp_build_dir)
-	wget $(GO_REPO)
-	tar -xvzf go$(GO_VERSION).tar.gz
-	cd go-go$(GO_VERSION)
-	patch -p1 < $(deb_build_dir)/$(name)/debian/$(GO_PATCH)
+	git clone -b $(GO_BRANCH) $(GO_REPO) .
 
 override_dh_auto_build: prepare
-	cd $(tmp_build_dir)/go-go$(GO_VERSION)/src; \
-		export GO_LDFLAGS="-compressdwarf=false"; \
+	cd $(tmp_build_dir)/src; \
 		./make.bash
 
 override_dh_install:
 	mkdir -p $(buildroot)/opt/occlum/toolchains
-	mv $(tmp_build_dir)/go-go$(GO_VERSION)/ $(install_dir)
+	mv $(tmp_build_dir)/ $(install_dir)
 	rm -rf $(install_dir)/.git*
 	cat > $(install_dir)/bin/occlum-go <<EOF
 		#!/bin/bash

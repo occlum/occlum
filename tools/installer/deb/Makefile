@@ -16,12 +16,11 @@ C_TOOLCHAIN_PACKAGE_NAME := occlum-toolchains-gcc
 # The version numbers are only needed to update when the toolchains are updated.
 # When updating the toolchain packages for Deb, please first update RPM configuration. And then
 # update the "changelog" file accordingly.
-MUSL_VERSION := 0.15.0
-GOLAN_VERSION := 0.16.0
+MUSL_VERSION := 0.27.0
+GOLAN_VERSION := 1.18.4
+GLIBC_VERSION := 2.31
 
-GO_PATCH = $(PROJECT_DIR)/tools/toolchains/golang/adapt-golang-to-occlum.patch
-
-.PHONY: all main config_files main_deps musl-gcc deps_c clean clean-build
+.PHONY: all main config_files main_deps musl-gcc deps_c glibc deps_glibc clean clean-build
 
 all: main
 
@@ -76,7 +75,17 @@ deps_golang:
 	mkdir -p $(TARGET_DIR)
 	mkdir -p $(DEB_BUILD_DIR)/occlum-toolchains-golang
 	cp -r toolchains/golang $(DEB_BUILD_DIR)/occlum-toolchains-golang/debian
-	cp -t $(DEB_BUILD_DIR)/occlum-toolchains-golang/debian $(GO_PATCH) $(PROJECT_DIR)/tools/installer/rpm/toolchains/golang/occlum-go.sh
+
+glibc: deps_glibc
+	cd $(DEB_BUILD_DIR)/occlum-toolchains-glibc ; \
+		dpkg-buildpackage -us -uc
+	cp -t $(TARGET_DIR) $(DEB_BUILD_DIR)/occlum-toolchains-glibc*.deb
+
+deps_glibc:
+	mkdir -p $(TARGET_DIR)
+	mkdir -p $(DEB_BUILD_DIR)/occlum-toolchains-glibc
+	cp -r toolchains/glibc $(DEB_BUILD_DIR)/occlum-toolchains-glibc/debian
+	sed -i -e 's/$$GLIBC_VERSION/$(GLIBC_VERSION)/g' $(DEB_BUILD_DIR)/occlum-toolchains-glibc/debian/changelog
 
 clean-build:
 	rm -rf $(DEB_BUILD_DIR)
