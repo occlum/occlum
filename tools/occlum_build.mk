@@ -6,7 +6,8 @@ SECURE_IMAGE_MAC := $(instance_dir)/build/mount/.ROOT_MAC
 INITFS := $(instance_dir)/initfs
 INITFS_IMAGE := $(instance_dir)/build/initfs/__ROOT/metadata
 INITFS_IMAGE_MAC := $(instance_dir)/build/initfs/.ROOT_MAC
-JSON_CONF := $(instance_dir)/Occlum.json
+YAML_CONF := $(instance_dir)/Occlum.yaml
+JSON_CONF := $(instance_dir)/.Occlum.json
 CONF_TMP_MAC := $(instance_dir)/build/tmp_mac
 
 LIBOS := $(instance_dir)/build/lib/$(libos_lib).$(occlum_version)
@@ -70,11 +71,14 @@ $(LIBOS): $(instance_dir)/build/.Occlum_sys.json.protected
 		ln -sf "libocclum-libos.so.$(major_ver)" libocclum-libos.so ; \
 		$(call get_occlum_file_mac, "$(instance_dir)/build/.Occlum_sys.json.protected", "$(CONF_TMP_MAC)") && \
 		$(call set_kss_isv_family_id, "$(instance_dir)/build/Enclave.xml", "$(CONF_TMP_MAC)") && \
-		rm -f "$(CONF_TMP_MAC)"
+		rm -f "$(CONF_TMP_MAC)" "$(JSON_CONF)"
 
 $(instance_dir)/build/.Occlum_sys.json.protected: $(instance_dir)/build/.Occlum_sys.json
 	@cd "$(instance_dir)/build" ; \
 		LD_LIBRARY_PATH="$(SGX_SDK)/sdk_libs" "$(occlum_dir)/build/bin/occlum-protect-integrity" protect .Occlum_sys.json ;
+
+$(JSON_CONF): $(YAML_CONF)
+	@yq -o=json '.' $(YAML_CONF) > $(JSON_CONF)
 
 $(instance_dir)/build/Enclave.xml:
 $(instance_dir)/build/.Occlum_sys.json: $(INITFS_IMAGE) $(INITFS_IMAGE_MAC) $(JSON_CONF) $(SECURE_IMAGE) $(SECURE_IMAGE_MAC)

@@ -35,11 +35,11 @@ if [ -f "$occlum_sgx_env" ]; then
 fi
 
 get_enclave_debuggable_flag() {
-    jq '.metadata.debuggable' $instance_dir/Occlum.json
+    yq '.metadata.debuggable' $instance_dir/Occlum.yaml
 }
 
 get_enclave_enable_kss_flag() {
-    jq '.metadata.enable_kss' $instance_dir/Occlum.json
+    yq '.metadata.enable_kss' $instance_dir/Occlum.yaml
 }
 
 exit_error() {
@@ -60,7 +60,7 @@ Usage:
 
     occlum build [--sign-key <key_path>] [--sign-tool <tool_path>] [--image-key <key_path>] [-f/--force]
         Build and sign an Occlum SGX enclave (.so) and generate its associated secure
-        FS image according to the user-provided image directory and Occlum.json config file.
+        FS image according to the user-provided image directory and Occlum.yaml config file.
         The whole building process is incremental: the building artifacts are built only
         when needed.
         To force rebuilding all artifacts, give the [-f/--force] flag.
@@ -248,8 +248,8 @@ cmd_init() {
 
     cp "$occlum_dir"/build/bin/init initfs/bin/
 
-    cp "$occlum_dir"/etc/template/Occlum.json "$instance_dir"/
-    chmod 644 "$instance_dir"/Occlum.json
+    cp "$occlum_dir"/etc/template/Occlum.yaml "$instance_dir"/
+    chmod 644 "$instance_dir"/Occlum.yaml
 
     echo "$instance_dir initialized as an Occlum instance"
 }
@@ -462,7 +462,7 @@ cmd_package() {
 
     if [[ "`get_enclave_debuggable_flag`" == "true" && "$debug" != "true" ]]; then
         echo 'Warning: current Occlum instance is configured as "debuggable".'
-        echo '(If it is not expected, you can modify the Occlum.json "metadata" - "debuggable" field to "false" and build again. And then use "occlum package")'
+        echo '(If it is not expected, you can modify the Occlum.yaml "metadata" - "debuggable" field to "false" and build again. And then use "occlum package")'
         echo 'Or, use "occlum package --debug" to support debug mode package'
         exit 1
     fi
@@ -478,7 +478,7 @@ cmd_package() {
     rm -f $package_name
 
     pkg_files="\
-    $instance_base_name/Occlum.json \
+    $instance_base_name/Occlum.yaml \
     $instance_base_name/build/bin \
     $instance_base_name/build/lib/libocclum-libos.signed.so \
     $instance_base_name/build/lib/libocclum-pal.so* \
