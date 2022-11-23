@@ -35,11 +35,21 @@ if [ -f "$occlum_sgx_env" ]; then
 fi
 
 get_enclave_debuggable_flag() {
-    yq '.metadata.debuggable' $instance_dir/Occlum.yaml
+    if [[ `grep "debuggable:" $instance_dir/Occlum.yaml` =~ "true" ]]
+    then
+        echo "true"
+    else
+        echo "false"
+    fi
 }
 
 get_enclave_enable_kss_flag() {
-    yq '.metadata.enable_kss' $instance_dir/Occlum.yaml
+    if [[ `grep "enable_kss:" $instance_dir/Occlum.yaml` =~ "true" ]]
+    then
+        echo "true"
+    else
+        echo "false"
+    fi
 }
 
 exit_error() {
