@@ -390,8 +390,10 @@ fn merge_env(env: *const *const c_char) -> Result<Vec<CString>> {
         helper: HashMap::new(),
     };
 
+    let config_env_trusted = crate::config::TRUSTED_ENVS.read().unwrap();
+
     // Use inner struct to parse env default
-    for (idx, val) in config::LIBOS_CONFIG.env.default.iter().enumerate() {
+    for (idx, val) in config_env_trusted.iter().enumerate() {
         env_default.content.push(CString::new(val.clone())?);
         let kv: Vec<&str> = val.to_str().unwrap().splitn(2, '=').collect(); // only split the first "="
         env_default.helper.insert(kv[0].to_string(), idx);

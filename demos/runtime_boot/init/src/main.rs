@@ -9,15 +9,11 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{ErrorKind, Read};
 
+use std::mem::size_of;
 use std::ffi::CString;
-use std::env;
-
 
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
-    println!("{:?}", args);
-
     // TODO: Get the rootfs key and other parameters through RA/LA or PAL
     let rootfs_key = b"c7-32-b3-ed-44-df-ec-7b-25-2d-9a-32-38-8d-58-61";
     let rootfs_upper_layer = "../gen_rootfs_instance/mnt_unionfs/upper";
@@ -53,12 +49,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         CString::new(rootfs_lower_layer).expect("CString::new failed");
     let entry_point = CString::new(rootfs_entry).expect("CString::new failed");
     let hostfs_source = CString::new("/tmp").expect("CString::new failed");
+
+    // Example envs. must end with null
+    let env1 = CString::new("TEST=1234").unwrap();
+    let env2 = CString::new("OCCLUM=NO").unwrap();
+    let env3 = CString::new("TEST2=5678").unwrap();
+    let envp = [env1.as_ptr(), env2.as_ptr(), env3.as_ptr(), std::ptr::null()];
+
     let rootfs_config: user_rootfs_config = user_rootfs_config {
+        len: size_of::<user_rootfs_config>(),
         upper_layer_path: upper_layer_path.as_ptr(),
         lower_layer_path: lower_layer_path.as_ptr(),
         entry_point: entry_point.as_ptr(),
         hostfs_source: hostfs_source.as_ptr(),
-        hostfs_target: std::ptr::null()
+        hostfs_target: std::ptr::null(),
+        envp: envp.as_ptr()
     };
 
     let ret = unsafe { syscall(
@@ -80,6 +85,8 @@ type sgx_key_128bit_t = [u8; 16];
 #[derive(Debug, Copy, Clone)]
 #[allow(non_camel_case_types)]
 struct user_rootfs_config {
+    // length of the struct
+    len: usize,
     // UnionFS type rootfs upper layer, read-write layer
     upper_layer_path: *const i8,
     // UnionFS type rootfs lower layer, read-only layer
@@ -89,6 +96,9 @@ struct user_rootfs_config {
     hostfs_source: *const i8,
     // HostFS target path, default value is "/host"
     hostfs_target: *const i8,
+    // An array of pointers to null-terminated strings
+    // and must be terminated by a null pointer
+    envp: *const *const i8,
 }
 
 fn load_key(key_path: &str) -> Result<String, Box<dyn Error>> {
