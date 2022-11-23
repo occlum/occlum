@@ -22,6 +22,12 @@ lazy_static! {
     };
 }
 
+// Envs merged from default envs and possible envs passed by syscall do_mount_rootfs
+lazy_static! {
+    pub static ref TRUSTED_ENVS: RwLock<Vec<CString>> =
+        RwLock::new(LIBOS_CONFIG.env.default.clone());
+}
+
 pub fn load_config(config_path: &str, expected_mac: &sgx_aes_gcm_128bit_tag_t) -> Result<Config> {
     let mut config_file = {
         let config_file = SgxFile::open_integrity_only(config_path).map_err(|e| errno!(e))?;

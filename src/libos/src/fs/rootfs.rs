@@ -4,6 +4,7 @@ use super::procfs::ProcFS;
 use super::sefs::{SgxStorage, SgxUuidProvider};
 use super::*;
 use config::{ConfigApp, ConfigMountFsType};
+use std::mem::size_of;
 use std::path::{Path, PathBuf};
 use std::untrusted::path::PathEx;
 
@@ -270,11 +271,20 @@ fn open_or_create_sefs_according_to(
 #[derive(Debug, Copy, Clone)]
 #[allow(non_camel_case_types)]
 pub struct user_rootfs_config {
+    // length of the struct
+    len: usize,
+    // UnionFS type rootfs upper layer, read-write layer
     upper_layer_path: *const i8,
+    // UnionFS type rootfs lower layer, read-only layer
     lower_layer_path: *const i8,
     entry_point: *const i8,
+    // HostFS source path
     hostfs_source: *const i8,
+    // HostFS target path, default value is "/host"
     hostfs_target: *const i8,
+    // An array of pointers to null-terminated strings
+    // and must be terminated by a null pointer
+    envp: *const *const i8,
 }
 
 impl user_rootfs_config {
@@ -298,7 +308,45 @@ fn to_option_pathbuf(path: *const i8) -> Result<Option<PathBuf>> {
     Ok(path)
 }
 
+fn combine_trusted_envs(envp: *const *const i8) -> Result<()> {
+    let mut user_envs = from_user::clone_cstrings_safely(envp)?;
+    trace!("User envs: {:?}", user_envs);
+    let env_key: Vec<&str> = user_envs
+        .iter()
+        .map(|x| {
+            let kv: Vec<&str> = x.to_str().unwrap().splitn(2, '=').collect();
+            kv[0]
+        })
+        .collect();
+
+    let mut merged = config::TRUSTED_ENVS.write().unwrap();
+    // First clear the default envs then do the merge again
+    merged.clear();
+    merged.extend_from_slice(&user_envs);
+
+    for (_idx, val) in config::LIBOS_CONFIG.env.default.iter().enumerate() {
+        let kv: Vec<&str> = val.to_str().unwrap().splitn(2, '=').collect(); // only split the first "="
+        info!("kv: {:?}", kv);
+        if !env_key.contains(&kv[0]) {
+            unsafe { merged.push(val.clone()) };
+        }
+    }
+
+    // trace!("Combined trusted envs: {:?}", merged);
+    Ok(())
+}
+
 pub fn gen_config_app(config: &user_rootfs_config) -> Result<ConfigApp> {
+    // Check config struct length for future possible extension
+    if config.len != size_of::<user_rootfs_config>() {
+        return_errno!(EINVAL, "User Config Struct length not match");
+    }
+
+    // Combine the default envs and user envs if necessary
+    if !config.envp.is_null() {
+        combine_trusted_envs(config.envp)?;
+    }
+
     let upper_layer = to_option_pathbuf(config.upper_layer_path)?;
     let lower_layer = to_option_pathbuf(config.lower_layer_path)?;
     let entry_point = to_option_pathbuf(config.entry_point)?;

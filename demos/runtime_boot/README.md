@@ -25,6 +25,8 @@ The second parameter `rootfs_config` needs to be set as NULL.
 But for runtime booting pre-generated UnionFS image, The first parameter `key_ptr` is must to have, the second parameter `rootfs_config` needs have valid members.
 ```
 struct user_rootfs_config {
+    // length of the struct
+    len: usize,
     // UnionFS type rootfs upper layer, read-write layer
     upper_layer_path: *const i8,
     // UnionFS type rootfs lower layer, read-only layer
@@ -34,10 +36,17 @@ struct user_rootfs_config {
     hostfs_source: *const i8,
     // HostFS target path, default value is "/host"
     hostfs_target: *const i8,
+    // An array of pointers to null-terminated strings
+    // and must be terminated by a null pointer
+    envp: *const *const i8,
 }
 ```
 
 In this demo, parameters values are provided as below.
+
+* **len**
+The length of the struct which should be the value of `size_of(user_rootfs_config)`.
+It is helpful for possible future extension.
 
 * **rootfs_key**
 The key to encrypt/decrypt the rootfs, here it is `"c7-32-b3-ed-44-df-ec-7b-25-2d-9a-32-38-8d-58-61".
@@ -53,6 +62,10 @@ The entry point of the rootfs. In his case, it is `"/bin"`.
 
 * **hostfs_source**
 It is set to be `/tmp` in this case.
+
+* **envp**
+An array of pointers to null-terminated strings and must be terminated by a null pointer.
+For example, set it to the address of ["TEST=1234", "TEST2=4567", NULL].
 
 In this example customized init, the above parameters are declared in the source [`main.rs`](./init/src/main.rs). In real case, they could be acquired by LA/RA or by modifying the PAL api `pal_run_init_process`.
 
@@ -71,5 +84,7 @@ After running the script, runtime boot BASH could be done as below even if the d
 # occlum run /bin/occlum_bash_test.sh
 ```
 
-
-
+Also, the runtime environment passed by **envp** could be verified by
+```
+# occlum run /bin/busybox env
+```
