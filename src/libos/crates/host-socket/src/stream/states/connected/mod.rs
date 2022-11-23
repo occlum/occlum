@@ -43,22 +43,36 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
     }
 
     pub fn shutdown(&self, how: Shutdown) -> Result<()> {
-        if how.should_shut_read() {
-            // Ignore the pending buffer and on-going request will return 0.
-            self.common.host_shutdown(Shutdown::Read)?;
+        // Do host shutdown
+        // For shutdown write, don't call host_shutdown until the content in the pending buffer is sent.
+        // For shutdown read, ignore the pending buffer.
+        let (shut_write, send_buf_is_empty, shut_read) = (
+            how.should_shut_write(),
+            self.sender.is_empty(),
+            how.should_shut_read(),
+        );
+        match (shut_write, send_buf_is_empty, shut_read) {
+            // As long as send buf is empty, just shutdown.
+            (_, true, _) => self.common.host_shutdown(how)?,
+            // If not shutdown write, just shutdown.
+            (false, _, _) => self.common.host_shutdown(how)?,
+            // If shutdown both but the send buf is not empty, only shutdown read.
+            (true, false, true) => self.common.host_shutdown(Shutdown::Read)?,
+            // If shutdown write but the send buf is not empty, don't do shutdown.
+            (true, false, false) => {}
+        }
+
+        // Set internal state and trigger events.
+        if shut_read {
             self.receiver.shutdown();
             self.common.pollee().add_events(Events::IN);
         }
-        if how.should_shut_write() {
-            // Don't call host_shutdown until the content in the pending buffer is sent.
-            if self.sender.is_empty() {
-                self.common.host_shutdown(Shutdown::Write)?;
-            }
+        if shut_write {
             self.sender.shutdown();
             self.common.pollee().add_events(Events::OUT);
         }
 
-        if how == Shutdown::Both {
+        if shut_read && shut_write {
             self.common.pollee().add_events(Events::HUP);
         }
 
