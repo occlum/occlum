@@ -56,12 +56,12 @@ usage: build.sh [OPTION]...
 
 For example, below command generates three container images.
 ```
-# ./build.sh -r demo -g 0.29.1
+# ./build.sh -r demo -g 0.29.2
 ```
 
-* **`demo/init_ra_server:0.29.1`** acts as key broker pod.
-* **`demo/tf_demo:0.29.1`** acts as tensorflow serving pod.
-* **`demo/tf_demo_client:0.29.1`** acts as client.
+* **`demo/init_ra_server:0.29.2`** acts as key broker pod.
+* **`demo/tf_demo:0.29.2`** acts as tensorflow serving pod.
+* **`demo/tf_demo_client:0.29.2`** acts as client.
 
 ## How to test
 
@@ -110,7 +110,7 @@ In default, only one replica for the tensorflow serving pod.
 ### Try the inference request
 
 ```
-$ docker run --rm --network host demo/tf_demo_client:0.29.1 python3 inception_client.py --server=localhost:31001 --crt server.crt --image cat.jpg
+$ docker run --rm --network host demo/tf_demo_client:0.29.2 python3 inception_client.py --server=localhost:31001 --crt server.crt --image cat.jpg
 ```
 
 If successful, it prints the classification results.
@@ -120,7 +120,7 @@ If successful, it prints the classification results.
 Below command can do benchmark test for the tensorflow serving service running in Occlum.
 
 ```
-$ docker run --rm --network host demo/tf_demo_client:0.29.1 python3 benchmark.py --server localhost:31001 --crt server.crt --cnum 4 --loop 10 --image cat.jpg
+$ docker run --rm --network host demo/tf_demo_client:0.29.2 python3 benchmark.py --server localhost:31001 --crt server.crt --cnum 4 --loop 10 --image cat.jpg
 ```
 
 Try scale up the tensorflow serving pods number, better `tps` can be achieved.
