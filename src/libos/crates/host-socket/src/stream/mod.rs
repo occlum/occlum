@@ -8,7 +8,8 @@ use crate::runtime::Runtime;
 use crate::sockopt::*;
 
 use async_io::socket::{
-    timeout_to_timeval, GetRecvTimeoutCmd, GetSendTimeoutCmd, SetRecvTimeoutCmd, SetSendTimeoutCmd,
+    timeout_to_timeval, GetRecvTimeoutCmd, GetSendTimeoutCmd, MsgFlags, SetRecvTimeoutCmd,
+    SetSendTimeoutCmd,
 };
 
 pub struct StreamSocket<A: Addr + 'static, R: Runtime> {
@@ -201,7 +202,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-        let ret = self.recvmsg(bufs, RecvFlags::empty(), None).await?;
+        let ret = self.recvmsg(bufs, RecvFlags::empty()).await?;
         Ok(ret.0)
     }
 
@@ -214,8 +215,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         &self,
         buf: &mut [&mut [u8]],
         flags: RecvFlags,
-        control: Option<&mut [u8]>,
-    ) -> Result<(usize, Option<A>)> {
+    ) -> Result<(usize, Option<A>, Option<MsgFlags>)> {
         let connected_stream = {
             let mut state = self.state.write().unwrap();
             match &*state {
@@ -237,7 +237,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         };
 
         let recv_len = connected_stream.recvmsg(buf, flags).await?;
-        Ok((recv_len, None))
+        Ok((recv_len, None, None))
     }
 
     pub async fn write(&self, buf: &[u8]) -> Result<usize> {

@@ -4,7 +4,7 @@ use super::*;
 use async_io::event::{Events, Observer, Poller};
 use async_io::file::StatusFlags;
 use async_io::ioctl::IoctlCmd;
-use async_io::socket::{SetRecvTimeoutCmd, SetSendTimeoutCmd, Shutdown, Timeout};
+use async_io::socket::{MsgFlags, SetRecvTimeoutCmd, SetSendTimeoutCmd, Shutdown, Timeout};
 use async_io::util::channel::Channel;
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -36,7 +36,7 @@ impl Stream {
     }
 
     pub async fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-        self.recvmsg(bufs, RecvFlags::empty(), None)
+        self.recvmsg(bufs, RecvFlags::empty())
             .await
             .map(|ret| ret.0)
     }
@@ -49,8 +49,7 @@ impl Stream {
         &self,
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
-        control: Option<&mut [u8]>,
-    ) -> Result<(usize, Option<UnixAddr>)> {
+    ) -> Result<(usize, Option<UnixAddr>, Option<MsgFlags>)> {
         let addr = {
             let trusted_addr = self.peer_addr().ok();
             debug!("recvfrom {:?}", trusted_addr);
@@ -75,7 +74,7 @@ impl Stream {
         };
         let data_len = connected_stream.readv(bufs).await?;
 
-        Ok((data_len, addr))
+        Ok((data_len, addr, None))
     }
 
     pub async fn write(&self, buf: &[u8]) -> Result<usize> {

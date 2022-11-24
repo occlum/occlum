@@ -1,3 +1,5 @@
+use async_io::socket::MsgFlags;
+
 use super::*;
 
 pub struct DatagramSocket<A: Addr + 'static, R: Runtime> {
@@ -215,7 +217,7 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
         control: Option<&mut [u8]>,
-    ) -> Result<(usize, Option<A>, i32, usize)> {
+    ) -> Result<(usize, Option<A>, Option<MsgFlags>, usize)> {
         self.receiver.recvmsg(bufs, flags, control).await
     }
 
@@ -239,20 +241,16 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
             return_errno!(EDESTADDRREQ, "Destination address required");
         }
 
-        let res = if addr.is_some() {
-            drop(state);
-            self.sender
-                .sendmsg(bufs, addr.unwrap(), flags, control)
-                .await
+        drop(state);
+        let res = if let Some(addr) = addr {
+            self.sender.sendmsg(bufs, addr, flags, control).await
         } else {
             let peer = self.common.peer_addr();
-            if peer.is_none() {
+            if let Some(peer) = peer.as_ref() {
+                self.sender.sendmsg(bufs, peer, flags, control).await
+            } else {
                 return_errno!(EDESTADDRREQ, "Destination address required");
             }
-            drop(state);
-            self.sender
-                .sendmsg(bufs, &peer.unwrap(), flags, control)
-                .await
         };
 
         let mut state = self.state.write().unwrap();

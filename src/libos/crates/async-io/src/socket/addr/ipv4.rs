@@ -20,10 +20,10 @@ impl Addr for Ipv4SocketAddr {
         if c_addr_len > std::mem::size_of::<libc::sockaddr_storage>() {
             return_errno!(EINVAL, "address length is too large");
         }
-        // TODO: Use addr length more specifically.
-        // The hard code value of 16 is the length of IN_ADDR_ANY.
+
+        // The c_addr_len is certainly not smaller than the length of IN_ADDR_ANY.
         // https://en.wikipedia.org/wiki/IPv4
-        if c_addr_len < 16 {
+        if c_addr_len < std::mem::size_of::<libc::sockaddr_in>() {
             return_errno!(EINVAL, "address length is too small");
         }
         // Safe to convert from sockaddr_storage to sockaddr_in
@@ -85,11 +85,6 @@ impl Ipv4SocketAddr {
     pub fn set_port(&mut self, new_port: u16) {
         self.port = new_port;
     }
-
-    // pub fn is_default(&self) -> bool {
-    //     let inaddr_any = Self::default();
-    //     *self == inaddr_any
-    // }
 }
 
 impl Default for Ipv4SocketAddr {

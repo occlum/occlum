@@ -1,4 +1,5 @@
 use super::*;
+use async_io::socket::MsgFlags;
 use async_io::socket::{NetlinkFamily, Type};
 use byteorder::{ByteOrder, NativeEndian};
 use core::ops::{Range, RangeFrom};
@@ -102,7 +103,7 @@ impl<A: Addr, R: Runtime> NetlinkSocket<A, R> {
         &self,
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
-    ) -> Result<(usize, Option<A>, i32, usize)> {
+    ) -> Result<(usize, Option<A>, Option<MsgFlags>, usize)> {
         self.receiver.recvmsg(bufs, flags, None).await
     }
 
@@ -124,7 +125,12 @@ impl<A: Addr, R: Runtime> NetlinkSocket<A, R> {
             self.sender.sendmsg(bufs, addr.unwrap(), flags, None).await
         } else {
             let peer = self.common.peer_addr();
-            // Need to check peer addr.
+            if peer.is_none() {
+                return_errno!(
+                    ENOTCONN,
+                    "The socket is not connected, and no target has been given"
+                )
+            }
             self.sender.sendmsg(bufs, &peer.unwrap(), flags, None).await
         };
 

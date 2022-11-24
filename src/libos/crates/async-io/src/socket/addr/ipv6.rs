@@ -25,10 +25,8 @@ impl Addr for Ipv6SocketAddr {
         if c_addr_len > std::mem::size_of::<libc::sockaddr_storage>() {
             return_errno!(EINVAL, "address length is too large");
         }
-        // TODO: Use addr length more specifically.
-        // The hard code value of 16 is the length of IN_ADDR_ANY.
-        // https://en.wikipedia.org/wiki/IPv6
-        if c_addr_len < 16 {
+
+        if c_addr_len < std::mem::size_of::<sockaddr_in6>() {
             return_errno!(EINVAL, "address length is too small");
         }
         // Safe to convert from sockaddr_storage to sockaddr_in
@@ -101,11 +99,6 @@ impl Ipv6SocketAddr {
     pub fn set_port(&mut self, new_port: u16) {
         self.port = new_port;
     }
-
-    // pub fn is_default(&self) -> bool {
-    //     let in6addr_any_init = Self::default();
-    //     *self == in6addr_any_init
-    // }
 }
 
 impl Default for Ipv6SocketAddr {

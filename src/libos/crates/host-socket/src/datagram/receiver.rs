@@ -1,6 +1,6 @@
-use core::ptr::null_mut;
 use std::mem::MaybeUninit;
 
+use async_io::socket::MsgFlags;
 use io_uring_callback::{Fd, IoHandle};
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
@@ -8,7 +8,6 @@ use super::netlink::NetlinkMsg;
 use crate::common::Common;
 use crate::prelude::*;
 use crate::runtime::Runtime;
-use core::ffi::c_void;
 
 pub struct Receiver<A: Addr + 'static, R: Runtime> {
     common: Arc<Common<A, R>>,
@@ -26,10 +25,11 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
         mut control: Option<&mut [u8]>,
-    ) -> Result<(usize, Option<A>, i32, usize)> {
+    ) -> Result<(usize, Option<A>, Option<MsgFlags>, usize)> {
         let mask = Events::IN;
         // Initialize the poller only when needed
         let mut poller = None;
+        let mut timeout = self.common.recv_timeout();
         loop {
             // Attempt to recv
             let res = self.try_recvmsg(bufs, flags, &mut control);
@@ -38,6 +38,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
             }
 
             // Need more handles for flags not MSG_DONTWAIT
+            // recv*(MSG_ERRQUEUE) never blocks, even without MSG_DONTWAIT
             if self.common.nonblocking()
                 || flags.contains(RecvFlags::MSG_DONTWAIT)
                 || flags.contains(RecvFlags::MSG_ERRQUEUE)
@@ -56,7 +57,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
                 let ret = poller
                     .as_ref()
                     .unwrap()
-                    .wait_timeout(self.common.recv_timeout().as_mut())
+                    .wait_timeout(timeout.as_mut())
                     .await;
                 if let Err(e) = ret {
                     warn!("recv wait errno = {:?}", e.errno());
@@ -78,7 +79,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
         control: &mut Option<&mut [u8]>,
-    ) -> Result<(usize, Option<A>, i32, usize)> {
+    ) -> Result<(usize, Option<A>, Option<MsgFlags>, usize)> {
         let mut inner = self.inner.lock().unwrap();
 
         if !flags.is_empty() && flags.contains(RecvFlags::MSG_OOB | RecvFlags::MSG_CMSG_CLOEXEC) {
@@ -99,23 +100,27 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
                     self.do_recv(&mut inner);
                 }
 
-                return Ok((recv_bytes, recv_addr, 0, 0));
+                return Ok((recv_bytes, recv_addr, None, 0));
             }
         } else {
             let copied_bytes = inner.try_copy_buf(bufs);
             if let Some(copied_bytes) = copied_bytes {
                 let recv_addr = inner.get_packet_addr();
+                let mut msg_flags = MsgFlags::empty();
                 // Copy ancillary data from control buffer
                 let msg_controllen = inner.req.msg.msg_controllen;
                 if msg_controllen > super::OPTMEM_MAX {
                     return_errno!(EINVAL, "invalid msg control length");
                 }
-                let control_buf_len = if control.is_some() {
-                    control.as_ref().unwrap().len()
+                let control_buf_len = if let Some(control) = control {
+                    control.len()
                 } else {
                     0
                 };
-                assert!(msg_controllen >= control_buf_len);
+
+                if control_buf_len < msg_controllen {
+                    msg_flags = msg_flags | MsgFlags::MSG_CTRUNC
+                }
 
                 if msg_controllen > 0 {
                     control
@@ -124,25 +129,32 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
                 }
 
                 let bufs_len: usize = bufs.iter().map(|buf| buf.len()).sum();
-                let msg_flags = if bufs_len < inner.recv_len().unwrap() {
+
+                // If user provided buffer length is smaller than kernel received datagram length,
+                // discard the datagram and set MsgFlags::MSG_TRUNC in returned msg_flags.
+                if bufs_len < inner.recv_len().unwrap() {
                     // update msg.msg_flags to MSG_TRUNC
-                    RecvFlags::MSG_TRUNC.bits()
-                } else {
-                    0
+                    msg_flags = msg_flags | MsgFlags::MSG_TRUNC
                 };
 
+                // If user provided flags contain MSG_TRUNC, the return received length should be
+                // kernel receiver buffer length, vice versa should return truly copied bytes length.
                 let recv_bytes = if flags.contains(RecvFlags::MSG_TRUNC) {
                     inner.recv_len().unwrap()
                 } else {
                     copied_bytes
                 };
-                // When flags contain MSG_PEEK and there is data in socket recv buffer, it is unnecessary to
-                // send blocking recv request (do_recv) to fetch data from iouring buffer, which may flush the data in recv buffer.
-                // When flags don't contain MSG_PEEK or there is no available data, it is time to send blocking request to iouring for notifying events.
+
+                // When flags contain MSG_PEEK and there is data in socket recv buffer,
+                // it is unnecessary to send blocking recv request (do_recv) to fetch data
+                // from iouring buffer, which may flush the data in recv buffer.
+                // When flags don't contain MSG_PEEK or there is no available data,
+                // it is time to send blocking request to iouring for notifying events.
                 if !flags.contains(RecvFlags::MSG_PEEK) {
                     self.do_recv(&mut inner);
                 }
 
+                let msg_flags = Some(msg_flags);
                 return Ok((recv_bytes, recv_addr, msg_flags, msg_controllen));
             }
         }
@@ -159,7 +171,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
             {
                 return_errno!(Errno::EWOULDBLOCK, "the socket recv has been shutdown");
             } else {
-                return Ok((0, None, flags.bits(), 0));
+                return Ok((0, None, None, 0));
             }
         }
 
@@ -256,7 +268,9 @@ struct Inner {
     // Datagram sockets in various domains permit zero-length datagrams.
     // Hence the recv_len might be 0.
     recv_len: Option<usize>,
-    recv_buf_offset: usize, // When the recv_buf content length is greater than user buffer, store the offset for the recv_buf for read loop
+    // When the recv_buf content length is greater than user buffer,
+    // store the offset for the recv_buf for read loop
+    recv_buf_offset: usize,
     msg_control: UntrustedBox<[u8]>,
     req: UntrustedBox<RecvReq>,
     io_handle: Option<IoHandle>,
@@ -294,8 +308,7 @@ impl Inner {
         msg.msg_name = &raw mut self.req.addr as _;
         msg.msg_namelen = std::mem::size_of::<libc::sockaddr_storage>() as _;
 
-        self.req.control = self.msg_control.as_mut_ptr() as _;
-        msg.msg_control = self.req.control as _;
+        msg.msg_control = self.msg_control.as_mut_ptr() as _;
         msg.msg_controllen = self.msg_control.len() as _;
 
         self.req.msg = msg;
@@ -410,7 +423,6 @@ struct RecvReq {
     msg: libc::msghdr,
     iovec: libc::iovec,
     addr: libc::sockaddr_storage,
-    control: *mut c_void,
 }
 
 unsafe impl MaybeUntrusted for RecvReq {}

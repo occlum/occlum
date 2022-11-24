@@ -309,7 +309,11 @@ pub async fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut libc::msghdr, flags: c_int)
     }
 
     // update msghdr
-    msg.msg_flags = msg_flags;
+    msg.msg_flags = if let Some(msg_flags) = msg_flags {
+        msg_flags.bits()
+    } else {
+        0
+    };
     msg.msg_controllen = msg_controllen;
     if msg_controllen == 0 {
         msg.msg_control = ptr::null_mut();
@@ -785,9 +789,16 @@ fn extract_msghdr_mut_from_user<'a>(
     let bufs = if msg_iov.is_null() {
         Vec::new()
     } else {
+        info!("error before make iovs");
         let iovs = from_user::make_mut_slice(msg_iov, msg_iovlen)?;
+        info!("error after make iovs");
         let mut bufs = Vec::with_capacity(msg_iovlen);
         for iov in iovs {
+            // In some situation using MSG_ERRQUEUE, users just require control buffers,
+            // they may left iovec buffer all zero. It works in Linux.
+            if iov.iov_base.is_null() {
+                break;
+            }
             let buf = from_user::make_mut_slice(iov.iov_base as *mut u8, iov.iov_len)?;
             bufs.push(buf);
         }

@@ -1,4 +1,3 @@
-use core::ops::Deref;
 use core::sync::atomic::{AtomicBool, Ordering};
 use std::ptr::{self};
 
@@ -119,12 +118,6 @@ fn new_send_req<A: Addr>(
 
     let (c_addr_storage, c_addr_len) = addr.to_c_storage();
 
-    // let (c_addr_storage, c_addr_len) = if let Some(addr) = addr {
-    //     addr.to_c_storage()
-    // } else {
-    //     let storage: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
-    //     (storage, 0)
-    // };
     req.addr = c_addr_storage;
     req.msg.msg_name = &raw mut req.addr as _;
     req.msg.msg_namelen = c_addr_len as _;

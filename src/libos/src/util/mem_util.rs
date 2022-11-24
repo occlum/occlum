@@ -27,12 +27,6 @@ pub mod from_user {
 
     /// Check the readonly array is within the readable memory of the user process
     pub fn check_array<T>(user_buf: *const T, count: usize) -> Result<()> {
-        // If user_buf pointer is null and count is zero, it is ok.
-        if user_buf.is_null() && count == 0 {
-            debug!("the user buf pointer is NULL and count is zero");
-            return Ok(());
-        }
-
         let checked_len = count
             .checked_mul(size_of::<T>())
             .ok_or_else(|| errno!(EINVAL, "the array is too long"))?;
