@@ -6,7 +6,7 @@ use core::ops::{Range, RangeFrom};
 
 pub struct NetlinkSocket<A: Addr + 'static, R: Runtime> {
     common: Arc<Common<A, R>>,
-    sender: Sender<A, R>,
+    sender: Arc<Sender<A, R>>,
     receiver: Arc<Receiver<A, R>>,
 }
 

@@ -5,7 +5,7 @@ use super::*;
 pub struct DatagramSocket<A: Addr + 'static, R: Runtime> {
     common: Arc<Common<A, R>>,
     state: RwLock<State>,
-    sender: Sender<A, R>,
+    sender: Arc<Sender<A, R>>,
     receiver: Arc<Receiver<A, R>>,
 }
 
