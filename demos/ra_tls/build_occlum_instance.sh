@@ -13,7 +13,7 @@ function get_mr() {
 function build_instance() {
     # 1. Init Occlum Workspace
     rm -rf occlum_$postfix
-    mkdir occlum_$postfixy
+    mkdir occlum_$postfix
     pushd occlum_$postfix
     occlum init
     yq '.resource_limits.user_space_size = "500MB" |
