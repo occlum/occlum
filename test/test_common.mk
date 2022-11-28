@@ -10,6 +10,9 @@ TEST_NAME := $(shell basename $(CUR_DIR))
 IMAGE_DIR := $(BUILD_DIR)/test/image
 BIN := $(IMAGE_DIR)/bin/$(TEST_NAME)
 
+# Occlum bin path
+OCCLUM_BIN_PATH ?= $(BUILD_DIR)/bin
+
 C_SRCS := $(wildcard *.c)
 C_OBJS := $(addprefix $(BUILD_DIR)/test/obj/$(TEST_NAME)/,$(C_SRCS:%.c=%.o))
 CXX_SRCS := $(wildcard *.cc)
@@ -72,7 +75,7 @@ $(BUILD_DIR)/test/obj/$(TEST_NAME)/%.o: %.cc
 
 test:
 	@cd $(BUILD_DIR)/test && \
-		$(EXTRA_ENV) $(BUILD_DIR)/bin/occlum exec /bin/$(TEST_NAME) $(BIN_ARGS)
+		$(EXTRA_ENV) $(OCCLUM_BIN_PATH)/occlum exec /bin/$(TEST_NAME) $(BIN_ARGS)
 
 test-native:
 	@LD_LIBRARY_PATH=/usr/local/occlum/lib cd $(IMAGE_DIR) && ./bin/$(TEST_NAME) $(BIN_ARGS)
