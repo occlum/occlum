@@ -1,14 +1,14 @@
 #![cfg_attr(feature = "sgx", no_std)]
 
 #[cfg(feature = "sgx")]
-extern crate sgx_types;
+extern crate sgx_libc as libc;
 #[cfg(feature = "sgx")]
-#[macro_use]
+//#[macro_use]
 extern crate sgx_tstd as std;
 #[cfg(feature = "sgx")]
-extern crate sgx_libc as libc;
+extern crate sgx_types;
 
-#[macro_use]
+//#[macro_use]
 extern crate log;
 
 use crate::prelude::*;

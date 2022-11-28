@@ -129,7 +129,7 @@ pub struct DiskDirEntry {
     /// file name
     pub name: Str256,
     /// file type
-    pub type_: FileType,
+    pub type_: u32,
 }
 
 /// File type
@@ -141,6 +141,15 @@ pub enum FileType {
     SymLink = 3,
     CharDevice = 4,
     BlockDevice = 5,
+}
+
+impl From<u32> for FileType {
+    fn from(t: u32) -> Self {
+        if t < Self::File as u32 || t > Self::BlockDevice as u32 {
+            panic!("invalid type");
+        }
+        unsafe { core::mem::transmute(t) }
+    }
 }
 
 impl From<FileType> for VfsFileType {

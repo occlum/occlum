@@ -500,7 +500,7 @@ impl AsyncInode for Inode {
             .append_direntry(&DiskDirEntry {
                 id: inode.inner.read().await.id as u32,
                 name: Str256::from(name),
-                type_: type_.into(),
+                type_: FileType::from(type_) as u32,
             })
             .await
         {
@@ -558,7 +558,7 @@ impl AsyncInode for Inode {
             .append_direntry(&DiskDirEntry {
                 id: other_inner_mut.id as u32,
                 name: Str256::from(name),
-                type_: other_inner_mut.disk_inode.type_,
+                type_: other_inner_mut.disk_inode.type_ as u32,
             })
             .await?;
         other_inner_mut.inc_nlinks();
@@ -704,7 +704,7 @@ impl AsyncInode for Inode {
                         &DiskDirEntry {
                             id: inode_id as u32,
                             name: Str256::from(new_name),
-                            type_: inode_type,
+                            type_: inode_type as u32,
                         },
                     )
                     .await;
@@ -726,7 +726,7 @@ impl AsyncInode for Inode {
                         &DiskDirEntry {
                             id: inode_id as u32,
                             name: Str256::from(new_name),
-                            type_: inode_type,
+                            type_: inode_type as u32,
                         },
                     )
                     .await;
@@ -774,7 +774,7 @@ impl AsyncInode for Inode {
                         &DiskDirEntry {
                             id: inode_id as u32,
                             name: Str256::from(new_name),
-                            type_: inode_type,
+                            type_: inode_type as u32,
                         },
                     )
                     .await;
@@ -797,7 +797,7 @@ impl AsyncInode for Inode {
                     .append_direntry(&DiskDirEntry {
                         id: inode_id as u32,
                         name: Str256::from(new_name),
-                        type_: inode_type,
+                        type_: inode_type as u32,
                     })
                     .await?;
                 self_inner_mut.remove_direntry(entry_id).await?;
@@ -850,7 +850,7 @@ impl AsyncInode for Inode {
             let written_len = match ctx.write_entry(
                 entry.name.as_ref(),
                 entry.id as u64,
-                VfsFileType::from(entry.type_),
+                VfsFileType::from(FileType::from(entry.type_)),
             ) {
                 Ok(written_len) => written_len,
                 Err(_) => {
@@ -1051,7 +1051,7 @@ impl InodeInner {
         for i in 0..self.disk_inode.size as usize / DIRENT_SIZE {
             let entry = self.read_direntry(i).await.unwrap();
             if entry.name.as_ref() == name {
-                return Some((entry.id as InodeId, entry.type_, i));
+                return Some((entry.id as InodeId, entry.type_.into(), i));
             }
         }
         None
@@ -1074,7 +1074,7 @@ impl InodeInner {
             &DiskDirEntry {
                 id: self.id as u32,
                 name: Str256::from("."),
-                type_: FileType::Dir,
+                type_: FileType::Dir as u32,
             },
         )
         .await;
@@ -1083,7 +1083,7 @@ impl InodeInner {
             &DiskDirEntry {
                 id: parent as u32,
                 name: Str256::from(".."),
-                type_: FileType::Dir,
+                type_: FileType::Dir as u32,
             },
         )
         .await;

@@ -83,7 +83,7 @@ pub trait File: Debug + Sync + Send {
         Default::default()
     }
 
-    fn seek(&self, pos: SeekFrom) -> Result<usize> {
+    fn seek(&self, _pos: SeekFrom) -> Result<usize> {
         return_errno!(ENOSYS, "not support seeking");
     }
 }
