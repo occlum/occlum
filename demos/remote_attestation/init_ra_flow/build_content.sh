@@ -51,7 +51,6 @@ function build_client_instance()
 
     yq '.resource_limits.user_space_size = "600MB" |
         .resource_limits.kernel_space_heap_size = "128MB" |
-        .resource_limits.max_num_of_threads = 32 |
         .metadata.debuggable = false |
         .metadata.enable_kss = true |
         .metadata.version_number = 88 |
