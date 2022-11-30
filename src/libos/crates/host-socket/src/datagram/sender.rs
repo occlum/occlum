@@ -1,4 +1,3 @@
-use std::mem::MaybeUninit;
 use std::ptr::{self};
 
 use io_uring_callback::{Fd, IoHandle};

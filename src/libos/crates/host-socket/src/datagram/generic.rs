@@ -119,14 +119,7 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
         // !state.is_connected() and peer_addr.is_none() are true.
 
         if let Some(peer) = peer_addr {
-            // We don't do connect syscall (or send connect io-uring requests) actually,
-            // We emulate the connect behavior by recording the peer address and applying
-            // the peer address during sendmsg and recvmsg.
-            //
-            // The advantage of emulation is avoiding to design a intermediate state (connecting)
-            // and avoiding to deal with some complex case. e.g, If we do connect actually,
-            // disconnect or connect to new address might affect the ongoing async recv request,
-            // which might increase the design complexity.
+            do_connect(self.host_fd(), Some(peer))?;
 
             self.receiver.reset_shutdown();
             self.sender.reset_shutdown();
@@ -137,7 +130,6 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
             } else {
                 state.mark_connected();
             }
-            do_connect(self.host_fd(), Some(peer))?;
             if !state.is_bound() {
                 state.mark_implicit_bind();
                 // Start async recv after explicit binding or implicit binding
@@ -151,10 +143,10 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
         // will assign a address to the socket.
         // In both cases, we should update the binding address that we stored.
         } else {
+            do_connect::<A>(self.host_fd(), None)?;
+
             self.common.reset_peer_addr();
             state.mark_disconnected();
-
-            do_connect::<A>(self.host_fd(), None)?;
 
             // TODO: clear binding in some cases.
             // Disconnect will effect the binding address. In Linux, for socket that
