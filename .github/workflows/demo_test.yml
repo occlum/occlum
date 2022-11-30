@@ -653,13 +653,13 @@ jobs:
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Run sysbench download and build
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/sysbench && SGX_MODE=SIM ./dl_and_build.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/sysbench && SGX_MODE=SIM ./dl_and_build.sh"
 
     - name: Run prepare sysbench occlum instance
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/sysbench && SGX_MODE=SIM ./prepare_sysbench.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/sysbench && SGX_MODE=SIM ./prepare_sysbench.sh"
 
     - name: Run sysbench threads benchmark
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/sysbench/occlum_instance;
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/sysbench/occlum_instance;
             occlum run /bin/sysbench threads --threads=200 --thread-yields=100 --thread-locks=4 --time=30 run"
 
   Gvisor_syscalls_test:
@@ -735,16 +735,16 @@ jobs:
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Build iperf2
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/iperf2; SGX_MODE=SIM ./build.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/iperf2; SGX_MODE=SIM ./build.sh"
 
     - name: Start iperf2 server
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/iperf2/occlum_server;
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/iperf2/occlum_server;
             occlum run /bin/iperf -s -p 6888 &"
 
     - name: Start iperf2 client
       run: |
         sleep ${{ 5 }};
-        docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/iperf2/occlum_client;
+        docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/iperf2/occlum_client;
             occlum run /bin/iperf -c 127.0.0.1 -p 6888 -P 16"
 
   Linux_LTP_test:
@@ -782,7 +782,7 @@ jobs:
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Build fio dependencies
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/fio && ./download_and_build_fio.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/fio && ./download_and_build_fio.sh"
 
     - name: Run fio test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/fio && SGX_MODE=SIM ./run_fio_on_occlum.sh fio-seq-read.fio"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/fio && SGX_MODE=SIM ./run_fio_on_occlum.sh fio-seq-read.fio"

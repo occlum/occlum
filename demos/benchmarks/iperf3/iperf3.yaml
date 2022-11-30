@@ -1,0 +1,13 @@
+includes:
+  - base.yaml
+# bash
+targets:
+  # copy iperf
+  - target: /bin
+    copy:
+      - files:
+        - ${IPERF3_INSTALL_DIR}/bin/iperf3
+  - target: /opt/occlum/glibc/lib
+    copy:
+      - files:
+          - ${IPERF3_INSTALL_DIR}/lib/libiperf.so.0
