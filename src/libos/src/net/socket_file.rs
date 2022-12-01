@@ -621,6 +621,8 @@ impl SocketFile {
         match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => ipv4_stream.close().await,
             AnySocket::Ipv6Stream(ipv6_stream) => ipv6_stream.close().await,
+            AnySocket::Ipv4Datagram(ipv4_datagram) => ipv4_datagram.close(),
+            AnySocket::Ipv6Datagram(ipv6_datagram) => ipv6_datagram.close(),
             _ => Ok(()),
         }
     }

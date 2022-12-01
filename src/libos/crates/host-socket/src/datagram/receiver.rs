@@ -160,7 +160,9 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         }
 
         if let Some(errno) = inner.error {
-            self.do_recv(&mut inner);
+            // Reset error
+            inner.error = None;
+            self.common.pollee().del_events(Events::ERR);
             return_errno!(errno, "recv failed");
         }
 
@@ -237,7 +239,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         self.do_recv(&mut inner);
     }
 
-    pub fn cancel_requests(&self) {
+    pub fn cancel_recv_requests(&self) {
         let inner = self.inner.lock().unwrap();
         if let Some(io_handle) = &inner.io_handle {
             let io_uring = self.common.io_uring();

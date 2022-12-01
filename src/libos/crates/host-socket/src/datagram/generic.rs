@@ -157,6 +157,13 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
         Ok(())
     }
 
+    // Close the datagram socket, cancel pending iouring requests
+    pub fn close(&self) -> Result<()> {
+        self.common.set_closed();
+        self.cancel_requests();
+        Ok(())
+    }
+
     /// Shutdown the udp socket. This syscall is very TCP-oriented, but it is also useful for udp socket.
     /// Not like tcp, shutdown does nothing on the wire, it only changes shutdown states.
     /// The shutdown states block the io-uring request of receiving or sending message.
@@ -362,7 +369,8 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
     }
 
     fn cancel_requests(&self) {
-        self.receiver.cancel_requests();
+        self.receiver.cancel_recv_requests();
+        self.sender.cancel_send_requests();
     }
 }
 
