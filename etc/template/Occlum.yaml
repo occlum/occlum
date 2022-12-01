@@ -92,6 +92,13 @@ mount:
         - target: /
           type: sefs
           source: ./run/mount/__ROOT
+          # options:
+          # The SEFS just uses MRSIGNER to drived key by default, so the data can
+          # be shared between same enclave signer on the same machine.
+          # If you want more secure scheme, you can set the autokey_policy field
+          # to 1 to enforcing the key is derived by MRSIGNER|MRENCLAVE|ISVFAMILYID.
+          # So the data can only be accessed by the enclave itself.
+          #  autokey_policy: 1
   #
   # HostFS mount
   # It provides a channel to exchange files between Host FS and LibOS FS.
