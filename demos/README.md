@@ -22,7 +22,7 @@ This set of demos shows how real-world apps can be easily run inside SGX enclave
 * [grpc](grpc/): A client and server communicating through [gRPC](https://grpc.io), containing [glibc-supported demo](grpc/grpc_glibc) and [musl-supported demo](grpc/grpc_musl).
 * [https_server](https_server/): A HTTPS file server based on [Mongoose Embedded Web Server Library](https://github.com/cesanta/mongoose).
 * [openvino](openvino/) A benchmark of [OpenVINO Inference Engine](https://docs.openvinotoolkit.org/2019_R3/_docs_IE_DG_inference_engine_intro.html).
-* [pytorch](pytorch/): A demo of [PyTorch](https://pytorch.org/).
+* [pytorch](pytorch/): Demos of standalone and distributed [PyTorch](https://pytorch.org/).
 * [redis](redis/): A demo of [Redis](https://redis.io).
 * [sofaboot](sofaboot/): A demo of [SOFABoot](https://github.com/sofastack/sofa-boot), an open source Java development framework based on Spring Boot.
 * [sqlite](sqlite/) A demo of [SQLite](https://www.sqlite.org) SQL database engine.

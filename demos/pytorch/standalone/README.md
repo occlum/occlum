@@ -10,22 +10,22 @@ Use the nn package to define our model as a sequence of layers. nn.Sequential is
 
 This tutorial is written under the assumption that you have Docker installed and use Occlum in a Docker container.
 
-Occlum is compatible with glibc-supported Python, we employ miniconda as python installation tool. You can import PyTorch packages using conda. Here, miniconda is automatically installed by install_python_with_conda.sh script, the required python and PyTorch packages for this project are also loaded by this script. Here, we take occlum/occlum:0.23.0-ubuntu18.04 as example.
+Occlum is compatible with glibc-supported Python, we employ miniconda as python installation tool. You can import PyTorch packages using conda. Here, miniconda is automatically installed by install_python_with_conda.sh script, the required python and PyTorch packages for this project are also loaded by this script. Here, we take occlum/occlum:0.29.3-ubuntu20.04 as example.
 
 Step 1 (on the host): Start an Occlum container
 ```
-docker pull occlum/occlum:0.23.0-ubuntu18.04
-docker run -it --name=pythonDemo --device /dev/sgx/enclave occlum/occlum:0.23.0-ubuntu18.04 bash
+docker pull occlum/occlum:0.29.3-ubuntu20.04
+docker run -it --name=pythonDemo --device /dev/sgx/enclave occlum/occlum:0.29.3-ubuntu20.04 bash
 ```
 
 Step 2 (in the Occlum container): Download miniconda and install python to prefix position.
 ```
-cd /root/demos/pytorch
+cd /root/demos/pytorch/standalone
 bash ./install_python_with_conda.sh
 ```
 
 Step 3 (in the Occlum container): Run the sample code on Occlum
 ```
-cd /root/demos/pytorch
+cd /root/demos/standalone/pytorch
 bash ./run_pytorch_on_occlum.sh
 ```
