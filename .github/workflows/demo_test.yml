@@ -276,11 +276,34 @@ jobs:
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Build python and pytorch
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/pytorch; ./install_python_with_conda.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/pytorch/standalone; ./install_python_with_conda.sh"
 
     - name: Run pytorch test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/pytorch; SGX_MODE=SIM ./run_pytorch_on_occlum.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/pytorch/standalone; SGX_MODE=SIM ./run_pytorch_on_occlum.sh"
 
+  Distributed_Pytorch_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/sim
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Build python and pytorch
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/pytorch/distributed; ./install_python_with_conda.sh"
+
+    - name: Build pytorch Occlum instance
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/pytorch/distributed; SGX_MODE=SIM ./build_pytorch_occlum_instance.sh"
+
+    - name: Start pytorch Occlum instance node one
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/pytorch/distributed/occlum_instance; WORLD_SIZE=2 RANK=0 occlum run /bin/python3 mnist.py --epoch 3 --no-cuda --seed 42 --save-model &"
+
+    - name: Start pytorch Occlum instance node two
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/pytorch/distributed/occlum_instance_2; WORLD_SIZE=2 RANK=1 occlum run /bin/python3 mnist.py --epoch 3 --no-cuda --seed 42 --save-model"
 
   Tensorflow_test:
     runs-on: ubuntu-20.04

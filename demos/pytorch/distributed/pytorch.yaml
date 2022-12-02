@@ -1,0 +1,39 @@
+includes:
+  - base.yaml
+targets:
+  - target: /bin
+    createlinks:
+      - src: /opt/python-occlum/bin/python3
+        linkname: python3
+    copy:
+      - files:
+          - /opt/occlum/toolchains/busybox/glibc/busybox
+  # python packages
+  - target: /opt
+    copy: 
+      - dirs:
+          - ../python-occlum
+  # python code
+  - target: /
+    copy:
+      - files: 
+          - ../mnist.py
+  - target: /opt/occlum/glibc/lib
+    copy:
+      - files:
+          - /lib/x86_64-linux-gnu/libnss_dns.so.2
+          - /lib/x86_64-linux-gnu/libnss_files.so.2
+  # etc files
+  - target: /etc
+    copy:
+      - dirs:
+          - /etc/ssl
+      - files:
+          - /etc/nsswitch.conf
+  # CA files
+  - target: /ppml/certs/
+    copy:
+      - files:
+          - ../myCA.pem
+          - ../test.key
+          - ../test.crt
