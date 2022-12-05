@@ -418,7 +418,7 @@ impl SocketFile {
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
         control: Option<&mut [u8]>,
-    ) -> Result<(usize, Option<AnyAddr>, Option<MsgFlags>, usize)> {
+    ) -> Result<(usize, Option<AnyAddr>, MsgFlags, usize)> {
         // return (bytes_recv, recv_addr, msg_flags, msg_controllen)
         // TODO: support msg_flags and msg_control
         Ok(match &self.socket {

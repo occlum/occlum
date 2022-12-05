@@ -25,7 +25,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
         mut control: Option<&mut [u8]>,
-    ) -> Result<(usize, Option<A>, Option<MsgFlags>, usize)> {
+    ) -> Result<(usize, Option<A>, MsgFlags, usize)> {
         let mask = Events::IN;
         // Initialize the poller only when needed
         let mut poller = None;
@@ -79,7 +79,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
         control: &mut Option<&mut [u8]>,
-    ) -> Result<(usize, Option<A>, Option<MsgFlags>, usize)> {
+    ) -> Result<(usize, Option<A>, MsgFlags, usize)> {
         let mut inner = self.inner.lock().unwrap();
 
         if !flags.is_empty() && flags.contains(RecvFlags::MSG_OOB | RecvFlags::MSG_CMSG_CLOEXEC) {
@@ -90,44 +90,50 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         // Mark the socket as non-readable since Datagram uses single packet
         self.common.pollee().del_events(Events::IN);
 
+        let mut recv_bytes = 0;
+        let mut msg_flags = MsgFlags::empty();
+        let recv_addr = inner.get_packet_addr();
+        // let msg_controllen = inner.req.msg.msg_controllen;
+        let msg_controllen = inner.control_len.unwrap_or(0);
+
+        // Copy ancillary data from control buffer
+        if msg_controllen > super::OPTMEM_MAX {
+            return_errno!(EINVAL, "invalid msg control length");
+        }
+        let user_controllen = if let Some(control) = control {
+            control.len()
+        } else {
+            0
+        };
+
+        if user_controllen < msg_controllen {
+            msg_flags = msg_flags | MsgFlags::MSG_CTRUNC
+        }
+
+        if msg_controllen > 0 {
+            control
+                .as_mut()
+                .map(|buf| buf.copy_from_slice(&inner.msg_control[..buf.len()]));
+        }
+
+        info!("msg control length: {:?}", msg_controllen);
+
         // Copy data from the recv buffer to the bufs
         if A::domain() == Domain::Netlink {
-            let recv_bytes = inner.try_copy_buf_netlink(bufs);
-            if let Some(recv_bytes) = recv_bytes {
-                let recv_addr = inner.get_packet_addr();
+            let copied_bytes = inner.try_copy_buf_netlink(bufs);
+            if let Some(bytes) = copied_bytes {
+                // let recv_addr = inner.get_packet_addr();
                 if inner.recv_len.is_none() {
                     // All recv_len are consumed, do next host recv.
                     self.do_recv(&mut inner);
                 }
 
-                return Ok((recv_bytes, recv_addr, None, 0));
+                recv_bytes = bytes;
+                return Ok((recv_bytes, recv_addr, msg_flags, msg_controllen));
             }
         } else {
             let copied_bytes = inner.try_copy_buf(bufs);
             if let Some(copied_bytes) = copied_bytes {
-                let recv_addr = inner.get_packet_addr();
-                let mut msg_flags = MsgFlags::empty();
-                // Copy ancillary data from control buffer
-                let msg_controllen = inner.req.msg.msg_controllen;
-                if msg_controllen > super::OPTMEM_MAX {
-                    return_errno!(EINVAL, "invalid msg control length");
-                }
-                let control_buf_len = if let Some(control) = control {
-                    control.len()
-                } else {
-                    0
-                };
-
-                if control_buf_len < msg_controllen {
-                    msg_flags = msg_flags | MsgFlags::MSG_CTRUNC
-                }
-
-                if msg_controllen > 0 {
-                    control
-                        .as_mut()
-                        .map(|buf| buf.copy_from_slice(&inner.msg_control[..buf.len()]));
-                }
-
                 let bufs_len: usize = bufs.iter().map(|buf| buf.len()).sum();
 
                 // If user provided buffer length is smaller than kernel received datagram length,
@@ -139,7 +145,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
 
                 // If user provided flags contain MSG_TRUNC, the return received length should be
                 // kernel receiver buffer length, vice versa should return truly copied bytes length.
-                let recv_bytes = if flags.contains(RecvFlags::MSG_TRUNC) {
+                recv_bytes = if flags.contains(RecvFlags::MSG_TRUNC) {
                     inner.recv_len().unwrap()
                 } else {
                     copied_bytes
@@ -153,12 +159,16 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
                 if !flags.contains(RecvFlags::MSG_PEEK) {
                     self.do_recv(&mut inner);
                 }
-
-                let msg_flags = Some(msg_flags);
                 return Ok((recv_bytes, recv_addr, msg_flags, msg_controllen));
             }
+        };
+
+        // In some situantions of MSG_ERRQUEUE, users only require control buffer but setting iovec length to zero.
+        if msg_controllen > 0 {
+            return Ok((recv_bytes, recv_addr, msg_flags, msg_controllen));
         }
 
+        // Handle iouring message error
         if let Some(errno) = inner.error {
             // Reset error
             inner.error = None;
@@ -173,7 +183,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
             {
                 return_errno!(Errno::EWOULDBLOCK, "the socket recv has been shutdown");
             } else {
-                return Ok((0, None, None, 0));
+                return Ok((0, None, msg_flags, 0));
             }
         }
 
@@ -187,6 +197,7 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         }
         // Clear recv_len and error
         inner.recv_len.take();
+        inner.control_len.take();
         inner.error.take();
 
         if inner.is_shutdown {
@@ -219,6 +230,10 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
 
             // Handle the normal case of a successful read
             inner.recv_len = Some(retval as usize);
+
+            let control_len = inner.req.msg.msg_controllen;
+            inner.control_len = Some(control_len);
+
             receiver.common.pollee().add_events(Events::IN);
 
             // We don't do_recv() here, since do_recv() will clear the recv message.
@@ -274,6 +289,7 @@ struct Inner {
     // store the offset for the recv_buf for read loop
     recv_buf_offset: usize,
     msg_control: UntrustedBox<[u8]>,
+    control_len: Option<usize>,
     req: UntrustedBox<RecvReq>,
     io_handle: Option<IoHandle>,
     error: Option<Errno>,
@@ -289,6 +305,7 @@ impl Inner {
             recv_len: None,
             recv_buf_offset: 0,
             msg_control: UntrustedBox::new_uninit_slice(super::OPTMEM_MAX),
+            control_len: None,
             req: UntrustedBox::new_uninit(),
             io_handle: None,
             error: None,

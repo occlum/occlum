@@ -309,11 +309,13 @@ pub async fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut libc::msghdr, flags: c_int)
     }
 
     // update msghdr
-    msg.msg_flags = if let Some(msg_flags) = msg_flags {
-        msg_flags.bits()
-    } else {
-        0
-    };
+    // msg.msg_flags = if let Some(msg_flags) = msg_flags {
+    //     msg_flags.bits()
+    // } else {
+    //     0
+    // };
+
+    msg.msg_flags = msg_flags.bits();
     msg.msg_controllen = msg_controllen;
     if msg_controllen == 0 {
         msg.msg_control = ptr::null_mut();

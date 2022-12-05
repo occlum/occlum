@@ -188,7 +188,7 @@ impl UnixStream {
         &self,
         buf: &mut [&mut [u8]],
         flags: RecvFlags,
-    ) -> Result<(usize, Option<UnixAddr>, Option<MsgFlags>)> {
+    ) -> Result<(usize, Option<UnixAddr>, MsgFlags)> {
         apply_fn_on_any_stream!(self.inner(), |stream| { stream.recvmsg(buf, flags).await })
     }
 

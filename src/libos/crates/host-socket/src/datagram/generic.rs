@@ -216,7 +216,7 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
         control: Option<&mut [u8]>,
-    ) -> Result<(usize, Option<A>, Option<MsgFlags>, usize)> {
+    ) -> Result<(usize, Option<A>, MsgFlags, usize)> {
         self.receiver.recvmsg(bufs, flags, control).await
     }
 

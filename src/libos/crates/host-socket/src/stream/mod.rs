@@ -215,7 +215,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         &self,
         buf: &mut [&mut [u8]],
         flags: RecvFlags,
-    ) -> Result<(usize, Option<A>, Option<MsgFlags>)> {
+    ) -> Result<(usize, Option<A>, MsgFlags)> {
         let connected_stream = {
             let mut state = self.state.write().unwrap();
             match &*state {
@@ -237,7 +237,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         };
 
         let recv_len = connected_stream.recvmsg(buf, flags).await?;
-        Ok((recv_len, None, None))
+        Ok((recv_len, None, MsgFlags::empty()))
     }
 
     pub async fn write(&self, buf: &[u8]) -> Result<usize> {

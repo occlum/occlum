@@ -49,7 +49,7 @@ impl Stream {
         &self,
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
-    ) -> Result<(usize, Option<UnixAddr>, Option<MsgFlags>)> {
+    ) -> Result<(usize, Option<UnixAddr>, MsgFlags)> {
         let addr = {
             let trusted_addr = self.peer_addr().ok();
             debug!("recvfrom {:?}", trusted_addr);
@@ -74,7 +74,7 @@ impl Stream {
         };
         let data_len = connected_stream.readv(bufs).await?;
 
-        Ok((data_len, addr, None))
+        Ok((data_len, addr, MsgFlags::empty()))
     }
 
     pub async fn write(&self, buf: &[u8]) -> Result<usize> {
