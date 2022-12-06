@@ -26,13 +26,16 @@ Table of Contents
    build_and_install.md
    install_occlum_packages.md
    binaries_compatibility.md
+   how_to_debug.md
 
 .. toctree::
    :maxdepth: 2
    :caption: Inside Occlum
 
    boot_flow.md
+   filesystem/fs_overview.md
    filesystem/mount.md
+   filesystem/encrypted_image.md
    remote_attestation.md
 
 .. toctree::

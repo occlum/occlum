@@ -97,6 +97,13 @@ mount:
         - target: /
           type: sefs
           source: ./run/mount/__ROOT
+          # options:
+          # The SEFS just uses MRSIGNER to drived key by default, so the data can
+          # be shared between same enclave signer on the same machine.
+          # If you want more secure scheme, you can set the autokey_policy field
+          # to 1 to enforcing the key is derived by MRSIGNER|MRENCLAVE|ISVFAMILYID.
+          # So the data can only be accessed by the enclave itself.
+          #  autokey_policy: 1
   #
   # HostFS mount
   # It provides a channel to exchange files between Host FS and LibOS FS.
@@ -142,7 +149,7 @@ mount:
 
 ## Runtime Resource Configuration for Occlum process
 
-Occlum has enabled per process resource configuration via [`prlimit`](https://man7.org/linux/man-pages//man2/prlimit.2.html) syscall and shell built-in command [`ulimit`](https://fishshell.com/docs/current/cmds/ulimit.html).
+Occlum has enabled per process resource configuration via [prlimit](https://man7.org/linux/man-pages//man2/prlimit.2.html) syscall and shell built-in command [ulimit](https://fishshell.com/docs/current/cmds/ulimit.html).
 
 ```shell
 #! /usr/bin/bash
@@ -160,4 +167,4 @@ ulimit -a
 ...
 ```
 
-For more info, please check [`demos/fish`](https://github.com/occlum/occlum/tree/master/demos/fish).
+For more info, please check [demos/fish](https://github.com/occlum/occlum/tree/master/demos/fish).

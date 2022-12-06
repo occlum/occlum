@@ -28,4 +28,4 @@ Users could run the unit test manually as well.
 
 ## LTP Tests
 
-Linux [`LTP`](https://github.com/linux-test-project/ltp) is the most popular test suite for Linux. Occlum could also apply the LTP to verify the stability and compatibility to Linux app. For detail, please refer to [**linux-ltp**](https://github.com/occlum/occlum/tree/master/demos/linux-ltp).
+Linux [LTP](https://github.com/linux-test-project/ltp) is the most popular test suite for Linux. Occlum could also apply the LTP to verify the stability and compatibility to Linux app. For detail, please refer to [**linux-ltp**](https://github.com/occlum/occlum/tree/master/demos/linux-ltp).

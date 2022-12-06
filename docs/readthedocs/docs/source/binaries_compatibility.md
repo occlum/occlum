@@ -1,6 +1,6 @@
 # Occlum-Compatible Executable Binaries
 
-The `hello_world` demo is based on [`musl libc`](https://www.musl-libc.org/) with recompiling. But Occlum actually can support both `musl libc` and `glibc` based executable binaries without recompiling if they meet below three principles.
+The `hello_world` demo is based on [musl libc](https://www.musl-libc.org/) with recompiling. But Occlum actually can support both `musl libc` and `glibc` based executable binaries without recompiling if they meet below three principles.
 
 ## No fork syscall
 
