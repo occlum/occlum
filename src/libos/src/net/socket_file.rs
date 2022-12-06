@@ -594,6 +594,7 @@ impl SocketFile {
                 AnyAddr::TrustedUnix(trusted_stream.peer_addr()?)
             }
             AnySocket::Ipv4Datagram(ipv4_datagram) => AnyAddr::Ipv4(ipv4_datagram.peer_addr()?),
+            AnySocket::Ipv6Datagram(ipv6_datagram) => AnyAddr::Ipv6(ipv6_datagram.peer_addr()?),
             AnySocket::UnixDatagram(unix_datagram) => AnyAddr::Unix(unix_datagram.peer_addr()?),
             AnySocket::NetlinkDatagram(netlink_socket) => {
                 AnyAddr::Netlink(netlink_socket.peer_addr()?)

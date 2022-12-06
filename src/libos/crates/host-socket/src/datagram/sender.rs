@@ -1,11 +1,15 @@
 use std::ptr::{self};
 
 use io_uring_callback::{Fd, IoHandle};
+use sgx_libc::c_void;
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
+use std::collections::VecDeque;
 
 use crate::common::Common;
 use crate::prelude::*;
 use crate::runtime::Runtime;
+
+const SENDMSG_QUEUE_LEN: usize = 16;
 
 pub struct Sender<A: Addr + 'static, R: Runtime> {
     common: Arc<Common<A, R>>,
@@ -22,13 +26,19 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
     /// Shutdown udp sender.
     pub fn shutdown(&self) {
         let mut inner = self.inner.lock().unwrap();
-        inner.is_shutdown = true;
+        inner.is_shutdown = ShutdownStatus::PreShutdown;
     }
 
     /// Reset udp sender shutdown state.
     pub fn reset_shutdown(&self) {
         let mut inner = self.inner.lock().unwrap();
-        inner.is_shutdown = false;
+        inner.is_shutdown = ShutdownStatus::Running;
+    }
+
+    /// Whether no buffer in sender.
+    pub fn is_empty(&self) -> bool {
+        let inner = self.inner.lock().unwrap();
+        inner.msg_queue.is_empty()
     }
 
     pub fn cancel_send_requests(&self) {
@@ -46,82 +56,64 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
         flags: SendFlags,
         control: Option<&[u8]>,
     ) -> Result<usize> {
-        let mut inner = self.inner.lock().unwrap();
-        if inner.is_shutdown() {
-            return_errno!(Errno::EWOULDBLOCK, "the write has been shutdown")
-        }
-        let total_len: usize = bufs.iter().map(|buf| buf.len()).sum();
-        if total_len > super::MAX_BUF_SIZE {
-            return_errno!(EMSGSIZE, "the message is too large")
-        }
-
-        // Mark the socket as non-writable since Datagram uses single packet
-        self.common.pollee().del_events(Events::OUT);
-
-        let mut send_buf = UntrustedBox::new_uninit_slice(total_len);
-        // Copy data from the bufs to the send buffer
-        let mut total_copied = 0;
-        for buf in bufs {
-            send_buf[total_copied..(total_copied + buf.len())].copy_from_slice(buf);
-            total_copied += buf.len();
-        }
-
-        let send_control_buf = if let Some(msg_control) = control {
-            let send_controllen = msg_control.len();
-            if send_controllen > super::OPTMEM_MAX {
-                return_errno!(EINVAL, "invalid msg control length");
-            }
-            let mut send_control_buf = UntrustedBox::new_uninit_slice(send_controllen);
-            send_control_buf.copy_from_slice(&msg_control[..send_controllen]);
-            Some(send_control_buf)
-        } else {
-            None
-        };
-
-        // Generate the async send request
-        let mut send_req = UntrustedBox::<SendReq>::new_uninit();
-        let send_control_buf = send_control_buf.as_ref().map(|buf| &**buf);
-        let msghdr_ptr = new_send_req(&mut send_req, &send_buf, addr, send_control_buf);
-
-        // Handle msg flags
-        let send_flags = if self.common.nonblocking() || flags.contains(SendFlags::MSG_DONTWAIT) {
-            libc::MSG_DONTWAIT as _
-        } else {
-            0
-        };
-
-        // Need to handle MSG_DONTWAIT and nonblocking().
-        self.do_send(&mut inner, msghdr_ptr, send_flags);
-
-        // Release inner lock to avoid lock comptetion in do_send (complete_fn)
-        drop(inner);
-
-        // Datagram send timeout
         let mask = Events::OUT;
-        let poller = Poller::new();
-        self.common.pollee().connect_poller(mask, &poller);
+        // Initialize the poller only when needed
+        let mut poller = None;
+        let mut timeout = self.common.send_timeout();
+        loop {
+            // Attempt to write
+            let res = self.try_sendmsg(bufs, addr, control);
+            if !res.has_errno(EAGAIN) {
+                return res;
+            }
 
-        let events = self.common.pollee().poll(mask, None);
-        if events.is_empty() {
-            let ret = poller
-                .wait_timeout(self.common.send_timeout().as_mut())
-                .await;
-            if let Err(e) = ret {
-                warn!("send wait errno = {:?}", e.errno());
-                match e.errno() {
-                    ETIMEDOUT => {
-                        self.cancel_send_requests();
-                        return_errno!(EAGAIN, "timeout reached")
-                    }
-                    _ => {
-                        // May need to handle inner error state and event
-                        return_errno!(e.errno(), "wait error")
+            // Still some buffer contents pending
+            if self.common.nonblocking() || flags.contains(SendFlags::MSG_DONTWAIT) {
+                return_errno!(EAGAIN, "try write again");
+            }
+
+            // Wait for interesting events by polling
+            if poller.is_none() {
+                let new_poller = Poller::new();
+                self.common.pollee().connect_poller(mask, &new_poller);
+                poller = Some(new_poller);
+            }
+
+            let events = self.common.pollee().poll(mask, None);
+            if events.is_empty() {
+                let ret = poller
+                    .as_ref()
+                    .unwrap()
+                    .wait_timeout(timeout.as_mut())
+                    .await;
+                if let Err(e) = ret {
+                    warn!("send wait errno = {:?}", e.errno());
+                    match e.errno() {
+                        ETIMEDOUT => {
+                            // Just cancel send requests if timeout
+                            self.cancel_send_requests();
+                            return_errno!(EAGAIN, "timeout reached")
+                        }
+                        _ => {
+                            return_errno!(e.errno(), "wait error")
+                        }
                     }
                 }
             }
         }
+    }
 
+    fn try_sendmsg(
+        self: &Arc<Self>,
+        bufs: &[&[u8]],
+        addr: &A,
+        control: Option<&[u8]>,
+    ) -> Result<usize> {
         let mut inner = self.inner.lock().unwrap();
+        if inner.is_shutdown() {
+            return_errno!(EPIPE, "the write has been shutdown")
+        }
+
         if let Some(errno) = inner.error {
             // Reset error
             inner.error = None;
@@ -129,15 +121,29 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
             return_errno!(errno, "write failed");
         }
 
+        let buf_len: usize = bufs.iter().map(|buf| buf.len()).sum();
+        let mut msg = DataMsg::new(buf_len);
+        let total_copied = msg.copy_buf(bufs)?;
+        msg.copy_control(control)?;
+
+        let msghdr_ptr = new_send_req(&mut msg, addr);
+
+        if !inner.msg_queue.push_msg(msg) {
+            // Msg queue can not push this msg, mark the socket as non-writable
+            self.common.pollee().del_events(Events::OUT);
+            return_errno!(EAGAIN, "try write again");
+        }
+
+        // Since the send buffer is not empty, try to flush the buffer
+        if inner.io_handle.is_none() {
+            self.do_send(&mut inner, msghdr_ptr);
+        }
         Ok(total_copied)
     }
 
-    fn do_send(
-        self: &Arc<Self>,
-        inner: &mut MutexGuard<Inner>,
-        msghdr_ptr: *mut libc::msghdr,
-        flags: u32,
-    ) {
+    fn do_send(self: &Arc<Self>, inner: &mut MutexGuard<Inner>, msghdr_ptr: *const libc::msghdr) {
+        debug_assert!(!inner.msg_queue.is_empty());
+        debug_assert!(inner.io_handle.is_none());
         let sender = self.clone();
         // Submit the async send to io_uring
         let complete_fn = move |retval: i32| {
@@ -157,54 +163,60 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
             }
 
             // Need to handle normal case
+            inner.msg_queue.pop_msg();
             sender.common.pollee().add_events(Events::OUT);
+            if !inner.msg_queue.is_empty() {
+                let msghdr_ptr = inner.msg_queue.first_msg_ptr();
+                debug_assert!(msghdr_ptr.is_some());
+                sender.do_send(&mut inner, msghdr_ptr.unwrap());
+            } else if inner.is_shutdown == ShutdownStatus::PreShutdown {
+                // The buffer is empty and the write side is shutdown by the user.
+                // We can safely shutdown host file here.
+                let _ = sender.common.host_shutdown(Shutdown::Write);
+                inner.is_shutdown = ShutdownStatus::PostShutdown
+            }
         };
 
         // Generate the async recv request
         let io_uring = self.common.io_uring();
         let host_fd = Fd(self.common.host_fd() as _);
-        let handle = unsafe { io_uring.sendmsg(host_fd, msghdr_ptr, flags, complete_fn) };
+        let handle = unsafe { io_uring.sendmsg(host_fd, msghdr_ptr, 0, complete_fn) };
         inner.io_handle.replace(handle);
     }
 }
 
-fn new_send_req<A: Addr>(
-    req: &mut SendReq,
-    buf: &[u8],
-    addr: &A,
-    msg_control: Option<&[u8]>,
-) -> *mut libc::msghdr {
-    req.iovec = libc::iovec {
-        iov_base: buf.as_ptr() as _,
-        iov_len: buf.len(),
+fn new_send_req<A: Addr>(dmsg: &mut DataMsg, addr: &A) -> *const libc::msghdr {
+    let iovec = libc::iovec {
+        iov_base: dmsg.send_buf.as_ptr() as _,
+        iov_len: dmsg.send_buf.len(),
     };
-    req.msg.msg_iov = &raw mut req.iovec as _;
-    req.msg.msg_iovlen = 1;
+
+    let (control, controllen) = match &dmsg.control {
+        Some(control) => (control.as_mut_ptr() as *mut c_void, control.len()),
+        None => (ptr::null_mut(), 0),
+    };
+
+    dmsg.req.iovec = iovec;
+
+    dmsg.req.msg.msg_iov = &raw mut dmsg.req.iovec as _;
+    dmsg.req.msg.msg_iovlen = 1;
 
     let (c_addr_storage, c_addr_len) = addr.to_c_storage();
 
-    req.addr = c_addr_storage;
-    req.msg.msg_name = &raw mut req.addr as _;
-    req.msg.msg_namelen = c_addr_len as _;
+    dmsg.req.addr = c_addr_storage;
+    dmsg.req.msg.msg_name = &raw mut dmsg.req.addr as _;
+    dmsg.req.msg.msg_namelen = c_addr_len as _;
+    dmsg.req.msg.msg_control = control;
+    dmsg.req.msg.msg_controllen = controllen;
 
-    match msg_control {
-        Some(inner_control) => {
-            req.msg.msg_control = inner_control.as_ptr() as _;
-            req.msg.msg_controllen = inner_control.len() as _;
-        }
-        None => {
-            req.msg.msg_control = ptr::null_mut();
-            req.msg.msg_controllen = 0;
-        }
-    }
-
-    &mut req.msg
+    &mut dmsg.req.msg
 }
 
 pub struct Inner {
     io_handle: Option<IoHandle>,
     error: Option<Errno>,
-    is_shutdown: bool,
+    is_shutdown: ShutdownStatus,
+    msg_queue: MsgQueue,
 }
 
 unsafe impl Send for Inner {}
@@ -214,13 +226,16 @@ impl Inner {
         Self {
             io_handle: None,
             error: None,
-            is_shutdown: false,
+            is_shutdown: ShutdownStatus::Running,
+            msg_queue: MsgQueue::new(),
         }
     }
 
     /// Obtain udp sender shutdown state.
+    #[inline(always)]
     pub fn is_shutdown(&self) -> bool {
-        self.is_shutdown
+        self.is_shutdown == ShutdownStatus::PreShutdown
+            || self.is_shutdown == ShutdownStatus::PostShutdown
     }
 }
 
@@ -232,3 +247,119 @@ struct SendReq {
 }
 
 unsafe impl MaybeUntrusted for SendReq {}
+
+struct MsgQueue {
+    queue: VecDeque<DataMsg>,
+    size: usize,
+}
+
+impl MsgQueue {
+    #[inline(always)]
+    fn new() -> Self {
+        Self {
+            queue: VecDeque::with_capacity(SENDMSG_QUEUE_LEN),
+            size: 0,
+        }
+    }
+
+    #[inline(always)]
+    fn size(&self) -> usize {
+        self.size
+    }
+
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
+    // Push datagram msg, return true if succeed,
+    // return false if buffer is full.
+    #[inline(always)]
+    fn push_msg(&mut self, msg: DataMsg) -> bool {
+        let total_len = msg.len() + self.size();
+        if total_len <= super::MAX_BUF_SIZE {
+            self.size = total_len;
+            self.queue.push_back(msg);
+            return true;
+        }
+        false
+    }
+
+    #[inline(always)]
+    fn pop_msg(&mut self) {
+        if let Some(msg) = self.queue.pop_front() {
+            self.size = self.size() - msg.len();
+        }
+    }
+
+    #[inline(always)]
+    fn first_msg_ptr(&self) -> Option<*const libc::msghdr> {
+        self.queue
+            .front()
+            .map(|data_msg| &data_msg.req.msg as *const libc::msghdr)
+    }
+}
+
+// Datagram msg contents in untrusted region
+struct DataMsg {
+    req: UntrustedBox<SendReq>,
+    send_buf: UntrustedBox<[u8]>,
+    control: Option<UntrustedBox<[u8]>>,
+}
+
+impl DataMsg {
+    #[inline(always)]
+    fn new(buf_len: usize) -> Self {
+        Self {
+            req: UntrustedBox::<SendReq>::new_uninit(),
+            send_buf: UntrustedBox::new_uninit_slice(buf_len),
+            control: None,
+        }
+    }
+
+    #[inline(always)]
+    fn copy_buf(&mut self, bufs: &[&[u8]]) -> Result<usize> {
+        // let total_len: usize = bufs.iter().map(|buf| buf.len()).sum();
+        let total_len = self.send_buf.len();
+        if total_len > super::MAX_BUF_SIZE {
+            return_errno!(EMSGSIZE, "the message is too large")
+        }
+        // Copy data from the bufs to the send buffer
+        let mut total_copied = 0;
+        let mut send_buf = UntrustedBox::new_uninit_slice(total_len);
+        for buf in bufs {
+            send_buf[total_copied..(total_copied + buf.len())].copy_from_slice(buf);
+            total_copied += buf.len();
+        }
+        self.send_buf = send_buf;
+        Ok(total_copied)
+    }
+
+    #[inline(always)]
+    fn copy_control(&mut self, control: Option<&[u8]>) -> Result<usize> {
+        if let Some(msg_control) = control {
+            let send_controllen = msg_control.len();
+            if send_controllen > super::OPTMEM_MAX {
+                return_errno!(EINVAL, "invalid msg control length");
+            }
+            let mut send_control_buf = UntrustedBox::new_uninit_slice(send_controllen);
+            send_control_buf.copy_from_slice(&msg_control[..send_controllen]);
+
+            self.control = Some(send_control_buf);
+            return Ok(send_controllen);
+        };
+        Ok(0)
+    }
+
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.send_buf.len()
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum ShutdownStatus {
+    Running,      // not shutdown
+    PreShutdown,  // start the shutdown process, set by calling shutdown syscall
+    PostShutdown, // shutdown process is done, set when the buffer is empty
+}

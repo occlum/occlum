@@ -116,8 +116,6 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
                 .map(|buf| buf.copy_from_slice(&inner.msg_control[..buf.len()]));
         }
 
-        info!("msg control length: {:?}", msg_controllen);
-
         // Copy data from the recv buffer to the bufs
         if A::domain() == Domain::Netlink {
             let copied_bytes = inner.try_copy_buf_netlink(bufs);

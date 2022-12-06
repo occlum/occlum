@@ -173,17 +173,25 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
             return_errno!(ENOTCONN, "The udp socket is not connected");
         }
         drop(state);
-        self.common.host_shutdown(how)?;
+        // self.common.host_shutdown(how)?;
         match how {
             Shutdown::Read => {
+                self.common.host_shutdown(how)?;
                 self.receiver.shutdown();
                 self.common.pollee().add_events(Events::IN);
             }
             Shutdown::Write => {
+                if self.sender.is_empty() {
+                    self.common.host_shutdown(how)?;
+                }
                 self.sender.shutdown();
                 self.common.pollee().add_events(Events::OUT);
             }
             Shutdown::Both => {
+                self.common.host_shutdown(Shutdown::Read)?;
+                if self.sender.is_empty() {
+                    self.common.host_shutdown(Shutdown::Write)?;
+                }
                 self.receiver.shutdown();
                 self.sender.shutdown();
                 self.common
