@@ -28,6 +28,9 @@ TESTS ?= env empty hello_world malloc mmap file fs_perms getpid spawn sched pipe
 # Benchmarks: need to be compiled and run by bench-% target
 BENCHES := spawn_and_exit_latency pipe_throughput unix_socket_throughput
 
+# Occlum bin path
+OCCLUM_BIN_PATH ?= $(BUILD_DIR)/bin
+
 # Top-level Makefile targets
 BUILD_TARGETS := $(TEST_DEPS) $(TESTS) $(BENCHES)
 TEST_TARGETS := $(TESTS:%=test-%)
@@ -60,7 +63,7 @@ prebuild:
 	@$(RM) -rf $(BUILD_DIR)/test
 	@mkdir -p $(BUILD_DIR)/test
 	@cd $(BUILD_DIR)/test && \
-		$(BUILD_DIR)/bin/occlum init
+		$(OCCLUM_BIN_PATH)/occlum init
 	@cp Occlum.yaml $(BUILD_DIR)/test/
 
 $(BUILD_TARGETS): %:
@@ -70,7 +73,7 @@ $(BUILD_TARGETS): %:
 
 postbuild:
 	@cd $(BUILD_DIR)/test && \
-		$(BUILD_DIR)/bin/occlum build -f
+		$(OCCLUM_BIN_PATH)/occlum build -f
 
 #############################################################################
 # Test targets
@@ -93,7 +96,7 @@ test-internal: build pretest $(TEST_TARGETS) posttest
 pretest:
 	@$(RM) $(PASS_LOG) $(FAIL_LOG)
 	@cd $(BUILD_DIR)/test && \
-		$(BUILD_DIR)/bin/occlum start $(cpu_options)
+		$(OCCLUM_BIN_PATH)/occlum start $(cpu_options)
 
 # Restart server if test failed
 $(TEST_TARGETS): test-%: %
@@ -109,14 +112,14 @@ $(TEST_TARGETS): test-%: %
 			$(ECHO) "$(RED)FAILED$(NO_COLOR)" ; \
 			$(ECHO) "$< FAILED $$i" >> $(FAIL_LOG) ; \
 			cd $(BUILD_DIR)/test && \
-			$(BUILD_DIR)/bin/occlum start ; \
+			$(OCCLUM_BIN_PATH)/occlum start ; \
 			cd -; \
 		fi ; \
 	done
 
 posttest:
 	@cd $(BUILD_DIR)/test && \
-		$(BUILD_DIR)/bin/occlum stop
+		$(OCCLUM_BIN_PATH)/occlum stop
 	@PASS_NUM=$(shell wc -l < $(PASS_LOG)); \
 		FAIL_NUM=$(shell wc -l < $(FAIL_LOG)); \
 		$(ECHO) "\nTotal:" ; \
