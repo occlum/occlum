@@ -18,13 +18,7 @@ pub use async_io::fs::{
     Timespec, UmountFlags, PATH_MAX,
 };
 pub use async_io::ioctl::IoctlCmd;
-
 pub use async_vfs::{AsyncFileSystem, AsyncInode};
-
-/*pub use self::file_ops::{
-    occlum_ocall_ioctl, AccessMode, BuiltinIoctlNum, CreationFlags, FileMode, Flock, FlockType,
-    IfConf, IoctlCmd, Stat, StatusFlags, StructuredIoctlArgType, StructuredIoctlNum,
-};*/
 
 use crate::config::ConfigMount;
 
@@ -47,14 +41,12 @@ pub use self::rootfs::rootfs;
 pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
 pub use self::syscalls::*;
 
+mod async_file_handle;
 mod builtin_disk;
+mod dentry;
 mod dev_fs;
 mod disk_file;
 mod event_file;
-// TODO: remove the file
-//mod file;
-mod async_file_handle;
-mod dentry;
 mod file_handle;
 pub mod file_ops;
 mod file_table;

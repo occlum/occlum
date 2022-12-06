@@ -21,18 +21,6 @@ use crate::fs::{
     do_unlinkat, do_utime, do_utimensat, do_utimes, do_write, do_writev, iovec_t, utimbuf_t,
     FileDesc, FileRef, StatBuf, Statfs,
 };
-/*
-use crate::fs::{
-    do_access, do_chdir, do_chmod, do_chown, do_close, do_dup, do_dup2, do_dup3, do_eventfd,
-    do_eventfd2, do_faccessat, do_fchmod, do_fchmodat, do_fchown, do_fchownat, do_fcntl,
-    do_fdatasync, do_fstat, do_fstatat, do_fsync, do_ftruncate, do_getcwd, do_getdents,
-    do_getdents64, do_ioctl, do_lchown, do_link, do_linkat, do_lseek, do_lstat, do_mkdir,
-    do_mkdirat, do_open, do_openat, do_pipe, do_pipe2, do_pread, do_pwrite, do_read, do_readlink,
-    do_readlinkat, do_readv, do_rename, do_renameat, do_rmdir, do_sendfile, do_stat, do_symlink,
-    do_symlinkat, do_sync, do_truncate, do_unlink, do_unlinkat, do_write, do_writev, iovec_t, File,
-    FileDesc, FileRef, HostStdioFds, Stat,
-};
-*/
 use crate::ipc::{do_shmat, do_shmctl, do_shmdt, do_shmget, key_t, shmids_t};
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t, RandFlags};
 use crate::net::{
@@ -40,14 +28,6 @@ use crate::net::{
     do_listen, do_recvfrom, do_recvmsg, do_sendmmsg, do_sendmsg, do_sendto, do_setsockopt,
     do_shutdown, do_socket, do_socketpair, mmsghdr,
 };
-/*
-use crate::net::{
-    do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
-    do_epoll_pwait, do_epoll_wait, do_getpeername, do_getsockname, do_getsockopt, do_listen,
-    do_poll, do_recvfrom, do_recvmsg, do_select, do_sendmsg, do_sendto, do_setsockopt, do_shutdown,
-    do_socket, do_socketpair, msghdr, msghdr_mut,
-};
-*/
 use crate::poll::syscalls::{
     do_epoll_create, do_epoll_create1, do_epoll_ctl, do_epoll_pwait, do_epoll_wait, do_poll,
     do_ppoll, do_select,
