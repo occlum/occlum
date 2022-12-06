@@ -1,4 +1,4 @@
-# File System Mount Support
+# Mount Support
 
 ## Mount command
 
@@ -26,9 +26,11 @@ To mount an Occlum's secure FS image successfully, three conditions must be sati
 
 2. The three (optional) sign key, sign tool and image key arguments that are given to the `occlum mount` command must have the same values as those given to the `occlum build` command, which is how the image is created in the first place. This ensures that the secure FS can only be accessed by the owner of the enclave.
 
-3. If the image key is not given to the `occlum build` command, the `occlum mount` command must be run on the same machine as the `occlum run` command that runs the current Occlum instance and writes to the image. This condition is due to the fact that the encryption key of the secure FS is bound to the machine.
+3. If the image key is not given to the `occlum build` command, the `occlum mount` command must be run on the same machine as the `occlum run` command that runs the current Occlum instance and writes to the image. This condition is due to the fact that the automatically drived encryption key of the secure FS is bound to the machine, i.e., the MRSIGNER key policy.
 
 With the three conditions satisfied, the mount command is able to start a Linux FUSE FS server. Any I/O operations on the FUSE FS mounted at the specified path will be redirected by Linux kernel as I/O requests to the FUSE server. The FUSE server is backed by a special enclave, which can encrypt or decrypt the content of the secure FS image on demand.
+
+Please note that if the `autokey_policy` field of the configurations of FS is set in Occlum.yaml, the mount command will not work. This is because the MRENCLAVE is used as an input to generate the encryption key, and the mount tool cannot mimic it.
 
 The mount command **will not return** until the FUSE server is terminated in one of the two ways. The first one is to press ctrl+C. The second one is to use `umount` command. Both ways can terminate the server gracefully.
 

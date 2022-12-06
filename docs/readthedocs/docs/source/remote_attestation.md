@@ -22,9 +22,9 @@ Two versions (glibc and musl-libc), including static and dynamic libraries are p
 
 In short, applications can link to the prebuilt `libocclum_dcap.so` and use the APIs defined in `occlum_dcap.h` for their usage.
 
-For details how to use the library, please refer to the [`demo`](https://github.com/occlum/occlum/tree/master/demos/remote_attestation/dcap).
+For details how to use the library, please refer to the [demo](https://github.com/occlum/occlum/tree/master/demos/remote_attestation/dcap).
 
-The source code of the library is in the [`path`](https://github.com/occlum/occlum/tools/toolchains/dcap_lib/).
+The source code of the library is in the [path](https://github.com/occlum/occlum/tools/toolchains/dcap_lib/).
 
 Occlum also has a unique "Occlum -> init ->application" boot flow. Generally, all operation which is application required but not part of the application, such as remote attestation, could be put into `init` part. This feature makes Occlum highly compatible to any remote attestation solution without involving application’s change.
 
@@ -35,11 +35,11 @@ This design off load the remote attestation burden from application. Two RA solu
 ## Init-RA solution
 
 It is based on a GRPC-RATLS implementation.
-Details please refer to the demo [`init_ra_flow`](https://github.com/occlum/occlum/tree/master/demos/remote_attestation/init_ra_flow).
+Details please refer to the demo [init_ra_flow](https://github.com/occlum/occlum/tree/master/demos/remote_attestation/init_ra_flow).
 
 ## Azure Attestation
 
-To support Azure Attestation, there are some demos provided. Users could choose each one to their actual applications. Details please refer to the demo [`azure_attestation`](https://github.com/occlum/occlum/tree/master/demos/remote_attestation/azure_attestation).
+To support Azure Attestation, there are some demos provided. Users could choose each one to their actual applications. Details please refer to the demo [azure_attestation](https://github.com/occlum/occlum/tree/master/demos/remote_attestation/azure_attestation).
 
 ## SGX KSS (Key Separation and Sharing feature) support
 
