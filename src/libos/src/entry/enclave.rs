@@ -488,7 +488,8 @@ fn merge_env(env: *const *const c_char) -> Result<Vec<CString>> {
     }
 
     // Filter out env which are not listed in Occlum.json env untrusted section
-    // and remove env default element if it is overrided
+    // and record the index of env default element if it is overridden
+    let mut remove_idx: Vec<usize> = Vec::new();
     if (!env.is_null()) {
         let env_untrusted = clone_cstrings_safely(env)?;
         for iter in env_untrusted.iter() {
@@ -496,13 +497,22 @@ fn merge_env(env: *const *const c_char) -> Result<Vec<CString>> {
             if env_listed.contains(env_kv[0]) {
                 env_checked.push(iter.clone());
                 if let Some(idx) = env_default.helper.get(env_kv[0]) {
-                    env_default.content.remove(*idx);
+                    remove_idx.push(*idx);
                 }
             }
         }
     }
+
+    // Only keep items in env_default if they are not overridden by untrusted envs
+    let mut env_keep: Vec<CString> = Vec::new();
+    for (idx, val) in env_default.content.iter().enumerate() {
+        if !remove_idx.contains(&idx) {
+            env_keep.push(CString::new(val.clone())?);
+        }
+    }
+
     trace!("env_checked from env untrusted: {:?}", env_checked);
-    Ok([env_default.content, env_checked].concat())
+    Ok([env_keep, env_checked].concat())
 }
 
 pub(crate) fn set_pal_data_addr(pal_data_ptr: *const occlum_pal_vcpu_data) {
