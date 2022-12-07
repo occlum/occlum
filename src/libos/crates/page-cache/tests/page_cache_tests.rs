@@ -8,49 +8,42 @@ use page_cache::*;
 use std::sync::Arc;
 use std::time::Duration;
 
-// MyPageAlloc is a test-purpose fixed-size allocator.
-pub const MB: usize = 1024 * 1024;
-impl_fixed_size_page_alloc! { MyPageAlloc, MB * 5 }
+const MB: usize = 1024 * 1024;
 
-/// A flusher for page cache tests
-struct SimpleFlusher;
+macro_rules! new_page_cache_for_tests {
+    ($cache_size:expr) => {{
+        /// A flusher for page cache tests
+        struct SimpleFlusher;
+        #[async_trait]
+        impl PageCacheFlusher for SimpleFlusher {
+            async fn flush(&self) -> Result<usize> {
+                Ok(0)
+            }
+        }
 
-#[async_trait]
-impl PageCacheFlusher for SimpleFlusher {
-    async fn flush(&self) -> Result<usize> {
-        Ok(0)
-    }
-}
+        let flusher = Arc::new(SimpleFlusher);
 
-fn new_page_cache() -> PageCache<usize, MyPageAlloc> {
-    let flusher = Arc::new(SimpleFlusher);
-    PageCache::<usize, MyPageAlloc>::new(flusher)
-}
+        // `MyPageAlloc` is a test-purpose fixed-size allocator.
+        impl_fixed_size_page_alloc! { MyPageAlloc, $cache_size }
 
-fn read_page(page_handle: &PageHandle<usize, MyPageAlloc>) -> u8 {
-    let page_guard = page_handle.lock();
-    page_guard.as_slice()[0]
-}
-
-fn write_page(page_handle: &PageHandle<usize, MyPageAlloc>, content: u8) {
-    let mut page_guard = page_handle.lock();
-    const SIZE: usize = BLOCK_SIZE;
-    page_guard.as_slice_mut().copy_from_slice(&[content; SIZE]);
+        PageCache::<usize, MyPageAlloc>::new(flusher)
+    }};
 }
 
 #[test]
 fn page_cache_acquire_release() {
-    let cache = new_page_cache();
+    let cache = new_page_cache_for_tests!(MB * 5);
     let key: usize = 125;
-    let content: u8 = 5;
+    let content = [5u8; BLOCK_SIZE];
 
     let page_handle = cache.acquire(key).unwrap();
     let mut page_guard = page_handle.lock();
     assert_eq!(page_guard.state(), PageState::Uninit);
     page_guard.set_state(PageState::Dirty);
-    drop(page_guard);
 
-    write_page(&page_handle, content);
+    // Write a page
+    page_guard.as_slice_mut().copy_from_slice(&content);
+    drop(page_guard);
     cache.release(page_handle);
     assert_eq!(cache.size(), 1);
 
@@ -58,17 +51,18 @@ fn page_cache_acquire_release() {
     assert_eq!(page_handle.key(), key);
     let page_guard = page_handle.lock();
     assert_eq!(page_guard.state(), PageState::Dirty);
-    drop(page_guard);
 
-    let read_content = read_page(&page_handle);
+    // Read a page
+    let read_content = page_guard.as_slice();
     assert_eq!(read_content, content);
+    drop(page_guard);
     cache.release(page_handle);
     assert_eq!(cache.size(), 1);
 }
 
 #[test]
 fn page_cache_pop_dirty_to_flush() {
-    let cache = new_page_cache();
+    let cache = new_page_cache_for_tests!(MB * 5);
     let key: usize = 125;
 
     let page_handle = cache.acquire(key).unwrap();
@@ -95,7 +89,7 @@ fn page_cache_pop_dirty_to_flush() {
 
 #[test]
 fn page_cache_group_consecutive_pages() {
-    let cache = new_page_cache();
+    let cache = new_page_cache_for_tests!(MB * 5);
     let keys = vec![3usize, 8, 7, 0, 2, 9, 5];
     let consecutive_keys = vec![vec![0usize], vec![2, 3], vec![5], vec![7, 8, 9]];
 
@@ -124,13 +118,9 @@ fn page_cache_group_consecutive_pages() {
 }
 
 #[test]
-#[allow(unused)]
 fn page_cache_evictor_task() -> Result<()> {
     async_rt::task::block_on(async move {
-        impl_fixed_size_page_alloc! { TestPageAlloc, BLOCK_SIZE * 100 }
-        let flusher = Arc::new(SimpleFlusher);
-        let cache = PageCache::<usize, TestPageAlloc>::new(flusher);
-
+        let cache = new_page_cache_for_tests!(BLOCK_SIZE * 100);
         const CAPACITY: usize = 125;
         for key in 0..CAPACITY {
             if let Some(page_handle) = cache.acquire(key) {
@@ -141,7 +131,7 @@ fn page_cache_evictor_task() -> Result<()> {
         }
 
         let waiter = Waiter::new();
-        waiter.wait_timeout(Some(&mut Duration::from_secs(1))).await;
+        let _ = waiter.wait_timeout(Some(&mut Duration::from_secs(5))).await;
 
         // Pages being evicted during out-limit acquire
         assert!(cache.size() < CAPACITY);

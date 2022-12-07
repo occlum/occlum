@@ -24,14 +24,14 @@ pub trait PageAlloc: Send + Sync + Clone + 'static {
 
 /// A test-purpose page allocator with fixed total size.
 pub struct FixedSizePageAlloc {
-    total_bytes: usize,
+    total_bytes: AtomicUsize,
     remain_bytes: AtomicUsize,
 }
 
 impl FixedSizePageAlloc {
     pub fn new(total_bytes: usize) -> Self {
         let new_self = Self {
-            total_bytes,
+            total_bytes: AtomicUsize::new(total_bytes),
             remain_bytes: AtomicUsize::new(total_bytes),
         };
         trace!("[PageAlloc] new, {:#?}", new_self);
@@ -54,12 +54,18 @@ impl FixedSizePageAlloc {
     /// Calculate current memory consumption.
     /// Return true if 90 percent capacity has been consumed.
     pub fn is_memory_low(&self) -> bool {
-        let alloc_limit: usize = self.total_bytes / 10;
+        let alloc_limit: usize = self.total_bytes.load(Ordering::Relaxed) / 10;
         if self.remain_bytes.load(Ordering::Relaxed) < alloc_limit {
             trace!("[PageAlloc] memory low, {:#?}", self);
             return true;
         }
         false
+    }
+
+    pub fn define_limit(&self, total_bytes: usize) {
+        self.total_bytes.store(total_bytes, Ordering::Relaxed);
+        self.remain_bytes.store(total_bytes, Ordering::Relaxed);
+        trace!("[PageAlloc] define size limit, {:#?}", self);
     }
 
     #[inline]
@@ -73,7 +79,7 @@ impl Debug for FixedSizePageAlloc {
         write!(
             f,
             "FixedSizePageAlloc {{ total_bytes: {}, remain_bytes: {} }}",
-            self.total_bytes,
+            self.total_bytes.load(Ordering::Relaxed),
             self.remain_bytes.load(Ordering::Relaxed)
         )
     }
@@ -88,33 +94,35 @@ impl Debug for FixedSizePageAlloc {
 #[macro_export]
 macro_rules! impl_fixed_size_page_alloc {
     ($page_alloc:ident, $total_bytes:expr) => {
-        use lazy_static::lazy_static;
-        use $crate::{FixedSizePageAlloc, PageAlloc};
+        lazy_static::lazy_static! {
+            /// A global fixed-size page allocator.
+            /// The size limit should be user-defined later.
+            pub static ref GLOBAL_FIXED_SIZE_PAGE_ALLOC: $crate::FixedSizePageAlloc
+                = $crate::FixedSizePageAlloc::new(0);
+        }
+
+        GLOBAL_FIXED_SIZE_PAGE_ALLOC.define_limit($total_bytes);
 
         #[derive(Clone)]
         pub struct $page_alloc;
 
-        lazy_static! {
-            static ref ALLOCATOR: FixedSizePageAlloc = FixedSizePageAlloc::new($total_bytes);
-        }
-
-        impl PageAlloc for $page_alloc {
+        impl $crate::PageAlloc for $page_alloc {
             fn alloc_page() -> *mut u8 {
-                ALLOCATOR.alloc_page()
+                GLOBAL_FIXED_SIZE_PAGE_ALLOC.alloc_page()
             }
 
             unsafe fn dealloc_page(page_ptr: *mut u8) {
-                ALLOCATOR.dealloc_page(page_ptr);
+                GLOBAL_FIXED_SIZE_PAGE_ALLOC.dealloc_page(page_ptr);
             }
 
             fn register_low_memory_callback(f: impl Fn()) {
-                if ALLOCATOR.is_memory_low() {
+                if GLOBAL_FIXED_SIZE_PAGE_ALLOC.is_memory_low() {
                     f();
                 }
             }
 
             fn is_memory_low() -> bool {
-                ALLOCATOR.is_memory_low()
+                GLOBAL_FIXED_SIZE_PAGE_ALLOC.is_memory_low()
             }
         }
     };

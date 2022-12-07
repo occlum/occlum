@@ -7,20 +7,24 @@ use page_cache::*;
 use std::sync::Arc;
 use std::time::Duration;
 
-// MyPageAlloc is a test-purpose fixed-size allocator.
-pub const MB: usize = 1024 * 1024;
-impl_fixed_size_page_alloc! { MyPageAlloc, MB * 512 }
+const MB: usize = 1024 * 1024;
 
-fn new_cached_disk() -> CachedDisk<MyPageAlloc> {
-    const TOTAL_BLOCKS: usize = 1024 * 1024;
-    let mem_disk = MemDisk::new(TOTAL_BLOCKS).unwrap();
-    CachedDisk::<MyPageAlloc>::new(Arc::new(mem_disk)).unwrap()
+macro_rules! new_cached_disk_for_tests {
+    ($cache_size:expr) => {{
+        // `MyPageAlloc` is a test-purpose fixed-size allocator.
+        impl_fixed_size_page_alloc! { MyPageAlloc, $cache_size }
+
+        let total_blocks = 1024 * 1024;
+        let mem_disk = MemDisk::new(total_blocks).unwrap();
+
+        CachedDisk::<MyPageAlloc>::new(Arc::new(mem_disk)).unwrap()
+    }};
 }
 
 #[test]
 fn cached_disk_read_write() -> Result<()> {
     async_rt::task::block_on(async move {
-        let cached_disk = new_cached_disk();
+        let cached_disk = new_cached_disk_for_tests!(MB * 256);
         let content: u8 = 5;
         const SIZE: usize = BLOCK_SIZE * 1;
         const OFFSET: usize = 1024;
@@ -53,7 +57,7 @@ fn cached_disk_read_write() -> Result<()> {
 #[test]
 fn cached_disk_flush() -> Result<()> {
     async_rt::task::block_on(async move {
-        let cached_disk = new_cached_disk();
+        let cached_disk = new_cached_disk_for_tests!(MB * 256);
         const SIZE: usize = BLOCK_SIZE;
         let write_cnt = 1;
         for i in 0..write_cnt {
@@ -83,7 +87,7 @@ fn cached_disk_flush() -> Result<()> {
 #[test]
 fn cached_disk_flush_pages() -> Result<()> {
     async_rt::task::block_on(async move {
-        let cached_disk = new_cached_disk();
+        let cached_disk = new_cached_disk_for_tests!(MB * 256);
         const SIZE: usize = BLOCK_SIZE;
         let write_cnt = 100;
         for i in 0..write_cnt {
@@ -103,10 +107,9 @@ fn cached_disk_flush_pages() -> Result<()> {
 }
 
 #[test]
-#[allow(unused)]
 fn cached_disk_flusher_task() -> Result<()> {
     async_rt::task::block_on(async move {
-        let cached_disk = Arc::new(new_cached_disk());
+        let cached_disk = Arc::new(new_cached_disk_for_tests!(MB * 256));
         let reader = cached_disk.clone();
         let writer = cached_disk.clone();
         const SIZE: usize = 4096;
@@ -121,7 +124,7 @@ fn cached_disk_flusher_task() -> Result<()> {
         let reader_handle = async_rt::task::spawn(async move {
             let waiter = Waiter::new();
             for _ in 0..rw_cnt {
-                waiter
+                let _ = waiter
                     .wait_timeout(Some(&mut Duration::from_millis(500)))
                     .await;
                 let mut read_buf: [u8; SIZE] = [0; SIZE];
@@ -144,9 +147,7 @@ fn cached_disk_flusher_task() -> Result<()> {
 #[test]
 fn cached_disk_evictor_task() -> Result<()> {
     async_rt::task::block_on(async move {
-        impl_fixed_size_page_alloc! { PageAllocTest, BLOCK_SIZE * 100 }
-        let cached_disk =
-            CachedDisk::<PageAllocTest>::new(Arc::new(MemDisk::new(1024).unwrap())).unwrap();
+        let cached_disk = new_cached_disk_for_tests!(BLOCK_SIZE * 100);
 
         // Support out-limit read/write thanks to the evictor task
         let rw_cnt = 500;
