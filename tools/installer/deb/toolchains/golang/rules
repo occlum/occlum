@@ -36,7 +36,7 @@ override_dh_install:
 	rm -rf $(install_dir)/.git*
 	cat > $(install_dir)/bin/occlum-go <<EOF
 		#!/bin/bash
-		OCCLUM_GCC="\$$(which occlum-gcc)"
+		OCCLUM_GCC="\$${CC:-\$$(which occlum-gcc)}"
 		OCCLUM_GOFLAGS="-buildmode=pie \$$GOFLAGS"
 		CC=\$$OCCLUM_GCC GOFLAGS=\$$OCCLUM_GOFLAGS /opt/occlum/toolchains/golang/bin/go "\$$@"
 	EOF

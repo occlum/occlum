@@ -49,7 +49,7 @@ mv go-go%{GO_VERSION} %{buildroot}%{INSTALL_DIR}/golang
 rm -rf %{buildroot}%{INSTALL_DIR}/golang/.git*
 cat > %{buildroot}%{INSTALL_DIR}/golang/bin/occlum-go <<EOF
 #!/bin/bash
-OCCLUM_GCC="\$(which occlum-gcc)"
+OCCLUM_GCC="\${CC:-\$(which occlum-gcc)}"
 OCCLUM_GOFLAGS="-buildmode=pie \$GOFLAGS"
 CC=\$OCCLUM_GCC GOFLAGS=\$OCCLUM_GOFLAGS %{INSTALL_DIR}/golang/bin/go "\$@"
 EOF
