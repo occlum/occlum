@@ -626,7 +626,7 @@ impl SocketFile {
 
 mod impls {
     use super::*;
-    use io_uring_callback::IoUring;
+    use crate::io_uring::{IoUringRef, IO_URING_MANAGER};
 
     pub type Ipv4Stream = async_socket::StreamSocket<Ipv4SocketAddr, SocketRuntime>;
     pub type Ipv6Stream = async_socket::StreamSocket<Ipv6SocketAddr, SocketRuntime>;
@@ -644,8 +644,17 @@ mod impls {
     pub struct SocketRuntime;
 
     impl async_socket::Runtime for SocketRuntime {
-        fn io_uring() -> &'static IoUring {
-            &*crate::io_uring::SINGLETON
+        fn io_uring() -> IoUringRef {
+            let current = current!();
+            let vcpu_id = current
+                .task()
+                .unwrap()
+                .vcpu()
+                .expect("This task must be running");
+
+            IO_URING_MANAGER
+                .get_io_uring_ref(vcpu_id)
+                .expect("io_uring instance should be initialized")
         }
     }
 }

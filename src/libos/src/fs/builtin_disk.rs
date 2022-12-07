@@ -70,14 +70,24 @@ const MB: usize = 1024 * 1024;
 const GB: usize = 1024 * 1024 * 1024;
 
 mod runtime {
-    use io_uring_callback::IoUring;
+    use crate::io_uring::IO_URING_MANAGER;
+    use io_uring_callback::IoUringRef;
     use sgx_disk::IoUringProvider;
 
     pub struct IoUringRuntime;
 
     impl IoUringProvider for IoUringRuntime {
-        fn io_uring() -> &'static IoUring {
-            &*crate::io_uring::SINGLETON
+        fn io_uring() -> IoUringRef {
+            let current = current!();
+            let vcpu_id = current
+                .task()
+                .unwrap()
+                .vcpu()
+                .expect("This task must be running");
+
+            IO_URING_MANAGER
+                .get_io_uring_ref(vcpu_id)
+                .expect("io_uring instance should be initialized")
         }
     }
 }

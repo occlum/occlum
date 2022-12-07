@@ -601,6 +601,7 @@ dependencies = [
  "io-uring",
  "lazy_static",
  "libc",
+ "log",
  "sgx_libc",
  "sgx_tstd",
  "slab",

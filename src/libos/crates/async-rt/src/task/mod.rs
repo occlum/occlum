@@ -66,7 +66,8 @@ fn init_runner_threads() {
 
         for _ in 0..crate::executor::num_vcpus() {
             std::thread::spawn(|| {
-                crate::executor::run_tasks();
+                let this_vcpu = crate::executor::new_vcpu();
+                crate::executor::run_tasks(this_vcpu);
             });
         }
     });

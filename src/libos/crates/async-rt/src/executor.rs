@@ -14,9 +14,14 @@ pub fn num_vcpus() -> u32 {
     EXECUTOR.num_vcpus()
 }
 
+/// Create new vcpu id
+pub fn new_vcpu() -> u32 {
+    EXECUTOR.new_vcpu()
+}
+
 /// Start running tasks in this vcpu of executor
-pub fn run_tasks() -> u32 {
-    EXECUTOR.run_tasks()
+pub fn run_tasks(this_vcpu: u32) -> u32 {
+    EXECUTOR.run_tasks(this_vcpu)
 }
 
 /// Shutdown the executor
@@ -83,9 +88,13 @@ impl Executor {
         self.num_vcpus
     }
 
+    /// Return the new vcpu id
+    pub fn new_vcpu(&self) -> u32 {
+        self.running_vcpus.fetch_add(1, Ordering::Relaxed)
+    }
+
     /// Start running tasks in this vcpu of executor
-    pub fn run_tasks(&self) -> u32 {
-        let this_vcpu = self.running_vcpus.fetch_add(1, Ordering::Relaxed);
+    pub fn run_tasks(&self, this_vcpu: u32) -> u32 {
         debug_assert!(this_vcpu < self.num_vcpus);
 
         vcpu::set_current(this_vcpu);

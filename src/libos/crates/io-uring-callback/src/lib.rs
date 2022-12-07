@@ -105,6 +105,8 @@
 #![feature(get_mut_unchecked)]
 #![cfg_attr(feature = "sgx", no_std)]
 
+#[macro_use]
+extern crate log;
 #[cfg(feature = "sgx")]
 extern crate sgx_libc as libc;
 #[cfg(feature = "sgx")]
@@ -131,6 +133,7 @@ mod io_handle;
 
 pub use crate::io_handle::{IoHandle, IoState};
 pub use io_uring::opcode::types::{Fd, RwFlags, TimeoutFlags, Timespec};
+pub type IoUringRef = Arc<IoUring>;
 
 /// An io_uring instance.
 ///
