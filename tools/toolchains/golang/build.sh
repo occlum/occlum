@@ -28,7 +28,7 @@ mv ${BUILD_DIR} ${INSTALL_DIR}
 # Generate the wrappers for Go
 cat > ${INSTALL_DIR}/bin/occlum-go <<EOF
 #!/bin/bash
-OCCLUM_GCC="\$(which occlum-gcc)"
+OCCLUM_GCC="\${CC:-\$(which occlum-gcc)}"
 OCCLUM_GOFLAGS="-buildmode=pie \$GOFLAGS"
 CC=\$OCCLUM_GCC GOFLAGS=\$OCCLUM_GOFLAGS ${INSTALL_DIR}/bin/go "\$@"
 EOF
