@@ -194,6 +194,7 @@ pub struct ConfigMountOptions {
     pub layers: Option<Vec<ConfigMount>>,
     pub temporary: bool,
     pub total_size: Option<usize>,
+    pub page_cache_size: Option<usize>,
     pub index: u32,
     pub autokey_policy: Option<u32>,
 }
@@ -348,6 +349,11 @@ impl ConfigMountOptions {
         } else {
             None
         };
+        let page_cache_size = if input.page_cache_size.is_some() {
+            Some(parse_memory_size(input.page_cache_size.as_ref().unwrap())?)
+        } else {
+            None
+        };
         let layers = if let Some(layers) = &input.layers {
             let layers = layers
                 .iter()
@@ -362,6 +368,7 @@ impl ConfigMountOptions {
             layers,
             temporary: input.temporary,
             total_size,
+            page_cache_size,
             index: input.index,
             autokey_policy: input.autokey_policy,
         })
@@ -504,6 +511,8 @@ struct InputConfigMountOptions {
     pub temporary: bool,
     #[serde(default)]
     pub total_size: Option<String>,
+    #[serde(default)]
+    pub page_cache_size: Option<String>,
     #[serde(default)]
     pub index: u32,
     #[serde(default)]

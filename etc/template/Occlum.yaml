@@ -117,8 +117,12 @@ mount:
   #   type: async_sfs
   #   source: ./run/async_sfs_image
   #   options:
+  #     # Total size that Async-SFS can manage. Must be specified.
   #     total_size: 4GB
-
+  #     # Page cache size that Async-SFS can use. Must be specified.
+  #     # When the `page_cache_size` is given, the `kernel_space_heap_size` must be increased equally.
+  #     page_cache_size: 256MB
+#
 # Untrusted Unix domain socket
 # Besides the common Unix domain socket support that both ends are created in the same
 # Occlum instance, the Untrusted Unix domain socket can support cross-world connection by

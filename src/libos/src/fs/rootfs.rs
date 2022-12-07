@@ -293,10 +293,12 @@ async fn open_or_create_async_sfs_according_to(
     }
     let source_path = mc.source.as_ref().unwrap();
 
+    if mc.options.page_cache_size.is_none() {
+        return_errno!(EINVAL, "Page cache size is expected for Async-SFS");
+    }
+    let page_cache_size = mc.options.page_cache_size.unwrap();
     // AsyncFsPageAlloc is a fixed-size allocator for page cache.
-    // TODO: Make the page cache size configurable
-    const MB: usize = 1024 * 1024;
-    impl_fixed_size_page_alloc! { AsyncFsPageAlloc, 256 * MB };
+    impl_fixed_size_page_alloc! { AsyncFsPageAlloc, page_cache_size };
 
     let async_sfs = if source_path.exists() {
         let cache_disk = {
