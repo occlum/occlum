@@ -158,9 +158,11 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
     }
 
     // Close the datagram socket, cancel pending iouring requests
-    pub fn close(&self) -> Result<()> {
+    pub async fn close(&self) -> Result<()> {
+        self.sender.shutdown();
+        self.receiver.shutdown();
         self.common.set_closed();
-        self.cancel_requests();
+        self.cancel_requests().await;
         Ok(())
     }
 
@@ -173,7 +175,6 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
             return_errno!(ENOTCONN, "The udp socket is not connected");
         }
         drop(state);
-        // self.common.host_shutdown(how)?;
         match how {
             Shutdown::Read => {
                 self.common.host_shutdown(how)?;
@@ -376,16 +377,15 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
         self.common.set_recv_timeout(timeout);
     }
 
-    fn cancel_requests(&self) {
-        self.receiver.cancel_recv_requests();
-        self.sender.cancel_send_requests();
+    async fn cancel_requests(&self) {
+        self.receiver.cancel_recv_requests().await;
+        self.sender.try_clear_msg_queue_when_close().await;
     }
 }
 
 impl<A: Addr + 'static, R: Runtime> Drop for DatagramSocket<A, R> {
     fn drop(&mut self) {
         self.common.set_closed();
-        self.cancel_requests();
     }
 }
 

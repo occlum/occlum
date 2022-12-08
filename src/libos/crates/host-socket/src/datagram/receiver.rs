@@ -93,34 +93,29 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         let mut recv_bytes = 0;
         let mut msg_flags = MsgFlags::empty();
         let recv_addr = inner.get_packet_addr();
-        // let msg_controllen = inner.req.msg.msg_controllen;
         let msg_controllen = inner.control_len.unwrap_or(0);
+        let user_controllen = control.as_ref().map_or(0, |buf| buf.len());
 
         // Copy ancillary data from control buffer
-        if msg_controllen > super::OPTMEM_MAX {
+        if user_controllen > super::OPTMEM_MAX {
             return_errno!(EINVAL, "invalid msg control length");
         }
-        let user_controllen = if let Some(control) = control {
-            control.len()
-        } else {
-            0
-        };
 
         if user_controllen < msg_controllen {
             msg_flags = msg_flags | MsgFlags::MSG_CTRUNC
         }
 
         if msg_controllen > 0 {
+            let copied_bytes = msg_controllen.min(user_controllen);
             control
                 .as_mut()
-                .map(|buf| buf.copy_from_slice(&inner.msg_control[..buf.len()]));
+                .map(|buf| buf[..copied_bytes].copy_from_slice(&inner.msg_control[..copied_bytes]));
         }
 
         // Copy data from the recv buffer to the bufs
         if A::domain() == Domain::Netlink {
             let copied_bytes = inner.try_copy_buf_netlink(bufs);
             if let Some(bytes) = copied_bytes {
-                // let recv_addr = inner.get_packet_addr();
                 if inner.recv_len.is_none() {
                     // All recv_len are consumed, do next host recv.
                     self.do_recv(&mut inner);
@@ -252,11 +247,38 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         self.do_recv(&mut inner);
     }
 
-    pub fn cancel_recv_requests(&self) {
-        let inner = self.inner.lock().unwrap();
-        if let Some(io_handle) = &inner.io_handle {
-            let io_uring = self.common.io_uring();
-            unsafe { io_uring.cancel(io_handle) };
+    pub async fn cancel_recv_requests(&self) {
+        {
+            let inner = self.inner.lock().unwrap();
+            if let Some(io_handle) = &inner.io_handle {
+                let io_uring = self.common.io_uring();
+                unsafe { io_uring.cancel(io_handle) };
+            } else {
+                return;
+            }
+        }
+
+        // wait for the cancel to complete
+        let poller = Poller::new();
+        let mask = Events::ERR | Events::IN;
+        self.common.pollee().connect_poller(mask, &poller);
+
+        loop {
+            let pending_request_exist = {
+                let inner = self.inner.lock().unwrap();
+                inner.io_handle.is_some()
+            };
+
+            if pending_request_exist {
+                let mut timeout = Some(Duration::from_secs(10));
+                let ret = poller.wait_timeout(timeout.as_mut()).await;
+                if let Err(e) = ret {
+                    warn!("wait cancel recv request error = {:?}", e.errno());
+                    continue;
+                }
+            } else {
+                break;
+            }
         }
     }
 

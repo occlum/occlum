@@ -41,11 +41,50 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
         inner.msg_queue.is_empty()
     }
 
-    pub fn cancel_send_requests(&self) {
-        let io_uring = self.common.io_uring();
+    // Normally, We will always try to send as long as the kernel send buf is not empty.
+    // However, if the user calls close, we will wait LINGER time
+    // and then cancel on-going or new-issued send requests.
+    pub async fn try_clear_msg_queue_when_close(&self) {
         let inner = self.inner.lock().unwrap();
-        if let Some(io_handle) = &inner.io_handle {
-            unsafe { io_uring.cancel(io_handle) };
+        debug_assert!(inner.is_shutdown());
+        if inner.msg_queue.is_empty() {
+            return;
+        }
+
+        // Wait for linger time to empty the kernel buffer or cancel subsequent requests.
+        drop(inner);
+        const DEFUALT_LINGER_TIME: usize = 10;
+        let poller = Poller::new();
+        let mask = Events::ERR | Events::OUT;
+        self.common.pollee().connect_poller(mask, &poller);
+
+        loop {
+            let pending_request_exist = {
+                let inner = self.inner.lock().unwrap();
+                inner.io_handle.is_some()
+            };
+
+            if pending_request_exist {
+                let mut timeout = Some(Duration::from_secs(DEFUALT_LINGER_TIME as u64));
+                let ret = poller.wait_timeout(timeout.as_mut()).await;
+                trace!("wait empty send buffer ret = {:?}", ret);
+                if let Err(_) = ret {
+                    // No complete request to wake. Just cancel the send requests.
+                    let io_uring = self.common.io_uring();
+                    let inner = self.inner.lock().unwrap();
+                    if let Some(io_handle) = &inner.io_handle {
+                        unsafe { io_uring.cancel(io_handle) };
+                        // Loop again to wait the cancel request to complete
+                        continue;
+                    } else {
+                        // No pending request, just break
+                        break;
+                    }
+                }
+            } else {
+                // There is no pending requests
+                break;
+            }
         }
     }
 
@@ -56,6 +95,10 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
         flags: SendFlags,
         control: Option<&[u8]>,
     ) -> Result<usize> {
+        if !flags.is_empty() && flags != SendFlags::MSG_DONTWAIT {
+            error!("Not supported flags: {:?}", flags);
+            return_errno!(EINVAL, "not supported flags");
+        }
         let mask = Events::OUT;
         // Initialize the poller only when needed
         let mut poller = None;
@@ -90,8 +133,6 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
                     warn!("send wait errno = {:?}", e.errno());
                     match e.errno() {
                         ETIMEDOUT => {
-                            // Just cancel send requests if timeout
-                            self.cancel_send_requests();
                             return_errno!(EAGAIN, "timeout reached")
                         }
                         _ => {
@@ -250,7 +291,7 @@ unsafe impl MaybeUntrusted for SendReq {}
 
 struct MsgQueue {
     queue: VecDeque<DataMsg>,
-    size: usize,
+    curr_size: usize,
 }
 
 impl MsgQueue {
@@ -258,13 +299,13 @@ impl MsgQueue {
     fn new() -> Self {
         Self {
             queue: VecDeque::with_capacity(SENDMSG_QUEUE_LEN),
-            size: 0,
+            curr_size: 0,
         }
     }
 
     #[inline(always)]
     fn size(&self) -> usize {
-        self.size
+        self.curr_size
     }
 
     #[inline(always)]
@@ -278,7 +319,7 @@ impl MsgQueue {
     fn push_msg(&mut self, msg: DataMsg) -> bool {
         let total_len = msg.len() + self.size();
         if total_len <= super::MAX_BUF_SIZE {
-            self.size = total_len;
+            self.curr_size = total_len;
             self.queue.push_back(msg);
             return true;
         }
@@ -288,7 +329,7 @@ impl MsgQueue {
     #[inline(always)]
     fn pop_msg(&mut self) {
         if let Some(msg) = self.queue.pop_front() {
-            self.size = self.size() - msg.len();
+            self.curr_size = self.size() - msg.len();
         }
     }
 
