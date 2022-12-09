@@ -1,0 +1,34 @@
+includes:
+  - base.yaml
+# mysql
+targets:
+  # copy bins
+  - target: /bin
+    copy:
+      - files:
+        # server tools
+        - /usr/local/mysql/bin/mysqld
+        # client tools
+        - /usr/local/mysql/bin/mysql
+        - /usr/local/mysql/bin/mysqladmin
+        - /usr/local/mysql/bin/mysqlshow
+  - target: /etc
+    copy:
+      - files:
+        - ../my.cnf
+  - target: /etc
+    copy:
+      - files:
+        - /etc/localtime
+  - target: /opt/occlum/glibc/etc
+    copy:
+      - files:
+        - /etc/localtime
+  - target: /opt/occlum/glibc/lib
+    copy:
+      - files:
+        - /usr/local/mysql/lib/mysqlrouter/private/libprotobuf-lite.so.3.19.4
+  - target: /
+    copy:
+      - files:
+        - /usr/local/mysql/bin/mysqld
