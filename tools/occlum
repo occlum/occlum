@@ -120,6 +120,20 @@ check_has_run() {
     fi
 }
 
+check_has_start() {
+    if pgrep --full "build/bin/occlum_exec_server -d $instance_dir" > /dev/null ; then
+        echo "Error: the server of current Occlum instance has been started."
+        exit 1
+    fi
+}
+
+check_has_not_start() {
+    if ! pgrep --full "build/bin/occlum_exec_server -d $instance_dir" > /dev/null ; then
+        echo "Error: the server of current Occlum instance has not been started."
+        exit 1
+    fi
+}
+
 check_aesm_service() {
     # Ignore AESM service status for simulation mode
     if [ "$(cat $instance_dir/.sgx_mode 2>/dev/null)" != "HW" ]; then
@@ -375,6 +389,7 @@ cmd_run() {
 
 cmd_start() {
     check_has_built
+    check_has_start
     check_aesm_service
 
     loop=true
@@ -409,6 +424,7 @@ cmd_start() {
 
 cmd_exec() {
     check_has_built
+    check_has_not_start
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
@@ -426,6 +442,7 @@ cmd_exec() {
 
 cmd_stop() {
     check_has_built
+    check_has_not_start
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
@@ -438,6 +455,19 @@ cmd_stop() {
 
     RUST_BACKTRACE=1 "$instance_dir/build/bin/occlum_exec_client" stop -t 0
 
+    ## Ensure the server is stopped, default timeout is 30s
+    for i in $(seq 0 30); do
+        if pgrep --full "build/bin/occlum_exec_server -d $instance_dir" > /dev/null ; then
+            sleep 1
+        else
+            echo "server stopped."
+            echo "built" > "$status_file"
+            exit 0
+        fi
+    done
+
+    echo "Error: timeout to stop the server, let's kill it."
+    pkill -SIGKILL --full "build/bin/occlum_exec_server -d $instance_dir"
     echo "built" > "$status_file"
 }
 

@@ -292,14 +292,14 @@ fn main() -> Result<(), i32> {
 
     if let Some(ref _matches) = matches.subcommand_matches("start") {
         if let Err(s) = start_server(&client, DEFAULT_SERVER_FILE) {
-            println!("start_server failed {}", s);
+            println!("start server failed {}", s);
             return Err(-1);
         }
         println!("server is running.");
     } else if let Some(ref matches) = matches.subcommand_matches("stop") {
         let stop_time = matches.value_of("time").unwrap().parse::<u32>().unwrap();
         stop_server(&client, stop_time);
-        println!("server stopped.");
+        println!("server is stopping.");
     } else if let Some(ref matches) = matches.subcommand_matches("exec") {
         let mut cmd_args: Vec<&str> = match matches
             .values_of("args")
