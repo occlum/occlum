@@ -6,6 +6,12 @@ use rcore_fs_devfs::DevFS;
 use rcore_fs_mountfs::MountFS;
 use rcore_fs_ramfs::RamFS;
 
+#[cfg(feature = "dcap")]
+use self::dev_attestation::DevAttestQuote;
+#[cfg(feature = "dcap")]
+use self::dev_attestation::DevAttestReportData;
+#[cfg(feature = "dcap")]
+use self::dev_attestation::DevAttestType;
 use self::dev_fd::DevFd;
 use self::dev_null::DevNull;
 use self::dev_random::DevRandom;
@@ -13,6 +19,8 @@ use self::dev_sgx::DevSgx;
 use self::dev_shm::DevShm;
 use self::dev_zero::DevZero;
 
+#[cfg(feature = "dcap")]
+mod dev_attestation;
 mod dev_fd;
 mod dev_null;
 mod dev_random;
@@ -37,6 +45,15 @@ pub fn init_devfs() -> Result<Arc<MountFS>> {
     devfs.add("shm", dev_shm)?;
     let dev_fd = Arc::new(DevFd) as _;
     devfs.add("fd", dev_fd);
+    #[cfg(feature = "dcap")]
+    {
+        let dev_attest_type = Arc::new(DevAttestType) as _;
+        devfs.add("attestation_type", dev_attest_type)?;
+        let dev_attest_report_data = Arc::new(DevAttestReportData) as _;
+        devfs.add("attestation_report_data", dev_attest_report_data)?;
+        let dev_attest_quote = Arc::new(DevAttestQuote) as _;
+        devfs.add("attestation_quote", dev_attest_quote)?;
+    }
     let mountable_devfs = MountFS::new(devfs);
     // Mount the ramfs at '/shm'
     let ramfs = RamFS::new();
