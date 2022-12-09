@@ -1,0 +1,28 @@
+--- mysql_src/mysys/my_rdtsc-origin.cc	2022-12-08 09:14:01.171126659 +0000
++++ mysql_src/mysys/my_rdtsc.cc	2022-12-08 09:08:52.016352814 +0000
+@@ -299,16 +299,16 @@
+ */
+ 
+ ulonglong my_timer_ticks(void) {
+-#if defined(HAVE_SYS_TIMES_H) && defined(HAVE_TIMES)
+-  {
+-    struct tms times_buf;
+-    return (ulonglong)times(&times_buf);
+-  }
+-#elif defined(_WIN32)
+-  return (ulonglong)GetTickCount();
+-#else
++// #if defined(HAVE_SYS_TIMES_H) && defined(HAVE_TIMES)
++//   {
++//     struct tms times_buf;
++//     return (ulonglong)times(&times_buf);
++//   }
++// #elif defined(_WIN32)
++//   return (ulonglong)GetTickCount();
++// #else
+   return 0;
+-#endif
++// #endif
+ }
+ 
+ /**
