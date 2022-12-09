@@ -94,7 +94,7 @@ $(instance_dir)/build/bin:
 	@mkdir -p build/bin
 
 $(instance_dir)/build/lib/libocclum-pal.so:
-$(instance_dir)/build/lib/libocclum-pal.so.0: | $(instance_dir)/build/lib
+$(instance_dir)/build/lib/libocclum-pal.so.$(major_ver) : | $(instance_dir)/build/lib
 	@cp "$(occlum_dir)/build/lib/$(pal_lib).$(occlum_version)" build/lib/
 	@cd build/lib && ln -sf "$(pal_lib).$(occlum_version)" "libocclum-pal.so.$(major_ver)" && \
 		ln -sf "libocclum-pal.so.$(major_ver)" libocclum-pal.so
