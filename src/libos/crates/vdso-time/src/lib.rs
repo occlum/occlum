@@ -269,6 +269,7 @@ impl Vdso {
             ClockId::CLOCK_REALTIME_COARSE | ClockId::CLOCK_MONOTONIC_COARSE => {
                 self.do_coarse(ClockSource::CS_HRES_COARSE, clockid)
             }
+            // TODO: support CLOCK_PROCESS_CPUTIME_ID and CLOCK_THREAD_CPUTIME_ID.
             _ => return_errno!(EINVAL, "Unsupported clockid in do_clock_gettime()"),
         }
     }
@@ -284,6 +285,7 @@ impl Vdso {
             ClockId::CLOCK_REALTIME_COARSE | ClockId::CLOCK_MONOTONIC_COARSE => self
                 .coarse_resolution
                 .ok_or(errno!(EOPNOTSUPP, "coarse_resolution is none")),
+            // TODO: support CLOCK_PROCESS_CPUTIME_ID and CLOCK_THREAD_CPUTIME_ID.
             _ => return_errno!(EINVAL, "Unsupported clockid in do_clock_getres()"),
         }
     }

@@ -147,13 +147,6 @@ impl timespec_t {
 pub type clockid_t = i32;
 
 pub fn do_clock_gettime(clockid: ClockId) -> Result<timespec_t> {
-    // TODO: support CLOCK_PROCESS_CPUTIME_ID and CLOCK_THREAD_CPUTIME_ID.
-    if clockid == ClockId::CLOCK_PROCESS_CPUTIME_ID || clockid == ClockId::CLOCK_THREAD_CPUTIME_ID {
-        return_errno!(
-            EINVAL,
-            "Not support CLOCK_PROCESS_CPUTIME_ID or CLOCK_THREAD_CPUTIME_ID"
-        );
-    }
     let tv = timespec_t::from(vdso_time::clock_gettime(clockid).unwrap());
     tv.validate()
         .expect("clock_gettime returned invalid timespec");
