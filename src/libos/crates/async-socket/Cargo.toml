@@ -1,5 +1,5 @@
 [package]
-name = "host-socket"
+name = "async-socket"
 version = "0.1.0"
 authors = ["Tate, Hongliang Tian <tate.thl@antgroup.com>"]
 edition = "2021"

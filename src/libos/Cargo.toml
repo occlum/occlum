@@ -38,7 +38,7 @@ num_enum = { version = "0.5", default-features = false }
 vdso-time  = { path = "crates/vdso-time", default-features = false, features = ["sgx"] }
 inherit-methods-macro= { path = "crates/inherit-methods-macro" }
 io-uring-callback = { path = "crates/io-uring-callback", features = ["sgx"] }
-host-socket  = { path = "crates/host-socket", default-features = false, features = ["sgx"] }
+async-socket  = { path = "crates/async-socket", default-features = false, features = ["sgx"] }
 sgx-disk  = { path = "crates/sgx-disk", default-features = false, features = ["sgx"] }
 block-device  = { path = "crates/block-device" }
 page-cache = { path = "crates/page-cache", default-features = false, features = ["sgx"] }

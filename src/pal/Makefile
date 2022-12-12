@@ -22,7 +22,7 @@ ASYNC_RT_SRCS := $(CRATES_DIR)/async-rt/src/ocalls/async_rt_ocalls.c
 ASYNC_RT_OBJS := $(addprefix $(OBJ_DIR)/pal/external_ocalls,$(ASYNC_RT_SRCS:.c=.o))
 VDSO_SRCS := $(CRATES_DIR)/vdso-time/ocalls/vdso-time-ocalls.c
 VDSO_OBJS := $(addprefix $(OBJ_DIR)/pal/external_ocalls,$(VDSO_SRCS:.c=.o))
-SOCKET_SRCS := $(CRATES_DIR)/host-socket/ocalls/host_socket_ocalls.c
+SOCKET_SRCS := $(CRATES_DIR)/async-socket/ocalls/async_socket_ocalls.c
 SOCKET_OBJS := $(addprefix $(OBJ_DIR)/pal/external_ocalls,$(SOCKET_SRCS:.c=.o))
 
 # Object files for simulation mode are stored in libos/src_sim
@@ -79,7 +79,7 @@ $(OBJ_DIR)/pal/$(SRC_OBJ)/Enclave_u.c: $(SGX_EDGER8R) ../Enclave.edl
 		--search-path $(RUST_SGX_SDK_DIR)/edl/ \
 		--search-path $(CRATES_DIR)/async-rt/src/ocalls \
 		--search-path $(CRATES_DIR)/vdso-time/ocalls \
-		--search-path $(CRATES_DIR)/host-socket/ocalls \
+		--search-path $(CRATES_DIR)/async-socket/ocalls \
 		--search-path $(PROJECT_DIR)/deps/io-uring/ocalls
 	@echo "GEN <= $@"
 

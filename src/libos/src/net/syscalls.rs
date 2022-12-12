@@ -8,7 +8,7 @@ use async_io::socket::{
     GetRecvTimeoutCmd, GetSendTimeoutCmd, SetRecvTimeoutCmd, SetSendTimeoutCmd,
 };
 use async_io::socket::{RecvFlags, SendFlags, Shutdown, Type};
-use host_socket::sockopt::{
+use async_socket::sockopt::{
     GetAcceptConnCmd, GetDomainCmd, GetPeerNameCmd, GetSockOptRawCmd, GetTypeCmd, SetSockOptRawCmd,
     SockOptName,
 };

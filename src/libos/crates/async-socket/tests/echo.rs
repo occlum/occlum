@@ -85,7 +85,7 @@ fn run_echo_server_and_clients<A: Addr + 'static>(
 mod runtime {
     use std::sync::Once;
 
-    use host_socket::Runtime;
+    use async_socket::Runtime;
     use io_uring_callback::{Builder as IoUringBuilder, IoUring};
 
     pub struct SocketRuntime;
@@ -120,8 +120,8 @@ mod runtime {
 
 mod server {
     use async_io::socket::Addr;
+    use async_socket::StreamSocket;
     use errno::prelude::*;
-    use host_socket::StreamSocket;
 
     use super::runtime::SocketRuntime;
 
@@ -213,8 +213,8 @@ mod server {
 
 mod client {
     use async_io::socket::Addr;
+    use async_socket::StreamSocket;
     use errno::prelude::*;
-    use host_socket::StreamSocket;
 
     use super::random_base64::RandomBase64;
     use super::runtime::SocketRuntime;
@@ -320,7 +320,7 @@ mod stream_socket_ext {
     use futures::prelude::*;
 
     use async_io::socket::Addr;
-    use host_socket::StreamSocket;
+    use async_socket::StreamSocket;
 
     use super::runtime::SocketRuntime;
 

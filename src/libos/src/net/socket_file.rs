@@ -628,22 +628,22 @@ mod impls {
     use super::*;
     use io_uring_callback::IoUring;
 
-    pub type Ipv4Stream = host_socket::StreamSocket<Ipv4SocketAddr, SocketRuntime>;
-    pub type Ipv6Stream = host_socket::StreamSocket<Ipv6SocketAddr, SocketRuntime>;
-    // TODO: UnixStream cannot be simply re-exported from host_socket.
+    pub type Ipv4Stream = async_socket::StreamSocket<Ipv4SocketAddr, SocketRuntime>;
+    pub type Ipv6Stream = async_socket::StreamSocket<Ipv6SocketAddr, SocketRuntime>;
+    // TODO: UnixStream cannot be simply re-exported from async_socket.
     // There are two reasons. First, there needs to be some translation between LibOS
     // and host paths. Second, we need two types of unix domain sockets: the trusted one that
     // is implemented inside LibOS and the untrusted one that is implemented by host OS.
-    pub type UntrustedUnixStream = host_socket::StreamSocket<UnixAddr, SocketRuntime>;
+    pub type UntrustedUnixStream = async_socket::StreamSocket<UnixAddr, SocketRuntime>;
 
-    pub type Ipv4Datagram = host_socket::DatagramSocket<Ipv4SocketAddr, SocketRuntime>;
-    pub type Ipv6Datagram = host_socket::DatagramSocket<Ipv6SocketAddr, SocketRuntime>;
-    pub type UnixDatagram = host_socket::DatagramSocket<UnixAddr, SocketRuntime>;
-    pub type NetlinkDatagram = host_socket::NetlinkSocket<NetlinkSocketAddr, SocketRuntime>;
+    pub type Ipv4Datagram = async_socket::DatagramSocket<Ipv4SocketAddr, SocketRuntime>;
+    pub type Ipv6Datagram = async_socket::DatagramSocket<Ipv6SocketAddr, SocketRuntime>;
+    pub type UnixDatagram = async_socket::DatagramSocket<UnixAddr, SocketRuntime>;
+    pub type NetlinkDatagram = async_socket::NetlinkSocket<NetlinkSocketAddr, SocketRuntime>;
 
     pub struct SocketRuntime;
 
-    impl host_socket::Runtime for SocketRuntime {
+    impl async_socket::Runtime for SocketRuntime {
         fn io_uring() -> &'static IoUring {
             &*crate::io_uring::SINGLETON
         }

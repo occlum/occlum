@@ -32,7 +32,7 @@ async fn do_unlink(fs_path: &FsPath) -> Result<()> {
         return_errno!(EISDIR, "unlink on directory");
     }
     if metadata.type_ == FileType::Socket {
-        use host_socket::do_unlink as do_unlink_ocall;
+        use async_socket::do_unlink as do_unlink_ocall;
         let mut path_buf = vec![0u8; PATH_MAX];
         let host_addr_len = file_inode.read_at(0, &mut path_buf).await?;
         let host_addr = String::from_utf8(path_buf[..host_addr_len].to_vec())

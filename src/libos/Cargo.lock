@@ -11,6 +11,7 @@ dependencies = [
  "async-mountfs",
  "async-rt",
  "async-sfs",
+ "async-socket",
  "async-trait",
  "async-vfs",
  "atomic",
@@ -22,7 +23,6 @@ dependencies = [
  "errno",
  "futures",
  "goblin",
- "host-socket",
  "inherit-methods-macro",
  "intrusive-collections",
  "io-uring-callback",
@@ -165,6 +165,28 @@ dependencies = [
  "sgx_tstd",
  "sgx_types",
  "static_assertions 0.3.4",
+]
+
+[[package]]
+name = "async-socket"
+version = "0.1.0"
+dependencies = [
+ "async-io",
+ "atomic",
+ "bitflags",
+ "byteorder",
+ "cfg-if",
+ "errno",
+ "io-uring-callback",
+ "log",
+ "memoffset 0.6.1",
+ "num_enum",
+ "sgx-untrusted-alloc",
+ "sgx_libc",
+ "sgx_trts",
+ "sgx_tstd",
+ "sgx_types",
+ "slab",
 ]
 
 [[package]]
@@ -520,28 +542,6 @@ name = "hierarchical_hash_wheel_timer"
 version = "1.1.0"
 dependencies = [
  "sgx_tstd",
-]
-
-[[package]]
-name = "host-socket"
-version = "0.1.0"
-dependencies = [
- "async-io",
- "atomic",
- "bitflags",
- "byteorder",
- "cfg-if",
- "errno",
- "io-uring-callback",
- "log",
- "memoffset 0.6.1",
- "num_enum",
- "sgx-untrusted-alloc",
- "sgx_libc",
- "sgx_trts",
- "sgx_tstd",
- "sgx_types",
- "slab",
 ]
 
 [[package]]

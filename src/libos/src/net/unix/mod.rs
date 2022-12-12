@@ -71,7 +71,7 @@ impl UnixStream {
         apply_fn_on_any_stream!(self.inner(), |stream| { stream.domain() })
     }
 
-    fn get_host_socket_file_path(
+    fn get_async_socket_file_path(
         libos_path: &TrustedAddr,
         host_path: UnixAddr,
         is_socket_file: bool,
@@ -102,7 +102,7 @@ impl UnixStream {
             let untrusted_sock = UntrustedUnixStream::new(nonblocking)?;
 
             // Bind the Host FS address
-            let host_addr = Self::get_host_socket_file_path(addr, host_path, is_socket_file);
+            let host_addr = Self::get_async_socket_file_path(addr, host_path, is_socket_file);
             trace!(
                 "bind cross world sock: libos path: {:?}, host path: {:?}",
                 addr,
@@ -135,7 +135,7 @@ impl UnixStream {
             // Create untrusted socket end
             let untrusted_sock = UntrustedUnixStream::new(nonblocking)?;
 
-            let host_addr = Self::get_host_socket_file_path(addr, host_path, is_socket_file);
+            let host_addr = Self::get_async_socket_file_path(addr, host_path, is_socket_file);
             trace!(
                 "connect cross world sock: libos path: {:?}, host path: {:?}",
                 addr,

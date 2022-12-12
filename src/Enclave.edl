@@ -9,7 +9,7 @@ enclave {
     from "sgx_occlum_utils.edl" import *;
     from "sgx_async_rt_ocalls.edl" import *;
     from "sgx_vdso_time_ocalls.edl" import *;
-    from "sgx_host_socket_ocalls.edl" import *;
+    from "sgx_async_socket_ocalls.edl" import *;
     from "sgx_io_uring_ocalls.edl" import *;
     from "sgx_env.edl" import u_getcwd_ocall;
 

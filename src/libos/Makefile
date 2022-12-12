@@ -161,7 +161,7 @@ $(OBJ_DIR)/libos/$(SRC_OBJ)/Enclave_t.c: $(SGX_EDGER8R) ../Enclave.edl
 		--search-path $(RUST_SGX_SDK_DIR)/edl \
 		--search-path $(CRATES_DIR)/async-rt/src/ocalls \
 		--search-path $(CRATES_DIR)/vdso-time/ocalls \
-		--search-path $(CRATES_DIR)/host-socket/ocalls \
+		--search-path $(CRATES_DIR)/async-socket/ocalls \
 		--search-path $(PROJECT_DIR)/deps/io-uring/ocalls
 	@echo "GEN <= $@"
 
