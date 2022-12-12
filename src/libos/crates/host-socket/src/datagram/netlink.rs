@@ -124,14 +124,16 @@ impl<A: Addr, R: Runtime> NetlinkSocket<A, R> {
         let res = if addr.is_some() {
             self.sender.sendmsg(bufs, addr.unwrap(), flags, None).await
         } else {
-            let peer = self.common.peer_addr();
-            if peer.is_none() {
-                return_errno!(
-                    ENOTCONN,
-                    "The socket is not connected, and no target has been given"
-                )
-            }
-            self.sender.sendmsg(bufs, &peer.unwrap(), flags, None).await
+            let connected_addr = self.common.peer_addr();
+            let peer_addr = if let Some(addr) = connected_addr {
+                addr
+            } else {
+                // Sometimes Netlink has no assigning address in sendmsg and
+                // its status is not connected. In this situation, netlink addr
+                // use default dst_pid(0) and dst_groups(0).
+                A::default()
+            };
+            self.sender.sendmsg(bufs, &peer_addr, flags, None).await
         };
 
         res
