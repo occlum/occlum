@@ -53,7 +53,7 @@ Of course, Occlum must be run on Intel x86 CPUs with SGX support to do its magic
 
 ## Contributors
 
-This project follows the [all-contributors](https://allcontributors.org) specification. Contributions of any kind are welcome! We will publish contributing guidelines and accept pull requests after the project gets more stable.
+Contributions of any kind are welcome! We will publish contributing guidelines and accept pull requests after the project gets more stable.
 
 Thanks go to [all these wonderful contributors to this project](CONTRIBUTORS.md).
 
