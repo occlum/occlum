@@ -1,9 +1,12 @@
 resource_limits:
-  kernel_space_heap_size: 32MB
+  num_of_cpus: 128
   kernel_space_stack_size: 1MB
-  user_space_size: 300MB
-  min_num_of_cpus: 1
-  max_num_of_cpus: 128
+  kernel_space_heap_size:
+    init: 32MB
+    max: 512MB
+  user_space_size:
+    init: 300MB
+    max: 64GB
 process:
   default_stack_size: 4MB
   default_heap_size: 32MB

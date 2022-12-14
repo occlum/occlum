@@ -21,6 +21,17 @@ use crate::util::sgx::allow_debug as sgx_allow_debug;
 pub static mut INSTANCE_DIR: String = String::new();
 static mut ENCLAVE_PATH: String = String::new();
 
+// TCS used by Occlum kernel.
+// For "occlum run", we need 3 kernel thread:
+// * main thread to do occlum_ecall_new_process
+// * occlum timer thread to do occlum_ecall_timer_thread_create
+// * polling thread for io_uring
+//
+// For "occlum exec", we need 2 extra kernel thread:
+// * init process will call occlum_ecall_new_process in another thread different from the main thread
+// * "occlum stop" will create a new thread to do occlum_ecall_kill
+const OCCLUM_KERNEL_TCS_NUM: u32 = 5;
+
 lazy_static! {
     static ref INIT_ONCE: Once = Once::new();
     static ref HAS_INIT: AtomicBool = AtomicBool::new(false);
@@ -79,6 +90,20 @@ pub extern "C" fn occlum_ecall_init(
         }
     };
 
+    let max_tcs_num = std::enclave::get_tcs_max_num();
+    info!(
+        "num_vcpus = {:?}, max_tcs_num = {:?}",
+        num_vcpus, max_tcs_num
+    );
+    assert!(num_vcpus > 0 && num_vcpus <= 1024);
+    if max_tcs_num < num_vcpus + OCCLUM_KERNEL_TCS_NUM {
+        eprintln!(
+            "Can't create {:?} vcpus. Please enlarge the \"num_of_cpus\" in Occlum.yaml\n",
+            num_vcpus
+        );
+        return ecall_errno!(EINVAL);
+    }
+
     INIT_ONCE.call_once(|| {
         // Init the log infrastructure first so that log messages will be printed afterwards
         crate::util::log::init(log_level);
@@ -108,9 +133,6 @@ pub extern "C" fn occlum_ecall_init(
         }
 
         super::interrupt::init();
-
-        info!("num_vcpus = {:?}", num_vcpus);
-        assert!(num_vcpus > 0 && num_vcpus <= 1024);
 
         async_rt::vcpu::set_total(num_vcpus);
 

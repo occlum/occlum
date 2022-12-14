@@ -9,8 +9,8 @@ init_instance() {
     cd flink
     # Init Occlum instance
     occlum init
-    yq '.resource_limits.user_space_size = "7000MB" |
-        .resource_limits.kernel_space_heap_size="64MB" |
+    yq '.resource_limits.user_space_size.init = "7000MB" |
+        .resource_limits.kernel_space_heap_size.init="64MB" |
         .process.default_heap_size = "128MB" |
         .entry_points = [ "/usr/lib/jvm/java-11-openjdk-amd64/bin" ] |
         .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-11-openjdk-amd64/lib/server:/usr/lib/jvm/java-11-openjdk-amd64/lib:/usr/lib/jvm/java-11-openjdk-amd64/../lib:/lib:/opt/occlum/glibc/lib/", "OMP_NUM_THREADS=1", "KMP_AFFINITY=verbose,granularity=fine,compact,1,0", "KMP_BLOCKTIME=20" ]' \

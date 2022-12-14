@@ -25,7 +25,7 @@ function build_occlum_instance()
     pushd ${name}
     copy_bom -f ../iperf2.yaml --root image --include-dir /opt/occlum/etc/template
 
-    yq '.resource_limits.user_space_size = "1000MB" ' -i Occlum.yaml
+    yq '.resource_limits.user_space_size.init = "1000MB" ' -i Occlum.yaml
 
     occlum build
     popd
