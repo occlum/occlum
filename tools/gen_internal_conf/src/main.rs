@@ -7,12 +7,43 @@ extern crate serde_derive;
 extern crate serde_xml_rs;
 
 use clap::{App, Arg, SubCommand};
+use lazy_static::lazy_static;
 use log::debug;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+
+// Some hardcode implicit config value. Please update the values defined in "init()" when necessary.
+lazy_static! {
+    static ref DEFAULT_CONFIG: DefaultConfig = DefaultConfig::init();
+}
+
+struct DefaultConfig {
+    // TCS number used by Occlum kernel
+    num_of_tcs_used_by_occlum_kernel: u32,
+    // Corresponds to TCSMaxNum in Enclave.xml
+    num_of_cpus_max: u32,
+    // Corresponds to MiscSelect in Enclave.xml
+    misc_select: &'static str,
+    // Corresponds to MiscMask in Enclave.xml
+    misc_mask: &'static str,
+}
+
+impl DefaultConfig {
+    fn init() -> Self {
+        Self {
+            // from OCCLUM_KERNEL_TCS_NUM defined in src/libos/src/entry/enclave.rs
+            num_of_tcs_used_by_occlum_kernel: 5,
+            num_of_cpus_max: 1024,
+            // In order to operate on the User Region using EDMM API,
+            // both MiscSelect[0] and MiscMask[0] need to be set to 1
+            misc_select: "1",
+            misc_mask: "0xFFFFFFFF",
+        }
+    }
+}
 
 fn main() {
     env_logger::init();
@@ -120,9 +151,17 @@ fn main() {
             enclave_config_file_path
         );
 
-        let image_encrypted = sub_matches.value_of("encrypted").unwrap()
-            .parse::<bool>().unwrap();
+        let image_encrypted = sub_matches
+            .value_of("encrypted")
+            .unwrap()
+            .parse::<bool>()
+            .unwrap();
         debug!("Occlum image is encrypted: {}", image_encrypted);
+
+        // get the TCS number
+        let tcs_num = occlum_config.resource_limits.num_of_cpus + DEFAULT_CONFIG.num_of_tcs_used_by_occlum_kernel;
+        let tcs_min_pool = tcs_num;
+        let tcs_max_num = std::cmp::max(DEFAULT_CONFIG.num_of_cpus_max, tcs_num);
 
         // get the kernel stack size
         let stack_max_size =
@@ -134,22 +173,44 @@ fn main() {
             );
             return;
         }
+        let stack_min_size = stack_max_size;
+
         // get the kernel heap size
+        let heap_init_size =
+            parse_memory_size(&occlum_config.resource_limits.kernel_space_heap_size.init);
+        if heap_init_size.is_err() {
+            println!(
+                "The kernel_space_heap_size.init \"{}\" is not correct.",
+                occlum_config.resource_limits.kernel_space_heap_size.init
+            );
+            return;
+        }
+        let heap_min_size = heap_init_size;
         let heap_max_size =
-            parse_memory_size(&occlum_config.resource_limits.kernel_space_heap_size);
+            parse_memory_size(&occlum_config.resource_limits.kernel_space_heap_size.max);
         if heap_max_size.is_err() {
             println!(
-                "The kernel_space_heap_size \"{}\" is not correct.",
-                occlum_config.resource_limits.kernel_space_heap_size
+                "The kernel_space_heap_size.max \"{}\" is not correct.",
+                occlum_config.resource_limits.kernel_space_heap_size.max
             );
             return;
         }
         // get the user space size
-        let user_space_size = parse_memory_size(&occlum_config.resource_limits.user_space_size);
-        if user_space_size.is_err() {
+        let user_space_init_size =
+            parse_memory_size(&occlum_config.resource_limits.user_space_size.init);
+        if user_space_init_size.is_err() {
             println!(
-                "The user_space_size \"{}\" is not correct.",
-                occlum_config.resource_limits.user_space_size
+                "The user_space_size.init \"{}\" is not correct.",
+                occlum_config.resource_limits.user_space_size.init
+            );
+            return;
+        }
+        let user_space_max_size =
+            parse_memory_size(&occlum_config.resource_limits.user_space_size.max);
+        if user_space_max_size.is_err() {
+            println!(
+                "The user_space_size.max \"{}\" is not correct.",
+                occlum_config.resource_limits.user_space_size.max
             );
             return;
         }
@@ -161,23 +222,27 @@ fn main() {
             ProdID: occlum_config.metadata.product_id,
             ISVSVN: occlum_config.metadata.version_number,
             StackMaxSize: stack_max_size.unwrap() as u64,
-            StackMinSize: stack_max_size.unwrap() as u64, // just use the same size as max size
+            StackMinSize: stack_min_size.unwrap() as u64,
+            HeapInitSize: heap_init_size.unwrap() as u64,
             HeapMaxSize: heap_max_size.unwrap() as u64,
-            HeapMinSize: heap_max_size.unwrap() as u64, // just use the same size as max size
-            TCSNum: occlum_config.resource_limits.max_num_of_cpus * 2,
-            TCSMinPool: occlum_config.resource_limits.min_num_of_cpus + 1,
-            TCSMaxNum: occlum_config.resource_limits.max_num_of_cpus * 2,
+            HeapMinSize: heap_min_size.unwrap() as u64,
+            TCSNum: tcs_num,
+            TCSMinPool: tcs_min_pool,
+            TCSMaxNum: tcs_max_num,
             TCSPolicy: 0, // TCS is bound to the untrusted thread
             DisableDebug: match occlum_config.metadata.debuggable {
                 true => 0,
                 false => 1,
             },
-            MiscSelect: "0".to_string(),
-            MiscMask: "0xFFFFFFFF".to_string(),
-            ReservedMemMaxSize: user_space_size.unwrap() as u64,
-            ReservedMemMinSize: user_space_size.unwrap() as u64,
-            ReservedMemInitSize: user_space_size.unwrap() as u64,
+            MiscSelect: DEFAULT_CONFIG.misc_select.to_string(),
+            MiscMask: DEFAULT_CONFIG.misc_mask.to_string(),
+            // Use init size as the reserved memory region
+            ReservedMemMaxSize: user_space_init_size.unwrap() as u64,
+            ReservedMemMinSize: user_space_init_size.unwrap() as u64,
+            ReservedMemInitSize: user_space_init_size.unwrap() as u64,
             ReservedMemExecutable: 1,
+            // TODO: Enable this field when EDMM support is ready
+            // UserRegionSize: user_space_max_size.unwrap() as u64,
             EnableKSS: kss_tuple.0,
             ISVEXTPRODID_H: kss_tuple.1,
             ISVEXTPRODID_L: kss_tuple.2,
@@ -191,14 +256,13 @@ fn main() {
 
         // Generate app config, including "init" and user app
         let app_config = {
-            let app_config =
-                gen_app_config(
-                    occlum_config.entry_points,
-                    occlum_config.mount,
-                    occlum_conf_user_fs_mac.to_string(),
-                    occlum_conf_init_fs_mac.to_string(),
-                    image_encrypted,
-                );
+            let app_config = gen_app_config(
+                occlum_config.entry_points,
+                occlum_config.mount,
+                occlum_conf_user_fs_mac.to_string(),
+                occlum_conf_init_fs_mac.to_string(),
+                image_encrypted,
+            );
             if app_config.is_err() {
                 println!("Mount configuration invalid: {:?}", app_config);
                 return;
@@ -214,7 +278,16 @@ fn main() {
         };
         let occlum_json_config = InternalOcclumJson {
             resource_limits: InternalResourceLimits {
-                user_space_size: occlum_config.resource_limits.user_space_size.to_string(),
+                user_space_init_size: occlum_config
+                    .resource_limits
+                    .user_space_size
+                    .init
+                    .to_string(),
+                user_space_max_size: occlum_config
+                    .resource_limits
+                    .user_space_size
+                    .max
+                    .to_string(),
             },
             process: OcclumProcess {
                 default_stack_size: occlum_config.process.default_stack_size,
@@ -285,16 +358,14 @@ fn get_u64_id_high_and_low(id: &OcclumMetaID) -> (u64, u64) {
 }
 
 // Return a tuple (EnableKSS, ISVEXTPRODID_H, ISVEXTPRODID_L)
-fn parse_kss_conf(occlum_config: &OcclumConfiguration
-) -> (u32, u64, u64)
-{
+fn parse_kss_conf(occlum_config: &OcclumConfiguration) -> (u32, u64, u64) {
     match occlum_config.metadata.enable_kss {
         true => {
             let ext_prod_id = get_u64_id_high_and_low(&occlum_config.metadata.ext_prod_id);
 
             (1, ext_prod_id.0, ext_prod_id.1)
-        },
-        false => (0, 0, 0)
+        }
+        false => (0, 0, 0),
     }
 }
 
@@ -367,9 +438,7 @@ fn gen_app_config(
         .unwrap() = serde_json::Value::String(occlum_conf_init_fs_mac);
 
     // Update app entry points
-    *app_config
-        .pointer_mut("/app/1/entry_points")
-        .unwrap() = entry_points;
+    *app_config.pointer_mut("/app/1/entry_points").unwrap() = entry_points;
 
     debug!("User provided root mount config: {:?}", mount_conf);
     let mut root_mount_config = mount_conf;
@@ -406,9 +475,7 @@ fn gen_app_config(
         .append(&mut mount_array);
 
     // Update app encrypted tag
-    *app_config
-        .pointer_mut("/app/1/encrypted")
-        .unwrap() = image_encrypted.into();
+    *app_config.pointer_mut("/app/1/encrypted").unwrap() = image_encrypted.into();
 
     debug!("Occlum.json app config:\n{:?}", app_config);
 
@@ -429,11 +496,16 @@ struct OcclumConfiguration {
 
 #[derive(Debug, PartialEq, Deserialize)]
 struct OcclumResourceLimits {
-    min_num_of_cpus: u32,
-    max_num_of_cpus: u32,
-    kernel_space_heap_size: String,
+    num_of_cpus: u32,
     kernel_space_stack_size: String,
-    user_space_size: String,
+    kernel_space_heap_size: DynamicMemorySize,
+    user_space_size: DynamicMemorySize,
+}
+
+#[derive(Debug, PartialEq, Deserialize)]
+struct DynamicMemorySize {
+    init: String,
+    max: String,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
@@ -444,14 +516,14 @@ struct OcclumProcess {
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 struct UntrustedUnixSock {
-    host: serde_json::Value, // host path
+    host: serde_json::Value,  // host path
     libos: serde_json::Value, // libos path
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
 struct OcclumMetaID {
     high: String,
-    low: String
+    low: String,
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
@@ -510,6 +582,7 @@ struct EnclaveConfiguration {
     ISVSVN: u32,
     StackMaxSize: u64,
     StackMinSize: u64,
+    HeapInitSize: u64,
     HeapMaxSize: u64,
     HeapMinSize: u64,
     TCSNum: u32,
@@ -523,6 +596,10 @@ struct EnclaveConfiguration {
     ReservedMemMinSize: u64,
     ReservedMemInitSize: u64,
     ReservedMemExecutable: u32,
+    // TODO: Enable this field when EDMM support is ready
+    // UserRegionSize is the size of the region where users can
+    // operate on using the EDMM APIs introduced since Intel SGX SDK 2.18
+    // UserRegionSize: u64,
     EnableKSS: u32,
     ISVEXTPRODID_H: u64,
     ISVEXTPRODID_L: u64,
@@ -533,7 +610,8 @@ struct EnclaveConfiguration {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 struct InternalResourceLimits {
-    user_space_size: String,
+    user_space_init_size: String,
+    user_space_max_size: String,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]

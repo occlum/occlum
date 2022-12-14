@@ -17,8 +17,8 @@ if [[ " ${WORKLOAD_LIST[@]} "  =~ " ${WORKLOAD_FILE} " ]]; then
 
   # Enlarge "kernel_space_heap_size" when "pre-allocating files failed" occurs
   # Enlarge "user_space_size" when "procflow exec proc failed" occurs
-  yq '.resource_limits.user_space_size = "1024MB" |
-      .resource_limits.kernel_space_heap_size ="512MB" ' -i Occlum.yaml
+  yq '.resource_limits.user_space_size.init = "1024MB" |
+      .resource_limits.kernel_space_heap_size.init ="512MB" ' -i Occlum.yaml
 
   occlum build
 

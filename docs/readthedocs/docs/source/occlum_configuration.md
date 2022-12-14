@@ -5,17 +5,26 @@ Occlum can be configured easily via a configuration file named `Occlum.yaml`, wh
 ```yaml
 # All the settings below can only take effect after `occlum build`.
 resource_limits:
-  # The heap size of LibOS kernel
-  kernel_space_heap_size: 32MB
-  # The stack size of LibOS kernel. If not sure, don't modify it.
-  kernel_space_stack_size: 1MB
-  # The total size of enclave memory available to LibOS processes.
-  # This size should be adjusted per different applications.
-  # If reports ENOMEM error, try increase this size.
-  user_space_size: 256MB
-  # The minimum and maximum OS threads used by LibOS. If not sure, don't modify them.
-  min_num_of_cpus: 1
-  max_num_of_cpus: 128
+  # The number of OS threads created for this instance.
+  num_of_cpus: 128
+  # The stack size of LibOS kernel.
+  kernel_space_stack_size: 16MB
+  # The heap size of LibOS kernel.
+  # With EDMM support, choose "init" size based on the expected initialization time. And increase the "max" field if memory insufficiency occurs.
+  # Without EDMM support, increase the "init" field if memory insufficiency occurs. And the "max" field is ignored.
+  kernel_space_heap_size:
+    # Reserved and committed during the initialization stage. The more, the longer it takes to initialize.
+    init: 32MB
+    # Only committed when necessary. Only valid with EDMM support.
+    max:  512MB
+  # The total size of enclave memory available to the user applications running in LibOS.
+  # With EDMM support, choose "init" size based on the expected initialization time. And increase the "max" field if memory insufficiency occurs.
+  # Without EDMM support, increase the "init" field if memory insufficiency occurs. And the "max" field is ignored.
+  user_space_size:
+    # Reserved and committed during the initialization stage. The more, the longer it takes to initialize.
+    init: 256MB
+    # Only committed when necessary. Only valid with EDMM support.
+    max:  64GB
 process:
   # Default stack size for each process. If not sure, don't modify it.
   default_stack_size: 4MB

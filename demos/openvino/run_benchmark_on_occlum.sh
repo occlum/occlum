@@ -12,7 +12,7 @@ cd occlum_instance
 occlum init
 cpu_cc=`cat /proc/cpuinfo | grep processor | wc -l`
 
-yq '.resource_limits.user_space_size = "320MB"' -i Occlum.yaml
+yq '.resource_limits.user_space_size.init = "320MB"' -i Occlum.yaml
 
 # 2. Copy files into Occlum Workspace and Build
 rm -rf image

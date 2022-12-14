@@ -21,7 +21,8 @@ impl Default for ResourceLimits {
         // Get memory space limit from Occlum.json
         let cfg_heap_size: u64 = config::LIBOS_CONFIG.process.default_heap_size as u64;
         let cfg_stack_size: u64 = config::LIBOS_CONFIG.process.default_stack_size as u64;
-        let cfg_user_space_size: u64 = config::LIBOS_CONFIG.resource_limits.user_space_size as u64;
+        let cfg_user_space_size: u64 =
+            config::LIBOS_CONFIG.resource_limits.user_space_max_size as u64;
 
         let stack_size = rlimit_t::new(cfg_stack_size);
 

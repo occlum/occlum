@@ -14,7 +14,8 @@ pub struct UserSpaceVMManager(VMManager);
 
 impl UserSpaceVMManager {
     fn new() -> Result<UserSpaceVMManager> {
-        let rsrv_mem_size = LIBOS_CONFIG.resource_limits.user_space_size;
+        // TODO: Use reserved memory API for init space and use EDMM API for max space.
+        let rsrv_mem_size = LIBOS_CONFIG.resource_limits.user_space_init_size;
         let vm_range = unsafe {
             // TODO: Current sgx_alloc_rsrv_mem implmentation will commit all the pages of the desired size, which will consume
             // a lot of time. When EDMM is supported, there is no need to commit all the pages at the initialization stage. A function

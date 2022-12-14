@@ -16,7 +16,7 @@ fi
 rm -rf occlum_instance && mkdir occlum_instance
 cd occlum_instance
 occlum init
-yq '.resource_limits.user_space_size = "1000MB"' -i Occlum.yaml
+yq '.resource_limits.user_space_size.init = "1000MB"' -i Occlum.yaml
 
 # 2. Copy program into Occlum Workspace and build
 rm -rf image && \

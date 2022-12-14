@@ -49,8 +49,8 @@ function build_client_instance()
     rm -rf image
     copy_bom -f ../flask.yaml --root image --include-dir /opt/occlum/etc/template
 
-    yq '.resource_limits.user_space_size = "600MB" |
-        .resource_limits.kernel_space_heap_size = "128MB" |
+    yq '.resource_limits.user_space_size.init = "600MB" |
+        .resource_limits.kernel_space_heap_size.init = "128MB" |
         .metadata.debuggable = false |
         .metadata.enable_kss = true |
         .metadata.version_number = 88 |
@@ -119,7 +119,7 @@ function build_server_instance()
         .sgx_mrs[0].config_svn = 1234 |
         .sgx_mrs[0].debuggable = false ' ../ra_config_template.json > dynamic_config.json
 
-    yq '.resource_limits.user_space_size = "500MB" |
+    yq '.resource_limits.user_space_size.init = "500MB" |
         .metadata.debuggable = false ' -i Occlum.yaml
 
     rm -rf image

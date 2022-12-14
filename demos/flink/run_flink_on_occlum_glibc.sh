@@ -15,9 +15,9 @@ init_instance() {
     rm -rf occlum_instance_$postfix && mkdir occlum_instance_$postfix
     cd occlum_instance_$postfix
     occlum init
-    yq '.resource_limits.user_space_size = "5500MB" |
+    yq '.resource_limits.user_space_size.init = "5500MB" |
         .process.default_heap_size = "128MB" |
-        .resource_limits.kernel_space_heap_size="64MB" |
+        .resource_limits.kernel_space_heap_size.init="64MB" |
         .entry_points = [ "/usr/lib/jvm/java-11-openjdk-amd64/bin" ] |
         .mount += [{"target": "/host", "type": "hostfs", "source": "."}] |
         .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-11-openjdk-amd64/lib/server:/usr/lib/jvm/java-11-openjdk-amd64/lib:/usr/lib/jvm/java-11-openjdk-amd64/../lib:/lib" ]' \
