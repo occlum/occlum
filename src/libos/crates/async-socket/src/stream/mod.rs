@@ -326,6 +326,18 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+        let mut state = self.state.write().unwrap();
+        match &*state {
+            State::Connect(connecting_stream) => {
+                if let Some(connected_stream) =
+                    Self::try_switch_to_connected_state(connecting_stream)
+                {
+                    *state = State::Connected(connected_stream.clone());
+                }
+            }
+            _ => {}
+        }
+        drop(state);
         async_io::match_ioctl_cmd_mut!(&mut *cmd, {
             cmd: GetSockOptRawCmd => {
                 cmd.execute(self.host_fd())?;
