@@ -121,7 +121,7 @@ macro_rules! process_syscall_table_with_callback {
             (Mremap = 25) => do_mremap(old_addr: usize, old_size: usize, new_size: usize, flags: i32, new_addr: usize),
             (Msync = 26) => do_msync(addr: usize, size: usize, flags: u32),
             (Mincore = 27) => handle_unsupported(),
-            (Madvise = 28) => handle_unsupported(),
+            (Madvise = 28) => do_madvise(addr: usize, length: usize, advice: u32),
             (Shmget = 29) => do_shmget(key: key_t, size: size_t, shmflg: i32),
             (Shmat = 30) => do_shmat(shmid: i32, shmaddr: usize, shmflg: i32),
             (Shmctl = 31) => do_shmctl(shmid: i32, cmd: i32, buf: *mut shmids_t),
@@ -824,6 +824,11 @@ fn do_brk(new_brk_addr: usize) -> Result<isize> {
 fn do_msync(addr: usize, size: usize, flags: u32) -> Result<isize> {
     let flags = MSyncFlags::from_u32(flags)?;
     vm::do_msync(addr, size, flags)?;
+    Ok(0)
+}
+
+fn do_madvise(_addr: usize, _length: usize, _advice: u32) -> Result<isize> {
+    warn!("No real operation in LibOS, just return success.");
     Ok(0)
 }
 
