@@ -36,7 +36,7 @@ function build_instance()
     new_json="$(jq '.resource_limits.user_space_size = "4000MB" |
                     .resource_limits.kernel_space_heap_size = "256MB" |
                     .resource_limits.max_num_of_threads = 64 |
-                    .env.untrusted += [ "MASTER_ADDR", "MASTER_PORT", "WORLD_SIZE", "RANK", "TORCH_CPP_LOG_LEVEL" ] |
+                    .env.untrusted += [ "MASTER_ADDR", "MASTER_PORT", "WORLD_SIZE", "RANK", "OMP_NUM_THREADS", "HOME" ] |
                     .env.default += ["GLOO_DEVICE_TRANSPORT=TCP_TLS"] |
                     .env.default += ["GLOO_DEVICE_TRANSPORT_TCP_TLS_PKEY=/ppml/certs/test.key"] |
                     .env.default += ["GLOO_DEVICE_TRANSPORT_TCP_TLS_CERT=/ppml/certs/test.crt"] |

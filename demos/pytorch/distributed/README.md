@@ -9,6 +9,7 @@ There are a few environment variables that are related to distributed PyTorch tr
 2. MASTER_PORT
 3. WORLD_SIZE
 4. RANK
+5. OMP_NUM_THREADS
 
 `MASTER_ADDR` and `MASTER_PORT` specifies a rendezvous point where all the training processes will connect to.
 
@@ -17,6 +18,8 @@ There are a few environment variables that are related to distributed PyTorch tr
 `RANK` is the unique identifier for each of the training process.
 
 The `MASTER_ADDR`, `MASTER_PORT` and `WORLD_SIZE` should be identical for all the participants while the `RANK` should be unique.
+
+`OMP_NUM_THREADS` generally can be set to the number of physical CPU core numbers. But in Occlum, the more `OMP_NUM_THREADS` is, the more TCS and memory are required.
 
 **Note that in most cases PyTorch only use multi-threads. If you find a process fork, please set `num_workers=1` env.**
 
@@ -75,7 +78,7 @@ bash ./build_pytorch_occlum_instance.sh
 Step 4 (in the Occlum container): Run node one PyTorch instance
 ```bash
 cd /root/demos/pytorch/distributed/occlum_instance
-WORLD_SIZE=2 RANK=0 occlum run /bin/python3 mnist.py --epoch 3 --no-cuda --seed 42 --save-model
+WORLD_SIZE=2 RANK=0 OMP_NUM_THREADS=16 occlum run /bin/python3 mnist.py --epoch 3 --no-cuda --seed 42 --save-model
 ```
 
 If successful, it will wait for the node two to join.
@@ -86,7 +89,7 @@ Using distributed PyTorch with gloo backend
 Step 5 (in the Occlum container): Run node two PyTorch instance
 ```bash
 cd /root/demos/pytorch/distributed/occlum_instance
-WORLD_SIZE=2 RANK=1 occlum run /bin/python3 mnist.py --epoch 3 --no-cuda --seed 42 --save-model
+WORLD_SIZE=2 RANK=1 OMP_NUM_THREADS=16 occlum run /bin/python3 mnist.py --epoch 3 --no-cuda --seed 42 --save-model
 ```
 
 If everything goes well, node one and two has similar logs as below.
