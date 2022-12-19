@@ -95,7 +95,9 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
         flags: SendFlags,
         control: Option<&[u8]>,
     ) -> Result<usize> {
-        if !flags.is_empty() && flags != SendFlags::MSG_DONTWAIT {
+        if !flags.is_empty() &&
+            flags.intersects(!(SendFlags::MSG_DONTWAIT | SendFlags::MSG_NOSIGNAL))
+        {
             error!("Not supported flags: {:?}", flags);
             return_errno!(EINVAL, "not supported flags");
         }

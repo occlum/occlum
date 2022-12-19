@@ -89,7 +89,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         let mut inner = self.sender.inner.lock().unwrap();
 
         if !flags.is_empty()
-            && flags.intersects(!(SendFlags::MSG_DONTWAIT | SendFlags::MSG_NOSIGNAL))
+            && flags.intersects(!(SendFlags::MSG_DONTWAIT | SendFlags::MSG_NOSIGNAL | SendFlags::MSG_MORE))
         {
             error!("Not supported flags: {:?}", flags);
             return_errno!(EINVAL, "not supported flags");
