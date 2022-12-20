@@ -1,6 +1,9 @@
 name: Benchmarks Test
 
 on:
+  push:
+    branches:
+      - 1.0.0-preview
   schedule:
     # Schedule to run everyday at 10PM UTC (6AM CST)
     - cron:  '0 22 * * *'
