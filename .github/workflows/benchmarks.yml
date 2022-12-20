@@ -14,7 +14,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW, benchmark]]
+        self_runner: [[self-hosted, SGX2-HW]]
 
     steps:
     - name: Clean before running
@@ -64,7 +64,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW, benchmark]]
+        self_runner: [[self-hosted, SGX2-HW]]
 
     steps:
     - name: Clean before running
@@ -114,7 +114,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW, benchmark]]
+        self_runner: [[self-hosted, SGX2-HW]]
 
     steps:
     - name: Clean before running
