@@ -1,6 +1,7 @@
 name: Benchmarks Test
 
 on:
+  pull_request:
   schedule:
     # Schedule to run everyday at 10PM UTC (6AM CST)
     - cron:  '0 22 * * *'
