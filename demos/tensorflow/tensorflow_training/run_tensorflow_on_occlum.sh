@@ -21,7 +21,6 @@ if [ ! -L "image/bin/python3" ];then
     copy_bom -f ../tensorflow_training.yaml --root image --include-dir /opt/occlum/etc/template
     new_json="$(jq '.resource_limits.user_space_size = "5400MB" |
                     .resource_limits.kernel_space_heap_size = "512MB" |
-                    .process.default_mmap_size = "5000MB" |
                     .resource_limits.max_num_of_threads = 64 |
                     .env.default += ["PYTHONHOME=/opt/python-occlum", "OMP_NUM_THREADS=1"]' Occlum.json)" && \
     echo "${new_json}" > Occlum.json

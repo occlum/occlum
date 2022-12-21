@@ -19,7 +19,6 @@ init_instance() {
         .resource_limits.max_num_of_threads = 64 |
         .process.default_heap_size = "128MB" |
         .resource_limits.kernel_space_heap_size="64MB" |
-        .process.default_mmap_size = "5000MB" |
         .entry_points = [ "/usr/lib/jvm/java-11-openjdk-amd64/bin" ] |
         .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-11-openjdk-amd64/lib/server:/usr/lib/jvm/java-11-openjdk-amd64/lib:/usr/lib/jvm/java-11-openjdk-amd64/../lib:/lib" ]' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
