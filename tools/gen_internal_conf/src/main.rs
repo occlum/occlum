@@ -7,12 +7,44 @@ extern crate serde_derive;
 extern crate serde_xml_rs;
 
 use clap::{App, Arg, SubCommand};
+use lazy_static::lazy_static;
 use log::debug;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+
+// Some hardcode implicit config value. Please update the values defined in "init()" when necessary.
+lazy_static! {
+    static ref DEFAULT_CONFIG: DefaultConfig = DefaultConfig::init();
+}
+
+struct DefaultConfig {
+    // Corresponds to HeapMaxSize in Enclave.xml
+    kernel_heap_max_size: &'static str,
+    // Corresponds to TCSMaxNum in Enclave.xml
+    num_of_tcs_max: u32,
+    // Corresponds to MiscSelect in Enclave.xml
+    misc_select: &'static str,
+    // Corresponds to MiscMask in Enclave.xml
+    misc_mask: &'static str,
+}
+
+impl DefaultConfig {
+    fn init() -> Self {
+        Self {
+            kernel_heap_max_size: "1024MB",
+            num_of_tcs_max: 4096,
+            // If UserRegionSize is not configured, but the heap, stack and thread related
+            // configurations have dynamic part, set MiscSelect[0] = 1 and MiscMask[0] = 0,
+            // the enclave can be loaded on SGX 1.0 and 2.0 platform, and on SGX 2.0 platform,
+            // it can utilize the dynamic components.
+            misc_select: "1",
+            misc_mask: "0x0",
+        }
+    }
+}
 
 fn main() {
     env_logger::init();
@@ -125,6 +157,11 @@ fn main() {
             enclave_config_file_path
         );
 
+        // get the number of TCS
+        let tcs_num = occlum_config.resource_limits.max_num_of_threads;
+        let tcs_min_pool = tcs_num;
+        let tcs_max_num = std::cmp::max(tcs_num, DEFAULT_CONFIG.num_of_tcs_max);
+
         // get the kernel stack size
         let stack_max_size =
             parse_memory_size(&occlum_config.resource_limits.kernel_space_stack_size);
@@ -135,16 +172,36 @@ fn main() {
             );
             return;
         }
+
         // get the kernel heap size
-        let heap_max_size =
+        let heap_init_size =
             parse_memory_size(&occlum_config.resource_limits.kernel_space_heap_size);
-        if heap_max_size.is_err() {
+        if heap_init_size.is_err() {
             println!(
                 "The kernel_space_heap_size \"{}\" is not correct.",
                 occlum_config.resource_limits.kernel_space_heap_size
             );
             return;
         }
+        // For max heap size, try to use the values provided by users. If not provided, use the default value
+        let heap_max_size = {
+            if let Some(ref kernel_space_heap_max_size) =
+                occlum_config.resource_limits.kernel_space_heap_max_size
+            {
+                let heap_max_size = parse_memory_size(&kernel_space_heap_max_size);
+                if heap_max_size.is_err() {
+                    println!(
+                        "The kernel_space_heap_max_size \"{}\" is not correct.",
+                        kernel_space_heap_max_size
+                    );
+                    return;
+                }
+                heap_max_size
+            } else {
+                parse_memory_size(DEFAULT_CONFIG.kernel_heap_max_size)
+            }
+        };
+
         // get the user space size
         let user_space_size = parse_memory_size(&occlum_config.resource_limits.user_space_size);
         if user_space_size.is_err() {
@@ -183,16 +240,19 @@ fn main() {
             ISVSVN: occlum_config.metadata.version_number,
             StackMaxSize: stack_max_size.unwrap() as u64,
             StackMinSize: stack_max_size.unwrap() as u64, // just use the same size as max size
+            HeapInitSize: heap_init_size.unwrap() as u64,
             HeapMaxSize: heap_max_size.unwrap() as u64,
-            HeapMinSize: heap_max_size.unwrap() as u64, // just use the same size as max size
-            TCSNum: occlum_config.resource_limits.max_num_of_threads,
+            HeapMinSize: heap_init_size.unwrap() as u64,
+            TCSNum: tcs_num,
+            TCSMinPool: tcs_min_pool,
+            TCSMaxNum: tcs_max_num,
             TCSPolicy: 1,
             DisableDebug: match occlum_config.metadata.debuggable {
                 true => 0,
                 false => 1,
             },
-            MiscSelect: "0".to_string(),
-            MiscMask: "0xFFFFFFFF".to_string(),
+            MiscSelect: DEFAULT_CONFIG.misc_select.to_string(),
+            MiscMask: DEFAULT_CONFIG.misc_mask.to_string(),
             ReservedMemMaxSize: user_space_size.unwrap() as u64,
             ReservedMemMinSize: user_space_size.unwrap() as u64,
             ReservedMemInitSize: user_space_size.unwrap() as u64,
@@ -426,6 +486,8 @@ struct OcclumConfiguration {
 struct OcclumResourceLimits {
     max_num_of_threads: u32,
     kernel_space_heap_size: String,
+    #[serde(default)]
+    kernel_space_heap_max_size: Option<String>,
     kernel_space_stack_size: String,
     user_space_size: String,
     #[cfg(feature = "ms_buffer")]
@@ -497,9 +559,12 @@ struct EnclaveConfiguration {
     ISVSVN: u32,
     StackMaxSize: u64,
     StackMinSize: u64,
+    HeapInitSize: u64,
     HeapMaxSize: u64,
     HeapMinSize: u64,
     TCSNum: u32,
+    TCSMaxNum: u32,
+    TCSMinPool: u32,
     TCSPolicy: u32,
     DisableDebug: u32,
     MiscSelect: String,
