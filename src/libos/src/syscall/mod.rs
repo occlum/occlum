@@ -190,7 +190,7 @@ macro_rules! process_syscall_table_with_callback {
             (Lchown = 94) => do_lchown(path: *const i8, uid: u32, gid: u32),
             (Umask = 95) => do_umask(mask: u16),
             (Gettimeofday = 96) => do_gettimeofday(tv_u: *mut timeval_t),
-            (Getrlimit = 97) => handle_unsupported(),
+            (Getrlimit = 97) => do_gettrlimit(resource: u32, rlim: *mut rlimit_t),
             (Getrusage = 98) => handle_unsupported(),
             (SysInfo = 99) => do_sysinfo(info: *mut sysinfo_t),
             (Times = 100) => handle_unsupported(),
@@ -253,7 +253,7 @@ macro_rules! process_syscall_table_with_callback {
             (Prctl = 157) => do_prctl(option: i32, arg2: u64, arg3: u64, arg4: u64, arg5: u64),
             (ArchPrctl = 158) => do_arch_prctl(code: u32, addr: *mut usize),
             (Adjtimex = 159) => handle_unsupported(),
-            (Setrlimit = 160) => handle_unsupported(),
+            (Setrlimit = 160) => do_settrlimit(resource: u32, rlim: *const rlimit_t),
             (Chroot = 161) => handle_unsupported(),
             (Sync = 162) => do_sync(),
             (Acct = 163) => handle_unsupported(),
@@ -933,6 +933,14 @@ fn do_uname(name: *mut utsname_t) -> Result<isize> {
     check_mut_ptr(name)?;
     let name = unsafe { &mut *name };
     misc::do_uname(name).map(|_| 0)
+}
+
+fn do_gettrlimit(resource: u32, rlim: *mut rlimit_t) -> Result<isize> {
+    do_prlimit(0, resource, ptr::null(), rlim)
+}
+
+fn do_settrlimit(resource: u32, rlim: *const rlimit_t) -> Result<isize> {
+    do_prlimit(0, resource, rlim, ptr::null_mut())
 }
 
 fn do_prlimit(
