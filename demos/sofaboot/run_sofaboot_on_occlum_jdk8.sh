@@ -21,7 +21,6 @@ init_instance() {
                 .resource_limits.kernel_space_heap_size="64MB" |
                 .resource_limits.max_num_of_threads = 64 |
                 .process.default_heap_size = "256MB" |
-                .process.default_mmap_size = "1400MB" |
                 .entry_points = [ "/usr/lib/jvm/java-1.8-openjdk/jre/bin" ] |
                 .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-1.8-openjdk/jre/lib:/usr/lib/jvm/java-1.8-openjdk/lib" ]' Occlum.json)" && \
     echo "${new_json}" > Occlum.json

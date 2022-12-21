@@ -14,7 +14,6 @@ new_json="$(jq '.resource_limits.user_space_size = "512MB" |
                 .resource_limits.kernel_space_heap_size= "64MB" |
                 .process.default_stack_size = "1MB" |
                 .process.default_heap_size = "1MB" |
-                .process.default_mmap_size = "10MB" |
                 .env.default = [ "OCCLUM=yes", "HOME=/root" ]' Occlum.json)" && \
 echo "${new_json}" > Occlum.json
 
