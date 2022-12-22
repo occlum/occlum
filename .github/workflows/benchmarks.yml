@@ -10,7 +10,7 @@ on:
 
 jobs:
   Sysbench_Test:
-    timeout-minutes: 20
+    timeout-minutes: 40
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -60,7 +60,7 @@ jobs:
       run: docker stop ${{ env.CONTAINER_NAME }}
 
   Iperf3_Test:
-    timeout-minutes: 20
+    timeout-minutes: 40
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
