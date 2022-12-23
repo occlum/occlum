@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1671763962081,
+  "lastUpdate": 1671764344397,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -98,6 +98,44 @@ window.BENCHMARK_DATA = {
             "value": 185,
             "unit": "MiB/s",
             "extra": "randread"
+          }
+        ]
+      }
+    ],
+    "Iperf3 Benchmark": [
+      {
+        "commit": {
+          "author": {
+            "email": "huaiqing.zq@antgroup.com",
+            "name": "Zheng, Qi",
+            "username": "qzheng527"
+          },
+          "committer": {
+            "email": "volcano.dr@hotmail.com",
+            "name": "volcano",
+            "username": "volcano0dr"
+          },
+          "distinct": true,
+          "id": "01f161840cf71eeea0e49b342bdcfa4fa7323625",
+          "message": "[ci] Update benchmark links and increase timeout time",
+          "timestamp": "2022-12-23T09:24:59+08:00",
+          "tree_id": "7a7d1382489d11d2a910aa1b928066002486dac8",
+          "url": "https://github.com/occlum/occlum/commit/01f161840cf71eeea0e49b342bdcfa4fa7323625"
+        },
+        "date": 1671764343354,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 3658,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 3657,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
           }
         ]
       }
