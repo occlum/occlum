@@ -95,7 +95,9 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
         flags: SendFlags,
         control: Option<&[u8]>,
     ) -> Result<usize> {
-        if !flags.is_empty() && flags != SendFlags::MSG_DONTWAIT {
+        if !flags.is_empty()
+            && flags.intersects(!(SendFlags::MSG_DONTWAIT | SendFlags::MSG_NOSIGNAL))
+        {
             error!("Not supported flags: {:?}", flags);
             return_errno!(EINVAL, "not supported flags");
         }
@@ -360,19 +362,16 @@ impl DataMsg {
 
     #[inline(always)]
     fn copy_buf(&mut self, bufs: &[&[u8]]) -> Result<usize> {
-        // let total_len: usize = bufs.iter().map(|buf| buf.len()).sum();
         let total_len = self.send_buf.len();
         if total_len > super::MAX_BUF_SIZE {
             return_errno!(EMSGSIZE, "the message is too large")
         }
         // Copy data from the bufs to the send buffer
         let mut total_copied = 0;
-        let mut send_buf = UntrustedBox::new_uninit_slice(total_len);
         for buf in bufs {
-            send_buf[total_copied..(total_copied + buf.len())].copy_from_slice(buf);
+            self.send_buf[total_copied..(total_copied + buf.len())].copy_from_slice(buf);
             total_copied += buf.len();
         }
-        self.send_buf = send_buf;
         Ok(total_copied)
     }
 
