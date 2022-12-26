@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1671764718162,
+  "lastUpdate": 1672049922370,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -94,6 +94,54 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 253.35,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "zehuan97@gmail.com",
+            "name": "ClawSeven",
+            "username": "ClawSeven"
+          },
+          "committer": {
+            "email": "volcano.dr@hotmail.com",
+            "name": "volcano",
+            "username": "volcano0dr"
+          },
+          "distinct": true,
+          "id": "850946edc29ea6d53fba0a619d2a442c96814839",
+          "message": "[async-socket] Add MSG_NOSIGNAL and MSG_MORE flags",
+          "timestamp": "2022-12-26T17:32:42+08:00",
+          "tree_id": "1d89ef343a2289583ddef95eb66dabfe332682c3",
+          "url": "https://github.com/occlum/occlum/commit/850946edc29ea6d53fba0a619d2a442c96814839"
+        },
+        "date": 1672049920277,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.1,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 384.51,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 64087.65,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 282.25,
             "unit": "ms",
             "extra": "per95"
           }
