@@ -23,11 +23,9 @@ impl UserSpaceVMManager {
             if ptr.is_null() {
                 return_errno!(ENOMEM, "run out of reserved memory");
             }
-            // Change the page permission to RW (default)
-            assert!(
-                sgx_tprotect_rsrv_mem(ptr, rsrv_mem_size, RSRV_MEM_PERM.bits())
-                    == sgx_status_t::SGX_SUCCESS
-            );
+
+            // Without EDMM support and the ReservedMemExecutable is set to 1, the reserved memory will be RWX. And we can't change the reserved memory permission.
+            // With EDMM support, the reserved memory permission is RW by default. And we can change the permissions when needed.
 
             let addr = ptr as usize;
             debug!(
@@ -99,15 +97,4 @@ extern "C" {
     // Return: 0 on success; otherwise -1
     //
     fn sgx_free_rsrv_mem(addr: *const c_void, length: usize) -> i32;
-
-    // Modify the access permissions of the pages in the reserved memory area
-    //
-    // Parameters:
-    // Inputs: addr[in]: Starting address of region which needs to change access
-    //         permission. Page aligned.
-    //         length[in]: The length of the memory to be manipulated in bytes. Page aligned.
-    //         prot[in]: The target memory protection.
-    // Return: sgx_status_t
-    //
-    fn sgx_tprotect_rsrv_mem(addr: *const c_void, length: usize, prot: i32) -> sgx_status_t;
 }
