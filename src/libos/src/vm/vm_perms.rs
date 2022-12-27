@@ -34,14 +34,7 @@ impl VMPerms {
     }
 
     pub fn apply_perms(protect_range: &VMRange, perms: VMPerms) {
-        extern "C" {
-            pub fn occlum_ocall_mprotect(
-                retval: *mut i32,
-                addr: *const c_void,
-                len: usize,
-                prot: i32,
-            ) -> sgx_status_t;
-        };
+        use sgx_trts::enclave::rsgx_is_supported_EDMM;
 
         unsafe {
             let mut retval = 0;
@@ -51,8 +44,18 @@ impl VMPerms {
             // Since the memory are managed by our own, mprotect ocall shouldn't use this flag. Otherwise, EINVAL will be thrown.
             let mut prot = perms.clone();
             prot.remove(VMPerms::GROWSDOWN);
-            let sgx_status = occlum_ocall_mprotect(&mut retval, addr, len, prot.bits() as i32);
-            assert!(sgx_status == sgx_status_t::SGX_SUCCESS && retval == 0);
+
+            if rsgx_is_supported_EDMM() {
+                // With EDMM support, reserved memory permission should be updated.
+                assert!(
+                    sgx_tprotect_rsrv_mem(addr, len, prot.bits() as i32)
+                        == sgx_status_t::SGX_SUCCESS
+                );
+            } else {
+                // Without EDMM support, reserved memory permission is statically RWX and we only need to do mprotect ocall.
+                let sgx_status = occlum_ocall_mprotect(&mut retval, addr, len, prot.bits() as i32);
+                assert!(sgx_status == sgx_status_t::SGX_SUCCESS && retval == 0);
+            }
         }
     }
 
@@ -81,4 +84,24 @@ impl Default for VMPerms {
     fn default() -> Self {
         VMPerms::DEFAULT
     }
+}
+
+extern "C" {
+    // Modify the access permissions of the pages in the reserved memory area
+    //
+    // Parameters:
+    // Inputs: addr[in]: Starting address of region which needs to change access
+    //         permission. Page aligned.
+    //         length[in]: The length of the memory to be manipulated in bytes. Page aligned.
+    //         prot[in]: The target memory protection.
+    // Return: sgx_status_t
+    //
+    fn sgx_tprotect_rsrv_mem(addr: *const c_void, length: usize, prot: i32) -> sgx_status_t;
+
+    fn occlum_ocall_mprotect(
+        retval: *mut i32,
+        addr: *const c_void,
+        len: usize,
+        prot: i32,
+    ) -> sgx_status_t;
 }
