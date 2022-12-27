@@ -1,6 +1,6 @@
 //! Built-in disks for testing purposes
-use std::lazy::SyncLazy as Lazy;
 use std::path::PathBuf;
+use std::sync::LazyLock as Lazy;
 
 use block_device::{mem_disk::MemDisk, BlockDeviceAsFile, BLOCK_SIZE};
 use jindisk::JinDisk;

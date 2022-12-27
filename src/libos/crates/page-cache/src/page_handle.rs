@@ -39,7 +39,7 @@ impl<K: PageKey, A: PageAlloc> PageHandle<K, A> {
     }
 
     /// Return the lock guard of `state_and_page`.
-    pub fn lock(&'a self) -> PageHandleGuard<'a, A> {
+    pub fn lock<'a>(&'a self) -> PageHandleGuard<'a, A> {
         PageHandleGuard(self.0.state_and_page.lock())
     }
 }

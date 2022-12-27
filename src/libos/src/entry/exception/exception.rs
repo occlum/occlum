@@ -7,7 +7,7 @@ use crate::prelude::*;
 pub struct Exception {
     pub type_: sgx_exception_type_t,
     pub vector: sgx_exception_vector_t,
-    pub exinfo: sgx_exinfo_t,
+    pub exinfo: sgx_misc_exinfo_t,
 }
 
 impl<T> From<T> for Exception

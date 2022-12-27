@@ -45,7 +45,6 @@
 #![feature(async_closure)]
 #![feature(const_fn_trait_bound)]
 #![feature(get_mut_unchecked)]
-#![feature(in_band_lifetimes)]
 #![feature(map_first_last)]
 #![feature(slice_group_by)]
 

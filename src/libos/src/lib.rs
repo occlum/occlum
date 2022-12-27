@@ -23,7 +23,6 @@
 #![feature(atomic_from_mut)]
 #![feature(thread_local)]
 #![feature(btree_drain_filter)]
-#![feature(bench_black_box)]
 #![feature(div_duration)]
 #![feature(once_cell)]
 

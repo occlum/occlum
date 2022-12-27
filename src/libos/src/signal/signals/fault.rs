@@ -37,12 +37,12 @@ impl FaultSignal {
             // Page fault exception
             SGX_EXCEPTION_VECTOR_PF => {
                 const PF_ERR_FLAG_PRESENT : u32 = 1u32 << 0;
-                let code = if exception.exinfo.errcd & PF_ERR_FLAG_PRESENT != 0 {
+                let code = if exception.exinfo.error_code & PF_ERR_FLAG_PRESENT != 0 {
                     SEGV_ACCERR
                 } else {
                     SEGV_MAPERR
                 };
-                let addr = Some(exception.exinfo.maddr);
+                let addr = Some(exception.exinfo.faulting_address);
                 (SIGSEGV, code, addr)
             },
             // General protection exception
