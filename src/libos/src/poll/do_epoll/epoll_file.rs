@@ -18,7 +18,7 @@ use crate::prelude::*;
 ///
 /// To maintain the ready list, we need to monitor interesting events that happen
 /// on the files. To do so, the `EpollFile` registers itself as an `Observer` to
-/// the monotored files. Thus, we can add a file to the ready list when an interesting
+/// the monitored files. Thus, we can add a file to the ready list when an interesting
 /// event happens on the file.
 pub struct EpollFile {
     // All interesting entries.
@@ -69,7 +69,7 @@ impl EpollFile {
         let mask = ep_event.events;
         let entry = EpollEntry::new(fd, weak_file, ep_event, ep_flags, self.weak_self.clone());
 
-        // Add the new entry to the interest list and start monitering its events
+        // Add the new entry to the interest list and start monitoring its events
         let mut interest = self.interest.lock().unwrap();
         if interest.contains_key(&fd) {
             return_errno!(EEXIST, "the fd has been added");
@@ -102,7 +102,7 @@ impl EpollFile {
         //
         // To optimize the performance, we only mark the epoll entry as
         // deleted at this moment. The real deletion happens when the ready list
-        // is scanned in EpolFile::wait.
+        // is scanned in EpollFile::wait.
         entry.set_deleted();
 
         let file = match entry.file() {

@@ -162,7 +162,7 @@ impl BlockDevice for SyncIoDisk {
     }
 
     fn submit(&self, req: Arc<BioReq>) -> BioSubmission {
-        // Update the status of req to submittted
+        // Update the status of req to submitted
         let submission = BioSubmission::new(req);
 
         let req = submission.req();
@@ -219,7 +219,7 @@ impl fmt::Debug for SyncIoDisk {
 
 impl Drop for SyncIoDisk {
     fn drop(&mut self) {
-        // Ensure all data are peristed before the disk is dropped
+        // Ensure all data are persisted before the disk is dropped
         let _ = self.do_flush();
     }
 }

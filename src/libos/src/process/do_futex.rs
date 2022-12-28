@@ -133,7 +133,7 @@ pub async fn futex_wait_bitset(
     //     wait();
     //   }
     // }
-    // If the waiter on CPU 0 does not lock the bucket before check the futex velue,
+    // If the waiter on CPU 0 does not lock the bucket before check the futex value,
     // it cannot find the transition of futex value from val to new_val and enqueue
     // to the bucket, which will cause the waiter to wait forever.
 

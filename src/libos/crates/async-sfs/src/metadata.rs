@@ -302,9 +302,9 @@ pub const FS_MAGIC: u32 = 0x2f8d_be2b;
 pub const INODE_CACHE_CAP: usize = 256;
 /// number of direct blocks in inode
 pub const NDIRECT: usize = 12;
-/// default fs infomation string
+/// default fs information string
 pub const FS_INFO: &str = "async simple file system";
-/// max length of infomation
+/// max length of information
 pub const MAX_INFO_LEN: usize = 31;
 /// max length of filename
 pub const MAX_FNAME_LEN: usize = 255;

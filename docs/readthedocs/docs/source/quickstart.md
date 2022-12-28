@@ -4,7 +4,7 @@
 
 ### Supported HW
 
-First, please make sure the basemetal or VM machine support SGX. Otherwise, users can only try SW simulation mode.
+First, please make sure the baremetal or VM machine support SGX. Otherwise, users can only try SW simulation mode.
 
 From Occlum v1.0, only SGX2 or SGX1 with [FLC](https://www.intel.com/content/www/us/en/developer/articles/technical/an-update-on-3rd-party-attestation.html)(Flexible Launch Control) feature are supported. 
 

@@ -132,7 +132,7 @@ impl resource_t {
 /// and the input argument pid can only be process ID, not thread ID. This
 /// (unnecessary) restriction is lifted by our implementation. Nevertheless,
 /// since the rlimits object is shared between threads in a process, the
-/// semantic of limiting resource usage on a per-process basisi is preserved.
+/// semantic of limiting resource usage on a per-process basis is preserved.
 ///
 /// Limitation: Current implementation only takes effect on child processes.
 pub fn do_prlimit(

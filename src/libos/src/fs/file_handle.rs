@@ -20,7 +20,7 @@ use crate::time::TimerFile;
 /// `FileLike: Any` that abstracts the common characteristics of any file type. But we choose
 /// not to do so. The primary reason is that `FileHandle` needs to have async methods, but
 /// Rust does not support async methods in trait unless you are ok with incurring
-/// an overhead of one heap allocationn per call (I am not).
+/// an overhead of one heap allocation per call (I am not).
 /// For more info, check out [the async-trait crate](https://crates.io/crates/async-trait).
 ///
 /// Internally, `FileHandle` is implemented with an enum. Using enums is sufficient to achieve
@@ -225,7 +225,7 @@ impl FileHandle {
             //
             // Currently, disk files are the only types of files
             // that may have internal caches for updates and
-            // requires explict flushes to ensure the persist of the
+            // requires explicit flushes to ensure the persist of the
             // updates.
             //
             // TODO: add a general-purpose mechanism to do async drop.

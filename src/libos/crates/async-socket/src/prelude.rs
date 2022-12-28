@@ -12,7 +12,7 @@ cfg_if::cfg_if! {
     }
 }
 
-// Convenient type alises for internal uses.
+// Convenient type alias for internal uses.
 pub(crate) type HostFd = u32;
 
 pub(crate) use async_io::event::{Events, Observer, Pollee, Poller};

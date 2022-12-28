@@ -1,7 +1,6 @@
 //! Scheduler.
 
 use crate::prelude::*;
-use crate::util::AtomicBits;
 use crate::vcpu;
 use std::sync::Arc;
 

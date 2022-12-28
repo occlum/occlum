@@ -360,7 +360,7 @@ impl PartialEq for Process {
 
 // Why manual implementation of Debug trait?
 //
-// An explict implementation of Debug trait is required since Process and Thread
+// An explicit implementation of Debug trait is required since Process and Thread
 // structs refer to each other. Thus, the automatically-derived implementation
 // of Debug trait for the two structs may lead to infinite loop.
 

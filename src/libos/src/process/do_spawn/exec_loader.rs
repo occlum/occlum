@@ -97,7 +97,7 @@ pub async fn load_file_hdr_to_vec(
     }
     if file_mode.has_set_uid() || file_mode.has_set_gid() {
         warn!(
-            "set-user-ID and set-group-ID are not supportted, FileMode:{:?}",
+            "set-user-ID and set-group-ID are not supported, FileMode:{:?}",
             file_mode
         );
     }

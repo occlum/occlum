@@ -12,7 +12,7 @@ pub async fn handle_syscall_exception() -> Result<()> {
         let gp_regs = &mut context.gp_regs;
 
         // SYSCALL instruction saves RIP into RCX and RFLAGS into R11. This is to
-        // comply with hardware's behavoir. Not useful for us.
+        // comply with hardware's behavior. Not useful for us.
         gp_regs.rcx = gp_regs.rip;
         gp_regs.r11 = gp_regs.rflags;
 

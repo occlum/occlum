@@ -71,7 +71,7 @@ impl<B: BlockDevice> BlockDeviceAsFile for B {
     }
 }
 
-// TODO: The following implementation does not gurantee the atomicity of concurrent
+// TODO: The following implementation does not guarantee the atomicity of concurrent
 // reads and writes when their offsets or lengths are not block aligned.
 // Is this a problem? Should the interface promise such properties?
 //
@@ -200,8 +200,8 @@ impl<'a> Impl<'a> {
                     let ptr = NonNull::new_unchecked(whole_block_buf.as_mut_ptr());
                     let len = whole_block_buf.len();
                     debug_assert!(len % BLOCK_SIZE == 0);
-                    // Safety. The memory refered to by the pair of pointer and
-                    // length is valid during the entire life cyle of the request.
+                    // Safety. The memory referred to by the pair of pointer and
+                    // length is valid during the entire life cycle of the request.
                     BlockBuf::from_raw_parts(ptr, len)
                 };
                 bufs.push(buf);
@@ -394,8 +394,8 @@ impl<'a> Impl<'a> {
                     let ptr = NonNull::new_unchecked(whole_block_buf.as_ptr() as _);
                     let len = whole_block_buf.len();
                     debug_assert!(len % BLOCK_SIZE == 0);
-                    // Safety. The memory refered to by the pair of pointer and
-                    // length is valid during the entire life cyle of the request.
+                    // Safety. The memory referred to by the pair of pointer and
+                    // length is valid during the entire life cycle of the request.
                     BlockBuf::from_raw_parts(ptr, len)
                 };
                 bufs.push(buf);

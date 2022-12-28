@@ -71,7 +71,7 @@ pub struct RobustListHead {
 impl RobustListHead {
     /// Return an iterator for all futexes in the robust list.
     ///
-    /// The futex refered to by `list_op_pending`, if any, will be returned as
+    /// The futex referred to by `list_op_pending`, if any, will be returned as
     /// the last item.
     pub fn futexes<'a>(&'a self) -> FutexIter<'a> {
         FutexIter::new(self)

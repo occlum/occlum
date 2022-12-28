@@ -105,7 +105,7 @@ impl CryptDisk {
             origin_req.access_bufs_with(|bufs| {
                 let total_len = bufs.iter().map(|buf| buf.len()).sum();
                 let uninit_slice = Box::new_uninit_slice(total_len);
-                // Safety. The initiail content is not important now.
+                // Safety. The initial content is not important now.
                 let boxed_slice = unsafe { uninit_slice.assume_init() };
                 BlockBuf::from_boxed(boxed_slice)
             })
@@ -139,7 +139,7 @@ impl BlockDevice for CryptDisk {
         // submissions out of one request).
         let type_ = req.type_();
         if type_ != BioType::Flush {
-            // Update the status of req to submittted
+            // Update the status of req to submitted
             let submission = BioSubmission::new(req);
 
             let req = submission.req().clone();

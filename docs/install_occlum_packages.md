@@ -63,7 +63,7 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-cer
 
 2. Install Intel® SGX Driver and Intel® SGX PSW
 
-Please follow [Intel SGX Installation Guide](https://download.01.org/intel-sgx/sgx-linux/2.13/docs/Intel_SGX_Installation_Guide_Linux_2.13_Open_Source.pdf) to install SGX driver and SGX PSW. SGX SDK is not required. Using PSW installer is recommanded.
+Please follow [Intel SGX Installation Guide](https://download.01.org/intel-sgx/sgx-linux/2.13/docs/Intel_SGX_Installation_Guide_Linux_2.13_Open_Source.pdf) to install SGX driver and SGX PSW. SGX SDK is not required. Using PSW installer is recommended.
 
 To install PSW, follow the guide to add Intel® SGX repository to APT source. And then run:
 ```
@@ -99,11 +99,11 @@ occlum run /bin/hello_world
 ```
 
 
-## Version Compatability Matrix
+## Version Compatibility Matrix
 
 When version is not specified, Occlum with the latest version will be installed. If a user would like to evaluate an older version, please make sure the corresponding Intel® SGX PSW is installed.
 
-The matrix below shows the version compatability since Occlum `0.16.0`. Please check before installing or upgrading.
+The matrix below shows the version compatibility since Occlum `0.16.0`. Please check before installing or upgrading.
 
 | Occlum Version  |  SGX PSW Version  | Tested under Ubuntu | Tested under CentOS |
 | --------------- | ----------------- | ------------------- | ------------------- |

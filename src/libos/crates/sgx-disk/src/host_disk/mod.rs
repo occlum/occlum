@@ -1,4 +1,4 @@
-//! Host disks are untrusted hvirtual disks that are backed by a file on the host.
+//! Host disks are untrusted virtual disks that are backed by a file on the host.
 //!
 //! There are two types of host disks.
 //! * `SyncIoDisk` is a disk that uses normal sync I/O operations.

@@ -5,7 +5,7 @@ use super::{ProcessBuilder, ThreadRef};
 use crate::misc::ResourceLimits;
 /// Process 0, a.k.a, the idle process.
 ///
-/// The idle process has no practical use except making process 1 (a.k.a, the init proess)
+/// The idle process has no practical use except making process 1 (a.k.a, the init process)
 /// having a parent.
 use crate::prelude::*;
 use crate::vm::ProcessVM;

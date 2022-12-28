@@ -20,7 +20,7 @@ pub unsafe trait AsBuf {
     }
 }
 
-/// Dirty wraps a value of type T with functions similiar to that of a Read/Write
+/// Dirty wraps a value of type T with functions similar to that of a Read/Write
 /// lock but simply sets a dirty flag on write(), reset on read()
 pub struct Dirty<T: Clone + Debug> {
     value: T,

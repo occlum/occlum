@@ -44,7 +44,7 @@ message ExecCommRequest {
   string sockpath = 2;
   string command = 3;
   repeated string parameters = 4;
-  repeated string enviroments = 5;
+  repeated string environments = 5;
 }
 
 message ExecCommResponse {

@@ -6,7 +6,7 @@ use std::cell::Cell;
 /// # Overview
 ///
 /// Not all types are created equal: some of them are difficult---
-/// if not impossible---to be used safey when residing in untrusted memory.
+/// if not impossible---to be used safely when residing in untrusted memory.
 /// One obvious class is heap-backed Rust containers, like `Vec<T>`.
 /// If such types were put into untrusted memory, then an attacker could manipulate
 /// the internal pointer. Enums, in general, cannot be used safely in untrusted

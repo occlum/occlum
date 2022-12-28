@@ -553,11 +553,11 @@ jobs:
     - name: Download and build Enclave TLS
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/enclave_tls && ./download_and_build_enclave_tls.sh"
 
-    - name: Run the encalve tls server on Occlum
+    - name: Run the enclave tls server on Occlum
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/enclave_tls && SGX_MODE=SIM ./run_enclave_tls_server_in_occlum.sh"
 
     # Ignore the result here as simulation mode doesn't have RA capabilities
-    - name: Run the encalve tls client
+    - name: Run the enclave tls client
       run: |
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "/usr/share/enclave-tls/samples/enclave-tls-client" || true

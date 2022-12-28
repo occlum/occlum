@@ -120,7 +120,7 @@ impl InnerAgent {
             ) -> sgx_status_t;
         }
 
-        // Prepare argments for OCall
+        // Prepare arguments for OCall
         let (sigrl_ptr, sigrl_size): (*const u8, u32) = {
             match sigrl {
                 Some(sigrl) => {

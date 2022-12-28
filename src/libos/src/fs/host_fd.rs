@@ -45,7 +45,7 @@ lazy_static! {
         { SgxMutex::new(HostFdRegistry::new()) };
 }
 
-/// A registery for host fds to ensure that they are unique.
+/// A registry for host fds to ensure that they are unique.
 struct HostFdRegistry {
     set: HashSet<FileDesc>,
 }

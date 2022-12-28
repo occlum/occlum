@@ -178,7 +178,7 @@ fn adjust_alignment(
     envp: &[&CStr],
     argv: &[&CStr],
 ) -> Result<()> {
-    // Put 8 byte to make the postion of stack 8-byte aligned
+    // Put 8 byte to make the position of stack 8-byte aligned
     stack.put(0 as u64)?;
     let current_pos = stack.get_pos();
     let to_alloc_size = {
@@ -189,7 +189,7 @@ fn adjust_alignment(
         auxtbl_size + envp_size + argv_size + argc_size
     };
     // Libc ABI requires 16-byte alignment of the stack entrypoint.
-    // Current postion of the stack is 8-byte aligned already, insert 8 byte
+    // Current position of the stack is 8-byte aligned already, insert 8 byte
     // to meet the requirement if necessary.
     if (current_pos - to_alloc_size) % 16 != 0 {
         stack.put(0 as u64)?;

@@ -317,7 +317,7 @@ impl<P: IoUringProvider> BlockDevice for IoUringDisk<P> {
     }
 
     fn submit(&self, req: Arc<BioReq>) -> BioSubmission {
-        // Update the status of req to submittted
+        // Update the status of req to submitted
         let submission = BioSubmission::new(req);
 
         // Try to initiate the I/O
@@ -384,7 +384,7 @@ impl<P: IoUringProvider> fmt::Debug for IoUringDisk<P> {
 
 impl<P: IoUringProvider> Drop for IoUringDisk<P> {
     fn drop(&mut self) {
-        // Ensure all data are peristed before the disk is dropped
+        // Ensure all data are persisted before the disk is dropped
         let mut file = self.0.file.lock().unwrap();
         let _ = file.flush();
     }

@@ -13,7 +13,7 @@ pub trait Any: CoreAny + Debug + Send {}
 impl<T: CoreAny + Debug + Send> Any for T {}
 
 /// A collection of heterogeneous types, storing one value of each type. The
-/// only requiremet for the types is to implement `Any`.
+/// only requirement for the types is to implement `Any`.
 ///
 /// This is a simplified and specialized implementation of the `anymap` crate.
 /// We do not choose to use the crate because 1) it is no longer maintained and

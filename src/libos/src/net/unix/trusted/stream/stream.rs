@@ -253,7 +253,7 @@ impl Stream {
                     return_errno!(EINVAL, "the socket is already bound");
                 }
 
-                // check the global address space to see if the address is avaiable before bind
+                // check the global address space to see if the address is available before bind
                 ADDRESS_SPACE.add_binder(addr)?;
                 info.set_addr(addr);
             }
@@ -271,7 +271,7 @@ impl Stream {
     }
 
     pub fn listen(&self, backlog: u32) -> Result<()> {
-        //TODO: restrict backlog accroding to /proc/sys/net/core/somaxconn
+        //TODO: restrict backlog according to /proc/sys/net/core/somaxconn
         let capacity = backlog as usize;
 
         let mut inner = self.inner();
@@ -416,7 +416,7 @@ impl Drop for Stream {
 pub enum Status {
     Idle(Info),
     // The listeners are stored in a global data structure indexed by the address.
-    // The consitency of Status with that data structure should be carefully maintained.
+    // The consistency of Status with that data structure should be carefully maintained.
     Listening(TrustedAddr),
     Connected(SockEnd),
 }

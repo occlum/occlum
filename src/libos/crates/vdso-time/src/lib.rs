@@ -216,7 +216,7 @@ impl Vdso {
                 };
                 if estimated_inaccuracy > MAX_INACCURACY {
                     if retry_num == MAX_RETRY_NUM - 1 {
-                        return_errno!(EOPNOTSUPP, "Vdso reached max retey number");
+                        return_errno!(EOPNOTSUPP, "Vdso reached max retry number");
                     }
                     continue;
                 }

@@ -1,7 +1,7 @@
 use super::{FpRegs, GpRegs};
 use crate::prelude::*;
 
-/// Cpu context, including both general-pupose registers and floating-point registers.
+/// Cpu context, including both general-purpose registers and floating-point registers.
 ///
 /// Note. The Rust definition of this struct must be kept in sync with assembly code.
 #[derive(Clone, Default)]

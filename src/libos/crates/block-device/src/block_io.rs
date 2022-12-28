@@ -246,7 +246,7 @@ impl BioReq {
     /// The extensions of a request is a set of objects that may be added, removed,
     /// or accessed by block devices and their users. Implemented with `AnyMap`,
     /// each of the extension objects must have a different type. To avoid
-    /// conflicts, it is recommened to use only private types for the extension
+    /// conflicts, it is recommended to use only private types for the extension
     /// objects.
     pub fn ext(&self) -> MutexGuard<AnyMap> {
         self.ext.lock()

@@ -193,7 +193,7 @@ impl OcclumExec for OcclumExecImpl {
 
         let cmd = req.command.clone();
         let args = req.parameters.into_vec().clone();
-        let envs = req.enviroments.into_vec().clone();
+        let envs = req.environments.into_vec().clone();
         let client_process_id = req.process_id;
         let exit_status = Box::new(Futex::<Shared>::new(-1));
 

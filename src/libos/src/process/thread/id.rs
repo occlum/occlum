@@ -90,7 +90,7 @@ impl IdAlloc {
     }
 
     pub fn free(&mut self, id: u32) -> Option<u32> {
-        // Note: When enableing "execve", there is situation that the ThreadId is reused.
+        // Note: When enabling "execve", there is situation that the ThreadId is reused.
         // And thus when exit, it may free twice.
         // debug_assert!(self.used_ids.contains(&id));
         if self.used_ids.remove(&id) {

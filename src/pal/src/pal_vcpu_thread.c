@@ -28,7 +28,7 @@ static void *thread_func(void *_data) {
     }
     if (ret < 0) {
         int errno_ = -ret;
-        PAL_ERROR("Unexpcted error from occlum_ecall_run_vcpu: %s", errno2str(errno_));
+        PAL_ERROR("Unexpected error from occlum_ecall_run_vcpu: %s", errno2str(errno_));
         exit(EXIT_FAILURE);
     }
 

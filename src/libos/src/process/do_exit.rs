@@ -115,7 +115,7 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus, new_parent_ref: Opt
 
         let parent_inner = parent.inner();
         // To prevent the race condition that parent is changed after `parent()`,
-        // but before `parent().innner()`, we need to check again here.
+        // but before `parent().inner()`, we need to check again here.
         if parent.pid() != process.parent().pid() {
             continue;
         }
@@ -204,7 +204,7 @@ pub fn exit_old_process_for_execve(term_status: TermStatus, new_parent_ref: Proc
     let num_remaining_threads = thread.exit(term_status);
     if thread.tid() != thread.process().pid() {
         // Keep the main thread's tid available as long as the process is not destroyed.
-        // Main thread doesn't need to delete here. It will be repalced later.
+        // Main thread doesn't need to delete here. It will be replaced later.
         table::del_thread(thread.tid()).expect("tid must be in the table");
     }
 
