@@ -511,7 +511,7 @@ cmd_package() {
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" && "$debug" != "true" ]]; then
         echo '"occlum package" command should only be used for an Occlum instance of SGX hardware mode, not the simulation mode.'
         echo 'Please run "occlum build --sgx-mode HW" and then use "occlum package"'
-        echo 'Or, use "occlum package --debug" to support similation mode package'
+        echo 'Or, use "occlum package --debug" to support simulation mode package'
         exit 1
     fi
 

@@ -128,13 +128,13 @@ impl ChunkManager {
     }
 
     pub fn usage_percentage(&self) -> f32 {
-        let totol_size = self.range.size();
+        let total_size = self.range.size();
         let mut used_size = 0;
         self.vmas
             .iter()
             .for_each(|vma_obj| used_size += vma_obj.vma().size());
 
-        return used_size as f32 / totol_size as f32;
+        return used_size as f32 / total_size as f32;
     }
 
     // Returns whether the requested range is free

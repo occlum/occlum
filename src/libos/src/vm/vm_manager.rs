@@ -439,7 +439,7 @@ impl VMManager {
             internal_manager.clean_single_vma_chunks();
         }
 
-        // Deternmine the chunk of the old range
+        // Determine the chunk of the old range
         let chunk = {
             let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
             let chunk = process_mem_chunks
@@ -468,7 +468,7 @@ impl VMManager {
         let ret_addr = if let Some(mmap_options) = remap_result_option.mmap_options() {
             let mmap_addr = self.mmap(mmap_options);
 
-            // FIXME: For MRemapFlags::MayMove flag, we checked if the prefered range is free when parsing the options.
+            // FIXME: For MRemapFlags::MayMove flag, we checked if the preferred range is free when parsing the options.
             // But there is no lock after the checking, thus the mmap might fail. In this case, we should try mmap again.
             if mmap_addr.is_err() && remap_result_option.may_move() == true {
                 return_errno!(
@@ -488,7 +488,7 @@ impl VMManager {
 
         if let Some((munmap_addr, munmap_size)) = remap_result_option.munmap_args() {
             self.munmap(*munmap_addr, *munmap_size)
-                .expect("Shouln't fail");
+                .expect("Shouldn't fail");
         }
 
         return Ok(ret_addr);
@@ -616,7 +616,7 @@ impl VMManager {
     }
 }
 
-// Modification on this structure must aquire the global lock.
+// Modification on this structure must acquire the global lock.
 // TODO: Enable fast_default_chunks for faster chunk allocation
 #[derive(Debug)]
 pub struct InternalVMManager {
@@ -848,10 +848,10 @@ impl InternalVMManager {
                 }
                 _ => {
                     if same_start {
-                        // Protect range is at left side of the cotaining vma
+                        // Protect range is at left side of the containing vma
                         containing_vma.set_start(protect_range.end());
                     } else {
-                        // Protect range is at right side of the cotaining vma
+                        // Protect range is at right side of the containing vma
                         containing_vma.set_end(protect_range.start());
                     }
 

@@ -1,5 +1,5 @@
 //! It is infeasible to implement AsyncInode for INode and AsyncFilesystem for FileSystem,
-//! because doing upcasting and downcasting between traits is not allowd.
+//! because doing upcasting and downcasting between traits is not allowed.
 //!
 //! The SyncFS and SyncInode are very special structs to wrap any FileSystems and INodes of rcore-fs.
 //! It is straightforward to upcast struct to trait or downcast trait to struct, so the sync FileSystem

@@ -37,7 +37,7 @@ struct Inner<A: PageAlloc> {
     // and writers. This policy is important to implement
     // the semantic of the flush operation correctly.
     arw_lock: AsyncRwLock<()>,
-    // Whether CachedDisk is droppedd
+    // Whether CachedDisk is dropped
     is_dropped: AtomicBool,
 }
 

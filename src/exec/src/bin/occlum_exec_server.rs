@@ -114,7 +114,7 @@ fn main() {
         while !*server_stopped {
             server_stopped = cvar.wait(server_stopped).unwrap();
         }
-        rust_occlum_pal_destroy().expect("Destory occlum image failed");
+        rust_occlum_pal_destroy().expect("Destroy occlum image failed");
         println!("server stopped");
     }
 }
@@ -186,7 +186,7 @@ fn rust_occlum_pal_init(num_vcpus: u32) -> Result<(), i32> {
     }
 }
 
-///Destroyes the Occlum enclave image
+///Destroys the Occlum enclave image
 fn rust_occlum_pal_destroy() -> Result<(), i32> {
     let ret = unsafe { occlum_pal_destroy() };
     match ret {

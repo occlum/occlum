@@ -96,7 +96,7 @@ impl<D: HostDisk + Sized> OpenOptions<D> {
             .truncate(self.clear)
             .open(path.as_ref())?;
 
-        // If the size of the disk is specified, we set the length regradless
+        // If the size of the disk is specified, we set the length regardless
         // of the file is new or existing.
         if let Some(total_blocks) = self.total_blocks {
             let file_len = total_blocks * block_device::BLOCK_SIZE;

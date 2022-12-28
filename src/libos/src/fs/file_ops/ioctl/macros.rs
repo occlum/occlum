@@ -83,8 +83,8 @@ macro_rules! impl_ioctl_cmds {
                 if cmd_num.require_arg() && arg_ptr.is_null() {
                     return_errno!(EINVAL, "arg_ptr cannot be null");
                 }
-                // Note that we do allow the caller to give an non-enull arg even
-                // when the ioctl cmd does not take an arguement
+                // Note that we do allow the caller to give an non-null arg even
+                // when the ioctl cmd does not take an argument
 
                 let cmd = match cmd_num {
                     $(

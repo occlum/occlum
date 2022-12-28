@@ -42,7 +42,7 @@ To test and reproduce the new demo, it is better to "script-ize" the work. For e
 
 ## Step 3: Add New Demo to CI
 
-It is the last one step before submitting but very important, which can definityly boost the speed of review and merge. And it also makes sure that this demo is tested for every PR, commit and release. So that it won't get broken in a new version.
+It is the last one step before submitting but very important, which can definitely boost the speed of review and merge. And it also makes sure that this demo is tested for every PR, commit and release. So that it won't get broken in a new version.
 
 ### 3.1 - Simple dependency
 

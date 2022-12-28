@@ -52,7 +52,7 @@ pub async fn rootfs() -> &'static Arc<dyn AsyncFileSystem> {
     unsafe { ROOT_FS.as_ref().unwrap() }
 }
 
-/// Update the rootfs, must be called after initilized
+/// Update the rootfs, must be called after initialized
 pub async fn update_rootfs(new_rootfs: Arc<dyn AsyncFileSystem>) -> Result<()> {
     loop {
         match STATE.compare_exchange(

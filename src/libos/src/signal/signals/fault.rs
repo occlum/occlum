@@ -15,7 +15,7 @@ impl FaultSignal {
     pub fn new(exception: &Exception) -> Self {
         // TODO: the current mapping from exception to signal is only a first
         // order approximation. The resulting signum or siginfo may not be
-        // idential to Linux's behavior.
+        // identical to Linux's behavior.
         use sgx_exception_vector_t::*;
         let (num, code, addr) = match exception.vector {
             // Divider exception

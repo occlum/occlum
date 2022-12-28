@@ -14,7 +14,7 @@ use intrusive_collections::{intrusive_adapter, KeyAdapter};
 /// Memory chunk manager.
 ///
 /// Chunk is the memory unit for Occlum. For chunks with `default` size, every chunk is managed by a ChunkManager which provides
-/// usedful memory management APIs such as mmap, munmap, mremap, mprotect, etc.
+/// useful memory management APIs such as mmap, munmap, mremap, mprotect, etc.
 /// ChunkManager is implemented basically with two data structures: a red-black tree to track vmas in use and a FreeRangeManager to track
 /// ranges which are free.
 /// For vmas-in-use, there are two sentry vmas with zero length at the front and end of the red-black tree.
@@ -449,13 +449,13 @@ impl ChunkManager {
     }
 
     pub fn usage_percentage(&self) -> f32 {
-        let totol_size = self.range.size();
+        let total_size = self.range.size();
         let mut used_size = 0;
         self.vmas
             .iter()
             .for_each(|vma_obj| used_size += vma_obj.vma().size());
 
-        return used_size as f32 / totol_size as f32;
+        return used_size as f32 / total_size as f32;
     }
 
     fn merge_all_vmas(&mut self) {

@@ -80,7 +80,7 @@ impl DirProcINode for LockedPidDirINode {
             return Ok(Arc::clone(&file.parent));
         }
         // The 'fd' entry holds 1 Arc of LockedPidDirINode, so the LockedPidDirINode
-        // ifself will hold 2 Arcs. This makes it cannot be dropped automatically.
+        // itself will hold 2 Arcs. This makes it cannot be dropped automatically.
         // We initialize the 'fd' here to avoid this.
         // TODO:: Try to find a better solution.
         if name == "fd" {

@@ -80,7 +80,7 @@ impl BlockDevice for MemDisk {
     }
 
     fn submit(&self, req: Arc<BioReq>) -> BioSubmission {
-        // Update the status of req to submittted
+        // Update the status of req to submitted
         let submission = BioSubmission::new(req);
 
         let req = submission.req();

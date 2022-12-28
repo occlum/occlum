@@ -69,7 +69,7 @@ pub mod from_user {
             return_errno!(EINVAL, "NULL address is invalid");
         }
 
-        // confirm that at least the fisrt byte of the string is from user
+        // confirm that at least the first byte of the string is from user
         check_ptr(out_ptr)?;
 
         let cstr = unsafe { CStr::from_ptr(out_ptr) };
@@ -152,7 +152,7 @@ pub mod from_untrusted {
             return_errno!(EINVAL, "NULL address is invalid");
         }
 
-        // confirm that at least the fisrt byte of the string is out side of enclave
+        // confirm that at least the first byte of the string is out side of enclave
         check_ptr(out_ptr)?;
 
         let cstr = unsafe { CStr::from_ptr(out_ptr) };

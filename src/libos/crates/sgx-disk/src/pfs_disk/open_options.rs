@@ -1,4 +1,4 @@
-use std::io::{ErrorKind, Seek, SeekFrom, Write};
+use std::io::{Seek, SeekFrom, Write};
 use std::path::Path;
 use std::sgxfs::{OpenOptions as PfsOpenOptions, SgxFile as PfsFile};
 

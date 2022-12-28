@@ -25,7 +25,7 @@ pub fn create_report(
     };
     match sgx_status {
         sgx_status_t::SGX_SUCCESS => Ok(report),
-        sgx_status_t::SGX_ERROR_INVALID_PARAMETER => return_errno!(EINVAL, "invalid paramters"),
+        sgx_status_t::SGX_ERROR_INVALID_PARAMETER => return_errno!(EINVAL, "invalid parameters"),
         _ => return_errno!(EINVAL, "unexpected SGX error"),
     }
 }

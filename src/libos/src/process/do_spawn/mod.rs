@@ -183,7 +183,7 @@ async fn new_process_common(
         load_exec_file_hdr_to_vec(file_path, current_ref).await?;
 
     // elf_path might be different from file_path because file_path could lead to a script text file.
-    // And intepreter will be the loaded ELF.
+    // And interpreter will be the loaded ELF.
     let elf_path = if let Some(interpreter_path) = is_script {
         if argv.len() == 0 {
             return_errno!(EINVAL, "argv[0] not found");
@@ -356,7 +356,7 @@ async fn new_process_common(
             .sig_dispositions(sig_dispositions);
 
         let new_process = builder.build()?;
-        // This is done here becuase if we want to create a new process group, we must have a new process first.
+        // This is done here because if we want to create a new process group, we must have a new process first.
         // So we can't set "pgrp" during the build above.
         update_pgrp_for_new_process(&new_process, new_pgid)?;
         (new_process, init_cpu_state)

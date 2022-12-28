@@ -48,7 +48,7 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
             .stack_size
             .unwrap_or(config::LIBOS_CONFIG.process.default_stack_size);
 
-        // Before allocating memory, let's first calcualte how much memory
+        // Before allocating memory, let's first calculate how much memory
         // we need in total by iterating the memory layouts required by
         // all the memory regions
         let elf_layouts: Vec<VMLayout> = self
@@ -202,7 +202,7 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
         let mut empty_start_offset = 0;
         let mut empty_end_offset = 0;
 
-        // Init all loadable segements
+        // Init all loadable segments
         let elf_file_handle = elf_file
             .file_ref()
             .as_async_file_handle()

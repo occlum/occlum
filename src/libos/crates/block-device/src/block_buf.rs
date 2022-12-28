@@ -50,7 +50,7 @@ impl BlockBuf {
         }
     }
 
-    /// Convert the block buffer innto a boxed slice.
+    /// Convert the block buffer into a boxed slice.
     ///
     /// # Safety
     ///

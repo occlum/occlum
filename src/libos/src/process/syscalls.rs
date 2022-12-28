@@ -11,7 +11,7 @@ use super::do_wait4::WaitOptions;
 use super::pgrp::*;
 use super::prctl::PrctlCmd;
 use super::process::ProcessFilter;
-use super::spawn_attribute::{clone_spawn_atrributes_safely, posix_spawnattr_t, SpawnAttr};
+use super::spawn_attribute::{clone_spawn_attributes_safely, posix_spawnattr_t, SpawnAttr};
 use crate::prelude::*;
 use crate::time::{timespec_t, ClockId};
 use crate::util::mem_util::from_user::*;
@@ -29,7 +29,7 @@ pub async fn do_spawn_for_musl(
     let argv = clone_cstrings_safely(argv)?;
     let envp = clone_cstrings_safely(envp)?;
     let file_actions = clone_file_actions_safely(fdop_list)?;
-    let spawn_attrs = clone_spawn_atrributes_safely(attribute_list)?;
+    let spawn_attrs = clone_spawn_attributes_safely(attribute_list)?;
     let current = current!();
     debug!(
         "spawn: path: {:?}, argv: {:?}, envp: {:?}, fdop: {:?}, spawn_attr: {:?}",
@@ -109,7 +109,7 @@ pub async fn do_spawn_for_glibc(
     let argv = clone_cstrings_safely(argv)?;
     let envp = clone_cstrings_safely(envp)?;
     let file_actions = clone_file_actions_from_fa_safely(fa)?;
-    let spawn_attrs = clone_spawn_atrributes_safely(attribute_list)?;
+    let spawn_attrs = clone_spawn_attributes_safely(attribute_list)?;
     let current = current!();
     debug!(
         "spawn: path: {:?}, argv: {:?}, envp: {:?}, actions: {:?}, attributes: {:?}",

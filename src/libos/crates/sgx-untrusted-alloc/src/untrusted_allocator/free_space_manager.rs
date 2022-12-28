@@ -29,7 +29,7 @@ impl VMFreeSpaceManager {
     }
 
     pub fn find_free_range_internal(&mut self, size: usize, align: usize) -> Result<VMRange> {
-        // Record the minimal free range that satisfies the contraints
+        // Record the minimal free range that satisfies the constraints
         let mut result_free_range: Option<VMRange> = None;
         let mut result_idx: Option<usize> = None;
         let free_list = &self.free_manager;

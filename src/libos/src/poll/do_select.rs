@@ -77,7 +77,7 @@ pub async fn do_select(
     Ok(num_events)
 }
 
-// Convert select's rwe input to poll's IoEvents input accordingg to Linux's
+// Convert select's rwe input to poll's IoEvents input according to Linux's
 // behavior.
 fn convert_rwe_to_events(readable: bool, writable: bool, except: bool) -> Events {
     let mut events = Events::empty();

@@ -50,7 +50,7 @@ pub struct SpawnAttr {
     pub sig_default: Option<SigSet>,
 }
 
-pub fn clone_spawn_atrributes_safely(
+pub fn clone_spawn_attributes_safely(
     attr_ptr: *const posix_spawnattr_t,
 ) -> Result<Option<SpawnAttr>> {
     if attr_ptr != std::ptr::null() {

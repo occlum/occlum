@@ -20,7 +20,7 @@ pub enum VMInitializer {
     FileBacked {
         file: FileBacked,
     },
-    // For ELF files, there is specical handling to not copy all the contents of the file. This is only used for tracking.
+    // For ELF files, there is special handling to not copy all the contents of the file. This is only used for tracking.
     ElfSpecific {
         elf_file: FileRef,
     },
@@ -446,7 +446,7 @@ pub trait VMRemapParser {
         // For Linux, writing to either memory vma or the file will update the other two equally. But we won't be able to support this before
         // we really have paging. Thus, if the old_range is not equal to a recorded vma, we will just return with error.
         if writeback_file.is_some() && &old_range != vma.range() {
-            return_errno!(EINVAL, "Known limition")
+            return_errno!(EINVAL, "Known limitation")
         }
 
         // Implement mremap as one optional mmap followed by one optional munmap.
@@ -636,7 +636,7 @@ pub trait VMRemapParser {
 }
 
 // Generate a random address within [0, range]
-// Note: This function doesn't gurantee alignment
+// Note: This function doesn't guarantee alignment
 pub fn get_randomize_offset(range: usize) -> usize {
     if cfg!(debug_assertions) {
         return range;

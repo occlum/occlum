@@ -56,9 +56,9 @@ fn exec_command(
         parameter_list.push(p.to_string());
     }
 
-    let mut enviroments_list = RepeatedField::default();
+    let mut environments_list = RepeatedField::default();
     for env in envs {
-        enviroments_list.push(env.to_string());
+        environments_list.push(env.to_string());
     }
 
     let tmp_dir = TempDir::new("occlum_tmp").expect("create temp dir");
@@ -91,7 +91,7 @@ fn exec_command(
                     process_id: process::id(),
                     command: command.to_string(),
                     parameters: parameter_list,
-                    enviroments: enviroments_list,
+                    environments: environments_list,
                     sockpath: String::from(sockpath.as_path().to_str().unwrap()),
                     ..Default::default()
                 },

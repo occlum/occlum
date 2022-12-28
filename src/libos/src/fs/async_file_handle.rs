@@ -197,7 +197,7 @@ impl AsyncFileHandle {
         let ext = match self.dentry().inode().ext() {
             Some(ext) => ext,
             None => {
-                warn!("Inode extension is not supportted, the lock could be placed");
+                warn!("Inode extension is not supported, the lock could be placed");
                 lock.set_type(RangeLockType::F_UNLCK);
                 return Ok(());
             }

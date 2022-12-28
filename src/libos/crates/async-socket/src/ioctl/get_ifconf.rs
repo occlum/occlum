@@ -89,7 +89,7 @@ fn get_ifconf_by_host(fd: HostFd, if_conf: &mut IfConf) -> Result<()> {
         // Used to ioctl arguments with pointer members.
         //
         // Before the call the area the pointers points to should be assembled into
-        // one continous memory block. Then the block is repacked to ioctl arguments
+        // one continuous memory block. Then the block is repacked to ioctl arguments
         // in the ocall implementation in host.
         //
         // ret: holds the return value of ioctl in host

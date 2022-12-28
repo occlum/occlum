@@ -181,7 +181,7 @@ impl Thread {
             }
             Some(robust_list) => robust_list.as_ptr(),
         };
-        debug!("wake the rubust_list: {:?}", list_head_ptr);
+        debug!("wake the robust_list: {:?}", list_head_ptr);
         let robust_list = {
             // Invalid pointer, stop scanning the list further
             if crate::util::mem_util::from_user::check_ptr(list_head_ptr).is_err() {
@@ -314,7 +314,7 @@ impl PartialEq for Thread {
 
 // Why manual implementation of Debug trait?
 //
-// An explict implementation of Debug trait is required since Process and Thread
+// An explicit implementation of Debug trait is required since Process and Thread
 // structs refer to each other. Thus, the automatically-derived implementation
 // of Debug trait for the two structs may lead to infinite loop.
 

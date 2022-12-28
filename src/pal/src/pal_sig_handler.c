@@ -8,12 +8,12 @@
 
 int pal_register_sig_handlers(void) {
     if (signal(SIGRT_INTERRUPT, SIG_IGN) == SIG_ERR) {
-        PAL_ERROR("Failed to regiter the SIG64 handler");
+        PAL_ERROR("Failed to register the SIG64 handler");
         return -1;
     }
 
     if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
-        PAL_ERROR("Failed to regiter the SIGPIPE handler");
+        PAL_ERROR("Failed to register the SIGPIPE handler");
         return -1;
     }
     return 0;
