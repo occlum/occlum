@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1672286082847,
+  "lastUpdate": 1672286439079,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -362,6 +362,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 30.6,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "1498430017@qq.com",
+            "name": "Shaowei Song",
+            "username": "lucassong-mh"
+          },
+          "committer": {
+            "email": "volcano.dr@hotmail.com",
+            "name": "volcano",
+            "username": "volcano0dr"
+          },
+          "distinct": true,
+          "id": "fb456b0f0581e6ce5ec2dd27f461866b9a1ca085",
+          "message": "[hw-ci] Add MySQL to hw mode test",
+          "timestamp": "2022-12-28T16:29:49+08:00",
+          "tree_id": "44695e2476b116ea8e41c5093055d8eb9fb5fcaf",
+          "url": "https://github.com/occlum/occlum/commit/fb456b0f0581e6ce5ec2dd27f461866b9a1ca085"
+        },
+        "date": 1672286437275,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 57.2,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 57.1,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
