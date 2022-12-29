@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1672216814407,
+  "lastUpdate": 1672282991651,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -142,6 +142,54 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 282.25,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "1498430017@qq.com",
+            "name": "Shaowei Song",
+            "username": "lucassong-mh"
+          },
+          "committer": {
+            "email": "volcano.dr@hotmail.com",
+            "name": "volcano",
+            "username": "volcano0dr"
+          },
+          "distinct": true,
+          "id": "8393e87662aeda82c6cde7dc4835bbcada045c05",
+          "message": "[sefs] Configure larger cache size to improve pfs performance",
+          "timestamp": "2022-12-28T16:20:27+08:00",
+          "tree_id": "fd569262852bc01647bce3553bcdb14ff8aed30f",
+          "url": "https://github.com/occlum/occlum/commit/8393e87662aeda82c6cde7dc4835bbcada045c05"
+        },
+        "date": 1672282988217,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.08,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 328.36,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 66419.64,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 66.84,
             "unit": "ms",
             "extra": "per95"
           }
