@@ -21,6 +21,7 @@ This set of demos shows how real-world apps can be easily run inside SGX enclave
 * [font](font/font_support_for_java): A demo of supporting font with Java.
 * [grpc](grpc/): A client and server communicating through [gRPC](https://grpc.io), containing [glibc-supported demo](grpc/grpc_glibc) and [musl-supported demo](grpc/grpc_musl).
 * [https_server](https_server/): A HTTPS file server based on [Mongoose Embedded Web Server Library](https://github.com/cesanta/mongoose).
+* [mysql](mysql/): A demo of [MySQL](https://www.mysql.com/).
 * [openvino](openvino/) A benchmark of [OpenVINO Inference Engine](https://docs.openvinotoolkit.org/2019_R3/_docs_IE_DG_inference_engine_intro.html).
 * [pytorch](pytorch/): Demos of standalone and distributed [PyTorch](https://pytorch.org/).
 * [redis](redis/): A demo of [Redis](https://redis.io).
