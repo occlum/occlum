@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1672286439079,
+  "lastUpdate": 1672289086462,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -288,6 +288,54 @@ window.BENCHMARK_DATA = {
           {
             "name": "Random Read Throughput",
             "value": 185,
+            "unit": "MiB/s",
+            "extra": "randread"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "1498430017@qq.com",
+            "name": "Shaowei Song",
+            "username": "lucassong-mh"
+          },
+          "committer": {
+            "email": "volcano.dr@hotmail.com",
+            "name": "volcano",
+            "username": "volcano0dr"
+          },
+          "distinct": true,
+          "id": "fb456b0f0581e6ce5ec2dd27f461866b9a1ca085",
+          "message": "[hw-ci] Add MySQL to hw mode test",
+          "timestamp": "2022-12-28T16:29:49+08:00",
+          "tree_id": "44695e2476b116ea8e41c5093055d8eb9fb5fcaf",
+          "url": "https://github.com/occlum/occlum/commit/fb456b0f0581e6ce5ec2dd27f461866b9a1ca085"
+        },
+        "date": 1672289084928,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sequential Write Throughput",
+            "value": 43.2,
+            "unit": "MiB/s",
+            "extra": "seqwrite"
+          },
+          {
+            "name": "Random Write Throughput",
+            "value": 28.1,
+            "unit": "MiB/s",
+            "extra": "randwrite"
+          },
+          {
+            "name": "Sequential Read Throughput",
+            "value": 249,
+            "unit": "MiB/s",
+            "extra": "seqread"
+          },
+          {
+            "name": "Random Read Throughput",
+            "value": 218,
             "unit": "MiB/s",
             "extra": "randread"
           }
