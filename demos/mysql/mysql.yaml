@@ -27,7 +27,7 @@ targets:
   - target: /opt/occlum/glibc/lib
     copy:
       - files:
-        - /usr/local/mysql/lib/mysqlrouter/private/libprotobuf-lite.so.3.19.4
+        - ../mysql_src/bld/library_output_directory/libprotobuf-lite.so.3.19.4
   - target: /
     copy:
       - files:
