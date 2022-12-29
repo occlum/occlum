@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1672282991651,
+  "lastUpdate": 1672286082847,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -190,6 +190,54 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 66.84,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "1498430017@qq.com",
+            "name": "Shaowei Song",
+            "username": "lucassong-mh"
+          },
+          "committer": {
+            "email": "volcano.dr@hotmail.com",
+            "name": "volcano",
+            "username": "volcano0dr"
+          },
+          "distinct": true,
+          "id": "fb456b0f0581e6ce5ec2dd27f461866b9a1ca085",
+          "message": "[hw-ci] Add MySQL to hw mode test",
+          "timestamp": "2022-12-28T16:29:49+08:00",
+          "tree_id": "44695e2476b116ea8e41c5093055d8eb9fb5fcaf",
+          "url": "https://github.com/occlum/occlum/commit/fb456b0f0581e6ce5ec2dd27f461866b9a1ca085"
+        },
+        "date": 1672286080919,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.09,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 247.08,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 71219.69,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 41.85,
             "unit": "ms",
             "extra": "per95"
           }
