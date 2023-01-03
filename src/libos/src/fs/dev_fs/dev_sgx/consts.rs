@@ -70,5 +70,13 @@ pub const SGX_CMD_NUM_VER_DCAP_QUOTE: u32 = StructuredIoctlNum::new::<IoctlVerDC
 )
 .as_u32();
 
+/// Ioctl to get the key of the current enclave
+pub const SGX_CMD_NUM_KEY: u32 = StructuredIoctlNum::new::<IoctlGetKeyArg>(
+    11,
+    SGX_MAGIC_CHAR,
+    StructuredIoctlArgType::InputOutput,
+)
+.as_u32();
+
 /// A magical number that distinguishes SGX ioctls for other ioctls
 const SGX_MAGIC_CHAR: u8 = 's' as u8;

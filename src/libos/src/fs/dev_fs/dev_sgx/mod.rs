@@ -246,6 +246,24 @@ impl DevSgx {
                     slice.copy_from_slice(&supplemental_data);
                 }
             }
+            SGX_CMD_NUM_KEY => {
+                // Prepare the arguments
+                let arg = nonbuiltin_cmd.arg_mut::<IoctlGetKeyArg>()?;
+                let key_request = {
+                    if arg.key_request.is_null() {
+                        return_errno!(EINVAL, "key_request must not be null");
+                    }
+                    unsafe { &*arg.key_request }
+                };
+
+                let key = {
+                    if arg.key.is_null() {
+                        return_errno!(EINVAL, "output pointer for key must not be null");
+                    }
+                    unsafe { &mut *arg.key }
+                };
+                *key = get_key(key_request)?;
+            }
             _ => {
                 return_errno!(ENOSYS, "unknown ioctl cmd for /dev/sgx");
             }
@@ -303,4 +321,10 @@ struct IoctlVerDCAPQuoteArg {
     quote_verification_result: *mut sgx_ql_qv_result_t, // Output
     supplemental_data_size: u32,                        // Input (optional)
     supplemental_data: *mut u8,                         // Output (optional)
+}
+
+#[repr(C)]
+struct IoctlGetKeyArg {
+    key_request: *const sgx_key_request_t, // Input
+    key: *mut sgx_key_128bit_t,            // Output
 }
