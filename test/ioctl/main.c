@@ -15,6 +15,7 @@
 #include <sys/wait.h>
 #include <sgx_report.h>
 #include <sgx_quote.h>
+#include <sgx_key.h>
 #ifndef OCCLUM_DISABLE_DCAP
 #include <sgx_ql_quote.h>
 #include <sgx_qve_header.h>
@@ -142,6 +143,11 @@ typedef struct {
     sgx_report_t               *report;             // output
 } sgxioc_create_report_arg_t;
 
+typedef struct {
+    const sgx_key_request_t    *key_request;       // Input
+    sgx_key_128bit_t           *key;              // Output
+} sgxioc_get_key_arg_t;
+
 #ifndef OCCLUM_DISABLE_DCAP
 typedef struct {
     sgx_report_data_t      *report_data; // input
@@ -173,6 +179,8 @@ typedef struct {
 #define SGXIOC_GET_DCAP_SUPPLEMENTAL_SIZE _IOR('s', 9, uint32_t)
 #define SGXIOC_VER_DCAP_QUOTE             _IOWR('s', 10, sgxioc_ver_dcap_quote_arg_t)
 #endif
+
+#define SGXIOC_GET_KEY                    _IOWR('s', 11, sgxioc_get_key_arg_t)
 
 // The max number of retries if ioctl returns EBUSY
 #define IOCTL_MAX_RETRIES       20
@@ -306,6 +314,30 @@ static int do_SGXIOC_CREATE_AND_VERIFY_REPORT(int sgx_fd) {
             THROW_ERROR("failed to verify report");
         }
     }
+    return 0;
+}
+
+static int do_SGXIOC_GET_KEY(int sgx_fd) {
+    sgx_key_request_t key_request = { 0 };
+    sgx_key_128bit_t key = { 0 };
+
+    key_request.key_name = SGX_KEYSELECT_SEAL; // SGX_KEYSELECT_REPORT
+    key_request.key_policy = SGX_KEYPOLICY_MRENCLAVE; // SGX_KEYPOLICY_MRSIGNER
+
+    sgxioc_get_key_arg_t args = {
+        .key_request = (const sgx_key_request_t *) &key_request,
+        .key = &key,
+    };
+    if (ioctl(sgx_fd, SGXIOC_GET_KEY, &args) < 0) {
+        THROW_ERROR("failed to ioctl /dev/sgx");
+    }
+
+    printf("key: \n");
+    for (int i = 0; i < 16; i++) {
+        printf("%x ", key[i]);
+    }
+    printf("\n");
+
     return 0;
 }
 
@@ -460,6 +492,10 @@ int test_sgx_ioctl_SGXIOC_SELF_TARGET(void) {
 
 int test_sgx_ioctl_SGXIOC_CREATE_AND_VERIFY_REPORT(void) {
     return do_sgx_ioctl_test(do_SGXIOC_CREATE_AND_VERIFY_REPORT);
+}
+
+int test_sgx_ioctl_SGXIOC_GET_KEY(void) {
+    return do_sgx_ioctl_test(do_SGXIOC_GET_KEY);
 }
 
 #define CONFIG_SIZE  512
@@ -625,6 +661,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_sgx_ioctl_SGXIOC_GEN_EPID_QUOTE),
     TEST_CASE(test_sgx_ioctl_SGXIOC_SELF_TARGET),
     TEST_CASE(test_sgx_ioctl_SGXIOC_CREATE_AND_VERIFY_REPORT),
+    TEST_CASE(test_sgx_ioctl_SGXIOC_GET_KEY),
 #ifndef OCCLUM_DISABLE_DCAP
     TEST_CASE(test_sgx_ioctl_SGXIOC_GENERATE_AND_VERIFY_DCAP_QUOTE),
 #endif
