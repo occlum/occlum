@@ -8,6 +8,7 @@ use sgx_types::*;
 #[cfg(feature = "dcap")]
 mod dcap;
 mod epid;
+mod sgx_key;
 mod sgx_report;
 
 pub use sgx_types::{
@@ -20,6 +21,7 @@ pub use self::dcap::{
     QuoteGenerator as SgxDCAPQuoteGenerator, QuoteVerifier as SgxDCAPQuoteVerifier,
 };
 pub use self::epid::AttestationAgent as SgxEPIDAttestationAgent;
+pub use self::sgx_key::get_key;
 pub use self::sgx_report::{create_report, get_self_target, verify_report};
 
 pub fn allow_debug() -> bool {
