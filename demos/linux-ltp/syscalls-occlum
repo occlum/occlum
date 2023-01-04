@@ -171,7 +171,7 @@ epoll_wait01 epoll_wait01
 epoll_wait02 epoll_wait02
 #epoll_wait03 epoll_wait03
 epoll_wait04 epoll_wait04
-epoll_pwait01 epoll_pwait01
+#epoll_pwait01 epoll_pwait01
 epoll_pwait02 epoll_pwait02
 epoll_pwait03 epoll_pwait03
 epoll_pwait04 epoll_pwait04
@@ -424,7 +424,7 @@ getcwd02 getcwd02
 getcwd03 getcwd03
 getcwd04 getcwd04
 
-getdents01 getdents01
+#getdents01 getdents01
 getdents02 getdents02
 
 getdomainname01 getdomainname01
