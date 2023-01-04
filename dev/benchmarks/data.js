@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1672801240009,
+  "lastUpdate": 1672801931705,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -238,6 +238,54 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 41.85,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "huaiqing.zq@antgroup.com",
+            "name": "Zheng, Qi",
+            "username": "qzheng527"
+          },
+          "committer": {
+            "email": "volcano.dr@hotmail.com",
+            "name": "volcano",
+            "username": "volcano0dr"
+          },
+          "distinct": true,
+          "id": "9826f27618ba094c7630c6215c62c89fa5de2dec",
+          "message": "Add sgx_get_key ioctl command",
+          "timestamp": "2023-01-04T10:43:40+08:00",
+          "tree_id": "ee06774133fdbba65c5c0fc94d0bda9076d5d4d6",
+          "url": "https://github.com/occlum/occlum/commit/9826f27618ba094c7630c6215c62c89fa5de2dec"
+        },
+        "date": 1672801930370,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.07,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 109.13,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 22181.2,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 4.65,
             "unit": "ms",
             "extra": "per95"
           }
