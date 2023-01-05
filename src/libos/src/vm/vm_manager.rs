@@ -366,6 +366,48 @@ impl VMManager {
         }
     }
 
+    // Reset memory permission to default (R/W) and reset the memory contents to zero. Currently only used by brk.
+    pub fn reset_memory(&self, reset_range: VMRange) -> Result<()> {
+        let intersect_chunks = {
+            let chunks = self
+                .internal()
+                .chunks
+                .iter()
+                .filter(|&chunk| chunk.range().intersect(&reset_range).is_some())
+                .map(|chunk| chunk.clone())
+                .collect::<Vec<_>>();
+
+            // In the heap area, there shouldn't be any default chunks or chunks owned by other process.
+            if chunks
+                .iter()
+                .any(|chunk| !chunk.is_owned_by_current_process() || !chunk.is_single_vma())
+            {
+                return_errno!(EINVAL, "There is something wrong with the intersect chunks");
+            }
+            chunks
+        };
+
+        intersect_chunks.iter().for_each(|chunk| {
+            if let ChunkType::SingleVMA(vma) = chunk.internal() {
+                if let Some(intersection_range) = chunk.range().intersect(&reset_range) {
+                    let mut internal_manager = self.internal();
+                    internal_manager.mprotect_single_vma_chunk(
+                        &chunk,
+                        intersection_range,
+                        VMPerms::DEFAULT,
+                    );
+
+                    unsafe {
+                        let buf = intersection_range.as_slice_mut();
+                        buf.iter_mut().for_each(|b| *b = 0)
+                    }
+                }
+            }
+        });
+
+        Ok(())
+    }
+
     pub fn msync(&self, addr: usize, size: usize) -> Result<()> {
         let sync_range = VMRange::new_with_size(addr, size)?;
         let chunk = {
