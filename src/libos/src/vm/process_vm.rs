@@ -390,14 +390,15 @@ impl ProcessVM {
         // Collect merged vmas which will be the output of this function
         let mut merged_vmas = Vec::new();
 
-        // Insert the merged chunks or unchanged chunks back to mem_chunk list
+        // Insert unchanged chunks back to mem_chunks list and collect merged vmas for output
         for chunk in single_vma_chunks.into_iter().filter_map(|chunk| {
             if !chunk.is_single_dummy_vma() {
                 if chunk.is_single_vma_with_conflict_size() {
                     let new_vma = chunk.get_vma_for_single_vma_chunk();
-                    merged_vmas.push(new_vma.clone());
+                    merged_vmas.push(new_vma);
 
-                    Some(Arc::new(Chunk::new_chunk_with_vma(new_vma)))
+                    // Don't insert the merged chunks to mem_chunk list here. It should be updated later.
+                    None
                 } else {
                     Some(chunk)
                 }
