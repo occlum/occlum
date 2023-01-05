@@ -62,8 +62,6 @@ impl VMManager {
 
     // Allocate single VMA chunk for new process whose process VM is not ready yet
     pub fn alloc(&self, options: &VMMapOptions) -> Result<(VMRange, ChunkRef)> {
-        let addr = *options.addr();
-        let size = *options.size();
         if let Ok(new_chunk) = self.internal().mmap_chunk(options) {
             return Ok((new_chunk.range().clone(), new_chunk));
         }
@@ -432,11 +430,11 @@ impl VMManager {
             // Must lock the internal manager first here in case the chunk's range and vma are conflict when other threads are operating the VM
             let mut internal_manager = self.internal.lock().unwrap();
             let mut merged_vmas = current.vm().merge_all_single_vma_chunks()?;
+            internal_manager.clean_single_vma_chunks();
             while merged_vmas.len() != 0 {
                 let merged_vma = merged_vmas.pop().unwrap();
                 internal_manager.add_new_chunk(&current, merged_vma);
             }
-            internal_manager.clean_single_vma_chunks();
         }
 
         // Determine the chunk of the old range
@@ -779,12 +777,14 @@ impl InternalVMManager {
         self.chunks.insert(new_chunk);
     }
 
+    // protect_range should a sub-range of the chunk range
     pub fn mprotect_single_vma_chunk(
         &mut self,
         chunk: &ChunkRef,
         protect_range: VMRange,
         new_perms: VMPerms,
     ) -> Result<()> {
+        debug_assert!(chunk.range().is_superset_of(&protect_range));
         let vma = match chunk.internal() {
             ChunkType::MultiVMA(_) => {
                 unreachable!();
@@ -843,7 +843,8 @@ impl InternalVMManager {
                         )
                     };
 
-                    let updated_vmas = vec![containing_vma.clone(), new_vma, remaining_old_vma];
+                    // Put containing_vma at last to be updated first.
+                    let updated_vmas = vec![new_vma, remaining_old_vma, containing_vma.clone()];
                     updated_vmas
                 }
                 _ => {
@@ -863,28 +864,33 @@ impl InternalVMManager {
                     );
                     VMPerms::apply_perms(&new_vma, new_vma.perms());
 
-                    let updated_vmas = vec![containing_vma.clone(), new_vma];
+                    // Put containing_vma at last to be updated first.
+                    let updated_vmas = vec![new_vma, containing_vma.clone()];
                     updated_vmas
                 }
             }
         };
 
         let current = current!();
-        while updated_vmas.len() > 1 {
-            let vma = updated_vmas.pop().unwrap();
-            self.add_new_chunk(&current, vma);
+        // First update current vma chunk
+        if updated_vmas.len() > 1 {
+            let update_vma = updated_vmas.pop().unwrap();
+            self.update_single_vma_chunk(&current, &chunk, update_vma);
         }
 
-        debug_assert!(updated_vmas.len() == 1);
-        let vma = updated_vmas.pop().unwrap();
-        self.update_single_vma_chunk(&current, &chunk, vma);
+        // Then add new chunks if any
+        updated_vmas.into_iter().for_each(|vma| {
+            self.add_new_chunk(&current, vma);
+        });
 
         Ok(())
     }
 
+    // Must make sure that all the chunks are valid before adding new chunks
     fn add_new_chunk(&mut self, current_thread: &ThreadRef, new_vma: VMArea) {
         let new_vma_chunk = Arc::new(Chunk::new_chunk_with_vma(new_vma));
-        self.chunks.insert(new_vma_chunk.clone());
+        let success = self.chunks.insert(new_vma_chunk.clone());
+        debug_assert!(success);
         current_thread.vm().add_mem_chunk(new_vma_chunk);
     }
 
