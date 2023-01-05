@@ -11,7 +11,6 @@ use super::vm_util::{
     FileBacked, VMInitializer, VMMapAddr, VMMapOptions, VMMapOptionsBuilder, VMRemapOptions,
 };
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 // Used for heap and stack start address randomization.
 const RANGE_FOR_RANDOMIZATION: usize = 256 * 4096; // 1M
@@ -162,7 +161,7 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
         })?;
         debug_assert!(heap_range.start() % heap_layout.align() == 0);
         trace!("heap range = {:?}", heap_range);
-        let brk = AtomicUsize::new(heap_range.start());
+        let brk = RwLock::new(heap_range.start());
         chunks.insert(chunk_ref);
 
         // Init the stack memory in the process
@@ -274,7 +273,7 @@ pub struct ProcessVM {
     elf_ranges: Vec<VMRange>,
     heap_range: VMRange,
     stack_range: VMRange,
-    brk: AtomicUsize,
+    brk: RwLock<usize>,
     // Memory safety notes: the mem_chunks field must be the last one.
     //
     // Rust drops fields in the same order as they are declared. So by making
@@ -441,25 +440,40 @@ impl ProcessVM {
     }
 
     pub fn get_brk(&self) -> usize {
-        self.brk.load(Ordering::SeqCst)
+        *self.brk.read().unwrap()
     }
 
-    pub fn brk(&self, new_brk: usize) -> Result<usize> {
+    pub fn brk(&self, brk: usize) -> Result<usize> {
         let heap_start = self.heap_range.start();
         let heap_end = self.heap_range.end();
 
-        if new_brk >= heap_start && new_brk <= heap_end {
-            self.brk
-                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |old_brk| Some(new_brk));
-            Ok(new_brk)
+        // Acquire lock first to avoid data-race.
+        let mut brk_guard = self.brk.write().unwrap();
+
+        if brk >= heap_start && brk <= heap_end {
+            // Get page-aligned brk address.
+            let new_brk = align_up(brk, PAGE_SIZE);
+            // Get page-aligned old brk address.
+            let old_brk = align_up(*brk_guard, PAGE_SIZE);
+
+            // Reset the memory when brk shrinks.
+            if new_brk < old_brk {
+                let shrink_brk_range =
+                    VMRange::new(new_brk, old_brk).expect("shrink brk range must be valid");
+                USER_SPACE_VM_MANAGER.reset_memory(shrink_brk_range)?;
+            }
+
+            // Return the user-specified brk address without page aligned. This is same as Linux.
+            *brk_guard = brk;
+            Ok(brk)
         } else {
-            if new_brk < heap_start {
+            if brk < heap_start {
                 error!("New brk address is too low");
-            } else if new_brk > heap_end {
+            } else if brk > heap_end {
                 error!("New brk address is too high");
             }
 
-            Ok(self.get_brk())
+            Ok(*brk_guard)
         }
     }
 
