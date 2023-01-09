@@ -1,16 +1,20 @@
 mod get;
 mod get_acceptconn;
+mod get_buf_size;
 mod get_domain;
 mod get_peername;
 mod get_type;
 mod set;
+mod set_buf_size;
 
 pub use get::GetSockOptRawCmd;
 pub use get_acceptconn::GetAcceptConnCmd;
+pub use get_buf_size::{GetRcvBufSizeCmd, GetSndBufSizeCmd};
 pub use get_domain::GetDomainCmd;
 pub use get_peername::{AddrStorage, GetPeerNameCmd};
 pub use get_type::GetTypeCmd;
 pub use set::SetSockOptRawCmd;
+pub use set_buf_size::{SetRcvBufSizeCmd, SetSndBufSizeCmd};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 

@@ -8,7 +8,9 @@ use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 use super::ConnectedStream;
 use crate::prelude::*;
 use crate::runtime::Runtime;
+use crate::stream::SEND_BUF_SIZE;
 use crate::util::UntrustedCircularBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
     // We make sure the all the buffer contents are buffered in kernel and then return.
@@ -196,6 +198,10 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
                 // The buffer is empty and the write side is shutdown by the user. We can safely shutdown host file here.
                 let _ = stream.common.host_shutdown(Shutdown::Write);
                 inner.is_shutdown = ShutdownStatus::PostShutdown
+            } else if stream.sender.need_update() {
+                // send_buf is empty. We can try to update the send_buf
+                stream.sender.set_need_update(false);
+                inner.update_buf_size(SEND_BUF_SIZE.load(Ordering::Relaxed));
             }
         };
 
@@ -263,16 +269,40 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             }
         }
     }
+
+    // This function will try to update the kernel buf size.
+    // If the kernel buf is currently empty, the size will be updated immediately.
+    // If the kernel buf is not empty, update the flag in Sender and update the kernel buf after send.
+    pub fn try_update_send_buf_size(&self, buf_size: usize) {
+        let pre_buf_size = SEND_BUF_SIZE.swap(buf_size, Ordering::Relaxed);
+        if pre_buf_size == buf_size {
+            return;
+        }
+
+        // Try to acquire the lock. If success, try directly update here.
+        // If failure, don't wait because there is pending send request.
+        if let Ok(mut inner) = self.sender.inner.try_lock() {
+            if inner.send_buf.is_empty() && inner.io_handle.is_none() {
+                inner.update_buf_size(buf_size);
+                return;
+            }
+        }
+
+        // Can't easily aquire lock or the sendbuf is not empty. Update the flag only
+        self.sender.set_need_update(true);
+    }
 }
 
 pub struct Sender {
     inner: Mutex<Inner>,
+    need_update: AtomicBool,
 }
 
 impl Sender {
     pub fn new() -> Self {
         let inner = Mutex::new(Inner::new());
-        Self { inner }
+        let need_update = AtomicBool::new(false);
+        Self { inner, need_update }
     }
 
     pub fn shutdown(&self) {
@@ -283,6 +313,14 @@ impl Sender {
     pub fn is_empty(&self) -> bool {
         let inner = self.inner.lock().unwrap();
         inner.send_buf.is_empty()
+    }
+
+    pub fn set_need_update(&self, need_update: bool) {
+        self.need_update.store(need_update, Ordering::Relaxed)
+    }
+
+    pub fn need_update(&self) -> bool {
+        self.need_update.load(Ordering::Relaxed)
     }
 }
 
@@ -311,7 +349,7 @@ unsafe impl Send for Inner {}
 impl Inner {
     pub fn new() -> Self {
         Self {
-            send_buf: UntrustedCircularBuf::with_capacity(super::SEND_BUF_SIZE),
+            send_buf: UntrustedCircularBuf::with_capacity(SEND_BUF_SIZE.load(Ordering::Relaxed)),
             send_req: UntrustedBox::new_uninit(),
             io_handle: None,
             is_shutdown: ShutdownStatus::Running,
@@ -375,6 +413,12 @@ impl Inner {
         });
         debug_assert!(iovecs_len > 0);
         (iovecs, iovecs_len)
+    }
+
+    fn update_buf_size(&mut self, buf_size: usize) {
+        debug_assert!(self.send_buf.is_empty() && self.io_handle.is_none());
+        let new_send_buf = UntrustedCircularBuf::with_capacity(buf_size);
+        self.send_buf = new_send_buf;
     }
 }
 

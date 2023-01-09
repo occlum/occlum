@@ -7,8 +7,10 @@ use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 use super::ConnectedStream;
 use crate::prelude::*;
 use crate::runtime::Runtime;
+use crate::stream::RECV_BUF_SIZE;
 use crate::util::UntrustedCircularBuf;
 use io_uring::squeue::Flags;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Normal operation for io_uring is to try and issue an sqe as non-blocking first,
 /// and if that fails, execute it in an async manner.
@@ -140,6 +142,14 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             }
             (total_consumed, iov_buffer_index, iov_buffer_offset)
         };
+
+        if self.receiver.need_update() {
+            // Only update the recv buf when it is empty and there is no pending recv request
+            if inner.recv_buf.is_empty() && inner.io_handle.is_none() {
+                self.receiver.set_need_update(false);
+                inner.update_buf_size(RECV_BUF_SIZE.load(Ordering::Relaxed));
+            }
+        }
 
         if inner.end_of_file {
             return Ok(res);
@@ -284,21 +294,43 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         let inner = self.receiver.inner.lock().unwrap();
         inner.recv_buf.consumable()
     }
+
+    // This function will try to update the kernel recv buf size.
+    // For socket recv, there will always be a pending request in advance. Thus,we can only update the kernel
+    // buffer when a recv request is done and the kernel buffer is empty. Here, we just set the update flag.
+    pub fn try_update_recv_buf_size(&self, buf_size: usize) {
+        let pre_buf_size = RECV_BUF_SIZE.swap(buf_size, Ordering::Relaxed);
+        if buf_size == pre_buf_size {
+            return;
+        }
+
+        self.receiver.set_need_update(true);
+    }
 }
 
 pub struct Receiver {
     inner: Mutex<Inner>,
+    need_update: AtomicBool,
 }
 
 impl Receiver {
     pub fn new() -> Self {
         let inner = Mutex::new(Inner::new());
-        Self { inner }
+        let need_update = AtomicBool::new(false);
+        Self { inner, need_update }
     }
 
     pub fn shutdown(&self) {
         let mut inner = self.inner.lock().unwrap();
         inner.is_shutdown = true;
+    }
+
+    pub fn set_need_update(&self, need_update: bool) {
+        self.need_update.store(need_update, Ordering::Relaxed)
+    }
+
+    pub fn need_update(&self) -> bool {
+        self.need_update.load(Ordering::Relaxed)
     }
 }
 
@@ -328,7 +360,7 @@ unsafe impl Send for Inner {}
 impl Inner {
     pub fn new() -> Self {
         Self {
-            recv_buf: UntrustedCircularBuf::with_capacity(super::RECV_BUF_SIZE),
+            recv_buf: UntrustedCircularBuf::with_capacity(RECV_BUF_SIZE.load(Ordering::Relaxed)),
             recv_req: UntrustedBox::new_uninit(),
             io_handle: None,
             is_shutdown: false,
@@ -388,6 +420,12 @@ impl Inner {
         });
         debug_assert!(iovecs_len > 0);
         (iovecs, iovecs_len)
+    }
+
+    fn update_buf_size(&mut self, buf_size: usize) {
+        debug_assert!(self.recv_buf.is_empty() && self.io_handle.is_none());
+        let new_recv_buf = UntrustedCircularBuf::with_capacity(buf_size);
+        self.recv_buf = new_recv_buf;
     }
 }
 

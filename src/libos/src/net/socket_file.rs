@@ -267,10 +267,26 @@ impl SocketFile {
         apply_fn_on_any_socket!(&self.socket, |socket| { socket.domain() })
     }
 
+    pub fn get_type(&self) -> Type {
+        match self.socket {
+            AnySocket::Ipv4Stream(_)
+            | AnySocket::Ipv6Stream(_)
+            | AnySocket::UnixStream(_)
+            | AnySocket::TrustedUDS(_) => Type::STREAM,
+            AnySocket::UnixDatagram(_)
+            | AnySocket::Ipv4Datagram(_)
+            | AnySocket::Ipv6Datagram(_)
+            | AnySocket::NetlinkDatagram(_) => Type::DGRAM,
+        }
+    }
+
     pub fn is_stream(&self) -> bool {
         matches!(
             &self.socket,
-            AnySocket::Ipv4Stream(_) | AnySocket::UnixStream(_) | AnySocket::TrustedUDS(_)
+            AnySocket::Ipv4Stream(_)
+                | AnySocket::Ipv6Stream(_)
+                | AnySocket::UnixStream(_)
+                | AnySocket::TrustedUDS(_)
         )
     }
 
