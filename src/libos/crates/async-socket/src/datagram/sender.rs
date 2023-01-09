@@ -213,7 +213,9 @@ impl<A: Addr, R: Runtime> Sender<A, R> {
             } else if inner.is_shutdown == ShutdownStatus::PreShutdown {
                 // The buffer is empty and the write side is shutdown by the user.
                 // We can safely shutdown host file here.
-                let _ = sender.common.host_shutdown(Shutdown::Write);
+                if A::domain() != Domain::Netlink {
+                    let _ = sender.common.host_shutdown(Shutdown::Write);
+                }
                 inner.is_shutdown = ShutdownStatus::PostShutdown
             }
         };
