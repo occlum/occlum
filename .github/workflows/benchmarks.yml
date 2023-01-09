@@ -21,6 +21,8 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
+    - uses: AutoModality/action-clean@v1
+
     - name: Checkout code
       uses: actions/checkout@v2
       with:
@@ -71,6 +73,8 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
+    - uses: AutoModality/action-clean@v1
+
     - name: Checkout code
       uses: actions/checkout@v2
       with:
@@ -120,6 +124,8 @@ jobs:
     - name: Clean before running
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
       uses: actions/checkout@v2
