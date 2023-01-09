@@ -463,7 +463,7 @@ mod test {
             static ref IO_URING: IoUringRef = {
                 let ring = Arc::new(
                     Builder::new()
-                        .setup_sqpoll(Some(500/* ms */))
+                        .setup_sqpoll(500/* ms */)
                         .build(256)
                         .unwrap());
                 std::thread::spawn({
