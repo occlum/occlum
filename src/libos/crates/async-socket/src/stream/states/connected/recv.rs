@@ -8,6 +8,18 @@ use super::ConnectedStream;
 use crate::prelude::*;
 use crate::runtime::Runtime;
 use crate::util::UntrustedCircularBuf;
+use io_uring::squeue::Flags;
+
+/// Normal operation for io_uring is to try and issue an sqe as non-blocking first,
+/// and if that fails, execute it in an async manner.
+///
+/// To support more efficient overlapped operation of requests
+/// that the application knows/assumes will always (or most of the time) block,
+/// the application can ask for an sqe to be issued async from the start.
+///
+/// For recvmsg, since we always issue the io_uring request ahead of time, use this flag could save
+/// some resources.
+const RECV_FLAGS: Flags = Flags::ASYNC;
 
 impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
     pub async fn recvmsg(
@@ -222,7 +234,8 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         // Submit the async recv to io_uring
         let io_uring = self.common.io_uring();
         let host_fd = Fd(self.common.host_fd() as _);
-        let handle = unsafe { io_uring.recvmsg(host_fd, msghdr_ptr, 0, complete_fn) };
+        let handle =
+            unsafe { io_uring.recvmsg(host_fd, msghdr_ptr, RECV_FLAGS.bits() as u32, complete_fn) };
         inner.io_handle.replace(handle);
     }
 
