@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1673241899771,
+  "lastUpdate": 1673243371531,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -474,6 +474,54 @@ window.BENCHMARK_DATA = {
           {
             "name": "Sequential Read Throughput",
             "value": 319,
+            "unit": "MiB/s",
+            "extra": "seqread"
+          },
+          {
+            "name": "Random Read Throughput",
+            "value": 213,
+            "unit": "MiB/s",
+            "extra": "randread"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sanqian.hcy@antfin.com",
+            "name": "Hui, Chunyang",
+            "username": "jessehui"
+          },
+          "committer": {
+            "email": "volcano.dr@hotmail.com",
+            "name": "volcano",
+            "username": "volcano0dr"
+          },
+          "distinct": true,
+          "id": "5f2a2bce55d29003a94809918e9c5dfb64d69c52",
+          "message": "Fix brk not reset memory",
+          "timestamp": "2023-01-09T12:53:49+08:00",
+          "tree_id": "9d337bae1842768178e8848deb7c4b7eb035ddce",
+          "url": "https://github.com/occlum/occlum/commit/5f2a2bce55d29003a94809918e9c5dfb64d69c52"
+        },
+        "date": 1673243369771,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sequential Write Throughput",
+            "value": 40.9,
+            "unit": "MiB/s",
+            "extra": "seqwrite"
+          },
+          {
+            "name": "Random Write Throughput",
+            "value": 26.9,
+            "unit": "MiB/s",
+            "extra": "randwrite"
+          },
+          {
+            "name": "Sequential Read Throughput",
+            "value": 273,
             "unit": "MiB/s",
             "extra": "seqread"
           },
