@@ -139,6 +139,23 @@ impl<A: Addr, R: Runtime> NetlinkSocket<A, R> {
         res
     }
 
+    pub fn shutdown(&self, _how: Shutdown) -> Result<()> {
+        return_errno!(EOPNOTSUPP, "Netlink does not support shutdown");
+    }
+
+    pub async fn close(&self) -> Result<()> {
+        self.sender.shutdown();
+        self.receiver.shutdown();
+        self.common.set_closed();
+        self.cancel_requests().await;
+        Ok(())
+    }
+
+    async fn cancel_requests(&self) {
+        self.receiver.cancel_recv_requests().await;
+        self.sender.try_clear_msg_queue_when_close().await;
+    }
+
     pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
         let pollee = self.common.pollee();
         pollee.poll(mask, poller)

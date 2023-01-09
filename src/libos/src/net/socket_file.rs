@@ -607,6 +607,7 @@ impl SocketFile {
             AnySocket::UnixStream(unix_stream) => unix_stream.shutdown(how).await,
             AnySocket::Ipv4Datagram(ipv4_datagram) => ipv4_datagram.shutdown(how).await,
             AnySocket::Ipv6Datagram(ipv6_datagram) => ipv6_datagram.shutdown(how).await,
+            AnySocket::NetlinkDatagram(netlink_socket) => netlink_socket.shutdown(how),
             _ => {
                 return_errno!(EINVAL, "shutdown is not supported");
             }
@@ -619,6 +620,7 @@ impl SocketFile {
             AnySocket::Ipv6Stream(ipv6_stream) => ipv6_stream.close().await,
             AnySocket::Ipv4Datagram(ipv4_datagram) => ipv4_datagram.close().await,
             AnySocket::Ipv6Datagram(ipv6_datagram) => ipv6_datagram.close().await,
+            AnySocket::NetlinkDatagram(netlink_socket) => netlink_socket.close().await,
             _ => Ok(()),
         }
     }
