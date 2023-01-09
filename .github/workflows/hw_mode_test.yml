@@ -32,6 +32,8 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
+    - uses: AutoModality/action-clean@v1
+
     - name: Checkout code
       if: github.event_name == 'push'
       uses: actions/checkout@v2
@@ -75,6 +77,8 @@ jobs:
     - name: Clean before running
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
       if: github.event_name == 'push'
@@ -169,6 +173,8 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
+    - uses: AutoModality/action-clean@v1
+
     - name: Checkout code
       if: github.event_name == 'push'
       uses: actions/checkout@v2
@@ -216,6 +222,8 @@ jobs:
     - name: Clean before running
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
       if: github.event_name == 'push'
@@ -267,6 +275,8 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
+    - uses: AutoModality/action-clean@v1
+
     - name: Checkout code
       if: github.event_name == 'push'
       uses: actions/checkout@v2
@@ -311,6 +321,8 @@ jobs:
     - name: Clean before running
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
       if: github.event_name == 'push'
@@ -357,6 +369,8 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
+    - uses: AutoModality/action-clean@v1
+
     - name: Checkout code
       if: github.event_name == 'push'
       uses: actions/checkout@v2
@@ -398,6 +412,8 @@ jobs:
     - name: Clean before running
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
       if: github.event_name == 'push'
@@ -468,6 +484,8 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
+    - uses: AutoModality/action-clean@v1
+
     - name: Checkout code
       if: github.event_name == 'push'
       uses: actions/checkout@v2
@@ -533,6 +551,8 @@ jobs:
     - name: Clean before running
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
       if: github.event_name == 'push'
@@ -621,6 +641,8 @@ jobs:
     - name: Clean before running
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
       if: github.event_name == 'push'
@@ -728,6 +750,8 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
+    - uses: AutoModality/action-clean@v1
+
     - name: Checkout code
       if: github.event_name == 'push'
       uses: actions/checkout@v2
@@ -767,6 +791,8 @@ jobs:
     - name: Clean before running
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
       if: github.event_name == 'push'
@@ -845,6 +871,8 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
+    - uses: AutoModality/action-clean@v1
+
     - name: Checkout code
       if: github.event_name == 'push'
       uses: actions/checkout@v2
@@ -882,6 +910,8 @@ jobs:
     - name: Clean before running
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
       if: github.event_name == 'push'
@@ -935,6 +965,8 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
+    - uses: AutoModality/action-clean@v1
+
     - name: Checkout code
       if: github.event_name == 'push'
       uses: actions/checkout@v2
@@ -981,6 +1013,8 @@ jobs:
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
 
+    - uses: AutoModality/action-clean@v1
+
     - name: Checkout code
       uses: actions/checkout@v2
       with:
@@ -1013,6 +1047,8 @@ jobs:
     - name: Clean before running
       run: |
         sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
       uses: actions/checkout@v2
