@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1673241203071,
+  "lastUpdate": 1673241899771,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -286,6 +286,54 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 4.65,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sanqian.hcy@antfin.com",
+            "name": "Hui, Chunyang",
+            "username": "jessehui"
+          },
+          "committer": {
+            "email": "volcano.dr@hotmail.com",
+            "name": "volcano",
+            "username": "volcano0dr"
+          },
+          "distinct": true,
+          "id": "5f2a2bce55d29003a94809918e9c5dfb64d69c52",
+          "message": "Fix brk not reset memory",
+          "timestamp": "2023-01-09T12:53:49+08:00",
+          "tree_id": "9d337bae1842768178e8848deb7c4b7eb035ddce",
+          "url": "https://github.com/occlum/occlum/commit/5f2a2bce55d29003a94809918e9c5dfb64d69c52"
+        },
+        "date": 1673241897854,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.08,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 112.02,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 23286.22,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 5.77,
             "unit": "ms",
             "extra": "per95"
           }
