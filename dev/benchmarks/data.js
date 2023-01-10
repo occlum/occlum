@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1673243371531,
+  "lastUpdate": 1673322533303,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -710,6 +710,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 261,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "huaiqing.zq@antgroup.com",
+            "name": "Zheng, Qi",
+            "username": "qzheng527"
+          },
+          "committer": {
+            "email": "volcano.dr@hotmail.com",
+            "name": "volcano",
+            "username": "volcano0dr"
+          },
+          "distinct": true,
+          "id": "7013142f64a500e53e4547fbca2ec3f0aaf48f58",
+          "message": "[ci] Do repo clean when starting each hw ci job",
+          "timestamp": "2023-01-10T10:54:46+08:00",
+          "tree_id": "393b752adc447c65264539f7002f32aa4991fc08",
+          "url": "https://github.com/occlum/occlum/commit/7013142f64a500e53e4547fbca2ec3f0aaf48f58"
+        },
+        "date": 1673322531770,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 42.2,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 42,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
