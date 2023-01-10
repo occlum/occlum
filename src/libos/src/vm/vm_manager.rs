@@ -77,14 +77,14 @@ impl VMManager {
             VMMapAddr::Any => {}
             VMMapAddr::Hint(addr) => {
                 let target_range = VMRange::new_with_size(addr, size)?;
-                let ret = self.mmap_with_addr(target_range, options);
+                let ret = self.internal().mmap_with_addr(target_range, options);
                 if ret.is_ok() {
                     return ret;
                 }
             }
             VMMapAddr::Need(addr) | VMMapAddr::Force(addr) => {
                 let target_range = VMRange::new_with_size(addr, size)?;
-                return self.mmap_with_addr(target_range, options);
+                return self.internal().mmap_with_addr(target_range, options);
             }
         }
 
@@ -156,81 +156,6 @@ impl VMManager {
 
         // No free range
         return_errno!(ENOMEM, "Can't find a free chunk for this allocation");
-    }
-
-    // If addr is specified, use single VMA chunk to record this
-    fn mmap_with_addr(&self, target_range: VMRange, options: &VMMapOptions) -> Result<usize> {
-        let addr = *options.addr();
-        let size = *options.size();
-
-        let current = current!();
-
-        let chunk = {
-            let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
-            process_mem_chunks
-                .iter()
-                .find(|&chunk| chunk.range().intersect(&target_range).is_some())
-                .cloned()
-        };
-
-        if let Some(chunk) = chunk {
-            // This range is currently in a allocated chunk
-            match chunk.internal() {
-                ChunkType::MultiVMA(chunk_internal) => {
-                    if !chunk.range().is_superset_of(&target_range) && addr.is_force() {
-                        // The target range spans multiple chunks and have a strong need for the address
-                        return self.force_mmap_across_multiple_chunks(target_range, options);
-                    }
-
-                    trace!(
-                        "mmap with addr in existing default chunk: {:?}",
-                        chunk.range()
-                    );
-                    return chunk_internal
-                        .lock()
-                        .unwrap()
-                        .chunk_manager_mut()
-                        .mmap(options);
-                }
-                ChunkType::SingleVMA(_) => {
-                    match addr {
-                        VMMapAddr::Hint(addr) => {
-                            return_errno!(ENOMEM, "Single VMA is currently in use. Hint failure");
-                        }
-                        VMMapAddr::Need(addr) => {
-                            return_errno!(ENOMEM, "Single VMA is currently in use. Need failure");
-                        }
-                        VMMapAddr::Force(addr) => {
-                            if !chunk.range().is_superset_of(&target_range) {
-                                // The target range spans multiple chunks and have a strong need for the address
-                                return self
-                                    .force_mmap_across_multiple_chunks(target_range, options);
-                            }
-
-                            // Munmap the corresponding single vma chunk
-                            let mut internal_manager = self.internal();
-                            internal_manager.munmap_chunk(&chunk, Some(&target_range))?;
-                        }
-                        VMMapAddr::Any => unreachable!(),
-                    }
-                }
-            }
-        }
-
-        // This range is not currently using, allocate one in global list
-        if let Ok(new_chunk) = self.internal().mmap_chunk(options) {
-            let start = new_chunk.range().start();
-            debug_assert!({
-                match addr {
-                    VMMapAddr::Force(addr) | VMMapAddr::Need(addr) => start == target_range.start(),
-                    _ => true,
-                }
-            });
-            current.vm().add_mem_chunk(new_chunk);
-            return Ok(start);
-        } else {
-            return_errno!(ENOMEM, "can't allocate a chunk in global list")
-        }
     }
 
     pub fn munmap(&self, addr: usize, size: usize) -> Result<()> {
@@ -556,104 +481,6 @@ impl VMManager {
 
         assert!(mem_chunks.len() == 0);
     }
-
-    fn force_mmap_across_multiple_chunks(
-        &self,
-        target_range: VMRange,
-        options: &VMMapOptions,
-    ) -> Result<usize> {
-        match options.initializer() {
-            VMInitializer::DoNothing() | VMInitializer::FillZeros() => {}
-            _ => return_errno!(
-                ENOSYS,
-                "unsupported memory initializer in mmap across multiple chunks"
-            ),
-        }
-
-        // Get all intersect chunks
-        let intersect_chunks = {
-            let chunks = self
-                .internal()
-                .chunks
-                .iter()
-                .filter(|&chunk| chunk.range().intersect(&target_range).is_some())
-                .map(|chunk| chunk.clone())
-                .collect::<Vec<_>>();
-
-            // If any intersect chunk belongs to other process, then this mmap can't succeed
-            if chunks
-                .iter()
-                .any(|chunk| !chunk.is_owned_by_current_process())
-            {
-                return_errno!(
-                    ENOMEM,
-                    "part of the target range is allocated by other process"
-                );
-            }
-            chunks
-        };
-
-        let mut intersect_ranges = intersect_chunks
-            .iter()
-            .map(|chunk| chunk.range().intersect(&target_range).unwrap())
-            .collect::<Vec<_>>();
-
-        // Based on range of chunks, split the whole target range to ranges that are connected, including free ranges
-        let target_contained_ranges = {
-            let mut contained_ranges = Vec::with_capacity(intersect_ranges.len());
-            for ranges in intersect_ranges.windows(2) {
-                let range_a = ranges[0];
-                let range_b = ranges[1];
-                debug_assert!(range_a.end() <= range_b.start());
-                contained_ranges.push(range_a);
-                if range_a.end() < range_b.start() {
-                    contained_ranges.push(VMRange::new(range_a.end(), range_b.start()).unwrap());
-                }
-            }
-            contained_ranges.push(intersect_ranges.pop().unwrap());
-            contained_ranges
-        };
-
-        // Based on the target contained ranges, rebuild the VMMapOptions
-        let new_options = {
-            let perms = options.perms().clone();
-            let align = options.align().clone();
-            let initializer = options.initializer();
-            target_contained_ranges
-                .iter()
-                .map(|range| {
-                    let size = range.size();
-                    let addr = match options.addr() {
-                        VMMapAddr::Force(_) => VMMapAddr::Force(range.start()),
-                        _ => unreachable!(),
-                    };
-
-                    VMMapOptionsBuilder::default()
-                        .perms(perms)
-                        .align(align)
-                        .initializer(initializer.clone())
-                        .addr(addr)
-                        .size(size)
-                        .build()
-                        .unwrap()
-                })
-                .collect::<Vec<VMMapOptions>>()
-        };
-
-        trace!(
-            "force mmap across multiple chunks mmap ranges = {:?}",
-            target_contained_ranges
-        );
-        for (range, options) in target_contained_ranges.into_iter().zip(new_options.iter()) {
-            if self.mmap_with_addr(range, options).is_err() {
-                // Although the error here is fatal and rare, returning error is not enough here.
-                // FIXME: All previous mmap ranges should be munmapped.
-                return_errno!(ENOMEM, "mmap across multiple chunks failed");
-            }
-        }
-
-        Ok(target_range.start())
-    }
 }
 
 // Modification on this structure must acquire the global lock.
@@ -966,6 +793,185 @@ impl InternalVMManager {
         self.chunks
             .drain_filter(|chunk| chunk.is_single_vma_chunk_should_be_removed())
             .collect::<BTreeSet<Arc<Chunk>>>();
+    }
+
+    // If addr is specified, use single VMA chunk to record the memory chunk.
+    //
+    // Previously, this method is implemented for VMManager and only acquire the internal lock when needed. However, this will make mmap non-atomic.
+    // In multi-thread applications, for example, when a thread calls mmap with MAP_FIXED flag, and that desired memory is mapped already, the libos
+    // will first munmap the corresponding memory and then do a mmap with desired address. If the lock is not aquired during the whole process,
+    // the unmapped memory might be allocated by other thread who is waiting and acquiring the lock.
+    // Thus, in current code, this method is implemented for InternalManager and holds the lock during the whole process.
+    // Below method "force_mmap_across_multiple_chunks" is the same.
+    fn mmap_with_addr(&mut self, target_range: VMRange, options: &VMMapOptions) -> Result<usize> {
+        let addr = *options.addr();
+        let size = *options.size();
+
+        let current = current!();
+
+        let chunk = {
+            let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
+            process_mem_chunks
+                .iter()
+                .find(|&chunk| chunk.range().intersect(&target_range).is_some())
+                .cloned()
+        };
+
+        if let Some(chunk) = chunk {
+            // This range is currently in a allocated chunk
+            match chunk.internal() {
+                ChunkType::MultiVMA(chunk_internal) => {
+                    if !chunk.range().is_superset_of(&target_range) && addr.is_force() {
+                        // The target range spans multiple chunks and have a strong need for the address
+                        return self.force_mmap_across_multiple_chunks(target_range, options);
+                    }
+
+                    trace!(
+                        "mmap with addr in existing default chunk: {:?}",
+                        chunk.range()
+                    );
+                    return chunk_internal
+                        .lock()
+                        .unwrap()
+                        .chunk_manager_mut()
+                        .mmap(options);
+                }
+                ChunkType::SingleVMA(_) => {
+                    match addr {
+                        VMMapAddr::Hint(addr) => {
+                            return_errno!(ENOMEM, "Single VMA is currently in use. Hint failure");
+                        }
+                        VMMapAddr::Need(addr) => {
+                            return_errno!(ENOMEM, "Single VMA is currently in use. Need failure");
+                        }
+                        VMMapAddr::Force(addr) => {
+                            if !chunk.range().is_superset_of(&target_range) {
+                                // The target range spans multiple chunks and have a strong need for the address
+                                return self
+                                    .force_mmap_across_multiple_chunks(target_range, options);
+                            }
+
+                            // Munmap the corresponding single vma chunk
+                            // let mut internal_manager = self.internal();
+                            self.munmap_chunk(&chunk, Some(&target_range))?;
+                        }
+                        VMMapAddr::Any => unreachable!(),
+                    }
+                }
+            }
+        }
+
+        // This range is not currently using, allocate one in global list
+        if let Ok(new_chunk) = self.mmap_chunk(options) {
+            let start = new_chunk.range().start();
+            debug_assert!({
+                match addr {
+                    VMMapAddr::Force(addr) | VMMapAddr::Need(addr) => start == target_range.start(),
+                    _ => true,
+                }
+            });
+            current.vm().add_mem_chunk(new_chunk);
+            return Ok(start);
+        } else {
+            return_errno!(ENOMEM, "can't allocate a chunk in global list")
+        }
+    }
+
+    fn force_mmap_across_multiple_chunks(
+        &mut self,
+        target_range: VMRange,
+        options: &VMMapOptions,
+    ) -> Result<usize> {
+        match options.initializer() {
+            VMInitializer::DoNothing() | VMInitializer::FillZeros() => {}
+            _ => return_errno!(
+                ENOSYS,
+                "unsupported memory initializer in mmap across multiple chunks"
+            ),
+        }
+
+        // Get all intersect chunks
+        let intersect_chunks = {
+            let chunks = self
+                .chunks
+                .iter()
+                .filter(|&chunk| chunk.range().intersect(&target_range).is_some())
+                .map(|chunk| chunk.clone())
+                .collect::<Vec<_>>();
+
+            // If any intersect chunk belongs to other process, then this mmap can't succeed
+            if chunks
+                .iter()
+                .any(|chunk| !chunk.is_owned_by_current_process())
+            {
+                return_errno!(
+                    ENOMEM,
+                    "part of the target range is allocated by other process"
+                );
+            }
+            chunks
+        };
+
+        let mut intersect_ranges = intersect_chunks
+            .iter()
+            .map(|chunk| chunk.range().intersect(&target_range).unwrap())
+            .collect::<Vec<_>>();
+
+        // Based on range of chunks, split the whole target range to ranges that are connected, including free ranges
+        let target_contained_ranges = {
+            let mut contained_ranges = Vec::with_capacity(intersect_ranges.len());
+            for ranges in intersect_ranges.windows(2) {
+                let range_a = ranges[0];
+                let range_b = ranges[1];
+                debug_assert!(range_a.end() <= range_b.start());
+                contained_ranges.push(range_a);
+                if range_a.end() < range_b.start() {
+                    contained_ranges.push(VMRange::new(range_a.end(), range_b.start()).unwrap());
+                }
+            }
+            contained_ranges.push(intersect_ranges.pop().unwrap());
+            contained_ranges
+        };
+
+        // Based on the target contained ranges, rebuild the VMMapOptions
+        let new_options = {
+            let perms = options.perms().clone();
+            let align = options.align().clone();
+            let initializer = options.initializer();
+            target_contained_ranges
+                .iter()
+                .map(|range| {
+                    let size = range.size();
+                    let addr = match options.addr() {
+                        VMMapAddr::Force(_) => VMMapAddr::Force(range.start()),
+                        _ => unreachable!(),
+                    };
+
+                    VMMapOptionsBuilder::default()
+                        .perms(perms)
+                        .align(align)
+                        .initializer(initializer.clone())
+                        .addr(addr)
+                        .size(size)
+                        .build()
+                        .unwrap()
+                })
+                .collect::<Vec<VMMapOptions>>()
+        };
+
+        trace!(
+            "force mmap across multiple chunks mmap ranges = {:?}",
+            target_contained_ranges
+        );
+        for (range, options) in target_contained_ranges.into_iter().zip(new_options.iter()) {
+            if self.mmap_with_addr(range, options).is_err() {
+                // Although the error here is fatal and rare, returning error is not enough here.
+                // FIXME: All previous mmap ranges should be munmapped.
+                return_errno!(ENOMEM, "mmap across multiple chunks failed");
+            }
+        }
+
+        Ok(target_range.start())
     }
 }
 
