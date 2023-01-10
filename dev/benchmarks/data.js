@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1673322533303,
+  "lastUpdate": 1673325600351,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -334,6 +334,54 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 5.77,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "huaiqing.zq@antgroup.com",
+            "name": "Zheng, Qi",
+            "username": "qzheng527"
+          },
+          "committer": {
+            "email": "volcano.dr@hotmail.com",
+            "name": "volcano",
+            "username": "volcano0dr"
+          },
+          "distinct": true,
+          "id": "7013142f64a500e53e4547fbca2ec3f0aaf48f58",
+          "message": "[ci] Do repo clean when starting each hw ci job",
+          "timestamp": "2023-01-10T10:54:46+08:00",
+          "tree_id": "393b752adc447c65264539f7002f32aa4991fc08",
+          "url": "https://github.com/occlum/occlum/commit/7013142f64a500e53e4547fbca2ec3f0aaf48f58"
+        },
+        "date": 1673325598285,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.08,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 216.43,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 53715.79,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 36.24,
             "unit": "ms",
             "extra": "per95"
           }
