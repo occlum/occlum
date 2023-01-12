@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1673503133633,
+  "lastUpdate": 1673504349429,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -618,6 +618,54 @@ window.BENCHMARK_DATA = {
           {
             "name": "Sequential Read Throughput",
             "value": 273,
+            "unit": "MiB/s",
+            "extra": "seqread"
+          },
+          {
+            "name": "Random Read Throughput",
+            "value": 213,
+            "unit": "MiB/s",
+            "extra": "randread"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sanqian.hcy@antfin.com",
+            "name": "Hui, Chunyang",
+            "username": "jessehui"
+          },
+          "committer": {
+            "email": "volcano.dr@hotmail.com",
+            "name": "volcano",
+            "username": "volcano0dr"
+          },
+          "distinct": true,
+          "id": "84140d3667083beee032c3b9a68ab929555c314b",
+          "message": "Fix mmap with MAP_FIXED non-atomic behaviour",
+          "timestamp": "2023-01-12T13:27:56+08:00",
+          "tree_id": "d8a69ec2dc002727e07ffd615f5b79315a9bbc2e",
+          "url": "https://github.com/occlum/occlum/commit/84140d3667083beee032c3b9a68ab929555c314b"
+        },
+        "date": 1673504347803,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sequential Write Throughput",
+            "value": 40.4,
+            "unit": "MiB/s",
+            "extra": "seqwrite"
+          },
+          {
+            "name": "Random Write Throughput",
+            "value": 33.4,
+            "unit": "MiB/s",
+            "extra": "randwrite"
+          },
+          {
+            "name": "Sequential Read Throughput",
+            "value": 315,
             "unit": "MiB/s",
             "extra": "seqread"
           },
