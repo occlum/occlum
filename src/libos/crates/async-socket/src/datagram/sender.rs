@@ -1,7 +1,7 @@
 use std::ptr::{self};
 
 use io_uring_callback::{Fd, IoHandle};
-use sgx_libc::c_void;
+use libc::c_void;
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 use std::collections::VecDeque;
 

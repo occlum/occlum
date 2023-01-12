@@ -59,8 +59,9 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
             }
             let ret = poller.wait_timeout(timeout.as_mut()).await;
             if let Err(e) = ret {
-                warn!("connect wait errno = {:?}", e.errno());
-                match e.errno() {
+                let errno = e.errno();
+                warn!("connect wait errno = {:?}", errno);
+                match errno {
                     ETIMEDOUT => {
                         // Cancel connect request if timeout. No need to wait for cancel to complete.
                         self.cancel_connect_request(false).await;

@@ -17,9 +17,9 @@ use super::{Waiter, WaiterQueue};
 ///
 /// // Init runtime if not enable "auto_run" feature.
 /// async_rt::vcpu::set_total(2);
-/// for _ in 0..async_rt::executor::num_vcpus() {
-///     std::thread::spawn(|| {
-///         async_rt::executor::run_tasks();
+/// for i in 0..async_rt::executor::num_vcpus() {
+///     std::thread::spawn(move || {
+///         async_rt::executor::run_tasks(i);
 ///     });
 /// }
 ///
@@ -53,9 +53,9 @@ use super::{Waiter, WaiterQueue};
 /// #
 /// # // Init runtime if not enable "auto_run" feature.
 /// # async_rt::vcpu::set_total(2);
-/// # for _ in 0..async_rt::executor::num_vcpus() {
-/// #     std::thread::spawn(|| {
-/// #         async_rt::executor::run_tasks();
+/// # for i in 0..async_rt::executor::num_vcpus() {
+/// #     std::thread::spawn(move || {
+/// #         async_rt::executor::run_tasks(i);
 /// #     });
 /// # }
 /// #
