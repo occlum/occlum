@@ -6,12 +6,12 @@ on:
   pull_request_target:
     types: labeled
   schedule:
-  # Schedule to run everyday at 6PM UTC (2AM CST)
-    - cron:  '0 18 * * *'
+  # Schedule to run on Tue,Fri at 6PM UTC (2AM CST)
+    - cron:  '0 18 * * 2,5'
 
 env:
   nap_time: 60
-  repeat_times: 500  # Stress test repeat times
+  repeat_times: 250  # Stress test repeat times
 
 # Cancel previous running jobs on push or pull request
 concurrency:
@@ -21,7 +21,7 @@ concurrency:
 jobs:
   Make-test-on-ubuntu:
     timeout-minutes: 180
-    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    if: github.event_name == 'push' || github.event_name == 'schedule' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -35,7 +35,7 @@ jobs:
     - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: actions/checkout@v2
       with:
         submodules: true
@@ -67,7 +67,7 @@ jobs:
 
   C_cpp_rust_golang_embedded_mode_support_test:
     timeout-minutes: 180
-    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    if: github.event_name == 'push' || github.event_name == 'schedule' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -81,7 +81,7 @@ jobs:
     - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: actions/checkout@v2
       with:
         submodules: true
@@ -162,7 +162,7 @@ jobs:
 
   Java_support_test:
     timeout-minutes: 180
-    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    if: github.event_name == 'push' || github.event_name == 'schedule' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -176,7 +176,7 @@ jobs:
     - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: actions/checkout@v2
       with:
         submodules: true
@@ -212,7 +212,7 @@ jobs:
 
   Bazel_test:
     timeout-minutes: 180
-    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    if: github.event_name == 'push' || github.event_name == 'schedule' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -226,7 +226,7 @@ jobs:
     - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: actions/checkout@v2
       with:
         submodules: true
@@ -264,7 +264,7 @@ jobs:
 
   Fish_test:
     timeout-minutes: 180
-    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    if: github.event_name == 'push' || github.event_name == 'schedule' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -278,7 +278,7 @@ jobs:
     - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: actions/checkout@v2
       with:
         submodules: true
@@ -311,7 +311,7 @@ jobs:
 
   Xgboost_test:
     timeout-minutes: 180
-    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    if: github.event_name == 'push' || github.event_name == 'schedule' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -325,7 +325,7 @@ jobs:
     - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: actions/checkout@v2
       with:
         submodules: true
@@ -358,7 +358,7 @@ jobs:
 
   Sqlite_test:
     timeout-minutes: 180
-    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    if: github.event_name == 'push' || github.event_name == 'schedule' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -372,7 +372,7 @@ jobs:
     - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: actions/checkout@v2
       with:
         submodules: true
@@ -402,7 +402,7 @@ jobs:
 
   Python_musl_support_test:
     timeout-minutes: 180
-    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    if: github.event_name == 'push' || github.event_name == 'schedule' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -416,7 +416,7 @@ jobs:
     - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: actions/checkout@v2
       with:
         submodules: true
@@ -473,7 +473,7 @@ jobs:
 
   Openvino_test:
     timeout-minutes: 180
-    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    if: github.event_name == 'push' || github.event_name == 'schedule' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -487,7 +487,7 @@ jobs:
     - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: actions/checkout@v2
       with:
         submodules: true
@@ -541,7 +541,7 @@ jobs:
 
   Grpc_test:
     timeout-minutes: 180
-    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    if: github.event_name == 'push' || github.event_name == 'schedule' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -555,7 +555,7 @@ jobs:
     - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: actions/checkout@v2
       with:
         submodules: true
@@ -631,7 +631,7 @@ jobs:
 
   Gvisor_test:
     timeout-minutes: 180
-    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    if: github.event_name == 'push' || github.event_name == 'schedule' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -645,7 +645,7 @@ jobs:
     - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: actions/checkout@v2
       with:
         submodules: true
@@ -739,7 +739,7 @@ jobs:
 
   Test_deb_deploy:
     timeout-minutes: 180
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'schedule'
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -753,7 +753,7 @@ jobs:
     - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: actions/checkout@v2
       with:
         submodules: false
@@ -780,7 +780,7 @@ jobs:
 # Tensorflow_serving requires binary tensorflow_serving PIC, here we compile tensorflow_model_server before workflow
   Tensorflow_serving_test:
     timeout-minutes: 180
-    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    if: github.event_name == 'push' || github.event_name == 'schedule' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -795,7 +795,7 @@ jobs:
     - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: actions/checkout@v2
       with:
         submodules: true
@@ -860,7 +860,7 @@ jobs:
 
   Remote_attestation_test:
     timeout-minutes: 180
-    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    if: github.event_name == 'push' || github.event_name == 'schedule' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -874,7 +874,7 @@ jobs:
     - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: actions/checkout@v2
       with:
         submodules: true
@@ -900,7 +900,7 @@ jobs:
 
   Init_RA_test:
     timeout-minutes: 180
-    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    if: github.event_name == 'push' || github.event_name == 'schedule' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -914,7 +914,7 @@ jobs:
     - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: actions/checkout@v2
       with:
         submodules: true
@@ -954,7 +954,7 @@ jobs:
 
   MySQL_test:
     timeout-minutes: 180
-    if: github.event_name == 'push' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    if: github.event_name == 'push' || github.event_name == 'schedule' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
@@ -968,7 +968,7 @@ jobs:
     - uses: AutoModality/action-clean@v1
 
     - name: Checkout code
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: actions/checkout@v2
       with:
         submodules: true
