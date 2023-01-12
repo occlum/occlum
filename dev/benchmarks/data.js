@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1673502395668,
+  "lastUpdate": 1673503133633,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -382,6 +382,54 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 36.24,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sanqian.hcy@antfin.com",
+            "name": "Hui, Chunyang",
+            "username": "jessehui"
+          },
+          "committer": {
+            "email": "volcano.dr@hotmail.com",
+            "name": "volcano",
+            "username": "volcano0dr"
+          },
+          "distinct": true,
+          "id": "84140d3667083beee032c3b9a68ab929555c314b",
+          "message": "Fix mmap with MAP_FIXED non-atomic behaviour",
+          "timestamp": "2023-01-12T13:27:56+08:00",
+          "tree_id": "d8a69ec2dc002727e07ffd615f5b79315a9bbc2e",
+          "url": "https://github.com/occlum/occlum/commit/84140d3667083beee032c3b9a68ab929555c314b"
+        },
+        "date": 1673503132298,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.07,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 111.37,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 23946.93,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 0.41,
             "unit": "ms",
             "extra": "per95"
           }
