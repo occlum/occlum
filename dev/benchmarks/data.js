@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1673325600351,
+  "lastUpdate": 1673502395668,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -794,6 +794,42 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 42,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sanqian.hcy@antfin.com",
+            "name": "Hui, Chunyang",
+            "username": "jessehui"
+          },
+          "committer": {
+            "email": "volcano.dr@hotmail.com",
+            "name": "volcano",
+            "username": "volcano0dr"
+          },
+          "distinct": true,
+          "id": "84140d3667083beee032c3b9a68ab929555c314b",
+          "message": "Fix mmap with MAP_FIXED non-atomic behaviour",
+          "timestamp": "2023-01-12T13:27:56+08:00",
+          "tree_id": "d8a69ec2dc002727e07ffd615f5b79315a9bbc2e",
+          "url": "https://github.com/occlum/occlum/commit/84140d3667083beee032c3b9a68ab929555c314b"
+        },
+        "date": 1673502394298,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 216,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 216,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
