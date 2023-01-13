@@ -39,6 +39,7 @@ impl QuoteVerifier {
         let mut collateral_expiration_status = 1;
         let mut supplemental_data = vec![0; self.supplemental_data_size as usize];
         let mut qve_report_info = sgx_ql_qe_report_info_t::default();
+        let mut nonce;
 
         unsafe {
             let sgx_status = sgx_read_rand(
@@ -48,6 +49,7 @@ impl QuoteVerifier {
             if sgx_status != sgx_status_t::SGX_SUCCESS {
                 return_errno!(EAGAIN, "failed to get random number from sgx");
             }
+            nonce = qve_report_info.nonce;
         }
 
         qve_report_info.app_enclave_target_info = get_self_target()?;
@@ -66,6 +68,9 @@ impl QuoteVerifier {
                 supplemental_data.as_mut_ptr(),
             );
             assert_eq!(sgx_status_t::SGX_SUCCESS, sgx_status);
+            // We have to re-write qve_report_info.nonce with the value we backed up earlier,
+            // since qve_report_info.nonce can be overwrite by attacker from ocall side.
+            qve_report_info.nonce = nonce;
         }
 
         match qe3_ret {
