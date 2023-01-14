@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1673734393277,
+  "lastUpdate": 1673734405501,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -972,6 +972,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 216,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "997c21a45f0f0686caa0c96ca126347680532dd9",
+          "message": "Fix reserved memory permission for EDMM support",
+          "timestamp": "2022-12-27T03:58:10Z",
+          "url": "https://github.com/occlum/occlum/commit/997c21a45f0f0686caa0c96ca126347680532dd9"
+        },
+        "date": 1673734404042,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 1939,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 1939,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
