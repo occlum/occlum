@@ -94,14 +94,9 @@ jobs:
             cd ltp_instance;
             occlum run /opt/ltp/run-ltp.sh -f syscalls-occlum"
 
-    - name : gvisor syscall test
-      run: docker exec code_coverage bash -c "apt update && apt install curl gnupg -y;
-            curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel.gpg;
-            mv bazel.gpg /etc/apt/trusted.gpg.d/;
-            echo 'deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8' | tee /etc/apt/sources.list.d/bazel.list;
-            apt update && apt install bazel -y;
-            git clone -b occlum-release-20200921.0 https://github.com/occlum/gvisor.git;
-            cd gvisor/occlum && ./build_and_install_syscall_tests.sh && SGX_MODE=SIM ./run_occlum_passed_tests.sh"
+    - name : Gvisor syscall test
+      run: docker exec code_coverage bash -c "git clone -b occlum-release-20200921.0 https://github.com/occlum/gvisor.git;
+            cd gvisor/occlum && ./prepare_bazel.sh && ./build_and_install_syscall_tests.sh && SGX_MODE=SIM ./run_occlum_passed_tests.sh"
 
     - name: Upload coverage report
       run: docker exec code_coverage bash -c "cd /root/occlum/build/internal/src/libos/cargo-target/debug/deps; export CODECOV_TOKEN="${{ secrets.COV_TOKEN }}"; bash <(curl -s https://codecov.io/bash)"
