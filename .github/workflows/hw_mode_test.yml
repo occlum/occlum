@@ -423,9 +423,7 @@ jobs:
     - name: Create container
       run: |
         docker pull occlumbackup/ngo:latest-ubuntu20.04-python
-        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          python_musl_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/ngo:latest-ubuntu20.04-python);
-        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
           python_musl_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/ngo:latest-ubuntu20.04-python);
         else
           echo "Unsupported Hardware"
@@ -494,9 +492,7 @@ jobs:
     - name: Create container
       run: |
         docker pull occlumbackup/ngo:latest-ubuntu20.04-openvino
-        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          openvino_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/ngo:latest-ubuntu20.04-openvino);
-        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
           openvino_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/ngo:latest-ubuntu20.04-openvino);
         else
           echo "Unsupported Hardware"
@@ -562,9 +558,7 @@ jobs:
     - name: Create container
       run: |
         docker pull occlumbackup/ngo:latest-ubuntu20.04-grpc
-        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/ngo:latest-ubuntu20.04-grpc);
-        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
           grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/ngo:latest-ubuntu20.04-grpc);
         else
           echo "Unsupported Hardware"
@@ -652,9 +646,7 @@ jobs:
     - name: Create container
       run: |
         docker pull occlumbackup/ngo:latest-ubuntu20.04-gvisor_test
-        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/ngo:latest-ubuntu20.04-gvisor_test);
-        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
           gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/ngo:latest-ubuntu20.04-gvisor_test);
         else
           echo "Unsupported Hardware"
@@ -713,9 +705,7 @@ jobs:
   #   - name: Test deployment
   #     run: |
   #       cd demos/deployment
-  #       if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-  #         ./deploy_image_test.sh centos8.2
-  #       elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+  #       if [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
   #         DEVICE_OPTION="-v /dev/sgx:/dev/sgx" ./deploy_image_test.sh centos8.2
   #       else
   #         echo "Unsupported Hardware"
@@ -753,9 +743,7 @@ jobs:
     - name: Test deployment
       run: |
         cd demos/deployment
-        if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          ./deploy_image_test.sh ubuntu20.04
-        elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+        if [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
           DEVICE_OPTION="-v /dev/sgx:/dev/sgx" ./deploy_image_test.sh ubuntu20.04
         else
           echo "Unsupported Hardware"
@@ -800,9 +788,7 @@ jobs:
 #     - name: Create container
 #       run: |
 #         docker pull occlumbackup/occlum:latest-ubuntu20.04-tf_serving
-#         if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-#           tf_serving_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-tf_serving);
-#         elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
+#         if [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
 #           tf_serving_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-tf_serving);
 #         else
 #           echo "Unsupported Hardware"
