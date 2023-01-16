@@ -153,6 +153,11 @@ pub trait AsyncInode: Any + Sync + Send {
         None
     }
 
+    /// Returns whether a VFS dentry for this inode should be put into the dentry cache.
+    fn is_dentry_cacheable(&self) -> bool {
+        true
+    }
+
     /// This is used to implement dynamics cast.
     /// Simply return self in the implement of the function.
     fn as_any_ref(&self) -> &dyn Any;

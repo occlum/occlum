@@ -183,4 +183,8 @@ impl ProcINode for ProcStatINode {
         .into_bytes();
         Ok(result)
     }
+
+    fn is_volatile(&self) -> bool {
+        true
+    }
 }

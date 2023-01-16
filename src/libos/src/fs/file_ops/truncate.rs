@@ -2,12 +2,12 @@ use super::*;
 
 pub async fn do_truncate(fs_path: &FsPath, len: usize) -> Result<()> {
     debug!("truncate: path: {:?}, len: {}", fs_path, len);
-    let inode = {
+    let dentry = {
         let current = current!();
         let fs = current.fs();
-        fs.lookup_inode(fs_path).await?
+        fs.lookup(fs_path).await?
     };
-    inode.resize(len).await?;
+    dentry.inode().resize(len).await?;
     Ok(())
 }
 

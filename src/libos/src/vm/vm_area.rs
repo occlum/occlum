@@ -222,9 +222,8 @@ impl VMArea {
         if !cond_fn(file) {
             return;
         }
-        file_handle
-            .dentry()
-            .inode()
+        let inode = file_handle.dentry().inode();
+        inode
             .write_at(file_offset, unsafe { self.as_slice() })
             .await;
     }

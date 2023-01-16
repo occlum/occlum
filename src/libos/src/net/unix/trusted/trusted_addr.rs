@@ -62,24 +62,28 @@ impl TrustedAddr {
 
     pub async fn bind_untrusted_addr(&mut self, host_addr: &UnixAddr) -> Result<()> {
         if let UnixAddr::Pathname(path) = &self.unix_addr {
-            let (dir_inode, sock_name) = {
+            let (dir_dentry, sock_name) = {
                 let current = current!();
                 let fs = current.fs();
                 let path = FsPath::try_from(path.as_ref())?;
                 if path.ends_with("/") {
                     return_errno!(EISDIR, "path is a directory");
                 }
-                fs.lookup_dirinode_and_basename(&path).await?
+                fs.lookup_dir_and_base_name(&path).await?
             };
-
-            if !dir_inode.allow_write().await {
+            if !dir_dentry.inode().allow_write().await {
                 return_errno!(EPERM, "libos socket file cannot be created");
             }
 
-            let socket_inode = dir_inode
-                .create(&sock_name, FileType::Socket, 0o0777)
+            let socket_dentry = dir_dentry
+                .create(
+                    &sock_name,
+                    FileType::Socket,
+                    FileMode::from_bits(0o777).unwrap(),
+                )
                 .await?;
             let data = host_addr.get_path_name()?.as_bytes();
+            let socket_inode = socket_dentry.inode();
             socket_inode.resize(data.len()).await?;
             socket_inode.write_at(0, data).await?;
         }
@@ -117,8 +121,8 @@ impl TrustedAddr {
             let inode_num = {
                 let current = current!();
                 let fs = current.fs();
-                let inode_file = fs.lookup_inode(&FsPath::try_from(path.as_ref())?).await?;
-                inode_file.metadata().await?.inode
+                let dentry = fs.lookup(&FsPath::try_from(path.as_ref())?).await?;
+                dentry.inode().metadata().await?.inode
             };
             self.inode = Some(inode_num);
         }

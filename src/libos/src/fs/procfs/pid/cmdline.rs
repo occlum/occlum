@@ -21,4 +21,8 @@ impl ProcINode for ProcCmdlineINode {
         };
         Ok(cmdline)
     }
+
+    fn is_volatile(&self) -> bool {
+        true
+    }
 }

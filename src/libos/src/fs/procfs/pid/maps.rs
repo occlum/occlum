@@ -92,6 +92,10 @@ impl ProcINode for ProcMapsINode {
 
         Ok(result_string.into_bytes())
     }
+
+    fn is_volatile(&self) -> bool {
+        true
+    }
 }
 
 async fn get_output_for_vma(vma: &VMArea, heap_or_stack: Option<&str>) -> String {
@@ -113,15 +117,15 @@ async fn get_output_for_vma(vma: &VMArea, heap_or_stack: Option<&str>) -> String
             let device_id = inode_metadata.dev;
             (file_path, offset, device_id, inode_num)
         } else if heap_or_stack.is_some() {
-            (heap_or_stack.unwrap(), 0, 0, 0)
+            (heap_or_stack.unwrap().to_owned(), 0, 0, 0)
         } else {
-            ("", 0, 0, 0)
+            (String::from(""), 0, 0, 0)
         }
     };
 
     let shared = vma.writeback_file().is_some();
     print_each_map(
-        range, perms, shared, offset, device_id, inode_num, file_path,
+        range, perms, shared, offset, device_id, inode_num, &file_path,
     )
 }
 

@@ -18,12 +18,11 @@ pub use async_io::fs::{
     Timespec, UmountFlags, PATH_MAX,
 };
 pub use async_io::ioctl::IoctlCmd;
-pub use async_vfs::{AsyncFileSystem, AsyncInode};
+pub use async_vfs::{AsyncFileSystem, AsyncInode, Dentry};
 
 use crate::config::ConfigMount;
 
 pub use self::async_file_handle::{AsyncFileHandle, AsyncInodeExt};
-pub use self::dentry::Dentry;
 pub use self::disk_file::DiskFile;
 pub use self::event_file::{EventFile, EventFileFlags};
 pub use self::file_handle::{FileHandle as FileRef, WeakFileHandle as WeakFileRef};
@@ -44,7 +43,6 @@ pub use self::syscalls::*;
 
 mod async_file_handle;
 mod builtin_disk;
-mod dentry;
 mod dev_fs;
 mod disk_file;
 mod event_file;

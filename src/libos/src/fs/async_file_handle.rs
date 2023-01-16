@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 /// The opened async inode through sys_open()
 pub struct AsyncFileHandle {
-    dentry: Dentry,
+    dentry: Arc<Dentry>,
     offset: AsyncMutex<usize>,
     access_mode: AccessMode,
     status_flags: RwLock<StatusFlags>,
@@ -16,20 +16,21 @@ pub struct AsyncFileHandle {
 
 impl AsyncFileHandle {
     pub async fn open(
-        dentry: Dentry,
+        dentry: Arc<Dentry>,
         access_mode: AccessMode,
         creation_flags: CreationFlags,
         status_flags: StatusFlags,
     ) -> Result<Self> {
-        if access_mode.writable() && dentry.inode().metadata().await?.type_ == FileType::Dir {
+        let inode = dentry.inode();
+        if access_mode.writable() && inode.metadata().await?.type_ == FileType::Dir {
             return_errno!(EISDIR, "Directory cannot be open to write");
         }
         if creation_flags.should_truncate()
-            && dentry.inode().metadata().await?.type_ == FileType::File
+            && inode.metadata().await?.type_ == FileType::File
             && access_mode.writable()
         {
             // truncate the length to 0
-            dentry.inode().resize(0).await?;
+            inode.resize(0).await?;
         }
         Ok(Self {
             dentry,
@@ -53,10 +54,12 @@ impl AsyncFileHandle {
         if !self.access_mode.readable() {
             return_errno!(EBADF, "File not readable");
         }
+        let inode = self.dentry.inode();
+
         let mut offset = self.offset.lock().await;
         let mut total_len = 0;
         for buf in bufs {
-            match self.dentry.inode().read_at(*offset, buf).await {
+            match inode.read_at(*offset, buf).await {
                 Ok(len) => {
                     total_len += len;
                     *offset += len;
@@ -72,10 +75,12 @@ impl AsyncFileHandle {
         if !self.access_mode.readable() {
             return_errno!(EBADF, "File not readable");
         }
+        let inode = self.dentry.inode();
+
         let mut offset = offset;
         let mut total_len = 0;
         for buf in bufs {
-            match self.dentry.inode().read_at(offset, buf).await {
+            match inode.read_at(offset, buf).await {
                 Ok(len) => {
                     total_len += len;
                     offset += len;
@@ -98,12 +103,14 @@ impl AsyncFileHandle {
         if !self.access_mode.writable() {
             return_errno!(EBADF, "File not writable");
         }
+        let inode = self.dentry.inode();
+
         let mut offset = self.offset.lock().await;
         if self.status_flags.read().unwrap().always_append() {
-            let info = self.dentry.inode().metadata().await?;
+            let info = inode.metadata().await?;
             *offset = info.size;
         }
-        let len = self.dentry.inode().write_at(*offset, buf).await?;
+        let len = inode.write_at(*offset, buf).await?;
         *offset += len;
         Ok(len)
     }
@@ -112,14 +119,16 @@ impl AsyncFileHandle {
         if !self.access_mode.writable() {
             return_errno!(EBADF, "File not writable");
         }
+        let inode = self.dentry.inode();
+
         let mut offset = self.offset.lock().await;
         if self.status_flags.read().unwrap().always_append() {
-            let info = self.dentry.inode().metadata().await?;
+            let info = inode.metadata().await?;
             *offset = info.size;
         }
         let mut total_len = 0;
         for buf in bufs {
-            match self.dentry.inode().write_at(*offset, buf).await {
+            match inode.write_at(*offset, buf).await {
                 Ok(len) => {
                     total_len += len;
                     *offset += len;
@@ -135,10 +144,12 @@ impl AsyncFileHandle {
         if !self.access_mode.writable() {
             return_errno!(EBADF, "File not writable");
         }
+        let inode = self.dentry.inode();
+
         let mut offset = offset;
         let mut total_len = 0;
         for buf in bufs {
-            match self.dentry.inode().write_at(offset, buf).await {
+            match inode.write_at(offset, buf).await {
                 Ok(len) => {
                     total_len += len;
                     offset += len;
@@ -192,7 +203,7 @@ impl AsyncFileHandle {
     }
 
     pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
-        self.dentry().inode().poll(mask, poller)
+        self.dentry.inode().poll(mask, poller)
     }
 
     pub fn register_observer(&self, _observer: Arc<dyn Observer>, _mask: Events) -> Result<()> {
@@ -226,7 +237,7 @@ impl AsyncFileHandle {
     }
 
     pub async fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
-        self.dentry().inode().ioctl(cmd).await
+        self.dentry.inode().ioctl(cmd).await
     }
 
     pub async fn iterate_entries(&self, writer: &mut dyn DirentWriter) -> Result<usize> {
@@ -241,7 +252,8 @@ impl AsyncFileHandle {
     }
 
     pub fn test_range_lock(&self, lock: &mut RangeLock) -> Result<()> {
-        let ext = match self.dentry().inode().ext() {
+        let inode = self.dentry.inode();
+        let ext = match inode.ext() {
             Some(ext) => ext,
             None => {
                 warn!("Inode extension is not supported, the lock could be placed");
@@ -267,7 +279,8 @@ impl AsyncFileHandle {
         }
 
         self.check_range_lock_with_access_mode(lock)?;
-        let ext = match self.dentry().inode().ext() {
+        let inode = self.dentry.inode();
+        let ext = match inode.ext() {
             Some(ext) => ext,
             None => {
                 warn!(
@@ -297,7 +310,8 @@ impl AsyncFileHandle {
     }
 
     fn unlock_range_lock(&self, lock: &RangeLock) {
-        let ext = match self.dentry().inode().ext() {
+        let inode = self.dentry.inode();
+        let ext = match inode.ext() {
             Some(ext) => ext,
             None => {
                 return;
@@ -331,7 +345,8 @@ impl AsyncFileHandle {
     }
 
     pub async fn set_flock(&self, lock: Flock, is_nonblocking: bool) -> Result<()> {
-        let ext = match self.dentry().inode().ext() {
+        let inode = self.dentry.inode();
+        let ext = match inode.ext() {
             Some(ext) => ext,
             None => {
                 warn!("Inode extension is not supported, let the lock could be acquired");
@@ -348,7 +363,8 @@ impl AsyncFileHandle {
     }
 
     pub fn unlock_flock(&self) {
-        let ext = match self.dentry().inode().ext() {
+        let inode = self.dentry.inode();
+        let ext = match inode.ext() {
             Some(ext) => ext,
             None => {
                 return;
@@ -364,7 +380,7 @@ impl AsyncFileHandle {
         flock_list.unlock(self);
     }
 
-    pub fn dentry(&self) -> &Dentry {
+    pub fn dentry(&self) -> &Arc<Dentry> {
         &self.dentry
     }
 }

@@ -13,4 +13,8 @@ impl ProcINode for ProcExeSymINode {
     async fn generate_data_in_bytes(&self) -> Result<Vec<u8>> {
         Ok(self.0.exec_path().to_owned().into_bytes())
     }
+
+    fn is_volatile(&self) -> bool {
+        true
+    }
 }

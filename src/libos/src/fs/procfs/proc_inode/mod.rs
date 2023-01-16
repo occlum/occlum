@@ -11,12 +11,18 @@ mod symlink;
 #[async_trait]
 pub trait ProcINode {
     async fn generate_data_in_bytes(&self) -> Result<Vec<u8>>;
+    fn is_volatile(&self) -> bool {
+        false
+    }
 }
 
 #[async_trait]
 pub trait DirProcINode {
     async fn find(&self, name: &str) -> Result<Arc<dyn AsyncInode>>;
     async fn iterate_entries(&self, ctx: &mut DirentWriterContext) -> Result<usize>;
+    fn is_volatile(&self) -> bool {
+        false
+    }
 }
 
 #[macro_export]

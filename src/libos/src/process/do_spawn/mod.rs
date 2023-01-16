@@ -12,7 +12,7 @@ use super::thread::{ThreadId, ThreadName};
 use super::{table, HostWaker, ProcessRef, ThreadRef};
 use crate::entry::context_switch::{CpuContext, GpRegs};
 use crate::fs::{
-    CreationFlags, FileDesc, FileMode, FileTable, FsPath, FsView, HostStdioFds, StdinFile,
+    CreationFlags, Dentry, FileDesc, FileMode, FileTable, FsPath, FsView, HostStdioFds, StdinFile,
     StdoutFile,
 };
 use crate::prelude::*;
@@ -34,7 +34,6 @@ pub async fn do_spawn(
     spawn_attributes: Option<SpawnAttr>,
     current_ref: &ThreadRef,
 ) -> Result<pid_t> {
-    let exec_now = true;
     do_spawn_common(
         elf_path,
         argv,
@@ -44,12 +43,11 @@ pub async fn do_spawn(
         None,
         None,
         current_ref,
-        exec_now,
     )
     .await
 }
 
-/// Spawn a new process but execute it later.
+/// Spawn a new process from the root process
 pub async fn do_spawn_root(
     elf_path: &str,
     argv: &[CString],
@@ -60,7 +58,10 @@ pub async fn do_spawn_root(
     wake_host: *mut i32,
     current_ref: &ThreadRef,
 ) -> Result<pid_t> {
-    let exec_now = false;
+    if current_ref.fs().is_dummy() {
+        let root_dentry = Dentry::new_root(crate::fs::rootfs().await.root_inode().await);
+        current_ref.fs().set_root(root_dentry);
+    }
     do_spawn_common(
         elf_path,
         argv,
@@ -70,7 +71,6 @@ pub async fn do_spawn_root(
         Some(host_stdio_fds),
         Some(wake_host),
         current_ref,
-        exec_now,
     )
     .await
 }
@@ -84,7 +84,6 @@ async fn do_spawn_common(
     host_stdio_fds: Option<&HostStdioFds>,
     wake_host: Option<*mut i32>,
     current_ref: &ThreadRef,
-    exec_now: bool,
 ) -> Result<pid_t> {
     let (new_process_ref, init_cpu_state) = new_process(
         elf_path,

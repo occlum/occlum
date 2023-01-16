@@ -14,8 +14,8 @@ pub struct ThreadBuilder {
     tid: Option<ThreadId>,
     process: Option<ProcessRef>,
     vm: Option<ProcessVMRef>,
-    // Optional fields
     fs: Option<FsViewRef>,
+    // Optional fields
     files: Option<FileTableRef>,
     sched: Option<SchedAgentRef>,
     nice: Option<NiceValueRef>,
@@ -115,7 +115,7 @@ impl ThreadBuilder {
         let vm = self
             .vm
             .ok_or_else(|| errno!(EINVAL, "memory is mandatory"))?;
-        let fs = self.fs.unwrap_or_default();
+        let fs = self.fs.ok_or_else(|| errno!(EINVAL, "fs is mandatory"))?;
         let files = self.files.unwrap_or_default();
         let sched = self.sched.unwrap_or_default();
         let nice = self.nice.unwrap_or_default();

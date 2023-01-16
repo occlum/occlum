@@ -2,6 +2,7 @@ use super::super::pgrp::ProcessGrp;
 use super::super::table;
 use super::super::thread::ThreadId;
 use super::{ProcessBuilder, ThreadRef};
+use crate::fs::FsView;
 use crate::misc::ResourceLimits;
 /// Process 0, a.k.a, the idle process.
 ///
@@ -20,6 +21,7 @@ fn create_idle_thread() -> Result<ThreadRef> {
     let dummy_tid = ThreadId::zero();
     let dummy_vm = Arc::new(ProcessVM::default());
     let dummy_pgrp = Arc::new(ProcessGrp::default());
+    let dummy_fs = Arc::new(FsView::dummy());
 
     // rlimit get from Occlum.json
     let rlimits = Arc::new(SgxMutex::new(ResourceLimits::default()));
@@ -29,6 +31,7 @@ fn create_idle_thread() -> Result<ThreadRef> {
         .tid(dummy_tid)
         .vm(dummy_vm)
         .pgrp(dummy_pgrp)
+        .fs(dummy_fs)
         .rlimits(rlimits)
         .no_parent(true)
         .build()?;

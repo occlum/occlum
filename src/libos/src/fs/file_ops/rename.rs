@@ -9,34 +9,35 @@ pub async fn do_renameat(old_fs_path: &FsPath, new_fs_path: &FsPath) -> Result<(
     let current = current!();
     let fs = current.fs();
 
-    let old_path = PathBuf::from(fs.convert_fspath_to_abs(old_fs_path)?);
-    let new_path = PathBuf::from(fs.convert_fspath_to_abs(new_fs_path)?);
-    // Limitation: only compare the whole path components, cannot handle symlink or ".."
-    if new_path.starts_with(&old_path) && new_path != old_path {
-        return_errno!(EINVAL, "newpath contains a path prefix of the oldpath");
-    }
-
-    // The source and target to be renamed could be dirs
-    let (old_dir_inode, old_file_name) = fs
-        .lookup_dirinode_and_basename(&old_fs_path.trim_end_matches('/'))
-        .await?;
-    let (new_dir_inode, new_file_name) = fs
-        .lookup_dirinode_and_basename(&new_fs_path.trim_end_matches('/'))
-        .await?;
-    let old_file_mode = {
-        let old_file_inode = old_dir_inode.find(&old_file_name).await?;
-        let metadata = old_file_inode.metadata().await?;
-        // oldpath is directory, the old_file_inode should be directory
-        if old_fs_path.ends_with("/") && metadata.type_ != FileType::Dir {
-            return_errno!(ENOTDIR, "old path is not a directory");
-        }
-        FileMode::from_bits_truncate(metadata.mode)
-    };
+    let old_dentry = fs.lookup_no_follow(&old_fs_path).await?;
+    let old_metadata = old_dentry.inode().metadata().await?;
+    let old_file_mode = FileMode::from_bits_truncate(old_metadata.mode);
     if old_file_mode.has_sticky_bit() {
         warn!("ignoring the sticky bit");
     }
-    old_dir_inode
-        .move_(&old_file_name, &new_dir_inode, &new_file_name)
+
+    let (new_dir, new_file_name) = {
+        if new_fs_path.ends_with("/") && old_metadata.type_ != FileType::Dir {
+            return_errno!(ENOTDIR, "oldpath is not dir");
+        }
+        fs.lookup_dir_and_base_name(&new_fs_path.trim_end_matches('/'))
+            .await?
+    };
+
+    // Check the path before rename
+    let old_abs_path = old_dentry.abs_path();
+    let new_abs_path = new_dir.abs_path() + "/" + &new_file_name;
+    if new_abs_path.starts_with(&old_abs_path) {
+        if new_abs_path.len() == old_abs_path.len() {
+            return Ok(());
+        } else {
+            return_errno!(EINVAL, "newpath contains a path prefix of the oldpath");
+        }
+    }
+
+    let old_dir = old_dentry.parent().unwrap();
+    old_dir
+        .move_(&old_dentry.name(), &new_dir, &new_file_name)
         .await?;
     Ok(())
 }

@@ -17,4 +17,8 @@ impl ProcINode for ProcCommINode {
         comm.push(b'\n');
         Ok(comm)
     }
+
+    fn is_volatile(&self) -> bool {
+        true
+    }
 }

@@ -7,11 +7,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["libc"]
+default = ["libc", "async-vfs/default"]
 sgx = ["sgx_types", "sgx_tstd", "sgx_trts", "sgx_libc", "async-vfs/sgx", "async-io/sgx", "async-rt/sgx"]
 
 [dependencies]
-async-vfs = { path = "../async-vfs" }
+async-vfs = { path = "../async-vfs", default-features = false }
 async-io = { path = "../async-io" }
 async-rt = { path = "../async-rt" }
 errno = { path = "../errno" }
