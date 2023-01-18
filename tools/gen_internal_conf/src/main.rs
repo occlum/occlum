@@ -198,7 +198,8 @@ fn main() {
                 }
                 heap_max_size
             } else {
-                parse_memory_size(DEFAULT_CONFIG.kernel_heap_max_size)
+                // If the user doesn't provide a value, use the max value as heap_max_size.
+                std::cmp::max(heap_init_size, parse_memory_size(DEFAULT_CONFIG.kernel_heap_max_size))
             }
         };
 
