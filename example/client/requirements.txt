@@ -1,5 +1,5 @@
 grpcio>=1.34.0
 aiohttp>=3.7.0
-tensorflow==2.11
+tensorflow==2.11.1
 tensorflow-serving-api==2.11
 Pillow==9.4
