@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1674081333166,
+  "lastUpdate": 1674338999623,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -1212,6 +1212,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 3276,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "28fb6fd767ec1b6d908733427a7723ee4f0e4b77",
+          "message": "Update gvisor test with prepare_bazel.sh",
+          "timestamp": "2023-01-16T06:36:20Z",
+          "url": "https://github.com/occlum/occlum/commit/28fb6fd767ec1b6d908733427a7723ee4f0e4b77"
+        },
+        "date": 1674338998498,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 3701,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 3701,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
