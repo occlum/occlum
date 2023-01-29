@@ -103,6 +103,9 @@ pub extern "C" fn occlum_ecall_init(
 
         // Enable global backtrace
         unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
+
+        // Add hook for allocation error
+        std::alloc::set_alloc_error_hook(oom_handle);
     });
 
     // Parse host file
@@ -147,6 +150,11 @@ pub extern "C" fn occlum_ecall_init(
     }
 
     0
+}
+
+// hook for memory allocation error
+fn oom_handle(layout: std::alloc::Layout) {
+    panic!("memory allocation of {} bytes failed\n", layout.size());
 }
 
 #[no_mangle]
