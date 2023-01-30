@@ -396,11 +396,19 @@ impl VMManager {
         {
             // Must lock the internal manager first here in case the chunk's range and vma are conflict when other threads are operating the VM
             let mut internal_manager = self.internal.lock().unwrap();
-            let mut merged_vmas = current.vm().merge_all_single_vma_chunks()?;
+            // Lock process mem_chunks during the whole merging process to avoid conflict
+            let mut process_mem_chunks = current.vm().mem_chunks().write().unwrap();
+
+            let mut merged_vmas = ProcessVM::merge_all_single_vma_chunks(&mut process_mem_chunks)?;
             internal_manager.clean_single_vma_chunks();
+
+            // Add merged chunks to internal manager and process mem_chunks
             while merged_vmas.len() != 0 {
                 let merged_vma = merged_vmas.pop().unwrap();
-                internal_manager.add_new_chunk(&current, merged_vma);
+                let new_vma_chunk = Arc::new(Chunk::new_chunk_with_vma(merged_vma));
+                let success = internal_manager.chunks.insert(new_vma_chunk.clone());
+                process_mem_chunks.insert(new_vma_chunk);
+                debug_assert!(success);
             }
         }
 
@@ -852,7 +860,6 @@ impl InternalVMManager {
                             }
 
                             // Munmap the corresponding single vma chunk
-                            // let mut internal_manager = self.internal();
                             self.munmap_chunk(&chunk, Some(&target_range))?;
                         }
                         VMMapAddr::Any => unreachable!(),

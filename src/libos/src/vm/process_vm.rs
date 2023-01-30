@@ -10,6 +10,7 @@ use super::vm_util::{
     FileBacked, VMInitializer, VMMapAddr, VMMapOptions, VMMapOptionsBuilder, VMRemapOptions,
 };
 use std::collections::HashSet;
+use util::sync::RwLockWriteGuard;
 
 #[derive(Debug, Clone)]
 pub struct ProcessVMBuilder<'a, 'b> {
@@ -333,9 +334,10 @@ impl ProcessVM {
 
     // Try merging all connecting single VMAs of the process.
     // This is a very expensive operation.
-    pub fn merge_all_single_vma_chunks(&self) -> Result<Vec<VMArea>> {
+    pub fn merge_all_single_vma_chunks(
+        mem_chunks: &mut RwLockWriteGuard<HashSet<ChunkRef>>,
+    ) -> Result<Vec<VMArea>> {
         // Get all single VMA chunks
-        let mut mem_chunks = self.mem_chunks.write().unwrap();
         let mut single_vma_chunks = mem_chunks
             .drain_filter(|chunk| chunk.is_single_vma())
             .collect::<Vec<ChunkRef>>();
