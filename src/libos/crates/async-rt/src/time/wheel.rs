@@ -1,4 +1,4 @@
-use super::entry::TimerWheelEntry;
+use super::entry::{PendingEntry, TimerWheelEntry};
 use super::Instant;
 use crate::executor::EXECUTOR;
 use crate::prelude::*;
@@ -30,32 +30,35 @@ lazy_static! {
 pub fn run_timer_wheel_thread() {
     TIMER_WHEEL.set_running();
     loop {
-        // Lock the status.
-        let mut status = TIMER_WHEEL.status().lock();
-        debug_assert!(*status == TimerWheelStatus::Running);
-        let result = TIMER_WHEEL.try_make_progress();
-        if let Some(entries) = result.expired_timers {
-            drop(status);
-            // Don't hold lock when firing timers.
-            TimerWheel::fire(entries);
-        } else if let Some(skip) = result.skip {
-            let timeout = Duration::from_millis(skip as u64);
-            *status = TimerWheelStatus::Asleep(timeout);
-            drop(status);
+        {
+            // Lock the status.
+            let mut status = TIMER_WHEEL.status().lock();
+            debug_assert!(*status == TimerWheelStatus::Running);
+            let result = TIMER_WHEEL.try_make_progress();
+            if let Some(entries) = result.expired_timers {
+                drop(status);
+                // Don't hold lock when firing timers.
+                TimerWheel::fire(entries);
+            } else if let Some(skip) = result.skip {
+                let timeout = Duration::from_millis(skip as u64);
+                *status = TimerWheelStatus::Asleep(timeout);
+                drop(status);
 
-            debug!("Timer Wheel: will sleep {:?}", timeout);
-            let ret = futex_wait_timeout(&TIMER_WHEEL_WAKER, &timeout, WAKER_MAGIC_NUM);
+                debug!("Timer Wheel: will sleep {:?}", timeout);
+                let ret = futex_wait_timeout(&TIMER_WHEEL_WAKER, &timeout, WAKER_MAGIC_NUM);
 
-            // If timedout, set running by itself. If woken up, the status has been set by waker thread.
-            if ret.is_err() {
-                debug!("Timer Wheel: timeout");
-                TIMER_WHEEL.set_running();
-            } else {
-                debug!("Timer Wheel: woken up");
+                // If timedout, set running by itself. If woken up, the status has been set by waker thread.
+                if ret.is_err() {
+                    debug!("Timer Wheel: timeout");
+                    TIMER_WHEEL.set_running();
+                } else {
+                    debug!("Timer Wheel: woken up");
+                }
             }
-
-            TIMER_WHEEL.make_progress();
         }
+
+        // The timer wheel will make progress during the insertion
+        TIMER_WHEEL.insert_pending_entries();
 
         if EXECUTOR.is_shutdown() {
             break;
@@ -107,6 +110,8 @@ pub struct TimerWheel {
     start: Instant,
     // status of the timerwheel.
     status: Mutex<TimerWheelStatus>,
+    // Pending entries before adding to the wheel
+    pending_entries: Mutex<Vec<PendingEntry>>,
 }
 
 impl TimerWheel {
@@ -116,6 +121,7 @@ impl TimerWheel {
             ticks: AtomicU64::new(0),
             start: Instant::now(),
             status: Mutex::new(TimerWheelStatus::Idle),
+            pending_entries: Mutex::new(Vec::new()),
         }
     }
 
@@ -134,27 +140,53 @@ impl TimerWheel {
         *self.status.lock() = TimerWheelStatus::Asleep(sleep_time)
     }
 
-    /// Insert a new timer entry to the wheel and return the ticks when the entry is inserted.
+    /// Insert a new timer entry to the wheel pending list
     pub fn insert_entry(&self, entry: TimerWheelEntry, timeout: Duration) -> u64 {
-        let mut guard = self.wheel.lock();
+        let mut pending_entries = self.pending_entries.lock();
+        pending_entries.push(PendingEntry::new(entry, timeout));
 
-        // Try to make progress to assure that the wheel is up to date.
-        let entries = self.make_progress_locked(&mut guard);
-
-        // The minimum resolution of QuadWheelWithOverflow is 1 ms.
-        // Based on experiments, the timer is very likely to expire about 1 ms earlier, which truly follows the minimum resolution.
-        // But this is a unacceptable behavior for many test suite, because elapsed time could be smaller than timeout time.
-        // Thus, we wait one more milli-second here. For timeout less than 1 ms, we try to wait more than 1 ms.
-        let timeout = timeout + Duration::MILLISECOND;
-        guard.insert_with_delay(entry, timeout).unwrap();
-        let insert_ticks = self.latest_ticks();
-
-        drop(guard);
-        Self::fire(entries);
-
+        let elapsed = self.start.elapsed().as_millis() as u64;
+        // self.ticks.store(elapsed, Ordering::Release);
         wake_timer_wheel(&timeout);
+        debug!("insert timer entry, timeout = {:?}", timeout);
+        elapsed
+    }
 
-        insert_ticks
+    pub fn insert_pending_entries(&self) {
+        let mut pending_entries = self.pending_entries.lock();
+        while pending_entries.len() > 0 {
+            let pending_entry = pending_entries.pop().unwrap();
+            let PendingEntry { timeout, entry } = pending_entry;
+            let timeout_entries = {
+                let mut guard = self.wheel.lock();
+                // Try to make progress to assure that the wheel is up to date.
+                let timeout_entries = self.make_progress_locked(&mut guard);
+                let remained_timeout = entry.remained_duration();
+                debug!(
+                    "insert_pending_entries remained_timeout = {:?}",
+                    remained_timeout
+                );
+                if remained_timeout == Duration::ZERO {
+                    debug!("insert_pending_entries fire timer. timeout = {:?}", timeout);
+                    Self::fire(vec![entry]);
+                } else if remained_timeout <= Duration::MILLISECOND {
+                    // The minimum resolution of QuadWheelWithOverflow is 1 ms.
+                    // Based on experiments, the timer is very likely to expire about 1 ms earlier, which truly follows the minimum resolution.
+                    // But this is a unacceptable behavior for many test suite, because elapsed time could be smaller than timeout time.
+                    // Thus, we wait one more milli-second here. For timeout less than 1 ms, we try to wait more than 1 ms.
+                    let timeout = Duration::MILLISECOND;
+                    let _ = guard.insert_with_delay(entry, timeout);
+                    debug!("insert timer smaller than 1ms. timeout = {:?}", timeout);
+                } else {
+                    let timeout = remained_timeout;
+                    let _ = guard.insert_with_delay(entry, timeout);
+                    debug!("insert timer. timeout = {:?}", timeout);
+                }
+                timeout_entries
+            };
+
+            Self::fire(timeout_entries);
+        }
     }
 
     /// Try to move the timerwheel forward and fire expired timers.

@@ -25,7 +25,8 @@ pub struct StartedInner {
 impl StartedInner {
     pub fn new(start_ticks: u64, waker: Waker) -> Self {
         Self {
-            start_ticks,
+            // This will be updated when the timer entry is inserted to the timer wheel.
+            start_ticks: start_ticks,
             waker: Some(waker),
         }
     }
@@ -83,8 +84,10 @@ impl TimerShared {
             TimerState::Init => {
                 self.state = TimerState::Cancelled(DURATION_ZERO);
             }
-            TimerState::Started(inner) => {
-                self.state = TimerState::Cancelled(inner.elapsed_time());
+            TimerState::Started(_) => {
+                // self.state = TimerState::Cancelled(inner.elapsed_time());
+                // timer wheel may not be updated, the elapsed time could overflow.
+                self.state = TimerState::Cancelled(DURATION_ZERO);
             }
             TimerState::Expired => {}
             TimerState::Cancelled(_) => panic!("Can not cancel twice"),
@@ -104,6 +107,16 @@ impl TimerShared {
             TimerState::Cancelled(elapsed) => self.timeout.saturating_sub(*elapsed),
         }
     }
+
+    // pub fn update_start_ticks_when_insert(&self, tick: u64) {
+    //     match &self.state {
+    //         TimerState::Init => unreachable!(),
+    //         TimerState::Started(inner) => {
+    //             inner.start_ticks.store(tick, Ordering::Release);
+    //         }
+    //         TimerState::Expired | TimerState::Cancelled(_) => (),
+    //     }
+    // }
 }
 
 /// The entry used by user to get remained duration.
@@ -133,6 +146,8 @@ impl TimerEntry {
 
 impl TimerFutureEntry {
     pub fn new(entry: &TimerEntry) -> Self {
+        // Wake timer wheel to make progress
+        // super::wake_timer_wheel(&Duration::default());
         Self(entry.0.clone())
     }
 }
@@ -151,11 +166,17 @@ impl Future for TimerFutureEntry {
                     return Poll::Ready(());
                 }
 
-                // Insert the timer entry to the timer wheel.
                 let entry = TimerWheelEntry(self.0.clone());
-                let start_ticks = TIMER_WHEEL.insert_entry(entry, shared.timeout);
-                // Transfer to started state, set start_tick and waker.
-                let inner = StartedInner::new(start_ticks, cx.waker().clone());
+
+                // Insert the timer entry to the timer wheel pending list.
+                // Previously, there is too much work in "insert_entry", including making process for the timer wheel and fire timeout timers,
+                // which makes the poll slow and can cause the wait_timeout to fail to respond to other events.
+                // Now the heavy work is offloaded to the timer thread. And the current poll thread only inserts the timer into the pending list.
+                // The timer will then be inserted into the timer wheel by the timer thread when the timer thread is woken.
+                let start_tick = TIMER_WHEEL.insert_entry(entry, shared.timeout);
+
+                // Transfer to started state, set waker. start_ticks will be updated when inserting to the timer wheel.
+                let inner = StartedInner::new(start_tick, cx.waker().clone());
                 shared.state = TimerState::Started(inner);
                 Poll::Pending
             }
@@ -184,6 +205,31 @@ impl TimerWheelEntry {
     /// Fire the timer.
     pub fn fire(&self) {
         let mut shared = self.0.lock();
+        debug!("fire timer. timeout = {:?}", shared.timeout);
         shared.fire();
+    }
+
+    pub fn remained_duration(&self) -> Duration {
+        let shared = self.0.lock();
+        shared.remained_duration()
+    }
+}
+
+pub struct PendingEntry {
+    pub(super) entry: TimerWheelEntry,
+    pub(super) timeout: Duration,
+}
+
+impl PendingEntry {
+    pub fn new(entry: TimerWheelEntry, timeout: Duration) -> Self {
+        Self { entry, timeout }
+    }
+
+    pub fn entry(&self) -> &TimerWheelEntry {
+        &self.entry
+    }
+
+    pub fn timeout(&self) -> &Duration {
+        &self.timeout
     }
 }
