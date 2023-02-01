@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1675289401391,
+  "lastUpdate": 1675289840194,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -1636,6 +1636,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 3674,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "6107a32675bbf5c5efdd707bd2ec0c5b2413a7ed",
+          "message": "Fix mremap lock range when merging connecting chunks",
+          "timestamp": "2023-01-30T08:39:15Z",
+          "url": "https://github.com/occlum/occlum/commit/6107a32675bbf5c5efdd707bd2ec0c5b2413a7ed"
+        },
+        "date": 1675289838550,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 3008,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 3008,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
