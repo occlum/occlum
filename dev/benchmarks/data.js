@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1675290889731,
+  "lastUpdate": 1675548642564,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -1716,6 +1716,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 3008,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Zheng, Qi",
+            "username": "qzheng527",
+            "email": "huaiqing.zq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "386e968ccb08bdd763e1915eafc39d8fb9df2226",
+          "message": "[libos] Enable backtrace for memory allocation failure",
+          "timestamp": "2023-01-29T02:52:47Z",
+          "url": "https://github.com/occlum/occlum/commit/386e968ccb08bdd763e1915eafc39d8fb9df2226"
+        },
+        "date": 1675548640953,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 3479,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 3479,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
