@@ -21,18 +21,14 @@ pub fn do_sigtimedwait(interest: SigSet, timeout: Option<&Duration>) -> Result<s
         *blocked & interest
     };
 
-    let signal = match timeout {
-        None => dequeue_pending_signal(&interest, &thread, &process)
-            .ok_or_else(|| errno!(EAGAIN, "no interesting, pending signal"))?,
-        Some(timeout) => {
-            let pending_sig_waiter = PendingSigWaiter::new(thread, process, interest);
-            pending_sig_waiter.wait(timeout).map_err(|e| {
-                if e.errno() == Errno::EINTR {
-                    return e;
-                }
-                errno!(EAGAIN, "no interesting, pending signal")
-            })?
-        }
+    let signal = {
+        let pending_sig_waiter = PendingSigWaiter::new(thread, process, interest);
+        pending_sig_waiter.wait(timeout).map_err(|e| {
+            if e.errno() == Errno::EINTR {
+                return e;
+            }
+            errno!(EAGAIN, "no interesting, pending signal")
+        })?
     };
 
     let siginfo = signal.to_info();
@@ -70,25 +66,10 @@ impl PendingSigWaiter {
         })
     }
 
-    pub fn wait(&self, timeout: &Duration) -> Result<Box<dyn Signal>> {
+    pub fn wait(&self, timeout: Option<&Duration>) -> Result<Box<dyn Signal>> {
         let waiter_queue = self.observer.waiter_queue();
         let waiter = Waiter::new();
         loop {
-            if *timeout == Duration::new(0, 0) {
-                // When timeout is reached, it is possible that there is actually an interesting
-                // signal in the queue, but timeout happens slightly before being interrupted.
-                // So here we attempt to dequeue again before returning with timeout.
-                if let Some(signal) =
-                    dequeue_pending_signal(&self.interest, &self.thread, &self.process)
-                {
-                    return Ok(signal);
-                }
-                return_errno!(ETIMEDOUT, "timeout");
-            }
-
-            // Enqueue the waiter so that it can be waken up by the queue later.
-            waiter_queue.reset_and_enqueue(&waiter);
-
             // Try to dequeue a pending signal from the current process or thread
             if let Some(signal) =
                 dequeue_pending_signal(&self.interest, &self.thread, &self.process)
@@ -96,18 +77,28 @@ impl PendingSigWaiter {
                 return Ok(signal);
             }
 
+            // If the timeout is zero and if no pending signals, return immediately with an error.
+            if let Some(duration) = timeout {
+                if *duration == Duration::new(0, 0) {
+                    return_errno!(ETIMEDOUT, "timeout");
+                }
+            }
+
+            // Enqueue the waiter so that it can be waken up by the queue later.
+            waiter_queue.reset_and_enqueue(&waiter);
+
             // As there is no intersting signal to dequeue right now, let's wait
             // some time to try again later. Most likely, the waiter will keep
             // waiting until being waken up by the waiter queue, which means
             // the arrival of an interesting signal.
-            let res = waiter.wait(Some(timeout));
+            let res = waiter.wait(timeout);
 
             // Do not try again if some error is encountered. There are only
             // two possible errors: ETIMEDOUT or EINTR.
             if let Err(e) = res {
-                // When interrupted, it is possible that the interrupting signal happens
+                // When interrupted or timeout is reached, it is possible that the interrupting signal happens
                 // to be an interesting and pending signal. So we attempt to dequeue again.
-                if e.errno() == Errno::EINTR {
+                if e.errno() == Errno::EINTR || e.errno() == Errno::ETIMEDOUT {
                     if let Some(signal) =
                         dequeue_pending_signal(&self.interest, &self.thread, &self.process)
                     {
