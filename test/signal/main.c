@@ -472,8 +472,11 @@ int test_sigtimedwait() {
         THROW_ERROR("sigprocmask failed unexpectedly");
     }
 
+    timeout.tv_sec = 1;
+    timeout.tv_nsec = 0;
+
     // There is no pending signal, yet; so the syscall must return EAGAIN error
-    ret = sigtimedwait(&new_mask, &info, NULL);
+    ret = sigtimedwait(&new_mask, &info, &timeout);
     if (ret == 0 || (ret < 0 && errno != EAGAIN)) {
         THROW_ERROR("sigprocmask must return with EAGAIN error");
     }
