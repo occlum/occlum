@@ -10,7 +10,7 @@ source_suffix = {'.rst': 'restructuredtext',
 
 
 project = 'Occlum'
-copyright = '2019, Ant Financial Services Group'
+copyright = '2023, Occlum Contributors'
 author = 'Occlum Contributors'
 
 release = ''
