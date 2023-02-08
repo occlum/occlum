@@ -212,29 +212,50 @@ fn open_or_create_sefs_according_to(
     }
     let source_path = mc.source.as_ref().unwrap();
     let root_mac = mc.options.mac;
+    let cache_size = mc.options.cache_size;
     let sefs = if !mc.options.temporary {
         if root_mac.is_some() {
             SEFS::open(
-                Box::new(SgxStorage::new(source_path, user_key, &root_mac)),
+                Box::new(SgxStorage::new(
+                    source_path,
+                    user_key,
+                    &root_mac,
+                    cache_size,
+                )?),
                 &time::OcclumTimeProvider,
                 &SgxUuidProvider,
             )?
         } else if source_path.join("metadata").exists() {
             SEFS::open(
-                Box::new(SgxStorage::new(source_path, user_key, &root_mac)),
+                Box::new(SgxStorage::new(
+                    source_path,
+                    user_key,
+                    &root_mac,
+                    cache_size,
+                )?),
                 &time::OcclumTimeProvider,
                 &SgxUuidProvider,
             )?
         } else {
             SEFS::create(
-                Box::new(SgxStorage::new(source_path, user_key, &root_mac)),
+                Box::new(SgxStorage::new(
+                    source_path,
+                    user_key,
+                    &root_mac,
+                    cache_size,
+                )?),
                 &time::OcclumTimeProvider,
                 &SgxUuidProvider,
             )?
         }
     } else {
         SEFS::create(
-            Box::new(SgxStorage::new(source_path, user_key, &root_mac)),
+            Box::new(SgxStorage::new(
+                source_path,
+                user_key,
+                &root_mac,
+                cache_size,
+            )?),
             &time::OcclumTimeProvider,
             &SgxUuidProvider,
         )?
