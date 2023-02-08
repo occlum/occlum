@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1675550141809,
+  "lastUpdate": 1675894208015,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -1842,6 +1842,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 3479,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "LI Qing",
+            "username": "liqinggd",
+            "email": "geding.lq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "5174feae15ef7d42759803b5ece994a89fb81223",
+          "message": "[hyper mode] Add support for the package command",
+          "timestamp": "2023-02-08T03:00:44Z",
+          "url": "https://github.com/occlum/occlum/commit/5174feae15ef7d42759803b5ece994a89fb81223"
+        },
+        "date": 1675894206191,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 3362,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 3362,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
