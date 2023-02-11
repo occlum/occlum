@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1676153900518,
+  "lastUpdate": 1676154962800,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -1454,6 +1454,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Random Read Throughput",
             "value": 212,
+            "unit": "MiB/s",
+            "extra": "randread"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Shaowei Song",
+            "username": "lucassong-mh",
+            "email": "1498430017@qq.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "dbe404f16a2669df885d1ccf1d52f67de67219b8",
+          "message": "[sefs] Make cache size configurable in Occlum.json",
+          "timestamp": "2023-02-08T06:18:35Z",
+          "url": "https://github.com/occlum/occlum/commit/dbe404f16a2669df885d1ccf1d52f67de67219b8"
+        },
+        "date": 1676154961066,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sequential Write Throughput",
+            "value": 54.5,
+            "unit": "MiB/s",
+            "extra": "seqwrite"
+          },
+          {
+            "name": "Random Write Throughput",
+            "value": 43.3,
+            "unit": "MiB/s",
+            "extra": "randwrite"
+          },
+          {
+            "name": "Sequential Read Throughput",
+            "value": 286,
+            "unit": "MiB/s",
+            "extra": "seqread"
+          },
+          {
+            "name": "Random Read Throughput",
+            "value": 210,
             "unit": "MiB/s",
             "extra": "randread"
           }
