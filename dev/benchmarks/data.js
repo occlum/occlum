@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1675895955654,
+  "lastUpdate": 1676153461657,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -1968,6 +1968,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 3362,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Shaowei Song",
+            "username": "lucassong-mh",
+            "email": "1498430017@qq.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "dbe404f16a2669df885d1ccf1d52f67de67219b8",
+          "message": "[sefs] Make cache size configurable in Occlum.json",
+          "timestamp": "2023-02-08T06:18:35Z",
+          "url": "https://github.com/occlum/occlum/commit/dbe404f16a2669df885d1ccf1d52f67de67219b8"
+        },
+        "date": 1676153459845,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 3767,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 3766,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
