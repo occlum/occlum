@@ -646,6 +646,24 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "curl -s http://localhost:8080/actuator/readiness | grep -v DOWN"
 
+    Netty_UT_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/sim
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Download and compile netty unit test demos
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut && ./build.sh"
+
+    - name: Run netty unit test demo
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut && SGX_MODE=SIM ./run_netty_ut_jdk11.sh"
+
   Bash_test:
     runs-on: ubuntu-20.04
     steps:
