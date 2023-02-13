@@ -1,0 +1,13 @@
+# A Simple netty unit test usage demo
+
+This project demonstrates how to verify the completeness of Netty on Occlum.
+
+1. Download junit and related netty jars
+```
+./build.sh
+```
+
+2. Run `netty unit test ` on Occlum
+```
+./run_netty_ut_jdk11.sh
+```
