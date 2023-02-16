@@ -148,7 +148,12 @@ pub fn do_write(fd: FileDesc, buf: *const u8, size: usize) -> Result<isize> {
     Ok(len as isize)
 }
 
-pub fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<isize> {
+fn do_writev_offset(
+    fd: FileDesc,
+    iov: *const iovec_t,
+    count: i32,
+    offset: Option<off_t>,
+) -> Result<isize> {
     let count = {
         if count < 0 {
             return_errno!(EINVAL, "Invalid count of iovec");
@@ -169,11 +174,25 @@ pub fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<isize>
     };
     let bufs = &bufs_vec[..];
 
-    let len = file_ops::do_writev(fd, bufs)?;
+    let len = if let Some(offset) = offset {
+        file_ops::do_pwritev(fd, bufs, offset)?
+    } else {
+        file_ops::do_writev(fd, bufs)?
+    };
+
     Ok(len as isize)
 }
 
-pub fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize> {
+pub fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<isize> {
+    do_writev_offset(fd, iov, count, None)
+}
+
+fn do_readv_offset(
+    fd: FileDesc,
+    iov: *mut iovec_t,
+    count: i32,
+    offset: Option<off_t>,
+) -> Result<isize> {
     let count = {
         if count < 0 {
             return_errno!(EINVAL, "Invalid count of iovec");
@@ -194,8 +213,17 @@ pub fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize> {
     };
     let bufs = &mut bufs_vec[..];
 
-    let len = file_ops::do_readv(fd, bufs)?;
+    let len = if let Some(offset) = offset {
+        file_ops::do_preadv(fd, bufs, offset)?
+    } else {
+        file_ops::do_readv(fd, bufs)?
+    };
+
     Ok(len as isize)
+}
+
+pub fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize> {
+    do_readv_offset(fd, iov, count, None)
 }
 
 pub fn do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: off_t) -> Result<isize> {
@@ -207,6 +235,14 @@ pub fn do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: off_t) -> Resul
     Ok(len as isize)
 }
 
+pub fn do_preadv(fd: FileDesc, iov: *mut iovec_t, count: i32, offset: off_t) -> Result<isize> {
+    if offset < 0 {
+        return_errno!(EINVAL, "Invalid offset");
+    }
+
+    do_readv_offset(fd, iov, count, Some(offset))
+}
+
 pub fn do_pwrite(fd: FileDesc, buf: *const u8, size: usize, offset: off_t) -> Result<isize> {
     let safe_buf = {
         from_user::check_array(buf, size)?;
@@ -214,6 +250,14 @@ pub fn do_pwrite(fd: FileDesc, buf: *const u8, size: usize, offset: off_t) -> Re
     };
     let len = file_ops::do_pwrite(fd, safe_buf, offset)?;
     Ok(len as isize)
+}
+
+pub fn do_pwritev(fd: FileDesc, iov: *const iovec_t, count: i32, offset: off_t) -> Result<isize> {
+    if offset < 0 {
+        return_errno!(EINVAL, "Invalid offset");
+    }
+
+    do_writev_offset(fd, iov, count, Some(offset))
 }
 
 pub fn do_fstat(fd: FileDesc, stat_buf: *mut Stat) -> Result<isize> {

@@ -20,3 +20,9 @@ pub fn do_pwrite(fd: FileDesc, buf: &[u8], offset: off_t) -> Result<usize> {
     let file_ref = current!().file(fd)?;
     file_ref.write_at(offset as usize, buf)
 }
+
+pub fn do_pwritev(fd: FileDesc, bufs: &[&[u8]], offset: off_t) -> Result<usize> {
+    debug!("pwritev: fd: {}, offset {}", fd, offset);
+    let file_ref = current!().file(fd)?;
+    file_ref.pwritev(bufs, offset as usize)
+}

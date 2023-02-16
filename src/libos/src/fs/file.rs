@@ -43,6 +43,14 @@ pub trait File: Debug + Sync + Send + Any {
         return_op_unsupported_error!("seek")
     }
 
+    fn preadv(&self, bufs: &mut [&mut [u8]], offset: usize) -> Result<usize> {
+        return_op_unsupported_error!("preadv")
+    }
+
+    fn pwritev(&self, bufs: &[&[u8]], offset: usize) -> Result<usize> {
+        return_op_unsupported_error!("pwritev")
+    }
+
     fn position(&self) -> Result<off_t> {
         return_op_unsupported_error!("position")
     }
