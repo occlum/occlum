@@ -360,8 +360,8 @@ impl ShmManager {
             key, size, shmflg
         );
 
-        // Check the size from user
-        if size < SHMMIN || size > SHMMAX {
+        // Check the size from user for shm creation
+        if shmflg.contains(ShmFlags::IPC_CREAT) && (size < SHMMIN || size > SHMMAX) {
             return_errno!(EINVAL, "invalid size");
         }
 
@@ -374,10 +374,7 @@ impl ShmManager {
             || mode.contains(FileMode::S_IWGRP)
             || mode.contains(FileMode::S_IWOTH);
         if !(read_per && write_per) {
-            return_errno!(
-                EINVAL,
-                "shared memory segement in occlum should have rw permission now"
-            );
+            warn!("shared memory segement in occlum should have rw permission");
         }
 
         let mut shm_segments = self.shm_segments.write().unwrap();
