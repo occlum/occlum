@@ -16,7 +16,7 @@ use std::ffi::{CStr, CString};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::mem::MaybeUninit;
 use std::ptr;
-use time::{clockid_t, itimerspec_t, timespec_t, timeval_t};
+use time::{clockid_t, itimerspec_t, itimerval_t, timespec_t, timeval_t};
 use util::log::{self, LevelFilter};
 use util::mem_util::from_user::*;
 
@@ -129,9 +129,9 @@ macro_rules! process_syscall_table_with_callback {
             (Dup2 = 33) => do_dup2(old_fd: FileDesc, new_fd: FileDesc),
             (Pause = 34) => handle_unsupported(),
             (Nanosleep = 35) => do_nanosleep(req_u: *const timespec_t, rem_u: *mut timespec_t),
-            (Getitimer = 36) => handle_unsupported(),
+            (Getitimer = 36) => do_gettitimer(which: isize, curr_value: *mut itimerval_t),
             (Alarm = 37) => handle_unsupported(),
-            (Setitimer = 38) => handle_unsupported(),
+            (Setitimer = 38) => do_settitimer(which: isize, new_value: *const itimerval_t, old_value: *mut itimerval_t),
             (Getpid = 39) => do_getpid(),
             (Sendfile = 40) => do_sendfile(out_fd: FileDesc, in_fd: FileDesc, offset_ptr: *mut off_t, count: usize),
             (Socket = 41) => do_socket(domain: c_int, socket_type: c_int, protocol: c_int),
@@ -967,6 +967,18 @@ fn do_prlimit(
         }
     };
     misc::do_prlimit(pid, resource, new_limit, old_limit).map(|_| 0)
+}
+
+pub fn do_gettitimer(which: isize, curr_value: *mut itimerval_t) -> Result<isize> {
+    time::do_gettitimer(which, curr_value)
+}
+
+pub fn do_settitimer(
+    which: isize,
+    new_value: *const itimerval_t,
+    old_value: *mut itimerval_t,
+) -> Result<isize> {
+    time::do_settitimer(which, new_value, old_value)
 }
 
 fn handle_unsupported() -> Result<isize> {

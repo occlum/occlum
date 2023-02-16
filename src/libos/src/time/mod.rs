@@ -334,3 +334,28 @@ impl itimerspec_t {
         Ok(())
     }
 }
+
+// For getitimer, setitimer
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+#[allow(non_camel_case_types)]
+pub struct itimerval_t {
+    it_interval: timeval_t,
+    it_value: timeval_t,
+}
+
+// To be implemented
+pub fn do_gettitimer(which: isize, curr_value: *mut itimerval_t) -> Result<isize> {
+    warn!("do_gettitimer just return success");
+    Ok(0)
+}
+
+// To be implemented
+pub fn do_settitimer(
+    which: isize,
+    new_value: *const itimerval_t,
+    old_value: *mut itimerval_t,
+) -> Result<isize> {
+    warn!("do_settitimer just return success");
+    Ok(0)
+}
