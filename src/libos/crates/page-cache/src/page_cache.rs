@@ -4,13 +4,16 @@ use lru::LruCache;
 use object_id::ObjectId;
 
 use std::collections::BTreeSet;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
+pub type PageId = u64;
+/// A trait to define domain of key for page cache.
+pub trait PageKey: Into<PageId> + Copy + Send + Sync + Debug + 'static {}
+
 /// Page cache.
 pub struct PageCache<K: PageKey, A: PageAlloc>(pub(crate) Arc<PageCacheInner<K, A>>);
-
-type PageId = usize;
 
 pub(crate) struct PageCacheInner<K: PageKey, A: PageAlloc> {
     id: ObjectId,
@@ -249,6 +252,8 @@ impl<K: PageKey, A: PageAlloc> Drop for PageCache<K, A> {
     }
 }
 
+impl PageKey for PageId {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -265,12 +270,12 @@ mod tests {
         }
 
         let flusher = Arc::new(SimpleFlusher);
-        let cache = PageCache::<usize, MyPageAlloc>::new(flusher);
+        let cache = PageCache::<PageId, MyPageAlloc>::new(flusher);
 
         const CAPACITY: usize = 15;
         // Create `UpToDate` pages
         for key in 0..5 {
-            let page_handle = cache.acquire(key).unwrap();
+            let page_handle = cache.acquire(key as _).unwrap();
             let mut page_guard = page_handle.lock();
             // Simulate reading page data from disk
             page_guard.set_state(PageState::Fetching);
@@ -280,12 +285,12 @@ mod tests {
         }
         // Create `Uninit` pages
         for key in 5..10 {
-            let page_handle = cache.acquire(key).unwrap();
+            let page_handle = cache.acquire(key as _).unwrap();
             cache.release(page_handle);
         }
         // Create `Dirty` pages
         for key in 10..CAPACITY {
-            let page_handle = cache.acquire(key).unwrap();
+            let page_handle = cache.acquire(key as _).unwrap();
             let mut page_guard = page_handle.lock();
             // Simulate writing page data
             page_guard.set_state(PageState::Dirty);

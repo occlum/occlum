@@ -50,14 +50,14 @@ impl AsyncSimpleFS {
         let super_block = SuperBlock {
             magic: FS_MAGIC,
             blocks: blocks as u32,
-            unused_blocks: (blocks - BLKN_FREEMAP - alloc_map_blocks) as u32,
+            unused_blocks: (blocks - BLKN_FREEMAP.to_raw() as usize - alloc_map_blocks) as u32,
             info: Str32::from(FS_INFO),
             alloc_map_blocks: alloc_map_blocks as u32,
         };
         let alloc_map = {
             let mut bitset = BitVec::with_capacity(alloc_map_blocks * BLKBITS);
             bitset.extend(core::iter::repeat(false).take(alloc_map_blocks * BLKBITS));
-            for i in 0..BLKN_FREEMAP + alloc_map_blocks {
+            for i in 0..(BLKN_FREEMAP.to_raw() as usize) + alloc_map_blocks {
                 bitset.set(i, true);
             }
             BlockAllocMap::from_bitset(bitset)
@@ -125,7 +125,7 @@ impl AsyncSimpleFS {
     }
 
     /// Allocate a free block, return block id
-    async fn alloc_block(&self) -> Option<BlockId> {
+    async fn alloc_block(&self) -> Option<Bid> {
         let mut alloc_map = self.alloc_map.write().await;
         let id = alloc_map.alloc();
         if let Some(block_id) = id {
@@ -138,15 +138,15 @@ impl AsyncSimpleFS {
             super_block.unused_blocks -= 1;
             // trace!("alloc block {:#x}", block_id);
         }
-        id
+        id.map(|id| Bid::new(id as _))
     }
 
     /// Free a block
-    async fn free_block(&self, block_id: BlockId) {
+    async fn free_block(&self, block_id: Bid) {
         let mut alloc_map = self.alloc_map.write().await;
         let mut super_block = self.super_block.write().await;
-        assert!(alloc_map.is_allocated(block_id));
-        alloc_map.free(block_id);
+        assert!(alloc_map.is_allocated(block_id.to_raw() as _));
+        alloc_map.free(block_id.to_raw() as _);
         super_block.unused_blocks += 1;
         // trace!("free block {:#x}", block_id);
         // clear the block
@@ -174,7 +174,7 @@ impl AsyncSimpleFS {
     /// Get inode by id. Load if not in memory.
     /// ** Must ensure it's a valid inode **
     async fn get_inode(&self, id: InodeId) -> Arc<Inode> {
-        assert!(self.alloc_map.read().await.is_allocated(id));
+        assert!(self.alloc_map.read().await.is_allocated(id.to_raw() as _));
 
         // In the cache
         let mut inode_cache = self.inodes.write().await;
@@ -372,7 +372,7 @@ impl AsyncInode for Inode {
         Ok(Metadata {
             dev: 0,
             rdev: 0,
-            inode: inner.id,
+            inode: inner.id.to_raw() as _,
             size: match disk_inode.type_ {
                 FileType::File | FileType::SymLink | FileType::Dir => disk_inode.size as usize,
                 FileType::CharDevice => 0,
@@ -498,7 +498,7 @@ impl AsyncInode for Inode {
         // Write new entry
         if let Err(e) = inner_mut
             .append_direntry(&DiskDirEntry {
-                id: inode.inner.read().await.id as u32,
+                id: inode.inner.read().await.id.to_raw() as u32,
                 name: Str256::from(name),
                 type_: FileType::from(type_) as u32,
             })
@@ -556,7 +556,7 @@ impl AsyncInode for Inode {
         }
         self_inner_mut
             .append_direntry(&DiskDirEntry {
-                id: other_inner_mut.id as u32,
+                id: other_inner_mut.id.to_raw() as u32,
                 name: Str256::from(name),
                 type_: other_inner_mut.disk_inode.type_ as u32,
             })
@@ -702,7 +702,7 @@ impl AsyncInode for Inode {
                     .write_direntry(
                         entry_id,
                         &DiskDirEntry {
-                            id: inode_id as u32,
+                            id: inode_id.to_raw() as u32,
                             name: Str256::from(new_name),
                             type_: inode_type as u32,
                         },
@@ -724,7 +724,7 @@ impl AsyncInode for Inode {
                     .write_direntry(
                         entry_id,
                         &DiskDirEntry {
-                            id: inode_id as u32,
+                            id: inode_id.to_raw() as u32,
                             name: Str256::from(new_name),
                             type_: inode_type as u32,
                         },
@@ -772,7 +772,7 @@ impl AsyncInode for Inode {
                     .write_direntry(
                         replace_entry_id,
                         &DiskDirEntry {
-                            id: inode_id as u32,
+                            id: inode_id.to_raw() as u32,
                             name: Str256::from(new_name),
                             type_: inode_type as u32,
                         },
@@ -795,7 +795,7 @@ impl AsyncInode for Inode {
                 // just move inode
                 dest_inner_mut
                     .append_direntry(&DiskDirEntry {
-                        id: inode_id as u32,
+                        id: inode_id.to_raw() as u32,
                         name: Str256::from(new_name),
                         type_: inode_type as u32,
                     })
@@ -913,7 +913,7 @@ impl Debug for InodeInner {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
-            "InodeInner {{ id: {}, disk: {:?} }}",
+            "InodeInner {{ id: {:?}, disk: {:?} }}",
             self.id, self.disk_inode
         )
     }
@@ -925,10 +925,10 @@ impl InodeInner {
     }
 
     /// Map file block id to device block id
-    async fn get_device_block_id(&self, file_block_id: BlockId) -> Result<BlockId> {
+    async fn get_device_block_id(&self, file_block_id: Bid) -> Result<Bid> {
         let disk_inode = &self.disk_inode;
-        let device_block_id = match file_block_id {
-            id if id >= disk_inode.blocks as BlockId => {
+        let device_block_id = match file_block_id.to_raw() as usize {
+            id if id >= disk_inode.blocks as _ => {
                 return_errno!(EINVAL, "invalid file block id");
             }
             id if id < MAX_NBLOCK_DIRECT => disk_inode.direct[id],
@@ -936,7 +936,10 @@ impl InodeInner {
                 let device_block_id = self
                     .fs()
                     .storage
-                    .load_struct::<u32>(disk_inode.indirect as BlockId, ENTRY_SIZE * (id - NDIRECT))
+                    .load_struct::<u32>(
+                        Bid::new(disk_inode.indirect as _),
+                        ENTRY_SIZE * (id - NDIRECT),
+                    )
                     .await?;
                 device_block_id
             }
@@ -947,7 +950,7 @@ impl InodeInner {
                     .fs()
                     .storage
                     .load_struct::<u32>(
-                        disk_inode.db_indirect as BlockId,
+                        Bid::new(disk_inode.db_indirect as _),
                         ENTRY_SIZE * (indirect_id / BLK_NENTRY),
                     )
                     .await?;
@@ -956,7 +959,7 @@ impl InodeInner {
                     .fs()
                     .storage
                     .load_struct::<u32>(
-                        indirect_block_id as BlockId,
+                        Bid::new(indirect_block_id as _),
                         ENTRY_SIZE * (indirect_id as usize % BLK_NENTRY),
                     )
                     .await?;
@@ -965,29 +968,29 @@ impl InodeInner {
             }
             _ => unimplemented!("triple indirect blocks is not supported"),
         };
-        Ok(device_block_id as BlockId)
+        Ok(Bid::new(device_block_id as _))
     }
 
     /// Set the device block id for the file block id
     async fn set_device_block_id(
         &mut self,
-        file_block_id: BlockId,
-        device_block_id: BlockId,
+        file_block_id: Bid,
+        device_block_id: Bid,
     ) -> Result<()> {
-        match file_block_id {
-            id if id >= self.disk_inode.blocks as BlockId => {
+        match file_block_id.to_raw() as usize {
+            id if id >= self.disk_inode.blocks as _ => {
                 return_errno!(EINVAL, "invalid file block id");
             }
             id if id < MAX_NBLOCK_DIRECT => {
-                self.disk_inode.direct[id] = device_block_id as u32;
+                self.disk_inode.direct[id] = device_block_id.to_raw() as u32;
                 Ok(())
             }
             id if id < MAX_NBLOCK_INDIRECT => {
-                let device_block_id = device_block_id as u32;
+                let device_block_id = device_block_id.to_raw() as u32;
                 self.fs()
                     .storage
                     .store_struct::<u32>(
-                        self.disk_inode.indirect as BlockId,
+                        Bid::new(self.disk_inode.indirect as _),
                         ENTRY_SIZE * (id - NDIRECT),
                         &device_block_id,
                     )
@@ -1001,16 +1004,16 @@ impl InodeInner {
                     .fs()
                     .storage
                     .load_struct::<u32>(
-                        self.disk_inode.db_indirect as BlockId,
+                        Bid::new(self.disk_inode.db_indirect as _),
                         ENTRY_SIZE * (indirect_id / BLK_NENTRY),
                     )
                     .await?;
                 assert!(indirect_block_id > 0);
-                let device_block_id = device_block_id as u32;
+                let device_block_id = device_block_id.to_raw() as u32;
                 self.fs()
                     .storage
                     .store_struct::<u32>(
-                        indirect_block_id as BlockId,
+                        Bid::new(indirect_block_id as _),
                         ENTRY_SIZE * (indirect_id as usize % BLK_NENTRY),
                         &device_block_id,
                     )
@@ -1022,25 +1025,25 @@ impl InodeInner {
     }
 
     /// Get the indirect blocks
-    async fn indirect_blocks(&self) -> Result<Vec<BlockId>> {
+    async fn indirect_blocks(&self) -> Result<Vec<Bid>> {
         let mut indirect_blocks = Vec::new();
         let file_blocks = self.disk_inode.blocks as usize;
         if file_blocks > MAX_NBLOCK_DIRECT {
             assert!(self.disk_inode.indirect > 0);
-            indirect_blocks.push(self.disk_inode.indirect as BlockId);
+            indirect_blocks.push(Bid::new(self.disk_inode.indirect as _));
         }
         if file_blocks > MAX_NBLOCK_INDIRECT {
             assert!(self.disk_inode.db_indirect > 0);
-            indirect_blocks.push(self.disk_inode.db_indirect as BlockId);
+            indirect_blocks.push(Bid::new(self.disk_inode.db_indirect as _));
             let indirect_end = (file_blocks - MAX_NBLOCK_INDIRECT) / BLK_NENTRY + 1;
             for i in 0..indirect_end {
                 let indirect_id = self
                     .fs()
                     .storage
-                    .load_struct::<u32>(self.disk_inode.db_indirect as BlockId, ENTRY_SIZE * i)
+                    .load_struct::<u32>(Bid::new(self.disk_inode.db_indirect as _), ENTRY_SIZE * i)
                     .await?;
                 assert!(indirect_id > 0);
-                indirect_blocks.push(indirect_id as BlockId);
+                indirect_blocks.push(Bid::new(indirect_id as _));
             }
         }
         Ok(indirect_blocks)
@@ -1051,7 +1054,7 @@ impl InodeInner {
         for i in 0..self.disk_inode.size as usize / DIRENT_SIZE {
             let entry = self.read_direntry(i).await.unwrap();
             if entry.name.as_ref() == name {
-                return Some((entry.id as InodeId, entry.type_.into(), i));
+                return Some((InodeId::new(entry.id as _), entry.type_.into(), i));
             }
         }
         None
@@ -1072,7 +1075,7 @@ impl InodeInner {
         self.write_direntry(
             0,
             &DiskDirEntry {
-                id: self.id as u32,
+                id: self.id.to_raw() as u32,
                 name: Str256::from("."),
                 type_: FileType::Dir as u32,
             },
@@ -1081,7 +1084,7 @@ impl InodeInner {
         self.write_direntry(
             1,
             &DiskDirEntry {
-                id: parent as u32,
+                id: parent.to_raw() as u32,
                 name: Str256::from(".."),
                 type_: FileType::Dir as u32,
             },
@@ -1177,13 +1180,13 @@ impl InodeInner {
         self.disk_inode.blocks = new_blocks as u32;
         for file_block_id in old_blocks..new_blocks {
             if let Some(device_block_id) = self.fs().alloc_block().await {
-                self.set_device_block_id(file_block_id, device_block_id)
+                self.set_device_block_id(Bid::new(file_block_id as _), device_block_id)
                     .await
                     .unwrap();
             } else {
                 // rollback blocks allocation
                 for i in old_blocks..file_block_id {
-                    let device_block_id = self.get_device_block_id(i).await.unwrap();
+                    let device_block_id = self.get_device_block_id(Bid::new(i as _)).await.unwrap();
                     self.fs().free_block(device_block_id).await;
                 }
                 self.free_indirect_blocks(old_blocks).await;
@@ -1198,22 +1201,23 @@ impl InodeInner {
         let old_blocks = self.disk_inode.blocks as usize;
         // allocate indirect block if needed
         if old_blocks <= MAX_NBLOCK_DIRECT && new_blocks > MAX_NBLOCK_DIRECT {
-            self.disk_inode.indirect =
-                self.fs()
-                    .alloc_block()
-                    .await
-                    .ok_or(errno!(EIO, "no device space"))? as u32;
+            self.disk_inode.indirect = self
+                .fs()
+                .alloc_block()
+                .await
+                .ok_or(errno!(EIO, "no device space"))?
+                .to_raw() as u32;
         }
         // allocate double indirect block if needed
         if new_blocks > MAX_NBLOCK_INDIRECT {
             if self.disk_inode.db_indirect == 0 {
                 if let Some(block_id) = self.fs().alloc_block().await {
-                    self.disk_inode.db_indirect = block_id as u32;
+                    self.disk_inode.db_indirect = block_id.to_raw() as u32;
                 } else {
                     // rollback blocks allocation
                     if old_blocks <= MAX_NBLOCK_DIRECT {
                         self.fs()
-                            .free_block(self.disk_inode.indirect as BlockId)
+                            .free_block(Bid::new(self.disk_inode.indirect as _))
                             .await;
                         self.disk_inode.indirect = 0;
                     }
@@ -1233,9 +1237,9 @@ impl InodeInner {
                     self.fs()
                         .storage
                         .store_struct::<u32>(
-                            self.disk_inode.db_indirect as BlockId,
+                            Bid::new(self.disk_inode.db_indirect as _),
                             ENTRY_SIZE * i,
-                            &(indirect as u32),
+                            &(indirect.to_raw() as u32),
                         )
                         .await
                         .unwrap();
@@ -1246,22 +1250,22 @@ impl InodeInner {
                             .fs()
                             .storage
                             .load_struct::<u32>(
-                                self.disk_inode.db_indirect as BlockId,
+                                Bid::new(self.disk_inode.db_indirect as _),
                                 ENTRY_SIZE * j,
                             )
                             .await
                             .unwrap();
-                        self.fs().free_block(indirect as BlockId).await;
+                        self.fs().free_block(Bid::new(indirect as _)).await;
                     }
                     if old_blocks <= MAX_NBLOCK_INDIRECT {
                         self.fs()
-                            .free_block(self.disk_inode.db_indirect as BlockId)
+                            .free_block(Bid::new(self.disk_inode.db_indirect as _))
                             .await;
                         self.disk_inode.db_indirect = 0;
                     }
                     if old_blocks <= MAX_NBLOCK_DIRECT {
                         self.fs()
-                            .free_block(self.disk_inode.indirect as BlockId)
+                            .free_block(Bid::new(self.disk_inode.indirect as _))
                             .await;
                         self.disk_inode.indirect = 0;
                     }
@@ -1276,7 +1280,10 @@ impl InodeInner {
         // free data blocks
         let old_blocks = self.disk_inode.blocks as usize;
         for file_block_id in new_blocks..old_blocks {
-            let device_block_id = self.get_device_block_id(file_block_id).await.unwrap();
+            let device_block_id = self
+                .get_device_block_id(Bid::new(file_block_id as _))
+                .await
+                .unwrap();
             self.fs().free_block(device_block_id).await;
         }
 
@@ -1290,7 +1297,7 @@ impl InodeInner {
         // free indirect block if needed
         if new_blocks <= MAX_NBLOCK_DIRECT && old_blocks > MAX_NBLOCK_DIRECT {
             self.fs()
-                .free_block(self.disk_inode.indirect as BlockId)
+                .free_block(Bid::new(self.disk_inode.indirect as _))
                 .await;
             self.disk_inode.indirect = 0;
         }
@@ -1308,16 +1315,16 @@ impl InodeInner {
                 let indirect = self
                     .fs()
                     .storage
-                    .load_struct::<u32>(self.disk_inode.db_indirect as BlockId, ENTRY_SIZE * i)
+                    .load_struct::<u32>(Bid::new(self.disk_inode.db_indirect as _), ENTRY_SIZE * i)
                     .await
                     .unwrap();
                 assert!(indirect > 0);
-                self.fs().free_block(indirect as BlockId).await;
+                self.fs().free_block(Bid::new(indirect as _)).await;
             }
             if new_blocks <= MAX_NBLOCK_INDIRECT {
                 assert!(self.disk_inode.db_indirect > 0);
                 self.fs()
-                    .free_block(self.disk_inode.db_indirect as BlockId)
+                    .free_block(Bid::new(self.disk_inode.db_indirect as _))
                     .await;
                 self.disk_inode.db_indirect = 0;
             }
@@ -1440,8 +1447,8 @@ impl InodeInner {
     async fn sync_data(&self) -> Result<()> {
         let data_blocks = {
             let mut data_blocks = Vec::new();
-            for id in 0..self.disk_inode.blocks as BlockId {
-                let device_block_id = self.get_device_block_id(id).await?;
+            for id in 0..self.disk_inode.blocks {
+                let device_block_id = self.get_device_block_id(Bid::new(id as _)).await?;
                 data_blocks.push(device_block_id);
             }
             data_blocks
@@ -1469,7 +1476,7 @@ impl InodeInner {
             .await?;
         let metadata_blocks = {
             let mut metadata_blocks = self.indirect_blocks().await?;
-            metadata_blocks.push(self.id as BlockId);
+            metadata_blocks.push(self.id);
             metadata_blocks
         };
         self.fs().storage.flush_blocks(&metadata_blocks).await?;

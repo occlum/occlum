@@ -13,7 +13,7 @@ pub struct BlockRangeIter {
 /// Describe the range for one block.
 #[derive(Debug, Eq, PartialEq)]
 pub struct BlockRange {
-    pub block_id: BlockId,
+    pub block_id: Bid,
     pub begin: usize,
     pub end: usize,
     pub block_size: usize,
@@ -30,9 +30,9 @@ impl Iterator for BlockRangeIter {
 
         // Construct sub-range of next block
         let sub_range = {
-            let block_id = self.begin / self.block_size;
+            let block_id = Bid::from_byte_offset(self.begin);
             let begin = self.begin % self.block_size;
-            let end = if block_id == self.end / self.block_size {
+            let end = if block_id.to_raw() as usize == self.end / self.block_size {
                 self.end % self.block_size
             } else {
                 self.block_size
@@ -69,12 +69,12 @@ impl BlockRange {
 
     /// Describe the begin offset of this block from the whole range.
     pub fn origin_begin(&self) -> usize {
-        self.block_id * self.block_size + self.begin
+        self.block_id.to_raw() as usize * self.block_size + self.begin
     }
 
     /// Describe the end offset of this block from the whole range.
     pub fn origin_end(&self) -> usize {
-        self.block_id * self.block_size + self.end
+        self.block_id.to_raw() as usize * self.block_size + self.end
     }
 }
 
@@ -93,7 +93,7 @@ mod test {
         assert_eq!(
             iter.next(),
             Some(BlockRange {
-                block_id: 0,
+                block_id: Bid::new(0),
                 begin: 0x125,
                 end: 0x1000,
                 block_size: BLOCK_SIZE,
@@ -103,7 +103,7 @@ mod test {
         assert_eq!(
             iter.next(),
             Some(BlockRange {
-                block_id: 1,
+                block_id: Bid::new(1),
                 begin: 0,
                 end: 0x1000,
                 block_size: BLOCK_SIZE,
@@ -113,7 +113,7 @@ mod test {
         assert_eq!(
             iter.next(),
             Some(BlockRange {
-                block_id: 2,
+                block_id: Bid::new(2),
                 begin: 0,
                 end: 0x25,
                 block_size: BLOCK_SIZE,

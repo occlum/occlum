@@ -8,6 +8,7 @@ use page_cache::*;
 use std::sync::Arc;
 use std::time::Duration;
 
+type PageId = u64;
 const MB: usize = 1024 * 1024;
 
 macro_rules! new_page_cache_for_tests {
@@ -26,14 +27,14 @@ macro_rules! new_page_cache_for_tests {
         // `MyPageAlloc` is a test-purpose fixed-size allocator.
         impl_fixed_size_page_alloc! { MyPageAlloc, $cache_size }
 
-        PageCache::<usize, MyPageAlloc>::new(flusher)
+        PageCache::<PageId, MyPageAlloc>::new(flusher)
     }};
 }
 
 #[test]
 fn page_cache_acquire_release() {
-    let cache = new_page_cache_for_tests!(MB * 5);
-    let key: usize = 125;
+    let cache = new_page_cache_for_tests!(5 * MB);
+    let key: PageId = 125;
     let content = [5u8; BLOCK_SIZE];
 
     let page_handle = cache.acquire(key).unwrap();
@@ -62,8 +63,8 @@ fn page_cache_acquire_release() {
 
 #[test]
 fn page_cache_pop_dirty_to_flush() {
-    let cache = new_page_cache_for_tests!(MB * 5);
-    let key: usize = 125;
+    let cache = new_page_cache_for_tests!(5 * MB);
+    let key: PageId = 125;
 
     let page_handle = cache.acquire(key).unwrap();
     let mut page_guard = page_handle.lock();
@@ -89,9 +90,9 @@ fn page_cache_pop_dirty_to_flush() {
 
 #[test]
 fn page_cache_group_consecutive_pages() {
-    let cache = new_page_cache_for_tests!(MB * 5);
-    let keys = vec![3usize, 8, 7, 0, 2, 9, 5];
-    let consecutive_keys = vec![vec![0usize], vec![2, 3], vec![5], vec![7, 8, 9]];
+    let cache = new_page_cache_for_tests!(5 * MB);
+    let keys = vec![3 as PageId, 8, 7, 0, 2, 9, 5];
+    let consecutive_keys = vec![vec![0 as PageId], vec![2, 3], vec![5], vec![7, 8, 9]];
 
     for key in &keys {
         let page_handle = cache.acquire(*key).unwrap();
@@ -104,7 +105,7 @@ fn page_cache_group_consecutive_pages() {
     let mut dirty_pages = Vec::with_capacity(128);
     let flush_num = cache.pop_dirty_to_flush(&mut dirty_pages, 128);
 
-    let v: Vec<Vec<usize>> = PageCache::group_consecutive_pages(&dirty_pages)
+    let v: Vec<Vec<PageId>> = PageCache::group_consecutive_pages(&dirty_pages)
         .map(|page_handles| {
             page_handles
                 .iter()
@@ -120,10 +121,10 @@ fn page_cache_group_consecutive_pages() {
 #[test]
 fn page_cache_evictor_task() -> Result<()> {
     async_rt::task::block_on(async move {
-        let cache = new_page_cache_for_tests!(BLOCK_SIZE * 100);
+        let cache = new_page_cache_for_tests!(100 * BLOCK_SIZE);
         const CAPACITY: usize = 125;
         for key in 0..CAPACITY {
-            if let Some(page_handle) = cache.acquire(key) {
+            if let Some(page_handle) = cache.acquire(key as _) {
                 cache.release(page_handle);
             } else {
                 break;

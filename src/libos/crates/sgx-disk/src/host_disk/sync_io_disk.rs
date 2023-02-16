@@ -66,7 +66,7 @@ impl SyncIoDisk {
     }
 
     fn get_range_in_bytes(&self, req: &Arc<BioReq>) -> Result<(usize, usize)> {
-        let begin_block = req.addr();
+        let begin_block = req.addr().to_raw() as usize;
         let end_block = begin_block + req.num_blocks();
         if end_block > self.total_blocks {
             return Err(errno!(EINVAL, "invalid block range"));

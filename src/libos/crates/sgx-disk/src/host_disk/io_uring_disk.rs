@@ -290,7 +290,7 @@ impl<P: IoUringProvider> IoUringDisk<P> {
     }
 
     fn get_range_in_bytes(&self, req: &Arc<BioReq>) -> Result<(usize, usize)> {
-        let begin_block = req.addr();
+        let begin_block = req.addr().to_raw() as usize;
         let end_block = begin_block + req.num_blocks();
         if end_block > self.0.total_blocks {
             return Err(errno!(EINVAL, "invalid block range"));

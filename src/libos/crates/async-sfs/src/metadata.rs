@@ -37,7 +37,7 @@ impl SuperBlock {
         let unused_blocks = self.unused_blocks as usize;
         if blocks < MIN_NBLOCKS
             || alloc_map_blocks != (blocks + BLKBITS - 1) / BLKBITS
-            || unused_blocks >= blocks - BLKN_FREEMAP - alloc_map_blocks
+            || unused_blocks >= blocks - BLKN_FREEMAP.to_raw() as usize - alloc_map_blocks
         {
             return_errno!(EINVAL, "invalid blocks information");
         }
@@ -294,7 +294,7 @@ unsafe impl AsBuf for BlockAllocMap {
     }
 }
 
-pub type InodeId = BlockId;
+pub type InodeId = Bid;
 
 /// magic number for fs
 pub const FS_MAGIC: u32 = 0x2f8d_be2b;
@@ -311,16 +311,16 @@ pub const MAX_FNAME_LEN: usize = 255;
 /// max file size in theory (48KB + 4MB + 4GB)
 /// however, the file size is stored in u32
 pub const MAX_FILE_SIZE: usize = 0xffff_ffff;
-/// max number of blocks supported in fs, use u32 to store the BlockId on disk
+/// max number of blocks supported in fs, use u32 to store the Bid on disk
 pub const MAX_NBLOCKS: usize = 0xffff_ffff;
 /// min number of blocks required in fs
 pub const MIN_NBLOCKS: usize = 16;
 /// block the superblock lives in
-pub const BLKN_SUPER: BlockId = 0;
+pub const BLKN_SUPER: Bid = Bid::new(0);
 /// location of the root dir inode
-pub const BLKN_ROOT: BlockId = 1;
+pub const BLKN_ROOT: Bid = Bid::new(1);
 /// 1st block of the freemap
-pub const BLKN_FREEMAP: BlockId = 2;
+pub const BLKN_FREEMAP: Bid = Bid::new(2);
 /// number of bits in a block
 pub const BLKBITS: usize = BLOCK_SIZE * 8;
 /// size of one entry
