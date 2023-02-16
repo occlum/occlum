@@ -1,16 +1,17 @@
 [workspace]
 
 members = [
-    "async-rt",
     "async-io",
-    "async-sfs",
     "async-mountfs",
+    "async-rt",
+    "async-sfs",
+    "async-socket",
     "async-vfs",
     "block-device",
-    "inherit-methods-macro",
     "errno",
-    "async-socket",
+    "inherit-methods-macro",
     "io-uring-callback",
+    "jindisk",
     "keyable-arc",
     "new-self-ref-arc",
     "object-id",
@@ -22,15 +23,16 @@ members = [
 
 # Default members can run on Linux; non-default members can only run inside SGX.
 default-members = [
-    "async-rt",
     "async-io",
-    "async-sfs",
     "async-mountfs",
+    "async-rt",
+    "async-sfs",
+    "async-socket",
     "async-vfs",
     "block-device",
-    "async-socket",
     "inherit-methods-macro",
     "io-uring-callback",
+    "jindisk",
     "keyable-arc",
     "new-self-ref-arc",
     "object-id",
