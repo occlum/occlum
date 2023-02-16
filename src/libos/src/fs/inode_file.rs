@@ -113,6 +113,44 @@ impl File for INodeFile {
         Ok(*offset as i64)
     }
 
+    fn preadv(&self, bufs: &mut [&mut [u8]], offset: usize) -> Result<usize> {
+        if !self.access_mode.readable() {
+            return_errno!(EBADF, "File not readable");
+        }
+        let mut offset = offset;
+        let mut total_len = 0;
+        for buf in bufs {
+            match self.inode.read_at(offset, buf) {
+                Ok(len) => {
+                    total_len += len;
+                    offset += len;
+                }
+                Err(_) if total_len != 0 => break,
+                Err(e) => return Err(e.into()),
+            }
+        }
+        Ok(total_len)
+    }
+
+    fn pwritev(&self, bufs: &[&[u8]], offset: usize) -> Result<usize> {
+        if !self.access_mode.writable() {
+            return_errno!(EBADF, "File not writable");
+        }
+        let mut offset = offset;
+        let mut total_len = 0;
+        for buf in bufs {
+            match self.inode.write_at(offset, buf) {
+                Ok(len) => {
+                    total_len += len;
+                    offset += len;
+                }
+                Err(_) if total_len != 0 => break,
+                Err(e) => return Err(e.into()),
+            }
+        }
+        Ok(total_len)
+    }
+
     fn position(&self) -> Result<off_t> {
         let offset = self.offset.lock().unwrap();
         Ok(*offset as off_t)

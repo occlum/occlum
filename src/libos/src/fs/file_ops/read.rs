@@ -20,3 +20,9 @@ pub fn do_pread(fd: FileDesc, buf: &mut [u8], offset: off_t) -> Result<usize> {
     let file_ref = current!().file(fd)?;
     file_ref.read_at(offset as usize, buf)
 }
+
+pub fn do_preadv(fd: FileDesc, bufs: &mut [&mut [u8]], offset: off_t) -> Result<usize> {
+    debug!("preadv: fd: {}, offset {}", fd, offset);
+    let file_ref = current!().file(fd)?;
+    file_ref.preadv(bufs, offset as usize)
+}
