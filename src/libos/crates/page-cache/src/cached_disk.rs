@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use block_device::{
-    BioReqBuilder, BioType, BlockBuf, BlockDevice, BlockDeviceAsFile, BlockId, BlockRangeIter,
+    Bid, BioReqBuilder, BioType, BlockBuf, BlockDevice, BlockDeviceAsFile, BlockRangeIter,
     BLOCK_SIZE,
 };
 
@@ -28,7 +28,7 @@ pub struct CachedDisk<A: PageAlloc>(Arc<Inner<A>>);
 
 struct Inner<A: PageAlloc> {
     disk: Arc<dyn BlockDevice>,
-    cache: PageCache<BlockId, A>,
+    cache: PageCache<Bid, A>,
     flusher_wq: WaiterQueue,
     // This read-write lock is used to control the concurrent
     // writers and flushers. A writer acquires the read lock,
@@ -41,7 +41,7 @@ struct Inner<A: PageAlloc> {
     is_dropped: AtomicBool,
 }
 
-impl PageKey for BlockId {}
+impl PageKey for Bid {}
 
 impl<A: PageAlloc> CachedDisk<A> {
     /// Create a new `CachedDisk`.
@@ -122,7 +122,7 @@ impl<A: PageAlloc> BlockDeviceAsFile for CachedDisk<A> {
         self.0.sync().await
     }
 
-    async fn flush_blocks(&self, blocks: &[BlockId]) -> Result<usize> {
+    async fn flush_blocks(&self, blocks: &[Bid]) -> Result<usize> {
         self.0.flush_pages(blocks).await
     }
 }
@@ -185,7 +185,7 @@ impl<A: PageAlloc> Inner<A> {
     }
 
     /// Read a single page content from `offset` into the given buffer.
-    async fn read_one_page(&self, bid: BlockId, buf: &mut [u8], offset: usize) -> Result<usize> {
+    async fn read_one_page(&self, bid: Bid, buf: &mut [u8], offset: usize) -> Result<usize> {
         debug_assert!(buf.len() + offset <= BLOCK_SIZE);
 
         let page_handle = self.acquire_page(bid).await?;
@@ -239,7 +239,7 @@ impl<A: PageAlloc> Inner<A> {
     }
 
     /// Write a single page content from `offset` into the given buffer.
-    async fn write_one_page(&self, bid: BlockId, buf: &[u8], offset: usize) -> Result<usize> {
+    async fn write_one_page(&self, bid: Bid, buf: &[u8], offset: usize) -> Result<usize> {
         debug_assert!(buf.len() + offset <= BLOCK_SIZE);
 
         let page_handle = self.acquire_page(bid).await?;
@@ -378,7 +378,7 @@ impl<A: PageAlloc> Inner<A> {
                     bufs.push(unsafe { BlockBuf::from_raw_parts(page_ptr, BLOCK_SIZE) });
                 }
 
-                let first_block_addr: BlockId = page_handles[0].key().into();
+                let first_block_addr: Bid = page_handles[0].key();
                 self.write_consecutive_blocks(first_block_addr, bufs)
                     .await?;
 
@@ -405,7 +405,7 @@ impl<A: PageAlloc> Inner<A> {
     }
 
     /// Write back specified pages to block device, given an array of block IDs.
-    pub async fn flush_pages(&self, pages: &[BlockId]) -> Result<usize> {
+    pub async fn flush_pages(&self, pages: &[Bid]) -> Result<usize> {
         let mut total_pages = 0;
 
         for bid in pages {
@@ -451,7 +451,7 @@ impl<A: PageAlloc> Inner<A> {
 
     /// Acquire one page from page cache.
     /// Poll the readiness events on page cache if failed.
-    async fn acquire_page(&self, block_id: BlockId) -> Result<PageHandle<BlockId, A>> {
+    async fn acquire_page(&self, block_id: Bid) -> Result<PageHandle<Bid, A>> {
         loop {
             if let Some(page_handle) = self.cache.acquire(block_id) {
                 break Ok(page_handle);
@@ -466,21 +466,15 @@ impl<A: PageAlloc> Inner<A> {
         }
     }
 
-    async fn read_block(&self, block_id: BlockId, buf: &mut [u8]) -> Result<usize> {
-        let offset = block_id * BLOCK_SIZE;
-        self.disk.read(offset, buf).await
+    async fn read_block(&self, block_id: Bid, buf: &mut [u8]) -> Result<usize> {
+        self.disk.read(block_id.to_offset(), buf).await
     }
 
-    async fn write_block(&self, block_id: &BlockId, buf: &[u8]) -> Result<usize> {
-        let offset = block_id * BLOCK_SIZE;
-        self.disk.write(offset, buf).await
+    async fn write_block(&self, block_id: &Bid, buf: &[u8]) -> Result<usize> {
+        self.disk.write(block_id.to_offset(), buf).await
     }
 
-    async fn write_consecutive_blocks(
-        &self,
-        addr: BlockId,
-        write_bufs: Vec<BlockBuf>,
-    ) -> Result<()> {
+    async fn write_consecutive_blocks(&self, addr: Bid, write_bufs: Vec<BlockBuf>) -> Result<()> {
         let req = BioReqBuilder::new(BioType::Write)
             .addr(addr)
             .bufs(write_bufs)
@@ -495,16 +489,16 @@ impl<A: PageAlloc> Inner<A> {
         Ok(())
     }
 
-    fn clear_page_events(page_handle: &PageHandle<BlockId, A>) {
+    fn clear_page_events(page_handle: &PageHandle<Bid, A>) {
         page_handle.pollee().reset_events();
     }
 
-    fn notify_page_events(page_handle: &PageHandle<BlockId, A>, events: Events) {
+    fn notify_page_events(page_handle: &PageHandle<Bid, A>, events: Events) {
         page_handle.pollee().add_events(events);
     }
 
     #[allow(unused)]
-    async fn wait_page_events(page_handle: &PageHandle<BlockId, A>, events: Events) {
+    async fn wait_page_events(page_handle: &PageHandle<Bid, A>, events: Events) {
         let poller = Poller::new();
         if page_handle.pollee().poll(events, Some(&poller)).is_empty() {
             poller.wait().await;

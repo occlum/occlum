@@ -10,7 +10,8 @@ macro_rules! gen_unit_tests {
         use std::sync::Arc;
         use $crate::util::test::check_disk_filled_with_val;
         use $crate::{
-            BioReq, BioReqBuilder, BioType, BlockBuf, BlockDevice, BlockDeviceAsFile, BLOCK_SIZE,
+            Bid, BioReq, BioReqBuilder, BioType, BlockBuf, BlockDevice, BlockDeviceAsFile,
+            BLOCK_SIZE,
         };
 
         // Check a new disk is initialized with zeros.
@@ -44,7 +45,7 @@ macro_rules! gen_unit_tests {
                 let buf = BlockBuf::from_boxed(boxed_slice);
                 let bufs = vec![buf];
                 let req = BioReqBuilder::new(BioType::Write)
-                    .addr(0)
+                    .addr(Bid::new(0))
                     .bufs(bufs)
                     .on_drop(|_req: &BioReq, mut bufs: Vec<BlockBuf>| {
                         // Free the boxed slice that we allocated before
@@ -103,7 +104,7 @@ pub async fn check_disk_filled_with_val(disk: &dyn BlockDevice, val: u8) -> Resu
     let buf = BlockBuf::from_boxed(boxed_slice);
     let bufs = vec![buf];
     let req = BioReqBuilder::new(BioType::Read)
-        .addr(0)
+        .addr(Bid::new(0))
         .bufs(bufs)
         .on_drop(|_req: &BioReq, mut bufs: Vec<BlockBuf>| {
             // Free the boxed slice that we allocated before

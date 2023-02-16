@@ -1,6 +1,6 @@
 //! CachedDisk tests
 use async_rt::wait::Waiter;
-use block_device::{mem_disk::MemDisk, BlockDeviceAsFile, BLOCK_SIZE};
+use block_device::{mem_disk::MemDisk, Bid, BlockDeviceAsFile, BLOCK_SIZE};
 use errno::prelude::*;
 use page_cache::*;
 
@@ -97,7 +97,7 @@ fn cached_disk_flush_pages() -> Result<()> {
             assert_eq!(SIZE, len, "[CachedDisk] write failed");
         }
 
-        let pages = vec![0, 1, 2];
+        let pages = vec![Bid::new(0), Bid::new(1), Bid::new(2)];
         let flush_num = cached_disk.flush_blocks(&pages).await?;
         assert_eq!(flush_num, pages.len(), "[CachedDisk] flush pages failed");
 

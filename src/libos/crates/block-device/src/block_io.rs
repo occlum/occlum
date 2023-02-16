@@ -24,7 +24,7 @@ pub enum BioType {
 /// A builder for `BioReq`.
 pub struct BioReqBuilder {
     type_: BioType,
-    addr: Option<BlockId>,
+    addr: Option<Bid>,
     bufs: Option<Vec<BlockBuf>>,
     ext: Option<AnyMap>,
     on_complete: Option<BioReqOnCompleteFn>,
@@ -45,7 +45,7 @@ impl BioReqBuilder {
     }
 
     /// Specify the block address of the request.
-    pub fn addr(mut self, addr: BlockId) -> Self {
+    pub fn addr(mut self, addr: Bid) -> Self {
         self.addr = Some(addr);
         self
     }
@@ -91,11 +91,7 @@ impl BioReqBuilder {
             );
         }
 
-        let addr = self.addr.unwrap_or(0);
-        debug_assert!(
-            BLOCK_SIZE.saturating_mul(addr) <= isize::MAX as usize,
-            "addr is too big"
-        );
+        let addr = self.addr.unwrap_or(Bid::new(0));
 
         let bufs = self.bufs.take().unwrap_or_else(|| Vec::new());
         let num_bytes = bufs
@@ -131,7 +127,7 @@ impl BioReqBuilder {
 pub struct BioReq {
     id: ObjectId,
     type_: BioType,
-    addr: BlockId,
+    addr: Bid,
     num_blocks: u32,
     bufs: Mutex<Vec<BlockBuf>>,
     inner: Mutex<Inner>,
@@ -185,7 +181,7 @@ impl BioReq {
     /// Returns the starting address of requested blocks.
     ///
     /// The return value is meaningless if the request is not a read or write.
-    pub fn addr(&self) -> BlockId {
+    pub fn addr(&self) -> Bid {
         self.addr
     }
 

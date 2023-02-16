@@ -5,9 +5,6 @@ use std::fmt::{Debug, Formatter};
 use std::ptr::NonNull;
 use std::sync::Arc;
 
-/// A trait to define domain of key for page cache.
-pub trait PageKey: Into<usize> + Copy + Send + Sync + Debug + 'static {}
-
 /// Page handle.
 #[derive(Clone)]
 pub struct PageHandle<K: PageKey, A: PageAlloc>(pub(crate) Arc<Inner<K, A>>);
