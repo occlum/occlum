@@ -28,6 +28,7 @@ cd ${BUILD_DIR}
 unset LD_LIBRARY_PATH
 CFLAGS="-O2 -g ${EXTRA_CFLAGS}" ${SRC_DIR}/configure \
   --prefix=${INSTALL_DIR} --with-tls --without-selinux \
-  --enable-stack-protector=strong --disable-nscd ${EXTRA_CONFIG_OPTION}
+  --enable-stack-protector=strong --disable-nscd --disable-crypt \
+  ${EXTRA_CONFIG_OPTION}
 make
 make install
