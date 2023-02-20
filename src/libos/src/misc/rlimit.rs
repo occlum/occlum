@@ -151,10 +151,6 @@ pub fn do_prlimit(
         *old_limit = *rlimits.get(resource)
     }
     if let Some(new_limit) = new_limit {
-        // Privilege is not granted for setting hard limit
-        if new_limit.get_max() != u64::max_value() {
-            return_errno!(EPERM, "setting hard limit is not permitted")
-        }
         if new_limit.get_cur() > new_limit.get_max() {
             return_errno!(EINVAL, "soft limit is greater than hard limit");
         }
@@ -172,7 +168,7 @@ pub fn do_prlimit(
             resource_t::RLIMIT_AS => {
                 soft_rlimit_address_space_size = new_limit.get_cur();
             }
-            _ => warn!("resource type not supported"),
+            _ => (),
         }
 
         let soft_data_and_stack_size = soft_rlimit_data_size
