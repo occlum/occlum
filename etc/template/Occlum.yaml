@@ -110,6 +110,9 @@ mount:
           # to 1 to enforcing the key is derived by MRSIGNER|MRENCLAVE|ISVFAMILYID.
           # So the data can only be accessed by the enclave itself.
           #  autokey_policy: 1
+          # The SEFS internal cache size, increasing it will bring better file I/O 
+          # performance but also consume Occlum's kernel heap size.
+          #  sefs_cache_size: 192KB
   #
   # HostFS mount
   # It provides a channel to exchange files between Host FS and LibOS FS.
@@ -129,7 +132,7 @@ mount:
   #   source: ./run/async_sfs_image
   #   options:
   #     # Total size that Async-SFS can manage. Must be specified.
-  #     total_size: 4GB
+  #     async_sfs_total_size: 4GB
   #     # Page cache size that Async-SFS can use. Must be specified.
   #     # When the `page_cache_size` is given, the `kernel_space_heap_size` must be increased equally.
   #     page_cache_size: 256MB

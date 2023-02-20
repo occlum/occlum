@@ -307,10 +307,10 @@ async fn open_or_create_async_sfs_according_to(
         };
         AsyncSimpleFS::open(Arc::new(cache_disk)).await?
     } else {
-        if mc.options.total_size.is_none() {
+        if mc.options.async_sfs_total_size.is_none() {
             return_errno!(EINVAL, "Total size is expected for Async-SFS");
         }
-        let total_size = mc.options.total_size.unwrap();
+        let total_size = mc.options.async_sfs_total_size.unwrap();
         let cache_disk = {
             let total_blocks = total_size / BLOCK_SIZE;
             let sync_disk = SyncIoDisk::create_new(&source_path, total_blocks)?;
@@ -337,10 +337,17 @@ fn open_or_create_sefs_according_to(
         return_errno!(EINVAL, "Integrity protected SEFS cannot be temporary");
     }
     let source_path = mc.source.as_ref().unwrap();
+    let cache_size = mc.options.sefs_cache_size;
     let sefs = if !temporary {
         if root_mac.is_some() {
             SEFS::open(
-                Box::new(SgxStorage::new(source_path, user_key, &root_mac, &None)),
+                Box::new(SgxStorage::new(
+                    source_path,
+                    user_key,
+                    &root_mac,
+                    &None,
+                    cache_size,
+                )?),
                 &time::OcclumTimeProvider,
                 &SgxUuidProvider,
             )?
@@ -351,7 +358,8 @@ fn open_or_create_sefs_according_to(
                     user_key,
                     &None,
                     &autokey_policy,
-                )),
+                    cache_size,
+                )?),
                 &time::OcclumTimeProvider,
                 &SgxUuidProvider,
             )?
@@ -362,7 +370,8 @@ fn open_or_create_sefs_according_to(
                     user_key,
                     &None,
                     &autokey_policy,
-                )),
+                    cache_size,
+                )?),
                 &time::OcclumTimeProvider,
                 &SgxUuidProvider,
             )?
@@ -374,7 +383,8 @@ fn open_or_create_sefs_according_to(
                 user_key,
                 &None,
                 &autokey_policy,
-            )),
+                cache_size,
+            )?),
             &time::OcclumTimeProvider,
             &SgxUuidProvider,
         )?

@@ -159,7 +159,8 @@ fn main() {
         debug!("Occlum image is encrypted: {}", image_encrypted);
 
         // get the TCS number
-        let tcs_num = occlum_config.resource_limits.num_of_cpus + DEFAULT_CONFIG.num_of_tcs_used_by_occlum_kernel;
+        let tcs_num = occlum_config.resource_limits.num_of_cpus
+            + DEFAULT_CONFIG.num_of_tcs_used_by_occlum_kernel;
         let tcs_min_pool = tcs_num;
         let tcs_max_num = std::cmp::max(DEFAULT_CONFIG.num_of_cpus_max, tcs_num);
 
@@ -557,11 +558,13 @@ struct OcclumMountOptions {
     #[serde(default, skip_serializing_if = "is_false")]
     pub temporary: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub total_size: Option<String>,
+    pub async_sfs_total_size: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_cache_size: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     autokey_policy: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sefs_cache_size: Option<String>,
 }
 
 #[inline]

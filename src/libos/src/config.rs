@@ -194,10 +194,11 @@ pub struct ConfigMountOptions {
     pub mac: Option<sgx_aes_gcm_128bit_tag_t>,
     pub layers: Option<Vec<ConfigMount>>,
     pub temporary: bool,
-    pub total_size: Option<usize>,
+    pub async_sfs_total_size: Option<usize>,
     pub page_cache_size: Option<usize>,
     pub index: u32,
     pub autokey_policy: Option<u32>,
+    pub sefs_cache_size: Option<u64>,
 }
 
 impl Config {
@@ -349,16 +350,6 @@ impl ConfigMountOptions {
         } else {
             None
         };
-        let total_size = if input.total_size.is_some() {
-            Some(parse_memory_size(input.total_size.as_ref().unwrap())?)
-        } else {
-            None
-        };
-        let page_cache_size = if input.page_cache_size.is_some() {
-            Some(parse_memory_size(input.page_cache_size.as_ref().unwrap())?)
-        } else {
-            None
-        };
         let layers = if let Some(layers) = &input.layers {
             let layers = layers
                 .iter()
@@ -368,14 +359,32 @@ impl ConfigMountOptions {
         } else {
             None
         };
+        let async_sfs_total_size = if input.async_sfs_total_size.is_some() {
+            Some(parse_memory_size(
+                input.async_sfs_total_size.as_ref().unwrap(),
+            )?)
+        } else {
+            None
+        };
+        let page_cache_size = if input.page_cache_size.is_some() {
+            Some(parse_memory_size(input.page_cache_size.as_ref().unwrap())?)
+        } else {
+            None
+        };
+        let sefs_cache_size = if input.sefs_cache_size.is_some() {
+            Some(parse_memory_size(input.sefs_cache_size.as_ref().unwrap())? as _)
+        } else {
+            None
+        };
         Ok(ConfigMountOptions {
             mac,
             layers,
             temporary: input.temporary,
-            total_size,
+            async_sfs_total_size,
             page_cache_size,
             index: input.index,
             autokey_policy: input.autokey_policy,
+            sefs_cache_size,
         })
     }
 }
@@ -518,13 +527,15 @@ struct InputConfigMountOptions {
     #[serde(default)]
     pub temporary: bool,
     #[serde(default)]
-    pub total_size: Option<String>,
+    pub async_sfs_total_size: Option<String>,
     #[serde(default)]
     pub page_cache_size: Option<String>,
     #[serde(default)]
     pub index: u32,
     #[serde(default)]
     pub autokey_policy: Option<u32>,
+    #[serde(default)]
+    pub sefs_cache_size: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]

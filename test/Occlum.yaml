@@ -126,5 +126,5 @@ mount:
     type: async_sfs
     source: ./run/async_sfs_image
     options:
-      total_size: 4GB
+      async_sfs_total_size: 4GB
       page_cache_size: 256MB
