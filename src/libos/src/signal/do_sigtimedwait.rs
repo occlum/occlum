@@ -26,8 +26,9 @@ pub async fn do_sigtimedwait(interest: SigSet, timeout: Option<&Duration>) -> Re
     // If the timespec structure pointed to by timeout is zero-valued
     // and if none of the signals specified by set are pending,
     // then sigtimedwait() shall return immediately with an error.
-    // If timeout is the null pointer, the behavior is unspecified.
-    if timeout.is_none() || timeout.unwrap().is_zero() {
+    // If timeout is the null pointer, the behavior is unspecified in Man but
+    // it is block wait in glibc.
+    if timeout.is_some() && timeout.unwrap().is_zero() {
         if let Some(signal) = dequeue_signal(&thread, !interest) {
             let siginfo = signal.to_info();
             return Ok(siginfo);
