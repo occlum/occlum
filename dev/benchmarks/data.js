@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1676760019462,
+  "lastUpdate": 1677103840711,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -982,6 +982,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 74.46,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "ClawSeven",
+            "username": "ClawSeven",
+            "email": "zehuan97@gmail.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "e1cc5df1c8be3a3693ddd716c875c3676c79a4d2",
+          "message": "[Demo] Fix flask dependencies conflict",
+          "timestamp": "2023-02-17T09:01:42Z",
+          "url": "https://github.com/occlum/occlum/commit/e1cc5df1c8be3a3693ddd716c875c3676c79a4d2"
+        },
+        "date": 1677103839071,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.08,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 48.42,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 884.44,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 248.83,
             "unit": "ms",
             "extra": "per95"
           }
