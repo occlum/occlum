@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1677104289356,
+  "lastUpdate": 1677105327025,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -1724,6 +1724,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Sequential Read Throughput",
             "value": 320,
+            "unit": "MiB/s",
+            "extra": "seqread"
+          },
+          {
+            "name": "Random Read Throughput",
+            "value": 211,
+            "unit": "MiB/s",
+            "extra": "randread"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "ClawSeven",
+            "username": "ClawSeven",
+            "email": "zehuan97@gmail.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "e1cc5df1c8be3a3693ddd716c875c3676c79a4d2",
+          "message": "[Demo] Fix flask dependencies conflict",
+          "timestamp": "2023-02-17T09:01:42Z",
+          "url": "https://github.com/occlum/occlum/commit/e1cc5df1c8be3a3693ddd716c875c3676c79a4d2"
+        },
+        "date": 1677105325436,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sequential Write Throughput",
+            "value": 54.2,
+            "unit": "MiB/s",
+            "extra": "seqwrite"
+          },
+          {
+            "name": "Random Write Throughput",
+            "value": 44.3,
+            "unit": "MiB/s",
+            "extra": "randwrite"
+          },
+          {
+            "name": "Sequential Read Throughput",
+            "value": 282,
             "unit": "MiB/s",
             "extra": "seqread"
           },
