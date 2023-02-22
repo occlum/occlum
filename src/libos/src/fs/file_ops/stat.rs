@@ -23,7 +23,7 @@ pub async fn do_fstatat(fs_path: &FsPath, flags: StatFlags) -> Result<StatBuf> {
     let current = current!();
     let fs = current.fs();
 
-    let stat = if let Some(disk_file) = try_open_disk(&fs, fs_path)? {
+    let stat = if let Some(disk_file) = try_open_disk(&fs, fs_path).await? {
         StatBuf::from(disk_file.metadata())
     } else {
         let inode = if flags.contains(StatFlags::AT_SYMLINK_NOFOLLOW) {
