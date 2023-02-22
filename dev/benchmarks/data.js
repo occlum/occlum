@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1677103840711,
+  "lastUpdate": 1677104289356,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -2392,6 +2392,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 3392,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "ClawSeven",
+            "username": "ClawSeven",
+            "email": "zehuan97@gmail.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "e1cc5df1c8be3a3693ddd716c875c3676c79a4d2",
+          "message": "[Demo] Fix flask dependencies conflict",
+          "timestamp": "2023-02-17T09:01:42Z",
+          "url": "https://github.com/occlum/occlum/commit/e1cc5df1c8be3a3693ddd716c875c3676c79a4d2"
+        },
+        "date": 1677104288258,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 3391,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 3390,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
