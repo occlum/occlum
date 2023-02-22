@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
+
 function get_mr() {
     cd ${script_dir}/occlum_$1 && occlum print $2
 }
@@ -55,6 +57,7 @@ function build_instance() {
 
 if [[ $1 == "musl" ]]; then
     echo "*** Build musl-libc Occlum instance ***"
+    cp /opt/occlum/toolchains/dcap_lib/musl/libocclum_dcap.so.0.1.0 /usr/local/occlum/x86_64-linux-musl/lib/
 else
     echo "*** Build glibc Occlum instance ***"
     # glibc version requires libnss
