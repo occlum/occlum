@@ -10,12 +10,12 @@ use crate::prelude::*;
 
 /// A file wrapper for a block device.
 pub struct DiskFile {
-    disk: Arc<dyn BlockDevice>,
+    disk: Arc<dyn BlockDeviceAsFile>,
     offset: AsyncMutex<usize>,
 }
 
 impl DiskFile {
-    pub fn new(disk: Arc<dyn BlockDevice>) -> Self {
+    pub fn new(disk: Arc<dyn BlockDeviceAsFile>) -> Self {
         Self {
             disk,
             offset: AsyncMutex::new(0),
