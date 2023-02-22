@@ -29,6 +29,7 @@ function build_lib() {
 
     # Create SO links
     pushd ${TARGET_PATH}
+    strip libocclum_dcap.so
     mv libocclum_dcap.so $SONAME
     ln -s $SONAME libocclum_dcap.so
     popd
