@@ -1,0 +1,32 @@
+includes:
+  - base.yaml
+# postgres
+targets:
+  # copy bins
+  - target: /bin
+    createlinks:
+      - src: /bin/bash
+        linkname: sh
+    copy:
+      - files:
+        - /opt/occlum/toolchains/bash/glibc/bash
+  - target: /usr/local/pgsql/bin
+    copy:
+      - files:
+        - /usr/local/pgsql/bin/postgres
+  - target: /usr/local/
+    copy:
+      - dirs:
+        # PG files
+        - /usr/local/pgsql
+  - target: /opt/occlum/glibc/lib
+    copy:
+      - files:
+          - /opt/occlum/glibc/lib/libnss_dns.so.2
+          - /opt/occlum/glibc/lib/libnss_files.so.2
+          - /opt/occlum/glibc/lib/libnss_db.so.2
+          - /usr/local/pgsql/lib/postgis-3.so
+          - /usr/local/lib/libproj.so.9
+          - /usr/local/pgsql/lib/postgis_raster-3.so
+          - /usr/local/pgsql/lib/citus.so
+          - /usr/local/pgsql/lib/citus_columnar.so

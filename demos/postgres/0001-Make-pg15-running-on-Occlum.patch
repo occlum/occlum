@@ -1,0 +1,127 @@
+From 730c88b6f75d5847a71328aa477035b702af498b Mon Sep 17 00:00:00 2001
+From: "Zheng, Qi" <huaiqing.zq@antgroup.com>
+Date: Wed, 22 Feb 2023 10:14:46 +0800
+Subject: [PATCH] Make pg15 running on Occlum
+
+Signed-off-by: Zheng, Qi <huaiqing.zq@antgroup.com>
+---
+ src/backend/main/main.c             | 2 +-
+ src/backend/postmaster/postmaster.c | 2 +-
+ src/bin/initdb/initdb.c             | 3 ++-
+ src/bin/pg_ctl/pg_ctl.c             | 5 +++--
+ src/bin/pg_resetwal/pg_resetwal.c   | 3 ++-
+ src/bin/pg_rewind/pg_rewind.c       | 3 ++-
+ src/include/pg_config_manual.h      | 6 ++++++
+ 7 files changed, 17 insertions(+), 7 deletions(-)
+
+diff --git a/src/backend/main/main.c b/src/backend/main/main.c
+index f8f7ebb..49c15ef 100644
+--- a/src/backend/main/main.c
++++ b/src/backend/main/main.c
+@@ -62,7 +62,7 @@ static void check_root(const char *progname);
+ int
+ main(int argc, char *argv[])
+ {
+-	bool		do_check_root = true;
++	bool		do_check_root = false;
+ 
+ 	/*
+ 	 * If supported on the current platform, set up a handler to be called if
+diff --git a/src/backend/postmaster/postmaster.c b/src/backend/postmaster/postmaster.c
+index 0a33479..ca85f5c 100644
+--- a/src/backend/postmaster/postmaster.c
++++ b/src/backend/postmaster/postmaster.c
+@@ -4635,7 +4635,7 @@ internal_forkexec(int argc, char *argv[], Port *port)
+ 	argv[2] = tmpfilename;
+ 
+ 	/* Fire off execv in child */
+-	if ((pid = fork_process()) == 0)
++	if ((pid = vfork()) == 0)
+ 	{
+ 		if (execv(postgres_exec_path, argv) < 0)
+ 		{
+diff --git a/src/bin/initdb/initdb.c b/src/bin/initdb/initdb.c
+index 429844f..65c59ef 100644
+--- a/src/bin/initdb/initdb.c
++++ b/src/bin/initdb/initdb.c
+@@ -592,7 +592,8 @@ get_id(void)
+ {
+ 	const char *username;
+ 
+-#ifndef WIN32
++	/* Occlum supports only root (pid 0) user */
++#if 0
+ 	if (geteuid() == 0)			/* 0 is root's uid */
+ 	{
+ 		pg_log_error("cannot be run as root");
+diff --git a/src/bin/pg_ctl/pg_ctl.c b/src/bin/pg_ctl/pg_ctl.c
+index dd78e5b..8c3553f 100644
+--- a/src/bin/pg_ctl/pg_ctl.c
++++ b/src/bin/pg_ctl/pg_ctl.c
+@@ -457,7 +457,7 @@ start_postmaster(void)
+ 	pg_disable_aslr();
+ #endif
+ 
+-	pm_pid = fork();
++	pm_pid = vfork();
+ 	if (pm_pid < 0)
+ 	{
+ 		/* fork failed */
+@@ -2339,7 +2339,8 @@ main(int argc, char **argv)
+ 	/*
+ 	 * Disallow running as root, to forestall any possible security holes.
+ 	 */
+-#ifndef WIN32
++	/* Occlum supports only root (pid 0) user */
++#if 0
+ 	if (geteuid() == 0)
+ 	{
+ 		write_stderr(_("%s: cannot be run as root\n"
+diff --git a/src/bin/pg_resetwal/pg_resetwal.c b/src/bin/pg_resetwal/pg_resetwal.c
+index d4772a2..a70c53c 100644
+--- a/src/bin/pg_resetwal/pg_resetwal.c
++++ b/src/bin/pg_resetwal/pg_resetwal.c
+@@ -330,7 +330,8 @@ main(int argc, char *argv[])
+ 	 * -- any other user won't have sufficient permissions to modify files in
+ 	 * the data directory.
+ 	 */
+-#ifndef WIN32
++	/* Occlum supports only root (pid 0) user */
++#if 0
+ 	if (geteuid() == 0)
+ 	{
+ 		pg_log_error("cannot be executed by \"root\"");
+diff --git a/src/bin/pg_rewind/pg_rewind.c b/src/bin/pg_rewind/pg_rewind.c
+index 1ff8da1..3e8b3df 100644
+--- a/src/bin/pg_rewind/pg_rewind.c
++++ b/src/bin/pg_rewind/pg_rewind.c
+@@ -259,7 +259,8 @@ main(int argc, char **argv)
+ 	 * -- any other user won't have sufficient permissions to modify files in
+ 	 * the data directory.
+ 	 */
+-#ifndef WIN32
++	/* Occlum supports only root (pid 0) user */
++#if 0
+ 	if (geteuid() == 0)
+ 	{
+ 		pg_log_error("cannot be executed by \"root\"");
+diff --git a/src/include/pg_config_manual.h b/src/include/pg_config_manual.h
+index 8d2e3e3..3961831 100644
+--- a/src/include/pg_config_manual.h
++++ b/src/include/pg_config_manual.h
+@@ -13,6 +13,12 @@
+  *------------------------------------------------------------------------
+  */
+ 
++#define EXEC_BACKEND
++#undef HAVE_SHM_OPEN
++#undef HAVE_SYS_SIGNALFD_H
++#undef HAVE_SYS_PRCTL_H
++#undef HAVE_SETSID
++
+ /*
+  * This is the default value for wal_segment_size to be used when initdb is run
+  * without the --wal-segsize option.  It must be a valid segment size.
+-- 
+2.25.1
+
