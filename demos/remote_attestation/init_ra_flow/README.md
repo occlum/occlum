@@ -6,7 +6,7 @@ Remote attestation is a key part in the confidential computing. Occlum provides 
 
 Occlum provides a `Init RA` way to seperate the RA operation and the actual application. With this way, the APP developers don't need know too much about the RA and the application doesn't need to be modified for RA.
 
-This demo shows the `Init RA` way with a sample [`Flask TLS web application`](../../python/flask/), based on [`GRPC-RATLS`](../../ra_tls/) server/client implementation and a modified [`init`](./init_ra/) for Occlum InitFS.
+This demo shows the `Init RA` way with a sample [`Flask TLS web application`](../../python/flask/), based on [`GRPC-RATLS`](../../../tools/toolchains/grpc_ratls/ra_tls/) server/client implementation and a modified [`init`](./init_ra/) for Occlum InitFS.
 
 ![Arch Overview](./arch.png)
 

@@ -4,13 +4,15 @@ targets:
   - target: /bin/
     copy:
       - files:
-        - ${RATLS_DIR}/grpc-src/examples/cpp/ratls/build/server
+        - /opt/occlum/toolchains/grpc_ratls/musl/server
+  - target: /lib/
+    copy:
+      - files:
+        - /opt/occlum/toolchains/grpc_ratls/musl/libgrpc_ratls_server.so
+        - /opt/occlum/toolchains/grpc_ratls/musl/libhw_grpc_proto.so
+        - /opt/occlum/toolchains/dcap_lib/musl/libocclum_dcap.so.0.1.0
   - target: /
     copy:
       - files:
         - dynamic_config.json
         - ../secret_config.json
-  - target: /usr/share/grpc/
-    copy:
-      - files:
-        - ${RATLS_DIR}/grpc-src/etc/roots.pem
