@@ -8,12 +8,14 @@ targets:
   - target: /lib/
     copy:
       - files:
-        - ${DEP_LIBS_DIR}/libgrpc_ratls_client.so
+        - /opt/occlum/toolchains/grpc_ratls/musl/libgrpc_ratls_client.so
+        - /opt/occlum/toolchains/grpc_ratls/musl/libhw_grpc_proto.so
+        - /opt/occlum/toolchains/dcap_lib/musl/libocclum_dcap.so.0.1.0
   - target: /
     copy:
       - files:
         - dynamic_config.json
-  - target: /usr/share/grpc/
+  - target: /etc
     copy:
-      - files:
-        - ${RATLS_DIR}/grpc-src/etc/roots.pem
+      - dirs:
+        - /etc/ssl
