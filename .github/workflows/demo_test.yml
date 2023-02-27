@@ -646,7 +646,7 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "curl -s http://localhost:8080/actuator/readiness | grep -v DOWN"
 
-    Netty_UT_test:
+  Netty_UT_test:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
@@ -657,6 +657,9 @@ jobs:
       with:
         container-name: ${{ github.job }}
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Install OpenJDK 11 (Glibc)
+      run: docker exec ${{ github.job }} bash -c "apt update && apt install -y openjdk-11-jdk"
 
     - name: Download and compile netty unit test demos
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut && ./build.sh"
