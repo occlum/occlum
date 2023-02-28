@@ -183,6 +183,7 @@ COPY --from=alpine /usr/lib/jvm/java-1.8-openjdk $JDK8_PATH
 RUN rm $JDK8_PATH/jre/lib/security/cacerts
 COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK8_PATH/jre/lib/security/cacerts
 
+# Install Occlum
 WORKDIR /root
 RUN cd occlum && \
     source /opt/intel/sgxsdk/environment && \
@@ -191,6 +192,11 @@ RUN cd occlum && \
     make install && \
     cp -r demos /root/demos && \
     rm -rf /root/occlum
+
+# Install GRPC RATLS
+# Do after installing Occlum is because it depends on the dcap library.
+WORKDIR /tmp
+RUN cd grpc_ratls && ./build.sh && rm -rf /tmp/grpc_ratls
 
 # Start AESM service automatically
 #
