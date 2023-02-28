@@ -54,7 +54,7 @@ class GrSecretClient {
                 return reply.secret();
             } else {
                 std::cout << status.error_code() << ": " << status.error_message() << std::endl;
-                return "RPC failed";
+                return "";
             }
         }
 
@@ -128,21 +128,27 @@ int grpc_ratls_get_secret(
     GrSecretClient gr_secret(channel);
 
     std::string secret = gr_secret.GetSecret(name);
-    //std::cout << "secret received: " << secret << std::endl;
+    // std::cout << "secret received: " << secret << "len: " << secret.length() << std::endl;
 
-    //Decode From Base64
-    size_t len = base64_decode_len(secret.c_str());
-    if (len) {
-        char *secret_orig = (char *)malloc(len);
-        base64_decode(secret.c_str(), (unsigned char *)secret_orig, len);
-        std::string secret_string(secret_orig, secret_orig + len - 1);
+    if (secret.empty()) {
+        return -1;
+    } else {
+        //Decode From Base64
+        size_t len = base64_decode_len(secret.c_str());
+        if (len) {
+            char *secret_orig = (char *)malloc(len);
+            base64_decode(secret.c_str(), (unsigned char *)secret_orig, len);
+            std::string secret_string(secret_orig, secret_orig + len - 1);
 
-        //write to file
-        std::ofstream myfile;
-        myfile.open(secret_file);
-        myfile << secret_string;
-        myfile.close();
+            //write to file
+            std::ofstream myfile;
+            myfile.open(secret_file);
+            myfile << secret_string;
+            myfile.close();
+
+            return 0;
+        }
+
+        return -2;
     }
-
-    return 0;
 }
