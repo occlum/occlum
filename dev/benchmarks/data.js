@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1677364837801,
+  "lastUpdate": 1677708830073,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -2598,6 +2598,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 3351,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Zheng, Qi",
+            "username": "qzheng527",
+            "email": "huaiqing.zq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "80e2858ceeb05129880ca2b345d5a251839479fc",
+          "message": "[libos] Support setting hard limit",
+          "timestamp": "2023-02-20T08:23:43Z",
+          "url": "https://github.com/occlum/occlum/commit/80e2858ceeb05129880ca2b345d5a251839479fc"
+        },
+        "date": 1677708828314,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 624,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 623,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
