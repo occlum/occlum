@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1677709333770,
+  "lastUpdate": 1677710700494,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -1914,6 +1914,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Random Read Throughput",
             "value": 212,
+            "unit": "MiB/s",
+            "extra": "randread"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Zheng, Qi",
+            "username": "qzheng527",
+            "email": "huaiqing.zq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "80e2858ceeb05129880ca2b345d5a251839479fc",
+          "message": "[libos] Support setting hard limit",
+          "timestamp": "2023-02-20T08:23:43Z",
+          "url": "https://github.com/occlum/occlum/commit/80e2858ceeb05129880ca2b345d5a251839479fc"
+        },
+        "date": 1677710698889,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sequential Write Throughput",
+            "value": 47.6,
+            "unit": "MiB/s",
+            "extra": "seqwrite"
+          },
+          {
+            "name": "Random Write Throughput",
+            "value": 32.4,
+            "unit": "MiB/s",
+            "extra": "randwrite"
+          },
+          {
+            "name": "Sequential Read Throughput",
+            "value": 207,
+            "unit": "MiB/s",
+            "extra": "seqread"
+          },
+          {
+            "name": "Random Read Throughput",
+            "value": 209,
             "unit": "MiB/s",
             "extra": "randread"
           }
