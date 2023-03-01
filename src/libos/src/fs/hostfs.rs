@@ -1,3 +1,4 @@
+use crate::fs::fs_ops::fetch_host_statfs;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use core::any::Any;
@@ -39,8 +40,8 @@ impl FileSystem for HostFS {
     }
 
     fn info(&self) -> FsInfo {
-        warn!("HostFS: FsInfo is unimplemented");
-        Default::default()
+        let statfs = fetch_host_statfs(&self.path.to_string_lossy()).unwrap();
+        statfs.into()
     }
 }
 
