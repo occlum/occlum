@@ -86,7 +86,10 @@ impl TryFrom<FsInfo> for Statfs {
         let statfs = if info.magic == rcore_fs_unionfs::UNIONFS_MAGIC
             || info.magic == rcore_fs_sefs::SEFS_MAGIC as usize
         {
-            let mut host_statfs = host_statfs()?;
+            let mut host_statfs = {
+                let host_rootfs_dir = unsafe { format!("{}{}", INSTANCE_DIR, "/run/mount/__ROOT") };
+                fetch_host_statfs(&host_rootfs_dir)?
+            };
             host_statfs.f_type = info.magic;
             host_statfs
         } else {
@@ -117,14 +120,30 @@ impl TryFrom<FsInfo> for Statfs {
     }
 }
 
-fn host_statfs() -> Result<Statfs> {
+impl From<Statfs> for FsInfo {
+    fn from(statfs: Statfs) -> Self {
+        Self {
+            magic: statfs.f_type,
+            bsize: statfs.f_bsize,
+            frsize: statfs.f_frsize,
+            blocks: statfs.f_blocks,
+            bfree: statfs.f_bfree,
+            bavail: statfs.f_bavail,
+            files: statfs.f_files,
+            ffree: statfs.f_ffree,
+            namemax: statfs.f_namelen,
+        }
+    }
+}
+
+pub fn fetch_host_statfs(path: &str) -> Result<Statfs> {
     extern "C" {
         fn occlum_ocall_statfs(ret: *mut i32, path: *const i8, buf: *mut Statfs) -> sgx_status_t;
     }
 
     let mut ret: i32 = 0;
     let mut statfs: Statfs = Default::default();
-    let host_dir = unsafe { CString::new(INSTANCE_DIR.as_bytes()).unwrap() };
+    let host_dir = CString::new(path.as_bytes()).unwrap();
     let sgx_status = unsafe { occlum_ocall_statfs(&mut ret, host_dir.as_ptr(), &mut statfs) };
     assert!(sgx_status == sgx_status_t::SGX_SUCCESS);
     assert!(ret == 0 || libc::errno() == Errno::EINTR as i32);
