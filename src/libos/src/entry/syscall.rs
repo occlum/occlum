@@ -15,11 +15,11 @@ use crate::fs::{
     do_fchown, do_fchownat, do_fcntl, do_fdatasync, do_flock, do_fstat, do_fstatat, do_fstatfs,
     do_fsync, do_ftruncate, do_futimesat, do_getcwd, do_getdents, do_getdents64, do_ioctl,
     do_lchown, do_link, do_linkat, do_lseek, do_lstat, do_mkdir, do_mkdirat, do_mount,
-    do_mount_rootfs, do_open, do_openat, do_pipe, do_pipe2, do_pread, do_pwrite, do_read,
-    do_readlink, do_readlinkat, do_readv, do_rename, do_renameat, do_rmdir, do_sendfile, do_stat,
-    do_statfs, do_symlink, do_symlinkat, do_sync, do_truncate, do_umask, do_umount, do_unlink,
-    do_unlinkat, do_utime, do_utimensat, do_utimes, do_write, do_writev, iovec_t, utimbuf_t,
-    FileDesc, FileRef, StatBuf, Statfs,
+    do_mount_rootfs, do_open, do_openat, do_pipe, do_pipe2, do_pread, do_preadv, do_pwrite,
+    do_pwritev, do_read, do_readlink, do_readlinkat, do_readv, do_rename, do_renameat, do_rmdir,
+    do_sendfile, do_stat, do_statfs, do_symlink, do_symlinkat, do_sync, do_truncate, do_umask,
+    do_umount, do_unlink, do_unlinkat, do_utime, do_utimensat, do_utimes, do_write, do_writev,
+    iovec_t, utimbuf_t, FileDesc, FileRef, StatBuf, Statfs,
 };
 use crate::ipc::{do_shmat, do_shmctl, do_shmdt, do_shmget, key_t, shmids_t};
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t, RandFlags};
@@ -434,8 +434,8 @@ macro_rules! process_syscall_table_with_callback {
             (Dup3 = 292) => do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32),
             (Pipe2 = 293) => do_pipe2(fds_u: *mut i32, flags: u32),
             (InotifyInit1 = 294) => handle_unsupported(),
-            (Preadv = 295) => handle_unsupported(),
-            (Pwritev = 296) => handle_unsupported(),
+            (Preadv = 295) => do_preadv(fd: FileDesc, iov: *mut iovec_t, count: i32, offset: off_t),
+            (Pwritev = 296) => do_pwritev(fd: FileDesc, iov: *const iovec_t, count: i32, offset: off_t),
             (RtTgsigqueueinfo = 297) => handle_unsupported(),
             (PerfEventOpen = 298) => handle_unsupported(),
             (Recvmmsg = 299) => handle_unsupported(),

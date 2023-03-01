@@ -18,7 +18,7 @@ pub use self::link::{do_linkat, LinkFlags};
 pub use self::lseek::do_lseek;
 pub use self::mkdir::do_mkdirat;
 pub use self::open::do_openat;
-pub use self::read::{do_pread, do_read, do_readv};
+pub use self::read::{do_pread, do_preadv, do_read, do_readv};
 pub use self::rename::do_renameat;
 pub use self::rmdir::do_rmdir;
 pub use self::sendfile::do_sendfile;
@@ -29,7 +29,7 @@ pub use self::unlink::{do_unlinkat, UnlinkFlags};
 pub use self::utimes::{
     do_utimes_fd, do_utimes_path, get_utimes, utimbuf_t, Utime, UtimeFlags, UTIME_OMIT,
 };
-pub use self::write::{do_pwrite, do_write, do_writev};
+pub use self::write::{do_pwrite, do_pwritev, do_write, do_writev};
 
 mod access;
 mod chmod;
