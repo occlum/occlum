@@ -68,6 +68,25 @@ impl AsyncFileHandle {
         Ok(total_len)
     }
 
+    pub async fn preadv(&self, bufs: &mut [&mut [u8]], offset: usize) -> Result<usize> {
+        if !self.access_mode.readable() {
+            return_errno!(EBADF, "File not readable");
+        }
+        let mut offset = offset;
+        let mut total_len = 0;
+        for buf in bufs {
+            match self.dentry.inode().read_at(offset, buf).await {
+                Ok(len) => {
+                    total_len += len;
+                    offset += len;
+                }
+                Err(_) if total_len != 0 => break,
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(total_len)
+    }
+
     pub async fn write(&self, buf: &[u8]) -> Result<usize> {
         if !self.access_mode.writable() {
             return_errno!(EBADF, "File not writable");
@@ -97,6 +116,25 @@ impl AsyncFileHandle {
                 Ok(len) => {
                     total_len += len;
                     *offset += len;
+                }
+                Err(_) if total_len != 0 => break,
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(total_len)
+    }
+
+    pub async fn pwritev(&self, bufs: &[&[u8]], offset: usize) -> Result<usize> {
+        if !self.access_mode.writable() {
+            return_errno!(EBADF, "File not writable");
+        }
+        let mut offset = offset;
+        let mut total_len = 0;
+        for buf in bufs {
+            match self.dentry.inode().write_at(offset, buf).await {
+                Ok(len) => {
+                    total_len += len;
+                    offset += len;
                 }
                 Err(_) if total_len != 0 => break,
                 Err(e) => return Err(e),

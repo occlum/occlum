@@ -39,6 +39,16 @@ The script `run-ltp.sh` supports two optional arguments as below.
     example: run-ltp.sh -f syscalls-occlum -s timerfd
 ```
 
+* Run all the LTP syscall cases in Occlum.
+```
+# occlum run /opt/ltp/run-ltp.sh -f syscalls-occlum
+```
+
+* Run specific timerfd test cases in Occlum.
+```
+# occlum run /opt/ltp/run-ltp.sh -f syscalls-occlum -s timerfd
+```
+
 If no options provided, all the test cases in default LTP syscalls will be run one by one.
 
 Note:

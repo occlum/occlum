@@ -79,7 +79,12 @@ pub async fn do_write(fd: FileDesc, buf: *const u8, size: usize) -> Result<isize
     Ok(len as isize)
 }
 
-pub async fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<isize> {
+async fn do_writev_offset(
+    fd: FileDesc,
+    iov: *const iovec_t,
+    count: i32,
+    offset: Option<off_t>,
+) -> Result<isize> {
     let count = {
         if count < 0 {
             return_errno!(EINVAL, "Invalid count of iovec");
@@ -100,11 +105,38 @@ pub async fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<
     };
     let bufs = &bufs_vec[..];
 
-    let len = file_ops::do_writev(fd, bufs).await?;
+    let len = if let Some(offset) = offset {
+        file_ops::do_pwritev(fd, bufs, offset).await?
+    } else {
+        file_ops::do_writev(fd, bufs).await?
+    };
+
     Ok(len as isize)
 }
 
-pub async fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize> {
+pub async fn do_writev(fd: FileDesc, iov: *const iovec_t, count: i32) -> Result<isize> {
+    do_writev_offset(fd, iov, count, None).await
+}
+
+pub async fn do_pwritev(
+    fd: FileDesc,
+    iov: *const iovec_t,
+    count: i32,
+    offset: off_t,
+) -> Result<isize> {
+    if offset < 0 {
+        return_errno!(EINVAL, "Invalid offset");
+    }
+
+    do_writev_offset(fd, iov, count, Some(offset)).await
+}
+
+async fn do_readv_offset(
+    fd: FileDesc,
+    iov: *mut iovec_t,
+    count: i32,
+    offset: Option<off_t>,
+) -> Result<isize> {
     let count = {
         if count < 0 {
             return_errno!(EINVAL, "Invalid count of iovec");
@@ -125,8 +157,30 @@ pub async fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isi
     };
     let bufs = &mut bufs_vec[..];
 
-    let len = file_ops::do_readv(fd, bufs).await?;
+    let len = if let Some(offset) = offset {
+        file_ops::do_preadv(fd, bufs, offset).await?
+    } else {
+        file_ops::do_readv(fd, bufs).await?
+    };
+
     Ok(len as isize)
+}
+
+pub async fn do_readv(fd: FileDesc, iov: *mut iovec_t, count: i32) -> Result<isize> {
+    do_readv_offset(fd, iov, count, None).await
+}
+
+pub async fn do_preadv(
+    fd: FileDesc,
+    iov: *mut iovec_t,
+    count: i32,
+    offset: off_t,
+) -> Result<isize> {
+    if offset < 0 {
+        return_errno!(EINVAL, "Invalid offset");
+    }
+
+    do_readv_offset(fd, iov, count, Some(offset)).await
 }
 
 pub async fn do_pread(fd: FileDesc, buf: *mut u8, size: usize, offset: off_t) -> Result<isize> {
