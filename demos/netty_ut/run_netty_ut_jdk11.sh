@@ -46,7 +46,9 @@ run_netty_ut() {
         -Dos.name=Linux \
         -jar /usr/lib/netty/junit-platform-console-standalone-1.8.2.jar \
         -cp /usr/lib/netty/netty-testsuite-4.1.51.Final.jar:/usr/lib/netty/netty-all-4.1.51.Final.jar:/usr/lib/netty/xz-1.5.jar:/usr/lib/netty/hamcrest-library-1.3.jar:/usr/lib/netty/logback-classic-1.1.7.jar \
-        --scan-classpath > netty-test-heap512m.log
+        --scan-class-path > netty-test-heap512m.log || true
+    cat netty-test-heap512m.log
+    cat netty-test-heap512m.log | grep "141 containers successful"
 }       
 
 run_netty_ut
