@@ -1,0 +1,12 @@
+[package]
+name = "init_grpc_ratls"
+version = "0.0.2"
+build = "build.rs"
+authors = ["Zheng Qi huaiqing.zq@antgroup.com"]
+edition = "2021"
+
+[dependencies]
+libc = "0.2.84"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+base64 = "0.9"
