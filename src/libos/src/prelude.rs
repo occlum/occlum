@@ -35,12 +35,12 @@ macro_rules! current {
 }
 
 pub fn align_up(addr: usize, align: usize) -> usize {
-    debug_assert!(align >= 2 && align.is_power_of_two());
+    debug_assert!(align.is_power_of_two());
     align_down(addr + (align - 1), align)
 }
 
 pub fn align_down(addr: usize, align: usize) -> usize {
-    debug_assert!(align >= 2 && align.is_power_of_two());
+    debug_assert!(align.is_power_of_two());
     addr & !(align - 1)
 }
 
