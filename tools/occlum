@@ -56,11 +56,13 @@ report_arg_error() {
     echo ""
     cat <<EOF
 Usage:
-    occlum new <path>
+    occlum new <path> [--init-ra <grpc_ratls/aecs>]
         Create a new directory at <path> and initialize as the Occlum instance.
+        If flag --init-ra specifies, generate initfs with RA KMS client function.
 
-    occlum init
+    occlum init [--init-ra <grpc_ratls/aecs>]
         Initialize a directory as the Occlum instance.
+        If flag --init-ra specifies, generate initfs with RA KMS client function.
 
     occlum build [--sign-key <key_path>] [--sign-tool <tool_path>] [--image-key <key_path>] [--buildin-image-key] [-f/--force]
         Build and sign an Occlum SGX enclave (.so) and generate its associated secure
@@ -158,15 +160,79 @@ check_aesm_service() {
     exit 1
 }
 
+gen_initfs_grpc_ratls()
+{
+    echo "Generate initfs with GRPC RATLS KMS client"
+    mkdir -p initfs
+    mkdir -p initfs/bin
+    mkdir -p initfs/lib
+    mkdir -p initfs/dev
+    mkdir -p initfs/proc
+    mkdir -p initfs/etc
+    # add default timezone file
+    cp /etc/localtime initfs/etc/
+    # add ssl ca-certificates
+    mkdir -p initfs/etc/ssl/certs
+    cp /etc/ssl/certs/ca-certificates.crt initfs/etc/ssl/certs
+
+    # add musl
+    local occlum_musl_lib=/usr/local/occlum/x86_64-linux-musl/lib
+    cp -t initfs/lib \
+        /lib/ld-musl-x86_64.so.1 \
+        "$occlum_musl_lib/libc.so" \
+        "$occlum_musl_lib/libstdc++.so.6" \
+        "$occlum_musl_lib/libgcc_s.so.1" \
+        "$occlum_musl_lib/libgomp.so.1"
+
+    # add grpc_ratls required libs
+    cp -t initfs/lib \
+        "$occlum_dir"/toolchains/grpc_ratls/musl/libgrpc_ratls_client.so \
+        "$occlum_dir"/toolchains/grpc_ratls/musl/libhw_grpc_proto.so \
+        "$occlum_dir"/toolchains/dcap_lib/musl/libocclum_dcap.so.0.1.0 \
+        "$occlum_dir"/toolchains/gcc/x86_64-linux-musl/lib/libcjson.so.1
+
+    # add template init_ra_conf
+    cp "$occlum_dir"/etc/template/init_grpc_ratls.json "$instance_dir"/init_ra_conf.json
+
+    cp "$occlum_dir"/build/bin/init_grpc_ratls initfs/bin/init
+    cp "$occlum_dir"/etc/template/Occlum.json "$instance_dir"/
+}
+
+gen_initfs()
+{
+    mkdir -p initfs
+    mkdir -p initfs/bin
+    mkdir -p initfs/lib
+    mkdir -p initfs/dev
+    mkdir -p initfs/proc
+    mkdir -p initfs/etc
+    # add default /etc/hosts
+    echo "127.0.0.1   localhost" > initfs/etc/hosts
+    # add default timezone file
+    cp /etc/localtime initfs/etc/
+
+    # add musl
+    local occlum_musl_lib=/usr/local/occlum/x86_64-linux-musl/lib
+    cp -t initfs/lib \
+        /lib/ld-musl-x86_64.so.1 \
+        "$occlum_musl_lib/libc.so" \
+        "$occlum_musl_lib/libstdc++.so.6" \
+        "$occlum_musl_lib/libgcc_s.so.1" \
+        "$occlum_musl_lib/libgomp.so.1"
+
+    cp "$occlum_dir"/build/bin/init initfs/bin/
+    cp "$occlum_dir"/etc/template/Occlum.json "$instance_dir"/
+}
+
 cmd_new() {
-    if [ -z $@ ]; then
+    if [ -z $1 ]; then
         echo "Error: target directory is not set"
         exit 1
     fi
 
-    dir_path="$@"
+    dir_path="$1"
     if [[ "$dir_path" != "/"* ]]; then
-        dir_path="$instance_dir/$@"
+        dir_path="$instance_dir/$1"
     fi
 
     if [[ -e "$dir_path" ]]; then
@@ -177,7 +243,7 @@ cmd_new() {
     mkdir -p $dir_path
     instance_dir=$dir_path
     status_file=$instance_dir/.__occlum_status
-    cd $dir_path && cmd_init
+    cd $dir_path && cmd_init ${@:2:2}
 }
 
 cmd_init() {
@@ -185,6 +251,14 @@ cmd_init() {
         echo "Error: the current working directory has been initialized as an Occlum instance"
         exit 1
     fi
+
+    local init_ra=""
+    while [ -n "$1" ]; do
+        case "$1" in
+        --init-ra)     [ -n "$2" ] && init_ra=$2 ; shift 2 || exit_error "Empty init-ra option provided"     ;;
+        *)  ;;
+        esac
+    done
 
     echo "initialized" > $status_file
 
@@ -242,29 +316,15 @@ cmd_init() {
             /etc/localtime
     fi
 
-    mkdir -p initfs
-    mkdir -p initfs/bin
-    mkdir -p initfs/lib
-    mkdir -p initfs/dev
-    mkdir -p initfs/proc
-    mkdir -p initfs/etc
-    # add default /etc/hosts
-    echo "127.0.0.1   localhost" > initfs/etc/hosts
-    # add default timezone file
-    cp /etc/localtime initfs/etc/
+    if [[ "$init_ra" == "grpc_ratls" ]]; then
+        gen_initfs_grpc_ratls
+    elif [[ "$init_ra" == "aecs" ]]; then
+        echo "Error: do not support AECS yet"
+        exit 1
+    else
+        gen_initfs
+    fi
 
-    # add musl
-    local occlum_musl_lib=/usr/local/occlum/x86_64-linux-musl/lib
-    cp -t initfs/lib \
-        /lib/ld-musl-x86_64.so.1 \
-        "$occlum_musl_lib/libc.so" \
-        "$occlum_musl_lib/libstdc++.so.6" \
-        "$occlum_musl_lib/libgcc_s.so.1" \
-        "$occlum_musl_lib/libgomp.so.1"
-
-    cp "$occlum_dir"/build/bin/init initfs/bin/
-
-    cp "$occlum_dir"/etc/template/Occlum.json "$instance_dir"/
     chmod 644 "$instance_dir"/Occlum.json
 
     echo "$instance_dir initialized as an Occlum instance"
@@ -309,6 +369,10 @@ cmd_build() {
         echo "SGX mode: $SGX_MODE"
     else
         echo "SGX mode: HW"
+    fi
+
+    if [[ -f "$instance_dir/init_ra_conf.json" ]]; then
+        cp "$instance_dir/init_ra_conf.json" "$instance_dir/initfs/etc/"
     fi
 
     # If sgx mode is changed, build thoroughly again
@@ -667,10 +731,10 @@ fi
 cmd=$1
 case "$cmd" in
     new)
-        cmd_new "${@:2:1}"
+        cmd_new "${@:2}"
         ;;
     init)
-        cmd_init
+        cmd_init "${@:2}"
         ;;
     build)
         cmd_build "${@:2}"
