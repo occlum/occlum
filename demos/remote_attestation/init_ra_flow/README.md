@@ -4,13 +4,15 @@
 
 Remote attestation is a key part in the confidential computing. Occlum provides a [`DCAP Library`](../../../tools/toolchains/dcap_lib/) to ease the RA application. A brief Occlum RA [`introduction`](../../../docs/remote_attestation.md) is a good entry point. But still, utilizing the RA in a real application is complicated for general developers.
 
-Occlum provides a `Init RA` way to seperate the RA operation and the actual application. With this way, the APP developers don't need know too much about the RA and the application doesn't need to be modified for RA.
+Occlum provides a `Init RA` way to separate the RA operation and the actual application. With this way, the APP developers don't need know too much about the RA and the application doesn't need to be modified for RA.
 
-This demo shows the `Init RA` way with a sample [`Flask TLS web application`](../../python/flask/), based on [`GRPC-RATLS`](../../../tools/toolchains/grpc_ratls/ra_tls/) server/client implementation and a modified [`init`](./init_ra/) for Occlum InitFS.
+This demo shows the `Init RA` way with a sample [`Flask TLS web application`](../../python/flask/), based on [`GRPC-RATLS`](../../../tools/toolchains/grpc_ratls) server/client implementation and a customized [`init`](../../../tools/init_grpc_ratls) for Occlum InitFS.
+
+Note: users could choose different `init` by passing parameters on `occlum init` or `occlum new`. In this demo, **grpc-ratls** client is chosen.
 
 ![Arch Overview](./arch.png)
 
-The GRPC-RATLS server holds some sensitive data thus it is usually deploed on secure environment. The application consuming the sensitive data could be deployed on general environment, such as Cloud service vendor provided SGX instance. For this demo, all are running on one SGX machine.
+The GRPC-RATLS server holds some sensitive data thus it is usually deployed on secure environment. The application consuming the sensitive data could be deployed on general environment, such as Cloud service vendor provided SGX instance. For this demo, all are running on one SGX machine.
 
 ## Flow
 
@@ -59,10 +61,23 @@ The `RA Verify Config` JSON records the secrets. Each secret has a name and its 
 
 * Starts the Flask-TLS-Infer demo. For every Occlum built application, it starts `init` process first, then starts the real application in RootFS. The default [`init`](../../../tools/init/) process just run RootFS integrity check and then load the RootFS where the real application is located.
 
-For this demo, a modified [`init`](./init_ra/) is used. Besides the general `init` operation, it embeds the `GRPC-RATLS` client API `grpc_ratls_get_secret`, gets the secrets(base64 encoded) from the `GRPC-RATLS server`, does base64 decoding, acquires the real secrets. The `image_key` is used to decrypt the RootFS image. The other two are saved to RootFS. In this example, they are `/etc/flask.crt` and `/etc/flask.key`. Finally, when the Flask-TLS app is running, all secrets are securely obtained already in `init` thus the app runs successfully without RA involvement in this stage.
+For this demo, a customized [`init`](../../../tools/init_grpc_ratls) is used. Besides the general `init` operation, it embeds the `GRPC-RATLS` client API `grpc_ratls_get_secret`, gets the secrets(base64 encoded) from the `GRPC-RATLS server`, does base64 decoding, acquires the real secrets. The `image_key` is used to decrypt the RootFS image. The other two are saved to RootFS. In this example, they are `/etc/flask.crt` and `/etc/flask.key`. Finally, when the Flask-TLS app is running, all secrets are securely obtained already in `init` thus the app runs successfully without RA involvement in this stage.
+
+Also, to configure which KMS server (GRPC-RATLS server) is to be trusted, the default `init_ra_conf.json` needs modified accordingly. Details please refer to the function **update_client_init_ra_conf** in the script [build_content.sh](./build_content.sh).
 
 
 ## How-to build the demo
+
+A valid PCCS service should be accessible in your environment. This demo is verified in Aliyun, thus `https://sgx-dcap-server.cn-shanghai.aliyuncs.com/sgx/certification/v3/` is used as the PCCS URL. For example, 
+
+* Start the Occlum develop container
+```
+docker run --rm -it \
+     --device /dev/sgx/enclave --device /dev/sgx/provision \
+     occlum/occlum:latest-ubuntu20.04 bash
+```
+
+In the container, update the **pccs_url** in the file `/etc/sgx_default_qcnl.conf` with the valid address.
 
 * Just run `build_content.sh` which builds everything.
 Once successful, two Occlum instances are created.
@@ -82,7 +97,7 @@ occlum run /bin/server localhost:50051 &
 * Starts the Flask-TLS web portal in backgroud.
 ```
 cd occlum_client
-occlum run /bin/rest_api.py &
+occlum run --config-svn 1234 /bin/rest_api.py &
 ```
 
 Above two could be executed in one script [`run.sh`](./run.sh).
