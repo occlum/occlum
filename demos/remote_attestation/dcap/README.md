@@ -16,6 +16,18 @@ applications through ioctls on device `/dev/sgx`.
   include `libsgx_quote_ex, libsgx_quote_ex_sim, libsgx_dcap_tvl,
   libsgx_dcap_ql and libsgx_dcap_quoteverify`.
 
+You can simply start a Occlum develop container to meet above two.
+A valid PCCS service should be accessible in your environment. This demo is verified in Aliyun, thus `https://sgx-dcap-server.cn-shanghai.aliyuncs.com/sgx/certification/v3/` is used as the PCCS URL. For example, 
+
+* Start the Occlum develop container
+```
+docker run --rm -it \
+     --device /dev/sgx/enclave --device /dev/sgx/provision \
+     occlum/occlum:latest-ubuntu20.04 bash
+```
+
+In the container, update the **pccs_url** in the file `/etc/sgx_default_qcnl.conf` with the valid address.
+
 ## Run this demo on Occlum
 
 You can run the DCAP quote generation and verification demo, including rust test demo and C test demo on Occlum via

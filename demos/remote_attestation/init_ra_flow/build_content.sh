@@ -3,16 +3,7 @@ set -e
 
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
 
-export INITRA_DIR="${script_dir}/init_ra"
 export FLASK_DIR="${script_dir}/../../python/flask"
-export RATLS_DIR="${script_dir}/../../../tools/toolchains/grpc_ratls/"
-
-function build_ratls()
-{
-    pushd ${RATLS_DIR}
-    ./build.sh
-    popd
-}
 
 function build_flask()
 {
@@ -21,12 +12,23 @@ function build_flask()
     popd
 }
 
-function build_init_ra()
+function update_client_init_ra_conf()
 {
-    pushd ${INITRA_DIR}
-    occlum-cargo clean
-    occlum-cargo build --release
-    popd
+    # Fill in the keys
+    new_json="$(jq '.kms_keys = [ {"key": "flask_cert", "path": "/etc/flask.crt"}] |
+        .kms_keys += [ {"key": "flask_key", "path": "/etc/flask.key"}]' init_ra_conf.json)" && \
+    echo "${new_json}" > init_ra_conf.json
+
+    # Fill in the KMS server measurements.
+    new_json="$(jq ' .ra_config.verify_mr_enclave = "off" |
+        .ra_config.verify_mr_signer = "on" |
+        .ra_config.verify_isv_prod_id = "off" |
+        .ra_config.verify_isv_svn = "off" |
+        .ra_config.verify_config_svn = "off" |
+        .ra_config.verify_enclave_debuggable = "on" |
+        .ra_config.sgx_mrs[0].mr_signer = ''"'`get_mr client mrsigner`'" |
+        .ra_config.sgx_mrs[0].debuggable = true ' init_ra_conf.json)" && \
+    echo "${new_json}" > init_ra_conf.json
 }
 
 function build_client_instance()
@@ -34,38 +36,30 @@ function build_client_instance()
     # generate client image key
     occlum gen-image-key image_key
 
-    rm -rf occlum_client && occlum new occlum_client
+    rm -rf occlum_client
+    # choose grpc_ratls as init ra kms client
+    occlum new occlum_client --init-ra grpc_ratls
     pushd occlum_client
 
     # prepare flask content
     rm -rf image
     copy_bom -f ../flask.yaml --root image --include-dir /opt/occlum/etc/template
 
+    # Try build first to get mrsigner
+    # In our case, client and server use the same sign-key thus also the same mrsigner
+    occlum build
+
     new_json="$(jq '.resource_limits.user_space_size = "600MB" |
         .resource_limits.kernel_space_heap_size = "128MB" |
         .resource_limits.max_num_of_threads = 32 |
-        .metadata.debuggable = false |
+        .metadata.debuggable = true |
         .metadata.enable_kss = true |
         .metadata.version_number = 88 |
-        .env.default += ["PYTHONHOME=/opt/python-occlum"]' Occlum.json)" && \
+        .env.default += ["PYTHONHOME=/opt/python-occlum"] ' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
 
-    occlum build --image-key ../image_key
-
-    # Get server mrsigner.
-    # Here client and server use the same signer-key thus using client mrsigner directly.
-    jq ' .verify_mr_enclave = "off" |
-        .verify_mr_signer = "on" |
-        .verify_isv_prod_id = "off" |
-        .verify_isv_svn = "off" |
-        .verify_config_svn = "off" |
-        .verify_enclave_debuggable = "on" |
-        .sgx_mrs[0].mr_signer = ''"'`get_mr client mrsigner`'" |
-        .sgx_mrs[0].debuggable = false ' ../ra_config_template.json > dynamic_config.json
-
-    # prepare init-ra content
-    rm -rf initfs
-    copy_bom -f ../init_ra_client.yaml --root initfs --include-dir /opt/occlum/etc/template
+    # Update init_ra_conf json file accordingly before occlum build
+    update_client_init_ra_conf
 
     occlum build -f --image-key ../image_key
 
@@ -106,10 +100,10 @@ function build_server_instance()
         .sgx_mrs[0].mr_signer = ''"'`get_mr client mrsigner`'" |
         .sgx_mrs[0].isv_svn = 88 |
         .sgx_mrs[0].config_svn = 1234 |
-        .sgx_mrs[0].debuggable = false ' ../ra_config_template.json > dynamic_config.json
+        .sgx_mrs[0].debuggable = true ' ../ra_config_template.json > dynamic_config.json
 
     new_json="$(jq '.resource_limits.user_space_size = "500MB" |
-                    .metadata.debuggable = false ' Occlum.json)" && \
+                    .metadata.debuggable = true ' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
 
     rm -rf image
@@ -120,9 +114,6 @@ function build_server_instance()
     popd
 }
 
-build_ratls
 build_flask
-build_init_ra
-
 build_client_instance
 build_server_instance
