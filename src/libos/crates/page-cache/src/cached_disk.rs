@@ -1,8 +1,5 @@
 use crate::prelude::*;
-use block_device::{
-    Bid, BioReqBuilder, BioType, BlockBuf, BlockDevice, BlockDeviceAsFile, BlockRangeIter,
-    BLOCK_SIZE,
-};
+use block_device::{Bid, BlockDeviceAsFile, BlockRangeIter, BLOCK_SIZE};
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -27,7 +24,7 @@ use std::time::Duration;
 pub struct CachedDisk<A: PageAlloc>(Arc<Inner<A>>);
 
 struct Inner<A: PageAlloc> {
-    disk: Arc<dyn BlockDevice>,
+    disk: Arc<dyn BlockDeviceAsFile>,
     cache: PageCache<Bid, A>,
     flusher_wq: WaiterQueue,
     // This read-write lock is used to control the concurrent
@@ -47,7 +44,7 @@ impl<A: PageAlloc> CachedDisk<A> {
     /// Create a new `CachedDisk`.
     ///
     /// Specify a backing disk which implements `BlockDevice`.
-    pub fn new(disk: Arc<dyn BlockDevice>) -> Result<Self> {
+    pub fn new(disk: Arc<dyn BlockDeviceAsFile>) -> Result<Self> {
         let flusher = Arc::new(CachedDiskFlusher::<A>::new());
         let cache = PageCache::new(flusher.clone());
         let flusher_wq = WaiterQueue::new();
@@ -107,7 +104,7 @@ impl<A: PageAlloc> CachedDisk<A> {
 #[async_trait]
 impl<A: PageAlloc> BlockDeviceAsFile for CachedDisk<A> {
     fn total_bytes(&self) -> usize {
-        self.0.disk.total_blocks() * BLOCK_SIZE
+        self.0.disk.total_bytes()
     }
 
     async fn read(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
@@ -179,7 +176,7 @@ impl<A: PageAlloc> Inner<A> {
     /// Check if the arguments for a read or write is valid.
     fn check_rw_args(&self, offset: usize, buf: &[u8]) {
         debug_assert!(
-            offset + buf.len() <= self.disk.total_blocks() * BLOCK_SIZE,
+            offset + buf.len() <= self.disk.total_bytes(),
             "read/write length exceeds total blocks limit"
         );
     }
@@ -298,15 +295,13 @@ impl<A: PageAlloc> Inner<A> {
 
     /// Write back to block device block-by-block.
     ///
-    /// Currently we use `flush()` (write back to disk in batches) rather than `flush_by_block()`
-    /// for better I/O performance.
-    #[allow(dead_code)]
-    pub async fn flush_by_block(&self) -> Result<usize> {
+    /// On success, return the number of flushed pages.
+    pub async fn flush(&self) -> Result<usize> {
         let mut total_pages = 0;
         let aw_lock = self.arw_lock.write().await;
 
         let mut flush_pages = Vec::with_capacity(128);
-        const MAX_BATCH_SIZE: usize = 2048;
+        const MAX_BATCH_SIZE: usize = 1024;
         loop {
             flush_pages.clear();
             let num_pages = self
@@ -329,66 +324,11 @@ impl<A: PageAlloc> Inner<A> {
                 self.write_block(&bid, page_buf).await?;
 
                 let mut page_guard = page_handle.lock();
+
                 debug_assert!(page_guard.state() == PageState::Flushing);
                 page_guard.set_state(PageState::UpToDate);
                 Self::notify_page_events(&page_handle, Events::OUT);
                 drop(page_guard);
-            }
-
-            total_pages += num_pages;
-        }
-
-        drop(aw_lock);
-        // At this point, we can be certain that all writes
-        // have been written back to the disk because
-        // 1) There are no concurrent writers;
-        // 2) There are no concurrent flushers;
-        // 3) All dirty pages have been cleared.
-        trace!("[CachedDisk] flush pages: {}", total_pages);
-        Ok(total_pages)
-    }
-
-    /// Write back cached pages to block device in consecutive batches.
-    ///
-    /// On success, return the number of flushed pages.
-    pub async fn flush(&self) -> Result<usize> {
-        let mut total_pages = 0;
-        let aw_lock = self.arw_lock.write().await;
-
-        let mut flush_pages = Vec::with_capacity(128);
-        const MAX_BATCH_SIZE: usize = 1024;
-        loop {
-            flush_pages.clear();
-            let num_pages = self
-                .cache
-                .pop_dirty_to_flush(&mut flush_pages, MAX_BATCH_SIZE);
-            if num_pages == 0 {
-                break;
-            }
-
-            for page_handles in PageCache::group_consecutive_pages(&flush_pages) {
-                let mut bufs = Vec::with_capacity(page_handles.len());
-                for page_handle in page_handles {
-                    let page_guard = page_handle.lock();
-                    debug_assert!(page_guard.state() == PageState::Flushing);
-                    Self::clear_page_events(&page_handle);
-
-                    let page_ptr = page_guard.as_ptr();
-                    drop(page_guard);
-                    bufs.push(unsafe { BlockBuf::from_raw_parts(page_ptr, BLOCK_SIZE) });
-                }
-
-                let first_block_addr: Bid = page_handles[0].key();
-                self.write_consecutive_blocks(first_block_addr, bufs)
-                    .await?;
-
-                for page_handle in page_handles {
-                    let mut page_guard = page_handle.lock();
-                    debug_assert!(page_guard.state() == PageState::Flushing);
-                    page_guard.set_state(PageState::UpToDate);
-                    Self::notify_page_events(&page_handle, Events::OUT);
-                    drop(page_guard);
-                }
             }
 
             total_pages += num_pages;
@@ -472,21 +412,6 @@ impl<A: PageAlloc> Inner<A> {
 
     async fn write_block(&self, block_id: &Bid, buf: &[u8]) -> Result<usize> {
         self.disk.write(block_id.to_offset(), buf).await
-    }
-
-    async fn write_consecutive_blocks(&self, addr: Bid, write_bufs: Vec<BlockBuf>) -> Result<()> {
-        let req = BioReqBuilder::new(BioType::Write)
-            .addr(addr)
-            .bufs(write_bufs)
-            .build();
-        let submission = self.disk.submit(Arc::new(req));
-        let req = submission.complete().await;
-        let res = req.response().unwrap();
-
-        if let Err(e) = res {
-            return Err(errno!(e.errno(), "write on a block device failed"));
-        }
-        Ok(())
     }
 
     fn clear_page_events(page_handle: &PageHandle<Bid, A>) {
