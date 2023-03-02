@@ -11,11 +11,9 @@ pub fn unbox<T: Sized>(value: Box<T>) -> T {
 }
 
 pub(crate) const fn align_down(x: usize, align: usize) -> usize {
-    debug_assert!(align >= 2 && align.is_power_of_two());
     (x / align) * align
 }
 
 pub(crate) const fn align_up(x: usize, align: usize) -> usize {
-    debug_assert!(align >= 2 && align.is_power_of_two());
     ((x + align - 1) / align) * align
 }
