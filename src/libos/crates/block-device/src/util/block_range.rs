@@ -32,7 +32,7 @@ impl Iterator for BlockRangeIter {
         let sub_range = {
             let block_id = Bid::from_byte_offset(self.begin);
             let begin = self.begin % self.block_size;
-            let end = if block_id.to_raw() as usize == self.end / self.block_size {
+            let end = if block_id == Bid::from_byte_offset(self.end) {
                 self.end % self.block_size
             } else {
                 self.block_size

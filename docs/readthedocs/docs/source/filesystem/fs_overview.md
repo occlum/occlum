@@ -104,9 +104,9 @@ Here is the configuration of rootfs, the first item is the lower layer RO-SEFS a
 ```
 
 ## Async-SFS
-The Async-SFS is an asynchronous filesystem, which uses Rust asynchronous programming skills, making it fast and concurrent. It is mounted at `/sfs` by default. To achieve the high-performanced security, it uses the SwornDisk as the underlying data storage and sends async I/O requests to it.
+The Async-SFS is an asynchronous filesystem, which uses Rust asynchronous programming skills, making it fast and concurrent. It is mounted at `/sfs` by default. To achieve the high-performanced security, it uses the JinDisk as the underlying data storage and sends async I/O requests to it.
 
-To accelerate block I/O, the page cache is introduced. It caches all the block I/O in the middle of Async-SFS and SwornDisk. Thanks to the page cache and SwornDisk, the result of the benchmark (e.g., FIO and Filebench) is significantly better than SEFS. If your App's performance is highly dependent on disk I/O, it is recommended to use Async-SFS.
+To accelerate block I/O, the page cache is introduced. It caches all the block I/O in the middle of Async-SFS and JinDisk. Thanks to the page cache and JinDisk, the result of the benchmark (e.g., FIO and Filebench) is significantly better than SEFS. If your App's performance is highly dependent on disk I/O, it is recommended to use Async-SFS.
 ```
 ┌───────────┐
 │           │
@@ -122,7 +122,7 @@ To accelerate block I/O, the page cache is introduced. It caches all the block I
       │
 ┌─────┴─────┐
 │           │
-│ SwornDisk │
+│  JinDisk  │
 │           │
 └───────────┘
 ```

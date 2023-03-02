@@ -13,6 +13,7 @@ use std::untrusted::path::PathEx;
 use async_mountfs::AsyncMountFS;
 use async_sfs::AsyncSimpleFS;
 use block_device::{BlockDeviceAsFile, BLOCK_SIZE};
+use jindisk::JinDisk;
 use page_cache::{impl_fixed_size_page_alloc, CachedDisk};
 use rcore_fs_ramfs::RamFS;
 use rcore_fs_sefs::dev::*;
@@ -228,7 +229,7 @@ pub async fn mount_nonroot_fs_according_to(
                 mount_nonroot_fs(unionfs, root, &mc.target, follow_symlink).await?;
             }
             TYPE_ASYNC_SFS => {
-                let async_sfs = open_or_create_async_sfs_according_to(&mc).await?;
+                let async_sfs = open_or_create_async_sfs_according_to(&mc, user_key).await?;
                 mount_nonroot_fs(async_sfs, root, &mc.target, follow_symlink).await?;
             }
         }
@@ -287,6 +288,7 @@ pub async fn umount_nonroot_fs(
 
 async fn open_or_create_async_sfs_according_to(
     mc: &ConfigMount,
+    user_key: &Option<sgx_key_128bit_t>,
 ) -> Result<Arc<dyn AsyncFileSystem>> {
     if mc.source.is_none() {
         return_errno!(EINVAL, "Source is expected for Async-SFS");
@@ -303,7 +305,13 @@ async fn open_or_create_async_sfs_according_to(
     let async_sfs = if source_path.exists() {
         let cache_disk = {
             let sync_disk = SyncIoDisk::open(&source_path)?;
-            CachedDisk::<AsyncFsPageAlloc>::new(Arc::new(sync_disk))?
+            // TODO: Support key policy in jindisk
+            let jindisk = JinDisk::open(
+                Arc::new(sync_disk),
+                user_key.unwrap_or(sgx_key_128bit_t::default()),
+            )
+            .await?;
+            CachedDisk::<AsyncFsPageAlloc>::new(Arc::new(jindisk))?
         };
         AsyncSimpleFS::open(Arc::new(cache_disk)).await?
     } else {
@@ -314,7 +322,12 @@ async fn open_or_create_async_sfs_according_to(
         let cache_disk = {
             let total_blocks = total_size / BLOCK_SIZE;
             let sync_disk = SyncIoDisk::create_new(&source_path, total_blocks)?;
-            CachedDisk::<AsyncFsPageAlloc>::new(Arc::new(sync_disk))?
+            // TODO: Support key policy in jindisk
+            let jindisk = JinDisk::create(
+                Arc::new(sync_disk),
+                user_key.unwrap_or(sgx_key_128bit_t::default()),
+            );
+            CachedDisk::<AsyncFsPageAlloc>::new(Arc::new(jindisk))?
         };
         AsyncSimpleFS::create(Arc::new(cache_disk)).await?
     };
