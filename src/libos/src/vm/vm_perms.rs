@@ -47,14 +47,19 @@ impl VMPerms {
 
             if rsgx_is_supported_EDMM() {
                 // With EDMM support, reserved memory permission should be updated.
-                assert!(
-                    sgx_tprotect_rsrv_mem(addr, len, prot.bits() as i32)
-                        == sgx_status_t::SGX_SUCCESS
-                );
+                let sgx_status = sgx_tprotect_rsrv_mem(addr, len, prot.bits() as i32);
+                if sgx_status != sgx_status_t::SGX_SUCCESS {
+                    panic!("sgx_tprotect_rsrv_mem status {}", sgx_status);
+                }
             } else {
                 // Without EDMM support, reserved memory permission is statically RWX and we only need to do mprotect ocall.
                 let sgx_status = occlum_ocall_mprotect(&mut retval, addr, len, prot.bits() as i32);
-                assert!(sgx_status == sgx_status_t::SGX_SUCCESS && retval == 0);
+                if sgx_status != sgx_status_t::SGX_SUCCESS || retval != 0 {
+                    panic!(
+                        "occlum_ocall_mprotect status {}, retval {}",
+                        sgx_status, retval
+                    );
+                }
             }
         }
     }
