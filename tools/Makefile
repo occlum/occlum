@@ -12,6 +12,7 @@ all:
 	@$(MAKE) --no-print-directory -C gen_internal_conf
 	@$(MAKE) --no-print-directory -C copy_bom
 	@$(MAKE) --no-print-directory -C init
+	@$(MAKE) --no-print-directory -C init_grpc_ratls
 
 format:
 	@$(MAKE) --no-print-directory -C protect-integrity format
@@ -24,3 +25,4 @@ clean:
 	@$(MAKE) --no-print-directory -C gen_internal_conf clean
 	@$(MAKE) --no-print-directory -C copy_bom clean
 	@$(MAKE) --no-print-directory -C init clean
+	@$(MAKE) --no-print-directory -C init_grpc_ratls clean

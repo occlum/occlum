@@ -1,0 +1,27 @@
+{
+    "kms_server": "localhost:50051",
+    "kms_keys": [
+        {
+            "key": "demo_key",
+            "path": "/etc/demo_key"
+        }
+    ],
+    "ra_config": {
+        "verify_mr_enclave" : "off",
+        "verify_mr_signer" : "off",
+        "verify_isv_prod_id" : "off",
+        "verify_isv_svn" : "off",
+        "verify_config_svn" : "off",
+        "verify_enclave_debuggable" : "off",
+        "sgx_mrs": [
+            {
+                "mr_enclave" : "",
+                "mr_signer" : "",
+                "isv_prod_id" : 0,
+                "isv_svn" : 0,
+                "config_svn" : 0,
+                "debuggable" : true
+            }
+        ]
+    }
+}
