@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1677967871110,
+  "lastUpdate": 1677968391676,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -2770,6 +2770,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 623,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "LI Qing",
+            "username": "liqinggd",
+            "email": "geding.lq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "0ac398b635438fdbd2170861377d908ea9295daa",
+          "message": "Add support to statfs on hostfs",
+          "timestamp": "2023-03-01T03:27:39Z",
+          "url": "https://github.com/occlum/occlum/commit/0ac398b635438fdbd2170861377d908ea9295daa"
+        },
+        "date": 1677968390509,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 1887,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 1887,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
