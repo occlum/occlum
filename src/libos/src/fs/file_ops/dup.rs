@@ -8,7 +8,7 @@ pub fn do_dup(old_fd: FileDesc) -> Result<FileDesc> {
     Ok(new_fd)
 }
 
-pub fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<FileDesc> {
+pub async fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<FileDesc> {
     let current = current!();
     let mut files = current.files().lock().unwrap();
     let file = files.get(old_fd)?;
@@ -23,12 +23,16 @@ pub fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<FileDesc> {
     }
 
     if old_fd != new_fd {
-        files.put_at(new_fd, file, false);
+        if let Some(old_file) = files.put_at(new_fd, file, false) {
+            drop(files);
+            // If the file descriptor `new_fd` was previously open, close it silently.
+            let _ = old_file.clean_for_close().await;
+        }
     }
     Ok(new_fd)
 }
 
-pub fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<FileDesc> {
+pub async fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<FileDesc> {
     let creation_flags = CreationFlags::from_bits_truncate(flags);
     let current = current!();
     let mut files = current.files().lock().unwrap();
@@ -46,6 +50,10 @@ pub fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<FileDes
     if old_fd == new_fd {
         return_errno!(EINVAL, "old_fd must not be equal to new_fd");
     }
-    files.put_at(new_fd, file, creation_flags.must_close_on_spawn());
+    if let Some(old_file) = files.put_at(new_fd, file, creation_flags.must_close_on_spawn()) {
+        drop(files);
+        // If the file descriptor `new_fd` was previously open, close it silently.
+        let _ = old_file.clean_for_close().await;
+    }
     Ok(new_fd)
 }

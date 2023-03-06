@@ -84,7 +84,7 @@ impl FileTable {
         min_free_fd as FileDesc
     }
 
-    pub fn put_at(&mut self, fd: FileDesc, file: FileRef, close_on_spawn: bool) {
+    pub fn put_at(&mut self, fd: FileDesc, file: FileRef, close_on_spawn: bool) -> Option<FileRef> {
         let mut table = &mut self.table;
         let mut table_entry = Some(FileTableEntry::new(file, close_on_spawn));
         if fd as usize >= table.len() {
@@ -94,6 +94,7 @@ impl FileTable {
         if table_entry.is_none() {
             self.num_fds += 1;
         }
+        table_entry.map(|entry| entry.file.clone())
     }
 
     pub fn fds(&self) -> Vec<FileDesc> {

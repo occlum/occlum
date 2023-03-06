@@ -304,12 +304,12 @@ pub async fn do_dup(old_fd: FileDesc) -> Result<isize> {
 }
 
 pub async fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<isize> {
-    let new_fd = file_ops::do_dup2(old_fd, new_fd)?;
+    let new_fd = file_ops::do_dup2(old_fd, new_fd).await?;
     Ok(new_fd as isize)
 }
 
 pub async fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<isize> {
-    let new_fd = file_ops::do_dup3(old_fd, new_fd, flags)?;
+    let new_fd = file_ops::do_dup3(old_fd, new_fd, flags).await?;
     Ok(new_fd as isize)
 }
 
