@@ -23,7 +23,10 @@ pub fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<FileDesc> {
     }
 
     if old_fd != new_fd {
-        files.put_at(new_fd, file, false);
+        if let Some(old_file) = files.put_at(new_fd, file, false) {
+            // If the file descriptor `new_fd` was previously open, close it silently.
+            old_file.release_advisory_locks()
+        }
     }
     Ok(new_fd)
 }
@@ -46,6 +49,9 @@ pub fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<FileDes
     if old_fd == new_fd {
         return_errno!(EINVAL, "old_fd must not be equal to new_fd");
     }
-    files.put_at(new_fd, file, creation_flags.must_close_on_spawn());
+    if let Some(old_file) = files.put_at(new_fd, file, creation_flags.must_close_on_spawn()) {
+        // If the file descriptor `new_fd` was previously open, close it silently.
+        old_file.release_advisory_locks()
+    }
     Ok(new_fd)
 }
