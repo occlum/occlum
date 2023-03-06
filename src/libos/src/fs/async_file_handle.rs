@@ -87,6 +87,13 @@ impl AsyncFileHandle {
         Ok(total_len)
     }
 
+    pub async fn pread(&self, buf: &mut [u8], offset: usize) -> Result<usize> {
+        if !self.access_mode().readable() {
+            return_errno!(EBADF, "file is not readable");
+        }
+        self.dentry.inode().read_at(offset, buf).await
+    }
+
     pub async fn write(&self, buf: &[u8]) -> Result<usize> {
         if !self.access_mode.writable() {
             return_errno!(EBADF, "File not writable");
@@ -141,6 +148,13 @@ impl AsyncFileHandle {
             }
         }
         Ok(total_len)
+    }
+
+    pub async fn pwrite(&self, buf: &[u8], offset: usize) -> Result<usize> {
+        if !self.access_mode().writable() {
+            return_errno!(EBADF, "file is not writable");
+        }
+        self.dentry.inode().write_at(offset, buf).await
     }
 
     pub async fn seek(&self, pos: SeekFrom) -> Result<usize> {
