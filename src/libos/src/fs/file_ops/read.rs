@@ -19,14 +19,7 @@ pub async fn do_pread(fd: FileDesc, buf: &mut [u8], offset: off_t) -> Result<usi
     }
     let file_ref = current!().file(fd)?;
     if let Some(async_file_handle) = file_ref.as_async_file_handle() {
-        if !async_file_handle.access_mode().readable() {
-            return_errno!(EBADF, "file is not readable");
-        }
-        async_file_handle
-            .dentry()
-            .inode()
-            .read_at(offset as usize, buf)
-            .await
+        async_file_handle.pread(buf, offset as usize).await
     } else {
         // For non-inode files, we simply ignore the offset
         file_ref.read(buf).await
