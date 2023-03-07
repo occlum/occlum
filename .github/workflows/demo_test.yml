@@ -831,3 +831,21 @@ jobs:
 
     - name: Run fio test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/fio && SGX_MODE=SIM ./run_fio_on_occlum.sh fio-seq-read.fio"
+
+  PaddlePaddle_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/sim
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Build python and paddlepaddle
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/paddlepaddle; ./install_python_with_conda.sh"
+
+    - name: Run paddlepaddle test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/paddlepaddle; SGX_MODE=SIM ./run_paddlepaddle_on_occlum.sh"
