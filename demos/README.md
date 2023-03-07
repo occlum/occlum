@@ -24,6 +24,7 @@ This set of demos shows how real-world apps can be easily run inside SGX enclave
 * [mysql](mysql/): A demo of [MySQL](https://www.mysql.com/).
 * [openvino](openvino/) A benchmark of [OpenVINO Inference Engine](https://docs.openvinotoolkit.org/2019_R3/_docs_IE_DG_inference_engine_intro.html).
 * [pytorch](pytorch/): A demo of [PyTorch](https://pytorch.org/).
+* [paddlepaddle](paddlepaddle/): A demo of [PaddlePaddle](https://www.paddlepaddle.org.cn/).
 * [redis](redis/): A demo of [Redis](https://redis.io).
 * [rocksdb](rocksdb/): A demo of [RocksDB](https://github.com/facebook/rocksdb).
 * [sofaboot](sofaboot/): A demo of [SOFABoot](https://github.com/sofastack/sofa-boot), an open source Java development framework based on Spring Boot.
