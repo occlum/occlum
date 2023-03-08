@@ -23,7 +23,8 @@ TESTS ?= env empty hello_world malloc mmap file fs_perms getpid spawn sched pipe
 	truncate readdir mkdir open stat link symlink chmod chown tls pthread system_info rlimit \
 	server server_epoll unix_socket cout hostfs cpuid rdtsc device sleep exit_group posix_flock \
 	ioctl fcntl eventfd emulate_syscall access signal prctl rename procfs wait flock async_sfs \
-	spawn_attribute exec statfs random umask pgrp vfork mount sysinfo timerfd utimes shm epoll netlink brk
+	spawn_attribute exec statfs random umask pgrp vfork mount sysinfo timerfd utimes shm epoll \
+	netlink brk disk
 
 # Benchmarks: need to be compiled and run by bench-% target
 BENCHES := spawn_and_exit_latency pipe_throughput unix_socket_throughput
