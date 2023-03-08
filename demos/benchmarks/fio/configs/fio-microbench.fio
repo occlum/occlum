@@ -1,11 +1,10 @@
 # fio-microbench.fio
 
 [global]
-# Change 'filename' to target path
-filename=/root/fio-microbench
+# 'filename' must be given as input
+# filename=/root/fio-microbench
 ioengine=sync
-size=10G
-loops=3
+size=2G
 thread=1
 numjobs=1
 direct=1
@@ -17,12 +16,14 @@ time_based=0
 
 [seq-write-256k]
 stonewall
+wait_for_previous
 group_reporting
 rw=write
 bs=256k
 
 [rand-write-32k]
 stonewall
+wait_for_previous
 group_reporting
 rw=randwrite
 bs=32k
@@ -32,12 +33,14 @@ bs=32k
 
 [seq-read-256k]
 stonewall
+wait_for_previous
 group_reporting
 rw=read
 bs=256k
 
 [rand-read-32k]
 stonewall
+wait_for_previous
 group_reporting
 rw=randread
 bs=32k

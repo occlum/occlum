@@ -9,6 +9,7 @@ bomfile=${SCRIPT_DIR}/fio.yaml
 
 FIO=fio
 FIO_CONFIG=$1
+FIO_PATH=$2
 
 if [ ! -e ${SCRIPT_DIR}/fio_src/${FIO} ];then
     echo "Error: cannot stat '${FIO} in fio_src'"
@@ -25,7 +26,10 @@ fi
 # 1. Init Occlum instance
 rm -rf occlum_instance && occlum new occlum_instance
 cd occlum_instance
-yq '.resource_limits.user_space_size.init = "320MB"' -i Occlum.yaml
+yq '.resource_limits.user_space_size.init = "320MB" |
+    .resource_limits.kernel_space_heap_size.init = "800MB" |
+    .resource_limits.kernel_space_heap_size.max = "800MB" |
+    .mount += [{"target": "/sfs", "type": "async_sfs", "source": "./run/async_sfs_image", "options": {"async_sfs_total_size": "5GB", "page_cache_size": "256MB"}}] ' -i Occlum.yaml
 
 # 2. Copy files into Occlum instance and build
 rm -rf image
@@ -34,5 +38,5 @@ copy_bom -f $bomfile --root image --include-dir /opt/occlum/etc/template
 occlum build
 
 # 3. Run the program
-echo -e "${GREEN}occlum run /bin/${FIO} /configs/${FIO_CONFIG}${NC}"
-occlum run /bin/${FIO} "/configs/${FIO_CONFIG}"
+echo -e "${GREEN}occlum run /bin/${FIO} /configs/${FIO_CONFIG} --filename=${FIO_PATH}${NC}"
+occlum run /bin/${FIO} "/configs/${FIO_CONFIG}" "--filename=${FIO_PATH}"
