@@ -40,7 +40,7 @@
 //! ```
 use crate::prelude::*;
 use crate::util::RangeQueryCtx;
-use crate::{Checkpoint, Cleaner, DataCache, LsmTree, SuperBlock};
+use crate::{Checkpoint, Cleaner, DataCache, LsmTree, Record, SuperBlock};
 use errno::return_errno;
 
 /// JinDisk.
@@ -105,11 +105,8 @@ impl JinDisk {
         }
 
         let checkpoint_disk_view = Self::checkpoint_disk_view(&superblock, &disk);
-        let checkpoint = Arc::new(
-            Checkpoint::load(&checkpoint_disk_view, &superblock, &root_key)
-                .await
-                .unwrap(),
-        );
+        let checkpoint =
+            Arc::new(Checkpoint::load(&checkpoint_disk_view, &superblock, &root_key).await?);
 
         let data_disk_view = Self::data_disk_view(&superblock, &disk);
         let data_cache = Arc::new(DataCache::new(
@@ -165,7 +162,8 @@ impl JinDisk {
 
     /// Return upper limit number of data blocks that `JinDisk` can manage.
     pub fn data_blocks(&self) -> usize {
-        self.superblock.num_data_segments * NUM_BLOCKS_PER_SEGMENT
+        (self.superblock.num_data_segments - self.superblock.num_over_provisioning)
+            * NUM_BLOCKS_PER_SEGMENT
     }
 
     /// Return checkpoint of `JinDisk`. (Test-purpose)
@@ -268,7 +266,9 @@ impl JinDisk {
     /// Sync all cached data in the device to the storage medium for durability.
     pub async fn sync(&self) -> Result<()> {
         info!("[JinDisk] sync");
-        // TODO: Handle partial failure around these region persistence
+        // TODO: Handle partial failure around these regions' persistence
+        self.data_cache.persist().await?;
+
         self.lsm_tree.persist().await?;
 
         self.checkpoint
@@ -292,12 +292,18 @@ impl JinDisk {
         let target_lba = bid as Lba;
 
         // Search data segment buffer
-        if let Some(data_block) = self.data_cache.search(target_lba).await {
-            buf.copy_from_slice(data_block.as_slice());
-            return Ok(buf.len());
+        if let Ok(read_len) = self.data_cache.search(target_lba, buf).await {
+            return Ok(read_len);
         }
+
         // Search lsm tree
         if let Some(record) = self.lsm_tree.search(target_lba).await {
+            let record = if record.is_negative() {
+                // Handle negative record
+                self.cleaner.find_migrant(target_lba).unwrap()
+            } else {
+                record
+            };
             self.disk.read(record.hba().to_offset(), buf).await?;
             let decrypted = DefaultCryptor::decrypt_block(
                 buf,
@@ -306,8 +312,7 @@ impl JinDisk {
             )?;
             buf.copy_from_slice(&decrypted);
         } else {
-            // Issue: Should we allow this happen?
-            error!("[JinDisk] Read nothing! Target lba: {:?}", target_lba);
+            // error!("[JinDisk] Read nothing! Target lba: {:?}", target_lba);
         }
 
         Ok(buf.len())
@@ -327,12 +332,24 @@ impl JinDisk {
         }
 
         // Search lsm tree
-        let mut searched_records = self.lsm_tree.search_range(query_ctx).await;
+        let searched_records = self.lsm_tree.search_range(query_ctx).await;
         debug_assert!(
             query_ctx.is_completed(),
             "Range query still not completed: {:?}",
             query_ctx
         );
+
+        // Handle negative records
+        let mut searched_records: Vec<Record> = searched_records
+            .into_iter()
+            .map(|r| {
+                if r.is_negative() {
+                    self.cleaner.find_migrant(r.lba()).unwrap()
+                } else {
+                    r
+                }
+            })
+            .collect();
 
         // Sort and group records' hbas in consecutive increasing order.
         searched_records.sort_by(|r1, r2| r1.hba().cmp(&r2.hba()));
@@ -389,7 +406,7 @@ impl JinDisk {
 
     // TODO: Support `trim()`
     #[allow(dead_code)]
-    fn trim(&self, _lbas: &[Lba]) -> Result<usize> {
+    async fn trim(&self, _lbas: &[Lba]) -> Result<usize> {
         unimplemented!()
     }
 }

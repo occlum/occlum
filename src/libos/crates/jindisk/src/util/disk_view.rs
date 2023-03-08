@@ -14,7 +14,7 @@ pub struct DiskView {
 impl DiskView {
     pub fn new(boundary: HbaRange, disk: Arc<dyn BlockDevice>) -> Self {
         debug_assert!(
-            (boundary.end().to_raw() as usize) < disk.total_blocks() && !boundary.is_empty(),
+            (boundary.end().to_raw() as usize) <= disk.total_blocks() && !boundary.is_empty(),
             "check boundary failed: {:?}",
             boundary
         );
@@ -44,9 +44,15 @@ impl DiskView {
         self.disk.total_bytes()
     }
 
+    pub fn boundary(&self) -> &HbaRange {
+        &self.boundary
+    }
+
     fn check_boundary(&self, addr: Hba, buf_len: usize) -> Result<()> {
         debug_assert!(buf_len % BLOCK_SIZE == 0);
-        if !self.boundary.is_within_range(addr) {
+        let target_range =
+            HbaRange::new(addr..addr + Hba::from_byte_offset_aligned(buf_len).unwrap().to_raw());
+        if !self.boundary.is_sub_range(&target_range) {
             return_errno!(EINVAL, "read/write buffer not in legal boundary")
         }
         Ok(())

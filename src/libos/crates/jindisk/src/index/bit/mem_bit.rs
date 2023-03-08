@@ -108,11 +108,16 @@ impl Bit {
         };
 
         // Search leaf block
-        if let Ok(record_pos) = leaf_block
-            .records()
-            .binary_search_by(|record| record.lba().cmp(&target_lba))
-        {
-            let searched_record = leaf_block.records()[record_pos].clone();
+        let target_records = leaf_block.records();
+        if let Ok(pos) = target_records.binary_search_by(|record| record.lba().cmp(&target_lba)) {
+            let searched_record = if target_records[pos].is_negative()
+                && target_records[pos.saturating_sub(1)].lba() == target_lba
+            {
+                // Check the one before the negative one
+                target_records[pos.saturating_sub(1)].clone()
+            } else {
+                target_records[pos].clone()
+            };
             if !contained_incache {
                 self.cache.put_leaf_block(leaf_record.clone(), leaf_block);
             }
@@ -151,11 +156,19 @@ impl Bit {
                     .ok()?;
 
                 // Search leaf block
-                if let Ok(pos) = leaf_block
-                    .records()
-                    .binary_search_by(|record| record.lba().cmp(&target_lba))
+                let target_records = leaf_block.records();
+                if let Ok(pos) =
+                    target_records.binary_search_by(|record| record.lba().cmp(&target_lba))
                 {
-                    return Some(leaf_block.records()[pos].clone());
+                    let searched_record = if target_records[pos].is_negative()
+                        && target_records[pos.saturating_sub(1)].lba() == target_lba
+                    {
+                        // Check the one before the negative one
+                        target_records[pos.saturating_sub(1)].clone()
+                    } else {
+                        target_records[pos].clone()
+                    };
+                    return Some(searched_record);
                 }
             }
         }
@@ -190,6 +203,7 @@ impl Bit {
 
     /// Collect all records from BIT.
     pub async fn collect_all_records(&self, disk: &DiskView) -> Result<Vec<Record>> {
+        // TODO: Pass reference of result vector
         self.collect_all_records_with(disk, SearchFlag::Cached)
             .await
     }

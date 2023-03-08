@@ -123,9 +123,9 @@ impl LockedMemTable {
         if let Some(mem_record) = mem_table.get(&target_lba) {
             match mem_record {
                 MemRecord::Regular(record) | MemRecord::NegativeThenRegular(record) => {
-                    return Some(record.clone());
+                    return Some(record.clone())
                 }
-                _ => {}
+                MemRecord::Negative(lba) => return Some(Record::new_negative(*lba)),
             }
         }
         None
@@ -147,7 +147,10 @@ impl LockedMemTable {
                     searched_records.push(record.clone());
                     query_ctx.complete(lba);
                 }
-                _ => {}
+                MemRecord::Negative(lba) => {
+                    searched_records.push(Record::new_negative(*lba));
+                    query_ctx.complete(*lba);
+                }
             }
         }
     }

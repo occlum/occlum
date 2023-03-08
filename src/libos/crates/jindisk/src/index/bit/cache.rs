@@ -52,27 +52,19 @@ impl BitCache {
         let internal_blocks = self.internal_blocks.read();
 
         // Search level 1
-        if let Ok(internal_pos) = root_block.internal_records().binary_search_by(|record| {
-            if record.lba_range().end() <= target_lba {
-                std::cmp::Ordering::Less
-            } else if record.lba_range().is_within_range(target_lba) {
-                std::cmp::Ordering::Equal
-            } else {
-                std::cmp::Ordering::Greater
-            }
-        }) {
+        if let Some(internal_pos) = root_block
+            .internal_records()
+            .iter()
+            .position(|record| record.lba_range().is_within_range(target_lba))
+        {
             let internal_block = &internal_blocks[internal_pos];
 
             // Search level 2
-            if let Ok(leaf_pos) = internal_block.leaf_records().binary_search_by(|record| {
-                if record.lba_range().end() <= target_lba {
-                    std::cmp::Ordering::Less
-                } else if record.lba_range().is_within_range(target_lba) {
-                    std::cmp::Ordering::Equal
-                } else {
-                    std::cmp::Ordering::Greater
-                }
-            }) {
+            if let Some(leaf_pos) = internal_block
+                .leaf_records()
+                .iter()
+                .position(|record| record.lba_range().is_within_range(target_lba))
+            {
                 return Some(internal_block.leaf_records()[leaf_pos].clone());
             }
         }

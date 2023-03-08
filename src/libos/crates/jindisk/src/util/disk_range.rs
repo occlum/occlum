@@ -8,7 +8,7 @@ use std::ops::Range;
 pub struct DiskRange<T>(Range<T>);
 
 impl<T: Copy + PartialOrd> DiskRange<T> {
-    pub fn new(range: Range<T>) -> Self {
+    pub const fn new(range: Range<T>) -> Self {
         Self(range)
     }
 

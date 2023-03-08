@@ -1,6 +1,6 @@
 //! Checkpoint region.
 use crate::prelude::*;
-use crate::SuperBlock;
+use crate::superblock::{CheckpointRegion, SuperBlock};
 
 use std::fmt::{self, Debug};
 
@@ -11,7 +11,7 @@ mod rit;
 mod svt;
 
 pub(crate) use self::bitc::BITC;
-pub(crate) use self::dst::{VictimSegment, DST};
+pub(crate) use self::dst::DST;
 pub(crate) use self::key_table::KeyTable;
 pub(crate) use self::rit::RIT;
 pub(crate) use self::svt::SVT;
@@ -23,7 +23,7 @@ pub struct Checkpoint {
     data_svt: RwLock<SVT>,
     index_svt: RwLock<SVT>,
     dst: RwLock<DST>,
-    rit: RwLock<RIT>,
+    rit: AsyncRwLock<RIT>,
     key_table: KeyTable,
     disk: DiskView,
 }
@@ -47,7 +47,7 @@ impl Checkpoint {
                 superblock.data_region_addr,
                 superblock.num_data_segments,
             )),
-            rit: RwLock::new(RIT::new(
+            rit: AsyncRwLock::new(RIT::new(
                 superblock.checkpoint_region.rit_addr,
                 superblock.data_region_addr,
                 disk.clone(),
@@ -73,7 +73,7 @@ impl Checkpoint {
         &self.dst
     }
 
-    pub fn rit(&self) -> &RwLock<RIT> {
+    pub fn rit(&self) -> &AsyncRwLock<RIT> {
         &self.rit
     }
 
@@ -85,6 +85,10 @@ impl Checkpoint {
 impl Checkpoint {
     pub async fn persist(&self, superblock: &SuperBlock, root_key: &Key) -> Result<()> {
         let region = &superblock.checkpoint_region;
+        if self.still_initialized() {
+            return self.commit_pflag(&region, Pflag::Initialized).await;
+        }
+
         self.bitc
             .write()
             .persist(&self.disk, region.bitc_addr, root_key)
@@ -101,21 +105,29 @@ impl Checkpoint {
             .write()
             .persist(&self.disk, region.dst_addr, root_key)
             .await?;
-        self.rit.write().persist(root_key).await?;
+        self.rit.write().await.persist(root_key).await?;
         self.key_table
             .persist(&self.disk, region.keytable_addr, root_key)
             .await?;
+
+        self.commit_pflag(&region, Pflag::Commited).await?;
         Ok(())
     }
 
     pub async fn load(disk: &DiskView, superblock: &SuperBlock, root_key: &Key) -> Result<Self> {
         let region = &superblock.checkpoint_region;
+        match Self::check_pflag(disk, region).await {
+            Pflag::NotCommited => return_errno!(EINVAL, "checkpoint region not persisted yet"),
+            Pflag::Initialized => return Ok(Self::new(superblock, disk.clone())),
+            Pflag::Commited => {}
+        }
+
         let bitc = BITC::load(disk, region.bitc_addr, root_key).await?;
         bitc.init_bit_caches(disk).await?;
         let data_svt = SVT::load(disk, region.data_svt_addr, root_key).await?;
         let index_svt = SVT::load(disk, region.index_svt_addr, root_key).await?;
         let dst = DST::load(disk, region.dst_addr, root_key).await?;
-        let rit = RIT::load(disk, superblock.data_region_addr, region.rit_addr, root_key).await?;
+        let rit = RIT::load(disk, region.rit_addr, superblock.data_region_addr, root_key).await?;
         let key_table = KeyTable::load(disk, region.keytable_addr, root_key).await?;
 
         Ok(Self {
@@ -123,10 +135,61 @@ impl Checkpoint {
             data_svt: RwLock::new(data_svt),
             index_svt: RwLock::new(index_svt),
             dst: RwLock::new(dst),
-            rit: RwLock::new(rit),
+            rit: AsyncRwLock::new(rit),
             key_table,
             disk: disk.clone(),
         })
+    }
+
+    async fn check_pflag(disk: &DiskView, region: &CheckpointRegion) -> Pflag {
+        let mut pflag_buf = [0u8; BLOCK_SIZE];
+        disk.read(region.region_addr, &mut pflag_buf).await.unwrap();
+        Pflag::check_pflag(&pflag_buf)
+    }
+
+    async fn commit_pflag(&self, region: &CheckpointRegion, pflag: Pflag) -> Result<()> {
+        let mut pflag_buf = [0u8; BLOCK_SIZE];
+        Pflag::commit_pflag(pflag, &mut pflag_buf);
+        self.disk
+            .write(region.region_addr, &pflag_buf)
+            .await
+            .map(|_| ())
+    }
+
+    fn still_initialized(&self) -> bool {
+        self.bitc().read().max_bit_version() == 0
+    }
+}
+
+/// Persist flag.
+#[derive(Clone, Copy, Debug)]
+enum Pflag {
+    NotCommited,
+    Commited,
+    Initialized,
+}
+
+impl Pflag {
+    fn check_pflag(pflag_buf: &[u8]) -> Pflag {
+        debug_assert!(pflag_buf.len() == BLOCK_SIZE);
+        if pflag_buf == &[Pflag::Commited as u8; BLOCK_SIZE] {
+            Pflag::Commited
+        } else if pflag_buf == &[Pflag::Initialized as u8; BLOCK_SIZE] {
+            Pflag::Initialized
+        } else {
+            Pflag::NotCommited
+        }
+    }
+
+    fn commit_pflag(pflag: Pflag, pflag_buf: &mut [u8]) {
+        debug_assert!(pflag_buf.len() == BLOCK_SIZE);
+        match pflag {
+            Pflag::Commited => pflag_buf.copy_from_slice(&[Pflag::Commited as u8; BLOCK_SIZE]),
+            Pflag::Initialized => {
+                pflag_buf.copy_from_slice(&[Pflag::Initialized as u8; BLOCK_SIZE])
+            }
+            _ => {}
+        }
     }
 }
 
@@ -196,7 +259,7 @@ impl Debug for Checkpoint {
             .field("Data_SVT", &self.data_svt.read())
             .field("Index_SVT", &self.index_svt.read())
             .field("DST", &self.dst.read())
-            .field("RIT", &self.rit.read())
+            .field("RIT", &())
             .field("KeyTable", &self.key_table)
             .finish()
     }

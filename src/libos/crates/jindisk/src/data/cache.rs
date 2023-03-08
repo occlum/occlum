@@ -60,7 +60,7 @@ impl DataCache {
     }
 
     /// Search the data block from a target lba.
-    pub async fn search(&self, target_lba: Lba) -> Option<DataBlock> {
+    pub async fn search(&self, target_lba: Lba, buf: &mut [u8]) -> Result<usize> {
         let ar_lock = self.arw_lock.read().await;
 
         let cap = self.capacity;
@@ -73,13 +73,13 @@ impl DataCache {
             .chain((cur + 1..cap).into_iter().rev())
         {
             let seg_buf = &self.buffer_pool[i];
-            if let Some(data_block) = seg_buf.search(target_lba) {
-                return Some(data_block);
+            if let Ok(buf_len) = seg_buf.search(target_lba, buf) {
+                return Ok(buf_len);
             }
         }
 
         drop(ar_lock);
-        None
+        Err(errno!(ENOENT, "search not found"))
     }
 
     /// Range search multi data blocks from consecutive lbas.
@@ -124,9 +124,12 @@ impl DataCache {
 
             // Background writeback
             let cur_buf = current_buf.clone();
+            // Clear events
+            cur_buf.clear_events();
+            // TODO: Fix timing sequence across each segment buffer
             #[cfg(feature = "sgx")]
             async_rt::task::spawn(async move {
-                let _ = cur_buf.encrypt_and_persist(lsm_tree).await;
+                cur_buf.encrypt_and_persist(lsm_tree).await.unwrap();
             });
             // Foreground writeback (Test-purpose)
             #[cfg(not(feature = "sgx"))]
@@ -160,6 +163,18 @@ impl DataCache {
 
         // No newer data found, migrate this block
         self.insert_block(lba, buf, lsm_tree).await?;
+
+        drop(aw_lock);
+        Ok(())
+    }
+
+    pub async fn persist(&self) -> Result<()> {
+        let aw_lock = self.arw_lock.write().await;
+
+        // TODO: Flush partial filled `SegmentBuffer` first
+        for seg_buf in &self.buffer_pool {
+            seg_buf.wait_writeback().await?;
+        }
 
         drop(aw_lock);
         Ok(())
@@ -219,29 +234,49 @@ impl SegmentBuffer {
         Ok(is_full)
     }
 
+    async fn wait_writeback(&self) -> Result<()> {
+        let mut state = self.state.lock();
+
+        loop {
+            match *state {
+                // `Vacant` indicates available to insert
+                CacheState::Vacant => {
+                    break;
+                }
+                // `Full | Flushing | Clearing` indicates current buffer is busy,
+                // need to wait for a event (wait until it becomes `Vacant` again)
+                CacheState::Full | CacheState::Flushing | CacheState::Clearing => {
+                    drop(state);
+                    self.wait_events(Events::OUT).await?;
+                    state = self.state.lock();
+                }
+            }
+        }
+
+        drop(state);
+        Ok(())
+    }
+
     /// Search the data block from a target lba.
-    pub fn search(&self, target_lba: Lba) -> Option<DataBlock> {
+    pub fn search(&self, target_lba: Lba, buf: &mut [u8]) -> Result<usize> {
         let state = self.state.lock();
-        let mut searched_block = None;
 
         match *state {
             // `Vacant | Full | Flushing` indicates available to read
             CacheState::Vacant | CacheState::Full | CacheState::Flushing => {
-                self.plain_data_blocks
-                    .read()
-                    .get(&target_lba)
-                    .map(|data_block| {
-                        // TODO: Try avoid memory copy here
-                        searched_block.insert(data_block.clone())
-                    });
-                drop(state);
+                if let Some(data_block) = self.plain_data_blocks.read().get(&target_lba) {
+                    buf.copy_from_slice(data_block.as_slice());
+                    drop(state);
+                    return Ok(buf.len());
+                }
             }
             // `Clearing` indicates target data block is being flushed and cleared.
             // We just return `None` and the data will be found next step (from index)
             CacheState::Clearing => {}
         }
 
-        searched_block
+        drop(state);
+        Err(errno!(ENOENT, "search not found"))
     }
 
     /// Range search multi data blocks from consecutive lbas.
@@ -259,12 +294,13 @@ impl SegmentBuffer {
                         query_ctx.complete(lba);
                     }
                 }
-                drop(state);
             }
             // `Clearing` indicates target data block is being flushed and cleared.
             // We just return `None` and the data will be found next step (from index)
             CacheState::Clearing => {}
         }
+
+        drop(state);
     }
 
     /// Allocate and bind a segment to current segment buffer.
@@ -319,6 +355,10 @@ impl SegmentBuffer {
         Ok(())
     }
 
+    fn clear_events(&self) {
+        self.pollee.reset_events();
+    }
+
     #[allow(unused)]
     fn set_state(&self, new_state: CacheState) {
         let mut state = self.state.lock();
@@ -334,8 +374,6 @@ impl SegmentBuffer {
     async fn encrypt_and_persist(&self, lsm_tree: Arc<LsmTree>) -> Result<()> {
         assert!(*self.state.lock() == CacheState::Full);
         *self.state.lock() = CacheState::Flushing;
-        // Clear events
-        self.pollee.reset_events();
 
         let data_blocks = self.plain_data_blocks.read();
         debug_assert!(data_blocks.len() == self.capacity);
@@ -362,6 +400,7 @@ impl SegmentBuffer {
         drop(data_blocks);
 
         let mut wbufs = Vec::with_capacity(self.capacity);
+        let mut new_records = Vec::with_capacity(self.capacity);
         for (lba, cipher_block) in sorted_cb.iter_mut() {
             // Collect cipher block bufs
             // Safety.
@@ -375,26 +414,30 @@ impl SegmentBuffer {
             // Currently, no need to search index and collect older data blocks
             // thanks to delayed block reclamation policy.
 
-            // Build record and insert into index
-            lsm_tree
-                .insert(
-                    *lba,
-                    Record::new(*lba, block_addr, cipher_block.cipher_meta().clone()),
-                )
-                .await?;
-
-            // Update RIT
-            self.checkpoint
-                .rit()
-                .write()
-                .insert(block_addr, *lba)
-                .await?;
+            // Build new record
+            new_records.push(Record::new(
+                *lba,
+                block_addr,
+                cipher_block.cipher_meta().clone(),
+            ));
 
             block_addr = block_addr + 1 as _;
         }
 
         // Write back cipher blocks to disk
         self.write_consecutive_blocks(seg_addr, wbufs).await?;
+
+        for new_record in new_records {
+            // Update RIT
+            self.checkpoint
+                .rit()
+                .write()
+                .await
+                .insert(new_record.hba(), new_record.lba())
+                .await?;
+            // Update index only when data are successfully persisted
+            lsm_tree.insert(new_record.lba(), new_record).await?;
+        }
 
         // Update state and clear buffer
         *self.state.lock() = CacheState::Clearing;

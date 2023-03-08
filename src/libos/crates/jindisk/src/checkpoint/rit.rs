@@ -61,11 +61,11 @@ impl RIT {
 
     pub async fn load(
         disk: &DiskView,
-        data_region_addr: Hba,
         region_addr: Hba,
+        data_region_addr: Hba,
         _root_key: &Key,
     ) -> Result<Self> {
-        Ok(Self::new(data_region_addr, region_addr, disk.clone()))
+        Ok(Self::new(region_addr, data_region_addr, disk.clone()))
     }
 }
 

@@ -34,7 +34,7 @@ pub const INDEX_SEGMENT_SIZE: usize = BIT_SIZE_ON_DISK;
 
 /// # JinDisk
 // Batch read threshold (Range query trigger condition)
-pub const BATCH_READ_THRESHOLD: usize = 4 * BLOCK_SIZE;
+pub const BATCH_READ_THRESHOLD: usize = 2 * BLOCK_SIZE;
 
 /// # Data
 // Segment Id
@@ -46,7 +46,7 @@ pub const NUM_BLOCKS_PER_SEGMENT: usize = SEGMENT_SIZE / BLOCK_SIZE;
 // Number of blocks in one segment buffer
 pub const SEGMENT_BUFFER_CAPACITY: usize = NUM_BLOCKS_PER_SEGMENT;
 // Number of segment buffers in pool
-pub const BUFFER_POOL_CAPACITY: usize = 8;
+pub const BUFFER_POOL_CAPACITY: usize = 16;
 
 /// # Garbage collection
 pub const GC_WATERMARK: usize = 8;

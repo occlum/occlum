@@ -1,5 +1,5 @@
 //! Block Index Table Catalog (BITC).
-use crate::index::bit::{Bit, BitId, BIT_SIZE};
+use crate::index::bit::{Bit, BitId, BitVersion, BIT_SIZE};
 use crate::index::LsmLevel;
 use crate::prelude::*;
 
@@ -9,7 +9,7 @@ use std::fmt::{self, Debug};
 /// Block Index Table Catalog.
 /// Manage all BITs in index (lsm tree).
 pub struct BITC {
-    max_bit_version: u32,
+    max_bit_version: BitVersion,
     l0_bit: Option<Bit>,
     l1_bits: Vec<Bit>,
 }
@@ -24,7 +24,7 @@ impl BITC {
     }
 
     /// Assign a version to BIT (monotonic increased)
-    pub fn assign_version(&mut self) -> u32 {
+    pub fn assign_version(&mut self) -> BitVersion {
         self.max_bit_version += 1;
         self.max_bit_version
     }
@@ -43,6 +43,10 @@ impl BITC {
             _ => panic!("illegal lsm level"),
         };
         old_l0_bit
+    }
+
+    pub fn max_bit_version(&self) -> BitVersion {
+        self.max_bit_version
     }
 
     pub fn l0_bit(&self) -> Option<Bit> {
@@ -124,7 +128,7 @@ impl BITC {
         Ok(())
     }
 
-    pub fn from(max_bit_version: u32, l0_bit: Option<Bit>, l1_bits: Vec<Bit>) -> Self {
+    pub fn from(max_bit_version: BitVersion, l0_bit: Option<Bit>, l1_bits: Vec<Bit>) -> Self {
         Self {
             max_bit_version,
             l0_bit,
@@ -159,7 +163,7 @@ impl Serialize for BITC {
     {
         let mut offset = 0;
         let decode_err = EINVAL;
-        let max_bit_version = u32::from_le_bytes(
+        let max_bit_version = BitVersion::from_le_bytes(
             buf[offset..offset + U32_SIZE]
                 .try_into()
                 .map_err(|_| decode_err)?,

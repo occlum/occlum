@@ -30,12 +30,17 @@ impl KeyTable {
     }
 
     pub fn get_or_insert(&self, block_addr: Hba) -> Key {
+        fn seg_addr(region_addr: Hba, block_addr: Hba) -> Hba {
+            Hba::new(align_down(
+                (block_addr - region_addr.to_raw()).to_raw() as _,
+                NUM_BLOCKS_PER_SEGMENT,
+            ) as _)
+                + region_addr.to_raw()
+        }
+
         self.table
             .write()
-            .entry(Hba::new(align_down(
-                (block_addr - self.data_region_addr.to_raw()).to_raw() as _,
-                NUM_BLOCKS_PER_SEGMENT,
-            ) as _))
+            .entry(seg_addr(self.data_region_addr, block_addr))
             .or_insert(DefaultCryptor::gen_random_key())
             .clone()
     }

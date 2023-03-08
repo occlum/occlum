@@ -48,7 +48,7 @@ impl DST {
                 if is_valid {
                     *num_valid + 1
                 } else {
-                    *num_valid - 1
+                    num_valid.saturating_sub(1)
                 }
             };
             self.validity_tracker[*num_valid].insert(seg_addr);
