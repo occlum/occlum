@@ -667,7 +667,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/fio && ./download_and_build_fio.sh"
 
     - name: Run fio test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/fio && SGX_MODE=SIM ./run_fio_on_occlum.sh fio-seq-read.fio"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/fio && SGX_MODE=SIM ./run_fio_on_occlum.sh fio-seq-read.fio /root/fio-seq-read"
 
   Cross_world_unix_socket_test:
     runs-on: ubuntu-20.04
@@ -807,7 +807,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/rocksdb && ./dl_and_build_rocksdb.sh"
 
     - name: Prepare occlum instance and Run benchmark of Rocksdb
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/rocksdb && SGX_MODE=SIM ./run_benchmark.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/rocksdb && SGX_MODE=SIM ./run_benchmark.sh /tmp"
 
   Filebench_test:
     runs-on: ubuntu-20.04

@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 
-set $dir=/tmp
+set $dir=/sfs
 set $nfiles=10000
 set $meandirwidth=20
 set $filesize=128k

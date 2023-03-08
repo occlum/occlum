@@ -976,6 +976,56 @@ jobs:
       if: ${{ always() }}
       run: docker stop ${{ env.CONTAINER_NAME }}
 
+  JinDisk_test:
+    timeout-minutes: 180
+    if: github.event_name == 'push' || github.event_name == 'schedule' || ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX2-HW]]
+
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
+
+    - name: Checkout code
+      if: github.event_name == 'push' || github.event_name == 'schedule'
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+
+    - name: Checkout code from fork
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') }}
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Run FIO test
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/src/libos/crates/jindisk/tests/benchmarks/fio;
+            ./run_fio.sh fio-microbench.fio /dev/jindisk"
+
+    - name: Run Filebench test
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/src/libos/crates/jindisk/tests/benchmarks/filebench;
+            ./run_filebench.sh varmail;
+            ./run_filebench.sh fileserver"
+
+    - name: Run RocksDB test
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/src/libos/crates/jindisk/tests/benchmarks/rocksdb;
+            ./run_rocksdb.sh"
+
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop ${{ env.CONTAINER_NAME }}
+
   Stress_test_with_musl:
     timeout-minutes: 360
     if: github.event_name == 'schedule'

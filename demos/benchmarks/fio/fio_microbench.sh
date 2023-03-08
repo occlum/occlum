@@ -3,18 +3,22 @@ set -e
 
 CUR_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 MICRO_CONFIG="fio-microbench.fio"
+MICRO_PATH=$1
 
 function fio_prepare()
 {
-    ./download_and_build_fio.sh
+    if [ ! -d fio_src ];then
+        echo -e "Download and build FIO first"
+        ./download_and_build_fio.sh
+    fi
 }
 
 function fio_run()
 {
     echo ""
-    echo "*** Doing fio microbenchmarks ***"
+    echo "*** Doing FIO microbenchmarks ***"
 
-    ./run_fio_on_occlum.sh ${MICRO_CONFIG} | tee output.txt
+    ./run_fio_on_occlum.sh ${MICRO_CONFIG} ${MICRO_PATH} | tee output.txt
 }
 
 function fio_result()
