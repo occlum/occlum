@@ -47,13 +47,15 @@ pub fn apply_memtable_reclaim_policy<'a>(
         };
 
         if let Some(reclaimed_hba) = reclaimed_hba {
-            // Delayed block reclamation
-            if checkpoint
+            // Check if the hba has already been processed by cleaning
+            let avail_to_reclaim = checkpoint
                 .rit()
                 .write()
-                .check_valid(reclaimed_hba, target_lba)
                 .await
-            {
+                .check_valid(reclaimed_hba, target_lba)
+                .await;
+            if avail_to_reclaim {
+                // Delayed block reclamation
                 checkpoint
                     .dst()
                     .write()

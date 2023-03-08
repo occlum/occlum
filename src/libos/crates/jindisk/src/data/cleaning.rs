@@ -1,8 +1,8 @@
 //! Data segment cleaning (garbage collection) policy.
-use crate::checkpoint::VictimSegment;
 use crate::prelude::*;
 use crate::{Checkpoint, DataCache, LsmTree, Record};
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 // Cleaner. Used to execute different cleaning policy.
@@ -14,6 +14,7 @@ struct Inner {
     checkpoint: Arc<Checkpoint>,
     a_lock: AsyncMutex<()>,
     is_dropped: AtomicBool,
+    migrants: RwLock<HashMap<Lba, Record>>,
 }
 
 impl Cleaner {
@@ -28,6 +29,7 @@ impl Cleaner {
             checkpoint,
             a_lock: AsyncMutex::new(()),
             is_dropped: AtomicBool::new(false),
+            migrants: RwLock::new(HashMap::new()),
         }));
 
         // Start background task
@@ -52,9 +54,9 @@ impl Cleaner {
                 let mut timeout = GC_BACKGROUND_PERIOD;
                 let _ = waiter.wait_timeout(Some(&mut timeout)).await;
 
-                let _ = this
-                    .exec_background_cleaning(data_cache.clone(), lsm_tree.clone())
-                    .await;
+                this.exec_background_cleaning(data_cache.clone(), lsm_tree.clone())
+                    .await
+                    .unwrap();
             }
         });
     }
@@ -74,6 +76,10 @@ impl Cleaner {
         // Check remaining free segment
         data_svt.num_segments() - data_svt.num_allocated() <= threshold
     }
+
+    pub fn find_migrant(&self, lba: Lba) -> Option<Record> {
+        self.0.find_migrant(lba)
+    }
 }
 
 impl Inner {
@@ -84,12 +90,12 @@ impl Inner {
     ) -> Result<()> {
         let guard = self.a_lock.lock().await;
 
-        // Pick a victim segment from `DST`
-        let victim_seg = self.checkpoint.dst().read().pick_victim();
-        if let Some(victim) = victim_seg {
-            self.exec_cleaning(&victim, data_cache, lsm_tree).await?;
-            debug!("\n[Foreground Cleaning] complete. {:?}\n", victim);
-        }
+        let victim = self
+            .pick_victim(NUM_BLOCKS_PER_SEGMENT)
+            .await
+            .ok_or(errno!(EINVAL, "cannot pick a victim"))?;
+        self.exec_cleaning(&victim, data_cache, lsm_tree).await?;
+        debug!("\n[Foreground Cleaning] complete. {:?}\n", victim);
 
         drop(guard);
         Ok(())
@@ -105,18 +111,19 @@ impl Inner {
         let mut gc_cnt = 0usize;
         const GC_COUNT: usize = GC_WATERMARK;
         for _ in 0..GC_COUNT {
-            // Pick a victim segment from `DST`
-            let victim_seg = self.checkpoint.dst().read().pick_victim();
-            if let Some(victim) = victim_seg {
-                if victim.valid_blocks().len() > NUM_BLOCKS_PER_SEGMENT / 2 {
-                    break;
-                }
-                self.exec_cleaning(&victim, data_cache.clone(), lsm_tree.clone())
-                    .await?;
+            let victim = self.pick_victim(NUM_BLOCKS_PER_SEGMENT / 2).await;
+            if victim.is_some() {
+                self.exec_cleaning(
+                    victim.as_ref().unwrap(),
+                    data_cache.clone(),
+                    lsm_tree.clone(),
+                )
+                .await?;
                 gc_cnt += 1;
             }
         }
 
+        self.banish_migrants();
         debug!("\n[Background Cleaning] complete. GC count: {}\n", gc_cnt);
         drop(guard);
         Ok(())
@@ -125,25 +132,12 @@ impl Inner {
     /// Concrete cleaning logic.
     async fn exec_cleaning(
         &self,
-        victim: &VictimSegment,
+        victim: &Victim,
         data_cache: Arc<DataCache>,
         lsm_tree: Arc<LsmTree>,
     ) -> Result<()> {
-        // Get valid blocks' lbas from `RIT`
-        let mut valid_blocks: Vec<(Lba, Hba)> = Vec::with_capacity(victim.valid_blocks().len());
-        let mut rit = self.checkpoint.rit().write();
-        for &block_hba in victim.valid_blocks() {
-            // Get and invalidate lba in `RIT`, avoid false block invalidation(during compaction)
-            // This step can ensure the victim segment can be fully freed
-            let existed_lba = rit.find_and_invalidate(block_hba).await.unwrap();
-            if existed_lba != NEGATIVE_LBA {
-                valid_blocks.push((existed_lba, block_hba));
-            }
-        }
-        drop(rit);
-
         // Search records from index by lbas
-        for (lba, hba) in valid_blocks {
+        for &(lba, hba) in victim.valid_blocks() {
             // Check if exists newer record
             let record = lsm_tree
                 .search_or_insert(lba, |searched_record| {
@@ -160,6 +154,8 @@ impl Inner {
                 // Newer data are written so we just ignore current block
                 continue;
             }
+
+            self.migrants.write().insert(record.lba(), record.clone());
 
             // Read and decrypt from disk
             let mut rbuf = [0u8; BLOCK_SIZE];
@@ -191,10 +187,66 @@ impl Inner {
 
         Ok(())
     }
+
+    async fn pick_victim(&self, threshold: usize) -> Option<Victim> {
+        let dst = self.checkpoint.dst().read();
+        // Pick a victim segment from `DST`
+        let victim_seg = dst.pick_victim()?;
+        if victim_seg.valid_blocks().len() > threshold {
+            return None;
+        }
+
+        // Get valid blocks' lbas from `RIT`
+        let mut valid_blocks: Vec<(Lba, Hba)> = Vec::with_capacity(victim_seg.valid_blocks().len());
+        let mut rit = self.checkpoint.rit().write().await;
+        for &block_hba in victim_seg.valid_blocks() {
+            // Get and invalidate lba in `RIT`, avoid false block invalidation(during compaction)
+            // This step can ensure the victim segment can be fully freed
+            let existed_lba = rit.find_and_invalidate(block_hba).await.unwrap();
+            if existed_lba != NEGATIVE_LBA {
+                valid_blocks.push((existed_lba, block_hba));
+            }
+        }
+
+        drop(rit);
+        drop(dst);
+        Some(Victim::new(victim_seg.segment_addr(), valid_blocks))
+    }
+
+    fn find_migrant(&self, lba: Lba) -> Option<Record> {
+        self.migrants.read().get(&lba).map(|r| r.clone())
+    }
+
+    fn banish_migrants(&self) {
+        self.migrants.write().clear();
+    }
 }
 
 impl Drop for Cleaner {
     fn drop(&mut self) {
         self.0.is_dropped.store(true, Ordering::Relaxed);
+    }
+}
+
+#[derive(Clone, Debug)]
+struct Victim {
+    segment_addr: Hba,
+    valid_blocks: Vec<(Lba, Hba)>,
+}
+
+impl Victim {
+    pub fn new(segment_addr: Hba, valid_blocks: Vec<(Lba, Hba)>) -> Self {
+        Self {
+            segment_addr,
+            valid_blocks,
+        }
+    }
+
+    pub fn segment_addr(&self) -> Hba {
+        self.segment_addr
+    }
+
+    pub fn valid_blocks(&self) -> &Vec<(Lba, Hba)> {
+        &self.valid_blocks
     }
 }

@@ -20,6 +20,8 @@ pub struct SuperBlock {
 
     /// Number of data segments
     pub num_data_segments: usize,
+    /// Number of over provisioning data segemnts
+    pub num_over_provisioning: usize,
     /// Number of index segments
     pub num_index_segments: usize,
 
@@ -106,6 +108,7 @@ impl SuperBlock {
             block_size: BLOCK_SIZE,
             segment_size: SEGMENT_SIZE,
             num_data_segments,
+            num_over_provisioning: DATA_OVER_PROVISIONING,
             num_index_segments,
             superblock_addr,
             data_region_addr,
@@ -132,7 +135,7 @@ impl CheckpointRegion {
             RIT::calc_size_on_disk(num_data_segments),
             KeyTable::calc_size_on_disk(num_data_segments),
         );
-        let bitc_addr = region_addr;
+        let bitc_addr = region_addr + 1 as _; // PFLAG at begin
         let data_svt_addr = bitc_addr + Hba::from_byte_offset_aligned(bitc_size).unwrap().to_raw();
         let index_svt_addr = data_svt_addr
             + Hba::from_byte_offset_aligned(data_svt_size)

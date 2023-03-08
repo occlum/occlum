@@ -1,5 +1,5 @@
 //! Lsm tree compaction policy.
-use super::bit::{Bit, BitBuilder, BitId};
+use super::bit::{Bit, BitBuilder, BitId, MAX_RECORD_NUM_PER_BIT};
 use super::mem_table::LockedMemTable;
 use crate::index::lsm_tree::LsmLevel;
 use crate::prelude::*;
@@ -50,7 +50,7 @@ impl Compactor {
         let seg_addr = checkpoint.index_svt().write().pick_avail_seg().unwrap();
 
         // TODO: Optimize this padding logic
-        Record::padding_records(&mut records, MAX_MEM_TABLE_CAPACITY);
+        Record::padding_records(&mut records, MAX_RECORD_NUM_PER_BIT);
         let level = 0 as LsmLevel;
         // Build a new BIT
         let bit = BitBuilder::new(seg_addr)
@@ -124,7 +124,7 @@ impl Compactor {
             }
         }
 
-        // Collect L1 bits from newer to older
+        // Collect L1 BITs from newer to older
         for l1_bit in overlapped_bits {
             let l1_records = l1_bit.collect_all_records(disk).await?;
             for l1_record in l1_records.into_iter() {
@@ -138,12 +138,13 @@ impl Compactor {
                 }
                 if records_merge_map.contains_key(&lba) {
                     // Check if the hba has already been processed by cleaning
-                    if checkpoint
+                    let avail_to_reclaim = checkpoint
                         .rit()
                         .write()
-                        .check_valid(l1_record.hba(), lba)
                         .await
-                    {
+                        .check_valid(l1_record.hba(), lba)
+                        .await;
+                    if avail_to_reclaim {
                         // Delayed block reclamation
                         checkpoint
                             .dst()
@@ -162,9 +163,9 @@ impl Compactor {
         debug_assert!(records_merged.is_sorted_by_key(|record| record.lba()));
 
         // TODO: Optimize this padding logic
-        Record::padding_records(&mut records_merged, MAX_MEM_TABLE_CAPACITY);
+        Record::padding_records(&mut records_merged, MAX_RECORD_NUM_PER_BIT);
         // Construct several new BITs
-        for sub_records in records_merged.chunks(MAX_MEM_TABLE_CAPACITY) {
+        for sub_records in records_merged.chunks(MAX_RECORD_NUM_PER_BIT) {
             // Pick an available segment from index SVT
             let seg_addr = checkpoint.index_svt().write().pick_avail_seg().unwrap();
 

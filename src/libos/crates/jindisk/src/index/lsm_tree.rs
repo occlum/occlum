@@ -112,11 +112,12 @@ impl LsmTree {
             let wq = self.wq.clone();
             #[cfg(feature = "sgx")]
             async_rt::task::spawn(async move {
-                let _ = compactor
+                compactor
                     .exec_minor_compaction(mem_table, disk, checkpoint, || {
                         wq.wake_all();
                     })
-                    .await;
+                    .await
+                    .unwrap();
             });
             // Foreground compaction (Test-purpose)
             #[cfg(not(feature = "sgx"))]
@@ -275,7 +276,7 @@ impl LsmTree {
         // Slow path
         let mut waiter = Waiter::new();
         self.wq.enqueue(&mut waiter);
-        while !mem_table.is_full() {
+        while mem_table.is_full() {
             let _ = waiter.wait().await;
         }
         self.wq.dequeue(&mut waiter);
@@ -287,14 +288,13 @@ impl LsmTree {
     /// Persist MemTables to BIT.
     pub async fn persist(&self) -> Result<()> {
         let aw_lock = self.arw_lock.write().await;
+        // Wait immutable MemTable to finish compaction
+        self.wait_compaction(self.immut_mem_table()).await?;
 
         let mem_table = self.mem_table();
         if mem_table.is_empty() {
             return Ok(());
         }
-        // Wait immutable MemTable to finish compaction
-        self.wait_compaction(self.immut_mem_table()).await?;
-
         self.compactor
             .exec_minor_compaction(
                 mem_table.clone(),
