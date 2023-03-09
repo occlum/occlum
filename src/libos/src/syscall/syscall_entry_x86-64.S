@@ -117,6 +117,11 @@ __occlum_sysret:
     movq TASK_USER_FS(%r12), %r11
     wrfsbase %r11
 #endif
+
+    mov pku_enabled(%rip), %rax
+    cmp $1, %rax
+    je update_pkru_in_sysret
+
     // Restore flags first
     leaq (17*8)(%rdi), %rsp
     popfq
@@ -145,40 +150,79 @@ __occlum_sysret:
     pop %rcx
     pop %rsp
 
-    // Store RFLAGS since `cmp` operation may overwrite it
-    pushfq
-    push %rax
 
-    mov pku_enabled(%rip), %rax
-    cmp $1, %rax
-    je update_pkru_in_sysret
-
-    pop %rax
-    popfq
 
     jmp *%gs:(TD_SYSCALL_RET_ADDR_OFFSET)
     // This should never happen
     ud2
 
 update_pkru_in_sysret:
-    pop %rax
+    // Arguments:
+    //      %rdi - user_context: &mut CpuContext
+
+    // The `push` and `pushfq` instructions after `pop %rsp` may over-written data in red zone
+    // of user function and causing a crash.
+    // One workaround is to skip the red zone at the top of the stack:
+    // 1. Enlarge stack by modifying context->rsp.
+    // 2. Store the original %rsp on stack.
+    // 3. before we return to user process, pop the original rsp from the stack.
+
+    movq (15*8)(%rdi), %rcx     // read %rsp value from user context
+    mov %rcx, %rax              // backup original %rsp value in %rax
+    sub (128+8), %rcx           // skip the red zone area (128 bytes according to x86_64 System V ABI)
+    movq %rcx, (15*8)(%rdi)     // save modified %rsp value to user context
+    movq %rax, (%rcx)           // save original %rsp value to user stack
+
+    // Restore flags first
+    leaq (17*8)(%rdi), %rsp
     popfq
-    push %gs:(TD_SYSCALL_RET_ADDR_OFFSET)
+
+    // Restore the return address
+    movq (16*8)(%rdi), %rcx       //save the return address in %rcx
+    movq %rcx, %gs:(TD_SYSCALL_RET_ADDR_OFFSET)
+
+    // Make %rsp points to the CPU context
+    mov %rdi, %rsp
+    // Restore the CPU context of the user space
+    pop %r8
+    pop %r9
+    pop %r10
+    pop %r11
+    pop %r12
+    pop %r13
+    pop %r14
+    pop %r15
+    pop %rdi
+    pop %rsi
+    pop %rbp
+    pop %rbx
+    pop %rdx
+    pop %rax
+    pop %rcx
+    pop %rsp
+
+    // Prepare for calling wrpkru
     pushfq
     push %rax
     push %rcx
     push %rdx
+    push %gs:(TD_SYSCALL_RET_ADDR_OFFSET)
 
-    xor %ecx, %ecx
-    xor %edx, %edx
+    mov $0, %ecx
+    mov $0, %edx
     mov $PKRU_USER, %eax
     wrpkru
 
+    pop %rdx    // for stack balancing
     pop %rdx
     pop %rcx
     pop %rax
     popfq
-    ret
+    pop %rsp
+
+    jmp *(128+8+5*8)(%rsp)
+    // This should never happen
+    ud2
 
     .global __occlum_syscall_c_abi
     .type __occlum_syscall_c_abi, @function
