@@ -163,22 +163,21 @@ __occlum_sysret:
 update_pkru_in_sysret:
     pop %rax
     popfq
-
-    sub $0x20, %rsp
-    mov %rax, (%rsp)
-    mov %rdx, 0x8(%rsp)
-    mov %rcx, 0x10(%rsp)
-    mov %gs:(TD_SYSCALL_RET_ADDR_OFFSET), %rcx
-    mov %rcx, 0x18(%rsp)
+    push %gs:(TD_SYSCALL_RET_ADDR_OFFSET)
+    pushfq
+    push %rax
+    push %rcx
+    push %rdx
 
     xor %ecx, %ecx
     xor %edx, %edx
     mov $PKRU_USER, %eax
     wrpkru
 
-    pop %rax
     pop %rdx
     pop %rcx
+    pop %rax
+    popfq
     ret
 
     .global __occlum_syscall_c_abi
