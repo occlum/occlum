@@ -59,4 +59,4 @@ Thanks go to [all these wonderful contributors to this project](CONTRIBUTORS.md)
 
 ## License
 
-Occlum is released by Ant Financial under BSD License. See the copyright information [here](LICENSE).
+Occlum is released under BSD License. See the copyright information [here](LICENSE).
