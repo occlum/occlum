@@ -844,26 +844,24 @@ impl AsyncInode for Inode {
             return_errno!(ENOTDIR, "not dir");
         }
 
-        let mut total_written_len = 0;
         for entry_id in ctx.pos()..inner.disk_inode.size as usize / DIRENT_SIZE {
             let entry = inner.read_direntry(entry_id).await?;
-            let written_len = match ctx.write_entry(
-                entry.name.as_ref(),
-                entry.id as u64,
-                VfsFileType::from(FileType::from(entry.type_)),
-            ) {
-                Ok(written_len) => written_len,
-                Err(_) => {
-                    if total_written_len == 0 {
-                        return_errno!(EINVAL, "write entry fail");
-                    } else {
-                        break;
-                    }
+            if ctx
+                .write_entry(
+                    entry.name.as_ref(),
+                    entry.id as u64,
+                    VfsFileType::from(FileType::from(entry.type_)),
+                )
+                .is_err()
+            {
+                if ctx.written_len() == 0 {
+                    return_errno!(EINVAL, "write entry fail");
+                } else {
+                    break;
                 }
-            };
-            total_written_len += written_len;
+            }
         }
-        Ok(total_written_len)
+        Ok(ctx.written_len())
     }
 
     fn fs(&self) -> Arc<dyn AsyncFileSystem> {
