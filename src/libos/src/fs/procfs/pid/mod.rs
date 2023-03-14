@@ -115,29 +115,21 @@ impl DirProcINode for LockedPidDirINode {
 
     fn iterate_entries(&self, mut ctx: &mut DirentWriterContext) -> vfs::Result<usize> {
         let file = self.0.read().unwrap();
-        let mut total_written_len = 0;
         let idx = ctx.pos();
 
         // Write first two special entries
-        write_first_two_entries!(idx, &mut ctx, &file, &mut total_written_len);
+        write_first_two_entries!(idx, &mut ctx, &file);
 
         // Write the normal entries
         let skipped = if idx < 2 { 0 } else { idx - 2 };
         for (name, inode) in file.entries.iter().skip(skipped) {
-            write_inode_entry!(&mut ctx, name, inode, &mut total_written_len);
+            write_inode_entry!(&mut ctx, name, inode);
         }
 
         // Write the fd entry
         if idx <= 2 + file.entries.len() {
-            write_entry!(
-                &mut ctx,
-                "fd",
-                PROC_INO,
-                vfs::FileType::Dir,
-                &mut total_written_len
-            );
+            write_entry!(&mut ctx, "fd", PROC_INO, vfs::FileType::Dir);
         }
-
-        Ok(total_written_len)
+        Ok(ctx.written_len())
     }
 }

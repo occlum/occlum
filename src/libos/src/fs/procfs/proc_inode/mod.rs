@@ -66,52 +66,45 @@ macro_rules! impl_inode_for_file_or_symlink {
 
 #[macro_export]
 macro_rules! write_first_two_entries {
-    ($idx: expr, $ctx:expr, $file:expr, $total_written:expr) => {
+    ($idx: expr, $ctx:expr, $file:expr) => {
         let idx = $idx;
         let file = $file;
 
         if idx == 0 {
             let this_inode = file.this.upgrade().unwrap();
-            write_inode_entry!($ctx, ".", &this_inode, $total_written);
+            write_inode_entry!($ctx, ".", &this_inode);
         }
         if idx <= 1 {
-            write_inode_entry!($ctx, "..", &file.parent, $total_written);
+            write_inode_entry!($ctx, "..", &file.parent);
         }
     };
 }
 
 #[macro_export]
 macro_rules! write_inode_entry {
-    ($ctx:expr, $name:expr, $inode:expr, $total_written:expr) => {
+    ($ctx:expr, $name:expr, $inode:expr) => {
         let ctx = $ctx;
         let name = $name;
         let ino = $inode.metadata()?.inode;
         let type_ = $inode.metadata()?.type_;
-        let total_written = $total_written;
 
-        write_entry!(ctx, name, ino, type_, total_written);
+        write_entry!(ctx, name, ino, type_);
     };
 }
 
 #[macro_export]
 macro_rules! write_entry {
-    ($ctx:expr, $name:expr, $ino:expr, $type_:expr, $total_written:expr) => {
+    ($ctx:expr, $name:expr, $ino:expr, $type_:expr) => {
         let ctx = $ctx;
         let name = $name;
         let ino = $ino;
         let type_ = $type_;
-        let total_written = $total_written;
 
-        match ctx.write_entry(name, ino as u64, type_) {
-            Ok(written_len) => {
-                *total_written += written_len;
-            }
-            Err(e) => {
-                if *total_written == 0 {
-                    return Err(e);
-                } else {
-                    return Ok(*total_written);
-                }
+        if let Err(e) = ctx.write_entry(name, ino as u64, type_) {
+            if ctx.written_len() == 0 {
+                return Err(e);
+            } else {
+                return Ok(ctx.written_len());
             }
         }
     };
