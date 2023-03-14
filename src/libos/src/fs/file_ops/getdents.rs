@@ -19,17 +19,17 @@ async fn getdents_common<T: Dirent>(fd: FileDesc, buf: &mut [u8]) -> Result<usiz
 
     let file_ref = current!().file(fd)?;
     let mut writer = DirentBufWriter::<T>::new(buf);
-    let written_size = if let Some(async_file_handle) = file_ref.as_async_file_handle() {
+    let written_len = if let Some(async_file_handle) = file_ref.as_async_file_handle() {
         async_file_handle.iterate_entries(&mut writer).await?
     } else {
         return_errno!(EBADF, "not an inode");
     };
-    Ok(written_size)
+    Ok(written_len)
 }
 
 struct DirentBufWriter<'a, T: Dirent> {
     buf: &'a mut [u8],
-    written_size: usize,
+    written_len: usize,
     phantom: PhantomData<T>,
 }
 
@@ -37,40 +37,34 @@ impl<'a, T: Dirent> DirentBufWriter<'a, T> {
     fn new(buf: &'a mut [u8]) -> Self {
         Self {
             buf,
-            written_size: 0,
+            written_len: 0,
             phantom: PhantomData,
         }
-    }
-
-    fn try_write(&mut self, name: &str, ino: u64, type_: FileType) -> Result<usize> {
-        let dirent: T = Dirent::new(name, ino, type_);
-        if self.buf.len() - self.written_size < dirent.rec_len() {
-            return_errno!(EINVAL, "the given buffer is too small");
-        }
-        dirent.dump(&mut self.buf[self.written_size..], name, type_)?;
-        self.written_size += dirent.rec_len();
-        Ok(dirent.rec_len())
     }
 }
 
 impl<'a, T: Dirent> DirentWriter for DirentBufWriter<'a, T> {
-    fn write_entry(
-        &mut self,
-        name: &str,
-        ino: u64,
-        type_: FileType,
-    ) -> rcore_fs::vfs::Result<usize> {
-        let written_len = self
-            .try_write(&name, ino, type_)
+    fn write_entry(&mut self, name: &str, ino: u64, type_: FileType) -> rcore_fs::vfs::Result<()> {
+        let dirent: T = Dirent::new(name, ino, type_);
+        if self.buf.len() - self.written_len < dirent.rec_len() {
+            return Err(FsError::InvalidParam);
+        }
+        dirent
+            .serialize(&mut self.buf[self.written_len..], name, type_)
             .map_err(|_| FsError::InvalidParam)?;
-        Ok(written_len)
+        self.written_len += dirent.rec_len();
+        Ok(())
+    }
+
+    fn written_len(&self) -> usize {
+        self.written_len
     }
 }
 
 trait Dirent: Sync + Send {
     fn new(name: &str, ino: u64, type_: FileType) -> Self;
     fn rec_len(&self) -> usize;
-    fn dump(&self, buf: &mut [u8], name: &str, type_: FileType) -> Result<()>;
+    fn serialize(&self, buf: &mut [u8], name: &str, type_: FileType) -> Result<()>;
 }
 
 /// Same with struct linux_dirent64
@@ -106,7 +100,7 @@ impl Dirent for LinuxDirent64 {
         self.rec_len as usize
     }
 
-    fn dump(&self, buf: &mut [u8], name: &str, _type_: FileType) -> Result<()> {
+    fn serialize(&self, buf: &mut [u8], name: &str, _type_: FileType) -> Result<()> {
         unsafe {
             let ptr = buf.as_mut_ptr() as *mut Self;
             ptr.write(*self);
@@ -154,7 +148,7 @@ impl Dirent for LinuxDirent {
         self.rec_len as usize
     }
 
-    fn dump(&self, buf: &mut [u8], name: &str, type_: FileType) -> Result<()> {
+    fn serialize(&self, buf: &mut [u8], name: &str, type_: FileType) -> Result<()> {
         unsafe {
             let ptr = buf.as_mut_ptr() as *mut Self;
             ptr.write(*self);

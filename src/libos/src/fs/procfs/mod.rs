@@ -159,23 +159,22 @@ impl DirProcINode for LockedProcRootINode {
 
     fn iterate_entries(&self, mut ctx: &mut DirentWriterContext) -> vfs::Result<usize> {
         let file = self.0.read().unwrap();
-        let mut total_written_len = 0;
         let idx = ctx.pos();
 
         // Write first two special entries
         if idx == 0 {
             let this_inode = file.this.upgrade().unwrap();
-            write_inode_entry!(&mut ctx, ".", &this_inode, &mut total_written_len);
+            write_inode_entry!(&mut ctx, ".", &this_inode);
         }
         if idx <= 1 {
             let parent_inode = file.this.upgrade().unwrap();
-            write_inode_entry!(&mut ctx, "..", &parent_inode, &mut total_written_len);
+            write_inode_entry!(&mut ctx, "..", &parent_inode);
         }
 
         // Write the non volatile entries
         let skipped = if idx < 2 { 0 } else { idx - 2 };
         for (name, inode) in file.non_volatile_entries.iter().skip(skipped) {
-            write_inode_entry!(&mut ctx, name, inode, &mut total_written_len);
+            write_inode_entry!(&mut ctx, name, inode);
         }
 
         // Write the pid entries
@@ -192,11 +191,10 @@ impl DirProcINode for LockedProcRootINode {
                 &mut ctx,
                 &process.pid().to_string(),
                 PROC_INO,
-                vfs::FileType::Dir,
-                &mut total_written_len
+                vfs::FileType::Dir
             );
         }
 
-        Ok(total_written_len)
+        Ok(ctx.written_len())
     }
 }
