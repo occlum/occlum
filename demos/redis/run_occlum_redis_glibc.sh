@@ -8,7 +8,7 @@ bomfile=${SCRIPT_DIR}/redis_glibc.yaml
 rm -rf occlum_instance
 occlum new occlum_instance
 cd occlum_instance
-yq '.resource_limits.user_space_size.init = "320MB"' -i Occlum.yaml
+yq '.resource_limits.user_space_size.max = "320MB"' -i Occlum.yaml
 
 rm -rf image
 copy_bom -f $bomfile --root image --include-dir /opt/occlum/etc/template

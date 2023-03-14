@@ -14,7 +14,7 @@ MYSQLD=mysqld
 rm -rf occlum_instance && occlum new occlum_instance
 pushd occlum_instance
 
-yq '.resource_limits.user_space_size.init = "8000MB" |
+yq '.resource_limits.user_space_size.max = "8000MB" |
     .resource_limits.kernel_space_heap_size.init = "1000MB" |
     .resource_limits.kernel_space_heap_size.max = "2000MB" ' -i Occlum.yaml
 

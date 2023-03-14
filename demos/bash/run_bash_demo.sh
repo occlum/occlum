@@ -16,7 +16,7 @@ pushd occlum_instance
 rm -rf image
 copy_bom -f $bomfile --root image --include-dir /opt/occlum/etc/template
 
-yq '.resource_limits.user_space_size.init = "600MB" |
+yq '.resource_limits.user_space_size.max = "600MB" |
     .resource_limits.kernel_space_stack_size ="2MB"	' -i Occlum.yaml
 
 occlum build

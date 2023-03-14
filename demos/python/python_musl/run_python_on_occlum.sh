@@ -20,8 +20,8 @@ cd occlum_instance
 if [ ! -d "image/lib/python3.7" ];then
     rm -rf image
     copy_bom -f ../python_musl.yaml --root image --include-dir /opt/occlum/etc/template
-    yq '.resource_limits.user_space_size.init = "320MB" |
-        .resource_limits.kernel_space_heap_size.init = "256MB" |
+    yq '.resource_limits.user_space_size.max = "320MB" |
+        .resource_limits.kernel_space_heap_size.max = "256MB" |
         .mount += [{"target": "/host", "type": "hostfs", "source": "."}] ' -i Occlum.yaml
 
     occlum build

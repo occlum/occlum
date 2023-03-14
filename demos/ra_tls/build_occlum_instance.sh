@@ -16,7 +16,7 @@ function build_instance() {
     mkdir occlum_$postfix
     pushd occlum_$postfix
     occlum init
-    yq '.resource_limits.user_space_size.init = "500MB" |
+    yq '.resource_limits.user_space_size.max = "500MB" |
         .metadata.debuggable = false' -i Occlum.yaml
 
     if [ "$postfix" == "server" ]; then

@@ -8,7 +8,7 @@ bomfile=${SCRIPT_DIR}/redis.yaml
 rm -rf occlum_instance
 occlum new occlum_instance
 cd occlum_instance
-yq '.resource_limits.user_space_size.init = "320MB"' -i Occlum.yaml
+yq '.resource_limits.user_space_size.max = "320MB"' -i Occlum.yaml
 
 # 2. Copy files into Occlum Workspace and Build
 rm -rf image

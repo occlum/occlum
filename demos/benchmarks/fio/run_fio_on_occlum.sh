@@ -26,8 +26,7 @@ fi
 # 1. Init Occlum instance
 rm -rf occlum_instance && occlum new occlum_instance
 cd occlum_instance
-yq '.resource_limits.user_space_size.init = "320MB" |
-    .resource_limits.kernel_space_heap_size.init = "800MB" |
+yq '.resource_limits.user_space_size.max = "320MB" |
     .resource_limits.kernel_space_heap_size.max = "800MB" |
     .mount += [{"target": "/sfs", "type": "async_sfs", "source": "./run/async_sfs_image", "options": {"async_sfs_total_size": "5GB", "page_cache_size": "256MB"}}] ' -i Occlum.yaml
 

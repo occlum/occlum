@@ -19,8 +19,8 @@ cd occlum_instance
 if [ ! -L "image/bin/python3" ];then
     rm -rf image
     copy_bom -f ../tensorflow_training.yaml --root image --include-dir /opt/occlum/etc/template
-    yq '.resource_limits.user_space_size.init = "5400MB" |
-        .resource_limits.kernel_space_heap_size.init = "512MB" |
+    yq '.resource_limits.user_space_size.max = "5400MB" |
+        .resource_limits.kernel_space_heap_size.max = "512MB" |
         .env.default += ["PYTHONHOME=/opt/python-occlum", "OMP_NUM_THREADS=1"]' \
         -i Occlum.yaml
 
