@@ -55,32 +55,24 @@ impl DirProcINode for LockedProcFdDirINode {
 
     fn iterate_entries(&self, mut ctx: &mut DirentWriterContext) -> vfs::Result<usize> {
         let file = self.0.read().unwrap();
-        let mut total_written_len = 0;
         let idx = ctx.pos();
 
         // Write first two special entries
-        write_first_two_entries!(idx, &mut ctx, &file, &mut total_written_len);
+        write_first_two_entries!(idx, &mut ctx, &file);
 
         // Write the fd entries
         let skipped = if idx < 2 { 0 } else { idx - 2 };
         let main_thread = match file.process_ref.main_thread() {
             Some(main_thread) => main_thread,
             None => {
-                return Ok(total_written_len);
+                return Ok(ctx.written_len());
             }
         };
         let fds = main_thread.files().lock().unwrap().fds();
         for fd in fds.iter().skip(skipped) {
-            write_entry!(
-                &mut ctx,
-                &fd.to_string(),
-                PROC_INO,
-                vfs::FileType::SymLink,
-                &mut total_written_len
-            );
+            write_entry!(&mut ctx, &fd.to_string(), PROC_INO, vfs::FileType::SymLink);
         }
-
-        Ok(total_written_len)
+        Ok(ctx.written_len())
     }
 }
 
