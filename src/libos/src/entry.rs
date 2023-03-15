@@ -108,48 +108,14 @@ pub extern "C" fn occlum_ecall_init(
         std::alloc::set_alloc_error_hook(oom_handle);
     });
 
-    // Parse host file
-    let resolv_conf_ptr = unsafe { (*file_buffer).resolv_conf_buf };
-    match parse_host_file(HostFile::ResolvConf, resolv_conf_ptr) {
-        Err(e) => {
-            error!("failed to parse /etc/resolv.conf: {}", e.backtrace());
-        }
-        Ok(resolv_conf_str) => {
-            *RESOLV_CONF_STR.write().unwrap() = Some(resolv_conf_str);
-            if let Err(e) = write_host_file(HostFile::ResolvConf) {
-                error!("failed to write /etc/resolv.conf: {}", e.backtrace());
-            }
-        }
-    }
-
-    let hostname_ptr = unsafe { (*file_buffer).hostname_buf };
-    match parse_host_file(HostFile::HostName, hostname_ptr) {
-        Err(e) => {
-            error!("failed to parse /etc/hostname: {}", e.backtrace());
-        }
-        Ok(hostname_str) => {
-            misc::init_nodename(&hostname_str);
-            *HOSTNAME_STR.write().unwrap() = Some(hostname_str);
-            if let Err(e) = write_host_file(HostFile::HostName) {
-                error!("failed to write /etc/hostname: {}", e.backtrace());
-            }
-        }
-    }
-
-    let hosts_ptr = unsafe { (*file_buffer).hosts_buf };
-    match parse_host_file(HostFile::Hosts, hosts_ptr) {
-        Err(e) => {
-            error!("failed to parse /etc/hosts: {}", e.backtrace());
-        }
-        Ok(hosts_str) => {
-            *HOSTS_STR.write().unwrap() = Some(hosts_str);
-            if let Err(e) = write_host_file(HostFile::Hosts) {
-                error!("failed to write /etc/hosts: {}", e.backtrace());
-            }
-        }
-    }
-
-    0
+    panic::catch_unwind(|| {
+        backtrace::__rust_begin_short_backtrace(|| {
+            // Ignore the error when parsing host files
+            let _ = parse_host_files(file_buffer);
+            0 as i32
+        })
+    })
+    .unwrap_or(ecall_errno!(EFAULT))
 }
 
 // hook for memory allocation error
@@ -452,4 +418,49 @@ fn merge_env(env: *const *const c_char) -> Result<Vec<CString>> {
 
     trace!("env_checked from env untrusted: {:?}", env_checked);
     Ok([env_keep, env_checked].concat())
+}
+
+// Parse host files
+fn parse_host_files(file_buffer: *const host_file_buffer) -> Result<i32> {
+    let resolv_conf_ptr = unsafe { (*file_buffer).resolv_conf_buf };
+    match parse_host_file(HostFile::ResolvConf, resolv_conf_ptr) {
+        Err(e) => {
+            error!("failed to parse /etc/resolv.conf: {}", e.backtrace());
+        }
+        Ok(resolv_conf_str) => {
+            *RESOLV_CONF_STR.write().unwrap() = Some(resolv_conf_str);
+            if let Err(e) = write_host_file(HostFile::ResolvConf) {
+                error!("failed to write /etc/resolv.conf: {}", e.backtrace());
+            }
+        }
+    }
+
+    let hostname_ptr = unsafe { (*file_buffer).hostname_buf };
+    match parse_host_file(HostFile::HostName, hostname_ptr) {
+        Err(e) => {
+            error!("failed to parse /etc/hostname: {}", e.backtrace());
+        }
+        Ok(hostname_str) => {
+            misc::init_nodename(&hostname_str);
+            *HOSTNAME_STR.write().unwrap() = Some(hostname_str);
+            if let Err(e) = write_host_file(HostFile::HostName) {
+                error!("failed to write /etc/hostname: {}", e.backtrace());
+            }
+        }
+    }
+
+    let hosts_ptr = unsafe { (*file_buffer).hosts_buf };
+    match parse_host_file(HostFile::Hosts, hosts_ptr) {
+        Err(e) => {
+            error!("failed to parse /etc/hosts: {}", e.backtrace());
+        }
+        Ok(hosts_str) => {
+            *HOSTS_STR.write().unwrap() = Some(hosts_str);
+            if let Err(e) = write_host_file(HostFile::Hosts) {
+                error!("failed to write /etc/hosts: {}", e.backtrace());
+            }
+        }
+    }
+
+    Ok(0)
 }
