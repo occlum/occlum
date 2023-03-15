@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1678573226762,
+  "lastUpdate": 1678918362832,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -2964,6 +2964,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2568,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Zheng, Qi",
+            "username": "qzheng527",
+            "email": "huaiqing.zq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "745a7619c9a53e2d0b8762daefb7716036d77e6a",
+          "message": "Modify the project license description",
+          "timestamp": "2023-03-10T06:46:38Z",
+          "url": "https://github.com/occlum/occlum/commit/745a7619c9a53e2d0b8762daefb7716036d77e6a"
+        },
+        "date": 1678918361490,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2418,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2418,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
