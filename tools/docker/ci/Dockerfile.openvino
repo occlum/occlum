@@ -1,11 +1,11 @@
 ARG OCCLUM_VERSION
-FROM occlum/ngo:$OCCLUM_VERSION-ubuntu20.04 as base
+FROM jessehui/ngo:1.0.0-rc1-ubuntu20.04-edmm-experiment as base
 LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
 
 ARG OCCLUM_BRANCH
 WORKDIR /root
 RUN rm -rf /root/demos && \
-    git clone -b $OCCLUM_BRANCH https://github.com/occlum/ngo.git occlum/ && \
+    git clone -b $OCCLUM_BRANCH https://github.com/jessehui/occlum.git occlum/ && \
     cp -r occlum/demos /root/demos && \
     rm -rf /root/occlum
 

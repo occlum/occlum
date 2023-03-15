@@ -3,7 +3,7 @@ ARG OCCLUM_VERSION
 FROM occlumbackup/occlum:latest-ubuntu18.04-tf_serving_base as binary_build
 WORKDIR /root
 
-FROM occlum/ngo:$OCCLUM_VERSION-ubuntu20.04 as base
+FROM jessehui/ngo:1.0.0-rc1-ubuntu20.04-edmm-experiment as base
 LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
 
 WORKDIR /root
@@ -11,7 +11,7 @@ COPY --from=binary_build /root/tensorflow_model_server /root/tensorflow_model_se
 
 ARG OCCLUM_BRANCH
 RUN apt-get update && apt-get install git && \
-    git clone -b $OCCLUM_BRANCH https://github.com/occlum/ngo.git occlum/ && \
+    git clone -b $OCCLUM_BRANCH https://github.com/jessehui/occlum.git occlum/ && \
     cd occlum && \
     cd demos/tensorflow/tensorflow_serving && \
     ./prepare_model_and_env.sh && \
