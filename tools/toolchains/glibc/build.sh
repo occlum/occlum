@@ -30,5 +30,5 @@ CFLAGS="-O2 -g ${EXTRA_CFLAGS}" ${SRC_DIR}/configure \
   --prefix=${INSTALL_DIR} --with-tls --without-selinux \
   --enable-stack-protector=strong --disable-nscd --disable-crypt \
   ${EXTRA_CONFIG_OPTION}
-make
+make -j$(nproc)
 make install
