@@ -21,8 +21,9 @@ targets:
   - target: /opt/occlum/glibc/lib
     copy:
       - files:
-          - /lib/x86_64-linux-gnu/libnss_dns.so.2
-          - /lib/x86_64-linux-gnu/libnss_files.so.2
+          - /opt/occlum/glibc/lib/libnss_files.so.2
+          - /opt/occlum/glibc/lib/libnss_dns.so.2
+          - /opt/occlum/glibc/lib/libresolv.so.2
   # etc files
   - target: /etc
     copy:
