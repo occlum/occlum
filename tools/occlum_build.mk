@@ -61,7 +61,7 @@ $(LIBOS): $(instance_dir)/build/.Occlum_sys.json.protected
 		ln -sf "$(libos_lib).$(occlum_version)" "libocclum-libos.so.$(major_ver)" && \
 		ln -sf "libocclum-libos.so.$(major_ver)" libocclum-libos.so ; \
 		$(call get_occlum_file_mac, "$(instance_dir)/build/.Occlum_sys.json.protected", "$(CONF_TMP_MAC)") && \
-		objcopy --update-section .builtin_config="$(CONF_TMP_MAC)" libocclum-libos.so && \
+		objcopy --update-section .builtin_config="$(CONF_TMP_MAC)" "$(libos_lib).$(occlum_version)" && \
 		rm -f "$(CONF_TMP_MAC)"
 
 $(instance_dir)/build/.Occlum_sys.json.protected: $(instance_dir)/build/.Occlum_sys.json
