@@ -38,12 +38,29 @@ int connect_with_server(const char *addr_string, const char *port_string) {
         THROW_ERROR("inet_pton error");
     }
 
-    ret = connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
-    if (ret < 0) {
-        close(sockfd);
-        THROW_ERROR("connect error");
+    int retry_num = 5;
+    while (retry_num > 0) {
+        ret = connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+        if (ret == 0) {
+            break;
+        }
+        if (ret < 0 && errno == ECONNREFUSED) {
+            // The server maynot be ready to accept. Try again later.
+            sleep(1);
+            retry_num--;
+            continue;
+        } else {
+            close(sockfd);
+            THROW_ERROR("connect error");
+        }
     }
 
+    if (retry_num == 0) {
+        close(sockfd);
+        THROW_ERROR("Retry connect multiple times. All failure");
+    }
+
+    printf("connected with server");
     return sockfd;
 }
 
