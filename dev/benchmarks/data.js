@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1678918908888,
+  "lastUpdate": 1679177495165,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -3044,6 +3044,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2418,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "LI Qing",
+            "username": "liqinggd",
+            "email": "geding.lq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "27a3c752097d85bafac3f80588e6874a396d232d",
+          "message": "[libos] Refine the getdents syscall.",
+          "timestamp": "2023-03-14T04:00:37Z",
+          "url": "https://github.com/occlum/occlum/commit/27a3c752097d85bafac3f80588e6874a396d232d"
+        },
+        "date": 1679177492978,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2757,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2756,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
