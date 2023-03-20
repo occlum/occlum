@@ -183,6 +183,10 @@ COPY --from=alpine /usr/lib/jvm/java-1.8-openjdk $JDK8_PATH
 RUN rm $JDK8_PATH/jre/lib/security/cacerts
 COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK8_PATH/jre/lib/security/cacerts
 
+# Install AECS Client library
+WORKDIR /tmp
+RUN cd aecs_client && ./build.sh && rm -rf /tmp/aecs_client
+
 # Install Occlum
 WORKDIR /root
 RUN cd occlum && \
