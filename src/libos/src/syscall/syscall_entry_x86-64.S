@@ -6,6 +6,11 @@
     .global __occlum_syscall_linux_pku_abi
     .type __occlum_syscall_linux_pku_abi, @function
 __occlum_syscall_linux_pku_abi:
+    // Skip the red zone aera (128 bytes according to x86_64 System V ABI)
+    // Use `lea` here since it does not modify FLAGS
+    lea -128(%rsp), %rsp
+
+    pushfq
     pushq %rcx
     pushq %rdx
     pushq %rax
@@ -18,6 +23,9 @@ __occlum_syscall_linux_pku_abi:
     popq %rax
     popq %rdx
     popq %rcx
+    popfq
+
+    lea 128(%rsp), %rsp
 
     .global __occlum_syscall_linux_abi
     .type __occlum_syscall_linux_abi, @function
@@ -145,6 +153,10 @@ __occlum_sysret:
     pop %rcx
     pop %rsp
 
+    // Skip the red zone aera (128 bytes according to x86_64 System V ABI)
+    // Use `lea` here since it does not modify FLAGS
+    lea -128(%rsp), %rsp
+
     // Store RFLAGS since `cmp` operation may overwrite it
     pushfq
     push %rax
@@ -156,30 +168,36 @@ __occlum_sysret:
     pop %rax
     popfq
 
+    lea 128(%rsp), %rsp
     jmp *%gs:(TD_SYSCALL_RET_ADDR_OFFSET)
     // This should never happen
     ud2
 
 update_pkru_in_sysret:
-    pop %rax
-    popfq
-
-    sub $0x20, %rsp
-    mov %rax, (%rsp)
-    mov %rdx, 0x8(%rsp)
-    mov %rcx, 0x10(%rsp)
+    // Prepare temporary stack area for saving the %rdx, %rdx and return address
+    lea -3*8(%rsp), %rsp
+    mov %rdx, (%rsp)
+    mov %rcx, 8(%rsp)
     mov %gs:(TD_SYSCALL_RET_ADDR_OFFSET), %rcx
-    mov %rcx, 0x18(%rsp)
+    mov %rcx, 2*8(%rsp)
 
     xor %ecx, %ecx
     xor %edx, %edx
     mov $PKRU_USER, %eax
     wrpkru
 
-    pop %rax
     pop %rdx
     pop %rcx
-    ret
+    // Skip the return address
+    lea 8(%rsp), %rsp
+
+    pop %rax
+    popfq
+    lea 128(%rsp), %rsp     // Restore the %rsp
+
+    jmp *(-128-3*8)(%rsp)
+    // This should never happen
+    ud2
 
     .global __occlum_syscall_c_abi
     .type __occlum_syscall_c_abi, @function
