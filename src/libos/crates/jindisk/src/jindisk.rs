@@ -63,21 +63,22 @@ impl JinDisk {
         let checkpoint_disk_view = Self::checkpoint_disk_view(&superblock, &disk);
         let checkpoint = Arc::new(Checkpoint::new(&superblock, checkpoint_disk_view));
 
+        let index_disk_view = Self::index_disk_view(&superblock, &disk);
+        let lsm_tree = Arc::new(LsmTree::new(index_disk_view, checkpoint.clone()));
+
         let data_disk_view = Self::data_disk_view(&superblock, &disk);
         let data_cache = Arc::new(DataCache::new(
             BUFFER_POOL_CAPACITY,
             data_disk_view.clone(),
             checkpoint.clone(),
+            lsm_tree.clone(),
         ));
-
-        let index_disk_view = Self::index_disk_view(&superblock, &disk);
-        let lsm_tree = Arc::new(LsmTree::new(index_disk_view, checkpoint.clone()));
 
         let cleaner = Cleaner::new(
             data_disk_view,
-            data_cache.clone(),
-            lsm_tree.clone(),
             checkpoint.clone(),
+            lsm_tree.clone(),
+            data_cache.clone(),
         );
         info!("[JinDisk] successfully created\n {:#?}", superblock);
 
@@ -108,21 +109,22 @@ impl JinDisk {
         let checkpoint =
             Arc::new(Checkpoint::load(&checkpoint_disk_view, &superblock, &root_key).await?);
 
+        let index_disk_view = Self::index_disk_view(&superblock, &disk);
+        let lsm_tree = Arc::new(LsmTree::new(index_disk_view, checkpoint.clone()));
+
         let data_disk_view = Self::data_disk_view(&superblock, &disk);
         let data_cache = Arc::new(DataCache::new(
             BUFFER_POOL_CAPACITY,
             data_disk_view.clone(),
             checkpoint.clone(),
+            lsm_tree.clone(),
         ));
-
-        let index_disk_view = Self::index_disk_view(&superblock, &disk);
-        let lsm_tree = Arc::new(LsmTree::new(index_disk_view, checkpoint.clone()));
 
         let cleaner = Cleaner::new(
             data_disk_view,
-            data_cache.clone(),
-            lsm_tree.clone(),
             checkpoint.clone(),
+            lsm_tree.clone(),
+            data_cache.clone(),
         );
         info!(
             "[JinDisk] successfully opened\n{:#?}\n{:#?}",
@@ -251,22 +253,16 @@ impl JinDisk {
             let write_buf = &buf[write_len..write_len + range.len()];
             write_len += self.write_one_block(range.block_id, write_buf).await?;
         }
-
-        // Segment cleaning trigger condition
-        if self.cleaner.need_cleaning(GC_WATERMARK) {
-            self.cleaner
-                .exec_foreground_cleaning(self.data_cache.clone(), self.lsm_tree.clone())
-                .await?;
-        }
-
         debug_assert!(write_len == buf.len());
+
+        // No need for foreground cleaning thanks to threaded logging
+
         Ok(write_len)
     }
 
     /// Sync all cached data in the device to the storage medium for durability.
     pub async fn sync(&self) -> Result<()> {
         info!("[JinDisk] sync");
-        // TODO: Handle partial failure around these regions' persistence
         self.data_cache.persist().await?;
 
         self.lsm_tree.persist().await?;
@@ -307,7 +303,7 @@ impl JinDisk {
             self.disk.read(record.hba().to_offset(), buf).await?;
             let decrypted = DefaultCryptor::decrypt_block(
                 buf,
-                &self.checkpoint.key_table().get_or_insert(record.hba()),
+                &self.checkpoint.key_table().fetch_key(record.hba()),
                 record.cipher_meta(),
             )?;
             buf.copy_from_slice(&decrypted);
@@ -365,7 +361,7 @@ impl JinDisk {
             for record in records {
                 let decrypted = DefaultCryptor::decrypt_block(
                     &rbuf[offset..offset + BLOCK_SIZE],
-                    &self.checkpoint.key_table().get_or_insert(record.hba()),
+                    &self.checkpoint.key_table().fetch_key(record.hba()),
                     record.cipher_meta(),
                 )?;
                 offset += BLOCK_SIZE;
@@ -383,9 +379,7 @@ impl JinDisk {
         let target_lba = bid as Lba;
 
         // Write to data cache
-        self.data_cache
-            .insert(target_lba, buf, self.lsm_tree.clone())
-            .await?;
+        self.data_cache.insert(target_lba, buf).await?;
 
         Ok(buf.len())
     }

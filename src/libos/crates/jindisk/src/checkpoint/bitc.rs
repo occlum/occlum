@@ -53,7 +53,7 @@ impl BITC {
         self.l0_bit.as_ref().map(|bit| bit.clone())
     }
 
-    pub fn remove_bit(&mut self, bit_id: &BitId, level: LsmLevel) {
+    pub fn remove_bit(&mut self, bit_id: BitId, level: LsmLevel) {
         match level {
             0 => {
                 if let Some(l0_bit) = &self.l0_bit {
@@ -229,7 +229,7 @@ mod tests {
         assert!(old_l0_bit.is_some());
 
         let searched_bit = bitc.find_bit_by_lba(Lba::new(15), level0);
-        assert!(*searched_bit.unwrap().id() == id);
+        assert!(searched_bit.unwrap().id() == id);
 
         let id = BitId::from_byte_offset(5 * INDEX_SEGMENT_SIZE);
         let old_l0_bit = bitc.insert_bit(
@@ -240,14 +240,14 @@ mod tests {
         assert!(old_l0_bit.is_none());
 
         let searched_bit = bitc.find_bit_by_lba(Lba::new(25), level1);
-        assert!(*searched_bit.unwrap().id() == id);
+        assert!(searched_bit.unwrap().id() == id);
 
         let searched_bit =
             bitc.find_bit_by_lba_range(&LbaRange::new(Lba::new(20)..Lba::new(25)), level1);
-        assert!(*searched_bit[0].id() == id);
+        assert!(searched_bit[0].id() == id);
 
         assert!(
-            *bitc.find_bit_by_lba_range(&LbaRange::new(Lba::new(15)..Lba::new(25)), level1)[0].id()
+            bitc.find_bit_by_lba_range(&LbaRange::new(Lba::new(15)..Lba::new(25)), level1)[0].id()
                 == id
         );
         assert!(bitc
@@ -273,7 +273,7 @@ mod tests {
         bitc.encode(&mut bytes).unwrap();
         let decoded_bitc = BITC::decode(&bytes).unwrap();
 
-        assert_eq!(*decoded_bitc.l0_bit().unwrap().id(), id);
+        assert_eq!(decoded_bitc.l0_bit().unwrap().id(), id);
         assert_eq!(format!("{:?}", bitc), format!("{:?}", decoded_bitc));
     }
 

@@ -11,35 +11,39 @@ pub struct Cleaner(Arc<Inner>);
 
 struct Inner {
     disk: DiskView,
-    checkpoint: Arc<Checkpoint>,
     a_lock: AsyncMutex<()>,
     is_dropped: AtomicBool,
     migrants: RwLock<HashMap<Lba, Record>>,
+    checkpoint: Arc<Checkpoint>,
+    lsm_tree: Arc<LsmTree>,
+    data_cache: Arc<DataCache>,
 }
 
 impl Cleaner {
     pub fn new(
         disk: DiskView,
-        data_cache: Arc<DataCache>,
-        lsm_tree: Arc<LsmTree>,
         checkpoint: Arc<Checkpoint>,
+        lsm_tree: Arc<LsmTree>,
+        data_cache: Arc<DataCache>,
     ) -> Self {
         let new_self = Self(Arc::new(Inner {
             disk,
-            checkpoint,
             a_lock: AsyncMutex::new(()),
             is_dropped: AtomicBool::new(false),
             migrants: RwLock::new(HashMap::new()),
+            checkpoint,
+            lsm_tree,
+            data_cache,
         }));
 
         // Start background task
-        new_self.spawn_cleaning_task(data_cache, lsm_tree);
+        new_self.spawn_cleaning_task();
 
         new_self
     }
 
     /// Spawn a background cleaning task.
-    pub fn spawn_cleaning_task(&self, data_cache: Arc<DataCache>, lsm_tree: Arc<LsmTree>) {
+    pub fn spawn_cleaning_task(&self) {
         let this = self.0.clone();
         // Spawn the background cleaning task
         async_rt::task::spawn(async move {
@@ -54,23 +58,19 @@ impl Cleaner {
                 let mut timeout = GC_BACKGROUND_PERIOD;
                 let _ = waiter.wait_timeout(Some(&mut timeout)).await;
 
-                this.exec_background_cleaning(data_cache.clone(), lsm_tree.clone())
-                    .await
-                    .unwrap();
+                this.exec_background_cleaning().await.unwrap();
             }
         });
     }
 
     /// Do foreground cleaning.
-    pub async fn exec_foreground_cleaning(
-        &self,
-        data_cache: Arc<DataCache>,
-        lsm_tree: Arc<LsmTree>,
-    ) -> Result<()> {
-        self.0.exec_foreground_cleaning(data_cache, lsm_tree).await
+    #[allow(unused)]
+    pub async fn exec_foreground_cleaning(&self) -> Result<()> {
+        self.0.exec_foreground_cleaning().await
     }
 
     /// Whether cleaning is needed given a threshold.
+    #[allow(unused)]
     pub fn need_cleaning(&self, threshold: usize) -> bool {
         let data_svt = self.0.checkpoint.data_svt().read();
         // Check remaining free segment
@@ -83,63 +83,55 @@ impl Cleaner {
 }
 
 impl Inner {
-    async fn exec_foreground_cleaning(
-        &self,
-        data_cache: Arc<DataCache>,
-        lsm_tree: Arc<LsmTree>,
-    ) -> Result<()> {
+    async fn exec_foreground_cleaning(&self) -> Result<()> {
         let guard = self.a_lock.lock().await;
 
         let victim = self
             .pick_victim(NUM_BLOCKS_PER_SEGMENT)
             .await
             .ok_or(errno!(EINVAL, "cannot pick a victim"))?;
-        self.exec_cleaning(&victim, data_cache, lsm_tree).await?;
-        debug!("\n[Foreground Cleaning] complete. {:?}\n", victim);
+        let block_cnt = self.exec_cleaning(&victim).await?;
+        debug!(
+            "\n[Foreground Cleaning] complete. GC migrated {} blocks number, freed segment: {:?}\n",
+            block_cnt,
+            victim.segment_addr()
+        );
 
         drop(guard);
         Ok(())
     }
 
-    async fn exec_background_cleaning(
-        &self,
-        data_cache: Arc<DataCache>,
-        lsm_tree: Arc<LsmTree>,
-    ) -> Result<()> {
+    async fn exec_background_cleaning(&self) -> Result<()> {
         let guard = self.a_lock.lock().await;
 
-        let mut gc_cnt = 0usize;
-        const GC_COUNT: usize = GC_WATERMARK;
-        for _ in 0..GC_COUNT {
-            let victim = self.pick_victim(NUM_BLOCKS_PER_SEGMENT / 2).await;
+        let mut block_cnt = 0usize;
+        let mut seg_cnt = 0usize;
+        let threshold = NUM_BLOCKS_PER_SEGMENT * 5 / 8;
+        for _ in 0..GC_WATERMARK {
+            let victim = self.pick_victim(threshold).await;
             if victim.is_some() {
-                self.exec_cleaning(
-                    victim.as_ref().unwrap(),
-                    data_cache.clone(),
-                    lsm_tree.clone(),
-                )
-                .await?;
-                gc_cnt += 1;
+                seg_cnt += 1;
+                block_cnt += self.exec_cleaning(victim.as_ref().unwrap()).await?;
             }
         }
 
         self.banish_migrants();
-        debug!("\n[Background Cleaning] complete. GC count: {}\n", gc_cnt);
+        debug!(
+            "\n[Background Cleaning] complete. GC migrated {} blocks, freed {} segments\n",
+            block_cnt, seg_cnt
+        );
         drop(guard);
         Ok(())
     }
 
-    /// Concrete cleaning logic.
-    async fn exec_cleaning(
-        &self,
-        victim: &Victim,
-        data_cache: Arc<DataCache>,
-        lsm_tree: Arc<LsmTree>,
-    ) -> Result<()> {
+    /// Concrete cleaning logic. On success, return
+    /// the number of migrated blocks.
+    async fn exec_cleaning(&self, victim: &Victim) -> Result<usize> {
         // Search records from index by lbas
         for &(lba, hba) in victim.valid_blocks() {
             // Check if exists newer record
-            let record = lsm_tree
+            let record = self
+                .lsm_tree
                 .search_or_insert(lba, |searched_record| {
                     if searched_record.unwrap().hba() == hba {
                         // Insert a negative record, avoid double invalidation
@@ -162,15 +154,13 @@ impl Inner {
             self.disk.read(record.hba(), &mut rbuf).await?;
             let decrypted = DefaultCryptor::decrypt_block(
                 &rbuf,
-                &self.checkpoint.key_table().get_or_insert(record.hba()),
+                &self.checkpoint.key_table().fetch_key(record.hba()),
                 record.cipher_meta(),
             )?;
             rbuf.copy_from_slice(&decrypted);
 
             // Migrate still-valid ones by inserting back into data cache
-            data_cache
-                .search_or_insert(lba, &rbuf, lsm_tree.clone())
-                .await?;
+            self.data_cache.search_or_insert(lba, &rbuf).await?;
         }
 
         // Validate the segment from `DST`
@@ -185,11 +175,11 @@ impl Inner {
             .write()
             .validate_seg(victim.segment_addr());
 
-        Ok(())
+        Ok(victim.valid_blocks().len())
     }
 
     async fn pick_victim(&self, threshold: usize) -> Option<Victim> {
-        let dst = self.checkpoint.dst().read();
+        let mut dst = self.checkpoint.dst().write();
         // Pick a victim segment from `DST`
         let victim_seg = dst.pick_victim()?;
         if victim_seg.valid_blocks().len() > threshold {

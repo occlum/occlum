@@ -130,20 +130,20 @@ impl DiskBit {
         }
     }
 
-    pub fn id(&self) -> &BitId {
-        &self.id
+    pub fn id(&self) -> BitId {
+        self.id
     }
 
     pub fn lba_range(&self) -> &LbaRange {
         self.root_record.lba_range()
     }
 
-    pub fn version(&self) -> &BitVersion {
-        &self.version
+    pub fn version(&self) -> BitVersion {
+        self.version
     }
 
-    pub fn level(&self) -> &LsmLevel {
-        &self.level
+    pub fn level(&self) -> LsmLevel {
+        self.level
     }
 
     pub fn root_record(&self) -> &RootRecord {

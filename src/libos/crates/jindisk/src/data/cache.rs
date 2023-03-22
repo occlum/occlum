@@ -5,15 +5,17 @@ use crate::util::RangeQueryCtx;
 use crate::{Checkpoint, LsmTree, Record};
 
 use std::collections::HashMap;
+use std::future::Future;
 use std::ptr::NonNull;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 /// A cache for data. It consists of a buffer pool to manage
 /// multi segment buffers.
 pub struct DataCache {
     buffer_pool: Vec<Arc<SegmentBuffer>>,
-    current_idx: AtomicUsize,
+    curr_idx: AtomicUsize,
     capacity: usize,
+    is_init: AtomicBool,
     arw_lock: AsyncRwLock<()>,
 }
 
@@ -21,16 +23,21 @@ pub struct DataCache {
 pub struct SegmentBuffer {
     plain_data_blocks: RwLock<HashMap<Lba, DataBlock>>,
     state: Mutex<CacheState>,
-    segment_addr: Mutex<Option<Hba>>,
     capacity: usize,
     disk: DiskView,
-    checkpoint: Arc<Checkpoint>,
     pollee: Pollee,
+    checkpoint: Arc<Checkpoint>,
+    lsm_tree: Arc<LsmTree>,
 }
 
 impl DataCache {
     /// Initialize a `DataCache` given a capacity of pool.
-    pub fn new(pool_capacity: usize, disk: DiskView, checkpoint: Arc<Checkpoint>) -> Self {
+    pub fn new(
+        pool_capacity: usize,
+        disk: DiskView,
+        checkpoint: Arc<Checkpoint>,
+        lsm_tree: Arc<LsmTree>,
+    ) -> Self {
         Self {
             buffer_pool: {
                 let mut pool = Vec::with_capacity(pool_capacity);
@@ -39,21 +46,23 @@ impl DataCache {
                         SEGMENT_BUFFER_CAPACITY,
                         disk.clone(),
                         checkpoint.clone(),
+                        lsm_tree.clone(),
                     )))
                 }
                 pool
             },
-            current_idx: AtomicUsize::new(0),
+            curr_idx: AtomicUsize::new(0),
             capacity: pool_capacity,
+            is_init: AtomicBool::new(true),
             arw_lock: AsyncRwLock::new(()),
         }
     }
 
     /// Insert a block buffer to cache.
-    pub async fn insert(&self, lba: Lba, buf: &[u8], lsm_tree: Arc<LsmTree>) -> Result<()> {
+    pub async fn insert(&self, lba: Lba, buf: &[u8]) -> Result<()> {
         let aw_lock = self.arw_lock.write().await;
 
-        self.insert_block(lba, buf, lsm_tree).await?;
+        self.insert_block(lba, buf).await?;
 
         drop(aw_lock);
         Ok(())
@@ -64,7 +73,7 @@ impl DataCache {
         let ar_lock = self.arw_lock.read().await;
 
         let cap = self.capacity;
-        let cur = self.current_idx.load(Ordering::SeqCst);
+        let cur = self.curr_idx.load(Ordering::Relaxed);
 
         // Search ordered by access time
         for i in (0..cur + 1)
@@ -88,7 +97,7 @@ impl DataCache {
         let ar_lock = self.arw_lock.read().await;
 
         let cap = self.capacity;
-        let cur = self.current_idx.load(Ordering::SeqCst);
+        let cur = self.curr_idx.load(Ordering::Relaxed);
 
         // Search ordered by access time
         for i in (0..cur + 1)
@@ -107,62 +116,63 @@ impl DataCache {
     }
 
     /// Insert one data block to cache.
-    async fn insert_block(&self, lba: Lba, buf: &[u8], lsm_tree: Arc<LsmTree>) -> Result<()> {
-        let cur_idx = self.current_idx.load(Ordering::SeqCst);
-        let current_buf = &self.buffer_pool[cur_idx];
+    async fn insert_block(&self, lba: Lba, buf: &[u8]) -> Result<()> {
+        let curr_idx = self.curr_idx.load(Ordering::Relaxed);
+        let curr_buf = &self.buffer_pool[curr_idx];
 
-        // Allocate and bind a data segment
-        current_buf.alloc_segment();
+        let is_full = curr_buf.insert(lba, buf).await?;
 
-        let is_full = current_buf.insert(lba, buf).await?;
-
-        // If the buffer is full, change current index of pool
+        // If the segment buffer is full, shift current index of pool
         // and start a writeback task
         if is_full {
-            self.current_idx
-                .store((cur_idx + 1) % self.capacity, Ordering::SeqCst);
+            self.curr_idx
+                .store((curr_idx + 1) % self.capacity, Ordering::Relaxed);
 
+            curr_buf.clear_events(SegBufEvents::Writeback);
+
+            let curr_buf = curr_buf.clone();
+            let prev_buf = if curr_idx == 0 {
+                self.buffer_pool.last().unwrap().clone()
+            } else {
+                self.buffer_pool[curr_idx - 1].clone()
+            };
+            let is_init = if self.is_init.load(Ordering::Relaxed) {
+                self.is_init.store(false, Ordering::Relaxed);
+                true
+            } else {
+                false
+            };
             // Background writeback
-            let cur_buf = current_buf.clone();
-            // Clear events
-            cur_buf.clear_events();
-            // TODO: Fix timing sequence across each segment buffer
             #[cfg(feature = "sgx")]
             async_rt::task::spawn(async move {
-                cur_buf.encrypt_and_persist(lsm_tree).await.unwrap();
+                curr_buf
+                    .encrypt_and_persist(prev_buf.wait_indexing(), is_init)
+                    .await
+                    .unwrap();
             });
             // Foreground writeback (Test-purpose)
             #[cfg(not(feature = "sgx"))]
-            cur_buf.encrypt_and_persist(lsm_tree).await?;
+            curr_buf
+                .encrypt_and_persist(prev_buf.wait_indexing(), is_init)
+                .await?;
         }
         Ok(())
     }
 
     /// Search or insert a data block to cache.
     /// Used for segment cleaning, must be atomic.
-    pub async fn search_or_insert(
-        &self,
-        lba: Lba,
-        buf: &[u8],
-        lsm_tree: Arc<LsmTree>,
-    ) -> Result<()> {
+    pub async fn search_or_insert(&self, lba: Lba, buf: &[u8]) -> Result<()> {
         let aw_lock = self.arw_lock.write().await;
 
-        let mut has_newer_data = false;
-        // Search each segment buffer
         for seg_buf in &self.buffer_pool {
-            if seg_buf.check_newer(lba, lsm_tree.clone()).await {
-                has_newer_data = true;
-                break;
+            if seg_buf.check_newer(lba).await {
+                // Newer data are written, no need to migrate old one
+                return Ok(());
             }
-        }
-        if has_newer_data {
-            // Newer data are written, no need to migrate old one
-            return Ok(());
         }
 
         // No newer data found, migrate this block
-        self.insert_block(lba, buf, lsm_tree).await?;
+        self.insert_block(lba, buf).await?;
 
         drop(aw_lock);
         Ok(())
@@ -171,9 +181,12 @@ impl DataCache {
     pub async fn persist(&self) -> Result<()> {
         let aw_lock = self.arw_lock.write().await;
 
-        // TODO: Flush partial filled `SegmentBuffer` first
         for seg_buf in &self.buffer_pool {
             seg_buf.wait_writeback().await?;
+
+            // Flush partial filled segment buffer
+            seg_buf.set_state(CacheState::Full);
+            seg_buf.encrypt_and_persist(async { Ok(()) }, false).await?;
         }
 
         drop(aw_lock);
@@ -183,15 +196,20 @@ impl DataCache {
 
 impl SegmentBuffer {
     /// Initialize a `SegmentBuffer` given a capacity.
-    pub fn new(capacity: usize, disk: DiskView, checkpoint: Arc<Checkpoint>) -> Self {
+    pub fn new(
+        capacity: usize,
+        disk: DiskView,
+        checkpoint: Arc<Checkpoint>,
+        lsm_tree: Arc<LsmTree>,
+    ) -> Self {
         Self {
             plain_data_blocks: RwLock::new(HashMap::new()),
             state: Mutex::new(CacheState::Vacant),
-            segment_addr: Mutex::new(None),
             capacity,
-            checkpoint,
-            pollee: Pollee::new(Events::empty()),
             disk,
+            pollee: Pollee::new(Events::empty()),
+            checkpoint,
+            lsm_tree,
         }
     }
 
@@ -210,7 +228,7 @@ impl SegmentBuffer {
                 // need to wait for a event (wait until it becomes `Vacant` again)
                 CacheState::Full | CacheState::Flushing | CacheState::Clearing => {
                     drop(state);
-                    self.wait_events(Events::OUT).await?;
+                    self.wait_events(SegBufEvents::Writeback).await?;
                     state = self.state.lock();
                 }
             }
@@ -232,29 +250,6 @@ impl SegmentBuffer {
         drop(state);
 
         Ok(is_full)
-    }
-
-    async fn wait_writeback(&self) -> Result<()> {
-        let mut state = self.state.lock();
-
-        loop {
-            match *state {
-                // `Vacant` indicates available to insert
-                CacheState::Vacant => {
-                    break;
-                }
-                // `Full | Flushing | Clearing` indicates current buffer is busy,
-                // need to wait for a event (wait until it becomes `Vacant` again)
-                CacheState::Full | CacheState::Flushing | CacheState::Clearing => {
-                    drop(state);
-                    self.wait_events(Events::OUT).await?;
-                    state = self.state.lock();
-                }
-            }
-        }
-
-        drop(state);
-        Ok(())
     }
 
     /// Search the data block from a target lba.
@@ -303,26 +298,8 @@ impl SegmentBuffer {
         drop(state);
     }
 
-    /// Allocate and bind a segment to current segment buffer.
-    fn alloc_segment(&self) {
-        let mut seg_addr = self.segment_addr.lock();
-        // Check if current segment is allocated
-        if seg_addr.is_some() {
-            return;
-        }
-
-        // Allocate and bind a segment
-        // Assume to success every time due to segment cleaning policy
-        let picked_seg = self.checkpoint.data_svt().write().pick_avail_seg().unwrap();
-
-        // Insert to `DST`
-        self.checkpoint.dst().write().validate_or_insert(picked_seg);
-
-        let _ = seg_addr.insert(picked_seg);
-    }
-
     /// Check if segment buffer already contains written block of target lba.
-    async fn check_newer(&self, target_lba: Lba, lsm_tree: Arc<LsmTree>) -> bool {
+    async fn check_newer(&self, target_lba: Lba) -> bool {
         let state = self.state.lock();
 
         match *state {
@@ -336,7 +313,7 @@ impl SegmentBuffer {
             // `Clearing` indicates the buffer is just being flushed.
             // We should check index immediately
             CacheState::Clearing => {
-                if let Some(record) = lsm_tree.search(target_lba).await {
+                if let Some(record) = self.lsm_tree.search(target_lba).await {
                     if !record.is_negative() {
                         return true;
                     }
@@ -347,19 +324,71 @@ impl SegmentBuffer {
         false
     }
 
-    async fn wait_events(&self, events: Events) -> Result<()> {
+    /// Allocate and a segment to current segment buffer.
+    fn try_alloc_segment(&self) -> Result<Hba> {
+        // Allocate a segment from data `SVT`
+        let picked_seg = self.checkpoint.data_svt().write().pick_avail_seg()?;
+
+        // Update the segment info in `DST`
+        self.checkpoint.dst().write().validate_or_insert(picked_seg);
+
+        Ok(picked_seg)
+    }
+
+    async fn wait_writeback(&self) -> Result<()> {
+        let mut state = self.state.lock();
+
+        loop {
+            match *state {
+                // `Vacant` indicates available to insert
+                CacheState::Vacant => {
+                    break;
+                }
+                // `Full | Flushing | Clearing` indicates current buffer is busy,
+                // need to wait for a event (wait until it becomes `Vacant` again)
+                CacheState::Full | CacheState::Flushing | CacheState::Clearing => {
+                    drop(state);
+                    self.wait_events(SegBufEvents::Writeback).await?;
+                    state = self.state.lock();
+                }
+            }
+        }
+
+        drop(state);
+        Ok(())
+    }
+
+    async fn wait_indexing(&self) -> Result<()> {
+        {
+            let state = self.state.lock();
+            match *state {
+                CacheState::Vacant | CacheState::Clearing => {}
+                CacheState::Full | CacheState::Flushing => {
+                    drop(state);
+                    self.wait_events(SegBufEvents::Indexing).await?;
+                }
+            }
+        }
+        self.clear_events(SegBufEvents::Indexing);
+        Ok(())
+    }
+
+    async fn wait_events(&self, events: SegBufEvents) -> Result<()> {
         let poller = Poller::new();
-        if self.pollee.poll(events, Some(&poller)).is_empty() {
+        if self.pollee.poll(events.events(), Some(&poller)).is_empty() {
             poller.wait().await?;
         }
         Ok(())
     }
 
-    fn clear_events(&self) {
-        self.pollee.reset_events();
+    fn notify_events(&self, events: SegBufEvents) {
+        self.pollee.add_events(events.events());
     }
 
-    #[allow(unused)]
+    fn clear_events(&self, events: SegBufEvents) {
+        self.pollee.del_events(events.events());
+    }
+
     fn set_state(&self, new_state: CacheState) {
         let mut state = self.state.lock();
         CacheState::examine_state_transition(*state, new_state);
@@ -371,89 +400,144 @@ impl SegmentBuffer {
     /// Write-back function. It triggers when current segment buffer becomes
     /// full. First, encrypt each blocks, second, build records and insert into index,
     /// then, persist cipher blocks to underlying disk.
-    async fn encrypt_and_persist(&self, lsm_tree: Arc<LsmTree>) -> Result<()> {
-        assert!(*self.state.lock() == CacheState::Full);
-        *self.state.lock() = CacheState::Flushing;
+    async fn encrypt_and_persist(
+        &self,
+        wait_prebuf_indexing: impl Future<Output = Result<()>>,
+        is_init: bool,
+    ) -> Result<()> {
+        // Check buffer state
+        let mut state = self.state.lock();
+        assert!(*state == CacheState::Full);
+        *state = CacheState::Flushing;
+        drop(state);
+
+        let num_persist = self.plain_data_blocks.read().len();
+        debug_assert!(num_persist <= self.capacity);
+        let is_partial_persist: bool = {
+            if num_persist == self.capacity {
+                false
+            } else if num_persist == 0 {
+                *self.state.lock() = CacheState::Vacant;
+                return Ok(());
+            } else {
+                true
+            }
+        };
+        let mut left_blocks = vec![];
+
+        // Allocate and collect blocks
+        let allocated_blocks = {
+            if let Ok(seg_addr) = self.try_alloc_segment() {
+                if is_partial_persist {
+                    left_blocks.extend_from_slice(
+                        &DiskRangeIter::new(&HbaRange::new(
+                            seg_addr + num_persist as _..seg_addr + self.capacity as _,
+                        ))
+                        .collect::<Vec<_>>(),
+                    )
+                }
+                DiskRangeIter::new(&HbaRange::new(seg_addr..seg_addr + num_persist as _))
+                    .collect::<Vec<_>>()
+            } else {
+                // Enable threaded logging when there is no free segment
+                self.checkpoint
+                    .dst()
+                    .write()
+                    .alloc_blocks(num_persist)
+                    .unwrap()
+            }
+        };
 
         let data_blocks = self.plain_data_blocks.read();
-        debug_assert!(data_blocks.len() == self.capacity);
-
-        let seg_addr = self.segment_addr.lock().unwrap();
-        let mut block_addr = seg_addr;
-
-        // Sort each block by lba
-        let mut sorted_pb = data_blocks.iter().collect::<Vec<_>>();
-        sorted_pb.sort_by_key(|kv| kv.0);
+        // Collect data and sort each block by lba
+        let mut sorted_pbs = data_blocks.iter().collect::<Vec<_>>();
+        sorted_pbs.sort_by_key(|kv| kv.0);
         // Encrypt each block
-        let mut sorted_cb = sorted_pb
+        let mut sorted_cbs = sorted_pbs
             .iter()
-            .map(|(&lba, data_block)| {
+            .enumerate()
+            .map(|(idx, (&lba, data_block))| {
                 (
                     lba,
                     DefaultCryptor::encrypt_block(
                         data_block.as_slice(),
-                        &self.checkpoint.key_table().get_or_insert(block_addr),
+                        &self.checkpoint.key_table().fetch_key(allocated_blocks[idx]),
                     ),
+                    allocated_blocks[idx],
                 )
             })
             .collect::<Vec<_>>();
         drop(data_blocks);
 
-        let mut wbufs = Vec::with_capacity(self.capacity);
-        let mut new_records = Vec::with_capacity(self.capacity);
-        for (lba, cipher_block) in sorted_cb.iter_mut() {
-            // Collect cipher block bufs
-            // Safety.
-            wbufs.push(unsafe {
-                BlockBuf::from_raw_parts(
-                    NonNull::new_unchecked(cipher_block.as_slice_mut().as_mut_ptr()),
-                    BLOCK_SIZE,
-                )
-            });
+        let mut new_records = Vec::with_capacity(sorted_cbs.len());
+        for sub_cbs in sorted_cbs.group_by_mut(|(_, _, hba1), (_, _, hba2)| {
+            hba2.to_raw().saturating_sub(hba1.to_raw()) == 1
+        }) {
+            let mut wbufs = Vec::with_capacity(sub_cbs.len());
+            let start_addr = sub_cbs.first().unwrap().2;
 
-            // Currently, no need to search index and collect older data blocks
-            // thanks to delayed block reclamation policy.
+            for (lba, cipher_block, hba) in sub_cbs.iter_mut() {
+                // Collect cipher block bufs
+                // Safety.
+                wbufs.push(unsafe {
+                    BlockBuf::from_raw_parts(
+                        NonNull::new_unchecked(cipher_block.as_slice_mut().as_mut_ptr()),
+                        BLOCK_SIZE,
+                    )
+                });
 
-            // Build new record
-            new_records.push(Record::new(
-                *lba,
-                block_addr,
-                cipher_block.cipher_meta().clone(),
-            ));
+                // Currently, no need to search index and collect older data blocks
+                // thanks to delayed block reclamation policy.
 
-            block_addr = block_addr + 1 as _;
+                // Build new record
+                new_records.push(Record::new(*lba, *hba, cipher_block.cipher_meta().clone()));
+            }
+
+            // Write back cipher blocks to disk
+            self.write_consecutive_blocks(start_addr, wbufs).await?;
         }
 
-        // Write back cipher blocks to disk
-        self.write_consecutive_blocks(seg_addr, wbufs).await?;
-
-        for new_record in new_records {
-            // Update RIT
+        // Update `RIT`
+        for new_record in new_records.iter() {
             self.checkpoint
                 .rit()
                 .write()
                 .await
                 .insert(new_record.hba(), new_record.lba())
                 .await?;
-            // Update index only when data are successfully persisted
-            lsm_tree.insert(new_record.lba(), new_record).await?;
+        }
+
+        // Update index only when data are successfully persisted
+        // and previous buffer finished indexing
+        if !is_init {
+            wait_prebuf_indexing.await?;
+        }
+        for new_record in new_records {
+            self.lsm_tree.insert(new_record.lba(), new_record).await?;
+        }
+        self.notify_events(SegBufEvents::Indexing);
+
+        // Update not used blocks info within a segment in `DST`
+        // Used in partial persist while receiving a sync request
+        if is_partial_persist && !left_blocks.is_empty() {
+            self.checkpoint
+                .dst()
+                .write()
+                .update_validity(&left_blocks, false);
         }
 
         // Update state and clear buffer
         *self.state.lock() = CacheState::Clearing;
         self.plain_data_blocks.write().clear();
 
-        // Unbind segment
-        self.segment_addr.lock().take();
-
         // Update state and notify a event
         *self.state.lock() = CacheState::Vacant;
-        self.pollee.add_events(Events::OUT);
+        self.notify_events(SegBufEvents::Writeback);
         Ok(())
     }
 
     async fn write_consecutive_blocks(&self, addr: Hba, write_bufs: Vec<BlockBuf>) -> Result<()> {
-        debug_assert!(write_bufs.len() == SEGMENT_BUFFER_CAPACITY);
+        debug_assert!(write_bufs.len() <= self.capacity);
 
         let req = BioReqBuilder::new(BioType::Write)
             .addr(addr)
@@ -467,6 +551,20 @@ impl SegmentBuffer {
             return Err(errno!(e.errno(), "write on a block device failed"));
         }
         Ok(())
+    }
+}
+
+enum SegBufEvents {
+    Writeback,
+    Indexing,
+}
+
+impl SegBufEvents {
+    fn events(&self) -> Events {
+        match self {
+            SegBufEvents::Writeback => Events::OUT,
+            SegBufEvents::Indexing => Events::IN,
+        }
     }
 }
 

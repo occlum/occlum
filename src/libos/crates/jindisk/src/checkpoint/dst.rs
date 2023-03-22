@@ -17,8 +17,8 @@ pub struct DST {
     // Idx: Number of valid blocks
     // V: Set of data segment start hba
     validity_tracker: [HashSet<Hba>; NUM_BLOCKS_PER_SEGMENT + 1],
+    curr_victim: Option<Hba>,
 }
-// TODO: Adapt threaded logging
 
 impl DST {
     pub fn new(data_region_addr: Hba, num_data_segments: usize) -> Self {
@@ -29,6 +29,7 @@ impl DST {
             validity_tracker: vec![HashSet::new(); NUM_BLOCKS_PER_SEGMENT + 1]
                 .try_into()
                 .unwrap(),
+            curr_victim: None,
         }
     }
 
@@ -64,16 +65,22 @@ impl DST {
             self.validity_tracker[num_valid].remove(&segment_addr);
         }
         self.validity_tracker[seg_cap].insert(segment_addr);
+
+        if self.curr_victim.is_some() && self.curr_victim.unwrap() == segment_addr {
+            self.curr_victim.take();
+        }
     }
 
     /// Pick a victim segment.
-    pub fn pick_victim(&self) -> Option<VictimSegment> {
+    pub fn pick_victim(&mut self) -> Option<VictimSegment> {
         // Pick the victim which has most invalid blocks
         for (num_valid, seg_set) in self.validity_tracker.iter().enumerate() {
             if !seg_set.is_empty() {
                 for seg_addr in seg_set {
                     let (block_bitmap, valid_cnt) = self.bitmaps.get(seg_addr).unwrap();
                     debug_assert!(num_valid == *valid_cnt);
+
+                    let _ = self.curr_victim.insert(*seg_addr);
                     return Some(VictimSegment::new(
                         *seg_addr,
                         Self::collect_blocks(*seg_addr, block_bitmap, true),
@@ -84,41 +91,47 @@ impl DST {
         None
     }
 
-    #[allow(unused)]
-    pub fn alloc_blocks<const N: usize>(&mut self) -> Result<[Hba; N]> {
-        let mut block_vec = Vec::with_capacity(N);
+    pub fn alloc_blocks(&mut self, total_num: usize) -> Result<Vec<Hba>> {
+        let mut block_vec = Vec::with_capacity(total_num);
         let mut updated_segs = vec![];
         let mut updated_blocks = vec![];
 
         'outer: for seg_set in self.validity_tracker.iter() {
-            if !seg_set.is_empty() {
-                for seg_addr in seg_set.iter() {
-                    let (block_bitmap, valid_cnt) = self.bitmaps.get(seg_addr).unwrap();
-                    if block_vec.len() + (NUM_BLOCKS_PER_SEGMENT - valid_cnt) <= N {
-                        block_vec.extend_from_slice(&Self::collect_blocks(
-                            *seg_addr,
-                            block_bitmap,
-                            false,
-                        ));
-                        updated_segs.push(*seg_addr);
-                    } else {
-                        let invalid_blocks = &Self::collect_blocks(*seg_addr, block_bitmap, false)
-                            [..N - block_vec.len()];
-                        block_vec.extend_from_slice(invalid_blocks);
-                        updated_blocks.extend_from_slice(invalid_blocks);
-                        break 'outer;
-                    }
+            if seg_set.is_empty() {
+                continue;
+            }
+            for &seg_addr in seg_set.iter() {
+                if self.curr_victim.is_some() && self.curr_victim.unwrap() == seg_addr {
+                    continue;
+                }
+                let (block_bitmap, valid_cnt) = self.bitmaps.get(&seg_addr).unwrap();
+                if block_vec.len() + (NUM_BLOCKS_PER_SEGMENT - valid_cnt) <= total_num {
+                    block_vec.extend_from_slice(&Self::collect_blocks(
+                        seg_addr,
+                        block_bitmap,
+                        false,
+                    ));
+                    updated_segs.push(seg_addr);
+                } else {
+                    let invalid_blocks = &Self::collect_blocks(seg_addr, block_bitmap, false)
+                        [..total_num - block_vec.len()];
+                    block_vec.extend_from_slice(invalid_blocks);
+                    updated_blocks.extend_from_slice(invalid_blocks);
+                    break 'outer;
                 }
             }
         }
+        if block_vec.len() < total_num {
+            return_errno!(ENOENT, "no free blocks for allocation")
+        }
+        debug_assert!(block_vec.len() == total_num);
+
         updated_segs
             .iter()
             .for_each(|seg| self.validate_or_insert(*seg));
         self.update_validity(&updated_blocks, true);
-
-        debug_assert!(block_vec.len() == N);
         block_vec.sort();
-        Ok(block_vec.try_into().map_err(|_| EINVAL)?)
+        Ok(block_vec)
     }
 
     fn count_num_blocks(block_bitmap: &BitMap, is_valid: bool) -> usize {
@@ -153,6 +166,7 @@ impl DST {
             num_segments,
             bitmaps,
             validity_tracker,
+            curr_victim: None,
         }
     }
 
@@ -260,23 +274,24 @@ mod tests {
         dst.validate_or_insert(seg1);
         dst.validate_or_insert(seg2);
 
-        let invalid_blocks = [seg1, seg1 + 1 as _];
+        let invalid_blocks = [seg1, seg1 + 1 as _, seg2];
         dst.update_validity(&invalid_blocks, false);
-        dst.update_validity(&[seg2], false);
 
         let victim = dst.pick_victim().unwrap();
         assert_eq!(victim.segment_addr, seg1);
         assert_eq!(victim.valid_blocks.len(), NUM_BLOCKS_PER_SEGMENT - 2);
 
-        dst.update_validity(&[seg2 + 1 as _, seg2 + 5 as _], false);
+        let invalid_blocks = [seg2 + 1 as _, seg2 + 2 as _, seg2 + 5 as _, seg2 + 7 as _];
+        dst.update_validity(&invalid_blocks, false);
+
+        let alloc_blocks = dst.alloc_blocks(2).unwrap();
+        assert_eq!(alloc_blocks[0], seg2);
+        assert_eq!(alloc_blocks[1], seg2 + 1 as _);
 
         let victim = dst.pick_victim().unwrap();
         assert_eq!(victim.segment_addr, seg2);
-        assert_eq!(victim.valid_blocks[0], seg2 + 2 as _);
-
-        let alloc_blocks = dst.alloc_blocks::<5>().unwrap();
-        assert_eq!(alloc_blocks[0], seg1);
-        assert_eq!(alloc_blocks[4], seg2 + 5 as _);
+        assert_eq!(victim.valid_blocks[1], seg2 + 1 as _);
+        assert_eq!(victim.valid_blocks[4], seg2 + 6 as _);
     }
 
     #[test]

@@ -1,5 +1,4 @@
 //! Data region.
-// TODO: Support threaded logging
 mod cache;
 mod cleaning;
 mod state;

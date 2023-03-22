@@ -18,5 +18,5 @@ pub use crate::config::*;
 pub use crate::util::cryption::*;
 pub use crate::util::serialize::*;
 pub(crate) use crate::util::{align_down, align_up};
-pub(crate) use crate::util::{BitMap, DiskArray, DiskView, HbaRange, LbaRange};
+pub(crate) use crate::util::{BitMap, DiskArray, DiskRangeIter, DiskView, HbaRange, LbaRange};
 pub use crate::{Hba, JinDisk, Lba};

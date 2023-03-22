@@ -28,6 +28,7 @@ pub struct Checkpoint {
     disk: DiskView,
 }
 // TODO: Introduce shadow paging for recovery
+// TODO: Support on-demand loading for every structure
 
 impl Checkpoint {
     pub fn new(superblock: &SuperBlock, disk: DiskView) -> Self {

@@ -49,7 +49,7 @@ pub const SEGMENT_BUFFER_CAPACITY: usize = NUM_BLOCKS_PER_SEGMENT;
 pub const BUFFER_POOL_CAPACITY: usize = 16;
 
 /// # Garbage collection
-pub const GC_WATERMARK: usize = 8;
+pub const GC_WATERMARK: usize = 16;
 pub const GC_BACKGROUND_PERIOD: Duration = Duration::from_secs(5);
 
 /// # Index
