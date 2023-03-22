@@ -27,11 +27,11 @@ impl Bit {
         self.bit.lba_range()
     }
 
-    pub fn id(&self) -> &BitId {
+    pub fn id(&self) -> BitId {
         self.bit.id()
     }
 
-    pub fn version(&self) -> &BitVersion {
+    pub fn version(&self) -> BitVersion {
         self.bit.version()
     }
 
@@ -39,14 +39,13 @@ impl Bit {
         &self.bit.key()
     }
 
-    #[allow(unused)]
-    pub fn addr(&self) -> Hba {
-        *self.id() as _
+    pub fn level(&self) -> LsmLevel {
+        self.bit.level()
     }
 
     #[allow(unused)]
-    pub fn level(&self) -> &LsmLevel {
-        &self.bit.level()
+    pub fn addr(&self) -> Hba {
+        self.id() as _
     }
 
     #[allow(unused)]
@@ -375,8 +374,8 @@ impl Bit {
 impl Debug for Bit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BIT (Block Index Table)")
-            .field("id", self.id())
-            .field("version", self.version())
+            .field("id", &self.id())
+            .field("version", &self.version())
             .field("lba_range", self.lba_range())
             .finish()
     }

@@ -69,7 +69,7 @@ pub fn apply_memtable_reclaim_policy<'a>(
     Box::pin(inner(checkpoint, coming_record, existed_record).into_future())
 }
 
-// TODO: Add reclamation policy in compaction
+// TODO: Add reclamation policy for compaction
 #[allow(unused)]
 async fn apply_compaction_reclaim_policy(
     checkpoint: &Arc<Checkpoint>,

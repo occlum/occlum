@@ -46,23 +46,22 @@ impl LbaRange {
     }
 }
 
-/// Iterator for lba range.
-pub struct LbaRangeIter {
+/// Iterator for disk range.
+pub struct DiskRangeIter {
     pub start: Lba,
     pub end: Lba,
 }
 
-impl LbaRangeIter {
-    #[allow(unused)]
-    pub fn new(lba_range: &LbaRange) -> Self {
+impl DiskRangeIter {
+    pub fn new(disk_range: &LbaRange) -> Self {
         Self {
-            start: lba_range.start(),
-            end: lba_range.end(),
+            start: disk_range.start(),
+            end: disk_range.end(),
         }
     }
 }
 
-impl Iterator for LbaRangeIter {
+impl Iterator for DiskRangeIter {
     type Item = Lba;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
@@ -97,7 +96,7 @@ mod tests {
         assert_eq!(lba_range.is_overlapped(&rhs_lba_range), true);
 
         let mut offset = lba_range.start();
-        let lba_range_iter = LbaRangeIter::new(&lba_range);
+        let lba_range_iter = DiskRangeIter::new(&lba_range);
         for lba in lba_range_iter {
             assert_eq!(lba, offset);
             offset = offset + 1 as _;

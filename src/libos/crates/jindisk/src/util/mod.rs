@@ -7,7 +7,7 @@ mod range_query_ctx;
 pub mod serialize;
 
 pub(crate) use disk_array::DiskArray;
-pub(crate) use disk_range::{HbaRange, LbaRange};
+pub(crate) use disk_range::{DiskRangeIter, HbaRange, LbaRange};
 pub(crate) use disk_view::DiskView;
 pub(crate) use range_query_ctx::RangeQueryCtx;
 

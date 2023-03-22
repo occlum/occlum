@@ -155,7 +155,7 @@ impl Compactor {
                 }
                 records_merge_map.insert(lba, l1_record);
             }
-            overlapped_bit_ids.push(*l1_bit.id());
+            overlapped_bit_ids.push(l1_bit.id());
         }
 
         // All wait-compaction records
@@ -165,6 +165,7 @@ impl Compactor {
         // TODO: Optimize this padding logic
         Record::padding_records(&mut records_merged, MAX_RECORD_NUM_PER_BIT);
         // Construct several new BITs
+        let mut new_bits = Vec::with_capacity(records_merged.len() / MAX_RECORD_NUM_PER_BIT);
         for sub_records in records_merged.chunks(MAX_RECORD_NUM_PER_BIT) {
             // Pick an available segment from index SVT
             let seg_addr = checkpoint.index_svt().write().pick_avail_seg().unwrap();
@@ -180,25 +181,28 @@ impl Compactor {
                 )
                 .await?;
 
-            // Insert new one in BITC
-            checkpoint.bitc().write().insert_bit(bit, level);
+            new_bits.push(bit);
         }
 
-        // TODO: Make below steps atomic
         let mut bitc = checkpoint.bitc().write();
+        // Insert new one in BITC
+        for new_bit in new_bits {
+            let level = new_bit.level();
+            bitc.insert_bit(new_bit, level);
+        }
         let mut index_svt = checkpoint.index_svt().write();
         for bit_id in overlapped_bit_ids {
             // Remove old one in BITC
-            bitc.remove_bit(&bit_id, 1 as LsmLevel);
+            bitc.remove_bit(bit_id, 1 as LsmLevel);
 
             // Validate the index segment in SVT
             index_svt.validate_seg(bit_id);
         }
         // Remove l0 BIT and validate the segment
         bitc.remove_bit(l0_bit.id(), 0 as LsmLevel);
-        index_svt.validate_seg(*l0_bit.id());
-        drop(bitc);
+        index_svt.validate_seg(l0_bit.id());
         drop(index_svt);
+        drop(bitc);
 
         debug!(
             "{:#?}\n[Major Compaction] complete",

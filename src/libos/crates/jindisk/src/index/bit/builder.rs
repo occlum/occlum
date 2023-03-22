@@ -230,9 +230,9 @@ mod tests {
                 .build(&records, &disk, level, version)
                 .await?;
 
-            assert_eq!(*bit.id(), BitId::new(1));
-            assert_eq!(*bit.level(), level);
-            assert_eq!(*bit.version(), version);
+            assert_eq!(bit.id(), BitId::new(1));
+            assert_eq!(bit.level(), level);
+            assert_eq!(bit.version(), version);
             Ok(())
         })
     }

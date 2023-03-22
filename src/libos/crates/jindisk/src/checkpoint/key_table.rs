@@ -11,8 +11,6 @@ pub struct KeyTable {
     data_region_addr: Hba,
     table: RwLock<HashMap<Hba, Key>>,
 }
-// TODO: Support on-demand loading using `DiskArray<_>`
-// TODO: Adapt threaded logging
 
 impl KeyTable {
     pub fn new(data_region_addr: Hba) -> Self {
@@ -29,20 +27,20 @@ impl KeyTable {
         }
     }
 
-    pub fn get_or_insert(&self, block_addr: Hba) -> Key {
-        fn seg_addr(region_addr: Hba, block_addr: Hba) -> Hba {
-            Hba::new(align_down(
-                (block_addr - region_addr.to_raw()).to_raw() as _,
-                NUM_BLOCKS_PER_SEGMENT,
-            ) as _)
-                + region_addr.to_raw()
-        }
-
+    pub fn fetch_key(&self, block_addr: Hba) -> Key {
         self.table
             .write()
-            .entry(seg_addr(self.data_region_addr, block_addr))
+            .entry(self.calc_seg_addr(block_addr))
             .or_insert(DefaultCryptor::gen_random_key())
             .clone()
+    }
+
+    fn calc_seg_addr(&self, block_addr: Hba) -> Hba {
+        Hba::new(align_down(
+            (block_addr - self.data_region_addr.to_raw()).to_raw() as _,
+            NUM_BLOCKS_PER_SEGMENT,
+        ) as _)
+            + self.data_region_addr.to_raw()
     }
 
     pub fn size(&self) -> usize {
@@ -100,16 +98,16 @@ mod tests {
         let data_region_addr = Hba::new(1);
         let key_table = KeyTable::new(data_region_addr);
         let b1 = data_region_addr + 1 as _;
-        let k1 = key_table.get_or_insert(b1);
+        let k1 = key_table.fetch_key(b1);
         let b2 = data_region_addr + NUM_BLOCKS_PER_SEGMENT as _ + 1 as _;
-        let k2 = key_table.get_or_insert(b2);
+        let k2 = key_table.fetch_key(b2);
 
         let mut bytes = Vec::new();
         key_table.encode(&mut bytes).unwrap();
         let decoded_keytable = KeyTable::decode(&bytes).unwrap();
 
-        assert_eq!(decoded_keytable.get_or_insert(b1 + 1 as _), k1);
-        assert_eq!(decoded_keytable.get_or_insert(b2 - 1 as _), k2);
+        assert_eq!(decoded_keytable.fetch_key(b1 + 1 as _), k1);
+        assert_eq!(decoded_keytable.fetch_key(b2 - 1 as _), k2);
         assert_eq!(decoded_keytable.size(), 2);
     }
 
