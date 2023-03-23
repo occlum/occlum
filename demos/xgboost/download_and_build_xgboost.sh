@@ -4,18 +4,6 @@ set -e
 # Tell CMake to search for packages in Occlum toolchain's directory only
 export PKG_CONFIG_LIBDIR=/usr/local/occlum/x86_64-linux-musl/lib
 
-# Install the dependencies
-OS=`awk -F= '/^NAME/{print $2}' /etc/os-release`
-if [ "$OS" == "\"Ubuntu\"" ]; then
-  apt-get update -y && apt-get install -y python3-pip python3-setuptools
-else
-  yum install -y python3-pip python3-setuptools
-fi
-pip3 install kubernetes
-
-#install the cmake
-./install_cmake.sh
-
 # Download and build XGBoost
 rm -rf xgboost_src && mkdir xgboost_src
 pushd xgboost_src
