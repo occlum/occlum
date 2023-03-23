@@ -734,7 +734,7 @@ pub async fn do_sendfile(
     offset_ptr: *mut off_t,
     count: isize,
 ) -> Result<isize> {
-    let offset = if offset_ptr.is_null() {
+    let mut offset = if offset_ptr.is_null() {
         None
     } else {
         from_user::check_mut_ptr(offset_ptr)?;
@@ -744,14 +744,13 @@ pub async fn do_sendfile(
         return_errno!(EINVAL, "count is negative");
     }
 
-    let (written_len, read_offset) =
-        file_ops::do_sendfile(out_fd, in_fd, offset, count as usize).await?;
+    let send_len = file_ops::do_sendfile(out_fd, in_fd, offset.as_mut(), count as usize).await?;
     if !offset_ptr.is_null() {
         unsafe {
-            offset_ptr.write(read_offset as off_t);
+            offset_ptr.write(offset.take().unwrap());
         }
     }
-    Ok(written_len as isize)
+    Ok(send_len as isize)
 }
 
 pub async fn do_flock(fd: FileDesc, operation: i32) -> Result<isize> {
