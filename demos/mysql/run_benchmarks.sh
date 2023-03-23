@@ -4,17 +4,12 @@ set -e
 GREEN='\033[1;32m'
 NC='\033[0m'
 
-echo -e "${GREEN}Install sysbench first${NC}"
-
-# We use sysbench to test mysql, need to install it first
-apt-get install -y sysbench
-
 function run_benchmarks()
 {
     WORKLOADS=("oltp_point_select" "oltp_write_only" "oltp_read_write")
     for item in ${WORKLOADS[@]}
     do
-        echo "start to prepare for $item"
+        echo "${GREEN}start to prepare for $item${NC}"
         sleep 3
         sysbench /usr/share/sysbench/$item.lua\
             --mysql-host='127.0.0.1'\
@@ -26,7 +21,7 @@ function run_benchmarks()
             --rand-type=pareto\
             prepare
 
-        echo "start to run $item"
+        echo "${GREEN}start to run $item${NC}"
         sleep 3
         sysbench /usr/share/sysbench/$item.lua\
             --mysql-host='127.0.0.1'\
@@ -40,7 +35,7 @@ function run_benchmarks()
             --report-interval=10\
             run
 
-        echo "start to cleanup $item"
+        echo "${GREEN}start to cleanup $item${NC}"
         sleep 3
         sysbench /usr/share/sysbench/$item.lua\
             --mysql-host='127.0.0.1'\

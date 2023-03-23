@@ -2,16 +2,20 @@
 
 [Filebench](https://github.com/Filebench/Filebench) is a benchmark tool aiming to test file system and storage under certain workloads. This demo demonstrates how can Filebench run on Occlum, guarded with Intel SGX.
 
-### Step 1: Build Filebench from source
+### Step 1: Preinstall dependencies
+Related dependencies: bison flex
+```
+./preinstall_deps.sh
+```
 
+### Step 2: Build Filebench from source
 ```
 cd demos/Filebench && ./dl_and_build_Filebench.sh
 ```
 
 The script will download source code, make some adaptation then compile Filebench into a binary.
 
-### Step 2: Run Filebench workloads
-
+### Step 3: Run Filebench workloads
 ```
 cd demos/Filebench && ./run_workload.sh
 ```
