@@ -2,13 +2,37 @@ use std::sync::atomic::{AtomicBool, AtomicI8, AtomicU32, Ordering::*};
 
 use super::timeslice::calculate_timeslice;
 use crate::scheduler::Priority;
+use crate::time::Instant;
 use crate::util::AtomicBits;
+use bitflags::bitflags;
+use spin::Mutex;
+
+// Unit: milliseconds
+// If task is waked in 2ms, it is cache hot.
+const CACHE_HOT_DURATION: usize = 2;
+// If task run longer than 10ms without completion,
+// it is blocking.
+const BLOCK_DURATION: usize = 10;
 
 /// A schedulable entity.
 pub trait SchedEntity {
     /// Returns the state of the schedulable entity. The scheduler maintains
     /// scheduling-related information in the state.
     fn sched_state(&self) -> &SchedState;
+}
+
+// Flags to pattern scheduling entity
+bitflags! {
+    pub struct SchedTag: u32 {
+        const BLOCK = 0x01; // The scheduling entity is a long-running and blocking task
+        const CACHE_HOT = 0x02; // The scheduling entity is cache-friendly
+    }
+}
+
+#[derive(Debug, Default)]
+struct ExecTime {
+    start: Option<Instant>,
+    end: Option<Instant>,
 }
 
 /// The scheduler-related state of a schedulable entity.
@@ -25,6 +49,8 @@ pub struct SchedState {
     affinity: AtomicBits,
     vcpu: AtomicU32,
     is_yielded: AtomicBool,
+    exec_time: Mutex<ExecTime>,
+    sched_tag: Mutex<SchedTag>,
 }
 
 impl SchedState {
@@ -38,6 +64,8 @@ impl SchedState {
             affinity: AtomicBits::new_ones(num_vcpus as usize),
             vcpu: AtomicU32::new(Self::NONE_VCPU),
             is_yielded: AtomicBool::new(false),
+            exec_time: Mutex::new(ExecTime::default()),
+            sched_tag: Mutex::new(SchedTag::empty()),
         };
         new_self.assign_timeslice();
         new_self
@@ -181,5 +209,72 @@ impl SchedState {
     #[inline(always)]
     pub(crate) fn set_yielded(&self, is_yielded: bool) -> bool {
         self.is_yielded.swap(is_yielded, Relaxed)
+    }
+
+    #[inline(always)]
+    pub(crate) fn is_yielded(&self) -> bool {
+        self.is_yielded.load(Relaxed)
+    }
+
+    #[inline(always)]
+    pub(crate) fn is_blocking(&self) -> bool {
+        let curr_tag = self.sched_tag.lock();
+        curr_tag.contains(SchedTag::BLOCK)
+    }
+
+    // Based on the exec time to update scheduling entity tag.
+    // Can not be called when task is running.
+    #[inline(always)]
+    pub(crate) fn update_sched_tag(&self) -> SchedTag {
+        let exec_time = self.exec_time.lock();
+        let start_time = exec_time.start;
+        let stop_time = exec_time.end;
+        drop(exec_time);
+
+        let curr = Instant::now();
+        let mut update_tag = SchedTag::empty();
+        if let Some(start_time) = start_time {
+            if let Some(stop_time) = stop_time {
+                let elapsed = stop_time.duration_since(start_time).as_millis() as usize;
+                let delta = curr.duration_since(stop_time).as_millis() as usize;
+                if delta <= CACHE_HOT_DURATION {
+                    update_tag |= SchedTag::CACHE_HOT;
+                }
+                if elapsed >= BLOCK_DURATION {
+                    update_tag |= SchedTag::BLOCK;
+                }
+            } else {
+                // In normal case, code would not run into this if branch.
+                // This branch guarantees correctness when missing exec_stop instant
+                let elapsed = curr.duration_since(start_time).as_millis() as usize;
+                update_tag |= SchedTag::CACHE_HOT;
+                if elapsed >= BLOCK_DURATION {
+                    update_tag |= SchedTag::BLOCK;
+                }
+            }
+        }
+
+        // Update scheduling entity tag
+        let mut curr_tag = self.sched_tag.lock();
+        *curr_tag = update_tag;
+
+        update_tag
+    }
+
+    #[inline(always)]
+    pub(crate) fn update_exec_stop(&self) -> Instant {
+        let mut exec_time = self.exec_time.lock();
+        let cur = Instant::now();
+        exec_time.end = Some(cur);
+        cur
+    }
+
+    #[inline(always)]
+    pub(crate) fn update_exec_start(&self) -> Instant {
+        let mut exec_time = self.exec_time.lock();
+        let cur = Instant::now();
+        exec_time.start = Some(cur);
+        exec_time.end = None;
+        cur
     }
 }

@@ -5,15 +5,12 @@ use crate::scheduler::{Priority, SchedState};
 /// the length of the timeslice. The higher the priority, the longer the timeslice.
 pub fn calculate_timeslice(sched_state: &SchedState) -> u32 {
     use self::{MAX_TIMESLICE_MS as MAX, MIN_TIMESLICE_MS as MIN};
-    // let prio_val = sched_state.base_prio().val();
     let prio_val = sched_state.effective_prio().val();
     if prio_val >= Priority::mid_val() {
         MAX
     } else {
         const REMAIN_PRIOS: u32 = {
             let val = (Priority::mid_val() - 1) - Priority::min_val() + 1;
-            // More efficient working with a power of two
-            //static_assert!(val.is_power_of_two());
             val as u32
         };
         MIN + (MAX - MIN) / REMAIN_PRIOS * (prio_val as u32)

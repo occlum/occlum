@@ -28,7 +28,7 @@ static void *thread_func(void *_data) {
     }
 
     while (1) {
-        struct timespec timeout = { .tv_sec = 0, .tv_nsec = 250 * MS };
+        struct timespec timeout = { .tv_sec = 0, .tv_nsec = 100 * MS };
         int counter = pal_thread_counter_wait_zero(&timeout);
         if (counter == 0) {
             free(switch_cnts);

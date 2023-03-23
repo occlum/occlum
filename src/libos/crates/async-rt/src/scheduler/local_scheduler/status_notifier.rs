@@ -14,4 +14,7 @@ pub trait StatusNotifier: Send + Sync + 'static {
 
     /// Notify the changes of the sleep status of the local scheduler.
     fn notify_sleep_status(&self, vcpu: u32, is_sleep: bool);
+
+    /// Notify the changes of the heavy status of the local scheduler
+    fn notify_heavy_status(&self, vcpu: u32, is_heavy: bool);
 }
