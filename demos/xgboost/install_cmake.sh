@@ -12,3 +12,5 @@ cd cmake-3.15.5
 ./bootstrap
 make -j$(nproc)
 sudo make install
+
+echo "Install CMake success"

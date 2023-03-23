@@ -231,8 +231,8 @@ jobs:
         container-name: ${{ github.job }}
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
-    - name: Build xgboost dependencies
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/xgboost && ./download_and_build_xgboost.sh"
+    - name: Preinstall dependencies and build xgboost
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/xgboost && ./preinstall_deps.sh && ./download_and_build_xgboost.sh"
 
     - name: Run xgboost test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test"
@@ -525,7 +525,7 @@ jobs:
     - name: Run redis benchmark
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/redis; SGX_MODE=SIM ./benchmark_glibc.sh"
 
-  flink_test:
+  Flink_test:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
@@ -537,8 +537,8 @@ jobs:
         container-name: ${{ github.job }}
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
-    - name: Download flink
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && ./download_flink.sh"
+    - name: Preinstall dependencies and download flink
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && ./preinstall_deps.sh && ./download_flink.sh"
 
     - name: Run jobmanager on host
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_jobmanager_on_host.sh"
@@ -573,7 +573,7 @@ jobs:
     - name: Run cluster serving test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/cluster_serving; source ./environment.sh; SGX_MODE=SIM ./start-all.sh; ./push-image.sh"
 
-  enclave_ra_tls_test:
+  Enclave_RA_TLS_test:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
@@ -597,7 +597,7 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "/usr/share/enclave-tls/samples/enclave-tls-client" || true
 
-  vault_test:
+  Vault_test:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
@@ -620,7 +620,7 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/vault && ./run_occlum_vault_test.sh"
 
-  sofaboot_test:
+  Sofaboot_test:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
@@ -659,7 +659,7 @@ jobs:
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Install OpenJDK 11 (Glibc)
-      run: docker exec ${{ github.job }} bash -c "apt update && apt install -y openjdk-11-jdk"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut && ./preinstall_deps.sh"
 
     - name: Download and compile netty unit test demos
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut && ./build.sh"
@@ -767,7 +767,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/flask;
             curl --cacert flask.crt -X GET https://localhost:4996/customer/1"
 
-  iperf2_test:
+  Iperf2_test:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1

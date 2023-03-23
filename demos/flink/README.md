@@ -1,11 +1,25 @@
-1. Run the flink jobmanager
-    ./run_flink_jobmanager_on_host.sh
+# Run Flink on Occlum
 
-2. Run the taskManager
-    ./run_flink_on_occlum_glibc.sh tm
+### Preinstall dependencies
+Related dependencies: openjdk-11
+```
+./preinstall_deps.sh
+```
 
-3. Run flink jobs example
-    ./run_flink_on_occlum_glibc.sh task
+### Run the flink jobmanager
+```
+./run_flink_jobmanager_on_host.sh
+```
+
+### Run the taskManager
+```
+./run_flink_on_occlum_glibc.sh tm
+```
+
+### Run flink jobs example
+```
+./run_flink_on_occlum_glibc.sh task
+```
 
 **Note:**  
 1. If running the jobmanager in docker, please export the port 8081 and 6123
