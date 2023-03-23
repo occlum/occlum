@@ -84,6 +84,7 @@ pub struct LocalScheduler<E> {
     rqs: Mutex<([Box<RunQueues<E>>; 2], u8)>,
     // The total number of entities in the two runqueues.
     len: AtomicU32,
+    blocking_num: AtomicU32,
     is_locked: AtomicBool,
     status_notifier: Box<dyn StatusNotifier>,
 }
@@ -98,6 +99,7 @@ impl<E: SchedEntity> LocalScheduler<E> {
             this_vcpu,
             rqs: Mutex::new(([Box::new(RunQueues::new()), Box::new(RunQueues::new())], 0)),
             len: AtomicU32::new(0),
+            blocking_num: AtomicU32::new(0),
             is_locked: AtomicBool::new(false),
             status_notifier: Box::new(status_notifier),
         }
@@ -113,27 +115,44 @@ impl<E: SchedEntity> LocalScheduler<E> {
             return;
         }
 
-        let is_yielded = sched_state.set_yielded(false);
+        let _is_yielded = sched_state.set_yielded(false);
 
-        let last_vcpu = sched_state.vcpu();
+        if sched_state.is_blocking() {
+            self.blocking_num.fetch_add(1, Relaxed);
+            self.status_notifier
+                .notify_heavy_status(self.this_vcpu, true);
+        }
+
+        let _last_vcpu = sched_state.vcpu();
         sched_state.set_vcpu(self.this_vcpu);
 
+        let mut rqs = self.lock_rqs();
+        if sched_state.timeslice() > 0 {
+            let front_rqs = rqs.front_mut();
+            front_rqs.enqueue(entity.clone());
+        } else {
+            sched_state.assign_timeslice();
+            let back_rqs = rqs.back_mut();
+            back_rqs.enqueue(entity.clone());
+        }
+
+        // Disable next_slot temporarily
         // Depending on whether the entity still has remaining timeslice,
         // enqueue it into the front or back runqueues.
-        let mut rqs = self.lock_rqs();
-        if last_vcpu.is_some() && !is_yielded {
-            let front_rqs = rqs.front_mut();
-            front_rqs.enqueue_jump(entity.clone());
-        } else {
-            if sched_state.timeslice() > 0 {
-                let front_rqs = rqs.front_mut();
-                front_rqs.enqueue(entity.clone());
-            } else {
-                sched_state.assign_timeslice();
-                let back_rqs = rqs.back_mut();
-                back_rqs.enqueue(entity.clone());
-            }
-        }
+        // let mut rqs = self.lock_rqs();
+        // if last_vcpu.is_some() && !is_yielded {
+        //     let front_rqs = rqs.front_mut();
+        //     front_rqs.enqueue_jump(entity.clone());
+        // } else {
+        //     if sched_state.timeslice() > 0 {
+        //         let front_rqs = rqs.front_mut();
+        //         front_rqs.enqueue(entity.clone());
+        //     } else {
+        //         sched_state.assign_timeslice();
+        //         let back_rqs = rqs.back_mut();
+        //         back_rqs.enqueue(entity.clone());
+        //     }
+        // }
 
         // To ensure that len won't underflow, we need to
         // increase len before enqueueing.
@@ -150,6 +169,10 @@ impl<E: SchedEntity> LocalScheduler<E> {
     /// a single priority queue).
     pub fn len(&self) -> usize {
         self.len.load(Relaxed) as usize
+    }
+
+    pub fn blocking_num(&self) -> usize {
+        self.blocking_num.load(Relaxed) as usize
     }
 
     fn dequeue(&self) -> Option<Arc<E>> {
@@ -172,12 +195,9 @@ impl<E: SchedEntity> LocalScheduler<E> {
 
                 // Notify the idle status as early as possible
                 debug_assert!(old_len >= 1);
-                let is_idle = old_len == 1;
-                if is_idle {
-                    self.status_notifier
-                        .notify_idle_status(self.this_vcpu, true);
+                if entity.sched_state().is_blocking() {
+                    self.blocking_num.fetch_sub(1, Relaxed);
                 }
-
                 return Some(entity);
             }
 
@@ -252,8 +272,8 @@ impl<E: SchedEntity> LocalScheduler<E> {
     pub fn wait_enqueue(&self) {
         // The thread should keep some time in idle state and avoid slumping into sleep state too quickly.
         // The loop time of count 5_000_000 is about 0.18 seconds in our dev machine.
-        let mut count = 5_000_000;
 
+        let mut count = 5_000_000;
         // In the idle status
         {
             self.status_notifier

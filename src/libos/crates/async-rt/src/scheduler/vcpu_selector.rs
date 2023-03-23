@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
 use std::sync::Arc;
 
 use crate::scheduler::local_scheduler::StatusNotifier;
-use crate::scheduler::SchedState;
+use crate::scheduler::{SchedState, SchedTag};
 use crate::util::AtomicBits;
 
 /// vCPU selector.
@@ -14,21 +14,28 @@ use crate::util::AtomicBits;
 ///
 /// First and foremost, vCPU assignment must respect the
 /// affinity mask of an entity. Beyond that, vCPU selectors adopt some heuristics
-/// to make sensible decisions. The basic idea is to prioritize vCPUs that
-/// satisfy the following conditions.
+/// to make sensible decisions. For instance, cache-hot and blocking information
+/// is adopted in selecting mechanism. The selector keeps blocking tasks as evenly
+/// distributed on different vpus as possible and reduce their migration
 ///
+/// For spawned tasks, the scheduler distributes them to different core in consecutive order.
+/// For waked tasks, the scheduler apply different scheduling policies according to
+/// task heuristical pattern.
+///
+/// Blocking task needs to utilize cpu exclusively. So they choose:
+/// 1. Idle vCPUs (which are busy looping for available entities to schedule)
+/// 2. Unparking sleep vCPU (unparking overhead is trivial to blocking task running time)
+/// 3. Last vCPUs (hit cpu L1/L2 cache as possible)
+///
+/// Non-blocking task requires to respond as quickly.
 /// 1. Idle vCPUs (which are busy looping for available entities to schedule);
-/// 2. Active vCPUs (which are not sleeping);
-/// 3. The last vCPU that the entity runs on;
-/// 4. The current vCPU that is making the selection.
-///
-/// If no such vCPUs are in the affinity, then a vCPU selector
-/// picks a vCPU in a round-robin fashion so that
-/// workloads are more liekly to spread across multiple vCPUs evenly.
+/// 2. Active and light vCPUs (which are not sleeping and have no blocking task);
+/// 3. Unparking sleep vCPU if no active and light vCPUs
+/// 4. Last vCPUs (hit cpu L1/L2 cache as possible)
 pub struct VcpuSelector {
-    // The masks are usually accessed by iterators, so the cost of ”RwLock<BitMask>“ is much less than “AtomicBits”.
     idle_vcpu_mask: AtomicBits,
     sleep_vcpu_mask: AtomicBits,
+    heavy_vcpu_mask: AtomicBits,
     num_running_vcpus: AtomicU32,
     num_vcpus: u32,
 }
@@ -47,6 +54,10 @@ impl StatusNotifier for Arc<VcpuSelector> {
         }
         // TODO: assert num_running_vcpus.
     }
+
+    fn notify_heavy_status(&self, vcpu: u32, is_heavy: bool) {
+        self.heavy_vcpu_mask.set(vcpu as usize, is_heavy);
+    }
 }
 
 impl VcpuSelector {
@@ -55,6 +66,7 @@ impl VcpuSelector {
         Self {
             idle_vcpu_mask: AtomicBits::new_zeroes(num_vcpus as usize),
             sleep_vcpu_mask: AtomicBits::new_zeroes(num_vcpus as usize),
+            heavy_vcpu_mask: AtomicBits::new_zeroes(num_vcpus as usize),
             num_running_vcpus: AtomicU32::new(num_vcpus),
             num_vcpus,
         }
@@ -75,8 +87,6 @@ impl VcpuSelector {
     /// If the current thread is used as a vCPU, then the vCPU number should
     /// be provided.
     pub fn select_vcpu(&self, sched_state: &SchedState, has_this_vcpu: Option<u32>) -> u32 {
-        static NEXT_VCPU: AtomicU32 = AtomicU32::new(0);
-
         // Need to respect the CPU affinity mask
         let affinity = sched_state.affinity();
         debug_assert!(affinity.iter_ones().count() > 0);
@@ -106,29 +116,92 @@ impl VcpuSelector {
             }
         };
 
-        // 1. If the task is the first time to enqueue, use round-robin strategy to balance vCPU load
+        // If the task is the first time to enqueue, use round-robin strategy to balance vCPU load
         if has_last_vcpu.is_none() {
-            loop {
-                let vcpu = NEXT_VCPU.fetch_add(1, Relaxed) % self.num_vcpus;
-                if affinity.get(vcpu as usize) {
-                    return vcpu;
-                }
-            }
+            return self.select_vcpu_round_robin(sched_state);
         }
 
-        // 2. Give preferance to idle vCPU in vCPU selecting strategy
         // Todo: integrate the information of pending tasks into vCPU selecting strategy.
         // Consider the situation that this vCPU has large number of pending tasks,
         // but its queue length is zero and in the idle state.
+        let sched_tag = sched_state.update_sched_tag();
+        if sched_tag.contains(SchedTag::BLOCK) {
+            self.select_vcpu_blocking(sched_state, has_last_vcpu.unwrap(), has_this_vcpu)
+        } else {
+            self.select_vcpu_nonblocking(sched_state, has_last_vcpu.unwrap(), has_this_vcpu)
+        }
+    }
+
+    /// Select vcpu for blocking tasks
+    #[inline]
+    fn select_vcpu_round_robin(&self, sched_state: &SchedState) -> u32 {
+        static NEXT_VCPU: AtomicU32 = AtomicU32::new(0);
+        let affinity = sched_state.affinity();
+        loop {
+            let vcpu = NEXT_VCPU.fetch_add(1, Relaxed) % self.num_vcpus;
+            if affinity.get(vcpu as usize) {
+                return vcpu;
+            }
+        }
+    }
+
+    /// Select vcpu for blocking tasks
+    #[inline]
+    fn select_vcpu_blocking(
+        &self,
+        sched_state: &SchedState,
+        last_vcpu: u32,
+        _has_this_vcpu: Option<u32>,
+    ) -> u32 {
+        let idle_vcpu_mask = &self.idle_vcpu_mask;
+        let sleep_vcpu_mask = &self.sleep_vcpu_mask;
+        let affinity = sched_state.affinity();
+
+        // Select last run vCPU if idle, for hitting cache
+        if idle_vcpu_mask.get(last_vcpu as usize) {
+            return last_vcpu;
+        }
+
+        // Select any idle vCPU for load balancing
+        let has_idle_vcpu = idle_vcpu_mask
+            .iter_ones()
+            .find(|idle_vcpu| affinity.get(*idle_vcpu));
+        if let Some(idle_vcpu) = has_idle_vcpu {
+            return idle_vcpu as u32;
+        }
+
+        // Select sleep vCPU, blocking tasks need to utilize vCPU exclusively
+        if sleep_vcpu_mask.get(last_vcpu as usize) {
+            return last_vcpu;
+        }
+        let has_sleep_vcpu = sleep_vcpu_mask
+            .iter_ones()
+            .find(|sleep_vcpu| affinity.get(*sleep_vcpu));
+        if let Some(sleep_vcpu) = has_sleep_vcpu {
+            return sleep_vcpu as u32;
+        }
+
+        // Select last run vCPU if no sleep vCPU
+        last_vcpu
+    }
+
+    /// Select vcpu for non-blocking tasks
+    #[inline]
+    fn select_vcpu_nonblocking(
+        &self,
+        sched_state: &SchedState,
+        last_vcpu: u32,
+        has_this_vcpu: Option<u32>,
+    ) -> u32 {
+        let affinity = sched_state.affinity();
+        // Give preferance to idle vCPU in vCPU selecting strategy
         {
             let idle_vcpu_mask = &self.idle_vcpu_mask;
 
             // Select the last vCPU that the entity runs on, if it is idle.
             // Prefer last vCPU to avoid switching real cpu for one task.
-            if let Some(last_vcpu) = has_last_vcpu {
-                if idle_vcpu_mask.get(last_vcpu as usize) {
-                    return last_vcpu;
-                }
+            if idle_vcpu_mask.get(last_vcpu as usize) {
+                return last_vcpu;
             }
 
             // Select this vCPU, if it is idle.
@@ -147,32 +220,45 @@ impl VcpuSelector {
             }
         }
 
-        // 3. If no idle vCPU, select active vCPU and avoid waking up sleep vCPU.
+        let sleep_vcpu_mask = &self.sleep_vcpu_mask;
+        let heavy_vcpu_mask = &self.heavy_vcpu_mask;
+
+        // If no idle vCPU, select active vCPU and avoid waking up sleep vCPU.
         // Since waking up sleep vCPU need to unpark thread, which increase performance overhead.
         // Besides, if there are large amounts of idle vCPUs but a small number of runnable threads,
         // those threads are prone to switch run between different vCPU,
         // which also significantly increase performance overhead.
         {
-            let sleep_vcpu_mask = &self.sleep_vcpu_mask;
-
             // Select the last vCPU that the entity runs on, if it is active.
-            if let Some(last_vcpu) = has_last_vcpu {
-                if !sleep_vcpu_mask.get(last_vcpu as usize) {
-                    return last_vcpu;
-                }
+            if !sleep_vcpu_mask.get(last_vcpu as usize) {
+                return last_vcpu;
             }
 
-            // Select any active vCPU
-            let has_active_vcpu = sleep_vcpu_mask
-                .iter_zeroes()
-                .find(|active_vcpu| affinity.get(*active_vcpu));
-            if let Some(active_vcpu) = has_active_vcpu {
-                return active_vcpu as u32;
+            let has_active_light_vcpu = sleep_vcpu_mask.iter_zeroes().find(|active_light_vcpu| {
+                affinity.get(*active_light_vcpu)
+                    && !heavy_vcpu_mask.get(*active_light_vcpu as usize)
+            });
+            if let Some(active_light_vcpu) = has_active_light_vcpu {
+                return active_light_vcpu as u32;
             }
         }
 
-        // 4. The last vCPU that the entity runs on, regardless of whether it is
+        // If no active and light vCPU, waking up any sleep vCPU.
+        {
+            if sleep_vcpu_mask.get(last_vcpu as usize) {
+                return last_vcpu;
+            }
+
+            let has_sleep_vcpu = sleep_vcpu_mask
+                .iter_ones()
+                .find(|sleep_vcpu| affinity.get(*sleep_vcpu));
+            if let Some(sleep_vcpu) = has_sleep_vcpu {
+                return sleep_vcpu as u32;
+            }
+        }
+
+        // The last vCPU that the entity runs on, regardless of whether it is
         // active or not (as long as it is in the affinity mask)
-        has_last_vcpu.unwrap()
+        last_vcpu
     }
 }

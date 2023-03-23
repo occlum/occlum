@@ -4,10 +4,9 @@ use crate::load_balancer::LoadBalancer;
 use crate::prelude::*;
 #[allow(unused_imports)]
 use crate::task::Task;
-use crate::time::Instant;
 use crate::vcpu;
 
-use crate::scheduler::{SchedEntity, Scheduler};
+use crate::scheduler::{SchedEntity, Scheduler, StatusNotifier};
 
 /// Returning number of running vcpus
 pub fn num_vcpus() -> u32 {
@@ -90,7 +89,7 @@ impl Executor {
 
         vcpu::set_current(this_vcpu);
 
-        let _this_local_scheduler = &self.scheduler.local_schedulers[this_vcpu as usize];
+        let this_local_scheduler = &self.scheduler.local_schedulers[this_vcpu as usize];
 
         loop {
             let task = match self.dequeue_wait() {
@@ -122,34 +121,35 @@ impl Executor {
 
             crate::task::current::set(task.clone());
 
-            let start = Instant::now();
+            let start = task.sched_state().update_exec_start();
+
             // Execute task
             let waker = waker_ref(&task);
             let context = &mut Context::from_waker(&*waker);
             let ret = future.as_mut().poll(context);
-            let mut elapsed = start.elapsed().as_millis();
-            if elapsed == 0 {
-                elapsed = 1;
-            }
-            let remain_ms = task.sched_state().elapse(elapsed as u32);
-            if remain_ms == 0 {
-                task.sched_state().report_preemption();
-            }
 
-            if let Poll::Ready(()) = ret {
-                // As the task is completed, we can destory the future
-                drop(future_slot.take());
-            }
+            match ret {
+                Poll::Ready(()) => {
+                    // As the task is completed, we can destory the future
+                    drop(future_slot.take());
+                }
+                Poll::Pending => {
+                    let stop = task.sched_state().update_exec_stop();
+                    let elapsed = stop.duration_since(start).as_millis() as usize;
 
-            // Add the number of pending tasks in this vcpu.
-            // match ret {
-            //     Poll::Ready(()) => {
-            //         drop(future_slot.take());
-            //     }
-            //     Poll::Pending => {
-            //         self.vcpus_pending_len[this_vcpu as usize].fetch_add(1, Ordering::Relaxed);
-            //     }
-            // }
+                    let remain_ms = task.sched_state().elapse(elapsed as u32);
+                    if remain_ms == 0 {
+                        task.sched_state().report_preemption();
+                    }
+                }
+            }
+            drop(future_slot);
+
+            if this_local_scheduler.blocking_num() == 0 {
+                self.scheduler
+                    .vcpu_selector
+                    .notify_heavy_status(this_vcpu, false);
+            }
 
             // Reset current task
             crate::task::current::reset();

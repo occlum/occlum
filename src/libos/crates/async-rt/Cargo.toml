@@ -17,6 +17,7 @@ cfg-if = "1.0"
 atomic = "0.5"
 libc = { version = "0.2", optional = true }
 bit-vec = { version = "0.6", default-features = false }
+bitflags = "1.2"
 errno = { path = "../errno" }
 flume = { path = "../../../../deps/flume", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["alloc", "async-await"] }
