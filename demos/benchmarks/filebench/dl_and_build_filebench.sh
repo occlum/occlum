@@ -3,14 +3,6 @@ set -e
 
 BLUE='\033[1;34m'
 NC='\033[0m'
-echo -e "${BLUE}Start installing dependencies.${NC}"
-
-DEPS="bison flex"
-
-apt-get update
-apt-get install -y $DEPS
-echo -e "${BLUE}Finish installing dependencies.${NC}"
-
 echo -e "${BLUE}Start building filebench from tarball.${NC}"
 
 # Download release tarball

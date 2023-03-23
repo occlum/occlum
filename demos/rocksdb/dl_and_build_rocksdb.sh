@@ -3,14 +3,6 @@ set -e
 
 BLUE='\033[1;34m'
 NC='\033[0m'
-echo -e "${BLUE}Start installing dependencies.${NC}"
-
-DEPS="libgflags-dev libsnappy-dev zlib1g-dev libbz2-dev liblz4-dev libzstd-dev"
-
-apt-get update
-apt-get install -y $DEPS
-echo -e "${BLUE}Finish installing dependencies.${NC}"
-
 echo -e "${BLUE}Start building rocksdb from src.${NC}"
 TAG="v7.0.4"
 

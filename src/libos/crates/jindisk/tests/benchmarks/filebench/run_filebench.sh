@@ -10,6 +10,8 @@ BENCH_DIR=${DEMO_DIR}/benchmarks/filebench
 pushd ${BENCH_DIR}
 
 if [ ! -d filebench ];then
+    echo -e "${GREEN}Preinstall dependencies${NC}"
+    ./preinstall_deps.sh
     echo -e "${GREEN}Download and build Filebench first${NC}"
     ./dl_and_build_filebench.sh
 fi

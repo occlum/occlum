@@ -10,6 +10,8 @@ ROCKS_DIR=${DEMO_DIR}/rocksdb
 pushd ${ROCKS_DIR}
 
 if [ ! -d rocksdb ];then
+    echo -e "${GREEN}Preinstall dependencies${NC}"
+    ./preinstall_deps.sh
     echo -e "${GREEN}Download and build RocksDB first${NC}"
     ./dl_and_build_rocksdb.sh
 fi

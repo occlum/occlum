@@ -222,8 +222,8 @@ jobs:
         container-name: ${{ github.job }}
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
-    - name: Build xgboost dependencies
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/xgboost && ./download_and_build_xgboost.sh"
+    - name: Preinstall dependencies and build xgboost
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/xgboost && ./preinstall_deps.sh && ./download_and_build_xgboost.sh"
 
     - name: Run xgboost test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test"
@@ -388,6 +388,7 @@ jobs:
         docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_tls/occlum_client;
             occlum run /bin/greeter_secure_client"
 
+
   Openvino_test:
     runs-on: ubuntu-20.04
     steps:
@@ -460,6 +461,7 @@ jobs:
     - name: Check result
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/python_glibc/occlum_instance; cat smvlight.dat"
 
+
   # Redis test
   Redis_support_test:
     runs-on: ubuntu-20.04
@@ -490,6 +492,7 @@ jobs:
     - name: Run redis benchmark
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/redis; SGX_MODE=SIM ./benchmark_glibc.sh"
 
+
   Flink_test:
     runs-on: ubuntu-20.04
     steps:
@@ -502,8 +505,8 @@ jobs:
         container-name: ${{ github.job }}
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
-    - name: Download flink
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && ./download_flink.sh"
+    - name: Preinstall dependencies and download flink
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && ./preinstall_deps.sh && ./download_flink.sh"
 
     - name: Run jobmanager on host
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_jobmanager_on_host.sh"
@@ -519,6 +522,7 @@ jobs:
     - name: Check flink task manager's log
       if: ${{ always() }}
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink; cat occlum_instance_taskmanager/flink--taskmanager-0.log"
+
 
   Cluster_serving_test:
     runs-on: ubuntu-20.04
@@ -538,7 +542,8 @@ jobs:
     - name: Run cluster serving test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/cluster_serving; source ./environment.sh; SGX_MODE=SIM ./start-all.sh; ./push-image.sh"
 
-  Enclave_ra_tls_test:
+
+  Enclave_RA_TLS_test:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
@@ -562,6 +567,7 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "/usr/share/enclave-tls/samples/enclave-tls-client" || true
 
+
   Vault_test:
     runs-on: ubuntu-20.04
     steps:
@@ -584,7 +590,8 @@ jobs:
       run: |
         sleep 120;
         docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/vault && ./run_occlum_vault_test.sh"
-  
+
+
   Sofaboot_test:
     runs-on: ubuntu-20.04
     steps:
@@ -611,6 +618,7 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "curl -s http://localhost:8080/actuator/readiness | grep -v DOWN"
 
+
   Bash_test:
     runs-on: ubuntu-20.04
     steps:
@@ -628,6 +636,7 @@ jobs:
 
     - name: Run glibc Bash test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/bash && SGX_MODE=SIM ./run_bash_demo.sh"
+
 
   Sysbench_test:
     runs-on: ubuntu-20.04
@@ -650,6 +659,7 @@ jobs:
     - name: Run sysbench threads benchmark
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/sysbench/occlum_instance;
             occlum run /bin/sysbench threads --threads=200 --thread-yields=100 --thread-locks=4 --time=30 run"
+
 
   FIO_test:
     runs-on: ubuntu-20.04
@@ -684,6 +694,7 @@ jobs:
     - name: Run unix socket test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/cross_world_uds; SGX_MODE=SIM ./run_cross_world_uds_test.sh"
 
+
   Gvisor_syscalls_test:
     runs-on: ubuntu-20.04
     steps:
@@ -712,6 +723,7 @@ jobs:
 
     - name: Run gvisor syscall test
       run: docker exec $gvisor_test bash -c "cd /root/gvisor/occlum && SGX_MODE=SIM ./run_occlum_passed_tests.sh ngo"
+
 
   Flask_tls_test:
     runs-on: ubuntu-20.04
@@ -744,7 +756,8 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/flask;
             curl --cacert flask.crt -X GET https://localhost:4996/customer/1"
 
-  iperf2_test:
+
+  Iperf2_test:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v1
@@ -769,6 +782,7 @@ jobs:
         docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/iperf2/occlum_client;
             occlum run /bin/iperf -c 127.0.0.1 -p 6888 -P 16"
 
+
   Linux_LTP_test:
     runs-on: ubuntu-20.04
     steps:
@@ -791,6 +805,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/linux-ltp/ltp_instance;
             occlum run /opt/ltp/run-ltp.sh -f syscalls-occlum"
 
+
   Rocksdb_test:
     runs-on: ubuntu-20.04
     steps:
@@ -803,11 +818,12 @@ jobs:
         container-name: ${{ github.job }}
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
-    - name: Download and build Rocksdb
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/rocksdb && ./dl_and_build_rocksdb.sh"
+    - name: Preinstall dependencies and build Rocksdb
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/rocksdb && ./preinstall_deps.sh && ./dl_and_build_rocksdb.sh"
 
     - name: Prepare occlum instance and Run benchmark of Rocksdb
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/rocksdb && SGX_MODE=SIM ./run_benchmark.sh /tmp"
+
 
   Filebench_test:
     runs-on: ubuntu-20.04
@@ -821,11 +837,12 @@ jobs:
         container-name: ${{ github.job }}
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
-    - name: Download and build Filebench
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/filebench && ./dl_and_build_filebench.sh"
+    - name: Preinstall dependencies and build Filebench
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/filebench && ./preinstall_deps.sh && ./dl_and_build_filebench.sh"
 
     - name: Prepare occlum instance and Run Filebench
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/filebench && SGX_MODE=SIM ./run_workload.sh readfiles"
+
 
   RuntimeBoot_test:
     runs-on: ubuntu-20.04
