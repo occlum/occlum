@@ -1,5 +1,6 @@
 #include <signal.h>
 #include <pthread.h>
+#include <sched.h>
 #include "Enclave_u.h"
 #include "pal_enclave.h"
 #include "pal_error.h"
@@ -16,6 +17,8 @@
 
 static pthread_t thread;
 static int is_running = 0;
+static int policy = SCHED_RR;
+static int prio = 90;
 
 extern pthread_t *pal_vcpu_threads;
 extern struct occlum_pal_vcpu_data *pal_vcpu_data;
@@ -54,8 +57,43 @@ int pal_timer_thread_start(void) {
     is_running = 1;
     pal_thread_counter_inc();
 
+    // Timer thread is important for tasks scheduling,
+    // so it requires high priority for keeping accuracy
     int ret = 0;
-    if ((ret = pthread_create(&thread, NULL, timer_thread, NULL))) {
+    pthread_attr_t tattr;
+    pthread_attr_t *p_tattr = NULL;
+    struct sched_param param;
+
+    ret = pthread_attr_init(&tattr);
+    if (ret != 0) {
+        PAL_WARN("Failed to initialize timer thread attribute");
+        goto create_thread;
+    }
+    ret = pthread_attr_getschedparam(&tattr, &param);
+    if (ret != 0) {
+        PAL_WARN("Failed to get timer thread parameter");
+        goto create_thread;
+    }
+    param.sched_priority = prio;
+
+    ret = pthread_attr_setschedpolicy(&tattr, policy);
+    if (ret != 0) {
+        PAL_WARN("Failed to set timer scheduling policy");
+        goto create_thread;
+    }
+    ret = pthread_attr_setschedparam(&tattr, &param);
+    if (ret != 0) {
+        PAL_WARN("Failed to set timer thread attribute");
+        goto create_thread;
+    }
+    p_tattr = &tattr;
+
+create_thread:
+    ret = pthread_create(&thread, p_tattr, timer_thread, NULL);
+    if (p_tattr != NULL) {
+        pthread_attr_destroy(p_tattr);
+    }
+    if (ret != 0) {
         is_running = 0;
         pal_thread_counter_dec();
 
