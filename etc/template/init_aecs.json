@@ -1,0 +1,38 @@
+{
+    "kms_server": "localhost:19527",
+    "kms_keys": [
+        {
+            "key": "demo_key",
+            "path": "/etc/demo_key",
+            "service": "service"
+        }
+    ],
+    "ua_env_pccs_url": "",
+    "ra_config": {
+        "ua_ias_url": "https://api.trustedservices.intel.com/sgx/dev/attestation/v4",
+        "ua_ias_spid": "",
+        "ua_ias_apk_key": "",
+        "ua_dcap_lib_path": "",
+        "ua_dcap_pccs_url": "",
+        "ua_uas_url": "",
+        "ua_uas_app_key": "",
+        "ua_uas_app_secret": "",
+        "ua_policy_str_tee_platform": "",
+        "ua_policy_hex_platform_hw_version": "",
+        "ua_policy_hex_platform_sw_version": "",
+        "ua_policy_hex_secure_flags": "",
+        "ua_policy_hex_platform_measurement": "",
+        "ua_policy_hex_boot_measurement": "",
+        "ua_policy_str_tee_identity": "",
+        "ua_policy_hex_ta_measurement": "",
+        "ua_policy_hex_ta_dyn_measurement": "",
+        "ua_policy_hex_signer": "",
+        "ua_policy_hex_prod_id": "",
+        "ua_policy_str_min_isvsvn": "",
+        "ua_policy_hex_user_data": "",
+        "ua_policy_bool_debug_disabled": "",
+        "ua_policy_hex_hash_or_pem_pubkey": "",
+        "ua_policy_hex_nonce": "",
+        "ua_policy_hex_spid": ""
+    }
+}
