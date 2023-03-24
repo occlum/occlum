@@ -1,0 +1,13 @@
+[package]
+name = "init_aecs"
+version = "0.1.0"
+build = "build.rs"
+authors = ["Zheng Qi huaiqing.zq@antgroup.com"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libc = "0.2.84"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
