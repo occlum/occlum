@@ -160,6 +160,44 @@ check_aesm_service() {
     exit 1
 }
 
+gen_initfs_aecs()
+{
+    echo "Generate initfs with AECS client"
+    mkdir -p initfs
+    mkdir -p initfs/bin
+    mkdir -p initfs/lib
+    mkdir -p initfs/dev
+    mkdir -p initfs/proc
+    mkdir -p initfs/etc/kubetee
+    mkdir -p initfs/lib64
+    mkdir -p initfs/opt/occlum/
+    # add default timezone file
+    cp /etc/localtime initfs/etc/
+
+    # add glibc base libraries
+    # just copy from the image
+    cp -rf image/opt/occlum/glibc initfs/opt/occlum/
+    cp -f image/lib64/ld-linux-x86-64.so.2 initfs/lib64/
+
+    local occlum_glibc_lib=/opt/occlum/glibc/lib
+    # add aecs required libs
+    cp -t initfs/$occlum_glibc_lib \
+        "$occlum_dir"/toolchains/aecs_client/* \
+        /lib/x86_64-linux-gnu/libssl.so.1.1 \
+        /lib/x86_64-linux-gnu/libz.so.1 \
+        /lib/x86_64-linux-gnu/libcrypto.so.1.1 \
+        /lib/x86_64-linux-gnu/libdl.so.2 \
+        $occlum_glibc_lib/libnss_files.so.2 \
+        $occlum_glibc_lib/libnss_dns.so.2 \
+        $occlum_glibc_lib/libresolv.so.2
+
+    # add template init_ra_conf
+    cp "$occlum_dir"/etc/template/init_aecs.json "$instance_dir"/init_ra_conf.json
+
+    cp "$occlum_dir"/build/bin/init_aecs initfs/bin/init
+    cp "$occlum_dir"/etc/template/Occlum.json "$instance_dir"/
+}
+
 gen_initfs_grpc_ratls()
 {
     echo "Generate initfs with GRPC RATLS KMS client"
@@ -319,8 +357,7 @@ cmd_init() {
     if [[ "$init_ra" == "grpc_ratls" ]]; then
         gen_initfs_grpc_ratls
     elif [[ "$init_ra" == "aecs" ]]; then
-        echo "Error: do not support AECS yet"
-        exit 1
+        gen_initfs_aecs
     else
         gen_initfs
     fi
