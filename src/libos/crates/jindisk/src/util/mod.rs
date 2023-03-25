@@ -2,12 +2,14 @@
 pub mod cryption;
 mod disk_array;
 mod disk_range;
+mod disk_shadow;
 mod disk_view;
 mod range_query_ctx;
 pub mod serialize;
 
 pub(crate) use disk_array::DiskArray;
 pub(crate) use disk_range::{HbaRange, LbaRange};
+pub(crate) use disk_shadow::DiskShadow;
 pub(crate) use disk_view::DiskView;
 pub(crate) use range_query_ctx::RangeQueryCtx;
 

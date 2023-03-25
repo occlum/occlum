@@ -136,6 +136,7 @@ impl CheckpointRegion {
             KeyTable::calc_size_on_disk(num_data_segments),
         );
         let bitc_addr = region_addr + 1 as _; // PFLAG at begin
+        let bitc_addr = bitc_addr + 2 as _; // Reserve two blocks for shadow bitmap
         let data_svt_addr = bitc_addr + Hba::from_byte_offset_aligned(bitc_size).unwrap().to_raw();
         let index_svt_addr = data_svt_addr
             + Hba::from_byte_offset_aligned(data_svt_size)

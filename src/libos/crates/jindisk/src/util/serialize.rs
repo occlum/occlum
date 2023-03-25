@@ -155,11 +155,8 @@ impl<K: Serialize + std::cmp::Eq + std::hash::Hash, V: Serialize> Serialize for 
 
 impl Serialize for BitMap {
     fn encode(&self, encoder: &mut impl Encoder) -> Result<()> {
-        // TODO: Fix this limitation
-        assert!(self.len() % BITMAP_UNIT == 0);
-        let bitvec = self.clone().into_vec();
-        encoder.write_bytes(&bitvec.len().to_le_bytes())?;
-        encoder.write_bytes(&bitvec)?;
+        encoder.write_bytes(&self.len().to_le_bytes())?;
+        encoder.write_bytes(&self.as_raw_slice())?;
         Ok(())
     }
 
@@ -168,16 +165,19 @@ impl Serialize for BitMap {
         Self: Sized,
     {
         let decode_err = EINVAL;
-        let len = usize::from_le_bytes(buf[..USIZE_SIZE].try_into().map_err(|_| decode_err)?);
-        Ok(BitMap::from_vec(
-            buf[USIZE_SIZE..USIZE_SIZE + len]
+        let bit_len = usize::from_le_bytes(buf[..USIZE_SIZE].try_into().map_err(|_| decode_err)?);
+        let slice_len = (bit_len + BITMAP_UNIT - 1) / BITMAP_UNIT;
+        let mut bitmap = BitMap::from_vec(
+            buf[USIZE_SIZE..USIZE_SIZE + slice_len]
                 .try_into()
                 .map_err(|_| decode_err)?,
-        ))
+        );
+        bitmap.resize(bit_len, false);
+        Ok(bitmap)
     }
 
     fn bytes_len(&self) -> Option<usize> {
-        Some(USIZE_SIZE + self.clone().into_vec().len())
+        Some(USIZE_SIZE + self.as_raw_slice().len())
     }
 }
 
