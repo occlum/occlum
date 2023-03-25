@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1679782371330,
+  "lastUpdate": 1679782798417,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -1390,6 +1390,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Threads Maximum Latency",
             "value": 15563.06,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 244.38,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "sunhe05",
+            "username": "henrysun007",
+            "email": "sunhe05@baidu.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "2b98e1a0760869bf967b4464c94af29379e7a499",
+          "message": "Add PaddlePaddle demo",
+          "timestamp": "2023-03-07T02:47:45Z",
+          "url": "https://github.com/occlum/occlum/commit/2b98e1a0760869bf967b4464c94af29379e7a499"
+        },
+        "date": 1679782797058,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.08,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 51.66,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 8796.8,
             "unit": "ms",
             "extra": "max"
           },
