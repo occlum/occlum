@@ -1,6 +1,7 @@
 //! Checkpoint region.
 use crate::prelude::*;
 use crate::superblock::{CheckpointRegion, SuperBlock};
+use crate::util::DiskShadow;
 
 use std::fmt::{self, Debug};
 
@@ -25,12 +26,26 @@ pub struct Checkpoint {
     dst: RwLock<DST>,
     rit: AsyncRwLock<RIT>,
     key_table: KeyTable,
+    shadow: RwLock<BitMap>,
     disk: DiskView,
 }
+// TODO: Optimize RwLock granularity
 // TODO: Introduce shadow paging for recovery
 
+const NR_BITC: usize = 0;
+const NR_DATA_SVT: usize = 1;
+const NR_INDEX_SVT: usize = 2;
+const NR_DST: usize = 3;
+const NR_RIT: usize = 4;
+const NR_KEYTABLE: usize = 5;
+const NR_REGION_MAX: usize = 6;
+
 impl Checkpoint {
-    pub fn new(superblock: &SuperBlock, disk: DiskView) -> Self {
+    pub fn new(superblock: &SuperBlock, disk: DiskView, root_key: &Key) -> Self {
+        let rit_addr = superblock.checkpoint_region.rit_addr;
+        let rit_blocks = RIT::calc_rit_blocks(superblock.num_data_segments);
+        let rit_boundary = HbaRange::new(rit_addr..rit_addr + (rit_blocks as _));
+
         Self {
             bitc: RwLock::new(BITC::new()),
             data_svt: RwLock::new(SVT::new(
@@ -48,11 +63,14 @@ impl Checkpoint {
                 superblock.num_data_segments,
             )),
             rit: AsyncRwLock::new(RIT::new(
-                superblock.checkpoint_region.rit_addr,
                 superblock.data_region_addr,
+                superblock.num_data_segments,
+                rit_boundary,
                 disk.clone(),
+                root_key.clone(),
             )),
             key_table: KeyTable::new(superblock.data_region_addr),
+            shadow: RwLock::new(BitMap::repeat(false, NR_REGION_MAX)),
             disk,
         }
     }
@@ -83,7 +101,12 @@ impl Checkpoint {
 }
 
 impl Checkpoint {
-    pub async fn persist(&self, superblock: &SuperBlock, root_key: &Key) -> Result<()> {
+    pub async fn persist(
+        &self,
+        superblock: &SuperBlock,
+        root_key: &Key,
+        checkpoint: bool,
+    ) -> Result<()> {
         let region = &superblock.checkpoint_region;
         if self.still_initialized() {
             return self.commit_pflag(&region, Pflag::Initialized).await;
@@ -105,11 +128,15 @@ impl Checkpoint {
             .write()
             .persist(&self.disk, region.dst_addr, root_key)
             .await?;
-        self.rit.write().await.persist(root_key).await?;
+        let rit_shadow = self.rit.write().await.persist(checkpoint).await?;
+        self.shadow.write().set(NR_RIT, rit_shadow);
         self.key_table
             .persist(&self.disk, region.keytable_addr, root_key)
             .await?;
 
+        if checkpoint {
+            self.checkpoint(superblock, root_key).await?;
+        }
         self.commit_pflag(&region, Pflag::Commited).await?;
         Ok(())
     }
@@ -118,16 +145,40 @@ impl Checkpoint {
         let region = &superblock.checkpoint_region;
         match Self::check_pflag(disk, region).await {
             Pflag::NotCommited => return_errno!(EINVAL, "checkpoint region not persisted yet"),
-            Pflag::Initialized => return Ok(Self::new(superblock, disk.clone())),
+            Pflag::Initialized => return Ok(Self::new(superblock, disk.clone(), &root_key)),
             Pflag::Commited => {}
         }
+
+        let mut buf = [0u8; BLOCK_SIZE];
+        let shadow_addr = region.region_addr + 1;
+        match disk.read(shadow_addr, &mut buf).await {
+            Ok(_) => (),
+            Err(_) => {
+                // try read backup block
+                disk.read(shadow_addr + 1, &mut buf).await?;
+            }
+        }
+        let buf = DefaultCryptor::symm_decrypt_block(&buf, root_key)?;
+        let shadow = BitMap::decode(&buf)?;
 
         let bitc = BITC::load(disk, region.bitc_addr, root_key).await?;
         bitc.init_bit_caches(disk).await?;
         let data_svt = SVT::load(disk, region.data_svt_addr, root_key).await?;
         let index_svt = SVT::load(disk, region.index_svt_addr, root_key).await?;
         let dst = DST::load(disk, region.dst_addr, root_key).await?;
-        let rit = RIT::load(disk, region.rit_addr, superblock.data_region_addr, root_key).await?;
+
+        let rit_addr = superblock.checkpoint_region.rit_addr;
+        let rit_blocks = RIT::calc_rit_blocks(superblock.num_data_segments);
+        let rit_boundary = HbaRange::new(rit_addr..rit_addr + (rit_blocks as _));
+        let rit = RIT::load(
+            superblock.data_region_addr,
+            superblock.num_data_segments,
+            rit_boundary,
+            disk.clone(),
+            root_key.clone(),
+            shadow[NR_RIT],
+        )
+        .await?;
         let key_table = KeyTable::load(disk, region.keytable_addr, root_key).await?;
 
         Ok(Self {
@@ -137,8 +188,26 @@ impl Checkpoint {
             dst: RwLock::new(dst),
             rit: AsyncRwLock::new(rit),
             key_table,
+            shadow: RwLock::new(shadow),
             disk: disk.clone(),
         })
+    }
+
+    async fn checkpoint(&self, superblock: &SuperBlock, key: &Key) -> Result<()> {
+        let mut buf = [0u8; BLOCK_SIZE];
+        let mut encoder = Vec::<u8>::new();
+        let shadow = self.shadow.read();
+        shadow.encode(&mut encoder)?;
+        buf[..encoder.len()].copy_from_slice(&encoder);
+
+        let buf = DefaultCryptor::symm_encrypt_block(&buf, key)?;
+
+        let shadow_addr = superblock.checkpoint_region.region_addr + 1;
+        // write to bitmap backup block
+        self.disk.write(shadow_addr + 1, &buf).await?;
+        // write to bitmap block
+        self.disk.write(shadow_addr, &buf).await?;
+        Ok(())
     }
 
     async fn check_pflag(disk: &DiskView, region: &CheckpointRegion) -> Pflag {
@@ -278,8 +347,8 @@ mod tests {
             let disk = DiskView::new_unchecked(disk);
             let root_key = DefaultCryptor::gen_random_key();
             let sb = SuperBlock::init(total_blocks);
-            let checkpoint = Checkpoint::new(&sb, disk.clone());
-            checkpoint.persist(&sb, &root_key).await?;
+            let mut checkpoint = Checkpoint::new(&sb, disk.clone(), &root_key);
+            checkpoint.persist(&sb, &root_key, true).await?;
             let loaded_checkpoint = Checkpoint::load(&disk, &sb, &root_key).await?;
 
             assert_eq!(
