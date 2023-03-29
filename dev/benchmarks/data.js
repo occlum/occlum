@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1680127943515,
+  "lastUpdate": 1680128522705,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -3366,6 +3366,54 @@ window.BENCHMARK_DATA = {
           {
             "name": "Random Read Throughput",
             "value": 135,
+            "unit": "MiB/s",
+            "extra": "randread"
+          }
+        ]
+      }
+    ],
+    "FIO Benchmark on AsyncSFS and JinDisk": [
+      {
+        "commit": {
+          "author": {
+            "name": "Shaowei Song",
+            "username": "lucassong-mh",
+            "email": "1498430017@qq.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "5a03deb6b9b5ad1c0270a001eb59f6fb64f0abec",
+          "message": "[demos] Improve steps of dependency preinstall",
+          "timestamp": "2023-03-23T07:28:26Z",
+          "url": "https://github.com/occlum/occlum/commit/5a03deb6b9b5ad1c0270a001eb59f6fb64f0abec"
+        },
+        "date": 1680128521281,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sequential Write Throughput",
+            "value": 271,
+            "unit": "MiB/s",
+            "extra": "seqwrite"
+          },
+          {
+            "name": "Random Write Throughput",
+            "value": 195,
+            "unit": "MiB/s",
+            "extra": "randwrite"
+          },
+          {
+            "name": "Sequential Read Throughput",
+            "value": 126,
+            "unit": "MiB/s",
+            "extra": "seqread"
+          },
+          {
+            "name": "Random Read Throughput",
+            "value": 99.2,
             "unit": "MiB/s",
             "extra": "randread"
           }
