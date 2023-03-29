@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1680127932267,
+  "lastUpdate": 1680127943515,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -3284,6 +3284,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 1339,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Shaowei Song",
+            "username": "lucassong-mh",
+            "email": "1498430017@qq.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "5a03deb6b9b5ad1c0270a001eb59f6fb64f0abec",
+          "message": "[demos] Improve steps of dependency preinstall",
+          "timestamp": "2023-03-23T07:28:26Z",
+          "url": "https://github.com/occlum/occlum/commit/5a03deb6b9b5ad1c0270a001eb59f6fb64f0abec"
+        },
+        "date": 1680127941817,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 601,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 601,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
