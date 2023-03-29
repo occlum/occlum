@@ -6,6 +6,7 @@ use crate::ioctl::*;
 use crate::prelude::*;
 use crate::runtime::Runtime;
 use crate::sockopt::*;
+use spin::RwLock;
 
 use async_io::socket::{
     timeout_to_timeval, GetRecvTimeoutCmd, GetSendTimeoutCmd, MsgFlags, SetRecvTimeoutCmd,
@@ -70,13 +71,13 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     pub fn host_fd(&self) -> HostFd {
-        let state = self.state.read().unwrap();
+        let state = self.state.read();
         state.common().host_fd()
     }
 
     pub fn status_flags(&self) -> StatusFlags {
         // Only support O_NONBLOCK
-        let state = self.state.read().unwrap();
+        let state = self.state.read();
         if state.common().nonblocking() {
             StatusFlags::O_NONBLOCK
         } else {
@@ -86,14 +87,14 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
 
     pub fn set_status_flags(&self, new_flags: StatusFlags) -> Result<()> {
         // Only support O_NONBLOCK
-        let state = self.state.read().unwrap();
+        let state = self.state.read();
         let nonblocking = new_flags.is_nonblocking();
         state.common().set_nonblocking(nonblocking);
         Ok(())
     }
 
     pub fn bind(&self, addr: &A) -> Result<()> {
-        let state = self.state.read().unwrap();
+        let state = self.state.read();
         match &*state {
             State::Init(init_stream) => init_stream.bind(addr),
             _ => {
@@ -103,7 +104,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     pub fn listen(&self, backlog: u32) -> Result<()> {
-        let mut state = self.state.write().unwrap();
+        let mut state = self.state.write();
         match &*state {
             State::Init(init_stream) => {
                 let common = init_stream.common().clone();
@@ -121,7 +122,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         // Create the new intermediate state of connecting and save the
         // old state of init in case of failure to connect.
         let (init_stream, connecting_stream) = {
-            let mut state = self.state.write().unwrap();
+            let mut state = self.state.write();
             match &*state {
                 State::Init(init_stream) => {
                     let connecting_stream = {
@@ -167,12 +168,12 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
                     ConnectedStream::new(common)
                 };
 
-                let mut state = self.state.write().unwrap();
+                let mut state = self.state.write();
                 *state = State::Connected(connected_stream);
             }
             Err(_) => {
                 if !connecting_stream.common().nonblocking() {
-                    let mut state = self.state.write().unwrap();
+                    let mut state = self.state.write();
                     *state = State::Init(init_stream);
                 }
             }
@@ -182,7 +183,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
 
     pub async fn accept(&self, nonblocking: bool) -> Result<Self> {
         let listener_stream = {
-            let state = self.state.read().unwrap();
+            let state = self.state.read();
             match &*state {
                 State::Listen(listener_stream) => listener_stream.clone(),
                 _ => {
@@ -217,7 +218,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         flags: RecvFlags,
     ) -> Result<(usize, Option<A>, MsgFlags)> {
         let connected_stream = {
-            let mut state = self.state.write().unwrap();
+            let mut state = self.state.write();
             match &*state {
                 State::Connected(connected_stream) => connected_stream.clone(),
                 State::Connect(connecting_stream) => {
@@ -250,7 +251,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
 
     pub async fn sendmsg(&self, bufs: &[&[u8]], flags: SendFlags) -> Result<usize> {
         let connected_stream = {
-            let mut state = self.state.write().unwrap();
+            let mut state = self.state.write();
             match &*state {
                 State::Connected(connected_stream) => connected_stream.clone(),
                 State::Connect(connecting_stream) => {
@@ -273,20 +274,20 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
-        let state = self.state.read().unwrap();
+        let state = self.state.read();
         let pollee = state.common().pollee();
         pollee.poll(mask, poller)
     }
 
     pub fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) -> Result<()> {
-        let state = self.state.read().unwrap();
+        let state = self.state.read();
         let pollee = state.common().pollee();
         pollee.register_observer(observer, mask);
         Ok(())
     }
 
     pub fn unregister_observer(&self, observer: &Arc<dyn Observer>) -> Result<Arc<dyn Observer>> {
-        let state = self.state.read().unwrap();
+        let state = self.state.read();
         let pollee = state.common().pollee();
         pollee
             .unregister_observer(observer)
@@ -294,7 +295,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     pub fn addr(&self) -> Result<A> {
-        let state = self.state.read().unwrap();
+        let state = self.state.read();
         let common = state.common();
 
         // Always get addr from host.
@@ -306,7 +307,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     pub fn peer_addr(&self) -> Result<A> {
-        let mut state = self.state.write().unwrap();
+        let mut state = self.state.write();
         match &*state {
             State::Connected(connected_stream) => {
                 Ok(connected_stream.common().peer_addr().unwrap())
@@ -326,7 +327,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
-        let mut state = self.state.write().unwrap();
+        let mut state = self.state.write();
         match &*state {
             State::Connect(connecting_stream) => {
                 if let Some(connected_stream) =
@@ -361,7 +362,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             },
             cmd: GetAcceptConnCmd => {
                 let mut is_listen = false;
-                let state = self.state.read().unwrap();
+                let state = self.state.read();
                 if let State::Listen(_listener_stream) = &*state {
                     is_listen = true;
                 }
@@ -375,15 +376,15 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
                 cmd.set_output(AddrStorage(peer.to_c_storage()));
             },
             cmd: GetTypeCmd => {
-                let state = self.state.read().unwrap();
+                let state = self.state.read();
                 cmd.set_output(state.common().type_() as _);
             },
             cmd: SetNonBlocking => {
-                let state = self.state.read().unwrap();
+                let state = self.state.read();
                 state.common().set_nonblocking(*cmd.input() != 0);
             },
             cmd: GetReadBufLen => {
-                let state = self.state.read().unwrap();
+                let state = self.state.read();
                 if let State::Connected(connected_stream) = &*state {
                     let read_buf_len = connected_stream.bytes_to_consume();
                     cmd.set_output(read_buf_len as _);
@@ -405,7 +406,8 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     pub async fn shutdown(&self, shutdown: Shutdown) -> Result<()> {
-        let mut state = self.state.write().unwrap();
+        info!("do shutdown");
+        let mut state = self.state.write();
         match &*state {
             State::Listen(listener_stream) => {
                 // listening socket can be shutdown and then re-use by calling listen again.
@@ -443,7 +445,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     pub async fn close(&self) -> Result<()> {
-        let state = self.state.read().unwrap();
+        let state = self.state.read();
         match &*state {
             State::Init(_) => {}
             State::Listen(listener_stream) => {
@@ -465,22 +467,22 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     fn send_timeout(&self) -> Option<Duration> {
-        let state = self.state.read().unwrap();
+        let state = self.state.read();
         state.common().send_timeout()
     }
 
     fn recv_timeout(&self) -> Option<Duration> {
-        let state = self.state.read().unwrap();
+        let state = self.state.read();
         state.common().recv_timeout()
     }
 
     fn set_send_timeout(&self, timeout: Duration) {
-        let state = self.state.read().unwrap();
+        let state = self.state.read();
         state.common().set_send_timeout(timeout);
     }
 
     fn set_recv_timeout(&self, timeout: Duration) {
-        let state = self.state.read().unwrap();
+        let state = self.state.read();
         state.common().set_recv_timeout(timeout);
     }
 
@@ -499,7 +501,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
 
 impl<A: Addr + 'static, R: Runtime> Drop for StreamSocket<A, R> {
     fn drop(&mut self) {
-        let state = self.state.read().unwrap();
+        let state = self.state.read();
         state.common().set_closed();
         drop(state);
     }
@@ -520,7 +522,7 @@ impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for State<A, R> {
 impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for StreamSocket<A, R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StreamSocket")
-            .field("state", &self.state.read().unwrap())
+            .field("state", &self.state.read())
             .finish()
     }
 }
