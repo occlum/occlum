@@ -57,5 +57,5 @@ docker run --network host \
         --env GRPC_SERVER="${GRPC_SERVER}" \
         ${registry}/tf_demo:${tag} \
         taskset -c 0,1 occlum run /bin/tensorflow_model_server \
-        --model_name=INCEPTION --model_base_path=/model/INCEPTION/INCEPTION \
+        --model_name=resnet --model_base_path=/models/resnet \
         --port=9000 --ssl_config_file="/etc/tf_ssl.cfg" &

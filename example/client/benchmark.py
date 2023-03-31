@@ -1,6 +1,8 @@
 import grpc
 import tensorflow as tf
 import argparse, time, grpc, asyncio
+import numpy as np
+from PIL import Image
 
 from tensorflow_serving.apis import predict_pb2
 from tensorflow_serving.apis import prediction_service_pb2_grpc
@@ -22,17 +24,22 @@ class benchmark_engine(object):
     def __prepare__(self):
         for idx in range(self.concurrent_num):
             # get image array
-            with open(self.image, 'rb') as f:
-                input_name = 'images'
-                input_shape = [1]
-                input_data = f.read()
+            # with open(self.image, 'rb') as f:
+            #     input_name = 'images'
+            #     input_shape = [1]
+            #     input_data = f.read()
 
+            # Load the image and convert to RGB
+            img = Image.open(self.image).convert('RGB')
+            img = img.resize((224,224), Image.BICUBIC)
+            img_array = np.array(img)
+            img_array = img_array.astype(np.float32) /255.0
             # create request
             request = predict_pb2.PredictRequest()
-            request.model_spec.name = 'INCEPTION'
-            request.model_spec.signature_name = 'predict_images'
-            request.inputs[input_name].CopyFrom(
-                tf.make_tensor_proto(input_data, shape=input_shape))
+            request.model_spec.name = 'resnet'
+            request.model_spec.signature_name = 'serving_default'
+            request.inputs['input_1'].CopyFrom(
+                tf.make_tensor_proto(img_array, shape=[1,224,224,3]))
             
             self.request_signatures.append(request)
         return None

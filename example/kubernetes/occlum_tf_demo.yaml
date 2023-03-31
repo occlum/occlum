@@ -29,8 +29,8 @@ spec:
         - occlum
         - run
         - /bin/tensorflow_model_server
-        - --model_name=INCEPTION
-        - --model_base_path=/model/INCEPTION/INCEPTION
+        - --model_name=resnet
+        - --model_base_path=/models/resnet
         - --port=9001
         - --ssl_config_file=/etc/tf_ssl.cfg
         ports:
