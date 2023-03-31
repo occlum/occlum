@@ -2,10 +2,10 @@ includes:
   - base.yaml
 targets:
   # copy model
-  - target: /model
+  - target: /models
     copy: 
       - dirs:
-        - ${TF_DIR}/INCEPTION
+        - ${TF_DIR}/resnet
   - target: /bin
     copy: 
       - files:

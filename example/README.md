@@ -55,9 +55,9 @@ Now users could send inference request with server certificates (`server.crt`).
 
 There are prebuilt docker images could be used for the examples, either in the following docker way or [`kubernates`](./kubernetes/) way. Users could pull them directly and try the example.
 ```
-docker pull occlum/init_ra_server:0.29.2-ubuntu20.04
-docker pull occlum/tf_demo:0.29.2-ubuntu20.04
-docker pull occlum/tf_demo_client:0.29.2-ubuntu20.04
+docker pull occlum/init_ra_server:0.29.5-ubuntu20.04
+docker pull occlum/tf_demo:0.29.5-ubuntu20.04
+docker pull occlum/tf_demo_client:0.29.5-ubuntu20.04
 ```
 
 If users want to build or customize the images, please check below part.
@@ -66,11 +66,11 @@ If users want to build or customize the images, please check below part.
 
 Our target is to deploy the demo in separated container images, so docker build is necessary steps. Thanks to the `docker run in docker` method, this example build could be done in Occlum development container image.
 
-First, please make sure `docker` is installed successfully in your host. Then start the Occlum container (use version `0.29.2-ubuntu20.04` for example) as below.
+First, please make sure `docker` is installed successfully in your host. Then start the Occlum container (use version `latest-ubuntu20.04` for example) as below.
 ```
 $ sudo docker run --rm -itd --network host \
         -v $(which docker):/usr/bin/docker -v /var/run/docker.sock:/var/run/docker.sock \
-        occlum/occlum:0.29.2-ubuntu20.04
+        occlum/occlum:latest-ubuntu20.04
 ```
 
 All the following are running in the above container.
@@ -101,7 +101,7 @@ For the tensorflow-serving, there is no need rebuild from source, just use the o
 Once all content ready, runtime container images build are good to go.
 This step builds two container images, `init_ra_server` and `tf_demo`.
 ```
-# ./build_container_images.sh <registry>
+# ./build_container_images.sh <registry> <tag>
 ```
 
 `<registry>` means the docker registry prefix for the generated container images.
@@ -128,12 +128,13 @@ usage: run_container.sh [OPTION]...
     -p <GRPC Server port> default 50051.
     -u <PCCS URL> default https://localhost:8081/sgx/certification/v3/.
     -r <registry prefix> the registry for this demo container images.
+    -g <image tag> the container images tag, default it is "latest".
     -h <usage> usage help
 ```
 
 For example, using PCCS service from aliyun.
 ```
-$ sudo ./run_container.sh -s  localhost -p 50051 -u https://sgx-dcap-server.cn-shanghai.aliyuncs.com/sgx/certification/v3/ -r demo
+$ sudo ./run_container.sh -s  localhost -p 50051 -u https://sgx-dcap-server.cn-shanghai.aliyuncs.com/sgx/certification/v3/ -r demo -g <tag>
 ```
 
 If everything goes well, the tensorflow serving service would be available by GRPC secure channel `localhost:9000`.
@@ -142,12 +143,20 @@ If everything goes well, the tensorflow serving service would be available by GR
 
 There is an example python based [`inference client`](./client/inception_client.py) which sends a picture to tensorflow serving service to do inference with previously generated server certificate.
 
+Install the dependent python packages.
+```
+# pip3 install -r client/requirements.txt
+```
+
+Start the inference request.
 ```
 # cd client
-# python3 inception_client.py --server=localhost:9000 --crt ../ssl_configure/server.crt --image cat.jpg
+# python3 resnet_client_grpc.py --server=localhost:9000 --crt ../ssl_configure/server.crt --image cat.jpg
 ```
+
+If everything goes well, you will get the most likely predication class (int value, mapping could be found on https://storage.googleapis.com/download.tensorflow.org/data/ImageNetLabels.txt) and its probability.
 
 Or you can use the demo client container image to do the inference test.
 ```
-$ docker run --rm --network host <registry>/tf_demo_client:<tag> python3 inception_client.py --server=localhost:9000 --crt server.crt --image cat.jpg
+$ docker run --rm --network host <registry>/tf_demo_client:<tag> python3 resnet_client_grpc.py --server=localhost:9000 --crt server.crt --image cat.jpg
 ```

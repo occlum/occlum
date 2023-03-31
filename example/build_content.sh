@@ -27,10 +27,11 @@ function build_tf_serving()
     # Dump tensorflow/serving container rootfs content
     ./dump_rootfs.sh -i tensorflow/serving -d ${TF_DIR} -g 2.5.1
     pushd ${TF_DIR}
-    # Download pretrained inception model
-    rm -rf INCEPTION*
-    curl -O https://s3-us-west-2.amazonaws.com/tf-test-models/INCEPTION.zip
-    unzip INCEPTION.zip
+    # Download pretrained resnet model
+    rm -rf resnet*
+    wget https://tfhub.dev/tensorflow/resnet_50/classification/1?tf-hub-format=compressed -O resnet.tar.gz
+    mkdir -p resnet/123
+    tar zxf resnet.tar.gz -C resnet/123
     popd
 }
 
