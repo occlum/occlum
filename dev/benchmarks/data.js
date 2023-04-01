@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1680387201416,
+  "lastUpdate": 1680387702559,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -3364,6 +3364,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 601,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "zhubojun",
+            "username": "Bonjourz",
+            "email": "zhubojun.zbj@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "6cb368fbbeccae27f61677f70a8166772a30b528",
+          "message": "[libos] Retain red zone area and FLAGS unmodified across syscall\n\n1. The previous implementation of __occlum_syret usse the red zone to\nsave the register temporarily, which may overwrite the red zone area.\nThis change avoids using the red zone when handling syscall.\n\n2. Save and restore the FLAGS register before and after the operations\non PKRU to keep the FLAGS unmodified.",
+          "timestamp": "2023-03-21T01:46:38Z",
+          "url": "https://github.com/occlum/occlum/commit/6cb368fbbeccae27f61677f70a8166772a30b528"
+        },
+        "date": 1680387701067,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 1415,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 1414,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
