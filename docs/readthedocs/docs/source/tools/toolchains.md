@@ -54,7 +54,7 @@ The dragonwell-jdk11 for enclave is a musl-based JDK version compatible with the
 
 By default Occlum uses Dragonwell JDK11 as the default JDK. Thus `occlum-java` and `occlum-javac` (provided in the Docker image path **/opt/occlum/toolchains/jvm/bin/**) use Dragonwell JDK11. 
 
-Besides the musl-libc based JDK (less memory footprint), glibc based JDK are also supproted. Users are free to change to other JDK version by setting the `JAVA_HOME` to point to the installation directory of OpenJDK and copying it into Occlum instance.
+Besides the musl-libc based JDK (less memory footprint), glibc based JDK are also supported. Users are free to change to other JDK version by setting the `JAVA_HOME` to point to the installation directory of OpenJDK and copying it into Occlum instance.
 
 ### musl-gcc
 
