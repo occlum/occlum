@@ -10,6 +10,10 @@ use crate::common::{do_close, Common};
 use crate::prelude::*;
 use crate::runtime::Runtime;
 
+// We issue the async accept request ahead of time. But with big backlog number,
+// there will be too many pending requests, which could be harmful to the system.
+const PENDING_ASYNC_ACCEPT_NUM_MAX: usize = 128;
+
 /// A listener stream, ready to accept incoming connections.
 pub struct ListenerStream<A: Addr + 'static, R: Runtime> {
     common: Arc<Common<A, R>>,
@@ -19,9 +23,15 @@ pub struct ListenerStream<A: Addr + 'static, R: Runtime> {
 impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
     /// Creates a new listener stream.
     pub fn new(backlog: u32, common: Arc<Common<A, R>>) -> Result<Arc<Self>> {
-        let inner = Inner::new(backlog)?;
+        // Here we use different variables for the backlog. For the libos, as we will issue async accept request
+        // ahead of time, and cacel when the socket closes, we set the libos backlog to a reasonable value which
+        // is no greater than the max value we set to save resources and make it more efficient. For the host,
+        // we just use the backlog value for maximum connection.
+        let libos_backlog = std::cmp::min(backlog, PENDING_ASYNC_ACCEPT_NUM_MAX as u32);
+        let host_backlog = backlog;
 
-        Self::do_listen(common.host_fd(), backlog)?;
+        let inner = Inner::new(libos_backlog)?;
+        Self::do_listen(common.host_fd(), host_backlog)?;
 
         common.pollee().reset_events();
         let new_self = Arc::new(Self {
