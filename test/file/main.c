@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <poll.h>
 #include "test_fs.h"
 
 // ============================================================================
@@ -37,6 +38,27 @@ static int remove_file(const char *file_path) {
 // ============================================================================
 // Test cases for file
 // ============================================================================
+
+static int __test_poll(const char *file_path) {
+    int fd = open(file_path, O_WRONLY);
+    if (fd < 0) {
+        THROW_ERROR("failed to open a file to write");
+    }
+
+    struct pollfd poll_fds[] = {
+        { .fd = fd, .events = POLLIN | POLLOUT | POLLPRI | POLLRDHUP }
+    };
+
+    if (poll(poll_fds, 1, -1) < 0) {
+        THROW_ERROR("poll error");
+    }
+
+    if (poll_fds[0].revents != (POLLIN | POLLOUT)) {
+        THROW_ERROR("poll file with invalid revents");
+    }
+    close(fd);
+    return 0;
+}
 
 static int __test_write_read(const char *file_path) {
     char *write_str = "Hello World\n";
@@ -485,6 +507,10 @@ static int test_file_framework(test_file_func_t fn) {
     return 0;
 }
 
+static int test_poll() {
+    return test_file_framework(__test_poll);
+}
+
 static int test_write_read() {
     return test_file_framework(__test_write_read);
 }
@@ -534,6 +560,7 @@ static int test_fallocate_collapse_range() {
 // ============================================================================
 
 static test_case_t test_cases[] = {
+    TEST_CASE(test_poll),
     TEST_CASE(test_write_read),
     TEST_CASE(test_pwrite_pread),
     TEST_CASE(test_writev_readv),

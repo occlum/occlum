@@ -191,13 +191,8 @@ impl AsyncFileHandle {
         *offset
     }
 
-    pub fn poll(&self, mask: Events, _poller: Option<&Poller>) -> Events {
-        let events = match self.access_mode {
-            AccessMode::O_RDONLY => Events::IN,
-            AccessMode::O_WRONLY => Events::OUT,
-            AccessMode::O_RDWR => Events::IN | Events::OUT,
-        };
-        events | mask
+    pub fn poll(&self, mask: Events, poller: Option<&Poller>) -> Events {
+        self.dentry().inode().poll(mask, poller)
     }
 
     pub fn register_observer(&self, _observer: Arc<dyn Observer>, _mask: Events) -> Result<()> {
