@@ -192,7 +192,7 @@ RUN cd occlum && \
 #
 # To do so, we add the script to ~/.bashrc. We cannot use systemd to run AESM
 # as a "real" service since the pid 1 is not systemd in Docker. So we start
-# up AESM service when an user login with an interative shell.
+# up AESM service when an user login with an interactive shell.
 RUN mkdir -p /var/run/aesmd && echo '/opt/occlum/start_aesm.sh' >> /root/.bashrc
 
 WORKDIR /root

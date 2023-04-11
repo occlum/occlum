@@ -1,5 +1,5 @@
 //! This file defines data structures to store contents in bom file
-//! as well as all management on these strcutures.
+//! as well as all management on these structures.
 //! Structures `Bom`, `Target`, `SymLink`, `Source`, `NormalFile`, `FileWithOption`
 //! are used to parse the bom file.
 //! Structures ending with `management` are used to define managements on different levels.
@@ -581,7 +581,7 @@ impl TargetManagement {
 /// There is also a max_iteration bound. If the loop exceeds the bound and the queue is not empty, the function will abort the program.
 /// Because excess of the bound often means there's a reference cycles in the bom tree, which is an invalid case.
 /// After we visit all boms in the queue, we will get all boms sorted in the order of being included in the vector.
-/// Then we will remove redudant boms in the vector. For a bom file that may exist more than one time,
+/// Then we will remove redundant boms in the vector. For a bom file that may exist more than one time,
 /// only the last one will be kept in the final result. To remove redundancy, we will reverse the vector,
 /// and only keep the first one for each duplicate bom.
 fn find_all_included_bom_files(bom_file: &str, included_dirs: &Vec<String>) -> Vec<String> {
@@ -624,7 +624,7 @@ fn find_all_included_bom_files(bom_file: &str, included_dirs: &Vec<String>) -> V
 fn remove_redundant(bom_managements: &mut Vec<BomManagement>) {
     remove_redundant_mkdir(bom_managements);
     remove_redundant_createlink(bom_managements);
-    remove_redudant_copydir(bom_managements);
+    remove_redundant_copydir(bom_managements);
     remove_redundant_copyfile(bom_managements);
 }
 
@@ -665,7 +665,7 @@ fn remove_redundant_createlink(bom_managements: &mut Vec<BomManagement>) {
 
 /// If multiple operation tries to copy dir to the same dest, Only the *LAST* copy dir will reserve.
 /// Known limitations: if the source dir does not have filename, e.g., /home/root/, it will not be analyzed now.
-fn remove_redudant_copydir(bom_managements: &mut Vec<BomManagement>) {
+fn remove_redundant_copydir(bom_managements: &mut Vec<BomManagement>) {
     // reverse, then can save the first operation
     bom_managements.reverse();
     let mut all_copydirs = HashSet::new();

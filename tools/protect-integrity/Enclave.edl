@@ -7,7 +7,7 @@ enclave {
 
     trusted {
         public int ecall_protect([in, string] const char* input_path,
-                                 [in, string] const char* ouput_path);
+                                 [in, string] const char* output_path);
         public int ecall_show([in, string] const char* input_path,
                               [in, string] const char* output_path);
         public int ecall_show_mac([in, string] const char* input_path);

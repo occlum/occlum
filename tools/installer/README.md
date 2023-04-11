@@ -40,7 +40,7 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libcur
 ```
 
 **Step 2. Install Intel® SGX driver and Intel® SGX PSW**
-Please follow [Intel SGX Installation Guide](https://download.01.org/intel-sgx/sgx-linux/2.15.1/docs/Intel_SGX_SW_Installation_Guide_for_Linux.pdf) to install SGX driver and SGX PSW. SGX SDK is not required. Using PSW installer is recommanded.
+Please follow [Intel SGX Installation Guide](https://download.01.org/intel-sgx/sgx-linux/2.15.1/docs/Intel_SGX_SW_Installation_Guide_for_Linux.pdf) to install SGX driver and SGX PSW. SGX SDK is not required. Using PSW installer is recommended.
 
 To install PSW, follow the guide to add Intel® SGX repository to apt source. And then run:
 ```
@@ -134,7 +134,7 @@ yum install -y ocaml ocaml-ocamlbuild
 ```
 
 **Step 2. Install Intel® SGX driver and Intel® SGX PSW**
-Please follow [Intel SGX Installation Guide](https://download.01.org/intel-sgx/sgx-linux/2.13/docs/Intel_SGX_Installation_Guide_Linux_2.13_Open_Source.pdf) to install SGX driver and SGX PSW. SGX SDK is not required. Using RPM installer is recommanded.
+Please follow [Intel SGX Installation Guide](https://download.01.org/intel-sgx/sgx-linux/2.13/docs/Intel_SGX_Installation_Guide_Linux_2.13_Open_Source.pdf) to install SGX driver and SGX PSW. SGX SDK is not required. Using RPM installer is recommended.
 
 Also, UAE service libraries are needed but may not installed together with SGX PSW if SGX PSW installer is used. Go to SGX RPM local repo and run:
 ```
