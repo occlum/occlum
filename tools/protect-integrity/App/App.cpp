@@ -207,7 +207,7 @@ static int initialize_enclave(void) {
         return 0;
     }
 
-    /* reopen the file with write capablity */
+    /* reopen the file with write capability */
     fp = freopen(token_path, "wb", fp);
     if (fp == NULL) { return 0; }
     size_t write_num = fwrite(token, 1, sizeof(sgx_launch_token_t), fp);

@@ -147,7 +147,7 @@ fn main() {
 
         let occlum_user_json_file_path = sub_matches.value_of("output_user_json").unwrap();
         debug!(
-            "Genereated Occlum user config (json) file name {:?}",
+            "Generated Occlum user config (json) file name {:?}",
             occlum_user_json_file_path
         );
 
@@ -317,7 +317,7 @@ fn main() {
 
         let occlum_sys_json_file_path = sub_matches.value_of("sys_json").unwrap();
         debug!(
-            "Genereated Occlum sys config (json) file name {:?}",
+            "Generated Occlum sys config (json) file name {:?}",
             occlum_sys_json_file_path
         );
 
