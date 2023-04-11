@@ -1,6 +1,7 @@
 use crate::fs::AsyncFileSystem;
 use crate::prelude::*;
 
+use async_io::event::{Events, Poller};
 use async_io::fs::{DirentWriterContext, Extension, FallocateMode, FileType, Metadata, PATH_MAX};
 use async_io::ioctl::IoctlCmd;
 use async_trait::async_trait;
@@ -122,6 +123,11 @@ pub trait AsyncInode: Any + Sync + Send {
     /// Unmount the filesystem which is mounted at this inode
     async fn umount(&self) -> Result<()> {
         return_errno!(ENOTDIR, "self is not dir");
+    }
+
+    fn poll(&self, mask: Events, _poller: Option<&Poller>) -> Events {
+        let events = Events::IN | Events::OUT;
+        mask & events
     }
 
     /// Get the file system of the inode

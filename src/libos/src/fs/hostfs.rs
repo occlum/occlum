@@ -99,15 +99,9 @@ impl INode for HNode {
     }
 
     fn poll(&self) -> Result<PollStatus> {
-        if !self.is_file() {
-            return Err(FsError::NotFile);
-        }
-        let guard = self.open_file()?;
-        let file = guard.as_ref().unwrap();
-        let metadata = try_std!(file.metadata());
         Ok(PollStatus {
             read: true,
-            write: !metadata.permissions().readonly(),
+            write: true,
             error: false,
         })
     }
