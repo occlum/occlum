@@ -100,9 +100,24 @@ pub trait AsyncInode: Any + Sync + Send {
         Ok(())
     }
 
-    /// Get the name of directory entry
-    async fn get_entry(&self, _id: usize) -> Result<String> {
-        return_errno!(ENOTDIR, "self is not dir");
+    /// Read all contents into a Vec
+    async fn read_as_vec(&self) -> Result<Vec<u8>> {
+        let size = self.metadata().await?.size;
+        let mut buf = Vec::with_capacity(size);
+        buf.spare_capacity_mut();
+        unsafe {
+            buf.set_len(size);
+        }
+        self.read_at(0, buf.as_mut_slice()).await?;
+        Ok(buf)
+    }
+
+    /// Get all directory entry name as a Vec
+    async fn list(&self) -> Result<Vec<String>> {
+        let mut entries = Vec::new();
+        let mut dir_ctx = DirentWriterContext::new(0, &mut entries);
+        let _ = self.iterate_entries(&mut dir_ctx).await?;
+        Ok(entries)
     }
 
     /// Iterate directory entries

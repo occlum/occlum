@@ -7,7 +7,7 @@
 
 use super::*;
 
-use async_io::fs::Extension;
+use async_io::fs::{Extension, FsMac};
 use async_trait::async_trait;
 use async_vfs::{AsyncFileSystem, AsyncInode};
 
@@ -49,6 +49,10 @@ impl AsyncFileSystem for SyncFS {
 
     async fn info(&self) -> FsInfo {
         self.0.info()
+    }
+
+    async fn mac(&self) -> FsMac {
+        self.0.root_mac()
     }
 }
 
@@ -115,10 +119,6 @@ impl AsyncInode for SyncInode {
 
     async fn find(&self, name: &str) -> Result<Arc<dyn AsyncInode>> {
         Ok(Self::new(self.0.find(name)?))
-    }
-
-    async fn get_entry(&self, id: usize) -> Result<String> {
-        Ok(self.0.get_entry(id)?)
     }
 
     async fn iterate_entries(&self, ctx: &mut DirentWriterContext) -> Result<usize> {

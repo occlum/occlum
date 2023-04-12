@@ -826,18 +826,6 @@ impl AsyncInode for Inode {
         Ok(inner.fs().get_inode(inode_id).await)
     }
 
-    async fn get_entry(&self, id: usize) -> Result<String> {
-        let inner = self.inner.read().await;
-        if inner.disk_inode.type_ != FileType::Dir {
-            return_errno!(ENOTDIR, "not dir");
-        }
-        if id >= inner.disk_inode.size as usize / DIRENT_SIZE {
-            return_errno!(ENOENT, "can not find");
-        };
-        let entry = inner.read_direntry(id).await?;
-        Ok(String::from(entry.name.as_ref()))
-    }
-
     async fn iterate_entries(&self, ctx: &mut DirentWriterContext) -> Result<usize> {
         let inner = self.inner.read().await;
         if inner.disk_inode.type_ != FileType::Dir {
