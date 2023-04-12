@@ -1,5 +1,5 @@
 [package]
-name = "async-mountfs"
+name = "async-unionfs"
 version = "0.1.0"
 authors = ["Li Qing <geding.lq@antgroup.com>"]
 edition = "2021"
@@ -16,7 +16,6 @@ async-io = { path = "../async-io" }
 async-rt = { path = "../async-rt" }
 errno = { path = "../errno" }
 async-trait = "0.1.52"
-static_assertions = "0.3"
 log = "0.4"
 cfg-if = "1.0"
 libc = { version = "0.2", optional = true }

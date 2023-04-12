@@ -5,7 +5,7 @@ mod stat_buf;
 
 pub use rcore_fs::vfs::{
     AnyExt, DirentWriter, DirentWriterContext, Extension, FallocateMode, FileSystem, FileType,
-    FsError, FsInfo, INode, Metadata, Timespec, PATH_MAX,
+    FsError, FsInfo, FsMac, INode, Metadata, Timespec, PATH_MAX,
 };
 
 pub use self::fallocate_flags::FallocateFlags;

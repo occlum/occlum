@@ -1,7 +1,7 @@
 use crate::inode::AsyncInode;
 use crate::prelude::*;
 
-use async_io::fs::FsInfo;
+use async_io::fs::{FsInfo, FsMac};
 use async_trait::async_trait;
 
 /// Abstract Async FileSystem
@@ -15,4 +15,9 @@ pub trait AsyncFileSystem: Sync + Send {
 
     /// Get the file system information
     async fn info(&self) -> FsInfo;
+
+    /// Get the MAC of the file system
+    async fn mac(&self) -> FsMac {
+        Default::default()
+    }
 }
