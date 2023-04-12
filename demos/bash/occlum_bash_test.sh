@@ -15,7 +15,7 @@ busybox echo $DATE
 TEST=$(busybox echo $(busybox date))
 busybox echo $TEST
 
-# Test command subsitution and pipe
+# Test command substitution and pipe
 busybox echo $(busybox echo -e "Hello-world-from-bash\n test" | busybox awk '$1=$1' FS="-" OFS=" ")
 
 # Test multiple redirection
