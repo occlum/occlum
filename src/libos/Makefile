@@ -129,8 +129,9 @@ ifneq ($(OCCLUM_COV),)
         -Cpanic=abort"
 endif
 
+SHOW_UT_LOG = "--nocapture"
 ifneq ($(RUST_LOG),)
-	SHOW_UT_LOG := "--nocapture"
+	UT_OPTION += $(SHOW_UT_LOG)
 endif
 
 # Release build is for production use. We enable code coverage only for debug
@@ -212,7 +213,7 @@ gen_cov_report:
 
 # Unit tests and doc tests for active crates
 unit-test:
-	cd crates && RUST_BACKTRACE=full cargo test -- $(SHOW_UT_LOG) && \
+	cd crates && RUST_BACKTRACE=full cargo test -- $(UT_OPTION) && \
 		cargo doc
 
 clean:
