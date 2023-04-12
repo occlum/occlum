@@ -1,7 +1,7 @@
 # Run gRPC TLS C++ Client/Server on Occlum
 
 ## Step 1:
-Downlaod, build and install openssl into `/usr/local/occlum/x86_64-linux-musl/lib`:
+Download, build and install openssl into `/usr/local/occlum/x86_64-linux-musl/lib`:
 ```
 ./download_and_install_openssl.sh
 ```
