@@ -158,4 +158,4 @@ jobs:
           platforms: linux/amd64
           build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
           push: true
-          tags: jessehui/ngo:1.0.0-rc1-ubuntu20.04-edmm-experiment
+          tags: jessehui/ngo:1.0.0-rc1-ubuntu20.04-edmm-experiment-2.19

@@ -1,5 +1,5 @@
 ARG OCCLUM_VERSION
-FROM jessehui/ngo:1.0.0-rc1-ubuntu20.04-edmm-experiment as base
+FROM jessehui/ngo:1.0.0-rc1-ubuntu20.04-edmm-experiment-2.19 as base
 LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
 
 ARG OCCLUM_BRANCH
