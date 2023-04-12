@@ -178,7 +178,9 @@ dependencies = [
  "byteorder",
  "cfg-if",
  "errno",
+ "io-uring",
  "io-uring-callback",
+ "lazy_static",
  "log",
  "memoffset 0.6.1",
  "num_enum",
@@ -581,15 +583,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "instant"
-version = "0.1.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61124eeebbd69b8190558df225adf7e4caafce0d743919e5d6b19652314ec5ec"
-dependencies = [
- "cfg-if",
-]
-
-[[package]]
 name = "intrusive-collections"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -600,11 +593,10 @@ dependencies = [
 
 [[package]]
 name = "io-uring"
-version = "0.5.0-alpha"
+version = "0.5.9"
 dependencies = [
  "bitflags",
  "libc",
- "parking_lot",
  "sgx_libc",
  "sgx_trts",
  "sgx_tstd",
@@ -621,6 +613,7 @@ dependencies = [
  "io-uring",
  "lazy_static",
  "libc",
+ "log",
  "sgx_libc",
  "sgx_tstd",
  "slab",
@@ -683,9 +676,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.73"
+version = "0.2.139"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd7d4bd64732af4bf3a67f367c27df8520ad7e230c5817b8ff485864d80242b9"
+checksum = "201de327520df007757c1f0adce6e827fe8562fbc28bfd9c15571c66ca1f5f79"
 
 [[package]]
 name = "lock_api"
@@ -779,31 +772,6 @@ dependencies = [
  "sgx_tstd",
  "sgx_types",
  "spin 0.7.1",
-]
-
-[[package]]
-name = "parking_lot"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d7744ac029df22dca6284efe4e898991d28e3085c706c972bcd7da4a27a15eb"
-dependencies = [
- "instant",
- "lock_api",
- "parking_lot_core",
-]
-
-[[package]]
-name = "parking_lot_core"
-version = "0.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa7a782938e745763fe6907fc6ba86946d72f49fe7e21de074e08128a99fb018"
-dependencies = [
- "cfg-if",
- "instant",
- "libc",
- "redox_syscall",
- "smallvec",
- "winapi",
 ]
 
 [[package]]
@@ -1033,15 +1001,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "678054eb77286b51581ba43620cc911abf02758c91f93f479767aed0f90458b2"
 dependencies = [
  "rand_core 0.3.1",
-]
-
-[[package]]
-name = "redox_syscall"
-version = "0.2.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ab49abadf3f9e1c4bc499e8845e152ad87d2ad2d30371841171169e9d75feee"
-dependencies = [
- "bitflags",
 ]
 
 [[package]]
@@ -1288,12 +1247,6 @@ name = "slab"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9def91fd1e018fe007022791f865d0ccc9b3a0d5001e01aabb8b40e46000afb5"
-
-[[package]]
-name = "smallvec"
-version = "1.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
 
 [[package]]
 name = "spin"

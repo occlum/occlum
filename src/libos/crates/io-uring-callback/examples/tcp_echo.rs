@@ -4,7 +4,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::ptr;
 use std::sync::Mutex;
 
-use io_uring::opcode::types;
+use io_uring::types;
 use io_uring_callback::{Builder, IoHandle, IoUring};
 use lazy_static::lazy_static;
 
@@ -70,7 +70,7 @@ impl AcceptCount {
 
 fn main() {
     let ring = Builder::new()
-        .setup_sqpoll(Some(500 /* ms */))
+        .setup_sqpoll(500 /* ms */)
         .build(256)
         .unwrap();
     let listener = TcpListener::bind(("127.0.0.1", 3456)).unwrap();

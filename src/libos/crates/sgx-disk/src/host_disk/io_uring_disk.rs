@@ -1,6 +1,6 @@
 use block_device::{BioReq, BioSubmission, BioType, BlockDevice};
 use fs::File;
-use io_uring_callback::{Fd, IoHandle, IoUring};
+use io_uring_callback::{Fd, IoHandle, IoUringRef};
 use new_self_ref_arc::new_self_ref_arc;
 use std::fmt;
 use std::io::prelude::*;
@@ -21,7 +21,7 @@ use crate::HostDisk;
 /// This trait is introduced to decouple the creation of io_uring from
 /// its users.
 pub trait IoUringProvider: Send + Sync + 'static {
-    fn io_uring() -> &'static IoUring;
+    fn io_uring() -> IoUringRef;
 }
 
 /// A type of host disk that implements a block device interface by performing
@@ -35,11 +35,16 @@ struct Inner<P: IoUringProvider> {
     total_blocks: usize,
     can_read: bool,
     can_write: bool,
+    io_uring: IoUringRef,
     phantom: PhantomData<P>,
     weak_self: Weak<Inner<P>>,
 }
 
 impl<P: IoUringProvider> IoUringDisk<P> {
+    fn io_uring(&self) -> &IoUringRef {
+        &self.0.io_uring
+    }
+
     fn do_read(&self, req: &Arc<BioReq>) -> Result<()> {
         if !self.0.can_read {
             return Err(errno!(EACCES, "read is not allowed"));
@@ -135,7 +140,7 @@ impl<P: IoUringProvider> IoUringDisk<P> {
                 }
             }
         };
-        let io_uring = P::io_uring();
+        let io_uring = self.io_uring();
         let io_handle = unsafe {
             io_uring.readv(
                 fd,
@@ -236,7 +241,7 @@ impl<P: IoUringProvider> IoUringDisk<P> {
                 }
             }
         };
-        let io_uring = P::io_uring();
+        let io_uring = self.io_uring();
         let io_handle = unsafe {
             io_uring.writev(
                 fd,
@@ -281,7 +286,7 @@ impl<P: IoUringProvider> IoUringDisk<P> {
                 }
             }
         };
-        let io_uring = P::io_uring();
+        let io_uring = self.io_uring();
         let io_handle = unsafe { io_uring.fsync(fd, is_datasync, complete_fn) };
         // We don't need to keep the handle
         IoHandle::release(io_handle);
@@ -352,6 +357,7 @@ impl<P: IoUringProvider> HostDisk for IoUringDisk<P> {
         let can_read = options.read;
         let can_write = options.write;
         let path = path.to_owned();
+        let io_uring = P::io_uring();
         let inner = Inner {
             fd,
             file: Mutex::new(file),
@@ -359,6 +365,7 @@ impl<P: IoUringProvider> HostDisk for IoUringDisk<P> {
             total_blocks,
             can_read,
             can_write,
+            io_uring,
             phantom: PhantomData,
             weak_self: Weak::new(),
         };
@@ -441,22 +448,22 @@ mod test {
 
     mod runtime {
         use super::*;
-        use io_uring_callback::{Builder, IoUring};
+        use io_uring_callback::{Builder, IoUringRef};
         use lazy_static::lazy_static;
 
         pub struct IoUringSingleton;
 
         impl IoUringProvider for IoUringSingleton {
-            fn io_uring() -> &'static IoUring {
-                &*IO_URING
+            fn io_uring() -> IoUringRef {
+                IO_URING.clone()
             }
         }
 
         lazy_static! {
-            static ref IO_URING: Arc<IoUring> = {
+            static ref IO_URING: IoUringRef = {
                 let ring = Arc::new(
                     Builder::new()
-                        .setup_sqpoll(Some(500/* ms */))
+                        .setup_sqpoll(500/* ms */)
                         .build(256)
                         .unwrap());
                 std::thread::spawn({

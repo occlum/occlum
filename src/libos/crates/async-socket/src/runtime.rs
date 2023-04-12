@@ -1,4 +1,4 @@
-use io_uring_callback::IoUring;
+use io_uring_callback::IoUringRef;
 
 /// The runtime support for HostSocket.
 ///
@@ -6,5 +6,5 @@ use io_uring_callback::IoUring;
 /// that support HostSocket. Currently, the only dependency is a singleton
 /// of IoUring instance.
 pub trait Runtime: Send + Sync + 'static {
-    fn io_uring() -> &'static IoUring;
+    fn io_uring() -> IoUringRef;
 }

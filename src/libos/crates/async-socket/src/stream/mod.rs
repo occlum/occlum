@@ -6,11 +6,17 @@ use crate::ioctl::*;
 use crate::prelude::*;
 use crate::runtime::Runtime;
 use crate::sockopt::*;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_io::socket::{
     timeout_to_timeval, GetRecvTimeoutCmd, GetSendTimeoutCmd, MsgFlags, SetRecvTimeoutCmd,
     SetSendTimeoutCmd,
 };
+
+lazy_static! {
+    pub static ref SEND_BUF_SIZE: AtomicUsize = AtomicUsize::new(2565 * 1024); // Default Linux send buffer size is 2.5MB.
+    pub static ref RECV_BUF_SIZE: AtomicUsize = AtomicUsize::new(128 * 1024);
+}
 
 pub struct StreamSocket<A: Addr + 'static, R: Runtime> {
     state: RwLock<State<A, R>>,
@@ -397,6 +403,24 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             cmd: GetIfConf => {
                 cmd.execute(self.host_fd())?;
             },
+            cmd: SetSndBufSizeCmd => {
+                cmd.update_host(self.host_fd())?;
+                let buf_size = cmd.buf_size();
+                self.set_kernel_send_buf_size(buf_size);
+            },
+            cmd: SetRcvBufSizeCmd => {
+                cmd.update_host(self.host_fd())?;
+                let buf_size = cmd.buf_size();
+                self.set_kernel_recv_buf_size(buf_size);
+            },
+            cmd: GetSndBufSizeCmd => {
+                let buf_size = SEND_BUF_SIZE.load(Ordering::Relaxed);
+                cmd.set_output(buf_size);
+            },
+            cmd: GetRcvBufSizeCmd => {
+                let buf_size = RECV_BUF_SIZE.load(Ordering::Relaxed);
+                cmd.set_output(buf_size);
+            },
             _ => {
                 return_errno!(EINVAL, "Not supported yet");
             }
@@ -482,6 +506,32 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     fn set_recv_timeout(&self, timeout: Duration) {
         let state = self.state.read().unwrap();
         state.common().set_recv_timeout(timeout);
+    }
+
+    fn set_kernel_send_buf_size(&self, buf_size: usize) {
+        let state = self.state.read().unwrap();
+        match &*state {
+            State::Init(_) | State::Listen(_) | State::Connect(_) => {
+                // The kernel buffer is only created when the socket is connected. Just update the static variable.
+                SEND_BUF_SIZE.store(buf_size, Ordering::Relaxed);
+            }
+            State::Connected(connected_stream) => {
+                connected_stream.try_update_send_buf_size(buf_size);
+            }
+        }
+    }
+
+    fn set_kernel_recv_buf_size(&self, buf_size: usize) {
+        let state = self.state.read().unwrap();
+        match &*state {
+            State::Init(_) | State::Listen(_) | State::Connect(_) => {
+                // The kernel buffer is only created when the socket is connected. Just update the static variable.
+                RECV_BUF_SIZE.store(buf_size, Ordering::Relaxed);
+            }
+            State::Connected(connected_stream) => {
+                connected_stream.try_update_recv_buf_size(buf_size);
+            }
+        }
     }
 
     /*

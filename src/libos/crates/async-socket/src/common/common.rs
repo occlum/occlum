@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_io::socket::Timeout;
-use io_uring_callback::IoUring;
+use io_uring_callback::IoUringRef;
 cfg_if::cfg_if! {
     if #[cfg(feature = "sgx")] {
         use libc::ocall::socket as do_socket;
@@ -30,6 +30,7 @@ pub struct Common<A: Addr + 'static, R: Runtime> {
     inner: Mutex<Inner<A>>,
     timeout: Mutex<Timeout>,
     phantom_data: PhantomData<(A, R)>,
+    io_uring: IoUringRef,
 }
 
 impl<A: Addr + 'static, R: Runtime> Common<A, R> {
@@ -43,6 +44,7 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
         let pollee = Pollee::new(Events::empty());
         let inner = Mutex::new(Inner::new());
         let timeout = Mutex::new(Timeout::new());
+        let io_uring = R::io_uring();
         Ok(Self {
             host_fd,
             type_,
@@ -52,6 +54,7 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
             inner,
             timeout,
             phantom_data: PhantomData,
+            io_uring,
         })
     }
 
@@ -86,6 +89,7 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
         let pollee = Pollee::new(Events::empty());
         let inner = Mutex::new(Inner::new());
         let timeout = Mutex::new(Timeout::new());
+        let io_uring = R::io_uring();
         Self {
             host_fd,
             type_,
@@ -94,12 +98,13 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
             pollee,
             inner,
             timeout,
+            io_uring,
             phantom_data: PhantomData,
         }
     }
 
-    pub fn io_uring(&self) -> &IoUring {
-        R::io_uring()
+    pub fn io_uring(&self) -> &IoUringRef {
+        &self.io_uring
     }
 
     pub fn host_fd(&self) -> HostFd {

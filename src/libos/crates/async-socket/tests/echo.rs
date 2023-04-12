@@ -83,10 +83,10 @@ fn run_echo_server_and_clients<A: Addr + 'static>(
 }
 
 mod runtime {
-    use std::sync::Once;
+    use std::sync::{Arc, Once};
 
     use async_socket::Runtime;
-    use io_uring_callback::{Builder as IoUringBuilder, IoUring};
+    use io_uring_callback::{Builder as IoUringBuilder, IoUringRef};
 
     pub struct SocketRuntime;
 
@@ -105,15 +105,15 @@ mod runtime {
     }
 
     lazy_static::lazy_static! {
-        static ref IO_URING: IoUring = IoUringBuilder::new()
-            .setup_sqpoll(Some(500/* ms */))
+        static ref IO_URING: IoUringRef = Arc::new(IoUringBuilder::new()
+            .setup_sqpoll(500/* ms */)
             .build(4096)
-            .unwrap();
+            .unwrap());
     }
 
     impl Runtime for SocketRuntime {
-        fn io_uring() -> &'static IoUring {
-            &*IO_URING
+        fn io_uring() -> IoUringRef {
+            IO_URING.clone()
         }
     }
 }

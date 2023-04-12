@@ -34,6 +34,10 @@ impl Task {
         &self.tirqs
     }
 
+    pub fn vcpu(&self) -> Option<u32> {
+        self.sched_state.vcpu()
+    }
+
     /// Get the task that a given tirqs is associated to.
     ///
     /// # Safety

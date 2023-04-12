@@ -8,6 +8,7 @@ use std::sync::Once;
 use sgx_tse::*;
 
 use crate::fs::HostStdioFds;
+use crate::io_uring::{IoUringInstance, IO_URING_MANAGER};
 use crate::misc;
 use crate::prelude::*;
 use crate::process::{self, table, ProcessFilter, SpawnAttr};
@@ -136,15 +137,6 @@ pub extern "C" fn occlum_ecall_init(
 
         async_rt::vcpu::set_total(num_vcpus);
 
-        std::thread::spawn(move || {
-            let io_uring = &crate::io_uring::SINGLETON;
-            loop {
-                let min_complete = 1;
-                let polling_retries = 10000;
-                io_uring.poll_completions(min_complete, polling_retries);
-            }
-        });
-
         // Init boot up time stamp here.
         crate::time::up_time::init();
 
@@ -243,7 +235,12 @@ pub extern "C" fn occlum_ecall_run_vcpu(pal_data_ptr: *const occlum_pal_vcpu_dat
     assert!(check_ptr(pal_data_ptr).is_ok()); // Make sure the ptr is outside the enclave
     set_pal_data_addr(pal_data_ptr);
 
-    let running_vcpu_num = async_rt::executor::run_tasks();
+    // Init an io_uring instance for this vcpu
+    let this_vcpu = async_rt::executor::new_vcpu();
+    IO_URING_MANAGER.assign_io_uring_instance_for_vcpu(this_vcpu);
+
+    let running_vcpu_num = async_rt::executor::run_tasks(this_vcpu);
+
     if running_vcpu_num == 0 {
         // It is the last vcpu for the executor. We can perform some check to make sure there is no resource leakage
         assert!(
@@ -251,6 +248,7 @@ pub extern "C" fn occlum_ecall_run_vcpu(pal_data_ptr: *const occlum_pal_vcpu_dat
                 && table::get_all_processes().len() == 0
                 && table::get_all_threads().len() == 0
         );
+        IO_URING_MANAGER.clear();
     }
 
     0

@@ -545,7 +545,7 @@ int test_sockopt() {
         THROW_ERROR("create socket error");
     }
     int reuse = 1;
-    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, (socklen_t)sizeof(reuse)) < 0) {
         THROW_ERROR("setsockopt port to reuse failed");
     }
 
@@ -562,8 +562,59 @@ int test_sockopt() {
             optval != AF_INET) {
         THROW_ERROR("getsockopt(SO_DOMAIN) failed");
     }
-
     close(fd);
+
+    // Test SO_SNDBUF and SO_RCVBUF option.
+    int child_pid = 0;
+    int client_fd = connect_with_child(8806, &child_pid);
+    if (client_fd < 0) {
+        THROW_ERROR("connect failed");
+    }
+
+    size_t test_buf_size = 32 * 1024; // 32K
+    size_t send_buf_size = 0;
+    size_t recv_buf_size = 0;
+    optlen = sizeof(size_t);
+    if (getsockopt(client_fd, SOL_SOCKET, SO_SNDBUF, &send_buf_size, &optlen) < 0) {
+        THROW_ERROR("getsockopt(SO_SNDBUF) failed");
+    }
+
+    if (getsockopt(client_fd, SOL_SOCKET, SO_RCVBUF, &recv_buf_size, &optlen) < 0) {
+        THROW_ERROR("getsockopt(SO_RCVBUF) failed");
+    }
+    printf("default send buf size = %ld, recv buf size = %ld\n", send_buf_size,
+           recv_buf_size);
+
+    // Set the buf size to test_buf_size
+    send_buf_size = test_buf_size;
+    recv_buf_size = test_buf_size;
+    if (setsockopt(client_fd, SOL_SOCKET, SO_SNDBUF, &send_buf_size, optlen) < 0) {
+        THROW_ERROR("setsockopt(SO_SNDBUF) failed");
+    }
+
+    if (setsockopt(client_fd, SOL_SOCKET, SO_RCVBUF, &recv_buf_size, optlen) < 0) {
+        THROW_ERROR("setsockopt(SO_RCVBUF) failed");
+    }
+
+    // Get buffer size and should be the double size of the set value
+    if (getsockopt(client_fd, SOL_SOCKET, SO_SNDBUF, &send_buf_size, &optlen) < 0) {
+        THROW_ERROR("getsockopt(SO_SNDBUF) failed");
+    }
+
+    if (send_buf_size != 2 * test_buf_size) {
+        THROW_ERROR("send buffer size error");
+    }
+
+    if (getsockopt(client_fd, SOL_SOCKET, SO_RCVBUF, &recv_buf_size, &optlen) < 0) {
+        THROW_ERROR("getsockopt(SO_RCVBUF) failed");
+    }
+
+    if (recv_buf_size != 2 * test_buf_size) {
+        THROW_ERROR("send buffer size error");
+    }
+
+    wait_for_child_exit(child_pid);
+    close(client_fd);
     return 0;
 }
 

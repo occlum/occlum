@@ -73,10 +73,14 @@ mod tests {
     use crate::scheduler::SchedEntity;
     use crate::task::JoinHandle;
 
-    const TEST_PARALLELISM: u32 = 4;
+    lazy_static! {
+        static ref TEST_PARALLELISM: u32 =
+            std::thread::available_parallelism().unwrap().get() as u32;
+    }
 
     #[test]
     fn test_hello() {
+        info!("TEST_PARALLELISM = {:?}", *TEST_PARALLELISM);
         crate::task::block_on(async {
             let tid = crate::task::current::get().tid();
             println!("Hello from task {:?}", tid);
@@ -147,7 +151,7 @@ mod tests {
     #[test]
     fn test_scheduler() {
         crate::task::block_on(async {
-            let task_num = TEST_PARALLELISM * 100;
+            let task_num = (*TEST_PARALLELISM) * 100;
             let mut join_handles: Vec<JoinHandle<u32>> = (0..task_num)
                 .map(|i| {
                     crate::task::spawn(async move {
@@ -216,7 +220,7 @@ mod tests {
             const MAX_QUEUED_TASKS: usize = 1_000;
             use crate::task::JoinHandle;
 
-            let task_num = TEST_PARALLELISM * MAX_QUEUED_TASKS as u32 * 2;
+            let task_num = (*TEST_PARALLELISM) * MAX_QUEUED_TASKS as u32 * 2;
             let mut join_handles: Vec<JoinHandle<()>> = (0..task_num)
                 .map(|_| {
                     crate::task::spawn(async move {
@@ -263,7 +267,7 @@ mod tests {
     #[ctor::ctor]
     fn auto_init_executor() {
         // crate::config::set_parallelism(TEST_PARALLELISM);
-        crate::vcpu::set_total(TEST_PARALLELISM);
+        crate::vcpu::set_total(*TEST_PARALLELISM);
     }
 }
 

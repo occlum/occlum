@@ -9,7 +9,8 @@ use async_io::socket::{
 };
 use async_io::socket::{RecvFlags, SendFlags, Shutdown, Type};
 use async_socket::sockopt::{
-    GetAcceptConnCmd, GetDomainCmd, GetPeerNameCmd, GetSockOptRawCmd, GetTypeCmd, SetSockOptRawCmd,
+    GetAcceptConnCmd, GetDomainCmd, GetPeerNameCmd, GetRcvBufSizeCmd, GetSndBufSizeCmd,
+    GetSockOptRawCmd, GetTypeCmd, SetRcvBufSizeCmd, SetSndBufSizeCmd, SetSockOptRawCmd,
     SockOptName,
 };
 use num_enum::TryFromPrimitive;
@@ -425,7 +426,7 @@ pub async fn do_getsockopt(
         return Ok(0);
     }
 
-    let mut cmd = new_getsockopt_cmd(level, optname, optlen)?;
+    let mut cmd = new_getsockopt_cmd(level, optname, optlen, socket_file.get_type())?;
     socket_file.ioctl(cmd.as_mut()).await?;
     let src_optval = get_optval(cmd.as_ref())?;
     copy_bytes_to_user(src_optval, optval_mut, optlen_mut);
@@ -455,7 +456,7 @@ pub async fn do_setsockopt(
 
     let optval = from_user::make_slice(optval as *const u8, optlen as usize)?;
 
-    let mut cmd = new_setsockopt_cmd(level, optname, optval)?;
+    let mut cmd = new_setsockopt_cmd(level, optname, optval, socket_file.get_type())?;
     socket_file.ioctl(cmd.as_mut()).await?;
     Ok(0)
 }
@@ -547,7 +548,12 @@ fn get_slice_from_sock_addr_ptr_mut<'a>(
 }
 
 /// Create a new ioctl command for getsockopt syscall
-fn new_getsockopt_cmd(level: i32, optname: i32, optlen: u32) -> Result<Box<dyn IoctlCmd>> {
+fn new_getsockopt_cmd(
+    level: i32,
+    optname: i32,
+    optlen: u32,
+    socket_type: Type,
+) -> Result<Box<dyn IoctlCmd>> {
     if level != libc::SOL_SOCKET {
         return Ok(Box::new(GetSockOptRawCmd::new(level, optname, optlen)));
     }
@@ -562,12 +568,33 @@ fn new_getsockopt_cmd(level: i32, optname: i32, optlen: u32) -> Result<Box<dyn I
         SockOptName::SO_RCVTIMEO_OLD => Box::new(GetRecvTimeoutCmd::new(())),
         SockOptName::SO_SNDTIMEO_OLD => Box::new(GetSendTimeoutCmd::new(())),
         SockOptName::SO_CNX_ADVICE => return_errno!(ENOPROTOOPT, "it's a write-only option"),
+        SockOptName::SO_SNDBUF => {
+            if socket_type == Type::STREAM {
+                // Implement dynamic buf size for stream socket only.
+                Box::new(GetSndBufSizeCmd::new(()))
+            } else {
+                Box::new(GetSockOptRawCmd::new(level, optname, optlen))
+            }
+        }
+        SockOptName::SO_RCVBUF => {
+            if socket_type == Type::STREAM {
+                // Implement dynamic buf size for stream socket only.
+                Box::new(GetRcvBufSizeCmd::new(()))
+            } else {
+                Box::new(GetSockOptRawCmd::new(level, optname, optlen))
+            }
+        }
         _ => Box::new(GetSockOptRawCmd::new(level, optname, optlen)),
     })
 }
 
 /// Create a new ioctl command for setsockopt syscall
-fn new_setsockopt_cmd(level: i32, optname: i32, optval: &[u8]) -> Result<Box<dyn IoctlCmd>> {
+fn new_setsockopt_cmd(
+    level: i32,
+    optname: i32,
+    optval: &[u8],
+    socket_type: Type,
+) -> Result<Box<dyn IoctlCmd>> {
     if level != libc::SOL_SOCKET {
         return Ok(Box::new(SetSockOptRawCmd::new(level, optname, optval)));
     }
@@ -634,6 +661,70 @@ fn new_setsockopt_cmd(level: i32, optname: i32, optval: &[u8]) -> Result<Box<dyn
             trace!("send timeout = {:?}", timeout);
             Box::new(SetSendTimeoutCmd::new(timeout))
         }
+        SockOptName::SO_SNDBUF => {
+            // Implement dynamic buf size for stream socket only.
+            if socket_type != Type::STREAM {
+                Box::new(SetSockOptRawCmd::new(level, optname, optval))
+            } else {
+                // Based on the man page: The minimum (doubled) value for this option is 2048.
+                // However, the test on Linux shows the minimum value (doubled) is 4608. Here, we just
+                // use the same value as Linux.
+                let min_size = 1152;
+                // For the max value, we choose 4MB (doubled) to assure the libos kernel buf won't be the bottleneck.
+                let max_size = 2 * 1024 * 1024;
+
+                let mut send_buf_size = {
+                    let mut size = [0 as u8; std::mem::size_of::<usize>()];
+                    let start_offset = size.len() - optval.len();
+                    size[start_offset..].copy_from_slice(optval);
+                    usize::from_ne_bytes(size)
+                };
+                trace!("set SO_SNDBUF size = {:?}", send_buf_size);
+                if send_buf_size < min_size {
+                    send_buf_size = min_size;
+                }
+                if send_buf_size > max_size {
+                    send_buf_size = max_size;
+                }
+                // Based on man page: The kernel doubles this value (to allow space for bookkeeping overhead)
+                // when it is set using setsockopt(2), and this doubled value is returned by getsockopt(2).
+                send_buf_size *= 2;
+                Box::new(SetSndBufSizeCmd::new(send_buf_size))
+            }
+        }
+        SockOptName::SO_RCVBUF => {
+            // Implement dynamic buf size for stream socket only.
+            info!("optval = {:?}", optval);
+            // Based on the man page: The minimum (doubled) value for this option is 256.
+            // However, the test on Linux shows the minimum value (doubled) is 2304. Here, we just
+            // use the same value as Linux.
+            let min_size = 1152;
+            // For the max value, we choose 4MB (doubled) to assure the libos kernel buf won't be the bottleneck.
+            let max_size = 2 * 1024 * 1024;
+
+            if socket_type != Type::STREAM {
+                Box::new(SetSockOptRawCmd::new(level, optname, optval))
+            } else {
+                let mut recv_buf_size = {
+                    let mut size = [0 as u8; std::mem::size_of::<usize>()];
+                    let start_offset = size.len() - optval.len();
+                    size[start_offset..].copy_from_slice(optval);
+                    usize::from_ne_bytes(size)
+                };
+                trace!("set SO_RCVBUF size = {:?}", recv_buf_size);
+                if recv_buf_size < min_size {
+                    recv_buf_size = min_size;
+                }
+
+                if recv_buf_size > max_size {
+                    recv_buf_size = max_size
+                }
+                // Based on man page: The kernel doubles this value (to allow space for bookkeeping overhead)
+                // when it is set using setsockopt(2), and this doubled value is returned by getsockopt(2).
+                recv_buf_size *= 2;
+                Box::new(SetRcvBufSizeCmd::new(recv_buf_size))
+            }
+        }
         _ => Box::new(SetSockOptRawCmd::new(level, optname, optval)),
     })
 }
@@ -659,6 +750,12 @@ fn get_optval(cmd: &dyn IoctlCmd) -> Result<&[u8]> {
             cmd.get_output_as_bytes()
         },
         cmd : GetSendTimeoutCmd => {
+            cmd.get_output_as_bytes()
+        },
+        cmd : GetSndBufSizeCmd => {
+            cmd.get_output_as_bytes()
+        },
+        cmd : GetRcvBufSizeCmd => {
             cmd.get_output_as_bytes()
         },
         _ => {
