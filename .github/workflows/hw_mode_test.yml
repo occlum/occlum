@@ -674,7 +674,7 @@ jobs:
       run: docker exec $gvisor_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
     - name: Clone gvisor code
-      run: docker exec $gvisor_test bash -c "git clone https://github.com/occlum/gvisor.git"
+      run: docker exec $gvisor_test bash -c "git clone https://github.com/jessehui/gvisor.git"
 
     - name: Run gvisor syscall test
       run: docker exec $gvisor_test bash -c "cd /root/gvisor/occlum; ./run_occlum_passed_tests.sh ngo"
