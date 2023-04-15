@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1681597034138,
+  "lastUpdate": 1681597120204,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -1672,6 +1672,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 257.95,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "envlearner",
+            "username": "envlearner",
+            "email": "yishan_li@hust.edu.cn"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "fca61640198e19bdfae9e267c95235f45112aeb8",
+          "message": "Fix some typo errors\nincluding both doc/comment typo errors and code typo errors",
+          "timestamp": "2023-04-11T06:19:43Z",
+          "url": "https://github.com/occlum/occlum/commit/fca61640198e19bdfae9e267c95235f45112aeb8"
+        },
+        "date": 1681597118867,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.08,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 48.78,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 656.27,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 253.35,
             "unit": "ms",
             "extra": "per95"
           }
