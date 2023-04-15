@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1681596653282,
+  "lastUpdate": 1681597034138,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -3950,6 +3950,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Random Read Throughput",
             "value": 177,
+            "unit": "MiB/s",
+            "extra": "randread"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "envlearner",
+            "username": "envlearner",
+            "email": "yishan_li@hust.edu.cn"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "fca61640198e19bdfae9e267c95235f45112aeb8",
+          "message": "Fix some typo errors\nincluding both doc/comment typo errors and code typo errors",
+          "timestamp": "2023-04-11T06:19:43Z",
+          "url": "https://github.com/occlum/occlum/commit/fca61640198e19bdfae9e267c95235f45112aeb8"
+        },
+        "date": 1681597032808,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sequential Write Throughput",
+            "value": 55.5,
+            "unit": "MiB/s",
+            "extra": "seqwrite"
+          },
+          {
+            "name": "Random Write Throughput",
+            "value": 51.9,
+            "unit": "MiB/s",
+            "extra": "randwrite"
+          },
+          {
+            "name": "Sequential Read Throughput",
+            "value": 270,
+            "unit": "MiB/s",
+            "extra": "seqread"
+          },
+          {
+            "name": "Random Read Throughput",
+            "value": 186,
             "unit": "MiB/s",
             "extra": "randread"
           }
