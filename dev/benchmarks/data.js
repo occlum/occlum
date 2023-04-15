@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1681596577405,
+  "lastUpdate": 1681596653282,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -3684,6 +3684,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2154,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "envlearner",
+            "username": "envlearner",
+            "email": "yishan_li@hust.edu.cn"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "fca61640198e19bdfae9e267c95235f45112aeb8",
+          "message": "Fix some typo errors\nincluding both doc/comment typo errors and code typo errors",
+          "timestamp": "2023-04-11T06:19:43Z",
+          "url": "https://github.com/occlum/occlum/commit/fca61640198e19bdfae9e267c95235f45112aeb8"
+        },
+        "date": 1681596651690,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2149,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2148,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
