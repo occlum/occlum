@@ -23,6 +23,17 @@ extern "C" {
     ) -> c_int;
 }
 
+#[link(name = "grpc_ratls_client")]
+extern "C" {
+    fn grpc_ratls_get_secret_to_buf(
+        server_addr: *const c_char, // grpc server address+port, such as "localhost:50051"
+        config_json: *const c_char, // ratls handshake config json file
+        name: *const c_char, // secret name to be requested
+        secret_buf: *const u8, // secret buffer provided by user
+        buf_len: *mut u32 // buffer size
+    ) -> c_int;
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     // Load the configuration from initfs
     const IMAGE_CONFIG_FILE: &str = "/etc/image_config.json";
@@ -45,14 +56,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         "encrypted" => {
             // Get the image encrypted key through RA
             let secret = CString::new("image_key").unwrap();
-            let filename = CString::new("/etc/image_key").unwrap();
+            let mut buffer: Vec<u8> = vec![0; 256];
+            let buffer_ptr: *const u8 = buffer.as_ptr();
+            let mut buffer_len: u32 = buffer.len() as u32;
+            let len_ptr: *mut u32 = &mut buffer_len as *mut u32;
 
+            //Read to buffer instead of file system for better security
             let ret = unsafe {
-                grpc_ratls_get_secret(
+                grpc_ratls_get_secret_to_buf(
                     server_addr.as_ptr(),
                     config_json.as_ptr(),
                     secret.as_ptr(),
-                    filename.as_ptr())
+                    buffer_ptr,
+                    len_ptr
+                )
             };
 
             if ret != 0 {
@@ -60,8 +77,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 return Err(Box::new(std::io::Error::last_os_error()));
             }
 
-            const IMAGE_KEY_FILE: &str = "/etc/image_key";
-            let key_str = load_key(IMAGE_KEY_FILE)?;
+            buffer.resize(buffer_len as usize, 0);
+            let key_string = String::from_utf8(buffer)
+                .expect("error converting to string");
+            let key_str = key_string
+                .trim_end_matches(|c| c == '\r' || c == '\n').to_string();
             let mut key: sgx_key_128bit_t = Default::default();
             parse_str_to_bytes(&key_str, &mut key)?;
             Some(key)
@@ -149,13 +169,6 @@ fn load_config(config_path: &str) -> Result<ImageConfig, Box<dyn Error>> {
     };
     let config: ImageConfig = serde_json::from_str(&config_json)?;
     Ok(config)
-}
-
-fn load_key(key_path: &str) -> Result<String, Box<dyn Error>> {
-    let mut key_file = File::open(key_path)?;
-    let mut key = String::new();
-    key_file.read_to_string(&mut key)?;
-    Ok(key.trim_end_matches(|c| c == '\r' || c == '\n').to_string())
 }
 
 fn parse_str_to_bytes(arg_str: &str, bytes: &mut [u8]) -> Result<(), Box<dyn Error>> {
