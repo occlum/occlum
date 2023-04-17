@@ -35,6 +35,15 @@ using ratls::GrSecret;
 using ratls::SecretRequest;
 using ratls::SecretReply;
 
+typedef enum {
+    GRPC_RATLS_SUCCESS = 0,             /// Success
+    GRPC_RATLS_ERR = -1,                /// General error
+    GRPC_RATLS_INVALID_PARAM = -2,      /// Invalid parameter
+    GRPC_RATLS_BUF_ERR = -3,            /// Invalid buffer or buffer allocation failure
+    GRPC_RATLS_NO_SECRET = -4,          /// No valid secret
+    GRPC_RATLS_BUF_TOO_SMALL = -5       /// Buffer is too small
+} grpc_ratls_result_t;
+
 // Client
 class GrSecretClient {
     public:
@@ -115,11 +124,11 @@ void base64_decode(const char *b64input, unsigned char *dest, size_t dest_len) {
     }
 }
 
-int grpc_ratls_get_secret(
+static grpc_ratls_result_t grpc_ratls_get_secret_string(
     const char *server_addr,
     const char *config_json,
     const char *name,
-    const char *secret_file
+    std::string* secret_string
 )
 {
     auto cred = grpc::sgx::TlsCredentials(config_json);
@@ -131,24 +140,73 @@ int grpc_ratls_get_secret(
     // std::cout << "secret received: " << secret << "len: " << secret.length() << std::endl;
 
     if (secret.empty()) {
-        return -1;
+        return GRPC_RATLS_NO_SECRET;
     } else {
         //Decode From Base64
         size_t len = base64_decode_len(secret.c_str());
         if (len) {
             char *secret_orig = (char *)malloc(len);
+            if (!secret_orig) {
+                return GRPC_RATLS_BUF_ERR;
+            }
             base64_decode(secret.c_str(), (unsigned char *)secret_orig, len);
-            std::string secret_string(secret_orig, secret_orig + len - 1);
+            secret_string->assign(secret_orig, secret_orig + len - 1);
+            free(secret_orig);
 
-            //write to file
-            std::ofstream myfile;
-            myfile.open(secret_file);
-            myfile << secret_string;
-            myfile.close();
-
-            return 0;
+            return GRPC_RATLS_SUCCESS;
         }
 
-        return -2;
+        return GRPC_RATLS_ERR;
     }
+}
+
+// Get secret to file
+int grpc_ratls_get_secret(
+    const char *server_addr,
+    const char *config_json,
+    const char *name,
+    const char *secret_file
+)
+{
+    std::string secret_string;
+    grpc_ratls_result_t ret = grpc_ratls_get_secret_string(
+        server_addr, config_json, name, &secret_string
+    );
+
+    if (ret == GRPC_RATLS_SUCCESS) {
+        //write to file
+        std::ofstream myfile;
+        myfile.open(secret_file);
+        myfile << secret_string;
+        myfile.close();
+    }
+
+    return ret;
+}
+
+// Get secret to buffer
+int grpc_ratls_get_secret_to_buf(
+    const char *server_addr,
+    const char *config_json,
+    const char *name,
+    char *secret_buf,
+    unsigned int *buf_len
+)
+{
+    std::string secret_string;
+    grpc_ratls_result_t ret = grpc_ratls_get_secret_string(
+        server_addr, config_json, name, &secret_string
+    );
+
+    if (ret == GRPC_RATLS_SUCCESS) {
+        if (*buf_len < secret_string.size()) {
+            std::cout << "buffer size is smaller than the secret string length " << secret_string.size() << std::endl;;
+            return GRPC_RATLS_BUF_TOO_SMALL;
+        }
+        //write to buffer
+        memcpy(secret_buf, secret_string.data(), secret_string.size());
+        *buf_len = secret_string.size();
+    }
+
+    return ret;
 }
