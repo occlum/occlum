@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    printf("Local attestation Sucess!\n");
+    printf("Local attestation Success!\n");
     return 0;
 }
 

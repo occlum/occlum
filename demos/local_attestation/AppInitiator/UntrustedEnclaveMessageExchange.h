@@ -48,7 +48,7 @@ extern "C" {
 
 /* Function Description: This is OCALL interface for initiator enclave to get ECDH message 1 and session id from responder enclave
  * Parameter Description:
- *      [input, output] dh_msg1: pointer to ecdh msg1 buffer, this buffer is alloated in initiator enclave and filled by reponser enclave
+ *      [input, output] dh_msg1: pointer to ecdh msg1 buffer, this buffer is allocated in initiator enclave and filled by reponser enclave
  *      [output] session_id: pointer to session id which is allocated by responder enclave
  * */
 uint32_t session_request_ocall(sgx_dh_msg1_t* dh_msg1, uint32_t* session_id);
@@ -66,7 +66,7 @@ uint32_t exchange_report_ocall(sgx_dh_msg2_t* dh_msg2, sgx_dh_msg3_t* dh_msg3, u
  *      [input] session_id: this is session id allocated by responder enclave
  *      [input] req_message: this is pointer to request message
  *      [input] req_message_size: this is request message size
- *      [input] max_payload_size: this is maxium payload size in response message
+ *      [input] max_payload_size: this is maximum payload size in response message
  *      [input, output] this is pointer to response message, the buffer is allocated by initiator enclave and filled by responder enclave
  *      [input] response message size
  * */

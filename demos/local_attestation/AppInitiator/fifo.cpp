@@ -51,7 +51,7 @@
  * Parameter Description:
  * [input] fiforequest: this is pointer to request message
  * [input] fiforequest_size: this is request message size
- * [output] fiforesponse: this is pointer fo response message, the buffer is allocated inside this function
+ * [output] fiforesponse: this is pointer for response message, the buffer is allocated inside this function
  * [output] fiforesponse_size: this is response message size
  * */
 int client_send_receive(FIFO_MSG *fiforequest, size_t fiforequest_size, FIFO_MSG **fiforesponse, size_t *fiforesponse_size) {

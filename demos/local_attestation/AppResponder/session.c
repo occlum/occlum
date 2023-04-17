@@ -64,7 +64,7 @@ int  session_request(sgx_dh_msg1_t *dh_msg1,
     }
     memcpy(&g_dest_session_info_map[*session_id].in_progress.dh_session, &sgx_dh_session,
            sizeof(sgx_dh_session_t));
-    //Store the session information under the correspoding source enlave id key
+    //Store the session information under the corresponding source enlave id key
     g_dest_session_info_map[*session_id].status = IN_PROGRESS;
 
     return SUCCESS;
@@ -84,7 +84,7 @@ int exchange_report(sgx_dh_msg2_t *dh_msg2,
 
     memset(&dh_aek, 0, sizeof(sgx_key_128bit_t));
     do {
-        //Retreive the session information for the corresponding source enclave id
+        //Retrieve the session information for the corresponding source enclave id
         session_info  = &g_dest_session_info_map[session_id];
 
         memcpy(&sgx_dh_session, &session_info->in_progress.dh_session, sizeof(sgx_dh_session_t));

@@ -37,7 +37,7 @@ if [ ! -f "$TARGET_SO" ] ; then
     make -j${nproc} && make install && \
     echo "Build openssl successfully" || exit 1
 else
-    echo "The openssl library is aleady existent"
+    echo "The openssl library is already existent"
 fi
 
 # Download SGX SDK

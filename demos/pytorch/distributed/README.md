@@ -51,7 +51,7 @@ This tutorial is written under the assumption that you have Docker installed and
 
 Occlum is compatible with glibc-supported Python, we employ miniconda as python installation tool. You can import PyTorch packages using conda. Here, miniconda is automatically installed by install_python_with_conda.sh script, the required python and PyTorch packages for this project are also loaded by this script. Here, we take occlum/occlum:0.29.3-ubuntu20.04 as example.
 
-In the following example, we will try to run a distributed PyTorch training using `fasion-MNIST` dataset with 2 processes (Occlum instance).
+In the following example, we will try to run a distributed PyTorch training using `fashion-MNIST` dataset with 2 processes (Occlum instance).
 
 Thus, we set `WORLD_SIZE` to 2.
 

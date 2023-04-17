@@ -87,7 +87,7 @@ ATTESTATION_STATUS create_session(dh_session_t *session_info)
     memset(&dh_msg3, 0, sizeof(sgx_dh_msg3_t));
     memset(session_info, 0, sizeof(dh_session_t));
 
-    //Intialize the session as a session initiator
+    //Initialize the session as a session initiator
     status = sgx_dh_init_session(SGX_DH_SESSION_INITIATOR, &sgx_dh_session);
     if(SGX_SUCCESS != status)
     {
@@ -105,7 +105,7 @@ ATTESTATION_STATUS create_session(dh_session_t *session_info)
     {
         return ATTESTATION_SE_ERROR;
     }
-    //Process the message 1 obtained from desination enclave and generate message 2
+    //Process the message 1 obtained from destination enclave and generate message 2
     status = sgx_dh_initiator_proc_msg1(&dh_msg1, &dh_msg2, &sgx_dh_session);
     if(SGX_SUCCESS != status)
     {

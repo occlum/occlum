@@ -53,7 +53,7 @@ void
 runServer()
 {
     /**
-     * [!] Be carefull here using one cert with the CN != localhost. [!]
+     * [!] Be carefully here using one cert with the CN != localhost. [!]
      **/
     std::string server_address ( "localhost:50051" );
 

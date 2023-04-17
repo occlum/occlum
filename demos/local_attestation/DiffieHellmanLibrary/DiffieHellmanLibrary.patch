@@ -84,7 +84,7 @@ index 40c1539..dd8ab9e 100644
  #endif
  
 +typedef struct {
-+    const sgx_target_info_t*    target_info;        // input (optinal)
++    const sgx_target_info_t*    target_info;        // input (optional)
 +    const sgx_report_data_t*    report_data;        // input (optional)
 +    sgx_report_t*               report;             // output
 +} sgxioc_create_report_arg_t;

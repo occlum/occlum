@@ -8,7 +8,7 @@ Step 1: Download and build Enclave TLS.
 ```
 When completed, the resulting server can be found at `/opt/enclave-tls/bin`.
 
-Step 2: You can run the encalve tls server on Occlum.
+Step 2: You can run the enclave tls server on Occlum.
 ```shell
 ./run_enclave_tls_server_in_occlum.sh
 ```
