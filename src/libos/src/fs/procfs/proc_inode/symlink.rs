@@ -18,10 +18,6 @@ impl<T> INode for SymLink<T>
 where
     T: ProcINode + Sync + Send + 'static,
 {
-    fn poll(&self) -> vfs::Result<vfs::PollStatus> {
-        Err(vfs::FsError::NotFile)
-    }
-
     fn metadata(&self) -> vfs::Result<Metadata> {
         Ok(Metadata {
             dev: 0,

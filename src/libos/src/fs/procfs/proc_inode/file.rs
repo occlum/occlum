@@ -18,14 +18,6 @@ impl<T> INode for File<T>
 where
     T: ProcINode + Sync + Send + 'static,
 {
-    fn poll(&self) -> vfs::Result<vfs::PollStatus> {
-        Ok(vfs::PollStatus {
-            read: true,
-            write: false,
-            error: false,
-        })
-    }
-
     fn metadata(&self) -> vfs::Result<Metadata> {
         Ok(Metadata {
             dev: 0,
