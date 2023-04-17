@@ -15,14 +15,6 @@ impl INode for DevFd {
         Err(vfs::FsError::PermError)
     }
 
-    fn poll(&self) -> vfs::Result<vfs::PollStatus> {
-        Ok(vfs::PollStatus {
-            read: true,
-            write: true,
-            error: false,
-        })
-    }
-
     fn metadata(&self) -> vfs::Result<Metadata> {
         Ok(Metadata {
             dev: 1,

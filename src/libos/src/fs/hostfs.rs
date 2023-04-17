@@ -98,14 +98,6 @@ impl INode for HNode {
         Ok(len)
     }
 
-    fn poll(&self) -> Result<PollStatus> {
-        Ok(PollStatus {
-            read: true,
-            write: true,
-            error: false,
-        })
-    }
-
     fn metadata(&self) -> Result<Metadata> {
         let metadata = if self.is_file() {
             let guard = self.open_file()?;

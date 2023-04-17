@@ -134,6 +134,14 @@ impl AsyncInode for SyncInode {
         Ok(())
     }
 
+    fn poll(&self, mask: Events, _poller: Option<&Poller>) -> Events {
+        let events = match self.0.poll() {
+            Ok(poll_status) => Events::from(poll_status),
+            Err(_) => Events::empty(),
+        };
+        mask & events
+    }
+
     fn ext(&self) -> Option<&Extension> {
         self.0.ext()
     }
