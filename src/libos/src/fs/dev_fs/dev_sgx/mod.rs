@@ -25,10 +25,6 @@ impl INode for DevSgx {
         Err(FsError::PermError)
     }
 
-    fn poll(&self) -> vfs::Result<vfs::PollStatus> {
-        Err(FsError::PermError)
-    }
-
     fn metadata(&self) -> vfs::Result<Metadata> {
         Ok(Metadata {
             dev: 1,

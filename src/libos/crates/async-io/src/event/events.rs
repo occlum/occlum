@@ -21,3 +21,21 @@ bitflags::bitflags! {
         const ALWAYS_POLL = Self::ERR.bits | Self::HUP.bits;
     }
 }
+
+use rcore_fs::vfs::PollStatus;
+
+impl From<PollStatus> for Events {
+    fn from(poll_status: PollStatus) -> Self {
+        if poll_status.error {
+            return Self::ERR;
+        }
+        let mut events = Self::empty();
+        if poll_status.read {
+            events |= Self::IN
+        }
+        if poll_status.write {
+            events |= Self::OUT
+        }
+        events
+    }
+}
