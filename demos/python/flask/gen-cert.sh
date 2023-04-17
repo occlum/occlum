@@ -4,7 +4,7 @@ pushd ~
 openssl rand -writerand .rnd
 popd
 
-# Geneate self-signed key/cert
+# Generate self-signed key/cert
 # Generate valid Flask server Key/Cert
 openssl genrsa -out flask.key 2048
 openssl req -nodes -new -key flask.key -subj "/CN=localhost" -out flask.csr

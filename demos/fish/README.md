@@ -31,7 +31,7 @@ As demonstrated here, Occlum supports executing any script file that begins with
 at its first line by invoking the interpreter program specified with the shebang.
 
 ### Step 1:
-Downlaod FISH and busybox and build them with Occlum tool chain:
+Download FISH and busybox and build them with Occlum tool chain:
 ```
 ./download_and_build.sh
 ```

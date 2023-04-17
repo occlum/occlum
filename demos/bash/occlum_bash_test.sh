@@ -15,7 +15,7 @@ busybox echo $DATE
 TEST=$(busybox echo $(busybox date))
 busybox echo $TEST
 
-# Test command subsitution and pipe
+# Test command substitution and pipe
 busybox echo $(busybox echo -e "Hello-world-from-bash\n test" | busybox awk '$1=$1' FS="-" OFS=" ")
 
 # Test multiple redirection
@@ -62,7 +62,7 @@ cd /host
 pwd
 cd -
 
-# Test ulimit defined below will overide configuration in Occlum.json
+# Test ulimit defined below will override configuration in Occlum.json
 ulimit -Ss 10240 # stack size 10M
 ulimit -Sd 40960 # heap size 40M
 ulimit -Sv 122880 # virtual memory size 120M (including heap, stack, mmap size)

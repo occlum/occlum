@@ -122,7 +122,7 @@ uint32_t test_close_session()
  * For demonstration purpose, we verify below points:
  *   1. peer enclave's MRSIGNER is as expected
  *   2. peer enclave's PROD_ID is as expected
- *   3. peer enclave's attribute is reasonable: it's INITIALIZED'ed enclave; in non-debug build configuraiton, the enlave isn't loaded with enclave debug mode.
+ *   3. peer enclave's attribute is reasonable: it's INITIALIZED'ed enclave; in non-debug build configuration, the enlave isn't loaded with enclave debug mode.
  **/
 extern "C" uint32_t verify_peer_enclave_trust(sgx_dh_session_enclave_identity_t* peer_enclave_identity)
 {
@@ -141,7 +141,7 @@ extern "C" uint32_t verify_peer_enclave_trust(sgx_dh_session_enclave_identity_t*
     return SUCCESS;
 }
 
-/* Function Desciption: Operates on the input secret and generate the output secret
+/* Function Description: Operates on the input secret and generate the output secret
  * */
 uint32_t get_message_exchange_response(uint32_t inp_secret_data)
 {
