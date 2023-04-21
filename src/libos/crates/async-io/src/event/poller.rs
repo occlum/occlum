@@ -146,6 +146,7 @@ impl Pollee {
     /// the observer will not be dropped.
     pub fn register_observer(&self, observer: Arc<dyn Observer>, mask: Events) {
         let observer: KeyableArc<dyn Observer> = observer.into();
+        let mask = mask | Events::ALWAYS_POLL;
 
         let mut pollers = self.inner.pollers.lock();
         let is_new = pollers.insert(observer, mask).is_none();
@@ -165,9 +166,13 @@ impl Pollee {
         let observer: &KeyableArc<dyn Observer> = unsafe { core::mem::transmute(observer) };
 
         let mut pollers = self.inner.pollers.lock();
-        pollers
+        let observer = pollers
             .remove_entry(observer)
-            .map(|(observer, _mask)| observer.into())
+            .map(|(observer, _mask)| observer.into());
+        if observer.is_some() {
+            self.inner.num_pollers.fetch_sub(1, Ordering::Release);
+        }
+        observer
     }
 
     fn events(&self) -> Events {
