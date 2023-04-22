@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1682201420401,
+  "lastUpdate": 1682201483226,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -3844,6 +3844,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2039,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "LI Qing",
+            "username": "liqinggd",
+            "email": "geding.lq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "634e9c3d68ba2a7397b86ab68e4882c2e8c9264c",
+          "message": "Use the default poll implementation of INode",
+          "timestamp": "2023-04-17T06:06:19Z",
+          "url": "https://github.com/occlum/occlum/commit/634e9c3d68ba2a7397b86ab68e4882c2e8c9264c"
+        },
+        "date": 1682201481639,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 1737,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 1737,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
