@@ -17,13 +17,14 @@ use std::os::raw::{c_int, c_char};
 
 #[link(name = "aecs_client")]
 extern "C" {
-    fn aecs_client_get_secret_and_save_file(
+    fn aecs_client_get_secret_by_buffer(
         aec_server_endpoint: *const c_char,
         aecs_server_policy: *const c_char,
         secret_service: *const c_char,
         secret_name: *const c_char,
         nonce: *const c_char,
-        save_file_name: *const c_char
+        secret_outbuf: *const u8,
+        secret_outbuf_len: *mut i32
     ) -> c_int;
 }
 
@@ -96,20 +97,56 @@ fn load_ra_config(ra_conf_path: &str) -> Result<InitRAConfig, Box<dyn Error>> {
     Ok(config)
 }
 
+struct KeyInfo {
+    path: String,
+    val_buf: Vec<u8>,
+}
+
+fn get_kms_keys(kms_keys: Vec<KmsKeys>, kms_server: CString) -> Result<Vec<KeyInfo>, Box<dyn Error>> {
+    let mut keys_info: Vec<KeyInfo> = Vec::new();
+    for keys in kms_keys {
+        let key = CString::new(&*keys.key).unwrap();
+        let service =CString::new(keys.service).unwrap();
+        // Max key length is 10K
+        let mut buffer: Vec<u8> = vec![0; 10240];
+        let buffer_ptr: *const u8 = buffer.as_ptr();
+        let mut buffer_len: i32 = buffer.len() as i32;
+        let len_ptr: *mut i32 = &mut buffer_len as *mut i32;
+
+        let ret = unsafe {
+            aecs_client_get_secret_by_buffer(
+                kms_server.as_ptr(),
+                std::ptr::null(),
+                service.as_ptr(),
+                key.as_ptr(),
+                std::ptr::null(),
+                buffer_ptr,
+                len_ptr
+            )
+        };
+
+        if ret != 0 {
+            println!("aecs_client_get_secret_by_buffer failed return {}", ret);
+            return Err(Box::new(std::io::Error::last_os_error()));
+        }
+
+        buffer.resize(buffer_len as usize, 0);
+
+        let key_info: KeyInfo = KeyInfo {
+            path: keys.path.clone(),
+            val_buf: buffer.clone()
+        };
+
+        keys_info.push(key_info);
+    }
+    Ok(keys_info)
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Load the configuration from initfs
     const IMAGE_CONFIG_FILE: &str = "/etc/image_config.json";
     const INIT_RA_CONF: &str = "/etc/init_ra_conf.json";
     let image_config = load_config(IMAGE_CONFIG_FILE)?;
-
-    // Get the MAC of Occlum.json.protected file
-    let occlum_json_mac = {
-        let mut mac: sgx_aes_gcm_128bit_tag_t = Default::default();
-        parse_str_to_bytes(&image_config.occlum_json_mac, &mut mac)?;
-        mac
-    };
-    let occlum_json_mac_ptr = &occlum_json_mac as *const sgx_aes_gcm_128bit_tag_t;
 
     // Do parse to get Init RA information
     let init_ra_conf = load_ra_config(INIT_RA_CONF)?;
@@ -127,32 +164,40 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Get the image encrypted key through RA
             let secret = CString::new("image_key").unwrap();
             let service = CString::new("service1").unwrap();
-            let filename = CString::new("/etc/image_key").unwrap();
+            let mut buffer: Vec<u8> = vec![0; 256];
+            let buffer_ptr: *const u8 = buffer.as_ptr();
+            let mut buffer_len: i32 = buffer.len() as i32;
+            let len_ptr: *mut i32 = &mut buffer_len as *mut i32;
 
             let ret = unsafe {
-                aecs_client_get_secret_and_save_file(
+                aecs_client_get_secret_by_buffer(
                     server_addr.as_ptr(),
                     std::ptr::null(),
                     service.as_ptr(),
                     secret.as_ptr(),
                     std::ptr::null(),
-                    filename.as_ptr())
+                    buffer_ptr,
+                    len_ptr
+                )
             };
 
             if ret != 0 {
-                println!("grpc_ratls_get_secret failed return {}", ret);
+                println!("aecs_client_get_secret_by_buffer failed return {}", ret);
                 return Err(Box::new(std::io::Error::last_os_error()));
             }
 
-            const IMAGE_KEY_FILE: &str = "/etc/image_key";
-            let key_str = load_key(IMAGE_KEY_FILE)?;
-            // Remove key file which is not needed any more
-            fs::remove_file(IMAGE_KEY_FILE)?;
+            buffer.resize(buffer_len as usize, 0);
+            let key_string = String::from_utf8(buffer)
+                .expect("error converting to string");
+            let key_str = key_string
+                .trim_end_matches(|c| c == '\r' || c == '\n').to_string();
             let mut key: sgx_key_128bit_t = Default::default();
             parse_str_to_bytes(&key_str, &mut key)?;
             Some(key)
-        }
-        "integrity-only" => None,
+        },
+        "integrity-only" => {
+            None
+        },
         _ => unreachable!(),
     };
     let key_ptr = key
@@ -160,57 +205,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map(|key| key as *const sgx_key_128bit_t)
         .unwrap_or(std::ptr::null());
 
-    // Do one time key acquire to force all necessary libraries got loaded to memory.
-    // Thus after mount rootfs, the API could run successfully.
-    // The key got this time will be dropped.
-    unsafe {
-        let kms_key = init_ra_conf.kms_keys[0].clone();
-        let key = CString::new(kms_key.key).unwrap();
-        let file = CString::new(kms_key.path).unwrap();
-        let service =CString::new(kms_key.service).unwrap();
-
-        aecs_client_get_secret_and_save_file(
-            server_addr.as_ptr(),
-            std::ptr::null(),
-            service.as_ptr(),
-            key.as_ptr(),
-            std::ptr::null(),
-            file.as_ptr());
-        // Remove key file which is not needed any more
-        fs::remove_file(file.into_string().unwrap())?;
-    };
+    let keys_info: Vec<KeyInfo> =
+        get_kms_keys(init_ra_conf.kms_keys, server_addr).unwrap();
 
     // Mount the image
     const SYS_MOUNT_FS: i64 = 363;
-    let ret = unsafe { syscall(SYS_MOUNT_FS, key_ptr, occlum_json_mac_ptr) };
+    // User can provide valid path for runtime mount and boot
+    // Otherwise, just pass null pointer to do general mount and boot
+    let root_config_path: *const i8 = std::ptr::null();
+    let ret = unsafe { syscall(
+        SYS_MOUNT_FS, key_ptr, root_config_path) };
     if ret < 0 {
         return Err(Box::new(std::io::Error::last_os_error()));
     }
 
-    // Rewrite ra_config to rootfs
-    fs::create_dir_all("/etc/kubetee")?;
-    fs::write("/etc/kubetee/unified_attestation.json", ra_conf_string.clone().into_bytes())?;
-
     // Get keys and save to path
-    for keys in init_ra_conf.kms_keys {
-        let key = CString::new(keys.key).unwrap();
-        let file = CString::new(keys.path).unwrap();
-        let service =CString::new(keys.service).unwrap();
-
-        let ret = unsafe {
-            aecs_client_get_secret_and_save_file(
-                server_addr.as_ptr(),
-                std::ptr::null(),
-                service.as_ptr(),
-                key.as_ptr(),
-                std::ptr::null(),
-                file.as_ptr())
-        };
-
-        if ret != 0 {
-            println!("Failed to get key {:?}, return {}", key, ret);
-            // return Err(Box::new(std::io::Error::last_os_error()));
-        }
+    for key_info in keys_info {
+        fs::write(key_info.path, key_info.val_buf.as_slice())?;
     }
 
     Ok(())
@@ -218,13 +229,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 #[allow(non_camel_case_types)]
 type sgx_key_128bit_t = [u8; 16];
-#[allow(non_camel_case_types)]
-type sgx_aes_gcm_128bit_tag_t = [u8; 16];
 
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 struct ImageConfig {
-    occlum_json_mac: String,
     image_type: String,
 }
 
@@ -237,13 +245,6 @@ fn load_config(config_path: &str) -> Result<ImageConfig, Box<dyn Error>> {
     };
     let config: ImageConfig = serde_json::from_str(&config_json)?;
     Ok(config)
-}
-
-fn load_key(key_path: &str) -> Result<String, Box<dyn Error>> {
-    let mut key_file = File::open(key_path)?;
-    let mut key = String::new();
-    key_file.read_to_string(&mut key)?;
-    Ok(key.trim_end_matches(|c| c == '\r' || c == '\n').to_string())
 }
 
 fn parse_str_to_bytes(arg_str: &str, bytes: &mut [u8]) -> Result<(), Box<dyn Error>> {
