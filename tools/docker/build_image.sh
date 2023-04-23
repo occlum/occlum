@@ -50,7 +50,7 @@ function check_item_in_list() {
     [[ $list =~ (^|[[:space:]])$item($|[[:space:]]) ]]
 }
 
-check_item_in_list "$os_name" "ubuntu18.04 ubuntu20.04 centos8.2 aliyunlinux3 anolis8.4" || report_error
+check_item_in_list "$os_name" "ubuntu18.04 ubuntu20.04 centos8.2 aliyunlinux3 anolis8.4 anolis8.8" || report_error
 
 cd "$script_dir/.."
 docker build -f "$script_dir/Dockerfile.$os_name" -t "occlum/occlum:$occlum_label-$os_name" --build-arg OCCLUM_BRANCH=$occlum_branch .
