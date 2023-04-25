@@ -1,3 +1,4 @@
+use crate::process::do_vfork::reap_zombie_child_created_with_vfork;
 use crate::signal::constants::*;
 use std::intrinsics::atomic_store;
 
@@ -15,7 +16,8 @@ use crate::vm::USER_SPACE_VM_MANAGER;
 pub fn do_exit_group(status: i32, curr_user_ctxt: &mut CpuContext) -> Result<isize> {
     if is_vforked_child_process() {
         let current = current!();
-        return vfork_return_to_parent(curr_user_ctxt as *mut _, &current);
+        let child_exit_status = TermStatus::Exited(status as u8);
+        return vfork_return_to_parent(curr_user_ctxt as *mut _, &current, Some(child_exit_status));
     } else {
         let term_status = TermStatus::Exited(status as u8);
         current!().process().force_exit(term_status);
@@ -89,6 +91,7 @@ fn exit_thread(term_status: TermStatus) {
 
 fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
     let process = thread.process();
+    let pid = process.pid();
 
     // Deadlock note: always lock parent first, then child.
 
@@ -123,13 +126,16 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
     if parent_inner.is_none() {
         debug_assert!(parent.pid() == 0);
 
-        let pid = process.pid();
         let main_tid = pid;
         table::del_thread(main_tid).expect("tid must be in the table");
         table::del_process(pid).expect("pid must be in the table");
         clean_pgrp_when_exit(process);
 
         process_inner.exit(term_status, &idle_ref, &mut idle_inner);
+
+        // For vfork-and-exit children, just clean them to free the pid
+        let _ = reap_zombie_child_created_with_vfork(pid);
+
         idle_inner.remove_zombie_child(pid);
         return;
     }
@@ -137,6 +143,9 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus) {
     let mut parent_inner = parent_inner.unwrap();
 
     process_inner.exit(term_status, &idle_ref, &mut idle_inner);
+
+    // For vfork-and-exit children, just clean them to free the pid
+    let _ = reap_zombie_child_created_with_vfork(pid);
 
     //Send SIGCHLD to parent
     send_sigchld_to(&parent);
@@ -224,6 +233,9 @@ fn exit_process_for_execve(
 
     // Let new_process to adopt the children of current process
     process_inner.exit(term_status, &new_parent_ref, &mut new_parent_inner);
+
+    // For vfork-and-exit children, we don't need to adopt them here.
+    // Because the new parent process share the same pid with the old parent process.
 
     // Remove current process from parent process' zombie list.
     if parent_inner.is_none() {
