@@ -7,14 +7,15 @@ use std::untrusted::fs;
 pub struct StatINode;
 
 impl StatINode {
-    pub fn new() -> Arc<dyn INode> {
+    pub fn new() -> Arc<dyn AsyncInode> {
         Arc::new(File::new(Self))
     }
 }
 
+#[async_trait]
 impl ProcINode for StatINode {
-    fn generate_data_in_bytes(&self) -> vfs::Result<Vec<u8>> {
-        let mut host_stat = fs::read_to_string("/proc/stat").map_err(|e| e.into_fs_error())?;
+    async fn generate_data_in_bytes(&self) -> Result<Vec<u8>> {
+        let mut host_stat = fs::read_to_string("/proc/stat")?;
         let boot_time = crate::time::up_time::boot_time_since_epoch()
             .as_secs()
             .to_string();

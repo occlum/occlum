@@ -14,11 +14,25 @@ impl<T: ProcINode> SymLink<T> {
     }
 }
 
-impl<T> INode for SymLink<T>
+#[async_trait]
+impl<T> AsyncInode for SymLink<T>
 where
     T: ProcINode + Sync + Send + 'static,
 {
-    fn metadata(&self) -> vfs::Result<Metadata> {
+    async fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+        let data = self.inner().generate_data_in_bytes().await?;
+        let start = data.len().min(offset);
+        let end = data.len().min(offset + buf.len());
+        let len = end - start;
+        buf[0..len].copy_from_slice(&data[start..end]);
+        Ok(len)
+    }
+
+    async fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {
+        return_errno!(EPERM, "");
+    }
+
+    async fn metadata(&self) -> Result<Metadata> {
         Ok(Metadata {
             dev: 0,
             inode: PROC_INO,
@@ -28,7 +42,7 @@ where
             atime: Timespec { sec: 0, nsec: 0 },
             mtime: Timespec { sec: 0, nsec: 0 },
             ctime: Timespec { sec: 0, nsec: 0 },
-            type_: vfs::FileType::SymLink,
+            type_: FileType::SymLink,
             mode: 0o777,
             nlinks: 1,
             uid: 0,
@@ -37,5 +51,19 @@ where
         })
     }
 
-    impl_inode_for_file_or_symlink!();
+    async fn set_metadata(&self, metadata: &Metadata) -> Result<()> {
+        return_errno!(EPERM, "");
+    }
+
+    async fn resize(&self, _len: usize) -> Result<()> {
+        return_errno!(EPERM, "");
+    }
+
+    fn fs(&self) -> Arc<dyn AsyncFileSystem> {
+        unimplemented!();
+    }
+
+    fn as_any_ref(&self) -> &dyn Any {
+        self
+    }
 }

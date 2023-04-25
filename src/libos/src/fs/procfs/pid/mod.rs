@@ -25,14 +25,14 @@ pub struct LockedPidDirINode(RwLock<PidDirINode>);
 struct PidDirINode {
     process_ref: ProcessRef,
     this: Weak<Dir<LockedPidDirINode>>,
-    parent: Arc<dyn INode>,
-    entries: HashMap<String, Arc<dyn INode>>,
+    parent: Arc<dyn AsyncInode>,
+    entries: HashMap<String, Arc<dyn AsyncInode>>,
 }
 
 impl LockedPidDirINode {
-    pub fn new(pid: pid_t, parent: Arc<dyn INode>) -> vfs::Result<Arc<dyn INode>> {
+    pub fn new(pid: pid_t, parent: Arc<dyn AsyncInode>) -> Result<Arc<dyn AsyncInode>> {
         let inode = Arc::new(Dir::new(Self(RwLock::new(PidDirINode {
-            process_ref: get_process(pid).map_err(|_| FsError::EntryNotFound)?,
+            process_ref: get_process(pid)?,
             this: Weak::default(),
             parent: Arc::clone(&parent),
             entries: HashMap::new(),
@@ -42,7 +42,7 @@ impl LockedPidDirINode {
         Ok(inode)
     }
 
-    fn init_entries(&self) -> vfs::Result<()> {
+    fn init_entries(&self) -> Result<()> {
         let mut file = self.0.write().unwrap();
         // cmdline
         let cmdline_inode = ProcCmdlineINode::new(&file.process_ref);
@@ -70,8 +70,9 @@ impl LockedPidDirINode {
     }
 }
 
+#[async_trait]
 impl DirProcINode for LockedPidDirINode {
-    fn find(&self, name: &str) -> vfs::Result<Arc<dyn INode>> {
+    async fn find(&self, name: &str) -> Result<Arc<dyn AsyncInode>> {
         let file = self.0.read().unwrap();
         if name == "." {
             return Ok(file.this.upgrade().unwrap());
@@ -92,28 +93,11 @@ impl DirProcINode for LockedPidDirINode {
         if let Some(inode) = file.entries.get(name) {
             Ok(Arc::clone(inode))
         } else {
-            Err(FsError::EntryNotFound)
+            return_errno!(ENOENT, "");
         }
     }
 
-    fn get_entry(&self, id: usize) -> vfs::Result<String> {
-        match id {
-            0 => Ok(String::from(".")),
-            1 => Ok(String::from("..")),
-            i => {
-                let file = self.0.read().unwrap();
-                if let Some(name) = file.entries.keys().nth(i - 2) {
-                    Ok(name.to_owned())
-                } else if i == file.entries.len() + 2 {
-                    Ok(String::from("fd"))
-                } else {
-                    Err(FsError::EntryNotFound)
-                }
-            }
-        }
-    }
-
-    fn iterate_entries(&self, mut ctx: &mut DirentWriterContext) -> vfs::Result<usize> {
+    async fn iterate_entries(&self, mut ctx: &mut DirentWriterContext) -> Result<usize> {
         let file = self.0.read().unwrap();
         let idx = ctx.pos();
 
@@ -128,7 +112,7 @@ impl DirProcINode for LockedPidDirINode {
 
         // Write the fd entry
         if idx <= 2 + file.entries.len() {
-            write_entry!(&mut ctx, "fd", PROC_INO, vfs::FileType::Dir);
+            write_entry!(&mut ctx, "fd", PROC_INO, FileType::Dir);
         }
         Ok(ctx.written_len())
     }

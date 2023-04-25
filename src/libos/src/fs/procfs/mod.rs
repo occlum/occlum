@@ -1,6 +1,6 @@
 use super::*;
 use alloc::sync::{Arc, Weak};
-use rcore_fs::vfs;
+use async_trait::async_trait;
 
 use crate::process::pid_t;
 use crate::process::table::get_all_processes;
@@ -33,17 +33,18 @@ pub struct ProcFS {
     self_ref: Weak<ProcFS>,
 }
 
-impl FileSystem for ProcFS {
-    fn sync(&self) -> vfs::Result<()> {
+#[async_trait]
+impl AsyncFileSystem for ProcFS {
+    async fn sync(&self) -> Result<()> {
         Ok(())
     }
 
-    fn root_inode(&self) -> Arc<dyn INode> {
+    async fn root_inode(&self) -> Arc<dyn AsyncInode> {
         Arc::clone(&self.root) as _
     }
 
-    fn info(&self) -> vfs::FsInfo {
-        vfs::FsInfo {
+    async fn info(&self) -> FsInfo {
+        FsInfo {
             magic: PROC_SUPER_MAGIC,
             bsize: 4096,
             frsize: 4096,
@@ -91,7 +92,7 @@ impl ProcFS {
 struct LockedProcRootINode(RwLock<ProcRootINode>);
 
 struct ProcRootINode {
-    non_volatile_entries: HashMap<String, Arc<dyn INode>>,
+    non_volatile_entries: HashMap<String, Arc<dyn AsyncInode>>,
     this: Weak<Dir<LockedProcRootINode>>,
 }
 
@@ -116,8 +117,9 @@ impl LockedProcRootINode {
     }
 }
 
+#[async_trait]
 impl DirProcINode for LockedProcRootINode {
-    fn find(&self, name: &str) -> vfs::Result<Arc<dyn INode>> {
+    async fn find(&self, name: &str) -> Result<Arc<dyn AsyncInode>> {
         let file = self.0.read().unwrap();
         if name == "." {
             return Ok(file.this.upgrade().unwrap());
@@ -132,32 +134,11 @@ impl DirProcINode for LockedProcRootINode {
         } else if let Some(inode) = file.non_volatile_entries.get(name) {
             Ok(Arc::clone(inode))
         } else {
-            Err(FsError::EntryNotFound)
+            return_errno!(ENOENT, "");
         }
     }
 
-    fn get_entry(&self, id: usize) -> vfs::Result<String> {
-        match id {
-            0 => Ok(String::from(".")),
-            1 => Ok(String::from("..")),
-            i => {
-                let file = self.0.read().unwrap();
-                if let Some(name) = file.non_volatile_entries.keys().nth(i - 2) {
-                    Ok(name.to_owned())
-                } else {
-                    let processes = get_all_processes();
-                    let prior_entries_len = 2 + file.non_volatile_entries.len();
-                    let process = processes
-                        .iter()
-                        .nth(i - prior_entries_len)
-                        .ok_or(FsError::EntryNotFound)?;
-                    Ok(process.pid().to_string())
-                }
-            }
-        }
-    }
-
-    fn iterate_entries(&self, mut ctx: &mut DirentWriterContext) -> vfs::Result<usize> {
+    async fn iterate_entries(&self, mut ctx: &mut DirentWriterContext) -> Result<usize> {
         let file = self.0.read().unwrap();
         let idx = ctx.pos();
 
@@ -191,7 +172,7 @@ impl DirProcINode for LockedProcRootINode {
                 &mut ctx,
                 &process.pid().to_string(),
                 PROC_INO,
-                vfs::FileType::Dir
+                FileType::Dir
             );
         }
 
