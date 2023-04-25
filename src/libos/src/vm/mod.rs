@@ -63,10 +63,12 @@ use std::fmt;
 
 mod chunk;
 mod free_space_manager;
+mod page_tracker;
 mod process_vm;
 mod user_space_vm;
 mod vm_area;
 mod vm_chunk_manager;
+mod vm_epc;
 mod vm_layout;
 mod vm_manager;
 mod vm_perms;
@@ -77,8 +79,9 @@ use self::vm_layout::VMLayout;
 
 pub use self::chunk::{Chunk, ChunkRef, ChunkType};
 pub use self::process_vm::{MMapFlags, MRemapFlags, MSyncFlags, ProcessVM, ProcessVMBuilder};
-pub use self::user_space_vm::USER_SPACE_VM_MANAGER;
+pub use self::user_space_vm::{free_user_space, USER_SPACE_VM_MANAGER};
 pub use self::vm_area::VMArea;
+pub use self::vm_epc::enclave_page_fault_handler;
 pub use self::vm_perms::VMPerms;
 pub use self::vm_range::VMRange;
 pub use self::vm_util::{VMInitializer, VMMapOptionsBuilder};

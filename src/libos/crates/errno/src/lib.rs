@@ -109,16 +109,16 @@ extern crate sgx_tstd as std;
 extern crate log;
 
 mod backtrace;
-mod errno;
 mod error;
+mod error_num;
 mod macros;
 pub mod prelude;
 mod result;
 mod to_errno;
 
 pub use self::backtrace::ErrorBacktrace;
-pub use self::errno::Errno;
 pub use self::error::{Error, ErrorLocation};
+pub use self::error_num::Errno;
 pub use self::result::{Result, ResultExt};
 pub use self::to_errno::ToErrno;
 

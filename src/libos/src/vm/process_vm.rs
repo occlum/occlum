@@ -7,7 +7,8 @@ use super::user_space_vm::USER_SPACE_VM_MANAGER;
 use super::vm_area::VMArea;
 use super::vm_perms::VMPerms;
 use super::vm_util::{
-    FileBacked, VMInitializer, VMMapAddr, VMMapOptions, VMMapOptionsBuilder, VMRemapOptions,
+    FileBacked, PagePolicy, VMInitializer, VMMapAddr, VMMapOptions, VMMapOptionsBuilder,
+    VMRemapOptions,
 };
 use std::collections::HashSet;
 use util::sync::RwLockWriteGuard;
@@ -98,6 +99,8 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
                     .initializer(VMInitializer::ElfSpecific {
                         elf_file: elf_file.file_ref().clone(),
                     })
+                    // We only load loadable segments, just commit the memory when allocating.
+                    .page_policy(PagePolicy::CommitNow)
                     .build()
                     .map_err(|e| {
                         &self.handle_error_when_init(&chunks);
@@ -126,6 +129,7 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
             .size(heap_layout.size())
             .align(heap_layout.align())
             .perms(VMPerms::READ | VMPerms::WRITE)
+            .page_policy(PagePolicy::CommitOnDemand)
             .build()
             .map_err(|e| {
                 &self.handle_error_when_init(&chunks);
@@ -145,8 +149,10 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
         let stack_layout = &other_layouts[1];
         let vm_option = VMMapOptionsBuilder::default()
             .size(stack_layout.size())
-            .align(heap_layout.align())
+            .align(stack_layout.align())
             .perms(VMPerms::READ | VMPerms::WRITE)
+            // There are cases that we can't handle when the #PF happens at user's stack. Commit the stack memory now.
+            .page_policy(PagePolicy::CommitNow)
             .build()
             .map_err(|e| {
                 &self.handle_error_when_init(&chunks);
@@ -515,11 +521,22 @@ impl ProcessVM {
                 }
             }
         };
+
+        let page_policy = {
+            if flags.contains(MMapFlags::MAP_STACK) {
+                // With MAP_STACK, the mmaped memory will be used as user's stack. If not committed, the PF can occurs
+                // when switching to user space and can hardly be handled correctly.
+                PagePolicy::CommitNow
+            } else {
+                PagePolicy::CommitOnDemand
+            }
+        };
         let mmap_options = VMMapOptionsBuilder::default()
             .size(size)
             .addr(addr_option)
             .perms(perms)
             .initializer(initializer)
+            .page_policy(page_policy)
             .build()?;
         let mmap_addr = USER_SPACE_VM_MANAGER.mmap(&mmap_options)?;
         Ok(mmap_addr)

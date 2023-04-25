@@ -243,6 +243,16 @@ pub extern "C" fn occlum_ecall_run_vcpu(pal_data_ptr: *const occlum_pal_vcpu_dat
     assert!(check_ptr(pal_data_ptr).is_ok()); // Make sure the ptr is outside the enclave
     set_pal_data_addr(pal_data_ptr);
 
+    if cfg!(debug_assertions) {
+        let sgx_thread_data = sgx_trts::enclave::SgxThreadData::current();
+        let stack_base_addr = sgx_thread_data.stack_base();
+        let stack_limit_addr = sgx_thread_data.stack_limit();
+        debug!(
+            "run vcpu: stack base addr = 0x{:x}, stack limit addr = 0x{:x}",
+            stack_base_addr, stack_limit_addr
+        );
+    }
+
     let running_vcpu_num = async_rt::executor::run_tasks();
     if running_vcpu_num == 0 {
         // It is the last vcpu for the executor. We can perform some check to make sure there is no resource leakage
@@ -285,6 +295,8 @@ pub extern "C" fn occlum_ecall_shutdown_vcpus() -> i32 {
 
     // TODO: stop all the kernel threads/tasks
     async_rt::executor::shutdown();
+
+    crate::vm::free_user_space();
     0
 }
 

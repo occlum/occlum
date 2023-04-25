@@ -9,6 +9,7 @@ use self::syscall::{handle_syscall_exception, SYSCALL_OPCODE};
 use super::context_switch::{self, CpuContext, FpRegs, GpRegs, CURRENT_CONTEXT};
 use crate::prelude::*;
 use crate::signal::{FaultSignal, SigSet};
+use crate::vm::{enclave_page_fault_handler, USER_SPACE_VM_MANAGER};
 
 // Modules for instruction simulation
 mod cpuid;
@@ -30,6 +31,25 @@ pub fn register_exception_handlers() {
 #[no_mangle]
 extern "C" fn exception_entrypoint(sgx_except_info: *mut sgx_exception_info_t) -> i32 {
     let sgx_except_info = unsafe { &mut *sgx_except_info };
+
+    // If it is #PF, but the triggered code is not user's code and the #PF address is in the userspace, then
+    // it is a kernel-triggered #PF that we can handle.
+    if sgx_except_info.exception_vector == sgx_exception_vector_t::SGX_EXCEPTION_VECTOR_PF
+        && !USER_SPACE_VM_MANAGER
+            .range()
+            .contains(sgx_except_info.cpu_context.rip as usize)
+    {
+        // The PF address must be in the user space
+        let pf_addr = sgx_except_info.exinfo.faulting_address as usize;
+        if !USER_SPACE_VM_MANAGER.range().contains(pf_addr) {
+            return SGX_MM_EXCEPTION_CONTINUE_SEARCH;
+        } else {
+            // kernel code triggers #PF. This can happen e.g. when read syscall triggers user buffer #PF.
+            info!("kernel code triggers #PF");
+            enclave_page_fault_handler(sgx_except_info.exinfo).expect("handle PF failure");
+            return SGX_MM_EXCEPTION_CONTINUE_EXECUTION;
+        }
+    }
 
     // Update the current CPU context
     let mut curr_context_ptr = context_switch::current_context_ptr();
@@ -64,6 +84,17 @@ pub async fn handle_exception(exception: &Exception) -> Result<()> {
         } else if ip_opcode == RDTSC_OPCODE {
             return handle_rdtsc_exception();
         }
+    }
+
+    if exception.vector == sgx_exception_vector_t::SGX_EXCEPTION_VECTOR_PF {
+        info!("Userspace #PF caught, try handle");
+
+        if enclave_page_fault_handler(exception.exinfo).is_ok() {
+            info!("#PF handling is done successfully");
+            return Ok(());
+        }
+
+        warn!("#PF not handled. Turn to signal");
     }
 
     // Then, it must be a "real" exception. Convert it to signal and force delivering it.

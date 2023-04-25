@@ -63,6 +63,7 @@ extern crate memoffset;
 extern crate ctor;
 extern crate intrusive_collections;
 extern crate itertools;
+extern crate modular_bitfield;
 extern crate resolv_conf;
 extern crate vdso_time;
 

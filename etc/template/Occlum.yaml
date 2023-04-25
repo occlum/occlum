@@ -2,31 +2,33 @@
 resource_limits:
   # The number of OS threads created for this instance.
   num_of_cpus: 128
-  # The stack size of LibOS kernel.
+  # The stack size of Occlum kernel.
   kernel_space_stack_size: 16MB
-  # The heap size of LibOS kernel.
-  # With EDMM support, choose "init" size based on the expected initialization time. And increase the "max" field if memory insufficiency occurs.
-  # Without EDMM support, increase the "init" field if memory insufficiency occurs. And the "max" field is ignored.
+
+  # The heap size of Occlum kernel. Please configure this field based on the platform.
+  # With EDMM support:      Initialize the kernel heap with the "init" amount of memory. And kernel heap can grow on demand
+  #                         until reaching the "max" value. Please decrease the "init" value if faster start-up time is desired.
+  #                         And increase the "max" field if kernel memory insufficiency occurs.
+  # Without EDMM support:   Initialize the kernel heap with the "max" amount of memory and the "init" field is ignored.
   kernel_space_heap_size:
-    # Reserved and committed during the initialization stage. The more, the longer it takes to initialize.
-    init: 32MB
-    # Only committed when necessary. Only valid with EDMM support.
-    max:  512MB
-  # The total size of enclave memory available to the user applications running in LibOS.
-  # With EDMM support, choose "init" size based on the expected initialization time. And increase the "max" field if memory insufficiency occurs.
-  # Without EDMM support, increase the "init" field if memory insufficiency occurs. And the "max" field is ignored.
+    init: 1MB
+    max:  200MB
+
+  # The total size of enclave memory available to the user applications running in Occlum. Please configure this field based on the platform.
+  # With EDMM support:      Initialize the user space with the "init" amount of memory. And the user space can grow on demand
+  #                         until reaching the "max" value. Please decrease the "init" value if faster start-up time is desired.
+  #                         And increase the "max" field if user memory insufficiency occurs.
+  # Without EDMM support:   Initialize the user space with the "max" amount of memory and the "init" field is ignored.
   user_space_size:
-    # Reserved and committed during the initialization stage. The more, the longer it takes to initialize.
-    init: 256MB
-    # Only committed when necessary. Only valid with EDMM support.
-    max:  64GB
+    init: 1MB
+    max:  400MB
 
 # Default memory size for the users' processes. If not sure, don't modify it.
 process:
   # Default stack size for each process.
   default_stack_size: 4MB
   # Default heap size for each process.
-  default_heap_size: 32MB
+  default_heap_size: 8MB
 
 # Entry points
 # Specify all valid absolute <path> in `occlum run <path> <args>`.

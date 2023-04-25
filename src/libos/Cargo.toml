@@ -16,7 +16,7 @@ async-mountfs = { path = "crates/async-mountfs", features = ["sgx"] }
 async-trait = "0.1.52"
 atomic = "0.5"
 bitflags = "1.0"
-bitvec = { version = "0.17", default-features = false, features = ["alloc"]  }
+bitvec = { version = "1", default-features = false, features = ["alloc"] }
 errno = { path = "crates/errno", features = ["occlum"] }
 log = "0.4"
 aligned = "0.4.1"
@@ -46,11 +46,12 @@ jindisk  = { path = "crates/jindisk", default-features = false, features = ["sgx
 scroll = { version = "0.11.0", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["alloc", "async-await"] }
 itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"]  }
-ctor = "0.1"
+ctor = "0.1.26"
 spin = "0.7"
 regex = { git = "https://github.com/mesalock-linux/regex-sgx", default-features = false, features = ["std", "unicode", "mesalock_sgx"] }
 goblin = { version = "0.5.4", default-features = false, features = ["elf64", "elf32", "endian_fd"] }
 intrusive-collections = "0.9"
+modular-bitfield = "0.11.2"
 
 [patch.'https://github.com/apache/teaclave-sgx-sdk.git']
 sgx_tstd = { path = "../../deps/rust-sgx-sdk/sgx_tstd" }

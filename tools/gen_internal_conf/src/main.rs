@@ -25,10 +25,14 @@ struct DefaultConfig {
     num_of_tcs_used_by_occlum_kernel: u32,
     // Corresponds to TCSMaxNum in Enclave.xml
     num_of_cpus_max: u32,
+    // Extra user region memory for SDK
+    extra_user_region_for_sdk: &'static str,
     // Corresponds to MiscSelect in Enclave.xml
     misc_select: &'static str,
     // Corresponds to MiscMask in Enclave.xml
     misc_mask: &'static str,
+    // Extra reserved memory size for platforms without EDMM to simulate the memory layout
+    extra_rsrv_mem_for_no_edmm: usize,
 }
 
 impl DefaultConfig {
@@ -37,16 +41,25 @@ impl DefaultConfig {
             // from OCCLUM_KERNEL_TCS_NUM defined in src/libos/src/entry/enclave.rs
             num_of_tcs_used_by_occlum_kernel: 5,
             num_of_cpus_max: 1024,
+            extra_user_region_for_sdk: "1GB",
             // In order to operate on the User Region using EDMM API,
             // both MiscSelect[0] and MiscMask[0] need to be set to 1
             misc_select: "1",
             misc_mask: "0xFFFFFFFF",
+            extra_rsrv_mem_for_no_edmm: 100 << 20, // 100M
         }
     }
 }
 
 fn main() {
     env_logger::init();
+
+    let instance_is_for_edmm_platform = {
+        match std::env::var("instance_is_for_edmm_platform") {
+            Ok(val) => val == "YES",
+            _=> unreachable!(),
+        }
+    };
 
     let matches = App::new("gen_internal_conf")
         .version("0.2.0")
@@ -176,45 +189,85 @@ fn main() {
         }
         let stack_min_size = stack_max_size;
 
-        // get the kernel heap size
-        let heap_init_size =
+        // Get the kernel heap size. We use different value for different platforms.
+        // With EDMM support:       Initialize the kernel heap with the "init" amount of memory. And kernel heap can grow on demand
+        //                          until reaching the "max" value.
+        // Without EDMM support:    Initialize the kernel heap with the "max" amount of memory and the "init" field is ignored.
+        let heap_config_init_size =
             parse_memory_size(&occlum_config.resource_limits.kernel_space_heap_size.init);
-        if heap_init_size.is_err() {
+        if heap_config_init_size.is_err() {
             println!(
                 "The kernel_space_heap_size.init \"{}\" is not correct.",
                 occlum_config.resource_limits.kernel_space_heap_size.init
             );
             return;
         }
-        let heap_min_size = heap_init_size;
-        let heap_max_size =
+        let heap_config_max_size =
             parse_memory_size(&occlum_config.resource_limits.kernel_space_heap_size.max);
-        if heap_max_size.is_err() {
+        if heap_config_max_size.is_err() {
             println!(
                 "The kernel_space_heap_size.max \"{}\" is not correct.",
                 occlum_config.resource_limits.kernel_space_heap_size.max
             );
             return;
         }
-        // get the user space size
-        let user_space_init_size =
+        let heap_min_size = heap_config_init_size;
+        let heap_init_size = {
+            if instance_is_for_edmm_platform {
+                heap_config_init_size
+            } else {
+                // For platform without EDMM support, we use the "max" config value
+                heap_config_max_size
+            }
+        };
+        let heap_max_size = heap_config_max_size;
+
+        // Compute the memory size for user space
+        // For user space, we use different memory type for different platforms.
+        // With EDMM support:       Use the "init" amount of reserved memory and then use the user region memory for the rest of the memory
+        //                          until "max" amount of memory is reached.
+        // Without EDMM support:    Initialize the user space with the "max" amount of reserved memory and the "init" field is ignored.
+        let user_space_config_init_size =
             parse_memory_size(&occlum_config.resource_limits.user_space_size.init);
-        if user_space_init_size.is_err() {
+        if user_space_config_init_size.is_err() {
             println!(
                 "The user_space_size.init \"{}\" is not correct.",
                 occlum_config.resource_limits.user_space_size.init
             );
             return;
         }
-        let user_space_max_size =
+        let user_space_config_max_size =
             parse_memory_size(&occlum_config.resource_limits.user_space_size.max);
-        if user_space_max_size.is_err() {
+        if user_space_config_max_size.is_err() {
             println!(
                 "The user_space_size.max \"{}\" is not correct.",
                 occlum_config.resource_limits.user_space_size.max
             );
             return;
         }
+
+        let user_space_init_size = {
+            if instance_is_for_edmm_platform {
+                user_space_config_init_size
+            } else {
+                // For platform without EDMM support, we can only use reserved memory to simulate the memory layout of the user space.
+                // To achieve this, we need to alloc extra memory.
+                let max_size = user_space_config_max_size.unwrap();
+                let extra_mem = DEFAULT_CONFIG.extra_rsrv_mem_for_no_edmm;
+                Ok(max_size + extra_mem)
+            }
+        };
+
+        // This field is ignored for platform without EDMM support.
+        let user_space_max_size = {
+            // For platforms with EDMM support, we need extra memory SDK usage.
+            let extra_user_space = parse_memory_size(DEFAULT_CONFIG.extra_user_region_for_sdk);
+            if extra_user_space.is_err() {
+                println!("The extra_user_region_for_sdk in default config is not correct.");
+                return;
+            }
+            user_space_config_max_size.unwrap() + extra_user_space.unwrap()
+        };
 
         let kss_tuple = parse_kss_conf(&occlum_config);
 
@@ -242,8 +295,7 @@ fn main() {
             ReservedMemMinSize: user_space_init_size.unwrap() as u64,
             ReservedMemInitSize: user_space_init_size.unwrap() as u64,
             ReservedMemExecutable: 1,
-            // TODO: Enable this field when EDMM support is ready
-            // UserRegionSize: user_space_max_size.unwrap() as u64,
+            UserRegionSize: user_space_max_size as u64,
             EnableKSS: kss_tuple.0,
             ISVEXTPRODID_H: kss_tuple.1,
             ISVEXTPRODID_L: kss_tuple.2,
@@ -602,7 +654,7 @@ struct EnclaveConfiguration {
     // TODO: Enable this field when EDMM support is ready
     // UserRegionSize is the size of the region where users can
     // operate on using the EDMM APIs introduced since Intel SGX SDK 2.18
-    // UserRegionSize: u64,
+    UserRegionSize: u64,
     EnableKSS: u32,
     ISVEXTPRODID_H: u64,
     ISVEXTPRODID_L: u64,

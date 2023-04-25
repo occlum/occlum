@@ -97,18 +97,13 @@ impl Chunk {
         let vm_area = VMArea::new(
             vm_range.clone(),
             *options.perms(),
+            Some(options.initializer().clone()),
             options.initializer().backed_file(),
             DUMMY_CHUNK_PROCESS_ID,
-        );
-        // Initialize the memory of the new range
-        unsafe {
-            let buf = vm_range.as_slice_mut();
-            options.initializer().init_slice(buf)?;
-        }
-        // Set memory permissions
-        if !options.perms().is_default() {
-            VMPerms::apply_perms(&vm_area, vm_area.perms());
-        }
+            None,
+        )
+        .init_memory(options)?;
+
         Ok(Self::new_chunk_with_vma(vm_area))
     }
 
@@ -233,6 +228,24 @@ impl Chunk {
                     .unwrap()
                     .chunk_manager
                     .find_mmap_region(addr);
+            }
+        }
+    }
+
+    pub fn handle_page_fault(&self, pf_addr: usize, is_protection_violation: bool) -> Result<()> {
+        let internal = &self.internal;
+        match self.internal() {
+            ChunkType::SingleVMA(vma) => {
+                let mut vma = vma.lock().unwrap();
+                debug_assert!(vma.contains(pf_addr));
+                return vma.handle_page_fault(pf_addr, is_protection_violation);
+            }
+            ChunkType::MultiVMA(internal_manager) => {
+                return internal_manager
+                    .lock()
+                    .unwrap()
+                    .chunk_manager
+                    .handle_page_fault(pf_addr, is_protection_violation);
             }
         }
     }

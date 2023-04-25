@@ -136,7 +136,11 @@ impl VMFreeSpaceManager {
         };
 
         self.free_list_update_range(index, result_free_range);
-        trace!("after find free range, free list = {:?}", self.free_manager);
+        trace!(
+            "result free range = {:?}, after find free range, free list = {:?}",
+            result_free_range,
+            self.free_manager
+        );
         return Ok(result_free_range);
     }
 

@@ -1,7 +1,7 @@
 # All the settings below can only take effect after `occlum build`.
 resource_limits:
   # The number of OS threads created for this instance.
-  num_of_cpus: 128
+  num_of_cpus: 8
   # The stack size of LibOS kernel.
   kernel_space_stack_size: 16MB
   # The heap size of LibOS kernel.
@@ -10,18 +10,18 @@ resource_limits:
   kernel_space_heap_size:
     # Reserved and committed during the initialization stage. The more, the longer it takes to initialize.
     # NOTE: Decrease this value when EDMM support is enabled.
-    init: 512MB
+    init: 1MB
     # Only committed when necessary. Only valid with EDMM support.
-    max:  512MB
+    max:  128MB
   # The total size of enclave memory available to the user applications running in LibOS.
   # With EDMM support, choose "init" size based on the expected initialization time. And increase the "max" field if memory insufficiency occurs.
   # Without EDMM support, increase the "init" field if memory insufficiency occurs. And the "max" field is ignored.
   user_space_size:
     # Reserved and committed during the initialization stage. The more, the longer it takes to initialize.
     # NOTE: Decrease this value when EDMM support is enabled.
-    init: 420MB
+    init: 1MB
     # Only committed when necessary. Only valid with EDMM support.
-    max:  64GB
+    max:  400MB
 
 # Default memory size for the users' processes. If not sure, don't modify it.
 process:

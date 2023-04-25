@@ -23,7 +23,8 @@ static void *thread_func(void *_data) {
     sgx_status_t ecall_status = occlum_ecall_run_vcpu(eid, &ret, vcpu_data_ptr);
     if (ecall_status != SGX_SUCCESS) {
         const char *sgx_err = pal_get_sgx_error_msg(ecall_status);
-        PAL_ERROR("Failed to do ECall: occlum_ecall_run_vcpu: %s", sgx_err);
+        PAL_ERROR("Failed to do ECall: occlum_ecall_run_vcpu with error code 0x%x:: %s\n",
+                  ecall_status, sgx_err);
         exit(EXIT_FAILURE);
     }
     if (ret < 0) {

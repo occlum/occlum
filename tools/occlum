@@ -290,6 +290,7 @@ cmd_build() {
         --sign-key)     [ -n "$2" ] && ENCLAVE_SIGN_KEY=$2 ; shift 2 || exit_error "empty signing key path"     ;;
         --sign-tool)    [ -n "$2" ] && ENCLAVE_SIGN_TOOL=$2 ; shift 2 || exit_error "empty signing tool path"   ;;
         --sgx-mode)     [[ -n "$2" && "$2" != "HW" ]] && export SGX_MODE=SIM ; shift 2 || exit_error "empty sgx mode";;
+        --enable-edmm)  [[ -n "$2" && "$2" != "Y" ]] && export ENABLE_EDMM=N ; shift 2 || exit_error "empty edmm mode";;
         --image-key) [ -n "$2" ] && SECURE_IMAGE_KEY=$2 ; SECURE_IMAGE_ENCRYPTED=true; shift 2 || exit_error "empty secure image key path" ;;
         --force | -f)   MAKE_OPTION="clean" ; shift ;;
         *) exit_error "Unknown option: $1"                                                                      ;;
@@ -309,8 +310,22 @@ cmd_build() {
         pal_lib=libocclum-pal_sim.so
         libos_lib=libocclum-libos_sim.so
         echo "SGX mode: $SGX_MODE"
+        echo "Enable EDMM: No"
+        instance_is_for_edmm_platform="NO"
     else
         echo "SGX mode: HW"
+
+         # ENABLE_EDMM is only valid for HW mode
+        case "$ENABLE_EDMM" in
+            "" | "Y" | "Yes" | "yes" | "True" | "true")
+                instance_is_for_edmm_platform="YES"
+                echo "Enable EDMM: Yes"
+            ;;
+            *)
+                instance_is_for_edmm_platform="NO"
+                echo "Enable EDMM: No"
+            ;;
+        esac
     fi
 
     # If sgx mode is changed, build thoroughly again
@@ -331,7 +346,7 @@ cmd_build() {
         make -f $build_makefile $MAKE_OPTION
     fi
     occlum_dir=$occlum_dir instance_dir=$instance_dir pal_lib=$pal_lib major_ver=$major_ver \
-    occlum_version=$occlum_version libos_lib=$libos_lib \
+    occlum_version=$occlum_version libos_lib=$libos_lib instance_is_for_edmm_platform=$instance_is_for_edmm_platform \
     ENCLAVE_SIGN_KEY=$ENCLAVE_SIGN_KEY ENCLAVE_SIGN_TOOL=$ENCLAVE_SIGN_TOOL \
     SECURE_IMAGE_KEY=$SECURE_IMAGE_KEY SECURE_IMAGE_ENCRYPTED=$SECURE_IMAGE_ENCRYPTED \
     make -f $build_makefile --no-builtin-rules
@@ -370,9 +385,9 @@ cmd_run() {
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
-        export LD_LIBRARY_PATH="$instance_dir/build/lib"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib"
     fi
 
     echo "running" > $status_file
@@ -411,9 +426,9 @@ cmd_start() {
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
-        export LD_LIBRARY_PATH="$instance_dir/build/lib"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib"
     fi
 
     echo "running" > $status_file
@@ -440,9 +455,9 @@ cmd_exec() {
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
-        export LD_LIBRARY_PATH="$instance_dir/build/lib"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib"
     fi
 
     echo "running" > "$status_file"
@@ -458,9 +473,9 @@ cmd_stop() {
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
-        export LD_LIBRARY_PATH="$instance_dir/build/lib"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib"
     fi
 
     echo "running" > "$status_file"
@@ -546,9 +561,9 @@ cmd_gdb() {
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
-        export LD_LIBRARY_PATH="$instance_dir/build/lib"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib"
     fi
 
     echo "debugging" > "$status_file"
