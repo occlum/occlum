@@ -14,19 +14,20 @@ impl<T: DirProcINode> Dir<T> {
     }
 }
 
-impl<T> INode for Dir<T>
+#[async_trait]
+impl<T> AsyncInode for Dir<T>
 where
     T: DirProcINode + Sync + Send + 'static,
 {
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> vfs::Result<usize> {
-        Err(vfs::FsError::NotFile)
+    async fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize> {
+        return_errno!(EISDIR, "not file");
     }
 
-    fn write_at(&self, offset: usize, buf: &[u8]) -> vfs::Result<usize> {
-        Err(vfs::FsError::NotFile)
+    async fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {
+        return_errno!(EISDIR, "not file");
     }
 
-    fn metadata(&self) -> vfs::Result<Metadata> {
+    async fn metadata(&self) -> Result<Metadata> {
         Ok(Metadata {
             dev: 0,
             inode: PROC_INO,
@@ -36,7 +37,7 @@ where
             atime: Timespec { sec: 0, nsec: 0 },
             mtime: Timespec { sec: 0, nsec: 0 },
             ctime: Timespec { sec: 0, nsec: 0 },
-            type_: vfs::FileType::Dir,
+            type_: FileType::Dir,
             mode: 0o555,
             nlinks: 1,
             uid: 0,
@@ -45,28 +46,46 @@ where
         })
     }
 
-    fn set_metadata(&self, metadata: &Metadata) -> vfs::Result<()> {
-        Err(vfs::FsError::PermError)
+    async fn set_metadata(&self, _metadata: &Metadata) -> Result<()> {
+        return_errno!(EPERM, "");
     }
 
-    fn sync_all(&self) -> vfs::Result<()> {
-        Ok(())
+    async fn create(
+        &self,
+        _name: &str,
+        _type_: FileType,
+        _mode: u16,
+    ) -> Result<Arc<dyn AsyncInode>> {
+        return_errno!(EPERM, "");
     }
 
-    fn sync_data(&self) -> vfs::Result<()> {
-        Ok(())
+    async fn link(&self, _name: &str, _other: &Arc<dyn AsyncInode>) -> Result<()> {
+        return_errno!(EPERM, "");
     }
 
-    fn find(&self, name: &str) -> vfs::Result<Arc<dyn INode>> {
-        self.inner().find(name)
+    async fn unlink(&self, _name: &str) -> Result<()> {
+        return_errno!(EPERM, "");
     }
 
-    fn get_entry(&self, id: usize) -> vfs::Result<String> {
-        self.inner().get_entry(id)
+    async fn move_(
+        &self,
+        _old_name: &str,
+        _target: &Arc<dyn AsyncInode>,
+        _new_name: &str,
+    ) -> Result<()> {
+        return_errno!(EPERM, "");
     }
 
-    fn iterate_entries(&self, ctx: &mut DirentWriterContext) -> vfs::Result<usize> {
-        self.inner().iterate_entries(ctx)
+    async fn find(&self, name: &str) -> Result<Arc<dyn AsyncInode>> {
+        self.inner().find(name).await
+    }
+
+    async fn iterate_entries(&self, ctx: &mut DirentWriterContext) -> Result<usize> {
+        self.inner().iterate_entries(ctx).await
+    }
+
+    fn fs(&self) -> Arc<dyn AsyncFileSystem> {
+        unimplemented!();
     }
 
     fn as_any_ref(&self) -> &dyn Any {

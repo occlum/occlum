@@ -41,13 +41,14 @@ use crate::vm::{ChunkType, VMArea, VMPerms, VMRange};
 pub struct ProcMapsINode(ProcessRef);
 
 impl ProcMapsINode {
-    pub fn new(process_ref: &ProcessRef) -> Arc<dyn INode> {
+    pub fn new(process_ref: &ProcessRef) -> Arc<dyn AsyncInode> {
         Arc::new(File::new(Self(Arc::clone(process_ref))))
     }
 }
 
+#[async_trait]
 impl ProcINode for ProcMapsINode {
-    fn generate_data_in_bytes(&self) -> vfs::Result<Vec<u8>> {
+    async fn generate_data_in_bytes(&self) -> Result<Vec<u8>> {
         let result_string = {
             let main_thread = self.0.main_thread().unwrap();
             let process_vm = main_thread.vm();

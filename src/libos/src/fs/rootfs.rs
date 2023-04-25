@@ -200,7 +200,7 @@ pub async fn mount_nonroot_fs_according_to(
                 mount_nonroot_fs(ramfs, root, &mc.target.join("shm"), follow_symlink).await?;
             }
             TYPE_PROCFS => {
-                let procfs = SyncFS::new(ProcFS::new());
+                let procfs = ProcFS::new();
                 mount_nonroot_fs(procfs, root, &mc.target, follow_symlink).await?;
             }
             TYPE_UNIONFS => {

@@ -4,13 +4,14 @@ use std::untrusted::fs;
 pub struct CpuInfoINode;
 
 impl CpuInfoINode {
-    pub fn new() -> Arc<dyn INode> {
+    pub fn new() -> Arc<dyn AsyncInode> {
         Arc::new(File::new(Self))
     }
 }
 
+#[async_trait]
 impl ProcINode for CpuInfoINode {
-    fn generate_data_in_bytes(&self) -> vfs::Result<Vec<u8>> {
+    async fn generate_data_in_bytes(&self) -> Result<Vec<u8>> {
         Ok(CPUINFO.to_vec())
     }
 }

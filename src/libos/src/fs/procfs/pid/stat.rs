@@ -3,14 +3,15 @@ use super::*;
 pub struct ProcStatINode(ProcessRef);
 
 impl ProcStatINode {
-    pub fn new(process_ref: &ProcessRef) -> Arc<dyn INode> {
+    pub fn new(process_ref: &ProcessRef) -> Arc<dyn AsyncInode> {
         Arc::new(File::new(Self(Arc::clone(process_ref))))
     }
 }
 
+#[async_trait]
 impl ProcINode for ProcStatINode {
-    fn generate_data_in_bytes(&self) -> vfs::Result<Vec<u8>> {
-        let main_thread = self.0.main_thread().ok_or(FsError::EntryNotFound)?;
+    async fn generate_data_in_bytes(&self) -> Result<Vec<u8>> {
+        let main_thread = self.0.main_thread().ok_or(errno!(ENOENT, ""))?;
 
         // Get the process status information, some fields are filled with the
         // dummy value 0, while some fields are denies to access with value 0.
