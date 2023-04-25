@@ -66,7 +66,7 @@ pub fn do_exec(
             table::add_thread(new_process_ref.main_thread().unwrap());
             table::add_process(new_process_ref);
             task::enqueue_and_exec(new_main_thread);
-            return vfork_return_to_parent(context, current_ref);
+            return vfork_return_to_parent(context, current_ref, None);
         }
 
         // Force exit all child threads of current process
