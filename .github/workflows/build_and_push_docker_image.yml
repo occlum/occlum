@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       OS:
-        description: 'OS name (must choose from <centos, ubuntu18, ubuntu20>)'
+        description: 'OS name (must choose from <anolis, ubuntu20>)'
         required: true
         default: 'ubuntu20'
       release:
@@ -14,54 +14,10 @@ on:
         default: 'N'
 
 jobs:
-  generate-centos-image:
-      # GitHub Actions doesn't have CentOS VM provided
-      runs-on: ubuntu-18.04
-      if: github.event.inputs.OS == 'centos'
-
-      steps:
-      - name: Prepare tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install yum
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Get Occlum release version
-        run: echo "RELEASE_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
-
-      - name: Get branch name
-        # GITHUB_REF=refs/heads/branch-name
-        # ${GITHUB_REF##*/} == branch-name
-        run: echo "OCCLUM_BRANCH=$(echo ${GITHUB_REF##*/})" >> $GITHUB_ENV;
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-        with:
-          driver-opts: env.BUILDKIT_STEP_LOG_MAX_SIZE=104857600
-
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          file: ./tools/docker/Dockerfile.centos8.2
-          platforms: linux/amd64
-          build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
-          push: true
-          tags: occlum/occlum:${{ env.RELEASE_VERSION }}-centos8.2
-
-  generate-ubuntu18-image:
-      runs-on: ubuntu-18.04
-      if: github.event.inputs.OS == 'ubuntu18'
+  generate-anolis-image:
+    # GitHub Actions doesn't have anolis VM provided
+      runs-on: ubuntu-20.04
+      if: github.event.inputs.OS == 'anolis'
 
       steps:
       - name: Checkout code
@@ -82,6 +38,13 @@ jobs:
         # ${GITHUB_REF##*/} == branch-name
         run: echo "OCCLUM_BRANCH=$(echo ${GITHUB_REF##*/})" >> $GITHUB_ENV;
 
+      - name: Get image tag name for release image
+        if: github.event.inputs.release == 'Y'
+        run: echo "IMAGE_TAG=${{ env.RELEASE_VERSION }}" >> $GITHUB_ENV
+      - name: Get image tage name for dev image
+        if: github.event.inputs.release == 'N'
+        run: echo "IMAGE_TAG=latest-dev-${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
 
@@ -100,11 +63,11 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          file: ./tools/docker/Dockerfile.ubuntu18.04
+          file: ./tools/docker/Dockerfile.anolis8.8
           platforms: linux/amd64
           build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
           push: true
-          tags: occlum/occlum:${{ env.RELEASE_VERSION }}-ubuntu18.04
+          tags: occlum/occlum:${{ env.IMAGE_TAG }}-anolis8.8
 
   generate-ubuntu20-image:
       runs-on: ubuntu-20.04
