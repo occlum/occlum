@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1682547027957,
+  "lastUpdate": 1682547075001,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -3924,6 +3924,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 1737,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Zheng, Qi",
+            "username": "qzheng527",
+            "email": "huaiqing.zq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "0ba7f80b21756d96a650773747bb044bc42a8427",
+          "message": "[demos] Get image key to buffer",
+          "timestamp": "2023-04-17T11:36:16Z",
+          "url": "https://github.com/occlum/occlum/commit/0ba7f80b21756d96a650773747bb044bc42a8427"
+        },
+        "date": 1682547073334,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2020,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2019,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
