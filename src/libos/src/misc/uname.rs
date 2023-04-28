@@ -33,10 +33,10 @@ pub fn do_uname(name: &mut utsname_t) -> Result<()> {
 }
 
 lazy_static! {
-    static ref SYSNAME: CString = CString::new("Occlum").unwrap();
+    static ref SYSNAME: CString = CString::new("Linux").unwrap();
     static ref NODENAME: RwLock<CString> = RwLock::new(CString::new("occlum-node").unwrap());
-    static ref RELEASE: CString = CString::new("0.1").unwrap();
-    static ref VERSION: CString = CString::new("0.1").unwrap();
+    static ref RELEASE: CString = CString::new("4.19").unwrap();
+    static ref VERSION: CString = CString::new("Occlum").unwrap();
     static ref MACHINE: CString = CString::new("x86-64").unwrap();
     static ref DOMAINNAME: CString = CString::new("").unwrap();
 }
