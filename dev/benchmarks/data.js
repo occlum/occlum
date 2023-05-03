@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1683151828793,
+  "lastUpdate": 1683151877968,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -4084,6 +4084,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2409,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "0b0fed947c0f7ca10a69d68f53e31be5396cdb92",
+          "message": "Fix wait4 failure of child process created with vfork",
+          "timestamp": "2023-04-25T07:32:09Z",
+          "url": "https://github.com/occlum/occlum/commit/0b0fed947c0f7ca10a69d68f53e31be5396cdb92"
+        },
+        "date": 1683151876265,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2006,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2006,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
