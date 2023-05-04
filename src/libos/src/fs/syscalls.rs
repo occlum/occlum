@@ -9,7 +9,7 @@ use super::fs_ops::{MountFlags, MountOptions, UmountFlags};
 use super::time::{clockid_t, itimerspec_t, timespec_t, timeval_t, ClockID};
 use super::timer_file::{TimerCreationFlags, TimerSetFlags};
 use super::*;
-use config::ConfigMountFsType;
+use crate::config::{user_rootfs_config, ConfigApp, ConfigMountFsType};
 use util::mem_util::from_user;
 
 #[allow(non_camel_case_types)]
@@ -660,27 +660,25 @@ pub fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
 
 pub fn do_mount_rootfs(
     key_ptr: *const sgx_key_128bit_t,
-    rootfs_config: *const user_rootfs_config,
+    rootfs_config_ptr: *const user_rootfs_config,
 ) -> Result<isize> {
     let key = if key_ptr.is_null() {
         None
     } else {
         Some(unsafe { key_ptr.read() })
     };
-
     // If user provided valid parameters, do runtime mount and boot
     // Otherwise, do general mount and boot
-    if !rootfs_config.is_null() {
-        from_user::check_ptr(rootfs_config)?;
-        let rootfs_config = user_rootfs_config::from_raw_ptr(rootfs_config)?;
-        let app_config = gen_config_app(&rootfs_config)?;
+    if !rootfs_config_ptr.is_null() {
+        from_user::check_ptr(rootfs_config_ptr)?;
+        let rootfs_config = unsafe { *rootfs_config_ptr };
+        let app_config = ConfigApp::from_user(&rootfs_config)?;
         debug!("user provided app config: {:?}", app_config);
         fs_ops::do_mount_rootfs(&app_config, &key)?;
     } else {
         fs_ops::do_mount_rootfs(&config::LIBOS_CONFIG.get_app_config("app").unwrap(), &key)?;
     }
-
-    Ok(0)
+    Ok((0))
 }
 
 pub fn do_fallocate(fd: FileDesc, mode: u32, offset: off_t, len: off_t) -> Result<isize> {
