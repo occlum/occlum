@@ -849,3 +849,21 @@ jobs:
 
     - name: Run paddlepaddle test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/paddlepaddle; SGX_MODE=SIM ./run_paddlepaddle_on_occlum.sh"
+
+  RuntimeBoot_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/sim
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Download and prepare runtime boot instance
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/runtime_boot && SGX_MODE=SIM ./build_content.sh"
+
+    - name: Run runtime boot instance
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/runtime_boot/boot_instance && occlum run /bin/occlum_bash_test.sh"
