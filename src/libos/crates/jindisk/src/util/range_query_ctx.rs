@@ -9,7 +9,7 @@ pub struct RangeQueryCtx {
     range_ctx: BitMap,
 }
 
-impl RangeQueryCtx {
+impl<'a> RangeQueryCtx {
     pub fn build_from(offset: usize, buf: &'a mut [u8]) -> Self {
         let (start, end) = (
             Lba::from_byte_offset_aligned(offset).unwrap(),

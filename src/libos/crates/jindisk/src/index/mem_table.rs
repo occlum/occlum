@@ -41,7 +41,7 @@ pub type ReclaimFn = Box<
         + Sync,
 >;
 
-impl LockedMemTable {
+impl<'a> LockedMemTable {
     pub fn new(capacity: usize) -> Self {
         Self {
             mem_table: AsyncRwLock::new(BTreeMemTable::new()),

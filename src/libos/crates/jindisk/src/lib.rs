@@ -62,7 +62,6 @@
 #![cfg_attr(feature = "sgx", no_std)]
 #![feature(const_fn_trait_bound)]
 #![feature(drain_filter)]
-#![feature(in_band_lifetimes)]
 #![feature(into_future)]
 #![feature(is_sorted)]
 #![feature(new_uninit)]
