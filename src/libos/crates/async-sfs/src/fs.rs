@@ -1353,12 +1353,24 @@ impl InodeInner {
     /// Return the length of bytes read, it may be shorter than expected.
     async fn _read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         let file_size = self.disk_inode.size as usize;
+        let begin = file_size.min(offset);
+        let end = file_size.min(offset + buf.len());
         let iter = BlockRangeIter {
-            begin: file_size.min(offset),
-            end: file_size.min(offset + buf.len()),
+            begin,
+            end,
             block_size: BLOCK_SIZE,
         };
 
+        const BATCH_READ_THRESHOLD: usize = 2;
+        if iter.len() >= BATCH_READ_THRESHOLD {
+            return self._read_in_batches(iter, buf).await.map(|_| end - begin);
+        }
+
+        self._read_one_by_one(iter, buf).await
+    }
+
+    /// Read blocks one by one, allow smaller number of actual read bytes than requested.
+    async fn _read_one_by_one(&self, iter: BlockRangeIter, buf: &mut [u8]) -> Result<usize> {
         let mut len_read = 0;
         for range in iter {
             let device_block_id = self.get_device_block_id(range.block_id).await?;
@@ -1386,6 +1398,59 @@ impl InodeInner {
         }
 
         Ok(len_read)
+    }
+
+    /// Read blocks in consecutive batches, do NOT allow smaller number of actual read bytes than requested.
+    async fn _read_in_batches(&self, iter: BlockRangeIter, buf: &mut [u8]) -> Result<()> {
+        let sorted_device_blocks = {
+            // Collect and sort device blocks' metadata
+            let mut device_blocks = Vec::with_capacity(iter.len());
+            let mut offset = 0;
+            for range in iter {
+                device_blocks.push((
+                    self.get_device_block_id(range.block_id).await?,
+                    offset,
+                    range.len(),
+                    range.begin,
+                ));
+                offset += range.len();
+            }
+            device_blocks.sort_by(|(bid1, _, _, _), (bid2, _, _, _)| bid1.cmp(&bid2));
+            device_blocks
+        };
+
+        // Group device blocks in consecutive batches
+        let device_block_batches = sorted_device_blocks
+            .group_by(|(bid1, _, _, _), (bid2, _, _, _)| bid2.to_raw() - bid1.to_raw() == 1);
+
+        // Preform read in batches
+        let mut blocks_buf =
+            unsafe { Box::new_uninit_slice(sorted_device_blocks.len() * BLOCK_SIZE).assume_init() };
+        for device_block_batch in device_block_batches {
+            let buf_len = device_block_batch.len() * BLOCK_SIZE;
+            let len_read = self
+                .fs()
+                .storage
+                .read_at(
+                    device_block_batch.first().unwrap().0,
+                    &mut blocks_buf[..buf_len],
+                    0,
+                )
+                .await?;
+            if len_read < buf_len {
+                // Do not allow partial holed read in a batch read
+                return_errno!(EIO, "failed to read expected length in batch read");
+            }
+
+            for (nth, (_, offset, len, inner_offset)) in device_block_batch.iter().enumerate() {
+                buf[*offset..*offset + len].copy_from_slice(
+                    &blocks_buf
+                        [nth * BLOCK_SIZE + inner_offset..nth * BLOCK_SIZE + inner_offset + len],
+                );
+            }
+        }
+
+        Ok(())
     }
 
     /// Write content, no matter what type it is.

@@ -3,7 +3,7 @@
 use crate::prelude::*;
 
 /// Given a range and iterate sub-range for each block.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BlockRangeIter {
     pub begin: usize,
     pub end: usize,
@@ -11,7 +11,7 @@ pub struct BlockRangeIter {
 }
 
 /// Describe the range for one block.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BlockRange {
     pub block_id: Bid,
     pub begin: usize,
@@ -48,6 +48,27 @@ impl Iterator for BlockRangeIter {
 
         self.begin += sub_range.len();
         Some(sub_range)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let exact_size = {
+            let begin_bid = Bid::from_byte_offset(self.begin);
+            let end_bid = Bid::from_byte_offset(self.end);
+            if self.end % self.block_size == 0 {
+                (end_bid - begin_bid.to_raw()).to_raw() as _
+            } else {
+                (end_bid - begin_bid.to_raw()).to_raw() as usize + 1
+            }
+        };
+        (exact_size, Some(exact_size))
+    }
+}
+
+impl ExactSizeIterator for BlockRangeIter {
+    fn len(&self) -> usize {
+        let (lower, upper) = self.size_hint();
+        debug_assert!(upper == Some(lower));
+        lower
     }
 }
 
@@ -89,6 +110,7 @@ mod test {
             end: 0x2025,
             block_size: BLOCK_SIZE,
         };
+        assert_eq!(iter.clone().count(), iter.len());
 
         assert_eq!(
             iter.next(),
