@@ -1,4 +1,6 @@
 #![cfg_attr(feature = "sgx", no_std)]
+#![feature(new_uninit)]
+#![feature(slice_group_by)]
 
 #[cfg(feature = "sgx")]
 extern crate sgx_types;

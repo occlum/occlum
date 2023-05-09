@@ -217,7 +217,10 @@ impl JinDisk {
         // Batch read
         if buf.len() >= BATCH_READ_THRESHOLD {
             let mut query_ctx = RangeQueryCtx::build_from(offset, buf);
-            return self.read_multi_blocks(&mut query_ctx, buf).await;
+            return self
+                .read_multi_blocks(&mut query_ctx, buf)
+                .await
+                .map(|_| buf.len());
         }
 
         let block_range_iter = BlockRangeIter {
@@ -226,8 +229,8 @@ impl JinDisk {
             block_size: BLOCK_SIZE,
         };
 
-        let mut read_len = 0;
         // One-by-one read
+        let mut read_len = 0;
         for range in block_range_iter {
             let read_buf = &mut buf[read_len..read_len + range.len()];
             read_len += self.read_one_block(range.block_id, read_buf).await?;
@@ -314,17 +317,17 @@ impl JinDisk {
         Ok(buf.len())
     }
 
-    /// Read multi blocks into the given `buf`. Return success
+    /// Read multi blocks in batches into the given `buf`. Return success
     /// only if all blocks are successfully fetched.
     pub async fn read_multi_blocks(
         &self,
         query_ctx: &mut RangeQueryCtx,
         buf: &mut [u8],
-    ) -> Result<usize> {
+    ) -> Result<()> {
         // Search data segment buffer
         self.data_cache.search_range(query_ctx, buf).await;
         if query_ctx.is_completed() {
-            return Ok(buf.len());
+            return Ok(());
         }
 
         // Search lsm tree
@@ -347,20 +350,33 @@ impl JinDisk {
             })
             .collect();
 
-        // Sort and group records' hbas in consecutive increasing order.
-        searched_records.sort_by(|r1, r2| r1.hba().cmp(&r2.hba()));
-        for records in searched_records
-            .group_by(|r1, r2| r2.hba().to_raw().saturating_sub(r1.hba().to_raw()) == 1)
-        {
-            let mut rbuf = vec![0u8; records.len() * BLOCK_SIZE];
-            self.disk
-                .read(records.first().unwrap().hba().to_offset(), &mut rbuf)
+        // Sort and group records' hbas in consecutive increasing order
+        let record_batches = {
+            searched_records.sort_by(|r1, r2| r1.hba().cmp(&r2.hba()));
+            searched_records.group_by(|r1, r2| r2.hba().to_raw() - r1.hba().to_raw() == 1)
+        };
+
+        // Perform disk read in batches
+        let mut blocks_buf =
+            unsafe { Box::new_uninit_slice(searched_records.len() * BLOCK_SIZE).assume_init() };
+        for record_batch in record_batches {
+            let buf_len = record_batch.len() * BLOCK_SIZE;
+            let read_len = self
+                .disk
+                .read(
+                    record_batch.first().unwrap().hba().to_offset(),
+                    &mut blocks_buf[..buf_len],
+                )
                 .await?;
+            if read_len < buf_len {
+                // Do not allow partial holed read in a batch read
+                return_errno!(EIO, "failed to read expected length in batch read");
+            }
 
             let mut offset = 0;
-            for record in records {
+            for record in record_batch {
                 let decrypted = DefaultCryptor::decrypt_block(
-                    &rbuf[offset..offset + BLOCK_SIZE],
+                    &blocks_buf[offset..offset + BLOCK_SIZE],
                     &self.checkpoint.key_table().fetch_key(record.hba()),
                     record.cipher_meta(),
                 )?;
@@ -371,7 +387,7 @@ impl JinDisk {
             }
         }
 
-        Ok(buf.len())
+        Ok(())
     }
 
     /// Read a single block into the given `buf`.

@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use block_device::{Bid, BlockDeviceAsFile, BlockRangeIter, BLOCK_SIZE};
+use errno::return_errno;
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -137,6 +138,16 @@ impl<A: PageAlloc> Inner<A> {
             block_size: BLOCK_SIZE,
         };
 
+        // Batch read
+        const BATCH_READ_THRESHOLD: usize = 2;
+        if block_range_iter.len() >= BATCH_READ_THRESHOLD {
+            return self
+                .read_multi_pages(block_range_iter, buf)
+                .await
+                .map(|_| buf.len());
+        }
+
+        // One-by-one read
         let mut read_len = 0;
         for range in block_range_iter {
             let read_buf = &mut buf[read_len..read_len + range.len()];
@@ -233,6 +244,91 @@ impl<A: PageAlloc> Inner<A> {
         drop(page_guard);
         self.cache.release(page_handle);
         Ok(read_len)
+    }
+
+    /// Read multi pages with disk batch fetch into the given buffer. Do NOT allow partial read.
+    async fn read_multi_pages(
+        &self,
+        block_range_iter: BlockRangeIter,
+        buf: &mut [u8],
+    ) -> Result<()> {
+        // Read cached pages and collect uninit pages
+        let mut uninit_pages = Vec::new();
+        let mut offset = 0;
+        'outer: for range in block_range_iter {
+            let page_handle = self.acquire_page(range.block_id).await?;
+            let mut page_guard = page_handle.lock();
+            loop {
+                match page_guard.state() {
+                    // The page is ready for read
+                    PageState::UpToDate | PageState::Dirty | PageState::Flushing => {
+                        break;
+                    }
+                    // The page is not initialized. So we need to
+                    // collect it for batch read later.
+                    PageState::Uninit => {
+                        page_guard.set_state(PageState::Fetching);
+                        Self::clear_page_events(&page_handle);
+                        drop(page_guard);
+
+                        uninit_pages.push((offset, range.clone(), page_handle));
+                        offset += range.len();
+                        continue 'outer;
+                    }
+                    // The page is being fetched. We just try again
+                    // later to see if it is ready.
+                    PageState::Fetching => {
+                        drop(page_guard);
+                        Self::wait_page_events(&page_handle, Events::IN).await;
+                        page_guard = page_handle.lock();
+                    }
+                }
+            }
+            let range_len = range.len();
+            buf[offset..offset + range_len]
+                .copy_from_slice(&page_guard.as_slice()[range.begin..range.begin + range_len]);
+
+            drop(page_guard);
+            self.cache.release(page_handle);
+            offset += range_len;
+        }
+
+        // Group uninit pages in consecutive batches
+        let page_batches = uninit_pages.group_by(|(_, range1, _), (_, range2, _)| {
+            range2.block_id.to_raw() - range1.block_id.to_raw() == 1
+        });
+
+        // Perform batch disk read into multi uninit pages
+        let mut blocks_buf =
+            unsafe { Box::new_uninit_slice(uninit_pages.len() * BLOCK_SIZE).assume_init() };
+        for page_batch in page_batches {
+            let buf_len = page_batch.len() * BLOCK_SIZE;
+            let first_bid = page_batch.first().unwrap().1.block_id;
+            let read_len = self
+                .read_block(first_bid, &mut blocks_buf[..buf_len])
+                .await?;
+            if read_len < buf_len {
+                // Do not allow partial holed read in a batch read
+                return_errno!(EIO, "failed to read expected length in batch read");
+            }
+
+            for (nth, (offset, range, page_handle)) in page_batch.iter().enumerate() {
+                let mut page_guard = page_handle.lock();
+                debug_assert!(page_guard.state() == PageState::Fetching);
+                page_guard
+                    .as_slice_mut()
+                    .copy_from_slice(&blocks_buf[nth * BLOCK_SIZE..(nth + 1) * BLOCK_SIZE]);
+                buf[*offset..*offset + range.len()]
+                    .copy_from_slice(&page_guard.as_slice()[range.begin..range.end]);
+
+                page_guard.set_state(PageState::UpToDate);
+                Self::notify_page_events(&page_handle, Events::IN);
+                drop(page_guard);
+                self.cache.release(page_handle.clone());
+            }
+        }
+
+        Ok(())
     }
 
     /// Write a single page content from `offset` into the given buffer.

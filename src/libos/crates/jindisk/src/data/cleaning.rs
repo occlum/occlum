@@ -103,6 +103,7 @@ impl Inner {
 
     async fn exec_background_cleaning(&self) -> Result<()> {
         let guard = self.a_lock.lock().await;
+        self.banish_migrants();
 
         let mut block_cnt = 0usize;
         let mut seg_cnt = 0usize;
@@ -115,7 +116,6 @@ impl Inner {
             }
         }
 
-        self.banish_migrants();
         debug!(
             "\n[Background Cleaning] complete. GC migrated {} blocks, freed {} segments\n",
             block_cnt, seg_cnt
