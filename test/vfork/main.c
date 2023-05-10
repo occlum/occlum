@@ -9,12 +9,29 @@
 // Note: This test intends to test the case that child process directly calls _exit()
 // after vfork. "exit", "_exit" and returning from main function are different.
 // And here the exit function must be "_exit" to prevent undefined bevaviour.
-int test_vfork_exit() {
+int test_vfork_exit_and_wait() {
+    int status = 0;
     pid_t child_pid = vfork();
     if (child_pid == 0) {
         _exit(0);
     } else {
         printf ("Comming back to parent process from child with pid = %d\n", child_pid);
+
+        // vfork again
+        pid_t child_pid_2 = vfork();
+        if (child_pid_2 == 0) {
+            _exit(1);
+        } else {
+            printf ("Comming back to parent process from child with pid = %d\n", child_pid_2);
+            int ret = waitpid(child_pid, &status, WUNTRACED);
+            if (ret != child_pid  || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+                THROW_ERROR("wait child status error");
+            }
+            ret = waitpid(child_pid_2, &status, WUNTRACED);
+            if (ret != child_pid_2  || !WIFEXITED(status) || WEXITSTATUS(status) != 1) {
+                THROW_ERROR("wait child status error");
+            }
+        }
     }
     return 0;
 }
@@ -167,7 +184,7 @@ int test_vfork_stop_child_thread() {
 }
 
 static test_case_t test_cases[] = {
-    TEST_CASE(test_vfork_exit),
+    TEST_CASE(test_vfork_exit_and_wait),
     TEST_CASE(test_multiple_vfork_execve),
     TEST_CASE(test_vfork_isolate_file_table),
     TEST_CASE(test_vfork_stop_child_thread),

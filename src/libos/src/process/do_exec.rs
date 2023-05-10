@@ -65,7 +65,7 @@ pub async fn do_exec(
                 init_cpu_state,
             ));
 
-            return vfork_return_to_parent(curr_user_ctxt, current_ref).await;
+            return vfork_return_to_parent(curr_user_ctxt, current_ref, None).await;
         }
 
         // Force exit all child threads of current process

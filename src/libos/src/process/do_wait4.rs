@@ -2,6 +2,7 @@ use std::sync::Weak;
 
 use async_rt::waiter_loop;
 
+use super::do_vfork::wait4_exit_child_created_with_vfork;
 use super::pgrp::clean_pgrp_when_exit;
 use super::process::{ProcessFilter, ProcessInner};
 use super::{table, ProcessRef, ProcessStatus};
@@ -56,10 +57,6 @@ pub async fn do_wait4(child_filter: &ProcessFilter, options: WaitOptions) -> Res
             })
             .collect::<Vec<&ProcessRef>>();
 
-        if unwaited_children.len() == 0 {
-            return_errno!(ECHILD, "Cannot find any unwaited children");
-        }
-
         // Return immediately if a child that we wait for has already exited
         let zombie_child = unwaited_children
             .iter()
@@ -68,6 +65,15 @@ pub async fn do_wait4(child_filter: &ProcessFilter, options: WaitOptions) -> Res
             let zombie_pid = zombie_child.pid();
             let exit_status = free_zombie_child(&process, process_inner, zombie_pid);
             return Ok((zombie_pid, exit_status));
+        }
+
+        // Check again for vfork-and-exit child process which doesn't have a real structure of a process
+        if let Some(child_status) = wait4_exit_child_created_with_vfork(process.pid(), child_filter)
+        {
+            return Ok(child_status);
+        } else if unwaited_children.len() == 0 {
+            // No unwaited children or vforked children, return immediately
+            return_errno!(ECHILD, "Cannot find any unwaited children");
         }
 
         // TODO: Support these options

@@ -2,7 +2,9 @@ use std::intrinsics::atomic_store;
 use std::sync::Weak;
 
 use super::do_futex::futex_wake;
-use super::do_vfork::{is_vforked_child_process, vfork_return_to_parent};
+use super::do_vfork::{
+    is_vforked_child_process, reap_zombie_child_created_with_vfork, vfork_return_to_parent,
+};
 use super::do_wait4::idle_reap_zombie_children;
 use super::pgrp::clean_pgrp_when_exit;
 use super::process::{Process, ProcessFilter};
@@ -17,8 +19,9 @@ use crate::vm::USER_SPACE_VM_MANAGER;
 pub async fn do_exit_group(status: i32) -> Result<isize> {
     if is_vforked_child_process() {
         let current = current!();
+        let child_exit_status = TermStatus::Exited(status as u8);
         let mut curr_user_ctxt = CURRENT_CONTEXT.with(|context| context.as_ptr());
-        vfork_return_to_parent(curr_user_ctxt as *mut _, &current).await
+        vfork_return_to_parent(curr_user_ctxt as *mut _, &current, Some(child_exit_status)).await
     } else {
         let term_status = TermStatus::Exited(status as u8);
         let current = current!();
@@ -98,6 +101,7 @@ async fn exit_thread(term_status: TermStatus) {
 
 fn exit_process(thread: &ThreadRef, term_status: TermStatus, new_parent_ref: Option<ProcessRef>) {
     let process = thread.process();
+    let pid = process.pid();
     // Deadlock note: always lock parent first, then child.
 
     // Lock the idle process since it may adopt new children.
@@ -135,6 +139,9 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus, new_parent_ref: Opt
         // Let new_process to adopt the children of current process
         process_inner.exit(term_status, &new_parent_ref, &mut new_parent_inner, &parent);
 
+        // For vfork-and-exit children, we don't need to reap them here.
+        // Because the new parent process share the same pid with the old parent process.
+
         // Remove current process from parent process' zombie list.
         if parent_inner.is_none() {
             debug_assert!(parent.pid() == 0);
@@ -156,11 +163,18 @@ fn exit_process(thread: &ThreadRef, term_status: TermStatus, new_parent_ref: Opt
         clean_pgrp_when_exit(process);
 
         process_inner.exit(term_status, &idle_ref, &mut idle_inner, &parent);
+
+        // For vfork-and-exit children, just clean them to free the pid
+        let _ = reap_zombie_child_created_with_vfork(pid);
+
         idle_inner.remove_zombie_child(pid);
     } else {
         // Otherwise, we need to notify the parent process
         let mut parent_inner = parent_inner.unwrap();
         process_inner.exit(term_status, &idle_ref, &mut idle_inner, &parent);
+
+        // For vfork-and-exit children, just clean them to free the pid
+        let _ = reap_zombie_child_created_with_vfork(pid);
 
         //Send SIGCHLD to parent
         let signal = Box::new(KernelSignal::new(SigNum::from(SIGCHLD)));
