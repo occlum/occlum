@@ -1,4 +1,4 @@
-use super::{ProcessRef, ThreadId, ThreadRef};
+use super::{ProcessFilter, ProcessRef, TermStatus, ThreadId, ThreadRef};
 use crate::entry::context_switch::{CpuContext, CURRENT_CONTEXT};
 use crate::fs::FileTable;
 use crate::prelude::*;
@@ -23,10 +23,21 @@ use std::mem;
 // use vfork to replace fork. For multi-threaded applications, if vfork doesn't stop other child threads, the application
 // will be more likely to fail because the child process directly uses the VM and the file table of the parent process.
 
+// The exit status of the child process which directly calls exit after vfork.
+struct ChildExitStatus {
+    pid: pid_t,
+    status: TermStatus,
+}
+
 lazy_static! {
     // Store all the parents's file tables who call vfork. It will be recovered when the child exits or has its own task.
     // K: parent pid, V: parent file table
     static ref VFORK_PARENT_FILE_TABLES: SgxMutex<HashMap<pid_t, FileTable>> = SgxMutex::new(HashMap::new());
+    // Store all the child process's exit status which are created with vfork and directly exit without calling execve. Because
+    // these children process are only allocated with a pid, they are not managed by the usual way including exit and wait. Use
+    // this special structure to record these children.
+    // K: parent pid, V: exit children created with vfork.
+    static ref EXIT_CHILDREN_STATUS: SgxMutex<HashMap<pid_t, Vec<ChildExitStatus>>> = SgxMutex::new(HashMap::new());
 }
 
 async_rt::task_local! {
@@ -93,8 +104,13 @@ pub fn is_vforked_child_process() -> bool {
 pub async fn vfork_return_to_parent(
     mut context: *mut CpuContext,
     current_ref: &ThreadRef,
+    child_exit_status: Option<TermStatus>, // If the child process exits, the exit status should be specified.
 ) -> Result<isize> {
     let child_pid = restore_parent_process(context, current_ref).await?;
+
+    if let Some(term_status) = child_exit_status {
+        record_exit_child(current_ref.process().pid(), child_pid as pid_t, term_status);
+    }
 
     // Wake parent's child thread which are all sleeping
     let current = current!();
@@ -108,6 +124,17 @@ pub async fn vfork_return_to_parent(
     });
 
     Ok(child_pid)
+}
+
+fn record_exit_child(parent_pid: pid_t, child_pid: pid_t, child_exit_status: TermStatus) {
+    let child_exit_status = ChildExitStatus::new(child_pid, child_exit_status);
+
+    let mut children_status = EXIT_CHILDREN_STATUS.lock().unwrap();
+    if let Some(children) = children_status.get_mut(&parent_pid) {
+        children.push(child_exit_status);
+    } else {
+        children_status.insert(parent_pid, vec![child_exit_status]);
+    }
 }
 
 async fn restore_parent_process(
@@ -211,5 +238,66 @@ pub async fn handle_force_stop() {
         info!("Thread {} is forced to stop ...", current.tid());
 
         current.stop().await;
+    }
+}
+
+// Wait4 unwaited child which are created with vfork and directly exit without calling execve.
+pub fn wait4_exit_child_created_with_vfork(
+    parent_pid: pid_t,
+    child_filter: &ProcessFilter,
+) -> Option<(pid_t, i32)> {
+    let mut children_status = EXIT_CHILDREN_STATUS.lock().unwrap();
+    if let Some(children) = children_status.get_mut(&parent_pid) {
+        let unwaited_child_idx = children.iter().position(|child| match child_filter {
+            ProcessFilter::WithAnyPid => true,
+            ProcessFilter::WithPid(pid) => pid == child.pid(),
+            ProcessFilter::WithPgid(pgid) => todo!(), // This case should be rare.
+        });
+
+        if let Some(child_idx) = unwaited_child_idx {
+            let child = children.remove(child_idx);
+            if children.is_empty() {
+                children_status.remove(&parent_pid);
+            }
+            return Some((*child.pid(), child.status().as_u32() as i32));
+        }
+    }
+
+    None
+}
+
+// Reap all unwaited child which are created with vfork and directly exit without calling execve.
+pub fn reap_zombie_child_created_with_vfork(parent_pid: pid_t) -> Option<Vec<pid_t>> {
+    let mut children_status = EXIT_CHILDREN_STATUS.lock().unwrap();
+
+    let children = children_status.remove(&parent_pid);
+    if children.is_none() {
+        warn!("no vforked children found");
+        return None;
+    }
+
+    Some(
+        children
+            .unwrap()
+            .into_iter()
+            .map(|child| child.pid)
+            .collect(),
+    )
+}
+
+impl ChildExitStatus {
+    fn new(child_pid: pid_t, status: TermStatus) -> Self {
+        Self {
+            pid: child_pid,
+            status,
+        }
+    }
+
+    fn pid(&self) -> &pid_t {
+        &self.pid
+    }
+
+    fn status(&self) -> &TermStatus {
+        &self.status
     }
 }
