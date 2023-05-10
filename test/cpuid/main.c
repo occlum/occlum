@@ -35,8 +35,8 @@ static bool is_cpuidinfo_equal(int leaf, t_cpuid_t *cpu, t_cpuid_t *cpu_sgx) {
                 (cpu->ecx == cpu_sgx->ecx) &&
                 (cpu->edx == cpu_sgx->edx));
     }
-    /* Leaf 0BH and 06H CPUID.EDX is related with logical processor. */
-    if (leaf == 0xB || leaf == 0x6) {
+    /* Leaf 1FH, 0BH and 06H CPUID.EDX is related with logical processor. */
+    if (leaf == 0x1F || leaf == 0xB || leaf == 0x6) {
         return ((cpu->eax == cpu_sgx->eax) &&
                 (cpu->ebx == cpu_sgx->ebx) &&
                 (cpu->ecx == cpu_sgx->ecx));
