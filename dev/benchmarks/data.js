@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1684015919664,
+  "lastUpdate": 1684016320876,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -4324,6 +4324,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2223,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "d4b38f8ec0d178592cdc9b65542c5add5998357b",
+          "message": "[test] Fix false alarm for cpuid test\n\nFor new x86 processors, CPUID leaf 1FH is introduced as the\nV2 Extended Topology Enumeration and is a prefered superset to leaf 0BH.\n\nAdd extra case to skip the EDX check because the corresponding value is\nrelated with logical processor (x2APIC ID).",
+          "timestamp": "2023-05-10T05:47:40Z",
+          "url": "https://github.com/occlum/occlum/commit/d4b38f8ec0d178592cdc9b65542c5add5998357b"
+        },
+        "date": 1684016319497,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 1815,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 1814,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
