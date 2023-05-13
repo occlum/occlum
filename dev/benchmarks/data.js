@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1684016320876,
+  "lastUpdate": 1684016447840,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -2040,6 +2040,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 253.35,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "d4b38f8ec0d178592cdc9b65542c5add5998357b",
+          "message": "[test] Fix false alarm for cpuid test\n\nFor new x86 processors, CPUID leaf 1FH is introduced as the\nV2 Extended Topology Enumeration and is a prefered superset to leaf 0BH.\n\nAdd extra case to skip the EDX check because the corresponding value is\nrelated with logical processor (x2APIC ID).",
+          "timestamp": "2023-05-10T05:47:40Z",
+          "url": "https://github.com/occlum/occlum/commit/d4b38f8ec0d178592cdc9b65542c5add5998357b"
+        },
+        "date": 1684016446448,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.08,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 46.6,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 569.46,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 240.02,
             "unit": "ms",
             "extra": "per95"
           }
