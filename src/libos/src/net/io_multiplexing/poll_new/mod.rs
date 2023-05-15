@@ -20,14 +20,21 @@ pub fn do_poll_new(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) -> R
 
     // Map poll_fds to FileRef's
     let thread = current!();
+    let mut invalid_fd_count = 0;
     let files: Vec<FileRef> = poll_fds
         .iter()
         .filter_map(|poll_fd| {
+            if (poll_fd.fd as i32) < 0 {
+                // If poll_fd is negative, ignore the events.
+                return None;
+            }
+
             let file = thread.file(poll_fd.fd).ok();
 
             // Mark an invalid fd by outputting an IoEvents::NVAL event
             if file.is_none() {
                 poll_fd.revents.set(IoEvents::NVAL);
+                invalid_fd_count += 1;
             }
 
             file
@@ -35,9 +42,8 @@ pub fn do_poll_new(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) -> R
         .collect();
 
     // If there are any invalid fds, then report errors as events
-    let num_invalid_fds = poll_fds.len() - files.len();
-    if num_invalid_fds > 0 {
-        return Ok(num_invalid_fds);
+    if invalid_fd_count > 0 {
+        return Ok(invalid_fd_count);
     }
 
     // Now that all fds are valid, we set up a monitor for the set of files
@@ -61,6 +67,7 @@ pub fn do_poll_new(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) -> R
             let events = file.poll_new() & mask;
             if !events.is_empty() {
                 poll_fd.revents.set(events);
+                debug!("poll fd = {:?}, revents = {:?}", poll_fd, events);
                 count += 1;
             }
         }
