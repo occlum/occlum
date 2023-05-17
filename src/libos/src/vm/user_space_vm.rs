@@ -1,10 +1,12 @@
-use super::ipc::SHM_MANAGER;
 use super::*;
+
+use super::ipc::SHM_MANAGER;
 use crate::ctor::dtor;
 use crate::util::pku_util;
 use config::LIBOS_CONFIG;
-use std::ops::{Deref, DerefMut};
 use vm_manager::VMManager;
+
+use std::ops::{Deref, DerefMut};
 
 const RSRV_MEM_PERM: MemPerm =
     MemPerm::from_bits_truncate(MemPerm::READ.bits() | MemPerm::WRITE.bits());
@@ -47,13 +49,11 @@ impl UserSpaceVMManager {
     }
 }
 
-// This provides module teardown function attribute similar with `__attribute__((destructor))` in C/C++ and will
-// be called after the main function. Static variables are still safe to visit at this time.
-#[dtor]
-fn free_user_space() {
-    SHM_MANAGER.clean_when_libos_exit();
+// This will be called after all libos processes exit. Static variables are still safe to visit at this time.
+pub async fn free_user_space() {
+    SHM_MANAGER.clean_when_libos_exit().await;
     let range = USER_SPACE_VM_MANAGER.range();
-    assert!(USER_SPACE_VM_MANAGER.verified_clean_when_exit());
+    assert!(USER_SPACE_VM_MANAGER.verified_clean_when_exit().await);
     let addr = range.start();
     let size = range.size();
     info!("free user space VM: {:?}", range);

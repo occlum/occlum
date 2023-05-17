@@ -22,11 +22,11 @@ pub struct sysinfo_t {
     mem_unit: u32,
 }
 
-pub fn do_sysinfo() -> Result<sysinfo_t> {
+pub async fn do_sysinfo() -> Result<sysinfo_t> {
     let info = sysinfo_t {
         uptime: time::up_time::get().unwrap().as_secs() as i64, // Duration can't be negative
         totalram: USER_SPACE_VM_MANAGER.get_total_size() as u64,
-        freeram: current!().vm().get_free_size() as u64,
+        freeram: current!().vm().get_free_size().await as u64,
         procs: table::get_all_processes().len() as u16,
         mem_unit: 1,
         ..Default::default()

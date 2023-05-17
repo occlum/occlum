@@ -31,7 +31,7 @@ async fn __main_loop(current: ThreadRef, init_cpu_state: CpuContext) {
     let mut rounds: u64 = 0;
 
     loop {
-        crate::signal::deliver_signal();
+        crate::signal::deliver_signal().await;
 
         crate::process::handle_force_stop().await;
 

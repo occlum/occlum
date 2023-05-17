@@ -14,6 +14,7 @@ async-vfs = { path = "crates/async-vfs", features = ["sgx"] }
 async-sfs = { path = "crates/async-sfs", default-features = false, features = ["sgx"] }
 async-mountfs = { path = "crates/async-mountfs", features = ["sgx"] }
 async-trait = "0.1.52"
+async-recursion = "1.0.4"
 atomic = "0.5"
 bitflags = "1.0"
 bitvec = { version = "0.17", default-features = false, features = ["alloc"]  }

@@ -161,6 +161,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-unionfs"
+version = "0.1.0"
+dependencies = [
+ "async-io",
+ "async-rt",
+ "async-sfs",
+ "async-trait",
+ "async-vfs",
+ "block-device",
+ "cfg-if",
+ "errno",
+ "libc",
+ "log",
+ "sgx_libc 1.1.5",
+ "sgx_trts 1.1.5",
+ "sgx_tstd 1.1.5",
+ "sgx_types 1.1.5",
+]
+
+[[package]]
 name = "async-vfs"
 version = "0.1.0"
 dependencies = [

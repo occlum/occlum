@@ -218,8 +218,14 @@ async fn new_process_common(
     let (new_process_ref, init_cpu_state) = {
         let process_ref = current_ref.process().clone();
 
-        let vm = init_vm::do_init(&exec_elf_hdr, &ldso_elf_hdr)?;
-        let mut auxvec = init_auxvec(&vm, &exec_elf_hdr)?;
+        let vm = init_vm::do_init(&exec_elf_hdr, &ldso_elf_hdr).await?;
+        let mut auxvec = {
+            let auxvec = init_auxvec(&vm, &exec_elf_hdr);
+            if auxvec.is_err() {
+                vm.free_mem_chunks_when_create_error().await;
+            }
+            auxvec?
+        };
 
         // Notify debugger to load the symbols from elf file
         let ldso_elf_base = vm.get_elf_ranges()[1].start() as u64;
@@ -254,8 +260,15 @@ async fn new_process_common(
                 max(vm.get_stack_range().size() >> 8, 4096),
                 vm.get_stack_range().size(),
             ); // size in [4096, stack_range], by default 1/256 of stack range
-            let user_rsp =
-                init_stack::do_init(user_stack_base, init_stack_size, &argv, envp, &mut auxvec)?;
+            let user_rsp = {
+                let user_rsp =
+                    init_stack::do_init(user_stack_base, init_stack_size, &argv, envp, &mut auxvec);
+                if user_rsp.is_err() {
+                    vm.free_mem_chunks_when_create_error().await;
+                }
+                user_rsp?
+            };
+            init_stack::do_init(user_stack_base, init_stack_size, &argv, envp, &mut auxvec)?;
 
             // Set the default user fsbase to an address on user stack, which is
             // a relatively safe address in case the user program uses %fs before
@@ -272,7 +285,13 @@ async fn new_process_common(
         };
         let vm_ref = Arc::new(vm);
         let files_ref = {
-            let files = init_files(current_ref, file_actions, host_stdio_fds).await?;
+            let files = {
+                let files = init_files(current_ref, file_actions, host_stdio_fds).await;
+                if files.is_err() {
+                    vm_ref.free_mem_chunks_when_create_error().await;
+                }
+                files?
+            };
             Arc::new(SgxMutex::new(files))
         };
         let fs_ref = Arc::new((**current_ref.fs()).clone());
@@ -304,7 +323,13 @@ async fn new_process_common(
         let umask = process_ref.umask();
 
         // Check for process group spawn attribute. This must be done before building the new process.
-        let new_pgid = get_spawn_attribute_pgrp(spawn_attributes)?;
+        let new_pgid = {
+            let new_pgid = get_spawn_attribute_pgrp(spawn_attributes);
+            if new_pgid.is_err() {
+                vm_ref.free_mem_chunks_when_create_error().await;
+            }
+            new_pgid?
+        };
         // Use parent process's process group by default.
         let pgrp_ref = process_ref.pgrp();
 
@@ -318,7 +343,13 @@ async fn new_process_common(
                 None => {
                     // spawn new process path
                     if let Some(wake_host_ptr) = wake_host_ptr {
-                        let host_waker = HostWaker::new(wake_host_ptr)?;
+                        let host_waker = {
+                            let host_waker = HostWaker::new(wake_host_ptr);
+                            if host_waker.is_err() {
+                                vm_ref.free_mem_chunks_when_create_error().await;
+                            }
+                            host_waker?
+                        };
                         builder = builder.host_waker(host_waker);
                     }
                     process_ref
@@ -341,7 +372,7 @@ async fn new_process_common(
         };
 
         builder = builder
-            .vm(vm_ref)
+            .vm(vm_ref.clone())
             .exec_path(&elf_path)
             .umask(umask)
             .parent(parent)
@@ -355,10 +386,19 @@ async fn new_process_common(
             .sig_mask(sig_mask)
             .sig_dispositions(sig_dispositions);
 
-        let new_process = builder.build()?;
+        let new_process = {
+            let new_process = builder.build();
+            if new_process.is_err() {
+                vm_ref.free_mem_chunks_when_create_error().await;
+            }
+            new_process?
+        };
         // This is done here because if we want to create a new process group, we must have a new process first.
         // So we can't set "pgrp" during the build above.
-        update_pgrp_for_new_process(&new_process, new_pgid)?;
+        if let Err(e) = update_pgrp_for_new_process(&new_process, new_pgid) {
+            vm_ref.free_mem_chunks_when_create_error().await;
+            return Err(e);
+        }
         (new_process, init_cpu_state)
     };
 

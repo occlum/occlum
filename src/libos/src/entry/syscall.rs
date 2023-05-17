@@ -662,12 +662,12 @@ async fn do_mmap(
 ) -> Result<isize> {
     let perms = VMPerms::from_u32(perms as u32)?;
     let flags = MMapFlags::from_u32(flags as u32)?;
-    let addr = vm::do_mmap(addr, size, perms, flags, fd, offset as usize)?;
+    let addr = vm::do_mmap(addr, size, perms, flags, fd, offset as usize).await?;
     Ok(addr as isize)
 }
 
 async fn do_munmap(addr: usize, size: usize) -> Result<isize> {
-    vm::do_munmap(addr, size)?;
+    vm::do_munmap(addr, size).await?;
     Ok(0)
 }
 
@@ -679,31 +679,31 @@ async fn do_mremap(
     new_addr: usize,
 ) -> Result<isize> {
     let flags = MRemapFlags::from_raw(flags as u32, new_addr)?;
-    let addr = vm::do_mremap(old_addr, old_size, new_size, flags)?;
+    let addr = vm::do_mremap(old_addr, old_size, new_size, flags).await?;
     Ok(addr as isize)
 }
 
 async fn do_mprotect(addr: usize, len: usize, perms: u32) -> Result<isize> {
     let perms = VMPerms::from_u32(perms as u32)?;
-    vm::do_mprotect(addr, len, perms)?;
+    vm::do_mprotect(addr, len, perms).await?;
     Ok(0)
 }
 
 async fn do_brk(new_brk_addr: usize) -> Result<isize> {
-    let ret_brk_addr = vm::do_brk(new_brk_addr)?;
+    let ret_brk_addr = vm::do_brk(new_brk_addr).await?;
     Ok(ret_brk_addr as isize)
 }
 
 async fn do_msync(addr: usize, size: usize, flags: u32) -> Result<isize> {
     let flags = MSyncFlags::from_u32(flags)?;
-    vm::do_msync(addr, size, flags)?;
+    vm::do_msync(addr, size, flags).await?;
     Ok(0)
 }
 
 async fn do_sysinfo(info: *mut sysinfo_t) -> Result<isize> {
     check_mut_ptr(info)?;
     let info = unsafe { &mut *info };
-    *info = crate::misc::do_sysinfo()?;
+    *info = crate::misc::do_sysinfo().await?;
     Ok(0)
 }
 

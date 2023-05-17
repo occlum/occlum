@@ -9,6 +9,7 @@
 #![feature(alloc_layout_extra)]
 #![feature(concat_idents)]
 #![feature(trace_macros)]
+#![feature(extend_one)]
 // for !Send in rw_lock
 #![feature(negative_impls)]
 // for may_dangle in rw_lock

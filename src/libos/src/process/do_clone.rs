@@ -36,7 +36,9 @@ pub async fn do_clone(
         // Set the default user fsbase to an address on user stack, which is
         // a relatively safe address in case the user program uses %fs before
         // initializing fs base address.
-        guess_user_stack_bound(current!().vm(), user_rsp)?.start()
+        guess_user_stack_bound(current!().vm(), user_rsp)
+            .await?
+            .start()
     };
     let init_cpu_state = CpuContext {
         gp_regs: GpRegs {
@@ -248,9 +250,9 @@ fn check_clone_flags(flags: CloneFlags) -> Result<()> {
     Ok(())
 }
 
-fn guess_user_stack_bound(vm: &ProcessVM, user_rsp: usize) -> Result<VMRange> {
+async fn guess_user_stack_bound(vm: &ProcessVM, user_rsp: usize) -> Result<VMRange> {
     // The first case is most likely
-    if let Ok(stack_range) = vm.find_mmap_region(user_rsp) {
+    if let Ok(stack_range) = vm.find_mmap_region(user_rsp).await {
         Ok(stack_range)
     }
     // The next three cases are very unlikely, but valid

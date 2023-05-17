@@ -2,10 +2,11 @@
 // Currently only use simple vector as the base structure.
 //
 // Basically use address-ordered first fit to find free ranges.
-use std::cmp::Ordering;
+use super::*;
 
 use super::vm_util::VMMapAddr;
-use super::*;
+
+use std::cmp::Ordering;
 
 const INITIAL_SIZE: usize = 100;
 
