@@ -77,7 +77,7 @@ pub async fn handle_exception(exception: &Exception) -> Result<()> {
     // As the thread cannot proceed without handling the exception, we choose to force
     // delivering the signal regardless of the current signal mask.
     let signal = Box::new(FaultSignal::new(exception));
-    crate::signal::force_signal(signal);
+    crate::signal::force_signal(signal).await;
 
     Ok(())
 }

@@ -202,6 +202,32 @@ impl VMArea {
             }
         }
     }
+
+    /// Flush a file-backed VMA to its file. This has no effect on anonymous VMA.
+    pub async fn flush_backed_file(&self) {
+        Self::flush_backed_file_with_cond(self, |_| true).await
+    }
+
+    /// Same as `flush_backed_file()`, except that an extra condition on the file needs to satisfy.
+    pub async fn flush_backed_file_with_cond<F: Fn(&FileRef) -> bool>(&self, cond_fn: F) {
+        let (file, file_offset) = match self.writeback_file() {
+            None => return,
+            Some((file_and_offset)) => file_and_offset,
+        };
+        let file_handle = file.as_async_file_handle().unwrap();
+        let file_writable = file_handle.access_mode().writable();
+        if !file_writable {
+            return;
+        }
+        if !cond_fn(file) {
+            return;
+        }
+        file_handle
+            .dentry()
+            .inode()
+            .write_at(file_offset, unsafe { self.as_slice() })
+            .await;
+    }
 }
 
 impl Deref for VMArea {

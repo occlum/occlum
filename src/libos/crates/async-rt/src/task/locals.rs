@@ -21,9 +21,9 @@ impl<T: Send + 'static> LocalKey<T> {
     /// Attempts to get a reference to the task-local value with this key.
     ///
     /// This method will panic if not called within the context of a task.
-    pub fn with<F, R>(&'static self, f: F) -> R
+    pub fn with<'a, F, R>(&'static self, f: F) -> R
     where
-        F: FnOnce(&T) -> R,
+        F: FnOnce(&'a T) -> R,
     {
         self.try_with(f).unwrap()
     }
@@ -32,9 +32,9 @@ impl<T: Send + 'static> LocalKey<T> {
     ///
     /// This method will not invoke the closure and return an `None` if not
     /// called within the context of a task.
-    pub fn try_with<F, R>(&'static self, f: F) -> Option<R>
+    pub fn try_with<'a, F, R>(&'static self, f: F) -> Option<R>
     where
-        F: FnOnce(&T) -> R,
+        F: FnOnce(&'a T) -> R,
     {
         let current = match crate::task::current::try_get() {
             Some(current) => current,

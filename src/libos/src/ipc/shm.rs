@@ -139,14 +139,18 @@ struct ShmSegment {
 }
 
 impl ShmSegment {
-    fn new(shmid: ShmId, key: key_t, size: size_t, mode: FileMode) -> Result<Self> {
+    async fn new(shmid: ShmId, key: key_t, size: size_t, mode: FileMode) -> Result<Self> {
         let vm_option = VMMapOptionsBuilder::default()
             .size(size)
             // Currently, Occlum only support shared memory segment with rw permission
             .perms(VMPerms::READ | VMPerms::WRITE)
             .initializer(VMInitializer::FillZeros())
             .build()?;
-        let chunk = USER_SPACE_VM_MANAGER.internal().mmap_chunk(&vm_option)?;
+        let chunk = USER_SPACE_VM_MANAGER
+            .internal()
+            .await
+            .mmap_chunk(&vm_option)
+            .await?;
 
         Ok(ShmSegment {
             shmid: shmid,
@@ -210,10 +214,7 @@ impl Drop for ShmSegment {
     fn drop(&mut self) {
         debug!("drop shm: {:?}", self);
         assert!(self.shm_nattach == 0);
-        assert!(self.process_set.len() == 0);
-        USER_SPACE_VM_MANAGER
-            .internal()
-            .munmap_chunk(&self.chunk, None);
+        assert!(self.process_set.is_empty());
     }
 }
 
@@ -296,7 +297,7 @@ impl ShmManager {
         shmid_manager.free_shmid(&shmid)
     }
 
-    fn shmctl_rmshm(&self, shmid: ShmId) -> Result<()> {
+    async fn shmctl_rmshm(&self, shmid: ShmId) -> Result<()> {
         let mut shm_segments = self.shm_segments.write().unwrap();
         let shm = shm_segments.get_mut(&shmid);
 
@@ -306,7 +307,13 @@ impl ShmManager {
             if shm.shm_nattach == 0 {
                 let shmid = shm.shmid;
                 self.free_shmid(&shmid)?;
-                shm_segments.remove(&shmid);
+                if let Some(shm_segment) = shm_segments.remove(&shmid) {
+                    USER_SPACE_VM_MANAGER
+                        .internal()
+                        .await
+                        .munmap_chunk(&shm_segment.chunk, None)
+                        .await;
+                }
             }
         } else {
             return_errno!(EINVAL, "cannot find shm by shmid");
@@ -355,7 +362,7 @@ impl ShmManager {
         Ok(())
     }
 
-    pub fn do_shmget(&self, key: key_t, size: usize, shmflg: ShmFlags) -> Result<ShmId> {
+    pub async fn do_shmget(&self, key: key_t, size: usize, shmflg: ShmFlags) -> Result<ShmId> {
         debug!(
             "do_shmget: key: {:?}, size: {:?}, shmflg: {:?}",
             key, size, shmflg
@@ -381,7 +388,7 @@ impl ShmManager {
         let mut shm_segments = self.shm_segments.write().unwrap();
         let shmid = if key == IPC_PRIVATE {
             let shmid = self.get_new_shmid()?;
-            let shm = ShmSegment::new(shmid, key, size, mode)?;
+            let shm = ShmSegment::new(shmid, key, size, mode).await?;
             shm_segments.insert(shm.shmid, shm);
             shmid
         } else {
@@ -408,7 +415,7 @@ impl ShmManager {
                     return_errno!(ENOENT, "no segment exists for given key");
                 }
                 let shmid = self.get_new_shmid()?;
-                let shm = ShmSegment::new(shmid, key, size, mode)?;
+                let shm = ShmSegment::new(shmid, key, size, mode).await?;
                 shm_segments.insert(shm.shmid, shm);
                 shmid
             };
@@ -443,7 +450,7 @@ impl ShmManager {
         Ok(addr)
     }
 
-    pub fn do_shmdt(&self, addr: usize) -> Result<()> {
+    pub async fn do_shmdt(&self, addr: usize) -> Result<()> {
         debug!("do_shmdt: addr: {:?}", addr);
         let pid = current!().process().pid();
         let mut shm_segments = self.shm_segments.write().unwrap();
@@ -459,7 +466,13 @@ impl ShmManager {
             if shm.is_destruction() && shm.shm_nattach == 0 {
                 let shmid = shm.shmid;
                 self.free_shmid(&shmid);
-                shm_segments.remove(&shmid);
+                if let Some(shm_segment) = shm_segments.remove(&shmid) {
+                    USER_SPACE_VM_MANAGER
+                        .internal()
+                        .await
+                        .munmap_chunk(&shm_segment.chunk, None)
+                        .await;
+                }
             }
         } else {
             return_errno!(EINVAL, "cannot find shm by addr");
@@ -467,39 +480,60 @@ impl ShmManager {
         Ok(())
     }
 
-    pub fn do_shmctl(&self, shmid: ShmId, cmd: CmdId, buf: Option<&mut shmids_t>) -> Result<()> {
+    pub async fn do_shmctl(
+        &self,
+        shmid: ShmId,
+        cmd: CmdId,
+        buf: Option<&mut shmids_t>,
+    ) -> Result<()> {
         debug!(
             "do_shmctl: shmid: {:?}, cmd: {:?}, buf: {:?}",
             shmid, cmd, buf
         );
         match cmd {
-            IPC_RMID => self.shmctl_rmshm(shmid),
+            IPC_RMID => self.shmctl_rmshm(shmid).await,
             IPC_STAT => self.shmctl_ipcstat(shmid, buf),
             _ => return_errno!(EINVAL, "unimplemented cmd"),
         }
     }
 
-    pub fn detach_shm_when_process_exit(&self, thread: &ThreadRef) {
+    pub async fn detach_shm_when_process_exit(&self, thread: &ThreadRef) {
         let pid = &thread.process().pid();
         let mut shm_segments = self.shm_segments.write().unwrap();
-        shm_segments.drain_filter(|shmid, shm| match shm.shm_remove_pid(&pid) {
-            // There exists a shm that has been attached to the current process
-            Ok(_) => {
-                shm.shm_nattach -= 1;
-                if shm.is_destruction() && shm.shm_nattach == 0 {
-                    self.free_shmid(&shmid);
-                    true
-                } else {
-                    false
+        let freed_shm_segments = shm_segments
+            .drain_filter(|shmid, shm| match shm.shm_remove_pid(&pid) {
+                // There exists a shm that has been attached to the current process
+                Ok(_) => {
+                    shm.shm_nattach -= 1;
+                    if shm.is_destruction() && shm.shm_nattach == 0 {
+                        self.free_shmid(&shmid);
+                        true
+                    } else {
+                        false
+                    }
                 }
-            }
-            Err(_) => false,
-        });
+                Err(_) => false,
+            })
+            .map(|(_, shm)| shm)
+            .collect::<Vec<_>>();
+
+        for shm in freed_shm_segments {
+            USER_SPACE_VM_MANAGER
+                .internal()
+                .await
+                .munmap_chunk(&shm.chunk, None)
+                .await;
+        }
     }
 
-    pub fn clean_when_libos_exit(&self) {
+    pub async fn clean_when_libos_exit(&self) {
         let mut shm_segments = self.shm_segments.write().unwrap();
         for (_, shm) in shm_segments.drain() {
+            USER_SPACE_VM_MANAGER
+                .internal()
+                .await
+                .munmap_single_vma_chunk(&shm.chunk, None)
+                .await;
             debug!("clean shm: {:?}", shm);
             self.free_shmid(&shm.shmid);
         }

@@ -278,9 +278,12 @@ pub extern "C" fn occlum_ecall_shutdown_vcpus() -> i32 {
 
     table::wait_all_process_exit();
 
-    // Flush the async rootfs
     async_rt::task::block_on(async {
+        // Flush the async rootfs
         crate::fs::rootfs().await.sync().await.unwrap();
+
+        // Free user space VM
+        crate::vm::free_user_space().await;
     });
 
     // TODO: stop all the kernel threads/tasks

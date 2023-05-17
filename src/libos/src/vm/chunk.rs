@@ -6,6 +6,8 @@ use super::vm_perms::VMPerms;
 use super::vm_util::*;
 use crate::process::ProcessRef;
 use crate::process::ThreadRef;
+
+use async_rt::sync::Mutex as AsyncMutex;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -71,17 +73,17 @@ impl Chunk {
         &self.internal
     }
 
-    pub fn get_vma_for_single_vma_chunk(&self) -> VMArea {
+    pub async fn get_vma_for_single_vma_chunk(&self) -> VMArea {
         match self.internal() {
             ChunkType::MultiVMA(internal_manager) => unreachable!(),
-            ChunkType::SingleVMA(vma) => return vma.lock().unwrap().clone(),
+            ChunkType::SingleVMA(vma) => return vma.lock().await.clone(),
         }
     }
 
-    pub fn free_size(&self) -> usize {
+    pub async fn free_size(&self) -> usize {
         match self.internal() {
             ChunkType::SingleVMA(vma) => 0, // for single VMA chunk, there is no free space
-            ChunkType::MultiVMA(internal_manager) => internal_manager.lock().unwrap().free_size(),
+            ChunkType::MultiVMA(internal_manager) => internal_manager.lock().await.free_size(),
         }
     }
 
@@ -89,11 +91,11 @@ impl Chunk {
         let internal_manager = ChunkInternal::new(vm_range)?;
         Ok(Self {
             range: vm_range,
-            internal: ChunkType::MultiVMA(SgxMutex::new(internal_manager)),
+            internal: ChunkType::MultiVMA(AsyncMutex::new(internal_manager)),
         })
     }
 
-    pub fn new_single_vma_chunk(vm_range: &VMRange, options: &VMMapOptions) -> Result<Self> {
+    pub async fn new_single_vma_chunk(vm_range: &VMRange, options: &VMMapOptions) -> Result<Self> {
         let vm_area = VMArea::new(
             vm_range.clone(),
             *options.perms(),
@@ -103,7 +105,7 @@ impl Chunk {
         // Initialize the memory of the new range
         unsafe {
             let buf = vm_range.as_slice_mut();
-            options.initializer().init_slice(buf)?;
+            options.initializer().init_slice(buf).await?;
         }
         // Set memory permissions
         if !options.perms().is_default() {
@@ -115,13 +117,13 @@ impl Chunk {
     pub fn new_chunk_with_vma(vma: VMArea) -> Self {
         Self {
             range: vma.range().clone(),
-            internal: ChunkType::SingleVMA(SgxMutex::new(vma)),
+            internal: ChunkType::SingleVMA(AsyncMutex::new(vma)),
         }
     }
 
-    pub fn is_owned_by_current_process(&self) -> bool {
+    pub async fn is_owned_by_current_process(&self) -> bool {
         let current = current!();
-        let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
+        let process_mem_chunks = current.vm().mem_chunks().read().await;
         if !process_mem_chunks
             .iter()
             .any(|chunk| chunk.range() == self.range())
@@ -132,39 +134,39 @@ impl Chunk {
         match self.internal() {
             ChunkType::SingleVMA(vma) => true,
             ChunkType::MultiVMA(internal_manager) => {
-                let internal_manager = internal_manager.lock().unwrap();
+                let internal_manager = internal_manager.lock().await;
                 internal_manager.is_owned_by_current_process()
             }
         }
     }
 
-    pub fn add_process(&self, current: &ThreadRef) {
+    pub async fn add_process(&self, current: &ThreadRef) {
         match self.internal() {
             ChunkType::SingleVMA(vma) => unreachable!(),
             ChunkType::MultiVMA(internal_manager) => {
                 internal_manager
                     .lock()
-                    .unwrap()
+                    .await
                     .add_process(current.process().pid());
             }
         }
     }
 
-    pub fn mmap(&self, options: &VMMapOptions) -> Result<usize> {
+    pub async fn mmap(&self, options: &VMMapOptions) -> Result<usize> {
         debug_assert!(!self.is_single_vma());
         trace!("try allocate in chunk: {:?}", self);
         let mut internal_manager = if let ChunkType::MultiVMA(internal_manager) = &self.internal {
-            internal_manager.lock().unwrap()
+            internal_manager.lock().await
         } else {
             unreachable!();
         };
         if internal_manager.chunk_manager.free_size() < options.size() {
             return_errno!(ENOMEM, "no enough size without trying. try other chunks");
         }
-        return internal_manager.chunk_manager.mmap(options);
+        return internal_manager.chunk_manager.mmap(options).await;
     }
 
-    pub fn try_mmap(&self, options: &VMMapOptions) -> Result<usize> {
+    pub async fn try_mmap(&self, options: &VMMapOptions) -> Result<usize> {
         debug_assert!(!self.is_single_vma());
         // Try lock ChunkManager. If it fails, just return and will try other chunks.
         let mut internal_manager = if let ChunkType::MultiVMA(internal_manager) = &self.internal {
@@ -178,7 +180,7 @@ impl Chunk {
         if internal_manager.chunk_manager().free_size() < options.size() {
             return_errno!(ENOMEM, "no enough size without trying. try other chunks");
         }
-        internal_manager.chunk_manager_mut().mmap(options)
+        internal_manager.chunk_manager_mut().mmap(options).await
     }
 
     pub fn is_single_vma(&self) -> bool {
@@ -189,9 +191,9 @@ impl Chunk {
         }
     }
 
-    pub fn is_single_dummy_vma(&self) -> bool {
+    pub async fn is_single_dummy_vma(&self) -> bool {
         if let ChunkType::SingleVMA(vma) = &self.internal {
-            vma.lock().unwrap().size() == 0
+            vma.lock().await.size() == 0
         } else {
             false
         }
@@ -199,28 +201,28 @@ impl Chunk {
 
     // Chunk size and internal VMA size are conflict.
     // This is due to the change of internal VMA.
-    pub fn is_single_vma_with_conflict_size(&self) -> bool {
+    pub async fn is_single_vma_with_conflict_size(&self) -> bool {
         if let ChunkType::SingleVMA(vma) = &self.internal {
-            vma.lock().unwrap().size() != self.range.size()
+            vma.lock().await.size() != self.range.size()
         } else {
             false
         }
     }
 
-    pub fn is_single_vma_chunk_should_be_removed(&self) -> bool {
+    pub async fn is_single_vma_chunk_should_be_removed(&self) -> bool {
         if let ChunkType::SingleVMA(vma) = &self.internal {
-            let vma_size = vma.lock().unwrap().size();
+            let vma_size = vma.lock().await.size();
             vma_size == 0 || vma_size != self.range.size()
         } else {
             false
         }
     }
 
-    pub fn find_mmap_region(&self, addr: usize) -> Result<VMRange> {
+    pub async fn find_mmap_region(&self, addr: usize) -> Result<VMRange> {
         let internal = &self.internal;
         match self.internal() {
             ChunkType::SingleVMA(vma) => {
-                let vma = vma.lock().unwrap();
+                let vma = vma.lock().await;
                 if vma.contains(addr) {
                     return Ok(vma.range().clone());
                 } else {
@@ -230,19 +232,19 @@ impl Chunk {
             ChunkType::MultiVMA(internal_manager) => {
                 return internal_manager
                     .lock()
-                    .unwrap()
+                    .await
                     .chunk_manager
                     .find_mmap_region(addr);
             }
         }
     }
 
-    pub fn is_free_range(&self, request_range: &VMRange) -> bool {
+    pub async fn is_free_range(&self, request_range: &VMRange) -> bool {
         match self.internal() {
             ChunkType::SingleVMA(_) => false, // single-vma chunk can't be free
             ChunkType::MultiVMA(internal_manager) => internal_manager
                 .lock()
-                .unwrap()
+                .await
                 .chunk_manager
                 .is_free_range(request_range),
         }
@@ -251,8 +253,8 @@ impl Chunk {
 
 #[derive(Debug)]
 pub enum ChunkType {
-    SingleVMA(SgxMutex<VMArea>),
-    MultiVMA(SgxMutex<ChunkInternal>),
+    SingleVMA(AsyncMutex<VMArea>),
+    MultiVMA(AsyncMutex<ChunkInternal>),
 }
 
 #[derive(Debug)]
@@ -297,9 +299,9 @@ impl ChunkInternal {
     }
 
     // Clean vmas when munmap a MultiVMA chunk, return whether this chunk is cleaned
-    pub fn clean_multi_vmas(&mut self) -> bool {
+    pub async fn clean_multi_vmas(&mut self) -> bool {
         let current_pid = current!().process().pid();
-        self.chunk_manager.clean_vmas_with_pid(current_pid);
+        self.chunk_manager.clean_vmas_with_pid(current_pid).await;
         if self.chunk_manager.is_empty() {
             self.process_set.remove(&current_pid);
             return true;

@@ -77,13 +77,13 @@ use self::vm_layout::VMLayout;
 
 pub use self::chunk::{Chunk, ChunkRef, ChunkType};
 pub use self::process_vm::{MMapFlags, MRemapFlags, MSyncFlags, ProcessVM, ProcessVMBuilder};
-pub use self::user_space_vm::USER_SPACE_VM_MANAGER;
+pub use self::user_space_vm::{free_user_space, USER_SPACE_VM_MANAGER};
 pub use self::vm_area::VMArea;
 pub use self::vm_perms::VMPerms;
 pub use self::vm_range::VMRange;
 pub use self::vm_util::{VMInitializer, VMMapOptionsBuilder};
 
-pub fn do_mmap(
+pub async fn do_mmap(
     addr: usize,
     size: usize,
     perms: VMPerms,
@@ -103,16 +103,19 @@ pub fn do_mmap(
         );
     }
 
-    current!().vm().mmap(addr, size, perms, flags, fd, offset)
+    current!()
+        .vm()
+        .mmap(addr, size, perms, flags, fd, offset)
+        .await
 }
 
-pub fn do_munmap(addr: usize, size: usize) -> Result<()> {
+pub async fn do_munmap(addr: usize, size: usize) -> Result<()> {
     debug!("munmap: addr: {:#x}, size: {:#x}", addr, size);
     let current = current!();
-    current!().vm().munmap(addr, size)
+    current!().vm().munmap(addr, size).await
 }
 
-pub fn do_mremap(
+pub async fn do_mremap(
     old_addr: usize,
     old_size: usize,
     new_size: usize,
@@ -122,23 +125,26 @@ pub fn do_mremap(
         "mremap: old_addr: {:#x}, old_size: {:#x}, new_size: {:#x}, flags: {:?}",
         old_addr, old_size, new_size, flags
     );
-    current!().vm().mremap(old_addr, old_size, new_size, flags)
+    current!()
+        .vm()
+        .mremap(old_addr, old_size, new_size, flags)
+        .await
 }
 
-pub fn do_mprotect(addr: usize, size: usize, perms: VMPerms) -> Result<()> {
+pub async fn do_mprotect(addr: usize, size: usize, perms: VMPerms) -> Result<()> {
     debug!(
         "mprotect: addr: {:#x}, size: {:#x}, perms: {:?}",
         addr, size, perms
     );
-    current!().vm().mprotect(addr, size, perms)
+    current!().vm().mprotect(addr, size, perms).await
 }
 
-pub fn do_brk(addr: usize) -> Result<usize> {
+pub async fn do_brk(addr: usize) -> Result<usize> {
     debug!("brk: addr: {:#x}", addr);
-    current!().vm().brk(addr)
+    current!().vm().brk(addr).await
 }
 
-pub fn do_msync(addr: usize, size: usize, flags: MSyncFlags) -> Result<()> {
+pub async fn do_msync(addr: usize, size: usize, flags: MSyncFlags) -> Result<()> {
     debug!(
         "msync: addr: {:#x}, size: {:#x}, flags: {:?}",
         addr, size, flags
@@ -149,7 +155,7 @@ pub fn do_msync(addr: usize, size: usize, flags: MSyncFlags) -> Result<()> {
     if flags.contains(MSyncFlags::MS_ASYNC) {
         warn!("not support MS_ASYNC");
     }
-    current!().vm().msync(addr, size)
+    current!().vm().msync(addr, size).await
 }
 
 pub const PAGE_SIZE: usize = 4096;

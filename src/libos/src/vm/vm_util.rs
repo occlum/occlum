@@ -3,12 +3,12 @@ use super::*;
 use super::vm_area::*;
 use super::vm_perms::VMPerms;
 use crate::fs::FileMode;
-use std::collections::BTreeSet;
 
 use intrusive_collections::rbtree::{Link, RBTree};
 use intrusive_collections::Bound;
 use intrusive_collections::RBTreeLink;
 use intrusive_collections::{intrusive_adapter, KeyAdapter};
+use std::collections::BTreeSet;
 
 #[derive(Clone, Debug)]
 pub enum VMInitializer {
@@ -40,7 +40,7 @@ impl Default for VMInitializer {
 }
 
 impl VMInitializer {
-    pub fn init_slice(&self, buf: &mut [u8]) -> Result<()> {
+    pub async fn init_slice(&self, buf: &mut [u8]) -> Result<()> {
         match self {
             VMInitializer::DoNothing() | VMInitializer::ElfSpecific { .. } => {
                 // Do nothing
@@ -69,9 +69,8 @@ impl VMInitializer {
                     .unwrap()
                     .dentry()
                     .inode()
-                    .as_sync_inode()
-                    .unwrap()
                     .read_at(file.offset(), buf)
+                    .await
                     .map_err(|_| errno!(EACCES, "failed to init memory from file"))?;
                 for b in &mut buf[len..] {
                     *b = 0;
@@ -97,9 +96,8 @@ impl VMInitializer {
                     .unwrap()
                     .dentry()
                     .inode()
-                    .as_sync_inode()
-                    .unwrap()
                     .read_at(*offset, &mut buf[copy_len..])
+                    .await
                     .map_err(|_| errno!(EACCES, "failed to init memory from file"))?;
                 for b in &mut buf[(copy_len + len)..] {
                     *b = 0;

@@ -69,7 +69,7 @@ pub fn do_rt_sigreturn() -> Result<()> {
 ///
 /// **Interaction with force_signal.** If force_signal is called during a syscall,
 /// then deliver_signal won't deliver any signals.
-pub fn deliver_signal() {
+pub async fn deliver_signal() {
     let thread = current!();
 
     if thread.process().is_forced_to_exit() || thread.is_forced_to_stop() {
@@ -77,13 +77,13 @@ pub fn deliver_signal() {
     }
 
     if !forced_signal_flag::get() {
-        do_deliver_signal(&thread);
+        do_deliver_signal(&thread).await;
     } else {
         forced_signal_flag::reset();
     }
 }
 
-fn do_deliver_signal(thread: &ThreadRef) {
+async fn do_deliver_signal(thread: &ThreadRef) {
     loop {
         let sig_mask = thread.sig_mask();
         let signal = match dequeue_signal(thread, sig_mask) {
@@ -91,7 +91,7 @@ fn do_deliver_signal(thread: &ThreadRef) {
             None => return,
         };
 
-        let continue_handling = handle_signal(signal, thread);
+        let continue_handling = handle_signal(signal, thread).await;
         if !continue_handling {
             return;
         }
@@ -106,16 +106,16 @@ fn do_deliver_signal(thread: &ThreadRef) {
 ///
 /// **Requirement.** This function can only be called at most once during the execution of
 /// a syscall.
-pub fn force_signal(signal: Box<dyn Signal>) {
+pub async fn force_signal(signal: Box<dyn Signal>) {
     let thread = current!();
 
     assert!(forced_signal_flag::get() == false);
     forced_signal_flag::set();
 
-    handle_signal(signal, &thread);
+    handle_signal(signal, &thread).await;
 }
 
-fn handle_signal(signal: Box<dyn Signal>, thread: &ThreadRef) -> bool {
+async fn handle_signal(signal: Box<dyn Signal>, thread: &ThreadRef) -> bool {
     let action = thread
         .process()
         .sig_dispositions()
@@ -154,18 +154,21 @@ fn handle_signal(signal: Box<dyn Signal>, thread: &ThreadRef) -> bool {
             restorer_addr,
             mask,
         } => {
-            let ret = CURRENT_CONTEXT.with(|_context| {
+            let mut context = CURRENT_CONTEXT.with(|_context| {
                 let mut context = _context.borrow_mut();
-                handle_signals_by_user(
-                    signal,
-                    thread,
-                    handler_addr,
-                    flags,
-                    restorer_addr,
-                    mask,
-                    context.deref_mut(),
-                )
+                context
             });
+            let curr_user_ctxt = context.deref_mut();
+            let ret = handle_signals_by_user(
+                signal,
+                thread,
+                handler_addr,
+                flags,
+                restorer_addr,
+                mask,
+                curr_user_ctxt,
+            )
+            .await;
             if let Err(_) = ret {
                 todo!("kill the process if any error");
             }
@@ -175,14 +178,14 @@ fn handle_signal(signal: Box<dyn Signal>, thread: &ThreadRef) -> bool {
     continue_handling
 }
 
-fn handle_signals_by_user(
+async fn handle_signals_by_user<'a>(
     signal: Box<dyn Signal>,
-    thread: &ThreadRef,
+    thread: &'a ThreadRef,
     handler_addr: usize,
     flags: SigActionFlags,
     restorer_addr: usize,
     new_sig_mask: SigSet,
-    curr_user_ctxt: &mut CpuContext,
+    curr_user_ctxt: &'a mut CpuContext,
 ) -> Result<()> {
     // Set a new signal mask and get the old one
     let new_sig_mask = if flags.contains(SigActionFlags::SA_NODEFER) {
@@ -234,7 +237,7 @@ fn handle_signals_by_user(
         )
         .unwrap();
 
-        let mem_chunks = thread.vm().mem_chunks().read().unwrap();
+        let mem_chunks = thread.vm().mem_chunks().read().await;
         if mem_chunks
             .iter()
             .find(|chunk| chunk.range().is_superset_of(&stack_range))

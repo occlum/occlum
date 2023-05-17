@@ -55,10 +55,10 @@ impl ProcINode for ProcMapsINode {
             let heap_range = process_vm.heap_range();
             let stack_range = process_vm.stack_range();
 
-            let process_vm_chunks = process_vm.mem_chunks().read().unwrap();
-            process_vm_chunks
-                .iter()
-                .map(|chunk| match chunk.internal() {
+            let process_vm_chunks = process_vm.mem_chunks().read().await;
+            let mut vmas_info = String::new();
+            for chunk in process_vm_chunks.iter() {
+                vmas_info.extend_one(match chunk.internal() {
                     ChunkType::SingleVMA(vma) => {
                         let range = chunk.range();
                         let heap_or_stack = if range == heap_range {
@@ -68,26 +68,33 @@ impl ProcINode for ProcMapsINode {
                         } else {
                             None
                         };
-                        let vma = vma.lock().unwrap();
-                        get_output_for_vma(&vma, heap_or_stack)
+                        let vma = vma.lock().await;
+                        get_output_for_vma(&vma, heap_or_stack).await
                     }
                     ChunkType::MultiVMA(internal_manager) => {
-                        let internal = internal_manager.lock().unwrap();
-                        let vmas_list = internal.chunk_manager().vmas();
-                        vmas_list
+                        let internal = internal_manager.lock().await;
+                        let vmas_list = internal
+                            .chunk_manager()
+                            .vmas()
                             .iter()
-                            .map(|obj| get_output_for_vma(obj.vma(), None))
-                            .fold(String::new(), |acc, vma_info| acc + &vma_info)
+                            .map(|vma_obj| vma_obj.vma().clone())
+                            .collect::<Vec<_>>();
+                        let mut vma_info = String::new();
+                        for vma in vmas_list {
+                            vma_info += &get_output_for_vma(&vma, None).await;
+                        }
+                        vma_info
                     }
-                })
-                .fold(String::new(), |acc, vma_info| acc + &vma_info)
+                });
+            }
+            vmas_info
         };
 
         Ok(result_string.into_bytes())
     }
 }
 
-fn get_output_for_vma(vma: &VMArea, heap_or_stack: Option<&str>) -> String {
+async fn get_output_for_vma(vma: &VMArea, heap_or_stack: Option<&str>) -> String {
     let range = vma.range();
     let perms = vma.perms();
 
@@ -100,9 +107,10 @@ fn get_output_for_vma(vma: &VMArea, heap_or_stack: Option<&str>) -> String {
         if let Some((file, offset)) = vma.init_file() {
             let file_handle = file.as_async_file_handle().unwrap();
             let file_path = file_handle.dentry().abs_path();
-            let inode = file_handle.dentry().inode().as_sync_inode().unwrap();
-            let inode_num = inode.metadata().unwrap().inode;
-            let device_id = inode.metadata().unwrap().dev;
+            let inode = file_handle.dentry().inode();
+            let inode_metadata = inode.metadata().await.unwrap();
+            let inode_num = inode_metadata.inode;
+            let device_id = inode_metadata.dev;
             (file_path, offset, device_id, inode_num)
         } else if heap_or_stack.is_some() {
             (heap_or_stack.unwrap(), 0, 0, 0)

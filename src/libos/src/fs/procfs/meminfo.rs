@@ -15,7 +15,7 @@ impl MemInfoINode {
 impl ProcINode for MemInfoINode {
     async fn generate_data_in_bytes(&self) -> Result<Vec<u8>> {
         let total_ram = USER_SPACE_VM_MANAGER.get_total_size();
-        let free_ram = current!().vm().get_free_size();
+        let free_ram = current!().vm().get_free_size().await;
         Ok(format!(
             "MemTotal:       {} kB\n\
              MemFree:        {} kB\n\
