@@ -1,0 +1,12 @@
+# glibc backend openjdk 8
+# source dirs maybe changed according to different OS
+targets:
+  # copy jvm
+  - target: /usr/lib/jvm
+    copy:
+      - dirs:
+        - /usr/lib/jvm/java-8-openjdk-amd64
+  - target: /etc
+    copy:
+      - dirs:
+        - /etc/java-8-openjdk
