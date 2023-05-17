@@ -21,8 +21,8 @@ init_instance() {
                 .resource_limits.kernel_space_heap_size="64MB" |
                 .resource_limits.max_num_of_threads = 64 |
                 .process.default_heap_size = "256MB" |
-                .entry_points = [ "/usr/lib/jvm/java-1.8-openjdk/jre/bin" ] |
-                .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-1.8-openjdk/jre/lib:/usr/lib/jvm/java-1.8-openjdk/lib" ]' Occlum.json)" && \
+                .entry_points = [ "/usr/lib/jvm/java-8-openjdk-amd64/jre/bin/" ] |
+                .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-8-openjdk-amd64/jre/lib:/usr/lib/jvm/java-8-openjdk-amd64/lib" ]' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
 }
 
@@ -40,7 +40,10 @@ run_sofa() {
     init_instance
     build_sofa
     echo -e "${BLUE}occlum run SOFABoot demo${NC}"
-    occlum run /usr/lib/jvm/java-1.8-openjdk/jre/bin/java -Xmx512m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=64m -Dos.name=Linux -jar /usr/lib/spring/${jar_file} &
+    occlum run /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java \
+        -XX:-UseCompressedOops \
+        -XX:ActiveProcessorCount=4 \
+        -Dos.name=Linux -jar /usr/lib/spring/${jar_file} &
 }
 
 run_sofa
