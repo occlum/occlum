@@ -1,6 +1,6 @@
 includes: 
   - base.yaml
-  - java-8-openjdk.yaml
+  - java-8-openjdk-amd64.yaml
 targets: 
   # copy sofaboot jar
   - target: /usr/lib/spring

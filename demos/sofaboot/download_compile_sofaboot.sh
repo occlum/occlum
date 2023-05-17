@@ -5,11 +5,13 @@ if [[ $1 == "jdk8" ]]; then
     echo ""
     echo "*** Build sofaboot demo with openjdk 8 ***"
     echo "*** Make sure openjdk 8 is installed ***"
+    echo " For example on Ubuntu 20.04, apt install -y openjdk-8-jdk"
     mvn -v | grep "java-8"
 else
     echo ""
     echo "*** Build sofaboot demo with openjdk 11 ***"
     echo "*** Make sure openjdk 11 is installed ***"
+    echo " For example on Ubuntu 20.04, apt install -y openjdk-11-jdk"
     mvn -v | grep "java-11"
 fi
 

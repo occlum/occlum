@@ -17,12 +17,12 @@ This project demonstrates how to execute an unmodified sofaboot projects with Oc
 
 2. Run `sofaboot sample standard web` on Occlum
 
-* Run with openjdk 8
+* Run with openjdk 8 glibc version
 ```
 ./run_sofaboot_on_occlum_jdk8.sh
 ```
 
-* Run with openjdk 11
+* Run with openjdk 11 musl-libc version
 ```
 ./run_sofaboot_on_occlum.sh
 ```
