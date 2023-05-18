@@ -18,12 +18,12 @@ pub fn do_poll_new(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) -> R
         poll_fd.revents.set(IoEvents::empty());
     }
 
-    // Map poll_fds to FileRef's
+    // Map valid and non-negative poll_fds to FileRef's
     let thread = current!();
     let mut invalid_fd_count = 0;
-    let files: Vec<FileRef> = poll_fds
+    let files_and_expected_events: Vec<Option<(FileRef, IoEvents)>> = poll_fds
         .iter()
-        .filter_map(|poll_fd| {
+        .map(|poll_fd| {
             if (poll_fd.fd as i32) < 0 {
                 // If poll_fd is negative, ignore the events.
                 return None;
@@ -37,7 +37,7 @@ pub fn do_poll_new(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) -> R
                 invalid_fd_count += 1;
             }
 
-            file
+            Some((file.unwrap(), poll_fd.events))
         })
         .collect();
 
@@ -46,12 +46,17 @@ pub fn do_poll_new(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) -> R
         return Ok(invalid_fd_count);
     }
 
+    debug_assert!(files_and_expected_events.len() == poll_fds.len());
+
     // Now that all fds are valid, we set up a monitor for the set of files
     let mut monitor = {
-        let expected_num_files = files.len();
+        let expected_num_files = files_and_expected_events.len();
         let mut builder = EventMonitorBuilder::new(expected_num_files);
-        for (file, poll_fd) in files.into_iter().zip(poll_fds.iter()) {
-            builder.add_file(file, poll_fd.events);
+        for file_and_expect_event in files_and_expected_events.iter() {
+            if let Some((file_and_event)) = file_and_expect_event {
+                builder.add_file(file_and_event.0.clone(), file_and_event.1);
+            }
+            // Ignore negative poll_fds
         }
         builder.build()
     };
@@ -62,8 +67,13 @@ pub fn do_poll_new(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) -> R
 
         // Poll each and every interesting file
         let mut count = 0;
-        for (file, poll_fd) in monitor.files().zip(poll_fds.iter()) {
+        for (file_and_event, poll_fd) in files_and_expected_events.iter().zip(poll_fds.iter()) {
+            // Ignore negative poll_fds
+            if file_and_event.is_none() {
+                continue;
+            }
             let mask = poll_fd.events;
+            let file = &file_and_event.as_ref().unwrap().0;
             let events = file.poll_new() & mask;
             if !events.is_empty() {
                 poll_fd.revents.set(events);
