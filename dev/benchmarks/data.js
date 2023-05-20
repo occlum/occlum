@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1684620945260,
+  "lastUpdate": 1684621385166,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -4484,6 +4484,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2452,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Zheng, Qi",
+            "username": "qzheng527",
+            "email": "huaiqing.zq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "b89fa9dd5c3f325729e06e7cd89c4ccc353820ce",
+          "message": "[demos] Update sofaboot demo with glibc openjdk 8",
+          "timestamp": "2023-05-17T06:47:18Z",
+          "url": "https://github.com/occlum/occlum/commit/b89fa9dd5c3f325729e06e7cd89c4ccc353820ce"
+        },
+        "date": 1684621383746,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 1873,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 1873,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
