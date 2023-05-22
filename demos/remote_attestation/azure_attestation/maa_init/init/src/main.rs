@@ -63,7 +63,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Mount the image
     const SYS_MOUNT_FS: i64 = 363;
-    let ret = unsafe { syscall(SYS_MOUNT_FS, key_ptr, occlum_json_mac_ptr) };
+    // User can provide valid path for runtime mount and boot
+    // Otherwise, just pass null pointer to do general mount and boot
+    let rootfs_config: *const i8 = std::ptr::null();
+    let ret = unsafe { syscall(SYS_MOUNT_FS, key_ptr, rootfs_config) };
     if ret < 0 {
         return Err(Box::new(std::io::Error::last_os_error()));
     }
