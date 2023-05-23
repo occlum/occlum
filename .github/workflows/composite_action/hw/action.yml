@@ -21,7 +21,12 @@ runs:
       shell: bash
 
     - name: Get Occlum version
-      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+      run: |
+        if [[ ${{ contains(github.event.pull_request.labels.*.name, 'Pre-release-test') }} ]]; then
+          echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')-test" >> $GITHUB_ENV;
+        else
+          echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+        fi
       shell: bash
 
     - name: Set container name
