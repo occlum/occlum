@@ -137,44 +137,45 @@ RUN git clone -b sgx_2.17.1_for_occlum https://github.com/occlum/linux-sgx && \
 ARG OCCLUM_BRANCH
 WORKDIR /root
 RUN git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum && \
-    cp -r /root/occlum/tools/toolchains/* /tmp/ && mkdir -p /opt/occlum/ && \
+    cd /root/occlum && git submodule update --init && \
+    mkdir -p /opt/occlum/ && \
     cp /root/occlum/tools/docker/start_aesm.sh /opt/occlum/
 
 # Install Occlum toolchain
-WORKDIR /tmp
-RUN cd musl-gcc && ./build.sh && ./install_zlib.sh && rm -rf /tmp/musl-gcc
+WORKDIR /root/occlum/tools/toolchains
+RUN cd musl-gcc && ./build.sh && ./install_zlib.sh
 ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
 
 # Install glibc
-WORKDIR /tmp
-RUN cd glibc && ./build.sh && rm -rf /tmp/glibc
+WORKDIR /root/occlum/tools/toolchains
+RUN cd glibc && ./build.sh
 
 # Install Occlum Golang toolchain
-WORKDIR /tmp
-RUN cd golang && ./build.sh && rm -rf /tmp/golang
+WORKDIR /root/occlum/tools/toolchains
+RUN cd golang && ./build.sh
 ENV PATH="/opt/occlum/toolchains/golang/bin:$PATH"
 
 # Install Occlum Rust toolchain
-WORKDIR /tmp
-RUN cd rust && ./build.sh && rm -rf /tmp/rust
+WORKDIR /root/occlum/tools/toolchains
+RUN cd rust && ./build.sh
 ENV PATH="/opt/occlum/toolchains/rust/bin:$PATH"
 ENV LD_LIBRARY_PATH="/opt/intel/sgxsdk/sdk_libs"
 
 # Install Occlum bash
-WORKDIR /tmp
-RUN cd bash && ./build.sh && rm -rf /tmp/bash
+WORKDIR /root/occlum/tools/toolchains
+RUN cd bash && ./build.sh
 
 # Install Occlum busybox
-WORKDIR /tmp
-RUN cd busybox && ./build.sh && rm -rf /tmp/busybox
+WORKDIR /root/occlum/tools/toolchains
+RUN cd busybox && ./build.sh
 
 # Install Occlum Java toolchain (JDK 11)
 ARG JDK11_PATH=/opt/occlum/toolchains/jvm/java-11-openjdk
 COPY --from=alpine /usr/lib/jvm/java-11-openjdk $JDK11_PATH
 RUN rm $JDK11_PATH/lib/security/cacerts
 COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK11_PATH/lib/security/cacerts
-WORKDIR /tmp
-RUN cd java && ./install_dragonwell.sh && rm -rf /tmp/java
+WORKDIR /root/occlum/tools/toolchains
+RUN cd java && ./install_dragonwell.sh
 ENV PATH="/opt/occlum/toolchains/jvm/bin:$PATH"
 
 # Install OpenJDK 8
@@ -183,9 +184,17 @@ COPY --from=alpine /usr/lib/jvm/java-1.8-openjdk $JDK8_PATH
 RUN rm $JDK8_PATH/jre/lib/security/cacerts
 COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK8_PATH/jre/lib/security/cacerts
 
+# Install DCAP library
+WORKDIR /root/occlum/tools/toolchains
+RUN cd dcap_lib && ./build.sh
+
 # Install AECS Client library
-WORKDIR /tmp
-RUN cd aecs_client && ./build.sh && rm -rf /tmp/aecs_client
+WORKDIR /root/occlum/tools/toolchains
+RUN cd aecs_client && ./build.sh
+
+# Install GRPC RATLS
+WORKDIR /root/occlum/tools/toolchains
+RUN cd grpc_ratls && ./build.sh
 
 # Install Occlum
 WORKDIR /root
@@ -196,11 +205,6 @@ RUN cd occlum && \
     make install && \
     cp -r demos /root/demos && \
     rm -rf /root/occlum
-
-# Install GRPC RATLS
-# Do after installing Occlum is because it depends on the dcap library.
-WORKDIR /tmp
-RUN cd grpc_ratls && ./build.sh && rm -rf /tmp/grpc_ratls
 
 # Start AESM service automatically
 #
