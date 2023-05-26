@@ -7,8 +7,8 @@ use occlum_dcap::*;
 pub const MAX_REPORT_DATA_SIZE: usize = 64;
 
 fn maa_get_quote_base64(user_data: &[u8]) -> Result<String, &'static str> {
-    let mut dcap = DcapQuote::new();
-    let quote_size = dcap.get_quote_size();
+    let mut dcap = DcapQuote::new().unwrap();
+    let quote_size = dcap.get_quote_size().unwrap();
     let mut quote_buf: Vec<u8> = vec![0; quote_size as usize];
     let mut report_data = sgx_report_data_t::default();
 
@@ -25,10 +25,13 @@ fn maa_get_quote_base64(user_data: &[u8]) -> Result<String, &'static str> {
         report_data.d[i] = user_data[i];
     }
 
-    dcap.generate_quote(quote_buf.as_mut_ptr(), &mut report_data).unwrap();
+    let ret = dcap.generate_quote(quote_buf.as_mut_ptr(), &mut report_data).unwrap();
     dcap.close();
-    let quote = base64::encode(&quote_buf);
+    if ret < 0 {
+        return Err("DCAP generate quote failed");
+    }
 
+    let quote = base64::encode(&quote_buf);
     Ok(quote)
 }
 
