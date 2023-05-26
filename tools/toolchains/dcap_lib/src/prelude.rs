@@ -1,4 +1,5 @@
 pub use std::boxed::Box;
+pub use std::io::Error;
 pub use libc::{open, ioctl, close, c_void, c_int, O_RDONLY};
 
 // Defined in "occlum/deps/rust-sgx-sdk/sgx_types"

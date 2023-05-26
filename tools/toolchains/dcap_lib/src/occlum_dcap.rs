@@ -20,7 +20,6 @@ cfg_if::cfg_if! {
     }
 }
 
-
 // Copy from occlum/src/libos/src/fs/dev_fs/dev_sgx/mod.rs
 //#[allow(dead_code)]
 #[repr(C)]
@@ -49,32 +48,36 @@ pub struct DcapQuote {
 }
 
 impl DcapQuote {
-    pub fn new() -> Self {
-        let path =  CString::new("/dev/sgx").unwrap();
+    pub fn new() -> Result<Self, Error> {
+        let path = CString::new("/dev/sgx").unwrap();
         let fd = unsafe { libc::open(path.as_ptr(), O_RDONLY) };
         if fd > 0 {
-            Self {
+            Ok(Self {
                 fd: fd,
                 quote_size: 0,
                 supplemental_size: 0,
-            }
+            })
         } else {
-            panic!("Open /dev/sgx failed")
+            let os_err = Error::last_os_error();
+            println!("OS error: {os_err:?}");
+            Err(os_err)
         }
     }
 
-    pub fn get_quote_size(&mut self) -> u32 {
+    pub fn get_quote_size(&mut self) -> Result<u32, Error> {
         let size: u32 = 0;
         let ret = unsafe { libc::ioctl(self.fd, IOCTL_GET_DCAP_QUOTE_SIZE, &size) };
         if ret < 0 {
-            panic!("IOCTRL IOCTL_GET_DCAP_QUOTE_SIZE failed");
+            let os_err = Error::last_os_error();
+            println!("OS error: {os_err:?}");
+            Err(os_err)
         } else {
             self.quote_size = size;
-            size
+            Ok(size)
         }
     }
 
-    pub fn generate_quote(&mut self, quote_buf: *mut u8,  report_data: *const sgx_report_data_t) -> Result<i32, &'static str> {
+    pub fn generate_quote(&mut self, quote_buf: *mut u8,  report_data: *const sgx_report_data_t) -> Result<i32, Error> {
         let quote_arg: IoctlGenDCAPQuoteArg = IoctlGenDCAPQuoteArg {
             report_data: report_data,
             quote_size: &mut self.quote_size,
@@ -83,30 +86,35 @@ impl DcapQuote {
 
         let ret = unsafe { libc::ioctl(self.fd, IOCTL_GEN_DCAP_QUOTE, &quote_arg) };
         if ret < 0 {
-            Err("IOCTRL IOCTL_GEN_DCAP_QUOTE failed")
+            let os_err = Error::last_os_error();
+            println!("OS error: {os_err:?}");
+            Err(os_err)
         } else {
-            Ok( 0 )
+            Ok(0)
         }
     }
 
-    pub fn get_supplemental_data_size(&mut self) -> u32 {
+    pub fn get_supplemental_data_size(&mut self) -> Result<u32, Error> {
         let size: u32 = 0;
         let ret = unsafe { libc::ioctl(self.fd, IOCTL_GET_DCAP_SUPPLEMENTAL_SIZE, &size) };
         if ret < 0 {
-            panic!("IOCTRL IOCTL_GET_DCAP_SUPPLEMENTAL_SIZE failed");
+            let os_err = Error::last_os_error();
+            println!("OS error: {os_err:?}");
+            Err(os_err)
         } else {
             self.supplemental_size = size;
-            size
+            Ok(size)
         }
     }
 
-    pub fn verify_quote(&mut self, verify_arg: *mut IoctlVerDCAPQuoteArg) -> Result<i32, &'static str> {
+    pub fn verify_quote(&mut self, verify_arg: *mut IoctlVerDCAPQuoteArg) -> Result<i32, Error> {
         let ret = unsafe { libc::ioctl(self.fd, IOCTL_VER_DCAP_QUOTE, verify_arg) };
         if ret < 0 {
-            println!("ret = {}", ret);
-            Err("IOCTRL IOCTL_VER_DCAP_QUOTE failed")
+            let os_err = Error::last_os_error();
+            println!("OS error: {os_err:?}");
+            Err(os_err)
         } else {
-            Ok( 0 )
+            Ok(0)
         }
     }
 

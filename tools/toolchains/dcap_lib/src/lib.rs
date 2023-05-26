@@ -6,7 +6,11 @@ pub use crate::occlum_dcap::*;
 
 #[no_mangle]
 pub extern "C" fn dcap_quote_open() -> *mut c_void {
-    Box::into_raw(Box::new(DcapQuote::new())) as *mut c_void
+    if let Ok(fd) = DcapQuote::new() {
+        Box::into_raw(Box::new(fd)) as *mut c_void
+    } else {
+        std::ptr::null_mut::<u8>() as *mut c_void
+    }
 }
 
 #[no_mangle]
@@ -19,7 +23,7 @@ pub extern "C" fn dcap_get_quote_size(handle: *mut c_void) -> u32 {
         &mut *(handle as *mut DcapQuote)
     };
 
-    dcap.get_quote_size()
+    dcap.get_quote_size().unwrap_or(0)
 }
 
 #[no_mangle]
@@ -36,9 +40,7 @@ pub extern "C" fn dcap_generate_quote(
         &mut *(handle as *mut DcapQuote)
     };
 
-    dcap.generate_quote(quote_buf, report_data).unwrap();
-
-    0
+    dcap.generate_quote(quote_buf, report_data).unwrap_or(-1)
 }
 
 #[no_mangle]
@@ -51,7 +53,7 @@ pub extern "C" fn dcap_get_supplemental_data_size(handle: *mut c_void) -> u32 {
         &mut *(handle as *mut DcapQuote)
     };
 
-    dcap.get_supplemental_data_size()
+    dcap.get_supplemental_data_size().unwrap_or(0)
 }
 
 #[no_mangle]
@@ -81,9 +83,7 @@ pub extern "C" fn dcap_verify_quote(
         supplemental_data: supplemental_data,
     };
 
-    dcap.verify_quote(&mut verify_arg).unwrap();
-
-    0
+    dcap.verify_quote(&mut verify_arg).unwrap_or(-1)
 }
 
 

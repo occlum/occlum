@@ -15,9 +15,9 @@ struct DcapDemo {
 
 impl DcapDemo {
     pub fn new(report_data: &str) -> Self {
-        let mut dcap = DcapQuote::new();
-        let quote_size = dcap.get_quote_size();
-        let supplemental_size = dcap.get_supplemental_data_size();
+        let mut dcap = DcapQuote::new().unwrap();
+        let quote_size = dcap.get_quote_size().unwrap();
+        let supplemental_size = dcap.get_supplemental_data_size().unwrap();
         let quote_buf: Vec<u8> = vec![0; quote_size as usize];
         let suppl_buf: Vec<u8> = vec![0; supplemental_size as usize];
         let mut req_data = sgx_report_data_t::default();
@@ -37,12 +37,15 @@ impl DcapDemo {
         }
     }
 
-    fn dcap_quote_gen(&mut self) -> Result<i32> {
-        self.dcap_quote.generate_quote(self.quote_buf.as_mut_ptr(), &mut self.req_data).unwrap();
+    fn dcap_quote_gen(&mut self) -> i32 {
+        let ret = self.dcap_quote.generate_quote(self.quote_buf.as_mut_ptr(), &mut self.req_data).unwrap();
+        if ret < 0 {
+            println!("DCAP generate quote failed");
+        } else {
+            println!("DCAP generate quote successfully");
+        }
 
-        println!("DCAP generate quote successfully");
-
-        Ok( 0 )
+        ret
     }
 
     // Quote has type `sgx_quote3_t` and is structured as
@@ -68,7 +71,7 @@ impl DcapDemo {
         Ok(report_data_ptr)
     }
 
-    fn dcap_quote_ver(&mut self) -> Result<sgx_ql_qv_result_t> {
+    fn dcap_quote_verify(&mut self) -> sgx_ql_qv_result_t {
         let mut quote_verification_result = sgx_ql_qv_result_t::SGX_QL_QV_RESULT_UNSPECIFIED;
         let mut status = 1;
 
@@ -81,10 +84,14 @@ impl DcapDemo {
             supplemental_data: self.suppl_buf.as_mut_ptr(),
         };
 
-        self.dcap_quote.verify_quote(&mut verify_arg).unwrap();
-        println!("DCAP verify quote successfully");
+        let ret = self.dcap_quote.verify_quote(&mut verify_arg).unwrap();
+        if ret < 0 {
+            println!("DCAP verify quote failed");
+        } else {
+            println!("DCAP verify quote successfully");
+        }
 
-        Ok( quote_verification_result )
+        quote_verification_result
     }
 
     fn dcap_dump_quote_info(&mut self) {
@@ -137,7 +144,7 @@ fn main() {
     let mut dcap_demo = DcapDemo::new(report_str);
 
     println!("Generate quote with report data : {}", report_str);
-    dcap_demo.dcap_quote_gen().unwrap();
+    dcap_demo.dcap_quote_gen();
 
     // compare the report data in quote buffer
     let report_data_ptr = dcap_demo.dcap_quote_get_report_data().unwrap();
@@ -151,7 +158,7 @@ fn main() {
 
     dcap_demo.dcap_dump_quote_info();
 
-    let result = dcap_demo.dcap_quote_ver().unwrap();
+    let result = dcap_demo.dcap_quote_verify();
     match result {
         sgx_ql_qv_result_t::SGX_QL_QV_RESULT_OK => {
             println!("Succeed to verify the quote!");
