@@ -647,7 +647,7 @@ impl ConfigApp {
             .find(|m| m.target == Path::new("/") && m.type_ == ConfigMountFsType::TYPE_UNIONFS)
             .ok_or_else(|| errno!(Errno::ENOENT, "the root UnionFS is not valid"))?;
 
-        if upper_layer.is_some() {
+        if lower_layer.is_some() {
             let layer_mount_configs = root_mount_config.options.layers.as_mut().unwrap();
             // image SEFS in layers
             let root_image_sefs_mount_config = layer_mount_configs
@@ -659,12 +659,12 @@ impl ConfigApp {
                 })
                 .ok_or_else(|| errno!(Errno::ENOENT, "the image SEFS in layers is not valid"))?;
 
-            root_image_sefs_mount_config.source = upper_layer;
+            root_image_sefs_mount_config.source = lower_layer;
             root_image_sefs_mount_config.options.mac = None;
             root_image_sefs_mount_config.options.index = 1;
         }
 
-        if lower_layer.is_some() {
+        if upper_layer.is_some() {
             let layer_mount_configs = root_mount_config.options.layers.as_mut().unwrap();
             // container SEFS in layers
             let root_container_sefs_mount_config = layer_mount_configs
@@ -679,7 +679,7 @@ impl ConfigApp {
                     errno!(Errno::ENOENT, "the container SEFS in layers is not valid")
                 })?;
 
-            root_container_sefs_mount_config.source = lower_layer;
+            root_container_sefs_mount_config.source = upper_layer;
         }
 
         if entry_point.is_some() {
