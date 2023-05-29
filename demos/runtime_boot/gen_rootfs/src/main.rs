@@ -9,15 +9,14 @@ fn main() {
     println!("{:?}", args);
     fs::create_dir("/mount").unwrap();
 
-    let fs_type = "unionfs";
+    let fs_type = "sefs";
     let mount_path = Path::new("/mount");
-    let source = Path::new("unionfs");
+    let source = Path::new("sefs");
     let flags = MsFlags::empty();
     let key = &args[1];
     let options = format!(
-        "lowerdir={},upperdir={},key={}",
+        "dir={},key={}",
         "./mnt_unionfs/lower",
-        "./mnt_unionfs/upper",
         key
     );
 
