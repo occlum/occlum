@@ -11,7 +11,7 @@ The later step will use the image content to generate UnionFS image.
 
 ### Build and start a [`gen_rootfs`](./gen_rootfs) Occlum instance
 
-This `gen_rootfs` mounts a empty UnionFS, copy the BASH Occlum image content to the mount point, unmount the UnionFS. It generates an encrypted UnionFS image containing the BASH image content. The **key** used in this demo is `"c7-32-b3-ed-44-df-ec-7b-25-2d-9a-32-38-8d-58-61"`.
+This `gen_rootfs` mounts a empty **sefs** (uses the lower path as mount target dir), copy the BASH Occlum image content to the mount point, unmount the **sefs**. It generates an encrypted **sefs** image containing the BASH image content. The **key** used in this demo is `"c7-32-b3-ed-44-df-ec-7b-25-2d-9a-32-38-8d-58-61"`.
 
 ### Build customized [`init`](./init)
 
@@ -22,7 +22,7 @@ Occlum [`default init`](../../tools/init) calls syscall (363) `MountRootFS` to m
 The first parameter `key_ptr` is optional.
 The second parameter `rootfs_config` needs to be set as NULL.
 
-But for runtime booting pre-generated UnionFS image, The first parameter `key_ptr` is must to have, the second parameter `rootfs_config` needs have valid members.
+But for runtime booting pre-generated image, The first parameter `key_ptr` is must to have, the second parameter `rootfs_config` needs have valid members.
 ```
 struct user_rootfs_config {
     // length of the struct
