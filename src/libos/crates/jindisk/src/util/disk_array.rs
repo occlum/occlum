@@ -11,15 +11,17 @@ pub struct DiskArray<T> {
     start_addr: Hba,
     table: HashMap<Hba, DataBlock>,
     disk: DiskView,
+    key: Key,
     phantom: PhantomData<T>,
 }
 
 impl<T: Serialize> DiskArray<T> {
-    pub fn new(start_addr: Hba, disk: DiskView) -> Self {
+    pub fn new(start_addr: Hba, disk: DiskView, key: &Key) -> Self {
         Self {
             start_addr,
             table: HashMap::new(),
             disk,
+            key: key.clone(),
             phantom: PhantomData,
         }
     }
@@ -58,6 +60,9 @@ impl<T: Serialize> DiskArray<T> {
         if !self.table.contains_key(&hba) {
             let mut data_block = DataBlock::new_uninit();
             self.disk.read(hba, data_block.as_slice_mut()).await?;
+
+            let plaintext = DefaultCryptor::symm_decrypt_block(data_block.as_slice(), &self.key)?;
+            data_block.as_slice_mut().copy_from_slice(&plaintext);
             let _ = self.table.insert(hba, data_block);
         }
 
@@ -79,9 +84,9 @@ impl<T: Serialize> DiskArray<T> {
     }
 
     pub async fn persist(&self, _root_key: &Key) -> Result<()> {
-        // TODO: Add encryption(symmetric) for blocks
         for (hba, block) in self.table.iter() {
-            self.disk.write(*hba, block.as_slice()).await?;
+            let ciphertext = DefaultCryptor::symm_encrypt_block(block.as_slice(), &self.key)?;
+            self.disk.write(*hba, &ciphertext).await?;
         }
         Ok(())
     }
