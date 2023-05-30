@@ -11,10 +11,10 @@ pub struct RIT {
 }
 
 impl RIT {
-    pub fn new(region_addr: Hba, data_region_addr: Hba, disk: DiskView) -> Self {
+    pub fn new(region_addr: Hba, data_region_addr: Hba, disk: DiskView, key: &Key) -> Self {
         Self {
             data_region_addr,
-            disk_array: DiskArray::new(region_addr, disk.clone()),
+            disk_array: DiskArray::new(region_addr, disk.clone(), key),
         }
     }
 
@@ -63,9 +63,14 @@ impl RIT {
         disk: &DiskView,
         region_addr: Hba,
         data_region_addr: Hba,
-        _root_key: &Key,
+        root_key: &Key,
     ) -> Result<Self> {
-        Ok(Self::new(region_addr, data_region_addr, disk.clone()))
+        Ok(Self::new(
+            region_addr,
+            data_region_addr,
+            disk.clone(),
+            root_key,
+        ))
     }
 }
 
@@ -87,7 +92,8 @@ mod tests {
         async_rt::task::block_on(async move {
             let disk = Arc::new(MemDisk::new(1024usize).unwrap());
             let disk = DiskView::new_unchecked(disk);
-            let mut rit = RIT::new(Hba::new(0), Hba::new(0), disk.clone());
+            let key = DefaultCryptor::gen_random_key();
+            let mut rit = RIT::new(Hba::new(0), Hba::new(0), disk.clone(), &key);
 
             let kv1 = (Hba::new(1), Lba::new(2));
             let kv2 = (Hba::new(1025), Lba::new(5));

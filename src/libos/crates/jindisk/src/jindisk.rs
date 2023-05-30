@@ -61,7 +61,11 @@ impl JinDisk {
         let superblock = SuperBlock::init(disk.total_blocks());
 
         let checkpoint_disk_view = Self::checkpoint_disk_view(&superblock, &disk);
-        let checkpoint = Arc::new(Checkpoint::new(&superblock, checkpoint_disk_view));
+        let checkpoint = Arc::new(Checkpoint::new(
+            &superblock,
+            checkpoint_disk_view,
+            &root_key,
+        ));
 
         let index_disk_view = Self::index_disk_view(&superblock, &disk);
         let lsm_tree = Arc::new(LsmTree::new(index_disk_view, checkpoint.clone()));
