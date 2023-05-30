@@ -489,7 +489,7 @@ dependencies = [
 
 [[package]]
 name = "occlum_exec"
-version = "1.0.0-rc1"
+version = "1.0.0-rc2"
 dependencies = [
  "chrono",
  "clap",
