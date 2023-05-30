@@ -31,7 +31,7 @@ pub struct Checkpoint {
 // TODO: Support on-demand loading for every structure
 
 impl Checkpoint {
-    pub fn new(superblock: &SuperBlock, disk: DiskView) -> Self {
+    pub fn new(superblock: &SuperBlock, disk: DiskView, root_key: &Key) -> Self {
         Self {
             bitc: RwLock::new(BITC::new()),
             data_svt: RwLock::new(SVT::new(
@@ -52,6 +52,7 @@ impl Checkpoint {
                 superblock.checkpoint_region.rit_addr,
                 superblock.data_region_addr,
                 disk.clone(),
+                root_key,
             )),
             key_table: KeyTable::new(superblock.data_region_addr),
             disk,
@@ -119,7 +120,7 @@ impl Checkpoint {
         let region = &superblock.checkpoint_region;
         match Self::check_pflag(disk, region).await {
             Pflag::NotCommited => return_errno!(EINVAL, "checkpoint region not persisted yet"),
-            Pflag::Initialized => return Ok(Self::new(superblock, disk.clone())),
+            Pflag::Initialized => return Ok(Self::new(superblock, disk.clone(), root_key)),
             Pflag::Commited => {}
         }
 
@@ -279,7 +280,7 @@ mod tests {
             let disk = DiskView::new_unchecked(disk);
             let root_key = DefaultCryptor::gen_random_key();
             let sb = SuperBlock::init(total_blocks);
-            let checkpoint = Checkpoint::new(&sb, disk.clone());
+            let checkpoint = Checkpoint::new(&sb, disk.clone(), &root_key);
             checkpoint.persist(&sb, &root_key).await?;
             let loaded_checkpoint = Checkpoint::load(&disk, &sb, &root_key).await?;
 
