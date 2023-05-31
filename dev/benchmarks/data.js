@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1685226326553,
+  "lastUpdate": 1685571136597,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -5554,6 +5554,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Random Read Throughput",
             "value": 175,
+            "unit": "MiB/s",
+            "extra": "randread"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]",
+            "email": "49699333+dependabot[bot]@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "cc2d455a9e94253145973d491efd63bd7859ca49",
+          "message": "Bump h2 in /demos/remote_attestation/azure_attestation\n\nBumps [h2](https://github.com/hyperium/h2) from 0.3.13 to 0.3.18.\n- [Release notes](https://github.com/hyperium/h2/releases)\n- [Changelog](https://github.com/hyperium/h2/blob/master/CHANGELOG.md)\n- [Commits](https://github.com/hyperium/h2/compare/v0.3.13...v0.3.18)\n\n---\nupdated-dependencies:\n- dependency-name: h2\n  dependency-type: indirect\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>",
+          "timestamp": "2023-04-26T01:21:25Z",
+          "url": "https://github.com/occlum/occlum/commit/cc2d455a9e94253145973d491efd63bd7859ca49"
+        },
+        "date": 1685571134920,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sequential Write Throughput",
+            "value": 54.8,
+            "unit": "MiB/s",
+            "extra": "seqwrite"
+          },
+          {
+            "name": "Random Write Throughput",
+            "value": 50.5,
+            "unit": "MiB/s",
+            "extra": "randwrite"
+          },
+          {
+            "name": "Sequential Read Throughput",
+            "value": 259,
+            "unit": "MiB/s",
+            "extra": "seqread"
+          },
+          {
+            "name": "Random Read Throughput",
+            "value": 167,
             "unit": "MiB/s",
             "extra": "randread"
           }
