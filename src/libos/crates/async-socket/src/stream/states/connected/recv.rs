@@ -183,6 +183,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         let stream = self.clone();
         let complete_fn = move |retval: i32| {
             let mut inner = stream.receiver.inner.lock().unwrap();
+            trace!("recv request complete with retval: {}", retval);
 
             // Release the handle to the async recv
             inner.io_handle.take();
