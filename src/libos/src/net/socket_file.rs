@@ -160,16 +160,17 @@ impl SocketFile {
         socket_type: Type,
         nonblocking: bool,
     ) -> Result<Self> {
-        if domain != Domain::Netlink {
-            let protocol = SocketProtocol::try_from(protocol)
-                .map_err(|_| errno!(EINVAL, "invalid or unsupported network protocol"))?;
-            if protocol != SocketProtocol::IPPROTO_IP && protocol != SocketProtocol::IPPROTO_TCP {
-                return_errno!(EINVAL, "unsupported protocol");
-            }
-        }
-
         match socket_type {
             Type::STREAM => {
+                if domain != Domain::Netlink {
+                    let protocol = SocketProtocol::try_from(protocol)
+                        .map_err(|_| errno!(EINVAL, "Invalid or unsupported network protocol"))?;
+                    if protocol != SocketProtocol::IPPROTO_IP
+                        && protocol != SocketProtocol::IPPROTO_TCP
+                    {
+                        return_errno!(EPROTONOSUPPORT, "Protocol not supported");
+                    }
+                }
                 let any_socket = match domain {
                     Domain::Ipv4 => {
                         let ipv4_stream = Ipv4Stream::new(nonblocking)?;
@@ -191,6 +192,15 @@ impl SocketFile {
                 Ok(new_self)
             }
             Type::DGRAM => {
+                if domain != Domain::Netlink {
+                    let protocol = SocketProtocol::try_from(protocol)
+                        .map_err(|_| errno!(EINVAL, "Invalid or unsupported network protocol"))?;
+                    if protocol != SocketProtocol::IPPROTO_IP
+                        && protocol != SocketProtocol::IPPROTO_UDP
+                    {
+                        return_errno!(EPROTONOSUPPORT, "Protocol not supported");
+                    }
+                }
                 let any_socket = match domain {
                     Domain::Ipv4 => {
                         let ipv4_datagram = Ipv4Datagram::new(nonblocking)?;
@@ -221,6 +231,8 @@ impl SocketFile {
             Type::RAW => {
                 let any_socket = match domain {
                     Domain::Netlink => {
+                        // Netlink sockets use different protocol named NetlinkFamily,
+                        // while regular sockets use SocketProtocol.
                         let netlink_family = NetlinkFamily::try_from(protocol as u16)
                             .map_err(|_| errno!(EINVAL, "unknown netlink family"))?;
                         let netlink_socket =
