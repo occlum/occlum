@@ -1,5 +1,5 @@
-use std::ffi::CString;
 use crate::prelude::*;
+use std::ffi::CString;
 
 const SGXIOC_GET_DCAP_QUOTE_SIZE: u64 = 0x80047307;
 const SGXIOC_GEN_DCAP_QUOTE: u64 = 0xc0187308;
@@ -77,7 +77,11 @@ impl DcapQuote {
         }
     }
 
-    pub fn generate_quote(&mut self, quote_buf: *mut u8,  report_data: *const sgx_report_data_t) -> Result<i32, Error> {
+    pub fn generate_quote(
+        &mut self,
+        quote_buf: *mut u8,
+        report_data: *const sgx_report_data_t,
+    ) -> Result<i32, Error> {
         let quote_arg: IoctlGenDCAPQuoteArg = IoctlGenDCAPQuoteArg {
             report_data: report_data,
             quote_size: &mut self.quote_size,
@@ -122,4 +126,3 @@ impl DcapQuote {
         unsafe { libc::close(self.fd) };
     }
 }
-
