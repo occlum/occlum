@@ -5,12 +5,12 @@ extern crate serde_json;
 use libc::syscall;
 use serde::Deserialize;
 
+use std::env;
 use std::error::Error;
 use std::fs::{write, File};
 use std::io::{ErrorKind, Read};
-use std::env;
 
-use crate::maa::{maa_generate_json, maa_attestation};
+use crate::maa::{maa_attestation, maa_generate_json};
 pub mod maa;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -40,10 +40,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Get Attestation provider URL, rootfs token path and report data string from env
     let maa_provider_url = env::var("MAA_PROVIDER_URL")
         .unwrap_or("https://shareduks.uks.attest.azure.net".to_string());
-    let maa_token_path = env::var("MAA_TOKEN_PATH")
-        .unwrap_or("/root".to_string());
-    let report_data_base64 = env::var("MAA_REPORT_DATA")
-        .unwrap_or("example".to_string());
+    let maa_token_path = env::var("MAA_TOKEN_PATH").unwrap_or("/root".to_string());
+    let report_data_base64 = env::var("MAA_REPORT_DATA").unwrap_or("example".to_string());
     let report_data = base64::decode(&report_data_base64).unwrap();
 
     // Get maa quote json
@@ -58,8 +56,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // User can provide valid path for runtime mount and boot
     // Otherwise, just pass null pointer to do general mount and boot
     let root_config_path: *const i8 = std::ptr::null();
-    let ret = unsafe { syscall(
-        SYS_MOUNT_FS, key_ptr, root_config_path) };
+    let ret = unsafe { syscall(SYS_MOUNT_FS, key_ptr, root_config_path) };
     if ret < 0 {
         return Err(Box::new(std::io::Error::last_os_error()));
     }

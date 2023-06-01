@@ -1,8 +1,7 @@
+use occlum_dcap::*;
+use reqwest::blocking::Client;
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use reqwest::blocking::Client;
-use occlum_dcap::*;
-
 
 pub const MAX_REPORT_DATA_SIZE: usize = 64;
 
@@ -25,7 +24,9 @@ fn maa_get_quote_base64(user_data: &[u8]) -> Result<String, &'static str> {
         report_data.d[i] = user_data[i];
     }
 
-    let ret = dcap.generate_quote(quote_buf.as_mut_ptr(), &mut report_data).unwrap();
+    let ret = dcap
+        .generate_quote(quote_buf.as_mut_ptr(), &mut report_data)
+        .unwrap();
     dcap.close();
     if ret < 0 {
         return Err("DCAP generate quote failed");
@@ -52,31 +53,28 @@ pub fn maa_generate_json(user_data: &[u8]) -> Result<serde_json::Value, &'static
         }
     });
 
-    *maa_json
-        .pointer_mut("/quote")
-        .unwrap() = serde_json::Value::String(quote_base64);
+    *maa_json.pointer_mut("/quote").unwrap() = serde_json::Value::String(quote_base64);
 
-    *maa_json
-        .pointer_mut("/runtimeData/data")
-        .unwrap() = serde_json::Value::String(base64::encode(&user_data));  
+    *maa_json.pointer_mut("/runtimeData/data").unwrap() =
+        serde_json::Value::String(base64::encode(&user_data));
 
     Ok(maa_json.to_owned())
 }
 
-
-pub fn maa_attestation(url: String, request_body: serde_json::Value) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+pub fn maa_attestation(
+    url: String,
+    request_body: serde_json::Value,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let client = Client::new();
     let att_url = format!("{}/attest/SgxEnclave?api-version=2020-10-01", url);
 
-    let resp = client.post(att_url)
-        .json(&request_body)
-        .send()?;
-    
+    let resp = client.post(att_url).json(&request_body).send()?;
+
     match resp.status() {
         reqwest::StatusCode::OK => {
             println!("success!");
             Ok(resp.json().unwrap())
-        },
+        }
         s => {
             println!("Received response status: {:?}", s);
             Err("maa attestation failed".into())
