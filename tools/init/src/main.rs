@@ -37,8 +37,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // User can provide valid path for runtime mount and boot
     // Otherwise, just pass null pointer to do general mount and boot
     let root_config_path: *const i8 = std::ptr::null();
-    let ret = unsafe { syscall(
-        SYS_MOUNT_FS, key_ptr, root_config_path) };
+    let ret = unsafe { syscall(SYS_MOUNT_FS, key_ptr, root_config_path) };
     if ret < 0 {
         return Err(Box::new(std::io::Error::last_os_error()));
     }

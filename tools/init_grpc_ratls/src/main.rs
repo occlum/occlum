@@ -12,16 +12,16 @@ use std::io::{ErrorKind, Read};
 use std::str;
 
 use std::ffi::CString;
-use std::os::raw::{c_int, c_char};
+use std::os::raw::{c_char, c_int};
 
 #[link(name = "grpc_ratls_client")]
 extern "C" {
     fn grpc_ratls_get_secret_to_buf(
         server_addr: *const c_char, // grpc server address+port, such as "localhost:50051"
         config_json: *const c_char, // ratls handshake config json file
-        name: *const c_char, // secret name to be requested
-        secret_buf: *const u8, // secret buffer provided by user
-        buf_len: *mut u32 // buffer size
+        name: *const c_char,        // secret name to be requested
+        secret_buf: *const u8,      // secret buffer provided by user
+        buf_len: *mut u32,          // buffer size
     ) -> c_int;
 }
 
@@ -60,7 +60,7 @@ struct KmsKeys {
 struct InitRAConfig {
     kms_server: String,
     kms_keys: Vec<KmsKeys>,
-    ra_config: RAConfig
+    ra_config: RAConfig,
 }
 
 fn load_ra_config(ra_conf_path: &str) -> Result<InitRAConfig, Box<dyn Error>> {
@@ -79,36 +79,38 @@ struct KeyInfo {
     val_buf: Vec<u8>,
 }
 
-fn get_kms_keys(kms_keys: Vec<KmsKeys>, kms_server: CString, kms_config: CString) -> Result<Vec<KeyInfo>, Box<dyn Error>> {
+fn get_kms_keys(
+    kms_keys: Vec<KmsKeys>,
+    kms_server: CString,
+    kms_config: CString,
+) -> Result<Vec<KeyInfo>, Box<dyn Error>> {
     let mut keys_info: Vec<KeyInfo> = Vec::new();
     for keys in kms_keys {
         let key = CString::new(&*keys.key).unwrap();
         // Max key length is 10K
         let mut buffer: Vec<u8> = vec![0; 10240];
-        let buffer_ptr: *const u8 = buffer.as_ptr();
         let mut buffer_len: u32 = buffer.len() as u32;
-        let len_ptr: *mut u32 = &mut buffer_len as *mut u32;
 
         let ret = unsafe {
             grpc_ratls_get_secret_to_buf(
                 kms_server.as_ptr(),
                 kms_config.as_ptr(),
                 key.as_ptr(),
-                buffer_ptr,
-                len_ptr
+                buffer.as_ptr(),
+                &mut buffer_len,
             )
         };
 
         if ret != 0 {
-            println!("grpc_ratls_get_secret_to_buf failed return {}", ret);
-            return Err(Box::new(std::io::Error::last_os_error()));
+            let err_msg = format!("grpc_ratls client get secret error: {}", ret);
+            return Err(Box::new(std::io::Error::new(ErrorKind::Other, err_msg)));
         }
 
         buffer.resize(buffer_len as usize, 0);
 
         let key_info: KeyInfo = KeyInfo {
             path: keys.path.clone(),
-            val_buf: buffer.clone()
+            val_buf: buffer.clone(),
         };
 
         keys_info.push(key_info);
@@ -136,9 +138,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Get the image encrypted key through RA
             let secret = CString::new("image_key").unwrap();
             let mut buffer: Vec<u8> = vec![0; 256];
-            let buffer_ptr: *const u8 = buffer.as_ptr();
             let mut buffer_len: u32 = buffer.len() as u32;
-            let len_ptr: *mut u32 = &mut buffer_len as *mut u32;
 
             //Read to buffer instead of file system for better security
             let ret = unsafe {
@@ -146,28 +146,26 @@ fn main() -> Result<(), Box<dyn Error>> {
                     server_addr.as_ptr(),
                     config_json.as_ptr(),
                     secret.as_ptr(),
-                    buffer_ptr,
-                    len_ptr
+                    buffer.as_ptr(),
+                    &mut buffer_len,
                 )
             };
 
             if ret != 0 {
-                println!("grpc_ratls_get_secret failed return {}", ret);
-                return Err(Box::new(std::io::Error::last_os_error()));
+                let err_msg = format!("grpc_ratls client get secret error: {}", ret);
+                return Err(Box::new(std::io::Error::new(ErrorKind::Other, err_msg)));
             }
 
             buffer.resize(buffer_len as usize, 0);
-            let key_string = String::from_utf8(buffer)
-                .expect("error converting to string");
+            let key_string = String::from_utf8(buffer).expect("error converting to string");
             let key_str = key_string
-                .trim_end_matches(|c| c == '\r' || c == '\n').to_string();
+                .trim_end_matches(|c| c == '\r' || c == '\n')
+                .to_string();
             let mut key: sgx_key_128bit_t = Default::default();
             parse_str_to_bytes(&key_str, &mut key)?;
             Some(key)
-        },
-        "integrity-only" => {
-            None
-        },
+        }
+        "integrity-only" => None,
         _ => unreachable!(),
     };
     let key_ptr = key
@@ -175,16 +173,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map(|key| key as *const sgx_key_128bit_t)
         .unwrap_or(std::ptr::null());
 
-    let keys_info: Vec<KeyInfo> =
-        get_kms_keys(init_ra_conf.kms_keys, server_addr, config_json).unwrap();
+    // Get keys from kms if any
+    let keys_info: Vec<KeyInfo> = get_kms_keys(init_ra_conf.kms_keys, server_addr, config_json)?;
+    // Remove config file
+    fs::remove_file("ra_config.json")?;
 
     // Mount the image
     const SYS_MOUNT_FS: i64 = 363;
     // User can provide valid path for runtime mount and boot
     // Otherwise, just pass null pointer to do general mount and boot
     let root_config_path: *const i8 = std::ptr::null();
-    let ret = unsafe { syscall(
-        SYS_MOUNT_FS, key_ptr, root_config_path) };
+    let ret = unsafe { syscall(SYS_MOUNT_FS, key_ptr, root_config_path) };
     if ret < 0 {
         return Err(Box::new(std::io::Error::last_os_error()));
     }
