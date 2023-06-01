@@ -5,15 +5,15 @@ extern crate serde_json;
 use libc::syscall;
 use serde::{Deserialize, Serialize};
 
+use std::env;
 use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::io::{ErrorKind, Read};
 use std::str;
-use std::env;
 
 use std::ffi::CString;
-use std::os::raw::{c_int, c_char};
+use std::os::raw::{c_char, c_int};
 
 #[link(name = "aecs_client")]
 extern "C" {
@@ -24,7 +24,7 @@ extern "C" {
         secret_name: *const c_char,
         nonce: *const c_char,
         secret_outbuf: *const u8,
-        secret_outbuf_len: *mut i32
+        secret_outbuf_len: *mut i32,
     ) -> c_int;
 }
 
@@ -83,7 +83,7 @@ struct InitRAConfig {
     kms_server: String,
     kms_keys: Vec<KmsKeys>,
     ua_env_pccs_url: String,
-    ra_config: RAConfig
+    ra_config: RAConfig,
 }
 
 fn load_ra_config(ra_conf_path: &str) -> Result<InitRAConfig, Box<dyn Error>> {
@@ -102,16 +102,17 @@ struct KeyInfo {
     val_buf: Vec<u8>,
 }
 
-fn get_kms_keys(kms_keys: Vec<KmsKeys>, kms_server: CString) -> Result<Vec<KeyInfo>, Box<dyn Error>> {
+fn get_kms_keys(
+    kms_keys: Vec<KmsKeys>,
+    kms_server: CString,
+) -> Result<Vec<KeyInfo>, Box<dyn Error>> {
     let mut keys_info: Vec<KeyInfo> = Vec::new();
     for keys in kms_keys {
         let key = CString::new(&*keys.key).unwrap();
-        let service =CString::new(keys.service).unwrap();
+        let service = CString::new(keys.service).unwrap();
         // Max key length is 10K
         let mut buffer: Vec<u8> = vec![0; 10240];
-        let buffer_ptr: *const u8 = buffer.as_ptr();
         let mut buffer_len: i32 = buffer.len() as i32;
-        let len_ptr: *mut i32 = &mut buffer_len as *mut i32;
 
         let ret = unsafe {
             aecs_client_get_secret_by_buffer(
@@ -120,21 +121,21 @@ fn get_kms_keys(kms_keys: Vec<KmsKeys>, kms_server: CString) -> Result<Vec<KeyIn
                 service.as_ptr(),
                 key.as_ptr(),
                 std::ptr::null(),
-                buffer_ptr,
-                len_ptr
+                buffer.as_ptr(),
+                &mut buffer_len,
             )
         };
 
         if ret != 0 {
-            println!("aecs_client_get_secret_by_buffer failed return {}", ret);
-            return Err(Box::new(std::io::Error::last_os_error()));
+            let err_msg = format!("aecs client get key error: {}", ret);
+            return Err(Box::new(std::io::Error::new(ErrorKind::Other, err_msg)));
         }
 
         buffer.resize(buffer_len as usize, 0);
 
         let key_info: KeyInfo = KeyInfo {
             path: keys.path.clone(),
-            val_buf: buffer.clone()
+            val_buf: buffer.clone(),
         };
 
         keys_info.push(key_info);
@@ -153,7 +154,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Extract RA config part
     let ra_conf_string = serde_json::to_string_pretty(&init_ra_conf.ra_config).unwrap();
     fs::create_dir_all("/etc/kubetee")?;
-    fs::write("/etc/kubetee/unified_attestation.json", ra_conf_string.clone().into_bytes())?;
+    fs::write(
+        "/etc/kubetee/unified_attestation.json",
+        ra_conf_string.clone().into_bytes(),
+    )?;
 
     let server_addr = CString::new(init_ra_conf.kms_server).unwrap();
     env::set_var("UA_ENV_PCCS_URL", init_ra_conf.ua_env_pccs_url.clone());
@@ -165,9 +169,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let secret = CString::new("image_key").unwrap();
             let service = CString::new("service1").unwrap();
             let mut buffer: Vec<u8> = vec![0; 256];
-            let buffer_ptr: *const u8 = buffer.as_ptr();
             let mut buffer_len: i32 = buffer.len() as i32;
-            let len_ptr: *mut i32 = &mut buffer_len as *mut i32;
 
             let ret = unsafe {
                 aecs_client_get_secret_by_buffer(
@@ -176,28 +178,26 @@ fn main() -> Result<(), Box<dyn Error>> {
                     service.as_ptr(),
                     secret.as_ptr(),
                     std::ptr::null(),
-                    buffer_ptr,
-                    len_ptr
+                    buffer.as_ptr(),
+                    &mut buffer_len,
                 )
             };
 
             if ret != 0 {
-                println!("aecs_client_get_secret_by_buffer failed return {}", ret);
-                return Err(Box::new(std::io::Error::last_os_error()));
+                let err_msg = format!("aecs client get key error: {}", ret);
+                return Err(Box::new(std::io::Error::new(ErrorKind::Other, err_msg)));
             }
 
             buffer.resize(buffer_len as usize, 0);
-            let key_string = String::from_utf8(buffer)
-                .expect("error converting to string");
+            let key_string = String::from_utf8(buffer).expect("error converting to string");
             let key_str = key_string
-                .trim_end_matches(|c| c == '\r' || c == '\n').to_string();
+                .trim_end_matches(|c| c == '\r' || c == '\n')
+                .to_string();
             let mut key: sgx_key_128bit_t = Default::default();
             parse_str_to_bytes(&key_str, &mut key)?;
             Some(key)
-        },
-        "integrity-only" => {
-            None
-        },
+        }
+        "integrity-only" => None,
         _ => unreachable!(),
     };
     let key_ptr = key
@@ -205,16 +205,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map(|key| key as *const sgx_key_128bit_t)
         .unwrap_or(std::ptr::null());
 
-    let keys_info: Vec<KeyInfo> =
-        get_kms_keys(init_ra_conf.kms_keys, server_addr).unwrap();
+    // Get keys from kms if any
+    let keys_info: Vec<KeyInfo> = get_kms_keys(init_ra_conf.kms_keys, server_addr)?;
+    // Remove config file
+    fs::remove_dir_all("/etc/kubetee")?;
 
     // Mount the image
     const SYS_MOUNT_FS: i64 = 363;
     // User can provide valid path for runtime mount and boot
     // Otherwise, just pass null pointer to do general mount and boot
     let root_config_path: *const i8 = std::ptr::null();
-    let ret = unsafe { syscall(
-        SYS_MOUNT_FS, key_ptr, root_config_path) };
+    let ret = unsafe { syscall(SYS_MOUNT_FS, key_ptr, root_config_path) };
     if ret < 0 {
         return Err(Box::new(std::io::Error::last_os_error()));
     }
