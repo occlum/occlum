@@ -44,6 +44,9 @@ jobs:
       - name: Get image tage name for dev image
         if: github.event.inputs.release == 'N'
         run: echo "IMAGE_TAG=latest-dev-${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+      - name: Get image tage name for test image
+        if: github.event.inputs.release == 'T'
+        run: echo "IMAGE_TAG=${{ env.RELEASE_VERSION }}-test" >> $GITHUB_ENV
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -98,6 +101,9 @@ jobs:
       - name: Get image tage name for dev image
         if: github.event.inputs.release == 'N'
         run: echo "IMAGE_TAG=latest-dev-${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+      - name: Get image tage name for test image
+        if: github.event.inputs.release == 'T'
+        run: echo "IMAGE_TAG=${{ env.RELEASE_VERSION }}-test" >> $GITHUB_ENV
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
