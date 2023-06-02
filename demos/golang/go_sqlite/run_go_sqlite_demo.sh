@@ -7,7 +7,7 @@ NC='\033[0m'
 # Install SQLite with occlum-go
 rm -f go.mod
 occlum-go mod init simple_demo_instance && \
-occlum-go get -u -v github.com/mattn/go-sqlite3
+occlum-go get -u -v github.com/mattn/go-sqlite3@v1.14.16
 
 # Build the Golang SQLite demo program using the Occlum Golang toolchain (i.e., occlum-go)
 occlum-go build -o simple_demo simple_demo.go
