@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1685830470621,
+  "lastUpdate": 1685830564757,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -4804,6 +4804,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2338,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Zheng, Qi",
+            "username": "qzheng527",
+            "email": "huaiqing.zq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "7790223c520c08cfd8508b91aa0eabe64f8f2289",
+          "message": "[ci] Add test docker image choice in CI action",
+          "timestamp": "2023-06-01T11:43:03Z",
+          "url": "https://github.com/occlum/occlum/commit/7790223c520c08cfd8508b91aa0eabe64f8f2289"
+        },
+        "date": 1685830563162,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2359,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2359,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
