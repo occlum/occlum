@@ -1,6 +1,6 @@
 [package]
 name = "Occlum"
-version = "0.29.5"
+version = "0.29.6"
 edition = "2021"
 
 [lib]
