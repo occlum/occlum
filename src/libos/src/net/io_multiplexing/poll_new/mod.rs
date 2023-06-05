@@ -35,6 +35,7 @@ pub fn do_poll_new(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) -> R
             if file.is_none() {
                 poll_fd.revents.set(IoEvents::NVAL);
                 invalid_fd_count += 1;
+                return None;
             }
 
             Some((file.unwrap(), poll_fd.events))
