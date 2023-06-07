@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1686175912010,
+  "lastUpdate": 1686175992236,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -4884,6 +4884,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2359,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "0ddb8be317f1b771c92be3c3905223774d1ee2a2",
+          "message": "[poll] Fix panic for non-opened fds",
+          "timestamp": "2023-06-05T06:39:02Z",
+          "url": "https://github.com/occlum/occlum/commit/0ddb8be317f1b771c92be3c3905223774d1ee2a2"
+        },
+        "date": 1686175990732,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 1954,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 1954,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
