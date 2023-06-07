@@ -19,7 +19,7 @@ mkdir occlum_instance
 cd occlum_instance
 occlum init
 yq '.resource_limits.user_space_size.init = "7000MB" |
-    .resource_limits.kernel_space_heap_size.init="384MB" |
+    .resource_limits.kernel_space_heap_size.init="1024MB" |
     .process.default_heap_size = "128MB" |
     .env.default = [ "OMP_NUM_THREADS=8", "KMP_AFFINITY=verbose,granularity=fine,compact,1,0", "KMP_BLOCKTIME=20", "MKL_NUM_THREADS=8"]' \
     -i Occlum.yaml

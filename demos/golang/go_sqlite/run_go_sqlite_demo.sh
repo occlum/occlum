@@ -17,7 +17,7 @@ rm -rf simple_demo_instance && mkdir simple_demo_instance
 cd simple_demo_instance
 occlum init
 yq '.resource_limits.user_space_size.init = "2560MB" |
-	.resource_limits.kernel_space_heap_size.init="320MB" |
+	.resource_limits.kernel_space_heap_size.init="512MB" |
 	.resource_limits.kernel_space_stack_size="10MB" |
 	.process.default_stack_size = "40MB" |
 	.process.default_heap_size = "320MB" ' -i Occlum.yaml

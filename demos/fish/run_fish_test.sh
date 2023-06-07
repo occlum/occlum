@@ -9,7 +9,7 @@ occlum new occlum-instance
 cd occlum-instance
 
 yq '.resource_limits.user_space_size.init = "512MB" |
-    .resource_limits.kernel_space_heap_size.init = "64MB" |
+    .resource_limits.kernel_space_heap_size.init = "512MB" |
     .env.default = [ "OCCLUM=yes", "HOME=/root" ]' -i Occlum.yaml
 
 rm -rf image

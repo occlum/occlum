@@ -14,6 +14,7 @@ dependencies = [
  "async-sfs",
  "async-socket",
  "async-trait",
+ "async-unionfs",
  "async-vfs",
  "atomic",
  "bitflags",
@@ -211,6 +212,24 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.99",
+]
+
+[[package]]
+name = "async-unionfs"
+version = "0.1.0"
+dependencies = [
+ "async-io",
+ "async-rt",
+ "async-trait",
+ "async-vfs",
+ "cfg-if",
+ "errno",
+ "libc",
+ "log",
+ "sgx_libc",
+ "sgx_trts",
+ "sgx_tstd",
+ "sgx_types",
 ]
 
 [[package]]

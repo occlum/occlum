@@ -141,11 +141,13 @@ pub enum FileType {
     SymLink = 3,
     CharDevice = 4,
     BlockDevice = 5,
+    NamedPipe = 6,
+    Socket = 7,
 }
 
 impl From<u32> for FileType {
     fn from(t: u32) -> Self {
-        if t < Self::File as u32 || t > Self::BlockDevice as u32 {
+        if t < Self::File as u32 || t > Self::Socket as u32 {
             panic!("invalid type");
         }
         unsafe { core::mem::transmute(t) }
@@ -160,6 +162,8 @@ impl From<FileType> for VfsFileType {
             FileType::Dir => VfsFileType::Dir,
             FileType::CharDevice => VfsFileType::CharDevice,
             FileType::BlockDevice => VfsFileType::BlockDevice,
+            FileType::NamedPipe => VfsFileType::NamedPipe,
+            FileType::Socket => VfsFileType::Socket,
         }
     }
 }
@@ -172,7 +176,9 @@ impl From<VfsFileType> for FileType {
             VfsFileType::Dir => FileType::Dir,
             VfsFileType::CharDevice => FileType::CharDevice,
             VfsFileType::BlockDevice => FileType::BlockDevice,
-            _ => panic!("unknown file type"),
+            VfsFileType::NamedPipe => FileType::NamedPipe,
+            VfsFileType::Socket => FileType::Socket,
+            // _ => panic!("unknown file type"),
         }
     }
 }

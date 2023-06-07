@@ -50,7 +50,7 @@ function build_client_instance()
     copy_bom -f ../flask.yaml --root image --include-dir /opt/occlum/etc/template
 
     yq '.resource_limits.user_space_size.init = "600MB" |
-        .resource_limits.kernel_space_heap_size.init = "128MB" |
+        .resource_limits.kernel_space_heap_size.init = "512MB" |
         .metadata.debuggable = false |
         .metadata.enable_kss = true |
         .metadata.version_number = 88 |

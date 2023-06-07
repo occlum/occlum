@@ -17,7 +17,7 @@ rm -rf occlum_instance
 occlum new occlum_instance
 cd occlum_instance
 yq '.resource_limits.user_space_size.init = "2560MB" |
-	.resource_limits.kernel_space_heap_size.init ="320MB" |
+	.resource_limits.kernel_space_heap_size.init ="512MB" |
 	.resource_limits.kernel_space_stack_size="10MB" |
 	.process.default_stack_size = "40MB" |
 	.process.default_heap_size = "320MB" ' -i Occlum.yaml

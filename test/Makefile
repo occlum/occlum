@@ -17,14 +17,17 @@ FAIL_LOG = $(BUILD_DIR)/test/.fail
 
 # Dependencies: need to be compiled but not to run by any Makefile target
 TEST_DEPS := client data_sink naughty_child wait_child
-# Tests: need to be compiled and run by test-% target
 
-TESTS ?= env empty hello_world malloc mmap file fs_perms getpid spawn sched pipe time \
-	truncate readdir mkdir open stat link symlink chmod chown tls pthread system_info rlimit \
-	server server_epoll unix_socket cout hostfs cpuid rdtsc device sleep exit_group posix_flock \
-	ioctl fcntl eventfd emulate_syscall access signal prctl rename procfs wait flock async_sfs \
-	spawn_attribute exec statfs random umask pgrp vfork mount sysinfo timerfd utimes shm epoll \
-	netlink brk disk
+# Tests: need to be compiled and run by test-% target
+TESTS ?= env empty hello_world malloc fs_perms getpid spawn sched pipe time \
+    readdir mkdir open stat link symlink tls pthread system_info rlimit \
+    server server_epoll unix_socket cout hostfs cpuid rdtsc device sleep exit_group posix_flock \
+    ioctl fcntl eventfd emulate_syscall signal prctl rename procfs wait flock async_sfs \
+    spawn_attribute exec statfs random pgrp vfork mount sysinfo timerfd shm epoll \
+    netlink brk disk
+
+# Legacy tests: Some cases still applied on legacy configuration due to functionality cause
+TESTS_LEGACY ?= mmap file truncate chmod chown access umask utimes
 
 # Benchmarks: need to be compiled and run by bench-% target
 BENCHES := spawn_and_exit_latency pipe_throughput unix_socket_throughput
@@ -33,8 +36,9 @@ BENCHES := spawn_and_exit_latency pipe_throughput unix_socket_throughput
 OCCLUM_BIN_PATH ?= $(BUILD_DIR)/bin
 
 # Top-level Makefile targets
-BUILD_TARGETS := $(TEST_DEPS) $(TESTS) $(BENCHES)
+BUILD_TARGETS := $(TEST_DEPS) $(TESTS) $(TESTS_LEGACY) $(BENCHES)
 TEST_TARGETS := $(TESTS:%=test-%)
+TEST_LEGACY_TARGETS := $(TESTS_LEGACY:%=test-%)
 BENCH_TARGETS := $(BENCHES:%=bench-%)
 .PHONY: all prebuild build postbuild test clean $(BUILD_TARGETS) $(TEST_TARGETS) $(BENCH_TARGETS) format format-check
 
@@ -67,6 +71,13 @@ prebuild:
 		$(OCCLUM_BIN_PATH)/occlum init
 	@cp Occlum.yaml $(BUILD_DIR)/test/
 
+prebuild-legacy:
+	@$(RM) -rf $(BUILD_DIR)/test
+	@mkdir -p $(BUILD_DIR)/test
+	@cd $(BUILD_DIR)/test && \
+		$(OCCLUM_BIN_PATH)/occlum init
+	@cp -f Occlum-legacy.yaml $(BUILD_DIR)/test/Occlum.yaml
+
 $(BUILD_TARGETS): %:
 	@$(ECHO) "$(CYAN)BUILD TEST => $@$(NO_COLOR)"
 	@$(MAKE) --no-print-directory -C $@
@@ -94,6 +105,11 @@ test-common:
 
 test-internal: build pretest $(TEST_TARGETS) posttest
 
+test-legacy:
+	@OCCLUM_TEST_GLIBC=1 $(MAKE) test-legacy-internal
+
+test-legacy-internal: prebuild-legacy $(BUILD_TARGETS) postbuild pretest $(TEST_LEGACY_TARGETS) posttest
+
 pretest:
 	@$(RM) $(PASS_LOG) $(FAIL_LOG)
 	@cd $(BUILD_DIR)/test && \
@@ -117,6 +133,21 @@ $(TEST_TARGETS): test-%: %
 			cd -; \
 		fi ; \
 	done
+
+$(TEST_LEGACY_TARGETS): test-%: %
+	@touch $(PASS_LOG) $(FAIL_LOG)
+	@$(ECHO) "$(CYAN)RUN TEST => $<$(NO_COLOR)"
+	@$(MAKE) --no-print-directory -C $< test ; \
+		if [ $$? -eq 0 ] ; then \
+			$(ECHO) "$(GREEN)PASS $(NO_COLOR)" ; \
+			$(ECHO) "$< PASS " >> $(PASS_LOG) ; \
+		else \
+			$(ECHO) "$(RED)FAILED$(NO_COLOR)" ; \
+			$(ECHO) "$< FAILED " >> $(FAIL_LOG) ; \
+			cd $(BUILD_DIR)/test && \
+			$(OCCLUM_BIN_PATH)/occlum start ; \
+			cd -; \
+		fi ; \
 
 posttest:
 	@cd $(BUILD_DIR)/test && \

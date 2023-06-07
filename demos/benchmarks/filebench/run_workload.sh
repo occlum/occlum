@@ -23,8 +23,7 @@ copy_bom -f ../filebench.yaml --root image --include-dir /opt/occlum/etc/templat
 # Enlarge "user_space_size" when "procflow exec proc failed" occurs
 yq '.resource_limits.user_space_size.init = "2000MB" |
     .resource_limits.kernel_space_heap_size.init ="1000MB" |
-    .resource_limits.kernel_space_heap_size.max ="1000MB" |
-    .mount += [{"target": "/sfs", "type": "async_sfs", "source": "./run/async_sfs_image", "options": {"async_sfs_total_size": "5GB", "page_cache_size": "256MB"}}] ' -i Occlum.yaml
+    .resource_limits.kernel_space_heap_size.max ="1000MB" ' -i Occlum.yaml
 
 occlum build
 

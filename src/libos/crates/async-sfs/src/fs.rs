@@ -377,6 +377,8 @@ impl AsyncInode for Inode {
                 FileType::File | FileType::SymLink | FileType::Dir => disk_inode.size as usize,
                 FileType::CharDevice => 0,
                 FileType::BlockDevice => 0,
+                FileType::NamedPipe => 0,
+                FileType::Socket => 0,
             },
             mode: 0o777,
             type_: VfsFileType::from(disk_inode.type_.clone()),
@@ -488,7 +490,7 @@ impl AsyncInode for Inode {
         let inode = {
             let fs = inner_mut.fs();
             match type_ {
-                VfsFileType::File => fs.new_inode_file().await?,
+                VfsFileType::File | VfsFileType::Socket => fs.new_inode_file().await?,
                 VfsFileType::SymLink => fs.new_inode_symlink().await?,
                 VfsFileType::Dir => fs.new_inode_dir(inner_mut.id).await?,
                 _ => return_errno!(EINVAL, "invalid type"),

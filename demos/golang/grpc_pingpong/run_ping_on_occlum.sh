@@ -17,7 +17,7 @@ rm -rf occlum_ping_instance && mkdir occlum_ping_instance
 cd occlum_ping_instance
 occlum init
 yq '.resource_limits.user_space_size.init = "800MB" |
-	.resource_limits.kernel_space_heap_size.init ="40MB" |
+	.resource_limits.kernel_space_heap_size.init ="512MB" |
 	.resource_limits.kernel_space_stack_size="1MB" |
 	.process.default_stack_size = "1MB" |
 	.process.default_heap_size = "20MB" ' -i Occlum.yaml

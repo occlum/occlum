@@ -387,9 +387,27 @@ impl ConfigMountOptions {
             sefs_cache_size,
         })
     }
+
+    pub fn gen_async_sfs_default() -> Self {
+        let (async_sfs_total_size, page_cache_size) = {
+            const MB: usize = 1024 * 1024;
+            const GB: usize = 1024 * MB;
+            (10 * GB, 256 * MB)
+        };
+        Self {
+            mac: None,
+            layers: None,
+            temporary: false,
+            async_sfs_total_size: Some(async_sfs_total_size),
+            page_cache_size: Some(page_cache_size),
+            index: 0,
+            autokey_policy: None,
+            sefs_cache_size: None,
+        }
+    }
 }
 
-fn parse_memory_size(mem_str: &str) -> Result<usize> {
+pub fn parse_memory_size(mem_str: &str) -> Result<usize> {
     const UNIT2FACTOR: [(&str, usize); 5] = [
         ("KB", 1024),
         ("MB", 1024 * 1024),
@@ -666,20 +684,19 @@ impl ConfigApp {
 
         if upper_layer.is_some() {
             let layer_mount_configs = root_mount_config.options.layers.as_mut().unwrap();
-            // container SEFS in layers
-            let root_container_sefs_mount_config = layer_mount_configs
+            // container AsyncSFS/SEFS in layers
+            let root_container_fs_mount_config = layer_mount_configs
                 .iter_mut()
                 .find(|m| {
                     m.target == Path::new("/")
-                        && m.type_ == ConfigMountFsType::TYPE_SEFS
+                        && (m.type_ == ConfigMountFsType::TYPE_ASYNC_SFS
+                            || m.type_ == ConfigMountFsType::TYPE_SEFS)
                         && m.options.mac.is_none()
                         && m.options.index == 0
                 })
-                .ok_or_else(|| {
-                    errno!(Errno::ENOENT, "the container SEFS in layers is not valid")
-                })?;
+                .ok_or_else(|| errno!(Errno::ENOENT, "the container FS in layers is not valid"))?;
 
-            root_container_sefs_mount_config.source = upper_layer;
+            root_container_fs_mount_config.source = upper_layer;
         }
 
         if entry_point.is_some() {

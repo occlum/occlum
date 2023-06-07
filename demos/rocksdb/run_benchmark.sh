@@ -11,8 +11,7 @@ copy_bom -f ../rocksdb.yaml --root image --include-dir /opt/occlum/etc/template
 
 yq '.resource_limits.user_space_size.init = "1024MB" |
     .resource_limits.kernel_space_heap_size.init ="800MB" |
-    .resource_limits.kernel_space_heap_size.max ="800MB" |
-    .mount += [{"target": "/sfs", "type": "async_sfs", "source": "./run/async_sfs_image", "options": {"async_sfs_total_size": "5GB", "page_cache_size": "256MB"}}] ' -i Occlum.yaml
+    .resource_limits.kernel_space_heap_size.max ="800MB" ' -i Occlum.yaml
 
 occlum build
 

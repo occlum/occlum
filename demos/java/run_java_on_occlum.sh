@@ -25,7 +25,7 @@ init_instance() {
     cd occlum_instance
     occlum init
     yq '.resource_limits.user_space_size.init = "1680MB" |
-        .resource_limits.kernel_space_heap_size.init="64MB" |
+        .resource_limits.kernel_space_heap_size.init="512MB" |
         .process.default_heap_size = "256MB" |
         .entry_points = [ "/usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin" ] |
         .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-11-alibaba-dragonwell/jre/lib/server:/usr/lib/jvm/java-11-alibaba-dragonwell/jre/lib:/usr/lib/jvm/java-11-alibaba-dragonwell/jre/../lib" ]' \
