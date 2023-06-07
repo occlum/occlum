@@ -136,31 +136,31 @@ RUN git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum && \
 
 # Install Occlum toolchain
 WORKDIR /root/occlum/tools/toolchains
-RUN cd musl-gcc && ./build.sh && ./install_zlib.sh
+RUN cd musl-gcc && ./build.sh && ./install_zlib.sh && cd .. && rm -rf musl-gcc
 ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
 
 # Install glibc
 WORKDIR /root/occlum/tools/toolchains
-RUN cd glibc && ./build.sh
+RUN cd glibc && ./build.sh && cd .. && rm -rf glibc
 
 # Install Occlum Golang toolchain
 WORKDIR /root/occlum/tools/toolchains
-RUN cd golang && ./build.sh
+RUN cd golang && ./build.sh && cd .. && rm -rf golang
 ENV PATH="/opt/occlum/toolchains/golang/bin:$PATH"
 
 # Install Occlum Rust toolchain
 WORKDIR /root/occlum/tools/toolchains
-RUN cd rust && ./build.sh
+RUN cd rust && ./build.sh && cd .. && rm -rf rust
 ENV PATH="/opt/occlum/toolchains/rust/bin:$PATH"
 ENV LD_LIBRARY_PATH="/opt/intel/sgxsdk/sdk_libs"
 
 # Install Occlum bash
 WORKDIR /root/occlum/tools/toolchains
-RUN cd bash && ./build.sh
+RUN cd bash && ./build.sh && cd .. && rm -rf bash
 
 # Install Occlum busybox
 WORKDIR /root/occlum/tools/toolchains
-RUN cd busybox && ./build.sh
+RUN cd busybox && ./build.sh && cd .. && rm -rf busybox
 
 # Install Occlum Java toolchain (JDK 11)
 ARG JDK11_PATH=/opt/occlum/toolchains/jvm/java-11-openjdk
@@ -168,7 +168,7 @@ COPY --from=alpine /usr/lib/jvm/java-11-openjdk $JDK11_PATH
 RUN rm $JDK11_PATH/lib/security/cacerts
 COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK11_PATH/lib/security/cacerts
 WORKDIR /root/occlum/tools/toolchains
-RUN cd java && ./install_dragonwell.sh
+RUN cd java && ./install_dragonwell.sh && cd .. && rm -rf java
 ENV PATH="/opt/occlum/toolchains/jvm/bin:$PATH"
 
 # Install OpenJDK 8
@@ -179,15 +179,15 @@ COPY --from=alpine /etc/ssl/certs/java/cacerts $JDK8_PATH/jre/lib/security/cacer
 
 # Install DCAP library
 WORKDIR /root/occlum/tools/toolchains
-RUN cd dcap_lib && ./build.sh
+RUN cd dcap_lib && ./build.sh && cd .. && rm -rf dcap_lib
 
 # Install AECS Client library
 WORKDIR /root/occlum/tools/toolchains
-RUN cd aecs_client && ./build.sh
+RUN cd aecs_client && ./build.sh && cd .. && rm -rf aecs_client
 
 # Install GRPC RATLS
 WORKDIR /root/occlum/tools/toolchains
-RUN cd grpc_ratls && ./build.sh
+RUN cd grpc_ratls && ./build.sh && cd .. && rm -rf grpc_ratls
 
 # Build and install Occlum
 WORKDIR /root
