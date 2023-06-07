@@ -9,7 +9,6 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
-use std::time::Duration;
 
 /// Page evictor.
 ///
@@ -41,10 +40,15 @@ impl<K: PageKey, A: PageAlloc> PageEvictor<K, A> {
         lazy_static! {
             static ref EVICTOR_TASKS: Mutex<AnyMap> = Mutex::new(AnyMap::new());
         }
-
         let mut tasks = EVICTOR_TASKS.lock();
-        tasks.insert(EvictorTask::<K, A>::new());
-        tasks.get::<EvictorTask<K, A>>().unwrap().0.clone()
+
+        if let Some(task) = tasks.get::<EvictorTask<K, A>>() {
+            task.0.clone()
+        } else {
+            let new_task = EvictorTask::<K, A>::new();
+            tasks.insert(new_task.clone());
+            new_task.0
+        }
     }
 }
 
@@ -101,14 +105,12 @@ impl<K: PageKey, A: PageAlloc> EvictorTaskInner<K, A> {
         let id = page_cache.id();
         let mut caches = self.caches.lock();
         caches.retain(|v| v.id() != id);
-        self.is_dropped.store(true, Ordering::Relaxed);
     }
 
     #[allow(unused)]
     async fn task_main(&self) {
         let mut waiter = Waiter::new();
         self.evictor_wq.enqueue(&mut waiter);
-        const AUTO_EVICT_PERIOD: Duration = Duration::from_millis(10);
         while !self.is_dropped() {
             waiter.reset();
 
@@ -116,10 +118,8 @@ impl<K: PageKey, A: PageAlloc> EvictorTaskInner<K, A> {
                 self.evict_pages().await;
             }
 
-            // Wait until being notified or timeout
-            // waiter.wait().await;
-            let mut timeout = AUTO_EVICT_PERIOD;
-            waiter.wait_timeout(Some(&mut timeout)).await;
+            // Wait until being notified
+            waiter.wait().await;
         }
         self.evictor_wq.dequeue(&mut waiter);
     }
@@ -178,5 +178,11 @@ impl<K: PageKey, A: PageAlloc> EvictorTaskInner<K, A> {
 
     fn is_dropped(&self) -> bool {
         self.is_dropped.load(Ordering::Relaxed)
+    }
+}
+
+impl<K: PageKey, A: PageAlloc> Drop for EvictorTaskInner<K, A> {
+    fn drop(&mut self) {
+        self.is_dropped.store(true, Ordering::Relaxed);
     }
 }
