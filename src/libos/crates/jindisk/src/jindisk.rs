@@ -315,7 +315,7 @@ impl JinDisk {
             )?;
             buf.copy_from_slice(&decrypted);
         } else {
-            // error!("[JinDisk] Read nothing! Target lba: {:?}", target_lba);
+            // error!("[JinDisk] Read nothing! Target lba: {:?}", target_lba); // Allow empty read
         }
 
         Ok(buf.len())
@@ -336,11 +336,8 @@ impl JinDisk {
 
         // Search lsm tree
         let searched_records = self.lsm_tree.search_range(query_ctx).await;
-        debug_assert!(
-            query_ctx.is_completed(),
-            "Range query still not completed: {:?}",
-            query_ctx
-        );
+        // debug_assert!(query_ctx.is_completed(),
+        //     "Range query still not completed: {:?}", query_ctx); // Allow empty read
 
         // Handle negative records
         let mut searched_records: Vec<Record> = searched_records

@@ -66,14 +66,14 @@ impl<K: PageKey, A: PageAlloc> PageCache<K, A> {
             return Some(page_handle_incache.clone());
         // Cache miss
         } else {
+            self.0.pollee.reset_events();
             // Cache miss and a new page is allocated
             if let Some(page_handle) = PageHandle::new(key) {
                 cache.put(key.into(), page_handle.clone());
                 return Some(page_handle);
             }
+            // Cache miss and no free space for new page
         }
-        // Cache miss and no free space for new page
-        self.0.pollee.reset_events();
         None
     }
 
