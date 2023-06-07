@@ -56,19 +56,23 @@ Apps running inside Occlum can mount some specific file systems via the [mount()
 
 Currently, we only support to create a new mount with the trusted UnionFS consisting of SEFSs or the untrusted HostFS. The mount point is not allowed to be the root directory("/").
 
-#### 1. Mount trusted UnionFS consisting of SEFSs
+#### 1. Mount trusted UnionFS consisting of FSs
 Example code:
 
 ```
 mount("unionfs", "<target_dir>", "unionfs", 0/* mountflags is ignored */,
-      "lowerdir=<lower>,upperdir=<upper>,key=<128-bit-key>")
+      "lowerdir=<lower>,lowerfs=<fs_type>,upperdir=<upper>,upperfs=<fs_type>,key=<128-bit-key>,sfssize=<size>,cachesize=<size>")
 ```
 
 Mount options:
 
-- The `lowerdir=<lower>` is a mandatory field, which describes the directory path of the RO SEFS on Host OS.
-- The `upperdir=<upper>` is a mandatory field, which describes the directory path of the RW SEFS on Host OS.
+- The `lowerdir=<lower>` is a mandatory field, which describes the directory path of the RO FS on Host OS.
+- The `lowerfs=<fs_type>` is a mandatory field, which describes the type of the RO FS. (Support SEFS/AsyncSFS by now)
+- The `upperdir=<upper>` is a mandatory field, which describes the directory path of the RW FS on Host OS.
+- The `upperfs=<fs_type>` is a mandatory field, which describes the type of the RW FS. (Support SEFS/AsyncSFS by now)
 - The `key=<128-bit-key>` is an optional field, which describes the 128bit key used to encrypt or decrypt the FS. Here is an example of the key: `key=c7-32-b3-ed-44-df-ec-7b-25-2d-9a-32-38-8d-58-61`. If this field is not provided, it will use the automatic key derived from the enclave sealing key.
+- The `sfssize=<size>` is an optional field, which describes the total size of AsyncSFS.
+- The `cachesize=<size>` is an optional field, which describes the size of page cache used by AsyncSFS.
 
 #### 2. Mount untrusted HostFS
 Example code:

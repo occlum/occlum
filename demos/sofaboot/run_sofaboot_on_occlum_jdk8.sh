@@ -18,7 +18,7 @@ init_instance() {
     rm -rf occlum_instance && occlum new occlum_instance
     cd occlum_instance
     yq '.resource_limits.user_space_size.init = "1680MB" |
-        .resource_limits.kernel_space_heap_size.init="64MB" |
+        .resource_limits.kernel_space_heap_size.init="512MB" |
         .process.default_heap_size = "256MB" |
         .entry_points = [ "/usr/lib/jvm/java-1.8-openjdk/jre/bin" ] |
         .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-1.8-openjdk/jre/lib:/usr/lib/jvm/java-1.8-openjdk/lib" ]' \

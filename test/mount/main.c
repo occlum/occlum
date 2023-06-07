@@ -91,7 +91,8 @@ static int __test_mount_unionfs(const char *mnt_dir) {
     }
 
     if (mount("unionfs", mnt_dir, "unionfs", 0,
-              "lowerdir=./mnt_test/mnt_unionfs/lower,upperdir=./mnt_test/mnt_unionfs/upper") < 0) {
+              "lowerdir=./mnt_test/mnt_unionfs/lower,lowerfs=sefs,upperdir=./mnt_test/mnt_unionfs/upper,upperfs=async_sfs,sfssize=5GB,cachesize=128MB")
+            < 0) {
         THROW_ERROR("failed to mount unionfs");
     }
 

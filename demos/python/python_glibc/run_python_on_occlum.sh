@@ -18,7 +18,7 @@ if [ ! -d $python_dir ];then
 fi
 
 yq '.resource_limits.user_space_size.init = "640MB" |
-    .resource_limits.kernel_space_heap_size.init = "300MB" |
+    .resource_limits.kernel_space_heap_size.init = "512MB" |
     .env.default += ["PYTHONHOME=/opt/python-occlum"] |
     .mount += [{"target": "/host", "type": "hostfs", "source": "."}]' -i Occlum.yaml
 

@@ -1,4 +1,6 @@
-use config::{parse_key, parse_mac, ConfigMount, ConfigMountFsType, ConfigMountOptions};
+use config::{
+    parse_key, parse_mac, parse_memory_size, ConfigMount, ConfigMountFsType, ConfigMountOptions,
+};
 use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::sync::Once;
@@ -71,17 +73,63 @@ pub async fn do_mount(
     let (mount_configs, user_key) = match options {
         MountOptions::UnionFS(unionfs_options) => {
             let mc = {
-                let image_mc = ConfigMount {
-                    type_: ConfigMountFsType::TYPE_SEFS,
-                    target: target.clone(),
-                    source: Some(unionfs_options.lower_dir.clone()),
-                    options: Default::default(),
+                let image_mc = match unionfs_options.lower_fs {
+                    ConfigMountFsType::TYPE_SEFS => ConfigMount {
+                        type_: ConfigMountFsType::TYPE_SEFS,
+                        target: target.clone(),
+                        source: Some(unionfs_options.lower_dir.clone()),
+                        options: Default::default(),
+                    },
+                    ConfigMountFsType::TYPE_ASYNC_SFS => {
+                        let options = {
+                            let mut options = ConfigMountOptions::gen_async_sfs_default();
+                            if let Some(total_size) = unionfs_options.async_sfs_total_size {
+                                options.async_sfs_total_size.insert(total_size);
+                            }
+                            if let Some(cache_size) = unionfs_options.page_cache_size {
+                                options.page_cache_size.insert(cache_size);
+                            }
+                            options
+                        };
+                        ConfigMount {
+                            type_: ConfigMountFsType::TYPE_ASYNC_SFS,
+                            target: target.clone(),
+                            source: Some(unionfs_options.lower_dir.clone()),
+                            options,
+                        }
+                    }
+                    _ => {
+                        return_errno!(EINVAL, "unsupported fs type in mount unionfs");
+                    }
                 };
-                let container_mc = ConfigMount {
-                    type_: ConfigMountFsType::TYPE_SEFS,
-                    target: target.clone(),
-                    source: Some(unionfs_options.upper_dir.clone()),
-                    options: Default::default(),
+                let container_mc = match unionfs_options.upper_fs {
+                    ConfigMountFsType::TYPE_SEFS => ConfigMount {
+                        type_: ConfigMountFsType::TYPE_SEFS,
+                        target: target.clone(),
+                        source: Some(unionfs_options.upper_dir.clone()),
+                        options: Default::default(),
+                    },
+                    ConfigMountFsType::TYPE_ASYNC_SFS => {
+                        let options = {
+                            let mut options = ConfigMountOptions::gen_async_sfs_default();
+                            if let Some(total_size) = unionfs_options.async_sfs_total_size {
+                                options.async_sfs_total_size.insert(total_size);
+                            }
+                            if let Some(cache_size) = unionfs_options.page_cache_size {
+                                options.page_cache_size.insert(cache_size);
+                            }
+                            options
+                        };
+                        ConfigMount {
+                            type_: ConfigMountFsType::TYPE_ASYNC_SFS,
+                            target: target.clone(),
+                            source: Some(unionfs_options.upper_dir.clone()),
+                            options,
+                        }
+                    }
+                    _ => {
+                        return_errno!(EINVAL, "unsupported fs type in mount unionfs");
+                    }
                 };
 
                 ConfigMount {
@@ -107,6 +155,27 @@ pub async fn do_mount(
                 },
             };
             (vec![mc], sefs_options.key)
+        }
+        MountOptions::AsyncSFS(async_sfs_options) => {
+            let mc = {
+                let options = {
+                    let mut options = ConfigMountOptions::gen_async_sfs_default();
+                    if let Some(total_size) = async_sfs_options.total_size {
+                        options.async_sfs_total_size.insert(total_size);
+                    }
+                    if let Some(cache_size) = async_sfs_options.page_cache_size {
+                        options.page_cache_size.insert(cache_size);
+                    }
+                    options
+                };
+                ConfigMount {
+                    type_: ConfigMountFsType::TYPE_ASYNC_SFS,
+                    target,
+                    source: Some(async_sfs_options.dir.clone()),
+                    options,
+                }
+            };
+            (vec![mc], async_sfs_options.key)
         }
         MountOptions::HostFS(dir) => {
             let mc = ConfigMount {
@@ -166,6 +235,7 @@ pub async fn do_umount(target: &str, flags: UmountFlags) -> Result<()> {
 pub enum MountOptions {
     UnionFS(UnionFSMountOptions),
     SEFS(SEFSMountOptions),
+    AsyncSFS(AsyncSFSMountOptions),
     HostFS(PathBuf),
     RamFS,
 }
@@ -190,6 +260,15 @@ impl MountOptions {
                     UnionFSMountOptions::from_input(options.as_str())?
                 };
                 Self::UnionFS(unionfs_mount_options)
+            }
+            ConfigMountFsType::TYPE_ASYNC_SFS => {
+                let async_sfs_mount_options = {
+                    let options = from_user::clone_cstring_safely(options)?
+                        .to_string_lossy()
+                        .into_owned();
+                    AsyncSFSMountOptions::from_input(options.as_str())?
+                };
+                Self::AsyncSFS(async_sfs_mount_options)
             }
             ConfigMountFsType::TYPE_HOSTFS => {
                 let options = from_user::clone_cstring_safely(options)?
@@ -216,8 +295,12 @@ impl MountOptions {
 #[derive(Debug)]
 pub struct UnionFSMountOptions {
     lower_dir: PathBuf,
+    lower_fs: ConfigMountFsType,
     upper_dir: PathBuf,
+    upper_fs: ConfigMountFsType,
     key: Option<sgx_key_128bit_t>,
+    async_sfs_total_size: Option<usize>,
+    page_cache_size: Option<usize>,
 }
 
 impl UnionFSMountOptions {
@@ -228,19 +311,45 @@ impl UnionFSMountOptions {
             .iter()
             .find_map(|s| s.strip_prefix("lowerdir="))
             .ok_or_else(|| errno!(EINVAL, "no lowerdir options"))?;
+        let lower_fs = {
+            let input = options
+                .iter()
+                .find_map(|s| s.strip_prefix("lowerfs="))
+                .ok_or_else(|| errno!(EINVAL, "no lowerfs options"))?;
+            ConfigMountFsType::from_input(input)?
+        };
         let upper_dir = options
             .iter()
             .find_map(|s| s.strip_prefix("upperdir="))
             .ok_or_else(|| errno!(EINVAL, "no upperdir options"))?;
+        let upper_fs = {
+            let input = options
+                .iter()
+                .find_map(|s| s.strip_prefix("upperfs="))
+                .ok_or_else(|| errno!(EINVAL, "no upperfs options"))?;
+            ConfigMountFsType::from_input(input)?
+        };
         let key = match options.iter().find_map(|s| s.strip_prefix("key=")) {
             Some(key_str) => Some(parse_key(key_str)?),
+            None => None,
+        };
+        let async_sfs_total_size = match options.iter().find_map(|s| s.strip_prefix("sfssize=")) {
+            Some(size) => Some(parse_memory_size(size)?),
+            None => None,
+        };
+        let page_cache_size = match options.iter().find_map(|s| s.strip_prefix("cachesize=")) {
+            Some(size) => Some(parse_memory_size(size)?),
             None => None,
         };
 
         Ok(Self {
             lower_dir: PathBuf::from(lower_dir),
+            lower_fs,
             upper_dir: PathBuf::from(upper_dir),
+            upper_fs,
             key,
+            async_sfs_total_size,
+            page_cache_size,
         })
     }
 }
@@ -273,6 +382,44 @@ impl SEFSMountOptions {
             dir: PathBuf::from(dir),
             key,
             mac,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct AsyncSFSMountOptions {
+    dir: PathBuf,
+    key: Option<sgx_key_128bit_t>,
+    total_size: Option<usize>,
+    page_cache_size: Option<usize>,
+}
+
+impl AsyncSFSMountOptions {
+    pub fn from_input(input: &str) -> Result<Self> {
+        let options: Vec<&str> = input.split(",").collect();
+
+        let dir = options
+            .iter()
+            .find_map(|s| s.strip_prefix("dir="))
+            .ok_or_else(|| errno!(EINVAL, "no dir options"))?;
+        let key = match options.iter().find_map(|s| s.strip_prefix("key=")) {
+            Some(key_str) => Some(parse_key(key_str)?),
+            None => None,
+        };
+        let total_size = match options.iter().find_map(|s| s.strip_prefix("totalsize=")) {
+            Some(size) => Some(parse_memory_size(size)?),
+            None => None,
+        };
+        let page_cache_size = match options.iter().find_map(|s| s.strip_prefix("cachesize=")) {
+            Some(size) => Some(parse_memory_size(size)?),
+            None => None,
+        };
+
+        Ok(Self {
+            dir: PathBuf::from(dir),
+            key,
+            total_size,
+            page_cache_size,
         })
     }
 }

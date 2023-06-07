@@ -43,6 +43,9 @@ jobs:
     - name: Integration test with Glibc
       run:  docker exec ${{ github.job }} bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test-glibc"
 
+    - name: Integration test with legacy Occlum configuration (SEFS)
+      run:  docker exec ${{ github.job }} bash -c "cd /root/occlum/test; OCCLUM_LOG_LEVEL=trace SGX_MODE=SIM make test-legacy"
+
     - name: Show failed cases
       if: ${{ failure() }}
       run: docker exec ${{ github.job }} bash -c "cat /root/occlum/build/test/.fail"

@@ -10,9 +10,9 @@ resource_limits:
   kernel_space_heap_size:
     # Reserved and committed during the initialization stage. The more, the longer it takes to initialize.
     # NOTE: Decrease this value when EDMM support is enabled.
-    init: 512MB
+    init: 1024MB
     # Only committed when necessary. Only valid with EDMM support.
-    max:  512MB
+    max:  1024MB
   # The total size of enclave memory available to the user applications running in LibOS.
   # With EDMM support, choose "init" size based on the expected initialization time. And increase the "max" field if memory insufficiency occurs.
   # Without EDMM support, increase the "init" field if memory insufficiency occurs. And the "max" field is ignored.
@@ -106,8 +106,14 @@ mount:
             MAC: ''
         # The read-write layer whose content is produced when running the LibOS
         - target: /
-          type: sefs
+          type: async_sfs
           source: ./run/mount/__ROOT
+          options:
+            # Total size that Async-SFS can manage. Must be specified.
+            async_sfs_total_size: 10GB
+            # Page cache size that Async-SFS can use. Must be specified.
+            # When the `page_cache_size` is given, the `kernel_space_heap_size` must be increased equally.
+            page_cache_size: 256MB
   #
   # HostFS mount
   # It provides a channel to exchange files between Host FS and LibOS FS.
@@ -120,11 +126,3 @@ mount:
   - target: /host
     type: hostfs
     source: .
-  #
-  # Async FS mount
-  - target: /sfs
-    type: async_sfs
-    source: ./run/async_sfs_image
-    options:
-      async_sfs_total_size: 4GB
-      page_cache_size: 256MB

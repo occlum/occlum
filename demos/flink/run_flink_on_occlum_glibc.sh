@@ -17,7 +17,7 @@ init_instance() {
     occlum init
     yq '.resource_limits.user_space_size.init = "5500MB" |
         .process.default_heap_size = "128MB" |
-        .resource_limits.kernel_space_heap_size.init="64MB" |
+        .resource_limits.kernel_space_heap_size.init="512MB" |
         .entry_points = [ "/usr/lib/jvm/java-11-openjdk-amd64/bin" ] |
         .mount += [{"target": "/host", "type": "hostfs", "source": "."}] |
         .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-11-openjdk-amd64/lib/server:/usr/lib/jvm/java-11-openjdk-amd64/lib:/usr/lib/jvm/java-11-openjdk-amd64/../lib:/lib" ]' \

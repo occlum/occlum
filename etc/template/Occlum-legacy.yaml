@@ -9,7 +9,7 @@ resource_limits:
   # Without EDMM support, increase the "init" field if memory insufficiency occurs. And the "max" field is ignored.
   kernel_space_heap_size:
     # Reserved and committed during the initialization stage. The more, the longer it takes to initialize.
-    init: 512MB
+    init: 32MB
     # Only committed when necessary. Only valid with EDMM support.
     max:  512MB
   # The total size of enclave memory available to the user applications running in LibOS.
@@ -101,20 +101,18 @@ mount:
             MAC: ''
         # The read-write layer whose content is produced when running the LibOS
         - target: /
-          type: async_sfs
+          type: sefs
           source: ./run/mount/__ROOT
-          options:
-            # Total size that Async-SFS can manage. Must be specified.
-            async_sfs_total_size: 10GB
-            # Page cache size that Async-SFS can use. Must be specified.
-            # When the `page_cache_size` is given, the `kernel_space_heap_size` must be increased equally.
-            page_cache_size: 256MB
-            # The JinDisk under Async-SFS uses MRSIGNER to derive key by default, so the data can
-            # be shared between same enclave signer on the same machine.
-            # If you want more secure scheme, you can set the autokey_policy field
-            # to 1 to enforce the key is derived by MRSIGNER|MRENCLAVE|ISVFAMILYID.
-            # So the data can only be accessed by the enclave itself.
-            # autokey_policy: 1
+          # options:
+          # The SEFS just uses MRSIGNER to derive key by default, so the data can
+          # be shared between same enclave signer on the same machine.
+          # If you want more secure scheme, you can set the autokey_policy field
+          # to 1 to enforce the key is derived by MRSIGNER|MRENCLAVE|ISVFAMILYID.
+          # So the data can only be accessed by the enclave itself.
+          #  autokey_policy: 1
+          # The SEFS internal cache size, increasing it will bring better file I/O 
+          # performance but also consume Occlum's kernel heap size.
+          #  sefs_cache_size: 192KB
   #
   # HostFS mount
   # It provides a channel to exchange files between Host FS and LibOS FS.
@@ -128,20 +126,22 @@ mount:
   #   type: hostfs
   #   source: .
   #
-  # SEFS mount
-  # - target: /sefs
-  #   type: sefs
-  #   source: ./run
+  # Async FS mount
+  # - target: /sfs
+  #   type: async_sfs
+  #   source: ./run/async_sfs_image
   #   options:
-  #     # The SEFS just uses MRSIGNER to derive key by default, so the data can
+  #     # Total size that Async-SFS can manage. Must be specified.
+  #     async_sfs_total_size: 4GB
+  #     # Page cache size that Async-SFS can use. Must be specified.
+  #     # When the `page_cache_size` is given, the `kernel_space_heap_size` must be increased equally.
+  #     page_cache_size: 256MB
+  #     # The JinDisk under Async-SFS uses MRSIGNER to derive key by default, so the data can
   #     # be shared between same enclave signer on the same machine.
   #     # If you want more secure scheme, you can set the autokey_policy field
   #     # to 1 to enforce the key is derived by MRSIGNER|MRENCLAVE|ISVFAMILYID.
   #     # So the data can only be accessed by the enclave itself.
   #     autokey_policy: 1
-  #     # The SEFS internal cache size, increasing it will bring better file I/O 
-  #     # performance but also consume Occlum's kernel heap size.
-  #     sefs_cache_size: 192KB
 #
 # Untrusted Unix domain socket
 # Besides the common Unix domain socket support that both ends are created in the same

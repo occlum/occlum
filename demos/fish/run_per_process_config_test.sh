@@ -11,7 +11,7 @@ occlum new occlum-test && cd occlum-test
 
 # Set process memory space size to very small values and will fail when running target script using default configuration
 yq '.resource_limits.user_space_size.init = "512MB" |
-    .resource_limits.kernel_space_heap_size.init= "64MB" |
+    .resource_limits.kernel_space_heap_size.init= "512MB" |
     .process.default_stack_size = "1MB" |
     .process.default_heap_size = "1MB" |
     .env.default = [ "OCCLUM=yes", "HOME=/root" ]' -i Occlum.yaml

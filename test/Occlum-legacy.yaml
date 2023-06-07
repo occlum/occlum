@@ -9,6 +9,7 @@ resource_limits:
   # Without EDMM support, increase the "init" field if memory insufficiency occurs. And the "max" field is ignored.
   kernel_space_heap_size:
     # Reserved and committed during the initialization stage. The more, the longer it takes to initialize.
+    # NOTE: Decrease this value when EDMM support is enabled.
     init: 512MB
     # Only committed when necessary. Only valid with EDMM support.
     max:  512MB
@@ -17,7 +18,8 @@ resource_limits:
   # Without EDMM support, increase the "init" field if memory insufficiency occurs. And the "max" field is ignored.
   user_space_size:
     # Reserved and committed during the initialization stage. The more, the longer it takes to initialize.
-    init: 256MB
+    # NOTE: Decrease this value when EDMM support is enabled.
+    init: 420MB
     # Only committed when necessary. Only valid with EDMM support.
     max:  64GB
 
@@ -26,7 +28,7 @@ process:
   # Default stack size for each process.
   default_stack_size: 4MB
   # Default heap size for each process.
-  default_heap_size: 32MB
+  default_heap_size: 8MB
 
 # Entry points
 # Specify all valid absolute <path> in `occlum run <path> <args>`.
@@ -44,6 +46,8 @@ env:
   # are specified in this config file, they are considered trusted.
   default:
     - OCCLUM=yes
+    - STABLE=yes
+    - OVERRIDE=N
   # The untrusted env vars that are captured by Occlum from the host environment
   # and passed to the "root" LibOS processes. These untrusted env vars can
   # override the trusted, default envs specified above.
@@ -55,7 +59,8 @@ env:
   #       untrusted:
   #         - OCCLUM
   untrusted:
-    - EXAMPLE
+    - TEST
+    - OVERRIDE
 
 # Enclave metadata
 # If not sure, just keep them no change
@@ -101,20 +106,8 @@ mount:
             MAC: ''
         # The read-write layer whose content is produced when running the LibOS
         - target: /
-          type: async_sfs
+          type: sefs
           source: ./run/mount/__ROOT
-          options:
-            # Total size that Async-SFS can manage. Must be specified.
-            async_sfs_total_size: 10GB
-            # Page cache size that Async-SFS can use. Must be specified.
-            # When the `page_cache_size` is given, the `kernel_space_heap_size` must be increased equally.
-            page_cache_size: 256MB
-            # The JinDisk under Async-SFS uses MRSIGNER to derive key by default, so the data can
-            # be shared between same enclave signer on the same machine.
-            # If you want more secure scheme, you can set the autokey_policy field
-            # to 1 to enforce the key is derived by MRSIGNER|MRENCLAVE|ISVFAMILYID.
-            # So the data can only be accessed by the enclave itself.
-            # autokey_policy: 1
   #
   # HostFS mount
   # It provides a channel to exchange files between Host FS and LibOS FS.
@@ -124,43 +117,6 @@ mount:
   # For example, below section mount the occlum_instance directory in the Host FS
   # to the path /host in the LibOS FS.
   # It is disabled in default. Uncomment it if you are very sure about it.
-  # - target: /host
-  #   type: hostfs
-  #   source: .
-  #
-  # SEFS mount
-  # - target: /sefs
-  #   type: sefs
-  #   source: ./run
-  #   options:
-  #     # The SEFS just uses MRSIGNER to derive key by default, so the data can
-  #     # be shared between same enclave signer on the same machine.
-  #     # If you want more secure scheme, you can set the autokey_policy field
-  #     # to 1 to enforce the key is derived by MRSIGNER|MRENCLAVE|ISVFAMILYID.
-  #     # So the data can only be accessed by the enclave itself.
-  #     autokey_policy: 1
-  #     # The SEFS internal cache size, increasing it will bring better file I/O 
-  #     # performance but also consume Occlum's kernel heap size.
-  #     sefs_cache_size: 192KB
-#
-# Untrusted Unix domain socket
-# Besides the common Unix domain socket support that both ends are created in the same
-# Occlum instance, the Untrusted Unix domain socket can support cross-world connection by
-# mapping a libos socket address with the host socket address. In this way, a Unix domain
-# socket created in Occlum can communicate with a Unix domain socket in the host OS or in
-# another Occlum instance.
-# Uncomment and customize below if you are very sure about it.
-#
-# untrusted_unix_socks:
-# The libos path and the host path correspond to the same host sock file.
-# The host side should use the host path and libos side should use the libos path.
-#
-# Specify socket file in absolute path
-  # - host: /tmp/occlum/test.sock
-  #   libos: /root/test.sock
-# Or any files in the path
-  # - host: /tmp/root/
-  #   libos: /root/
-# Or the host path can be a relative path and is relative to the current Occlum instance dir.
-  # - host: ../test.sock
-  #   libos: /tmp/test.sock
+  - target: /host
+    type: hostfs
+    source: .
