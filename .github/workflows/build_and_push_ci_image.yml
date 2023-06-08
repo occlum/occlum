@@ -220,6 +220,10 @@ jobs:
     if: github.event.inputs.image_name == 'tf_serving'
 
     steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
     - name: Checkout code
       uses: actions/checkout@v2
 
