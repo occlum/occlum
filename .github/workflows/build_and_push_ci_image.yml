@@ -214,10 +214,16 @@ jobs:
   # Thus dividing into two jobs.
 
   Build_tf_serving_image:
-    runs-on: ubuntu-20.04
+    # Building TF serving demo image needs a lot of resources which exceeds the limit of GitHub Actions' hosted machine.
+    # Thus, we need to build this image on our host machine. This begins from Occlum 0.29.6 and onwards.
+    runs-on: [self-hosted, SGX2-HW]
     if: github.event.inputs.image_name == 'tf_serving'
 
     steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
     - name: Checkout code
       uses: actions/checkout@v2
 
