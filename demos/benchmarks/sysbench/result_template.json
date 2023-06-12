@@ -1,0 +1,26 @@
+[
+    {
+        "name": "Threads Minimum latency",
+        "unit": "ms",
+        "value": 0,
+        "extra": "min"
+    },
+    {
+        "name": "Threads Average Latency",
+        "unit": "ms",
+        "value": 0,
+        "extra": "avg"
+    },
+    {
+        "name": "Threads Maximum Latency",
+        "unit": "ms",
+        "value": 0,
+        "extra": "max"
+    },
+    {
+        "name": "Thread 95th Percentile Latency",
+        "unit": "ms",
+        "value": 0,
+        "extra": "per95"
+    }
+]

@@ -1,0 +1,14 @@
+[
+    {
+        "name": "Sender Average Rate",
+        "unit": "Mbits/sec",
+        "value": 0,
+        "extra": "sender"
+    },
+    {
+        "name": "Receiver Average Rate",
+        "unit": "Mbits/sec",
+        "value": 0,
+        "extra": "receiver"
+    }
+]
