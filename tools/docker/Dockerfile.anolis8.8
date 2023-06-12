@@ -141,7 +141,7 @@ ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
 
 # Install glibc
 WORKDIR /root/occlum/tools/toolchains
-RUN cd glibc && ./build.sh && cd .. && rm -rf glibc
+RUN cd glibc && ./build.sh && cd .. && rm -rf glibc && rm -rf /tmp/glibc*
 
 # Install Occlum Golang toolchain
 WORKDIR /root/occlum/tools/toolchains
@@ -187,7 +187,7 @@ RUN cd aecs_client && ./build.sh && cd .. && rm -rf aecs_client
 
 # Install GRPC RATLS
 WORKDIR /root/occlum/tools/toolchains
-RUN cd grpc_ratls && ./build.sh && cd .. && rm -rf grpc_ratls
+RUN cd grpc_ratls && ./build.sh && cd .. && rm -rf grpc_ratls && rm -rf /tmp/grpc*
 
 # Build and install Occlum
 WORKDIR /root
