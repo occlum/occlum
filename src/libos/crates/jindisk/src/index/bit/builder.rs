@@ -87,7 +87,7 @@ impl BitBuilder {
         let mut encoded_root_block = [0u8; ROOT_BLOCK_SIZE];
         root_block.encode(&mut encoded_root_block).unwrap();
         let mut cipher_root_block = [0u8; ROOT_BLOCK_SIZE];
-        let cipher_meta = DefaultCryptor::encrypt_arbitrary(
+        let cipher_meta = DefaultCryptor::encrypt_arbitrary_aead(
             &encoded_root_block,
             &mut cipher_root_block,
             &self.key,
@@ -136,7 +136,7 @@ impl BitBuilder {
             let mut encoded_internal_block = [0u8; INTERNAL_BLOCK_SIZE];
             internal_block.encode(&mut encoded_internal_block).unwrap();
             let mut cipher_internal_block = [0u8; INTERNAL_BLOCK_SIZE];
-            let cipher_meta = DefaultCryptor::encrypt_arbitrary(
+            let cipher_meta = DefaultCryptor::encrypt_arbitrary_aead(
                 &encoded_internal_block,
                 &mut cipher_internal_block,
                 &self.key,
@@ -183,7 +183,8 @@ impl BitBuilder {
             // Encode and encrypt leaf node
             let mut encoded_leaf_block = [0u8; LEAF_BLOCK_SIZE];
             leaf_block.encode(&mut encoded_leaf_block).unwrap();
-            let cipher_leaf_block = DefaultCryptor::encrypt_block(&encoded_leaf_block, &self.key);
+            let cipher_leaf_block =
+                DefaultCryptor::encrypt_block_aead(&encoded_leaf_block, &self.key);
 
             let leaf_record = LeafRecord::new(
                 lba_range,

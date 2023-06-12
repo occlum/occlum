@@ -107,21 +107,21 @@ impl Checkpoint {
             .write()
             .persist(&self.disk, region.dst_addr, root_key)
             .await?;
-        self.rit.write().await.persist(root_key).await?;
+        self.rit.write().await.persist().await?;
         self.key_table
             .persist(&self.disk, region.keytable_addr, root_key)
             .await?;
 
-        self.commit_pflag(&region, Pflag::Commited).await?;
+        self.commit_pflag(&region, Pflag::Committed).await?;
         Ok(())
     }
 
     pub async fn load(disk: &DiskView, superblock: &SuperBlock, root_key: &Key) -> Result<Self> {
         let region = &superblock.checkpoint_region;
         match Self::check_pflag(disk, region).await {
-            Pflag::NotCommited => return_errno!(EINVAL, "checkpoint region not persisted yet"),
+            Pflag::NotCommitted => return_errno!(EINVAL, "checkpoint region not persisted yet"),
             Pflag::Initialized => return Ok(Self::new(superblock, disk.clone(), root_key)),
-            Pflag::Commited => {}
+            Pflag::Committed => {}
         }
 
         let bitc = BITC::load(disk, region.bitc_addr, root_key).await?;
@@ -166,27 +166,27 @@ impl Checkpoint {
 /// Persist flag.
 #[derive(Clone, Copy, Debug)]
 enum Pflag {
-    NotCommited,
-    Commited,
+    NotCommitted,
+    Committed,
     Initialized,
 }
 
 impl Pflag {
     fn check_pflag(pflag_buf: &[u8]) -> Pflag {
         debug_assert!(pflag_buf.len() == BLOCK_SIZE);
-        if pflag_buf == &[Pflag::Commited as u8; BLOCK_SIZE] {
-            Pflag::Commited
+        if pflag_buf == &[Pflag::Committed as u8; BLOCK_SIZE] {
+            Pflag::Committed
         } else if pflag_buf == &[Pflag::Initialized as u8; BLOCK_SIZE] {
             Pflag::Initialized
         } else {
-            Pflag::NotCommited
+            Pflag::NotCommitted
         }
     }
 
     fn commit_pflag(pflag: Pflag, pflag_buf: &mut [u8]) {
         debug_assert!(pflag_buf.len() == BLOCK_SIZE);
         match pflag {
-            Pflag::Commited => pflag_buf.copy_from_slice(&[Pflag::Commited as u8; BLOCK_SIZE]),
+            Pflag::Committed => pflag_buf.copy_from_slice(&[Pflag::Committed as u8; BLOCK_SIZE]),
             Pflag::Initialized => {
                 pflag_buf.copy_from_slice(&[Pflag::Initialized as u8; BLOCK_SIZE])
             }
@@ -212,15 +212,18 @@ macro_rules! persist_load_checkpoint_region {
                 self.encode(&mut encoded_struct)?;
                 let bytes_len = encoded_struct.len();
 
-                let mut cipher_buf = vec![0u8; bytes_len];
-                let cipher_meta =
-                    DefaultCryptor::encrypt_arbitrary(&encoded_struct, &mut cipher_buf, root_key);
+                let mut cipher_buf = unsafe { Box::new_uninit_slice(bytes_len).assume_init() };
+                let cipher_meta = DefaultCryptor::encrypt_arbitrary_aead(
+                    &encoded_struct,
+                    &mut cipher_buf,
+                    root_key,
+                );
 
                 let buf_len = align_up((AUTH_ENC_MAC_SIZE + USIZE_SIZE + bytes_len), BLOCK_SIZE);
                 let mut persisted_buf = Vec::with_capacity(buf_len);
                 persisted_buf.extend_from_slice(cipher_meta.mac());
                 persisted_buf.extend_from_slice(&bytes_len.to_le_bytes());
-                persisted_buf.extend(&cipher_buf);
+                persisted_buf.extend(cipher_buf.iter());
                 persisted_buf.resize_with(buf_len, || 0u8);
 
                 disk.write(region_addr, &persisted_buf).await?;
@@ -235,11 +238,16 @@ macro_rules! persist_load_checkpoint_region {
                     usize::decode(&rbuf[AUTH_ENC_MAC_SIZE..AUTH_ENC_MAC_SIZE + USIZE_SIZE])?;
                 let mac: Mac = rbuf[0..AUTH_ENC_MAC_SIZE].try_into().unwrap();
 
-                let mut cipher_buf =
-                    vec![0u8; align_up(AUTH_ENC_MAC_SIZE + USIZE_SIZE + cipher_size, BLOCK_SIZE)];
+                let mut cipher_buf = unsafe {
+                    Box::new_uninit_slice(align_up(
+                        AUTH_ENC_MAC_SIZE + USIZE_SIZE + cipher_size,
+                        BLOCK_SIZE,
+                    ))
+                    .assume_init()
+                };
                 disk.read(region_addr, &mut cipher_buf).await?;
-                let mut struct_buf = vec![0u8; cipher_size];
-                DefaultCryptor::decrypt_arbitrary(
+                let mut struct_buf = unsafe { Box::new_uninit_slice(cipher_size).assume_init() };
+                DefaultCryptor::decrypt_arbitrary_aead(
                     &cipher_buf[AUTH_ENC_MAC_SIZE + USIZE_SIZE
                         ..AUTH_ENC_MAC_SIZE + USIZE_SIZE + cipher_size],
                     &mut struct_buf,

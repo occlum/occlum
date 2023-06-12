@@ -459,7 +459,7 @@ impl SegmentBuffer {
             .map(|(idx, (&lba, data_block))| {
                 (
                     lba,
-                    DefaultCryptor::encrypt_block(
+                    DefaultCryptor::encrypt_block_aead(
                         data_block.as_slice(),
                         &self.checkpoint.key_table().fetch_key(allocated_blocks[idx]),
                     ),

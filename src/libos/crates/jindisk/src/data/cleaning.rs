@@ -152,7 +152,7 @@ impl Inner {
             // Read and decrypt from disk
             let mut rbuf = [0u8; BLOCK_SIZE];
             self.disk.read(record.hba(), &mut rbuf).await?;
-            let decrypted = DefaultCryptor::decrypt_block(
+            let decrypted = DefaultCryptor::decrypt_block_aead(
                 &rbuf,
                 &self.checkpoint.key_table().fetch_key(record.hba()),
                 record.cipher_meta(),

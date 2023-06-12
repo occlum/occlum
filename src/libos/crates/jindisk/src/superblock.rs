@@ -20,7 +20,7 @@ pub struct SuperBlock {
 
     /// Number of data segments
     pub num_data_segments: usize,
-    /// Number of over provisioning data segemnts
+    /// Number of over provisioning data segments
     pub num_over_provisioning: usize,
     /// Number of index segments
     pub num_index_segments: usize,

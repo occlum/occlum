@@ -20,7 +20,7 @@
 //! - `read(lba: Lba, buf: &mut [u8])`
 //! - `write(lba: Lba, buf: &[u8])`
 //! - `flush()`
-//! - `trim(lbas: &[Lba])`
+//! - `discard(lbas: &[Lba])`
 //!
 //! JinDisk protects all block I/O through these operations transparently.
 //!
@@ -98,7 +98,7 @@ mod util;
 use self::checkpoint::Checkpoint;
 pub use self::config::{GiB, Hba, KiB, Lba, MiB, SEGMENT_SIZE};
 use self::data::{Cleaner, DataCache};
-use self::index::{LsmTree, Record};
+use self::index::{bit::Bit, LsmTree, Record};
 pub use self::jindisk::JinDisk;
 pub use self::superblock::SuperBlock;
 pub use self::util::cryption::{Cryption, DefaultCryptor};

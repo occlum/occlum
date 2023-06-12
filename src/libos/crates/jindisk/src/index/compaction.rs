@@ -1,11 +1,10 @@
 //! Lsm tree compaction policy.
-use super::bit::{Bit, BitBuilder, BitId, MAX_RECORD_NUM_PER_BIT};
+use super::bit::{Bit, BitBuilder, MAX_RECORD_NUM_PER_BIT};
 use super::mem_table::LockedMemTable;
+use super::reclaim::apply_compaction_reclaim_policy;
 use crate::index::lsm_tree::LsmLevel;
 use crate::prelude::*;
 use crate::{Checkpoint, Record};
-
-use std::collections::{BTreeMap, HashSet};
 
 /// Compactor. Used to execute different compaction policy.
 pub struct Compactor(AsyncMutex<()>);
@@ -87,86 +86,47 @@ impl Compactor {
         disk: &DiskView,
         checkpoint: &Arc<Checkpoint>,
     ) -> Result<()> {
-        // Find L0's overlapped bit in L1
-        let mut overlapped_bits = checkpoint
-            .bitc()
-            .read()
-            .find_bit_by_lba_range(l0_bit.lba_range(), 1 as LsmLevel);
-        // Sort by version in descending order
-        overlapped_bits.sort_by(|a, b| b.version().cmp(&a.version()));
+        // Find L0's overlapped BIT in L1
+        let overlapped_l1_bits = {
+            let mut overlapped_bits = checkpoint
+                .bitc()
+                .read()
+                .find_bit_by_lba_range(l0_bit.lba_range(), 1 as LsmLevel);
 
-        if overlapped_bits.is_empty() {
-            // No overlap between L0 and L1. Just turn L0 BIT into a L1 one
-            let level = 1 as LsmLevel;
-            let mut bitc = checkpoint.bitc().write();
-            bitc.insert_bit(l0_bit.clone(), level);
-            bitc.remove_bit(l0_bit.id(), 0 as LsmLevel);
-            drop(bitc);
+            if overlapped_bits.is_empty() {
+                // No overlap between L0 and L1. Just turn L0 BIT into a L1 one
+                let level = 1 as LsmLevel;
+                let mut bitc = checkpoint.bitc().write();
+                bitc.insert_bit(l0_bit.clone(), level);
+                bitc.remove_bit(l0_bit.id(), 0 as LsmLevel);
+                drop(bitc);
 
-            debug!(
-                "{:#?}\n[Major Compaction] complete",
-                checkpoint.bitc().read()
-            );
-            return Ok(());
-        }
-        let mut overlapped_bit_ids: Vec<BitId> = Vec::with_capacity(overlapped_bits.len());
-
-        let l0_records = l0_bit.collect_all_records(disk).await?;
-
-        // Construct L0 regular records map and collect negative ones
-        let mut records_merge_map = BTreeMap::<Lba, Record>::new();
-        let mut negative_map = HashSet::<Lba>::new();
-        for l0_record in l0_records.into_iter() {
-            if l0_record.is_negative() {
-                negative_map.insert(l0_record.lba());
-            } else {
-                records_merge_map.insert(l0_record.lba(), l0_record);
+                debug!(
+                    "{:#?}\n[Major Compaction] complete",
+                    checkpoint.bitc().read()
+                );
+                return Ok(());
             }
-        }
 
-        // Collect L1 BITs from newer to older
-        for l1_bit in overlapped_bits {
-            let l1_records = l1_bit.collect_all_records(disk).await?;
-            for l1_record in l1_records.into_iter() {
-                let lba = l1_record.lba();
-                if l1_record.is_negative() {
-                    negative_map.insert(lba);
-                    continue;
-                }
-                if negative_map.contains(&lba) {
-                    continue;
-                }
-                if records_merge_map.contains_key(&lba) {
-                    // Check if the hba has already been processed by cleaning
-                    let avail_to_reclaim = checkpoint
-                        .rit()
-                        .write()
-                        .await
-                        .check_valid(l1_record.hba(), lba)
-                        .await;
-                    if avail_to_reclaim {
-                        // Delayed block reclamation
-                        checkpoint
-                            .dst()
-                            .write()
-                            .update_validity(&[l1_record.hba()], false);
-                    }
-                    continue;
-                }
-                records_merge_map.insert(lba, l1_record);
-            }
-            overlapped_bit_ids.push(l1_bit.id());
-        }
+            // Sort by version in descending order (newer to older)
+            overlapped_bits.sort_by(|bit1, bit2| bit2.version().cmp(&bit1.version()));
+            overlapped_bits
+        };
 
         // All wait-compaction records
-        let mut records_merged: Vec<Record> = records_merge_map.into_values().collect();
-        debug_assert!(records_merged.is_sorted_by_key(|record| record.lba()));
+        let compacted_records = {
+            let mut records =
+                apply_compaction_reclaim_policy(l0_bit, &overlapped_l1_bits, disk, checkpoint)
+                    .await?;
+            debug_assert!(records.is_sorted_by_key(|r| r.lba()));
+            // TODO: Optimize this padding logic
+            Record::padding_records(&mut records, MAX_RECORD_NUM_PER_BIT);
+            records
+        };
 
-        // TODO: Optimize this padding logic
-        Record::padding_records(&mut records_merged, MAX_RECORD_NUM_PER_BIT);
         // Construct several new BITs
-        let mut new_bits = Vec::with_capacity(records_merged.len() / MAX_RECORD_NUM_PER_BIT);
-        for sub_records in records_merged.chunks(MAX_RECORD_NUM_PER_BIT) {
+        let mut new_bits = Vec::with_capacity(compacted_records.len() / MAX_RECORD_NUM_PER_BIT);
+        for sub_records in compacted_records.chunks(MAX_RECORD_NUM_PER_BIT) {
             // Pick an available segment from index SVT
             let seg_addr = checkpoint.index_svt().write().pick_avail_seg().unwrap();
 
@@ -191,13 +151,14 @@ impl Compactor {
             bitc.insert_bit(new_bit, level);
         }
         let mut index_svt = checkpoint.index_svt().write();
-        for bit_id in overlapped_bit_ids {
+        overlapped_l1_bits.iter().for_each(|bit| {
+            let bit_id = bit.id();
             // Remove old one in BITC
             bitc.remove_bit(bit_id, 1 as LsmLevel);
 
             // Validate the index segment in SVT
             index_svt.validate_seg(bit_id);
-        }
+        });
         // Remove l0 BIT and validate the segment
         bitc.remove_bit(l0_bit.id(), 0 as LsmLevel);
         index_svt.validate_seg(l0_bit.id());

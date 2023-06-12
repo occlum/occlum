@@ -16,7 +16,7 @@ JinDisk targets a typical setting of TEE usage, where applications are ported in
 
 ![The threat model of JinDisk.](https://user-images.githubusercontent.com/22837133/202613207-907cd9ed-338b-47a4-a558-b3713e531faf.png)
 
-As shown in the image above, the TEE runtime is integrated with JinDisk, which serves as a trusted logical block device that supports four standard block I/O commands including `read()`, `write()`, `flush()`, and `trim()`. From the perspective of JinDisk's users (e.g., file systems), all data written to or read from JinDisk is in plaintext. To serve these I/O requests securely, JinDisk takes some extra security measures, including but not limited to encrypting/decrypting the data transferred to/from the host block device properly.
+As shown in the image above, the TEE runtime is integrated with JinDisk, which serves as a trusted logical block device that supports four standard block I/O commands including `read()`, `write()`, `flush()`, and `discard()`. From the perspective of JinDisk's users (e.g., file systems), all data written to or read from JinDisk is in plaintext. To serve these I/O requests securely, JinDisk takes some extra security measures, including but not limited to encrypting/decrypting the data transferred to/from the host block device properly.
 
 To distinguish between the addresses on the trusted logical block device (i.e., JinDisk) and on the untrusted host block device, we term the former as _logical block addresses (LBAs)_ and the latter _host block addresses (HBAs)_.
 

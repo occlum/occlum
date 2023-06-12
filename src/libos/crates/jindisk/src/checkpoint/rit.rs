@@ -55,8 +55,8 @@ impl RIT {
 }
 
 impl RIT {
-    pub async fn persist(&self, _root_key: &Key) -> Result<()> {
-        self.disk_array.persist(_root_key).await
+    pub async fn persist(&self) -> Result<()> {
+        self.disk_array.persist().await
     }
 
     pub async fn load(
@@ -92,8 +92,8 @@ mod tests {
         async_rt::task::block_on(async move {
             let disk = Arc::new(MemDisk::new(1024usize).unwrap());
             let disk = DiskView::new_unchecked(disk);
-            let key = DefaultCryptor::gen_random_key();
-            let mut rit = RIT::new(Hba::new(0), Hba::new(0), disk.clone(), &key);
+            let root_key = DefaultCryptor::gen_random_key();
+            let mut rit = RIT::new(Hba::new(0), Hba::new(0), disk.clone(), &root_key);
 
             let kv1 = (Hba::new(1), Lba::new(2));
             let kv2 = (Hba::new(1025), Lba::new(5));
@@ -107,9 +107,9 @@ mod tests {
             assert_eq!(rit.find_and_invalidate(kv2.0).await.unwrap(), kv2.1);
             assert_eq!(rit.check_valid(kv2.0, kv2.1).await, false);
 
-            let root_key = DefaultCryptor::gen_random_key();
-            rit.persist(&root_key).await?;
-            let _loaded_rit = RIT::load(&disk, Hba::new(0), Hba::new(0), &root_key).await?;
+            rit.persist().await?;
+            let mut loaded_rit = RIT::load(&disk, Hba::new(0), Hba::new(0), &root_key).await?;
+            assert_eq!(loaded_rit.find_lba(kv1.0).await.unwrap(), kv1.1);
 
             Ok(())
         })

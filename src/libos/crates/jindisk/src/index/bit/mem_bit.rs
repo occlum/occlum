@@ -301,7 +301,7 @@ impl Bit {
 
         // Decrypt and decode
         let mut decrypted = [0u8; ROOT_BLOCK_SIZE];
-        DefaultCryptor::decrypt_arbitrary(
+        DefaultCryptor::decrypt_arbitrary_aead(
             &rbuf[0..ROOT_BLOCK_SIZE],
             &mut decrypted,
             self.key(),
@@ -324,7 +324,7 @@ impl Bit {
 
         // Decrypt and decode
         let mut decrypted = [0u8; INTERNAL_BLOCK_SIZE];
-        DefaultCryptor::decrypt_arbitrary(
+        DefaultCryptor::decrypt_arbitrary_aead(
             &rbuf[0..INTERNAL_BLOCK_SIZE],
             &mut decrypted,
             self.key(),
@@ -347,7 +347,7 @@ impl Bit {
 
         // Decrypt and decode
         let decrypted =
-            DefaultCryptor::decrypt_block(&rbuf, self.key(), leaf_record.cipher_meta())?;
+            DefaultCryptor::decrypt_block_aead(&rbuf, self.key(), leaf_record.cipher_meta())?;
 
         LeafBlock::decode(&decrypted)
     }
