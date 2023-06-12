@@ -308,7 +308,7 @@ impl JinDisk {
                 record
             };
             self.disk.read(record.hba().to_offset(), buf).await?;
-            let decrypted = DefaultCryptor::decrypt_block(
+            let decrypted = DefaultCryptor::decrypt_block_aead(
                 buf,
                 &self.checkpoint.key_table().fetch_key(record.hba()),
                 record.cipher_meta(),
@@ -379,7 +379,7 @@ impl JinDisk {
 
             let mut offset = 0;
             for record in record_batch {
-                let decrypted = DefaultCryptor::decrypt_block(
+                let decrypted = DefaultCryptor::decrypt_block_aead(
                     &blocks_buf[offset..offset + BLOCK_SIZE],
                     &self.checkpoint.key_table().fetch_key(record.hba()),
                     record.cipher_meta(),
@@ -418,10 +418,15 @@ impl JinDisk {
         }
     }
 
-    // TODO: Support `trim()`
-    #[allow(dead_code)]
-    async fn trim(&self, _lbas: &[Lba]) -> Result<usize> {
-        unimplemented!()
+    /// Disgard a bunch of lbas. Mark these blocks invalid so they can be cleaned later.
+    #[allow(unused)]
+    pub async fn discard(&self, lbas: &[Lba]) -> Result<usize> {
+        // Insert negative records for each discard lba to lsm tree
+        for &lba in lbas {
+            self.lsm_tree.insert(lba, Record::new_negative(lba)).await?;
+        }
+        // TODO: Evaluate performance impact brought by discard
+        Ok(lbas.len())
     }
 }
 

@@ -2,14 +2,14 @@
 use crate::data::DataBlock;
 use crate::prelude::*;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::mem::size_of;
 
 /// Disk array that manages on-disk structures.
 pub struct DiskArray<T> {
     start_addr: Hba,
-    table: HashMap<Hba, DataBlock>,
+    table: BTreeMap<Hba, DataBlock>,
     disk: DiskView,
     key: Key,
     phantom: PhantomData<T>,
@@ -19,7 +19,7 @@ impl<T: Serialize> DiskArray<T> {
     pub fn new(start_addr: Hba, disk: DiskView, key: &Key) -> Self {
         Self {
             start_addr,
-            table: HashMap::new(),
+            table: BTreeMap::new(),
             disk,
             key: key.clone(),
             phantom: PhantomData,
@@ -61,8 +61,11 @@ impl<T: Serialize> DiskArray<T> {
             let mut data_block = DataBlock::new_uninit();
             self.disk.read(hba, data_block.as_slice_mut()).await?;
 
-            let plaintext = DefaultCryptor::symm_decrypt_block(data_block.as_slice(), &self.key)?;
+            let iv = (hba.to_raw() as u128).to_le_bytes();
+            let plaintext =
+                DefaultCryptor::decrypt_block(data_block.as_slice(), &self.key, Some(&iv))?;
             data_block.as_slice_mut().copy_from_slice(&plaintext);
+
             let _ = self.table.insert(hba, data_block);
         }
 
@@ -83,9 +86,11 @@ impl<T: Serialize> DiskArray<T> {
         )
     }
 
-    pub async fn persist(&self, _root_key: &Key) -> Result<()> {
+    pub async fn persist(&self) -> Result<()> {
+        // TODO: Support batch write
         for (hba, block) in self.table.iter() {
-            let ciphertext = DefaultCryptor::symm_encrypt_block(block.as_slice(), &self.key)?;
+            let iv = (hba.to_raw() as u128).to_le_bytes();
+            let ciphertext = DefaultCryptor::encrypt_block(block.as_slice(), &self.key, Some(&iv))?;
             self.disk.write(*hba, &ciphertext).await?;
         }
         Ok(())

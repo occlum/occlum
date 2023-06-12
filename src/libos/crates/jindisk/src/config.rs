@@ -63,7 +63,7 @@ pub const DATA_SIZE_PER_BIT: usize = MAX_RECORD_NUM_PER_BIT * BLOCK_SIZE;
 pub const MAX_LEVEL0_BIT_NUM: usize = 1;
 
 /// ## Record
-// Negative hba/lba (Used for delayed reclamation and trim)
+// Negative hba/lba (Used for delayed reclamation and block discard)
 pub const NEGATIVE_HBA: Hba = Hba::new(RawBid::MAX as _);
 pub const NEGATIVE_LBA: Lba = Lba::new(RawBid::MAX as _);
 

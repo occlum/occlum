@@ -1,8 +1,9 @@
 //! Block reclaim policy.
 use super::mem_table::MemRecord;
 use crate::prelude::*;
-use crate::{Checkpoint, Record};
+use crate::{Bit, Checkpoint, Record};
 
+use std::collections::{BTreeMap, HashSet};
 use std::future::{Future, IntoFuture};
 use std::pin::Pin;
 
@@ -69,12 +70,73 @@ pub fn apply_memtable_reclaim_policy<'a>(
     Box::pin(inner(checkpoint, coming_record, existed_record).into_future())
 }
 
-// TODO: Add reclamation policy for compaction
-#[allow(unused)]
-async fn apply_compaction_reclaim_policy(
+/// Delayed block reclamation policy in compaction.
+///
+/// When older records meet newer records (same lba) during compaction (currently L0 -> L1),
+/// 1. If there exists a newer negative record (which means a newer write occurred), older ones should be discarded.
+/// 2. If There is no newer negative record,
+///   2.a. If the hba of older record's corresponding lba in `RIT` is negative, do not reclaim since this block has already been processed by cleaning.
+///   2.b. If not, then do delayed block reclamation: mark the hba of older record **Invalid** in `DST`, so it can be dealt with in later cleaning.
+pub async fn apply_compaction_reclaim_policy(
+    l0_bit: &Bit,
+    overlapped_l1_bits: &Vec<Bit>,
+    disk: &DiskView,
     checkpoint: &Arc<Checkpoint>,
-    new_record: &Record,
-    old_record: &Record,
-) -> Record {
-    todo!()
+) -> Result<Vec<Record>> {
+    debug_assert!(
+        !overlapped_l1_bits.is_empty()
+            && overlapped_l1_bits
+                .is_sorted_by(|bit1, bit2| Some(bit2.version().cmp(&bit1.version())))
+    );
+
+    // Construct L0 regular records map and collect negative ones
+    let (mut compacted_records_map, mut negative_map) = {
+        let mut compacted_records_map = BTreeMap::<Lba, Record>::new();
+        let mut negative_map = HashSet::<Lba>::new();
+
+        let l0_records = l0_bit.collect_all_records(disk).await?;
+        for l0_record in l0_records.into_iter() {
+            if l0_record.is_negative() {
+                negative_map.insert(l0_record.lba());
+            } else {
+                compacted_records_map.insert(l0_record.lba(), l0_record);
+            }
+        }
+        (compacted_records_map, negative_map)
+    };
+
+    // Scan each overlapped L1 BIT and apply reclaim policy
+    for l1_bit in overlapped_l1_bits.iter() {
+        let l1_records = l1_bit.collect_all_records(disk).await?;
+        for l1_record in l1_records.into_iter() {
+            let lba = l1_record.lba();
+            if l1_record.is_negative() {
+                negative_map.insert(lba);
+                continue;
+            }
+            if negative_map.contains(&lba) {
+                continue;
+            }
+            if compacted_records_map.contains_key(&lba) {
+                // Check if the hba has already been processed by cleaning
+                let avail_to_reclaim = checkpoint
+                    .rit()
+                    .write()
+                    .await
+                    .check_valid(l1_record.hba(), lba)
+                    .await;
+                if avail_to_reclaim {
+                    // Delayed block reclamation
+                    checkpoint
+                        .dst()
+                        .write()
+                        .update_validity(&[l1_record.hba()], false);
+                }
+                continue;
+            }
+            compacted_records_map.insert(lba, l1_record);
+        }
+    }
+
+    Ok(compacted_records_map.into_values().collect())
 }
