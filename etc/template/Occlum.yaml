@@ -104,10 +104,10 @@ mount:
           type: sefs
           source: ./run/mount/__ROOT
           # options:
-          # The SEFS just uses MRSIGNER to drived key by default, so the data can
+          # The SEFS just uses MRSIGNER to derive key by default, so the data can
           # be shared between same enclave signer on the same machine.
           # If you want more secure scheme, you can set the autokey_policy field
-          # to 1 to enforcing the key is derived by MRSIGNER|MRENCLAVE|ISVFAMILYID.
+          # to 1 to enforce the key is derived by MRSIGNER|MRENCLAVE|ISVFAMILYID.
           # So the data can only be accessed by the enclave itself.
           #  autokey_policy: 1
           # The SEFS internal cache size, increasing it will bring better file I/O 
@@ -136,6 +136,12 @@ mount:
   #     # Page cache size that Async-SFS can use. Must be specified.
   #     # When the `page_cache_size` is given, the `kernel_space_heap_size` must be increased equally.
   #     page_cache_size: 256MB
+  #     # The JinDisk under Async-SFS uses MRSIGNER to derive key by default, so the data can
+  #     # be shared between same enclave signer on the same machine.
+  #     # If you want more secure scheme, you can set the autokey_policy field
+  #     # to 1 to enforce the key is derived by MRSIGNER|MRENCLAVE|ISVFAMILYID.
+  #     # So the data can only be accessed by the enclave itself.
+  #     autokey_policy: 1
 #
 # Untrusted Unix domain socket
 # Besides the common Unix domain socket support that both ends are created in the same

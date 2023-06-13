@@ -242,7 +242,7 @@ impl EncryptMode {
 }
 
 bitflags! {
-    struct KeyPolicy: u16 {
+    pub struct KeyPolicy: u16 {
         const KEYPOLICY_MRENCLAVE = 0x0001;
         const KEYPOLICY_MRSIGNER = 0x0002;
         const KEYPOLICY_NOISVPRODID = 0x0004;

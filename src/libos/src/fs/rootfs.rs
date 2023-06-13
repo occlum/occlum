@@ -9,6 +9,7 @@ use config::{ConfigApp, ConfigMountFsType};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::untrusted::path::PathEx;
+use util::sgx::get_autokey_with_policy;
 
 use async_mountfs::AsyncMountFS;
 use async_sfs::AsyncSimpleFS;
@@ -302,15 +303,17 @@ async fn open_or_create_async_sfs_according_to(
     // AsyncFsPageAlloc is a fixed-size allocator for page cache.
     impl_fixed_size_page_alloc! { AsyncFsPageAlloc, page_cache_size };
 
+    let root_key = if let Some(user_key) = user_key {
+        user_key.clone()
+    } else {
+        let autokey_policy = mc.options.autokey_policy;
+        get_autokey_with_policy(&autokey_policy, source_path)?
+    };
+
     let async_sfs = if source_path.exists() {
         let cache_disk = {
             let sync_disk = SyncIoDisk::open(&source_path)?;
-            // TODO: Support key policy in jindisk
-            let jindisk = JinDisk::open(
-                Arc::new(sync_disk),
-                user_key.unwrap_or(sgx_key_128bit_t::default()),
-            )
-            .await?;
+            let jindisk = JinDisk::open(Arc::new(sync_disk), root_key).await?;
             CachedDisk::<AsyncFsPageAlloc>::new(Arc::new(jindisk))?
         };
         AsyncSimpleFS::open(Arc::new(cache_disk)).await?
@@ -322,11 +325,7 @@ async fn open_or_create_async_sfs_according_to(
         let cache_disk = {
             let total_blocks = total_size / BLOCK_SIZE;
             let sync_disk = SyncIoDisk::create_new(&source_path, total_blocks)?;
-            // TODO: Support key policy in jindisk
-            let jindisk = JinDisk::create(
-                Arc::new(sync_disk),
-                user_key.unwrap_or(sgx_key_128bit_t::default()),
-            );
+            let jindisk = JinDisk::create(Arc::new(sync_disk), root_key);
             CachedDisk::<AsyncFsPageAlloc>::new(Arc::new(jindisk))?
         };
         AsyncSimpleFS::create(Arc::new(cache_disk)).await?
