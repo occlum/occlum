@@ -28,7 +28,8 @@ static inline void native_cpuid(int leaf, int subleaf, t_cpuid_t *p) {
                  : "a" (leaf), "c" (subleaf));
 }
 
-static bool is_cpuidinfo_equal(int leaf, t_cpuid_t *cpu, t_cpuid_t *cpu_sgx) {
+static bool is_cpuidinfo_equal_with_host(uint32_t leaf, uint32_t subleaf, t_cpuid_t *cpu,
+        t_cpuid_t *cpu_sgx) {
     /* Leaf 01H CPUID.EBX is related with logical processor. */
     if (leaf == 1) {
         return ((cpu->eax == cpu_sgx->eax) &&
@@ -40,6 +41,15 @@ static bool is_cpuidinfo_equal(int leaf, t_cpuid_t *cpu, t_cpuid_t *cpu_sgx) {
         return ((cpu->eax == cpu_sgx->eax) &&
                 (cpu->ebx == cpu_sgx->ebx) &&
                 (cpu->ecx == cpu_sgx->ecx));
+    }
+    /* Leaf 0DH subleaf 0x0/0x1, CPUID.EBX is related with the size of XSAVE based on enabled features in XCR0, e.g. PKU.
+       And can be different for host OS and enclave. For SGX platform, it is fine because CPUID is executed via host ocall.
+       However, for HyperEnclave, CPUID is trapped by hypervisor and return the exact value based on the actual
+       enabled features of the enclave. And can be different from host Linux. Thus skip the check of EBX. */
+    if (leaf == 0xd && (subleaf == 0x0 || subleaf == 0x1)) {
+        return ((cpu->eax == cpu_sgx->eax) &&
+                (cpu->ecx == cpu_sgx->ecx) &&
+                (cpu->edx == cpu_sgx->edx));
     }
     /* Leaf 0x8000001E is for threads/core_id/apic_ids/socket_id */
     if (leaf == 0x8000001E) {
@@ -271,7 +281,7 @@ static int test_cpuid_with_host_cpuidinfo() {
         }
         t_cpuid_t cpu_sgx = {0};
         native_cpuid(leaf, subleaf, &cpu_sgx);
-        if (!is_cpuidinfo_equal(leaf, &cpu, &cpu_sgx)) {
+        if (!is_cpuidinfo_equal_with_host(leaf, subleaf, &cpu, &cpu_sgx)) {
             printf("leaf:0x%x subleaf:0x%x\n", leaf, subleaf);
             printf("ori_eax:0x%x ori_ebx:0x%x ori_ecx:0x%x ori_edx:0x%x\n",
                    cpu.eax, cpu.ebx, cpu.ecx, cpu.edx);
