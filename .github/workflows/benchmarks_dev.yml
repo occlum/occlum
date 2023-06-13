@@ -1,0 +1,220 @@
+name: Benchmarks Test for dev branch
+# Currently this workflow is only used for running benchmarks test on schedule on branch 1.0.0-preview
+
+on:
+  schedule:
+    # Schedule to run on Tue,Fri at 10PM UTC (6AM CST)
+    - cron:  '0 22 * * 2,5'
+
+jobs:
+  Sysbench_Test:
+    timeout-minutes: 40
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX2-HW, benchmark]]
+
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
+
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+        ref: 1.0.0-preview
+
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Run sysbench download and build
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/benchmarks/sysbench && ./sysbench.sh 120"
+
+    - name: Copy result
+      run: docker cp ${{ env.CONTAINER_NAME }}:/root/occlum/demos/benchmarks/sysbench/result.json .
+
+    # Run `github-action-benchmark` action
+    - name: Store benchmark result
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        name: Sysbench Benchmark
+        # What benchmark tool the output.txt came from
+        tool: 'customSmallerIsBetter'
+        # Where the output from the benchmark tool is stored
+        output-file-path: result.json
+        # Path to directory which contains benchmark files on GitHub pages branch
+        benchmark-data-dir-path: 'dev/benchmarks'
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        # Show alert with commit comment on detecting possible performance regression
+        alert-threshold: '200%'
+        comment-on-alert: true
+        # Workflow will fail when an alert happens
+        fail-on-alert: true
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop ${{ env.CONTAINER_NAME }}
+
+  Iperf3_Test:
+    timeout-minutes: 40
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX2-HW, benchmark]]
+
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
+
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+        ref: 1.0.0-preview
+
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Run iperf3 download and build
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/benchmarks/iperf3 && ./iperf3.sh 120"
+
+    - name: Copy result
+      run: docker cp ${{ env.CONTAINER_NAME }}:/root/occlum/demos/benchmarks/iperf3/result.json .
+
+    # Run `github-action-benchmark` action
+    - name: Store benchmark result
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        name: Iperf3 Benchmark
+        # What benchmark tool the output.txt came from
+        tool: 'customBiggerIsBetter '
+        # Where the output from the benchmark tool is stored
+        output-file-path: result.json
+        # Path to directory which contains benchmark files on GitHub pages branch
+        benchmark-data-dir-path: 'dev/benchmarks'
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        # Show alert with commit comment on detecting possible performance regression
+        alert-threshold: '200%'
+        comment-on-alert: true
+        # Workflow will fail when an alert happens
+        fail-on-alert: true
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop ${{ env.CONTAINER_NAME }}
+
+  SEFS_FIO_Test:
+    timeout-minutes: 60
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX2-HW, benchmark]]
+
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
+
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+        ref: 1.0.0-preview
+
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Run fio download and build
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/benchmarks/fio && ./fio_microbench.sh /root/fio-microbench"
+
+    - name: Copy result
+      run: docker cp ${{ env.CONTAINER_NAME }}:/root/occlum/demos/benchmarks/fio/result.json .
+
+    # Run `github-action-benchmark` action
+    - name: Store benchmark result
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        name: FIO Benchmark on SEFS
+        # What benchmark tool the output.txt came from
+        tool: 'customBiggerIsBetter'
+        # Where the output from the benchmark tool is stored
+        output-file-path: result.json
+        # Path to directory which contains benchmark files on GitHub pages branch
+        benchmark-data-dir-path: 'dev/benchmarks'
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        # Show alert with commit comment on detecting possible performance regression
+        alert-threshold: '200%'
+        comment-on-alert: true
+        # Workflow will fail when an alert happens
+        fail-on-alert: true
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop ${{ env.CONTAINER_NAME }}
+
+  AsyncSFS_FIO_Test:
+    timeout-minutes: 60
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX2-HW, benchmark]]
+
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
+
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+        ref: 1.0.0-preview
+
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Run fio download and build
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/benchmarks/fio && ./fio_microbench.sh /sfs/fio-microbench"
+
+    - name: Copy result
+      run: docker cp ${{ env.CONTAINER_NAME }}:/root/occlum/demos/benchmarks/fio/result.json .
+
+    # Run `github-action-benchmark` action
+    - name: Store benchmark result
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        name: FIO Benchmark on AsyncSFS and JinDisk
+        # What benchmark tool the output.txt came from
+        tool: 'customBiggerIsBetter'
+        # Where the output from the benchmark tool is stored
+        output-file-path: result.json
+        # Path to directory which contains benchmark files on GitHub pages branch
+        benchmark-data-dir-path: 'dev/benchmarks'
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        # Show alert with commit comment on detecting possible performance regression
+        alert-threshold: '200%'
+        comment-on-alert: true
+        # Workflow will fail when an alert happens
+        fail-on-alert: true
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop ${{ env.CONTAINER_NAME }}

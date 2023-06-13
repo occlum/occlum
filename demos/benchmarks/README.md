@@ -7,3 +7,16 @@ This set of demos shows how commonly used benchmarking tools can be run inside S
 * [iperf3](iperf3/): A demo of [Iperf3](https://github.com/esnet/iperf), a tool for measuring Internet bandwidth performance.
 * [sysbench](sysbench/): A demo of [Sysbench](https://github.com/akopytov/sysbench), a scriptable multi-threaded benchmark tool for Linux.
 
+## Benchmarks Data
+
+There are two enabled **benchmarks CI**(https://github.com/occlum/occlum/blob/1.0.0-preview/.github/workflows/benchmarks.yml) for continuous benchmarking. It utilizes the [`github-action-benchmark`](https://github.com/benchmark-action/github-action-benchmark) to provide a chart view for visualized historical benchmarks data on the GitHub pages.
+
+### CI and Data for Master branch
+
+[**benchmarks CI**](https://github.com/occlum/occlum/blob/master/.github/workflows/benchmarks.yml)
+[**History Data**](https://occlum.io/occlum/stable/benchmarks/)
+
+### CI and Data for Dev branch
+
+[**benchmarks CI**](https://github.com/occlum/occlum/blob/master/.github/workflows/benchmarks_dev.yml)
+[**History Data**](https://occlum.io/occlum/dev/benchmarks/)
