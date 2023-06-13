@@ -38,6 +38,7 @@ pub use self::locks::{
     RangeLockType, OFFSET_MAX,
 };
 pub use self::rootfs::rootfs;
+pub use self::sefs::KeyPolicy;
 pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
 pub use self::syscalls::*;
 
