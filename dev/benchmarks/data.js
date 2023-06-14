@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1686780878930,
+  "lastUpdate": 1686781562318,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -5044,6 +5044,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2115,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "78ef07cbb48edb0246f448be7371211f0ea6bae0",
+          "message": "Fix building deb package failure",
+          "timestamp": "2023-06-12T10:00:19Z",
+          "url": "https://github.com/occlum/occlum/commit/78ef07cbb48edb0246f448be7371211f0ea6bae0"
+        },
+        "date": 1686781560158,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 696,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 695,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
