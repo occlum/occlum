@@ -1,19 +1,26 @@
-use std::ops::{Deref, DerefMut};
+use super::*;
 
 use super::vm_perms::VMPerms;
 use super::vm_range::VMRange;
 use super::vm_util::FileBacked;
-use super::*;
 
 use intrusive_collections::rbtree::{Link, RBTree};
 use intrusive_collections::{intrusive_adapter, KeyAdapter};
+use std::collections::HashSet;
+use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Debug, Default)]
 pub struct VMArea {
     range: VMRange,
     perms: VMPerms,
     file_backed: Option<FileBacked>,
-    pid: pid_t,
+    access: VMAccess,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum VMAccess {
+    Private(pid_t),
+    Shared(HashSet<pid_t>),
 }
 
 impl VMArea {
@@ -27,7 +34,7 @@ impl VMArea {
             range,
             perms,
             file_backed,
-            pid,
+            access: VMAccess::Private(pid),
         }
     }
 
@@ -37,7 +44,7 @@ impl VMArea {
         vma: &VMArea,
         new_range: VMRange,
         new_perms: VMPerms,
-        pid: pid_t,
+        access: VMAccess,
     ) -> Self {
         let new_backed_file = vma.file_backed.as_ref().map(|file| {
             let mut new_file = file.clone();
@@ -57,7 +64,12 @@ impl VMArea {
             new_file
         });
 
-        Self::new(new_range, new_perms, new_backed_file, pid)
+        Self {
+            range: new_range,
+            perms: new_perms,
+            file_backed: new_backed_file,
+            access,
+        }
     }
 
     pub fn perms(&self) -> VMPerms {
@@ -68,8 +80,22 @@ impl VMArea {
         &self.range
     }
 
-    pub fn pid(&self) -> pid_t {
-        self.pid
+    pub fn access(&self) -> &VMAccess {
+        &self.access
+    }
+
+    pub fn belong_to(&self, target_pid: pid_t) -> bool {
+        match &self.access {
+            VMAccess::Private(pid) => *pid == target_pid,
+            VMAccess::Shared(pid_set) => pid_set.contains(&target_pid),
+        }
+    }
+
+    pub fn exclusive_by(&self, target_pid: pid_t) -> bool {
+        match &self.access {
+            VMAccess::Private(pid) => *pid == target_pid,
+            VMAccess::Shared(pid_set) => pid_set.len() == 1 && pid_set.contains(&target_pid),
+        }
     }
 
     pub fn init_file(&self) -> Option<(&FileRef, usize)> {
@@ -96,7 +122,7 @@ impl VMArea {
         self.deref()
             .subtract(other)
             .into_iter()
-            .map(|range| Self::inherits_file_from(self, range, self.perms(), self.pid()))
+            .map(|range| Self::inherits_file_from(self, range, self.perms(), self.access().clone()))
             .collect()
     }
 
@@ -109,7 +135,8 @@ impl VMArea {
             }
             new_range.unwrap()
         };
-        let new_vma = VMArea::inherits_file_from(self, new_range, self.perms(), self.pid());
+        let new_vma =
+            VMArea::inherits_file_from(self, new_range, self.perms(), self.access().clone());
         Some(new_vma)
     }
 
@@ -139,7 +166,7 @@ impl VMArea {
     }
 
     pub fn is_the_same_to(&self, other: &VMArea) -> bool {
-        if self.pid() != other.pid() {
+        if self.access() != other.access() {
             return false;
         }
 
@@ -175,7 +202,7 @@ impl VMArea {
             return false;
         }
         // The two VMAs must be owned by the same process
-        if left.pid() != right.pid() {
+        if left.access() != right.access() {
             return false;
         }
         // The two VMAs must border with each other
@@ -202,6 +229,78 @@ impl VMArea {
             }
         }
     }
+
+    /// Flush a file-backed VMA to its file. This has no effect on anonymous VMA.
+    pub fn flush_backed_file(&self) {
+        self.flush_backed_file_with_cond(|_| true)
+    }
+
+    /// Same as `flush_backed_file()`, except that an extra condition on the file needs to satisfy.
+    pub fn flush_backed_file_with_cond<F: Fn(&FileRef) -> bool>(&self, cond_fn: F) {
+        let (file, file_offset) = match self.writeback_file() {
+            None => return,
+            Some((file_and_offset)) => file_and_offset,
+        };
+        let file_writable = file
+            .access_mode()
+            .map(|ac| ac.writable())
+            .unwrap_or_default();
+        if !file_writable {
+            return;
+        }
+        if !cond_fn(file) {
+            return;
+        }
+        file.write_at(file_offset, unsafe { self.as_slice() });
+    }
+
+    pub fn is_shared(&self) -> bool {
+        match self.access {
+            VMAccess::Private(_) => false,
+            VMAccess::Shared(_) => true,
+        }
+    }
+
+    pub fn mark_shared(&mut self) {
+        let access = match self.access {
+            VMAccess::Private(pid) => VMAccess::Shared(HashSet::from([pid])),
+            VMAccess::Shared(_) => {
+                return;
+            }
+        };
+        self.access = access;
+    }
+
+    pub fn shared_process_set(&self) -> Result<&HashSet<pid_t>> {
+        match &self.access {
+            VMAccess::Private(_) => Err(errno!(EINVAL, "not a shared vma")),
+            VMAccess::Shared(pid_set) => Ok(pid_set),
+        }
+    }
+
+    pub fn attach_shared_process(&mut self, pid: pid_t) -> Result<()> {
+        match &mut self.access {
+            VMAccess::Private(_) => Err(errno!(EINVAL, "not a shared vma")),
+            VMAccess::Shared(pid_set) => {
+                pid_set.insert(pid);
+                Ok(())
+            }
+        }
+    }
+
+    pub fn detach_shared_process(&mut self, pid: pid_t) -> Result<bool> {
+        match &mut self.access {
+            VMAccess::Private(_) => Err(errno!(EINVAL, "not a shared vma")),
+            VMAccess::Shared(pid_set) => {
+                pid_set.remove(&pid);
+                Ok(pid_set.is_empty())
+            }
+        }
+    }
+
+    pub fn inherits_access_from(&mut self, vma: &VMArea) {
+        self.access = vma.access().clone()
+    }
 }
 
 impl Deref for VMArea {
@@ -209,6 +308,12 @@ impl Deref for VMArea {
 
     fn deref(&self) -> &Self::Target {
         &self.range
+    }
+}
+
+impl Default for VMAccess {
+    fn default() -> Self {
+        Self::Private(0)
     }
 }
 

@@ -1,10 +1,12 @@
-use super::ipc::SHM_MANAGER;
 use super::*;
+
+use super::vm_manager::VMManager;
+use crate::config::LIBOS_CONFIG;
 use crate::ctor::dtor;
+use crate::ipc::SHM_MANAGER;
 use crate::util::pku_util;
-use config::LIBOS_CONFIG;
+
 use std::ops::{Deref, DerefMut};
-use vm_manager::VMManager;
 
 const RSRV_MEM_PERM: MemPerm =
     MemPerm::from_bits_truncate(MemPerm::READ.bits() | MemPerm::WRITE.bits());
@@ -16,7 +18,7 @@ impl UserSpaceVMManager {
     fn new() -> Result<UserSpaceVMManager> {
         let rsrv_mem_size = LIBOS_CONFIG.resource_limits.user_space_size;
         let vm_range = unsafe {
-            // TODO: Current sgx_alloc_rsrv_mem implmentation will commit all the pages of the desired size, which will consume
+            // TODO: Current sgx_alloc_rsrv_mem implementation will commit all the pages of the desired size, which will consume
             // a lot of time. When EDMM is supported, there is no need to commit all the pages at the initialization stage. A function
             // which reserves memory but not commit pages should be provided then.
             let ptr = sgx_alloc_rsrv_mem(rsrv_mem_size);

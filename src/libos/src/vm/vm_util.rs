@@ -3,12 +3,12 @@ use super::*;
 use super::vm_area::*;
 use super::vm_perms::VMPerms;
 use crate::fs::FileMode;
-use std::collections::BTreeSet;
 
 use intrusive_collections::rbtree::{Link, RBTree};
 use intrusive_collections::Bound;
 use intrusive_collections::RBTreeLink;
 use intrusive_collections::{intrusive_adapter, KeyAdapter};
+use rcore_fs::vfs::Metadata;
 
 #[derive(Clone, Debug)]
 pub enum VMInitializer {
@@ -20,7 +20,7 @@ pub enum VMInitializer {
     FileBacked {
         file: FileBacked,
     },
-    // For ELF files, there is specical handling to not copy all the contents of the file. This is only used for tracking.
+    // For ELF files, there is special handling to not copy all the contents of the file. This is only used for tracking.
     ElfSpecific {
         elf_file: FileRef,
     },
@@ -150,6 +150,10 @@ impl FileBacked {
             None
         }
     }
+
+    pub fn metadata(&self) -> Metadata {
+        self.file.metadata().unwrap()
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -257,6 +261,13 @@ impl VMMapOptions {
 
     pub fn initializer(&self) -> &VMInitializer {
         &self.initializer
+    }
+
+    pub fn is_shared(&self) -> bool {
+        if let Some(backed_file) = self.initializer.backed_file() {
+            return backed_file.need_write_back();
+        }
+        false
     }
 }
 
@@ -407,7 +418,7 @@ pub trait VMRemapParser {
         // For Linux, writing to either memory vma or the file will update the other two equally. But we won't be able to support this before
         // we really have paging. Thus, if the old_range is not equal to a recorded vma, we will just return with error.
         if writeback_file.is_some() && &old_range != vma.range() {
-            return_errno!(EINVAL, "Known limition")
+            return_errno!(EINVAL, "Known limitation")
         }
 
         // Implement mremap as one optional mmap followed by one optional munmap.
@@ -449,13 +460,13 @@ pub trait VMRemapParser {
                 (Some(mmap_opts), ret_addr)
             }
             (MRemapFlags::MayMove, VMRemapSizeType::Growing, None) => {
-                let prefered_new_range =
+                let preferred_new_range =
                     VMRange::new_with_size(old_addr + old_size, new_size - old_size)?;
-                if self.is_free_range(&prefered_new_range) {
+                if self.is_free_range(&preferred_new_range) {
                     // Don't need to move the old range
                     let mmap_ops = VMMapOptionsBuilder::default()
-                        .size(prefered_new_range.size())
-                        .addr(VMMapAddr::Need(prefered_new_range.start()))
+                        .size(preferred_new_range.size())
+                        .addr(VMMapAddr::Need(preferred_new_range.start()))
                         .perms(perms)
                         .initializer(VMInitializer::DoNothing())
                         .build()?;
@@ -475,9 +486,9 @@ pub trait VMRemapParser {
                 }
             }
             (MRemapFlags::MayMove, VMRemapSizeType::Growing, Some((backed_file, offset))) => {
-                let prefered_new_range =
+                let preferred_new_range =
                     VMRange::new_with_size(old_addr + old_size, new_size - old_size)?;
-                if self.is_free_range(&prefered_new_range) {
+                if self.is_free_range(&preferred_new_range) {
                     // Don't need to move the old range
                     let vm_initializer_for_new_range = VMInitializer::FileBacked {
                         file: FileBacked::new(
@@ -487,8 +498,8 @@ pub trait VMRemapParser {
                         ),
                     };
                     let mmap_ops = VMMapOptionsBuilder::default()
-                        .size(prefered_new_range.size())
-                        .addr(VMMapAddr::Need(prefered_new_range.start()))
+                        .size(preferred_new_range.size())
+                        .addr(VMMapAddr::Need(preferred_new_range.start()))
                         .perms(perms)
                         .initializer(vm_initializer_for_new_range)
                         .build()?;

@@ -6,6 +6,7 @@ use super::vm_perms::VMPerms;
 use super::vm_util::*;
 use crate::process::ProcessRef;
 use crate::process::ThreadRef;
+
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -71,10 +72,10 @@ impl Chunk {
         &self.internal
     }
 
-    pub fn get_vma_for_single_vma_chunk(&self) -> VMArea {
+    pub fn get_vma_for_single_vma_chunk(&self) -> SgxMutexGuard<VMArea> {
         match self.internal() {
+            ChunkType::SingleVMA(vma) => return vma.lock().unwrap(),
             ChunkType::MultiVMA(internal_manager) => unreachable!(),
-            ChunkType::SingleVMA(vma) => return vma.lock().unwrap().clone(),
         }
     }
 
@@ -98,7 +99,7 @@ impl Chunk {
             vm_range.clone(),
             *options.perms(),
             options.initializer().backed_file(),
-            DUMMY_CHUNK_PROCESS_ID,
+            current!().process().pid(),
         );
         // Initialize the memory of the new range
         unsafe {
@@ -245,6 +246,13 @@ impl Chunk {
                 .unwrap()
                 .chunk_manager
                 .is_free_range(request_range),
+        }
+    }
+
+    pub fn is_shared(&self) -> bool {
+        match self.internal() {
+            ChunkType::SingleVMA(vma) => vma.lock().unwrap().is_shared(),
+            ChunkType::MultiVMA(_) => false,
         }
     }
 }

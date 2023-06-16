@@ -4,15 +4,15 @@ use super::chunk::{
     Chunk, ChunkID, ChunkRef, ChunkType, CHUNK_DEFAULT_SIZE, DUMMY_CHUNK_PROCESS_ID,
 };
 use super::free_space_manager::VMFreeSpaceManager;
-use super::vm_area::VMArea;
+use super::shm_manager::{MmapSharedResult, MunmapSharedResult, ShmManager};
+use super::vm_area::{VMAccess, VMArea};
 use super::vm_chunk_manager::ChunkManager;
 use super::vm_perms::VMPerms;
 use super::vm_util::*;
 use crate::process::{ThreadRef, ThreadStatus};
-use std::ops::Bound::{Excluded, Included};
 
-use crate::util::sync::rw_lock;
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
+use std::ops::Bound::{Excluded, Included};
 
 // Incorrect order of locks could cause deadlock easily.
 // Don't hold a low-order lock and then try to get a high-order lock.
@@ -65,6 +65,24 @@ impl VMManager {
     }
 
     pub fn mmap(&self, options: &VMMapOptions) -> Result<usize> {
+        if options.is_shared() {
+            let res = self.internal().mmap_shared_chunk(options);
+            match res {
+                Ok(addr) => {
+                    trace!(
+                        "mmap_shared_chunk success: addr = 0x{:X}, pid = {}",
+                        res.as_ref().unwrap(),
+                        current!().process().pid()
+                    );
+                    return Ok(addr);
+                }
+                Err(e) => {
+                    warn!("mmap_shared_chunk failed: {:?}", e);
+                    // Do not return when `mmap_shared_chunk()` fails. Try mmap as a regular chunk as below.
+                }
+            }
+        }
+
         let addr = *options.addr();
         let size = *options.size();
         let align = *options.align();
@@ -198,7 +216,7 @@ impl VMManager {
             for chunk in overlapping_chunks.iter() {
                 match chunk.internal() {
                     ChunkType::SingleVMA(_) => {
-                        internal_manager.munmap_chunk(chunk, Some(&munmap_range))?
+                        internal_manager.munmap_chunk(chunk, Some(&munmap_range), false)?
                     }
                     ChunkType::MultiVMA(manager) => manager
                         .lock()
@@ -232,7 +250,11 @@ impl VMManager {
                         .map(|chunk| chunk.clone())
                 };
                 if let Some(overlapping_chunk) = overlapping_chunk {
-                    return internal_manager.munmap_chunk(&overlapping_chunk, Some(&munmap_range));
+                    return internal_manager.munmap_chunk(
+                        &overlapping_chunk,
+                        Some(&munmap_range),
+                        false,
+                    );
                 } else {
                     warn!("no overlapping chunks anymore");
                     return Ok(());
@@ -354,7 +376,7 @@ impl VMManager {
             }
             ChunkType::SingleVMA(vma) => {
                 let vma = vma.lock().unwrap();
-                ChunkManager::flush_file_vma(&vma);
+                vma.flush_backed_file();
             }
         }
         Ok(())
@@ -375,7 +397,9 @@ impl VMManager {
                         .msync_by_file(sync_file);
                 }
                 ChunkType::SingleVMA(vma) => {
-                    ChunkManager::flush_file_vma_with_cond(&vma.lock().unwrap(), is_same_file);
+                    vma.lock()
+                        .unwrap()
+                        .flush_backed_file_with_cond(is_same_file);
                 }
             });
     }
@@ -437,7 +461,7 @@ impl VMManager {
         let ret_addr = if let Some(mmap_options) = remap_result_option.mmap_options() {
             let mmap_addr = self.mmap(mmap_options);
 
-            // FIXME: For MRemapFlags::MayMove flag, we checked if the prefered range is free when parsing the options.
+            // FIXME: For MRemapFlags::MayMove flag, we checked if the preferred range is free when parsing the options.
             // But there is no lock after the checking, thus the mmap might fail. In this case, we should try mmap again.
             if mmap_addr.is_err() && remap_result_option.may_move() == true {
                 return_errno!(
@@ -457,7 +481,7 @@ impl VMManager {
 
         if let Some((munmap_addr, munmap_size)) = remap_result_option.munmap_args() {
             self.munmap(*munmap_addr, *munmap_size)
-                .expect("Shouln't fail");
+                .expect("Shouldn't fail");
         }
 
         return Ok(ret_addr);
@@ -479,7 +503,7 @@ impl VMManager {
         let mut mem_chunks = thread.vm().mem_chunks().write().unwrap();
 
         mem_chunks.iter().for_each(|chunk| {
-            internal_manager.munmap_chunk(&chunk, None);
+            internal_manager.munmap_chunk(&chunk, None, false);
         });
         mem_chunks.clear();
 
@@ -487,13 +511,14 @@ impl VMManager {
     }
 }
 
-// Modification on this structure must aquire the global lock.
+// Modification on this structure must acquire the global lock.
 // TODO: Enable fast_default_chunks for faster chunk allocation
 #[derive(Debug)]
 pub struct InternalVMManager {
     chunks: BTreeSet<ChunkRef>, // track in-use chunks, use B-Tree for better performance and simplicity (compared with red-black tree)
     fast_default_chunks: Vec<ChunkRef>, // empty default chunks
     free_manager: VMFreeSpaceManager,
+    shm_manager: ShmManager, // track chunks which are shared by processes
 }
 
 impl InternalVMManager {
@@ -501,10 +526,12 @@ impl InternalVMManager {
         let chunks = BTreeSet::new();
         let fast_default_chunks = Vec::new();
         let free_manager = VMFreeSpaceManager::new(vm_range);
+        let shm_manager = ShmManager::new();
         Self {
             chunks,
             fast_default_chunks,
             free_manager,
+            shm_manager,
         }
     }
 
@@ -522,26 +549,38 @@ impl InternalVMManager {
 
     // Allocate a chunk with single vma
     pub fn mmap_chunk(&mut self, options: &VMMapOptions) -> Result<ChunkRef> {
+        let new_chunk = self
+            .new_chunk_with_options(options)
+            .map_err(|e| errno!(e.errno(), "mmap_chunk failure"))?;
+        trace!("allocate a new single vma chunk: {:?}", new_chunk);
+        self.chunks.insert(new_chunk.clone());
+        Ok(new_chunk)
+    }
+
+    fn new_chunk_with_options(&mut self, options: &VMMapOptions) -> Result<ChunkRef> {
         let addr = *options.addr();
         let size = *options.size();
         let align = *options.align();
         let free_range = self.find_free_gaps(size, align, addr)?;
-        let free_chunk = Chunk::new_single_vma_chunk(&free_range, options);
-        if let Err(e) = free_chunk {
+        let free_chunk = Chunk::new_single_vma_chunk(&free_range, options).map_err(|e| {
             // Error when creating chunks. Must return the free space before returning error
             self.free_manager
                 .add_range_back_to_free_manager(&free_range);
-            return_errno!(e.errno(), "mmap_chunk failure");
-        }
-        let chunk = Arc::new(free_chunk.unwrap());
-        trace!("allocate a new single vma chunk: {:?}", chunk);
-        self.chunks.insert(chunk.clone());
-        Ok(chunk)
+            e
+        })?;
+        Ok(Arc::new(free_chunk))
     }
 
     // Munmap a chunk
     // For Single VMA chunk, a part of the chunk could be munmapped if munmap_range is specified.
-    pub fn munmap_chunk(&mut self, chunk: &ChunkRef, munmap_range: Option<&VMRange>) -> Result<()> {
+    // `force_unmap` indicates whether a unmap request came from a (re)map request with `MAP_FIXED`,
+    // the chunk would end differently when it is being shared.
+    pub fn munmap_chunk(
+        &mut self,
+        chunk: &ChunkRef,
+        munmap_range: Option<&VMRange>,
+        force_unmap: bool,
+    ) -> Result<()> {
         trace!(
             "munmap_chunk range = {:?}, munmap_range = {:?}",
             chunk.range(),
@@ -569,6 +608,15 @@ impl InternalVMManager {
             }
         };
 
+        if chunk.is_shared() {
+            trace!(
+                "munmap_shared_chunk, chunk_range: {:?}, munmap_range = {:?}",
+                chunk.range(),
+                munmap_range,
+            );
+            return self.munmap_shared_chunk(chunk, munmap_range, force_unmap);
+        }
+
         // Either the munmap range is a subset of the chunk range or the munmap range is
         // a superset of the chunk range. We can handle both cases.
 
@@ -580,7 +628,7 @@ impl InternalVMManager {
         };
 
         // File-backed VMA needs to be flushed upon munmap
-        ChunkManager::flush_file_vma(&intersection_vma);
+        intersection_vma.flush_backed_file();
 
         // Reset memory permissions
         if !&intersection_vma.perms().is_default() {
@@ -625,7 +673,9 @@ impl InternalVMManager {
                 let new_vma = new_vmas.pop().unwrap();
                 let new_vma_chunk = Arc::new(Chunk::new_chunk_with_vma(new_vma));
                 self.chunks.insert(new_vma_chunk.clone());
-                current.vm().add_mem_chunk(new_vma_chunk);
+                if current.status() != ThreadStatus::Exited {
+                    current.vm().add_mem_chunk(new_vma_chunk);
+                }
 
                 let updated_vma = new_vmas.pop().unwrap();
                 self.update_single_vma_chunk(&current, &chunk, updated_vma);
@@ -635,18 +685,119 @@ impl InternalVMManager {
         Ok(())
     }
 
+    pub fn mmap_shared_chunk(&mut self, options: &VMMapOptions) -> Result<usize> {
+        match self.shm_manager.mmap_shared_chunk(options)? {
+            MmapSharedResult::Success(addr) => Ok(addr),
+            MmapSharedResult::NeedCreate => {
+                let new_chunk = self.mmap_chunk(options)?;
+                current!().vm().add_mem_chunk(new_chunk.clone());
+                self.shm_manager
+                    .create_shared_chunk(options, new_chunk.clone())
+                    .map_err(|e| {
+                        let vma = new_chunk.get_vma_for_single_vma_chunk();
+                        // Reset memory permissions
+                        if !vma.perms().is_default() {
+                            VMPerms::apply_perms(&vma, VMPerms::default());
+                        }
+                        // Reset memory contents
+                        unsafe {
+                            let buf = vma.as_slice_mut();
+                            buf.iter_mut().for_each(|b| *b = 0)
+                        }
+                        drop(vma);
+
+                        self.free_chunk(&new_chunk);
+                        current!().vm().remove_mem_chunk(&new_chunk);
+                        e
+                    })
+            }
+            MmapSharedResult::NeedExpand(old_shared_chunk, expand_range) => {
+                let new_chunk = {
+                    let new_chunk = self.new_chunk_with_options(options)?;
+                    self.merge_two_single_vma_chunks(&old_shared_chunk, &new_chunk)
+                };
+                let new_range = *new_chunk.range();
+                debug_assert_eq!(new_range, expand_range);
+                self.shm_manager
+                    .replace_shared_chunk(old_shared_chunk, new_chunk);
+                Ok(new_range.start())
+            }
+            MmapSharedResult::NeedReplace(_) => {
+                return_errno!(EINVAL, "mmap shared chunk failed");
+                // TODO: Support replace shared chunk when necessary,
+                // e.g., Current shared chunk is exclusived and `remap()` by same process
+            }
+        }
+    }
+
+    pub fn munmap_shared_chunk(
+        &mut self,
+        chunk: &ChunkRef,
+        munmap_range: &VMRange,
+        force_unmap: bool,
+    ) -> Result<()> {
+        if !chunk.is_shared() {
+            return_errno!(EINVAL, "not a shared chunk");
+        }
+        if !chunk.range().overlap_with(munmap_range) {
+            return Ok(());
+        }
+
+        if self
+            .shm_manager
+            .munmap_shared_chunk(chunk, munmap_range, force_unmap)?
+            == MunmapSharedResult::Freeable
+        {
+            let vma = chunk.get_vma_for_single_vma_chunk();
+            // Flush memory contents to backed file
+            vma.flush_backed_file();
+            // Reset memory permissions
+            if !vma.perms().is_default() {
+                VMPerms::apply_perms(&vma, VMPerms::default());
+            }
+            // Reset memory contents
+            unsafe {
+                let buf = vma.as_slice_mut();
+                buf.iter_mut().for_each(|b| *b = 0)
+            }
+            drop(vma);
+
+            self.free_chunk(chunk);
+            let current = current!();
+            if current.status() != ThreadStatus::Exited {
+                current.vm().remove_mem_chunk(&chunk);
+            }
+        }
+        Ok(())
+    }
+
     fn update_single_vma_chunk(
         &mut self,
         current_thread: &ThreadRef,
         old_chunk: &ChunkRef,
         new_vma: VMArea,
-    ) {
+    ) -> ChunkRef {
         let new_chunk = Arc::new(Chunk::new_chunk_with_vma(new_vma));
         current_thread
             .vm()
             .replace_mem_chunk(old_chunk, new_chunk.clone());
         self.chunks.remove(old_chunk);
-        self.chunks.insert(new_chunk);
+        self.chunks.insert(new_chunk.clone());
+        new_chunk
+    }
+
+    fn merge_two_single_vma_chunks(&mut self, lhs: &ChunkRef, rhs: &ChunkRef) -> ChunkRef {
+        let mut new_vma = {
+            let lhs_vma = lhs.get_vma_for_single_vma_chunk();
+            let rhs_vma = rhs.get_vma_for_single_vma_chunk();
+            debug_assert_eq!(lhs_vma.end(), rhs_vma.start());
+
+            let mut new_vma = rhs_vma.clone();
+            new_vma.set_start(lhs_vma.start());
+            new_vma
+        };
+
+        self.update_single_vma_chunk(&current!(), lhs, new_vma)
     }
 
     // protect_range should a sub-range of the chunk range
@@ -657,6 +808,17 @@ impl InternalVMManager {
         new_perms: VMPerms,
     ) -> Result<()> {
         debug_assert!(chunk.range().is_superset_of(&protect_range));
+        if chunk.is_shared() {
+            trace!(
+                "mprotect_shared_chunk, chunk_range: {:?}, mprotect_range = {:?}",
+                chunk.range(),
+                protect_range,
+            );
+            // When protect range hits a shared chunk, new perms are
+            // applied in a all-or-nothing mannner of the whole vma
+            return self.shm_manager.mprotect_shared_chunk(chunk, new_perms);
+        }
+
         let vma = match chunk.internal() {
             ChunkType::MultiVMA(_) => {
                 unreachable!();
@@ -677,6 +839,7 @@ impl InternalVMManager {
                 return Ok(());
             }
 
+            let current_pid = current!().process().pid();
             let same_start = protect_range.start() == containing_vma.start();
             let same_end = protect_range.end() == containing_vma.end();
             match (same_start, same_end) {
@@ -701,7 +864,7 @@ impl InternalVMManager {
                         &containing_vma,
                         protect_range,
                         new_perms,
-                        DUMMY_CHUNK_PROCESS_ID,
+                        VMAccess::Private(current_pid),
                     );
                     VMPerms::apply_perms(&new_vma, new_vma.perms());
 
@@ -711,7 +874,7 @@ impl InternalVMManager {
                             &containing_vma,
                             range,
                             old_perms,
-                            DUMMY_CHUNK_PROCESS_ID,
+                            VMAccess::Private(current_pid),
                         )
                     };
 
@@ -732,7 +895,7 @@ impl InternalVMManager {
                         &containing_vma,
                         protect_range,
                         new_perms,
-                        DUMMY_CHUNK_PROCESS_ID,
+                        VMAccess::Private(current_pid),
                     );
                     VMPerms::apply_perms(&new_vma, new_vma.perms());
 
@@ -800,7 +963,7 @@ impl InternalVMManager {
     //
     // Previously, this method is implemented for VMManager and only acquire the internal lock when needed. However, this will make mmap non-atomic.
     // In multi-thread applications, for example, when a thread calls mmap with MAP_FIXED flag, and that desired memory is mapped already, the libos
-    // will first munmap the corresponding memory and then do a mmap with desired address. If the lock is not aquired during the whole process,
+    // will first munmap the corresponding memory and then do a mmap with desired address. If the lock is not acquired during the whole process,
     // the unmapped memory might be allocated by other thread who is waiting and acquiring the lock.
     // Thus, in current code, this method is implemented for InternalManager and holds the lock during the whole process.
     // Below method "force_mmap_across_multiple_chunks" is the same.
@@ -853,7 +1016,7 @@ impl InternalVMManager {
                             }
 
                             // Munmap the corresponding single vma chunk
-                            self.munmap_chunk(&chunk, Some(&target_range))?;
+                            self.munmap_chunk(&chunk, Some(&target_range), true)?;
                         }
                         VMMapAddr::Any => unreachable!(),
                     }

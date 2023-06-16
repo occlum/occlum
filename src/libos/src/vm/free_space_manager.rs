@@ -2,10 +2,11 @@
 // Currently only use simple vector as the base structure.
 //
 // Basically use address-ordered first fit to find free ranges.
-use std::cmp::Ordering;
+use super::*;
 
 use super::vm_util::VMMapAddr;
-use super::*;
+
+use std::cmp::Ordering;
 
 const INITIAL_SIZE: usize = 100;
 
@@ -37,7 +38,7 @@ impl VMFreeSpaceManager {
         align: usize,
         addr: VMMapAddr,
     ) -> Result<VMRange> {
-        // Record the minimal free range that satisfies the contraints
+        // Record the minimal free range that satisfies the constraints
         let mut result_free_range: Option<VMRange> = None;
         let mut result_idx: Option<usize> = None;
         let mut free_list = &mut self.free_manager;

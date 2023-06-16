@@ -4,12 +4,12 @@ use super::free_space_manager::VMFreeSpaceManager as FreeRangeManager;
 use super::vm_area::*;
 use super::vm_perms::VMPerms;
 use super::vm_util::*;
-use std::collections::BTreeSet;
 
 use intrusive_collections::rbtree::{Link, RBTree};
 use intrusive_collections::Bound;
 use intrusive_collections::RBTreeLink;
 use intrusive_collections::{intrusive_adapter, KeyAdapter};
+use std::collections::BTreeSet;
 
 /// Memory chunk manager.
 ///
@@ -77,13 +77,13 @@ impl ChunkManager {
         vmas_cursor.move_next(); // move to the first element of the tree
         while !vmas_cursor.is_null() {
             let vma = vmas_cursor.get().unwrap().vma();
-            if vma.pid() != pid || vma.size() == 0 {
+            if !vma.belong_to(pid) || vma.size() == 0 {
                 // Skip vmas which doesn't belong to this process
                 vmas_cursor.move_next();
                 continue;
             }
 
-            Self::flush_file_vma(vma);
+            vma.flush_backed_file();
 
             if !vma.perms().is_default() {
                 VMPerms::apply_perms(vma, VMPerms::default());
@@ -156,7 +156,7 @@ impl ChunkManager {
         while !vmas_cursor.is_null() && vmas_cursor.get().unwrap().vma().start() <= range.end() {
             let vma = &vmas_cursor.get().unwrap().vma();
             trace!("munmap related vma = {:?}", vma);
-            if vma.size() == 0 || current_pid != vma.pid() {
+            if vma.size() == 0 || !vma.belong_to(current_pid) {
                 vmas_cursor.move_next();
                 continue;
             }
@@ -169,7 +169,7 @@ impl ChunkManager {
             };
 
             // File-backed VMA needs to be flushed upon munmap
-            Self::flush_file_vma(&intersection_vma);
+            intersection_vma.flush_backed_file();
             if !&intersection_vma.perms().is_default() {
                 VMPerms::apply_perms(&intersection_vma, VMPerms::default());
             }
@@ -254,7 +254,7 @@ impl ChunkManager {
             {
                 let vma = &vmas_cursor.get().unwrap().vma();
                 // The old range must be contained in one single VMA
-                if vma.pid() == current_pid && vma.is_superset_of(&old_range) {
+                if vma.belong_to(current_pid) && vma.is_superset_of(&old_range) {
                     break;
                 } else {
                     vmas_cursor.move_next();
@@ -284,7 +284,7 @@ impl ChunkManager {
             && containing_vmas.get().unwrap().vma().start() <= protect_range.end()
         {
             let mut containing_vma = containing_vmas.get().unwrap().vma().clone();
-            if containing_vma.pid() != current_pid {
+            if !containing_vma.belong_to(current_pid) {
                 containing_vmas.move_next();
                 continue;
             }
@@ -332,7 +332,7 @@ impl ChunkManager {
                             &containing_vma,
                             protect_range,
                             new_perms,
-                            current_pid,
+                            VMAccess::Private(current_pid),
                         );
                         VMPerms::apply_perms(&new_vma, new_vma.perms());
                         let new_vma = VMAObj::new_vma_obj(new_vma);
@@ -344,7 +344,7 @@ impl ChunkManager {
                                 &containing_vma,
                                 range,
                                 old_perms,
-                                current_pid,
+                                VMAccess::Private(current_pid),
                             );
                             VMAObj::new_vma_obj(new_vma)
                         };
@@ -369,7 +369,7 @@ impl ChunkManager {
                             &containing_vma,
                             intersection_vma.range().clone(),
                             new_perms,
-                            current_pid,
+                            VMAccess::Private(current_pid),
                         );
                         VMPerms::apply_perms(&new_vma, new_vma.perms());
 
@@ -399,7 +399,7 @@ impl ChunkManager {
                 None => continue,
                 Some(vma) => vma,
             };
-            Self::flush_file_vma(&vma);
+            vma.flush_backed_file();
         }
         Ok(())
     }
@@ -409,32 +409,8 @@ impl ChunkManager {
     pub fn msync_by_file(&mut self, sync_file: &FileRef) {
         for vma_obj in &self.vmas {
             let is_same_file = |file: &FileRef| -> bool { Arc::ptr_eq(&file, &sync_file) };
-            Self::flush_file_vma_with_cond(&vma_obj.vma(), is_same_file);
+            vma_obj.vma().flush_backed_file_with_cond(is_same_file);
         }
-    }
-
-    /// Flush a file-backed VMA to its file. This has no effect on anonymous VMA.
-    pub fn flush_file_vma(vma: &VMArea) {
-        Self::flush_file_vma_with_cond(vma, |_| true)
-    }
-
-    /// Same as flush_vma, except that an extra condition on the file needs to satisfy.
-    pub fn flush_file_vma_with_cond<F: Fn(&FileRef) -> bool>(vma: &VMArea, cond_fn: F) {
-        let (file, file_offset) = match vma.writeback_file() {
-            None => return,
-            Some((file_and_offset)) => file_and_offset,
-        };
-        let file_writable = file
-            .access_mode()
-            .map(|ac| ac.writable())
-            .unwrap_or_default();
-        if !file_writable {
-            return;
-        }
-        if !cond_fn(file) {
-            return;
-        }
-        file.write_at(file_offset, unsafe { vma.as_slice() });
     }
 
     pub fn find_mmap_region(&self, addr: usize) -> Result<VMRange> {
@@ -443,7 +419,7 @@ impl ChunkManager {
             return_errno!(ESRCH, "no mmap regions that contains the address");
         }
         let vma = vma.get().unwrap().vma();
-        if vma.pid() != current!().process().pid() || !vma.contains(addr) {
+        if !vma.belong_to(current!().process().pid()) || !vma.contains(addr) {
             return_errno!(ESRCH, "no mmap regions that contains the address");
         }
 
@@ -451,13 +427,13 @@ impl ChunkManager {
     }
 
     pub fn usage_percentage(&self) -> f32 {
-        let totol_size = self.range.size();
+        let total_size = self.range.size();
         let mut used_size = 0;
         self.vmas
             .iter()
             .for_each(|vma_obj| used_size += vma_obj.vma().size());
 
-        return used_size as f32 / totol_size as f32;
+        return used_size as f32 / total_size as f32;
     }
 
     fn merge_all_vmas(&mut self) {
