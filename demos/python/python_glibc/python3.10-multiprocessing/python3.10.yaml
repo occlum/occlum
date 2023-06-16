@@ -1,0 +1,18 @@
+includes:
+  - base.yaml
+targets:
+  - target: /bin
+    copy:
+      - files:
+          - ../python-occlum/bin/python3.10
+  # python packages
+  - target: /opt
+    copy: 
+      - dirs:
+          - ../python-occlum
+  # below are python code and data
+  - target: /
+    copy:
+      - from: ..
+        files: 
+          - multiprocessing_demo.py

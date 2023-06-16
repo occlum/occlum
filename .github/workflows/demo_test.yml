@@ -495,6 +495,10 @@ jobs:
     - name: Check result
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/python_glibc/occlum_instance; cat smvlight.dat"
 
+    - name: Run python3.10 multiprocessing demo
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/python_glibc/python3.10-multiprocessing; ./install_python3.10.sh;
+            SGX_MODE=SIM ./run_python3.10_on_occlum.sh"
+
   # Redis test
   Redis_support_test:
     runs-on: ubuntu-20.04

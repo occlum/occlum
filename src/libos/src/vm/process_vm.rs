@@ -1,17 +1,18 @@
 use super::*;
 
 use super::chunk::*;
-use super::config;
-use super::ipc::SHM_MANAGER;
-use super::process::elf_file::{ElfFile, ProgramHeaderExt};
 use super::user_space_vm::USER_SPACE_VM_MANAGER;
 use super::vm_area::VMArea;
 use super::vm_perms::VMPerms;
 use super::vm_util::{
     FileBacked, VMInitializer, VMMapAddr, VMMapOptions, VMMapOptionsBuilder, VMRemapOptions,
 };
+use crate::config;
+use crate::ipc::SHM_MANAGER;
+use crate::process::elf_file::{ElfFile, ProgramHeaderExt};
+use crate::util::sync::rw_lock::RwLockWriteGuard;
+
 use std::collections::HashSet;
-use util::sync::rw_lock::RwLockWriteGuard;
 
 // Used for heap and stack start address randomization.
 const RANGE_FOR_RANDOMIZATION: usize = 256 * 4096; // 1M
@@ -50,14 +51,14 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
     }
 
     // Generate a random address within [0, range]
-    // Note: This function doesn't gurantee alignment
+    // Note: This function doesn't guarantee alignment
     fn get_randomize_offset(range: usize) -> usize {
         if cfg!(debug_assertions) {
             return range;
         }
 
         use crate::misc;
-        trace!("entrophy size = {}", range);
+        trace!("entropy size = {}", range);
         let mut random_buf: [u8; 8] = [0u8; 8]; // same length as usize
         misc::get_random(&mut random_buf).expect("failed to get random number");
         let random_num: usize = u64::from_le_bytes(random_buf) as usize;
@@ -74,7 +75,7 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
             .stack_size
             .unwrap_or(config::LIBOS_CONFIG.process.default_stack_size);
 
-        // Before allocating memory, let's first calcualte how much memory
+        // Before allocating memory, let's first calculate how much memory
         // we need in total by iterating the memory layouts required by
         // all the memory regions
         let elf_layouts: Vec<VMLayout> = self
@@ -211,7 +212,9 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
 
     fn handle_error_when_init(&self, chunks: &HashSet<Arc<Chunk>>) {
         chunks.iter().for_each(|chunk| {
-            USER_SPACE_VM_MANAGER.internal().munmap_chunk(chunk, None);
+            USER_SPACE_VM_MANAGER
+                .internal()
+                .munmap_chunk(chunk, None, false);
         });
     }
 
@@ -227,7 +230,7 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
         let mut empty_start_offset = 0;
         let mut empty_end_offset = 0;
 
-        // Init all loadable segements
+        // Init all loadable segments
         elf_file
             .program_headers()
             .filter(|segment| segment.loadable())
@@ -309,7 +312,9 @@ impl Drop for ProcessVM {
         mem_chunks
             .drain_filter(|chunk| chunk.is_single_vma())
             .for_each(|chunk| {
-                USER_SPACE_VM_MANAGER.internal().munmap_chunk(&chunk, None);
+                USER_SPACE_VM_MANAGER
+                    .internal()
+                    .munmap_chunk(&chunk, None, false);
             });
 
         assert!(mem_chunks.len() == 0);
@@ -351,8 +356,9 @@ impl ProcessVM {
         mem_chunks: &mut RwLockWriteGuard<HashSet<ChunkRef>>,
     ) -> Result<Vec<VMArea>> {
         // Get all single VMA chunks
+        // Shared chunks shouldn't be merged since they are managed by shm manager and shared by multi processes
         let mut single_vma_chunks = mem_chunks
-            .drain_filter(|chunk| chunk.is_single_vma())
+            .drain_filter(|chunk| chunk.is_single_vma() && !chunk.is_shared())
             .collect::<Vec<ChunkRef>>();
         single_vma_chunks.sort_unstable_by(|chunk_a, chunk_b| {
             chunk_a
@@ -395,7 +401,7 @@ impl ProcessVM {
         for chunk in single_vma_chunks.into_iter().filter_map(|chunk| {
             if !chunk.is_single_dummy_vma() {
                 if chunk.is_single_vma_with_conflict_size() {
-                    let new_vma = chunk.get_vma_for_single_vma_chunk();
+                    let new_vma = chunk.get_vma_for_single_vma_chunk().clone();
                     merged_vmas.push(new_vma);
 
                     // Don't insert the merged chunks to mem_chunk list here. It should be updated later.
