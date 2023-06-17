@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1687040239061,
+  "lastUpdate": 1687040320628,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -5124,6 +5124,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 695,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "72aaa4744567ae12c8ca89a84a4160bb1b188225",
+          "message": "Fix cpuid test failure on HyperEnclave",
+          "timestamp": "2023-06-13T07:39:39Z",
+          "url": "https://github.com/occlum/occlum/commit/72aaa4744567ae12c8ca89a84a4160bb1b188225"
+        },
+        "date": 1687040317233,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2006,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2006,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
