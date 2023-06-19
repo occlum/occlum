@@ -12,7 +12,9 @@ all:
 	@$(MAKE) --no-print-directory -C gen_internal_conf
 	@$(MAKE) --no-print-directory -C copy_bom
 	@$(MAKE) --no-print-directory -C init
+ifndef OCCLUM_DISABLE_DCAP
 	@$(MAKE) --no-print-directory -C init_grpc_ratls
+endif
 	@$(MAKE) --no-print-directory -C init_aecs
 
 format:
@@ -26,5 +28,7 @@ clean:
 	@$(MAKE) --no-print-directory -C gen_internal_conf clean
 	@$(MAKE) --no-print-directory -C copy_bom clean
 	@$(MAKE) --no-print-directory -C init clean
+ifndef OCCLUM_DISABLE_DCAP
 	@$(MAKE) --no-print-directory -C init_grpc_ratls clean
+endif
 	@$(MAKE) --no-print-directory -C init_aecs clean
