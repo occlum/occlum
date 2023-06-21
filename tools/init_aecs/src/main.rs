@@ -1,3 +1,4 @@
+extern crate base64;
 extern crate libc;
 extern crate serde;
 extern crate serde_json;
@@ -75,6 +76,9 @@ struct KmsKeys {
     key: String,
     path: String,
     service: String,
+    // Encode option, currently only support base64
+    #[serde(default)]
+    encode: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -132,6 +136,17 @@ fn get_kms_keys(
         }
 
         buffer.resize(buffer_len as usize, 0);
+
+        // Do decode if necessary
+        if let Some(encode) = keys.encode {
+            if encode == "base64" {
+                println!("base64 encoded key {:}", keys.key);
+                let base64_string = String::from_utf8(buffer).expect("error converting to string");
+                let mut buf = Vec::<u8>::new();
+                base64::decode_config_buf(&base64_string, base64::STANDARD, &mut buf).unwrap();
+                buffer = buf.clone();
+            }
+        }
 
         let key_info: KeyInfo = KeyInfo {
             path: keys.path.clone(),
