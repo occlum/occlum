@@ -14,7 +14,13 @@ bitflags! {
 
 impl VMPerms {
     pub fn from_u32(bits: u32) -> Result<VMPerms> {
-        Self::from_bits(bits).ok_or_else(|| errno!(EINVAL, "invalid bits"))
+        let mut perms = Self::from_bits(bits).ok_or_else(|| errno!(EINVAL, "invalid bits"))?;
+
+        // SGX SDK doesn't accept permissions like write or exec without read.
+        if perms != VMPerms::NONE {
+            perms |= VMPerms::READ
+        }
+        Ok(perms)
     }
 
     pub fn can_read(&self) -> bool {
