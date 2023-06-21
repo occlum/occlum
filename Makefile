@@ -46,7 +46,7 @@ else
 submodule: githooks init-submodule
 	@rm -rf build
 	@# Enclaves used by tools are running in simulation mode by default to run faster.
-	@$(MAKE) SGX_MODE=SIM MS_BUFFER=1 --no-print-directory -C tools
+	@$(MAKE) SGX_MODE=SIM MS_BUFFER=1 OCCLUM_DISABLE_DCAP=1 --no-print-directory -C tools
 	@# Apply the sefs-cli's patch for HYPER mode
 	cd deps/sefs && git apply ../sefs-cli_hyper.patch >/dev/null 2>&1 || git apply ../sefs-cli_hyper.patch -R --check
 	@$(MAKE) --no-print-directory -C deps/sefs/sefs-cli clean
