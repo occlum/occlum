@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1687385699193,
+  "lastUpdate": 1687385707283,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -5204,6 +5204,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2006,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "e574ab65d3b21534bb85194eed7d8cb91be0108e",
+          "message": "Fix sgx_tprotect_rsrv_mem failure on EDMM-enabled platform",
+          "timestamp": "2023-06-21T07:26:41Z",
+          "url": "https://github.com/occlum/occlum/commit/e574ab65d3b21534bb85194eed7d8cb91be0108e"
+        },
+        "date": 1687385705046,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2317,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2316,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
