@@ -18,13 +18,13 @@ impl ForcedExitStatus {
     }
 
     pub fn is_forced_to_exit(&self) -> bool {
-        self.exited.load(Ordering::SeqCst)
+        self.exited.load(Ordering::Acquire)
     }
 
     pub fn force_exit(&self, status: TermStatus) {
         let mut old_status = self.status.lock().unwrap();
         // set the bool after getting the status lock
-        self.exited.store(true, Ordering::SeqCst);
+        self.exited.store(true, Ordering::Release);
         old_status.get_or_insert(status);
     }
 

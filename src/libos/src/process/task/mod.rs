@@ -51,10 +51,10 @@ impl Task {
     }
 
     pub(super) fn set_user_fs(&self, user_fs: usize) {
-        self.user_fs.store(user_fs, Ordering::SeqCst);
+        self.user_fs.store(user_fs, Ordering::Relaxed);
     }
 
     pub fn user_fs(&self) -> usize {
-        self.user_fs.load(Ordering::SeqCst)
+        self.user_fs.load(Ordering::Relaxed)
     }
 }

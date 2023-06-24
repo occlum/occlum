@@ -170,7 +170,7 @@ pub fn wake_robust_futex(futex_addr: *const i32, tid: pid_t) -> Result<()> {
         check_ptr(futex_addr)?;
         unsafe { AtomicU32::from_mut(&mut *(futex_addr as *mut u32)) }
     };
-    let mut old_val = futex_val.load(Ordering::SeqCst);
+    let mut old_val = futex_val.load(Ordering::Relaxed);
     loop {
         // This futex may held by another thread, do nothing
         if old_val & FUTEX_TID_MASK != tid {
@@ -178,14 +178,14 @@ pub fn wake_robust_futex(futex_addr: *const i32, tid: pid_t) -> Result<()> {
         }
         let new_val = (old_val & FUTEX_WAITERS) | FUTEX_OWNER_DIED;
         if let Err(cur_val) =
-            futex_val.compare_exchange(old_val, new_val, Ordering::SeqCst, Ordering::SeqCst)
+            futex_val.compare_exchange(old_val, new_val, Ordering::Relaxed, Ordering::Relaxed)
         {
             // The futex value has changed, let's retry with current value
             old_val = cur_val;
             continue;
         }
         // Wakeup one waiter
-        if futex_val.load(Ordering::SeqCst) & FUTEX_WAITERS != 0 {
+        if futex_val.load(Ordering::Relaxed) & FUTEX_WAITERS != 0 {
             debug!("wake robust futex addr: {:?}", futex_addr);
             super::do_futex::futex_wake(futex_addr, 1)?;
         }

@@ -117,11 +117,11 @@ impl Inner {
     }
 
     pub fn is_woken(&self) -> bool {
-        self.is_woken.load(Ordering::SeqCst)
+        self.is_woken.load(Ordering::Acquire)
     }
 
     pub fn reset(&self) {
-        self.is_woken.store(false, Ordering::SeqCst);
+        self.is_woken.store(false, Ordering::Release);
     }
 
     pub fn wait(&self, timeout: Option<&Duration>) -> Result<()> {
@@ -154,7 +154,7 @@ impl Inner {
     pub fn wake(&self) {
         if self
             .is_woken
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
             .is_ok()
         {
             self.host_eventfd.write_u64(1);
