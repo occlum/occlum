@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1687645211120,
+  "lastUpdate": 1687645894925,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -5284,6 +5284,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2316,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Shaowei Song",
+            "username": "lucassong-mh",
+            "email": "1498430017@qq.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "b0de80bd507ec6753deeb1e56af9dfebb759022f",
+          "message": "[vm] Support shared memory (POSIX)",
+          "timestamp": "2023-06-16T08:52:05Z",
+          "url": "https://github.com/occlum/occlum/commit/b0de80bd507ec6753deeb1e56af9dfebb759022f"
+        },
+        "date": 1687645893116,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2208,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2207,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
