@@ -1,11 +1,11 @@
 use super::address_space::ADDRESS_SPACE;
-use super::endpoint::{end_pair, Endpoint, RelayNotifier};
+use super::endpoint::{end_pair, Ancillary, Endpoint, RelayNotifier};
 use super::*;
 use events::{Event, EventFilter, Notifier, Observer};
 use fs::channel::Channel;
 use fs::IoEvents;
 use fs::{CreationFlags, FileMode};
-use net::socket::{Iovs, MsgHdr, MsgHdrMut};
+use net::socket::{CMessages, CmsgData, Iovs, MsgHdr, MsgHdrMut};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -161,6 +161,9 @@ impl Stream {
                 if let Some(self_addr) = self_addr_opt {
                     end_self.set_addr(self_addr);
                 }
+                end_self.set_ancillary(Ancillary {
+                    tid: current!().tid(),
+                });
 
                 ADDRESS_SPACE
                     .push_incoming(addr, end_incoming)
@@ -190,6 +193,9 @@ impl Stream {
             Status::Listening(addr) => {
                 let endpoint = ADDRESS_SPACE.pop_incoming(&addr)?;
                 endpoint.set_nonblocking(flags.contains(FileFlags::SOCK_NONBLOCK));
+                endpoint.set_ancillary(Ancillary {
+                    tid: current!().tid(),
+                });
                 let notifier = Arc::new(RelayNotifier::new());
                 notifier.observe_endpoint(&endpoint);
 
@@ -228,12 +234,14 @@ impl Stream {
         if !flags.is_empty() {
             warn!("unsupported flags: {:?}", flags);
         }
-        if msg_hdr.get_control().is_some() {
-            warn!("sendmsg with msg_control is not supported");
-        }
 
         let bufs = msg_hdr.get_iovs().as_slices();
-        self.writev(bufs)
+        let mut data_len = self.writev(bufs)?;
+
+        if let Some(msg_control) = msg_hdr.get_control() {
+            data_len += self.write(msg_control)?;
+        }
+        Ok(data_len)
     }
 
     pub fn recvmsg(&self, msg_hdr: &mut MsgHdrMut, flags: RecvFlags) -> Result<usize> {
@@ -242,11 +250,33 @@ impl Stream {
         }
 
         let bufs = msg_hdr.get_iovs_mut().as_slices_mut();
-        let data_len = self.readv(bufs)?;
+        let mut data_len = self.readv(bufs)?;
 
         // For stream socket, the msg_name is ignored. And other fields are not supported.
         msg_hdr.set_name_len(0);
 
+        if let Some(msg_control) = msg_hdr.get_control_mut() {
+            data_len += self.read(msg_control)?;
+
+            // For each control message that contains file descriptors (SOL_SOCKET and SCM_RIGHTS),
+            // reassign each fd in the message in receive end.
+            for cmsg in CMessages::from_bytes(msg_control) {
+                if let CmsgData::ScmRights(mut scm_rights) = cmsg {
+                    let send_tid = self.peer_ancillary().unwrap().tid();
+                    scm_rights.iter_and_reassign_fds(|send_fd| {
+                        let ipc_file = process::table::get_thread(send_tid)
+                            .unwrap()
+                            .files()
+                            .lock()
+                            .unwrap()
+                            .get(send_fd)
+                            .unwrap();
+                        current!().add_file(ipc_file.clone(), false)
+                    })
+                }
+                // Unix credentials need not to be handled here
+            }
+        }
         Ok(data_len)
     }
 
@@ -280,6 +310,28 @@ impl Stream {
 
     pub(super) fn inner(&self) -> SgxMutexGuard<'_, Status> {
         self.inner.lock().unwrap()
+    }
+
+    fn ancillary(&self) -> Option<Ancillary> {
+        match &*self.inner() {
+            Status::Idle(_) => None,
+            Status::Listening(_) => None,
+            Status::Connected(endpoint) => endpoint.ancillary(),
+        }
+    }
+
+    fn peer_ancillary(&self) -> Option<Ancillary> {
+        if let Status::Connected(endpoint) = &*self.inner() {
+            endpoint.peer_ancillary()
+        } else {
+            None
+        }
+    }
+
+    fn set_ancillary(&self, ancillary: Ancillary) {
+        if let Status::Connected(endpoint) = &*self.inner() {
+            endpoint.set_ancillary(ancillary)
+        }
     }
 }
 
