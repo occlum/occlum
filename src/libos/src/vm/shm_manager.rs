@@ -187,9 +187,10 @@ impl ShmManager {
     }
 
     pub fn replace_shared_chunk(&mut self, old_shared_chunk: ChunkRef, new_chunk: ChunkRef) {
-        debug_assert!(old_shared_chunk.is_shared() && new_chunk.is_shared());
+        debug_assert!(old_shared_chunk.is_shared());
         let inode_id = {
             let mut new_vma = Self::vma_of(&new_chunk);
+            new_vma.mark_shared();
             let old_vma = Self::vma_of(&old_shared_chunk);
             // Inherits access and perms from the old one
             new_vma.inherits_access_from(&old_vma);
