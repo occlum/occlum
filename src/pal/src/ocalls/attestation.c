@@ -62,7 +62,9 @@ sgx_status_t occlum_ocall_sgx_calc_quote_size (
 
 int occlum_ocall_detect_dcap_driver() {
     return access("/dev/sgx/enclave", F_OK) == 0 &&
-           access("/dev/sgx/provision", F_OK) == 0;
+           access("/dev/sgx/provision", F_OK) == 0 ||
+           access("/dev/sgx_enclave", F_OK) == 0 &&
+           access("/dev/sgx_provision", F_OK) == 0 ;
 }
 
 #define MAX_RETRY 5
