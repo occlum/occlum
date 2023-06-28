@@ -11,6 +11,10 @@ use crate::prelude::*;
 ///
 /// While the queue is conceptually for `Waiter`s, it internally maintains a list
 /// of `Waker`s.
+/// Note about memory ordering:
+/// Here count needs to be synchronized with wakers. The read operation of count 
+/// needs to see the change of the waker field. Just `Acquire` or `Release` needs 
+/// to be used to make all the change of the wakers visible to us.
 pub struct WaiterQueue {
     count: AtomicUsize,
     wakers: SgxMutex<VecDeque<Waker>>,
@@ -27,7 +31,7 @@ impl WaiterQueue {
 
     /// Returns whether the queue is empty.
     pub fn is_empty(&self) -> bool {
-        self.count.load(Ordering::SeqCst) == 0
+        self.count.load(Ordering::Acquire) == 0
     }
 
     /// Reset a waiter and enqueue it.
@@ -39,7 +43,7 @@ impl WaiterQueue {
         waiter.reset();
 
         let mut wakers = self.wakers.lock().unwrap();
-        self.count.fetch_add(1, Ordering::SeqCst);
+        self.count.fetch_add(1, Ordering::Release);
         wakers.push_back(waiter.waker());
     }
 
@@ -65,7 +69,7 @@ impl WaiterQueue {
             let mut wakers = self.wakers.lock().unwrap();
             let max_count = max_count.min(wakers.len());
             let to_wake: Vec<Waker> = wakers.drain(..max_count).collect();
-            self.count.fetch_sub(to_wake.len(), Ordering::SeqCst);
+            self.count.fetch_sub(to_wake.len(), Ordering::Release);
             to_wake
         };
 

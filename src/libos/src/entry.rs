@@ -21,6 +21,10 @@ use sgx_tse::*;
 pub static mut INSTANCE_DIR: String = String::new();
 static mut ENCLAVE_PATH: String = String::new();
 
+/// Note about memory ordering: 
+/// Although HAS_INIT is a global falg, it is just a signal and doesn't synchronize 
+/// with other variables. Therefore, `Relaxed` can be used in both single-threaded 
+/// and multi-threaded environments.
 lazy_static! {
     static ref INIT_ONCE: Once = Once::new();
     static ref HAS_INIT: AtomicBool = AtomicBool::new(false);
@@ -49,7 +53,7 @@ pub extern "C" fn occlum_ecall_init(
     instance_dir: *const c_char,
     file_buffer: *const host_file_buffer,
 ) -> i32 {
-    if HAS_INIT.load(Ordering::SeqCst) == true {
+    if HAS_INIT.load(Ordering::Relaxed) == true {
         return ecall_errno!(EEXIST);
     }
 
@@ -101,7 +105,7 @@ pub extern "C" fn occlum_ecall_init(
 
         interrupt::init();
 
-        HAS_INIT.store(true, Ordering::SeqCst);
+        HAS_INIT.store(true, Ordering::Relaxed);
 
         // Init boot up time stamp here.
         time::up_time::init();
@@ -135,7 +139,7 @@ pub extern "C" fn occlum_ecall_new_process(
     env: *const *const c_char,
     host_stdio_fds: *const HostStdioFds,
 ) -> i32 {
-    if HAS_INIT.load(Ordering::SeqCst) == false {
+    if HAS_INIT.load(Ordering::Relaxed) == false {
         return ecall_errno!(EAGAIN);
     }
 
@@ -164,7 +168,7 @@ pub extern "C" fn occlum_ecall_new_process(
 
 #[no_mangle]
 pub extern "C" fn occlum_ecall_exec_thread(libos_pid: i32, host_tid: i32) -> i32 {
-    if HAS_INIT.load(Ordering::SeqCst) == false {
+    if HAS_INIT.load(Ordering::Relaxed) == false {
         return ecall_errno!(EAGAIN);
     }
 
@@ -184,7 +188,7 @@ pub extern "C" fn occlum_ecall_exec_thread(libos_pid: i32, host_tid: i32) -> i32
 
 #[no_mangle]
 pub extern "C" fn occlum_ecall_kill(pid: i32, sig: i32) -> i32 {
-    if HAS_INIT.load(Ordering::SeqCst) == false {
+    if HAS_INIT.load(Ordering::Relaxed) == false {
         return ecall_errno!(EAGAIN);
     }
 
@@ -202,7 +206,7 @@ pub extern "C" fn occlum_ecall_kill(pid: i32, sig: i32) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn occlum_ecall_broadcast_interrupts() -> i32 {
-    if HAS_INIT.load(Ordering::SeqCst) == false {
+    if HAS_INIT.load(Ordering::Relaxed) == false {
         return ecall_errno!(EAGAIN);
     }
 

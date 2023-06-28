@@ -101,6 +101,14 @@ impl Waker {
     }
 }
 
+/// Note about memory ordering:
+/// Here is_woken needs to be synchronized with host_eventfd. The read operation of
+/// is_woken needs to see the change of the host_eventfd field. Just `Acquire` or 
+/// `Release` needs to be used to make all the change of the host_eventfd visible to us.
+/// 
+/// In addition, fail does not synchronize other variables in the CAS operation, which
+/// can use `Relaxed`, and the host_enent fields need to be synchronized in success, so 
+/// `Acquire` needs to be used to make all the change of the host_eventfd visible to us.
 struct Inner {
     is_woken: AtomicBool,
     host_eventfd: Arc<HostEventFd>,
@@ -117,11 +125,11 @@ impl Inner {
     }
 
     pub fn is_woken(&self) -> bool {
-        self.is_woken.load(Ordering::SeqCst)
+        self.is_woken.load(Ordering::Acquire)
     }
 
     pub fn reset(&self) {
-        self.is_woken.store(false, Ordering::SeqCst);
+        self.is_woken.store(false, Ordering::Release);
     }
 
     pub fn wait(&self, timeout: Option<&Duration>) -> Result<()> {
@@ -154,7 +162,7 @@ impl Inner {
     pub fn wake(&self) {
         if self
             .is_woken
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
             .is_ok()
         {
             self.host_eventfd.write_u64(1);
@@ -167,7 +175,7 @@ impl Inner {
             .filter(|inner| {
                 inner
                     .is_woken
-                    .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                    .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
                     .is_ok()
             })
             .map(|inner| inner.host_eventfd.host_fd())
