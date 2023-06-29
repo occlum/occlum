@@ -50,18 +50,16 @@ Build Occlum TF examples container images for k8s deployment.
 usage: build.sh [OPTION]...
     -r <container image registry> the container image registry
     -g <tag> container image tag
-    -d <grpc_server_domain> GPRC RA server domain
-    -p <grpc_server_port> GPRC RA server port
 ```
 
 For example, below command generates three container images.
 ```
-# ./build.sh -r demo -g 0.29.5
+# ./build.sh -r demo -g 0.29.6
 ```
 
-* **`demo/init_ra_server:0.29.5`** acts as key broker pod.
-* **`demo/tf_demo:0.29.5`** acts as tensorflow serving pod.
-* **`demo/tf_demo_client:0.29.5`** acts as client.
+* **`demo/init_ra_server:0.29.6`** acts as key broker pod.
+* **`demo/tf_demo:0.29.6`** acts as tensorflow serving pod.
+* **`demo/tf_demo_client:0.29.6`** acts as client.
 
 ## How to test
 
@@ -80,7 +78,7 @@ For example, below command generates three container images.
 ```
 In this case, for inference, "8000MB" SGX EPC memory size is used because Occlum `user_space_size` is set to "7000MB" in building stage. cpu limits "1000m" here is to limit the CPU usage for each Occlum inference pod with the purpose to show the performance gain by scalability in `benchmark`.
 
-* Args `"taskset -c 2,3,4,5"` is necessary till Occlum v1.0 release. The purpose is to limit the CPU cores used in tensorflow serving which makes the SGX thread number used won't exceed the `max_num_of_threads` defined in building stage.
+* Args `"taskset -c 0-3"` is necessary till Occlum v1.0 release. The purpose is to limit the CPU cores used in tensorflow serving which makes the SGX thread number used won't exceed the `max_num_of_threads` defined in building stage.
 
 
 ### Start the key broker service
@@ -110,7 +108,7 @@ In default, only one replica for the tensorflow serving pod.
 ### Try the inference request
 
 ```
-$ docker run --rm --network host demo/tf_demo_client:0.29.5 python3 resnet_client_grpc.py --server=localhost:31001 --crt server.crt --image cat.jpg
+$ docker run --rm --network host demo/tf_demo_client:0.29.6 python3 resnet_client_grpc.py --server=localhost:31001 --crt server.crt --image cat.jpg
 ```
 
 If successful, it prints the classification results.
@@ -120,7 +118,7 @@ If successful, it prints the classification results.
 Below command can do benchmark test for the tensorflow serving service running in Occlum.
 
 ```
-$ docker run --rm --network host demo/tf_demo_client:0.29.5 python3 benchmark.py --server localhost:31001 --crt server.crt --cnum 4 --loop 10 --image cat.jpg
+$ docker run --rm --network host demo/tf_demo_client:0.29.6 python3 benchmark.py --server localhost:31001 --crt server.crt --cnum 4 --loop 10 --image cat.jpg
 ```
 
 Try scale up the tensorflow serving pods number, better `tps` can be achieved.
