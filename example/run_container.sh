@@ -54,7 +54,7 @@ GRPC_SERVER="${grpc_domain}:${grpc_port}"
 docker run --network host \
         --device /dev/sgx/enclave --device /dev/sgx/provision \
         --env PCCS_URL=${pccs_url} \
-        --env GRPC_SERVER="${GRPC_SERVER}" \
+        --env OCCLUM_INIT_RA_KMS_SERVER="${GRPC_SERVER}" \
         ${registry}/tf_demo:${tag} \
         taskset -c 0,1 occlum run /bin/tensorflow_model_server \
         --model_name=resnet --model_base_path=/models/resnet \

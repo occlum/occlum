@@ -37,7 +37,7 @@ It is used to encrypt/decrypt the Occlum application RootFS image which is Tenso
 
 #### Step 2
 
-Application starts. First it starts the `init` process. This customized [`init`](./init_ra/) requests `ssl_config` and `image_key` from GRPC-RATLS server through a secure GRPC RATLS connection. Then it uses the `image_key` to decrypt the RootFS where the real application is located, mount the RootFS, save the `ssl_config` to RootFS `/etc/tf_ssl.cfg`.
+Application starts. First it starts the `init` process. This customized [`init`](../tools/init_grpc_ratls/) requests `ssl_config` and `image_key` from GRPC-RATLS server through a secure GRPC RATLS connection. Then it uses the `image_key` to decrypt the RootFS where the real application is located, mount the RootFS, save the `ssl_config` to RootFS `/etc/tf_ssl.cfg`.
 
 Detail description of the above two steps Init-RA operation could refer to [`Init-RA`](../demos/remote_attestation/init_ra_flow/).
 
@@ -55,9 +55,9 @@ Now users could send inference request with server certificates (`server.crt`).
 
 There are prebuilt docker images could be used for the examples, either in the following docker way or [`kubernates`](./kubernetes/) way. Users could pull them directly and try the example.
 ```
-docker pull occlum/init_ra_server:0.29.5-ubuntu20.04
-docker pull occlum/tf_demo:0.29.5-ubuntu20.04
-docker pull occlum/tf_demo_client:0.29.5-ubuntu20.04
+docker pull occlum/init_ra_server:0.29.6-ubuntu20.04
+docker pull occlum/tf_demo:0.29.6-ubuntu20.04
+docker pull occlum/tf_demo_client:0.29.6-ubuntu20.04
 ```
 
 If users want to build or customize the images, please check below part.
