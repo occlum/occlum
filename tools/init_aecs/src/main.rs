@@ -174,7 +174,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         ra_conf_string.clone().into_bytes(),
     )?;
 
-    let server_addr = CString::new(init_ra_conf.kms_server).unwrap();
+    // aecs kms server address from environment has higher priority
+    let server_addr =
+        CString::new(env::var("OCCLUM_INIT_RA_KMS_SERVER").unwrap_or(init_ra_conf.kms_server))
+            .unwrap();
     env::set_var("UA_ENV_PCCS_URL", init_ra_conf.ua_env_pccs_url.clone());
 
     // Get the key of FS image if needed
