@@ -107,6 +107,7 @@ extern crate alloc;
 
 use alloc::sync::{Arc, Weak};
 use core::borrow::Borrow;
+use core::cmp::Ordering;
 use core::convert::AsRef;
 use core::fmt;
 use core::hash::{Hash, Hasher};
@@ -182,6 +183,18 @@ impl<T: ?Sized> PartialEq for KeyableArc<T> {
 }
 
 impl<T: ?Sized> Eq for KeyableArc<T> {}
+
+impl<T: ?Sized> PartialOrd for KeyableArc<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(Arc::as_ptr(&self.0).cmp(&Arc::as_ptr(&other.0)))
+    }
+}
+
+impl<T: ?Sized> Ord for KeyableArc<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        Arc::as_ptr(&self.0).cmp(&Arc::as_ptr(&other.0))
+    }
+}
 
 impl<T: ?Sized> Hash for KeyableArc<T> {
     fn hash<H: Hasher>(&self, s: &mut H) {

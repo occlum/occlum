@@ -1,11 +1,14 @@
+use crate::fs::{hostfs::HostFS, sync_fs_wrapper::SyncFS};
 use config::{parse_key, parse_mac, ConfigMount, ConfigMountFsType, ConfigMountOptions};
+use rcore_fs_ramfs::RamFS;
+use rcore_fs_unionfs::UnionFS;
 use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::sync::Once;
 use util::host_file_util::{write_host_file, HostFile};
 use util::mem_util::from_user;
 
-use super::rootfs::{init_rootfs, mount_nonroot_fs_according_to, umount_nonroot_fs, update_rootfs};
+use super::rootfs::{init_rootfs, open_or_create_sefs_according_to, update_rootfs};
 use super::*;
 
 pub async fn do_mount_rootfs(
@@ -17,7 +20,17 @@ pub async fn do_mount_rootfs(
     let new_rootfs = init_rootfs(&user_app_config.mount, user_key).await?;
 
     // Update the rootfs
-    update_rootfs(new_rootfs).await?;
+    update_rootfs(new_rootfs.clone()).await?;
+
+    // Update the fs root of all remaining processes
+    let new_root = Dentry::new_root(new_rootfs.root_inode().await);
+    process::IDLE.fs().set_root(new_root.clone());
+    let processes = crate::process::table::get_all_processes();
+    for process in processes.iter() {
+        if let Some(main_thread) = process.main_thread() {
+            main_thread.fs().set_root(new_root.clone());
+        }
+    }
 
     // Update entry_points
     *ENTRY_POINTS.write().unwrap() = user_app_config.entry_points.to_owned();
@@ -48,15 +61,7 @@ pub async fn do_mount(
         source, target, flags, options
     );
 
-    let target = if target == "/" {
-        return_errno!(EPERM, "can not mount on root");
-    } else {
-        let fs_path = FsPath::try_from(target)?;
-        let current = current!();
-        let fs = current.fs();
-        PathBuf::from(fs.convert_fspath_to_abs(&fs_path)?)
-    };
-
+    let target = FsPath::try_from(target)?;
     if flags.contains(MountFlags::MS_REMOUNT)
         || flags.contains(MountFlags::MS_BIND)
         || flags.contains(MountFlags::MS_SHARED)
@@ -68,97 +73,70 @@ pub async fn do_mount(
         return_errno!(EINVAL, "Only support to create a new mount");
     }
 
-    let (mount_configs, user_key) = match options {
-        MountOptions::UnionFS(unionfs_options) => {
-            let mc = {
-                let image_mc = ConfigMount {
-                    type_: ConfigMountFsType::TYPE_SEFS,
-                    target: target.clone(),
-                    source: Some(unionfs_options.lower_dir.clone()),
-                    options: Default::default(),
-                };
-                let container_mc = ConfigMount {
-                    type_: ConfigMountFsType::TYPE_SEFS,
-                    target: target.clone(),
-                    source: Some(unionfs_options.upper_dir.clone()),
-                    options: Default::default(),
-                };
-
-                ConfigMount {
-                    type_: ConfigMountFsType::TYPE_UNIONFS,
-                    target,
-                    source: None,
-                    options: ConfigMountOptions {
-                        layers: Some(vec![image_mc, container_mc]),
-                        ..Default::default()
-                    },
-                }
-            };
-            (vec![mc], unionfs_options.key)
-        }
+    let fs = match options {
+        MountOptions::RamFS => SyncFS::new(RamFS::new()),
+        MountOptions::HostFS(dir) => SyncFS::new(HostFS::new(dir)),
         MountOptions::SEFS(sefs_options) => {
             let mc = ConfigMount {
                 type_: ConfigMountFsType::TYPE_SEFS,
-                target,
+                target: PathBuf::new(),
                 source: Some(sefs_options.dir.clone()),
                 options: ConfigMountOptions {
                     mac: sefs_options.mac,
                     ..Default::default()
                 },
             };
-            (vec![mc], sefs_options.key)
+            let sefs = open_or_create_sefs_according_to(&mc, &sefs_options.key)?;
+            SyncFS::new(sefs)
         }
-        MountOptions::HostFS(dir) => {
-            let mc = ConfigMount {
-                type_: ConfigMountFsType::TYPE_HOSTFS,
-                target,
-                source: Some(dir.clone()),
+        MountOptions::UnionFS(unionfs_options) => {
+            let image_mc = ConfigMount {
+                type_: ConfigMountFsType::TYPE_SEFS,
+                target: PathBuf::new(),
+                source: Some(unionfs_options.lower_dir.clone()),
                 options: Default::default(),
             };
-            (vec![mc], None)
-        }
-        MountOptions::RamFS => {
-            let mc = ConfigMount {
-                type_: ConfigMountFsType::TYPE_RAMFS,
-                target,
-                source: None,
+            let container_mc = ConfigMount {
+                type_: ConfigMountFsType::TYPE_SEFS,
+                target: PathBuf::new(),
+                source: Some(unionfs_options.upper_dir.clone()),
                 options: Default::default(),
             };
-            (vec![mc], None)
+            let image_sefs = open_or_create_sefs_according_to(&image_mc, &unionfs_options.key)?;
+            let container_sefs =
+                open_or_create_sefs_according_to(&container_mc, &unionfs_options.key)?;
+            SyncFS::new(UnionFS::new(vec![container_sefs, image_sefs])?)
         }
     };
 
-    // Should we sync the fs before mount?
-    let rootfs = rootfs().await;
-    rootfs.sync().await?;
-    let follow_symlink = !flags.contains(MountFlags::MS_NOSYMFOLLOW);
-    mount_nonroot_fs_according_to(
-        &rootfs.root_inode().await,
-        &mount_configs,
-        &user_key,
-        follow_symlink,
-    )
-    .await?;
+    let dir_dentry = {
+        let current = current!();
+        let fs = current.fs();
+        if !flags.contains(MountFlags::MS_NOSYMFOLLOW) {
+            fs.lookup(&target).await?
+        } else {
+            fs.lookup_no_follow(&target).await?
+        }
+    };
+    dir_dentry.mount(fs).await?;
     Ok(())
 }
 
 pub async fn do_umount(target: &str, flags: UmountFlags) -> Result<()> {
     debug!("umount: target: {}, flags: {:?}", target, flags);
 
-    let target = if target == "/" {
-        return_errno!(EPERM, "cannot umount rootfs");
-    } else {
-        let fs_path = FsPath::try_from(target)?;
+    let target = FsPath::try_from(target)?;
+
+    let dir_dentry = {
         let current = current!();
         let fs = current.fs();
-        fs.convert_fspath_to_abs(&fs_path)?
+        if !flags.contains(UmountFlags::UMOUNT_NOFOLLOW) {
+            fs.lookup(&target).await?
+        } else {
+            fs.lookup_no_follow(&target).await?
+        }
     };
-
-    // Should we sync the fs before umount?
-    let rootfs = rootfs().await;
-    rootfs.sync().await?;
-    let follow_symlink = !flags.contains(UmountFlags::UMOUNT_NOFOLLOW);
-    umount_nonroot_fs(&rootfs.root_inode().await, &target, follow_symlink).await?;
+    dir_dentry.umount().await?;
     Ok(())
 }
 

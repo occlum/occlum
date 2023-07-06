@@ -28,7 +28,7 @@ pub async fn write_host_file(host_file: HostFile) -> Result<()> {
         _ => return_errno!(EINVAL, "Unsupported host file"),
     };
 
-    let fs_view = FsView::new();
+    let fs_view = FsView::new().await;
     // overwrite host file if existed in Occlum fs
     let enclave_file = fs_view
         .open_file(

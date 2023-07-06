@@ -31,18 +31,15 @@ pub async fn do_sendfile(
         None => in_file_handle.offset().await,
     };
 
+    let in_file_inode = in_file_handle.dentry().inode();
+
     // read from specified offset and write new offset back
     let mut bytes_sent = 0;
     let mut send_error = None;
     while bytes_sent < count {
         let len = min(buffer.len(), count - bytes_sent);
 
-        match in_file_handle
-            .dentry()
-            .inode()
-            .read_at(read_offset, &mut buffer[..len])
-            .await
-        {
+        match in_file_inode.read_at(read_offset, &mut buffer[..len]).await {
             Ok(read_len) if read_len > 0 => match out_file.write(&buffer[..read_len]).await {
                 Ok(write_len) => {
                     bytes_sent += write_len;

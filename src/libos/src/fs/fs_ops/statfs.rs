@@ -22,13 +22,13 @@ pub async fn do_fstatfs(fd: FileDesc) -> Result<Statfs> {
 pub async fn do_statfs(path: &FsPath) -> Result<Statfs> {
     debug!("statfs: path: {:?}", path);
 
-    let inode = {
+    let dentry = {
         let current = current!();
         let fs = current.fs();
-        fs.lookup_inode(path).await?
+        fs.lookup(path).await?
     };
     let statfs = {
-        let fs_info = inode.fs().info().await;
+        let fs_info = dentry.inode().fs().info().await;
         Statfs::try_from(fs_info)?
     };
     trace!("statfs result: {:?}", statfs);

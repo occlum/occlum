@@ -3,19 +3,16 @@ use super::*;
 pub async fn do_readlinkat(fs_path: &FsPath, buf: &mut [u8]) -> Result<usize> {
     debug!("readlinkat: fs_path: {:?}", fs_path);
 
-    let file_path = {
-        let inode = {
+    let linkpath = {
+        let dentry = {
             let current = current!();
             let fs = current.fs();
-            fs.lookup_inode_no_follow(fs_path).await?
+            fs.lookup_no_follow(fs_path).await?
         };
-        if inode.metadata().await?.type_ != FileType::SymLink {
-            return_errno!(EINVAL, "not a symbolic link");
-        }
-        inode.read_link().await?
+        dentry.inode().read_link().await?
     };
-    let len = file_path.len().min(buf.len());
-    buf[0..len].copy_from_slice(&file_path.as_bytes()[0..len]);
+    let len = linkpath.len().min(buf.len());
+    buf[..len].copy_from_slice(&linkpath.as_bytes()[..len]);
     Ok(len)
 }
 
@@ -29,20 +26,24 @@ pub async fn do_symlinkat(target: &str, link_path: &FsPath) -> Result<usize> {
         return_errno!(ENAMETOOLONG, "target is too long");
     }
 
-    let (dir_inode, link_name) = {
+    let (dir, link_name) = {
         let current = current!();
         let fs = current.fs();
         if link_path.ends_with("/") {
             return_errno!(EISDIR, "link path is dir");
         }
-        fs.lookup_dirinode_and_basename(link_path).await?
+        fs.lookup_dir_and_base_name(link_path).await?
     };
-    if !dir_inode.allow_write().await {
+    if !dir.inode().allow_write().await {
         return_errno!(EPERM, "symlink cannot be created");
     }
-    let link_inode = dir_inode
-        .create(&link_name, FileType::SymLink, 0o0777)
+    let link_dentry = dir
+        .create(
+            &link_name,
+            FileType::SymLink,
+            FileMode::from_bits(0o0777).unwrap(),
+        )
         .await?;
-    link_inode.write_link(target).await?;
+    link_dentry.inode().write_link(target).await?;
     Ok(0)
 }

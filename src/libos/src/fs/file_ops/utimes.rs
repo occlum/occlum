@@ -125,11 +125,12 @@ pub async fn do_utimes_path(
     let inode = {
         let current = current!();
         let fs = current.fs();
-        if flags.contains(UtimeFlags::AT_SYMLINK_NOFOLLOW) {
-            fs.lookup_inode_no_follow(fs_path).await?
+        let dentry = if flags.contains(UtimeFlags::AT_SYMLINK_NOFOLLOW) {
+            fs.lookup_no_follow(fs_path).await?
         } else {
-            fs.lookup_inode(fs_path).await?
-        }
+            fs.lookup(fs_path).await?
+        };
+        dentry.inode()
     };
     let mut info = inode.metadata().await?;
     if let Utime::UTIME(atime) = atime {

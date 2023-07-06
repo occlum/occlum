@@ -6,21 +6,21 @@ pub async fn do_linkat(old_fs_path: &FsPath, new_fs_path: &FsPath, flags: LinkFl
         old_fs_path, new_fs_path, flags
     );
 
-    let (inode, new_dir_inode, new_file_name) = {
+    let (dentry, new_dir, new_file_name) = {
         let current = current!();
         let fs = current.fs();
-        let inode = if flags.contains(LinkFlags::AT_SYMLINK_FOLLOW) {
-            fs.lookup_inode(old_fs_path).await?
+        let dentry = if flags.contains(LinkFlags::AT_SYMLINK_FOLLOW) {
+            fs.lookup(old_fs_path).await?
         } else {
-            fs.lookup_inode_no_follow(old_fs_path).await?
+            fs.lookup_no_follow(old_fs_path).await?
         };
         if new_fs_path.ends_with("/") {
             return_errno!(EISDIR, "new path is dir");
         }
-        let (new_dir_inode, new_file_name) = fs.lookup_dirinode_and_basename(new_fs_path).await?;
-        (inode, new_dir_inode, new_file_name)
+        let (new_dir, new_file_name) = fs.lookup_dir_and_base_name(new_fs_path).await?;
+        (dentry, new_dir, new_file_name)
     };
-    new_dir_inode.link(&new_file_name, &inode).await?;
+    new_dir.link(&new_file_name, &dentry).await?;
     Ok(())
 }
 

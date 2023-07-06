@@ -88,6 +88,10 @@ where
         unimplemented!();
     }
 
+    fn is_dentry_cacheable(&self) -> bool {
+        !self.inner().is_volatile()
+    }
+
     fn as_any_ref(&self) -> &dyn Any {
         self
     }

@@ -47,13 +47,13 @@ pub async fn do_faccessat(
         fs_path, mode, flags
     );
 
-    let inode = {
+    let dentry = {
         let current = current!();
         let fs = current.fs();
         if flags.contains(AccessibilityCheckFlags::AT_SYMLINK_NOFOLLOW) {
-            fs.lookup_inode_no_follow(fs_path).await?
+            fs.lookup_no_follow(fs_path).await?
         } else {
-            fs.lookup_inode(fs_path).await?
+            fs.lookup(fs_path).await?
         }
     };
 
@@ -62,7 +62,7 @@ pub async fn do_faccessat(
     }
     // Check the permissions of file owner
     let owner_file_mode = {
-        let metadata = inode.metadata().await?;
+        let metadata = dentry.inode().metadata().await?;
         AccessibilityCheckMode::from_u32((metadata.mode >> 6) as u32 & 0b111)?
     };
     if !owner_file_mode.contains(mode) {

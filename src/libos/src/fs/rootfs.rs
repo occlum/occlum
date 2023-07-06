@@ -1,5 +1,5 @@
 use super::dev_fs;
-use super::fs_view::{split_path, MAX_SYMLINKS};
+use super::fs_view::MAX_SYMLINKS;
 use super::hostfs::HostFS;
 use super::procfs::ProcFS;
 use super::sefs::{SgxStorage, SgxUuidProvider};
@@ -98,8 +98,7 @@ pub async fn init_rootfs(
     user_key: &Option<sgx_key_128bit_t>,
 ) -> Result<Arc<dyn AsyncFileSystem>> {
     let rootfs = open_rootfs_according_to(mount_configs, user_key)?;
-    mount_nonroot_fs_according_to(&rootfs.root_inode().await, mount_configs, user_key, true)
-        .await?;
+    mount_nonroot_fs_according_to(&rootfs.root_inode().await, mount_configs, user_key).await?;
     Ok(rootfs)
 }
 
@@ -151,11 +150,10 @@ fn open_rootfs_according_to(
     Ok(root_mountable_unionfs as _)
 }
 
-pub async fn mount_nonroot_fs_according_to(
+async fn mount_nonroot_fs_according_to(
     root: &Arc<dyn AsyncInode>,
     mount_configs: &Vec<ConfigMount>,
     user_key: &Option<sgx_key_128bit_t>,
-    follow_symlink: bool,
 ) -> Result<()> {
     for mc in mount_configs {
         if mc.target == Path::new("/") {
@@ -170,7 +168,7 @@ pub async fn mount_nonroot_fs_according_to(
         match mc.type_ {
             TYPE_SEFS => {
                 let sefs = SyncFS::new(open_or_create_sefs_according_to(&mc, user_key)?);
-                mount_nonroot_fs(sefs, root, &mc.target, follow_symlink).await?;
+                mount_nonroot_fs(sefs, root, &mc.target).await?;
             }
             TYPE_HOSTFS => {
                 let source_path =
@@ -188,21 +186,21 @@ pub async fn mount_nonroot_fs_according_to(
                 }
 
                 let hostfs = SyncFS::new(HostFS::new(source_path.unwrap()));
-                mount_nonroot_fs(hostfs, root, &mc.target, follow_symlink).await?;
+                mount_nonroot_fs(hostfs, root, &mc.target).await?;
             }
             TYPE_RAMFS => {
                 let ramfs = SyncFS::new(RamFS::new());
-                mount_nonroot_fs(ramfs, root, &mc.target, follow_symlink).await?;
+                mount_nonroot_fs(ramfs, root, &mc.target).await?;
             }
             TYPE_DEVFS => {
                 let devfs = SyncFS::new(dev_fs::init_devfs()?);
-                mount_nonroot_fs(devfs, root, &mc.target, follow_symlink).await?;
+                mount_nonroot_fs(devfs, root, &mc.target).await?;
                 let ramfs = SyncFS::new(RamFS::new());
-                mount_nonroot_fs(ramfs, root, &mc.target.join("shm"), follow_symlink).await?;
+                mount_nonroot_fs(ramfs, root, &mc.target.join("shm")).await?;
             }
             TYPE_PROCFS => {
                 let procfs = ProcFS::new();
-                mount_nonroot_fs(procfs, root, &mc.target, follow_symlink).await?;
+                mount_nonroot_fs(procfs, root, &mc.target).await?;
             }
             TYPE_UNIONFS => {
                 let layer_mcs = mc
@@ -227,67 +225,31 @@ pub async fn mount_nonroot_fs_according_to(
                         return_errno!(EINVAL, "Unsupported fs type inside unionfs");
                     }
                 };
-                mount_nonroot_fs(unionfs, root, &mc.target, follow_symlink).await?;
+                mount_nonroot_fs(unionfs, root, &mc.target).await?;
             }
             TYPE_ASYNC_SFS => {
                 let async_sfs = open_or_create_async_sfs_according_to(&mc, user_key).await?;
-                mount_nonroot_fs(async_sfs, root, &mc.target, follow_symlink).await?;
+                mount_nonroot_fs(async_sfs, root, &mc.target).await?;
             }
         }
     }
     Ok(())
 }
 
-pub async fn mount_nonroot_fs(
+async fn mount_nonroot_fs(
     fs: Arc<dyn AsyncFileSystem>,
     root: &Arc<dyn AsyncInode>,
     abs_path: &Path,
-    follow_symlink: bool,
 ) -> Result<()> {
     let path = abs_path
         .to_str()
         .ok_or_else(|| errno!(EINVAL, "invalid path"))?;
-    let mount_dir = if follow_symlink {
-        root.lookup_follow(path, Some(MAX_SYMLINKS)).await?
-    } else {
-        if path.ends_with("/") {
-            root.lookup_follow(path, Some(MAX_SYMLINKS)).await?
-        } else {
-            let (dir_path, file_name) = split_path(path);
-            root.lookup_follow(dir_path, Some(MAX_SYMLINKS))
-                .await?
-                .lookup(file_name)
-                .await?
-        }
-    };
+    let mount_dir = root.lookup_follow(path, Some(MAX_SYMLINKS)).await?;
     mount_dir.mount(fs).await?;
     Ok(())
 }
 
-pub async fn umount_nonroot_fs(
-    root: &Arc<dyn AsyncInode>,
-    abs_path: &str,
-    follow_symlink: bool,
-) -> Result<()> {
-    let mount_dir = if follow_symlink {
-        root.lookup_follow(abs_path, Some(MAX_SYMLINKS)).await?
-    } else {
-        if abs_path.ends_with("/") {
-            root.lookup_follow(abs_path, Some(MAX_SYMLINKS)).await?
-        } else {
-            let (dir_path, file_name) = split_path(abs_path);
-            root.lookup_follow(dir_path, Some(MAX_SYMLINKS))
-                .await?
-                .lookup(file_name)
-                .await?
-        }
-    };
-
-    mount_dir.umount().await?;
-    Ok(())
-}
-
-async fn open_or_create_async_sfs_according_to(
+pub async fn open_or_create_async_sfs_according_to(
     mc: &ConfigMount,
     user_key: &Option<sgx_key_128bit_t>,
 ) -> Result<Arc<dyn AsyncFileSystem>> {
@@ -333,7 +295,7 @@ async fn open_or_create_async_sfs_according_to(
     Ok(async_sfs as _)
 }
 
-fn open_or_create_sefs_according_to(
+pub fn open_or_create_sefs_according_to(
     mc: &ConfigMount,
     user_key: &Option<sgx_key_128bit_t>,
 ) -> Result<Arc<SEFS>> {

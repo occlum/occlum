@@ -13,6 +13,10 @@ impl ProcINode for ProcCwdSymINode {
     async fn generate_data_in_bytes(&self) -> Result<Vec<u8>> {
         let main_thread = self.0.main_thread().ok_or(errno!(ENOENT, ""))?;
         let fs = main_thread.fs();
-        Ok(fs.cwd().to_owned().into_bytes())
+        Ok(fs.cwd().abs_path().into_bytes())
+    }
+
+    fn is_volatile(&self) -> bool {
+        true
     }
 }

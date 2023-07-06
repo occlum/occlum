@@ -18,15 +18,15 @@ bitflags::bitflags! {
 }
 
 async fn do_unlink(fs_path: &FsPath) -> Result<()> {
-    let (dir_inode, file_name) = {
+    let (dir, file_name) = {
         let current = current!();
         let fs = current.fs();
         if fs_path.ends_with("/") {
             return_errno!(EISDIR, "unlink on directory");
         }
-        fs.lookup_dirinode_and_basename(fs_path).await?
+        fs.lookup_dir_and_base_name(fs_path).await?
     };
-    let file_inode = dir_inode.find(&file_name).await?;
+    let file_inode = dir.find(&file_name).await?.inode();
     let metadata = file_inode.metadata().await?;
     if metadata.type_ == FileType::Dir {
         return_errno!(EISDIR, "unlink on directory");
@@ -43,6 +43,6 @@ async fn do_unlink(fs_path: &FsPath) -> Result<()> {
     if file_mode.has_sticky_bit() {
         warn!("ignoring the sticky bit");
     }
-    dir_inode.unlink(&file_name).await?;
+    dir.unlink(&file_name).await?;
     Ok(())
 }

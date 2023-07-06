@@ -56,6 +56,10 @@ impl DirProcINode for LockedProcFdDirINode {
         }
         Ok(ctx.written_len())
     }
+
+    fn is_volatile(&self) -> bool {
+        true
+    }
 }
 
 struct FdSymINode(FileRef);
@@ -72,7 +76,7 @@ impl FdSymINode {
 impl ProcINode for FdSymINode {
     async fn generate_data_in_bytes(&self) -> Result<Vec<u8>> {
         let path = if let Some(async_file_handle) = self.0.as_async_file_handle() {
-            async_file_handle.dentry().abs_path().to_owned()
+            async_file_handle.dentry().abs_path()
         } else {
             // TODO: Support other file types
             // For file descriptors for pipes and sockets,
@@ -82,5 +86,9 @@ impl ProcINode for FdSymINode {
             return_errno!(ENOENT, "");
         };
         Ok(path.into_bytes())
+    }
+
+    fn is_volatile(&self) -> bool {
+        true
     }
 }

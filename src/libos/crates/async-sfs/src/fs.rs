@@ -547,8 +547,8 @@ impl AsyncInode for Inode {
 
         // Normal path
         let (mut self_inner_mut, mut other_inner_mut) = write_lock_two_inodes(self, other).await;
-        if self_inner_mut.disk_inode.nlinks == 0 {
-            return_errno!(ENOENT, "dir removed");
+        if self_inner_mut.disk_inode.nlinks == 0 || other_inner_mut.disk_inode.nlinks == 0 {
+            return_errno!(ENOENT, "inode removed");
         }
         // When we get the lock, the entry may be exist
         if self_inner_mut.get_file_inode_id(name).await.is_some() {

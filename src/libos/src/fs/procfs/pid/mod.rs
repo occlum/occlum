@@ -116,4 +116,8 @@ impl DirProcINode for LockedPidDirINode {
         }
         Ok(ctx.written_len())
     }
+
+    fn is_volatile(&self) -> bool {
+        true
+    }
 }
