@@ -22,7 +22,7 @@ pub static mut INSTANCE_DIR: String = String::new();
 static mut ENCLAVE_PATH: String = String::new();
 
 /// Note about memory ordering: 
-/// Although HAS_INIT is a global falg, it is just a signal and doesn't synchronize 
+/// Although HAS_INIT is a global flag, it is just a signal and doesn't synchronize 
 /// with other variables. Therefore, `Relaxed` can be used in both single-threaded 
 /// and multi-threaded environments.
 lazy_static! {

@@ -282,6 +282,8 @@ impl EpollFile {
         // A critical section protected by the lock of self.interest
         {
             let mut interest_entries = self.interest.lock().unwrap();
+            // There is a data-dependency, so this cannot be re-ordered, 
+            // `Relaxed` should be enough.
             let ep_entry = interest_entries
                 .remove(&fd)
                 .ok_or_else(|| errno!(ENOENT, "fd is not added"))?;

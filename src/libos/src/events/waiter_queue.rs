@@ -15,6 +15,16 @@ use crate::prelude::*;
 /// Here count needs to be synchronized with wakers. The read operation of count 
 /// needs to see the change of the waker field. Just `Acquire` or `Release` needs 
 /// to be used to make all the change of the wakers visible to us.
+/// 
+/// Regarding the usage of functions like fetch_add and fetch_sub, they perform 
+/// atomic addition or subtraction operations. The memory ordering parameter for 
+/// these functions can be chosen from options such as `Relaxed`, `Acquire`, `Release`, 
+/// `AcqRel` and `SeqCst`. It is important to select the appropriate memory ordering 
+/// based on the corresponding usage scenario.
+/// 
+/// In this code snippet, the count variable is synchronized with the wakers field. 
+/// In this case, we only need to ensure that waker.lock() occurs before count. 
+/// Although it is safer to use AcqRel，here using `Release` would be enough.
 pub struct WaiterQueue {
     count: AtomicUsize,
     wakers: SgxMutex<VecDeque<Waker>>,
@@ -31,7 +41,9 @@ impl WaiterQueue {
 
     /// Returns whether the queue is empty.
     pub fn is_empty(&self) -> bool {
-        self.count.load(Ordering::Acquire) == 0
+        // Here is_empty function is only used in line 75 below. And when calling this, it 
+        // doesn't need to synchronize with the wakers. Therefore, Relaxed can be enough.
+        self.count.load(Ordering::Relaxed) == 0
     }
 
     /// Reset a waiter and enqueue it.
