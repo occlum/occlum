@@ -3,7 +3,7 @@
 For every application to be running in Occlum (TEE env), all the running required files, libraries and binaries have to be put into Occlum file system. Here is the tree view of one Occlum instance.
 ```
 ./occlum_instance/
-|-- Occlum.yaml
+|-- Occlum.json
 |-- build
 |-- image       // Occlum root file system
 |   |-- bin

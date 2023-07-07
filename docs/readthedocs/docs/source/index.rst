@@ -7,11 +7,6 @@ As a LibOS, it enables legacy applications to run on SGX with little or even no 
 .. image:: images/arch_overview.png
    :alt: Occlum Arch Overview
 
-.. note::
-
-   This project is under active development.
-   There is no guarantee that the content here are all up to date.
-
 *****************
 Table of Contents
 *****************

@@ -21,7 +21,7 @@ Initialize a directory as the Occlum instance.
 ```bash
 occlum build [--sign-key <key_path>] [--sign-tool <tool_path>] [--image-key <key_path>] [-f/--force]
 ```
-Build and sign an Occlum SGX enclave (.so) and generate its associated secure FS image according to the user-provided image directory and Occlum.yaml config file.
+Build and sign an Occlum SGX enclave (.so) and generate its associated secure FS image according to the user-provided image directory and Occlum.json config file.
 The whole building process is incremental: the building artifacts are built only
 when needed.
 To force rebuilding all artifacts, give the [-f/--force] flag.

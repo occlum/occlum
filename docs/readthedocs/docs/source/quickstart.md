@@ -6,9 +6,9 @@
 
 First, please make sure the baremetal or VM machine support SGX. Otherwise, users can only try SW simulation mode.
 
-From Occlum v1.0, only SGX2 or SGX1 with [FLC](https://www.intel.com/content/www/us/en/developer/articles/technical/an-update-on-3rd-party-attestation.html)(Flexible Launch Control) feature are supported. 
+To have best user experience, SGX2 or SGX1 with [FLC](https://www.intel.com/content/www/us/en/developer/articles/technical/an-update-on-3rd-party-attestation.html)(Flexible Launch Control) feature are required. 
 
-Users can use command `cpuid` to detect if the HW satisfy Occlum v1.0 requirements.
+Users can use command `cpuid` to detect if the HW satisfy Occlum requirements.
 
 * SGX2, ```cpuid | grep SGX2```
 * FLC, ```cpuid | grep SGX_LC```
@@ -17,7 +17,7 @@ Users can use command `cpuid` to detect if the HW satisfy Occlum v1.0 requiremen
 
 #### Kernel Version
 
-From Occlum v1.0, the `io_uring` is used to enhance the IO performance. The `io_uring` is first introduced in Linux kernel 5.1 and still fast growing. To make Occlum v1.0 works well with `io_uring` and also the SGX in-tree driver, Linux kernel 5.10+ is expected.
+To use SGX in-tree driver, Linux kernel 5.10+ is expected.
 
 For example, in the Ubuntu 20.04 OS (Occlum default development OS), users could update the kernel with below command to get all Occlum required kernel features.
 ```
