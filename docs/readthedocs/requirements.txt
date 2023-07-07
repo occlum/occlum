@@ -1,0 +1,12 @@
+breathe<4.13.0
+toml>=0.10
+
+pillow
+mock==1.0.1
+alabaster>=0.7,<0.8,!=0.7.5
+commonmark==0.9.1
+recommonmark==0.5.0
+sphinx
+sphinx-rtd-theme
+readthedocs-sphinx-ext<2.2
+sphinx_markdown_tables
