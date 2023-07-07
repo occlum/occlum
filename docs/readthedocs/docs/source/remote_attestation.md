@@ -55,12 +55,9 @@ ISVEXTPRODID, 16 bytes
 CONFIG ID, 64 bytes
 CONFIG SVN, 16 bits
 ```
-Occlum can support both above by either modifying the fields in `Occlum.yaml` (for `Signning stage`) or using Occlum run arguments `"--config-id"` or `"--config-svn"` (for `Running stage`).
-
-* Note: `ISVFAMILYID` is reserved for saving the MAC of the configuration file.
+Occlum can support both above by either modifying the fields in `Occlum.json` (for `Signning stage`) or using Occlum run arguments `"--config-id"` or `"--config-svn"` (for `Running stage`).
 
 Details please refer to the [RFC](https://github.com/occlum/occlum/issues/589).
-
 
 ## References
 

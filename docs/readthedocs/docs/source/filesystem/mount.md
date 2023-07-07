@@ -30,7 +30,7 @@ To mount an Occlum's secure FS image successfully, three conditions must be sati
 
 With the three conditions satisfied, the mount command is able to start a Linux FUSE FS server. Any I/O operations on the FUSE FS mounted at the specified path will be redirected by Linux kernel as I/O requests to the FUSE server. The FUSE server is backed by a special enclave, which can encrypt or decrypt the content of the secure FS image on demand.
 
-Please note that if the `autokey_policy` field of the configurations of FS is set in Occlum.yaml, the mount command will not work. This is because the MRENCLAVE is used as an input to generate the encryption key, and the mount tool cannot mimic it.
+Please note that if the `autokey_policy` field of the configurations of FS is set in Occlum.json, the mount command will not work. This is because the MRENCLAVE is used as an input to generate the encryption key, and the mount tool cannot mimic it.
 
 The mount command **will not return** until the FUSE server is terminated in one of the two ways. The first one is to press ctrl+C. The second one is to use `umount` command. Both ways can terminate the server gracefully.
 
@@ -49,7 +49,7 @@ After mounting the secure FS successfully, you can access and manipulate the FS 
 ## Mount and Unmount Filesystems at Runtime
 
 ### Background
-Users can specify the mount configuration in the `Occlum.yaml` file, then the file systems are mounted during the libOS startup phase. While this design provides a safe and simple way to access files, it is not as convenient as traditional Host OS. Apps are not allowed to mount and unmount file systems at runtime.
+Users can specify the mount configuration in the `Occlum.json` file, then the file systems are mounted during the libOS startup phase. While this design provides a safe and simple way to access files, it is not as convenient as traditional Host OS. Apps are not allowed to mount and unmount file systems at runtime.
 
 ### How to mount filesystems at runtime?
 Apps running inside Occlum can mount some specific file systems via the [mount()](https://man7.org/linux/man-pages/man2/mount.2.html) system call. This makes it flexible to mount and access files at runtime.

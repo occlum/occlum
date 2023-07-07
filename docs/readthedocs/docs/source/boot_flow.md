@@ -14,13 +14,12 @@ There are total three MACs which are all generated in building stage and verifie
 
 * MAC of the configuration file. Both above MACs are filled into the configuration file. Thus the MAC of the configuration file reflects the differences of the two file systems to some extent.
 
-* **mrenclave**, it indicates the measurement of the Occlum LibOS.
 
 ## Boot flow
 
-1. To user, the entry point is the command `occlum run`. The steps behind the command are PAL APIs `occlum_pal_init` and `occlum_pal_create_process`. It launches the Occlum LibOS kernel in the Enclave. The kernel then loads the configuration file `.Occlum_sys.json.protected`, doing integrity check with the MAC saved in `KSS ISV FamilyID`. If pass, it uses the settings in the configuration file to do memory/process initialization. Then, it tries mount the init filesystem. It does integrity check again with MAC in the `.Occlum_sys.json.protected`. If pass, the first user space process `init` got launched.
+1. To user, the entry point is the command `occlum run`. The steps behind the command are PAL APIs `occlum_pal_init` and `occlum_pal_create_process`. It launches the Occlum LibOS kernel in the Enclave. The kernel then loads the configuration file `.Occlum_sys.json.protected`, doing integrity check with the MAC saved in the LibOS section **builtin_config** (marked as `conf_mac` in the picture). If pass, it uses the settings in the configuration file to do memory/process initialization. Then, it tries mount the init filesystem. It does integrity check again with init FS MAC in the `.Occlum_sys.json.protected`. If pass, the first user space process `init` got launched.
 
-2. There is a default minimal `init` provided. In this `init`, it calls the Occlum added syscall `SYS_MOUNT_FS` to mount the application file system. The syscall implementation in the Occlum kernel does integrity check again with MAC in the `.Occlum_sys.json.protected` to make sure expected application got launched.
+2. There is a default minimal `init` provided. In this `init`, it calls the Occlum added syscall `SYS_MOUNT_FS` to mount the application file system. The syscall implementation in the Occlum kernel does integrity check again with root FS MAC in the `.Occlum_sys.json.protected` to make sure expected application got launched.
 
 3. At this stage, the real user application got launched.
 

@@ -137,7 +137,7 @@ The HostFS is used for convenient data exchange between the LibOS and the host O
 ## RamFS and other pseudo filesystems
 The RamFS and other pseudo filesystems like ProcFS use the memory as the storage. So the data may lose if one terminates the enclave.
 
-Please remember to enlarge the `kernel_space_heap_size` of Occlum.yaml if your app depends on RamFS.
+Please remember to enlarge the `kernel_space_heap_size` of Occlum.json if your app depends on RamFS.
 
 ## Q & A
 
