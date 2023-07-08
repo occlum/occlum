@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1688854867048,
+  "lastUpdate": 1688854960537,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -2770,6 +2770,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Threads Maximum Latency",
             "value": 658.57,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 257.95,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Zheng, Qi",
+            "username": "qzheng527",
+            "email": "huaiqing.zq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "b43cd4233a248f242f536c970f9ad1009eddc968",
+          "message": "[example] Update example with init-ra way",
+          "timestamp": "2023-06-29T08:19:34Z",
+          "url": "https://github.com/occlum/occlum/commit/b43cd4233a248f242f536c970f9ad1009eddc968"
+        },
+        "date": 1688854958457,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.08,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 51.46,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 8382.87,
             "unit": "ms",
             "extra": "max"
           },
