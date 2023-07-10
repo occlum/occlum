@@ -2,17 +2,8 @@
 set -e
 
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
-
-export INITRA_DIR="${script_dir}/init_ra"
-export RATLS_DIR="${script_dir}/../tools/toolchains/grpc_ratls"
 export TF_DIR="${script_dir}/tf_serving"
 
-function build_ratls()
-{
-    pushd ${RATLS_DIR}
-    ./build.sh
-    popd
-}
 
 function build_tf_serving()
 {
@@ -27,12 +18,22 @@ function build_tf_serving()
     popd
 }
 
-function build_init_ra()
+function update_client_init_ra_conf()
 {
-    pushd ${INITRA_DIR}
-    occlum-cargo clean
-    occlum-cargo build --release
-    popd
+    # Fill in the keys
+    new_json="$(jq '.kms_keys = [ {"key": "ssl_config", "path": "/etc/tf_ssl.cfg"}]' init_ra_conf.json)" && \
+    echo "${new_json}" > init_ra_conf.json
+
+    # Fill in the KMS server measurements.
+    new_json="$(jq ' .ra_config.verify_mr_enclave = "off" |
+        .ra_config.verify_mr_signer = "on" |
+        .ra_config.verify_isv_prod_id = "off" |
+        .ra_config.verify_isv_svn = "off" |
+        .ra_config.verify_config_svn = "off" |
+        .ra_config.verify_enclave_debuggable = "on" |
+        .ra_config.sgx_mrs[0].mr_signer = ''"'`get_mr tf mrsigner`'" |
+        .ra_config.sgx_mrs[0].debuggable = false ' init_ra_conf.json)" && \
+    echo "${new_json}" > init_ra_conf.json
 }
 
 function build_tf_instance()
@@ -40,40 +41,32 @@ function build_tf_instance()
     # generate tf image key
     occlum gen-image-key image_key
 
-    rm -rf occlum_tf && occlum new occlum_tf
+    rm -rf occlum_tf
+    # choose grpc_ratls as init ra kms client
+    occlum new occlum_tf --init-ra grpc_ratls
     pushd occlum_tf
 
     # prepare tf_serving content
     rm -rf image
     copy_bom -f ../tf_serving.yaml --root image --include-dir /opt/occlum/etc/template
 
+    # Try build first to get mrsigner
+    # In our case, client and server use the same sign-key thus also the same mrsigner
+    occlum build
+
     new_json="$(jq '.resource_limits.user_space_size = "7000MB" |
                     .resource_limits.kernel_space_heap_size="384MB" |
                     .process.default_heap_size = "128MB" |
                     .resource_limits.max_num_of_threads = 64 |
                     .metadata.debuggable = false |
-                    .env.default += ["GRPC_SERVER=localhost:50051"] |
-                    .env.untrusted += ["GRPC_SERVER"]' Occlum.json)" && \
+                    .env.default += ["OCCLUM_INIT_RA_KMS_SERVER=localhost:50051"] |
+                    .env.untrusted += ["OCCLUM_INIT_RA_KMS_SERVER"]' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
 
+    # Update init_ra_conf json file accordingly before occlum build
+    update_client_init_ra_conf
+
     occlum build --image-key ../image_key
-
-    # Get server mrsigner.
-    # Here client and server use the same signer-key thus using client mrsigner directly.
-    jq ' .verify_mr_enclave = "off" |
-        .verify_mr_signer = "on" |
-        .verify_isv_prod_id = "off" |
-        .verify_isv_svn = "off" |
-        .verify_config_svn = "off" |
-        .verify_enclave_debuggable = "on" |
-        .sgx_mrs[0].mr_signer = ''"'`get_mr tf mrsigner`'" |
-        .sgx_mrs[0].debuggable = false ' ../ra_config_template.json > dynamic_config.json
-
-    # prepare init-ra content
-    rm -rf initfs
-    copy_bom -f ../init_ra_client.yaml --root initfs --include-dir /opt/occlum/etc/template
-
-    occlum build -f --image-key ../image_key
     occlum package occlum_instance
 
     popd
@@ -125,9 +118,7 @@ function build_server_instance()
     popd
 }
 
-build_ratls
 build_tf_serving
-build_init_ra
 
 build_tf_instance
 build_server_instance

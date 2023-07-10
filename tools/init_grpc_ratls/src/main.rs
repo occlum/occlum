@@ -5,6 +5,7 @@ extern crate serde_json;
 use libc::syscall;
 use serde::{Deserialize, Serialize};
 
+use std::env;
 use std::error::Error;
 use std::fs;
 use std::fs::File;
@@ -130,7 +131,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ra_conf_string = serde_json::to_string_pretty(&init_ra_conf.ra_config).unwrap();
     fs::write("ra_config.json", ra_conf_string.clone().into_bytes())?;
     let config_json = CString::new("ra_config.json").unwrap();
-    let server_addr = CString::new(init_ra_conf.kms_server).unwrap();
+
+    // grpc server address from environment has higher priority
+    let server_addr =
+        CString::new(env::var("OCCLUM_INIT_RA_KMS_SERVER").unwrap_or(init_ra_conf.kms_server))
+            .unwrap();
 
     // Get the key of FS image if needed
     let key = match &image_config.image_type[..] {

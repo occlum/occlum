@@ -20,12 +20,12 @@ spec:
         env:
         - name: PCCS_URL
           value: https://sgx-dcap-server.cn-shanghai.aliyuncs.com/sgx/certification/v3/
-        - name: GRPC_SERVER
+        - name: OCCLUM_INIT_RA_KMS_SERVER
           value: init-ra-server-svc:5000
         args:
         - taskset
         - -c
-        - 2,3,4,5
+        - 0-3
         - occlum
         - run
         - /bin/tensorflow_model_server

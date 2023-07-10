@@ -1,3 +1,4 @@
+extern crate base64;
 extern crate libc;
 extern crate serde;
 extern crate serde_json;
@@ -75,6 +76,9 @@ struct KmsKeys {
     key: String,
     path: String,
     service: String,
+    // Encode option, currently only support base64
+    #[serde(default)]
+    encode: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -133,6 +137,17 @@ fn get_kms_keys(
 
         buffer.resize(buffer_len as usize, 0);
 
+        // Do decode if necessary
+        if let Some(encode) = keys.encode {
+            if encode == "base64" {
+                println!("base64 encoded key {:}", keys.key);
+                let base64_string = String::from_utf8(buffer).expect("error converting to string");
+                let mut buf = Vec::<u8>::new();
+                base64::decode_config_buf(&base64_string, base64::STANDARD, &mut buf).unwrap();
+                buffer = buf.clone();
+            }
+        }
+
         let key_info: KeyInfo = KeyInfo {
             path: keys.path.clone(),
             val_buf: buffer.clone(),
@@ -159,7 +174,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         ra_conf_string.clone().into_bytes(),
     )?;
 
-    let server_addr = CString::new(init_ra_conf.kms_server).unwrap();
+    // aecs kms server address from environment has higher priority
+    let server_addr =
+        CString::new(env::var("OCCLUM_INIT_RA_KMS_SERVER").unwrap_or(init_ra_conf.kms_server))
+            .unwrap();
     env::set_var("UA_ENV_PCCS_URL", init_ra_conf.ua_env_pccs_url.clone());
 
     // Get the key of FS image if needed
