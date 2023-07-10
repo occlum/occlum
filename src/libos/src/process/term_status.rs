@@ -5,8 +5,8 @@ use sgx_tstd::sync::SgxMutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Note about memory ordering:
-/// Here exited needs to be synchronized with status. The read operation of exited 
-/// needs to see the change of the status field. Just `Acquire` or `Release` needs 
+/// Here exited needs to be synchronized with status. The read operation of exited
+/// needs to see the change of the status field. Just `Acquire` or `Release` needs
 /// to be used to make all the change of the status visible to us.
 pub struct ForcedExitStatus {
     exited: AtomicBool,

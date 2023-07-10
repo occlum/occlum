@@ -11,20 +11,20 @@ use crate::prelude::*;
 ///
 /// While the queue is conceptually for `Waiter`s, it internally maintains a list
 /// of `Waker`s.
-/// 
+///
 /// Note about memory ordering:
-/// Here count needs to be synchronized with wakers. The read operation of count 
-/// needs to see the change of the waker field. Just `Acquire` or `Release` needs 
+/// Here count needs to be synchronized with wakers. The read operation of count
+/// needs to see the change of the waker field. Just `Acquire` or `Release` needs
 /// to be used to make all the change of the wakers visible to us.
-/// 
-/// Regarding the usage of functions like fetch_add and fetch_sub, they perform 
-/// atomic addition or subtraction operations. The memory ordering parameter for 
-/// these functions can be chosen from options such as `Relaxed`, `Acquire`, `Release`, 
-/// `AcqRel` and `SeqCst`. It is important to select the appropriate memory ordering 
+///
+/// Regarding the usage of functions like fetch_add and fetch_sub, they perform
+/// atomic addition or subtraction operations. The memory ordering parameter for
+/// these functions can be chosen from options such as `Relaxed`, `Acquire`, `Release`,
+/// `AcqRel` and `SeqCst`. It is important to select the appropriate memory ordering
 /// based on the corresponding usage scenario.
-/// 
-/// In this code snippet, the count variable is synchronized with the wakers field. 
-/// In this case, we only need to ensure that waker.lock() occurs before count. 
+///
+/// In this code snippet, the count variable is synchronized with the wakers field.
+/// In this case, we only need to ensure that waker.lock() occurs before count.
 /// Although it is safer to use AcqRel，here using `Release` would be enough.
 pub struct WaiterQueue {
     count: AtomicUsize,
@@ -42,7 +42,7 @@ impl WaiterQueue {
 
     /// Returns whether the queue is empty.
     pub fn is_empty(&self) -> bool {
-        // Here is_empty function is only used in line 76 below. And when calling this, it 
+        // Here is_empty function is only used in line 76 below. And when calling this, it
         // doesn't need to synchronize with the wakers. Therefore, Relaxed can be enough.
         self.count.load(Ordering::Relaxed) == 0
     }

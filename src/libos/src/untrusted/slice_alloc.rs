@@ -5,10 +5,10 @@ use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// An memory allocator for slices, backed by a fixed-size, untrusted buffer
-/// 
-/// Note about memory ordering: 
-/// Here buf_pos is used here for counting, not to synchronize access to other 
-/// shared variables. Therefore, `Relaxed` can be used in both single-threaded 
+///
+/// Note about memory ordering:
+/// Here buf_pos is used here for counting, not to synchronize access to other
+/// shared variables. Therefore, `Relaxed` can be used in both single-threaded
 /// and multi-threaded environments.
 pub struct UntrustedSliceAlloc {
     /// The pointer to the untrusted buffer

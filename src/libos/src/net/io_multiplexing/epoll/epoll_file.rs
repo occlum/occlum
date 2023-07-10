@@ -282,7 +282,7 @@ impl EpollFile {
         // A critical section protected by the lock of self.interest
         {
             let mut interest_entries = self.interest.lock().unwrap();
-            // There is a data-dependency, so this cannot be re-ordered, 
+            // There is a data-dependency, so this cannot be re-ordered,
             // `Relaxed` should be enough.
             let ep_entry = interest_entries
                 .remove(&fd)
@@ -503,9 +503,9 @@ impl AsEpollFile for FileRef {
     }
 }
 
-/// Note about memory ordering: 
-/// Here is_ready and is_deleted are just a signal and doesn't synchronize with other 
-/// variables. Therefore, `Relaxed` can be used in both single-threaded 
+/// Note about memory ordering:
+/// Here is_ready and is_deleted are just a signal and doesn't synchronize with other
+/// variables. Therefore, `Relaxed` can be used in both single-threaded
 /// and multi-threaded environments.
 #[derive(Debug)]
 struct EpollEntry {

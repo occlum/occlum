@@ -421,8 +421,8 @@ impl FutexBucketVec {
 }
 
 /// Note about memory ordering:
-/// Here is_woken needs to be synchronized with thread. The read operation of is_woken 
-/// needs to see the change of the thread field. Just `Acquire` or `Release` needs 
+/// Here is_woken needs to be synchronized with thread. The read operation of is_woken
+/// needs to see the change of the thread field. Just `Acquire` or `Release` needs
 /// to be used to make all the change of the thread visible to us.
 #[derive(Debug)]
 struct Waiter {

@@ -8,9 +8,9 @@ pub use self::exec::{enqueue, enqueue_and_exec, exec};
 mod exec;
 
 /// Note: this definition must be in sync with task.h
-/// Note about memory ordering: 
-/// Here user_fs is just a signal and doesn't synchronize with other 
-/// variables. Therefore, `Relaxed` can be used in both single-threaded 
+/// Note about memory ordering:
+/// Here user_fs is just a signal and doesn't synchronize with other
+/// variables. Therefore, `Relaxed` can be used in both single-threaded
 /// and multi-threaded environments.
 #[derive(Debug, Default)]
 #[repr(C)]
