@@ -9,7 +9,7 @@ on:
         required: true
         default: 'ubuntu20'
       release:
-        description: 'Whether it is a release image (must choose from <Y/N>)'
+        description: 'Whether it is a release image or test image (must choose from <Y/N/T>)'
         required: true
         default: 'N'
 
