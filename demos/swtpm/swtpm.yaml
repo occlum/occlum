@@ -1,0 +1,15 @@
+includes:
+  - base.yaml
+# copy directories 
+targets:
+  - target: /bin
+    copy:
+      - dirs:
+         - /usr/bin/
+         - /usr/lib/swtpm/
+         - ../libtpms/src/.libs/
+         - /usr/lib/x86_64-linux-gnu/
+  - target: /bin/myvtpm
+    copy:
+      - dirs:
+         - /bin/myvtpm
