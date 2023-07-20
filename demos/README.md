@@ -28,6 +28,7 @@ This set of demos shows how real-world apps can be easily run inside SGX enclave
 * [redis](redis/): A demo of [Redis](https://redis.io).
 * [sofaboot](sofaboot/): A demo of [SOFABoot](https://github.com/sofastack/sofa-boot), an open source Java development framework based on Spring Boot.
 * [sqlite](sqlite/) A demo of [SQLite](https://www.sqlite.org) SQL database engine.
+* [swtpm](swtpm/) A demo of [SWTPM](https://github.com/stefanberger/swtpm) Software Trusted Platform Module (TPM) Emulator.
 * [tensorflow](tensorflow/tensorflow_training): A demo of [TensorFlow](https://www.tensorflow.org/) MNIST classification training.
 * [tensorflow_lite](tensorflow_lite/): A demo and benchmark of [TensorFlow Lite](https://www.tensorflow.org/lite) inference engine.
 * [tensorflow_serving](tensorflow/tensorflow_serving): A demo of [TensorFlow Serving](https://github.com/tensorflow/serving) 

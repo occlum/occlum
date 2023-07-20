@@ -871,3 +871,26 @@ jobs:
 
     - name: Run runtime boot instance
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/runtime_boot/boot_instance && occlum run /bin/occlum_bash_test.sh"
+
+  Swtpm_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/sim
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: download and build swtpm
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/swtpm; ./install_swtpm.sh"
+
+    - name: Run swtpm server
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/swtpm && SGX_MODE=SIM ./run_swtpm.sh" & 
+
+    - name: download tss and run a test
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/swtpm; ./run_client.sh"
