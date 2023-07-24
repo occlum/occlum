@@ -2,6 +2,7 @@ use super::address_space::ADDRESS_SPACE;
 use super::stream::Status;
 use super::*;
 use fs::{AccessMode, File, FileRef, IoEvents, IoNotifier, IoctlCmd, StatusFlags};
+use rcore_fs::vfs::{FileType, Metadata, Timespec};
 use std::any::Any;
 
 impl File for Stream {
@@ -117,5 +118,24 @@ impl File for Stream {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn metadata(&self) -> Result<Metadata> {
+        Ok(Metadata {
+            dev: 0,
+            inode: 0,
+            size: 0,
+            blk_size: 0,
+            blocks: 0,
+            atime: Timespec { sec: 0, nsec: 0 },
+            mtime: Timespec { sec: 0, nsec: 0 },
+            ctime: Timespec { sec: 0, nsec: 0 },
+            type_: FileType::Socket,
+            mode: 0o666,
+            nlinks: 1,
+            uid: 0,
+            gid: 0,
+            rdev: 0,
+        })
     }
 }
