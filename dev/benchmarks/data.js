@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1690323221533,
+  "lastUpdate": 1690323634834,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -6050,6 +6050,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 4038,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "ClawSeven",
+            "username": "ClawSeven",
+            "email": "zehuan97@gmail.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "6b11e2ae3d8ca4f0d1701d803a235a10231b49c9",
+          "message": "Support fstat for Unix Domain Stream Socket",
+          "timestamp": "2023-07-24T06:58:23Z",
+          "url": "https://github.com/occlum/occlum/commit/6b11e2ae3d8ca4f0d1701d803a235a10231b49c9"
+        },
+        "date": 1690323633829,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 3976,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 3976,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
