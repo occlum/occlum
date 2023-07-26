@@ -8,13 +8,16 @@ Occlum now can use PKU, a hardware feature, to enforce isolation between LibOS a
 
 **PKU** (Protection Keys for Userspace) (aka. **MPK**: Memory Protection Keys) has been introduced into Linux since 2015 (details can be found in the [lwn page](https://lwn.net/Articles/643797/)). It is a lightweight intra-process isolation mechanism for userspace (Ring 3) software. Since its memory access policy is restricted by MMU (Memory Management Unit), it incurs almost non-zero overhead at runtime compared to Software Fault Isolation (SFI), and the memory access permission switch overhead is low. More details can be found in the [manual page](https://man7.org/linux/man-pages/man7/pkeys.7.html).
 
-Currently, Occlum lacks the ability to isolate LibOS from userspace applications. Though userspace applications are **considered benign** in Occlum, but it is bug-prone inevitably. Potential illegal memory accesses may affect the correctness of computation, even lead to the crash of the whole enclave. Intra-enclave isolation is helpful for developers to uncover bugs beforehand.
+Currently, Occlum lacks the ability to isolate LibOS from userspace applications. Though userspace applications are **considered benign** in Occlum, but it is bug-prone inevitably. Potential illegal memory accesses may affect the correctness of computation silently, even lead to the crash of the whole enclave. Intra-enclave isolation is helpful for developers to uncover bugs beforehand.
 
 It necessary to enforce the isolation in Occlum, and leveraging PKU is a good choice.
 
-**Security Concerns**:
-PKU is only an option for users to enhance Occlum's security.
-Userspace applications are still in TCB (Trusted Computing Base).
+### Security Analysis
+PKU is an option for users and developers to enhance Occlum's fault isolation between LibOS and userspace applications.
+It is not a complete protection from malicious attacks which come from an enclave itself.
+**Userspace applications are still in TCB (Trusted Computing Base) in Occlum's threat model.**
+They are considered to be benign but inevitably bug-prone.
+
 It is should be emphasized that OS has the full control of enclave's page table and control registers (e.g. CR4), and OS has mainly two ways to enforce data access policy related to PKU:
 
 1. OS is able to set CR4.PKE to 0, rendering intra-enclave isolation useless;
