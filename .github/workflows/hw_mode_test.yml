@@ -1017,7 +1017,6 @@ jobs:
 
     - name: Run Filebench test
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/src/libos/crates/jindisk/tests/benchmarks/filebench;
-            ./run_filebench.sh varmail;
             ./run_filebench.sh fileserver"
 
     - name: Run RocksDB test

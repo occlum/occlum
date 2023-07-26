@@ -450,6 +450,7 @@ impl AsyncInode for Inode {
             }
             _ => {
                 warn!("only support posix_fallocate now");
+                // TODO: Support common-use mode "FALLOC_FL_PUNCH_HOLE|FALLOC_FL_KEEP_SIZE" and "FALLOC_FL_ZERO_RANGE"
             }
         }
         Ok(())
