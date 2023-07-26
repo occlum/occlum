@@ -17,7 +17,7 @@ pushd occlum_instance
 yq '.resource_limits.user_space_size.init = "8000MB" |
     .resource_limits.kernel_space_heap_size.init = "2500MB" |
     .resource_limits.kernel_space_heap_size.max = "2500MB" |
-    .mount[0].options.layers[1].options.async_sfs_total_size = "35GB" ' -i Occlum.yaml
+    .mount[0].options.layers[1].options.async_sfs_total_size = "50GB" ' -i Occlum.yaml
 
 # 2. Copy files into Occlum instance and build
 rm -rf image
