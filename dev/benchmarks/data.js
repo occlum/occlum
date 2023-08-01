@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1690927833801,
+  "lastUpdate": 1690928227817,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -6210,6 +6210,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 3924,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "zhubojun",
+            "username": "Bonjourz",
+            "email": "zhubojun.zbj@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "abd69269c089c2998cb01456b18d9e895fdf11d7",
+          "message": "[docs] Refine the description on Occlum's PKU",
+          "timestamp": "2023-07-26T02:46:05Z",
+          "url": "https://github.com/occlum/occlum/commit/abd69269c089c2998cb01456b18d9e895fdf11d7"
+        },
+        "date": 1690928225648,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 1573,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 1573,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
