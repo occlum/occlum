@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1691014215328,
+  "lastUpdate": 1691014222618,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -586,6 +586,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 580.02,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "zhubojun",
+            "username": "Bonjourz",
+            "email": "zhubojun.zbj@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "abd69269c089c2998cb01456b18d9e895fdf11d7",
+          "message": "[docs] Refine the description on Occlum's PKU",
+          "timestamp": "2023-07-26T02:46:05Z",
+          "url": "https://github.com/occlum/occlum/commit/abd69269c089c2998cb01456b18d9e895fdf11d7"
+        },
+        "date": 1691014220656,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.55,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 90.33,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 1675.3,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 569.67,
             "unit": "ms",
             "extra": "per95"
           }
