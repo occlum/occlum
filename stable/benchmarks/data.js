@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1691014222618,
+  "lastUpdate": 1691032727250,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -266,6 +266,38 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2013,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "occlum",
+            "username": "occlum"
+          },
+          "committer": {
+            "name": "occlum",
+            "username": "occlum"
+          },
+          "id": "4783098308da2b76c600c31c716d36eeedc95478",
+          "message": "Bump version to 0.29.7",
+          "timestamp": "2023-07-31T06:41:55Z",
+          "url": "https://github.com/occlum/occlum/pull/1359/commits/4783098308da2b76c600c31c716d36eeedc95478"
+        },
+        "date": 1691032724488,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 1049,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 1049,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
