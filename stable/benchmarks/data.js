@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1691032727250,
+  "lastUpdate": 1691032736074,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -664,6 +664,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 569.67,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "occlum",
+            "username": "occlum"
+          },
+          "committer": {
+            "name": "occlum",
+            "username": "occlum"
+          },
+          "id": "4783098308da2b76c600c31c716d36eeedc95478",
+          "message": "Bump version to 0.29.7",
+          "timestamp": "2023-07-31T06:41:55Z",
+          "url": "https://github.com/occlum/occlum/pull/1359/commits/4783098308da2b76c600c31c716d36eeedc95478"
+        },
+        "date": 1691032733703,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.56,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 273.98,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 8585.5,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 1280.93,
             "unit": "ms",
             "extra": "per95"
           }
