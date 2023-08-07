@@ -10,6 +10,9 @@ script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
 [ -d miniconda ] || bash ./Miniconda3-latest-Linux-x86_64.sh -b -p $script_dir/miniconda
 $script_dir/miniconda/bin/conda create --prefix $script_dir/python-occlum -y matplotlib numpy python=3.8.10 paddlepaddle==2.4.2 -c paddle
 
+# Remove miniconda and installation scripts
+rm -rf ./Miniconda3-latest-Linux-x86_64.sh $script_dir/miniconda
+
 CORE_PY=$script_dir/python-occlum/lib/python3.8/site-packages/paddle/fluid/core.py
 IMAGE_PY=$script_dir/python-occlum/lib/python3.8/site-packages/paddle/dataset/image.py
 

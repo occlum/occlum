@@ -27,6 +27,7 @@ function build_instance()
     pushd occlum_instance
     rm -rf image
     copy_bom -f ../pytorch.yaml --root image --include-dir /opt/occlum/etc/template
+    rm -rf $script_dir/python-occlum
 
     if [ ! -d $python_dir ];then
         echo "Error: cannot stat '$python_dir' directory"

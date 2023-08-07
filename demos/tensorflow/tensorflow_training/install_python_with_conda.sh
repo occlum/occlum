@@ -9,3 +9,6 @@ $script_dir/miniconda/bin/conda create --prefix $script_dir/python-occlum -y  py
 
 # Download mnist dataset
 [ -f mnist.npz ] || wget https://storage.googleapis.com/tensorflow/tf-keras-datasets/mnist.npz
+
+# Remove miniconda and installation scripts
+rm -rf ./Miniconda3-latest-Linux-x86_64.sh $script_dir/miniconda
