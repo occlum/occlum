@@ -174,6 +174,8 @@ gen_initfs_aecs()
     # add default timezone file
     cp /etc/localtime initfs/etc/
 
+    local os_lib_path=${1:-"/usr/lib/x86_64-linux-gnu"}
+
     # add glibc base libraries
     # just copy from the image
     cp -rf image/opt/occlum/glibc initfs/opt/occlum/
@@ -183,13 +185,18 @@ gen_initfs_aecs()
     # add aecs required libs
     cp -t initfs/$occlum_glibc_lib \
         "$occlum_dir"/toolchains/aecs_client/* \
-        /lib/x86_64-linux-gnu/libssl.so.1.1 \
-        /lib/x86_64-linux-gnu/libz.so.1 \
-        /lib/x86_64-linux-gnu/libcrypto.so.1.1 \
-        /lib/x86_64-linux-gnu/libdl.so.2 \
+        $os_lib_path/libssl.so.1.1 \
+        $os_lib_path/libz.so.1 \
+        $os_lib_path/libcrypto.so.1.1 \
+        $os_lib_path/libdl.so.2 \
         $occlum_glibc_lib/libnss_files.so.2 \
         $occlum_glibc_lib/libnss_dns.so.2 \
         $occlum_glibc_lib/libresolv.so.2
+
+    # add libprotobuf.so.32 if existed
+    if [ -f $os_lib_path/libprotobuf.so.32 ]; then
+        cp -t initfs/$occlum_glibc_lib $os_lib_path/libprotobuf.so.32
+    fi
 
     # add template init_ra_conf
     cp "$occlum_dir"/etc/template/init_aecs.json "$instance_dir"/init_ra_conf.json
@@ -332,6 +339,7 @@ cmd_init() {
         "$occlum_musl_lib/libgomp.so.1"
 
     # add glibc
+    local os_lib_path="/usr/lib/x86_64-linux-gnu" # for ubuntu
     if [ -d "$occlum_glibc_lib" ]; then
         cp -t image/lib64 \
             "$occlum_glibc_lib/ld-linux-x86-64.so.2"
@@ -341,15 +349,13 @@ cmd_init() {
             "$occlum_glibc_lib/libpthread.so.0" \
             "$occlum_glibc_lib/libm.so.6"
         local os_release=`awk -F= '/^NAME/{print $2}' /etc/os-release`
-        if [ "$os_release" == "\"Ubuntu\"" ]; then
-            cp -t "image/$occlum_glibc_lib" \
-                "/usr/lib/x86_64-linux-gnu/libstdc++.so.6" \
-                "/lib/x86_64-linux-gnu/libgcc_s.so.1"
-        else
-            cp -t "image/$occlum_glibc_lib" \
-                "/usr/lib64/libstdc++.so.6" \
-                "/usr/lib64/libgcc_s.so.1"
+        if [ "$os_release" != "\"Ubuntu\"" ]; then
+            os_lib_path="/usr/lib64/"  # for openanolis, alios
         fi
+
+        cp -t "image/$occlum_glibc_lib" \
+            "${os_lib_path}/libstdc++.so.6" \
+            "${os_lib_path}/libgcc_s.so.1"
         cp -t "image/$occlum_glibc_etc" \
             /etc/localtime
     fi
@@ -357,7 +363,7 @@ cmd_init() {
     if [[ "$init_ra" == "grpc_ratls" ]]; then
         gen_initfs_grpc_ratls
     elif [[ "$init_ra" == "aecs" ]]; then
-        gen_initfs_aecs
+        gen_initfs_aecs ${os_lib_path}
     else
         gen_initfs
     fi
