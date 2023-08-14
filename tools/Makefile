@@ -13,9 +13,13 @@ all:
 	@$(MAKE) --no-print-directory -C copy_bom
 	@$(MAKE) --no-print-directory -C init
 ifndef OCCLUM_DISABLE_DCAP
+ifndef OCCLUM_NO_INIT_RA_TLS
 	@$(MAKE) --no-print-directory -C init_grpc_ratls
 endif
+endif
+ifndef OCCLUM_NO_INIT_RA_AECS
 	@$(MAKE) --no-print-directory -C init_aecs
+endif
 
 format:
 	@$(MAKE) --no-print-directory -C protect-integrity format
@@ -29,6 +33,10 @@ clean:
 	@$(MAKE) --no-print-directory -C copy_bom clean
 	@$(MAKE) --no-print-directory -C init clean
 ifndef OCCLUM_DISABLE_DCAP
+ifndef OCCLUM_NO_INIT_RA_TLS
 	@$(MAKE) --no-print-directory -C init_grpc_ratls clean
 endif
+endif
+ifndef OCCLUM_NO_INIT_RA_AECS
 	@$(MAKE) --no-print-directory -C init_aecs clean
+endif
