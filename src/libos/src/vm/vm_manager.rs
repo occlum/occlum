@@ -46,6 +46,15 @@ impl VMManager {
         self.internal().free_manager.free_size()
     }
 
+    pub fn get_precise_free_size(&self) -> usize {
+        let internal = self.internal();
+        internal.free_manager.free_size()
+            + internal
+                .chunks
+                .iter()
+                .fold(0, |acc, chunks| acc + chunks.free_size())
+    }
+
     pub fn verified_clean_when_exit(&self) -> bool {
         let internal = self.internal();
         internal.chunks.len() == 0 && internal.free_manager.free_size() == self.range.size()
