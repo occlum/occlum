@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1692137625681,
+  "lastUpdate": 1692137698642,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -6484,6 +6484,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 3911,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "1e8584af102e238326ee5e01693c1406a5b8a504",
+          "message": "Add capability to get precise free size for userspace",
+          "timestamp": "2023-08-15T03:56:48Z",
+          "url": "https://github.com/occlum/occlum/commit/1e8584af102e238326ee5e01693c1406a5b8a504"
+        },
+        "date": 1692137696499,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 1805,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 1805,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
