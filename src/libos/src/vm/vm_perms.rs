@@ -42,6 +42,7 @@ impl VMPerms {
     pub fn apply_perms(protect_range: &VMRange, perms: VMPerms) {
         use sgx_trts::enclave::rsgx_is_supported_EDMM;
 
+        info!("apply perms via OCALL");
         unsafe {
             let mut retval = 0;
             let addr = protect_range.start() as *const c_void;

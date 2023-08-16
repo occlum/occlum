@@ -60,6 +60,11 @@ impl VMManager {
         internal.chunks.len() == 0 && internal.free_manager.free_size() == self.range.size()
     }
 
+    pub fn reduce_host_vma_count(&self) -> Result<()> {
+        let internal = self.internal();
+        internal.free_manager.reduce_host_vma_count()
+    }
+
     pub fn free_chunk(&self, chunk: &ChunkRef) {
         let mut internal = self.internal();
         internal.free_chunk(chunk);

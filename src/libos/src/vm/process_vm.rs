@@ -301,23 +301,27 @@ impl Default for ProcessVM {
 
 impl Drop for ProcessVM {
     fn drop(&mut self) {
-        let mut mem_chunks = self.mem_chunks.write().unwrap();
-        // There are two cases when this drop is called:
-        // (1) Process exits normally and in the end, drop process VM
-        // (2) During creating process stage, process VM is ready but there are some other errors when creating the process, e.g. spawn_attribute is set
-        // to a wrong value
-        //
-        // For the first case, the process VM is cleaned in the exit procedure and nothing is needed. For the second cases, mem_chunks is not empty and should
-        // be cleaned here.
-        mem_chunks
-            .drain_filter(|chunk| chunk.is_single_vma())
-            .for_each(|chunk| {
-                USER_SPACE_VM_MANAGER
-                    .internal()
-                    .munmap_chunk(&chunk, None, false);
-            });
+        {
+            let mut mem_chunks = self.mem_chunks.write().unwrap();
+            // There are two cases when this drop is called:
+            // (1) Process exits normally and in the end, drop process VM
+            // (2) During creating process stage, process VM is ready but there are some other errors when creating the process, e.g. spawn_attribute is set
+            // to a wrong value
+            //
+            // For the first case, the process VM is cleaned in the exit procedure and nothing is needed. For the second cases, mem_chunks is not empty and should
+            // be cleaned here.
+            mem_chunks
+                .drain_filter(|chunk| chunk.is_single_vma())
+                .for_each(|chunk| {
+                    USER_SPACE_VM_MANAGER
+                        .internal()
+                        .munmap_chunk(&chunk, None, false);
+                });
 
-        assert!(mem_chunks.len() == 0);
+            assert!(mem_chunks.len() == 0);
+        }
+
+        USER_SPACE_VM_MANAGER.reduce_host_vma_count();
         info!("Process VM dropped");
     }
 }

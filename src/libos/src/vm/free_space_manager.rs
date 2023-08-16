@@ -210,4 +210,11 @@ impl VMFreeSpaceManager {
             .iter()
             .any(|free_range| free_range.is_superset_of(request_range))
     }
+
+    pub fn reduce_host_vma_count(&self) -> Result<()> {
+        self.free_manager
+            .iter()
+            .for_each(|range| VMPerms::apply_perms(range, VMPerms::DEFAULT));
+        Ok(())
+    }
 }
