@@ -51,7 +51,8 @@ jobs:
             cd occlum_instance && rm -rf image;
             copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
             SGX_MODE=SIM occlum build --image-key ./image_key --buildin-image-key;
-            occlum run /bin/hello_world"
+            occlum run /bin/hello_world;
+            cd /root/occlum/demos && rm -rf ./hello_c"
 
     - name: C++ test
       run: docker exec code_coverage bash -c "cd /root/occlum/demos/hello_cc && make;
@@ -59,13 +60,16 @@ jobs:
             cd occlum_instance && rm -rf image;
             copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
             SGX_MODE=SIM occlum build;
-            occlum run /bin/hello_world"
+            occlum run /bin/hello_world;
+            cd /root/occlum/demos && rm -rf ./hello_cc"
 
     - name: Rust test
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/rust && SGX_MODE=SIM ./run_rust_demo_on_occlum.sh"
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/rust && SGX_MODE=SIM ./run_rust_demo_on_occlum.sh;
+            cd /root/occlum/demos && rm -rf ./rust"
 
     - name: Run Golang sqlite test
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh"
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh;
+            cd /root/occlum/demos && rm -rf ./golang"
 
     - name: Build Fish dependencies
       run: docker exec code_coverage bash -c "cd /root/occlum/demos/fish && ./download_and_build.sh"
@@ -74,25 +78,29 @@ jobs:
       run: docker exec code_coverage bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_fish_test.sh"
 
     - name: Run Fish process rlimit test
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_per_process_config_test.sh"
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_per_process_config_test.sh;
+            cd /root/occlum/demos && rm -rf ./fish"
 
     - name: Build LA dependencies
       run: docker exec code_coverage bash -c "cd /root/occlum/demos/local_attestation && ./download_src_and_build_deps.sh"
 
     - name: Run LA test
       run: docker exec code_coverage bash -c "cd /root/occlum/demos/local_attestation && SGX_MODE=SIM make;
-              SGX_MODE=SIM make test"
+            SGX_MODE=SIM make test;
+            cd /root/occlum/demos && rm -rf ./local_attestation"
 
     - name: Build sqlite dependencies
       run: docker exec code_coverage bash -c "cd /root/occlum/demos/sqlite && ./download_and_build_sqlite.sh"
 
     - name: Run sqlite test
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/sqlite && SGX_MODE=SIM ./run_sqlite_on_occlum.sh"
+      run: docker exec code_coverage bash -c "cd /root/occlum/demos/sqlite && SGX_MODE=SIM ./run_sqlite_on_occlum.sh;
+            cd /root/occlum/demos && rm -rf ./sqlite"
 
     - name: LTP test
       run: docker exec code_coverage bash -c "cd /root/occlum/demos/linux-ltp && ./dl_and_build_ltp.sh && SGX_MODE=SIM ./prepare_ltp.sh;
             cd ltp_instance;
-            occlum run /opt/ltp/run-ltp.sh -f syscalls-occlum"
+            occlum run /opt/ltp/run-ltp.sh -f syscalls-occlum;
+            cd /root/occlum/demos && rm -rf ./linux-ltp"
     
     - name: Clean demos
       run: docker exec code_coverage bash -c "rm -rf /root/occlum/demos/"
