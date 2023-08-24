@@ -867,8 +867,6 @@ impl InternalVMManager {
                     let old_end = containing_vma.end();
                     let old_perms = containing_vma.perms();
 
-                    containing_vma.set_end(protect_range.start());
-
                     let new_vma = VMArea::inherits_file_from(
                         &containing_vma,
                         protect_range,
@@ -887,19 +885,13 @@ impl InternalVMManager {
                         )
                     };
 
+                    containing_vma.set_end(protect_range.start());
+
                     // Put containing_vma at last to be updated first.
                     let updated_vmas = vec![new_vma, remaining_old_vma, containing_vma.clone()];
                     updated_vmas
                 }
                 _ => {
-                    if same_start {
-                        // Protect range is at left side of the cotaining vma
-                        containing_vma.set_start(protect_range.end());
-                    } else {
-                        // Protect range is at right side of the cotaining vma
-                        containing_vma.set_end(protect_range.start());
-                    }
-
                     let new_vma = VMArea::inherits_file_from(
                         &containing_vma,
                         protect_range,
@@ -907,6 +899,14 @@ impl InternalVMManager {
                         VMAccess::Private(current_pid),
                     );
                     VMPerms::apply_perms(&new_vma, new_vma.perms());
+
+                    if same_start {
+                        // Protect range is at left side of the cotaining vma
+                        containing_vma.set_start(protect_range.end());
+                    } else {
+                        // Protect range is at right side of the cotaining vma
+                        containing_vma.set_end(protect_range.start());
+                    }
 
                     // Put containing_vma at last to be updated first.
                     let updated_vmas = vec![new_vma, containing_vma.clone()];
