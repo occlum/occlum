@@ -46,6 +46,7 @@ impl VMArea {
         new_perms: VMPerms,
         access: VMAccess,
     ) -> Self {
+        debug_assert!(vma.is_superset_of(&new_range));
         let new_backed_file = vma.file_backed.as_ref().map(|file| {
             let mut new_file = file.clone();
             let file_offset = file.offset();
