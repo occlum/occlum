@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1693001371598,
+  "lastUpdate": 1693001851699,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -6770,6 +6770,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2650,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "56f7ab02a56fa2863db4d390116c894f9f127dcb",
+          "message": "[vm] Refine VMA created with inherits_file_from",
+          "timestamp": "2023-08-24T03:09:43Z",
+          "url": "https://github.com/occlum/occlum/commit/56f7ab02a56fa2863db4d390116c894f9f127dcb"
+        },
+        "date": 1693001850703,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 4087,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 4087,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
