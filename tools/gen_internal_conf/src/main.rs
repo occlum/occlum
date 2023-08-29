@@ -487,6 +487,20 @@ fn main() {
             app_config.unwrap()
         };
 
+        // If the user doesn't provide a value, set it false unless it is release enclave.
+        // If the user provides a value, just use it.
+        let disable_log = {
+            if occlum_config.metadata.disable_log.is_none() {
+                if occlum_config.metadata.debuggable {
+                    false
+                } else {
+                    true
+                }
+            } else {
+                occlum_config.metadata.disable_log.unwrap()
+            }
+        };
+
         let occlum_json_config = InternalOcclumJson {
             resource_limits: InternalResourceLimits {
                 user_space_init_size: config_user_space_init_size.to_string() + "B",
@@ -498,6 +512,7 @@ fn main() {
                 default_mmap_size: occlum_config.process.default_mmap_size,
             },
             env: occlum_config.env,
+            disable_log: disable_log,
             app: app_config,
             feature: occlum_config.feature.clone(),
         };
@@ -728,6 +743,8 @@ struct OcclumMetadata {
     product_id: u32,
     version_number: u32,
     debuggable: bool,
+    #[serde(default)]
+    disable_log: Option<bool>,
     enable_kss: bool,
     family_id: OcclumMetaID,
     ext_prod_id: OcclumMetaID,
@@ -823,6 +840,7 @@ struct InternalOcclumJson {
     resource_limits: InternalResourceLimits,
     process: OcclumProcess,
     env: serde_json::Value,
+    disable_log: bool,
     app: serde_json::Value,
     feature: OcclumFeature,
 }
