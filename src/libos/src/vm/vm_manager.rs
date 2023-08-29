@@ -723,10 +723,10 @@ impl InternalVMManager {
             MmapSharedResult::NeedExpand(old_shared_chunk, expand_range) => {
                 let new_chunk = {
                     let new_chunk = self.new_chunk_with_options(options)?;
-                    debug_assert_eq!(*new_chunk.range(), expand_range);
                     self.merge_two_single_vma_chunks(&old_shared_chunk, &new_chunk)
                 };
                 let new_range = *new_chunk.range();
+                debug_assert_eq!(new_range, expand_range);
                 self.shm_manager
                     .replace_shared_chunk(old_shared_chunk, new_chunk);
                 Ok(new_range.start())
