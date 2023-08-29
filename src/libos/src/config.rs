@@ -1,5 +1,6 @@
 use super::*;
 use crate::std::untrusted::path::PathEx;
+use crate::util::sgx::allow_debug as sgx_allow_debug;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::ffi::CString;
@@ -9,6 +10,8 @@ use std::path::{Path, PathBuf};
 use std::sgxfs::SgxFile;
 
 use crate::util::mem_util::from_user;
+
+use log::{set_max_level, LevelFilter};
 
 lazy_static! {
     pub static ref LIBOS_CONFIG: Config = {
@@ -200,6 +203,20 @@ impl Config {
         };
         let feature = ConfigFeature::from_input(&input.feature)?;
 
+        if input.disable_log {
+            log::set_max_level(LevelFilter::Off);
+        } else if !sgx_allow_debug() {
+            if log::max_level() != LevelFilter::Off {
+                // Release enclave can only set error level log
+                log::set_max_level(LevelFilter::Error);
+            }
+            eprintln!("Warnning: Occlum Log is enabled for release enclave!");
+            eprintln!(
+                "Uses can disable Occlum Log by setting metadata.disable_log=true \
+                in Occlum.json and rebuild Occlum instance.\n"
+            );
+        }
+
         Ok(Config {
             resource_limits,
             process,
@@ -384,6 +401,8 @@ struct InputConfig {
     pub process: InputConfigProcess,
     #[serde(default)]
     pub env: InputConfigEnv,
+    #[serde(default)]
+    pub disable_log: bool,
     #[serde(default)]
     pub app: Vec<InputConfigApp>,
     #[serde(default)]
