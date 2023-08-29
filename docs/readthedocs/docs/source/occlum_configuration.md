@@ -61,7 +61,14 @@ The template of `Occlum.json` is shown below.
         "version_number": 0,
         // Whether the enclave is debuggable through special SGX instructions.
         // For production enclave, it is IMPORTANT to set this value to false.
-        "debuggable": true
+        "debuggable": true,
+        // Whether the enclave is allowable to print Occlum log.
+        // Optional, if not set, in default it is false for debuggable enclave
+        // but true for production/release enclave for better security.
+        // Production/release enclave could explicitly set it false to have log
+        // output for debugging purpose. In this case, error log level is the
+        // only allowed log level.
+        "disable_log": false,
     },
     // Features
     "feature": {
