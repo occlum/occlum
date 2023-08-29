@@ -60,24 +60,17 @@ pub extern "C" fn occlum_ecall_init(
 
     assert!(!instance_dir.is_null());
 
-    let log_level = {
-        let input_log_level = match parse_log_level(log_level) {
-            Err(e) => {
-                eprintln!("invalid log level: {}", e.backtrace());
-                return ecall_errno!(EINVAL);
-            }
-            Ok(log_level) => log_level,
-        };
-        // Use the input log level if and only if the enclave allows debug
-        if sgx_allow_debug() {
-            input_log_level
-        } else {
-            LevelFilter::Off
+    let log_level = match parse_log_level(log_level) {
+        Err(e) => {
+            eprintln!("invalid log level: {}", e.backtrace());
+            return ecall_errno!(EINVAL);
         }
+        Ok(log_level) => log_level,
     };
 
     INIT_ONCE.call_once(|| {
         // Init the log infrastructure first so that log messages will be printed afterwards
+        // The log level may be set to off later if disable_log is true in user configuration
         util::log::init(log_level);
 
         let report = rsgx_self_report();
