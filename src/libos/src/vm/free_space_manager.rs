@@ -31,7 +31,6 @@ impl VMFreeSpaceManager {
             .fold(0, |acc, free_range| acc + free_range.size())
     }
 
-    // TODO: respect options.align when mmap
     pub fn find_free_range_internal(
         &mut self,
         size: usize,
@@ -45,6 +44,15 @@ impl VMFreeSpaceManager {
 
         trace!("find free range, free list = {:?}", free_list);
 
+        match addr {
+            VMMapAddr::Any => {}
+            VMMapAddr::Hint(addr) | VMMapAddr::Need(addr) | VMMapAddr::Force(addr) => {
+                if addr % align != 0 {
+                    return_errno!(EINVAL, "user-provided address is not well-aligned");
+                }
+            }
+        }
+
         for (idx, free_range) in free_list.iter().enumerate() {
             let mut free_range = {
                 if free_range.size() < size {
@@ -55,22 +63,33 @@ impl VMFreeSpaceManager {
 
             match addr {
                 // Want a minimal free_range
-                VMMapAddr::Any => {}
+                VMMapAddr::Any => {
+                    let start = align_up(free_range.start(), align);
+                    let end = start + size;
+                    if end > free_range.end() {
+                        continue;
+                    }
+                    free_range.start = start;
+                    free_range.end = end;
+                }
                 // Prefer to have free_range.start == addr
                 VMMapAddr::Hint(addr) => {
-                    if addr % align == 0
-                        && free_range.contains(addr)
-                        && free_range.end() - addr >= size
-                    {
+                    if free_range.contains(addr) && free_range.end() - addr >= size {
                         free_range.start = addr;
                         free_range.end = addr + size;
-                        self.free_list_update_range(idx, free_range);
-                        return Ok(free_range);
                     } else {
                         // Hint failure, record the result but keep iterating.
                         if result_free_range == None
                             || result_free_range.as_ref().unwrap().size() > free_range.size()
                         {
+                            let start = align_up(free_range.start(), align);
+                            let end = start + size;
+                            if end > free_range.end() {
+                                continue;
+                            }
+                            free_range.start = start;
+                            free_range.end = end;
+
                             result_free_range = Some(free_range);
                             result_idx = Some(idx);
                         }
@@ -103,15 +122,14 @@ impl VMFreeSpaceManager {
         }
 
         let index = result_idx.unwrap();
-        let result_free_range = {
-            let free_range = result_free_range.unwrap();
-            let start = align_up(free_range.start(), align);
-            let end = start + size;
-            VMRange { start, end }
-        };
+        let result_free_range = result_free_range.unwrap();
 
         self.free_list_update_range(index, result_free_range);
-        trace!("after find free range, free list = {:?}", self.free_manager);
+        trace!(
+            "result free range = {:?}. After find free range, free list = {:?}",
+            result_free_range,
+            self.free_manager
+        );
         return Ok(result_free_range);
     }
 
