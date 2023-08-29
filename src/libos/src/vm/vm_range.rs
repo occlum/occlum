@@ -89,7 +89,7 @@ impl VMRange {
         self.start() <= addr && addr < self.end()
     }
 
-    // Returns whether two ranges have non-empty intersection.
+    // Returns whether two ranges have non-empty interesection.
     pub fn overlap_with(&self, other: &VMRange) -> bool {
         let intersection_start = self.start().max(other.start());
         let intersection_end = self.end().min(other.end());

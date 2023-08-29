@@ -64,7 +64,6 @@ use std::fmt;
 mod chunk;
 mod free_space_manager;
 mod process_vm;
-mod shm_manager;
 mod user_space_vm;
 mod vm_area;
 mod vm_chunk_manager;
