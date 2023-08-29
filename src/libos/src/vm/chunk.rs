@@ -276,7 +276,6 @@ impl ChunkInternal {
         let chunk_manager = ChunkManager::from(vm_range.start(), vm_range.size())?;
 
         let mut process_set = HashSet::with_capacity(PROCESS_SET_INIT_SIZE);
-        process_set.insert(current!().process().pid());
         Ok(Self {
             chunk_manager,
             process_set,
