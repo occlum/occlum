@@ -101,6 +101,35 @@ impl Waker {
     }
 }
 
+/// Instruction rearrangement about control dependency
+///
+/// Such as the following code:
+/// fn function(flag: bool, a: i32, b: i32) {
+///     if flag { // 1
+///         let i = a * b; // 2
+///     }
+/// }
+///
+/// Guidelines for compilation optimization：without changing the single-threaded semantics
+/// of the program, the execution order of statements can be rearranged. There is a control
+/// dependency between flag and i. When the instruction is reordered, step 2 will write the
+/// result value to the hardware cache, and when judged to be true, the result value will be
+/// written to the variable i. Therefore, controlling dependency does not prevent compiler
+/// optimizations
+///
+/// Note about memory ordering:
+/// Here is_woken needs to be synchronized with host_eventfd. The read operation of
+/// is_woken needs to see the change of the host_eventfd field. Just `Acquire` or
+/// `Release` needs to be used to make all the change of the host_eventfd visible to us.
+///
+/// The ordering in CAS operations can be `Relaxed`, `Acquire`, `AcqRel` or `SeqCst`,
+/// The key is to consider the specific usage scenario. Here fail does not synchronize other
+/// variables in the CAS operation, which can use `Relaxed`, and the host_enent needs
+/// to be synchronized in success, so `Acquire` needs to be used so that we can see all the
+/// changes in the host_eventfd after that.
+///
+/// Although it is correct to use AcqRel, here I think it is okay to use Acquire, because
+/// you don't need to synchronize host_event before is_woken, only later.
 struct Inner {
     is_woken: AtomicBool,
     host_eventfd: Arc<HostEventFd>,
@@ -117,11 +146,11 @@ impl Inner {
     }
 
     pub fn is_woken(&self) -> bool {
-        self.is_woken.load(Ordering::SeqCst)
+        self.is_woken.load(Ordering::Acquire)
     }
 
     pub fn reset(&self) {
-        self.is_woken.store(false, Ordering::SeqCst);
+        self.is_woken.store(false, Ordering::Release);
     }
 
     pub fn wait(&self, timeout: Option<&Duration>) -> Result<()> {
@@ -154,7 +183,7 @@ impl Inner {
     pub fn wake(&self) {
         if self
             .is_woken
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
             .is_ok()
         {
             self.host_eventfd.write_u64(1);
@@ -167,7 +196,7 @@ impl Inner {
             .filter(|inner| {
                 inner
                     .is_woken
-                    .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                    .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
                     .is_ok()
             })
             .map(|inner| inner.host_eventfd.host_fd())

@@ -172,7 +172,7 @@ impl EpollFile {
                 // Note that while iterating the ready entries, we do not hold the lock
                 // of the ready list. This reduces the chances of lock contention.
                 for ep_entry in ready_entries.into_iter() {
-                    if ep_entry.is_deleted.load(Ordering::Acquire) {
+                    if ep_entry.is_deleted.load(Ordering::Relaxed) {
                         continue;
                     }
 
@@ -282,10 +282,12 @@ impl EpollFile {
         // A critical section protected by the lock of self.interest
         {
             let mut interest_entries = self.interest.lock().unwrap();
+            // There is a data-dependency, so this cannot be re-ordered,
+            // `Relaxed` should be enough.
             let ep_entry = interest_entries
                 .remove(&fd)
                 .ok_or_else(|| errno!(ENOENT, "fd is not added"))?;
-            ep_entry.is_deleted.store(true, Ordering::Release);
+            ep_entry.is_deleted.store(true, Ordering::Relaxed);
 
             let notifier = ep_entry.file.notifier().unwrap();
             let weak_observer = self.weak_self.clone() as Weak<dyn Observer<_>>;
@@ -501,6 +503,10 @@ impl AsEpollFile for FileRef {
     }
 }
 
+/// Note about memory ordering:
+/// Here is_ready and is_deleted are just a signal and doesn't synchronize with other
+/// variables. Therefore, `Relaxed` can be used in both single-threaded
+/// and multi-threaded environments.
 #[derive(Debug)]
 struct EpollEntry {
     fd: FileDesc,
