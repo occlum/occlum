@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1693606543702,
+  "lastUpdate": 1693606546768,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -6850,6 +6850,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 4087,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "3225a378326f6ed939fd7886cd5aa566ba38fbd0",
+          "message": "Remove adding process pid when creating multi-vma chunk",
+          "timestamp": "2023-08-29T08:55:05Z",
+          "url": "https://github.com/occlum/occlum/commit/3225a378326f6ed939fd7886cd5aa566ba38fbd0"
+        },
+        "date": 1693606543137,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 3062,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 3062,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
