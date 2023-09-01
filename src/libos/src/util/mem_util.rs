@@ -97,7 +97,8 @@ pub mod from_user {
         let ur_start = user_range.start();
         let ur_end = user_range.end();
         let addr_start = addr as usize;
-        addr_start >= ur_start && addr_start < ur_end && ur_end - addr_start >= len
+        addr_start == 1
+            || (addr_start >= ur_start && addr_start < ur_end && ur_end - addr_start >= len)
     }
 }
 
