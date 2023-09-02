@@ -22,8 +22,8 @@ pub static mut INSTANCE_DIR: String = String::new();
 static mut ENCLAVE_PATH: String = String::new();
 
 /// Note about memory ordering:
-/// HAS_INIT need to synchronize the relevant resources in interrupt::init(). 
-/// The read operation of HAS_INIT needs to see the change of the resources. 
+/// HAS_INIT need to synchronize the relevant resources in interrupt::init().
+/// The read operation of HAS_INIT needs to see the change of the resources.
 /// Just `Acquire` or `Release` needs to be used to make all the change of the
 /// wakers visible to us.
 lazy_static! {

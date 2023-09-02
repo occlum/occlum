@@ -11,7 +11,7 @@ use crate::prelude::*;
 ///
 /// While the queue is conceptually for `Waiter`s, it internally maintains a list
 /// of `Waker`s.
-/// 
+///
 /// Note about memory ordering:
 /// Here count needs to be synchronized with wakers. The read operation of count
 /// needs to see the change of the waker field. Just `Acquire` or `Release` needs

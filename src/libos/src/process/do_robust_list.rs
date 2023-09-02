@@ -165,10 +165,10 @@ const FUTEX_OWNER_DIED: u32 = 0x4000_0000;
 const FUTEX_TID_MASK: u32 = 0x3FFF_FFFF;
 
 /// Wakeup one robust futex owned by the thread
-/// 
+///
 /// Note about memory ordering:
 /// Here futex_val is just a shared variables between threads and doesn't synchronize
-/// with other variables. Compare_exchange guarantees that the operation is on the 
+/// with other variables. Compare_exchange guarantees that the operation is on the
 /// "latest" value. Therefore, `Relaxed` can be used in both single-threaded and
 /// multi-threaded environments.
 pub fn wake_robust_futex(futex_addr: *const i32, tid: pid_t) -> Result<()> {

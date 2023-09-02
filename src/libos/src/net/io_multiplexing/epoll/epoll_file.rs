@@ -504,9 +504,9 @@ impl AsEpollFile for FileRef {
 }
 
 /// Note about memory ordering:
-/// Here is_deleted needs to be synchronized with entry. The read 
-/// operation of is_deleted needs to see the entry has been deleted 
-/// from the interest list. Just `Acquire` or `Release` needs to be 
+/// Here is_deleted needs to be synchronized with entry. The read
+/// operation of is_deleted needs to see the entry has been deleted
+/// from the interest list. Just `Acquire` or `Release` needs to be
 /// used to make all the change of the wakers visible to us.
 #[derive(Debug)]
 struct EpollEntry {
