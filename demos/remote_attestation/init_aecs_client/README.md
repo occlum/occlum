@@ -49,6 +49,8 @@ init (get secrets and save to rootfs per the definition in init_ra_conf.json) --
 ```
 
 Thus, a simple command as below will print the secret **secret-my-keypair** acquired in **init** process.
+
+Just note, **UA_ENV_PCCS_URL** needs to be set as PCCS URL when running.
 ```
-occlum run /bin/busybox cat /etc/saved_secret_rsa_keypair
+UA_ENV_PCCS_URL=https://sgx-dcap-server.cn-shanghai.aliyuncs.com/sgx/certification/v3/ occlum run /bin/busybox cat /etc/saved_secret_rsa_keypair
 ```
