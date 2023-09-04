@@ -57,4 +57,4 @@ $ occlum build --sign-key <path_to/your_key.pem>
 $ occlum run <prog_path> <prog_args>
 ```
 
-Ultimately, whether an enclave is running in the release mode should be checked and judged by a trusted client through remotely attesting the enclave. See the remote attestation demo [here](demos/remote_attestation).
+Ultimately, whether an enclave is running in the release mode should be checked and judged by a trusted client through remotely attesting the enclave. See the remote attestation demo [here](https://github.com/occlum/occlum/tree/master/demos/remote_attestation).

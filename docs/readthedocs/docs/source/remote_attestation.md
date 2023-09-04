@@ -26,16 +26,13 @@ For details how to use the library, please refer to the [demo](https://github.co
 
 The source code of the library is in the [path](https://github.com/occlum/occlum/tools/toolchains/dcap_lib/).
 
+## Init RA Solution
+
 Occlum also has a unique "Occlum -> init ->application" boot flow. Generally, all operation which is application required but not part of the application, such as remote attestation, could be put into `init` part. This feature makes Occlum highly compatible to any remote attestation solution without involving application’s change.
 
 ![init_ra_flow](./images/ra_init.png)
 
-This design off load the remote attestation burden from application. Two RA solutions are provided for reference.
-
-## Init-RA solution
-
-It is based on a GRPC-RATLS implementation.
-Details please refer to the demo [init_ra_flow](https://github.com/occlum/occlum/tree/master/demos/remote_attestation/init_ra_flow).
+This design off load the remote attestation burden from application. Two RA solutions are provided for reference. Details please refer to [doc](./init_ra.md)
 
 ## Azure Attestation
 
