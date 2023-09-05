@@ -886,7 +886,7 @@ jobs:
       run: docker stop $tf_serving_test
 
 
-  Remote_attestation_test:
+  dcap_test:
     timeout-minutes: 180
     if: github.event_name == 'push' || github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') || contains(github.event.pull_request.labels.*.name, 'Pre-release-test')
     runs-on: ${{ matrix.self_runner }}
@@ -921,6 +921,46 @@ jobs:
 
     - name: Build and run remote attestation demo
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/remote_attestation/dcap; ./run_dcap_quote_on_occlum.sh"
+
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop ${{ env.CONTAINER_NAME }}
+
+  dcap_fs_test:
+    timeout-minutes: 180
+    if: github.event_name == 'push' || github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') || contains(github.event.pull_request.labels.*.name, 'Pre-release-test')
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX2-HW]]
+
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
+
+    - name: Checkout code
+      if: github.event_name == 'push' || github.event_name == 'schedule'
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+
+    - name: Checkout code from fork
+      if: contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') || contains(github.event.pull_request.labels.*.name, 'Pre-release-test')
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Build and run dcap fs demo
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/remote_attestation/dcap_fs; ./build_and_run.sh"
 
     - name: Clean the environment
       if: ${{ always() }}
