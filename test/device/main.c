@@ -215,6 +215,7 @@ int test_dev_attestation() {
 
     close(fd);
 
+    // Generate dcap quote
     fd = open("/dev/attestation_quote", O_RDONLY);
     if (fd < 0) {
         THROW_ERROR("failed to open a file to read");
@@ -222,9 +223,9 @@ int test_dev_attestation() {
 
     len = 5000;
     char quote_buf[5000] = {0};
-    len = read(fd, buf, len);
+    len = read(fd, quote_buf, len);
     if (len < 0) {
-        THROW_ERROR("failed to read from %s", file_path);
+        THROW_ERROR("failed to read from /dev/attestation_quote");
     }
 
     close(fd);
@@ -245,7 +246,9 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_dev_arandom),
     TEST_CASE(test_dev_shm),
     TEST_CASE(test_dev_fd),
+#ifndef OCCLUM_DISABLE_DCAP
     TEST_CASE(test_dev_attestation),
+#endif
 };
 
 int main() {
