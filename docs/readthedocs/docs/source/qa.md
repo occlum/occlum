@@ -45,3 +45,33 @@ Add below part in the bom file if required.
       - dirs:
         - /etc/ssl
 ```
+
+### How to modify the default timezone in Occlum?
+
+In Occlum, default timezone is Coordinated Universal Time (UTC). Users could do below to modify the timezone accordingly.
+
+For example, **Asia/Shanghai** is expected timezone.
+Put below in the bom file and do copy_bom again, then rebuild the occlum instance.
+
+* For glibc application:
+```
+  - target: /opt/occlum/glibc/etc
+    copy:
+      - files:
+        - name: /usr/share/zoneinfo/Asia/Shanghai
+          rename: localtime
+```
+
+* For musl-libc application:
+```
+  - target: /etc
+    copy:
+      - files:
+        - name: /usr/share/zoneinfo/Asia/Shanghai
+          rename: localtime
+```
+
+Above two could be verified by demo [bash](https://github.com/occlum/occlum/tree/master/demos/bash). Just adding above timezone parts into corresponding bom file, rebuild and try below command to make sure the timezone is as expected.
+```
+occlum run /bin/busybox date
+```
