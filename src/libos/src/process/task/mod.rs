@@ -8,6 +8,11 @@ pub use self::exec::{enqueue, enqueue_and_exec, exec};
 mod exec;
 
 /// Note: this definition must be in sync with task.h
+///
+/// Note about memory ordering:
+/// Here user_fs is just a signal and doesn't synchronize with other
+/// variables. Therefore, `Relaxed` can be used in both single-threaded
+/// and multi-threaded environments.
 #[derive(Debug, Default)]
 #[repr(C)]
 pub struct Task {
@@ -51,10 +56,10 @@ impl Task {
     }
 
     pub(super) fn set_user_fs(&self, user_fs: usize) {
-        self.user_fs.store(user_fs, Ordering::SeqCst);
+        self.user_fs.store(user_fs, Ordering::Relaxed);
     }
 
     pub fn user_fs(&self) -> usize {
-        self.user_fs.load(Ordering::SeqCst)
+        self.user_fs.load(Ordering::Relaxed)
     }
 }

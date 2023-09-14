@@ -282,10 +282,12 @@ impl EpollFile {
         // A critical section protected by the lock of self.interest
         {
             let mut interest_entries = self.interest.lock().unwrap();
+            // There is a data-dependency, so this cannot be re-ordered,
+            // `Relaxed` should be enough.
             let ep_entry = interest_entries
                 .remove(&fd)
                 .ok_or_else(|| errno!(ENOENT, "fd is not added"))?;
-            ep_entry.is_deleted.store(true, Ordering::Release);
+            ep_entry.is_deleted.store(true, Ordering::Relaxed);
 
             let notifier = ep_entry.file.notifier().unwrap();
             let weak_observer = self.weak_self.clone() as Weak<dyn Observer<_>>;
@@ -501,6 +503,11 @@ impl AsEpollFile for FileRef {
     }
 }
 
+/// Note about memory ordering:
+/// Here is_deleted needs to be synchronized with entry. The read
+/// operation of is_deleted needs to see the entry has been deleted
+/// from the interest list. Just `Acquire` or `Release` needs to be
+/// used to make all the change of the wakers visible to us.
 #[derive(Debug)]
 struct EpollEntry {
     fd: FileDesc,

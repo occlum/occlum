@@ -4,6 +4,10 @@ use crate::signal::SigNum;
 use sgx_tstd::sync::SgxMutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+/// Note about memory ordering:
+/// Here exited needs to be synchronized with status. The read operation of exited
+/// needs to see the change of the status field. Just `Acquire` or `Release` needs
+/// to be used to make all the change of the status visible to us.
 pub struct ForcedExitStatus {
     exited: AtomicBool,
     status: SgxMutex<Option<TermStatus>>,
@@ -18,13 +22,13 @@ impl ForcedExitStatus {
     }
 
     pub fn is_forced_to_exit(&self) -> bool {
-        self.exited.load(Ordering::SeqCst)
+        self.exited.load(Ordering::Acquire)
     }
 
     pub fn force_exit(&self, status: TermStatus) {
         let mut old_status = self.status.lock().unwrap();
         // set the bool after getting the status lock
-        self.exited.store(true, Ordering::SeqCst);
+        self.exited.store(true, Ordering::Release);
         old_status.get_or_insert(status);
     }
 
