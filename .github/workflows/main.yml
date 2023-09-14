@@ -21,10 +21,34 @@ jobs:
       with:
         submodules: true
     
-    - uses: ./.github/workflows/composite_action/sim
+    - name: Print info
+      run: echo Occlum build environment ${{ inputs.build-envs }}
+      shell: bash
+
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep "Version =" src/pal/include/occlum_version.h |  awk '{print $4}')" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Create container
+      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04
+      shell: bash
+
+    - uses: ./.github/workflows/composite_action/prebuild
       with:
         container-name: ${{ github.job }}
-        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Build dependencies
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum; make submodule"
+      shell: bash
+
+    - name: Make install
+      run: docker exec ${{ github.job }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
+      shell: bash
+    
+    # - uses: ./.github/workflows/composite_action/sim
+    #   with:
+    #     container-name: ${{ github.job }}
+    #     build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Check format
       run:  docker exec ${{ github.job }} bash -c 'cd /root/occlum; info=$(make format-check);
