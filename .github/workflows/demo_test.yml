@@ -15,6 +15,13 @@ jobs:
   C_cpp_rust_golang_embedded_mode_support_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -41,6 +48,9 @@ jobs:
             SGX_MODE=SIM occlum build --image-key ./image_key --buildin-image-key;
             occlum run /bin/hello_world"
 
+    - name: Clean C test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./hello_c"
+
     - name: C++ test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/hello_cc && make;
             occlum new occlum_instance;
@@ -48,13 +58,22 @@ jobs:
             copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
             SGX_MODE=SIM occlum build;
             occlum run /bin/hello_world"
+  
+    - name: Clean C++ test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./hello_cc"
 
     - name: Rust test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/rust && SGX_MODE=SIM ./run_rust_demo_on_occlum.sh"
+    
+    - name: Clean Rust test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./rust"
 
     - name: Embedded mode test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/embedded_mode && SGX_MODE=SIM make;
             SGX_MODE=SIM make test"
+    
+    - name: Clean Embedded mode test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./embedded_mode"
 
     - name: Run Golang v1.16.3 sqlite test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/tools/toolchains/golang && ./build.sh go1.16.3_for_occlum && cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh"
@@ -83,10 +102,20 @@ jobs:
       run: |
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "curl http://127.0.0.1:8090/ping"
+    
+    - name: Clean Golang test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./golang/grpc_pingpong && rm -rf ./golang/web_server"
 
   Java_support_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -107,10 +136,20 @@ jobs:
 
     - name: Run processBuilder
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/java && SGX_MODE=SIM ./run_java_on_occlum.sh processBuilder"
+    
+    - name: Clean Java test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./java"
 
   Fish_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -128,10 +167,20 @@ jobs:
 
     - name: Run Fish process rlimit test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_per_process_config_test.sh"
+    
+    - name: Clean Fish test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./fish"
 
   Bazel_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -154,11 +203,20 @@ jobs:
             cd occlum_instance && rm -rf image && copy_bom -f ../bazel.yaml --root image --include-dir /opt/occlum/etc/template;
             SGX_MODE=SIM occlum build;
             occlum run /bin/hello-world"
-
+    
+    - name: Clean Bazel test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./hello_bazel"
 
   Https_server_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -178,11 +236,20 @@ jobs:
       run: |
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "curl -k https://127.0.0.1:8443"
-
+    
+    - name: Clean Https test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./https_server"
 
   Local_attestation_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -198,11 +265,20 @@ jobs:
     - name: Run LA test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/local_attestation && SGX_MODE=SIM make;
               SGX_MODE=SIM make test"
-
+    
+    - name: Clean local attestation test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./local_attestation"
 
   Sqlite_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -217,11 +293,20 @@ jobs:
 
     - name: Run sqlite test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/sqlite && SGX_MODE=SIM ./run_sqlite_on_occlum.sh"
-
+    
+    - name: Clean Sqlite test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./sqlite"
 
   Xgboost_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -239,11 +324,20 @@ jobs:
 
     - name: Run xgboost cluster test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/xgboost && SGX_MODE=SIM make test-local-cluster"
-
+    
+    - name: Clean Xgboost test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./xgboost"
 
   Tensorflow_lite_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -261,11 +355,20 @@ jobs:
 
     - name: Run Tensorflow-lite benchmark
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/tensorflow_lite && SGX_MODE=SIM ./run_tflite_in_occlum.sh benchmark"
-
+    
+    - name: Clean Tensorflow lite test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./tensorflow_lite"
 
   Pytorch_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -280,10 +383,20 @@ jobs:
 
     - name: Run pytorch test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/pytorch/standalone; SGX_MODE=SIM ./run_pytorch_on_occlum.sh"
+    
+    - name: Clean Pytorch test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./pytorch/standalone"
 
   Distributed_Pytorch_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -304,10 +417,20 @@ jobs:
 
     - name: Start pytorch Occlum instance node two
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/pytorch/distributed/occlum_instance_2; WORLD_SIZE=2 RANK=1 occlum run /bin/python3 mnist.py --epoch 3 --no-cuda --seed 42 --save-model"
+    
+    - name: Clean distributed Pytorch test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./pytorch/distributed"
 
   Tensorflow_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -322,12 +445,21 @@ jobs:
 
     - name: Run tensorflow test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/tensorflow/tensorflow_training; SGX_MODE=SIM ./run_tensorflow_on_occlum.sh 2>&1 | tee /root/occlum/log"
-
+    
+    - name: Clean Tensorflow test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./tensorflow/tensorflow_training"
 
 # Below tests needs test image to run faster
   Grpc_musl_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -356,10 +488,19 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_musl && SGX_MODE=SIM ./run_client_on_occlum.sh"
 
+    - name: Clean Grpc test
+      run: docker exec ${{ github.job }} bash -c "cd /root/demos && rm -rf ./grpc/grpc_musl"
 
   Grpc_glibc_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -390,11 +531,21 @@ jobs:
 
     - name: Run grpc stress client
       run: docker exec ${{ github.job }} bash -c "cd /root/demos/grpc/grpc_glibc && ./run_stress_test.sh"
+    
+    - name: Clean Grpc test
+      run: docker exec ${{ github.job }} bash -c "cd /root/demos && rm -rf ./grpc/grpc_glibc"
 
 
   Grpc_tls_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -421,11 +572,21 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/grpc/grpc_tls/occlum_client;
             occlum run /bin/greeter_secure_client"
+    
+    - name: Clean Grpc tls test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./grpc/grpc_tls"
 
 
   Openvino_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -443,14 +604,23 @@ jobs:
     - name: Make install
       run: docker exec ${{ github.job }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
 
-    - name: Run openVINO benchmark
+    - name: Run Openvino benchmark
       run: docker exec ${{ github.job }} bash -c "cd /root/demos/openvino && cp -rf /root/occlum/demos/openvino/* . && SGX_MODE=SIM ./run_benchmark_on_occlum.sh"
-
+    
+    - name: Clean Openvino test
+      run: docker exec ${{ github.job }} bash -c "cd /root/demos && rm -rf ./grpc/openvino"
 
   # Python test also needs its own image because in Alpine environment, modules are built locally and consumes a lot of time.
   Python_musl_support_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -468,15 +638,25 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=1 make install"
 
     - name: Run python support test
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/python_musl; SGX_MODE=SIM ./run_python_on_occlum.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/demos/python/python_musl; SGX_MODE=SIM ./run_python_on_occlum.sh"
 
     - name: Check result
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/python_musl/occlum_instance; cat smvlight.dat"
+      run: docker exec ${{ github.job }} bash -c "cd /root/demos/python/python_musl/occlum_instance; cat smvlight.dat"
+    
+    - name: Clean Python musl test
+      run: docker exec ${{ github.job }} bash -c "cd /root/demos && rm -rf ./python/python_musl"
 
   # Python glibc support test
   Python_glibc_support_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -498,11 +678,21 @@ jobs:
     - name: Run python3.10 multiprocessing demo
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/python_glibc/python3.10-multiprocessing; ./install_python3.10.sh;
             SGX_MODE=SIM ./run_python3.10_on_occlum.sh"
+    
+    - name: Clean Python glibc test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./python/python_glibc"
 
   # Redis test
   Redis_support_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -528,10 +718,20 @@ jobs:
 
     - name: Run redis benchmark
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/redis; SGX_MODE=SIM ./benchmark_glibc.sh"
+    
+    - name: Clean Redis glibc test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./redis"
 
   Flink_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -559,9 +759,19 @@ jobs:
       if: ${{ always() }}
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink; cat occlum_instance_taskmanager/flink--taskmanager-0.log"
 
+    - name: Clean Flink test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./flink"
+
   Cluster_serving_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -576,10 +786,20 @@ jobs:
 
     - name: Run cluster serving test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/cluster_serving; source ./environment.sh; SGX_MODE=SIM ./start-all.sh; ./push-image.sh"
+    
+    - name: Clean Cluster serving test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./cluster_serving"
 
   Enclave_RA_TLS_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -600,10 +820,20 @@ jobs:
       run: |
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "/usr/share/enclave-tls/samples/enclave-tls-client" || true
+    
+    - name: Clean RA Tls test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./enclave_tls"
 
   Vault_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -623,10 +853,20 @@ jobs:
       run: |
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/vault && ./run_occlum_vault_test.sh"
+    
+    - name: Clean Vault test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./golang/vault"
 
   Sofaboot_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -649,10 +889,20 @@ jobs:
       run: |
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "curl -s http://localhost:8080/actuator/readiness | grep -v DOWN"
+    
+    - name: Clean Sofaboot test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./sofaboot"
 
   Netty_UT_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -670,10 +920,20 @@ jobs:
 
     - name: Run netty unit test demo
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut && SGX_MODE=SIM ./run_netty_ut_jdk11.sh"
+    
+    - name: Clean Netty test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./netty_ut"
 
   Bash_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -688,10 +948,20 @@ jobs:
 
     - name: Run glibc Bash test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/bash && SGX_MODE=SIM ./run_bash_demo.sh"
+    
+    - name: Clean Bash test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./bash"
 
   Sysbench_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -710,10 +980,20 @@ jobs:
     - name: Run sysbench threads benchmark
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/sysbench/occlum_instance;
             occlum run /bin/sysbench threads --threads=200 --thread-yields=100 --thread-locks=4 --time=30 run"
+    
+    - name: Clean Sysbench test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./benchmarks/sysbench"
 
   Gvisor_syscalls_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -743,6 +1023,13 @@ jobs:
   Flask_tls_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -767,13 +1054,24 @@ jobs:
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/flask;
             curl --cacert flask.crt -X PUT https://localhost:4996/customer/1 -d "data=Tom""
+
     - name: Test Get
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/python/flask;
             curl --cacert flask.crt -X GET https://localhost:4996/customer/1"
+    
+    - name: Clean Flask tls test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./python/flask"
 
   Iperf2_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -795,10 +1093,20 @@ jobs:
         sleep ${{ 5 }};
         docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/iperf2/occlum_client;
             occlum run /bin/iperf -c 127.0.0.1 -p 6888 -P 16"
+    
+    - name: Clean Iperf2 test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./benchmarks/iperf2"
 
   Linux_LTP_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -817,10 +1125,20 @@ jobs:
     - name: Run the LTP demo
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/linux-ltp/ltp_instance;
             occlum run /opt/ltp/run-ltp.sh -f syscalls-occlum"
+    
+    - name: Clean LTP test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./linux-ltp"
 
   FIO_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -835,10 +1153,20 @@ jobs:
 
     - name: Run fio test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/fio && SGX_MODE=SIM ./run_fio_on_occlum.sh fio-seq-read.fio"
+    
+    - name: Clean FIO test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./benchmarks/fio"
 
   PaddlePaddle_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -853,10 +1181,20 @@ jobs:
 
     - name: Run paddlepaddle test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/paddlepaddle; SGX_MODE=SIM ./run_paddlepaddle_on_occlum.sh"
+    
+    - name: Clean PaddlePaddle test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./paddlepaddle"
 
   RuntimeBoot_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -871,10 +1209,20 @@ jobs:
 
     - name: Run runtime boot instance
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/runtime_boot/boot_instance && occlum run /bin/occlum_bash_test.sh"
+    
+    - name: Clean RuntimeBoot test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./runtime_boot"
 
   Swtpm_test:
     runs-on: ubuntu-20.04
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    
     - uses: actions/checkout@v1
       with:
         submodules: true
@@ -894,3 +1242,6 @@ jobs:
       run: |
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/swtpm; ./run_client.sh"
+    
+    - name: Clean Swtpm test
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./swtpm"
