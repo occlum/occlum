@@ -898,7 +898,7 @@ jobs:
       if: ${{ always() }}
       run: docker stop ${{ env.CONTAINER_NAME }}
 
-  Init_RA_test:
+  Init_RA_grpc:
     timeout-minutes: 180
     if: github.event_name == 'push' || github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') || contains(github.event.pull_request.labels.*.name, 'Pre-release-test')
     runs-on: ${{ matrix.self_runner }}
@@ -951,6 +951,61 @@ jobs:
     - name: Clean the environment
       if: ${{ always() }}
       run: docker stop ${{ env.CONTAINER_NAME }}
+
+  Init_RA_AECS:
+    timeout-minutes: 180
+    if: github.event_name == 'push' || github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') || contains(github.event.pull_request.labels.*.name, 'Pre-release-test')
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX2-HW]]
+
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
+
+    - name: Checkout code
+      if: github.event_name == 'push' || github.event_name == 'schedule'
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+
+    - name: Checkout code from fork
+      if: contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') || contains(github.event.pull_request.labels.*.name, 'Pre-release-test')
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+        container-run-params: '--network host'
+
+    - name: Build the init_aecs_client demo
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/remote_attestation/init_aecs_client; ./build.sh"
+
+    - name: Start the test AECS service
+      run: |
+        wget https://raw.githubusercontent.com/SOFAEnclave/enclave-configuration-service/master/deployment/aecs_test.sh;
+        wget https://raw.githubusercontent.com/SOFAEnclave/enclave-configuration-service/master/deployment/run_image.sh;
+        chmod +x ./aecs_test.sh;
+        chmod +x ./run_image.sh;
+        sed -i "s/-it/-itd/g" run_image.sh;
+        ./aecs_test.sh start
+
+    - name: Run init_aecs_client demo
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/remote_attestation/init_aecs_client/occlum_instance; UA_ENV_PCCS_URL=https://sgx-dcap-server.cn-shanghai.aliyuncs.com/sgx/certification/v3/ occlum run /bin/busybox cat /etc/saved_secret_rsa_keypair"
+
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: |
+        docker stop ${{ env.CONTAINER_NAME }};
+        ./aecs_test.sh stop
 
   MySQL_test:
     timeout-minutes: 180

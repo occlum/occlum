@@ -40,6 +40,7 @@ Table of Contents
    filesystem/mount.md
    filesystem/encrypted_image.md
    remote_attestation.md
+   init_ra.md
 
 .. toctree::
    :maxdepth: 2

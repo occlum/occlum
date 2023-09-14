@@ -178,7 +178,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let server_addr =
         CString::new(env::var("OCCLUM_INIT_RA_KMS_SERVER").unwrap_or(init_ra_conf.kms_server))
             .unwrap();
-    env::set_var("UA_ENV_PCCS_URL", init_ra_conf.ua_env_pccs_url.clone());
+
+    // Set UA_ENV_PCCS_URL env if not set before
+    if env::var("UA_ENV_PCCS_URL").is_err() {
+        env::set_var("UA_ENV_PCCS_URL", init_ra_conf.ua_env_pccs_url.clone());
+    }
 
     // Get the key of FS image if needed
     let key = match &image_config.image_type[..] {
