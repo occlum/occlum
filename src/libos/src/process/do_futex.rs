@@ -420,6 +420,10 @@ impl FutexBucketVec {
     }
 }
 
+/// Note about memory ordering:
+/// Here is_woken needs to be synchronized with thread. The read operation of is_woken
+/// needs to see the change of the thread field. Just `Acquire` or `Release` needs
+/// to be used to make all the change of the thread visible to us.
 #[derive(Debug)]
 struct Waiter {
     thread: *const c_void,
@@ -441,9 +445,9 @@ impl Waiter {
         if current != self.thread {
             return Ok(());
         }
-        while self.is_woken.load(Ordering::SeqCst) == false {
+        while self.is_woken.load(Ordering::Acquire) == false {
             if let Err(e) = wait_event_timeout(self.thread, timeout) {
-                self.is_woken.store(true, Ordering::SeqCst);
+                self.is_woken.store(true, Ordering::Release);
                 return_errno!(e.errno(), "wait_timeout error");
             }
         }
@@ -451,7 +455,7 @@ impl Waiter {
     }
 
     pub fn wake(&self) {
-        if self.is_woken().fetch_or(true, Ordering::SeqCst) == false {
+        if self.is_woken().fetch_or(true, Ordering::Acquire) == false {
             set_events(&[self.thread])
         }
     }
@@ -470,7 +474,7 @@ impl Waiter {
             .filter_map(|waiter| {
                 // Only wake up items that are not woken.
                 // Set the item to be woken if it is not woken.
-                if waiter.is_woken().fetch_or(true, Ordering::SeqCst) == false {
+                if waiter.is_woken().fetch_or(true, Ordering::Acquire) == false {
                     Some(waiter.thread())
                 } else {
                     None
