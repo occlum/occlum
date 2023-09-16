@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1694643379586,
+  "lastUpdate": 1694902878653,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -706,6 +706,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 1954,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Zheng, Qi",
+            "username": "qzheng527",
+            "email": "huaiqing.zq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "f54eabfa92319490e1b13075b28fef2d3d9129fd",
+          "message": "[ci] Add init aecs to hw ci",
+          "timestamp": "2023-09-04T09:46:14Z",
+          "url": "https://github.com/occlum/occlum/commit/f54eabfa92319490e1b13075b28fef2d3d9129fd"
+        },
+        "date": 1694902877480,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 1987,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 1987,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
