@@ -49,8 +49,10 @@ function build_client_instance()
     # In our case, client and server use the same sign-key thus also the same mrsigner
     occlum build
 
-    new_json="$(jq '.resource_limits.user_space_size = "600MB" |
-        .resource_limits.kernel_space_heap_size = "128MB" |
+    new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+        .resource_limits.user_space_max_size = "600MB" |
+        .resource_limits.kernel_space_heap_size = "1MB" |
+        .resource_limits.kernel_space_heap_max_size = "128MB" |
         .resource_limits.max_num_of_threads = 32 |
         .metadata.debuggable = true |
         .metadata.enable_kss = true |
@@ -102,7 +104,8 @@ function build_server_instance()
         .sgx_mrs[0].config_svn = 1234 |
         .sgx_mrs[0].debuggable = true ' ../ra_config_template.json > dynamic_config.json
 
-    new_json="$(jq '.resource_limits.user_space_size = "500MB" |
+    new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+                    .resource_limits.user_space_max_size = "500MB" |
                     .metadata.debuggable = true ' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
 
