@@ -9,8 +9,10 @@ init_instance() {
     cd flink
     # Init Occlum instance
     occlum init
-    new_json="$(jq '.resource_limits.user_space_size = "7000MB" |
-                .resource_limits.kernel_space_heap_size="64MB" |
+    new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+                .resource_limits.user_space_max_size = "7000MB" |
+                .resource_limits.kernel_space_heap_size="1MB" |
+                .resource_limits.kernel_space_heap_max_size="64MB" |
                 .resource_limits.max_num_of_threads = 72 |
                 .process.default_heap_size = "128MB" |
                 .entry_points = [ "/usr/lib/jvm/java-11-openjdk-amd64/bin" ] |

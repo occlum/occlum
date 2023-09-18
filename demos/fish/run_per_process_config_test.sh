@@ -10,8 +10,10 @@ rm -rf occlum-test
 occlum new occlum-test && cd occlum-test
 
 # Set process memory space size to very small values and will fail when running target script using default configuration
-new_json="$(jq '.resource_limits.user_space_size = "512MB" |
-                .resource_limits.kernel_space_heap_size= "64MB" |
+new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+                .resource_limits.user_space_max_size = "512MB" |
+                .resource_limits.kernel_space_heap_size= "1MB" |
+                .resource_limits.kernel_space_heap_max_size = "64MB" |
                 .process.default_stack_size = "1MB" |
                 .process.default_heap_size = "1MB" |
                 .env.default = [ "OCCLUM=yes", "HOME=/root" ]' Occlum.json)" && \

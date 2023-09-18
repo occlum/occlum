@@ -54,8 +54,10 @@ function build_tf_instance()
     # In our case, client and server use the same sign-key thus also the same mrsigner
     occlum build
 
-    new_json="$(jq '.resource_limits.user_space_size = "7000MB" |
-                    .resource_limits.kernel_space_heap_size="384MB" |
+    new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+                    .resource_limits.user_space_max_size = "7000MB" |
+                    .resource_limits.kernel_space_heap_size="1MB" |
+                    .resource_limits.kernel_space_heap_max_size="384MB" |
                     .process.default_heap_size = "128MB" |
                     .resource_limits.max_num_of_threads = 64 |
                     .metadata.debuggable = false |
@@ -105,7 +107,8 @@ function build_server_instance()
         .sgx_mrs[0].mr_signer = ''"'`get_mr tf mrsigner`'" |
         .sgx_mrs[0].debuggable = false ' ../ra_config_template.json > dynamic_config.json 
 
-    new_json="$(jq '.resource_limits.user_space_size = "500MB" |
+    new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+                    .resource_limits.user_space_max_size = "500MB" |
                     .metadata.debuggable = false ' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
 
