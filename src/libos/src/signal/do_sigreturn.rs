@@ -5,9 +5,8 @@ use super::{SigAction, SigActionFlags, SigDefaultAction, SigSet, Signal};
 use crate::lazy_static::__Deref;
 use crate::prelude::*;
 use crate::process::{ProcessRef, TermStatus, ThreadRef};
-use crate::syscall::{CpuContext, FpRegs};
+use crate::syscall::{CpuContext, ExtraContext, FpRegs, XsaveArea};
 use aligned::{Aligned, A16};
-use core::arch::x86_64::{_fxrstor, _fxsave};
 use std::{ptr, slice};
 
 pub fn do_rt_sigreturn(curr_user_ctxt: &mut CpuContext) -> Result<()> {
@@ -34,11 +33,27 @@ pub fn do_rt_sigreturn(curr_user_ctxt: &mut CpuContext) -> Result<()> {
     *curr_user_ctxt = last_ucontext.uc_mcontext.inner;
 
     // Restore the floating point registers to a temp area
-    // The floating point registers would be recoved just
-    // before return to user's code
-    let mut fpregs = Box::new(unsafe { FpRegs::from_slice(&last_ucontext.fpregs) });
-    curr_user_ctxt.fpregs = Box::into_raw(fpregs);
-    curr_user_ctxt.fpregs_on_heap = 1; // indicates the fpregs is on heap
+    // The floating point registers would be recoved just before return to user's code
+    match curr_user_ctxt.extra_context {
+        ExtraContext::Fpregs => {
+            // Signal raised by direct syscall
+            // fpregs should be stored on the heap. Because the ucontext_t will be freed when this function returns. And curr_user_ctxt only stores the pointer
+            let mut fpregs = Box::new(unsafe { FpRegs::from_slice(&last_ucontext.fpregs) });
+            curr_user_ctxt.extra_context_ptr = Box::into_raw(fpregs) as *mut u8;
+        }
+        ExtraContext::Xsave => {
+            // Signal raised by exception
+            // The xsave_area is stored at a special area reserved on kernel's stack. We can just overwrite this area with the latest user context
+            // Note: Currently, we only restore the fpregs instead of restoring the whole xsave area for sigreturn. Because during the
+            // handle path, we don't touch other advanced registers. However, in the future, if we have to touch those registers,
+            // we should restore the whole xsave area when sigreturn.
+            let latest_fpregs = unsafe { FpRegs::from_slice(&last_ucontext.fpregs) };
+            let xsave_area =
+                unsafe { (&mut *(curr_user_ctxt.extra_context_ptr as *mut XsaveArea)) };
+            xsave_area.set_fpregs_area(latest_fpregs);
+        }
+    }
+
     Ok(())
 }
 
@@ -261,16 +276,24 @@ fn handle_signals_by_user(
         // Save the old sigmask
         ucontext.uc_sigmask = old_sigmask.to_c();
         // Save the user context
-        ucontext.uc_mcontext.inner = *curr_user_ctxt;
+        ucontext.uc_mcontext.inner = curr_user_ctxt.clone();
 
         // Save the floating point registers
-        if curr_user_ctxt.fpregs != ptr::null_mut() {
-            ucontext
-                .fpregs
-                .copy_from_slice(unsafe { curr_user_ctxt.fpregs.as_ref().unwrap().as_slice() });
-            // Clear the floating point registers, since we do not need to recover is when this syscall return
-            curr_user_ctxt.fpregs = ptr::null_mut();
+        if curr_user_ctxt.extra_context_ptr != ptr::null_mut() {
+            // Signal from exception handling
+            debug_assert!(matches!(curr_user_ctxt.extra_context, ExtraContext::Xsave));
+            let fpregs_area =
+                unsafe { (&*(curr_user_ctxt.extra_context_ptr as *mut XsaveArea)) }.get_fpregs();
+            ucontext.fpregs.copy_from_slice(fpregs_area.as_slice());
+            // Clear the floating point registers, since we do not need to recover this when this syscall return
+            curr_user_ctxt.extra_context_ptr = ptr::null_mut();
         } else {
+            // Raise the signal with direct syscall
+            debug_assert!(
+                matches!(curr_user_ctxt.extra_context, ExtraContext::Fpregs)
+                    && curr_user_ctxt.extra_context_ptr == ptr::null_mut()
+            );
+
             // We need a correct fxsave structure in the buffer,
             // because the app may modify part of it to update the
             // floating point after the signal handler finished.

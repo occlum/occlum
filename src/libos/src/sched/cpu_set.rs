@@ -8,6 +8,7 @@
 //! * If `cpu_set[i] == true`, then the i-th CPU core belongs to the set;
 //! * Otherwise, the i-th CPU core is not in the set.
 
+use bitvec::order::LocalBits as Local;
 use bitvec::prelude::*;
 use std::ops::Index;
 
@@ -15,7 +16,7 @@ use crate::prelude::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CpuSet {
-    bits: BitBox<Local, u8>,
+    bits: BitBox<u8, Local>,
 }
 
 impl CpuSet {
@@ -33,14 +34,14 @@ impl CpuSet {
 
     /// Create a CpuSet that consists of all of the CPU cores.
     pub fn new_full() -> Self {
-        let mut bits = bitbox![Local, u8; 1; Self::len() * 8];
+        let mut bits = bitbox![u8, Local; 1; Self::len() * 8];
         Self::clear_unused(&mut bits);
         Self { bits }
     }
 
     /// Create a CpuSet that consists of none of the CPU cores.
     pub fn new_empty() -> Self {
-        let bits = bitbox![Local, u8; 0; Self::len() * 8];
+        let bits = bitbox![u8, Local; 0; Self::len() * 8];
         Self { bits }
     }
 
@@ -61,7 +62,7 @@ impl CpuSet {
 
     /// Returns the first index of CPUs in set.
     pub fn first_cpu_idx(&self) -> Option<usize> {
-        self.iter().position(|&b| b == true)
+        self.iter().position(|b| b == true)
     }
 
     // Returns if the CpuSet is a subset of available cpu set
@@ -75,7 +76,7 @@ impl CpuSet {
             return_errno!(EINVAL, "slice is not long enough");
         }
         let slice = &slice[..Self::len()];
-        let mut bits = BitBox::from_slice(slice);
+        let mut bits = BitBox::from_bitslice(&BitSlice::from_slice(slice));
         Self::clear_unused(&mut bits);
 
         Ok(Self { bits })
@@ -85,11 +86,11 @@ impl CpuSet {
     ///
     /// The last, unused bits in the byte slice are guaranteed to be zero.
     pub fn as_slice(&self) -> &[u8] {
-        self.bits.as_slice()
+        self.bits.as_raw_slice()
     }
 
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
-        self.bits.as_mut_slice()
+        self.bits.as_raw_mut_slice()
     }
 
     /// Returns an iterator that allows accessing the underlying bits.
@@ -102,7 +103,7 @@ impl CpuSet {
         self.bits.iter_mut()
     }
 
-    fn clear_unused(bits: &mut BitSlice<Local, u8>) {
+    fn clear_unused(bits: &mut BitSlice<u8, Local>) {
         let unused_bits = &mut bits[Self::ncores()..(Self::len() * 8)];
         for mut bit in unused_bits {
             *bit = false;
@@ -110,8 +111,8 @@ impl CpuSet {
     }
 }
 
-pub type Iter<'a> = bitvec::slice::Iter<'a, Local, u8>;
-pub type IterMut<'a> = bitvec::slice::IterMut<'a, Local, u8>;
+pub type Iter<'a> = bitvec::slice::Iter<'a, u8, Local>;
+pub type IterMut<'a> = bitvec::slice::IterMut<'a, u8, Local>;
 
 impl Index<usize> for CpuSet {
     type Output = bool;

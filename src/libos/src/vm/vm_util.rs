@@ -10,6 +10,11 @@ use intrusive_collections::RBTreeLink;
 use intrusive_collections::{intrusive_adapter, KeyAdapter};
 use rcore_fs::vfs::Metadata;
 
+pub const GB: usize = 1 << 30;
+pub const TB: usize = 1 << 40;
+pub const MB: usize = 1 << 20;
+pub const KB: usize = 1 << 10;
+
 #[derive(Clone, Debug)]
 pub enum VMInitializer {
     DoNothing(),
@@ -139,7 +144,7 @@ impl FileBacked {
         self.write_back
     }
 
-    pub fn init_file(&self) -> (&FileRef, usize) {
+    pub fn backed_file(&self) -> (&FileRef, usize) {
         (&self.file, self.offset)
     }
 
@@ -179,6 +184,19 @@ impl VMMapAddr {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum PagePolicy {
+    ReserveOnly = 0x1,    // Only reserve
+    CommitNow = 0x2,      // Commit all pages when mmap.
+    CommitOnDemand = 0x4, // Reserve space when mmap, commit in the PF handler. This is the default policy.
+}
+
+impl Default for PagePolicy {
+    fn default() -> PagePolicy {
+        PagePolicy::CommitOnDemand
+    }
+}
+
 #[derive(Builder, Debug)]
 #[builder(pattern = "owned", build_fn(skip), no_std)]
 pub struct VMMapOptions {
@@ -187,6 +205,7 @@ pub struct VMMapOptions {
     perms: VMPerms,
     addr: VMMapAddr,
     initializer: VMInitializer,
+    page_policy: PagePolicy,
 }
 
 // VMMapOptionsBuilder is generated automatically, except the build function
@@ -232,12 +251,21 @@ impl VMMapOptionsBuilder {
             Some(initializer) => initializer.clone(),
             None => VMInitializer::default(),
         };
+        let page_policy = {
+            match &initializer {
+                VMInitializer::CopyFrom { .. } => PagePolicy::CommitNow,
+                VMInitializer::CopyOldAndReadNew { .. } => PagePolicy::CommitNow,
+                _ => self.page_policy.unwrap_or_default(),
+            }
+        };
+
         Ok(VMMapOptions {
             size,
             align,
             perms,
             addr,
             initializer,
+            page_policy,
         })
     }
 }
@@ -268,6 +296,10 @@ impl VMMapOptions {
             return backed_file.need_write_back();
         }
         false
+    }
+
+    pub fn page_policy(&self) -> &PagePolicy {
+        &self.page_policy
     }
 }
 
