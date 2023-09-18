@@ -2,9 +2,7 @@ pub use self::sgx::sgx_interrupt_info_t;
 use crate::prelude::*;
 use crate::process::ThreadRef;
 use crate::syscall::exception_interrupt_syscall_c_abi;
-use crate::syscall::{CpuContext, FpRegs, SyscallNum};
-use aligned::{Aligned, A16};
-use core::arch::x86_64::_fxsave;
+use crate::syscall::{CpuContext, ExtraContext, SyscallNum};
 
 mod sgx;
 
@@ -16,28 +14,23 @@ pub fn init() {
 }
 
 extern "C" fn handle_interrupt(info: *mut sgx_interrupt_info_t) -> i32 {
-    let mut fpregs = FpRegs::save();
     unsafe {
-        exception_interrupt_syscall_c_abi(
-            SyscallNum::HandleInterrupt as u32,
-            info as *mut _,
-            &mut fpregs as *mut FpRegs,
-        )
+        exception_interrupt_syscall_c_abi(SyscallNum::HandleInterrupt as u32, info as *mut _)
     };
     unreachable!();
 }
 
 pub fn do_handle_interrupt(
     info: *mut sgx_interrupt_info_t,
-    fpregs: *mut FpRegs,
     cpu_context: *mut CpuContext,
 ) -> Result<isize> {
-    let info = unsafe { &*info };
+    let info = unsafe { &mut *info };
     let context = unsafe { &mut *cpu_context };
     // The cpu context is overriden so that it is as if the syscall is called from where the
     // interrupt happened
     *context = CpuContext::from_sgx(&info.cpu_context);
-    context.fpregs = fpregs;
+    context.extra_context = ExtraContext::Xsave;
+    context.extra_context_ptr = info.xsave_area.as_mut_ptr();
     Ok(0)
 }
 

@@ -25,4 +25,4 @@ dependencies = [
 
 [[package]]
 name = "sgx_types"
-version = "1.1.5"
+version = "1.1.6"
