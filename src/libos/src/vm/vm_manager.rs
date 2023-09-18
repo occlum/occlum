@@ -9,6 +9,7 @@ use super::vm_area::{VMAccess, VMArea};
 use super::vm_chunk_manager::ChunkManager;
 use super::vm_perms::VMPerms;
 use super::vm_util::*;
+use crate::ipc::SYSTEM_V_SHM_MANAGER;
 use crate::process::{ThreadRef, ThreadStatus};
 
 use std::collections::BTreeSet;
