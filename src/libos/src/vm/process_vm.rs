@@ -6,7 +6,8 @@ use super::vm_area::VMArea;
 use super::vm_manager::MunmapChunkFlag;
 use super::vm_perms::VMPerms;
 use super::vm_util::{
-    FileBacked, VMInitializer, VMMapAddr, VMMapOptions, VMMapOptionsBuilder, VMRemapOptions,
+    FileBacked, PagePolicy, VMInitializer, VMMapAddr, VMMapOptions, VMMapOptionsBuilder,
+    VMRemapOptions,
 };
 use crate::config;
 use crate::ipc::SHM_MANAGER;
@@ -124,6 +125,8 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
                     .initializer(VMInitializer::ElfSpecific {
                         elf_file: elf_file.file_ref().clone(),
                     })
+                    // We only load loadable segments, just commit the memory when allocating.
+                    .page_policy(PagePolicy::CommitNow)
                     .build()
                     .map_err(|e| {
                         &self.handle_error_when_init(&chunks);
@@ -152,6 +155,8 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
             .size(heap_layout.size())
             .align(heap_layout.align())
             .perms(VMPerms::READ | VMPerms::WRITE)
+            .page_policy(PagePolicy::CommitOnDemand)
+            // .page_policy(PagePolicy::CommitNow)
             .build()
             .map_err(|e| {
                 &self.handle_error_when_init(&chunks);
@@ -171,8 +176,10 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
         let stack_layout = &other_layouts[1];
         let vm_option = VMMapOptionsBuilder::default()
             .size(stack_layout.size())
-            .align(heap_layout.align())
+            .align(stack_layout.align())
             .perms(VMPerms::READ | VMPerms::WRITE)
+            // There are cases that we can't handle when the #PF happens at user's stack. Commit the stack memory now.
+            .page_policy(PagePolicy::CommitNow)
             .build()
             .map_err(|e| {
                 &self.handle_error_when_init(&chunks);
@@ -537,11 +544,26 @@ impl ProcessVM {
                 }
             }
         };
+
+        let page_policy = {
+            if flags.contains(MMapFlags::MAP_STACK) {
+                // With MAP_STACK, the mmaped memory will be used as user's stack. If not committed, the #PF can occurs
+                // when switching to user space and can't be handled correctly by us.
+                PagePolicy::CommitNow
+            } else if !flags.contains(MMapFlags::MAP_ANONYMOUS) {
+                // Use commit-now policy for file-backed mmap. We tried the commit-on-demand policy, but didn't get any performance gain at all.
+                // However, the path for file-backed mmap with commit-on-demand policy is ready. We can enable this whenever needed.
+                PagePolicy::CommitNow
+            } else {
+                PagePolicy::CommitOnDemand
+            }
+        };
         let mmap_options = VMMapOptionsBuilder::default()
             .size(size)
             .addr(addr_option)
             .perms(perms)
             .initializer(initializer)
+            .page_policy(page_policy)
             .build()?;
         let mmap_addr = USER_SPACE_VM_MANAGER.mmap(&mmap_options)?;
         Ok(mmap_addr)
@@ -672,5 +694,35 @@ impl MSyncFlags {
             return_errno!(EINVAL, "must be either sync or async");
         }
         Ok(flags)
+    }
+}
+
+#[allow(non_camel_case_types)]
+#[repr(i32)]
+#[derive(Debug)]
+pub enum MadviceFlags {
+    MADV_NORMAL = 0,
+    MADV_RANDOM = 1,
+    MADV_SEQUENTIAL = 2,
+    MADV_WILLNEED = 3,
+    MADV_DONTNEED = 4,
+}
+
+impl MadviceFlags {
+    pub fn from_i32(raw: i32) -> Result<Self> {
+        const MADV_NORMAL: i32 = 0;
+        const MADV_RANDOM: i32 = 1;
+        const MADV_SEQUENTIAL: i32 = 2;
+        const MADV_WILLNEED: i32 = 3;
+        const MADV_DONTNEED: i32 = 4;
+
+        match raw {
+            MADV_NORMAL => Ok(MadviceFlags::MADV_NORMAL),
+            MADV_RANDOM => Ok(MadviceFlags::MADV_RANDOM),
+            MADV_SEQUENTIAL => Ok(MadviceFlags::MADV_SEQUENTIAL),
+            MADV_WILLNEED => Ok(MadviceFlags::MADV_WILLNEED),
+            MADV_DONTNEED => Ok(MadviceFlags::MADV_DONTNEED),
+            _ => return_errno!(ENOSYS, "unknown madvice flags"),
+        }
     }
 }
