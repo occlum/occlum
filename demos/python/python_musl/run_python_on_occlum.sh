@@ -20,8 +20,10 @@ cd occlum_instance
 if [ ! -d "image/lib/python3.7" ];then
     rm -rf image
     copy_bom -f ../python_musl.yaml --root image --include-dir /opt/occlum/etc/template
-    new_json="$(jq '.resource_limits.user_space_size = "320MB" |
-                    .resource_limits.kernel_space_heap_size = "256MB"' Occlum.json)" && \
+    new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+                    .resource_limits.user_space_max_size = "320MB" |
+                    .resource_limits.kernel_space_heap_size = "1MB" |
+                    .resource_limits.kernel_space_heap_max_size = "256MB" ' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
     occlum build
 fi

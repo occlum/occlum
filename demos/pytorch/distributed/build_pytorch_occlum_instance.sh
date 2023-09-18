@@ -34,8 +34,10 @@ function build_instance()
         exit 1
     fi
 
-    new_json="$(jq '.resource_limits.user_space_size = "4000MB" |
-                    .resource_limits.kernel_space_heap_size = "400MB" |
+    new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+                    .resource_limits.user_space_max_size = "4000MB" |
+                    .resource_limits.kernel_space_heap_size = "1MB" |
+                    .resource_limits.kernel_space_heap_max_size = "400MB" |
                     .resource_limits.max_num_of_threads = 64 |
                     .env.untrusted += [ "MASTER_ADDR", "MASTER_PORT", "WORLD_SIZE", "RANK", "OMP_NUM_THREADS", "HOME" ] |
                     .env.default += ["GLOO_DEVICE_TRANSPORT=TCP_TLS"] |
