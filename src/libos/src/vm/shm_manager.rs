@@ -206,8 +206,8 @@ impl ShmManager {
             let old_perms = old_vma.perms();
             if new_perms != old_perms {
                 let perms = new_perms | old_perms;
-                VMPerms::apply_perms(new_vma.range(), perms);
                 new_vma.set_perms(perms);
+                new_vma.modify_permissions_for_committed_pages(perms);
             }
 
             let inode_id = Self::inode_id_of(&new_vma);
@@ -279,7 +279,7 @@ impl ShmManager {
         if perms == old_perms {
             return;
         }
-        VMPerms::apply_perms(vma.range(), perms);
         vma.set_perms(perms);
+        vma.modify_permissions_for_committed_pages(perms);
     }
 }

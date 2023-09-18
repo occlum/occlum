@@ -10,7 +10,7 @@ crate-type = ["staticlib"]
 [dependencies]
 atomic = "0.5"
 bitflags = "1.0"
-bitvec = { version = "0.17", default-features = false, features = ["alloc"]  }
+bitvec = { version = "1", default-features = false, features = ["alloc"]  }
 log = "0.4"
 aligned = "0.4.1"
 lazy_static = { version = "1.1.0", features = ["spin_no_std"] } # Implies nightly
@@ -33,6 +33,7 @@ regex = { git = "https://github.com/mesalock-linux/regex-sgx", default-features 
 goblin = { version = "0.5.4", default-features = false, features = ["elf64", "elf32", "endian_fd"] }
 intrusive-collections = "0.9"
 spin = "0.7"
+modular-bitfield = "0.11.2"
 
 [patch.'https://github.com/apache/teaclave-sgx-sdk.git']
 sgx_tstd = { path = "../../deps/rust-sgx-sdk/sgx_tstd" }
