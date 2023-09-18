@@ -144,7 +144,6 @@ impl ShmSegment {
             .size(size)
             // Currently, Occlum only support shared memory segment with rw permission
             .perms(VMPerms::READ | VMPerms::WRITE)
-            .initializer(VMInitializer::FillZeros())
             .build()?;
         let chunk = USER_SPACE_VM_MANAGER.internal().mmap_chunk(&vm_option)?;
 
@@ -203,6 +202,14 @@ impl ShmSegment {
         }
         self.process_set.remove(&pid);
         Ok(())
+    }
+
+    fn chunk(&self) -> &ChunkRef {
+        &self.chunk
+    }
+
+    fn process_set(&self) -> &HashSet<pid_t> {
+        &self.process_set
     }
 }
 
@@ -265,7 +272,7 @@ impl ShmIdManager {
 }
 
 lazy_static! {
-    pub static ref SHM_MANAGER: ShmManager = ShmManager::new();
+    pub static ref SYSTEM_V_SHM_MANAGER: ShmManager = ShmManager::new();
 }
 
 #[derive(Debug)]
@@ -280,6 +287,16 @@ impl ShmManager {
             shm_segments: RwLock::new(HashMap::new()),
             shmid_manager: RwLock::new(ShmIdManager::new()),
         }
+    }
+
+    pub fn get_shm_chunk_containing_addr(&self, addr: usize, pid: pid_t) -> Option<ChunkRef> {
+        let shm_segments = self.shm_segments.read().unwrap();
+        shm_segments
+            .iter()
+            .find(|(_, shm_segment)| {
+                shm_segment.chunk().range().contains(addr) && shm_segment.process_set.contains(&pid)
+            })
+            .map(|(_, shm_segment)| shm_segment.chunk().clone())
     }
 
     fn current_time() -> time_t {
