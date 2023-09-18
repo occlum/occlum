@@ -1,10 +1,12 @@
 {
     "resource_limits": {
-        "kernel_space_heap_size": "40MB",
-        "kernel_space_heap_max_size": "512MB",
         "kernel_space_stack_size": "1MB",
-        "user_space_size": "600MB",
-        "max_num_of_threads": 32
+        "kernel_space_heap_size": "1MB",
+        "kernel_space_heap_max_size": "40MB",
+        "user_space_size": "1MB",
+        "user_space_max_size": "600MB",
+        "init_num_of_threads": 2,
+        "max_num_of_threads": 64
     },
     "process": {
         "default_stack_size": "4MB",
