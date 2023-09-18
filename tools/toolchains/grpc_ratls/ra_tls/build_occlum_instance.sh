@@ -13,7 +13,8 @@ function build_instance() {
     mkdir occlum_$postfix
     pushd occlum_$postfix
     occlum init
-    new_json="$(jq '.resource_limits.user_space_size = "500MB" |
+    new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+                    .resource_limits.user_space_max_size = "500MB" |
                     .metadata.debuggable = false' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
 

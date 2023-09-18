@@ -18,8 +18,10 @@ rm -rf occlum_instance
 mkdir occlum_instance
 cd occlum_instance
 occlum init
-new_json="$(jq '.resource_limits.user_space_size = "7000MB" |
-                .resource_limits.kernel_space_heap_size="384MB" |
+new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+                .resource_limits.user_space_max_size = "7000MB" |
+                .resource_limits.kernel_space_heap_size="1MB" |
+                .resource_limits.kernel_space_heap_max_size="384MB" |
                 .process.default_heap_size = "128MB" |
                 .resource_limits.max_num_of_threads = 64 |
                 .env.default = [ "OMP_NUM_THREADS=8", "KMP_AFFINITY=verbose,granularity=fine,compact,1,0", "KMP_BLOCKTIME=20", "MKL_NUM_THREADS=8"]' Occlum.json)" && \

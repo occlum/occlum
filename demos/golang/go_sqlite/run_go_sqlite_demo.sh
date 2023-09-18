@@ -16,8 +16,10 @@ occlum-go build -o simple_demo simple_demo.go
 rm -rf simple_demo_instance && mkdir simple_demo_instance
 cd simple_demo_instance
 occlum init
-new_json="$(jq '.resource_limits.user_space_size = "2560MB" |
-	.resource_limits.kernel_space_heap_size="320MB" |
+new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+	.resource_limits.user_space_max_size = "2560MB" |
+	.resource_limits.kernel_space_heap_size="1MB" |
+	.resource_limits.kernel_space_heap_max_size="320MB" |
 	.resource_limits.kernel_space_stack_size="10MB" |
 	.process.default_stack_size = "40MB" |
 	.process.default_heap_size = "320MB" ' Occlum.json)" && \
