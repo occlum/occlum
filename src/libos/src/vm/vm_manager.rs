@@ -876,6 +876,11 @@ impl InternalVMManager {
                     VMPerms::apply_perms(&new_vma, new_vma.perms());
 
                     let remaining_old_vma = {
+                        trace!(
+                            "create new range start = {}, end = {}",
+                            protect_range.end(),
+                            old_end
+                        );
                         let range = VMRange::new(protect_range.end(), old_end).unwrap();
                         VMArea::inherits_file_from(
                             &containing_vma,
