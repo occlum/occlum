@@ -488,9 +488,9 @@ cmd_run() {
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
-        export LD_LIBRARY_PATH="$instance_dir/build/lib"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib"
     fi
 
     echo "running" > $status_file
@@ -524,9 +524,9 @@ cmd_start() {
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
-        export LD_LIBRARY_PATH="$instance_dir/build/lib"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib"
     fi
 
     echo "running" > $status_file
@@ -549,9 +549,9 @@ cmd_exec() {
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
-        export LD_LIBRARY_PATH="$instance_dir/build/lib"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib"
     fi
 
     echo "running" > "$status_file"
@@ -567,9 +567,9 @@ cmd_stop() {
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
-        export LD_LIBRARY_PATH="$instance_dir/build/lib"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib"
     fi
 
     echo "running" > "$status_file"
@@ -658,9 +658,9 @@ cmd_gdb() {
 
     SGX_MODE=$(cat $instance_dir/.sgx_mode)
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
-        export LD_LIBRARY_PATH="$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib:$SGX_SDK/sdk_libs/"
     else
-        export LD_LIBRARY_PATH="$instance_dir/build/lib"
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$instance_dir/build/lib"
     fi
 
     echo "debugging" > "$status_file"
