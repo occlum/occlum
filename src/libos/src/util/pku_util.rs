@@ -1,5 +1,6 @@
 use super::*;
 
+use crate::vm::{VMPerms, VMRange};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Status variable accessed by assembly code
@@ -31,55 +32,91 @@ pub fn check_pku_enabled() -> bool {
     PKU_ENABLED.load(Ordering::Acquire)
 }
 
-pub fn pkey_mprotect_userspace_mem(user_mem_base: usize, user_mem_len: usize, perm: i32) {
+pub fn pkey_mprotect_userspace_mem(
+    user_space_range: &VMRange,
+    gap_range: Option<&VMRange>,
+    perm: VMPerms,
+) {
     if !self::check_pku_enabled() {
         return;
     }
-    let mut retval = -1;
     debug!(
         "associate memory region: 0x{:x} -> 0x{:x}, size: 0x{:x} with pkey for userspace: {:?}",
-        user_mem_base,
-        user_mem_base + user_mem_len,
-        user_mem_len,
+        user_space_range.start(),
+        user_space_range.end(),
+        user_space_range.size(),
         PKEY_USER
     );
-    let sgx_status = unsafe {
-        occlum_ocall_pkey_mprotect(
-            &mut retval,
-            user_mem_base as *const c_void,
-            user_mem_len,
-            perm,
-            PKEY_USER,
-        )
-    };
+
+    pkey_mprotect_user_space(user_space_range, gap_range, perm.bits() as i32, PKEY_USER);
+}
+
+pub fn clear_pku_when_libos_exit(
+    user_space_range: &VMRange,
+    gap_range: Option<&VMRange>,
+    perm: VMPerms,
+) {
+    if !self::check_pku_enabled() {
+        return;
+    }
+    debug!(
+        "re-associate memory region  0x{:x} -> 0x{:x}, size: 0x{:x} with pkey for libos: {:?}",
+        user_space_range.start(),
+        user_space_range.end(),
+        user_space_range.size(),
+        PKEY_LIBOS
+    );
+    pkey_mprotect_user_space(user_space_range, gap_range, perm.bits() as i32, PKEY_LIBOS);
+
+    debug!("free pkey: {:?}", PKEY_USER);
+    let mut retval = -1;
+    let sgx_status = unsafe { occlum_ocall_pkey_free(&mut retval, PKEY_USER) };
     assert!(sgx_status == sgx_status_t::SGX_SUCCESS && retval == 0);
 }
 
-pub fn clear_pku_when_libos_exit(user_mem_base: usize, user_mem_len: usize, perm: i32) {
-    if !self::check_pku_enabled() {
-        return;
-    }
+fn pkey_mprotect_user_space(
+    user_space_range: &VMRange,
+    gap_range: Option<&VMRange>,
+    perm: i32,
+    pkey: i32,
+) {
     let mut retval = -1;
-    debug!(
-        "re-associate memory region  0x{:x} -> 0x{:x}, size: 0x{:x} with pkey for libos: {:?}",
-        user_mem_base,
-        user_mem_base + user_mem_len,
-        user_mem_len,
-        PKEY_LIBOS
-    );
-    let sgx_status = unsafe {
-        occlum_ocall_pkey_mprotect(
-            &mut retval,
-            user_mem_base as *const c_void,
-            user_mem_len,
-            perm,
-            PKEY_LIBOS,
-        )
-    };
-    assert!(sgx_status == sgx_status_t::SGX_SUCCESS && retval == 0);
-    debug!("free pkey: {:?}", PKEY_USER);
-    let sgx_status = unsafe { occlum_ocall_pkey_free(&mut retval, PKEY_USER) };
-    assert!(sgx_status == sgx_status_t::SGX_SUCCESS && retval == 0);
+
+    if let Some(gap_range) = gap_range {
+        // user_space_left
+        let user_space_left = VMRange::new(user_space_range.start(), gap_range.start()).unwrap();
+        let user_space_right = VMRange::new(gap_range.end(), user_space_range.end()).unwrap();
+        let sgx_status = unsafe {
+            occlum_ocall_pkey_mprotect(
+                &mut retval,
+                user_space_left.start() as *const c_void,
+                user_space_left.size(),
+                perm,
+                pkey,
+            )
+        };
+        assert!(sgx_status == sgx_status_t::SGX_SUCCESS && retval == 0);
+        let sgx_status = unsafe {
+            occlum_ocall_pkey_mprotect(
+                &mut retval,
+                user_space_right.start() as *const c_void,
+                user_space_right.size(),
+                perm,
+                pkey,
+            )
+        };
+    } else {
+        let sgx_status = unsafe {
+            occlum_ocall_pkey_mprotect(
+                &mut retval,
+                user_space_range.start() as *const c_void,
+                user_space_range.size(),
+                perm,
+                pkey,
+            )
+        };
+        assert!(sgx_status == sgx_status_t::SGX_SUCCESS && retval == 0);
+    }
 }
 
 extern "C" {

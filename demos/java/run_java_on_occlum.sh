@@ -6,7 +6,7 @@ NC='\033[0m'
 
 show_usage() {
     echo "Error: invalid arguments"
-    echo "Usage: $0 web_app/hello/processBuilder"
+    echo "Usage: $0 web_app/hello/processBuilder/hello_pku"
     exit 1
 }
 
@@ -31,6 +31,10 @@ init_instance() {
                 .entry_points = [ "/usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin" ] |
                 .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-11-alibaba-dragonwell/jre/lib/server:/usr/lib/jvm/java-11-alibaba-dragonwell/jre/lib:/usr/lib/jvm/java-11-alibaba-dragonwell/jre/../lib" ]' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
+}
+
+update_pku_config() {
+    new_json="$(jq '.metadata.pkru = 1' Occlum.json)" && echo "${new_json}" > Occlum.json
 }
 
 build_web() {
@@ -66,6 +70,16 @@ run_hello() {
     occlum run /usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin/java -Xmx512m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=64m -Dos.name=Linux Main
 }
 
+run_hello_pku() {
+    hello=./hello_world/Main.class
+    check_file_exist ${hello}
+    init_instance
+    update_pku_config
+    build_hello
+    echo -e "${BLUE}occlum run JVM hello with PKU enabled${NC}"
+    occlum run /usr/lib/jvm/java-11-alibaba-dragonwell/jre/bin/java -Xmx512m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=64m -Dos.name=Linux Main
+}
+
 build_processBuilder() {
     # Copy JVM and class file into Occlum instance and build
     rm -rf image
@@ -96,6 +110,9 @@ case "$arg" in
         ;;
     processBuilder)
         run_processBuilder
+        ;;
+    hello_pku)
+        run_hello_pku
         ;;
     *)
         show_usage
