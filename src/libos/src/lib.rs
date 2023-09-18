@@ -21,8 +21,9 @@
 #![feature(test)]
 #![feature(atomic_from_mut)]
 #![feature(btree_drain_filter)]
-#![feature(bench_black_box)]
 #![feature(arbitrary_enum_discriminant)]
+// for core::ptr::non_null::NonNull addr() method
+#![feature(strict_provenance)]
 
 #[macro_use]
 extern crate alloc;
@@ -59,6 +60,7 @@ extern crate memoffset;
 extern crate ctor;
 extern crate intrusive_collections;
 extern crate itertools;
+extern crate modular_bitfield;
 extern crate resolv_conf;
 
 use sgx_trts::libc;

@@ -63,11 +63,13 @@ use std::fmt;
 
 mod chunk;
 mod free_space_manager;
+mod page_tracker;
 mod process_vm;
 mod shm_manager;
 mod user_space_vm;
 mod vm_area;
 mod vm_chunk_manager;
+mod vm_epc;
 mod vm_layout;
 mod vm_manager;
 mod vm_perms;
@@ -77,9 +79,12 @@ mod vm_util;
 use self::vm_layout::VMLayout;
 
 pub use self::chunk::{ChunkRef, ChunkType};
-pub use self::process_vm::{MMapFlags, MRemapFlags, MSyncFlags, ProcessVM, ProcessVMBuilder};
+pub use self::process_vm::{
+    MMapFlags, MRemapFlags, MSyncFlags, MadviceFlags, ProcessVM, ProcessVMBuilder,
+};
 pub use self::user_space_vm::USER_SPACE_VM_MANAGER;
 pub use self::vm_area::VMArea;
+pub use self::vm_epc::enclave_page_fault_handler;
 pub use self::vm_manager::MunmapChunkFlag;
 pub use self::vm_perms::VMPerms;
 pub use self::vm_range::VMRange;
@@ -152,6 +157,11 @@ pub fn do_msync(addr: usize, size: usize, flags: MSyncFlags) -> Result<()> {
         warn!("not support MS_ASYNC");
     }
     current!().vm().msync(addr, size)
+}
+
+pub fn do_madvice(addr: usize, length: usize, advice: MadviceFlags) -> Result<()> {
+    warn!("madvice is not supported. madvice flags:{:?}", advice);
+    Ok(())
 }
 
 pub const PAGE_SIZE: usize = 4096;
