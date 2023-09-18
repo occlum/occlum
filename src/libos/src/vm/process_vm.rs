@@ -10,7 +10,6 @@ use super::vm_util::{
     VMRemapOptions,
 };
 use crate::config;
-use crate::ipc::SHM_MANAGER;
 use crate::process::elf_file::{ElfFile, ProgramHeaderExt};
 use crate::util::sync::rw_lock::RwLockWriteGuard;
 
