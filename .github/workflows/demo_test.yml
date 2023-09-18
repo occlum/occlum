@@ -413,11 +413,15 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/pytorch/distributed; SGX_MODE=SIM ./build_pytorch_occlum_instance.sh"
 
     - name: Start pytorch Occlum instance node one
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/pytorch/distributed/occlum_instance; WORLD_SIZE=2 RANK=0 occlum run /bin/python3 mnist.py --epoch 3 --no-cuda --seed 42 --save-model &"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/pytorch/distributed/occlum_instance; WORLD_SIZE=2 RANK=0 occlum run /bin/python3 mnist.py --epoch 3 --no-cuda --seed 42 --save-model > pytorch_1.log 2>&1 &"
 
     - name: Start pytorch Occlum instance node two
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/pytorch/distributed/occlum_instance_2; WORLD_SIZE=2 RANK=1 occlum run /bin/python3 mnist.py --epoch 3 --no-cuda --seed 42 --save-model"
-    
+
+    - name: Check error log
+      if: ${{ always() }}
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/pytorch/distributed/occlum_instance; cat pytorch_1.log"
+
     - name: Clean distributed Pytorch test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./pytorch/distributed"
 
@@ -748,7 +752,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_jobmanager_on_host.sh"
 
     - name: Run flink taskmanager
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_on_occlum_glibc.sh tm"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_on_occlum_glibc.sh tm > flink.log 2>&1 &"
 
     - name: Run flink task
       run: |
@@ -758,6 +762,10 @@ jobs:
     - name: Check flink task manager's log
       if: ${{ always() }}
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink; cat occlum_instance_taskmanager/flink--taskmanager-0.log"
+
+    - name: Check error log
+      if: ${{ always() }}
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink; cat flink.log"
 
     - name: Clean Flink test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./flink"
@@ -847,13 +855,17 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/vault && ./prepare_vault.sh"
 
     - name: Run the Vault server on Occlum
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/vault && SGX_MODE=SIM ./run_occlum_vault_server.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/vault && SGX_MODE=SIM ./run_occlum_vault_server.sh > vault.log 2>&1 &"
 
     - name: Run the Vault client
       run: |
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/vault && ./run_occlum_vault_test.sh"
-    
+
+    - name: Check error log
+      if: ${{ always() }}
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/golang/vault; cat vault.log"
+
     - name: Clean Vault test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./golang/vault"
 
@@ -883,13 +895,17 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/sofaboot && ./download_compile_sofaboot.sh"
 
     - name: Run SOFABoot web demo
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/sofaboot && SGX_MODE=SIM ./run_sofaboot_on_occlum.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/sofaboot && SGX_MODE=SIM ./run_sofaboot_on_occlum.sh > sofa.log 2>&1 &"
 
     - name: Check SOFABoot result
       run: |
         sleep ${{ env.nap_time }};
         docker exec ${{ github.job }} bash -c "curl -s http://localhost:8080/actuator/readiness | grep -v DOWN"
-    
+
+    - name: Check error log
+      if: ${{ always() }}
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/sofaboot; cat sofa.log"
+
     - name: Clean Sofaboot test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./sofaboot"
 
