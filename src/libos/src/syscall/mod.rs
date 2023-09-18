@@ -7,7 +7,7 @@
 //! 3. Preprocess the system call and then call `dispatch_syscall` (in this file)
 //! 4. Call `do_*` to process the system call (in other modules)
 
-use aligned::{Aligned, A16};
+use aligned::{Aligned, A16, A64};
 use core::arch::x86_64::{_fxrstor, _fxsave};
 use std::any::Any;
 use std::convert::TryFrom;
@@ -60,7 +60,7 @@ use crate::signal::{
     do_rt_sigtimedwait, do_sigaltstack, do_tgkill, do_tkill, sigaction_t, siginfo_t, sigset_t,
     stack_t,
 };
-use crate::vm::{MMapFlags, MRemapFlags, MSyncFlags, VMPerms};
+use crate::vm::{MMapFlags, MRemapFlags, MSyncFlags, MadviceFlags, VMPerms};
 use crate::{fs, process, std, vm};
 
 use super::*;
@@ -122,7 +122,7 @@ macro_rules! process_syscall_table_with_callback {
             (Mremap = 25) => do_mremap(old_addr: usize, old_size: usize, new_size: usize, flags: i32, new_addr: usize),
             (Msync = 26) => do_msync(addr: usize, size: usize, flags: u32),
             (Mincore = 27) => handle_unsupported(),
-            (Madvise = 28) => handle_unsupported(),
+            (Madvise = 28) => do_madvice(addr: usize, length: usize, advice: i32),
             (Shmget = 29) => do_shmget(key: key_t, size: size_t, shmflg: i32),
             (Shmat = 30) => do_shmat(shmid: i32, shmaddr: usize, shmflg: i32),
             (Shmctl = 31) => do_shmctl(shmid: i32, cmd: i32, buf: *mut shmids_t),
@@ -424,8 +424,8 @@ macro_rules! process_syscall_table_with_callback {
             // Occlum-specific system calls
             (SpawnGlibc = 359) => do_spawn_for_glibc(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fa: *const SpawnFileActions, attribute_list: *const posix_spawnattr_t),
             (SpawnMusl = 360) => do_spawn_for_musl(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fdop_list: *const FdOp, attribute_list: *const posix_spawnattr_t),
-            (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
-            (HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, fpregs: *mut FpRegs, context: *mut CpuContext),
+            (HandleException = 361) => do_handle_exception(info: *mut sgx_exception_info_t, context: *mut CpuContext),
+            (HandleInterrupt = 362) => do_handle_interrupt(info: *mut sgx_interrupt_info_t, context: *mut CpuContext),
             (MountRootFS = 363) => do_mount_rootfs(key_ptr: *const sgx_key_128bit_t, rootfs_config_ptr: *const user_rootfs_config),
         }
     };
@@ -649,12 +649,10 @@ fn do_syscall(user_context: &mut CpuContext) {
             syscall.args[1] = user_context as *mut _ as isize;
         } else if syscall_num == SyscallNum::HandleException {
             // syscall.args[0] == info
-            // syscall.args[1] == fpregs
-            syscall.args[2] = user_context as *mut _ as isize;
+            syscall.args[1] = user_context as *mut _ as isize;
         } else if syscall.num == SyscallNum::HandleInterrupt {
             // syscall.args[0] == info
-            // syscall.args[1] == fpregs
-            syscall.args[2] = user_context as *mut _ as isize;
+            syscall.args[1] = user_context as *mut _ as isize;
         } else if syscall.num == SyscallNum::Sigaltstack {
             // syscall.args[0] == new_ss
             // syscall.args[1] == old_ss
@@ -751,21 +749,27 @@ fn do_sysret(user_context: &mut CpuContext) -> ! {
         fn do_exit_task() -> !;
     }
     if current!().status() != ThreadStatus::Exited {
-        // Restore the floating point registers
-        // Todo: Is it correct to do fxstor in kernel?
-        let fpregs = user_context.fpregs;
-        if (fpregs != ptr::null_mut()) {
-            if user_context.fpregs_on_heap == 1 {
-                let fpregs = unsafe { Box::from_raw(user_context.fpregs as *mut FpRegs) };
-                fpregs.restore();
-            } else {
-                unsafe { fpregs.as_ref().unwrap().restore() };
+        if user_context.extra_context_ptr != ptr::null_mut() {
+            match user_context.extra_context {
+                ExtraContext::Fpregs => {
+                    let fpregs = user_context.extra_context_ptr as *mut FpRegs;
+                    unsafe { fpregs.as_ref().unwrap().restore() };
+                    // The fpregs must be allocated on heap
+                    drop(unsafe { Box::from_raw(user_context.extra_context_ptr as *mut FpRegs) });
+                }
+                ExtraContext::Xsave => {
+                    let xsave_area = user_context.extra_context_ptr;
+                    unsafe { (&*(xsave_area as *mut XsaveArea)).restore() };
+                }
             }
+            user_context.extra_context_ptr = ptr::null_mut();
         }
         unsafe { __occlum_sysret(user_context) } // jump to user space
     } else {
-        if user_context.fpregs != ptr::null_mut() && user_context.fpregs_on_heap == 1 {
-            drop(unsafe { Box::from_raw(user_context.fpregs as *mut FpRegs) });
+        if user_context.extra_context_ptr != ptr::null_mut()
+            && matches!(user_context.extra_context, ExtraContext::Fpregs)
+        {
+            drop(unsafe { Box::from_raw(user_context.extra_context_ptr as *mut FpRegs) });
         }
         unsafe { do_exit_task() } // exit enclave
     }
@@ -825,6 +829,12 @@ fn do_brk(new_brk_addr: usize) -> Result<isize> {
 fn do_msync(addr: usize, size: usize, flags: u32) -> Result<isize> {
     let flags = MSyncFlags::from_u32(flags)?;
     vm::do_msync(addr, size, flags)?;
+    Ok(0)
+}
+
+fn do_madvice(addr: usize, length: usize, advice: i32) -> Result<isize> {
+    let flags = MadviceFlags::from_i32(advice)?;
+    vm::do_madvice(addr, length, flags)?;
     Ok(0)
 }
 
@@ -977,7 +987,6 @@ fn handle_unsupported() -> Result<isize> {
 /// Floating point registers
 ///
 /// Note. The area is used to save fxsave result
-//#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct FpRegs {
     inner: Aligned<A16, [u8; 512]>,
@@ -1017,6 +1026,41 @@ impl FpRegs {
     }
 }
 
+#[derive(Debug)]
+#[repr(C)]
+pub struct XsaveArea {
+    inner: Aligned<A64, [u8; 4096]>,
+}
+
+impl XsaveArea {
+    // The first 512 bytes of xsave area is used for FP registers
+    const FXSAVE_AREA_LEN: usize = 512;
+
+    /// Save the current CPU floating pointer states to an instance of FpRegs
+    pub fn save() -> Self {
+        let mut xsave_area = MaybeUninit::<Self>::uninit();
+        unsafe {
+            save_xregs(xsave_area.as_mut_ptr() as *mut u8);
+            xsave_area.assume_init()
+        }
+    }
+
+    /// Restore the current CPU floating pointer states from this FpRegs instance
+    pub fn restore(&self) {
+        unsafe {
+            restore_xregs(self.inner.as_ptr());
+        }
+    }
+
+    pub fn get_fpregs(&self) -> FpRegs {
+        unsafe { FpRegs::from_slice(&self.inner[..Self::FXSAVE_AREA_LEN]) }
+    }
+
+    pub fn set_fpregs_area(&mut self, fpregs: FpRegs) {
+        self.inner[..Self::FXSAVE_AREA_LEN].copy_from_slice(fpregs.as_slice())
+    }
+}
+
 /// Cpu context.
 ///
 /// Note. The definition of this struct must be kept in sync with the assembly
@@ -1042,8 +1086,21 @@ pub struct CpuContext {
     pub rsp: u64,
     pub rip: u64,
     pub rflags: u64,
-    pub fpregs_on_heap: u64,
-    pub fpregs: *mut FpRegs,
+    pub extra_context: ExtraContext,
+    pub extra_context_ptr: *mut u8,
+}
+
+#[repr(u64)]
+#[derive(Clone, Copy, Debug)]
+pub enum ExtraContext {
+    Fpregs = 0,
+    Xsave = 1,
+}
+
+impl Default for ExtraContext {
+    fn default() -> Self {
+        Self::Fpregs
+    }
 }
 
 impl CpuContext {
@@ -1067,8 +1124,8 @@ impl CpuContext {
             rsp: src.rsp,
             rip: src.rip,
             rflags: src.rflags,
-            fpregs_on_heap: 0,
-            fpregs: ptr::null_mut(),
+            extra_context: Default::default(),
+            extra_context_ptr: ptr::null_mut(),
         }
     }
 }
@@ -1082,14 +1139,15 @@ impl CpuContext {
 //  pointer that is not safe to use by external modules. In our case, the
 //  FpRegs pointer will not be used actually. So the Rust warning is a
 //  false alarm. We suppress it here.
-pub unsafe fn exception_interrupt_syscall_c_abi(
-    num: u32,
-    info: *mut c_void,
-    fpregs: *mut FpRegs,
-) -> u32 {
+pub unsafe fn exception_interrupt_syscall_c_abi(num: u32, info: *mut c_void) -> u32 {
     #[allow(improper_ctypes)]
     extern "C" {
-        pub fn __occlum_syscall_c_abi(num: u32, info: *mut c_void, fpregs: *mut FpRegs) -> u32;
+        pub fn __occlum_syscall_c_abi(num: u32, info: *mut c_void) -> u32;
     }
-    __occlum_syscall_c_abi(num, info, fpregs)
+    __occlum_syscall_c_abi(num, info)
+}
+
+extern "C" {
+    pub fn save_xregs(save_area: *mut u8);
+    pub fn restore_xregs(save_area: *const u8);
 }

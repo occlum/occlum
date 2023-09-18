@@ -199,7 +199,7 @@ impl siginfo_t {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 #[repr(C)]
 pub struct ucontext_t {
     pub uc_flags: u64,
@@ -225,7 +225,8 @@ pub type stack_t = sigaltstack_t;
 pub struct mcontext_t {
     pub inner: CpuContext,
     // TODO: the fields should be csgsfs, err, trapno, oldmask, and cr2
-    _unused0: [u64; 5],
+    // The number should be 5 but we use extra 2 spaces to store something else in the CpuContext. Thus make it 3.
+    _unused0: [u64; 3],
     // TODO: this field should be `fpregs: fpregset_t,`
     _unused1: usize,
     _reserved: [u64; 8],
