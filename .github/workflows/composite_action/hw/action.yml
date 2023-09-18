@@ -48,9 +48,10 @@ runs:
         fi;
       shell: bash
 
+    # The pccs_url must be v3
     - name: Update PCCS server
       run: |
-        docker exec ${{ env.CONTAINER_NAME }} bash -c "sed -r -i 's/\"pccs_url\": \"https:\/\/localhost:8081\/sgx\/certification\/v3\/\"/\"pccs_url\": \"https:\/\/sgx-dcap-server.cn-hongkong.aliyuncs.com\/sgx\/certification\/v3\/\"/g' /etc/sgx_default_qcnl.conf"
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "sed -r -i 's/\"pccs_url\": \"https:\/\/localhost:8081\/sgx\/certification\/v4\/\"/\"pccs_url\": \"https:\/\/sgx-dcap-server.cn-hongkong.aliyuncs.com\/sgx\/certification\/v3\/\"/g' /etc/sgx_default_qcnl.conf"
       shell: bash
 
     # - name: Change download source of crates.io
