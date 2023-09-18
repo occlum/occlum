@@ -166,7 +166,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW, PKU]]
 
     steps:
     - name: Clean before running
@@ -204,6 +204,9 @@ jobs:
 
     - name: Run processBuilder
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/java && ./run_java_on_occlum.sh processBuilder"
+
+    - name: Run hello PKU
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/java && ./run_java_on_occlum.sh hello_pku"
 
     - name: Clean the environment
       if: ${{ always() }}
