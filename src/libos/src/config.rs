@@ -108,7 +108,8 @@ pub struct Config {
 
 #[derive(Debug)]
 pub struct ConfigResourceLimits {
-    pub user_space_size: usize,
+    pub user_space_init_size: usize,
+    pub user_space_max_size: usize,
 }
 
 #[derive(Debug)]
@@ -213,8 +214,12 @@ impl Config {
 
 impl ConfigResourceLimits {
     fn from_input(input: &InputConfigResourceLimits) -> Result<ConfigResourceLimits> {
-        let user_space_size = parse_memory_size(&input.user_space_size)?;
-        Ok(ConfigResourceLimits { user_space_size })
+        let user_space_init_size = parse_memory_size(&input.user_space_init_size)?;
+        let user_space_max_size = parse_memory_size(&input.user_space_max_size)?;
+        Ok(ConfigResourceLimits {
+            user_space_init_size,
+            user_space_max_size,
+        })
     }
 }
 
@@ -369,12 +374,19 @@ struct InputConfig {
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 struct InputConfigResourceLimits {
-    #[serde(default = "InputConfigResourceLimits::get_user_space_size")]
-    pub user_space_size: String,
+    #[serde(default = "InputConfigResourceLimits::get_user_space_init_size")]
+    pub user_space_init_size: String,
+    #[serde(default = "InputConfigResourceLimits::get_user_space_max_size")]
+    pub user_space_max_size: String,
 }
 
 impl InputConfigResourceLimits {
-    fn get_user_space_size() -> String {
+    fn get_user_space_init_size() -> String {
+        "128MB".to_string()
+    }
+
+    // For default, just make it equal with the init size
+    fn get_user_space_max_size() -> String {
         "128MB".to_string()
     }
 }
@@ -382,7 +394,8 @@ impl InputConfigResourceLimits {
 impl Default for InputConfigResourceLimits {
     fn default() -> InputConfigResourceLimits {
         InputConfigResourceLimits {
-            user_space_size: InputConfigResourceLimits::get_user_space_size(),
+            user_space_init_size: InputConfigResourceLimits::get_user_space_init_size(),
+            user_space_max_size: InputConfigResourceLimits::get_user_space_max_size(),
         }
     }
 }
