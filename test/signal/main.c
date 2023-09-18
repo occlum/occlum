@@ -212,19 +212,9 @@ static int killed_child() {
 // ============================================================================
 // Test catching and handling hardware exception
 // ============================================================================
+static int SIGFPE_RESURSIVE_LEVEL = 0;
 
-static void handle_sigfpe(int num, siginfo_t *info, void *_context) {
-    printf("SIGFPE Caught\n");
-    assert(num == SIGFPE);
-    assert(info->si_signo == SIGFPE);
-
-    ucontext_t *ucontext = _context;
-    mcontext_t *mcontext = &ucontext->uc_mcontext;
-    // The faulty instruction should be `idiv %esi` (f7 fe)
-    mcontext->gregs[REG_RIP] += 2;
-
-    return;
-}
+#define fxsave(addr) __asm __volatile("fxsave %0" : "=m" (*(addr)))
 
 // Note: this function is fragile in the sense that compiler may not always
 // emit the instruction pattern that triggers divide-by-zero as we expect.
@@ -233,15 +223,68 @@ int div_maybe_zero(int x, int y) {
     return x / y;
 }
 
-#define fxsave(addr) __asm __volatile("fxsave %0" : "=m" (*(addr)))
+static void handle_sigfpe(int num, siginfo_t *info, void *_context) {
+    printf("SIGFPE Caught\n");
+    assert(num == SIGFPE);
+    assert(info->si_signo == SIGFPE);
+    char x[512] __attribute__((aligned(16))) = {};
+    char y[512] __attribute__((aligned(16))) = {};
+    SIGFPE_RESURSIVE_LEVEL ++;
+
+    ucontext_t *ucontext = _context;
+    mcontext_t *mcontext = &ucontext->uc_mcontext;
+    // The faulty instruction should be `idiv %esi` (f7 fe)
+    mcontext->gregs[REG_RIP] += 2;
+    fxsave(x);
+
+    // Try modify the floating point register
+    float a = 3.00001234567890123 / 2.001;
+    printf("a = %f\n", a);
+    float value = 3.14f;
+    __asm__ volatile (
+        "movss %[newval], %%xmm0"   // Move new value to xmm0 register
+        :
+        : [newval] "m" (value)       // Input constraint: value is a memory operand
+        : "%xmm0"                    // Use xmm0 register
+    );
+
+    fxsave(y);
+
+    // Make sure the floating point registers are modified
+    if (memcmp(x, y, 512) == 0) {
+        printf("floating point registers is not modified\n");
+        abort();
+    }
+
+    // Recursively trigger exception
+    if (SIGFPE_RESURSIVE_LEVEL < 4) {
+        volatile int c;
+        // Trigger divide-by-zero exception
+        int a = 1;
+        int b = 0;
+        c = div_maybe_zero(a, b);
+    }
+
+    return;
+}
 
 int test_handle_sigfpe() {
+    static char stack[SIGSTKSZ * 4];
+    stack_t expected_ss = {
+        .ss_size = SIGSTKSZ * 4,
+        .ss_sp = stack,
+        .ss_flags = 0,
+    };
+    if (sigaltstack(&expected_ss, NULL) < 0) {
+        THROW_ERROR("failed to call sigaltstack");
+    }
+
     // Set up a signal handler that handles divide-by-zero exception
     struct sigaction new_action, old_action;
     memset(&new_action, 0, sizeof(struct sigaction));
     memset(&old_action, 0, sizeof(struct sigaction));
     new_action.sa_sigaction = handle_sigfpe;
-    new_action.sa_flags = SA_SIGINFO;
+    new_action.sa_flags = SA_SIGINFO | SA_NODEFER | SA_ONSTACK;
     if (sigaction(SIGFPE, &new_action, &old_action) < 0) {
         THROW_ERROR("registering new signal handler failed");
     }
@@ -272,7 +315,6 @@ int test_handle_sigfpe() {
     }
     return 0;
 }
-
 
 // TODO: rewrite this in assembly
 int read_maybe_null(int *p) {
