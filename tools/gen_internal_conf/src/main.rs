@@ -20,34 +20,41 @@ lazy_static! {
     static ref DEFAULT_CONFIG: DefaultConfig = DefaultConfig::init();
 }
 
+const MISC_FOR_EDMM_PLATFORM: (&str, &str) = ("1", "0xFFFFFFFF");
+const MISC_FOR_NON_EDMM_PLATFORM: (&str, &str) = ("0", "0");
+
 struct DefaultConfig {
     // Corresponds to HeapMaxSize in Enclave.xml
     kernel_heap_max_size: &'static str,
+    user_space_max_size: &'static str,
+    tcs_init_num: u32,
     // Corresponds to TCSMaxNum in Enclave.xml
-    num_of_tcs_max: u32,
-    // Corresponds to MiscSelect in Enclave.xml
-    misc_select: &'static str,
-    // Corresponds to MiscMask in Enclave.xml
-    misc_mask: &'static str,
+    tcs_max_num: u32,
+    // Extra user region memory for SDK
+    extra_user_region_for_sdk: &'static str,
 }
 
 impl DefaultConfig {
     fn init() -> Self {
         Self {
             kernel_heap_max_size: "1024MB",
-            num_of_tcs_max: 4096,
-            // If UserRegionSize is not configured, but the heap, stack and thread related
-            // configurations have dynamic part, set MiscSelect[0] = 1 and MiscMask[0] = 0,
-            // the enclave can be loaded on SGX 1.0 and 2.0 platform, and on SGX 2.0 platform,
-            // it can utilize the dynamic components.
-            misc_select: "1",
-            misc_mask: "0x0",
+            user_space_max_size: "16GB",
+            tcs_init_num: 16,
+            tcs_max_num: 4096,
+            extra_user_region_for_sdk: "1GB",
         }
     }
 }
 
 fn main() {
     env_logger::init();
+
+    let instance_is_for_edmm_platform = {
+        match std::env::var("INSTANCE_IS_FOR_EDMM_PLATFORM") {
+            Ok(val) => val == "YES",
+            _ => unreachable!(),
+        }
+    };
 
     let matches = App::new("gen_internal_conf")
         .version("0.2.0")
@@ -144,10 +151,56 @@ fn main() {
             enclave_config_file_path
         );
 
-        // get the number of TCS
-        let tcs_num = occlum_config.resource_limits.max_num_of_threads;
-        let tcs_min_pool = tcs_num;
-        let tcs_max_num = std::cmp::max(tcs_num, DEFAULT_CONFIG.num_of_tcs_max);
+        debug!(
+            "Build on platform {} EDMM support",
+            if instance_is_for_edmm_platform {
+                "WITH"
+            } else {
+                "WITHOUT"
+            }
+        );
+        debug!(
+            "user config init num of threads = {:?}",
+            occlum_config.resource_limits.init_num_of_threads
+        );
+
+        // For init TCS number, try to use the values provided by users. If not provided, use the default value
+        let (tcs_init_num, tcs_min_pool, tcs_max_num) = {
+            if instance_is_for_edmm_platform {
+                let tcs_init_num = if let Some(ref init_num_of_threads) =
+                    occlum_config.resource_limits.init_num_of_threads
+                {
+                    *init_num_of_threads
+                } else {
+                    // The user doesn't provide a value
+                    std::cmp::min(DEFAULT_CONFIG.tcs_init_num,occlum_config.resource_limits.max_num_of_threads )
+                };
+
+                // For platforms with EDMM support, use the max value
+                let tcs_max_num = std::cmp::max(
+                    occlum_config.resource_limits.max_num_of_threads,
+                    DEFAULT_CONFIG.tcs_max_num,
+                );
+
+                (tcs_init_num, tcs_init_num, tcs_max_num)
+            } else {
+                // For platforms without EDMM support (including SIM mode), use the "max_num_of_threads" provided by user
+                let tcs_max_num = occlum_config.resource_limits.max_num_of_threads;
+                (tcs_max_num, tcs_max_num, tcs_max_num)
+            }
+        };
+
+        debug!(
+            "tcs init num: {}, tcs_min_pool: {}, tcs_max_num: {}",
+            tcs_init_num, tcs_min_pool, tcs_max_num
+        );
+        if tcs_init_num > tcs_max_num {
+            println!(
+                "init_num_of_threads: {:?}, max_num_of_threads: {:?}, wrong configuration",
+                occlum_config.resource_limits.init_num_of_threads, occlum_config.resource_limits.max_num_of_threads,
+            );
+            return;
+        }
 
         // get the kernel stack size
         let stack_max_size =
@@ -160,48 +213,189 @@ fn main() {
             return;
         }
 
-        // get the kernel heap size
-        let heap_init_size =
-            parse_memory_size(&occlum_config.resource_limits.kernel_space_heap_size);
-        if heap_init_size.is_err() {
-            println!(
-                "The kernel_space_heap_size \"{}\" is not correct.",
-                occlum_config.resource_limits.kernel_space_heap_size
-            );
-            return;
-        }
-        // For max heap size, try to use the values provided by users. If not provided, use the default value
-        let heap_max_size = {
-            if let Some(ref kernel_space_heap_max_size) =
-                occlum_config.resource_limits.kernel_space_heap_max_size
-            {
-                let heap_max_size = parse_memory_size(&kernel_space_heap_max_size);
-                if heap_max_size.is_err() {
+        let (kernel_heap_init_size, kernel_heap_max_size) = {
+            let heap_init_size = {
+                let heap_init_size =
+                    parse_memory_size(&occlum_config.resource_limits.kernel_space_heap_size);
+                if heap_init_size.is_err() {
                     println!(
-                        "The kernel_space_heap_max_size \"{}\" is not correct.",
-                        kernel_space_heap_max_size
+                        "The kernel_space_heap_size \"{}\" is not correct.",
+                        occlum_config.resource_limits.kernel_space_heap_size
                     );
                     return;
                 }
-                heap_max_size
-            } else {
-                // If the user doesn't provide a value, use the max value as heap_max_size.
-                std::cmp::max(
-                    heap_init_size,
-                    parse_memory_size(DEFAULT_CONFIG.kernel_heap_max_size),
-                )
+                heap_init_size.unwrap()
+            };
+
+            let optional_config_heap_max_size = {
+                if let Some(ref heap_max_size) =
+                    occlum_config.resource_limits.kernel_space_heap_max_size
+                {
+                    let config_kernel_heap_max_size = parse_memory_size(&heap_max_size);
+                    if config_kernel_heap_max_size.is_err() {
+                        println!(
+                            "The kernel_space_heap_max_size \"{}\" is not correct.",
+                            heap_max_size
+                        );
+                        return;
+                    }
+                    config_kernel_heap_max_size.ok()
+                } else {
+                    None
+                }
+            };
+
+            debug!(
+                "optional_config_heap_max_size = {:?}",
+                optional_config_heap_max_size
+            );
+
+            match optional_config_heap_max_size {
+                Some(heap_max_size) => {
+                    if instance_is_for_edmm_platform {
+                        let heap_max_size = std::cmp::max(
+                            heap_max_size,
+                            parse_memory_size(DEFAULT_CONFIG.kernel_heap_max_size).unwrap(),
+                        );
+                        (heap_init_size, heap_max_size)
+                    } else {
+                        // User specified heap_max but no EDMM support, use user specified as the heap value
+                        (heap_max_size, heap_max_size)
+                    }
+                }
+                None => {
+                    if instance_is_for_edmm_platform {
+                        let heap_max_size = std::cmp::max(
+                            heap_init_size,
+                            parse_memory_size(DEFAULT_CONFIG.kernel_heap_max_size).unwrap(),
+                        );
+                        (heap_init_size, heap_max_size)
+                    } else {
+                        (heap_init_size, heap_init_size)
+                    }
+                }
             }
         };
-
-        // get the user space size
-        let user_space_size = parse_memory_size(&occlum_config.resource_limits.user_space_size);
-        if user_space_size.is_err() {
+        if kernel_heap_init_size > kernel_heap_max_size {
             println!(
-                "The user_space_size \"{}\" is not correct.",
-                occlum_config.resource_limits.user_space_size
+                "kernel_space_heap_size: {:?}, kernel_space_heap_max_size: {:?}, wrong configuration",
+                occlum_config.resource_limits.kernel_space_heap_size, occlum_config.resource_limits.kernel_space_heap_max_size,
             );
             return;
         }
+        debug!(
+            "kernel heap init size = {}, kernel heap max size = {}",
+            kernel_heap_init_size, kernel_heap_max_size
+        );
+        assert!(kernel_heap_max_size >= kernel_heap_init_size);
+
+        let (config_user_space_init_size, config_user_space_max_size) = {
+            let user_space_init_size = {
+                let user_space_init_size =
+                    parse_memory_size(&occlum_config.resource_limits.user_space_size);
+                if user_space_init_size.is_err() {
+                    println!(
+                        "The user_space_size \"{}\" is not correct.",
+                        occlum_config.resource_limits.user_space_size
+                    );
+                    return;
+                }
+                user_space_init_size.unwrap()
+            };
+
+            let optional_config_user_space_max_size = {
+                if let Some(ref user_space_max_size) =
+                    occlum_config.resource_limits.user_space_max_size
+                {
+                    let config_user_space_max_size = parse_memory_size(&user_space_max_size);
+                    if config_user_space_max_size.is_err() {
+                        println!(
+                            "The kernel_space_heap_max_size \"{}\" is not correct.",
+                            user_space_max_size
+                        );
+                        return;
+                    }
+                    config_user_space_max_size.ok()
+                } else {
+                    None
+                }
+            };
+            debug!(
+                "optional_config_user_space_max_size = {:?}",
+                optional_config_user_space_max_size
+            );
+
+            let user_space_max_size = match optional_config_user_space_max_size {
+                Some(user_space_max_size) => {
+                    if instance_is_for_edmm_platform {
+                        std::cmp::max(
+                            user_space_max_size,
+                            parse_memory_size(DEFAULT_CONFIG.user_space_max_size).unwrap(),
+                        )
+                    } else {
+                        // Without EDMM support, just use user-provided value
+                        user_space_max_size
+                    }
+                }
+                None => {
+                    if instance_is_for_edmm_platform {
+                        std::cmp::max(
+                            user_space_init_size,
+                            parse_memory_size(DEFAULT_CONFIG.user_space_max_size).unwrap(),
+                        )
+                    } else {
+                        user_space_init_size
+                    }
+                }
+            };
+            (user_space_init_size, user_space_max_size)
+        };
+        if config_user_space_init_size > config_user_space_max_size {
+            println!(
+                "user_space_size: {:?}, user_space_max_size: {:?}, wrong configuration",
+                occlum_config.resource_limits.user_space_size, occlum_config.resource_limits.user_space_max_size,
+            );
+            return;
+        }
+
+        debug!(
+            "config user space init size = {},config user space max size = {}",
+            config_user_space_init_size, config_user_space_max_size
+        );
+        assert!(config_user_space_init_size <= config_user_space_max_size);
+
+        // Calculate the actual memory size for different regions
+        let (reserved_mem_size, user_region_mem_size) = {
+            if instance_is_for_edmm_platform {
+                // For platforms with EDMM support, we need extra memory for SDK usage. This might be fixed by SGX SDK in the future.
+                let extra_user_region = parse_memory_size(DEFAULT_CONFIG.extra_user_region_for_sdk);
+                if extra_user_region.is_err() {
+                    println!("The extra_user_region_for_sdk in default config is not correct.");
+                    return;
+                }
+                let user_region_mem_size = if config_user_space_max_size == config_user_space_init_size {
+                    // SDK still need user region to track the EMA.
+                    config_user_space_max_size
+                } else {
+                    config_user_space_max_size + extra_user_region.unwrap()
+                };
+
+                (
+                    config_user_space_init_size as u64,
+                    Some(user_region_mem_size as u64),
+                )
+            } else {
+                // For platforms without EDMM support, use the max value for the user space
+                let reserved_mem_size = config_user_space_max_size;
+                (reserved_mem_size as u64, None)
+            }
+        };
+
+        debug!(
+            "reserved memory size = {:?}, user_region_memory size = {:?}",
+            reserved_mem_size, user_region_mem_size
+        );
+
         #[cfg(feature = "ms_buffer")]
         let marshal_buffer_size = if occlum_config.resource_limits.marshal_buffer_size.is_some() {
             let marshal_buffer_size = parse_memory_size(
@@ -225,16 +419,26 @@ fn main() {
 
         let kss_tuple = parse_kss_conf(&occlum_config);
 
+        let (misc_select, misc_mask) = if instance_is_for_edmm_platform {
+            MISC_FOR_EDMM_PLATFORM
+        } else {
+            MISC_FOR_NON_EDMM_PLATFORM
+        };
+        debug!(
+            "misc_select = {:?}, misc_mask = {:?}",
+            misc_select, misc_mask
+        );
+
         // Generate the enclave configuration
         let sgx_enclave_configuration = EnclaveConfiguration {
             ProdID: occlum_config.metadata.product_id,
             ISVSVN: occlum_config.metadata.version_number,
             StackMaxSize: stack_max_size.unwrap() as u64,
             StackMinSize: stack_max_size.unwrap() as u64, // just use the same size as max size
-            HeapInitSize: heap_init_size.unwrap() as u64,
-            HeapMaxSize: heap_max_size.unwrap() as u64,
-            HeapMinSize: heap_init_size.unwrap() as u64,
-            TCSNum: tcs_num,
+            HeapInitSize: kernel_heap_init_size as u64,
+            HeapMaxSize: kernel_heap_max_size as u64,
+            HeapMinSize: kernel_heap_init_size as u64,
+            TCSNum: tcs_init_num,
             TCSMinPool: tcs_min_pool,
             TCSMaxNum: tcs_max_num,
             TCSPolicy: 1,
@@ -242,12 +446,13 @@ fn main() {
                 true => 0,
                 false => 1,
             },
-            MiscSelect: DEFAULT_CONFIG.misc_select.to_string(),
-            MiscMask: DEFAULT_CONFIG.misc_mask.to_string(),
-            ReservedMemMaxSize: user_space_size.unwrap() as u64,
-            ReservedMemMinSize: user_space_size.unwrap() as u64,
-            ReservedMemInitSize: user_space_size.unwrap() as u64,
+            MiscSelect: misc_select.to_string(),
+            MiscMask: misc_mask.to_string(),
+            ReservedMemMaxSize: reserved_mem_size,
+            ReservedMemMinSize: reserved_mem_size,
+            ReservedMemInitSize: reserved_mem_size,
             ReservedMemExecutable: 1,
+            UserRegionSize: user_region_mem_size,
             #[cfg(feature = "ms_buffer")]
             MarshalBufferSize: marshal_buffer_size as u64,
             EnableKSS: kss_tuple.0,
@@ -262,13 +467,12 @@ fn main() {
 
         // Generate app config, including "init" and user app
         let app_config = {
-            let app_config =
-                gen_app_config(
-                    occlum_config.entry_points,
-                    occlum_config.mount,
-                    occlum_conf_user_fs_mac.to_string(),
-                    occlum_conf_init_fs_mac.to_string(),
-                );
+            let app_config = gen_app_config(
+                occlum_config.entry_points,
+                occlum_config.mount,
+                occlum_conf_user_fs_mac.to_string(),
+                occlum_conf_init_fs_mac.to_string(),
+            );
             if app_config.is_err() {
                 println!("Mount configuration invalid: {:?}", app_config);
                 return;
@@ -278,7 +482,8 @@ fn main() {
 
         let occlum_json_config = InternalOcclumJson {
             resource_limits: InternalResourceLimits {
-                user_space_size: occlum_config.resource_limits.user_space_size.to_string(),
+                user_space_init_size: config_user_space_init_size.to_string() + "B",
+                user_space_max_size: config_user_space_max_size.to_string() + "B",
             },
             process: OcclumProcess {
                 default_stack_size: occlum_config.process.default_stack_size,
@@ -429,9 +634,7 @@ fn gen_app_config(
         .unwrap() = serde_json::Value::String(occlum_conf_init_fs_mac);
 
     // Update app entry points
-    *app_config
-        .pointer_mut("/app/1/entry_points")
-        .unwrap() = entry_points;
+    *app_config.pointer_mut("/app/1/entry_points").unwrap() = entry_points;
 
     debug!("User provided root mount config: {:?}", mount_conf);
     let mut root_mount_config = mount_conf;
@@ -484,12 +687,16 @@ struct OcclumConfiguration {
 
 #[derive(Debug, PartialEq, Deserialize)]
 struct OcclumResourceLimits {
+    #[serde(default)]
+    init_num_of_threads: Option<u32>,
     max_num_of_threads: u32,
     kernel_space_heap_size: String,
     #[serde(default)]
     kernel_space_heap_max_size: Option<String>,
     kernel_space_stack_size: String,
     user_space_size: String,
+    #[serde(default)]
+    user_space_max_size: Option<String>,
     #[cfg(feature = "ms_buffer")]
     marshal_buffer_size: Option<String>,
 }
@@ -575,6 +782,8 @@ struct EnclaveConfiguration {
     ReservedMemMinSize: u64,
     ReservedMemInitSize: u64,
     ReservedMemExecutable: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    UserRegionSize: Option<u64>,
     #[cfg(feature = "ms_buffer")]
     MarshalBufferSize: u64,
     EnableKSS: u32,
@@ -587,7 +796,8 @@ struct EnclaveConfiguration {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 struct InternalResourceLimits {
-    user_space_size: String,
+    user_space_init_size: String,
+    user_space_max_size: String,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
