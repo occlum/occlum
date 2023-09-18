@@ -16,9 +16,12 @@ fi
 rm -rf occlum_instance
 occlum new occlum_instance
 cd occlum_instance
-new_json="$(jq '.resource_limits.user_space_size = "2560MB" |
-	.resource_limits.kernel_space_heap_size="320MB" |
+new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+	.resource_limits.user_space_max_size = "2560MB" |
+	.resource_limits.kernel_space_heap_size="1MB" |
+	.resource_limits.kernel_space_heap_max_size="320MB" |
 	.resource_limits.kernel_space_stack_size="10MB" |
+	.resource_limits.max_num_of_threads=64 |
 	.process.default_stack_size = "40MB" |
 	.process.default_heap_size = "320MB" ' Occlum.json)" && \
 echo "${new_json}" > Occlum.json
