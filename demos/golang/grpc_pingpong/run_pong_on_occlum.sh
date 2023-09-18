@@ -16,8 +16,10 @@ fi
 rm -rf occlum_pong_instance && mkdir occlum_pong_instance
 cd occlum_pong_instance
 occlum init
-new_json="$(jq '.resource_limits.user_space_size = "800MB" |
-	.resource_limits.kernel_space_heap_size="40MB" |
+new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+	.resource_limits.user_space_max_size = "800MB" |
+	.resource_limits.kernel_space_heap_size="1MB" |
+	.resource_limits.kernel_space_heap_max_size="40MB" |
 	.resource_limits.kernel_space_stack_size="1MB" |
 	.process.default_stack_size = "1MB" |
 	.process.default_heap_size = "20MB" ' Occlum.json)" && \

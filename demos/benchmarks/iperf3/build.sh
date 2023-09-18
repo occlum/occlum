@@ -26,7 +26,8 @@ function build_occlum_instance()
     pushd ${name}
     copy_bom -f ../iperf3.yaml --root image --include-dir /opt/occlum/etc/template
 
-    new_json="$(jq '.resource_limits.user_space_size = "1000MB" |
+    new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+            .resource_limits.user_space_max_size = "1000MB" |
             .resource_limits.max_num_of_threads = 64 ' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
 

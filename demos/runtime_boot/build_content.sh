@@ -18,7 +18,8 @@ function build_bash_demo()
     rm -rf image
     copy_bom -f ../bash.yaml --root image --include-dir /opt/occlum/etc/template
 
-    new_json="$(jq '.resource_limits.user_space_size = "600MB" |
+    new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+                    .resource_limits.user_space_max_size = "600MB" |
                     .resource_limits.kernel_space_stack_size ="2MB"	' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
 
@@ -44,8 +45,10 @@ function build_and_gen_rootfs()
     rm -rf gen_rootfs_instance && occlum new gen_rootfs_instance
     pushd gen_rootfs_instance
 
-    new_json="$(jq '.resource_limits.user_space_size = "1000MB" |
-                .resource_limits.kernel_space_heap_size= "512MB" |
+    new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+                .resource_limits.user_space_max_size = "1000MB" |
+                .resource_limits.kernel_space_heap_size= "1MB" |
+                .resource_limits.kernel_space_heap_max_size= "512MB" |
                 .resource_limits.kernel_space_stack_size= "16MB" ' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
 
@@ -69,7 +72,8 @@ function build_boot_template()
     rm -rf boot_instance && occlum new boot_instance
     pushd boot_instance
 
-    new_json="$(jq '.resource_limits.user_space_size = "600MB" |
+    new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+                    .resource_limits.user_space_max_size = "600MB" |
                     .resource_limits.kernel_space_stack_size ="2MB"	' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
 
