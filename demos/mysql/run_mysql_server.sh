@@ -14,8 +14,10 @@ MYSQLD=mysqld
 rm -rf occlum_instance && occlum new occlum_instance
 pushd occlum_instance
 
-new_json="$(jq '.resource_limits.user_space_size = "8000MB" |
-                .resource_limits.kernel_space_heap_size ="1000MB" |
+new_json="$(jq '.resource_limits.user_space_size = "1MB" |
+                .resource_limits.user_space_max_size = "8000MB" |
+                .resource_limits.kernel_space_heap_size ="1MB" |
+                .resource_limits.kernel_space_heap_max_size ="1000MB" |
                 .resource_limits.max_num_of_threads = 96' Occlum.json)" && \
 echo "${new_json}" > Occlum.json
 

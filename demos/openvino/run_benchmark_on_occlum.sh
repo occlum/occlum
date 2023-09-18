@@ -18,7 +18,9 @@ cpu_cc=`cat /proc/cpuinfo | grep processor | wc -l`
 #                .process.default_stack_size = "8MB" |
 #                .process.default_heap_size = "32MB" |
 #                .metadata.debuggable = false ' Occlum.json)" && \
-new_json="$(jq '.resource_limits.user_space_size = "320MB"' Occlum.json)" && \
+new_json="$(jq '.resource_limits.max_num_of_threads = 64 |
+                .resource_limits.user_space_size = "1MB" |
+                .resource_limits.user_space_max_size = "600MB"' Occlum.json)" && \
 echo "${new_json}" > Occlum.json
 
 # 2. Copy files into Occlum Workspace and Build
