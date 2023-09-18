@@ -62,6 +62,28 @@ static int get_a_valid_range_of_hints(size_t *hint_begin, size_t *hint_end) {
     return 0;
 }
 
+static int create_random_file(char *path, size_t size) {
+    FILE *myFile = fopen(path, "w");
+    FILE *urandom = fopen("/dev/urandom", "r");
+    const size_t unit_size = 256 * 1024;
+    size_t write_len = 0;
+
+    char *tmp = calloc(1, unit_size);
+    while (write_len < size) {
+        int write_once_len = unit_size;
+        if (size - write_len < unit_size) {
+            write_once_len = size - write_len;
+        }
+        size_t ret = fread(tmp, 1, write_once_len, urandom);
+        fwrite(tmp, 1, ret, myFile);
+        write_len += write_once_len;
+    }
+
+    fclose(myFile);
+    fclose(urandom);
+    return 0;
+}
+
 static size_t HINT_BEGIN, HINT_END;
 
 int test_suite_init() {
@@ -1417,6 +1439,103 @@ int test_file_backed_mremap_mem_may_move() {
     return _test_file_backed_mremap(file_backed_mremap_mem_may_move);
 }
 
+int test_random_mmap_file() {
+    char *test_buf = calloc(1, 1024);
+
+    char *file_path = "/root/myfile";
+    const size_t file_len = 4 * 1024 * 1024; //4M
+    create_random_file(file_path, file_len);
+
+    int fd = open(file_path, O_RDWR, 0600);
+    if (fd < 0) {
+        THROW_ERROR("open file error");
+    }
+
+    int ret = pread(fd, test_buf, 1024, PAGE_SIZE * 4);
+    if (ret != 1024) {
+        THROW_ERROR("read failed");
+    }
+
+    // Allocate in the new chunk. So that the access can trigger PF.
+    size_t desired_addr = HINT_BEGIN + DEFAULT_CHUNK_SIZE;
+    char *file = mmap((void *)desired_addr, file_len, PROT_READ, MAP_PRIVATE, fd, 0);
+    if ((size_t)file != desired_addr) {
+        THROW_ERROR("mmap with desired addr failed");
+    }
+
+    int offset = 1 * PAGE_SIZE;
+    void *addr = mmap((void *)(file + offset), 4096, PROT_READ | PROT_EXEC,
+                      MAP_PRIVATE | MAP_FIXED, fd, offset);
+    if (addr != file + offset) {
+        THROW_ERROR("mmap with desired addr failed");
+    }
+
+    offset =  2 * PAGE_SIZE;
+    addr = mmap(file + offset, 8192, PROT_READ, MAP_FIXED | MAP_PRIVATE, fd, offset);
+    if (addr != file + offset) {
+        THROW_ERROR("mmap with desired addr failed");
+    }
+
+    offset = 4 * PAGE_SIZE;
+    addr = mmap(file + offset, 8192 * 2, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE, fd,
+                offset);
+    if (addr != file + offset) {
+        THROW_ERROR("mmap with desired addr failed");
+    }
+
+    if (memcmp(test_buf + 512, addr + 512, 512) != 0 ) {
+        THROW_ERROR("content mismatch");
+    }
+
+    return 0;
+}
+
+int test_user_space_pf_trigger() {
+    size_t total_len = 4 * PAGE_SIZE;
+    size_t magic_length = 100 * MB;     // Used to find a uncommitted memory
+    int init_prot = PROT_READ | PROT_EXEC;
+    void *buf = mmap((void *)(HINT_END + magic_length), total_len, init_prot,
+                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (buf == MAP_FAILED) {
+        THROW_ERROR("mmap failed");
+    }
+    // Trigger PF by read
+    char test = ((char *)buf)[0];
+    if (test != 0) {
+        THROW_ERROR("check test valure failed");
+    }
+
+    return 0;
+}
+
+int test_kernel_space_pf_trigger() {
+    size_t total_len = 4 * PAGE_SIZE;
+    size_t magic_length = 200 * MB;     // Used to find a uncommitted memory
+    int init_prot = PROT_READ | PROT_WRITE;
+    void *buf = mmap((void *)(HINT_END + magic_length), total_len, init_prot,
+                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (buf == MAP_FAILED) {
+        THROW_ERROR("mmap failed");
+    }
+
+    char *file_path = "/root/test-file";
+    const size_t file_len = total_len * 2;
+    create_random_file(file_path, file_len);
+
+    int fd = open(file_path, O_RDWR, 0600);
+    if (fd < 0) {
+        THROW_ERROR("open file error");
+    }
+
+    // Read to uncommitted memory will trigger #PF and handled by the kernel
+    int ret = pread(fd, buf, total_len, 1024);
+    if (ret != total_len) {
+        THROW_ERROR("read failed");
+    }
+
+    return 0;
+}
+
 // ============================================================================
 // Test suite main
 // ============================================================================
@@ -1464,6 +1583,9 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_mprotect_multiple_vmas),
     TEST_CASE(test_mprotect_grow_down),
     TEST_CASE(test_mremap_concurrent),
+    TEST_CASE(test_random_mmap_file),
+    TEST_CASE(test_user_space_pf_trigger),
+    TEST_CASE(test_kernel_space_pf_trigger),
 };
 
 int main() {
