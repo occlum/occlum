@@ -4,7 +4,7 @@ name: Demo Test
 on: [push, pull_request]
 
 env:
-  nap_time: 60
+  nap_time: 120
 
 # Cancel previous running jobs on push or pull request
 concurrency:
@@ -337,7 +337,7 @@ jobs:
         submodules: true
 
     - name: Create container
-      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc
+      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum jessehui/occlum:latest-ubuntu20.04-grpc-edmm
 
     - uses: ./.github/workflows/composite_action/prebuild
       with:
@@ -369,7 +369,7 @@ jobs:
         submodules: true
 
     - name: Create container
-      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc
+      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum jessehui/occlum:latest-ubuntu20.04-grpc-edmm
 
     - uses: ./.github/workflows/composite_action/prebuild
       with:
@@ -435,7 +435,7 @@ jobs:
         submodules: true
 
     - name: Create container
-      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-openvino
+      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum jessehui/occlum:latest-ubuntu20.04-openvino-edmm
 
     - uses: ./.github/workflows/composite_action/prebuild
       with:
@@ -459,7 +459,7 @@ jobs:
       with:
         submodules: true
     - name: Create container
-      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-python
+      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum jessehui/occlum:latest-ubuntu20.04-python-edmm
 
     - uses: ./.github/workflows/composite_action/prebuild
       with:
@@ -736,8 +736,8 @@ jobs:
 
     - name: Create container
       run: |
-        docker pull occlumbackup/occlum:latest-ubuntu20.04-gvisor_test
-        gvisor_test=$(docker run -itd -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-gvisor_test);
+        docker pull jessehui/occlum:latest-ubuntu20.04-gvisor_test-edmm
+        gvisor_test=$(docker run -itd -v $GITHUB_WORKSPACE:/root/occlum jessehui/occlum:latest-ubuntu20.04-gvisor_test-edmm);
         echo "gvisor_test=$gvisor_test" >> $GITHUB_ENV
 
     - uses: ./.github/workflows/composite_action/prebuild

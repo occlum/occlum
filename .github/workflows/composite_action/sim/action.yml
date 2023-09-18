@@ -25,7 +25,7 @@ runs:
       shell: bash
 
     - name: Create container
-      run: docker run -itd --name=${{ inputs.container-name }} -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }}
+      run: docker run -itd --name=${{ inputs.container-name }} -v $GITHUB_WORKSPACE:/root/occlum jessehui/occlum:occlum-ubuntu20.04-edmm-experiment-v6
       shell: bash
 
     - uses: ./.github/workflows/composite_action/prebuild
