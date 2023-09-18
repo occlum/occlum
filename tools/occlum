@@ -64,7 +64,7 @@ Usage:
         Initialize a directory as the Occlum instance.
         If flag --init-ra specifies, generate initfs with RA KMS client function.
 
-    occlum build [--sign-key <key_path>] [--sign-tool <tool_path>] [--image-key <key_path>] [--buildin-image-key] [-f/--force]
+    occlum build [--sign-key <key_path>] [--sign-tool <tool_path>] [--image-key <key_path>] [--buildin-image-key] [-f/--force] [--enable-edmm <Y/N>]
         Build and sign an Occlum SGX enclave (.so) and generate its associated secure
         FS image according to the user-provided image directory and Occlum.json config file.
         The whole building process is incremental: the building artifacts are built only
@@ -375,7 +375,6 @@ cmd_init() {
 
 cmd_build() {
     check_has_init
-
     pal_lib=libocclum-pal.so
     libos_lib=libocclum-libos.so
     BUILDIN_IMAGE_KEY=false
@@ -385,10 +384,11 @@ cmd_build() {
         --sign-key)     [ -n "$2" ] && ENCLAVE_SIGN_KEY=$2 ; shift 2 || exit_error "empty signing key path"     ;;
         --sign-tool)    [ -n "$2" ] && ENCLAVE_SIGN_TOOL=$2 ; shift 2 || exit_error "empty signing tool path"   ;;
         --sgx-mode)     [[ -n "$2" && "$2" != "HW" ]] && export SGX_MODE=$2 ; shift 2 || exit_error "empty sgx mode";;
+        --enable-edmm)  [[ -n "$2" && "$2" != "N" ]] && export ENABLE_EDMM=Y ; shift 2 || exit_error "empty edmm mode";;
         --image-key)    [ -n "$2" ] && SECURE_IMAGE_KEY=$2 ; shift 2 || exit_error "empty secure image key path"   ;;
         --buildin-image-key)  BUILDIN_IMAGE_KEY=true ; shift ;;
         --force | -f)   MAKE_OPTION="clean" ; shift ;;
-        *) exit_error "Unknown option: $1"                                                                      ;;
+        *) exit_error "Unknown option: $1" ;;
         esac
     done
     [ -e "$ENCLAVE_SIGN_KEY" ] || exit_error "invalid signing key path: $ENCLAVE_SIGN_KEY"
@@ -410,8 +410,22 @@ cmd_build() {
             libos_lib=libocclum-libos_hyper.so
         fi
         echo "SGX mode: $SGX_MODE"
+        echo "Enable EDMM: No"
+        INSTANCE_IS_FOR_EDMM_PLATFORM="NO"
     else
         echo "SGX mode: HW"
+
+         # ENABLE_EDMM is only valid for HW mode and is not enabled by default
+        case "$ENABLE_EDMM" in
+            "Y" | "YES" | "Yes" | "yes" | "True" | "true" | "1")
+                INSTANCE_IS_FOR_EDMM_PLATFORM="YES"
+                echo "Enable EDMM: Yes"
+            ;;
+            *)
+                INSTANCE_IS_FOR_EDMM_PLATFORM="NO"
+                echo "Enable EDMM: No"
+            ;;
+        esac
     fi
 
     if [[ -f "$instance_dir/init_ra_conf.json" ]]; then
@@ -436,7 +450,7 @@ cmd_build() {
         make -f $build_makefile $MAKE_OPTION
     fi
     occlum_dir=$occlum_dir instance_dir=$instance_dir pal_lib=$pal_lib major_ver=$major_ver \
-    occlum_version=$occlum_version libos_lib=$libos_lib \
+    occlum_version=$occlum_version libos_lib=$libos_lib INSTANCE_IS_FOR_EDMM_PLATFORM=$INSTANCE_IS_FOR_EDMM_PLATFORM \
     ENCLAVE_SIGN_KEY=$ENCLAVE_SIGN_KEY ENCLAVE_SIGN_TOOL=$ENCLAVE_SIGN_TOOL \
     SECURE_IMAGE_KEY=$SECURE_IMAGE_KEY BUILDIN_IMAGE_KEY=$BUILDIN_IMAGE_KEY \
     make -f $build_makefile --no-builtin-rules
