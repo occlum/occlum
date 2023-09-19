@@ -875,20 +875,30 @@ impl InternalVMManager {
                     );
                     VMPerms::apply_perms(&new_vma, new_vma.perms());
 
-                    let remaining_old_vma = {
-                        let range = VMRange::new(protect_range.end(), old_end).unwrap();
-                        VMArea::inherits_file_from(
-                            &containing_vma,
-                            range,
-                            old_perms,
-                            VMAccess::Private(current_pid),
-                        )
-                    };
+                    let updated_vmas = vec![new_vma];
+
+                    if protect_range.end() < old_end {
+                        let remaining_old_vma = {
+                            trace!(
+                                "create new range start = {}, end = {}",
+                                protect_range.end(),
+                                old_end
+                            );
+                            let range = VMRange::new(protect_range.end(), old_end).unwrap();
+                            VMArea::inherits_file_from(
+                                &containing_vma,
+                                range,
+                                old_perms,
+                                VMAccess::Private(current_pid),
+                            )
+                        };
+                        updated_vmas.push(remaining_old_vma);
+                    }
 
                     containing_vma.set_end(protect_range.start());
-
                     // Put containing_vma at last to be updated first.
-                    let updated_vmas = vec![new_vma, remaining_old_vma, containing_vma.clone()];
+                    updated_vmas.push(containing_vma);
+
                     updated_vmas
                 }
                 _ => {
