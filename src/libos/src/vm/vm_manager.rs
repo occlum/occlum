@@ -875,7 +875,7 @@ impl InternalVMManager {
                     );
                     VMPerms::apply_perms(&new_vma, new_vma.perms());
 
-                    let updated_vmas = vec![new_vma];
+                    let mut updated_vmas = vec![new_vma];
 
                     if protect_range.end() < old_end {
                         let remaining_old_vma = {
@@ -897,7 +897,7 @@ impl InternalVMManager {
 
                     containing_vma.set_end(protect_range.start());
                     // Put containing_vma at last to be updated first.
-                    updated_vmas.push(containing_vma);
+                    updated_vmas.push(containing_vma.clone());
 
                     updated_vmas
                 }
