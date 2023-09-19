@@ -4,7 +4,8 @@ use crate::fs::FileMode;
 use crate::process::{do_getegid, do_geteuid, gid_t, uid_t, ThreadRef};
 use crate::time::{do_gettimeofday, time_t};
 use crate::vm::{
-    ChunkRef, VMInitializer, VMMapOptionsBuilder, VMPerms, VMRange, USER_SPACE_VM_MANAGER,
+    ChunkRef, MunmapChunkFlag, VMInitializer, VMMapOptionsBuilder, VMPerms, VMRange,
+    USER_SPACE_VM_MANAGER,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -212,7 +213,7 @@ impl Drop for ShmSegment {
         assert!(self.process_set.len() == 0);
         USER_SPACE_VM_MANAGER
             .internal()
-            .munmap_chunk(&self.chunk, None, false);
+            .munmap_chunk(&self.chunk, None, MunmapChunkFlag::Default);
     }
 }
 

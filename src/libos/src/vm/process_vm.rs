@@ -3,6 +3,7 @@ use super::*;
 use super::chunk::*;
 use super::user_space_vm::USER_SPACE_VM_MANAGER;
 use super::vm_area::VMArea;
+use super::vm_manager::MunmapChunkFlag;
 use super::vm_perms::VMPerms;
 use super::vm_util::{
     FileBacked, VMInitializer, VMMapAddr, VMMapOptions, VMMapOptionsBuilder, VMRemapOptions,
@@ -214,7 +215,7 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
         chunks.iter().for_each(|chunk| {
             USER_SPACE_VM_MANAGER
                 .internal()
-                .munmap_chunk(chunk, None, false);
+                .munmap_chunk(chunk, None, MunmapChunkFlag::Default);
         });
     }
 
@@ -312,9 +313,11 @@ impl Drop for ProcessVM {
         mem_chunks
             .drain_filter(|chunk| chunk.is_single_vma())
             .for_each(|chunk| {
-                USER_SPACE_VM_MANAGER
-                    .internal()
-                    .munmap_chunk(&chunk, None, false);
+                USER_SPACE_VM_MANAGER.internal().munmap_chunk(
+                    &chunk,
+                    None,
+                    MunmapChunkFlag::OnProcessExit,
+                );
             });
 
         assert!(mem_chunks.len() == 0);
