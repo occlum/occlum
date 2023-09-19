@@ -25,7 +25,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -71,7 +71,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -166,7 +166,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW, PKU]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, PKU]]
 
     steps:
     - name: Clean before running
@@ -206,7 +206,12 @@ jobs:
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/java && ./run_java_on_occlum.sh processBuilder"
 
     - name: Run hello PKU
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/java && ./run_java_on_occlum.sh hello_pku"
+      run: |
+        if [[ "${{ matrix.self_runner[3] }}" == "PKU" ]]; then
+          docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/java && ./run_java_on_occlum.sh hello_pku"
+        else
+          echo "Skip PKU test"
+        fi
 
     - name: Clean the environment
       if: ${{ always() }}
@@ -219,7 +224,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -271,7 +276,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -318,7 +323,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -365,7 +370,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -409,7 +414,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -437,7 +442,11 @@ jobs:
         if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
           python_musl_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-python);
         elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          python_musl_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-python);
+          if [[ "${{ matrix.self_runner[2] }}" == "EDMM" ]]; then
+            python_musl_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-python);
+          else
+            python_musl_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-python);
+          fi
         else
           echo "Unsupported Hardware"
         fi;
@@ -480,7 +489,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -508,7 +517,11 @@ jobs:
         if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
           openvino_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-openvino);
         elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          openvino_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-openvino);
+          if [[ "${{ matrix.self_runner[2] }}" == "EDMM" ]]; then
+            openvino_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-openvino);
+          else
+            openvino_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-openvino);
+          fi
         else
           echo "Unsupported Hardware"
         fi;
@@ -548,7 +561,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -576,7 +589,11 @@ jobs:
         if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
           grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc);
         elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc);
+          if [[ "${{ matrix.self_runner[2] }}" == "EDMM" ]]; then
+            grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc);
+          else
+            grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc);
+          fi
         else
           echo "Unsupported Hardware"
         fi;
@@ -638,7 +655,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -666,7 +683,11 @@ jobs:
         if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
           gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-gvisor_test);
         elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-gvisor_test);
+          if [[ "${{ matrix.self_runner[2] }}" == "EDMM" ]]; then
+            gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-gvisor_test);
+          else
+            gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-gvisor_test);
+          fi
         else
           echo "Unsupported Hardware"
         fi;
@@ -788,7 +809,7 @@ jobs:
     strategy:
       matrix:
         # Tensorflow serving test requires AVX512 instruction support. Only the SGX2-HW machine has support for that.
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -816,7 +837,11 @@ jobs:
         if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
           tf_serving_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-tf_serving);
         elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          tf_serving_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-tf_serving);
+          if [[ "${{ matrix.self_runner[2] }}" == "EDMM" ]]; then
+            tf_serving_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-tf_serving);
+          else
+            tf_serving_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-tf_serving);
+          fi
         else
           echo "Unsupported Hardware"
         fi;
@@ -867,7 +892,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -907,7 +932,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -961,7 +986,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -1016,7 +1041,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -1064,7 +1089,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -1110,7 +1135,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
@@ -1145,7 +1170,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
