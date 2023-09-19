@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1695162502682,
+  "lastUpdate": 1695162646856,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -3690,6 +3690,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Threads Maximum Latency",
             "value": 583.27,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 248.83,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "wang384670111",
+            "username": "wang384670111",
+            "email": "384670111@qq.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "3724a06714c73ae14a4f6e75ea011b9a6c4824ad",
+          "message": "modify_comment",
+          "timestamp": "2023-09-14T04:24:04Z",
+          "url": "https://github.com/occlum/occlum/commit/3724a06714c73ae14a4f6e75ea011b9a6c4824ad"
+        },
+        "date": 1695162644740,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.08,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 48.67,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 582.89,
             "unit": "ms",
             "extra": "max"
           },
