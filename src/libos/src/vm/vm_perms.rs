@@ -62,8 +62,8 @@ impl VMPerms {
                 let sgx_status = occlum_ocall_mprotect(&mut retval, addr, len, prot.bits() as i32);
                 if sgx_status != sgx_status_t::SGX_SUCCESS || retval != 0 {
                     panic!(
-                        "occlum_ocall_mprotect status {}, retval {}",
-                        sgx_status, retval
+                        "occlum_ocall_mprotect status {}, retval {}, addr {:p}",
+                        sgx_status, retval, addr
                     );
                 }
             }
