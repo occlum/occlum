@@ -25,7 +25,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
 
     steps:
     - name: Clean before running
