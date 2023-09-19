@@ -136,8 +136,9 @@ RUN git clone -b sgx_2.20_for_occlum_volcano https://github.com/jessehui/linux-s
 # Download the Occlum source
 ARG OCCLUM_BRANCH
 WORKDIR /root
-RUN git clone -b dev_edmm https://github.com/jessehui/occlum && \
-    cp -r /root/occlum/tools/toolchains/* /tmp/ && mkdir -p /opt/occlum/ && \
+RUN git clone -b $OCCLUM_BRANCH https://github.com/jessehui/occlum && \
+    cd /root/occlum && git submodule update --init && \
+    mkdir -p /opt/occlum/ && \
     cp /root/occlum/tools/docker/start_aesm.sh /opt/occlum/
 
 # Install Occlum toolchain
