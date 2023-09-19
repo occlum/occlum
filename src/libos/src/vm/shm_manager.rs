@@ -1,12 +1,12 @@
 //! Shared memory manager. (POSIX)
 use super::*;
 
-use super::vm_manager::InternalVMManager;
+use super::vm_manager::{InternalVMManager, MunmapChunkFlag};
 use super::vm_util::VMMapOptions;
 use crate::process::ThreadStatus;
 
 use rcore_fs::vfs::{FileType, Metadata};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 
 type InodeId = usize;
@@ -120,8 +120,8 @@ impl ShmManager {
         };
 
         Self::apply_new_perms_if_higher(&mut shared_vma, *options.perms());
+        shared_vma.attach_shared_process(current_pid)?;
         if !contained {
-            shared_vma.attach_shared_process(current_pid)?;
             current.vm().add_mem_chunk(shared_chunk.clone());
         }
 
@@ -132,7 +132,7 @@ impl ShmManager {
         &mut self,
         chunk: &ChunkRef,
         unmap_range: &VMRange,
-        force_unmap: bool,
+        flag: MunmapChunkFlag,
     ) -> Result<MunmapSharedResult> {
         debug_assert!(chunk.is_shared());
         let mut shared_vma = Self::vma_of(chunk);
@@ -141,7 +141,9 @@ impl ShmManager {
         let partial_unmap = !unmap_range.is_superset_of(shared_range);
 
         // Fails when force unmap a partial of shared chunk which is still shared by other process
-        if force_unmap && (partial_unmap || !shared_vma.exclusive_by(current_pid)) {
+        if flag == MunmapChunkFlag::Force
+            && (partial_unmap || !shared_vma.exclusive_by(current_pid))
+        {
             return_errno!(EINVAL, "force unmap shared chunk failed");
         }
 
@@ -150,7 +152,11 @@ impl ShmManager {
             return Ok(MunmapSharedResult::StillInUse);
         }
 
-        if shared_vma.detach_shared_process(current_pid)? {
+        let force_detach = match flag {
+            MunmapChunkFlag::Default => false,
+            MunmapChunkFlag::Force | MunmapChunkFlag::OnProcessExit => true,
+        };
+        if shared_vma.detach_shared_process(current_pid, force_detach)? {
             self.shared_chunks.remove(&Self::inode_id_of(&shared_vma));
             Ok(MunmapSharedResult::Freeable)
         } else {

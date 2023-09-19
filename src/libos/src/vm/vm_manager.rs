@@ -224,9 +224,11 @@ impl VMManager {
 
             for chunk in overlapping_chunks.iter() {
                 match chunk.internal() {
-                    ChunkType::SingleVMA(_) => {
-                        internal_manager.munmap_chunk(chunk, Some(&munmap_range), false)?
-                    }
+                    ChunkType::SingleVMA(_) => internal_manager.munmap_chunk(
+                        chunk,
+                        Some(&munmap_range),
+                        MunmapChunkFlag::Default,
+                    )?,
                     ChunkType::MultiVMA(manager) => manager
                         .lock()
                         .unwrap()
@@ -262,7 +264,7 @@ impl VMManager {
                     return internal_manager.munmap_chunk(
                         &overlapping_chunk,
                         Some(&munmap_range),
-                        false,
+                        MunmapChunkFlag::Default,
                     );
                 } else {
                     warn!("no overlapping chunks anymore");
@@ -512,7 +514,7 @@ impl VMManager {
         let mut mem_chunks = thread.vm().mem_chunks().write().unwrap();
 
         mem_chunks.iter().for_each(|chunk| {
-            internal_manager.munmap_chunk(&chunk, None, false);
+            internal_manager.munmap_chunk(&chunk, None, MunmapChunkFlag::OnProcessExit);
         });
         mem_chunks.clear();
 
@@ -588,7 +590,7 @@ impl InternalVMManager {
         &mut self,
         chunk: &ChunkRef,
         munmap_range: Option<&VMRange>,
-        force_unmap: bool,
+        flag: MunmapChunkFlag,
     ) -> Result<()> {
         trace!(
             "munmap_chunk range = {:?}, munmap_range = {:?}",
@@ -619,11 +621,11 @@ impl InternalVMManager {
 
         if chunk.is_shared() {
             trace!(
-                "munmap_shared_chunk, chunk_range: {:?}, munmap_range = {:?}",
+                "munmap_shared_chunk, chunk_range = {:?}, munmap_range = {:?}",
                 chunk.range(),
                 munmap_range,
             );
-            return self.munmap_shared_chunk(chunk, munmap_range, force_unmap);
+            return self.munmap_shared_chunk(chunk, munmap_range, flag);
         }
 
         // Either the munmap range is a subset of the chunk range or the munmap range is
@@ -743,7 +745,7 @@ impl InternalVMManager {
         &mut self,
         chunk: &ChunkRef,
         munmap_range: &VMRange,
-        force_unmap: bool,
+        flag: MunmapChunkFlag,
     ) -> Result<()> {
         if !chunk.is_shared() {
             return_errno!(EINVAL, "not a shared chunk");
@@ -754,7 +756,7 @@ impl InternalVMManager {
 
         if self
             .shm_manager
-            .munmap_shared_chunk(chunk, munmap_range, force_unmap)?
+            .munmap_shared_chunk(chunk, munmap_range, flag)?
             == MunmapSharedResult::Freeable
         {
             let vma = chunk.get_vma_for_single_vma_chunk();
@@ -1025,7 +1027,7 @@ impl InternalVMManager {
                             }
 
                             // Munmap the corresponding single vma chunk
-                            self.munmap_chunk(&chunk, Some(&target_range), true)?;
+                            self.munmap_chunk(&chunk, Some(&target_range), MunmapChunkFlag::Force)?;
                         }
                         VMMapAddr::Any => unreachable!(),
                     }
@@ -1145,6 +1147,17 @@ impl InternalVMManager {
 
         Ok(target_range.start())
     }
+}
+
+/// Flags used by `munmap_chunk()` and `munmap_shared_chunk()`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MunmapChunkFlag {
+    /// Indicates normal behavior when munamp a shared chunk
+    Default,
+    /// Indicates the shared chunk must be freed entirely
+    Force,
+    /// Indicates the shared chunk must detach current process totally
+    OnProcessExit,
 }
 
 impl VMRemapParser for InternalVMManager {

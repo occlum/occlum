@@ -6,7 +6,6 @@ use super::vm_util::FileBacked;
 
 use intrusive_collections::rbtree::{Link, RBTree};
 use intrusive_collections::{intrusive_adapter, KeyAdapter};
-use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Debug, Default)]
@@ -19,8 +18,11 @@ pub struct VMArea {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum VMAccess {
+    /// Can only be accessed by one single process
     Private(pid_t),
-    Shared(HashSet<pid_t>),
+    /// Can be accessed by multi processes, also a reference counter
+    /// to record sharings within each process(like thread)
+    Shared(HashMap<pid_t, u32>),
 }
 
 impl VMArea {
@@ -88,14 +90,18 @@ impl VMArea {
     pub fn belong_to(&self, target_pid: pid_t) -> bool {
         match &self.access {
             VMAccess::Private(pid) => *pid == target_pid,
-            VMAccess::Shared(pid_set) => pid_set.contains(&target_pid),
+            VMAccess::Shared(pid_table) => pid_table.contains_key(&target_pid),
         }
     }
 
     pub fn exclusive_by(&self, target_pid: pid_t) -> bool {
         match &self.access {
             VMAccess::Private(pid) => *pid == target_pid,
-            VMAccess::Shared(pid_set) => pid_set.len() == 1 && pid_set.contains(&target_pid),
+            VMAccess::Shared(pid_table) => {
+                pid_table.len() == 1
+                    && pid_table.contains_key(&target_pid)
+                    && *pid_table.get(&target_pid).unwrap() == 1
+            }
         }
     }
 
@@ -264,7 +270,7 @@ impl VMArea {
 
     pub fn mark_shared(&mut self) {
         let access = match self.access {
-            VMAccess::Private(pid) => VMAccess::Shared(HashSet::from([pid])),
+            VMAccess::Private(pid) => VMAccess::Shared(HashMap::from([(pid, 1)])),
             VMAccess::Shared(_) => {
                 return;
             }
@@ -272,29 +278,31 @@ impl VMArea {
         self.access = access;
     }
 
-    pub fn shared_process_set(&self) -> Result<&HashSet<pid_t>> {
-        match &self.access {
-            VMAccess::Private(_) => Err(errno!(EINVAL, "not a shared vma")),
-            VMAccess::Shared(pid_set) => Ok(pid_set),
-        }
-    }
-
     pub fn attach_shared_process(&mut self, pid: pid_t) -> Result<()> {
         match &mut self.access {
             VMAccess::Private(_) => Err(errno!(EINVAL, "not a shared vma")),
-            VMAccess::Shared(pid_set) => {
-                pid_set.insert(pid);
+            VMAccess::Shared(pid_table) => {
+                if let Some(mut ref_ctr) = pid_table.get_mut(&pid) {
+                    *ref_ctr += 1;
+                } else {
+                    let _ = pid_table.insert(pid, 1);
+                }
                 Ok(())
             }
         }
     }
 
-    pub fn detach_shared_process(&mut self, pid: pid_t) -> Result<bool> {
+    pub fn detach_shared_process(&mut self, pid: pid_t, force_detach: bool) -> Result<bool> {
         match &mut self.access {
             VMAccess::Private(_) => Err(errno!(EINVAL, "not a shared vma")),
-            VMAccess::Shared(pid_set) => {
-                pid_set.remove(&pid);
-                Ok(pid_set.is_empty())
+            VMAccess::Shared(pid_table) => {
+                if let Some(mut ref_ctr) = pid_table.get_mut(&pid) {
+                    *ref_ctr -= 1;
+                    if *ref_ctr == 0 || force_detach {
+                        let _ = pid_table.remove(&pid);
+                    }
+                }
+                Ok(pid_table.is_empty())
             }
         }
     }
