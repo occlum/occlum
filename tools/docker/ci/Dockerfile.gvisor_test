@@ -1,5 +1,5 @@
 ARG OCCLUM_VERSION
-FROM jessehui/occlum:occlum-ubuntu20.04-edmm-experiment-v6 as base
+FROM jessehui/occlum:occlum-ubuntu20.04-edmm-experiment-v7 as base
 LABEL maintainer="He Sun <bochang.sh@antgroup.com>"
 
 # Install gvisor syscall test binaries
