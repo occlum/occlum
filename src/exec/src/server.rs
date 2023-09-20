@@ -15,9 +15,11 @@ use sendfd::RecvWithFd;
 use std::cmp;
 use std::collections::HashMap;
 use std::ffi::CString;
+use std::mem;
 use std::os::unix::io::RawFd;
 use std::os::unix::net::UnixStream;
 use std::panic;
+use std::ptr;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use timer::{Guard, Timer};
@@ -244,29 +246,33 @@ impl OcclumExec for OcclumExecImpl {
             commands.entry(process_id).or_insert((None, true));
             drop(commands);
 
-            //Run the command in a thread
-            thread::spawn(move || {
-                let mut exit_status = Box::new(0);
+            // Run the command in a thread
+            // Use a 8MB stack for rust started thread
+            const DEFAULT_STACK_SIZE: usize = 8 * 1024 * 1024;
+            thread::Builder::new()
+                .stack_size(DEFAULT_STACK_SIZE)
+                .spawn(move || {
+                    let mut exit_status = Box::new(0);
 
-                let result = rust_occlum_pal_exec(process_id, &mut exit_status);
-                let mut commands = _commands.lock().unwrap();
+                    let result = rust_occlum_pal_exec(process_id, &mut exit_status);
+                    let mut commands = _commands.lock().unwrap();
 
-                if result == Ok(()) {
-                    *commands.get_mut(&process_id).expect("get process") =
-                        (Some(*exit_status), false);
-                } else {
-                    // Return -1 if the process crashed or get any unexpected error
-                    *commands.get_mut(&process_id).expect("get process") = (Some(-1), false);
-                }
+                    if result == Ok(()) {
+                        *commands.get_mut(&process_id).expect("get process") =
+                            (Some(*exit_status), false);
+                    } else {
+                        // Return -1 if the process crashed or get any unexpected error
+                        *commands.get_mut(&process_id).expect("get process") = (Some(-1), false);
+                    }
 
-                //Notifies the client that the application stopped
-                debug!(
-                    "process:{} finished, send signal to {}",
-                    process_id, client_process_id
-                );
-                signal::kill(Pid::from_raw(client_process_id as i32), Signal::SIGUSR1)
-                    .unwrap_or_default();
-            });
+                    //Notifies the client that the application stopped
+                    debug!(
+                        "process:{} finished, send signal to {}",
+                        process_id, client_process_id
+                    );
+                    signal::kill(Pid::from_raw(client_process_id as i32), Signal::SIGUSR1)
+                        .unwrap_or_default();
+                });
 
             resp.finish(ExecCommResponse {
                 status: ExecCommResponse_ExecutionStatus::RUNNING,
@@ -346,6 +352,12 @@ extern "C" {
     fn occlum_pal_kill(pid: i32, sig: i32) -> i32;
 }
 
+pub unsafe fn disable_sigstack() {
+    let mut stack: libc::stack_t = mem::zeroed();
+    stack.ss_flags = libc::SS_DISABLE;
+    libc::sigaltstack(&stack, ptr::null_mut());
+}
+
 fn vec_strings_to_cchars(
     strings: &Vec<String>,
 ) -> Result<(Vec<*const libc::c_char>, Vec<CString>), i32> {
@@ -399,6 +411,15 @@ fn rust_occlum_pal_exec(occlum_process_id: i32, exit_status: &mut i32) -> Result
         exit_value: exit_status as *mut i32,
     };
 
+    // Disable signal handler default 8KB stack which is created in
+    // https://github.com/rust-lang/rust/blob/master/library/std/src/sys/unix/stack_overflow.rs#L165
+    // 8KB stack is not enough to save xsave in Intel SPR.
+    // Disable sigstack here makes the handler to use the DEFAULT_STACK_SIZE
+    // stack created in previous thread creation.
+    // Todo: create bigger dedicated stack for signal handler.
+    unsafe {
+        disable_sigstack();
+    }
     let result =
         panic::catch_unwind(|| unsafe { occlum_pal_exec(&args as *const occlum_pal_exec_args) });
 
