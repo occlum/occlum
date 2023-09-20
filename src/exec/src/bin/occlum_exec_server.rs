@@ -172,7 +172,10 @@ fn rust_occlum_pal_init() -> Result<(), i32> {
     };
     let rust_object = Box::new(&occlum_pal_attribute);
 
-    let ret = unsafe { occlum_pal_init(*rust_object) };
+    let ret = unsafe {
+        occlum_exec::server::disable_sigstack();
+        occlum_pal_init(*rust_object)
+    };
     match ret {
         0 => Ok(()),
         _ => Err(ret),
