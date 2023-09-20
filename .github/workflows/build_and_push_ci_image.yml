@@ -67,7 +67,7 @@ jobs:
           "OCCLUM_VERSION=${{ env.OCCLUM_VERSION }}"
           "OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}"
         push: true
-        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu20.04-grpc
+        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu20.04-grpc-edmm
 
 
   Build_gvisor_test_image:
@@ -110,7 +110,7 @@ jobs:
           "OCCLUM_VERSION=${{ env.OCCLUM_VERSION }}"
           "OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}"
         push: true
-        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu20.04-gvisor_test
+        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu20.04-gvisor_test-edmm
 
 
   Build_openvino_image:
@@ -158,7 +158,7 @@ jobs:
           "OCCLUM_VERSION=${{ env.OCCLUM_VERSION }}"
           "OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}"
         push: true
-        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu20.04-openvino
+        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu20.04-openvino-edmm
 
 
   Build_python_image:
@@ -206,7 +206,7 @@ jobs:
           "OCCLUM_VERSION=${{ env.OCCLUM_VERSION }}"
           "OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}"
         push: true
-        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu20.04-python
+        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu20.04-python-edmm
 
 
   # TODO: Add actions to build tf_serving_base image.
@@ -265,4 +265,4 @@ jobs:
           "OCCLUM_VERSION=${{ env.OCCLUM_VERSION }}"
           "OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}"
         push: true
-        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu20.04-tf_serving
+        tags: occlumbackup/occlum:${{ github.event.inputs.tag }}-ubuntu20.04-tf_serving-edmm
