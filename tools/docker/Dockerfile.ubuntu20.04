@@ -79,15 +79,15 @@ RUN echo "ca_directory=/etc/ssl/certs" >> /etc/wgetrc && \
 
 # Install Rust
 ENV PATH="/root/.cargo/bin:$PATH"
-ENV OCCLUM_RUST_VERSION=nightly-2022-02-23
+ENV OCCLUM_RUST_VERSION=nightly-2022-10-22
 RUN curl https://sh.rustup.rs -sSf | \
         sh -s -- --default-toolchain ${OCCLUM_RUST_VERSION} -y && \
     rm -rf /root/.cargo/registry && rm -rf /root/.cargo/git && \
     cargo -V
 
 # Install SGX PSW
-ARG PSW_VERSION=2.17.100.3
-ARG DCAP_VERSION=1.14.100.3
+ARG PSW_VERSION=2.20.100.4
+ARG DCAP_VERSION=1.17.100.4
 RUN apt-get update && aptitude install -y \
         libsgx-launch-dev=$PSW_VERSION-focal1 \
         libsgx-epid-dev=$PSW_VERSION-focal1 \
@@ -125,7 +125,7 @@ RUN apt-get update && aptitude install -y \
 
 # Install SGX SDK
 WORKDIR /tmp
-RUN git clone -b sgx_2.17.1_for_occlum https://github.com/occlum/linux-sgx && \
+RUN git clone -b sgx_2.20_for_occlum https://github.com/occlum/linux-sgx && \
     mkdir /etc/init && \
     cd linux-sgx && \
     make preparation && \
