@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1695248223286,
+  "lastUpdate": 1695248294607,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -740,6 +740,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 1987,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Qi Zheng",
+            "username": "qzheng527",
+            "email": "huaiqing.zq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "ad317e61f68289eda3d7fb542f0634885f3b03a0",
+          "message": "[exec] Increase sighandle stack size",
+          "timestamp": "2023-09-20T02:05:00Z",
+          "url": "https://github.com/occlum/occlum/commit/ad317e61f68289eda3d7fb542f0634885f3b03a0"
+        },
+        "date": 1695248292666,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2070,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2070,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
