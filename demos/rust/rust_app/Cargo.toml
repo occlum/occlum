@@ -6,6 +6,7 @@ build = "build.rs"
 
 [dependencies]
 libc = "0.2"
+memmap = "0.7.0"
 
 [build-dependencies]
 cc = "1.0"
