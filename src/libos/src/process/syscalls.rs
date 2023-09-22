@@ -345,7 +345,6 @@ pub fn do_prctl(option: i32, arg2: u64, arg3: u64, arg4: u64, arg5: u64) -> Resu
 
 pub fn do_arch_prctl(code: u32, addr: *mut usize) -> Result<isize> {
     let code = ArchPrctlCode::from_u32(code)?;
-    check_mut_ptr(addr)?;
     super::do_arch_prctl::do_arch_prctl(code, addr).map(|_| 0)
 }
 
