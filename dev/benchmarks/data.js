@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1695162646856,
+  "lastUpdate": 1695420876091,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -7284,6 +7284,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 1246,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "ClawSeven",
+            "username": "ClawSeven",
+            "email": "zehuan97@gmail.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "5cc3e213f23c98e892405084ff628d4b3d33a015",
+          "message": "Remove occlum installation package in SIM and HW CI",
+          "timestamp": "2023-09-14T03:46:18Z",
+          "url": "https://github.com/occlum/occlum/commit/5cc3e213f23c98e892405084ff628d4b3d33a015"
+        },
+        "date": 1695420872522,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 1965,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 1964,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
