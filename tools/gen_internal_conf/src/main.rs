@@ -461,6 +461,7 @@ fn main() {
             ISVFAMILYID_H: kss_tuple.3,
             ISVFAMILYID_L: kss_tuple.4,
             PKRU: occlum_config.metadata.pkru,
+            AMX: occlum_config.metadata.amx,
         };
         let enclave_config = serde_xml_rs::to_string(&sgx_enclave_configuration).unwrap();
         debug!("The enclave config:{:?}", enclave_config);
@@ -724,6 +725,8 @@ struct OcclumMetadata {
     ext_prod_id: OcclumMetaID,
     #[serde(default)]
     pkru: u32,
+    #[serde(default)]
+    amx: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -792,6 +795,7 @@ struct EnclaveConfiguration {
     ISVFAMILYID_H: u64,
     ISVFAMILYID_L: u64,
     PKRU: u32,
+    AMX: u32,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
