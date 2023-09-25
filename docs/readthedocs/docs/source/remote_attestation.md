@@ -1,5 +1,7 @@
 # Remote Attestation
 
+## DCAP Library
+
 Occlum provides wrapped library `libocclum_dcap` for `DCAP` remote attestion applications.
 This Occlum DCAP library is prebuilt as part of the Occlum toolchains in the [Occlum Docker images](https://hub.docker.com/r/occlum/occlum).
 
@@ -25,6 +27,26 @@ In short, applications can link to the prebuilt `libocclum_dcap.so` and use the 
 For details how to use the library, please refer to the [demo](https://github.com/occlum/occlum/tree/master/demos/remote_attestation/dcap).
 
 The source code of the library is in the [path](https://github.com/occlum/occlum/tools/toolchains/dcap_lib/).
+
+## IOCTL way
+
+Occlum provides several customized IOCTL commands for generation and verification of remote attestation. Details please check the function `do_SGXIOC_GENERATE_AND_VERIFY_DCAP_QUOTE` in the [test](https://github.com/occlum/occlum/blob/master/test/ioctl/main.c).
+
+## DCAP Device node
+
+Sometimes it is not easy to embed DCAP libraris or use IOCTL ways for DCAP quote generation for some APPs. Thus Occlum also provides pseudo device nodes way to genrate DCAP quote directly. 
+
+**/dev/attestation_type**, readonly, it is always `dcap` for now.
+
+**/dev/attestation_report_data**, readwrite. When write, it updates the **report_data** (sgx_report_data_t) for generating DCAP quote. When read, it gets the current **report_data**.
+
+**/dev/attestation_quote**, readonly. It gets the DCAP quote for every reading from this node.
+
+So, the flow is as below.
+1. write the user provided report data to **/dev/attestation_report_data**.
+2. generate the DCAP quote by reading the node **/dev/attestation_quote**.
+
+Details please check the function `test_dev_attestation` in unit test [device](https://github.com/occlum/occlum/blob/master/test/device/main.c) and [dcap_fs](https://github.com/occlum/occlum/tree/master/demos/remote_attestation/dcap_fs) demo.
 
 ## Init RA Solution
 
