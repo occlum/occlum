@@ -81,7 +81,4 @@ runs:
     - name: Build source
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; ${{ inputs.build-envs}} make install"
       shell: bash
-    
-    - name: Remove occlum installation package
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum; rm -rf ./build; rm -rf ./src; rm -rf ./deps"
-      shell: bash
+
