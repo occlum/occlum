@@ -1,0 +1,64 @@
+name: Occlum Runtime Docker Image Build and Push
+
+# This is a manual trigger.
+on:
+  workflow_dispatch:
+    inputs:
+      OS:
+        description: 'OS name (must choose from <ubuntu20>)'
+        required: true
+        default: 'ubuntu20'
+      OCCLUM_VERSION:
+        description: 'The Occlum version is built on, e.g "0.29.7"'
+        required: true
+        default: '0.29.7'
+      SGX_PSW_VERSION:
+        description: 'The SGX PSW version libraries expected to be installed, e.g "2.17.100.3"'
+        required: true
+        default: '2.17.100.3'
+      SGX_DCAP_VERSION:
+        description: 'The SGX DCAP version libraries expected to be installed, e.g "1.14.100.3"'
+        required: true
+        default: '1.14.100.3'
+
+jobs:
+  generate-ubuntu20-rt-image:
+      runs-on: ubuntu-20.04
+      if: github.event.inputs.OS == 'ubuntu20'
+
+      steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Because "Build and push" step `context` field can't be subdir,
+      # we need to copy files needed by dockerfile to root dir of the project
+      - name: Copy context for docker build
+        run: |
+          cp -r tools/docker .
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+        with:
+          driver-opts: env.BUILDKIT_STEP_LOG_MAX_SIZE=104857600
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: ./tools/docker
+          file: ./tools/docker/Dockerfile.ubuntu20.04-rt
+          platforms: linux/amd64
+          build-args: |
+            "OCCLUM_VERSION=${{ github.event.inputs.OCCLUM_VERSION }}"
+            "SGX_PSW_VERSION=${{ github.event.inputs.SGX_PSW_VERSION }}"
+            "SGX_DCAP_VERSION=${{ github.event.inputs.SGX_DCAP_VERSION }}"
+          push: true
+          tags: occlum/occlum:${{ github.event.inputs.OCCLUM_VERSION }}-rt-ubuntu20.04
