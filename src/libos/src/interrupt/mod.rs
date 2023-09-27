@@ -29,8 +29,9 @@ pub fn do_handle_interrupt(
     // The cpu context is overriden so that it is as if the syscall is called from where the
     // interrupt happened
     *context = CpuContext::from_sgx(&info.cpu_context);
-    context.extra_context = ExtraContext::Xsave;
+    context.extra_context = ExtraContext::XsaveOnStack;
     context.extra_context_ptr = info.xsave_area.as_mut_ptr();
+    context.extra_context_size = info.xsave_size;
     Ok(0)
 }
 
