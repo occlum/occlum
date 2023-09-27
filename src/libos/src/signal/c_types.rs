@@ -225,8 +225,8 @@ pub type stack_t = sigaltstack_t;
 pub struct mcontext_t {
     pub inner: CpuContext,
     // TODO: the fields should be csgsfs, err, trapno, oldmask, and cr2
-    // The number should be 5 but we use extra 2 spaces to store something else in the CpuContext. Thus make it 3.
-    _unused0: [u64; 3],
+    // The number should be 5 but we use extra 3 spaces to store something else in the CpuContext. Thus make it 2.
+    _unused0: [u64; 2],
     // TODO: this field should be `fpregs: fpregset_t,`
     _unused1: usize,
     _reserved: [u64; 8],

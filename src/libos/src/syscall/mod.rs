@@ -9,13 +9,15 @@
 
 use aligned::{Aligned, A16, A64};
 use core::arch::x86_64::{_fxrstor, _fxsave};
+use std::alloc::Layout;
 use std::any::Any;
 use std::convert::TryFrom;
 use std::default::Default;
 use std::ffi::{CStr, CString};
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::mem::MaybeUninit;
+use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ptr;
+use std::ptr::NonNull;
 use time::{clockid_t, itimerspec_t, timespec_t, timeval_t};
 use util::log::{self, LevelFilter};
 use util::mem_util::from_user::*;
@@ -752,24 +754,55 @@ fn do_sysret(user_context: &mut CpuContext) -> ! {
         if user_context.extra_context_ptr != ptr::null_mut() {
             match user_context.extra_context {
                 ExtraContext::Fpregs => {
-                    let fpregs = user_context.extra_context_ptr as *mut FpRegs;
-                    unsafe { fpregs.as_ref().unwrap().restore() };
                     // The fpregs must be allocated on heap
-                    drop(unsafe { Box::from_raw(user_context.extra_context_ptr as *mut FpRegs) });
+                    let fpregs =
+                        unsafe { Box::from_raw(user_context.extra_context_ptr as *mut FpRegs) };
+                    unsafe { fpregs.restore() };
+                    // Drop automatically
+                    // Note: Manually-drop could modify some of the context registers.
+                    // For example, we observe using $XMM0 register when drop manually with debug build.
+                    // Same for the xsave area
                 }
-                ExtraContext::Xsave => {
+                ExtraContext::XsaveOnStack => {
                     let xsave_area = user_context.extra_context_ptr;
-                    unsafe { (&*(xsave_area as *mut XsaveArea)).restore() };
+                    unsafe {
+                        restore_xregs(xsave_area as *const u8);
+                    }
+                }
+                // return from rt_sigreturn
+                ExtraContext::XsaveOnHeap => {
+                    let xsave_area = unsafe {
+                        BoxXsaveArea::from_raw(
+                            user_context.extra_context_ptr,
+                            user_context.extra_context_size as usize,
+                        )
+                    };
+                    xsave_area.restore();
+                    // This heap memory will finally be dropped and freed.
                 }
             }
             user_context.extra_context_ptr = ptr::null_mut();
         }
         unsafe { __occlum_sysret(user_context) } // jump to user space
     } else {
-        if user_context.extra_context_ptr != ptr::null_mut()
-            && matches!(user_context.extra_context, ExtraContext::Fpregs)
-        {
-            drop(unsafe { Box::from_raw(user_context.extra_context_ptr as *mut FpRegs) });
+        if user_context.extra_context_ptr != ptr::null_mut() {
+            match user_context.extra_context {
+                ExtraContext::Fpregs => {
+                    let fpregs =
+                        unsafe { Box::from_raw(user_context.extra_context_ptr as *mut FpRegs) };
+                    // Drop automatically
+                }
+                ExtraContext::XsaveOnStack => {}
+                ExtraContext::XsaveOnHeap => {
+                    let xsave_area = unsafe {
+                        BoxXsaveArea::from_raw(
+                            user_context.extra_context_ptr,
+                            user_context.extra_context_size as usize,
+                        )
+                    };
+                    // This heap memory will finally be dropped and freed.
+                }
+            }
         }
         unsafe { do_exit_task() } // exit enclave
     }
@@ -1026,38 +1059,75 @@ impl FpRegs {
     }
 }
 
+// This is used to represent the xsave area on heap.
 #[derive(Debug)]
-#[repr(C)]
-pub struct XsaveArea {
-    inner: Aligned<A64, [u8; 4096]>,
+pub struct BoxXsaveArea {
+    ptr: NonNull<u8>,
+    layout: Layout,
 }
 
-impl XsaveArea {
+impl BoxXsaveArea {
     // The first 512 bytes of xsave area is used for FP registers
     const FXSAVE_AREA_LEN: usize = 512;
+    const ALIGNMENT: usize = 64;
 
-    /// Save the current CPU floating pointer states to an instance of FpRegs
-    pub fn save() -> Self {
-        let mut xsave_area = MaybeUninit::<Self>::uninit();
-        unsafe {
-            save_xregs(xsave_area.as_mut_ptr() as *mut u8);
-            xsave_area.assume_init()
-        }
+    pub fn new_with_slice(slice: &[u8]) -> Self {
+        let size = slice.len();
+        let layout = Layout::from_size_align(size, Self::ALIGNMENT).expect("Invalid layout");
+        let ptr = unsafe {
+            let raw_ptr = std::alloc::alloc(layout);
+            if raw_ptr.is_null() {
+                panic!("Heap memory allocation failure");
+            }
+            std::slice::from_raw_parts_mut(raw_ptr, size).copy_from_slice(slice);
+            NonNull::<u8>::new(raw_ptr).unwrap()
+        };
+
+        Self { ptr, layout }
+    }
+
+    // Reconstruct from raw pointer
+    // Safety: Users must ensure the heap memory area is valid.
+    pub unsafe fn from_raw(raw_ptr: *mut u8, size: usize) -> Self {
+        let ptr = NonNull::<u8>::new(raw_ptr).expect("raw ptr shouldn't be null");
+        let layout = Layout::from_size_align(size, Self::ALIGNMENT).unwrap();
+        Self { ptr, layout }
+    }
+
+    pub fn raw_ptr(&self) -> *mut u8 {
+        self.ptr.as_ptr()
     }
 
     /// Restore the current CPU floating pointer states from this FpRegs instance
     pub fn restore(&self) {
         unsafe {
-            restore_xregs(self.inner.as_ptr());
+            restore_xregs(self.raw_ptr() as *const u8);
         }
     }
 
+    pub fn as_slice(&self) -> &[u8] {
+        unsafe { std::slice::from_raw_parts(self.raw_ptr() as *const u8, self.layout.size()) }
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+        unsafe { std::slice::from_raw_parts_mut(self.raw_ptr(), self.layout.size()) }
+    }
+
     pub fn get_fpregs(&self) -> FpRegs {
-        unsafe { FpRegs::from_slice(&self.inner[..Self::FXSAVE_AREA_LEN]) }
+        let xsave_slice = self.as_slice();
+        unsafe { FpRegs::from_slice(&xsave_slice[..Self::FXSAVE_AREA_LEN]) }
     }
 
     pub fn set_fpregs_area(&mut self, fpregs: FpRegs) {
-        self.inner[..Self::FXSAVE_AREA_LEN].copy_from_slice(fpregs.as_slice())
+        self.as_mut_slice()[..Self::FXSAVE_AREA_LEN].copy_from_slice(fpregs.as_slice())
+    }
+}
+
+impl Drop for BoxXsaveArea {
+    fn drop(&mut self) {
+        // Modify this function with cautions because this is usally called after restore the xsave area.
+        // Extra operations could mess up the context.
+        unsafe { std::alloc::dealloc(self.raw_ptr(), self.layout) };
     }
 }
 
@@ -1088,13 +1158,34 @@ pub struct CpuContext {
     pub rflags: u64,
     pub extra_context: ExtraContext,
     pub extra_context_ptr: *mut u8,
+    pub extra_context_size: u64,
 }
 
+// Define 3 kinds of extra context types:
+//
+// 1. Fpregs: store fpregs on kernel heap -> restore fpregs when sysret
+// example: syscall + find signal when sysret + user signal handler + sigreturn + sysret
+//
+// 2. XsaveOnStack: xsave on kernel stack -> restore xsave when sysret
+// example: exception + kernel can handle + sysret
+//
+// 3. XsaveOnHeap: xsave initiailly on kernel stack  -> copy xsave area to kernel heap -> restore xsave area (on kernel heap) when sysret
+// example:
+// a. exception + kernel can handle + find signal when sysret + user signal handler + sigreturn + sysret
+// b. exception + kernel can't handle + signal + user signal handler + sigreturn + sysret
+// c. Interrupt + signal + user signal handler + sigreturn + sysret
 #[repr(u64)]
 #[derive(Clone, Copy, Debug)]
 pub enum ExtraContext {
+    // To handle signals before syscall returns
     Fpregs = 0,
-    Xsave = 1,
+    // To handle SGX SDK defined "non-standard exception", some kinds of exceptions can solely be handled by the kernel,
+    // e.g. #PF, and the xsave area will not be overwritten, thus, save on the stack is enough.
+    XsaveOnStack = 1,
+    // Some kinds of exceptions can't be handled by the kernel, e.g. divided-by-zero exception, and will switch to user's
+    // signal handler and could trigger recursive exception and the xsave area will be overwritten, thus, saving on the
+    // heap is required.
+    XsaveOnHeap = 2,
 }
 
 impl Default for ExtraContext {
@@ -1126,6 +1217,7 @@ impl CpuContext {
             rflags: src.rflags,
             extra_context: Default::default(),
             extra_context_ptr: ptr::null_mut(),
+            extra_context_size: 0,
         }
     }
 }
