@@ -5,18 +5,19 @@ use super::{SigAction, SigActionFlags, SigDefaultAction, SigSet, Signal};
 use crate::lazy_static::__Deref;
 use crate::prelude::*;
 use crate::process::{ProcessRef, TermStatus, ThreadRef};
-use crate::syscall::{CpuContext, ExtraContext, FpRegs, XsaveArea};
+use crate::syscall::{BoxXsaveArea, CpuContext, ExtraContext, FpRegs};
 use aligned::{Aligned, A16};
+use std::mem::ManuallyDrop;
 use std::{ptr, slice};
 
 pub fn do_rt_sigreturn(curr_user_ctxt: &mut CpuContext) -> Result<()> {
     debug!("do_rt_sigreturn");
-    let last_ucontext = {
-        let last_ucontext = PRE_UCONTEXTS.with(|ref_cell| {
+    let (last_ucontext_ptr, last_extra_context) = {
+        let last_context = PRE_UCONTEXTS.with(|ref_cell| {
             let mut stack = ref_cell.borrow_mut();
             stack.pop()
         });
-        if last_ucontext.is_none() {
+        if last_context.is_none() {
             let term_status = TermStatus::Killed(SIGKILL);
             current!().process().force_exit(term_status);
             return_errno!(
@@ -24,33 +25,53 @@ pub fn do_rt_sigreturn(curr_user_ctxt: &mut CpuContext) -> Result<()> {
                 "sigreturn should not have been called; kill this process"
             );
         }
-        unsafe { &*last_ucontext.unwrap() }
+        last_context.unwrap().consume()
     };
+
+    let last_ucontext = unsafe { &*last_ucontext_ptr };
+    let (extra_context, extra_context_ptr, extra_context_size) = last_extra_context.consume();
 
     // Restore sigmask
     *current!().sig_mask().write().unwrap() = SigSet::from_c(last_ucontext.uc_sigmask);
     // Restore user context
     *curr_user_ctxt = last_ucontext.uc_mcontext.inner;
+    // Restore extra context
+    curr_user_ctxt.extra_context = extra_context;
+    curr_user_ctxt.extra_context_ptr = extra_context_ptr;
+    curr_user_ctxt.extra_context_size = extra_context_size;
+    debug_assert!(
+        curr_user_ctxt.extra_context_ptr != ptr::null_mut()
+            && curr_user_ctxt.extra_context_size != 0
+    );
 
-    // Restore the floating point registers to a temp area
-    // The floating point registers would be recoved just before return to user's code
+    // Udpate the fpregs field based on the current's user context
     match curr_user_ctxt.extra_context {
         ExtraContext::Fpregs => {
             // Signal raised by direct syscall
-            // fpregs should be stored on the heap. Because the ucontext_t will be freed when this function returns. And curr_user_ctxt only stores the pointer
-            let mut fpregs = Box::new(unsafe { FpRegs::from_slice(&last_ucontext.fpregs) });
-            curr_user_ctxt.extra_context_ptr = Box::into_raw(fpregs) as *mut u8;
+            let mut old_fpregs_slice = unsafe {
+                std::slice::from_raw_parts_mut(
+                    curr_user_ctxt.extra_context_ptr,
+                    curr_user_ctxt.extra_context_size as usize,
+                )
+            };
+            old_fpregs_slice.copy_from_slice(&last_ucontext.fpregs);
         }
-        ExtraContext::Xsave => {
+        ExtraContext::XsaveOnHeap => {
             // Signal raised by exception
-            // The xsave_area is stored at a special area reserved on kernel's stack. We can just overwrite this area with the latest user context
-            // Note: Currently, we only restore the fpregs instead of restoring the whole xsave area for sigreturn. Because during the
-            // handle path, we don't touch other advanced registers. However, in the future, if we have to touch those registers,
-            // we should restore the whole xsave area when sigreturn.
+            // The xsave_area is stored on kernel heap
             let latest_fpregs = unsafe { FpRegs::from_slice(&last_ucontext.fpregs) };
-            let xsave_area =
-                unsafe { (&mut *(curr_user_ctxt.extra_context_ptr as *mut XsaveArea)) };
+            let mut xsave_area = ManuallyDrop::new(unsafe {
+                BoxXsaveArea::from_raw(
+                    curr_user_ctxt.extra_context_ptr,
+                    curr_user_ctxt.extra_context_size as usize,
+                )
+            });
             xsave_area.set_fpregs_area(latest_fpregs);
+        }
+        ExtraContext::XsaveOnStack => {
+            // As long as we switch the control to the userspace, we must save the context on heap
+            // to prevent overwritten when recursive exception/interrupt happens
+            unreachable!()
         }
     }
 
@@ -263,7 +284,8 @@ fn handle_signals_by_user(
         *info = signal.to_info();
         info as *mut siginfo_t
     };
-    // 2. Allocate and init ucontext_t on the user stack.
+    // 2. Allocate and init ucontext_t on the user stack. And save the context's address for restoring after the handler
+    let mut restore_context = RestoreContext::new_uninit();
     let ucontext = {
         // The x86 calling convention requires rsp to be 16-byte aligned.
         // The following allocation on stack is right before we "call" the
@@ -277,32 +299,109 @@ fn handle_signals_by_user(
         ucontext.uc_sigmask = old_sigmask.to_c();
         // Save the user context
         ucontext.uc_mcontext.inner = curr_user_ctxt.clone();
+        // Reset the extra context to prevent leaking the info to userspace
+        ucontext.uc_mcontext.inner.extra_context_ptr = ptr::null_mut();
+        ucontext.uc_mcontext.inner.extra_context_size = 0;
 
-        // Save the floating point registers
-        if curr_user_ctxt.extra_context_ptr != ptr::null_mut() {
-            // Signal from exception handling
-            debug_assert!(matches!(curr_user_ctxt.extra_context, ExtraContext::Xsave));
-            let fpregs_area =
-                unsafe { (&*(curr_user_ctxt.extra_context_ptr as *mut XsaveArea)) }.get_fpregs();
-            ucontext.fpregs.copy_from_slice(fpregs_area.as_slice());
-            // Clear the floating point registers, since we do not need to recover this when this syscall return
-            curr_user_ctxt.extra_context_ptr = ptr::null_mut();
+        if curr_user_ctxt.extra_context_ptr == ptr::null_mut() {
+            match curr_user_ctxt.extra_context {
+                ExtraContext::Fpregs => {
+                    // If curr_user_ctxt.extra_context_ptr is null, signal is handled in a normal syscall
+                    // We need a correct fxsave structure in the buffer, because the app may modify part of
+                    // it to update the floating point after the signal handler finished.
+                    // fpregs context is saved at two places:
+                    // (1) Copy to ucontext which can be used by user's handler
+                    // (2) Save at the heap and store the pointer to Occlum's defined RestoreContext
+                    let fpregs = Box::new(FpRegs::save());
+                    ucontext.fpregs.copy_from_slice(fpregs.as_slice());
+                    let fpregs_raw_ptr = Box::into_raw(fpregs) as *mut u8;
+                    let extra_context = ExtraCtx::new(
+                        ExtraContext::Fpregs,
+                        fpregs_raw_ptr,
+                        std::mem::size_of::<FpRegs>() as u64,
+                    );
+                    restore_context.set_extra_context(extra_context);
+                }
+                ExtraContext::XsaveOnStack | ExtraContext::XsaveOnHeap => unreachable!(),
+            }
         } else {
-            // Raise the signal with direct syscall
-            debug_assert!(
-                matches!(curr_user_ctxt.extra_context, ExtraContext::Fpregs)
-                    && curr_user_ctxt.extra_context_ptr == ptr::null_mut()
-            );
+            // curr_user_ctxt.extra_context_ptr != ptr::null_mut()
+            match curr_user_ctxt.extra_context {
+                ExtraContext::Fpregs => {
+                    // Handle another signal found after previous sigreturn and before sysret, reuse the fpregs context
+                    let fpregs =
+                        unsafe { Box::from_raw(curr_user_ctxt.extra_context_ptr as *mut FpRegs) };
+                    ucontext.fpregs.copy_from_slice(fpregs.as_slice());
+                    let fpregs_raw_ptr = Box::into_raw(fpregs) as *mut u8;
 
-            // We need a correct fxsave structure in the buffer,
-            // because the app may modify part of it to update the
-            // floating point after the signal handler finished.
-            let fpregs = FpRegs::save();
-            ucontext.fpregs.copy_from_slice(fpregs.as_slice());
+                    // ucontext.uc_mcontext.inner.extra_context = ExtraContext::Fpregs;
+                    // ucontext.uc_mcontext.inner.extra_context_size =
+                    //     std::mem::size_of::<FpRegs>() as u64;
+                    let extra_context = ExtraCtx::new(
+                        ExtraContext::Fpregs,
+                        fpregs_raw_ptr,
+                        std::mem::size_of::<FpRegs>() as u64,
+                    );
+                    restore_context.set_extra_context(extra_context);
+                }
+                // force_signal from exception or deliver_signal when interrupt returns
+                ExtraContext::XsaveOnStack => {
+                    // Save Xsave area at the heap and store the pointer to Occlum's defined CpuContext.
+                    // So that recursive exception will not overwrite the xsave area.
+                    let xsave_size = curr_user_ctxt.extra_context_size;
+                    debug_assert!(
+                        xsave_size != 0 && curr_user_ctxt.extra_context_ptr != ptr::null_mut()
+                    );
+                    let xsave_area = ManuallyDrop::new(BoxXsaveArea::new_with_slice(unsafe {
+                        std::slice::from_raw_parts(
+                            curr_user_ctxt.extra_context_ptr,
+                            xsave_size as usize,
+                        )
+                    }));
+
+                    let extra_context =
+                        ExtraCtx::new(ExtraContext::XsaveOnHeap, xsave_area.raw_ptr(), xsave_size);
+                    restore_context.set_extra_context(extra_context);
+
+                    // Copy fpregs to ucontext for user's handler
+                    let fpregs_area = xsave_area.get_fpregs();
+                    ucontext.fpregs.copy_from_slice(fpregs_area.as_slice());
+                }
+                // Handle another signal before sysret during exception/interrupt
+                ExtraContext::XsaveOnHeap => {
+                    debug_assert!(
+                        curr_user_ctxt.extra_context_size != 0
+                            && curr_user_ctxt.extra_context_ptr != ptr::null_mut()
+                    );
+                    // xsave area is already saved on the heap. Just reuse it.
+                    let xsave_area = ManuallyDrop::new(unsafe {
+                        BoxXsaveArea::from_raw(
+                            curr_user_ctxt.extra_context_ptr,
+                            curr_user_ctxt.extra_context_size as usize,
+                        )
+                    });
+                    let extra_context = ExtraCtx::new(
+                        ExtraContext::XsaveOnHeap,
+                        xsave_area.raw_ptr(),
+                        curr_user_ctxt.extra_context_size,
+                    );
+                    restore_context.set_extra_context(extra_context);
+
+                    // Copy fpregs to ucontext for user's handler
+                    let fpregs_area = xsave_area.get_fpregs();
+                    ucontext.fpregs.copy_from_slice(fpregs_area.as_slice());
+                }
+            }
         }
+
+        // Clear the context pointer, since we do not need to recover this when this syscall return
+        curr_user_ctxt.extra_context_ptr = ptr::null_mut();
+        curr_user_ctxt.extra_context_size = 0;
 
         ucontext as *mut ucontext_t
     };
+    restore_context.set_ucontext_ptr(ucontext);
+
     // 3. Set up the call return address on the stack before we "call" the signal handler
     let handler_stack_top = {
         let handler_stack_top = user_stack.alloc::<usize>()?;
@@ -322,7 +421,7 @@ fn handle_signals_by_user(
 
     PRE_UCONTEXTS.with(|ref_cell| {
         let mut stack = ref_cell.borrow_mut();
-        stack.push(ucontext).unwrap();
+        stack.push(restore_context).unwrap();
     });
     Ok(())
 }
@@ -402,8 +501,71 @@ thread_local! {
 
 #[derive(Debug, Default)]
 struct CpuContextStack {
-    stack: [Option<*mut ucontext_t>; 32],
+    stack: [Option<RestoreContext>; 32],
     count: usize,
+}
+
+// Save the context ptr to restore after the signal handler returns
+#[derive(Debug)]
+struct RestoreContext {
+    ucontext: *mut ucontext_t,
+    extra_context: ExtraCtx,
+}
+
+#[derive(Debug)]
+struct ExtraCtx {
+    type_: ExtraContext,
+    ptr: *mut u8,
+    size: u64,
+}
+
+impl Default for ExtraCtx {
+    fn default() -> Self {
+        Self {
+            type_: ExtraContext::Fpregs,
+            ptr: ptr::null_mut(),
+            size: 0,
+        }
+    }
+}
+
+impl ExtraCtx {
+    fn new(type_: ExtraContext, ptr: *mut u8, size: u64) -> Self {
+        Self { type_, ptr, size }
+    }
+
+    pub fn consume(self) -> (ExtraContext, *mut u8, u64) {
+        (self.type_, self.ptr, self.size)
+    }
+}
+
+impl RestoreContext {
+    pub fn new_uninit() -> Self {
+        Self {
+            ucontext: ptr::null_mut() as *mut ucontext_t,
+            extra_context: Default::default(),
+        }
+    }
+
+    pub fn set_ucontext_ptr(&mut self, ucontext: *mut ucontext_t) {
+        self.ucontext = ucontext;
+    }
+
+    pub fn set_extra_context(&mut self, extra_context: ExtraCtx) {
+        self.extra_context = extra_context;
+    }
+
+    pub fn ucontext(&self) -> *mut ucontext_t {
+        self.ucontext
+    }
+
+    pub fn extra_context(&self) -> &ExtraCtx {
+        &self.extra_context
+    }
+
+    pub fn consume(self) -> (*mut ucontext_t, ExtraCtx) {
+        (self.ucontext, self.extra_context)
+    }
 }
 
 impl CpuContextStack {
@@ -419,7 +581,7 @@ impl CpuContextStack {
         self.count == 0
     }
 
-    pub fn push(&mut self, cpu_context: *mut ucontext_t) -> Result<()> {
+    pub fn push(&mut self, cpu_context: RestoreContext) -> Result<()> {
         if self.full() {
             return_errno!(ENOMEM, "cpu context stack is full");
         }
@@ -428,7 +590,7 @@ impl CpuContextStack {
         Ok(())
     }
 
-    pub fn pop(&mut self) -> Option<*mut ucontext_t> {
+    pub fn pop(&mut self) -> Option<RestoreContext> {
         if self.empty() {
             return None;
         }

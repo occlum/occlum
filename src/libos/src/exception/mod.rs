@@ -103,8 +103,9 @@ pub fn do_handle_exception(
     let user_context = unsafe { &mut *user_context };
     *user_context = CpuContext::from_sgx(&info.cpu_context);
     let xsave_area = info.xsave_area.as_mut_ptr();
-    user_context.extra_context = ExtraContext::Xsave;
+    user_context.extra_context = ExtraContext::XsaveOnStack;
     user_context.extra_context_ptr = xsave_area;
+    user_context.extra_context_size = info.xsave_size;
 
     // Try to do instruction emulation first
     if info.exception_vector == sgx_exception_vector_t::SGX_EXCEPTION_VECTOR_UD {
