@@ -30,7 +30,7 @@ jobs:
       shell: bash
 
     - name: Create container
-      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04
+      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-test-ubuntu20.04
       shell: bash
 
     - uses: ./.github/workflows/composite_action/prebuild

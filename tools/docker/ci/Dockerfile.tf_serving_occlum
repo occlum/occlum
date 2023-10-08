@@ -2,7 +2,7 @@ ARG OCCLUM_VERSION
 FROM occlumbackup/occlum:latest-ubuntu18.04-tf_serving_base as binary_build
 WORKDIR /root
 
-FROM occlum/occlum:$OCCLUM_VERSION-ubuntu20.04 as base
+FROM occlum/occlum:$OCCLUM_VERSION-test-ubuntu20.04 as base
 LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
 
 WORKDIR /root
