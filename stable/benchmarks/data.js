@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1696717291653,
+  "lastUpdate": 1696833514650,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -944,6 +944,38 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 1971,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "jessehui",
+            "username": "jessehui"
+          },
+          "committer": {
+            "name": "jessehui",
+            "username": "jessehui"
+          },
+          "id": "04927c5d6396d2b36b69a7230aebb0b8fbfa1eed",
+          "message": "Add EDMM and AMX support for 0.30.0 release",
+          "timestamp": "2021-12-27T10:58:14Z",
+          "url": "https://github.com/occlum/occlum/pull/1408/commits/04927c5d6396d2b36b69a7230aebb0b8fbfa1eed"
+        },
+        "date": 1696833513159,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 708,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 708,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
