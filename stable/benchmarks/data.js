@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1696833514650,
+  "lastUpdate": 1696833541549,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -2260,6 +2260,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 694.45,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "jessehui",
+            "username": "jessehui"
+          },
+          "committer": {
+            "name": "jessehui",
+            "username": "jessehui"
+          },
+          "id": "04927c5d6396d2b36b69a7230aebb0b8fbfa1eed",
+          "message": "Add EDMM and AMX support for 0.30.0 release",
+          "timestamp": "2021-12-27T10:58:14Z",
+          "url": "https://github.com/occlum/occlum/pull/1408/commits/04927c5d6396d2b36b69a7230aebb0b8fbfa1eed"
+        },
+        "date": 1696833538535,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.62,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 351.01,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 5766.13,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 1401.61,
             "unit": "ms",
             "extra": "per95"
           }
