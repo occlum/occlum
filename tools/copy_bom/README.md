@@ -47,7 +47,7 @@ The second part in the line indicates where to find shared libraries. All paths 
 
 # known limitations
 
-- The use of wildcard(like *) in files or directories is not supported. It may result in `copy_bom` behaving incorrectly.
+- The use of wildcard(like *) in files or directories is not supported. It may result in `copy_bom` behaving incorrectly. To achieve a similar purpose, directly add `/` after the directory name to copy all contents in the directory while not copying the directory itself. 
 - If we create symbolic link in bom file, it will always delete the old link and create a new one. It will change the modification time of the symbolic link.
 - Environmental variables pointing to an empty value may fail to resolve.
 

@@ -461,11 +461,7 @@ impl BomManagement {
         // get all files in copydirs. filter directories and symlinks
         let mut files_in_copied_dirs = Vec::new();
         for (src, dest) in dirs_to_copy {
-            let dirname = PathBuf::from(src)
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .to_string();
+            let dirname = src.split('/').last().unwrap();
             let dest_dir = PathBuf::from(dest)
                 .join(dirname)
                 .to_string_lossy()
