@@ -36,3 +36,11 @@ targets:
     mkdirs:
       - python-occlum
       - python-occlum/bin
+  - target: /etc
+    copy:
+      - dirs:
+        # If there's a '/' as the postfix in directory name, copy the contents in 
+        # directories, not including the directory itself.
+        # cp -r /etc/opt/ /etc
+        - /etc/opt/
+
