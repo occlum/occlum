@@ -31,6 +31,8 @@ pub fn do_arch_prctl(code: ArchPrctlCode, addr: *mut usize) -> Result<()> {
                 } else {
                     info!("AMX is enabled for this enclave");
                 }
+            } else {
+                return_errno!(ENOSYS, "feature not supported");
             }
         }
     }
