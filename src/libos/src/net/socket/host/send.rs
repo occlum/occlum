@@ -1,5 +1,17 @@
 use super::*;
 
+#[derive(Debug)]
+pub struct Sender {
+    alloc: UntrustedSliceAlloc,
+}
+
+impl Sender {
+    pub fn new() -> Result<Self> {
+        let alloc = UntrustedSliceAlloc::new(SEND_BUF_SIZE)?;
+        Ok(Self { alloc })
+    }
+}
+
 impl HostSocket {
     pub fn send(&self, buf: &[u8], flags: SendFlags) -> Result<usize> {
         self.sendto(buf, flags, &None)
@@ -24,16 +36,31 @@ impl HostSocket {
         control: Option<&[u8]>,
     ) -> Result<usize> {
         let data_length = data.iter().map(|s| s.len()).sum();
-        let u_allocator = UntrustedSliceAlloc::new(data_length)?;
+        let mut sender: SgxMutexGuard<'_, Sender>;
+        let mut ocall_alloc;
+        // Allocated slice in untrusted memory region
+        let u_allocator = if data_length > SEND_BUF_SIZE {
+            // Ocall allocator
+            ocall_alloc = UntrustedSliceAlloc::new(data_length)?;
+            &mut ocall_alloc
+        } else {
+            // Inner allocator, lock buffer until send ocall completion
+            sender = self.sender.lock().unwrap();
+            &mut sender.alloc
+        };
+
         let u_data = {
             let mut bufs = Vec::new();
             for buf in data {
-                bufs.push(u_allocator.new_slice(buf)?);
+                let u_slice = u_allocator.new_slice(buf)?;
+                bufs.push(u_slice);
             }
             bufs
         };
 
-        self.do_sendmsg_untrusted_data(&u_data, flags, name, control)
+        let retval = self.do_sendmsg_untrusted_data(&u_data, flags, name, control);
+        u_allocator.reset();
+        retval
     }
 
     fn do_sendmsg_untrusted_data(

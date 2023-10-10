@@ -1,5 +1,6 @@
 use super::*;
 use std::alloc::{AllocError, Allocator, Layout};
+use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -20,6 +21,8 @@ pub struct UntrustedSliceAlloc {
     /// New slices must be allocated from [buf_ptr + buf_pos, buf_ptr + buf_size)
     buf_pos: AtomicUsize,
 }
+
+unsafe impl Send for UntrustedSliceAlloc {}
 
 impl UntrustedSliceAlloc {
     pub fn new(buf_size: usize) -> Result<Self> {
@@ -68,6 +71,10 @@ impl UntrustedSliceAlloc {
         let new_slice = unsafe { std::slice::from_raw_parts_mut(new_slice_ptr, new_slice_len) };
         Ok(UntrustedSlice { slice: new_slice })
     }
+
+    pub fn reset(&mut self) {
+        self.buf_pos.store(0, Ordering::Relaxed);
+    }
 }
 
 impl Drop for UntrustedSliceAlloc {
@@ -81,6 +88,15 @@ impl Drop for UntrustedSliceAlloc {
         unsafe {
             UNTRUSTED_ALLOC.deallocate(NonNull::new(self.buf_ptr).unwrap(), layout);
         }
+    }
+}
+
+impl Debug for UntrustedSliceAlloc {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("UntrustedSliceAlloc")
+            .field("buf size", &self.buf_size)
+            .field("buf pos", &self.buf_pos.load(Ordering::Relaxed))
+            .finish()
     }
 }
 
