@@ -43,11 +43,13 @@ impl VMArea {
     ) -> Self {
         let epc_type = EPCMemType::new(&range);
         let pages = {
-            let pages = PageTracker::new_vma_tracker(&range, &epc_type).unwrap();
-            if pages.is_fully_committed() {
-                None
-            } else {
-                Some(pages)
+            match epc_type {
+                EPCMemType::Reserved => None,
+                EPCMemType::UserRegion => {
+                    let pages =
+                        PageTracker::new_vma_tracker(&range, &EPCMemType::UserRegion).unwrap();
+                    (!pages.is_fully_committed()).then_some(pages)
+                }
             }
         };
 
@@ -141,6 +143,13 @@ impl VMArea {
         &self.access
     }
 
+    pub fn get_private_pid(&self) -> Option<pid_t> {
+        match &self.access {
+            VMAccess::Private(pid) => Some(*pid),
+            VMAccess::Shared(_) => None,
+        }
+    }
+
     pub fn belong_to(&self, target_pid: pid_t) -> bool {
         match &self.access {
             VMAccess::Private(pid) => *pid == target_pid,
@@ -203,17 +212,16 @@ impl VMArea {
 
         // Commit pages if needed
         if !vm_area.is_fully_committed() && page_policy == &PagePolicy::CommitNow {
-            vm_area
-                .pages_mut()
-                .commit_current_vma_whole(VMPerms::DEFAULT)?;
+            vm_area.pages_mut().commit_whole(VMPerms::DEFAULT)?;
             vm_area.pages = None;
         }
 
         // Initialize committed memory
         if vm_area.is_partially_committed() {
-            return vm_area
-                .init_committed_memory(options.initializer())
-                .map(|_| vm_area);
+            let committed = true;
+            for range in vm_area.pages().get_ranges(committed) {
+                vm_area.init_memory_internal(&range, Some(options.initializer()))?;
+            }
         } else if vm_area.is_fully_committed() {
             // Initialize the memory of the new range
             unsafe {
@@ -225,11 +233,9 @@ impl VMArea {
             if !options.perms().is_default() {
                 vm_area.modify_protection_force(None, vm_area.perms());
             }
-            return Ok(vm_area);
         }
+        // Do nothing if this vma has no committed memory
 
-        // This vma has no committed memory
-        debug_assert!(vm_area.is_reserved_only());
         Ok(vm_area)
     }
 
@@ -352,9 +358,9 @@ impl VMArea {
         Ok(())
     }
 
-    pub fn init_file(&self) -> Option<(&FileRef, usize)> {
+    pub fn backed_file(&self) -> Option<(&FileRef, usize)> {
         if let Some(file) = &self.file_backed {
-            Some(file.init_file())
+            Some(file.backed_file())
         } else {
             None
         }
@@ -439,15 +445,15 @@ impl VMArea {
     }
 
     pub fn is_the_same_to(&self, other: &VMArea) -> bool {
-        if self.access() != other.access() {
-            return false;
-        }
-
         if self.range() != other.range() {
             return false;
         }
 
         if self.perms() != other.perms() {
+            return false;
+        }
+
+        if self.access() != other.access() {
             return false;
         }
 
@@ -481,16 +487,21 @@ impl VMArea {
         if left.size() == 0 || right.size() == 0 {
             return false;
         }
-        // The two VMAs must be owned by the same process
-        if left.access() != right.access() {
-            return false;
-        }
         // The two VMAs must border with each other
         if left.end() != right.start() {
             return false;
         }
         // The two VMAs must have the same memory permissions
         if left.perms() != right.perms() {
+            return false;
+        }
+        // The two VMAs must be owned by the same process privately
+        // Return false if (either is none) or (both are some but two private pids are different)
+        let private_access = left.get_private_pid().zip(right.get_private_pid());
+        if private_access.is_none() {
+            return false;
+        }
+        if private_access.is_some_and(|(left_pid, right_pid)| left_pid != right_pid) {
             return false;
         }
 
@@ -617,7 +628,7 @@ impl VMArea {
         if let Some(initializer) = initializer {
             match initializer {
                 VMInitializer::FileBacked { file } => {
-                    let (file, offset) = file.init_file();
+                    let (file, offset) = file.backed_file();
                     let vma_range_start = self.range.start();
 
                     let init_file_offset = offset + (target_range.start() - vma_range_start);
@@ -643,7 +654,7 @@ impl VMArea {
         } else {
             // No initializer, #PF triggered.
             let init_file = self
-                .init_file()
+                .backed_file()
                 .map(|(file, offset)| (file.clone(), offset));
             if let Some((file, offset)) = init_file {
                 let vma_range_start = self.range.start();
@@ -664,7 +675,7 @@ impl VMArea {
                 self.pages
                     .as_mut()
                     .unwrap()
-                    .commit_range_for_current_vma(target_range, Some(perms))?;
+                    .commit_range(target_range, Some(perms))?;
             }
         }
 
@@ -691,18 +702,6 @@ impl VMArea {
 
         if !new_perm.is_default() {
             self.modify_protection_force(Some(target_range), new_perm);
-        }
-
-        Ok(())
-    }
-
-    // Inintialize the VMA memory if the VMA is partially committed
-    fn init_committed_memory(&mut self, initializer: &VMInitializer) -> Result<()> {
-        debug_assert!(self.is_partially_committed());
-        let committed = true;
-        for range in self.pages().get_ranges(committed) {
-            trace!("init committed memory: {:?}", range);
-            self.init_memory_internal(&range, Some(initializer))?;
         }
 
         Ok(())
@@ -736,8 +735,9 @@ impl VMArea {
                 range.resize(commit_once_size - total_commit_size);
             }
 
+            // We don't take care the file-backed memory here
+            debug_assert!(self.backed_file().is_none());
             self.init_memory_internal(&range, None)?;
-            debug_assert!(self.init_file().is_none());
 
             total_commit_size += range.size();
             if total_commit_size >= commit_once_size {
@@ -756,7 +756,7 @@ impl VMArea {
     // Only used to handle PF triggered by the kernel
     fn commit_current_vma_whole(&mut self) -> Result<()> {
         debug_assert!(!self.is_fully_committed());
-        debug_assert!(self.init_file().is_none());
+        debug_assert!(self.backed_file().is_none());
 
         let mut uncommitted_ranges = self.pages.as_ref().unwrap().get_ranges(false);
         for range in uncommitted_ranges {

@@ -144,7 +144,7 @@ impl FileBacked {
         self.write_back
     }
 
-    pub fn init_file(&self) -> (&FileRef, usize) {
+    pub fn backed_file(&self) -> (&FileRef, usize) {
         (&self.file, self.offset)
     }
 

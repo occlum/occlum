@@ -31,9 +31,9 @@ pub struct UserRegionMem;
 
 #[repr(C, align(4096))]
 #[derive(Clone)]
-struct Page([u8; PAGE_SIZE]);
+struct ZeroPage([u8; PAGE_SIZE]);
 
-impl Page {
+impl ZeroPage {
     fn new() -> Self {
         Self([0; PAGE_SIZE])
     }
@@ -41,11 +41,11 @@ impl Page {
     fn new_page_aligned_vec(size: usize) -> Vec<u8> {
         debug_assert!(size % PAGE_SIZE == 0);
         let page_num = size / PAGE_SIZE;
-        let mut page_vec = vec![Page::new(); page_num];
+        let mut page_vec = vec![Self::new(); page_num];
 
         let ptr = page_vec.as_mut_ptr();
 
-        let size = page_num * std::mem::size_of::<Page>();
+        let size = page_num * std::mem::size_of::<Self>();
         std::mem::forget(page_vec);
 
         unsafe { Vec::from_raw_parts(ptr as *mut u8, size, size) }
@@ -53,7 +53,7 @@ impl Page {
 }
 
 lazy_static! {
-    static ref ZERO_PAGES: Vec<u8> = Page::new_page_aligned_vec(PAGE_SIZE);
+    static ref ZERO_PAGE: Vec<u8> = ZeroPage::new_page_aligned_vec(PAGE_SIZE);
 }
 
 pub trait EPCAllocator {
@@ -100,6 +100,7 @@ impl EPCAllocator for ReservedMem {
     }
 
     fn modify_protection(addr: usize, length: usize, protection: VMPerms) -> Result<()> {
+        let mut ret_val = 0;
         let ret = if rsgx_is_supported_EDMM() {
             unsafe {
                 sgx_tprotect_rsrv_mem(addr as *const c_void, length, protection.bits() as i32)
@@ -107,7 +108,6 @@ impl EPCAllocator for ReservedMem {
         } else {
             // For platforms without EDMM, sgx_tprotect_rsrv_mem is actually useless.
             // However, at least we can set pages to desired protections in the host kernel page table.
-            let mut ret_val = 0;
             unsafe {
                 occlum_ocall_mprotect(
                     &mut ret_val as *mut i32,
@@ -118,7 +118,7 @@ impl EPCAllocator for ReservedMem {
             }
         };
 
-        if ret != sgx_status_t::SGX_SUCCESS {
+        if ret != sgx_status_t::SGX_SUCCESS || ret_val != 0 {
             return_errno!(ENOMEM, "reserved memory modify protection failure");
         }
 
@@ -182,10 +182,10 @@ impl UserRegionMem {
         let ptr = NonNull::<u8>::new(start_addr as *mut u8).unwrap();
         let perm = Perm::from_bits(new_perms.bits()).unwrap();
         if size == PAGE_SIZE {
-            unsafe { EmmAlloc::commit_with_data(ptr, ZERO_PAGES.as_slice(), perm) }
+            unsafe { EmmAlloc::commit_with_data(ptr, ZERO_PAGE.as_slice(), perm) }
                 .map_err(|e| errno!(Errno::from(e as u32)))?;
         } else {
-            let data = Page::new_page_aligned_vec(size);
+            let data = ZeroPage::new_page_aligned_vec(size);
             unsafe { EmmAlloc::commit_with_data(ptr, data.as_slice(), perm) }
                 .map_err(|e| errno!(Errno::from(e as u32)))?;
         }
@@ -199,7 +199,7 @@ impl UserRegionMem {
         file_offset: usize,
         new_perms: VMPerms,
     ) -> Result<()> {
-        let mut data = Page::new_page_aligned_vec(size);
+        let mut data = ZeroPage::new_page_aligned_vec(size);
         let len = file
             .read_at(file_offset, data.as_mut_slice())
             .map_err(|_| errno!(EACCES, "failed to init memory from file"))?;
@@ -306,7 +306,7 @@ impl EPCMemType {
             if let Some(gap_range) = USER_SPACE_VM_MANAGER.gap_range() {
                 debug_assert!({
                     if range.size() > 0 {
-                        !gap_range.is_superset_of(range)
+                        !gap_range.overlap_with(range)
                     } else {
                         // Ignore for sentry VMA
                         true
@@ -341,43 +341,20 @@ impl EPCMemType {
     }
 }
 
-pub fn commit_epc_for_user_space(
-    start_addr: usize,
-    size: usize,
-    new_perms: Option<VMPerms>,
-) -> Result<()> {
-    if let Some(new_perms) = new_perms {
-        // To make it concurrent safe when commit epc and set new permission, we need to use EACCEPTCOPY
-        commit_epc_for_user_space_with_new_permission(start_addr, size, new_perms)
-    } else {
-        commit_epc_for_user_space_internal(start_addr, size)
-    }
-}
-
-fn commit_epc_for_user_space_internal(start_addr: usize, size: usize) -> Result<()> {
+pub fn commit_memory(start_addr: usize, size: usize, new_perms: Option<VMPerms>) -> Result<()> {
     trace!(
-        "commit epc: {:?}",
-        VMRange::new_with_size(start_addr, size).unwrap()
-    );
-    UserRegionMem::commit_memory(start_addr, size)
-}
-
-// We should make memory commit and permission change atomic to prevent data races
-// Thus, if the new perms are not the default permission (RW),
-fn commit_epc_for_user_space_with_new_permission(
-    start_addr: usize,
-    size: usize,
-    new_perms: VMPerms,
-) -> Result<()> {
-    trace!(
-        "commit epc: {:?}",
-        VMRange::new_with_size(start_addr, size).unwrap()
+        "commit epc: {:?}, new permission: {:?}",
+        VMRange::new_with_size(start_addr, size).unwrap(),
+        new_perms
     );
 
-    if new_perms != VMPerms::DEFAULT {
-        UserRegionMem::commit_memory_with_new_permission(start_addr, size, new_perms)
-    } else {
-        UserRegionMem::commit_memory(start_addr, size)
+    // We should make memory commit and permission change atomic to prevent data races. Thus, if the new perms
+    // are not the default permission (RW), we implement a different function by calling EACCEPTCOPY
+    match new_perms {
+        Some(perms) if perms != VMPerms::DEFAULT => {
+            UserRegionMem::commit_memory_with_new_permission(start_addr, size, perms)
+        }
+        _ => UserRegionMem::commit_memory(start_addr, size),
     }
 }
 

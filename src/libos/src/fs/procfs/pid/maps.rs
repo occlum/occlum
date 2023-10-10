@@ -91,7 +91,7 @@ fn get_output_for_vma(vma: &VMArea, heap_or_stack: Option<&str>) -> String {
     let perms = vma.perms();
 
     let (file_path, offset, device_id, inode_num) = {
-        if let Some((file, offset)) = vma.init_file() {
+        if let Some((file, offset)) = vma.backed_file() {
             let inode_file = file.as_inode_file().unwrap();
             let file_path = inode_file.abs_path();
             let inode_num = inode_file.inode().metadata().unwrap().inode;

@@ -24,6 +24,8 @@
 #![feature(arbitrary_enum_discriminant)]
 // for core::ptr::non_null::NonNull addr() method
 #![feature(strict_provenance)]
+// for VMArea::can_merge_vmas
+#![feature(is_some_and)]
 
 #[macro_use]
 extern crate alloc;

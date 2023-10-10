@@ -125,7 +125,7 @@ impl PageTracker {
 
                 // Skip sentry
                 if page_num != 0 {
-                    new_vma_tracker.update_committed_pages_from_global()?;
+                    new_vma_tracker.get_committed_pages_from_global_tracker()?;
                 }
                 new_vma_tracker
             }
@@ -279,7 +279,7 @@ impl PageTracker {
     }
 
     // Commit memory for the whole current VMA (VMATracker)
-    pub fn commit_current_vma_whole(&mut self, perms: VMPerms) -> Result<()> {
+    pub fn commit_whole(&mut self, perms: VMPerms) -> Result<()> {
         debug_assert!(self.type_ == TrackerType::VMATracker);
 
         if self.is_fully_committed() {
@@ -288,18 +288,12 @@ impl PageTracker {
 
         // Commit EPC
         if self.is_reserved_only() {
-            vm_epc::commit_epc_for_user_space(
-                self.range().start(),
-                self.range().size(),
-                Some(perms),
-            )
-            .unwrap();
+            vm_epc::commit_memory(self.range().start(), self.range().size(), Some(perms)).unwrap();
         } else {
             debug_assert!(self.is_partially_committed());
             let uncommitted_ranges = self.get_ranges(false);
             for range in uncommitted_ranges {
-                vm_epc::commit_epc_for_user_space(range.start(), range.size(), Some(perms))
-                    .unwrap();
+                vm_epc::commit_memory(range.start(), range.size(), Some(perms)).unwrap();
             }
         }
 
@@ -307,24 +301,20 @@ impl PageTracker {
         self.inner.fill(true);
         self.fully_committed = true;
 
-        self.update_pages_for_global_tracker(self.range().start(), self.range().size());
+        self.set_committed_pages_for_global_tracker(self.range().start(), self.range().size());
 
         Ok(())
     }
 
     // Commit memory of a specific range for the current VMA (VMATracker). The range should be verified by caller.
-    pub fn commit_range_for_current_vma(
-        &mut self,
-        range: &VMRange,
-        new_perms: Option<VMPerms>,
-    ) -> Result<()> {
+    pub fn commit_range(&mut self, range: &VMRange, new_perms: Option<VMPerms>) -> Result<()> {
         debug_assert!(self.type_ == TrackerType::VMATracker);
         debug_assert!(self.range().is_superset_of(range));
 
-        vm_epc::commit_epc_for_user_space(range.start(), range.size(), new_perms)?;
+        vm_epc::commit_memory(range.start(), range.size(), new_perms)?;
 
-        self.commit_pages_internal(range.start(), range.size());
-        self.update_pages_for_global_tracker(range.start(), range.size());
+        self.commit_pages_common(range.start(), range.size());
+        self.set_committed_pages_for_global_tracker(range.start(), range.size());
 
         Ok(())
     }
@@ -347,14 +337,15 @@ impl PageTracker {
             new_perms,
         )?;
 
-        self.commit_pages_internal(range.start(), range.size());
-        self.update_pages_for_global_tracker(range.start(), range.size());
+        self.commit_pages_common(range.start(), range.size());
+        self.set_committed_pages_for_global_tracker(range.start(), range.size());
 
         Ok(())
     }
 
-    // VMA tracker update page commit status from global tracker
-    fn update_committed_pages_from_global(&mut self) -> Result<()> {
+    // VMATracker get page commit status from global tracker and update itself
+    // This should be called when the VMATracker inits
+    fn get_committed_pages_from_global_tracker(&mut self) -> Result<()> {
         debug_assert!(self.type_ == TrackerType::VMATracker);
         let mut vma_tracker = self;
         let mut page_chunk_start = get_page_chunk_start_addr(vma_tracker.range().start());
@@ -365,11 +356,11 @@ impl PageTracker {
             if let Some(page_chunk) = manager.inner.get(&page_chunk_addr) {
                 if page_chunk.fully_committed {
                     // global page chunk fully committed. commit pages for vma page chunk
-                    vma_tracker.commit_pages_internal(page_chunk_addr, PAGE_CHUNK_UNIT);
+                    vma_tracker.commit_pages_common(page_chunk_addr, PAGE_CHUNK_UNIT);
                 } else {
                     debug_assert!(page_chunk.tracker.is_some());
                     let global_tracker = page_chunk.tracker.as_ref().unwrap().read().unwrap();
-                    global_tracker.update_committed_pages_for_vma_tracker(vma_tracker);
+                    global_tracker.set_committed_pages_for_vma_tracker(vma_tracker);
                 }
                 drop(manager);
             } else {
@@ -393,36 +384,9 @@ impl PageTracker {
         Ok(())
     }
 
-    // GlobalTracker helps to update VMATracker based on the paging status of itself.
-    fn update_committed_pages_for_vma_tracker(&self, vma_tracker: &mut PageTracker) {
-        debug_assert!(self.type_ == TrackerType::GlobalTracker);
-        debug_assert!(vma_tracker.type_ == TrackerType::VMATracker);
-
-        let global_tracker = self;
-
-        if let Some(intersection_range) = global_tracker.range().intersect(vma_tracker.range()) {
-            let vma_tracker_page_id =
-                (intersection_range.start() - vma_tracker.range().start()) / PAGE_SIZE;
-            let global_tracker_page_id =
-                (intersection_range.start() - global_tracker.range().start()) / PAGE_SIZE;
-            let page_num = intersection_range.size() / PAGE_SIZE;
-
-            vma_tracker.inner[vma_tracker_page_id..vma_tracker_page_id + page_num]
-                .copy_from_bitslice(
-                    &global_tracker.inner
-                        [global_tracker_page_id..global_tracker_page_id + page_num],
-                );
-            if vma_tracker.inner.all() {
-                vma_tracker.fully_committed = true;
-            }
-        } else {
-            // No intersection range, why calling this? Wierd.
-            unreachable!();
-        }
-    }
-
     // VMAtracker helps to update global tracker based on the paging status of itself.
-    fn update_pages_for_global_tracker(&self, commit_start_addr: usize, commit_size: usize) {
+    // This should be called whenever the VMATracker updates and needs to sync with the GlobalTracker.
+    fn set_committed_pages_for_global_tracker(&self, commit_start_addr: usize, commit_size: usize) {
         debug_assert!(self.type_ == TrackerType::VMATracker);
 
         let commit_end_addr = commit_start_addr + commit_size;
@@ -439,7 +403,7 @@ impl PageTracker {
                 // Update the global page tracker
                 if let Some(global_page_tracker) = &page_chunk.tracker {
                     let mut global_tracker = global_page_tracker.write().unwrap();
-                    global_tracker.commit_pages_internal(commit_start_addr, commit_size);
+                    global_tracker.commit_pages_common(commit_start_addr, commit_size);
                     global_tracker.fully_committed
                 } else {
                     // page_tracker is none, the page chunk is fully committed. Go to next chunk.
@@ -467,8 +431,37 @@ impl PageTracker {
         }
     }
 
+    // GlobalTracker helps to update VMATracker based on the paging status of itself.
+    // This should be called when the VMATracker inits.
+    fn set_committed_pages_for_vma_tracker(&self, vma_tracker: &mut PageTracker) {
+        debug_assert!(self.type_ == TrackerType::GlobalTracker);
+        debug_assert!(vma_tracker.type_ == TrackerType::VMATracker);
+
+        let global_tracker = self;
+
+        if let Some(intersection_range) = global_tracker.range().intersect(vma_tracker.range()) {
+            let vma_tracker_page_id =
+                (intersection_range.start() - vma_tracker.range().start()) / PAGE_SIZE;
+            let global_tracker_page_id =
+                (intersection_range.start() - global_tracker.range().start()) / PAGE_SIZE;
+            let page_num = intersection_range.size() / PAGE_SIZE;
+
+            vma_tracker.inner[vma_tracker_page_id..vma_tracker_page_id + page_num]
+                .copy_from_bitslice(
+                    &global_tracker.inner
+                        [global_tracker_page_id..global_tracker_page_id + page_num],
+                );
+            if vma_tracker.inner.all() {
+                vma_tracker.fully_committed = true;
+            }
+        } else {
+            // No intersection range, why calling this? Wierd.
+            unreachable!();
+        }
+    }
+
     // Commit pages for page tracker itself. This is a common method for both VMATracker and GlobalTracker.
-    fn commit_pages_internal(&mut self, start_addr: usize, size: usize) {
+    fn commit_pages_common(&mut self, start_addr: usize, size: usize) {
         debug_assert!(!self.fully_committed);
 
         if let Some(intersection_range) = {
