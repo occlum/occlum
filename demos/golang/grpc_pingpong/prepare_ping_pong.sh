@@ -31,8 +31,6 @@ done
 GOVERSION=`occlum-go version|awk -F ' ' '{printf $3}'`
 export GO111MODULE=on
 if [[ $GOVERSION != 'go1.16.3' ]];then
-	rm -f go.mod
-	occlum-go mod init grpc_pingpong
 	occlum-go mod tidy
 fi
 # update PATH so that the protoc compiler can find the plugin:
