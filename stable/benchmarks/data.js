@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1696833541549,
+  "lastUpdate": 1697062925596,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -976,6 +976,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 708,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Zheng, Qi",
+            "username": "qzheng527",
+            "email": "huaiqing.zq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "cd7a8cbc57af82c9957a7aeb15cd76ef8820807a",
+          "message": " [demos] Specify grpc_pingpong package version for go 1.18",
+          "timestamp": "2023-10-11T06:55:18Z",
+          "url": "https://github.com/occlum/occlum/commit/cd7a8cbc57af82c9957a7aeb15cd76ef8820807a"
+        },
+        "date": 1697062923513,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2023,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2023,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
