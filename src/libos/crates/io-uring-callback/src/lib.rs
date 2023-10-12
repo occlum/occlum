@@ -110,12 +110,13 @@ extern crate sgx_libc as libc;
 #[cfg(feature = "sgx")]
 extern crate sgx_tstd as std;
 
-use std::io;
+use std::{io, println};
 use std::sync::Arc;
 cfg_if::cfg_if! {
     if #[cfg(feature = "sgx")] {
         use std::prelude::v1::*;
-        use std::sync::SgxMutex as Mutex;
+        // use std::sync::SgxMutex as Mutex;
+        use spin::Mutex as Mutex;
     } else {
         use std::sync::Mutex;
     }
@@ -149,7 +150,8 @@ impl Drop for IoUring {
         // This emptyness check prevents handles created by this io_uring become "dangling".
         // That is, no user will ever hold a handle whose associated io_uring instance has
         // been destroyed.
-        let token_table = self.token_table.lock().unwrap();
+        // let token_table = self.token_table.lock().unwrap();
+        let token_table = self.token_table.lock();
         assert!(token_table.len() == 0);
     }
 }
@@ -249,13 +251,12 @@ impl IoUring {
         len: u32,
         offset: libc::off_t,
         flags: types::RwFlags,
-        callback: impl FnOnce(i32) + Send + 'static,
-    ) -> IoHandle {
+    ) {
         let entry = opcode::Write::new(fd, buf, len)
             .offset(offset)
             .rw_flags(flags)
             .build();
-        self.push_entry(entry, callback)
+        self.push_write(entry);
     }
 
     /// Push a readv request into the submission queue of the io_uring.
@@ -313,6 +314,7 @@ impl IoUring {
         callback: impl FnOnce(i32) + Send + 'static,
     ) -> IoHandle {
         let entry = opcode::RecvMsg::new(fd, msg).flags(flags).build();
+        // entry = entry.set_ioprio_poll_first();
         self.push_entry(entry, callback)
     }
 
@@ -399,10 +401,20 @@ impl IoUring {
                 if let Some(cqe) = cq.pop() {
                     let retval = cqe.result();
                     let token_key = cqe.user_data();
+
+                    let flags = cqe.flags();
+                    // println!("return flags: {:?}", flags);
+
+                    // if token_key == 0 {
+                    //     nr_complete += 1;
+                    //     continue;
+                    // }
+
                     if token_key != IoUring::CANCEL_TOKEN_KEY {
                         let io_token = {
                             let token_idx = token_key as usize;
-                            let mut token_table = self.token_table.lock().unwrap();
+                            // let mut token_table = self.token_table.lock().unwrap();
+                            let mut token_table = self.token_table.lock();
                             token_table.remove(token_idx)
                         };
 
@@ -457,7 +469,8 @@ impl IoUring {
     ) -> IoHandle {
         // Create the user-visible handle that is associated with the submission entry
         let io_handle = {
-            let mut token_table = self.token_table.lock().unwrap();
+            // let mut token_table = self.token_table.lock().unwrap();
+            let mut token_table = self.token_table.lock();
             let token_slot = token_table.vacant_entry();
             let token_key = token_slot.key() as u64;
             assert!(token_key != IoUring::CANCEL_TOKEN_KEY);
@@ -475,6 +488,31 @@ impl IoUring {
         self.push(entry);
 
         io_handle
+    }
+
+    unsafe fn push_write(
+        &self,
+        mut entry: SqEntry,
+    ) {
+        // Create the user-visible handle that is associated with the submission entry
+        // let io_handle = {
+        //     let mut token_table = self.token_table.lock().unwrap();
+        //     let token_slot = token_table.vacant_entry();
+        //     let token_key = token_slot.key() as u64;
+        //     assert!(token_key != IoUring::CANCEL_TOKEN_KEY);
+
+        //     let token = Arc::new(IoToken::new(callback, token_key));
+        //     token_slot.insert(token.clone());
+        //     let handle = IoHandle::new(token);
+
+        //     // Associated entry with token, the latter of which is pointed to by handle.
+        //     entry = entry.user_data(token_key);
+
+        //     handle
+        // };
+        let new_entry = entry.user_data(0);
+
+        self.push(new_entry);
     }
 
     /// Cancel an ongoing I/O request.

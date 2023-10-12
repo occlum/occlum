@@ -2,7 +2,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Weak;
 use std::time::Duration;
 
+use io_uring_callback::Fd;
+use sgx_untrusted_alloc::UntrustedBox;
+
 use super::host_event_fd::HostEventFd;
+use crate::io_uring::SINGLETON;
 use crate::prelude::*;
 
 /// A waiter enables a thread to sleep.
@@ -133,15 +137,18 @@ impl Waker {
 struct Inner {
     is_woken: AtomicBool,
     host_eventfd: Arc<HostEventFd>,
+    // val: UntrustedBox<u64>,
 }
 
 impl Inner {
     pub fn new() -> Self {
         let is_woken = AtomicBool::new(false);
         let host_eventfd = current!().host_eventfd().clone();
+        // let val = UntrustedBox::new(0_u64);
         Self {
             is_woken,
             host_eventfd,
+            // val,
         }
     }
 
@@ -187,6 +194,13 @@ impl Inner {
             .is_ok()
         {
             self.host_eventfd.write_u64(1);
+
+            // let host_fd = Fd(self.host_eventfd.host_fd() as _);
+
+            // unsafe { self.val.as_mut_ptr().write(1) };
+            // let io_uring = &*SINGLETON;
+            // let buf_ptr = self.val.as_ptr() as *const u8;
+            // unsafe { io_uring.write(host_fd, buf_ptr, std::mem::size_of::<u64>() as u32, 0, 0) };
         }
     }
 

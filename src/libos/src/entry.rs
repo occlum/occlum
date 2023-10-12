@@ -96,16 +96,24 @@ pub extern "C" fn occlum_ecall_init(
 
         interrupt::init();
 
-        // Init vdso and boot up time stamp here.
-        time::init();
-
         vm::init_user_space();
+
+        std::thread::spawn(move || {
+            let io_uring = &crate::io_uring::SINGLETON;
+            loop {
+                let min_complete = 1;
+                let polling_retries = 10000;
+                io_uring.poll_completions(min_complete, polling_retries);
+            }
+        });
+
+        // Init boot up time stamp here.
+        time::up_time::init();
 
         // Register exception handlers (support cpuid & rdtsc for now)
         register_exception_handlers();
 
         HAS_INIT.store(true, Ordering::Release);
-
         // Enable global backtrace
         unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
 

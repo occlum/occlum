@@ -448,7 +448,7 @@ fn main() {
             TCSNum: tcs_init_num,
             TCSMinPool: tcs_min_pool,
             TCSMaxNum: tcs_max_num,
-            TCSPolicy: 1,
+            TCSPolicy: 0,
             DisableDebug: match occlum_config.metadata.debuggable {
                 true => 0,
                 false => 1,

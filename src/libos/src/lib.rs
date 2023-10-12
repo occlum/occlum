@@ -28,6 +28,8 @@
 #![feature(is_some_and)]
 // for edmm_api macro
 #![feature(linkage)]
+#![feature(map_first_last)]
+#![feature(new_uninit)]
 
 #[macro_use]
 extern crate alloc;
@@ -88,12 +90,14 @@ mod events;
 mod exception;
 mod fs;
 mod interrupt;
+mod io_uring;
 mod ipc;
 mod misc;
 mod net;
 mod process;
 mod sched;
 mod signal;
+mod socket;
 mod syscall;
 mod time;
 mod untrusted;

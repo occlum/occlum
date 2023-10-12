@@ -5,7 +5,8 @@ use std::task::{Context, Poll, Waker};
 cfg_if::cfg_if! {
     if #[cfg(feature = "sgx")] {
         use std::prelude::v1::*;
-        use std::sync::SgxMutex as Mutex;
+        use spin::Mutex as Mutex;
+        // use std::sync::SgxMutex as Mutex;
     } else {
         use std::sync::Mutex;
     }
@@ -64,21 +65,21 @@ impl IoHandle {
 
 impl Unpin for IoHandle {}
 
-impl Future for IoHandle {
-    type Output = i32;
+// impl Future for IoHandle {
+//     type Output = i32;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut inner = self.0.inner.lock().unwrap();
-        match inner.state {
-            IoState::Processed(retval) => Poll::Ready(retval),
-            IoState::Cancelled => Poll::Ready(CANCEL_RETVAL),
-            IoState::Submitted | IoState::Cancelling => {
-                inner.waker = Some(cx.waker().clone());
-                Poll::Pending
-            }
-        }
-    }
-}
+//     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+//         let mut inner = self.0.inner.lock().unwrap();
+//         match inner.state {
+//             IoState::Processed(retval) => Poll::Ready(retval),
+//             IoState::Cancelled => Poll::Ready(CANCEL_RETVAL),
+//             IoState::Submitted | IoState::Cancelling => {
+//                 inner.waker = Some(cx.waker().clone());
+//                 Poll::Pending
+//             }
+//         }
+//     }
+// }
 
 impl Drop for IoHandle {
     fn drop(&mut self) {
@@ -105,17 +106,20 @@ impl IoToken {
     }
 
     pub fn state(&self) -> IoState {
-        let inner = self.inner.lock().unwrap();
+        // let inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.state()
     }
 
     pub fn retval(&self) -> Option<i32> {
-        let inner = self.inner.lock().unwrap();
+        // let inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.retval()
     }
 
     pub fn complete(&self, retval: i32) {
-        let mut inner = self.inner.lock().unwrap();
+        // let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         let callback = inner.complete(retval);
         // Must release the lock before invoking the callback function.
         // This avoids any deadlock if the IoHandle is accessed inside the callback by
@@ -128,7 +132,8 @@ impl IoToken {
     /// Change the state from submited to cancelling.
     /// If transition succeeds, return the token_key for following cancel operation.
     pub fn transit_to_cancelling(&self) -> Result<u64, ()> {
-        let mut inner = self.inner.lock().unwrap();
+        // let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.transit_to_cancelling()
     }
 }

@@ -69,6 +69,10 @@ pub fn do_select(
 
     // Do the poll syscall that is equivalent to the select syscall
     let num_ready_fds = do_poll_new(&poll_fds, timeout)?;
+    debug!(
+        "do_select: num_ready_fds: {:?}, poll_fds: {:?}",
+        num_ready_fds, &poll_fds
+    );
     if num_ready_fds == 0 {
         return Ok(0);
     }
