@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1697236190688,
+  "lastUpdate": 1697236327511,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -7856,6 +7856,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 1501,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "ClawSeven",
+            "username": "ClawSeven",
+            "email": "zehuan97@gmail.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "7e0633116c3f6531f4cb7eee0f965372f47a30f5",
+          "message": "Improve network performance by reducing ocalls",
+          "timestamp": "2023-10-10T08:53:46Z",
+          "url": "https://github.com/occlum/occlum/commit/7e0633116c3f6531f4cb7eee0f965372f47a30f5"
+        },
+        "date": 1697236325286,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 3337,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 3336,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
