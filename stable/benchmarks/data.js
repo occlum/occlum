@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1697062940471,
+  "lastUpdate": 1697322170724,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -2384,6 +2384,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 707.07,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "ClawSeven",
+            "username": "ClawSeven",
+            "email": "zehuan97@gmail.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "7e0633116c3f6531f4cb7eee0f965372f47a30f5",
+          "message": "Improve network performance by reducing ocalls",
+          "timestamp": "2023-10-10T08:53:46Z",
+          "url": "https://github.com/occlum/occlum/commit/7e0633116c3f6531f4cb7eee0f965372f47a30f5"
+        },
+        "date": 1697322168706,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.55,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 85.51,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 1807.22,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 493.24,
             "unit": "ms",
             "extra": "per95"
           }
