@@ -1,5 +1,11 @@
 version: 2
 
+# Set the version of Python
+build:
+  os: ubuntu-20.04  # <- add this line
+  tools:
+    python: "3.10"
+
 sphinx:
   configuration: docs/readthedocs/docs/source/conf.py
 
