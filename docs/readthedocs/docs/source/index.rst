@@ -30,6 +30,7 @@ Table of Contents
    tutorials/gen_occlum_instance.md
    tutorials/distributed_pytorch.md
    tutorials/occlum_ppml.md
+   tutorials/LLM_inference.md
 
 .. toctree::
    :maxdepth: 2
