@@ -2,7 +2,55 @@
 The `copy_bom` tool is designed to copy files described in a bom file to a given dest root directory.
 
 ## Bom file
-Bom file is used to describe which files should be copied to the root directory(usually, the image directory). A bom file contains all files, directories that should be copied to the root directory. We also can define symbolic links and directories that should be created in a bom file. The meanings of each entry in the bom file can be seen in [RFC: bom file](https://github.com/occlum/occlum/issues/565). Also, a bom example with all optional entries can be seen in `example.yaml`.
+Bom file is used to describe which files should be copied to the root directory(usually, the image directory). A bom file contains all files, directories that should be copied to the root directory. We also can define symbolic links and directories that should be created in a bom file. The meanings of each entry in the bom file can be seen in [RFC: bom file](https://github.com/occlum/occlum/issues/565). Also, a bom example with all optional entries can be seen in **example.yaml**.
+
+```yaml
+# include other bom files
+includes:
+  - base.yaml
+  - java-11-alibaba-dragonwell.yaml
+# This excludes will only take effect when copy directories. We will exclude files or dirs with following patterns.
+excludes:
+  - .git
+  - .dockerignore
+targets:
+  # one target represents operations at the same destination
+  - target: /
+    # make directory in dest: mkdir -p $target/dirname
+    mkdirs:
+     - bin
+     - proc
+    # build a symlink: ln -s $src $target/linkname
+    createlinks:
+      - src: ../hello
+        linkname: hello_softlink
+    copy:
+      # from represents the prefix of copydirs and files(to copy)
+      # If there's no copydirs or files, copy the *ENTIRE from directory* to target: cp -r $from/ $target
+      - from: .
+        # copy directory: cp -r $from/dirname $target
+        dirs:
+          - hello_c_demo
+          - example_dirname
+        # copy file: cp $from/filename $target
+        files:
+          - Makefile
+          - name: Cargo.toml
+            hash: DA665E483C11922D07239B1A04BEE0F0C7C1AB6D60AF041DDA7CE56D07AF723E
+            autodep: false
+            rename: Cargo.toml.backup
+  - target: /bin
+    mkdirs:
+      - python-occlum
+      - python-occlum/bin
+  - target: /etc
+    copy:
+      - dirs:
+        # If there's a '/' as the postfix in directory name, copy the contents in
+        # directories, not including the directory itself.
+        # cp -r /etc/opt/ /etc
+        - /etc/opt/
+```
 
 ## copy_bom
 ### overview
@@ -51,7 +99,10 @@ The second part in the line indicates where to find shared libraries. All paths 
 
 ## known limitations
 
-- The use of wildcard(like *) in files or directories is not supported. It may result in `copy_bom` behaving incorrectly.
+- The use of wildcard(like *) in files or directories is not supported. It may result in `copy_bom` behaving incorrectly. To achieve a similar purpose, directly add `/` after the directory name to copy all contents in the directory while not copying the directory itself.
 - If we create symbolic link in bom file, it will always delete the old link and create a new one. It will change the modification time of the symbolic link.
 - Environmental variables pointing to an empty value may fail to resolve.
 
+## Demos
+
+Now all the Occlum [demos](https://github.com/occlum/occlum/tree/master/demos) are using **copy_bom** tool to generate Occlum file system. There is also a [tutorial](https://occlum.readthedocs.io/en/latest/tutorials/gen_occlum_instance.html) to give insight of Occlum instance generation using **copy_bom**.
