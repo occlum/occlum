@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1697580907362,
+  "lastUpdate": 1697581543778,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -7890,6 +7890,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 3336,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Qi Zheng",
+            "username": "qzheng527",
+            "email": "huaiqing.zq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "34c1ff7922a946955355fd8b879611d3bdb90bdb",
+          "message": "[readthedoc] Add build.os for .readthedocs.yaml",
+          "timestamp": "2023-10-17T10:51:46Z",
+          "url": "https://github.com/occlum/occlum/commit/34c1ff7922a946955355fd8b879611d3bdb90bdb"
+        },
+        "date": 1697581542706,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 3643,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 3643,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
