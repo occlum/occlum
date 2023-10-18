@@ -1,17 +1,5 @@
 use super::*;
 
-#[derive(Debug)]
-pub struct Sender {
-    alloc: UntrustedSliceAlloc,
-}
-
-impl Sender {
-    pub fn new() -> Result<Self> {
-        let alloc = UntrustedSliceAlloc::new(SEND_BUF_SIZE)?;
-        Ok(Self { alloc })
-    }
-}
-
 impl HostSocket {
     pub fn send(&self, buf: &[u8], flags: SendFlags) -> Result<usize> {
         self.sendto(buf, flags, &None)
@@ -35,18 +23,17 @@ impl HostSocket {
         name: Option<&[u8]>,
         control: Option<&[u8]>,
     ) -> Result<usize> {
+        let current = current!();
         let data_length = data.iter().map(|s| s.len()).sum();
-        let mut sender: SgxMutexGuard<'_, Sender>;
         let mut ocall_alloc;
         // Allocated slice in untrusted memory region
-        let u_allocator = if data_length > SEND_BUF_SIZE {
+        let u_allocator = if data_length > IO_BUF_SIZE {
             // Ocall allocator
             ocall_alloc = UntrustedSliceAlloc::new(data_length)?;
-            &mut ocall_alloc
+            ocall_alloc.guard()
         } else {
-            // Inner allocator, lock buffer until send ocall completion
-            sender = self.sender.lock().unwrap();
-            &mut sender.alloc
+            // IO buffer per thread
+            current.io_buffer()
         };
 
         let u_data = {
@@ -59,7 +46,6 @@ impl HostSocket {
         };
 
         let retval = self.do_sendmsg_untrusted_data(&u_data, flags, name, control);
-        u_allocator.reset();
         retval
     }
 

@@ -46,13 +46,17 @@ impl UntrustedSliceAlloc {
         })
     }
 
-    pub fn new_slice(&self, src_slice: &[u8]) -> Result<UntrustedSlice> {
+    pub fn guard(&self) -> UntrustedSliceAllocGuard<'_> {
+        UntrustedSliceAllocGuard { alloc: self }
+    }
+
+    fn new_slice(&self, src_slice: &[u8]) -> Result<UntrustedSlice> {
         let mut new_slice = self.new_slice_mut(src_slice.len())?;
         new_slice.read_from_slice(src_slice)?;
         Ok(new_slice)
     }
 
-    pub fn new_slice_mut(&self, new_slice_len: usize) -> Result<UntrustedSlice> {
+    fn new_slice_mut(&self, new_slice_len: usize) -> Result<UntrustedSlice> {
         let new_slice_ptr = {
             // Move self.buf_pos forward if enough space _atomically_.
             let old_pos = self
@@ -72,7 +76,7 @@ impl UntrustedSliceAlloc {
         Ok(UntrustedSlice { slice: new_slice })
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&self) {
         self.buf_pos.store(0, Ordering::Relaxed);
     }
 }
@@ -97,6 +101,25 @@ impl Debug for UntrustedSliceAlloc {
             .field("buf size", &self.buf_size)
             .field("buf pos", &self.buf_pos.load(Ordering::Relaxed))
             .finish()
+    }
+}
+
+pub struct UntrustedSliceAllocGuard<'a> {
+    alloc: &'a UntrustedSliceAlloc,
+}
+
+impl<'a> UntrustedSliceAllocGuard<'a> {
+    pub fn new_slice(&self, src_slice: &[u8]) -> Result<UntrustedSlice> {
+        self.alloc.new_slice(src_slice)
+    }
+    pub fn new_slice_mut(&self, new_slice_len: usize) -> Result<UntrustedSlice> {
+        self.alloc.new_slice_mut(new_slice_len)
+    }
+}
+
+impl<'a> Drop for UntrustedSliceAllocGuard<'a> {
+    fn drop(&mut self) {
+        self.alloc.reset();
     }
 }
 

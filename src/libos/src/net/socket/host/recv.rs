@@ -1,18 +1,6 @@
 use super::*;
 use crate::untrusted::{SliceAsMutPtrAndLen, SliceAsPtrAndLen, UntrustedSliceAlloc};
 
-#[derive(Debug)]
-pub struct Receiver {
-    alloc: UntrustedSliceAlloc,
-}
-
-impl Receiver {
-    pub fn new() -> Result<Self> {
-        let alloc = UntrustedSliceAlloc::new(RECV_BUF_SIZE)?;
-        Ok(Self { alloc })
-    }
-}
-
 impl HostSocket {
     pub fn recv(&self, buf: &mut [u8], flags: RecvFlags) -> Result<usize> {
         let (bytes_recvd, _) = self.recvfrom(buf, flags)?;
@@ -43,18 +31,17 @@ impl HostSocket {
         mut name: Option<&mut [u8]>,
         mut control: Option<&mut [u8]>,
     ) -> Result<(usize, usize, usize, MsgHdrFlags)> {
+        let current = current!();
         let data_length = data.iter().map(|s| s.len()).sum();
-        let mut receiver: SgxMutexGuard<'_, Receiver>;
         let mut ocall_alloc;
         // Allocated slice in untrusted memory region
-        let u_allocator = if data_length > RECV_BUF_SIZE {
+        let u_allocator = if data_length > IO_BUF_SIZE {
             // Ocall allocator
             ocall_alloc = UntrustedSliceAlloc::new(data_length)?;
-            &mut ocall_alloc
+            ocall_alloc.guard()
         } else {
-            // Inner allocator, lock buffer until recv ocall completion
-            receiver = self.receiver.lock().unwrap();
-            &mut receiver.alloc
+            // IO buffer per thread
+            current.io_buffer()
         };
 
         let mut u_data = {
@@ -77,7 +64,6 @@ impl HostSocket {
                 break;
             }
         }
-        u_allocator.reset();
         Ok(retval)
     }
 

@@ -1,3 +1,4 @@
+use spin::Once;
 use std::fmt;
 use std::ptr::NonNull;
 
@@ -12,6 +13,7 @@ use crate::net::THREAD_NOTIFIERS;
 use crate::prelude::*;
 use crate::signal::{SigQueues, SigSet, SigStack};
 use crate::time::ThreadProfiler;
+use crate::untrusted::{UntrustedSliceAlloc, UntrustedSliceAllocGuard};
 
 pub use self::builder::ThreadBuilder;
 pub use self::id::ThreadId;
@@ -20,6 +22,8 @@ pub use self::name::ThreadName;
 mod builder;
 mod id;
 mod name;
+
+pub const IO_BUF_SIZE: usize = 128 * 1024;
 
 pub struct Thread {
     // Low-level info
@@ -50,6 +54,8 @@ pub struct Thread {
     // Misc
     host_eventfd: Arc<HostEventFd>,
     raw_ptr: RwLock<usize>,
+    // Thread ocall buffer
+    io_buffer: Once<UntrustedSliceAlloc>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -214,6 +220,12 @@ impl Thread {
 
     pub fn host_eventfd(&self) -> &Arc<HostEventFd> {
         &self.host_eventfd
+    }
+
+    pub fn io_buffer(&self) -> UntrustedSliceAllocGuard<'_> {
+        self.io_buffer
+            .call_once(|| UntrustedSliceAlloc::new(IO_BUF_SIZE).unwrap())
+            .guard()
     }
 
     pub(super) fn start(&self, host_tid: pid_t) {

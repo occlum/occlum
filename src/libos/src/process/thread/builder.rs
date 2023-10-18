@@ -1,3 +1,4 @@
+use spin::Once;
 use std::ptr::NonNull;
 
 use super::{
@@ -143,6 +144,7 @@ impl ThreadBuilder {
         };
         let host_eventfd = Arc::new(HostEventFd::new()?);
         let raw_ptr = RwLock::new(0);
+        let io_buffer = Once::new();
 
         let new_thread = Arc::new(Thread {
             task,
@@ -165,6 +167,7 @@ impl ThreadBuilder {
             profiler,
             host_eventfd,
             raw_ptr,
+            io_buffer,
         });
 
         let mut inner = new_thread.process().inner();
