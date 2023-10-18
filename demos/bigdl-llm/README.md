@@ -76,9 +76,9 @@ In order to load models using BigDL-LLM, the model name should include "bigdl". 
 
 To serve using the Web UI, you need three main components: web servers that interface with users, model workers that host one or more models, and a controller to coordinate the web server and model workers.
 
-#### Launch the Controller
+#### Launch the Controller in non-TEE env
 ```bash
-./python-occlum/bin/python -m fastchat.serve.controller
+./python-occlum/bin/python -m fastchat.serve.controller --host 0.0.0.0
 ```
 
 This controller manages the distributed workers.
