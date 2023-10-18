@@ -33,7 +33,7 @@ pub use self::spawn_attribute::SpawnAttr;
 pub use self::syscalls::*;
 pub use self::task::Task;
 pub use self::term_status::{ForcedExitStatus, TermStatus};
-pub use self::thread::{Thread, ThreadStatus};
+pub use self::thread::{Thread, ThreadStatus, IO_BUF_SIZE};
 
 mod do_arch_prctl;
 mod do_clone;

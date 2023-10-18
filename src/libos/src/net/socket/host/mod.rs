@@ -4,30 +4,25 @@ use std::mem;
 
 use atomic::Atomic;
 
-use self::recv::Receiver;
-use self::send::Sender;
-
 use super::*;
 use crate::fs::{
     occlum_ocall_ioctl, AccessMode, CreationFlags, File, FileRef, HostFd, IoEvents, IoNotifier,
     IoctlCmd, StatusFlags,
 };
 
+use crate::process::IO_BUF_SIZE;
+
 mod ioctl_impl;
 mod recv;
 mod send;
 mod socket_file;
 
-pub const SEND_BUF_SIZE: usize = 128 * 1024;
-pub const RECV_BUF_SIZE: usize = 128 * 1024;
 /// Native linux socket
 #[derive(Debug)]
 pub struct HostSocket {
     host_fd: HostFd,
     host_events: Atomic<IoEvents>,
     notifier: IoNotifier,
-    sender: SgxMutex<Sender>,
-    receiver: SgxMutex<Receiver>,
 }
 
 impl HostSocket {
@@ -49,14 +44,10 @@ impl HostSocket {
     fn from_host_fd(host_fd: HostFd) -> Result<HostSocket> {
         let host_events = Atomic::new(IoEvents::empty());
         let notifier = IoNotifier::new();
-        let sender = SgxMutex::new(Sender::new()?);
-        let receiver = SgxMutex::new(Receiver::new()?);
         Ok(Self {
             host_fd,
             host_events,
             notifier,
-            sender,
-            receiver,
         })
     }
 

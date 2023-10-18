@@ -6,5 +6,5 @@ mod slice_ext;
 use super::*;
 
 pub use self::alloc::UNTRUSTED_ALLOC;
-pub use self::slice_alloc::{UntrustedSlice, UntrustedSliceAlloc};
+pub use self::slice_alloc::{UntrustedSlice, UntrustedSliceAlloc, UntrustedSliceAllocGuard};
 pub use self::slice_ext::{SliceAsMutPtrAndLen, SliceAsPtrAndLen};
