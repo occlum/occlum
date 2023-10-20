@@ -282,6 +282,6 @@ impl ShmManager {
             return;
         }
         vma.set_perms(perms);
-        vma.modify_permissions_for_committed_pages(perms);
+        vma.modify_permissions_for_committed_pages(old_perms, perms);
     }
 }
