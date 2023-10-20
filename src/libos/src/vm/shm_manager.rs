@@ -202,12 +202,12 @@ impl ShmManager {
             new_vma.inherits_access_from(&old_vma);
 
             // Apply higher perms to the whole new range
-            let new_perms = new_vma.perms();
-            let old_perms = old_vma.perms();
-            if new_perms != old_perms {
-                let perms = new_perms | old_perms;
-                new_vma.set_perms(perms);
-                new_vma.modify_permissions_for_committed_pages(perms);
+            let new_vma_perms = new_vma.perms();
+            let old_vma_perms = old_vma.perms();
+            if new_vma_perms != old_vma_perms {
+                let target_perms = new_vma_perms | old_vma_perms;
+                new_vma.set_perms(target_perms);
+                new_vma.modify_permissions_for_committed_pages(new_vma_perms, target_perms);
             }
 
             let inode_id = Self::inode_id_of(&new_vma);
@@ -280,6 +280,6 @@ impl ShmManager {
             return;
         }
         vma.set_perms(perms);
-        vma.modify_permissions_for_committed_pages(perms);
+        vma.modify_permissions_for_committed_pages(old_perms, perms);
     }
 }

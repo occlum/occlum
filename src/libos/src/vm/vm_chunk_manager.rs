@@ -289,7 +289,8 @@ impl ChunkManager {
             if intersection_vma.range() == containing_vma.range() {
                 // The whole containing_vma is mprotected
                 containing_vma.set_perms(new_perms);
-                containing_vma.modify_permissions_for_committed_pages(containing_vma.perms());
+                containing_vma
+                    .modify_permissions_for_committed_pages(old_perms, containing_vma.perms());
                 containing_vmas.replace_with(VMAObj::new_vma_obj(containing_vma));
                 containing_vmas.move_next();
                 continue;
@@ -313,7 +314,10 @@ impl ChunkManager {
                             new_perms,
                             VMAccess::Private(current_pid),
                         );
-                        new_vma.modify_permissions_for_committed_pages(new_vma.perms());
+                        new_vma.modify_permissions_for_committed_pages(
+                            containing_vma.perms(),
+                            new_vma.perms(),
+                        );
                         let new_vma = VMAObj::new_vma_obj(new_vma);
 
                         // Another new VMA
@@ -347,7 +351,10 @@ impl ChunkManager {
                             VMAccess::Private(current_pid),
                         );
 
-                        new_vma.modify_permissions_for_committed_pages(new_vma.perms());
+                        new_vma.modify_permissions_for_committed_pages(
+                            containing_vma.perms(),
+                            new_vma.perms(),
+                        );
 
                         if remain_vma.start() == containing_vma.start() {
                             // mprotect right side of the vma

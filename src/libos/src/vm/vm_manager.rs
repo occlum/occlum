@@ -771,7 +771,10 @@ impl InternalVMManager {
                         let mut vma = new_chunk.get_vma_for_single_vma_chunk();
                         // Reset memory permissions
                         if !vma.perms().is_default() {
-                            vma.modify_permissions_for_committed_pages(VMPerms::default())
+                            vma.modify_permissions_for_committed_pages(
+                                vma.perms(),
+                                VMPerms::default(),
+                            )
                         }
                         // Reset memory contents
                         unsafe {
@@ -912,7 +915,7 @@ impl InternalVMManager {
                 (true, true) => {
                     // Exact the same vma
                     containing_vma.set_perms(new_perms);
-                    containing_vma.modify_permissions_for_committed_pages(new_perms);
+                    containing_vma.modify_permissions_for_committed_pages(old_perms, new_perms);
                     return Ok(());
                 }
                 (false, false) => {
@@ -928,7 +931,8 @@ impl InternalVMManager {
                         new_perms,
                         VMAccess::Private(current_pid),
                     );
-                    new_vma.modify_permissions_for_committed_pages(new_perms);
+                    new_vma
+                        .modify_permissions_for_committed_pages(containing_vma.perms(), new_perms);
 
                     let remaining_old_vma = {
                         let range = VMRange::new(protect_range.end(), old_end).unwrap();
@@ -952,7 +956,8 @@ impl InternalVMManager {
                         new_perms,
                         VMAccess::Private(current_pid),
                     );
-                    new_vma.modify_permissions_for_committed_pages(new_perms);
+                    new_vma
+                        .modify_permissions_for_committed_pages(containing_vma.perms(), new_perms);
 
                     if same_start {
                         // Protect range is at left side of the containing vma
