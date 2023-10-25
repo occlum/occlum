@@ -249,16 +249,18 @@ impl VMManager {
                     .chunk_manager_mut()
                     .munmap_range(munmap_range);
             }
-            ChunkType::SingleVMA(_) => {
+            ChunkType::SingleVMA(vma) => {
                 // Single VMA Chunk could be updated during the release of internal manager lock. Get overlapping chunk again.
                 // This is done here because we don't want to acquire the big internal manager lock as soon as entering this function.
                 let mut internal_manager = self.internal();
-                let overlapping_chunk = {
+                let overlapping_chunk = if chunk.range() != vma.lock().unwrap().range() {
                     let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
                     process_mem_chunks
                         .iter()
                         .find(|&chunk| chunk.range().intersect(&munmap_range).is_some())
                         .map(|chunk| chunk.clone())
+                } else {
+                    Some(chunk)
                 };
                 if let Some(overlapping_chunk) = overlapping_chunk {
                     return internal_manager.munmap_chunk(
@@ -313,8 +315,25 @@ impl VMManager {
                     .chunk_manager_mut()
                     .mprotect(addr, size, perms);
             }
-            ChunkType::SingleVMA(_) => {
+            ChunkType::SingleVMA(vma) => {
                 let mut internal_manager = self.internal();
+
+                // There are rare cases that mutliple threads do mprotect or munmap for the same single-vma chunk
+                // but for different ranges and the cloned chunk is outdated when acquiring the InternalVMManger lock here.
+                // In this case, we search for the chunk again.
+                let chunk = if chunk.range() != vma.lock().unwrap().range() {
+                    let current = current!();
+                    let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
+                    let chunk = process_mem_chunks
+                        .iter()
+                        .find(|&chunk| chunk.range().is_superset_of(&protect_range));
+                    if chunk.is_none() {
+                        return_errno!(ENOMEM, "invalid mprotect range");
+                    }
+                    chunk.unwrap().clone()
+                } else {
+                    chunk
+                };
                 return internal_manager.mprotect_single_vma_chunk(&chunk, protect_range, perms);
             }
         }
@@ -386,6 +405,10 @@ impl VMManager {
                     .msync_by_range(&sync_range);
             }
             ChunkType::SingleVMA(vma) => {
+                // Note: There are rare cases that mutliple threads do mprotect or munmap for the same single-vma chunk
+                // but for different ranges and the cloned chunk is outdated when the code reaches here.
+                // It is fine here because this function doesn't modify the global chunk list and only operates on the vma
+                // which is updated realtimely.
                 let vma = vma.lock().unwrap();
                 vma.flush_backed_file();
             }
