@@ -45,11 +45,12 @@ use crate::net::{
     do_setsockopt, do_shutdown, do_socket, do_socketpair, mmsghdr, msghdr, msghdr_mut,
 };
 use crate::process::{
-    do_arch_prctl, do_clone, do_execve, do_exit, do_exit_group, do_futex, do_get_robust_list,
-    do_getegid, do_geteuid, do_getgid, do_getgroups, do_getpgid, do_getpgrp, do_getpid, do_getppid,
-    do_gettid, do_getuid, do_prctl, do_set_robust_list, do_set_tid_address, do_setpgid,
-    do_spawn_for_glibc, do_spawn_for_musl, do_vfork, do_wait4, pid_t, posix_spawnattr_t, FdOp,
-    RobustListHead, SpawnFileActions, ThreadStatus,
+    do_arch_prctl, do_capget, do_clone, do_execve, do_exit, do_exit_group, do_futex,
+    do_get_robust_list, do_getegid, do_geteuid, do_getgid, do_getgroups, do_getpgid, do_getpgrp,
+    do_getpid, do_getppid, do_gettid, do_getuid, do_prctl, do_set_robust_list, do_set_tid_address,
+    do_setpgid, do_spawn_for_glibc, do_spawn_for_musl, do_vfork, do_wait4, pid_t,
+    posix_spawnattr_t, CapGetData, CapGetHeader, FdOp, RobustListHead, SpawnFileActions,
+    ThreadStatus,
 };
 use crate::sched::{
     do_get_priority, do_getcpu, do_sched_getaffinity, do_sched_setaffinity, do_sched_yield,
@@ -219,7 +220,7 @@ macro_rules! process_syscall_table_with_callback {
             (Setfsuid = 122) => handle_unsupported(),
             (Setfsgid = 123) => handle_unsupported(),
             (Getsid = 124) => handle_unsupported(),
-            (Capget = 125) => handle_unsupported(),
+            (Capget = 125) => do_capget(header: *mut CapGetHeader, data: *mut CapGetData),
             (Capset = 126) => handle_unsupported(),
             (RtSigpending = 127) => do_rt_sigpending(buf_ptr: *mut sigset_t, buf_size: usize),
             (RtSigtimedwait = 128) => do_rt_sigtimedwait(mask_ptr: *const sigset_t, info_ptr: *mut siginfo_t, timeout_ptr: *const timespec_t, mask_size: usize),
