@@ -253,14 +253,12 @@ impl VMManager {
                 // Single VMA Chunk could be updated during the release of internal manager lock. Get overlapping chunk again.
                 // This is done here because we don't want to acquire the big internal manager lock as soon as entering this function.
                 let mut internal_manager = self.internal();
-                let overlapping_chunk = if chunk.range() != vma.lock().unwrap().range() {
+                let overlapping_chunk = {
                     let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
                     process_mem_chunks
                         .iter()
                         .find(|&chunk| chunk.range().intersect(&munmap_range).is_some())
                         .map(|chunk| chunk.clone())
-                } else {
-                    Some(chunk)
                 };
                 if let Some(overlapping_chunk) = overlapping_chunk {
                     return internal_manager.munmap_chunk(
@@ -320,8 +318,8 @@ impl VMManager {
 
                 // There are rare cases that mutliple threads do mprotect or munmap for the same single-vma chunk
                 // but for different ranges and the cloned chunk is outdated when acquiring the InternalVMManger lock here.
-                // In this case, we search for the chunk again.
-                let chunk = if chunk.range() != vma.lock().unwrap().range() {
+                //Thus, we search for the chunk again.
+                let chunk = {
                     let current = current!();
                     let process_mem_chunks = current.vm().mem_chunks().read().unwrap();
                     let chunk = process_mem_chunks
@@ -331,8 +329,6 @@ impl VMManager {
                         return_errno!(ENOMEM, "invalid mprotect range");
                     }
                     chunk.unwrap().clone()
-                } else {
-                    chunk
                 };
                 return internal_manager.mprotect_single_vma_chunk(&chunk, protect_range, perms);
             }
