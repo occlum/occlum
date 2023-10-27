@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1698445958073,
+  "lastUpdate": 1698446759489,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -4248,6 +4248,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 325.98,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "8759a57902d44f76c24424ca36e378eaa7f8b74c",
+          "message": "Fix concurrent mprotect/munmap causing conflict chunk and vma",
+          "timestamp": "2023-10-25T06:39:54Z",
+          "url": "https://github.com/occlum/occlum/commit/8759a57902d44f76c24424ca36e378eaa7f8b74c"
+        },
+        "date": 1698446758301,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.08,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 56.02,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 1158.53,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 337.94,
             "unit": "ms",
             "extra": "per95"
           }
