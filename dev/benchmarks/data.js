@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1698445223969,
+  "lastUpdate": 1698445958073,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -8130,6 +8130,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 1809,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "8759a57902d44f76c24424ca36e378eaa7f8b74c",
+          "message": "Fix concurrent mprotect/munmap causing conflict chunk and vma",
+          "timestamp": "2023-10-25T06:39:54Z",
+          "url": "https://github.com/occlum/occlum/commit/8759a57902d44f76c24424ca36e378eaa7f8b74c"
+        },
+        "date": 1698445956874,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 517,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 517,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
