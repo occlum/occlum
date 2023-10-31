@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1698791264732,
+  "lastUpdate": 1698792036177,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Sysbench Benchmark": [
@@ -8256,6 +8256,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 517,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "c26830a8203eacc64c57cf1d227a458628bcb86c",
+          "message": "Add searching always for chunks after getting global lock",
+          "timestamp": "2023-10-27T10:40:51Z",
+          "url": "https://github.com/occlum/occlum/commit/c26830a8203eacc64c57cf1d227a458628bcb86c"
+        },
+        "date": 1698792034991,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 558,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 558,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
