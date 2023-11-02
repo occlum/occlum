@@ -26,6 +26,8 @@
 #![feature(strict_provenance)]
 // for VMArea::can_merge_vmas
 #![feature(is_some_and)]
+// for edmm_api macro
+#![feature(linkage)]
 
 #[macro_use]
 extern crate alloc;

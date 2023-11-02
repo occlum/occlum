@@ -90,6 +90,18 @@ pub use self::vm_perms::VMPerms;
 pub use self::vm_range::VMRange;
 pub use self::vm_util::{VMInitializer, VMMapOptionsBuilder};
 
+pub fn init_user_space() {
+    // Lazy initialize
+    let _ = &USER_SPACE_VM_MANAGER;
+}
+
+pub fn is_page_committed(addr: usize) -> bool {
+    page_tracker::USER_SPACE_PAGE_CHUNK_MANAGER
+        .read()
+        .unwrap()
+        .is_committed(addr)
+}
+
 pub fn do_mmap(
     addr: usize,
     size: usize,
