@@ -50,6 +50,27 @@ impl UserSpaceVMManager {
     pub fn get_total_size(&self) -> usize {
         self.range().size()
     }
+
+    pub fn get_user_space_ranges(&self) -> [VMRange; 2] {
+        let total_user_space_range = self.range();
+        let gap_range = self.gap_range();
+        if let Some(gap) = gap_range {
+            // There are two parts of user space
+            let (part_a_start_addr, part_b_end_addr) =
+                (total_user_space_range.start(), total_user_space_range.end());
+            let (part_a_end_addr, part_b_start_addr) = (gap.start(), gap.end());
+            let user_space_range_a = VMRange::new(part_a_start_addr, part_a_end_addr).unwrap();
+            let user_space_range_b = VMRange::new(part_b_start_addr, part_b_end_addr).unwrap();
+            [user_space_range_a, user_space_range_b]
+        } else {
+            // There is no gap. Thus set the part B memory range to zero
+            let (part_a_start_addr, part_a_end_addr) =
+                (total_user_space_range.start(), total_user_space_range.end());
+            let user_space_range_a = VMRange::new(part_a_start_addr, part_a_end_addr).unwrap();
+            let user_space_range_b = unsafe { VMRange::from_unchecked(0, 0) };
+            [user_space_range_a, user_space_range_b]
+        }
+    }
 }
 
 // This provides module teardown function attribute similar with `__attribute__((destructor))` in C/C++ and will

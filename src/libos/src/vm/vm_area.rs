@@ -4,7 +4,9 @@ use super::page_tracker::PageTracker;
 use super::vm_epc::EPCMemType;
 use super::vm_perms::VMPerms;
 use super::vm_range::VMRange;
-use super::vm_util::{FileBacked, PagePolicy, VMInitializer, VMMapOptions, GB, KB, MB};
+use super::vm_util::{
+    AlignedZeroPage, FileBacked, PagePolicy, VMInitializer, VMMapOptions, GB, KB, MB,
+};
 use intrusive_collections::rbtree::{Link, RBTree};
 use intrusive_collections::{intrusive_adapter, KeyAdapter};
 use std::ops::{Deref, DerefMut};
@@ -231,7 +233,7 @@ impl VMArea {
 
             // Set memory permissions
             if !options.perms().is_default() {
-                vm_area.modify_protection_force(None, VMPerms::DEFAULT, vm_area.perms());
+                vm_area.modify_permission_force(None, VMPerms::DEFAULT, vm_area.perms());
             }
         }
         // Do nothing if this vma has no committed memory
@@ -274,7 +276,7 @@ impl VMArea {
         debug_assert!(self.range().is_superset_of(target_range));
         let buf = unsafe { target_range.as_slice_mut() };
         if !self.perms().is_default() {
-            self.modify_protection_force(Some(&target_range), self.perms(), VMPerms::default());
+            self.modify_permission_force(Some(&target_range), self.perms(), VMPerms::default());
         }
 
         if need_flush {
@@ -288,17 +290,13 @@ impl VMArea {
         }
     }
 
-    pub fn modify_permissions_for_committed_pages(
-        &self,
-        current_perms: VMPerms,
-        new_perms: VMPerms,
-    ) {
+    pub fn modify_permissions_for_committed_pages(&self, curr_perms: VMPerms, new_perms: VMPerms) {
         if self.is_fully_committed() {
-            self.modify_protection_force(None, current_perms, new_perms);
+            self.modify_permission_force(None, curr_perms, new_perms);
         } else if self.is_partially_committed() {
             let committed = true;
             for range in self.pages().get_ranges(committed) {
-                self.modify_protection_force(Some(&range), current_perms, new_perms);
+                self.modify_permission_force(Some(&range), curr_perms, new_perms);
             }
         }
     }
@@ -611,7 +609,7 @@ impl VMArea {
     // Current implementation with "unwrap()" can help us find the error quickly by panicing directly. Also, restoring VM state
     // when this function fails will require some work and is not that simple.
     // TODO: Return with Result instead of "unwrap()"" in this function.
-    fn modify_protection_force(
+    fn modify_permission_force(
         &self,
         protect_range: Option<&VMRange>,
         current_perms: VMPerms,
@@ -620,7 +618,8 @@ impl VMArea {
         let protect_range = protect_range.unwrap_or_else(|| self.range());
 
         self.epc_type
-            .modify_protection(
+            .epc_allocator()
+            .modify_permission(
                 protect_range.start(),
                 protect_range.size(),
                 current_perms,
@@ -651,7 +650,7 @@ impl VMArea {
                 }
                 VMInitializer::DoNothing() => {
                     if !self.perms().is_default() {
-                        self.modify_protection_force(Some(target_range), VMPerms::DEFAULT, perms);
+                        self.modify_permission_force(Some(target_range), VMPerms::DEFAULT, perms);
                     }
                 }
                 VMInitializer::FillZeros() => {
@@ -660,37 +659,14 @@ impl VMArea {
                         buf.iter_mut().for_each(|b| *b = 0);
                     }
                     if !perms.is_default() {
-                        self.modify_protection_force(Some(target_range), VMPerms::DEFAULT, perms);
+                        self.modify_permission_force(Some(target_range), VMPerms::DEFAULT, perms);
                     }
                 }
                 _ => todo!(),
             }
         } else {
             // No initializer, #PF triggered.
-            let init_file = self
-                .backed_file()
-                .map(|(file, offset)| (file.clone(), offset));
-            if let Some((file, offset)) = init_file {
-                let vma_range_start = self.range.start();
-
-                let init_file_offset = offset + (target_range.start() - vma_range_start);
-
-                self.pages
-                    .as_mut()
-                    .unwrap()
-                    .commit_memory_and_init_with_file(
-                        target_range,
-                        &file,
-                        init_file_offset,
-                        perms,
-                    )?;
-            } else {
-                // PF triggered, no file-backed memory, just modify protection
-                self.pages
-                    .as_mut()
-                    .unwrap()
-                    .commit_range(target_range, Some(perms))?;
-            }
+            self.init_memory_for_page_fault(target_range)?;
         }
 
         Ok(())
@@ -715,9 +691,38 @@ impl VMArea {
             .map_err(|_| errno!(EACCES, "failed to init memory from file"))?;
 
         if !new_perm.is_default() {
-            self.modify_protection_force(Some(target_range), VMPerms::DEFAULT, new_perm);
+            self.modify_permission_force(Some(target_range), VMPerms::DEFAULT, new_perm);
         }
 
+        Ok(())
+    }
+
+    fn init_memory_for_page_fault(&mut self, target_range: &VMRange) -> Result<()> {
+        let perms = self.perms;
+        let init_file = self
+            .backed_file()
+            .map(|(file, offset)| (file.clone(), offset));
+        if let Some((file, offset)) = init_file {
+            let vma_range_start = self.range.start();
+
+            let init_file_offset = offset + (target_range.start() - vma_range_start);
+
+            let mut data = AlignedZeroPage::new_page_aligned_vec(target_range.size());
+            let _ = file
+                .read_at(init_file_offset, data.as_mut_slice())
+                .map_err(|_| errno!(EACCES, "failed to init memory from file"))?;
+            self.pages.as_mut().unwrap().commit_memory_with_data(
+                target_range,
+                data.as_slice(),
+                perms,
+            )?;
+        } else {
+            // PF triggered, no file-backed memory, just modify protection
+            self.pages
+                .as_mut()
+                .unwrap()
+                .commit_range(target_range, Some(perms))?;
+        }
         Ok(())
     }
 

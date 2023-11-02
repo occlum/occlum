@@ -48,7 +48,6 @@ dcap = []               # DCAP support. The compilation relies on DCAP package.
 cov = ["sgx_cov"]       # Enable coverage colletcion.
 hyper_mode = []         # For running in hyper mode.
 pku = []                # PKU Support
-sim_mode = []           # For running in SGX simulation mode
 
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
 sgx_types = { path = "../../deps/rust-sgx-sdk/sgx_types" }
