@@ -638,3 +638,26 @@ pub trait VMRemapParser {
 
     fn is_free_range(&self, request_range: &VMRange) -> bool;
 }
+
+#[repr(C, align(4096))]
+#[derive(Clone)]
+pub struct AlignedZeroPage([u8; PAGE_SIZE]);
+
+impl AlignedZeroPage {
+    fn new() -> Self {
+        Self([0; PAGE_SIZE])
+    }
+
+    pub fn new_page_aligned_vec(size: usize) -> Vec<u8> {
+        debug_assert!(size % PAGE_SIZE == 0);
+        let page_num = size / PAGE_SIZE;
+        let mut page_vec = vec![Self::new(); page_num];
+
+        let ptr = page_vec.as_mut_ptr();
+
+        let size = page_num * std::mem::size_of::<Self>();
+        std::mem::forget(page_vec);
+
+        unsafe { Vec::from_raw_parts(ptr as *mut u8, size, size) }
+    }
+}
