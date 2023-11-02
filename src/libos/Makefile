@@ -61,12 +61,7 @@ else
 endif
 
 LIBOS_CORE_A := $(OBJ_DIR)/libos/lib/lib$(LIBOS_CORE_LIB_NAME).a
-
-ifeq ($(SGX_MODE), SIM)
-	LIBOS_CORE_RS_A := $(OBJ_DIR)/libos/lib/libocclum_libos_core_rs_sim.a
-else
-	LIBOS_CORE_RS_A := $(OBJ_DIR)/libos/lib/libocclum_libos_core_rs.a
-endif
+LIBOS_CORE_RS_A := $(OBJ_DIR)/libos/lib/libocclum_libos_core_rs.a
 
 # All source code
 RUST_SRCS := $(wildcard src/*.rs src/*/*.rs src/*/*/*.rs src/*/*/*/*.rs src/*/*/*/*/*.rs)
@@ -145,27 +140,20 @@ ifeq ($(SGX_MODE), HYPER)
     LIBOS_FEATURES += hyper_mode
 endif
 
-ifeq ($(SGX_MODE), SIM)
-    LIBOS_FEATURES += sim_mode
-endif
-
 # Release build is for production use. We enable code coverage only for debug
 # build.  It also simplifies the implementation as the release and debug build
 # have different output paths.
 ifeq ($(OCCLUM_RELEASE_BUILD), 1)
 $(LIBOS_CORE_RS_A): $(RUST_SRCS)
 	@RUSTC_BOOTSTRAP=1 RUSTC_WRAPPER=$(RUSTC_WRAPPER) cargo build --release --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR) --features "$(LIBOS_FEATURES)"
-	@mv $(OBJ_DIR)/libos/lib/libocclum_libos_core_rs.a $@ || true
 	@echo "CARGO (release) => $@"
 else ifneq ($(OCCLUM_COV),)
 $(LIBOS_CORE_RS_A): $(RUST_SRCS)
 	@CARGO_INCREMENTAL=0 RUSTC_BOOTSTRAP=1 RUSTFLAGS=$(COV_FLAGS) cargo build --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR) --features "$(LIBOS_FEATURES)"
-	@mv $(OBJ_DIR)/libos/lib/libocclum_libos_core_rs.a $@ || true
 	@echo "CARGO (debug + cov) => $@"
 else
 $(LIBOS_CORE_RS_A): $(RUST_SRCS)
 	@RUSTC_BOOTSTRAP=1 RUSTC_WRAPPER=$(RUSTC_WRAPPER) cargo build --target-dir=$(RUST_TARGET_DIR) -Z unstable-options --out-dir=$(RUST_OUT_DIR) --features "$(LIBOS_FEATURES)"
-	@mv $(OBJ_DIR)/libos/lib/libocclum_libos_core_rs.a $@ || true
 	@echo "CARGO (debug) => $@"
 endif
 

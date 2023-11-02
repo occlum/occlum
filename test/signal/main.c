@@ -365,6 +365,21 @@ int test_handle_sigsegv() {
 
     printf("Signal handler successfully jumped over a null-dereferencing instruction\n");
 
+    void *ptr = mmap(NULL, 8192, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    if (ptr == NULL) {
+        THROW_ERROR("mmap failure");
+    }
+
+    int ret = mprotect(ptr, 8192, PROT_NONE);
+    if (ret < 0) {
+        THROW_ERROR("mprotect failure");
+    }
+
+    val = read_maybe_null(ptr);
+    (void)val; // to suppress "unused variables" warning
+
+    printf("Signal handler successfully jumped over a PROT_NONE-visit instruction\n");
+
     if (sigaction(SIGSEGV, &old_action, NULL) < 0) {
         THROW_ERROR("restoring old signal handler failed");
     }
