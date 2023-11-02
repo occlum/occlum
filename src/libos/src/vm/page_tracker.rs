@@ -4,7 +4,7 @@ use super::user_space_vm::USER_SPACE_VM_MANAGER;
 use super::vm_util::{GB, KB, MB};
 use bitvec::vec::BitVec;
 use util::sync::RwLock;
-use vm_epc::EPCMemType;
+use vm_epc::{EPCAllocator, EPCMemType, UserRegionMem};
 
 // In SGX v2, there is no upper limit for the size of EPC. If the user configure 1 TB memory,
 // and we only use one bit to track if the page is committed, that's 1 TB / 4 kB / 8 bit = 32 MB of memory.
@@ -51,6 +51,23 @@ impl PageChunkManager {
         Self {
             range: range.clone(),
             inner: HashMap::new(),
+        }
+    }
+
+    pub fn is_committed(&self, mem_addr: usize) -> bool {
+        let page_start_addr = align_down(mem_addr, PAGE_SIZE);
+        let page_chunk_start_addr = get_page_chunk_start_addr(page_start_addr);
+        if let Some(global_page_chunk) = self.inner.get(&page_chunk_start_addr) {
+            if let Some(page_tracker) = &global_page_chunk.tracker {
+                let page_id = (page_start_addr - page_chunk_start_addr) / PAGE_SIZE;
+                page_tracker.read().unwrap().inner[page_id] == true
+            } else {
+                debug_assert!(global_page_chunk.fully_committed == true);
+                return true;
+            }
+        } else {
+            // the whole global page chunk is not committed
+            false
         }
     }
 }
@@ -288,12 +305,16 @@ impl PageTracker {
 
         // Commit EPC
         if self.is_reserved_only() {
-            vm_epc::commit_memory(self.range().start(), self.range().size(), Some(perms)).unwrap();
+            UserRegionMem
+                .commit_memory(self.range().start(), self.range().size(), Some(perms))
+                .unwrap();
         } else {
             debug_assert!(self.is_partially_committed());
             let uncommitted_ranges = self.get_ranges(false);
             for range in uncommitted_ranges {
-                vm_epc::commit_memory(range.start(), range.size(), Some(perms)).unwrap();
+                UserRegionMem
+                    .commit_memory(range.start(), range.size(), Some(perms))
+                    .unwrap();
             }
         }
 
@@ -311,7 +332,7 @@ impl PageTracker {
         debug_assert!(self.type_ == TrackerType::VMATracker);
         debug_assert!(self.range().is_superset_of(range));
 
-        vm_epc::commit_memory(range.start(), range.size(), new_perms)?;
+        UserRegionMem.commit_memory(range.start(), range.size(), new_perms)?;
 
         self.commit_pages_common(range.start(), range.size());
         self.set_committed_pages_for_global_tracker(range.start(), range.size());
@@ -319,24 +340,16 @@ impl PageTracker {
         Ok(())
     }
 
-    pub fn commit_memory_and_init_with_file(
+    pub fn commit_memory_with_data(
         &mut self,
         range: &VMRange,
-        file: &FileRef,
-        file_offset: usize,
+        data: &[u8],
         new_perms: VMPerms,
     ) -> Result<()> {
         debug_assert!(self.type_ == TrackerType::VMATracker);
         debug_assert!(self.range().is_superset_of(range));
 
-        vm_epc::commit_memory_and_init_with_file(
-            range.start(),
-            range.size(),
-            file,
-            file_offset,
-            new_perms,
-        )?;
-
+        UserRegionMem.commit_memory_with_data(range.start(), data, new_perms)?;
         self.commit_pages_common(range.start(), range.size());
         self.set_committed_pages_for_global_tracker(range.start(), range.size());
 
