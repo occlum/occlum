@@ -8,7 +8,7 @@ With these two solutions, two customized **init** are provided. Thus users don't
 
 [AECS](https://github.com/SOFAEnclave/enclave-configuration-service) is a short name of **Attestation based Enclave Configuration Service**. Basically, part of its function is acting as a remote attestation based key management service. 
 
-Occlum provides a way to embed the AECS client function in Occlum Init process by simply running `occlum new --init-ra aecs` to initiate an Occlum instance.
+Occlum provides a way to embed the AECS client function in Occlum Init process by simply running `occlum new occlum_instance --init-ra aecs` to initiate an Occlum instance.
 
 Then, users can modify the template `init_ra_conf.json` in oclcum_instance accordingly.
 
