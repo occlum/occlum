@@ -16,6 +16,8 @@ Occlum has the following salient features:
   * **Memory safety.** Occlum is the _first_ SGX LibOS written in a memory-safe programming language ([Rust](https://www.rust-lang.org/)). Thus, Occlum is much less likely to contain low-level, memory-safety bugs and is more trustworthy to host security-critical applications.
   * **Ease-of-use.** Occlum provides user-friendly build and command-line tools. Running applications on Occlum inside SGX enclaves can be as simple as only typing several shell commands (see the next section).
 
+Since version 0.30.0, Occlum has introduced EDMM as an optional feature. With EDMM, Occlum configurations become more flexible, and enclave loading time is significantly reduced. More details please refer to [edmm_config_guide](./docs/edmm/edmm_config_guide.md).
+
 ## Occlum Documentation
 
 The official Occlum documentation can be found at [`https://occlum.readthedocs.io`](https://occlum.readthedocs.io).
