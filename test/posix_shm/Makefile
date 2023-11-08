@@ -7,4 +7,4 @@ BIN_ARGS :=
 CUSTOM_PRE_BUILD := 1
 
 custom_pre_build:
-	@cp /lib/x86_64-linux-gnu/librt.so.1 $(BUILD_DIR)/test/image/opt/occlum/glibc/lib/
+	@cp /opt/occlum/glibc/lib/librt.so.1 $(BUILD_DIR)/test/image/opt/occlum/glibc/lib/
