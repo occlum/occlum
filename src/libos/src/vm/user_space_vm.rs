@@ -23,13 +23,12 @@ impl UserSpaceVMManager {
         let sgx_platform = SGXPlatform::new();
         let init_size = LIBOS_CONFIG.resource_limits.user_space_init_size;
         let max_size = LIBOS_CONFIG.resource_limits.user_space_max_size;
+        info!(
+            "alloc user space init size = {:?}, max size = {:?}",
+            init_size, max_size
+        );
 
         let (userspace_vm_range, gap_range) = sgx_platform.alloc_user_space(init_size, max_size)?;
-
-        info!(
-            "user space allocated, range = {:?}, gap_range = {:?}",
-            userspace_vm_range, gap_range
-        );
 
         // Use pkey_mprotect to set the whole userspace to R/W permissions. If user specifies a new
         // permission, the mprotect ocall will update the permission.
@@ -40,6 +39,11 @@ impl UserSpaceVMManager {
         );
 
         let vm_manager = VMManager::init(userspace_vm_range, gap_range)?;
+
+        info!(
+            "user space allocated, total size = {:?}",
+            userspace_vm_range.size()
+        );
 
         Ok(Self {
             inner: vm_manager,
@@ -63,7 +67,7 @@ fn free_user_space() {
     assert!(USER_SPACE_VM_MANAGER.verified_clean_when_exit());
     let addr = total_user_space_range.start();
     let size = total_user_space_range.size();
-    info!("free user space VM: {:?}", total_user_space_range);
+    debug!("free user space VM: {:?}", total_user_space_range);
 
     pku_util::clear_pku_when_libos_exit(
         total_user_space_range,
