@@ -1,0 +1,26 @@
+From 34ac52eb5d694f0ef0cec30c66c8c417cba9789c Mon Sep 17 00:00:00 2001
+From: Qi Zheng <huaiqing.zq@antgroup.com>
+Date: Tue, 14 Nov 2023 07:43:41 +0000
+Subject: [PATCH] Fixes build with glibc 2.34
+
+---
+ absl/debugging/failure_signal_handler.cc | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/absl/debugging/failure_signal_handler.cc b/absl/debugging/failure_signal_handler.cc
+index a9ed6ef9..3ddebd74 100644
+--- a/absl/debugging/failure_signal_handler.cc
++++ b/absl/debugging/failure_signal_handler.cc
+@@ -136,7 +136,8 @@ static bool SetupAlternateStackOnce() {
+ #else
+   const size_t page_mask = sysconf(_SC_PAGESIZE) - 1;
+ #endif
+-  size_t stack_size = (std::max(SIGSTKSZ, 65536) + page_mask) & ~page_mask;
++  size_t stack_size =
++      (std::max<size_t>(SIGSTKSZ, 65536) + page_mask) & ~page_mask;
+ #if defined(ABSL_HAVE_ADDRESS_SANITIZER) || \
+     defined(ABSL_HAVE_MEMORY_SANITIZER) || defined(ABSL_HAVE_THREAD_SANITIZER)
+   // Account for sanitizer instrumentation requiring additional stack space.
+-- 
+2.34.1
+
