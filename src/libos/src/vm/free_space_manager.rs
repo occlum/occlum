@@ -42,7 +42,10 @@ impl VMFreeSpaceManager {
         let mut result_idx: Option<usize> = None;
         let mut free_list = &mut self.free_manager;
 
-        trace!("find free range, free list = {:?}", free_list);
+        debug!(
+            "try to find free range, current free list = {:?}",
+            free_list
+        );
 
         match addr {
             VMMapAddr::Any => {}
@@ -125,10 +128,9 @@ impl VMFreeSpaceManager {
         let result_free_range = result_free_range.unwrap();
 
         self.free_list_update_range(index, result_free_range);
-        trace!(
-            "result free range = {:?}. After find free range, free list = {:?}",
-            result_free_range,
-            self.free_manager
+        debug!(
+            "result free range = {:?}. After finding free range, free list = {:?}",
+            result_free_range, self.free_manager
         );
         return Ok(result_free_range);
     }
@@ -148,6 +150,7 @@ impl VMFreeSpaceManager {
     }
 
     pub fn add_range_back_to_free_manager(&mut self, dirty_range: &VMRange) -> Result<()> {
+        debug!("add back dirty range: {:?}", dirty_range);
         let mut free_list = &mut self.free_manager;
 
         // If the free list is empty, insert the dirty range and it's done.
