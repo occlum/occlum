@@ -58,7 +58,7 @@ impl Debug for Chunk {
         write!(f, "range = {:?}, ", self.range);
         match self.internal() {
             ChunkType::SingleVMA(vma) => write!(f, "Single VMA chunk: {:?}", vma),
-            ChunkType::MultiVMA(internal_manager) => write!(f, "default chunk: {:?}", self.range()),
+            ChunkType::MultiVMA(internal_manager) => write!(f, "default chunk"),
         }
     }
 }
@@ -146,7 +146,7 @@ impl Chunk {
 
     pub fn mmap(&self, options: &VMMapOptions) -> Result<usize> {
         debug_assert!(!self.is_single_vma());
-        trace!("try allocate in chunk: {:?}", self);
+        debug!("try allocate in chunk: {:?}", self);
         let mut internal_manager = if let ChunkType::MultiVMA(internal_manager) = &self.internal {
             internal_manager.lock().unwrap()
         } else {
