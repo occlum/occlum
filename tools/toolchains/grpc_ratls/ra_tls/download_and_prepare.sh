@@ -5,10 +5,10 @@ source ./env.sh
 
 # Download and update cmake
 function dl_and_build_cmake() {
-    # Ubuntu 20.04 has newer enough cmake version
+    # Ubuntu 20.04/22.04 has newer enough cmake version
     if [ -f "/etc/os-release" ]; then
         local os_name=$(cat /etc/os-release)
-        if [[ $os_name =~ "Ubuntu" && $os_name =~ "20.04" ]]; then
+        if [[ $os_name =~ "Ubuntu" ]]; then
             return
         fi
     fi
@@ -27,9 +27,16 @@ function dl_grpc() {
     # GRPC source code
     rm -rf ${GRPC_PATH}
     git clone https://github.com/grpc/grpc -b ${GRPC_VERSION} ${GRPC_PATH}
-    pushd ${GRPC_PATH} \
-        && git checkout ${GRPC_VERSION} \
-        && git submodule update --init
+    pushd ${GRPC_PATH}
+    git submodule update --init
+    # Apply occlum patch
+    git apply ../0001-Add-Occlum-SGX-tls-function.patch
+    popd
+
+    ABSEIL_PATH=${GRPC_PATH}/third_party/abseil-cpp
+    pushd $ABSEIL_PATH
+    # Apply patch
+    git apply ../../../0001-Fixes-build-with-glibc-2.34.patch
     popd
 }
 
