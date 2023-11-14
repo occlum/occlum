@@ -227,10 +227,6 @@ impl SGXPlatform {
         init_size: usize,
         max_size: usize,
     ) -> Result<(VMRange, Option<VMRange>)> {
-        debug!(
-            "alloc user space init size = {:?}, max size = {:?}",
-            init_size, max_size
-        );
         if matches!(self, SGXPlatform::WithEDMM) && max_size > init_size {
             let user_region_size = max_size - init_size;
 
@@ -245,7 +241,7 @@ impl SGXPlatform {
             let gap_range =
                 VMRange::new(reserved_mem_start_addr + init_size, user_region_start_addr)?;
 
-            info!(
+            debug!(
                 "allocated user space range is {:?}, gap range is {:?}. reserved_mem range is {:?}, user region range is {:?}",
                 total_user_space_range, gap_range, VMRange::new_with_size(reserved_mem_start_addr, init_size),
                 VMRange::new_with_size(user_region_start_addr, user_region_size)
@@ -258,7 +254,7 @@ impl SGXPlatform {
             let total_user_space_range =
                 VMRange::new(reserved_mem_start_addr, reserved_mem_start_addr + max_size)?;
 
-            info!(
+            debug!(
                 "allocated user space range is {:?}, gap range is None",
                 total_user_space_range
             );
@@ -384,10 +380,9 @@ pub fn enclave_page_fault_handler(
 ) -> Result<()> {
     let pf_addr = exception_info.faulting_address as usize;
     let pf_errcd = exception_info.error_code;
-    trace!(
+    debug!(
         "enclave page fault caught, pf_addr = 0x{:x}, error code = {:?}",
-        pf_addr,
-        pf_errcd
+        pf_addr, pf_errcd
     );
 
     USER_SPACE_VM_MANAGER.handle_page_fault(rip, pf_addr, pf_errcd, kernel_triggers)?;

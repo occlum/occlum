@@ -69,6 +69,8 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
     pub fn build(self) -> Result<ProcessVM> {
         self.validate()?;
 
+        info!("allocate for new process");
+
         let heap_size = self
             .heap_size
             .unwrap_or(config::LIBOS_CONFIG.process.default_heap_size);
@@ -142,7 +144,7 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
                     &self.handle_error_when_init(&chunks);
                     e
                 })?;
-                trace!("elf range = {:?}", elf_range);
+                debug!("elf range = {:?}", elf_range);
                 elf_ranges.push(elf_range);
                 Ok(())
             })
@@ -167,7 +169,7 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
             e
         })?;
         debug_assert!(heap_range.start() % heap_layout.align() == 0);
-        trace!("heap range = {:?}", heap_range);
+        debug!("heap range = {:?}", heap_range);
         let brk = RwLock::new(heap_range.start());
         chunks.insert(chunk_ref);
 
@@ -190,7 +192,7 @@ impl<'a, 'b> ProcessVMBuilder<'a, 'b> {
         })?;
         debug_assert!(stack_range.start() % stack_layout.align() == 0);
         chunks.insert(chunk_ref);
-        trace!("stack range = {:?}", stack_range);
+        debug!("stack range = {:?}", stack_range);
 
         let mem_chunks = Arc::new(RwLock::new(chunks));
         Ok(ProcessVM {
@@ -567,6 +569,7 @@ impl ProcessVM {
             .initializer(initializer)
             .page_policy(page_policy)
             .build()?;
+        debug!("mmap options = {:?}", mmap_options);
         let mmap_addr = USER_SPACE_VM_MANAGER.mmap(&mmap_options)?;
         Ok(mmap_addr)
     }

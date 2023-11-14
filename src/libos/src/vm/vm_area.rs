@@ -306,7 +306,7 @@ impl VMArea {
         errcd: u32,
         kernel_triggers: bool,
     ) -> Result<()> {
-        trace!("PF vma = {:?}", self);
+        debug!("PF vma = {:?}", self);
         if (self.perms() == VMPerms::NONE)
             || (crate::exception::check_rw_bit(errcd) == false
                 && !self.perms().contains(VMPerms::READ))
@@ -340,6 +340,7 @@ impl VMArea {
         }
 
         if kernel_triggers || self.pf_count >= PF_NUM_THRESHOLD {
+            info!("commit whole vma");
             return self.commit_current_vma_whole();
         }
 
@@ -347,13 +348,11 @@ impl VMArea {
         // The return commit_size can be 0 when other threads already commit the PF-containing range but the vma is not fully committed yet.
         let commit_size = self.commit_once_for_page_fault(pf_addr).unwrap();
 
-        trace!("page fault commit memory size = {:?}", commit_size);
+        debug!("page fault commit memory size = {:?}", commit_size);
 
         if commit_size == 0 {
             warn!("This PF has been handled by other threads already.");
         }
-
-        info!("page fault handle success");
 
         Ok(())
     }

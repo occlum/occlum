@@ -97,18 +97,27 @@ impl Log for SimpleLogger {
             let tid = current!().tid();
             let rounds = round_count();
             let desc = round_desc();
+            let target = record.target().split("::").skip(1).next().unwrap();
             // Message (null-terminated)
             let message = if let Some(desc) = desc {
                 format!(
-                    "[{:>5}][T{}][#{}][{:·>8}] {}\0",
+                    "[{:>5}][T{}][#{}][{:·>8}][{}] {}\0",
                     level,
                     tid,
                     rounds,
                     desc,
+                    target,
                     record.args()
                 )
             } else {
-                format!("[{:>5}][T{}][#{}] {}\0", level, tid, rounds, record.args())
+                format!(
+                    "[{:>5}][T{}][#{}][{}] {}\0",
+                    level,
+                    tid,
+                    rounds,
+                    target,
+                    record.args()
+                )
             };
             // Print the message
             unsafe {
