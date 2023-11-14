@@ -1,0 +1,2406 @@
+From 00d3a4744aa7fecea3c07dc70be26aa55ffdfa2b Mon Sep 17 00:00:00 2001
+From: Qi Zheng <huaiqing.zq@antgroup.com>
+Date: Tue, 14 Nov 2023 03:43:34 +0000
+Subject: [PATCH] Add Occlum SGX tls function
+
+---
+ CMakeLists.txt                                |  58 +++-
+ examples/cpp/ratls/CMakeLists.txt             |  64 ++++
+ examples/cpp/ratls/README.md                  |  15 +
+ examples/cpp/ratls/build.sh                   |  27 ++
+ examples/cpp/ratls/client.cc                  |  41 +++
+ examples/cpp/ratls/grpc_ratls_client.cc       | 212 ++++++++++++
+ examples/cpp/ratls/grpc_ratls_client.h        |  28 ++
+ examples/cpp/ratls/grpc_ratls_server.cc       |  96 ++++++
+ examples/cpp/ratls/grpc_ratls_server.h        |  19 +
+ examples/cpp/ratls/server.cc                  |  37 ++
+ examples/protos/ratls.proto                   |  38 ++
+ include/grpcpp/security/sgx/sgx_ra_tls.h      |  83 +++++
+ .../grpcpp/security/sgx/sgx_ra_tls_options.h  |  67 ++++
+ .../credentials/tls/tls_credentials.cc        |  10 +-
+ .../tls/tls_security_connector.cc             | 194 ++++++++++-
+ .../tls/tls_security_connector.h              |  22 ++
+ src/cpp/sgx/sgx_ra_tls_backends.cc            | 260 ++++++++++++++
+ src/cpp/sgx/sgx_ra_tls_backends.h             | 114 ++++++
+ src/cpp/sgx/sgx_ra_tls_credentials.cc         |  98 ++++++
+ src/cpp/sgx/sgx_ra_tls_occlum.cc              | 325 ++++++++++++++++++
+ src/cpp/sgx/sgx_ra_tls_options.cc             |  55 +++
+ src/cpp/sgx/sgx_ra_tls_utils.cc               | 169 +++++++++
+ src/cpp/sgx/sgx_ra_tls_utils.h                |  68 ++++
+ 23 files changed, 2071 insertions(+), 29 deletions(-)
+ create mode 100644 examples/cpp/ratls/CMakeLists.txt
+ create mode 100644 examples/cpp/ratls/README.md
+ create mode 100644 examples/cpp/ratls/build.sh
+ create mode 100644 examples/cpp/ratls/client.cc
+ create mode 100644 examples/cpp/ratls/grpc_ratls_client.cc
+ create mode 100644 examples/cpp/ratls/grpc_ratls_client.h
+ create mode 100644 examples/cpp/ratls/grpc_ratls_server.cc
+ create mode 100644 examples/cpp/ratls/grpc_ratls_server.h
+ create mode 100644 examples/cpp/ratls/server.cc
+ create mode 100644 examples/protos/ratls.proto
+ create mode 100644 include/grpcpp/security/sgx/sgx_ra_tls.h
+ create mode 100644 include/grpcpp/security/sgx/sgx_ra_tls_options.h
+ create mode 100644 src/cpp/sgx/sgx_ra_tls_backends.cc
+ create mode 100644 src/cpp/sgx/sgx_ra_tls_backends.h
+ create mode 100644 src/cpp/sgx/sgx_ra_tls_credentials.cc
+ create mode 100644 src/cpp/sgx/sgx_ra_tls_occlum.cc
+ create mode 100644 src/cpp/sgx/sgx_ra_tls_options.cc
+ create mode 100644 src/cpp/sgx/sgx_ra_tls_utils.cc
+ create mode 100644 src/cpp/sgx/sgx_ra_tls_utils.h
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index eeaf0b43c7..d648e4237a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -49,6 +49,16 @@ option(gRPC_BUILD_CODEGEN "Build codegen" ON)
+ option(gRPC_BUILD_CSHARP_EXT "Build C# extensions" ON)
+ option(gRPC_BACKWARDS_COMPATIBILITY_MODE "Build libraries that are binary compatible across a larger number of OS and libc versions" OFF)
+ 
++option(DEFINE_SGX_RA_TLS_OCCLUM_BACKEND "SGX Occlum Backend" OFF)
++
++
++if(DEFINE_SGX_RA_TLS_OCCLUM_BACKEND)
++  message("SGX_RA_TLS_OCCLUM_BACKEND is defined")
++  include_directories(/opt/intel/sgxsdk/include)
++  include_directories(/opt/occlum/toolchains/dcap_lib/inc)
++  add_definitions(-DSGX_RA_TLS_OCCLUM_BACKEND)
++endif()
++
+ set(gRPC_INSTALL_default ON)
+ if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+   # Disable gRPC_INSTALL by default if building as a submodule
+@@ -2064,22 +2074,28 @@ target_include_directories(grpc
+     ${_gRPC_XXHASH_INCLUDE_DIR}
+     ${_gRPC_ZLIB_INCLUDE_DIR}
+ )
+-target_link_libraries(grpc
+-  ${_gRPC_BASELIB_LIBRARIES}
+-  ${_gRPC_ZLIB_LIBRARIES}
+-  ${_gRPC_CARES_LIBRARIES}
+-  ${_gRPC_ADDRESS_SORTING_LIBRARIES}
+-  ${_gRPC_RE2_LIBRARIES}
+-  ${_gRPC_UPB_LIBRARIES}
+-  ${_gRPC_ALLTARGETS_LIBRARIES}
+-  absl::flat_hash_map
+-  absl::inlined_vector
+-  absl::bind_front
+-  absl::statusor
+-  gpr
+-  ${_gRPC_SSL_LIBRARIES}
+-  address_sorting
+-)
++
++if(DEFINE_SGX_RA_TLS_OCCLUM_BACKEND)
++  target_link_libraries(grpc
++    ${_gRPC_BASELIB_LIBRARIES}
++    ${_gRPC_ZLIB_LIBRARIES}
++    ${_gRPC_CARES_LIBRARIES}
++    ${_gRPC_ADDRESS_SORTING_LIBRARIES}
++    ${_gRPC_RE2_LIBRARIES}
++    ${_gRPC_UPB_LIBRARIES}
++    ${_gRPC_ALLTARGETS_LIBRARIES}
++    absl::flat_hash_map
++    absl::inlined_vector
++    absl::bind_front
++    absl::statusor
++    gpr
++    ${_gRPC_SSL_LIBRARIES}
++    address_sorting
++    occlum_dcap
++    cjson
++  )
++endif()
++
+ if(_gRPC_PLATFORM_IOS OR _gRPC_PLATFORM_MAC)
+   target_link_libraries(grpc "-framework CoreFoundation")
+ endif()
+@@ -2775,6 +2791,11 @@ add_library(grpc++
+   src/cpp/util/status.cc
+   src/cpp/util/string_ref.cc
+   src/cpp/util/time_cc.cc
++  src/cpp/sgx/sgx_ra_tls_credentials.cc
++  src/cpp/sgx/sgx_ra_tls_options.cc
++  src/cpp/sgx/sgx_ra_tls_backends.cc
++  src/cpp/sgx/sgx_ra_tls_occlum.cc
++  src/cpp/sgx/sgx_ra_tls_utils.cc
+ )
+ 
+ set_target_properties(grpc++ PROPERTIES
+@@ -2972,7 +2993,8 @@ foreach(_hdr
+   include/grpcpp/security/credentials.h
+   include/grpcpp/security/server_credentials.h
+   include/grpcpp/security/tls_certificate_provider.h
+-  include/grpcpp/security/tls_credentials_options.h
++  include/grpcpp/security/sgx/sgx_ra_tls.h
++  include/grpcpp/security/sgx/sgx_ra_tls_options.h
+   include/grpcpp/server.h
+   include/grpcpp/server_builder.h
+   include/grpcpp/server_context.h
+@@ -3620,6 +3642,8 @@ foreach(_hdr
+   include/grpcpp/security/server_credentials.h
+   include/grpcpp/security/tls_certificate_provider.h
+   include/grpcpp/security/tls_credentials_options.h
++  include/grpcpp/security/sgx/sgx_ra_tls.h
++  include/grpcpp/security/sgx/sgx_ra_tls_options.h
+   include/grpcpp/server.h
+   include/grpcpp/server_builder.h
+   include/grpcpp/server_context.h
+diff --git a/examples/cpp/ratls/CMakeLists.txt b/examples/cpp/ratls/CMakeLists.txt
+new file mode 100644
+index 0000000000..200583db23
+--- /dev/null
++++ b/examples/cpp/ratls/CMakeLists.txt
+@@ -0,0 +1,64 @@
++# Copyright (c) 2022 Intel Corporation
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++cmake_minimum_required(VERSION 3.5.1)
++
++project(RA-TLS C CXX)
++
++include(../cmake/common.cmake)
++
++# Proto file
++get_filename_component(hw_proto "../../protos/ratls.proto" ABSOLUTE)
++get_filename_component(hw_proto_path "${hw_proto}" PATH)
++
++# Generated sources
++set(hw_proto_srcs "${CMAKE_CURRENT_BINARY_DIR}/ratls.pb.cc")
++set(hw_proto_hdrs "${CMAKE_CURRENT_BINARY_DIR}/ratls.pb.h")
++set(hw_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/ratls.grpc.pb.cc")
++set(hw_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/ratls.grpc.pb.h")
++add_custom_command(
++      OUTPUT "${hw_proto_srcs}" "${hw_proto_hdrs}" "${hw_grpc_srcs}" "${hw_grpc_hdrs}"
++      COMMAND ${_PROTOBUF_PROTOC}
++      ARGS --grpc_out "${CMAKE_CURRENT_BINARY_DIR}"
++        --cpp_out "${CMAKE_CURRENT_BINARY_DIR}"
++        -I "${hw_proto_path}"
++        --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}"
++        "${hw_proto}"
++      DEPENDS "${hw_proto}")
++
++# Include generated *.pb.h files
++include_directories("${CMAKE_CURRENT_BINARY_DIR}")
++
++# hw_grpc_proto
++add_library(hw_grpc_proto SHARED
++  ${hw_grpc_srcs}
++  ${hw_grpc_hdrs}
++  ${hw_proto_srcs}
++  ${hw_proto_hdrs})
++target_link_libraries(hw_grpc_proto
++  ${_REFLECTION}
++  ${_GRPC_GRPCPP}
++  ${_PROTOBUF_LIBPROTOBUF})
++
++foreach(_target grpc_ratls_client grpc_ratls_server)
++  add_library(${_target} SHARED "${_target}.cc")
++  target_link_libraries(${_target}
++    hw_grpc_proto)
++endforeach()
++
++foreach(_target client server)
++  add_executable(${_target} "${_target}.cc")
++  target_link_libraries(${_target}
++    grpc_ratls_${_target})
++endforeach()
+diff --git a/examples/cpp/ratls/README.md b/examples/cpp/ratls/README.md
+new file mode 100644
+index 0000000000..4b3d8307e8
+--- /dev/null
++++ b/examples/cpp/ratls/README.md
+@@ -0,0 +1,15 @@
++# gRPC
++
++This directory contains the Makefile and the template manifest for the most
++recent version of gRPC (as of this writing, version 3.18.0). This was tested
++on a machine with SGX v1 and Ubuntu 18.04.
++
++The Makefile and the template manifest contain extensive comments and are made
++self-explanatory. Please review them to gain understanding of Gramine-SGX
++and requirements for applications running under Gramine-SGX.
++
++# Quick Start
++
++```
++./build.sh
++```
+diff --git a/examples/cpp/ratls/build.sh b/examples/cpp/ratls/build.sh
+new file mode 100644
+index 0000000000..b6ed9c8aea
+--- /dev/null
++++ b/examples/cpp/ratls/build.sh
+@@ -0,0 +1,27 @@
++#
++# Copyright (c) 2022 Intel Corporation
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++set -ex
++
++export BUILD_TYPE=Release
++export EXP_PATH=`dirname $0`
++
++# build c++ example
++cd ${EXP_PATH}
++mkdir -p build
++cd build
++cmake -D CMAKE_PREFIX_PATH=${INSTALL_PREFIX} -D CMAKE_BUILD_TYPE=${BUILD_TYPE} ..
++make -j `nproc`
++cd -
+diff --git a/examples/cpp/ratls/client.cc b/examples/cpp/ratls/client.cc
+new file mode 100644
+index 0000000000..db13031d7f
+--- /dev/null
++++ b/examples/cpp/ratls/client.cc
+@@ -0,0 +1,41 @@
++/*
++ *
++ * Copyright (c) 2022 Intel Corporation
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ */
++#include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++
++#include "../grpc_ratls_client.h"
++
++
++int main(int argc, char** argv) {
++    // Parse arguments
++    if (argc < 4) {
++        printf("[ERROR] Three arguments must be provided\n\n");
++        printf("Usage: client <grpc-server addr> <request_name> <secret_file_to_be_saved>\n");
++        return -1;
++    }
++
++    grpc_ratls_get_secret(
++        argv[1],
++        "dynamic_config.json",
++        argv[2],
++        argv[3]
++    );
++
++    return 0;
++}
+diff --git a/examples/cpp/ratls/grpc_ratls_client.cc b/examples/cpp/ratls/grpc_ratls_client.cc
+new file mode 100644
+index 0000000000..1c2fd75a7e
+--- /dev/null
++++ b/examples/cpp/ratls/grpc_ratls_client.cc
+@@ -0,0 +1,212 @@
++/*
++ *
++ * Copyright (c) 2022 Intel Corporation
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ */
++#include <stdio.h>
++#include <string.h>
++#include <iostream>
++#include <fstream>
++
++#include <grpcpp/grpcpp.h>
++#include <grpcpp/security/sgx/sgx_ra_tls.h>
++
++#ifdef BAZEL_BUILD
++#include "examples/protos/ratls.grpc.pb.h"
++#else
++#include "ratls.grpc.pb.h"
++#endif
++
++#include "../grpc_ratls_client.h"
++
++using ratls::GrSecret;
++using ratls::SecretRequest;
++using ratls::SecretReply;
++
++typedef enum {
++    GRPC_RATLS_SUCCESS = 0,             /// Success
++    GRPC_RATLS_ERR = -1,                /// General error
++    GRPC_RATLS_INVALID_PARAM = -2,      /// Invalid parameter
++    GRPC_RATLS_BUF_ERR = -3,            /// Invalid buffer or buffer allocation failure
++    GRPC_RATLS_NO_SECRET = -4,          /// No valid secret
++    GRPC_RATLS_BUF_TOO_SMALL = -5       /// Buffer is too small
++} grpc_ratls_result_t;
++
++// Client
++class GrSecretClient {
++    public:
++        GrSecretClient(std::shared_ptr<grpc::Channel> channel) : stub_(GrSecret::NewStub(channel)) {}
++
++        std::string GetSecret(const std::string& name) {
++            SecretRequest request;
++            request.set_name(name);
++
++            SecretReply reply;
++
++            grpc::ClientContext context;
++
++            grpc::Status status = stub_->GetSecret(&context, request, &reply);
++
++            if (status.ok()) {
++                return reply.secret();
++            } else {
++                std::cout << status.error_code() << ": " << status.error_message() << std::endl;
++                return "";
++            }
++        }
++
++    private:
++        std::unique_ptr<GrSecret::Stub> stub_;
++};
++
++static const unsigned char base64_table[65] =
++    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
++
++static size_t base64_decode_len(const char *b64input) {
++    size_t len = strlen(b64input), padding = 0;
++
++    if (b64input[len - 1] == '=' && b64input[len - 2] == '=') { //last two chars are =
++        padding = 2;
++    } else if (b64input[len - 1] == '=') { //last char is =
++        padding = 1;
++    }
++
++    return (len * 3) / 4 - padding;
++}
++
++/**
++ * base64_decode - Base64 decode
++ */
++void base64_decode(const char *b64input, unsigned char *dest, size_t dest_len) {
++    unsigned char dtable[256], *pos, block[4], tmp;
++    size_t i, count, olen;
++    size_t len = strlen(b64input);
++
++    memset(dtable, 0x80, 256);
++    for (i = 0; i < sizeof(base64_table) - 1; i++) {
++        dtable[base64_table[i]] = (unsigned char) i;
++    }
++    dtable['='] = 0;
++
++    olen = base64_decode_len(b64input);
++    if (olen > dest_len) {
++        printf("Base64 encoded length %ld is biggeer than %ld\n", olen, dest_len);
++        return;
++    }
++
++    pos = dest;
++    count = 0;
++    for (i = 0; i < len; i++) {
++        tmp = dtable[(unsigned char)b64input[i]];
++        if (tmp == 0x80) {
++            continue;
++        }
++        block[count] = tmp;
++        count++;
++        if (count == 4) {
++            *pos++ = (block[0] << 2) | (block[1] >> 4);
++            *pos++ = (block[1] << 4) | (block[2] >> 2);
++            *pos++ = (block[2] << 6) | block[3];
++            count = 0;
++        }
++    }
++}
++
++static grpc_ratls_result_t grpc_ratls_get_secret_string(
++    const char *server_addr,
++    const char *config_json,
++    const char *name,
++    std::string* secret_string
++)
++{
++    auto cred = grpc::sgx::TlsCredentials(config_json);
++    auto channel = grpc::CreateChannel(server_addr, cred);
++
++    GrSecretClient gr_secret(channel);
++
++    std::string secret = gr_secret.GetSecret(name);
++    // std::cout << "secret received: " << secret << "len: " << secret.length() << std::endl;
++
++    if (secret.empty()) {
++        return GRPC_RATLS_NO_SECRET;
++    } else {
++        //Decode From Base64
++        size_t len = base64_decode_len(secret.c_str());
++        if (len) {
++            char *secret_orig = (char *)malloc(len);
++            if (!secret_orig) {
++                return GRPC_RATLS_BUF_ERR;
++            }
++            base64_decode(secret.c_str(), (unsigned char *)secret_orig, len);
++            secret_string->assign(secret_orig, secret_orig + len - 1);
++            free(secret_orig);
++
++            return GRPC_RATLS_SUCCESS;
++        }
++
++        return GRPC_RATLS_ERR;
++    }
++}
++
++// Get secret to file
++int grpc_ratls_get_secret(
++    const char *server_addr,
++    const char *config_json,
++    const char *name,
++    const char *secret_file
++)
++{
++    std::string secret_string;
++    grpc_ratls_result_t ret = grpc_ratls_get_secret_string(
++        server_addr, config_json, name, &secret_string
++    );
++
++    if (ret == GRPC_RATLS_SUCCESS) {
++        //write to file
++        std::ofstream myfile;
++        myfile.open(secret_file);
++        myfile << secret_string;
++        myfile.close();
++    }
++
++    return ret;
++}
++
++// Get secret to buffer
++int grpc_ratls_get_secret_to_buf(
++    const char *server_addr,
++    const char *config_json,
++    const char *name,
++    char *secret_buf,
++    unsigned int *buf_len
++)
++{
++    std::string secret_string;
++    grpc_ratls_result_t ret = grpc_ratls_get_secret_string(
++        server_addr, config_json, name, &secret_string
++    );
++
++    if (ret == GRPC_RATLS_SUCCESS) {
++        if (*buf_len < secret_string.size()) {
++            std::cout << "buffer size is smaller than the secret string length " << secret_string.size() << std::endl;;
++            return GRPC_RATLS_BUF_TOO_SMALL;
++        }
++        //write to buffer
++        memcpy(secret_buf, secret_string.data(), secret_string.size());
++        *buf_len = secret_string.size();
++    }
++
++    return ret;
++}
+diff --git a/examples/cpp/ratls/grpc_ratls_client.h b/examples/cpp/ratls/grpc_ratls_client.h
+new file mode 100644
+index 0000000000..10b39c7459
+--- /dev/null
++++ b/examples/cpp/ratls/grpc_ratls_client.h
+@@ -0,0 +1,28 @@
++#ifndef _GRPC_RATLS_CLIENT_H_
++#define _GRPC_RATLS_CLIENT_H_
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++// client get secret
++extern int grpc_ratls_get_secret(
++    const char *server_addr, // grpc server address+port, such as "localhost:50051"
++    const char *config_json, // ratls handshake config json file
++    const char *name, // secret name to be requested
++    const char *secret_file // secret file to be saved
++);
++
++extern int grpc_ratls_get_secret_to_buf(
++    const char *server_addr, // grpc server address+port, such as "localhost:50051"
++    const char *config_json, // ratls handshake config json file
++    const char *name, // secret name to be requested
++    char *secret_buf, // buffer to save secret
++    unsigned int *buf_len // buffer size
++);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif  // _GRPC_RATLS_CLIENT_H_
+\ No newline at end of file
+diff --git a/examples/cpp/ratls/grpc_ratls_server.cc b/examples/cpp/ratls/grpc_ratls_server.cc
+new file mode 100644
+index 0000000000..0a88c301d5
+--- /dev/null
++++ b/examples/cpp/ratls/grpc_ratls_server.cc
+@@ -0,0 +1,96 @@
++/*
++ *
++ * Copyright (c) 2022 Intel Corporation
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ */
++
++#include <grpcpp/grpcpp.h>
++#include <grpcpp/security/sgx/sgx_ra_tls.h>
++#include <grpcpp/ext/proto_server_reflection_plugin.h>
++
++#ifdef BAZEL_BUILD
++#include "examples/protos/ratls.grpc.pb.h"
++#else
++#include "ratls.grpc.pb.h"
++#endif
++
++#include "../grpc_ratls_server.h"
++
++using ratls::GrSecret;
++using ratls::SecretRequest;
++using ratls::SecretReply;
++
++
++// Logic and data behind the server's behavior.
++class GrSecretServiceImpl final: public GrSecret::Service {
++    public:
++        grpc::Status GetSecret(
++            grpc::ServerContext* context, const SecretRequest* request, SecretReply* reply) override {
++            //std::cout << "Request:  " << request->name() << std::endl;
++            auto secret = this->get_secret_string(request->name().c_str());
++            if (!secret.empty()) {
++                reply->set_secret(secret);
++                return grpc::Status::OK;
++            } else {
++                return grpc::Status::CANCELLED;
++            }
++        }
++
++        GrSecretServiceImpl(const char* file) : secret_file(nullptr) {
++            this->secret_file = file;
++        }
++
++    private:
++        std::string get_secret_string(const char *name) {
++            std::string secret = "";
++            class grpc::sgx::json_engine secret_config(this->secret_file);
++            auto item = secret_config.get_item(secret_config.get_handle(), name);
++            if (item) {
++                secret = secret_config.print_item(item);
++            }
++
++            return secret;
++        }
++
++        const char *secret_file;
++};
++
++
++int grpc_ratls_start_server(
++    const char *server_addr,
++    const char *config_json,
++    const char *secret_json
++) 
++{
++    GrSecretServiceImpl service(secret_json);
++
++    grpc::EnableDefaultHealthCheckService(true);
++    grpc::reflection::InitProtoReflectionServerBuilderPlugin();
++    grpc::ServerBuilder builder;
++
++    auto creds = grpc::sgx::TlsServerCredentials(config_json);
++    GPR_ASSERT(creds.get() != nullptr);
++
++    builder.AddListeningPort(server_addr, creds);
++    builder.RegisterService(&service);
++
++    std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
++    std::cout << "Server listening on " << server_addr << std::endl;
++
++    server->Wait();
++
++    return 0;
++}
++
+diff --git a/examples/cpp/ratls/grpc_ratls_server.h b/examples/cpp/ratls/grpc_ratls_server.h
+new file mode 100644
+index 0000000000..1aee644a49
+--- /dev/null
++++ b/examples/cpp/ratls/grpc_ratls_server.h
+@@ -0,0 +1,19 @@
++#ifndef _GRPC_RATLS_SERVER_H_
++#define _GRPC_RATLS_SERVER_H_
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++// start server
++extern int grpc_ratls_start_server(
++    const char *server_addr, // grpc server address+port, such as "localhost:50051"
++    const char *config_json, // ratls handshake config json file
++    const char *secret_json  // secret config json file
++);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif  // _GRPC_RATLS_SERVER_H_
+\ No newline at end of file
+diff --git a/examples/cpp/ratls/server.cc b/examples/cpp/ratls/server.cc
+new file mode 100644
+index 0000000000..38479703a9
+--- /dev/null
++++ b/examples/cpp/ratls/server.cc
+@@ -0,0 +1,37 @@
++/*
++ *
++ * Copyright (c) 2022 Intel Corporation
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ */
++#include <stdio.h>
++#include <stdlib.h>
++#include "../grpc_ratls_server.h"
++
++
++int main(int argc, char** argv) {
++    if (argc < 2) {
++        printf("[ERROR] One argument must be provided\n\n");
++        printf("Usage: server <grpc-server addr>\n");
++        return -1;
++    }
++
++    grpc_ratls_start_server(
++        argv[1],
++        "dynamic_config.json",
++        "secret_config.json"
++    );
++
++    return 0;
++}
+\ No newline at end of file
+diff --git a/examples/protos/ratls.proto b/examples/protos/ratls.proto
+new file mode 100644
+index 0000000000..0bae704719
+--- /dev/null
++++ b/examples/protos/ratls.proto
+@@ -0,0 +1,38 @@
++// Copyright (c) 2022 Intel Corporation
++// 
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++// 
++//     http://www.apache.org/licenses/LICENSE-2.0
++// 
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++syntax = "proto3";
++
++option java_multiple_files = true;
++option java_package = "io.grpc.examples.ratls";
++option java_outer_classname = "RATLSProto";
++option objc_class_prefix = "HLW";
++
++package ratls;
++
++// The GRPC_RATLS secret service definition.
++service GrSecret {
++  // Sends a greeting
++  rpc GetSecret (SecretRequest) returns (SecretReply) {}
++}
++
++// The request message containing the request's name.
++message SecretRequest {
++  string name = 1;
++}
++
++// The response message containing the secret (base64 encoded string)
++message SecretReply {
++  string secret = 1;
++}
+diff --git a/include/grpcpp/security/sgx/sgx_ra_tls.h b/include/grpcpp/security/sgx/sgx_ra_tls.h
+new file mode 100644
+index 0000000000..2ea167d2f9
+--- /dev/null
++++ b/include/grpcpp/security/sgx/sgx_ra_tls.h
+@@ -0,0 +1,83 @@
++/*
++ *
++ * Copyright (c) 2022 Intel Corporation
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ */
++
++#ifndef SGX_RA_TLS_H
++#define SGX_RA_TLS_H
++
++#include <memory>
++
++#include <grpcpp/security/credentials.h>
++#include <grpcpp/security/server_credentials.h>
++
++#include <cjson/cJSON.h>
++
++namespace grpc {
++namespace sgx {
++
++struct sgx_config;
++
++std::vector<std::string> ra_tls_get_key_cert();
++
++void ra_tls_parse_sgx_config(sgx_config sgx_cfg);
++
++void ra_tls_parse_sgx_config(const char* file);
++
++void ra_tls_verify_init();
++
++int ra_tls_auth_check_schedule(void* /* config_user_data */,
++                               grpc_tls_server_authorization_check_arg* arg);
++
++std::shared_ptr<grpc::ChannelCredentials> TlsCredentials(sgx_config sgx_cfg);
++
++std::shared_ptr<grpc::ChannelCredentials> TlsCredentials(const char* sgx_cfg_json);
++
++std::shared_ptr<grpc::ServerCredentials> TlsServerCredentials(sgx_config sgx_cfg);
++
++std::shared_ptr<grpc::ServerCredentials> TlsServerCredentials(const char* sgx_cfg_json);
++
++std::shared_ptr<grpc::Channel> CreateSecureChannel(
++    string target_str, std::shared_ptr<grpc::ChannelCredentials> channel_creds);
++
++class json_engine {
++    public:
++        json_engine();
++
++        json_engine(const char*);
++
++        ~json_engine();
++
++        bool open(const char*);
++
++        void close();
++
++        cJSON* get_handle();
++
++        cJSON* get_item(cJSON* obj, const char* item);
++
++        char* print_item(cJSON* obj);
++
++        bool compare_item(cJSON* obj, const char* item);
++
++    private:
++        cJSON* handle;
++};
++
++}  // namespace sgx
++}  // namespace grpc
++
++#endif  // SGX_RA_TLS_H
+diff --git a/include/grpcpp/security/sgx/sgx_ra_tls_options.h b/include/grpcpp/security/sgx/sgx_ra_tls_options.h
+new file mode 100644
+index 0000000000..cb942b0911
+--- /dev/null
++++ b/include/grpcpp/security/sgx/sgx_ra_tls_options.h
+@@ -0,0 +1,67 @@
++/*
++ *
++ * Copyright (c) 2022 Intel Corporation
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ */
++
++#ifndef SGX_RA_TLS_OPTIONS_H
++#define SGX_RA_TLS_OPTIONS_H
++
++#include <grpc/grpc_security_constants.h>
++#include <grpc/status.h>
++#include <grpc/support/log.h>
++#include <grpcpp/security/tls_certificate_provider.h>
++#include <grpcpp/security/tls_credentials_options.h>
++#include <grpcpp/support/config.h>
++
++#include <memory>
++#include <vector>
++
++namespace grpc {
++namespace sgx {
++
++// Contains configurable options on the client side.
++// Client side doesn't need to always use certificate provider. When the
++// certificate provider is not set, we will use the root certificates stored
++// in the system default locations, and assume client won't provide any
++// identity certificates(single side TLS).
++// It is used for experimental purposes for now and it is subject to change.
++class CredentialsOptions final : public grpc::experimental::TlsCredentialsOptions {
++ public:
++
++  explicit CredentialsOptions() : TlsCredentialsOptions() {}
++
++  // Sets option to request the certificates from the client.
++  // The default is GRPC_SSL_DONT_REQUEST_CLIENT_CERTIFICATE.
++  void set_cert_request_type(
++      grpc_ssl_client_certificate_request_type cert_request_type);
++
++  // Sets the option to verify the server.
++  // The default is GRPC_TLS_SERVER_VERIFICATION.
++  void set_verification_option(
++      grpc_tls_server_verification_option server_verification_option);
++
++  // Sets the custom authorization config.
++  void set_authorization_check_config(
++      std::shared_ptr<grpc::experimental::TlsServerAuthorizationCheckConfig>
++          authorization_check_config);
++
++ private:
++};
++
++}  // namespace sgx
++}  // namespace grpc
++
++#endif  // SGX_RA_TLS_OPTIONS_H
+diff --git a/src/core/lib/security/credentials/tls/tls_credentials.cc b/src/core/lib/security/credentials/tls/tls_credentials.cc
+index f5b05d8a01..ab80b22554 100644
+--- a/src/core/lib/security/credentials/tls/tls_credentials.cc
++++ b/src/core/lib/security/credentials/tls/tls_credentials.cc
+@@ -41,11 +41,11 @@ bool CredentialOptionSanityCheck(const grpc_tls_credentials_options* options,
+     return false;
+   }
+   // TODO(ZhenLian): remove this when it is also supported on server side.
+-  if (!is_client && options->server_authorization_check_config() != nullptr) {
+-    gpr_log(GPR_INFO,
+-            "Server's credentials options should not contain server "
+-            "authorization check config.");
+-  }
++  // if (!is_client && options->server_authorization_check_config() != nullptr) {
++  //   gpr_log(GPR_INFO,
++  //           "Server's credentials options should not contain server "
++  //           "authorization check config.");
++  // }
+   if (options->server_verification_option() != GRPC_TLS_SERVER_VERIFICATION &&
+       options->server_authorization_check_config() == nullptr) {
+     gpr_log(GPR_ERROR,
+diff --git a/src/core/lib/security/security_connector/tls/tls_security_connector.cc b/src/core/lib/security/security_connector/tls/tls_security_connector.cc
+index ea6b42e07d..db21ed0f4c 100644
+--- a/src/core/lib/security/security_connector/tls/tls_security_connector.cc
++++ b/src/core/lib/security/security_connector/tls/tls_security_connector.cc
+@@ -67,6 +67,13 @@ tsi_ssl_pem_key_cert_pair* ConvertToTsiPemKeyCertPair(
+ 
+ }  // namespace
+ 
++void gpr_check_free(void* p) {
++  if (p) {
++    gpr_free(p);
++    p = nullptr;
++  }
++}
++
+ // -------------------channel security connector-------------------
+ RefCountedPtr<grpc_channel_security_connector>
+ TlsChannelSecurityConnector::CreateTlsChannelSecurityConnector(
+@@ -241,7 +248,7 @@ void TlsChannelSecurityConnector::check_peer(
+                                     ? gpr_strdup(target_name)
+                                     : check_arg_->target_name;
+       on_peer_checked_ = on_peer_checked;
+-      gpr_free(peer_pem);
++      gpr_check_free(peer_pem);
+       const tsi_peer_property* chain = tsi_peer_get_property_by_name(
+           &peer, TSI_X509_PEM_CERT_CHAIN_PROPERTY);
+       if (chain != nullptr) {
+@@ -252,7 +259,7 @@ void TlsChannelSecurityConnector::check_peer(
+             check_arg_->peer_cert_full_chain == nullptr
+                 ? gpr_strdup(peer_pem_chain)
+                 : check_arg_->peer_cert_full_chain;
+-        gpr_free(peer_pem_chain);
++        gpr_check_free(peer_pem_chain);
+       }
+       // TODO(zhenlian) - This should be cleaned up as part of the custom
+       // verification changes. Fill in the subject alternative names
+@@ -474,9 +481,9 @@ void TlsChannelSecurityConnector::ServerAuthorizationCheckArgDestroy(
+   if (arg == nullptr) {
+     return;
+   }
+-  gpr_free(const_cast<char*>(arg->target_name));
+-  gpr_free(const_cast<char*>(arg->peer_cert));
+-  gpr_free(const_cast<char*>(arg->peer_cert_full_chain));
++  gpr_check_free(const_cast<char*>(arg->target_name));
++  gpr_check_free(const_cast<char*>(arg->peer_cert));
++  gpr_check_free(const_cast<char*>(arg->peer_cert_full_chain));
+   for (size_t i = 0; i < arg->subject_alternative_names_size; ++i) {
+     delete[] arg->subject_alternative_names[i];
+   }
+@@ -486,6 +493,7 @@ void TlsChannelSecurityConnector::ServerAuthorizationCheckArgDestroy(
+     arg->destroy_context(arg->context);
+   }
+   delete arg;
++  arg = nullptr;
+ }
+ 
+ // -------------------server security connector-------------------
+@@ -509,12 +517,91 @@ TlsServerSecurityConnector::CreateTlsServerSecurityConnector(
+                                                     std::move(options));
+ }
+ 
++void TlsServerSecurityConnector::ClientAuthorizationCheckDone(
++    grpc_tls_server_authorization_check_arg* arg) {
++  GPR_ASSERT(arg != nullptr);
++  ExecCtx exec_ctx;
++  grpc_error_handle error = ProcessClientAuthorizationCheckResult(arg);
++  TlsServerSecurityConnector* connector =
++      static_cast<TlsServerSecurityConnector*>(arg->cb_user_data);
++  ExecCtx::Run(DEBUG_LOCATION, connector->on_peer_checked_, error);
++}
++
++grpc_error_handle
++TlsServerSecurityConnector::ProcessClientAuthorizationCheckResult(
++    grpc_tls_server_authorization_check_arg* arg) {
++  grpc_error_handle error = GRPC_ERROR_NONE;
++  /* Client authorization check is cancelled by caller. */
++  if (arg->status == GRPC_STATUS_CANCELLED) {
++    error = GRPC_ERROR_CREATE_FROM_COPIED_STRING(
++        absl::StrCat("Client authorization check is cancelled by the caller "
++                     "with error: ",
++                     arg->error_details->error_details())
++            .c_str());
++  } else if (arg->status == GRPC_STATUS_OK) {
++    /* Client authorization check completed successfully but returned check
++     * failure. */
++    if (!arg->success) {
++      error = GRPC_ERROR_CREATE_FROM_COPIED_STRING(
++          absl::StrCat("Client authorization check failed with error: ",
++                       arg->error_details->error_details())
++              .c_str());
++    }
++    /* Client authorization check did not complete correctly. */
++  } else {
++    error = GRPC_ERROR_CREATE_FROM_COPIED_STRING(
++        absl::StrCat(
++            "Client authorization check did not finish correctly with error: ",
++            arg->error_details->error_details())
++            .c_str());
++  }
++  return error;
++}
++
++grpc_tls_server_authorization_check_arg*
++TlsServerSecurityConnector::ClientAuthorizationCheckArgCreate(
++    void* user_data) {
++  grpc_tls_server_authorization_check_arg* arg =
++      new grpc_tls_server_authorization_check_arg();
++  arg->target_name = nullptr;
++  arg->peer_cert = nullptr;
++  arg->peer_cert_full_chain = nullptr;
++  arg->subject_alternative_names = nullptr;
++  arg->subject_alternative_names_size = 0;
++  arg->error_details = new grpc_tls_error_details();
++  arg->cb = ClientAuthorizationCheckDone;
++  arg->cb_user_data = user_data;
++  arg->status = GRPC_STATUS_OK;
++  return arg;
++}
++
++void TlsServerSecurityConnector::ClientAuthorizationCheckArgDestroy(
++    grpc_tls_server_authorization_check_arg* arg) {
++  if (arg == nullptr) {
++    return;
++  }
++  gpr_check_free(const_cast<char*>(arg->target_name));
++  gpr_check_free(const_cast<char*>(arg->peer_cert));
++  gpr_check_free(const_cast<char*>(arg->peer_cert_full_chain));
++  for (size_t i = 0; i < arg->subject_alternative_names_size; ++i) {
++    delete[] arg->subject_alternative_names[i];
++  }
++  delete[] arg->subject_alternative_names;
++  delete arg->error_details;
++  if (arg->destroy_context != nullptr) {
++    arg->destroy_context(arg->context);
++  }
++  delete arg;
++  arg = nullptr;
++}
++
+ TlsServerSecurityConnector::TlsServerSecurityConnector(
+     RefCountedPtr<grpc_server_credentials> server_creds,
+     RefCountedPtr<grpc_tls_credentials_options> options)
+     : grpc_server_security_connector(GRPC_SSL_URL_SCHEME,
+                                      std::move(server_creds)),
+       options_(std::move(options)) {
++  check_arg_ = ClientAuthorizationCheckArgCreate(this);
+   // Create a watcher.
+   auto watcher_ptr = absl::make_unique<TlsServerCertificateWatcher>(this);
+   certificate_watcher_ = watcher_ptr.get();
+@@ -539,10 +626,15 @@ TlsServerSecurityConnector::~TlsServerSecurityConnector() {
+   // Cancel all the watchers.
+   grpc_tls_certificate_distributor* distributor =
+       options_->certificate_distributor();
+-  distributor->CancelTlsCertificatesWatch(certificate_watcher_);
++  if (distributor != nullptr) {
++    distributor->CancelTlsCertificatesWatch(certificate_watcher_);
++  }
+   if (server_handshaker_factory_ != nullptr) {
+     tsi_ssl_server_handshaker_factory_unref(server_handshaker_factory_);
+   }
++  if (check_arg_ != nullptr) {
++    ClientAuthorizationCheckArgDestroy(check_arg_);
++  }
+ }
+ 
+ void TlsServerSecurityConnector::add_handshakers(
+@@ -574,10 +666,98 @@ void TlsServerSecurityConnector::check_peer(
+     RefCountedPtr<grpc_auth_context>* auth_context,
+     grpc_closure* on_peer_checked) {
+   grpc_error_handle error = grpc_ssl_check_alpn(&peer);
++  if (error != GRPC_ERROR_NONE) {
++    ExecCtx::Run(DEBUG_LOCATION, on_peer_checked, error);
++    tsi_peer_destruct(&peer);
++    return;
++  }
+   *auth_context =
+       grpc_ssl_peer_to_auth_context(&peer, GRPC_TLS_TRANSPORT_SECURITY_TYPE);
+-  tsi_peer_destruct(&peer);
++  if (options_->server_verification_option() == GRPC_TLS_SERVER_VERIFICATION) {
++    /* Do the default host name check if specifying the target name. */
++    error = internal::TlsCheckHostName("", &peer);
++    if (error != GRPC_ERROR_NONE) {
++      ExecCtx::Run(DEBUG_LOCATION, on_peer_checked, error);
++      tsi_peer_destruct(&peer);
++      return;
++    }
++  }
++  /* Do the custom client authorization check, if specified by the user. */
++  const grpc_tls_server_authorization_check_config* config =
++      options_->server_authorization_check_config();
++  /* If client authorization config is not null, use it to perform
++   * client authorization check. */
++  if (config != nullptr) {
++    const tsi_peer_property* p =
++        tsi_peer_get_property_by_name(&peer, TSI_X509_PEM_CERT_PROPERTY);
++    if (p == nullptr) {
++      error = GRPC_ERROR_CREATE_FROM_STATIC_STRING(
++          "Cannot check peer: missing pem cert property.");
++    } else {
++      char* peer_pem = static_cast<char*>(gpr_zalloc(p->value.length + 1));
++      memcpy(peer_pem, p->value.data, p->value.length);
++      GPR_ASSERT(check_arg_ != nullptr);
++      check_arg_->peer_cert = gpr_strdup(peer_pem);
++      check_arg_->target_name = gpr_strdup("");
++      on_peer_checked_ = on_peer_checked;
++      gpr_check_free(peer_pem);
++      const tsi_peer_property* chain = tsi_peer_get_property_by_name(
++          &peer, TSI_X509_PEM_CERT_CHAIN_PROPERTY);
++      if (chain != nullptr) {
++        char* peer_pem_chain =
++            static_cast<char*>(gpr_zalloc(chain->value.length + 1));
++        memcpy(peer_pem_chain, chain->value.data, chain->value.length);
++        check_arg_->peer_cert_full_chain =
++            check_arg_->peer_cert_full_chain == nullptr
++                ? gpr_strdup(peer_pem_chain)
++                : check_arg_->peer_cert_full_chain;
++        gpr_check_free(peer_pem_chain);
++      }
++      // TODO(zhenlian) - This should be cleaned up as part of the custom
++      // verification changes. Fill in the subject alternative names
++      std::vector<char*> subject_alternative_names;
++      for (size_t i = 0; i < peer.property_count; i++) {
++        const tsi_peer_property* prop = &peer.properties[i];
++        if (strcmp(prop->name,
++                   TSI_X509_SUBJECT_ALTERNATIVE_NAME_PEER_PROPERTY) == 0) {
++          char* san = new char[prop->value.length + 1];
++          memcpy(san, prop->value.data, prop->value.length);
++          san[prop->value.length] = '\0';
++          subject_alternative_names.emplace_back(san);
++        }
++      }
++      if (check_arg_->subject_alternative_names != nullptr) {
++        for (size_t i = 0; i < check_arg_->subject_alternative_names_size;
++             ++i) {
++          delete[] check_arg_->subject_alternative_names[i];
++        }
++        delete[] check_arg_->subject_alternative_names;
++      }
++      check_arg_->subject_alternative_names_size =
++          subject_alternative_names.size();
++      if (subject_alternative_names.empty()) {
++        check_arg_->subject_alternative_names = nullptr;
++      } else {
++        check_arg_->subject_alternative_names =
++            new char*[check_arg_->subject_alternative_names_size];
++        for (size_t i = 0; i < check_arg_->subject_alternative_names_size;
++             ++i) {
++          check_arg_->subject_alternative_names[i] =
++              subject_alternative_names[i];
++        }
++      }
++      int callback_status = config->Schedule(check_arg_);
++      /* Client authorization check is handled asynchronously. */
++      if (callback_status) {
++        tsi_peer_destruct(&peer);
++        return;
++      }
++      /* Client authorization check is handled synchronously. */
++      error = ProcessClientAuthorizationCheckResult(check_arg_);
++    }
++  }
+   ExecCtx::Run(DEBUG_LOCATION, on_peer_checked, error);
++  tsi_peer_destruct(&peer);
+ }
+ 
+ int TlsServerSecurityConnector::cmp(
+diff --git a/src/core/lib/security/security_connector/tls/tls_security_connector.h b/src/core/lib/security/security_connector/tls/tls_security_connector.h
+index 80c26954ac..cd830b9b7a 100644
+--- a/src/core/lib/security/security_connector/tls/tls_security_connector.h
++++ b/src/core/lib/security/security_connector/tls/tls_security_connector.h
+@@ -219,9 +219,31 @@ class TlsServerSecurityConnector final : public grpc_server_security_connector {
+   grpc_security_status UpdateHandshakerFactoryLocked()
+       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
+ 
++  // gRPC-provided callback executed by application, which servers to bring the
++  // control back to gRPC core.
++  static void ClientAuthorizationCheckDone(
++      grpc_tls_server_authorization_check_arg* arg);
++
++  // A util function to process server authorization check result.
++  static grpc_error_handle ProcessClientAuthorizationCheckResult(
++      grpc_tls_server_authorization_check_arg* arg);
++
++  // A util function to create a server authorization check arg instance.
++  static grpc_tls_server_authorization_check_arg*
++      ClientAuthorizationCheckArgCreate(void* user_data);
++
++  // A util function to destroy a server authorization check arg instance.
++  static void ClientAuthorizationCheckArgDestroy(
++      grpc_tls_server_authorization_check_arg* arg);
++
+   RefCountedPtr<grpc_tls_credentials_options> options_;
++
+   grpc_tls_certificate_distributor::TlsCertificatesWatcherInterface*
+       certificate_watcher_ = nullptr;
++  grpc_closure* on_peer_checked_ = nullptr;
++  std::string target_name_ = "localhost";
++  std::string overridden_target_name_= "localhost";
++  grpc_tls_server_authorization_check_arg* check_arg_ = nullptr;
+ 
+   Mutex mu_;
+   tsi_ssl_server_handshaker_factory* server_handshaker_factory_
+diff --git a/src/cpp/sgx/sgx_ra_tls_backends.cc b/src/cpp/sgx/sgx_ra_tls_backends.cc
+new file mode 100644
+index 0000000000..2ac4bff09f
+--- /dev/null
++++ b/src/cpp/sgx/sgx_ra_tls_backends.cc
+@@ -0,0 +1,260 @@
++/*
++ *
++ * Copyright (c) 2022 Intel Corporation
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ */
++
++#include "sgx_ra_tls_backends.h"
++
++namespace grpc {
++namespace sgx {
++
++struct ra_tls_context _ctx_;
++
++std::vector<std::string> ra_tls_get_key_cert() {
++#ifdef SGX_RA_TLS_OCCLUM_BACKEND
++    return occlum_get_key_cert();
++#endif
++}
++
++static std::vector<grpc::experimental::IdentityKeyCertPair> get_identity_key_cert_pairs(
++    std::vector<std::string> key_cert) {
++    grpc::experimental::IdentityKeyCertPair key_cert_pair;
++    key_cert_pair.private_key = key_cert[0];
++    key_cert_pair.certificate_chain = key_cert[1];
++    std::vector<grpc::experimental::IdentityKeyCertPair> identity_key_cert_pairs;
++    identity_key_cert_pairs.emplace_back(key_cert_pair);
++    return identity_key_cert_pairs;
++}
++
++void credential_option_set_certificate_provider(grpc::sgx::CredentialsOptions& options) {
++    std::lock_guard<std::mutex> lock(_ctx_.mtx);
++
++    _ctx_.cache.id++;
++
++    auto certificate_provider = _ctx_.cache.certificate_provider.insert({
++            _ctx_.cache.id,
++            std::make_shared<grpc::experimental::StaticDataCertificateProvider>(
++                get_identity_key_cert_pairs(ra_tls_get_key_cert()))
++        }).first;
++
++    options.set_certificate_provider(certificate_provider->second);
++    options.watch_identity_key_cert_pairs();
++    options.set_cert_request_type(GRPC_SSL_REQUEST_AND_REQUIRE_CLIENT_CERTIFICATE_BUT_DONT_VERIFY);
++    options.set_root_cert_name("");
++    options.set_identity_cert_name("");
++}
++
++static sgx_config parse_sgx_config_json(const char* file) {
++    class json_engine sgx_json(file);
++    struct sgx_config sgx_cfg;
++
++    sgx_cfg.verify_mr_enclave = sgx_json.compare_item(sgx_json.get_item(sgx_json.get_handle(), "verify_mr_enclave"), "on");
++    sgx_cfg.verify_mr_signer = sgx_json.compare_item(sgx_json.get_item(sgx_json.get_handle(), "verify_mr_signer"), "on");
++    sgx_cfg.verify_isv_prod_id = sgx_json.compare_item(sgx_json.get_item(sgx_json.get_handle(), "verify_isv_prod_id"), "on");
++    sgx_cfg.verify_isv_svn = sgx_json.compare_item(sgx_json.get_item(sgx_json.get_handle(), "verify_isv_svn"), "on");
++    sgx_cfg.verify_config_svn = sgx_json.compare_item(sgx_json.get_item(sgx_json.get_handle(), "verify_config_svn"), "on");
++    sgx_cfg.verify_enclave_debuggable =
++        sgx_json.compare_item(sgx_json.get_item(sgx_json.get_handle(), "verify_enclave_debuggable"), "on");
++
++    auto objs = sgx_json.get_item(sgx_json.get_handle(), "sgx_mrs");
++    auto obj_num = std::min(cJSON_GetArraySize(objs), SGX_MESUREMENTS_MAX_SIZE);
++
++    sgx_cfg.sgx_mrs = std::vector<sgx_measurement>(obj_num, sgx_measurement());
++    for (auto i = 0; i < obj_num; i++) {
++        auto obj = cJSON_GetArrayItem(objs, i);
++
++        auto mr_enclave = sgx_json.print_item(sgx_json.get_item(obj, "mr_enclave"));
++        memset(sgx_cfg.sgx_mrs[i].mr_enclave, 0, sizeof(sgx_cfg.sgx_mrs[i].mr_enclave));
++        hex_to_byte(mr_enclave+1, sgx_cfg.sgx_mrs[i].mr_enclave, sizeof(sgx_cfg.sgx_mrs[i].mr_enclave));
++
++        auto mr_signer = sgx_json.print_item(sgx_json.get_item(obj, "mr_signer"));
++        memset(sgx_cfg.sgx_mrs[i].mr_signer, 0, sizeof(sgx_cfg.sgx_mrs[i].mr_signer));
++        hex_to_byte(mr_signer+1, sgx_cfg.sgx_mrs[i].mr_signer, sizeof(sgx_cfg.sgx_mrs[i].mr_signer));
++
++        auto isv_prod_id = sgx_json.print_item(sgx_json.get_item(obj, "isv_prod_id"));
++        sgx_cfg.sgx_mrs[i].isv_prod_id = strtoul(isv_prod_id, nullptr, 10);
++
++        auto isv_svn = sgx_json.print_item(sgx_json.get_item(obj, "isv_svn"));
++        sgx_cfg.sgx_mrs[i].isv_svn = strtoul(isv_svn, nullptr, 10);
++
++        auto config_svn = sgx_json.print_item(sgx_json.get_item(obj, "config_svn"));
++        sgx_cfg.sgx_mrs[i].config_svn = strtoul(config_svn, nullptr, 10);
++
++        if (cJSON_IsTrue(sgx_json.get_item(obj, "debuggable")) == 0)
++            sgx_cfg.sgx_mrs[i].debuggable = false;
++        else
++            sgx_cfg.sgx_mrs[i].debuggable = true;
++    };
++    return sgx_cfg;
++}
++
++void ra_tls_parse_sgx_config(sgx_config sgx_cfg) {
++    std::lock_guard<std::mutex> lock(_ctx_.mtx);
++    _ctx_.sgx_cfg = sgx_cfg;
++}
++
++void ra_tls_parse_sgx_config(const char* file) {
++    ra_tls_parse_sgx_config(parse_sgx_config_json(file));
++}
++
++void ra_tls_verify_init() {
++    std::lock_guard<std::mutex> lock(_ctx_.mtx);
++}
++
++static bool verify_measurement_internal(const char* mr_enclave, const char* mr_signer,
++                                        const char* isv_prod_id, const char* isv_svn,
++                                        const char* config_svn, bool debuggable) {
++    bool status = false;
++    auto & sgx_cfg = _ctx_.sgx_cfg;
++    for (auto & obj : sgx_cfg.sgx_mrs) {
++        status = true;
++
++        if (status && sgx_cfg.verify_mr_enclave && \
++            memcmp(obj.mr_enclave, mr_enclave, 32)) {
++            status = false;
++        }
++
++        if (status && sgx_cfg.verify_mr_signer && \
++            memcmp(obj.mr_signer, mr_signer, 32)) {
++            status = false;
++        }
++
++        if (status && sgx_cfg.verify_isv_prod_id && \
++            (obj.isv_prod_id != *(uint16_t*)isv_prod_id)) {
++            status = false;
++        }
++
++        if (status && sgx_cfg.verify_isv_svn && \
++            (obj.isv_svn != *(uint16_t*)isv_svn)) {
++            status = false;
++        }
++
++        if (status && sgx_cfg.verify_config_svn && \
++            (obj.config_svn != *(uint16_t*)config_svn)) {
++            status = false;
++        }
++
++        if (status && sgx_cfg.verify_enclave_debuggable && \
++            (obj.debuggable != debuggable)) {
++            status = false;
++        }
++
++        if (status) {
++            break;
++        }
++    }
++    return status;
++}
++
++int verify_measurement(const char* mr_enclave, const char* mr_signer,
++                       const char* isv_prod_id, const char* isv_svn,
++                       const char* config_svn, bool debuggable) {
++    std::lock_guard<std::mutex> lock(_ctx_.mtx);
++    bool status = false;
++    try {
++        assert(mr_enclave && mr_signer && isv_prod_id && isv_svn && config_svn);
++        status = verify_measurement_internal(
++            mr_enclave, mr_signer, isv_prod_id, isv_svn, config_svn, debuggable
++            );
++        if (status) {
++            grpc_printf("  |- verify result  :  success\n");
++        } else {
++            grpc_printf("Below remote sgx measurements is not in the allowable list.\n");
++            grpc_printf("  |- mr_enclave     :  %s\n", byte_to_hex(mr_enclave, 32).c_str());
++            grpc_printf("  |- mr_signer      :  %s\n", byte_to_hex(mr_signer, 32).c_str());
++            grpc_printf("  |- isv_prod_id    :  %hu\n", *((uint16_t*)isv_prod_id));
++            grpc_printf("  |- isv_svn        :  %hu\n", *((uint16_t*)isv_svn));
++            grpc_printf("  |- config_svn     :  %hu\n", *((uint16_t*)config_svn));
++            grpc_printf("  |- debuggable     :  %s\n", debuggable?"true":"false");
++            grpc_printf("  |- verify result  :  failed\n");
++        }
++    } catch (...) {
++        grpc_printf("unable to verify measurement!");
++    }
++
++    fflush(stdout);
++    return status ? 0 : -1;
++}
++
++int TlsAuthorizationCheck::Schedule(grpc::experimental::TlsServerAuthorizationCheckArg* arg) {
++    GPR_ASSERT(arg != nullptr);
++
++    char der_crt[16000] = "";
++    auto peer_cert_buf = arg->peer_cert();
++    peer_cert_buf.copy(der_crt, peer_cert_buf.length(), 0);
++
++#ifdef SGX_RA_TLS_OCCLUM_BACKEND
++    int ret = occlum_verify_cert((const unsigned char *)der_crt, 16000);
++#endif
++
++    if (ret != 0) {
++        grpc_printf("something went wrong while verifying quote\n");
++        arg->set_success(0);
++        arg->set_status(GRPC_STATUS_UNAUTHENTICATED);
++    } else {
++        arg->set_success(1);
++        arg->set_status(GRPC_STATUS_OK);
++    }
++    return 0;
++};
++
++void TlsAuthorizationCheck::Cancel(grpc::experimental::TlsServerAuthorizationCheckArg* arg) {
++    GPR_ASSERT(arg != nullptr);
++    arg->set_status(GRPC_STATUS_PERMISSION_DENIED);
++    arg->set_error_details("cancelled");
++};
++
++int ra_tls_auth_check_schedule(void* /* confiuser_data */,
++                               grpc_tls_server_authorization_check_arg* arg) {
++    char der_crt[16000] = "";
++    memcpy(der_crt, arg->peer_cert, strlen(arg->peer_cert));
++
++#ifdef SGX_RA_TLS_OCCLUM_BACKEND
++    int ret = occlum_verify_cert((const unsigned char *)der_crt, 16000);
++#endif
++
++    if (ret != 0) {
++        grpc_printf("something went wrong while verifying quote\n");
++        arg->success = 0;
++        arg->status = GRPC_STATUS_UNAUTHENTICATED;
++    } else {
++        arg->success = 1;
++        arg->status = GRPC_STATUS_OK;
++    }
++    return 0;
++}
++
++void credential_option_set_authorization_check(grpc::sgx::CredentialsOptions& options) {
++    std::lock_guard<std::mutex> lock(_ctx_.mtx);
++
++    _ctx_.cache.id++;
++
++    auto authorization_check = _ctx_.cache.authorization_check.insert({
++            _ctx_.cache.id, std::make_shared<grpc::sgx::TlsAuthorizationCheck>()
++        }).first;
++
++    auto authorization_check_config = _ctx_.cache.authorization_check_config.insert({
++            _ctx_.cache.id,
++            std::make_shared<grpc::experimental::TlsServerAuthorizationCheckConfig>(
++                authorization_check->second)
++        }).first;
++
++    options.set_authorization_check_config(authorization_check_config->second);
++    options.set_verification_option(GRPC_TLS_SKIP_ALL_SERVER_VERIFICATION);
++}
++
++} // namespace sgx
++} // namespace grpc
+diff --git a/src/cpp/sgx/sgx_ra_tls_backends.h b/src/cpp/sgx/sgx_ra_tls_backends.h
+new file mode 100644
+index 0000000000..0c28518e46
+--- /dev/null
++++ b/src/cpp/sgx/sgx_ra_tls_backends.h
+@@ -0,0 +1,114 @@
++/*
++ *
++ * Copyright (c) 2022 Intel Corporation
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ */
++
++#ifndef SGX_RA_TLS_BACKENDS_H
++#define SGX_RA_TLS_BACKENDS_H
++
++#include "sgx_ra_tls_utils.h"
++
++#include <mutex>
++#include <unordered_map>
++
++#include <grpcpp/grpcpp.h>
++#include <grpc/grpc_security.h>
++#include <grpc/grpc_security_constants.h>
++#include <grpcpp/security/credentials.h>
++#include <grpcpp/security/tls_certificate_provider.h>
++#include <grpcpp/security/tls_credentials_options.h>
++#include <grpcpp/security/server_credentials.h>
++#include <grpcpp/security/sgx/sgx_ra_tls_options.h>
++
++// Set 1 for strict safety checks
++#define SGX_MESUREMENTS_MAX_SIZE 16
++
++namespace grpc {
++namespace sgx {
++
++class TlsAuthorizationCheck
++    : public grpc::experimental::TlsServerAuthorizationCheckInterface {
++    int Schedule(grpc::experimental::TlsServerAuthorizationCheckArg* arg) override;
++    void Cancel(grpc::experimental::TlsServerAuthorizationCheckArg* arg) override;
++};
++
++struct sgx_measurement {
++    char mr_enclave[32];
++    char mr_signer[32];
++    uint16_t isv_prod_id;
++    uint16_t isv_svn;
++    uint16_t config_svn;
++    bool debuggable;
++};
++
++struct sgx_config {
++    bool verify_mr_enclave  = true;
++    bool verify_mr_signer   = true;
++    bool verify_isv_prod_id = true;
++    bool verify_isv_svn     = true;
++    bool verify_config_svn = true;
++    bool verify_enclave_debuggable = true;
++    std::vector<sgx_measurement> sgx_mrs;
++};
++
++struct ra_tls_cache {
++    int id = 0;
++    std::unordered_map<
++            int, std::shared_ptr<grpc::experimental::StaticDataCertificateProvider>
++        > certificate_provider;
++    std::unordered_map<
++            int, std::shared_ptr<grpc::sgx::TlsAuthorizationCheck>
++        > authorization_check;
++    std::unordered_map<
++            int, std::shared_ptr<grpc::experimental::TlsServerAuthorizationCheckConfig>
++        > authorization_check_config;
++};
++
++struct ra_tls_context {
++    std::mutex mtx;
++    struct sgx_config sgx_cfg;
++    struct ra_tls_cache cache;
++};
++
++extern struct ra_tls_context _ctx_;
++
++
++#ifdef SGX_RA_TLS_OCCLUM_BACKEND
++
++std::vector<std::string> occlum_get_key_cert();
++
++int occlum_verify_cert(const unsigned char * der_crt, size_t len);
++
++#endif // SGX_RA_TLS_OCCLUM_BACKEND
++
++void ra_tls_parse_sgx_config(sgx_config sgx_cfg);
++
++void ra_tls_parse_sgx_config(const char* file);
++
++void ra_tls_verify_init();
++
++int verify_measurement(const char* mr_enclave, const char* mr_signer,
++                       const char* isv_prod_id, const char* isv_svn,
++                       const char* config_svn, bool debuggable);
++
++void credential_option_set_certificate_provider(grpc::sgx::CredentialsOptions& options);
++
++void credential_option_set_authorization_check(grpc::sgx::CredentialsOptions& options);
++
++} // namespace sgx
++} // namespace grpc
++
++#endif // SGX_RA_TLS_BACKENDS_H
+diff --git a/src/cpp/sgx/sgx_ra_tls_credentials.cc b/src/cpp/sgx/sgx_ra_tls_credentials.cc
+new file mode 100644
+index 0000000000..c0acf5fbd0
+--- /dev/null
++++ b/src/cpp/sgx/sgx_ra_tls_credentials.cc
+@@ -0,0 +1,98 @@
++/*
++ *
++ * Copyright (c) 2022 Intel Corporation
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ */
++
++#include "sgx_ra_tls_backends.h"
++
++namespace grpc {
++namespace sgx {
++
++/*
++RA-TLS: on client, only need to register ra_tls_verify_callback() for cert verification
++  1. extract SGX quote from "quote" OID extension from crt
++  2. compare public key's hash from cert against quote's report_data
++  3. prepare user-supplied verification parameter "allow outdated TCB"
++  4. call into libsgx_dcap_quoteverify to verify ECDSA/based SGX quote
++  5. verify all measurements from the SGX quote
++*/
++
++std::shared_ptr<grpc::ChannelCredentials> TlsCredentials(sgx_config sgx_cfg) {
++    grpc::sgx::CredentialsOptions options;
++
++    ra_tls_parse_sgx_config(sgx_cfg);
++
++    credential_option_set_certificate_provider(options);
++
++    ra_tls_verify_init();
++    credential_option_set_authorization_check(options);
++
++    return grpc::experimental::TlsCredentials(
++        reinterpret_cast<const grpc::experimental::TlsChannelCredentialsOptions&>(options));
++};
++
++std::shared_ptr<grpc::ChannelCredentials> TlsCredentials(const char* sgx_cfg_json) {
++    grpc::sgx::CredentialsOptions options;
++
++    ra_tls_parse_sgx_config(sgx_cfg_json);
++
++    credential_option_set_certificate_provider(options);
++
++    ra_tls_verify_init();
++    credential_option_set_authorization_check(options);
++
++    return grpc::experimental::TlsCredentials(
++        reinterpret_cast<const grpc::experimental::TlsChannelCredentialsOptions&>(options));
++};
++
++std::shared_ptr<grpc::ServerCredentials> TlsServerCredentials(sgx_config sgx_cfg) {
++    grpc::sgx::CredentialsOptions options;
++
++    ra_tls_parse_sgx_config(sgx_cfg);
++
++    credential_option_set_certificate_provider(options);
++
++    ra_tls_verify_init();
++    credential_option_set_authorization_check(options);
++
++    return grpc::experimental::TlsServerCredentials(
++        reinterpret_cast<const grpc::experimental::TlsServerCredentialsOptions&>(options));
++};
++
++std::shared_ptr<grpc::ServerCredentials> TlsServerCredentials(const char* sgx_cfg_json) {
++    grpc::sgx::CredentialsOptions options;
++
++    ra_tls_parse_sgx_config(sgx_cfg_json);
++
++    credential_option_set_certificate_provider(options);
++
++    ra_tls_verify_init();
++    credential_option_set_authorization_check(options);
++
++    return grpc::experimental::TlsServerCredentials(
++        reinterpret_cast<const grpc::experimental::TlsServerCredentialsOptions&>(options));
++};
++
++std::shared_ptr<grpc::Channel> CreateSecureChannel(
++    string target_str, std::shared_ptr<grpc::ChannelCredentials> channel_creds) {
++    GPR_ASSERT(channel_creds.get() != nullptr);
++    auto channel_args = grpc::ChannelArguments();
++    channel_args.SetSslTargetNameOverride("RATLS");
++    return grpc::CreateCustomChannel(target_str, std::move(channel_creds), channel_args);
++};
++
++} // namespace sgx
++} // namespace grpc
+diff --git a/src/cpp/sgx/sgx_ra_tls_occlum.cc b/src/cpp/sgx/sgx_ra_tls_occlum.cc
+new file mode 100644
+index 0000000000..ef0086aedf
+--- /dev/null
++++ b/src/cpp/sgx/sgx_ra_tls_occlum.cc
+@@ -0,0 +1,325 @@
++/*
++ *
++ * Copyright (c) 2022 Intel Corporation
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ */
++
++#include "sgx_ra_tls_backends.h"
++
++namespace grpc {
++namespace sgx {
++
++#ifdef SGX_RA_TLS_OCCLUM_BACKEND
++
++#include <openssl/evp.h>
++#include <openssl/rsa.h>
++#include <openssl/x509.h>
++#include <openssl/x509v3.h>
++#include <openssl/sha.h>
++#include <openssl/pem.h>
++#include <openssl/asn1.h>
++
++#include "sgx_quote_3.h"
++#include "occlum_dcap.h"
++
++const char * RA_TLS_LONG_NAME = "RA-TLS Extension";
++const char * RA_TLS_SHORT_NAME = "RA-TLS";
++
++std::vector<std::string> occlum_get_key_cert() {
++    unsigned char private_key_pem[16000], cert_pem[16000];
++
++    BIGNUM * e = BN_new();
++    BN_set_word(e, RSA_F4);
++    RSA * rsa = RSA_new();
++    RSA_generate_key_ex(rsa, 2048, e, nullptr);
++
++    EVP_PKEY * pkey = EVP_PKEY_new();
++    EVP_PKEY_assign_RSA(pkey, rsa);
++
++    X509 * x509 = X509_new();
++
++    ASN1_INTEGER_set(X509_get_serialNumber(x509), 1);
++    X509_gmtime_adj(X509_get_notBefore(x509), 0);
++    X509_gmtime_adj(X509_get_notAfter(x509), 630720000L);
++    X509_set_pubkey(x509, pkey);
++
++    X509_NAME * name = X509_NAME_new();
++    // X509_NAME * name = X509_get_subject_name(x509);
++    X509_NAME_add_entry_by_txt(name, "C",  MBSTRING_ASC,
++                            (unsigned char *)"CN", -1, -1, 0);
++    X509_NAME_add_entry_by_txt(name, "O",  MBSTRING_ASC,
++                            (unsigned char *)"Intel Inc.", -1, -1, 0);
++    X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC,
++                            (unsigned char *)"localhost", -1, -1, 0);
++    X509_set_subject_name(x509, name);
++    X509_set_issuer_name(x509, name);
++
++    int32_t ret;
++    size_t key_len = i2d_PUBKEY(pkey, 0);
++    unsigned char *public_key = NULL;
++    // size_t pubkey_len = i2d_PUBKEY(pkey, &public_key);
++    size_t pubkey_len = i2d_X509_PUBKEY(X509_get_X509_PUBKEY(x509), &public_key);
++
++    if (pubkey_len != key_len) {
++        grpc_printf("get public key failed!\n");
++    }
++
++    BIO *bio = BIO_new(BIO_s_mem());
++    if (nullptr == bio) {
++        grpc_printf("create bio failed!\n");
++    }
++
++    ret = PEM_write_bio_RSAPrivateKey(bio, rsa, nullptr, nullptr, 0, nullptr, nullptr);
++    if (ret == 0) {
++        grpc_printf("write private key failed!\n");
++    }
++
++    ret = BIO_read(bio, private_key_pem, bio->num_write);
++    if (ret == 0) {
++        grpc_printf("read private key failed!\n");
++    }
++
++    unsigned char hash[SHA256_DIGEST_LENGTH];
++    SHA256_CTX sha256;
++    SHA256_Init(&sha256);
++    SHA256_Update(&sha256, public_key, key_len);
++    SHA256_Final(hash, &sha256);
++
++    void *handle;
++    uint32_t quote_size;
++    uint8_t *p_quote_buffer;
++
++    handle = dcap_quote_open();
++    quote_size = dcap_get_quote_size(handle);
++
++    p_quote_buffer = (uint8_t*)malloc(quote_size);
++    if (nullptr == p_quote_buffer) {
++        grpc_printf("Couldn't allocate quote_buffer\n");
++    }
++    memset(p_quote_buffer, 0, quote_size);
++
++    sgx_report_data_t report_data = { 0 };
++    memcpy(report_data.d, hash, SHA256_DIGEST_LENGTH);
++
++    ret = dcap_generate_quote(handle, p_quote_buffer, &report_data);
++    if (0 != ret) {
++        grpc_printf( "Error in dcap_generate_quote.\n");
++    }
++
++    int nid = OBJ_create("1.2.840.113741.1", RA_TLS_SHORT_NAME, RA_TLS_LONG_NAME);
++    ASN1_OBJECT* obj = OBJ_nid2obj(nid);  
++    ASN1_OCTET_STRING* data = ASN1_OCTET_STRING_new();
++    ASN1_OCTET_STRING_set(data, p_quote_buffer, quote_size);
++
++    X509_EXTENSION* ext = X509_EXTENSION_create_by_OBJ(nullptr, obj, 0, data);
++    X509_add_ext(x509, ext, -1);
++
++    X509_sign(x509, pkey, EVP_sha1());
++
++    BIO *cert_bio = BIO_new(BIO_s_mem());
++    if (nullptr == cert_bio) {
++        grpc_printf("create crt bio failed!\n");
++    }
++
++    if (0 == PEM_write_bio_X509(cert_bio, x509)) {
++        BIO_free(cert_bio);
++        grpc_printf("read crt bio failed!\n");
++    }
++
++    ret = BIO_read(cert_bio, cert_pem, cert_bio->num_write);
++    if (ret == 0) {
++        grpc_printf("read pem cert failed!\n");
++    }
++
++    BIO_free(bio);
++    BIO_free(cert_bio);
++    EVP_PKEY_free(pkey);
++    check_free(p_quote_buffer);
++    dcap_quote_close(handle);
++
++    std::vector<std::string> key_cert;
++    key_cert.emplace_back(std::string((char*) private_key_pem));
++    key_cert.emplace_back(std::string((char*) cert_pem));
++    return key_cert;
++}
++
++static int occlum_get_quote(X509 *x509, uint8_t **quote, size_t *len) {
++    STACK_OF(X509_EXTENSION) *exts = x509->cert_info->extensions;
++    int ext_num;
++    int ret = -1; 
++    if (exts) {
++        ext_num = sk_X509_EXTENSION_num(exts);
++
++        for (int i = 0; i < ext_num; i++) {
++        X509_EXTENSION *ext = sk_X509_EXTENSION_value(exts, i);
++        ASN1_OBJECT *obj = X509_EXTENSION_get_object(ext);
++
++        unsigned nid = OBJ_obj2nid(obj);
++        if (nid != NID_undef) {
++            const char *ln = OBJ_nid2ln(nid);
++            if (memcmp(RA_TLS_LONG_NAME, ln, sizeof(RA_TLS_LONG_NAME)) == 0) {
++            BIO *ext_bio = BIO_new(BIO_s_mem());
++
++            *len = i2d_ASN1_OCTET_STRING(ext->value, quote);
++            *quote = *quote + 4;
++            *len = *len - 4;
++            ret = 0;
++            BIO_free(ext_bio);
++            }
++        }
++
++        }
++    }
++
++    return ret;
++}
++
++static int occlum_verify_pubkey_hash(X509 *x509, uint8_t *pubkey_hash, size_t len) {
++    EVP_PKEY *pkey = X509_get_pubkey(x509);
++
++    int32_t ret;
++    size_t key_len = EVP_PKEY_bits(pkey)/8;
++    unsigned char *public_key = NULL;
++
++    key_len = i2d_X509_PUBKEY(X509_get_X509_PUBKEY(x509), &public_key);
++
++    unsigned char hash[SHA256_DIGEST_LENGTH];
++    SHA256_CTX sha256;
++    SHA256_Init(&sha256);
++    SHA256_Update(&sha256, public_key, key_len);
++    SHA256_Final(hash, &sha256);
++
++    ret = memcmp(hash, pubkey_hash, len);
++    return ret;
++}
++
++static int occlum_verify_quote(uint8_t * quote_buffer, size_t quote_size) {
++    void *handle;
++    handle = dcap_quote_open();
++
++    uint32_t supplemental_size, ret;
++    uint8_t *p_supplemental_buffer;
++    sgx_ql_qv_result_t quote_verification_result = SGX_QL_QV_RESULT_UNSPECIFIED;
++    uint32_t collateral_expiration_status = 1;
++
++    supplemental_size = dcap_get_supplemental_data_size(handle);
++    p_supplemental_buffer = (uint8_t *)malloc(supplemental_size);
++    if (NULL == p_supplemental_buffer) {
++        grpc_printf("Couldn't allocate supplemental buffer\n");
++    }
++    memset(p_supplemental_buffer, 0, supplemental_size);
++
++    ret = dcap_verify_quote(
++        handle,
++        quote_buffer,
++        quote_size,
++        &collateral_expiration_status,
++        &quote_verification_result,
++        supplemental_size,
++        p_supplemental_buffer
++        );
++
++    if (0 != ret) {
++        grpc_printf( "Error in dcap_verify_quote.\n");
++    }
++
++    if (collateral_expiration_status != 0) {
++        grpc_printf("the verification collateral has expired\n");
++    }
++
++    switch (quote_verification_result) {
++        case SGX_QL_QV_RESULT_OK:
++            grpc_printf("Succeed to verify the quote!\n");
++            break;
++        case SGX_QL_QV_RESULT_CONFIG_NEEDED:
++        case SGX_QL_QV_RESULT_OUT_OF_DATE:
++        case SGX_QL_QV_RESULT_OUT_OF_DATE_CONFIG_NEEDED:
++        case SGX_QL_QV_RESULT_SW_HARDENING_NEEDED:
++        case SGX_QL_QV_RESULT_CONFIG_AND_SW_HARDENING_NEEDED:
++            grpc_printf("WARN: App: Verification completed with Non-terminal result: %x\n",
++                   quote_verification_result);
++            break;
++        case SGX_QL_QV_RESULT_INVALID_SIGNATURE:
++        case SGX_QL_QV_RESULT_REVOKED:
++        case SGX_QL_QV_RESULT_UNSPECIFIED:
++        default:
++            grpc_printf("\tError: App: Verification completed with Terminal result: %x\n",
++                   quote_verification_result);
++    }
++    check_free(p_supplemental_buffer);
++    dcap_quote_close(handle);
++    return ret;
++}
++
++int occlum_verify_cert(const unsigned char * der_crt, size_t len) {
++    BIO* bio = BIO_new(BIO_s_mem());
++    BIO_write(bio, der_crt, strlen((const char *)der_crt));
++    X509 *x509 = PEM_read_bio_X509(bio, NULL, NULL, NULL);
++    
++    if (x509 == nullptr) {
++        grpc_printf("parse the crt failed! \n");
++        return -1;
++    }
++
++    uint8_t * quote_buf = nullptr;
++    size_t quote_len = 0;
++    int ret = occlum_get_quote(x509, &quote_buf, &quote_len);
++    if (ret != 0) {
++        grpc_printf("parse quote failed!\n");
++        return -1;
++    }
++
++    ret = occlum_verify_quote(quote_buf, quote_len);
++    if (ret != 0) {
++        grpc_printf("verify quote failed!\n");
++        return -1;
++    }
++
++    sgx_quote3_t *p_quote = (sgx_quote3_t *)quote_buf;
++    sgx_report_body_t *p_rep_body = (sgx_report_body_t *)(&p_quote->report_body);
++    sgx_report_data_t *p_rep_data =(sgx_report_data_t *)(&p_rep_body->report_data);
++    uint8_t *pubkey_hash = p_rep_data->d;
++
++
++    ret = occlum_verify_pubkey_hash(x509, pubkey_hash, SHA256_DIGEST_LENGTH);
++    if (ret != 0) {
++        grpc_printf("verify the public key hash failed!\n");
++        return -1;
++    }
++
++    // Check if enclave is debuggable
++    bool debuggable = false;
++    if (p_rep_body->attributes.flags & SGX_FLAGS_DEBUG)
++        debuggable = true;
++
++    ret = verify_measurement((const char *)&p_rep_body->mr_enclave,
++                             (const char *)&p_rep_body->mr_signer,
++                             (const char *)&p_rep_body->isv_prod_id,
++                             (const char *)&p_rep_body->isv_svn,
++                             (const char *)&p_rep_body->config_svn,
++                             debuggable);
++    if (ret != 0) {
++        grpc_printf("verify the measurement failed!\n");
++        return -1;
++    }
++
++    BIO_free(bio);
++    return 0;
++}
++
++#endif // SGX_RA_TLS_OCCLUM_BACKEND
++
++} // namespace sgx
++} // namespace grpc
+diff --git a/src/cpp/sgx/sgx_ra_tls_options.cc b/src/cpp/sgx/sgx_ra_tls_options.cc
+new file mode 100644
+index 0000000000..c5a9fa499c
+--- /dev/null
++++ b/src/cpp/sgx/sgx_ra_tls_options.cc
+@@ -0,0 +1,55 @@
++/*
++ *
++ * Copyright (c) 2022 Intel Corporation
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ */
++
++#include <grpc/grpc_security.h>
++#include <grpc/support/alloc.h>
++#include <grpcpp/security/sgx/sgx_ra_tls_options.h>
++
++#include "absl/container/inlined_vector.h"
++#include "src/cpp/common/tls_credentials_options_util.h"
++
++namespace grpc {
++namespace sgx {
++
++void CredentialsOptions::set_verification_option(
++    grpc_tls_server_verification_option server_verification_option) {
++    grpc_tls_credentials_options* options = c_credentials_options();
++    GPR_ASSERT(options != nullptr);
++    grpc_tls_credentials_options_set_server_verification_option(
++        options, server_verification_option);
++}
++
++void CredentialsOptions::set_authorization_check_config(
++    std::shared_ptr<grpc::experimental::TlsServerAuthorizationCheckConfig> config) {
++    grpc_tls_credentials_options* options = c_credentials_options();
++    GPR_ASSERT(options != nullptr);
++    if (config != nullptr) {
++        grpc_tls_credentials_options_set_server_authorization_check_config(
++            options, config->c_config());
++    }
++}
++
++void CredentialsOptions::set_cert_request_type(
++    grpc_ssl_client_certificate_request_type cert_request_type) {
++    grpc_tls_credentials_options* options = c_credentials_options();
++    GPR_ASSERT(options != nullptr);
++    grpc_tls_credentials_options_set_cert_request_type(options, cert_request_type);
++}
++
++} // namespace sgx
++} // namespace grpc
+diff --git a/src/cpp/sgx/sgx_ra_tls_utils.cc b/src/cpp/sgx/sgx_ra_tls_utils.cc
+new file mode 100644
+index 0000000000..68c57beacb
+--- /dev/null
++++ b/src/cpp/sgx/sgx_ra_tls_utils.cc
+@@ -0,0 +1,169 @@
++/*
++ *
++ * Copyright (c) 2022 Intel Corporation
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ */
++
++#include "sgx_ra_tls_utils.h"
++
++#include <cstring>
++#include <iostream>
++#include <fstream>
++#include <sstream>
++
++namespace grpc {
++namespace sgx {
++
++void check_free(void* ptr) {
++    if (ptr) {
++        free(ptr);
++        ptr = nullptr;
++    };
++}
++
++bool hex_to_byte(const char *src, char *dst, size_t dst_size) {
++    if (std::strlen(src) < dst_size*2) {
++        return false;
++    } else {
++        for (auto i = 0; i < dst_size; i++) {
++            if (!isxdigit(src[i*2]) || !isxdigit(src[i*2+1])) {
++                return false;
++            } else {
++                sscanf(src+i*2, "%02hhx", dst+i);
++            }
++        }
++        return true;
++    }
++};
++
++void byte_to_hex(const char *src, char *dst, size_t src_size) {
++    for (auto i = 0; i < src_size; i++) {
++        sprintf(dst+i*2, "%02hhx", src[i]);
++    }
++};
++
++std::string byte_to_hex(const char *src, size_t src_size) {
++    char dst[src_size*2];
++    memset(dst, 0, sizeof(dst));
++    byte_to_hex(src, dst, src_size);
++    return std::string(dst);
++};
++
++library_engine::library_engine() : handle(nullptr), error(nullptr) {};
++
++library_engine::library_engine(const char* file, int mode) : handle(nullptr), error(nullptr) {
++    this->open(file, mode);
++}
++
++library_engine::~library_engine() {
++    this->close();
++}
++
++void library_engine::open(const char* file, int mode) {
++    this->close();
++    handle = dlopen(file, mode);
++    error = dlerror();
++    if (error != nullptr || handle == nullptr) {
++        throw std::runtime_error("dlopen " + std::string(file) + " error, " + std::string(error));
++    }
++}
++
++void library_engine::close() {
++    if (handle) {
++        dlclose(handle);
++    }
++    handle = nullptr;
++    error = nullptr;
++}
++
++void* library_engine::get_func(const char* name) {
++  auto func = dlsym(handle, name);
++  error = dlerror();
++  if (error != nullptr || func == nullptr) {
++    throw std::runtime_error("dlsym " + std::string(name) + " error, " + std::string(error));
++    return nullptr;
++  } else {
++    return func;
++  }
++}
++
++void* library_engine::get_handle() {
++    return handle;
++}
++
++json_engine::json_engine() : handle(nullptr) {};
++
++json_engine::json_engine(const char* file) : handle(nullptr){
++    this->open(file);
++}
++
++json_engine::~json_engine() {
++    this->close();
++}
++
++bool json_engine::open(const char* file) {
++    if (!file) {
++        grpc_printf("wrong json file path\n");
++        return false;
++    }
++
++    this->close();
++
++    auto file_ptr = fopen(file, "r");
++    fseek(file_ptr, 0, SEEK_END);
++    auto length = ftell(file_ptr);
++    fseek(file_ptr, 0, SEEK_SET);
++    auto buffer = malloc(length);
++    fread(buffer, 1, length, file_ptr);
++    fclose(file_ptr);
++
++    this->handle = cJSON_Parse((const char *)buffer);
++
++    check_free(buffer);
++
++    if (this->handle) {
++        return true;
++    } else {
++        grpc_printf("cjson open %s error: %s", file, cJSON_GetErrorPtr());
++        return false;
++    }
++}
++
++void json_engine::close() {
++    if (this->handle) {
++        cJSON_Delete(this->handle);
++        this->handle = nullptr;
++    }
++}
++
++cJSON* json_engine::get_handle() {
++    return this->handle;
++}
++
++cJSON* json_engine::get_item(cJSON* obj, const char* item) {
++    return cJSON_GetObjectItem(obj, item);
++};
++
++char* json_engine::print_item(cJSON* obj) {
++    return cJSON_Print(obj);
++};
++
++bool json_engine::compare_item(cJSON* obj, const char* item) {
++    auto obj_item = this->print_item(obj);
++    return strncmp(obj_item+1, item, std::min(strlen(item), strlen(obj_item)-2)) == 0;
++};
++
++} // namespace sgx
++} // namespace grpc
+diff --git a/src/cpp/sgx/sgx_ra_tls_utils.h b/src/cpp/sgx/sgx_ra_tls_utils.h
+new file mode 100644
+index 0000000000..35bfde9342
+--- /dev/null
++++ b/src/cpp/sgx/sgx_ra_tls_utils.h
+@@ -0,0 +1,68 @@
++/*
++ *
++ * Copyright (c) 2022 Intel Corporation
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ */
++
++#ifndef SGX_RA_TLS_UTILS_H
++#define SGX_RA_TLS_UTILS_H
++
++#include <string>
++#include <vector>
++#include <memory>
++#include <dlfcn.h>
++
++#define grpc_printf printf
++#define grpc_fprintf fprintf
++
++#include <grpcpp/security/sgx/sgx_ra_tls.h>
++
++namespace grpc {
++namespace sgx {
++
++
++class library_engine {
++    public:
++        library_engine();
++
++        library_engine(const char*, int);
++
++        ~library_engine();
++
++        void open(const char*, int);
++
++        void close();
++
++        void* get_func(const char*);
++
++        void* get_handle();
++
++    private:
++        void* handle;
++        char* error;
++};
++
++void check_free(void* ptr);
++
++bool hex_to_byte(const char* src, char* dst, size_t dst_size);
++
++void byte_to_hex(const char* src, char* dst, size_t src_size);
++
++std::string byte_to_hex(const char* src, size_t src_size);
++
++} // namespace sgx
++} // namespace grpc
++
++#endif // SGX_RA_TLS_UTILS_H
+-- 
+2.34.1
+
