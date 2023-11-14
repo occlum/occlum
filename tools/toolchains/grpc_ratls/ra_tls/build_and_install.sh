@@ -36,9 +36,6 @@ function build_grpc_ratls() {
     # Copy occlum dcap lib first to ease linking
     cp ${DCAP_LIB_PATH}/libocclum_dcap.so* ${INSTALL_PREFIX}/lib
 
-    # Copy ratls added/updated files to grpc source
-    cp -rf grpc/${GRPC_VERSION}/* ${GRPC_PATH}/
-
     ABSEIL_PATH=${GRPC_PATH}/third_party/abseil-cpp
 
     # build and install abseil library
