@@ -269,13 +269,17 @@ static void handle_sigfpe(int num, siginfo_t *info, void *_context) {
 }
 
 int test_handle_sigfpe() {
-    static char stack[SIGSTKSZ * 4];
+    char *stack = malloc(SIGSTKSZ * 4);
+    if (stack == NULL) {
+        THROW_ERROR("stack allocation failed");
+    }
     stack_t expected_ss = {
         .ss_size = SIGSTKSZ * 4,
         .ss_sp = stack,
         .ss_flags = 0,
     };
     if (sigaltstack(&expected_ss, NULL) < 0) {
+        free(stack);
         THROW_ERROR("failed to call sigaltstack");
     }
 
@@ -286,9 +290,11 @@ int test_handle_sigfpe() {
     new_action.sa_sigaction = handle_sigfpe;
     new_action.sa_flags = SA_SIGINFO | SA_NODEFER | SA_ONSTACK;
     if (sigaction(SIGFPE, &new_action, &old_action) < 0) {
+        free(stack);
         THROW_ERROR("registering new signal handler failed");
     }
     if (old_action.sa_handler != SIG_DFL) {
+        free(stack);
         THROW_ERROR("unexpected old sig handler");
     }
 
@@ -305,14 +311,17 @@ int test_handle_sigfpe() {
     fxsave(y);
 
     if (memcmp(x, y, 512) != 0) {
+        free(stack);
         THROW_ERROR("floating point registers are modified");
     }
 
     printf("Signal handler successfully jumped over the divide-by-zero instruction\n");
 
     if (sigaction(SIGFPE, &old_action, NULL) < 0) {
+        free(stack);
         THROW_ERROR("restoring old signal handler failed");
     }
+    free(stack);
     return 0;
 }
 
@@ -388,22 +397,28 @@ static void handle_sigpipe(int num, siginfo_t *info, void *context) {
 }
 
 int test_sigaltstack() {
-    static char stack[SIGSTKSZ];
+    char *stack = malloc(SIGSTKSZ);
+    if (stack == NULL) {
+        THROW_ERROR("stack allocation failed");
+    }
     stack_t expected_ss = {
         .ss_size = SIGSTKSZ,
         .ss_sp = stack,
         .ss_flags = 0,
     };
     if (sigaltstack(&expected_ss, NULL) < 0) {
+        free(stack);
         THROW_ERROR("failed to call sigaltstack");
     }
     stack_t actual_ss;
     if (sigaltstack(NULL, &actual_ss) < 0) {
+        free(stack);
         THROW_ERROR("failed to call sigaltstack");
     }
     if (actual_ss.ss_size != expected_ss.ss_size
             || actual_ss.ss_sp != expected_ss.ss_sp
             || actual_ss.ss_flags != expected_ss.ss_flags) {
+        free(stack);
         THROW_ERROR("failed to check the signal stack after set");
     }
 
@@ -413,20 +428,25 @@ int test_sigaltstack() {
     new_action.sa_sigaction = handle_sigpipe;
     new_action.sa_flags = SA_SIGINFO | SA_NODEFER | SA_ONSTACK;
     if (sigaction(SIGPIPE, &new_action, &old_action) < 0) {
+        free(stack);
         THROW_ERROR("registering new signal handler failed");
     }
     if (old_action.sa_handler != SIG_DFL) {
+        free(stack);
         THROW_ERROR("unexpected old sig handler");
     }
 
     raise(SIGPIPE);
     if (g_old_ss.ss_flags != SS_ONSTACK) {
+        free(stack);
         THROW_ERROR("check stack flags failed");
     }
 
     if (sigaction(SIGPIPE, &old_action, NULL) < 0) {
+        free(stack);
         THROW_ERROR("restoring old signal handler failed");
     }
+    free(stack);
     return 0;
 }
 
