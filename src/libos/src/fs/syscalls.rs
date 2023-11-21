@@ -288,13 +288,17 @@ pub fn do_fstatat(dirfd: i32, path: *const i8, stat_buf: *mut Stat, flags: u32) 
         .to_string_lossy()
         .into_owned();
     let flags = StatFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
-    let fs_path = FsPath::new(&path, dirfd, flags.contains(StatFlags::AT_EMPTY_PATH))?;
-    from_user::check_mut_ptr(stat_buf)?;
-    let stat = file_ops::do_fstatat(&fs_path, flags)?;
-    unsafe {
-        stat_buf.write(stat);
+    if flags.contains(StatFlags::AT_EMPTY_PATH) {
+        do_fstat(dirfd as u32, stat_buf)
+    } else {
+        let fs_path = FsPath::new(&path, dirfd, false)?;
+        from_user::check_mut_ptr(stat_buf)?;
+        let stat = file_ops::do_fstatat(&fs_path, flags)?;
+        unsafe {
+            stat_buf.write(stat);
+        }
+        Ok(0)
     }
-    Ok(0)
 }
 
 pub fn do_access(path: *const i8, mode: u32) -> Result<isize> {
