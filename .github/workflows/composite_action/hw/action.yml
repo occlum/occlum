@@ -40,12 +40,12 @@ runs:
     - name: Create container
       run: |
         if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          docker run -itd --name=${{ env.CONTAINER_NAME }} ${{ inputs.container-run-params }} --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }};
+          docker run -itd --name=${{ env.CONTAINER_NAME }} ${{ inputs.container-run-params }} --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum jessehui/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }}-NA;
         elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
           if [[ "${{ matrix.self_runner[2] }}" == "EDMM" ]]; then
-            docker run -itd --name=${{ env.CONTAINER_NAME }} ${{ inputs.container-run-params }} --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }};
+            docker run -itd --name=${{ env.CONTAINER_NAME }} ${{ inputs.container-run-params }} --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum jessehui/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }}-NA;
           else
-            docker run -itd --name=${{ env.CONTAINER_NAME }} ${{ inputs.container-run-params }} --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }};
+            docker run -itd --name=${{ env.CONTAINER_NAME }} ${{ inputs.container-run-params }} --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum jessehui/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }}-NA;
           fi
         else
           echo "Unsupported Hardware"

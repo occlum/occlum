@@ -18,7 +18,7 @@ jobs:
       run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
 
     - name: Create container
-      run: docker run -itd --name=code_coverage -e OCCLUM_LOG_LEVEL=trace -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04
+      run: docker run -itd --name=code_coverage -e OCCLUM_LOG_LEVEL=trace -v $GITHUB_WORKSPACE:/root/occlum jessehui/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-NA
 
     - uses: ./.github/workflows/composite_action/prebuild
       with:

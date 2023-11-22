@@ -1,11 +1,11 @@
 ARG OCCLUM_VERSION
-FROM occlum/occlum:$OCCLUM_VERSION-ubuntu20.04 as base
+FROM jessehui/occlum:$OCCLUM_VERSION-ubuntu20.04-NA as base
 LABEL maintainer="Chunyang Hui <sanqian.hcy@antgroup.com>"
 
 ARG OCCLUM_BRANCH
 WORKDIR /root
 RUN rm -rf /root/demos && \
-    git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum.git && \
+    git clone -b $OCCLUM_BRANCH https://github.com/jessehui/occlum.git && \
     cp -r occlum/demos /root/demos && \
     rm -rf /root/occlum
 

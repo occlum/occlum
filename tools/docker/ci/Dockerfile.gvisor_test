@@ -1,5 +1,5 @@
 ARG OCCLUM_VERSION
-FROM occlum/occlum:$OCCLUM_VERSION-ubuntu20.04 as base
+FROM jessehui/occlum:$OCCLUM_VERSION-ubuntu20.04-NA as base
 LABEL maintainer="He Sun <bochang.sh@antgroup.com>"
 
 # Install gvisor syscall test binaries
