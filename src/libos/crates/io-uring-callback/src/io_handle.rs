@@ -1,12 +1,8 @@
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll, Waker};
 cfg_if::cfg_if! {
     if #[cfg(feature = "sgx")] {
         use std::prelude::v1::*;
         use spin::Mutex as Mutex;
-        // use std::sync::SgxMutex as Mutex;
     } else {
         use std::sync::Mutex;
     }
@@ -65,22 +61,6 @@ impl IoHandle {
 
 impl Unpin for IoHandle {}
 
-// impl Future for IoHandle {
-//     type Output = i32;
-
-//     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-//         let mut inner = self.0.inner.lock().unwrap();
-//         match inner.state {
-//             IoState::Processed(retval) => Poll::Ready(retval),
-//             IoState::Cancelled => Poll::Ready(CANCEL_RETVAL),
-//             IoState::Submitted | IoState::Cancelling => {
-//                 inner.waker = Some(cx.waker().clone());
-//                 Poll::Pending
-//             }
-//         }
-//     }
-// }
-
 impl Drop for IoHandle {
     fn drop(&mut self) {
         // The user cannot drop a handle if the request isn't completed.
@@ -106,14 +86,12 @@ impl IoToken {
     }
 
     pub fn state(&self) -> IoState {
-        // let inner = self.inner.lock().unwrap();
-        let mut inner = self.inner.lock();
+        let inner = self.inner.lock();
         inner.state()
     }
 
     pub fn retval(&self) -> Option<i32> {
-        // let inner = self.inner.lock().unwrap();
-        let mut inner = self.inner.lock();
+        let inner = self.inner.lock();
         inner.retval()
     }
 
@@ -149,7 +127,6 @@ impl std::fmt::Debug for IoToken {
 struct Inner {
     state: IoState,
     completion_callback: Option<Callback>,
-    waker: Option<Waker>,
     token_key: u64,
 }
 
@@ -159,11 +136,9 @@ impl Inner {
     pub fn new(completion_callback: impl FnOnce(i32) + Send + 'static, token_key: u64) -> Self {
         let state = IoState::Submitted;
         let completion_callback = Some(Box::new(completion_callback) as _);
-        let waker = None;
         Self {
             state,
             completion_callback,
-            waker,
             token_key,
         }
     }
@@ -186,10 +161,6 @@ impl Inner {
             _ => {
                 unreachable!("cannot do complete twice");
             }
-        }
-
-        if let Some(waker) = self.waker.take() {
-            waker.wake();
         }
 
         self.completion_callback.take().unwrap()

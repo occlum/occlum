@@ -1,25 +1,18 @@
 use crate::events::Observer;
-use crate::socket::ioctl::IoctlCmd;
-use crate::socket::socket::{MsgFlags, NetlinkFamily, RecvFlags, SendFlags, Shutdown, Type};
-use crate::socket::util::poller::Poller;
-
+use crate::uring_socket::ioctl::IoctlCmd;
+use crate::uring_socket::socket::{MsgFlags, NetlinkFamily, RecvFlags, SendFlags, Shutdown, Type};
+use crate::uring_socket::util::poller::Poller;
 // use self::impls::{
 //     Ipv4Datagram, Ipv4Stream, Ipv6Datagram, Ipv6Stream, NetlinkDatagram, UnixDatagram,
 // };
-
 use self::impls::{Ipv4Stream, Ipv6Stream};
-
 // use super::unix::trusted::Stream as TrustedStream;
 // use super::unix::UnixStream;
 use crate::fs::{AccessMode, IoEvents, IoNotifier, StatusFlags};
-
 use crate::net::{Addr, AnyAddr, Domain};
-
-use crate::socket::socket::{Ipv4SocketAddr, Ipv6SocketAddr};
-
 use crate::prelude::*;
+use crate::uring_socket::socket::{Ipv4SocketAddr, Ipv6SocketAddr};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-
 // pub use self::impls::UntrustedUnixStream;
 
 #[derive(Debug)]
@@ -60,118 +53,6 @@ macro_rules! apply_fn_on_any_socket {
     }}
 }
 
-// impl File for SocketFile {
-
-//     fn read(&self, buf: &mut [u8]) -> Result<usize> {
-//         apply_fn_on_any_socket!(&self.socket, |socket| { socket.read(buf) })
-//     }
-
-//     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-//         apply_fn_on_any_socket!(&self.socket, |socket| { socket.readv(bufs) })
-//     }
-
-//     fn write(&self, buf: &[u8]) -> Result<usize> {
-//         apply_fn_on_any_socket!(&self.socket, |socket| { socket.write(buf) })
-//     }
-
-//     fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
-//         apply_fn_on_any_socket!(&self.socket, |socket| { socket.writev(bufs) })
-//     }
-
-//     // fn read(&self, buf: &mut [u8]) -> Result<usize> {
-//     //     self.recvmsg(buf, RecvFlags::empty())
-//     // }
-
-//     // fn write(&self, buf: &[u8]) -> Result<usize> {
-//     //     self.send(buf, SendFlags::empty())
-//     // }
-
-//     // fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-//     //     if offset != 0 {
-//     //         return_errno!(ESPIPE, "a nonzero position is not supported");
-//     //     }
-//     //     self.read(buf)
-//     // }
-
-//     // fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
-//     //     if offset != 0 {
-//     //         return_errno!(ESPIPE, "a nonzero position is not supported");
-//     //     }
-//     //     self.write(buf)
-//     // }
-
-//     // fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-//     //     let (bytes_recvd, _, _, _) = self.do_recvmsg(bufs, RecvFlags::empty(), None, None)?;
-//     //     Ok(bytes_recvd)
-//     // }
-
-//     // fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
-//     //     self.do_sendmsg(bufs, SendFlags::empty(), None, None)
-//     // }
-
-//     // fn seek(&self, pos: SeekFrom) -> Result<off_t> {
-//     //     return_errno!(ESPIPE, "Socket does not support seek")
-//     // }
-
-//     // fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-//     //     self.ioctl_impl(cmd)
-//     // }
-
-//     // fn access_mode(&self) -> Result<AccessMode> {
-//     //     Ok(AccessMode::O_RDWR)
-//     // }
-
-//     // fn status_flags(&self) -> Result<StatusFlags> {
-//     //     let ret = try_libc!(libc::ocall::fcntl_arg0(
-//     //         self.raw_host_fd() as i32,
-//     //         libc::F_GETFL
-//     //     ));
-//     //     Ok(StatusFlags::from_bits_truncate(ret as u32))
-//     // }
-
-//     fn set_status_flags(&self, new_status_flags: StatusFlags) -> Result<()> {
-//         self.set_status_flags(new_status_flags)
-//         // let raw_status_flags = (new_status_flags & STATUS_FLAGS_MASK).bits();
-//         // try_libc!(libc::ocall::fcntl_arg1(
-//         //     self.raw_host_fd() as i32,
-//         //     libc::F_SETFL,
-//         //     raw_status_flags as c_int
-//         // ));
-//         // Ok(())
-//     }
-
-//     fn poll_new(&self) -> IoEvents {
-//         let mask = IoEvents::all();
-//         self.poll(mask, None)
-//     }
-
-//     fn host_fd(&self) -> Option<&HostFd> {
-//         Some(&self.host_fd_inner())
-//     }
-
-//     // fn notifier(&self) -> Option<&IoNotifier> {
-//     //     Some(&self.notifier)
-//     // }
-
-//     // fn update_host_events(&self, ready: &IoEvents, mask: &IoEvents, trigger_notifier: bool) {
-//     //     self.host_events.update(ready, mask, Ordering::Release);
-
-//     //     if trigger_notifier {
-//     //         self.notifier.broadcast(ready);
-//     //     }
-//     // }
-
-//     fn as_any(&self) -> &dyn core::any::Any {
-//         self
-//     }
-// }
-
-// impl File for SocketFile {
-//     fn as_any(&self) -> &dyn core::any::Any {
-//         self
-//     }
-// }
-
 pub trait UringSocketType {
     fn as_uring_socket(&self) -> Result<&SocketFile>;
 }
@@ -180,7 +61,7 @@ impl UringSocketType for FileRef {
     fn as_uring_socket(&self) -> Result<&SocketFile> {
         self.as_any()
             .downcast_ref::<SocketFile>()
-            .ok_or_else(|| errno!(EBADF, "not a host socket"))
+            .ok_or_else(|| errno!(ENOTSOCK, "not a socket"))
     }
 }
 
@@ -780,8 +661,8 @@ mod impls {
     use super::*;
     use io_uring_callback::IoUring;
 
-    pub type Ipv4Stream = crate::socket::stream::StreamSocket<Ipv4SocketAddr, SocketRuntime>;
-    pub type Ipv6Stream = crate::socket::stream::StreamSocket<Ipv6SocketAddr, SocketRuntime>;
+    pub type Ipv4Stream = crate::uring_socket::stream::StreamSocket<Ipv4SocketAddr, SocketRuntime>;
+    pub type Ipv6Stream = crate::uring_socket::stream::StreamSocket<Ipv6SocketAddr, SocketRuntime>;
     // TODO: UnixStream cannot be simply re-exported from async_socket.
     // There are two reasons. First, there needs to be some translation between LibOS
     // and host paths. Second, we need two types of unix domain sockets: the trusted one that
@@ -795,9 +676,13 @@ mod impls {
 
     pub struct SocketRuntime;
 
-    impl crate::socket::runtime::Runtime for SocketRuntime {
-        fn io_uring() -> &'static IoUring {
-            &*crate::io_uring::SINGLETON
+    impl crate::uring_socket::runtime::Runtime for SocketRuntime {
+        fn io_uring() -> Arc<IoUring> {
+            crate::io_uring::MULTITON.get_uring()
+        }
+
+        fn free_io_uring(uring: Arc<IoUring>) {
+            crate::io_uring::MULTITON.free_uring(uring);
         }
     }
 }

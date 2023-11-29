@@ -1,3 +1,4 @@
+use core::hint;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Weak;
 use std::time::Duration;
@@ -5,7 +6,7 @@ use std::time::Duration;
 use io_uring_callback::Fd;
 use sgx_untrusted_alloc::UntrustedBox;
 
-use super::host_event_fd::HostEventFd;
+use crate::events::HostEventFd;
 use crate::prelude::*;
 
 /// A waiter enables a thread to sleep.
@@ -97,11 +98,6 @@ impl Waker {
             inner.wake()
         }
     }
-
-    /// Wake up waiters in batch, more efficient than waking up one-by-one.
-    pub fn batch_wake<'a, I: Iterator<Item = &'a Waker>>(iter: I) {
-        Inner::batch_wake(iter);
-    }
 }
 
 /// Instruction rearrangement about control dependency
@@ -136,18 +132,15 @@ impl Waker {
 struct Inner {
     is_woken: AtomicBool,
     host_eventfd: Arc<HostEventFd>,
-    // val: UntrustedBox<u64>,
 }
 
 impl Inner {
     pub fn new() -> Self {
         let is_woken = AtomicBool::new(false);
         let host_eventfd = current!().host_eventfd().clone();
-        // let val = UntrustedBox::new(0_u64);
         Self {
             is_woken,
             host_eventfd,
-            // val,
         }
     }
 
@@ -160,13 +153,28 @@ impl Inner {
     }
 
     pub fn wait(&self, timeout: Option<&Duration>) -> Result<()> {
+        // self.is_woken.store(false, Ordering::Relaxed);
+
+        let mut spin = 1000;
+        while spin != 0 && !self.is_woken() {
+            hint::spin_loop();
+            spin -= 1;
+        }
+
+        if spin != 0 {
+            self.is_woken.store(true, Ordering::Relaxed);
+            return Ok(());
+        }
+
         while !self.is_woken() {
             self.host_eventfd.poll(timeout)?;
         }
+
         Ok(())
     }
 
     pub fn wait_mut(&self, timeout: Option<&mut Duration>) -> Result<()> {
+        self.is_woken.store(false, Ordering::Relaxed);
         let mut remain = timeout.as_ref().map(|d| **d);
 
         // Need to change timeout from `Option<&mut Duration>` to `&mut Option<Duration>`
@@ -193,29 +201,6 @@ impl Inner {
             .is_ok()
         {
             self.host_eventfd.write_u64(1);
-
-            // let host_fd = Fd(self.host_eventfd.host_fd() as _);
-
-            // unsafe { self.val.as_mut_ptr().write(1) };
-            // let io_uring = &*SINGLETON;
-            // let buf_ptr = self.val.as_ptr() as *const u8;
-            // unsafe { io_uring.write(host_fd, buf_ptr, std::mem::size_of::<u64>() as u32, 0, 0) };
-        }
-    }
-
-    pub fn batch_wake<'a, I: Iterator<Item = &'a Waker>>(iter: I) {
-        let host_eventfds = iter
-            .filter_map(|waker| waker.inner.upgrade())
-            .filter(|inner| {
-                inner
-                    .is_woken
-                    .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-                    .is_ok()
-            })
-            .map(|inner| inner.host_eventfd.host_fd())
-            .collect::<Vec<FileDesc>>();
-        unsafe {
-            HostEventFd::write_u64_raw_and_batch(&host_eventfds, 1);
         }
     }
 

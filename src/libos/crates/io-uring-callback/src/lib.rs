@@ -110,28 +110,31 @@ extern crate sgx_libc as libc;
 #[cfg(feature = "sgx")]
 extern crate sgx_tstd as std;
 
-use std::{io, println};
+use std::io;
 use std::sync::Arc;
 cfg_if::cfg_if! {
     if #[cfg(feature = "sgx")] {
         use std::prelude::v1::*;
-        // use std::sync::SgxMutex as Mutex;
         use spin::Mutex as Mutex;
     } else {
         use std::sync::Mutex;
     }
 }
 
-use io_uring::opcode::{self, types};
+use io_uring::opcode;
 use io_uring::squeue::Entry as SqEntry;
+use io_uring::types;
 use slab::Slab;
+use std::os::unix::prelude::RawFd;
 
 use crate::io_handle::IoToken;
 
 mod io_handle;
 
 pub use crate::io_handle::{IoHandle, IoState};
-pub use io_uring::opcode::types::{Fd, RwFlags, TimeoutFlags, Timespec};
+
+pub use io_uring::types::{Fd, RwFlags, TimeoutFlags, Timespec};
+pub type IoUringRef = Arc<IoUring>;
 
 /// An io_uring instance.
 ///
@@ -140,8 +143,9 @@ pub use io_uring::opcode::types::{Fd, RwFlags, TimeoutFlags, Timespec};
 /// All I/O methods are based on the assumption that the resources (e.g., file descriptors, pointers, etc.)
 /// given in their arguments are valid before the completion of the async I/O.
 pub struct IoUring {
-    ring: io_uring::concurrent::IoUring,
+    ring: io_uring::IoUring,
     token_table: Mutex<Slab<Arc<IoToken>>>,
+    sq_lock: Mutex<()>, // For submission queue synchronization
 }
 
 impl Drop for IoUring {
@@ -165,9 +169,18 @@ impl IoUring {
     ///
     /// Users should use `Builder` instead.
     pub(crate) fn new(ring: io_uring::IoUring) -> Self {
-        let ring = ring.concurrent();
         let token_table = Mutex::new(Slab::new());
-        Self { ring, token_table }
+        let sq_lock = Mutex::new(());
+        Self {
+            ring,
+            token_table,
+            sq_lock,
+        }
+    }
+
+    /// Get the raw io_uring instance for advanced usage.
+    pub fn raw(&self) -> &io_uring::IoUring {
+        &self.ring
     }
 
     /// Push an accept request into the submission queue of the io_uring.
@@ -183,7 +196,9 @@ impl IoUring {
         flags: u32,
         callback: impl FnOnce(i32) + Send + 'static,
     ) -> IoHandle {
-        let entry = opcode::Accept::new(fd, addr, addrlen).flags(flags).build();
+        let entry = opcode::Accept::new(fd, addr, addrlen)
+            .flags(flags as i32)
+            .build();
         self.push_entry(entry, callback)
     }
 
@@ -251,12 +266,13 @@ impl IoUring {
         len: u32,
         offset: libc::off_t,
         flags: types::RwFlags,
-    ) {
+        callback: impl FnOnce(i32) + Send + 'static,
+    ) -> IoHandle {
         let entry = opcode::Write::new(fd, buf, len)
             .offset(offset)
             .rw_flags(flags)
             .build();
-        self.push_write(entry);
+        self.push_entry(entry, callback)
     }
 
     /// Push a readv request into the submission queue of the io_uring.
@@ -392,23 +408,18 @@ impl IoUring {
     /// to 0. If the user does not want to the method to busy polling, set
     /// `polling_retries` to 0.
     pub fn poll_completions(&self, min_complete: usize, polling_retries: usize) -> usize {
-        let cq = self.ring.completion();
+        // let cq = self.ring.completion();
+        let mut cq = unsafe { self.ring.completion_shared() }; // Safety: Only polling thread is using the completion queue
         let mut nr_complete = 0;
         loop {
             // Polling for at most a specified number of times
             let mut nr_retries = 0;
             while nr_retries <= polling_retries {
-                if let Some(cqe) = cq.pop() {
+                // completetion queue must be synchoronized when loop for next entry.
+                cq.sync();
+                if let Some(cqe) = cq.next() {
                     let retval = cqe.result();
                     let token_key = cqe.user_data();
-
-                    let flags = cqe.flags();
-                    // println!("return flags: {:?}", flags);
-
-                    // if token_key == 0 {
-                    //     nr_complete += 1;
-                    //     continue;
-                    // }
 
                     if token_key != IoUring::CANCEL_TOKEN_KEY {
                         let io_token = {
@@ -443,8 +454,11 @@ impl IoUring {
 
     unsafe fn push(&self, entry: SqEntry) {
         // Push the entry into the submission queue
+        // No other `SubmissionQueue`s may exist when calling submission_shared(). Thus must lock here.
+        // Since the loop below should be very quick, acquire lock here.
+        let sq_guard = self.sq_lock.lock();
         loop {
-            if self.ring.submission().push(entry.clone()).is_err() {
+            if self.ring.submission_shared().push(&entry).is_err() {
                 if self.ring.enter(1, 1, 0, None).is_err() {
                     panic!("sq broken");
                 }
@@ -452,6 +466,7 @@ impl IoUring {
                 break;
             }
         }
+        drop(sq_guard);
 
         // Make sure Linux is aware of the new submission
         if let Err(e) = self.ring.submit() {
@@ -490,31 +505,6 @@ impl IoUring {
         io_handle
     }
 
-    unsafe fn push_write(
-        &self,
-        mut entry: SqEntry,
-    ) {
-        // Create the user-visible handle that is associated with the submission entry
-        // let io_handle = {
-        //     let mut token_table = self.token_table.lock().unwrap();
-        //     let token_slot = token_table.vacant_entry();
-        //     let token_key = token_slot.key() as u64;
-        //     assert!(token_key != IoUring::CANCEL_TOKEN_KEY);
-
-        //     let token = Arc::new(IoToken::new(callback, token_key));
-        //     token_slot.insert(token.clone());
-        //     let handle = IoHandle::new(token);
-
-        //     // Associated entry with token, the latter of which is pointed to by handle.
-        //     entry = entry.user_data(token_key);
-
-        //     handle
-        // };
-        let new_entry = entry.user_data(0);
-
-        self.push(new_entry);
-    }
-
     /// Cancel an ongoing I/O request.
     ///
     /// # safety
@@ -535,7 +525,6 @@ impl IoUring {
 }
 
 /// A builder for `IoUring`.
-#[derive(Default)]
 pub struct Builder {
     inner: io_uring::Builder,
 }
@@ -543,14 +532,20 @@ pub struct Builder {
 impl Builder {
     /// Creates a `IoUring` builder.
     pub fn new() -> Self {
-        Default::default()
+        let inner = io_uring::IoUring::builder();
+        Self { inner }
     }
 
     /// When this flag is specified, a kernel thread is created to perform submission queue polling.
     /// An io_uring instance configured in this way enables an application to issue I/O
     /// without ever context switching into the kernel.
-    pub fn setup_sqpoll(&mut self, idle: impl Into<Option<u32>>) -> &mut Self {
+    pub fn setup_sqpoll(&mut self, idle: u32) -> &mut Self {
         self.inner.setup_sqpoll(idle);
+        self
+    }
+
+    pub fn setup_attach_wq(&mut self, fd: RawFd) -> &mut Self {
+        self.inner.setup_attach_wq(fd);
         self
     }
 
@@ -726,10 +721,7 @@ mod tests {
 
         let start = Instant::now();
         let secs = 1;
-        let timespec = types::Timespec {
-            tv_sec: secs,
-            tv_nsec: 0,
-        };
+        let timespec = types::Timespec::new().sec(secs).nsec(0);
         let complete_fn = move |_retval: i32| {};
 
         let handle = unsafe {
@@ -752,10 +744,7 @@ mod tests {
 
         let start = Instant::now();
         let secs = 1;
-        let timespec = types::Timespec {
-            tv_sec: secs,
-            tv_nsec: 0,
-        };
+        let timespec = types::Timespec::new().sec(secs).nsec(0);
 
         let complete_fn = move |_retval: i32| {};
 

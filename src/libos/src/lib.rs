@@ -97,10 +97,10 @@ mod net;
 mod process;
 mod sched;
 mod signal;
-mod socket;
 mod syscall;
 mod time;
 mod untrusted;
+mod uring_socket;
 mod util;
 mod vm;
 

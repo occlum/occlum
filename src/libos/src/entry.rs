@@ -98,14 +98,10 @@ pub extern "C" fn occlum_ecall_init(
 
         vm::init_user_space();
 
-        std::thread::spawn(move || {
-            let io_uring = &crate::io_uring::SINGLETON;
-            loop {
-                let min_complete = 1;
-                let polling_retries = 10000;
-                io_uring.poll_completions(min_complete, polling_retries);
-            }
-        });
+        // Create four IO-Uring instances and spawn polling threads for each of them.
+        // Assign IO-Uring references during socket initialization.
+        let multiton = &crate::io_uring::MULTITON;
+        multiton.poll_completions();
 
         // Init boot up time stamp here.
         time::up_time::init();

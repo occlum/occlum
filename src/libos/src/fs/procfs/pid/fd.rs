@@ -46,7 +46,7 @@ impl DirProcINode for LockedProcFdDirINode {
                     .process_ref
                     .main_thread()
                     .ok_or(FsError::EntryNotFound)?;
-                let fds = main_thread.files().lock().unwrap().fds();
+                let fds = main_thread.files().lock().fds();
                 let fd = fds.iter().nth(i - 2).ok_or(FsError::EntryNotFound)?;
                 Ok(fd.to_string())
             }
@@ -68,7 +68,7 @@ impl DirProcINode for LockedProcFdDirINode {
                 return Ok(ctx.written_len());
             }
         };
-        let fds = main_thread.files().lock().unwrap().fds();
+        let fds = main_thread.files().lock().fds();
         for fd in fds.iter().skip(skipped) {
             write_entry!(&mut ctx, &fd.to_string(), PROC_INO, vfs::FileType::SymLink);
         }

@@ -1,5 +1,6 @@
 use super::*;
 
+use core::f32::consts::E;
 use std::mem::MaybeUninit;
 use std::time::Duration;
 
@@ -17,16 +18,21 @@ use util::mem_util::from_user;
 //     let file_flags = FileFlags::from_bits_truncate(socket_type);
 //     let sock_type = SocketType::try_from(socket_type & (!file_flags.bits()))?;
 
-//     let file_ref: Arc<dyn File> = match sock_domain {
-//         AddressFamily::LOCAL => {
-//             let unix_socket = unix_socket(sock_type, file_flags, protocol)?;
-//             Arc::new(unix_socket)
-//         }
-//         _ => {
-//             let socket = HostSocket::new(sock_domain, sock_type, file_flags, protocol)?;
-//             Arc::new(socket)
-//         }
-//     };
+//     let enable_uring = true;
+//     if enable_uring {
+//         let socket_file = SocketFile::new(domain, protocol, socket_type, nonblocking)?;
+//     } else {
+//         let file_ref: Arc<dyn File> = match sock_domain {
+//             AddressFamily::LOCAL => {
+//                 let unix_socket = unix_socket(sock_type, file_flags, protocol)?;
+//                 Arc::new(unix_socket)
+//             }
+//             _ => {
+//                 let socket = HostSocket::new(sock_domain, sock_type, file_flags, protocol)?;
+//                 Arc::new(socket)
+//             }
+//         };
+//     }
 
 //     let close_on_spawn = file_flags.contains(FileFlags::SOCK_CLOEXEC);
 //     let fd = current!().add_file(file_ref, close_on_spawn);
@@ -48,6 +54,8 @@ use util::mem_util::from_user;
 //         let mut unix_addr = unsafe { UnixAddr::try_from_raw(addr, addr_len)? };
 //         trace!("bind to addr: {:?}", unix_addr);
 //         unix_socket.bind(&mut unix_addr)?;
+//     } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
+//         uring_socket.bind(&sock_addr)?;
 //     } else {
 //         return_errno!(ENOTSOCK, "not a socket");
 //     }

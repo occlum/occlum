@@ -100,7 +100,7 @@ pub fn do_ioctl(fd: FileDesc, cmd: &mut IoctlCmd) -> Result<i32> {
     debug!("ioctl: fd: {}, cmd: {:?}", fd, cmd);
     let current = current!();
     let file_ref = current.file(fd)?;
-    let mut file_table = current.files().lock().unwrap();
+    let mut file_table = current.files().lock();
     let mut entry = file_table.get_entry_mut(fd)?;
     match cmd {
         IoctlCmd::FIONCLEX(_) => {

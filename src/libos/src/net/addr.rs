@@ -3,7 +3,7 @@ use std::mem::{self, MaybeUninit};
 use crate::prelude::*;
 
 // use super::unix::trusted::TrustedAddr;
-use crate::socket::socket::{
+use crate::uring_socket::socket::{
     Addr, CSockAddr, Domain, Ipv4Addr, Ipv4SocketAddr, Ipv6SocketAddr, NetlinkSocketAddr, UnixAddr,
 };
 use num_enum::IntoPrimitive;

@@ -7,11 +7,8 @@ use crate::events::{Observer, Waiter, WaiterQueueObserver};
 use crate::fs::{AtomicIoEvents, IoEvents};
 use crate::net::socket_file::UringSocketType;
 use crate::prelude::*;
-use crate::socket::util::poller::Poller;
 use crate::time::{timespec_t, TIMERSLACK};
-
-use crate::socket::util::Waiter as SpinWaiter;
-use crate::socket::util::WaiterQueueObserver as SpinWaiterQueueObserver;
+use crate::uring_socket::util::poller::Poller;
 
 /// Monitor events that happen on a set of interesting files.
 ///
@@ -37,11 +34,6 @@ pub struct EventMonitor {
     // The last two fields comprise of a common pattern enabled by the event
     // subsystem.
     waiter: Waiter,
-
-    poller: Poller,
-    // spin_observer: Arc<SpinWaiterQueueObserver<IoEvents>>,
-    // spin_waiter: SpinWaiter,
-    is_uring: bool,
 }
 
 impl EventMonitor {
@@ -59,21 +51,9 @@ impl EventMonitor {
 
     /// Reset the monitor so that it can wait for new events.
     pub fn reset_events(&mut self) {
-        if !self.is_uring {
-            self.observer
-                .waiter_queue()
-                .reset_and_enqueue(&mut self.waiter);
-        }
-        // self.observer.waiter_queue().reset_and_enqueue(&mut self.waiter);
-        // if self.is_uring {
-        //     self.spin_observer.waiter_queue().reset_and_enqueue(&self.spin_waiter);
-        // } else {
-        //     self.observer.waiter_queue().reset_and_enqueue(&mut self.waiter);
-        // }
-    }
-
-    pub fn is_uring(&self) -> bool {
-        self.is_uring
+        self.observer
+            .waiter_queue()
+            .reset_and_enqueue(&mut self.waiter);
     }
 
     /// Wait for some interesting events that happen on the set of files.
@@ -117,10 +97,6 @@ impl EventMonitor {
         assert!(num_events > 0);
 
         Ok(timeout)
-    }
-
-    pub fn uring_wait(&self) {
-        self.poller.wait();
     }
 
     /// Poll the host files among the set of the interesting files and update
@@ -190,13 +166,7 @@ impl EventMonitor {
 
 impl Drop for EventMonitor {
     fn drop(&mut self) {
-        let weak_observer = if self.is_uring {
-            self.poller.observer()
-            // Arc::downgrade(&self.spin_observer) as Weak<dyn Observer<_>>
-        } else {
-            Arc::downgrade(&self.observer) as Weak<dyn Observer<_>>
-        };
-        // let weak_observer = Arc::downgrade(&self.observer) as Weak<dyn Observer<_>>;
+        let weak_observer = Arc::downgrade(&self.observer) as Weak<dyn Observer<_>>;
         weak_observer.unregister_files(self.files_and_events.iter());
     }
 }
@@ -207,10 +177,6 @@ pub struct EventMonitorBuilder {
     ocall_pollfds: Vec<libc::pollfd>,
     observer: Arc<WaiterQueueObserver<IoEvents>>,
     waiter: Waiter,
-    poller: Poller,
-    // spin_observer: Arc<SpinWaiterQueueObserver<IoEvents>>,
-    // spin_waiter: SpinWaiter,
-    is_uring: bool,
 }
 
 impl EventMonitorBuilder {
@@ -222,8 +188,6 @@ impl EventMonitorBuilder {
         let waiter = Waiter::new();
 
         let poller = Poller::new();
-        // let spin_observer = SpinWaiterQueueObserver::new();
-        // let spin_waiter = SpinWaiter::new();
         let is_uring = false;
         Self {
             files_and_events,
@@ -231,10 +195,6 @@ impl EventMonitorBuilder {
             ocall_pollfds,
             observer,
             waiter,
-            poller,
-            // spin_observer,
-            // spin_waiter,
-            is_uring,
         }
     }
 
@@ -264,49 +224,16 @@ impl EventMonitorBuilder {
             });
         }
 
-        // !!!!!
-        // self.is_uring = files_and_events.into_iter().all(|(file, events)| file.as_uring_socket().is_ok());
-
-        if !self.is_uring {
-            // Add one more for waiter's underlying host eventfd
-            ocall_pollfds.push(libc::pollfd {
-                fd: self.waiter.host_eventfd().host_fd() as i32,
-                events: libc::POLLIN,
-                revents: 0,
-            });
-        }
-
-        // let is_uring = files_and_events.into_iter().all(|(file, events)| file.as_uring_socket().is_ok());
-
-        // TODO: FIXME
-        // if ocall_pollfds.is_empty() {
-        //     self.is_uring = files_and_events.into_iter().all(|(file, events)| file.as_uring_socket().is_ok());
-        //     // self.is_uring = true;
-        // } else {
-        //     // Add one more for waiter's underlying host eventfd
-        //     ocall_pollfds.push(libc::pollfd {
-        //         fd: self.waiter.host_eventfd().host_fd() as i32,
-        //         events: libc::POLLIN,
-        //         revents: 0,
-        //     });
-        // }
-
-        // // Add one more for waiter's underlying host eventfd
-        // ocall_pollfds.push(libc::pollfd {
-        //     fd: self.waiter.host_eventfd().host_fd() as i32,
-        //     events: libc::POLLIN,
-        //     revents: 0,
-        // });
+        // Add one more for waiter's underlying host eventfd
+        ocall_pollfds.push(libc::pollfd {
+            fd: self.waiter.host_eventfd().host_fd() as i32,
+            events: libc::POLLIN,
+            revents: 0,
+        });
     }
 
     fn init_observer(&self) {
-        let weak_observer = if self.is_uring {
-            self.poller.observer()
-        } else {
-            Arc::downgrade(&self.observer) as Weak<dyn Observer<_>>
-        };
-
-        // let weak_observer = Arc::downgrade(&self.observer) as Weak<dyn Observer<_>>;
+        let weak_observer = Arc::downgrade(&self.observer) as Weak<dyn Observer<_>>;
         weak_observer.register_files(self.files_and_events.iter());
     }
 
@@ -321,10 +248,6 @@ impl EventMonitorBuilder {
                 ocall_pollfds,
                 observer,
                 waiter,
-                poller,
-                // spin_observer,
-                // spin_waiter,
-                is_uring,
             } = self;
             EventMonitor {
                 files_and_events,
@@ -332,16 +255,10 @@ impl EventMonitorBuilder {
                 ocall_pollfds,
                 observer,
                 waiter,
-                poller,
-                // spin_observer,
-                // spin_waiter,
-                is_uring,
             }
         };
-        if !self.is_uring {
-            new_event_monitor.poll_host_files();
-        }
-        // new_event_monitor.poll_host_files();
+
+        new_event_monitor.poll_host_files();
         new_event_monitor
     }
 }
@@ -391,13 +308,5 @@ impl ObserverExt for Weak<dyn Observer<IoEvents>> {
                 }
             };
         }
-
-        // for (file, events) in files_and_events {
-        //     let notifier = match file.notifier() {
-        //         None => continue,
-        //         Some(notifier) => notifier,
-        //     };
-        //     notifier.unregister(self);
-        // }
     }
 }
