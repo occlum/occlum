@@ -91,6 +91,16 @@ impl<'a> FsPath<'a> {
         }
         Ok(abs_path)
     }
+
+    /// Returns `Some(fd)` if the `FsPath` is exactly a file descriptor.
+    ///
+    /// This method is useful for handling system calls with `AT_EMPTY_PATH` flag.
+    pub fn as_fd(&self) -> Option<FileDesc> {
+        match &self.inner {
+            FsPathInner::Fd(fd) => Some(*fd),
+            _ => None,
+        }
+    }
 }
 
 impl<'a> Debug for FsPath<'a> {
