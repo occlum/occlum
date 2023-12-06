@@ -935,7 +935,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut && ./build.sh"
 
     - name: Run netty unit test demo
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut && SGX_MODE=SIM ./run_netty_ut_jdk11.sh"
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut && SGX_MODE=SIM ./run_netty_ut_jdk8.sh"
     
     - name: Clean Netty test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./netty_ut"
