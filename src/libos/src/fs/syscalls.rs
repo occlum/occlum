@@ -289,6 +289,12 @@ pub fn do_fstatat(dirfd: i32, path: *const i8, stat_buf: *mut Stat, flags: u32) 
         .into_owned();
     let flags = StatFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
     let fs_path = FsPath::new(&path, dirfd, flags.contains(StatFlags::AT_EMPTY_PATH))?;
+
+    // In this case, the behavior of fstatat() is similar to that of fstat().
+    if let Some(fd) = fs_path.as_fd() {
+        return self::do_fstat(fd, stat_buf);
+    }
+
     from_user::check_mut_ptr(stat_buf)?;
     let stat = file_ops::do_fstatat(&fs_path, flags)?;
     unsafe {
@@ -517,6 +523,7 @@ pub fn do_linkat(
         .to_string_lossy()
         .into_owned();
     let flags = LinkFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
+    // The oldpath must be an inode.
     let old_fs_path = FsPath::new(&oldpath, olddirfd, flags.contains(LinkFlags::AT_EMPTY_PATH))?;
     let new_fs_path = FsPath::new(&newpath, newdirfd, false)?;
     file_ops::do_linkat(&old_fs_path, &new_fs_path, flags)?;
@@ -606,6 +613,12 @@ pub fn do_fchownat(dirfd: i32, path: *const i8, uid: u32, gid: u32, flags: i32) 
         .into_owned();
     let flags = ChownFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
     let fs_path = FsPath::new(&path, dirfd, flags.contains(ChownFlags::AT_EMPTY_PATH))?;
+
+    // In this case, the behavior of fchownat() is similar to that of fchown().
+    if let Some(fd) = fs_path.as_fd() {
+        return self::do_fchown(fd, uid, gid);
+    }
+
     file_ops::do_fchownat(&fs_path, uid, gid, flags)?;
     Ok(0)
 }
