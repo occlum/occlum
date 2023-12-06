@@ -23,15 +23,15 @@ init_instance() {
                 .resource_limits.kernel_space_heap_max_size="64MB" |
                 .resource_limits.max_num_of_threads = 128 |
                 .process.default_heap_size = "512MB" |
-                .entry_points = [ "/usr/lib/jvm/java-11-openjdk-amd64/bin" ] |
-                .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-11-openjdk-amd64/lib/server:/usr/lib/jvm/java-11-openjdk-amd64/lib:/usr/lib/jvm/java-11-openjdk-amd64/../lib:/lib" ]' Occlum.json)" && \
+                .entry_points = [ "/usr/lib/jvm/java-8-openjdk-amd64/bin" ] |
+                .env.default = [ "LD_LIBRARY_PATH=/usr/lib/jvm/java-8-openjdk-amd64/lib/server:/usr/lib/jvm/java-8-openjdk-amd64/lib:/usr/lib/jvm/java-8-openjdk-amd64/../lib:/lib" ]' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
 }
 
 build_netty_ut() {
     # Copy JVM and JAR file into Occlum instance and build
     rm -rf image
-    copy_bom -f ../netty-ut-jdk11.yaml --root image --include-dir /opt/occlum/etc/template
+    copy_bom -f ../netty-ut-jdk8.yaml --root image --include-dir /opt/occlum/etc/template
     occlum build
 }
 
@@ -42,7 +42,7 @@ run_netty_ut() {
     init_instance
     build_netty_ut
     echo -e "${BLUE}occlum run netty ut${NC}"
-    occlum run /usr/lib/jvm/java-11-openjdk-amd64/bin/java \
+    occlum run /usr/lib/jvm/java-8-openjdk-amd64/bin/java \
         -Xmx1048m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=128m \
         -XX:ActiveProcessorCount=2 \
         -Dos.name=Linux \
@@ -50,7 +50,7 @@ run_netty_ut() {
         -cp /usr/lib/netty/netty-testsuite-4.1.51.Final.jar:/usr/lib/netty/netty-all-4.1.51.Final.jar:/usr/lib/netty/xz-1.5.jar:/usr/lib/netty/hamcrest-library-1.3.jar:/usr/lib/netty/logback-classic-1.1.7.jar \
         --scan-class-path > netty-test-heap512m.log || true
     cat netty-test-heap512m.log
-    cat netty-test-heap512m.log | grep "141 containers successful"
+    cat netty-test-heap512m.log | grep "190 tests successful"
 }       
 
 run_netty_ut
