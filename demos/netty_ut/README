@@ -3,7 +3,7 @@
 This demo demonstrates how to verify the completeness of Netty on Occlum.
 
 ### 1. Preinstall dependencies
-Related dependencies: OpenJDK 11 (Glibc)
+Related dependencies: OpenJDK 8 (Glibc)
 ```
 ./preinstall_deps.sh
 ```
@@ -15,5 +15,5 @@ Related dependencies: OpenJDK 11 (Glibc)
 
 ### 3. Run `netty unit test ` on Occlum
 ```
-./run_netty_ut_jdk11.sh
+./run_netty_ut_jdk8.sh
 ```

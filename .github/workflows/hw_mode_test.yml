@@ -1128,7 +1128,7 @@ jobs:
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/netty_ut && ./build.sh"
 
     - name: Run netty unit test demo
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/netty_ut && ./run_netty_ut_jdk11.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/netty_ut && ./run_netty_ut_jdk8.sh"
 
     - name: Clean the environment
       if: ${{ always() }}
