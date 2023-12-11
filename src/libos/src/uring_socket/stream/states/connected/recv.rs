@@ -1,3 +1,4 @@
+use core::hint;
 use core::sync::atomic::AtomicBool;
 use core::time::Duration;
 use std::mem::MaybeUninit;
@@ -41,7 +42,6 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
                     total_received += received_size;
 
                     if !flags.contains(RecvFlags::MSG_WAITALL) || total_received == total_len {
-                        // println!("user recv bytes: {:?}", total_received);
                         return Ok(total_received);
                     } else {
                         // save the index and offset for the next round
@@ -68,7 +68,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             }
             let events = self.common.pollee().poll(mask, None);
             if events.is_empty() {
-                let ret = poller.as_ref().unwrap().wait_timeout(timeout.as_ref());
+                let ret = poller.as_ref().unwrap().wait_timeout(timeout.as_mut());
                 if let Err(e) = ret {
                     warn!("recv wait errno = {:?}", e.errno());
                     // For recv with MSG_WAITALL, return total received bytes if timeout or interrupt
@@ -95,7 +95,6 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         iov_buffer_index: usize,
         iov_buffer_offset: usize,
     ) -> Result<(usize, usize, usize)> {
-        // let mut inner = self.receiver.inner.lock().unwrap();
         let mut inner = self.receiver.inner.lock();
 
         if !flags.is_empty()
@@ -149,7 +148,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         }
 
         if res.0 > 0 {
-            self.do_recv(&mut inner, false, res.0);
+            self.do_recv(&mut inner);
             return Ok(res);
         }
 
@@ -168,11 +167,11 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             return_errno!(errno, "read failed");
         }
 
-        self.do_recv(&mut inner, false, res.0);
+        self.do_recv(&mut inner);
         return_errno!(EAGAIN, "try read again");
     }
 
-    fn do_recv(self: &Arc<Self>, inner: &mut MutexGuard<Inner>, is_callback: bool, bytes: usize) {
+    fn do_recv(self: &Arc<Self>, inner: &mut MutexGuard<Inner>) {
         if inner.recv_buf.is_full()
             || inner.is_shutdown
             || inner.io_handle.is_some()
@@ -195,9 +194,6 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             // let mut inner = stream.receiver.inner.lock().unwrap();
             let mut inner = stream.receiver.inner.lock();
             trace!("recv request complete with retval: {}", retval);
-
-            // let fd = stream.common().host_fd();
-            // println!("fd: {:?}, retval: {:?}", fd, retval);
 
             // Release the handle to the async recv
             inner.io_handle.take();
@@ -228,7 +224,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             // ready to read.
             stream.common.pollee().add_events(Events::IN);
 
-            stream.do_recv(&mut inner, true, retval as usize);
+            stream.do_recv(&mut inner);
         };
 
         // Generate the async recv request
@@ -237,7 +233,6 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         // Submit the async recv to io_uring
         let io_uring = self.common.io_uring();
         let host_fd = Fd(self.common.host_fd() as _);
-        // println!("recv from callback: {:?}, host fd: {:?}, bytes: {}", is_callback, host_fd.0, bytes);
 
         let handle = unsafe { io_uring.recvmsg(host_fd, msghdr_ptr, 0, complete_fn) };
         inner.io_handle.replace(handle);
@@ -246,13 +241,11 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
     pub(super) fn initiate_async_recv(self: &Arc<Self>) {
         // trace!("initiate async recv");
         let mut inner = self.receiver.inner.lock();
-        // let mut inner = self.receiver.inner.lock().unwrap();
-        self.do_recv(&mut inner, false, 0);
+        self.do_recv(&mut inner);
     }
 
     pub fn cancel_recv_requests(&self) {
         {
-            // let inner = self.receiver.inner.lock().unwrap();
             let inner = self.receiver.inner.lock();
             if let Some(io_handle) = &inner.io_handle {
                 let io_uring = self.common.io_uring();
@@ -269,14 +262,13 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
 
         loop {
             let pending_request_exist = {
-                // let inner = self.receiver.inner.lock().unwrap();
                 let inner = self.receiver.inner.lock();
                 inner.io_handle.is_some()
             };
 
             if pending_request_exist {
                 let mut timeout = Some(Duration::from_secs(10));
-                let ret = poller.wait_timeout(timeout.as_ref());
+                let ret = poller.wait_timeout(timeout.as_mut());
                 if let Err(e) = ret {
                     warn!("wait cancel recv request error = {:?}", e.errno());
                     continue;
@@ -288,7 +280,6 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
     }
 
     pub fn bytes_to_consume(self: &Arc<Self>) -> usize {
-        // let inner = self.receiver.inner.lock().unwrap();
         let inner = self.receiver.inner.lock();
         inner.recv_buf.consumable()
     }
@@ -320,7 +311,6 @@ impl Receiver {
     }
 
     pub fn shutdown(&self) {
-        // let mut inner = self.inner.lock().unwrap();
         let mut inner = self.inner.lock();
         inner.is_shutdown = true;
     }
@@ -384,14 +374,6 @@ impl Inner {
     /// The buffer used in the new `RecvReq` is part of `self.recv_buf`.
     pub fn new_recv_req(&mut self) -> *mut libc::msghdr {
         let (iovecs, iovecs_len) = self.gen_iovecs_from_recv_buf();
-
-        // log
-        // let recv_req_len = if iovecs_len == 1 {
-        //     iovecs[0].iov_len
-        // } else {
-        //     iovecs[0].iov_len + iovecs[1].iov_len
-        // };
-        // println!("recv req len: {:?}", recv_req_len);
 
         let msghdr_ptr: *mut libc::msghdr = &mut self.recv_req.msg;
         let iovecs_ptr: *mut libc::iovec = &mut self.recv_req.iovecs as *mut _ as _;

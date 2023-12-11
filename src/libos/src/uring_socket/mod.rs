@@ -3,6 +3,7 @@
 #![feature(raw_ref_op)]
 
 pub mod common;
+pub mod datagram;
 pub mod ioctl;
 pub mod runtime;
 pub mod socket;

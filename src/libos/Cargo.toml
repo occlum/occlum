@@ -43,6 +43,7 @@ num_enum = { version = "0.5", default-features = false }
 keyable-arc = { path = "./crates/keyable-arc" }
 downcast-rs = { version = "1.2.0", default-features = false }
 spin = "0.7"
+byteorder = { version = "1.3.2", default-features = false }
 
 [patch.'https://github.com/apache/teaclave-sgx-sdk.git']
 sgx_tstd = { path = "../../deps/rust-sgx-sdk/sgx_tstd" }

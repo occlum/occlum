@@ -293,11 +293,6 @@ impl<T: ?Sized> PartialEq for KeyableWeak<T> {
 }
 
 impl<T: ?Sized> PartialOrd for KeyableWeak<T> {
-    // fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-    //     self.0.as_ptr().cmp(&other.0.as_ptr())
-    //     // todo!()
-    // }
-
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(self.cmp(other))
     }
@@ -308,7 +303,6 @@ impl<T: ?Sized> Eq for KeyableWeak<T> {}
 impl<T: ?Sized> Ord for KeyableWeak<T> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.0.as_ptr().cmp(&other.0.as_ptr())
-        // todo!()
     }
 }
 

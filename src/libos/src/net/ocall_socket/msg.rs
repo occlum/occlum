@@ -1,51 +1,18 @@
 /// Socket message and its flags.
 use super::*;
 
-/// C struct for a socket message with const pointers
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct msghdr {
-    pub msg_name: *const c_void,
-    pub msg_namelen: libc::socklen_t,
-    pub msg_iov: *const libc::iovec,
-    pub msg_iovlen: size_t,
-    pub msg_control: *const c_void,
-    pub msg_controllen: size_t,
-    pub msg_flags: c_int,
-}
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct mmsghdr {
-    pub msg_hdr: msghdr,
-    pub msg_len: c_uint,
-}
-
-/// C struct for a socket message with mutable pointers
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct msghdr_mut {
-    pub msg_name: *mut c_void,
-    pub msg_namelen: libc::socklen_t,
-    pub msg_iov: *mut libc::iovec,
-    pub msg_iovlen: size_t,
-    pub msg_control: *mut c_void,
-    pub msg_controllen: size_t,
-    pub msg_flags: c_int,
-}
-
 /// MsgHdr is a memory-safe, immutable wrapper of msghdr
 pub struct MsgHdr<'a> {
     name: Option<&'a [u8]>,
     iovs: Iovs<'a>,
     control: Option<&'a [u8]>,
     flags: MsgHdrFlags,
-    c_self: &'a msghdr,
+    c_self: &'a libc::msghdr,
 }
 
 impl<'a> MsgHdr<'a> {
     /// Wrap a unsafe msghdr into a safe MsgHdr
-    pub unsafe fn from_c(c_msg: &'a msghdr) -> Result<MsgHdr> {
+    pub unsafe fn from_c(c_msg: &'a libc::msghdr) -> Result<MsgHdr> {
         // Convert c_msg's (*mut T, usize)-pair fields to Option<&mut [T]>
         let name_opt_slice =
             new_optional_slice(c_msg.msg_name as *const u8, c_msg.msg_namelen as usize);
@@ -103,13 +70,13 @@ pub struct MsgHdrMut<'a> {
     iovs: IovsMut<'a>,
     control: Option<&'a mut [u8]>,
     flags: MsgHdrFlags,
-    c_self: &'a mut msghdr_mut,
+    c_self: &'a mut libc::msghdr,
 }
 
 // TODO: use macros to eliminate redundant code between MsgHdr and MsgHdrMut
 impl<'a> MsgHdrMut<'a> {
     /// Wrap a unsafe msghdr_mut into a safe MsgHdrMut
-    pub unsafe fn from_c(c_msg: &'a mut msghdr_mut) -> Result<MsgHdrMut> {
+    pub unsafe fn from_c(c_msg: &'a mut libc::msghdr) -> Result<MsgHdrMut> {
         // Convert c_msg's (*mut T, usize)-pair fields to Option<&mut [T]>
         let name_opt_slice =
             new_optional_slice_mut(c_msg.msg_name as *mut u8, c_msg.msg_namelen as usize);

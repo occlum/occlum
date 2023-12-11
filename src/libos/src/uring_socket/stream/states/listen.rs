@@ -92,7 +92,7 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
 
             let events = self.common.pollee().poll(mask, None);
             if events.is_empty() {
-                let ret = poller.as_ref().unwrap().wait_timeout(timeout.as_ref());
+                let ret = poller.as_ref().unwrap().wait_timeout(timeout.as_mut());
                 if let Err(e) = ret {
                     warn!("accept wait errno = {:?}", e.errno());
                     match e.errno() {
@@ -183,7 +183,7 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
 
             if pending_entry_exists {
                 let mut timeout = Some(Duration::from_secs(20));
-                let ret = poller.wait_timeout(timeout.as_ref());
+                let ret = poller.wait_timeout(timeout.as_mut());
                 if let Err(e) = ret {
                     warn!("wait cancel accept request error = {:?}", e.errno());
                     continue;

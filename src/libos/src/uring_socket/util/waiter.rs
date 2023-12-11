@@ -1,4 +1,5 @@
 use core::hint;
+use core::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Weak;
 use std::time::Duration;
@@ -26,22 +27,22 @@ impl Waiter {
         }
     }
 
-    /// Return whether a waiter has been waken up.
-    ///
-    /// Once a waiter is waken up, the `wait` or `wait_mut` method becomes
-    /// non-blocking.
-    pub fn is_woken(&self) -> bool {
-        self.inner.is_woken()
-    }
+    // /// Return whether a waiter has been waken up.
+    // ///
+    // /// Once a waiter is waken up, the `wait` or `wait_mut` method becomes
+    // /// non-blocking.
+    // pub fn is_woken(&self) -> bool {
+    //     self.inner.is_woken()
+    // }
 
-    /// Reset a waiter.
-    ///
-    /// After a `Waiter` being waken up, the `reset` method must be called so
-    /// that the `Waiter` can use the `wait` or `wait_mut` methods to sleep the
-    /// current thread again.
-    pub fn reset(&self) {
-        self.inner.reset();
-    }
+    // /// Reset a waiter.
+    // ///
+    // /// After a `Waiter` being waken up, the `reset` method must be called so
+    // /// that the `Waiter` can use the `wait` or `wait_mut` methods to sleep the
+    // /// current thread again.
+    // pub fn reset(&self) {
+    //     self.inner.reset();
+    // }
 
     /// Put the current thread to sleep until being waken up by a waker.
     ///
@@ -85,6 +86,10 @@ impl Waiter {
 
 impl !Send for Waiter {}
 impl !Sync for Waiter {}
+
+const WAIT: u32 = u32::MAX;
+const INIT: u32 = 0;
+const NOTIFIED: u32 = 1;
 
 /// A waker can wake up the thread that its waiter has put to sleep.
 pub struct Waker {
@@ -131,15 +136,18 @@ impl Waker {
 /// you don't need to synchronize host_event before is_woken, only later.
 struct Inner {
     is_woken: AtomicBool,
+    state: AtomicU32,
     host_eventfd: Arc<HostEventFd>,
 }
 
 impl Inner {
     pub fn new() -> Self {
         let is_woken = AtomicBool::new(false);
+        let state = AtomicU32::new(INIT);
         let host_eventfd = current!().host_eventfd().clone();
         Self {
             is_woken,
+            state,
             host_eventfd,
         }
     }
@@ -153,33 +161,45 @@ impl Inner {
     }
 
     pub fn wait(&self, timeout: Option<&Duration>) -> Result<()> {
-        // self.is_woken.store(false, Ordering::Relaxed);
-
-        let mut spin = 1000;
-        while spin != 0 && !self.is_woken() {
-            hint::spin_loop();
-            spin -= 1;
-        }
-
-        if spin != 0 {
-            self.is_woken.store(true, Ordering::Relaxed);
+        if self.state.fetch_sub(1, Ordering::Acquire) == NOTIFIED {
             return Ok(());
         }
 
-        while !self.is_woken() {
+        loop {
             self.host_eventfd.poll(timeout)?;
+            if self
+                .state
+                .compare_exchange(NOTIFIED, INIT, Ordering::Acquire, Ordering::Acquire)
+                .is_ok()
+            {
+                return Ok(());
+            } else {
+                // Spurious wake up. We loop to try again.
+            }
         }
-
-        Ok(())
     }
 
     pub fn wait_mut(&self, timeout: Option<&mut Duration>) -> Result<()> {
-        self.is_woken.store(false, Ordering::Relaxed);
+        if self.state.fetch_sub(1, Ordering::Acquire) == NOTIFIED {
+            return Ok(());
+        }
         let mut remain = timeout.as_ref().map(|d| **d);
 
         // Need to change timeout from `Option<&mut Duration>` to `&mut Option<Duration>`
         // so that the Rust compiler is happy about using the variable in a loop.
-        let ret = self.do_wait_mut(&mut remain);
+        let ret = self.host_eventfd.poll_mut(remain.as_mut());
+
+        // Wait for something to happen, assuming it's still set to PARKED.
+        // futex_wait(&self.state, PARKED, Some(timeout));
+        // This is not just a store, because we need to establish a
+        // release-acquire ordering with unpark().
+        if self.state.swap(INIT, Ordering::Acquire) == NOTIFIED {
+            // Woke up because of unpark().
+        } else {
+            // Timeout or spurious wake up.
+            // We return either way, because we can't easily tell if it was the
+            // timeout or not.
+        }
 
         if let Some(timeout) = timeout {
             *timeout = remain.unwrap();
@@ -195,11 +215,7 @@ impl Inner {
     }
 
     pub fn wake(&self) {
-        if self
-            .is_woken
-            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-            .is_ok()
-        {
+        if self.state.swap(NOTIFIED, Ordering::Release) == WAIT {
             self.host_eventfd.write_u64(1);
         }
     }

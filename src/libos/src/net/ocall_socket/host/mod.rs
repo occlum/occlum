@@ -28,13 +28,13 @@ pub struct HostSocket {
 impl HostSocket {
     pub fn new(
         domain: AddressFamily,
-        socket_type: SocketType,
-        file_flags: FileFlags,
+        socket_type: Type,
+        socket_flags: SocketFlags,
         protocol: i32,
     ) -> Result<Self> {
         let raw_host_fd = try_libc!(libc::ocall::socket(
             domain as i32,
-            socket_type as i32 | file_flags.bits(),
+            socket_type as i32 | socket_flags.bits(),
             protocol
         )) as FileDesc;
         let host_fd = HostFd::new(raw_host_fd);
@@ -67,7 +67,7 @@ impl HostSocket {
         Ok(())
     }
 
-    pub fn accept(&self, flags: FileFlags) -> Result<(Self, Option<SockAddr>)> {
+    pub fn accept(&self, flags: SocketFlags) -> Result<(Self, Option<SockAddr>)> {
         let mut sockaddr = SockAddr::default();
         let mut addr_len = sockaddr.len();
 
@@ -135,8 +135,11 @@ impl HostSocket {
         self.host_fd.to_raw()
     }
 
-    pub fn shutdown(&self, how: HowToShut) -> Result<()> {
-        try_libc!(libc::ocall::shutdown(self.raw_host_fd() as i32, how.bits()));
+    pub fn shutdown(&self, how: Shutdown) -> Result<()> {
+        try_libc!(libc::ocall::shutdown(
+            self.raw_host_fd() as i32,
+            how.to_c() as i32
+        ));
         Ok(())
     }
 }

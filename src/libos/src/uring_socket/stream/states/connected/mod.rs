@@ -33,18 +33,6 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             receiver,
         });
 
-        // let send_buf_size = SEND_BUF_SIZE.load(Ordering::Relaxed);
-        // // The buf size for host call should be divided by 2 because the value will be doubled by host kernel.
-        // let host_call_buf_size = (send_buf_size / 2).to_ne_bytes();
-
-        // // Setting SO_RCVBUF for host socket needs to respect /proc/sys/net/core/rmem_max. Thus, the value might be different on host, but it is fine.
-        // setsockopt_by_host(
-        //     fd,
-        //     libc::SOL_SOCKET,
-        //     SockOptName::SO_SNDBUF.into(),
-        //     &host_call_buf_size,
-        // );
-
         // Start async recv requests right as early as possible to support poll and
         // improve performance. If we don't start recv requests early, the poll()
         // might block forever when user just invokes poll(Event::In) without read().

@@ -1,3 +1,4 @@
+use core::hint;
 use core::sync::atomic::AtomicBool;
 use core::time::Duration;
 use std::mem::MaybeUninit;
@@ -66,7 +67,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
 
             let events = self.common.pollee().poll(mask, None);
             if events.is_empty() {
-                let ret = poller.as_ref().unwrap().wait_timeout(timeout.as_ref());
+                let ret = poller.as_ref().unwrap().wait_timeout(timeout.as_mut());
                 if let Err(e) = ret {
                     warn!("send wait errno = {:?}", e.errno());
                     match e.errno() {
@@ -91,7 +92,6 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         iov_buf_id: &mut usize,
         iov_buf_index: &mut usize,
     ) -> Result<usize> {
-        // let mut inner = self.sender.inner.lock().unwrap();
         let mut inner = self.sender.inner.lock();
 
         if !flags.is_empty()
@@ -169,7 +169,6 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         // Init the callback invoked upon the completion of the async send
         let stream = self.clone();
         let complete_fn = move |retval: i32| {
-            // let mut inner = stream.sender.inner.lock().unwrap();
             let mut inner = stream.sender.inner.lock();
 
             trace!("send request complete with retval: {}", retval);
@@ -223,7 +222,6 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
 
     pub fn cancel_send_requests(&self) {
         let io_uring = self.common.io_uring();
-        // let inner = self.sender.inner.lock().unwrap();
         let inner = self.sender.inner.lock();
         if let Some(io_handle) = &inner.io_handle {
             unsafe { io_uring.cancel(io_handle) };
@@ -247,12 +245,6 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
                 return;
             }
         }
-        // if let Some(mut inner) = self.sender.inner.try_lock() {
-        //     if inner.send_buf.is_empty() && inner.io_handle.is_none() {
-        //         inner.update_buf_size(buf_size);
-        //         return;
-        //     }
-        // }
 
         // Can't easily aquire lock or the sendbuf is not empty. Update the flag only
         self.sender.set_need_update(true);
@@ -284,7 +276,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
 
             if pending_request_exist {
                 let mut timeout = Some(Duration::from_secs(DEFUALT_LINGER_TIME as u64));
-                let ret = poller.wait_timeout(timeout.as_ref());
+                let ret = poller.wait_timeout(timeout.as_mut());
                 trace!("wait empty send buffer ret = {:?}", ret);
                 if let Err(_) = ret {
                     // No complete request to wake. Just cancel the send requests.
@@ -322,12 +314,10 @@ impl Sender {
 
     pub fn shutdown(&self) {
         let mut inner = self.inner.lock();
-        // let mut inner = self.inner.lock().unwrap();
         inner.is_shutdown = ShutdownStatus::PreShutdown;
     }
 
     pub fn is_empty(&self) -> bool {
-        // let inner = self.inner.lock().unwrap();
         let inner = self.inner.lock();
         inner.send_buf.is_empty()
     }

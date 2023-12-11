@@ -188,7 +188,6 @@ impl EventMonitorBuilder {
         let waiter = Waiter::new();
 
         let poller = Poller::new();
-        let is_uring = false;
         Self {
             files_and_events,
             host_file_idxes,

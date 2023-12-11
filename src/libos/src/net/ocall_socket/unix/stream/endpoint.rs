@@ -90,16 +90,16 @@ impl Inner {
         self.reader.items_to_consume()
     }
 
-    pub fn shutdown(&self, how: HowToShut) -> Result<()> {
+    pub fn shutdown(&self, how: Shutdown) -> Result<()> {
         if !self.is_connected() {
             return_errno!(ENOTCONN, "The socket is not connected.");
         }
 
-        if how.to_shut_read() {
+        if how.should_shut_read() {
             self.reader.shutdown()
         }
 
-        if how.to_shut_write() {
+        if how.should_shut_write() {
             self.writer.shutdown()
         }
 

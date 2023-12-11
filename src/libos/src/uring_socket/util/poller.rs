@@ -188,8 +188,8 @@ impl Poller {
     }
 
     /// Wait until there are any interesting events happen since last `wait`, or reach timeout.
-    pub fn wait_timeout(&self, timeout: Option<&Duration>) -> Result<()> {
-        self.inner.waiter.wait(timeout)
+    pub fn wait_timeout(&self, timeout: Option<&mut Duration>) -> Result<()> {
+        self.inner.waiter.wait_mut(timeout)
     }
 
     pub fn observer(&self) -> Weak<dyn Observer<IoEvents>> {

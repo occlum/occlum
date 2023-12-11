@@ -30,6 +30,7 @@
 #![feature(linkage)]
 #![feature(map_first_last)]
 #![feature(new_uninit)]
+#![feature(raw_ref_op)]
 
 #[macro_use]
 extern crate alloc;

@@ -21,7 +21,7 @@ use crate::uring_socket::sockopt::*;
 
 lazy_static! {
     pub static ref SEND_BUF_SIZE: AtomicUsize = AtomicUsize::new(2565 * 1024 + 1); // Default Linux send buffer size is 2.5MB.
-    pub static ref RECV_BUF_SIZE: AtomicUsize = AtomicUsize::new(128 * 1024 + 1);
+    pub static ref RECV_BUF_SIZE: AtomicUsize = AtomicUsize::new(256 * 1024 + 1);
 }
 
 pub struct StreamSocket<A: Addr + 'static, R: Runtime> {
@@ -56,13 +56,6 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         let socket2 = Self::new_connected(connected2);
         Ok((socket1, socket2))
     }
-
-    // pub fn notifier(&self) -> &IoNotifier {
-    //     let lock = self.state.read().unwrap();
-    //     let notifier = lock.common().notifier();
-    //     notifier
-    //     // let common = self.state.read().unwrap().common().notifier()
-    // }
 
     fn new_connected(connected_stream: Arc<ConnectedStream<A, R>>) -> Self {
         let state = RwLock::new(State::Connected(connected_stream));
@@ -255,24 +248,6 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
             }
         };
 
-        // let res = connected_stream.recvmsg(buf, flags);
-        // match res {
-        //     Err(e) => {
-        //         println!("recv err: {:?}", e);
-        //         Err(e)
-        //     }
-        //     Ok(len) => {
-        //         println!("recv len: {:?}", len);
-        //         Ok((len, None, MsgFlags::empty()))
-        //     }
-        // }
-
-        // let mut count = 200;
-        // while count != 0 {
-        //     count -= 1;
-        //     hint::spin_loop();
-        // }
-
         let recv_len = connected_stream.recvmsg(buf, flags)?;
         Ok((recv_len, None, MsgFlags::empty()))
     }
@@ -332,7 +307,6 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         let pollee = state.common().pollee();
         let observer = Arc::downgrade(&observer) as _;
         pollee.unregister_observer(&observer);
-        // .ok_or_else(|| errno!(ENOENT, "the observer is not registered"))
     }
 
     pub fn addr(&self) -> Result<A> {
@@ -388,20 +362,16 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
                 cmd.execute(self.host_fd())?;
             },
             cmd: SetRecvTimeoutCmd => {
-                // panic!()
                 self.set_recv_timeout(*cmd.timeout());
             },
             cmd: SetSendTimeoutCmd => {
-                // panic!()
                 self.set_send_timeout(*cmd.timeout());
             },
             cmd: GetRecvTimeoutCmd => {
-                // panic!()
                 let timeval = timeout_to_timeval(self.recv_timeout());
                 cmd.set_output(timeval);
             },
             cmd: GetSendTimeoutCmd => {
-                // panic!()
                 let timeval = timeout_to_timeval(self.send_timeout());
                 cmd.set_output(timeval);
             },
@@ -609,9 +579,7 @@ impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for State<A, R> {
 
 impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for StreamSocket<A, R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("StreamSocket")
-            // .field("state", &self.state.read().unwrap())
-            .finish()
+        f.debug_struct("StreamSocket").finish()
     }
 }
 

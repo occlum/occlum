@@ -2,6 +2,7 @@ use core::sync::atomic::{AtomicU32, AtomicUsize};
 use std::{collections::HashMap, thread::current};
 
 use alloc::{sync::Arc, vec::Vec};
+use atomic::Ordering;
 use io_uring_callback::{Builder, IoUring};
 use keyable_arc::KeyableArc;
 use spin::{Mutex, RwLock};
@@ -44,28 +45,43 @@ impl UringState {
 }
 
 pub struct UringSet {
-    urings: Mutex<HashMap<KeyableArc<IoUring>, UringState>>,
+    // urings: Mutex<HashMap<KeyableArc<IoUring>, UringState>>,
+    urings: Mutex<Vec<(Arc<IoUring>, UringState)>>,
+    count: AtomicUsize,
 }
 
 impl UringSet {
     pub fn new() -> Self {
-        let urings = Mutex::new(HashMap::new());
+        // let urings = Mutex::new(HashMap::new());
+        let urings = Mutex::new(Vec::with_capacity(URING_NUM_LIMIT));
 
         let mut guard = urings.lock();
         for _ in 0..URING_NUM_LIMIT {
-            let uring: KeyableArc<IoUring> = Arc::new(
+            let uring: Arc<IoUring> = Arc::new(
                 Builder::new()
                     .setup_sqpoll(500 /* ms */)
                     .build(256)
                     .unwrap(),
             )
             .into();
-            guard.insert(uring, UringState::default());
+            guard.push((uring, UringState::default()));
+
+            // let uring: KeyableArc<IoUring> = Arc::new(
+            //     Builder::new()
+            //         .setup_sqpoll(500 /* ms */)
+            //         .build(256)
+            //         .unwrap(),
+            // )
+            // .into();
+            // guard.insert(uring, UringState::default());
         }
 
         drop(guard);
 
-        Self { urings }
+        Self {
+            urings,
+            count: AtomicUsize::new(0),
+        }
     }
 
     pub fn poll_completions(&self) {
@@ -78,10 +94,15 @@ impl UringSet {
 
     pub fn get_uring(&self) -> Arc<IoUring> {
         let mut map = self.urings.lock();
-        let (uring, state) = map
-            .iter_mut()
-            .min_by_key(|(_, &mut state)| state.registered_num)
-            .unwrap();
+
+        let idx = self.count.fetch_add(1, Ordering::Relaxed) % URING_NUM_LIMIT;
+
+        let (uring, state) = map.get_mut(idx).unwrap();
+
+        // let (uring, state) = map
+        //     .iter_mut()
+        //     .min_by_key(|(_, &mut state)| state.registered_num)
+        //     .unwrap();
         // Update states
         state.register_one_socket();
         if !state.is_enable_poll {
@@ -92,10 +113,10 @@ impl UringSet {
     }
 
     pub fn free_uring(&self, uring: Arc<IoUring>) {
-        let uring: KeyableArc<IoUring> = uring.into();
-        let mut map = self.urings.lock();
-        let mut state = map.get_mut(&uring).unwrap();
+        // let uring: KeyableArc<IoUring> = uring.into();
+        // let mut map = self.urings.lock();
+        // let mut state = map.get_mut(&uring).unwrap();
 
-        state.unregister_one_socket();
+        // state.unregister_one_socket();
     }
 }

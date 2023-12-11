@@ -61,7 +61,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
             if !events.is_empty() {
                 break;
             }
-            let ret = poller.wait_timeout(timeout.as_ref());
+            let ret = poller.wait_timeout(timeout.as_mut());
             if let Err(e) = ret {
                 let errno = e.errno();
                 warn!("connect wait errno = {:?}", errno);
@@ -160,7 +160,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
 
             if pending_request_exist {
                 let mut timeout = Some(Duration::from_secs(10));
-                let ret = poller.wait_timeout(timeout.as_ref());
+                let ret = poller.wait_timeout(timeout.as_mut());
                 if let Err(e) = ret {
                     warn!("wait cancel connect request error = {:?}", e.errno());
                     continue;

@@ -8,9 +8,8 @@ pub use self::io_multiplexing::{
 };
 
 pub use self::ocall_socket::{
-    socketpair, unix_socket, AddressFamily, AsUnixSocket, FileFlags, HostSocket, HostSocketType,
-    HowToShut, Iovs, IovsMut, MsgHdr, MsgHdrFlags, MsgHdrMut, RecvFlags, SendFlags,
-    SliceAsLibcIovec, SockAddr, SocketType, UnixAddr,
+    socketpair, unix_socket, AddressFamily, AsUnixSocket, HostSocket, HostSocketType, Iovs,
+    IovsMut, MsgHdr, MsgHdrMut, SliceAsLibcIovec, SockAddr, UnixAddr,
 };
 pub use self::syscalls::*;
 
@@ -23,6 +22,5 @@ mod socket_file;
 mod socket_file_impl;
 mod sockopt;
 mod syscalls;
-mod uring_syscalls;
 
-pub use self::uring_syscalls::*;
+pub use self::syscalls::*;

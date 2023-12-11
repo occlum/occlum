@@ -23,17 +23,17 @@ pub struct Stream {
 }
 
 impl Stream {
-    pub fn new(flags: FileFlags) -> Self {
+    pub fn new(flags: SocketFlags) -> Self {
         Self {
             inner: SgxMutex::new(Status::Idle(Info::new(
-                flags.contains(FileFlags::SOCK_NONBLOCK),
+                flags.contains(SocketFlags::SOCK_NONBLOCK),
             ))),
             notifier: Arc::new(RelayNotifier::new()),
         }
     }
 
-    pub fn socketpair(flags: FileFlags) -> Result<(Self, Self)> {
-        let nonblocking = flags.contains(FileFlags::SOCK_NONBLOCK);
+    pub fn socketpair(flags: SocketFlags) -> Result<(Self, Self)> {
+        let nonblocking = flags.contains(SocketFlags::SOCK_NONBLOCK);
         let (end_a, end_b) = end_pair(nonblocking)?;
         let notifier_a = Arc::new(RelayNotifier::new());
         let notifier_b = Arc::new(RelayNotifier::new());
@@ -187,12 +187,12 @@ impl Stream {
         }
     }
 
-    pub fn accept(&self, flags: FileFlags) -> Result<(Self, Option<Addr>)> {
+    pub fn accept(&self, flags: SocketFlags) -> Result<(Self, Option<Addr>)> {
         let status = (*self.inner()).clone();
         match status {
             Status::Listening(addr) => {
                 let endpoint = ADDRESS_SPACE.pop_incoming(&addr)?;
-                endpoint.set_nonblocking(flags.contains(FileFlags::SOCK_NONBLOCK));
+                endpoint.set_nonblocking(flags.contains(SocketFlags::SOCK_NONBLOCK));
                 endpoint.set_ancillary(Ancillary {
                     tid: current!().tid(),
                 });
@@ -287,7 +287,7 @@ impl Stream {
     }
 
     /// perform shutdown on the socket.
-    pub fn shutdown(&self, how: HowToShut) -> Result<()> {
+    pub fn shutdown(&self, how: Shutdown) -> Result<()> {
         if let Status::Connected(ref end) = &*self.inner() {
             end.shutdown(how)
         } else {
