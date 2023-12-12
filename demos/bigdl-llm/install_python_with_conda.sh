@@ -10,4 +10,5 @@ $script_dir/miniconda/bin/conda create \
     python=3.9.11
 
 # Install BigDL LLM
+$script_dir/python-occlum/bin/pip install torch==2.1.0 --index-url https://download.pytorch.org/whl/cpu
 $script_dir/python-occlum/bin/pip install --pre --upgrade bigdl-llm[all] bigdl-llm[serving]

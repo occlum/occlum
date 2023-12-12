@@ -70,7 +70,7 @@ BigDL-LLM also support FastChat with using BigDL-LLM as a serving backend in the
 
 For this demo, below commands show how to run an inference service in Occlum with webui interface.
 
-In order to load models using BigDL-LLM, the model name should include "bigdl". In our case, first create a soft link **chatglm2-6b-bigdl** to **chatglm2-6b**.
+In order to load models using BigDL-LLM, the model name should include "bigdl". For example, model **vicuna-7b** should be renamed to **bigdl-7b**. A special case is **ChatGLM** models. For these models, you do not need to do any changes after downloading the model and the BigDL-LLM backend will be used automatically. Details please refer to [Models](https://github.com/intel-analytics/BigDL/tree/main/python/llm/src/bigdl/llm/serving#models).
 
 ### Serving with WebGUI
 
@@ -87,7 +87,7 @@ This controller manages the distributed workers.
 ```bash
 cd occlum_instance
 occlum start
-HF_DATASETS_CACHE=/root/cache  occlum exec /bin/python3 -m bigdl.llm.serving.model_worker --model-path /models/chatglm2-6b-bigdl --device cpu --host 0.0.0.0
+HF_DATASETS_CACHE=/root/cache  occlum exec /bin/python3 -m bigdl.llm.serving.model_worker --model-path /models/chatglm2-6b --device cpu --host 0.0.0.0
 ```
 Wait until the process finishes loading the model and you see "Uvicorn running on ...". The model worker will register itself to the controller.
 
