@@ -1,5 +1,5 @@
 use super::ocall_socket::MsgHdrFlags;
-use super::{socket_file::SocketFile, *};
+use super::{uring_socket::socket_file::SocketFile, *};
 
 use core::f32::consts::E;
 use std::mem::MaybeUninit;
@@ -14,23 +14,22 @@ use std::convert::TryFrom;
 use time::{timespec_t, timeval_t};
 use util::mem_util::from_user;
 
-use crate::uring_socket::ioctl::IoctlCmd;
-use crate::uring_socket::socket::{
+use super::uring_socket::ioctl::IoctlCmd;
+use super::uring_socket::socket::{
     GetRecvTimeoutCmd, GetSendTimeoutCmd, RecvFlags, SendFlags, Shutdown, Type,
 };
-use crate::uring_socket::sockopt::{
-    GetAcceptConnCmd, GetDomainCmd, GetPeerNameCmd, GetRcvBufSizeCmd, GetSndBufSizeCmd,
-    GetSockOptRawCmd, GetTypeCmd, SetRcvBufSizeCmd, SetSndBufSizeCmd, SetSockOptRawCmd,
-    SockOptName,
+use super::uring_socket::sockopt::{
+    GetAcceptConnCmd, GetDomainCmd, GetOutputAsBytes, GetPeerNameCmd, GetRcvBufSizeCmd,
+    GetSndBufSizeCmd, GetSockOptRawCmd, GetTypeCmd, SetRcvBufSizeCmd, SetSndBufSizeCmd,
+    SetSockOptRawCmd, SockOptName,
 };
 use std::ptr;
 
-use crate::uring_socket::socket::{SetRecvTimeoutCmd, SetSendTimeoutCmd};
+use crate::net::uring_socket::socket::{SetRecvTimeoutCmd, SetSendTimeoutCmd};
 
 use num_enum::TryFromPrimitive;
 
-use super::socket_file::UringSocketType;
-use super::sockopt::GetOutputAsBytes;
+use super::uring_socket::{AnyAddr, UringSocketType};
 use super::*;
 
 use crate::fs::StatusFlags;
@@ -40,7 +39,7 @@ use crate::prelude::*;
 const SOMAXCONN: u32 = 4096;
 const SOCONN_DEFAULT: u32 = 16;
 
-const ENABLE_URING: bool = true;
+pub const ENABLE_URING: bool = true;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -804,67 +803,6 @@ pub fn do_sendmmsg(
         return_errno!(ENOTSOCK, "not a socket")
     }
 }
-
-// #[allow(non_camel_case_types)]
-// trait c_msghdr_ext {
-//     fn check_member_ptrs(&self) -> Result<()>;
-// }
-
-// impl c_msghdr_ext for msghdr {
-//     // TODO: implement this!
-//     fn check_member_ptrs(&self) -> Result<()> {
-//         Ok(())
-//     }
-//     /*
-//             ///user space check
-//             pub unsafe fn check_from_user(user_hdr: *const msghdr) -> Result<()> {
-//                 Self::check_pointer(user_hdr, from_user::check_ptr)
-//             }
-
-//             ///Check msghdr ptr
-//             pub unsafe fn check_pointer(
-//                 user_hdr: *const msghdr,
-//                 check_ptr: fn(*const u8) -> Result<()>,
-//             ) -> Result<()> {
-//                 check_ptr(user_hdr as *const u8)?;
-
-//                 if (*user_hdr).msg_name.is_null() ^ ((*user_hdr).msg_namelen == 0) {
-//                     return_errno!(EINVAL, "name length is invalid");
-//                 }
-
-//                 if (*user_hdr).msg_iov.is_null() ^ ((*user_hdr).msg_iovlen == 0) {
-//                     return_errno!(EINVAL, "iov length is invalid");
-//                 }
-
-//                 if (*user_hdr).msg_control.is_null() ^ ((*user_hdr).msg_controllen == 0) {
-//                     return_errno!(EINVAL, "control length is invalid");
-//                 }
-
-//                 if !(*user_hdr).msg_name.is_null() {
-//                     check_ptr((*user_hdr).msg_name as *const u8)?;
-//                 }
-
-//                 if !(*user_hdr).msg_iov.is_null() {
-//                     check_ptr((*user_hdr).msg_iov as *const u8)?;
-//                     let iov_slice = slice::from_raw_parts((*user_hdr).msg_iov, (*user_hdr).msg_iovlen);
-//                     for iov in iov_slice {
-//                         check_ptr(iov.iov_base as *const u8)?;
-//                     }
-//                 }
-
-//                 if !(*user_hdr).msg_control.is_null() {
-//                     check_ptr((*user_hdr).msg_control as *const u8)?;
-//                 }
-//                 Ok(())
-//             }
-//     */
-// }
-
-// impl c_msghdr_ext for msghdr_mut {
-//     fn check_member_ptrs(&self) -> Result<()> {
-//         Ok(())
-//     }
-// }
 
 pub fn do_select(
     nfds: c_int,

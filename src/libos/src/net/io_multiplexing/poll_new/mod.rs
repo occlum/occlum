@@ -4,9 +4,9 @@ use std::cell::Cell;
 use std::sync::Weak;
 use std::time::Duration;
 
+use crate::net::uring_socket::util::poller::Poller;
 use crate::prelude::*;
-use crate::uring_socket::util::poller::Poller;
-use crate::{fs::IoEvents, net::socket_file::UringSocketType};
+use crate::{fs::IoEvents, net::uring_socket::UringSocketType};
 
 use self::event_monitor::{EventMonitor, EventMonitorBuilder};
 

@@ -110,7 +110,8 @@ extern crate sgx_libc as libc;
 #[cfg(feature = "sgx")]
 extern crate sgx_tstd as std;
 
-use std::io;
+use core::sync::atomic::AtomicUsize;
+use std::{io, collections::HashMap};
 use std::sync::Arc;
 cfg_if::cfg_if! {
     if #[cfg(feature = "sgx")] {
@@ -121,10 +122,12 @@ cfg_if::cfg_if! {
     }
 }
 
+use atomic::Ordering;
 use io_uring::opcode;
 use io_uring::squeue::Entry as SqEntry;
 use io_uring::types;
 use slab::Slab;
+use spin::RwLock;
 use std::os::unix::prelude::RawFd;
 
 use crate::io_handle::IoToken;
@@ -146,6 +149,7 @@ pub struct IoUring {
     ring: io_uring::IoUring,
     token_table: Mutex<Slab<Arc<IoToken>>>,
     sq_lock: Mutex<()>, // For submission queue synchronization
+    fd_map: RwLock<HashMap<usize, AtomicUsize>>, // (key: fd, value: op num)
 }
 
 impl Drop for IoUring {
@@ -171,10 +175,12 @@ impl IoUring {
     pub(crate) fn new(ring: io_uring::IoUring) -> Self {
         let token_table = Mutex::new(Slab::new());
         let sq_lock = Mutex::new(());
+        let fd_map = RwLock::new(HashMap::new());
         Self {
             ring,
             token_table,
             sq_lock,
+            fd_map,
         }
     }
 
@@ -199,6 +205,7 @@ impl IoUring {
         let entry = opcode::Accept::new(fd, addr, addrlen)
             .flags(flags as i32)
             .build();
+        self.op_fetch_add(fd.0 as usize, 1);
         self.push_entry(entry, callback)
     }
 
@@ -215,6 +222,7 @@ impl IoUring {
         callback: impl FnOnce(i32) + Send + 'static,
     ) -> IoHandle {
         let entry = opcode::Connect::new(fd, addr, addrlen).build();
+        self.op_fetch_add(fd.0 as usize, 1);
         self.push_entry(entry, callback)
     }
 
@@ -230,6 +238,7 @@ impl IoUring {
         callback: impl FnOnce(i32) + Send + 'static,
     ) -> IoHandle {
         let entry = opcode::PollAdd::new(fd, flags).build();
+        self.op_fetch_add(fd.0 as usize, 1);
         self.push_entry(entry, callback)
     }
 
@@ -251,6 +260,7 @@ impl IoUring {
             .offset(offset)
             .rw_flags(flags)
             .build();
+        self.op_fetch_add(fd.0 as usize, 1);
         self.push_entry(entry, callback)
     }
 
@@ -272,6 +282,7 @@ impl IoUring {
             .offset(offset)
             .rw_flags(flags)
             .build();
+        self.op_fetch_add(fd.0 as usize, 1);
         self.push_entry(entry, callback)
     }
 
@@ -293,6 +304,7 @@ impl IoUring {
             .offset(offset)
             .rw_flags(flags)
             .build();
+        self.op_fetch_add(fd.0 as usize, 1);
         self.push_entry(entry, callback)
     }
 
@@ -314,6 +326,7 @@ impl IoUring {
             .offset(offset)
             .rw_flags(flags)
             .build();
+        self.op_fetch_add(fd.0 as usize, 1);
         self.push_entry(entry, callback)
     }
 
@@ -330,7 +343,7 @@ impl IoUring {
         callback: impl FnOnce(i32) + Send + 'static,
     ) -> IoHandle {
         let entry = opcode::RecvMsg::new(fd, msg).flags(flags).build();
-        // entry = entry.set_ioprio_poll_first();
+        self.op_fetch_add(fd.0 as usize, 1);
         self.push_entry(entry, callback)
     }
 
@@ -347,6 +360,7 @@ impl IoUring {
         callback: impl FnOnce(i32) + Send + 'static,
     ) -> IoHandle {
         let entry = opcode::SendMsg::new(fd, msg).flags(flags).build();
+        self.op_fetch_add(fd.0 as usize, 1);
         self.push_entry(entry, callback)
     }
 
@@ -368,6 +382,7 @@ impl IoUring {
         } else {
             opcode::Fsync::new(fd).build()
         };
+        self.op_fetch_add(fd.0 as usize, 1);
         self.push_entry(entry, callback)
     }
 
@@ -503,6 +518,37 @@ impl IoUring {
         self.push(entry);
 
         io_handle
+    }
+
+    fn op_fetch_add(&self, fd: usize, val: usize) -> usize {
+        let fd_map = self.fd_map.upgradeable_read();
+        match fd_map.get(&fd) {
+            Some(ops_num) => {
+                ops_num.fetch_add(val, Ordering::Relaxed)
+            },
+            None => {
+                let mut fd_map = fd_map.upgrade();
+                fd_map.insert(fd, AtomicUsize::new(val));
+                0
+            },
+        }
+    }
+
+    pub fn dissattach_fd(&self, fd: usize) -> Option<AtomicUsize> {
+        let mut fd_map = self.fd_map.write();
+        fd_map.remove(&fd)
+    }
+
+    // Using the sum of the number of attached file descriptors (raw fd) as a measure of task load.
+    pub fn task_load(&self) -> usize {
+        let fd_map = self.fd_map.read();
+        fd_map.values().fold(0, |acc, val| acc + val.load(Ordering::Relaxed))
+    }
+
+    // The number of registered fd in this io_uring instance
+    pub fn registered_fds(&self) -> usize {
+        let fd_map = self.fd_map.read();
+        fd_map.len()
     }
 
     /// Cancel an ongoing I/O request.

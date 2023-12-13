@@ -13,14 +13,9 @@ pub use self::ocall_socket::{
 };
 pub use self::syscalls::*;
 
-pub use self::addr::*;
-
-mod addr;
 mod io_multiplexing;
 mod ocall_socket;
-mod socket_file;
-mod socket_file_impl;
-mod sockopt;
 mod syscalls;
+pub mod uring_socket;
 
 pub use self::syscalls::*;

@@ -5,10 +5,10 @@ use std::time::Duration;
 
 use crate::events::{Observer, Waiter, WaiterQueueObserver};
 use crate::fs::{AtomicIoEvents, IoEvents};
-use crate::net::socket_file::UringSocketType;
+use crate::net::uring_socket::util::poller::Poller;
+use crate::net::uring_socket::UringSocketType;
 use crate::prelude::*;
 use crate::time::{timespec_t, TIMERSLACK};
-use crate::uring_socket::util::poller::Poller;
 
 /// Monitor events that happen on a set of interesting files.
 ///

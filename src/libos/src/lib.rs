@@ -101,7 +101,6 @@ mod signal;
 mod syscall;
 mod time;
 mod untrusted;
-mod uring_socket;
 mod util;
 mod vm;
 
