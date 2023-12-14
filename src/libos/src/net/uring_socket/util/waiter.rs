@@ -4,9 +4,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Weak;
 use std::time::Duration;
 
-use io_uring_callback::Fd;
-use sgx_untrusted_alloc::UntrustedBox;
-
 use crate::events::HostEventFd;
 use crate::prelude::*;
 

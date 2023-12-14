@@ -12,8 +12,8 @@ use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 use super::ConnectedStream;
 use crate::net::uring_socket::runtime::Runtime;
 use crate::net::uring_socket::stream::SEND_BUF_SIZE;
-use crate::net::uring_socket::util::UntrustedCircularBuf;
 use crate::prelude::*;
+use crate::untrusted::UntrustedCircularBuf;
 
 use crate::util::sync::{Mutex, MutexGuard};
 

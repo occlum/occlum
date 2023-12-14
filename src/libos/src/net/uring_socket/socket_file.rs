@@ -1,10 +1,8 @@
 use self::impls::{Ipv4Datagram, Ipv6Datagram, NetlinkDatagram};
-use crate::events::Observer;
 use super::ioctl::IoctlCmd;
-use super::socket::{
-    MsgFlags, NetlinkFamily, RecvFlags, SendFlags, Shutdown, Type,
-};
+use super::socket::{MsgFlags, NetlinkFamily, RecvFlags, SendFlags, Shutdown, Type};
 use super::util::poller::Poller;
+use crate::events::Observer;
 
 // use self::impls::{
 //     UnixDatagram,
@@ -13,8 +11,8 @@ use self::impls::{Ipv4Stream, Ipv6Stream};
 // use super::unix::trusted::Stream as TrustedStream;
 // use super::unix::UnixStream;
 use super::addr::AnyAddr;
-use crate::fs::{AccessMode, IoEvents, IoNotifier, StatusFlags};
 use super::socket::{Ipv4SocketAddr, Ipv6SocketAddr};
+use crate::fs::{AccessMode, IoEvents, IoNotifier, StatusFlags};
 use crate::prelude::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 // pub use self::impls::UntrustedUnixStream;

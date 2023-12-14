@@ -534,7 +534,7 @@ impl IoUring {
         }
     }
 
-    pub fn dissattach_fd(&self, fd: usize) -> Option<AtomicUsize> {
+    pub fn disattach_fd(&self, fd: usize) -> Option<AtomicUsize> {
         let mut fd_map = self.fd_map.write();
         fd_map.remove(&fd)
     }
