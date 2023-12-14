@@ -8,7 +8,7 @@ AECS_DIR=${script_dir}/enclave-configuration-service
 # Default TEE TYPE is SGX2, also support HYPERENCLAVE
 TEETYPE=${1:-SGX2}
 
-git clone https://github.com/SOFAEnclave/enclave-configuration-service.git
+git clone -b v2.0.0 https://github.com/SOFAEnclave/enclave-configuration-service.git
 
 pushd ${AECS_DIR}
 git submodule update --init --recursive
