@@ -17,7 +17,6 @@ use crate::process::pgrp::{get_spawn_attribute_pgrp, update_pgrp_for_new_process
 use crate::util::pku_util;
 use crate::util::sync::Mutex;
 use crate::vm::ProcessVM;
-// use spin::Mutex;
 
 mod aux_vec;
 mod exec_loader;

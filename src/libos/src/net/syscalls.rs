@@ -2,7 +2,9 @@ use super::ocall_socket::MsgHdrFlags;
 use super::{uring_socket::socket_file::SocketFile, *};
 
 use core::f32::consts::E;
+use num_enum::TryFromPrimitive;
 use std::mem::MaybeUninit;
+use std::ptr;
 use std::time::Duration;
 
 use super::io_multiplexing::{AsEpollFile, EpollCtl, EpollFile, EpollFlags, FdSetExt, PollFd};
@@ -16,20 +18,16 @@ use util::mem_util::from_user;
 
 use super::uring_socket::ioctl::IoctlCmd;
 use super::uring_socket::socket::{
-    GetRecvTimeoutCmd, GetSendTimeoutCmd, RecvFlags, SendFlags, Shutdown, Type,
+    GetRecvTimeoutCmd, GetSendTimeoutCmd, RecvFlags, SendFlags, SetRecvTimeoutCmd,
+    SetSendTimeoutCmd, Shutdown, Type,
 };
 use super::uring_socket::sockopt::{
     GetAcceptConnCmd, GetDomainCmd, GetOutputAsBytes, GetPeerNameCmd, GetRcvBufSizeCmd,
     GetSndBufSizeCmd, GetSockOptRawCmd, GetTypeCmd, SetRcvBufSizeCmd, SetSndBufSizeCmd,
     SetSockOptRawCmd, SockOptName,
 };
-use std::ptr;
-
-use crate::net::uring_socket::socket::{SetRecvTimeoutCmd, SetSendTimeoutCmd};
-
-use num_enum::TryFromPrimitive;
-
 use super::uring_socket::{AnyAddr, UringSocketType};
+
 use super::*;
 
 use crate::fs::StatusFlags;

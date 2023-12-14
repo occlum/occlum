@@ -15,8 +15,8 @@ use crate::prelude::*;
 use crate::untrusted::UntrustedCircularBuf;
 use crate::util::sync::{Mutex, MutexGuard};
 
+use crate::events::Poller;
 use crate::fs::IoEvents as Events;
-use crate::net::uring_socket::util::poller::Poller;
 
 impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
     pub fn recvmsg(self: &Arc<Self>, bufs: &mut [&mut [u8]], flags: RecvFlags) -> Result<usize> {

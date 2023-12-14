@@ -1,8 +1,7 @@
 use self::impls::{Ipv4Datagram, Ipv6Datagram, NetlinkDatagram};
 use super::ioctl::IoctlCmd;
 use super::socket::{MsgFlags, NetlinkFamily, RecvFlags, SendFlags, Shutdown, Type};
-use super::util::poller::Poller;
-use crate::events::Observer;
+use crate::events::{Observer, Poller};
 
 // use self::impls::{
 //     UnixDatagram,

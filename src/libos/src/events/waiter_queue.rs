@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use super::{Waiter, Waker};
+use super::{LevelWaiter, LevelWaker};
 use crate::prelude::*;
 
 // use crate::socket::util::Waiter as SpinWaiter;
@@ -12,7 +12,7 @@ use crate::prelude::*;
 /// By using this queue, we can wake up threads in their waiters' enqueue order.
 ///
 /// While the queue is conceptually for `Waiter`s, it internally maintains a list
-/// of `Waker`s.
+/// of `LevelWaker`s.
 ///
 /// Note about memory ordering:
 /// Here count needs to be synchronized with wakers. The read operation of count
@@ -30,7 +30,7 @@ use crate::prelude::*;
 /// Although it is safer to use AcqRel，here using `Release` would be enough.
 pub struct WaiterQueue {
     count: AtomicUsize,
-    wakers: SgxMutex<VecDeque<Waker>>,
+    wakers: SgxMutex<VecDeque<LevelWaker>>,
 }
 
 impl WaiterQueue {
@@ -54,7 +54,7 @@ impl WaiterQueue {
     /// It is allowed to enqueue a waiter more than once before it is dequeued.
     /// But this is usually not a good idea. It is the callers' responsibility
     /// to use the API properly.
-    pub fn reset_and_enqueue(&self, waiter: &Waiter) {
+    pub fn reset_and_enqueue(&self, waiter: &LevelWaiter) {
         waiter.reset();
 
         let mut wakers = self.wakers.lock().unwrap();
@@ -83,13 +83,13 @@ impl WaiterQueue {
         let to_wake = {
             let mut wakers = self.wakers.lock().unwrap();
             let max_count = max_count.min(wakers.len());
-            let to_wake: Vec<Waker> = wakers.drain(..max_count).collect();
+            let to_wake: Vec<LevelWaker> = wakers.drain(..max_count).collect();
             self.count.fetch_sub(to_wake.len(), Ordering::Release);
             to_wake
         };
 
         // Wake in batch
-        Waker::batch_wake(to_wake.iter());
+        LevelWaker::batch_wake(to_wake.iter());
         to_wake.len()
     }
 }

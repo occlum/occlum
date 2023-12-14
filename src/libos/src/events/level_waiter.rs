@@ -1,50 +1,51 @@
-use core::hint;
-use core::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Weak;
 use std::time::Duration;
 
-use crate::events::HostEventFd;
+use io_uring_callback::Fd;
+use sgx_untrusted_alloc::UntrustedBox;
+
+use super::host_event_fd::HostEventFd;
 use crate::prelude::*;
 
 /// A waiter enables a thread to sleep.
-pub struct Waiter {
+pub struct LevelWaiter {
     inner: Arc<Inner>,
 }
 
-impl Waiter {
+impl LevelWaiter {
     /// Create a waiter for the current thread.
     ///
-    /// A `Waiter` is bound to the curent thread that creates it: it cannot be
+    /// A `LevelWaiter` is bound to the curent thread that creates it: it cannot be
     /// sent to or used by any other threads as the type implements `!Send` and
-    /// `!Sync` traits. Thus, a `Waiter` can only put the current thread to sleep.
+    /// `!Sync` traits. Thus, a `LevelWaiter` can only put the current thread to sleep.
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Inner::new()),
         }
     }
 
-    // /// Return whether a waiter has been waken up.
-    // ///
-    // /// Once a waiter is waken up, the `wait` or `wait_mut` method becomes
-    // /// non-blocking.
-    // pub fn is_woken(&self) -> bool {
-    //     self.inner.is_woken()
-    // }
+    /// Return whether a waiter has been waken up.
+    ///
+    /// Once a waiter is waken up, the `wait` or `wait_mut` method becomes
+    /// non-blocking.
+    pub fn is_woken(&self) -> bool {
+        self.inner.is_woken()
+    }
 
-    // /// Reset a waiter.
-    // ///
-    // /// After a `Waiter` being waken up, the `reset` method must be called so
-    // /// that the `Waiter` can use the `wait` or `wait_mut` methods to sleep the
-    // /// current thread again.
-    // pub fn reset(&self) {
-    //     self.inner.reset();
-    // }
+    /// Reset a waiter.
+    ///
+    /// After a `LevelWaiter` being waken up, the `reset` method must be called so
+    /// that the `LevelWaiter` can use the `wait` or `wait_mut` methods to sleep the
+    /// current thread again.
+    pub fn reset(&self) {
+        self.inner.reset();
+    }
 
     /// Put the current thread to sleep until being waken up by a waker.
     ///
     /// The method has three possible return values:
-    /// 1. `Ok(())`: The `Waiter` has been waken up by one of its `Waker`;
+    /// 1. `Ok(())`: The `LevelWaiter` has been waken up by one of its `LevelWaker`;
     /// 2. `Err(e) if e.errno() == Errno::ETIMEDOUT`: Timeout.
     /// 3. `Err(e) if e.errno() == Errno::EINTR`: Interrupted by a signal.
     ///
@@ -64,11 +65,11 @@ impl Waiter {
 
     /// Create a waker that can wake up this waiter.
     ///
-    /// `WaiterQueue` maintains a list of `Waker` internally to wake up the
-    /// enqueued `Waiter`s. So, for users that uses `WaiterQueue`, this method
+    /// `WaiterQueue` maintains a list of `LevelWaker` internally to wake up the
+    /// enqueued `LevelWaiter`s. So, for users that uses `WaiterQueue`, this method
     /// does not need to be called manually.
-    pub fn waker(&self) -> Waker {
-        Waker {
+    pub fn waker(&self) -> LevelWaker {
+        LevelWaker {
             inner: Arc::downgrade(&self.inner),
         }
     }
@@ -81,24 +82,25 @@ impl Waiter {
     }
 }
 
-impl !Send for Waiter {}
-impl !Sync for Waiter {}
-
-const WAIT: u32 = u32::MAX;
-const INIT: u32 = 0;
-const NOTIFIED: u32 = 1;
+impl !Send for LevelWaiter {}
+impl !Sync for LevelWaiter {}
 
 /// A waker can wake up the thread that its waiter has put to sleep.
-pub struct Waker {
+pub struct LevelWaker {
     inner: Weak<Inner>,
 }
 
-impl Waker {
+impl LevelWaker {
     /// Wake up the waiter that creates this waker.
     pub fn wake(&self) {
         if let Some(inner) = self.inner.upgrade() {
             inner.wake()
         }
+    }
+
+    /// Wake up waiters in batch, more efficient than waking up one-by-one.
+    pub fn batch_wake<'a, I: Iterator<Item = &'a LevelWaker>>(iter: I) {
+        Inner::batch_wake(iter);
     }
 }
 
@@ -133,18 +135,15 @@ impl Waker {
 /// you don't need to synchronize host_event before is_woken, only later.
 struct Inner {
     is_woken: AtomicBool,
-    state: AtomicU32,
     host_eventfd: Arc<HostEventFd>,
 }
 
 impl Inner {
     pub fn new() -> Self {
         let is_woken = AtomicBool::new(false);
-        let state = AtomicU32::new(INIT);
         let host_eventfd = current!().host_eventfd().clone();
         Self {
             is_woken,
-            state,
             host_eventfd,
         }
     }
@@ -158,45 +157,18 @@ impl Inner {
     }
 
     pub fn wait(&self, timeout: Option<&Duration>) -> Result<()> {
-        if self.state.fetch_sub(1, Ordering::Acquire) == NOTIFIED {
-            return Ok(());
-        }
-
-        loop {
+        while !self.is_woken() {
             self.host_eventfd.poll(timeout)?;
-            if self
-                .state
-                .compare_exchange(NOTIFIED, INIT, Ordering::Acquire, Ordering::Acquire)
-                .is_ok()
-            {
-                return Ok(());
-            } else {
-                // Spurious wake up. We loop to try again.
-            }
         }
+        Ok(())
     }
 
     pub fn wait_mut(&self, timeout: Option<&mut Duration>) -> Result<()> {
-        if self.state.fetch_sub(1, Ordering::Acquire) == NOTIFIED {
-            return Ok(());
-        }
         let mut remain = timeout.as_ref().map(|d| **d);
 
         // Need to change timeout from `Option<&mut Duration>` to `&mut Option<Duration>`
         // so that the Rust compiler is happy about using the variable in a loop.
-        let ret = self.host_eventfd.poll_mut(remain.as_mut());
-
-        // Wait for something to happen, assuming it's still set to PARKED.
-        // futex_wait(&self.state, PARKED, Some(timeout));
-        // This is not just a store, because we need to establish a
-        // release-acquire ordering with unpark().
-        if self.state.swap(INIT, Ordering::Acquire) == NOTIFIED {
-            // Woke up because of unpark().
-        } else {
-            // Timeout or spurious wake up.
-            // We return either way, because we can't easily tell if it was the
-            // timeout or not.
-        }
+        let ret = self.do_wait_mut(&mut remain);
 
         if let Some(timeout) = timeout {
             *timeout = remain.unwrap();
@@ -212,8 +184,28 @@ impl Inner {
     }
 
     pub fn wake(&self) {
-        if self.state.swap(NOTIFIED, Ordering::Release) == WAIT {
+        if self
+            .is_woken
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
+        {
             self.host_eventfd.write_u64(1);
+        }
+    }
+
+    pub fn batch_wake<'a, I: Iterator<Item = &'a LevelWaker>>(iter: I) {
+        let host_eventfds = iter
+            .filter_map(|waker| waker.inner.upgrade())
+            .filter(|inner| {
+                inner
+                    .is_woken
+                    .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+                    .is_ok()
+            })
+            .map(|inner| inner.host_eventfd.host_fd())
+            .collect::<Vec<FileDesc>>();
+        unsafe {
+            HostEventFd::write_u64_raw_and_batch(&host_eventfds, 1);
         }
     }
 

@@ -1,8 +1,8 @@
 use core::time::Duration;
 use std::mem::MaybeUninit;
 
+use crate::events::Poller;
 use crate::net::uring_socket::socket::MsgFlags;
-use crate::net::uring_socket::util::poller::Poller;
 use io_uring_callback::{Fd, IoHandle};
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 

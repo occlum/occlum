@@ -4,7 +4,7 @@ use std::sync::Weak;
 use ringbuf::{Consumer as RbConsumer, Producer as RbProducer, RingBuffer};
 
 use super::{IoEvents, IoNotifier};
-use crate::events::{Event, EventFilter, Notifier, Observer, Waiter, WaiterQueueObserver};
+use crate::events::{Event, EventFilter, LevelWaiter, Notifier, Observer, WaiterQueueObserver};
 use crate::prelude::*;
 
 /// A unidirectional communication channel, intended to implement IPC, e.g., pipe,
@@ -195,7 +195,7 @@ macro_rules! waiter_loop {
         }
 
         // The main loop
-        let waiter = Waiter::new();
+        let waiter = LevelWaiter::new();
         let waiter_queue = $waiter_queue;
         loop {
             waiter_queue.reset_and_enqueue(&waiter);

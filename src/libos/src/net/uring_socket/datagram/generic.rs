@@ -1,10 +1,10 @@
 use core::time::Duration;
 
 use crate::{
-    events::Observer,
+    events::{Observer, Poller},
     fs::StatusFlags,
     match_ioctl_cmd_mut,
-    net::uring_socket::{socket::MsgFlags, util::poller::Poller},
+    net::uring_socket::socket::MsgFlags,
 };
 
 use super::*;

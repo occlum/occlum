@@ -15,4 +15,3 @@ pub mod socket;
 pub mod socket_file;
 pub mod sockopt;
 pub mod stream;
-pub mod util;

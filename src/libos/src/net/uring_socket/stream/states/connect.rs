@@ -5,10 +5,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use io_uring_callback::{Fd, IoHandle};
 use sgx_untrusted_alloc::UntrustedBox;
 
+use crate::events::Poller;
 use crate::fs::IoEvents;
 use crate::net::uring_socket::common::Common;
 use crate::net::uring_socket::runtime::Runtime;
-use crate::net::uring_socket::util::poller::Poller;
 use crate::prelude::*;
 use std::sync::SgxMutex as Mutex;
 

@@ -1,11 +1,11 @@
 use core::sync::atomic::{AtomicU32, AtomicUsize};
 use std::{collections::HashMap, thread::current};
 
+use crate::util::sync::Mutex;
 use alloc::{sync::Arc, vec::Vec};
 use atomic::Ordering;
 use io_uring_callback::{Builder, IoUring};
 use keyable_arc::KeyableArc;
-use spin::{Mutex, RwLock};
 
 // Four uring instances are sufficient to reach the network bandwidth threshold of host kernel.
 const URING_LIMIT: u32 = 4;

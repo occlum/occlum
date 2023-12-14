@@ -11,7 +11,7 @@ use atomic::Atomic;
 use super::epoll_waiter::EpollWaiter;
 use super::host_file_epoller::HostFileEpoller;
 use super::{EpollCtl, EpollEvent, EpollFlags};
-use crate::events::{Observer, Waiter, WaiterQueue};
+use crate::events::{LevelWaiter, Observer, WaiterQueue};
 use crate::fs::{
     AtomicIoEvents, File, FileTableEvent, FileTableNotifier, HostFd, IoEvents, IoNotifier,
 };

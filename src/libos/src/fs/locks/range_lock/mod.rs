@@ -1,6 +1,6 @@
 /// File POSIX advisory range locks
 use super::*;
-use crate::events::{Waiter, WaiterQueue};
+use crate::events::{LevelWaiter, WaiterQueue};
 use crate::util::sync::rw_lock::RwLockWriteGuard;
 use process::pid_t;
 use rcore_fs::vfs::AnyExt;
@@ -115,7 +115,7 @@ impl RangeLock {
         }
     }
 
-    pub fn enqueue_waiter(&mut self, waiter: &Waiter) {
+    pub fn enqueue_waiter(&mut self, waiter: &LevelWaiter) {
         if self.waiters.is_none() {
             self.waiters = Some(WaiterQueue::new());
         }
@@ -208,7 +208,7 @@ impl RangeLockList {
                     return_errno!(EAGAIN, "lock conflict, try again later");
                 }
                 // Start to wait
-                let waiter = Waiter::new();
+                let waiter = LevelWaiter::new();
                 // TODO: Add deadlock detection, and returns EDEADLK
                 warn!("Do not support deadlock detection, maybe wait infinitely");
                 conflict_lock.enqueue_waiter(&waiter);

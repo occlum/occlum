@@ -2,7 +2,7 @@ use std::sync::Weak;
 use std::time::Duration;
 
 use super::{siginfo_t, SigNum, SigSet, Signal};
-use crate::events::{Observer, Waiter, WaiterQueueObserver};
+use crate::events::{LevelWaiter, Observer, WaiterQueueObserver};
 use crate::prelude::*;
 use crate::process::{ProcessRef, TermStatus, ThreadRef};
 
@@ -68,7 +68,7 @@ impl PendingSigWaiter {
 
     pub fn wait(&self, timeout: Option<&Duration>) -> Result<Box<dyn Signal>> {
         let waiter_queue = self.observer.waiter_queue();
-        let waiter = Waiter::new();
+        let waiter = LevelWaiter::new();
         loop {
             // Try to dequeue a pending signal from the current process or thread
             if let Some(signal) =

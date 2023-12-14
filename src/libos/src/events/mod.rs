@@ -15,18 +15,22 @@
 //! * `WaiterQueueObserver` implements the common pattern of waking up threads
 //! * once some interesting events happen.
 
+mod edge_waiter;
 mod event;
 mod host_event_fd;
+mod level_waiter;
 mod notifier;
 mod observer;
-mod waiter;
+mod poller;
 mod waiter_queue;
 mod waiter_queue_observer;
 
+pub use self::edge_waiter::{EdgeWaiter, EdgeWaker};
 pub use self::event::{Event, EventFilter};
 pub use self::host_event_fd::HostEventFd;
+pub use self::level_waiter::{LevelWaiter, LevelWaker};
 pub use self::notifier::Notifier;
 pub use self::observer::Observer;
-pub use self::waiter::{Waiter, Waker};
+pub use self::poller::{Pollee, Poller};
 pub use self::waiter_queue::WaiterQueue;
 pub use self::waiter_queue_observer::WaiterQueueObserver;

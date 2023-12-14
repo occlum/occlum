@@ -1,9 +1,8 @@
 use super::*;
-use crate::events::Observer;
+use crate::events::{Observer, Poller};
 use crate::fs::{IoEvents as Events, StatusFlags};
 use crate::net::uring_socket::socket::MsgFlags;
 use crate::net::uring_socket::socket::{NetlinkFamily, Type};
-use crate::net::uring_socket::util::poller::Poller;
 use byteorder::{ByteOrder, NativeEndian};
 use core::ops::{Range, RangeFrom};
 

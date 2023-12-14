@@ -6,10 +6,10 @@ use libc::c_void;
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 use std::collections::VecDeque;
 
+use crate::events::Poller;
 use crate::fs::IoEvents as Events;
 use crate::net::uring_socket::common::Common;
 use crate::net::uring_socket::runtime::Runtime;
-use crate::net::uring_socket::util::poller::Poller;
 use crate::prelude::*;
 use crate::util::sync::MutexGuard;
 

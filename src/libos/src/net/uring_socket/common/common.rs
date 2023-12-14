@@ -11,9 +11,9 @@ use libc::ocall::shutdown as do_shutdown;
 use libc::ocall::socket as do_socket;
 use libc::ocall::socketpair as do_socketpair;
 
+use crate::events::Pollee;
 use crate::fs::{IoEvents, IoNotifier};
 use crate::net::uring_socket::runtime::Runtime;
-use crate::net::uring_socket::util::poller::Pollee;
 use crate::prelude::*;
 
 /// The common parts of all stream sockets.
@@ -24,7 +24,7 @@ pub struct Common<A: Addr + 'static, R: Runtime> {
     is_closed: AtomicBool,
     pollee: Pollee,
     inner: SgxMutex<Inner<A>>,
-    timeout: Mutex<Timeout>,
+    timeout: SgxMutex<Timeout>,
     io_uring: Arc<IoUring>,
     phantom_data: PhantomData<(A, R)>,
 }
@@ -39,7 +39,7 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
         let is_closed = AtomicBool::new(false);
         let pollee = Pollee::new(IoEvents::empty());
         let inner = SgxMutex::new(Inner::new());
-        let timeout = Mutex::new(Timeout::new());
+        let timeout = SgxMutex::new(Timeout::new());
         let io_uring = R::io_uring();
         Ok(Self {
             host_fd,

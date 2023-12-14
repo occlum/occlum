@@ -1,18 +1,14 @@
-use std::borrow::BorrowMut;
-use std::collections::HashMap;
-use std::hash::Hash;
-use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
-use super::waiter::Waiter;
+use super::{EdgeWaiter, Notifier, Observer};
+
 use alloc::collections::BTreeMap;
-use keyable_arc::{KeyableArc, KeyableWeak};
+use keyable_arc::KeyableWeak;
 
 use std::sync::Weak;
 
-use crate::events::{Notifier, Observer};
 use crate::fs::{IoEvents, IoNotifier};
-use crate::net::PollEventFlags;
 use crate::prelude::*;
 
 /// A pollee maintains a set of active events, which can be polled with
@@ -162,7 +158,7 @@ pub struct Poller {
 
 struct PollerInner {
     // Use event counter to wait or wake up a poller
-    waiter: Waiter,
+    waiter: EdgeWaiter,
     // All pollees that are interesting to this poller
     pollees: Mutex<BTreeMap<KeyableWeak<PolleeInner>, ()>>,
 }
@@ -174,7 +170,7 @@ impl Poller {
     /// Constructs a new `Poller`.
     pub fn new() -> Self {
         let inner = PollerInner {
-            waiter: Waiter::new(),
+            waiter: EdgeWaiter::new(),
             pollees: Mutex::new(BTreeMap::new()),
         };
         Self {
