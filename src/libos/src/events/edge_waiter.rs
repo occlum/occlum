@@ -115,29 +115,18 @@ impl EdgeWaker {
 /// Although it is correct to use AcqRel, here I think it is okay to use Acquire, because
 /// you don't need to synchronize host_event before is_woken, only later.
 struct Inner {
-    is_woken: AtomicBool,
     state: AtomicU32,
     host_eventfd: Arc<HostEventFd>,
 }
 
 impl Inner {
     pub fn new() -> Self {
-        let is_woken = AtomicBool::new(false);
         let state = AtomicU32::new(INIT);
         let host_eventfd = current!().host_eventfd().clone();
         Self {
-            is_woken,
             state,
             host_eventfd,
         }
-    }
-
-    pub fn is_woken(&self) -> bool {
-        self.is_woken.load(Ordering::Acquire)
-    }
-
-    pub fn reset(&self) {
-        self.is_woken.store(false, Ordering::Release);
     }
 
     pub fn wait(&self, timeout: Option<&Duration>) -> Result<()> {
@@ -185,13 +174,6 @@ impl Inner {
             *timeout = remain.unwrap();
         }
         ret
-    }
-
-    fn do_wait_mut(&self, remain: &mut Option<Duration>) -> Result<()> {
-        while !self.is_woken() {
-            self.host_eventfd.poll_mut(remain.as_mut())?;
-        }
-        Ok(())
     }
 
     pub fn wake(&self) {

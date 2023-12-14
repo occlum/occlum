@@ -139,8 +139,9 @@ impl UringSet {
         let uring: KeyableArc<IoUring> = uring.into();
         let mut map = self.urings.lock();
         let mut state = map.get_mut(&uring).unwrap();
+        state.unregister_one_socket();
+        drop(map);
 
         uring.disattach_fd(fd);
-        state.unregister_one_socket();
     }
 }

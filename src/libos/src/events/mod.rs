@@ -22,6 +22,7 @@ mod level_waiter;
 mod notifier;
 mod observer;
 mod poller;
+mod waiter;
 mod waiter_queue;
 mod waiter_queue_observer;
 
