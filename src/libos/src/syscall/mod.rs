@@ -697,18 +697,20 @@ fn do_syscall(user_context: &mut CpuContext) {
 
                 // All other log levels require errors to be outputed. But
                 // some errnos are usually benign and may occur in a very high
-                // frequency. So we want to ignore them to keep noises at a
-                // minimum level in the log.
+                // frequency. So we want to lower them to warn level to keep noises
+                // at a minimum level in the error log.
                 //
                 // TODO: use a smarter, frequency-based strategy to decide whether
                 // to suppress error messages.
                 match errno {
-                    EAGAIN | ETIMEDOUT => false,
+                    EAGAIN | ETIMEDOUT | ENOENT | ENOTTY => false,
                     _ => true,
                 }
             };
             if should_log_err(e.errno()) {
                 error!("Error = {}", e.backtrace());
+            } else {
+                warn!("Error = {}", e.backtrace());
             }
 
             let retval = -(e.errno() as isize);
