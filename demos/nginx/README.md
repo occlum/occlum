@@ -10,10 +10,10 @@ Once completed, the resulting NGINX source code can be found in the `source_code
 
 Step 2: Run NGINX server
 ```
-./run_occlum_vault_server.sh
+./run_occlum_nginx_server.sh
 ```
 
 Step 3: In another terminal, run a `curl` command
 ```
-curl http://localhost
+curl -v http://localhost:80
 ```
