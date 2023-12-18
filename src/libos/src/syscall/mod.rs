@@ -423,6 +423,15 @@ macro_rules! process_syscall_table_with_callback {
             (Userfaultfd = 323) => handle_unsupported(),
             (Membarrier = 324) => handle_unsupported(),
             (Mlock2 = 325) => handle_unsupported(),
+            (CopyFileRange = 326) => handle_unsupported(),
+            (Preadv2 = 327) => handle_unsupported(),
+            (Pwritev2 = 328) => handle_unsupported(),
+            (PkeyMprotect = 329) => handle_unsupported(),
+            (PkeyAlloc = 330) => handle_unsupported(),
+            (PkeyFree = 331) => handle_unsupported(),
+            (Statx = 332) => handle_unsupported(),
+            (IoPgetevents = 333) => handle_unsupported(),
+            (Rseq = 334) => handle_unsupported(),
 
             // Occlum-specific system calls
             (SpawnGlibc = 359) => do_spawn_for_glibc(child_pid_ptr: *mut u32, path: *const i8, argv: *const *const i8, envp: *const *const i8, fa: *const SpawnFileActions, attribute_list: *const posix_spawnattr_t),
