@@ -14,6 +14,13 @@ pub struct SigQueues {
 }
 
 impl SigQueues {
+    const ORDERED_STD_SIGS: [SigNum; COUNT_STD_SIGS] = [
+        SIGKILL, SIGTERM, SIGSTOP, SIGCONT, SIGSEGV, SIGILL, SIGHUP, SIGINT, SIGQUIT, SIGTRAP,
+        SIGABRT, SIGBUS, SIGFPE, SIGUSR1, SIGUSR2, SIGPIPE, SIGALRM, SIGSTKFLT, SIGCHLD, SIGTSTP,
+        SIGTTIN, SIGTTOU, SIGURG, SIGXCPU, SIGXFSZ, SIGVTALRM, SIGPROF, SIGWINCH, SIGIO, SIGPWR,
+        SIGSYS,
+    ];
+
     pub fn new() -> Self {
         let count = 0;
         let std_queues = (0..COUNT_STD_SIGS).map(|_| None).collect();
@@ -29,6 +36,41 @@ impl SigQueues {
 
     pub fn empty(&self) -> bool {
         self.count == 0
+    }
+
+    pub fn has_valid_signal(&self, blocked: &SigSet) -> bool {
+        // Fast path for the common case of no pending signals
+        if self.empty() {
+            return false;
+        }
+
+        // Check standard signals.
+        for &signum in &Self::ORDERED_STD_SIGS {
+            if blocked.contains(signum) {
+                continue;
+            }
+
+            let queue = self.get_std_queue(signum);
+            if queue.is_some() {
+                return true;
+            }
+        }
+
+        // If no standard signals, then check real-time signals.
+        for signum in MIN_RT_SIG_NUM..=MAX_RT_SIG_NUM {
+            let signum = unsafe { SigNum::from_u8_unchecked(signum) };
+            if blocked.contains(signum) {
+                continue;
+            }
+
+            let queue = self.get_rt_queue(signum);
+            if !queue.is_empty() {
+                return true;
+            }
+        }
+
+        // There must be pending but blocked signals
+        false
     }
 
     pub fn enqueue(&mut self, signal: Box<dyn Signal>) {
@@ -81,13 +123,7 @@ impl SigQueues {
         // POSIX leaves unspecified which to deliver first if there are multiple
         // pending standard signals. So we are free to define our own. The
         // principle is to give more urgent signals higher priority (like SIGKILL).
-        const ORDERED_STD_SIGS: [SigNum; COUNT_STD_SIGS] = [
-            SIGKILL, SIGTERM, SIGSTOP, SIGCONT, SIGSEGV, SIGILL, SIGHUP, SIGINT, SIGQUIT, SIGTRAP,
-            SIGABRT, SIGBUS, SIGFPE, SIGUSR1, SIGUSR2, SIGPIPE, SIGALRM, SIGSTKFLT, SIGCHLD,
-            SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGXCPU, SIGXFSZ, SIGVTALRM, SIGPROF, SIGWINCH,
-            SIGIO, SIGPWR, SIGSYS,
-        ];
-        for &signum in &ORDERED_STD_SIGS {
+        for &signum in &Self::ORDERED_STD_SIGS {
             if blocked.contains(signum) {
                 continue;
             }
