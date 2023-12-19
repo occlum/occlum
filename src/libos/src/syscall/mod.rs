@@ -43,8 +43,9 @@ use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t, RandFlags};
 use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
     do_epoll_pwait, do_epoll_wait, do_getpeername, do_getsockname, do_getsockopt, do_listen,
-    do_poll, do_ppoll, do_recvfrom, do_recvmsg, do_select, do_sendmmsg, do_sendmsg, do_sendto,
-    do_setsockopt, do_shutdown, do_socket, do_socketpair, mmsghdr, msghdr, msghdr_mut,
+    do_poll, do_ppoll, do_pselect6, do_recvfrom, do_recvmsg, do_select, do_sendmmsg, do_sendmsg,
+    do_sendto, do_setsockopt, do_shutdown, do_socket, do_socketpair, mmsghdr, msghdr, msghdr_mut,
+    Pselect6sig,
 };
 use crate::process::{
     do_arch_prctl, do_clone, do_execve, do_exit, do_exit_group, do_futex, do_get_robust_list,
@@ -366,7 +367,7 @@ macro_rules! process_syscall_table_with_callback {
             (Readlinkat = 267) => do_readlinkat(dirfd: i32, path: *const i8, buf: *mut u8, size: usize),
             (Fchmodat = 268) => do_fchmodat(dirfd: i32, path: *const i8, mode: u16),
             (Faccessat = 269) => do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32),
-            (Pselect6 = 270) => handle_unsupported(),
+            (Pselect6 = 270) => do_pselect6(nfds: c_int, readfds: *mut libc::fd_set, writefds: *mut libc::fd_set, exceptfds: *mut libc::fd_set, timeout: *mut timespec_t, data: *const Pselect6sig),
             (Ppoll = 271) => do_ppoll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout_ts: *const timespec_t, sigmask: *const sigset_t),
             (Unshare = 272) => handle_unsupported(),
             (SetRobustList = 273) => do_set_robust_list(list_head_ptr: *mut RobustListHead, len: usize),
