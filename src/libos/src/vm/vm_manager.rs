@@ -852,14 +852,15 @@ impl InternalVMManager {
         new_chunk
     }
 
+    // The left chunk is an existing chunk, the right chunk is a newly-created chunk
     fn merge_two_single_vma_chunks(&mut self, lhs: &ChunkRef, rhs: &ChunkRef) -> ChunkRef {
         let mut new_vma = {
             let lhs_vma = lhs.get_vma_for_single_vma_chunk();
             let rhs_vma = rhs.get_vma_for_single_vma_chunk();
             debug_assert_eq!(lhs_vma.end(), rhs_vma.start());
 
-            let mut new_vma = rhs_vma.clone();
-            new_vma.set_start(lhs_vma.start());
+            let mut new_vma = lhs_vma.clone();
+            new_vma.set_end(rhs_vma.end());
             new_vma
         };
 

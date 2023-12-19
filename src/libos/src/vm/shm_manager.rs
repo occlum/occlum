@@ -103,6 +103,7 @@ impl ShmManager {
                                 .unwrap()
                                 .writeback_file()
                                 .unwrap(),
+                            options.perms(),
                         ),
                     ) {
                         return Ok(MmapSharedResult::NeedExpand(
@@ -192,23 +193,13 @@ impl ShmManager {
         Ok(addr)
     }
 
+    // Replace the given old shared chunk with a new one. The new shared chunk would inherit
+    // the access and perms from the old one.
     pub fn replace_shared_chunk(&mut self, old_shared_chunk: ChunkRef, new_chunk: ChunkRef) {
         debug_assert!(old_shared_chunk.is_shared());
         let inode_id = {
-            let mut new_vma = Self::vma_of(&new_chunk);
-            new_vma.mark_shared();
+            let new_vma = Self::vma_of(&new_chunk);
             let old_vma = Self::vma_of(&old_shared_chunk);
-            // Inherits access and perms from the old one
-            new_vma.inherits_access_from(&old_vma);
-
-            // Apply higher perms to the whole new range
-            let new_perms = new_vma.perms();
-            let old_perms = old_vma.perms();
-            if new_perms != old_perms {
-                let perms = new_perms | old_perms;
-                new_vma.set_perms(perms);
-                new_vma.modify_permissions_for_committed_pages(perms);
-            }
 
             let inode_id = Self::inode_id_of(&new_vma);
             debug_assert_eq!(inode_id, Self::inode_id_of(&old_vma));
@@ -219,24 +210,30 @@ impl ShmManager {
         debug_assert!(Arc::ptr_eq(&replaced, &old_shared_chunk));
     }
 
-    // Left: Old shared vma. Right: New vm range, backed file and offset.
-    fn can_expand_shared_vma(lhs: &VMArea, rhs: (&VMRange, (&FileRef, usize))) -> bool {
+    // Left: Old shared vma. Right: New vm range, backed file and offset, perms.
+    fn can_expand_shared_vma(lhs: &VMArea, rhs: (&VMRange, (&FileRef, usize), &VMPerms)) -> bool {
         debug_assert!(lhs.is_shared());
-        let (lhs_range, lhs_file, lhs_file_offset) = {
+        let (lhs_range, lhs_file, lhs_file_offset, lhs_perms) = {
             let writeback_file = lhs.writeback_file().unwrap();
-            (lhs.range(), writeback_file.0, writeback_file.1)
+            (lhs.range(), writeback_file.0, writeback_file.1, lhs.perms())
         };
-        let (rhs_range, (rhs_file, rhs_file_offset)) = rhs;
-        debug_assert!(lhs_range.end() <= rhs_range.start());
+        let (rhs_range, (rhs_file, rhs_file_offset), rhs_perms) = rhs;
+
+        // The two vm ranges must not be empty, and must be border with each other
         if lhs_range.size() == 0 || rhs_range.size() == 0 {
             return false;
         }
-
-        // The two vm range must border with each other
         if lhs_range.end() != rhs_range.start() {
             return false;
         }
 
+        // The two vm must have consistent perms
+        if lhs_perms != *rhs_perms {
+            return false;
+        }
+
+        // The two vm must have the same backed file and consecutive offset
+        // within one process
         Arc::ptr_eq(lhs_file, rhs_file)
             && rhs_file_offset > lhs_file_offset
             && rhs_file_offset - lhs_file_offset == lhs_range.size()
