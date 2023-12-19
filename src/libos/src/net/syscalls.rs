@@ -7,7 +7,7 @@ use super::io_multiplexing::{AsEpollFile, EpollCtl, EpollFile, EpollFlags, FdSet
 use fs::{CreationFlags, File, FileDesc, FileRef};
 use misc::resource_t;
 use process::Process;
-use signal::{sigset_t, SigSet};
+use signal::{do_sigprocmask, sigset_t, MaskOp, SigSet};
 use std::convert::TryFrom;
 use time::{timespec_t, timeval_t};
 use util::mem_util::from_user;
@@ -718,6 +718,109 @@ pub fn do_select(
 
     if let Some(timeout_c) = timeout_c {
         *timeout_c = timeout.unwrap().into();
+    }
+
+    ret
+}
+
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+pub struct Pselect6sig {
+    ss: *const sigset_t,
+    ss_len: size_t,
+}
+
+pub fn do_pselect6(
+    nfds: c_int,
+    readfds: *mut libc::fd_set,
+    writefds: *mut libc::fd_set,
+    exceptfds: *mut libc::fd_set,
+    timeout: *mut timespec_t,
+    sig_data: *const Pselect6sig,
+) -> Result<isize> {
+    let mut is_set_sig = false;
+    let mut original_sig_set = sigset_t::default();
+
+    if !sig_data.is_null() {
+        from_user::check_ptr(sig_data)?;
+        let user_sig_data = unsafe { &*(sig_data) };
+
+        is_set_sig = !user_sig_data.ss.is_null();
+        if is_set_sig {
+            if user_sig_data.ss_len != std::mem::size_of::<sigset_t>() {
+                return_errno!(EINVAL, "unexpected sigset size");
+            }
+            let op_and_set = {
+                let op = MaskOp::SetMask;
+                let sigset = user_sig_data.ss;
+                from_user::check_ptr(sigset)?;
+                let set = unsafe { &*sigset };
+                Some((op, set))
+            };
+
+            do_sigprocmask::do_rt_sigprocmask(op_and_set, Some(&mut original_sig_set))?;
+        }
+    }
+
+    let nfds = {
+        let soft_rlimit_nofile = current!()
+            .rlimits()
+            .lock()
+            .unwrap()
+            .get(resource_t::RLIMIT_NOFILE)
+            .get_cur();
+        if nfds < 0 || nfds > libc::FD_SETSIZE as i32 || nfds as u64 > soft_rlimit_nofile {
+            return_errno!(
+                EINVAL,
+                "nfds is negative or exceeds the resource limit or FD_SETSIZE"
+            );
+        }
+        nfds as FileDesc
+    };
+
+    let mut timeout_c = if !timeout.is_null() {
+        from_user::check_ptr(timeout)?;
+        let timeval = unsafe { &mut *timeout };
+        timeval.validate()?;
+        Some(timeval)
+    } else {
+        None
+    };
+    let mut timeout = timeout_c.as_ref().map(|timeout_c| timeout_c.as_duration());
+
+    let readfds = if !readfds.is_null() {
+        from_user::check_mut_ptr(readfds)?;
+        Some(unsafe { &mut *readfds })
+    } else {
+        None
+    };
+    let writefds = if !writefds.is_null() {
+        from_user::check_mut_ptr(writefds)?;
+        Some(unsafe { &mut *writefds })
+    } else {
+        None
+    };
+    let exceptfds = if !exceptfds.is_null() {
+        from_user::check_mut_ptr(exceptfds)?;
+        Some(unsafe { &mut *exceptfds })
+    } else {
+        None
+    };
+
+    let ret = io_multiplexing::do_select(nfds, readfds, writefds, exceptfds, timeout.as_mut());
+
+    if let Some(timeout_c) = timeout_c {
+        *timeout_c = timeout.unwrap().into();
+    }
+
+    // Restore the original signal mask
+    if is_set_sig {
+        let op_and_set = {
+            let op = MaskOp::SetMask;
+            let set = &original_sig_set;
+            Some((op, set))
+        };
+        do_sigprocmask::do_rt_sigprocmask(op_and_set, None)?;
     }
 
     ret
