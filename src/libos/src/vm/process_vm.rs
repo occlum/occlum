@@ -485,10 +485,12 @@ impl ProcessVM {
             *brk_guard = brk;
             Ok(brk)
         } else {
-            if brk < heap_start {
-                error!("New brk address is too low");
+            if brk == 0 {
+                debug!("Try get current program break address")
+            } else if brk < heap_start {
+                warn!("New brk address is too low");
             } else if brk > heap_end {
-                error!("New brk address is too high");
+                warn!("New brk address is too high");
             }
 
             Ok(*brk_guard)
