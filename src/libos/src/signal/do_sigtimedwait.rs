@@ -35,7 +35,7 @@ pub fn do_sigtimedwait(interest: SigSet, timeout: Option<&Duration>) -> Result<s
     Ok(siginfo)
 }
 
-struct PendingSigWaiter {
+pub struct PendingSigWaiter {
     thread: ThreadRef,
     process: ProcessRef,
     interest: SigSet,
@@ -109,6 +109,40 @@ impl PendingSigWaiter {
             }
         }
     }
+
+    pub fn suspend(&self) -> Result<()> {
+        let waiter_queue = self.observer.waiter_queue();
+        let waiter = Waiter::new();
+        // As EINTR may occur even if there are no interesting signals
+        loop {
+            // Try to search for an interesting signal from the current process or thread
+            if has_interest_signal(&self.interest, &self.thread, &self.process) {
+                return Ok(());
+            }
+
+            // Enqueue the waiter so that it can be waken up by the queue later.
+            waiter_queue.reset_and_enqueue(&waiter);
+
+            // As there is no intersting signal right now, let's wait for
+            // the arrival of an interesting signal.
+            let res = waiter.wait(None);
+
+            // Do not try again if some error is encountered. There are only
+            // two possible errors: ETIMEDOUT or EINTR.
+            if let Err(e) = res {
+                // When interrupted is reached, it is possible that the interrupting signal happens
+                // to be an interesting and pending signal. So we attempt to search for signals again.
+                if e.errno() == Errno::EINTR {
+                    if has_interest_signal(&self.interest, &self.thread, &self.process) {
+                        return Ok(());
+                    }
+                } else {
+                    // Impossible case
+                    return Err(e);
+                }
+            }
+        }
+    }
 }
 
 impl Drop for PendingSigWaiter {
@@ -127,6 +161,20 @@ impl Drop for PendingSigWaiter {
             .notifier()
             .unregister(&weak_observer);
     }
+}
+
+fn has_interest_signal(interest: &SigSet, thread: &ThreadRef, process: &ProcessRef) -> bool {
+    let blocked = !*interest;
+    process
+        .sig_queues()
+        .write()
+        .unwrap()
+        .has_valid_signal(&blocked)
+        || thread
+            .sig_queues()
+            .write()
+            .unwrap()
+            .has_valid_signal(&blocked)
 }
 
 fn dequeue_pending_signal(

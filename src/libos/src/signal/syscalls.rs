@@ -194,3 +194,16 @@ pub fn do_rt_sigtimedwait(
     *info = super::do_sigtimedwait::do_sigtimedwait(mask, timeout.as_ref())?;
     Ok(0)
 }
+
+pub fn do_rt_sigsuspend(mask_ptr: *const sigset_t) -> Result<isize> {
+    let mask = {
+        if mask_ptr.is_null() {
+            return_errno!(EFAULT, "ptr must not be null");
+        }
+        from_user::check_ptr(mask_ptr)?;
+        unsafe { *mask_ptr }
+    };
+
+    super::do_sigsuspend::do_sigsuspend(&mask)?;
+    Ok(0)
+}
