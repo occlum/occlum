@@ -23,6 +23,7 @@ mod do_sigaction;
 mod do_sigaltstack;
 mod do_sigpending;
 mod do_sigreturn;
+mod do_sigsuspend;
 mod do_sigtimedwait;
 mod sig_action;
 mod sig_dispositions;
