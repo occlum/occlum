@@ -689,26 +689,38 @@ fn do_syscall(user_context: &mut CpuContext) {
     let retval = match ret {
         Ok(retval) => retval as isize,
         Err(e) => {
-            let should_log_err = |errno| {
+            // let syscall_num = SyscallNum::try_from(num).unwrap();
+            let should_log_err = |num, errno| {
+                let syscall_num = match SyscallNum::try_from(num) {
+                    Ok(num) => num,
+                    Err(e) => return true,
+                };
                 // If the log level requires every detail, don't ignore any error
                 if log::max_level() == LevelFilter::Trace {
                     return true;
                 }
-
                 // All other log levels require errors to be outputed. But
                 // some errnos are usually benign and may occur in a very high
-                // frequency. So we want to ignore them to keep noises at a
-                // minimum level in the log.
+                // frequency. So we want to lower them to warn level to keep noises
+                // at a minimum level in the error log.
                 //
                 // TODO: use a smarter, frequency-based strategy to decide whether
                 // to suppress error messages.
                 match errno {
-                    EAGAIN | ETIMEDOUT => false,
+                    EAGAIN | ETIMEDOUT | ENOENT | ENOTTY => false,
+                    ENOSYS => match syscall_num {
+                        SyscallNum::Getrusage => false,
+                        SyscallNum::Madvise => false,
+                        _ => true,
+                    },
                     _ => true,
                 }
             };
-            if should_log_err(e.errno()) {
+
+            if should_log_err(num, e.errno()) {
                 error!("Error = {}", e.backtrace());
+            } else {
+                warn!("Error = {}", e.backtrace());
             }
 
             let retval = -(e.errno() as isize);
