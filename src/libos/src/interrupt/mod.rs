@@ -38,15 +38,25 @@ pub fn do_handle_interrupt(
 /// Broadcast interrupts to threads by sending POSIX signals.
 pub fn broadcast_interrupts() -> Result<usize> {
     let should_interrupt_thread = |thread: &&ThreadRef| -> bool {
-        let should_interrupt = thread.process().is_forced_to_exit()
-            || thread.is_forced_to_stop()
-            || !thread.process().sig_queues().read().unwrap().empty();
+        if thread.process().is_forced_to_exit() || thread.is_forced_to_stop() {
+            return true;
+        }
 
-        // Check Thread::sig_mask to avoid wrong interrupts
-        let sig_queues = thread.sig_queues().read().unwrap();
-        let sig_mask = thread.sig_mask().read().unwrap();
+        let sig_mask_guard = thread.sig_mask().read().unwrap();
+        let interested = !*sig_mask_guard;
+        drop(sig_mask_guard);
 
-        should_interrupt || sig_queues.has_valid_signal(&sig_mask)
+        let thread_pending_sig = thread.sig_queues().read().unwrap().pending() & interested;
+        if !thread_pending_sig.empty() {
+            return true;
+        }
+
+        let process_pending_sig =
+            thread.process().sig_queues().read().unwrap().pending() & interested;
+        if !process_pending_sig.empty() {
+            return true;
+        }
+        false
     };
 
     let num_signaled_threads = crate::process::table::get_all_threads()
