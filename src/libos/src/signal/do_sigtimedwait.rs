@@ -136,10 +136,9 @@ impl PendingSigWaiter {
                     if has_interest_signal(&self.interest, &self.thread, &self.process) {
                         return Ok(());
                     }
-                } else {
-                    // Impossible case
-                    return Err(e);
                 }
+                // Impossible case
+                return Err(e);
             }
         }
     }
@@ -164,17 +163,11 @@ impl Drop for PendingSigWaiter {
 }
 
 fn has_interest_signal(interest: &SigSet, thread: &ThreadRef, process: &ProcessRef) -> bool {
-    let blocked = !*interest;
-    process
-        .sig_queues()
-        .write()
-        .unwrap()
-        .has_valid_signal(&blocked)
-        || thread
-            .sig_queues()
-            .write()
-            .unwrap()
-            .has_valid_signal(&blocked)
+    let pending = (thread.sig_queues().read().unwrap().pending()
+        | process.sig_queues().read().unwrap().pending())
+        & *interest;
+
+    !pending.empty()
 }
 
 fn dequeue_pending_signal(

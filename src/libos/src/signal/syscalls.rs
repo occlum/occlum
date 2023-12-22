@@ -89,23 +89,25 @@ pub fn do_rt_sigprocmask(
     if sigset_size != std::mem::size_of::<sigset_t>() {
         return_errno!(EINVAL, "unexpected sigset size");
     }
+
+    let mut set_sig = SigSet::default();
     let op_and_set = {
         if !set_ptr.is_null() {
             let op = MaskOp::from_u32(how as u32)?;
-            let set = unsafe { &*set_ptr };
-            Some((op, set))
+            set_sig = SigSet::from_c(unsafe { *set_ptr });
+            Some((op, &set_sig))
         } else {
             None
         }
     };
-    let old_set = {
-        if !oldset_ptr.is_null() {
-            Some(unsafe { &mut *oldset_ptr })
-        } else {
-            None
+
+    let old_set = super::do_sigprocmask::do_rt_sigprocmask(op_and_set)?;
+    if !oldset_ptr.is_null() {
+        unsafe {
+            *oldset_ptr = old_set.to_c();
         }
-    };
-    super::do_sigprocmask::do_rt_sigprocmask(op_and_set, old_set)?;
+    }
+
     Ok(0)
 }
 
@@ -201,7 +203,7 @@ pub fn do_rt_sigsuspend(mask_ptr: *const sigset_t) -> Result<isize> {
             return_errno!(EFAULT, "ptr must not be null");
         }
         from_user::check_ptr(mask_ptr)?;
-        unsafe { *mask_ptr }
+        SigSet::from_c(unsafe { *mask_ptr })
     };
 
     super::do_sigsuspend::do_sigsuspend(&mask)?;

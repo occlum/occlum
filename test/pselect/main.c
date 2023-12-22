@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <stdint.h> // for uint64_t
 #include <pthread.h>
+#include "test.h"
 
 // Signal handler for SIGUSR1
 void sigusr1_handler(int sig) {
@@ -36,13 +37,13 @@ int main() {
     // Spawn new thread for sending signal when call pselect syscall
     pthread_t signal_thread;
     if (pthread_create(&signal_thread, NULL, send_signal, &main_thread_id) != 0) {
-        perror("pthread_create");
+        THROW_ERROR("pthread_create");
         return 1;
     }
 
     int timer_fd = timerfd_create(CLOCK_REALTIME, 0);
     if (timer_fd == -1) {
-        perror("timerfd_create");
+        THROW_ERROR("timerfd_create");
         return 1;
     }
 
@@ -52,7 +53,7 @@ int main() {
     timerValue.it_interval.tv_sec = 0;
     timerValue.it_interval.tv_nsec = 0;
     if (timerfd_settime(timer_fd, 0, &timerValue, NULL) == -1) {
-        perror("timerfd_settime");
+        THROW_ERROR("timerfd_settime");
         close(timer_fd);
         return 1;
     }
@@ -63,17 +64,17 @@ int main() {
 
     int ready = pselect(timer_fd + 1, &readfds, NULL, NULL, NULL, &sigmask);
 
-    if (ready == -1) {
-        perror("pselect6");
-    } else if (ready == 0) {
-        // Impossible case
-        printf("No input - timeout reached\n");
-    } else {
+    if (ready > 0) {
         if (FD_ISSET(timer_fd, &readfds)) {
             printf("Timer expired, pselect blocked SIGUSR1 signal successfully\n");
             uint64_t expirations;
             read(timer_fd, &expirations, sizeof(expirations));
         }
+    } else if (ready == 0) {
+        // Impossible case
+        printf("No input - timeout reached\n");
+    } else {
+        THROW_ERROR("failed to pselect");
     }
 
     pthread_join(signal_thread, NULL);

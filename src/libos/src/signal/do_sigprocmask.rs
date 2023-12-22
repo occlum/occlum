@@ -2,24 +2,15 @@ use super::constants::*;
 use super::{sigset_t, SigSet};
 use crate::prelude::*;
 
-pub fn do_rt_sigprocmask(
-    op_and_set: Option<(MaskOp, &sigset_t)>,
-    oldset: Option<&mut sigset_t>,
-) -> Result<()> {
-    debug!(
-        "do_rt_sigprocmask: op_and_set: {:?}, oldset: {:?}",
-        op_and_set.map(|(op, set)| (op, SigSet::from_c(*set))),
-        oldset
-    );
+pub fn do_rt_sigprocmask(op_and_set: Option<(MaskOp, &SigSet)>) -> Result<SigSet> {
+    debug!("do_rt_sigprocmask: op_and_set: {:?}", op_and_set,);
 
     let thread = current!();
     let mut sig_mask = thread.sig_mask().write().unwrap();
-    if let Some(oldset) = oldset {
-        *oldset = sig_mask.to_c();
-    }
-    if let Some((op, &set)) = op_and_set {
+    let old_mask = *sig_mask;
+    if let Some((op, set)) = op_and_set {
         let set = {
-            let mut set = SigSet::from_c(set);
+            let mut set = *set;
             // According to man pages, "it is not possible to block SIGKILL or SIGSTOP.
             // Attempts to do so are silently ignored."
             set -= SIGKILL;
@@ -38,7 +29,7 @@ pub fn do_rt_sigprocmask(
             }
         };
     }
-    Ok(())
+    Ok(old_mask)
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

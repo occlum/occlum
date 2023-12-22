@@ -1,36 +1,46 @@
-use super::do_sigprocmask::do_rt_sigprocmask;
+use super::constants::*;
 use super::do_sigtimedwait::PendingSigWaiter;
 use super::{sigset_t, MaskOp, SigNum, SigSet, Signal};
 use crate::prelude::*;
 
-pub fn do_sigsuspend(mask: &sigset_t) -> Result<()> {
+pub fn do_sigsuspend(mask: &SigSet) -> Result<()> {
     debug!("do_sigsuspend: mask: {:?}", mask);
 
     let thread = current!();
     let process = thread.process().clone();
-    let mut original_sig_set = sigset_t::default();
 
     // Set signal mask
-    let op_and_set = Some((MaskOp::SetMask, mask));
-    do_rt_sigprocmask(op_and_set, Some(&mut original_sig_set))?;
+    let update_mask = {
+        let mut set = *mask;
+        // According to man pages, "it is not possible to block SIGKILL or SIGSTOP.
+        // Attempts to do so are silently ignored."
+        set -= SIGKILL;
+        set -= SIGSTOP;
+        set
+    };
 
-    let interest = SigSet::from_c(!*mask);
-    let pending_sig_waiter = PendingSigWaiter::new(thread, process, interest);
+    let mut curr_mask = thread.sig_mask().write().unwrap();
+    let prev_mask = *curr_mask;
+    *curr_mask = update_mask;
+    drop(curr_mask);
 
-    match pending_sig_waiter.suspend() {
+    // Suspend for interest signal
+    let interest = !update_mask;
+    let pending_sig_waiter = PendingSigWaiter::new(thread.clone(), process, interest);
+
+    let err = match pending_sig_waiter.suspend() {
         Ok(_) => {
-            // Restore the original signal mask
-            let op_and_set = {
-                let op = MaskOp::SetMask;
-                let set = &original_sig_set;
-                Some((op, set))
-            };
-            do_rt_sigprocmask(op_and_set, None).unwrap();
-            Err(errno!(EINTR, "Wait for EINTR signal successfully"))
+            errno!(EINTR, "Wait for EINTR signal successfully")
         }
         Err(_) => {
             // Impossible path
-            Err(errno!(EFAULT, "No interesting, pending signal"))
+            errno!(EFAULT, "No interesting, pending signal")
         }
-    }
+    };
+
+    // Restore the original signal mask
+    let mut curr_mask = thread.sig_mask().write().unwrap();
+    *curr_mask = prev_mask;
+
+    Err(err)
 }
