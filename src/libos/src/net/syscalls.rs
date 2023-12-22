@@ -7,7 +7,7 @@ use super::io_multiplexing::{AsEpollFile, EpollCtl, EpollFile, EpollFlags, FdSet
 use fs::{CreationFlags, File, FileDesc, FileRef};
 use misc::resource_t;
 use process::Process;
-use signal::{do_sigprocmask, sigset_t, MaskOp, SigSet};
+use signal::{sigset_t, MaskOp, SigSet, SIGKILL, SIGSTOP};
 use std::convert::TryFrom;
 use time::{timespec_t, timeval_t};
 use util::mem_util::from_user;
@@ -723,9 +723,9 @@ pub fn do_select(
     ret
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 #[repr(C)]
-pub struct Pselect6sig {
+pub struct sigset_argpack {
     ss: *const sigset_t,
     ss_len: size_t,
 }
@@ -736,11 +736,13 @@ pub fn do_pselect6(
     writefds: *mut libc::fd_set,
     exceptfds: *mut libc::fd_set,
     timeout: *mut timespec_t,
-    sig_data: *const Pselect6sig,
+    sig_data: *const sigset_argpack,
 ) -> Result<isize> {
     let mut is_set_sig = false;
-    let mut original_sig_set = sigset_t::default();
+    let mut prev_mask = SigSet::default();
+    let thread = current!();
 
+    // Set signal mask
     if !sig_data.is_null() {
         from_user::check_ptr(sig_data)?;
         let user_sig_data = unsafe { &*(sig_data) };
@@ -750,15 +752,20 @@ pub fn do_pselect6(
             if user_sig_data.ss_len != std::mem::size_of::<sigset_t>() {
                 return_errno!(EINVAL, "unexpected sigset size");
             }
-            let op_and_set = {
-                let op = MaskOp::SetMask;
+            let update_mask = {
                 let sigset = user_sig_data.ss;
                 from_user::check_ptr(sigset)?;
                 let set = unsafe { &*sigset };
-                Some((op, set))
+                let mut set = SigSet::from_c(unsafe { *sigset });
+                // According to man pages, "it is not possible to block SIGKILL or SIGSTOP.
+                // Attempts to do so are silently ignored."
+                set -= SIGKILL;
+                set -= SIGSTOP;
+                set
             };
-
-            do_sigprocmask::do_rt_sigprocmask(op_and_set, Some(&mut original_sig_set))?;
+            let mut curr_mask = thread.sig_mask().write().unwrap();
+            prev_mask = *curr_mask;
+            *curr_mask = update_mask;
         }
     }
 
@@ -815,12 +822,8 @@ pub fn do_pselect6(
 
     // Restore the original signal mask
     if is_set_sig {
-        let op_and_set = {
-            let op = MaskOp::SetMask;
-            let set = &original_sig_set;
-            Some((op, set))
-        };
-        do_sigprocmask::do_rt_sigprocmask(op_and_set, None)?;
+        let mut curr_mask = thread.sig_mask().write().unwrap();
+        *curr_mask = prev_mask;
     }
 
     ret

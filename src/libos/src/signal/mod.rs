@@ -22,6 +22,7 @@ mod do_kill;
 mod do_sigaction;
 mod do_sigaltstack;
 mod do_sigpending;
+mod do_sigprocmask;
 mod do_sigreturn;
 mod do_sigsuspend;
 mod do_sigtimedwait;
@@ -35,4 +36,3 @@ mod signals;
 mod syscalls;
 
 pub mod constants;
-pub mod do_sigprocmask;
