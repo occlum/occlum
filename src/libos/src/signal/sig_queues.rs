@@ -38,41 +38,6 @@ impl SigQueues {
         self.count == 0
     }
 
-    pub fn has_valid_signal(&self, blocked: &SigSet) -> bool {
-        // Fast path for the common case of no pending signals
-        if self.empty() {
-            return false;
-        }
-
-        // Check standard signals.
-        for &signum in &Self::ORDERED_STD_SIGS {
-            if blocked.contains(signum) {
-                continue;
-            }
-
-            let queue = self.get_std_queue(signum);
-            if queue.is_some() {
-                return true;
-            }
-        }
-
-        // If no standard signals, then check real-time signals.
-        for signum in MIN_RT_SIG_NUM..=MAX_RT_SIG_NUM {
-            let signum = unsafe { SigNum::from_u8_unchecked(signum) };
-            if blocked.contains(signum) {
-                continue;
-            }
-
-            let queue = self.get_rt_queue(signum);
-            if !queue.is_empty() {
-                return true;
-            }
-        }
-
-        // There must be pending but blocked signals
-        false
-    }
-
     pub fn enqueue(&mut self, signal: Box<dyn Signal>) {
         let signum = signal.num();
         if signum.is_std() {
