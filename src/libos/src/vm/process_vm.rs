@@ -355,8 +355,9 @@ impl ProcessVM {
     }
 
     pub fn replace_mem_chunk(&self, old_chunk: &ChunkRef, new_chunk: ChunkRef) {
-        self.remove_mem_chunk(old_chunk);
-        self.add_mem_chunk(new_chunk)
+        let mut mem_chunks = self.mem_chunks.write().unwrap();
+        mem_chunks.remove(old_chunk);
+        mem_chunks.insert(new_chunk);
     }
 
     // Try merging all connecting single VMAs of the process.
