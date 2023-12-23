@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1703110233012,
+  "lastUpdate": 1703369424631,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -3910,6 +3910,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Threads Maximum Latency",
             "value": 1791.64,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 569.67,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "9ee0a0ae73c109fb862d38e17e34ddf2cca792b8",
+          "message": "Refine replace_mem_chunks to lock once",
+          "timestamp": "2023-12-22T09:46:00Z",
+          "url": "https://github.com/occlum/occlum/commit/9ee0a0ae73c109fb862d38e17e34ddf2cca792b8"
+        },
+        "date": 1703369423496,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.55,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 91.36,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 1848.61,
             "unit": "ms",
             "extra": "max"
           },
