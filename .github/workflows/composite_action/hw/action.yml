@@ -87,3 +87,10 @@ runs:
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; ${{ inputs.build-envs}} make install"
       shell: bash
 
+    # When there comes new features, the configuration should be enabled accordingly
+    - name: Configure Occlum features
+      run: |
+        if [[ "${{ matrix.self_runner[2] }}" == "EDMM" ]]; then
+          docker exec ${{ env.CONTAINER_NAME }} bash -c "jq '.feature.enable_posix_shm = true' /opt/occlum/etc/template/Occlum.json > /tmp.json && mv /tmp.json /opt/occlum/etc/template/Occlum.json"
+        fi;
+      shell: bash
