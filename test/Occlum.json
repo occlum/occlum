@@ -39,8 +39,11 @@
         "ext_prod_id": {
             "high": "0x0",
             "low": "0x0"
-        },
-        "pkru": 0
+        }
+    },
+    "feature": {
+        "pkru": 0,
+        "enable_posix_shm": true
     },
     "mount": [
         {

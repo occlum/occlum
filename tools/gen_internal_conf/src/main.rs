@@ -173,7 +173,10 @@ fn main() {
                     *init_num_of_threads
                 } else {
                     // The user doesn't provide a value
-                    std::cmp::min(DEFAULT_CONFIG.tcs_init_num,occlum_config.resource_limits.max_num_of_threads )
+                    std::cmp::min(
+                        DEFAULT_CONFIG.tcs_init_num,
+                        occlum_config.resource_limits.max_num_of_threads,
+                    )
                 };
 
                 // For platforms with EDMM support, use the max value
@@ -197,7 +200,8 @@ fn main() {
         if tcs_init_num > tcs_max_num {
             println!(
                 "init_num_of_threads: {:?}, max_num_of_threads: {:?}, wrong configuration",
-                occlum_config.resource_limits.init_num_of_threads, occlum_config.resource_limits.max_num_of_threads,
+                occlum_config.resource_limits.init_num_of_threads,
+                occlum_config.resource_limits.max_num_of_threads,
             );
             return;
         }
@@ -353,7 +357,8 @@ fn main() {
         if config_user_space_init_size > config_user_space_max_size {
             println!(
                 "user_space_size: {:?}, user_space_max_size: {:?}, wrong configuration",
-                occlum_config.resource_limits.user_space_size, occlum_config.resource_limits.user_space_max_size,
+                occlum_config.resource_limits.user_space_size,
+                occlum_config.resource_limits.user_space_max_size,
             );
             return;
         }
@@ -373,12 +378,13 @@ fn main() {
                     println!("The extra_user_region_for_sdk in default config is not correct.");
                     return;
                 }
-                let user_region_mem_size = if config_user_space_max_size == config_user_space_init_size {
-                    // SDK still need user region to track the EMA.
-                    config_user_space_max_size
-                } else {
-                    config_user_space_max_size + extra_user_region.unwrap()
-                };
+                let user_region_mem_size =
+                    if config_user_space_max_size == config_user_space_init_size {
+                        // SDK still need user region to track the EMA.
+                        config_user_space_max_size
+                    } else {
+                        config_user_space_max_size + extra_user_region.unwrap()
+                    };
 
                 (
                     config_user_space_init_size as u64,
@@ -460,7 +466,7 @@ fn main() {
             ISVEXTPRODID_L: kss_tuple.2,
             ISVFAMILYID_H: kss_tuple.3,
             ISVFAMILYID_L: kss_tuple.4,
-            PKRU: occlum_config.metadata.pkru,
+            PKRU: occlum_config.feature.pkru,
             AMX: occlum_config.metadata.amx,
         };
         let enclave_config = serde_xml_rs::to_string(&sgx_enclave_configuration).unwrap();
@@ -493,6 +499,7 @@ fn main() {
             },
             env: occlum_config.env,
             app: app_config,
+            feature: occlum_config.feature.clone(),
         };
 
         let occlum_json_str = serde_json::to_string_pretty(&occlum_json_config).unwrap();
@@ -683,6 +690,7 @@ struct OcclumConfiguration {
     entry_points: serde_json::Value,
     env: serde_json::Value,
     metadata: OcclumMetadata,
+    feature: OcclumFeature,
     mount: Vec<OcclumMount>,
 }
 
@@ -724,9 +732,15 @@ struct OcclumMetadata {
     family_id: OcclumMetaID,
     ext_prod_id: OcclumMetaID,
     #[serde(default)]
+    amx: u32,
+}
+
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
+struct OcclumFeature {
+    #[serde(default)]
     pkru: u32,
     #[serde(default)]
-    amx: u32,
+    enable_posix_shm: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -810,4 +824,5 @@ struct InternalOcclumJson {
     process: OcclumProcess,
     env: serde_json::Value,
     app: serde_json::Value,
+    feature: OcclumFeature,
 }
