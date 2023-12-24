@@ -106,7 +106,7 @@ PKU feature can only be enabled in `HW` mode. Whether to turn on PKU feature is 
 ```js
 {
     // ...
-    "metadata": {
+    "feature": {
         // "pkru" = 0: PKU feature must be disabled
         // "pkru" = 1: PKU feature must be enabled
         // "pkru" = 2: PKU feature is enabled if the platform supports it
@@ -118,8 +118,8 @@ PKU feature can only be enabled in `HW` mode. Whether to turn on PKU feature is 
 
 Users have three options for PKU feature:
 
-1. If `metadata.pkru` == 0: The PKU feature must disabled in Occlum. It is the default value. Since docker has not supported PKU related syscalls in container environment by default, Occlum turns off PKU feature in default configuration.
+1. If `feature.pkru` == 0: The PKU feature must disabled in Occlum. It is the default value. Since docker has not supported PKU related syscalls in container environment by default, Occlum turns off PKU feature in default configuration.
 
-2. If `metadata.pkru` == 1: The PKU feature must enabled in Occlum. If CPU on the platform does not support PKU, then enclave cannot be successfully initialized.
+2. If `feature.pkru` == 1: The PKU feature must enabled in Occlum. If CPU on the platform does not support PKU, then enclave cannot be successfully initialized.
 
-3. If `metadata.pkru` == 2: If CPU supports PKU, also OS enables PKU feature, PKU feature is turned on in Occlum.
+3. If `feature.pkru` == 2: If CPU supports PKU, also OS enables PKU feature, PKU feature is turned on in Occlum.

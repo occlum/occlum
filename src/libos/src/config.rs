@@ -104,6 +104,7 @@ pub struct Config {
     pub process: ConfigProcess,
     pub env: ConfigEnv,
     pub app: Vec<ConfigApp>,
+    pub feature: ConfigFeature,
 }
 
 #[derive(Debug)]
@@ -138,6 +139,12 @@ pub struct ConfigApp {
     pub entry_points: Vec<PathBuf>,
     pub stage: String,
     pub mount: Vec<ConfigMount>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ConfigFeature {
+    pub pkru: u32,
+    pub enable_posix_shm: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -184,7 +191,6 @@ impl Config {
         let resource_limits = ConfigResourceLimits::from_input(&input.resource_limits)?;
         let process = ConfigProcess::from_input(&input.process)?;
         let env = ConfigEnv::from_input(&input.env)?;
-
         let app = {
             let mut app = Vec::new();
             for input_app in &input.app {
@@ -192,12 +198,14 @@ impl Config {
             }
             app
         };
+        let feature = ConfigFeature::from_input(&input.feature)?;
 
         Ok(Config {
             resource_limits,
             process,
             env,
             app,
+            feature,
         })
     }
 
@@ -271,6 +279,15 @@ impl ConfigApp {
             stage,
             entry_points,
             mount,
+        })
+    }
+}
+
+impl ConfigFeature {
+    fn from_input(input: &InputConfigFeature) -> Result<ConfigFeature> {
+        Ok(ConfigFeature {
+            pkru: input.pkru,
+            enable_posix_shm: input.enable_posix_shm,
         })
     }
 }
@@ -369,6 +386,8 @@ struct InputConfig {
     pub env: InputConfigEnv,
     #[serde(default)]
     pub app: Vec<InputConfigApp>,
+    #[serde(default)]
+    pub feature: InputConfigFeature,
 }
 
 #[derive(Deserialize, Debug)]
@@ -486,6 +505,24 @@ struct InputConfigApp {
     pub entry_points: Vec<String>,
     #[serde(default)]
     pub mount: Vec<InputConfigMount>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+struct InputConfigFeature {
+    #[serde(default)]
+    pub pkru: u32,
+    #[serde(default)]
+    pub enable_posix_shm: bool,
+}
+
+impl Default for InputConfigFeature {
+    fn default() -> InputConfigFeature {
+        InputConfigFeature {
+            pkru: 0,
+            enable_posix_shm: false,
+        }
+    }
 }
 
 #[repr(C)]
