@@ -36,7 +36,7 @@ init_instance() {
 }
 
 update_pku_config() {
-    new_json="$(jq '.metadata.pkru = 1' Occlum.json)" && echo "${new_json}" > Occlum.json
+    new_json="$(jq '.feature.pkru = 1' Occlum.json)" && echo "${new_json}" > Occlum.json
 }
 
 build_web() {
