@@ -61,7 +61,10 @@ The template of `Occlum.json` is shown below.
         "version_number": 0,
         // Whether the enclave is debuggable through special SGX instructions.
         // For production enclave, it is IMPORTANT to set this value to false.
-        "debuggable": true,
+        "debuggable": true
+    },
+    // Features
+    "feature": {
         // Whether to turn on PKU feature in Occlum
         // Occlum uses PKU for isolation between LibOS and userspace program,
         // It is useful for developers to detect potential bugs.
@@ -69,7 +72,15 @@ The template of `Occlum.json` is shown below.
         // "pkru" = 0: PKU feature must be disabled
         // "pkru" = 1: PKU feature must be enabled
         // "pkru" = 2: PKU feature is enabled if the platform supports it
-        "pkru": 0
+        "pkru": 0,
+        // Whether to enable POSIX shared memory feature.
+        // Enabling POSIX shm allows processes to communicate by sharing a region of memory.
+        // 
+        // Set "enable_posix_shm" to true, the syscall `mmap` with flag `MAP_SHARED` 
+        // is supported more comprehensively, implies that the file-backed memory mapping
+        // become shared among processes.
+        // More API information of POSIX shm is listed in [shm_overview](https://man7.org/linux/man-pages/man7/shm_overview.7.html).
+        "enable_posix_shm": false
     },
     // Mount points and their file systems
     //

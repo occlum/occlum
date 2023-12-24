@@ -9,6 +9,7 @@ use super::vm_area::{VMAccess, VMArea};
 use super::vm_chunk_manager::ChunkManager;
 use super::vm_perms::VMPerms;
 use super::vm_util::*;
+use crate::config::LIBOS_CONFIG;
 use crate::ipc::SYSTEM_V_SHM_MANAGER;
 use crate::process::{ThreadRef, ThreadStatus};
 
@@ -88,7 +89,7 @@ impl VMManager {
     }
 
     pub fn mmap(&self, options: &VMMapOptions) -> Result<usize> {
-        if options.is_shared() {
+        if LIBOS_CONFIG.feature.enable_posix_shm && options.is_shared() {
             let res = self.internal().mmap_shared_chunk(options);
             match res {
                 Ok(addr) => {
@@ -694,7 +695,7 @@ impl InternalVMManager {
             }
         };
 
-        if chunk.is_shared() {
+        if LIBOS_CONFIG.feature.enable_posix_shm && chunk.is_shared() {
             trace!(
                 "munmap_shared_chunk, chunk_range = {:?}, munmap_range = {:?}",
                 chunk.range(),
@@ -875,7 +876,7 @@ impl InternalVMManager {
         new_perms: VMPerms,
     ) -> Result<()> {
         debug_assert!(chunk.range().is_superset_of(&protect_range));
-        if chunk.is_shared() {
+        if LIBOS_CONFIG.feature.enable_posix_shm && chunk.is_shared() {
             trace!(
                 "mprotect_shared_chunk, chunk_range: {:?}, mprotect_range = {:?}",
                 chunk.range(),

@@ -19,6 +19,7 @@ fi
 
 new_json="$(jq '.resource_limits.user_space_size = "1000MB" |
         .resource_limits.kernel_space_heap_size = "300MB" |
+        .feature.enable_posix_shm = true |
         .env.default += ["PYTHONHOME=/opt/python-occlum", "PATH=/bin"]' Occlum.json)" && \
 echo "${new_json}" > Occlum.json
 occlum build
