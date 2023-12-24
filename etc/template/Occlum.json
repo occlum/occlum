@@ -34,8 +34,11 @@
             "high": "0x0",
             "low": "0x0"
         },
-        "pkru": 0,
         "amx": 0
+    },
+    "feature": {
+        "pkru": 0,
+        "enable_posix_shm": false
     },
     "mount": [
         {
