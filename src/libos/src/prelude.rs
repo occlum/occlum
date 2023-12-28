@@ -15,7 +15,7 @@ pub use std::sync::{
 
 pub(crate) type HostFd = u32;
 
-pub(crate) use net::uring_socket::socket::{Addr, Domain, RecvFlags, SendFlags, Shutdown, Type};
+pub(crate) use net::socket::uring::misc::{Addr, Domain, RecvFlags, SendFlags, Shutdown, Type};
 
 // Override prelude::Result with error::Result
 pub use crate::error::Result;
@@ -24,7 +24,7 @@ pub use crate::fs::{File, FileDesc, FileRef};
 pub use crate::process::{pid_t, uid_t};
 pub use crate::util::sync::Mutex;
 pub use crate::util::sync::RwLock;
-use crate::{net, net::uring_socket};
+use crate::{net, net::socket::uring};
 
 macro_rules! debug_trace {
     () => {

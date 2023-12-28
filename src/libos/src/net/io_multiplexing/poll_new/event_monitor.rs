@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use crate::events::{LevelWaiter, Observer, Poller, WaiterQueueObserver};
 use crate::fs::IoEvents;
-use crate::net::uring_socket::UringSocketType;
+use crate::net::socket::uring::UringSocketType;
 use crate::prelude::*;
 use crate::time::{timespec_t, TIMERSLACK};
 

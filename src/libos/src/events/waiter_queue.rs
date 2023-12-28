@@ -5,8 +5,6 @@ use std::time::Duration;
 use super::{LevelWaiter, LevelWaker};
 use crate::prelude::*;
 
-// use crate::socket::util::Waiter as SpinWaiter;
-
 /// A queue for waiters.
 ///
 /// By using this queue, we can wake up threads in their waiters' enqueue order.

@@ -7,15 +7,14 @@ pub use self::io_multiplexing::{
     PollEventFlags, PollFd, THREAD_NOTIFIERS,
 };
 
-pub use self::ocall_socket::{
+pub use self::socket::{
     socketpair, unix_socket, AddressFamily, AsUnixSocket, HostSocket, HostSocketType, Iovs,
     IovsMut, MsgHdr, MsgHdrMut, SliceAsLibcIovec, SockAddr, UnixAddr,
 };
 pub use self::syscalls::*;
 
 mod io_multiplexing;
-mod ocall_socket;
+pub(crate) mod socket;
 mod syscalls;
-pub mod uring_socket;
 
 pub use self::syscalls::*;

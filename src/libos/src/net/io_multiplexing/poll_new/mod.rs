@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use crate::events::Poller;
 use crate::prelude::*;
-use crate::{fs::IoEvents, net::uring_socket::UringSocketType};
+use crate::{fs::IoEvents, net::socket::uring::UringSocketType};
 
 use self::event_monitor::{EventMonitor, EventMonitorBuilder};
 
