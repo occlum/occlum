@@ -55,7 +55,7 @@ pub fn exec(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
             info!("Thread exited: tid = {}, status = {}", libos_tid, status);
         }
         TermStatus::Killed(signum) => {
-            info!("Thread killed: tid = {}, signum = {:?}", libos_tid, signum);
+            error!("Thread killed: tid = {}, signum = {:?}", libos_tid, signum);
         }
     }
 
