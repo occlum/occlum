@@ -42,21 +42,12 @@ pub fn broadcast_interrupts() -> Result<usize> {
             return true;
         }
 
-        let sig_mask_guard = thread.sig_mask().read().unwrap();
-        let interested = !*sig_mask_guard;
-        drop(sig_mask_guard);
-
-        let thread_pending_sig = thread.sig_queues().read().unwrap().pending() & interested;
-        if !thread_pending_sig.empty() {
-            return true;
-        }
-
-        let process_pending_sig =
-            thread.process().sig_queues().read().unwrap().pending() & interested;
-        if !process_pending_sig.empty() {
-            return true;
-        }
-        false
+        let interested = !*thread.sig_mask().read().unwrap();
+        // In the nightly-2022-10-22 Rust compiler, this expression holds two nested read locks.
+        // However, in the stable-2023-12-21 Rust compiler, the expression drops the temporary variables
+        // (including: read lock guard) after each division code completes.
+        !((thread.process().sig_queues().read().unwrap().pending() & interested).empty())
+            || !((thread.sig_queues().read().unwrap().pending() & interested).empty())
     };
 
     let num_signaled_threads = crate::process::table::get_all_threads()
