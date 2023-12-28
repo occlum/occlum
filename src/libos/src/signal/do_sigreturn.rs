@@ -125,12 +125,12 @@ fn do_deliver_signal(thread: &ThreadRef, process: &ProcessRef, cpu_context: &mut
             let sig_mask =
                 *thread.sig_mask().read().unwrap() | *thread.sig_tmp_mask().read().unwrap();
 
-            let signal_opt = process
-                .sig_queues()
-                .write()
-                .unwrap()
-                .dequeue(&sig_mask)
-                .or_else(|| thread.sig_queues().write().unwrap().dequeue(&sig_mask));
+            // Don't use `Option` or_else to avoid nested write locks
+            let mut signal_opt = process.sig_queues().write().unwrap().dequeue(&sig_mask);
+            if signal_opt.is_none() {
+                signal_opt = thread.sig_queues().write().unwrap().dequeue(&sig_mask);
+            }
+
             if signal_opt.is_none() {
                 return;
             }
