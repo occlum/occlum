@@ -689,7 +689,6 @@ fn do_syscall(user_context: &mut CpuContext) {
     let retval = match ret {
         Ok(retval) => retval as isize,
         Err(e) => {
-            // let syscall_num = SyscallNum::try_from(num).unwrap();
             let should_log_err = |num, errno| {
                 let syscall_num = match SyscallNum::try_from(num) {
                     Ok(num) => num,
@@ -708,9 +707,15 @@ fn do_syscall(user_context: &mut CpuContext) {
                 // to suppress error messages.
                 match errno {
                     EAGAIN | ETIMEDOUT | ENOENT | ENOTTY => false,
+                    EINTR => match syscall_num {
+                        SyscallNum::Nanosleep => false,
+                        SyscallNum::Futex => false,
+                        _ => true,
+                    },
                     ENOSYS => match syscall_num {
                         SyscallNum::Getrusage => false,
                         SyscallNum::Madvise => false,
+                        SyscallNum::Ioctl => false,
                         _ => true,
                     },
                     _ => true,
