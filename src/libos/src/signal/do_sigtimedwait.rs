@@ -163,8 +163,8 @@ impl Drop for PendingSigWaiter {
 }
 
 fn has_interest_signal(interest: &SigSet, thread: &ThreadRef, process: &ProcessRef) -> bool {
-    let pending = (thread.sig_queues().read().unwrap().pending()
-        | process.sig_queues().read().unwrap().pending())
+    let pending = (process.sig_queues().read().unwrap().pending()
+        | thread.sig_queues().read().unwrap().pending())
         & *interest;
 
     !pending.empty()
