@@ -1,0 +1,11 @@
+includes:
+  - base.yaml
+targets:
+  - target: /bin
+    copy:
+      - files:
+        - ../exec
+  - target: /root
+    copy:
+      - files:
+        - ../helloworld
