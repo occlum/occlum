@@ -131,7 +131,7 @@ pub fn do_handle_exception(
             return Ok(0);
         }
 
-        warn!(
+        error!(
             "#PF not handled. Turn to signal. user context = {:?}",
             user_context
         );
