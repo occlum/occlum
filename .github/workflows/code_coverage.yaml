@@ -98,7 +98,7 @@ jobs:
 
     - name: LTP test
       run: docker exec code_coverage bash -c "cd /root/occlum/demos/linux-ltp && ./dl_and_build_ltp.sh && SGX_MODE=SIM ./prepare_ltp.sh;
-            cd ltp_instance;
+            cd occlum_instance;
             occlum run /opt/ltp/run-ltp.sh -f syscalls-occlum;
             cd /root/occlum/demos && rm -rf ./linux-ltp"
     
