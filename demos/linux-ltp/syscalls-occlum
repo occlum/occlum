@@ -1004,8 +1004,8 @@ preadv03_64 preadv03_64
 
 preadv201 preadv201
 preadv201_64 preadv201_64
-preadv202 preadv202
-preadv202_64 preadv202_64
+# preadv202 preadv202
+# preadv202_64 preadv202_64
 preadv203 preadv203
 preadv203_64 preadv203_64
 
@@ -1052,15 +1052,15 @@ pwrite04_64 pwrite04_64
 
 pwritev01 pwritev01
 pwritev01_64 pwritev01_64
-# pwritev02 pwritev02
-# pwritev02_64 pwritev02_64
+pwritev02 pwritev02
+pwritev02_64 pwritev02_64
 pwritev03 pwritev03
 pwritev03_64 pwritev03_64
 
 pwritev201 pwritev201
 pwritev201_64 pwritev201_64
-pwritev202 pwritev202
-pwritev202_64 pwritev202_64
+# pwritev202 pwritev202
+# pwritev202_64 pwritev202_64
 
 quotactl01 quotactl01
 quotactl02 quotactl02
@@ -1090,7 +1090,7 @@ readlinkat01 readlinkat01
 readlinkat02 readlinkat02
 
 readv01 readv01
-readv02 readv02
+# readv02 readv02
 
 realpath01 realpath01
 
@@ -1695,12 +1695,12 @@ write02 write02
 write04 write04
 #write05 write05
 
-#writev01 writev01
-#writev02 writev02
+writev01 writev01
+# writev02 writev02
 writev03 writev03
-#writev05 writev05
+# writev05 writev05
 writev06 writev06
-#writev07 writev07
+# writev07 writev07
 
 perf_event_open01 perf_event_open01
 perf_event_open02 perf_event_open02
@@ -1729,7 +1729,7 @@ copy_file_range03 copy_file_range03
 
 statx01 statx01
 statx02 statx02
-statx03 statx03
+# statx03 statx03
 statx04 statx04
 statx05 statx05
 statx06 statx06
