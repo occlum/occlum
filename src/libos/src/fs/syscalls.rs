@@ -167,8 +167,11 @@ fn do_writev_offset(
         for iov_i in 0..count {
             let iov_ptr = unsafe { iov.offset(iov_i as isize) };
             let iov = unsafe { &*iov_ptr };
-            let buf = unsafe { std::slice::from_raw_parts(iov.base as *const u8, iov.len) };
-            bufs_vec.push(buf);
+            if iov.len != 0 {
+                from_user::check_array(iov.base as *const u8, iov.len)?;
+                let buf = unsafe { std::slice::from_raw_parts(iov.base as *const u8, iov.len) };
+                bufs_vec.push(buf);
+            }
         }
         bufs_vec
     };
@@ -206,8 +209,11 @@ fn do_readv_offset(
         for iov_i in 0..count {
             let iov_ptr = unsafe { iov.offset(iov_i as isize) };
             let iov = unsafe { &*iov_ptr };
-            let buf = unsafe { std::slice::from_raw_parts_mut(iov.base as *mut u8, iov.len) };
-            bufs_vec.push(buf);
+            if iov.len != 0 {
+                from_user::check_mut_array(iov.base as *mut u8, iov.len)?;
+                let buf = unsafe { std::slice::from_raw_parts_mut(iov.base as *mut u8, iov.len) };
+                bufs_vec.push(buf);
+            }
         }
         bufs_vec
     };
