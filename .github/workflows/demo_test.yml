@@ -1139,7 +1139,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/linux-ltp && SGX_MODE=SIM ./prepare_ltp.sh"
 
     - name: Run the LTP demo
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/linux-ltp/ltp_instance;
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/linux-ltp/occlum_instance;
             occlum run /opt/ltp/run-ltp.sh -f syscalls-occlum"
     
     - name: Clean LTP test

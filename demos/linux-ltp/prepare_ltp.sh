@@ -1,10 +1,10 @@
 #! /bin/bash
 set -e
 
-rm -rf ltp_instance
-occlum new ltp_instance
+rm -rf occlum_instance
+occlum new occlum_instance
 
-cd ltp_instance
+cd occlum_instance
 rm -rf image
 copy_bom -f ../ltp.yaml --root image --include-dir /opt/occlum/etc/template
 
