@@ -1,10 +1,3 @@
-// cfg_if::cfg_if! {
-//     if #[cfg(feature = "sgx")] {
-//         use libc::ocall::setsockopt as do_setsockopt;
-//     } else {
-//         use libc::setsockopt as do_setsockopt;
-//     }
-// }
 use libc::ocall::setsockopt as do_setsockopt;
 
 use crate::{net::socket::uring::ioctl::IoctlCmd, prelude::*};

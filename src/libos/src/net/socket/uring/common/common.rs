@@ -55,28 +55,7 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
     }
 
     pub fn new_pair(sock_type: Type, nonblocking: bool) -> Result<(Self, Self)> {
-        if A::domain() != Domain::Unix {
-            return_errno!(EAFNOSUPPORT, "unsupported domain");
-        }
-        let domain_c = Domain::Unix as libc::c_int;
-        let type_c = sock_type as libc::c_int;
-        let mut socks = [0; 2];
-        try_libc!(do_socketpair(domain_c, type_c, 0, socks.as_mut_ptr()));
-
-        let common1 = Self::with_host_fd(socks[0] as HostFd, sock_type, nonblocking);
-        let mut inner1 = common1.inner.lock().unwrap();
-        // addr and peer_addr should be UnixAddr::Unnamed
-        inner1.addr = Some(A::default());
-        inner1.peer_addr = Some(A::default());
-        drop(inner1);
-
-        let common2 = Self::with_host_fd(socks[1] as HostFd, sock_type, nonblocking);
-        let mut inner2 = common2.inner.lock().unwrap();
-        inner2.addr = Some(A::default());
-        inner2.peer_addr = Some(A::default());
-        drop(inner2);
-
-        Ok((common1, common2))
+        return_errno!(EINVAL, "Unix is unsupported");
     }
 
     pub fn with_host_fd(host_fd: HostFd, type_: Type, nonblocking: bool) -> Self {

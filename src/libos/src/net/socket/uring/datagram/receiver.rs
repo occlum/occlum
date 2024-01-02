@@ -6,7 +6,6 @@ use crate::net::socket::uring::misc::MsgFlags;
 use io_uring_callback::{Fd, IoHandle};
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
-use super::netlink::NetlinkMsg;
 use crate::fs::IoEvents as Events;
 use crate::net::socket::uring::common::Common;
 use crate::net::socket::uring::runtime::Runtime;
@@ -113,48 +112,36 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         }
 
         // Copy data from the recv buffer to the bufs
-        if A::domain() == Domain::Netlink {
-            let copied_bytes = inner.try_copy_buf_netlink(bufs);
-            if let Some(bytes) = copied_bytes {
-                if inner.recv_len.is_none() {
-                    // All recv_len are consumed, do next host recv.
-                    self.do_recv(&mut inner);
-                }
 
-                recv_bytes = bytes;
-                return Ok((recv_bytes, recv_addr, msg_flags, msg_controllen));
+        let copied_bytes = inner.try_copy_buf(bufs);
+        if let Some(copied_bytes) = copied_bytes {
+            let bufs_len: usize = bufs.iter().map(|buf| buf.len()).sum();
+
+            // If user provided buffer length is smaller than kernel received datagram length,
+            // discard the datagram and set MsgFlags::MSG_TRUNC in returned msg_flags.
+            if bufs_len < inner.recv_len().unwrap() {
+                // update msg.msg_flags to MSG_TRUNC
+                msg_flags = msg_flags | MsgFlags::MSG_TRUNC
+            };
+
+            // If user provided flags contain MSG_TRUNC, the return received length should be
+            // kernel receiver buffer length, vice versa should return truly copied bytes length.
+            recv_bytes = if flags.contains(RecvFlags::MSG_TRUNC) {
+                inner.recv_len().unwrap()
+            } else {
+                copied_bytes
+            };
+
+            // When flags contain MSG_PEEK and there is data in socket recv buffer,
+            // it is unnecessary to send blocking recv request (do_recv) to fetch data
+            // from iouring buffer, which may flush the data in recv buffer.
+            // When flags don't contain MSG_PEEK or there is no available data,
+            // it is time to send blocking request to iouring for notifying events.
+            if !flags.contains(RecvFlags::MSG_PEEK) {
+                self.do_recv(&mut inner);
             }
-        } else {
-            let copied_bytes = inner.try_copy_buf(bufs);
-            if let Some(copied_bytes) = copied_bytes {
-                let bufs_len: usize = bufs.iter().map(|buf| buf.len()).sum();
-
-                // If user provided buffer length is smaller than kernel received datagram length,
-                // discard the datagram and set MsgFlags::MSG_TRUNC in returned msg_flags.
-                if bufs_len < inner.recv_len().unwrap() {
-                    // update msg.msg_flags to MSG_TRUNC
-                    msg_flags = msg_flags | MsgFlags::MSG_TRUNC
-                };
-
-                // If user provided flags contain MSG_TRUNC, the return received length should be
-                // kernel receiver buffer length, vice versa should return truly copied bytes length.
-                recv_bytes = if flags.contains(RecvFlags::MSG_TRUNC) {
-                    inner.recv_len().unwrap()
-                } else {
-                    copied_bytes
-                };
-
-                // When flags contain MSG_PEEK and there is data in socket recv buffer,
-                // it is unnecessary to send blocking recv request (do_recv) to fetch data
-                // from iouring buffer, which may flush the data in recv buffer.
-                // When flags don't contain MSG_PEEK or there is no available data,
-                // it is time to send blocking request to iouring for notifying events.
-                if !flags.contains(RecvFlags::MSG_PEEK) {
-                    self.do_recv(&mut inner);
-                }
-                return Ok((recv_bytes, recv_addr, msg_flags, msg_controllen));
-            }
-        };
+            return Ok((recv_bytes, recv_addr, msg_flags, msg_controllen));
+        }
 
         // In some situantions of MSG_ERRQUEUE, users only require control buffer but setting iovec length to zero.
         if msg_controllen > 0 {
@@ -371,77 +358,6 @@ impl Inner {
                 }
             }
             copy_len
-        })
-    }
-
-    // TODO: Support MSG_TRUNC flag
-    pub fn try_copy_buf_netlink(&mut self, bufs: &mut [&mut [u8]]) -> Option<usize> {
-        let user_buf_total_len = bufs.iter().map(|s| s.len()).sum();
-        self.recv_len.map(|recv_len| {
-            let mut copy_len = 0; // total copy length for user buffer
-            let kernel_recv_buf = &self.recv_buf[self.recv_buf_offset..recv_len];
-            let mut parsing_offset = 0; // kernel buf offset for msg parsing
-
-            loop {
-                // Try parse netlink message
-                let netlink_msg = NetlinkMsg::new(&kernel_recv_buf[parsing_offset..]);
-                if netlink_msg.is_none() {
-                    warn!("can't parse as netlink msg");
-                    if copy_len > 0 {
-                        // Just return parsed bytes.
-                        break;
-                    } else {
-                        // nothing can be parsed, copy all the bytes to user buffer
-                        copy_len = recv_len - self.recv_buf_offset;
-                        break;
-                    }
-                }
-
-                let msg_len = netlink_msg.unwrap().length() as usize;
-                // If the user buffer can't fill in one netlink msg, just break.
-                if copy_len == 0 && msg_len >= user_buf_total_len {
-                    copy_len = user_buf_total_len;
-                    parsing_offset = msg_len;
-                    break;
-                }
-
-                // Try to fill in the user buffer with as many complete netlink messages as possible, instead of truncating the msg.
-                if copy_len + msg_len <= user_buf_total_len {
-                    copy_len += msg_len;
-                    parsing_offset += msg_len;
-                    if copy_len + self.recv_buf_offset == recv_len {
-                        // reach the end of the kernel recv buffer
-                        break;
-                    } else {
-                        continue;
-                    }
-                } else {
-                    debug_assert!(copy_len + msg_len > user_buf_total_len);
-                    debug_assert!(copy_len != 0);
-                    break;
-                }
-            }
-
-            // fill the user buffers with the kernel buffer contents
-            let copy_buf = &self.recv_buf[self.recv_buf_offset..self.recv_buf_offset + copy_len];
-            let mut copy_offset = 0;
-            bufs.iter_mut().for_each(|buf| {
-                let once_copy_len = std::cmp::min(buf.len(), copy_buf.len() - copy_offset);
-                buf[..once_copy_len]
-                    .copy_from_slice(&copy_buf[copy_offset..copy_offset + once_copy_len]);
-                copy_offset += once_copy_len;
-            });
-
-            // Update global data
-            // The recv_buf_offset must be at the boundary of a message for next recv.
-            self.recv_buf_offset += std::cmp::max(copy_offset, parsing_offset);
-            if self.recv_buf_offset == recv_len {
-                // All bytes are consumed. Reset for next recv.
-                self.recv_len.take();
-                self.recv_buf_offset = 0;
-            }
-
-            copy_offset
         })
     }
 

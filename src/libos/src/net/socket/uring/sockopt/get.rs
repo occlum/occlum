@@ -1,11 +1,3 @@
-// cfg_if::cfg_if! {
-//     if #[cfg(feature = "sgx")] {
-//         use libc::ocall::getsockopt as do_getsockopt;
-//     } else {
-//         use libc::getsockopt as do_getsockopt;
-//     }
-// }
-
 use libc::ocall::getsockopt as do_getsockopt;
 
 use crate::{net::socket::uring::ioctl::IoctlCmd, prelude::*};

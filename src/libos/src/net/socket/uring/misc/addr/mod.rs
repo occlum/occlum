@@ -7,8 +7,6 @@ use crate::prelude::*;
 mod c_sock_addr;
 mod ipv4;
 mod ipv6;
-mod netlink;
-mod unix;
 
 /// A trait for network addresses.
 pub trait Addr: Clone + Debug + Default + PartialEq + Send + Sync {
@@ -38,8 +36,6 @@ pub trait Addr: Clone + Debug + Default + PartialEq + Send + Sync {
 pub use self::c_sock_addr::CSockAddr;
 pub use self::ipv4::{Ipv4Addr, Ipv4SocketAddr};
 pub use self::ipv6::{Ipv6Addr, Ipv6SocketAddr};
-pub use self::netlink::{NetlinkFamily, NetlinkSocketAddr};
-pub use self::unix::UnixAddr;
 
 #[cfg(test)]
 mod tests {
@@ -67,67 +63,6 @@ mod tests {
         };
 
         check_to_and_from_c(&c_addr, &addr);
-    }
-
-    #[test]
-    fn unix_unnamed_to_and_from_c() {
-        let c_addr = libc::sockaddr_un {
-            sun_family: libc::AF_UNIX as _,
-            sun_path: [0; 108],
-        };
-        let c_addr_len = size_of::<libc::sa_family_t>() + 0;
-
-        let addr = UnixAddr::Unnamed;
-
-        check_to_and_from_c(&(c_addr, c_addr_len), &addr);
-    }
-
-    #[test]
-    fn unix_pathname_to_and_from_c() {
-        let path = "test.sock";
-        let c_addr = {
-            let mut c_addr = libc::sockaddr_un {
-                sun_family: libc::AF_UNIX as _,
-                sun_path: [0; 108],
-            };
-            let sun_path: &mut [u8] = unsafe {
-                let path_len = path.as_bytes().len();
-                // Pathname must be a null-terminated C string
-                c_addr.sun_path[path_len] = 0;
-                std::mem::transmute(&mut c_addr.sun_path[..path_len])
-            };
-            sun_path.copy_from_slice(path.as_bytes());
-            c_addr
-        };
-        let c_addr_len = size_of::<libc::sa_family_t>() + path.as_bytes().len() + 1;
-
-        let addr = UnixAddr::Pathname(path.to_string());
-
-        check_to_and_from_c(&(c_addr, c_addr_len), &addr);
-    }
-
-    #[test]
-    fn unix_abstract_to_and_from_c() {
-        let name = "an\nabstract\tname";
-        let c_addr = {
-            let mut c_addr = libc::sockaddr_un {
-                sun_family: libc::AF_UNIX as _,
-                sun_path: [0; 108],
-            };
-            let sun_path: &mut [u8] = unsafe {
-                let name_len = name.as_bytes().len();
-                // Abstract name must have a path starting with a null byte.
-                c_addr.sun_path[0] = 0;
-                std::mem::transmute(&mut c_addr.sun_path[1..name_len + 1])
-            };
-            sun_path.copy_from_slice(name.as_bytes());
-            c_addr
-        };
-        let c_addr_len = size_of::<libc::sa_family_t>() + name.as_bytes().len() + 1;
-
-        let addr = UnixAddr::Abstract(name.as_bytes().to_vec());
-
-        check_to_and_from_c(&(c_addr, c_addr_len), &addr);
     }
 
     fn check_to_and_from_c<T: CSockAddr, U: Addr>(c_addr: &T, addr: &U) {
