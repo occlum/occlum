@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1703974267620,
+  "lastUpdate": 1704188791561,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -4156,6 +4156,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 569.67,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "superajun-wsj",
+            "username": "superajun-wsj"
+          },
+          "committer": {
+            "name": "superajun-wsj",
+            "username": "superajun-wsj"
+          },
+          "id": "ab0cf4996b5b0d8b4325e69ce0a6143fae925dee",
+          "message": "Add go exec call demo in occlum",
+          "timestamp": "2023-12-28T09:58:07Z",
+          "url": "https://github.com/occlum/occlum/pull/1460/commits/ab0cf4996b5b0d8b4325e69ce0a6143fae925dee"
+        },
+        "date": 1704188788767,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.56,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 284.48,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 7455.7,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 1352.03,
             "unit": "ms",
             "extra": "per95"
           }
