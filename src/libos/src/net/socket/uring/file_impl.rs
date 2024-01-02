@@ -43,6 +43,10 @@ impl File for SocketFile {
     //     self.ioctl_impl(cmd)
     // }
 
+    fn notifier(&self) -> Option<&IoNotifier> {
+        Some(self.notifier())
+    }
+
     fn access_mode(&self) -> Result<AccessMode> {
         Ok(AccessMode::O_RDWR)
     }

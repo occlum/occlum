@@ -63,7 +63,7 @@ impl UringSocketType for FileRef {
     fn as_uring_socket(&self) -> Result<&SocketFile> {
         self.as_any()
             .downcast_ref::<SocketFile>()
-            .ok_or_else(|| errno!(ENOTSOCK, "not a socket"))
+            .ok_or_else(|| errno!(ENOTSOCK, "not a uring socket"))
     }
 }
 
@@ -149,28 +149,12 @@ impl SocketFile {
         })
     }
 
-    // pub fn notifier(&self) -> &IoNotifier {
-    //     apply_fn_on_any_socket!(&self.socket, |socket| { socket.notifier() })
-    // }
+    pub fn notifier(&self) -> &IoNotifier {
+        apply_fn_on_any_socket!(&self.socket, |socket| { socket.notifier() })
+    }
 
     pub fn poll(&self, mask: IoEvents, poller: Option<&Poller>) -> IoEvents {
         apply_fn_on_any_socket!(&self.socket, |socket| { socket.poll(mask, poller) })
-    }
-
-    pub fn register_observer(
-        &self,
-        observer: Arc<dyn Observer<IoEvents>>,
-        mask: IoEvents,
-    ) -> Result<()> {
-        apply_fn_on_any_socket!(&self.socket, |socket| {
-            socket.register_observer(observer, mask)
-        })
-    }
-
-    pub fn unregister_observer(&self, observer: &Arc<dyn Observer<IoEvents>>) {
-        apply_fn_on_any_socket!(&self.socket, |socket| {
-            socket.unregister_observer(observer)
-        })
     }
 
     pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {

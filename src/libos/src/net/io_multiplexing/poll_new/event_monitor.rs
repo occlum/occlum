@@ -2,9 +2,8 @@ use std::ptr;
 use std::sync::Weak;
 use std::time::Duration;
 
-use crate::events::{LevelWaiter, Observer, Poller, WaiterQueueObserver};
+use crate::events::{LevelWaiter, Observer, WaiterQueueObserver};
 use crate::fs::IoEvents;
-use crate::net::socket::uring::UringSocketType;
 use crate::prelude::*;
 use crate::time::{timespec_t, TIMERSLACK};
 
@@ -185,7 +184,6 @@ impl EventMonitorBuilder {
         let observer = WaiterQueueObserver::new();
         let waiter = LevelWaiter::new();
 
-        let poller = Poller::new();
         Self {
             files_and_events,
             host_file_idxes,
@@ -271,14 +269,7 @@ impl ObserverExt for Weak<dyn Observer<IoEvents>> {
     fn register_files<'a>(&self, files_and_events: impl Iterator<Item = &'a (FileRef, IoEvents)>) {
         for (file, events) in files_and_events {
             match file.notifier() {
-                None => match file.as_uring_socket() {
-                    Ok(socket) => {
-                        let mask = *events;
-                        let observer = self.clone().upgrade().unwrap();
-                        socket.register_observer(observer, mask);
-                    }
-                    Err(_) => continue,
-                },
+                None => continue,
                 Some(notifier) => {
                     let mask = *events;
                     notifier.register(self.clone(), Some(mask), None);
@@ -293,13 +284,7 @@ impl ObserverExt for Weak<dyn Observer<IoEvents>> {
     ) {
         for (file, events) in files_and_events {
             match file.notifier() {
-                None => match file.as_uring_socket() {
-                    Ok(socket) => {
-                        let observer = self.upgrade().unwrap();
-                        socket.unregister_observer(&observer);
-                    }
-                    Err(_) => continue,
-                },
+                None => continue,
                 Some(notifier) => {
                     notifier.unregister(self);
                 }

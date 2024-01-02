@@ -2,7 +2,7 @@ use core::time::Duration;
 
 use crate::{
     events::{Observer, Poller},
-    fs::StatusFlags,
+    fs::{IoNotifier, StatusFlags},
     match_ioctl_cmd_mut,
     net::socket::uring::misc::MsgFlags,
 };
@@ -283,23 +283,6 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
         pollee.poll(mask, poller)
     }
 
-    pub fn register_observer(
-        &self,
-        observer: Arc<dyn Observer<Events>>,
-        mask: Events,
-    ) -> Result<()> {
-        let pollee = self.common.pollee();
-        let observer = Arc::downgrade(&observer) as _;
-        pollee.register_observer(observer, mask);
-        Ok(())
-    }
-
-    pub fn unregister_observer(&self, observer: &Arc<dyn Observer<Events>>) {
-        let pollee = self.common.pollee();
-        let observer = &Arc::downgrade(&observer) as _;
-        pollee.unregister_observer(observer)
-    }
-
     pub fn addr(&self) -> Result<A> {
         let common = &self.common;
 
@@ -309,6 +292,11 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
         let addr = common.get_addr_from_host()?;
         common.set_addr(&addr);
         Ok(addr)
+    }
+
+    pub fn notifier(&self) -> &IoNotifier {
+        let notifier = self.common.notifier();
+        notifier
     }
 
     pub fn peer_addr(&self) -> Result<A> {

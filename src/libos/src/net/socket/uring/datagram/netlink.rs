@@ -1,8 +1,7 @@
 use super::*;
 use crate::events::{Observer, Poller};
-use crate::fs::{IoEvents as Events, StatusFlags};
-use crate::net::socket::uring::misc::MsgFlags;
-use crate::net::socket::uring::misc::{NetlinkFamily, Type};
+use crate::fs::{IoEvents as Events, IoNotifier, StatusFlags};
+use crate::net::socket::uring::misc::{MsgFlags, NetlinkFamily, Type};
 use byteorder::{ByteOrder, NativeEndian};
 use core::ops::{Range, RangeFrom};
 
@@ -156,21 +155,9 @@ impl<A: Addr, R: Runtime> NetlinkSocket<A, R> {
         pollee.poll(mask, poller)
     }
 
-    pub fn register_observer(
-        &self,
-        observer: Arc<dyn Observer<Events>>,
-        mask: Events,
-    ) -> Result<()> {
-        let pollee = self.common.pollee();
-        let observer = Arc::downgrade(&observer) as _;
-        pollee.register_observer(observer, mask);
-        Ok(())
-    }
-
-    pub fn unregister_observer(&self, observer: &Arc<dyn Observer<Events>>) {
-        let pollee = self.common.pollee();
-        let observer = &Arc::downgrade(&observer) as _;
-        pollee.unregister_observer(observer)
+    pub fn notifier(&self) -> &IoNotifier {
+        let notifier = self.common.notifier();
+        notifier
     }
 
     pub fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {

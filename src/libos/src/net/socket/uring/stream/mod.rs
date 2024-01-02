@@ -26,6 +26,7 @@ lazy_static! {
 
 pub struct StreamSocket<A: Addr + 'static, R: Runtime> {
     state: RwLock<State<A, R>>,
+    common: Arc<Common<A, R>>,
 }
 
 enum State<A: Addr + 'static, R: Runtime> {
@@ -42,9 +43,11 @@ enum State<A: Addr + 'static, R: Runtime> {
 impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     pub fn new(nonblocking: bool) -> Result<Self> {
         let init_stream = InitStream::new(nonblocking)?;
+        let common = init_stream.common().clone();
         let init_state = State::Init(init_stream);
         Ok(Self {
             state: RwLock::new(init_state),
+            common,
         })
     }
 
@@ -58,8 +61,9 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     fn new_connected(connected_stream: Arc<ConnectedStream<A, R>>) -> Self {
+        let common = connected_stream.common().clone();
         let state = RwLock::new(State::Connected(connected_stream));
-        Self { state }
+        Self { state, common }
     }
 
     fn try_switch_to_connected_state(
@@ -290,25 +294,6 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         pollee.poll(mask, poller)
     }
 
-    pub fn register_observer(
-        &self,
-        observer: Arc<dyn Observer<IoEvents>>,
-        mask: IoEvents,
-    ) -> Result<()> {
-        let state = self.state.read().unwrap();
-        let pollee = state.common().pollee();
-        let observer = Arc::downgrade(&observer) as _;
-        pollee.register_observer(observer, mask);
-        Ok(())
-    }
-
-    pub fn unregister_observer(&self, observer: &Arc<dyn Observer<IoEvents>>) {
-        let state = self.state.read().unwrap();
-        let pollee = state.common().pollee();
-        let observer = Arc::downgrade(&observer) as _;
-        pollee.unregister_observer(&observer);
-    }
-
     pub fn addr(&self) -> Result<A> {
         let state = self.state.read().unwrap();
         let common = state.common();
@@ -319,6 +304,10 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
         let addr = common.get_addr_from_host()?;
         common.set_addr(&addr);
         Ok(addr)
+    }
+
+    pub fn notifier(&self) -> &IoNotifier {
+        self.common.notifier()
     }
 
     pub fn peer_addr(&self) -> Result<A> {
