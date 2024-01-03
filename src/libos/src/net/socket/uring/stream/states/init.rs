@@ -2,7 +2,6 @@ use crate::fs::IoEvents;
 use crate::net::socket::uring::common::Common;
 use crate::net::socket::uring::runtime::Runtime;
 use crate::prelude::*;
-use std::sync::SgxMutex as Mutex;
 
 /// A stream socket that is in its initial state.
 pub struct InitStream<A: Addr + 'static, R: Runtime> {
@@ -32,7 +31,7 @@ impl<A: Addr + 'static, R: Runtime> InitStream<A, R> {
     }
 
     pub fn bind(&self, addr: &A) -> Result<()> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         if inner.has_bound {
             return_errno!(EINVAL, "the socket is already bound to an address");
         }
@@ -53,7 +52,7 @@ impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for InitStream<A, R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("InitStream")
             .field("common", &self.common)
-            .field("inner", &*self.inner.lock().unwrap())
+            .field("inner", &*self.inner.lock())
             .finish()
     }
 }

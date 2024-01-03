@@ -4,7 +4,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::net::socket::uring::misc::Timeout;
 use io_uring_callback::IoUring;
-use std::sync::SgxMutex as Mutex;
 
 use libc::ocall::getsockname as do_getsockname;
 use libc::ocall::shutdown as do_shutdown;
@@ -23,8 +22,8 @@ pub struct Common<A: Addr + 'static, R: Runtime> {
     nonblocking: AtomicBool,
     is_closed: AtomicBool,
     pollee: Pollee,
-    inner: SgxMutex<Inner<A>>,
-    timeout: SgxMutex<Timeout>,
+    inner: Mutex<Inner<A>>,
+    timeout: Mutex<Timeout>,
     io_uring: Arc<IoUring>,
     phantom_data: PhantomData<(A, R)>,
 }
@@ -38,8 +37,8 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
         let nonblocking = AtomicBool::new(nonblocking);
         let is_closed = AtomicBool::new(false);
         let pollee = Pollee::new(IoEvents::empty());
-        let inner = SgxMutex::new(Inner::new());
-        let timeout = SgxMutex::new(Timeout::new());
+        let inner = Mutex::new(Inner::new());
+        let timeout = Mutex::new(Timeout::new());
         let io_uring = R::io_uring();
         Ok(Self {
             host_fd,
@@ -103,19 +102,19 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
     }
 
     pub fn send_timeout(&self) -> Option<Duration> {
-        self.timeout.lock().unwrap().sender_timeout()
+        self.timeout.lock().sender_timeout()
     }
 
     pub fn recv_timeout(&self) -> Option<Duration> {
-        self.timeout.lock().unwrap().receiver_timeout()
+        self.timeout.lock().receiver_timeout()
     }
 
     pub fn set_send_timeout(&self, timeout: Duration) {
-        self.timeout.lock().unwrap().set_sender(timeout)
+        self.timeout.lock().set_sender(timeout)
     }
 
     pub fn set_recv_timeout(&self, timeout: Duration) {
-        self.timeout.lock().unwrap().set_receiver(timeout)
+        self.timeout.lock().set_receiver(timeout)
     }
 
     pub fn is_closed(&self) -> bool {
@@ -136,12 +135,12 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
 
     #[allow(unused)]
     pub fn addr(&self) -> Option<A> {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         inner.addr.clone()
     }
 
     pub fn set_addr(&self, addr: &A) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.addr = Some(addr.clone())
     }
 
@@ -157,17 +156,17 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
     }
 
     pub fn peer_addr(&self) -> Option<A> {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         inner.peer_addr.clone()
     }
 
     pub fn set_peer_addr(&self, peer_addr: &A) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.peer_addr = Some(peer_addr.clone());
     }
 
     pub fn reset_peer_addr(&self) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.peer_addr = None;
     }
 
@@ -195,7 +194,7 @@ impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for Common<A, R> {
             .field("type", &self.type_)
             .field("nonblocking", &self.nonblocking)
             .field("pollee", &self.pollee)
-            .field("inner", &self.inner.lock().unwrap())
+            .field("inner", &self.inner.lock())
             .finish()
     }
 }

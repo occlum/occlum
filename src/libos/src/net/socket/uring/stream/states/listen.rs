@@ -12,8 +12,6 @@ use crate::fs::IoEvents;
 use crate::net::socket::uring::common::{do_close, Common};
 use crate::net::socket::uring::runtime::Runtime;
 use crate::prelude::*;
-use std::sync::SgxMutex as Mutex;
-use std::sync::SgxMutexGuard as MutexGuard;
 
 // We issue the async accept request ahead of time. But with big backlog number,
 // there will be too many pending requests, which could be harmful to the system.
@@ -46,7 +44,7 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
 
         // Start async accept requests right as early as possible to improve performance
         {
-            let inner = new_self.inner.lock().unwrap();
+            let inner = new_self.inner.lock();
             new_self.initiate_async_accepts(inner);
         }
 
@@ -109,7 +107,7 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
     }
 
     pub fn try_accept(self: &Arc<Self>, nonblocking: bool) -> Result<Arc<ConnectedStream<A, R>>> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
 
         if let Some(errno) = inner.fatal {
             // Reset error
@@ -154,7 +152,7 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
             // Set the listener stream as closed to prevent submitting new request in the callback fn
             self.common().set_closed();
             let io_uring = self.common.io_uring();
-            let inner = self.inner.lock().unwrap();
+            let inner = self.inner.lock();
             for entry in inner.backlog.entries.iter() {
                 if let Entry::Pending { io_handle } = entry {
                     unsafe { io_uring.cancel(&io_handle) };
@@ -169,7 +167,7 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
 
         loop {
             let pending_entry_exists = {
-                let inner = self.inner.lock().unwrap();
+                let inner = self.inner.lock();
                 inner
                     .backlog
                     .entries
@@ -217,7 +215,7 @@ impl<A: Addr + 'static, R: Runtime> std::fmt::Debug for ListenerStream<A, R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ListenerStream")
             .field("common", &self.common)
-            .field("inner", &self.inner.lock().unwrap())
+            .field("inner", &self.inner.lock())
             .finish()
     }
 }
@@ -342,7 +340,7 @@ impl<A: Addr> Backlog<A> {
         let callback = {
             let stream = stream.clone();
             move |retval: i32| {
-                let mut inner = stream.inner.lock().unwrap();
+                let mut inner = stream.inner.lock();
 
                 if retval < 0 {
                     // Since most errors that may result from the accept syscall are _not fatal_,

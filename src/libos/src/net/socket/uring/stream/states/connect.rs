@@ -10,7 +10,6 @@ use crate::fs::IoEvents;
 use crate::net::socket::uring::common::Common;
 use crate::net::socket::uring::runtime::Runtime;
 use crate::prelude::*;
-use std::sync::SgxMutex as Mutex;
 
 /// A stream socket that is in its connecting state.
 pub struct ConnectingStream<A: Addr + 'static, R: Runtime> {
@@ -80,7 +79,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
         }
 
         // Finish the async connect
-        let req = self.req.lock().unwrap();
+        let req = self.req.lock();
         if let Some(e) = req.errno {
             return_errno!(e, "connect failed");
         }
@@ -89,7 +88,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
 
     fn initiate_async_connect(self: &Arc<Self>) {
         let io_uring = self.common.io_uring();
-        let mut req = self.req.lock().unwrap();
+        let mut req = self.req.lock();
         // Skip if there is pending request
         if req.io_handle.is_some() {
             return;
@@ -100,7 +99,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
             // Guard against Igao attack
             assert!(retval <= 0);
 
-            let mut req = arc_self.req.lock().unwrap();
+            let mut req = arc_self.req.lock();
             // Release the handle to the async connect
             req.io_handle.take();
 
@@ -135,7 +134,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
     pub async fn cancel_connect_request(&self, need_wait: bool) {
         {
             let io_uring = self.common.io_uring();
-            let req = self.req.lock().unwrap();
+            let req = self.req.lock();
             if let Some(io_handle) = &req.io_handle {
                 unsafe { io_uring.cancel(io_handle) };
             } else {
@@ -154,7 +153,7 @@ impl<A: Addr + 'static, R: Runtime> ConnectingStream<A, R> {
 
         loop {
             let pending_request_exist = {
-                let req = self.req.lock().unwrap();
+                let req = self.req.lock();
                 req.io_handle.is_some()
             };
 
@@ -205,7 +204,7 @@ impl<A: Addr, R: Runtime> std::fmt::Debug for ConnectingStream<A, R> {
         f.debug_struct("ConnectingStream")
             .field("common", &self.common)
             .field("peer_addr", &self.peer_addr)
-            .field("req", &*self.req.lock().unwrap())
+            .field("req", &*self.req.lock())
             .field("connected", &self.connected)
             .finish()
     }
