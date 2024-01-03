@@ -711,6 +711,7 @@ fn do_syscall(user_context: &mut CpuContext) {
                     EINTR => match syscall_num {
                         SyscallNum::Nanosleep => false,
                         SyscallNum::Futex => false,
+                        SyscallNum::RtSigsuspend => false,
                         _ => true,
                     },
                     ENOSYS => match syscall_num {
