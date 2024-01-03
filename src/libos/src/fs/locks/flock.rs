@@ -1,6 +1,6 @@
 /// Non-POSIX file advisory lock (FLOCK)
 use super::*;
-use crate::events::{LevelWaiter, WaiterQueue};
+use crate::events::{Waiter, WaiterQueue};
 use rcore_fs::vfs::AnyExt;
 use std::ptr;
 use std::sync::Weak;
@@ -42,7 +42,7 @@ impl Flock {
         false
     }
 
-    pub fn enqueue_waiter(&mut self, waiter: &LevelWaiter) {
+    pub fn enqueue_waiter(&mut self, waiter: &Waiter) {
         if self.waiters.is_none() {
             self.waiters = Some(WaiterQueue::new());
         }
@@ -97,7 +97,7 @@ impl FlockList {
                     return_errno!(EAGAIN, "The file is locked");
                 }
                 // Start to wait
-                let waiter = LevelWaiter::new();
+                let waiter = Waiter::new();
                 // FLOCK do not support deadlock detection
                 conflict_lock.enqueue_waiter(&waiter);
                 // Ensure that we drop any locks before wait

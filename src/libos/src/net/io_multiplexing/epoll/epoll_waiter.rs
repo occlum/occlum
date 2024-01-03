@@ -2,20 +2,20 @@ use std::ptr;
 use std::time::Duration;
 
 use super::host_file_epoller::HostFileEpoller;
-use crate::events::LevelWaiter;
+use crate::events::Waiter;
 use crate::prelude::*;
 use crate::time::{timespec_t, TIMERSLACK};
 
 /// A waiter that is suitable for epoll.
 pub struct EpollWaiter {
-    waiter: LevelWaiter,
+    waiter: Waiter,
     host_epoll_fd: FileDesc,
 }
 
 impl EpollWaiter {
     pub fn new(host_file_epoller: &HostFileEpoller) -> Self {
         Self {
-            waiter: LevelWaiter::new(),
+            waiter: Waiter::new(),
             host_epoll_fd: host_file_epoller.host_fd().to_raw(),
         }
     }
@@ -81,8 +81,8 @@ impl EpollWaiter {
     }
 }
 
-impl AsRef<LevelWaiter> for EpollWaiter {
-    fn as_ref(&self) -> &LevelWaiter {
+impl AsRef<Waiter> for EpollWaiter {
+    fn as_ref(&self) -> &Waiter {
         &self.waiter
     }
 }

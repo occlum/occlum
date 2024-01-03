@@ -2,7 +2,7 @@ use std::ptr;
 use std::sync::Weak;
 use std::time::Duration;
 
-use crate::events::{LevelWaiter, Observer, WaiterQueueObserver};
+use crate::events::{Observer, Waiter, WaiterQueueObserver};
 use crate::fs::IoEvents;
 use crate::prelude::*;
 use crate::time::{timespec_t, TIMERSLACK};
@@ -30,7 +30,7 @@ pub struct EventMonitor {
     //
     // The last two fields comprise of a common pattern enabled by the event
     // subsystem.
-    waiter: LevelWaiter,
+    waiter: Waiter,
 }
 
 impl EventMonitor {
@@ -173,7 +173,7 @@ pub struct EventMonitorBuilder {
     host_file_idxes: Vec<usize>,
     ocall_pollfds: Vec<libc::pollfd>,
     observer: Arc<WaiterQueueObserver<IoEvents>>,
-    waiter: LevelWaiter,
+    waiter: Waiter,
 }
 
 impl EventMonitorBuilder {
@@ -182,7 +182,7 @@ impl EventMonitorBuilder {
         let host_file_idxes = Vec::new();
         let ocall_pollfds = Vec::new();
         let observer = WaiterQueueObserver::new();
-        let waiter = LevelWaiter::new();
+        let waiter = Waiter::new();
 
         Self {
             files_and_events,

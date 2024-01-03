@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
-use super::{EdgeWaiter, Notifier, Observer};
+use super::{EdgeSync, Notifier, Observer, Waiter};
 
 use alloc::collections::BTreeMap;
 use keyable_arc::KeyableWeak;
@@ -158,7 +158,7 @@ pub struct Poller {
 
 struct PollerInner {
     // Use event counter to wait or wake up a poller
-    waiter: EdgeWaiter,
+    waiter: Waiter<EdgeSync>,
     // All pollees that are interesting to this poller
     pollees: Mutex<BTreeMap<KeyableWeak<PolleeInner>, ()>>,
 }
@@ -170,7 +170,7 @@ impl Poller {
     /// Constructs a new `Poller`.
     pub fn new() -> Self {
         let inner = PollerInner {
-            waiter: EdgeWaiter::new(),
+            waiter: Waiter::<EdgeSync>::new(),
             pollees: Mutex::new(BTreeMap::new()),
         };
         Self {

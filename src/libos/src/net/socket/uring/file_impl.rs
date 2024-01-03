@@ -1,5 +1,5 @@
 use super::socket_file::SocketFile;
-use crate::fs::{AccessMode, HostFd, IoEvents, IoNotifier, StatusFlags};
+use crate::fs::{AccessMode, HostFd, IoEvents, IoNotifier, IoctlCmd, StatusFlags};
 use crate::prelude::*;
 use sgx_trts::libc::ESPIPE;
 use std::{io::SeekFrom, os::unix::raw::off_t};

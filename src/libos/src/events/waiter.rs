@@ -94,9 +94,9 @@ where
 impl<S: Synchronizer> Waiter<S> {
     /// Create a waiter for the current thread.
     ///
-    /// A `LevelWaiter` is bound to the curent thread that creates it: it cannot be
+    /// A `Waiter` is bound to the curent thread that creates it: it cannot be
     /// sent to or used by any other threads as the type implements `!Send` and
-    /// `!Sync` traits. Thus, a `LevelWaiter` can only put the current thread to sleep.
+    /// `!Sync` traits. Thus, a `Waiter` can only put the current thread to sleep.
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Inner::new()),
@@ -113,8 +113,8 @@ impl<S: Synchronizer> Waiter<S> {
 
     /// Reset a waiter.
     ///
-    /// After a `LevelWaiter` being waken up, the `reset` method must be called so
-    /// that the `LevelWaiter` can use the `wait` or `wait_mut` methods to sleep the
+    /// After a `Waiter` being waken up, the `reset` method must be called so
+    /// that the `Waiter` can use the `wait` or `wait_mut` methods to sleep the
     /// current thread again.
     pub fn reset(&self) {
         self.inner.reset();
@@ -123,7 +123,7 @@ impl<S: Synchronizer> Waiter<S> {
     /// Put the current thread to sleep until being waken up by a waker.
     ///
     /// The method has three possible return values:
-    /// 1. `Ok(())`: The `LevelWaiter` has been waken up by one of its `LevelWaker`;
+    /// 1. `Ok(())`: The `Waiter` has been waken up by one of its `Waker`;
     /// 2. `Err(e) if e.errno() == Errno::ETIMEDOUT`: Timeout.
     /// 3. `Err(e) if e.errno() == Errno::EINTR`: Interrupted by a signal.
     ///
@@ -143,8 +143,8 @@ impl<S: Synchronizer> Waiter<S> {
 
     /// Create a waker that can wake up this waiter.
     ///
-    /// `WaiterQueue` maintains a list of `LevelWaker` internally to wake up the
-    /// enqueued `LevelWaiter`s. So, for users that uses `WaiterQueue`, this method
+    /// `WaiterQueue` maintains a list of `Waker` internally to wake up the
+    /// enqueued `Waiter`s. So, for users that uses `WaiterQueue`, this method
     /// does not need to be called manually.
     pub fn waker(&self) -> Waker<S> {
         Waker {
