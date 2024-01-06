@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1704579077649,
+  "lastUpdate": 1704579085813,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -1790,6 +1790,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2299,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "9ee0a0ae73c109fb862d38e17e34ddf2cca792b8",
+          "message": "Refine replace_mem_chunks to lock once",
+          "timestamp": "2023-12-22T09:46:00Z",
+          "url": "https://github.com/occlum/occlum/commit/9ee0a0ae73c109fb862d38e17e34ddf2cca792b8"
+        },
+        "date": 1704579083788,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2303,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2303,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
