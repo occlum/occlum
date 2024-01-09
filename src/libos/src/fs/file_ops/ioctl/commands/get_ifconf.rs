@@ -135,13 +135,3 @@ fn get_ifconf_by_host(fd: HostFd, if_conf: &mut IfConf) -> Result<()> {
 
     Ok(())
 }
-
-// #[cfg(not(feature = "sgx"))]
-// fn get_ifconf_by_host(fd: HostFd, if_conf: &mut IfConf) -> Result<()> {
-//     try_libc!(libc::ioctl(
-//         fd as _,
-//         SIOCGIFCONF as _,
-//         if_conf as *mut IfConf as *mut i32
-//     ));
-//     Ok(())
-// }

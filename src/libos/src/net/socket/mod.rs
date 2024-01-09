@@ -6,6 +6,7 @@ mod host;
 mod iovs;
 mod msg;
 mod socket_address;
+pub mod sockopt;
 mod unix;
 pub mod uring;
 

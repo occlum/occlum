@@ -8,7 +8,7 @@ use std::ptr;
 use std::time::Duration;
 
 use super::io_multiplexing::{AsEpollFile, EpollCtl, EpollFile, EpollFlags, FdSetExt, PollFd};
-use fs::{CreationFlags, File, FileDesc, FileRef};
+use fs::{CreationFlags, File, FileDesc, FileRef, IoctlCmd};
 use misc::resource_t;
 use process::Process;
 use signal::{sigset_t, MaskOp, SigSet, SIGKILL, SIGSTOP};
@@ -16,17 +16,16 @@ use std::convert::TryFrom;
 use time::{timespec_t, timeval_t};
 use util::mem_util::from_user;
 
-use super::socket::uring::ioctl::IoctlCmd;
-use super::socket::uring::misc::{
-    GetRecvTimeoutCmd, GetSendTimeoutCmd, RecvFlags, SendFlags, SetRecvTimeoutCmd,
-    SetSendTimeoutCmd, Shutdown, Type,
-};
-use super::socket::uring::sockopt::{
+use super::socket::sockopt::{
     GetAcceptConnCmd, GetDomainCmd, GetOutputAsBytes, GetPeerNameCmd, GetRcvBufSizeCmd,
     GetSndBufSizeCmd, GetSockOptRawCmd, GetTypeCmd, SetRcvBufSizeCmd, SetSndBufSizeCmd,
     SetSockOptRawCmd, SockOptName,
 };
-use super::socket::uring::{AnyAddr, UringSocketType};
+use super::socket::uring::misc::{
+    GetRecvTimeoutCmd, GetSendTimeoutCmd, RecvFlags, SendFlags, SetRecvTimeoutCmd,
+    SetSendTimeoutCmd, Shutdown, Type,
+};
+use super::socket::uring::{AnyAddr, SocketProtocol, UringSocketType};
 
 use super::*;
 
@@ -54,27 +53,43 @@ pub fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<i
     let socket_type =
         Type::try_from(type_bits).map_err(|_| errno!(EINVAL, "invalid socket type"))?;
 
-    let file_ref: Arc<dyn File> = if ENABLE_URING {
-        let domain = Domain::try_from(domain)
-            .map_err(|_| errno!(EINVAL, "invalid or unsupported network domain"))?;
-        let nonblocking = flags.contains(SocketFlags::SOCK_NONBLOCK);
-        let socket_file = SocketFile::new(domain, protocol, socket_type, nonblocking)?;
-        Arc::new(socket_file)
-    } else {
+    let socket_protocol = SocketProtocol::try_from(protocol)
+        .map_err(|_| errno!(Errno::EINVAL, "Invalid or unsupported network protocol"))?;
+
+    let mut file_ref: Option<Arc<dyn File>> = None;
+
+    if ENABLE_URING {
+        let uring_domain = Domain::try_from(ocall_domain);
+        let is_uring_type = (socket_type == Type::DGRAM || socket_type == Type::STREAM);
+        let is_uring_protocol = (socket_protocol == SocketProtocol::IPPROTO_IP
+            || socket_protocol == SocketProtocol::IPPROTO_TCP
+            || socket_protocol == SocketProtocol::IPPROTO_UDP);
+        let is_uring_domain = uring_domain.is_ok();
+
+        if is_uring_type && is_uring_protocol && is_uring_domain {
+            let nonblocking = flags.contains(SocketFlags::SOCK_NONBLOCK);
+            let socket_file =
+                SocketFile::new(uring_domain.unwrap(), protocol, socket_type, nonblocking)?;
+            file_ref = Some(Arc::new(socket_file));
+        }
+    };
+
+    // Dispatch unsupported uring domain and flags to ocall
+    if file_ref.is_none() {
         match ocall_domain {
             AddressFamily::LOCAL => {
                 let unix_socket = unix_socket(socket_type, flags, protocol)?;
-                Arc::new(unix_socket)
+                file_ref = Some(Arc::new(unix_socket));
             }
             _ => {
                 let socket = HostSocket::new(ocall_domain, socket_type, flags, protocol)?;
-                Arc::new(socket)
+                file_ref = Some(Arc::new(socket));
             }
         }
     };
 
     let close_on_spawn = flags.contains(SocketFlags::SOCK_CLOEXEC);
-    let fd = current!().add_file(file_ref, close_on_spawn);
+    let fd = current!().add_file(file_ref.unwrap(), close_on_spawn);
     Ok(fd as isize)
 }
 

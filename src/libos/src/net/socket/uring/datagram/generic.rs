@@ -9,6 +9,7 @@ use crate::{
 
 use super::*;
 use crate::fs::IoEvents as Events;
+use crate::fs::{GetIfConf, GetIfReqWithRawCmd, GetReadBufLen, IoctlCmd};
 
 pub struct DatagramSocket<A: Addr + 'static, R: Runtime> {
     common: Arc<Common<A, R>>,

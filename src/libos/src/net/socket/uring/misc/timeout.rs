@@ -1,4 +1,4 @@
-use crate::net::socket::uring::ioctl::IoctlCmd;
+use crate::fs::IoctlCmd;
 use crate::prelude::*;
 use libc::{suseconds_t, time_t};
 use std::time::Duration;

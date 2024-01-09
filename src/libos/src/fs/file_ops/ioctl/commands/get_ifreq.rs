@@ -65,39 +65,6 @@ fn get_ifreq_by_host(fd: HostFd, cmd: u32, req: &IfReq) -> Result<IfReq> {
             std::mem::size_of::<IfReq>(),
         );
         assert!(status == sgx_types::sgx_status_t::SGX_SUCCESS);
-
-        // cfg_if::cfg_if! {
-        //     if #[cfg(feature = "sgx")] {
-        //         extern "C" {
-        //             pub fn occlum_ocall_ioctl(
-        //                 ret: *mut i32,
-        //                 fd: c_int,
-        //                 request: c_int,
-        //                 arg: *mut c_void,
-        //                 len: size_t,
-        //             ) -> sgx_types::sgx_status_t;
-        //         }
-
-        //         use occlum_ocall_ioctl as do_ioctl;
-        //         use libc::{c_int, c_void, size_t};
-
-        //         let status = do_ioctl(
-        //             &mut retval as *mut i32,
-        //             fd as i32,
-        //             cmd as i32,
-        //             &mut if_req as *mut IfReq as *mut c_void,
-        //             std::mem::size_of::<IfReq>(),
-        //         );
-        //         assert!(status == sgx_types::sgx_status_t::SGX_SUCCESS);
-        //     } else {
-        //         use libc::ioctl as do_ioctl;
-        //         retval = do_ioctl(
-        //                 fd as _,
-        //                 cmd as _,
-        //                 &mut if_req as *mut IfReq as *mut u8
-        //             );
-        //     }
-        // }
         retval
     });
     Ok(if_req)

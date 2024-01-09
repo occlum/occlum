@@ -3,10 +3,9 @@ use atomic::Ordering;
 use self::recv::Receiver;
 use self::send::Sender;
 use crate::fs::IoEvents as Events;
+use crate::net::socket::sockopt::{setsockopt_by_host, SockOptName};
 use crate::net::socket::uring::common::Common;
 use crate::net::socket::uring::runtime::Runtime;
-use crate::net::socket::uring::sockopt::{setsockopt_by_host, SockOptName};
-use crate::net::socket::uring::stream::SEND_BUF_SIZE;
 use crate::prelude::*;
 
 mod recv;

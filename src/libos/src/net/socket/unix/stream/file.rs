@@ -1,7 +1,9 @@
+use crate::fs::{GetReadBufLen, IoctlCmd};
+
 use super::address_space::ADDRESS_SPACE;
 use super::stream::Status;
 use super::*;
-use fs::{AccessMode, File, FileRef, IoEvents, IoNotifier, IoctlCmd, StatusFlags};
+use fs::{AccessMode, File, FileRef, IoEvents, IoNotifier, IoctlRawCmd, StatusFlags};
 use rcore_fs::vfs::{FileType, Metadata, Timespec};
 use std::any::Any;
 
@@ -55,23 +57,19 @@ impl File for Stream {
         }
     }
 
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-        match cmd {
-            IoctlCmd::TCGETS(_) => return_errno!(ENOTTY, "not tty device"),
-            IoctlCmd::TCSETS(_) => return_errno!(ENOTTY, "not tty device"),
-            IoctlCmd::FIONBIO(nonblocking) => {
-                self.set_nonblocking(**nonblocking != 0);
-            }
-            IoctlCmd::FIONREAD(arg) => match &*self.inner() {
-                Status::Connected(endpoint) => {
-                    let bytes_to_read = endpoint.bytes_to_read().min(std::i32::MAX as usize) as i32;
-                    **arg = bytes_to_read;
-                }
-                _ => return_errno!(ENOTCONN, "unconnected socket"),
+    fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+        match_ioctl_cmd_auto_error!(cmd, {
+            cmd : GetReadBufLen => {
+                match &*self.inner() {
+                    Status::Connected(endpoint) => {
+                        let bytes_to_read = endpoint.bytes_to_read().min(std::i32::MAX as usize) as i32;
+                        cmd.set_output(bytes_to_read as _);
+                    }
+                    _ => return_errno!(ENOTCONN, "unconnected socket"),
+                };
             },
-            _ => return_errno!(EINVAL, "unknown ioctl cmd for unix socket"),
-        }
-        Ok(0)
+        });
+        Ok(())
     }
 
     fn access_mode(&self) -> Result<AccessMode> {

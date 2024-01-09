@@ -1,6 +1,6 @@
 use libc::ocall::getsockopt as do_getsockopt;
 
-use crate::{net::socket::uring::ioctl::IoctlCmd, prelude::*};
+use crate::{fs::IoctlCmd, prelude::*};
 
 #[derive(Debug)]
 pub struct GetSockOptRawCmd {

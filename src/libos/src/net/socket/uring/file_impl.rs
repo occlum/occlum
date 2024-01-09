@@ -1,5 +1,5 @@
 use super::socket_file::SocketFile;
-use crate::fs::{AccessMode, HostFd, IoEvents, IoNotifier, IoctlCmd, StatusFlags};
+use crate::fs::{AccessMode, HostFd, IoEvents, IoNotifier, IoctlCmd, IoctlRawCmd, StatusFlags};
 use crate::prelude::*;
 use sgx_trts::libc::ESPIPE;
 use std::{io::SeekFrom, os::unix::raw::off_t};
@@ -39,9 +39,9 @@ impl File for SocketFile {
         return_errno!(Errno::ESPIPE, "Socket does not support seek")
     }
 
-    // fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-    //     self.ioctl_impl(cmd)
-    // }
+    fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+        self.ioctl(cmd)
+    }
 
     fn notifier(&self) -> Option<&IoNotifier> {
         Some(self.notifier())

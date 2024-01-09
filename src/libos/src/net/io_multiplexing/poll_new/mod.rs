@@ -54,12 +54,6 @@ pub fn do_poll_new(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) -> R
 
     debug_assert!(files_and_expected_events.len() == poll_fds.len());
 
-    // Fast poll
-    let count = poll_interested_events(files_and_expected_events.iter(), poll_fds.iter());
-    if count > 0 {
-        return Ok(count);
-    }
-
     // Now that all fds are valid, we set up a monitor for the set of files
     let mut monitor = {
         let expected_num_files = files_and_expected_events.len();

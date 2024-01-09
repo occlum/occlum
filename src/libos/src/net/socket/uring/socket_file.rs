@@ -1,11 +1,10 @@
 use self::impls::{Ipv4Datagram, Ipv6Datagram};
-use super::ioctl::IoctlCmd;
 use super::misc::{Ipv4SocketAddr, Ipv6SocketAddr, MsgFlags, RecvFlags, SendFlags, Shutdown, Type};
 use crate::events::{Observer, Poller};
 
 use self::impls::{Ipv4Stream, Ipv6Stream};
 use super::addr::AnyAddr;
-use crate::fs::{AccessMode, IoEvents, IoNotifier, StatusFlags};
+use crate::fs::{AccessMode, IoEvents, IoNotifier, IoctlCmd, StatusFlags};
 use crate::prelude::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 

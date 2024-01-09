@@ -116,7 +116,7 @@ impl File for TimerFile {
     }
 
     // TODO: implement ioctl
-    // fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
+    // fn ioctl(&self, cmd: &mut IoctlRawCmd) -> Result<i32> {
     //     self.ioctl_impl(cmd)
     // }
 

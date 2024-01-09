@@ -5,10 +5,9 @@ mod sender;
 
 use self::receiver::Receiver;
 use self::sender::Sender;
+use crate::net::socket::sockopt::*;
 use crate::net::socket::uring::common::{do_bind, do_connect, Common};
-use crate::net::socket::uring::ioctl::*;
 use crate::net::socket::uring::runtime::Runtime;
-use crate::net::socket::uring::sockopt::*;
 use crate::prelude::*;
 
 pub use generic::DatagramSocket;

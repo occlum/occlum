@@ -1,6 +1,6 @@
 use libc::ocall::setsockopt as do_setsockopt;
 
-use crate::{net::socket::uring::ioctl::IoctlCmd, prelude::*};
+use crate::{fs::IoctlCmd, prelude::*};
 
 #[derive(Debug)]
 pub struct SetSockOptRawCmd {

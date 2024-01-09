@@ -1,7 +1,7 @@
-//! Macros to implement `BuiltinIoctlNum` and `IoctlCmd` given a list of ioctl
+//! Macros to implement `BuiltinIoctlNum` and `IoctlRawCmd` given a list of ioctl
 //! names, numbers, and argument types.
 
-/// Implement `BuiltinIoctlNum` and `IoctlCmd`.
+/// Implement `BuiltinIoctlNum` and `IoctlRawCmd`.
 #[macro_export]
 macro_rules! impl_ioctl_nums_and_cmds {
     ($( $ioctl_name: ident => ( $ioctl_num: expr, $($ioctl_type_tt: tt)* ) ),+,) => {
@@ -12,7 +12,7 @@ macro_rules! impl_ioctl_nums_and_cmds {
             )*
         }
 
-        // Implement IoctlCmd given ioctl names and their argument types
+        // Implement IoctlRawCmd given ioctl names and their argument types
         impl_ioctl_cmds! {
             $(
                 $ioctl_name => ( $($ioctl_type_tt)*),
@@ -57,21 +57,21 @@ macro_rules! impl_builtin_ioctl_nums {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// IoctlCmd
+// IoctlRawCmd
 ////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! impl_ioctl_cmds {
     ($( $ioctl_name: ident => ( $($ioctl_type_tt: tt)* ) ),+,) => {
         #[derive(Debug)]
-        pub enum IoctlCmd<'a> {
+        pub enum IoctlRawCmd<'a> {
             $(
                 $ioctl_name( get_arg_type!($($ioctl_type_tt)*) ),
             )*
             NonBuiltin(NonBuiltinIoctlCmd<'a>),
         }
 
-        impl<'a> IoctlCmd<'a> {
-            pub unsafe fn new(cmd_num: u32, arg_ptr: *mut u8) -> Result<IoctlCmd<'a>> {
+        impl<'a> IoctlRawCmd<'a> {
+            pub unsafe fn new(cmd_num: u32, arg_ptr: *mut u8) -> Result<IoctlRawCmd<'a>> {
                 if let Some(builtin_cmd_num) = BuiltinIoctlNum::from_u32(cmd_num) {
                     unsafe { Self::new_builtin_cmd(builtin_cmd_num, arg_ptr) }
                 } else {
@@ -79,7 +79,7 @@ macro_rules! impl_ioctl_cmds {
                 }
             }
 
-            unsafe fn new_builtin_cmd(cmd_num: BuiltinIoctlNum, arg_ptr: *mut u8) -> Result<IoctlCmd<'a>> {
+            unsafe fn new_builtin_cmd(cmd_num: BuiltinIoctlNum, arg_ptr: *mut u8) -> Result<IoctlRawCmd<'a>> {
                 if cmd_num.require_arg() && arg_ptr.is_null() {
                     return_errno!(EINVAL, "arg_ptr cannot be null");
                 }
@@ -90,43 +90,43 @@ macro_rules! impl_ioctl_cmds {
                     $(
                         BuiltinIoctlNum::$ioctl_name => {
                             let arg = get_arg!($($ioctl_type_tt)*, arg_ptr);
-                            IoctlCmd::$ioctl_name(arg)
+                            IoctlRawCmd::$ioctl_name(arg)
                         }
                     )*
                 };
                 Ok(cmd)
             }
 
-            unsafe fn new_nonbuiltin_cmd(cmd_num: u32, arg_ptr: *mut u8) -> Result<IoctlCmd<'a>> {
+            unsafe fn new_nonbuiltin_cmd(cmd_num: u32, arg_ptr: *mut u8) -> Result<IoctlRawCmd<'a>> {
                 let structured_cmd_num = StructuredIoctlNum::from_u32(cmd_num)?;
                 let inner_cmd = unsafe { NonBuiltinIoctlCmd::new(structured_cmd_num, arg_ptr)? };
-                Ok(IoctlCmd::NonBuiltin(inner_cmd))
+                Ok(IoctlRawCmd::NonBuiltin(inner_cmd))
             }
 
             pub fn arg_ptr(&self) -> *const u8 {
                 match self {
                     $(
-                        IoctlCmd::$ioctl_name(arg_ref) => get_arg_ptr!($($ioctl_type_tt)*, arg_ref),
+                        IoctlRawCmd::$ioctl_name(arg_ref) => get_arg_ptr!($($ioctl_type_tt)*, arg_ref),
                     )*
-                    IoctlCmd::NonBuiltin(inner) => inner.arg_ptr(),
+                    IoctlRawCmd::NonBuiltin(inner) => inner.arg_ptr(),
                 }
             }
 
             pub fn arg_len(&self) -> usize {
                 match self {
                     $(
-                        IoctlCmd::$ioctl_name(_) => get_arg_len!($($ioctl_type_tt)*),
+                        IoctlRawCmd::$ioctl_name(_) => get_arg_len!($($ioctl_type_tt)*),
                     )*
-                    IoctlCmd::NonBuiltin(inner) => inner.arg_len(),
+                    IoctlRawCmd::NonBuiltin(inner) => inner.arg_len(),
                 }
             }
 
             pub fn cmd_num(&self) -> u32 {
                 match self {
                     $(
-                        IoctlCmd::$ioctl_name(_) => BuiltinIoctlNum::$ioctl_name as u32,
+                        IoctlRawCmd::$ioctl_name(_) => BuiltinIoctlNum::$ioctl_name as u32,
                     )*
-                    IoctlCmd::NonBuiltin(inner) => inner.cmd_num().as_u32(),
+                    IoctlRawCmd::NonBuiltin(inner) => inner.cmd_num().as_u32(),
                 }
             }
         }

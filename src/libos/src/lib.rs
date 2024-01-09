@@ -85,6 +85,9 @@ mod prelude;
 #[macro_use]
 mod error;
 
+#[macro_use]
+mod net;
+
 mod config;
 mod entry;
 mod events;
@@ -94,7 +97,6 @@ mod interrupt;
 mod io_uring;
 mod ipc;
 mod misc;
-mod net;
 mod process;
 mod sched;
 mod signal;

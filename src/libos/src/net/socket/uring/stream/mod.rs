@@ -8,16 +8,19 @@ use atomic::Ordering;
 
 use self::states::{ConnectedStream, ConnectingStream, InitStream, ListenerStream};
 use crate::events::Observer;
-use crate::fs::{IoEvents, IoNotifier, StatusFlags};
+use crate::fs::{
+    GetIfConf, GetIfReqWithRawCmd, GetReadBufLen, IoEvents, IoNotifier, IoctlCmd, SetNonBlocking,
+    StatusFlags,
+};
+
 use crate::net::socket::uring::common::Common;
-use crate::net::socket::uring::ioctl::*;
 use crate::net::socket::uring::runtime::Runtime;
 use crate::prelude::*;
 
 use super::misc::MsgFlags;
 use crate::events::Poller;
+use crate::net::socket::sockopt::*;
 use crate::net::socket::uring::misc::*;
-use crate::net::socket::uring::sockopt::*;
 
 lazy_static! {
     pub static ref SEND_BUF_SIZE: AtomicUsize = AtomicUsize::new(2565 * 1024 + 1); // Default Linux send buffer size is 2.5MB.

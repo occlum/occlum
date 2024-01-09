@@ -38,9 +38,8 @@
 //! Here is a simple program to demonstrate the usage of `IoctlCmd`.
 //!
 //! ```rust
-//! use async_io::prelude::*;
-//! use async_io::{impl_ioctl_cmd, match_ioctl_cmd_mut};
-//! use async_io::ioctl::{IoctlCmd};
+//! use net::{impl_ioctl_cmd, match_ioctl_cmd_mut};
+//! use net::ioctl::{IoctlCmd};
 //!
 //! /// A trait to abstract any file-like type.
 //! ///
@@ -196,7 +195,7 @@ macro_rules! impl_ioctl_cmd {
             }
         }
 
-        impl crate::net::socket::uring::ioctl::IoctlCmd for $CmdName {}
+        impl crate::fs::IoctlCmd for $CmdName {}
 
         impl std::fmt::Debug for $CmdName  {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -228,7 +227,7 @@ macro_rules! match_ioctl_cmd_ref {
             _ => $default:expr
         }
     ) => {{
-        let __cmd : &dyn IoctlCmd = $cmd;
+        let __cmd : &dyn crate::fs::IoctlCmd = $cmd;
         $(
             if __cmd.is::<$ty>() {
                 let $bind = __cmd.downcast_ref::<$ty>().unwrap();
@@ -250,7 +249,7 @@ macro_rules! match_ioctl_cmd_mut {
             _ => $default:expr
         }
     ) => {{
-        let __cmd : &mut dyn IoctlCmd = $cmd;
+        let __cmd : &mut dyn crate::fs::IoctlCmd = $cmd;
         $(
             if __cmd.is::<$ty>() {
                 let $bind = __cmd.downcast_mut::<$ty>().unwrap();
@@ -273,8 +272,8 @@ macro_rules! match_ioctl_cmd_auto_error {
             $( $bind:ident : $ty:ty => $arm:expr ),* $(,)?
         }
     ) => {{
-        use crate::fs::file_ops::ioctl::*;
-        let __cmd : &mut dyn IoctlCmd = $cmd;
+        use crate::fs::file_ops::*;
+        let __cmd : &mut dyn crate::fs::IoctlCmd = $cmd;
         $(
             if __cmd.is::<$ty>() {
                 let $bind = __cmd.downcast_mut::<$ty>().unwrap();
@@ -283,16 +282,16 @@ macro_rules! match_ioctl_cmd_auto_error {
         )*
         // If the corresponding cmds are not defined, it will go here for default error
         if __cmd.is::<TcGets>() {
-            return_errno!(ENOTTY, "not tty device");
+            return_errno!(Errno::ENOTTY, "not tty device");
         }
         else if __cmd.is::<TcSets>() {
-            return_errno!(ENOTTY, "not tty device");
+            return_errno!(Errno::ENOTTY, "not tty device");
         }
         else if __cmd.is::<GetWinSize>() {
-            return_errno!(ENOTTY, "not tty device");
+            return_errno!(Errno::ENOTTY, "not tty device");
         }
         else if __cmd.is::<SetWinSize>() {
-            return_errno!(ENOTTY, "not tty device");
+            return_errno!(Errno::ENOTTY, "not tty device");
         }
         else {
             // Default branch
@@ -300,75 +299,3 @@ macro_rules! match_ioctl_cmd_auto_error {
         }
     }}
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[derive(Copy, Clone, Debug, Default, PartialEq)]
-//     pub struct WinSize(/* rows: */ u32, /* cols: */ u32);
-
-//     impl_ioctl_cmd! {
-//         // = ioctl TIOCSWINSZ
-//         #[derive(Default)]
-//         pub struct SetWinSize<Input=WinSize, Output=()> {}
-//     }
-
-//     impl_ioctl_cmd! {
-//         // = ioctl TIOCGWINSZ
-//         #[derive(Default)]
-//         pub struct GetWinSize<Input=(), Output=WinSize> {}
-//     }
-
-//     #[test]
-//     fn getter_setter() {
-//         let cmd = SetWinSize::new(WinSize(0, 0));
-//         assert!(cmd.input() == &WinSize(0, 0));
-//         assert!(cmd.output() == None);
-
-//         let mut cmd = GetWinSize::new(());
-//         assert!(cmd.input() == &());
-//         assert!(cmd.output() == None);
-
-//         let win_size = WinSize(1, 2);
-//         cmd.set_output(win_size);
-//         assert!(cmd.output() == Some(&win_size));
-
-//         let taken_win_size = cmd.take_output();
-//         assert!(taken_win_size == Some(win_size));
-//         assert!(cmd.output() == None);
-//     }
-
-//     #[test]
-//     fn match_boxed_cmd_ref() {
-//         let cmd: Box<dyn IoctlCmd> = Box::new(GetWinSize::new(()));
-//         match_ioctl_cmd_ref!(&*cmd, {
-//             cmd : GetWinSize => {
-//                 println!("as expected: {:?}", cmd);
-//             },
-//             cmd : SetWinSize => {
-//                 panic!("impossible: {:?}", cmd);
-//             },
-//             _ => {
-//                 panic!("impossible");
-//             }
-//         });
-//     }
-
-//     #[test]
-//     fn match_boxed_cmd_mut() {
-//         let win_size = WinSize(1, 2);
-//         let mut cmd: Box<dyn IoctlCmd> = Box::new(SetWinSize::new(win_size));
-//         match_ioctl_cmd_mut!(&mut *cmd, {
-//             cmd : GetWinSize => {
-//                 panic!("impossible: {:?}", cmd);
-//             },
-//             cmd : SetWinSize => {
-//                 println!("as expected: {:?}", cmd);
-//             },
-//             _ => {
-//                 panic!("impossible");
-//             }
-//         });
-//     }
-// }

@@ -7,7 +7,7 @@ use atomic::Atomic;
 use super::*;
 use crate::fs::{
     occlum_ocall_ioctl, AccessMode, CreationFlags, File, FileRef, HostFd, IoEvents, IoNotifier,
-    IoctlCmd, StatusFlags,
+    IoctlRawCmd, StatusFlags,
 };
 
 use crate::process::IO_BUF_SIZE;

@@ -1,5 +1,5 @@
 use super::set::setsockopt_by_host;
-use crate::{net::socket::uring::ioctl::IoctlCmd, prelude::*};
+use crate::{fs::IoctlCmd, prelude::*};
 
 #[derive(Debug)]
 pub struct SetSndBufSizeCmd {
