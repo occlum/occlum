@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1704579085813,
+  "lastUpdate": 1704924690438,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -1824,6 +1824,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2303,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "jeffery.wsj",
+            "username": "superajun-wsj",
+            "email": "jeffery.wsj@alibaba-inc.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "dbd13458d7118f1ba6061911bd411ac9005e597a",
+          "message": "Add go exec call demo in occlum",
+          "timestamp": "2023-12-28T09:54:49Z",
+          "url": "https://github.com/occlum/occlum/commit/dbd13458d7118f1ba6061911bd411ac9005e597a"
+        },
+        "date": 1704924689300,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2249,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2249,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
