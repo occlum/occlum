@@ -152,7 +152,7 @@ jobs:
     - name: Run Golang exec test
       run: |
         sleep ${{ env.nap_time }};
-        docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/golang/go_exec ./run_sub_exec_on_occlum.sh"
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/golang/go_exec && ./run_sub_exec_on_occlum.sh"
 
     # Sleeps longer to make sure the server is up.
     - name: Curl test
