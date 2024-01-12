@@ -17,10 +17,9 @@ use crate::net::socket::uring::common::Common;
 use crate::net::socket::uring::runtime::Runtime;
 use crate::prelude::*;
 
-use super::misc::MsgFlags;
 use crate::events::Poller;
-use crate::net::socket::sockopt::*;
 use crate::net::socket::uring::misc::*;
+use crate::net::socket::{sockopt::*, MsgFlags};
 
 lazy_static! {
     pub static ref SEND_BUF_SIZE: AtomicUsize = AtomicUsize::new(2565 * 1024 + 1); // Default Linux send buffer size is 2.5MB.

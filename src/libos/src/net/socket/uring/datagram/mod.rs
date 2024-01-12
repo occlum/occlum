@@ -12,7 +12,7 @@ use crate::prelude::*;
 
 pub use generic::DatagramSocket;
 
-use crate::net::socket::uring::misc::{
+use crate::net::socket::sockopt::{
     timeout_to_timeval, GetRecvTimeoutCmd, GetSendTimeoutCmd, SetRecvTimeoutCmd, SetSendTimeoutCmd,
 };
 

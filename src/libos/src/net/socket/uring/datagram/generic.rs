@@ -4,7 +4,7 @@ use crate::{
     events::{Observer, Poller},
     fs::{IoNotifier, StatusFlags},
     match_ioctl_cmd_mut,
-    net::socket::uring::misc::MsgFlags,
+    net::socket::MsgFlags,
 };
 
 use super::*;

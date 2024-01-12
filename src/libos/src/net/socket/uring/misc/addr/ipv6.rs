@@ -18,7 +18,7 @@ pub struct Ipv6SocketAddr {
 
 impl Addr for Ipv6SocketAddr {
     fn domain() -> Domain {
-        Domain::Ipv6
+        Domain::INET6
     }
 
     fn from_c_storage(c_addr: &libc::sockaddr_storage, c_addr_len: usize) -> Result<Self> {

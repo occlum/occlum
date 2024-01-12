@@ -3,7 +3,7 @@
 #![feature(raw_ref_op)]
 
 pub use self::addr::*;
-pub use self::socket_file::{SocketProtocol, UringSocketType};
+pub use self::socket_file::UringSocketType;
 
 pub mod addr;
 pub mod common;

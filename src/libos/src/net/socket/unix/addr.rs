@@ -15,6 +15,13 @@ pub enum Addr {
 }
 
 impl Addr {
+    // pub fn new(storage: libc::sockaddr_storage, len: usize) -> Self {
+    //     Self {
+    //         storage,
+    //         len,
+    //     }
+    // }
+
     /// Caller should guarentee the sockaddr and addr_len are valid.
     /// The pathname should end with a '\0' within the passed length.
     /// The abstract name should both start and end with a '\0' within the passed length.
@@ -33,8 +40,8 @@ impl Addr {
             return_errno!(EINVAL, "the address is too long.");
         }
 
-        if AddressFamily::try_from((*sockaddr).sa_family)? != AddressFamily::LOCAL {
-            return_errno!(EINVAL, "not a valid address for unix socket");
+        if Domain::try_from((*sockaddr).sa_family)? != Domain::LOCAL {
+            return_errno!(Errno::EINVAL, "not a valid address for unix socket");
         }
 
         let sockaddr = sockaddr as *const libc::sockaddr_un;
@@ -83,7 +90,7 @@ impl Addr {
 
     fn to_raw(&self) -> (libc::sockaddr_un, usize) {
         let mut addr: libc::sockaddr_un = unsafe { mem::zeroed() };
-        addr.sun_family = AddressFamily::LOCAL as libc::sa_family_t;
+        addr.sun_family = Domain::LOCAL as libc::sa_family_t;
 
         let addr_len = match self {
             Self::File(_, unix_path) => {

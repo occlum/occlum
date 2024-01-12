@@ -1,12 +1,12 @@
 use self::impls::{Ipv4Datagram, Ipv6Datagram};
-use super::misc::{Ipv4SocketAddr, Ipv6SocketAddr, MsgFlags, RecvFlags, SendFlags, Shutdown, Type};
+use super::misc::{Ipv4SocketAddr, Ipv6SocketAddr};
 use crate::events::{Observer, Poller};
+use crate::net::socket::{MsgFlags, SocketProtocol};
 
 use self::impls::{Ipv4Stream, Ipv6Stream};
 use super::addr::AnyAddr;
 use crate::fs::{AccessMode, IoEvents, IoNotifier, IoctlCmd, StatusFlags};
 use crate::prelude::*;
-use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 #[derive(Debug)]
 pub struct SocketFile {
@@ -52,39 +52,6 @@ enum AnySocket {
     Ipv6Stream(Ipv6Stream),
     Ipv4Datagram(Ipv4Datagram),
     Ipv6Datagram(Ipv6Datagram),
-}
-
-/* Standard well-defined IP protocols.  */
-#[allow(non_camel_case_types)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, IntoPrimitive, TryFromPrimitive)]
-#[repr(i32)]
-pub enum SocketProtocol {
-    IPPROTO_IP = 0,        /* Dummy protocol for TCP.  */
-    IPPROTO_ICMP = 1,      /* Internet Control Message Protocol.  */
-    IPPROTO_IGMP = 2,      /* Internet Group Management Protocol. */
-    IPPROTO_IPIP = 4,      /* IPIP tunnels (older KA9Q tunnels use 94).  */
-    IPPROTO_TCP = 6,       /* Transmission Control Protocol.  */
-    IPPROTO_EGP = 8,       /* Exterior Gateway Protocol.  */
-    IPPROTO_PUP = 12,      /* PUP protocol.  */
-    IPPROTO_UDP = 17,      /* User Datagram Protocol.  */
-    IPPROTO_IDP = 22,      /* XNS IDP protocol.  */
-    IPPROTO_TP = 29,       /* SO Transport Protocol Class 4.  */
-    IPPROTO_DCCP = 33,     /* Datagram Congestion Control Protocol.  */
-    IPPROTO_IPV6 = 41,     /* IPv6 header.  */
-    IPPROTO_RSVP = 46,     /* Reservation Protocol.  */
-    IPPROTO_GRE = 47,      /* General Routing Encapsulation.  */
-    IPPROTO_ESP = 50,      /* encapsulating security payload.  */
-    IPPROTO_AH = 51,       /* authentication header.  */
-    IPPROTO_MTP = 92,      /* Multicast Transport Protocol.  */
-    IPPROTO_BEETPH = 94,   /* IP option pseudo header for BEET.  */
-    IPPROTO_ENCAP = 98,    /* Encapsulation Header.  */
-    IPPROTO_PIM = 103,     /* Protocol Independent Multicast.  */
-    IPPROTO_COMP = 108,    /* Compression Header Protocol.  */
-    IPPROTO_SCTP = 132,    /* Stream Control Transmission Protocol.  */
-    IPPROTO_UDPLITE = 136, /* UDP-Lite protocol.  */
-    IPPROTO_MPLS = 137,    /* MPLS in IP.  */
-    IPPROTO_RAW = 255,     /* Raw IP packets.  */
-    IPPROTO_MAX,
 }
 
 // Implement the common methods required by FileHandle
@@ -148,24 +115,27 @@ impl SocketFile {
 impl SocketFile {
     pub fn new(
         domain: Domain,
-        protocol: c_int,
+        protocol: SocketProtocol,
         socket_type: Type,
         nonblocking: bool,
     ) -> Result<Self> {
         match socket_type {
             Type::STREAM => {
+<<<<<<< HEAD
                 let protocol = SocketProtocol::try_from(protocol)
                     .map_err(|_| errno!(EINVAL, "Invalid or unsupported network protocol"))?;
+=======
+>>>>>>> fde2e9cc... [libos] Refactor uring / unix / host socket
                 if protocol != SocketProtocol::IPPROTO_IP && protocol != SocketProtocol::IPPROTO_TCP
                 {
                     return_errno!(EPROTONOSUPPORT, "Protocol not supported");
                 }
                 let any_socket = match domain {
-                    Domain::Ipv4 => {
+                    Domain::INET => {
                         let ipv4_stream = Ipv4Stream::new(nonblocking)?;
                         AnySocket::Ipv4Stream(ipv4_stream)
                     }
-                    Domain::Ipv6 => {
+                    Domain::INET6 => {
                         let ipv6_stream = Ipv6Stream::new(nonblocking)?;
                         AnySocket::Ipv6Stream(ipv6_stream)
                     }
@@ -177,18 +147,16 @@ impl SocketFile {
                 Ok(new_self)
             }
             Type::DGRAM => {
-                let protocol = SocketProtocol::try_from(protocol)
-                    .map_err(|_| errno!(EINVAL, "Invalid or unsupported network protocol"))?;
                 if protocol != SocketProtocol::IPPROTO_IP && protocol != SocketProtocol::IPPROTO_UDP
                 {
                     return_errno!(EPROTONOSUPPORT, "Protocol not supported");
                 }
                 let any_socket = match domain {
-                    Domain::Ipv4 => {
+                    Domain::INET => {
                         let ipv4_datagram = Ipv4Datagram::new(nonblocking)?;
                         AnySocket::Ipv4Datagram(ipv4_datagram)
                     }
-                    Domain::Ipv6 => {
+                    Domain::INET6 => {
                         let ipv6_datagram = Ipv6Datagram::new(nonblocking)?;
                         AnySocket::Ipv6Datagram(ipv6_datagram)
                     }

@@ -1,8 +1,9 @@
 use std::mem::{self, MaybeUninit};
 
+use crate::net::socket::Domain;
 use crate::prelude::*;
 
-use super::misc::{Addr, CSockAddr, Domain, Ipv4Addr, Ipv4SocketAddr, Ipv6SocketAddr};
+use super::misc::{Addr, CSockAddr, Ipv4Addr, Ipv4SocketAddr, Ipv6SocketAddr};
 use num_enum::IntoPrimitive;
 use std::path::Path;
 

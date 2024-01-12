@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::fmt::Debug;
 
-use super::Domain;
+use crate::net::Domain;
 use crate::prelude::*;
 
 mod c_sock_addr;

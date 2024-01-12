@@ -1,4 +1,4 @@
-use crate::net::socket::uring::misc::{GetRecvTimeoutCmd, GetSendTimeoutCmd};
+use super::{GetRecvTimeoutCmd, GetSendTimeoutCmd};
 
 use super::{
     GetAcceptConnCmd, GetDomainCmd, GetPeerNameCmd, GetRcvBufSizeCmd, GetSndBufSizeCmd,

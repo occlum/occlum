@@ -7,6 +7,7 @@ mod get_sockbuf;
 mod get_type;
 mod set;
 mod set_sockbuf;
+mod timeout;
 
 pub use get::GetSockOptRawCmd;
 pub use get_acceptconn::GetAcceptConnCmd;
@@ -17,6 +18,9 @@ pub use get_sockbuf::{GetRcvBufSizeCmd, GetSndBufSizeCmd};
 pub use get_type::GetTypeCmd;
 pub use set::{setsockopt_by_host, SetSockOptRawCmd};
 pub use set_sockbuf::{SetRcvBufSizeCmd, SetSndBufSizeCmd};
+pub use timeout::{
+    timeout_to_timeval, GetRecvTimeoutCmd, GetSendTimeoutCmd, SetRecvTimeoutCmd, SetSendTimeoutCmd,
+};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 

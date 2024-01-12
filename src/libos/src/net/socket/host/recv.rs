@@ -30,8 +30,7 @@ impl HostSocket {
         flags: RecvFlags,
         mut name: Option<&mut [u8]>,
         mut control: Option<&mut [u8]>,
-    ) -> Result<(usize, usize, usize, MsgHdrFlags)> {
-        let current = current!();
+    ) -> Result<(usize, usize, usize, MsgFlags)> {
         let data_length = data.iter().map(|s| s.len()).sum();
         let mut ocall_alloc;
         // Allocated slice in untrusted memory region
@@ -73,7 +72,7 @@ impl HostSocket {
         flags: RecvFlags,
         mut name: Option<&mut [u8]>,
         mut control: Option<&mut [u8]>,
-    ) -> Result<(usize, usize, usize, MsgHdrFlags)> {
+    ) -> Result<(usize, usize, usize, MsgFlags)> {
         // Prepare the arguments for OCall
         // Host socket fd
         let host_fd = self.raw_host_fd() as i32;
@@ -119,7 +118,7 @@ impl HostSocket {
             retval
         });
 
-        let flags_recvd = MsgHdrFlags::from_bits(msg_flags_recvd).unwrap();
+        let flags_recvd = MsgFlags::from_bits(msg_flags_recvd).unwrap();
 
         // Check values returned from outside the enclave
         let bytes_recvd = {
@@ -133,7 +132,7 @@ impl HostSocket {
             // For MSG_TRUNC recvmsg returns the real length of the packet or datagram,
             // even when it was longer than the passed buffer.
             if flags.contains(RecvFlags::MSG_TRUNC) && retval > max_bytes_recvd {
-                assert!(flags_recvd.contains(MsgHdrFlags::MSG_TRUNC));
+                assert!(flags_recvd.contains(MsgFlags::MSG_TRUNC));
             } else {
                 assert!(retval <= max_bytes_recvd);
             }

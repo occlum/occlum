@@ -8,8 +8,8 @@ pub use self::io_multiplexing::{
 };
 
 pub use self::socket::{
-    socketpair, unix_socket, AddressFamily, AsUnixSocket, HostSocket, HostSocketType, Iovs,
-    IovsMut, MsgHdr, MsgHdrMut, SliceAsLibcIovec, SockAddr, UnixAddr,
+    socketpair, unix_socket, AsUnixSocket, Domain, HostSocket, HostSocketType, Iovs, IovsMut,
+    MsgHdr, MsgHdrMut, SliceAsLibcIovec, SockAddr, UnixAddr,
 };
 pub use self::syscalls::*;
 

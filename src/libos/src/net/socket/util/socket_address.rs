@@ -11,16 +11,17 @@ pub struct SockAddr {
 impl fmt::Debug for SockAddr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SockAddr")
-            .field(
-                "family",
-                &AddressFamily::try_from(self.storage.ss_family).unwrap(),
-            )
+            .field("family", &Domain::try_from(self.storage.ss_family).unwrap())
             .field("len", &self.len)
             .finish()
     }
 }
 
 impl SockAddr {
+    pub fn new(storage: libc::sockaddr_storage, len: usize) -> Self {
+        Self { storage, len }
+    }
+
     // Caller should guarentee the sockaddr and addr_len are valid
     pub unsafe fn try_from_raw(
         sockaddr: *const libc::sockaddr,
@@ -34,13 +35,13 @@ impl SockAddr {
             return_errno!(EINVAL, "the address is too long.");
         }
 
-        match AddressFamily::try_from((*sockaddr).sa_family)? {
-            AddressFamily::INET => {
+        match Domain::try_from((*sockaddr).sa_family)? {
+            Domain::INET => {
                 if addr_len < std::mem::size_of::<libc::sockaddr_in>() as u32 {
                     return_errno!(EINVAL, "short ipv4 address.");
                 }
             }
-            AddressFamily::INET6 => {
+            Domain::INET6 => {
                 let ipv6_addr_len = std::mem::size_of::<libc::sockaddr_in6>() as u32;
                 // Omit sin6_scope_id when it is not fully provided
                 // 4 represents the size of sin6_scope_id which is not a must

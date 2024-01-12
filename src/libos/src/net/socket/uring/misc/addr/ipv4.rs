@@ -13,7 +13,7 @@ pub struct Ipv4SocketAddr {
 
 impl Addr for Ipv4SocketAddr {
     fn domain() -> Domain {
-        Domain::Ipv4
+        Domain::INET
     }
 
     fn from_c_storage(c_addr: &libc::sockaddr_storage, c_addr_len: usize) -> Result<Self> {

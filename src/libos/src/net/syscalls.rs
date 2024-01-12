@@ -1,4 +1,4 @@
-use super::socket::MsgHdrFlags;
+use super::socket::{MsgFlags, SocketProtocol};
 use super::{socket::uring::socket_file::SocketFile, *};
 
 use core::f32::consts::E;
@@ -18,14 +18,11 @@ use util::mem_util::from_user;
 
 use super::socket::sockopt::{
     GetAcceptConnCmd, GetDomainCmd, GetOutputAsBytes, GetPeerNameCmd, GetRcvBufSizeCmd,
-    GetSndBufSizeCmd, GetSockOptRawCmd, GetTypeCmd, SetRcvBufSizeCmd, SetSndBufSizeCmd,
-    SetSockOptRawCmd, SockOptName,
+    GetRecvTimeoutCmd, GetSendTimeoutCmd, GetSndBufSizeCmd, GetSockOptRawCmd, GetTypeCmd,
+    SetRcvBufSizeCmd, SetRecvTimeoutCmd, SetSendTimeoutCmd, SetSndBufSizeCmd, SetSockOptRawCmd,
+    SockOptName,
 };
-use super::socket::uring::misc::{
-    GetRecvTimeoutCmd, GetSendTimeoutCmd, RecvFlags, SendFlags, SetRecvTimeoutCmd,
-    SetSendTimeoutCmd, Shutdown, Type,
-};
-use super::socket::uring::{AnyAddr, SocketProtocol, UringSocketType};
+use super::socket::uring::{AnyAddr, UringSocketType};
 
 use super::*;
 
@@ -46,43 +43,43 @@ pub struct mmsghdr {
 }
 
 pub fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize> {
-    let ocall_domain = AddressFamily::try_from(domain as u16)?;
+    let domain = Domain::try_from(domain as u16)?;
     let flags = SocketFlags::from_bits_truncate(socket_type);
 
     let type_bits = socket_type & !flags.bits();
     let socket_type =
         Type::try_from(type_bits).map_err(|_| errno!(EINVAL, "invalid socket type"))?;
-
-    let socket_protocol = SocketProtocol::try_from(protocol)
+    let protocol = SocketProtocol::try_from(protocol)
         .map_err(|_| errno!(Errno::EINVAL, "Invalid or unsupported network protocol"))?;
 
     let mut file_ref: Option<Arc<dyn File>> = None;
 
-    if ENABLE_URING {
-        let uring_domain = Domain::try_from(ocall_domain);
+    // Determine if type and domain match uring supported socket
+    let match_uring = move || {
         let is_uring_type = (socket_type == Type::DGRAM || socket_type == Type::STREAM);
-        let is_uring_protocol = (socket_protocol == SocketProtocol::IPPROTO_IP
-            || socket_protocol == SocketProtocol::IPPROTO_TCP
-            || socket_protocol == SocketProtocol::IPPROTO_UDP);
-        let is_uring_domain = uring_domain.is_ok();
+        let is_uring_protocol = (protocol == SocketProtocol::IPPROTO_IP
+            || protocol == SocketProtocol::IPPROTO_TCP
+            || protocol == SocketProtocol::IPPROTO_UDP);
+        let is_uring_domain = (domain == Domain::INET || domain == Domain::INET6);
 
-        if is_uring_type && is_uring_protocol && is_uring_domain {
-            let nonblocking = flags.contains(SocketFlags::SOCK_NONBLOCK);
-            let socket_file =
-                SocketFile::new(uring_domain.unwrap(), protocol, socket_type, nonblocking)?;
-            file_ref = Some(Arc::new(socket_file));
-        }
+        is_uring_type && is_uring_protocol && is_uring_domain
+    };
+
+    if ENABLE_URING && match_uring() {
+        let nonblocking = flags.contains(SocketFlags::SOCK_NONBLOCK);
+        let socket_file = SocketFile::new(domain, protocol, socket_type, nonblocking)?;
+        file_ref = Some(Arc::new(socket_file));
     };
 
     // Dispatch unsupported uring domain and flags to ocall
     if file_ref.is_none() {
-        match ocall_domain {
-            AddressFamily::LOCAL => {
+        match domain {
+            Domain::LOCAL => {
                 let unix_socket = unix_socket(socket_type, flags, protocol)?;
                 file_ref = Some(Arc::new(unix_socket));
             }
             _ => {
-                let socket = HostSocket::new(ocall_domain, socket_type, flags, protocol)?;
+                let socket = HostSocket::new(domain, socket_type, flags, protocol)?;
                 file_ref = Some(Arc::new(socket));
             }
         }
@@ -462,7 +459,7 @@ pub fn do_getsockname(
             }
         } else {
             unsafe {
-                (*addr).sa_family = AddressFamily::LOCAL as u16;
+                (*addr).sa_family = Domain::LOCAL as u16;
                 *addr_len = 2;
             }
         }
@@ -562,7 +559,7 @@ pub fn do_recvfrom(
 
     // MSG_CTRUNC is a return flag but linux allows it to be set on input flags.
     // We just ignore it.
-    let recv_flags = RecvFlags::from_bits(flags & !(MsgHdrFlags::MSG_CTRUNC.bits()))
+    let recv_flags = RecvFlags::from_bits(flags & !(MsgFlags::MSG_CTRUNC.bits()))
         .ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
 
     let addr_set: bool = !addr.is_null();
@@ -632,7 +629,33 @@ pub fn do_socketpair(
     protocol: c_int,
     sv: *mut c_int,
 ) -> Result<isize> {
-    panic!()
+    let mut sock_pair = unsafe {
+        from_user::check_mut_array(sv, 2)?;
+        std::slice::from_raw_parts_mut(sv as *mut u32, 2)
+    };
+
+    let protocol = SocketProtocol::try_from(protocol)
+        .map_err(|_| errno!(Errno::EINVAL, "Invalid or unsupported network protocol"))?;
+
+    let file_flags = SocketFlags::from_bits_truncate(socket_type);
+    let close_on_spawn = file_flags.contains(SocketFlags::SOCK_CLOEXEC);
+    let sock_type = Type::try_from(socket_type & (!file_flags.bits()))
+        .map_err(|_| errno!(Errno::EINVAL, "invalid socket type"))?;
+
+    let domain = Domain::try_from(domain as u16)?;
+    if (domain == Domain::LOCAL) {
+        let (client_socket, server_socket) = socketpair(sock_type, file_flags, protocol)?;
+
+        let current = current!();
+        let mut files = current.files().lock();
+        sock_pair[0] = files.put(Arc::new(client_socket), close_on_spawn);
+        sock_pair[1] = files.put(Arc::new(server_socket), close_on_spawn);
+
+        debug!("socketpair: ({}, {})", sock_pair[0], sock_pair[1]);
+        Ok(0)
+    } else {
+        return_errno!(EAFNOSUPPORT, "domain not supported")
+    }
 }
 
 pub fn do_sendmsg(fd: c_int, msg_ptr: *const libc::msghdr, flags_c: c_int) -> Result<isize> {

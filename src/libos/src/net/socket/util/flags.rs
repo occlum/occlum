@@ -34,5 +34,6 @@ bitflags! {
         const MSG_TRUNC        = 0x20;      // The trailing portion of a datagram was discarded
         const MSG_EOR          = 0x80;      // End of record
         const MSG_ERRQUEUE     = 0x2000;    // Fetch message from error queue
+        const MSG_NOTIFICATION = 0x8000;     // Only applicable to SCTP socket
     }
 }

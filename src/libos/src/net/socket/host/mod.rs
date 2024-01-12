@@ -27,15 +27,15 @@ pub struct HostSocket {
 
 impl HostSocket {
     pub fn new(
-        domain: AddressFamily,
+        domain: Domain,
         socket_type: Type,
         socket_flags: SocketFlags,
-        protocol: i32,
+        protocol: SocketProtocol,
     ) -> Result<Self> {
         let raw_host_fd = try_libc!(libc::ocall::socket(
             domain as i32,
             socket_type as i32 | socket_flags.bits(),
-            protocol
+            protocol.into()
         )) as FileDesc;
         let host_fd = HostFd::new(raw_host_fd);
         Ok(HostSocket::from_host_fd(host_fd)?)

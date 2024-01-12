@@ -2,7 +2,7 @@ use core::time::Duration;
 use std::mem::MaybeUninit;
 
 use crate::events::Poller;
-use crate::net::socket::uring::misc::MsgFlags;
+use crate::net::socket::MsgFlags;
 use io_uring_callback::{Fd, IoHandle};
 use sgx_untrusted_alloc::{MaybeUntrusted, UntrustedBox};
 
