@@ -410,7 +410,6 @@ cmd_build() {
             libos_lib=libocclum-libos_hyper.so
         fi
         echo "SGX mode: $SGX_MODE"
-        echo "Enable EDMM: No"
         INSTANCE_IS_FOR_EDMM_PLATFORM="NO"
     else
         echo "SGX mode: HW"
@@ -419,11 +418,9 @@ cmd_build() {
         case "$ENABLE_EDMM" in
             "Y" | "YES" | "Yes" | "yes" | "True" | "true" | "1")
                 INSTANCE_IS_FOR_EDMM_PLATFORM="YES"
-                echo "Enable EDMM: Yes"
             ;;
             *)
                 INSTANCE_IS_FOR_EDMM_PLATFORM="NO"
-                echo "Enable EDMM: No"
             ;;
         esac
     fi

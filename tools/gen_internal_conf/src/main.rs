@@ -49,13 +49,6 @@ impl DefaultConfig {
 fn main() {
     env_logger::init();
 
-    let instance_is_for_edmm_platform = {
-        match std::env::var("INSTANCE_IS_FOR_EDMM_PLATFORM") {
-            Ok(val) => val == "YES",
-            _ => unreachable!(),
-        }
-    };
-
     let matches = App::new("gen_internal_conf")
         .version("0.2.0")
         // Input: JSON file which users may change
@@ -131,6 +124,14 @@ fn main() {
         .expect("It is not a valid Occlum configuration file.");
     debug!("The occlum config is:{:?}", occlum_config);
 
+    // If env is set, or Occlum.json `enable_edmm` field is set to true, EDMM is enabled.
+    let instance_is_for_edmm_platform = {
+        match std::env::var("INSTANCE_IS_FOR_EDMM_PLATFORM") {
+            Ok(val) => val == "YES" || occlum_config.feature.enable_edmm,
+            _ => unreachable!(),
+        }
+    };
+
     // Match subcommand
     if let Some(sub_matches) = matches.subcommand_matches("gen_conf") {
         let occlum_conf_user_fs_mac = sub_matches.value_of("user_fs_mac").unwrap();
@@ -151,7 +152,7 @@ fn main() {
             enclave_config_file_path
         );
 
-        debug!(
+        println!(
             "Build on platform {} EDMM support",
             if instance_is_for_edmm_platform {
                 "WITH"
@@ -467,7 +468,7 @@ fn main() {
             ISVFAMILYID_H: kss_tuple.3,
             ISVFAMILYID_L: kss_tuple.4,
             PKRU: occlum_config.feature.pkru,
-            AMX: occlum_config.metadata.amx,
+            AMX: occlum_config.feature.amx,
         };
         let enclave_config = serde_xml_rs::to_string(&sgx_enclave_configuration).unwrap();
         debug!("The enclave config:{:?}", enclave_config);
@@ -748,14 +749,16 @@ struct OcclumMetadata {
     enable_kss: bool,
     family_id: OcclumMetaID,
     ext_prod_id: OcclumMetaID,
-    #[serde(default)]
-    amx: u32,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 struct OcclumFeature {
     #[serde(default)]
+    amx: u32,
+    #[serde(default)]
     pkru: u32,
+    #[serde(default)]
+    enable_edmm: bool,
     #[serde(default)]
     enable_posix_shm: bool,
 }
