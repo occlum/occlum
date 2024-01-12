@@ -279,7 +279,15 @@ impl VMArea {
 
         if need_flush {
             let file_offset = file_offset.unwrap() + (target_range.start() - self.range.start());
-            file.unwrap().write_at(file_offset, buf);
+            let file_len = file.unwrap().metadata().unwrap().size;
+            if file_offset < file_len {
+                let effective_mem_len = std::cmp::min(target_range.size(), file_len - file_offset);
+                let len = file
+                    .unwrap()
+                    .write_at(file_offset, &buf[..effective_mem_len])
+                    .expect("flush file failure");
+                debug_assert!(len == effective_mem_len);
+            } // else file_offset >= file_len, no need to write file
         }
 
         // reset zeros
@@ -541,16 +549,40 @@ impl VMArea {
         if !cond_fn(file) {
             return;
         }
+        self.flush_file(file, file_offset)
+            .expect("flush memory to file failure");
+    }
+
+    fn flush_file(&self, file: &Arc<dyn File>, file_offset: usize) -> Result<()> {
+        let file_len = file.metadata().unwrap().size;
+        if file_offset >= file_len {
+            return Ok(());
+        }
+
         if self.is_fully_committed() {
-            file.write_at(file_offset, unsafe { self.as_slice() });
+            let effective_mem_len = std::cmp::min(self.range().size(), file_len - file_offset);
+            let len = file.write_at(file_offset, unsafe {
+                &self.as_slice()[..effective_mem_len]
+            })?;
+            debug_assert!(len == effective_mem_len);
         } else {
             let committed = true;
             let vm_range_start = self.range().start();
             for range in self.pages().get_ranges(committed) {
                 let file_offset = file_offset + (range.start() - vm_range_start);
-                file.write_at(file_offset, unsafe { range.as_slice() });
+                if file_offset >= file_len {
+                    break;
+                }
+
+                let effective_mem_len = std::cmp::min(range.size(), file_len - file_offset);
+                let len = file.write_at(file_offset, unsafe {
+                    &range.as_slice()[..effective_mem_len]
+                })?;
+                debug_assert!(len == effective_mem_len);
             }
         }
+
+        Ok(())
     }
 
     pub fn is_shared(&self) -> bool {
