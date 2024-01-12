@@ -146,7 +146,9 @@ pub struct ConfigApp {
 
 #[derive(Clone, Debug)]
 pub struct ConfigFeature {
+    pub amx: u32,
     pub pkru: u32,
+    pub enable_edmm: bool,
     pub enable_posix_shm: bool,
 }
 
@@ -303,7 +305,9 @@ impl ConfigApp {
 impl ConfigFeature {
     fn from_input(input: &InputConfigFeature) -> Result<ConfigFeature> {
         Ok(ConfigFeature {
+            amx: input.amx,
             pkru: input.pkru,
+            enable_edmm: input.enable_edmm,
             enable_posix_shm: input.enable_posix_shm,
         })
     }
@@ -530,7 +534,11 @@ struct InputConfigApp {
 #[serde(deny_unknown_fields)]
 struct InputConfigFeature {
     #[serde(default)]
+    pub amx: u32,
+    #[serde(default)]
     pub pkru: u32,
+    #[serde(default)]
+    pub enable_edmm: bool,
     #[serde(default)]
     pub enable_posix_shm: bool,
 }
@@ -538,7 +546,9 @@ struct InputConfigFeature {
 impl Default for InputConfigFeature {
     fn default() -> InputConfigFeature {
         InputConfigFeature {
+            amx: 0,
             pkru: 0,
+            enable_edmm: false,
             enable_posix_shm: false,
         }
     }

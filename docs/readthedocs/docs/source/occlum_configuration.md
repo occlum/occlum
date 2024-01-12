@@ -72,6 +72,13 @@ The template of `Occlum.json` is shown below.
     },
     // Features
     "feature": {
+        // Whether to turn on AMX feature in Occlum
+        // Occlum supports AMX instruction running inside the enclave when user enables it
+        //
+        // "amx" = 0: AMX feature must be disabled
+        // "amx" = 1: AMX feature must be enabled
+        // "amx" = 2: AMX feature is enabled if the platform supports it
+        "amx": 0,
         // Whether to turn on PKU feature in Occlum
         // Occlum uses PKU for isolation between LibOS and userspace program,
         // It is useful for developers to detect potential bugs.
@@ -80,9 +87,16 @@ The template of `Occlum.json` is shown below.
         // "pkru" = 1: PKU feature must be enabled
         // "pkru" = 2: PKU feature is enabled if the platform supports it
         "pkru": 0,
-        // Whether to enable POSIX shared memory feature.
-        // Enabling POSIX shm allows processes to communicate by sharing a region of memory.
-        // 
+        // Whether to enable the EDMM feature
+        // Enabling EDMM feature can make the enclave initialize faster and sometimes can also
+        // bring performance benifit for the entire application
+        //
+        // Enabling EDMM feature will need more configuration on the memory related fields, for more information,
+        // please visit [EDMM Configuration Guide](https://github.com/occlum/occlum/blob/master/docs/edmm/edmm_config_guide.md)
+        "enable_edmm": false,
+        // Whether to enable POSIX shared memory feature
+        // Enabling POSIX shm allows processes to communicate by sharing a region of memory
+        //
         // Set "enable_posix_shm" to true, the syscall `mmap` with flag `MAP_SHARED` 
         // is supported more comprehensively, implies that the file-backed memory mapping
         // become shared among processes.
