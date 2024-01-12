@@ -1536,6 +1536,78 @@ int test_kernel_space_pf_trigger() {
     return 0;
 }
 
+int test_shared_file_mmap_small_file() {
+    int fd;
+    struct stat sb1, sb2;
+    char *mapped;
+    char write_buf[] = "hello world\n";
+    size_t page_sz;
+    size_t file_sz;
+    size_t new_file_sz;
+
+    if ((fd = open("/root/a.txt", O_RDWR | O_CREAT, S_IRWXU)) < 0) {
+        perror("open");
+        return -1;
+    }
+
+    if (write(fd, write_buf, strlen(write_buf)) < 0) {
+        perror("write");
+        return -1;
+    }
+    if ((fstat(fd, &sb1)) == -1 ) {
+        perror("fstat");
+        return -1;
+    }
+
+    file_sz = sb1.st_size;
+    page_sz = getpagesize();
+
+    // Output the size before mmap
+    printf("before msync file_sz = %ld\n", file_sz);
+    if ((mapped = mmap(NULL, page_sz, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
+                       0)) == (void *) -1) {
+        perror("mmap");
+        return -1;
+    }
+
+    // Appending characters at the end of a file.
+    mapped[file_sz] = '9';
+    // Synchronizing the modified contents of a file
+    if ((msync((void *)mapped, page_sz, MS_SYNC)) == -1) {
+        perror("msync");
+        return -1;
+    }
+
+    if (fstat(fd, &sb2) == -1) {
+        perror("fstat");
+        return -1;
+    }
+
+    new_file_sz = sb2.st_size;
+    // Output the size after mmap
+    printf("msync after file_sz = %ld\n", new_file_sz);
+    if (new_file_sz != file_sz) {
+        THROW_ERROR("The file size doesn't match");
+    }
+
+    if ((munmap((void *)mapped, page_sz)) == -1) {
+        perror("munmap");
+        return -1;
+    }
+
+    if ((fstat(fd, &sb1)) == -1 ) {
+        perror("fstat");
+        return -1;
+    }
+
+    file_sz = sb1.st_size;
+    if (new_file_sz != file_sz) {
+        THROW_ERROR("The file size doesn't match");
+    }
+
+    return 0;
+}
+
 // ============================================================================
 // Test suite main
 // ============================================================================
@@ -1555,6 +1627,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_shared_file_mmap_flushing_with_munmap),
     TEST_CASE(test_shared_file_mmap_flushing_with_fdatasync),
     TEST_CASE(test_shared_file_mmap_flushing_with_fsync),
+    TEST_CASE(test_shared_file_mmap_small_file),
     TEST_CASE(test_fixed_mmap_that_does_not_override_any_mmaping),
     TEST_CASE(test_fixed_mmap_that_overrides_existing_mmaping),
     TEST_CASE(test_fixed_mmap_with_non_page_aligned_addr),
