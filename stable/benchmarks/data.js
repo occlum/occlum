@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1705183905943,
+  "lastUpdate": 1705183914724,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -4506,6 +4506,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 559.5,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "jeffery.wsj",
+            "username": "superajun-wsj",
+            "email": "jeffery.wsj@alibaba-inc.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "1c8ae036c2956b7b8a9c0299c2a34488505e8e97",
+          "message": "Fix go exec demo ci bug v2",
+          "timestamp": "2024-01-11T06:59:05Z",
+          "url": "https://github.com/occlum/occlum/commit/1c8ae036c2956b7b8a9c0299c2a34488505e8e97"
+        },
+        "date": 1705183912700,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.55,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 91.66,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 1706.91,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 569.67,
             "unit": "ms",
             "extra": "per95"
           }
