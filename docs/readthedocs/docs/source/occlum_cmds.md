@@ -19,15 +19,25 @@ occlum init
 Initialize a directory as the Occlum instance.
 
 ```bash
-occlum build [--sign-key <key_path>] [--sign-tool <tool_path>] [--image-key <key_path>] [-f/--force]
+occlum build [--sign-key <key_path>] [--sign-tool <tool_path>] [--image-key <key_path>] [-f/--force] [--enable-edmm <Y/N>]
 ```
 Build and sign an Occlum SGX enclave (.so) and generate its associated secure FS image according to the user-provided image directory and Occlum.json config file.
 The whole building process is incremental: the building artifacts are built only
 when needed.
 To force rebuilding all artifacts, give the [-f/--force] flag.
 
+EDMM feature is not enabled by default. To enable it, set ENABLE_EDMM during the Occlum build phase as below:
+```
+ENABLE_EDMM=Y occlum build
+```
+Or
+```
+occlum build --enable-edmm Y
+```
+Details please refer to [doc](https://occlum.readthedocs.io/en/latest/edmm_config_guide.html).
+
 ```bash
-occlum run [--cpus <num_of_cpus>] <program_name> <program_args>
+occlum run <program_name> <program_args>
 ```
 Run the user program inside an SGX enclave.
 
