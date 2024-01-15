@@ -1608,6 +1608,38 @@ int test_shared_file_mmap_small_file() {
     return 0;
 }
 
+int test_shared_file_mmap_permissions() {
+    const char *file_path = "/root/mmap_file.data";
+    int fd = open(file_path, O_CREAT | O_TRUNC | O_RDONLY, 0644);
+    if (fd < 0) {
+        THROW_ERROR("file creation failed");
+    }
+
+    char *buf = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (buf != MAP_FAILED || errno != EACCES) {
+        THROW_ERROR("permission violation not detected");
+    }
+
+    close(fd);
+    fd = open(file_path, O_CREAT | O_TRUNC | O_RDONLY, 0644);
+    if (fd < 0) {
+        THROW_ERROR("file creation failed");
+    }
+
+    buf = mmap(NULL, PAGE_SIZE, PROT_READ, MAP_SHARED, fd, 0);
+    if (buf == MAP_FAILED) {
+        THROW_ERROR("mmap failed");
+    }
+
+    int ret = mprotect(buf, PAGE_SIZE, PROT_READ | PROT_WRITE);
+    if (ret != -1 || errno != EACCES) {
+        printf("ret = %d, errno = %d\n", ret, errno);
+        THROW_ERROR("permission violation not detected");
+    }
+
+    return 0;
+}
+
 // ============================================================================
 // Test suite main
 // ============================================================================
@@ -1628,6 +1660,7 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_shared_file_mmap_flushing_with_fdatasync),
     TEST_CASE(test_shared_file_mmap_flushing_with_fsync),
     TEST_CASE(test_shared_file_mmap_small_file),
+    TEST_CASE(test_shared_file_mmap_permissions),
     TEST_CASE(test_fixed_mmap_that_does_not_override_any_mmaping),
     TEST_CASE(test_fixed_mmap_that_overrides_existing_mmaping),
     TEST_CASE(test_fixed_mmap_with_non_page_aligned_addr),
