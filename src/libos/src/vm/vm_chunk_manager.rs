@@ -286,6 +286,12 @@ impl ChunkManager {
                 Some(intersection_vma) => intersection_vma,
             };
 
+            if let Some((file_ref, _)) = intersection_vma.writeback_file() {
+                if !file_ref.access_mode().unwrap().writable() && new_perms.can_write() {
+                    return_errno!(EACCES, "file is not writable");
+                }
+            }
+
             if intersection_vma.range() == containing_vma.range() {
                 // The whole containing_vma is mprotected
                 containing_vma.set_perms(new_perms);

@@ -170,6 +170,11 @@ impl ShmManager {
         if !vma.is_shared() {
             return_errno!(EINVAL, "not a shared chunk");
         }
+        if let Some((file_ref, _)) = vma.writeback_file() {
+            if !file_ref.access_mode().unwrap().writable() && new_perms.can_write() {
+                return_errno!(EACCES, "file is not writable");
+            }
+        }
         Self::apply_new_perms_if_higher(&mut vma, new_perms);
         Ok(())
     }
