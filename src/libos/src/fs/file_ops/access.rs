@@ -22,6 +22,7 @@ impl AccessibilityCheckMode {
     }
 }
 
+#[allow(dead_code)]
 bitflags! {
     pub struct AccessibilityCheckFlags : u32 {
         /// If path is a symbolic link, do not dereference it
@@ -31,31 +32,21 @@ bitflags! {
     }
 }
 
+#[allow(dead_code)]
 impl AccessibilityCheckFlags {
     pub fn from_u32(bits: u32) -> Result<Self> {
         AccessibilityCheckFlags::from_bits(bits).ok_or_else(|| errno!(EINVAL, "invalid flags"))
     }
 }
 
-pub fn do_faccessat(
-    fs_path: &FsPath,
-    mode: AccessibilityCheckMode,
-    flags: AccessibilityCheckFlags,
-) -> Result<()> {
-    debug!(
-        "faccessat: fs_path: {:?}, mode: {:?}, flags: {:?}",
-        fs_path, mode, flags
-    );
+pub fn do_faccessat(fs_path: &FsPath, mode: AccessibilityCheckMode) -> Result<()> {
+    debug!("faccessat: fs_path: {:?}, mode: {:?}", fs_path, mode);
 
     let inode = {
         let path = fs_path.to_abs_path()?;
         let current = current!();
         let fs = current.fs().read().unwrap();
-        if flags.contains(AccessibilityCheckFlags::AT_SYMLINK_NOFOLLOW) {
-            fs.lookup_inode_no_follow(&path)?
-        } else {
-            fs.lookup_inode(&path)?
-        }
+        fs.lookup_inode(&path)?
     };
     if mode.test_for_exist() {
         return Ok(());
