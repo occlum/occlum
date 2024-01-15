@@ -89,6 +89,8 @@ impl VMManager {
     }
 
     pub fn mmap(&self, options: &VMMapOptions) -> Result<usize> {
+        mmap_file_check_permissions(options)?;
+
         if LIBOS_CONFIG.feature.enable_posix_shm && options.is_shared() {
             let res = self.internal().mmap_shared_chunk(options);
             match res {
@@ -911,6 +913,12 @@ impl InternalVMManager {
                 return Ok(());
             }
 
+            if let Some((file_ref, _)) = containing_vma.writeback_file() {
+                if !file_ref.access_mode().unwrap().writable() && new_perms.can_write() {
+                    return_errno!(EACCES, "file is not writable");
+                }
+            }
+
             let current_pid = current!().process().pid();
             let same_start = protect_range.start() == containing_vma.start();
             let same_end = protect_range.end() == containing_vma.end();
@@ -1217,5 +1225,32 @@ pub enum MunmapChunkFlag {
 impl VMRemapParser for InternalVMManager {
     fn is_free_range(&self, request_range: &VMRange) -> bool {
         self.free_manager.is_free_range(request_range)
+    }
+}
+
+// Based on the mmap man page:
+// A file descriptor refers to a non-regular file.  Or a file
+// mapping was requested, but fd is not open for reading.  Or
+// MAP_SHARED was requested and PROT_WRITE is set, but fd is
+// not open in read/write (O_RDWR) mode.  Or PROT_WRITE is
+// set, but the file is append-only.
+fn mmap_file_check_permissions(mmap_options: &VMMapOptions) -> Result<()> {
+    match mmap_options.initializer() {
+        VMInitializer::FileBacked { file } => {
+            let (file_ref, _) = file.backed_file();
+            if !file_ref.access_mode().unwrap().readable() {
+                return_errno!(EACCES, "mmap file is not readable");
+            }
+
+            let perms = mmap_options.perms();
+            if let Some((file_ref, _)) = file.writeback_file() {
+                if !file_ref.access_mode().unwrap().writable() && perms.can_write() {
+                    return_errno!(EACCES, "mmap file is not writable");
+                }
+            }
+
+            return Ok(());
+        }
+        _ => return Ok(()),
     }
 }
