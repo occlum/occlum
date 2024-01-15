@@ -1,8 +1,8 @@
 use super::event_file::EventCreationFlags;
 use super::file_ops;
 use super::file_ops::{
-    get_abs_path_by_fd, get_utimes, AccessibilityCheckFlags, AccessibilityCheckMode, ChownFlags,
-    FcntlCmd, FsPath, LinkFlags, StatFlags, UnlinkFlags, Utime, UtimeFlags, AT_FDCWD, UTIME_OMIT,
+    get_abs_path_by_fd, get_utimes, AccessibilityCheckMode, ChownFlags, FcntlCmd, FsPath,
+    LinkFlags, StatFlags, UnlinkFlags, Utime, UtimeFlags, AT_FDCWD, UTIME_OMIT,
 };
 use super::fs_ops;
 use super::fs_ops::{MountFlags, MountOptions, UmountFlags};
@@ -304,17 +304,16 @@ pub fn do_fstatat(dirfd: i32, path: *const i8, stat_buf: *mut Stat, flags: u32) 
 }
 
 pub fn do_access(path: *const i8, mode: u32) -> Result<isize> {
-    self::do_faccessat(AT_FDCWD, path, mode, 0)
+    self::do_faccessat(AT_FDCWD, path, mode)
 }
 
-pub fn do_faccessat(dirfd: i32, path: *const i8, mode: u32, flags: u32) -> Result<isize> {
+pub fn do_faccessat(dirfd: i32, path: *const i8, mode: u32) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
     let fs_path = FsPath::new(&path, dirfd, false)?;
     let mode = AccessibilityCheckMode::from_u32(mode)?;
-    let flags = AccessibilityCheckFlags::from_u32(flags)?;
-    file_ops::do_faccessat(&fs_path, mode, flags).map(|_| 0)
+    file_ops::do_faccessat(&fs_path, mode).map(|_| 0)
 }
 
 pub fn do_lseek(fd: FileDesc, offset: off_t, whence: i32) -> Result<isize> {
