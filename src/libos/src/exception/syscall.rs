@@ -5,8 +5,6 @@ use sgx_types::*;
 pub const SYSCALL_OPCODE: u16 = 0x050F;
 
 pub fn handle_syscall_exception(user_context: &mut CpuContext) -> ! {
-    debug!("handle SYSCALL exception");
-
     // SYSCALL instruction saves RIP into RCX and RFLAGS into R11. This is to
     // comply with hardware's behavoir. Not useful for us.
     user_context.rcx = user_context.rip;
@@ -19,6 +17,7 @@ pub fn handle_syscall_exception(user_context: &mut CpuContext) -> ! {
 
     let num = user_context.rax as u32;
     assert!(num != SyscallNum::HandleException as u32);
+    debug!("handle SYSCALL exception: syscall number = {:?}", num);
 
     // FIXME: occlum syscall must use Linux ABI
     occlum_syscall(user_context);
