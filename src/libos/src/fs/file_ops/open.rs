@@ -19,5 +19,7 @@ pub fn do_openat(fs_path: &FsPath, flags: u32, mode: FileMode) -> Result<FileDes
         let creation_flags = CreationFlags::from_bits_truncate(flags);
         current.add_file(file_ref, creation_flags.must_close_on_spawn())
     };
+
+    debug!("openat: result fd: {:?}", fd);
     Ok(fd)
 }
