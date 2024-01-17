@@ -952,11 +952,12 @@ fn do_time(tloc_u: *mut time_t) -> Result<isize> {
 }
 
 fn do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t) -> Result<isize> {
+    let clockid = time::ClockID::from_raw(clockid)?;
     if res_u.is_null() {
         return Ok(0);
     }
     check_mut_ptr(res_u)?;
-    let clockid = time::ClockID::from_raw(clockid)?;
+
     let res = time::do_clock_getres(clockid)?;
     unsafe {
         *res_u = res;
