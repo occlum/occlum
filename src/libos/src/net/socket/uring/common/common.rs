@@ -2,7 +2,7 @@ use core::time::Duration;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::net::socket::uring::misc::Timeout;
+use super::Timeout;
 use io_uring_callback::IoUring;
 
 use libc::ocall::getsockname as do_getsockname;

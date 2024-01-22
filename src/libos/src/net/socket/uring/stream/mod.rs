@@ -18,7 +18,6 @@ use crate::net::socket::uring::runtime::Runtime;
 use crate::prelude::*;
 
 use crate::events::Poller;
-use crate::net::socket::uring::misc::*;
 use crate::net::socket::{sockopt::*, MsgFlags};
 
 lazy_static! {

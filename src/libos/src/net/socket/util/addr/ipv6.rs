@@ -1,6 +1,7 @@
 use std::any::Any;
 use std::fmt::Debug;
 
+use super::RawAddr;
 use super::{Addr, CSockAddr, Domain};
 use crate::prelude::*;
 use libc::in6_addr;
@@ -82,6 +83,11 @@ impl Ipv6SocketAddr {
             sin6_flowinfo: self.flowinfo.to_be(),
             sin6_scope_id: self.flowinfo.to_be(),
         }
+    }
+
+    pub fn to_raw(&self) -> RawAddr {
+        let (storage, len) = self.to_c_storage();
+        RawAddr::from_c_storage(&storage, len)
     }
 
     pub fn ip(&self) -> &Ipv6Addr {

@@ -112,7 +112,6 @@ impl<A: Addr, R: Runtime> Receiver<A, R> {
         }
 
         // Copy data from the recv buffer to the bufs
-
         let copied_bytes = inner.try_copy_buf(bufs);
         if let Some(copied_bytes) = copied_bytes {
             let bufs_len: usize = bufs.iter().map(|buf| buf.len()).sum();

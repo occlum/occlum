@@ -36,12 +36,12 @@ impl File for HostSocket {
     }
 
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-        let (bytes_recvd, _, _, _) = self.do_recvmsg(bufs, RecvFlags::empty(), None, None)?;
+        let (bytes_recvd, _, _, _) = self.recvmsg(bufs, RecvFlags::empty(), None)?;
         Ok(bytes_recvd)
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
-        self.do_sendmsg(bufs, SendFlags::empty(), None, None)
+        self.sendmsg(bufs, SendFlags::empty(), &None, None)
     }
 
     fn seek(&self, pos: SeekFrom) -> Result<off_t> {

@@ -42,7 +42,7 @@ impl GetSockOptRawCmd {
 
 impl IoctlCmd for GetSockOptRawCmd {}
 
-fn getsockopt_by_host(fd: HostFd, level: i32, optname: i32, optval: &mut [u8]) -> Result<u32> {
+pub fn getsockopt_by_host(fd: HostFd, level: i32, optname: i32, optval: &mut [u8]) -> Result<u32> {
     let max_optlen = optval.len() as u32;
     let mut optlen = max_optlen;
     try_libc!(do_getsockopt(

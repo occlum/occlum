@@ -9,7 +9,7 @@ mod set;
 mod set_sockbuf;
 mod timeout;
 
-pub use get::GetSockOptRawCmd;
+pub use get::{getsockopt_by_host, GetSockOptRawCmd};
 pub use get_acceptconn::GetAcceptConnCmd;
 pub use get_domain::GetDomainCmd;
 pub use get_output::*;

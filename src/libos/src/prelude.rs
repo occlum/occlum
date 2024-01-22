@@ -15,7 +15,7 @@ pub use std::sync::{
 
 pub(crate) type HostFd = u32;
 
-pub(crate) use net::socket::uring::misc::Addr;
+pub(crate) use net::socket::util::Addr;
 pub(crate) use net::socket::{Domain, RecvFlags, SendFlags, Shutdown, Type};
 
 // Override prelude::Result with error::Result

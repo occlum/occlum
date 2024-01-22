@@ -22,7 +22,8 @@ use super::socket::sockopt::{
     SetRcvBufSizeCmd, SetRecvTimeoutCmd, SetSendTimeoutCmd, SetSndBufSizeCmd, SetSockOptRawCmd,
     SockOptName,
 };
-use super::socket::uring::{AnyAddr, UringSocketType};
+use super::socket::uring::UringSocketType;
+use super::socket::AnyAddr;
 
 use super::*;
 
@@ -33,7 +34,7 @@ use crate::prelude::*;
 const SOMAXCONN: u32 = 4096;
 const SOCONN_DEFAULT: u32 = 16;
 
-pub const ENABLE_URING: bool = true;
+pub const ENABLE_URING: bool = false;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -91,28 +92,20 @@ pub fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<i
 }
 
 pub fn do_bind(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t) -> Result<isize> {
-    if addr.is_null() || addr_len == 0 {
-        return_errno!(EINVAL, "no address is specified");
-    }
-    from_user::check_array(addr as *const u8, addr_len as usize)?;
+    let addr_len = addr_len as usize;
+    let sockaddr_storage = copy_sock_addr_from_user(addr, addr_len)?;
+    let mut addr = AnyAddr::from_c_storage(&sockaddr_storage, addr_len)?;
+    trace!("bind to addr: {:?}", addr);
 
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_host_socket() {
-        let sock_addr = unsafe { SockAddr::try_from_raw(addr, addr_len)? };
-        trace!("bind to addr: {:?}", sock_addr);
-        socket.bind(&sock_addr)?;
+        let mut raw_addr = addr.to_raw();
+        socket.bind(&mut raw_addr)?;
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
-        let mut unix_addr = unsafe { UnixAddr::try_from_raw(addr, addr_len)? };
-        trace!("bind to addr: {:?}", unix_addr);
+        let mut unix_addr = (addr.to_unix()?).clone();
         unix_socket.bind(&mut unix_addr)?;
     } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
-        let mut uring_addr = {
-            let addr_len = addr_len as usize;
-            let sockaddr_storage = copy_sock_addr_from_user(addr, addr_len)?;
-            let addr = AnyAddr::from_c_storage(&sockaddr_storage, addr_len)?;
-            addr
-        };
-        uring_socket.bind(&mut uring_addr)?;
+        uring_socket.bind(&mut addr)?;
     } else {
         return_errno!(ENOTSOCK, "not a socket");
     }
@@ -158,28 +151,23 @@ pub fn do_connect(
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_host_socket() {
         let addr_option = if addr_set {
-            Some(unsafe { SockAddr::try_from_raw(addr, addr_len)? })
+            Some(unsafe { RawAddr::try_from_raw(addr, addr_len as u32)? })
         } else {
             None
         };
 
         socket.connect(&addr_option)?;
-    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+        return Ok(0);
+    };
+
+    let addr_len = addr_len as usize;
+    let sockaddr_storage = copy_sock_addr_from_user(addr, addr_len)?;
+    let addr = AnyAddr::from_c_storage(&sockaddr_storage, addr_len)?;
+
+    if let Ok(unix_socket) = file_ref.as_unix_socket() {
         // TODO: support AF_UNSPEC address for datagram socket use
-        let addr = if addr_set {
-            unsafe { UnixAddr::try_from_raw(addr, addr_len)? }
-        } else {
-            return_errno!(EINVAL, "invalid address");
-        };
-
-        unix_socket.connect(&addr)?;
+        unix_socket.connect(addr.to_unix()?)?;
     } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
-        let addr = {
-            let addr_len = addr_len as usize;
-            let sockaddr_storage = copy_sock_addr_from_user(addr, addr_len)?;
-            AnyAddr::from_c_storage(&sockaddr_storage, addr_len)?
-        };
-
         uring_socket.connect(&addr)?;
     } else {
         return_errno!(ENOTSOCK, "not a socket");
@@ -202,76 +190,49 @@ pub fn do_accept4(
     addr_len: *mut libc::socklen_t,
     flags: c_int,
 ) -> Result<isize> {
-    let addr_set: bool = !addr.is_null();
-    if addr_set {
-        from_user::check_ptr(addr_len)?;
-        from_user::check_mut_array(addr as *mut u8, unsafe { *addr_len } as usize)?;
-    }
-
+    let addr_and_addr_len = get_slice_from_sock_addr_ptr_mut(addr, addr_len)?;
     let sock_flags =
         SocketFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
     let close_on_spawn = sock_flags.contains(SocketFlags::SOCK_CLOEXEC);
 
     let file_ref = current!().file(fd as FileDesc)?;
-    if let Ok(socket) = file_ref.as_host_socket() {
-        let (new_socket_file, sock_addr_option) = socket.accept(sock_flags)?;
-        let new_file_ref: Arc<dyn File> = Arc::new(new_socket_file);
-        let new_fd = current!().add_file(new_file_ref, close_on_spawn);
 
-        if addr_set {
-            if let Some(sock_addr) = sock_addr_option {
-                let mut buf =
-                    unsafe { std::slice::from_raw_parts_mut(addr as *mut u8, *addr_len as usize) };
-                sock_addr.copy_to_slice(&mut buf);
-                unsafe {
-                    *addr_len = sock_addr.len() as u32;
-                }
-            } else {
-                unsafe {
-                    *addr_len = 0;
-                }
-            }
-        }
-        Ok(new_fd as isize)
-    } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
-        let (new_socket_file, sock_addr_option) = unix_socket.accept(sock_flags)?;
-        let new_file_ref: Arc<dyn File> = Arc::new(new_socket_file);
-        let new_fd = current!().add_file(new_file_ref, close_on_spawn);
-
-        if addr_set {
-            if let Some(sock_addr) = sock_addr_option {
-                let mut buf =
-                    unsafe { std::slice::from_raw_parts_mut(addr as *mut u8, *addr_len as usize) };
-                sock_addr.copy_to_slice(&mut buf);
-                unsafe {
-                    *addr_len = sock_addr.raw_len() as u32;
-                }
-            } else {
-                unsafe {
-                    *addr_len = 0;
-                }
-            }
-        }
-        Ok(new_fd as isize)
-    } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
-        let addr_and_addr_len = get_slice_from_sock_addr_ptr_mut(addr, addr_len)?;
-        let nonblocking = sock_flags.contains(SocketFlags::SOCK_NONBLOCK);
-        let accepted_socket = uring_socket.accept(nonblocking)?;
-
-        // Output the address
-        if let Some((addr_mut, addr_len_mut)) = addr_and_addr_len {
-            let (src_addr, src_addr_len) = accepted_socket.peer_addr()?.to_c_storage();
-            copy_sock_addr_to_user(src_addr, src_addr_len, addr_mut, addr_len_mut);
-        }
-        // Update the file table
-        let new_fd = {
-            let new_file_ref = Arc::new(accepted_socket);
-            current!().add_file(new_file_ref, close_on_spawn)
+    // Accept the socket
+    let (new_file_ref, sock_addr_option): (Arc<dyn File>, Option<AnyAddr>) =
+        if let Ok(socket) = file_ref.as_host_socket() {
+            let (new_socket_file, sock_addr_option) = socket.accept(sock_flags)?;
+            (
+                Arc::new(new_socket_file),
+                sock_addr_option.map(|raw_addr| AnyAddr::Raw(raw_addr)),
+            )
+        } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+            let (new_socket_file, sock_addr_option) = unix_socket.accept(sock_flags)?;
+            (
+                Arc::new(new_socket_file),
+                sock_addr_option.map(|unix_addr| AnyAddr::Unix(unix_addr)),
+            )
+        } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
+            let nonblocking = sock_flags.contains(SocketFlags::SOCK_NONBLOCK);
+            let accepted_socket = uring_socket.accept(nonblocking)?;
+            let sock_addr = accepted_socket.peer_addr()?;
+            (Arc::new(accepted_socket), Some(sock_addr))
+        } else {
+            return_errno!(ENOTSOCK, "not a socket");
         };
-        Ok(new_fd as isize)
-    } else {
-        return_errno!(ENOTSOCK, "not a socket");
+
+    let new_fd = current!().add_file(new_file_ref, close_on_spawn);
+
+    // Output the address
+    if let Some((addr_mut, addr_len_mut)) = addr_and_addr_len {
+        if let Some(sock_addr) = sock_addr_option {
+            let (src_addr, src_addr_len) = sock_addr.to_c_storage();
+            copy_sock_addr_to_user(src_addr, src_addr_len, addr_mut, addr_len_mut);
+        } else {
+            *addr_len_mut = 0;
+        }
     }
+
+    Ok(new_fd as isize)
 }
 
 pub fn do_shutdown(fd: c_int, how: c_int) -> Result<isize> {
@@ -304,30 +265,19 @@ pub fn do_setsockopt(
         fd, level, optname, optval, optlen
     );
     let file_ref = current!().file(fd as FileDesc)?;
-    if optval as usize != 0 && optlen == 0 {
-        return_errno!(EINVAL, "the optlen size is 0");
-    }
-    if let Ok(socket) = file_ref.as_host_socket() {
-        let ret = try_libc!(libc::ocall::setsockopt(
-            socket.raw_host_fd() as i32,
-            level,
-            optname,
-            optval,
-            optlen
-        ));
-        Ok(ret as isize)
+    let optval = from_user::make_slice(optval as *const u8, optlen as usize)?;
+
+    if let Ok(host_socket) = file_ref.as_host_socket() {
+        host_socket.setsockopt(level, optname, optval)?;
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
         warn!("setsockopt for unix socket is unimplemented");
-        Ok(0)
     } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
-        let optval = from_user::make_slice(optval as *const u8, optlen as usize)?;
-
         let mut cmd = new_setsockopt_cmd(level, optname, optval, uring_socket.get_type())?;
         uring_socket.ioctl(cmd.as_mut())?;
-        Ok(0)
     } else {
         return_errno!(ENOTSOCK, "not a socket")
     }
+    Ok(0)
 }
 
 pub fn do_getsockopt(
@@ -341,41 +291,33 @@ pub fn do_getsockopt(
         "getsockopt: fd: {}, level: {}, optname: {}, optval: {:?}, optlen: {:?}",
         fd, level, optname, optval, optlen
     );
-    let file_ref = current!().file(fd as FileDesc)?;
-    let socket = file_ref.as_host_socket();
+    let optlen_mut = from_user::make_mut_ref(optlen)?;
+    let optlen = *optlen_mut;
+    let optval_mut = from_user::make_mut_slice(optval as *mut u8, optlen as usize)?;
 
-    if let Ok(socket) = socket {
-        let ret = try_libc!(libc::ocall::getsockopt(
-            socket.raw_host_fd() as i32,
-            level,
-            optname,
-            optval,
-            optlen
-        ));
-        Ok(ret as isize)
+    // Man getsockopt:
+    // If the size of the option value is greater than option_len, the value stored in the object pointed to by the option_value argument will be silently truncated.
+    // Thus if the optlen is 0, nothing is returned to optval. We can just return here.
+    if optlen == 0 {
+        return Ok(0);
+    }
+
+    let file_ref = current!().file(fd as FileDesc)?;
+
+    if let Ok(host_socket) = file_ref.as_host_socket() {
+        // Some problem
+        host_socket.getsockopt(level, optname, optval_mut)?;
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
         warn!("getsockopt for unix socket is unimplemented");
-        Ok(0)
     } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
-        let optlen_mut = from_user::make_mut_ref(optlen)?;
-        let optlen = *optlen_mut;
-        let optval_mut = from_user::make_mut_slice(optval as *mut u8, optlen as usize)?;
-
-        // Man getsockopt:
-        // If the size of the option value is greater than option_len, the value stored in the object pointed to by the option_value argument will be silently truncated.
-        // Thus if the optlen is 0, nothing is returned to optval. We can just return here.
-        if optlen == 0 {
-            return Ok(0);
-        }
-
         let mut cmd = new_getsockopt_cmd(level, optname, optlen, uring_socket.get_type())?;
         uring_socket.ioctl(cmd.as_mut())?;
         let src_optval = get_optval(cmd.as_ref())?;
         copy_bytes_to_user(src_optval, optval_mut, optlen_mut);
-        Ok(0)
     } else {
         return_errno!(ENOTSOCK, "not a socket")
     }
+    Ok(0)
 }
 
 pub fn do_getpeername(
@@ -383,43 +325,27 @@ pub fn do_getpeername(
     addr: *mut libc::sockaddr,
     addr_len: *mut libc::socklen_t,
 ) -> Result<isize> {
-    let addr_set: bool = !addr.is_null();
-    if addr_set {
-        from_user::check_ptr(addr_len)?;
-        from_user::check_mut_array(addr as *mut u8, unsafe { *addr_len } as usize)?;
-    } else {
+    let addr_and_addr_len = get_slice_from_sock_addr_ptr_mut(addr, addr_len)?;
+    if addr_and_addr_len.is_none() {
         return Ok(0);
     }
 
     let file_ref = current!().file(fd as FileDesc)?;
-    if let Ok(socket) = file_ref.as_host_socket() {
-        let ret = try_libc!(libc::ocall::getpeername(
-            socket.raw_host_fd() as i32,
-            addr,
-            addr_len
-        ));
-        Ok(ret as isize)
+    let (src_addr, src_addr_len) = if let Ok(host_socket) = file_ref.as_host_socket() {
+        host_socket.peer_addr()?.to_c_storage()
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
-        let name = unix_socket.peer_addr()?;
-        let mut dst = unsafe {
-            std::slice::from_raw_parts_mut(addr as *mut _ as *mut u8, *addr_len as usize)
-        };
-        name.copy_to_slice(dst);
-        unsafe {
-            *addr_len = name.raw_len() as u32;
-        }
-        Ok(0)
+        unix_socket.peer_addr()?.to_c_storage()
     } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
-        let addr_and_addr_len = get_slice_from_sock_addr_ptr_mut(addr, addr_len)?;
-
-        let (src_addr, src_addr_len) = uring_socket.peer_addr()?.to_c_storage();
-        if let Some((addr_mut, addr_len_mut)) = addr_and_addr_len {
-            copy_sock_addr_to_user(src_addr, src_addr_len, addr_mut, addr_len_mut);
-        }
-        Ok(0)
+        uring_socket.peer_addr()?.to_c_storage()
     } else {
         return_errno!(ENOTSOCK, "not a socket")
+    };
+
+    if let Some((addr_mut, addr_len_mut)) = addr_and_addr_len {
+        copy_sock_addr_to_user(src_addr, src_addr_len, addr_mut, addr_len_mut);
     }
+
+    Ok(0)
 }
 
 pub fn do_getsockname(
@@ -427,54 +353,27 @@ pub fn do_getsockname(
     addr: *mut libc::sockaddr,
     addr_len: *mut libc::socklen_t,
 ) -> Result<isize> {
-    let addr_set: bool = !addr.is_null();
-    if addr_set {
-        from_user::check_ptr(addr_len)?;
-        from_user::check_mut_array(addr as *mut u8, unsafe { *addr_len } as usize)?;
-    } else {
+    let addr_and_addr_len = get_slice_from_sock_addr_ptr_mut(addr, addr_len)?;
+    if addr_and_addr_len.is_none() {
         return Ok(0);
     }
 
-    if unsafe { *addr_len } < std::mem::size_of::<libc::sa_family_t>() as u32 {
-        return_errno!(EINVAL, "input length is too short");
-    }
-
     let file_ref = current!().file(fd as FileDesc)?;
-    if let Ok(socket) = file_ref.as_host_socket() {
-        let ret = try_libc!(libc::ocall::getsockname(
-            socket.raw_host_fd() as i32,
-            addr,
-            addr_len
-        ));
-        Ok(ret as isize)
+    let (src_addr, src_addr_len) = if let Ok(host_socket) = file_ref.as_host_socket() {
+        host_socket.addr()?.to_c_storage()
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
-        let name_opt = unix_socket.addr();
-        if let Some(name) = name_opt {
-            let mut dst = unsafe {
-                std::slice::from_raw_parts_mut(addr as *mut _ as *mut u8, *addr_len as usize)
-            };
-            name.copy_to_slice(dst);
-            unsafe {
-                *addr_len = name.raw_len() as u32;
-            }
-        } else {
-            unsafe {
-                (*addr).sa_family = Domain::LOCAL as u16;
-                *addr_len = 2;
-            }
-        }
-        Ok(0)
+        unix_socket.addr().to_c_storage()
     } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
-        let addr_and_addr_len = get_slice_from_sock_addr_ptr_mut(addr, addr_len)?;
-
-        let (src_addr, src_addr_len) = uring_socket.addr()?.to_c_storage();
-        if let Some((addr_mut, addr_len_mut)) = addr_and_addr_len {
-            copy_sock_addr_to_user(src_addr, src_addr_len, addr_mut, addr_len_mut);
-        }
-        Ok(0)
+        uring_socket.addr()?.to_c_storage()
     } else {
         return_errno!(ENOTSOCK, "not a socket");
+    };
+
+    if let Some((addr_mut, addr_len_mut)) = addr_and_addr_len {
+        copy_sock_addr_to_user(src_addr, src_addr_len, addr_mut, addr_len_mut);
     }
+
+    Ok(0)
 }
 
 pub fn do_sendto(
@@ -485,55 +384,40 @@ pub fn do_sendto(
     addr: *const libc::sockaddr,
     addr_len: libc::socklen_t,
 ) -> Result<isize> {
-    if len == 0 {
-        return Ok(0);
-    }
-
     if addr.is_null() ^ (addr_len == 0) {
-        return_errno!(EINVAL, "addr and ddr_len should be both null");
+        return_errno!(EINVAL, "addr and addr_len should be both null and 0 or not");
     }
+    let addr = {
+        if addr.is_null() {
+            None
+        } else {
+            let addr_storage = copy_sock_addr_from_user(addr, addr_len as _)?;
+            Some(AnyAddr::from_c_storage(&addr_storage, addr_len as _)?)
+        }
+    };
 
     from_user::check_array(base as *const u8, len)?;
     let buf = unsafe { std::slice::from_raw_parts(base as *const u8, len as usize) };
 
-    let addr_set: bool = !addr.is_null();
-    if addr_set {
-        from_user::check_mut_array(addr as *mut u8, addr_len as usize)?;
-    }
-
     let send_flags = SendFlags::from_bits_truncate(flags);
 
     let file_ref = current!().file(fd as FileDesc)?;
-    if let Ok(socket) = file_ref.as_host_socket() {
-        let addr_option = if addr_set {
-            Some(unsafe { SockAddr::try_from_raw(addr, addr_len)? })
-        } else {
-            None
-        };
+    if let Ok(host_socket) = file_ref.as_host_socket() {
+        let addr = addr.map(|any_addr| any_addr.to_raw());
 
-        socket
-            .sendto(buf, send_flags, &addr_option)
+        host_socket
+            .sendto(buf, send_flags, &addr)
             .map(|u| u as isize)
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
-        let addr_option = if addr_set {
-            Some(unsafe { UnixAddr::try_from_raw(addr, addr_len)? })
-        } else {
-            None
+        let addr = match addr {
+            Some(any_addr) => Some(any_addr.to_unix()?.clone()),
+            None => None,
         };
 
         unix_socket
-            .sendto(buf, send_flags, &addr_option)
+            .sendto(buf, send_flags, &addr)
             .map(|u| u as isize)
     } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
-        let addr = {
-            if addr.is_null() {
-                None
-            } else {
-                let addr_storage = copy_sock_addr_from_user(addr, addr_len as _)?;
-                Some(AnyAddr::from_c_storage(&addr_storage, addr_len as _)?)
-            }
-        };
-
         uring_socket
             .sendto(&buf, addr, send_flags)
             .map(|bytes_send| bytes_send as isize)
@@ -550,9 +434,7 @@ pub fn do_recvfrom(
     addr: *mut libc::sockaddr,
     addr_len: *mut libc::socklen_t,
 ) -> Result<isize> {
-    if addr.is_null() ^ addr_len.is_null() {
-        return_errno!(EINVAL, "addr and ddr_len should be both null");
-    }
+    let addr_and_addr_len = get_slice_from_sock_addr_ptr_mut(addr, addr_len)?;
 
     from_user::check_array(base as *mut u8, len)?;
     let mut buf = unsafe { std::slice::from_raw_parts_mut(base as *mut u8, len as usize) };
@@ -562,65 +444,31 @@ pub fn do_recvfrom(
     let recv_flags = RecvFlags::from_bits(flags & !(MsgFlags::MSG_CTRUNC.bits()))
         .ok_or_else(|| errno!(EINVAL, "invalid flags"))?;
 
-    let addr_set: bool = !addr.is_null();
-    if addr_set {
-        from_user::check_ptr(addr_len)?;
-        from_user::check_mut_array(addr as *mut u8, unsafe { *addr_len } as usize)?;
-    }
-
     let file_ref = current!().file(fd as FileDesc)?;
-    if let Ok(socket) = file_ref.as_host_socket() {
-        let (data_len, sock_addr_option) = socket.recvfrom(buf, recv_flags)?;
-        if addr_set {
-            if let Some(sock_addr) = sock_addr_option {
-                let mut buf =
-                    unsafe { std::slice::from_raw_parts_mut(addr as *mut u8, *addr_len as usize) };
-                sock_addr.copy_to_slice(&mut buf);
-                unsafe {
-                    *addr_len = sock_addr.len() as u32;
-                }
-            } else {
-                unsafe {
-                    *addr_len = 0;
-                }
-            }
-        }
-        Ok(data_len as isize)
+    let (data_len, addr_recv) = if let Ok(socket) = file_ref.as_host_socket() {
+        socket
+            .recvfrom(buf, recv_flags)
+            .map(|(len, addr_recv)| (len, addr_recv.map(|raw_addr| AnyAddr::Raw(raw_addr))))?
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
-        let (data_len, sock_addr_option) = unix_socket.recvfrom(buf, recv_flags)?;
-        if addr_set {
-            if let Some(sock_addr) = sock_addr_option {
-                let mut buf =
-                    unsafe { std::slice::from_raw_parts_mut(addr as *mut u8, *addr_len as usize) };
-                sock_addr.copy_to_slice(&mut buf);
-                unsafe {
-                    *addr_len = sock_addr.raw_len() as u32;
-                }
-            } else {
-                unsafe {
-                    *addr_len = 0;
-                }
-            }
-        }
-        Ok(data_len as isize)
+        unix_socket
+            .recvfrom(buf, recv_flags)
+            .map(|(len, addr_recv)| (len, addr_recv.map(|unix_addr| AnyAddr::Unix(unix_addr))))?
     } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
-        let addr_and_addr_len = get_slice_from_sock_addr_ptr_mut(addr, addr_len)?;
-
-        let (bytes_recv, addr_recv) = uring_socket.recvfrom(&mut buf, recv_flags)?;
-
-        if let Some((addr_mut, addr_len_mut)) = addr_and_addr_len {
-            if let Some(addr_recv) = addr_recv {
-                let (c_addr_storage, c_addr_len) = addr_recv.to_c_storage();
-                copy_sock_addr_to_user(c_addr_storage, c_addr_len, addr_mut, addr_len_mut);
-            } else {
-                // If addr_recv is not filled, set addr_len to 0
-                *addr_len_mut = 0;
-            }
-        }
-        Ok(bytes_recv as _)
+        uring_socket.recvfrom(&mut buf, recv_flags)?
     } else {
         return_errno!(ENOTSOCK, "not a socket");
+    };
+
+    if let Some((addr_mut, addr_len_mut)) = addr_and_addr_len {
+        if let Some(addr_recv) = addr_recv {
+            let (c_addr_storage, c_addr_len) = addr_recv.to_c_storage();
+            copy_sock_addr_to_user(c_addr_storage, c_addr_len, addr_mut, addr_len_mut);
+        } else {
+            // If addr_recv is not filled, set addr_len to 0
+            *addr_len_mut = 0;
+        }
     }
+    Ok(data_len as isize)
 }
 
 pub fn do_socketpair(
@@ -664,28 +512,20 @@ pub fn do_sendmsg(fd: c_int, msg_ptr: *const libc::msghdr, flags_c: c_int) -> Re
         fd, msg_ptr, flags_c
     );
 
-    let msg_hdr = {
-        let msg_hdr_c = {
-            from_user::check_ptr(msg_ptr)?;
-            let msg_hdr_c = unsafe { &*msg_ptr };
-            msg_hdr_c
-        };
-        unsafe { MsgHdr::from_c(&msg_hdr_c)? }
-    };
-
+    let (addr, bufs, control) = extract_msghdr_from_user(msg_ptr)?;
     let flags = SendFlags::from_bits_truncate(flags_c);
 
     let file_ref = current!().file(fd as FileDesc)?;
-    if let Ok(socket) = file_ref.as_host_socket() {
-        socket
-            .sendmsg(&msg_hdr, flags)
-            .map(|bytes_sent| bytes_sent as isize)
+    if let Ok(host_socket) = file_ref.as_host_socket() {
+        let raw_addr = addr.map(|addr| addr.to_raw());
+        host_socket
+            .sendmsg(&bufs[..], flags, &raw_addr, control)
+            .map(|bytes_send| bytes_send as isize)
     } else if let Ok(socket) = file_ref.as_unix_socket() {
         socket
-            .sendmsg(&msg_hdr, flags)
+            .sendmsg(&bufs[..], flags, control)
             .map(|bytes_sent| bytes_sent as isize)
     } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
-        let (addr, bufs, control) = extract_msghdr_from_user(msg_ptr)?;
         uring_socket
             .sendmsg(&bufs[..], addr, flags, control)
             .map(|bytes_send| bytes_send as isize)
@@ -699,50 +539,46 @@ pub fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut libc::msghdr, flags_c: c_int) -> 
         "recvmsg: fd: {}, msg: {:?}, flags: 0x{:x}",
         fd, msg_mut_ptr, flags_c
     );
-
-    let mut msg_hdr_mut = {
-        let msg_hdr_mut_c = {
-            from_user::check_mut_ptr(msg_mut_ptr)?;
-            let msg_hdr_mut_c = unsafe { &mut *msg_mut_ptr };
-            msg_hdr_mut_c
-        };
-        unsafe { MsgHdrMut::from_c(msg_hdr_mut_c) }?
-    };
-
+    let (mut msg, mut addr, mut control, mut bufs) = extract_msghdr_mut_from_user(msg_mut_ptr)?;
     let flags = RecvFlags::from_bits_truncate(flags_c);
 
     let file_ref = current!().file(fd as FileDesc)?;
-    if let Ok(socket) = file_ref.as_host_socket() {
-        socket
-            .recvmsg(&mut msg_hdr_mut, flags)
-            .map(|bytes_recvd| bytes_recvd as isize)
-    } else if let Ok(socket) = file_ref.as_unix_socket() {
-        socket
-            .recvmsg(&mut msg_hdr_mut, flags)
-            .map(|bytes_recvd| bytes_recvd as isize)
-    } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
-        let (mut msg, mut addr, mut control, mut bufs) = extract_msghdr_mut_from_user(msg_mut_ptr)?;
+    let (bytes_recv, recv_addr, msg_flags, msg_controllen) =
+        if let Ok(host_socket) = file_ref.as_host_socket() {
+            host_socket.recvmsg(&mut bufs[..], flags, control).map(
+                |(bytes, addr, msg, controllen)| {
+                    (
+                        bytes,
+                        addr.map(|raw_addr| AnyAddr::Raw(raw_addr)),
+                        msg,
+                        controllen,
+                    )
+                },
+            )?
+        } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
+            unix_socket.recvmsg(&mut bufs[..], flags, control).map(
+                |(bytes_recvd, control_len)| (bytes_recvd, None, MsgFlags::empty(), control_len),
+            )?
+        } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
+            uring_socket.recvmsg(&mut bufs[..], flags, control)?
+        } else {
+            return_errno!(ENOTSOCK, "not a socket")
+        };
 
-        let (bytes_recv, recv_addr, msg_flags, msg_controllen) =
-            uring_socket.recvmsg(&mut bufs[..], flags, control)?;
-
-        if let Some(addr) = addr {
-            if let Some(recv_addr) = recv_addr {
-                let (c_addr_storage, c_addr_len) = recv_addr.to_c_storage();
-                copy_sock_addr_to_user(c_addr_storage, c_addr_len, addr, &mut msg.msg_namelen);
-            }
+    if let Some(addr) = addr {
+        if let Some(recv_addr) = recv_addr {
+            let (c_addr_storage, c_addr_len) = recv_addr.to_c_storage();
+            copy_sock_addr_to_user(c_addr_storage, c_addr_len, addr, &mut msg.msg_namelen);
         }
-
-        msg.msg_flags = msg_flags.bits();
-        msg.msg_controllen = msg_controllen;
-        if msg_controllen == 0 {
-            msg.msg_control = ptr::null_mut();
-        }
-
-        Ok(bytes_recv as isize)
-    } else {
-        return_errno!(ENOTSOCK, "not a socket")
     }
+
+    msg.msg_flags = msg_flags.bits();
+    msg.msg_controllen = msg_controllen;
+    if msg_controllen == 0 {
+        msg.msg_control = ptr::null_mut();
+    }
+
+    Ok(bytes_recv as isize)
 }
 
 pub fn do_sendmmsg(
@@ -757,27 +593,22 @@ pub fn do_sendmmsg(
     );
 
     from_user::check_ptr(msgvec_ptr)?;
-
     let mut msgvec = unsafe { std::slice::from_raw_parts_mut(msgvec_ptr, vlen as usize) };
+
     let flags = SendFlags::from_bits_truncate(flags_c);
     let file_ref = current!().file(fd as FileDesc)?;
+    let mut send_count = 0;
 
-    if let Ok(socket) = file_ref.as_host_socket() {
-        let mut send_count = 0;
+    if let Ok(host_socket) = file_ref.as_host_socket() {
         for mmsg in (msgvec) {
-            let msg = unsafe {
-                if let Ok(msg) = MsgHdr::from_c({ &mmsg.msg_hdr }) {
-                    msg
-                } else {
-                    break;
-                }
-            };
+            let (any_addr, bufs, control) = extract_msghdr_from_user(&mmsg.msg_hdr)?;
+            let raw_addr = any_addr.map(|any_addr| any_addr.to_raw());
 
-            if socket
-                .sendmsg(&msg, flags)
-                .map(|bytes_sent| {
-                    mmsg.msg_len = bytes_sent as u32;
-                    mmsg.msg_len
+            if host_socket
+                .sendmsg(&bufs[..], flags, &raw_addr, control)
+                .map(|bytes_send| {
+                    mmsg.msg_len += bytes_send as c_uint;
+                    bytes_send as isize
                 })
                 .is_ok()
             {
@@ -786,14 +617,9 @@ pub fn do_sendmmsg(
                 break;
             }
         }
-
-        Ok(send_count as isize)
     } else if let Ok(socket) = file_ref.as_unix_socket() {
         return_errno!(EOPNOTSUPP, "does not support unix socket")
     } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
-        let mut msgvec = unsafe { std::slice::from_raw_parts_mut(msgvec_ptr, vlen as usize) };
-
-        let mut send_count = 0;
         for mmsg in (msgvec) {
             let (addr, bufs, control) = extract_msghdr_from_user(&mmsg.msg_hdr)?;
 
@@ -810,11 +636,11 @@ pub fn do_sendmmsg(
                 break;
             }
         }
-
-        Ok(send_count as isize)
     } else {
         return_errno!(ENOTSOCK, "not a socket")
     }
+
+    Ok(send_count as isize)
 }
 
 pub fn do_select(

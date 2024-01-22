@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::fmt::{self, Debug};
 
-use super::{Addr, CSockAddr, Domain};
+use super::{Addr, CSockAddr, Domain, RawAddr};
 use crate::prelude::*;
 
 /// An IPv4 socket address, consisting of an IPv4 address and a port.
@@ -68,6 +68,11 @@ impl Ipv4SocketAddr {
             sin_addr: self.ip.to_c(),
             sin_zero: [0; 8],
         }
+    }
+
+    pub fn to_raw(&self) -> RawAddr {
+        let (storage, len) = self.to_c_storage();
+        RawAddr::from_c_storage(&storage, len)
     }
 
     pub fn ip(&self) -> &Ipv4Addr {

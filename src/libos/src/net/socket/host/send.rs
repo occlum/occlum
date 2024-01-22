@@ -5,22 +5,11 @@ impl HostSocket {
         self.sendto(buf, flags, &None)
     }
 
-    pub fn sendmsg<'a, 'b>(&self, msg: &'b MsgHdr<'a>, flags: SendFlags) -> Result<usize> {
-        let msg_iov = msg.get_iovs();
-
-        self.do_sendmsg(
-            msg_iov.as_slices(),
-            flags,
-            msg.get_name(),
-            msg.get_control(),
-        )
-    }
-
-    pub(super) fn do_sendmsg(
+    pub fn sendmsg(
         &self,
         data: &[&[u8]],
         flags: SendFlags,
-        name: Option<&[u8]>,
+        addr: &Option<RawAddr>,
         control: Option<&[u8]>,
     ) -> Result<usize> {
         let current = current!();
@@ -45,8 +34,8 @@ impl HostSocket {
             bufs
         };
 
-        let retval = self.do_sendmsg_untrusted_data(&u_data, flags, name, control);
-        retval
+        let name = addr.as_ref().map(|raw_addr| raw_addr.as_slice());
+        self.do_sendmsg_untrusted_data(&u_data, flags, name, control)
     }
 
     fn do_sendmsg_untrusted_data(

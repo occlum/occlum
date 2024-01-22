@@ -1,11 +1,10 @@
 use self::impls::{Ipv4Datagram, Ipv6Datagram};
-use super::misc::{Ipv4SocketAddr, Ipv6SocketAddr};
 use crate::events::{Observer, Poller};
 use crate::net::socket::{MsgFlags, SocketProtocol};
 
 use self::impls::{Ipv4Stream, Ipv6Stream};
-use super::addr::AnyAddr;
 use crate::fs::{AccessMode, IoEvents, IoNotifier, IoctlCmd, StatusFlags};
+use crate::net::socket::{AnyAddr, Ipv4SocketAddr, Ipv6SocketAddr};
 use crate::prelude::*;
 
 #[derive(Debug)]

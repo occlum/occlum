@@ -7,30 +7,12 @@ impl HostSocket {
         Ok(bytes_recvd)
     }
 
-    pub fn recvmsg<'a, 'b>(&self, msg: &'b mut MsgHdrMut<'a>, flags: RecvFlags) -> Result<usize> {
-        // Do OCall-based recvmsg
-        let (bytes_recvd, namelen_recvd, controllen_recvd, flags_recvd) = {
-            // Acquire mutable references to the name and control buffers
-            let (iovs, name, control) = msg.get_iovs_name_and_control_mut();
-            // Fill the data, the name, and the control buffers
-            self.do_recvmsg(iovs.as_slices_mut(), flags, name, control)?
-        };
-
-        // Update the output lengths and flags
-        msg.set_name_len(namelen_recvd)?;
-        msg.set_control_len(controllen_recvd)?;
-        msg.set_flags(flags_recvd);
-
-        Ok(bytes_recvd)
-    }
-
-    pub(super) fn do_recvmsg(
+    pub fn recvmsg(
         &self,
         data: &mut [&mut [u8]],
         flags: RecvFlags,
-        mut name: Option<&mut [u8]>,
-        mut control: Option<&mut [u8]>,
-    ) -> Result<(usize, usize, usize, MsgFlags)> {
+        control: Option<&mut [u8]>,
+    ) -> Result<(usize, Option<RawAddr>, MsgFlags, usize)> {
         let data_length = data.iter().map(|s| s.len()).sum();
         let mut ocall_alloc;
         // Allocated slice in untrusted memory region
@@ -51,7 +33,7 @@ impl HostSocket {
             }
             bufs
         };
-        let retval = self.do_recvmsg_untrusted_data(&mut u_data, flags, name, control)?;
+        let retval = self.do_recvmsg_untrusted_data(&mut u_data, flags, control)?;
 
         let mut remain = retval.0;
         for (i, buf) in data.iter_mut().enumerate() {
@@ -70,16 +52,17 @@ impl HostSocket {
         &self,
         data: &mut [UntrustedSlice],
         flags: RecvFlags,
-        mut name: Option<&mut [u8]>,
         mut control: Option<&mut [u8]>,
-    ) -> Result<(usize, usize, usize, MsgFlags)> {
+    ) -> Result<(usize, Option<RawAddr>, MsgFlags, usize)> {
         // Prepare the arguments for OCall
         // Host socket fd
         let host_fd = self.raw_host_fd() as i32;
-        // Name
-        let (msg_name, msg_namelen) = name.as_mut_ptr_and_len();
-        let msg_name = msg_name as *mut c_void;
+        // Addr
+        let mut addr = RawAddr::default();
+        let mut msg_name = addr.as_mut_ptr();
+        let mut msg_namelen = addr.len();
         let mut msg_namelen_recvd = 0_u32;
+
         // Iovs
         let mut raw_iovs: Vec<libc::iovec> = data
             .iter()
@@ -100,7 +83,7 @@ impl HostSocket {
             let status = occlum_ocall_recvmsg(
                 &mut retval as *mut isize,
                 host_fd,
-                msg_name,
+                msg_name as _,
                 msg_namelen as u32,
                 &mut msg_namelen_recvd as *mut u32,
                 msg_iov,
@@ -139,14 +122,17 @@ impl HostSocket {
             retval
         };
         let msg_namelen_recvd = msg_namelen_recvd as usize;
+
+        let raw_addr = if msg_namelen_recvd == 0 {
+            None
+        } else {
+            addr.set_len(msg_namelen_recvd)?;
+            Some(addr)
+        };
+
         assert!(msg_namelen_recvd <= msg_namelen);
         assert!(msg_controllen_recvd <= msg_controllen);
-        Ok((
-            bytes_recvd,
-            msg_namelen_recvd,
-            msg_controllen_recvd,
-            flags_recvd,
-        ))
+        Ok((bytes_recvd, raw_addr, flags_recvd, msg_controllen_recvd))
     }
 }
 

@@ -1,10 +1,7 @@
-use self::addr::Addr;
 use super::*;
 
-mod addr;
 mod stream;
 
-pub use self::addr::Addr as UnixAddr;
 pub use self::stream::Stream;
 
 //TODO: rewrite this file when a new kind of uds is added

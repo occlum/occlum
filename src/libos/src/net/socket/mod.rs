@@ -1,14 +1,15 @@
 use super::*;
 
 mod host;
-pub mod sockopt;
+pub(crate) mod sockopt;
 mod unix;
-pub mod uring;
-mod util;
+pub(crate) mod uring;
+pub(crate) mod util;
 
 pub use self::host::{HostSocket, HostSocketType};
-pub use self::unix::{socketpair, unix_socket, AsUnixSocket, UnixAddr};
+pub use self::unix::{socketpair, unix_socket, AsUnixSocket};
 pub use self::util::{
-    CMessages, CmsgData, Domain, Iovs, IovsMut, MsgFlags, MsgHdr, MsgHdrMut, RecvFlags, SendFlags,
-    Shutdown, SliceAsLibcIovec, SockAddr, SocketProtocol, Type,
+    Addr, AnyAddr, CMessages, CSockAddr, CmsgData, Domain, Iovs, IovsMut, Ipv4Addr, Ipv4SocketAddr,
+    Ipv6SocketAddr, MsgFlags, RawAddr, RecvFlags, SendFlags, Shutdown, SliceAsLibcIovec,
+    SocketProtocol, Type, UnixAddr,
 };

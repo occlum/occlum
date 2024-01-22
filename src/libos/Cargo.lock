@@ -14,6 +14,7 @@ dependencies = [
  "ctor",
  "derive_builder",
  "downcast-rs",
+ "errno",
  "goblin",
  "intrusive-collections",
  "io-uring-callback",
@@ -230,6 +231,9 @@ name = "errno"
 version = "0.1.0"
 dependencies = [
  "log",
+ "rcore-fs",
+ "serde_json",
+ "sgx_tstd",
 ]
 
 [[package]]

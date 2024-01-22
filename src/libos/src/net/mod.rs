@@ -9,7 +9,7 @@ pub use self::io_multiplexing::{
 
 pub use self::socket::{
     socketpair, unix_socket, AsUnixSocket, Domain, HostSocket, HostSocketType, Iovs, IovsMut,
-    MsgHdr, MsgHdrMut, SliceAsLibcIovec, SockAddr, UnixAddr,
+    RawAddr, SliceAsLibcIovec, UnixAddr,
 };
 pub use self::syscalls::*;
 

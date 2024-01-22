@@ -3,7 +3,7 @@ use atomic::Ordering;
 use self::recv::Receiver;
 use self::send::Sender;
 use crate::fs::IoEvents as Events;
-use crate::net::socket::sockopt::{setsockopt_by_host, SockOptName};
+use crate::net::socket::sockopt::SockOptName;
 use crate::net::socket::uring::common::Common;
 use crate::net::socket::uring::runtime::Runtime;
 use crate::prelude::*;
