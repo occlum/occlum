@@ -441,16 +441,19 @@ jobs:
         ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+
     - name: Create container
       run: |
-        docker pull occlumbackup/occlum:latest-ubuntu20.04-python
+        docker pull occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-python
         if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          python_musl_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-python);
+          python_musl_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-python);
         elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
           if [[ "${{ matrix.self_runner[2] }}" == "EDMM" ]]; then
-            python_musl_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-python);
+            python_musl_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-python);
           else
-            python_musl_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-python);
+            python_musl_support_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-python);
           fi
         else
           echo "Unsupported Hardware"
@@ -516,16 +519,19 @@ jobs:
         ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+
     - name: Create container
       run: |
-        docker pull occlumbackup/occlum:latest-ubuntu20.04-openvino
+        docker pull occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-openvino
         if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          openvino_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-openvino);
+          openvino_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-openvino);
         elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
           if [[ "${{ matrix.self_runner[2] }}" == "EDMM" ]]; then
-            openvino_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-openvino);
+            openvino_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-openvino);
           else
-            openvino_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-openvino);
+            openvino_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-openvino);
           fi
         else
           echo "Unsupported Hardware"
@@ -588,16 +594,19 @@ jobs:
         ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+
     - name: Create container
       run: |
-        docker pull occlumbackup/occlum:latest-ubuntu20.04-grpc
+        docker pull occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-grpc
         if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc);
+          grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-grpc);
         elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
           if [[ "${{ matrix.self_runner[2] }}" == "EDMM" ]]; then
-            grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc);
+            grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-grpc);
           else
-            grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-grpc);
+            grpc_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-grpc);
           fi
         else
           echo "Unsupported Hardware"
@@ -682,16 +691,19 @@ jobs:
         ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+
     - name: Create container
       run: |
-        docker pull occlumbackup/occlum:latest-ubuntu20.04-gvisor_test
+        docker pull occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-gvisor_test
         if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-gvisor_test);
+          gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-gvisor_test);
         elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
           if [[ "${{ matrix.self_runner[2] }}" == "EDMM" ]]; then
-            gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-gvisor_test);
+            gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-gvisor_test);
           else
-            gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-gvisor_test);
+            gvisor_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-gvisor_test);
           fi
         else
           echo "Unsupported Hardware"
@@ -836,16 +848,19 @@ jobs:
         ref: refs/pull/${{ github.event.pull_request.number }}/merge
         submodules: true
 
+    - name: Get occlum version
+      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
+
     - name: Create container
       run: |
-        docker pull occlumbackup/occlum:latest-ubuntu20.04-tf_serving
+        docker pull occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-tf_serving
         if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          tf_serving_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-tf_serving);
+          tf_serving_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-tf_serving);
         elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
           if [[ "${{ matrix.self_runner[2] }}" == "EDMM" ]]; then
-            tf_serving_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-tf_serving);
+            tf_serving_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --env ENABLE_EDMM=Y --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-tf_serving);
           else
-            tf_serving_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:latest-ubuntu20.04-tf_serving);
+            tf_serving_test=$(docker run -itd --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --net host -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-tf_serving);
           fi
         else
           echo "Unsupported Hardware"
