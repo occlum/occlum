@@ -30,11 +30,11 @@ pub fn do_sigsuspend(mask: &SigSet) -> Result<()> {
 
     let err = match pending_sig_waiter.suspend() {
         Ok(_) => {
-            errno!(EINTR, "Wait for EINTR signal successfully")
+            errno!(Errno::EINTR, "Wait for EINTR signal successfully")
         }
         Err(_) => {
             // Impossible path
-            errno!(EFAULT, "No interesting, pending signal")
+            errno!(Errno::EFAULT, "No interesting, pending signal")
         }
     };
 

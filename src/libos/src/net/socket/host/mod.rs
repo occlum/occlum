@@ -13,7 +13,6 @@ use crate::fs::{
 
 use crate::process::IO_BUF_SIZE;
 
-mod ioctl_impl;
 mod recv;
 mod send;
 mod socket_file;

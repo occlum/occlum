@@ -27,12 +27,12 @@ pub fn do_arch_prctl(code: ArchPrctlCode, addr: *mut usize) -> Result<()> {
                 // Check if AMX is enabled for current Enclave
                 let target_info = get_self_target()?;
                 if target_info.attributes.xfrm & SGX_XFRM_AMX != SGX_XFRM_AMX {
-                    return_errno!(EINVAL, "AMX is not enabled for this enclave");
+                    return_errno!(Errno::EINVAL, "AMX is not enabled for this enclave");
                 } else {
                     info!("AMX is enabled for this enclave");
                 }
             } else {
-                return_errno!(ENOSYS, "feature not supported");
+                return_errno!(Errno::ENOSYS, "feature not supported");
             }
         }
     }

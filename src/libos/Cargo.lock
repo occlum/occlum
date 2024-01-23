@@ -9,7 +9,7 @@ dependencies = [
  "aligned",
  "atomic",
  "bitflags",
- "bitvec",
+ "bitvec 1.0.1",
  "byteorder",
  "ctor",
  "derive_builder",
@@ -461,6 +461,11 @@ name = "modular-bitfield-impl"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a7d5f7076603ebc68de2dc6a650ec331a062a13abaa346975be747bbfa4b789"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "num_enum"
@@ -689,7 +694,7 @@ dependencies = [
  "log",
  "rcore-fs",
  "spin 0.5.2",
- "static_assertions",
+ "static_assertions 0.3.4",
  "uuid",
 ]
 

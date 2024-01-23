@@ -206,7 +206,7 @@ pub fn do_rt_sigtimedwait(
 pub fn do_rt_sigsuspend(mask_ptr: *const sigset_t) -> Result<isize> {
     let mask = {
         if mask_ptr.is_null() {
-            return_errno!(EFAULT, "ptr must not be null");
+            return_errno!(Errno::EFAULT, "ptr must not be null");
         }
         from_user::check_ptr(mask_ptr)?;
         SigSet::from_c(unsafe { *mask_ptr })

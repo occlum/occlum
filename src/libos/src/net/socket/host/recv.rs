@@ -13,6 +13,7 @@ impl HostSocket {
         flags: RecvFlags,
         control: Option<&mut [u8]>,
     ) -> Result<(usize, Option<RawAddr>, MsgFlags, usize)> {
+        let current = current!();
         let data_length = data.iter().map(|s| s.len()).sum();
         let mut ocall_alloc;
         // Allocated slice in untrusted memory region
