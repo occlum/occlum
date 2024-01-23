@@ -26,6 +26,13 @@ macro_rules! convert_result {
     }};
 }
 
+macro_rules! get_result_unwrap {
+    ($body: block) => {{
+        let mut closure_fn = || -> Result<_> { $body };
+        closure_fn().unwrap_or_else(|e| panic!("SGX protected file I/O error: {}", e.backtrace()))
+    }};
+}
+
 pub struct SgxStorage {
     path: PathBuf,
     encrypt_mode: EncryptMode,
@@ -105,58 +112,66 @@ impl SgxStorage {
 
 impl Storage for SgxStorage {
     fn open(&self, file_id: &str) -> DevResult<Box<dyn File>> {
-        let locked_file = self.get(file_id, |this| {
-            let mut path = this.path.to_path_buf();
-            path.push(file_id);
-            let options = {
-                let mut options = OpenOptions::new();
-                options.read(true).update(true);
-                options
-            };
-            let file = match self.encrypt_mode {
-                EncryptMode::IntegrityOnly(_) => options.open_integrity_only(path)?,
-                EncryptMode::EncryptWithIntegrity(key, _) | EncryptMode::Encrypt(key) => {
-                    options.open_with(path, Some(&key), self.cache_size)?
-                }
-                EncryptMode::EncryptAutoKey => options.open_with(path, None, self.cache_size)?,
-            };
+        let locked_file = self
+            .get(file_id, |this| {
+                let mut path = this.path.to_path_buf();
+                path.push(file_id);
+                let options = {
+                    let mut options = OpenOptions::new();
+                    options.read(true).update(true);
+                    options
+                };
+                let file = match self.encrypt_mode {
+                    EncryptMode::IntegrityOnly(_) => options.open_integrity_only(path)?,
+                    EncryptMode::EncryptWithIntegrity(key, _) | EncryptMode::Encrypt(key) => {
+                        options.open_with(path, Some(&key), self.cache_size)?
+                    }
+                    EncryptMode::EncryptAutoKey => {
+                        options.open_with(path, None, self.cache_size)?
+                    }
+                };
 
-            // Check the MAC of the root file against the given root MAC of the storage
-            if file_id == "metadata" && self.protect_integrity() {
-                let root_file_mac = file.get_mac().expect("Failed to get mac");
-                if root_file_mac != self.encrypt_mode.root_mac().unwrap() {
-                    error!(
+                // Check the MAC of the root file against the given root MAC of the storage
+                if file_id == "metadata" && self.protect_integrity() {
+                    let root_file_mac = file.get_mac().expect("Failed to get mac");
+                    if root_file_mac != self.encrypt_mode.root_mac().unwrap() {
+                        error!(
                         "MAC validation for metadata file failed: expected = {:#?}, found = {:?}",
                         self.encrypt_mode.root_mac().unwrap(),
                         root_file_mac
                     );
-                    return_errno!(EACCES);
+                        return_errno!(EACCES);
+                    }
                 }
-            }
 
-            Ok(LockedFile(Arc::new(Mutex::new(file))))
-        })?;
+                Ok(LockedFile(Arc::new(Mutex::new(file))))
+            })
+            .unwrap_or_else(|e| panic!("SGX protected file I/O error: {}", e.backtrace()));
         Ok(Box::new(locked_file))
     }
 
     fn create(&self, file_id: &str) -> DevResult<Box<dyn File>> {
-        let locked_file = self.get(file_id, |this| {
-            let mut path = this.path.to_path_buf();
-            path.push(file_id);
-            let options = {
-                let mut options = OpenOptions::new();
-                options.write(true).update(true);
-                options
-            };
-            let file = match self.encrypt_mode {
-                EncryptMode::IntegrityOnly(_) => options.open_integrity_only(path)?,
-                EncryptMode::EncryptWithIntegrity(key, _) | EncryptMode::Encrypt(key) => {
-                    options.open_with(path, Some(&key), self.cache_size)?
-                }
-                EncryptMode::EncryptAutoKey => options.open_with(path, None, self.cache_size)?,
-            };
-            Ok(LockedFile(Arc::new(Mutex::new(file))))
-        })?;
+        let locked_file = self
+            .get(file_id, |this| {
+                let mut path = this.path.to_path_buf();
+                path.push(file_id);
+                let options = {
+                    let mut options = OpenOptions::new();
+                    options.write(true).update(true);
+                    options
+                };
+                let file = match self.encrypt_mode {
+                    EncryptMode::IntegrityOnly(_) => options.open_integrity_only(path)?,
+                    EncryptMode::EncryptWithIntegrity(key, _) | EncryptMode::Encrypt(key) => {
+                        options.open_with(path, Some(&key), self.cache_size)?
+                    }
+                    EncryptMode::EncryptAutoKey => {
+                        options.open_with(path, None, self.cache_size)?
+                    }
+                };
+                Ok(LockedFile(Arc::new(Mutex::new(file))))
+            })
+            .unwrap_or_else(|e| panic!("SGX protected file I/O error: {}", e.backtrace()));
         Ok(Box::new(locked_file))
     }
 
@@ -233,7 +248,7 @@ unsafe impl Sync for LockedFile {}
 
 impl File for LockedFile {
     fn read_at(&self, buf: &mut [u8], offset: usize) -> DevResult<usize> {
-        convert_result!({
+        let len = get_result_unwrap!({
             if buf.len() == 0 {
                 return Ok(0);
             }
@@ -250,11 +265,12 @@ impl File for LockedFile {
             file.seek(SeekFrom::Start(offset))?;
             let len = file.read(buf)?;
             Ok(len)
-        })
+        });
+        Ok(len)
     }
 
     fn write_at(&self, buf: &[u8], offset: usize) -> DevResult<usize> {
-        convert_result!({
+        let len = get_result_unwrap!({
             if buf.len() == 0 {
                 return Ok(0);
             }
@@ -277,13 +293,14 @@ impl File for LockedFile {
             file.seek(SeekFrom::Start(offset))?;
             let len = file.write(buf)?;
             Ok(len)
-        })
+        });
+        Ok(len)
     }
 
     fn set_len(&self, len: usize) -> DevResult<()> {
         // The set_len() is unsupported for SgxFile, we have to
         // implement it in a slow way by padding null bytes.
-        convert_result!({
+        get_result_unwrap!({
             let mut file = self.0.lock().unwrap();
             let file_size = file.seek(SeekFrom::End(0))? as usize;
             let mut reset_len = if len > file_size {
@@ -297,23 +314,22 @@ impl File for LockedFile {
             static ZEROS: [u8; 0x1000] = [0; 0x1000];
             while reset_len != 0 {
                 let l = reset_len.min(0x1000);
-                // Probably there's not enough space on disk, let's panic here
-                let written_len = file.write(&ZEROS[..l]).unwrap_or_else(|e| {
-                    error!("failed to set null bytes: {}", e);
-                    panic!();
-                });
+                // Probably there's not enough space on disk.
+                let written_len = file.write(&ZEROS[..l])?;
                 reset_len -= written_len;
             }
             Ok(())
-        })
+        });
+        Ok(())
     }
 
     fn flush(&self) -> DevResult<()> {
-        convert_result!({
+        get_result_unwrap!({
             let mut file = self.0.lock().unwrap();
             file.flush()?;
             Ok(())
-        })
+        });
+        Ok(())
     }
 
     fn get_file_mac(&self) -> DevResult<SefsMac> {
