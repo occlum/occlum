@@ -110,7 +110,7 @@ macro_rules! process_syscall_table_with_callback {
             (Mprotect = 10) => do_mprotect(addr: usize, len: usize, prot: u32),
             (Munmap = 11) => do_munmap(addr: usize, size: usize),
             (Brk = 12) => do_brk(new_brk_addr: usize),
-            (RtSigaction = 13) => do_rt_sigaction(signum_c: c_int, new_sa_c: *const sigaction_t, old_sa_c: *mut sigaction_t),
+            (RtSigaction = 13) => do_rt_sigaction(signum_c: c_int, new_sa_c: *const sigaction_t, old_sa_c: *mut sigaction_t, sigset_size: size_t),
             (RtSigprocmask = 14) => do_rt_sigprocmask(how: c_int, set: *const sigset_t, oldset: *mut sigset_t, sigset_size: size_t),
             (RtSigreturn = 15) => do_rt_sigreturn(context: *mut CpuContext),
             (Ioctl = 16) => do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8),
