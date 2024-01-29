@@ -559,6 +559,9 @@ pub fn do_readlinkat(dirfd: i32, path: *const i8, buf: *mut u8, size: usize) -> 
         .to_string_lossy()
         .into_owned();
     let buf = {
+        if size == 0 {
+            return_errno!(EINVAL, "bufsiz is not a positive number");
+        }
         from_user::check_array(buf, size)?;
         unsafe { std::slice::from_raw_parts_mut(buf, size) }
     };
