@@ -14,9 +14,15 @@ pub fn do_rt_sigaction(
     signum_c: c_int,
     new_sa_c: *const sigaction_t,
     old_sa_c: *mut sigaction_t,
+    sigset_size: size_t,
 ) -> Result<isize> {
     // C types -> Rust types
     let signum = SigNum::from_u8(signum_c as u8)?;
+
+    if sigset_size != std::mem::size_of::<sigset_t>() {
+        return_errno!(EINVAL, "unexpected sig action size");
+    }
+
     let new_sa = {
         if !new_sa_c.is_null() {
             let new_sa_c = unsafe { &*new_sa_c };
