@@ -15,6 +15,17 @@ pub fn do_sendfile(
     let current = current!();
     let in_file = current.file(in_fd)?;
     let out_file = current.file(out_fd)?;
+
+    let in_file_access = in_file.access_mode()?;
+    if !in_file_access.readable() {
+        return_errno!(EBADF, "The in file is non-readable");
+    }
+
+    let out_file_access = out_file.access_mode()?;
+    if !out_file_access.writable() {
+        return_errno!(EBADF, "The out file is non-writable");
+    }
+
     let mut buffer: [u8; 1024 * 11] = unsafe { MaybeUninit::uninit().assume_init() };
 
     let mut read_offset = match offset {
