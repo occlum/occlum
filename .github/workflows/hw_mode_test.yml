@@ -54,6 +54,15 @@ jobs:
         container-name: ${{ github.job }}
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
+    # Udpate the test json file
+    # When there comes new features, the configuration should be enabled accordingly
+    - name: Configure Occlum features
+      run: |
+        if [[ "${{ matrix.self_runner[2] }}" == "EDMM" ]]; then
+          docker exec ${{ env.CONTAINER_NAME }} bash -c "jq '.feature.enable_posix_shm = true | .feature.enable_edmm = true' /root/occlum/test/Occlum.json > /tmp.json && mv /tmp.json /root/occlum/test/Occlum.json"
+        fi;
+      shell: bash
+
     - name: Integration test
       run:  docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum; OCCLUM_LOG_LEVEL=trace make test"
 
