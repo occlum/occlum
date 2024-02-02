@@ -188,6 +188,50 @@ int test_dev_fd() {
     close(fd);
     return 0;
 }
+
+int test_dev_attestation() {
+    char *file_path = "/dev/attestation_report_data";
+    char *report_string = "Example Occlum attestation";
+    int fd = open(file_path, O_RDWR);
+    if (fd < 0) {
+        THROW_ERROR("failed to open a file to write");
+    }
+
+    int len = write(fd, report_string, strlen(report_string));
+    if (len < 0) {
+        THROW_ERROR("failed to write to %d", fd);
+    }
+
+    len = 64;
+    char buf[64] = {0};
+    len = read(fd, buf, len);
+    if (len < 0) {
+        THROW_ERROR("failed to read from %s", file_path);
+    }
+
+    if (strncmp(report_string, buf, strlen(report_string)) != 0 ) {
+        THROW_ERROR("Read report data is not %s", report_string);
+    }
+
+    close(fd);
+
+    // Generate dcap quote
+    fd = open("/dev/attestation_quote", O_RDONLY);
+    if (fd < 0) {
+        THROW_ERROR("failed to open a file to read");
+    }
+
+    len = 5000;
+    char quote_buf[5000] = {0};
+    len = read(fd, quote_buf, len);
+    if (len < 0) {
+        THROW_ERROR("failed to read from /dev/attestation_quote");
+    }
+
+    close(fd);
+    return 0;
+}
+
 // ============================================================================
 // Test suite
 // ============================================================================
@@ -202,6 +246,9 @@ static test_case_t test_cases[] = {
     TEST_CASE(test_dev_arandom),
     TEST_CASE(test_dev_shm),
     TEST_CASE(test_dev_fd),
+#ifndef OCCLUM_DISABLE_DCAP
+    TEST_CASE(test_dev_attestation),
+#endif
 };
 
 int main() {

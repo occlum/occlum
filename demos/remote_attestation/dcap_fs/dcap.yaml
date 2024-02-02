@@ -1,0 +1,9 @@
+includes:
+  - base.yaml
+# dcap
+targets:
+  # copy bins
+  - target: /bin
+    copy:
+      - files:
+        - ../c_app/dcap_fs
