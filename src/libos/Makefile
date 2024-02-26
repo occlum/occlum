@@ -45,7 +45,7 @@ LIBOS_LOG ?= error
 
 LIBOS_SONAME := libocclum-libos.so.$(MAJOR_VER_NUM)
 
-LIBOS_FEATURES :=
+LIBOS_FEATURES := $(LIBOS_FEATURES)
 
 ifeq ($(SGX_MODE), HW)
 	LIBOS_CORE_LIB_NAME := occlum-libos-core

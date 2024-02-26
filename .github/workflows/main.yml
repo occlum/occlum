@@ -68,6 +68,12 @@ jobs:
       if: ${{ failure() }}
       run: docker exec ${{ github.job }} bash -c "cat /root/occlum/build/test/.fail"
 
+    - name: Integration test with optional Occlum features
+      run: |
+        docker exec ${{ github.job }} bash -c 'source /opt/intel/sgxsdk/environment; cd /root/occlum; make clean && LIBOS_FEATURES="kernel_heap_monitor" make install'
+        docker exec ${{ github.job }} bash -c "cd /root/occlum; SGX_MODE=SIM make test-glibc"
+      shell: bash
+
   # Make_test_on_centos:
   #   runs-on: ubuntu-18.04
 
