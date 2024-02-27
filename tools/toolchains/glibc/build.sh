@@ -2,9 +2,12 @@
 SRC_DIR=/tmp/glibc/glibc
 BUILD_DIR=/tmp/glibc/glibc_build
 INSTALL_DIR=/opt/occlum/glibc
+GLIBC_BRANCH=${1:-"occlum-glibc-2.31"}
 
 # GCC 9/10 introduces many new checkings and will cause the build to fail.
-if [ "$(gcc -dumpversion)" = "9" -o "$(gcc -dumpversion)" = "10" ]; then
+if [ "$(gcc -dumpversion)" = "9" ] || \
+  [ "$(gcc -dumpversion)" = "10" ] || \
+  [ "$(gcc -dumpversion)" = "11" ]; then
     EXTRA_CFLAGS=-fcommon
     EXTRA_CONFIG_OPTION="--disable-werror"
 fi
@@ -20,7 +23,7 @@ rm -rf ${INSTALL_DIR}
 mkdir -p ${SRC_DIR}
 cd ${SRC_DIR}
 # Download glibc
-git clone -b occlum-glibc-2.31 https://github.com/occlum/glibc .
+git clone -b ${GLIBC_BRANCH} https://github.com/occlum/glibc .
 
 mkdir -p ${BUILD_DIR}
 cd ${BUILD_DIR}
