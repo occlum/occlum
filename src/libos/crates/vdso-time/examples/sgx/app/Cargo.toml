@@ -1,0 +1,10 @@
+[package]
+name = "app"
+version = "1.0.0"
+build = "build.rs"
+
+[dependencies]
+sgx_types = { path = "../../../../../../../deps/rust-sgx-sdk/sgx_types" }
+sgx_urts = { path = "../../../../../../../deps/rust-sgx-sdk/sgx_urts" }
+
+[workspace]

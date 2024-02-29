@@ -25,7 +25,8 @@ rcore-fs-devfs = { path = "../../deps/sefs/rcore-fs-devfs" }
 resolv-conf = { path = "../../deps/resolv-conf" }
 serde = { path = "../../deps/serde-sgx/serde", features = ["derive"] }
 serde_json = { path = "../../deps/serde-json-sgx" }
-errno = { path = "./crates/errno", features = ["occlum"] }
+errno = { path = "crates/errno", features = ["occlum"] }
+vdso-time = { path = "crates/vdso-time", default-features = false, features = ["sgx"] }
 memoffset = "0.6.1"
 scroll = { version = "0.11.0", default-features = false }
 itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"]  }

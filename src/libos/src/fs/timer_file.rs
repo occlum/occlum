@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::time::{clockid_t, itimerspec_t, timespec_t, ClockID};
+use crate::time::{clockid_t, itimerspec_t, timespec_t, ClockId};
 use atomic::{Atomic, Ordering};
 use std::time::Duration;
 
@@ -13,7 +13,7 @@ pub struct TimerFile {
 }
 
 impl TimerFile {
-    pub fn new(clockid: ClockID, flags: TimerCreationFlags) -> Result<Self> {
+    pub fn new(clockid: ClockId, flags: TimerCreationFlags) -> Result<Self> {
         let raw_host_fd = try_libc!({
             let mut ret: i32 = 0;
             let status = occlum_ocall_timerfd_create(&mut ret, clockid as clockid_t, flags.bits());

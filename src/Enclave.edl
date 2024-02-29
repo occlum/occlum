@@ -6,6 +6,7 @@ enclave {
     from "sgx_tprotected_fs.edl" import *;
     from "sgx_net.edl" import *;
     from "sgx_occlum_utils.edl" import *;
+    from "sgx_vdso_time_ocalls.edl" import *;
 
     include "sgx_quote.h"
     include "occlum_edl_types.h"
@@ -148,9 +149,6 @@ enclave {
 
         int occlum_ocall_thread_getcpuclock([out] struct timespec* ts) propagate_errno;
 
-        void occlum_ocall_gettimeofday([out] struct timeval* tv);
-        void occlum_ocall_clock_gettime(clockid_t clockid, [out] struct timespec* ts);
-        void occlum_ocall_clock_getres(clockid_t clockid, [out] struct timespec* res);
         void occlum_ocall_rdtsc([out] uint32_t* low, [out] uint32_t* high);
         void occlum_ocall_get_timerslack([out] int *timer_slack);
 
