@@ -1,0 +1,32 @@
+[package]
+name = "vdso-time"
+version = "0.1.0"
+authors = ["Shuocheng Wang <shuocheng.wsc@antgroup.com>"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["std"]
+std = ["libc"]
+sgx = ["sgx_types", "sgx_tstd", "sgx_libc", "sgx_trts"]
+
+[dependencies]
+cfg-if = "1.0"
+errno = { path = "../errno" }
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+libc = { version = "0.2", optional = true }
+log = "0.4"
+sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }
+sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", optional = true, features = ["backtrace"] }
+sgx_libc = { path = "../../../../deps/rust-sgx-sdk/sgx_libc", optional = true }
+sgx_trts = { path = "../../../../deps/rust-sgx-sdk/sgx_trts", optional = true }
+
+[dev-dependencies]
+criterion = "0.3"
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+ctor = "0.1"
+
+[[bench]]
+name = "bench"
+harness = false

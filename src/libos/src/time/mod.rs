@@ -14,6 +14,7 @@ pub mod up_time;
 
 pub use profiler::ThreadProfiler;
 pub use timer_slack::TIMERSLACK;
+pub use vdso_time::ClockId;
 
 #[allow(non_camel_case_types)]
 pub type time_t = i64;
@@ -74,15 +75,9 @@ impl From<Duration> for timeval_t {
 }
 
 pub fn do_gettimeofday() -> timeval_t {
-    extern "C" {
-        fn occlum_ocall_gettimeofday(tv: *mut timeval_t) -> sgx_status_t;
-    }
-
-    let mut tv: timeval_t = Default::default();
-    unsafe {
-        occlum_ocall_gettimeofday(&mut tv as *mut timeval_t);
-    }
-    tv.validate().expect("ocall returned invalid timeval_t");
+    let tv = timeval_t::from(vdso_time::clock_gettime(ClockId::CLOCK_REALTIME).unwrap());
+    tv.validate()
+        .expect("gettimeofday returned invalid timeval_t");
     tv
 }
 
@@ -149,58 +144,15 @@ impl timespec_t {
 #[allow(non_camel_case_types)]
 pub type clockid_t = i32;
 
-#[derive(Debug, Copy, Clone)]
-#[allow(non_camel_case_types)]
-pub enum ClockID {
-    CLOCK_REALTIME = 0,
-    CLOCK_MONOTONIC = 1,
-    CLOCK_PROCESS_CPUTIME_ID = 2,
-    CLOCK_THREAD_CPUTIME_ID = 3,
-    CLOCK_MONOTONIC_RAW = 4,
-    CLOCK_REALTIME_COARSE = 5,
-    CLOCK_MONOTONIC_COARSE = 6,
-    CLOCK_BOOTTIME = 7,
-}
-
-impl ClockID {
-    #[deny(unreachable_patterns)]
-    pub fn from_raw(clockid: clockid_t) -> Result<ClockID> {
-        Ok(match clockid as i32 {
-            0 => ClockID::CLOCK_REALTIME,
-            1 => ClockID::CLOCK_MONOTONIC,
-            2 => ClockID::CLOCK_PROCESS_CPUTIME_ID,
-            3 => ClockID::CLOCK_THREAD_CPUTIME_ID,
-            4 => ClockID::CLOCK_MONOTONIC_RAW,
-            5 => ClockID::CLOCK_REALTIME_COARSE,
-            6 => ClockID::CLOCK_MONOTONIC_COARSE,
-            7 => ClockID::CLOCK_BOOTTIME,
-            _ => return_errno!(EINVAL, "invalid command"),
-        })
-    }
-}
-
-pub fn do_clock_gettime(clockid: ClockID) -> Result<timespec_t> {
-    extern "C" {
-        fn occlum_ocall_clock_gettime(clockid: clockid_t, tp: *mut timespec_t) -> sgx_status_t;
-    }
-
-    let mut tv: timespec_t = Default::default();
-    unsafe {
-        occlum_ocall_clock_gettime(clockid as clockid_t, &mut tv as *mut timespec_t);
-    }
-    tv.validate().expect("ocall returned invalid timespec");
+pub fn do_clock_gettime(clockid: ClockId) -> Result<timespec_t> {
+    let tv = timespec_t::from(vdso_time::clock_gettime(clockid).unwrap());
+    tv.validate()
+        .expect("clock_gettime returned invalid timespec");
     Ok(tv)
 }
 
-pub fn do_clock_getres(clockid: ClockID) -> Result<timespec_t> {
-    extern "C" {
-        fn occlum_ocall_clock_getres(clockid: clockid_t, res: *mut timespec_t) -> sgx_status_t;
-    }
-
-    let mut res: timespec_t = Default::default();
-    unsafe {
-        occlum_ocall_clock_getres(clockid as clockid_t, &mut res as *mut timespec_t);
-    }
+pub fn do_clock_getres(clockid: ClockId) -> Result<timespec_t> {
+    let res = timespec_t::from(vdso_time::clock_getres(clockid).unwrap());
     let validate_resolution = |res: &timespec_t| -> Result<()> {
         // The resolution can be ranged from 1 nanosecond to a few milliseconds
         if res.sec == 0 && res.nsec > 0 && res.nsec < 1_000_000_000 {
@@ -210,14 +162,14 @@ pub fn do_clock_getres(clockid: ClockID) -> Result<timespec_t> {
         }
     };
     // do sanity check
-    validate_resolution(&res).expect("ocall returned invalid resolution");
+    validate_resolution(&res).expect("clock_getres returned invalid resolution");
     Ok(res)
 }
 
 const TIMER_ABSTIME: i32 = 0x01;
 
 pub fn do_clock_nanosleep(
-    clockid: ClockID,
+    clockid: ClockId,
     flags: i32,
     req: &timespec_t,
     rem: Option<&mut timespec_t>,
@@ -235,11 +187,11 @@ pub fn do_clock_nanosleep(
     let mut ret = 0;
     let mut u_rem: timespec_t = timespec_t { sec: 0, nsec: 0 };
     match clockid {
-        ClockID::CLOCK_REALTIME
-        | ClockID::CLOCK_MONOTONIC
-        | ClockID::CLOCK_BOOTTIME
-        | ClockID::CLOCK_PROCESS_CPUTIME_ID => {}
-        ClockID::CLOCK_THREAD_CPUTIME_ID => {
+        ClockId::CLOCK_REALTIME
+        | ClockId::CLOCK_MONOTONIC
+        | ClockId::CLOCK_BOOTTIME
+        | ClockId::CLOCK_PROCESS_CPUTIME_ID => {}
+        ClockId::CLOCK_THREAD_CPUTIME_ID => {
             return_errno!(EINVAL, "CLOCK_THREAD_CPUTIME_ID is not a permitted value");
         }
         _ => {
@@ -269,7 +221,7 @@ pub fn do_nanosleep(req: &timespec_t, rem: Option<&mut timespec_t>) -> Result<()
     // the CLOCK_REALTIME clock.  However, Linux measures the time using
     // the CLOCK_MONOTONIC clock.
     // Here we follow the POSIX.1
-    let clock_id = ClockID::CLOCK_REALTIME;
+    let clock_id = ClockId::CLOCK_REALTIME;
     return do_clock_nanosleep(clock_id, 0, req, rem);
 }
 

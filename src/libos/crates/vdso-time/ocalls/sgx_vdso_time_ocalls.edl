@@ -1,0 +1,14 @@
+enclave {
+    include "time.h"
+
+    untrusted {
+        int vdso_ocall_get_vdso_info(
+            [out] unsigned long* vdso_addr,
+            [out, size = release_len] char* release,
+            int release_len
+        );
+
+        int vdso_ocall_clock_gettime(int clockid, [out] struct timespec* ts);
+        int vdso_ocall_clock_getres(int clockid, [out] struct timespec* res);
+    };
+};

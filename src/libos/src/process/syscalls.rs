@@ -11,7 +11,7 @@ use super::process::ProcessFilter;
 use super::spawn_attribute::{clone_spawn_atrributes_safely, posix_spawnattr_t, SpawnAttr};
 use crate::prelude::*;
 use crate::syscall::CpuContext;
-use crate::time::{timespec_t, ClockID};
+use crate::time::{timespec_t, ClockId};
 use crate::util::mem_util::from_user::*;
 use std::ptr::NonNull;
 
@@ -290,9 +290,9 @@ pub fn do_futex(
                     "FUTEX_CLOCK_REALTIME with this futex operation is not supported"
                 );
             }
-            ClockID::CLOCK_REALTIME
+            ClockId::CLOCK_REALTIME
         } else {
-            ClockID::CLOCK_MONOTONIC
+            ClockId::CLOCK_MONOTONIC
         };
 
         // From futex man page:

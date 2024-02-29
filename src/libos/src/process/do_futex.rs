@@ -4,7 +4,7 @@ use std::intrinsics::atomic_load_seqcst;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::prelude::*;
-use crate::time::{timespec_t, ClockID};
+use crate::time::{timespec_t, ClockId};
 
 /// `FutexOp`, `FutexFlags`, and `futex_op_and_flags_from_u32` are helper types and
 /// functions for handling the versatile commands and arguments of futex system
@@ -75,13 +75,13 @@ const FUTEX_BITSET_MATCH_ANY: u32 = 0xFFFF_FFFF;
 
 #[derive(Debug, Copy, Clone)]
 pub struct FutexTimeout {
-    clock_id: ClockID,
+    clock_id: ClockId,
     ts: timespec_t,
     absolute_time: bool,
 }
 
 impl FutexTimeout {
-    pub fn new(clock_id: ClockID, ts: timespec_t, absolute_time: bool) -> Self {
+    pub fn new(clock_id: ClockId, ts: timespec_t, absolute_time: bool) -> Self {
         Self {
             clock_id,
             ts,
@@ -89,7 +89,7 @@ impl FutexTimeout {
         }
     }
 
-    pub fn clock_id(&self) -> &ClockID {
+    pub fn clock_id(&self) -> &ClockId {
         &self.clock_id
     }
 
@@ -502,7 +502,7 @@ fn wait_event_timeout(thread: *const c_void, timeout: &Option<FutexTimeout>) -> 
         .as_ref()
         .map(|timeout| {
             let clockbit = match timeout.clock_id() {
-                ClockID::CLOCK_REALTIME => FutexFlags::FUTEX_CLOCK_REALTIME.bits() as i32,
+                ClockId::CLOCK_REALTIME => FutexFlags::FUTEX_CLOCK_REALTIME.bits() as i32,
                 _ => 0,
             };
             (
