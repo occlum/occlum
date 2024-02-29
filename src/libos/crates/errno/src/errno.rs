@@ -1,4 +1,4 @@
-use super::*;
+use core::fmt;
 
 /// POSIX errno
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -46,7 +46,6 @@ pub enum Errno {
     ENOSYS = 38,
     ENOTEMPTY = 39,
     ELOOP = 40,
-    EWOULDBLOCK = 41,
     ENOMSG = 42,
     EIDRM = 43,
     ECHRNG = 44,
@@ -145,6 +144,9 @@ const ERRNO_MIN: u32 = Errno::EPERM as u32;
 const ERRNO_MAX: u32 = Errno::EHWPOISON as u32;
 
 impl Errno {
+    // EWOULDBLOCK was used on BSD/Sun variants of Unix, and EAGAIN was the AT&T System V error code.
+    // Here we keep same with linux, define EWOULDBLOCK with EAGAIN.
+    pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
     pub(crate) fn as_str(&self) -> &'static str {
         use self::Errno::*;
         match *self {
