@@ -66,6 +66,7 @@ extern crate intrusive_collections;
 extern crate itertools;
 extern crate modular_bitfield;
 extern crate resolv_conf;
+extern crate vdso_time;
 
 use sgx_trts::libc;
 use sgx_types::*;

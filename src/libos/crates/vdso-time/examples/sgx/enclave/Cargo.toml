@@ -1,0 +1,22 @@
+[package]
+name = "Helloworldsampleenclave"
+version = "1.0.0"
+
+[lib]
+name = "helloworldsampleenclave"
+crate-type = ["staticlib"]
+
+[features]
+default = []
+
+[dependencies]
+vdso-time = { path = "../../../../vdso-time", default-features = false, features = ["sgx"] }
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+
+[target.'cfg(not(target_env = "sgx"))'.dependencies]
+sgx_types = { path = "../../../../../../../deps/rust-sgx-sdk/sgx_types" }
+sgx_tstd = { path = "../../../../../../../deps/rust-sgx-sdk/sgx_tstd", features = ["backtrace", "thread"] }
+sgx_trts = { path = "../../../../../../../deps/rust-sgx-sdk/sgx_trts" }
+sgx_libc = { path = "../../../../../../../deps/rust-sgx-sdk/sgx_libc" }
+
+[workspace]
