@@ -321,10 +321,3 @@ impl File for LockedFile {
         Ok(SefsMac(file.get_mac().unwrap()))
     }
 }
-
-impl From<Error> for DevError {
-    fn from(e: Error) -> Self {
-        error!("SGX protected file I/O error: {}", e.backtrace());
-        DevError(e.errno() as i32)
-    }
-}

@@ -1,0 +1,19 @@
+[package]
+name = "errno"
+version = "0.1.0"
+authors = ["Tate, Hongliang Tian <tate.thl@antgroup.com>"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = []
+std = []
+occlum = ["sgx", "serde_json", "rcore-fs"]
+sgx = ["sgx_tstd"]
+
+[dependencies]
+log = "0.4"
+serde_json = { path = "../../../../deps/serde-json-sgx", optional = true }
+sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", optional = true }
+rcore-fs = { path = "../../../../deps/sefs/rcore-fs", optional = true }

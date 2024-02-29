@@ -1,4 +1,7 @@
-use super::*;
+use alloc::boxed::Box;
+use core::fmt;
+
+use super::{Errno, ToErrno};
 
 #[derive(Debug)]
 pub struct Error {
@@ -10,7 +13,7 @@ pub struct Error {
 #[derive(Debug)]
 enum Error__ {
     Embedded((Errno, &'static str)),
-    Boxed(Box<dyn ToErrno + 'static>),
+    Boxed(Box<dyn ToErrno + Send + 'static>),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -30,7 +33,7 @@ impl Error {
 
     pub fn boxed<T>(inner: T, location: Option<ErrorLocation>) -> Error
     where
-        T: ToErrno + 'static,
+        T: ToErrno + Send + 'static,
     {
         Error {
             inner: Error__::Boxed(Box::new(inner)),
@@ -64,23 +67,6 @@ impl ErrorLocation {
     }
 }
 
-impl std::error::Error for Error {
-    fn description(&self) -> &str {
-        self.errno().as_str()
-    }
-
-    fn cause(&self) -> Option<&dyn std::error::Error> {
-        self.cause.as_ref().map(|e| e as &dyn std::error::Error)
-    }
-    /*
-       fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-           self.cause
-               .as_ref()
-               .map(|e| e as &(dyn std::error::Error + 'static))
-       }
-    */
-}
-
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.inner)?;
@@ -103,5 +89,27 @@ impl fmt::Display for Error__ {
 impl fmt::Display for ErrorLocation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "[line = {}, file = {}]", self.line, self.file)
+    }
+}
+
+#[cfg(any(feature = "std", feature = "sgx", test, doctest))]
+mod if_std {
+    use super::*;
+
+    impl std::error::Error for Error {
+        fn description(&self) -> &str {
+            self.errno().as_str()
+        }
+
+        fn cause(&self) -> Option<&dyn std::error::Error> {
+            self.cause.as_ref().map(|e| e as &dyn std::error::Error)
+        }
+        /*
+           fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+               self.cause
+                   .as_ref()
+                   .map(|e| e as &(dyn std::error::Error + 'static))
+           }
+        */
     }
 }
