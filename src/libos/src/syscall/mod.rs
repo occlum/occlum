@@ -932,7 +932,7 @@ fn do_gettimeofday(tv_u: *mut timeval_t) -> Result<isize> {
 
 fn do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t) -> Result<isize> {
     check_mut_ptr(ts_u)?;
-    let clockid = time::ClockID::from_raw(clockid)?;
+    let clockid = time::ClockId::try_from(clockid)?;
     let ts = time::do_clock_gettime(clockid)?;
     unsafe {
         *ts_u = ts;
@@ -941,7 +941,7 @@ fn do_clock_gettime(clockid: clockid_t, ts_u: *mut timespec_t) -> Result<isize> 
 }
 
 fn do_time(tloc_u: *mut time_t) -> Result<isize> {
-    let ts = time::do_clock_gettime(time::ClockID::CLOCK_REALTIME)?;
+    let ts = time::do_clock_gettime(time::ClockId::CLOCK_REALTIME)?;
     if !tloc_u.is_null() {
         check_mut_ptr(tloc_u)?;
         unsafe {
@@ -952,7 +952,7 @@ fn do_time(tloc_u: *mut time_t) -> Result<isize> {
 }
 
 fn do_clock_getres(clockid: clockid_t, res_u: *mut timespec_t) -> Result<isize> {
-    let clockid = time::ClockID::from_raw(clockid)?;
+    let clockid = time::ClockId::try_from(clockid)?;
     if res_u.is_null() {
         return Ok(0);
     }
@@ -981,7 +981,7 @@ fn do_clock_nanosleep(
     } else {
         None
     };
-    let clockid = time::ClockID::from_raw(clockid)?;
+    let clockid = time::ClockId::try_from(clockid)?;
     time::do_clock_nanosleep(clockid, flags, &req, rem)?;
     Ok(0)
 }

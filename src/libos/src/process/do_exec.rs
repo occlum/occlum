@@ -102,12 +102,12 @@ pub fn do_exec(
 // Blocking wait until there is only one thread in the calling process
 fn wait_for_other_threads_to_exit(current_ref: &ThreadRef) {
     use super::do_futex::{self, FutexTimeout};
-    use crate::time::{timespec_t, ClockID};
+    use crate::time::{timespec_t, ClockId};
     use core::time::Duration;
 
     // Set timeout to 50ms
     let timeout = FutexTimeout::new(
-        ClockID::CLOCK_MONOTONIC,
+        ClockId::CLOCK_MONOTONIC,
         timespec_t::from(Duration::from_millis(50)),
         false,
     );

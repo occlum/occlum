@@ -6,7 +6,7 @@ use super::file_ops::{
 };
 use super::fs_ops;
 use super::fs_ops::{MountFlags, MountOptions, UmountFlags};
-use super::time::{clockid_t, itimerspec_t, timespec_t, timeval_t, ClockID};
+use super::time::{clockid_t, itimerspec_t, timespec_t, timeval_t, ClockId};
 use super::timer_file::{TimerCreationFlags, TimerSetFlags};
 use super::*;
 use crate::config::{user_rootfs_config, ConfigApp, ConfigMountFsType};
@@ -42,9 +42,9 @@ pub fn do_eventfd2(init_val: u32, flags: i32) -> Result<isize> {
 pub fn do_timerfd_create(clockid: clockid_t, flags: i32) -> Result<isize> {
     debug!("timerfd: clockid {}, flags {} ", clockid, flags);
 
-    let clockid = ClockID::from_raw(clockid)?;
+    let clockid = ClockId::try_from(clockid)?;
     match clockid {
-        ClockID::CLOCK_REALTIME | ClockID::CLOCK_MONOTONIC => {}
+        ClockId::CLOCK_REALTIME | ClockId::CLOCK_MONOTONIC => {}
         _ => {
             return_errno!(EINVAL, "invalid clockid");
         }

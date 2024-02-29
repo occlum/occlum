@@ -4,18 +4,6 @@
 #include <sys/prctl.h>
 #include "ocalls.h"
 
-void occlum_ocall_gettimeofday(struct timeval *tv) {
-    gettimeofday(tv, NULL);
-}
-
-void occlum_ocall_clock_gettime(int clockid, struct timespec *tp) {
-    clock_gettime(clockid, tp);
-}
-
-void occlum_ocall_clock_getres(int clockid, struct timespec *res) {
-    clock_getres(clockid, res);
-}
-
 int occlum_ocall_clock_nanosleep(clockid_t clockid, int flags, const struct timespec *req,
                                  struct timespec *rem) {
     return clock_nanosleep(clockid, flags, req, rem);
