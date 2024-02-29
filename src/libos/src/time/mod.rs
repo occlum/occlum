@@ -1,9 +1,12 @@
 use self::timer_slack::*;
 use super::*;
+use crate::exception::is_cpu_support_sgx2;
 use core::convert::TryFrom;
 use process::pid_t;
 use rcore_fs::dev::TimeProvider;
 use rcore_fs::vfs::Timespec;
+use sgx_trts::enclave::{rsgx_get_enclave_mode, EnclaveMode};
+use spin::Once;
 use std::time::Duration;
 use std::{fmt, u64};
 use syscall::SyscallNum;
@@ -27,6 +30,26 @@ pub type clock_t = i64;
 
 /// Clock ticks per second
 pub const SC_CLK_TCK: u64 = 100;
+
+static IS_ENABLE_VDSO: Once<bool> = Once::new();
+
+pub fn init() {
+    init_vdso();
+    up_time::init();
+}
+
+fn init_vdso() {
+    IS_ENABLE_VDSO.call_once(|| match rsgx_get_enclave_mode() {
+        EnclaveMode::Hw if is_cpu_support_sgx2() => true,
+        EnclaveMode::Sim => true,
+        _ => false,
+    });
+}
+
+#[inline(always)]
+fn is_enable_vdso() -> bool {
+    IS_ENABLE_VDSO.get().map_or(false, |is_enable| *is_enable)
+}
 
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -75,7 +98,14 @@ impl From<Duration> for timeval_t {
 }
 
 pub fn do_gettimeofday() -> timeval_t {
-    let tv = timeval_t::from(vdso_time::clock_gettime(ClockId::CLOCK_REALTIME).unwrap());
+    let duration = if is_enable_vdso() {
+        vdso_time::clock_gettime(ClockId::CLOCK_REALTIME).unwrap()
+    } else {
+        // SGX1 Hardware doesn't support rdtsc instruction
+        vdso_time::clock_gettime_slow(ClockId::CLOCK_REALTIME).unwrap()
+    };
+
+    let tv = timeval_t::from(duration);
     tv.validate()
         .expect("gettimeofday returned invalid timeval_t");
     tv
@@ -145,14 +175,28 @@ impl timespec_t {
 pub type clockid_t = i32;
 
 pub fn do_clock_gettime(clockid: ClockId) -> Result<timespec_t> {
-    let tv = timespec_t::from(vdso_time::clock_gettime(clockid).unwrap());
+    let duration = if is_enable_vdso() {
+        vdso_time::clock_gettime(clockid).unwrap()
+    } else {
+        // SGX1 Hardware doesn't support rdtsc instruction
+        vdso_time::clock_gettime_slow(clockid).unwrap()
+    };
+
+    let tv = timespec_t::from(duration);
     tv.validate()
         .expect("clock_gettime returned invalid timespec");
     Ok(tv)
 }
 
 pub fn do_clock_getres(clockid: ClockId) -> Result<timespec_t> {
-    let res = timespec_t::from(vdso_time::clock_getres(clockid).unwrap());
+    let duration = if is_enable_vdso() {
+        vdso_time::clock_getres(clockid).unwrap()
+    } else {
+        // SGX1 Hardware doesn't support rdtsc instruction
+        vdso_time::clock_getres_slow(clockid).unwrap()
+    };
+
+    let res = timespec_t::from(duration);
     let validate_resolution = |res: &timespec_t| -> Result<()> {
         // The resolution can be ranged from 1 nanosecond to a few milliseconds
         if res.sec == 0 && res.nsec > 0 && res.nsec < 1_000_000_000 {
