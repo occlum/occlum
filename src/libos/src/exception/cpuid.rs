@@ -18,7 +18,7 @@ struct CpuIdInput {
 
 #[repr(C)]
 #[derive(Eq, PartialEq, Hash, Clone, Copy, Debug)]
-struct CpuIdResult {
+pub struct CpuIdResult {
     eax: u32,
     ebx: u32,
     ecx: u32,
@@ -218,6 +218,15 @@ impl CpuId {
         };
         cpuid_result
     }
+
+    pub fn support_sgx2(&self) -> bool {
+        const SGX_CPUID: u32 = 12;
+        let cpuid = self.get_cpuid_info(SGX_CPUID, 0);
+
+        // The 0th bit set to 1 in `cpuid.eax` indicates that the SGX feature is enabled.
+        // The 1st bit set to 1 in `cpuid.eax` indicates that the SGX2 feature is enabled.
+        (cpuid.eax & 0b11) == 0b11
+    }
 }
 
 lazy_static! {
@@ -245,6 +254,14 @@ fn get_cpuid_info_via_ocall(cpuid_input: CpuIdInput) -> CpuIdResult {
         _ => panic!("failed to call sgx_cpuidex"),
     };
     cpuid_result
+}
+
+pub fn is_cpu_support_sgx2() -> bool {
+    CPUID.support_sgx2()
+}
+
+pub fn get_cpuid_info(leaf: u32, subleaf: u32) -> CpuIdResult {
+    CPUID.get_cpuid_info(leaf, subleaf)
 }
 
 pub fn setup_cpuid_info() {

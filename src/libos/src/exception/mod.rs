@@ -11,6 +11,8 @@ use crate::vm::{enclave_page_fault_handler, is_page_committed, VMRange, USER_SPA
 use sgx_types::*;
 use sgx_types::{sgx_exception_type_t, sgx_exception_vector_t};
 
+pub use self::cpuid::{get_cpuid_info, is_cpu_support_sgx2};
+
 const ENCLU: u32 = 0xd7010f;
 const EACCEPT: u32 = 0x5;
 const EACCEPTCOPY: u32 = 0x7;
