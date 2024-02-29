@@ -10,7 +10,7 @@ use crate::interrupt;
 use crate::process::idle_reap_zombie_children;
 use crate::process::{ProcessFilter, SpawnAttr};
 use crate::signal::SigNum;
-use crate::time::up_time::init;
+use crate::time::init;
 use crate::util::host_file_util::{host_file_buffer, parse_host_file, write_host_file, HostFile};
 use crate::util::log::LevelFilter;
 use crate::util::mem_util::from_untrusted::*;
@@ -96,8 +96,8 @@ pub extern "C" fn occlum_ecall_init(
 
         interrupt::init();
 
-        // Init boot up time stamp here.
-        time::up_time::init();
+        // Init vdso and boot up time stamp here.
+        time::init();
 
         vm::init_user_space();
 

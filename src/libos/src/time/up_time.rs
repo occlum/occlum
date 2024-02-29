@@ -10,7 +10,7 @@ lazy_static! {
         .as_duration();
 }
 
-pub fn init() {
+pub(super) fn init() {
     *BOOT_TIME_STAMP;
     *BOOT_TIME_STAMP_SINCE_EPOCH;
 }

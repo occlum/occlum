@@ -408,13 +408,7 @@ unsafe impl Sync for Vdso {}
 unsafe impl Send for Vdso {}
 
 lazy_static! {
-    static ref VDSO: Option<Vdso> = Vdso::new().map_or_else(
-        |e| {
-            trace!("{}", e);
-            None
-        },
-        |v| Some(v)
-    );
+    static ref VDSO: Option<Vdso> = Vdso::new().ok();
 }
 
 /// Try to get time according to ClockId.
@@ -455,7 +449,7 @@ pub fn clock_getres(clockid: ClockId) -> Result<Duration> {
     }
 }
 
-fn clock_gettime_slow(clockid: ClockId) -> Result<Duration> {
+pub fn clock_gettime_slow(clockid: ClockId) -> Result<Duration> {
     let mut ts = libc::timespec {
         tv_sec: 0,
         tv_nsec: 0,
@@ -486,7 +480,7 @@ fn clock_gettime_slow(clockid: ClockId) -> Result<Duration> {
     }
 }
 
-fn clock_getres_slow(clockid: ClockId) -> Result<Duration> {
+pub fn clock_getres_slow(clockid: ClockId) -> Result<Duration> {
     let mut res = libc::timespec {
         tv_sec: 0,
         tv_nsec: 0,
