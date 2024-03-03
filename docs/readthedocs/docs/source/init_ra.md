@@ -59,9 +59,9 @@ The json file specifies:
 
 **"kms_server"** in the json file, which can be overwritten by environment value **OCCLUM_INIT_RA_KMS_SERVER** when running.
 
-* The secrets users need aquire and where to put.
+* The secrets users need acquire and where to put.
 
-**"kms_keys"** part. It can define multiple keys to be aquired from KMS server (AECS), and the paths to save the keys. This part should align with the keys injected into KMS server (AECS).
+**"kms_keys"** part. It can define multiple keys to be acquired from KMS server (AECS), and the paths to save the keys. This part should align with the keys injected into KMS server (AECS).
 
 * The PCCS URL.
 
@@ -117,9 +117,9 @@ The json file specifies:
 
 **"kms_server"** in the json file, which can be overwritten by environment value **OCCLUM_INIT_RA_KMS_SERVER** when running.
 
-* The secrets users need aquire and where to put.
+* The secrets users need acquire and where to put.
 
-**"kms_keys"** part. It can define multiple keys to be aquired from KMS server (GRPC RA Server), and the paths to save the keys. This part should align with the keys injected into KMS server (GRPC RA Server).
+**"kms_keys"** part. It can define multiple keys to be acquired from KMS server (GRPC RA Server), and the paths to save the keys. This part should align with the keys injected into KMS server (GRPC RA Server).
 
 * The measurement of the KMS server (GRPC RA Server) to be trusted.
 
