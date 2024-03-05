@@ -220,7 +220,7 @@ impl CpuId {
     }
 
     pub fn support_sgx2(&self) -> bool {
-        const SGX_CPUID: u32 = 12;
+        const SGX_CPUID: u32 = 0x12;
         let cpuid = self.get_cpuid_info(SGX_CPUID, 0);
 
         // The 0th bit set to 1 in `cpuid.eax` indicates that the SGX feature is enabled.
