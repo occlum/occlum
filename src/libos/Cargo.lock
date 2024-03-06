@@ -4,7 +4,7 @@ version = 3
 
 [[package]]
 name = "Occlum"
-version = "0.30.1-rc"
+version = "0.30.1"
 dependencies = [
  "aligned",
  "atomic",
