@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use super::{Waiter, Waker};
+use super::{LevelSync, Waiter, Waker};
 use crate::prelude::*;
 
 /// A queue for waiters.
@@ -87,7 +87,7 @@ impl WaiterQueue {
         };
 
         // Wake in batch
-        Waker::batch_wake(to_wake.iter());
+        Waker::<LevelSync>::batch_wake(to_wake.iter());
         to_wake.len()
     }
 }

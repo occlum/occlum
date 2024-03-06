@@ -45,7 +45,7 @@ impl INode for DevSgx {
 
     fn io_control(&self, _cmd: u32, _data: usize) -> vfs::Result<()> {
         let mut ioctl_cmd =
-            unsafe { IoctlCmd::new(_cmd, _data as *mut u8).map_err(|_| FsError::InvalidParam)? };
+            unsafe { IoctlRawCmd::new(_cmd, _data as *mut u8).map_err(|_| FsError::InvalidParam)? };
         self.ioctl(&mut ioctl_cmd).map_err(|e| {
             error!("{}", e.backtrace());
             FsError::IOCTLError
@@ -59,9 +59,9 @@ impl INode for DevSgx {
 }
 
 impl DevSgx {
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
+    fn ioctl(&self, cmd: &mut IoctlRawCmd) -> Result<i32> {
         let nonbuiltin_cmd = match cmd {
-            IoctlCmd::NonBuiltin(nonbuiltin_cmd) => nonbuiltin_cmd,
+            IoctlRawCmd::NonBuiltin(nonbuiltin_cmd) => nonbuiltin_cmd,
             _ => return_errno!(EINVAL, "unknown ioctl cmd for /dev/sgx"),
         };
         let cmd_num = nonbuiltin_cmd.cmd_num().as_u32();

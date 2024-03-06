@@ -34,8 +34,15 @@ ctor = "0.1"
 regex = { git = "https://github.com/mesalock-linux/regex-sgx", default-features = false, features = ["std", "unicode", "mesalock_sgx"] }
 goblin = { version = "0.5.4", default-features = false, features = ["elf64", "elf32", "endian_fd"] }
 intrusive-collections = "0.9"
-spin = "0.7"
 modular-bitfield = "0.11.2"
+
+sgx-untrusted-alloc = { path = "./crates/sgx-untrusted-alloc", features = ["sgx"]}
+io-uring-callback = { path = "./crates/io-uring-callback", features = ["sgx"]}
+num_enum = { version = "0.5", default-features = false }
+keyable-arc = { path = "./crates/keyable-arc" }
+downcast-rs = { version = "1.2.0", default-features = false }
+spin = "0.7"
+byteorder = { version = "1.3.2", default-features = false }
 
 [patch.'https://github.com/apache/teaclave-sgx-sdk.git']
 sgx_tstd = { path = "../../deps/rust-sgx-sdk/sgx_tstd" }
@@ -54,7 +61,7 @@ kernel_heap_monitor = []# Kernel heap usage tracking. With overhead.
 
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
 sgx_types = { path = "../../deps/rust-sgx-sdk/sgx_types" }
-sgx_tstd = { path = "../../deps/rust-sgx-sdk/sgx_tstd", features = ["backtrace"] }
+sgx_tstd = { path = "../../deps/rust-sgx-sdk/sgx_tstd", features = ["backtrace", "thread"] }
 sgx_trts = { path = "../../deps/rust-sgx-sdk/sgx_trts" }
 sgx_tse = { path = "../../deps/rust-sgx-sdk/sgx_tse" }
 sgx_tcrypto = { path = "../../deps/rust-sgx-sdk/sgx_tcrypto" }

@@ -108,14 +108,14 @@ impl EpollFile {
     fn register_to_file_table(&self) {
         let weak_observer = self.weak_self.clone() as Weak<dyn Observer<_>>;
         let thread = current!();
-        let file_table = thread.files().lock().unwrap();
+        let file_table = thread.files().lock();
         file_table.notifier().register(weak_observer, None, None);
     }
 
     fn unregister_from_file_table(&self) {
         let weak_observer = self.weak_self.clone() as Weak<dyn Observer<_>>;
         let thread = current!();
-        let file_table = thread.files().lock().unwrap();
+        let file_table = thread.files().lock();
         file_table.notifier().unregister(&weak_observer);
     }
 

@@ -60,6 +60,7 @@ submodule: githooks init-submodule
 	@cp deps/sefs/sefs-cli/lib/libsefs-cli_sim.so build/lib
 	@cp deps/sefs/sefs-cli/lib/libsefs-cli.signed.so build/lib
 	@cp deps/sefs/sefs-cli/enclave/Enclave.config.xml build/sefs-cli.Enclave.xml
+	@cd deps/io-uring/ocalls && cargo clean && cargo build --release
 endif
 
 init-submodule:

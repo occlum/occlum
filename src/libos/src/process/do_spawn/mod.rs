@@ -15,6 +15,7 @@ use crate::fs::{
 use crate::prelude::*;
 use crate::process::pgrp::{get_spawn_attribute_pgrp, update_pgrp_for_new_process};
 use crate::util::pku_util;
+use crate::util::sync::Mutex;
 use crate::vm::ProcessVM;
 
 mod aux_vec;
@@ -253,8 +254,12 @@ fn new_process_common(
         let vm_ref = Arc::new(vm);
         let files_ref = {
             let files = init_files(current_ref, file_actions, host_stdio_fds, &reuse_tid)?;
-            Arc::new(SgxMutex::new(files))
+            Arc::new(Mutex::new(files))
         };
+        // let files_ref = {
+        //     let files = init_files(current_ref, file_actions, host_stdio_fds, &reuse_tid)?;
+        //     Arc::new(SgxMutex::new(files))
+        // };
         let fs_ref = Arc::new(RwLock::new(current_ref.fs().read().unwrap().clone()));
         let sched_ref = Arc::new(SgxMutex::new(current_ref.sched().lock().unwrap().clone()));
         let nice_ref = Arc::new(RwLock::new(current_ref.nice().read().unwrap().clone()));
@@ -361,7 +366,8 @@ fn init_files(
     let should_inherit_file_table = current_ref.process().pid() > 0;
     if should_inherit_file_table {
         // Fork: clone file table
-        let mut cloned_file_table = current_ref.files().lock().unwrap().clone();
+        let mut cloned_file_table = current_ref.files().lock().clone();
+        // let mut cloned_file_table = current_ref.files().lock().unwrap().clone();
 
         // By default, file descriptors remain open across an execve().
         // File descriptors that are marked close-on-exec are closed, which will cause

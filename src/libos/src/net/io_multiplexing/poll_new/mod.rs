@@ -1,7 +1,10 @@
+use core::hint;
+use core::slice::Iter;
 use std::cell::Cell;
 use std::sync::Weak;
 use std::time::Duration;
 
+use crate::events::Poller;
 use crate::fs::IoEvents;
 use crate::prelude::*;
 
@@ -83,6 +86,8 @@ pub fn do_poll_new(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) -> R
             }
         }
 
+        // // Poll each and every interesting file
+        // let count = poll_interested_events(files_and_expected_events.iter(), poll_fds.iter());
         if count > 0 {
             return Ok(count);
         }
@@ -103,6 +108,29 @@ pub fn do_poll_new(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) -> R
             }
         }
     }
+}
+
+fn poll_interested_events(
+    files_and_expected_events_iter: Iter<Option<(FileRef, IoEvents)>>,
+    poll_fds_iter: Iter<PollFd>,
+) -> usize {
+    let mut count = 0;
+    for (file_and_event, poll_fd) in files_and_expected_events_iter.zip(poll_fds_iter) {
+        // Ignore negative poll_fds
+        if file_and_event.is_none() {
+            continue;
+        }
+        let mask = poll_fd.events;
+        let file = &file_and_event.as_ref().unwrap().0;
+        let events = file.poll_new() & mask;
+        if !events.is_empty() {
+            poll_fd.revents.set(events);
+            debug!("poll fd = {:?}, revents = {:?}", poll_fd, events);
+            count += 1;
+        }
+    }
+
+    count
 }
 
 #[derive(Debug)]

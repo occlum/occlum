@@ -39,7 +39,7 @@ pub fn end_pair(nonblocking: bool) -> Result<(Endpoint, Endpoint)> {
 
 /// One end of the connected unix socket
 pub struct Inner {
-    addr: RwLock<Option<Addr>>,
+    addr: RwLock<Option<UnixAddr>>,
     reader: Consumer<u8>,
     writer: Producer<u8>,
     peer: Weak<Self>,
@@ -47,15 +47,15 @@ pub struct Inner {
 }
 
 impl Inner {
-    pub fn addr(&self) -> Option<Addr> {
+    pub fn addr(&self) -> Option<UnixAddr> {
         self.addr.read().unwrap().clone()
     }
 
-    pub fn set_addr(&self, addr: &Addr) {
+    pub fn set_addr(&self, addr: &UnixAddr) {
         *self.addr.write().unwrap() = Some(addr.clone());
     }
 
-    pub fn peer_addr(&self) -> Option<Addr> {
+    pub fn peer_addr(&self) -> Option<UnixAddr> {
         self.peer.upgrade().map(|end| end.addr().clone()).flatten()
     }
 
@@ -90,16 +90,16 @@ impl Inner {
         self.reader.items_to_consume()
     }
 
-    pub fn shutdown(&self, how: HowToShut) -> Result<()> {
+    pub fn shutdown(&self, how: Shutdown) -> Result<()> {
         if !self.is_connected() {
             return_errno!(ENOTCONN, "The socket is not connected.");
         }
 
-        if how.to_shut_read() {
+        if how.should_shut_read() {
             self.reader.shutdown()
         }
 
-        if how.to_shut_write() {
+        if how.should_shut_write() {
             self.writer.shutdown()
         }
 

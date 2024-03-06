@@ -96,16 +96,15 @@ pub extern "C" fn occlum_ecall_init(
 
         interrupt::init();
 
-        // Init vdso and boot up time stamp here.
-        time::init();
-
         vm::init_user_space();
+
+        // Init boot up time stamp here.
+        time::init();
 
         // Register exception handlers (support cpuid & rdtsc for now)
         register_exception_handlers();
 
         HAS_INIT.store(true, Ordering::Release);
-
         // Enable global backtrace
         unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
 

@@ -19,14 +19,17 @@ mod event;
 mod host_event_fd;
 mod notifier;
 mod observer;
+mod poller;
 mod waiter;
 mod waiter_queue;
 mod waiter_queue_observer;
 
 pub use self::event::{Event, EventFilter};
 pub use self::host_event_fd::HostEventFd;
+
 pub use self::notifier::Notifier;
 pub use self::observer::Observer;
-pub use self::waiter::{Waiter, Waker};
+pub use self::poller::{Pollee, Poller};
+pub use self::waiter::{EdgeSync, LevelSync, Waiter, Waker};
 pub use self::waiter_queue::WaiterQueue;
 pub use self::waiter_queue_observer::WaiterQueueObserver;

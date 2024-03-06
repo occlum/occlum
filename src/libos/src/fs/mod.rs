@@ -20,8 +20,9 @@ pub use self::events::{AtomicIoEvents, IoEvents, IoNotifier};
 pub use self::file::{File, FileRef};
 pub use self::file_ops::{
     occlum_ocall_ioctl, utimbuf_t, AccessMode, BuiltinIoctlNum, CreationFlags, FallocateFlags,
-    FileMode, IfConf, IoctlCmd, Stat, StatusFlags, StructuredIoctlArgType, StructuredIoctlNum,
-    STATUS_FLAGS_MASK,
+    FileMode, GetIfConf, GetIfReqWithRawCmd, GetReadBufLen, IfConf, IoctlCmd, IoctlRawCmd,
+    NonBuiltinIoctlCmd, SetNonBlocking, Stat, StatusFlags, StructuredIoctlArgType,
+    StructuredIoctlNum, STATUS_FLAGS_MASK,
 };
 pub use self::file_table::{FileDesc, FileTable, FileTableEvent, FileTableNotifier};
 pub use self::fs_ops::Statfs;
@@ -43,7 +44,7 @@ mod dev_fs;
 mod event_file;
 mod events;
 mod file;
-mod file_ops;
+pub mod file_ops;
 mod file_table;
 mod fs_ops;
 mod fs_view;

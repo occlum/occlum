@@ -1,16 +1,97 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use atomic::Ordering;
+use core::{
+    sync::atomic::{AtomicBool, AtomicU32},
+    time::Duration,
+};
+use io_uring_callback::Fd;
+use sgx_untrusted_alloc::UntrustedBox;
 use std::sync::Weak;
-use std::time::Duration;
 
-use super::host_event_fd::HostEventFd;
+use super::HostEventFd;
 use crate::prelude::*;
 
-/// A waiter enables a thread to sleep.
-pub struct Waiter {
-    inner: Arc<Inner>,
+pub trait Synchronizer {
+    fn new() -> Self;
+    fn wait_cond(&self) -> bool;
+    fn wake_cond(&self) -> bool;
+    fn is_woken(&self) -> bool;
+    fn reset(&self);
 }
 
-impl Waiter {
+const WAIT: u32 = u32::MAX;
+const INIT: u32 = 0;
+const NOTIFIED: u32 = 1;
+
+pub struct EdgeSync {
+    state: AtomicU32,
+}
+
+impl Synchronizer for EdgeSync {
+    fn new() -> Self {
+        Self {
+            state: AtomicU32::new(INIT),
+        }
+    }
+    fn wait_cond(&self) -> bool {
+        self.state
+            .compare_exchange(NOTIFIED, INIT, Ordering::Acquire, Ordering::Acquire)
+            .is_err()
+    }
+
+    fn wake_cond(&self) -> bool {
+        self.state.swap(NOTIFIED, Ordering::Release) == WAIT
+    }
+
+    fn is_woken(&self) -> bool {
+        // Attention: edge waiter modify states!
+        self.state.fetch_sub(1, Ordering::Acquire) == NOTIFIED
+    }
+
+    fn reset(&self) {
+        // Edge waiter doesn't need reset.
+        ()
+    }
+}
+
+pub struct LevelSync {
+    is_woken: AtomicBool,
+}
+
+impl Synchronizer for LevelSync {
+    fn new() -> Self {
+        Self {
+            is_woken: AtomicBool::new(false),
+        }
+    }
+
+    fn wait_cond(&self) -> bool {
+        !self.is_woken()
+    }
+
+    fn wake_cond(&self) -> bool {
+        self.is_woken
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
+    }
+
+    fn is_woken(&self) -> bool {
+        self.is_woken.load(Ordering::Acquire)
+    }
+
+    fn reset(&self) {
+        self.is_woken.store(false, Ordering::Release);
+    }
+}
+
+/// A waiter enables a thread to sleep.
+pub struct Waiter<S = LevelSync>
+where
+    S: Synchronizer,
+{
+    inner: Arc<Inner<S>>,
+}
+
+impl<S: Synchronizer> Waiter<S> {
     /// Create a waiter for the current thread.
     ///
     /// A `Waiter` is bound to the curent thread that creates it: it cannot be
@@ -65,7 +146,7 @@ impl Waiter {
     /// `WaiterQueue` maintains a list of `Waker` internally to wake up the
     /// enqueued `Waiter`s. So, for users that uses `WaiterQueue`, this method
     /// does not need to be called manually.
-    pub fn waker(&self) -> Waker {
+    pub fn waker(&self) -> Waker<S> {
         Waker {
             inner: Arc::downgrade(&self.inner),
         }
@@ -79,15 +160,18 @@ impl Waiter {
     }
 }
 
-impl !Send for Waiter {}
-impl !Sync for Waiter {}
+impl<S: Synchronizer> !Send for Waiter<S> {}
+impl<S: Synchronizer> !Sync for Waiter<S> {}
 
 /// A waker can wake up the thread that its waiter has put to sleep.
-pub struct Waker {
-    inner: Weak<Inner>,
+pub struct Waker<S = LevelSync>
+where
+    S: Synchronizer,
+{
+    inner: Weak<Inner<S>>,
 }
 
-impl Waker {
+impl<S: Synchronizer> Waker<S> {
     /// Wake up the waiter that creates this waker.
     pub fn wake(&self) {
         if let Some(inner) = self.inner.upgrade() {
@@ -96,8 +180,8 @@ impl Waker {
     }
 
     /// Wake up waiters in batch, more efficient than waking up one-by-one.
-    pub fn batch_wake<'a, I: Iterator<Item = &'a Waker>>(iter: I) {
-        Inner::batch_wake(iter);
+    pub fn batch_wake<'a, W: 'a + Synchronizer, I: Iterator<Item = &'a Waker<W>>>(iter: I) {
+        Inner::<W>::batch_wake(iter);
     }
 }
 
@@ -130,37 +214,41 @@ impl Waker {
 ///
 /// Although it is correct to use AcqRel, here I think it is okay to use Acquire, because
 /// you don't need to synchronize host_event before is_woken, only later.
-struct Inner {
-    is_woken: AtomicBool,
+struct Inner<S: Synchronizer> {
+    sync: S,
     host_eventfd: Arc<HostEventFd>,
 }
 
-impl Inner {
+impl<S: Synchronizer> Inner<S> {
     pub fn new() -> Self {
-        let is_woken = AtomicBool::new(false);
+        let sync = S::new();
         let host_eventfd = current!().host_eventfd().clone();
-        Self {
-            is_woken,
-            host_eventfd,
-        }
+        Self { sync, host_eventfd }
     }
 
     pub fn is_woken(&self) -> bool {
-        self.is_woken.load(Ordering::Acquire)
+        self.sync.is_woken()
     }
 
     pub fn reset(&self) {
-        self.is_woken.store(false, Ordering::Release);
+        self.sync.reset();
     }
 
     pub fn wait(&self, timeout: Option<&Duration>) -> Result<()> {
-        while !self.is_woken() {
+        if self.sync.is_woken() {
+            return Ok(());
+        }
+
+        while self.sync.wait_cond() {
             self.host_eventfd.poll(timeout)?;
         }
         Ok(())
     }
 
     pub fn wait_mut(&self, timeout: Option<&mut Duration>) -> Result<()> {
+        if self.sync.is_woken() {
+            return Ok(());
+        }
         let mut remain = timeout.as_ref().map(|d| **d);
 
         // Need to change timeout from `Option<&mut Duration>` to `&mut Option<Duration>`
@@ -174,31 +262,23 @@ impl Inner {
     }
 
     fn do_wait_mut(&self, remain: &mut Option<Duration>) -> Result<()> {
-        while !self.is_woken() {
+        while self.sync.wait_cond() {
             self.host_eventfd.poll_mut(remain.as_mut())?;
         }
         Ok(())
     }
 
     pub fn wake(&self) {
-        if self
-            .is_woken
-            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-            .is_ok()
-        {
+        if self.sync.wake_cond() {
             self.host_eventfd.write_u64(1);
         }
     }
 
-    pub fn batch_wake<'a, I: Iterator<Item = &'a Waker>>(iter: I) {
+    // Caution: edge waiter
+    pub fn batch_wake<'a, W: 'a + Synchronizer, I: Iterator<Item = &'a Waker<W>>>(iter: I) {
         let host_eventfds = iter
             .filter_map(|waker| waker.inner.upgrade())
-            .filter(|inner| {
-                inner
-                    .is_woken
-                    .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-                    .is_ok()
-            })
+            .filter(|inner| inner.sync.wake_cond())
             .map(|inner| inner.host_eventfd.host_fd())
             .collect::<Vec<FileDesc>>();
         unsafe {

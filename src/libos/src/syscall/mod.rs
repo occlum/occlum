@@ -40,13 +40,25 @@ use crate::fs::{
 use crate::interrupt::{do_handle_interrupt, sgx_interrupt_info_t};
 use crate::ipc::{do_shmat, do_shmctl, do_shmdt, do_shmget, key_t, shmids_t};
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t, RandFlags};
+// use crate::net::{
+//     do_accept, do_accept4, do_bind, do_connect, do_getpeername, do_getsockname, do_getsockopt, do_listen,
+//     do_recvfrom, do_recvmsg, do_sendmmsg, do_sendmsg, do_sendto,
+//     do_setsockopt, do_shutdown, do_socket, do_socketpair, mmsghdr
+// };
+
 use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
     do_epoll_pwait, do_epoll_wait, do_getpeername, do_getsockname, do_getsockopt, do_listen,
     do_poll, do_ppoll, do_pselect6, do_recvfrom, do_recvmsg, do_select, do_sendmmsg, do_sendmsg,
-    do_sendto, do_setsockopt, do_shutdown, do_socket, do_socketpair, mmsghdr, msghdr, msghdr_mut,
-    sigset_argpack,
+    do_sendto, do_setsockopt, do_shutdown, do_socket, do_socketpair, mmsghdr, sigset_argpack,
 };
+
+// use crate::net::{
+//     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
+//     do_epoll_pwait, do_epoll_wait, do_getpeername, do_getsockname, do_getsockopt, do_listen,
+//     do_poll, do_ppoll, do_recvfrom, do_recvmsg, do_select, do_sendmmsg, do_sendmsg, do_sendto,
+//     do_setsockopt, do_shutdown, do_socket, do_socketpair, mmsghdr, msghdr, msghdr_mut,
+// };
 use crate::process::{
     do_arch_prctl, do_clone, do_execve, do_exit, do_exit_group, do_futex, do_get_robust_list,
     do_getegid, do_geteuid, do_getgid, do_getgroups, do_getpgid, do_getpgrp, do_getpid, do_getppid,
@@ -105,6 +117,7 @@ macro_rules! process_syscall_table_with_callback {
             (Fstat = 5) => do_fstat(fd: FileDesc, stat_buf: *mut Stat),
             (Lstat = 6) => do_lstat(path: *const i8, stat_buf: *mut Stat),
             (Poll = 7) => do_poll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout: c_int),
+            // (Poll = 7) => handle_unsupported(),
             (Lseek = 8) => do_lseek(fd: FileDesc, offset: off_t, whence: i32),
             (Mmap = 9) => do_mmap(addr: usize, size: usize, perms: i32, flags: i32, fd: FileDesc, offset: off_t),
             (Mprotect = 10) => do_mprotect(addr: usize, len: usize, prot: u32),
@@ -121,6 +134,7 @@ macro_rules! process_syscall_table_with_callback {
             (Access = 21) => do_access(path: *const i8, mode: u32),
             (Pipe = 22) => do_pipe(fds_u: *mut i32),
             (Select = 23) => do_select(nfds: c_int, readfds: *mut libc::fd_set, writefds: *mut libc::fd_set, exceptfds: *mut libc::fd_set, timeout: *mut timeval_t),
+            // (Select = 23) => handle_unsupported(),
             (SchedYield = 24) => do_sched_yield(),
             (Mremap = 25) => do_mremap(old_addr: usize, old_size: usize, new_size: usize, flags: i32, new_addr: usize),
             (Msync = 26) => do_msync(addr: usize, size: usize, flags: u32),
@@ -143,8 +157,8 @@ macro_rules! process_syscall_table_with_callback {
             (Accept = 43) => do_accept(fd: c_int, addr: *mut libc::sockaddr, addr_len: *mut libc::socklen_t),
             (Sendto = 44) => do_sendto(fd: c_int, base: *const c_void, len: size_t, flags: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t),
             (Recvfrom = 45) => do_recvfrom(fd: c_int, base: *mut c_void, len: size_t, flags: c_int, addr: *mut libc::sockaddr, addr_len: *mut libc::socklen_t),
-            (Sendmsg = 46) => do_sendmsg(fd: c_int, msg_ptr: *const msghdr, flags_c: c_int),
-            (Recvmsg = 47) => do_recvmsg(fd: c_int, msg_mut_ptr: *mut msghdr_mut, flags_c: c_int),
+            (Sendmsg = 46) => do_sendmsg(fd: c_int, msg_ptr: *const libc::msghdr, flags_c: c_int),
+            (Recvmsg = 47) => do_recvmsg(fd: c_int, msg_mut_ptr: *mut libc::msghdr, flags_c: c_int),
             (Shutdown = 48) => do_shutdown(fd: c_int, how: c_int),
             (Bind = 49) => do_bind(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t),
             (Listen = 50) => do_listen(fd: c_int, backlog: c_int),
@@ -311,6 +325,7 @@ macro_rules! process_syscall_table_with_callback {
             (GetThreadArea = 211) => handle_unsupported(),
             (LookupDcookie = 212) => handle_unsupported(),
             (EpollCreate = 213) => do_epoll_create(size: c_int),
+            // (EpollCreate = 213) => handle_unsupported(),
             (EpollCtlOld = 214) => handle_unsupported(),
             (EpollWaitOld = 215) => handle_unsupported(),
             (RemapFilePages = 216) => handle_unsupported(),
@@ -331,6 +346,8 @@ macro_rules! process_syscall_table_with_callback {
             (ExitGroup = 231) => do_exit_group(exit_status: i32, user_context: *mut CpuContext),
             (EpollWait = 232) => do_epoll_wait(epfd: c_int, events: *mut libc::epoll_event, maxevents: c_int, timeout: c_int),
             (EpollCtl = 233) => do_epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *const libc::epoll_event),
+            // (EpollWait = 232) => handle_unsupported(),
+            // (EpollCtl = 233) => handle_unsupported(),
             (Tgkill = 234) => do_tgkill(pid: i32, tid: pid_t, sig: c_int),
             (Utimes = 235) => do_utimes(path: *const i8, times: *const timeval_t),
             (Vserver = 236) => handle_unsupported(),
@@ -369,6 +386,7 @@ macro_rules! process_syscall_table_with_callback {
             (Faccessat = 269) => do_faccessat(dirfd: i32, path: *const i8, mode: u32),
             (Pselect6 = 270) => do_pselect6(nfds: c_int, readfds: *mut libc::fd_set, writefds: *mut libc::fd_set, exceptfds: *mut libc::fd_set, timeout: *mut timespec_t, data: *const sigset_argpack),
             (Ppoll = 271) => do_ppoll(fds: *mut libc::pollfd, nfds: libc::nfds_t, timeout_ts: *const timespec_t, sigmask: *const sigset_t),
+            // (Ppoll = 271) => handle_unsupported(),
             (Unshare = 272) => handle_unsupported(),
             (SetRobustList = 273) => do_set_robust_list(list_head_ptr: *mut RobustListHead, len: usize),
             (GetRobustList = 274) => do_get_robust_list(tid: pid_t, list_head_ptr_ptr: *mut *mut RobustListHead, len_ptr: *mut usize),
@@ -379,6 +397,7 @@ macro_rules! process_syscall_table_with_callback {
             (MovePages = 279) => handle_unsupported(),
             (Utimensat = 280) => do_utimensat(dirfd: i32, path: *const i8, times: *const timespec_t, flags: i32),
             (EpollPwait = 281) => do_epoll_pwait(epfd: c_int, events: *mut libc::epoll_event, maxevents: c_int, timeout: c_int, sigmask: *const usize),
+            // (EpollPwait = 281) => handle_unsupported(),
             (Signalfd = 282) => handle_unsupported(),
             (TimerfdCreate = 283) => do_timerfd_create(clockid: clockid_t, flags: i32 ),
             (Eventfd = 284) => do_eventfd(init_val: u32),
@@ -389,6 +408,7 @@ macro_rules! process_syscall_table_with_callback {
             (Signalfd4 = 289) => handle_unsupported(),
             (Eventfd2 = 290) => do_eventfd2(init_val: u32, flags: i32),
             (EpollCreate1 = 291) => do_epoll_create1(flags: c_int),
+            // (EpollCreate1 = 291) => handle_unsupported(),
             (Dup3 = 292) => do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32),
             (Pipe2 = 293) => do_pipe2(fds_u: *mut i32, flags: u32),
             (InotifyInit1 = 294) => handle_unsupported(),

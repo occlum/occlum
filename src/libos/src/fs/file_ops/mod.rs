@@ -14,8 +14,9 @@ pub use self::fspath::{get_abs_path_by_fd, FsPath, AT_FDCWD};
 pub use self::fsync::{do_fdatasync, do_fsync};
 pub use self::getdents::{do_getdents, do_getdents64};
 pub use self::ioctl::{
-    do_ioctl, occlum_ocall_ioctl, BuiltinIoctlNum, IfConf, IoctlCmd, StructuredIoctlArgType,
-    StructuredIoctlNum,
+    do_ioctl, occlum_ocall_ioctl, BuiltinIoctlNum, GetIfConf, GetIfReqWithRawCmd, GetReadBufLen,
+    GetWinSize, IfConf, IoctlCmd, IoctlRawCmd, NonBuiltinIoctlCmd, SetNonBlocking, SetWinSize,
+    StructuredIoctlArgType, StructuredIoctlNum, TcGets, TcSets,
 };
 pub use self::link::{do_linkat, LinkFlags};
 pub use self::lseek::do_lseek;

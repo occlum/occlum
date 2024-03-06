@@ -129,4 +129,8 @@ impl StatusFlags {
     pub fn is_fast_open(&self) -> bool {
         self.contains(StatusFlags::O_PATH)
     }
+
+    pub fn is_nonblocking(&self) -> bool {
+        self.contains(StatusFlags::O_NONBLOCK)
+    }
 }

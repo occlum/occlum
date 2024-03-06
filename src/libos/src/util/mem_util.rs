@@ -2,6 +2,7 @@ use super::*;
 use std::ffi::{CStr, CString};
 use std::mem::size_of;
 use std::ptr;
+use std::slice;
 use vm::VMRange;
 
 /// Memory utilities that deals with primitive types passed from user process
@@ -40,6 +41,26 @@ pub mod from_user {
         // The user space is both readable and writable on SGX1.
         // TODO: Fine-tune the checking on SGX2.
         check_array(user_buf, count)
+    }
+
+    pub fn make_slice<'a, T>(user_buf: *const T, count: usize) -> Result<&'a [T]> {
+        check_array(user_buf, count)?;
+        Ok(unsafe { slice::from_raw_parts(user_buf, count) })
+    }
+
+    pub fn make_mut_slice<'a, T>(user_buf: *mut T, count: usize) -> Result<&'a mut [T]> {
+        check_mut_array(user_buf, count)?;
+        Ok(unsafe { slice::from_raw_parts_mut(user_buf, count) })
+    }
+
+    pub fn make_ref<'a, T>(user_ptr: *const T) -> Result<&'a T> {
+        check_ptr(user_ptr)?;
+        Ok(unsafe { &*user_ptr })
+    }
+
+    pub fn make_mut_ref<'a, T>(user_ptr: *mut T) -> Result<&'a mut T> {
+        check_mut_ptr(user_ptr)?;
+        Ok(unsafe { &mut *user_ptr })
     }
 
     /// Clone a C-string from the user process safely

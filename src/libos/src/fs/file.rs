@@ -1,3 +1,5 @@
+use crate::fs::IoctlCmd;
+
 use super::*;
 
 macro_rules! return_op_unsupported_error {
@@ -79,8 +81,8 @@ pub trait File: Debug + Sync + Send + Any {
         Ok(())
     }
 
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-        return_op_unsupported_error!("ioctl")
+    fn ioctl(&self, _cmd: &mut dyn IoctlCmd) -> Result<()> {
+        return_errno!(EINVAL, "this file does not support ioctl");
     }
 
     fn access_mode(&self) -> Result<AccessMode> {

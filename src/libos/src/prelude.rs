@@ -13,12 +13,19 @@ pub use std::sync::{
     Arc, SgxMutex, SgxMutexGuard, SgxRwLock, SgxRwLockReadGuard, SgxRwLockWriteGuard,
 };
 
+pub(crate) type HostFd = u32;
+
+pub(crate) use net::socket::util::Addr;
+pub(crate) use net::socket::{Domain, RecvFlags, SendFlags, Shutdown, Type};
+
 // Override prelude::Result with error::Result
 pub use crate::error::Result;
 pub use crate::error::*;
 pub use crate::fs::{File, FileDesc, FileRef};
 pub use crate::process::{pid_t, uid_t};
 pub use crate::util::sync::RwLock;
+pub use crate::util::sync::{Mutex, MutexGuard};
+use crate::{net, net::socket::uring};
 
 macro_rules! debug_trace {
     () => {
