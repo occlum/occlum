@@ -61,7 +61,7 @@ impl INode for DevSgx {
 impl DevSgx {
     fn ioctl(&self, cmd: &mut IoctlRawCmd) -> Result<i32> {
         let nonbuiltin_cmd = match cmd {
-            IoctlCmd::NonBuiltin(nonbuiltin_cmd) => nonbuiltin_cmd,
+            IoctlRawCmd::NonBuiltin(nonbuiltin_cmd) => nonbuiltin_cmd,
             _ => return_errno!(EINVAL, "unknown ioctl cmd for /dev/sgx"),
         };
         let cmd_num = nonbuiltin_cmd.cmd_num().as_u32();

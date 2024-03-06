@@ -98,13 +98,8 @@ pub extern "C" fn occlum_ecall_init(
 
         vm::init_user_space();
 
-        // // Create four IO-Uring instances and spawn polling threads for each of them.
-        // // Assign IO-Uring references during socket initialization.
-        // let multiton = &crate::io_uring::MULTITON;
-        // multiton.poll_completions();
-
         // Init boot up time stamp here.
-        time::up_time::init();
+        time::init();
 
         // Register exception handlers (support cpuid & rdtsc for now)
         register_exception_handlers();

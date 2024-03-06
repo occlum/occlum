@@ -8,7 +8,9 @@ use crate::fs::{
     occlum_ocall_ioctl, AccessMode, AtomicIoEvents, CreationFlags, File, FileRef, HostFd, IoEvents,
     IoctlRawCmd, StatusFlags, STATUS_FLAGS_MASK,
 };
-use crate::fs::{GetIfConf, GetIfReqWithRawCmd, IoctlCmd};
+use crate::fs::{
+    GetIfConf, GetIfReqWithRawCmd, GetReadBufLen, IoctlCmd, NonBuiltinIoctlCmd, SetNonBlocking,
+};
 use crate::net::socket::sockopt::{GetSockOptRawCmd, SetSockOptRawCmd};
 
 //TODO: refactor write syscall to allow zero length with non-zero buffer
@@ -60,6 +62,15 @@ impl File for HostSocket {
                 cmd.execute(self.raw_host_fd())?;
             },
             cmd: GetIfConf => {
+                cmd.execute(self.raw_host_fd())?;
+            },
+            cmd: GetReadBufLen => {
+                cmd.execute(self.raw_host_fd())?;
+            },
+            cmd: SetNonBlocking => {
+                cmd.execute(self.raw_host_fd())?;
+            },
+            cmd: NonBuiltinIoctlCmd => {
                 cmd.execute(self.raw_host_fd())?;
             },
             _ => {

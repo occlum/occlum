@@ -208,6 +208,8 @@ macro_rules! impl_ioctl_cmd {
     }
 }
 
+use super::*;
+
 mod get_ifconf;
 mod get_ifreq;
 mod get_readbuflen;

@@ -120,11 +120,6 @@ impl SocketFile {
     ) -> Result<Self> {
         match socket_type {
             Type::STREAM => {
-<<<<<<< HEAD
-                let protocol = SocketProtocol::try_from(protocol)
-                    .map_err(|_| errno!(EINVAL, "Invalid or unsupported network protocol"))?;
-=======
->>>>>>> fde2e9cc... [libos] Refactor uring / unix / host socket
                 if protocol != SocketProtocol::IPPROTO_IP && protocol != SocketProtocol::IPPROTO_TCP
                 {
                     return_errno!(EPROTONOSUPPORT, "Protocol not supported");

@@ -8,7 +8,7 @@ use io_uring_callback::{Builder, IoUring};
 use keyable_arc::KeyableArc;
 
 // Four uring instances are sufficient to reach the network bandwidth threshold of host kernel.
-const URING_LIMIT: u32 = 4;
+const URING_LIMIT: u32 = 1;
 // The number of sockets to reach the network bandwidth threshold of one io_uring instance
 const SOCKET_THRESHOLD_PER_URING: u32 = 1;
 

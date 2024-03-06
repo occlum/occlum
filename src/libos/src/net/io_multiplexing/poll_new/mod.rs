@@ -21,8 +21,6 @@ pub fn do_poll_new(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) -> R
         poll_fd.revents.set(IoEvents::empty());
     }
 
-    let mut fds = [0; 10];
-
     // Map valid and non-negative poll_fds to FileRef's
     let thread = current!();
     let mut invalid_fd_count = 0;
@@ -72,7 +70,24 @@ pub fn do_poll_new(poll_fds: &[PollFd], mut timeout: Option<&mut Duration>) -> R
         monitor.reset_events();
 
         // Poll each and every interesting file
-        let count = poll_interested_events(files_and_expected_events.iter(), poll_fds.iter());
+        let mut count = 0;
+        for (file_and_event, poll_fd) in files_and_expected_events.iter().zip(poll_fds.iter()) {
+            // Ignore negative poll_fds
+            if file_and_event.is_none() {
+                continue;
+            }
+            let mask = poll_fd.events;
+            let file = &file_and_event.as_ref().unwrap().0;
+            let events = file.poll_new() & mask;
+            if !events.is_empty() {
+                poll_fd.revents.set(events);
+                debug!("poll fd = {:?}, revents = {:?}", poll_fd, events);
+                count += 1;
+            }
+        }
+
+        // // Poll each and every interesting file
+        // let count = poll_interested_events(files_and_expected_events.iter(), poll_fds.iter());
         if count > 0 {
             return Ok(count);
         }

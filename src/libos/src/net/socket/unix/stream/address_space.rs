@@ -40,8 +40,7 @@ impl AddressSpace {
     }
 
     pub fn add_binder(&self, addr: &UnixAddr) -> Result<()> {
-        let key =
-            Self::get_key(addr).ok_or_else(|| errno!(EINVAL, "can't find socket file"))?;
+        let key = Self::get_key(addr).ok_or_else(|| errno!(EINVAL, "can't find socket file"))?;
         let mut space = self.get_space(addr)?;
         if space.contains_key(&key) {
             return_errno!(EADDRINUSE, "the addr is already bound");
@@ -58,8 +57,7 @@ impl AddressSpace {
         nonblocking: bool,
         notifier: Arc<RelayNotifier>,
     ) -> Result<()> {
-        let key =
-            Self::get_key(addr).ok_or_else(|| errno!(EINVAL, "the socket is not bound"))?;
+        let key = Self::get_key(addr).ok_or_else(|| errno!(EINVAL, "the socket is not bound"))?;
         let mut space = self.get_space(addr)?;
 
         if let Some(option) = space.get(&key) {
@@ -78,8 +76,7 @@ impl AddressSpace {
     }
 
     pub fn resize_listener(&self, addr: &UnixAddr, capacity: usize) -> Result<()> {
-        let key =
-            Self::get_key(addr).ok_or_else(|| errno!(EINVAL, "the socket is not bound"))?;
+        let key = Self::get_key(addr).ok_or_else(|| errno!(EINVAL, "the socket is not bound"))?;
         let mut space = self.get_space(addr)?;
 
         if let Some(option) = space.get(&key) {
