@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1709763346838,
+  "lastUpdate": 1710022487766,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -2402,6 +2402,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2274,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Ikko Eltociear Ashimine",
+            "username": "eltociear",
+            "email": "eltociear@gmail.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "d60d603dbae364876a7cde96ace733cb7e62959d",
+          "message": "[readthedoc] Fix typo in init_ra.md\n\naquire -> acquire\r\naquired -> acquired",
+          "timestamp": "2024-03-03T15:19:00Z",
+          "url": "https://github.com/occlum/occlum/commit/d60d603dbae364876a7cde96ace733cb7e62959d"
+        },
+        "date": 1710022486669,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2279,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2279,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
