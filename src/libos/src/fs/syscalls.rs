@@ -606,16 +606,16 @@ pub fn do_fchmodat(dirfd: i32, path: *const i8, mode: u16) -> Result<isize> {
     Ok(0)
 }
 
-pub fn do_chown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
+pub fn do_chown(path: *const i8, uid: i32, gid: i32) -> Result<isize> {
     self::do_fchownat(AT_FDCWD, path, uid, gid, 0)
 }
 
-pub fn do_fchown(fd: FileDesc, uid: u32, gid: u32) -> Result<isize> {
+pub fn do_fchown(fd: FileDesc, uid: i32, gid: i32) -> Result<isize> {
     file_ops::do_fchown(fd, uid, gid)?;
     Ok(0)
 }
 
-pub fn do_fchownat(dirfd: i32, path: *const i8, uid: u32, gid: u32, flags: i32) -> Result<isize> {
+pub fn do_fchownat(dirfd: i32, path: *const i8, uid: i32, gid: i32, flags: i32) -> Result<isize> {
     let path = from_user::clone_cstring_safely(path)?
         .to_string_lossy()
         .into_owned();
@@ -631,7 +631,7 @@ pub fn do_fchownat(dirfd: i32, path: *const i8, uid: u32, gid: u32, flags: i32) 
     Ok(0)
 }
 
-pub fn do_lchown(path: *const i8, uid: u32, gid: u32) -> Result<isize> {
+pub fn do_lchown(path: *const i8, uid: i32, gid: i32) -> Result<isize> {
     self::do_fchownat(
         AT_FDCWD,
         path,
