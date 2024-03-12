@@ -2,18 +2,17 @@ use super::priority::{NiceValue, PrioWhich};
 use crate::prelude::*;
 use crate::process::table::{get_all_processes, get_pgrp, get_process};
 
-pub fn do_set_priority(which: PrioWhich, who: i32, prio: NiceValue) -> Result<()> {
+pub fn do_set_priority(which: PrioWhich, who: i32, nice: NiceValue) -> Result<()> {
     debug!(
-        "set_priority: which: {:?}, who: {}, prio: {:?}",
-        which, who, prio
+        "set_priority: which: {:?}, who: {}, nice: {:?}",
+        which, who, nice
     );
 
     let processes = get_processes(which, who)?;
     for process in processes.iter() {
-        let main_thread = process
-            .main_thread()
-            .ok_or_else(|| errno!(ESRCH, "invalid pid"))?;
-        *main_thread.nice().write().unwrap() = prio;
+        for thread in process.threads().iter() {
+            *thread.nice().write().unwrap() = nice;
+        }
     }
     Ok(())
 }
@@ -22,27 +21,25 @@ pub fn do_get_priority(which: PrioWhich, who: i32) -> Result<NiceValue> {
     debug!("get_priority: which: {:?}, who: {}", which, who);
 
     let processes = get_processes(which, who)?;
-    let prio = {
-        let mut prio = NiceValue::max_value();
+    let nice = {
+        let mut nice = NiceValue::MAX;
         for process in processes.iter() {
             let main_thread = process
                 .main_thread()
                 .ok_or_else(|| errno!(ESRCH, "invalid pid"))?;
-            let nice_value = main_thread.nice().read().unwrap();
+            let current_nice = main_thread.nice().read().unwrap();
             // Returns the highest priority enjoyed by the processes
-            if *nice_value < prio {
-                prio = *nice_value;
+            if *current_nice < nice {
+                nice = *current_nice;
             }
         }
-        prio
+        nice
     };
-    Ok(prio)
+    Ok(nice)
 }
 
-// According to POSIX, the nice value is a per-process setting.
-// In our implementation, the threads belong to same process share the same nice value.
 fn get_processes(which: PrioWhich, who: i32) -> Result<Vec<crate::process::ProcessRef>> {
-    Ok(match which {
+    let processes = match which {
         PrioWhich::PRIO_PROCESS => {
             let process = if who == 0 {
                 current!().process().clone()
@@ -67,5 +64,10 @@ fn get_processes(which: PrioWhich, who: i32) -> Result<Vec<crate::process::Proce
                 return_errno!(ESRCH, "no such user");
             }
         }
-    })
+    };
+    if processes.is_empty() {
+        return_errno!(ESRCH, "no such process");
+    }
+
+    Ok(processes)
 }

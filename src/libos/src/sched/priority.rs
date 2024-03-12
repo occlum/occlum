@@ -21,55 +21,48 @@ impl TryFrom<i32> for PrioWhich {
     }
 }
 
-/// Process priority value
+/// Process scheduling nice value.
 ///
 /// Lower values give a process a higher scheduling priority.
 #[derive(Copy, Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct NiceValue {
-    value: i32,
+    value: i8,
 }
 
 impl NiceValue {
-    const MAX_PRIO: i32 = 19;
+    pub const MAX: Self = Self { value: 19 };
 
-    const MIN_PRIO: i32 = -20;
+    pub const MIN: Self = Self { value: -20 };
 
-    pub fn max_value() -> Self {
-        Self {
-            value: Self::MAX_PRIO,
+    /// Create a nice value from a raw value.
+    ///
+    /// The raw value given beyond the range are automatically adjusted
+    /// to the nearest boundary value.
+    pub fn new(raw: i8) -> Self {
+        if raw < Self::MIN.value {
+            Self::MIN
+        } else if raw > Self::MAX.value {
+            Self::MAX
+        } else {
+            Self { value: raw }
         }
     }
 
-    pub fn min_value() -> Self {
-        Self {
-            value: Self::MIN_PRIO,
-        }
-    }
-
-    pub fn raw_val(&self) -> i32 {
+    /// Convert to the raw value with range [19, -20].
+    pub fn to_raw_val(self) -> i8 {
         self.value
-    }
-
-    /// Convert [19,-20] to priority value [39,0].
-    pub fn to_priority_val(&self) -> i32 {
-        self.value - Self::MIN_PRIO
-    }
-
-    /// Convert [19,-20] to rlimit style value [1,40].
-    pub fn to_rlimit_val(&self) -> i32 {
-        Self::MAX_PRIO - self.value + 1
     }
 }
 
 impl From<i32> for NiceValue {
     fn from(raw: i32) -> Self {
-        let value = if raw < Self::MIN_PRIO {
-            Self::MIN_PRIO
-        } else if raw > Self::MAX_PRIO {
-            Self::MAX_PRIO
+        let adj_raw = if raw > i8::MAX as i32 {
+            i8::MAX
+        } else if raw < i8::MIN as i32 {
+            i8::MIN
         } else {
-            raw
+            raw as i8
         };
-        Self { value }
+        Self::new(adj_raw)
     }
 }
