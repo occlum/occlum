@@ -36,8 +36,9 @@ impl ProcINode for ProcStatINode {
         let stime = 0;
         let cutime = 0;
         let cstime = 0;
-        let priority = main_thread.nice().read().unwrap().to_priority_val();
-        let nice = main_thread.nice().read().unwrap().raw_val();
+        // Convert [19,-20] to [39,0].
+        let priority = main_thread.nice().read().unwrap().to_raw_val() + 20;
+        let nice = main_thread.nice().read().unwrap().to_raw_val();
         let num_threads = self.0.threads().len();
         let itrealvalue = 0;
         let starttime = self.0.start_time();

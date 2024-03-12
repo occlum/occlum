@@ -42,6 +42,9 @@ pub struct Thread {
     fs: FsViewRef,
     files: FileTableRef,
     sched: SchedAgentRef,
+    // According to POSIX, the nice value is a per-process setting.
+    // In our implementation, the threads belong to same process
+    // share the same nice value.
     nice: NiceValueRef,
     rlimits: ResourceLimitsRef,
     // Signal
