@@ -55,6 +55,57 @@ static int __test_chown(const char *file_path) {
     return 0;
 }
 
+static int __test_chown_with_negative_id(const char *file_path) {
+    struct stat old_stat_buf;
+    struct stat new_stat_buf;
+    uid_t uid = -100;
+    gid_t gid = -100;
+    int ret;
+
+    ret = chown(file_path, uid, gid);
+    if (!(ret < 0 && errno == EINVAL)) {
+        THROW_ERROR("chown should return EINVAL");
+    }
+
+    ret = stat(file_path, &old_stat_buf);
+    if (ret < 0) {
+        THROW_ERROR("failed to stat file");
+    }
+
+    uid = 100;
+    gid = -1;
+    ret = chown(file_path, uid, gid);
+    if (ret < 0) {
+        THROW_ERROR("failed to chown file");
+    }
+
+    ret = stat(file_path, &new_stat_buf);
+    if (ret < 0) {
+        THROW_ERROR("failed to stat file");
+    }
+    if (new_stat_buf.st_uid != uid || new_stat_buf.st_gid != old_stat_buf.st_gid) {
+        THROW_ERROR("check chown result failed");
+    }
+
+    old_stat_buf.st_uid = new_stat_buf.st_uid;
+    uid = -1;
+    gid = 100;
+    ret = chown(file_path, uid, gid);
+    if (ret < 0) {
+        THROW_ERROR("failed to chown file");
+    }
+
+    ret = stat(file_path, &new_stat_buf);
+    if (ret < 0) {
+        THROW_ERROR("failed to stat file");
+    }
+    if (new_stat_buf.st_uid != old_stat_buf.st_uid || new_stat_buf.st_gid != gid) {
+        THROW_ERROR("check chown result failed");
+    }
+
+    return 0;
+}
+
 static int __test_lchown(const char *file_path) {
     struct stat stat_buf;
     uid_t uid = 100;
@@ -188,6 +239,10 @@ static int test_chown() {
     return test_chown_framework(__test_chown);
 }
 
+static int test_chown_with_negative_id() {
+    return test_chown_framework(__test_chown_with_negative_id);
+}
+
 static int test_lchown() {
     return test_chown_framework(__test_lchown);
 }
@@ -210,6 +265,7 @@ static int test_fchownat_with_empty_path() {
 
 static test_case_t test_cases[] = {
     TEST_CASE(test_chown),
+    TEST_CASE(test_chown_with_negative_id),
     TEST_CASE(test_lchown),
     TEST_CASE(test_fchown),
     TEST_CASE(test_fchownat),
