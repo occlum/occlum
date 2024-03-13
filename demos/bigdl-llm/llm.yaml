@@ -18,6 +18,7 @@ targets:
     copy:
       - dirs:
           - ../chatglm2
+          - ../benchmarks
   - target: /opt/occlum/glibc/lib
     copy:
       - files:
