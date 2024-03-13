@@ -61,6 +61,33 @@ HF_DATASETS_CACHE=/root/cache \
 
 For both examples, more arguments info could refer to BigDL-LLM [chatglm2](https://github.com/intel-analytics/BigDL/tree/main/python/llm/example/CPU/HF-Transformers-AutoModels/Model/chatglm2).
 
+## LLM Inference Benchmark
+
+Based on the [benchmark](https://github.com/intel-analytics/BigDL/tree/main/python/llm/dev/benchmark) demo from BigDL, a simple [benchmark](./benchmarks/) is provided to measure the performance of LLM inference both in host and in TEE.
+
+Output will be like:
+```
+=========First token cost xx.xxxxs=========
+=========Last token cost average xx.xxxxs (xx tokens in all)=========
+```
+
+The following **model_path** could be the path of chatglm2-6b or Qwen-7B-Chat.
+**OMP_NUM_THREADS** is used to set the number of threads for OpenMP.
+
+### Benchmark in Host
+```bash
+OMP_NUM_THREADS=16 ./python-occlum/bin/python \
+    ./benchmarks/bench.py  --repo-id-or-model-path <model_path>
+```
+
+### Benchmark in TEE
+```bash
+cd occlum_instance
+OMP_NUM_THREADS=16 occlum run /bin/python3 \
+    /benchmarks/bench.py --repo-id-or-model-path <model_path>
+```
+
+By our benchmark result in Intel Ice Lake server, LLM inference performance within a TEE is approximately 30% less compared to on a host environment.
 
 ## Do inference with webui
 
