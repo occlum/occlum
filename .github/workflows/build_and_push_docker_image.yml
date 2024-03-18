@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       OS:
-        description: 'OS name (must choose from <anolis, ubuntu20>)'
+        description: 'OS name (must choose from <anolis, ubuntu20, ubuntu22>)'
         required: true
         default: 'ubuntu20'
       release:
@@ -73,9 +73,9 @@ jobs:
           tags: occlum/occlum:${{ env.IMAGE_TAG }}-anolis8.8
 
 
-  generate-ubuntu20-image:
+  generate-ubuntu-image:
       runs-on: ubuntu-20.04
-      if: github.event.inputs.OS == 'ubuntu20'
+      if: github.event.inputs.OS == 'ubuntu20' || github.event.inputs.OS == 'ubuntu22'
 
       steps:
       - name: Checkout code
@@ -105,6 +105,13 @@ jobs:
       - name: Get image tage name for test image
         if: github.event.inputs.release == 'T'
         run: echo "IMAGE_TAG=${{ env.RELEASE_VERSION }}-test" >> $GITHUB_ENV
+      - name: Choose image base OS
+        run: |
+          if [[ "${{ github.event.inputs.OS }}" == "ubuntu22" ]]; then
+            echo "IMAGE_BASE=ubuntu22.04" >> $GITHUB_ENV
+          else
+            echo "IMAGE_BASE=ubuntu20.04" >> $GITHUB_ENV
+          fi;
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -124,8 +131,8 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          file: ./tools/docker/Dockerfile.ubuntu20.04
+          file: ./tools/docker/Dockerfile.${{ env.IMAGE_BASE }}
           platforms: linux/amd64
           build-args: OCCLUM_BRANCH=${{ env.OCCLUM_BRANCH }}
           push: true
-          tags: occlum/occlum:${{ env.IMAGE_TAG }}-ubuntu20.04
+          tags: occlum/occlum:${{ env.IMAGE_TAG }}-${{ env.IMAGE_BASE }}
