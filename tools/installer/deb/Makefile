@@ -18,7 +18,7 @@ C_TOOLCHAIN_PACKAGE_NAME := occlum-toolchains-gcc
 # update the "changelog" file accordingly.
 MUSL_VERSION := 0.27.0
 GOLAN_VERSION := 1.18.4
-GLIBC_VERSION := 2.31
+GLIBC_VERSION ?= 2.31
 
 .PHONY: all main config_files main_deps musl-gcc deps_c glibc deps_glibc clean clean-build
 
@@ -77,6 +77,7 @@ deps_golang:
 	cp -r toolchains/golang $(DEB_BUILD_DIR)/occlum-toolchains-golang/debian
 
 glibc: deps_glibc
+	@echo "glibc version is $(GLIBC_VERSION)"
 	cd $(DEB_BUILD_DIR)/occlum-toolchains-glibc ; \
 		dpkg-buildpackage -us -uc
 	cp -t $(TARGET_DIR) $(DEB_BUILD_DIR)/occlum-toolchains-glibc*.deb
@@ -85,7 +86,7 @@ deps_glibc:
 	mkdir -p $(TARGET_DIR)
 	mkdir -p $(DEB_BUILD_DIR)/occlum-toolchains-glibc
 	cp -r toolchains/glibc $(DEB_BUILD_DIR)/occlum-toolchains-glibc/debian
-	sed -i -e 's/$$GLIBC_VERSION/$(GLIBC_VERSION)/g' $(DEB_BUILD_DIR)/occlum-toolchains-glibc/debian/changelog
+	sed -i -e 's/2.31/$(GLIBC_VERSION)/g' $(DEB_BUILD_DIR)/occlum-toolchains-glibc/debian/changelog
 
 clean-build:
 	rm -rf $(DEB_BUILD_DIR)
