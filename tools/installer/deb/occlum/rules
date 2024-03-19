@@ -18,12 +18,12 @@ SHELL = /bin/bash
 	dh $@
 
 override_dh_auto_build:
-	cd $(deb_build_dir)/occlum-$(VERSION)/occlum-src; make submodule
+	cd $(deb_build_dir)/occlum-$(VERSION)/occlum-src; OCCLUM_NO_INIT_RA_AECS=1 make submodule
 
 override_dh_install:
 	# install Occlum
 	cd $(deb_build_dir)/occlum-$(VERSION)/occlum-src; source /opt/intel/sgxsdk/environment; \
-	OCCLUM_RELEASE_BUILD=1 OCCLUM_PREFIX=$(buildroot)/opt/occlum make install
+	OCCLUM_RELEASE_BUILD=1 OCCLUM_PREFIX=$(buildroot)/opt/occlum OCCLUM_NO_INIT_RA_AECS=1 make install
 	mkdir -p $(buildroot)/etc/profile.d
 	cp $(deb_build_dir)/occlum-$(VERSION)/debian/{occlum-pal.sh,occlum-runtime.sh} $(buildroot)/etc/profile.d
 	chmod 644 $(buildroot)/etc/profile.d/{occlum-pal.sh,occlum-runtime.sh}
