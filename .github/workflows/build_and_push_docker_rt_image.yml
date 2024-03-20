@@ -5,26 +5,26 @@ on:
   workflow_dispatch:
     inputs:
       OS:
-        description: 'OS name (must choose from <ubuntu20>)'
+        description: 'OS name (must choose from <ubuntu20, ubuntu22>)'
         required: true
         default: 'ubuntu20'
       OCCLUM_VERSION:
-        description: 'The Occlum version is built on, e.g "0.29.7"'
+        description: 'The Occlum version is built on, e.g "0.30.1"'
         required: true
-        default: '0.29.7'
+        default: '0.30.1'
       SGX_PSW_VERSION:
-        description: 'The SGX PSW version libraries expected to be installed, e.g "2.17.100.3"'
+        description: 'The SGX PSW version libraries expected to be installed, e.g "2.20.100.4"'
         required: true
-        default: '2.17.100.3'
+        default: '2.20.100.4'
       SGX_DCAP_VERSION:
-        description: 'The SGX DCAP version libraries expected to be installed, e.g "1.14.100.3"'
+        description: 'The SGX DCAP version libraries expected to be installed, e.g "1.17.100.4"'
         required: true
-        default: '1.14.100.3'
+        default: '1.17.100.4'
 
 jobs:
-  generate-ubuntu20-rt-image:
+  generate-ubuntu-rt-image:
       runs-on: ubuntu-20.04
-      if: github.event.inputs.OS == 'ubuntu20'
+      if: github.event.inputs.OS == 'ubuntu20' || github.event.inputs.OS == 'ubuntu22'
 
       steps:
       - name: Checkout code
@@ -50,15 +50,23 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Choose image base OS
+        run: |
+          if [[ "${{ github.event.inputs.OS }}" == "ubuntu22" ]]; then
+            echo "IMAGE_BASE=ubuntu22.04" >> $GITHUB_ENV
+          else
+            echo "IMAGE_BASE=ubuntu20.04" >> $GITHUB_ENV
+          fi;
+
       - name: Build and push
         uses: docker/build-push-action@v2
         with:
           context: ./tools/docker
-          file: ./tools/docker/Dockerfile.ubuntu20.04-rt
+          file: ./tools/docker/Dockerfile.${{ env.IMAGE_BASE }}-rt
           platforms: linux/amd64
           build-args: |
             "OCCLUM_VERSION=${{ github.event.inputs.OCCLUM_VERSION }}"
             "SGX_PSW_VERSION=${{ github.event.inputs.SGX_PSW_VERSION }}"
             "SGX_DCAP_VERSION=${{ github.event.inputs.SGX_DCAP_VERSION }}"
           push: true
-          tags: occlum/occlum:${{ github.event.inputs.OCCLUM_VERSION }}-rt-ubuntu20.04
+          tags: occlum/occlum:${{ github.event.inputs.OCCLUM_VERSION }}-rt-${{ env.IMAGE_BASE }}
