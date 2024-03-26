@@ -250,32 +250,41 @@ impl INode for HNode {
         }
     }
 
-    fn iterate_entries(&self, ctx: &mut DirentWriterContext) -> Result<usize> {
+    fn iterate_entries(&self, offset: usize, visitor: &mut dyn DirentVisitor) -> Result<usize> {
         if !self.is_dir() {
             return Err(FsError::NotDir);
         }
-        let idx = ctx.pos();
-        for entry in try_std!(self.path.read_dir()).skip(idx) {
-            let entry = try_std!(entry);
-            if let Err(e) = ctx.write_entry(
-                &entry
-                    .file_name()
-                    .into_string()
-                    .map_err(|_| FsError::InvalidParam)?,
-                entry.ino(),
-                entry
-                    .file_type()
-                    .map_err(|_| FsError::InvalidParam)?
-                    .into_fs_filetype(),
-            ) {
-                if ctx.written_len() == 0 {
-                    return Err(e);
-                } else {
-                    break;
-                }
-            };
+
+        let try_iterate = |offset: &mut usize, visitor: &mut dyn DirentVisitor| -> Result<()> {
+            let start_offset = *offset;
+            for (idx, entry) in try_std!(self.path.read_dir())
+                .enumerate()
+                .skip_while(|(idx, _)| idx < &start_offset)
+            {
+                let entry = try_std!(entry);
+                visitor.visit_entry(
+                    &entry
+                        .file_name()
+                        .into_string()
+                        .map_err(|_| FsError::InvalidParam)?,
+                    entry.ino() as u64,
+                    entry
+                        .file_type()
+                        .map_err(|_| FsError::InvalidParam)?
+                        .into_fs_filetype(),
+                    idx,
+                )?;
+                *offset = idx + 1;
+            }
+
+            Ok(())
+        };
+
+        let mut iterate_offset = offset;
+        match try_iterate(&mut iterate_offset, visitor) {
+            Err(e) if iterate_offset == offset => Err(e),
+            _ => Ok(iterate_offset - offset),
         }
-        Ok(ctx.written_len())
     }
 
     fn io_control(&self, cmd: u32, data: usize) -> Result<()> {

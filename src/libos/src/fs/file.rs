@@ -67,7 +67,7 @@ pub trait File: Debug + Sync + Send + Any {
         return_op_unsupported_error!("set_len")
     }
 
-    fn iterate_entries(&self, writer: &mut dyn DirentWriter) -> Result<usize> {
+    fn iterate_entries(&self, visitor: &mut dyn DirentVisitor) -> Result<usize> {
         return_op_unsupported_error!("iterate_entries")
     }
 
