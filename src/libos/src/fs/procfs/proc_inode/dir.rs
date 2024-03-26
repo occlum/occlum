@@ -65,8 +65,12 @@ where
         self.inner().get_entry(id)
     }
 
-    fn iterate_entries(&self, ctx: &mut DirentWriterContext) -> vfs::Result<usize> {
-        self.inner().iterate_entries(ctx)
+    fn iterate_entries(
+        &self,
+        offset: usize,
+        visitor: &mut dyn DirentVisitor,
+    ) -> vfs::Result<usize> {
+        self.inner().iterate_entries(offset, visitor)
     }
 
     fn as_any_ref(&self) -> &dyn Any {

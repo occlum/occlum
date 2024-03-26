@@ -15,7 +15,8 @@ pub trait ProcINode {
 pub trait DirProcINode {
     fn find(&self, name: &str) -> vfs::Result<Arc<dyn INode>>;
     fn get_entry(&self, id: usize) -> vfs::Result<String>;
-    fn iterate_entries(&self, ctx: &mut DirentWriterContext) -> vfs::Result<usize>;
+    fn iterate_entries(&self, offset: usize, visitor: &mut dyn DirentVisitor)
+        -> vfs::Result<usize>;
 }
 
 #[macro_export]
@@ -54,7 +55,11 @@ macro_rules! impl_inode_for_file_or_symlink {
             Err(FsError::NotDir)
         }
 
-        fn iterate_entries(&self, ctx: &mut DirentWriterContext) -> vfs::Result<usize> {
+        fn iterate_entries(
+            &self,
+            offset: usize,
+            visitor: &mut dyn DirentVisitor,
+        ) -> vfs::Result<usize> {
             Err(FsError::NotDir)
         }
 
@@ -65,47 +70,19 @@ macro_rules! impl_inode_for_file_or_symlink {
 }
 
 #[macro_export]
-macro_rules! write_first_two_entries {
-    ($idx: expr, $ctx:expr, $file:expr) => {
-        let idx = $idx;
+macro_rules! visit_first_two_entries {
+    ($visitor:expr, $file:expr, $offset: expr) => {
+        use rcore_fs::visit_inode_entry;
         let file = $file;
 
-        if idx == 0 {
+        let offset = **$offset;
+        if offset == 0 {
             let this_inode = file.this.upgrade().unwrap();
-            write_inode_entry!($ctx, ".", &this_inode);
+            visit_inode_entry!($visitor, ".", &this_inode, $offset);
         }
-        if idx <= 1 {
-            write_inode_entry!($ctx, "..", &file.parent);
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! write_inode_entry {
-    ($ctx:expr, $name:expr, $inode:expr) => {
-        let ctx = $ctx;
-        let name = $name;
-        let ino = $inode.metadata()?.inode;
-        let type_ = $inode.metadata()?.type_;
-
-        write_entry!(ctx, name, ino, type_);
-    };
-}
-
-#[macro_export]
-macro_rules! write_entry {
-    ($ctx:expr, $name:expr, $ino:expr, $type_:expr) => {
-        let ctx = $ctx;
-        let name = $name;
-        let ino = $ino;
-        let type_ = $type_;
-
-        if let Err(e) = ctx.write_entry(name, ino as u64, type_) {
-            if ctx.written_len() == 0 {
-                return Err(e);
-            } else {
-                return Ok(ctx.written_len());
-            }
+        let offset = **$offset;
+        if offset == 1 {
+            visit_inode_entry!($visitor, "..", &file.parent, $offset);
         }
     };
 }

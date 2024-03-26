@@ -113,23 +113,42 @@ impl DirProcINode for LockedPidDirINode {
         }
     }
 
-    fn iterate_entries(&self, mut ctx: &mut DirentWriterContext) -> vfs::Result<usize> {
+    fn iterate_entries(
+        &self,
+        offset: usize,
+        visitor: &mut dyn DirentVisitor,
+    ) -> vfs::Result<usize> {
         let file = self.0.read().unwrap();
-        let idx = ctx.pos();
 
-        // Write first two special entries
-        write_first_two_entries!(idx, &mut ctx, &file);
+        let try_iterate =
+            |mut offset: &mut usize, mut visitor: &mut dyn DirentVisitor| -> vfs::Result<()> {
+                // The two special entries
+                visit_first_two_entries!(&mut visitor, &file, &mut offset);
 
-        // Write the normal entries
-        let skipped = if idx < 2 { 0 } else { idx - 2 };
-        for (name, inode) in file.entries.iter().skip(skipped) {
-            write_inode_entry!(&mut ctx, name, inode);
+                // The normal entries
+                let start_offset = *offset;
+                for (name, child) in file.entries.iter().skip(start_offset - 2) {
+                    rcore_fs::visit_inode_entry!(&mut visitor, name, child, &mut offset);
+                }
+
+                // The fd entry
+                if *offset == 2 + file.entries.len() {
+                    rcore_fs::visit_entry!(
+                        &mut visitor,
+                        "fd",
+                        PROC_INO as u64,
+                        vfs::FileType::Dir,
+                        &mut offset
+                    );
+                }
+
+                Ok(())
+            };
+
+        let mut iterate_offset = offset;
+        match try_iterate(&mut iterate_offset, visitor) {
+            Err(e) if iterate_offset == offset => Err(e),
+            _ => Ok(iterate_offset - offset),
         }
-
-        // Write the fd entry
-        if idx <= 2 + file.entries.len() {
-            write_entry!(&mut ctx, "fd", PROC_INO, vfs::FileType::Dir);
-        }
-        Ok(ctx.written_len())
     }
 }

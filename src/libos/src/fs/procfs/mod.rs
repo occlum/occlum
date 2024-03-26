@@ -157,44 +157,51 @@ impl DirProcINode for LockedProcRootINode {
         }
     }
 
-    fn iterate_entries(&self, mut ctx: &mut DirentWriterContext) -> vfs::Result<usize> {
+    fn iterate_entries(
+        &self,
+        offset: usize,
+        visitor: &mut dyn DirentVisitor,
+    ) -> vfs::Result<usize> {
         let file = self.0.read().unwrap();
-        let idx = ctx.pos();
 
-        // Write first two special entries
-        if idx == 0 {
-            let this_inode = file.this.upgrade().unwrap();
-            write_inode_entry!(&mut ctx, ".", &this_inode);
-        }
-        if idx <= 1 {
-            let parent_inode = file.this.upgrade().unwrap();
-            write_inode_entry!(&mut ctx, "..", &parent_inode);
-        }
+        let try_iterate =
+            |mut offset: &mut usize, mut visitor: &mut dyn DirentVisitor| -> vfs::Result<()> {
+                // The two special entries
+                if *offset == 0 {
+                    let this_inode = file.this.upgrade().unwrap();
+                    rcore_fs::visit_inode_entry!(&mut visitor, ".", &this_inode, &mut offset);
+                }
+                if *offset == 1 {
+                    let parent_inode = file.this.upgrade().unwrap();
+                    rcore_fs::visit_inode_entry!(&mut visitor, "..", &parent_inode, &mut offset);
+                }
 
-        // Write the non volatile entries
-        let skipped = if idx < 2 { 0 } else { idx - 2 };
-        for (name, inode) in file.non_volatile_entries.iter().skip(skipped) {
-            write_inode_entry!(&mut ctx, name, inode);
-        }
+                // The non volatile entries
+                let start_offset = *offset;
+                for (name, child) in file.non_volatile_entries.iter().skip(start_offset - 2) {
+                    rcore_fs::visit_inode_entry!(&mut visitor, name, child, &mut offset);
+                }
 
-        // Write the pid entries
-        let skipped = {
-            let prior_entries_len = 2 + file.non_volatile_entries.len();
-            if idx < prior_entries_len {
-                0
-            } else {
-                idx - prior_entries_len
-            }
-        };
-        for process in get_all_processes().iter().skip(skipped) {
-            write_entry!(
-                &mut ctx,
-                &process.pid().to_string(),
-                PROC_INO,
-                vfs::FileType::Dir
-            );
-        }
+                // The pid entries
+                let start_offset = *offset;
+                let skipped_len = 2 + file.non_volatile_entries.len();
+                for process in get_all_processes().iter().skip(start_offset - skipped_len) {
+                    rcore_fs::visit_entry!(
+                        &mut visitor,
+                        &process.pid().to_string(),
+                        PROC_INO,
+                        vfs::FileType::Dir,
+                        &mut offset
+                    );
+                }
 
-        Ok(ctx.written_len())
+                Ok(())
+            };
+
+        let mut iterate_offset = offset;
+        match try_iterate(&mut iterate_offset, visitor) {
+            Err(e) if iterate_offset == offset => Err(e),
+            _ => Ok(iterate_offset - offset),
+        }
     }
 }

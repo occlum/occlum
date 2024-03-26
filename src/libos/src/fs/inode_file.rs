@@ -193,15 +193,14 @@ impl File for INodeFile {
         Ok(())
     }
 
-    fn iterate_entries(&self, writer: &mut dyn DirentWriter) -> Result<usize> {
+    fn iterate_entries(&self, visitor: &mut dyn DirentVisitor) -> Result<usize> {
         if !self.access_mode.readable() {
             return_errno!(EBADF, "File not readable. Can't read entry.");
         }
         let mut offset = self.offset.lock().unwrap();
-        let mut dir_ctx = DirentWriterContext::new(*offset, writer);
-        let written_size = self.inode.iterate_entries(&mut dir_ctx)?;
-        *offset = dir_ctx.pos();
-        Ok(written_size)
+        let visited_len = self.inode.iterate_entries(*offset, visitor)?;
+        *offset += visited_len;
+        Ok(visited_len)
     }
 
     fn access_mode(&self) -> Result<AccessMode> {
