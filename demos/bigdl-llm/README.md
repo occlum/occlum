@@ -114,7 +114,7 @@ This controller manages the distributed workers.
 ```bash
 cd occlum_instance
 occlum start
-HF_DATASETS_CACHE=/root/cache  occlum exec /bin/python3 -m bigdl.llm.serving.model_worker --model-path /models/chatglm2-6b --device cpu --host 0.0.0.0
+HF_DATASETS_CACHE=/root/cache  occlum exec /bin/python3 -m ipex_llm.serving.fastchat.model_worker --model-path /models/chatglm2-6b --device cpu --host 0.0.0.0
 ```
 Wait until the process finishes loading the model and you see "Uvicorn running on ...". The model worker will register itself to the controller.
 
