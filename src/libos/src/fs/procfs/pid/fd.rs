@@ -53,26 +53,45 @@ impl DirProcINode for LockedProcFdDirINode {
         }
     }
 
-    fn iterate_entries(&self, mut ctx: &mut DirentWriterContext) -> vfs::Result<usize> {
+    fn iterate_entries(
+        &self,
+        offset: usize,
+        visitor: &mut dyn DirentVisitor,
+    ) -> vfs::Result<usize> {
         let file = self.0.read().unwrap();
-        let idx = ctx.pos();
 
-        // Write first two special entries
-        write_first_two_entries!(idx, &mut ctx, &file);
+        let try_iterate =
+            |mut offset: &mut usize, mut visitor: &mut dyn DirentVisitor| -> vfs::Result<()> {
+                // The two special entries
+                visit_first_two_entries!(&mut visitor, &file, &mut offset);
 
-        // Write the fd entries
-        let skipped = if idx < 2 { 0 } else { idx - 2 };
-        let main_thread = match file.process_ref.main_thread() {
-            Some(main_thread) => main_thread,
-            None => {
-                return Ok(ctx.written_len());
-            }
-        };
-        let fds = main_thread.files().lock().unwrap().fds();
-        for fd in fds.iter().skip(skipped) {
-            write_entry!(&mut ctx, &fd.to_string(), PROC_INO, vfs::FileType::SymLink);
+                // The fd entries
+                let main_thread = match file.process_ref.main_thread() {
+                    Some(main_thread) => main_thread,
+                    None => {
+                        return Ok(());
+                    }
+                };
+                let fds = main_thread.files().lock().unwrap().fds();
+                let start_offset = *offset;
+                for fd in fds.iter().skip(start_offset - 2) {
+                    rcore_fs::visit_entry!(
+                        &mut visitor,
+                        &fd.to_string(),
+                        PROC_INO,
+                        vfs::FileType::SymLink,
+                        &mut offset
+                    );
+                }
+
+                Ok(())
+            };
+
+        let mut iterate_offset = offset;
+        match try_iterate(&mut iterate_offset, visitor) {
+            Err(e) if iterate_offset == offset => Err(e),
+            _ => Ok(iterate_offset - offset),
         }
-        Ok(ctx.written_len())
     }
 }
 

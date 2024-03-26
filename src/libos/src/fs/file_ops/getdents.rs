@@ -9,7 +9,7 @@ pub fn do_getdents(fd: FileDesc, buf: &mut [u8]) -> Result<usize> {
     getdents_common::<LinuxDirent>(fd, buf)
 }
 
-fn getdents_common<T: Dirent>(fd: FileDesc, buf: &mut [u8]) -> Result<usize> {
+fn getdents_common<T: DirentSerializer>(fd: FileDesc, buf: &mut [u8]) -> Result<usize> {
     debug!(
         "getdents: fd: {}, buf: {:?}, buf_size: {}",
         fd,
@@ -23,17 +23,17 @@ fn getdents_common<T: Dirent>(fd: FileDesc, buf: &mut [u8]) -> Result<usize> {
         return_errno!(ENOTDIR, "");
     }
     let mut writer = DirentBufWriter::<T>::new(buf);
-    let written_len = file_ref.iterate_entries(&mut writer)?;
-    Ok(written_len)
+    let _ = file_ref.iterate_entries(&mut writer)?;
+    Ok(writer.written_len())
 }
 
-struct DirentBufWriter<'a, T: Dirent> {
+struct DirentBufWriter<'a, T: DirentSerializer> {
     buf: &'a mut [u8],
     written_len: usize,
     phantom: PhantomData<T>,
 }
 
-impl<'a, T: Dirent> DirentBufWriter<'a, T> {
+impl<'a, T: DirentSerializer> DirentBufWriter<'a, T> {
     fn new(buf: &'a mut [u8]) -> Self {
         Self {
             buf,
@@ -41,29 +41,38 @@ impl<'a, T: Dirent> DirentBufWriter<'a, T> {
             phantom: PhantomData,
         }
     }
-}
 
-impl<'a, T: Dirent> DirentWriter for DirentBufWriter<'a, T> {
-    fn write_entry(&mut self, name: &str, ino: u64, type_: FileType) -> rcore_fs::vfs::Result<()> {
-        let dirent: T = Dirent::new(name, ino, type_);
-        if self.buf.len() - self.written_len < dirent.rec_len() {
-            return Err(FsError::InvalidParam);
-        }
-        dirent
-            .serialize(&mut self.buf[self.written_len..], name, type_)
-            .map_err(|_| FsError::InvalidParam)?;
-        self.written_len += dirent.rec_len();
-        Ok(())
-    }
-
-    fn written_len(&self) -> usize {
+    pub fn written_len(&self) -> usize {
         self.written_len
     }
 }
 
-trait Dirent: Sync + Send {
-    fn new(name: &str, ino: u64, type_: FileType) -> Self;
+impl<'a, T: DirentSerializer> DirentVisitor for DirentBufWriter<'a, T> {
+    fn visit_entry(
+        &mut self,
+        name: &str,
+        ino: u64,
+        type_: FileType,
+        offset: usize,
+    ) -> rcore_fs::vfs::Result<()> {
+        let dirent_serializer = T::new(name, ino, type_, offset);
+        if self.written_len >= self.buf.len() {
+            return Err(FsError::InvalidParam);
+        }
+        dirent_serializer
+            .serialize(&mut self.buf[self.written_len..], name, type_)
+            .map_err(|_| FsError::InvalidParam)?;
+        self.written_len += dirent_serializer.rec_len();
+        Ok(())
+    }
+}
+
+trait DirentSerializer: Sync + Send {
+    /// Creates a new DirentSerializer.
+    fn new(name: &str, ino: u64, type_: FileType, offset: usize) -> Self;
+    /// Returns the length.
     fn rec_len(&self) -> usize;
+    /// Tries to serialize a directory entry into buffer.
     fn serialize(&self, buf: &mut [u8], name: &str, type_: FileType) -> Result<()>;
 }
 
@@ -83,13 +92,13 @@ struct LinuxDirent64 {
     pub name: [u8; 0],
 }
 
-impl Dirent for LinuxDirent64 {
-    fn new(name: &str, ino: u64, type_: FileType) -> Self {
+impl DirentSerializer for LinuxDirent64 {
+    fn new(name: &str, ino: u64, type_: FileType, offset: usize) -> Self {
         let ori_len = core::mem::size_of::<Self>() + name.len() + 1;
         let len = align_up(ori_len, 8); // align up to 8 bytes
         Self {
             ino,
-            offset: 0,
+            offset: offset as u64,
             rec_len: len as u16,
             type_: DirentType::from_file_type(type_),
             name: [],
@@ -101,6 +110,10 @@ impl Dirent for LinuxDirent64 {
     }
 
     fn serialize(&self, buf: &mut [u8], name: &str, _type_: FileType) -> Result<()> {
+        if self.rec_len() > buf.len() {
+            return_errno!(EINVAL, "not enough buf");
+        }
+
         unsafe {
             let ptr = buf.as_mut_ptr() as *mut Self;
             ptr.write(*self);
@@ -131,14 +144,14 @@ struct LinuxDirent {
     */
 }
 
-impl Dirent for LinuxDirent {
-    fn new(name: &str, ino: u64, type_: FileType) -> Self {
+impl DirentSerializer for LinuxDirent {
+    fn new(name: &str, ino: u64, type_: FileType, offset: usize) -> Self {
         let ori_len =
             core::mem::size_of::<Self>() + name.len() + 1 + core::mem::size_of::<FileType>();
         let len = align_up(ori_len, 8); // align up to 8 bytes
         Self {
             ino,
-            offset: 0,
+            offset: offset as u64,
             rec_len: len as u16,
             name: [],
         }
@@ -149,6 +162,10 @@ impl Dirent for LinuxDirent {
     }
 
     fn serialize(&self, buf: &mut [u8], name: &str, type_: FileType) -> Result<()> {
+        if self.rec_len() > buf.len() {
+            return_errno!(EINVAL, "not enough buf");
+        }
+
         unsafe {
             let ptr = buf.as_mut_ptr() as *mut Self;
             ptr.write(*self);
