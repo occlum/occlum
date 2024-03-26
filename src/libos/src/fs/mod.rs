@@ -2,8 +2,7 @@ use super::*;
 
 use process;
 use rcore_fs::vfs::{
-    DirentWriter, DirentWriterContext, FileSystem, FileType, FsError, INode, Metadata, Timespec,
-    PATH_MAX,
+    DirentVisitor, FileSystem, FileType, FsError, INode, Metadata, Timespec, PATH_MAX,
 };
 use std;
 use std::any::Any;
