@@ -20,7 +20,7 @@ import argparse
 
 
 # load Hugging Face Transformers model with INT4 optimizations
-from bigdl.llm.transformers import AutoModelForCausalLM
+from ipex_llm.transformers import AutoModelForCausalLM
 from transformers import AutoTokenizer
 
 
