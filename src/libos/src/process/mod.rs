@@ -14,6 +14,7 @@ use crate::misc::ResourceLimits;
 use crate::prelude::*;
 use crate::sched::{NiceValue, SchedAgent};
 use crate::signal::{SigDispositions, SigQueues};
+use crate::util::sync::Mutex;
 use crate::vm::ProcessVM;
 
 use self::pgrp::ProcessGrp;
@@ -74,7 +75,7 @@ pub type gid_t = u32;
 
 pub type ProcessRef = Arc<Process>;
 pub type ThreadRef = Arc<Thread>;
-pub type FileTableRef = Arc<SgxMutex<FileTable>>;
+pub type FileTableRef = Arc<Mutex<FileTable>>;
 pub type ProcessVMRef = Arc<ProcessVM>;
 pub type FsViewRef = Arc<RwLock<FsView>>;
 pub type SchedAgentRef = Arc<SgxMutex<SchedAgent>>;
