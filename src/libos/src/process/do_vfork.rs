@@ -77,7 +77,7 @@ pub fn do_vfork(mut context: *mut CpuContext) -> Result<isize> {
     let parent_pid = current.process().pid();
     let mut vfork_file_tables = VFORK_PARENT_FILE_TABLES.lock().unwrap();
     let parent_file_table = {
-        let mut current_file_table = current.files().lock().unwrap();
+        let mut current_file_table = current.files().lock();
         let new_file_table = current_file_table.clone();
         // FileTable contains non-cloned struct, so here we do a memory replacement to use new
         // file table in child and store the original file table in TLS.
@@ -156,7 +156,7 @@ fn restore_parent_process(mut context: *mut CpuContext, current_ref: &ThreadRef)
     // Close all child opened files
     close_files_opened_by_child(current_ref, &parent_file_table)?;
 
-    let mut current_file_table = current_ref.files().lock().unwrap();
+    let mut current_file_table = current_ref.files().lock();
     *current_file_table = parent_file_table;
 
     // Get child pid and restore CpuContext
@@ -195,7 +195,7 @@ pub fn check_vfork_for_exec(current_ref: &ThreadRef) -> Option<(ThreadId, Option
 }
 
 fn close_files_opened_by_child(current: &ThreadRef, parent_file_table: &FileTable) -> Result<()> {
-    let current_file_table = current.files().lock().unwrap();
+    let current_file_table = current.files().lock();
     let child_open_fds: Vec<FileDesc> = current_file_table
         .table()
         .iter()

@@ -10,7 +10,7 @@ pub fn do_dup(old_fd: FileDesc) -> Result<FileDesc> {
 
 pub fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<FileDesc> {
     let current = current!();
-    let mut files = current.files().lock().unwrap();
+    let mut files = current.files().lock();
     let file = files.get(old_fd)?;
     let soft_rlimit_nofile = current!()
         .rlimits()
@@ -34,7 +34,7 @@ pub fn do_dup2(old_fd: FileDesc, new_fd: FileDesc) -> Result<FileDesc> {
 pub fn do_dup3(old_fd: FileDesc, new_fd: FileDesc, flags: u32) -> Result<FileDesc> {
     let creation_flags = CreationFlags::from_bits_truncate(flags);
     let current = current!();
-    let mut files = current.files().lock().unwrap();
+    let mut files = current.files().lock();
     let file = files.get(old_fd)?;
     let soft_rlimit_nofile = current!()
         .rlimits()
