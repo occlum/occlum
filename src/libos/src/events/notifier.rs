@@ -8,7 +8,7 @@ use crate::prelude::*;
 
 /// An event notifier broadcasts interesting events to registered observers.
 pub struct Notifier<E: Event, F: EventFilter<E> = DummyEventFilter<E>> {
-    subscribers: SgxMutex<VecDeque<Subscriber<E, F>>>,
+    subscribers: Mutex<VecDeque<Subscriber<E, F>>>,
 }
 
 struct Subscriber<E: Event, F: EventFilter<E>> {
@@ -20,7 +20,7 @@ struct Subscriber<E: Event, F: EventFilter<E>> {
 impl<E: Event, F: EventFilter<E>> Notifier<E, F> {
     /// Create an event notifier.
     pub fn new() -> Self {
-        let subscribers = SgxMutex::new(VecDeque::new());
+        let subscribers = Mutex::new(VecDeque::new());
         Self { subscribers }
     }
 
@@ -31,7 +31,7 @@ impl<E: Event, F: EventFilter<E>> Notifier<E, F> {
         filter: Option<F>,
         metadata: Option<Weak<dyn Any + Send + Sync>>,
     ) {
-        let mut subscribers = self.subscribers.lock().unwrap();
+        let mut subscribers = self.subscribers.lock();
         subscribers.push_back(Subscriber {
             observer,
             filter,
@@ -41,13 +41,13 @@ impl<E: Event, F: EventFilter<E>> Notifier<E, F> {
 
     /// Unregister an observer.
     pub fn unregister(&self, observer: &Weak<dyn Observer<E>>) {
-        let mut subscribers = self.subscribers.lock().unwrap();
+        let mut subscribers = self.subscribers.lock();
         subscribers.retain(|subscriber| !Weak::ptr_eq(&subscriber.observer, observer));
     }
 
     /// Broadcast an event to all registered observers.
     pub fn broadcast(&self, event: &E) {
-        let subscribers = self.subscribers.lock().unwrap();
+        let subscribers = self.subscribers.lock();
         for subscriber in subscribers.iter() {
             if let Some(filter) = subscriber.filter.as_ref() {
                 if !filter.filter(event) {

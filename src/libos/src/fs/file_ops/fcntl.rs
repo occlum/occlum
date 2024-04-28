@@ -63,7 +63,7 @@ pub fn do_fcntl(fd: FileDesc, cmd: &mut FcntlCmd) -> Result<isize> {
     debug!("fcntl: fd: {:?}, cmd: {:?}", &fd, cmd);
 
     let current = current!();
-    let mut file_table = current.files().lock().unwrap();
+    let mut file_table = current.files().lock();
 
     let ret = match cmd {
         FcntlCmd::DupFd(min_fd) => {

@@ -46,7 +46,7 @@ impl DirProcINode for LockedProcFdDirINode {
                     .process_ref
                     .main_thread()
                     .ok_or(FsError::EntryNotFound)?;
-                let fds = main_thread.files().lock().unwrap().fds();
+                let fds = main_thread.files().lock().fds();
                 let fd = fds.iter().nth(i - 2).ok_or(FsError::EntryNotFound)?;
                 Ok(fd.to_string())
             }
@@ -72,7 +72,7 @@ impl DirProcINode for LockedProcFdDirINode {
                         return Ok(());
                     }
                 };
-                let fds = main_thread.files().lock().unwrap().fds();
+                let fds = main_thread.files().lock().fds();
                 let start_offset = *offset;
                 for fd in fds.iter().skip(start_offset - 2) {
                     rcore_fs::visit_entry!(
