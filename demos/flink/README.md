@@ -6,21 +6,38 @@ Related dependencies: openjdk-11
 ./preinstall_deps.sh
 ```
 
-### Run the flink jobmanager
+### Download flink
 ```
-./run_flink_jobmanager_on_host.sh
-```
-
-### Run the taskManager
-```
-./run_flink_on_occlum_glibc.sh tm
+./download_flink.sh
 ```
 
-### Run flink jobs example
+### Build Occlum instance
 ```
-./run_flink_on_occlum_glibc.sh task
+./build_occlum_instance.sh
+```
+
+### Run flink job manager on Occlum
+```
+./run_flink_on_occlum.sh jm
+```
+
+Wait a while for job manager started successfully. You can check the log `occlum_instance_jobmanager/flink--standalonesession-0.log` for detail status.
+
+### Run flink task manager on Occlum
+
+Once the job manager is up, you can run the task manager.
+```
+./run_flink_on_occlum.sh tm
+```
+
+Wait a while for task manager started successfully. You can check the log `occlum_instance_taskmanager/flink--taskmanager-0.log` for detail status.
+
+### Submit a flink job to occlum
+
+You can submit an example flink job by using the following command:
+```
+./run_flink_on_occlum.sh task
 ```
 
 **Note:**  
-1. If running the jobmanager in docker, please export the port 8081 and 6123
-2. Step 2 may report warning for not finding shared objects. It doesn't matter. To avoid these warnings, you can **REPLACE the FIRST LINE** of config file `/opt/occlum/etc/template/occlum_elf_loader.config` with `/opt/occlum/glibc/lib/ld-linux-x86-64.so.2 /usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/usr/lib/jvm/java-11-openjdk-amd64/lib/server`.
+If running the jobmanager in docker, please export the port 8081 and 6123.
