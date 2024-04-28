@@ -766,16 +766,24 @@ jobs:
     - name: Preinstall dependencies and download flink
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && ./preinstall_deps.sh && ./download_flink.sh"
 
-    - name: Run jobmanager on host
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_jobmanager_on_host.sh"
+    - name: Build Occlum instance
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./build_occlum_instance.sh"
 
-    - name: Run flink taskmanager
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_on_occlum_glibc.sh tm > flink.log 2>&1 &"
+    - name: Run flink job manager on Occlum
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && ./run_flink_on_occlum.sh jm"
 
+    - name: Run flink task manager on Occlum
+      run: |
+        sleep ${{ env.nap_time }};
+        docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && ./run_flink_on_occlum.sh tm > flink.log 2>&1 &"
     - name: Run flink task
       run: |
         sleep ${{ env.nap_time }};
-        docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && SGX_MODE=SIM ./run_flink_on_occlum_glibc.sh task"
+        docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink && ./run_flink_on_occlum.sh task"
+
+    - name: Check flink job manager's log
+      if: ${{ always() }}
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/flink; cat occlum_instance_jobmanager/flink--standalonesession-0.log"
 
     - name: Check flink task manager's log
       if: ${{ always() }}
