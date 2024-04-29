@@ -64,7 +64,8 @@ LIBOS_CORE_A := $(OBJ_DIR)/libos/lib/lib$(LIBOS_CORE_LIB_NAME).a
 LIBOS_CORE_RS_A := $(OBJ_DIR)/libos/lib/libocclum_libos_core_rs.a
 
 # All source code
-RUST_SRCS := $(wildcard src/*.rs src/*/*.rs src/*/*/*.rs src/*/*/*/*.rs src/*/*/*/*/*.rs)
+RUST_SRCS := $(wildcard src/*.rs src/*/*.rs src/*/*/*.rs src/*/*/*/*.rs src/*/*/*/*/*.rs \
+				crates/*/src/*.rs crates/*/src/*/*.rs crates/*/src/*/*/*.rs crates/*/src/*/*/*/*.rs)
 RUST_TARGET_DIR := $(OBJ_DIR)/libos/cargo-target
 RUST_OUT_DIR := $(OBJ_DIR)/libos/lib
 EDL_C_SRCS := $(addprefix $(OBJ_DIR)/libos/,$(SRC_OBJ)/Enclave_t.c $(SRC_OBJ)/Enclave_t.h)
@@ -166,7 +167,8 @@ $(OBJ_DIR)/libos/$(SRC_OBJ)/Enclave_t.c: $(SGX_EDGER8R) ../Enclave.edl
 		$(SGX_EDGER8R) $(SGX_EDGER8R_MODE) --trusted $(CUR_DIR)/../Enclave.edl \
 		--search-path $(SGX_SDK)/include \
 		--search-path $(RUST_SGX_SDK_DIR)/edl \
-		--search-path $(CRATES_DIR)/vdso-time/ocalls
+		--search-path $(CRATES_DIR)/vdso-time/ocalls \
+		--search-path $(PROJECT_DIR)/deps/io-uring/ocalls
 	@echo "GEN <= $@"
 
 $(C_OBJS):$(OBJ_DIR)/libos/$(SRC_OBJ)/%.o: src/%.c
@@ -188,6 +190,7 @@ format-c: $(C_SRCS) $(CXX_SRCS)
 
 format-rust: $(RUST_SRCS)
 	@$(call format-rust)
+	@cd crates && $(call format-rust)
 
 format-check: format-check-c format-check-rust
 
@@ -196,6 +199,7 @@ format-check-c: $(C_SRCS) $(CXX_SRCS)
 
 format-check-rust: $(RUST_SRCS)
 	@$(call format-check-rust)
+	@cd crates && $(call format-check-rust)
 
 COV_TARGET_DIR := $(RUST_TARGET_DIR)/debug/deps
 DEPS_DIR := $(shell pwd)/../../deps
