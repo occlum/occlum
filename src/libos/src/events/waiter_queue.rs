@@ -1,8 +1,7 @@
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
 
-use super::{Waiter, Waker};
+use super::{LevelSync, Synchronizer, Waiter, Waker};
 use crate::prelude::*;
 
 /// A queue for waiters.
@@ -26,12 +25,12 @@ use crate::prelude::*;
 /// In this code snippet, the count variable is synchronized with the wakers field.
 /// In this case, we only need to ensure that waker.lock() occurs before count.
 /// Although it is safer to use AcqRel，here using `Release` would be enough.
-pub struct WaiterQueue {
+pub struct WaiterQueue<Sync: Synchronizer = LevelSync> {
     count: AtomicUsize,
-    wakers: SgxMutex<VecDeque<Waker>>,
+    wakers: SgxMutex<VecDeque<Waker<Sync>>>,
 }
 
-impl WaiterQueue {
+impl<Sync: Synchronizer> WaiterQueue<Sync> {
     /// Creates an empty queue for `Waiter`s.
     pub fn new() -> Self {
         Self {
@@ -52,7 +51,7 @@ impl WaiterQueue {
     /// It is allowed to enqueue a waiter more than once before it is dequeued.
     /// But this is usually not a good idea. It is the callers' responsibility
     /// to use the API properly.
-    pub fn reset_and_enqueue(&self, waiter: &Waiter) {
+    pub fn reset_and_enqueue(&self, waiter: &Waiter<Sync>) {
         waiter.reset();
 
         let mut wakers = self.wakers.lock().unwrap();
@@ -81,13 +80,13 @@ impl WaiterQueue {
         let to_wake = {
             let mut wakers = self.wakers.lock().unwrap();
             let max_count = max_count.min(wakers.len());
-            let to_wake: Vec<Waker> = wakers.drain(..max_count).collect();
+            let to_wake: Vec<Waker<Sync>> = wakers.drain(..max_count).collect();
             self.count.fetch_sub(to_wake.len(), Ordering::Release);
             to_wake
         };
 
         // Wake in batch
-        Waker::batch_wake(to_wake.iter());
+        Waker::<Sync>::batch_wake(to_wake.iter());
         to_wake.len()
     }
 }
