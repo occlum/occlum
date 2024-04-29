@@ -116,8 +116,8 @@ mod result;
 mod to_errno;
 
 pub use self::backtrace::ErrorBacktrace;
-pub use self::errno::*;
 pub use self::errno::Errno::*;
+pub use self::errno::*;
 pub use self::error::{Error, ErrorLocation};
 pub use self::result::{Result, ResultExt};
 pub use self::to_errno::ToErrno;
@@ -130,13 +130,18 @@ macro_rules! errno {
             let msg: &'static str = $error_msg;
             (errno, msg)
         };
-        let error =
-            $crate::Error::embedded(inner_error, Some($crate::ErrorLocation::new(file!(), line!())));
+        let error = $crate::Error::embedded(
+            inner_error,
+            Some($crate::ErrorLocation::new(file!(), line!())),
+        );
         error
     }};
     ($error_expr: expr) => {{
         let inner_error = $error_expr;
-        let error = $crate::Error::boxed(inner_error, Some($crate::ErrorLocation::new(file!(), line!())));
+        let error = $crate::Error::boxed(
+            inner_error,
+            Some($crate::ErrorLocation::new(file!(), line!())),
+        );
         error
     }};
 }
