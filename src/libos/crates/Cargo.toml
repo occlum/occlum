@@ -1,0 +1,24 @@
+[workspace]
+
+members = [
+    "errno",
+    "io-uring-callback",
+    "keyable-arc",
+    "object-id",
+    "sgx-untrusted-alloc",
+    "vdso-time"
+]
+
+# Default members can run on Linux; non-default members can only run inside SGX.
+default-members = [
+    "errno",
+    "io-uring-callback",
+    "keyable-arc",
+    "object-id",
+    "sgx-untrusted-alloc",
+    "vdso-time"
+]
+
+exclude = [ 
+    "test",
+]
