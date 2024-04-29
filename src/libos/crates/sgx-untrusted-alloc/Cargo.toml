@@ -1,0 +1,22 @@
+[package]
+name = "sgx-untrusted-alloc"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["libc"]
+sgx = ["sgx_types", "sgx_tstd", "sgx_trts", "sgx_libc"]
+
+[dependencies]
+cfg-if = "1.0.0"
+libc = { version = "0.2", optional = true }
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+intrusive-collections = "0.9"
+log = "0.4"
+spin = "0.7"
+errno = { path = "../errno" }
+
+sgx_types = { path = "../../../../deps/rust-sgx-sdk/sgx_types", optional = true }
+sgx_tstd = { path = "../../../../deps/rust-sgx-sdk/sgx_tstd", optional = true, features = ["backtrace"] }
+sgx_trts = { path = "../../../../deps/rust-sgx-sdk/sgx_trts", optional = true }
+sgx_libc = { path = "../../../../deps/rust-sgx-sdk/sgx_libc", optional = true }

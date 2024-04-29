@@ -1,0 +1,11 @@
+Cargo.lock
+Enclave_u.c
+Enclave_u.h
+Enclave_t.c
+Enclave_t.h
+app/target
+enclave/target
+bin/app
+*.o
+*.a
+*.so
