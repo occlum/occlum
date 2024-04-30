@@ -69,7 +69,29 @@ impl<'a> NonBuiltinIoctlCmd<'a> {
     pub fn arg_len(&self) -> usize {
         self.cmd_num.arg_size()
     }
+
+    pub fn execute(&self, host_fd: FileDesc) -> Result<()> {
+        let cmd_num = self.cmd_num().as_u32() as c_int;
+        let cmd_arg_ptr = self.arg_ptr() as *mut c_void;
+
+        let ret = try_libc!({
+            let mut retval: i32 = 0;
+            let status = occlum_ocall_ioctl(
+                &mut retval as *mut i32,
+                host_fd as i32,
+                cmd_num,
+                cmd_arg_ptr,
+                self.arg_len(),
+            );
+            assert!(status == sgx_status_t::SGX_SUCCESS);
+            retval
+        });
+
+        Ok(())
+    }
 }
+
+impl IoctlCmd for NonBuiltinIoctlCmd<'static> {}
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct StructuredIoctlNum {

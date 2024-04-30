@@ -1,4 +1,5 @@
 use super::*;
+use crate::fs::IoctlCmd;
 
 macro_rules! return_op_unsupported_error {
     ($op_name: expr, $errno: expr) => {{
@@ -79,8 +80,8 @@ pub trait File: Debug + Sync + Send + Any {
         Ok(())
     }
 
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-        return_op_unsupported_error!("ioctl")
+    fn ioctl(&self, _cmd: &mut dyn IoctlCmd) -> Result<()> {
+        return_op_unsupported_error!("ioctl", EINVAL);
     }
 
     fn access_mode(&self) -> Result<AccessMode> {
@@ -142,7 +143,7 @@ pub trait File: Debug + Sync + Send + Any {
 
     /// Return the host fd, if the file is backed by an underlying host file.
     fn host_fd(&self) -> Option<&HostFd> {
-        return None;
+        None
     }
 
     /// Update the ready events of a host file.

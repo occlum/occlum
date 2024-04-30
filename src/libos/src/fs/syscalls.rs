@@ -673,7 +673,7 @@ pub fn do_ioctl(fd: FileDesc, cmd: u32, argp: *mut u8) -> Result<isize> {
         if argp.is_null() == false {
             from_user::check_mut_ptr(argp)?;
         }
-        IoctlCmd::new(cmd, argp)?
+        IoctlRawCmd::new(cmd, argp)?
     };
     file_ops::do_ioctl(fd, &mut ioctl_cmd)?;
     Ok(0)
