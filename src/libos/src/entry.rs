@@ -7,6 +7,7 @@ use super::*;
 use crate::exception::*;
 use crate::fs::HostStdioFds;
 use crate::interrupt;
+use crate::io_uring::ENABLE_URING;
 use crate::process::idle_reap_zombie_children;
 use crate::process::{ProcessFilter, SpawnAttr};
 use crate::signal::SigNum;
@@ -101,11 +102,14 @@ pub extern "C" fn occlum_ecall_init(
 
         vm::init_user_space();
 
+        if ENABLE_URING.load(Ordering::Relaxed) {
+            crate::io_uring::MULTITON.poll_completions();
+        }
+
         // Register exception handlers (support cpuid & rdtsc for now)
         register_exception_handlers();
 
         HAS_INIT.store(true, Ordering::Release);
-
         // Enable global backtrace
         unsafe { backtrace::enable_backtrace(&ENCLAVE_PATH, PrintFormat::Short) };
 

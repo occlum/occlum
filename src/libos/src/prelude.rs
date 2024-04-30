@@ -17,8 +17,11 @@ pub use std::sync::{
 pub use crate::error::Result;
 pub use crate::error::*;
 pub use crate::fs::{File, FileDesc, FileRef};
+pub use crate::net::socket::util::Addr;
+pub use crate::net::socket::{Domain, RecvFlags, SendFlags, Shutdown, Type};
 pub use crate::process::{pid_t, uid_t};
 pub use crate::util::sync::RwLock;
+pub use crate::util::sync::{Mutex, MutexGuard};
 
 macro_rules! debug_trace {
     () => {
