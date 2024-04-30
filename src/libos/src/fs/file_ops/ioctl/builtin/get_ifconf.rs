@@ -99,7 +99,7 @@ fn get_ifconf_by_host(fd: FileDesc, if_conf: &mut IfConf) -> Result<()> {
         // len: the size of the buf
         // recv_len: accepts transferred data length when buf is used to get data from host
         //
-        fn socket_ocall_ioctl_repack(
+        fn occlum_ocall_ioctl_repack(
             ret: *mut i32,
             fd: i32,
             cmd_num: i32,
@@ -112,7 +112,7 @@ fn get_ifconf_by_host(fd: FileDesc, if_conf: &mut IfConf) -> Result<()> {
     try_libc!({
         let mut recv_len: i32 = 0;
         let mut retval: i32 = 0;
-        let status = socket_ocall_ioctl_repack(
+        let status = occlum_ocall_ioctl_repack(
             &mut retval as *mut i32,
             fd as _,
             SIOCGIFCONF as _,

@@ -4,10 +4,11 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use atomic::{Atomic, Ordering};
 
 use super::*;
+use crate::fs::{AccessMode, File, HostFd, IoEvents, StatusFlags, STATUS_FLAGS_MASK};
 use crate::fs::{
-    occlum_ocall_ioctl, AccessMode, AtomicIoEvents, CreationFlags, File, FileRef, HostFd, IoEvents,
-    IoctlCmd, StatusFlags, STATUS_FLAGS_MASK,
+    GetIfConf, GetIfReqWithRawCmd, GetReadBufLen, IoctlCmd, NonBuiltinIoctlCmd, SetNonBlocking,
 };
+use crate::net::socket::sockopt::{GetSockOptRawCmd, SetSockOptRawCmd};
 
 //TODO: refactor write syscall to allow zero length with non-zero buffer
 impl File for HostSocket {
@@ -34,20 +35,46 @@ impl File for HostSocket {
     }
 
     fn readv(&self, bufs: &mut [&mut [u8]]) -> Result<usize> {
-        let (bytes_recvd, _, _, _) = self.do_recvmsg(bufs, RecvFlags::empty(), None, None)?;
+        let (bytes_recvd, _, _, _) = self.recvmsg(bufs, RecvFlags::empty(), None)?;
         Ok(bytes_recvd)
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
-        self.do_sendmsg(bufs, SendFlags::empty(), None, None)
+        self.sendmsg(bufs, SendFlags::empty(), &None, None)
     }
 
     fn seek(&self, pos: SeekFrom) -> Result<off_t> {
         return_errno!(ESPIPE, "Socket does not support seek")
     }
 
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-        self.ioctl_impl(cmd)
+    fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+        match_ioctl_cmd_mut!(&mut *cmd, {
+            cmd: GetSockOptRawCmd => {
+                cmd.execute(self.raw_host_fd())?;
+            },
+            cmd: SetSockOptRawCmd => {
+                cmd.execute(self.raw_host_fd())?;
+            },
+            cmd: GetIfReqWithRawCmd => {
+                cmd.execute(self.raw_host_fd())?;
+            },
+            cmd: GetIfConf => {
+                cmd.execute(self.raw_host_fd())?;
+            },
+            cmd: GetReadBufLen => {
+                cmd.execute(self.raw_host_fd())?;
+            },
+            cmd: SetNonBlocking => {
+                cmd.execute(self.raw_host_fd())?;
+            },
+            cmd: NonBuiltinIoctlCmd => {
+                cmd.execute(self.raw_host_fd())?;
+            },
+            _ => {
+                return_errno!(EINVAL, "Not supported yet");
+            }
+        });
+        Ok(())
     }
 
     fn access_mode(&self) -> Result<AccessMode> {

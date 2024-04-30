@@ -1,10 +1,9 @@
-use std::cell::Cell;
 use std::ptr;
 use std::sync::Weak;
 use std::time::Duration;
 
 use crate::events::{Observer, Waiter, WaiterQueueObserver};
-use crate::fs::{AtomicIoEvents, IoEvents};
+use crate::fs::IoEvents;
 use crate::prelude::*;
 use crate::time::{timespec_t, TIMERSLACK};
 
@@ -265,13 +264,13 @@ trait ObserverExt {
 impl ObserverExt for Weak<dyn Observer<IoEvents>> {
     fn register_files<'a>(&self, files_and_events: impl Iterator<Item = &'a (FileRef, IoEvents)>) {
         for (file, events) in files_and_events {
-            let notifier = match file.notifier() {
+            match file.notifier() {
                 None => continue,
-                Some(notifier) => notifier,
+                Some(notifier) => {
+                    let mask = *events;
+                    notifier.register(self.clone(), Some(mask), None);
+                }
             };
-
-            let mask = *events;
-            notifier.register(self.clone(), Some(mask), None);
         }
     }
 
@@ -280,11 +279,12 @@ impl ObserverExt for Weak<dyn Observer<IoEvents>> {
         files_and_events: impl Iterator<Item = &'a (FileRef, IoEvents)>,
     ) {
         for (file, events) in files_and_events {
-            let notifier = match file.notifier() {
+            match file.notifier() {
                 None => continue,
-                Some(notifier) => notifier,
+                Some(notifier) => {
+                    notifier.unregister(self);
+                }
             };
-            notifier.unregister(self);
         }
     }
 }
