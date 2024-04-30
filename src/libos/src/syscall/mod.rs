@@ -44,8 +44,7 @@ use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
     do_epoll_pwait, do_epoll_wait, do_getpeername, do_getsockname, do_getsockopt, do_listen,
     do_poll, do_ppoll, do_pselect6, do_recvfrom, do_recvmsg, do_select, do_sendmmsg, do_sendmsg,
-    do_sendto, do_setsockopt, do_shutdown, do_socket, do_socketpair, mmsghdr, msghdr, msghdr_mut,
-    sigset_argpack,
+    do_sendto, do_setsockopt, do_shutdown, do_socket, do_socketpair, mmsghdr, sigset_argpack,
 };
 use crate::process::{
     do_arch_prctl, do_clone, do_execve, do_exit, do_exit_group, do_futex, do_get_robust_list,
@@ -143,8 +142,8 @@ macro_rules! process_syscall_table_with_callback {
             (Accept = 43) => do_accept(fd: c_int, addr: *mut libc::sockaddr, addr_len: *mut libc::socklen_t),
             (Sendto = 44) => do_sendto(fd: c_int, base: *const c_void, len: size_t, flags: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t),
             (Recvfrom = 45) => do_recvfrom(fd: c_int, base: *mut c_void, len: size_t, flags: c_int, addr: *mut libc::sockaddr, addr_len: *mut libc::socklen_t),
-            (Sendmsg = 46) => do_sendmsg(fd: c_int, msg_ptr: *const msghdr, flags_c: c_int),
-            (Recvmsg = 47) => do_recvmsg(fd: c_int, msg_mut_ptr: *mut msghdr_mut, flags_c: c_int),
+            (Sendmsg = 46) => do_sendmsg(fd: c_int, msg_ptr: *const libc::msghdr, flags_c: c_int),
+            (Recvmsg = 47) => do_recvmsg(fd: c_int, msg_mut_ptr: *mut libc::msghdr, flags_c: c_int),
             (Shutdown = 48) => do_shutdown(fd: c_int, how: c_int),
             (Bind = 49) => do_bind(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t),
             (Listen = 50) => do_listen(fd: c_int, backlog: c_int),

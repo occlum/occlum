@@ -1,21 +1,15 @@
 use super::*;
 
-mod address_family;
-mod flags;
 mod host;
-mod iovs;
-mod msg;
-mod shutdown;
-mod socket_address;
-mod socket_type;
+pub(crate) mod sockopt;
 mod unix;
+pub(crate) mod uring;
+pub(crate) mod util;
 
-pub use self::address_family::AddressFamily;
-pub use self::flags::{FileFlags, MsgHdrFlags, RecvFlags, SendFlags};
 pub use self::host::{HostSocket, HostSocketType};
-pub use self::iovs::{Iovs, IovsMut, SliceAsLibcIovec};
-pub use self::msg::{mmsghdr, msghdr, msghdr_mut, CMessages, CmsgData, MsgHdr, MsgHdrMut};
-pub use self::shutdown::HowToShut;
-pub use self::socket_address::SockAddr;
-pub use self::socket_type::SocketType;
-pub use self::unix::{socketpair, unix_socket, AsUnixSocket, UnixAddr};
+pub use self::unix::{socketpair, unix_socket, AsUnixSocket};
+pub use self::util::{
+    Addr, AnyAddr, CMessages, CSockAddr, CmsgData, Domain, Iovs, IovsMut, Ipv4Addr, Ipv4SocketAddr,
+    Ipv6SocketAddr, MsgFlags, RawAddr, RecvFlags, SendFlags, Shutdown, SliceAsLibcIovec,
+    SocketProtocol, Type, UnixAddr,
+};

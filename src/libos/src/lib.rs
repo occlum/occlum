@@ -28,6 +28,8 @@
 #![feature(is_some_and)]
 // for edmm_api macro
 #![feature(linkage)]
+#![feature(new_uninit)]
+#![feature(raw_ref_op)]
 
 #[macro_use]
 extern crate alloc;
@@ -66,7 +68,6 @@ extern crate intrusive_collections;
 extern crate itertools;
 extern crate modular_bitfield;
 extern crate resolv_conf;
-extern crate vdso_time;
 
 use sgx_trts::libc;
 use sgx_types::*;
@@ -82,15 +83,18 @@ mod prelude;
 #[macro_use]
 mod error;
 
+#[macro_use]
+mod net;
+
 mod config;
 mod entry;
 mod events;
 mod exception;
 mod fs;
 mod interrupt;
+mod io_uring;
 mod ipc;
 mod misc;
-mod net;
 mod process;
 mod sched;
 mod signal;
