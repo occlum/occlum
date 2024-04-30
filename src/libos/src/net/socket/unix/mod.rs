@@ -1,19 +1,16 @@
-use self::addr::Addr;
 use super::*;
 
-mod addr;
 mod stream;
 
-pub use self::addr::Addr as UnixAddr;
 pub use self::stream::Stream;
 
 //TODO: rewrite this file when a new kind of uds is added
-pub fn unix_socket(socket_type: SocketType, flags: FileFlags, protocol: i32) -> Result<Stream> {
-    if protocol != 0 && protocol != AddressFamily::LOCAL as i32 {
+pub fn unix_socket(socket_type: Type, flags: SocketFlags, protocol: i32) -> Result<Stream> {
+    if protocol != 0 && protocol != Domain::LOCAL as i32 {
         return_errno!(EPROTONOSUPPORT, "protocol is not supported");
     }
 
-    if socket_type == SocketType::STREAM {
+    if socket_type == Type::STREAM {
         Ok(Stream::new(flags))
     } else {
         return_errno!(ESOCKTNOSUPPORT, "only stream type is supported");
@@ -21,15 +18,15 @@ pub fn unix_socket(socket_type: SocketType, flags: FileFlags, protocol: i32) -> 
 }
 
 pub fn socketpair(
-    socket_type: SocketType,
-    flags: FileFlags,
+    socket_type: Type,
+    flags: SocketFlags,
     protocol: i32,
 ) -> Result<(Stream, Stream)> {
-    if protocol != 0 && protocol != AddressFamily::LOCAL as i32 {
+    if protocol != 0 && protocol != Domain::LOCAL as i32 {
         return_errno!(EPROTONOSUPPORT, "protocol is not supported");
     }
 
-    if socket_type == SocketType::STREAM {
+    if socket_type == Type::STREAM {
         Stream::socketpair(flags)
     } else {
         return_errno!(ESOCKTNOSUPPORT, "only stream type is supported");
