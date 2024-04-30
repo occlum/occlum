@@ -5,7 +5,7 @@ use events::{Event, EventFilter, Notifier, Observer};
 use fs::channel::Channel;
 use fs::IoEvents;
 use fs::{CreationFlags, FileMode};
-use net::socket::{CMessages, CmsgData, Iovs, MsgHdr, MsgHdrMut};
+use net::socket::{CMessages, CmsgData};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -23,17 +23,17 @@ pub struct Stream {
 }
 
 impl Stream {
-    pub fn new(flags: FileFlags) -> Self {
+    pub fn new(flags: SocketFlags) -> Self {
         Self {
             inner: SgxMutex::new(Status::Idle(Info::new(
-                flags.contains(FileFlags::SOCK_NONBLOCK),
+                flags.contains(SocketFlags::SOCK_NONBLOCK),
             ))),
             notifier: Arc::new(RelayNotifier::new()),
         }
     }
 
-    pub fn socketpair(flags: FileFlags) -> Result<(Self, Self)> {
-        let nonblocking = flags.contains(FileFlags::SOCK_NONBLOCK);
+    pub fn socketpair(flags: SocketFlags) -> Result<(Self, Self)> {
+        let nonblocking = flags.contains(SocketFlags::SOCK_NONBLOCK);
         let (end_a, end_b) = end_pair(nonblocking)?;
         let notifier_a = Arc::new(RelayNotifier::new());
         let notifier_b = Arc::new(RelayNotifier::new());
@@ -53,15 +53,17 @@ impl Stream {
         Ok((socket_a, socket_b))
     }
 
-    pub fn addr(&self) -> Option<Addr> {
-        match &*self.inner() {
+    pub fn addr(&self) -> UnixAddr {
+        let addr_opt = match &*self.inner() {
             Status::Idle(info) => info.addr().clone(),
             Status::Connected(endpoint) => endpoint.addr(),
             Status::Listening(addr) => Some(addr).cloned(),
-        }
+        };
+
+        addr_opt.unwrap_or(UnixAddr::Unnamed)
     }
 
-    pub fn peer_addr(&self) -> Result<Addr> {
+    pub fn peer_addr(&self) -> Result<UnixAddr> {
         if let Status::Connected(endpoint) = &*self.inner() {
             if let Some(addr) = endpoint.peer_addr() {
                 return Ok(addr);
@@ -70,8 +72,8 @@ impl Stream {
         return_errno!(ENOTCONN, "the socket is not connected");
     }
 
-    pub fn bind(&self, addr: &mut Addr) -> Result<()> {
-        if let Addr::File(inode_num, path) = addr {
+    pub fn bind(&self, addr: &mut UnixAddr) -> Result<()> {
+        if let UnixAddr::File(inode_num, path) = addr {
             // create the corresponding file in the fs and fill Addr with its inode
             let corresponding_inode_num = {
                 let current = current!();
@@ -143,7 +145,7 @@ impl Stream {
 
     /// The establishment of the connection is very fast and can be done immediately.
     /// Therefore, the connect function in our implementation will never block.
-    pub fn connect(&self, addr: &Addr) -> Result<()> {
+    pub fn connect(&self, addr: &UnixAddr) -> Result<()> {
         debug!("connect to {:?}", addr);
 
         let mut inner = self.inner();
@@ -168,7 +170,7 @@ impl Stream {
                 ADDRESS_SPACE
                     .push_incoming(addr, end_incoming)
                     .map_err(|e| match e.errno() {
-                        Errno::EAGAIN => errno!(ECONNREFUSED, "the backlog is full"),
+                        EAGAIN => errno!(ECONNREFUSED, "the backlog is full"),
                         _ => e,
                     })?;
 
@@ -187,12 +189,12 @@ impl Stream {
         }
     }
 
-    pub fn accept(&self, flags: FileFlags) -> Result<(Self, Option<Addr>)> {
+    pub fn accept(&self, flags: SocketFlags) -> Result<(Self, Option<UnixAddr>)> {
         let status = (*self.inner()).clone();
         match status {
             Status::Listening(addr) => {
                 let endpoint = ADDRESS_SPACE.pop_incoming(&addr)?;
-                endpoint.set_nonblocking(flags.contains(FileFlags::SOCK_NONBLOCK));
+                endpoint.set_nonblocking(flags.contains(SocketFlags::SOCK_NONBLOCK));
                 endpoint.set_ancillary(Ancillary {
                     tid: current!().tid(),
                 });
@@ -216,12 +218,12 @@ impl Stream {
     }
 
     // TODO: handle flags
-    pub fn sendto(&self, buf: &[u8], flags: SendFlags, addr: &Option<Addr>) -> Result<usize> {
+    pub fn sendto(&self, buf: &[u8], flags: SendFlags, addr: &Option<UnixAddr>) -> Result<usize> {
         self.write(buf)
     }
 
     // TODO: handle flags
-    pub fn recvfrom(&self, buf: &mut [u8], flags: RecvFlags) -> Result<(usize, Option<Addr>)> {
+    pub fn recvfrom(&self, buf: &mut [u8], flags: RecvFlags) -> Result<(usize, Option<UnixAddr>)> {
         let data_len = self.read(buf)?;
         let addr = self.peer_addr().ok();
 
@@ -230,33 +232,39 @@ impl Stream {
         Ok((data_len, addr))
     }
 
-    pub fn sendmsg(&self, msg_hdr: &MsgHdr, flags: SendFlags) -> Result<usize> {
+    pub fn sendmsg(
+        &self,
+        bufs: &[&[u8]],
+        flags: SendFlags,
+        control: Option<&[u8]>,
+    ) -> Result<usize> {
         if !flags.is_empty() {
             warn!("unsupported flags: {:?}", flags);
         }
 
-        let bufs = msg_hdr.get_iovs().as_slices();
-        let mut data_len = self.writev(bufs)?;
-
-        if let Some(msg_control) = msg_hdr.get_control() {
-            data_len += self.write(msg_control)?;
+        let data_len = self.writev(bufs)?;
+        if let Some(msg_control) = control {
+            self.write(msg_control)?;
         }
+
         Ok(data_len)
     }
 
-    pub fn recvmsg(&self, msg_hdr: &mut MsgHdrMut, flags: RecvFlags) -> Result<usize> {
+    pub fn recvmsg(
+        &self,
+        bufs: &mut [&mut [u8]],
+        flags: RecvFlags,
+        control: Option<&mut [u8]>,
+    ) -> Result<(usize, usize)> {
         if !flags.is_empty() {
             warn!("unsupported flags: {:?}", flags);
         }
 
-        let bufs = msg_hdr.get_iovs_mut().as_slices_mut();
-        let mut data_len = self.readv(bufs)?;
+        let data_len = self.readv(bufs)?;
 
         // For stream socket, the msg_name is ignored. And other fields are not supported.
-        msg_hdr.set_name_len(0);
-
-        if let Some(msg_control) = msg_hdr.get_control_mut() {
-            data_len += self.read(msg_control)?;
+        let control_len = if let Some(msg_control) = control {
+            let control_len = self.read(msg_control)?;
 
             // For each control message that contains file descriptors (SOL_SOCKET and SCM_RIGHTS),
             // reassign each fd in the message in receive end.
@@ -268,7 +276,6 @@ impl Stream {
                             .unwrap()
                             .files()
                             .lock()
-                            .unwrap()
                             .get(send_fd)
                             .unwrap();
                         current!().add_file(ipc_file.clone(), false)
@@ -276,12 +283,16 @@ impl Stream {
                 }
                 // Unix credentials need not to be handled here
             }
-        }
-        Ok(data_len)
+            control_len
+        } else {
+            0
+        };
+
+        Ok((data_len, control_len))
     }
 
     /// perform shutdown on the socket.
-    pub fn shutdown(&self, how: HowToShut) -> Result<()> {
+    pub fn shutdown(&self, how: Shutdown) -> Result<()> {
         if let Status::Connected(ref end) = &*self.inner() {
             end.shutdown(how)
         } else {
@@ -369,13 +380,13 @@ pub enum Status {
     Idle(Info),
     // The listeners are stored in a global data structure indexed by the address.
     // The consitency of Status with that data structure should be carefully maintained.
-    Listening(Addr),
+    Listening(UnixAddr),
     Connected(Endpoint),
 }
 
 #[derive(Debug, Clone)]
 pub struct Info {
-    addr: Option<Addr>,
+    addr: Option<UnixAddr>,
     nonblocking: bool,
 }
 
@@ -387,11 +398,11 @@ impl Info {
         }
     }
 
-    pub fn addr(&self) -> &Option<Addr> {
+    pub fn addr(&self) -> &Option<UnixAddr> {
         &self.addr
     }
 
-    pub fn set_addr(&mut self, addr: &Addr) {
+    pub fn set_addr(&mut self, addr: &UnixAddr) {
         self.addr = Some(addr.clone());
     }
 

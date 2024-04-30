@@ -1,10 +1,11 @@
 use super::*;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 // The protocol family generally is the same as the address family
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
 #[repr(u16)]
 #[allow(non_camel_case_types)]
-pub enum AddressFamily {
+pub enum Domain {
     UNSPEC = 0,
     LOCAL = 1,
     /* Hide the families with the same number
@@ -60,7 +61,7 @@ pub enum AddressFamily {
     MAX = 45,
 }
 
-impl AddressFamily {
+impl Domain {
     pub fn try_from(af: u16) -> Result<Self> {
         if af >= Self::MAX as u16 {
             return_errno!(EINVAL, "Unknown address family");
