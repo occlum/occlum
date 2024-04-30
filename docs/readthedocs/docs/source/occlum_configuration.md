@@ -72,6 +72,13 @@ The template of `Occlum.json` is shown below.
     },
     // Features
     "feature": {
+        // Determines the use of the IO_Uring feature in Occlum for network I/O operations.
+        // Enabling IO_Uring feature can improve network I/O performance.
+        //
+        // "io_uring": 0 - Disables IO_Uring; network I/O uses Ocall instead.
+        // "io_uring": 1 - Enables IO_Uring with a single IO_Uring instance.
+        // "io_uring": n (1 < n <= 16) - Enables IO_Uring with 'n' IO_Uring instances.
+        "io_uring": 0,
         // Whether to turn on AMX feature in Occlum
         // Occlum supports AMX instruction running inside the enclave when user enables it
         //

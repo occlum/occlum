@@ -160,6 +160,12 @@ fn main() {
                 "WITHOUT"
             }
         );
+
+        debug!(
+            "Enable IO_Uring feature with {:?} instances",
+            occlum_config.feature.io_uring
+        );
+
         debug!(
             "user config init num of threads = {:?}",
             occlum_config.resource_limits.init_num_of_threads
@@ -448,7 +454,7 @@ fn main() {
             TCSNum: tcs_init_num,
             TCSMinPool: tcs_min_pool,
             TCSMaxNum: tcs_max_num,
-            TCSPolicy: 1,
+            TCSPolicy: 0,
             DisableDebug: match occlum_config.metadata.debuggable {
                 true => 0,
                 false => 1,
@@ -757,6 +763,8 @@ struct OcclumFeature {
     amx: u32,
     #[serde(default)]
     pkru: u32,
+    #[serde(default)]
+    io_uring: u32,
     #[serde(default)]
     enable_edmm: bool,
     #[serde(default)]
