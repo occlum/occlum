@@ -1,4 +1,5 @@
 use super::*;
+use crate::fs::IoctlCmd;
 use crate::net::PollEventFlags;
 use crate::process::do_getuid;
 use rcore_fs::vfs::FallocateMode;
@@ -275,16 +276,13 @@ impl File for INodeFile {
         self.unlock_range_lock(&range_lock)
     }
 
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-        match cmd {
-            IoctlCmd::TCGETS(_) => return_errno!(ENOTTY, "not tty device"),
-            IoctlCmd::TCSETS(_) => return_errno!(ENOTTY, "not tty device"),
-            _ => {}
-        };
-        let cmd_num = cmd.cmd_num();
-        let cmd_argp = cmd.arg_ptr() as usize;
-        self.inode.io_control(cmd_num, cmd_argp)?;
-        Ok(0)
+    fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+        match_ioctl_cmd_auto_error!(cmd, {
+            cmd : NonBuiltinIoctlCmd => {
+                self.inode.io_control(cmd.cmd_num().as_u32(), cmd.arg_ptr() as usize)?;
+            },
+        });
+        Ok(())
     }
 
     fn poll_new(&self) -> IoEvents {

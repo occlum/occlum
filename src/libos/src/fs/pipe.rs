@@ -1,8 +1,10 @@
 use atomic::{Atomic, Ordering};
+use net::PollEventFlags;
 
 use super::channel::{Channel, Consumer, Producer};
 use super::*;
-use net::PollEventFlags;
+
+use crate::fs::{GetReadBufLen, IoctlCmd};
 
 // TODO: Add F_SETPIPE_SZ in fcntl to dynamically change the size of pipe
 // to improve memory efficiency. This value is got from /proc/sys/fs/pipe-max-size on linux.
@@ -107,18 +109,14 @@ impl File for PipeReader {
         self
     }
 
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-        match cmd {
-            IoctlCmd::TCGETS(_) => return_errno!(ENOTTY, "not tty device"),
-            IoctlCmd::TCSETS(_) => return_errno!(ENOTTY, "not tty device"),
-            IoctlCmd::FIONREAD(arg) => {
-                let ready_len = self.get_ready_len().min(std::i32::MAX as usize) as i32;
-                **arg = ready_len;
-                return Ok(0);
-            }
-            _ => return_errno!(ENOSYS, "not supported"),
-        };
-        unreachable!();
+    fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+        match_ioctl_cmd_auto_error!(cmd, {
+            cmd : GetReadBufLen => {
+                let read_buf_len = self.consumer.ready_len();
+                cmd.set_output(read_buf_len as _);
+            },
+        });
+        Ok(())
     }
 }
 
@@ -209,13 +207,9 @@ impl File for PipeWriter {
         self
     }
 
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-        match cmd {
-            IoctlCmd::TCGETS(_) => return_errno!(ENOTTY, "not tty device"),
-            IoctlCmd::TCSETS(_) => return_errno!(ENOTTY, "not tty device"),
-            _ => return_errno!(ENOSYS, "not supported"),
-        };
-        unreachable!();
+    fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+        match_ioctl_cmd_auto_error!(cmd, {});
+        Ok(())
     }
 }
 
