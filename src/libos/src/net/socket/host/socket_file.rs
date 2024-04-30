@@ -1,14 +1,15 @@
 use std::any::Any;
 use std::io::{Read, Seek, SeekFrom, Write};
 
-use atomic::{Atomic, Ordering};
-
 use super::*;
-use crate::fs::{AccessMode, File, HostFd, IoEvents, StatusFlags, STATUS_FLAGS_MASK};
+use crate::fs::{
+    AccessMode, AtomicIoEvents, File, HostFd, IoEvents, StatusFlags, STATUS_FLAGS_MASK,
+};
 use crate::fs::{
     GetIfConf, GetIfReqWithRawCmd, GetReadBufLen, IoctlCmd, NonBuiltinIoctlCmd, SetNonBlocking,
 };
 use crate::net::socket::sockopt::{GetSockOptRawCmd, SetSockOptRawCmd};
+use atomic::{Atomic, Ordering};
 
 //TODO: refactor write syscall to allow zero length with non-zero buffer
 impl File for HostSocket {
