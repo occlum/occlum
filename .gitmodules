@@ -24,3 +24,6 @@
 [submodule "deps/resolv-conf"]
 	path = deps/resolv-conf
 	url = https://github.com/tailhook/resolv-conf.git
+[submodule "deps/io-uring"]
+	path = deps/io-uring
+	url = https://github.com/occlum/io-uring.git
