@@ -1,7 +1,7 @@
+use atomic::Atomic;
 use std::any::Any;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::mem;
-use atomic::Atomic;
 
 use super::*;
 use crate::fs::{
