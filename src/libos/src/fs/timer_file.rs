@@ -115,11 +115,6 @@ impl File for TimerFile {
         Ok(ret)
     }
 
-    // TODO: implement ioctl
-    // fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-    //     self.ioctl_impl(cmd)
-    // }
-
     fn access_mode(&self) -> Result<AccessMode> {
         Ok(AccessMode::O_RDWR)
     }
