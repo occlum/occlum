@@ -148,6 +148,7 @@ pub struct ConfigApp {
 pub struct ConfigFeature {
     pub amx: u32,
     pub pkru: u32,
+    pub io_uring: u32,
     pub enable_edmm: bool,
     pub enable_posix_shm: bool,
 }
@@ -307,6 +308,7 @@ impl ConfigFeature {
         Ok(ConfigFeature {
             amx: input.amx,
             pkru: input.pkru,
+            io_uring: input.io_uring,
             enable_edmm: input.enable_edmm,
             enable_posix_shm: input.enable_posix_shm,
         })
@@ -538,6 +540,8 @@ struct InputConfigFeature {
     #[serde(default)]
     pub pkru: u32,
     #[serde(default)]
+    pub io_uring: u32,
+    #[serde(default)]
     pub enable_edmm: bool,
     #[serde(default)]
     pub enable_posix_shm: bool,
@@ -548,6 +552,7 @@ impl Default for InputConfigFeature {
         InputConfigFeature {
             amx: 0,
             pkru: 0,
+            io_uring: 0,
             enable_edmm: false,
             enable_posix_shm: false,
         }

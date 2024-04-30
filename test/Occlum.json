@@ -44,6 +44,7 @@
     "feature": {
         "amx": 0,
         "pkru": 0,
+        "io_uring": 0,
         "enable_edmm": false,
         "enable_posix_shm": true
     },
