@@ -6,8 +6,13 @@
 
 use super::*;
 
-pub use self::builtin::*;
+use self::builtin::*;
+pub use self::builtin::{
+    GetIfConf, GetIfReqWithRawCmd, GetReadBufLen, GetWinSize, IfConf, IoctlCmd, SetNonBlocking,
+    SetWinSize, TcGets, TcSets,
+};
 pub use self::non_builtin::{NonBuiltinIoctlCmd, StructuredIoctlArgType, StructuredIoctlNum};
+use crate::util::mem_util::from_user;
 
 #[macro_use]
 mod macros;
@@ -18,7 +23,7 @@ mod non_builtin;
 ///
 /// By giving the names, numbers, and argument types of built-in ioctls,
 /// the macro below generates the corresponding code of `BuiltinIoctlNum` and
-/// `IoctlCmd`.
+/// `IoctlRawCmd`.
 ///
 /// To add a new built-in ioctl, just follow the convention as shown
 /// by existing built-in ioctls.
@@ -68,51 +73,121 @@ impl_ioctl_nums_and_cmds! {
 ///
 /// Sanity checks are mostly useful when the argument values are returned from
 /// the untrusted host OS.
-impl<'a> IoctlCmd<'a> {
-    pub fn validate_arg_and_ret_vals(&self, ret: i32) -> Result<()> {
+impl<'a> IoctlRawCmd<'a> {
+    pub fn to_safe_ioctlcmd(&self) -> Result<Box<dyn IoctlCmd>> {
+        Ok(match self {
+            IoctlRawCmd::TCGETS(_) => Box::new(TcGets::new(())),
+            IoctlRawCmd::TCSETS(termios_ref) => {
+                let termios = **termios_ref;
+                Box::new(TcSets::new(termios))
+            }
+            IoctlRawCmd::TIOCGWINSZ(_) => Box::new(GetWinSize::new(())),
+            IoctlRawCmd::TIOCSWINSZ(winsize_ref) => {
+                let winsize = **winsize_ref;
+                Box::new(SetWinSize::new(winsize))
+            }
+            IoctlRawCmd::NonBuiltin(inner) => {
+                let nonbuiltin_cmd =
+                    unsafe { NonBuiltinIoctlCmd::new(*inner.cmd_num(), inner.arg_ptr() as _)? };
+                Box::new(nonbuiltin_cmd)
+            }
+            IoctlRawCmd::FIONBIO(non_blocking) => Box::new(SetNonBlocking::new(**non_blocking)),
+            IoctlRawCmd::FIONREAD(_) => Box::new(GetReadBufLen::new(())),
+            IoctlRawCmd::FIONCLEX(_) => Box::new(SetCloseOnExec::new(false)),
+            IoctlRawCmd::FIOCLEX(_) => Box::new(SetCloseOnExec::new(true)),
+            IoctlRawCmd::SIOCGIFCONF(ifconf_mut) => {
+                if !ifconf_mut.ifc_buf.is_null() {
+                    if ifconf_mut.ifc_len < 0 {
+                        return_errno!(EINVAL, "invalid ifc_len");
+                    }
+                    from_user::check_array(ifconf_mut.ifc_buf, ifconf_mut.ifc_len as usize)?;
+                }
+                Box::new(GetIfConf::new(ifconf_mut))
+            }
+            IoctlRawCmd::SIOCGIFFLAGS(req)
+            | IoctlRawCmd::SIOCGIFNAME(req)
+            | IoctlRawCmd::SIOCGIFADDR(req)
+            | IoctlRawCmd::SIOCGIFDSTADDR(req)
+            | IoctlRawCmd::SIOCGIFBRDADDR(req)
+            | IoctlRawCmd::SIOCGIFNETMASK(req)
+            | IoctlRawCmd::SIOCGIFMTU(req)
+            | IoctlRawCmd::SIOCGIFHWADDR(req)
+            | IoctlRawCmd::SIOCGIFINDEX(req)
+            | IoctlRawCmd::SIOCGIFPFLAGS(req)
+            | IoctlRawCmd::SIOCGIFTXQLEN(req)
+            | IoctlRawCmd::SIOCGIFMAP(req) => {
+                Box::new(GetIfReqWithRawCmd::new(self.cmd_num(), **req))
+            }
+            _ => {
+                return_errno!(EINVAL, "unsupported cmd");
+            }
+        })
+    }
+
+    pub fn copy_output_from_safe(&mut self, cmd: &dyn IoctlCmd) {
         match self {
-            IoctlCmd::TIOCGWINSZ(winsize_ref) => {
-                // ws_row and ws_col are usually not zeros
-                if winsize_ref.ws_row == 0 || winsize_ref.ws_col == 0 {
-                    warn!(
-                        "window size: row: {:?}, col: {:?}",
-                        winsize_ref.ws_row, winsize_ref.ws_col
-                    );
+            IoctlRawCmd::TCGETS(termios_mut) => {
+                let cmd = cmd.downcast_ref::<TcGets>().unwrap();
+                **termios_mut = *cmd.output().unwrap();
+            }
+            IoctlRawCmd::TIOCGWINSZ(winsize_mut) => {
+                let cmd = cmd.downcast_ref::<GetWinSize>().unwrap();
+                **winsize_mut = *cmd.output().unwrap();
+            }
+            IoctlRawCmd::FIONREAD(len_mut) => {
+                let cmd = cmd.downcast_ref::<GetReadBufLen>().unwrap();
+                **len_mut = *cmd.output().unwrap();
+            }
+            IoctlRawCmd::SIOCGIFCONF(ifconf_mut) => {
+                let cmd = cmd.downcast_ref::<GetIfConf>().unwrap();
+                ifconf_mut.ifc_len = cmd.len() as i32;
+                if !ifconf_mut.ifc_buf.is_null() {
+                    let mut raw_buf = unsafe {
+                        std::slice::from_raw_parts_mut(
+                            ifconf_mut.ifc_buf as _,
+                            ifconf_mut.ifc_len as _,
+                        )
+                    };
+                    raw_buf.copy_from_slice(cmd.as_slice().unwrap());
                 }
             }
-            IoctlCmd::FIONREAD(nread_ref) => {
-                if (**nread_ref < 0) {
-                    return_errno!(EINVAL, "invalid data from host");
-                }
+            IoctlRawCmd::SIOCGIFNAME(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFFLAGS(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFADDR(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFDSTADDR(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFBRDADDR(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFNETMASK(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFMTU(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFHWADDR(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFINDEX(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFPFLAGS(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFTXQLEN(ifreq_mut)
+            | IoctlRawCmd::SIOCGIFMAP(ifreq_mut) => {
+                let cmd = cmd.downcast_ref::<GetIfReqWithRawCmd>().unwrap();
+                **ifreq_mut = *cmd.output().unwrap();
             }
             _ => {}
         }
-
-        // Current ioctl commands all return zero
-        if ret != 0 {
-            return_errno!(EINVAL, "return value should be zero");
-        }
-        Ok(())
     }
 }
 
-pub fn do_ioctl(fd: FileDesc, cmd: &mut IoctlCmd) -> Result<i32> {
-    debug!("ioctl: fd: {}, cmd: {:?}", fd, cmd);
+pub fn do_ioctl(fd: FileDesc, raw_cmd: &mut IoctlRawCmd<'_>) -> Result<i32> {
+    debug!("ioctl: fd: {}, cmd: {:?}", fd, raw_cmd);
     let current = current!();
     let file_ref = current.file(fd)?;
-    let mut file_table = current.files().lock().unwrap();
-    let mut entry = file_table.get_entry_mut(fd)?;
-    match cmd {
-        IoctlCmd::FIONCLEX(_) => {
-            entry.set_close_on_spawn(false);
-            return Ok(0);
-        }
-        IoctlCmd::FIOCLEX(_) => {
-            entry.set_close_on_spawn(true);
-            return Ok(0);
-        }
-        _ => return file_ref.ioctl(cmd),
+    let mut cmd = raw_cmd.to_safe_ioctlcmd()?;
+
+    if cmd.is::<SetCloseOnExec>() {
+        let is_close_on_exec = cmd.downcast_ref::<SetCloseOnExec>().unwrap().input();
+        let mut file_table = current.files().lock();
+        let entry = file_table.get_entry_mut(fd)?;
+        entry.set_close_on_spawn(*is_close_on_exec);
+        return Ok(0);
     }
+
+    file_ref.ioctl(cmd.as_mut())?;
+    raw_cmd.copy_output_from_safe(cmd.as_ref());
+    Ok(0)
 }
 
 extern "C" {

@@ -1,30 +1,4 @@
-//! Built-in ioctls.
-
 use super::*;
-
-#[derive(Debug)]
-#[repr(C)]
-pub struct WinSize {
-    pub ws_row: u16,
-    pub ws_col: u16,
-    pub ws_xpixel: u16,
-    pub ws_ypixel: u16,
-}
-
-#[derive(Debug)]
-#[repr(C)]
-pub struct IfConf {
-    pub ifc_len: i32,
-    pub ifc_buf: *const u8,
-}
-
-const IFNAMSIZ: usize = 16;
-#[derive(Debug)]
-#[repr(C)]
-pub struct IfReq {
-    pub ifr_name: [u8; IFNAMSIZ],
-    pub ifr_union: [u8; 24],
-}
 
 /*
  The termios structure used in the Linux kernel is not the same as we use in the glibc. Thus, we have two
@@ -78,49 +52,10 @@ impl KernelTermios {
             c_ospeed: 0,
         }
     }
-
-    pub fn execute_tcgets(&mut self, host_fd: i32, cmd_num: i32) -> Result<i32> {
-        debug_assert!(cmd_num == 0x5401);
-        let mut termios = self.to_termios();
-        let len = std::mem::size_of::<Termios>();
-        let ret = try_libc!({
-            let mut retval: i32 = 0;
-            let status = occlum_ocall_ioctl(
-                &mut retval as *mut i32,
-                host_fd,
-                cmd_num,
-                &mut termios as *const Termios as *mut c_void,
-                len,
-            );
-            assert!(status == sgx_status_t::SGX_SUCCESS);
-            retval
-        });
-        *self = termios.to_kernel_termios();
-        Ok(ret)
-    }
-
-    pub fn execute_tcsets(&self, host_fd: i32, cmd_num: i32) -> Result<i32> {
-        debug_assert!(cmd_num == 0x5402);
-        let termios = self.to_termios();
-        let len = std::mem::size_of::<Termios>();
-        let ret = try_libc!({
-            let mut retval: i32 = 0;
-            let status = occlum_ocall_ioctl(
-                &mut retval as *mut i32,
-                host_fd,
-                cmd_num,
-                &termios as *const Termios as *mut c_void,
-                len,
-            );
-            assert!(status == sgx_status_t::SGX_SUCCESS);
-            retval
-        });
-        Ok(ret)
-    }
 }
 
 impl Termios {
-    pub fn to_kernel_termios(&self) -> KernelTermios {
+    fn to_kernel_termios(&self) -> KernelTermios {
         let mut c_cc = [0; KERNEL_NCCS];
         c_cc.copy_from_slice(&self.c_cc[..KERNEL_NCCS]);
 
@@ -132,5 +67,57 @@ impl Termios {
             c_line: self.c_line,
             c_cc: c_cc,
         }
+    }
+}
+
+impl_ioctl_cmd! {
+    pub struct TcGets<Input=(), Output=KernelTermios> {}
+}
+
+impl TcGets {
+    pub fn execute(&mut self, host_fd: FileDesc) -> Result<()> {
+        let mut termios: Termios = Default::default();
+
+        try_libc!({
+            let mut retval: i32 = 0;
+            let status = occlum_ocall_ioctl(
+                &mut retval as *mut i32,
+                host_fd as i32,
+                BuiltinIoctlNum::TCGETS as i32,
+                &mut termios as *mut Termios as *mut c_void,
+                std::mem::size_of::<Termios>(),
+            );
+            assert!(status == sgx_status_t::SGX_SUCCESS);
+            retval
+        });
+
+        let kernel_termios = termios.to_kernel_termios();
+        trace!("kernel termios = {:?}", kernel_termios);
+        self.set_output(kernel_termios);
+        Ok(())
+    }
+}
+
+impl_ioctl_cmd! {
+    pub struct TcSets<Input=KernelTermios, Output=()> {}
+}
+
+impl TcSets {
+    pub fn execute(&self, host_fd: FileDesc) -> Result<()> {
+        let kernel_termios = self.input();
+        let termios = kernel_termios.to_termios();
+        try_libc!({
+            let mut retval: i32 = 0;
+            let status = occlum_ocall_ioctl(
+                &mut retval as *mut i32,
+                host_fd as i32,
+                BuiltinIoctlNum::TCSETS as i32,
+                &termios as *const Termios as *mut c_void,
+                std::mem::size_of::<Termios>(),
+            );
+            assert!(status == sgx_status_t::SGX_SUCCESS);
+            retval
+        });
+        Ok(())
     }
 }

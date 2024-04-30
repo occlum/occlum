@@ -4,6 +4,9 @@ use core::cmp;
 use std::io::{BufReader, LineWriter};
 use std::sync::SgxMutex;
 
+use crate::fs::file_ops::{GetWinSize, SetWinSize, TcGets, TcSets};
+use crate::fs::IoctlCmd;
+
 macro_rules! try_libc_stdio {
     ($ret: expr) => {{
         let ret = unsafe { $ret };
@@ -169,50 +172,6 @@ impl File for StdoutFile {
         Ok(())
     }
 
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-        let host_stdout_fd = self.host_fd() as i32;
-        let cmd_bits = cmd.cmd_num() as c_int;
-
-        // Handle special case for TCGETS/TCSETS which use different structures
-        // in linux kernel and libc
-        match cmd {
-            IoctlCmd::TCGETS(kernel_termios) => {
-                return kernel_termios.execute_tcgets(host_stdout_fd, cmd_bits);
-            }
-            IoctlCmd::TCSETS(kernel_termios) => {
-                return kernel_termios.execute_tcsets(host_stdout_fd, cmd_bits);
-            }
-            _ => {}
-        };
-
-        let can_delegate_to_host = match cmd {
-            IoctlCmd::TIOCGWINSZ(_) => true,
-            IoctlCmd::TIOCSWINSZ(_) => true,
-            _ => false,
-        };
-        if !can_delegate_to_host {
-            return_errno!(EINVAL, "unknown ioctl cmd for stdout");
-        }
-
-        let cmd_arg_ptr = cmd.arg_ptr() as *mut c_void;
-        let cmd_arg_len = cmd.arg_len();
-        let ret = try_libc!({
-            let mut retval: i32 = 0;
-            let status = occlum_ocall_ioctl(
-                &mut retval as *mut i32,
-                host_stdout_fd,
-                cmd_bits,
-                cmd_arg_ptr,
-                cmd_arg_len,
-            );
-            assert!(status == sgx_status_t::SGX_SUCCESS);
-            retval
-        });
-        cmd.validate_arg_and_ret_vals(ret)?;
-
-        Ok(ret)
-    }
-
     fn status_flags(&self) -> Result<StatusFlags> {
         let ret = try_libc!(libc::ocall::fcntl_arg0(
             self.host_fd() as i32,
@@ -359,48 +318,8 @@ impl File for StdinFile {
         })
     }
 
-    fn ioctl(&self, cmd: &mut IoctlCmd) -> Result<i32> {
-        let host_stdin_fd = self.host_fd() as i32;
-        let cmd_bits = cmd.cmd_num() as c_int;
-
-        // Handle special case for TCGETS/TCSETS which use different structures
-        // in linux kernel and libc
-        match cmd {
-            IoctlCmd::TCGETS(kernel_termios) => {
-                return kernel_termios.execute_tcgets(host_stdin_fd, cmd_bits);
-            }
-            IoctlCmd::TCSETS(kernel_termios) => {
-                return kernel_termios.execute_tcsets(host_stdin_fd, cmd_bits);
-            }
-            _ => {}
-        };
-
-        let can_delegate_to_host = match cmd {
-            IoctlCmd::TIOCGWINSZ(_) => true,
-            IoctlCmd::TIOCSWINSZ(_) => true,
-            _ => false,
-        };
-        if !can_delegate_to_host {
-            return_errno!(EINVAL, "unknown ioctl cmd for stdin");
-        }
-
-        let cmd_arg_ptr = cmd.arg_ptr() as *mut c_void;
-        let cmd_arg_len = cmd.arg_len();
-        let ret = try_libc!({
-            let mut retval: i32 = 0;
-            let status = occlum_ocall_ioctl(
-                &mut retval as *mut i32,
-                host_stdin_fd,
-                cmd_bits,
-                cmd_arg_ptr,
-                cmd_arg_len,
-            );
-            assert!(status == sgx_status_t::SGX_SUCCESS);
-            retval
-        });
-        cmd.validate_arg_and_ret_vals(ret)?;
-
-        Ok(ret)
+    fn ioctl(&self, cmd: &mut dyn IoctlCmd) -> Result<()> {
+        stdio_ioctl(cmd, self.host_fd())
     }
 
     fn status_flags(&self) -> Result<StatusFlags> {
@@ -444,3 +363,22 @@ impl Debug for StdinFile {
 
 unsafe impl Send for StdinFile {}
 unsafe impl Sync for StdinFile {}
+
+fn stdio_ioctl(cmd: &mut dyn IoctlCmd, host_fd: FileDesc) -> Result<()> {
+    debug!("stdio ioctl: cmd: {:?}", cmd);
+    match_ioctl_cmd_auto_error!(cmd, {
+        cmd : TcGets => {
+            cmd.execute(host_fd)?
+        },
+        cmd : TcSets => {
+            cmd.execute(host_fd)?
+        },
+        cmd : SetWinSize => {
+            cmd.execute(host_fd)?
+        },
+        cmd : GetWinSize => {
+            cmd.execute(host_fd)?
+        },
+    });
+    Ok(())
+}
