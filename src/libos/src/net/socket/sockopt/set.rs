@@ -5,12 +5,11 @@ use libc::ocall::setsockopt as do_setsockopt;
 pub struct SetSockOptRawCmd {
     level: i32,
     optname: i32,
-    optval: Box<[u8]>,
+    optval: &'static [u8],
 }
 
 impl SetSockOptRawCmd {
-    pub fn new(level: i32, optname: i32, optval: &[u8]) -> Self {
-        let optval = Box::from(optval);
+    pub fn new(level: i32, optname: i32, optval: &'static [u8]) -> Self {
         Self {
             level,
             optname,
