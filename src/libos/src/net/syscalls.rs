@@ -274,10 +274,6 @@ pub fn do_setsockopt(
     );
     let file_ref = current!().file(fd as FileDesc)?;
 
-    if optval as usize != 0 && optlen == 0 && ENABLE_URING.load(Ordering::Relaxed) {
-        return_errno!(EINVAL, "the optlen size is 0");
-    }
-
     let optval = from_user::make_slice(optval as *const u8, optlen as usize)?;
 
     if let Ok(host_socket) = file_ref.as_host_socket() {
@@ -1132,7 +1128,11 @@ fn new_uring_getsockopt_cmd(
 }
 
 /// Create a new ioctl command for host socket setsockopt syscall
-fn new_host_setsockopt_cmd(level: i32, optname: i32, optval: &[u8]) -> Result<Box<dyn IoctlCmd>> {
+fn new_host_setsockopt_cmd(
+    level: i32,
+    optname: i32,
+    optval: &'static [u8],
+) -> Result<Box<dyn IoctlCmd>> {
     if level != libc::SOL_SOCKET {
         return Ok(Box::new(SetSockOptRawCmd::new(level, optname, optval)));
     }
@@ -1162,7 +1162,7 @@ fn new_host_setsockopt_cmd(level: i32, optname: i32, optval: &[u8]) -> Result<Bo
 fn new_uring_setsockopt_cmd(
     level: i32,
     optname: i32,
-    optval: &[u8],
+    optval: &'static [u8],
     socket_type: Type,
 ) -> Result<Box<dyn IoctlCmd>> {
     if level != libc::SOL_SOCKET {
