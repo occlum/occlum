@@ -35,7 +35,8 @@ impl GetSockOptRawCmd {
     }
 
     pub fn output(&self) -> Option<&[u8]> {
-        self.optlen.map(|_| self.optval.as_ref())
+        self.optlen
+            .map(|opt_len| &self.optval[..(opt_len as usize)])
     }
 }
 
