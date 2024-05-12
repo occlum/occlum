@@ -15,7 +15,7 @@ For every application to be running in Occlum (TEE env), all the running require
 |   |-- opt
 |   |-- proc
 |   |-- root
-|   |-- sfs
+|   |-- sbin
 |   |-- sys
 |   `-- tmp
 |-- initfs      // Occlum init file system

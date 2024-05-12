@@ -318,6 +318,8 @@ cmd_init() {
     mkdir -p image/dev
     mkdir -p image/proc
     mkdir -p image/etc
+    mkdir -p image/sbin
+    mkdir -p image/ext2
     local occlum_glibc_lib=/opt/occlum/glibc/lib
     local occlum_glibc_etc=/opt/occlum/glibc/etc
     if [ -d "$occlum_glibc_lib" ]; then
@@ -429,6 +431,8 @@ cmd_build() {
         cp "$instance_dir/init_ra_conf.json" "$instance_dir/initfs/etc/"
     fi
 
+    prepare_ext2_if_enabled
+
     # If sgx mode is changed, build thoroughly again
     if [[ -n $SGX_MODE && "$SGX_MODE" != "HW" ]]; then
         if [ "$(cat $instance_dir/.sgx_mode 2>/dev/null)" != "$SGX_MODE" ]; then
@@ -468,6 +472,39 @@ cmd_build() {
     echo "Built the Occlum image and enclave successfully"
 }
 
+prepare_ext2_if_enabled() {
+    if ! jq -e '.mount[] | select(.type == "ext2")' "$instance_dir/Occlum.json" > /dev/null 2>&1; then
+        return
+    fi
+
+    local mke2fs_path="/usr/sbin/mke2fs"
+    local occlum_glibc_lib="/opt/occlum/glibc/lib"
+    local os_lib_path="/usr/lib/x86_64-linux-gnu" # for ubuntu
+    local os_release=`awk -F= '/^NAME/{print $2}' /etc/os-release`
+        if [ "$os_release" != "\"Ubuntu\"" ]; then
+            os_lib_path="/usr/lib64"  # for openanolis, alios
+        fi
+    if [ -f "$mke2fs_path" ] && [ -d "$os_lib_path" ] && [ -d "$occlum_glibc_lib" ]; then
+        cp -t "$instance_dir/image/sbin/" "$mke2fs_path"
+        mkdir -p "$instance_dir/image/$occlum_glibc_lib"
+        cp -t "$instance_dir/image/$occlum_glibc_lib" \
+            "$os_lib_path/libext2fs.so.2" \
+            "$os_lib_path/libcom_err.so.2" \
+            "$os_lib_path/libblkid.so.1" \
+            "$os_lib_path/libuuid.so.1" \
+            "$os_lib_path/libe2p.so.2"
+
+        cp -t "$instance_dir/image/lib64/" \
+            "$occlum_glibc_lib/ld-linux-x86-64.so.2"
+        ln -sf /lib64/ld-linux-x86-64.so.2 "$instance_dir/image/$occlum_glibc_lib/ld-linux-x86-64.so.2"
+        cp -t "$instance_dir/image/$occlum_glibc_lib" \
+            "$occlum_glibc_lib/libc.so.6" \
+            "$occlum_glibc_lib/libpthread.so.0" \
+            "$occlum_glibc_lib/libm.so.6"
+    else
+        exit_error "Ext2 enabled but mke2fs tool or its libs not found"
+    fi
+}
 
 cmd_run() {
     check_has_built

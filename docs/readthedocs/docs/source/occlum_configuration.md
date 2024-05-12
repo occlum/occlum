@@ -147,6 +147,13 @@ The template of `Occlum.json` is shown below.
         {
             "target": "/dev",
             "type": "devfs"
+        },
+        {
+            "target": "/ext2",
+            "type": "ext2",
+            "options": {
+                "disk_size": "10GB"
+            }
         }
     ]
 }
