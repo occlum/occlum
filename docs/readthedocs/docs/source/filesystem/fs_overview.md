@@ -1,6 +1,6 @@
 # Occlum File System Overview
 
-Occlum supports various file systems: e.g., read-only integrity-protected SEFS, writable encrypted SEFS, UnionFS, Async-SFS, untrusted HostFS, RamFS, and other pseudo filesystems.
+Occlum supports various file systems: e.g., read-only integrity-protected SEFS, writable encrypted SEFS, UnionFS, Ext2, untrusted HostFS, RamFS, and other pseudo filesystems.
 
 Here is the default FS layout:
 
@@ -16,12 +16,12 @@ Here is the default FS layout:
            │             │
            └──────┬──────┘
                   │
-    ┌────────┬────┴─────┬────────┐
-    │        │          │        │
-    │"/sfs"  │"/dev/shm"│"/proc" │"/dev"
-┌───┴─┐   ┌──┴──┐   ┌───┴──┐  ┌──┴──┐
-│A-SFS│   │RamFS│   │ProcFS│  │DevFS│
-└─────┘   └─────┘   └──────┘  └─────┘
+   ┌──────────┬───┴─────┬───────┐
+   │          │         │       │
+   │"/dev/shm"│"/proc"  │"/dev" │"/ext2"(optional)
+┌──┴──┐   ┌───┴──┐   ┌──┴──┐  ┌─┴──┐
+│RamFS│   │ProcFS│   │DevFS│  │Ext2│
+└─────┘   └──────┘   └─────┘  └────┘
 ```
 
 ## SEFS
@@ -103,33 +103,19 @@ Here is the configuration of rootfs, the first item is the lower layer RO-SEFS a
           source: ./run/mount/__ROOT
 ```
 
-## Async-SFS
-The Async-SFS is an asynchronous filesystem, which uses Rust asynchronous programming skills, making it fast and concurrent. It is mounted at `/sfs` by default. To achieve the high-performanced security, it uses the JinDisk as the underlying data storage and sends async I/O requests to it.
+## Ext2
+The [Ext2](https://github.com/liqinggd/ext2-rs) is an independent filesystem Rust crate that resembles Linux's Ext2. For the sake of performance and security, it utilizes [SwornDisk](https://github.com/asterinas/mlsdisk) as its underlying block device. Compared with SEFS, the file I/O performance of "Ext2+SwornDisk" is superior. If your App's performance is highly dependent on file I/O, it is recommended to enable Ext2 in Occlum.json.
 
-To accelerate block I/O, the page cache is introduced. It caches all the block I/O in the middle of Async-SFS and JinDisk. Thanks to the page cache and JinDisk, the result of the benchmark (e.g., FIO and Filebench) is significantly better than SEFS. If your App's performance is highly dependent on disk I/O, it is recommended to use Async-SFS.
 ```
-┌───────────┐
-│           │
-│ Async-SFS │
-│           │
-└─────┬─────┘
-      │
-┌─────┴─────┐
-│           │
-│ Page Cache│
-│           │
-└─────┬─────┘
-      │
-┌─────┴─────┐
-│           │
-│  JinDisk  │
-│           │
-└───────────┘
+  "mount": [{
+    "target": "/ext2",
+    "type": "ext2",
+    "options": {
+        "disk_size": "10GB"
+    }
+  }]
 ```
-
-Currently, there are some limitations of Async-SFS:
-1. The maximum size of the file is 4GB.
-2. The maximum size of FS is 16TB.
+The configuration of enabling Ext2 is showed above, you can specify your mount point at `target`, the disk size that Ext2 manages should be specified at `options.disk_size`.
 
 ## HostFS
 The HostFS is used for convenient data exchange between the LibOS and the host OS. It simply wraps the untrusted host OS file to implement the functionalities of FS. So the data is straightforwardly transferred between LibOS and host OS without any protection or validation.

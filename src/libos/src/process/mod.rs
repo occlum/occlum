@@ -24,7 +24,7 @@ use self::wait::{WaitQueue, Waiter};
 pub use self::do_exit::handle_force_exit;
 pub use self::do_futex::{futex_wait, futex_wake};
 pub use self::do_robust_list::RobustListHead;
-pub use self::do_spawn::do_spawn_without_exec;
+pub use self::do_spawn::{do_spawn, do_spawn_without_exec};
 pub use self::do_vfork::{do_vfork, handle_force_stop};
 pub use self::do_wait4::idle_reap_zombie_children;
 pub use self::process::{Process, ProcessFilter, ProcessStatus, IDLE};

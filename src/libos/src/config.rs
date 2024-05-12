@@ -162,6 +162,7 @@ pub enum ConfigMountFsType {
     TYPE_UNIONFS,
     TYPE_DEVFS,
     TYPE_PROCFS,
+    TYPE_EXT2,
 }
 
 impl ConfigMountFsType {
@@ -175,6 +176,7 @@ impl ConfigMountFsType {
             "unionfs" => ConfigMountFsType::TYPE_UNIONFS,
             "devfs" => ConfigMountFsType::TYPE_DEVFS,
             "procfs" => ConfigMountFsType::TYPE_PROCFS,
+            "ext2" => ConfigMountFsType::TYPE_EXT2,
             _ => {
                 return_errno!(EINVAL, "Unsupported file system type");
             }
@@ -189,6 +191,7 @@ pub struct ConfigMountOptions {
     pub layers: Option<Vec<ConfigMount>>,
     pub temporary: bool,
     pub cache_size: Option<u64>,
+    pub disk_size: Option<u64>,
     pub index: u32,
 }
 
@@ -363,11 +366,17 @@ impl ConfigMountOptions {
         } else {
             None
         };
+        let disk_size = if input.disk_size.is_some() {
+            Some(parse_memory_size(input.disk_size.as_ref().unwrap())? as _)
+        } else {
+            None
+        };
         Ok(ConfigMountOptions {
             mac,
             layers,
             temporary: input.temporary,
             cache_size,
+            disk_size,
             index: input.index,
         })
     }
@@ -517,6 +526,8 @@ struct InputConfigMountOptions {
     pub temporary: bool,
     #[serde(default)]
     pub cache_size: Option<String>,
+    #[serde(default)]
+    pub disk_size: Option<String>,
     #[serde(default)]
     pub index: u32,
 }

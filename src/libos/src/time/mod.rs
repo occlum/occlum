@@ -309,6 +309,13 @@ impl TimeProvider for OcclumTimeProvider {
     }
 }
 
+impl ext2_rs::TimeProvider for OcclumTimeProvider {
+    fn now(&self) -> ext2_rs::UnixTime {
+        let time = do_gettimeofday();
+        ext2_rs::UnixTime { sec: time.sec as _ }
+    }
+}
+
 // For Timerfd
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
