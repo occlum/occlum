@@ -12,7 +12,9 @@ runs:
       run: |
         docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum";
         docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/grpc-rust";
+        docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/ext2-rs";
         docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/itoa-sgx";
+        docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/mlsdisk";
         docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/resolv-conf";
         docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/ringbuf";
         docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/rust-sgx-sdk";

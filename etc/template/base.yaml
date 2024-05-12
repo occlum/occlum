@@ -13,3 +13,5 @@ targets:
       - root
       - sys
       - tmp
+      - sbin
+      - ext2
