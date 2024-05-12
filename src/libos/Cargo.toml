@@ -35,6 +35,8 @@ regex = { git = "https://github.com/mesalock-linux/regex-sgx", default-features 
 goblin = { version = "0.5.4", default-features = false, features = ["elf64", "elf32", "endian_fd"] }
 intrusive-collections = "0.9"
 modular-bitfield = "0.11.2"
+sworndisk-v2 = { path = "../../deps/mlsdisk/core", default-features = false, features = ["occlum"] }
+ext2-rs = { path = "../../deps/ext2-rs", default-features = false, features = ["sgx"] }
 
 sgx-untrusted-alloc = { path = "./crates/sgx-untrusted-alloc", features = ["sgx"]}
 io-uring-callback = { path = "./crates/io-uring-callback", features = ["sgx"]}

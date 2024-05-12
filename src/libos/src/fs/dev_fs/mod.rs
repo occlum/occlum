@@ -12,6 +12,7 @@ use self::dev_random::DevRandom;
 use self::dev_sgx::DevSgx;
 use self::dev_shm::DevShm;
 use self::dev_zero::DevZero;
+use blk::DevDisk;
 
 mod dev_fd;
 mod dev_null;
@@ -21,7 +22,7 @@ mod dev_shm;
 mod dev_zero;
 
 /// API to initialize the DevFS
-pub fn init_devfs() -> Result<Arc<MountFS>> {
+pub fn init_devfs(disk_options: &[DevDiskOption]) -> Result<Arc<MountFS>> {
     let devfs = DevFS::new();
     let dev_null = Arc::new(DevNull) as _;
     devfs.add("null", dev_null)?;
@@ -37,6 +38,11 @@ pub fn init_devfs() -> Result<Arc<MountFS>> {
     devfs.add("shm", dev_shm)?;
     let dev_fd = Arc::new(DevFd) as _;
     devfs.add("fd", dev_fd);
+    for disk_option in disk_options {
+        let disk_name = &disk_option.name;
+        let dev_disk = Arc::new(DevDisk::open_or_create(disk_name)?);
+        devfs.add(disk_name, dev_disk)?;
+    }
     let mountable_devfs = MountFS::new(devfs);
     // Mount the ramfs at '/shm'
     let ramfs = RamFS::new();
@@ -48,4 +54,15 @@ pub fn init_devfs() -> Result<Arc<MountFS>> {
     )?;
     // TODO: Add stdio(stdin, stdout, stderr) into DevFS
     Ok(mountable_devfs)
+}
+
+/// Options of block device under the DevFS.
+pub struct DevDiskOption {
+    name: &'static str,
+}
+
+impl DevDiskOption {
+    pub fn new(name: &'static str) -> Self {
+        Self { name }
+    }
 }

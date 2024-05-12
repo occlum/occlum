@@ -30,6 +30,7 @@
 #![feature(linkage)]
 #![feature(new_uninit)]
 #![feature(raw_ref_op)]
+#![feature(let_chains)]
 
 #[macro_use]
 extern crate alloc;
@@ -86,6 +87,7 @@ mod error;
 #[macro_use]
 mod net;
 
+mod blk;
 mod config;
 mod entry;
 mod events;

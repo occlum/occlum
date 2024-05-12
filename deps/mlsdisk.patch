@@ -1,0 +1,28 @@
+diff --git a/core/Cargo.toml b/core/Cargo.toml
+index c1e1746..20b896f 100644
+--- a/core/Cargo.toml
++++ b/core/Cargo.toml
+@@ -22,16 +22,18 @@ serde = { version = "=1.0.188", default-features = false, features = ["alloc", "
+ spin = { version = "0.9.8", optional = true }
+ static_assertions = "1.1.0"
+ 
+-sgx_tstd = { git = "https://github.com/apache/teaclave-sgx-sdk.git", features = ["backtrace", "thread"], optional = true }
+-sgx_rand = { git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
+-sgx_tcrypto = { git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
+-sgx_types = { git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
++sgx_tstd = { path = "../../../deps/rust-sgx-sdk/sgx_tstd", features = ["backtrace", "thread"], optional = true }
++sgx_rand = { path = "../../../deps/rust-sgx-sdk/sgx_rand", optional = true }
++sgx_tcrypto = { path = "../../../deps/rust-sgx-sdk/sgx_tcrypto", optional = true }
++sgx_types = { path = "../../../deps/rust-sgx-sdk/sgx_types", optional = true }
++ext2-rs = { path = "../../../deps/ext2-rs", default-features = false, optional = true }
++ahash = { version="=0.8.6", default-features = false }
+ 
+ [features]
+ default = ["std"]
+ std = ["spin", "openssl", "log"]
+ linux = ["bindings"]
+-occlum = ["sgx_tstd", "sgx_rand", "sgx_tcrypto", "sgx_types", "spin", "log"]
++occlum = ["sgx_tstd", "sgx_rand", "sgx_tcrypto", "sgx_types", "spin", "log", "ext2-rs/sgx"]
+ jinux = []
+ 
+ 
