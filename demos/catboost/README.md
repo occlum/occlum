@@ -19,13 +19,13 @@ docker pull occlum/occlum:latest-ubuntu20.04
 docker run -it --name=pythonCatboostDemo --device /dev/sgx/enclave occlum/occlum:latest-ubuntu20.04 /bin/bash
 ```
 
-Step 2 (on the host): Download miniconda and install Python with Catboost and deps to prefix position.
+Step 2 (in the occlum container): Download miniconda and install Python with Catboost and deps to prefix position.
 ```
 cd /root/occlum/demos/catboost
 bash ./install_python_and_deps_with_conda.sh
 ```
 
-Step 3 (on the host): Run the sample code on Occlum
+Step 3 (in the occlum container): Run the sample code on Occlum
 ```
 cd /root/occlum/demos/catboost
 bash ./run_catboost_on_occlum.sh

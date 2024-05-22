@@ -39,7 +39,7 @@ use crate::fs::{
 };
 use crate::interrupt::{do_handle_interrupt, sgx_interrupt_info_t};
 use crate::ipc::{do_shmat, do_shmctl, do_shmdt, do_shmget, key_t, shmids_t};
-use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t, RandFlags};
+use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t, RandFlags, Rusage, RusageWho};
 use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
     do_epoll_pwait, do_epoll_wait, do_getpeername, do_getsockname, do_getsockopt, do_listen,
@@ -195,7 +195,7 @@ macro_rules! process_syscall_table_with_callback {
             (Umask = 95) => do_umask(mask: u16),
             (Gettimeofday = 96) => do_gettimeofday(tv_u: *mut timeval_t),
             (Getrlimit = 97) => do_gettrlimit(resource: u32, rlim: *mut rlimit_t),
-            (Getrusage = 98) => handle_unsupported(),
+            (Getrusage = 98) => do_getrusage(who: i32, usage: *mut Rusage),
             (SysInfo = 99) => do_sysinfo(info: *mut sysinfo_t),
             (Times = 100) => handle_unsupported(),
             (Ptrace = 101) => handle_unsupported(),
@@ -1014,6 +1014,12 @@ fn do_gettrlimit(resource: u32, rlim: *mut rlimit_t) -> Result<isize> {
 
 fn do_settrlimit(resource: u32, rlim: *const rlimit_t) -> Result<isize> {
     do_prlimit(0, resource, rlim, ptr::null_mut())
+}
+
+fn do_getrusage(who: i32, usage: *mut Rusage) -> Result<isize> {
+    let rusage_who = RusageWho::try_from(who)?;
+    misc::do_getrusage(rusage_who, unsafe { &mut *usage })?;
+    Ok(0)
 }
 
 fn do_prlimit(

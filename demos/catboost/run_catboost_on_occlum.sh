@@ -18,9 +18,10 @@ if [ ! -d $python_dir ];then
 fi
 
 new_json="$(jq '.resource_limits.user_space_size = "1GB" |
-        .resource_limits.user_space_max_size = "4GB" |
+        .resource_limits.user_space_max_size = "16GB" |
         .resource_limits.kernel_space_heap_size = "1GB" |
         .resource_limits.kernel_space_heap_max_size = "4GB" |
+        .resource_limits.max_nums_of_threads = "128" |
         .env.default += ["PYTHONHOME=/opt/python-occlum"]' Occlum.json)" && \
 echo "${new_json}" > Occlum.json
 occlum build --sgx-mode SIM
