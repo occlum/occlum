@@ -3,7 +3,7 @@
 	url = https://github.com/occlum/incubator-teaclave-sgx-sdk.git
 [submodule "deps/sefs"]
 	path = deps/sefs
-	url = https://github.com/occlum/sefs.git
+	url = https://github.com/jessehui/sefs.git
 	branch = unionfs
 [submodule "deps/serde-sgx"]
 	path = deps/serde-sgx
@@ -24,3 +24,6 @@
 [submodule "deps/resolv-conf"]
 	path = deps/resolv-conf
 	url = https://github.com/tailhook/resolv-conf.git
+[submodule "deps/lru-rs"]
+	path = deps/lru-rs
+	url = https://github.com/jessehui/lru-rs.git

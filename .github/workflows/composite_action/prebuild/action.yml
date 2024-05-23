@@ -19,4 +19,5 @@ runs:
         docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/sefs";
         docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/serde-json-sgx";
         docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/serde-sgx"
+        docker exec ${{ inputs.container-name }} bash -c "git config --global --add safe.directory /root/occlum/deps/lru-rs"
       shell: bash
