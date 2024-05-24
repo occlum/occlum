@@ -3,7 +3,7 @@ use std::mem::{self, MaybeUninit};
 use crate::net::socket::Domain;
 use crate::prelude::*;
 
-use super::{Addr, CSockAddr, Ipv4Addr, Ipv4SocketAddr, Ipv6SocketAddr, RawAddr, UnixAddr};
+use super::{Addr, CSockAddr, Ipv4Addr, Ipv4SocketAddr, Ipv6SocketAddr, SockAddr, UnixAddr};
 use num_enum::IntoPrimitive;
 use std::path::Path;
 
@@ -12,7 +12,7 @@ pub enum AnyAddr {
     Ipv4(Ipv4SocketAddr),
     Ipv6(Ipv6SocketAddr),
     Unix(UnixAddr),
-    Raw(RawAddr),
+    Raw(SockAddr),
     Unspec,
 }
 
@@ -33,7 +33,7 @@ impl AnyAddr {
                 Self::Unix(unix_addr)
             }
             _ => {
-                let raw_addr = RawAddr::from_c_storage(c_addr, c_addr_len);
+                let raw_addr = SockAddr::from_c_storage(c_addr, c_addr_len);
                 Self::Raw(raw_addr)
             }
         };
@@ -55,7 +55,7 @@ impl AnyAddr {
         }
     }
 
-    pub fn to_raw(&self) -> RawAddr {
+    pub fn to_raw(&self) -> SockAddr {
         match self {
             Self::Ipv4(ipv4_addr) => ipv4_addr.to_raw(),
             Self::Ipv6(ipv6_addr) => ipv6_addr.to_raw(),
@@ -65,7 +65,7 @@ impl AnyAddr {
                 let mut sockaddr_storage =
                     unsafe { MaybeUninit::<libc::sockaddr_storage>::uninit().assume_init() };
                 sockaddr_storage.ss_family = libc::AF_UNSPEC as _;
-                RawAddr::from_c_storage(&sockaddr_storage, mem::size_of::<libc::sa_family_t>())
+                SockAddr::from_c_storage(&sockaddr_storage, mem::size_of::<libc::sa_family_t>())
             }
         }
     }
@@ -74,13 +74,6 @@ impl AnyAddr {
         match self {
             Self::Unix(unix_addr) => Ok(unix_addr),
             _ => return_errno!(EAFNOSUPPORT, "not unix address"),
-        }
-    }
-
-    pub fn as_ipv4(&self) -> Option<&Ipv4SocketAddr> {
-        match self {
-            Self::Ipv4(ipv4_addr) => Some(ipv4_addr),
-            _ => None,
         }
     }
 

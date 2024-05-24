@@ -1,7 +1,8 @@
+use crate::net::{Addr, Domain};
 use std::any::Any;
 use std::fmt::{self, Debug};
 
-use super::{Addr, CSockAddr, Domain, RawAddr};
+use super::{CSockAddr, SockAddr};
 use crate::prelude::*;
 
 /// An IPv4 socket address, consisting of an IPv4 address and a port.
@@ -70,9 +71,9 @@ impl Ipv4SocketAddr {
         }
     }
 
-    pub fn to_raw(&self) -> RawAddr {
+    pub fn to_raw(&self) -> SockAddr {
         let (storage, len) = self.to_c_storage();
-        RawAddr::from_c_storage(&storage, len)
+        SockAddr::from_c_storage(&storage, len)
     }
 
     pub fn ip(&self) -> &Ipv4Addr {

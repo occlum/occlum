@@ -183,7 +183,14 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
 
                 inner.fatal = Some(errno);
                 stream.common.set_errno(errno);
-                stream.common.pollee().add_events(Events::ERR);
+
+                let events = if errno == ENOTCONN || errno == ECONNRESET || errno == ECONNREFUSED {
+                    Events::HUP | Events::OUT | Events::ERR
+                } else {
+                    Events::ERR
+                };
+
+                stream.common.pollee().add_events(events);
                 return;
             }
             assert!(retval != 0);
