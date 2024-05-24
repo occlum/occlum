@@ -20,7 +20,7 @@ pub struct DatagramSocket<A: Addr + 'static, R: Runtime> {
 
 impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
     pub fn new(nonblocking: bool) -> Result<Self> {
-        let common = Arc::new(Common::new(Type::DGRAM, nonblocking, None)?);
+        let common = Arc::new(Common::new(SocketType::DGRAM, nonblocking, None)?);
         let state = RwLock::new(State::new());
         let sender = Sender::new(common.clone());
         let receiver = Receiver::new(common.clone());
@@ -33,7 +33,7 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
     }
 
     pub fn new_pair(nonblocking: bool) -> Result<(Self, Self)> {
-        let (common1, common2) = Common::new_pair(Type::DGRAM, nonblocking)?;
+        let (common1, common2) = Common::new_pair(SocketType::DGRAM, nonblocking)?;
         let socket1 = Self::new_connected(common1);
         let socket2 = Self::new_connected(common2);
         Ok((socket1, socket2))
@@ -321,10 +321,10 @@ impl<A: Addr, R: Runtime> DatagramSocket<A, R> {
                 cmd.execute(self.host_fd())?;
             },
             cmd: SetRecvTimeoutCmd => {
-                self.set_recv_timeout(*cmd.timeout());
+                self.set_recv_timeout(*cmd.input());
             },
             cmd: SetSendTimeoutCmd => {
-                self.set_send_timeout(*cmd.timeout());
+                self.set_send_timeout(*cmd.input());
             },
             cmd: GetRecvTimeoutCmd => {
                 let timeval = timeout_to_timeval(self.recv_timeout());

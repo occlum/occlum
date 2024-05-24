@@ -214,7 +214,6 @@ pub use self::set_close_on_exec::*;
 pub use self::set_nonblocking::SetNonBlocking;
 pub use self::termios::*;
 pub use self::winsize::*;
-pub use net::socket::sockopt::SetSockOptRawCmd;
 
 mod get_ifconf;
 mod get_ifreq;

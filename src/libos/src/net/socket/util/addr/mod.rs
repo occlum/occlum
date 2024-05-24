@@ -38,7 +38,7 @@ pub trait Addr: Clone + Debug + Default + PartialEq + Send + Sync {
 pub use self::c_sock_addr::CSockAddr;
 pub use self::ipv4::{Ipv4Addr, Ipv4SocketAddr};
 pub use self::ipv6::{Ipv6Addr, Ipv6SocketAddr};
-pub use self::raw_addr::RawAddr;
+pub use self::raw_addr::SockAddr;
 pub use self::unix_addr::UnixAddr;
 
 #[cfg(test)]

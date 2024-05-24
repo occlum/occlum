@@ -3,34 +3,12 @@ use crate::prelude::*;
 use libc::{suseconds_t, time_t};
 use std::time::Duration;
 
-#[derive(Debug)]
-pub struct SetSendTimeoutCmd(Duration);
-
-impl IoctlCmd for SetSendTimeoutCmd {}
-
-impl SetSendTimeoutCmd {
-    pub fn new(timeout: Duration) -> Self {
-        Self(timeout)
-    }
-
-    pub fn timeout(&self) -> &Duration {
-        &self.0
-    }
+crate::impl_ioctl_cmd! {
+    pub struct SetSendTimeoutCmd<Input=Duration, Output=()> {}
 }
 
-#[derive(Debug)]
-pub struct SetRecvTimeoutCmd(Duration);
-
-impl IoctlCmd for SetRecvTimeoutCmd {}
-
-impl SetRecvTimeoutCmd {
-    pub fn new(timeout: Duration) -> Self {
-        Self(timeout)
-    }
-
-    pub fn timeout(&self) -> &Duration {
-        &self.0
-    }
+crate::impl_ioctl_cmd! {
+    pub struct SetRecvTimeoutCmd<Input=Duration, Output=()> {}
 }
 
 crate::impl_ioctl_cmd! {

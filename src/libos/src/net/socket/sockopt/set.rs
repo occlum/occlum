@@ -2,14 +2,16 @@ use crate::{fs::IoctlCmd, prelude::*};
 use libc::ocall::setsockopt as do_setsockopt;
 
 #[derive(Debug)]
-pub struct SetSockOptRawCmd {
+pub struct SetSockOptRawCmd<'a> {
     level: i32,
     optname: i32,
-    optval: &'static [u8],
+    optval: &'a [u8],
 }
 
-impl SetSockOptRawCmd {
-    pub fn new(level: i32, optname: i32, optval: &'static [u8]) -> Self {
+impl IoctlCmd for SetSockOptRawCmd<'static> {}
+
+impl<'a> SetSockOptRawCmd<'a> {
+    pub fn new(level: i32, optname: i32, optval: &'a [u8]) -> SetSockOptRawCmd<'a> {
         Self {
             level,
             optname,
@@ -22,8 +24,6 @@ impl SetSockOptRawCmd {
         Ok(())
     }
 }
-
-impl IoctlCmd for SetSockOptRawCmd {}
 
 pub fn setsockopt_by_host(fd: FileDesc, level: i32, optname: i32, optval: &[u8]) -> Result<()> {
     try_libc!(do_setsockopt(

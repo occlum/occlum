@@ -121,7 +121,11 @@ impl<A: Addr + 'static, R: Runtime> ListenerStream<A, R> {
         self.initiate_async_accepts(inner);
 
         let common = {
-            let common = Arc::new(Common::with_host_fd(accepted_fd, Type::STREAM, nonblocking));
+            let common = Arc::new(Common::with_host_fd(
+                accepted_fd,
+                SocketType::STREAM,
+                nonblocking,
+            ));
             common.set_peer_addr(&accepted_addr);
             common
         };

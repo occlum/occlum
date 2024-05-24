@@ -18,7 +18,7 @@ use crate::prelude::*;
 /// The common parts of all stream sockets.
 pub struct Common<A: Addr + 'static, R: Runtime> {
     host_fd: FileDesc,
-    type_: Type,
+    type_: SocketType,
     nonblocking: AtomicBool,
     is_closed: AtomicBool,
     pollee: Pollee,
@@ -30,7 +30,7 @@ pub struct Common<A: Addr + 'static, R: Runtime> {
 }
 
 impl<A: Addr + 'static, R: Runtime> Common<A, R> {
-    pub fn new(type_: Type, nonblocking: bool, protocol: Option<i32>) -> Result<Self> {
+    pub fn new(type_: SocketType, nonblocking: bool, protocol: Option<i32>) -> Result<Self> {
         let domain_c = A::domain() as libc::c_int;
         let type_c = type_ as libc::c_int;
         let protocol = protocol.unwrap_or(0) as libc::c_int;
@@ -56,11 +56,11 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
         })
     }
 
-    pub fn new_pair(sock_type: Type, nonblocking: bool) -> Result<(Self, Self)> {
+    pub fn new_pair(sock_type: SocketType, nonblocking: bool) -> Result<(Self, Self)> {
         return_errno!(EINVAL, "Unix is unsupported");
     }
 
-    pub fn with_host_fd(host_fd: FileDesc, type_: Type, nonblocking: bool) -> Self {
+    pub fn with_host_fd(host_fd: FileDesc, type_: SocketType, nonblocking: bool) -> Self {
         let nonblocking = AtomicBool::new(nonblocking);
         let is_closed = AtomicBool::new(false);
         let pollee = Pollee::new(IoEvents::empty());
@@ -90,7 +90,7 @@ impl<A: Addr + 'static, R: Runtime> Common<A, R> {
         self.host_fd
     }
 
-    pub fn type_(&self) -> Type {
+    pub fn type_(&self) -> SocketType {
         self.type_
     }
 

@@ -1,4 +1,6 @@
 use bitflags::bitflags;
+use sgx_trts::libc;
+use std::ffi::c_uint;
 
 // Flags to use when sending data through a socket
 bitflags! {
@@ -36,4 +38,19 @@ bitflags! {
         const MSG_ERRQUEUE     = 0x2000;    // Fetch message from error queue
         const MSG_NOTIFICATION = 0x8000;     // Only applicable to SCTP socket
     }
+}
+
+// Flags to use when creating a new socket
+bitflags! {
+    pub struct SocketFlags: i32 {
+        const SOCK_NONBLOCK = 0x800;
+        const SOCK_CLOEXEC  = 0x80000;
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct mmsghdr {
+    pub msg_hdr: libc::msghdr,
+    pub msg_len: c_uint,
 }

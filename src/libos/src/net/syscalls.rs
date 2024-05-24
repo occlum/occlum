@@ -1,5 +1,4 @@
-use super::socket::{MsgFlags, SocketProtocol};
-use super::{socket::uring::socket_file::SocketFile, *};
+use super::socket::{mmsghdr, MsgFlags, SocketFlags, SocketProtocol};
 
 use atomic::Ordering;
 use core::f32::consts::E;
@@ -17,15 +16,6 @@ use std::convert::TryFrom;
 use time::{timespec_t, timeval_t};
 use util::mem_util::from_user;
 
-use super::socket::sockopt::{
-    GetAcceptConnCmd, GetDomainCmd, GetErrorCmd, GetOutputAsBytes, GetPeerNameCmd,
-    GetRcvBufSizeCmd, GetRecvTimeoutCmd, GetSendTimeoutCmd, GetSndBufSizeCmd, GetSockOptRawCmd,
-    GetTypeCmd, SetRcvBufSizeCmd, SetRecvTimeoutCmd, SetSendTimeoutCmd, SetSndBufSizeCmd,
-    SetSockOptRawCmd, SockOptName,
-};
-use super::socket::uring::UringSocketType;
-use super::socket::AnyAddr;
-
 use super::*;
 
 use crate::fs::StatusFlags;
@@ -36,20 +26,13 @@ use crate::prelude::*;
 const SOMAXCONN: u32 = 4096;
 const SOCONN_DEFAULT: u32 = 16;
 
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct mmsghdr {
-    pub msg_hdr: libc::msghdr,
-    pub msg_len: c_uint,
-}
-
 pub fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<isize> {
     let domain = Domain::try_from(domain as u16)?;
     let flags = SocketFlags::from_bits_truncate(socket_type);
 
     let type_bits = socket_type & !flags.bits();
     let socket_type =
-        Type::try_from(type_bits).map_err(|_| errno!(EINVAL, "invalid socket type"))?;
+        SocketType::try_from(type_bits).map_err(|_| errno!(EINVAL, "invalid socket type"))?;
 
     debug!(
         "socket domain: {:?}, type: {:?}, protocol: {:?}",
@@ -64,7 +47,8 @@ pub fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<i
 
         // Determine if type and domain match uring supported socket
         let match_uring = move || {
-            let is_uring_type = (socket_type == Type::DGRAM || socket_type == Type::STREAM);
+            let is_uring_type =
+                (socket_type == SocketType::DGRAM || socket_type == SocketType::STREAM);
             let is_uring_protocol = (protocol == SocketProtocol::IPPROTO_IP
                 || protocol == SocketProtocol::IPPROTO_TCP
                 || protocol == SocketProtocol::IPPROTO_UDP);
@@ -100,20 +84,24 @@ pub fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<i
 }
 
 pub fn do_bind(fd: c_int, addr: *const libc::sockaddr, addr_len: libc::socklen_t) -> Result<isize> {
-    let addr_len = addr_len as usize;
-    let sockaddr_storage = copy_sock_addr_from_user(addr, addr_len)?;
-    let mut addr = AnyAddr::from_c_storage(&sockaddr_storage, addr_len)?;
+    let addr = {
+        let addr_len = addr_len as usize;
+        let sockaddr_storage = copy_sock_addr_from_user(addr, addr_len)?;
+        let addr = AnyAddr::from_c_storage(&sockaddr_storage, addr_len)?;
+        addr
+    };
+
     trace!("bind to addr: {:?}", addr);
 
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_host_socket() {
-        let mut raw_addr = addr.to_raw();
-        socket.bind(&mut raw_addr)?;
+        let raw_addr = addr.to_raw();
+        socket.bind(&raw_addr)?;
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
-        let mut unix_addr = (addr.to_unix()?).clone();
-        unix_socket.bind(&mut unix_addr)?;
+        let unix_addr = addr.to_unix()?;
+        unix_socket.bind(unix_addr)?;
     } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
-        uring_socket.bind(&mut addr)?;
+        uring_socket.bind(&addr)?;
     } else {
         return_errno!(ENOTSOCK, "not a socket");
     }
@@ -159,18 +147,21 @@ pub fn do_connect(
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(socket) = file_ref.as_host_socket() {
         let addr_option = if addr_set {
-            Some(unsafe { RawAddr::try_from_raw(addr, addr_len as u32)? })
+            Some(unsafe { SockAddr::try_from_raw(addr, addr_len as u32)? })
         } else {
             None
         };
 
-        socket.connect(&addr_option)?;
+        socket.connect(addr_option.as_ref())?;
         return Ok(0);
     };
 
-    let addr_len = addr_len as usize;
-    let sockaddr_storage = copy_sock_addr_from_user(addr, addr_len)?;
-    let addr = AnyAddr::from_c_storage(&sockaddr_storage, addr_len)?;
+    let addr = {
+        let addr_len = addr_len as usize;
+        let sockaddr_storage = copy_sock_addr_from_user(addr, addr_len)?;
+        let addr = AnyAddr::from_c_storage(&sockaddr_storage, addr_len)?;
+        addr
+    };
 
     if let Ok(unix_socket) = file_ref.as_unix_socket() {
         // TODO: support AF_UNSPEC address for datagram socket use
@@ -415,19 +406,17 @@ pub fn do_sendto(
 
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(host_socket) = file_ref.as_host_socket() {
-        let addr = addr.map(|any_addr| any_addr.to_raw());
-
         host_socket
-            .sendto(buf, send_flags, &addr)
+            .sendto(buf, send_flags, addr)
             .map(|u| u as isize)
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
         let addr = match addr {
-            Some(any_addr) => Some(any_addr.to_unix()?.clone()),
+            Some(ref any_addr) => Some(any_addr.to_unix()?),
             None => None,
         };
 
         unix_socket
-            .sendto(buf, send_flags, &addr)
+            .sendto(buf, send_flags, addr)
             .map(|u| u as isize)
     } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
         uring_socket
@@ -458,9 +447,7 @@ pub fn do_recvfrom(
 
     let file_ref = current!().file(fd as FileDesc)?;
     let (data_len, addr_recv) = if let Ok(socket) = file_ref.as_host_socket() {
-        socket
-            .recvfrom(buf, recv_flags)
-            .map(|(len, addr_recv)| (len, addr_recv.map(|raw_addr| AnyAddr::Raw(raw_addr))))?
+        socket.recvfrom(buf, recv_flags)?
     } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
         unix_socket
             .recvfrom(buf, recv_flags)
@@ -496,7 +483,7 @@ pub fn do_socketpair(
 
     let file_flags = SocketFlags::from_bits_truncate(socket_type);
     let close_on_spawn = file_flags.contains(SocketFlags::SOCK_CLOEXEC);
-    let sock_type = Type::try_from(socket_type & (!file_flags.bits()))
+    let sock_type = SocketType::try_from(socket_type & (!file_flags.bits()))
         .map_err(|_| errno!(EINVAL, "invalid socket type"))?;
 
     let domain = Domain::try_from(domain as u16)?;
@@ -526,9 +513,8 @@ pub fn do_sendmsg(fd: c_int, msg_ptr: *const libc::msghdr, flags_c: c_int) -> Re
 
     let file_ref = current!().file(fd as FileDesc)?;
     if let Ok(host_socket) = file_ref.as_host_socket() {
-        let raw_addr = addr.map(|addr| addr.to_raw());
         host_socket
-            .sendmsg(&bufs[..], flags, &raw_addr, control)
+            .sendmsg(&bufs[..], flags, addr, control)
             .map(|bytes_send| bytes_send as isize)
     } else if let Ok(socket) = file_ref.as_unix_socket() {
         socket
@@ -554,20 +540,9 @@ pub fn do_recvmsg(fd: c_int, msg_mut_ptr: *mut libc::msghdr, flags_c: c_int) -> 
     let file_ref = current!().file(fd as FileDesc)?;
     let (bytes_recv, recv_addr, msg_flags, msg_controllen) =
         if let Ok(host_socket) = file_ref.as_host_socket() {
-            host_socket.recvmsg(&mut bufs[..], flags, control).map(
-                |(bytes, addr, msg, controllen)| {
-                    (
-                        bytes,
-                        addr.map(|raw_addr| AnyAddr::Raw(raw_addr)),
-                        msg,
-                        controllen,
-                    )
-                },
-            )?
+            host_socket.recvmsg(&mut bufs[..], flags, control)?
         } else if let Ok(unix_socket) = file_ref.as_unix_socket() {
-            unix_socket.recvmsg(&mut bufs[..], flags, control).map(
-                |(bytes_recvd, control_len)| (bytes_recvd, None, MsgFlags::empty(), control_len),
-            )?
+            unix_socket.recvmsg(&mut bufs[..], flags, control)?
         } else if let Ok(uring_socket) = file_ref.as_uring_socket() {
             uring_socket.recvmsg(&mut bufs[..], flags, control)?
         } else {
@@ -610,13 +585,12 @@ pub fn do_sendmmsg(
 
     if let Ok(host_socket) = file_ref.as_host_socket() {
         for mmsg in (msgvec) {
-            let (any_addr, bufs, control) = extract_msghdr_from_user(&mmsg.msg_hdr)?;
-            let raw_addr = any_addr.map(|any_addr| any_addr.to_raw());
+            let (addr, bufs, control) = extract_msghdr_from_user(&mmsg.msg_hdr)?;
 
             if host_socket
-                .sendmsg(&bufs[..], flags, &raw_addr, control)
+                .sendmsg(&bufs[..], flags, addr, control)
                 .map(|bytes_send| {
-                    mmsg.msg_len += bytes_send as c_uint;
+                    mmsg.msg_len = bytes_send as c_uint;
                     bytes_send as isize
                 })
                 .is_ok()
@@ -635,7 +609,7 @@ pub fn do_sendmmsg(
             if uring_socket
                 .sendmsg(&bufs[..], addr, flags, control)
                 .map(|bytes_send| {
-                    mmsg.msg_len += bytes_send as c_uint;
+                    mmsg.msg_len = bytes_send as c_uint;
                     bytes_send as isize
                 })
                 .is_ok()
@@ -1021,18 +995,17 @@ fn copy_sock_addr_from_user(
     let sockaddr_src_buf = from_user::make_slice(addr as *const u8, addr_len)?;
 
     let sockaddr_storage = {
-        // Safety. The content will be initialized before function returns.
-        let mut sockaddr_storage =
-            unsafe { MaybeUninit::<libc::sockaddr_storage>::uninit().assume_init() };
+        let mut sockaddr_storage = MaybeUninit::<libc::sockaddr_storage>::uninit();
         // Safety. The dst slice is the only mutable reference to the sockaddr_storage
         let sockaddr_dst_buf = unsafe {
-            let ptr = &mut sockaddr_storage as *mut _ as *mut u8;
+            let ptr = sockaddr_storage.as_mut_ptr() as *mut u8;
             let len = addr_len;
             std::slice::from_raw_parts_mut(ptr, len)
         };
         sockaddr_dst_buf.copy_from_slice(sockaddr_src_buf);
-        sockaddr_storage
+        unsafe { sockaddr_storage.assume_init() }
     };
+
     Ok(sockaddr_storage)
 }
 
@@ -1088,7 +1061,7 @@ fn new_uring_getsockopt_cmd(
     level: i32,
     optname: i32,
     optlen: u32,
-    socket_type: Type,
+    socket_type: SocketType,
 ) -> Result<Box<dyn IoctlCmd>> {
     if level != libc::SOL_SOCKET {
         return Ok(Box::new(GetSockOptRawCmd::new(level, optname, optlen)));
@@ -1106,17 +1079,17 @@ fn new_uring_getsockopt_cmd(
         SockOptName::SO_RCVTIMEO_OLD => Box::new(GetRecvTimeoutCmd::new(())),
         SockOptName::SO_SNDTIMEO_OLD => Box::new(GetSendTimeoutCmd::new(())),
         SockOptName::SO_SNDBUF => {
-            if socket_type == Type::STREAM {
+            if socket_type == SocketType::STREAM {
                 // Implement dynamic buf size for stream socket only.
-                Box::new(GetSndBufSizeCmd::new(()))
+                Box::new(GetSendBufSizeCmd::new(()))
             } else {
                 Box::new(GetSockOptRawCmd::new(level, optname, optlen))
             }
         }
         SockOptName::SO_RCVBUF => {
-            if socket_type == Type::STREAM {
+            if socket_type == SocketType::STREAM {
                 // Implement dynamic buf size for stream socket only.
-                Box::new(GetRcvBufSizeCmd::new(()))
+                Box::new(GetRecvBufSizeCmd::new(()))
             } else {
                 Box::new(GetSockOptRawCmd::new(level, optname, optlen))
             }
@@ -1163,161 +1136,153 @@ fn new_uring_setsockopt_cmd(
     level: i32,
     optname: i32,
     optval: &'static [u8],
-    socket_type: Type,
+    socket_type: SocketType,
 ) -> Result<Box<dyn IoctlCmd>> {
     if level != libc::SOL_SOCKET {
         return Ok(Box::new(SetSockOptRawCmd::new(level, optname, optval)));
     }
 
+    if optval.len() == 0 {
+        return_errno!(EINVAL, "Not a valid optval length");
+    }
+
     let opt =
         SockOptName::try_from(optname).map_err(|_| errno!(ENOPROTOOPT, "Not a valid optname"))?;
 
-    let enable_uring = ENABLE_URING.load(Ordering::Relaxed);
-    if !enable_uring {
-        Ok(match opt {
-            SockOptName::SO_ACCEPTCONN
-            | SockOptName::SO_DOMAIN
-            | SockOptName::SO_PEERNAME
-            | SockOptName::SO_TYPE
-            | SockOptName::SO_ERROR
-            | SockOptName::SO_PEERCRED
-            | SockOptName::SO_SNDLOWAT
-            | SockOptName::SO_PEERSEC
-            | SockOptName::SO_PROTOCOL
-            | SockOptName::SO_MEMINFO
-            | SockOptName::SO_INCOMING_NAPI_ID
-            | SockOptName::SO_COOKIE
-            | SockOptName::SO_PEERGROUPS => return_errno!(ENOPROTOOPT, "it's a read-only option"),
-            _ => Box::new(SetSockOptRawCmd::new(level, optname, optval)),
-        })
-    } else {
-        Ok(match opt {
-            SockOptName::SO_ACCEPTCONN
-            | SockOptName::SO_DOMAIN
-            | SockOptName::SO_PEERNAME
-            | SockOptName::SO_TYPE
-            | SockOptName::SO_ERROR
-            | SockOptName::SO_PEERCRED
-            | SockOptName::SO_SNDLOWAT
-            | SockOptName::SO_PEERSEC
-            | SockOptName::SO_PROTOCOL
-            | SockOptName::SO_MEMINFO
-            | SockOptName::SO_INCOMING_NAPI_ID
-            | SockOptName::SO_COOKIE
-            | SockOptName::SO_PEERGROUPS => return_errno!(ENOPROTOOPT, "it's a read-only option"),
-            SockOptName::SO_RCVTIMEO_OLD => {
-                let mut timeout: *const libc::timeval = std::ptr::null();
-                if optval.len() >= std::mem::size_of::<libc::timeval>() {
-                    timeout = optval as *const _ as *const libc::timeval;
-                } else {
-                    return_errno!(EINVAL, "invalid timeout option");
-                }
-                let timeout = unsafe {
-                    let secs = if (*timeout).tv_sec < 0 {
-                        0
-                    } else {
-                        (*timeout).tv_sec
-                    };
-
-                    let usec = (*timeout).tv_usec;
-                    if usec < 0 || usec > 1000000 || (usec as u32).checked_mul(1000).is_none() {
-                        return_errno!(EDOM, "time struct value is invalid");
-                    }
-                    Duration::new(secs as u64, (*timeout).tv_usec as u32 * 1000)
-                };
-                trace!("recv timeout = {:?}", timeout);
-                Box::new(SetRecvTimeoutCmd::new(timeout))
+    Ok(match opt {
+        SockOptName::SO_ACCEPTCONN
+        | SockOptName::SO_DOMAIN
+        | SockOptName::SO_PEERNAME
+        | SockOptName::SO_TYPE
+        | SockOptName::SO_ERROR
+        | SockOptName::SO_PEERCRED
+        | SockOptName::SO_SNDLOWAT
+        | SockOptName::SO_PEERSEC
+        | SockOptName::SO_PROTOCOL
+        | SockOptName::SO_MEMINFO
+        | SockOptName::SO_INCOMING_NAPI_ID
+        | SockOptName::SO_COOKIE
+        | SockOptName::SO_PEERGROUPS => return_errno!(ENOPROTOOPT, "it's a read-only option"),
+        SockOptName::SO_RCVTIMEO_OLD => {
+            let mut timeout: *const libc::timeval = std::ptr::null();
+            if optval.len() >= std::mem::size_of::<libc::timeval>() {
+                timeout = optval as *const _ as *const libc::timeval;
+            } else {
+                return_errno!(EINVAL, "invalid timeout option");
             }
-            SockOptName::SO_SNDTIMEO_OLD => {
-                let mut timeout: *const libc::timeval = std::ptr::null();
-                if optval.len() >= std::mem::size_of::<libc::timeval>() {
-                    timeout = optval as *const _ as *const libc::timeval;
+            let timeout = unsafe {
+                let secs = if (*timeout).tv_sec < 0 {
+                    0
                 } else {
-                    return_errno!(EINVAL, "invalid timeout option");
-                }
-                let timeout = unsafe {
-                    let secs = if (*timeout).tv_sec < 0 {
-                        0
-                    } else {
-                        (*timeout).tv_sec
-                    };
-
-                    let usec = (*timeout).tv_usec;
-                    if usec < 0 || usec > 1000000 || (usec as u32).checked_mul(1000).is_none() {
-                        return_errno!(EDOM, "time struct value is invalid");
-                    }
-                    Duration::new(secs as u64, usec as u32 * 1000)
+                    (*timeout).tv_sec
                 };
-                trace!("send timeout = {:?}", timeout);
-                Box::new(SetSendTimeoutCmd::new(timeout))
+
+                let usec = (*timeout).tv_usec;
+                if usec < 0 || usec > 1000000 || (usec as u32).checked_mul(1000).is_none() {
+                    return_errno!(EDOM, "time struct value is invalid");
+                }
+                Duration::new(secs as u64, (*timeout).tv_usec as u32 * 1000)
+            };
+            trace!("recv timeout = {:?}", timeout);
+            Box::new(SetRecvTimeoutCmd::new(timeout))
+        }
+        SockOptName::SO_SNDTIMEO_OLD => {
+            let mut timeout: *const libc::timeval = std::ptr::null();
+            if optval.len() >= std::mem::size_of::<libc::timeval>() {
+                timeout = optval as *const _ as *const libc::timeval;
+            } else {
+                return_errno!(EINVAL, "invalid timeout option");
             }
-            SockOptName::SO_SNDBUF => {
+            let timeout = unsafe {
+                let secs = if (*timeout).tv_sec < 0 {
+                    0
+                } else {
+                    (*timeout).tv_sec
+                };
+
+                let usec = (*timeout).tv_usec;
+                if usec < 0 || usec > 1000000 || (usec as u32).checked_mul(1000).is_none() {
+                    return_errno!(EDOM, "time struct value is invalid");
+                }
+                Duration::new(secs as u64, usec as u32 * 1000)
+            };
+            trace!("send timeout = {:?}", timeout);
+            Box::new(SetSendTimeoutCmd::new(timeout))
+        }
+        SockOptName::SO_SNDBUF => {
+            // Implement dynamic buf size for stream socket only.
+            if socket_type != SocketType::STREAM {
+                Box::new(SetSockOptRawCmd::new(level, optname, optval))
+            } else {
+                // Based on the man page: The minimum (doubled) value for this option is 2048.
+                // However, the test on Linux shows the minimum value (doubled) is 4608. Here, we just
+                // use the same value as Linux.
+                let min_size = 128 * 1024;
+                // For the max value, we choose 4MB (doubled) to assure the libos kernel buf won't be the bottleneck.
+                let max_size = 2 * 1024 * 1024;
+
+                if optval.len() > 8 {
+                    return_errno!(EINVAL, "optval size is invalid");
+                }
+
+                let mut send_buf_size = {
+                    let mut size = [0 as u8; std::mem::size_of::<usize>()];
+                    let start_offset = size.len() - optval.len();
+                    size[start_offset..].copy_from_slice(optval);
+                    usize::from_ne_bytes(size)
+                };
+                trace!("set SO_SNDBUF size = {:?}", send_buf_size);
+                if send_buf_size < min_size {
+                    send_buf_size = min_size;
+                }
+                if send_buf_size > max_size {
+                    send_buf_size = max_size;
+                }
+                // Based on man page: The kernel doubles this value (to allow space for bookkeeping overhead)
+                // when it is set using setsockopt(2), and this doubled value is returned by getsockopt(2).
+                send_buf_size *= 2;
+                Box::new(SetSendBufSizeCmd::new(send_buf_size))
+            }
+        }
+        SockOptName::SO_RCVBUF => {
+            if socket_type != SocketType::STREAM {
+                Box::new(SetSockOptRawCmd::new(level, optname, optval))
+            } else {
                 // Implement dynamic buf size for stream socket only.
-                if socket_type != Type::STREAM {
-                    Box::new(SetSockOptRawCmd::new(level, optname, optval))
-                } else {
-                    // Based on the man page: The minimum (doubled) value for this option is 2048.
-                    // However, the test on Linux shows the minimum value (doubled) is 4608. Here, we just
-                    // use the same value as Linux.
-                    let min_size = 1152;
-                    // For the max value, we choose 4MB (doubled) to assure the libos kernel buf won't be the bottleneck.
-                    let max_size = 2 * 1024 * 1024;
+                info!("optval = {:?}", optval);
+                // Based on the man page: The minimum (doubled) value for this option is 256.
+                // However, the test on Linux shows the minimum value (doubled) is 2304. Here, we just
+                // use the same value as Linux.
+                let min_size = 128 * 1024;
+                // For the max value, we choose 4MB (doubled) to assure the libos kernel buf won't be the bottleneck.
+                let max_size = 2 * 1024 * 1024;
 
-                    let mut send_buf_size = {
-                        let mut size = [0 as u8; std::mem::size_of::<usize>()];
-                        let start_offset = size.len() - optval.len();
-                        size[start_offset..].copy_from_slice(optval);
-                        usize::from_ne_bytes(size)
-                    };
-                    trace!("set SO_SNDBUF size = {:?}", send_buf_size);
-                    if send_buf_size < min_size {
-                        send_buf_size = min_size;
-                    }
-                    if send_buf_size > max_size {
-                        send_buf_size = max_size;
-                    }
-                    // Based on man page: The kernel doubles this value (to allow space for bookkeeping overhead)
-                    // when it is set using setsockopt(2), and this doubled value is returned by getsockopt(2).
-                    send_buf_size *= 2;
-                    Box::new(SetSndBufSizeCmd::new(send_buf_size))
+                if optval.len() > 8 {
+                    return_errno!(EINVAL, "optval size is invalid");
                 }
-            }
-            SockOptName::SO_RCVBUF => {
-                if socket_type != Type::STREAM {
-                    Box::new(SetSockOptRawCmd::new(level, optname, optval))
-                } else {
-                    // Implement dynamic buf size for stream socket only.
-                    info!("optval = {:?}", optval);
-                    // Based on the man page: The minimum (doubled) value for this option is 256.
-                    // However, the test on Linux shows the minimum value (doubled) is 2304. Here, we just
-                    // use the same value as Linux.
-                    let min_size = 1152;
-                    // For the max value, we choose 4MB (doubled) to assure the libos kernel buf won't be the bottleneck.
-                    let max_size = 2 * 1024 * 1024;
 
-                    let mut recv_buf_size = {
-                        let mut size = [0 as u8; std::mem::size_of::<usize>()];
-                        let start_offset = size.len() - optval.len();
-                        size[start_offset..].copy_from_slice(optval);
-                        usize::from_ne_bytes(size)
-                    };
-                    trace!("set SO_RCVBUF size = {:?}", recv_buf_size);
-                    if recv_buf_size < min_size {
-                        recv_buf_size = min_size;
-                    }
-
-                    if recv_buf_size > max_size {
-                        recv_buf_size = max_size
-                    }
-                    // Based on man page: The kernel doubles this value (to allow space for bookkeeping overhead)
-                    // when it is set using setsockopt(2), and this doubled value is returned by getsockopt(2).
-                    recv_buf_size *= 2;
-                    Box::new(SetRcvBufSizeCmd::new(recv_buf_size))
+                let mut recv_buf_size = {
+                    let mut size = [0 as u8; std::mem::size_of::<usize>()];
+                    let start_offset = size.len() - optval.len();
+                    size[start_offset..].copy_from_slice(optval);
+                    usize::from_ne_bytes(size)
+                };
+                trace!("set SO_RCVBUF size = {:?}", recv_buf_size);
+                if recv_buf_size < min_size {
+                    recv_buf_size = min_size;
                 }
+
+                if recv_buf_size > max_size {
+                    recv_buf_size = max_size
+                }
+                // Based on man page: The kernel doubles this value (to allow space for bookkeeping overhead)
+                // when it is set using setsockopt(2), and this doubled value is returned by getsockopt(2).
+                recv_buf_size *= 2;
+                Box::new(SetRecvBufSizeCmd::new(recv_buf_size))
             }
-            _ => Box::new(SetSockOptRawCmd::new(level, optname, optval)),
-        })
-    }
+        }
+        _ => Box::new(SetSockOptRawCmd::new(level, optname, optval)),
+    })
 }
 
 fn get_optval(cmd: &dyn IoctlCmd) -> Result<&[u8]> {
@@ -1346,10 +1311,10 @@ fn get_optval(cmd: &dyn IoctlCmd) -> Result<&[u8]> {
         cmd : GetSendTimeoutCmd => {
             cmd.get_output_as_bytes()
         },
-        cmd : GetSndBufSizeCmd => {
+        cmd : GetSendBufSizeCmd => {
             cmd.get_output_as_bytes()
         },
-        cmd : GetRcvBufSizeCmd => {
+        cmd : GetRecvBufSizeCmd => {
             cmd.get_output_as_bytes()
         },
         _ => {
@@ -1490,12 +1455,4 @@ fn extract_msghdr_mut_from_user<'a>(
     };
 
     Ok((msg_mut, name, control, bufs))
-}
-
-// Flags to use when creating a new socket
-bitflags! {
-    pub struct SocketFlags: i32 {
-        const SOCK_NONBLOCK = 0x800;
-        const SOCK_CLOEXEC  = 0x80000;
-    }
 }

@@ -16,10 +16,10 @@ pub use get_domain::GetDomainCmd;
 pub use get_error::GetErrorCmd;
 pub use get_output::*;
 pub use get_peername::{AddrStorage, GetPeerNameCmd};
-pub use get_sockbuf::{GetRcvBufSizeCmd, GetSndBufSizeCmd};
+pub use get_sockbuf::{GetRecvBufSizeCmd, GetSendBufSizeCmd};
 pub use get_type::GetTypeCmd;
 pub use set::{setsockopt_by_host, SetSockOptRawCmd};
-pub use set_sockbuf::{SetRcvBufSizeCmd, SetSndBufSizeCmd};
+pub use set_sockbuf::{SetRecvBufSizeCmd, SetSendBufSizeCmd};
 pub use timeout::{
     timeout_to_timeval, GetRecvTimeoutCmd, GetSendTimeoutCmd, SetRecvTimeoutCmd, SetSendTimeoutCmd,
 };
