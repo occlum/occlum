@@ -102,10 +102,10 @@ impl SocketFile {
         apply_fn_on_any_socket!(&self.socket, |socket| { socket.ioctl(cmd) })
     }
 
-    pub fn get_type(&self) -> Type {
+    pub fn get_type(&self) -> SocketType {
         match self.socket {
-            AnySocket::Ipv4Stream(_) | AnySocket::Ipv6Stream(_) => Type::STREAM,
-            AnySocket::Ipv4Datagram(_) | AnySocket::Ipv6Datagram(_) => Type::DGRAM,
+            AnySocket::Ipv4Stream(_) | AnySocket::Ipv6Stream(_) => SocketType::STREAM,
+            AnySocket::Ipv4Datagram(_) | AnySocket::Ipv6Datagram(_) => SocketType::DGRAM,
         }
     }
 }
@@ -115,11 +115,11 @@ impl SocketFile {
     pub fn new(
         domain: Domain,
         protocol: SocketProtocol,
-        socket_type: Type,
+        socket_type: SocketType,
         nonblocking: bool,
     ) -> Result<Self> {
         match socket_type {
-            Type::STREAM => {
+            SocketType::STREAM => {
                 if protocol != SocketProtocol::IPPROTO_IP && protocol != SocketProtocol::IPPROTO_TCP
                 {
                     return_errno!(EPROTONOSUPPORT, "Protocol not supported");
@@ -140,7 +140,7 @@ impl SocketFile {
                 let new_self = Self { socket: any_socket };
                 Ok(new_self)
             }
-            Type::DGRAM => {
+            SocketType::DGRAM => {
                 if protocol != SocketProtocol::IPPROTO_IP && protocol != SocketProtocol::IPPROTO_UDP
                 {
                     return_errno!(EPROTONOSUPPORT, "Protocol not supported");
@@ -161,7 +161,7 @@ impl SocketFile {
                 let new_self = Self { socket: any_socket };
                 Ok(new_self)
             }
-            Type::RAW => {
+            SocketType::RAW => {
                 return_errno!(EINVAL, "RAW socket not supported");
             }
             _ => {
@@ -210,7 +210,7 @@ impl SocketFile {
         }
     }
 
-    pub fn bind(&self, addr: &mut AnyAddr) -> Result<()> {
+    pub fn bind(&self, addr: &AnyAddr) -> Result<()> {
         match &self.socket {
             AnySocket::Ipv4Stream(ipv4_stream) => {
                 let ip_addr = addr.to_ipv4()?;

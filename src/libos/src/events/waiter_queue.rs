@@ -27,7 +27,7 @@ use crate::prelude::*;
 /// Although it is safer to use AcqRel，here using `Release` would be enough.
 pub struct WaiterQueue<Sync: Synchronizer = LevelSync> {
     count: AtomicUsize,
-    wakers: SgxMutex<VecDeque<Waker<Sync>>>,
+    wakers: Mutex<VecDeque<Waker<Sync>>>,
 }
 
 impl<Sync: Synchronizer> WaiterQueue<Sync> {
@@ -35,7 +35,7 @@ impl<Sync: Synchronizer> WaiterQueue<Sync> {
     pub fn new() -> Self {
         Self {
             count: AtomicUsize::new(0),
-            wakers: SgxMutex::new(VecDeque::new()),
+            wakers: Mutex::new(VecDeque::new()),
         }
     }
 
@@ -54,7 +54,7 @@ impl<Sync: Synchronizer> WaiterQueue<Sync> {
     pub fn reset_and_enqueue(&self, waiter: &Waiter<Sync>) {
         waiter.reset();
 
-        let mut wakers = self.wakers.lock().unwrap();
+        let mut wakers = self.wakers.lock();
         self.count.fetch_add(1, Ordering::Release);
         wakers.push_back(waiter.waker());
     }
@@ -78,7 +78,7 @@ impl<Sync: Synchronizer> WaiterQueue<Sync> {
 
         // Dequeue wakers
         let to_wake = {
-            let mut wakers = self.wakers.lock().unwrap();
+            let mut wakers = self.wakers.lock();
             let max_count = max_count.min(wakers.len());
             let to_wake: Vec<Waker<Sync>> = wakers.drain(..max_count).collect();
             self.count.fetch_sub(to_wake.len(), Ordering::Release);

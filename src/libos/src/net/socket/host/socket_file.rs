@@ -41,7 +41,7 @@ impl File for HostSocket {
     }
 
     fn writev(&self, bufs: &[&[u8]]) -> Result<usize> {
-        self.sendmsg(bufs, SendFlags::empty(), &None, None)
+        self.sendmsg(bufs, SendFlags::empty(), None, None)
     }
 
     fn seek(&self, pos: SeekFrom) -> Result<off_t> {

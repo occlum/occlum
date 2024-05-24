@@ -14,7 +14,6 @@ use crate::misc::ResourceLimits;
 use crate::prelude::*;
 use crate::sched::{NiceValue, SchedAgent};
 use crate::signal::{SigDispositions, SigQueues};
-use crate::util::sync::Mutex;
 use crate::vm::ProcessVM;
 
 use self::pgrp::ProcessGrp;

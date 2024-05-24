@@ -36,7 +36,8 @@ impl GetIfConf {
         }
 
         let mut if_conf = self.to_raw_ifconf();
-        get_ifconf_by_host(fd, &mut if_conf)?;
+        GetIfConf::get_ifconf_by_host(fd, &mut if_conf)?;
+
         self.set_len(if_conf.ifc_len as usize);
         Ok(())
     }
@@ -78,59 +79,59 @@ impl GetIfConf {
             },
         }
     }
+
+    fn get_ifconf_by_host(fd: FileDesc, if_conf: &mut IfConf) -> Result<()> {
+        const SIOCGIFCONF: u32 = 0x8912;
+
+        extern "C" {
+            // Used to ioctl arguments with pointer members.
+            //
+            // Before the call the area the pointers points to should be assembled into
+            // one continuous memory block. Then the block is repacked to ioctl arguments
+            // in the ocall implementation in host.
+            //
+            // ret: holds the return value of ioctl in host
+            // fd: the host fd for the device
+            // cmd_num: request number of the ioctl
+            // buf: the data to exchange with host
+            // len: the size of the buf
+            // recv_len: accepts transferred data length when buf is used to get data from host
+            //
+            fn occlum_ocall_ioctl_repack(
+                ret: *mut i32,
+                fd: i32,
+                cmd_num: i32,
+                buf: *const u8,
+                len: i32,
+                recv_len: *mut i32,
+            ) -> sgx_types::sgx_status_t;
+        }
+
+        try_libc!({
+            let mut recv_len: i32 = 0;
+            let mut retval: i32 = 0;
+            let status = occlum_ocall_ioctl_repack(
+                &mut retval as *mut i32,
+                fd as _,
+                SIOCGIFCONF as _,
+                if_conf.ifc_buf,
+                if_conf.ifc_len,
+                &mut recv_len as *mut i32,
+            );
+            assert!(status == sgx_types::sgx_status_t::SGX_SUCCESS);
+
+            // If ifc_req is NULL, SIOCGIFCONF returns the necessary buffer
+            // size in bytes for receiving all available addresses in ifc_len
+            // which is irrelevant to the orginal ifc_len.
+            if !if_conf.ifc_buf.is_null() {
+                assert!(if_conf.ifc_len >= recv_len);
+            }
+            if_conf.ifc_len = recv_len;
+            retval
+        });
+
+        Ok(())
+    }
 }
 
 impl IoctlCmd for GetIfConf {}
-
-const SIOCGIFCONF: u32 = 0x8912;
-
-fn get_ifconf_by_host(fd: FileDesc, if_conf: &mut IfConf) -> Result<()> {
-    extern "C" {
-        // Used to ioctl arguments with pointer members.
-        //
-        // Before the call the area the pointers points to should be assembled into
-        // one continuous memory block. Then the block is repacked to ioctl arguments
-        // in the ocall implementation in host.
-        //
-        // ret: holds the return value of ioctl in host
-        // fd: the host fd for the device
-        // cmd_num: request number of the ioctl
-        // buf: the data to exchange with host
-        // len: the size of the buf
-        // recv_len: accepts transferred data length when buf is used to get data from host
-        //
-        fn occlum_ocall_ioctl_repack(
-            ret: *mut i32,
-            fd: i32,
-            cmd_num: i32,
-            buf: *const u8,
-            len: i32,
-            recv_len: *mut i32,
-        ) -> sgx_types::sgx_status_t;
-    }
-
-    try_libc!({
-        let mut recv_len: i32 = 0;
-        let mut retval: i32 = 0;
-        let status = occlum_ocall_ioctl_repack(
-            &mut retval as *mut i32,
-            fd as _,
-            SIOCGIFCONF as _,
-            if_conf.ifc_buf,
-            if_conf.ifc_len,
-            &mut recv_len as *mut i32,
-        );
-        assert!(status == sgx_types::sgx_status_t::SGX_SUCCESS);
-
-        // If ifc_req is NULL, SIOCGIFCONF returns the necessary buffer
-        // size in bytes for receiving all available addresses in ifc_len
-        // which is irrelevant to the orginal ifc_len.
-        if !if_conf.ifc_buf.is_null() {
-            assert!(if_conf.ifc_len >= recv_len);
-        }
-        if_conf.ifc_len = recv_len;
-        retval
-    });
-
-    Ok(())
-}

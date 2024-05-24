@@ -11,20 +11,20 @@ use atomic::Ordering;
 use crate::process::{futex_wait, futex_wake};
 
 #[derive(Default)]
-pub struct Mutex<T> {
-    value: UnsafeCell<T>,
+pub struct Mutex<T: ?Sized> {
     inner: Box<MutexInner>,
+    value: UnsafeCell<T>,
 }
 
-unsafe impl<T: Send> Sync for Mutex<T> {}
-unsafe impl<T: Send> Send for Mutex<T> {}
+unsafe impl<T: Send + ?Sized> Sync for Mutex<T> {}
+unsafe impl<T: Send + ?Sized> Send for Mutex<T> {}
 
-pub struct MutexGuard<'a, T: 'a> {
+pub struct MutexGuard<'a, T: ?Sized + 'a> {
     inner: &'a Mutex<T>,
 }
 
-impl<T> !Send for MutexGuard<'_, T> {}
-unsafe impl<T: Sync> Sync for MutexGuard<'_, T> {}
+impl<T: ?Sized> !Send for MutexGuard<'_, T> {}
+unsafe impl<T: Sync + ?Sized> Sync for MutexGuard<'_, T> {}
 
 impl<T> Mutex<T> {
     #[inline]
@@ -34,14 +34,9 @@ impl<T> Mutex<T> {
             inner: Box::new(MutexInner::new()),
         }
     }
-
-    #[inline]
-    pub fn into_inner(self) -> T {
-        self.value.into_inner()
-    }
 }
 
-impl<T> Mutex<T> {
+impl<T: ?Sized> Mutex<T> {
     #[inline]
     pub fn lock(&self) -> MutexGuard<'_, T> {
         self.inner.lock();
@@ -50,7 +45,7 @@ impl<T> Mutex<T> {
 
     #[inline]
     pub fn try_lock(&self) -> Option<MutexGuard<'_, T>> {
-        self.inner.try_lock().map(|_| MutexGuard { inner: self })
+        self.inner.try_lock().then(|| MutexGuard { inner: self })
     }
 
     #[inline]
@@ -67,9 +62,17 @@ impl<T> Mutex<T> {
     pub fn get_mut(&mut self) -> &mut T {
         self.value.get_mut()
     }
+
+    #[inline]
+    pub fn into_inner(self) -> T
+    where
+        T: Sized,
+    {
+        self.value.into_inner()
+    }
 }
 
-impl<T> Deref for MutexGuard<'_, T> {
+impl<T: ?Sized> Deref for MutexGuard<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -77,13 +80,13 @@ impl<T> Deref for MutexGuard<'_, T> {
     }
 }
 
-impl<T> DerefMut for MutexGuard<'_, T> {
+impl<T: ?Sized> DerefMut for MutexGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut *self.inner.value.get() }
     }
 }
 
-impl<T> Drop for MutexGuard<'_, T> {
+impl<T: ?Sized> Drop for MutexGuard<'_, T> {
     fn drop(&mut self) {
         unsafe {
             self.inner.force_unlock();
@@ -91,13 +94,13 @@ impl<T> Drop for MutexGuard<'_, T> {
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for MutexGuard<'_, T> {
+impl<T: fmt::Debug + ?Sized> fmt::Debug for MutexGuard<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Debug::fmt(&**self, f)
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for Mutex<T> {
+impl<T: fmt::Debug + ?Sized> fmt::Debug for Mutex<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.try_lock() {
             Some(guard) => write!(f, "Mutex {{ value: ")
@@ -138,10 +141,10 @@ impl MutexInner {
     }
 
     #[inline]
-    pub fn try_lock(&self) -> Option<u32> {
+    pub fn try_lock(&self) -> bool {
         self.lock
             .compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed)
-            .ok()
+            .is_ok()
     }
 
     #[inline]

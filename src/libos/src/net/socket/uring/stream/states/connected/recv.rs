@@ -191,7 +191,6 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
         // Init the callback invoked upon the completion of the async recv
         let stream = self.clone();
         let complete_fn = move |retval: i32| {
-            // let mut inner = stream.receiver.inner.lock().unwrap();
             let mut inner = stream.receiver.inner.lock();
             trace!("recv request complete with retval: {:?}", retval);
 
@@ -232,7 +231,9 @@ impl<A: Addr + 'static, R: Runtime> ConnectedStream<A, R> {
             // ready to read.
             stream.common.pollee().add_events(Events::IN);
 
-            stream.do_recv(&mut inner);
+            if !stream.receiver.need_update() {
+                stream.do_recv(&mut inner);
+            }
         };
 
         // Generate the async recv request
