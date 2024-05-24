@@ -26,7 +26,11 @@ impl Synchronizer for EdgeSync {
             return Ok(());
         }
         loop {
-            self.host_eventfd.poll(timeout)?;
+            if let Err(error) = self.host_eventfd.poll(timeout) {
+                self.state.store(INIT, Ordering::Relaxed);
+                return Err(error);
+            }
+
             if self
                 .state
                 .compare_exchange(NOTIFIED, INIT, Ordering::Acquire, Ordering::Acquire)
@@ -47,8 +51,7 @@ impl Synchronizer for EdgeSync {
         // Need to change timeout from `Option<&mut Duration>` to `&mut Option<Duration>`
         // so that the Rust compiler is happy about using the variable in a loop.
         let ret = self.host_eventfd.poll_mut(remain.as_mut());
-        // Wait for something to happen, assuming it's still set to PARKED.
-        // futex_wait(&self.state, PARKED, Some(timeout));
+        // Wait for something to happen, assuming it's still set to NOTIFIED.
         // This is not just a store, because we need to establish a
         // release-acquire ordering with unpark().
         if self.state.swap(INIT, Ordering::Acquire) == NOTIFIED {

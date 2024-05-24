@@ -12,7 +12,7 @@ impl HostSocket {
         data: &mut [&mut [u8]],
         flags: RecvFlags,
         control: Option<&mut [u8]>,
-    ) -> Result<(usize, Option<RawAddr>, MsgFlags, usize)> {
+    ) -> Result<(usize, Option<AnyAddr>, MsgFlags, usize)> {
         let current = current!();
         let data_length = data.iter().map(|s| s.len()).sum();
         let mut ocall_alloc;
@@ -54,10 +54,10 @@ impl HostSocket {
         data: &mut [UntrustedSlice],
         flags: RecvFlags,
         mut control: Option<&mut [u8]>,
-    ) -> Result<(usize, Option<RawAddr>, MsgFlags, usize)> {
+    ) -> Result<(usize, Option<AnyAddr>, MsgFlags, usize)> {
         // Prepare the arguments for OCall
         let host_fd = self.raw_host_fd() as i32;
-        let mut addr = RawAddr::default();
+        let mut addr = SockAddr::default();
         let mut msg_name = addr.as_mut_ptr();
         let mut msg_namelen = addr.len();
         let mut msg_namelen_recvd = 0_u32;
@@ -122,16 +122,16 @@ impl HostSocket {
         };
         let msg_namelen_recvd = msg_namelen_recvd as usize;
 
-        let raw_addr = if msg_namelen_recvd == 0 {
-            None
-        } else {
-            addr.set_len(msg_namelen_recvd)?;
-            Some(addr)
-        };
+        let raw_addr = (msg_namelen_recvd != 0).then(|| {
+            addr.set_len(msg_namelen_recvd);
+            addr
+        });
+
+        let addr = raw_addr.map(|addr| AnyAddr::Raw(addr));
 
         assert!(msg_namelen_recvd <= msg_namelen);
         assert!(msg_controllen_recvd <= msg_controllen);
-        Ok((bytes_recvd, raw_addr, flags_recvd, msg_controllen_recvd))
+        Ok((bytes_recvd, addr, flags_recvd, msg_controllen_recvd))
     }
 }
 

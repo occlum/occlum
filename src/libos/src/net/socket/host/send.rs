@@ -2,14 +2,14 @@ use super::*;
 
 impl HostSocket {
     pub fn send(&self, buf: &[u8], flags: SendFlags) -> Result<usize> {
-        self.sendto(buf, flags, &None)
+        self.sendto(buf, flags, None)
     }
 
     pub fn sendmsg(
         &self,
         data: &[&[u8]],
         flags: SendFlags,
-        addr: &Option<RawAddr>,
+        addr: Option<AnyAddr>,
         control: Option<&[u8]>,
     ) -> Result<usize> {
         let current = current!();
@@ -34,8 +34,14 @@ impl HostSocket {
             bufs
         };
 
-        let name = addr.as_ref().map(|raw_addr| raw_addr.as_slice());
-        self.do_sendmsg_untrusted_data(&u_data, flags, name, control)
+        let raw_addr = addr.map(|addr| addr.to_raw());
+
+        self.do_sendmsg_untrusted_data(
+            &u_data,
+            flags,
+            raw_addr.as_ref().map(|addr| addr.as_slice()),
+            control,
+        )
     }
 
     fn do_sendmsg_untrusted_data(

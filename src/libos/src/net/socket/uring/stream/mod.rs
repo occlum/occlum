@@ -57,7 +57,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     pub fn new_pair(nonblocking: bool) -> Result<(Self, Self)> {
-        let (common1, common2) = Common::new_pair(Type::STREAM, nonblocking)?;
+        let (common1, common2) = Common::new_pair(SocketType::STREAM, nonblocking)?;
         let connected1 = ConnectedStream::new(Arc::new(common1));
         let connected2 = ConnectedStream::new(Arc::new(common2));
         let socket1 = Self::new_connected(connected1);
@@ -373,10 +373,10 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
                 cmd.execute(self.host_fd())?;
             },
             cmd: SetRecvTimeoutCmd => {
-                self.set_recv_timeout(*cmd.timeout());
+                self.set_recv_timeout(*cmd.input());
             },
             cmd: SetSendTimeoutCmd => {
-                self.set_send_timeout(*cmd.timeout());
+                self.set_send_timeout(*cmd.input());
             },
             cmd: GetRecvTimeoutCmd => {
                 let timeval = timeout_to_timeval(self.recv_timeout());
@@ -386,21 +386,21 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
                 let timeval = timeout_to_timeval(self.send_timeout());
                 cmd.set_output(timeval);
             },
-            cmd: SetSndBufSizeCmd => {
+            cmd: SetSendBufSizeCmd => {
                 cmd.update_host(self.host_fd())?;
-                let buf_size = cmd.buf_size();
+                let buf_size = *cmd.input();
                 self.set_kernel_send_buf_size(buf_size);
             },
-            cmd: SetRcvBufSizeCmd => {
+            cmd: SetRecvBufSizeCmd => {
                 cmd.update_host(self.host_fd())?;
-                let buf_size = cmd.buf_size();
+                let buf_size = *cmd.input();
                 self.set_kernel_recv_buf_size(buf_size);
             },
-            cmd: GetSndBufSizeCmd => {
+            cmd: GetSendBufSizeCmd => {
                 let buf_size = SEND_BUF_SIZE.load(Ordering::Relaxed);
                 cmd.set_output(buf_size);
             },
-            cmd: GetRcvBufSizeCmd => {
+            cmd: GetRecvBufSizeCmd => {
                 let buf_size = RECV_BUF_SIZE.load(Ordering::Relaxed);
                 cmd.set_output(buf_size);
             },
@@ -454,6 +454,8 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     fn set_kernel_send_buf_size(&self, buf_size: usize) {
+        // Setting the minimal buf_size to 128 Kbytes
+        let buf_size = (128 * 1024 + 1).max(buf_size);
         let state = self.state.read().unwrap();
         match &*state {
             State::Init(_) | State::Listen(_) | State::Connect(_) => {
@@ -467,6 +469,8 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     fn set_kernel_recv_buf_size(&self, buf_size: usize) {
+        // Setting the minimal buf_size to 128 Kbytes
+        let buf_size = (128 * 1024 + 1).max(buf_size);
         let state = self.state.read().unwrap();
         match &*state {
             State::Init(_) | State::Listen(_) | State::Connect(_) => {

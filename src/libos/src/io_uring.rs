@@ -104,13 +104,11 @@ impl UringSet {
                 // Sum registered socket
                 let total_socket_num = map
                     .values()
-                    .fold(0, |acc, state| acc + state.registered_num)
-                    + 1;
+                    .fold(0, |acc, state| acc + state.registered_num);
                 // Determine the number of available io_uring
                 let uring_num = (total_socket_num / SOCKET_THRESHOLD_PER_URING) + 1;
-                let existed_uring_num = self.running_uring_num.load(Ordering::Relaxed);
-                assert!(existed_uring_num <= uring_num);
-                existed_uring_num < uring_num
+
+                running_uring_num < uring_num
             };
 
             if should_build_uring {
@@ -134,7 +132,7 @@ impl UringSet {
         // Link the file to the io_uring instance with the least load.
         let (mut uring, mut state) = map
             .iter_mut()
-            .min_by_key(|(_, &mut state)| state.registered_num)
+            .min_by_key(|(_, state)| state.registered_num)
             .unwrap();
 
         // Re-select io_uring instance with least task load

@@ -106,7 +106,7 @@ impl UnixAddr {
         /// The '/0' at the end of Self::File counts
         match self.path_str() {
             Ok(str) => str.len() + 1 + *SUN_PATH_OFFSET,
-            Err(_) => 0,
+            Err(_) => std::mem::size_of::<libc::sa_family_t>(),
         }
     }
 
@@ -123,9 +123,9 @@ impl UnixAddr {
         c_un_addr.to_c_storage()
     }
 
-    pub fn to_raw(&self) -> RawAddr {
+    pub fn to_raw(&self) -> SockAddr {
         let (storage, addr_len) = self.to_c_storage();
-        RawAddr::from_c_storage(&storage, addr_len)
+        SockAddr::from_c_storage(&storage, addr_len)
     }
 
     fn to_c(&self) -> (libc::sockaddr_un, usize) {

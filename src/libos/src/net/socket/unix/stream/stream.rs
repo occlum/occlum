@@ -72,7 +72,10 @@ impl Stream {
         return_errno!(ENOTCONN, "the socket is not connected");
     }
 
-    pub fn bind(&self, addr: &mut UnixAddr) -> Result<()> {
+    pub fn bind(&self, addr: &UnixAddr) -> Result<()> {
+        let mut unix_addr = addr.clone();
+        let addr = &mut unix_addr;
+
         if let UnixAddr::File(inode_num, path) = addr {
             // create the corresponding file in the fs and fill Addr with its inode
             let corresponding_inode_num = {
@@ -218,7 +221,7 @@ impl Stream {
     }
 
     // TODO: handle flags
-    pub fn sendto(&self, buf: &[u8], flags: SendFlags, addr: &Option<UnixAddr>) -> Result<usize> {
+    pub fn sendto(&self, buf: &[u8], flags: SendFlags, addr: Option<&UnixAddr>) -> Result<usize> {
         self.write(buf)
     }
 
@@ -255,7 +258,7 @@ impl Stream {
         bufs: &mut [&mut [u8]],
         flags: RecvFlags,
         control: Option<&mut [u8]>,
-    ) -> Result<(usize, usize)> {
+    ) -> Result<(usize, Option<AnyAddr>, MsgFlags, usize)> {
         if !flags.is_empty() {
             warn!("unsupported flags: {:?}", flags);
         }
@@ -288,7 +291,7 @@ impl Stream {
             0
         };
 
-        Ok((data_len, control_len))
+        Ok((data_len, None, MsgFlags::empty(), control_len))
     }
 
     /// perform shutdown on the socket.

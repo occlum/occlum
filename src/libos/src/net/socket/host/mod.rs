@@ -26,7 +26,7 @@ pub struct HostSocket {
 impl HostSocket {
     pub fn new(
         domain: Domain,
-        socket_type: Type,
+        socket_type: SocketType,
         socket_flags: SocketFlags,
         protocol: i32,
     ) -> Result<Self> {
@@ -49,7 +49,7 @@ impl HostSocket {
         })
     }
 
-    pub fn bind(&self, addr: &RawAddr) -> Result<()> {
+    pub fn bind(&self, addr: &SockAddr) -> Result<()> {
         let (addr_ptr, addr_len) = addr.as_ptr_and_len();
 
         let ret = try_libc!(libc::ocall::bind(
@@ -65,8 +65,8 @@ impl HostSocket {
         Ok(())
     }
 
-    pub fn accept(&self, flags: SocketFlags) -> Result<(Self, Option<RawAddr>)> {
-        let mut sockaddr = RawAddr::default();
+    pub fn accept(&self, flags: SocketFlags) -> Result<(Self, Option<SockAddr>)> {
+        let mut sockaddr = SockAddr::default();
         let mut addr_len = sockaddr.len();
 
         let raw_host_fd = try_libc!(libc::ocall::accept4(
@@ -86,8 +86,8 @@ impl HostSocket {
         Ok((HostSocket::from_host_fd(host_fd)?, addr_option))
     }
 
-    pub fn addr(&self) -> Result<RawAddr> {
-        let mut sockaddr = RawAddr::default();
+    pub fn addr(&self) -> Result<SockAddr> {
+        let mut sockaddr = SockAddr::default();
         let mut addr_len = sockaddr.len();
         try_libc!(libc::ocall::getsockname(
             self.raw_host_fd() as i32,
@@ -99,8 +99,8 @@ impl HostSocket {
         Ok(sockaddr)
     }
 
-    pub fn peer_addr(&self) -> Result<RawAddr> {
-        let mut sockaddr = RawAddr::default();
+    pub fn peer_addr(&self) -> Result<SockAddr> {
+        let mut sockaddr = SockAddr::default();
         let mut addr_len = sockaddr.len();
         try_libc!(libc::ocall::getpeername(
             self.raw_host_fd() as i32,
@@ -112,7 +112,7 @@ impl HostSocket {
         Ok(sockaddr)
     }
 
-    pub fn connect(&self, addr: &Option<RawAddr>) -> Result<()> {
+    pub fn connect(&self, addr: Option<&SockAddr>) -> Result<()> {
         debug!("connect: host_fd: {}, addr {:?}", self.raw_host_fd(), addr);
 
         let (addr_ptr, addr_len) = if let Some(sock_addr) = addr {
@@ -133,14 +133,13 @@ impl HostSocket {
         &self,
         buf: &[u8],
         flags: SendFlags,
-        addr_option: &Option<RawAddr>,
+        addr_option: Option<AnyAddr>,
     ) -> Result<usize> {
         let bufs = vec![buf];
         self.sendmsg(&bufs, flags, addr_option, None)
     }
 
-    pub fn recvfrom(&self, buf: &mut [u8], flags: RecvFlags) -> Result<(usize, Option<RawAddr>)> {
-        let mut sockaddr = RawAddr::default();
+    pub fn recvfrom(&self, buf: &mut [u8], flags: RecvFlags) -> Result<(usize, Option<AnyAddr>)> {
         let mut bufs = vec![buf];
         let (bytes_recv, recv_addr, _, _) = self.recvmsg(&mut bufs, flags, None)?;
 

@@ -1,12 +1,11 @@
 use super::{GetRecvTimeoutCmd, GetSendTimeoutCmd};
 
 use super::{
-    GetAcceptConnCmd, GetDomainCmd, GetErrorCmd, GetPeerNameCmd, GetRcvBufSizeCmd,
-    GetSndBufSizeCmd, GetSockOptRawCmd, GetTypeCmd,
+    GetAcceptConnCmd, GetDomainCmd, GetErrorCmd, GetPeerNameCmd, GetRecvBufSizeCmd,
+    GetSendBufSizeCmd, GetSockOptRawCmd, GetTypeCmd,
 };
 
 use libc::timeval;
-use std::time::Duration;
 
 use crate::prelude::*;
 
@@ -60,7 +59,7 @@ impl GetOutputAsBytes for GetTypeCmd {
     }
 }
 
-impl GetOutputAsBytes for GetSndBufSizeCmd {
+impl GetOutputAsBytes for GetSendBufSizeCmd {
     fn get_output_as_bytes(&self) -> Option<&[u8]> {
         self.output().map(|val_ref| unsafe {
             std::slice::from_raw_parts(
@@ -71,7 +70,7 @@ impl GetOutputAsBytes for GetSndBufSizeCmd {
     }
 }
 
-impl GetOutputAsBytes for GetRcvBufSizeCmd {
+impl GetOutputAsBytes for GetRecvBufSizeCmd {
     fn get_output_as_bytes(&self) -> Option<&[u8]> {
         self.output().map(|val_ref| unsafe {
             std::slice::from_raw_parts(

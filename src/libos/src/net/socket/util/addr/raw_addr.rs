@@ -2,22 +2,22 @@ use super::*;
 use std::*;
 
 #[derive(Copy, Clone)]
-pub struct RawAddr {
+pub struct SockAddr {
     storage: libc::sockaddr_storage,
     len: usize,
 }
 
 // TODO: add more fields
-impl fmt::Debug for RawAddr {
+impl fmt::Debug for SockAddr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("RawAddr")
+        f.debug_struct("SockAddr")
             .field("family", &Domain::try_from(self.storage.ss_family).unwrap())
             .field("len", &self.len)
             .finish()
     }
 }
 
-impl RawAddr {
+impl SockAddr {
     pub fn from_c_storage(c_addr: &libc::sockaddr_storage, c_addr_len: usize) -> Self {
         Self {
             storage: *c_addr,
@@ -118,7 +118,7 @@ impl RawAddr {
     }
 }
 
-impl Default for RawAddr {
+impl Default for SockAddr {
     fn default() -> Self {
         let mut storage: libc::sockaddr_storage = unsafe { mem::zeroed() };
         Self {

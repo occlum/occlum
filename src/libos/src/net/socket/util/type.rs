@@ -4,7 +4,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 /// A network type.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, IntoPrimitive, TryFromPrimitive)]
 #[repr(i32)]
-pub enum Type {
+pub enum SocketType {
     STREAM = libc::SOCK_STREAM,
     DGRAM = libc::SOCK_DGRAM,
     RAW = libc::SOCK_RAW,
