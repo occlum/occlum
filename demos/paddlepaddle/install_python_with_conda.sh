@@ -21,19 +21,7 @@ sed -i "186 i \    elif sysstr == 'occlum':\n        return True" $CORE_PY
 sed -ie "37,64d" $IMAGE_PY
 sed -i "37 i \try:\n    import cv2\nexcept ImportError:\n     cv2 = None" $IMAGE_PY
 
+
 # Download the dataset
-DATASET=$script_dir/mnist
+git clone https://github.com/fgnt/mnist.git
 
-[ -d $DATASET ] && exit 0
-
-TRAIN_IMAGE=train-images-idx3-ubyte.gz
-TRAIN_LABEL=train-labels-idx1-ubyte.gz
-TEST_IMAGE=t10k-images-idx3-ubyte.gz
-TEST_LABEL=t10k-labels-idx1-ubyte.gz
-URL=http://yann.lecun.com/exdb/mnist
-
-mkdir $DATASET
-wget $URL/$TRAIN_IMAGE -P $DATASET
-wget $URL/$TRAIN_LABEL -P $DATASET
-wget $URL/$TEST_IMAGE  -P $DATASET
-wget $URL/$TEST_LABEL  -P $DATASET
