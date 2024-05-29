@@ -1,5 +1,8 @@
 # Run Flink on Occlum
 
+This is for how to run Flink job manager and task manager in Occlum.
+For how to start Flink K8S cluster in Occlum, please refer to [kubernetes](./kubernetes/).
+
 ### Preinstall dependencies
 Related dependencies: openjdk-11
 ```
