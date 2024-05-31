@@ -97,7 +97,12 @@ impl Log for SimpleLogger {
             let tid = current!().tid();
             let rounds = round_count();
             let desc = round_desc();
-            let target = record.target().split("::").skip(1).next().unwrap();
+            let target = record
+                .target()
+                .split("::")
+                .skip(1)
+                .next()
+                .unwrap_or_default();
             // Message (null-terminated)
             let message = if let Some(desc) = desc {
                 format!(

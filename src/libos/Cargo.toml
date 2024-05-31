@@ -17,7 +17,8 @@ lazy_static = { version = "1.1.0", features = ["spin_no_std"] } # Implies nightl
 derive_builder = "0.9"
 ringbuf = { path = "../../deps/ringbuf" }
 rcore-fs = { path = "../../deps/sefs/rcore-fs" }
-rcore-fs-sefs = { path = "../../deps/sefs/rcore-fs-sefs" }
+# rcore-fs-sefs = { path = "../../deps/sefs/rcore-fs-sefs" }
+rcore-fs-sefs = { path = "../../deps/sefs/rcore-fs-sefs", features = ["sgx"] }
 rcore-fs-ramfs = { path = "../../deps/sefs/rcore-fs-ramfs" }
 rcore-fs-mountfs = { path = "../../deps/sefs/rcore-fs-mountfs" }
 rcore-fs-unionfs = { path = "../../deps/sefs/rcore-fs-unionfs" }
