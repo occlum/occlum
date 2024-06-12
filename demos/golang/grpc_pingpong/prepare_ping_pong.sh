@@ -54,9 +54,9 @@ fi
 if ! type "protoc-gen-go-grpc" > /dev/null 2>&1; then
 	if [[ $GOVERSION != 'go1.16.3' ]];then
 	occlum-go get google.golang.org/grpc/cmd/protoc-gen-go-grpc
-	occlum-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc
+	occlum-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
 	else
-	occlum-go get google.golang.org/grpc/cmd/protoc-gen-go-grpc
+	occlum-go get google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
 	fi
 fi
 
