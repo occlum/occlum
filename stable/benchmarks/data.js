@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1718230235143,
+  "lastUpdate": 1718230238818,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -3286,6 +3286,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2230,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Hui, Chunyang",
+            "username": "jessehui",
+            "email": "sanqian.hcy@antfin.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "0c9a44fc60ed9b4db5f0c7009299760c8c865c2f",
+          "message": "Add kernel_heap_monitor as the default feature",
+          "timestamp": "2024-05-28T11:08:29Z",
+          "url": "https://github.com/occlum/occlum/commit/0c9a44fc60ed9b4db5f0c7009299760c8c865c2f"
+        },
+        "date": 1718230234892,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2211,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2211,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
