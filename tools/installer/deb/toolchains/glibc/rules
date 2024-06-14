@@ -42,7 +42,7 @@ override_dh_usrlocal:
 override_dh_fixperms:
 	dh_fixperms
 	# Occlum need this to be executable
-	chmod 755 $(install_dir)/lib/ld-2.31.so
+	chmod 755 $(install_dir)/lib/ld-*.so*
 	chmod 755 $(install_dir)/lib/libc.so.6
 
 override_dh_install:
