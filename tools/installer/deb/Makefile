@@ -5,7 +5,8 @@ TARGET_DIR := $(abspath $(PROJECT_DIR)/build/debs)
 MAJOR_VER_NUM = $(shell grep '\#define OCCLUM_MAJOR_VERSION' $(PROJECT_DIR)/src/pal/include/occlum_version.h | awk '{print $$3}')
 MINOR_VER_NUM = $(shell grep '\#define OCCLUM_MINOR_VERSION' $(PROJECT_DIR)/src/pal/include/occlum_version.h | awk '{print $$3}')
 PATCH_VER_NUM = $(shell grep '\#define OCCLUM_PATCH_VERSION' $(PROJECT_DIR)/src/pal/include/occlum_version.h | awk '{print $$3}')
-VERSION_NUM = $(MAJOR_VER_NUM).$(MINOR_VER_NUM).$(PATCH_VER_NUM)
+OS_CODE = $(shell grep "VERSION_CODENAME" /etc/os-release 2> /dev/null | cut -d= -f2)
+VERSION_NUM = $(MAJOR_VER_NUM).$(MINOR_VER_NUM).$(PATCH_VER_NUM)-$(OS_CODE)
 
 DEB_BUILD_DIR := /tmp/deb_build
 PACKAGE_DIR := /tmp
@@ -17,8 +18,12 @@ C_TOOLCHAIN_PACKAGE_NAME := occlum-toolchains-gcc
 # When updating the toolchain packages for Deb, please first update RPM configuration. And then
 # update the "changelog" file accordingly.
 MUSL_VERSION := 0.27.0
-GOLAN_VERSION := 1.18.4
-GLIBC_VERSION ?= 2.31
+GOLANG_VERSION := 1.18.4
+ifeq ($(OS_CODE), jammy)
+	GLIBC_VERSION := 2.35
+else
+	GLIBC_VERSION := 2.31
+endif
 
 .PHONY: all main config_files main_deps musl-gcc deps_c glibc deps_glibc clean clean-build
 
@@ -41,7 +46,7 @@ config_files: main_deps
 	sed -i -e '$$aetc/profile.d/occlum-runtime.sh' $(DEB_BUILD_DIR)/occlum-$(VERSION_NUM)/debian/occlum-runtime-filelist
 	sed -i -e 's/$$OCCLUM_VERSION/$(VERSION_NUM)/g' $(DEB_BUILD_DIR)/occlum-$(VERSION_NUM)/debian/changelog
 	sed -i -e 's/$$OCCLUM_VERSION/$(VERSION_NUM)/g' $(DEB_BUILD_DIR)/occlum-$(VERSION_NUM)/debian/control
-	sed -i -e 's/$$MUSL_VERSION/$(MUSL_VERSION)/g' $(DEB_BUILD_DIR)/occlum-$(VERSION_NUM)/debian/control
+	sed -i -e 's/$$MUSL_VERSION/$(MUSL_VERSION)-$(OS_CODE)/g' $(DEB_BUILD_DIR)/occlum-$(VERSION_NUM)/debian/control
 
 main_deps:
 	mkdir -p $(TARGET_DIR)
@@ -64,7 +69,7 @@ deps_c:
 	cp $(PROJECT_DIR)/tools/toolchains/musl-gcc/0014-libgomp-futex-occlum.diff $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME)/debian
 	cp $(PROJECT_DIR)/tools/installer/rpm/toolchains/musl-gcc/occlum-gcc.sh $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME)/debian
 	echo " echo 'Please execute command \"source /etc/profile\" to validate envs immediately' " > $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME)/debian/occlum-gcc.postinst
-	sed -i -e 's/$$MUSL_VERSION/$(MUSL_VERSION)/g' $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME)/debian/changelog
+	sed -i -e 's/0.27.0/$(MUSL_VERSION)-$(OS_CODE)/g' $(DEB_BUILD_DIR)/$(C_TOOLCHAIN_PACKAGE_NAME)/debian/changelog
 
 golang: deps_golang
 	cd $(DEB_BUILD_DIR)/occlum-toolchains-golang ; \
@@ -75,6 +80,7 @@ deps_golang:
 	mkdir -p $(TARGET_DIR)
 	mkdir -p $(DEB_BUILD_DIR)/occlum-toolchains-golang
 	cp -r toolchains/golang $(DEB_BUILD_DIR)/occlum-toolchains-golang/debian
+	sed -i -e 's/1.18.4/$(GOLANG_VERSION)-$(OS_CODE)/g' $(DEB_BUILD_DIR)/occlum-toolchains-golang/debian/changelog
 
 glibc: deps_glibc
 	@echo "glibc version is $(GLIBC_VERSION)"
@@ -86,7 +92,7 @@ deps_glibc:
 	mkdir -p $(TARGET_DIR)
 	mkdir -p $(DEB_BUILD_DIR)/occlum-toolchains-glibc
 	cp -r toolchains/glibc $(DEB_BUILD_DIR)/occlum-toolchains-glibc/debian
-	sed -i -e 's/2.31/$(GLIBC_VERSION)/g' $(DEB_BUILD_DIR)/occlum-toolchains-glibc/debian/changelog
+	sed -i -e 's/2.31/$(GLIBC_VERSION)-$(OS_CODE)/g' $(DEB_BUILD_DIR)/occlum-toolchains-glibc/debian/changelog
 
 clean-build:
 	rm -rf $(DEB_BUILD_DIR)
