@@ -340,6 +340,7 @@ impl IntoFsError for std::io::Error {
             ErrorKind::WouldBlock => FsError::Again,
             ErrorKind::InvalidInput => FsError::InvalidParam,
             ErrorKind::InvalidData => FsError::InvalidParam,
+            ErrorKind::PermissionDenied => FsError::PermError,
             _ => FsError::NotSupported,
         }
     }
