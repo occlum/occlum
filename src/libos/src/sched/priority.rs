@@ -39,12 +39,8 @@ impl NiceValue {
     /// The raw value given beyond the range are automatically adjusted
     /// to the nearest boundary value.
     pub fn new(raw: i8) -> Self {
-        if raw < Self::MIN.value {
-            Self::MIN
-        } else if raw > Self::MAX.value {
-            Self::MAX
-        } else {
-            Self { value: raw }
+        Self {
+            value: raw.clamp(Self::MIN.value, Self::MAX.value),
         }
     }
 
@@ -56,13 +52,7 @@ impl NiceValue {
 
 impl From<i32> for NiceValue {
     fn from(raw: i32) -> Self {
-        let adj_raw = if raw > i8::MAX as i32 {
-            i8::MAX
-        } else if raw < i8::MIN as i32 {
-            i8::MIN
-        } else {
-            raw as i8
-        };
+        let adj_raw = raw.clamp(i8::MIN as i32, i8::MAX as i32) as i8;
         Self::new(adj_raw)
     }
 }
