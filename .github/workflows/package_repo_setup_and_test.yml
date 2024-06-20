@@ -4,6 +4,14 @@ name: Set up Package Repository and Test (Manual Trigger)
 on:
   workflow_dispatch:
     inputs:
+      ubuntu_focal:
+        description: 'Need build ubuntu 20.04 package? <Y/N>'
+        required: true
+        default: 'Y'
+      ubuntu_jammy:
+        description: 'Need build ubuntu 22.04 package? <Y/N>'
+        required: true
+        default: 'Y'
       update_musl:
         description: 'Need build new musl package? <Y/N>'
         required: true
@@ -26,10 +34,10 @@ on:
 
 jobs:
   Package_repository_setup_and_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     if: github.event.inputs.only_test == 'N'
     env:
-     TOKEN: ${{ secrets.PAT_TOKEN }}
+      TOKEN: ${{ secrets.PAT_TOKEN }}
     # Map a step output to a job output
     outputs:
       occlum_version: ${{ steps.occlum_version.outputs.version }}
@@ -45,6 +53,7 @@ jobs:
     - name: Checkout occlum src code
       uses: actions/checkout@v2
       with:
+        ref: 2204-apt
         path: occlum
 
     - name: Checkout target occlum-package-repo
@@ -65,56 +74,113 @@ jobs:
       id: occlum_version
       run: echo "::set-output name=version::${{ env.OCCLUM_VERSION }}"
 
-    - name: Create ubuntu container
-      run: docker run -itd --name=ubuntu -v $GITHUB_WORKSPACE:/root/workspace occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04
+    - name: Start ubuntu 20.04 occlum container
+      if: github.event.inputs.ubuntu_focal == 'Y'
+      run: docker run -itd --name=occlum-focal -v $GITHUB_WORKSPACE:/root/workspace occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04
 
-    - name: Build deb packages
-      run: docker exec ubuntu bash -c "cd /root/workspace/occlum/tools/installer/deb; make"
+    - name: Build focal deb packages and copy out
+      if: github.event.inputs.ubuntu_focal == 'Y'
+      run: |
+        docker exec occlum-focal bash -c "cd /root/workspace/occlum/tools/installer/deb; make clean && make"
+        if [ "${{ github.event.inputs.update_musl }}" == "Y" ]; then
+          docker exec occlum-focal bash -c "cd /root/workspace/occlum/tools/installer/deb; make musl-gcc"
+        fi
+        
+        if [ "${{ github.event.inputs.update_glibc }}" == "Y" ]; then
+          docker exec occlum-focal bash -c "cd /root/workspace/occlum/tools/installer/deb; make glibc"
+        fi
 
-    - name: Build musl toolchain package
-      if: github.event.inputs.update_musl == 'Y'
-      run: docker exec ubuntu bash -c "cd /root/workspace/occlum/tools/installer/deb; make musl-gcc"
+        if [ "${{ github.event.inputs.update_golang }}" == "Y" ]; then
+          docker exec occlum-focal bash -c "cd /root/workspace/occlum/tools/installer/deb; make golang"
+        fi
 
-    - name: Build glibc toolchain package
-      if: github.event.inputs.update_glibc == 'Y'
-      run: docker exec ubuntu bash -c "cd /root/workspace/occlum/tools/installer/deb; make glibc"
+        docker exec occlum-focal bash -c "mkdir -p /root/workspace/focal-debs; cp -rf /root/workspace/occlum/build/debs/* /root/workspace/focal-debs/"
 
-    - name: Build golang toolchain package
-      if: github.event.inputs.update_golang == 'Y'
-      run: docker exec ubuntu bash -c "cd /root/workspace/occlum/tools/installer/deb; make golang"
+    - name: Start ubuntu 22.04 occlum container
+      if: github.event.inputs.ubuntu_jammy == 'Y'
+      run: docker run -itd --name=occlum-jammy -v $GITHUB_WORKSPACE:/root/workspace occlum/occlum:${{ env.OCCLUM_VERSION }}-test-ubuntu22.04
 
-    - name: Prepare tools and keys    # Since aptly still use gpg1 by default, we all use gpg1 as gpg tool.
-      run: docker exec ubuntu bash -c 'apt-get update; apt-get install -y tree apt-utils gnupg reprepro rng-tools aptly; rm -rf /root/.gnupg;
-            echo "${{ secrets.DEB_PRIVATE_KEY }}" > /root/deb_private_key; gpg1 --allow-secret-key-import --import /root/deb_private_key;
-            gpg1 --export -a "deb_gpg_key" > /root/public.key;
-            gpg1 --import /root/public.key;
-            gpg1 --list-keys;
-            apt-key add /root/public.key && apt-key list'
+    - name: Build jammy deb packages and copy out
+      if: github.event.inputs.ubuntu_jammy == 'Y'
+      run: |
+        docker exec occlum-jammy bash -c "cd /root/workspace/occlum/tools/installer/deb; make clean && make"
+        if [ "${{ github.event.inputs.update_musl }}" == "Y" ]; then
+          docker exec occlum-jammy bash -c "cd /root/workspace/occlum/tools/installer/deb; make musl-gcc"
+        fi
+        
+        if [ "${{ github.event.inputs.update_glibc }}" == "Y" ]; then
+          docker exec occlum-jammy bash -c "cd /root/workspace/occlum/tools/installer/deb; make glibc"
+        fi
+
+        if [ "${{ github.event.inputs.update_golang }}" == "Y" ]; then
+          docker exec occlum-jammy bash -c "cd /root/workspace/occlum/tools/installer/deb; make golang"
+        fi
+
+        docker exec occlum-jammy bash -c "mkdir -p /root/workspace/jammy-debs; cp -rf /root/workspace/occlum/build/debs/* /root/workspace/jammy-debs/"
+
+    - name: Prepare tools and keys
+      run: |
+        sudo apt update && sudo apt install -y tree wget apt-utils rng-tools gnupg xz-utils bzip2
+        wget https://github.com/aptly-dev/aptly/releases/download/v1.5.0/aptly_1.5.0_linux_amd64.tar.gz
+        tar zxf aptly_1.5.0_linux_amd64.tar.gz -C /usr/local/bin
+        echo "${{ secrets.DEB_PRIVATE_KEY }}" > deb_private_key
+        gpg --allow-secret-key-import --import deb_private_key
+        gpg --export -a "occlum_deb_key" > ~/public.key
+        gpg --import ~/public.key
+        gpg --list-keys
+        sudo apt-key add ~/public.key && apt-key list
 
     - name: Inherit apt repo for Ubuntu 18.04
-      run: docker exec ubuntu bash -c 'aptly -architectures="amd64" -keyring=/etc/apt/trusted.gpg mirror create bionic-mirror https://occlum.io/occlum-package-repos/debian/ bionic main;
-            aptly -keyring=/etc/apt/trusted.gpg mirror update bionic-mirror;
-            aptly snapshot create bionic-main from mirror bionic-mirror;
-            aptly publish snapshot -distribution=bionic bionic-main'
+      run: |
+        export PATH=/usr/local/bin/aptly_1.5.0_linux_amd64:$PATH
+        aptly -architectures="amd64" -keyring=/etc/apt/trusted.gpg mirror create bionic-mirror https://occlum.io/occlum-package-repos/debian bionic main
+        aptly -keyring=/etc/apt/trusted.gpg mirror update bionic-mirror
+        aptly snapshot create bionic-main from mirror bionic-mirror
+        aptly publish snapshot -distribution=bionic bionic-main
 
     - name: Update apt repo for Ubuntu 20.04
-      run: docker exec ubuntu bash -c 'aptly -architectures="amd64" -keyring=/etc/apt/trusted.gpg mirror create focal-mirror https://occlum.io/occlum-package-repos/debian/ focal main;
-            aptly -keyring=/etc/apt/trusted.gpg mirror update focal-mirror;
-            aptly snapshot create focal-old from mirror focal-mirror;
-            aptly -distribution='focal' -architectures=amd64 repo create deb-focal-new;
-            aptly repo add deb-focal-new /root/workspace/occlum/build/debs/*;
-            aptly snapshot create focal-new from repo deb-focal-new;
-            aptly -no-remove snapshot merge focal-main focal-old focal-new;
-            aptly publish snapshot -distribution=focal focal-main && tree /root/.aptly/public'
+      run: |
+        export PATH=/usr/local/bin/aptly_1.5.0_linux_amd64:$PATH
+        aptly -architectures="amd64" -keyring=/etc/apt/trusted.gpg mirror create focal-mirror https://occlum.io/occlum-package-repos/debian focal main
+        aptly -keyring=/etc/apt/trusted.gpg mirror update focal-mirror
+        aptly snapshot create focal-old from mirror focal-mirror
+        aptly -distribution='focal' -architectures=amd64 repo create deb-focal-new
+        aptly repo add deb-focal-new $GITHUB_WORKSPACE/focal-debs/*
+        aptly snapshot create focal-new from repo deb-focal-new
+        aptly -no-remove snapshot merge focal-main focal-old focal-new
+        aptly publish snapshot -distribution=focal focal-main
+
+    # - name: Update apt repo for Ubuntu 22.04
+    #   run: |
+    #     export PATH=/usr/local/bin/aptly_1.5.0_linux_amd64:$PATH
+    #     aptly -architectures="amd64" -keyring=/etc/apt/trusted.gpg mirror create jammy-mirror https://occlum.io/occlum-package-repos/debian jammy main
+    #     aptly -keyring=/etc/apt/trusted.gpg mirror update jammy-mirror
+    #     aptly snapshot create jammy-old from mirror jammy-mirror
+    #     aptly -distribution='jammy' -architectures=amd64 repo create deb-jammy-new
+    #     aptly repo add deb-jammy-new $GITHUB_WORKSPACE/jammy-debs/*
+    #     aptly snapshot create jammy-new from repo deb-jammy-new
+    #     aptly -no-remove snapshot merge jammy-main jammy-old jammy-new
+    #     aptly publish snapshot -distribution=jammy jammy-main
+
+    - name: Update apt repo for Ubuntu 22.04 for first time
+      run: |
+        export PATH=/usr/local/bin/aptly_1.5.0_linux_amd64:$PATH
+        aptly -distribution='jammy' -architectures=amd64 repo create deb-jammy-new
+        aptly repo add deb-jammy-new $GITHUB_WORKSPACE/jammy-debs/*
+        aptly snapshot create jammy-new from repo deb-jammy-new
+        aptly publish snapshot -distribution=jammy jammy-new
 
     - name: Update Git repo
-      run: docker exec ubuntu bash -c 'cd /root/workspace/occlum-package-repos; rm -rf debian; cp -r /root/.aptly/public/ /root/workspace/occlum-package-repos/debian;
-            cp /root/public.key /root/workspace/occlum-package-repos/debian'
+      run: |
+        cd $GITHUB_WORKSPACE/occlum-package-repos
+        rm -rf debian
+        cp -r  ~/.aptly/public/ $GITHUB_WORKSPACE/occlum-package-repos/debian
+        cp ~/public.key $GITHUB_WORKSPACE/occlum-package-repos/debian
+        tree $GITHUB_WORKSPACE/occlum-package-repos/debian/
 
     - name: Clean ubuntu container and image
       run: |
-          docker rm -f ubuntu
-          docker rmi -f occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04
+          docker rm -f occlum-focal occlum-jammy
 
     # - name: Create centos container
     #   run: docker run -itd --name=centos -v $GITHUB_WORKSPACE:/root/workspace occlum/occlum:${{ env.OCCLUM_VERSION }}-centos8.2
@@ -136,7 +202,7 @@ jobs:
 
     - name: Commit files
       run: |
-        cd occlum-package-repos
+        cd $GITHUB_WORKSPACE/occlum-package-repos
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add -A
@@ -155,14 +221,14 @@ jobs:
       run: sleep 600
 
 
-  Test_deb_package:
+  Test_deb_focal_package:
     if: ${{ always() }}
     needs: Package_repository_setup_and_test
     runs-on: ubuntu-20.04
 
     steps:
     - name: Create a clean ubuntu container
-      run: docker run -itd --name=ubuntu ubuntu:20.04
+      run: docker run --rm -itd --name=ubuntu ubuntu:20.04
 
     - name: Get occlum version from user inputs
       run: echo "OCCLUM_VERSION=${{github.event.inputs.test_version}}" >> $GITHUB_ENV
@@ -200,6 +266,58 @@ jobs:
     - name: Run occlum python glibc test
       run: docker exec ubuntu bash -c "source /etc/profile; cd /root && git clone https://github.com/occlum/occlum.git && cd /root/occlum/demos/python/python_glibc && ./install_python_with_conda.sh && SGX_MODE=SIM ./run_python_on_occlum.sh && cat occlum_instance/smvlight.dat"
 
+    - name: Clean ubuntu container
+      run: |
+          docker rm -f ubuntu
+
+  Test_deb_jammy_package:
+    if: ${{ always() }}
+    needs: Package_repository_setup_and_test
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Create a clean ubuntu container
+      run: docker run --rm -itd --name=ubuntu ubuntu:22.04
+
+    - name: Get occlum version from user inputs
+      run: echo "OCCLUM_VERSION=${{github.event.inputs.test_version}}" >> $GITHUB_ENV
+
+    - name: Update occlum version from previous job
+      if: github.event.inputs.only_test == 'N'
+      run: echo "OCCLUM_VERSION=${{needs.Package_repository_setup_and_test.outputs.occlum_version}}" >> $GITHUB_ENV
+
+    - name: Configure sgx and occlum deb repo
+      run: |
+          # Set the default timezone to make tzdata work
+          docker exec ubuntu bash -c "ln -snf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && echo Asia/Shanghai > /etc/timezone"
+          docker exec ubuntu bash -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates gnupg jq make gdb wget libfuse-dev libtool tzdata;
+            echo 'deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu jammy main' | tee /etc/apt/sources.list.d/intel-sgx.list;
+            wget -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key | apt-key add -"
+          docker exec ubuntu bash -c "echo 'deb [arch=amd64] https://occlum.io/occlum-package-repos/debian jammy main' | tee /etc/apt/sources.list.d/occlum.list;
+            wget -qO - https://occlum.io/occlum-package-repos/debian/public.key | apt-key add -;"
+
+    - name: Install sgx dependencies and occlum
+      run: docker exec ubuntu bash -c "apt-get update; apt-cache policy occlum | grep -n5 ${{ env.OCCLUM_VERSION }} && apt-get install -y occlum libsgx-uae-service libsgx-dcap-ql"
+
+    - name: Hello world test
+      run: docker exec ubuntu bash -c "source /etc/profile; cd /root; wget https://raw.githubusercontent.com/occlum/occlum/master/demos/hello_c/hello_world.c; occlum-gcc -o hello_world hello_world.c;
+            occlum new occlum-instance; cp hello_world /root/occlum-instance/image/bin; cd /root/occlum-instance && SGX_MODE=SIM occlum build; occlum run /bin/hello_world"
+
+    # If there is no match, it will return 1.
+    - name: Check installed version
+      run: docker exec ubuntu bash -c "cat /opt/occlum/include/occlum_version.h | grep -n5 ${{ env.OCCLUM_VERSION }}"
+
+    - name: Install occlum-glibc toolchain
+      run: |
+          docker exec ubuntu bash -c "apt-get install -y occlum-toolchains-glibc"
+          docker exec ubuntu bash -c "apt-get install -y git python3 python3-pip python-is-python3 rsync"
+
+    - name: Run occlum python glibc test
+      run: docker exec ubuntu bash -c "source /etc/profile; cd /root && git clone https://github.com/occlum/occlum.git && cd /root/occlum/demos/python/python_glibc && ./install_python_with_conda.sh && SGX_MODE=SIM ./run_python_on_occlum.sh && cat occlum_instance/smvlight.dat"
+
+    - name: Clean ubuntu container
+      run: |
+          docker rm -f ubuntu
 
   # Test_rpm_package:
   #   if: ${{ always() }}
