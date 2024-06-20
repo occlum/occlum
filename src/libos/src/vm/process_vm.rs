@@ -511,6 +511,15 @@ impl ProcessVM {
         free_size
     }
 
+    // Get a NON-accurate in-use size for current process (no System V shared memory)
+    pub fn get_in_use_size(&self) -> usize {
+        let process_chunks = self.mem_chunks.read().unwrap();
+        let total_size = process_chunks.iter().fold(0, |acc, chunk| {
+            acc + (chunk.range().size() - chunk.free_size())
+        });
+        total_size
+    }
+
     pub fn mmap(
         &self,
         addr: usize,

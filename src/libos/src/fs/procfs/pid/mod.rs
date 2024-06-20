@@ -10,6 +10,7 @@ use self::fd::LockedProcFdDirINode;
 use self::maps::ProcMapsINode;
 use self::root::ProcRootSymINode;
 use self::stat::ProcStatINode;
+use self::statm::ProcStatmINode;
 
 mod cmdline;
 mod comm;
@@ -19,6 +20,7 @@ mod fd;
 mod maps;
 mod root;
 mod stat;
+mod statm;
 
 pub struct LockedPidDirINode(RwLock<PidDirINode>);
 
@@ -65,6 +67,9 @@ impl LockedPidDirINode {
         // maps
         let maps_inode = ProcMapsINode::new(&file.process_ref);
         file.entries.insert(String::from("maps"), maps_inode);
+        // statm
+        let statm_inode = ProcStatmINode::new(&file.process_ref);
+        file.entries.insert(String::from("statm"), statm_inode);
 
         Ok(())
     }
