@@ -1,0 +1,63 @@
+diff --color -ruN filebench/config.h modify/config.h
+--- filebench/config.h	2022-05-10 11:24:44.393676003 +0800
++++ modify/config.h	2022-05-10 11:15:23.769794727 +0800
+@@ -295,6 +295,7 @@
+ 
+ /* Define if you have SYSV sems */
+ #define HAVE_SYSV_SEM 1
++#undef HAVE_SYSV_SEM
+ 
+ /* Define to 1 if you have the <sys/dir.h> header file, and it defines `DIR'.
+    */
+diff --color -ruN filebench/ipc.c modify/ipc.c
+--- filebench/ipc.c	2022-05-10 11:24:44.393676003 +0800
++++ modify/ipc.c	2022-05-10 11:16:06.768145518 +0800
+@@ -400,21 +400,22 @@
+ int
+ ipc_attach(void *shmaddr, char *shmpath)
+ {
+-	int shmfd;
++	// int shmfd;
+ 
+-	if ((shmfd = open(shmpath, O_RDWR)) < 0) {
+-		filebench_log(LOG_FATAL, "Could not open shared memory "
+-			      "file %s: %s", shmpath, strerror(errno));
+-		return (-1);
+-	}
++	// if ((shmfd = open(shmpath, O_RDWR)) < 0) {
++	// 	filebench_log(LOG_FATAL, "Could not open shared memory "
++	// 		      "file %s: %s", shmpath, strerror(errno));
++	// 	return (-1);
++	// }
+ 
+-	if ((filebench_shm = (filebench_shm_t *)mmap(shmaddr,
+-	    sizeof (filebench_shm_t), PROT_READ | PROT_WRITE,
+-	    MAP_SHARED | MAP_FIXED, shmfd, 0)) == MAP_FAILED) {
+-		filebench_log(LOG_FATAL, "Could not mmap the shared "
+-		"memory file: %s", strerror(errno));
+-		return (-1);
+-	}
++	// if ((filebench_shm = (filebench_shm_t *)mmap(shmaddr,
++	//     sizeof (filebench_shm_t), PROT_READ | PROT_WRITE,
++	//     MAP_SHARED | MAP_FIXED, shmfd, 0)) == MAP_FAILED) {
++	// 	filebench_log(LOG_FATAL, "Could not mmap the shared "
++	// 	"memory file: %s", strerror(errno));
++	// 	return (-1);
++	// }
++	filebench_shm = (filebench_shm_t *)shmaddr;
+ 
+ 	if (filebench_shm != shmaddr) {
+ 		filebench_log(LOG_FATAL, "Could not mmap the shared "
+diff --color -ruN filebench/procflow.c modify/procflow.c
+--- filebench/procflow.c	2022-05-10 11:24:44.393676003 +0800
++++ modify/procflow.c	2022-05-10 11:16:35.772217279 +0800
+@@ -90,7 +90,8 @@
+ 		return (-1);
+ 	}
+ #else
+-	if ((pid = fork()) < 0) {
++	// if ((pid = fork()) < 0) {
++	if ((pid = vfork()) < 0) {
+ 		filebench_log(LOG_ERROR,
+ 		    "procflow_createproc fork failed: %s",
+ 		    strerror(errno));

@@ -1,0 +1,18 @@
+includes:
+  - base.yaml
+# filebench
+targets:
+  # copy filebench, bash and busybox
+  - target: /bin
+    copy:
+      - files:
+        - /usr/local/bin/filebench
+  # copy workload files
+  - target: /
+    copy:
+      - dirs:
+        - ../workloads
+  - target: /opt/occlum/glibc/lib
+    copy:
+      - files:
+        - /lib/x86_64-linux-gnu/libgcc_s.so.1
