@@ -1289,3 +1289,22 @@ jobs:
     
     - name: Clean Swtpm test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./swtpm"
+
+
+  Filebench_test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/sim
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Preinstall dependencies and build Filebench
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/filebench && ./preinstall_deps.sh && ./dl_and_build_filebench.sh"
+
+    - name: Prepare occlum instance and Run Filebench on Ext2
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/filebench && SGX_MODE=SIM ./run_workload.sh readfiles"
