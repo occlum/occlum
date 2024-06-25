@@ -142,7 +142,7 @@ fn main() {
 
         let occlum_json_file_path = sub_matches.value_of("output_json").unwrap();
         debug!(
-            "Genereated Occlum user config (json) file name {:?}",
+            "Generated Occlum user config (json) file name {:?}",
             occlum_json_file_path
         );
 
@@ -321,7 +321,7 @@ fn main() {
                     let config_user_space_max_size = parse_memory_size(&user_space_max_size);
                     if config_user_space_max_size.is_err() {
                         println!(
-                            "The kernel_space_heap_max_size \"{}\" is not correct.",
+                            "The user_space_max_size \"{}\" is not correct.",
                             user_space_max_size
                         );
                         return;
@@ -429,6 +429,56 @@ fn main() {
         } else {
             0x10_0000
         };
+
+        // Check validity of cache and disk size in mount options
+        const CACHE_PAGE_SIZE: usize = 0x1000;
+        const MIN_CACHE_SIZE: usize = 48 * CACHE_PAGE_SIZE; // 192KB
+        const MIN_DISK_SIZE: usize = 5 * 1024usize.pow(3); // 5GB
+        for mount in &occlum_config.mount {
+            if let Some(cache_size_str) = mount.options.cache_size.as_ref() {
+                let cache_size = {
+                    let cache_size = parse_memory_size(cache_size_str);
+                    if cache_size.is_err() {
+                        println!("The cache_size \"{}\" is not correct.", cache_size_str);
+                        return;
+                    }
+                    cache_size.unwrap()
+                };
+                if cache_size < MIN_CACHE_SIZE
+                    || cache_size % CACHE_PAGE_SIZE != 0
+                    || cache_size > kernel_heap_max_size
+                {
+                    println!(
+                        "Invalid cache_size \"{}\". The cache_size must be 1. larger than the minimum size \"{}\", \
+                        2. aligned with cache page size \"{}\", \
+                        3. smaller than the kernel_heap_max_size \"{}\".",
+                        cache_size, MIN_CACHE_SIZE, CACHE_PAGE_SIZE, kernel_heap_max_size
+                    );
+                    return;
+                }
+            }
+            if mount.type_ == String::from("ext2") && mount.options.disk_size.is_none() {
+                println!("The disk_size must be specified for Ext2.");
+                return;
+            }
+            if let Some(disk_size_str) = mount.options.disk_size.as_ref() {
+                let disk_size = {
+                    let disk_size = parse_memory_size(disk_size_str);
+                    if disk_size.is_err() {
+                        println!("The disk_size \"{}\" is not correct.", disk_size_str);
+                        return;
+                    }
+                    disk_size.unwrap()
+                };
+                if disk_size < MIN_DISK_SIZE {
+                    println!(
+                        "The disk_size \"{}\" is too small, minimum size is \"{}\".",
+                        disk_size, MIN_DISK_SIZE
+                    );
+                    return;
+                }
+            }
+        }
 
         let kss_tuple = parse_kss_conf(&occlum_config);
 
@@ -677,7 +727,7 @@ fn gen_app_config(
     if root_mc.options.layers.is_none() {
         return Err("the root UnionFS must be given layers");
     }
-    let mut root_image_sefs_mc = root_mc
+    let root_image_sefs_mc = root_mc
         .options
         .layers
         .as_mut()
