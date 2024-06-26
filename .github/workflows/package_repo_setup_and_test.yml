@@ -124,7 +124,7 @@ jobs:
         tar zxf aptly_1.5.0_linux_amd64.tar.gz -C /usr/local/bin
         echo "${{ secrets.DEB_PRIVATE_KEY }}" > deb_private_key
         gpg --allow-secret-key-import --import deb_private_key
-        gpg --export -a "occlum_deb_key" > ~/public.key
+        gpg --export -a "deb_gpg_key" > ~/public.key
         gpg --import ~/public.key
         gpg --list-keys
         sudo apt-key add ~/public.key && apt-key list
