@@ -185,9 +185,7 @@ gen_initfs_aecs()
     # add aecs required libs
     cp -t initfs/$occlum_glibc_lib \
         "$occlum_dir"/toolchains/aecs_client/* \
-        $os_lib_path/libssl.so.1.1 \
         $os_lib_path/libz.so.1 \
-        $os_lib_path/libcrypto.so.1.1 \
         $os_lib_path/libdl.so.2 \
         $occlum_glibc_lib/libnss_files.so.2 \
         $occlum_glibc_lib/libnss_dns.so.2 \
@@ -197,6 +195,10 @@ gen_initfs_aecs()
     if [ -f $os_lib_path/libprotobuf.so.32 ]; then
         cp -t initfs/$occlum_glibc_lib $os_lib_path/libprotobuf.so.32
     fi
+
+    # If no libssl.so or libcrypto.so in toolchain then use the ones from os lib
+    [ -f initfs/$occlum_glibc_lib/libssl.so.1.1 ] || cp $os_lib_path/libssl.so.1.1 initfs/$occlum_glibc_lib/
+    [ -f initfs/$occlum_glibc_lib/libcrypto.so.1.1 ] || cp $os_lib_path/libcrypto.so.1.1 initfs/$occlum_glibc_lib/
 
     # add template init_ra_conf
     cp "$occlum_dir"/etc/template/init_aecs.json "$instance_dir"/init_ra_conf.json
