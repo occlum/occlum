@@ -14,6 +14,9 @@ concurrency:
 jobs:
   C_cpp_rust_golang_embedded_mode_support_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -112,6 +115,9 @@ jobs:
 
   Java_support_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -146,6 +152,9 @@ jobs:
 
   Fish_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -177,6 +186,9 @@ jobs:
 
   Bazel_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -213,6 +225,9 @@ jobs:
 
   Https_server_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -246,6 +261,9 @@ jobs:
 
   Local_attestation_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -275,6 +293,9 @@ jobs:
 
   Sqlite_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -303,6 +324,9 @@ jobs:
 
   Xgboost_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -334,6 +358,9 @@ jobs:
 
   Tensorflow_lite_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -365,6 +392,9 @@ jobs:
 
   Pytorch_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -393,6 +423,9 @@ jobs:
 
   Distributed_Pytorch_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -431,6 +464,9 @@ jobs:
 
   Tensorflow_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -460,6 +496,9 @@ jobs:
 # Below tests needs test image to run faster
   Grpc_musl_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -504,6 +543,9 @@ jobs:
 
   Grpc_glibc_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -552,6 +594,9 @@ jobs:
 
   Grpc_tls_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -593,6 +638,9 @@ jobs:
 
   Openvino_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -630,6 +678,9 @@ jobs:
   # Python test also needs its own image because in Alpine environment, modules are built locally and consumes a lot of time.
   Python_musl_support_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -670,6 +721,9 @@ jobs:
   # Python glibc support test
   Python_glibc_support_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -706,6 +760,9 @@ jobs:
   # Redis test
   Redis_support_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -745,6 +802,9 @@ jobs:
 
   Flink_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -797,6 +857,9 @@ jobs:
 
   Cluster_serving_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -825,6 +888,9 @@ jobs:
 
   Enclave_RA_TLS_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -859,6 +925,9 @@ jobs:
 
   Vault_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -896,6 +965,9 @@ jobs:
 
   Sofaboot_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -936,6 +1008,9 @@ jobs:
 
   Netty_UT_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -967,6 +1042,9 @@ jobs:
 
   Bash_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -995,6 +1073,9 @@ jobs:
 
   Sysbench_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1027,6 +1108,9 @@ jobs:
 
   Gvisor_syscalls_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1062,10 +1146,19 @@ jobs:
       run: docker exec $gvisor_test bash -c "git clone https://github.com/occlum/gvisor.git"
 
     - name: Run gvisor syscall test
-      run: docker exec $gvisor_test bash -c "cd /root/gvisor/occlum && SGX_MODE=SIM ./run_occlum_passed_tests.sh"
+      run: |
+        if [[ "${{ matrix.features }}" == "IO_Uring" ]]; then
+          docker exec $gvisor_test bash -c "cd /root/gvisor/occlum && SGX_MODE=SIM ./run_occlum_passed_tests.sh uring";
+        else
+          docker exec $gvisor_test bash -c "cd /root/gvisor/occlum && SGX_MODE=SIM ./run_occlum_passed_tests.sh";
+        fi;
+      shell: bash
 
   Flask_tls_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1108,6 +1201,9 @@ jobs:
 
   Iperf2_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1143,6 +1239,9 @@ jobs:
 
   Linux_LTP_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1175,6 +1274,9 @@ jobs:
 
   FIO_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1203,6 +1305,9 @@ jobs:
 
   PaddlePaddle_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1231,6 +1336,9 @@ jobs:
 
   RuntimeBoot_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1259,6 +1367,9 @@ jobs:
 
   Swtpm_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1293,6 +1404,9 @@ jobs:
 
   Filebench_test:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
     steps:
     - uses: actions/checkout@v1
       with:
