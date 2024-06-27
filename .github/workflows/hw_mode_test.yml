@@ -25,7 +25,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -80,7 +80,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -179,7 +179,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, PKU]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring, PKU]]
 
     steps:
     - name: Clean before running
@@ -220,7 +220,7 @@ jobs:
 
     - name: Run hello PKU
       run: |
-        if [[ "${{ matrix.self_runner[3] }}" == "PKU" ]]; then
+        if [[ "${{ matrix.self_runner[4] }}" == "PKU" ]]; then
           docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/java && ./run_java_on_occlum.sh hello_pku"
         else
           echo "Skip PKU test"
@@ -237,7 +237,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -289,7 +289,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -336,7 +336,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -383,7 +383,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -427,7 +427,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -505,7 +505,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -580,7 +580,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -677,7 +677,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -741,8 +741,15 @@ jobs:
     - name: Clone gvisor code
       run: docker exec $gvisor_test bash -c "git clone https://github.com/occlum/gvisor.git"
 
+
     - name: Run gvisor syscall test
-      run: docker exec $gvisor_test bash -c "cd /root/gvisor/occlum; ./run_occlum_passed_tests.sh"
+      run: |
+        if [[ "${{ matrix.self_runner[3] }}" == "IO_Uring" ]]; then
+          docker exec $gvisor_test bash -c "cd /root/gvisor/occlum; ./run_occlum_passed_tests.sh uring";
+        else
+          docker exec $gvisor_test bash -c "cd /root/gvisor/occlum; ./run_occlum_passed_tests.sh";
+        fi;
+      shell: bash
 
     - name: Clean the environment
       if: ${{ always() }}
@@ -920,7 +927,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -960,7 +967,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -1014,7 +1021,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -1069,7 +1076,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -1117,7 +1124,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -1163,7 +1170,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -1198,7 +1205,7 @@ jobs:
     runs-on: ${{ matrix.self_runner }}
     strategy:
       matrix:
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
