@@ -149,25 +149,25 @@ jobs:
         aptly -no-remove snapshot merge focal-main focal-old focal-new
         aptly publish snapshot -distribution=focal focal-main
 
-    # - name: Update apt repo for Ubuntu 22.04
-    #   run: |
-    #     export PATH=/usr/local/bin/aptly_1.5.0_linux_amd64:$PATH
-    #     aptly -architectures="amd64" -keyring=/etc/apt/trusted.gpg mirror create jammy-mirror https://occlum.io/occlum-package-repos/debian jammy main
-    #     aptly -keyring=/etc/apt/trusted.gpg mirror update jammy-mirror
-    #     aptly snapshot create jammy-old from mirror jammy-mirror
-    #     aptly -distribution='jammy' -architectures=amd64 repo create deb-jammy-new
-    #     aptly repo add deb-jammy-new $GITHUB_WORKSPACE/jammy-debs/*
-    #     aptly snapshot create jammy-new from repo deb-jammy-new
-    #     aptly -no-remove snapshot merge jammy-main jammy-old jammy-new
-    #     aptly publish snapshot -distribution=jammy jammy-main
-
-    - name: Update apt repo for Ubuntu 22.04 for first time
+    - name: Update apt repo for Ubuntu 22.04
       run: |
         export PATH=/usr/local/bin/aptly_1.5.0_linux_amd64:$PATH
+        aptly -architectures="amd64" -keyring=/etc/apt/trusted.gpg mirror create jammy-mirror https://occlum.io/occlum-package-repos/debian jammy main
+        aptly -keyring=/etc/apt/trusted.gpg mirror update jammy-mirror
+        aptly snapshot create jammy-old from mirror jammy-mirror
         aptly -distribution='jammy' -architectures=amd64 repo create deb-jammy-new
         aptly repo add deb-jammy-new $GITHUB_WORKSPACE/jammy-debs/*
         aptly snapshot create jammy-new from repo deb-jammy-new
-        aptly publish snapshot -distribution=jammy jammy-new
+        aptly -no-remove snapshot merge jammy-main jammy-old jammy-new
+        aptly publish snapshot -distribution=jammy jammy-main
+
+    # - name: Update apt repo for Ubuntu 22.04 for first time
+    #   run: |
+    #     export PATH=/usr/local/bin/aptly_1.5.0_linux_amd64:$PATH
+    #     aptly -distribution='jammy' -architectures=amd64 repo create deb-jammy-new
+    #     aptly repo add deb-jammy-new $GITHUB_WORKSPACE/jammy-debs/*
+    #     aptly snapshot create jammy-new from repo deb-jammy-new
+    #     aptly publish snapshot -distribution=jammy jammy-new
 
     - name: Update Git repo
       run: |
