@@ -3,12 +3,13 @@ set -e
 
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
 INSTALL_DIR=/opt/occlum/toolchains/aecs_client
+OCCLUM_INSTALL_DIR=/usr/local/occlum/x86_64-linux-gnu/lib
 AECS_DIR=${script_dir}/enclave-configuration-service
 
 # Default TEE TYPE is SGX2, also support HYPERENCLAVE
 TEETYPE=${1:-SGX2}
 
-git clone -b v2.0.0 https://github.com/SOFAEnclave/enclave-configuration-service.git
+git clone -b occlum-init-ra https://github.com/occlum/enclave-configuration-service.git
 
 pushd ${AECS_DIR}
 git submodule update --init --recursive
@@ -22,7 +23,9 @@ echo "Move AECS client libraries to toolchain path"
 mkdir -p ${INSTALL_DIR}
 cp ./build/out/libaecs_client.so ${INSTALL_DIR}/
 cp ./build/out/libual.so ${INSTALL_DIR}/
-cp /usr/local/occlum/x86_64-linux-gnu/lib/libcurl_static.a ${INSTALL_DIR}/
+cp $OCCLUM_INSTALL_DIR/libcurl_static.a ${INSTALL_DIR}/
+[ -f $OCCLUM_INSTALL_DIR/libssl.so ] && cp $OCCLUM_INSTALL_DIR/libssl.so* ${INSTALL_DIR}/
+[ -f $OCCLUM_INSTALL_DIR/libcrypto.so ] && cp $OCCLUM_INSTALL_DIR/libcrypto.so* ${INSTALL_DIR}/
 popd
 
 # Clean up
