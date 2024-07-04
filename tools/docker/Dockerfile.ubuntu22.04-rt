@@ -1,26 +1,16 @@
-ARG OCCLUM_DEV_IMG=occlum/occlum:0.30.1-test-ubuntu22.04
-FROM $OCCLUM_DEV_IMG as base
-
-# Download the Occlum source
-ARG OCCLUM_BRANCH=0.30.1-dev
-WORKDIR /root
-RUN git clone -b $OCCLUM_BRANCH https://github.com/occlum/occlum
-
-# Build Occlum debian packages
-WORKDIR /root/occlum/tools/installer/deb
-RUN make && make musl-gcc && GLIBC_VERSION=2.35 make glibc
-
-
 FROM ubuntu:22.04
 LABEL maintainer="Qi Zheng <huaiqing.zq@antgroup.com>"
 
 # Install SGX DCAP and PSW
 ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
-ARG PSW_VERSION=2.20.100.4
-ARG DCAP_VERSION=1.17.100.4
+ARG PSW_VERSION=2.21.100.1
+ARG DCAP_VERSION=1.18.100.1
+ARG OCCLUM_VERSION=0.31.0
 RUN apt update && DEBIAN_FRONTEND="noninteractive" apt install -y --no-install-recommends gnupg wget ca-certificates jq && \
     echo 'deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu jammy main' | tee /etc/apt/sources.list.d/intel-sgx.list && \
     wget -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key | apt-key add - && \
+    echo 'deb [arch=amd64] https://occlum.io/occlum-package-repos/debian jammy main' | tee /etc/apt/sources.list.d/occlum.list && \
+    wget -qO - https://occlum.io/occlum-package-repos/debian/public.key | apt-key add - && \
     apt update && apt install -y --no-install-recommends \
         libsgx-launch=$PSW_VERSION-jammy1 \
         libsgx-epid=$PSW_VERSION-jammy1 \
@@ -37,13 +27,10 @@ RUN apt update && DEBIAN_FRONTEND="noninteractive" apt install -y --no-install-r
         libsgx-qe3-logic=$DCAP_VERSION-jammy1 \
         libsgx-dcap-default-qpl=$DCAP_VERSION-jammy1 \
         libsgx-dcap-quote-verify=$DCAP_VERSION-jammy1 \
+        occlum-runtime=$OCCLUM_VERSION-jammy-1 \
         && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
-
-# Only runtime deb package is required for occlum run
-COPY --from=base /tmp/deb_build/occlum-runtime_*.deb /tmp
-RUN cd /tmp && dpkg -i *.deb && rm -rf *.deb
 
 COPY docker-entrypoint.sh /usr/local/bin/
 
