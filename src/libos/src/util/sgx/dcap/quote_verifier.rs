@@ -7,7 +7,7 @@ pub struct QuoteVerifier {
 
 // The latest QvE ISVSVN from Intel PCS.
 // It should be updated when a newer QvE is released.
-const QVE_ISVSVN_THRESHOLD: sgx_isv_svn_t = 5;
+const QVE_ISVSVN_THRESHOLD: sgx_isv_svn_t = 7;
 
 impl QuoteVerifier {
     pub fn new() -> Option<Self> {
