@@ -1036,7 +1036,16 @@ jobs:
 
     - name: Run netty unit test demo
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut && SGX_MODE=SIM ./run_netty_ut_jdk8.sh"
-    
+
+    - name: Check netty unit demo results
+      run: |
+        if [[ "${{ matrix.features }}" == "IO_Uring" ]]; then
+          docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut && cat netty-test-heap512m.log | grep '189 tests successful'";
+        else
+          docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut && cat netty-test-heap512m.log | grep '190 tests successful'";
+        fi
+      shell: bash
+
     - name: Clean Netty test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./netty_ut"
 

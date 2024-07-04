@@ -1,5 +1,17 @@
+From 21b67e210670f6c7cb7e88d9900699ac52b0c3b1 Mon Sep 17 00:00:00 2001
+From: ClawSeven <zehuan97@gmail.com>
+Date: Tue, 23 Jul 2024 10:47:12 +0800
+Subject: [PATCH] Adapt hyper patch with updated sdk
+
+---
+ sefs-cli/Makefile                   | 42 ++++++++++++++++++++---------
+ sefs-cli/app/build.rs               |  4 +++
+ sefs-cli/enclave/Enclave.config.xml |  1 +
+ sefs-cli/enclave/Enclave.lds        |  3 +++
+ 4 files changed, 38 insertions(+), 12 deletions(-)
+
 diff --git a/sefs-cli/Makefile b/sefs-cli/Makefile
-index f0eeb8c..8c6fae0 100644
+index f0eeb8c..50b9917 100644
 --- a/sefs-cli/Makefile
 +++ b/sefs-cli/Makefile
 @@ -14,13 +14,19 @@ endif
@@ -31,12 +43,14 @@ index f0eeb8c..8c6fae0 100644
  ######## Enclave Settings ########
  
 -ifneq ($(SGX_MODE), HW)
+-	Trts_Library_Name := sgx_trts_sim
+-	Service_Library_Name := sgx_tservice_sim
 +ifeq ($(SGX_MODE), HW)
 +	Trts_Library_Name := sgx_trts
 +	Service_Library_Name := sgx_tservice
 +else ifeq ($(SGX_MODE), SIM)
- 	Trts_Library_Name := sgx_trts_sim
- 	Service_Library_Name := sgx_tservice_sim
++   Trts_Library_Name := sgx_trts_sim
++   Service_Library_Name := sgx_tservice_sim
 +else ifeq ($(SGX_MODE), HYPER)
 +	Trts_Library_Name := sgx_trts_hyper
 +	Service_Library_Name := sgx_tservice_hyper
@@ -48,12 +62,14 @@ index f0eeb8c..8c6fae0 100644
  	-Wl,--version-script=enclave/Enclave.lds
  
 -ifneq ($(SGX_MODE), HW)
+-	RustEnclave_Name := lib/libsefs-cli_sim.so
+-	App_Name := bin/sefs-cli_sim
 +ifeq ($(SGX_MODE), HW)
 +	RustEnclave_Name := lib/libsefs-cli.so
 +	App_Name := bin/sefs-cli
 +else ifeq ($(SGX_MODE), SIM)
- 	RustEnclave_Name := lib/libsefs-cli_sim.so
- 	App_Name := bin/sefs-cli_sim
++   RustEnclave_Name := lib/libsefs-cli_sim.so
++   App_Name := bin/sefs-cli_sim
 +else ifeq ($(SGX_MODE), HYPER)
 +	RustEnclave_Name := lib/libsefs-cli_hyper.so
 +	App_Name := bin/sefs-cli_hyper
@@ -72,25 +88,20 @@ index f0eeb8c..8c6fae0 100644
  
  ######## App Objects ########
 diff --git a/sefs-cli/app/build.rs b/sefs-cli/app/build.rs
-index 4bf4c0a..96391ac 100644
+index 6d54f91..a523baf 100644
 --- a/sefs-cli/app/build.rs
 +++ b/sefs-cli/app/build.rs
-@@ -14,6 +14,7 @@ fn main() {
-     match is_sim.as_ref() {
-         "SW" | "SIM" => println!("cargo:rustc-link-lib=static=sgx_urts_sim_with_se_event"),
-         "HW" => println!("cargo:rustc-link-lib=dylib=sgx_urts"),
-+        "HYPER" => println!("cargo:rustc-link-lib=static=sgx_urts_hyper_with_se_event"),
-         _ => println!("cargo:rustc-link-lib=dylib=sgx_urts"), // Treat undefined as HW
-     }
- 
-@@ -21,6 +22,7 @@ fn main() {
-     match is_sim.as_ref() {
-         "SW" | "SIM" => println!("cargo:rustc-link-lib=dylib=sgx_uae_service_sim"),
-         "HW" => println!("cargo:rustc-link-lib=dylib=sgx_uae_service"),
-+        "HYPER" => println!("cargo:rustc-link-lib=dylib=sgx_uae_service_hyper"),
-         _ => println!("cargo:rustc-link-lib=dylib=sgx_uae_service"), // Treat undefined as HW
-     }
- 
+@@ -29,6 +29,10 @@ fn main() {
+             println!("cargo:rustc-link-lib=dylib=sgx_urts");
+             println!("cargo:rustc-link-lib=dylib=sgx_uae_service");
+         }
++        "HYPER" => {
++            println!("cargo:rustc-link-lib=dylib=sgx_urts_hyper");
++            println!("cargo:rustc-link-lib=dylib=sgx_uae_service_hyper");
++        }
+         _ => {
+             println!("cargo:rustc-link-lib=dylib=sgx_urts");
+             println!("cargo:rustc-link-lib=dylib=sgx_uae_service");
 diff --git a/sefs-cli/enclave/Enclave.config.xml b/sefs-cli/enclave/Enclave.config.xml
 index 109fcd2..e69f2b6 100644
 --- a/sefs-cli/enclave/Enclave.config.xml
@@ -119,3 +130,6 @@ index 92bebf2..d93532c 100644
      local:
          *;
  };
+-- 
+2.25.1
+
