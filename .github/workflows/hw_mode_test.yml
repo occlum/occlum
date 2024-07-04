@@ -841,7 +841,7 @@ jobs:
     strategy:
       matrix:
         # Tensorflow serving test requires AVX512 instruction support. Only the SGX2-HW machine has support for that.
-        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM]]
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
 
     steps:
     - name: Clean before running
@@ -1159,6 +1159,15 @@ jobs:
 
     - name: Run netty unit test demo
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/netty_ut && ./run_netty_ut_jdk8.sh"
+    
+    - name: Check netty unit demo results
+      run: |
+        if [[ "${{ matrix.self_runner[3] }}" == "IO_Uring" ]]; then
+          docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut && cat netty-test-heap512m.log | grep '189 tests successful'";
+        else
+          docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut && cat netty-test-heap512m.log | grep '190 tests successful'";
+        fi
+      shell: bash
 
     - name: Clean the environment
       if: ${{ always() }}

@@ -92,7 +92,5 @@ runs:
           else
             docker exec ${{ env.CONTAINER_NAME }} bash -c "jq '.feature.enable_posix_shm = true | .feature.enable_edmm = true' /opt/occlum/etc/template/Occlum.json > /tmp.json && mv /tmp.json /opt/occlum/etc/template/Occlum.json";
           fi;
-        elif [[ "${{ matrix.features }}" == "IO_Uring" ]]; then
-          docker exec ${{ env.CONTAINER_NAME }} bash -c "jq '.feature.io_uring = 1' /opt/occlum/etc/template/Occlum.json > /tmp.json && mv /tmp.json /opt/occlum/etc/template/Occlum.json";
         fi;
       shell: bash
