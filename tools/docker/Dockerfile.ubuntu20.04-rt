@@ -3,9 +3,9 @@ LABEL maintainer="Qi Zheng <huaiqing.zq@antgroup.com>"
 
 # Install SGX DCAP and Occlum runtime
 ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
-ARG PSW_VERSION=2.20.100.4
-ARG DCAP_VERSION=1.17.100.4
-ARG OCCLUM_VERSION=0.30.0
+ARG PSW_VERSION=2.21.100.1
+ARG DCAP_VERSION=1.18.100.1
+ARG OCCLUM_VERSION=0.31.0
 RUN apt update && DEBIAN_FRONTEND="noninteractive" apt install -y --no-install-recommends gnupg wget ca-certificates jq && \
     echo 'deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu focal main' | tee /etc/apt/sources.list.d/intel-sgx.list && \
     wget -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key | apt-key add - && \
@@ -27,7 +27,7 @@ RUN apt update && DEBIAN_FRONTEND="noninteractive" apt install -y --no-install-r
         libsgx-qe3-logic=$DCAP_VERSION-focal1 \
         libsgx-dcap-default-qpl=$DCAP_VERSION-focal1 \
         libsgx-dcap-quote-verify=$DCAP_VERSION-focal1 \
-        occlum-runtime=$OCCLUM_VERSION-1 \
+        occlum-runtime=$OCCLUM_VERSION-focal-1 \
         && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
@@ -35,7 +35,7 @@ RUN apt update && DEBIAN_FRONTEND="noninteractive" apt install -y --no-install-r
 COPY docker-entrypoint.sh /usr/local/bin/
 
 ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
-# This PCCS value could be updated by env passed from user by below entryp
+# This PCCS value could be updated by env passed from user by below entrypoint
 ENV PCCS_URL="https://localhost:8081/sgx/certification/v3/"
 ENV USE_SECURE_CERT=true
 
