@@ -25,7 +25,7 @@ runs:
       shell: bash
 
     - name: Create container
-      run: docker run -itd --name=${{ inputs.container-name }} -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }}
+      run: docker run -itd --name=${{ inputs.container-name }} --privileged -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }}
       shell: bash
 
     - uses: ./.github/workflows/composite_action/prebuild
@@ -38,6 +38,14 @@ runs:
 
     - name: Make install
       run: docker exec ${{ inputs.container-name }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; ${{ inputs.build-envs}} make install"
+      shell: bash
+    
+    # When there comes new features, the configuration should be enabled accordingly
+    - name: Configure Occlum features
+      run: |
+        if [[ "${{ matrix.features }}" == "IO_Uring" ]]; then
+          docker exec ${{ inputs.container-name }} bash -c "jq '.feature.io_uring = 1' /opt/occlum/etc/template/Occlum.json > /tmp.json && mv /tmp.json /opt/occlum/etc/template/Occlum.json";
+        fi;
       shell: bash
     
     - name: Remove occlum installation package

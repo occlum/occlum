@@ -53,9 +53,9 @@ endif
 ######## App Settings ########
 
 ifneq ($(SGX_MODE), HW)
-	# Tools are built in simulation mode by default and should be built with sgx_urts_sim_with_se_event
+	# Tools are built in simulation mode by default and should be built with sgx_urts_sim
 	# to resolve undefined symbols
-	URTS_LIBRARY_NAME := sgx_urts_sim_with_se_event
+	URTS_LIBRARY_NAME := sgx_urts_sim
 else
 	URTS_LIBRARY_NAME := sgx_urts
 endif
