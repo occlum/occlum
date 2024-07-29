@@ -52,9 +52,8 @@ lazy_static! {
                 let loader_path = line_split[0].to_string();
                 let loader_path_buf = PathBuf::from(&loader_path);
                 let loader_file_name = loader_path_buf.file_name().unwrap().to_string_lossy().to_string();
-                // The second string plus the loader directory is LD_LIBRARY_PATH
-                let loader_dir = loader_path_buf.parent().unwrap().to_string_lossy().to_string();
-                let ld_library_path = format!("{}:{}", loader_dir, line_split[1]);
+                // The second string is LD_LIBRARY_PATH
+                let ld_library_path = line_split[1].to_string();
                 // parse all libraries in LD_LIBRARY_PATH
                 let lib_paths = ld_library_path.split(':').filter(|s| s.len()>0).map(|s| s.to_string()).collect();
                 loader_paths.insert(loader_file_name, loader_path.clone());
@@ -230,6 +229,8 @@ pub fn find_dependent_shared_objects(
     let output = command_output_of_executing_dynamic_loader(&file_path, &occlum_elf_loader);
 
     if let Ok(output) = output {
+        let loader_path_buf = PathBuf::from(&occlum_elf_loader);
+        let loader_dir = loader_path_buf.parent().unwrap().to_string_lossy().to_string();
         let default_lib_dirs = OCCLUM_LOADERS
             .default_lib_dirs
             .get(&occlum_elf_loader)
@@ -237,6 +238,7 @@ pub fn find_dependent_shared_objects(
         let mut objects = extract_dependencies_from_output(
             &file_path,
             output,
+            loader_dir,
             default_lib_dirs,
             lazy_check_missing_libraries,
         );
@@ -377,6 +379,7 @@ pub fn infer_default_loader(files_autodep: &Vec<String>) -> Option<(String, Stri
 pub fn extract_dependencies_from_output(
     file_path: &str,
     output: Output,
+    loader_dir: String,
     default_lib_dirs: Option<Vec<String>>,
     lazy_check_missing_libraries: bool,
 ) -> HashSet<(String, String)> {
@@ -422,10 +425,10 @@ pub fn extract_dependencies_from_output(
                             .to_string_lossy()
                             .to_string();
                         // if the shared object is from one of the default dirs,
-                        // we will copy to the first default dir(the loader dir)
+                        // we will copy to the the loader dir
                         // Otherwise it will be copied to the same dir as its dir in host.
                         if default_lib_dirs.contains(&lib_dir_in_host) {
-                            let target_dir = default_lib_dirs.first().unwrap();
+                            let target_dir = loader_dir.clone();
                             let target_path = PathBuf::from(target_dir)
                                 .join(file_name)
                                 .to_string_lossy()
