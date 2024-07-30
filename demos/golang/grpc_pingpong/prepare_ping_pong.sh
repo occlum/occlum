@@ -66,13 +66,12 @@ export GOPRIVATE=github.com/occlum/demos/\*
 protoc --proto_path=pingpong --go-grpc_out=. --go_out=. pingpong/pingpong.proto
 
 # prepare occlum images
-occlum-go mod download golang.org/x/net
-occlum-go mod download google.golang.org/grpc
-occlum-go mod download github.com/golang/protobuf
-occlum-go mod download golang.org/x/sys
-occlum-go mod download golang.org/x/text
-occlum-go mod download google.golang.org/genproto
-occlum-go mod download google.golang.org/protobuf
+occlum-go get -u -v golang.org/x/net@v0.17.0
+occlum-go get -u -v google.golang.org/grpc@v1.58.2
+occlum-go get -u -v golang.org/x/sys@v0.13.0
+occlum-go get -u -v golang.org/x/text@v0.13.0
+# occlum-go get -u -v google.golang.org/genproto
+occlum-go get -u -v google.golang.org/protobuf
 
 occlum-go build -o occlum_pong pong.go
 occlum-go build -o occlum_ping ping.go
