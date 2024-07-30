@@ -15,18 +15,17 @@ apt-get install -y ${DEPS}
 # 2. Install libtpms and swtpm to specified position
 [ -d $script_dir/libtpms ] || mkdir $script_dir/libtpms && 
 	cd $script_dir/libtpms && 
-	git clone https://github.com/stefanberger/libtpms.git . &&
+	git clone -b stable-0.9 https://github.com/stefanberger/libtpms.git . &&
 	./autogen.sh --with-openssl --prefix=/usr --with-tpm2 &&
-	make &&
+	make -j &&
 	make check &&
 	make install &&
 	cd ..
 
 [ -d $script_dir/swtpm ] || mkdir $script_dir/swtpm && 
 	cd $script_dir/swtpm && 
-	git clone https://github.com/stefanberger/swtpm.git . &&
-    ./autogen.sh --prefix=/usr &&
-	make &&
+	git clone -b stable-0.9 https://github.com/stefanberger/swtpm.git . &&
+    ./autogen.sh --prefix=/usr --with-openssl --with-tss-user=root --with-tss-group=root --without-selinux --without-cuse &&
+	make -j &&
 	make check &&
 	make install
-
