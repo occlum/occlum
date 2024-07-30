@@ -1040,9 +1040,9 @@ jobs:
     - name: Check netty unit demo results
       run: |
         if [[ "${{ matrix.features }}" == "IO_Uring" ]]; then
-          docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut && cat netty-test-heap512m.log | grep '189 tests successful'";
+          docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut/occlum_netty_ut_instance && cat netty-test-heap512m.log | grep '189 tests successful'";
         else
-          docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut && cat netty-test-heap512m.log | grep '190 tests successful'";
+          docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/netty_ut/occlum_netty_ut_instance && cat netty-test-heap512m.log | grep '190 tests successful'";
         fi
       shell: bash
 
