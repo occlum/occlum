@@ -104,7 +104,7 @@ Here is the configuration of rootfs, the first item is the lower layer RO-SEFS a
 ```
 
 ## Ext2
-The [Ext2](https://github.com/liqinggd/ext2-rs) is an independent filesystem Rust crate that resembles Linux's Ext2. For the sake of performance and security, it utilizes [SwornDisk](https://github.com/asterinas/mlsdisk) as its underlying block device. Compared with SEFS, the file I/O performance of "Ext2+SwornDisk" is superior. If your App's performance is highly dependent on file I/O, it is recommended to enable Ext2 in Occlum.json.
+The [Ext2](https://github.com/occlum/ext2-rs) is an independent filesystem Rust crate that resembles Linux's Ext2. For the sake of performance and security, it utilizes [SwornDisk](https://github.com/asterinas/mlsdisk) as its underlying block device. Compared with SEFS, the file I/O performance of "Ext2+SwornDisk" is superior. If your App's performance is highly dependent on file I/O, it is recommended to enable Ext2 in Occlum.json.
 
 ```
   "mount": [{
