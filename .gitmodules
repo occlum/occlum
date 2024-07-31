@@ -32,4 +32,4 @@
 	url = https://github.com/asterinas/mlsdisk
 [submodule "deps/ext2-rs"]
 	path = deps/ext2-rs
-	url = https://github.com/liqinggd/ext2-rs
+	url = https://github.com/occlum/ext2-rs
