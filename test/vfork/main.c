@@ -118,7 +118,17 @@ static void *child_thread_routine(void *_arg) {
         return (void *) -1;
     }
 
-    sleep(1);
+    int i = 0;
+    while (1) {
+        i++;
+        int ret = sleep(1);
+        if (ret == 0 || i >= 10) {
+            break;
+        } else if (errno == EINTR) {
+            // Interrupted, sleep again
+            continue;
+        }
+    }
 
     if (clock_gettime(CLOCK_REALTIME, &t2)) {
         return (void *) -1;
@@ -183,11 +193,99 @@ int test_vfork_stop_child_thread() {
     return 0;
 }
 
+#define NUM_THREADS 20
+volatile static int test_main_thread_is_ready = 0;
+
+void *child_thread(void *arg) {
+    int *number = (int *)arg;
+
+    int repeat = 10;
+    if (*number == 3) {
+        printf("child thread %d do vfork\n", *number);
+        fflush(stdout);
+        // This thread will continually vfork and exit
+        int i = repeat;
+        while (i--) {
+            // wait for main thread to be ready for vfork
+            while (test_main_thread_is_ready == 0);
+            pid_t pid = vfork();
+            if (pid == 0) {
+                // Child process
+                sleep(1);
+                _exit(0);
+            } else if (pid > 0) {
+                // Parent process
+                waitpid(pid, NULL, 0);
+                printf("child vfork i = %d\n", i);
+            } else {
+                perror("vfork");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        return NULL;
+    }
+
+    // Other threads do their own work
+    for (int i = 5; i < repeat; ++i) {
+        printf("Thread %ld doing its work i = %d.\n", pthread_self(), i);
+        fflush(stdout);
+        sleep(1);
+    }
+
+    return NULL;
+}
+
+// Test multiple threads of the same process do vfork simultaneously and shouldn't force stop each other to make the process hang.
+int test_vfork_multiple_threads() {
+    pthread_t threads[NUM_THREADS];
+    int ret;
+    int test[NUM_THREADS] = {0};
+
+    // Create NUM_THREADS threads
+    for (int i = 0; i < NUM_THREADS; ++i) {
+        test[i] = i;
+        ret = pthread_create(&threads[i], NULL, child_thread, &test[i]);
+        if (ret != 0) {
+            perror("pthread_create");
+            return EXIT_FAILURE;
+        }
+    }
+    printf("create child threads done\n");
+    fflush(stdout);
+
+    test_main_thread_is_ready = 1;
+    // Main thread does a vfork and exec hello_world
+    pid_t pid = vfork();
+    if (pid == 0) {
+        // Child process
+        sleep(1);
+        char *args[] = { "/bin/getpid", NULL };
+        execv(args[0], args);
+        perror("execv");
+        _exit(EXIT_FAILURE); // Exit if exec fails
+    } else if (pid > 0) {
+        // Parent process waits for the child to complete
+        waitpid(pid, NULL, 0);
+    } else {
+        perror("vfork");
+        return EXIT_FAILURE;
+    }
+
+    // Join the threads
+    for (int i = 0; i < NUM_THREADS; ++i) {
+        pthread_join(threads[i], NULL);
+    }
+
+    return 0;
+}
+
 static test_case_t test_cases[] = {
     TEST_CASE(test_vfork_exit_and_wait),
     TEST_CASE(test_multiple_vfork_execve),
     TEST_CASE(test_vfork_isolate_file_table),
     TEST_CASE(test_vfork_stop_child_thread),
+    TEST_CASE(test_vfork_multiple_threads),
 };
 
 int main() {
