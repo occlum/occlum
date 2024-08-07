@@ -21,7 +21,7 @@ impl ProcINode for StatINode {
         fill_in_stat(&mut host_stat, "btime", &boot_time);
         let procs_running = {
             let mut processes = crate::process::table::get_all_processes();
-            processes.retain(|p| p.status() == crate::process::ProcessStatus::Running);
+            processes.retain(|p| p.status().is_alive());
             processes.len().to_string()
         };
         fill_in_stat(&mut host_stat, "procs_running", &procs_running);

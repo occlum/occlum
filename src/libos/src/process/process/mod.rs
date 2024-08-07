@@ -36,6 +36,15 @@ pub enum ProcessStatus {
     Zombie,
 }
 
+impl ProcessStatus {
+    pub fn is_alive(&self) -> bool {
+        match self {
+            ProcessStatus::Running | ProcessStatus::Stopped => true,
+            _ => false,
+        }
+    }
+}
+
 impl Process {
     /// Get process ID.
     pub fn pid(&self) -> pid_t {
@@ -213,6 +222,20 @@ impl ProcessInner {
         }
     }
 
+    pub fn stop(&mut self) {
+        match self {
+            Self::Live { status, .. } => *status = LiveStatus::Stopped,
+            Self::Zombie { .. } => unreachable!(),
+        }
+    }
+
+    pub fn resume(&mut self) {
+        match self {
+            Self::Live { status, .. } => *status = LiveStatus::Running,
+            Self::Zombie { .. } => unreachable!(),
+        }
+    }
+
     pub fn children(&self) -> Option<&Vec<ProcessRef>> {
         match self {
             Self::Live { children, .. } => Some(children),
@@ -298,7 +321,7 @@ impl ProcessInner {
         new_parent_inner: &mut SgxMutexGuard<ProcessInner>,
     ) {
         // Check preconditions
-        debug_assert!(self.status() == ProcessStatus::Running);
+        debug_assert!(self.status().is_alive());
         debug_assert!(self.num_threads() == 0);
 
         // When this process exits, its children are adopted by the init process

@@ -1,5 +1,5 @@
 use super::untrusted_event::{set_event, wait_event};
-use super::{ProcessFilter, ProcessRef, TermStatus, ThreadId, ThreadRef};
+use super::{ProcessFilter, ProcessRef, ProcessStatus, TermStatus, ThreadId, ThreadRef};
 use crate::fs::FileTable;
 use crate::interrupt::broadcast_interrupts;
 use crate::prelude::*;
@@ -50,21 +50,30 @@ pub fn do_vfork(mut context: *mut CpuContext) -> Result<isize> {
     let current = current!();
     trace!("vfork parent process pid = {:?}", current.process().pid());
 
+    // Force stop all child threads
+    // To prevent multiple threads do vfork simultaneously and force stop each other, the thread must change the process status at first.
+    loop {
+        let mut process_inner = current.process().inner();
+        if process_inner.status() == ProcessStatus::Stopped {
+            trace!("process is doing vfork, current thread handle force stop");
+            drop(process_inner);
+            handle_force_stop();
+            continue;
+        } else {
+            trace!("current thread start vfork");
+            process_inner.stop();
+            break;
+        }
+    }
+
+    // Stop all other child threads
+    vfork_stop_all_child_thread(&current);
+
     // Generate a new pid for child process
     let child_pid = {
         let new_tid = ThreadId::new();
         new_tid.as_u32() as pid_t
     };
-
-    // stop all other child threads
-    let child_threads = current.process().threads();
-    child_threads.iter().for_each(|thread| {
-        if thread.tid() != current.tid() {
-            thread.force_stop();
-        }
-    });
-    // Don't hesitate. Interrupt all threads right now to stop child threads.
-    broadcast_interrupts();
 
     // Save parent's context in TLS
     VFORK_CONTEXT.with(|cell| {
@@ -73,19 +82,8 @@ pub fn do_vfork(mut context: *mut CpuContext) -> Result<isize> {
         *ctx = Some(new_context);
     });
 
-    // Save parent's file table
-    let parent_pid = current.process().pid();
-    let mut vfork_file_tables = VFORK_PARENT_FILE_TABLES.lock().unwrap();
-    let parent_file_table = {
-        let mut current_file_table = current.files().lock();
-        let new_file_table = current_file_table.clone();
-        // FileTable contains non-cloned struct, so here we do a memory replacement to use new
-        // file table in child and store the original file table in TLS.
-        mem::replace(&mut *current_file_table, new_file_table)
-    };
-    if let Some(_) = vfork_file_tables.insert(parent_pid, parent_file_table) {
-        return_errno!(EINVAL, "current process's vfork has not returned yet");
-    }
+    // Save parent's file table.
+    vfork_save_file_table(&current)?;
 
     // This is the first time return and will return as child.
     // The second time return will return as parent in vfork_return_to_parent.
@@ -101,6 +99,48 @@ pub fn is_vforked_child_process() -> bool {
     })
 }
 
+fn vfork_save_file_table(current: &ThreadRef) -> Result<()> {
+    let parent_pid = current.process().pid();
+    let mut vfork_file_tables = VFORK_PARENT_FILE_TABLES.lock().unwrap();
+    let parent_file_table = {
+        let mut current_file_table = current.files().lock();
+        let new_file_table = current_file_table.clone();
+        // FileTable contains non-cloned struct, so here we do a memory replacement to use new
+        // file table in child and store the original file table in TLS.
+        mem::replace(&mut *current_file_table, new_file_table)
+    };
+
+    // Insert the parent file table. The key shouldn't exist because there must be only one thread doing the vfork and save the file table for current process.
+    let ret = vfork_file_tables.insert(parent_pid, parent_file_table);
+    debug_assert!(ret.is_none());
+    Ok(())
+}
+
+fn vfork_stop_all_child_thread(current: &ThreadRef) {
+    // stop all other child threads
+    loop {
+        let child_threads = current.process().threads();
+        let running_thread_num = child_threads
+            .iter()
+            .filter(|thread| !thread.is_stopped() && thread.tid() != current.tid())
+            .map(|thread| {
+                thread.force_stop();
+                thread
+            })
+            .count();
+
+        trace!("running threads num: {:?}", running_thread_num);
+
+        if running_thread_num == 0 {
+            trace!("all other threads are stopped");
+            break;
+        }
+
+        // Don't hesitate. Interrupt all threads right now to stop child threads.
+        broadcast_interrupts();
+    }
+}
+
 // Return to parent process to continue executing
 pub fn vfork_return_to_parent(
     mut context: *mut CpuContext,
@@ -114,8 +154,10 @@ pub fn vfork_return_to_parent(
     }
 
     // Wake parent's child thread which are all sleeping
+    // Hold the process inner lock during the wake process to avoid other threads do vfork again and try to stop the thread
     let current = current!();
-    let child_threads = current.process().threads();
+    let mut process_inner = current.process().inner();
+    let child_threads = process_inner.threads().unwrap();
     child_threads.iter().for_each(|thread| {
         thread.resume();
         let thread_ptr = thread.raw_ptr();
@@ -124,6 +166,7 @@ pub fn vfork_return_to_parent(
             info!("Thread 0x{:x} is waken", thread_ptr);
         }
     });
+    process_inner.resume();
 
     Ok(child_pid)
 }
@@ -223,7 +266,9 @@ pub fn handle_force_stop() {
             "Thread 0x{:x} is forced to stop ...",
             current_thread_ptr as usize
         );
-        while current.is_forced_to_stop() {
+
+        current.inner().stop();
+        while current.is_stopped() {
             wait_event(current_thread_ptr as *const c_void);
         }
     }
