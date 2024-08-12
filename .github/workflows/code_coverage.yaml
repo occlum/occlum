@@ -8,110 +8,120 @@ env:
 
 jobs:
   Collect-code-coverage:
-    runs-on: ubuntu-20.04
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX2-HW, EDMM, IO_Uring]]
+
     steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
+
     - uses: actions/checkout@v2
       with:
         submodules: true
 
-    - name: Get Occlum version
-      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
-
-    - name: Create container
-      run: docker run -itd --name=code_coverage -e OCCLUM_LOG_LEVEL=trace -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04
-
-    - uses: ./.github/workflows/composite_action/prebuild
+    - uses: ./.github/workflows/composite_action/hw
       with:
-        container-name: 'code_coverage'
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=0'  # code coverage test should use debug mode
 
-    - name: Build dependencies
-      run: docker exec code_coverage bash -c "cargo uninstall sccache || true; cd /root/occlum; make submodule"
-
+    # Build the source code with code coverage enabled
     - name: Build source
-      run: docker exec code_coverage bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_COV=1 make install"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; make clean && OCCLUM_COV=1 make install"
+
+    # Udpate the test json file
+    # When there comes new features, the configuration should be enabled accordingly
+    - name: Configure Occlum features
+      run: |
+        docker exec ${{ env.CONTAINER_NAME }} bash -c "jq '.feature.enable_posix_shm = true | .feature.enable_edmm = true' /root/occlum/test/Occlum.json > /tmp.json && mv /tmp.json /root/occlum/test/Occlum.json"
+      shell: bash
 
     - name: Integration test
-      run:  docker exec code_coverage bash -c "cd /root/occlum; SGX_MODE=SIM make test"
+      run:  docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum; make test"
 
     - name: Integration test with Glibc
-      run:  docker exec code_coverage bash -c "cd /root/occlum; SGX_MODE=SIM make test-glibc"
+      run:  docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum; make test-glibc"
 
     - name: C test
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/hello_c && make;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/hello_c && make;
             occlum new occlum_instance;
             cd occlum_instance && rm -rf image;
             copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
-            SGX_MODE=SIM occlum build;
+            occlum build;
             occlum run /bin/hello_world"
 
     - name: C with encrypted image test
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/hello_c && make;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/hello_c && make;
             rm -rf occlum_instance && occlum new occlum_instance;
             occlum gen-image-key occlum_instance/image_key;
             cd occlum_instance && rm -rf image;
             copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
-            SGX_MODE=SIM occlum build --image-key ./image_key --buildin-image-key;
+            occlum build --image-key ./image_key --buildin-image-key;
             occlum run /bin/hello_world;
             cd /root/occlum/demos && rm -rf ./hello_c"
 
     - name: C++ test
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/hello_cc && make;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/hello_cc && make;
             occlum new occlum_instance;
             cd occlum_instance && rm -rf image;
             copy_bom -f ../hello.yaml --root image --include-dir /opt/occlum/etc/template;
-            SGX_MODE=SIM occlum build;
+            occlum build;
             occlum run /bin/hello_world;
             cd /root/occlum/demos && rm -rf ./hello_cc"
 
     - name: Rust test
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/rust && SGX_MODE=SIM ./run_rust_demo_on_occlum.sh;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/rust && ./run_rust_demo_on_occlum.sh;
             cd /root/occlum/demos && rm -rf ./rust"
 
     - name: Run Golang sqlite test
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/golang/go_sqlite/ && SGX_MODE=SIM ./run_go_sqlite_demo.sh;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/golang/go_sqlite/ && ./run_go_sqlite_demo.sh;
             cd /root/occlum/demos && rm -rf ./golang"
 
     - name: Build Fish dependencies
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/fish && ./download_and_build.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/fish && ./download_and_build.sh"
 
     - name: Run Fish test
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_fish_test.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/fish && ./run_fish_test.sh"
 
     - name: Run Fish process rlimit test
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/fish && SGX_MODE=SIM ./run_per_process_config_test.sh;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/fish && ./run_per_process_config_test.sh;
             cd /root/occlum/demos && rm -rf ./fish"
 
     - name: Build LA dependencies
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/local_attestation && ./download_src_and_build_deps.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/local_attestation && ./download_src_and_build_deps.sh"
 
     - name: Run LA test
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/local_attestation && SGX_MODE=SIM make;
-            SGX_MODE=SIM make test;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/local_attestation && make;
+            make test;
             cd /root/occlum/demos && rm -rf ./local_attestation"
 
     - name: Build sqlite dependencies
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/sqlite && ./download_and_build_sqlite.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/sqlite && ./download_and_build_sqlite.sh"
 
     - name: Run sqlite test
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/sqlite && SGX_MODE=SIM ./run_sqlite_on_occlum.sh;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/sqlite && ./run_sqlite_on_occlum.sh;
             cd /root/occlum/demos && rm -rf ./sqlite"
 
     - name: LTP test
-      run: docker exec code_coverage bash -c "cd /root/occlum/demos/linux-ltp && ./dl_and_build_ltp.sh && SGX_MODE=SIM ./prepare_ltp.sh;
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/linux-ltp && ./dl_and_build_ltp.sh && ./prepare_ltp.sh;
             cd occlum_instance;
             occlum run /opt/ltp/run-ltp.sh -f syscalls-occlum;
             cd /root/occlum/demos && rm -rf ./linux-ltp"
-    
+
     - name: Clean demos
-      run: docker exec code_coverage bash -c "rm -rf /root/occlum/demos/"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "rm -rf /root/occlum/demos/"
 
     - name : Gvisor syscall test
-      run: docker exec code_coverage bash -c "git clone -b occlum-release-20200921.0 https://github.com/occlum/gvisor.git;
-            cd gvisor/occlum && ./prepare_bazel.sh && ./build_and_install_syscall_tests.sh && SGX_MODE=SIM ./run_occlum_passed_tests.sh"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "git clone -b occlum-release-20200921.0 https://github.com/occlum/gvisor.git;
+            cd gvisor/occlum && ./prepare_bazel.sh && ./build_and_install_syscall_tests.sh && ./run_occlum_passed_tests.sh"
 
     - name: Upload coverage report
-      run: docker exec code_coverage bash -c "cd /root/occlum/build/internal/src/libos/cargo-target/debug/deps; export CODECOV_TOKEN="${{ secrets.COV_TOKEN }}"; bash <(curl -s https://codecov.io/bash)"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/build/internal/src/libos/cargo-target/debug/deps; export CODECOV_TOKEN="${{ secrets.COV_TOKEN }}"; bash <(curl -s https://codecov.io/bash)"
 
     - name: Clean the environment
       if: ${{ always() }}
-      run: docker stop code_coverage
+      run: docker stop ${{ env.CONTAINER_NAME }}
