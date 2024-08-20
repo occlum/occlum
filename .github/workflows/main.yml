@@ -15,6 +15,9 @@ concurrency:
 jobs:
   Make_test_on_ubuntu:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        os_ver: [ubuntu20.04, ubuntu22.04]
 
     steps:
     - uses: actions/checkout@v1
@@ -30,7 +33,7 @@ jobs:
       shell: bash
 
     - name: Create container
-      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04
+      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ matrix.os_ver }}
       shell: bash
 
     - uses: ./.github/workflows/composite_action/prebuild
