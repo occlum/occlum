@@ -8,10 +8,10 @@ inputs:
     description: 'Occlum build environments'
     required: false
     default: 'OCCLUM_RELEASE_BUILD=1'
-  os:
-    description: 'Occlum docker image base OS'
-    required: false
-    default: 'ubuntu20.04'
+  # os:
+  #   description: 'Occlum docker image base OS'
+  #   required: false
+  #   default: 'ubuntu20.04'
   container-run-params:
     description: 'Extra container run parameters'
     required: false
@@ -40,9 +40,9 @@ runs:
     - name: Create container
       run: |
         if [[ "${{ matrix.self_runner[1] }}" == "SGX1-HW" ]]; then
-          docker run -itd --name=${{ env.CONTAINER_NAME }} ${{ inputs.container-run-params }} --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }};
+          docker run -itd --name=${{ env.CONTAINER_NAME }} ${{ inputs.container-run-params }} --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false --device /dev/isgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ matrix.os_ver }};
         elif [[ "${{ matrix.self_runner[1] }}" == "SGX2-HW" ]]; then
-          docker run -itd --name=${{ env.CONTAINER_NAME }} ${{ inputs.container-run-params }} --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ inputs.os }};
+          docker run -itd --name=${{ env.CONTAINER_NAME }} ${{ inputs.container-run-params }} --privileged --rm --env CARGO_HTTP_MULTIPLEXING=false -v /dev/sgx:/dev/sgx -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ matrix.os_ver }};
         else
           echo "Unsupported Hardware"
         fi;
