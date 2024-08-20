@@ -17,6 +17,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -118,6 +119,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -155,6 +157,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -189,6 +192,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -228,6 +232,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -264,6 +269,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -296,6 +302,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -327,6 +334,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -361,6 +369,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -395,6 +404,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -426,6 +436,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -467,6 +478,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -597,6 +609,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -724,6 +737,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -763,6 +777,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -805,6 +820,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -860,6 +876,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -891,6 +908,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -928,6 +946,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -968,6 +987,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1011,6 +1031,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1054,6 +1075,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1085,6 +1107,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1168,6 +1191,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1213,6 +1237,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1251,6 +1276,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1286,6 +1312,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1317,6 +1344,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1348,6 +1376,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1379,6 +1408,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1416,6 +1446,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - uses: actions/checkout@v1
       with:
