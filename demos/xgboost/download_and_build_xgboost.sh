@@ -17,6 +17,7 @@ git apply ../../patch/rabit-01.diff
 popd
 pushd dmlc-core
 git apply ../../patch/dmlc-core-01.diff
+sed -i 's/isAlive/is_alive/g' tracker/dmlc_tracker/tracker.py
 popd
 mkdir build
 cd build
