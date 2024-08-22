@@ -17,13 +17,4 @@ else
   exit 1
 fi
 
-BOOST="boost_1_77_0"
-wget https://boostorg.jfrog.io/artifactory/main/release/1.77.0/source/${BOOST}.tar.bz2
-tar --bzip2 -xf ${BOOST}.tar.bz2
-pushd ${BOOST}
-./bootstrap.sh --prefix=/usr --with-python=python3 &&
-./b2 stage -j4 threading=multi link=shared
-./b2 install threading=multi link=shared
-popd
-
 echo -e "${BLUE}Finish installing dependencies.${NC}"
