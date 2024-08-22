@@ -12,6 +12,7 @@ jobs:
     strategy:
       matrix:
         self_runner: [[self-hosted, SGX2-HW, EDMM, IO_Uring]]
+        os_ver: [ubuntu20.04]
 
     steps:
     - name: Clean before running
