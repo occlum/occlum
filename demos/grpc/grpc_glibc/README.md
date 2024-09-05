@@ -1,18 +1,12 @@
 # Run gRPC C++ Client/Server on Occlum
 
 ## Step 1:
-Download, build and install cares, protobuf and gRPC:
+Download, build and install grpc and examples
 ```
-./download_and_install_grpc_glibc.sh
+./dl_and_build.sh
 ```
 
 ## Step 2:
-Prepare the gRPC C++ Hello World sample project, which consists of a client and server:
-```
-./prepare_client_server_glibc.sh
-```
-
-## Step 3:
 Run the demo `server` which will listen on port `50051` on Occlum:
 ```
 ./run_server_on_occlum_glibc.sh
