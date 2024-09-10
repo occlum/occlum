@@ -1,0 +1,46 @@
+# fio-microbench.fio
+
+[global]
+# 'filename' must be given as input
+# filename=/root/fio-microbench
+ioengine=sync
+size=2G
+thread=1
+numjobs=1
+direct=1
+fsync_on_close=1
+time_based=0
+
+
+# Write
+
+[seq-write-256k]
+stonewall
+wait_for_previous
+group_reporting
+rw=write
+bs=256k
+
+[rand-write-32k]
+stonewall
+wait_for_previous
+group_reporting
+rw=randwrite
+bs=32k
+
+
+# Read
+
+[seq-read-256k]
+stonewall
+wait_for_previous
+group_reporting
+rw=read
+bs=256k
+
+[rand-read-32k]
+stonewall
+wait_for_previous
+group_reporting
+rw=randread
+bs=32k
