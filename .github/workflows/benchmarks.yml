@@ -110,7 +110,7 @@ jobs:
         build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
     - name: Run iperf3 download and build
-      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/benchmarks/iperf3 && ./iperf3.sh 120"
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/benchmarks/iperf3 && IO_URING_TEST=true ./iperf3.sh 120"
 
     - name: Copy result
       run: docker cp ${{ env.CONTAINER_NAME }}:/root/occlum/demos/benchmarks/iperf3/result.json .
