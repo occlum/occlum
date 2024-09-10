@@ -1,0 +1,26 @@
+[
+    {
+        "name": "Sequential Write Throughput",
+        "unit": "MiB/s",
+        "value": 0,
+        "extra": "seqwrite"
+    },
+    {
+        "name": "Random Write Throughput",
+        "unit": "MiB/s",
+        "value": 0,
+        "extra": "randwrite"
+    },
+    {
+        "name": "Sequential Read Throughput",
+        "unit": "MiB/s",
+        "value": 0,
+        "extra": "seqread"
+    },
+    {
+        "name": "Random Read Throughput",
+        "unit": "MiB/s",
+        "value": 0,
+        "extra": "randread"
+    }
+]
