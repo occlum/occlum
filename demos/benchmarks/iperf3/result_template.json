@@ -10,5 +10,17 @@
         "unit": "Mbits/sec",
         "value": 0,
         "extra": "receiver"
+    },
+    {
+        "name": "Sender Average Rate (IO_URING)",
+        "unit": "Mbits/sec",
+        "value": 0,
+        "extra": "sender_iouring"
+    },
+    {
+        "name": "Receiver Average Rate (IO_URING)",
+        "unit": "Mbits/sec",
+        "value": 0,
+        "extra": "receiver_iouring"
     }
 ]
