@@ -1046,6 +1046,7 @@ jobs:
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
     steps:
     - name: Remove unnecessary files
       run: |
@@ -1058,34 +1059,21 @@ jobs:
       with:
         submodules: true
 
-    - name: Get occlum version
-      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
-
-    - name: Create container
-      run: |
-        docker pull occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-gvisor_test
-        gvisor_test=$(docker run -itd -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-gvisor_test);
-        echo "gvisor_test=$gvisor_test" >> $GITHUB_ENV
-
-    - uses: ./.github/workflows/composite_action/prebuild
+    - uses: ./.github/workflows/composite_action/sim
       with:
-        container-name: $gvisor_test
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
 
-    - name: Build dependencies
-      run: docker exec $gvisor_test bash -c "cd /root/occlum; make submodule"
-
-    - name: Make install in debug mode
-      run: docker exec $gvisor_test bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; make install"
-
-    - name: Clone gvisor code
-      run: docker exec $gvisor_test bash -c "git clone https://github.com/occlum/gvisor.git"
+    - name: Build gvisor
+      run: docker exec ${{ github.job }} bash -c "git clone -b occlum-release-20200921.0 https://github.com/occlum/gvisor.git;
+            cd gvisor/occlum && ./prepare_bazel.sh && ./build_and_install_syscall_tests.sh"
 
     - name: Run gvisor syscall test
       run: |
         if [[ "${{ matrix.features }}" == "IO_Uring" ]]; then
-          docker exec $gvisor_test bash -c "cd /root/gvisor/occlum && SGX_MODE=SIM ./run_occlum_passed_tests.sh uring";
+          docker exec ${{ github.job }} bash -c "cd gvisor/occlum && SGX_MODE=SIM ./run_occlum_passed_tests.sh uring";
         else
-          docker exec $gvisor_test bash -c "cd /root/gvisor/occlum && SGX_MODE=SIM ./run_occlum_passed_tests.sh";
+          docker exec ${{ github.job }} bash -c "cd gvisor/occlum && SGX_MODE=SIM ./run_occlum_passed_tests.sh";
         fi;
       shell: bash
 
