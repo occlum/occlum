@@ -2,6 +2,7 @@
 set -e
 
 rm -rf model && mkdir model
-cd model
-wget https://download.01.org/opencv/2019/open_model_zoo/R3/20190905_163000_models_bin/age-gender-recognition-retail-0013/FP32/age-gender-recognition-retail-0013.bin
-wget https://download.01.org/opencv/2019/open_model_zoo/R3/20190905_163000_models_bin/age-gender-recognition-retail-0013/FP32/age-gender-recognition-retail-0013.xml
+pushd model
+wget https://storage.openvinotoolkit.org/repositories/open_model_zoo/2023.0/models_bin/1/age-gender-recognition-retail-0013/FP16/age-gender-recognition-retail-0013.xml
+wget https://storage.openvinotoolkit.org/repositories/open_model_zoo/2023.0/models_bin/1/age-gender-recognition-retail-0013/FP16/age-gender-recognition-retail-0013.bin
+popd
