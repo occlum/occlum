@@ -41,7 +41,8 @@ pub fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<i
 
     let mut file_ref: Option<Arc<dyn File>> = None;
 
-    if ENABLE_URING.load(Ordering::Relaxed) {
+    // Only support INET and INET6 domain with uring feature
+    if ENABLE_URING.load(Ordering::Relaxed) && (domain == Domain::INET || domain == Domain::INET6) {
         let protocol = SocketProtocol::try_from(protocol)
             .map_err(|_| errno!(EINVAL, "Invalid or unsupported network protocol"))?;
 
@@ -52,9 +53,8 @@ pub fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<i
             let is_uring_protocol = (protocol == SocketProtocol::IPPROTO_IP
                 || protocol == SocketProtocol::IPPROTO_TCP
                 || protocol == SocketProtocol::IPPROTO_UDP);
-            let is_uring_domain = (domain == Domain::INET || domain == Domain::INET6);
 
-            is_uring_type && is_uring_protocol && is_uring_domain
+            is_uring_type && is_uring_protocol
         };
 
         if match_uring() {
@@ -1078,22 +1078,8 @@ fn new_uring_getsockopt_cmd(
         SockOptName::SO_TYPE => Box::new(GetTypeCmd::new(())),
         SockOptName::SO_RCVTIMEO_OLD => Box::new(GetRecvTimeoutCmd::new(())),
         SockOptName::SO_SNDTIMEO_OLD => Box::new(GetSendTimeoutCmd::new(())),
-        SockOptName::SO_SNDBUF => {
-            if socket_type == SocketType::STREAM {
-                // Implement dynamic buf size for stream socket only.
-                Box::new(GetSendBufSizeCmd::new(()))
-            } else {
-                Box::new(GetSockOptRawCmd::new(level, optname, optlen))
-            }
-        }
-        SockOptName::SO_RCVBUF => {
-            if socket_type == SocketType::STREAM {
-                // Implement dynamic buf size for stream socket only.
-                Box::new(GetRecvBufSizeCmd::new(()))
-            } else {
-                Box::new(GetSockOptRawCmd::new(level, optname, optlen))
-            }
-        }
+        SockOptName::SO_SNDBUF => Box::new(GetSockOptRawCmd::new(level, optname, optlen)),
+        SockOptName::SO_RCVBUF => Box::new(GetSockOptRawCmd::new(level, optname, optlen)),
 
         SockOptName::SO_CNX_ADVICE => return_errno!(ENOPROTOOPT, "it's a write-only option"),
         _ => Box::new(GetSockOptRawCmd::new(level, optname, optlen)),
@@ -1214,10 +1200,6 @@ fn new_uring_setsockopt_cmd(
             if socket_type != SocketType::STREAM {
                 Box::new(SetSockOptRawCmd::new(level, optname, optval))
             } else {
-                // Based on the man page: The minimum (doubled) value for this option is 2048.
-                // However, the test on Linux shows the minimum value (doubled) is 4608. Here, we just
-                // use the same value as Linux.
-                let min_size = 1152;
                 // For the max value, we choose 4MB (doubled) to assure the libos kernel buf won't be the bottleneck.
                 let max_size = 2 * 1024 * 1024;
 
@@ -1232,9 +1214,6 @@ fn new_uring_setsockopt_cmd(
                     usize::from_ne_bytes(size)
                 };
                 trace!("set SO_SNDBUF size = {:?}", send_buf_size);
-                if send_buf_size < min_size {
-                    send_buf_size = min_size;
-                }
                 if send_buf_size > max_size {
                     send_buf_size = max_size;
                 }
@@ -1250,10 +1229,6 @@ fn new_uring_setsockopt_cmd(
             } else {
                 // Implement dynamic buf size for stream socket only.
                 info!("optval = {:?}", optval);
-                // Based on the man page: The minimum (doubled) value for this option is 256.
-                // However, the test on Linux shows the minimum value (doubled) is 2304. Here, we just
-                // use the same value as Linux.
-                let min_size = 1152;
                 // For the max value, we choose 4MB (doubled) to assure the libos kernel buf won't be the bottleneck.
                 let max_size = 2 * 1024 * 1024;
 
@@ -1268,10 +1243,6 @@ fn new_uring_setsockopt_cmd(
                     usize::from_ne_bytes(size)
                 };
                 trace!("set SO_RCVBUF size = {:?}", recv_buf_size);
-                if recv_buf_size < min_size {
-                    recv_buf_size = min_size;
-                }
-
                 if recv_buf_size > max_size {
                     recv_buf_size = max_size
                 }
