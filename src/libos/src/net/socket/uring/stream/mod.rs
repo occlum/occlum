@@ -454,8 +454,6 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     fn set_kernel_send_buf_size(&self, buf_size: usize) {
-        // Setting the minimal buf_size to 128 Kbytes
-        let buf_size = (128 * 1024 + 1).max(buf_size);
         let state = self.state.read().unwrap();
         match &*state {
             State::Init(_) | State::Listen(_) | State::Connect(_) => {
@@ -469,8 +467,6 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     fn set_kernel_recv_buf_size(&self, buf_size: usize) {
-        // Setting the minimal buf_size to 128 Kbytes
-        let buf_size = (128 * 1024 + 1).max(buf_size);
         let state = self.state.read().unwrap();
         match &*state {
             State::Init(_) | State::Listen(_) | State::Connect(_) => {
