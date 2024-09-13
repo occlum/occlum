@@ -1217,7 +1217,7 @@ fn new_uring_setsockopt_cmd(
                 // Based on the man page: The minimum (doubled) value for this option is 2048.
                 // However, the test on Linux shows the minimum value (doubled) is 4608. Here, we just
                 // use the same value as Linux.
-                let min_size = 128 * 1024;
+                let min_size = 1152;
                 // For the max value, we choose 4MB (doubled) to assure the libos kernel buf won't be the bottleneck.
                 let max_size = 2 * 1024 * 1024;
 
@@ -1253,7 +1253,7 @@ fn new_uring_setsockopt_cmd(
                 // Based on the man page: The minimum (doubled) value for this option is 256.
                 // However, the test on Linux shows the minimum value (doubled) is 2304. Here, we just
                 // use the same value as Linux.
-                let min_size = 128 * 1024;
+                let min_size = 1152;
                 // For the max value, we choose 4MB (doubled) to assure the libos kernel buf won't be the bottleneck.
                 let max_size = 2 * 1024 * 1024;
 
