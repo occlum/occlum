@@ -397,12 +397,10 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
                 self.set_kernel_recv_buf_size(buf_size);
             },
             cmd: GetSendBufSizeCmd => {
-                let buf_size = SEND_BUF_SIZE.load(Ordering::Relaxed);
-                cmd.set_output(buf_size);
+                cmd.execute(self.host_fd())?;
             },
             cmd: GetRecvBufSizeCmd => {
-                let buf_size = RECV_BUF_SIZE.load(Ordering::Relaxed);
-                cmd.set_output(buf_size);
+                cmd.execute(self.host_fd())?;
             },
             cmd: GetAcceptConnCmd => {
                 let mut is_listen = false;
@@ -454,6 +452,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     fn set_kernel_send_buf_size(&self, buf_size: usize) {
+        let buf_size = (128 * 1024 + 1).max(buf_size);
         let state = self.state.read().unwrap();
         match &*state {
             State::Init(_) | State::Listen(_) | State::Connect(_) => {
@@ -467,6 +466,7 @@ impl<A: Addr, R: Runtime> StreamSocket<A, R> {
     }
 
     fn set_kernel_recv_buf_size(&self, buf_size: usize) {
+        let buf_size = (128 * 1024 + 1).max(buf_size);
         let state = self.state.read().unwrap();
         match &*state {
             State::Init(_) | State::Listen(_) | State::Connect(_) => {
