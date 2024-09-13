@@ -1,0 +1,17 @@
+includes:
+  - base.yaml
+targets:
+  # copy model
+  - target: /models
+    copy:
+      - dirs:
+        - ${TF_DIR}/resnet
+  - target: /bin
+    copy:
+      - files:
+        - ${TF_DIR}/rootfs/usr/bin/tensorflow_model_server
+  # copy ssl file
+  - target: /etc
+    copy:
+      - files:
+        - ../ssl_configure/ssl.cfg
