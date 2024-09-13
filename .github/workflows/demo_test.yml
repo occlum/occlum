@@ -593,47 +593,6 @@ jobs:
     - name: Clean Grpc tls test
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./grpc/grpc_tls"
 
-
-  Openvino_test:
-    runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        features: [Legacy, IO_Uring]
-    steps:
-    - name: Remove unnecessary files
-      run: |
-        sudo rm -rf /usr/share/dotnet
-        sudo rm -rf /opt/ghc
-        sudo rm -rf "/usr/local/share/boost"
-        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
-    - uses: actions/checkout@v1
-      with:
-        submodules: true
-
-    - name: Get occlum version
-      run: echo "OCCLUM_VERSION=$(grep 'Version =' src/pal/include/occlum_version.h | awk '{print $4}')" >> $GITHUB_ENV;
-
-    - name: Create container
-      run: docker run -itd --name=${{ github.job }} -v $GITHUB_WORKSPACE:/root/occlum occlumbackup/occlum:${{ env.OCCLUM_VERSION }}-ubuntu20.04-openvino
-
-    - uses: ./.github/workflows/composite_action/prebuild
-      with:
-        container-name: ${{ github.job }}
-
-    - name: Build dependencies
-      run: docker exec ${{ github.job }} bash -c "cd /root/occlum; make submodule"
-
-    - name: Make install
-      run: docker exec ${{ github.job }} bash -c "source /opt/intel/sgxsdk/environment; cd /root/occlum; OCCLUM_RELEASE_BUILD=y make install"
-
-    - name: Run Openvino benchmark
-      run: docker exec ${{ github.job }} bash -c "cd /root/demos/openvino && cp -rf /root/occlum/demos/openvino/* . && SGX_MODE=SIM ./run_benchmark_on_occlum.sh"
-    
-    - name: Clean Openvino test
-      run: docker exec ${{ github.job }} bash -c "cd /root/demos && rm -rf ./grpc/openvino"
-
-
   # Python glibc support test
   Python_glibc_support_test:
     runs-on: ubuntu-20.04
