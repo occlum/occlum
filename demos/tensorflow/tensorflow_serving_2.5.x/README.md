@@ -11,10 +11,11 @@ And then you can dump the binary **tensorflow_model_server** from docker image `
 # ./prepare_tf_and_model.sh
 ```
 
-Then start the Occlum container (use version `latest-ubuntu20.04` for example) as below.
+Start the Occlum container per the [doc](https://occlum.readthedocs.io/en/latest/quickstart.html#start-the-occlum-dev-container).
+
 All the following are running in the above container.
 
-The following command will generate the TLS key and certificates for localhost( server domain name). The server.crt will be used by client. The sever.key and ssl.cfg is used by TF serving.
+The following command will generate the TLS key and certificates for localhost( server domain name). The server.crt will be used by client. The ssl.cfg is used by TF serving.
 ```
 ./generate_ssl_config.sh localhost
 ```
@@ -26,7 +27,7 @@ Now build TF serving Occlum instance.
 ```
 
 Last, build the client for TF serving test.
-There is an example python based [`inference client`](./client/inception_client.py) which sends a picture to tensorflow serving service to do inference with previously generated server certificate.
+There is an example python based [`inference client`](./client/resnet_client_grpc.py) which sends a picture to tensorflow serving service to do inference with previously generated server certificate.
 
 Install the dependent python packages.
 ```
