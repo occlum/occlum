@@ -31,7 +31,7 @@ This set of demos shows how real-world apps can be easily run inside SGX enclave
 * [swtpm](swtpm/) A demo of [SWTPM](https://github.com/stefanberger/swtpm) Software Trusted Platform Module (TPM) Emulator.
 * [tensorflow](tensorflow/tensorflow_training): A demo of [TensorFlow](https://www.tensorflow.org/) MNIST classification training.
 * [tensorflow_lite](tensorflow_lite/): A demo and benchmark of [TensorFlow Lite](https://www.tensorflow.org/lite) inference engine.
-* [tensorflow_serving](tensorflow/tensorflow_serving): A demo of [TensorFlow Serving](https://github.com/tensorflow/serving) 
+* [tensorflow_serving](tensorflow/tensorflow_serving_2.5.x): A demo of [TensorFlow Serving](https://github.com/tensorflow/serving)
 * [vault](golang/vault/): A demo of [HashiCorp Vault](https://github.com/hashicorp/vault).
 * [xgboost](xgboost/): A demo of [XGBoost](https://xgboost.readthedocs.io/en/latest).
 
