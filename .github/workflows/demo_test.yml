@@ -1312,3 +1312,39 @@ jobs:
 
     - name: Prepare occlum instance and Run Filebench on Ext2
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/benchmarks/filebench && SGX_MODE=SIM ./run_workload.sh readfiles"
+
+  Tensorflow_serving_test:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        features: [Legacy, IO_Uring]
+        os_ver: [ubuntu20.04, ubuntu22.04]
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/sim
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+        container-run-params: '-v $(which docker):/usr/bin/docker -v /var/run/docker.sock:/var/run/docker.sock'
+
+    - name: Dump TF serving and Download model
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving_2.5.x; ./prepare_tf_and_model.sh"
+
+    - name: Generate SSL
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving_2.5.x; ./generate_ssl_config.sh localhost"
+
+    - name: Build TF Occlum instance
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving_2.5.x; SGX_MODE=SIM ./build_occlum_instance.sh"
+
+    - name: Run tf_serving server
+      run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving_2.5.x; ./run.sh &"
+
+    - name: Run tf_serving client
+      run: |
+        sleep 60;
+        docker exec ${{ github.job }} bash -c "cd /root/occlum/demos/tensorflow/tensorflow_serving_2.5.x/client;
+          pip3 install -r requirements.txt;
+          python3 resnet_client_grpc.py --server=localhost:9000 --crt ../ssl_configure/server.crt --image cat.jpg"
