@@ -48,6 +48,8 @@ function build_instance()
                     .env.default += [ "MASTER_ADDR=127.0.0.1", "MASTER_PORT=29500" ] ' Occlum.json)" && \
     echo "${new_json}" > Occlum.json
     occlum build
+    # Delete image folder to save disk
+    rm -rf image
     popd
 }
 
