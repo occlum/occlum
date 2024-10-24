@@ -35,7 +35,7 @@ function build_instance()
     fi
 
     new_json="$(jq '.resource_limits.user_space_size = "1MB" |
-                    .resource_limits.user_space_max_size = "4000MB" |
+                    .resource_limits.user_space_max_size = "5000MB" |
                     .resource_limits.kernel_space_heap_size = "1MB" |
                     .resource_limits.kernel_space_heap_max_size = "400MB" |
                     .resource_limits.max_num_of_threads = 64 |
