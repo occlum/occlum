@@ -17,7 +17,7 @@ rm -rf occlum_pong_instance && mkdir occlum_pong_instance
 cd occlum_pong_instance
 occlum init
 new_json="$(jq '.resource_limits.user_space_size = "1MB" |
-	.resource_limits.user_space_max_size = "800MB" |
+	.resource_limits.user_space_max_size = "1000MB" |
 	.resource_limits.kernel_space_heap_size="1MB" |
 	.resource_limits.kernel_space_heap_max_size="80MB" ' Occlum.json)" && \
 echo "${new_json}" > Occlum.json
