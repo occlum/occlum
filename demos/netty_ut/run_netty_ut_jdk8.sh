@@ -45,7 +45,8 @@ run_netty_ut() {
     occlum run /usr/lib/jvm/java-8-openjdk-amd64/bin/java \
         -Xmx1048m -XX:-UseCompressedOops -XX:MaxMetaspaceSize=128m \
         -XX:ActiveProcessorCount=2 \
-        -Dos.name=Linux \
+        -Dreactor.netty.pool.maxIdleTime=60000 \
+	-Dos.name=Linux \
         -jar /usr/lib/netty/junit-platform-console-standalone-1.8.2.jar \
         -cp /usr/lib/netty/netty-testsuite-4.1.51.Final.jar:/usr/lib/netty/netty-all-4.1.51.Final.jar:/usr/lib/netty/xz-1.5.jar:/usr/lib/netty/hamcrest-library-1.3.jar:/usr/lib/netty/logback-classic-1.1.7.jar \
         --scan-class-path > netty-test-heap512m.log || true
