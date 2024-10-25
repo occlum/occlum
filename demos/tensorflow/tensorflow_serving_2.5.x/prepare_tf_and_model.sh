@@ -7,9 +7,10 @@ container="tensorflow/serving"
 tag="2.5.1"
 dest="${script_dir}/tf_serving"
 
+container_name=rootfs_dump_$RANDOM
 rm -f rootfs.tar
-docker export $(docker create --network host --name rootfs_dump ${container}:${tag}) -o rootfs.tar
-docker rm rootfs_dump
+docker export $(docker create --network host --name $container_name ${container}:${tag}) -o rootfs.tar
+docker rm $container_name
 
 rm -rf ${dest}/rootfs && mkdir -p ${dest}/rootfs
 tar xf rootfs.tar -C ${dest}/rootfs
