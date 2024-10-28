@@ -28,7 +28,7 @@ def main():
     tf.make_tensor_proto(img_array, shape=[1,224,224,3]))
 
   # Send the request to TensorFlow Serving
-  result = stub.Predict(request, 10.0)
+  result = stub.Predict(request, 25.0)
 
   # Print the predicted class and probability
   result = result.outputs['activation_49'].float_val
