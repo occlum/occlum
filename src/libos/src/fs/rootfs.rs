@@ -5,10 +5,12 @@ use super::sefs::{SgxStorage, SgxUuidProvider};
 use super::*;
 use crate::blk::{DevDisk, SwornDiskMeta, DEV_SWORNDISK};
 use crate::config::{ConfigApp, ConfigMountFsType};
+use crate::ctor::dtor;
 use crate::fs::dev_fs::DevDiskOption;
 use crate::time::OcclumTimeProvider;
 
 use alloc::ffi::CString;
+use alloc::sync::Weak;
 use ext2_rs::{BlockDevice, Ext2};
 use rcore_fs_mountfs::{MNode, MountFS};
 use rcore_fs_ramfs::RamFS;
@@ -34,6 +36,8 @@ lazy_static! {
         });
         RwLock::new(rootfs)
     };
+    /// All mounted SEFSes
+    pub static ref SEFS_MANAGER: GlobalSefsManager = GlobalSefsManager::new();
 }
 
 pub fn open_root_fs_according_to(
@@ -288,6 +292,8 @@ fn open_or_create_sefs_according_to(
             &SgxUuidProvider,
         )?
     };
+
+    SEFS_MANAGER.add(&sefs);
     Ok(sefs)
 }
 
@@ -330,4 +336,59 @@ fn setup_disk_meta_for_ext2(mc: &ConfigMount, user_key: &Option<sgx_key_128bit_t
     }
     let source_path = mc.source.as_ref();
     SwornDiskMeta::setup(disk_size.unwrap(), user_key, source_path)
+}
+
+/// Manage all mounted SEFSes globally.
+pub struct GlobalSefsManager(RwLock<Vec<Weak<SEFS>>>);
+
+impl GlobalSefsManager {
+    pub fn new() -> Self {
+        Self(RwLock::new(Vec::new()))
+    }
+
+    pub fn add(&self, sefs: &Arc<SEFS>) {
+        self.0.write().unwrap().push(Arc::downgrade(sefs));
+    }
+
+    pub fn update(&self) {
+        self.0
+            .write()
+            .unwrap()
+            .retain(|sefs| sefs.upgrade().is_some());
+    }
+
+    pub fn sync_all(&self) -> Result<()> {
+        for sefs in self
+            .0
+            .read()
+            .unwrap()
+            .iter()
+            .filter_map(|sefs| sefs.upgrade())
+        {
+            sefs.sync()?;
+        }
+        Ok(())
+    }
+
+    pub fn update_then_sync_all(&self) -> Result<()> {
+        let mut sefs_list = self.0.write().unwrap();
+        sefs_list.retain(|sefs| sefs.upgrade().is_some());
+        for sefs in sefs_list.iter().filter_map(|sefs| sefs.upgrade()) {
+            sefs.sync()?;
+        }
+        Ok(())
+    }
+
+    pub fn clear(&self) {
+        self.0.write().unwrap().clear();
+    }
+}
+
+#[dtor]
+fn sync_rootfs_when_exit() {
+    crate::fs::ROOT_FS
+        .read()
+        .unwrap()
+        .sync()
+        .expect("sync rootfs when exit failed");
 }
