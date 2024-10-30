@@ -1042,3 +1042,43 @@ jobs:
       run: |
         docker exec ${{ env.CONTAINER_NAME }} bash -c "cat /root/occlum/build/test/.fail"
         docker stop ${{ env.CONTAINER_NAME }}
+
+  Filebench_test:
+    timeout-minutes: 180
+    if: github.event_name == 'push' || github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') || contains(github.event.pull_request.labels.*.name, 'Pre-release-test')
+    runs-on: ${{ matrix.self_runner }}
+    strategy:
+      matrix:
+        self_runner: [[self-hosted, SGX2-HW], [self-hosted, SGX2-HW, EDMM, IO_Uring]]
+        os_ver: [ubuntu20.04, ubuntu22.04]
+
+    steps:
+    - name: Clean before running
+      run: |
+        sudo chown -R ${{ secrets.CI_ADMIN }} "${{ github.workspace }}"
+
+    - uses: AutoModality/action-clean@v1
+
+    - name: Checkout code
+      if: github.event_name == 'push' || github.event_name == 'schedule'
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+
+    - name: Checkout code from fork
+      if: contains(github.event.pull_request.labels.*.name, 'SGX-hardware-test-required') || contains(github.event.pull_request.labels.*.name, 'Pre-release-test')
+      uses: actions/checkout@v2
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
+        submodules: true
+
+    - uses: ./.github/workflows/composite_action/hw
+      with:
+        container-name: ${{ github.job }}
+        build-envs: 'OCCLUM_RELEASE_BUILD=1'
+
+    - name: Preinstall dependencies and build Filebench
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/benchmarks/filebench && ./preinstall_deps.sh && ./dl_and_build_filebench.sh"
+
+    - name: Prepare occlum instance and Run Filebench on Ext2
+      run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/benchmarks/filebench && ./run_workload.sh readfiles"
