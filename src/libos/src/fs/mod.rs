@@ -33,7 +33,7 @@ pub use self::locks::range_lock::{
     FileRange, RangeLock, RangeLockBuilder, RangeLockList, RangeLockType, OFFSET_MAX,
 };
 pub use self::pipe::PipeType;
-pub use self::rootfs::ROOT_FS;
+pub use self::rootfs::{ROOT_FS, SEFS_MANAGER};
 pub use self::stdio::{HostStdioFds, StdinFile, StdoutFile};
 pub use self::syscalls::*;
 pub use self::timer_file::{AsTimer, TimerCreationFlags, TimerFile};
