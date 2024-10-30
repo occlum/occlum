@@ -1,5 +1,6 @@
 use config::{parse_key, parse_mac, ConfigMount, ConfigMountFsType, ConfigMountOptions};
 use rcore_fs_mountfs::MNode;
+use rootfs::SEFS_MANAGER;
 use std::path::PathBuf;
 use std::sync::Once;
 use util::host_file_util::{write_host_file, HostFile};
@@ -23,6 +24,8 @@ pub fn do_mount_rootfs(
     }
 
     let mount_config = &user_app_config.mount;
+
+    SEFS_MANAGER.clear();
     let new_rootfs = open_root_fs_according_to(mount_config, user_key)?;
     let root_inode = new_rootfs.root_inode();
     MOUNT_ONCE.call_once(|| {
@@ -150,8 +153,7 @@ pub fn do_mount(
     };
 
     let mut rootfs = ROOT_FS.write().unwrap();
-    // Should we sync the fs before mount?
-    rootfs.sync()?;
+    SEFS_MANAGER.sync_all()?;
     let root_inode = rootfs.root_inode();
     drop(rootfs);
 
@@ -174,10 +176,12 @@ pub fn do_umount(target: &str, flags: UmountFlags) -> Result<()> {
     };
 
     let mut rootfs = ROOT_FS.write().unwrap();
-    // Should we sync the fs before umount?
-    rootfs.sync()?;
+    // XXX: There may be redundant sync with `MNode::umount()`
+    SEFS_MANAGER.sync_all()?;
+    let root_inode = rootfs.root_inode();
     let follow_symlink = !flags.contains(UmountFlags::UMOUNT_NOFOLLOW);
-    umount_nonroot_fs(&rootfs.root_inode(), &target, follow_symlink)?;
+    umount_nonroot_fs(&root_inode, &target, follow_symlink)?;
+    SEFS_MANAGER.update();
     Ok(())
 }
 
