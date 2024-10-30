@@ -5,7 +5,7 @@ use std::sync::Once;
 
 use super::*;
 use crate::exception::*;
-use crate::fs::HostStdioFds;
+use crate::fs::{HostStdioFds, ROOT_FS, SEFS_MANAGER};
 use crate::interrupt;
 use crate::io_uring::ENABLE_URING;
 use crate::process::idle_reap_zombie_children;
@@ -320,10 +320,10 @@ fn do_exec_thread(libos_tid: pid_t, host_tid: pid_t) -> Result<i32> {
     // Idle process should reap all zombie children
     idle_reap_zombie_children()?;
 
-    // sync file system
-    // TODO: only sync when all processes exit
-    use rcore_fs::vfs::FileSystem;
-    crate::fs::ROOT_FS.read().unwrap().sync()?;
+    // We sync all mounted SEFSes before the thread exits
+    // to flush cached data and free memory.
+    let _rootfs = ROOT_FS.read().unwrap();
+    SEFS_MANAGER.update_then_sync_all()?;
 
     // Not to be confused with the return value of a main function.
     // The exact meaning of status is described in wait(2) man page.
