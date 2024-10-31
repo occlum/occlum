@@ -12,6 +12,10 @@ inputs:
   #   description: 'Occlum docker image base OS'
   #   required: false
   #   default: 'ubuntu20.04'
+  container-run-params:
+    description: 'Extra container run parameters'
+    required: false
+    default: ''
 
 runs:
   using: "composite"
@@ -25,7 +29,7 @@ runs:
       shell: bash
 
     - name: Create container
-      run: docker run -itd --name=${{ inputs.container-name }} --privileged -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ matrix.os_ver }}
+      run: docker run -itd --name=${{ inputs.container-name }} ${{ inputs.container-run-params }} --privileged -v $GITHUB_WORKSPACE:/root/occlum occlum/occlum:${{ env.OCCLUM_VERSION }}-${{ matrix.os_ver }}
       shell: bash
 
     - uses: ./.github/workflows/composite_action/prebuild
