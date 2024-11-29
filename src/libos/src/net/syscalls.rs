@@ -1,8 +1,9 @@
-use super::socket::{mmsghdr, MsgFlags, SocketFlags, SocketProtocol};
+use super::socket::{mmsghdr, IPProtocol, MsgFlags, NetlinkFamily, SocketFlags, SocketProtocol};
 
 use atomic::Ordering;
 use core::f32::consts::E;
 use num_enum::TryFromPrimitive;
+use socket::EthernetProtocol;
 use std::mem::MaybeUninit;
 use std::ptr;
 use std::time::Duration;
@@ -41,18 +42,46 @@ pub fn do_socket(domain: c_int, socket_type: c_int, protocol: c_int) -> Result<i
 
     let mut file_ref: Option<Arc<dyn File>> = None;
 
-    // Only support INET and INET6 domain with uring feature
-    if ENABLE_URING.load(Ordering::Relaxed) && (domain == Domain::INET || domain == Domain::INET6) {
-        let protocol = SocketProtocol::try_from(protocol)
-            .map_err(|_| errno!(EINVAL, "Invalid or unsupported network protocol"))?;
+    // Only support INET and INET6 and NETLINK domain with uring feature
+    if ENABLE_URING.load(Ordering::Relaxed)
+        && (domain == Domain::INET
+            || domain == Domain::INET6
+            || domain == Domain::NETLINK
+            || domain == Domain::PACKET)
+    {
+        let protocol = match domain {
+            Domain::NETLINK => {
+                let netlink_family: NetlinkFamily = NetlinkFamily::try_from(protocol)
+                    .map_err(|_| errno!(EINVAL, "Invalid or unsupported netlink family"))?;
+                SocketProtocol::NetlinkFamily(netlink_family)
+            }
+            Domain::PACKET => {
+                // packet socket protocol use big endian as u16
+                EthernetProtocol::from_network_byte_order(protocol as u16)
+                    .map(|proto| SocketProtocol::EthernetProtocol(proto))
+                    .ok_or_else(|| errno!(EINVAL, "Invalid or unsupported Ethernet protocol"))?
+            }
+            _ => {
+                let ip_protocol = IPProtocol::try_from(protocol)
+                    .map_err(|_| errno!(EINVAL, "Invalid or unsupported network protocol"))?;
+                SocketProtocol::IPProtocol(ip_protocol)
+            }
+        };
 
         // Determine if type and domain match uring supported socket
         let match_uring = move || {
-            let is_uring_type =
-                (socket_type == SocketType::DGRAM || socket_type == SocketType::STREAM);
-            let is_uring_protocol = (protocol == SocketProtocol::IPPROTO_IP
-                || protocol == SocketProtocol::IPPROTO_TCP
-                || protocol == SocketProtocol::IPPROTO_UDP);
+            let is_uring_type = (socket_type == SocketType::DGRAM
+                || socket_type == SocketType::STREAM
+                || socket_type == SocketType::RAW);
+            let is_uring_protocol = match protocol {
+                SocketProtocol::IPProtocol(ipprotocol) => {
+                    (ipprotocol == IPProtocol::IPPROTO_IP
+                        || ipprotocol == IPProtocol::IPPROTO_TCP
+                        || ipprotocol == IPProtocol::IPPROTO_UDP
+                        || ipprotocol == IPProtocol::IPPROTO_RAW)
+                }
+                SocketProtocol::NetlinkFamily(_) | SocketProtocol::EthernetProtocol(_) => (true),
+            };
 
             is_uring_type && is_uring_protocol
         };
