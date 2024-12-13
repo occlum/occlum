@@ -590,13 +590,6 @@ pub struct user_rootfs_config {
     envp: *const *const i8,
 }
 
-impl user_rootfs_config {
-    pub fn from_raw_ptr(ptr: *const user_rootfs_config) -> Result<user_rootfs_config> {
-        let config = unsafe { *ptr };
-        Ok(config)
-    }
-}
-
 fn to_option_pathbuf(path: *const i8) -> Result<Option<PathBuf>> {
     let path = if path.is_null() {
         None
