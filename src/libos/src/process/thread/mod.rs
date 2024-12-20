@@ -9,6 +9,7 @@ use super::{
 };
 use crate::events::HostEventFd;
 use crate::fs::{EventCreationFlags, EventFile};
+use crate::net::AsEpollFile;
 use crate::net::THREAD_NOTIFIERS;
 use crate::prelude::*;
 use crate::signal::{SigQueues, SigSet, SigStack};
@@ -145,10 +146,13 @@ impl Thread {
     /// Close a file from the file table. It will release the POSIX advisory locks owned
     /// by current process.
     pub fn close_file(&self, fd: FileDesc) -> Result<()> {
-        // Deadlock note: EpollFile's drop method needs to access file table. So
-        // if the drop method is invoked inside the del method, then there will be
-        // a deadlock.
+        // Unregister epoll file to avoid deadlock in file table
         let file = self.files().lock().del(fd)?;
+
+        if let Ok(epoll_file) = file.as_epoll_file() {
+            epoll_file.unregister_from_file_table();
+        }
+
         file.release_advisory_locks();
         Ok(())
     }
@@ -156,9 +160,13 @@ impl Thread {
     /// Close all files in the file table. It will release the POSIX advisory locks owned
     /// by current process.
     pub fn close_all_files(&self) {
-        // Deadlock note: Same with the issue in close_file method
         let files = self.files().lock().del_all();
         for file in files {
+            if let Ok(epoll_file) = file.as_epoll_file() {
+                // Unregister epoll file to avoid deadlock in file table
+                epoll_file.unregister_from_file_table();
+            }
+
             file.release_advisory_locks();
         }
     }

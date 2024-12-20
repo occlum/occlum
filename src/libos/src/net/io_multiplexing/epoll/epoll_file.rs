@@ -112,7 +112,7 @@ impl EpollFile {
         file_table.notifier().register(weak_observer, None, None);
     }
 
-    fn unregister_from_file_table(&self) {
+    pub fn unregister_from_file_table(&self) {
         let weak_observer = self.weak_self.clone() as Weak<dyn Observer<_>>;
         let thread = current!();
         let file_table = thread.files().lock();
@@ -455,8 +455,6 @@ impl Drop for EpollFile {
                 notifier.unregister(&self_observer);
             }
         });
-
-        self.unregister_from_file_table();
     }
 }
 
