@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1735769443176,
+  "lastUpdate": 1735769450187,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -4918,6 +4918,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate",
             "value": 2248,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "ClawSeven",
+            "username": "ClawSeven",
+            "email": "zehuan97@gmail.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "be4de47940ca6f9c3a9d4873587dfa592b2b2dc6",
+          "message": "[Demos] Fix broken mnist source in paddlepaddle demo",
+          "timestamp": "2024-05-27T08:52:07Z",
+          "url": "https://github.com/occlum/occlum/commit/be4de47940ca6f9c3a9d4873587dfa592b2b2dc6"
+        },
+        "date": 1735769447721,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2270,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2270,
             "unit": "Mbits/sec",
             "extra": "receiver"
           }
