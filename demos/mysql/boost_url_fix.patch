@@ -1,0 +1,12 @@
+--- mysql_src/cmake/boost.cmake.orig    2025-02-28 01:54:28.808070733 +0000
++++ mysql_src/cmake/boost.cmake 2025-02-28 01:57:59.593407329 +0000
+@@ -41,7 +41,7 @@
+ SET(BOOST_PACKAGE_NAME "boost_1_77_0")
+ SET(BOOST_TARBALL "${BOOST_PACKAGE_NAME}.tar.bz2")
+ SET(BOOST_DOWNLOAD_URL
+-  "https://boostorg.jfrog.io/artifactory/main/release/1.77.0/source/${BOOST_TARBALL}"
++  "https://archives.boost.io/release/1.77.0/source/${BOOST_TARBALL}"
+   )
+
+ SET(OLD_PACKAGE_NAMES
+

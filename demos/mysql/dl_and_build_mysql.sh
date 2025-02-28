@@ -15,6 +15,8 @@ tar -xf ${TARBALL} -C mysql_src --strip-components 1
 # Make modification to
 # 1. Disable `times` syscall
 patch -s -p0 < apply-mysql-to-occlum.patch
+# 2. Fix boost url issue
+patch -s -p0 < boost_url_fix.patch
 
 # Build and install
 pushd mysql_src
