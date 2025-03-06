@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1741238329373,
+  "lastUpdate": 1741238390586,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -13160,6 +13160,54 @@ window.BENCHMARK_DATA = {
             "value": 559.5,
             "unit": "ms",
             "extra": "per95"
+          }
+        ]
+      }
+    ],
+    "Fio Benchmark": [
+      {
+        "commit": {
+          "author": {
+            "name": "Qi Zheng",
+            "username": "qzheng527",
+            "email": "huaiqing.zq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "abf1f0ed29d181ea459a3b27adbaf8022a977bb3",
+          "message": "Bump to version 0.31.0",
+          "timestamp": "2025-02-10T06:02:59Z",
+          "url": "https://github.com/occlum/occlum/commit/abf1f0ed29d181ea459a3b27adbaf8022a977bb3"
+        },
+        "date": 1741238387778,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sequential Write Throughput",
+            "value": 63.9,
+            "unit": "MiB/s",
+            "extra": "seqwrite"
+          },
+          {
+            "name": "Random Write Throughput",
+            "value": 42.4,
+            "unit": "MiB/s",
+            "extra": "randwrite"
+          },
+          {
+            "name": "Sequential Read Throughput",
+            "value": 887,
+            "unit": "MiB/s",
+            "extra": "seqread"
+          },
+          {
+            "name": "Random Read Throughput",
+            "value": 612,
+            "unit": "MiB/s",
+            "extra": "randread"
           }
         ]
       }
