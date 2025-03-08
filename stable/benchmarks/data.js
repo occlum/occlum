@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1741472133351,
+  "lastUpdate": 1741472263797,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -5576,6 +5576,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate (IO_URING)",
             "value": 4833,
+            "unit": "Mbits/sec",
+            "extra": "receiver_iouring"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Qi Zheng",
+            "username": "qzheng527",
+            "email": "huaiqing.zq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "abf1f0ed29d181ea459a3b27adbaf8022a977bb3",
+          "message": "Bump to version 0.31.0",
+          "timestamp": "2025-02-10T06:02:59Z",
+          "url": "https://github.com/occlum/occlum/commit/abf1f0ed29d181ea459a3b27adbaf8022a977bb3"
+        },
+        "date": 1741472261260,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2201,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2201,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          },
+          {
+            "name": "Sender Average Rate (IO_URING)",
+            "value": 4075,
+            "unit": "Mbits/sec",
+            "extra": "sender_iouring"
+          },
+          {
+            "name": "Receiver Average Rate (IO_URING)",
+            "value": 4075,
             "unit": "Mbits/sec",
             "extra": "receiver_iouring"
           }
