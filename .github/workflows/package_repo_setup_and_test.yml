@@ -97,7 +97,7 @@ jobs:
 
     - name: Start ubuntu 22.04 occlum container
       if: github.event.inputs.ubuntu_jammy == 'Y'
-      run: docker run -itd --name=occlum-jammy -v $GITHUB_WORKSPACE:/root/workspace occlum/occlum:${{ env.OCCLUM_VERSION }}-test-ubuntu22.04
+      run: docker run -itd --name=occlum-jammy -v $GITHUB_WORKSPACE:/root/workspace occlum/occlum:${{ env.OCCLUM_VERSION }}-ubuntu22.04
 
     - name: Build jammy deb packages and copy out
       if: github.event.inputs.ubuntu_jammy == 'Y'
