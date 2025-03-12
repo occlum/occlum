@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1741817423866,
+  "lastUpdate": 1741817552206,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -5622,6 +5622,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate (IO_URING)",
             "value": 4075,
+            "unit": "Mbits/sec",
+            "extra": "receiver_iouring"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Qi Zheng",
+            "username": "qzheng527",
+            "email": "huaiqing.zq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "d88f6e36301ae77e5c08f919f781ab3c9b0cce72",
+          "message": "[ci] Use non test docker image to generate debian package",
+          "timestamp": "2025-03-10T05:58:38Z",
+          "url": "https://github.com/occlum/occlum/commit/d88f6e36301ae77e5c08f919f781ab3c9b0cce72"
+        },
+        "date": 1741817549980,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2201,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2201,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          },
+          {
+            "name": "Sender Average Rate (IO_URING)",
+            "value": 4125,
+            "unit": "Mbits/sec",
+            "extra": "sender_iouring"
+          },
+          {
+            "name": "Receiver Average Rate (IO_URING)",
+            "value": 4125,
             "unit": "Mbits/sec",
             "extra": "receiver_iouring"
           }
