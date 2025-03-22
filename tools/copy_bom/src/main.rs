@@ -31,6 +31,9 @@ struct CopyBomOption {
     /// Set the paths where to find included bom files
     #[structopt(long = "include-dir")]
     included_dirs: Vec<String>,
+    /// Set the paths under where to log files
+    #[structopt(long = "filter-path")]
+    filter_path: Option<String>,
 }
 
 impl CopyBomOption {
@@ -40,6 +43,7 @@ impl CopyBomOption {
             root_dir,
             dry_run,
             included_dirs,
+            filter_path: _,
         } = self;
         let image = Bom::from_yaml_file(bom_file);
         image.manage_top_bom(bom_file, root_dir, *dry_run, included_dirs);
@@ -53,5 +57,8 @@ fn main() {
     check_rsync();
 
     let copy_bom_option = CopyBomOption::from_args();
+    if copy_bom_option.filter_path.is_some(){
+        util::set_log_filter_path(copy_bom_option.filter_path.clone());
+    }
     copy_bom_option.copy_files();
 }

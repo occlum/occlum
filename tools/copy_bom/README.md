@@ -27,6 +27,7 @@ All dependencies will be copied to the corresponding directory in root directory
 
 ### options
 - dry run mode: pass an option `--dry-run` to `copy_bom` will enable dry run mode. Dry run mode will output all file oprations in log but does not do real oprations. It is useul to check whether `copy_bom` performs as expected before doing real operations.
+- log filter path: pass an option `--log-filter-path <path>` to track files moved during copy operations. Only files under the specified path will be logged, with their paths recorded relative to the filter path. This helps monitor which files are being added or modified in specific directories. When this option is not set, file movement logging is disabled.
 
 ### flags
 - -i, --include-dir: This flag is used to indicate which directory to find included bom files. This flag can be set multiple times. If the `include-dir` is set as a relative path, it is a path relative to the current path where you run the `copy_bom` command. 

@@ -22,6 +22,9 @@ BIN_LINKS := $(addprefix $(instance_dir)/build/bin/, $(BIN_LINKS))
 LIB_LINKS := libocclum-pal.so.$(major_ver) libocclum-pal.so
 LIB_LINKS := $(addprefix $(instance_dir)/build/lib/, $(LIB_LINKS))
 
+MOVED_FILES_LOG := $(instance_dir)/moved_files.log
+ZIP_MODE ?= NORMAL
+
 ifneq (, $(wildcard $(IMAGE)/. ))
 	IMAGE_DIRS := $(shell find $(IMAGE) -type d 2>/dev/null | sed 's/ /\\ /g' | sed 's/:/\\:/g' || true)
 	IMAGE_FILES := $(shell find $(IMAGE) -type f 2>/dev/null | sed 's/ /\\ /g' | sed 's/:/\\:/g' || true)
@@ -39,7 +42,7 @@ define get_occlum_file_mac
 		"$(occlum_dir)/build/bin/occlum-protect-integrity" show-mac $(1) $(2)
 endef
 
-.PHONY : all clean
+.PHONY : all clean increment
 
 ALL_TARGETS := $(SIGNED_ENCLAVE) $(BIN_LINKS) $(LIB_LINKS)
 
@@ -115,6 +118,7 @@ $(IMAGE_CONFIG_JSON):
 ifneq ($(wildcard $(IMAGE)/. ),)
 $(SECURE_IMAGE_MAC):
 $(SECURE_IMAGE): $(IMAGE) $(IMAGE_DIRS) $(IMAGE_FILES) $(SEFS_CLI_SIM) $(SIGNED_SEFS_CLI_LIB)
+ifeq ($(ZIP_MODE),NORMAL)
 	@echo "Building new image..."
 	@rm -rf build/mount
 	@mkdir -p build/mount/
@@ -126,6 +130,20 @@ $(SECURE_IMAGE): $(IMAGE) $(IMAGE_DIRS) $(IMAGE_FILES) $(SEFS_CLI_SIM) $(SIGNED_
 			"$(IMAGE)" \
 			"$(instance_dir)/build/mount/__ROOT" \
 			"$(SECURE_IMAGE_MAC)"
+else
+	@echo "Updating new image..."
+	@[ -n "$(SECURE_IMAGE_KEY)" ] && export SECURE_IMAGE_KEY_OPTION="--key $(SECURE_IMAGE_KEY)" ; \
+		LD_LIBRARY_PATH="$(SGX_SDK)/sdk_libs" $(SEFS_CLI_SIM) \
+			--enclave "$(SIGNED_SEFS_CLI_LIB)" \
+			update \
+			$$SECURE_IMAGE_KEY_OPTION \
+			"$(instance_dir)/build/mount/__ROOT" \
+			"$(IMAGE)" \
+			"$(MOVED_FILES_LOG)" \
+			"$(SECURE_IMAGE_MAC)" \
+			--protect-integrity
+	@rm -f "$(MOVED_FILES_LOG)"
+endif
 endif
 
 clean:
