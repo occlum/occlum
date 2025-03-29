@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1743286372521,
+  "lastUpdate": 1743286434651,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -14172,6 +14172,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Random Read Throughput",
             "value": 739,
+            "unit": "MiB/s",
+            "extra": "randread"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Qi Zheng",
+            "username": "qzheng527",
+            "email": "huaiqing.zq@antgroup.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "d88f6e36301ae77e5c08f919f781ab3c9b0cce72",
+          "message": "[ci] Use non test docker image to generate debian package",
+          "timestamp": "2025-03-10T05:58:38Z",
+          "url": "https://github.com/occlum/occlum/commit/d88f6e36301ae77e5c08f919f781ab3c9b0cce72"
+        },
+        "date": 1743286431512,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sequential Write Throughput",
+            "value": 58.5,
+            "unit": "MiB/s",
+            "extra": "seqwrite"
+          },
+          {
+            "name": "Random Write Throughput",
+            "value": 44.9,
+            "unit": "MiB/s",
+            "extra": "randwrite"
+          },
+          {
+            "name": "Sequential Read Throughput",
+            "value": 153,
+            "unit": "MiB/s",
+            "extra": "seqread"
+          },
+          {
+            "name": "Random Read Throughput",
+            "value": 713,
             "unit": "MiB/s",
             "extra": "randread"
           }
