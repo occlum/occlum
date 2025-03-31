@@ -22,6 +22,8 @@ BIN_LINKS := $(addprefix $(instance_dir)/build/bin/, $(BIN_LINKS))
 LIB_LINKS := libocclum-pal.so.$(major_ver) libocclum-pal.so
 LIB_LINKS := $(addprefix $(instance_dir)/build/lib/, $(LIB_LINKS))
 
+INCREMENTAL_BUILD ?= false
+
 ifneq (, $(wildcard $(IMAGE)/. ))
 	IMAGE_DIRS := $(shell find $(IMAGE) -type d 2>/dev/null | sed 's/ /\\ /g' | sed 's/:/\\:/g' || true)
 	IMAGE_FILES := $(shell find $(IMAGE) -type f 2>/dev/null | sed 's/ /\\ /g' | sed 's/:/\\:/g' || true)
@@ -115,9 +117,13 @@ $(IMAGE_CONFIG_JSON):
 ifneq ($(wildcard $(IMAGE)/. ),)
 $(SECURE_IMAGE_MAC):
 $(SECURE_IMAGE): $(IMAGE) $(IMAGE_DIRS) $(IMAGE_FILES) $(SEFS_CLI_SIM) $(SIGNED_SEFS_CLI_LIB)
+ifneq ($(INCREMENTAL_BUILD), true)
 	@echo "Building new image..."
 	@rm -rf build/mount
 	@mkdir -p build/mount/
+else
+	@echo "Incremental building image..."
+endif
 	@[ -n "$(SECURE_IMAGE_KEY)" ] && export SECURE_IMAGE_KEY_OPTION="--key $(SECURE_IMAGE_KEY)" ; \
 		LD_LIBRARY_PATH="$(SGX_SDK)/sdk_libs" $(SEFS_CLI_SIM) \
 			--enclave "$(SIGNED_SEFS_CLI_LIB)" \
@@ -125,7 +131,8 @@ $(SECURE_IMAGE): $(IMAGE) $(IMAGE_DIRS) $(IMAGE_FILES) $(SEFS_CLI_SIM) $(SIGNED_
 			$$SECURE_IMAGE_KEY_OPTION \
 			"$(IMAGE)" \
 			"$(instance_dir)/build/mount/__ROOT" \
-			"$(SECURE_IMAGE_MAC)"
+			"$(SECURE_IMAGE_MAC)" \
+			$(if $(filter true,$(INCREMENTAL_BUILD)),--inc,)
 endif
 
 clean:

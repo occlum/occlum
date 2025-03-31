@@ -27,6 +27,7 @@ All dependencies will be copied to the corresponding directory in root directory
 
 ### options
 - dry run mode: pass an option `--dry-run` to `copy_bom` will enable dry run mode. Dry run mode will output all file oprations in log but does not do real oprations. It is useul to check whether `copy_bom` performs as expected before doing real operations.
+- inc mode: pass an option `--inc` to `copy_bom` will enable inc mode. Inc mode will generate an additional file containing the file path of all the copies in rsync. The default path of the generated file is the path of `<root-dir>` plus ".log_path", which can also be specified by `--log-path`.
 
 ### flags
 - -i, --include-dir: This flag is used to indicate which directory to find included bom files. This flag can be set multiple times. If the `include-dir` is set as a relative path, it is a path relative to the current path where you run the `copy_bom` command. 
