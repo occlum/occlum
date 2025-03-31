@@ -7,10 +7,19 @@ use elf::types::{Type, ET_DYN, ET_EXEC};
 use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 use std::vec;
+use std::fs;
+use std::io::Write;
+
+lazy_static! {
+    static ref LOG_PATH: RwLock<Option<String>> = RwLock::new(None);
+    static ref PREFIX_PATH: RwLock<Option<String>> = RwLock::new(None);
+    static ref INC_MODE: RwLock<bool> = RwLock::new(false);
+    static ref NEW_LOGFILE: RwLock<bool> = RwLock::new(true);
+}
 
 /// This structure represents loader information in config file.
 /// `loader_paths` stores the actual path of each loader. key: the loader name, value: the loader path in host
@@ -88,11 +97,11 @@ lazy_static! {
 }
 
 pub fn copy_file(src: &str, dest: &str, dry_run: bool) {
-    info!("rsync -aL {} {}", src, dest);
+    info!("rsync -avc {} {}", src, dest);
     if !dry_run {
-        let output = Command::new("rsync").arg("-aL").arg(src).arg(dest).output();
+        let output = Command::new("rsync").arg("-avc").arg(src).arg(dest).output();
         match output {
-            Ok(output) => deal_with_output(output, COPY_FILE_ERROR),
+            Ok(output) => deal_with_output(output, dest, false, COPY_FILE_ERROR),
             Err(e) => {
                 error!("copy file {} to {} failed. {}", src, dest, e);
                 std::process::exit(COPY_FILE_ERROR);
@@ -135,7 +144,7 @@ pub fn create_link(src: &str, linkname: &str, dry_run: bool) {
 pub fn copy_dir(src: &str, dest: &str, dry_run: bool, excludes: &Vec<String>) {
     // we should not pass --delete args. Otherwise it will overwrite files in the same place
     // We pass --copy-unsafe-links instead of -L arg. So links point to current directory will be kept.
-    let mut args: Vec<_> = vec!["-ar", "--copy-unsafe-links"]
+    let mut args: Vec<_> = vec!["-avr", "--copy-unsafe-links"]
         .into_iter()
         .map(|s| s.to_string())
         .collect();
@@ -148,7 +157,7 @@ pub fn copy_dir(src: &str, dest: &str, dry_run: bool, excludes: &Vec<String>) {
     if !dry_run {
         let output = Command::new("rsync").args(args).arg(src).arg(dest).output();
         match output {
-            Ok(output) => deal_with_output(output, CREATE_DIR_ERROR),
+            Ok(output) => deal_with_output(output, dest, true, CREATE_DIR_ERROR),
             Err(e) => {
                 error!("copy dir {} to {} failed. {}", src, dest, e);
                 std::process::exit(COPY_DIR_ERROR);
@@ -522,10 +531,80 @@ pub fn resolve_envs(path: &str) -> String {
     )
 }
 
-fn deal_with_output(output: Output, error_number: i32) {
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    if stdout.trim().len() > 0 {
-        debug!("{}", stdout);
+fn write_to_log_file(content: &str) {
+    let _log_path = LOG_PATH.read().unwrap();
+    match *_log_path {
+        None => {
+            return;
+        },
+        Some(ref log_path) => {
+            let mut file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_path)
+            .expect("Failed to open or create the log file");
+            
+            // If the logfile was empty before, there is no need to judge whether it is repeated this time.
+            if *NEW_LOGFILE.read().unwrap() {
+                writeln!(file, "{}", content).expect("Failed to write to log file");
+                return;
+            }
+
+            // Read the content of the file and determine whether the line already exists.
+            let existing_content = std::fs::read_to_string(log_path).expect("Failed to read the log file");
+            if existing_content.contains(content) {
+                return;
+            }
+
+            writeln!(file, "{}", content).expect("Failed to write to log file");
+        }
+    }
+}
+
+fn deal_with_output(output: Output, dst: &str, is_dir: bool, error_number: i32) {
+    if *INC_MODE.read().unwrap() {
+        let _prefix_path = PREFIX_PATH.read().unwrap();
+        let mut prefix_path = String::new();
+        if let Some(ref path) = *_prefix_path {
+            prefix_path = if path.ends_with('/') {
+                path.clone()
+            } else {
+                format!("{}/", path)
+            };
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        if stdout.trim().len() > 0 {
+            let lines: Vec<&str> = stdout.lines().collect();
+            let n = lines.len();
+            if n > 4 {
+                let sub_lines = lines.iter().skip(1).take(n - 4);
+                
+                if is_dir{    
+                    let dst_dir = if dst.ends_with('/') {
+                        dst.to_owned()
+                    } else {
+                        format!("{}/", dst)
+                    };
+                    for line in sub_lines {
+                        // If it is a directory, ignore it.
+                        if line.chars().last() == Some('/') {
+                            continue;
+                        }
+                        // It is not a directory. It needs to be kept and intercepted before the space.
+                        let items: Vec<&str> = line.split(" ").collect();
+                        let log_content = format!("{}{}{}", prefix_path, dst_dir, items[0]);
+                        write_to_log_file(&log_content);
+                    }
+                } else {
+                    for line in sub_lines {
+                        // There will only be one line here.
+                        let log_content = format!("{}{}", prefix_path, dst);
+                        write_to_log_file(&log_content);
+                    }
+                }
+            }
+        }
     }
     // if stderr is not None, the operation fails. We should abort the process and output error log.
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -618,4 +697,46 @@ pub fn check_rsync() {
     }
     println!("rsync is not installed.");
     std::process::exit(RSYNC_NOT_FOUND_ERROR);
+}
+
+pub fn set_log_path(log_path: Option<String>, root_path: String, inc_mode: bool) {
+    // Generate default log path
+    let trimmed_root = root_path.trim_end_matches('/');
+    let base_path = if root_path.starts_with('/') {
+        PathBuf::from(trimmed_root)
+    } else {
+        std::env::current_dir()
+            .unwrap_or_default()
+            .join(trimmed_root)
+    };
+    let default_log_path = format!("{}.path_log", base_path.to_string_lossy());
+
+    // Set PREFIX_PATH for relative paths
+    if !root_path.starts_with('/') {
+        let prefix = std::env::current_dir()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default()
+            .trim_end_matches('/')
+            .to_string();
+        *PREFIX_PATH.write().unwrap() = Some(prefix);
+    }
+
+    // Update LOG_PATH
+    let mut log_path_guard = LOG_PATH.write().unwrap();
+    *log_path_guard = log_path.or(Some(default_log_path));
+
+    // Update INC_MODE and NEW_LOGFILE
+    *INC_MODE.write().unwrap() = inc_mode;
+    
+    if inc_mode {
+        let root_dir = Path::new(&root_path);
+        let is_new = (root_dir.is_dir() && is_dir_empty(root_dir))
+            || log_path_guard.as_ref().map_or(false, |p| !Path::new(p).exists());
+        *NEW_LOGFILE.write().unwrap() = is_new;
+    }
+}
+
+fn is_dir_empty(path: &Path) -> bool {
+    fs::read_dir(path).map(|mut d| d.next().is_none()).unwrap_or(false)
 }
