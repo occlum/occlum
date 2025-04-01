@@ -382,6 +382,7 @@ cmd_build() {
     pal_lib=libocclum-pal.so
     libos_lib=libocclum-libos.so
     BUILDIN_IMAGE_KEY=false
+    INCREMENT_BUILD=false
 
     while [ -n "$1" ]; do
         case "$1" in
@@ -392,6 +393,7 @@ cmd_build() {
         --image-key)    [ -n "$2" ] && SECURE_IMAGE_KEY=$2 ; shift 2 || exit_error "empty secure image key path"   ;;
         --buildin-image-key)  BUILDIN_IMAGE_KEY=true ; shift ;;
         --force | -f)   MAKE_OPTION="clean" ; shift ;;
+        --increment)    INCREMENT_BUILD=true ; shift ;;
         *) exit_error "Unknown option: $1" ;;
         esac
     done
@@ -452,11 +454,20 @@ cmd_build() {
         occlum_dir=$occlum_dir instance_dir=$instance_dir \
         make -f $build_makefile $MAKE_OPTION
     fi
-    occlum_dir=$occlum_dir instance_dir=$instance_dir pal_lib=$pal_lib major_ver=$major_ver \
-    occlum_version=$occlum_version libos_lib=$libos_lib INSTANCE_IS_FOR_EDMM_PLATFORM=$INSTANCE_IS_FOR_EDMM_PLATFORM \
-    ENCLAVE_SIGN_KEY=$ENCLAVE_SIGN_KEY ENCLAVE_SIGN_TOOL=$ENCLAVE_SIGN_TOOL \
-    SECURE_IMAGE_KEY=$SECURE_IMAGE_KEY BUILDIN_IMAGE_KEY=$BUILDIN_IMAGE_KEY \
-    make -f $build_makefile --no-builtin-rules
+
+    if [ "$INCREMENT_BUILD" = true ]; then
+        occlum_dir=$occlum_dir instance_dir=$instance_dir pal_lib=$pal_lib major_ver=$major_ver \
+        occlum_version=$occlum_version libos_lib=$libos_lib INSTANCE_IS_FOR_EDMM_PLATFORM=$INSTANCE_IS_FOR_EDMM_PLATFORM \
+        ENCLAVE_SIGN_KEY=$ENCLAVE_SIGN_KEY ENCLAVE_SIGN_TOOL=$ENCLAVE_SIGN_TOOL \
+        SECURE_IMAGE_KEY=$SECURE_IMAGE_KEY BUILDIN_IMAGE_KEY=$BUILDIN_IMAGE_KEY \
+        make -f $build_makefile ZIP_MODE=UPDATE
+    else
+        occlum_dir=$occlum_dir instance_dir=$instance_dir pal_lib=$pal_lib major_ver=$major_ver \
+        occlum_version=$occlum_version libos_lib=$libos_lib INSTANCE_IS_FOR_EDMM_PLATFORM=$INSTANCE_IS_FOR_EDMM_PLATFORM \
+        ENCLAVE_SIGN_KEY=$ENCLAVE_SIGN_KEY ENCLAVE_SIGN_TOOL=$ENCLAVE_SIGN_TOOL \
+        SECURE_IMAGE_KEY=$SECURE_IMAGE_KEY BUILDIN_IMAGE_KEY=$BUILDIN_IMAGE_KEY \
+        make -f $build_makefile --no-builtin-rules
+    fi
 
     cd "$instance_dir"
     echo "built" > $status_file
