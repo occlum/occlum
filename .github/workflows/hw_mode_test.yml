@@ -1082,3 +1082,7 @@ jobs:
 
     - name: Prepare occlum instance and Run Filebench on Ext2
       run: docker exec ${{ env.CONTAINER_NAME }} bash -c "cd /root/occlum/demos/benchmarks/filebench && ./run_workload.sh readfiles"
+
+    - name: Clean the environment
+      if: ${{ always() }}
+      run: docker stop ${{ env.CONTAINER_NAME }}
