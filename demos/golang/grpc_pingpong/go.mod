@@ -15,4 +15,5 @@ require (
 	google.golang.org/protobuf v1.31.0 // indirect
 )
 
+replace golang.org/x/sys => golang.org/x/sys v0.31.0
 replace google.golang.org/protobuf => google.golang.org/protobuf v1.31.0
