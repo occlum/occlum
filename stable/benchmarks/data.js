@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1744496080529,
+  "lastUpdate": 1744496474287,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -14170,6 +14170,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Thread 95th Percentile Latency",
             "value": 475.79,
+            "unit": "ms",
+            "extra": "per95"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Sal Kimmich",
+            "username": "Salkimmich",
+            "email": "7944142+Salkimmich@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "dfb1d3a0b3164cf3251e40c90011e0406ab6836f",
+          "message": "OpenSSF Badge Score",
+          "timestamp": "2024-05-09T11:36:53Z",
+          "url": "https://github.com/occlum/occlum/commit/dfb1d3a0b3164cf3251e40c90011e0406ab6836f"
+        },
+        "date": 1744496471681,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Threads Minimum latency",
+            "value": 0.55,
+            "unit": "ms",
+            "extra": "min"
+          },
+          {
+            "name": "Threads Average Latency",
+            "value": 80.38,
+            "unit": "ms",
+            "extra": "avg"
+          },
+          {
+            "name": "Threads Maximum Latency",
+            "value": 1805.3,
+            "unit": "ms",
+            "extra": "max"
+          },
+          {
+            "name": "Thread 95th Percentile Latency",
+            "value": 442.73,
             "unit": "ms",
             "extra": "per95"
           }
