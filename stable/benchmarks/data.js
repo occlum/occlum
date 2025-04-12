@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1744496008547,
+  "lastUpdate": 1744496080529,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -14816,6 +14816,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Random Read Throughput",
             "value": 229,
+            "unit": "MiB/s",
+            "extra": "randread"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Sal Kimmich",
+            "username": "Salkimmich",
+            "email": "7944142+Salkimmich@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "dfb1d3a0b3164cf3251e40c90011e0406ab6836f",
+          "message": "OpenSSF Badge Score",
+          "timestamp": "2024-05-09T11:36:53Z",
+          "url": "https://github.com/occlum/occlum/commit/dfb1d3a0b3164cf3251e40c90011e0406ab6836f"
+        },
+        "date": 1744496077289,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sequential Write Throughput",
+            "value": 50.9,
+            "unit": "MiB/s",
+            "extra": "seqwrite"
+          },
+          {
+            "name": "Random Write Throughput",
+            "value": 46.8,
+            "unit": "MiB/s",
+            "extra": "randwrite"
+          },
+          {
+            "name": "Sequential Read Throughput",
+            "value": 184,
+            "unit": "MiB/s",
+            "extra": "seqread"
+          },
+          {
+            "name": "Random Read Throughput",
+            "value": 532,
             "unit": "MiB/s",
             "extra": "randread"
           }
