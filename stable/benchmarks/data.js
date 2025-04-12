@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1744237289655,
+  "lastUpdate": 1744496008547,
   "repoUrl": "https://github.com/occlum/occlum",
   "entries": {
     "Iperf3 Benchmark": [
@@ -6036,6 +6036,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Receiver Average Rate (IO_URING)",
             "value": 5064,
+            "unit": "Mbits/sec",
+            "extra": "receiver_iouring"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Sal Kimmich",
+            "username": "Salkimmich",
+            "email": "7944142+Salkimmich@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "volcano",
+            "username": "volcano0dr",
+            "email": "volcano.dr@hotmail.com"
+          },
+          "id": "dfb1d3a0b3164cf3251e40c90011e0406ab6836f",
+          "message": "OpenSSF Badge Score",
+          "timestamp": "2024-05-09T11:36:53Z",
+          "url": "https://github.com/occlum/occlum/commit/dfb1d3a0b3164cf3251e40c90011e0406ab6836f"
+        },
+        "date": 1744496004926,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "Sender Average Rate",
+            "value": 2571,
+            "unit": "Mbits/sec",
+            "extra": "sender"
+          },
+          {
+            "name": "Receiver Average Rate",
+            "value": 2571,
+            "unit": "Mbits/sec",
+            "extra": "receiver"
+          },
+          {
+            "name": "Sender Average Rate (IO_URING)",
+            "value": 4783,
+            "unit": "Mbits/sec",
+            "extra": "sender_iouring"
+          },
+          {
+            "name": "Receiver Average Rate (IO_URING)",
+            "value": 4783,
             "unit": "Mbits/sec",
             "extra": "receiver_iouring"
           }
