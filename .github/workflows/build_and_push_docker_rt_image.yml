@@ -23,7 +23,7 @@ on:
 
 jobs:
   generate-ubuntu-rt-image:
-      runs-on: ubuntu-20.04
+      runs-on: ubuntu-22.04
       if: github.event.inputs.OS == 'ubuntu20' || github.event.inputs.OS == 'ubuntu22'
 
       steps:

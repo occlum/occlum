@@ -223,7 +223,7 @@ jobs:
   Test_deb_focal_package:
     if: ${{ always() }}
     needs: Package_repository_setup_and_test
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Create a clean ubuntu container

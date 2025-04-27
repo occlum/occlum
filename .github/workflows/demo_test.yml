@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   C_cpp_rust_golang_embedded_mode_support_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -115,7 +115,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./golang/grpc_pingpong && rm -rf ./golang/web_server"
 
   Java_support_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -153,7 +153,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./java"
 
   Fish_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -188,7 +188,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./fish"
 
   Bazel_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -228,7 +228,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./hello_bazel"
 
   Https_server_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -265,7 +265,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./https_server"
 
   Local_attestation_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -298,7 +298,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./local_attestation"
 
   Sqlite_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -330,7 +330,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./sqlite"
 
   Xgboost_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -365,7 +365,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./xgboost"
 
   Tensorflow_lite_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -400,7 +400,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./tensorflow_lite"
 
   Pytorch_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -432,7 +432,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./pytorch/standalone"
 
   Distributed_Pytorch_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -474,7 +474,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./pytorch/distributed"
 
   Tensorflow_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -506,7 +506,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./tensorflow/tensorflow_training"
 
   Grpc_glibc_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -550,7 +550,7 @@ jobs:
 
 
   Grpc_tls_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -595,7 +595,7 @@ jobs:
 
   # Python glibc support test
   Python_glibc_support_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -635,7 +635,7 @@ jobs:
 
   # Redis test
   Redis_support_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -678,7 +678,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./redis"
 
   Flink_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -734,7 +734,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./flink"
 
   Cluster_serving_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -766,7 +766,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./cluster_serving"
 
   Enclave_RA_TLS_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -804,7 +804,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./enclave_tls"
 
   Vault_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -845,7 +845,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./golang/vault"
 
   Sofaboot_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -889,7 +889,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./sofaboot"
 
   Netty_UT_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -933,7 +933,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./netty_ut"
 
   Bash_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -965,7 +965,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./bash"
 
   Sysbench_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -1001,7 +1001,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./benchmarks/sysbench"
 
   Gvisor_syscalls_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -1037,7 +1037,7 @@ jobs:
       shell: bash
 
   Flask_tls_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -1083,7 +1083,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./python/flask"
 
   Iperf2_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -1122,7 +1122,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./benchmarks/iperf2"
 
   Linux_LTP_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -1158,7 +1158,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./linux-ltp"
 
   FIO_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -1190,7 +1190,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./benchmarks/fio"
 
   PaddlePaddle_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -1222,7 +1222,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./paddlepaddle"
 
   RuntimeBoot_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
@@ -1254,7 +1254,7 @@ jobs:
       run: docker exec ${{ github.job }} bash -c "cd /root/occlum/demos && rm -rf ./runtime_boot"
 
   Swtpm_test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         features: [Legacy, IO_Uring]
