@@ -16,7 +16,7 @@ on:
 jobs:
   generate-anolis-image:
     # GitHub Actions doesn't have anolis VM provided
-      runs-on: ubuntu-20.04
+      runs-on: ubuntu-22.04
       if: github.event.inputs.OS == 'anolis'
 
       steps:
@@ -74,7 +74,7 @@ jobs:
 
 
   generate-ubuntu-image:
-      runs-on: ubuntu-20.04
+      runs-on: ubuntu-22.04
       if: github.event.inputs.OS == 'ubuntu20' || github.event.inputs.OS == 'ubuntu22'
 
       steps:
