@@ -39,7 +39,10 @@ use crate::fs::{
     Statfs,
 };
 use crate::interrupt::{do_handle_interrupt, sgx_interrupt_info_t};
-use crate::ipc::{do_shmat, do_shmctl, do_shmdt, do_shmget, key_t, shmids_t};
+use crate::ipc::{
+    do_semctl, do_semget, do_semop, do_semtimedop, do_shmat, do_shmctl, do_shmdt, do_shmget, key_t,
+    sembuf_t, shmids_t,
+};
 use crate::misc::{resource_t, rlimit_t, sysinfo_t, utsname_t, RandFlags};
 use crate::net::{
     do_accept, do_accept4, do_bind, do_connect, do_epoll_create, do_epoll_create1, do_epoll_ctl,
@@ -161,9 +164,9 @@ macro_rules! process_syscall_table_with_callback {
             (Wait4 = 61) => do_wait4(pid: i32, _exit_status: *mut i32, options: u32),
             (Kill = 62) => do_kill(pid: i32, sig: c_int),
             (Uname = 63) => do_uname(name: *mut utsname_t),
-            (Semget = 64) => handle_unsupported(),
-            (Semop = 65) => handle_unsupported(),
-            (Semctl = 66) => handle_unsupported(),
+            (Semget = 64) => do_semget(key: u32, nsems: i32, semflg: i32),
+            (Semop = 65) => do_semop(semid: i32, sops_ptr: *const sembuf_t, nsops: usize),
+            (Semctl = 66) => do_semctl(semid: i32, semnum: i32, cmd: i32, arg: usize),
             (Shmdt = 67) => do_shmdt(shmaddr: usize),
             (Msgget = 68) => handle_unsupported(),
             (Msgsnd = 69) => handle_unsupported(),
@@ -317,7 +320,7 @@ macro_rules! process_syscall_table_with_callback {
             (Getdents64 = 217) => do_getdents64(fd: FileDesc, buf: *mut u8, buf_size: usize),
             (SetTidAddress = 218) => do_set_tid_address(tidptr: *mut pid_t),
             (RestartSysCall = 219) => handle_unsupported(),
-            (Semtimedop = 220) => handle_unsupported(),
+            (Semtimedop = 220) => do_semtimedop(semid: i32, sops_ptr: *const sembuf_t, nsops: usize, timeout_ptr: *const timespec_t),
             (Fadvise64 = 221) => handle_unsupported(),
             (TimerCreate = 222) => handle_unsupported(),
             (TimerSettime = 223) => handle_unsupported(),
