@@ -51,10 +51,11 @@ impl<E: Event, F: EventFilter<E>> Notifier<E, F> {
         subscribers.retain(|subscriber| {
             if let Some(observer) = subscriber.observer.upgrade() {
                 if let Some(filter) = subscriber.filter.as_ref() {
-                    if filter.filter(event) {
-                        observer.on_event(event, &subscriber.metadata);
+                    if !filter.filter(event) {
+                        return true;
                     }
                 }
+                observer.on_event(event, &subscriber.metadata);
                 true
             } else {
                 false
