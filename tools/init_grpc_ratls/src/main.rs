@@ -21,7 +21,7 @@ extern "C" {
         server_addr: *const c_char, // grpc server address+port, such as "localhost:50051"
         config_json: *const c_char, // ratls handshake config json file
         name: *const c_char,        // secret name to be requested
-        secret_buf: *const u8,      // secret buffer provided by user
+        secret_buf: *mut u8,      // secret buffer provided by user
         buf_len: *mut u32,          // buffer size
     ) -> c_int;
 }
@@ -97,7 +97,7 @@ fn get_kms_keys(
                 kms_server.as_ptr(),
                 kms_config.as_ptr(),
                 key.as_ptr(),
-                buffer.as_ptr(),
+                buffer.as_mut_ptr(),
                 &mut buffer_len,
             )
         };

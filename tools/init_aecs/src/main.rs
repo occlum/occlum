@@ -125,7 +125,7 @@ fn get_kms_keys(
                 service.as_ptr(),
                 key.as_ptr(),
                 std::ptr::null(),
-                buffer.as_ptr(),
+                buffer.as_mut_ptr(),
                 &mut buffer_len,
             )
         };
