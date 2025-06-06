@@ -24,7 +24,7 @@ extern "C" {
         secret_service: *const c_char,
         secret_name: *const c_char,
         nonce: *const c_char,
-        secret_outbuf: *const u8,
+        secret_outbuf: *mut u8,
         secret_outbuf_len: *mut i32,
     ) -> c_int;
 }
@@ -200,7 +200,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     service.as_ptr(),
                     secret.as_ptr(),
                     std::ptr::null(),
-                    buffer.as_ptr(),
+                    buffer.as_mut_ptr(),
                     &mut buffer_len,
                 )
             };

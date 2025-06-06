@@ -151,7 +151,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     server_addr.as_ptr(),
                     config_json.as_ptr(),
                     secret.as_ptr(),
-                    buffer.as_ptr(),
+                    buffer.as_mut_ptr(),
                     &mut buffer_len,
                 )
             };
