@@ -4,5 +4,5 @@ grpcio>=1.34.0
 opencv-python>=4.4.0
 tensorflow==2.13
 tensorflow-serving-api==2.13
-protobuf==3.20.3
+protobuf==4.25.8
 numpy==1.22.1
