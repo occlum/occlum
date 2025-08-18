@@ -18,3 +18,10 @@ targets:
     copy: 
       - files:
         - ../hosts
+  # copy nss files
+  target: /opt/occlum/glibc/lib
+    copy: 
+      - from: /opt/occlum/glibc/lib
+        files: 
+          - libnss_files.so.2
+          - libnss_compat.so.2
