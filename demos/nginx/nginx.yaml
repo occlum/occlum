@@ -1,0 +1,33 @@
+includes:
+  - base.yaml
+targets:
+  - target: /bin
+    copy:
+      - files:
+        - /usr/local/nginx/sbin/nginx
+  - target: /usr/local/nginx/logs/
+    copy:
+      - files:
+        - /usr/local/nginx/logs/error.log
+  - target: /usr/local/nginx/conf/
+    copy:
+      - files:
+        - /usr/local/nginx/conf/nginx.conf
+        - /usr/local/nginx/conf/mime.types
+        - /usr/local/nginx/conf/nginx.conf.default
+        - /usr/local/nginx/conf/uwsgi_params.default
+        - /usr/local/nginx/conf/uwsgi_params
+        - /usr/local/nginx/conf/fastcgi.conf
+        - /usr/local/nginx/conf/mime.types.default
+  - target: /etc
+    copy:
+      - files:
+        - /etc/localtime
+        - /etc/nsswitch.conf
+        - /etc/passwd
+        - /etc/group
+  - target: /opt/occlum/glibc/etc
+    copy:
+      - files:
+        - /etc/localtime
+
