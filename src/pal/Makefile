@@ -55,6 +55,8 @@ endif
 endif
 
 LINK_FLAGS += -L$(PROJECT_DIR)/deps/io-uring/ocalls/target/release/ -lsgx_io_uring_ocalls
+LINK_FLAGS += -L$(PROJECT_DIR)/deps/sgx_aio/ocalls/target/release/ -lsgx_aio_ocalls
+
 ALL_BUILD_SUBDIRS := $(sort $(patsubst %/,%,$(dir $(LIBOCCLUM_PAL_SO_REAL) $(EDL_C_OBJS) $(C_OBJS) $(CXX_OBJS) $(VDSO_OBJS))))
 
 .PHONY: all format format-check clean
@@ -81,7 +83,9 @@ $(OBJ_DIR)/pal/$(SRC_OBJ)/Enclave_u.c: $(SGX_EDGER8R) ../Enclave.edl
 		--search-path $(SGX_SDK)/include \
 		--search-path $(RUST_SGX_SDK_DIR)/edl/ \
 		--search-path $(CRATES_DIR)/vdso-time/ocalls \
-		--search-path $(PROJECT_DIR)/deps/io-uring/ocalls
+		--search-path $(PROJECT_DIR)/deps/io-uring/ocalls \
+		--search-path $(PROJECT_DIR)/deps/sgx_aio/ocalls
+
 	@echo "GEN <= $@"
 
 $(OBJ_DIR)/pal/$(SRC_OBJ)/%.o: src/%.c

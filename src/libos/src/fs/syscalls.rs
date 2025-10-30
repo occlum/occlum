@@ -10,7 +10,28 @@ use super::time::{clockid_t, itimerspec_t, timespec_t, timeval_t, ClockId};
 use super::timer_file::{TimerCreationFlags, TimerSetFlags};
 use super::*;
 use crate::config::{user_rootfs_config, ConfigApp, ConfigMountFsType};
+use crate::fs::host_fd::HOST_FD_REGISTRY;
+use errno::try_libc;
+use sgx_aio::{io_cancel, io_destroy, io_getevents, io_setup, io_submit};
+use sgx_trts::libc;
 use util::mem_util::from_user;
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct Kiocb {
+    pub aio_data: libc::c_ulonglong,
+    pub aio_key: libc::c_uint,
+    pub aio_rw_flags: libc::c_int,
+    pub aio_lio_opcode: libc::c_ushort,
+    pub aio_reqprio: libc::c_short,
+    pub aio_fildes: libc::c_uint,
+    pub aio_buf: libc::c_ulonglong,
+    pub aio_nbytes: libc::c_ulonglong,
+    pub aio_offset: libc::c_longlong,
+    pub aio_reserved2: libc::c_ulonglong,
+    pub aio_flags: libc::c_uint,
+    pub aio_resfd: libc::c_uint,
+}
 
 #[allow(non_camel_case_types)]
 pub struct iovec_t {
@@ -874,4 +895,99 @@ fn do_utimes_wrapper(
         let fs_path = FsPath::new(&path, dirfd, false)?;
         file_ops::do_utimes_path(&fs_path, atime, mtime, flags)
     }
+}
+
+pub fn do_io_setup(nr_events: c_int, ctxpp: u64) -> Result<isize> {
+    let ret = unsafe { io_setup(nr_events, ctxpp as *mut *mut c_void) };
+    debug!(
+        "syscall: io_setup, nr_events: {:?}, ctxpp: {:?}, ret: {:?}",
+        nr_events, ctxpp, ret as isize
+    );
+    Ok(ret as isize)
+}
+
+pub fn do_io_destory(ctxp: u64) -> Result<isize> {
+    let ret = unsafe { io_destroy(ctxp as *const c_void) };
+    debug!("syscall: io_destory, ctxp: {:?}, ret: {:?}", ctxp, ret);
+    Ok(ret as isize)
+}
+
+pub fn do_io_submit(ctxp: u64, nr: c_long, iocbpp: u64) -> Result<isize> {
+    let iocbpp_ptr = iocbpp as *mut *mut Kiocb;
+    let mut original_fds = Vec::with_capacity(nr as usize);
+
+    for i in 0..nr {
+        let kiocb_ptr_ptr = unsafe { iocbpp_ptr.add(i as usize) };
+        from_user::check_ptr(kiocb_ptr_ptr)?;
+
+        let kiocb_ptr = unsafe { *kiocb_ptr_ptr };
+        from_user::check_ptr(kiocb_ptr)?;
+
+        let kiocb = unsafe { &mut *kiocb_ptr };
+
+        original_fds.push(kiocb.aio_fildes);
+
+        match HOST_FD_REGISTRY.lock().unwrap().get_map(kiocb.aio_fildes) {
+            Some(hnode_fd) => {
+                kiocb.aio_fildes = hnode_fd;
+            }
+            None => {
+                return_errno!(EBADF, "Invalid file descriptor");
+            }
+        }
+    }
+
+    let ret = unsafe { io_submit(ctxp as *const c_void, nr, iocbpp as *mut *mut c_void) };
+
+    for i in 0..nr {
+        let kiocb_ptr_ptr = unsafe { iocbpp_ptr.add(i as usize) };
+        let kiocb_ptr = unsafe { *kiocb_ptr_ptr };
+        let kiocb = unsafe { &mut *kiocb_ptr };
+        kiocb.aio_fildes = original_fds[i as usize];
+    }
+
+    debug!(
+        "syscall: io_submit, ctxp: {:?}, nr: {:?}, iocbpp: {:?}, sgx_ret: {:?}",
+        ctxp, nr, iocbpp, ret as isize
+    );
+
+    Ok(ret as isize)
+}
+
+pub fn do_io_getevents(
+    ctxp: u64,
+    min_nr: c_long,
+    nr: c_long,
+    events: u64,
+    timeout: u64,
+) -> Result<isize> {
+    let ret = unsafe {
+        io_getevents(
+            ctxp as *const c_void,
+            min_nr,
+            nr,
+            events as *const c_void,
+            timeout as *const c_void,
+        )
+    };
+    debug!(
+        "syscall: io_getevents, ctxp: {:?}, ret: {:?}",
+        ctxp, ret as isize
+    );
+    Ok(ret as isize)
+}
+
+pub fn do_io_cancel(ctxp: u64, iocbp: u64, events: u64) -> Result<isize> {
+    let ret = unsafe {
+        io_cancel(
+            ctxp as *const c_void,
+            iocbp as *const c_void,
+            events as *const c_void,
+        )
+    };
+    debug!(
+        "syscall: io_destory, ctxp: {:?}, iocbp: {:?}, events: {:?}, ret: {:?}",
+        ctxp, iocbp, events, ret
+    );
+    Ok(ret as isize)
 }

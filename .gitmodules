@@ -33,3 +33,6 @@
 [submodule "deps/ext2-rs"]
 	path = deps/ext2-rs
 	url = https://github.com/occlum/ext2-rs
+[submodule "deps/sgx_aio"]
+	path = deps/sgx_aio
+	url = https://github.com/occlum/sgx_aio.git

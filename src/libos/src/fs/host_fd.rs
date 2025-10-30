@@ -41,19 +41,21 @@ impl Drop for HostFd {
 }
 
 lazy_static! {
-    static ref HOST_FD_REGISTRY: SgxMutex<HostFdRegistry> =
+    pub static ref HOST_FD_REGISTRY: SgxMutex<HostFdRegistry> =
         { SgxMutex::new(HostFdRegistry::new()) };
 }
 
-/// A registery for host fds to ensure that they are unique.
-struct HostFdRegistry {
+/// A registery for host fds to ensure that they are unique.pub
+pub struct HostFdRegistry {
     set: HashSet<FileDesc>,
+    map: HashMap<FileDesc, FileDesc>,
 }
 
 impl HostFdRegistry {
     pub fn new() -> Self {
         Self {
             set: HashSet::new(),
+            map: HashMap::new(),
         }
     }
 
@@ -71,5 +73,17 @@ impl HostFdRegistry {
             return_errno!(ENOENT, "host fd has NOT been registered");
         }
         Ok(())
+    }
+
+    pub fn insert_map(&mut self, key: FileDesc, value: FileDesc) -> Option<FileDesc> {
+        self.map.insert(key, value)
+    }
+
+    pub fn remove_map(&mut self, key: FileDesc) -> Option<FileDesc> {
+        self.map.remove(&key)
+    }
+
+    pub fn get_map(&self, key: FileDesc) -> Option<FileDesc> {
+        self.map.get(&key).copied()
     }
 }
