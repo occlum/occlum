@@ -1,6 +1,14 @@
+use core::any::TypeId;
+
+use downcast_rs::Downcast;
+use rcore_fs_mountfs::MNode;
+
 use super::*;
 
-use crate::events::{Event, Notifier};
+use crate::{
+    events::{Event, Notifier},
+    fs::{host_fd::HOST_FD_REGISTRY, hostfs::HNode},
+};
 
 pub type FileDesc = u32;
 
@@ -80,15 +88,17 @@ impl FileTable {
             table.len() - 1
         };
 
-        table[min_free_fd as usize] = Some(FileTableEntry::new(file, close_on_spawn));
+        table[min_free_fd as usize] = Some(FileTableEntry::new(file.clone(), close_on_spawn));
         self.num_fds += 1;
+
+        self.try_insert_hostfd(&file, min_free_fd as FileDesc);
 
         min_free_fd as FileDesc
     }
 
     pub fn put_at(&mut self, fd: FileDesc, file: FileRef, close_on_spawn: bool) -> Option<FileRef> {
         let mut table = &mut self.table;
-        let mut table_entry = Some(FileTableEntry::new(file, close_on_spawn));
+        let mut table_entry = Some(FileTableEntry::new(file.clone(), close_on_spawn));
         if fd as usize >= table.len() {
             table.resize(fd as usize + 1, None);
         }
@@ -96,6 +106,8 @@ impl FileTable {
         if table_entry.is_none() {
             self.num_fds += 1;
         }
+
+        self.try_insert_hostfd(&file, fd);
         table_entry.map(|entry| entry.file.clone())
     }
 
@@ -150,6 +162,7 @@ impl FileTable {
             Some(del_table_entry) => {
                 self.num_fds -= 1;
                 self.broadcast_del(fd);
+                self.try_remove_hostfd(fd);
                 Ok(del_table_entry.file)
             }
             None => return_errno!(EBADF, "Invalid file descriptor"),
@@ -173,6 +186,7 @@ impl FileTable {
         self.num_fds = 0;
         for fd in deleted_fds {
             self.broadcast_del(fd);
+            self.try_remove_hostfd(fd);
         }
         deleted_files
     }
@@ -208,6 +222,41 @@ impl FileTable {
     fn broadcast_del(&self, fd: FileDesc) {
         let del_event = FileTableEvent::Del(fd);
         self.notifier.broadcast(&del_event);
+    }
+
+    fn try_insert_hostfd(&self, file: &FileRef, fd: FileDesc) {
+        let inode_file = if let Ok(f) = file.as_inode_file() {
+            f
+        } else {
+            debug!("try insert hostfd: not mnode");
+            return;
+        };
+
+        let mnode = if let Some(m) = inode_file.inode().downcast_ref::<MNode>() {
+            m
+        } else {
+            debug!("try insert hostfd: not mnode");
+            return;
+        };
+
+        let hnode = if let Some(h) = mnode.inode.downcast_ref::<HNode>() {
+            h
+        } else {
+            debug!("try insert hostfd: not hnode");
+            return;
+        };
+
+        if let Ok(host_fd) = hnode.host_fd() {
+            debug!("try insert hostfd: hnode fd {:?}", host_fd);
+            HOST_FD_REGISTRY
+                .lock()
+                .unwrap()
+                .insert_map(fd as u32, host_fd as _);
+        }
+    }
+
+    fn try_remove_hostfd(&self, fd: FileDesc) {
+        HOST_FD_REGISTRY.lock().unwrap().remove_map(fd);
     }
 }
 

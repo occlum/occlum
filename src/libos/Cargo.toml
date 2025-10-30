@@ -37,6 +37,7 @@ intrusive-collections = "0.9"
 modular-bitfield = "0.11.2"
 sworndisk-v2 = { path = "../../deps/mlsdisk/core", default-features = false, features = ["occlum"] }
 ext2-rs = { path = "../../deps/ext2-rs", default-features = false, features = ["sgx"] }
+sgx_aio = { path = "../../deps/sgx_aio", features = ["sgx"] }
 
 sgx-untrusted-alloc = { path = "./crates/sgx-untrusted-alloc", features = ["sgx"]}
 io-uring-callback = { path = "./crates/io-uring-callback", features = ["sgx"]}

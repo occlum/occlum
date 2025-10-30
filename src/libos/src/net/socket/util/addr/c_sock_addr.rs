@@ -115,6 +115,24 @@ impl CSockAddr for (libc::sockaddr_nl, usize) {
     }
 }
 
+impl CSockAddr for (libc::sockaddr_ll, usize) {
+    fn c_family(&self) -> libc::sa_family_t {
+        libc::AF_PACKET as _
+    }
+
+    fn c_addr(&self) -> &[u8] {
+        assert!(self.1 == size_of::<libc::sockaddr_ll>());
+
+        unsafe {
+            let addr_ptr = (&self.0 as *const _ as *const u8).add(size_of_val(&self.c_family()));
+            std::slice::from_raw_parts(
+                addr_ptr,
+                size_of::<libc::sockaddr_ll>() - size_of_val(&self.c_family()),
+            )
+        }
+    }
+}
+
 impl CSockAddr for (libc::sockaddr_storage, usize) {
     fn c_family(&self) -> libc::sa_family_t {
         self.0.ss_family

@@ -39,6 +39,7 @@ dependencies = [
  "serde 1.0.104",
  "serde_json",
  "sgx-untrusted-alloc",
+ "sgx_aio",
  "sgx_cov",
  "sgx_tcrypto",
  "sgx_trts",
@@ -1187,6 +1188,17 @@ dependencies = [
  "sgx_tstd",
  "sgx_types",
  "spin 0.7.1",
+]
+
+[[package]]
+name = "sgx_aio"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "sgx_libc",
+ "sgx_trts",
+ "sgx_tstd",
+ "sgx_types",
 ]
 
 [[package]]

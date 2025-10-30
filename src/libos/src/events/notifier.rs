@@ -47,21 +47,20 @@ impl<E: Event, F: EventFilter<E>> Notifier<E, F> {
 
     /// Broadcast an event to all registered observers.
     pub fn broadcast(&self, event: &E) {
-        let subscribers = self.subscribers.lock();
-        for subscriber in subscribers.iter() {
-            if let Some(filter) = subscriber.filter.as_ref() {
-                if !filter.filter(event) {
-                    continue;
+        let mut subscribers = self.subscribers.lock();
+        subscribers.retain(|subscriber| {
+            if let Some(observer) = subscriber.observer.upgrade() {
+                if let Some(filter) = subscriber.filter.as_ref() {
+                    if !filter.filter(event) {
+                        return true;
+                    }
                 }
+                observer.on_event(event, &subscriber.metadata);
+                true
+            } else {
+                false
             }
-            let observer = match subscriber.observer.upgrade() {
-                // TODO: should remove subscribers whose observers have been freed
-                None => return,
-                Some(observer) => observer,
-            };
-
-            observer.on_event(event, &subscriber.metadata);
-        }
+        });
     }
 }
 

@@ -1,9 +1,11 @@
 use crate::fs::fs_ops::fetch_host_statfs;
+use crate::fs::FileDesc;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use core::any::Any;
 use rcore_fs::vfs::*;
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::os::fd::AsRawFd;
 use std::os::unix::fs::{DirEntryExt, FileExt, FileTypeExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{SgxMutex as Mutex, SgxMutexGuard as MutexGuard};
@@ -324,6 +326,14 @@ impl HNode {
     /// Returns `true` if this HNode is for a directory.
     fn is_dir(&self) -> bool {
         self.type_ == FileType::Dir
+    }
+
+    pub fn host_fd(&self) -> Result<i32> {
+        let guard = self.file.lock().unwrap();
+        match guard.as_ref() {
+            Some(file) => Ok(file.as_raw_fd()),
+            None => Err(FsError::EntryNotFound),
+        }
     }
 }
 
