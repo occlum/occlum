@@ -46,6 +46,11 @@ impl<Sync: Synchronizer> WaiterQueue<Sync> {
         self.count.load(Ordering::Relaxed) == 0
     }
 
+    /// Returns the number of waiters in the queue.
+    pub fn len(&self) -> usize {
+        self.count.load(Ordering::Relaxed)
+    }
+
     /// Reset a waiter and enqueue it.
     ///
     /// It is allowed to enqueue a waiter more than once before it is dequeued.
